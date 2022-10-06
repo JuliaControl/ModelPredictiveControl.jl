@@ -1,10 +1,15 @@
+using Pkg, Revise
+Pkg.activate(".")
 
+using ModelPredictiveControl
 using DAQP
 using OSQP
 using JuMP, LinearAlgebra
 using MAT
 
-vars_ml = matread("matlab.mat")
+println(greet())
+
+vars_ml = matread("example/matlab.mat")
 
 H_qp = vars_ml["mMPC"]["Hqp"]
 f_qp = vec(vars_ml["fqp"])
@@ -18,6 +23,7 @@ b = vec(vars_ml["b"])
 Hc = Int(vars_ml["mMPC"]["Hc"])
 nu = Int(vars_ml["mMPC"]["nu"])
 n_var = (Hc*nu)+1
+
 
 model = Model(OSQP.Optimizer)
 
