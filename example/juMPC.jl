@@ -9,11 +9,23 @@ using MAT
 
 println(greet())
 
-vars_ml = matread("example/matlab.mat")
+vars_ml = matread("example/matlab.mat");
 
+A   = vars_ml["mMPC"]["A"];
+Bu  = vars_ml["mMPC"]["B"];
+Bd  = vars_ml["mMPC"]["Bd"];
+C   = vars_ml["mMPC"]["C"];
+Dd  = vars_ml["mMPC"]["Dd"];
+
+linModel1 = LinModel(A,Bu,C)
+linModel2 = LinModel(A,Bu,C,Bd);
+linModel3 = LinModel(A,Bu,C,Bd,[]);
+linModel4 = LinModel(A,Bu,C,Bd,Dd);
+ 
+#=
 H_qp = vars_ml["mMPC"]["Hqp"]
 f_qp = vec(vars_ml["fqp"])
-
+ 
 A = vars_ml["A"]
 b = vec(vars_ml["b"])
 
@@ -36,4 +48,5 @@ optimize!(model)
 julia_ΔUϵ = value.(ΔUϵ)
 
 ml_ΔUϵ = vec(vars_ml["deltaUhc"])
-julia_ΔUϵ - ml_ΔUϵ
+julia_ΔUϵ - ml_ΔUϵ 
+=#
