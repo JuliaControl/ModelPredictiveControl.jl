@@ -16,12 +16,29 @@ Bu  = vars_ml["mMPC"]["B"];
 Bd  = vars_ml["mMPC"]["Bd"];
 C   = vars_ml["mMPC"]["C"];
 Dd  = vars_ml["mMPC"]["Dd"];
+Ts  = vars_ml["mMPC"]["Ts"];
 
-linModel1 = LinModel(A,Bu,C)
-linModel2 = LinModel(A,Bu,C,Bd);
-linModel3 = LinModel(A,Bu,C,Bd,[]);
-linModel4 = LinModel(A,Bu,C,Bd,Dd);
- 
+linModel1 = LinModel(Ts,A,Bu,C)
+linModel2 = LinModel(Ts,A,Bu,C,Bd);
+linModel3 = LinModel(Ts,A,Bu,C,Bd,[]);
+linModel4 = LinModel(Ts,A,Bu,C,Bd,Dd);
+
+function MaSimulFunc(x,u_mat)
+    Nx = size(u_mat,2) + 1
+    x_mat = Matrix{Float64}(undef,4,Nx)
+    y_mat = Matrix{Float64}(undef,2,Nx)
+    x_mat[:,1] = x;
+    for i in 1:Nx-1
+        y_mat[:,i] = C*x_mat[:,i]
+        x_mat[:,i+1] =  A*x_mat[:,i]+ Bu*u_mat[:,i]
+    end
+    y_mat[:,Nx] = C*x_mat[:,Nx]
+    return (y_mat,x_mat)
+end
+
+nonLinModel1 = NonLinModel(Ts,4,2,2,0,MaSimulFunc)
+
+
 #=
 H_qp = vars_ml["mMPC"]["Hqp"]
 f_qp = vec(vars_ml["fqp"])
