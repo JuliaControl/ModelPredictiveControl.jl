@@ -2,5 +2,5 @@ using ModelPredictiveControl
 using Test
 
 @testset "ModelPredictiveControl.jl" begin
-    @test ModelPredictiveControl.greet() == "Hell World!"
+    @test ModelPredictiveControl.greet() == "Hello World!"
 end

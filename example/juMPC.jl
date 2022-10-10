@@ -1,4 +1,5 @@
-using Pkg, Revise
+using Pkg
+using Revise
 Pkg.activate(".")
 
 using ModelPredictiveControl
