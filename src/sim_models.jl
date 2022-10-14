@@ -17,6 +17,7 @@ struct LinModel <: SimModel
     Bd  ::Matrix{Float64}
     Dd  ::Matrix{Float64}
     function LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
+        Ts > 0 || error("Sampling time Ts must be positive")
         size(A)     == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu)    == (nx,nu) || error("Bu size must be $((nx,nu))")
         size(C)     == (ny,nx) || error("C size must be $((ny,nx))")
@@ -31,12 +32,12 @@ end
 
 function LinModel(
     G::StateSpace,
-    Ts;
+    Ts::Real;
     i_u::Vector{Int} = Int[],
     i_d::Vector{Int} = Int[],
-    u_op::Vector{Float64} = Float64[],
-    y_op::Vector{Float64} = Float64[],
-    d_op::Vector{Float64} = Float64[]
+    u_op::Vector{<:Real} = Float64[],
+    y_op::Vector{<:Real} = Float64[],
+    d_op::Vector{<:Real} = Float64[]
     )
     if isempty(i_u) && isempty(i_d)
         # assume that all inputs of G are manipulated inputs u :
@@ -70,7 +71,7 @@ function LinModel(
         Gd_dis = Gd     
     end
 
-    G_min = sminreal([Gu_dis Gd_dis]) # remove uncontrollabe and unobservable states
+    G_min = sminreal([Gu_dis Gd_dis]) # remove uncontrollable + unobservable states (if any)
 
     nx = size(G_min.A,1)
     nu = length(i_u)
@@ -94,7 +95,7 @@ function LinModel(
     return LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
 end
 
-function LinModel(G::TransferFunction,Ts;kwargs...)
+function LinModel(G::TransferFunction,Ts::Real;kwargs...)
     G_min = minreal(ss(G)) # remove useless states with pole-zero cancelation
     return LinModel(G_min,Ts;kwargs...)
 end

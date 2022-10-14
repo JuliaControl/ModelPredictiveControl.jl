@@ -11,21 +11,25 @@ using MAT
 
 println(greet())
 
-vars_ml = matread("example/matlab.mat");
+vars_ml = matread("example/matlab.mat")
 
-A   = vars_ml["mMPC"]["A"];
-Bu  = vars_ml["mMPC"]["B"];
-Bd  = vars_ml["mMPC"]["Bd"];
-C   = vars_ml["mMPC"]["C"];
-Dd  = vars_ml["mMPC"]["Dd"];
-Ts  = vars_ml["mMPC"]["Ts"];
+A   = vars_ml["mMPC"]["A"]
+Bu  = vars_ml["mMPC"]["B"]
+Bd  = vars_ml["mMPC"]["Bd"]
+C   = vars_ml["mMPC"]["C"]
+Dd  = vars_ml["mMPC"]["Dd"]
+Ts  = vars_ml["mMPC"]["Ts"]
 
 linModel1 = LinModel(ss(A,Bu,C,0,Ts),Ts)
 linModel2 = LinModel(ss(A,[Bu Bd],C,0,Ts),Ts,i_d=[3])
 G = [tf(1.90,[18.0,1]) tf(1.90,[18.0,1]) tf(1.90,[18.0,1]);
     tf(-0.74,[8.0,1]) tf(0.74,[8.0,1]) tf(-0.74,[8.0,1])]
 linModel3 = LinModel(G,Ts,i_d=[3])
-
+linModel4 = LinModel(
+    ss(A,[Bu Bd],C,0,Ts),Ts,i_d=[3],
+    u_op=[10,50],
+    d_op=[5],
+    y_op=[50,30])
 function MaSimulFunc(x,u_mat)
     Nx = size(u_mat,2) + 1
     x_mat = Matrix{Float64}(undef,4,Nx)
