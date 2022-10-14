@@ -6,6 +6,7 @@ using ModelPredictiveControl
 using DAQP
 using OSQP
 using JuMP, LinearAlgebra
+using ControlSystemsBase
 using MAT
 
 println(greet())
@@ -19,10 +20,8 @@ C   = vars_ml["mMPC"]["C"];
 Dd  = vars_ml["mMPC"]["Dd"];
 Ts  = vars_ml["mMPC"]["Ts"];
 
-linModel1 = LinModel(Ts,A,Bu,C)
-linModel2 = LinModel(Ts,A,Bu,C,Bd);
-linModel3 = LinModel(Ts,A,Bu,C,Bd,[]);
-linModel4 = LinModel(Ts,A,Bu,C,Bd,Dd);
+linModel1 = LinModel(ss(A,Bu,C,0,Ts),Ts)
+linModel2 = LinModel(ss(A,[Bu Bd],C,0,Ts),Ts,i_d=[3])
 
 function MaSimulFunc(x,u_mat)
     Nx = size(u_mat,2) + 1
