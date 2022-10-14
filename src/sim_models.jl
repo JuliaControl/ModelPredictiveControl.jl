@@ -70,7 +70,7 @@ function LinModel(
         Gd_dis = Gd     
     end
 
-    G_min = sminreal([Gu_dis Gd_dis]) # reduce state qty with pole-zero cancelation
+    G_min = sminreal([Gu_dis Gd_dis]) # remove uncontrollabe and unobservable states
 
     nx = size(G_min.A,1)
     nu = length(i_u)
@@ -94,29 +94,9 @@ function LinModel(
     return LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
 end
 
-function LinModel(Ts,A::Matrix,B::Matrix,C::Matrix)
-    nx = size(A,1)
-    nu = size(B,2)
-    nd = 0
-    ny = size(C,1)
-    u_op = zeros(nu,)
-    y_op = zeros(ny,)
-    d_op = zeros(nd,)
-    Bd = zeros(nx,nd)
-    Dd = zeros(ny,nd)
-    return LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,B,C,Bd,Dd)
-end 
-
-function LinModel(Ts,A::Matrix,Bu::Matrix,C::Matrix,Bd::Matrix,Dd=[])
-    nx = size(A,1)
-    nu = size(Bu,2)
-    nd = size(Bd,2)
-    ny = size(C,1)
-    u_op = zeros(nu,)
-    y_op = zeros(ny,)
-    d_op = zeros(nd,)
-    isempty(Dd) && (Dd = zeros(ny,nd));
-    return LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
+function LinModel(G::TransferFunction,Ts;kwargs...)
+    G_min = minreal(ss(G)) # remove useless states with pole-zero cancelation
+    return LinModel(G_min,Ts;kwargs...)
 end
 
 struct NonLinModel <: SimModel
