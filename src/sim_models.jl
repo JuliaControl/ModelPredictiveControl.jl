@@ -18,16 +18,19 @@ struct LinModel <: SimModel
     Dd  ::Matrix{Float64}
     function LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
         Ts > 0 || error("Sampling time Ts must be positive")
-        size(A)     == (nx,nx) || error("A size must be $((nx,nx))")
-        size(Bu)    == (nx,nu) || error("Bu size must be $((nx,nu))")
-        size(C)     == (ny,nx) || error("C size must be $((ny,nx))")
-        size(Bd)    == (nx,nd) || error("Bd size must be $((nx,nd))")
-        size(Dd)    == (ny,nd) || error("Dd size must be $((ny,nd))")
-        size(u_op)  == (nu,)   || error("u_op size must be $((nu,))")
-        size(y_op)  == (ny,)   || error("y_op size must be $((ny,))")
-        size(d_op)  == (nd,)   || error("d_op size must be $((nd,))")
+        validate_op!(u_op,y_op,d_op,nu,ny,nd)
+        size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
+        size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
+        size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
+        size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
+        size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
         return new(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
     end
+end
+
+function LinModel(G::TransferFunction,Ts::Real;kwargs...)
+    G_min = minreal(ss(G)) # remove useless states with pole-zero cancelation
+    return LinModel(G_min,Ts;kwargs...)
 end
 
 function LinModel(
@@ -53,7 +56,6 @@ function LinModel(
     if length(unique(i_d)) != length(i_d)
         error("Measured disturbances indices i_d should contains valid and unique indices")
     end
-
     Gu = G[:,i_u]
     Gd = G[:,i_d]
     if ~iszero(Gu.D)
@@ -70,34 +72,17 @@ function LinModel(
         Gu_dis = Gu
         Gd_dis = Gd     
     end
-
     G_min = sminreal([Gu_dis Gd_dis]) # remove uncontrollable + unobservable states (if any)
-
     nx = size(G_min.A,1)
     nu = length(i_u)
     ny = size(G_min,1)
     nd = length(i_d)
-
     A   = G_min.A
     Bu  = G_min.B[:,1:nu]
     Bd  = G_min.B[:,nu+1:end]
     C   = G_min.C;
-    Dd  = G_min.D[:,nu+1:end];
-
-    isempty(u_op) && (u_op = zeros(nu,))
-    isempty(y_op) && (y_op = zeros(ny,))
-    isempty(d_op) && (d_op = zeros(nd,))
-
-    size(u_op)  == (nu,)  || error("u_op size must be $((nu,))")
-    size(y_op)  == (ny,)  || error("y_op size must be $((ny,))")
-    size(d_op)  == (nd,)  || error("d_op size must be $((nd,))")
-    
+    Dd  = G_min.D[:,nu+1:end]
     return LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
-end
-
-function LinModel(G::TransferFunction,Ts::Real;kwargs...)
-    G_min = minreal(ss(G)) # remove useless states with pole-zero cancelation
-    return LinModel(G_min,Ts;kwargs...)
 end
 
 struct NonLinModel <: SimModel
@@ -133,7 +118,14 @@ function NonLinModel(Ts,nx,nu,ny,nd,SimulFunc)
     return NonLinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,SimulFunc)
 end
 
-function set_op!(model::SimModel,u_op,y_op,d_op)
+function validate_op!(u_op,y_op,d_op,nu,ny,nd)
+    isempty(u_op) && push!(u_op,0(1:nu)...)
+    isempty(y_op) && push!(y_op,0(1:ny)...)
+    isempty(d_op) && push!(d_op,0(1:nd)...)
+    size(u_op)  == (nu,) || error("u_op size must be $((nu,))")
+    size(y_op)  == (ny,) || error("y_op size must be $((ny,))")
+    size(d_op)  == (nd,) || error("d_op size must be $((nd,))")
+    return nothing
 end
 
 #=
