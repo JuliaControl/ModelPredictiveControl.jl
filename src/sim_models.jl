@@ -3,20 +3,20 @@ using ControlSystemsBase
 abstract type SimModel end
 
 struct LinModel <: SimModel
-    Ts  ::Float64
-    nx  ::Int
-    nu  ::Int
-    ny  ::Int
-    nd  ::Int
-    u_op::Vector{Float64}
-    y_op::Vector{Float64}
-    d_op::Vector{Float64}
     A   ::Matrix{Float64}
     Bu  ::Matrix{Float64}
     C   ::Matrix{Float64}
     Bd  ::Matrix{Float64}
     Dd  ::Matrix{Float64}
-    function LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
+    Ts  ::Float64
+    nu  ::Int
+    nx  ::Int
+    ny  ::Int
+    nd  ::Int
+    u_op::Vector{Float64}
+    y_op::Vector{Float64}
+    d_op::Vector{Float64}
+    function LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_op!(u_op,y_op,d_op,nu,ny,nd)
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
@@ -24,12 +24,12 @@ struct LinModel <: SimModel
         size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
         size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
         size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
-        return new(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
+        return new(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
     end
 end
 
 function LinModel(G::TransferFunction,Ts::Real;kwargs...)
-    G_min = minreal(ss(G)) # remove useless states with pole-zero cancelation
+    G_min = ss(minreal(G)) # remove useless states with pole-zero cancelation
     return LinModel(G_min,Ts;kwargs...)
 end
 
@@ -56,15 +56,15 @@ function LinModel(
     if length(unique(i_d)) != length(i_d)
         error("Measured disturbances indices i_d should contains valid and unique indices")
     end
-    Gu = G[:,i_u]
-    Gd = G[:,i_d]
+    Gu = sminreal(G[:,i_u])  # remove states associated to measured disturbances d
+    Gd = sminreal(G[:,i_d])  # remove states associated to manipulates inputs u
     if ~iszero(Gu.D)
         error("State matrix D must be 0 for columns associated to manipulated inputs u")
     end
     if iscontinuous(G)
-        # manipulated inputs : zero-order hold discretization
+        # manipulated inputs : zero-order hold discretization 
         Gu_dis = c2d(Gu,Ts,:zoh);
-        # measured disturbances : tustin discretization
+        # measured disturbances : tustin discretization (continous signals with ADCs)
         Gd_dis = c2d(Gd,Ts,:tustin)
     else
         #TODO: Resample discrete system instead of throwing an error
@@ -72,50 +72,44 @@ function LinModel(
         Gu_dis = Gu
         Gd_dis = Gd     
     end
-    G_min = sminreal([Gu_dis Gd_dis]) # remove uncontrollable + unobservable states (if any)
-    nx = size(G_min.A,1)
+    G_dis = [Gu_dis Gd_dis]
+    nx = size(G_dis.A,1)
     nu = length(i_u)
-    ny = size(G_min,1)
+    ny = size(G_dis,1)
     nd = length(i_d)
-    A   = G_min.A
-    Bu  = G_min.B[:,1:nu]
-    Bd  = G_min.B[:,nu+1:end]
-    C   = G_min.C;
-    Dd  = G_min.D[:,nu+1:end]
-    return LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
+    A   = G_dis.A
+    Bu  = G_dis.B[:,1:nu]
+    Bd  = G_dis.B[:,nu+1:end]
+    C   = G_dis.C;
+    Dd  = G_dis.D[:,nu+1:end]
+    return LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
 end
 
 struct NonLinModel <: SimModel
+    SimulFunc::Function
     Ts::Float64
-    nx  ::Int
-    nu  ::Int
-    ny  ::Int
-    nd  ::Int
+    nu::Int
+    nx::Int
+    ny::Int
+    nd::Int
     u_op::Vector{Float64}
     y_op::Vector{Float64}
     d_op::Vector{Float64}
-    SimulFunc::Function
-    function NonLinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,SimulFunc)
-        size(u_op)  == (nu,)  || error("u_op size must be $((nu,))")
-        size(y_op)  == (ny,)  || error("y_op size must be $((ny,))")
-        size(d_op)  == (nd,)  || error("d_op size must be $((nd,))")
-        return new(Ts,nx,nu,ny,nd,u_op,y_op,d_op,SimulFunc)
+    function NonLinModel(
+        SimulFunc::Function,
+        Ts::Real,
+        nu::Int,
+        nx::Int,
+        ny::Int,   
+        nd::Int = 0;
+        u_op::Vector{<:Real} = Float64[],
+        y_op::Vector{<:Real} = Float64[],
+        d_op::Vector{<:Real} = Float64[]
+        )
+        Ts > 0 || error("Sampling time Ts must be positive")
+        validate_op!(u_op,y_op,d_op,nu,ny,nd)
+        return new(SimulFunc,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
     end
-end
-
-function NonLinModel(Ts,nx,nu,ny,SimulFunc)
-    nd = 0
-    u_op = zeros(nu,)
-    y_op = zeros(ny,)
-    d_op = zeros(nd,)
-    return NonLinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,SimulFunc)
-end
-
-function NonLinModel(Ts,nx,nu,ny,nd,SimulFunc)
-    u_op = zeros(nu,)
-    y_op = zeros(ny,)
-    d_op = zeros(nd,)
-    return NonLinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,SimulFunc)
 end
 
 function validate_op!(u_op,y_op,d_op,nu,ny,nd)
@@ -131,8 +125,8 @@ end
 function Base.show(io::IO,model::SimModel)
     println(    "Discrete-time $(typestr(model)) model with "*
                 "a sample time Ts = $(model.Ts) s and:")
-    println(    "- $(model.nx) states x")
     println(    "- $(model.nu) manipulated inputs u")
+    println(    "- $(model.nx) states x")
     println(    "- $(model.ny) outputs y")
     print(      "- $(model.nd) measured disturbances d") 
 end

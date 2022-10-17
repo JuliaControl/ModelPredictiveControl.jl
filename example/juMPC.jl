@@ -9,6 +9,7 @@ using JuMP, LinearAlgebra
 using ControlSystemsBase
 using MAT
 
+
 println(greet())
 
 vars_ml = matread("example/matlab.mat")
@@ -17,19 +18,22 @@ A   = vars_ml["mMPC"]["A"]
 Bu  = vars_ml["mMPC"]["B"]
 Bd  = vars_ml["mMPC"]["Bd"]
 C   = vars_ml["mMPC"]["C"]
+Du  = zeros(size(C,1),size(Bu,2))
 Dd  = vars_ml["mMPC"]["Dd"]
 Ts  = vars_ml["mMPC"]["Ts"]
 
 linModel1 = LinModel(ss(A,Bu,C,0,Ts),Ts)
-linModel2 = LinModel(ss(A,[Bu Bd],C,0,Ts),Ts,i_d=[3])
+linModel2 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3])
 G = [tf(1.90,[18.0,1]) tf(1.90,[18.0,1]) tf(1.90,[18.0,1]);
     tf(-0.74,[8.0,1]) tf(0.74,[8.0,1]) tf(-0.74,[8.0,1])]
 linModel3 = LinModel(G,Ts,i_d=[3])
 linModel4 = LinModel(
-    ss(A,[Bu Bd],C,0,Ts),Ts,i_d=[3],
+    ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3],
     u_op=[10,50],
     d_op=[5],
     y_op=[50,30])
+
+
 function MaSimulFunc(x,u_mat)
     Nx = size(u_mat,2) + 1
     x_mat = Matrix{Float64}(undef,4,Nx)
@@ -43,12 +47,13 @@ function MaSimulFunc(x,u_mat)
     return (y_mat,x_mat)
 end
 
-nonLinModel1 = NonLinModel(Ts,4,2,2,0,MaSimulFunc)
+nonLinModel1 = NonLinModel(MaSimulFunc,Ts,2,4,2)
+nonLinModel2 = NonLinModel(MaSimulFunc,Ts,2,4,2,0)
+nonLinModel3 = NonLinModel(MaSimulFunc,Ts,2,4,2,u_op=[10,50],y_op=[50,30])
 
 
 
-
-#=
+#=([
 H_qp = vars_ml["mMPC"]["Hqp"]
 f_qp = vec(vars_ml["fqp"])
  
