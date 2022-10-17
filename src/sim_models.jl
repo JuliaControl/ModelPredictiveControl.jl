@@ -85,17 +85,6 @@ function LinModel(
     return LinModel(Ts,nx,nu,ny,nd,u_op,y_op,d_op,A,Bu,C,Bd,Dd)
 end
 
-function Base.show(io::IO,model::SimModel)
-    println(    "Discrete-time $(typestr(model)) model with "*
-                "a sample time Ts = $(model.Ts) s and:")
-    println(    "- $(model.nx) states x")
-    println(    "- $(model.nu) manipulated inputs u")
-    println(    "- $(model.ny) outputs y")
-    print(      "- $(model.nd) measured disturbances d") 
-end
-typestr(model::LinModel) = "linear"
-typestr(model::NonLinModel) = "nonlinear"
-
 struct NonLinModel <: SimModel
     Ts::Float64
     nx  ::Int
@@ -138,6 +127,17 @@ function validate_op!(u_op,y_op,d_op,nu,ny,nd)
     size(d_op)  == (nd,) || error("d_op size must be $((nd,))")
     return nothing
 end
+
+function Base.show(io::IO,model::SimModel)
+    println(    "Discrete-time $(typestr(model)) model with "*
+                "a sample time Ts = $(model.Ts) s and:")
+    println(    "- $(model.nx) states x")
+    println(    "- $(model.nu) manipulated inputs u")
+    println(    "- $(model.ny) outputs y")
+    print(      "- $(model.nd) measured disturbances d") 
+end
+typestr(model::LinModel) = "linear"
+typestr(model::NonLinModel) = "nonlinear"
 
 #=
 function update_x(mMPC,x,u,d)
