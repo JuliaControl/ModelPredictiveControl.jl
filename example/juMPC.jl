@@ -34,24 +34,15 @@ linModel4 = LinModel(
     y_op=[50,30])
 
 
-function MaSimulFunc(x,u_mat)
-    Nx = size(u_mat,2) + 1
-    x_mat = Matrix{Float64}(undef,4,Nx)
-    y_mat = Matrix{Float64}(undef,2,Nx)
-    x_mat[:,1] = x;
-    for i in 1:Nx-1
-        y_mat[:,i] = C*x_mat[:,i]
-        x_mat[:,i+1] =  A*x_mat[:,i]+ Bu*u_mat[:,i]
-    end
-    y_mat[:,Nx] = C*x_mat[:,Nx]
-    return (y_mat,x_mat)
-end
-
-nonLinModel1 = NonLinModel(MaSimulFunc,Ts,2,4,2)
-nonLinModel2 = NonLinModel(MaSimulFunc,Ts,2,4,2,0)
-nonLinModel3 = NonLinModel(MaSimulFunc,Ts,2,4,2,u_op=[10,50],y_op=[50,30])
+f(x::Vector{ComplexF64},u::Vector{Float64}) = A*x + B*u
+h(x::Vector{ComplexF64}) = C*x
 
 
+nonLinModel1 = NonLinModel(f,h,Ts,2,4,2)
+
+
+#TODO: trouver un moyen d'utiliser hasmethod avec simulfunc pour s'assurer que
+# les arguments d'entrées sont O.K.
 
 #=([
 H_qp = vars_ml["mMPC"]["Hqp"]

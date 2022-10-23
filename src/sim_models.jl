@@ -28,11 +28,24 @@ struct LinModel <: SimModel
     end
 end
 
-function LinModel(G::TransferFunction,Ts::Real;kwargs...)
+# TODO: Continuer la docstring (jula-repl ou jldoctest ?)
+"""
+    LinModel(G, Ts; <keyword arguments>)
+
+Convert TransferFunction `G` to StateSpace and construct a LinModel.
+
+# Examples
+```julia-repl
+julia> bar([1, 2], [1, 2])
+1
+```
+"""
+function LinModel(G::TransferFunction, Ts::Real; kwargs...)
     G_min = ss(minreal(G)) # remove useless states with pole-zero cancelation
     return LinModel(G_min,Ts;kwargs...)
 end
 
+"LinModel constructor based on StateSpace type"
 function LinModel(
     G::StateSpace,
     Ts::Real;
@@ -86,7 +99,8 @@ function LinModel(
 end
 
 struct NonLinModel <: SimModel
-    SimulFunc::Function
+    f::Function
+    h::Function
     Ts::Float64
     nu::Int
     nx::Int
@@ -96,7 +110,8 @@ struct NonLinModel <: SimModel
     y_op::Vector{Float64}
     d_op::Vector{Float64}
     function NonLinModel(
-        SimulFunc::Function,
+        f::Function,
+        h::Function,
         Ts::Real,
         nu::Int,
         nx::Int,
@@ -106,13 +121,47 @@ struct NonLinModel <: SimModel
         y_op::Vector{<:Real} = Float64[],
         d_op::Vector{<:Real} = Float64[]
         )
+        if nd == 0
+            fargsvalid1 = hasmethod(f,Tuple{Vector{Float64}, Vector{Float64}})
+            fargsvalid2 = hasmethod(f,Tuple{Vector{ComplexF64}, Vector{Float64}})
+            if ~fargsvalid1 && ~fargsvalid2
+                error("f function has no method of type "*
+                      "f(x::Vector{Float64}, u::Vector{Float64}) or "*
+                      "f(x::Vector{ComplexF64}, u::Vector{Float64})")
+            end
+            hargsvalid1 = hasmethod(h,Tuple{Vector{Float64}})
+            hargsvalid2 = hasmethod(h,Tuple{Vector{ComplexF64}})
+            if ~hargsvalid1 && ~hargsvalid2
+                error("h function has no method of type "*
+                      "h(x::Vector{Float64}) or h(x::Vector{ComplexF64})")
+            end
+        else
+            fargsvalid1 = hasmethod(f,
+                Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
+            )
+            fargsvalid2 = hasmethod(f,
+                Tuple{Vector{ComplexF64}, Vector{Float64}, Vector{Float64}}
+            )
+            if ~fargsvalid1 && ~fargsvalid2
+                error("f function has no method of type "*
+                      "f(x::Vector{Float64}, u::Vector{Float64}, d::Vector{Float64}) or "*
+                      "f(x::Vector{ComplexF64}, u::Vector{Float64}, d::Vector{Float64})")
+            end
+            hargsvalid1 = hasmethod(h,Tuple{Vector{Float64}, Vector{Float64}})
+            hargsvalid2 = hasmethod(h,Tuple{Vector{ComplexF64}, Vector{Float64}})
+            if ~hargsvalid1 && ~hargsvalid2
+                error("h function has no method of type "*
+                      "h(x::Vector{Float64}, d::Vector{Float64}) or "*
+                      "h(x::Vector{ComplexF64}, d::Vector{Float64})")
+            end
+        end
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_op!(u_op,y_op,d_op,nu,ny,nd)
-        return new(SimulFunc,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
+        return new(f,h,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
     end
 end
 
-function validate_op!(u_op,y_op,d_op,nu,ny,nd)
+function validate_op!(u_op, y_op, d_op, nu, ny, nd)
     isempty(u_op) && push!(u_op,0(1:nu)...)
     isempty(y_op) && push!(y_op,0(1:ny)...)
     isempty(d_op) && push!(d_op,0(1:nd)...)
@@ -122,7 +171,7 @@ function validate_op!(u_op,y_op,d_op,nu,ny,nd)
     return nothing
 end
 
-function Base.show(io::IO,model::SimModel)
+function Base.show(io::IO, model::SimModel)
     println(    "Discrete-time $(typestr(model)) model with "*
                 "a sample time Ts = $(model.Ts) s and:")
     println(    "- $(model.nu) manipulated inputs u")
