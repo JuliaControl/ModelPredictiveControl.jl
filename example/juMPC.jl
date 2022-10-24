@@ -34,15 +34,16 @@ linModel4 = LinModel(
     y_op=[50,30])
 
 
-f(x::Vector{ComplexF64},u::Vector{Float64}) = A*x + B*u
-h(x::Vector{ComplexF64}) = C*x
+f(x,u) = A*x + Bu*u
+h(x) = C*x
+f2(x,u,d) = A*x + Bu*u + Bd*d
+h2(x,_) = C*x
 
 
 nonLinModel1 = NonLinModel(f,h,Ts,2,4,2)
+nonLinModel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
 
 
-#TODO: trouver un moyen d'utiliser hasmethod avec simulfunc pour s'assurer que
-# les arguments d'entrées sont O.K.
 
 #=([
 H_qp = vars_ml["mMPC"]["Hqp"]

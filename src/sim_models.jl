@@ -8,6 +8,8 @@ struct LinModel <: SimModel
     C   ::Matrix{Float64}
     Bd  ::Matrix{Float64}
     Dd  ::Matrix{Float64}
+    f   ::Function
+    h   ::Function
     Ts  ::Float64
     nu  ::Int
     nx  ::Int
@@ -17,14 +19,15 @@ struct LinModel <: SimModel
     y_op::Vector{Float64}
     d_op::Vector{Float64}
     function LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
-        Ts > 0 || error("Sampling time Ts must be positive")
-        validate_op!(u_op,y_op,d_op,nu,ny,nd)
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
         size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
         size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
         size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
-        return new(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
+        f(x,u,d) = A*x + Bu*u + Bd*d
+        h(x,d) = C*x + Dd*d
+        validate_op!(u_op,y_op,d_op,nu,ny,nd)
+        return new(A,Bu,C,Bd,Dd,f,h,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
     end
 end
 
@@ -121,47 +124,57 @@ struct NonLinModel <: SimModel
         y_op::Vector{<:Real} = Float64[],
         d_op::Vector{<:Real} = Float64[]
         )
-        if nd == 0
-            fargsvalid1 = hasmethod(f,Tuple{Vector{Float64}, Vector{Float64}})
-            fargsvalid2 = hasmethod(f,Tuple{Vector{ComplexF64}, Vector{Float64}})
-            if ~fargsvalid1 && ~fargsvalid2
-                error("f function has no method of type "*
-                      "f(x::Vector{Float64}, u::Vector{Float64}) or "*
-                      "f(x::Vector{ComplexF64}, u::Vector{Float64})")
-            end
-            hargsvalid1 = hasmethod(h,Tuple{Vector{Float64}})
-            hargsvalid2 = hasmethod(h,Tuple{Vector{ComplexF64}})
-            if ~hargsvalid1 && ~hargsvalid2
-                error("h function has no method of type "*
-                      "h(x::Vector{Float64}) or h(x::Vector{ComplexF64})")
-            end
-        else
-            fargsvalid1 = hasmethod(f,
-                Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
-            )
-            fargsvalid2 = hasmethod(f,
-                Tuple{Vector{ComplexF64}, Vector{Float64}, Vector{Float64}}
-            )
-            if ~fargsvalid1 && ~fargsvalid2
-                error("f function has no method of type "*
-                      "f(x::Vector{Float64}, u::Vector{Float64}, d::Vector{Float64}) or "*
-                      "f(x::Vector{ComplexF64}, u::Vector{Float64}, d::Vector{Float64})")
-            end
-            hargsvalid1 = hasmethod(h,Tuple{Vector{Float64}, Vector{Float64}})
-            hargsvalid2 = hasmethod(h,Tuple{Vector{ComplexF64}, Vector{Float64}})
-            if ~hargsvalid1 && ~hargsvalid2
-                error("h function has no method of type "*
-                      "h(x::Vector{Float64}, d::Vector{Float64}) or "*
-                      "h(x::Vector{ComplexF64}, d::Vector{Float64})")
-            end
-        end
-        Ts > 0 || error("Sampling time Ts must be positive")
+        f,h = validate_fcts(f,h,Ts,nd)
         validate_op!(u_op,y_op,d_op,nu,ny,nd)
         return new(f,h,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
     end
 end
 
-function validate_op!(u_op, y_op, d_op, nu, ny, nd)
+function validate_fcts(f::Function, h::Function, Ts::Float64, nd::Int)
+    Ts > 0 || error("Sampling time Ts must be positive")
+    if nd == 0
+        fargsvalid1 = hasmethod(f,Tuple{Vector{Float64}, Vector{Float64}})
+        fargsvalid2 = hasmethod(f,Tuple{Vector{ComplexF64}, Vector{Float64}})
+        if ~fargsvalid1 && ~fargsvalid2
+            error("state function has no method of type "*
+                "f(x::Vector{Float64}, u::Vector{Float64}) or "*
+                "f(x::Vector{ComplexF64}, u::Vector{Float64})")
+        end
+        hargsvalid1 = hasmethod(h,Tuple{Vector{Float64}})
+        hargsvalid2 = hasmethod(h,Tuple{Vector{ComplexF64}})
+        if ~hargsvalid1 && ~hargsvalid2
+            error("output function has no method of type "*
+                "h(x::Vector{Float64}) or h(x::Vector{ComplexF64})")
+        end
+        # accept a final "d" argument in f and h functions, but ignore it :
+        f_d = (x,u,_) -> f(x,u) 
+        h_d = (x,_) -> h(x)
+    else
+        fargsvalid1 = hasmethod(f,
+            Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
+        )
+        fargsvalid2 = hasmethod(f,
+            Tuple{Vector{ComplexF64}, Vector{Float64}, Vector{Float64}}
+        )
+        if ~fargsvalid1 && ~fargsvalid2
+            error("state function has no method of type "*
+                "f(x::Vector{Float64}, u::Vector{Float64}, d::Vector{Float64}) or "*
+                "f(x::Vector{ComplexF64}, u::Vector{Float64}, d::Vector{Float64})")
+        end
+        hargsvalid1 = hasmethod(h,Tuple{Vector{Float64}, Vector{Float64}})
+        hargsvalid2 = hasmethod(h,Tuple{Vector{ComplexF64}, Vector{Float64}})
+        if ~hargsvalid1 && ~hargsvalid2
+            error("output function has no method of type "*
+                "h(x::Vector{Float64}, d::Vector{Float64}) or "*
+                "h(x::Vector{ComplexF64}, d::Vector{Float64})")
+        end
+        f_d = f
+        h_d = h
+    end
+    return f_d, h_d
+end
+
+function validate_op!(u_op, y_op, d_op, nu::Int, ny::Int, nd::Int)
     isempty(u_op) && push!(u_op,0(1:nu)...)
     isempty(y_op) && push!(y_op,0(1:ny)...)
     isempty(d_op) && push!(d_op,0(1:nd)...)
