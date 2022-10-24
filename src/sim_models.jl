@@ -176,9 +176,9 @@ function validate_fcts(f::Function, h::Function, Ts::Float64, nd::Int)
 end
 
 function validate_op!(u_op, y_op, d_op, nu::Int, ny::Int, nd::Int)
-    isempty(u_op) && push!(u_op,0(1:nu)...)
-    isempty(y_op) && push!(y_op,0(1:ny)...)
-    isempty(d_op) && push!(d_op,0(1:nd)...)
+    isempty(u_op) && append!(u_op,zeros(nu,))
+    isempty(y_op) && append!(y_op,zeros(ny,))
+    isempty(d_op) && append!(d_op,zeros(nd,))
     size(u_op)  == (nu,) || error("u_op size must be $((nu,))")
     size(y_op)  == (ny,) || error("y_op size must be $((ny,))")
     size(d_op)  == (nd,) || error("d_op size must be $((nd,))")
