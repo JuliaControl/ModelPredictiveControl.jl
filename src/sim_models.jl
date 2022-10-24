@@ -24,6 +24,7 @@ struct LinModel <: SimModel
         size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
         size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
         size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
+        Ts > 0 || error("Sampling time Ts must be positive")
         f(x,u,d) = A*x + Bu*u + Bd*d
         h(x,d) = C*x + Dd*d
         validate_op!(u_op,y_op,d_op,nu,ny,nd)
@@ -44,7 +45,7 @@ julia> bar([1, 2], [1, 2])
 ```
 """
 function LinModel(G::TransferFunction, Ts::Real; kwargs...)
-    G_min = ss(minreal(G)) # remove useless states with pole-zero cancelation
+    G_min = minreal(ss(G)) # remove useless states with pole-zero cancelation
     return LinModel(G_min,Ts;kwargs...)
 end
 
@@ -52,8 +53,8 @@ end
 function LinModel(
     G::StateSpace,
     Ts::Real;
-    i_u::Vector{Int} = Int[],
-    i_d::Vector{Int} = Int[],
+    i_u::Union{UnitRange{Int},Vector{Int}} = Int[],
+    i_d::Union{UnitRange{Int},Vector{Int}} = Int[],
     u_op::Vector{<:Real} = Float64[],
     y_op::Vector{<:Real} = Float64[],
     d_op::Vector{<:Real} = Float64[]
@@ -124,6 +125,7 @@ struct NonLinModel <: SimModel
         y_op::Vector{<:Real} = Float64[],
         d_op::Vector{<:Real} = Float64[]
         )
+        Ts > 0 || error("Sampling time Ts must be positive")
         f,h = validate_fcts(f,h,Ts,nd)
         validate_op!(u_op,y_op,d_op,nu,ny,nd)
         return new(f,h,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
@@ -131,7 +133,6 @@ struct NonLinModel <: SimModel
 end
 
 function validate_fcts(f::Function, h::Function, Ts::Float64, nd::Int)
-    Ts > 0 || error("Sampling time Ts must be positive")
     if nd == 0
         fargsvalid1 = hasmethod(f,Tuple{Vector{Float64}, Vector{Float64}})
         fargsvalid2 = hasmethod(f,Tuple{Vector{ComplexF64}, Vector{Float64}})
