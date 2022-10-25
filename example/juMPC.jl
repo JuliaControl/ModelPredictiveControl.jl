@@ -9,9 +9,6 @@ using JuMP, LinearAlgebra
 using ControlSystemsBase
 using MAT
 
-
-println(greet())
-
 vars_ml = matread("example/matlab.mat")
 
 A   = vars_ml["mMPC"]["A"]
@@ -34,8 +31,8 @@ linModel4 = LinModel(
     y_op=[50,30])
 linModel5 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_u=1:2)
 
-f(x,u) = A*x + Bu*u
-h(x) = C*x
+f(x,u,_) = A*x + Bu*u
+h(x,_) = C*x
 f2(x,u,d) = A*x + Bu*u + Bd*d
 h2(x,_) = C*x
 

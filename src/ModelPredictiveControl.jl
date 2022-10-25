@@ -3,9 +3,7 @@ module ModelPredictiveControl
 using JuMP
 using LinearAlgebra
 
-export greet, LinModel, NonLinModel
-
-greet() = "Hello World!"
+export LinModel, NonLinModel
 
 include("sim_models.jl")
 

@@ -3,7 +3,9 @@ using Test
 using ModelPredictiveControl
 
 @testset "ModelPredictiveControl.jl" begin
-    @test ModelPredictiveControl.greet() == "Hello World!"
+    
+    # === LinModel Construction tests ===
+
     Ts = 4.0
     G = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
             tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]        
@@ -53,6 +55,29 @@ using ModelPredictiveControl
     @test_throws ErrorException LinModel(G,Ts,y_op=[0,0,0,0,0])
     Gss.D .= 1
     @test_throws ErrorException LinModel(Gss,Ts)
- 
+
+    # === NonLinModel Construction tests ===
+
+    f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
+    h(x,_)   = linmodel1.C*x
+    nonlinmodel1 = NonLinModel(f,h,Ts,2,2,2)
+    @test nonlinmodel1.nx == 2
+    @test nonlinmodel1.nu == 2
+    @test nonlinmodel1.nd == 0
+    @test nonlinmodel1.ny == 2
+    @test nonlinmodel1.f([0,0],[0,0],[1]) ≈ zeros(2,)
+    @test nonlinmodel1.h([0,0],[1]) ≈ zeros(2,)
+
+    f2(x,u,d) = linmodel3.A*x + linmodel3.Bu*u + linmodel3.Bd*d
+    h2(x,_)   = linmodel3.C*x 
+    nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
+
+    @test nonlinmodel2.nx == 4
+    @test nonlinmodel2.nu == 2
+    @test nonlinmodel2.nd == 1
+    @test nonlinmodel2.ny == 2
+    @test nonlinmodel2.f([0,0,0,0],[0,0],[0]) ≈ zeros(4,)
+    @test nonlinmodel2.h([0,0,0,0],[0]) ≈ zeros(2,)
+
 
 end
