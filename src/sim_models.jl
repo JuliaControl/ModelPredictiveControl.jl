@@ -1,5 +1,3 @@
-using ControlSystemsBase
-
 abstract type SimModel end
 
 struct LinModel <: SimModel
@@ -36,19 +34,19 @@ end
 IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
 
 """
-    LinModel(G::StateSpace, Ts::Real; kwargs...)
+    LinModel(sys::StateSpace, Ts::Real; kwargs...)
 
-Construct a LinModel from state-state model `G`.
+Construct a LinModel from state-state model `sys`.
 
-If `G` is continuous, it is dicretized using `c2d` and `:zoh` for manipulated inputs, 
+If `sys` is continuous, it is dicretized using `c2d` and `:zoh` for manipulated inputs, 
 and `:tustin`, for measured disturbances.
 
 # Arguments
-- `G::StateSpace`: state-space model including manipulated inputs and measured disturbances
+- `sys::StateSpace`: state-space model incl. manipulated inputs and measured disturbances
 - `Ts::Real`: model sampling time in second
-- `i_u::IntRangeOrVector = 1:size(G,2)`: index of `G` inputs that are 
+- `i_u::IntRangeOrVector = 1:size(sys,2)`: index of `sys` inputs that are 
     manipulated
-- `i_d::IntRangeOrVector = Int[]`: index of `G` inputs that are measured
+- `i_d::IntRangeOrVector = Int[]`: index of `sys` inputs that are measured
     disturbances
 - `u_op::Vector{<:Real} = Float64[]`: manipulated input operating points
 - `y_op::Vector{<:Real} = Float64[]`: outputs operating points
@@ -56,13 +54,18 @@ and `:tustin`, for measured disturbances.
 
 # Examples
 ```jldoctest
-julia> LinModel(tf(3, [10,1]), 2)
+julia> LinModel(tf(3, [10, 1]), 2, u_op=[50], y_op=[20])
+Discrete-time linear model with a sample time Ts = 2.0 s and:
+- 1 manipulated inputs u
+- 1 states x
+- 1 outputs y
+- 0 measured disturbances d
 ```
 """
 function LinModel(
-    G::StateSpace,
+    sys::StateSpace,
     Ts::Real;
-    i_u::IntRangeOrVector = 1:size(G,2),
+    i_u::IntRangeOrVector = 1:size(sys,2),
     i_d::IntRangeOrVector = Int[],
     u_op::Vector{<:Real} = Float64[],
     y_op::Vector{<:Real} = Float64[],
@@ -79,43 +82,43 @@ function LinModel(
     if length(unique(i_d)) ≠ length(i_d)
         error("Measured disturbances indices i_d should contains valid and unique indices")
     end
-    Gu = sminreal(G[:,i_u])  # remove states associated to measured disturbances d
-    Gd = sminreal(G[:,i_d])  # remove states associated to manipulates inputs u
-    if ~iszero(Gu.D)
+    sysu = sminreal(sys[:,i_u])  # remove states associated to measured disturbances d
+    sysd = sminreal(sys[:,i_d])  # remove states associated to manipulates inputs u
+    if ~iszero(sysu.D)
         error("State matrix D must be 0 for columns associated to manipulated inputs u")
     end
-    if iscontinuous(G)
+    if iscontinuous(sys)
         # manipulated inputs : zero-order hold discretization 
-        Gu_dis = c2d(Gu,Ts,:zoh);
+        sysu_dis = c2d(sysu,Ts,:zoh);
         # measured disturbances : tustin discretization (continous signals with ADCs)
-        Gd_dis = c2d(Gd,Ts,:tustin)
+        sysd_dis = c2d(sysd,Ts,:tustin)
     else
         #TODO: Resample discrete system instead of throwing an error
-        G.Ts == Ts || error("Sample time Ts must be identical to model.Ts")
-        Gu_dis = Gu
-        Gd_dis = Gd     
+        sys.Ts == Ts || error("Sample time Ts must be identical to model.Ts")
+        sysu_dis = sysu
+        sysd_dis = sysd     
     end
-    G_dis = [Gu_dis Gd_dis]
-    nx = size(G_dis.A,1)
+    sys_dis = [sysu_dis sysd_dis]
+    nx = size(sys_dis.A,1)
     nu = length(i_u)
-    ny = size(G_dis,1)
+    ny = size(sys_dis,1)
     nd = length(i_d)
-    A   = G_dis.A
-    Bu  = G_dis.B[:,1:nu]
-    Bd  = G_dis.B[:,nu+1:end]
-    C   = G_dis.C;
-    Dd  = G_dis.D[:,nu+1:end]
+    A   = sys_dis.A
+    Bu  = sys_dis.B[:,1:nu]
+    Bd  = sys_dis.B[:,nu+1:end]
+    C   = sys_dis.C;
+    Dd  = sys_dis.D[:,nu+1:end]
     return LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
 end
 
 """
-    LinModel(G::TransferFunction, Ts::Real; kwargs...)
+    LinModel(sys::TransferFunction, Ts::Real; kwargs...)
 
-Convert to minimal realization state-space when `G` is a transfer function.
+Convert to minimal realization state-space when `sys` is a transfer function.
 """
-function LinModel(G::TransferFunction, Ts::Real; kwargs...)
-    G_min = minreal(ss(G)) # remove useless states with pole-zero cancelation
-    return LinModel(G_min,Ts;kwargs...)
+function LinModel(sys::TransferFunction, Ts::Real; kwargs...)
+    sys_min = minreal(ss(sys)) # remove useless states with pole-zero cancelation
+    return LinModel(sys_min,Ts;kwargs...)
 end
 
 struct NonLinModel <: SimModel

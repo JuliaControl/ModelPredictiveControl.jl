@@ -7,11 +7,11 @@ using ModelPredictiveControl
     # === LinModel Construction tests ===
 
     Ts = 4.0
-    G = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
+    sys = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
             tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]        
     
-    linmodel1 = LinModel(G, Ts, i_u=1:2)
-    Gss = c2d(minreal(ss(G))[:,1:2], Ts, :zoh)
+    linmodel1 = LinModel(sys, Ts, i_u=1:2)
+    Gss = c2d(minreal(ss(sys))[:,1:2], Ts, :zoh)
 
     @test linmodel1.nx == 2
     @test linmodel1.nu == 2
@@ -33,28 +33,28 @@ using ModelPredictiveControl
     @test linmodel2.y_op    ≈ [50,30]
     @test linmodel2.d_op    ≈ zeros(0,1)
 
-    linmodel3 = LinModel(G,Ts,i_d=[3])
+    linmodel3 = LinModel(sys,Ts,i_d=[3])
     @test linmodel3.nx == 4
     @test linmodel3.nu == 2
     @test linmodel3.nd == 1
     @test linmodel3.ny == 2
-    Gu_ss = sminreal(c2d(minreal(ss(G))[:,1:2], Ts, :zoh))
-    Gd_ss = sminreal(c2d(minreal(ss(G))[:,3],   Ts, :tustin))
-    Gss = [Gu_ss Gd_ss]
-    @test linmodel3.A   ≈ Gss.A
-    @test linmodel3.Bu  ≈ Gss.B[:,1:2]
-    @test linmodel3.Bd  ≈ Gss.B[:,3]
-    @test linmodel3.C   ≈ Gss.C
-    @test linmodel3.Dd  ≈ Gss.D[:,3]
+    sysu_ss = sminreal(c2d(minreal(ss(sys))[:,1:2], Ts, :zoh))
+    sysd_ss = sminreal(c2d(minreal(ss(sys))[:,3],   Ts, :tustin))
+    sys_ss = [sysu_ss sysd_ss]
+    @test linmodel3.A   ≈ sys_ss.A
+    @test linmodel3.Bu  ≈ sys_ss.B[:,1:2]
+    @test linmodel3.Bd  ≈ sys_ss.B[:,3]
+    @test linmodel3.C   ≈ sys_ss.C
+    @test linmodel3.Dd  ≈ sys_ss.D[:,3]
 
-    @test_throws ErrorException LinModel(G,-Ts)
-    @test_throws ErrorException LinModel(G,Ts,i_u=[1,1])
-    @test_throws ErrorException LinModel(Gss,Ts+1)
-    @test_throws ErrorException LinModel(G,Ts,u_op=[0,0,0,0,0])
-    @test_throws ErrorException LinModel(G,Ts,d_op=[0,0,0,0,0])
-    @test_throws ErrorException LinModel(G,Ts,y_op=[0,0,0,0,0])
-    Gss.D .= 1
-    @test_throws ErrorException LinModel(Gss,Ts)
+    @test_throws ErrorException LinModel(sys,-Ts)
+    @test_throws ErrorException LinModel(sys,Ts,i_u=[1,1])
+    @test_throws ErrorException LinModel(sys_ss,Ts+1)
+    @test_throws ErrorException LinModel(sys,Ts,u_op=[0,0,0,0,0])
+    @test_throws ErrorException LinModel(sys,Ts,d_op=[0,0,0,0,0])
+    @test_throws ErrorException LinModel(sys,Ts,y_op=[0,0,0,0,0])
+    sys_ss.D .= 1
+    @test_throws ErrorException LinModel(sys_ss,Ts)
 
     # === NonLinModel Construction tests ===
 
