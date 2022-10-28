@@ -1,6 +1,6 @@
 using ControlSystemsBase
 using Test
-using Documenter
+# using Documenter
 using ModelPredictiveControl
 
 @testset "ModelPredictiveControl.jl" begin
