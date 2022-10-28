@@ -32,45 +32,51 @@ struct LinModel <: SimModel
     end
 end
 
-# TODO: Continuer la docstring (jula-repl ou jldoctest ?)
-"""
-    LinModel(G, Ts; <keyword arguments>)
 
-Convert TransferFunction `G` to StateSpace and construct a LinModel.
+IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
+
+"""
+    LinModel(G::StateSpace, Ts::Real; kwargs...)
+
+Construct a LinModel from state-state model `G`.
+
+If `G` is continuous, it is dicretized using `c2d` and `:zoh` for manipulated inputs, 
+and `:tustin`, for measured disturbances.
+
+# Arguments
+- `G::StateSpace`: state-space model including manipulated inputs and measured disturbances
+- `Ts::Real`: model sampling time in second
+- `i_u::IntRangeOrVector = 1:size(G,2)`: index of `G` inputs that are 
+    manipulated
+- `i_d::IntRangeOrVector = Int[]`: index of `G` inputs that are measured
+    disturbances
+- `u_op::Vector{<:Real} = Float64[]`: manipulated input operating points
+- `y_op::Vector{<:Real} = Float64[]`: outputs operating points
+- `d_op::Vector{<:Real} = Float64[]`: measured disturbances operating points
 
 # Examples
-```julia-repl
-julia> bar([1, 2], [1, 2])
-1
+```jldoctest
+julia> LinModel(tf(3, [10,1]), 2)
 ```
 """
-function LinModel(G::TransferFunction, Ts::Real; kwargs...)
-    G_min = minreal(ss(G)) # remove useless states with pole-zero cancelation
-    return LinModel(G_min,Ts;kwargs...)
-end
-
-"LinModel constructor based on StateSpace type"
 function LinModel(
     G::StateSpace,
     Ts::Real;
-    i_u::Union{UnitRange{Int},Vector{Int}} = Int[],
-    i_d::Union{UnitRange{Int},Vector{Int}} = Int[],
+    i_u::IntRangeOrVector = 1:size(G,2),
+    i_d::IntRangeOrVector = Int[],
     u_op::Vector{<:Real} = Float64[],
     y_op::Vector{<:Real} = Float64[],
     d_op::Vector{<:Real} = Float64[]
     )
-    if isempty(i_u) && isempty(i_d)
-        # assume that all inputs of G are manipulated inputs u :
-        i_u = collect(1:size(G,2))
-    elseif isempty(i_u) && ~isempty(i_d)
-        # assume that the rest is a manipulated input u :
-        i_u = collect(1:size(G,2))
-        deleteat!(i_u,i_d)
+    if ~isempty(i_d)
+        # common indexes in i_u and i_d are interpreted as measured disturbances d :
+        i_u = collect(i_u);
+        map(i -> deleteat!(i_u, i_u .== i), i_d);
     end
-    if length(unique(i_u)) != length(i_u)
+    if length(unique(i_u)) ≠ length(i_u)
         error("Manipulated input indices i_u should contains valid and unique indices")
     end
-    if length(unique(i_d)) != length(i_d)
+    if length(unique(i_d)) ≠ length(i_d)
         error("Measured disturbances indices i_d should contains valid and unique indices")
     end
     Gu = sminreal(G[:,i_u])  # remove states associated to measured disturbances d
@@ -100,6 +106,16 @@ function LinModel(
     C   = G_dis.C;
     Dd  = G_dis.D[:,nu+1:end]
     return LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
+end
+
+"""
+    LinModel(G::TransferFunction, Ts::Real; kwargs...)
+
+Convert to minimal realization state-space when `G` is a transfer function.
+"""
+function LinModel(G::TransferFunction, Ts::Real; kwargs...)
+    G_min = minreal(ss(G)) # remove useless states with pole-zero cancelation
+    return LinModel(G_min,Ts;kwargs...)
 end
 
 struct NonLinModel <: SimModel
@@ -164,12 +180,12 @@ function validate_op!(u_op, y_op, d_op, nu::Int, ny::Int, nd::Int)
 end
 
 function Base.show(io::IO, model::SimModel)
-    println(    "Discrete-time $(typestr(model)) model with "*
+    println(io,   "Discrete-time $(typestr(model)) model with "*
                 "a sample time Ts = $(model.Ts) s and:")
-    println(    "- $(model.nu) manipulated inputs u")
-    println(    "- $(model.nx) states x")
-    println(    "- $(model.ny) outputs y")
-    print(      "- $(model.nd) measured disturbances d") 
+    println(io, "- $(model.nu) manipulated inputs u")
+    println(io, "- $(model.nx) states x")
+    println(io, "- $(model.ny) outputs y")
+    print(io,   "- $(model.nd) measured disturbances d")
 end
 typestr(model::LinModel) = "linear"
 typestr(model::NonLinModel) = "nonlinear"
