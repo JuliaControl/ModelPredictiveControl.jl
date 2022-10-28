@@ -82,12 +82,12 @@ using ModelPredictiveControl
 
     # === DocTest ===
 
-    DocMeta.setdocmeta!(
-        ModelPredictiveControl, 
-        :DocTestSetup, 
-        :(using ModelPredictiveControl, ControlSystemsBase); 
-        recursive=true
-    )
-    doctest(ModelPredictiveControl)
+    # DocMeta.setdocmeta!(
+    #     ModelPredictiveControl, 
+    #     :DocTestSetup, 
+    #     :(using ModelPredictiveControl, ControlSystemsBase); 
+    #     recursive=true
+    # )
+    # doctest(ModelPredictiveControl)
 
 end
