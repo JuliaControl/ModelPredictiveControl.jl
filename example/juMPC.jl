@@ -21,9 +21,9 @@ Ts  = vars_ml["mMPC"]["Ts"]
 
 linModel1 = LinModel(ss(A,Bu,C,0,Ts),Ts)
 linModel2 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3])
-G = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
+sys = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
         tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]
-linModel3 = LinModel(G,Ts,i_d=[3])
+linModel3 = LinModel(sys,Ts,i_d=[3])
 linModel4 = LinModel(
     ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3],
     u_op=[10,50],

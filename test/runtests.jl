@@ -1,9 +1,10 @@
 using ControlSystemsBase
 using Test
+using Documenter
 using ModelPredictiveControl
 
 @testset "ModelPredictiveControl.jl" begin
-    
+
     # === LinModel Construction tests ===
 
     Ts = 4.0
@@ -79,5 +80,14 @@ using ModelPredictiveControl
     @test nonlinmodel2.f([0,0,0,0],[0,0],[0]) ≈ zeros(4,)
     @test nonlinmodel2.h([0,0,0,0],[0]) ≈ zeros(2,)
 
+    # === DocTest ===
+
+    DocMeta.setdocmeta!(
+        ModelPredictiveControl, 
+        :DocTestSetup, 
+        :(using ModelPredictiveControl, ControlSystemsBase); 
+        recursive=true
+    )
+    doctest(ModelPredictiveControl)
 
 end
