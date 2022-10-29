@@ -17,4 +17,5 @@ makedocs(
 
 deploydocs(
     repo = "github.com/franckgaga/ModelPredictiveControl.jl.git",
+    devbranch = "main",
 )
