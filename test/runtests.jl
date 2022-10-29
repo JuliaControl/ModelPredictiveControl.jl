@@ -1,6 +1,6 @@
 using ControlSystemsBase
 using Test
-# using Documenter
+using Documenter
 using ModelPredictiveControl
 
 @testset "ModelPredictiveControl.jl" begin
@@ -82,12 +82,12 @@ using ModelPredictiveControl
 
     # === DocTest ===
 
-    # DocMeta.setdocmeta!(
-    #     ModelPredictiveControl, 
-    #     :DocTestSetup, 
-    #     :(using ModelPredictiveControl, ControlSystemsBase); 
-    #     recursive=true
-    # )
-    # doctest(ModelPredictiveControl)
+    DocMeta.setdocmeta!(
+        ModelPredictiveControl, 
+        :DocTestSetup, 
+        :(using ModelPredictiveControl, ControlSystemsBase); 
+        recursive=true
+    )
+    doctest(ModelPredictiveControl)
 
 end
