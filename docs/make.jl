@@ -14,3 +14,7 @@ makedocs(
     modules     = [ModelPredictiveControl],
     doctest     = true
 )
+
+deploydocs(
+    repo = "github.com/franckgaga/ModelPredictiveControl.jl.git",
+)
