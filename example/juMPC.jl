@@ -36,7 +36,6 @@ h(x,_) = C*x
 f2(x,u,d) = A*x + Bu*u + Bd*d
 h2(x,_) = C*x
 
-
 nonLinModel1 = NonLinModel(f,h,Ts,2,4,2)
 nonLinModel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
 

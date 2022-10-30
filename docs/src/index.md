@@ -2,4 +2,5 @@
 
 ```@docs
 LinModel
+NonLinModel
 ```

@@ -24,7 +24,7 @@ using ModelPredictiveControl
     @test linmodel1.C   ≈ Gss.C
     @test linmodel1.Dd  ≈ zeros(2,0)
 
-    linmodel2 = LinModel(Gss,Ts,u_op=[10,50],y_op=[50,30])
+    linmodel2 = LinModel(Gss,u_op=[10,50],y_op=[50,30])
     @test linmodel2.A       ≈ Gss.A
     @test linmodel2.Bu      ≈ Gss.B
     @test linmodel2.Bd      ≈ zeros(2,0)
@@ -48,6 +48,7 @@ using ModelPredictiveControl
     @test linmodel3.C   ≈ sys_ss.C
     @test linmodel3.Dd  ≈ sys_ss.D[:,3]
 
+    @test_throws ErrorException LinModel(sys)
     @test_throws ErrorException LinModel(sys,-Ts)
     @test_throws ErrorException LinModel(sys,Ts,i_u=[1,1])
     @test_throws ErrorException LinModel(sys_ss,Ts+1)
