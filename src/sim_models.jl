@@ -34,9 +34,9 @@ end
 IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
 
 """
-    LinModel(sys::StateSpace, Ts::Real; kwargs...)
+    LinModel(sys::StateSpace, Ts::Real; <keyword arguments>)
 
-Construct a LinModel from state-state model `sys`.
+Construct a `LinModel` from state-state model `sys`.
 
 If `sys` is continuous, it is dicretized with [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.c2d)
 and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances.
@@ -45,6 +45,7 @@ See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/cons
 [`tf`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.tf).
 
 # Arguments
+
 - `sys::StateSpace`: state-space model incl. manipulated inputs and measured disturbances
 - `Ts::Real = NaN`: model sampling time in second, can be ommited if sys is discrete
 - `i_u::IntRangeOrVector = 1:size(sys,2)`: indices of `sys` inputs that are 
@@ -56,6 +57,7 @@ See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/cons
 - `d_op::Vector{<:Real} = Float64[]`: measured disturbances operating points
 
 # Examples
+
 ```jldoctest
 julia> LinModel(tf(3, [10, 1]), 2, u_op=[50], y_op=[20])
 Discrete-time linear model with a sample time Ts = 2.0 s and:
@@ -120,7 +122,7 @@ function LinModel(
 end
 
 """
-    LinModel(sys::TransferFunction, Ts::Real; kwargs...)
+    LinModel(sys::TransferFunction, Ts::Real; <keyword arguments>)
 
 Convert to minimal realization state-space when `sys` is a transfer function.
 """
@@ -130,12 +132,35 @@ function LinModel(sys::TransferFunction, Ts::Real = NaN; kwargs...)
 end
 
 
-"""
-    NonLinModel()
+@doc raw"""
+    NonLinModel(f, h, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0; <keyword arguments>)
 
-Construct a NonLinModel from discrete state-state functions `f` and `h`.
+Construct a `NonLinModel` from discrete state-state functions `f` and `h`.
+
+The discrete state-space functions are:
+```math
+\begin{align*}
+\mathbf{x}(k+1) &= \mathbf{f}\big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k) \big) \\
+\mathbf{y}(k)   &= \mathbf{h}\big( \mathbf{x}(k), \mathbf{d}(k) \big)
+\end{align*}
+```
+Replace the `d` argument with `_` if `nd = 0` (see [Examples](@ref))
+
+# Arguments
+
+- `f`: state update function ``\mathbf{f}(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k))``
+- `h`: output function ``\mathbf{h}(\mathbf{x}(k), \mathbf{d}(k))``
+- `Ts::Real`: model sampling time in second
+- `nu::Int`: number of manipulated inputs
+- `nx::Int`: number of states
+- `ny::Int`: number of outpus
+- `nd::Int = 0`: number of measured distrubances
+- `u_op::Vector{<:Real} = Float64[]`: manipulated input operating points
+- `y_op::Vector{<:Real} = Float64[]`: outputs operating points
+- `d_op::Vector{<:Real} = Float64[]`: measured disturbances operating points
 
 # Examples
+
 ```jldoctest
 julia> NonLinModel((x,u,_)->-x+u, (x,_)->2x, 10, 1 , 1 , 1)
 Discrete-time nonlinear model with a sample time Ts = 10.0 s and:

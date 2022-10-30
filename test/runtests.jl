@@ -81,6 +81,8 @@ using ModelPredictiveControl
     @test nonlinmodel2.f([0,0,0,0],[0,0],[0]) ≈ zeros(4,)
     @test nonlinmodel2.h([0,0,0,0],[0]) ≈ zeros(2,)
 
+    @test_throws 
+
     # === DocTest ===
 
     DocMeta.setdocmeta!(
