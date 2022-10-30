@@ -144,7 +144,7 @@ The discrete state-space functions are:
 \mathbf{y}(k)   &= \mathbf{h}\big( \mathbf{x}(k), \mathbf{d}(k) \big)
 \end{align*}
 ```
-Replace the `d` argument with `_` if `nd = 0` (see [Examples](@ref))
+Replace the `d` argument with `_` if `nd = 0` (see [Examples](@ref nonlinmodel_ex))
 
 # Arguments
 
@@ -159,7 +159,7 @@ Replace the `d` argument with `_` if `nd = 0` (see [Examples](@ref))
 - `y_op::Vector{<:Real} = Float64[]`: outputs operating points
 - `d_op::Vector{<:Real} = Float64[]`: measured disturbances operating points
 
-# Examples
+# [Examples](@id nonlinmodel_ex)
 
 ```jldoctest
 julia> NonLinModel((x,u,_)->-x+u, (x,_)->2x, 10, 1 , 1 , 1)

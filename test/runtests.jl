@@ -81,7 +81,12 @@ using ModelPredictiveControl
     @test nonlinmodel2.f([0,0,0,0],[0,0],[0]) ≈ zeros(4,)
     @test nonlinmodel2.h([0,0,0,0],[0]) ≈ zeros(2,)
 
-    @test_throws 
+    @test_throws ErrorException NonLinModel(
+        (x,u)->linmodel1.A*x + linmodel1.Bu*u,
+        (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1)
+    @test_throws ErrorException NonLinModel(
+        (x,u,_)->linmodel1.A*x + linmodel1.Bu*u,
+        (x)->linmodel1.C*x, Ts, 2, 4, 2, 1)
 
     # === DocTest ===
 
