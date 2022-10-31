@@ -56,7 +56,7 @@ with [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constru
 and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. 
     
 The constructor transforms the system to a more practical form (**Dᵤ = 0** because of the 
-zero-order hold or zoh):
+zero-order hold):
 ```math
 \begin{align*}
     \mathbf{x}(k+1) &=  \mathbf{A} \mathbf{x}(k) + 
@@ -129,10 +129,13 @@ function LinModel(
     return LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd)
 end
 
-"""
+@doc raw"""
     LinModel(sys::TransferFunction, Ts::Real; <keyword arguments>)
 
 Convert to minimal realization state-space when `sys` is a transfer function.
+
+`sys` is equal to ``\frac{\mathbf{y}(s)}{\mathbf{z}(s)}`` for continuous-time, and 
+``\frac{\mathbf{y}(z)}{\mathbf{z}(z)}``, for discrete-time.
 
 # Examples
 ```jldoctest
