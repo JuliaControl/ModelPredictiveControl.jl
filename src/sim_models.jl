@@ -13,9 +13,9 @@ struct LinModel <: SimModel
     nx  ::Int
     ny  ::Int
     nd  ::Int
-    u_op::Vector{Float64}
-    y_op::Vector{Float64}
-    d_op::Vector{Float64}
+    uop::Vector{Float64}
+    yop::Vector{Float64}
+    dop::Vector{Float64}
     function LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd)
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
@@ -25,10 +25,10 @@ struct LinModel <: SimModel
         Ts > 0 || error("Sampling time Ts must be positive")
         f = (x,u,d) -> A*x + Bu*u + Bd*d
         h = (x,d)   -> C*x + Dd*d
-        u_op = zeros(nu,)
-        y_op = zeros(ny,)
-        d_op = zeros(nd,)
-        return new(A,Bu,C,Bd,Dd,f,h,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
+        uop = zeros(nu,)
+        yop = zeros(ny,)
+        dop = zeros(nd,)
+        return new(A,Bu,C,Bd,Dd,f,h,Ts,nu,nx,ny,nd,uop,yop,dop)
     end
 end
 
@@ -190,9 +190,9 @@ struct NonLinModel <: SimModel
     nx::Int
     ny::Int
     nd::Int
-    u_op::Vector{Float64}
-    y_op::Vector{Float64}
-    d_op::Vector{Float64}
+    uop::Vector{Float64}
+    yop::Vector{Float64}
+    dop::Vector{Float64}
     function NonLinModel(
         f,
         h,
@@ -204,10 +204,10 @@ struct NonLinModel <: SimModel
         )
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_fcts(f,h,Ts,nd)
-        u_op = zeros(nu,)
-        y_op = zeros(ny,)
-        d_op = zeros(nd,)
-        return new(f,h,Ts,nu,nx,ny,nd,u_op,y_op,d_op)
+        uop = zeros(nu,)
+        yop = zeros(ny,)
+        dop = zeros(nd,)
+        return new(f,h,Ts,nu,nx,ny,nd,uop,yop,dop)
     end
 end
 
@@ -234,11 +234,11 @@ end
 
 
 @doc raw"""
-    setop!(model::SimModel; u_op=Float64[], y_op=Float64[], d_op=Float64[])
+    setop!(model::SimModel; uop=Float64[], yop=Float64[], dop=Float64[])
 
-Set `model` inputs and outputs operating points (a.k.a nominal values).
+Set `model` inputs `uop`, outputs `yop` and measured disturbances `dop` operating points.
 
-The state-space model including operating points is:
+The state-space model including operating points (a.k.a nominal values) is:
 ```math
 \begin{align*}
     \mathbf{x}(k+1) &=  \mathbf{A} \mathbf{x}(k) + 
@@ -267,28 +267,28 @@ The structure is similar if `model` is a `NonLinModel`:
 ```jldoctest
 julia> model = LinModel(tf(3, [10, 1]), 2);
 
-julia> setop!(model, u_op=[50], y_op=[20])
+julia> setop!(model, uop=[50], yop=[20])
 
 ```
 
 """
 function setop!(
     model::SimModel;
-    u_op::Vector{<:Real} = Float64[],
-    y_op::Vector{<:Real} = Float64[],
-    d_op::Vector{<:Real} = Float64[]
+    uop::Vector{<:Real} = Float64[],
+    yop::Vector{<:Real} = Float64[],
+    dop::Vector{<:Real} = Float64[]
 )
-    if ~isempty(u_op) 
-        size(u_op)  == (model.nu,) || error("u_op size must be $((model.nu,))")
-        model.u_op[:] = u_op
+    if ~isempty(uop) 
+        size(uop)  == (model.nu,) || error("uop size must be $((model.nu,))")
+        model.uop[:] = uop
     end
-    if ~isempty(y_op)
-        size(y_op)  == (model.ny,) || error("y_op size must be $((model.ny,))")
-        model.y_op[:] = y_op
+    if ~isempty(yop)
+        size(yop)  == (model.ny,) || error("yop size must be $((model.ny,))")
+        model.yop[:] = yop
     end
-    if ~isempty(d_op)
-        size(d_op)  == (model.nd,) || error("d_op size must be $((model.nd,))")
-        model.d_op[:] = d_op
+    if ~isempty(dop)
+        size(dop)  == (model.nd,) || error("dop size must be $((model.nd,))")
+        model.dop[:] = dop
     end
 end
 
@@ -303,29 +303,26 @@ end
 typestr(model::LinModel) = "linear"
 typestr(model::NonLinModel) = "nonlinear"
 
-#=
-function update_x(mMPC,x,u,d)
-#UPDATE_X Update |mMPC| model states with current states |x|, manipulated
-#input |u| and measured disturbance |d|.
+
+#= function update_x(mMPC,x,u,d)
     
-        if ~mMPC.nd
-            d = zeros(0,1); # d argument ignored
-        end
-    
-        d0 = d - mMPC.d_op;
-        u0 = u - mMPC.u_op;
-     
-        if mMPC.linModel
-            xNext = mMPC.A*x + mMPC.B*u0 + mMPC.Bd*d0;
-        else
-            if mMPC.SimulFuncHasW   
-                # process noise w = 0 (only used for MHE observer)
-                [~,Xmat] = mMPC.SimulFunc(x,u0,d0,zeros(mMPC.nx,1));
-            else                              
-                [~,Xmat] = mMPC.SimulFunc(x,u0,d0);
-            end
-            return Xmat(:,end);
-        end
-        
+    if ~mMPC.nd
+        d = zeros(0,1); # d argument ignored
     end
-=#
+
+    d0 = d - mMPC.d_op;
+    u0 = u - mMPC.u_op;
+    
+    if mMPC.linModel
+        xNext = mMPC.A*x + mMPC.B*u0 + mMPC.Bd*d0;
+    else
+        if mMPC.SimulFuncHasW   
+            # process noise w = 0 (only used for MHE observer)
+            [~,Xmat] = mMPC.SimulFunc(x,u0,d0,zeros(mMPC.nx,1));
+        else                              
+            [~,Xmat] = mMPC.SimulFunc(x,u0,d0);
+        end
+        return Xmat(:,end);
+    end
+        
+end =#

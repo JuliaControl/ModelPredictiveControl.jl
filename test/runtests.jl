@@ -8,7 +8,7 @@ using ModelPredictiveControl
     # === LinModel Construction tests ===
 
     Ts = 4.0
-    sys = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
+    sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
             tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]        
     
     linmodel1 = LinModel(sys, Ts, i_u=1:2)
@@ -25,15 +25,15 @@ using ModelPredictiveControl
     @test linmodel1.Dd  ≈ zeros(2,0)
 
     linmodel2 = LinModel(Gss)
-    setop!(linmodel2,u_op=[10,50],y_op=[50,30])
-    @test linmodel2.A       ≈ Gss.A
-    @test linmodel2.Bu      ≈ Gss.B
-    @test linmodel2.Bd      ≈ zeros(2,0)
-    @test linmodel2.C       ≈ Gss.C
-    @test linmodel2.Dd      ≈ zeros(2,0)
-    @test linmodel2.u_op    ≈ [10,50]
-    @test linmodel2.y_op    ≈ [50,30]
-    @test linmodel2.d_op    ≈ zeros(0,1)
+    setop!(linmodel2,uop=[10,50],yop=[50,30])
+    @test linmodel2.A   ≈ Gss.A
+    @test linmodel2.Bu  ≈ Gss.B
+    @test linmodel2.Bd  ≈ zeros(2,0)
+    @test linmodel2.C   ≈ Gss.C
+    @test linmodel2.Dd  ≈ zeros(2,0)
+    @test linmodel2.uop ≈ [10,50]
+    @test linmodel2.yop ≈ [50,30]
+    @test linmodel2.dop ≈ zeros(0,1)
 
     linmodel3 = LinModel(sys,Ts,i_d=[3])
     @test linmodel3.nx == 4
@@ -53,9 +53,9 @@ using ModelPredictiveControl
     @test_throws ErrorException LinModel(sys,-Ts)
     @test_throws ErrorException LinModel(sys,Ts,i_u=[1,1])
     @test_throws ErrorException LinModel(sys_ss,Ts+1)
-    @test_throws ErrorException setop!(linmodel3, u_op=[0,0,0,0,0])
-    @test_throws ErrorException setop!(linmodel3, y_op=[0,0,0,0,0])
-    @test_throws ErrorException setop!(linmodel3, d_op=[0,0,0,0,0])
+    @test_throws ErrorException setop!(linmodel3, uop=[0,0,0,0,0])
+    @test_throws ErrorException setop!(linmodel3, yop=[0,0,0,0,0])
+    @test_throws ErrorException setop!(linmodel3, dop=[0,0,0,0,0])
     sys_ss.D .= 1
     @test_throws ErrorException LinModel(sys_ss,Ts)
 

@@ -25,7 +25,7 @@ sys = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
         tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]
 linModel3 = LinModel(sys,Ts,i_d=[3])
 linModel4 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3])
-setop!(linModel4,u_op=[10,50],y_op=[50,30],d_op=[15])
+setop!(linModel4,uop=[10,50],yop=[50,30],dop=[15])
 linModel5 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_u=1:2)
 
 f(x,u,_) = A*x + Bu*u
