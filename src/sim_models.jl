@@ -136,12 +136,12 @@ Convert to minimal realization state-space when `sys` is a transfer function.
 
 # Examples
 ```jldoctest
-julia> model = LinModel(tf(3, [10, 1]), 2)
+julia> model = LinModel([tf(3, [30, 1]) tf(-2, [5, 1])], 2, i_d=[2])
 Discrete-time linear model with a sample time Ts = 2.0 s and:
 - 1 manipulated inputs u
-- 1 states x
+- 2 states x
 - 1 outputs y
-- 0 measured disturbances d
+- 1 measured disturbances d
 ```
 """
 function LinModel(sys::TransferFunction, Ts::Real = NaN; kwargs...)
