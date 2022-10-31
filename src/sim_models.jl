@@ -167,7 +167,7 @@ with `_` if `nd=0` (see Examples below). Nonlinear continuous-time state-space f
 are not supported for the time being. In such a case, manually call a differential equation 
 solver in the `f` function (e.g.: Euler method).
 
-See also [LinModel](@ref).
+See also [`LinModel`](@ref).
 
 # Examples
 ```jldoctest
