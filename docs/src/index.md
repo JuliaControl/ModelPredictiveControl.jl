@@ -3,4 +3,5 @@
 ```@docs
 LinModel
 NonLinModel
+setop!
 ```
