@@ -1,6 +1,8 @@
 {
     "cSpell.ignoreWords": [
+        "evaloutput",
         "setop",
-        "typestr"
+        "typestr",
+        "updatestate"
     ]
 }

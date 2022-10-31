@@ -4,4 +4,6 @@
 LinModel
 NonLinModel
 setop!
+updatestate
+evaloutput
 ```

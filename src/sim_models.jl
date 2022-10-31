@@ -23,8 +23,8 @@ struct LinModel <: SimModel
         size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
         size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
         Ts > 0 || error("Sampling time Ts must be positive")
-        f = (x,u,d) -> A*x + Bu*u + Bd*d
-        h = (x,d)   -> C*x + Dd*d
+        f(x,u,d)  = A*x + Bu*u + Bd*d
+        h(x,d)    = C*x + Dd*d
         uop = zeros(nu,)
         yop = zeros(ny,)
         dop = zeros(nd,)
@@ -40,7 +40,7 @@ IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
 
 Construct a `LinModel` from state-space model `sys` with sampling time `Ts` in second.
 
-`Ts` can be omitted when `sys` is discrete-time, and its state-space matrices are:
+`Ts` can be omitted when `sys` is discrete-time. Its state-space matrices are:
 ```math
 \begin{align*}
     \mathbf{x}(k+1) &= \mathbf{A} \mathbf{x}(k) + \mathbf{B} \mathbf{z}(k) \\
@@ -203,7 +203,7 @@ struct NonLinModel <: SimModel
         nd::Int = 0;
         )
         Ts > 0 || error("Sampling time Ts must be positive")
-        validate_fcts(f,h,Ts,nd)
+        validate_fcts(f, h)
         uop = zeros(nu,)
         yop = zeros(ny,)
         dop = zeros(nd,)
@@ -211,7 +211,7 @@ struct NonLinModel <: SimModel
     end
 end
 
-function validate_fcts(f, h, Ts::Real, nd::Int)
+function validate_fcts(f, h)
     fargsvalid1 = hasmethod(f,
         Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
     )
@@ -303,26 +303,17 @@ end
 typestr(model::LinModel) = "linear"
 typestr(model::NonLinModel) = "nonlinear"
 
+"""
+    updatestate(sys::SimModel, x, u, d=Float64[])
 
-#= function update_x(mMPC,x,u,d)
-    
-    if ~mMPC.nd
-        d = zeros(0,1); # d argument ignored
-    end
+Update states `x` of `sys` with current inputs `u` and measured disturbances `d`.
+"""
+updatestate(sys::SimModel, x, u, d=Float64[]) = sys.f(x, u-sys.uop, d-sys.dop)
 
-    d0 = d - mMPC.d_op;
-    u0 = u - mMPC.u_op;
-    
-    if mMPC.linModel
-        xNext = mMPC.A*x + mMPC.B*u0 + mMPC.Bd*d0;
-    else
-        if mMPC.SimulFuncHasW   
-            # process noise w = 0 (only used for MHE observer)
-            [~,Xmat] = mMPC.SimulFunc(x,u0,d0,zeros(mMPC.nx,1));
-        else                              
-            [~,Xmat] = mMPC.SimulFunc(x,u0,d0);
-        end
-        return Xmat(:,end);
-    end
-        
-end =#
+"""
+    evaloutput(sys::SimModel, x, d=Float64[])
+
+Evaluate output `y` of `sys` with current state `x` and measured disturbances `d`.
+"""
+evaloutput(sys::SimModel, x, d=Float64[]) = sys.h(x, d-sys.dop)
+

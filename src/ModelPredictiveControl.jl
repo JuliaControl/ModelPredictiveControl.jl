@@ -4,7 +4,7 @@ using JuMP
 using LinearAlgebra
 using ControlSystemsBase
 
-export LinModel, NonLinModel, setop!
+export LinModel, NonLinModel, setop!, updatestate, evaloutput
 
 include("sim_models.jl")
 

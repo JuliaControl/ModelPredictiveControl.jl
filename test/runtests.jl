@@ -59,6 +59,16 @@ using ModelPredictiveControl
     sys_ss.D .= 1
     @test_throws ErrorException LinModel(sys_ss,Ts)
 
+    # === LinModel sim functions call tests ===
+
+    @test updatestate(linmodel1, zeros(2,), zeros(2,)) ≈ zeros(2,) 
+    @test updatestate(linmodel1, zeros(2,), zeros(2,), Float64[]) ≈ zeros(2,)
+    @test evaloutput(linmodel1, zeros(2,)) ≈ zeros(2,) 
+    @test evaloutput(linmodel1, zeros(2,), Float64[]) ≈ zeros(2,)
+
+    @test_throws DimensionMismatch updatestate(linmodel1, zeros(2,), zeros(2,), zeros(1,))
+    @test_throws DimensionMismatch evaloutput(linmodel1, zeros(2,), zeros(1,))
+
     # === NonLinModel Construction tests ===
 
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
@@ -88,6 +98,16 @@ using ModelPredictiveControl
     @test_throws ErrorException NonLinModel(
         (x,u,_)->linmodel1.A*x + linmodel1.Bu*u,
         (x)->linmodel1.C*x, Ts, 2, 4, 2, 1)
+
+    # === NonLinModel sim functions call tests ===
+    
+    @test updatestate(nonlinmodel1, zeros(2,), zeros(2,)) ≈ zeros(2,) 
+    @test updatestate(nonlinmodel1, zeros(2,), zeros(2,), Float64[]) ≈ zeros(2,)
+    @test evaloutput(nonlinmodel1, zeros(2,)) ≈ zeros(2,) 
+    @test evaloutput(nonlinmodel1, zeros(2,), Float64[]) ≈ zeros(2,)
+    
+    @test_throws DimensionMismatch updatestate(nonlinmodel1, zeros(2,), zeros(2,), zeros(1,))
+    @test_throws DimensionMismatch evaloutput(nonlinmodel1, zeros(2,), zeros(1,))
 
     # === DocTest ===
 
