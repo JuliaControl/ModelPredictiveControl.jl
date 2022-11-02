@@ -130,7 +130,7 @@ function LinModel(
 end
 
 @doc raw"""
-    LinModel(sys::TransferFunction, Ts::Real; <keyword arguments>)
+    LinModel(sys::TransferFunction, Ts=NaN; <keyword arguments>)
 
 Convert to minimal realization state-space when `sys` is a transfer function.
 

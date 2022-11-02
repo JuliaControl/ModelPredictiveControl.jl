@@ -6,4 +6,4 @@
 
 
 
-A model predictive control pacakge for Julia 
+A model predictive control package for Julia 
