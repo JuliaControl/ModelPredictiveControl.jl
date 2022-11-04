@@ -6,4 +6,5 @@ NonLinModel
 setop!
 updatestate
 evaloutput
+init_internalmodel
 ```

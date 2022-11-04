@@ -130,7 +130,7 @@ function LinModel(
 end
 
 @doc raw"""
-    LinModel(sys::TransferFunction, Ts=NaN; <keyword arguments>)
+    LinModel(sys::TransferFunction, Ts=NaN; i_u=1:size(sys,2), i_d=Int[])
 
 Convert to minimal realization state-space when `sys` is a transfer function.
 
@@ -238,7 +238,7 @@ end
 
 Set `model` inputs `uop`, outputs `yop` and measured disturbances `dop` operating points.
 
-The state-space model including operating points (a.k.a nominal values) is:
+The state-space model including operating points (a.k.a. nominal values) is:
 ```math
 \begin{align*}
     \mathbf{x}(k+1) &=  \mathbf{A} \mathbf{x}(k) + 

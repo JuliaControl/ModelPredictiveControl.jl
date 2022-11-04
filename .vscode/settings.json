@@ -4,5 +4,10 @@
         "setop",
         "typestr",
         "updatestate"
+    ],
+    "cSpell.words": [
+        "estim",
+        "internalmodel",
+        "stoch"
     ]
 }
