@@ -44,27 +44,19 @@ struct InternalModel <: StateEstimator
 end
 
 function InternalModel(
-    model::SimModel, 
-    stoch::StateSpace;
-    i_ym::IntRangeOrVector = 1:model.ny
+    model::SimModel;
+    i_ym::IntRangeOrVector = 1:model.ny,
+    stoch_ym::Union{StateSpace, TransferFunction} = ss(1,1,1,1,model.Ts).*I(length(i_ym))
     )
-    if iscontinuous(stoch)
-        stoch_dis = c2d(stoch, model.Ts, :tustin)
-    else
-        stoch.Ts == model.Ts || error("stoch.Ts must be identical to model.Ts")
-        stoch_dis = stoch
+    if isa(stoch_ym, TransferFunction) 
+        stoch_ym = minreal(ss(stoch_ym))
     end
-    return InternalModel(model, stoch.A, stoch.B, stoch.C, stoch.D, i_ym)
-end
-
-
-function InternalModel(
-    model::SimModel, 
-    stoch::TransferFunction; 
-    kwargs...
-    )
-    stoch_ss = minreal(ss(stoch))
-    return InternalModel(model, stoch_ss; kwargs...)
+    if iscontinuous(stoch_ym)
+        stoch_ym = c2d(stoch_ym, model.Ts, :tustin)
+    else
+        stoch_ym.Ts == model.Ts || error("stoch_ym.Ts must be identical to model.Ts")
+    end
+    return InternalModel(model, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D, i_ym)
 end
 
 

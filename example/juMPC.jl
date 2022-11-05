@@ -36,7 +36,7 @@ h2(x,_) = C*x
 nonLinModel1 = NonLinModel(f,h,Ts,2,4,2)
 nonLinModel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
 
-internalModel1 = InternalModel(linModel1,[tf([1,0],[1,-1],Ts) 0; 0 tf([1,0],[1,-1],Ts)])
+internalModel1 = InternalModel(linModel1,stoch_ym=[tf([1,0],[1,-1],Ts) 0; 0 tf([1,0],[1,-1],Ts)])
 
 
 #=([
