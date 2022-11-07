@@ -1,7 +1,8 @@
 using ControlSystemsBase
-using Test
 using Documenter
+using LinearAlgebra
 using ModelPredictiveControl
+using Test
 
 @testset "ModelPredictiveControl.jl" begin
 
