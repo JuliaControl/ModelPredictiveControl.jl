@@ -109,6 +109,15 @@ using ModelPredictiveControl
     @test_throws DimensionMismatch updatestate(nonlinmodel1, zeros(2,), zeros(2,), zeros(1,))
     @test_throws DimensionMismatch evaloutput(nonlinmodel1, zeros(2,), zeros(1,))
 
+    # === InternalModel constructor tests ===
+
+    unstablemodel = LinModel(ss(diagm([0.5, -0.5, 1.5]), ones(3,1), I, 0, 1))
+    @test_throws ErrorException InternalModel(unstablemodel)
+    @test_throws ErrorException InternalModel(linmodel1, i_ym=[1,4])
+    @test_throws ErrorException InternalModel(linmodel1, i_ym=[2,2])
+    @test_throws ErrorException InternalModel(linmodel1, stoch_ym=ss(1,1,1,1,Ts))
+    @test_throws ErrorException InternalModel(linmodel1, stoch_ym=ss(1,1,1,0,Ts).*I(2))
+
     # === DocTest ===
 
     DocMeta.setdocmeta!(

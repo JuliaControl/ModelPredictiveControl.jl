@@ -42,10 +42,10 @@ Construct a `LinModel` from state-space model `sys` with sampling time `Ts` in s
 
 `Ts` can be omitted when `sys` is discrete-time. Its state-space matrices are:
 ```math
-\begin{align*}
+\begin{aligned}
     \mathbf{x}(k+1) &= \mathbf{A} \mathbf{x}(k) + \mathbf{B} \mathbf{z}(k) \\
     \mathbf{y}(k)   &= \mathbf{C} \mathbf{x}(k) + \mathbf{D} \mathbf{z}(k)
-\end{align*}
+\end{aligned}
 ```
 with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{z}`` vector 
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
@@ -58,11 +58,11 @@ and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances.
 The constructor transforms the system to a more practical form (**Dᵤ = 0** because of the 
 zero-order hold):
 ```math
-\begin{align*}
+\begin{aligned}
     \mathbf{x}(k+1) &=  \mathbf{A} \mathbf{x}(k) + 
                         \mathbf{B_u} \mathbf{u}(k) + \mathbf{B_d} \mathbf{d}(k) \\
     \mathbf{y}(k)   &=  \mathbf{C} \mathbf{x}(k) + \mathbf{D_d} \mathbf{d}(k)
-\end{align*}
+\end{aligned}
 ```
 
 See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.ss),
@@ -72,10 +72,10 @@ See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/cons
 ```jldoctest
 julia> model = LinModel(ss(0.4, 0.2, 0.3, 0, 0.1))
 Discrete-time linear model with a sample time Ts = 0.1 s and:
-- 1 manipulated inputs u
-- 1 states x
-- 1 outputs y
-- 0 measured disturbances d
+ 1 manipulated inputs u
+ 1 states x
+ 1 outputs y
+ 0 measured disturbances d
 ```
 """
 function LinModel(
@@ -139,12 +139,12 @@ Convert to minimal realization state-space when `sys` is a transfer function.
 
 # Examples
 ```jldoctest
-julia> model = LinModel([tf(3, [30, 1]) tf(-2, [5, 1])], 2, i_d=[2])
-Discrete-time linear model with a sample time Ts = 2.0 s and:
-- 1 manipulated inputs u
-- 2 states x
-- 1 outputs y
-- 1 measured disturbances d
+julia> model = LinModel([tf(3, [30, 1]) tf(-2, [5, 1])], 0.5, i_d=[2])
+Discrete-time linear model with a sample time Ts = 0.5 s and:
+ 1 manipulated inputs u
+ 2 states x
+ 1 outputs y
+ 1 measured disturbances d
 ```
 """
 function LinModel(sys::TransferFunction, Ts::Real = NaN; kwargs...)
@@ -159,16 +159,19 @@ Construct a `NonLinModel` from discrete-time state-space functions `f` and `h`.
 
 The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined as :
 ```math
-    \begin{align*}
+    \begin{aligned}
     \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \\
     \mathbf{y}(k)   &= \mathbf{h}\Big( \mathbf{x}(k), \mathbf{d}(k) \Big)
-    \end{align*}
+    \end{aligned}
 ```
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
-manipulated inputs, states, outputs and measured disturbances. Replace the `d` argument
-with `_` if `nd=0` (see Examples below). Nonlinear continuous-time state-space functions 
-are not supported for the time being. In such a case, manually call a differential equation 
-solver in the `f` function (e.g.: Euler method).
+manipulated inputs, states, outputs and measured disturbances. 
+
+!!! tip
+    Replace the `d` argument with `_` if `nd = 0` (see Examples below).  
+
+Nonlinear continuous-time state-space functions are not supported for now. In such a case, 
+manually call a differential equation solver in the `f` function (e.g.: Euler method).
 
 See also [`LinModel`](@ref).
 
@@ -176,10 +179,10 @@ See also [`LinModel`](@ref).
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->-x+u, (x,_)->2x, 10, 1 , 1 , 1)
 Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
-- 1 manipulated inputs u
-- 1 states x
-- 1 outputs y
-- 0 measured disturbances d
+ 1 manipulated inputs u
+ 1 states x
+ 1 outputs y
+ 0 measured disturbances d
 ```
 """
 struct NonLinModel <: SimModel
@@ -240,35 +243,37 @@ Set `model` inputs `uop`, outputs `yop` and measured disturbances `dop` operatin
 
 The state-space model including operating points (a.k.a. nominal values) is:
 ```math
-\begin{align*}
+\begin{aligned}
     \mathbf{x}(k+1) &=  \mathbf{A} \mathbf{x}(k) + 
     \mathbf{B_u} \mathbf{u_0}(k) + \mathbf{B_d} \mathbf{d_0}(k) \\
     \mathbf{y_0}(k) &=  \mathbf{C} \mathbf{x}(k) + \mathbf{D_d} \mathbf{d_0}(k)
-\end{align*}
+\end{aligned}
 ```
 where
 ```math
-\begin{align*}
+\begin{aligned}
     \mathbf{u_0}(k) &= \mathbf{u}(k) - \mathbf{u_{op}}(k) \\
     \mathbf{y_0}(k) &= \mathbf{y}(k) - \mathbf{y_{op}}(k) \\
     \mathbf{d_0}(k) &= \mathbf{d}(k) - \mathbf{d_{op}}(k) 
-\end{align*}
+\end{aligned}
 ```
 
 The structure is similar if `model` is a `NonLinModel`:
 ```math
-\begin{align*}
+\begin{aligned}
     \mathbf{x}(k+1) &= \mathbf{f}\Big(\mathbf{x}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big)\\
     \mathbf{y_0}(k) &= \mathbf{h}\Big(\mathbf{x}(k), \mathbf{d_0}(k)\Big)
-\end{align*}
+\end{aligned}
 ```
 
 # Examples
 ```jldoctest
-julia> model = LinModel(tf(3, [10, 1]), 2);
-
-julia> setop!(model, uop=[50], yop=[20])
-
+julia> model = setop!(LinModel(tf(3, [10, 1]), 2), uop=[50], yop=[20])
+Discrete-time linear model with a sample time Ts = 2.0 s and:
+ 1 manipulated inputs u
+ 1 states x
+ 1 outputs y
+ 0 measured disturbances d
 ```
 
 """
@@ -290,15 +295,16 @@ function setop!(
         size(dop)  == (model.nd,) || error("dop size must be $((model.nd,))")
         model.dop[:] = dop
     end
+    return model
 end
 
 function Base.show(io::IO, model::SimModel)
-    println(io,   "Discrete-time $(typestr(model)) model with "*
+    println(io, "Discrete-time $(typestr(model)) model with "*
                 "a sample time Ts = $(model.Ts) s and:")
-    println(io, "- $(model.nu) manipulated inputs u")
-    println(io, "- $(model.nx) states x")
-    println(io, "- $(model.ny) outputs y")
-    print(io,   "- $(model.nd) measured disturbances d")
+    println(io, " $(model.nu) manipulated inputs u")
+    println(io, " $(model.nx) states x")
+    println(io, " $(model.ny) outputs y")
+    print(io,   " $(model.nd) measured disturbances d")
 end
 typestr(model::LinModel) = "linear"
 typestr(model::NonLinModel) = "nonlinear"
