@@ -6,17 +6,17 @@ struct LinModel <: SimModel
     C   ::Matrix{Float64}
     Bd  ::Matrix{Float64}
     Dd  ::Matrix{Float64}
-    f   ::Function
-    h   ::Function
-    Ts  ::Float64
-    nu  ::Int
-    nx  ::Int
-    ny  ::Int
-    nd  ::Int
+    f::Function
+    h::Function
+    Ts::Float64
+    nu::Int
+    nx::Int
+    ny::Int
+    nd::Int
     uop::Vector{Float64}
     yop::Vector{Float64}
     dop::Vector{Float64}
-    function LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd)
+    function LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
         size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
@@ -25,10 +25,10 @@ struct LinModel <: SimModel
         Ts > 0 || error("Sampling time Ts must be positive")
         f(x,u,d)  = A*x + Bu*u + Bd*d
         h(x,d)    = C*x + Dd*d
-        uop = zeros(nu,)
-        yop = zeros(ny,)
-        dop = zeros(nd,)
-        return new(A,Bu,C,Bd,Dd,f,h,Ts,nu,nx,ny,nd,uop,yop,dop)
+        uop = zeros(nu)
+        yop = zeros(ny)
+        dop = zeros(nd)
+        return new(A, Bu, C, Bd, Dd, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
 end
 
@@ -36,22 +36,22 @@ end
 IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
 
 @doc raw"""
-    LinModel(sys::StateSpace, Ts=NaN; i_u=1:size(sys,2), i_d=Int[])
+    LinModel(sys::StateSpace[, Ts]; i_u=1:size(sys,2), i_d=Int[])
 
 Construct a `LinModel` from state-space model `sys` with sampling time `Ts` in second.
 
 `Ts` can be omitted when `sys` is discrete-time. Its state-space matrices are:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{A} \mathbf{x}(k) + \mathbf{B} \mathbf{z}(k) \\
-    \mathbf{y}(k)   &= \mathbf{C} \mathbf{x}(k) + \mathbf{D} \mathbf{z}(k)
+    \mathbf{x}(k+1) &= \mathbf{A x}(k) + \mathbf{B z}(k) \\
+    \mathbf{y}(k)   &= \mathbf{C x}(k) + \mathbf{D z}(k)
 \end{aligned}
 ```
 with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{z}`` vector 
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
 in any order. `i_u` provides the indices of ``\mathbf{z}`` that are manipulated, and `i_d`, 
 the measured disturbances. The state-space matrices are similar if `sys` is continuous-time 
-(replace ``\mathbf{x}(k+1)`` with ``\dot{\mathbf{x}}(t)``). In such a case, it's discretized 
+(replace **x**(k+1) with **ẋ**(t)). In such a case, it's discretized 
 with [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.c2d)
 and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. 
     
@@ -59,9 +59,8 @@ The constructor transforms the system to a more practical form (**Dᵤ = 0** bec
 zero-order hold):
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &=  \mathbf{A} \mathbf{x}(k) + 
-                        \mathbf{B_u} \mathbf{u}(k) + \mathbf{B_d} \mathbf{d}(k) \\
-    \mathbf{y}(k)   &=  \mathbf{C} \mathbf{x}(k) + \mathbf{D_d} \mathbf{d}(k)
+    \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u}(k) + \mathbf{B_d d}(k) \\
+    \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D_d d}(k)
 \end{aligned}
 ```
 
@@ -80,7 +79,7 @@ Discrete-time linear model with a sample time Ts = 0.1 s and:
 """
 function LinModel(
     sys::StateSpace,
-    Ts::Real = NaN;
+    Ts::Union{Real,Nothing} = nothing;
     i_u::IntRangeOrVector = 1:size(sys,2),
     i_d::IntRangeOrVector = Int[]
     )
@@ -101,13 +100,13 @@ function LinModel(
         error("State matrix D must be 0 for columns associated to manipulated inputs u")
     end
     if iscontinuous(sys)
-        isnan(Ts) && error("Sample time Ts must be specified if sys is continuous")
+        isnothing(Ts) && error("Sample time Ts must be specified if sys is continuous")
         # manipulated inputs : zero-order hold discretization 
         sysu_dis = c2d(sysu,Ts,:zoh);
         # measured disturbances : tustin discretization (continuous signals with ADCs)
         sysd_dis = c2d(sysd,Ts,:tustin)
     else
-        if ~isnan(Ts)
+        if ~isnothing(Ts)
             #TODO: Resample discrete system instead of throwing an error
             sys.Ts == Ts || error("Sample time Ts must be identical to sys.Ts")
         else
@@ -116,7 +115,7 @@ function LinModel(
         sysu_dis = sysu
         sysd_dis = sysd     
     end
-    sys_dis = [sysu_dis sysd_dis]
+    sys_dis = sminreal([sysu_dis sysd_dis]) # merge common poles if possible
     nx = size(sys_dis.A,1)
     nu = length(i_u)
     ny = size(sys_dis,1)
@@ -126,11 +125,11 @@ function LinModel(
     Bd  = sys_dis.B[:,nu+1:end]
     C   = sys_dis.C;
     Dd  = sys_dis.D[:,nu+1:end]
-    return LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd)
+    return LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
 end
 
 @doc raw"""
-    LinModel(sys::TransferFunction, Ts=NaN; i_u=1:size(sys,2), i_d=Int[])
+    LinModel(sys::TransferFunction[, Ts]; i_u=1:size(sys,2), i_d=Int[])
 
 Convert to minimal realization state-space when `sys` is a transfer function.
 
@@ -147,7 +146,7 @@ Discrete-time linear model with a sample time Ts = 0.5 s and:
  1 measured disturbances d
 ```
 """
-function LinModel(sys::TransferFunction, Ts::Real = NaN; kwargs...)
+function LinModel(sys::TransferFunction, Ts::Union{Real,Nothing} = nothing; kwargs...)
     sys_min = minreal(ss(sys)) # remove useless states with pole-zero cancellation
     return LinModel(sys_min, Ts; kwargs...)
 end
@@ -207,10 +206,10 @@ struct NonLinModel <: SimModel
         )
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_fcts(f, h)
-        uop = zeros(nu,)
-        yop = zeros(ny,)
-        dop = zeros(nd,)
-        return new(f,h,Ts,nu,nx,ny,nd,uop,yop,dop)
+        uop = zeros(nu)
+        yop = zeros(ny)
+        dop = zeros(nd)
+        return new(f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
 end
 
@@ -244,9 +243,8 @@ Set `model` inputs `uop`, outputs `yop` and measured disturbances `dop` operatin
 The state-space model including operating points (a.k.a. nominal values) is:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &=  \mathbf{A} \mathbf{x}(k) + 
-    \mathbf{B_u} \mathbf{u_0}(k) + \mathbf{B_d} \mathbf{d_0}(k) \\
-    \mathbf{y_0}(k) &=  \mathbf{C} \mathbf{x}(k) + \mathbf{D_d} \mathbf{d_0}(k)
+    \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) \\
+    \mathbf{y_0}(k) &=  \mathbf{C x}(k) + \mathbf{D_d d_0}(k)
 \end{aligned}
 ```
 where

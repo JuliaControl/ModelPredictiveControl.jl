@@ -7,7 +7,7 @@ using ControlSystemsBase
 export LinModel, NonLinModel, setop!, updatestate, evaloutput
 export InternalModel
 
-include("sim_models.jl")
+include("sim_model.jl")
 include("state_estim.jl")
 
 end

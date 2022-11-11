@@ -60,11 +60,11 @@ unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions
 ``\mathbf{ŷ_d}``, and `stoch_ym`, the stochastic predictions of the measured outputs 
 ``\mathbf{ŷ_s^m}``, the unmeasured ones being ``\mathbf{ŷ_s^u} = \mathbf{0}``. 
 
-`stoch_ym` is a `TransferFunction` or `StateSpace` model. Its default value supposes 1 
-integrator per measured outputs, assuming that the current stochastic estimate 
-``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` will be constant in the future. 
-This is the dynamic matrix control (DMC) strategy, which is simple but sometimes too 
-aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
+`stoch_ym` is a `TransferFunction` or `StateSpace` model that filters zero mean white 
+noises. Its default value supposes 1 integrator per measured outputs, assuming that the 
+current stochastic estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` will
+be constant in the future. This is the dynamic matrix control strategy, which is simple 
+but sometimes too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
 
 !!! warning "Integrating or unstable poles"
     `InternalModel` estimator does not work if `model` is integrating or unstable. The 
