@@ -14,7 +14,7 @@ struct InternalModel <: StateEstimator
     Âs::Matrix{Float64}
     B̂s::Matrix{Float64}
     nint_ym::Vector{Int}
-    function InternalModel(model::SimModel, Asm, Bsm, Csm, Dsm, i_ym)
+    function InternalModel(model, Asm, Bsm, Csm, Dsm, i_ym)
         ny = model.ny
         if isa(model, LinModel)
             poles = eigvals(model.A)
@@ -44,11 +44,12 @@ struct InternalModel <: StateEstimator
         nxs = size(As,1);
         nx̂ = model.nx
         nxs = size(As,1)
-        nint_ym = fill(0,nym,) # not used for InternalModel
+        nint_ym = zeros(nym) # not used for InternalModel
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         return new(model, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s, nint_ym)
     end
 end
+
 
 @doc raw"""
     InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(1,1,1,1,model.Ts).*I)
@@ -60,15 +61,15 @@ unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions
 ``\mathbf{ŷ_d}``, and `stoch_ym`, the stochastic predictions of the measured outputs 
 ``\mathbf{ŷ_s^m}``, the unmeasured ones being ``\mathbf{ŷ_s^u} = \mathbf{0}``. 
 
-`stoch_ym` is a `TransferFunction` or `StateSpace` model that filters zero mean white 
-noises. Its default value supposes 1 integrator per measured outputs, assuming that the 
+`stoch_ym` is a `TransferFunction` or `StateSpace` model that filters a zero mean white 
+noise vector. Its default value supposes 1 integrator per measured outputs, assuming that the 
 current stochastic estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` will
-be constant in the future. This is the dynamic matrix control strategy, which is simple 
+be constant in the future. This is the dynamic matrix control (DMC) strategy, which is simple 
 but sometimes too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
 
-!!! warning "Integrating or unstable poles"
+!!! warning "Integrating or unstable model not supported"
     `InternalModel` estimator does not work if `model` is integrating or unstable. The 
-    constructor verifies these aspects for `LinModel`, but not for `NonLinModel`. Uses any 
+    constructor verifies these aspects for `LinModel` but not for `NonLinModel`. Uses any 
     other state estimator in such cases.
 
 See also [`init_internalmodel`](@ref)
@@ -101,8 +102,6 @@ function InternalModel(
 end
 
 
-
-
 @doc raw"""
     init_internalmodel(As, Bs, Cs, Ds)
 
@@ -110,7 +109,7 @@ Calc stochastic model update matrices `Âs` and `B̂s` for `InternalModel` esti
 
 `Âs` and `B̂s` are the stochastic model update matrices :
 ```math
-    \mathbf{x̂_s}(k+1) =   \mathbf{Â_s}\mathbf{x̂_s}(k) + \mathbf{B̂_s}\mathbf{ŷ_s}(k)
+    \mathbf{x̂_s}(k+1) =  \mathbf{Â_s x̂_s}(k) + \mathbf{B̂_s ŷ_s}(k)
 ```
 with current stochastic model states ``\mathbf{x̂_s}`` and outputs 
 ``\mathbf{ŷ_s}(k) = \mathbf{y}(k) - \mathbf{ŷ_d}(k)``. See Desbiens et al. 

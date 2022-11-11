@@ -9,5 +9,6 @@ export InternalModel
 
 include("sim_model.jl")
 include("state_estim.jl")
+include("predictive_control.jl")
 
 end
