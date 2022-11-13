@@ -12,7 +12,10 @@ DocMeta.setdocmeta!(
 makedocs(
     sitename    = "ModelPredictiveControl.jl",
     modules     = [ModelPredictiveControl],
-    doctest     = true
+    doctest     = true,
+    pages = [
+        "Home" => "index.md",
+    ]
 )
 
 deploydocs(

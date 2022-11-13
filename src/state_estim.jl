@@ -111,9 +111,12 @@ Calc stochastic model update matrices `Âs` and `B̂s` for `InternalModel` esti
 ```math
     \mathbf{x̂_s}(k+1) =  \mathbf{Â_s x̂_s}(k) + \mathbf{B̂_s ŷ_s}(k)
 ```
-with current stochastic model states ``\mathbf{x̂_s}`` and outputs 
-``\mathbf{ŷ_s}(k) = \mathbf{y}(k) - \mathbf{ŷ_d}(k)``. See Desbiens et al. 
-"Model-based predictive control: a general framework" (sec. 4.3.5).
+with current stochastic model states ``\mathbf{x̂_s}(k)`` and outputs ``\mathbf{ŷ_s}(k)``, 
+which is in turn composed of the measured ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - 
+\mathbf{ŷ_d^m}(k)`` and unmeasured ``\mathbf{ŷ^u = 0}`` outputs. See [^1].
+
+[^1]:
+    > Desbiens et al. "Model-based predictive control: a general framework" (sec. 4.3.5)
 """
 function init_internalmodel(As, Bs, Cs, Ds)
     B̂s = Bs/Ds

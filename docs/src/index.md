@@ -1,5 +1,17 @@
 # ModelPredictiveControl.jl Documentation
 
+```@contents
+```
+
+# Tutorial
+
+
+# Specifying models
+
+adsasd
+
+## SimModel functions
+
 ```@docs
 LinModel
 NonLinModel
@@ -8,10 +20,27 @@ updatestate
 evaloutput
 ```
 
+# State estimator design
+
 All the state estimators support measured ``\mathbf{y^m}`` and unmeasured ``\mathbf{y^u}``
 outputs, where ``\mathbf{y}`` refers to all of them.
 
+## StateEstimator functions
+
 ```@docs
 InternalModel
-init_internalmodel
+```
+
+# Advanced Topics
+
+## Internals
+
+```@docs
+ModelPredictiveControl.init_internalmodel
+```
+
+
+# API
+
+```@index
 ```

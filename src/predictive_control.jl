@@ -47,6 +47,7 @@ struct LinMPC <: PredictiveController
     end
 end
 
+
 function LinMPC(
     estim::StateEstimator;
     Hp::Int = 1,
@@ -57,8 +58,14 @@ function LinMPC(
     ru  = fill(0.0, model.nu),
     Cwt = 1e5
 )
-    return MPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
+    return LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
 end
+
+function LinMPC(model::LinModel; kwargs...)
+    
+    return LinMPC(estim; kwargs...)
+end
+
 
 
 
