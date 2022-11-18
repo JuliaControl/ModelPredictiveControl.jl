@@ -1,18 +1,16 @@
 abstract type StateEstimator end
 
+abstract type Estimate end
 
-#=
-abstract type StateEstimate end
-
-mutable struct InternalModelState <: StateEstimate
-    x̂d::Vector{Float}
-    x̂s::Vector{Float}
+struct InternalModelState <: Estimate
+    x̂::Vector{Float64}
+    x̂d::Vector{Float64}
+    x̂s::Vector{Float64}
 end
-=#
-
 
 struct InternalModel <: StateEstimator
     model::SimModel
+    state::InternalModelState
     i_ym::IntRangeOrVector
     nx̂::Int
     nym::Int
@@ -57,7 +55,10 @@ struct InternalModel <: StateEstimator
         nxs = size(As,1)
         nint_ym = zeros(nym) # not used for InternalModel
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        return new(model, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s, nint_ym)
+        x̂d = zeros(nx̂)
+        x̂s = zeros(nxs)
+        state = InternalModelState(x̂d, x̂d, x̂s)
+        return new(model, state, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s, nint_ym)
     end
 end
 
@@ -138,33 +139,28 @@ function init_internalmodel(As, Bs, Cs, Ds)
     return Âs, B̂s
 end
 
-#=
-function updatestate(estim::InternalModel, x̂::InternalModelState, u, d=Float64[], ym)
-    # ------- deterministic model --------
-    x̂d = x̂.x̂d
-    x̂d = updatestate(estim.model, x̂d, u, d)
-
-
-    if yo
-        xhatNext = mMPC.Ahat*xhat + mMPC.Bhat*u + mMPC.Bdhat*d;
-        yhatd    = mMPC.Chat*xhat + mMPC.Ddhat*d;
-    else
-        xhatd = xhat(1:mMPC.nx);
-        whatd = zeros(mMPC.nx,1); % whatd=0 for IMC (only used for MHE)
-        if mMPC.SimulFuncHasW     
-            [YhatDmat,XhatDmat] = mMPC.SimulFunc(xhatd,u,d,whatd);
-        else                              
-            [YhatDmat,XhatDmat] = mMPC.SimulFunc(xhatd,u,d);
-        end
-        xhatNext = XhatDmat(:,end);
-        yhatd    = YhatDmat(:,1);
-    end
-    # -------- stochastic model  ---------
-    yhats = zeros(mMPC.ny,1); 
-    yhats(mMPC.i_ym) = ym - yhatd(mMPC.i_ym); % yhats=0 for unmeas. outputs
-    xhatsNext = mMPC.Ashat*xhats + mMPC.Bshat*yhats;
+"Update `estim.state` values with current inputs `u`, measured outputs `ym` and dist. `d`."
+function updatestate!(estim::InternalModel, u, ym, d=Float64[])
+    model = estim.model
+    # -------------- deterministic model ---------------------
+    ŷd = model.h(estim.state.x̂d, d - model.dop) + model.yop
+    estim.state.x̂d[:] = model.f(estim.state.x̂d, u - model.u_op, d - model.dop)
+    # --------------- stochastic model -----------------------
+    ŷs = zeros(model.ny,1);
+    ŷs[estim.i_ym] = ym - ŷd[estim.i_ym];   # ŷs=0 for unmeasured outputs
+    model.state.x̂s[:] = estim.Âs*estim.state.x̂s + estim.B̂s*ŷs;
+    return estim.state
 end
-=#
+
+"Evaluate estimator outputs `̂ŷ` from `estim.state` values"
+function evaloutput(estim::InternalModel, d=Float64[])
+    # TODO: adding current ŷs, two choices:
+    # 1) adding a field in InternalModelState (not sur if possible)
+    # 2) overload evaloutput for internal model add receive ym as input argument
+    # 3) other solution ?
+    return estim.model.h(estim.state.x̂, d - estim.model.dop) + estim.model.yop
+end
+
 
 function Base.show(io::IO, estim::StateEstimator)
     println(io, "$(typeof(estim)) state estimator with "*

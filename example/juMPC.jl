@@ -3,9 +3,10 @@ using Revise
 Pkg.activate(".")
 
 using ModelPredictiveControl
-using DAQP
-using OSQP
-using JuMP, LinearAlgebra
+#using DAQP
+#using OSQP
+#using JuMP 
+using LinearAlgebra
 using ControlSystemsBase
 using MAT
 
