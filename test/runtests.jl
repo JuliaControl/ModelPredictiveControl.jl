@@ -62,13 +62,14 @@ using Test
 
     # === LinModel sim functions call tests ===
 
-    @test updatestate(linmodel1, zeros(2,), zeros(2,)) ≈ zeros(2,) 
-    @test updatestate(linmodel1, zeros(2,), zeros(2,), Float64[]) ≈ zeros(2,)
-    @test evaloutput(linmodel1, zeros(2,)) ≈ zeros(2,) 
-    @test evaloutput(linmodel1, zeros(2,), Float64[]) ≈ zeros(2,)
+    @test updatestate!(linmodel1, zeros(2)) ≈ zeros(2) 
+    @test updatestate!(linmodel1, zeros(2), Float64[]) ≈ zeros(2)
+    @test evaloutput(linmodel1) ≈ zeros(2) 
+    @test evaloutput(linmodel1, Float64[]) ≈ zeros(2,)
+    @test linmodel1() ≈ zeros(2)
 
-    @test_throws DimensionMismatch updatestate(linmodel1, zeros(2,), zeros(2,), zeros(1,))
-    @test_throws DimensionMismatch evaloutput(linmodel1, zeros(2,), zeros(1,))
+    @test_throws DimensionMismatch updatestate!(linmodel1, zeros(2), zeros(1))
+    @test_throws DimensionMismatch evaloutput(linmodel1, zeros(1))
 
     # === NonLinModel Construction tests ===
 
@@ -102,13 +103,14 @@ using Test
 
     # === NonLinModel sim functions call tests ===
     
-    @test updatestate(nonlinmodel1, zeros(2,), zeros(2,)) ≈ zeros(2,) 
-    @test updatestate(nonlinmodel1, zeros(2,), zeros(2,), Float64[]) ≈ zeros(2,)
-    @test evaloutput(nonlinmodel1, zeros(2,)) ≈ zeros(2,) 
-    @test evaloutput(nonlinmodel1, zeros(2,), Float64[]) ≈ zeros(2,)
+    @test updatestate!(nonlinmodel1, zeros(2,)) ≈ zeros(2) 
+    @test updatestate!(nonlinmodel1, zeros(2,), Float64[]) ≈ zeros(2)
+    @test evaloutput(nonlinmodel1) ≈ zeros(2) 
+    @test evaloutput(nonlinmodel1, Float64[]) ≈ zeros(2)
+    @test nonlinmodel1() ≈ zeros(2)
     
-    @test_throws DimensionMismatch updatestate(nonlinmodel1, zeros(2,), zeros(2,), zeros(1,))
-    @test_throws DimensionMismatch evaloutput(nonlinmodel1, zeros(2,), zeros(1,))
+    @test_throws DimensionMismatch updatestate!(nonlinmodel1, zeros(2), zeros(1))
+    @test_throws DimensionMismatch evaloutput(nonlinmodel1, zeros(1))
 
     # === InternalModel constructor tests ===
 

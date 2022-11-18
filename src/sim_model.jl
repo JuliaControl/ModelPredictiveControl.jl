@@ -6,6 +6,7 @@ struct LinModel <: SimModel
     C   ::Matrix{Float64}
     Bd  ::Matrix{Float64}
     Dd  ::Matrix{Float64}
+    x::Vector{Float64}
     f::Function
     h::Function
     Ts::Float64
@@ -28,7 +29,8 @@ struct LinModel <: SimModel
         uop = zeros(nu)
         yop = zeros(ny)
         dop = zeros(nd)
-        return new(A, Bu, C, Bd, Dd, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
+        x = zeros(nx)
+        return new(A, Bu, C, Bd, Dd, x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
 end
 
@@ -185,6 +187,7 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
 ```
 """
 struct NonLinModel <: SimModel
+    x::Vector{Float64}
     f::Function
     h::Function
     Ts::Float64
@@ -195,21 +198,14 @@ struct NonLinModel <: SimModel
     uop::Vector{Float64}
     yop::Vector{Float64}
     dop::Vector{Float64}
-    function NonLinModel(
-        f,
-        h,
-        Ts::Real,
-        nu::Int,
-        nx::Int,
-        ny::Int,   
-        nd::Int = 0;
-        )
+    function NonLinModel(f, h, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int = 0)
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_fcts(f, h)
         uop = zeros(nu)
         yop = zeros(ny)
         dop = zeros(nd)
-        return new(f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
+        x = zeros(nx)
+        return new(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
 end
 
@@ -307,17 +303,14 @@ end
 typestr(model::LinModel) = "linear"
 typestr(model::NonLinModel) = "nonlinear"
 
-"""
-    updatestate(sys::SimModel, x, u, d=Float64[])
+"Update states `x` in `model` with current inputs `u` and measured disturbances `d`."
+function updatestate!(model::SimModel, u, d=Float64[])
+    model.x[:] = model.f(model.x, u - model.uop, d - model.dop)
+    return model.x
+end
 
-Update states `x` of `sys` with current inputs `u` and measured disturbances `d`.
-"""
-updatestate(sys::SimModel, x, u, d=Float64[]) = sys.f(x, u-sys.uop, d-sys.dop)
+"Evaluate output `y` of `model` with current states `x` and measured disturbances `d`."
+evaloutput(model::SimModel, d=Float64[]) = model.h(model.x, d - model.dop) + model.yop
 
-"""
-    evaloutput(sys::SimModel, x, d=Float64[])
-
-Evaluate output `y` of `sys` with current state `x` and measured disturbances `d`.
-"""
-evaloutput(sys::SimModel, x, d=Float64[]) = sys.h(x, d-sys.dop)
-
+"Functor allowing callable `SimModel` object as an alias for `evaloutput`."
+(model::SimModel)(d=Float64[]) = evaloutput(model::SimModel, d)

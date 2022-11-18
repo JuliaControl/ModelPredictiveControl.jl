@@ -96,7 +96,7 @@ function init_stoch_pred(estim::StateEstimator, Hp)
         iRow = (1:nxs) + nxs*(i-1);
         Ms[iRow, :] = As^i;
     end
-    Ps = kron(I(Hp), Cs);
+    Ps = repeatdiag(Cs, Hp);
     Ks = Ps*Ms;
     return Ks, zeros(ny*Hp,0)
 end
@@ -130,7 +130,8 @@ function init_stoch_pred(estim::InternalModel, Hp)
     return Ks, Ls 
 end
 
-
+"Generate a block diagonal matrix repeating `n` times the matrix `A`."
+repeatdiag(A, n::Int) = kron(I(n), A)
 
 
 #=

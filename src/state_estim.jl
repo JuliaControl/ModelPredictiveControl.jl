@@ -1,5 +1,16 @@
 abstract type StateEstimator end
 
+
+#=
+abstract type StateEstimate end
+
+mutable struct InternalModelState <: StateEstimate
+    x̂d::Vector{Float}
+    x̂s::Vector{Float}
+end
+=#
+
+
 struct InternalModel <: StateEstimator
     model::SimModel
     i_ym::IntRangeOrVector
@@ -61,13 +72,14 @@ unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions
 ``\mathbf{ŷ_d}``, and `stoch_ym`, the stochastic predictions of the measured outputs 
 ``\mathbf{ŷ_s^m}``, the unmeasured ones being ``\mathbf{ŷ_s^u} = \mathbf{0}``. 
 
-`stoch_ym` is a `TransferFunction` or `StateSpace` model that filters a zero mean white 
-noise vector. Its default value supposes 1 integrator per measured outputs, assuming that the 
-current stochastic estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` will
-be constant in the future. This is the dynamic matrix control (DMC) strategy, which is simple 
-but sometimes too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
+`stoch_ym` is a `TransferFunction` or `StateSpace` model that hypothetically filters a zero 
+mean white noise vector. Its default value supposes 1 integrator per measured outputs, 
+assuming that the current stochastic estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - 
+\mathbf{ŷ_d^m}(k)`` will be constant in the future. This is the dynamic matrix control (DMC) 
+strategy, which is simple but sometimes too aggressive. Additional poles and zeros in 
+`stoch_ym` can mitigate this.
 
-!!! warning "Integrating or unstable model not supported"
+!!! warning
     `InternalModel` estimator does not work if `model` is integrating or unstable. The 
     constructor verifies these aspects for `LinModel` but not for `NonLinModel`. Uses any 
     other state estimator in such cases.
@@ -113,10 +125,12 @@ Calc stochastic model update matrices `Âs` and `B̂s` for `InternalModel` esti
 ```
 with current stochastic model states ``\mathbf{x̂_s}(k)`` and outputs ``\mathbf{ŷ_s}(k)``, 
 which is in turn composed of the measured ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - 
-\mathbf{ŷ_d^m}(k)`` and unmeasured ``\mathbf{ŷ^u = 0}`` outputs. See [^1].
+\mathbf{ŷ_d^m}(k)`` and unmeasured ``\mathbf{ŷ_s^u = 0}`` outputs. See [^1].
 
-[^1]:
-    > Desbiens et al. "Model-based predictive control: a general framework" (sec. 4.3.5)
+[^1]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
+    control structure for decoupling setpoint tracking, feedforward compensation and 
+    disturbance rejection dynamics", *IEE Proceedings - Control Theory and Applications*, 
+    vol. 147, no 4, https://doi.org/10.1049/ip-cta:20000443, p. 465–475, ISSN 1350-2379.
 """
 function init_internalmodel(As, Bs, Cs, Ds)
     B̂s = Bs/Ds
@@ -124,6 +138,33 @@ function init_internalmodel(As, Bs, Cs, Ds)
     return Âs, B̂s
 end
 
+#=
+function updatestate(estim::InternalModel, x̂::InternalModelState, u, d=Float64[], ym)
+    # ------- deterministic model --------
+    x̂d = x̂.x̂d
+    x̂d = updatestate(estim.model, x̂d, u, d)
+
+
+    if yo
+        xhatNext = mMPC.Ahat*xhat + mMPC.Bhat*u + mMPC.Bdhat*d;
+        yhatd    = mMPC.Chat*xhat + mMPC.Ddhat*d;
+    else
+        xhatd = xhat(1:mMPC.nx);
+        whatd = zeros(mMPC.nx,1); % whatd=0 for IMC (only used for MHE)
+        if mMPC.SimulFuncHasW     
+            [YhatDmat,XhatDmat] = mMPC.SimulFunc(xhatd,u,d,whatd);
+        else                              
+            [YhatDmat,XhatDmat] = mMPC.SimulFunc(xhatd,u,d);
+        end
+        xhatNext = XhatDmat(:,end);
+        yhatd    = YhatDmat(:,1);
+    end
+    # -------- stochastic model  ---------
+    yhats = zeros(mMPC.ny,1); 
+    yhats(mMPC.i_ym) = ym - yhatd(mMPC.i_ym); % yhats=0 for unmeas. outputs
+    xhatsNext = mMPC.Ashat*xhats + mMPC.Bshat*yhats;
+end
+=#
 
 function Base.show(io::IO, estim::StateEstimator)
     println(io, "$(typeof(estim)) state estimator with "*
