@@ -1,6 +1,6 @@
 module ModelPredictiveControl
 
-using JuMP
+#using JuMP
 using LinearAlgebra
 using ControlSystemsBase
 

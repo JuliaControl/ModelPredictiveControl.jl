@@ -57,7 +57,7 @@ struct InternalModel <: StateEstimator
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         x̂d = zeros(nx̂)
         x̂s = zeros(nxs)
-        state = InternalModelState(x̂d, x̂d, x̂s)
+        state = InternalModelState(x̂d, x̂d, x̂s) # xhat = xhatd for InternalModel
         return new(model, state, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s, nint_ym)
     end
 end
@@ -71,7 +71,7 @@ Construct an `InternalModel` estimator based on `model`.
 `i_ym` provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are 
 unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions 
 ``\mathbf{ŷ_d}``, and `stoch_ym`, the stochastic predictions of the measured outputs 
-``\mathbf{ŷ_s^m}``, the unmeasured ones being ``\mathbf{ŷ_s^u} = \mathbf{0}``. 
+``\mathbf{ŷ_s^m}`` (the unmeasured ones being ``\mathbf{ŷ_s^u} = \mathbf{0}``). 
 
 `stoch_ym` is a `TransferFunction` or `StateSpace` model that hypothetically filters a zero 
 mean white noise vector. Its default value supposes 1 integrator per measured outputs, 
@@ -152,13 +152,23 @@ function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     return estim.state
 end
 
-"Evaluate estimator outputs `̂ŷ` from `estim.state` values"
-function evaloutput(estim::InternalModel, d=Float64[])
-    # TODO: adding current ŷs, two choices:
-    # 1) adding a field in InternalModelState (not sur if possible)
-    # 2) overload evaloutput for internal model add receive ym as input argument
-    # 3) other solution ?
-    return estim.model.h(estim.state.x̂, d - estim.model.dop) + estim.model.yop
+
+@doc raw"""
+    evaloutput(estim::InternalModel, d=Float64[], ym=nothing)
+
+Evaluate `InternalModel` outputs `̂ŷ` from `estim.state` values and measured outputs `ym`.
+
+`InternalModel` estimator needs current measured outputs ``\mathbf{y^m}(k)`` to estimate
+its current outputs ``\mathbf{ŷ^m}(k)``, since the strategy imposes that ``\mathbf{ŷ^m}(k) = 
+\mathbf{ŷ^m}(k)`` is always true. 
+"""
+function evaloutput(estim::InternalModel, d=Float64[], ym=nothing)
+    if isnothing(ym) 
+        error("InternalModel needs current measured outputs ym to estimate its outputs ŷ")
+    end
+    ŷ = estim.model.h(estim.state.x̂d, d - estim.model.dop) + estim.model.yop
+    ŷ[estim.i_ym] = ym
+    return ŷ
 end
 
 
