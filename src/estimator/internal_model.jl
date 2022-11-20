@@ -135,7 +135,11 @@ function init_internalmodel(As, Bs, Cs, Ds)
     return Âs, B̂s
 end
 
-"Update `estim.state` values with current inputs `u`, measured outputs `ym` and dist. `d`."
+"""
+    updatestate!(estim::InternalModel, u, ym, d=Float64[])
+
+Update `estim.state` values with current inputs `u`, measured outputs `ym` and dist. `d`.
+"""
 function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     model = estim.model
     # -------------- deterministic model ---------------------
@@ -150,13 +154,14 @@ end
 
 
 @doc raw"""
-    evaloutput(estim::InternalModel, d=Float64[], ym=nothing)
+    evaloutput(estim::InternalModel, ym, d=Float64[])
 
-Evaluate `InternalModel` outputs `̂ŷ` from `estim.state` values and measured outputs `ym`.
+Evaluate `InternalModel` outputs `̂ŷ` from `estim.state` values.
 
-`InternalModel` estimator needs current measured outputs ``\mathbf{y^m}(k)`` to estimate
-its current outputs ``\mathbf{ŷ^m}(k)``, since the strategy imposes that ``\mathbf{ŷ^m}(k) = 
-\mathbf{y^m}(k)`` is always true. 
+`ym` and `d` are current measured outputs and disturbances, respectively. `InternalModel` 
+estimator needs current measured outputs ``\mathbf{y^m}(k)`` to estimate its outputs 
+``\mathbf{ŷ^m}(k)``, since the strategy imposes that ``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` 
+is always true. 
 """
 function evaloutput(estim::InternalModel, ym, d=Float64[])
     ŷ = estim.model.h(estim.state.x̂d, d - estim.model.dop) + estim.model.yop

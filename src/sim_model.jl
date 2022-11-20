@@ -303,13 +303,21 @@ end
 typestr(model::LinModel) = "linear"
 typestr(model::NonLinModel) = "nonlinear"
 
-"Update states `x` in `model` with current inputs `u` and measured disturbances `d`."
+"""
+    updatestate!(model::SimModel, u, d=Float64[])
+
+Update states `x` in `model` with current inputs `u` and measured disturbances `d`.
+"""
 function updatestate!(model::SimModel, u, d=Float64[])
     model.x[:] = model.f(model.x, u - model.uop, d - model.dop)
     return model.x
 end
 
-"Evaluate output `y` of `model` with current states `x` and measured disturbances `d`."
+"""
+    evaloutput(model::SimModel, d=Float64[])
+
+Evaluate output `y` of `model` with current states `x` and measured disturbances `d`.
+"""
 evaloutput(model::SimModel, d=Float64[]) = model.h(model.x, d - model.dop) + model.yop
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
