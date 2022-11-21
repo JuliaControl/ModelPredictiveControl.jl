@@ -1,3 +1,21 @@
+@doc raw"""
+Abstract supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
+
+---
+
+    (model::SimModel)(d=Float64[])
+
+Functor allowing callable `SimModel` object as an alias for [`evaloutput`](@ref).
+
+# Examples
+```jldoctest
+julia> model = NonLinModel((x,u,_)->-x + u, (x,_)->x .+ 20, 10, 1, 1, 1);
+
+julia> y = model()
+1-element Vector{Float64}:
+ 20.0
+```
+"""
 abstract type SimModel end
 
 struct LinModel <: SimModel
@@ -178,7 +196,7 @@ See also [`LinModel`](@ref).
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->-x+u, (x,_)->2x, 10, 1 , 1 , 1)
+julia> model = NonLinModel((x,u,_)->-x+u, (x,_)->2x, 10, 1, 1, 1)
 Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
  1 manipulated inputs u
  1 states x
@@ -278,15 +296,15 @@ function setop!(
     dop::Vector{<:Real} = Float64[]
 )
     if ~isempty(uop) 
-        size(uop)  == (model.nu,) || error("uop size must be $((model.nu,))")
+        size(uop) == (model.nu,) || error("uop size must be $((model.nu,))")
         model.uop[:] = uop
     end
     if ~isempty(yop)
-        size(yop)  == (model.ny,) || error("yop size must be $((model.ny,))")
+        size(yop) == (model.ny,) || error("yop size must be $((model.ny,))")
         model.yop[:] = yop
     end
     if ~isempty(dop)
-        size(dop)  == (model.nd,) || error("dop size must be $((model.nd,))")
+        size(dop) == (model.nd,) || error("dop size must be $((model.nd,))")
         model.dop[:] = dop
     end
     return model
@@ -316,9 +334,10 @@ end
 """
     evaloutput(model::SimModel, d=Float64[])
 
-Evaluate output `y` of `model` with current states `x` and measured disturbances `d`.
+Evaluate `SimModel` outputs `y` from `model.x` states and measured disturbances `d`.
 """
 evaloutput(model::SimModel, d=Float64[]) = model.h(model.x, d - model.dop) + model.yop
+
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=Float64[]) = evaloutput(model::SimModel, d)

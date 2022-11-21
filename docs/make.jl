@@ -13,9 +13,10 @@ makedocs(
     sitename    = "ModelPredictiveControl.jl",
     modules     = [ModelPredictiveControl],
     doctest     = true,
-    pages = [
-        "Home" => "index.md",
-    ]
+    format      = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
+    #pages = [
+    #    "Home" => "index.md",
+    #]
 )
 
 deploydocs(

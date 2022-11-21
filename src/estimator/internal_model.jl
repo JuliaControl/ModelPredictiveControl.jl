@@ -81,7 +81,7 @@ strategy, which is simple but sometimes too aggressive. Additional poles and zer
     constructor verifies these aspects for `LinModel` but not for `NonLinModel`. Uses any 
     other state estimator in such cases.
 
-See also [`init_internalmodel`](@ref)
+See also [`LinModel`](@ref), [`NonLinModel`](@ref)
 
 # Examples
 ```jldoctest
@@ -169,6 +169,10 @@ function evaloutput(estim::InternalModel, ym, d=Float64[])
     return ŷ
 end
 
-"Functor allowing callable `InternalModel` object as an alias for `evaloutput`."
+"""
+    (estim::InternalModel)(ym, d=Float64[])
+
+Functor allowing callable `InternalModel` object as an alias for `evaloutput`.
+"""
 (estim::InternalModel)(ym, d=Float64[]) = evaloutput(estim::InternalModel, d, ym)
 
