@@ -105,8 +105,9 @@ using Test
     
     @test updatestate!(nonlinmodel1, zeros(2,)) ≈ zeros(2) 
     @test updatestate!(nonlinmodel1, zeros(2,), Float64[]) ≈ zeros(2)
-    @test evaloutput(nonlinmodel1) ≈ nonlinmodel1() ≈ zeros(2) 
-    @test evaloutput(nonlinmodel1, Float64[])  ≈ nonlinmodel1(Float64[]) ≈ zeros(2)
+    @test nonlinmodel1.x ≈ zeros(2)
+    @test evaloutput(nonlinmodel1) ≈ nonlinmodel1() ≈ zeros(2)
+    @test evaloutput(nonlinmodel1, Float64[]) ≈ nonlinmodel1(Float64[]) ≈ zeros(2)
     
     @test_throws DimensionMismatch updatestate!(nonlinmodel1, zeros(2), zeros(1))
     @test_throws DimensionMismatch evaloutput(nonlinmodel1, zeros(1))

@@ -1,11 +1,14 @@
 {
     "cSpell.ignoreWords": [
+        "estimstoch",
         "evaloutput",
+        "nint",
         "setop",
         "typestr",
         "updatestate"
     ],
     "cSpell.words": [
+        "bidiagonal",
         "estim",
         "feedforward",
         "franckgaga",

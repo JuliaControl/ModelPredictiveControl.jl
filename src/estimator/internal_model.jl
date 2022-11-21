@@ -18,8 +18,7 @@ struct InternalModel <: StateEstimator
     Ds::Matrix{Float64}
     Âs::Matrix{Float64}
     B̂s::Matrix{Float64}
-    nint_ym::Vector{Int}
-    function InternalModel(model, Asm, Bsm, Csm, Dsm, i_ym)
+    function InternalModel(model, i_ym, Asm, Bsm, Csm, Dsm)
         ny = model.ny
         if isa(model, LinModel)
             poles = eigvals(model.A)
@@ -27,9 +26,7 @@ struct InternalModel <: StateEstimator
                 error("InternalModel does not support integrating or unstable model")
             end
         end
-        if length(unique(i_ym)) ≠ length(i_ym) || maximum(i_ym) > ny
-            error("Measured output indices i_ym should contains valid and unique indices")
-        end
+        validate_ym(model, i_ym)
         nym = length(i_ym);
         nyu = ny - nym;
         if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
@@ -49,12 +46,11 @@ struct InternalModel <: StateEstimator
         nxs = size(As,1);
         nx̂ = model.nx
         nxs = size(As,1)
-        nint_ym = zeros(nym) # not used for InternalModel
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         x̂d = zeros(nx̂)
         x̂s = zeros(nxs)
         state = InternalModelState(x̂d, x̂d, x̂s) # xhat = xhatd for InternalModel
-        return new(model, state, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s, nint_ym)
+        return new(model, state, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s)
     end
 end
 
@@ -107,7 +103,7 @@ function InternalModel(
     else
         stoch_ym.Ts == model.Ts || error("stoch_ym.Ts must be identical to model.Ts")
     end
-    return InternalModel(model, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D, i_ym)
+    return InternalModel(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
 end
 
 
@@ -116,13 +112,26 @@ end
 
 Calc stochastic model update matrices `Âs` and `B̂s` for `InternalModel` estimator.
 
-`Âs` and `B̂s` are the stochastic model update matrices :
+`As`, `Bs`, `Cs` and `Ds` are the stochastic model matrices :
 ```math
-    \mathbf{x̂_s}(k+1) =  \mathbf{Â_s x̂_s}(k) + \mathbf{B̂_s ŷ_s}(k)
+\begin{aligned}
+    \mathbf{x_s}(k+1) &= \mathbf{A_s x_s}(k) + \mathbf{B_s e}(k) \\
+    \mathbf{y_s}(k)   &= \mathbf{C_s x_s}(k) + \mathbf{D_s e}(k)
+\end{aligned}
 ```
-with current stochastic model states ``\mathbf{x̂_s}(k)`` and outputs ``\mathbf{ŷ_s}(k)``, 
-which is in turn composed of the measured ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - 
-\mathbf{ŷ_d^m}(k)`` and unmeasured ``\mathbf{ŷ_s^u = 0}`` outputs. See [^1].
+where ``\mathbf{e}(k)`` is conceptual and unknown zero mean white noise. Its optimal
+estimation is ``\mathbf{ê=0}``, the expected value. Thus, the `Âs` and `B̂s` matrices that 
+optimally update the stochastic estimate ``\mathbf{x̂_s}`` are:
+```math
+\begin{aligned}
+    \mathbf{x̂_s}(k+1) 
+        &= \mathbf{(A_s - B_s D_s^{-1} C_s) x̂_s}(k) + \mathbf{(B_s D_s^{-1}) ŷ_s}(k) \\
+        &= \mathbf{Â_s x̂_s}(k) + \mathbf{B̂_s ŷ_s}(k)
+\end{aligned}
+```
+with current stochastic outputs estimation ``\mathbf{ŷ_s}(k)``, composed of the measured 
+``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` and unmeasured 
+``\mathbf{ŷ_s^u = 0}`` outputs. See [^1].
 
 [^1]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
     control structure for decoupling setpoint tracking, feedforward compensation and 
