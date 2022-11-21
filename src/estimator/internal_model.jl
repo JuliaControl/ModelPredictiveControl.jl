@@ -144,11 +144,11 @@ function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     model = estim.model
     # -------------- deterministic model ---------------------
     ŷd = model.h(estim.state.x̂d, d - model.dop) + model.yop
-    estim.state.x̂d[:] = model.f(estim.state.x̂d, u - model.u_op, d - model.dop)
+    estim.state.x̂d[:] = model.f(estim.state.x̂d, u - model.uop, d - model.dop)
     # --------------- stochastic model -----------------------
     ŷs = zeros(model.ny,1);
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym];   # ŷs=0 for unmeasured outputs
-    model.state.x̂s[:] = estim.Âs*estim.state.x̂s + estim.B̂s*ŷs;
+    estim.state.x̂s[:] = estim.Âs*estim.state.x̂s + estim.B̂s*ŷs;
     return estim.state.x̂
 end
 
@@ -174,5 +174,5 @@ end
 
 Functor allowing callable `InternalModel` object as an alias for `evaloutput`.
 """
-(estim::InternalModel)(ym, d=Float64[]) = evaloutput(estim::InternalModel, d, ym)
+(estim::InternalModel)(ym, d=Float64[]) = evaloutput(estim::InternalModel, ym, d)
 
