@@ -169,7 +169,7 @@ Evaluate `InternalModel` outputs `̂ŷ` from `estim.state` values.
 
 `ym` and `d` are current measured outputs and disturbances, respectively. `InternalModel` 
 estimator needs current measured outputs ``\mathbf{y^m}(k)`` to estimate its outputs 
-``\mathbf{ŷ^m}(k)``, since the strategy imposes that ``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` 
+``\mathbf{ŷ}(k)``, since the strategy imposes that ``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` 
 is always true. 
 """
 function evaloutput(estim::InternalModel, ym, d=Float64[])

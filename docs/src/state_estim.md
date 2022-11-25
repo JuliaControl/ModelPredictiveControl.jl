@@ -10,6 +10,8 @@
 
 ```@docs
 InternalModel
+updatestate!(::InternalModel,::Any, ::Any, ::Any)
+evaloutput(::InternalModel, ::Any, ::Any)
 ```
 
 ### Asymptotic Kalman filter

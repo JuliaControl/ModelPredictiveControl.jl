@@ -42,8 +42,8 @@ struct LinModel <: SimModel
         size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
         size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
         Ts > 0 || error("Sampling time Ts must be positive")
-        f(x,u,d)  = A*x + Bu*u + Bd*d
-        h(x,d)    = C*x + Dd*d
+        f(x,u,d) = A*x + Bu*u + Bd*d
+        h(x,d) = C*x + Dd*d
         uop = zeros(nu)
         yop = zeros(ny)
         dop = zeros(nd)
@@ -264,9 +264,9 @@ The state-space model including operating points (a.k.a. nominal values) is:
 where
 ```math
 \begin{aligned}
-    \mathbf{u_0}(k) &= \mathbf{u}(k) - \mathbf{u_{op}}(k) \\
-    \mathbf{y_0}(k) &= \mathbf{y}(k) - \mathbf{y_{op}}(k) \\
-    \mathbf{d_0}(k) &= \mathbf{d}(k) - \mathbf{d_{op}}(k) 
+    \mathbf{u_0}(k) &= \mathbf{u}(k) - \mathbf{u_{op}} \\
+    \mathbf{y_0}(k) &= \mathbf{y}(k) - \mathbf{y_{op}} \\
+    \mathbf{d_0}(k) &= \mathbf{d}(k) - \mathbf{d_{op}} 
 \end{aligned}
 ```
 
