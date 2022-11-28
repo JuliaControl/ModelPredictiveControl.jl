@@ -5,7 +5,7 @@ using LinearAlgebra
 using ControlSystemsBase
 
 export SimModel, LinModel, NonLinModel, setop!, updatestate!, evaloutput
-export InternalModel
+export StateEstimator, InternalModel, KalmanFilter
 
 include("sim_model.jl")
 include("state_estim.jl")

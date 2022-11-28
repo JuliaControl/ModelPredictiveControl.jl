@@ -161,6 +161,29 @@ using Test
     @test evaloutput(internalmodel1, [51,31], Float64[]) ≈ [51,31]
     @test internalmodel1([51,31], Float64[]) ≈ [51,31]
 
+    # === KalmanFilter constructor tests ===
+
+    kalmanfilter1 = KalmanFilter(linmodel2)
+    @test kalmanfilter1.nym == 2
+    @test kalmanfilter1.nyu == 0
+    @test kalmanfilter1.nxs == 2
+    @test kalmanfilter1.nx̂ == 4
+
+    kalmanfilter2 = KalmanFilter(linmodel3, i_ym=[2])
+    @test kalmanfilter2.nym == 1
+    @test kalmanfilter2.nyu == 1
+    @test kalmanfilter2.nxs == 1
+    @test kalmanfilter2.nx̂ == 5
+
+    kalmanfilter3 = KalmanFilter(linmodel2, nint_ym=Int[])
+    @test kalmanfilter3.nxs == 0
+    @test kalmanfilter3.nx̂ == 2
+
+    kalmanfilter4 = KalmanFilter(linmodel2, nint_ym=[2,2])
+    @test kalmanfilter4.nxs == 4
+    @test kalmanfilter4.nx̂ == 6
+
+
     # === DocTest ===
 
     DocMeta.setdocmeta!(

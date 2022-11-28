@@ -151,14 +151,16 @@ Update `estim.state` values with current inputs `u`, measured outputs `ym` and d
 """
 function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     model = estim.model
+    u, d, ym = remove_op(estim, u, d, ym)
+    x̂d, x̂s = estim.state.x̂d, estim.state.x̂s
     # -------------- deterministic model ---------------------
-    ŷd = model.h(estim.state.x̂d, d - model.dop) + model.yop
-    estim.state.x̂d[:] = model.f(estim.state.x̂d, u - model.uop, d - model.dop)
+    ŷd = model.h(x̂d, d)
+    x̂d[:] = model.f(x̂d, u, d)
     # --------------- stochastic model -----------------------
     ŷs = zeros(model.ny,1);
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym];   # ŷs=0 for unmeasured outputs
-    estim.state.x̂s[:] = estim.Âs*estim.state.x̂s + estim.B̂s*ŷs;
-    return estim.state.x̂
+    x̂s[:] = estim.Âs*x̂s + estim.B̂s*ŷs;
+    return x̂d
 end
 
 

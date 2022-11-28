@@ -2,7 +2,7 @@
 
 adsasd
 
-## SimModel functions
+## SimModel functions and types
 
 ```@docs
 LinModel

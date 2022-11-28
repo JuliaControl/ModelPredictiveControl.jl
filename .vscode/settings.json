@@ -18,11 +18,13 @@
         "ISSN",
         "Kalman",
         "kron",
+        "Luenburger",
         "Plamondon",
         "repeatdiag",
         "setpoint",
         "setpoints",
         "stoch",
+        "struct",
         "typeof"
     ]
 }

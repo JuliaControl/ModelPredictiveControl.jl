@@ -4,7 +4,12 @@
     All the state estimators support measured ``\mathbf{y^m}`` and unmeasured 
     ``\mathbf{y^u}`` model outputs, where ``\mathbf{y}`` refers to all of them.
 
-## StateEstimator functions
+## StateEstimator functions and types
+
+
+```@docs
+StateEstimator
+```
 
 ### InternalModel
 
@@ -14,9 +19,21 @@ updatestate!(::InternalModel,::Any, ::Any, ::Any)
 evaloutput(::InternalModel, ::Any, ::Any)
 ```
 
-### Asymptotic Kalman filter
+### Luenburger
 
-### Kalman filter
+### SteadyKalmanFilter
+
+### KalmanFilter
+
+```@docs
+KalmanFilter
+updatestate!(::KalmanFilter,::Any, ::Any, ::Any)
+evaloutput(::KalmanFilter, ::Any)
+```
+
+### UnscentedKalmanFilter
+
+### MovingHorizonEstimator
 
 # Advanced Topics
 
@@ -24,4 +41,6 @@ evaloutput(::InternalModel, ::Any, ::Any)
 
 ```@docs
 ModelPredictiveControl.init_internalmodel
+ModelPredictiveControl.init_estimstoch
+ModelPredictiveControl.augment_model
 ```
