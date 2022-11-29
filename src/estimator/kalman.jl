@@ -1,11 +1,7 @@
-struct KalmanState <: StateEstimate
-    x̂::Vector{Float64}
-    P̂::Matrix{Float64}
-end
-
 struct KalmanFilter <: StateEstimator
     model::LinModel
-    state::KalmanState
+    x̂::Vector{Float64}
+    P̂::Matrix{Float64}
     i_ym::IntRangeOrVector
     nx̂::Int
     nym::Int
@@ -20,9 +16,9 @@ struct KalmanFilter <: StateEstimator
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
-    P̂0  ::Matrix{Float64}
-    Q̂   ::Matrix{Float64}
-    R̂   ::Matrix{Float64}
+    P̂0  ::Union{Diagonal{Float64}, Matrix{Float64}}
+    Q̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
+    R̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
     function KalmanFilter(model, i_ym, Asm, Csm, P̂0, Q̂, R̂)
         nx, ny = model.nx, model.ny
         nym = length(i_ym);
@@ -40,12 +36,10 @@ struct KalmanFilter <: StateEstimator
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         x̂ = zeros(nx̂)
         P̂ = zeros(nx̂, nx̂)
-        state = KalmanState(x̂, P̂)
         return new(
             model, 
-            state, 
-            i_ym, 
-            nx̂, nym, nyu, nxs, 
+            x̂, P̂, 
+            i_ym, nx̂, nym, nyu, nxs, 
             As, Cs,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
@@ -67,18 +61,18 @@ The process model is :
 - `model::LinModel` : (deterministic) model for the estimations.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
     are unmeasured ``\mathbf{y^u}``.
-- `σP0=10*ones(model.nx)` : standard deviations for the initial estimate covariance 
+- `σP0=10*ones(model.nx)` : standard deviation vector for the initial estimate covariance 
     ``\mathbf{P}(0)`` of `model`.
-- `σQ=0.1*ones(model.nx)` : standard deviations for the process noise covariance 
+- `σQ=0.1*ones(model.nx)` : standard deviation vector for the process noise covariance 
     ``\mathbf{Q}`` of `model`.
-- `σR=0.1*ones(length(i_ym))` : standard deviations for the sensor noise covariance 
+- `σR=0.1*ones(length(i_ym))` : standard deviation vector for the sensor noise covariance 
     ``\mathbf{R}`` of `model` measured outputs.
 - `nint_ym=fill(1,length(i_ym))` : integrator quantity per measured outputs for the 
     stochastic model, `nint_ym=Int[]` means no integrator at all.
-- `σP0_int=10*ones(sum(nint_ym))` : standard deviations for the initial estimate covariance 
-    of the stochastic model (composed of output integrators).
-- `σQ_int=10*ones(sum(nint_ym))` : standard deviations for the process noise covariance 
-    of the stochastic model (composed of output integrators).
+- `σP0_int=10*ones(sum(nint_ym))` : standard deviation vector for the initial estimate 
+    covariance of the stochastic model (composed of output integrators).
+- `σQ_int=10*ones(sum(nint_ym))` : standard deviation vector for the process noise 
+    covariance of the stochastic model (composed of output integrators).
 """
 function KalmanFilter(
     model::LinModel;
@@ -104,13 +98,12 @@ end
 """
     updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
 
-Update `estim.state` values with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂`\`P̂` estimates with current inputs `u`, measured outputs `ym` and dist. `d`.
 """
 function updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
     u, d, ym = remove_op(estim, u, d, ym)
     A, Bu, Bd, C, Dd = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
-    x̂, P̂ = estim.state.x̂, estim.state.P̂
-    Q̂, R̂ = estim.Q̂, estim.R̂ 
+    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂ 
     # --- observer gain calculation ---
     M  = (P̂*C')/(C*P̂*C'+R̂)
     Ko = A*M
@@ -124,9 +117,8 @@ end
 @doc raw"""
     evaloutput(estim::KalmanFilter, d=Float64[])
 
-Evaluate `KalmanFilter` outputs `̂ŷ` from `estim.state.x̂` and current disturbances `d`.
+Evaluate `KalmanFilter` outputs `̂ŷ` from `estim.x̂` states and current disturbances `d`.
 """
 function evaloutput(estim::KalmanFilter, d=Float64[])
-    ŷ = estim.Ĉ*estim.state.x̂ + estim.D̂d*(d - estim.model.dop) + estim.model.yop
-    return ŷ
+    return estim.Ĉ*estim.x̂ + estim.D̂d*(d - estim.model.dop) + estim.model.yop
 end

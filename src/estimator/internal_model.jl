@@ -1,12 +1,8 @@
-struct InternalModelState <: StateEstimate
+struct InternalModel <: StateEstimator
+    model::SimModel
     x̂::Vector{Float64}
     x̂d::Vector{Float64}
     x̂s::Vector{Float64}
-end
-
-struct InternalModel <: StateEstimator
-    model::SimModel
-    state::InternalModelState
     i_ym::IntRangeOrVector
     nx̂::Int
     nym::Int
@@ -47,10 +43,9 @@ struct InternalModel <: StateEstimator
         nx̂ = model.nx
         nxs = size(As,1)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        x̂d = zeros(nx̂)
+        x̂d = x̂ = zeros(nx̂)
         x̂s = zeros(nxs)
-        state = InternalModelState(x̂d, x̂d, x̂s) # xhat = xhatd for InternalModel
-        return new(model, state, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s)
+        return new(model, x̂, x̂d, x̂s, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s)
     end
 end
 
@@ -147,12 +142,12 @@ end
 """
     updatestate!(estim::InternalModel, u, ym, d=Float64[])
 
-Update `estim.state` values with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂d`\`x̂s` states with current inputs `u`, measured outputs `ym` and dist. `d`.
 """
 function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     model = estim.model
     u, d, ym = remove_op(estim, u, d, ym)
-    x̂d, x̂s = estim.state.x̂d, estim.state.x̂s
+    x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
     ŷd = model.h(x̂d, d)
     x̂d[:] = model.f(x̂d, u, d)
@@ -167,7 +162,7 @@ end
 @doc raw"""
     evaloutput(estim::InternalModel, ym, d=Float64[])
 
-Evaluate `InternalModel` outputs `̂ŷ` from `estim.state` values.
+Evaluate `InternalModel` outputs `̂ŷ` from `estim.x̂d` states.
 
 `ym` and `d` are current measured outputs and disturbances, respectively. `InternalModel` 
 estimator needs current measured outputs ``\mathbf{y^m}(k)`` to estimate its outputs 
@@ -175,7 +170,7 @@ estimator needs current measured outputs ``\mathbf{y^m}(k)`` to estimate its out
 is always true. 
 """
 function evaloutput(estim::InternalModel, ym, d=Float64[])
-    ŷ = estim.model.h(estim.state.x̂d, d - estim.model.dop) + estim.model.yop
+    ŷ = estim.model.h(estim.x̂d, d - estim.model.dop) + estim.model.yop
     ŷ[estim.i_ym] = ym
     return ŷ
 end

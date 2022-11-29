@@ -17,8 +17,6 @@ julia> ŷ = kf()
 ```
 """
 abstract type StateEstimator end
-"Abstract supertype of all state estimates implemented as `mutable struct`."
-abstract type StateEstimate end
 
 include("estimator/internal_model.jl")
 include("estimator/kalman.jl")
@@ -71,8 +69,7 @@ function init_estimstoch(i_ym, nint_ym)
     end
     any(nint_ym .< 0) && error("nint_ym values should be ≥ 0")
     nxs = sum(nint_ym)
-    if nxs ≠ 0
-        # --- construct stochastic model state-space matrices (integrators) ---
+    if nxs ≠ 0 # construct stochastic model state-space matrices (integrators) :
         Asm = Bidiagonal(zeros(nxs), zeros(nxs-1), :L)
         i_Asm = 1
         for iym = 1:nym
@@ -90,8 +87,7 @@ function init_estimstoch(i_ym, nint_ym)
                 i_Csm += nint;
             end    
         end
-    else
-        println("Yo")
+    else    # no stochastic model :
         Asm, Csm = zeros(0, 0), zeros(nym, 0)
     end
     return Asm, Csm
