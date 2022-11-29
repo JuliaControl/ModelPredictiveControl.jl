@@ -139,7 +139,7 @@ function init_internalmodel(As, Bs, Cs, Ds)
     return Âs, B̂s
 end
 
-"""
+@doc raw"""
     updatestate!(estim::InternalModel, u, ym, d=Float64[])
 
 Update `estim.x̂d`\`x̂s` states with current inputs `u`, measured outputs `ym` and dist. `d`.
