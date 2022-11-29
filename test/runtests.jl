@@ -175,7 +175,7 @@ using Test
     @test kalmanfilter2.nxs == 1
     @test kalmanfilter2.nx̂ == 5
 
-    kalmanfilter3 = KalmanFilter(linmodel2, nint_ym=Int[])
+    kalmanfilter3 = KalmanFilter(linmodel2, nint_ym=0)
     @test kalmanfilter3.nxs == 0
     @test kalmanfilter3.nx̂ == 2
 

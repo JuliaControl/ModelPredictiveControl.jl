@@ -5,7 +5,9 @@
         "nint",
         "setop",
         "typestr",
-        "updatestate"
+        "updatestate",
+        "xhat",
+        "xhatd"
     ],
     "cSpell.words": [
         "bidiagonal",

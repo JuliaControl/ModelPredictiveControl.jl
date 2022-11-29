@@ -48,6 +48,8 @@ struct KalmanFilter <: StateEstimator
     end
 end
 
+const IntVectorOrInt = Union{Int, Vector{Int}}
+
 @doc raw"""
     KalmanFilter(model::LinModel; <keyword arguments>)
 
@@ -61,37 +63,37 @@ The process model is :
 - `model::LinModel` : (deterministic) model for the estimations.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
     are unmeasured ``\mathbf{y^u}``.
-- `σP0=10*ones(model.nx)` : standard deviation vector for the initial estimate covariance 
+- `σP0=fill(10,model.nx)` : standard deviation vector for the initial estimate covariance 
     ``\mathbf{P}(0)`` of `model`.
-- `σQ=0.1*ones(model.nx)` : standard deviation vector for the process noise covariance 
+- `σQ=fill(0.1,model.nx)` : standard deviation vector for the process noise covariance 
     ``\mathbf{Q}`` of `model`.
-- `σR=0.1*ones(length(i_ym))` : standard deviation vector for the sensor noise covariance 
+- `σR=fill(0.1,length(i_ym))` : standard deviation vector for the sensor noise covariance 
     ``\mathbf{R}`` of `model` measured outputs.
 - `nint_ym=fill(1,length(i_ym))` : integrator quantity per measured outputs for the 
-    stochastic model, `nint_ym=Int[]` means no integrator at all.
-- `σP0_int=10*ones(sum(nint_ym))` : standard deviation vector for the initial estimate 
+    stochastic model, `nint_ym=0` means no integrator at all.
+- `σP0_int=fill(10,sum(nint_ym))` : standard deviation vector for the initial estimate 
     covariance of the stochastic model (composed of output integrators).
-- `σQ_int=10*ones(sum(nint_ym))` : standard deviation vector for the process noise 
+- `σQ_int=fill(0.1,sum(nint_ym))` : standard deviation vector for the process noise 
     covariance of the stochastic model (composed of output integrators).
 """
 function KalmanFilter(
     model::LinModel;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector{<:Real} = 10*ones(model.nx),
-    σQ::Vector{<:Real} = 0.1*ones(model.nx),
-    σR::Vector{<:Real} = 0.1*ones(length(i_ym)),
-    nint_ym::Vector{Int} = fill(1,length(i_ym)),
-    σP0_int::Vector{<:Real} = 10*ones(sum(nint_ym)),
-    σQ_int::Vector{<:Real} = 0.1*ones(sum(nint_ym))
+    σP0::Vector{<:Real} = fill(10, model.nx),
+    σQ::Vector{<:Real} = fill(0.1, model.nx),
+    σR::Vector{<:Real} = fill(0.1, length(i_ym)),
+    nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
+    σP0_int::Vector{<:Real} = fill(10, sum(nint_ym)),
+    σQ_int::Vector{<:Real} = fill(0.1, sum(nint_ym))
 )
-    if isempty(nint_ym) # nint_ym = Int[] : alias for no output integrator at all
+    if nint_ym == 0 # alias for no output integrator at all :
         nint_ym = fill(0, length(i_ym));
     end
     Asm, Csm = init_estimstoch(i_ym, nint_ym)
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Diagonal([σP0  ; σP0_int   ].^2);
-    Q̂  = Diagonal([σQ   ; σQ_int    ].^2);
-    R̂  = Diagonal(σR.^2);
+    P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
+    Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
+    R̂  = Diagonal{Float64}(σR.^2);
     return KalmanFilter(model, i_ym, Asm, Csm, P̂0, Q̂ , R̂)
 end
 

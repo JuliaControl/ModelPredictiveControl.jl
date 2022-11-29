@@ -43,7 +43,7 @@ struct InternalModel <: StateEstimator
         nx̂ = model.nx
         nxs = size(As,1)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        x̂d = x̂ = zeros(nx̂)
+        x̂d = x̂ = zeros(nx̂) # xhat = xhatd, same object, updating xhatd will update xhat
         x̂s = zeros(nxs)
         return new(model, x̂, x̂d, x̂s, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s)
     end

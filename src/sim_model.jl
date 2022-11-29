@@ -53,7 +53,7 @@ struct LinModel <: SimModel
 end
 
 
-IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
+const IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
 
 @doc raw"""
     LinModel(sys::StateSpace[, Ts]; i_u=1:size(sys,2), i_d=Int[])
