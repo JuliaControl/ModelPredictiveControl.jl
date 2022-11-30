@@ -100,7 +100,7 @@ end
 @doc raw"""
     updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
 
-Update `estim.x̂`\`P̂` estimates with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂` \ `P̂` with current inputs `u`, measured outputs `ym` and dist. `d`.
 """
 function updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
     u, d, ym = remove_op(estim, u, d, ym)

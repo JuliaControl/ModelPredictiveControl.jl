@@ -18,14 +18,14 @@ estimates ``\mathbf{x̂}_k(k)`` is sometimes slightly more accurate.
 
 ```@docs
 StateEstimator
+updatestate!
+evaloutput
 ```
 
 ### InternalModel
 
 ```@docs
 InternalModel
-updatestate!(::InternalModel,::Any, ::Any, ::Any)
-evaloutput(::InternalModel, ::Any, ::Any)
 ```
 
 ### Luenberger
@@ -36,8 +36,6 @@ evaloutput(::InternalModel, ::Any, ::Any)
 
 ```@docs
 KalmanFilter
-updatestate!(::KalmanFilter,::Any, ::Any, ::Any)
-evaloutput(::KalmanFilter, ::Any)
 ```
 
 ### UnscentedKalmanFilter

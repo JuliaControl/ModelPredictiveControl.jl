@@ -58,14 +58,7 @@ Construct an `InternalModel` estimator based on `model`.
 `i_ym` provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are 
 unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions 
 ``\mathbf{ŷ_d}``, and `stoch_ym`, the stochastic predictions of the measured outputs 
-``\mathbf{ŷ_s^m}`` (the unmeasured ones being ``\mathbf{ŷ_s^u} = \mathbf{0}``). 
-
-`stoch_ym` is a `TransferFunction` or `StateSpace` model that hypothetically filters a zero 
-mean white noise vector. Its default value supposes 1 integrator per measured outputs, 
-assuming that the current stochastic estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - 
-\mathbf{ŷ_d^m}(k)`` will be constant in the future. This is the dynamic matrix control (DMC) 
-strategy, which is simple but sometimes too aggressive. Additional poles and zeros in 
-`stoch_ym` can mitigate this.
+``\mathbf{ŷ_s^m}`` (the unmeasured ones being ``\mathbf{ŷ_s^u=0}``). 
 
 !!! warning
     `InternalModel` estimator does not work if `model` is integrating or unstable. The 
@@ -84,6 +77,14 @@ InternalModel state estimator with a sample time Ts = 0.5 s and:
  1 unmeasured outputs yu
  0 measured disturbances d
 ```
+
+# Extended Help
+`stoch_ym` is a `TransferFunction` or `StateSpace` model that hypothetically filters a zero 
+mean white noise vector. Its default value supposes 1 integrator per measured outputs, 
+assuming that the current stochastic estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - 
+\mathbf{ŷ_d^m}(k)`` will be constant in the future. This is the dynamic matrix control (DMC) 
+strategy, which is simple but sometimes too aggressive. Additional poles and zeros in 
+`stoch_ym` can mitigate this.
 """
 function InternalModel(
     model::SimModel;
@@ -142,7 +143,7 @@ end
 @doc raw"""
     updatestate!(estim::InternalModel, u, ym, d=Float64[])
 
-Update `estim.x̂d`\`x̂s` states with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂d` \ `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
 """
 function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     model = estim.model
@@ -175,10 +176,5 @@ function evaloutput(estim::InternalModel, ym, d=Float64[])
     return ŷ
 end
 
-"""
-    (estim::InternalModel)(ym, d=Float64[])
-
-Functor allowing callable `InternalModel` object as an alias for `evaloutput`.
-"""
 (estim::InternalModel)(ym, d=Float64[]) = evaloutput(estim::InternalModel, ym, d)
 

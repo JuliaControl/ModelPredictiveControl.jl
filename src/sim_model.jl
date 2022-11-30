@@ -70,19 +70,7 @@ Construct a `LinModel` from state-space model `sys` with sampling time `Ts` in s
 with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{z}`` vector 
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
 in any order. `i_u` provides the indices of ``\mathbf{z}`` that are manipulated, and `i_d`, 
-the measured disturbances. The state-space matrices are similar if `sys` is continuous-time 
-(replace **x**(k+1) with **ẋ**(t)). In such a case, it's discretized 
-with [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.c2d)
-and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. 
-    
-The constructor transforms the system to a more practical form (**Dᵤ = 0** because of the 
-zero-order hold):
-```math
-\begin{aligned}
-    \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u}(k) + \mathbf{B_d d}(k) \\
-    \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D_d d}(k)
-\end{aligned}
-```
+the measured disturbances. See Extended Help if `sys` is continuous-time.
 
 See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.ss),
 [`tf`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.tf).
@@ -95,6 +83,21 @@ Discrete-time linear model with a sample time Ts = 0.1 s and:
  1 states x
  1 outputs y
  0 measured disturbances d
+```
+
+# Extended Help
+State-space matrices are similar if `sys` is continuous (replace ``\mathbf{x}(k+1)`` with 
+``\mathbf{ẋ}(t)`` and ``k`` with ``t`` on the LHS). In such a case, it's discretized with 
+[`c2d`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.c2d)
+and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. 
+
+The constructor transforms the system to a more practical form (``\mathbf{D_u=0}`` because 
+of the zero-order hold):
+```math
+\begin{aligned}
+    \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u}(k) + \mathbf{B_d d}(k) \\
+    \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D_d d}(k)
+\end{aligned}
 ```
 """
 function LinModel(
@@ -269,7 +272,6 @@ where
     \mathbf{d_0}(k) &= \mathbf{d}(k) - \mathbf{d_{op}} 
 \end{aligned}
 ```
-
 The structure is similar if `model` is a `NonLinModel`:
 ```math
 \begin{aligned}
@@ -324,7 +326,7 @@ typestr(model::NonLinModel) = "nonlinear"
 """
     updatestate!(model::SimModel, u, d=Float64[])
 
-Update states `x` in `model` with current inputs `u` and measured disturbances `d`.
+Update `model.x` states with current inputs `u` and measured disturbances `d`.
 """
 function updatestate!(model::SimModel, u, d=Float64[])
     model.x[:] = model.f(model.x, u - model.uop, d - model.dop)
