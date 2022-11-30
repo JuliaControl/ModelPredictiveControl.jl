@@ -28,7 +28,7 @@ updatestate!(::InternalModel,::Any, ::Any, ::Any)
 evaloutput(::InternalModel, ::Any, ::Any)
 ```
 
-### Luenburger
+### Luenberger
 
 ### SteadyKalmanFilter
 

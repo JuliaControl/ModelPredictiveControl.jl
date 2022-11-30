@@ -103,7 +103,7 @@ function LinModel(
     i_u::IntRangeOrVector = 1:size(sys,2),
     i_d::IntRangeOrVector = Int[]
     )
-    if ~isempty(i_d)
+    if !isempty(i_d)
         # common indexes in i_u and i_d are interpreted as measured disturbances d :
         i_u = collect(i_u);
         map(i -> deleteat!(i_u, i_u .== i), i_d);
@@ -116,7 +116,7 @@ function LinModel(
     end
     sysu = sminreal(sys[:,i_u])  # remove states associated to measured disturbances d
     sysd = sminreal(sys[:,i_d])  # remove states associated to manipulates inputs u
-    if ~iszero(sysu.D)
+    if !iszero(sysu.D)
         error("State matrix D must be 0 for columns associated to manipulated inputs u")
     end
     if iscontinuous(sys)
@@ -126,7 +126,7 @@ function LinModel(
         # measured disturbances : tustin discretization (continuous signals with ADCs)
         sysd_dis = c2d(sysd,Ts,:tustin)
     else
-        if ~isnothing(Ts)
+        if !isnothing(Ts)
             #TODO: Resample discrete system instead of throwing an error
             sys.Ts == Ts || error("Sample time Ts must be identical to sys.Ts")
         else
@@ -234,14 +234,14 @@ function validate_fcts(f, h)
     fargsvalid2 = hasmethod(f,
         Tuple{Vector{ComplexF64}, Vector{Float64}, Vector{Float64}}
     )
-    if ~fargsvalid1 && ~fargsvalid2
+    if !fargsvalid1 && !fargsvalid2
         error("state function has no method of type "*
             "f(x::Vector{Float64}, u::Vector{Float64}, d::Vector{Float64}) or "*
             "f(x::Vector{ComplexF64}, u::Vector{Float64}, d::Vector{Float64})")
     end
     hargsvalid1 = hasmethod(h,Tuple{Vector{Float64}, Vector{Float64}})
     hargsvalid2 = hasmethod(h,Tuple{Vector{ComplexF64}, Vector{Float64}})
-    if ~hargsvalid1 && ~hargsvalid2
+    if !hargsvalid1 && !hargsvalid2
         error("output function has no method of type "*
             "h(x::Vector{Float64}, d::Vector{Float64}) or "*
             "h(x::Vector{ComplexF64}, d::Vector{Float64})")
@@ -295,15 +295,15 @@ function setop!(
     yop::Vector{<:Real} = Float64[],
     dop::Vector{<:Real} = Float64[]
 )
-    if ~isempty(uop) 
+    if !isempty(uop) 
         size(uop) == (model.nu,) || error("uop size must be $((model.nu,))")
         model.uop[:] = uop
     end
-    if ~isempty(yop)
+    if !isempty(yop)
         size(yop) == (model.ny,) || error("yop size must be $((model.ny,))")
         model.yop[:] = yop
     end
-    if ~isempty(dop)
+    if !isempty(dop)
         size(dop) == (model.nd,) || error("dop size must be $((model.nd,))")
         model.dop[:] = dop
     end
