@@ -72,8 +72,8 @@ comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mat
 in any order. `i_u` provides the indices of ``\mathbf{z}`` that are manipulated, and `i_d`, 
 the measured disturbances. See Extended Help if `sys` is continuous-time.
 
-See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.ss),
-[`tf`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.tf).
+See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.ss),
+[`tf`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.tf).
 
 # Examples
 ```jldoctest
@@ -88,7 +88,7 @@ Discrete-time linear model with a sample time Ts = 0.1 s and:
 # Extended Help
 State-space matrices are similar if `sys` is continuous (replace ``\mathbf{x}(k+1)`` with 
 ``\mathbf{ẋ}(t)`` and ``k`` with ``t`` on the LHS). In such a case, it's discretized with 
-[`c2d`](https://juliacontrol.github.io/ControlSystems.jl/latest/lib/constructors/#ControlSystemsBase.c2d)
+[`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
 and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. 
 
 The constructor transforms the system to a more practical form (``\mathbf{D_u=0}`` because 

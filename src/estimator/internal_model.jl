@@ -58,7 +58,8 @@ Construct an `InternalModel` estimator based on `model`.
 `i_ym` provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are 
 unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions 
 ``\mathbf{ŷ_d}``, and `stoch_ym`, the stochastic predictions of the measured outputs 
-``\mathbf{ŷ_s^m}`` (the unmeasured ones being ``\mathbf{ŷ_s^u=0}``). 
+``\mathbf{ŷ_s^m}`` (the unmeasured ones being ``\mathbf{ŷ_s^u=0}``). The predicted outputs
+sum both value : ``\mathbf{ŷ = ŷ_d + ŷ_s}``.
 
 !!! warning
     `InternalModel` estimator does not work if `model` is integrating or unstable. The 
