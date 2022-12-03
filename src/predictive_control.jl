@@ -39,34 +39,65 @@ struct LinMPC <: PredictiveController
             N_Hc = Diagonal([repeat(Nwt, Hc); Cwt])
         end
         L_Hp = Diagonal(repeat(Lwt, Hp))
-        # TODO: quick boolean test for no u setpoints for NonLinMPC
+        # TODO: quick boolean test for no u setpoints (for NonLinMPC)
         R̂u = repeat(r_u,Hp) # constant over Hp
-
         Ks, Ls = init_stoch_pred(estim, Hp) 
-        return new(model, estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, M_Hp, N_Hc, L_Hp, R̂u, Ks, Ls)
+        return new(
+            model, estim, 
+            Hp, Hc, 
+            Mwt, Nwt, Lwt, Cwt, 
+            ru, 
+            M_Hp, N_Hc, L_Hp, 
+            R̂u, 
+            Ks, Ls)
     end
 end
 
 
+"""
+    LinMPC(estim::StateEstimator; <keyword arguments>)
+
+Use custom state estimator `estim` to construct `LinMPC`,
+
+`estim.model` must be a [`LinModel`](@ref). Else, a (`NonLinMPC`) is required.
+
+# Arguments
+- `estim::StateEstimator` : state estimator used for `LinMPC` predictions.
+- `Hp=nothing`: prediction horizon, the default value is `10 + 
+- `Hc=2` : control horizon
+
+
+"""
 function LinMPC(
     estim::StateEstimator;
-    Hp::Int = 1,
-    Hc::Int = 1,
+    Hp::Int = nothing,
+    Hc::Int = 2,
     Mwt = fill(1.0, model.ny),
     Nwt = fill(0.1, model.nu),
     Lwt = fill(0.0, model.nu),
     ru  = fill(0.0, model.nu),
     Cwt = 1e5
 )
+    isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
+    if isnothing(Hp)
+        poles = eigvals(estim.model.A)
+        max_delays = sum(poles .≈ 0)
+        Hp= max_delays + 10
+    end
     return LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
 end
 
-function LinMPC(model::LinModel; kwargs...)
-    
-    return LinMPC(estim; kwargs...)
-end
 
+"""
+    LinMPC(model::LinModel; <keyword arguments>)
 
+Construct a linear model predictive cosntroller `LinMPC` based on `model`.
+
+The default state estimator is a [`SteadyKalmanFilter`](@ref) with default arguments.
+
+See [`LinModel`](@ref).
+"""
+LinMPC(model::LinModel; kwargs...) = LinMPC(SteadyKalmanFilter(model); kwargs...)
 
 
 @doc raw"""
@@ -91,13 +122,13 @@ to ``k+H_p``). ``\mathbf{x̂_s}`` is extracted from the current estimate ``\math
 function init_stoch_pred(estim::StateEstimator, Hp)
     As = estim.As
     nxs = estim.nxs
-    Ms = zeros(Hp*nxs, nxs);
+    Ms = zeros(Hp*nxs, nxs)
     for i = 1:Hp
-        iRow = (1:nxs) + nxs*(i-1);
-        Ms[iRow, :] = As^i;
+        iRow = (1:nxs) + nxs*(i-1)
+        Ms[iRow, :] = As^i
     end
-    Ps = repeatdiag(Cs, Hp);
-    Ks = Ps*Ms;
+    Ps = repeatdiag(Cs, Hp)
+    Ks = Ps*Ms
     return Ks, zeros(ny*Hp,0)
 end
 
@@ -119,13 +150,13 @@ function init_stoch_pred(estim::InternalModel, Hp)
     As, B̂s, Cs = estim.As, estim.B̂s, estim.Cs
     ny  = estim.model.ny
     nxs = estim.nxs
-    Ks = zeros(ny*Hp, nxs);
-    Ls = zeros(ny*Hp, ny);
+    Ks = zeros(ny*Hp, nxs)
+    Ls = zeros(ny*Hp, ny)
     for i = 1:Hp
-        iRow = (1:ny) + ny*(i-1);
-        Ms = Cs*As^(i-1)*B̂s;
-        Ks[iRow, :] = Cs*As^i - Ms*Cs;
-        Ls[iRow, :] = Ms;
+        iRow = (1:ny) + ny*(i-1)
+        Ms = Cs*As^(i-1)*B̂s
+        Ks[iRow, :] = Cs*As^i - Ms*Cs
+        Ls[iRow, :] = Ms
     end
     return Ks, Ls 
 end

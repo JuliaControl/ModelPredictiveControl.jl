@@ -174,6 +174,23 @@ function LinModel(sys::TransferFunction, Ts::Union{Real,Nothing} = nothing; kwar
     return LinModel(sys_min, Ts; kwargs...)
 end
 
+
+"""
+    LinModel(sys::DelayLtiSystem, Ts[, Ts]; i_u=1:size(sys,2), i_d=Int[])
+
+TBW
+"""
+function LinModel(sys::DelayLtiSystem, Ts::Union{Real,Nothing} = nothing; kwargs...)
+    if iscontinuous(sys)
+        isnothing(Ts) && error("Sample time Ts must be specified if sys is continuous")
+        sys_dis = minreal(c2d(sys, Ts, :zoh)) # c2d only supports :zoh for DelayLtiSystem
+    else
+        sys_dis = sys;
+    end
+    return LinModel(sys_dis, Ts; kwargs...)
+end
+
+
 @doc raw"""
     NonLinModel(f, h, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0)
 

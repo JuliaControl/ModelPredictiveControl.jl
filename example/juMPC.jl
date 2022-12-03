@@ -46,6 +46,11 @@ kalmanFilter1 = KalmanFilter(linModel1,nint_ym=0)
 
 updatestate!(kalmanFilter1,[1, 1],[1, 1])
 
+ssKalmanFilter1 = SteadyKalmanFilter(linModel1)
+ssKalmanFilter1 = SteadyKalmanFilter(linModel1,nint_ym=0)
+
+updatestate!(ssKalmanFilter1,[1, 1],[1, 1])
+
 #=([
 H_qp = vars_ml["mMPC"]["Hqp"]
 f_qp = vec(vars_ml["fqp"])

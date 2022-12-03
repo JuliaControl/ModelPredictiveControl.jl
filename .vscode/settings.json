@@ -2,10 +2,13 @@
     "cSpell.ignoreWords": [
         "estimstoch",
         "evaloutput",
+        "kfparam",
+        "mathbb",
         "nint",
         "setop",
         "typestr",
         "updatestate",
+        "validate_kfcov",
         "xhat",
         "xhatd"
     ],

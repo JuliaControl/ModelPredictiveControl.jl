@@ -6,8 +6,9 @@ and stochastic systems.
 The estimator are all implemented in the predictor form (a.k.a. observer form), that is, 
 they all estimates at each discrete time ``k`` the states of the next period 
 ``\mathbf{x̂}_k(k+1)``. This form comes in handy for control applications since the 
-estimations do not delay the controller computations. In contrast, the filter form that
-estimates ``\mathbf{x̂}_k(k)`` is sometimes slightly more accurate.
+estimations come after the controller computations, without introducing additional delays. 
+In contrast, the filter form that estimates ``\mathbf{x̂}_k(k)`` is sometimes slightly more 
+accurate.
 
 !!! info 
     All the state estimators support measured ``\mathbf{y^m}`` and unmeasured 
@@ -31,6 +32,10 @@ InternalModel
 ### Luenberger
 
 ### SteadyKalmanFilter
+
+```@docs
+SteadyKalmanFilter
+```
 
 ### KalmanFilter
 

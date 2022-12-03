@@ -23,7 +23,7 @@ struct InternalModel <: StateEstimator
             end
         end
         validate_ym(model, i_ym)
-        nym = length(i_ym);
+        nym = length(i_ym)
         nyu = ny - nym;
         if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
             error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
@@ -32,14 +32,8 @@ struct InternalModel <: StateEstimator
         if iszero(Dsm)
             error("Stochastic model requires a nonzero direct transmission matrix D")
         end
-        # s : all model outputs, sm : measured outputs only
-        As = Asm;
-        Bs = Bsm;
-        Cs = zeros(ny,size(Csm,2));
-        Ds = zeros(ny,size(Dsm,2));
-        Cs[i_ym,:] = Csm;
-        Ds[i_ym,:] = Dsm;
-        nxs = size(As,1);
+        As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
+        nxs = size(As,1)
         nx̂ = model.nx
         nxs = size(As,1)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
@@ -53,7 +47,7 @@ end
 @doc raw"""
     InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(1,1,1,1,model.Ts).*I)
 
-Construct an `InternalModel` estimator based on `model`.
+Construct an `InternalModel` estimator based on `model` (`LinModel` or `NonLinModel`).
 
 `i_ym` provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are 
 unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions 
@@ -144,7 +138,7 @@ end
 @doc raw"""
     updatestate!(estim::InternalModel, u, ym, d=Float64[])
 
-Update `estim.x̂d` \ `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂` \ `x̂d` \ `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
 """
 function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     model = estim.model
@@ -152,11 +146,11 @@ function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
     ŷd = model.h(x̂d, d)
-    x̂d[:] = model.f(x̂d, u, d)
+    x̂d[:] = model.f(x̂d, u, d) # this also updates estim.xhat (they are the same object)
     # --------------- stochastic model -----------------------
-    ŷs = zeros(model.ny,1);
-    ŷs[estim.i_ym] = ym - ŷd[estim.i_ym];   # ŷs=0 for unmeasured outputs
-    x̂s[:] = estim.Âs*x̂s + estim.B̂s*ŷs;
+    ŷs = zeros(model.ny,1)
+    ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]   # ŷs=0 for unmeasured outputs
+    x̂s[:] = estim.Âs*x̂s + estim.B̂s*ŷs
     return x̂d
 end
 

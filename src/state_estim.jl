@@ -44,6 +44,20 @@ function validate_ym(model::SimModel, i_ym)
     end
 end
 
+"Convert the measured outputs stochastic model `stoch_ym` to all outputs `stoch_y`."
+function stoch_ym2y(model::SimModel, i_ym, Asm, Bsm, Csm, Dsm)
+    As = Asm
+    Bs = Bsm
+    Cs = zeros(model.ny, size(Csm,2))
+    Cs[i_ym,:] = Csm
+    if isempty(Dsm) || Dsm == 0
+        Ds = Dsm
+    else
+        Ds = zeros(model.ny, size(Dsm,2))
+        Ds[i_ym,:] = Dsm
+    end
+    return As, Bs, Cs, Ds
+end
 
 @doc raw"""
     Asm, Csm = init_estimstoch(model::SimModel, i_ym, nint_ym)
@@ -93,7 +107,6 @@ function init_estimstoch(i_ym, nint_ym)
     return Asm, Csm
 end
 
-
 @doc raw"""
     augment_model(model::LinModel, As, Cs)
 
@@ -117,7 +130,7 @@ function augment_model(model::LinModel, As, Cs)
     B̂u  = [model.Bu; zeros(nxs,nu)]
     Ĉ   = [model.C Cs]
     B̂d  = [model.Bd; zeros(nxs,nd)]
-    D̂d  = model.Dd;
+    D̂d  = model.Dd
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 
