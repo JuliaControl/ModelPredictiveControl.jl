@@ -1,0 +1,4 @@
+[sysimage]
+exclude=["PackageCompiler"]   # Additional packages to be excluded in the system image
+statements_files=[] #  Precompile statements files to be used, relative to the project folder
+execution_files=[".vscode/precompile_control.jl"] # Precompile execution files to be used, relative to the project folder

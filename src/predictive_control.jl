@@ -91,7 +91,7 @@ end
 """
     LinMPC(model::LinModel; <keyword arguments>)
 
-Construct a linear model predictive cosntroller `LinMPC` based on `model`.
+Construct a linear model predictive controller `LinMPC` based on `model`.
 
 The default state estimator is a [`SteadyKalmanFilter`](@ref) with default arguments.
 

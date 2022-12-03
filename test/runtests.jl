@@ -50,6 +50,10 @@ using Test
     @test linmodel3.C   ≈ sys_ss.C
     @test linmodel3.Dd  ≈ sys_ss.D[:,3]
 
+    linmodel4 = LinModel([delay(4) delay(4)]*sys,Ts,i_d=[3])
+    @test linmodel4.nx == 6
+    @test sum(eigvals(linmodel4.A) .≈ 0) == 2
+
     @test_throws ErrorException LinModel(sys)
     @test_throws ErrorException LinModel(sys,-Ts)
     @test_throws ErrorException LinModel(sys,Ts,i_u=[1,1])

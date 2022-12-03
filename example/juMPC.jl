@@ -28,6 +28,7 @@ linModel3 = LinModel(sys,Ts,i_d=[3])
 linModel4 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3])
 setop!(linModel4,uop=[10,50],yop=[50,30],dop=[15])
 linModel5 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_u=1:2)
+linModel6 = LinModel([delay(4) delay(8)]*sys,Ts,i_d=[3])
 
 f(x,u,_) = A*x + Bu*u
 h(x,_) = C*x

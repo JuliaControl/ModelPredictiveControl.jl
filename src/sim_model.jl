@@ -176,17 +176,24 @@ end
 
 
 """
-    LinModel(sys::DelayLtiSystem, Ts[, Ts]; i_u=1:size(sys,2), i_d=Int[])
+    LinModel(sys::DelayLtiSystem, Ts; i_u=1:size(sys,2), i_d=Int[])
 
-TBW
+Discretize with `:zoh` when sys is a continuous system with delays.
+
+The delays must be multiples of the sample `Ts`.
+
+# Examples
+```jldoctest
+julia> model = LinModel(tf(4, [10, 1])*delay(2), 0.5)
+Discrete-time linear model with a sample time Ts = 0.5 s and:
+ 1 manipulated inputs u
+ 5 states x
+ 1 outputs y
+ 0 measured disturbances d
+```
 """
-function LinModel(sys::DelayLtiSystem, Ts::Union{Real,Nothing} = nothing; kwargs...)
-    if iscontinuous(sys)
-        isnothing(Ts) && error("Sample time Ts must be specified if sys is continuous")
-        sys_dis = minreal(c2d(sys, Ts, :zoh)) # c2d only supports :zoh for DelayLtiSystem
-    else
-        sys_dis = sys;
-    end
+function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
+    sys_dis = minreal(c2d(sys, Ts, :zoh)) # c2d only supports :zoh for DelayLtiSystem
     return LinModel(sys_dis, Ts; kwargs...)
 end
 
