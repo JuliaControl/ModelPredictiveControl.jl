@@ -85,6 +85,10 @@ function LinMPC(
         Hp = 10 + nk
     end
     if Hp < nk
+        # TODO: use warning ?
+        println("warning : prediction horizon Hp ($Hp) < number of delays in model "*
+                "($nk), the closed-loop response may be unstable")
+    end
     return LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
 end
 
