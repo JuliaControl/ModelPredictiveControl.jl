@@ -14,13 +14,10 @@ accurate.
     All the state estimators support measured ``\mathbf{y^m}`` and unmeasured 
     ``\mathbf{y^u}`` model outputs, where ``\mathbf{y}`` refers to all of them.
 
-## StateEstimator functions and types
-
+## StateEstimator types
 
 ```@docs
 StateEstimator
-updatestate!
-evaloutput
 ```
 
 ### InternalModel
@@ -46,6 +43,13 @@ KalmanFilter
 ### UnscentedKalmanFilter
 
 ### MovingHorizonEstimator
+
+## StateEstimator functions
+
+```@doc
+updatestate!
+evaloutput
+```
 
 # Advanced Topics
 

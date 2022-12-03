@@ -180,7 +180,7 @@ end
 
 Discretize with `:zoh` when sys is a continuous system with delays.
 
-The delays must be multiples of the sample `Ts`.
+The delays must be multiples of the sample time `Ts`.
 
 # Examples
 ```jldoctest

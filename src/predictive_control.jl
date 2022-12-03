@@ -63,7 +63,7 @@ Use custom state estimator `estim` to construct `LinMPC`,
 
 # Arguments
 - `estim::StateEstimator` : state estimator used for `LinMPC` predictions.
-- `Hp=nothing`: prediction horizon, the default value is `10 + 
+- `Hp=10+nk`: prediction horizon, `nk` is the number of delays in `model`.
 - `Hc=2` : control horizon
 
 
@@ -79,11 +79,12 @@ function LinMPC(
     Cwt = 1e5
 )
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
+    poles = eigvals(estim.model.A)
+    nk = sum(poles .≈ 0)
     if isnothing(Hp)
-        poles = eigvals(estim.model.A)
-        max_delays = sum(poles .≈ 0)
-        Hp= max_delays + 10
+        Hp = 10 + nk
     end
+    if Hp < nk
     return LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
 end
 
