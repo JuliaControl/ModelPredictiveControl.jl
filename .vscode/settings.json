@@ -20,6 +20,7 @@
         "feedforward",
         "franckgaga",
         "Hodouin",
+        "initstate",
         "internalmodel",
         "ISSN",
         "Kalman",
@@ -29,6 +30,9 @@
         "repeatdiag",
         "setpoint",
         "setpoints",
+        "setstate",
+        "smallmatrix",
+        "steadystate",
         "stoch",
         "struct",
         "typeof"

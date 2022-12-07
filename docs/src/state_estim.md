@@ -6,7 +6,7 @@ and stochastic systems.
 The estimator are all implemented in the predictor form (a.k.a. observer form), that is, 
 they all estimates at each discrete time ``k`` the states of the next period 
 ``\mathbf{x̂}_k(k+1)``. This form comes in handy for control applications since the 
-estimations come after the controller computations, without introducing additional delays. 
+estimations come after the controller computations, without introducing any additional delays. 
 In contrast, the filter form that estimates ``\mathbf{x̂}_k(k)`` is sometimes slightly more 
 accurate.
 
@@ -46,9 +46,11 @@ KalmanFilter
 
 ## StateEstimator functions
 
-```@doc
+```@docs
+initstate!
 updatestate!
 evaloutput
+setstate!
 ```
 
 # Advanced Topics

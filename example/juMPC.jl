@@ -1,3 +1,5 @@
+# spell-checker: disable
+
 using Pkg
 using Revise
 Pkg.activate(".")

@@ -30,7 +30,7 @@ struct SteadyKalmanFilter <: StateEstimator
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
-        Ko = kalman(Discrete, Â, Ĉ, Q̂, R̂)
+        Ko = kalman(Discrete, Â, Ĉm, Q̂, R̂)
         x̂ = zeros(nx̂)
         return new(
             model, 
@@ -60,12 +60,12 @@ The process model is the stochastic system :
 \end{aligned}
 ```
 with sensor ``\mathbf{v}(k)`` and process ``\mathbf{w}(k)`` noises as zero mean white noise 
-processes. Their respective covariance is ``\mathbf{R}`` and ``\mathbf{Q}``. The covariance 
-arguments are in standard deviations σ, i.e. same units than outputs and states. The 
-matrices ``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the 
-stochastic model, which is specified by the numbers of output integrator `nint_ym`. 
-``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to measured 
-outputs ``\mathbf{y^m}`` (or unmeasured ``\mathbf{y^u}``, for ``\mathbf{Ĉ^u, D̂_d^u}``)
+processes, with a respective covariance of ``\mathbf{R}`` and ``\mathbf{Q}``. The arguments 
+are in standard deviations σ, i.e. same units than outputs and states. The matrices 
+``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the stochastic model, 
+which is specified by the numbers of output integrator `nint_ym`. ``\mathbf{Ĉ^m, D̂_d^m}`` 
+are the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` 
+(or unmeasured ``\mathbf{y^u}``, for ``\mathbf{Ĉ^u, D̂_d^u}``)
 
 See also [`LinModel`](@ref).
 
@@ -85,7 +85,8 @@ See also [`LinModel`](@ref).
 # Extended Help
 The model augmentation with `nint_ym` vector produces the integral action when the estimator
 is used in a controller as state feedback. More than 1 integrator per measured outputs is 
-interesting only when `model` is integrating or unstable. See [`augment_model`](@ref).
+interesting only when `model` is integrating or unstable, or when the unmeasured 
+output disturbances are "ramp-like". See [`augment_model`](@ref).
 
 !!! tip
     Increasing `σQ_int` values increases the integral action "gain".
@@ -96,7 +97,7 @@ function SteadyKalmanFilter(
     σQ::Vector{<:Real} = fill(0.1, model.nx),
     σR::Vector{<:Real} = fill(0.1, length(i_ym)),
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
-    σQ_int::Vector{<:Real} = fill(0.1, sum(nint_ym))
+    σQ_int::Vector{<:Real} = fill(0.1, max(sum(nint_ym), 0))
 )
     if nint_ym == 0 # alias for no output integrator at all :
         nint_ym = fill(0, length(i_ym));
@@ -154,7 +155,7 @@ struct KalmanFilter <: StateEstimator
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         x̂ = zeros(nx̂)
-        P̂ = zeros(nx̂, nx̂)
+        P̂ = P̂0
         return new(
             model, 
             x̂, P̂, 
@@ -189,8 +190,8 @@ function KalmanFilter(
     σQ::Vector{<:Real} = fill(0.1, model.nx),
     σR::Vector{<:Real} = fill(0.1, length(i_ym)),
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
-    σP0_int::Vector{<:Real} = fill(10, sum(nint_ym)),
-    σQ_int::Vector{<:Real} = fill(0.1, sum(nint_ym))
+    σP0_int::Vector{<:Real} = fill(10, max(sum(nint_ym), 0)),
+    σQ_int::Vector{<:Real} = fill(0.1, max(sum(nint_ym), 0))
 )
     if nint_ym == 0 # alias for no output integrator at all :
         nint_ym = fill(0, length(i_ym));
@@ -247,3 +248,6 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
         size(P̂0) ≠ (nx̂, nx̂) && error("P̂0 size $(size(P̂0)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
     end
 end
+
+
+

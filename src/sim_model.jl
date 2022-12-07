@@ -178,7 +178,7 @@ end
 """
     LinModel(sys::DelayLtiSystem, Ts; i_u=1:size(sys,2), i_d=Int[])
 
-Discretize with `:zoh` when sys is a continuous system with delays.
+Discretize with zero-order hold when `sys` is a continuous system with delays.
 
 The delays must be multiples of the sample time `Ts`.
 
@@ -195,6 +195,12 @@ Discrete-time linear model with a sample time Ts = 0.5 s and:
 function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
     sys_dis = minreal(c2d(sys, Ts, :zoh)) # c2d only supports :zoh for DelayLtiSystem
     return LinModel(sys_dis, Ts; kwargs...)
+end
+
+
+"Evaluate the steady-state vector when `model` is a [`LinModel`](@ref)."
+function steadystate(model::LinModel, u, d=Float64[])
+    return (I - model.A) \ (model.Bu*(u - model.uop) + mMPC.Bd*(d - model.dop))
 end
 
 
@@ -243,7 +249,11 @@ struct NonLinModel <: SimModel
     uop::Vector{Float64}
     yop::Vector{Float64}
     dop::Vector{Float64}
-    function NonLinModel(f, h, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int = 0)
+    function NonLinModel(
+            f, h, Ts::Real, 
+            nu::Int, nx::Int, ny::Int, nd::Int = 0; 
+            x0 = nothing
+    )
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_fcts(f, h)
         uop = zeros(nu)
@@ -333,6 +343,18 @@ function setop!(
         size(dop) == (model.nd,) || error("dop size must be $((model.nd,))")
         model.dop[:] = dop
     end
+    return model
+end
+
+
+"""
+    setstate!(model::SimModel, x)
+
+Set `model.x` states to values specified by `x`. 
+"""
+function setstate!(model::SimModel, x)
+    size(x) == (model.nx,) || error("x size must be $((model.nx,))")
+    model.x[:] = x
     return model
 end
 

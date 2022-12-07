@@ -134,5 +134,43 @@ function augment_model(model::LinModel, As, Cs)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 
+
+"""
+    initstate!(estim::StateEstimator, u, ym, d=Float64[])
+
+TBW
+"""
+function initstate!(estim::StateEstimator, u, ym, d=Float64[])
+    model = estim.model
+    if isa(model, LinModel)
+        # init deterministic state with steady-states at current input and disturbance :
+        x̂d = steadystate(model, u, d)
+    else
+        # init NonLinModel with with model.x current value :
+        x̂d = copy(model.x)
+    end
+
+
+    # TODO: CONTINUER ICI :
+
+    # ŷd = model.h(x̂d, d - model.dop)
+    # ŷsm = ym - ̂ŷd[estim.i_ym]
+
+    # nInt_ym_nonZero_i =  (mMPC.nInt_ym .≠ 0) 
+    # lastInt_i = cumsum(mMPC.nInt_ym[nInt_ym_nonZero_i])
+    # xhats = zeros(mMPC.nxs); # xs : integrator states
+    # xhats[lastInt_i] = yhats[nInt_ym_nonZero_i]
+    # xhat = [xhatd; xhats]
+    # if any(strcmpi(mMPC.feedbackStrategy,{'KF','UKF','MHE'}))
+    #     estimStatus = mMPC.P0hat; # estimation error covariance matrix 
+    # else
+    #     estimStatus = []; # not used for const. gain observers e.g. LO
+    # end
+
+    # estim.x̂[:] = [x̂d; x̂s]
+    return estim.x̂
+end
+
+
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
 (estim::StateEstimator)(d=Float64[]) = evaloutput(estim, d)

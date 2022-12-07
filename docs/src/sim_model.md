@@ -9,6 +9,7 @@ LinModel
 NonLinModel
 SimModel
 setop!
+setstate!(::SimModel,::Any)
 updatestate!(::SimModel,::Any)
 evaloutput(::SimModel)
 ```

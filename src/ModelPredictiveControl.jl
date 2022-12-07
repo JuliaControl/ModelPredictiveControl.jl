@@ -4,7 +4,7 @@ module ModelPredictiveControl
 using LinearAlgebra
 using ControlSystemsBase
 
-export SimModel, LinModel, NonLinModel, setop!, updatestate!, evaloutput
+export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput
 export StateEstimator, InternalModel, SteadyKalmanFilter, KalmanFilter
 
 include("sim_model.jl")
