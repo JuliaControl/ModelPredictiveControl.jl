@@ -104,7 +104,6 @@ function init_estimstoch(i_ym, nint_ym)
     else    # no stochastic model :
         Asm, Csm = zeros(0, 0), zeros(nym, 0)
     end
-    println(Asm)
     return Asm, Csm
 end
 
