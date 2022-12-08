@@ -84,7 +84,7 @@ function init_estimstoch(i_ym, nint_ym)
     any(nint_ym .< 0) && error("nint_ym values should be ≥ 0")
     nxs = sum(nint_ym)
     if nxs ≠ 0 # construct stochastic model state-space matrices (integrators) :
-        Asm = Bidiagonal(zeros(nxs), zeros(nxs-1), :L)
+        Asm = zeros(nxs, nxs)
         i_Asm = 1
         for iym = 1:nym
             nint = nint_ym[iym]
@@ -104,6 +104,7 @@ function init_estimstoch(i_ym, nint_ym)
     else    # no stochastic model :
         Asm, Csm = zeros(0, 0), zeros(nym, 0)
     end
+    println(Asm)
     return Asm, Csm
 end
 
