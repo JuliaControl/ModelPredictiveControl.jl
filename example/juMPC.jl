@@ -61,6 +61,9 @@ updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 
 initstate!(ssKalmanFilter1,[0,0],[2,1])
 
+mpc = LinMPC(linModel1)
+
+
 #=([
 H_qp = vars_ml["mMPC"]["Hqp"]
 f_qp = vec(vars_ml["fqp"])

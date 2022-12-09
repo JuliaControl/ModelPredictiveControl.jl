@@ -7,3 +7,11 @@ asddas
 ```@docs
 LinMPC
 ```
+
+# Advanced Topics
+
+## Internals
+
+```@docs
+ModelPredictiveControl.init_stochpred
+```
