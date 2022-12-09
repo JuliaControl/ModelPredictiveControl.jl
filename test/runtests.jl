@@ -1,20 +1,21 @@
+# spell-checker: disable
+
 using ControlSystemsBase
 using Documenter
 using LinearAlgebra
 using ModelPredictiveControl
 using Test
 
-@testset "ModelPredictiveControl.jl" begin
+testset_titlelen = 40
 
-    # === LinModel Construction ===
+Ts = 4.0
+sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
+        tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ] 
+sys_ss = minreal(ss(sys))
+Gss = c2d(sys_ss[:,1:2], Ts, :zoh)
 
-    Ts = 4.0
-    sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
-            tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]        
-    
+@testset "$(rpad("LinModel construction", testset_titlelen))" begin
     linmodel1 = LinModel(sys, Ts, i_u=1:2)
-    Gss = c2d(minreal(ss(sys))[:,1:2], Ts, :zoh)
-
     @test linmodel1.nx == 2
     @test linmodel1.nu == 2
     @test linmodel1.nd == 0
@@ -67,23 +68,26 @@ using Test
     @test_throws ErrorException setop!(linmodel4, dop=[0,0,0,0,0])
     sys_ss.D .= 1
     @test_throws ErrorException LinModel(sys_ss,Ts)
+end
 
-    # === LinModel sim functions call ===
+@testset "$(rpad("LinModel sim methods", testset_titlelen))" begin
+    linmodel1 = setop!(LinModel(Gss), uop=[10,50], yop=[50,30])
 
-    @test updatestate!(linmodel2, [10, 50]) ≈ zeros(2) 
-    @test updatestate!(linmodel2, [10, 50], Float64[]) ≈ zeros(2)
-    @test linmodel2.x ≈ zeros(2)
-    @test evaloutput(linmodel2) ≈ linmodel2() ≈ [50,30] 
-    @test evaloutput(linmodel2, Float64[]) ≈ linmodel2(Float64[]) ≈ [50,30] 
+    @test updatestate!(linmodel1, [10, 50]) ≈ zeros(2) 
+    @test updatestate!(linmodel1, [10, 50], Float64[]) ≈ zeros(2)
+    @test linmodel1.x ≈ zeros(2)
+    @test evaloutput(linmodel1) ≈ linmodel1() ≈ [50,30] 
+    @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30] 
 
     @test_throws DimensionMismatch updatestate!(linmodel1, zeros(2), zeros(1))
     @test_throws DimensionMismatch evaloutput(linmodel1, zeros(1))
+end
 
-    # === NonLinModel Construction ===
-
-    f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
-    h(x,_)   = linmodel1.C*x
-    nonlinmodel1 = NonLinModel(f,h,Ts,2,2,2)
+@testset "$(rpad("NonLinModel construction", testset_titlelen))" begin
+    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
+    f1(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
+    h1(x,_)   = linmodel1.C*x
+    nonlinmodel1 = NonLinModel(f1,h1,Ts,2,2,2)
     @test nonlinmodel1.nx == 2
     @test nonlinmodel1.nu == 2
     @test nonlinmodel1.nd == 0
@@ -91,8 +95,9 @@ using Test
     @test nonlinmodel1.f([0,0],[0,0],[1]) ≈ zeros(2,)
     @test nonlinmodel1.h([0,0],[1]) ≈ zeros(2,)
 
-    f2(x,u,d) = linmodel4.A*x + linmodel4.Bu*u + linmodel4.Bd*d
-    h2(x,_)   = linmodel4.C*x 
+    linmodel2 = LinModel(sys,Ts,i_d=[3])
+    f2(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
+    h2(x,_)   = linmodel2.C*x 
     nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
 
     @test nonlinmodel2.nx == 4
@@ -108,108 +113,123 @@ using Test
     @test_throws ErrorException NonLinModel(
         (x,u,_)->linmodel1.A*x + linmodel1.Bu*u,
         (x)->linmodel1.C*x, Ts, 2, 4, 2, 1)
+end
 
-    # === NonLinModel sim functions call ===
+@testset "$(rpad("NonLinModel sim methods", testset_titlelen))" begin
+    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
+    f1(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
+    h1(x,_)   = linmodel1.C*x
+    nonlinmodel = NonLinModel(f1,h1,Ts,2,2,2)
     
-    @test updatestate!(nonlinmodel1, zeros(2,)) ≈ zeros(2) 
-    @test updatestate!(nonlinmodel1, zeros(2,), Float64[]) ≈ zeros(2)
-    @test nonlinmodel1.x ≈ zeros(2)
-    @test evaloutput(nonlinmodel1) ≈ nonlinmodel1() ≈ zeros(2)
-    @test evaloutput(nonlinmodel1, Float64[]) ≈ nonlinmodel1(Float64[]) ≈ zeros(2)
+    @test updatestate!(nonlinmodel, zeros(2,)) ≈ zeros(2) 
+    @test updatestate!(nonlinmodel, zeros(2,), Float64[]) ≈ zeros(2)
+    @test nonlinmodel.x ≈ zeros(2)
+    @test evaloutput(nonlinmodel) ≈ nonlinmodel() ≈ zeros(2)
+    @test evaloutput(nonlinmodel, Float64[]) ≈ nonlinmodel(Float64[]) ≈ zeros(2)
     
-    @test_throws DimensionMismatch updatestate!(nonlinmodel1, zeros(2), zeros(1))
-    @test_throws DimensionMismatch evaloutput(nonlinmodel1, zeros(1))
+    @test_throws DimensionMismatch updatestate!(nonlinmodel, zeros(2), zeros(1))
+    @test_throws DimensionMismatch evaloutput(nonlinmodel, zeros(1))
+end
 
-    # === SteadyKalmanFilter construction ===
-
-    skalmanfilter1 = SteadyKalmanFilter(linmodel2)
+@testset "$(rpad("SteadyKalmanFilter construction", testset_titlelen))" begin
+    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
+    skalmanfilter1 = SteadyKalmanFilter(linmodel1)
     @test skalmanfilter1.nym == 2
     @test skalmanfilter1.nyu == 0
     @test skalmanfilter1.nxs == 2
     @test skalmanfilter1.nx̂ == 4
 
-    skalmanfilter2 = SteadyKalmanFilter(linmodel4, i_ym=[2])
+    linmodel2 = LinModel(sys,Ts,i_d=[3])
+    skalmanfilter2 = SteadyKalmanFilter(linmodel2, i_ym=[2])
     @test skalmanfilter2.nym == 1
     @test skalmanfilter2.nyu == 1
     @test skalmanfilter2.nxs == 1
     @test skalmanfilter2.nx̂ == 5
 
-    skalmanfilter3 = SteadyKalmanFilter(linmodel2, nint_ym=0)
+    skalmanfilter3 = SteadyKalmanFilter(linmodel1, nint_ym=0)
     @test skalmanfilter3.nxs == 0
     @test skalmanfilter3.nx̂ == 2
 
-    skalmanfilter4 = SteadyKalmanFilter(linmodel2, nint_ym=[2,2])
+    skalmanfilter4 = SteadyKalmanFilter(linmodel1, nint_ym=[2,2])
     @test skalmanfilter4.nxs == 4
     @test skalmanfilter4.nx̂ == 6
 
-    @test_throws ErrorException SteadyKalmanFilter(linmodel2, nint_ym=[1,1,1])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel2, nint_ym=[-1,0])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel2, nint_ym=0, σQ=[1])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel2, nint_ym=0, σR=[1,1,1])
-
-    # === SteadyKalmanFilter estimator function call ===
-
+    @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=[1,1,1])
+    @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=[-1,0])
+    @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σQ=[1])
+    @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σR=[1,1,1])
+end    
+    
+@testset "$(rpad("SteadyKalmanFilter estimator methods", testset_titlelen))" begin
+    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    skalmanfilter1 = SteadyKalmanFilter(linmodel1)
     @test updatestate!(skalmanfilter1, [10, 50], [50, 30]) ≈ zeros(4)
     @test updatestate!(skalmanfilter1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
     @test skalmanfilter1.x̂ ≈ zeros(4)
     @test evaloutput(skalmanfilter1) ≈ skalmanfilter1() ≈ [50, 30]
     @test evaloutput(skalmanfilter1, Float64[]) ≈ skalmanfilter1(Float64[]) ≈ [50, 30]
+end   
     
-    # === KalmanFilter construction ===
-
-    kalmanfilter1 = KalmanFilter(linmodel2)
+@testset "$(rpad("KalmanFilter construction", testset_titlelen))" begin
+    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    kalmanfilter1 = KalmanFilter(linmodel1)
     @test kalmanfilter1.nym == 2
     @test kalmanfilter1.nyu == 0
     @test kalmanfilter1.nxs == 2
     @test kalmanfilter1.nx̂ == 4
 
-    kalmanfilter2 = KalmanFilter(linmodel4, i_ym=[2])
+    linmodel2 = LinModel(sys,Ts,i_d=[3])
+    kalmanfilter2 = KalmanFilter(linmodel2, i_ym=[2])
     @test kalmanfilter2.nym == 1
     @test kalmanfilter2.nyu == 1
     @test kalmanfilter2.nxs == 1
     @test kalmanfilter2.nx̂ == 5
 
-    kalmanfilter3 = KalmanFilter(linmodel2, nint_ym=0)
+    kalmanfilter3 = KalmanFilter(linmodel1, nint_ym=0)
     @test kalmanfilter3.nxs == 0
     @test kalmanfilter3.nx̂ == 2
 
-    kalmanfilter4 = KalmanFilter(linmodel2, nint_ym=[2,2])
+    kalmanfilter4 = KalmanFilter(linmodel1, nint_ym=[2,2])
     @test kalmanfilter4.nxs == 4
     @test kalmanfilter4.nx̂ == 6
 
-    @test_throws ErrorException KalmanFilter(linmodel2, nint_ym=0, σP0=[1])
+    @test_throws ErrorException KalmanFilter(linmodel1, nint_ym=0, σP0=[1])
+end
 
-    # === KalmanFilter estimator function call ===
-
+@testset "$(rpad("KalmanFilter estimator methods", testset_titlelen))" begin
+    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    kalmanfilter1 = KalmanFilter(linmodel1)
     @test updatestate!(kalmanfilter1, [10, 50], [50, 30]) ≈ zeros(4)
     @test updatestate!(kalmanfilter1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
     @test kalmanfilter1.x̂ ≈ zeros(4)
     @test evaloutput(kalmanfilter1) ≈ kalmanfilter1() ≈ [50, 30]
     @test evaloutput(kalmanfilter1, Float64[]) ≈ kalmanfilter1(Float64[]) ≈ [50, 30]
+end   
 
-    # === InternalModel constructor ===
-
-    internalmodel1 = InternalModel(linmodel2)
+@testset "$(rpad("InternalModel construction", testset_titlelen))" begin
+    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
+    internalmodel1 = InternalModel(linmodel1)
     @test internalmodel1.nym == 2
     @test internalmodel1.nyu == 0
     @test internalmodel1.nxs == 2
     @test internalmodel1.nx̂ == 2
 
-    internalmodel2 = InternalModel(linmodel4,i_ym=[2])
+    linmodel2 = LinModel(sys,Ts,i_d=[3])
+    internalmodel2 = InternalModel(linmodel2,i_ym=[2])
     @test internalmodel2.nym == 1
     @test internalmodel2.nyu == 1
     @test internalmodel2.nxs == 1
     @test internalmodel2.nx̂ == 4
 
     stoch_ym_tf = tf([1, -0.3],[1, -0.5],Ts)*tf([1,0],[1,-1],Ts).*I(2)
-    internalmodel3 = InternalModel(linmodel4,stoch_ym=stoch_ym_tf)
+    internalmodel3 = InternalModel(linmodel2,stoch_ym=stoch_ym_tf)
     @test internalmodel3.nym == 2
     @test internalmodel3.nyu == 0
     @test internalmodel3.nxs == 4
     @test internalmodel3.nx̂ == 4
 
     stoch_ym_ss=minreal(ss(stoch_ym_tf))
-    internalmodel4 = InternalModel(linmodel4,stoch_ym=stoch_ym_ss)
+    internalmodel4 = InternalModel(linmodel2,stoch_ym=stoch_ym_ss)
     @test internalmodel4.nym == 2
     @test internalmodel4.nyu == 0
     @test internalmodel4.nxs == 4
@@ -225,18 +245,20 @@ using Test
     @test_throws ErrorException InternalModel(linmodel1, i_ym=[2,2])
     @test_throws ErrorException InternalModel(linmodel1, stoch_ym=ss(1,1,1,1,Ts))
     @test_throws ErrorException InternalModel(linmodel1, stoch_ym=ss(1,1,1,0,Ts).*I(2))
-
-    # === InternalModel estimator functions call ===
-
+end    
+    
+@testset "$(rpad("InternalModel estimator methods", testset_titlelen))" begin
+    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]) , uop=[10,50], yop=[50,30])
+    internalmodel1 = InternalModel(linmodel1)
     @test updatestate!(internalmodel1, [10, 50], [50, 30] .+ 1) ≈ zeros(2)
     @test updatestate!(internalmodel1, [10, 50], [50, 30] .+ 1, Float64[]) ≈ zeros(2)
     @test internalmodel1.x̂d ≈ internalmodel1.x̂ ≈ zeros(2)
     @test internalmodel1.x̂s ≈ ones(2)
     @test evaloutput(internalmodel1, [51,31]) ≈ internalmodel1([51,31]) ≈ [51,31] 
     @test evaloutput(internalmodel1, [51,31], Float64[]) ≈ internalmodel1([51,31], Float64[]) ≈ [51,31]
-
-    # === DocTest ===
-
+end
+    
+@testset "$(rpad("DocTest", testset_titlelen))" begin
     DocMeta.setdocmeta!(
         ModelPredictiveControl, 
         :DocTestSetup, 
@@ -244,5 +266,4 @@ using Test
         recursive=true
     )
     doctest(ModelPredictiveControl)
-
 end

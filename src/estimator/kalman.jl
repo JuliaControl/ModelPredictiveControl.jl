@@ -1,5 +1,3 @@
-const IntVectorOrInt = Union{Int, Vector{Int}}
-
 struct SteadyKalmanFilter <: StateEstimator
     model::LinModel
     x̂::Vector{Float64}
@@ -10,6 +8,7 @@ struct SteadyKalmanFilter <: StateEstimator
     nxs::Int
     As::Matrix{Float64}
     Cs::Matrix{Float64}
+    nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}
     B̂d  ::Matrix{Float64}
@@ -20,10 +19,9 @@ struct SteadyKalmanFilter <: StateEstimator
     Q̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
     R̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
     Ko  ::Matrix{Float64}
-    function SteadyKalmanFilter(model, i_ym, Asm, Csm, Q̂, R̂)
+    function SteadyKalmanFilter(model, i_ym, nint_ym, Asm, Csm, Q̂, R̂)
         nx, ny = model.nx, model.ny
-        nym = length(i_ym)
-        nyu = ny - nym
+        nym, nyu = length(i_ym), ny - length(i_ym)
         nxs = size(Asm,1)
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂)
@@ -31,12 +29,12 @@ struct SteadyKalmanFilter <: StateEstimator
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         Ko = kalman(Discrete, Â, Ĉm, Matrix(Q̂), Matrix(R̂)) # Matrix() required for Julia 1.6
-        x̂ = zeros(nx̂)
+        x̂ = [copy(model.x); zeros(nxs)]
         return new(
             model, 
             x̂,
             i_ym, nx̂, nym, nyu, nxs, 
-            As, Cs,
+            As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
             Q̂, R̂,
@@ -106,7 +104,7 @@ function SteadyKalmanFilter(
     # estimated covariances matrices (variance = σ²) :
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return SteadyKalmanFilter(model, i_ym, Asm, Csm, Q̂ , R̂)
+    return SteadyKalmanFilter(model, i_ym, nint_ym, Asm, Csm, Q̂ , R̂)
 end
 
 @doc raw"""
@@ -134,6 +132,7 @@ struct KalmanFilter <: StateEstimator
     nxs::Int
     As::Matrix{Float64}
     Cs::Matrix{Float64}
+    nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}
     B̂d  ::Matrix{Float64}
@@ -144,23 +143,22 @@ struct KalmanFilter <: StateEstimator
     P̂0  ::Union{Diagonal{Float64}, Matrix{Float64}}
     Q̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
     R̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
-    function KalmanFilter(model, i_ym, Asm, Csm, P̂0, Q̂, R̂)
+    function KalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂)
         nx, ny = model.nx, model.ny
-        nym = length(i_ym);
-        nyu = ny - nym;
+        nym, nyu = length(i_ym), ny - length(i_ym)
         nxs = size(Asm,1)
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
-        x̂ = zeros(nx̂)
+        x̂ = [copy(model.x); zeros(nxs)]
         P̂ = P̂0
         return new(
             model, 
             x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
-            As, Cs,
+            As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
             P̂0, Q̂, R̂
@@ -201,7 +199,7 @@ function KalmanFilter(
     P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return KalmanFilter(model, i_ym, Asm, Csm, P̂0, Q̂ , R̂)
+    return KalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂)
 end
 
 @doc raw"""
@@ -223,6 +221,15 @@ function updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
     return x̂
 end
 
+"""
+    initstate!(estim::KalmanFilter, u, ym, d=Float64[])
+
+Initialize covariance `estim.P̂` and invoke [`initstate!(::StateEstimator)`](@ref).
+"""
+function initstate!(estim::KalmanFilter, u, ym, d=Float64[])
+    estim.P̂[:] = estim.P̂0
+    invoke(initstate!, Tuple{StateEstimator, Any, Any, Any}, estim, u, ym, d)
+end
 
 @doc raw"""
     evaloutput(estim::Union{SteadyKalmanFilter, KalmanFilter}, d=Float64[])
@@ -233,6 +240,10 @@ function evaloutput(estim::Union{SteadyKalmanFilter, KalmanFilter}, d=Float64[])
     return estim.Ĉ*estim.x̂ + estim.D̂d*(d - estim.model.dop) + estim.model.yop
 end
 
+
+
+function init_kalman()
+end
 
 """
     validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)

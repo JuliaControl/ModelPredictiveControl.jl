@@ -44,15 +44,22 @@ internalModel1 = InternalModel(linModel1)
 internalModel2 = InternalModel(linModel1,stoch_ym=[tf([1,0],[1,-1],Ts) 0; 0 tf([1,0],[1,-1],Ts)])
 internalModel3 = InternalModel(linModel1,i_ym=[1])
 
-kalmanFilter1 = KalmanFilter(linModel1)
-kalmanFilter1 = KalmanFilter(linModel1,nint_ym=0)
+initstate!(internalModel1,[0,0],[1,1])
 
-updatestate!(kalmanFilter1,[1, 1],[1, 1])
+kalmanFilter1 = KalmanFilter(linModel1)
+kalmanFilter2 = KalmanFilter(linModel1,nint_ym=0)
+
+updatestate!(kalmanFilter2,[1, 1],[1, 1])
+
+initstate!(kalmanFilter1,[0,0],[2,1])
 
 ssKalmanFilter1 = SteadyKalmanFilter(linModel1)
-ssKalmanFilter1 = SteadyKalmanFilter(linModel1,nint_ym=0)
+ssKalmanFilter2 = SteadyKalmanFilter(linModel1,nint_ym=0)
 
-updatestate!(ssKalmanFilter1,[1, 1],[1, 1])
+
+updatestate!(ssKalmanFilter2,[1, 1],[1,1])
+
+initstate!(ssKalmanFilter1,[0,0],[2,1])
 
 #=([
 H_qp = vars_ml["mMPC"]["Hqp"]

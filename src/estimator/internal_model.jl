@@ -16,6 +16,7 @@ struct InternalModel <: StateEstimator
     B̂s::Matrix{Float64}
     function InternalModel(model, i_ym, Asm, Bsm, Csm, Dsm)
         ny = model.ny
+        nym, nyu = length(i_ym), ny - length(i_ym)
         if isa(model, LinModel)
             poles = eigvals(model.A)
             if any(abs.(poles) .≥ 1) 
@@ -23,8 +24,6 @@ struct InternalModel <: StateEstimator
             end
         end
         validate_ym(model, i_ym)
-        nym = length(i_ym)
-        nyu = ny - nym;
         if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
             error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
                   "measured output quantity ($nym)")
@@ -37,7 +36,7 @@ struct InternalModel <: StateEstimator
         nx̂ = model.nx
         nxs = size(As,1)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        x̂d = x̂ = zeros(nx̂) # xhat = xhatd, same object, updating xhatd will update xhat
+        x̂d = x̂ = copy(model.x) # x̂ and x̂d are same object (updating x̂d will update x̂)
         x̂s = zeros(nxs)
         return new(model, x̂, x̂d, x̂s, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s)
     end
@@ -154,6 +153,26 @@ function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     return x̂d
 end
 
+@doc raw"""
+    initstate!(estim::InternalModel, u, ym, d=Float64[])
+
+Init `estim.x̂d` / `x̂s` states from current inputs `u`, meas. outputs `ym` and disturb. `d`.
+
+The deterministic state `estim.x̂d` initialization method is identical to 
+[`initstate!(::StateEstimator)`](@ref). The stochastic states `estim.x̂s` are init at 0. 
+"""
+function initstate!(estim::InternalModel, u, ym, d=Float64[])
+    model = estim.model
+    if isa(model, LinModel)
+        x̂d = steadystate(model, u, d)
+    else
+        x̂d = estim.x̂[1:model.nx]
+    end
+    estim.x̂d[:] = x̂d
+    # TODO: best method to initialize internal model stochastic states ? not sure...
+    estim.x̂s[:] = zeros(estim.nxs)
+    return x̂d
+end
 
 @doc raw"""
     evaloutput(estim::InternalModel, ym, d=Float64[])

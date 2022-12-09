@@ -200,7 +200,7 @@ end
 
 "Evaluate the steady-state vector when `model` is a [`LinModel`](@ref)."
 function steadystate(model::LinModel, u, d=Float64[])
-    return (I - model.A) \ (model.Bu*(u - model.uop) + mMPC.Bd*(d - model.dop))
+    return (I - model.A) \ (model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
 end
 
 
