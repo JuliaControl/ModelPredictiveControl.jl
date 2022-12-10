@@ -27,6 +27,7 @@
         "Kalman",
         "kron",
         "Luenberger",
+        "mathrm",
         "Plamondon",
         "repeatdiag",
         "setpoint",

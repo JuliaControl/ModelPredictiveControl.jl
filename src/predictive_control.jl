@@ -53,24 +53,50 @@ struct LinMPC <: PredictiveController
     end
 end
 
-"""
+@doc raw"""
     LinMPC(model::LinModel; <keyword arguments>)
 
 Construct a linear model predictive controller `LinMPC` based on `model`.
 
 The default state estimator is a [`SteadyKalmanFilter`](@ref) with its default arguments.
+The controller minimizes the following objective function at each discrete time ``k``:
+
+```math
+\min_{\mathbf{ΔU}, ϵ}   \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)} + 
+                        \mathbf{(ΔU)}' \mathbf{N}_{H_c} \mathbf{(ΔU)} +
+                        \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} + Cϵ^2
+```
+
+in which :                                   ``\gdef\diag#1{\mathrm{diag}\{\mathbf{#1}\}}``
+
+- ``H_p`` : prediction horizon
+- ``H_c`` : control horizon
+- ``\mathbf{ΔU}`` : manipulated input increments over ``H_c``
+- ``\mathbf{Ŷ}`` : predicted outputs over ``H_p``
+- ``\mathbf{U}`` : manipulated inputs over ``H_p``
+- ``\mathbf{R̂_y}`` : predicted output setpoints over ``H_p``
+- ``\mathbf{R̂_u}`` : predicted manipulated input setpoints over ``H_p``
+- ``\mathbf{M}_{H_p} = \diag{M, M, ... , M}`` : output setpoint tracking weights
+- ``\mathbf{N}_{H_c} = \diag{N, N, ... , N}`` : manipulated input increment weights 
+- ``\mathbf{L}_{H_p} = \diag{L, L, ... , L}`` : manipulated input setpoint tracking weights
+- ``C`` : slack variable weight
+- ``ϵ`` : slack variable for constraint softening
+
+The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{Δu}(k+j) = 
+\mathbf{u}(k + j) - \mathbf{u}(k + j - 1)`` from ``j = 0`` to ``H_c - 1``. The
+manipulated input setpoint predictions ``\mathbf{R̂_u}`` are constant at ``\mathbf{r_u}``.
 
 See [`LinModel`](@ref).
 
 # Arguments
 - `model::LinModel` : model used for controller predictions and state estimations.
-- `Hp=10+nk`: prediction horizon, `nk` is the number of delays in `model`.
-- `Hc=2` : control horizon.
-- `Mwt=fill(1.0,model.ny)` : output setpoint tracking weights (vector)
-- `Nwt=fill(0.1,model.nu)` : manipulated input increment weights (vector)
-- `Cwt=1e5` : slack variable weight for constraint softening (scalar) 
-- `Lwt=fill(0.0,model.nu)` : manipulated input setpoint tracking weights (vector)
-- `ru=model.uop`: manipulated input setpoints (vector)
+- `Hp=10+nk`: prediction horizon ``H_p``, `nk` is the number of delays in `model`.
+- `Hc=2` : control horizon ``H_c``.
+- `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector)
+- `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector)
+- `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector)
+- `Cwt=1e5` : slack variable weight ``C`` (scalar) 
+- `ru=model.uop`: manipulated input setpoints ``\mathbf{r_u}`` (vector)
 
 """
 LinMPC(model::LinModel; kwargs...) = LinMPC(SteadyKalmanFilter(model); kwargs...)
@@ -181,7 +207,7 @@ repeatdiag(A, n::Int) = kron(I(n), A)
 
 function Base.show(io::IO, mpc::PredictiveController)
     println(io, "$(typeof(mpc)) predictive controller with a sample time "*
-                "Ts = $(mpc.model.Ts) s, $(typeof(mpc.estim)) state estimator and:")
+                "Ts = $(mpc.model.Ts) s, $(typeof(mpc.estim)) estimator and:")
     println(io, " $(mpc.model.nu) manipulated inputs u")
     println(io, " $(mpc.estim.nx̂) states x̂")
     println(io, " $(mpc.estim.nym) measured outputs ym")

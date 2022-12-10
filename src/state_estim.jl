@@ -161,7 +161,7 @@ The method tries to find a good steady-state to initialize `estim.x̂` estimate 
   
 It then estimates the measured outputs `ŷm` from these states, and the residual offset with 
 current measured outputs `(ym - ŷm)` initializes the integrators of the stochastic model.
-This method ensures that ``\mathbf{ŷ^m}(0) = \mathbf{y^m}(0)``. For [`LinModel`](@ref), it 
+This approach ensures that ``\mathbf{ŷ^m}(0) = \mathbf{y^m}(0)``. For [`LinModel`](@ref), it 
 also ensures that the estimator starts at steady-state, resulting in a bumpless manual to 
 automatic transfer for control applications. 
 """
