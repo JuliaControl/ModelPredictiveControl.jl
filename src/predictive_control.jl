@@ -58,15 +58,12 @@ end
 
 Construct a linear model predictive controller `LinMPC` based on `model`.
 
-The default state estimator is a [`SteadyKalmanFilter`](@ref) with its default arguments.
 The controller minimizes the following objective function at each discrete time ``k``:
-
 ```math
 \min_{\mathbf{ΔU}, ϵ}   \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)} + 
                         \mathbf{(ΔU)}' \mathbf{N}_{H_c} \mathbf{(ΔU)} +
                         \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} + Cϵ^2
 ```
-
 in which :                                   ``\gdef\diag#1{\mathrm{diag}\{\mathbf{#1}\}}``
 
 - ``H_p`` : prediction horizon
@@ -85,6 +82,9 @@ in which :                                   ``\gdef\diag#1{\mathrm{diag}\{\math
 The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{Δu}(k+j) = 
 \mathbf{u}(k + j) - \mathbf{u}(k + j - 1)`` from ``j = 0`` to ``H_c - 1``. The
 manipulated input setpoint predictions ``\mathbf{R̂_u}`` are constant at ``\mathbf{r_u}``.
+
+This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
+arguments.
 
 See [`LinModel`](@ref).
 
@@ -115,8 +115,8 @@ function LinMPC(
     Hc::Int = 2,
     Mwt = fill(1.0, estim.model.ny),
     Nwt = fill(0.1, estim.model.nu),
-    Cwt = 1e5,
     Lwt = fill(0.0, estim.model.nu),
+    Cwt = 1e5,
     ru  = estim.model.uop
 )
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 

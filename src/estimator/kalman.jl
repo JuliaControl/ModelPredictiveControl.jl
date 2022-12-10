@@ -71,14 +71,14 @@ See also [`LinModel`](@ref).
 - `model::LinModel` : (deterministic) model for the estimations.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
     are unmeasured ``\mathbf{y^u}``.
-- `σQ=fill(0.1,model.nx)` : standard deviation vector for the process noise covariance 
-    ``\mathbf{Q}`` of `model`.
-- `σR=fill(0.1,length(i_ym))` : standard deviation vector for the sensor noise covariance 
-    ``\mathbf{R}`` of `model` measured outputs.
+- `σQ=fill(0.1,model.nx)` : main diagonal of the process noise covariance ``\mathbf{Q}``,
+    specified as a standard deviation vector.
+- `σR=fill(0.1,length(i_ym))` : main diagonal of the sensor noise covariance ``\mathbf{R}``
+    for measured outputs, specified as a standard deviation vector.
 - `nint_ym=fill(1,length(i_ym))` : integrator quantity per measured outputs (vector) for the 
     stochastic model, use `nint_ym=0` for no integrator at all.
-- `σQ_int=fill(0.1,sum(nint_ym))` : standard deviation vector for the process noise 
-    covariance of the stochastic model (composed of output integrators).
+- `σQ_int=fill(0.1,sum(nint_ym))` : same than `σQ` but for the stochastic model (composed 
+    of output integrators)
 
 # Extended Help
 The model augmentation with `nint_ym` vector produces the integral action when the estimator
@@ -175,10 +175,10 @@ The process model is identical to [`SteadyKalmanFilter`](@ref).
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
-- `σP0=fill(10,model.nx)` : standard deviation vector for the initial estimate covariance 
-    ``\mathbf{P}(0)`` of `model`.
-- `σP0_int=fill(10,sum(nint_ym))` : standard deviation vector for the initial estimate 
-    covariance of the stochastic model (composed of output integrators).
+- `σP0=fill(10,model.nx)` : main diagonal of the initial estimate covariance 
+    ``\mathbf{P}(0)``, specified as a standard deviation vector.
+- `σP0_int=fill(10,sum(nint_ym))` : same than `σP0` but for the stochastic model (composed 
+    of output integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref)
 """
 function KalmanFilter(
