@@ -58,12 +58,13 @@ The process model is the stochastic system :
 \end{aligned}
 ```
 with sensor ``\mathbf{v}(k)`` and process ``\mathbf{w}(k)`` noises as zero mean white noise 
-processes, with a respective covariance of ``\mathbf{R}`` and ``\mathbf{Q}``. The arguments 
+processes, with a respective covariance of ``\mathbf{R̂}`` and ``\mathbf{Q̂}``. The arguments 
 are in standard deviations σ, i.e. same units than outputs and states. The matrices 
 ``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the stochastic model, 
-which is specified by the numbers of output integrator `nint_ym`. ``\mathbf{Ĉ^m, D̂_d^m}`` 
-are the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` 
-(or unmeasured ``\mathbf{y^u}``, for ``\mathbf{Ĉ^u, D̂_d^u}``)
+which is specified by the numbers of output integrator `nint_ym`. Likewise, the covariance
+matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, Q_{int})}`` and ``\mathbf{R̂ = R}``.
+The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to 
+measured outputs ``\mathbf{y^m}`` (and unmeasured ones for ``\mathbf{Ĉ^u, D̂_d^u}``).
 
 See also [`LinModel`](@ref).
 
@@ -71,20 +72,21 @@ See also [`LinModel`](@ref).
 - `model::LinModel` : (deterministic) model for the estimations.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
     are unmeasured ``\mathbf{y^u}``.
-- `σQ=fill(0.1,model.nx)` : main diagonal of the process noise covariance ``\mathbf{Q}``,
-    specified as a standard deviation vector.
+- `σQ=fill(0.1,model.nx)` : main diagonal of the process noise covariance ``\mathbf{Q}`` of
+    `model`, specified as a standard deviation vector.
 - `σR=fill(0.1,length(i_ym))` : main diagonal of the sensor noise covariance ``\mathbf{R}``
-    for measured outputs, specified as a standard deviation vector.
+    of `model` measured outputs, specified as a standard deviation vector.
 - `nint_ym=fill(1,length(i_ym))` : integrator quantity per measured outputs (vector) for the 
     stochastic model, use `nint_ym=0` for no integrator at all.
-- `σQ_int=fill(0.1,sum(nint_ym))` : same than `σQ` but for the stochastic model (composed 
-    of output integrators)
+- `σQ_int=fill(0.1,sum(nint_ym))` : same than `σQ` but for the stochastic model covariance
+    ``\mathbf{Q_{int}}`` (composed of output integrators)
 
 # Extended Help
 The model augmentation with `nint_ym` vector produces the integral action when the estimator
-is used in a controller as state feedback. More than 1 integrator per measured outputs is 
-interesting only when `model` is integrating or unstable, or when the unmeasured 
-output disturbances are "ramp-like". See [`augment_model`](@ref).
+is used in a controller as state feedback (a.k.a. offset-free control). The default is 1 
+integrator per measured outputs. More than 1 integrator is interesting only when `model` is 
+integrating or unstable, or when the unmeasured output disturbances are "ramp-like". See 
+[`augment_model`](@ref).
 
 !!! tip
     Increasing `σQ_int` values increases the integral action "gain".
@@ -177,8 +179,8 @@ The process model is identical to [`SteadyKalmanFilter`](@ref).
 - `model::LinModel` : (deterministic) model for the estimations.
 - `σP0=fill(10,model.nx)` : main diagonal of the initial estimate covariance 
     ``\mathbf{P}(0)``, specified as a standard deviation vector.
-- `σP0_int=fill(10,sum(nint_ym))` : same than `σP0` but for the stochastic model (composed 
-    of output integrators).
+- `σP0_int=fill(10,sum(nint_ym))` : same than `σP0` but for the stochastic model
+    covariance ``\mathbf{P_{int}}(0)`` (composed of output integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref)
 """
 function KalmanFilter(

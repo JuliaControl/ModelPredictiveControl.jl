@@ -30,6 +30,7 @@
         "mathrm",
         "Plamondon",
         "repeatdiag",
+        "setconstraint",
         "setpoint",
         "setpoints",
         "setstate",
@@ -37,6 +38,12 @@
         "steadystate",
         "stoch",
         "struct",
-        "typeof"
+        "typeof",
+        "umax",
+        "umin",
+        "ŷmax",
+        "ŷmin",
+        "Δumax",
+        "Δumin"
     ]
 }

@@ -287,7 +287,7 @@ end
 
 
 @doc raw"""
-    setop!(model::SimModel; uop=Float64[], yop=Float64[], dop=Float64[])
+    setop!(model::SimModel; uop=nothing, yop=nothing, dop=nothing)
 
 Set `model` inputs `uop`, outputs `yop` and measured disturbances `dop` operating points.
 
@@ -325,21 +325,16 @@ Discrete-time linear model with a sample time Ts = 2.0 s and:
 ```
 
 """
-function setop!(
-    model::SimModel;
-    uop::Vector{<:Real} = Float64[],
-    yop::Vector{<:Real} = Float64[],
-    dop::Vector{<:Real} = Float64[]
-)
-    if !isempty(uop) 
+function setop!(model::SimModel; uop = nothing, yop = nothing, dop = nothing)
+    if !isnothing(uop) 
         size(uop) == (model.nu,) || error("uop size must be $((model.nu,))")
         model.uop[:] = uop
     end
-    if !isempty(yop)
+    if !isnothing(yop)
         size(yop) == (model.ny,) || error("yop size must be $((model.ny,))")
         model.yop[:] = yop
     end
-    if !isempty(dop)
+    if !isnothing(dop)
         size(dop) == (model.nd,) || error("dop size must be $((model.nd,))")
         model.dop[:] = dop
     end
