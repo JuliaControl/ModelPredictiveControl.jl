@@ -7,6 +7,9 @@ asddas
 ```@docs
 LinMPC
 ```
+```@docs
+setconstraint!
+```
 
 # Advanced Topics
 

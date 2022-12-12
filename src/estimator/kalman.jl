@@ -46,9 +46,9 @@ end
 @doc raw"""
     SteadyKalmanFilter(model::LinModel; <keyword arguments>)
 
-Construct a `SteadyKalmanFilter` (steady-state or asymptotic) based on `model`.
+Construct a `SteadyKalmanFilter` (asymptotic) based on the [`LinModel`](@ref) `model`.
 
-The process model is the stochastic system :
+The steady-state Kalman filter is based on the process model :
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &= 
@@ -65,8 +65,6 @@ which is specified by the numbers of output integrator `nint_ym`. Likewise, the 
 matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, Q_{int})}`` and ``\mathbf{R̂ = R}``.
 The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to 
 measured outputs ``\mathbf{y^m}`` (and unmeasured ones for ``\mathbf{Ĉ^u, D̂_d^u}``).
-
-See also [`LinModel`](@ref).
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
@@ -171,7 +169,7 @@ end
 @doc raw"""
     KalmanFilter(model::LinModel; <keyword arguments>)
 
-Construct a time-varying `KalmanFilter` based on `model`.
+Construct a time-varying `KalmanFilter` based on the [`LinModel`](@ref) `model`.
 
 The process model is identical to [`SteadyKalmanFilter`](@ref).
 

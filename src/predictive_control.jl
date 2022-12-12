@@ -13,6 +13,18 @@ struct LinMPC <: PredictiveController
     M_Hp::Diagonal{Float64}
     N_Hc::Diagonal{Float64}
     L_Hp::Diagonal{Float64}
+    #umin   ::Vector{Float64}
+    #umax   ::Vector{Float64}
+    #Δumin  ::Vector{Float64}
+    #Δumax  ::Vector{Float64}
+    #ŷmin   ::Vector{Float64}
+    #ŷmax   ::Vector{Float64}
+    #c_umin ::Vector{Float64}
+    #c_umax ::Vector{Float64}
+    #c_Δumin::Vector{Float64}
+    #c_Δumax::Vector{Float64}
+    #c_ŷmin ::Vector{Float64}
+    #c_ŷmax ::Vector{Float64}
     R̂u::Vector{Float64}
     Ks::Matrix{Float64}
     Ls::Matrix{Float64}
@@ -39,6 +51,13 @@ struct LinMPC <: PredictiveController
             N_Hc = Diagonal([repeat(Nwt, Hc); Cwt])
         end
         L_Hp = Diagonal(repeat(Lwt, Hp))
+        umin,  umax      = fill(-Inf, nu), fill(+Inf, nu)
+        Δumin, Δumax     = fill(-Inf, nu), fill(+Inf, nu)
+        ŷmin,  ŷmax      = fill(-Inf, ny), fill(+Inf, ny)
+        c_umin, c_umax   = fill(0.0, nu),  fill(0.0, nu)
+        c_Δumin, c_Δumax = fill(0.0, nu),  fill(0.0, nu)
+        c_ŷmin, c_ŷmax   = fill(1.0, ny),  fill(1.0, ny)
+
         # TODO: quick boolean test for no u setpoints (for NonLinMPC)
         R̂u = repeat(ru,Hp) # constant over Hp
         Ks, Ls = init_stochpred(estim, Hp) 
@@ -56,29 +75,28 @@ end
 @doc raw"""
     LinMPC(model::LinModel; <keyword arguments>)
 
-Construct a linear model predictive controller `LinMPC` based on `model`.
+Construct a linear predictive controller `LinMPC` based on [`LinModel`](@ref) `model`.
 
 The controller minimizes the following objective function at each discrete time ``k``:
 ```math
-\min_{\mathbf{ΔU}, ϵ}   \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)} + 
-                        \mathbf{(ΔU)}' \mathbf{N}_{H_c} \mathbf{(ΔU)} +
-                        \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} + Cϵ^2
+\min_{\mathbf{ΔU}, ϵ}   \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)}  + 
+                             \mathbf{(ΔU)}' \mathbf{N}_{H_c} \mathbf{(ΔU)}  +
+                        \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)}  + Cϵ^2
 ```
 in which :
 
-- ``H_p``: prediction horizon
-- ``H_c``: control horizon
-- ``\mathbf{ΔU}``: manipulated input increments over ``H_c``
-- ``\mathbf{Ŷ}``: predicted outputs over ``H_p``
-- ``\mathbf{U}``: manipulated inputs over ``H_p``
-- ``\mathbf{R̂_y}``: predicted output setpoints over ``H_p``
-- ``\mathbf{R̂_u}``: predicted manipulated input setpoints over ``H_p``
-- ``\mathbf{M}_{H_p} = \text{diag}\mathbf{(M,M,...,M)}``: output setpoint tracking weights
-- ``\mathbf{N}_{H_c} = \text{diag}\mathbf{(N,N,...,N)}``: manipulated input increment weights
-- ``\mathbf{L}_{H_p} = \text{diag}\mathbf{(L,L,...,L)}``: manipulated input setpoint 
-    tracking weights
-- ``C``: slack variable weight
-- ``ϵ``: slack variable for constraint softening
+- ``H_p`` : prediction horizon 
+- ``H_c`` : control horizon
+- ``\mathbf{ΔU}`` : manipulated input increments over ``H_c``
+- ``\mathbf{Ŷ}`` : predicted outputs over ``H_p``
+- ``\mathbf{U}`` : manipulated inputs over ``H_p``
+- ``\mathbf{R̂_y}`` : predicted output setpoints over ``H_p``
+- ``\mathbf{R̂_u}`` : predicted manipulated input setpoints over ``H_p``
+- ``\mathbf{M}_{H_p} = \text{diag}\mathbf{(M,M,...,M)}`` : output setpoint tracking weights
+- ``\mathbf{N}_{H_c} = \text{diag}\mathbf{(N,N,...,N)}`` : manipulated input increment weights
+- ``\mathbf{L}_{H_p} = \text{diag}\mathbf{(L,L,...,L)}`` : manipulated input setpoint tracking weights
+- ``C`` : slack variable weight
+- ``ϵ`` : slack variable for constraint softening
 
 The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{Δu}(k+j) = 
 \mathbf{u}(k + j) - \mathbf{u}(k + j - 1)`` from ``j = 0`` to ``H_c - 1``. The
@@ -87,8 +105,6 @@ manipulated input setpoint predictions ``\mathbf{R̂_u}`` are constant at ``\mat
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
 arguments.
 
-See [`LinModel`](@ref).
-
 # Arguments
 - `model::LinModel` : model used for controller predictions and state estimations.
 - `Hp=10+nk`: prediction horizon ``H_p``, `nk` is the number of delays in `model`.
@@ -96,7 +112,7 @@ See [`LinModel`](@ref).
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector)
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector)
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector)
-- `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints
+- `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only
 - `ru=model.uop`: manipulated input setpoints ``\mathbf{r_u}`` (vector)
 
 """
@@ -112,7 +128,7 @@ Use custom state estimator `estim` to construct `LinMPC`.
 """
 function LinMPC(
     estim::StateEstimator;
-    Hp::Union{Int,Nothing} = nothing,
+    Hp::Union{Int, Nothing} = nothing,
     Hc::Int = 2,
     Mwt = fill(1.0, estim.model.ny),
     Nwt = fill(0.1, estim.model.nu),
@@ -148,23 +164,51 @@ end
 =#
 
 
-"""
+@doc raw"""
     setconstraint!(mpc::PredictiveController; <keyword arguments>)
 
-TBW
+Set the constraint parameters of `mpc` predictive controller.
+
+The predictive controllers support both soft and hard constraints, defined by:
+```math 
+\begin{alignat*}{3}
+    \mathbf{u_{min}  - c_{u_{min}}}  ϵ &≤ \mathbf{u}(k+j)  &&≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad j = 0, 1 ,..., H_c - 1 \\
+    \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ &≤ \mathbf{Δu}(k+j) &&≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad j = 0, 1 ,..., H_c - 1 \\
+    \mathbf{ŷ_{min}  - c_{ŷ_{min}}}  ϵ &≤ \mathbf{ŷ(k+j)}  &&≤ \mathbf{ŷ_{max}  + c_{ŷ_{max}}}  ϵ &&\qquad j = 1, 2 ,..., H_p \\
+\end{alignat*}
+```
+and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there 
+is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern 
+for relaxation, are non-negative values that specify the softness of the associated bound. 
+Use `0.0` values for hard constraints. The predicted output constraints ``\mathbf{ŷ_{min}}`` 
+and ``\mathbf{ŷ_{max}}`` are soft by default.
+
+# Arguments
+!!! info
+    The default constraints are mentioned here for clarity but omitting a keyword argument 
+    will not re-assign to its default value (defaults are set at construction only).
+
+- `umin=fill(-Inf,nu)` : manipulated input lower bounds ``\mathbf{u_{min}}`` 
+- `umax=fill(+Inf,nu)` : manipulated input upper bounds ``\mathbf{u_{max}}`` 
+- `Δumin=fill(-Inf,nu)` : manipulated input increment lower bounds ``\mathbf{Δu_{min}}`` 
+- `Δumax=fill(+Inf,nu)` : manipulated input increment upper bounds ``\mathbf{Δu_{max}}`` 
+- `ŷmin=fill(-Inf,ny)` : predicted output lower bounds ``\mathbf{ŷ_{min}}`` 
+- `ŷmax=fill(+Inf,ny)` : predicted output upper bounds ``\mathbf{ŷ_{max}}`` 
+- `c_umin=fill(0.0,nu)` : `umin` softness weights ``\mathbf{c_{u_{min}}}`` 
+- `c_umax=fill(0.0,nu)` : `umax` softness weights ``\mathbf{c_{u_{max}}}`` 
+- `c_Δumin=fill(0.0,nu)` : `Δumin` softness weights ``\mathbf{c_{Δu_{min}}}`` 
+- `c_Δumax=fill(0.0,nu)` : `Δumax` softness weights ``\mathbf{c_{Δu_{max}}}`` 
+- `c_ŷmin=fill(1.0,ny)` : `ŷmin` softness weights ``\mathbf{c_{ŷ_{min}}}`` 
+- `c_ŷmax=fill(1.0,ny)` : `ŷmax` softness weights ``\mathbf{c_{ŷ_{max}}}``
 """
 function setconstraint!(
     mpc::PredictiveController; 
-    umin  = nothing,
-    umax  = nothing,
-    Δumin = nothing,
-    Δumax = nothing,
-    ŷmin  = nothing,
-    ŷmax  = nothing,
-    c_umin = nothing,
-    c_umax = nothing,
-    c_ŷmin = nothing,
-    c_ŷmax = nothing
+    umin = nothing,    umax  = nothing,
+    Δumin = nothing,   Δumax = nothing,
+    ŷmin = nothing,    ŷmax  = nothing,
+    c_umin = nothing,  c_umax = nothing,
+    c_Δumin = nothing, c_Δumax = nothing,
+    c_ŷmin = nothing,  c_ŷmax = nothing
 )
     model = mpc.model
     nu, ny = model.ny, model.ny
@@ -200,7 +244,17 @@ function setconstraint!(
     if !isnothing(c_umax)
         size(c_umax) == (nu,) || error("c_umax size must be $((nu,))")
         any(c_umax .< 0) && error("c_umax weights should be non-negative")
-        mpc.c_umin[:] = c_umin
+        mpc.c_umax[:] = c_umax
+    end
+    if !isnothing(c_Δumin)
+        size(c_Δumin) == (nu,) || error("c_Δumin size must be $((nu,))")
+        any(c_Δumin .< 0) && error("c_Δumin weights should be non-negative")
+        mpc.c_Δumin[:] = c_Δumin
+    end
+    if !isnothing(c_Δumax)
+        size(c_Δumax) == (nu,) || error("c_Δumax size must be $((nu,))")
+        any(c_Δumax .< 0) && error("c_Δumax weights should be non-negative")
+        mpc.c_Δumax[:] = c_Δumax
     end
     if !isnothing(c_ŷmin)
         size(c_ŷmin) == (ny,) || error("c_ŷmin size must be $((ny,))")
@@ -212,74 +266,47 @@ function setconstraint!(
         any(c_ŷmax .< 0) && error("c_ŷmax weights should be non-negative")
         mpc.c_ŷmax[:] = c_ŷmax
     end
-    init_constraint(mpc::PredictiveController)
+    init_constraint!(mpc::PredictiveController)
     return mpc
 end
 
 function init_constraint(mpc::PredictiveController)
-#=
-    c_U_min          = repmat(c_u_min,Hc,1);
-    c_U_max          = repmat(c_u_max,Hc,1);
-    c_Yhat_min       = repmat(c_yhat_min,Hp,1);
-    c_Yhat_max       = repmat(c_yhat_max,Hp,1);
-
-    mMPC.c_U_min     = c_U_min;
-    mMPC.c_U_max     = c_U_max;
-    mMPC.c_Yhat_min  = c_Yhat_min;
-    mMPC.c_Yhat_max  = c_Yhat_max;
-
-    DU_min   = repmat(reshape(Du_min,nu,1),Hc,1);
-    DU_max   = repmat(reshape(Du_max,nu,1),Hc,1);
-    Yhat_min = repmat(reshape(yhat_min,ny,1),Hp,1);
-    Yhat_max = repmat(reshape(yhat_max,ny,1),Hp,1);
-    % Yhat precalculations for nonlinear model constaint function
-    Yhat_minNonInf_i    = not(isinf(Yhat_min)) & not(linModel);
-    Yhat_maxNonInf_i    = not(isinf(Yhat_max)) & not(linModel);
-    Yhat_minNonInf      = Yhat_min(Yhat_minNonInf_i);
-    Yhat_maxNonInf      = Yhat_max(Yhat_maxNonInf_i);
-    c_Yhat_minNonInf  = c_Yhat_min(Yhat_minNonInf_i);
-    c_Yhat_maxNonInf  = c_Yhat_max(Yhat_maxNonInf_i);
-    U_min = repmat(reshape(u_min,nu,1),Hc,1);
-    U_max = repmat(reshape(u_max,nu,1),Hc,1);
-    Mc_Hc = tril(repmat(eye(nu),Hc));
-    Nc_Hc = repmat(eye(nu),Hc,1);
-    Mc_Hp = [Mc_Hc;repmat(eye(nu),Hp-Hc,Hc)];
-    Nc_Hp = [Nc_Hc;repmat(eye(nu),Hp-Hc,1)];
-    if not(isinf(mMPC.Cwt)) % delta U is augmented with slack var. eps:
-        % 0 <= eps <= +inf :
-        DU_min = [DU_min;0];
-        DU_max = [DU_max;+inf];
-        % eps impacts deltaUhc->Uhc conversion for constraints:
-        Mc_Hc_min  = [Mc_Hc, + c_U_min    ];
-        Mc_Hc_max  = [Mc_Hc, - c_U_max    ];
-        % eps has no effect on deltaUhc->Uhc conversion for predictions:
-        Mc_Hc      = [Mc_Hc,   zeros(Hc*nu,1)];
-        Mc_Hp      = [Mc_Hp,   zeros(Hp*nu,1)];
+    # --- repeated bounds ---
+    Umin  = repeat(umin, Hc)
+    Umax  = repeat(umax, Hc)
+    ΔUmin = repeat(Δumin, Hc)
+    ΔUmax = repeat(Δumax, Hc)
+    Ŷmin  = repeat(ŷmin, Hp)
+    Ŷmax  = repeat(ŷmax, Hp)
+    # --- repeated softness weights ---
+    c_Umin  = repeat(c_umin, Hc)
+    c_Umax  = repeat(c_umax, Hc)
+    c_ΔUmin = repeat(c_Δumin, Hc)
+    c_ΔUmax = repeat(c_Δumax, Hc)
+    c_Ŷmin  = repeat(c_ŷmin, Hp)
+    c_Ŷmax  = repeat(c_ŷmax, Hp)
+    # TODO: move the next part to a separate function : 
+    # --- ΔU → U conversion matrices ---
+    Mc_Hc = LowerTriangular(repeat(I(nu), Hc, Hc))
+    Nc_Hc = repeat(I(nu), Hc)
+    Mc_Hp = [Mc_Hc; repeat(I(nu), Hp - Hc, Hc)]
+    Nc_Hp = [Nc_Hc; repeat(I(nu), Hp - Hc, 1)]
+    if !isinf(Cwt) # ΔU vector is augmented with slack variable ϵ:
+        # 0 ≤ ϵ ≤ ∞ :
+        ΔUmin = [ΔUmin; 0.0]
+        ΔUmax = [ΔUmax; +Inf]
+        # ϵ impacts ΔU → U conversion for constraints:
+        Mcmin_Hc = [Mc_Hc, +c_Umin]
+        Mcmax_Hc = [Mc_Hc, -c_Umax]
+        # ϵ has no impact on ΔU → U conversion for predictions:
+        Mc_Hc = [Mc_Hc, zeros(Hc*nu)]
+        Mc_Hp = [Mc_Hp, zeros(Hp*nu)]
     else
-        Mc_Hc_min = Mc_Hc;
-        Mc_Hc_max = Mc_Hc;
+        Mcmin_Hc = Mc_Hc
+        Mcmax_Hc = Mc_Hc
     end
-
-    mMPC.DU_min   = DU_min;
-    mMPC.DU_max   = DU_max;
-    mMPC.U_min    = U_min;
-    mMPC.U_max    = U_max;
-    mMPC.Yhat_min = Yhat_min;
-    mMPC.Yhat_max = Yhat_max;
-    mMPC.Yhat_minNonInf_i      = Yhat_minNonInf_i;
-    mMPC.Yhat_maxNonInf_i      = Yhat_maxNonInf_i;
-    mMPC.Yhat_minNonInf        = Yhat_minNonInf;
-    mMPC.Yhat_maxNonInf        = Yhat_maxNonInf;
-    mMPC.c_Yhat_minNonInf      = c_Yhat_minNonInf; 
-    mMPC.c_Yhat_maxNonInf      = c_Yhat_maxNonInf;
-    mMPC.Mc_Hc      = Mc_Hc;
-    mMPC.Mc_Hp      = Mc_Hp;
-    mMPC.Mc_Hc_min  = Mc_Hc_min;
-    mMPC.Mc_Hc_max  = Mc_Hc_max;
-    mMPC.Nc_Hc      = Nc_Hc;
-    mMPC.Nc_Hp      = Nc_Hp;
-=#
-    return nothing
+    return (  Umin,   Umax,   ΔUmin,   ΔUmax,   Ŷmin,   Ŷmax, 
+            c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax)
 end
 
 @doc raw"""
