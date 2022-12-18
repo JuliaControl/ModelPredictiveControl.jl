@@ -17,4 +17,5 @@ setconstraint!
 
 ```@docs
 ModelPredictiveControl.init_stochpred
+ModelPredictiveControl.init_ΔUtoU
 ```
