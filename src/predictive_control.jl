@@ -418,7 +418,7 @@ function init_deterpred(model::LinModel, Hp, Hc)
 end
 
 @doc raw"""
-    augment_slack(El, c_Ŷmin, c_Ŷmax)
+    augment_slack(Hp, Hc, ΔUmin, ΔUmax, El, S_Hp, S_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax)
 
 Augment linear model deterministic prediction matrices with slack variable ϵ.
 
