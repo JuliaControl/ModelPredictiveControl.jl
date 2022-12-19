@@ -358,7 +358,7 @@ The linear model predictions are evaluated by :
 ```math
 \begin{aligned}
     \mathbf{Ŷ} &= \mathbf{E_l ΔU} + \mathbf{G_l u}(k-1) + \mathbf{H_l d}(k) + \mathbf{J_l D̂} 
-                                  + \mathbf{K_l x̂_d}(k) + \mathbf{Ŷ_s}
+                                  + \mathbf{K_l x̂_d}(k) + \mathbf{Ŷ_s} \\
                &= \mathbf{E_l ΔU} + \mathbf{F_l}
 \end{aligned}
 ```
