@@ -16,8 +16,9 @@ setconstraint!
 ## Internals
 
 ```@docs
-ModelPredictiveControl.init_stochpred
+ModelPredictiveControl.init_deterpred
 ModelPredictiveControl.init_ΔUtoU
 ModelPredictiveControl.augment_slack
 ModelPredictiveControl.init_quadprog
+ModelPredictiveControl.init_stochpred
 ```
