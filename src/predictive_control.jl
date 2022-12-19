@@ -6,12 +6,10 @@ struct LinMPC <: PredictiveController
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64}
-    N_Hc::Diagonal{Float64}
+    Ñ_Hc::Diagonal{Float64}
     L_Hp::Diagonal{Float64}
     C::Float64
     R̂u::Vector{Float64}
-    Ks::Matrix{Float64}
-    Ls::Matrix{Float64}
     Umin   ::Vector{Float64}
     Umax   ::Vector{Float64}
     ΔŨmin  ::Vector{Float64}
@@ -24,12 +22,22 @@ struct LinMPC <: PredictiveController
     c_ΔUmax::Vector{Float64}
     c_Ŷmin ::Vector{Float64}
     c_Ŷmax ::Vector{Float64}
-    S_Hp::Matrix{Bool}
+    S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
-    S_Hc::Matrix{Bool}
+    S̃_Hc::Matrix{Bool}
     T_Hc::Matrix{Bool}
     A_umin::Matrix{Float64}
     A_umax::Matrix{Float64}
+    A_ŷmin::Matrix{Float64}
+    A_ŷmax::Matrix{Float64}
+    Ẽl::Matrix{Float64}
+    Gl::Matrix{Float64}
+    Hl::Matrix{Float64}
+    Jl::Matrix{Float64}
+    Kl::Matrix{Float64}
+    Q̃l::Matrix{Float64}
+    Ks::Matrix{Float64}
+    Hs::Matrix{Float64}
     function LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         model = estim.model
         nu = model.nu
@@ -47,16 +55,11 @@ struct LinMPC <: PredictiveController
         any(Lwt.<0) && error("Lwt weights should be ≥ 0")
         Cwt < 0     && error("Cwt weight should be ≥ 0")
         M_Hp = Diagonal(repeat(Mwt, Hp))
-        if isinf(Cwt) # no constraint softening nor slack variable ϵ :  
-            N_Hc = Diagonal(repeat(Nwt, Hc))
-        else # ΔU vector is augmented with slack variable ϵ :
-            N_Hc = Diagonal([repeat(Nwt, Hc); Cwt])
-        end
+        N_Hc = Diagonal(repeat(Nwt, Hc)) 
         L_Hp = Diagonal(repeat(Lwt, Hp))
         C = Cwt
         # TODO: quick boolean test for no u setpoints (for NonLinMPC)
         R̂u = repeat(ru, Hp) # constant over Hp
-        Ks, Ls = init_stochpred(estim, Hp) 
         umin,  umax      = fill(-Inf, nu), fill(+Inf, nu)
         Δumin, Δumax     = fill(-Inf, nu), fill(+Inf, nu)
         ŷmin,  ŷmax      = fill(-Inf, ny), fill(+Inf, ny)
@@ -67,26 +70,30 @@ struct LinMPC <: PredictiveController
             repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
         c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = 
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
-        ΔŨmin, ΔŨmax, S_Hp, T_Hp, S_Hc, T_Hc, A_umin, A_umax = init_ΔUtoU(
-            nu,
-            Hp, 
-            Hc, 
-            C,
-            ΔUmin,
-            ΔUmax, 
-            c_Umin, 
-            c_Umax)
-        mpc = new(
+        S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
+        El, Gl, Hl, Jl, Kl = init_deterpred(model, Hp, Hc)
+        # TODO: move this part to augment_slack function :
+        if !isinf(C) # ΔU vector is augmented with slack variable ϵ :
+            Ñ_Hc = Diagonal([diag(N_Hc); C])
+        else # no constraint softening nor slack variable ϵ : 
+            Ñ_Hc = N_Hc
+        end
+        ΔŨmin, ΔŨmax, S̃_Hp, S̃_Hc, Ẽl, A_umin, A_umax, A_ŷmin, A_ŷmax = augment_slack(
+            Hp, Hc, ΔUmin, ΔUmax, El, S_Hp, S_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax
+        )
+        Q̃l = init_quadprog(Ẽl, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        Ks, Hs = init_stochpred(estim, Hp) 
+        return new(
             model, estim, 
             Hp, Hc, 
-            M_Hp, N_Hc, L_Hp, C,
-            R̂u, Ks, Ls,
+            M_Hp, Ñ_Hc, L_Hp, C, R̂u,
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
             c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax, 
-            S_Hp, T_Hp, S_Hc, T_Hc, A_umin, A_umax
+            S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
+            A_umin, A_umax, A_ŷmin, A_ŷmax,
+            Ẽl, Gl, Hl, Jl, Kl, Q̃l,
+            Ks, Hs
         )
-
-
     end
 end
 
@@ -166,7 +173,6 @@ function LinMPC(
     end
     return LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
 end
-
 
 @doc raw"""
     setconstraint!(mpc::PredictiveController; <keyword arguments>)
@@ -270,25 +276,18 @@ function setconstraint!(
         any(c_ŷmax .< 0) && error("c_ŷmax weights should be non-negative")
         mpc.c_ŷmax[:] = c_ŷmax
     end
+    Hp, Hc = mpc.Hp, mpc.Hc
+    umin, umax = mpc.umin, mpc.umax
+    Δumin, Δumax = mpc.Δumin, mpc.Δumax
+    ŷmin, ŷmax = mpc.ŷmin, mpc.ŷmax
+    c_umin, c_umax = mpc.c_umin, mpc.c_umax
+    c_Δumin, c_Δumax = mpc.c_Δumin, mpc.c_Δumax
+    c_ŷmin, c_ŷmax = mpc.c_ŷmin, mpc.c_ŷmax
     Umin, Umax, ΔUmin, ΔUmax, Ŷmin, Ŷmax = repeat_constraints(
-        mpc.Hp, 
-        mpc.Hc, 
-        mpc.umin, 
-        mpc.umax, 
-        mpc.Δumin, 
-        mpc.Δumax, 
-        mpc.ŷmin, 
-        mpc.ŷmax
+        Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax
     )
     c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = repeat_constraints(
-        mpc.Hp, 
-        mpc.Hc,
-        mpc.c_umin, 
-        mpc.c_umax, 
-        mpc.c_Δumin, 
-        mpc.c_Δumax, 
-        mpc.c_ŷmin, 
-        mpc.c_ŷmax
+        Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax
     )
     mpc.Umin[:] = Umin
     mpc.Umax[:] = Umax
@@ -302,19 +301,14 @@ function setconstraint!(
     mpc.c_ΔUmax[:] = c_ΔUmax
     mpc.c_Ŷmin[:] = c_Ŷmin
     mpc.c_Ŷmax[:] = c_Ŷmax
-    if !isnothing(c_umin) || !isnothing(c_umax)
-        _, _, _, _, _, _, A_umin, A_umax = init_ΔUtoU(
-            mpc.nu, 
-            mpc.Hp,
-            mpc.Hc, 
-            mpc.C, 
-            mpc.ΔUmin, 
-            mpc.ΔUmax, 
-            mpc.c_Umin, 
-            mpc.c_Umax
+    if !all(isnothing.((c_umin, c_umax, c_ŷmin, c_ŷmax)))
+        _,_,_,_,_, A_umin, A_umax, A_ŷmin, A_ŷmax = augment_slack(
+            Hp, Hc, ΔUmin, ΔUmax, El, S_Hp, S_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax
         )
         mpc.A_umin[:] = A_umin
         mpc.A_umax[:] = A_umax
+        mpc.A_ŷmin[:] = A_ŷmin  
+        mpc.A_ŷmax[:] = A_ŷmax
     end
     return mpc
 end
@@ -330,62 +324,160 @@ function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
 end
 
 
-
 @doc raw"""
     init_ΔUtoU(nu, Hp, Hc, C, c_Umin, c_Umax)
 
 Init manipulated input increments to inputs conversion matrices.
 
-The conversion from the augmented input increment vector ``\mathbf{ΔŨ} = 
-[\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]`` to manipulated inputs over 
-``H_p`` and ``H_c`` are calculated by:
+The conversion from the input increments ``\mathbf{ΔU}`` to manipulated inputs over ``H_p`` 
+and ``H_c`` are calculated by:
 ```math
 \begin{aligned}
-\mathbf{U}       &= \mathbf{S}_{H_p} \mathbf{ΔŨ} + \mathbf{T}_{H_p} \mathbf{u}(k-1) \\
-\mathbf{U}_{H_c} &= \mathbf{S}_{H_c} \mathbf{ΔŨ} + \mathbf{T}_{H_c} \mathbf{u}(k-1)
+\mathbf{U} = 
+    \mathbf{U}_{H_p} &= \mathbf{S}_{H_p} \mathbf{ΔU} + \mathbf{T}_{H_p} \mathbf{u}(k-1) \\
+    \mathbf{U}_{H_c} &= \mathbf{S}_{H_c} \mathbf{ΔU} + \mathbf{T}_{H_c} \mathbf{u}(k-1)
 \end{aligned}
 ```
-The method also returns the ``\mathbf{A}`` matrices for the linear inequality constraints:
-```math
-\begin{bmatrix} 
-    - \mathbf{A_{u_{min}}} \\ 
-    + \mathbf{A_{u_{max}}}
-\end{bmatrix} \mathbf{ΔŨ} ≤
-\begin{bmatrix}
-    + \mathbf{T}_{H_c} \mathbf{u}(k-1) - \mathbf{U_{min}} \\
-    - \mathbf{T}_{H_c} \mathbf{u}(k-1) + \mathbf{U_{max}}
-\end{bmatrix}
-```
 """
-function init_ΔUtoU(nu, Hp, Hc, C, ΔUmin, ΔUmax, c_Umin, c_Umax)
-    # --- ΔU → U conversion matrices ---
+function init_ΔUtoU(nu, Hp, Hc)
     S_Hc = LowerTriangular(repeat(I(nu), Hc, Hc))
     T_Hc = repeat(I(nu), Hc)
     S_Hp = [S_Hc; repeat(I(nu), Hp - Hc, Hc)]
     T_Hp = [T_Hc; repeat(I(nu), Hp - Hc, 1)]
-    if !isinf(C) # ΔU vector is augmented with slack variable ϵ, denoted by ΔŨ :
-        # 0 ≤ ϵ ≤ ∞ :
-        ΔŨmin = [ΔUmin; 0.0]
-        ΔŨmax = [ΔUmax; Inf]
-        # ϵ impacts ΔU → U conversion for constraint calculations:
-        A_umin = [S_Hc +c_Umin]
-        A_umax = [S_Hc -c_Umax]
-        # ϵ has no impact on ΔU → U conversion for prediction calculations:
-        S_Hc = [S_Hc falses(Hc*nu)]
-        S_Hp = [S_Hp falses(Hp*nu)]
-    else # hard constraints only, ΔŨ == ΔU :
-        ΔŨmin = ΔUmin
-        ΔŨmax = ΔUmax
-        A_umin = S_Hc
-        A_umax = S_Hc
+    return S_Hp, T_Hp, S_Hc, T_Hc
+end
+
+
+
+@doc raw"""
+    init_deterpred(model::LinModel, Hp, Hc)
+
+Construct deterministic prediction matrices for [`LinModel`](@ref) `model`.
+
+The linear model predictions are evaluated by :
+```math
+\begin{aligned}
+    \mathbf{Ŷ} &= \mathbf{E_l ΔU} + \mathbf{G_l u}(k-1) + \mathbf{H_l d}(k) + \mathbf{J_l D̂} 
+                                  + \mathbf{K_l x̂_d}(k) + \mathbf{Ŷ_s}
+               &= \mathbf{E_l ΔU} + \mathbf{F_l}
+\end{aligned}
+```
+where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``, and 
+disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
+``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. 
+
+Deterministic state estimates ``\mathbf{x̂_d}(k)`` are extracted from current estimates 
+``\mathbf{x̂}_{k-1}(k)``. Operating points on `u`, `d` and `y` are omitted in above equation.
+Stochastic predictions ``\mathbf{Ŷ_s}`` are evaluated separately to support internal model 
+structure. It also allows troubleshooting by inspecting the stochastic model integrator 
+values `info.Ŷs`.
+"""
+function init_deterpred(model::LinModel, Hp, Hc)
+    A, Bu, C, Bd, Dd = model.A, model.Bu, model.C, model.Bd, model.Dd
+    nu, nx, ny, nd = model.nu, model.nx, model.ny, model.nd
+
+    ## === manipulated inputs u ===
+    # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ...
+    Apow = Array{Float64}(undef, size(A,1), size(A,2), Hp+1)
+    Apow[:,:,1] = I(nx)
+    Kl = Matrix{Float64}(undef, Hp*ny, nx)
+    for i=1:Hp
+        Apow[:,:,i+1] = A^i
+        iRow           = (1:ny) .+ ny*(i-1)
+        Kl[iRow,:]     = C*Apow[:,:,i+1]
+    end 
+    # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
+    Apow_csum  = cumsum(Apow, dims=3)
+    Gl = Matrix{Float64}(undef, Hp*ny, nu)
+    for i=1:Hp
+        iRow        = (1:ny) .+ ny*(i-1)
+        Gl[iRow,:]  = C*Apow_csum[:,:,i]*Bu
     end
-    return ΔŨmin, ΔŨmax, S_Hp, T_Hp, S_Hc, T_Hc, A_umin, A_umax
+    El = zeros(Hp*ny, Hc*nu) 
+    for i=1:Hc # truncated with control horizon
+        iRow            = (ny*(i-1)+1):(ny*Hp)
+        iCol            = (1:nu) .+ nu*(i-1)
+        El[iRow,iCol]   = Gl[iRow .- ny*(i-1),:]
+    end
+
+    ## === measured disturbances d ===
+    Hl = Matrix{Float64}(undef, Hp*ny, nd)
+    Jl = repeatdiag(Dd, Hp)
+    if nd ≠ 0
+        for i=1:Hp
+            iRow        = (1:ny) .+ ny*(i-1)
+            Hl[iRow,:]  = C*Apow[:,:,i]*Bd
+        end
+        for i=1:Hp
+            iRow            = (ny*i+1):(ny*Hp)
+            iCol            = (1:nd) .+ nd*(i-1)
+            Jl[iRow,iCol]   = Hl[iRow-ny*i,:]
+        end
+    end
+    return El, Gl, Hl, Jl, Kl
 end
 
 @doc raw"""
-    init_stoch_pred(estim::StateEstimator, Hp)
+    augment_slack(El, c_Ŷmin, c_Ŷmax)
 
-Init stochastic prediction matrix `Ks` from `estim` state estimator for predictive control.
+Augment linear model deterministic prediction matrices with slack variable ϵ.
+
+Denoting the input increments augmented with the slack variable 
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, 
+it returns the augmented conversion matrices ``\mathbf{S̃}_{H_p}`` and ``\mathbf{S̃}_{H_c}``,
+similar to the ones described at [`init_ΔUtoU`](@ref). It also returns ``\mathbf{Ẽ_l}`` 
+to predict the outputs ``\mathbf{Ŷ = Ẽ_l ΔŨ + F_l}``, and the ``\mathbf{A}`` matrices for 
+the inequality constraints:
+```math
+\begin{bmatrix} 
+    \mathbf{A_{u_{min}}} \\ 
+    \mathbf{A_{u_{max}}} \\
+    \mathbf{A_{ŷ_{min}}} \\ 
+    \mathbf{A_{ŷ_{max}}}
+\end{bmatrix} \mathbf{ΔŨ} ≤
+\begin{bmatrix}
+    + \mathbf{T}_{H_c} \mathbf{u}(k-1) - \mathbf{U_{min}} \\
+    - \mathbf{T}_{H_c} \mathbf{u}(k-1) + \mathbf{U_{max}} \\
+    + \mathbf{F_l} - \mathbf{Ŷ_{min}} \\
+    - \mathbf{F_l} + \mathbf{Ŷ_{max}}
+\end{bmatrix}
+```
+"""
+function augment_slack(
+    Hp, Hc, ΔUmin, ΔUmax, El, S_Hp, S_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax
+)
+    if !isinf(C) # ΔŨ = [ΔU; ϵ]
+        # 0 ≤ ϵ ≤ ∞ :
+        ΔŨmin = [ΔUmin; 0.0]
+        ΔŨmax = [ΔUmax; Inf]
+        # ϵ has no impact on ΔU → U conversion for prediction calculations:
+        S̃_Hp = [S_Hp falses(size(S_Hp, 1))]
+        S̃_Hc = [S_Hc falses(size(S_Hc, 1))] 
+        # ϵ impacts ΔU → U conversion for constraint calculations:
+        A_umin = -[S_Hc +c_Umin]
+        A_umax = +[S_Hc -c_Umax]
+        # ϵ has not impact on output predictions
+        Ẽl = [El zeros(size(El, 1), 1)] 
+        # ϵ impacts predicted output constraint calculations:
+        A_ŷmin = -[El +c_Ŷmin] 
+        A_ŷmax = +[El -c_Ŷmax]
+    else # ΔŨ = ΔU (only hard constraints)
+        ΔŨmin = ΔUmin
+        ΔŨmax = ΔUmax
+        A_umin = -S_Hc
+        A_umax = +S_Hc
+        A_ŷmin = -El
+        A_ŷmax = +El
+        Ẽl = El
+    end
+    return ΔŨmin, ΔŨmax, S̃_Hp, S̃_Hc, Ẽl, A_umin, A_umax, A_ŷmin, A_ŷmax
+end
+
+
+@doc raw"""
+    init_stochpred(estim::StateEstimator, Hp)
+
+Init the stochastic prediction matrix `Ks` from `estim` estimator for predictive control.
 
 ``\mathbf{K_s}`` is the prediction matrix of the stochastic model (composed exclusively of 
 integrators):
@@ -398,13 +490,13 @@ stochastic predictions ``\mathbf{Ŷ_s}`` are the integrator outputs (from ``k+1
 to ``k+H_p``). ``\mathbf{x̂_s}`` is extracted from the current estimate ``\mathbf{x̂}``.
 
 !!! note
-    Stochastic predictions are calculated separately and added to ``\mathbf{F̄}`` matrix to 
-    reduce MPC optimization computational costs.
+    Stochastic predictions are calculated separately and added to ``\mathbf{F_l}``
+    or ``\mathbf{F_{nl}}`` matrix to reduce MPC optimization computational costs.
 """
 function init_stochpred(estim::StateEstimator, Hp)
     As, Cs = estim.As, estim.Cs
     nxs = estim.nxs
-    Ms = zeros(Hp*nxs, nxs)
+    Ms = Matrix{Float64}(undef, Hp*nxs, nxs) 
     for i = 1:Hp
         iRow = (1:nxs) .+ nxs*(i-1)
         Ms[iRow, :] = As^i
@@ -416,15 +508,15 @@ end
 
 
 @doc raw"""
-    init_stoch_pred(estim::InternalModel, Hp)
+    init_stochpred(estim::InternalModel, Hp)
 
-Init the stochastic prediction matrices `Ks` and `Ls` for [`InternalModel`](@ref).
+Init the stochastic prediction matrices for [`InternalModel`](@ref).
 
-`Ks` and `Ls` matrices are defined as:
+`Ks` and `Hs` matrices are defined as:
 ```math
-    \mathbf{Ŷ_s} = \mathbf{K_s x̂_s}(k) + \mathbf{L_s ŷ_s}(k)
+    \mathbf{Ŷ_s} = \mathbf{K_s x̂_s}(k) + \mathbf{H_s ŷ_s}(k)
 ```
-with ``\mathbf{Ŷ_s}`` as stochastic predictions from ``k + 1`` to ``k + H_p``, current 
+with ``\mathbf{Ŷ_s}`` as stochastic predictions from ``k+1`` to ``k+H_p``, current 
 stochastic states ``\mathbf{x̂_s}(k)`` and outputs ``\mathbf{ŷ_s}(k)``. ``\mathbf{ŷ_s}(k)``
 comprises the measured outputs ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d}(k)``
 and unmeasured ``\mathbf{ŷ_s^u(k) = 0}``. See [^1].
@@ -438,16 +530,33 @@ function init_stochpred(estim::InternalModel, Hp)
     As, B̂s, Cs = estim.As, estim.B̂s, estim.Cs
     ny  = estim.model.ny
     nxs = estim.nxs
-    Ks = zeros(ny*Hp, nxs)
-    Ls = zeros(ny*Hp, ny)
+    Ks = Matrix{Float64}(undef, ny*Hp, nxs)
+    Hs = Matrix{Float64}(undef, ny*Hp, ny)
     for i = 1:Hp
         iRow = (1:ny) .+ ny*(i-1)
         Ms = Cs*As^(i-1)*B̂s
         Ks[iRow, :] = Cs*As^i - Ms*Cs
-        Ls[iRow, :] = Ms
+        Hs[iRow, :] = Ms
     end
-    return Ks, Ls 
+    return Ks, Hs 
 end
+
+
+"""
+    init_quadprog(El, S_Hp, M_Hp, N_Hc, L_Hp)
+
+Init quadratic programming (optimization) matrix.
+
+`Ql` is the quadratic programming `Q` matrix. It is constant if the model and weights 
+are LTI. The quadratic programming `p` vector needs recalculation each control iteration.  
+"""
+function init_quadprog(El, S_Hp, M_Hp, N_Hc, L_Hp)
+    Ql = 2*(El'*M_Hp*El + N_Hc + S_Hp'*L_Hp*S_Hp)
+    # TODO: verify if necessary or use special matrix (symmetric ?)
+    # Ql = (Ql + Ql')/2
+    return Ql
+end
+
 
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)

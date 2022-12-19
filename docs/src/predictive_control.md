@@ -18,4 +18,6 @@ setconstraint!
 ```@docs
 ModelPredictiveControl.init_stochpred
 ModelPredictiveControl.init_ΔUtoU
+ModelPredictiveControl.augment_slack
+ModelPredictiveControl.init_quadprog
 ```
