@@ -72,7 +72,7 @@ function stoch_ym2y(model::SimModel, i_ym, Asm, Bsm, Csm, Dsm)
 end
 
 @doc raw"""
-    Asm, Csm = init_estimstoch(model::SimModel, i_ym, nint_ym::Vector{Int})
+    init_estimstoch(model::SimModel, i_ym, nint_ym::Vector{Int})
 
 Calc stochastic model matrices from output integrators specifications for state estimation.
 
