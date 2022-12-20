@@ -121,7 +121,7 @@ The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{
 \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to ``H_c-1``, the ``\mathbf{Ŷ}`` vector, 
 the output predictions ``\mathbf{ŷ(k+j)}`` from ``j=1`` to ``H_p``, and the ``\mathbf{U}`` 
 vector, the manipulated inputs ``\mathbf{u}(k+j)`` from ``j=0`` to ``H_p-1``. The 
-manipulated input setpoint predictions ``\mathbf{R̂_u}`` are constant at ``\mathbf{r_u}```.
+manipulated input setpoint predictions ``\mathbf{R̂_u}`` are constant at ``\mathbf{r_u}``.
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
 arguments.
@@ -439,8 +439,8 @@ the inequality constraints:
 \begin{bmatrix}
     + \mathbf{T}_{H_c} \mathbf{u}(k-1) - \mathbf{U_{min}} \\
     - \mathbf{T}_{H_c} \mathbf{u}(k-1) + \mathbf{U_{max}} \\
-    + \mathbf{F_l} - \mathbf{Ŷ_{min}} \\
-    - \mathbf{F_l} + \mathbf{Ŷ_{max}}
+    + \mathbf{F} - \mathbf{Ŷ_{min}} \\
+    - \mathbf{F} + \mathbf{Ŷ_{max}}
 \end{bmatrix}
 ```
 """
