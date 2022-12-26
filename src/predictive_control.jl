@@ -72,9 +72,11 @@ struct LinMPC <: PredictiveController
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, G, J, Kd, P = init_deterpred(model, Hp, Hc)
-        ΔŨmin, ΔŨmax, S̃_Hp, S̃_Hc, Ẽ, Ñ_Hc, A_umin, A_umax, A_ŷmin, A_ŷmax = augment_slack(
-            Hp, Hc, ΔUmin, ΔUmax, E, S_Hp, S_Hc, N_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax
-        )
+        
+        A_umin, A_umax, S̃_Hp, S̃_Hc = slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        ΔŨmin, ΔŨmax, Ñ_Hc = slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+        A_ŷmin, A_ŷmax, Ẽ = slackŶ(C, c_Ŷmin, c_Ŷmax, E)
+        
         Q̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp) 
         return new(
@@ -418,7 +420,7 @@ function init_deterpred(model::LinModel, Hp, Hc)
     return E, G, J, Kd, P
 end
 
-@doc raw"""
+#=
     augment_slack(Hp, Hc, ΔUmin, ΔUmax, E, S_Hp, S_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax)
 
 Augment linear model deterministic prediction matrices with slack variable ϵ.
@@ -443,39 +445,50 @@ the inequality constraints:
     - \mathbf{F} + \mathbf{Ŷ_{max}}
 \end{bmatrix}
 ```
-"""
-function augment_slack(
-    Hp, Hc, ΔUmin, ΔUmax, E, S_Hp, S_Hc, N_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax
-)
+=#
+
+
+
+function slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
-        # 0 ≤ ϵ ≤ ∞ :
-        ΔŨmin = [ΔUmin; 0.0]
-        ΔŨmax = [ΔUmax; Inf]
-        # ϵ has no impact on ΔU → U conversion for prediction calculations:
-        S̃_Hp = [S_Hp falses(size(S_Hp, 1))]
-        S̃_Hc = [S_Hc falses(size(S_Hc, 1))] 
         # ϵ impacts ΔU → U conversion for constraint calculations:
-        A_umin = -[S_Hc +c_Umin]
-        A_umax = +[S_Hc -c_Umax]
-        # ϵ has not impact on output predictions
-        Ẽ = [E zeros(size(E, 1), 1)] 
+        A_umin, A_umax = -[S_Hc +c_Umin], +[S_Hc -c_Umax] 
+        # ϵ has no impact on ΔU → U conversion for prediction calculations:
+        S̃_Hp, S̃_Hc = [S_Hp falses(size(S_Hp, 1))], [S_Hc falses(size(S_Hc, 1))] 
+    else # ΔŨ = ΔU (only hard constraints)
+        A_umin, A_umax = -S_Hc, +S_Hc
+        S̃_Hp, S̃_Hc = S_Hp, S_Hc
+    end
+    return A_umin, A_umax, S̃_Hp, S̃_Hc
+end
+
+function slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+    if !isinf(C) # ΔŨ = [ΔU; ϵ]
+        # 0 ≤ ϵ ≤ ∞
+        ΔŨmin, ΔŨmax = [ΔUmin; 0.0], [ΔUmax; Inf]
         # the C weight is incorporated into the input increment weights N_Hc
         Ñ_Hc = Diagonal([diag(N_Hc); C])
-        # ϵ impacts predicted output constraint calculations:
-        A_ŷmin = -[E +c_Ŷmin] 
-        A_ŷmax = +[E -c_Ŷmax]
     else # ΔŨ = ΔU (only hard constraints)
-        ΔŨmin = ΔUmin
-        ΔŨmax = ΔUmax
-        A_umin = -S_Hc
-        A_umax = +S_Hc
-        Ẽ = E
+        ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
         Ñ_Hc = N_Hc
-        A_ŷmin = -E
-        A_ŷmax = +E
     end
-    return ΔŨmin, ΔŨmax, S̃_Hp, S̃_Hc, Ẽ, Ñ_Hc, A_umin, A_umax, A_ŷmin, A_ŷmax
+    return ΔŨmin, ΔŨmax, Ñ_Hc
 end
+
+function slackŶ(C, c_Ŷmin, c_Ŷmax, E)
+    if !isinf(C) # ΔŨ = [ΔU; ϵ]
+        # ϵ impacts predicted output constraint calculations:
+        A_ŷmin, A_ŷmax = -[E +c_Ŷmin], +[E -c_Ŷmax] 
+        # ϵ has not impact on output predictions
+        Ẽ = [E zeros(size(E, 1), 1)] 
+    else # ΔŨ = ΔU (only hard constraints)
+        Ẽ = E
+        A_ŷmin, A_ŷmax = -E, +E
+    end
+    return A_ŷmin, A_ŷmax, Ẽ
+end
+
+
 
 
 """
