@@ -63,6 +63,7 @@ initstate!(ssKalmanFilter1,[0,0],[2,1])
 
 mpc = LinMPC(linModel1)
 
+setconstraint!(mpc, c_umin=[1,1])
 
 #=([
 H_qp = vars_ml["mMPC"]["Hqp"]

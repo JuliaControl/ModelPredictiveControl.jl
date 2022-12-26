@@ -66,10 +66,12 @@ struct LinMPC <: PredictiveController
         c_umin, c_umax   = fill(0.0, nu),  fill(0.0, nu)
         c_Δumin, c_Δumax = fill(0.0, nu),  fill(0.0, nu)
         c_ŷmin, c_ŷmax   = fill(1.0, ny),  fill(1.0, ny)
+
         Umin, Umax, ΔUmin, ΔUmax, Ŷmin, Ŷmax = 
             repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
         c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = 
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
+
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, G, J, Kd, P = init_deterpred(model, Hp, Hc)
         
@@ -224,89 +226,87 @@ function setconstraint!(
 )
     model = mpc.model
     nu, ny = model.ny, model.ny
+    Hp, Hc = mpc.Hp, mpc.Hc
+    C = mpc.C
+    ΔUmin, ΔUmax = mpc.ΔŨmin[1:nu*Hc], mpc.ΔŨmax[1:nu*Hc]
+    Umin,  Umax  = mpc.Umin, mpc.Umax
+    Ŷmin,  Ŷmax  = mpc.Ŷmin, mpc.Ŷmax
+    c_Umin,  c_Umax  = mpc.c_Umin, mpc.c_Umax
+    c_Ŷmin,  c_Ŷmax  = mpc.c_Ŷmin, mpc.c_Ŷmax
+    c_ΔUmin, c_ΔUmax = mpc.c_ΔUmin, mpc.c_ΔUmax
     if !isnothing(umin)
         size(umin)   == (nu,) || error("umin size must be $((nu,))")
-        mpc.umin[:] = umin
+        Umin  = repeat(umin, Hc)
+        mpc.Umin[:] = Umin
     end
     if !isnothing(umax)
         size(umax)   == (nu,) || error("umax size must be $((nu,))")
-        mpc.umax[:] = umax
+        Umax  = repeat(umax, Hc)
+        mpc.Umax[:] = Umax
     end
     if !isnothing(Δumin)
         size(Δumin)  == (nu,) || error("Δumin size must be $((nu,))")
-        mpc.Δumin[:] = Δumin
+        ΔUmin = repeat(Δumin, Hc)
+        mpc.ΔŨmin[1:nu*Hc] = ΔUmin
     end
     if !isnothing(Δumax)
         size(Δumax)  == (nu,) || error("Δumax size must be $((nu,))")
-        mpc.Δumax[:] = Δumax
+        ΔUmax = repeat(Δumax, Hc)
+        mpc.ΔŨmax[1:nu*Hc] = ΔUmax
     end
     if !isnothing(ŷmin)
         size(ŷmin)   == (ny,) || error("ŷmin size must be $((ny,))")
-        mpc.ŷmin[:] = ŷmin
+        Ŷmin  = repeat(ŷmin, Hp)
+        mpc.Ŷmin[:] = Ŷmin 
     end
     if !isnothing(ŷmax)
         size(ŷmax)   == (ny,) || error("ŷmax size must be $((ny,))")
-        mpc.ŷmax[:] = ŷmax
+        Ŷmax  = repeat(ŷmax, Hp)
+        mpc.Ŷmax[:] = Ŷmax
     end
     if !isnothing(c_umin)
         size(c_umin) == (nu,) || error("c_umin size must be $((nu,))")
         any(c_umin .< 0) && error("c_umin weights should be non-negative")
-        mpc.umin[:] = umin
+        c_Umin  = repeat(c_umin, Hc)
+        mpc.c_Umin[:] = c_Umin
     end
     if !isnothing(c_umax)
         size(c_umax) == (nu,) || error("c_umax size must be $((nu,))")
         any(c_umax .< 0) && error("c_umax weights should be non-negative")
-        mpc.c_umax[:] = c_umax
+        c_Umax  = repeat(c_umax, Hc)
+        mpc.c_Umax[:] = c_Umax
     end
     if !isnothing(c_Δumin)
         size(c_Δumin) == (nu,) || error("c_Δumin size must be $((nu,))")
         any(c_Δumin .< 0) && error("c_Δumin weights should be non-negative")
-        mpc.c_Δumin[:] = c_Δumin
+        c_ΔUmin  = repeat(c_Δumin, Hc)
+        mpc.c_ΔUmin[:] = c_ΔUmin
     end
     if !isnothing(c_Δumax)
         size(c_Δumax) == (nu,) || error("c_Δumax size must be $((nu,))")
         any(c_Δumax .< 0) && error("c_Δumax weights should be non-negative")
-        mpc.c_Δumax[:] = c_Δumax
+        c_ΔUmax  = repeat(c_Δumax, Hc)
+        mpc.c_ΔUmax[:] = c_ΔUmax
     end
     if !isnothing(c_ŷmin)
         size(c_ŷmin) == (ny,) || error("c_ŷmin size must be $((ny,))")
         any(c_ŷmin .< 0) && error("c_ŷmin weights should be non-negative")
-        mpc.c_ŷmin[:] = c_ŷmin
+        c_Ŷmin  = repeat(c_ŷmin, Hc)
+        mpc.c_Ŷmin[:] = c_Ŷmin
     end
     if !isnothing(c_ŷmax)
         size(c_ŷmax) == (ny,) || error("c_ŷmax size must be $((ny,))")
         any(c_ŷmax .< 0) && error("c_ŷmax weights should be non-negative")
-        mpc.c_ŷmax[:] = c_ŷmax
+        c_Ŷmax  = repeat(c_ŷmax, Hc)
+        mpc.c_Ŷmax[:] = c_Ŷmax
     end
-    Hp, Hc = mpc.Hp, mpc.Hc
-    umin, umax = mpc.umin, mpc.umax
-    Δumin, Δumax = mpc.Δumin, mpc.Δumax
-    ŷmin, ŷmax = mpc.ŷmin, mpc.ŷmax
-    c_umin, c_umax = mpc.c_umin, mpc.c_umax
-    c_Δumin, c_Δumax = mpc.c_Δumin, mpc.c_Δumax
-    c_ŷmin, c_ŷmax = mpc.c_ŷmin, mpc.c_ŷmax
-    Umin, Umax, ΔUmin, ΔUmax, Ŷmin, Ŷmax = repeat_constraints(
-        Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax
-    )
-    c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = repeat_constraints(
-        Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax
-    )
-    mpc.Umin[:] = Umin
-    mpc.Umax[:] = Umax
-    mpc.ΔUmin[:] = ΔUmin
-    mpc.ΔUmax[:] = ΔUmax
-    mpc.Ŷmin[:] = Ŷmin
-    mpc.Ŷmax[:] = Ŷmax
-    mpc.c_Umin[:] = c_Umin
-    mpc.c_Umax[:] = c_Umax
-    mpc.c_ΔUmin[:] = c_ΔUmin
-    mpc.c_ΔUmax[:] = c_ΔUmax
-    mpc.c_Ŷmin[:] = c_Ŷmin
-    mpc.c_Ŷmax[:] = c_Ŷmax
-    if !all(isnothing.((c_umin, c_umax, c_ŷmin, c_ŷmax)))
-        _,_,_,_,_,_, A_umin, A_umax, A_ŷmin, A_ŷmax = augment_slack(
-            Hp, Hc, ΔUmin, ΔUmax, E, S_Hp, S_Hc, N_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax
-        )
+    if !all(isnothing.((c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)))
+        S_Hp, S_Hc = mpc.S̃_Hp[:, 1:nu*Hc], mpc.S̃_Hc[:, 1:nu*Hc]
+        N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
+        E = mpc.Ẽ[:, 1:nu*Hc]
+        A_umin, A_umax, _ , _ = slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        # ΔŨmin, ΔŨmax, _ = slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+        A_ŷmin, A_ŷmax, _ = slackŶ(C, c_Ŷmin, c_Ŷmax, E)
         mpc.A_umin[:] = A_umin
         mpc.A_umax[:] = A_umax
         mpc.A_ŷmin[:] = A_ŷmin  
@@ -420,6 +420,7 @@ function init_deterpred(model::LinModel, Hp, Hc)
     return E, G, J, Kd, P
 end
 
+
 #=
     augment_slack(Hp, Hc, ΔUmin, ΔUmax, E, S_Hp, S_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax)
 
@@ -446,9 +447,6 @@ the inequality constraints:
 \end{bmatrix}
 ```
 =#
-
-
-
 function slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
