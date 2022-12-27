@@ -38,22 +38,12 @@ struct LinMPC <: PredictiveController
     Q̃ ::Matrix{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
+    Yop::Vector{Float64}
+    Dop::Vector{Float64}
     function LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         model = estim.model
-        nu = model.nu
-        ny = model.ny
-        Hp < 1  && error("Prediction horizon Hp should be ≥ 1")
-        Hc < 1  && error("Control horizon Hc should be ≥ 1")
-        Hc > Hp && error("Control horizon Hc should be ≤ prediction horizon Hp")
-        size(Mwt) ≠ (ny,) && error("Mwt size $(size(Mwt)) ≠ output size ($ny,)")
-        size(Nwt) ≠ (nu,) && error("Nwt size $(size(Nwt)) ≠ manipulated input size ($nu,)")
-        size(Lwt) ≠ (nu,) && error("Lwt size $(size(Lwt)) ≠ manipulated input size ($nu,)")
-        size(ru)  ≠ (nu,) && error("ru size $(size(ru)) ≠ manipulated input size ($nu,)")
-        size(Cwt) ≠ ()    && error("Cwt should be a real scalar")
-        any(Mwt.<0) && error("Mwt weights should be ≥ 0")
-        any(Nwt.<0) && error("Nwt weights should be ≥ 0")
-        any(Lwt.<0) && error("Lwt weights should be ≥ 0")
-        Cwt < 0     && error("Cwt weight should be ≥ 0")
+        nu, ny = model.nu, model.ny
+        validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         M_Hp = Diagonal(repeat(Mwt, Hp))
         N_Hc = Diagonal(repeat(Nwt, Hc)) 
         L_Hp = Diagonal(repeat(Lwt, Hp))
@@ -66,21 +56,18 @@ struct LinMPC <: PredictiveController
         c_umin, c_umax   = fill(0.0, nu),  fill(0.0, nu)
         c_Δumin, c_Δumax = fill(0.0, nu),  fill(0.0, nu)
         c_ŷmin, c_ŷmax   = fill(1.0, ny),  fill(1.0, ny)
-
         Umin, Umax, ΔUmin, ΔUmax, Ŷmin, Ŷmax = 
             repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
         c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = 
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
-
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, G, J, Kd, P = init_deterpred(model, Hp, Hc)
-        
         A_umin, A_umax, S̃_Hp, S̃_Hc = slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         ΔŨmin, ΔŨmax, Ñ_Hc = slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
         A_ŷmin, A_ŷmax, Ẽ = slackŶ(C, c_Ŷmin, c_Ŷmax, E)
-        
         Q̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
-        Ks, Ps = init_stochpred(estim, Hp) 
+        Ks, Ps = init_stochpred(estim, Hp)
+        Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         return new(
             model, estim, 
             Hp, Hc, 
@@ -91,6 +78,7 @@ struct LinMPC <: PredictiveController
             A_umin, A_umax, A_ŷmin, A_ŷmax,
             Ẽ, G, J, Kd, P, Q̃,
             Ks, Ps,
+            Yop, Dop
         )
     end
 end
@@ -302,7 +290,7 @@ function setconstraint!(
     end
     if !all(isnothing.((c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)))
         S_Hp, S_Hc = mpc.S̃_Hp[:, 1:nu*Hc], mpc.S̃_Hc[:, 1:nu*Hc]
-        N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
+        # N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
         E = mpc.Ẽ[:, 1:nu*Hc]
         A_umin, A_umax, _ , _ = slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         # ΔŨmin, ΔŨmax, _ = slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
@@ -421,32 +409,27 @@ function init_deterpred(model::LinModel, Hp, Hc)
 end
 
 
-#=
-    augment_slack(Hp, Hc, ΔUmin, ΔUmax, E, S_Hp, S_Hc, C, c_Umin, c_Umax, c_Ŷmin, c_Ŷmax)
+@doc raw"""
+    slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
 
-Augment linear model deterministic prediction matrices with slack variable ϵ.
+Augment manipulated inputs constraints with slack variable ϵ for softening.
 
 Denoting the input increments augmented with the slack variable 
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, 
-it returns the augmented conversion matrices ``\mathbf{S̃}_{H_p}`` and ``\mathbf{S̃}_{H_c}``,
-similar to the ones described at [`init_ΔUtoU`](@ref). It also returns ``\mathbf{Ẽ}`` 
-to predict the outputs ``\mathbf{Ŷ = Ẽ ΔŨ + F}``, and the ``\mathbf{A}`` matrices for 
-the inequality constraints:
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
+augmented conversion matrices ``\mathbf{S̃}_{H_p}`` and ``\mathbf{S̃}_{H_c}``, similar to the 
+ones described at [`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the
+ inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{u_{min}}} \\ 
-    \mathbf{A_{u_{max}}} \\
-    \mathbf{A_{ŷ_{min}}} \\ 
-    \mathbf{A_{ŷ_{max}}}
+    \mathbf{A_{u_{max}}} 
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
     + \mathbf{T}_{H_c} \mathbf{u}(k-1) - \mathbf{U_{min}} \\
-    - \mathbf{T}_{H_c} \mathbf{u}(k-1) + \mathbf{U_{max}} \\
-    + \mathbf{F} - \mathbf{Ŷ_{min}} \\
-    - \mathbf{F} + \mathbf{Ŷ_{max}}
+    - \mathbf{T}_{H_c} \mathbf{u}(k-1) + \mathbf{U_{max}} 
 \end{bmatrix}
 ```
-=#
+"""
 function slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
@@ -460,6 +443,25 @@ function slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
     return A_umin, A_umax, S̃_Hp, S̃_Hc
 end
 
+@doc raw"""
+    slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+
+Augment input increments constraints with slack variable ϵ for softening.
+
+Denoting the input increments augmented with the slack variable 
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
+augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{max}}`` over ``H_c``, and the 
+``\mathbf{A}`` matrices for the inequality constraints:
+```math
+\begin{bmatrix} 
+    \mathbf{A_{Δu_{min}}} \\ 
+    \mathbf{A_{Δu_{max}}}
+\end{bmatrix} \mathbf{ΔŨ} ≤
+\begin{bmatrix}
+    TODO:
+\end{bmatrix}
+```
+"""
 function slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # 0 ≤ ϵ ≤ ∞
@@ -473,6 +475,26 @@ function slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     return ΔŨmin, ΔŨmax, Ñ_Hc
 end
 
+@doc raw"""
+    slackŶ(C, c_Ŷmin, c_Ŷmax, E)
+
+Augment linear output prediction constraints with slack variable ϵ for softening.
+
+Denoting the input increments augmented with the slack variable 
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
+``\mathbf{Ẽ}`` matrix that appears in the linear model prediction equation 
+``\mathbf{Ŷ = Ẽ ΔŨ + F}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
+```math
+\begin{bmatrix} 
+    \mathbf{A_{ŷ_{min}}} \\ 
+    \mathbf{A_{ŷ_{max}}}
+\end{bmatrix} \mathbf{ΔŨ} ≤
+\begin{bmatrix}
+    + \mathbf{F} - \mathbf{Ŷ_{min}} \\
+    - \mathbf{F} + \mathbf{Ŷ_{max}}
+\end{bmatrix}
+```
+"""
 function slackŶ(C, c_Ŷmin, c_Ŷmax, E)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts predicted output constraint calculations:
@@ -485,7 +507,6 @@ function slackŶ(C, c_Ŷmin, c_Ŷmax, E)
     end
     return A_ŷmin, A_ŷmax, Ẽ
 end
-
 
 
 
@@ -570,6 +591,22 @@ function init_stochpred(estim::InternalModel, Hp)
     return Ks, Ps 
 end
 
+
+function validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
+    nu, ny = model.nu, model.ny
+    Hp < 1  && error("Prediction horizon Hp should be ≥ 1")
+    Hc < 1  && error("Control horizon Hc should be ≥ 1")
+    Hc > Hp && error("Control horizon Hc should be ≤ prediction horizon Hp")
+    size(Mwt) ≠ (ny,) && error("Mwt size $(size(Mwt)) ≠ output size ($ny,)")
+    size(Nwt) ≠ (nu,) && error("Nwt size $(size(Nwt)) ≠ manipulated input size ($nu,)")
+    size(Lwt) ≠ (nu,) && error("Lwt size $(size(Lwt)) ≠ manipulated input size ($nu,)")
+    size(ru)  ≠ (nu,) && error("ru size $(size(ru)) ≠ manipulated input size ($nu,)")
+    size(Cwt) ≠ ()    && error("Cwt should be a real scalar")
+    any(Mwt.<0) && error("Mwt weights should be ≥ 0")
+    any(Nwt.<0) && error("Nwt weights should be ≥ 0")
+    any(Lwt.<0) && error("Lwt weights should be ≥ 0")
+    Cwt < 0     && error("Cwt weight should be ≥ 0")
+end
 
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)

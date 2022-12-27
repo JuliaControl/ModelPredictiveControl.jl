@@ -59,8 +59,6 @@ sum both values : ``\mathbf{ŷ = ŷ_d + ŷ_s}``.
     constructor verifies these aspects for `LinModel` but not for `NonLinModel`. Uses any 
     other state estimator in such cases.
 
-See also [`LinModel`](@ref), [`NonLinModel`](@ref)
-
 # Examples
 ```jldoctest
 julia> estim = InternalModel(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5), i_ym=[2])

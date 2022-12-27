@@ -7,6 +7,7 @@ asddas
 ```@docs
 LinMPC
 ```
+
 ```@docs
 setconstraint!
 ```
@@ -18,7 +19,9 @@ setconstraint!
 ```@docs
 ModelPredictiveControl.init_deterpred
 ModelPredictiveControl.init_ΔUtoU
-ModelPredictiveControl.augment_slack
+ModelPredictiveControl.slackU
+ModelPredictiveControl.slackΔU
+ModelPredictiveControl.slackŶ
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
 ```

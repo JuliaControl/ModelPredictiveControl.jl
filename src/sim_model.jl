@@ -297,7 +297,7 @@ The state-space model with operating points (a.k.a. nominal values) is:
     \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) \\
     \mathbf{y_0}(k) &=  \mathbf{C x}(k) + \mathbf{D_d d_0}(k)
 \end{aligned}
-```wit
+```
 in which the `uop`, `yop` and `dop` vectors evaluate :
 ```math
 \begin{aligned}
