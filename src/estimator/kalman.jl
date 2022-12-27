@@ -57,14 +57,15 @@ The steady-state Kalman filter is based on the process model :
     \mathbf{y^u}(k) &= \mathbf{Ĉ^u x}(k) + \mathbf{D̂_d^u d}(k)
 \end{aligned}
 ```
-with sensor ``\mathbf{v}(k)`` and process ``\mathbf{w}(k)`` noises as zero mean white noise 
-processes, with a respective covariance of ``\mathbf{R̂}`` and ``\mathbf{Q̂}``. The arguments 
-are in standard deviations σ, i.e. same units than outputs and states. The matrices 
-``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the stochastic model, 
-which is specified by the numbers of output integrator `nint_ym`. Likewise, the covariance
-matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, Q_{int})}`` and ``\mathbf{R̂ = R}``.
-The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to 
-measured outputs ``\mathbf{y^m}`` (and unmeasured ones for ``\mathbf{Ĉ^u, D̂_d^u}``).
+with sensor ``\mathbf{v}(k)`` and process ``\mathbf{w}(k)`` noises as uncorrelated zero mean 
+white noise processes, with a respective covariance of ``\mathbf{R̂}`` and ``\mathbf{Q̂}``. 
+The arguments are in standard deviations σ, i.e. same units than outputs and states. The 
+matrices ``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the stochastic
+model, which is specified by the numbers of output integrator `nint_ym`. Likewise, the 
+covariance matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, Q_{int})}`` and 
+``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of ``\mathbf{Ĉ, D̂_d}`` 
+that correspond to measured outputs ``\mathbf{y^m}``(and unmeasured ones for 
+``\mathbf{Ĉ^u, D̂_d^u}``).
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
@@ -241,9 +242,6 @@ function evaloutput(estim::Union{SteadyKalmanFilter, KalmanFilter}, d=Float64[])
 end
 
 
-
-function init_kalman()
-end
 
 """
     validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)

@@ -3,6 +3,8 @@ abstract type PredictiveController end
 struct LinMPC <: PredictiveController
     model::LinModel
     estim::StateEstimator
+    lastu ::Vector{Float64}
+    lastΔŨ::Vector{Float64}
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64}
@@ -35,7 +37,7 @@ struct LinMPC <: PredictiveController
     J ::Matrix{Float64}
     Kd::Matrix{Float64}
     P ::Matrix{Float64}
-    Q̃ ::Matrix{Float64}
+    Q̃ ::Symmetric{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
@@ -48,8 +50,11 @@ struct LinMPC <: PredictiveController
         N_Hc = Diagonal(repeat(Nwt, Hc)) 
         L_Hp = Diagonal(repeat(Lwt, Hp))
         C = Cwt
-        # TODO: quick boolean test for no u setpoints (for NonLinMPC)
-        R̂u = repeat(ru, Hp) # constant over Hp
+        if ~iszero(Lwt)
+            R̂u = repeat(ru, Hp) # constant over Hp
+        else
+            R̂u = Float64[] # useless if Lwt weights are all 0.0
+        end
         umin,  umax      = fill(-Inf, nu), fill(+Inf, nu)
         Δumin, Δumax     = fill(-Inf, nu), fill(+Inf, nu)
         ŷmin,  ŷmax      = fill(-Inf, ny), fill(+Inf, ny)
@@ -68,8 +73,11 @@ struct LinMPC <: PredictiveController
         Q̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
+        lastu  = model.uop
+        lastΔŨ = zeros(size(Q̃, 1))
         return new(
             model, estim, 
+            lastu, lastΔŨ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, C, R̂u,
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
@@ -130,8 +138,8 @@ arguments.
 
 # Extended Help
 Manipulated inputs setpoints ``\mathbf{r_u}`` are not common but they can be interesting
-for over-actuated systems (e.g. prioritize solutions with lower economical costs). The 
-default `Lwt` value implies that this feature is disabled by default.
+for over-actuated systems, when `nu > ny` (e.g. prioritize solutions with lower economical 
+costs). The default `Lwt` value implies that this feature is disabled by default.
 """
 LinMPC(model::LinModel; kwargs...) = LinMPC(SteadyKalmanFilter(model); kwargs...)
 
@@ -303,6 +311,114 @@ function setconstraint!(
     return mpc
 end
 
+"""
+    evalinput!(mpc::LinMPC, ry, d=Float64[]; ym=nothing)
+
+TBW.
+"""
+function evalinput!(mpc::LinMPC, ry::Vector{<:Real}, d::Vector{<:Real}=Float64[]; kwargs...)
+    R̂y, D̂ = repeat(ry, 1, mpc.Hp), repeat(d, 1, mpc.Hp) # constant over Hp
+    return evalinput!(mpc, ry, R̂y, d, D̂; kwargs...)
+end
+
+
+"""
+    evalinput!(mpc::LinMPC, ry, R̂y, d=Float64[], D̂=Float64[]; ym=nothing)
+
+Use custom output setpoints `R̂y` and measured disturbances `D̂` predictions.
+"""
+function evalinput!(
+    mpc::LinMPC, 
+    ry::Vector{<:Real}, 
+    R̂y::Matrix{<:Real}, 
+    d ::Vector{<:Real} = Float64[], 
+    D̂ ::Matrix{<:Real} = Float64[]; 
+    ym::Union{Vector{<:Real}, Nothing} = nothing
+)
+    if isnothing(ym) && isa(mpc.estim, InternalModel)
+        error("Predictive controllers with an InternalModel require the measured"*
+              "outputs ym in argument to compute the control actions u")
+    end
+    R̂y, D̂ = R̂y[:], D̂[:] # convert matrices to column vectors
+    x̂d, x̂s = split_state(mpc.estim)
+    ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
+    F, p̃, q = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d)
+    A, b = init_constraint(mpc, mpc.model, F)
+    
+    Δu = zeros(mpc.model.nu)
+
+    u = mpc.last_u + Δu
+    mpc.last_u[:] = u
+    return u
+end
+
+
+
+"""
+    initstate!(mpc::PredictiveController, u, ym, d=Float64[])
+
+Init `mpc` predictive controller variables and states of `mpc.estim` estimator.
+"""
+function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
+    mpc.lastu[:] = u
+    mpc.lastΔŨ  .= 0
+    return initstate!(mpc.estim, u, ym, d)
+end
+
+
+split_state(estim::StateEstimator) = (nx=estim.model.nx; (estim.x̂[1:nx], estim.x̂[nx+1:end]))
+split_state(estim::InternalModel)  = (estim.x̂d, estim.x̂s)
+
+predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ ) = (estim.Cs*x̂s, mpc.Ks*x̂s)
+function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
+    ŷd = estim.model.h(estim.x̂d, d - estim.model.dop) + estim.model.yop 
+    ŷs = zeros(estim.model.ny,1)
+    ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
+    Ŷs = mpc.Ks*x̂s + mpc.Ps*ŷs
+    return ŷs, Ŷs
+end
+
+
+function init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d)
+    lastu0 = mpc.lastu - model.uop
+    F = mpc.Kd*x̂d + mpc.P*lastu0 + Ŷs + mpc.Yop
+    if model.nd ≠ 0
+        F += mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
+    end
+    Ẑ = F - R̂y
+    p̃ = 2*(mpc.M_Hp*mpc.Ẽ)'*Ẑ
+    q = Ẑ'*mpc.M_Hp*Ẑ
+    if ~isempty(mpc.R̂u)
+        V̂ = (mpc.T_Hp*mpc.lastu - mpc.R̂u)
+        p̃ += 2*(mpc.L_Hp*mpc.T_Hp)'*V̂
+        q += V̂'*mpc.L_Hp*V̂
+    end
+    return F, p̃, q
+end
+
+
+function init_constraint(mpc, model::LinModel, F)
+    # === manipulated input constraints ===
+    A_u = [mpc.A_umin; mpc.A_umax]
+    b_u = [(+mpc.T_Hc*mpc.lastu - mpc.Umin); (-mpc.T_Hc*mpc.lastu + mpc.Umax)]
+
+    # === input increment constraints ===
+    # TODO: add manipulated input constraints that support softening
+
+    # === predicted output constraints ====
+    A_y = [mpc.A_ŷmin; mpc.A_ŷmax]
+    b_y = [(+F - mpc.Ŷmin); (-F + mpc.Ŷmax)]
+
+    # === merging constraints ===
+    A = [A_u; A_y]
+    b = [b_u; b_y]
+    i_nonInf = .!isinf.(b)
+    A = A[i_nonInf, :]
+    b = b[i_nonInf, :]
+    return A, b
+end
+
+"Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
 function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
     Umin  = repeat(umin, Hc)
     Umax  = repeat(umax, Hc)
@@ -510,21 +626,21 @@ end
 
 
 
-"""
+@doc raw"""
     init_quadprog(E, S_Hp, M_Hp, N_Hc, L_Hp)
 
-Init quadratic programming (optimization) matrix.
+Init the quadratic programming optimization matrix `Q`.
 
-`Q` is the quadratic programming matrix in general form. It is constant if the model and 
-objective function weights are linear and time invariant (LTI). The quadratic programming 
-`p` vector needs recalculation each control iteration.  
+The `Q` matrix appears in the quadratic general form :
+```math
+    J = \min_{\mathbf{ΔU}} \frac{1}{2}\mathbf{(ΔU)'Q(ΔU)} + \mathbf{p'(ΔU)} + q 
+```
+``\mathbf{Q}`` is constant if the model and weights are linear and time invariant (LTI). The 
+vector ``\mathbf{p}`` and scalar ``q`` need recalculation each control period ``k``. ``q`` 
+does not impact the minima position. It is thus useless at optimization but required to 
+evaluate the minimal ``J`` value.
 """
-function init_quadprog(E, S_Hp, M_Hp, N_Hc, L_Hp)
-    Q = 2*(E'*M_Hp*E + N_Hc + S_Hp'*L_Hp*S_Hp)
-    # TODO: verify if necessary or use special matrix (symmetric ?)
-    # Q = (Q + Q')/2
-    return Q
-end
+init_quadprog(E, S_Hp, M_Hp, N_Hc, L_Hp) = 2*Symmetric(E'*M_Hp*E + N_Hc + S_Hp'*L_Hp*S_Hp)
 
 
 @doc raw"""
@@ -591,7 +707,7 @@ function init_stochpred(estim::InternalModel, Hp)
     return Ks, Ps 
 end
 
-
+"Validate predictive controller weight and horizon specified values."
 function validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
     nu, ny = model.nu, model.ny
     Hp < 1  && error("Prediction horizon Hp should be ≥ 1")
