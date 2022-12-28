@@ -3,11 +3,13 @@ module ModelPredictiveControl
 #using JuMP
 using LinearAlgebra
 using ControlSystemsBase
+using OSQP
+using SparseArrays
 
 export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput
 export StateEstimator, InternalModel, SteadyKalmanFilter, KalmanFilter
 export initstate!
-export LinMPC, setconstraint!
+export LinMPC, setconstraint!, moveinput!
 
 include("sim_model.jl")
 include("state_estim.jl")

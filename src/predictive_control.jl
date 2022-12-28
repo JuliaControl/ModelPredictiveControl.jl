@@ -36,12 +36,13 @@ struct LinMPC <: PredictiveController
     G ::Matrix{Float64}
     J ::Matrix{Float64}
     Kd::Matrix{Float64}
-    P ::Matrix{Float64}
-    Q̃ ::Symmetric{Float64}
+    Q ::Matrix{Float64}
+    P̃ ::Symmetric{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
+    optmodel::OSQP.Model
     function LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         model = estim.model
         nu, ny = model.nu, model.ny
@@ -50,11 +51,8 @@ struct LinMPC <: PredictiveController
         N_Hc = Diagonal(repeat(Nwt, Hc)) 
         L_Hp = Diagonal(repeat(Lwt, Hp))
         C = Cwt
-        if ~iszero(Lwt)
-            R̂u = repeat(ru, Hp) # constant over Hp
-        else
-            R̂u = Float64[] # useless if Lwt weights are all 0.0
-        end
+        # manipulated input setpoint predictions are constant over Hp :
+        R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[] 
         umin,  umax      = fill(-Inf, nu), fill(+Inf, nu)
         Δumin, Δumax     = fill(-Inf, nu), fill(+Inf, nu)
         ŷmin,  ŷmax      = fill(-Inf, ny), fill(+Inf, ny)
@@ -66,15 +64,23 @@ struct LinMPC <: PredictiveController
         c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = 
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
-        E, G, J, Kd, P = init_deterpred(model, Hp, Hc)
+        E, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
         A_umin, A_umax, S̃_Hp, S̃_Hc = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
         A_ŷmin, A_ŷmax, Ẽ = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
-        Q̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        P̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         lastu  = model.uop
-        lastΔŨ = zeros(size(Q̃, 1))
+        lastΔŨ = zeros(size(P̃, 1))
+        # test with OSQP package :
+        optmodel = OSQP.Model()
+        A = [A_umin; A_umax; A_ŷmin; A_ŷmax]
+        b = [Umin; Umax; Ŷmin; Ŷmax]
+        i_nonInf = .!isinf.(b)
+        A = A[i_nonInf, :]
+        b = b[i_nonInf]
+        OSQP.setup!(optmodel; P=sparse(P̃), A=sparse(A), u=b, verbose=false)
         return new(
             model, estim, 
             lastu, lastΔŨ,
@@ -84,9 +90,10 @@ struct LinMPC <: PredictiveController
             c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax, 
             S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
             A_umin, A_umax, A_ŷmin, A_ŷmax,
-            Ẽ, G, J, Kd, P, Q̃,
+            Ẽ, G, J, Kd, Q, P̃,
             Ks, Ps,
-            Yop, Dop
+            Yop, Dop,
+            optmodel
         )
     end
 end
@@ -287,13 +294,13 @@ function setconstraint!(
     if !isnothing(c_ŷmin)
         size(c_ŷmin) == (ny,) || error("c_ŷmin size must be $((ny,))")
         any(c_ŷmin .< 0) && error("c_ŷmin weights should be non-negative")
-        c_Ŷmin  = repeat(c_ŷmin, Hc)
+        c_Ŷmin  = repeat(c_ŷmin, Hp)
         mpc.c_Ŷmin[:] = c_Ŷmin
     end
     if !isnothing(c_ŷmax)
         size(c_ŷmax) == (ny,) || error("c_ŷmax size must be $((ny,))")
         any(c_ŷmax .< 0) && error("c_ŷmax weights should be non-negative")
-        c_Ŷmax  = repeat(c_ŷmax, Hc)
+        c_Ŷmax  = repeat(c_ŷmax, Hp)
         mpc.c_Ŷmax[:] = c_Ŷmax
     end
     if !all(isnothing.((c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)))
@@ -312,22 +319,22 @@ function setconstraint!(
 end
 
 """
-    evalinput!(mpc::LinMPC, ry, d=Float64[]; ym=nothing)
+    moveinput!(mpc::LinMPC, ry, d=Float64[]; ym=nothing)
 
 TBW.
 """
-function evalinput!(mpc::LinMPC, ry::Vector{<:Real}, d::Vector{<:Real}=Float64[]; kwargs...)
+function moveinput!(mpc::LinMPC, ry::Vector{<:Real}, d::Vector{<:Real}=Float64[]; kwargs...)
     R̂y, D̂ = repeat(ry, 1, mpc.Hp), repeat(d, 1, mpc.Hp) # constant over Hp
-    return evalinput!(mpc, ry, R̂y, d, D̂; kwargs...)
+    return moveinput!(mpc, ry, R̂y, d, D̂; kwargs...)
 end
 
 
 """
-    evalinput!(mpc::LinMPC, ry, R̂y, d=Float64[], D̂=Float64[]; ym=nothing)
+    moveinput!(mpc::LinMPC, ry, R̂y, d=Float64[], D̂=Float64[]; ym=nothing)
 
 Use custom output setpoints `R̂y` and measured disturbances `D̂` predictions.
 """
-function evalinput!(
+function moveinput!(
     mpc::LinMPC, 
     ry::Vector{<:Real}, 
     R̂y::Matrix{<:Real}, 
@@ -335,20 +342,15 @@ function evalinput!(
     D̂ ::Matrix{<:Real} = Float64[]; 
     ym::Union{Vector{<:Real}, Nothing} = nothing
 )
-    if isnothing(ym) && isa(mpc.estim, InternalModel)
-        error("Predictive controllers with an InternalModel require the measured"*
-              "outputs ym in argument to compute the control actions u")
-    end
     R̂y, D̂ = R̂y[:], D̂[:] # convert matrices to column vectors
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
-    F, p̃, q = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d)
+    F, q̃, p = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d)
     A, b = init_constraint(mpc, mpc.model, F)
-    
-    Δu = zeros(mpc.model.nu)
-
-    u = mpc.last_u + Δu
-    mpc.last_u[:] = u
+    ΔŨ, J = optim_objective(mpc, A, b, q̃, p)
+    Δu = ΔŨ[1:mpc.model.nu] # receding horizon principle: only Δu(k) is used
+    u = mpc.lastu + Δu
+    mpc.lastu[:] = u
     return u
 end
 
@@ -357,7 +359,7 @@ end
 """
     initstate!(mpc::PredictiveController, u, ym, d=Float64[])
 
-Init `mpc` predictive controller variables and states of `mpc.estim` estimator.
+Init `mpc` controller variables and the states of `mpc.estim` [`StateEstimator`](@ref).
 """
 function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
     mpc.lastu[:] = u
@@ -366,11 +368,21 @@ function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
 end
 
 
+"""
+    updatestate!(mpc::PredictiveController, u, ym, d=Float64[])
+
+Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
+"""
+updatestate!(mpc::PredictiveController, u, ym, d=Float64[]) = updatestate!(mpc.estim,u,ym,d)
+
+
 split_state(estim::StateEstimator) = (nx=estim.model.nx; (estim.x̂[1:nx], estim.x̂[nx+1:end]))
 split_state(estim::InternalModel)  = (estim.x̂d, estim.x̂s)
 
 predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ ) = (estim.Cs*x̂s, mpc.Ks*x̂s)
 function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
+    isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
+                           "outputs ym in keyword argument to compute control actions u")
     ŷd = estim.model.h(estim.x̂d, d - estim.model.dop) + estim.model.yop 
     ŷs = zeros(estim.model.ny,1)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
@@ -381,19 +393,19 @@ end
 
 function init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d)
     lastu0 = mpc.lastu - model.uop
-    F = mpc.Kd*x̂d + mpc.P*lastu0 + Ŷs + mpc.Yop
+    F = mpc.Kd*x̂d + mpc.Q*lastu0 + Ŷs + mpc.Yop
     if model.nd ≠ 0
         F += mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
     end
     Ẑ = F - R̂y
-    p̃ = 2*(mpc.M_Hp*mpc.Ẽ)'*Ẑ
-    q = Ẑ'*mpc.M_Hp*Ẑ
+    q̃ = 2*(mpc.M_Hp*mpc.Ẽ)'*Ẑ
+    p = Ẑ'*mpc.M_Hp*Ẑ
     if ~isempty(mpc.R̂u)
         V̂ = (mpc.T_Hp*mpc.lastu - mpc.R̂u)
-        p̃ += 2*(mpc.L_Hp*mpc.T_Hp)'*V̂
-        q += V̂'*mpc.L_Hp*V̂
+        q̃ += 2*(mpc.L_Hp*mpc.T_Hp)'*V̂
+        p += V̂'*mpc.L_Hp*V̂
     end
-    return F, p̃, q
+    return F, q̃, p
 end
 
 
@@ -414,8 +426,42 @@ function init_constraint(mpc, model::LinModel, F)
     b = [b_u; b_y]
     i_nonInf = .!isinf.(b)
     A = A[i_nonInf, :]
-    b = b[i_nonInf, :]
+    b = b[i_nonInf]
     return A, b
+end
+
+function optim_objective(mpc::LinMPC, A, b, q̃, p)
+    # initial ΔŨ: [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0]
+    ΔŨ0 = [mpc.lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
+    if !isinf(mpc.C) # if soft constraints, append the last slack value ϵ_{k-1}:
+        ΔŨ0 = [ΔŨ0; mpc.lastΔŨ[end]]
+    end
+
+    OSQP.warm_start!(mpc.optmodel; x=ΔŨ0)
+    OSQP.update!(mpc.optmodel; q=q̃, u=b)
+
+    # --- optimization ---
+    @info "ModelPredictiveControl: optimizing controller objective function..."
+    res = OSQP.solve!(mpc.optmodel)
+    ΔŨ = res.x 
+    J = res.info.obj_val + p; # optimal objective value by adding constant term p
+    
+        
+    # --- error handling ---
+    #=
+    if ~isempty(deltaUhc) && all(isnan(deltaUhc))
+        flag = -777;
+        mess = "Optimal deltaUs are all NaN!"
+    end
+    if flag <= 0 
+        warning("MPC optimization error message (exitflag=%d):\n%s",flag,mess)
+    end
+    if flag < 0 # if error, we take last value :
+        deltaUhc = deltaUhc0
+    end
+    =#
+    mpc.lastΔŨ[:] = ΔŨ
+    return ΔŨ, J
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -464,7 +510,7 @@ The linear model predictions are evaluated by :
 ```math
 \begin{aligned}
     \mathbf{Ŷ} &= \mathbf{E ΔU} + \mathbf{G d}(k) + \mathbf{J D̂} + \mathbf{K_d x̂_d}(k) 
-                                                  + \mathbf{P u}(k-1) + \mathbf{Ŷ_s}     \\
+                                                  + \mathbf{Q u}(k-1) + \mathbf{Ŷ_s}     \\
                &= \mathbf{E ΔU} + \mathbf{F}
 \end{aligned}
 ```
@@ -513,7 +559,7 @@ matrices are computed by :
 \mathbf{C}\mathbf{A}^{H_p-1}
 \end{bmatrix}
 \\
-\mathbf{P} &= \begin{bmatrix}
+\mathbf{Q} &= \begin{bmatrix}
 \mathbf{W}_0        \\
 \mathbf{W}_1        \\
 \vdots              \\
@@ -531,23 +577,23 @@ function init_deterpred(model::LinModel, Hp, Hc)
     Kd = Matrix{Float64}(undef, Hp*ny, nx)
     for i=1:Hp
         Apow[:,:,i+1] = A^i
-        iRow           = (1:ny) .+ ny*(i-1)
-        Kd[iRow,:]     = C*Apow[:,:,i+1]
+        iRow = (1:ny) .+ ny*(i-1)
+        Kd[iRow,:] = C*Apow[:,:,i+1]
     end 
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Apow_csum  = cumsum(Apow, dims=3)
 
     ## === manipulated inputs u ===
-    P = Matrix{Float64}(undef, Hp*ny, nu)
+    Q = Matrix{Float64}(undef, Hp*ny, nu)
     for i=1:Hp
-        iRow        = (1:ny) .+ ny*(i-1)
-        P[iRow,:]  = C*Apow_csum[:,:,i]*Bu
+        iRow = (1:ny) .+ ny*(i-1)
+        Q[iRow,:] = C*Apow_csum[:,:,i]*Bu
     end
     E = zeros(Hp*ny, Hc*nu) 
     for i=1:Hc # truncated with control horizon
-        iRow            = (ny*(i-1)+1):(ny*Hp)
-        iCol            = (1:nu) .+ nu*(i-1)
-        E[iRow,iCol]   = P[iRow .- ny*(i-1),:]
+        iRow = (ny*(i-1)+1):(ny*Hp)
+        iCol = (1:nu) .+ nu*(i-1)
+        E[iRow,iCol] = Q[iRow .- ny*(i-1),:]
     end
 
     ## === measured disturbances d ===
@@ -555,16 +601,16 @@ function init_deterpred(model::LinModel, Hp, Hc)
     J = repeatdiag(Dd, Hp)
     if nd ≠ 0
         for i=1:Hp
-            iRow        = (1:ny) .+ ny*(i-1)
-            G[iRow,:]  = C*Apow[:,:,i]*Bd
+            iRow = (1:ny) .+ ny*(i-1)
+            G[iRow,:] = C*Apow[:,:,i]*Bd
         end
         for i=1:Hp
-            iRow            = (ny*i+1):(ny*Hp)
-            iCol            = (1:nd) .+ nd*(i-1)
-            J[iRow,iCol]   = G[iRow-ny*i,:]
+            iRow = (ny*i+1):(ny*Hp)
+            iCol = (1:nd) .+ nd*(i-1)
+            J[iRow,iCol] = G[iRow .- ny*i,:]
         end
     end
-    return E, G, J, Kd, P
+    return E, G, J, Kd, Q
 end
 
 
@@ -672,14 +718,14 @@ end
 @doc raw"""
     init_quadprog(E, S_Hp, M_Hp, N_Hc, L_Hp)
 
-Init the quadratic programming optimization matrix `Q`.
+Init the quadratic programming optimization matrix `P`.
 
-The `Q` matrix appears in the quadratic general form :
+The `P` matrix appears in the quadratic general form :
 ```math
-    J = \min_{\mathbf{ΔU}} \frac{1}{2}\mathbf{(ΔU)'Q(ΔU)} + \mathbf{p'(ΔU)} + q 
+    J = \min_{\mathbf{ΔU}} \frac{1}{2}\mathbf{(ΔU)'P(ΔU)} + \mathbf{q'(ΔU)} + p 
 ```
-``\mathbf{Q}`` is constant if the model and weights are linear and time invariant (LTI). The 
-vector ``\mathbf{p}`` and scalar ``q`` need recalculation each control period ``k``. ``q`` 
+``\mathbf{P}`` is constant if the model and weights are linear and time invariant (LTI). The 
+vector ``\mathbf{q}`` and scalar ``p`` need recalculation each control period ``k``. ``p`` 
 does not impact the minima position. It is thus useless at optimization but required to 
 evaluate the minimal ``J`` value.
 """

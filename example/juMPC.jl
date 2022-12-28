@@ -28,7 +28,7 @@ sys = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
         tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]
 linModel3 = LinModel(sys,Ts,i_d=[3])
 linModel4 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3])
-setop!(linModel4,uop=[10,50],yop=[50,30],dop=[15])
+setop!(linModel4,uop=[10,10],yop=[50,30],dop=[15])
 linModel5 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_u=1:2)
 linModel6 = LinModel([delay(4) delay(8)]*sys,Ts,i_d=[3])
 
@@ -61,9 +61,15 @@ updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 
 initstate!(ssKalmanFilter1,[0,0],[2,1])
 
-mpc = LinMPC(linModel1)
+mpc = LinMPC(linModel4, Hp=15, Hc=1, Nwt=[0.1, 0.1], Cwt=1e6)
 
-setconstraint!(mpc, c_umin=[1,1])
+#setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
+#setconstraint!(mpc, umin=[5, 9.9])
+#setconstraint!(mpc, ŷmax=[55, 35])
+
+
+u = moveinput!(mpc, [50,31], mpc.model.dop)
+
 
 #=([
 H_qp = vars_ml["mMPC"]["Hqp"]
