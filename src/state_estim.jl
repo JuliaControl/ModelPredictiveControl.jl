@@ -43,6 +43,7 @@ function Base.show(io::IO, estim::StateEstimator)
     print(io,   " $(estim.model.nd) measured disturbances d")
 end
 
+"Remove operating points on inputs `u`, measured outputs `ym` and disturbances `d`."
 function remove_op(estim::StateEstimator, u, d, ym)
     u0  = u  - estim.model.uop
     d0  = d  - estim.model.dop
@@ -163,7 +164,19 @@ It then estimates the measured outputs `ŷm` from these states, and the residua
 current measured outputs `(ym - ŷm)` initializes the integrators of the stochastic model.
 This approach ensures that ``\mathbf{ŷ^m}(0) = \mathbf{y^m}(0)``. For [`LinModel`](@ref), it 
 also ensures that the estimator starts at steady-state, resulting in a bumpless manual to 
-automatic transfer for control applications. 
+automatic transfer for control applications.
+
+# Examples
+```jldoctest
+julia> estim = SteadyKalmanFilter(LinModel(tf(3, [10, 1]), 0.5), nint_ym=[2]);
+
+julia> x̂ = initstate!(estim, [1], [3 - 0.1])
+3-element Vector{Float64}:
+  5.0000000000000115
+  0.0
+ -0.10000000000000675
+```
+
 """
 function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     model = estim.model

@@ -80,6 +80,19 @@ that correspond to measured outputs ``\mathbf{y^m}``(and unmeasured ones for
 - `σQ_int=fill(0.1,sum(nint_ym))` : same than `σQ` but for the stochastic model covariance
     ``\mathbf{Q_{int}}`` (composed of output integrators)
 
+# Examples
+```jldoctest
+julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
+
+julia> estim = SteadyKalmanFilter(model, i_ym=[2], σR=[1], σQ_int=[0.01])
+SteadyKalmanFilter state estimator with a sample time Ts = 0.5 s and:
+ 1 manipulated inputs u
+ 3 states x̂
+ 1 measured outputs ym
+ 1 unmeasured outputs yu
+ 0 measured disturbances d
+```
+
 # Extended Help
 The model augmentation with `nint_ym` vector produces the integral action when the estimator
 is used in a controller as state feedback (a.k.a. offset-free control). The default is 1 
@@ -181,6 +194,19 @@ The process model is identical to [`SteadyKalmanFilter`](@ref).
 - `σP0_int=fill(10,sum(nint_ym))` : same than `σP0` but for the stochastic model
     covariance ``\mathbf{P_{int}}(0)`` (composed of output integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref)
+
+# Examples
+```jldoctest
+julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
+
+julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP0=[100, 100], σQ_int=[0.01])
+KalmanFilter state estimator with a sample time Ts = 0.5 s and:
+ 1 manipulated inputs u
+ 3 states x̂
+ 1 measured outputs ym
+ 1 unmeasured outputs yu
+ 0 measured disturbances d
+```
 """
 function KalmanFilter(
     model::LinModel;

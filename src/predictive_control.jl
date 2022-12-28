@@ -1,3 +1,28 @@
+@doc raw"""
+Abstract supertype of all predictive controllers.
+
+---
+
+    (mpc::PredictiveController)(ry, d=Float64[]; kwargs...)
+
+Functor allowing callable `PredictiveController` object as an alias for [`moveinput!`](@ref).
+
+# Examples
+```jldoctest
+julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
+
+julia> u = mpc([5])
+[ Info: ModelPredictiveControl: optimizing controller objective function...
+1-element Vector{Float64}:
+ 1.0002377873771395
+```
+
+---
+
+    (mpc::PredictiveController)(ry, R̂y, d=Float64[], D̂=Float64[]; kwargs...)
+
+Call [`moveinput!`](@ref) with custom `ry` and `d` predictions.
+"""
 abstract type PredictiveController end
 
 struct LinMPC <: PredictiveController
@@ -376,7 +401,18 @@ Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 updatestate!(mpc::PredictiveController, u, ym, d=Float64[]) = updatestate!(mpc.estim,u,ym,d)
 
 
+"""
+    split_state(estim::StateEstimator)
+
+Split `estim.x̂` vector into the deterministic `x̂d` and stochastic `x̂s` states.
+"""
 split_state(estim::StateEstimator) = (nx=estim.model.nx; (estim.x̂[1:nx], estim.x̂[nx+1:end]))
+
+"""
+    split_state(estim::InternalModel)
+
+Get the internal model deterministic `estim.x̂d` and stochastic `estim.x̂s` states.
+"""
 split_state(estim::InternalModel)  = (estim.x̂d, estim.x̂s)
 
 predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ ) = (estim.Cs*x̂s, mpc.Ks*x̂s)
@@ -391,6 +427,11 @@ function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
 end
 
 
+"""
+    init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d)
+
+Init linear model prediction matrices `F`, `q̃` and `p`.
+"""
 function init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d)
     lastu0 = mpc.lastu - model.uop
     F = mpc.Kd*x̂d + mpc.Q*lastu0 + Ŷs + mpc.Yop
@@ -431,6 +472,7 @@ function init_constraint(mpc, model::LinModel, F)
 end
 
 function optim_objective(mpc::LinMPC, A, b, q̃, p)
+    # --- initial point (warm start) ---
     # initial ΔŨ: [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0]
     ΔŨ0 = [mpc.lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
     if !isinf(mpc.C) # if soft constraints, append the last slack value ϵ_{k-1}:
@@ -444,9 +486,7 @@ function optim_objective(mpc::LinMPC, A, b, q̃, p)
     @info "ModelPredictiveControl: optimizing controller objective function..."
     res = OSQP.solve!(mpc.optmodel)
     ΔŨ = res.x 
-    J = res.info.obj_val + p; # optimal objective value by adding constant term p
-    
-        
+    J = res.info.obj_val + p; # optimal objective value by adding constant term p 
     # --- error handling ---
     #=
     if ~isempty(deltaUhc) && all(isnan(deltaUhc))
@@ -515,15 +555,11 @@ The linear model predictions are evaluated by :
 \end{aligned}
 ```
 where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``, and 
-disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
+measured disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
 ``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. Deterministic state estimates 
-``\mathbf{x̂_d}(k)`` are extracted from current estimates ``\mathbf{x̂}_{k-1}(k)``. Operating
-points on ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{y}`` are omitted in above equations.
-
-!!! note
-    Stochastic predictions ``\mathbf{Ŷ_s}`` are calculated separately (see 
-    [`init_stochpred`](@ref)) and added to ``\mathbf{F}`` matrix to support internal model 
-    structure and reduce NonLinMPC computational costs.
+``\mathbf{x̂_d}(k)`` are extracted from current estimates ``\mathbf{x̂}_{k-1}(k)`` with
+[`split_state`](@ref). Operating points on ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{y}`` 
+are omitted in above equations.
 
 # Extended Help
 Using the ``\mathbf{A, B_u, C, B_d, D_d}`` matrices in `model` and the equation
@@ -567,6 +603,12 @@ matrices are computed by :
 \end{bmatrix}
 \end{aligned}
 ```
+!!! note
+    Stochastic predictions ``\mathbf{Ŷ_s}`` are calculated separately (see 
+    [`init_stochpred`](@ref)) and added to the ``\mathbf{F}`` matrix to support internal 
+    model structure and reduce NonLinMPC computational costs. That is also why the 
+    prediction matrices are built on ``\mathbf{A, B_u, C, B_d, D_d}`` instead of the 
+    augmented model ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `mpc.estim` estimator.
 """
 function init_deterpred(model::LinModel, Hp, Hc)
     A, Bu, C, Bd, Dd = model.A, model.Bu, model.C, model.Bd, model.Dd
@@ -725,9 +767,9 @@ The `P` matrix appears in the quadratic general form :
     J = \min_{\mathbf{ΔU}} \frac{1}{2}\mathbf{(ΔU)'P(ΔU)} + \mathbf{q'(ΔU)} + p 
 ```
 ``\mathbf{P}`` is constant if the model and weights are linear and time invariant (LTI). The 
-vector ``\mathbf{q}`` and scalar ``p`` need recalculation each control period ``k``. ``p`` 
-does not impact the minima position. It is thus useless at optimization but required to 
-evaluate the minimal ``J`` value.
+vector ``\mathbf{q}`` and scalar ``p`` need recalculation each control period ``k`` (see
+[`init_prediction`](@ref) method). ``p`` does not impact the minima position. It is thus 
+useless at optimization but required to evaluate the minimal ``J`` value.
 """
 init_quadprog(E, S_Hp, M_Hp, N_Hc, L_Hp) = 2*Symmetric(E'*M_Hp*E + N_Hc + S_Hp'*L_Hp*S_Hp)
 
@@ -743,9 +785,9 @@ integrators):
     \mathbf{Ŷ_s} = \mathbf{K_s x̂_s}(k)
 ```
 The stochastic predictions ``\mathbf{Ŷ_s}`` are the integrator outputs from ``k+1`` to 
-``k+H_p``. ``\mathbf{x̂_s}(k)`` is extracted from current estimates ``\mathbf{x̂}_{k-1}(k)``.
-The method also returns the matrix ``\mathbf{P_s = 0}``, which is useless except for 
-[`InternalModel`] estimators.
+``k+H_p``. ``\mathbf{x̂_s}(k)`` is extracted from current estimates ``\mathbf{x̂}_{k-1}(k)``
+with [`split_state`](@ref). The method also returns an empty ``\mathbf{P_s}`` matrix, since 
+it is useless except for [`InternalModel`](@ref) estimators.
 """
 function init_stochpred(estim::StateEstimator, Hp)
     As, Cs = estim.As, estim.Cs
@@ -771,10 +813,9 @@ Init the stochastic prediction matrices for [`InternalModel`](@ref).
 ```math
     \mathbf{Ŷ_s} = \mathbf{K_s x̂_s}(k) + \mathbf{P_s ŷ_s}(k)
 ```
-with ``\mathbf{Ŷ_s}`` as stochastic predictions from ``k+1`` to ``k+H_p``, current 
-stochastic states ``\mathbf{x̂_s}(k)`` and outputs ``\mathbf{ŷ_s}(k)``. ``\mathbf{ŷ_s}(k)``
-comprises the measured outputs ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d}(k)``
-and unmeasured ``\mathbf{ŷ_s^u(k) = 0}``. See [^1].
+Current stochastic outputs ``\mathbf{ŷ_s}(k)`` comprises the measured outputs 
+``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d}(k)``and unmeasured 
+``\mathbf{ŷ_s^u(k) = 0}``. See [^1].
 
 [^1]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
     control structure for decoupling setpoint tracking, feedforward compensation and 
@@ -790,8 +831,8 @@ function init_stochpred(estim::InternalModel, Hp)
     for i = 1:Hp
         iRow = (1:ny) .+ ny*(i-1)
         Ms = Cs*As^(i-1)*B̂s
-        Ks[iRow, :] = Cs*As^i - Ms*Cs
-        Ps[iRow, :] = Ms
+        Ks[iRow,:] = Cs*As^i - Ms*Cs
+        Ps[iRow,:] = Ms
     end
     return Ks, Ps 
 end
@@ -825,4 +866,25 @@ function Base.show(io::IO, mpc::PredictiveController)
     println(io, " $(mpc.estim.nym) measured outputs ym")
     println(io, " $(mpc.estim.nyu) unmeasured outputs yu")
     print(io,   " $(mpc.estim.model.nd) measured disturbances d")
+end
+
+
+"Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
+function (mpc::PredictiveController)(
+    ry::Vector{<:Real}, 
+    d::Vector{<:Real}=Float64[]; 
+    kwargs...
+)
+    return moveinput!(mpc, ry, d; kwargs...)
+end
+
+"Call [`moveinput!`](@ref) with custom `ry` and `d` predictions."
+function (mpc::PredictiveController)(
+    ry::Vector{<:Real}, 
+    R̂y::Matrix{<:Real}, 
+    d ::Vector{<:Real} = Float64[], 
+    D̂ ::Matrix{<:Real} = Float64[];
+    kwargs...
+)
+    return moveinput!(mpc, ry, R̂y, d, D̂; kwargs...)
 end

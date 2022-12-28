@@ -5,6 +5,7 @@ asddas
 ## PredictiveController functions and types
 
 ```@docs
+PredictiveController
 LinMPC
 ```
 
@@ -24,4 +25,5 @@ ModelPredictiveControl.relaxΔU
 ModelPredictiveControl.relaxŶ
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
+ModelPredictiveControl.split_state
 ```
