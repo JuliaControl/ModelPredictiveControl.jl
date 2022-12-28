@@ -9,7 +9,7 @@ using SparseArrays
 export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput
 export StateEstimator, InternalModel, SteadyKalmanFilter, KalmanFilter
 export initstate!
-export LinMPC, setconstraint!, moveinput!
+export PredictiveController, LinMPC, setconstraint!, moveinput!
 
 include("sim_model.jl")
 include("state_estim.jl")
