@@ -19,9 +19,9 @@ setconstraint!
 ```@docs
 ModelPredictiveControl.init_deterpred
 ModelPredictiveControl.init_ΔUtoU
-ModelPredictiveControl.slackU
-ModelPredictiveControl.slackΔU
-ModelPredictiveControl.slackŶ
+ModelPredictiveControl.relaxU
+ModelPredictiveControl.relaxΔU
+ModelPredictiveControl.relaxŶ
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
 ```

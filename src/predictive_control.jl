@@ -67,9 +67,9 @@ struct LinMPC <: PredictiveController
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, G, J, Kd, P = init_deterpred(model, Hp, Hc)
-        A_umin, A_umax, S̃_Hp, S̃_Hc = slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
-        ΔŨmin, ΔŨmax, Ñ_Hc = slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
-        A_ŷmin, A_ŷmax, Ẽ = slackŶ(C, c_Ŷmin, c_Ŷmax, E)
+        A_umin, A_umax, S̃_Hp, S̃_Hc = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+        A_ŷmin, A_ŷmax, Ẽ = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
         Q̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
@@ -300,9 +300,9 @@ function setconstraint!(
         S_Hp, S_Hc = mpc.S̃_Hp[:, 1:nu*Hc], mpc.S̃_Hc[:, 1:nu*Hc]
         # N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
         E = mpc.Ẽ[:, 1:nu*Hc]
-        A_umin, A_umax, _ , _ = slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        A_umin, A_umax, _ , _ = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         # ΔŨmin, ΔŨmax, _ = slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
-        A_ŷmin, A_ŷmax, _ = slackŶ(C, c_Ŷmin, c_Ŷmax, E)
+        A_ŷmin, A_ŷmax, _ = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
         mpc.A_umin[:] = A_umin
         mpc.A_umax[:] = A_umax
         mpc.A_ŷmin[:] = A_ŷmin  
@@ -464,7 +464,7 @@ The linear model predictions are evaluated by :
 ```math
 \begin{aligned}
     \mathbf{Ŷ} &= \mathbf{E ΔU} + \mathbf{G d}(k) + \mathbf{J D̂} + \mathbf{K_d x̂_d}(k) 
-                                                  + \mathbf{P u}(k-1) + \mathbf{Ŷ_s} \\
+                                                  + \mathbf{P u}(k-1) + \mathbf{Ŷ_s}     \\
                &= \mathbf{E ΔU} + \mathbf{F}
 \end{aligned}
 ```
@@ -472,12 +472,55 @@ where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``,
 disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
 ``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. Deterministic state estimates 
 ``\mathbf{x̂_d}(k)`` are extracted from current estimates ``\mathbf{x̂}_{k-1}(k)``. Operating
-points on `u`, `d` and `y` are omitted in above equation.
+points on ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{y}`` are omitted in above equations.
 
 !!! note
     Stochastic predictions ``\mathbf{Ŷ_s}`` are calculated separately (see 
     [`init_stochpred`](@ref)) and added to ``\mathbf{F}`` matrix to support internal model 
     structure and reduce NonLinMPC computational costs.
+
+# Extended Help
+Using the ``\mathbf{A, B_u, C, B_d, D_d}`` matrices in `model` and the equation
+``\mathbf{W}_j = \mathbf{C} ( ∑_{i=0}^j \mathbf{A}^i ) \mathbf{B_u}``, the prediction 
+matrices are computed by :
+```math
+\begin{aligned}
+\mathbf{E} &= \begin{bmatrix}
+\mathbf{W}_{0}      & \mathbf{0}         & \cdots & \mathbf{0}              \\
+\mathbf{W}_{1}      & \mathbf{0}         & \cdots & \mathbf{0}              \\
+\vdots              & \vdots             & \ddots & \vdots                  \\
+\mathbf{W}_{H_p-1}  & \mathbf{W}_{H_p-2} & \cdots & \mathbf{W}_{H_p-H_c+1}
+\end{bmatrix}
+\\
+\mathbf{G} &= \begin{bmatrix}
+\mathbf{C}\mathbf{A}^{0} \mathbf{B_d}     \\ 
+\mathbf{C}\mathbf{A}^{1} \mathbf{B_d}     \\ 
+\vdots                                    \\
+\mathbf{C}\mathbf{A}^{H_p-1} \mathbf{B_d}
+\end{bmatrix}
+\\
+\mathbf{J} &= \begin{bmatrix}
+\mathbf{D_d}                              & \mathbf{0}                                & \cdots & \mathbf{0}   \\ 
+\mathbf{C}\mathbf{A}^{0} \mathbf{B_d}     & \mathbf{D_d}                              & \cdots & \mathbf{0}   \\ 
+\vdots                                    & \vdots                                    & \ddots & \mathbf{0}   \\
+\mathbf{C}\mathbf{A}^{H_p-2} \mathbf{B_d} & \mathbf{C}\mathbf{A}^{H_p-3} \mathbf{B_d} & \cdots & \mathbf{D_d}
+\end{bmatrix}
+\\
+\mathbf{K_d} &= \begin{bmatrix}
+\mathbf{C}\mathbf{A}^{0}      \\
+\mathbf{C}\mathbf{A}^{1}      \\
+\vdots                        \\
+\mathbf{C}\mathbf{A}^{H_p-1}
+\end{bmatrix}
+\\
+\mathbf{P} &= \begin{bmatrix}
+\mathbf{W}_0        \\
+\mathbf{W}_1        \\
+\vdots              \\
+\mathbf{W}_{H_p-1}
+\end{bmatrix}
+\end{aligned}
+```
 """
 function init_deterpred(model::LinModel, Hp, Hc)
     A, Bu, C, Bd, Dd = model.A, model.Bu, model.C, model.Bd, model.Dd
@@ -526,7 +569,7 @@ end
 
 
 @doc raw"""
-    slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+    relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
@@ -546,7 +589,7 @@ ones described at [`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matr
 \end{bmatrix}
 ```
 """
-function slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+function relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
         A_umin, A_umax = -[S_Hc +c_Umin], +[S_Hc -c_Umax] 
@@ -560,7 +603,7 @@ function slackU(C, c_Umin, c_Umax, S_Hp, S_Hc)
 end
 
 @doc raw"""
-    slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+    relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
 
 Augment input increments constraints with slack variable ϵ for softening.
 
@@ -578,7 +621,7 @@ augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{max}}`` over
 \end{bmatrix}
 ```
 """
-function slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # 0 ≤ ϵ ≤ ∞
         ΔŨmin, ΔŨmax = [ΔUmin; 0.0], [ΔUmax; Inf]
@@ -592,7 +635,7 @@ function slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
 end
 
 @doc raw"""
-    slackŶ(C, c_Ŷmin, c_Ŷmax, E)
+    relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
 
 Augment linear output prediction constraints with slack variable ϵ for softening.
 
@@ -611,7 +654,7 @@ Denoting the input increments augmented with the slack variable
 \end{bmatrix}
 ```
 """
-function slackŶ(C, c_Ŷmin, c_Ŷmax, E)
+function relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts predicted output constraint calculations:
         A_ŷmin, A_ŷmax = -[E +c_Ŷmin], +[E -c_Ŷmax] 
