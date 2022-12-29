@@ -1,4 +1,4 @@
-# State estimator design
+# State Estimator Design
 
 This package includes many state estimators (or state observer), both for deterministic
 and stochastic systems. 
@@ -51,14 +51,4 @@ initstate!
 updatestate!
 evaloutput
 setstate!
-```
-
-# Advanced Topics
-
-## Internals
-
-```@docs
-ModelPredictiveControl.init_internalmodel
-ModelPredictiveControl.init_estimstoch
-ModelPredictiveControl.augment_model
 ```

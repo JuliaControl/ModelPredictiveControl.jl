@@ -1,21 +1,6 @@
-# Model predictive controller design
+# PredictiveController Internals
 
-asddas
-
-## PredictiveController functions and types
-
-```@docs
-PredictiveController
-LinMPC
-```
-
-```@docs
-setconstraint!
-```
-
-# Advanced Topics
-
-## Internals
+ss
 
 ```@docs
 ModelPredictiveControl.init_deterpred
