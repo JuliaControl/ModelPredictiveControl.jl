@@ -606,9 +606,9 @@ matrices are computed by :
 !!! note
     Stochastic predictions ``\mathbf{Ŷ_s}`` are calculated separately (see 
     [`init_stochpred`](@ref)) and added to the ``\mathbf{F}`` matrix to support internal 
-    model structure and reduce NonLinMPC computational costs. That is also why the 
+    model structure and reduce `NonLinMPC` computational costs. That is also why the 
     prediction matrices are built on ``\mathbf{A, B_u, C, B_d, D_d}`` instead of the 
-    augmented model ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `mpc.estim` estimator.
+    augmented model ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}``.
 """
 function init_deterpred(model::LinModel, Hp, Hc)
     A, Bu, C, Bd, Dd = model.A, model.Bu, model.C, model.Bd, model.Dd
