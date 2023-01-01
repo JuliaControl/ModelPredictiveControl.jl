@@ -181,12 +181,10 @@ julia> x̂ = initstate!(estim, [1], [3 - 0.1])
 function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     model = estim.model
     # --- deterministic model states ---
-    if isa(model, LinModel)
+    x̂d = estim.x̂[1:model.nx]
+    if isa(model, LinModel) && all(abs.(eigvals(model.A)) .≠ 1) # non-integrating model only
         # init deterministic state with steady-states at current input and disturbance :
         x̂d = steadystate(model, u, d)
-    else
-        # keep current deterministic states unchanged :
-        x̂d = estim.x̂[1:model.nx]
     end
     # --- stochastic model states (integrators) ---
     ŷd = model.h(x̂d, d - model.dop)
