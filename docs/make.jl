@@ -22,6 +22,7 @@ makedocs(
                 "Specifying Plant Models" => "public/sim_model.md",
                 "State Estimator Design" => "public/state_estim.md",
                 "Predictive Controller Design" => "public/predictive_control.md",
+                "Generic Functions" => "public/generic_func.md",
             ],
             "Internals" => [
                 "SimModel" => "internals/sim_model.md",
@@ -29,7 +30,7 @@ makedocs(
                 "PredictiveController" => "internals/predictive_control.md",
             ],
         ],  
-        "API" => "api.md"
+        "Index" => "func_index.md"
     ]
 )
 

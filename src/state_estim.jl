@@ -5,7 +5,7 @@ Abstract supertype of all state estimators.
 
     (estim::StateEstimator)(d=Float64[])
 
-Functor allowing callable `StateEstimator` object as an alias for `evaloutput`.
+Functor allowing callable `StateEstimator` object as an alias for [`evaloutput`](@ref).
 
 # Examples
 ```jldoctest
@@ -155,10 +155,11 @@ Init `estim.x̂` states from current inputs `u`, measured outputs `ym` and distu
 
 The method tries to find a good steady-state to initialize `estim.x̂` estimate :
 
-- If `estim.model` is a [`LinModel`](@ref), it evaluates `estim.model` steady-state with 
-  current inputs `u` and measured disturbances `d`, and saves the result to `estim.x̂[1:nx].`
-- If `estim.model` is a [`NonLinModel`](@ref), the current deterministic states 
-  `estim.x̂[1:nx]` are left unchanged (use [`setstate!`](@ref) to manually modify them). 
+- If `estim.model` is a non-integrating [`LinModel`](@ref), it evaluates `estim.model` 
+  steady-state with current inputs `u` and measured disturbances `d`, and saves the result 
+  to `estim.x̂[1:nx].`
+- Else, the current deterministic states `estim.x̂[1:nx]` are left unchanged (use 
+  [`setstate!`](@ref) to manually modify them). 
   
 It then estimates the measured outputs `ŷm` from these states, and the residual offset with 
 current measured outputs `(ym - ŷm)` initializes the integrators of the stochastic model.
@@ -182,7 +183,7 @@ function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     model = estim.model
     # --- deterministic model states ---
     x̂d = estim.x̂[1:model.nx]
-    if isa(model, LinModel) && all(abs.(eigvals(model.A)) .≠ 1) # non-integrating model only
+    if isa(model, LinModel) && !any(abs.(eigvals(model.A)) .≈ 1)# non-integrating model only
         # init deterministic state with steady-states at current input and disturbance :
         x̂d = steadystate(model, u, d)
     end

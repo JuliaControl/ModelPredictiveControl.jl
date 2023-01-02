@@ -9,6 +9,8 @@ PredictiveController
 LinMPC
 ```
 
+## Generic Functions
+
 ```@docs
 setconstraint!
 ```

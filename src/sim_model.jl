@@ -198,7 +198,18 @@ function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
 end
 
 
-"Evaluate the steady-state vector when `model` is a [`LinModel`](@ref)."
+@doc raw"""
+    steadystate(model::LinModel, u, d=Float64[])
+
+Evaluate the steady-state vector when `model` is a [`LinModel`](@ref).
+
+Omitting the operating points, the method evaluates the equilibrium ``\mathbf{x}(∞)`` from:
+```math
+    \mathbf{x}(∞) = \mathbf{(I - A)^{-1}(B_u u + B_d d)}
+```
+with the manipulated inputs held constant at ``\mathbf{u}`` and, the measured disturbances, 
+at ``\mathbf{d}``.
+"""
 function steadystate(model::LinModel, u, d=Float64[])
     return (I - model.A) \ (model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
 end

@@ -1,7 +1,5 @@
 # PredictiveController Internals
 
-ss
-
 ```@docs
 ModelPredictiveControl.init_deterpred
 ModelPredictiveControl.init_ΔUtoU

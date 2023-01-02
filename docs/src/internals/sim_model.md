@@ -1,3 +1,5 @@
 # SimModel Internals
 
-asds
+```@docs
+ModelPredictiveControl.steadystate
+```
