@@ -28,7 +28,15 @@ struct SteadyKalmanFilter <: StateEstimator
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
-        Ko = kalman(Discrete, Â, Ĉm, Matrix(Q̂), Matrix(R̂)) # Matrix() required for Julia 1.6
+        Ko = try
+            kalman(Discrete, Â, Ĉm, Matrix(Q̂), Matrix(R̂)) # Matrix() required for Julia 1.6
+        catch my_error
+            if isa(my_error, ErrorException)
+                error("Cannot compute the optimal Kalman gain Ko for the "* 
+                      "SteadyKalmanFilter. You may try to remove integrators with nint_ym "*
+                      "parameter or use the time-varying KalmanFilter.")
+            end
+        end
         x̂ = [copy(model.x); zeros(nxs)]
         return new(
             model, 
