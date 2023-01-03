@@ -439,11 +439,11 @@ end
 
 Init linear model prediction matrices `F`, `q̃` and `p`.
 """
-function init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d)
-    lastu0 = mpc.lastu - model.uop
+function init_prediction(mpc, ::LinModel, d, D̂, Ŷs, R̂y, x̂d)
+    lastu0 = mpc.lastu - mpc.model.uop
     F = mpc.Kd*x̂d + mpc.Q*lastu0 + Ŷs + mpc.Yop
-    if model.nd ≠ 0
-        F += mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
+    if mpc.model.nd ≠ 0
+        F += mpc.G*(d - mpc.model.dop) + mpc.J*(D̂ - mpc.Dop)
     end
     Ẑ = F - R̂y
     q̃ = 2*(mpc.M_Hp*mpc.Ẽ)'*Ẑ
@@ -457,21 +457,28 @@ function init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d)
 end
 
 
-function init_constraint(mpc, model::LinModel, F)
-    # === manipulated input constraints ===
-    A_u = [mpc.A_umin; mpc.A_umax]
-    b_u = [(+mpc.T_Hc*mpc.lastu - mpc.Umin); (-mpc.T_Hc*mpc.lastu + mpc.Umax)]
+"""
+    init_constraint(mpc, ::LinModel, F)
 
-    # === input increment constraints ===
-    # TODO: add manipulated input constraints that support softening
-
-    # === predicted output constraints ====
-    A_y = [mpc.A_ŷmin; mpc.A_ŷmax]
-    b_y = [(+F - mpc.Ŷmin); (-F + mpc.Ŷmax)]
-
-    # === merging constraints ===
-    A = [A_u; A_y]
-    b = [b_u; b_y]
+Init `A` matrix and `b` vector for the linear model inequality constraints `A ΔŨ ≤ b`.
+"""
+function init_constraint(mpc, ::LinModel, F)
+    A = [
+        mpc.A_Umin
+        mpc.A_Umax
+        mpc.A_ΔŨmin
+        mpc.A_ΔŨmax
+        mpc.A_Ŷmin
+        mpc.A_Ŷmax
+    ]
+    b = [
+        +mpc.T_Hc*mpc.lastu - mpc.Umin
+        -mpc.T_Hc*mpc.lastu + mpc.Umax
+        -mpc.ΔŨmin
+        +mpc.ΔŨmax 
+        +F - mpc.Ŷmin 
+        -F + mpc.Ŷmax
+    ]
     i_nonInf = .!isinf.(b)
     A = A[i_nonInf, :]
     b = b[i_nonInf]
@@ -723,7 +730,7 @@ function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
         # ϵ ≥ 0 (no upper bound on ϵ), thus ΔŨmax = ΔUmax and c_ΔŨmax = c_ΔUmax
         ΔŨmin, ΔŨmax = [ΔUmin; 0.0], ΔUmax
         c_ΔŨmin, c_ΔŨmax = [c_ΔUmin; 1.0], c_ΔUmax
-        A_ΔŨmin, A_ΔŨmax = -[I +c_ΔŨmin], +[I -c_ΔŨmax]
+        A_ΔŨmin, A_ΔŨmax = -[vcat(I, zeros(1, length(ΔUmin))) +c_ΔŨmin], +[I -c_ΔŨmax]
         Ñ_Hc = Diagonal([diag(N_Hc); C])
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
