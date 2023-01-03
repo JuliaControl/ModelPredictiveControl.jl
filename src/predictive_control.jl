@@ -53,10 +53,12 @@ struct LinMPC <: PredictiveController
     T_Hp::Matrix{Bool}
     S̃_Hc::Matrix{Bool}
     T_Hc::Matrix{Bool}
-    A_umin::Matrix{Float64}
-    A_umax::Matrix{Float64}
-    A_ŷmin::Matrix{Float64}
-    A_ŷmax::Matrix{Float64}
+    A_Umin::Matrix{Float64}
+    A_Umax::Matrix{Float64}
+    A_ΔŨmin::Matrix{Float64}
+    A_ΔŨmax::Matrix{Float64}
+    A_Ŷmin::Matrix{Float64}
+    A_Ŷmax::Matrix{Float64}
     Ẽ ::Matrix{Float64}
     G ::Matrix{Float64}
     J ::Matrix{Float64}
@@ -90,9 +92,12 @@ struct LinMPC <: PredictiveController
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
-        A_umin, A_umax, S̃_Hp, S̃_Hc = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
-        ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
-        A_ŷmin, A_ŷmax, Ẽ = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
+        A_Umin, A_Umax, S̃_Hp, S̃_Hc = 
+            relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = 
+            relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+        A_Ŷmin, A_Ŷmax, Ẽ = 
+            relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
         P̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
@@ -100,8 +105,8 @@ struct LinMPC <: PredictiveController
         lastΔŨ = zeros(size(P̃, 1))
         # test with OSQP package :
         optmodel = OSQP.Model()
-        A = [A_umin; A_umax; A_ŷmin; A_ŷmax]
-        b = [Umin; Umax; Ŷmin; Ŷmax]
+        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
+        b = [Umin; Umax; ΔŨmin; ΔŨmax; Ŷmin; Ŷmax]
         i_nonInf = .!isinf.(b)
         A = A[i_nonInf, :]
         b = b[i_nonInf]
@@ -114,7 +119,7 @@ struct LinMPC <: PredictiveController
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
             c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax, 
             S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
-            A_umin, A_umax, A_ŷmin, A_ŷmax,
+            A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
             Ẽ, G, J, Kd, Q, P̃,
             Ks, Ps,
             Yop, Dop,
@@ -256,8 +261,8 @@ function setconstraint!(
     nu, ny = model.ny, model.ny
     Hp, Hc = mpc.Hp, mpc.Hc
     C = mpc.C
-    ΔUmin, ΔUmax = mpc.ΔŨmin[1:nu*Hc], mpc.ΔŨmax[1:nu*Hc]
     Umin,  Umax  = mpc.Umin, mpc.Umax
+    ΔUmin, ΔUmax = mpc.ΔŨmin[1:nu*Hc], mpc.ΔŨmax[1:nu*Hc]
     Ŷmin,  Ŷmax  = mpc.Ŷmin, mpc.Ŷmax
     c_Umin,  c_Umax  = mpc.c_Umin, mpc.c_Umax
     c_Ŷmin,  c_Ŷmax  = mpc.c_Ŷmin, mpc.c_Ŷmax
@@ -330,15 +335,17 @@ function setconstraint!(
     end
     if !all(isnothing.((c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)))
         S_Hp, S_Hc = mpc.S̃_Hp[:, 1:nu*Hc], mpc.S̃_Hc[:, 1:nu*Hc]
-        # N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
+        N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
         E = mpc.Ẽ[:, 1:nu*Hc]
-        A_umin, A_umax, _ , _ = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
-        # ΔŨmin, ΔŨmax, _ = slackΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
-        A_ŷmin, A_ŷmax, _ = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
-        mpc.A_umin[:] = A_umin
-        mpc.A_umax[:] = A_umax
-        mpc.A_ŷmin[:] = A_ŷmin  
-        mpc.A_ŷmax[:] = A_ŷmax
+        A_Umin, A_Umax, _ , _ = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        A_ΔŨmin, A_ΔŨmax, _ , _ , _ = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+        A_Ŷmin, A_Ŷmax, _ = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
+        mpc.A_Umin[:] = A_Umin
+        mpc.A_Umax[:] = A_Umax
+        mpc.A_ΔŨmin[:] = A_ΔŨmin
+        mpc.A_ΔŨmax[:] = A_ΔŨmax
+        mpc.A_Ŷmin[:] = A_Ŷmin  
+        mpc.A_Ŷmax[:] = A_Ŷmax
     end
     return mpc
 end
@@ -668,8 +675,8 @@ ones described at [`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matr
  inequality constraints:
 ```math
 \begin{bmatrix} 
-    \mathbf{A_{u_{min}}} \\ 
-    \mathbf{A_{u_{max}}} 
+    \mathbf{A_{U_{min}}} \\ 
+    \mathbf{A_{U_{max}}} 
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
     + \mathbf{T}_{H_c} \mathbf{u}(k-1) - \mathbf{U_{min}} \\
@@ -680,14 +687,14 @@ ones described at [`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matr
 function relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
-        A_umin, A_umax = -[S_Hc +c_Umin], +[S_Hc -c_Umax] 
+        A_Umin, A_Umax = -[S_Hc +c_Umin], +[S_Hc -c_Umax] 
         # ϵ has no impact on ΔU → U conversion for prediction calculations:
         S̃_Hp, S̃_Hc = [S_Hp falses(size(S_Hp, 1))], [S_Hc falses(size(S_Hc, 1))] 
     else # ΔŨ = ΔU (only hard constraints)
-        A_umin, A_umax = -S_Hc, +S_Hc
+        A_Umin, A_Umax = -S_Hc, +S_Hc
         S̃_Hp, S̃_Hc = S_Hp, S_Hc
     end
-    return A_umin, A_umax, S̃_Hp, S̃_Hc
+    return A_Umin, A_Umax, S̃_Hp, S̃_Hc
 end
 
 @doc raw"""
@@ -696,30 +703,35 @@ end
 Augment input increments constraints with slack variable ϵ for softening.
 
 Denoting the input increments augmented with the slack variable 
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
-augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{max}}`` over ``H_c``, and the 
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
+augmented input increment weights ``\mathbf{Ñ_Hc}`` (that incorporate ``C``). It also  
+returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{max}}`` and the 
 ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
-    \mathbf{A_{Δu_{min}}} \\ 
-    \mathbf{A_{Δu_{max}}}
+    \mathbf{A_{ΔŨ_{min}}} \\ 
+    \mathbf{A_{ΔŨ_{max}}}
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    TODO:
+    - \matbhf{ΔŨ_{min}} \\
+    + \mathbf{ΔŨ_{max}}
 \end{bmatrix}
 ```
 """
 function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
-        # 0 ≤ ϵ ≤ ∞
-        ΔŨmin, ΔŨmax = [ΔUmin; 0.0], [ΔUmax; Inf]
-        # the C weight is incorporated into the input increment weights N_Hc
+        # ϵ ≥ 0 (no upper bound on ϵ), thus ΔŨmax = ΔUmax and c_ΔŨmax = c_ΔUmax
+        ΔŨmin, ΔŨmax = [ΔUmin; 0.0], ΔUmax
+        c_ΔŨmin, c_ΔŨmax = [c_ΔUmin; 1.0], c_ΔUmax
+        A_ΔŨmin, A_ΔŨmax = -[I +c_ΔŨmin], +[I -c_ΔŨmax]
         Ñ_Hc = Diagonal([diag(N_Hc); C])
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
+        I_Hc = Matrix{Float64}(I, size(N_Hc))
+        A_ΔŨmin, A_ΔŨmax = -I_Hc, +I_Hc
         Ñ_Hc = N_Hc
     end
-    return ΔŨmin, ΔŨmax, Ñ_Hc
+    return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
 end
 
 @doc raw"""
@@ -733,8 +745,8 @@ Denoting the input increments augmented with the slack variable
 ``\mathbf{Ŷ = Ẽ ΔŨ + F}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
-    \mathbf{A_{ŷ_{min}}} \\ 
-    \mathbf{A_{ŷ_{max}}}
+    \mathbf{A_{Ŷ_{min}}} \\ 
+    \mathbf{A_{Ŷ_{max}}}
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
     + \mathbf{F} - \mathbf{Ŷ_{min}} \\
@@ -745,14 +757,14 @@ Denoting the input increments augmented with the slack variable
 function relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts predicted output constraint calculations:
-        A_ŷmin, A_ŷmax = -[E +c_Ŷmin], +[E -c_Ŷmax] 
+        A_Ŷmin, A_Ŷmax = -[E +c_Ŷmin], +[E -c_Ŷmax] 
         # ϵ has not impact on output predictions
         Ẽ = [E zeros(size(E, 1), 1)] 
     else # ΔŨ = ΔU (only hard constraints)
         Ẽ = E
-        A_ŷmin, A_ŷmax = -E, +E
+        A_Ŷmin, A_Ŷmax = -E, +E
     end
-    return A_ŷmin, A_ŷmax, Ẽ
+    return A_Ŷmin, A_Ŷmax, Ẽ
 end
 
 
