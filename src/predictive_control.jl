@@ -584,7 +584,7 @@ matrices are computed by :
 \mathbf{J} &= \begin{bmatrix}
 \mathbf{D_d}                              & \mathbf{0}                                & \cdots & \mathbf{0}   \\ 
 \mathbf{C}\mathbf{A}^{0} \mathbf{B_d}     & \mathbf{D_d}                              & \cdots & \mathbf{0}   \\ 
-\vdots                                    & \vdots                                    & \ddots & \mathbf{0}   \\
+\vdots                                    & \vdots                                    & \ddots & \vdots       \\
 \mathbf{C}\mathbf{A}^{H_p-2} \mathbf{B_d} & \mathbf{C}\mathbf{A}^{H_p-3} \mathbf{B_d} & \cdots & \mathbf{D_d}
 \end{bmatrix}
 \\
