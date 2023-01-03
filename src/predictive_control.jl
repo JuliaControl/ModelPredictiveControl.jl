@@ -711,7 +711,7 @@ Augment input increments constraints with slack variable ϵ for softening.
 
 Denoting the input increments augmented with the slack variable 
 ``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
-augmented input increment weights ``\mathbf{Ñ_Hc}`` (that incorporate ``C``). It also  
+augmented input increment weights ``\mathbf{Ñ}_{H_c}`` (that incorporate ``C``). It also  
 returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{max}}`` and the 
 ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
