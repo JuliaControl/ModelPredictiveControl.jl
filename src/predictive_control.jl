@@ -472,12 +472,12 @@ function init_constraint(mpc, ::LinModel, F)
         mpc.A_Ŷmax
     ]
     b = [
-        +mpc.T_Hc*mpc.lastu - mpc.Umin
-        -mpc.T_Hc*mpc.lastu + mpc.Umax
+        -mpc.Umin + mpc.T_Hc*mpc.lastu
+        +mpc.Umax - mpc.T_Hc*mpc.lastu 
         -mpc.ΔŨmin
         +mpc.ΔŨmax 
-        +F - mpc.Ŷmin 
-        -F + mpc.Ŷmax
+        -mpc.Ŷmin + F
+        +mpc.Ŷmax - F
     ]
     i_nonInf = .!isinf.(b)
     A = A[i_nonInf, :]
@@ -686,8 +686,8 @@ ones described at [`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matr
     \mathbf{A_{U_{max}}} 
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    + \mathbf{T}_{H_c} \mathbf{u}(k-1) - \mathbf{U_{min}} \\
-    - \mathbf{T}_{H_c} \mathbf{u}(k-1) + \mathbf{U_{max}} 
+    - \mathbf{U_{min}} + \mathbf{T}_{H_c} \mathbf{u}(k-1) \\
+    + \mathbf{U_{max}} - \mathbf{T}_{H_c} \mathbf{u}(k-1)
 \end{bmatrix}
 ```
 """
@@ -720,7 +720,7 @@ returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{
     \mathbf{A_{ΔŨ_{max}}}
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \matbhf{ΔŨ_{min}} \\
+    - \mathbf{ΔŨ_{min}} \\
     + \mathbf{ΔŨ_{max}}
 \end{bmatrix}
 ```
@@ -756,8 +756,8 @@ Denoting the input increments augmented with the slack variable
     \mathbf{A_{Ŷ_{max}}}
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    + \mathbf{F} - \mathbf{Ŷ_{min}} \\
-    - \mathbf{F} + \mathbf{Ŷ_{max}}
+    - \mathbf{Ŷ_{min}} + \mathbf{F} \\
+    + \mathbf{Ŷ_{max}} - \mathbf{F} 
 \end{bmatrix}
 ```
 """
