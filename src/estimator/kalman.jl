@@ -103,7 +103,7 @@ SteadyKalmanFilter state estimator with a sample time Ts = 0.5 s and:
 
 # Extended Help
 The model augmentation with `nint_ym` vector produces the integral action when the estimator
-is used in a controller as state feedback (a.k.a. offset-free control). The default is 1 
+is used in a controller as state feedback (a.k.a. offset-free tracking). The default is 1 
 integrator per measured outputs. More than 1 integrator is interesting only when `model` is 
 integrating or unstable, or when the unmeasured output disturbances are "ramp-like". See 
 [`augment_model`](@ref).
