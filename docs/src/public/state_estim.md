@@ -1,9 +1,18 @@
 # State Estimator Design
 
-This package includes many state estimators (or state observer), both for deterministic
-and stochastic systems.
+This module includes many state estimators (or state observer), both for deterministic
+and stochastic systems. The implementations focus on control applications, that is, relying
+on the estimates to compute a [full state feedback](https://en.wikipedia.org/wiki/Full_state_feedback).
+(model predictive controllers, for this package). They all incorporates some kind of
+integral action by default, since it is generally desired to eleminate the steady-state
+error in closed-loop (a.k.a. offset-free tracking).
 
-The estimator are all implemented in the predictor form (a.k.a. observer form), that is,
+!!! warning
+    The addition of the integral action is not necessarily desired for other applications
+    than control (e.g. filter, soft-sensor, etc.). Careful must be taken at the estimator
+    construction in such a case, for example, by using `nint_ym=0` to add 0 integrator.
+
+The estimators are all implemented in the predictor form (a.k.a. observer form), that is,
 they all estimates at each discrete time ``k`` the states of the next period
 ``\mathbf{x̂}_k(k+1)``. This form comes in handy for control applications since the
 estimations come after the controller computations, without introducing any additional
