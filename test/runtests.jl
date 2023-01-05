@@ -13,6 +13,7 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
         tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ] 
 sys_ss = minreal(ss(sys))
 Gss = c2d(sys_ss[:,1:2], Ts, :zoh)
+Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
 
 @testset "$(rpad("LinModel construction", testset_titlelen))" begin
     linmodel1 = LinModel(sys, Ts, i_u=1:2)
@@ -37,35 +38,40 @@ Gss = c2d(sys_ss[:,1:2], Ts, :zoh)
     @test linmodel2.yop ≈ [50,30]
     @test linmodel2.dop ≈ zeros(0,1)
 
-    linmodel3 = LinModel(Gss)
-    setstate!(linmodel3, [1;-1])
-    @test linmodel3.x ≈ [1;-1]
+    linmodel3 = LinModel(Gss, 0.5Ts)
+    @test linmodel3.Ts == 2.0
+    @test linmodel3.A ≈ Gss2.A
+    @test linmodel3.C ≈ Gss2.C
+    
+    linmodel4 = LinModel(Gss)
+    setstate!(linmodel4, [1;-1])
+    @test linmodel4.x ≈ [1;-1]
 
-    linmodel4 = LinModel(sys,Ts,i_d=[3])
-    @test linmodel4.nx == 4
-    @test linmodel4.nu == 2
-    @test linmodel4.nd == 1
-    @test linmodel4.ny == 2
+    linmodel5 = LinModel(sys,Ts,i_d=[3])
+    @test linmodel5.nx == 4
+    @test linmodel5.nu == 2
+    @test linmodel5.nd == 1
+    @test linmodel5.ny == 2
     sysu_ss = sminreal(c2d(minreal(ss(sys))[:,1:2], Ts, :zoh))
     sysd_ss = sminreal(c2d(minreal(ss(sys))[:,3],   Ts, :tustin))
     sys_ss = [sysu_ss sysd_ss]
-    @test linmodel4.A   ≈ sys_ss.A
-    @test linmodel4.Bu  ≈ sys_ss.B[:,1:2]
-    @test linmodel4.Bd  ≈ sys_ss.B[:,3]
-    @test linmodel4.C   ≈ sys_ss.C
-    @test linmodel4.Dd  ≈ sys_ss.D[:,3]
+    @test linmodel5.A   ≈ sys_ss.A
+    @test linmodel5.Bu  ≈ sys_ss.B[:,1:2]
+    @test linmodel5.Bd  ≈ sys_ss.B[:,3]
+    @test linmodel5.C   ≈ sys_ss.C
+    @test linmodel5.Dd  ≈ sys_ss.D[:,3]
 
-    linmodel5 = LinModel([delay(4) delay(4)]*sys,Ts,i_d=[3])
-    @test linmodel5.nx == 6
-    @test sum(eigvals(linmodel5.A) .≈ 0) == 2
+    linmodel6 = LinModel([delay(4) delay(4)]*sys,Ts,i_d=[3])
+    @test linmodel6.nx == 6
+    @test sum(eigvals(linmodel6.A) .≈ 0) == 2
 
     @test_throws ErrorException LinModel(sys)
     @test_throws ErrorException LinModel(sys,-Ts)
     @test_throws ErrorException LinModel(sys,Ts,i_u=[1,1])
     @test_throws ErrorException LinModel(sys_ss,Ts+1)
-    @test_throws ErrorException setop!(linmodel4, uop=[0,0,0,0,0])
-    @test_throws ErrorException setop!(linmodel4, yop=[0,0,0,0,0])
-    @test_throws ErrorException setop!(linmodel4, dop=[0,0,0,0,0])
+    @test_throws ErrorException setop!(linmodel5, uop=[0,0,0,0,0])
+    @test_throws ErrorException setop!(linmodel5, yop=[0,0,0,0,0])
+    @test_throws ErrorException setop!(linmodel5, dop=[0,0,0,0,0])
     sys_ss.D .= 1
     @test_throws ErrorException LinModel(sys_ss,Ts)
 end

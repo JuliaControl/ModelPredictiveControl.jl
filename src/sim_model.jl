@@ -70,7 +70,8 @@ Construct a `LinModel` from state-space model `sys` with sampling time `Ts` in s
 with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{z}`` vector 
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
 in any order. `i_u` provides the indices of ``\mathbf{z}`` that are manipulated, and `i_d`, 
-the measured disturbances. See Extended Help if `sys` is continuous-time.
+the measured disturbances. See Extended Help if `sys` is continuous-time, or discrete-time
+and `Ts ≠ sys.Ts`.
 
 See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.ss),
 [`tf`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.tf).
@@ -89,7 +90,9 @@ Discrete-time linear model with a sample time Ts = 0.1 s and:
 State-space matrices are similar if `sys` is continuous (replace ``\mathbf{x}(k+1)`` with 
 ``\mathbf{ẋ}(t)`` and ``k`` with ``t`` on the LHS). In such a case, it's discretized with 
 [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
-and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. 
+and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Lastly, if 
+`sys` is discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by using 
+the same discretization methods.
 
 The constructor transforms the system to a more practical form (``\mathbf{D_u=0}`` because 
 of the zero-order hold):
@@ -129,14 +132,17 @@ function LinModel(
         # measured disturbances : tustin discretization (continuous signals with ADCs)
         sysd_dis = c2d(sysd,Ts,:tustin)
     else
-        if !isnothing(Ts)
-            #TODO: Resample discrete system instead of throwing an error
-            sys.Ts == Ts || error("Sample time Ts must be identical to sys.Ts")
+        if !isnothing(Ts) && !(Ts ≈ sys.Ts)
+            @info "Resampling the sys model at Ts = $Ts s..."
+            sysu = d2c(sysu, :zoh)
+            sysd = d2c(sysd, :tustin)
+            sysu_dis = c2d(sysu, Ts, :zoh)
+            sysd_dis = c2d(sysd, Ts, :tustin)
         else
             Ts = sys.Ts
-        end
-        sysu_dis = sysu
-        sysd_dis = sysd     
+            sysu_dis = sysu
+            sysd_dis = sysd
+        end     
     end
     sys_dis = sminreal([sysu_dis sysd_dis]) # merge common poles if possible
     nx = size(sys_dis.A,1)
