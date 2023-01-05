@@ -92,7 +92,7 @@ State-space matrices are similar if `sys` is continuous (replace ``\mathbf{x}(k+
 [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
 and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Lastly, if 
 `sys` is discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by using 
-the same discretization methods.
+the aforementioned discretization methods.
 
 The constructor transforms the system to a more practical form (``\mathbf{D_u=0}`` because 
 of the zero-order hold):
