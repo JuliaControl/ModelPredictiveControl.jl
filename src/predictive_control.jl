@@ -25,6 +25,10 @@ Call [`moveinput!`](@ref) with custom `ry` and `d` predictions.
 """
 abstract type PredictiveController end
 
+mutable struct OptimData 
+    model::OSQP.Model
+end
+
 struct LinMPC <: PredictiveController
     model::LinModel
     estim::StateEstimator
@@ -69,7 +73,7 @@ struct LinMPC <: PredictiveController
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
-    optmodel::OSQP.Model
+    optim::OptimData
     function LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         model = estim.model
         nu, ny = model.nu, model.ny
@@ -106,11 +110,12 @@ struct LinMPC <: PredictiveController
         # test with OSQP package :
         optmodel = OSQP.Model()
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
-        b = [Umin; Umax; ΔŨmin; ΔŨmax; Ŷmin; Ŷmax]
+        b = [-Umin; +Umax; -ΔŨmin; +ΔŨmax; -Ŷmin; +Ŷmax]
         i_nonInf = .!isinf.(b)
         A = A[i_nonInf, :]
         b = b[i_nonInf]
         OSQP.setup!(optmodel; P=sparse(P̃), A=sparse(A), u=b, verbose=false)
+        optim = OptimData(optmodel)
         return new(
             model, estim, 
             lastu, lastΔŨ,
@@ -123,7 +128,7 @@ struct LinMPC <: PredictiveController
             Ẽ, G, J, Kd, Q, P̃,
             Ks, Ps,
             Yop, Dop,
-            optmodel
+            optim
         )
     end
 end
@@ -337,9 +342,9 @@ function setconstraint!(
         S_Hp, S_Hc = mpc.S̃_Hp[:, 1:nu*Hc], mpc.S̃_Hc[:, 1:nu*Hc]
         N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
         E = mpc.Ẽ[:, 1:nu*Hc]
-        A_Umin, A_Umax, _ , _ = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
-        A_ΔŨmin, A_ΔŨmax, _ , _ , _ = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
-        A_Ŷmin, A_Ŷmax, _ = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
+        A_Umin, A_Umax = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        A_ΔŨmin, A_ΔŨmax = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+        A_Ŷmin, A_Ŷmax = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
         mpc.A_Umin[:] = A_Umin
         mpc.A_Umax[:] = A_Umax
         mpc.A_ΔŨmin[:] = A_ΔŨmin
@@ -347,6 +352,14 @@ function setconstraint!(
         mpc.A_Ŷmin[:] = A_Ŷmin  
         mpc.A_Ŷmax[:] = A_Ŷmax
     end
+    optmodel = OSQP.Model()
+    A = [mpc.A_Umin; mpc.A_Umax; mpc.A_ΔŨmin; mpc.A_ΔŨmax; mpc.A_Ŷmin; mpc.A_Ŷmax]
+    b = [-mpc.Umin; +mpc.Umax; -mpc.ΔŨmin; +mpc.ΔŨmax; -mpc.Ŷmin; +mpc.Ŷmax]
+    i_nonInf = .!isinf.(b)
+    A = A[i_nonInf, :]
+    b = b[i_nonInf]
+    OSQP.setup!(optmodel; P=sparse(mpc.P̃), A=sparse(A), u=b, verbose=false)
+    mpc.optim.model = optmodel
     return mpc
 end
 
@@ -493,12 +506,12 @@ function optim_objective(mpc::LinMPC, A, b, q̃, p)
         ΔŨ0 = [ΔŨ0; mpc.lastΔŨ[end]]
     end
 
-    OSQP.warm_start!(mpc.optmodel; x=ΔŨ0)
-    OSQP.update!(mpc.optmodel; q=q̃, u=b)
+    OSQP.warm_start!(mpc.optim.model; x=ΔŨ0)
+    OSQP.update!(mpc.optim.model; q=q̃, u=b)
 
     # --- optimization ---
     @info "ModelPredictiveControl: optimizing controller objective function..."
-    res = OSQP.solve!(mpc.optmodel)
+    res = OSQP.solve!(mpc.optim.model)
     ΔŨ = res.x 
     J = res.info.obj_val + p; # optimal objective value by adding constant term p 
     # --- error handling ---
@@ -727,10 +740,9 @@ returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{
 """
 function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
-        # ϵ ≥ 0 (no upper bound on ϵ), thus ΔŨmax = ΔUmax and c_ΔŨmax = c_ΔUmax
+        # ϵ ≥ 0 (no upper bound on ϵ), thus ΔŨmax = ΔUmax
         ΔŨmin, ΔŨmax = [ΔUmin; 0.0], ΔUmax
-        c_ΔŨmin, c_ΔŨmax = [c_ΔUmin; 1.0], c_ΔUmax
-        A_ΔŨmin, A_ΔŨmax = -[vcat(I, zeros(1, length(ΔUmin))) +c_ΔŨmin], +[I -c_ΔŨmax]
+        A_ΔŨmin, A_ΔŨmax = -[I +c_ΔUmin; zeros(1, length(ΔUmin)) 1], +[I -c_ΔUmax]
         Ñ_Hc = Diagonal([diag(N_Hc); C])
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax

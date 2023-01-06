@@ -15,5 +15,6 @@ updatestate!
 ## Set State
 
 ```@docs
+initstate!
 setstate!
 ```

@@ -72,7 +72,7 @@ matrices ``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augment
 model, which is specified by the numbers of output integrator `nint_ym`. Likewise, the 
 covariance matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, Q_{int})}`` and 
 ``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of ``\mathbf{Ĉ, D̂_d}`` 
-that correspond to measured outputs ``\mathbf{y^m}``(and unmeasured ones for 
+that correspond to measured outputs ``\mathbf{y^m}`` (and unmeasured ones, for 
 ``\mathbf{Ĉ^u, D̂_d^u}``).
 
 # Arguments

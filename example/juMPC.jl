@@ -60,14 +60,52 @@ updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 
 initstate!(ssKalmanFilter1,[0,0],[2,1])
 
-mpc = LinMPC(linModel4, Hp=15, Hc=1, Nwt=[0.1, 0.1], Cwt=1e6)
 
-#setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
-#setconstraint!(mpc, umin=[5, 9.9])
-#setconstraint!(mpc, ŷmax=[55, 35])
+nx = linModel4.nx
+kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
+mpc = LinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e6)
 
-u = moveinput!(mpc, [50,31], mpc.model.dop)
+setconstraint!(mpc, c_umin=[0,0], c_umax=[0,0])
+setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
+setconstraint!(mpc, umin=[5, 9.9], umax=[Inf,Inf])
+setconstraint!(mpc, ŷmin=[-Inf,-Inf],ŷmax=[55, 35])
+setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
-updatestate!(mpc, u, [50,30], mpc.model.dop)
+N= 200
 
+u_data = zeros(2,N)
+y_data = zeros(2,N)
+r_data = zeros(2,N)
+
+u = linModel4.uop
+d = linModel4.dop
+r = [50,31]
+initstate!(mpc,u,linModel4(d),d)
+for k = 0:N-1
+    y = linModel4(d)
+    if k == 40
+        r[2] = 29
+    end
+    if k == 100
+        r[2] = 36
+    end
+    if k == 150
+        global d = [3]
+    end
+    if k ≥ 180
+        y[1] += 15
+    end  
+    u = moveinput!(mpc, r, d)
+    u_data[:,k+1] = u
+    y_data[:,k+1] = y
+    r_data[:,k+1] = r 
+    updatestate!(mpc, u, y, d)
+    updatestate!(linModel4, u, d)
+end
+
+using PlotThemes, Plots
+#theme(:default)
+theme(:dark)
+default(fontfamily="Computer Modern"); scalefontsizes(1.1)
+plot(0:N-1,y_data)
