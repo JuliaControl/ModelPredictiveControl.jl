@@ -188,7 +188,7 @@ function initstate!(estim::StateEstimator, u, ym, d=Float64[])
         x̂d = steadystate(model, u, d)
     end
     # --- stochastic model states (integrators) ---
-    ŷd = model.h(x̂d, d - model.dop)
+    ŷd = model.h(x̂d, d - model.dop) + model.yop
     ŷsm = ym - ŷd[estim.i_ym]
     nint_ym = estim.nint_ym
     i_nint_nonzero = (nint_ym .≠ 0) 

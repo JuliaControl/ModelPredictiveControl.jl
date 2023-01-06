@@ -43,14 +43,14 @@ internalModel1 = InternalModel(linModel1)
 internalModel2 = InternalModel(linModel1,stoch_ym=[tf([1,0],[1,-1],Ts) 0; 0 tf([1,0],[1,-1],Ts)])
 internalModel3 = InternalModel(linModel1,i_ym=[1])
 
-initstate!(internalModel1,[0,0],[1,1])
+#initstate!(internalModel1,[0,0],[1,1])
 
 kalmanFilter1 = KalmanFilter(linModel1)
 kalmanFilter2 = KalmanFilter(linModel1,nint_ym=0)
 
 updatestate!(kalmanFilter2,[1, 1],[1, 1])
 
-initstate!(kalmanFilter1,[0,0],[2,1])
+#initstate!(kalmanFilter1,[0,0],[2,1])
 
 ssKalmanFilter1 = SteadyKalmanFilter(linModel1)
 ssKalmanFilter2 = SteadyKalmanFilter(linModel1,nint_ym=0)
@@ -58,7 +58,7 @@ ssKalmanFilter2 = SteadyKalmanFilter(linModel1,nint_ym=0)
 
 updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 
-initstate!(ssKalmanFilter1,[0,0],[2,1])
+#initstate!(ssKalmanFilter1,[0,0],[2,1])
 
 
 nx = linModel4.nx
@@ -66,11 +66,11 @@ kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1]
 
 mpc = LinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e6)
 
-setconstraint!(mpc, c_umin=[0,0], c_umax=[0,0])
-setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
-setconstraint!(mpc, umin=[5, 9.9], umax=[Inf,Inf])
-setconstraint!(mpc, ŷmin=[-Inf,-Inf],ŷmax=[55, 35])
-setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
+#setconstraint!(mpc, c_umin=[0,0], c_umax=[0,0])
+#setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
+#setconstraint!(mpc, umin=[5, 9.9], umax=[Inf,Inf])
+#setconstraint!(mpc, ŷmin=[-Inf,-Inf],ŷmax=[55, 35])
+#setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
 N= 200
 
@@ -82,8 +82,8 @@ u = linModel4.uop
 d = linModel4.dop
 r = [50,31]
 initstate!(mpc,u,linModel4(d),d)
+
 for k = 0:N-1
-    y = linModel4(d)
     if k == 40
         r[2] = 29
     end
@@ -93,9 +93,10 @@ for k = 0:N-1
     if k == 150
         global d = [3]
     end
+    y = linModel4(d) 
     if k ≥ 180
         y[1] += 15
-    end  
+    end 
     u = moveinput!(mpc, r, d)
     u_data[:,k+1] = u
     y_data[:,k+1] = y
@@ -108,4 +109,15 @@ using PlotThemes, Plots
 #theme(:default)
 theme(:dark)
 default(fontfamily="Computer Modern"); scalefontsizes(1.1)
-plot(0:N-1,y_data)
+p1 = plot(0:N-1,y_data[1,:],label=raw"$y_1$")
+plot!(0:N-1,r_data[1,:],label=raw"r_1")
+p2 = plot(0:N-1,y_data[2,:],label=raw"$y_2$")
+plot!(0:N-1,r_data[2,:],label=raw"r_2")
+p = plot(p1,p2, layout=[1,1])
+display(p)
+
+p1 = plot(0:N-1,u_data[1,:],label=raw"$u_1$")
+p2 = plot(0:N-1,u_data[2,:],label=raw"$u_2$")
+p = plot(p1,p2, layout=[1,1])
+display(p)
+

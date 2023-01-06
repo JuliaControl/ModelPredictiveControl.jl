@@ -105,7 +105,7 @@ struct LinMPC <: PredictiveController
         P̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
-        lastu  = model.uop
+        lastu  = copy(model.uop)
         lastΔŨ = zeros(size(P̃, 1))
         # test with OSQP package :
         optmodel = OSQP.Model()
@@ -393,7 +393,7 @@ function moveinput!(
     F, q̃, p = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d)
     A, b = init_constraint(mpc, mpc.model, F)
     ΔŨ, J = optim_objective(mpc, A, b, q̃, p)
-    Δu = ΔŨ[1:mpc.model.nu] # receding horizon principle: only Δu(k) is used
+    Δu = ΔŨ[1:mpc.model.nu] # receding horizon principle: only Δu(k) is used (first one)
     u = mpc.lastu + Δu
     mpc.lastu[:] = u
     return u
