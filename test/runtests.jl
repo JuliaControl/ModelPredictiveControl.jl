@@ -3,6 +3,7 @@
 using ControlSystemsBase
 using Documenter
 using LinearAlgebra
+using OSQP, SparseArrays #TODO: TO DELETE
 using ModelPredictiveControl
 using Test
 
