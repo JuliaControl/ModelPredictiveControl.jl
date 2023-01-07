@@ -64,7 +64,7 @@ updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
-mpc = LinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=Inf)
+mpc = LinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e6)
 
 setconstraint!(mpc, c_umin=[0,0], c_umax=[0,0])
 setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])

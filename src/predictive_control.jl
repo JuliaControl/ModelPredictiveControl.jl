@@ -110,11 +110,7 @@ struct LinMPC <: PredictiveController
         # test with OSQP package :
         optmodel = OSQP.Model()
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
-        b = [-Umin; +Umax; -ΔŨmin; +ΔŨmax; -Ŷmin; +Ŷmax]
-        i_nonInf = .!isinf.(b)
-        A = A[i_nonInf, :]
-        b = b[i_nonInf]
-        OSQP.setup!(optmodel; P=sparse(P̃), A=sparse(A), u=b, verbose=false)
+        OSQP.setup!(optmodel; P=sparse(P̃), A=sparse(A), u=zeros(size(A, 1)), verbose=false)
         optim = OptimData(optmodel)
         return new(
             model, estim, 
