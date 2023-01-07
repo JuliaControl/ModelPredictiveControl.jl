@@ -489,28 +489,18 @@ function optim_objective(mpc::LinMPC, b, q̃, p)
     if !isinf(mpc.C) # if soft constraints, append the last slack value ϵ_{k-1}:
         ΔŨ0 = [ΔŨ0; mpc.lastΔŨ[end]]
     end
-
     OSQP.warm_start!(mpc.optim.model; x=ΔŨ0)
     OSQP.update!(mpc.optim.model; q=q̃, u=b)
-
-    # --- optimization ---
-    @info "ModelPredictiveControl: optimizing controller objective function..."
+    @info "ModelPredictiveControl: optimizing MPC objective function..."
     res = OSQP.solve!(mpc.optim.model)
     ΔŨ = res.x
     J = res.info.obj_val + p; # optimal objective value by adding constant term p 
-    # --- error handling ---
-    #=
-    if ~isempty(deltaUhc) && all(isnan(deltaUhc))
-        flag = -777;
-        mess = "Optimal deltaUs are all NaN!"
+    status_val = res.info.status_val
+    status = res.info.status
+    status_val ≤ 0 && @warn "MPC exit status ≤ 0 ($status_val, $status)"
+    if status_val < 0 # if error, we take last value :
+        ΔŨ = ΔŨ0
     end
-    if flag <= 0 
-        warning("MPC optimization error message (exitflag=%d):\n%s",flag,mess)
-    end
-    if flag < 0 # if error, we take last value :
-        deltaUhc = deltaUhc0
-    end
-    =#
     mpc.lastΔŨ[:] = ΔŨ
     return ΔŨ, J
 end
