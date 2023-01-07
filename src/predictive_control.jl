@@ -354,11 +354,7 @@ function setconstraint!(
     end
     optmodel = OSQP.Model()
     A = [mpc.A_Umin; mpc.A_Umax; mpc.A_ΔŨmin; mpc.A_ΔŨmax; mpc.A_Ŷmin; mpc.A_Ŷmax]
-    b = [-mpc.Umin; +mpc.Umax; -mpc.ΔŨmin; +mpc.ΔŨmax; -mpc.Ŷmin; +mpc.Ŷmax]
-    i_nonInf = .!isinf.(b)
-    A = A[i_nonInf, :]
-    b = b[i_nonInf]
-    OSQP.setup!(optmodel; P=sparse(mpc.P̃), A=sparse(A), u=b, verbose=false)
+    OSQP.setup!(optmodel; P=sparse(mpc.P̃), A=sparse(A), u=zeros(size(A, 1)), verbose=false)
     mpc.optim.model = optmodel
     return mpc
 end
@@ -391,8 +387,8 @@ function moveinput!(
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
     F, q̃, p = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d)
-    A, b = init_constraint(mpc, mpc.model, F)
-    ΔŨ, J = optim_objective(mpc, A, b, q̃, p)
+    b = init_constraint(mpc, mpc.model, F)
+    ΔŨ, J = optim_objective(mpc, b, q̃, p)
     Δu = ΔŨ[1:mpc.model.nu] # receding horizon principle: only Δu(k) is used (first one)
     u = mpc.lastu + Δu
     mpc.lastu[:] = u
@@ -469,20 +465,12 @@ function init_prediction(mpc, ::LinModel, d, D̂, Ŷs, R̂y, x̂d)
 end
 
 
-"""
+@doc raw"""
     init_constraint(mpc, ::LinModel, F)
 
-Init `A` matrix and `b` vector for the linear model inequality constraints `A ΔŨ ≤ b`.
+Init `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 """
 function init_constraint(mpc, ::LinModel, F)
-    A = [
-        mpc.A_Umin
-        mpc.A_Umax
-        mpc.A_ΔŨmin
-        mpc.A_ΔŨmax
-        mpc.A_Ŷmin
-        mpc.A_Ŷmax
-    ]
     b = [
         -mpc.Umin + mpc.T_Hc*mpc.lastu
         +mpc.Umax - mpc.T_Hc*mpc.lastu 
@@ -491,13 +479,10 @@ function init_constraint(mpc, ::LinModel, F)
         -mpc.Ŷmin + F
         +mpc.Ŷmax - F
     ]
-    i_nonInf = .!isinf.(b)
-    A = A[i_nonInf, :]
-    b = b[i_nonInf]
-    return A, b
+    return b
 end
 
-function optim_objective(mpc::LinMPC, A, b, q̃, p)
+function optim_objective(mpc::LinMPC, b, q̃, p)
     # --- initial point (warm start) ---
     # initial ΔŨ: [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0]
     ΔŨ0 = [mpc.lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
@@ -511,7 +496,7 @@ function optim_objective(mpc::LinMPC, A, b, q̃, p)
     # --- optimization ---
     @info "ModelPredictiveControl: optimizing controller objective function..."
     res = OSQP.solve!(mpc.optim.model)
-    ΔŨ = res.x 
+    ΔŨ = res.x
     J = res.info.obj_val + p; # optimal objective value by adding constant term p 
     # --- error handling ---
     #=

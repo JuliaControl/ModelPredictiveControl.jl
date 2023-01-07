@@ -133,7 +133,7 @@ function LinModel(
         sysd_dis = c2d(sysd,Ts,:tustin)
     else
         if !isnothing(Ts) && !(Ts ≈ sys.Ts)
-            @info "Resampling the sys model at Ts = $Ts s..."
+            @info "Resampling the linear model from Ts = $(sys.Ts) to $Ts s..."
             sysu = d2c(sysu, :zoh)
             sysd = d2c(sysd, :tustin)
             sysu_dis = c2d(sysu, Ts, :zoh)
