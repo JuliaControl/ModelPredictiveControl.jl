@@ -12,7 +12,7 @@ Functor allowing callable `PredictiveController` object as an alias for [`movein
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1); ry = [5];
 
 julia> u = mpc(ry); round.(u)
-[ Info: ModelPredictiveControl: optimizing controller objective function...
+[ Info: ModelPredictiveControl: optimizing MPC objective function...
 1-element Vector{Float64}:
  1.0
 ```
