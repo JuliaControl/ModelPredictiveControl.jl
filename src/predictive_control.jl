@@ -742,7 +742,7 @@ function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ ≥ 0 (no upper bound on ϵ), thus ΔŨmax = ΔUmax
         ΔŨmin, ΔŨmax = [ΔUmin; 0.0], ΔUmax
-        A_ΔŨmin, A_ΔŨmax = -[I +c_ΔUmin; zeros(1, length(ΔUmin)) 1], +[I -c_ΔUmax]
+        A_ΔŨmin, A_ΔŨmax = -[I +c_ΔUmin; zeros(1, length(ΔUmin)) [1]], +[I -c_ΔUmax]
         Ñ_Hc = Diagonal([diag(N_Hc); C])
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
