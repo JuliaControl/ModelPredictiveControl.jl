@@ -440,7 +440,7 @@ function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
                            "outputs ym in keyword argument to compute control actions u")
     ŷd = estim.model.h(estim.x̂d, d - estim.model.dop) + estim.model.yop 
-    ŷs = zeros(estim.model.ny,1)
+    ŷs = zeros(estim.model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
     Ŷs = mpc.Ks*x̂s + mpc.Ps*ŷs
     return ŷs, Ŷs
@@ -453,8 +453,7 @@ end
 Init linear model prediction matrices `F`, `q̃` and `p`.
 """
 function init_prediction(mpc, ::LinModel, d, D̂, Ŷs, R̂y, x̂d)
-    lastu0 = mpc.lastu - mpc.model.uop
-    F = mpc.Kd*x̂d + mpc.Q*lastu0 + Ŷs + mpc.Yop
+    F = mpc.Kd*x̂d + mpc.Q*(mpc.lastu - mpc.model.uop) + Ŷs + mpc.Yop
     if mpc.model.nd ≠ 0
         F += mpc.G*(d - mpc.model.dop) + mpc.J*(D̂ - mpc.Dop)
     end

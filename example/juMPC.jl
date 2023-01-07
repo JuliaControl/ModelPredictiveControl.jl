@@ -27,7 +27,7 @@ sys = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
         tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]
 linModel3 = LinModel(sys,Ts,i_d=[3])
 linModel4 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3])
-setop!(linModel4,uop=[10,10],yop=[50,30],dop=[15])
+setop!(linModel4,uop=[10,10],yop=[50,30],dop=[5])
 linModel5 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_u=1:2)
 linModel6 = LinModel([delay(4) delay(8)]*sys,Ts,i_d=[3])
 
@@ -64,7 +64,7 @@ updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
-mpc = LinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e6)
+mpc = LinMPC(InternalModel(linModel4), Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e6)
 
 setconstraint!(mpc, c_umin=[0,0], c_umax=[0,0])
 setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
@@ -72,11 +72,12 @@ setconstraint!(mpc, umin=[5, 9.9], umax=[Inf,Inf])
 setconstraint!(mpc, ŷmin=[-Inf,-Inf],ŷmax=[55, 35])
 setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
-N= 200
+N = 200
 
 u_data = zeros(2,N)
 y_data = zeros(2,N)
 r_data = zeros(2,N)
+d_data = zeros(1,N)
 
 u = linModel4.uop
 d = linModel4.dop
@@ -97,10 +98,11 @@ for k = 0:N-1
     if k ≥ 180
         y[1] += 15
     end 
-    u = moveinput!(mpc, r, d)
+    u = moveinput!(mpc, r, d; ym=y)
     u_data[:,k+1] = u
     y_data[:,k+1] = y
-    r_data[:,k+1 ] = r 
+    r_data[:,k+1] = r 
+    d_data[:,k+1] = d
     updatestate!(mpc, u, y, d)
     updatestate!(linModel4, u, d)
 end
@@ -116,8 +118,11 @@ plot!(0:N-1,r_data[2,:],label=raw"$r_2$",linestyle=:dash)
 p = plot(p1,p2, layout=[1,1])
 display(p)
 
-p1 = plot(0:N-1,u_data[1,:],label=raw"$u_1$")
-p2 = plot(0:N-1,u_data[2,:],label=raw"$u_2$")
+p1 = plot(0:N-1,u_data[1,:],label=raw"$u_1$",linetype=:steppost)
+p2 = plot(0:N-1,u_data[2,:],label=raw"$u_2$",linetype=:steppost)
 p = plot(p1,p2, layout=[1,1])
 display(p)
 
+
+p = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
+display(p)
