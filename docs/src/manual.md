@@ -1,3 +1,3 @@
-# Tutorial
+# Manual
 
 asd ads. 

@@ -19,7 +19,7 @@ makedocs(
     ),
     pages = pages = [
         "Home" => "index.md",
-        "Tutorial" => "tutorial.md",
+        "Manual" => "manual.md",
         "Functions" => [
             "Public" => [
                 "Specifying Plant Models" => "public/sim_model.md",
