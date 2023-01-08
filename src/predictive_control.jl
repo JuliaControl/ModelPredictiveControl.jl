@@ -187,7 +187,7 @@ LinMPC(model::LinModel; kwargs...) = LinMPC(SteadyKalmanFilter(model); kwargs...
 
 Use custom state estimator `estim` to construct `LinMPC`.
 
-`estim.model` must be a [`LinModel`](@ref). Else, a [`NonLinMPC`](@ref) is required. 
+`estim.model` must be a [`LinModel`](@ref). Else, a `NonLinMPC` is required. 
 """
 function LinMPC(
     estim::StateEstimator;

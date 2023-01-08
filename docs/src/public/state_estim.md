@@ -46,10 +46,3 @@ KalmanFilter
 ```@docs
 InternalModel
 ```
-
-## Luenberger
-
-## UnscentedKalmanFilter
-
-## MovingHorizonEstimator
-

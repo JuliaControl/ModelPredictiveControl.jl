@@ -177,10 +177,18 @@ end
 
 Evaluate `InternalModel` outputs `̂ŷ` from `estim.x̂d` states.
 
-`ym` and `d` are current measured outputs and disturbances, respectively. `InternalModel` 
-estimator needs current measured outputs ``\mathbf{y^m}(k)`` to estimate its outputs 
-``\mathbf{ŷ}(k)``, since the strategy imposes that ``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` 
-is always true. 
+[`InternalModel`](@ref) estimator needs current measured outputs ``\mathbf{y^m}(k)`` to 
+estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that 
+``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` is always true. 
+
+# Examples
+```jldoctest
+julia> intmodel = InternalModel(LinModel(tf(2, [10, 1]), 5));
+
+julia> ŷ = evaloutput(intmodel, [20])
+1-element Vector{Float64}:
+ 20.0
+```
 """
 function evaloutput(estim::InternalModel, ym, d=Float64[])
     ŷ = estim.model.h(estim.x̂d, d - estim.model.dop) + estim.model.yop

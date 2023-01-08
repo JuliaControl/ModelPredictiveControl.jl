@@ -66,7 +66,7 @@ sys_ss.D .= 1
 @test_throws ErrorException LinModel(sys_ss,Ts)
 end
 
-@testset "$(rpad("LinModel sim methods", testset_titlelen))" begin
+@testset "LinModel sim methods" begin
 linmodel1 = setop!(LinModel(Gss), uop=[10,50], yop=[50,30])
 
 @test updatestate!(linmodel1, [10, 50]) ≈ zeros(2) 
@@ -112,7 +112,7 @@ nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
     (x)->linmodel1.C*x, Ts, 2, 4, 2, 1)
 end
 
-@testset "$(rpad("NonLinModel sim methods", testset_titlelen))" begin
+@testset "NonLinModel sim methods" begin
 linmodel1 = LinModel(sys,Ts,i_u=[1,2])
 f1(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
 h1(x,_)   = linmodel1.C*x

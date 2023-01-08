@@ -16,9 +16,11 @@ struct SteadyKalmanFilter <: StateEstimator
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
-    Q̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
-    R̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
-    Ko  ::Matrix{Float64}
+    f̂::Function
+    ĥ::Function
+    Q̂::Union{Diagonal{Float64}, Matrix{Float64}}
+    R̂::Union{Diagonal{Float64}, Matrix{Float64}}
+    Ko::Matrix{Float64}
     function SteadyKalmanFilter(model, i_ym, nint_ym, Asm, Csm, Q̂, R̂)
         nx, ny = model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
@@ -28,6 +30,8 @@ struct SteadyKalmanFilter <: StateEstimator
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
+        f̂(x̂,u,d) = Â*x̂ + B̂u*u + B̂d*d
+        ĥ(x̂,d) = Ĉ*x̂ + D̂d*d
         Ko = try
             kalman(Discrete, Â, Ĉm, Matrix(Q̂), Matrix(R̂)) # Matrix() required for Julia 1.6
         catch my_error
@@ -45,6 +49,7 @@ struct SteadyKalmanFilter <: StateEstimator
             As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
+            f̂, ĥ,
             Q̂, R̂,
             Ko
         )
@@ -162,9 +167,11 @@ struct KalmanFilter <: StateEstimator
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
-    P̂0  ::Union{Diagonal{Float64}, Matrix{Float64}}
-    Q̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
-    R̂   ::Union{Diagonal{Float64}, Matrix{Float64}}
+    f̂::Function
+    ĥ::Function
+    P̂0::Union{Diagonal{Float64}, Matrix{Float64}}
+    Q̂::Union{Diagonal{Float64}, Matrix{Float64}}
+    R̂::Union{Diagonal{Float64}, Matrix{Float64}}
     function KalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂)
         nx, ny = model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
@@ -174,6 +181,8 @@ struct KalmanFilter <: StateEstimator
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
+        f̂(x̂,u,d) = Â*x̂ + B̂u*u + B̂d*d
+        ĥ(x̂,d) = Ĉ*x̂ + D̂d*d
         x̂ = [copy(model.x); zeros(nxs)]
         P̂ = P̂0
         return new(
@@ -183,6 +192,7 @@ struct KalmanFilter <: StateEstimator
             As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
+            f̂, ĥ,
             P̂0, Q̂, R̂
         )
     end
@@ -265,16 +275,6 @@ function initstate!(estim::KalmanFilter, u, ym, d=Float64[])
     estim.P̂[:] = estim.P̂0
     invoke(initstate!, Tuple{StateEstimator, Any, Any, Any}, estim, u, ym, d)
 end
-
-@doc raw"""
-    evaloutput(estim::Union{SteadyKalmanFilter, KalmanFilter}, d=Float64[])
-
-Evaluate Kalman filter outputs `̂ŷ` from `estim.x̂` states and current disturbances `d`.
-"""
-function evaloutput(estim::Union{SteadyKalmanFilter, KalmanFilter}, d=Float64[])
-    return estim.Ĉ*estim.x̂ + estim.D̂d*(d - estim.model.dop) + estim.model.yop
-end
-
 
 
 """

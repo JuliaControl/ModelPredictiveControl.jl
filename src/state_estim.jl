@@ -200,6 +200,26 @@ function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     return estim.x̂
 end
 
+@doc raw"""
+    evaloutput(estim::StateEstimator, d=Float64[])
+
+Evaluate `StateEstimator` outputs `̂ŷ` from `estim.x̂` states and disturbances `d`.
+
+Calling a [`StateEstimator`](@ref) object calls this `evaloutput` method.
+
+# Examples
+```jldoctest
+julia> kf = SteadyKalmanFilter(setop!(LinModel(tf(2, [10, 1]), 5), yop=[20]));
+
+julia> ŷ = evaloutput(kf)
+1-element Vector{Float64}:
+ 20.0
+```
+"""
+function evaloutput(estim::StateEstimator, d=Float64[]) 
+    return estim.ĥ(estim.x̂, d - estim.model.dop) + estim.model.yop
+end
+
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
 (estim::StateEstimator)(d=Float64[]) = evaloutput(estim, d)
 

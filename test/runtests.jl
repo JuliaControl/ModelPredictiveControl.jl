@@ -21,7 +21,7 @@ DocMeta.setdocmeta!(
     recursive=true,
     warn=false
 )
-doctest(ModelPredictiveControl, testset="$(rpad("DocTest", testset_titlelen))")
+doctest(ModelPredictiveControl, testset="DocTest")
 
 
 end;

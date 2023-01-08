@@ -1,20 +1,25 @@
 # Generic Functions
 
-## Evaluate Output
+## Evaluate Output y
 
 ```@docs
 evaloutput
 ```
 
-## Update State
+## Update State x
 
 ```@docs
 updatestate!
 ```
 
-## Set State
+## Init State x
 
 ```@docs
 initstate!
+```
+
+## Set State x
+
+```@docs
 setstate!
 ```

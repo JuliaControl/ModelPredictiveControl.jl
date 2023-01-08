@@ -395,6 +395,17 @@ end
     evaloutput(model::SimModel, d=Float64[])
 
 Evaluate `SimModel` outputs `y` from `model.x` states and measured disturbances `d`.
+
+Calling a [`SimModel`](@ref) object calls this `evaloutput` method.
+
+# Examples
+```jldoctest
+julia> model = setop!(LinModel(tf(2, [10, 1]), 5), yop=[20]);
+
+julia> y = evaloutput(model)
+1-element Vector{Float64}:
+ 20.0
+```
 """
 evaloutput(model::SimModel, d=Float64[]) = model.h(model.x, d - model.dop) + model.yop
 

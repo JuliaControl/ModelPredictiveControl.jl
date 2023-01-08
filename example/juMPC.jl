@@ -43,14 +43,14 @@ internalModel1 = InternalModel(linModel1)
 internalModel2 = InternalModel(linModel1,stoch_ym=[tf([1,0],[1,-1],Ts) 0; 0 tf([1,0],[1,-1],Ts)])
 internalModel3 = InternalModel(linModel1,i_ym=[1])
 
-#initstate!(internalModel1,[0,0],[1,1])
+initstate!(internalModel1,[0,0],[1,1])
 
 kalmanFilter1 = KalmanFilter(linModel1)
 kalmanFilter2 = KalmanFilter(linModel1,nint_ym=0)
 
 updatestate!(kalmanFilter2,[1, 1],[1, 1])
 
-#initstate!(kalmanFilter1,[0,0],[2,1])
+initstate!(kalmanFilter1,[0,0],[2,1])
 
 ssKalmanFilter1 = SteadyKalmanFilter(linModel1)
 ssKalmanFilter2 = SteadyKalmanFilter(linModel1,nint_ym=0)
@@ -58,9 +58,9 @@ ssKalmanFilter2 = SteadyKalmanFilter(linModel1,nint_ym=0)
 
 updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 
-#initstate!(ssKalmanFilter1,[0,0],[2,1])
+initstate!(ssKalmanFilter1,[0,0],[2,1])
 
-
+#=
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
@@ -126,3 +126,4 @@ display(p)
 
 p = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(p)
+=#
