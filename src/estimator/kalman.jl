@@ -20,7 +20,7 @@ struct SteadyKalmanFilter <: StateEstimator
     ĥ::Function
     Q̂::Union{Diagonal{Float64}, Matrix{Float64}}
     R̂::Union{Diagonal{Float64}, Matrix{Float64}}
-    Ko::Matrix{Float64}
+    K::Matrix{Float64}
     function SteadyKalmanFilter(model, i_ym, nint_ym, Asm, Csm, Q̂, R̂)
         nx, ny = model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
@@ -32,7 +32,7 @@ struct SteadyKalmanFilter <: StateEstimator
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         f̂(x̂,u,d) = Â*x̂ + B̂u*u + B̂d*d
         ĥ(x̂,d) = Ĉ*x̂ + D̂d*d
-        Ko = try
+        K = try
             kalman(Discrete, Â, Ĉm, Matrix(Q̂), Matrix(R̂)) # Matrix() required for Julia 1.6
         catch my_error
             if isa(my_error, ErrorException)
@@ -51,7 +51,7 @@ struct SteadyKalmanFilter <: StateEstimator
             Ĉm, D̂dm,
             f̂, ĥ,
             Q̂, R̂,
-            Ko
+            K
         )
     end
 end
@@ -137,13 +137,23 @@ end
 @doc raw"""
     updatestate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
 
-Update `estim.x̂` with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂` estimate with current inputs `u`, measured outputs `ym` and dist. `d`.
+
+# Examples
+```jldoctest
+julia> kf = SteadyKalmanFilter(LinModel(ss(1, 1, 1, 0, 1)));
+
+julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_ym argument)
+2-element Vector{Float64}:
+ 1.0
+ 0.0
+```
 """
 function updatestate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
     u, d, ym = remove_op(estim, u, d, ym)
-    A, Bu, Bd, C, Dd = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
-    x̂, Ko = estim.x̂, estim.Ko
-    x̂[:] = A*x̂ + Bu*u + Bd*d + Ko*(ym - C*x̂ - Dd*d)
+    Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
+    x̂, K = estim.x̂, estim.K
+    x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K*(ym - Ĉm*x̂ - D̂dm*d)
     return x̂
 end
 
@@ -251,19 +261,47 @@ end
     updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
 
 Update `estim.x̂` \ `P̂` with current inputs `u`, measured outputs `ym` and dist. `d`.
+
+See [`updatestate_kf!`](@ref) for the implementation details.
+```
 """
 function updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
-    u, d, ym = remove_op(estim, u, d, ym)
-    A, Bu, Bd, C, Dd = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
-    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂ 
-    # --- observer gain calculation ---
-    M  = (P̂*C')/(C*P̂*C'+R̂)
-    Ko = A*M
-    # --- next state calculation ---
-    x̂[:] = A*x̂ + Bu*u + Bd*d + Ko*(ym - C*x̂ - Dd*d)
-    # --- next estimation error covariance calculation ---
-    P̂[:] = A*(P̂-M*C*P̂)*A' + Q̂ 
-    return x̂
+    u, d, ym = remove_op(estim, u, d, ym) 
+    updatestate_kf!(estim, u, ym, d)
+    return estim.x̂
+end
+
+
+@doc raw"""
+    updatestate_kf!(estim::KalmanFilter, u, ym, d)
+
+Update [`KalmanFilter`](@ref) state `estim.x̂` and estimation error covariance `estim.P̂`.
+
+The method implement the time-varying Kalman Filter in its predictor (observer) form :
+```math
+\begin{aligned}
+    \mathbf{M}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^{m}{}'}
+                           [\mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m + R̂}]^{-1} \\
+    \mathbf{K}(k)       &= \mathbf{Â M(k)} \\
+    \mathbf{ŷ^m(k)}     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k) \\
+    \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
+                           + \mathbf{K}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)] \\
+    \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k) - \mathbf{M Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}'
+                           + \mathbf{Q̂}
+\end{aligned}
+```
+based on the process model described in [`SteadyKalmanFilter`](@ref). The notation 
+``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` estimated at the last 
+control period ``k-1``.
+"""
+function updatestate_kf!(estim::KalmanFilter, u, ym, d)
+    Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
+    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
+    M  = (P̂*Ĉm')/(Ĉm*P̂*Ĉm'+R̂)
+    K = Â*M
+    x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K*(ym - Ĉm*x̂ - D̂dm*d)
+    P̂[:] = Â*(P̂-M*Ĉm*P̂)*Â' + Q̂ 
+    return x̂, P̂
 end
 
 """

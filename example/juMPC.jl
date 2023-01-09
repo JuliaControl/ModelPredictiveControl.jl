@@ -60,7 +60,7 @@ updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 
 initstate!(ssKalmanFilter1,[0,0],[2,1])
 
-#=
+
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
@@ -98,7 +98,7 @@ for k = 0:N-1
     if k ≥ 180
         y[1] += 15
     end 
-    u = moveinput!(mpc, r, d)
+    global u = moveinput!(mpc, r, d)
     u_data[:,k+1] = u
     y_data[:,k+1] = y
     r_data[:,k+1] = r 
@@ -110,20 +110,19 @@ end
 using PlotThemes, Plots
 #theme(:default)
 theme(:dark)
-#default(fontfamily="Computer Modern"); scalefontsizes(1.1)
+default(fontfamily="Computer Modern"); scalefontsizes(1.1)
 p1 = plot(0:N-1,y_data[1,:],label=raw"$y_1$")
 plot!(0:N-1,r_data[1,:],label=raw"$r_1$",linestyle=:dash)
 p2 = plot(0:N-1,y_data[2,:],label=raw"$y_2$")
 plot!(0:N-1,r_data[2,:],label=raw"$r_2$",linestyle=:dash)
-p = plot(p1,p2, layout=[1,1])
-display(p)
+py = plot(p1,p2, layout=[1,1])
 
 p1 = plot(0:N-1,u_data[1,:],label=raw"$u_1$",linetype=:steppost)
 p2 = plot(0:N-1,u_data[2,:],label=raw"$u_2$",linetype=:steppost)
-p = plot(p1,p2, layout=[1,1])
-display(p)
+pu = plot(p1,p2, layout=[1,1])
 
+pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 
-p = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
-display(p)
-=#
+display(pd)
+display(pu)
+display(py)

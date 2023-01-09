@@ -224,5 +224,5 @@ end
 (estim::StateEstimator)(d=Float64[]) = evaloutput(estim, d)
 
 
-include("estimator/internal_model.jl")
 include("estimator/kalman.jl")
+include("estimator/internal_model.jl")

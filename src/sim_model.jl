@@ -385,6 +385,15 @@ typestr(model::NonLinModel) = "nonlinear"
     updatestate!(model::SimModel, u, d=Float64[])
 
 Update `model.x` states with current inputs `u` and measured disturbances `d`.
+
+# Examples
+```jldoctest
+julia> model = LinModel(ss(1, 1, 1, 0, 1));
+
+julia> x = updatestate!(model, [1])
+1-element Vector{Float64}:
+ 1.0
+```
 """
 function updatestate!(model::SimModel, u, d=Float64[])
     model.x[:] = model.f(model.x, u - model.uop, d - model.dop)
