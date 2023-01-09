@@ -365,21 +365,36 @@ function setconstraint!(
     return mpc
 end
 
-"""
-    moveinput!(mpc::LinMPC, ry, d=Float64[]; ym=nothing)
+@doc raw"""
+    moveinput!(mpc::PredictiveController, ry, d=Float64[]; ym=nothing)
 
-TBW.
+Compute the optimal manipulated input value `u` for the current control period.
+
+Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the
+results ``\mathbf{u}(k)``. The arguments `ry` and `d` are current output setpoints 
+``\mathbf{r_y}(k)`` and measured disturbances ``\mathbf{d}(k)``. This method assumes that 
+the output setpoints and measured disturbances are constant in the future, that is 
+``\mathbf{r̂_y}(k+j) = \mathbf{r_y}(k)`` and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for ``j=1`` 
+to ``H_p``. The current measured output `ym` keyword argument is only required if
+`mpc.estim` is a [`InternalModel`](@ref)
 """
-function moveinput!(mpc::LinMPC, ry::Vector{<:Real}, d::Vector{<:Real}=Float64[]; kwargs...)
+function moveinput!(
+    mpc::PredictiveController, 
+    ry::Vector{<:Real}, 
+    d::Vector{<:Real}=Float64[]; 
+    kwargs...
+)
     R̂y, D̂ = repeat(ry, 1, mpc.Hp), repeat(d, 1, mpc.Hp) # constant over Hp
     return moveinput!(mpc, ry, R̂y, d, D̂; kwargs...)
 end
 
 
-"""
+@doc raw"""
     moveinput!(mpc::LinMPC, ry, R̂y, d=Float64[], D̂=Float64[]; ym=nothing)
 
-Use custom output setpoints `R̂y` and measured disturbances `D̂` predictions.
+Compute input u with custom output setpoints `R̂y` and measured disturbances `D̂` predictions.
+
+The matrices ``\mathbf{R̂_y}`` and ``\mathbf{D̂}`` 
 """
 function moveinput!(
     mpc::LinMPC, 

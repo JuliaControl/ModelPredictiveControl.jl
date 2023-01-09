@@ -29,7 +29,7 @@ LinModel
 NonLinModel
 ```
 
-## Generic Functions
+## Set Operating Points
 
 ```@docs
 setop!

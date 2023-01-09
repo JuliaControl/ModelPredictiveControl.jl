@@ -23,8 +23,14 @@ PredictiveController
 LinMPC
 ```
 
-## Generic Functions
+## Set Constraint
 
 ```@docs
 setconstraint!
+```
+
+## Move Manipulated Input
+
+```@docs
+moveinput!
 ```

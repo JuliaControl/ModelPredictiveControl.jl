@@ -222,7 +222,7 @@ end
 
 
 @doc raw"""
-    NonLinModel(f, h, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0)
+    NonLinModel(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
 
 Construct a `NonLinModel` from discrete-time state-space functions `f` and `h`.
 
