@@ -1,5 +1,9 @@
 # State Estimator Design
 
+```@contents
+Pages = ["state_estim.md"]
+```
+
 This module includes many state estimators (or state observer), both for deterministic
 and stochastic systems. The implementations focus on control applications, that is, relying
 on the estimates to compute a [full state feedback](https://en.wikipedia.org/wiki/Full_state_feedback)

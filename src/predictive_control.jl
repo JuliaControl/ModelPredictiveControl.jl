@@ -107,10 +107,15 @@ struct LinMPC <: PredictiveController
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         lastu  = copy(model.uop)
         lastΔŨ = zeros(size(P̃, 1))
-        # test with OSQP package :
+        # TODO: replace OSQP package with JuMP (configured to use OSQP)
         optmodel = OSQP.Model()
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
-        OSQP.setup!(optmodel; P=sparse(P̃), A=sparse(A), u=zeros(size(A, 1)), verbose=false)
+        # dummy b vector to detect Inf values (b is updated just before MPC optimization):
+        b = [-Umin; +Umax; -ΔŨmin; +ΔŨmax; -Ŷmin; +Ŷmax]
+        i_nonInf = .!isinf.(b)
+        A = A[i_nonInf, :]
+        b = b[i_nonInf]
+        OSQP.setup!(optmodel; P=sparse(P̃), A=sparse(A), u=b, verbose=false)
         optim = OptimData(optmodel)
         return new(
             model, estim, 
@@ -350,7 +355,12 @@ function setconstraint!(
     end
     optmodel = OSQP.Model()
     A = [mpc.A_Umin; mpc.A_Umax; mpc.A_ΔŨmin; mpc.A_ΔŨmax; mpc.A_Ŷmin; mpc.A_Ŷmax]
-    OSQP.setup!(optmodel; P=sparse(mpc.P̃), A=sparse(A), u=zeros(size(A, 1)), verbose=false)
+    # dummy b vector to detect Inf values (b is updated just before MPC optimization):
+    b = [-mpc.Umin; +mpc.Umax; -mpc.ΔŨmin; +mpc.ΔŨmax; -mpc.Ŷmin; +mpc.Ŷmax]
+    i_nonInf = .!isinf.(b)
+    A = A[i_nonInf, :]
+    b = b[i_nonInf]
+    OSQP.setup!(optmodel; P=sparse(mpc.P̃), A=sparse(A), u=b, verbose=false)
     mpc.optim.model = optmodel
     return mpc
 end
@@ -475,6 +485,8 @@ function init_constraint(mpc, ::LinModel, F)
         -mpc.Ŷmin + F
         +mpc.Ŷmax - F
     ]
+    i_nonInf = .!isinf.(b)
+    b = b[i_nonInf]
     return b
 end
 

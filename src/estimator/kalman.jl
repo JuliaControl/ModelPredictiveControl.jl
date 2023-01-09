@@ -36,7 +36,7 @@ struct SteadyKalmanFilter <: StateEstimator
             kalman(Discrete, Â, Ĉm, Matrix(Q̂), Matrix(R̂)) # Matrix() required for Julia 1.6
         catch my_error
             if isa(my_error, ErrorException)
-                error("Cannot compute the optimal Kalman gain Ko for the "* 
+                error("Cannot compute the optimal Kalman gain K for the "* 
                       "SteadyKalmanFilter. You may try to remove integrators with nint_ym "*
                       "parameter or use the time-varying KalmanFilter.")
             end
@@ -74,11 +74,11 @@ with sensor ``\mathbf{v}(k)`` and process ``\mathbf{w}(k)`` noises as uncorrelat
 white noise processes, with a respective covariance of ``\mathbf{R̂}`` and ``\mathbf{Q̂}``. 
 The arguments are in standard deviations σ, i.e. same units than outputs and states. The 
 matrices ``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the stochastic
-model, which is specified by the numbers of output integrator `nint_ym`. Likewise, the 
-covariance matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, Q_{int})}`` and 
-``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of ``\mathbf{Ĉ, D̂_d}`` 
-that correspond to measured outputs ``\mathbf{y^m}`` (and unmeasured ones, for 
-``\mathbf{Ĉ^u, D̂_d^u}``).
+model, which is specified by the numbers of output integrator `nint_ym` (see Extended Help). 
+Likewise, the covariance matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, Q_{int})}`` 
+and ``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of 
+``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and unmeasured 
+ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
@@ -108,13 +108,17 @@ SteadyKalmanFilter state estimator with a sample time Ts = 0.5 s and:
 
 # Extended Help
 The model augmentation with `nint_ym` vector produces the integral action when the estimator
-is used in a controller as state feedback (a.k.a. offset-free tracking). The default is 1 
-integrator per measured outputs. More than 1 integrator is interesting only when `model` is 
-integrating or unstable, or when the unmeasured output disturbances are "ramp-like". See 
-[`augment_model`](@ref).
+is used in a controller as state feedback. The default is 1 integrator per measured outputs,
+resulting in an offset-free tracking for "step-like" unmeasured output disturbances. Use 2 
+integrators for "ramp-like" disturbances. See [`init_estimstoch`](@ref).
 
 !!! tip
     Increasing `σQ_int` values increases the integral action "gain".
+
+The constructor pre-compute the steady-state Kalman gain `K` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
+function. It can sometimes fail, for example when `model` is integrating. In such a case,
+you can use 0 integrator on `model` integrating outputs, or the alternative time-varying 
+[`KalmanFilter`](@ref).
 """
 function SteadyKalmanFilter(
     model::LinModel;
@@ -263,7 +267,6 @@ end
 Update `estim.x̂` \ `P̂` with current inputs `u`, measured outputs `ym` and dist. `d`.
 
 See [`updatestate_kf!`](@ref) for the implementation details.
-```
 """
 function updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
     u, d, ym = remove_op(estim, u, d, ym) 

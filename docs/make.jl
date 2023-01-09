@@ -17,7 +17,7 @@ makedocs(
         prettyurls = get(ENV, "CI", nothing) == "true",
         edit_link = "main"
     ),
-    pages = pages = [
+    pages = [
         "Home" => "index.md",
         "Manual" => "manual.md",
         "Functions" => [

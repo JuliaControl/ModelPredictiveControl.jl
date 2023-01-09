@@ -1,5 +1,9 @@
 # Generic Functions
 
+```@contents
+Pages = ["generic_func.md"]
+```
+
 ## Evaluate Output y
 
 ```@docs
