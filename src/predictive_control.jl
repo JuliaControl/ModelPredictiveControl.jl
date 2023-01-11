@@ -842,7 +842,7 @@ Init the stochastic prediction matrices for [`InternalModel`](@ref).
     \mathbf{Ŷ_s} = \mathbf{K_s x̂_s}(k) + \mathbf{P_s ŷ_s}(k)
 ```
 Current stochastic outputs ``\mathbf{ŷ_s}(k)`` comprises the measured outputs 
-``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d}(k)``and unmeasured 
+``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)``and unmeasured 
 ``\mathbf{ŷ_s^u(k) = 0}``. See [^1].
 
 [^1]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
