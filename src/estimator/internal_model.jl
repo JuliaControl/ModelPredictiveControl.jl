@@ -175,7 +175,7 @@ end
 @doc raw"""
     evaloutput(estim::InternalModel, ym, d=Float64[])
 
-Evaluate `InternalModel` outputs `̂ŷ` from `estim.x̂d` states.
+Evaluate `InternalModel` outputs `ŷ` from `estim.x̂d` states and measured outputs `ym`.
 
 [`InternalModel`](@ref) estimator needs current measured outputs ``\mathbf{y^m}(k)`` to 
 estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that 
