@@ -86,8 +86,8 @@ be added for each measured output ``\mathbf{y^m}``. The argument generates the `
 \mathbf{y_s^m}(k) &= \mathbf{C_s^m x_s}(k)
 \end{aligned}
 ```
-where ``\mathbf{e}(k)`` is conceptual and unknown zero mean white noise. ``\mathbf{B_s^m}``
-is not used for closed-loop state estimators thus ignored.
+where ``\mathbf{e}(k)`` is a conceptual and unknown zero mean white noise. 
+``\mathbf{B_s^m}`` is not used for closed-loop state estimators thus ignored.
 """
 function init_estimstoch(i_ym, nint_ym::Vector{Int})
     nym = length(i_ym);
