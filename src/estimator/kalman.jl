@@ -71,7 +71,7 @@ The steady-state Kalman filter is based on the process model :
 \end{aligned}
 ```
 with sensor ``\mathbf{v}(k)`` and process ``\mathbf{w}(k)`` noises as uncorrelated zero mean 
-white noise processes, with a respective covariance of ``\mathbf{R̂}`` and ``\mathbf{Q̂}``. 
+white noise vectors, with a respective covariance of ``\mathbf{R̂}`` and ``\mathbf{Q̂}``. 
 The arguments are in standard deviations σ, i.e. same units than outputs and states. The 
 matrices ``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the stochastic
 model, which is specified by the numbers of output integrator `nint_ym` (see Extended Help). 

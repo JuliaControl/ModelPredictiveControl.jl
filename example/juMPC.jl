@@ -41,7 +41,7 @@ nonLinModel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
 
 internalModel1 = InternalModel(linModel1)
 internalModel2 = InternalModel(linModel1,stoch_ym=[tf([1,0],[1,-1],Ts) 0; 0 tf([1,0],[1,-1],Ts)])
-internalModel3 = InternalModel(linModel1,i_ym=[1])
+internalModel3 = InternalModel(linModel1,i_ym=[2])
 
 initstate!(internalModel1,[0,0],[1,1])
 

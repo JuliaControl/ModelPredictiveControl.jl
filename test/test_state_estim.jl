@@ -111,6 +111,13 @@ end
     @test internalmodel4.Cs == stoch_ym_ss.C
     @test internalmodel4.Ds == stoch_ym_ss.D
 
+    stoch_ym_resample = c2d(d2c(ss(1,1,1,1,linModel2.Ts), :tustin), 2linmodel2.Ts, :tustin)
+    internalmodel5 = InternalModel(linModel2, i_ym=[2], stoch_ym=stoch_ym_resample)
+    @test internalmodel5.As ≈ internalmodel2.As
+    @test internalmodel5.Bs ≈ internalmodel2.Bs
+    @test internalmodel5.Cs ≈ internalmodel2.Cs
+    @test internalmodel5.Ds ≈ internalmodel2.Ds
+
     unstablemodel = LinModel(ss(diagm([0.5, -0.5, 1.5]), ones(3,1), I, 0, 1))
     @test_throws ErrorException InternalModel(unstablemodel)
     @test_throws ErrorException InternalModel(linmodel1, i_ym=[1,4])

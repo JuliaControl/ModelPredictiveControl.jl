@@ -71,12 +71,12 @@ InternalModel state estimator with a sample time Ts = 0.5 s and:
 ```
 
 # Extended Help
-`stoch_ym` is a `TransferFunction` or `StateSpace` model that hypothetically filters a zero 
-mean white noise vector. Its default value supposes 1 integrator per measured outputs, 
-assuming that the current stochastic estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - 
-\mathbf{ŷ_d^m}(k)`` will be constant in the future. This is the dynamic matrix control (DMC) 
-strategy, which is simple but sometimes too aggressive. Additional poles and zeros in 
-`stoch_ym` can mitigate this.
+`stoch_ym` is a `TransferFunction` or `StateSpace` object that models disturbances on
+``\mathbf{y^m}``. Its input is a hypothetical zero mean white noise vector. `stoch_ym` 
+supposes 1 integrator per measured outputs by default, assuming that the current stochastic
+estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` is constant in the 
+future. This is the dynamic matrix control (DMC) strategy, which is simple but sometimes too
+aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
 """
 function InternalModel(
     model::SimModel;
@@ -89,7 +89,12 @@ function InternalModel(
     if iscontinuous(stoch_ym)
         stoch_ym = c2d(stoch_ym, model.Ts, :tustin)
     else
-        stoch_ym.Ts == model.Ts || error("stoch_ym.Ts must be identical to model.Ts")
+        if !(stoch_ym.Ts ≈ model.Ts) 
+            @info "InternalModel: resampling stochastic model from Ts = $(stoch_ym.Ts) to "*
+                  "$(model.Ts) s..."
+            stoch_ym_c = d2c(stoch_ym, :tustin)
+            stoch_ym   = c2d(stoch_ym_c, model.Ts, :tustin)
+        end
     end
     return InternalModel(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
 end

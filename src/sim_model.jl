@@ -133,7 +133,7 @@ function LinModel(
         sysd_dis = c2d(sysd,Ts,:tustin)
     else
         if !isnothing(Ts) && !(Ts ≈ sys.Ts)
-            @info "Resampling the linear model from Ts = $(sys.Ts) to $Ts s..."
+            @info "LinModel: resampling linear model from Ts = $(sys.Ts) to $Ts s..."
             sysu = d2c(sysu, :zoh)
             sysd = d2c(sysd, :tustin)
             sysu_dis = c2d(sysu, Ts, :zoh)
@@ -315,7 +315,7 @@ The state-space model with operating points (a.k.a. nominal values) is:
     \mathbf{y_0}(k) &=  \mathbf{C x}(k) + \mathbf{D_d d_0}(k)
 \end{aligned}
 ```
-in which the `uop`, `yop` and `dop` vectors evaluate :
+in which the `uop`, `yop` and `dop` vectors evaluate:
 ```math
 \begin{aligned}
     \mathbf{u_0}(k) &= \mathbf{u}(k) - \mathbf{u_{op}} \\
