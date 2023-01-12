@@ -111,8 +111,8 @@ end
     @test internalmodel4.Cs == stoch_ym_ss.C
     @test internalmodel4.Ds == stoch_ym_ss.D
 
-    stoch_ym_resample = c2d(d2c(ss(1,1,1,1,linModel2.Ts), :tustin), 2linmodel2.Ts, :tustin)
-    internalmodel5 = InternalModel(linModel2, i_ym=[2], stoch_ym=stoch_ym_resample)
+    stoch_ym_resample = c2d(d2c(ss(1,1,1,1,linmodel2.Ts), :tustin), 2linmodel2.Ts, :tustin)
+    internalmodel5 = InternalModel(linmodel2, i_ym=[2], stoch_ym=stoch_ym_resample)
     @test internalmodel5.As ≈ internalmodel2.As
     @test internalmodel5.Bs ≈ internalmodel2.Bs
     @test internalmodel5.Cs ≈ internalmodel2.Cs
