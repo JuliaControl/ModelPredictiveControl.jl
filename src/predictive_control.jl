@@ -17,11 +17,6 @@ julia> u = mpc(ry); round.(u)
  1.0
 ```
 
----
-
-    (mpc::PredictiveController)(ry, R̂y, d=Float64[], D̂=Float64[]; kwargs...)
-
-Call [`moveinput!`](@ref) with custom `ry` and `d` predictions.
 """
 abstract type PredictiveController end
 
@@ -365,46 +360,42 @@ function setconstraint!(
     return mpc
 end
 
+
 @doc raw"""
-    moveinput!(mpc::PredictiveController, ry, d=Float64[]; ym=nothing)
+    moveinput!(mpc::LinMPC, ry, d=Float64[]; R̂y=repeat(ry, Hp), D̂=repeat(d, Hp), ym=nothing)
 
 Compute the optimal manipulated input value `u` for the current control period.
 
-Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the
-results ``\mathbf{u}(k)``. The arguments `ry` and `d` are current output setpoints 
-``\mathbf{r_y}(k)`` and measured disturbances ``\mathbf{d}(k)``. This method assumes that 
-the output setpoints and measured disturbances are constant in the future, that is 
-``\mathbf{r̂_y}(k+j) = \mathbf{r_y}(k)`` and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for ``j=1`` 
-to ``H_p``. The current measured output `ym` keyword argument is only required if
-`mpc.estim` is a [`InternalModel`](@ref)
-"""
-function moveinput!(
-    mpc::PredictiveController, 
-    ry::Vector{<:Real}, 
-    d::Vector{<:Real}=Float64[]; 
-    kwargs...
-)
-    R̂y, D̂ = repeat(ry, 1, mpc.Hp), repeat(d, 1, mpc.Hp) # constant over Hp
-    return moveinput!(mpc, ry, R̂y, d, D̂; kwargs...)
-end
-
-
-@doc raw"""
-    moveinput!(mpc::LinMPC, ry, R̂y, d=Float64[], D̂=Float64[]; ym=nothing)
-
-Compute input u with custom output setpoints `R̂y` and measured disturbances `D̂` predictions.
-
-The matrices ``\mathbf{R̂_y}`` and ``\mathbf{D̂}`` 
+Solve the optimization problem of `mpc` [`LinMPC`](@ref) controller and return the results 
+``\mathbf{u}(k)``. The arguments `ry` and `d` are current output setpoints 
+``\mathbf{r_y}(k)`` and measured disturbances ``\mathbf{d}(k)``. The predicted output 
+setpoint `R̂y` and mesured disturbances `D̂` are defined as:
+```math
+    \mathbf{R̂_y} = \begin{bmatrix}
+        \mathbf{r̂_y}(k+1)   \\
+        \mathbf{r̂_y}(k+2)   \\
+        \vdots              \\
+        \mathbf{r̂_y}(k+H_p)
+    \end{bmatrix} \qquad \text{and} \qquad
+    \mathbf{D̂}   = \begin{bmatrix}
+        \mathbf{d̂}(k+1)     \\
+        \mathbf{d̂}(k+2)     \\
+        \vdots              \\
+        \mathbf{d̂}(k+H_p)
+    \end{bmatrix}
+```
+They are constant in the future by default, that is ``\mathbf{r̂_y}(k+j) = \mathbf{r_y}(k)`` 
+and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for ``j=1`` to ``H_p``. The current measured output 
+`ym` keyword argument is only required if `mpc.estim` is a [`InternalModel`](@ref).
 """
 function moveinput!(
     mpc::LinMPC, 
     ry::Vector{<:Real}, 
-    R̂y::Matrix{<:Real}, 
-    d ::Vector{<:Real} = Float64[], 
-    D̂ ::Matrix{<:Real} = Float64[]; 
+    d ::Vector{<:Real} = Float64[];
+    R̂y::Vector{<:Real} = repeat(ry, mpc.Hp),
+    D̂ ::Vector{<:Real} = repeat(d,  mpc.Hp),
     ym::Union{Vector{<:Real}, Nothing} = nothing
 )
-    R̂y, D̂ = R̂y[:], D̂[:] # convert matrices to column vectors
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
     F, q̃, p = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d)
@@ -900,19 +891,8 @@ end
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(
     ry::Vector{<:Real}, 
-    d::Vector{<:Real}=Float64[]; 
+    d ::Vector{<:Real} = Float64[];
     kwargs...
 )
     return moveinput!(mpc, ry, d; kwargs...)
-end
-
-"Call [`moveinput!`](@ref) with custom `ry` and `d` predictions."
-function (mpc::PredictiveController)(
-    ry::Vector{<:Real}, 
-    R̂y::Matrix{<:Real}, 
-    d ::Vector{<:Real} = Float64[], 
-    D̂ ::Matrix{<:Real} = Float64[];
-    kwargs...
-)
-    return moveinput!(mpc, ry, R̂y, d, D̂; kwargs...)
 end

@@ -8,7 +8,6 @@ using ModelPredictiveControl
 using Test
 
 
-
 @testset "ModelPredictiveControl.jl" begin
 include("test_sim_model.jl")
 include("test_state_estim.jl")
