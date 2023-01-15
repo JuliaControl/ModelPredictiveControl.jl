@@ -22,15 +22,15 @@ makedocs(
         "Manual" => "manual.md",
         "Functions" => [
             "Public" => [
-                "Specifying Plant Models" => "public/sim_model.md",
-                "State Estimator Design" => "public/state_estim.md",
-                "Predictive Controller Design" => "public/predictive_control.md",
+                "Plant Models" => "public/sim_model.md",
+                "State Estimator" => "public/state_estim.md",
+                "Predictive Controller" => "public/predictive_control.md",
                 "Generic Functions" => "public/generic_func.md",
             ],
             "Internals" => [
-                "SimModel" => "internals/sim_model.md",
-                "StateEstimator" => "internals/state_estim.md",
-                "PredictiveController" => "internals/predictive_control.md",
+                "Plant Models" => "internals/sim_model.md",
+                "State Estimator" => "internals/state_estim.md",
+                "Predictive Controller" => "internals/predictive_control.md",
             ],
         ],  
         "Index" => "func_index.md"

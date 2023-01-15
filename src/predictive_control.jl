@@ -375,7 +375,7 @@ Compute the optimal manipulated input value `u` for the current control period.
 
 Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the results 
 ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm dicards the 
-optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...`` The arguments 
+optimal future manipulated inputs ``\mathbf{u}(k+1)``, \mathbf{u}(k+2), ``... The arguments 
 `ry` and `d` are current output setpoints ``\mathbf{r_y}(k)`` and measured disturbances 
 ``\mathbf{d}(k)``. The predicted output setpoint `R̂y` and mesured disturbances `D̂` are :
 ```math
