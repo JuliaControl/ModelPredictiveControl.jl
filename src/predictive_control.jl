@@ -9,9 +9,9 @@ Functor allowing callable `PredictiveController` object as an alias for [`movein
 
 # Examples
 ```jldoctest
-julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1); ry = [5];
+julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
 
-julia> u = mpc(ry); round.(u)
+julia> u = mpc([5]); round.(u, digits=3)
 [ Info: ModelPredictiveControl: optimizing MPC objective function...
 1-element Vector{Float64}:
  1.0
@@ -362,14 +362,22 @@ end
 
 
 @doc raw"""
-    moveinput!(mpc::LinMPC, ry, d=Float64[]; R̂y=repeat(ry, Hp), D̂=repeat(d, Hp), ym=nothing)
+    moveinput!(
+        mpc::PredictiveController, 
+        ry, 
+        d  = Float64[];
+        R̂y = repeat(ry, mpc.Hp), 
+        D̂  = repeat(d,  mpc.Hp), 
+        ym = nothing
+    )
 
 Compute the optimal manipulated input value `u` for the current control period.
 
-Solve the optimization problem of `mpc` [`LinMPC`](@ref) controller and return the results 
-``\mathbf{u}(k)``. The arguments `ry` and `d` are current output setpoints 
-``\mathbf{r_y}(k)`` and measured disturbances ``\mathbf{d}(k)``. The predicted output 
-setpoint `R̂y` and mesured disturbances `D̂` are defined as:
+Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the results 
+``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm dicards the 
+optimal future manipulated inputs (``\mathbf{u}(k+1), \mathbf{u}(k+2), … ``). The arguments 
+`ry` and `d` are current output setpoints ``\mathbf{r_y}(k)`` and measured disturbances 
+``\mathbf{d}(k)``. The predicted output setpoint `R̂y` and mesured disturbances `D̂` are :
 ```math
     \mathbf{R̂_y} = \begin{bmatrix}
         \mathbf{r̂_y}(k+1)   \\
@@ -385,11 +393,22 @@ setpoint `R̂y` and mesured disturbances `D̂` are defined as:
     \end{bmatrix}
 ```
 They are constant in the future by default, that is ``\mathbf{r̂_y}(k+j) = \mathbf{r_y}(k)`` 
-and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for ``j=1`` to ``H_p``. The current measured output 
-`ym` keyword argument is only required if `mpc.estim` is a [`InternalModel`](@ref).
+and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for ``j=1`` to ``H_p``. Current measured outputs 
+`ym` (keyword argument) are only required if `mpc.estim` is a [`InternalModel`](@ref).
+
+See also [`LinMPC`](@ref), `NonLinMPC`.
+
+# Examples
+```jldoctest
+julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
+
+julia> u = moveinput!(mpc, [5]); round.(u, digits=3)
+[ Info: ModelPredictiveControl: optimizing MPC objective function...
+1-element Vector{Float64}:
+ 1.0
 """
 function moveinput!(
-    mpc::LinMPC, 
+    mpc::PredictiveController, 
     ry::Vector{<:Real}, 
     d ::Vector{<:Real} = Float64[];
     R̂y::Vector{<:Real} = repeat(ry, mpc.Hp),
