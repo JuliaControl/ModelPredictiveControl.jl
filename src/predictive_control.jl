@@ -406,6 +406,7 @@ julia> u = moveinput!(mpc, [5]); round.(u, digits=3)
 [ Info: ModelPredictiveControl: optimizing MPC objective function...
 1-element Vector{Float64}:
  1.0
+ ```
 """
 function moveinput!(
     mpc::PredictiveController, 
