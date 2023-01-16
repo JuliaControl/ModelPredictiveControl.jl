@@ -1,4 +1,4 @@
-# State Estimator Design
+# State Estimators
 
 ```@contents
 Pages = ["state_estim.md"]

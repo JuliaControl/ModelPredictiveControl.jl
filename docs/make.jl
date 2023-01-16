@@ -23,8 +23,8 @@ makedocs(
         "Functions" => [
             "Public" => [
                 "Plant Models" => "public/sim_model.md",
-                "State Estimator" => "public/state_estim.md",
-                "Predictive Controller" => "public/predictive_control.md",
+                "State Estimators" => "public/state_estim.md",
+                "Predictive Controllers" => "public/predictive_control.md",
                 "Generic Functions" => "public/generic_func.md",
             ],
             "Internals" => [

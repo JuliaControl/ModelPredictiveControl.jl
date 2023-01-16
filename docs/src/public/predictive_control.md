@@ -1,4 +1,4 @@
-# Predictive Controller Design
+# Predictive Controllers
 
 ```@contents
 Pages = ["predictive_control.md"]

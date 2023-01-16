@@ -12,7 +12,6 @@ Functor allowing callable `PredictiveController` object as an alias for [`movein
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
 
 julia> u = mpc([5]); round.(u, digits=3)
-[ Info: ModelPredictiveControl: optimizing MPC objective function...
 1-element Vector{Float64}:
  1.0
 ```
@@ -373,18 +372,19 @@ end
 
 Compute the optimal manipulated input value `u` for the current control period.
 
-Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the results 
-``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm dicards the 
-optimal future manipulated inputs ``\mathbf{u}(k+1)``, \mathbf{u}(k+2), ``... The arguments 
-`ry` and `d` are current output setpoints ``\mathbf{r_y}(k)`` and measured disturbances 
-``\mathbf{d}(k)``. The predicted output setpoint `R̂y` and mesured disturbances `D̂` are :
+Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the 
+results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm dicards 
+the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ``... The 
+arguments `ry` and `d` are current output setpoints ``\mathbf{r_y}(k)`` and measured 
+disturbances ``\mathbf{d}(k)``. The predicted output setpoint `R̂y` and mesured disturbances 
+`D̂` are defined as:
 ```math
     \mathbf{R̂_y} = \begin{bmatrix}
         \mathbf{r̂_y}(k+1)   \\
         \mathbf{r̂_y}(k+2)   \\
         \vdots              \\
         \mathbf{r̂_y}(k+H_p)
-    \end{bmatrix} \qquad \text{and} \qquad
+    \end{bmatrix}                   \qquad \text{and} \qquad
     \mathbf{D̂}   = \begin{bmatrix}
         \mathbf{d̂}(k+1)     \\
         \mathbf{d̂}(k+2)     \\
@@ -403,7 +403,6 @@ See also [`LinMPC`](@ref), `NonLinMPC`.
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
 
 julia> u = moveinput!(mpc, [5]); round.(u, digits=3)
-[ Info: ModelPredictiveControl: optimizing MPC objective function...
 1-element Vector{Float64}:
  1.0
 ```
@@ -525,7 +524,7 @@ function optim_objective(mpc::LinMPC, b, q̃, p)
     end
     OSQP.warm_start!(mpc.optim.model; x=ΔŨ0)
     OSQP.update!(mpc.optim.model; q=q̃, u=b)
-    @info "ModelPredictiveControl: optimizing MPC objective function..."
+    # @info "ModelPredictiveControl: optimizing MPC objective function..."
     res = OSQP.solve!(mpc.optim.model)
     ΔŨ = res.x
     J = res.info.obj_val + p; # optimal objective value by adding constant term p 
