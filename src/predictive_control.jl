@@ -466,13 +466,15 @@ split_state(estim::InternalModel)  = (estim.x̂d, estim.x̂s)
     predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ )
 
 Predict the current `ŷs` and future `Ŷs` stochastic model outputs over `Hp`. 
+
+See [`init_stochpred`](@ref) for details on `Ŷs` and `Ks` matrices.
 """
 predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ ) = (estim.Cs*x̂s, mpc.Ks*x̂s)
 
 """
     predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
 
-Use current measured ouputs `ym` to predict them when `estim` is a [`InternalModel`](@ref).
+Use current measured ouputs `ym` for prediction when `estim` is a [`InternalModel`](@ref).
 """
 function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
@@ -489,6 +491,8 @@ end
     init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d)
 
 Init linear model prediction matrices `F`, `q̃` and `p`.
+
+See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
 function init_prediction(mpc, ::LinModel, d, D̂, Ŷs, R̂y, x̂d)
     F = mpc.Kd*x̂d + mpc.Q*(mpc.lastu - mpc.model.uop) + Ŷs + mpc.Yop
