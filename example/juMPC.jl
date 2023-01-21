@@ -94,7 +94,7 @@ for k = 0:N-1
     if k == 150
         global d = [3]
     end
-    y = linModel4(d) 
+    y = linModel4(d)
     if k ≥ 180
         y[1] += 15
     end 

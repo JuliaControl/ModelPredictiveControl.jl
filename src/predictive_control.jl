@@ -462,7 +462,18 @@ Get the internal model deterministic `estim.x̂d` and stochastic `estim.x̂s` st
 """
 split_state(estim::InternalModel)  = (estim.x̂d, estim.x̂s)
 
+"""
+    predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ )
+
+Predict the current `ŷs` and future `Ŷs` stochastic model outputs over `Hp`. 
+"""
 predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ ) = (estim.Cs*x̂s, mpc.Ks*x̂s)
+
+"""
+    predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
+
+Use current measured ouputs `ym` to predict them when `estim` is a [`InternalModel`](@ref).
+"""
 function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
                            "outputs ym in keyword argument to compute control actions u")
@@ -515,6 +526,11 @@ function init_constraint(mpc, ::LinModel, F)
     return b
 end
 
+"""
+    optim_objective(mpc::LinMPC, b, q̃, p)
+
+Optimize the `mpc` quadratic objective function for [`LinMPC`](@ref) type. 
+"""
 function optim_objective(mpc::LinMPC, b, q̃, p)
     # --- initial point (warm start) ---
     # initial ΔŨ: [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0]
