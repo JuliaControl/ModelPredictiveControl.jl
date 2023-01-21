@@ -23,6 +23,20 @@ mutable struct OptimData
     model::OSQP.Model
 end
 
+mutable struct OptimInfo
+    info::String
+    status::Symbol
+    status_val::Int
+    ΔU::Vector{Float64}
+    ϵ ::Float64
+    ŷ ::Vector{Float64}
+    Ŷ ::Vector{Float64}
+    ŷs::Vector{Float64}
+    Ŷs::Vector{Float64}
+    d ::Vector{Float64}
+    D̂ ::Vector{Float64}
+end
+
 struct LinMPC <: PredictiveController
     model::LinModel
     estim::StateEstimator
@@ -392,9 +406,10 @@ disturbances ``\mathbf{d}(k)``. The predicted output setpoint `R̂y` and mesured
         \mathbf{d̂}(k+H_p)
     \end{bmatrix}
 ```
-They are constant in the future by default, that is ``\mathbf{r̂_y}(k+j) = \mathbf{r_y}(k)`` 
-and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for ``j=1`` to ``H_p``. Current measured outputs 
-`ym` (keyword argument) are only required if `mpc.estim` is a [`InternalModel`](@ref).
+They are assumed constant in the future by default, that is 
+``\mathbf{r̂_y}(k+j) = \mathbf{r_y}(k)`` and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for ``j=1``
+to ``H_p``. Current measured outputs `ym` (keyword argument) are only required if 
+`mpc.estim` is a [`InternalModel`](@ref).
 
 See also [`LinMPC`](@ref), `NonLinMPC`.
 
