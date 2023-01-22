@@ -19,29 +19,25 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController end
 
-mutable struct OptimData 
+mutable struct OptimData
     model::OSQP.Model
-end
-
-mutable struct OptimInfo
-    info::String
-    status::Symbol
-    status_val::Int
-    ΔU::Vector{Float64}
-    ϵ ::Float64
+    info::OSQP.Info
+    J ::Float64
+    ΔŨ::Vector{Float64}
+    ϵ ::Union{Nothing, Float64}
+    u ::Vector{Float64}
+    U ::Vector{Float64}
     ŷ ::Vector{Float64}
     Ŷ ::Vector{Float64}
     ŷs::Vector{Float64}
     Ŷs::Vector{Float64}
-    d ::Vector{Float64}
-    D̂ ::Vector{Float64}
 end
+
 
 struct LinMPC <: PredictiveController
     model::LinModel
     estim::StateEstimator
-    lastu ::Vector{Float64}
-    lastΔŨ::Vector{Float64}
+    optim::OptimData
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64}
@@ -81,7 +77,6 @@ struct LinMPC <: PredictiveController
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
-    optim::OptimData
     function LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         model = estim.model
         nu, ny = model.nu, model.ny
@@ -113,8 +108,6 @@ struct LinMPC <: PredictiveController
         P̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
-        lastu  = copy(model.uop)
-        lastΔŨ = zeros(size(P̃, 1))
         # TODO: replace OSQP package with JuMP (configured to use OSQP)
         optmodel = OSQP.Model()
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
@@ -124,10 +117,15 @@ struct LinMPC <: PredictiveController
         A = A[i_nonInf, :]
         b = b[i_nonInf]
         OSQP.setup!(optmodel; P=sparse(P̃), A=sparse(A), u=b, verbose=false)
-        optim = OptimData(optmodel)
+        info = OSQP.Info()
+        u, U  = copy(model.uop), repeat(model.uop, Hp)
+        ΔŨ = zeros(size(P̃, 1))
+        ϵ  = isinf(C) ? nothing : 0.0 # C = Inf means hard constraints only
+        ŷ, Ŷ  = copy(model.yop), repeat(model.yop, Hp)
+        ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
+        optim = OptimData(optmodel, info, 0, ΔŨ, ϵ, u, U, ŷ, Ŷ, ŷs, Ŷs)
         return new(
-            model, estim, 
-            lastu, lastΔŨ,
+            model, estim, optim,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, C, R̂u,
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
@@ -137,7 +135,6 @@ struct LinMPC <: PredictiveController
             Ẽ, G, J, Kd, Q, P̃,
             Ks, Ps,
             Yop, Dop,
-            optim
         )
     end
 end
@@ -430,14 +427,15 @@ function moveinput!(
     D̂ ::Vector{<:Real} = repeat(d,  mpc.Hp),
     ym::Union{Vector{<:Real}, Nothing} = nothing
 )
+    lastu = mpc.optim.u
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
-    F, q̃, p = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d)
-    b = init_constraint(mpc, mpc.model, F)
-    ΔŨ, J = optim_objective(mpc, b, q̃, p)
+    F, q̃, p = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
+    b = init_constraint(mpc, mpc.model, F, lastu)
+    ΔŨ, ϵ, J, info = optim_objective(mpc, b, q̃, p)
+    write_optimdata!(mpc, ΔŨ, ϵ, J, info, ŷs, Ŷs, lastu, F, ym, d)
     Δu = ΔŨ[1:mpc.model.nu] # receding horizon principle: only Δu(k) is used (first one)
-    u = mpc.lastu + Δu
-    mpc.lastu[:] = u
+    u = lastu + Δu
     return u
 end
 
@@ -446,11 +444,11 @@ end
 """
     initstate!(mpc::PredictiveController, u, ym, d=Float64[])
 
-Init `mpc` controller variables and the states of `mpc.estim` [`StateEstimator`](@ref).
+Init `mpc.optim` and the states of `mpc.estim` [`StateEstimator`](@ref).
 """
 function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
-    mpc.lastu[:] = u
-    mpc.lastΔŨ  .= 0
+    mpc.optim.u = u
+    mpc.optim.ΔŨ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
 
@@ -503,14 +501,14 @@ end
 
 
 """
-    init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d)
+    init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
 
 Init linear model prediction matrices `F`, `q̃` and `p`.
 
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
-function init_prediction(mpc, ::LinModel, d, D̂, Ŷs, R̂y, x̂d)
-    F = mpc.Kd*x̂d + mpc.Q*(mpc.lastu - mpc.model.uop) + Ŷs + mpc.Yop
+function init_prediction(mpc, ::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
+    F = mpc.Kd*x̂d + mpc.Q*(lastu - mpc.model.uop) + Ŷs + mpc.Yop
     if mpc.model.nd ≠ 0
         F += mpc.G*(d - mpc.model.dop) + mpc.J*(D̂ - mpc.Dop)
     end
@@ -531,10 +529,10 @@ end
 
 Init `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 """
-function init_constraint(mpc, ::LinModel, F)
+function init_constraint(mpc, ::LinModel, F, lastu)
     b = [
-        -mpc.Umin + mpc.T_Hc*mpc.lastu
-        +mpc.Umax - mpc.T_Hc*mpc.lastu 
+        -mpc.Umin + mpc.T_Hc*lastu
+        +mpc.Umax - mpc.T_Hc*lastu 
         -mpc.ΔŨmin
         +mpc.ΔŨmax 
         -mpc.Ŷmin + F
@@ -553,24 +551,41 @@ Optimize the `mpc` quadratic objective function for [`LinMPC`](@ref) type.
 function optim_objective(mpc::LinMPC, b, q̃, p)
     # --- initial point (warm start) ---
     # initial ΔŨ: [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0]
-    ΔŨ0 = [mpc.lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
+    lastΔŨ = mpc.optim.ΔŨ
+    ΔŨ0 = [lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
     if !isinf(mpc.C) # if soft constraints, append the last slack value ϵ_{k-1}:
-        ΔŨ0 = [ΔŨ0; mpc.lastΔŨ[end]]
+        ΔŨ0 = [ΔŨ0; lastΔŨ[end]]
     end
     OSQP.warm_start!(mpc.optim.model; x=ΔŨ0)
     OSQP.update!(mpc.optim.model; q=q̃, u=b)
     # @info "ModelPredictiveControl: optimizing MPC objective function..."
     res = OSQP.solve!(mpc.optim.model)
     ΔŨ = res.x
+    ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
     J = res.info.obj_val + p; # optimal objective value by adding constant term p 
     status_val = res.info.status_val
-    status = res.info.status
-    status_val ≤ 0 && @warn "MPC exit status ≤ 0 ($status_val, $status)"
+    status_val ≤ 0 && @warn "MPC exit status ≤ 0 ($status_val, $(res.info.status))"
     if status_val < 0 # if error, we take last value :
         ΔŨ = ΔŨ0
     end
-    mpc.lastΔŨ[:] = ΔŨ
-    return ΔŨ, J
+    return ΔŨ, ϵ, J, res.info
+end
+
+"""
+    write_optimdata!(mpc::LinMPC, ΔŨ, ϵ, J, info, ŷs, Ŷs, lastu, F, ym, d)
+
+Write `mpc.optim` with the [`LinMPC`](@ref) optimzation results.
+"""
+function write_optimdata!(mpc::LinMPC, ΔŨ, ϵ, J, info, ŷs, Ŷs, lastu, F, ym, d)
+    mpc.optim.ΔŨ = ΔŨ
+    mpc.optim.ϵ = ϵ
+    mpc.optim.J = J
+    mpc.optim.info = info
+    mpc.optim.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*lastu
+    mpc.optim.u = mpc.optim.U[1:mpc.model.nu]
+    mpc.optim.ŷ = isa(mpc.estim, InternalModel) ? mpc.estim(ym, d) : mpc.estim(d)
+    mpc.optim.Ŷ = mpc.Ẽ*ΔŨ + F
+    mpc.optim.ŷs, mpc.optim.Ŷs = ŷs, Ŷs
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -782,9 +797,10 @@ returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{
 """
 function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
-        # ϵ ≥ 0 (no upper bound on ϵ), thus ΔŨmax = ΔUmax
-        ΔŨmin, ΔŨmax = [ΔUmin; 0.0], ΔUmax
-        A_ΔŨmin, A_ΔŨmax = -[I +c_ΔUmin; zeros(1, length(ΔUmin)) [1]], +[I -c_ΔUmax]
+        # 0 ≤ ϵ ≤ ∞  
+        ΔŨmin, ΔŨmax = [ΔUmin; 0.0], [ΔUmax; Inf]
+        A_ϵ = [zeros(1, length(ΔUmin)) [1]]
+        A_ΔŨmin, A_ΔŨmax = -[I +c_ΔUmin;  A_ϵ], +[I -c_ΔUmax; A_ϵ]
         Ñ_Hc = Diagonal([diag(N_Hc); C])
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
