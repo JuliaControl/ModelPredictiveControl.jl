@@ -29,8 +29,8 @@ makedocs(
             ],
             "Internals" => [
                 "Plant Models" => "internals/sim_model.md",
-                "State Estimator" => "internals/state_estim.md",
-                "Predictive Controller" => "internals/predictive_control.md",
+                "State Estimators" => "internals/state_estim.md",
+                "Predictive Controllers" => "internals/predictive_control.md",
             ],
         ],  
         "Index" => "func_index.md"
