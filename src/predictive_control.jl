@@ -348,15 +348,15 @@ function setconstraint!(
         S_Hp, S_Hc = mpc.S̃_Hp[:, 1:nu*Hc], mpc.S̃_Hc[:, 1:nu*Hc]
         N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
         E = mpc.Ẽ[:, 1:nu*Hc]
-        A_Umin, A_Umax = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        A_Umin, A_Umax   = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         A_ΔŨmin, A_ΔŨmax = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
-        A_Ŷmin, A_Ŷmax = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
-        mpc.A_Umin[:] = A_Umin
-        mpc.A_Umax[:] = A_Umax
+        A_Ŷmin, A_Ŷmax   = relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
+        mpc.A_Umin[:]  = A_Umin
+        mpc.A_Umax[:]  = A_Umax
         mpc.A_ΔŨmin[:] = A_ΔŨmin
         mpc.A_ΔŨmax[:] = A_ΔŨmax
-        mpc.A_Ŷmin[:] = A_Ŷmin  
-        mpc.A_Ŷmax[:] = A_Ŷmax
+        mpc.A_Ŷmin[:]  = A_Ŷmin  
+        mpc.A_Ŷmax[:]  = A_Ŷmax
     end
     optmodel = OSQP.Model()
     A = [mpc.A_Umin; mpc.A_Umax; mpc.A_ΔŨmin; mpc.A_ΔŨmax; mpc.A_Ŷmin; mpc.A_Ŷmax]
@@ -440,7 +440,6 @@ function moveinput!(
 end
 
 
-
 """
     initstate!(mpc::PredictiveController, u, ym, d=Float64[])
 
@@ -500,24 +499,24 @@ function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
 end
 
 
-"""
+@doc raw"""
     init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
 
 Init linear model prediction matrices `F`, `q̃` and `p`.
 
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
-function init_prediction(mpc, ::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
-    F = mpc.Kd*x̂d + mpc.Q*(lastu - mpc.model.uop) + Ŷs + mpc.Yop
-    if mpc.model.nd ≠ 0
-        F += mpc.G*(d - mpc.model.dop) + mpc.J*(D̂ - mpc.Dop)
+function init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
+    F = mpc.Kd*x̂d + mpc.Q*(lastu - model.uop) + Ŷs + mpc.Yop
+    if model.nd ≠ 0
+        F += mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
     end
     Ẑ = F - R̂y
-    q̃ = 2*(mpc.M_Hp*mpc.Ẽ)'*Ẑ
+    q̃ = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
     p = Ẑ'*mpc.M_Hp*Ẑ
     if ~isempty(mpc.R̂u)
-        V̂ = (mpc.T_Hp*mpc.lastu - mpc.R̂u)
-        q̃ += 2*(mpc.L_Hp*mpc.T_Hp)'*V̂
+        V̂ = (mpc.T_Hp*lastu - mpc.R̂u)
+        q̃ += 2(mpc.L_Hp*mpc.T_Hp)'*V̂
         p += V̂'*mpc.L_Hp*V̂
     end
     return F, q̃, p
@@ -549,13 +548,11 @@ end
 Optimize the `mpc` quadratic objective function for [`LinMPC`](@ref) type. 
 """
 function optim_objective(mpc::LinMPC, b, q̃, p)
-    # --- initial point (warm start) ---
-    # initial ΔŨ: [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0]
+    # initial ΔŨ (warm start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
     lastΔŨ = mpc.optim.ΔŨ
     ΔŨ0 = [lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
-    if !isinf(mpc.C) # if soft constraints, append the last slack value ϵ_{k-1}:
-        ΔŨ0 = [ΔŨ0; lastΔŨ[end]]
-    end
+    # if soft constraints, append the last slack value ϵ_{k-1}:
+    !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
     OSQP.warm_start!(mpc.optim.model; x=ΔŨ0)
     OSQP.update!(mpc.optim.model; q=q̃, u=b)
     # @info "ModelPredictiveControl: optimizing MPC objective function..."
@@ -565,9 +562,8 @@ function optim_objective(mpc::LinMPC, b, q̃, p)
     J = res.info.obj_val + p; # optimal objective value by adding constant term p 
     status_val = res.info.status_val
     status_val ≤ 0 && @warn "MPC exit status ≤ 0 ($status_val, $(res.info.status))"
-    if status_val < 0 # if error, we take last value :
-        ΔŨ = ΔŨ0
-    end
+    # if error, we take last value :
+    status_val < 0 && (ΔŨ = ΔŨ0)
     return ΔŨ, ϵ, J, res.info
 end
 

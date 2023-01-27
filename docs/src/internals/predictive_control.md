@@ -9,4 +9,6 @@ ModelPredictiveControl.relaxŶ
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
 ModelPredictiveControl.split_state
+ModelPredictiveControl.init_prediction
+ModelPredictiveControl.init_constraint
 ```

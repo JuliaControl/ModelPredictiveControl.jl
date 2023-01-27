@@ -143,6 +143,12 @@ end
 
 Update `estim.x̂` estimate with current inputs `u`, measured outputs `ym` and dist. `d`.
 
+The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\mathbf{K}``:
+```math
+\mathbf{x̂}_{k}(k+1) = \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
+               + \mathbf{K}[\mathbf{y^m}(k) - \mathbf{Ĉ^m x̂}_{k-1}(k) - \mathbf{D̂_d^m d}(k)]
+```
+
 # Examples
 ```jldoctest
 julia> kf = SteadyKalmanFilter(LinModel(ss(1, 1, 1, 0, 1)));
