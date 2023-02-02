@@ -13,8 +13,8 @@ error with closed-loop control (offset-free tracking).
 
 !!! info
     If you plan to use the estimators for other contexts than this specific package (e.g. :
-    filter, soft-sensor, etc.), careful must be taken at construction since the integral
-    action is not necessarily desired. The option `nint_ym=0` disable the integral action.
+    filter, parameter estimation, etc.), careful must be taken at construction since the
+    integral action is not necessarily desired. The option `nint_ym=0` disable it.
 
 The estimators are all implemented in the predictor form (a.k.a. observer form), that is,
 they all estimates at each discrete time ``k`` the states of the next period
