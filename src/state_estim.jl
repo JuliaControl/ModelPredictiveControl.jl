@@ -152,7 +152,7 @@ function augment_model(model::LinModel, As, Cs)
 end
 
 """
-    augment_model(model::SimModel, As, Cs)
+    augment_model(model::NonLinModel, As, Cs)
 
 Only returns the augmented functions `f̂`, `ĥ` when `model` is a [`NonLinModel`](@ref).
 """
