@@ -123,16 +123,18 @@ end
 @doc raw"""
     augment_model(model::LinModel, As, Cs)
 
-Augment `LinModel` state-space matrices with the stochastic ones `As` and `Cs`.
+Augment [`LinModel`](ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
 If ``\mathbf{x_d}`` are `model.x` states, and ``\mathbf{x_s}``, the states defined at
 [`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x} = 
-[ \begin{smallmatrix} \mathbf{x_d} \\ \mathbf{x_s} \end{smallmatrix} ]``. The function
-returns the augmented model matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
+[ \begin{smallmatrix} \mathbf{x_d} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
+returns the augmented model functions `f̂`, `ĥ` and matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{Â x}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
-    \mathbf{y}(k)   &= \mathbf{Ĉ x}(k) + \mathbf{D̂_d d}(k)
+    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) 
+                     = \mathbf{Â x}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
+    \mathbf{y}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) 
+                     = \mathbf{Ĉ x}(k) + \mathbf{D̂_d d}(k)
 \end{aligned}
 ```
 """
@@ -144,7 +146,20 @@ function augment_model(model::LinModel, As, Cs)
     Ĉ   = [model.C Cs]
     B̂d  = [model.Bd; zeros(nxs,nd)]
     D̂d  = model.Dd
-    return Â, B̂u, Ĉ, B̂d, D̂d
+    f̂(x̂,u,d) = Â*x̂ + B̂u*u + B̂d*d
+    ĥ(x̂,d) = Ĉ*x̂ + D̂d*d
+    return f̂, ĥ, Â, B̂u, Ĉ, B̂d, D̂d
+end
+
+"""
+    augment_model(model::SimModel, As, Cs)
+
+Only returns the augmented functions `f̂`, `ĥ` when `model` is a [`NonLinModel`](@ref).
+"""
+function augment_model(model::NonLinModel, As, Cs)
+    f̂(x̂, u, d) = [model.f(x̂[1:model.nx], u, d); As*x̂[model.nx+1:end]]
+    ĥ(x̂, d) = model.h(x̂[1:model.nx], d) + Cs*x̂[model.nx+1:end]
+    return f̂, ĥ
 end
 
 
