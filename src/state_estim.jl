@@ -131,10 +131,10 @@ If ``\mathbf{x_d}`` are `model.x` states, and ``\mathbf{x_s}``, the states defin
 returns the augmented model functions `f̂`, `ĥ` and matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) 
-                     = \mathbf{Â x}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
-    \mathbf{y}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) 
-                     = \mathbf{Ĉ x}(k) + \mathbf{D̂_d d}(k)
+    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
+                    &= \mathbf{Â x}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
+    \mathbf{y}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) \\
+                    &= \mathbf{Ĉ x}(k) + \mathbf{D̂_d d}(k)
 \end{aligned}
 ```
 """
