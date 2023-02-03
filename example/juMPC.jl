@@ -6,7 +6,7 @@ Pkg.activate(".")
 
 using ModelPredictiveControl
 #using DAQP
-#using JuMP 
+#using JuMP
 using LinearAlgebra
 using ControlSystemsBase
 using MAT
