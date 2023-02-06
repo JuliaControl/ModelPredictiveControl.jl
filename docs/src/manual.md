@@ -24,7 +24,7 @@ flows out of an opening at the bottom of the tank. The manipulated inputs are th
 \end{aligned}
 ```
 
-At the operating points:
+At the steady-state operating points:
 
 ```math
 \begin{aligned}
@@ -40,7 +40,7 @@ the following linear model accurately describes the plant dynamics:
     y_L(s) \\ y_T(s)
 \end{bmatrix} = 
 \begin{bmatrix}
-    \frac{1.90}{18s + 1} & \frac{1.90}{18s + 1} \\[2pt]
+    \frac{1.90}{18s + 1} & \frac{1.90}{18s + 1} \\[3pt]
     \frac{-0.74}{8s + 1} & \frac{0.74}{8s + 1}
 \end{bmatrix}
 \begin{bmatrix}
@@ -59,7 +59,7 @@ y_L ≥ 45
 We first need to construct a [`LinModel`](@ref) objet with [`setop!`](@ref) to handle the
 operating points:
 
-```julia
+```@example 1
 using ControlSystemsBase
 using ModelPredictiveControl
 sys = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
@@ -70,64 +70,68 @@ model = setop!(LinModel(sys, Ts), uop=[10, 10], yop=[50, 30])
 
 The `model` object will be used for two purposes : to construct our controller, and as a
 plant simulator to test the design. We design our [`LinMPC`](@ref) controllers by including
-the level constraint with [`setconstraint`](@ref):
+the level constraint with [`setconstraint!`](@ref):
 
-```julia
+```@example 1
 mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2), ŷmin=[45, -Inf])
 ```
 
 Before closing the loop, we call [`initstate!`](@ref) with the actual plant inputs and
-measurements to ensure a bumpless transfer. Since `model` simulates our plant here, we
-evaluate its outputs to initialize the states. [`LinModel`](@ref) objects are callable for
-this purpose (an alias for [`evaloutput`](@ref)):
+measurements to ensure a bumpless transfer. Since `model` simulates our plant here, its
+output will initialize the states. [`LinModel`](@ref) objects are callable for this purpose
+(an alias for [`evaloutput`](@ref)):
 
-```julia
+```@example 1
 u = model.uop
 y = model() # or equivalently : y = evaloutput(model)
 initstate!(mpc, u, y)
+nothing # hide
 ```
 
 We can then close the loop and test `mpc` performance on the simulator by imposing step
 changes on output setpoints ``\mathbf{r_y}`` and on a load disturbance ``\mathbf{u_d}``:
 
-```julia
-N = 100
-t_data  = Ts*(0:N-1)
-ry, ud  = [50, 30], [0, 0]
-u_data  = zeros(model.nu, N)
-y_data  = zeros(model.ny, N)
-ry_data = zeros(model.ny, N)
-for k = 0:N-1
-    k == 0  && (ry = [50, 35])
-    k == 25 && (ry = [55, 35])
-    k == 50 && (ry = [50, 30])
-    k == 75 && (ud = [-10, 0])
-    y = model() # simulated measurements
-    u = mpc(ry) # or equivalently : u = moveinput!(mpc, ry)
-    u_data[:,k+1]  = u
-    y_data[:,k+1]  = y
-    ry_data[:,k+1] = ry 
-    updatestate!(mpc, u, y) # update mpc state estimate
-    updatestate!(model, u + ud)  # update simulated plant + load disturbance
+```@example 1
+function test_mpc(mpc, model)
+    N = 100
+    ry, ud = [50, 30], [0, 0]
+    u_data  = zeros(model.nu, N)
+    y_data  = zeros(model.ny, N)
+    ry_data = zeros(model.ny, N)
+    for k = 0:N-1
+        y = model() # simulated measurements
+        k == 25 && (ry = [50, 35])
+        k == 50 && (ry = [55, 30])
+        k == 75 && (ud = [-15, 0])
+        u = mpc(ry) # or equivalently : u = moveinput!(mpc, ry)
+        u_data[:,k+1]  = u
+        y_data[:,k+1]  = y
+        ry_data[:,k+1] = ry 
+        updatestate!(mpc, u, y) # update mpc state estimate
+        updatestate!(model, u + ud) # update simulator with disturbance
+    end
+    return u_data, y_data, ry_data
 end
+u_data, y_data, ry_data = test_mpc(mpc, model)
+t_data = Ts*(0:(size(y_data,2)-1))
+nothing # hide
 ```
 
 The [`LinMPC`](@ref) objects are also callable to provide an alternative syntax for
-the [`moveinput!`] method. Calling [updatestate!](@ref) on the `mpc` object updates its
-internal state for the **NEXT** control period. That is why the call is done at the end
-of the `for` loop. The same logic applies for the `model` object. Lastly, we plot the
-closed-loop test with the `Plots` package:
+the [`moveinput!`](@ref) method. Calling [updatestate!](@ref) on the `mpc` object updates
+its internal state for the **NEXT** control period. That is why the call is done at the end
+of the `for` loop. The same logic applies for the `model` object. 
 
-```julia
+Lastly, we plot the closed-loop test with the `Plots` package:
+
+```@example 1
 using Plots
-p1 = plot(t_data, y_data[1,:], label=raw"$y_L$")
-plot!(t_data,r_data[1,:],label=raw"$r_L$", linestyle=:dash)
-p2 = plot(t_data,y_data[2,:],label=raw"$y_T$")
-plot!(t_data,r_data[2,:],label=raw"$r_T$", linestyle=:dash)
-py = plot(p1, p2, layout=[1,1])
-p1 = plot(t_data,u_data[1,:],label=raw"$u_1$", linetype=:steppost)
-p2 = plot(t_data,u_data[2,:],label=raw"$u_2$", linetype=:steppost)
-pu = plot(p1,p2, layout=[1,1])
-display(pu)
-display(py)
+p1 = plot(t_data, y_data[1,:], label="level"); ylabel!("level")
+plot!(t_data, ry_data[1,:], label="setpoint", linestyle=:dash, linetype=:steppost)
+plot!(t_data, fill(45,size(t_data)), label="min", linestyle=:dot, linetype=:steppost)
+p2 = plot(t_data, y_data[2,:], label="temp."); ylabel!("temp.")
+plot!(t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
+p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost); ylabel!("flow rate")
+plot!(t_data,u_data[2,:],label=raw"hot", linetype=:steppost); xlabel!("time (s)")
+p = plot(p1, p2, p3, layout=(3,1))
 ```
