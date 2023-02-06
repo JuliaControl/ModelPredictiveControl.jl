@@ -1,6 +1,5 @@
-# Set plot globals
 ENV["PLOTS_TEST"] = "true"
-ENV["GKSwstype"] = "nul"
+ENV["GKS_WSTYPE"]=100
 
 push!(LOAD_PATH,"../src/")
 

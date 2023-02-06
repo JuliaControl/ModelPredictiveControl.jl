@@ -134,5 +134,5 @@ p2 = plot(t_data, y_data[2,:], label="temp."); ylabel!("temp.")
 plot!(t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
 p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost); ylabel!("flow rate")
 plot!(t_data,u_data[2,:],label=raw"hot", linetype=:steppost); xlabel!("time (s)")
-p = plot(p1, p2, p3, layout=(3,1), size=(550,500), fmt=:svg)
+p = plot(p1, p2, p3, layout=(3,1), fmt=:svg)
 ```
