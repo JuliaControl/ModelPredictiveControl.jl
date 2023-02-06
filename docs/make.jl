@@ -1,3 +1,7 @@
+# Set plot globals
+ENV["PLOTS_TEST"] = "true"
+ENV["GKSwstype"] = "nul"
+
 push!(LOAD_PATH,"../src/")
 
 using Documenter
