@@ -112,9 +112,9 @@ using PlotThemes, Plots
 theme(:dark)
 default(fontfamily="Computer Modern"); scalefontsizes(1.1)
 p1 = plot(0:N-1,y_data[1,:],label=raw"$y_1$")
-plot!(0:N-1,r_data[1,:],label=raw"$r_1$",linestyle=:dash)
+plot!(0:N-1,r_data[1,:],label=raw"$r_1$",linestyle=:dash, linetype=:steppost)
 p2 = plot(0:N-1,y_data[2,:],label=raw"$y_2$")
-plot!(0:N-1,r_data[2,:],label=raw"$r_2$",linestyle=:dash)
+plot!(0:N-1,r_data[2,:],label=raw"$r_2$",linestyle=:dash, linetype=:steppost)
 py = plot(p1,p2, layout=[1,1])
 
 p1 = plot(0:N-1,u_data[1,:],label=raw"$u_1$",linetype=:steppost)
