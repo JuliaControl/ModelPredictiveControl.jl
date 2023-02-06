@@ -2,14 +2,14 @@
 <html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Manual · ModelPredictiveControl.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">ModelPredictiveControl.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Manual</a><ul class="internal"><li><a class="tocitem" href="#Installation"><span>Installation</span></a></li><li><a class="tocitem" href="#Predictive-Controller-Design"><span>Predictive Controller Design</span></a></li></ul></li><li><span class="tocitem">Functions</span><ul><li><input class="collapse-toggle" id="menuitem-3-1" type="checkbox"/><label class="tocitem" for="menuitem-3-1"><span class="docs-label">Public</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../public/sim_model/">Plant Models</a></li><li><a class="tocitem" href="../public/state_estim/">State Estimators</a></li><li><a class="tocitem" href="../public/predictive_control/">Predictive Controllers</a></li><li><a class="tocitem" href="../public/generic_func/">Generic Functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-2" type="checkbox"/><label class="tocitem" for="menuitem-3-2"><span class="docs-label">Internals</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../internals/sim_model/">Plant Models</a></li><li><a class="tocitem" href="../internals/state_estim/">State Estimators</a></li><li><a class="tocitem" href="../internals/predictive_control/">Predictive Controllers</a></li></ul></li></ul></li><li><a class="tocitem" href="../func_index/">Index</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Manual</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Manual</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/franckgaga/ModelPredictiveControl.jl/blob/main/docs/src/manual.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Manual"><a class="docs-heading-anchor" href="#Manual">Manual</a><a id="Manual-1"></a><a class="docs-heading-anchor-permalink" href="#Manual" title="Permalink"></a></h1><h2 id="Installation"><a class="docs-heading-anchor" href="#Installation">Installation</a><a id="Installation-1"></a><a class="docs-heading-anchor-permalink" href="#Installation" title="Permalink"></a></h2><p>To install the <code>ModelPredictiveControl</code> package, run this command in the Julia REPL:</p><pre><code class="language-text hljs">using Pkg; Pkg.add(&quot;ModelPredictiveControl&quot;)</code></pre><h2 id="Predictive-Controller-Design"><a class="docs-heading-anchor" href="#Predictive-Controller-Design">Predictive Controller Design</a><a id="Predictive-Controller-Design-1"></a><a class="docs-heading-anchor-permalink" href="#Predictive-Controller-Design" title="Permalink"></a></h2><h3 id="Linear-Model"><a class="docs-heading-anchor" href="#Linear-Model">Linear Model</a><a id="Linear-Model-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-Model" title="Permalink"></a></h3><p>The considered plant is well-stirred tank with a cold and hot water inlet. The water flows out of an opening at the bottom of the tank. The manipulated inputs are the cold <span>$u_c$</span> and hot <span>$u_h$</span> water flow rate, and the measured outputs are the liquid level <span>$y_L$</span> and temperature <span>$y_T$</span>:</p><p class="math-container">\[\begin{aligned}
     \mathbf{u} &amp;= \begin{bmatrix} u_c \\ u_h \end{bmatrix} \\
     \mathbf{y} &amp;= \begin{bmatrix} y_L \\ y_T \end{bmatrix}
-\end{aligned}\]</p><p>At the operating points:</p><p class="math-container">\[\begin{aligned}
+\end{aligned}\]</p><p>At the steady-state operating points:</p><p class="math-container">\[\begin{aligned}
     \mathbf{u_{op}} &amp;= \begin{bmatrix} 10 \\ 10 \end{bmatrix} \\
     \mathbf{y_{op}} &amp;= \begin{bmatrix} 50 \\ 30 \end{bmatrix} 
 \end{aligned}\]</p><p>the following linear model accurately describes the plant dynamics:</p><p class="math-container">\[\begin{bmatrix}
     y_L(s) \\ y_T(s)
 \end{bmatrix} = 
 \begin{bmatrix}
-    \frac{1.90}{18s + 1} &amp; \frac{1.90}{18s + 1} \\[2pt]
+    \frac{1.90}{18s + 1} &amp; \frac{1.90}{18s + 1} \\[3pt]
     \frac{-0.74}{8s + 1} &amp; \frac{0.74}{8s + 1}
 \end{bmatrix}
 \begin{bmatrix}
@@ -19,34 +19,44 @@ using ModelPredictiveControl
 sys = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
         tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
 Ts = 4.0
-model = setop!(LinModel(sys, Ts), uop=[10, 10], yop=[50, 30])</code></pre><p>The <code>model</code> object will be used for two purposes : to construct our controller, and as a plant simulator to test the design. We design our <a href="../public/predictive_control/#ModelPredictiveControl.LinMPC"><code>LinMPC</code></a> controllers by including the level constraint with <a href="@ref"><code>setconstraint</code></a>:</p><pre><code class="language-julia hljs">mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2), ŷmin=[45, -Inf])</code></pre><p>Before closing the loop, we call <a href="../public/generic_func/#ModelPredictiveControl.initstate!"><code>initstate!</code></a> with the actual plant inputs and measurements to ensure a bumpless transfer. Since <code>model</code> simulates our plant here, we evaluate its outputs to initialize the states. <a href="../public/sim_model/#ModelPredictiveControl.LinModel"><code>LinModel</code></a> objects are callable for this purpose (an alias for <a href="../public/generic_func/#ModelPredictiveControl.evaloutput"><code>evaloutput</code></a>):</p><pre><code class="language-julia hljs">u = model.uop
+model = setop!(LinModel(sys, Ts), uop=[10, 10], yop=[50, 30])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Discrete-time linear model with a sample time Ts = 4.0 s and:
+ 2 manipulated inputs u
+ 2 states x
+ 2 outputs y
+ 0 measured disturbances d</code></pre><p>The <code>model</code> object will be used for two purposes : to construct our controller, and as a plant simulator to test the design. We design our <a href="../public/predictive_control/#ModelPredictiveControl.LinMPC"><code>LinMPC</code></a> controllers by including the level constraint with <a href="../public/predictive_control/#ModelPredictiveControl.setconstraint!"><code>setconstraint!</code></a>:</p><pre><code class="language-julia hljs">mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2), ŷmin=[45, -Inf])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LinMPC predictive controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimator and:
+ 2 manipulated inputs u
+ 4 states x̂
+ 2 measured outputs ym
+ 0 unmeasured outputs yu
+ 0 measured disturbances d</code></pre><p>Before closing the loop, we call <a href="../public/generic_func/#ModelPredictiveControl.initstate!"><code>initstate!</code></a> with the actual plant inputs and measurements to ensure a bumpless transfer. Since <code>model</code> simulates our plant here, its output will initialize the states. <a href="../public/sim_model/#ModelPredictiveControl.LinModel"><code>LinModel</code></a> objects are callable for this purpose (an alias for <a href="../public/generic_func/#ModelPredictiveControl.evaloutput"><code>evaloutput</code></a>):</p><pre><code class="language-julia hljs">u = model.uop
 y = model() # or equivalently : y = evaloutput(model)
-initstate!(mpc, u, y)</code></pre><p>We can then close the loop and test <code>mpc</code> performance on the simulator by imposing step changes on output setpoints <span>$\mathbf{r_y}$</span> and on a load disturbance <span>$\mathbf{u_d}$</span>:</p><pre><code class="language-julia hljs">N = 100
-t_data  = Ts*(0:N-1)
-ry, ud  = [50, 30], [0, 0]
-u_data  = zeros(model.nu, N)
-y_data  = zeros(model.ny, N)
-ry_data = zeros(model.ny, N)
-for k = 0:N-1
-    k == 0  &amp;&amp; (ry = [50, 35])
-    k == 25 &amp;&amp; (ry = [55, 35])
-    k == 50 &amp;&amp; (ry = [50, 30])
-    k == 75 &amp;&amp; (ud = [-10, 0])
-    y = model() # simulated measurements
-    u = mpc(ry) # or equivalently : u = moveinput!(mpc, ry)
-    u_data[:,k+1]  = u
-    y_data[:,k+1]  = y
-    ry_data[:,k+1] = ry 
-    updatestate!(mpc, u, y) # update mpc state estimate
-    updatestate!(model, u + ud)  # update simulated plant + load disturbance
-end</code></pre><p>The <a href="../public/predictive_control/#ModelPredictiveControl.LinMPC"><code>LinMPC</code></a> objects are also callable to provide an alternative syntax for the [<code>moveinput!</code>] method. Calling <a href="@ref">updatestate!</a> on the <code>mpc</code> object updates its internal state for the <strong>NEXT</strong> control period. That is why the call is done at the end of the <code>for</code> loop. The same logic applies for the <code>model</code> object. Lastly, we plot the closed-loop test with the <code>Plots</code> package:</p><pre><code class="language-julia hljs">using Plots
-p1 = plot(t_data, y_data[1,:], label=raw&quot;$y_L$&quot;)
-plot!(t_data,r_data[1,:],label=raw&quot;$r_L$&quot;, linestyle=:dash)
-p2 = plot(t_data,y_data[2,:],label=raw&quot;$y_T$&quot;)
-plot!(t_data,r_data[2,:],label=raw&quot;$r_T$&quot;, linestyle=:dash)
-py = plot(p1, p2, layout=[1,1])
-p1 = plot(t_data,u_data[1,:],label=raw&quot;$u_1$&quot;, linetype=:steppost)
-p2 = plot(t_data,u_data[2,:],label=raw&quot;$u_2$&quot;, linetype=:steppost)
-pu = plot(p1,p2, layout=[1,1])
-display(pu)
-display(py)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../public/sim_model/">Plant Models »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Sunday 5 February 2023 21:38">Sunday 5 February 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+initstate!(mpc, u, y)</code></pre><p>We can then close the loop and test <code>mpc</code> performance on the simulator by imposing step changes on output setpoints <span>$\mathbf{r_y}$</span> and on a load disturbance <span>$\mathbf{u_d}$</span>:</p><pre><code class="language-julia hljs">function test_mpc(mpc, model)
+    N = 100
+    ry, ud = [50, 30], [0, 0]
+    u_data  = zeros(model.nu, N)
+    y_data  = zeros(model.ny, N)
+    ry_data = zeros(model.ny, N)
+    for k = 0:N-1
+        y = model() # simulated measurements
+        k == 25 &amp;&amp; (ry = [50, 35])
+        k == 50 &amp;&amp; (ry = [55, 30])
+        k == 75 &amp;&amp; (ud = [-15, 0])
+        u = mpc(ry) # or equivalently : u = moveinput!(mpc, ry)
+        u_data[:,k+1]  = u
+        y_data[:,k+1]  = y
+        ry_data[:,k+1] = ry
+        updatestate!(mpc, u, y) # update mpc state estimate
+        updatestate!(model, u + ud) # update simulator with disturbance
+    end
+    return u_data, y_data, ry_data
+end
+u_data, y_data, ry_data = test_mpc(mpc, model)
+t_data = Ts*(0:(size(y_data,2)-1))</code></pre><p>The <a href="../public/predictive_control/#ModelPredictiveControl.LinMPC"><code>LinMPC</code></a> objects are also callable to provide an alternative syntax for the <a href="../public/predictive_control/#ModelPredictiveControl.moveinput!"><code>moveinput!</code></a> method. Calling <a href="@ref">updatestate!</a> on the <code>mpc</code> object updates its internal state for the <strong>NEXT</strong> control period. That is why the call is done at the end of the <code>for</code> loop. The same logic applies for the <code>model</code> object. </p><p>Lastly, we plot the closed-loop test with the <code>Plots</code> package:</p><pre><code class="language- hljs">using Plots
+p1 = plot(t_data, y_data[1,:], label=&quot;level&quot;); ylabel!(&quot;level&quot;)
+plot!(t_data, ry_data[1,:], label=&quot;setpoint&quot;, linestyle=:dash, linetype=:steppost)
+plot!(t_data, fill(45,size(t_data)), label=&quot;min&quot;, linestyle=:dot, linetype=:steppost)
+p2 = plot(t_data, y_data[2,:], label=&quot;temp.&quot;); ylabel!(&quot;temp.&quot;)
+plot!(t_data, ry_data[2,:],label=&quot;setpoint&quot;, linestyle=:dash, linetype=:steppost)
+p3 = plot(t_data,u_data[1,:],label=&quot;cold&quot;, linetype=:steppost); ylabel!(&quot;flow rate&quot;)
+plot!(t_data,u_data[2,:],label=raw&quot;hot&quot;, linetype=:steppost); xlabel!(&quot;time (s)&quot;)
+p = plot(p1, p2, p3, layout=(3,1))</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../public/sim_model/">Plant Models »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Monday 6 February 2023 17:50">Monday 6 February 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
