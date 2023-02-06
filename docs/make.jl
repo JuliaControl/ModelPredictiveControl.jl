@@ -1,6 +1,6 @@
+# debug bad cropping Plots in manual:
 ENV["PLOTS_TEST"] = "true"
-ENV["GKS_WSTYPE"]=100
-
+ENV["GKSwstype"] = "nul"
 push!(LOAD_PATH,"../src/")
 
 using Documenter
