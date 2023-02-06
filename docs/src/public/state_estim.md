@@ -18,10 +18,15 @@ error with closed-loop control (offset-free tracking).
 
 The estimators are all implemented in the predictor form (a.k.a. observer form), that is,
 they all estimates at each discrete time ``k`` the states of the next period
-``\mathbf{x̂}_k(k+1)``. This form comes in handy for control applications since the
-estimations come after the controller computations, without introducing any additional
-delays (see [Manual](@ref) for examples). In contrast, the filter form that estimates
-``\mathbf{x̂}_k(k)`` is sometimes slightly more accurate.
+``\mathbf{x̂}_k(k+1)``. In contrast, the filter form that estimates ``\mathbf{x̂}_k(k)`` is
+sometimes slightly more accurate.
+
+The predictor form comes in handy for control applications since the estimations come after
+the controller computations, without introducing any additional delays. Moreover, the
+[`moveinput!`](@ref) method of the predictive controller does not automatically update the
+estimate with [`updatestate!`](@ref). This allows applying the calculated inputs on the real
+plant before starting the potentially expensive estimator computations (see [Manual](@ref)
+for examples).
 
 !!! info
     All the estimators support measured ``\mathbf{y^m}`` and unmeasured ``\mathbf{y^u}``
