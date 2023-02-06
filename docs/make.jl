@@ -2,6 +2,7 @@ push!(LOAD_PATH,"../src/")
 
 using Documenter
 using ModelPredictiveControl
+using Plots
 
 DocMeta.setdocmeta!(
     ModelPredictiveControl, 
