@@ -60,8 +60,7 @@ We first need to construct a [`LinModel`](@ref) objet with [`setop!`](@ref) to h
 operating points:
 
 ```@example 1
-using ControlSystemsBase
-using ModelPredictiveControl
+using ModelPredictiveControl, ControlSystemsBase
 sys = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
         tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
 Ts = 4.0
@@ -117,11 +116,11 @@ t_data = Ts*(0:(size(y_data,2)-1))
 nothing # hide
 ```
 
-The [`LinMPC`](@ref) objects are also callable to provide an alternative syntax for
-the [`moveinput!`](@ref) method. Calling [`updatestate!`](@ref) on the `mpc` object updates
-its internal state for the *NEXT* control period (this is by design, see
-[State Estimators](@ref) for the justification). That is why the call is done at the
-end of the `for` loop. The same logic applies for `model`.
+The [`LinMPC`](@ref) objects are also callable as an alternative syntax for
+[`moveinput!`](@ref). Calling [`updatestate!`](@ref) on the `mpc` object updates its
+internal state for the *NEXT* control period (this is by design, see
+[State Estimators](@ref) for justifications). That is why the call is done at the end of the
+`for` loop. The same logic applies for `model`.
 
 Lastly, we plot the closed-loop test with the `Plots` package:
 

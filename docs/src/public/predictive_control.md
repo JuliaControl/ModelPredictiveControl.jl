@@ -11,7 +11,7 @@ predictions. The default [`LinMPC`](@ref) estimator is a [`SteadyKalmanFilter`](
 current model mismatch estimation is constant in the future (same approach than dynamic
 matrix control, DMC).
 
-## Abstract Types
+## PredictiveController
 
 ```@docs
 PredictiveController

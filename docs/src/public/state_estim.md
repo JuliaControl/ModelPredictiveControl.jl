@@ -23,7 +23,7 @@ sometimes slightly more accurate.
 
 The predictor form comes in handy for control applications since the estimations come after
 the controller computations, without introducing any additional delays. Moreover, the
-[`moveinput!`](@ref) method of the predictive controller does not automatically update the
+[`moveinput!`](@ref) method of the predictive controllers does not automatically update the
 estimates with [`updatestate!`](@ref). This allows applying the calculated inputs on the
 real plant before starting the potentially expensive estimator computations (see
 [Manual](@ref) for examples).
@@ -32,7 +32,7 @@ real plant before starting the potentially expensive estimator computations (see
     All the estimators support measured ``\mathbf{y^m}`` and unmeasured ``\mathbf{y^u}``
     model outputs, where ``\mathbf{y}`` refers to all of them.
 
-## Abstract Types
+## StateEstimator
 
 ```@docs
 StateEstimator

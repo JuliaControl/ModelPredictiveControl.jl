@@ -11,7 +11,7 @@ simulators by calling [`evaloutput`](@ref) and [`updatestate!`](@ref) methods on
 states `x` are stored inside [`SimModel`](@ref) objects. Use [`setstate!`](@ref) method
 to manually modify them.
 
-## Abstract Types
+## SimModel
 
 ```@docs
 SimModel
