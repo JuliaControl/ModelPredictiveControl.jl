@@ -170,8 +170,9 @@ Init `estim.x̂` states from current inputs `u`, measured outputs `ym` and distu
 
 The method tries to find a good steady-state to initialize `estim.x̂` estimate :
 
-- If `estim.model` is a [`LinModel`](@ref), it evaluates `estim.model` steady-state with 
-  current inputs `u` and measured disturbances `d`, and saves the result to `estim.x̂[1:nx].`
+- If `estim.model` is a [`LinModel`](@ref), it evaluates `estim.model` steady-state (using
+  [`steadystate`](@ref)) with current inputs `u` and measured disturbances `d`, and saves
+  the result to `estim.x̂[1:nx].`
 - Else, the current deterministic states `estim.x̂[1:nx]` are left unchanged (use 
   [`setstate!`](@ref) to manually modify them). 
   
