@@ -36,6 +36,7 @@
         "mathrm",
         "moveinput",
         "OSQP",
+        "Penrose",
         "Plamondon",
         "quadprog",
         "repeatdiag",

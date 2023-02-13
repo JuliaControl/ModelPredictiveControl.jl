@@ -214,10 +214,11 @@ Omitting the operating points, the method evaluates the equilibrium ``\mathbf{x}
     \mathbf{x}(∞) = \mathbf{(I - A)^{-1}(B_u u + B_d d)}
 ```
 with the manipulated inputs held constant at ``\mathbf{u}`` and, the measured disturbances, 
-at ``\mathbf{d}``.
+at ``\mathbf{d}``. The Moore-Penrose pseudo-inverse evaluates ``\mathbf{(I - A)^{-1}``
+to support integrating `model` (integrator states will be 0).
 """
 function steadystate(model::LinModel, u, d=Float64[])
-    return (I - model.A) \ (model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
+    return pinv(I - model.A)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
 end
 
 
