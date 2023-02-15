@@ -6,6 +6,14 @@
 
 A model predictive control package for Julia.
 
+## Installation
+
+To install the `ModelPredictiveControl` package, run this command in the Julia REPL:
+
+```julia
+using Pkg; Pkg.add("ModelPredictiveControl")
+```
+
 ## Features
 
 ✅ implemented feature  
