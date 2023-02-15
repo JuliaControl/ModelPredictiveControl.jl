@@ -16,17 +16,19 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 
 ## Features
 
+### Legend
+
 ✅ implemented feature  
 ⬜ planned feature
 
-### Model Predictive Control
+### Model Predictive Control Features
 
-- ✅ linear and nonlinear plant models using a unified structure
-- ⬜ model predictive controllers based on a :
-  - ✅ linear plant model
-  - ⬜ nonlinear plant model
-- ⬜ support for linear model predictions using fast matrix algebra in a nonlinear
-  controller (e.g. economic cost minimization of a linear plant model)
+- ✅ linear and nonlinear plant models exploiting multiple dispatch
+- ⬜ model predictive controllers based on :
+  - ✅ linear plant models
+  - ⬜ linear plant models in a nonlinear controller using fast matrix algebra for the
+       predictions (e.g. economic optimization of a linear model)
+  - ⬜ nonlinear plant models
 - ⬜ supported objective function terms :
   - ✅ output setpoint tracking
   - ✅ move suppression
@@ -39,15 +41,15 @@ using Pkg; Pkg.add("ModelPredictiveControl")
   - ✅ manipulated inputs increments
 - ⬜ custom manipulated input constraints that are a function of the predictions
 - ✅ supported feedback strategy :
-  - ✅ internal model structure with custom stochastic model
   - ✅ state estimator (see State Estimation features)
+  - ✅ internal model structure with a custom stochastic model
 - ✅ offset-free tracking with a single or multiple integrators on measured outputs
 - ✅ support for unmeasured model outputs
 - ✅ feedforward action with measured disturbances that supports direct transmission
 - ✅ custom predictions for :
   - ✅ output setpoints
   - ✅ measured disturbances
-- ⬜ get additional information about the optimum to ease troubleshooting :
+- ⬜ additional information about the optimum to ease troubleshooting :
   - ✅ optimal input increments over control horizon
   - ✅ slack variable optimum
   - ✅ objective function optimum
@@ -55,7 +57,7 @@ using Pkg; Pkg.add("ModelPredictiveControl")
   - ✅ current stochastic output predictions
   - ⬜ custom penalty value at optimum
 
-### State Estimation
+### State Estimation Features
 
 - ⬜ supported state estimators/observers :
   - ✅ steady-state Kalman filter
@@ -64,7 +66,7 @@ using Pkg; Pkg.add("ModelPredictiveControl")
   - ✅ internal model structure
   - ⬜ unscented Kalman filter
   - ⬜ moving horizon estimator
-- ✅ observers in the predictor form to facilitate predictive control applications.
+- ✅ observers in predictor form to ease  control applications
 - ⬜ moving horizon estimator that supports :
   - ⬜ inequality state constraints
-  - ⬜ equality constraints at zero on process noise (to reduce the problem size)
+  - ⬜ zero process noise equality constraint to reduce the problem size
