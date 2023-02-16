@@ -300,7 +300,7 @@ based on the process model described in [`SteadyKalmanFilter`](@ref). The notati
 control period ``k-1``. See [^2] for details.
 
 [^2]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
-Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
+     Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
 """
 function updatestate_kf!(estim::KalmanFilter, u, ym, d)
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
