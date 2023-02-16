@@ -291,13 +291,16 @@ The method implement the time-varying Kalman Filter in its predictor (observer) 
     \mathbf{ŷ^m(k)}     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k) \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
                            + \mathbf{K}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)] \\
-    \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k) - \mathbf{M Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}'
-                           + \mathbf{Q̂}
+    \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k) - 
+                           \mathbf{M}(k)\mathbf{Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}' + \mathbf{Q̂}
 \end{aligned}
 ```
 based on the process model described in [`SteadyKalmanFilter`](@ref). The notation 
 ``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` estimated at the last 
-control period ``k-1``.
+control period ``k-1``. See [^2] for details.
+
+[^2]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
+Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
 """
 function updatestate_kf!(estim::KalmanFilter, u, ym, d)
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
