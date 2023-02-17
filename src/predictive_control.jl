@@ -151,7 +151,7 @@ The controller minimizes the following objective function at each discrete time 
                        + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
                        + C ϵ^2
 ```
-in which the weight matrices are :
+in which the weight matrices are repeated ``H_p`` or ``H_c`` times :
 ```math
 \begin{aligned}
     \mathbf{M}_{H_p} &= \text{diag}\mathbf{(M,M,...,M)}     \\
@@ -159,22 +159,22 @@ in which the weight matrices are :
     \mathbf{L}_{H_p} &= \text{diag}\mathbf{(L,L,...,L)}     
 \end{aligned}
 ```
-and following the nomeclature:
+and with the following nomeclature:
 
-| Var.                 | Description                                        |
-| :------------------- | :------------------------------------------------- |
-| ``H_p``              | prediction horizon                                 |
-| ``H_c``              | control horizon                                    |
-| ``\mathbf{ΔU}``      | manipulated input increments over ``H_c``          |
-| ``\mathbf{Ŷ}``       | predicted outputs over ``H_p``                     |
-| ``\mathbf{U}``       | manipulated inputs over ``H_p``                    |
-| ``\mathbf{R̂_y}``     | predicted output setpoints over ``H_p``            |
-| ``\mathbf{R̂_u}``     | predicted manipulated input setpoints over ``H_p`` |
-| ``\mathbf{M}_{H_p}`` | output setpoint tracking weights                   |
-| ``\mathbf{N}_{H_c}`` | manipulated input increment weights                |
-| ``\mathbf{L}_{H_p}`` | manipulated input setpoint tracking weights        |
-| ``C``                | slack variable weight                              |
-| ``ϵ``                | slack variable for constraint softening            |
+| Var.              | Description                                        |
+| :---------------- | :------------------------------------------------- |
+| ``H_p``           | prediction horizon                                 |
+| ``H_c``           | control horizon                                    |
+| ``\mathbf{ΔU}``   | manipulated input increments over ``H_c``          |
+| ``\mathbf{Ŷ}``    | predicted outputs over ``H_p``                     |
+| ``\mathbf{U}``    | manipulated inputs over ``H_p``                    |
+| ``\mathbf{R̂_y}``  | predicted output setpoints over ``H_p``            |
+| ``\mathbf{R̂_u}``  | predicted manipulated input setpoints over ``H_p`` |
+| ``\mathbf{M}``    | output setpoint tracking weights                   |
+| ``\mathbf{N}``    | manipulated input increment weights                |
+| ``\mathbf{L}``    | manipulated input setpoint tracking weights        |
+| ``C``             | slack variable weight                              |
+| ``ϵ``             | slack variable for constraint softening            |
 
 The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{Δu}(k+j) = 
 \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to ``H_c-1``, the ``\mathbf{Ŷ}`` vector, 
