@@ -151,7 +151,7 @@ The controller minimizes the following objective function at each discrete time 
                        + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
                        + C ϵ^2
 ```
-in which the weight matrices are repeated ``H_p`` or ``H_c`` times :
+in which the weight matrices are repeated ``H_p`` or ``H_c`` times:
 ```math
 \begin{aligned}
     \mathbf{M}_{H_p} &= \text{diag}\mathbf{(M,M,...,M)}     \\
@@ -660,7 +660,7 @@ matrices are computed by :
 \begin{aligned}
 \mathbf{E} &= \begin{bmatrix}
 \mathbf{W}_{0}      & \mathbf{0}         & \cdots & \mathbf{0}              \\
-\mathbf{W}_{1}      & \mathbf{0}         & \cdots & \mathbf{0}              \\
+\mathbf{W}_{1}      & \mathbf{W}_{0}     & \cdots & \mathbf{0}              \\
 \vdots              & \vdots             & \ddots & \vdots                  \\
 \mathbf{W}_{H_p-1}  & \mathbf{W}_{H_p-2} & \cdots & \mathbf{W}_{H_p-H_c+1}
 \end{bmatrix}
