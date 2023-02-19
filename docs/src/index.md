@@ -52,6 +52,7 @@ Pages = [
 - ✅ custom predictions for :
   - ✅ output setpoints
   - ✅ measured disturbances
+- ⬜ easy integration with `Plots.jl`
 - ⬜ additional information about the optimum to ease troubleshooting :
   - ✅ optimal input increments over control horizon
   - ✅ slack variable optimum
