@@ -21,7 +21,7 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 ✅ implemented feature  
 ⬜ planned feature
 
-## Model Predictive Control Features
+### Model Predictive Control Features
 
 - ✅ linear and nonlinear plant models exploiting multiple dispatch
 - ⬜ model predictive controllers based on:
