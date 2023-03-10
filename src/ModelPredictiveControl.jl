@@ -3,7 +3,7 @@ module ModelPredictiveControl
 #using JuMP
 using LinearAlgebra
 using ControlSystemsBase
-using OSQP
+using JuMP, OSQP, Ipopt
 using SparseArrays
 
 export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput

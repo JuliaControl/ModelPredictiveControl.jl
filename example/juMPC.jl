@@ -69,7 +69,7 @@ mpc = LinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e6)
 setconstraint!(mpc, c_umin=[0,0], c_umax=[0,0])
 setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
 setconstraint!(mpc, umin=[5, 9.9], umax=[Inf,Inf])
-setconstraint!(mpc, ŷmin=[-Inf,-Inf],ŷmax=[55, 35])
+setconstraint!(mpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
 N = 200
