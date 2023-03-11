@@ -113,7 +113,7 @@ struct LinMPC <: PredictiveController
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
         nvar = size(P̃, 1)
         optmodel = Model(OSQP.MathOptInterfaceOSQP.Optimizer) # default to OSQP solver
-        set_attribute(optmodel, "verbose", false)
+        set_silent(optmodel)
         @variable(optmodel, ΔŨ[1:nvar])
         # dummy q̃ value (the vector is updated just before optimization):
         q̃ = zeros(nvar) 
@@ -124,7 +124,7 @@ struct LinMPC <: PredictiveController
         i_nonInf = .!isinf.(b)
         A = A[i_nonInf, :]
         b = b[i_nonInf]
-        @constraint(optmodel, constraint_lin, A*ΔŨ .≤ b)        
+        @constraint(optmodel, constraint_lin, A*ΔŨ .≤ b)
         optim = OptimData(optmodel, 0, zeros(nvar), ϵ, u, U, ŷ, Ŷ, ŷs, Ŷs)
         return new(
             model, estim, optim,
@@ -576,14 +576,13 @@ function optim_objective!(mpc::LinMPC, b, q̃, p)
     ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
     J = objective_value(mpc.optim.model) + p # optimal objective value by adding constant p
     status = termination_status(mpc.optim.model)
-    if status ≠ MOI.OPTIMAL && status ≠ MOI.LOCALLY_SOLVED
+    if status ≠ OPTIMAL && status ≠ LOCALLY_SOLVED
         @warn "MPC termination status not optimal ($status)"
     end
     # if error, we take last value :
-    if any(status .== [MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE, MOI.LOCALLY_INFEASIBLE, 
-                       MOI.SLOW_PROGRESS, MOI.NUMERICAL_ERROR, 
-                       MOI.INVALID_MODEL, MOI.INVALID_OPTION, MOI.INTERRUPTED,
-                       MOI.OTHER_ERROR])
+    if any(status .== [INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, SLOW_PROGRESS, 
+                       NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
+                       OTHER_ERROR])
         ΔŨ = ΔŨ0
     end
     return ΔŨ, ϵ, J
