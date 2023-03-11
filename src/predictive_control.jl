@@ -577,9 +577,9 @@ function optim_objective!(mpc::LinMPC, b, q̃, p)
     J = objective_value(mpc.optim.model) + p # optimal objective value by adding constant p
     status = termination_status(mpc.optim.model)
     status ≠ OPTIMAL && @warn "MPC termination status not optimal ($status)"
-    # if error, we take last value :
     if any(status .== [INFEASIBLE, DUAL_INFEASIBLE, SLOW_PROGRESS, INVALID_MODEL, 
                        INVALID_OPTION, INTERRUPTED, OTHER_ERROR])
+        # if error, we take last value :
         ΔŨ = ΔŨ0
     end
     return ΔŨ, ϵ, J
