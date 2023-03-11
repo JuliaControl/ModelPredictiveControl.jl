@@ -23,7 +23,6 @@ mutable struct OptimData
     model::JuMP.Model
     J ::Float64
     ΔŨ::Vector{Float64}
-    ΔŨr::Vector{VariableRef}
     ϵ ::Union{Nothing, Float64}
     u ::Vector{Float64}
     U ::Vector{Float64}
@@ -109,32 +108,24 @@ struct LinMPC <: PredictiveController
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         u, U  = copy(model.uop), repeat(model.uop, Hp)
-        ΔŨ = zeros(size(P̃, 1))
         ϵ  = isinf(C) ? nothing : 0.0 # C = Inf means hard constraints only
         ŷ, Ŷ  = copy(model.yop), repeat(model.yop, Hp)
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
-        # default to OSQP solver :
-        optmodel = Model(OSQP.MathOptInterfaceOSQP.Optimizer)
+        nvar = size(P̃, 1)
+        optmodel = Model(OSQP.MathOptInterfaceOSQP.Optimizer) # default to OSQP solver
         set_attribute(optmodel, "verbose", false)
-        @variable(optmodel, ΔŨr[1:length(ΔŨ)])
-
-
+        @variable(optmodel, ΔŨ[1:nvar])
         # dummy q̃ value (the vector is updated just before optimization):
-        q̃ = zeros(length(ΔŨ)) 
-        @objective(optmodel, Min, 0.5*ΔŨr'*P̃*ΔŨr + q̃'*ΔŨr)
-
+        q̃ = zeros(nvar) 
+        @objective(optmodel, Min, obj_quadprog(ΔŨ, P̃, q̃))
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
         # dummy b vector to detect Inf values (b is updated just before optimization):
         b = [-Umin; +Umax; -ΔŨmin; +ΔŨmax; -Ŷmin; +Ŷmax]
         i_nonInf = .!isinf.(b)
         A = A[i_nonInf, :]
         b = b[i_nonInf]
-        @constraint(optmodel, constraint_lin, A*ΔŨr .≤ b)
-
-        
-        
-        #OSQP.setup!(optmodel; P=sparse(P̃), A=sparse(A), u=b, verbose=false)
-        optim = OptimData(optmodel, 0, ΔŨ, ΔŨr, ϵ, u, U, ŷ, Ŷ, ŷs, Ŷs)
+        @constraint(optmodel, constraint_lin, A*ΔŨ .≤ b)        
+        optim = OptimData(optmodel, 0, zeros(nvar), ϵ, u, U, ŷ, Ŷ, ŷs, Ŷs)
         return new(
             model, estim, optim,
             Hp, Hc, 
@@ -170,7 +161,7 @@ in which the weight matrices are repeated ``H_p`` or ``H_c`` times:
     \mathbf{L}_{H_p} &= \text{diag}\mathbf{(L,L,...,L)}     
 \end{aligned}
 ```
-and with the following nomeclature:
+and with the following nomenclature:
 
 | Var.              | Description                                        |
 | :---------------- | :------------------------------------------------- |
@@ -380,29 +371,16 @@ function setconstraint!(
         mpc.A_Ŷmin[:]  = A_Ŷmin  
         mpc.A_Ŷmax[:]  = A_Ŷmax
     end
-    
-    # TODO: CONVERT THIS CODE TO JUMP :
-    #optmodel = OSQP.Model()
-    #A = [mpc.A_Umin; mpc.A_Umax; mpc.A_ΔŨmin; mpc.A_ΔŨmax; mpc.A_Ŷmin; mpc.A_Ŷmax]
-    # dummy b vector to detect Inf values (b is updated just before MPC optimization):
-    #b = [-mpc.Umin; +mpc.Umax; -mpc.ΔŨmin; +mpc.ΔŨmax; -mpc.Ŷmin; +mpc.Ŷmax]
-    #i_nonInf = .!isinf.(b)
-    #A = A[i_nonInf, :]
-    #b = b[i_nonInf]
-    #OSQP.setup!(optmodel; P=sparse(mpc.P̃), A=sparse(A), u=b, verbose=false)
-    #mpc.optim.model = optmodel
-
     A = [mpc.A_Umin; mpc.A_Umax; mpc.A_ΔŨmin; mpc.A_ΔŨmax; mpc.A_Ŷmin; mpc.A_Ŷmax]
     # dummy b vector to detect Inf values (b is updated just before optimization):
     b = [-mpc.Umin; +mpc.Umax; -mpc.ΔŨmin; +mpc.ΔŨmax; -mpc.Ŷmin; +mpc.Ŷmax]
     i_nonInf = .!isinf.(b)
     A = A[i_nonInf, :]
     b = b[i_nonInf]
-
-    ΔŨr = mpc.optim.ΔŨr
+    ΔŨ = mpc.optim.model[:ΔŨ]
     delete(mpc.optim.model, mpc.optim.model[:constraint_lin])
     unregister(mpc.optim.model, :constraint_lin)
-    @constraint(mpc.optim.model, constraint_lin, A*ΔŨr .≤ b)
+    @constraint(mpc.optim.model, constraint_lin, A*ΔŨ .≤ b)
     return mpc
 end
 
@@ -589,13 +567,12 @@ function optim_objective!(mpc::LinMPC, b, q̃, p)
     ΔŨ0 = [lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
-    # @info "ModelPredictiveControl: optimizing MPC objective function..."
-    ΔŨr = mpc.optim.ΔŨr # TODO: delete ΔŨr
-    set_start_value.(ΔŨr, ΔŨ0)
-    set_objective_function(mpc.optim.model, 0.5*ΔŨr'*mpc.P̃*ΔŨr + q̃'*ΔŨr)
+    ΔŨ = mpc.optim.model[:ΔŨ]
+    set_start_value.(ΔŨ, ΔŨ0)
+    set_objective_function(mpc.optim.model, obj_quadprog(ΔŨ, mpc.P̃, q̃))
     set_normalized_rhs.(mpc.optim.model[:constraint_lin], b)
     optimize!(mpc.optim.model)
-    ΔŨ = value.(mpc.optim.ΔŨr)
+    ΔŨ = value.(ΔŨ)
     ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
     J = objective_value(mpc.optim.model) + p # optimal objective value by adding constant p
     status = termination_status(mpc.optim.model)
@@ -884,8 +861,6 @@ function relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
     return A_Ŷmin, A_Ŷmax, Ẽ
 end
 
-
-
 @doc raw"""
     init_quadprog(E, S_Hp, M_Hp, N_Hc, L_Hp)
 
@@ -902,6 +877,8 @@ useless at optimization but required to evaluate the minimal ``J`` value.
 """
 init_quadprog(E, S_Hp, M_Hp, N_Hc, L_Hp) = 2*Symmetric(E'*M_Hp*E + N_Hc + S_Hp'*L_Hp*S_Hp)
 
+"Return the quadratic programming objective function, see [`init_quadprog`](@ref)."
+obj_quadprog(ΔU, P, q) = 1/2*ΔU'*P*ΔU + q'*ΔU
 
 @doc raw"""
     init_stochpred(estim::StateEstimator, Hp)
