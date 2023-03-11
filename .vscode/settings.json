@@ -35,6 +35,7 @@
         "Luenberger",
         "mathrm",
         "moveinput",
+        "optim",
         "OSQP",
         "Penrose",
         "Plamondon",
