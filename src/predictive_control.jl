@@ -112,7 +112,7 @@ struct LinMPC <: PredictiveController
         ŷ, Ŷ  = copy(model.yop), repeat(model.yop, Hp)
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
         nvar = size(P̃, 1)
-        optmodel = Model(OSQP.MathOptInterfaceOSQP.Optimizer) # default to OSQP solver
+        optmodel = Model(OSQP.MathOptInterfaceOSQP.Optimizer, add_bridges=false) # default to OSQP solver
         set_silent(optmodel)
         @variable(optmodel, ΔŨ[1:nvar])
         # dummy q̃ value (the vector is updated just before optimization):
@@ -385,6 +385,7 @@ function setconstraint!(
 end
 
 
+
 @doc raw"""
     moveinput!(
         mpc::PredictiveController, 
@@ -576,9 +577,10 @@ function optim_objective!(mpc::LinMPC, b, q̃, p)
     ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
     J = objective_value(mpc.optim.model) + p # optimal objective value by adding constant p
     status = termination_status(mpc.optim.model)
-    status ≠ OPTIMAL && @warn "MPC termination status not optimal ($status)"
-    if any(status .== [INFEASIBLE, DUAL_INFEASIBLE, SLOW_PROGRESS, INVALID_MODEL, 
-                       INVALID_OPTION, INTERRUPTED, OTHER_ERROR])
+    if !(status == OPTIMAL || status == LOCALLY_SOLVED)
+        @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVER ($status)"
+    end
+    if isfatal(status)
         # if error, we take last value :
         ΔŨ = ΔŨ0
     end
@@ -588,7 +590,7 @@ end
 """
     write_optimdata!(mpc::LinMPC, ΔŨ, ϵ, J, info, ŷs, Ŷs, lastu, F, ym, d)
 
-Write `mpc.optim` with the [`LinMPC`](@ref) optimzation results.
+Write `mpc.optim` with the [`LinMPC`](@ref) optimization results.
 """
 function write_optimdata!(mpc::LinMPC, ΔŨ, ϵ, J, ŷs, Ŷs, lastu, F, ym, d)
     mpc.optim.ΔŨ = ΔŨ
@@ -954,6 +956,16 @@ function validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
     any(Nwt.<0) && error("Nwt weights should be ≥ 0")
     any(Lwt.<0) && error("Lwt weights should be ≥ 0")
     Cwt < 0     && error("Cwt weight should be ≥ 0")
+end
+
+"Verify that the solver termination status means 'no solution available'."
+function isfatal(status::MOI.TerminationStatusCode)
+    fatalstatuses = [
+        INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 
+        SLOW_PROGRESS, NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
+        OTHER_ERROR
+    ]
+    return any(status .== fatalstatuses)
 end
 
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
