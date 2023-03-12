@@ -399,10 +399,10 @@ end
 Compute the optimal manipulated input value `u` for the current control period.
 
 Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the 
-results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm dicards 
+results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm discards 
 the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ``... The 
 arguments `ry` and `d` are current output setpoints ``\mathbf{r_y}(k)`` and measured 
-disturbances ``\mathbf{d}(k)``. The predicted output setpoint `R̂y` and mesured disturbances 
+disturbances ``\mathbf{d}(k)``. The predicted output setpoint `R̂y` and measured disturbances 
 `D̂` are defined as:
 ```math
     \mathbf{R̂_y} = \begin{bmatrix}
@@ -447,8 +447,8 @@ function moveinput!(
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
     F, q̃, p = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
     b = init_constraint(mpc, mpc.model, F, lastu)
-    ΔŨ, ϵ, J = optim_objective!(mpc, b, q̃, p)
-    write_optimdata!(mpc, ΔŨ, ϵ, J, ŷs, Ŷs, lastu, F, ym, d)
+    ΔŨ, J = optim_objective!(mpc, b, q̃, p)
+    write_optimdata!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     Δu = ΔŨ[1:mpc.model.nu] # receding horizon principle: only Δu(k) is used (first one)
     u = lastu + Δu
     return u
@@ -501,7 +501,7 @@ predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ ) = (estim.Cs*x̂s, mpc.Ks*
 """
     predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
 
-Use current measured ouputs `ym` for prediction when `estim` is a [`InternalModel`](@ref).
+Use current measured outputs `ym` for prediction when `estim` is a [`InternalModel`](@ref).
 """
 function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
@@ -563,28 +563,29 @@ end
 Optimize the `mpc` quadratic objective function for [`LinMPC`](@ref) type. 
 """
 function optim_objective!(mpc::LinMPC, b, q̃, p)
-    # initial ΔŨ (warm start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
+    optmodel = mpc.optim.model
+    ΔŨ = optmodel[:ΔŨ]
     lastΔŨ = mpc.optim.ΔŨ
+    set_objective_function(optmodel, obj_quadprog(ΔŨ, mpc.P̃, q̃))
+    set_normalized_rhs.(optmodel[:constraint_lin], b)
+    # initial ΔŨ (warm start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
     ΔŨ0 = [lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
-    ΔŨ = mpc.optim.model[:ΔŨ]
     set_start_value.(ΔŨ, ΔŨ0)
-    set_objective_function(mpc.optim.model, obj_quadprog(ΔŨ, mpc.P̃, q̃))
-    set_normalized_rhs.(mpc.optim.model[:constraint_lin], b)
-    optimize!(mpc.optim.model)
-    ΔŨ = value.(ΔŨ)
-    ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
-    J = objective_value(mpc.optim.model) + p # optimal objective value by adding constant p
-    status = termination_status(mpc.optim.model)
+    optimize!(optmodel)
+    status = termination_status(optmodel)
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
         @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVER ($status)"
+        @debug solution_summary(optmodel)
     end
-    if isfatal(status)
-        # if error, we take last value :
+    if has_values(optmodel)
+        ΔŨ = value.(ΔŨ)
+    else # if error, we take last value :
         ΔŨ = ΔŨ0
     end
-    return ΔŨ, ϵ, J
+    J = objective_value(optmodel) + p # optimal objective value by adding constant p
+    return ΔŨ, J
 end
 
 """
@@ -592,9 +593,9 @@ end
 
 Write `mpc.optim` with the [`LinMPC`](@ref) optimization results.
 """
-function write_optimdata!(mpc::LinMPC, ΔŨ, ϵ, J, ŷs, Ŷs, lastu, F, ym, d)
+function write_optimdata!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     mpc.optim.ΔŨ = ΔŨ
-    mpc.optim.ϵ = ϵ
+    mpc.optim.ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
     mpc.optim.J = J
     mpc.optim.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*lastu
     mpc.optim.u = mpc.optim.U[1:mpc.model.nu]
@@ -956,16 +957,6 @@ function validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
     any(Nwt.<0) && error("Nwt weights should be ≥ 0")
     any(Lwt.<0) && error("Lwt weights should be ≥ 0")
     Cwt < 0     && error("Cwt weight should be ≥ 0")
-end
-
-"Verify that the solver termination status means 'no solution available'."
-function isfatal(status::MOI.TerminationStatusCode)
-    fatalstatuses = [
-        INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 
-        SLOW_PROGRESS, NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
-        OTHER_ERROR
-    ]
-    return any(status .== fatalstatuses)
 end
 
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
