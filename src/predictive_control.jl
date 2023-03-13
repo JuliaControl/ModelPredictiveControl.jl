@@ -196,8 +196,8 @@ arguments.
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector)
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only
 - `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector)
-- `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : the MPC quadratic optimizer, 
-  provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
+- `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
+  the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
 
 # Extended Help
 Manipulated inputs setpoints ``\mathbf{r_u}`` are not common but they can be interesting
