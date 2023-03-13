@@ -53,6 +53,7 @@ Pages = [
   - ✅ output setpoints
   - ✅ measured disturbances
 - ⬜ easy integration with `Plots.jl`
+- ✅ quickly compare multiple optimizers using the `JuMP.jl` interface
 - ⬜ additional information about the optimum to ease troubleshooting:
   - ✅ optimal input increments over control horizon
   - ✅ slack variable optimum

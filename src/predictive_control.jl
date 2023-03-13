@@ -580,7 +580,8 @@ function optim_objective!(mpc::LinMPC, b, q̃, p)
         optimize!(optim)
     catch err
         if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
-            MOIU.reset_optimizer(optim)
+            # reset_optimizer() to unset warm-start, set_start_value.(nothing) seems buggy
+            MOIU.reset_optimizer(optim) 
             optimize!(optim)
         else
             rethrow(err)
