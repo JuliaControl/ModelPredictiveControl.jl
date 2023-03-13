@@ -19,11 +19,10 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController end
 
-mutable struct OptimData
-    model::JuMP.Model
-    J ::Float64
+mutable struct OptimInfo
     ΔŨ::Vector{Float64}
     ϵ ::Union{Nothing, Float64}
+    J ::Float64
     u ::Vector{Float64}
     U ::Vector{Float64}
     ŷ ::Vector{Float64}
@@ -36,7 +35,8 @@ end
 struct LinMPC <: PredictiveController
     model::LinModel
     estim::StateEstimator
-    optim::OptimData
+    optim::JuMP.Model
+    info::OptimInfo
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64}
@@ -76,7 +76,7 @@ struct LinMPC <: PredictiveController
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
-    function LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
+    function LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
         model = estim.model
         nu, ny = model.nu, model.ny
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
@@ -107,27 +107,27 @@ struct LinMPC <: PredictiveController
         P̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
-        u, U  = copy(model.uop), repeat(model.uop, Hp)
-        ϵ  = isinf(C) ? nothing : 0.0 # C = Inf means hard constraints only
-        ŷ, Ŷ  = copy(model.yop), repeat(model.yop, Hp)
-        ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
         nvar = size(P̃, 1)
-        optmodel = Model(OSQP.MathOptInterfaceOSQP.Optimizer, add_bridges=false) # default to OSQP solver
-        set_silent(optmodel)
-        @variable(optmodel, ΔŨ[1:nvar])
+        set_silent(optim)
+        @variable(optim, ΔŨ[1:nvar])
         # dummy q̃ value (the vector is updated just before optimization):
-        q̃ = zeros(nvar) 
-        @objective(optmodel, Min, obj_quadprog(ΔŨ, P̃, q̃))
+        q̃ = zeros(nvar)
+        @objective(optim, Min, obj_quadprog(ΔŨ, P̃, q̃))
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
         # dummy b vector to detect Inf values (b is updated just before optimization):
         b = [-Umin; +Umax; -ΔŨmin; +ΔŨmax; -Ŷmin; +Ŷmax]
         i_nonInf = .!isinf.(b)
         A = A[i_nonInf, :]
         b = b[i_nonInf]
-        @constraint(optmodel, constraint_lin, A*ΔŨ .≤ b)
-        optim = OptimData(optmodel, 0, zeros(nvar), ϵ, u, U, ŷ, Ŷ, ŷs, Ŷs)
+        @constraint(optim, constraint_lin, A*ΔŨ .≤ b)
+        ΔŨ0 = zeros(nvar)
+        ϵ = isinf(C) ? nothing : 0.0 # C = Inf means hard constraints only
+        u, U = copy(model.uop), repeat(model.uop, Hp)
+        ŷ, Ŷ = copy(model.yop), repeat(model.yop, Hp)
+        ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
+        info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
         return new(
-            model, estim, optim,
+            model, estim, optim, info,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, C, R̂u,
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
@@ -195,7 +195,9 @@ arguments.
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector)
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector)
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only
-- `ru=model.uop`: manipulated input setpoints ``\mathbf{r_u}`` (vector)
+- `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector)
+- `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : the MPC quadratic optimizer, 
+  provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
 
 # Extended Help
 Manipulated inputs setpoints ``\mathbf{r_u}`` are not common but they can be interesting
@@ -220,7 +222,8 @@ function LinMPC(
     Nwt = fill(0.1, estim.model.nu),
     Lwt = fill(0.0, estim.model.nu),
     Cwt = 1e5,
-    ru  = estim.model.uop
+    ru  = estim.model.uop,
+    optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
 )
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     poles = eigvals(estim.model.A)
@@ -232,7 +235,7 @@ function LinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*
               "($nk), the closed-loop system may be zero-gain (unresponsive) or unstable")
     end
-    return LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
+    return LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
 end
 
 @doc raw"""
@@ -377,10 +380,10 @@ function setconstraint!(
     i_nonInf = .!isinf.(b)
     A = A[i_nonInf, :]
     b = b[i_nonInf]
-    ΔŨ = mpc.optim.model[:ΔŨ]
-    delete(mpc.optim.model, mpc.optim.model[:constraint_lin])
-    unregister(mpc.optim.model, :constraint_lin)
-    @constraint(mpc.optim.model, constraint_lin, A*ΔŨ .≤ b)
+    ΔŨ = mpc.optim[:ΔŨ]
+    delete(mpc.optim, mpc.optim[:constraint_lin])
+    unregister(mpc.optim, :constraint_lin)
+    @constraint(mpc.optim, constraint_lin, A*ΔŨ .≤ b)
     return mpc
 end
 
@@ -442,13 +445,13 @@ function moveinput!(
     D̂ ::Vector{<:Real} = repeat(d,  mpc.Hp),
     ym::Union{Vector{<:Real}, Nothing} = nothing
 )
-    lastu = mpc.optim.u
+    lastu = mpc.info.u
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
     F, q̃, p = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
     b = init_constraint(mpc, mpc.model, F, lastu)
     ΔŨ, J = optim_objective!(mpc, b, q̃, p)
-    write_optimdata!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
+    write_info!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     Δu = ΔŨ[1:mpc.model.nu] # receding horizon principle: only Δu(k) is used (first one)
     u = lastu + Δu
     return u
@@ -458,11 +461,11 @@ end
 """
     initstate!(mpc::PredictiveController, u, ym, d=Float64[])
 
-Init `mpc.optim` and the states of `mpc.estim` [`StateEstimator`](@ref).
+Init `mpc.info` and the states of `mpc.estim` [`StateEstimator`](@ref).
 """
 function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
-    mpc.optim.u = u
-    mpc.optim.ΔŨ .= 0
+    mpc.info.u = u
+    mpc.info.ΔŨ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
 
@@ -563,41 +566,50 @@ end
 Optimize the `mpc` quadratic objective function for [`LinMPC`](@ref) type. 
 """
 function optim_objective!(mpc::LinMPC, b, q̃, p)
-    optmodel = mpc.optim.model
-    ΔŨ = optmodel[:ΔŨ]
-    lastΔŨ = mpc.optim.ΔŨ
-    set_objective_function(optmodel, obj_quadprog(ΔŨ, mpc.P̃, q̃))
-    set_normalized_rhs.(optmodel[:constraint_lin], b)
-    # initial ΔŨ (warm start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
+    optim = mpc.optim
+    ΔŨ = optim[:ΔŨ]
+    lastΔŨ = mpc.info.ΔŨ
+    set_objective_function(optim, obj_quadprog(ΔŨ, mpc.P̃, q̃))
+    set_normalized_rhs.(optim[:constraint_lin], b)
+    # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
     ΔŨ0 = [lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
-    #set_start_value.(ΔŨ, ΔŨ0)
-    optimize!(optmodel)
-    status = termination_status(optmodel)
+    set_start_value.(ΔŨ, ΔŨ0)
+    try
+        optimize!(optim)
+    catch err
+        if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
+            MOIU.reset_optimizer(optim)
+            optimize!(optim)
+        else
+            rethrow(err)
+        end
+    end
+    status = termination_status(optim)
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
         @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVED ($status)"
-        @debug solution_summary(optmodel)
+        @debug solution_summary(optim)
     end
     ΔŨ = isfatal(status) ? ΔŨ0 : value.(ΔŨ) # fatal status : use last value
-    J = objective_value(optmodel) + p # optimal objective value by adding constant p
+    J = objective_value(optim) + p # optimal objective value by adding constant p
     return ΔŨ, J
 end
 
 """
-    write_optimdata!(mpc::LinMPC, ΔŨ, ϵ, J, info, ŷs, Ŷs, lastu, F, ym, d)
+    write_info!(mpc::LinMPC, ΔŨ, ϵ, J, info, ŷs, Ŷs, lastu, F, ym, d)
 
-Write `mpc.optim` with the [`LinMPC`](@ref) optimization results.
+Write `mpc.info` with the [`LinMPC`](@ref) optimization results.
 """
-function write_optimdata!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
-    mpc.optim.ΔŨ = ΔŨ
-    mpc.optim.ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
-    mpc.optim.J = J
-    mpc.optim.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*lastu
-    mpc.optim.u = mpc.optim.U[1:mpc.model.nu]
-    mpc.optim.ŷ = isa(mpc.estim, InternalModel) ? mpc.estim(ym, d) : mpc.estim(d)
-    mpc.optim.Ŷ = mpc.Ẽ*ΔŨ + F
-    mpc.optim.ŷs, mpc.optim.Ŷs = ŷs, Ŷs
+function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
+    mpc.info.ΔŨ = ΔŨ
+    mpc.info.ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
+    mpc.info.J = J
+    mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*lastu
+    mpc.info.u = mpc.info.U[1:mpc.model.nu]
+    mpc.info.ŷ = isa(mpc.estim, InternalModel) ? mpc.estim(ym, d) : mpc.estim(d)
+    mpc.info.Ŷ = mpc.Ẽ*ΔŨ + F
+    mpc.info.ŷs, mpc.info.Ŷs = ŷs, Ŷs
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
