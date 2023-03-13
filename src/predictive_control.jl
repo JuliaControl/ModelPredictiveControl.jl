@@ -572,18 +572,14 @@ function optim_objective!(mpc::LinMPC, b, q̃, p)
     ΔŨ0 = [lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
-    set_start_value.(ΔŨ, ΔŨ0)
+    #set_start_value.(ΔŨ, ΔŨ0)
     optimize!(optmodel)
     status = termination_status(optmodel)
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
-        @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVER ($status)"
+        @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVED ($status)"
         @debug solution_summary(optmodel)
     end
-    if has_values(optmodel)
-        ΔŨ = value.(ΔŨ)
-    else # if error, we take last value :
-        ΔŨ = ΔŨ0
-    end
+    ΔŨ = isfatal(status) ? ΔŨ0 : value.(ΔŨ) # fatal status : use last value
     J = objective_value(optmodel) + p # optimal objective value by adding constant p
     return ΔŨ, J
 end
@@ -971,6 +967,16 @@ function Base.show(io::IO, mpc::PredictiveController)
     println(io, " $(mpc.estim.nym) measured outputs ym")
     println(io, " $(mpc.estim.nyu) unmeasured outputs yu")
     print(io,   " $(mpc.estim.model.nd) measured disturbances d")
+end
+
+"Verify that the solver termination status means 'no solution available'."
+function isfatal(status::TerminationStatusCode)
+    fatalstatuses = [
+        INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 
+        SLOW_PROGRESS, NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
+        OTHER_ERROR
+    ]
+    return any(status .== fatalstatuses)
 end
 
 
