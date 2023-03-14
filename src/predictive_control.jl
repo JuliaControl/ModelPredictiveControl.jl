@@ -457,6 +457,12 @@ function moveinput!(
     return u
 end
 
+"""
+    setstate!(mpc::PredictiveController, x̂)
+
+Set the estimate at `mpc.estim.x̂`.
+"""
+setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
 
 """
     initstate!(mpc::PredictiveController, u, ym, d=Float64[])
