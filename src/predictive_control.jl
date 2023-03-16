@@ -200,6 +200,19 @@ arguments.
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
   (default to [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html) optimizer)
 
+# Examples
+```jldoctest
+julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
+
+julia> mpc = LinMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
+LinMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimator and:
+ 1 manipulated inputs u
+ 4 states x̂
+ 2 measured outputs ym
+ 0 unmeasured outputs yu
+ 0 measured disturbances d
+```
+
 # Extended Help
 Manipulated inputs setpoints ``\mathbf{r_u}`` are not common but they can be interesting
 for over-actuated systems, when `nu > ny` (e.g. prioritize solutions with lower economical 
@@ -214,6 +227,19 @@ LinMPC(model::LinModel; kwargs...) = LinMPC(SteadyKalmanFilter(model); kwargs...
 Use custom state estimator `estim` to construct `LinMPC`.
 
 `estim.model` must be a [`LinModel`](@ref). Else, a `NonLinMPC` is required. 
+
+# Examples
+```jldoctest
+julia> estim = KalmanFilter(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4), i_ym=[2]);
+
+julia> mpc = LinMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
+LinMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
+ 1 manipulated inputs u
+ 3 states x̂
+ 1 measured outputs ym
+ 1 unmeasured outputs yu
+ 0 measured disturbances d
+```
 """
 function LinMPC(
     estim::StateEstimator;
@@ -980,7 +1006,7 @@ repeatdiag(A, n::Int) = kron(I(n), A)
 
 
 function Base.show(io::IO, mpc::PredictiveController)
-    println(io, "$(typeof(mpc)) predictive controller with a sample time "*
+    println(io, "$(typeof(mpc)) controller with a sample time "*
                 "Ts = $(mpc.model.Ts) s, $(typeof(mpc.estim)) estimator and:")
     println(io, " $(mpc.model.nu) manipulated inputs u")
     println(io, " $(mpc.estim.nx̂) states x̂")

@@ -96,7 +96,7 @@ ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
 julia> estim = SteadyKalmanFilter(model, i_ym=[2], σR=[1], σQ_int=[0.01])
-SteadyKalmanFilter state estimator with a sample time Ts = 0.5 s and:
+SteadyKalmanFilter estimator with a sample time Ts = 0.5 s and:
  1 manipulated inputs u
  3 states x̂
  1 measured outputs ym
@@ -234,7 +234,7 @@ The process model is identical to [`SteadyKalmanFilter`](@ref).
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
 julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP0=[100, 100], σQ_int=[0.01])
-KalmanFilter state estimator with a sample time Ts = 0.5 s and:
+KalmanFilter estimator with a sample time Ts = 0.5 s and:
  1 manipulated inputs u
  3 states x̂
  1 measured outputs ym

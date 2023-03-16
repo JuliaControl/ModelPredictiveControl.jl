@@ -62,7 +62,7 @@ sum both values : ``\mathbf{ŷ = ŷ_d + ŷ_s}``.
 # Examples
 ```jldoctest
 julia> estim = InternalModel(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5), i_ym=[2])
-InternalModel state estimator with a sample time Ts = 0.5 s and:
+InternalModel estimator with a sample time Ts = 0.5 s and:
  1 manipulated inputs u
  2 states x̂
  1 measured outputs ym

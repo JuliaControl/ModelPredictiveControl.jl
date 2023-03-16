@@ -34,7 +34,7 @@ end
 
 
 function Base.show(io::IO, estim::StateEstimator)
-    println(io, "$(typeof(estim)) state estimator with "*
+    println(io, "$(typeof(estim)) estimator with "*
                 "a sample time Ts = $(estim.model.Ts) s and:")
     println(io, " $(estim.model.nu) manipulated inputs u")
     println(io, " $(estim.nx̂) states x̂")
@@ -214,7 +214,7 @@ end
 @doc raw"""
     evaloutput(estim::StateEstimator, d=Float64[])
 
-Evaluate `StateEstimator` outputs `̂ŷ` from `estim.x̂` states and disturbances `d`.
+Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂` states and disturbances `d`.
 
 Calling a [`StateEstimator`](@ref) object calls this `evaloutput` method.
 
