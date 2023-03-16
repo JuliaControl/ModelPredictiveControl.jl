@@ -198,6 +198,7 @@ arguments.
 - `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector)
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
+  (default to [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html) optimizer)
 
 # Extended Help
 Manipulated inputs setpoints ``\mathbf{r_u}`` are not common but they can be interesting
