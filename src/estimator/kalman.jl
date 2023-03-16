@@ -297,9 +297,9 @@ The method implement the time-varying Kalman Filter in its predictor (observer) 
 ```
 based on the process model described in [`SteadyKalmanFilter`](@ref). The notation 
 ``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` estimated at the last 
-control period ``k-1``. See [^2] for details.
+control period ``k-1``. See [^3] for details.
 
-[^2]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
+[^3]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
      Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
 """
 function updatestate_kf!(estim::KalmanFilter, u, ym, d)
