@@ -935,9 +935,9 @@ Init the stochastic prediction matrices for [`InternalModel`](@ref).
 ```
 Current stochastic outputs ``\mathbf{ŷ_s}(k)`` comprises the measured outputs 
 ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` and unmeasured 
-``\mathbf{ŷ_s^u(k) = 0}``. See [^1].
+``\mathbf{ŷ_s^u(k) = 0}``. See [^2].
 
-[^1]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
+[^2]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
     control structure for decoupling setpoint tracking, feedforward compensation and 
     disturbance rejection dynamics", *IEE Proceedings - Control Theory and Applications*, 
     vol. 147, no 4, https://doi.org/10.1049/ip-cta:20000443, p. 465–475, ISSN 1350-2379.
