@@ -53,7 +53,9 @@ using Pkg; Pkg.add("ModelPredictiveControl")
   - ✅ output setpoints
   - ✅ measured disturbances
 - ⬜ easy integration with `Plots.jl`
-- ✅ quickly compare multiple optimizers using the `JuMP.jl` interface
+- ✅ optimzation based on `JuMP.jl`:
+  - ✅ quickly compare multiple optimizers
+  - ✅ nonlinear solvers relying on automatic differentiation (exact derivative)
 - ⬜ additional information about the optimum to ease troubleshooting:
   - ✅ optimal input increments over control horizon
   - ✅ slack variable optimum
