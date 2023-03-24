@@ -50,6 +50,12 @@ SteadyKalmanFilter
 KalmanFilter
 ```
 
+## UnscentedKalmanFilter
+
+```@docs
+UnscentedKalmanFilter
+```
+
 ## InternalModel
 
 ```@docs

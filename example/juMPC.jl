@@ -60,7 +60,10 @@ updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 
 initstate!(ssKalmanFilter1,[0,0],[2,1])
 
+uscKalmanFilter1 = UnscentedKalmanFilter(linModel1)
+updatestate!(uscKalmanFilter1,[0,0],[2,1])
 
+#=
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
@@ -126,3 +129,5 @@ pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(pd)
 display(pu)
 display(py)
+
+=#

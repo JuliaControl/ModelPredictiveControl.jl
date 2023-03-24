@@ -58,7 +58,7 @@ const IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
 @doc raw"""
     LinModel(sys::StateSpace[, Ts]; i_u=1:size(sys,2), i_d=Int[])
 
-Construct a `LinModel` from state-space model `sys` with sampling time `Ts` in second.
+Construct a linear model from state-space model `sys` with sampling time `Ts` in second.
 
 `Ts` can be omitted when `sys` is discrete-time. Its state-space matrices are:
 ```math
@@ -225,7 +225,7 @@ end
 @doc raw"""
     NonLinModel(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
 
-Construct a `NonLinModel` from discrete-time state-space functions `f` and `h`.
+Construct a nonlinear model from discrete-time state-space functions `f` and `h`.
 
 The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined as :
 ```math

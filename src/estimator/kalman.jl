@@ -57,9 +57,9 @@ end
 @doc raw"""
     SteadyKalmanFilter(model::LinModel; <keyword arguments>)
 
-Construct a `SteadyKalmanFilter` (asymptotic) based on the [`LinModel`](@ref) `model`.
+Construct a steady-state Kalman Filter based on the [`LinModel`](@ref) `model`.
 
-The steady-state Kalman filter is based on the process model :
+The steady-state (or asymptotic) Kalman filter is based on the process model :
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &= 
@@ -217,7 +217,7 @@ end
 @doc raw"""
     KalmanFilter(model::LinModel; <keyword arguments>)
 
-Construct a time-varying `KalmanFilter` based on the [`LinModel`](@ref) `model`.
+Construct a time-varying Kalman Filter based on the [`LinModel`](@ref) `model`.
 
 The process model is identical to [`SteadyKalmanFilter`](@ref).
 
@@ -227,7 +227,7 @@ The process model is identical to [`SteadyKalmanFilter`](@ref).
     ``\mathbf{P}(0)``, specified as a standard deviation vector.
 - `σP0_int=fill(10,sum(nint_ym))` : same than `σP0` but for the stochastic model
     covariance ``\mathbf{P_{int}}(0)`` (composed of output integrators).
-- `<keyword arguments>` of [`SteadyKalmanFilter`](@ref)
+- `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
 ```jldoctest
@@ -342,7 +342,11 @@ struct UnscentedKalmanFilter <: StateEstimator
     P̂0::Union{Diagonal{Float64}, Matrix{Float64}}
     Q̂::Union{Diagonal{Float64}, Matrix{Float64}}
     R̂::Union{Diagonal{Float64}, Matrix{Float64}}
-    function UnscentedKalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0 ,Q̂, R̂)
+    nσ::Int 
+    γ::Float64
+    m̂::Vector{Float64}
+    Ŝ::Diagonal{Float64}
+    function UnscentedKalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂, α, β, κ)
         nx, ny = model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
         nxs = size(Asm,1)
@@ -350,22 +354,141 @@ struct UnscentedKalmanFilter <: StateEstimator
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         f̂, ĥ = augment_model(model, As, Cs)
-        Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
+        nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         x̂ = [copy(model.x); zeros(nxs)]
         P̂ = P̂0
         return new(
-            model, 
-            x̂,
+            model,
+            x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs, nint_ym,
-            Â, B̂u, B̂d, Ĉ, D̂d, 
-            Ĉm, D̂dm,
             f̂, ĥ,
-            Q̂, R̂,
-            K
+            P̂0, Q̂, R̂,
+            nσ, γ, m̂, Ŝ
         )
     end
 end
+
+@doc raw"""
+    UnscentedKalmanFilter(model::SimModel; <keyword arguments>)
+
+Construct an unscented Kalman Filter based on the [`SimModel`](@ref) `model`.
+
+Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The unscented Kalman filter
+is based on the process model :
+```math
+\begin{aligned}
+    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) 
+                        + \mathbf{w}(k)                                                   \\
+    \mathbf{y^m}(k) &= \mathbf{ĥ^m}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) + \mathbf{v}(k) \\
+    \mathbf{y^u}(k) &= \mathbf{ĥ^u}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big)                 \\
+\end{aligned}
+```
+See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)`` noises and 
+``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The function ``\mathbf{f̂, ĥ}`` are `model` 
+state-space functions augmented with the stochastic model, which is specified by the numbers
+of output integrator `nint_ym` (see [`SteadyKalmanFilter`](@ref) for details). The 
+``\mathbf{ĥ^m}`` function represent the measured outputs of ``\mathbf{ĥ}`` (and unmeasured 
+ones, for ``\mathbf{ĥ^u}``) 
+
+# Arguments
+- `model::SimModel` : (deterministic) model for the estimations.
+- `α=1e-3` : alpha parameter, spread of the state distribution (``0 ≤ α ≤ 1``)
+- `β=2` : beta parameter, skewness and kurtosis of the states distribution (``β ≥ 0``)
+- `κ=0` : kappa parameter, another spread parameter (``0 ≤ κ ≤ 3``)
+- `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
+
+# Examples
+```jldoctest
+julia> a = 1;
+
+```
+"""
+function UnscentedKalmanFilter(
+    model::SimModel;
+    i_ym::IntRangeOrVector = 1:model.ny,
+    σP0::Vector{<:Real} = fill(10, model.nx),
+    σQ::Vector{<:Real} = fill(0.1, model.nx),
+    σR::Vector{<:Real} = fill(0.1, length(i_ym)),
+    nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
+    σP0_int::Vector{<:Real} = fill(10, max(sum(nint_ym), 0)),
+    σQ_int::Vector{<:Real} = fill(0.1, max(sum(nint_ym), 0)),
+    α::Real = 1e-3,
+    β::Real = 2,
+    κ::Real = 0
+    )
+    if nint_ym == 0 # alias for no output integrator at all :
+        nint_ym = fill(0, length(i_ym));
+    end
+    Asm, Csm = init_estimstoch(i_ym, nint_ym)
+    # estimated covariances matrices (variance = σ²) :
+    P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
+    Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
+    R̂  = Diagonal{Float64}(σR.^2);
+    return UnscentedKalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂, α, β, κ)
+end
+
+"Pre-compute the constant parameters of the unscented Kalman Filter"
+function init_ukf(nx̂, α, β, κ)
+    nσ  = 2*nx̂ + 1                              # number of sigma points
+    γ   = α*√(nx̂+κ)                             # constant factor of standard deviation √P
+    m̂_0 = 1-nx̂/α^2/(nx̂+κ)
+    Ŝ_0 = m̂_0 + 1 - α^2 + β
+    w = 1/2/α^2/(nx̂+κ)
+    m̂ = [m̂_0; fill(w, 2*nx̂)]                    # weights for means
+    Ŝ = Diagonal{Float64}([Ŝ_0; fill(w, 2*nx̂)]) # weights for covariances
+    return nσ, γ, m̂, Ŝ
+end
+  
+
+@doc raw"""
+    updatestate!(estim::UnscentedKalmanFilter, u, ym, d=Float64[])
+
+Same than `KalmanFilter` but using the unscented estimator.
+
+See [`updatestate_ukf!`](@ref) for the implementation details.
+"""
+function updatestate!(estim::UnscentedKalmanFilter, u, ym, d=Float64[])
+    u, d, ym = remove_op(estim, u, d, ym) 
+    updatestate_ukf!(estim, u, ym, d)
+    return estim.x̂
+end
+
+@doc raw"""
+    updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
+
+TBW
+"""
+function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
+    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
+    nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
+    γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
+    # === correction step ===
+    sqrt_P̂ = P̂#chol(P̂, "lower")
+    X̂ = repeat(x̂, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂ -γ*sqrt_P̂]
+    Ŷm = zeros(nym, nσ)
+    for i in axes(Ŷm, 2)
+        Ŷm[:,i] = estim.ĥ(X̂[:,i], d)[estim.i_ym]
+    end
+    ŷm = Ŷm*m̂
+    X̄ = X̂ .- x̂
+    Ȳm = Ŷm .- ŷm
+    P̂_yy = Ȳm*Ŝ*Ȳm' + R̂
+    K = X̄*Ŝ*Ȳm'/P̂_yy
+    x̂_cor = x̂ + K*(ym-ŷm);
+    P̂_cor = P̂ - K*P̂_yy*K';
+    # === prediction step ===
+    sqrt_P̂_cor = P̂_cor#chol(P̂_cor, "lower")
+    X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂_cor -γ*sqrt_P̂_cor]
+    X̂_next = zeros(nx̂, nσ)
+    for i in axes(X̂_next, 2)
+        X̂_next[:,i] = estim.f̂(X̂_cor[:,i], u, d)
+    end
+    x̂[:] = X̂_next*m̂
+    X̄_next = X̂_next .- x̂
+    P̂[:] = X̄_next*Ŝ*X̄_next' + Q̂
+end
+
 
 """
     validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)

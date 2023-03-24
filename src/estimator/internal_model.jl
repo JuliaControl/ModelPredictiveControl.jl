@@ -46,7 +46,7 @@ end
 @doc raw"""
     InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(1,1,1,1,model.Ts).*I)
 
-Construct an `InternalModel` estimator based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
+Construct an internal model estimator based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
 
 `i_ym` provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are 
 unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions 
