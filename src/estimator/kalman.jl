@@ -385,17 +385,18 @@ is based on the process model :
 \end{aligned}
 ```
 See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)`` noises and 
-``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The function ``\mathbf{f̂, ĥ}`` are `model` 
+``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The functions ``\mathbf{f̂, ĥ}`` are `model` 
 state-space functions augmented with the stochastic model, which is specified by the numbers
 of output integrator `nint_ym` (see [`SteadyKalmanFilter`](@ref) for details). The 
-``\mathbf{ĥ^m}`` function represent the measured outputs of ``\mathbf{ĥ}`` (and unmeasured 
-ones, for ``\mathbf{ĥ^u}``) 
+``\mathbf{ĥ^m}`` function represents the measured outputs of ``\mathbf{ĥ}`` function (and 
+unmeasured ones, for ``\mathbf{ĥ^u}``) 
 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
 - `α=1e-3` : alpha parameter, spread of the state distribution (``0 ≤ α ≤ 1``)
 - `β=2` : beta parameter, skewness and kurtosis of the states distribution (``β ≥ 0``)
 - `κ=0` : kappa parameter, another spread parameter (``0 ≤ κ ≤ 3``)
+- `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 - `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
 
 # Examples
