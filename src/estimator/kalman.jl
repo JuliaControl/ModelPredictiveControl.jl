@@ -285,12 +285,12 @@ Update [`KalmanFilter`](@ref) state `estim.x̂` and estimation error covariance 
 The method implement the time-varying Kalman Filter in its predictor (observer) form :
 ```math
 \begin{aligned}
-    \mathbf{M}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^{m}{}'}
-                           [\mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m + R̂}]^{-1} \\
-    \mathbf{K}(k)       &= \mathbf{Â M(k)} \\
-    \mathbf{ŷ^m}(k)     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k) \\
+    \mathbf{M}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^m}'
+                           [\mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m + R̂}]^{-1}                 \\
+    \mathbf{K}(k)       &= \mathbf{Â M(k)}                                                \\
+    \mathbf{ŷ^m}(k)     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k)                  \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
-                           + \mathbf{K}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)] \\
+                           + \mathbf{K}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
     \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k) - 
                            \mathbf{M}(k)\mathbf{Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}' + \mathbf{Q̂}
 \end{aligned}
@@ -426,7 +426,21 @@ function UnscentedKalmanFilter(
     return UnscentedKalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂, α, β, κ)
 end
 
-"Compute the unscented Kalman Filter constants, see ['updatestate_ukf!'](@ref)."
+@doc raw"""
+    init_ukf(nx̂, α, β, κ)
+
+Compute the unscented Kalman Filter constants, see ['updatestate_ukf!'](@ref).
+
+```math
+\begin{aligned}
+    \mathbf{m̂} &= \begin{bmatrix} \end{bmatrix} \\
+    \mathbf{Ŝ} &= \mathrm{diag}[]
+\end{aligned}
+```
+
+the weights for the
+    mean ``\mathbf{m̂}`` and covariance ``\mathbf{Ŝ}`` calculations.
+"""
 function init_ukf(nx̂, α, β, κ)
     nσ = 2nx̂ + 1                                  # number of sigma points
     γ = α * √(nx̂ + κ)                             # constant factor of standard deviation √P
@@ -468,40 +482,33 @@ With ``n_\mathbf{x̂}`` states  ``n_σ = 2 n_\mathbf{x̂} + 1`` sigma points, th
         \begin{bmatrix} 1-\frac{n_\mathbf{x̂}}{α²}\end{bmatrix}
 \end{aligned}
 ```
-With the null column vector ``\mathbf{0}``, the estimator updates the state ``\mathbf{x̂}``
+With ``\mathbf{0}``, a null column vector, the estimator updates the state ``\mathbf{x̂}``
 and covariance ``\mathbf{P̂}`` with:
 ```math
 \begin{aligned}
-    \mathbf{X̂}_{k-1}(k)   &= \bigg[\begin{matrix} \mathbf{x̂}_{k-1}(k) & \mathbf{x̂}_{k-1}(k) & \cdots & \mathbf{x̂}_{k-1}(k)  \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & γ \sqrt{\mathbf{P̂}_{k-1}(k)} & -γ \sqrt{\mathbf{P̂}_{k-1}(k)} \end{matrix}\bigg] \\
-    \mathbf{Ŷ^m}_{k-1}(k) &= \bigg[\begin{matrix} \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{1}(k) \Big) & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{2}(k) \Big) & \cdots & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{n_σ}(k) \Big) \end{matrix}\bigg] \\
-    \mathbf{ŷ^m}_{k-1}(k) &= \mathbf{Ŷ^m}_{k-1}(k)\mathbf{m̂} \\
-    \mathbf{X̄}_{k-1}(k)   &= \begin{bmatrix} \mathbf{X̂}_{k-1}^{1}(k) - \mathbf{x̂}_{k-1}(k) &\: \mathbf{X̂}_{k-1}^{2}(k) - \mathbf{x̂}_{k-1}(k) &\: \cdots &\; \mathbf{X̂}_{k-1}^{n_σ}(k) - \mathbf{x̂}_{k-1}(k) \end{bmatrix} \\
-	\mathbf{Ȳ^m}_{k-1}(k) &= \begin{bmatrix} \mathbf{Ŷ^m}_{k-1}^{1}(k) - \mathbf{ŷ^m}_{k-1}(k) &\: \mathbf{Ŷ^m}_{k-1}^{2}(k) - \mathbf{ŷ^m}_{k-1}(k) &\: \cdots &\; \mathbf{Ŷ^m}_{k-1}^{n_σ}(k) - \mathbf{ŷ^m}_{k-1}(k) \end{bmatrix} \\
-    \mathbf{K}(k)         &= \mathbf{X̄}_{k-1}(k)\mathbf{Ŝ} \mathbf{Ȳ}_{k-1}'(k) \big[ \mathbf{Ȳ}_{k-1}(k)\mathbf{Ŝ} \mathbf{Ȳ}_{k-1}'(k) + \mathbf{R̂} \big]^{-1} \\
-    \mathbf{x̂}_k(k)       &= \mathbf{x̂}_{k-1}(k) + \mathbf{K}(k) \big[ \mathbf{y^m}(k) - \mathbf{ŷ^m}_{k-1}(k) \big] \\
-    \mathbf{P̂}_k(k)       &= \mathbf{P̂}_{k-1}(k) - \mathbf{K}(k) \big[ \mathbf{Ȳ}_{k-1}(k)\mathbf{Ŝ} \mathbf{Ȳ}_{k-1}'(k) + \mathbf{R̂} \big] \mathbf{K}'(k) \\
-    \mathbf{X̂}_k(k)       &= \bigg[\begin{matrix} \mathbf{x̂}_{k}(k) & \mathbf{x̂}_{k}(k) & \cdots & \mathbf{x̂}_{k}(k) \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & \gamma \sqrt{\mathbf{P̂}_{k}(k)} & - \gamma \sqrt{\mathbf{P̂}_{k}(k)} \end{matrix}\bigg] \\
-	\mathbf{X̂}_{k}(k+1)   &= \bigg[\begin{matrix} \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{1}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{2}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \cdots & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{n_σ}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \end{matrix}\bigg] \\
-    \mathbf{x̂}_{k}(k+1)   &= \mathbf{X̂}_{k}(k+1)\mathbf{m̂} \\
-    \mathbf{X̄}_k(k+1)     &= \begin{bmatrix} \mathbf{X̂}_{k}^{1}(k+1) - \mathbf{x̂}_{k}(k+1) &\: \mathbf{X̂}_{k}^{2}(k+1) - \mathbf{x̂}_{k}(k+1) &\: \cdots &\: \mathbf{X̂}_{k}^{n_σ}(k+1) - \mathbf{x̂}_{k}(k+1) \end{bmatrix} \\
-	\mathbf{P̂}_k(k+1)     &= \mathbf{X̄}_k(k+1) \mathbf{Ŝ} \mathbf{X̄}_k'(k+1) + \mathbf{Q̂}
+    \mathbf{X̂}_{k-1}(k) &= \bigg[\begin{matrix} \mathbf{x̂}_{k-1}(k) & \mathbf{x̂}_{k-1}(k) & \cdots & \mathbf{x̂}_{k-1}(k)  \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & γ \sqrt{\mathbf{P̂}_{k-1}(k)} & -γ \sqrt{\mathbf{P̂}_{k-1}(k)} \end{matrix}\bigg] \\
+    \mathbf{Ŷ^m}(k)     &= \bigg[\begin{matrix} \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{1}(k) \Big) & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{2}(k) \Big) & \cdots & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{n_σ}(k) \Big) \end{matrix}\bigg] \\
+    \mathbf{ŷ^m}(k)     &= \mathbf{Ŷ^m}(k)\mathbf{m̂} \\
+    \mathbf{X̄}_{k-1}(k) &= \begin{bmatrix} \mathbf{X̂}_{k-1}^{1}(k) - \mathbf{x̂}_{k-1}(k) & \mathbf{X̂}_{k-1}^{2}(k) - \mathbf{x̂}_{k-1}(k) & \cdots & \mathbf{X̂}_{k-1}^{n_σ}(k) - \mathbf{x̂}_{k-1}(k) \end{bmatrix} \\
+    \mathbf{Ȳ^m}(k)     &= \begin{bmatrix} \mathbf{Ŷ^m}^{1}(k)     - \mathbf{ŷ^m}(k)     & \mathbf{Ŷ^m}^{2}(k)     - \mathbf{ŷ^m}(k)     & \cdots & \mathbf{Ŷ^m}^{n_σ}(k)     - \mathbf{ŷ^m}(k)     \end{bmatrix} \\
+    \mathbf{M}(k)       &= \mathbf{Ȳ^m}(k)\mathbf{Ŝ} \mathbf{Ȳ^m}'(k) + \mathbf{R̂} \\
+    \mathbf{K}(k)       &= \mathbf{X̄}_{k-1}(k)\mathbf{Ŝ} \mathbf{Ȳ^m}'(k) \mathbf{M}^{-1}(k) \\
+    \mathbf{x̂}_k(k)     &= \mathbf{x̂}_{k-1}(k) + \mathbf{K}(k) \big[ \mathbf{y^m}(k) - \mathbf{ŷ^m}(k) \big] \\
+    \mathbf{P̂}_k(k)     &= \mathbf{P̂}_{k-1}(k) - \mathbf{K}(k) \mathbf{M}(k) \mathbf{K}'(k) \\
+    \mathbf{X̂}_k(k)     &= \bigg[\begin{matrix} \mathbf{x̂}_{k}(k) & \mathbf{x̂}_{k}(k) & \cdots & \mathbf{x̂}_{k}(k) \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & \gamma \sqrt{\mathbf{P̂}_{k}(k)} & - \gamma \sqrt{\mathbf{P̂}_{k}(k)} \end{matrix}\bigg] \\
+    \mathbf{X̂}_{k}(k+1) &= \bigg[\begin{matrix} \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{1}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{2}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \cdots & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{n_σ}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \end{matrix}\bigg] \\
+    \mathbf{x̂}_{k}(k+1) &= \mathbf{X̂}_{k}(k+1)\mathbf{m̂} \\
+    \mathbf{X̄}_k(k+1)   &= \begin{bmatrix} \mathbf{X̂}_{k}^{1}(k+1) - \mathbf{x̂}_{k}(k+1) & \mathbf{X̂}_{k}^{2}(k+1) - \mathbf{x̂}_{k}(k+1) & \cdots &\, \mathbf{X̂}_{k}^{n_σ}(k+1) - \mathbf{x̂}_{k}(k+1) \end{bmatrix} \\
+    \mathbf{P̂}_k(k+1)   &= \mathbf{X̄}_k(k+1) \mathbf{Ŝ} \mathbf{X̄}_k'(k+1) + \mathbf{Q̂}
 \end{aligned} 
 ```
-
-
-#TODO: remplacer des matrix avec des bmatrix, enlever des espacements latex inutile, corriger le problème avec m en exposant et indices k-1 trop séparé
-
-``\mathbf{P̂, Q̂, R̂}`` are the covariance estimates of the estimation error, process noise and
-sensor noise, respectively. 
-
-The notations ``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` 
-estimated at the last control period ``k-1``, and ``\mathbf{X̂}_{k-1}^j(k)``, the ``j``th 
-column of ``\mathbf{X̂}_{k-1}(k)``.
-
-
-See [^4] for details.
-
-
+by using the lower triangular factor of [`cholesky`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.cholesky)
+to compute ``\sqrt{\mathbf{P̂}_{k-1}(k)}`` and ``\sqrt{\mathbf{P̂}_{k}(k)}``. The notations 
+``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` estimated at the last
+control period ``k-1``, and ``\mathbf{X̂}_{k-1}^j(k)``, the ``j``th column of 
+``\mathbf{X̂}_{k-1}(k)``. The matrices ``\mathbf{P̂, Q̂, R̂}`` are the estimated covariance of 
+the estimation error, process noise and sensor noise, respectively. See [`init_ukf`](@ref) 
+for the definition of``\mathbf{m̂, Ŝ}`` and ``γ``. See [^4] for technical details.
 
 [^4]: Simon, D. 2006, "Chapter 14: The unscented Kalman filter" in "Optimal State Estimation: 
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, https://doi.org/10.1002/0470045345.ch14, 
@@ -514,7 +521,7 @@ function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # --- correction step ---
     sqrt_P̂ = cholesky(P̂).L
-    X̂ = repeat(x̂, 1, nσ) + [zeros(nx̂) +γ * sqrt_P̂ -γ * sqrt_P̂]
+    X̂ = repeat(x̂, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂ -γ*sqrt_P̂]
     Ŷm = Matrix{Float64}(undef, nym, nσ)
     for j in axes(Ŷm, 2)
         Ŷm[:, j] = ĥ(X̂[:, j], d)[estim.i_ym]
@@ -522,13 +529,13 @@ function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
     ŷm = Ŷm * m̂
     X̄ = X̂ .- x̂
     Ȳm = Ŷm .- ŷm
-    P̂_yy = Hermitian(Ȳm * Ŝ * Ȳm' + R̂, :L)
-    K = X̄ * Ŝ * Ȳm' / P̂_yy
+    M = Hermitian(Ȳm * Ŝ * Ȳm' + R̂, :L)
+    K = X̄ * Ŝ * Ȳm' / M
     x̂_cor = x̂ + K * (ym - ŷm)
-    P̂_cor = P̂ - Hermitian(K * P̂_yy * K', :L)
+    P̂_cor = P̂ - Hermitian(K * M * K', :L)
     # --- prediction step ---
     sqrt_P̂_cor = cholesky(P̂_cor).L
-    X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(nx̂) +γ * sqrt_P̂_cor -γ * sqrt_P̂_cor]
+    X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂_cor -γ*sqrt_P̂_cor]
     X̂_next = Matrix{Float64}(undef, nx̂, nσ)
     for j in axes(X̂_next, 2)
         X̂_next[:, j] = f̂(X̂_cor[:, j], u, d)

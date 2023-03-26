@@ -10,5 +10,11 @@ ModelPredictiveControl.augment_model
 
 ```@docs
 ModelPredictiveControl.updatestate_kf!
+```
+
+## UnscentedKalmanFilter
+
+```@docs
+ModelPredictiveControl.init_ukf
 ModelPredictiveControl.updatestate_ukf!
 ```
