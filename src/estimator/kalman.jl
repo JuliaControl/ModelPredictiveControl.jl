@@ -169,7 +169,7 @@ end
 struct KalmanFilter <: StateEstimator
     model::LinModel
     x̂::Vector{Float64}
-    P̂::Matrix{Float64}
+    P̂::Hermitian{Float64}
     i_ym::IntRangeOrVector
     nx̂::Int
     nym::Int
@@ -187,7 +187,7 @@ struct KalmanFilter <: StateEstimator
     D̂dm ::Matrix{Float64}
     f̂::Function
     ĥ::Function
-    P̂0::Union{Diagonal{Float64}, Matrix{Float64}}
+    P̂0::Union{Diagonal{Float64}, Hermitian{Float64}}
     Q̂::Union{Diagonal{Float64}, Matrix{Float64}}
     R̂::Union{Diagonal{Float64}, Matrix{Float64}}
     function KalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂)
@@ -200,7 +200,7 @@ struct KalmanFilter <: StateEstimator
         f̂, ĥ, Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         x̂ = [copy(model.x); zeros(nxs)]
-        P̂ = P̂0
+        P̂ = Hermitian(Matrix(P̂0), :L)
         return new(
             model, 
             x̂, P̂, 
@@ -305,10 +305,10 @@ control period ``k-1``. See [^3] for details.
 function updatestate_kf!(estim::KalmanFilter, u, ym, d)
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
-    M  = (P̂*Ĉm')/(Ĉm*P̂*Ĉm'+R̂)
-    K = Â*M
-    x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K*(ym - Ĉm*x̂ - D̂dm*d)
-    P̂[:] = Â*(P̂-M*Ĉm*P̂)*Â' + Q̂ 
+    M = (P̂ * Ĉm') / (Ĉm * P̂ * Ĉm' + R̂)
+    K = Â * M
+    x̂[:] = Â * x̂ + B̂u * u + B̂d * d + K * (ym - Ĉm * x̂ - D̂dm * d)
+    P̂.data[:] = Â * (P̂ - M * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitian matrices
     return x̂, P̂
 end
 
@@ -318,7 +318,7 @@ end
 Initialize covariance `estim.P̂` and invoke [`initstate!(::StateEstimator)`](@ref).
 """
 function initstate!(estim::KalmanFilter, u, ym, d=Float64[])
-    estim.P̂[:] = estim.P̂0
+    estim.P̂.data[:] = estim.P̂0 # .data is necessary for Hermitian matrices
     invoke(initstate!, Tuple{StateEstimator, Any, Any, Any}, estim, u, ym, d)
 end
 
@@ -328,7 +328,7 @@ end
 struct UnscentedKalmanFilter <: StateEstimator
     model::SimModel
     x̂::Vector{Float64}
-    P̂::Matrix{Float64}
+    P̂::Hermitian{Float64}
     i_ym::IntRangeOrVector
     nx̂::Int
     nym::Int
@@ -339,7 +339,7 @@ struct UnscentedKalmanFilter <: StateEstimator
     nint_ym::Vector{Int}
     f̂::Function
     ĥ::Function
-    P̂0::Union{Diagonal{Float64}, Matrix{Float64}}
+    P̂0::Union{Diagonal{Float64}, Hermitian{Float64}}
     Q̂::Union{Diagonal{Float64}, Matrix{Float64}}
     R̂::Union{Diagonal{Float64}, Matrix{Float64}}
     nσ::Int 
@@ -356,7 +356,7 @@ struct UnscentedKalmanFilter <: StateEstimator
         f̂, ĥ = augment_model(model, As, Cs)
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         x̂ = [copy(model.x); zeros(nxs)]
-        P̂ = P̂0
+        P̂ = Hermitian(Matrix(P̂0), :L)
         return new(
             model,
             x̂, P̂, 
@@ -461,33 +461,34 @@ end
 TBW
 """
 function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
+    f̂, ĥ = estim.f̂, estim.ĥ
     x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
-    # === correction step ===
-    sqrt_P̂ = P̂#chol(P̂, "lower")
-    X̂ = repeat(x̂, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂ -γ*sqrt_P̂]
-    Ŷm = zeros(nym, nσ)
+    # --- correction step ---
+    sqrt_P̂ = cholesky(P̂).L
+    X̂ = repeat(x̂, 1, nσ) + [zeros(nx̂) +γ * sqrt_P̂ -γ * sqrt_P̂]
+    Ŷm = Matrix{Float64}(undef, nym, nσ)
     for i in axes(Ŷm, 2)
-        Ŷm[:,i] = estim.ĥ(X̂[:,i], d)[estim.i_ym]
+        Ŷm[:, i] = ĥ(X̂[:, i], d)[estim.i_ym]
     end
-    ŷm = Ŷm*m̂
+    ŷm = Ŷm * m̂
     X̄ = X̂ .- x̂
     Ȳm = Ŷm .- ŷm
-    P̂_yy = Ȳm*Ŝ*Ȳm' + R̂
-    K = X̄*Ŝ*Ȳm'/P̂_yy
-    x̂_cor = x̂ + K*(ym-ŷm);
-    P̂_cor = P̂ - K*P̂_yy*K';
-    # === prediction step ===
-    sqrt_P̂_cor = P̂_cor#chol(P̂_cor, "lower")
-    X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂_cor -γ*sqrt_P̂_cor]
-    X̂_next = zeros(nx̂, nσ)
+    P̂_yy = Hermitian(Ȳm * Ŝ * Ȳm' + R̂, :L)
+    K = X̄ * Ŝ * Ȳm' / P̂_yy
+    x̂_cor = x̂ + K * (ym - ŷm)
+    P̂_cor = P̂ - Hermitian(K * P̂_yy * K', :L)
+    # --- prediction step ---
+    sqrt_P̂_cor = cholesky(P̂_cor).L
+    X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(nx̂) +γ * sqrt_P̂_cor -γ * sqrt_P̂_cor]
+    X̂_next = Matrix{Float64}(undef, nx̂, nσ)
     for i in axes(X̂_next, 2)
-        X̂_next[:,i] = estim.f̂(X̂_cor[:,i], u, d)
+        X̂_next[:, i] = f̂(X̂_cor[:, i], u, d)
     end
-    x̂[:] = X̂_next*m̂
+    x̂[:] = X̂_next * m̂
     X̄_next = X̂_next .- x̂
-    P̂[:] = X̄_next*Ŝ*X̄_next' + Q̂
+    P̂.data[:] = X̄_next * Ŝ * X̄_next' + Q̂ # .data is necessary for Hermitian matrices
 end
 
 
