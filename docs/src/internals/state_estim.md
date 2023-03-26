@@ -10,4 +10,5 @@ ModelPredictiveControl.augment_model
 
 ```@docs
 ModelPredictiveControl.updatestate_kf!
+ModelPredictiveControl.updatestate_ukf!
 ```

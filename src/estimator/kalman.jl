@@ -57,7 +57,7 @@ end
 @doc raw"""
     SteadyKalmanFilter(model::LinModel; <keyword arguments>)
 
-Construct a steady-state Kalman Filter based on the [`LinModel`](@ref) `model`.
+Construct a steady-state Kalman Filter with the [`LinModel`](@ref) `model`.
 
 The steady-state (or asymptotic) Kalman filter is based on the process model :
 ```math
@@ -89,7 +89,7 @@ ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 - `nint_ym=fill(1,length(i_ym))` : integrator quantity per measured outputs (vector) for the 
     stochastic model, use `nint_ym=0` for no integrator at all.
 - `σQ_int=fill(0.1,sum(nint_ym))` : same than `σQ` but for the stochastic model covariance
-    ``\mathbf{Q_{int}}`` (composed of output integrators)
+    ``\mathbf{Q_{int}}`` (composed of output integrators).
 
 # Examples
 ```jldoctest
@@ -217,7 +217,7 @@ end
 @doc raw"""
     KalmanFilter(model::LinModel; <keyword arguments>)
 
-Construct a time-varying Kalman Filter based on the [`LinModel`](@ref) `model`.
+Construct a time-varying Kalman Filter with the [`LinModel`](@ref) `model`.
 
 The process model is identical to [`SteadyKalmanFilter`](@ref).
 
@@ -288,7 +288,7 @@ The method implement the time-varying Kalman Filter in its predictor (observer) 
     \mathbf{M}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^{m}{}'}
                            [\mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m + R̂}]^{-1} \\
     \mathbf{K}(k)       &= \mathbf{Â M(k)} \\
-    \mathbf{ŷ^m(k)}     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k) \\
+    \mathbf{ŷ^m}(k)     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k) \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
                            + \mathbf{K}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)] \\
     \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k) - 
@@ -321,9 +321,6 @@ function initstate!(estim::KalmanFilter, u, ym, d=Float64[])
     estim.P̂.data[:] = estim.P̂0 # .data is necessary for Hermitian matrices
     invoke(initstate!, Tuple{StateEstimator, Any, Any, Any}, estim, u, ym, d)
 end
-
-
-
 
 struct UnscentedKalmanFilter <: StateEstimator
     model::SimModel
@@ -372,7 +369,7 @@ end
 @doc raw"""
     UnscentedKalmanFilter(model::SimModel; <keyword arguments>)
 
-Construct an unscented Kalman Filter based on the [`SimModel`](@ref) `model`.
+Construct an unscented Kalman Filter with the [`SimModel`](@ref) `model`.
 
 Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The unscented Kalman filter
 is based on the process model :
@@ -389,13 +386,13 @@ See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)``
 state-space functions augmented with the stochastic model, which is specified by the numbers
 of output integrator `nint_ym` (see [`SteadyKalmanFilter`](@ref) for details). The 
 ``\mathbf{ĥ^m}`` function represents the measured outputs of ``\mathbf{ĥ}`` function (and 
-unmeasured ones, for ``\mathbf{ĥ^u}``) 
+unmeasured ones, for ``\mathbf{ĥ^u}``).
 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
-- `α=1e-3` : alpha parameter, spread of the state distribution (``0 ≤ α ≤ 1``)
-- `β=2` : beta parameter, skewness and kurtosis of the states distribution (``β ≥ 0``)
-- `κ=0` : kappa parameter, another spread parameter (``0 ≤ κ ≤ 3``)
+- `α=1e-3` : alpha parameter, spread of the state distribution ``(0 ≤ α ≤ 1)``.
+- `β=2` : beta parameter, skewness and kurtosis of the states distribution ``(β ≥ 0)``.
+- `κ=0` : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 - `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
 
@@ -429,15 +426,15 @@ function UnscentedKalmanFilter(
     return UnscentedKalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂, α, β, κ)
 end
 
-"Pre-compute the constant parameters of the unscented Kalman Filter"
+"Compute the unscented Kalman Filter constants, see ['updatestate_ukf!'](@ref)."
 function init_ukf(nx̂, α, β, κ)
-    nσ  = 2*nx̂ + 1                              # number of sigma points
-    γ   = α*√(nx̂+κ)                             # constant factor of standard deviation √P
-    m̂_0 = 1-nx̂/α^2/(nx̂+κ)
+    nσ = 2nx̂ + 1                                  # number of sigma points
+    γ = α * √(nx̂ + κ)                             # constant factor of standard deviation √P
+    m̂_0 = 1 - nx̂ / α^2 / (nx̂ + κ)
     Ŝ_0 = m̂_0 + 1 - α^2 + β
-    w = 1/2/α^2/(nx̂+κ)
-    m̂ = [m̂_0; fill(w, 2*nx̂)]                    # weights for means
-    Ŝ = Diagonal{Float64}([Ŝ_0; fill(w, 2*nx̂)]) # weights for covariances
+    w = 1 / 2 / α^2 / (nx̂ + κ)
+    m̂ = [m̂_0; fill(w, 2 * nx̂)]                    # weights for means
+    Ŝ = Diagonal{Float64}([Ŝ_0; fill(w, 2 * nx̂)]) # weights for covariances
     return nσ, γ, m̂, Ŝ
 end
   
@@ -457,8 +454,58 @@ end
 
 @doc raw"""
     updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
+    
+Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂` and covariance estimate `estim.P̂`.
 
-TBW
+This method implement the unscented Kalman Filter in its predictor (observer) form, relying
+on the generalized unscented transform. 
+
+With ``n_\mathbf{x̂}`` states  ``n_σ = 2 n_\mathbf{x̂} + 1`` sigma points, the constants are:
+```math
+\begin{aligned}
+    γ          &= α √(n_\mathbf{x̂} + κ)
+    \mathbf{m̂} &= 
+        \begin{bmatrix} 1-\frac{n_\mathbf{x̂}}{α²}\end{bmatrix}
+\end{aligned}
+```
+With the null column vector ``\mathbf{0}``, the estimator updates the state ``\mathbf{x̂}``
+and covariance ``\mathbf{P̂}`` with:
+```math
+\begin{aligned}
+    \mathbf{X̂}_{k-1}(k)   &= \bigg[\begin{matrix} \mathbf{x̂}_{k-1}(k) & \mathbf{x̂}_{k-1}(k) & \cdots & \mathbf{x̂}_{k-1}(k)  \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & γ \sqrt{\mathbf{P̂}_{k-1}(k)} & -γ \sqrt{\mathbf{P̂}_{k-1}(k)} \end{matrix}\bigg] \\
+    \mathbf{Ŷ^m}_{k-1}(k) &= \bigg[\begin{matrix} \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{1}(k) \Big) & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{2}(k) \Big) & \cdots & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{n_σ}(k) \Big) \end{matrix}\bigg] \\
+    \mathbf{ŷ^m}_{k-1}(k) &= \mathbf{Ŷ^m}_{k-1}(k)\mathbf{m̂} \\
+    \mathbf{X̄}_{k-1}(k)   &= \begin{bmatrix} \mathbf{X̂}_{k-1}^{1}(k) - \mathbf{x̂}_{k-1}(k) &\: \mathbf{X̂}_{k-1}^{2}(k) - \mathbf{x̂}_{k-1}(k) &\: \cdots &\; \mathbf{X̂}_{k-1}^{n_σ}(k) - \mathbf{x̂}_{k-1}(k) \end{bmatrix} \\
+	\mathbf{Ȳ^m}_{k-1}(k) &= \begin{bmatrix} \mathbf{Ŷ^m}_{k-1}^{1}(k) - \mathbf{ŷ^m}_{k-1}(k) &\: \mathbf{Ŷ^m}_{k-1}^{2}(k) - \mathbf{ŷ^m}_{k-1}(k) &\: \cdots &\; \mathbf{Ŷ^m}_{k-1}^{n_σ}(k) - \mathbf{ŷ^m}_{k-1}(k) \end{bmatrix} \\
+    \mathbf{K}(k)         &= \mathbf{X̄}_{k-1}(k)\mathbf{Ŝ} \mathbf{Ȳ}_{k-1}'(k) \big[ \mathbf{Ȳ}_{k-1}(k)\mathbf{Ŝ} \mathbf{Ȳ}_{k-1}'(k) + \mathbf{R̂} \big]^{-1} \\
+    \mathbf{x̂}_k(k)       &= \mathbf{x̂}_{k-1}(k) + \mathbf{K}(k) \big[ \mathbf{y^m}(k) - \mathbf{ŷ^m}_{k-1}(k) \big] \\
+    \mathbf{P̂}_k(k)       &= \mathbf{P̂}_{k-1}(k) - \mathbf{K}(k) \big[ \mathbf{Ȳ}_{k-1}(k)\mathbf{Ŝ} \mathbf{Ȳ}_{k-1}'(k) + \mathbf{R̂} \big] \mathbf{K}'(k) \\
+    \mathbf{X̂}_k(k)       &= \bigg[\begin{matrix} \mathbf{x̂}_{k}(k) & \mathbf{x̂}_{k}(k) & \cdots & \mathbf{x̂}_{k}(k) \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & \gamma \sqrt{\mathbf{P̂}_{k}(k)} & - \gamma \sqrt{\mathbf{P̂}_{k}(k)} \end{matrix}\bigg] \\
+	\mathbf{X̂}_{k}(k+1)   &= \bigg[\begin{matrix} \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{1}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{2}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \cdots & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{n_σ}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \end{matrix}\bigg] \\
+    \mathbf{x̂}_{k}(k+1)   &= \mathbf{X̂}_{k}(k+1)\mathbf{m̂} \\
+    \mathbf{X̄}_k(k+1)     &= \begin{bmatrix} \mathbf{X̂}_{k}^{1}(k+1) - \mathbf{x̂}_{k}(k+1) &\: \mathbf{X̂}_{k}^{2}(k+1) - \mathbf{x̂}_{k}(k+1) &\: \cdots &\: \mathbf{X̂}_{k}^{n_σ}(k+1) - \mathbf{x̂}_{k}(k+1) \end{bmatrix} \\
+	\mathbf{P̂}_k(k+1)     &= \mathbf{X̄}_k(k+1) \mathbf{Ŝ} \mathbf{X̄}_k'(k+1) + \mathbf{Q̂}
+\end{aligned} 
+```
+
+
+#TODO: remplacer des matrix avec des bmatrix, enlever des espacements latex inutile, corriger le problème avec m en exposant et indices k-1 trop séparé
+
+``\mathbf{P̂, Q̂, R̂}`` are the covariance estimates of the estimation error, process noise and
+sensor noise, respectively. 
+
+The notations ``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` 
+estimated at the last control period ``k-1``, and ``\mathbf{X̂}_{k-1}^j(k)``, the ``j``th 
+column of ``\mathbf{X̂}_{k-1}(k)``.
+
+
+See [^4] for details.
+
+
+
+[^4]: Simon, D. 2006, "Chapter 14: The unscented Kalman filter" in "Optimal State Estimation: 
+     Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, https://doi.org/10.1002/0470045345.ch14, 
+     ISBN9780470045343.
 """
 function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
     f̂, ĥ = estim.f̂, estim.ĥ
@@ -469,8 +516,8 @@ function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
     sqrt_P̂ = cholesky(P̂).L
     X̂ = repeat(x̂, 1, nσ) + [zeros(nx̂) +γ * sqrt_P̂ -γ * sqrt_P̂]
     Ŷm = Matrix{Float64}(undef, nym, nσ)
-    for i in axes(Ŷm, 2)
-        Ŷm[:, i] = ĥ(X̂[:, i], d)[estim.i_ym]
+    for j in axes(Ŷm, 2)
+        Ŷm[:, j] = ĥ(X̂[:, j], d)[estim.i_ym]
     end
     ŷm = Ŷm * m̂
     X̄ = X̂ .- x̂
@@ -483,12 +530,13 @@ function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
     sqrt_P̂_cor = cholesky(P̂_cor).L
     X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(nx̂) +γ * sqrt_P̂_cor -γ * sqrt_P̂_cor]
     X̂_next = Matrix{Float64}(undef, nx̂, nσ)
-    for i in axes(X̂_next, 2)
-        X̂_next[:, i] = f̂(X̂_cor[:, i], u, d)
+    for j in axes(X̂_next, 2)
+        X̂_next[:, j] = f̂(X̂_cor[:, j], u, d)
     end
     x̂[:] = X̂_next * m̂
     X̄_next = X̂_next .- x̂
     P̂.data[:] = X̄_next * Ŝ * X̄_next' + Q̂ # .data is necessary for Hermitian matrices
+    return x̂, P̂
 end
 
 
