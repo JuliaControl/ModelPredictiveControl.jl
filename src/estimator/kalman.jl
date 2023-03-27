@@ -449,7 +449,7 @@ covariance are respectively:
     \mathbf{Ŝ} &= \mathrm{diag}\big( 2 - α^2 + β - \tfrac{n_\mathbf{x̂}}{γ^2} \:,\; \tfrac{1}{2γ^2} \:,\; \tfrac{1}{2γ^2} \:,\; \cdots \:,\; \tfrac{1}{2γ^2} \big)
 \end{aligned}
 ```
-See [`updatestate_ukf`](@ref) for other details.
+See [`updatestate_ukf!`](@ref) for other details.
 """
 function init_ukf(nx̂, α, β, κ)
     nσ = 2nx̂ + 1                                  # number of sigma points
@@ -509,8 +509,8 @@ of sigma points, and ``\mathbf{X̂}_{k-1}^j(k)``, the vector at the ``j``th colu
 ```
 by using the lower triangular factor of [`cholesky`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.cholesky)
 to compute ``\sqrt{\mathbf{P̂}_{k-1}(k)}`` and ``\sqrt{\mathbf{P̂}_{k}(k)}``.  The matrices 
-``\mathbf{P̂, Q̂, R̂}`` are the estimated covariance of the estimation error, process noise and
-sensor noise, respectively.
+``\mathbf{P̂, Q̂, R̂}`` are the covariance of the estimation error, process noise and sensor 
+noise, respectively.
 
 [^2]: Simon, D. 2006, "Chapter 14: The unscented Kalman filter" in "Optimal State Estimation: 
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, https://doi.org/10.1002/0470045345.ch14, 
