@@ -163,7 +163,7 @@ in which the weight matrices are repeated ``H_p`` or ``H_c`` times:
 ```
 and with the following nomenclature:
 
-| Var.              | Description                                        |
+| VAR.              | DESCRIPTION                                        |
 | :---------------- | :------------------------------------------------- |
 | ``H_p``           | prediction horizon                                 |
 | ``H_c``           | control horizon                                    |
