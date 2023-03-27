@@ -58,7 +58,7 @@ Pages = [
   - ✅ output setpoints
   - ✅ measured disturbances
 - ⬜ easy integration with `Plots.jl`
-- ✅ optimzation based on `JuMP.jl`:
+- ✅ optimization based on `JuMP.jl`:
   - ✅ quickly compare multiple optimizers
   - ✅ nonlinear solvers relying on automatic differentiation (exact derivative)
 - ⬜ additional information about the optimum to ease troubleshooting:
@@ -76,7 +76,7 @@ Pages = [
   - ✅ Kalman filter
   - ⬜ Luenberger observer
   - ✅ internal model structure
-  - ⬜ unscented Kalman filter
+  - ✅ unscented Kalman filter
   - ⬜ moving horizon estimator
 - ✅ observers in predictor form to ease  control applications
 - ⬜ moving horizon estimator that supports:

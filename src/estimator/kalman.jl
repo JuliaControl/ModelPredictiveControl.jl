@@ -221,7 +221,7 @@ Construct a time-varying Kalman Filter with the [`LinModel`](@ref) `model`.
 
 The process model is identical to [`SteadyKalmanFilter`](@ref). The augmented model 
 estimation error ``\mathbf{x}(k+1) - \mathbf{x̂}_k(k+1)`` covariance is denoted 
-``\mathbf{P̂}_k(k+1)``. Two keyword arguments modifies its initial value through
+``\mathbf{P̂}_k(k+1)``. Two keyword arguments modify its initial value through
 ``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int}}(0) \}``.
 
 
@@ -314,16 +314,6 @@ function updatestate_kf!(estim::KalmanFilter, u, ym, d)
     x̂[:] = Â * x̂ + B̂u * u + B̂d * d + K * (ym - Ĉm * x̂ - D̂dm * d)
     P̂.data[:] = Â * (P̂ - M * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitian matrices
     return x̂, P̂
-end
-
-"""
-    initstate!(estim::KalmanFilter, u, ym, d=Float64[])
-
-Initialize covariance `estim.P̂` and invoke [`initstate!(::StateEstimator)`](@ref).
-"""
-function initstate!(estim::KalmanFilter, u, ym, d=Float64[])
-    estim.P̂.data[:] = estim.P̂0 # .data is necessary for Hermitian matrices
-    invoke(initstate!, Tuple{StateEstimator, Any, Any, Any}, estim, u, ym, d)
 end
 
 struct UnscentedKalmanFilter <: StateEstimator
@@ -546,6 +536,17 @@ function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
     X̄_next = X̂_next .- x̂
     P̂.data[:] = X̄_next * Ŝ * X̄_next' + Q̂ # .data is necessary for Hermitian matrices
     return x̂, P̂
+end
+
+
+"""
+    initstate!(estim::{KalmanFilter, UnscentedKalmanFilter}, u, ym, d=Float64[])
+
+Initialize covariance `estim.P̂` and invoke [`initstate!(::StateEstimator)`](@ref).
+"""
+function initstate!(estim::Union{KalmanFilter, UnscentedKalmanFilter}, u, ym, d=Float64[])
+    estim.P̂.data[:] = estim.P̂0 # .data is necessary for Hermitian matrices
+    invoke(initstate!, Tuple{StateEstimator, Any, Any, Any}, estim, u, ym, d)
 end
 
 

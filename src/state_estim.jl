@@ -146,8 +146,8 @@ function augment_model(model::LinModel, As, Cs)
     Ĉ   = [model.C Cs]
     B̂d  = [model.Bd; zeros(nxs,nd)]
     D̂d  = model.Dd
-    f̂(x̂,u,d) = Â*x̂ + B̂u*u + B̂d*d
-    ĥ(x̂,d) = Ĉ*x̂ + D̂d*d
+    f̂(x̂, u, d) = Â*x̂ + B̂u*u + B̂d*d
+    ĥ(x̂, d) = Ĉ*x̂ + D̂d*d
     return f̂, ĥ, Â, B̂u, Ĉ, B̂d, D̂d
 end
 
