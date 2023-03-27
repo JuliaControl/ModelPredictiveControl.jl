@@ -444,11 +444,11 @@ See [`updatestate_ukf!`](@ref) for other details.
 function init_ukf(nx̂, α, β, κ)
     nσ = 2nx̂ + 1                                  # number of sigma points
     γ = α * √(nx̂ + κ)                             # constant factor of standard deviation √P
-    m̂_0 = 1 - nx̂ / α^2 / (nx̂ + κ)
+    m̂_0 = 1 - nx̂ / γ^2
     Ŝ_0 = m̂_0 + 1 - α^2 + β
-    w = 1 / 2 / α^2 / (nx̂ + κ)
-    m̂ = [m̂_0; fill(w, 2 * nx̂)]                    # weights for means
-    Ŝ = Diagonal{Float64}([Ŝ_0; fill(w, 2 * nx̂)]) # weights for covariances
+    w = 1 / 2 / γ^2
+    m̂ = [m̂_0; fill(w, 2 * nx̂)]                    # weights for the mean
+    Ŝ = Diagonal{Float64}([Ŝ_0; fill(w, 2 * nx̂)]) # weights for the covariance
     return nσ, γ, m̂, Ŝ
 end
   
