@@ -219,7 +219,11 @@ end
 
 Construct a time-varying Kalman Filter with the [`LinModel`](@ref) `model`.
 
-The process model is identical to [`SteadyKalmanFilter`](@ref).
+The process model is identical to [`SteadyKalmanFilter`](@ref). The augmented model 
+estimation error ``\mathbf{x}(k+1) - \mathbf{x̂}_k(k+1)`` covariance is denoted 
+``\mathbf{P̂}_k(k+1)``. Two keyword arguments modifies its initial value through
+``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int}}(0) \}``.
+
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
@@ -282,7 +286,7 @@ end
 
 Update [`KalmanFilter`](@ref) state `estim.x̂` and estimation error covariance `estim.P̂`.
 
-The method implement the time-varying Kalman Filter in its predictor (observer) form :
+It implements the time-varying Kalman Filter in its predictor (observer) form :
 ```math
 \begin{aligned}
     \mathbf{M}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^m}'
@@ -297,9 +301,9 @@ The method implement the time-varying Kalman Filter in its predictor (observer) 
 ```
 based on the process model described in [`SteadyKalmanFilter`](@ref). The notation 
 ``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` estimated at the last 
-control period ``k-1``. See [^3] for details.
+control period ``k-1``. See [^1] for details.
 
-[^3]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
+[^1]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
      Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
 """
 function updatestate_kf!(estim::KalmanFilter, u, ym, d)
@@ -429,17 +433,23 @@ end
 @doc raw"""
     init_ukf(nx̂, α, β, κ)
 
-Compute the unscented Kalman Filter constants, see ['updatestate_ukf!'](@ref).
+Compute the [`UnscentedKalmanFilter`](@ref) constants from ``α, β`` and ``κ``.
 
+With ``n_\mathbf{x̂}`` elements in the state vector ``\mathbf{x̂}`` and 
+``n_σ = 2 n_\mathbf{x̂} + 1`` sigma points, the scaling factor applied on standard deviation 
+matrices ``\sqrt{\mathbf{P̂}}`` is:
+```math
+    γ = α \sqrt{ n_\mathbf{x̂} + κ }
+```
+The weight vector ``(n_σ × 1)`` for the mean and the weight matrix ``(n_σ × n_σ)`` for the 
+covariance are respectively:
 ```math
 \begin{aligned}
-    \mathbf{m̂} &= \begin{bmatrix} \end{bmatrix} \\
-    \mathbf{Ŝ} &= \mathrm{diag}[]
+    \mathbf{m̂} &= \begin{bmatrix} 1 - \tfrac{n_\mathbf{x̂}}{γ^2} & \tfrac{1}{2γ^2} & \tfrac{1}{2γ^2} & \cdots & \tfrac{1}{2γ^2} \end{bmatrix} \\
+    \mathbf{Ŝ} &= \mathrm{diag}\big( 2 - α^2 + β - \tfrac{n_\mathbf{x̂}}{γ^2} \:,\; \tfrac{1}{2γ^2} \:,\; \tfrac{1}{2γ^2} \:,\; \cdots \:,\; \tfrac{1}{2γ^2} \big)
 \end{aligned}
 ```
-
-the weights for the
-    mean ``\mathbf{m̂}`` and covariance ``\mathbf{Ŝ}`` calculations.
+See [`updatestate_ukf`](@ref) for other details.
 """
 function init_ukf(nx̂, α, β, κ)
     nσ = 2nx̂ + 1                                  # number of sigma points
@@ -471,28 +481,23 @@ end
     
 Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂` and covariance estimate `estim.P̂`.
 
-This method implement the unscented Kalman Filter in its predictor (observer) form, relying
-on the generalized unscented transform. 
+It implements the unscented Kalman Filter in its predictor (observer) form, based on the 
+generalized unscented transform[^2]. See [`init_ukf`](@ref) for the definition of the 
+constants ``\mathbf{m̂, Ŝ}`` and ``γ``. 
 
-With ``n_\mathbf{x̂}`` states  ``n_σ = 2 n_\mathbf{x̂} + 1`` sigma points, the constants are:
-```math
-\begin{aligned}
-    γ          &= α √(n_\mathbf{x̂} + κ)
-    \mathbf{m̂} &= 
-        \begin{bmatrix} 1-\frac{n_\mathbf{x̂}}{α²}\end{bmatrix}
-\end{aligned}
-```
-With ``\mathbf{0}``, a null column vector, the estimator updates the state ``\mathbf{x̂}``
-and covariance ``\mathbf{P̂}`` with:
+Denoting ``\mathbf{x̂}_{k-1}(k)`` as the state for the current time ``k`` estimated at the 
+last period ``k-1``, ``\mathbf{0}``, a null vector, ``n_σ = 2 n_\mathbf{x̂} + 1``, the number
+of sigma points, and ``\mathbf{X̂}_{k-1}^j(k)``, the vector at the ``j``th column of 
+``\mathbf{X̂}_{k-1}(k)``, the estimator updates the states with:
 ```math
 \begin{aligned}
     \mathbf{X̂}_{k-1}(k) &= \bigg[\begin{matrix} \mathbf{x̂}_{k-1}(k) & \mathbf{x̂}_{k-1}(k) & \cdots & \mathbf{x̂}_{k-1}(k)  \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & γ \sqrt{\mathbf{P̂}_{k-1}(k)} & -γ \sqrt{\mathbf{P̂}_{k-1}(k)} \end{matrix}\bigg] \\
     \mathbf{Ŷ^m}(k)     &= \bigg[\begin{matrix} \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{1}(k) \Big) & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{2}(k) \Big) & \cdots & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{n_σ}(k) \Big) \end{matrix}\bigg] \\
-    \mathbf{ŷ^m}(k)     &= \mathbf{Ŷ^m}(k)\mathbf{m̂} \\
+    \mathbf{ŷ^m}(k)     &= \mathbf{Ŷ^m}(k) \mathbf{m̂} \\
     \mathbf{X̄}_{k-1}(k) &= \begin{bmatrix} \mathbf{X̂}_{k-1}^{1}(k) - \mathbf{x̂}_{k-1}(k) & \mathbf{X̂}_{k-1}^{2}(k) - \mathbf{x̂}_{k-1}(k) & \cdots & \mathbf{X̂}_{k-1}^{n_σ}(k) - \mathbf{x̂}_{k-1}(k) \end{bmatrix} \\
     \mathbf{Ȳ^m}(k)     &= \begin{bmatrix} \mathbf{Ŷ^m}^{1}(k)     - \mathbf{ŷ^m}(k)     & \mathbf{Ŷ^m}^{2}(k)     - \mathbf{ŷ^m}(k)     & \cdots & \mathbf{Ŷ^m}^{n_σ}(k)     - \mathbf{ŷ^m}(k)     \end{bmatrix} \\
-    \mathbf{M}(k)       &= \mathbf{Ȳ^m}(k)\mathbf{Ŝ} \mathbf{Ȳ^m}'(k) + \mathbf{R̂} \\
-    \mathbf{K}(k)       &= \mathbf{X̄}_{k-1}(k)\mathbf{Ŝ} \mathbf{Ȳ^m}'(k) \mathbf{M}^{-1}(k) \\
+    \mathbf{M}(k)       &= \mathbf{Ȳ^m}(k) \mathbf{Ŝ} \mathbf{Ȳ^m}'(k) + \mathbf{R̂} \\
+    \mathbf{K}(k)       &= \mathbf{X̄}_{k-1}(k) \mathbf{Ŝ} \mathbf{Ȳ^m}'(k) \mathbf{M}(k)^{-1} \\
     \mathbf{x̂}_k(k)     &= \mathbf{x̂}_{k-1}(k) + \mathbf{K}(k) \big[ \mathbf{y^m}(k) - \mathbf{ŷ^m}(k) \big] \\
     \mathbf{P̂}_k(k)     &= \mathbf{P̂}_{k-1}(k) - \mathbf{K}(k) \mathbf{M}(k) \mathbf{K}'(k) \\
     \mathbf{X̂}_k(k)     &= \bigg[\begin{matrix} \mathbf{x̂}_{k}(k) & \mathbf{x̂}_{k}(k) & \cdots & \mathbf{x̂}_{k}(k) \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & \gamma \sqrt{\mathbf{P̂}_{k}(k)} & - \gamma \sqrt{\mathbf{P̂}_{k}(k)} \end{matrix}\bigg] \\
@@ -503,14 +508,11 @@ and covariance ``\mathbf{P̂}`` with:
 \end{aligned} 
 ```
 by using the lower triangular factor of [`cholesky`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.cholesky)
-to compute ``\sqrt{\mathbf{P̂}_{k-1}(k)}`` and ``\sqrt{\mathbf{P̂}_{k}(k)}``. The notations 
-``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` estimated at the last
-control period ``k-1``, and ``\mathbf{X̂}_{k-1}^j(k)``, the ``j``th column of 
-``\mathbf{X̂}_{k-1}(k)``. The matrices ``\mathbf{P̂, Q̂, R̂}`` are the estimated covariance of 
-the estimation error, process noise and sensor noise, respectively. See [`init_ukf`](@ref) 
-for the definition of``\mathbf{m̂, Ŝ}`` and ``γ``. See [^4] for technical details.
+to compute ``\sqrt{\mathbf{P̂}_{k-1}(k)}`` and ``\sqrt{\mathbf{P̂}_{k}(k)}``.  The matrices 
+``\mathbf{P̂, Q̂, R̂}`` are the estimated covariance of the estimation error, process noise and
+sensor noise, respectively.
 
-[^4]: Simon, D. 2006, "Chapter 14: The unscented Kalman filter" in "Optimal State Estimation: 
+[^2]: Simon, D. 2006, "Chapter 14: The unscented Kalman filter" in "Optimal State Estimation: 
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, https://doi.org/10.1002/0470045345.ch14, 
      ISBN9780470045343.
 """

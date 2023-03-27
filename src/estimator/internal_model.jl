@@ -124,9 +124,9 @@ optimally update the stochastic estimate ``\mathbf{x̂_s}`` are:
 ```
 with current stochastic outputs estimation ``\mathbf{ŷ_s}(k)``, composed of the measured 
 ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` and unmeasured 
-``\mathbf{ŷ_s^u = 0}`` outputs. See [^1].
+``\mathbf{ŷ_s^u = 0}`` outputs. See [^3].
 
-[^1]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
+[^3]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
     control structure for decoupling setpoint tracking, feedforward compensation and 
     disturbance rejection dynamics", *IEE Proceedings - Control Theory and Applications*, 
     vol. 147, no 4, https://doi.org/10.1049/ip-cta:20000443, p. 465–475, ISSN 1350-2379.
