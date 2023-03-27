@@ -219,11 +219,10 @@ end
 
 Construct a time-varying Kalman Filter with the [`LinModel`](@ref) `model`.
 
-The process model is identical to [`SteadyKalmanFilter`](@ref). The augmented model 
-estimation error ``\mathbf{x}(k+1) - \mathbf{x̂}_k(k+1)`` covariance is denoted 
-``\mathbf{P̂}_k(k+1)``. Two keyword arguments modify its initial value through
-``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int}}(0) \}``.
-
+The process model is identical to [`SteadyKalmanFilter`](@ref). The matrix 
+``\mathbf{P̂}_k(k+1)`` is the estimation error covariance of `model` states augmented with
+the stochastic ones (specified by `nint_ym`). Two keyword arguments modify its initial value
+with ``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int}}(0) \}``.
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
@@ -392,8 +391,15 @@ unmeasured ones, for ``\mathbf{ĥ^u}``).
 
 # Examples
 ```jldoctest
-julia> a = 1;
+julia> model = NonLinModel((x,u,_)->-x+u, (x,_)->2x, 10, 1, 1, 1);
 
+julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0_int=[1, 1])
+UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s and:
+ 1 manipulated inputs u
+ 3 states x̂
+ 1 measured outputs ym
+ 0 unmeasured outputs yu
+ 0 measured disturbances d
 ```
 """
 function UnscentedKalmanFilter(
