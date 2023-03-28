@@ -75,10 +75,11 @@ the level constraint with [`setconstraint!`](@ref):
 mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2), ŷmin=[45, -Inf])
 ```
 
-Before closing the loop, we call [`initstate!`](@ref) with the actual plant inputs and
-measurements to ensure a bumpless transfer. Since `model` simulates our plant here, its
-output will initialize the states. [`LinModel`](@ref) objects are callable for this purpose
-(an alias for [`evaloutput`](@ref)):
+By default, [`LinMPC`](ref) controllers use a [`SteadyKalmanFilter`](@ref) to estimate the
+plant states. Before closing the loop, we call [`initstate!`](@ref) with the actual plant
+inputs and measurements to ensure a bumpless transfer. Since `model` simulates our plant
+here, its output will initialize the states. [`LinModel`](@ref) objects are callable for
+this purpose (an alias for [`evaloutput`](@ref)):
 
 ```@example 1
 u = model.uop
