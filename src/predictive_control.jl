@@ -409,7 +409,7 @@ to incorporate current values in the 3 arguments. Note that ``\mathbf{U}`` omits
 value at ``k+H_p``.
 
 !!! tip
-    Replace any of the 3 arguments with '_' if they are not needed (see `J_E` argument
+    Replace any of the 3 arguments with `_` if they are not needed (see `J_E` argument
     default value below).
 
 This method uses the default state estimator, an [`UnscentedKalmanFilter`](@ref) with 
