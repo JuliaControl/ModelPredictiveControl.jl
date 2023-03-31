@@ -5,8 +5,7 @@ using Revise
 Pkg.activate(".")
 
 using ModelPredictiveControl
-#using DAQP
-#using JuMP
+#using JuMP, DAQP
 using LinearAlgebra
 using ControlSystemsBase
 using MAT
@@ -65,7 +64,7 @@ updatestate!(uscKalmanFilter1,[0,0],[2,1])
 
 initstate!(uscKalmanFilter1,[0,0],[2,1])
 
-#=
+
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
@@ -77,45 +76,48 @@ setconstraint!(mpc, umin=[5, 9.9], umax=[Inf,Inf])
 setconstraint!(mpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
-N = 200
-
-u_data = zeros(2,N)
-y_data = zeros(2,N)
-r_data = zeros(2,N)
-d_data = zeros(1,N)
-
-u = linModel4.uop
-d = linModel4.dop
-r = [50,31]
-initstate!(mpc,u,linModel4(d),d)
-
-for k = 0:N-1
-    if k == 40
-        r[2] = 29
+function test_mpc(model, mpc)
+    N = 200
+    u_data = zeros(2,N)
+    y_data = zeros(2,N)
+    r_data = zeros(2,N)
+    d_data = zeros(1,N)
+    u = model.uop
+    d = model.dop
+    r = [50,31]
+    initstate!(mpc,u,model(d),d)
+    for k = 0:N-1
+        if k == 40
+            r[2] = 29
+        end
+        if k == 100
+            r[2] = 36
+        end
+        if k == 150
+            d = [3]
+        end
+        y = linModel4(d)
+        if k ≥ 180
+            y[1] += 15
+        end  
+        u = moveinput!(mpc, r, d)
+        u_data[:,k+1] = u
+        y_data[:,k+1] = y
+        r_data[:,k+1] = r 
+        d_data[:,k+1] = d
+        updatestate!(mpc, u, y, d)
+        updatestate!(model, u, d)
     end
-    if k == 100
-        r[2] = 36
-    end
-    if k == 150
-        global d = [3]
-    end
-    y = linModel4(d)
-    if k ≥ 180
-        y[1] += 15
-    end 
-    global u = moveinput!(mpc, r, d)
-    u_data[:,k+1] = u
-    y_data[:,k+1] = y
-    r_data[:,k+1] = r 
-    d_data[:,k+1] = d
-    updatestate!(mpc, u, y, d)
-    updatestate!(linModel4, u, d)
+    return u_data, y_data, r_data, d_data
 end
+
+@time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 
 using PlotThemes, Plots
 #theme(:default)
 theme(:dark)
 default(fontfamily="Computer Modern"); scalefontsizes(1.1)
+N = size(r_data, 2)
 p1 = plot(0:N-1,y_data[1,:],label=raw"$y_1$")
 plot!(0:N-1,r_data[1,:],label=raw"$r_1$",linestyle=:dash, linetype=:steppost)
 p2 = plot(0:N-1,y_data[2,:],label=raw"$y_2$")
@@ -131,5 +133,3 @@ pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(pd)
 display(pu)
 display(py)
-
-=#

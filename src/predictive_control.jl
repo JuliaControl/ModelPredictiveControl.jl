@@ -144,7 +144,7 @@ end
 @doc raw"""
     LinMPC(model::LinModel; <keyword arguments>)
 
-Construct a linear predictive controller `LinMPC` based on [`LinModel`](@ref) `model`.
+Construct a linear predictive controller based on [`LinModel`](@ref) `model`.
 
 The controller minimizes the following objective function at each discrete time ``k``:
 ```math
@@ -226,7 +226,7 @@ LinMPC(model::LinModel; kwargs...) = LinMPC(SteadyKalmanFilter(model); kwargs...
 
 Use custom state estimator `estim` to construct `LinMPC`.
 
-`estim.model` must be a [`LinModel`](@ref). Else, a `NonLinMPC` is required. 
+`estim.model` must be a [`LinModel`](@ref). Else, a [`NonLinMPC`](@ref) is required. 
 
 # Examples
 ```jldoctest
@@ -242,6 +242,212 @@ LinMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
 ```
 """
 function LinMPC(
+    estim::StateEstimator;
+    Hp::Union{Int, Nothing} = nothing,
+    Hc::Int = 2,
+    Mwt = fill(1.0, estim.model.ny),
+    Nwt = fill(0.1, estim.model.nu),
+    Lwt = fill(0.0, estim.model.nu),
+    Cwt = 1e5,
+    ru  = estim.model.uop,
+    optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
+)
+    isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
+    poles = eigvals(estim.model.A)
+    nk = sum(poles .≈ 0)
+    if isnothing(Hp)
+        Hp = 10 + nk
+    end
+    if Hp ≤ nk
+        @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*
+              "($nk), the closed-loop system may be zero-gain (unresponsive) or unstable")
+    end
+    return LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
+end
+
+
+
+struct NonLinMPC <: PredictiveController
+    model::SimModel
+    estim::StateEstimator
+    optim::JuMP.Model
+    info::OptimInfo
+    Hp::Int
+    Hc::Int
+    M_Hp::Diagonal{Float64}
+    Ñ_Hc::Diagonal{Float64}
+    L_Hp::Diagonal{Float64}
+    C::Float64
+    R̂u::Vector{Float64}
+    Umin   ::Vector{Float64}
+    Umax   ::Vector{Float64}
+    ΔŨmin  ::Vector{Float64}
+    ΔŨmax  ::Vector{Float64}
+    Ŷmin   ::Vector{Float64}
+    Ŷmax   ::Vector{Float64}
+    c_Umin ::Vector{Float64}
+    c_Umax ::Vector{Float64}
+    c_ΔUmin::Vector{Float64}
+    c_ΔUmax::Vector{Float64}
+    c_Ŷmin ::Vector{Float64}
+    c_Ŷmax ::Vector{Float64}
+    S̃_Hp::Matrix{Bool}
+    T_Hp::Matrix{Bool}
+    S̃_Hc::Matrix{Bool}
+    T_Hc::Matrix{Bool}
+    A_Umin::Matrix{Float64}
+    A_Umax::Matrix{Float64}
+    A_ΔŨmin::Matrix{Float64}
+    A_ΔŨmax::Matrix{Float64}
+    A_Ŷmin::Matrix{Float64}
+    A_Ŷmax::Matrix{Float64}
+    Ẽ ::Matrix{Float64}
+    G ::Matrix{Float64}
+    J ::Matrix{Float64}
+    Kd::Matrix{Float64}
+    Q ::Matrix{Float64}
+    P̃ ::Symmetric{Float64}
+    Ks::Matrix{Float64}
+    Ps::Matrix{Float64}
+    Yop::Vector{Float64}
+    Dop::Vector{Float64}
+    function NonLinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
+        model = estim.model
+        nu, ny = model.nu, model.ny
+        validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
+        M_Hp = Diagonal(repeat(Mwt, Hp))
+        N_Hc = Diagonal(repeat(Nwt, Hc)) 
+        L_Hp = Diagonal(repeat(Lwt, Hp))
+        C = Cwt
+        # manipulated input setpoint predictions are constant over Hp :
+        R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[] 
+        umin,  umax      = fill(-Inf, nu), fill(+Inf, nu)
+        Δumin, Δumax     = fill(-Inf, nu), fill(+Inf, nu)
+        ŷmin,  ŷmax      = fill(-Inf, ny), fill(+Inf, ny)
+        c_umin, c_umax   = fill(0.0, nu),  fill(0.0, nu)
+        c_Δumin, c_Δumax = fill(0.0, nu),  fill(0.0, nu)
+        c_ŷmin, c_ŷmax   = fill(1.0, ny),  fill(1.0, ny)
+        Umin, Umax, ΔUmin, ΔUmax, Ŷmin, Ŷmax = 
+            repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
+        c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = 
+            repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
+        S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
+        E, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
+        A_Umin, A_Umax, S̃_Hp, S̃_Hc = 
+            relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = 
+            relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+        A_Ŷmin, A_Ŷmax, Ẽ = 
+            relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
+        P̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        Ks, Ps = init_stochpred(estim, Hp)
+        Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
+        nvar = size(P̃, 1)
+        set_silent(optim)
+        @variable(optim, ΔŨ[1:nvar])
+        # dummy q̃ value (the vector is updated just before optimization):
+        q̃ = zeros(nvar)
+        @objective(optim, Min, obj_quadprog(ΔŨ, P̃, q̃))
+        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
+        # dummy b vector to detect Inf values (b is updated just before optimization):
+        b = [-Umin; +Umax; -ΔŨmin; +ΔŨmax; -Ŷmin; +Ŷmax]
+        i_nonInf = .!isinf.(b)
+        A = A[i_nonInf, :]
+        b = b[i_nonInf]
+        @constraint(optim, constraint_lin, A*ΔŨ .≤ b)
+        ΔŨ0 = zeros(nvar)
+        ϵ = isinf(C) ? nothing : 0.0 # C = Inf means hard constraints only
+        u, U = copy(model.uop), repeat(model.uop, Hp)
+        ŷ, Ŷ = copy(model.yop), repeat(model.yop, Hp)
+        ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
+        info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
+        return new(
+            model, estim, optim, info,
+            Hp, Hc, 
+            M_Hp, Ñ_Hc, L_Hp, C, R̂u,
+            Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
+            c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax, 
+            S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
+            A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+            Ẽ, G, J, Kd, Q, P̃,
+            Ks, Ps,
+            Yop, Dop,
+        )
+    end
+end
+
+@doc raw"""
+    NonLinMPC(model::SimModel; <keyword arguments>)
+
+Construct a nonlinear predictive controller based on [`SimModel`](@ref) `model`.
+
+Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The controller minimizes 
+the following objective function at each discrete time ``k``:
+```math
+\min_{\mathbf{ΔU}, ϵ}    \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)}   
+                       + \mathbf{(ΔU)}'      \mathbf{N}_{H_c} \mathbf{(ΔU)}  
+                       + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
+                       + C ϵ^2  +  E J_E(\mathbf{U}, \mathbf{Ŷ}_E, \mathbf{D̂}_E)
+
+```
+See [`LinMPC`](@ref) for the variable defintions. The custom economic function 
+``J_E`` can penalizes solutions with high economic costs. Setting all the weights to 0 
+except ``E`` produces a pure economic model predictive controller (EMPC). ``J_E`` is a 
+function of ``\mathbf{U}``, the manipulated inputs from ``k`` to ``k+H_p-1``, and also the 
+output and measured disturbance predictions from ``k`` to ``k+H_p``:
+```math
+    \mathbf{Ŷ}_E =  \begin{bmatrix} 
+                        \mathbf{ŷ}(k) \\ 
+                        \mathbf{Ŷ} 
+                    \end{bmatrix}                 \quad \text{and} \quad
+    \mathbf{D̂}_E =  \begin{bmatrix} 
+                        \mathbf{d}(k) \\ 
+                        \mathbf{D̂} 
+                    \end{bmatrix}
+```
+to incorporate current values in the 3 arguments. Note that ``\mathbf{U}`` omits the last 
+value at ``k+H_p``.
+
+!!! tip
+    Replace any of the 3 arguments with '_' if they are not needed (see `J_E` argument
+    default value below).
+
+This method uses the default state estimator, an [`UnscentedKalmanFilter`](@ref) with 
+default arguments.
+
+# Arguments
+- `model::SimModel` : model used for controller predictions and state estimations.
+- `Hp=10`: prediction horizon ``H_p``.
+- `Hc=2` : control horizon ``H_c``.
+- `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector)
+- `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector)
+- `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector)
+- `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only
+- `Ewt=1.0` : economic costs weight ``E`` (scalar). 
+- `J_E=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U, D̂, Ŷ})``.
+- `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector)
+- `optim=JuMP.Model(Ipopt.Optimizez)` : quadratic optimizer used in the predictive 
+   controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
+  (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer)
+
+# Examples
+```jldoctest
+julia> a = 1;
+"""
+NonLinMPC(model::SimModel; kwargs...) = LinMPC(UnscentedKalmanFilter(model); kwargs...)
+
+
+"""
+    NonLinMPC(estim::StateEstimator; <keyword arguments>)
+
+Use custom state estimator `estim` to construct `NonLinMPC`.
+
+# Examples
+```jldoctest
+julia> a = 1;
+```
+"""
+function NonLinMPC(
     estim::StateEstimator;
     Hp::Union{Int, Nothing} = nothing,
     Hc::Int = 2,
@@ -453,7 +659,7 @@ They are assumed constant in the future by default, that is
 to ``H_p``. Current measured outputs `ym` (keyword argument) are only required if 
 `mpc.estim` is a [`InternalModel`](@ref).
 
-See also [`LinMPC`](@ref), `NonLinMPC`.
+See also [`LinMPC`](@ref), @ref[`NonLinMPC`].
 
 # Examples
 ```jldoctest
@@ -613,7 +819,7 @@ function optim_objective!(mpc::LinMPC, b, q̃, p)
         optimize!(optim)
     catch err
         if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
-            # reset_optimizer() to unset warm-start, set_start_value.(nothing) seems buggy
+            # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
             MOIU.reset_optimizer(optim) 
             optimize!(optim)
         else
@@ -903,23 +1109,23 @@ function relaxŶ(C, c_Ŷmin, c_Ŷmax, E)
 end
 
 @doc raw"""
-    init_quadprog(E, S_Hp, M_Hp, N_Hc, L_Hp)
+    init_quadprog(Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
 
-Init the quadratic programming optimization matrix `P`.
+Init the quadratic programming optimization matrix `P̃`.
 
-The `P` matrix appears in the quadratic general form :
+The `P̃` matrix appears in the quadratic general form :
 ```math
-    J = \min_{\mathbf{ΔU}} \frac{1}{2}\mathbf{(ΔU)'P(ΔU)} + \mathbf{q'(ΔU)} + p 
+    J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'P̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
 ```
-``\mathbf{P}`` is constant if the model and weights are linear and time invariant (LTI). The 
-vector ``\mathbf{q}`` and scalar ``p`` need recalculation each control period ``k`` (see
+``\mathbf{P̃}`` is constant if the model and weights are linear and time invariant (LTI). The 
+vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k`` (see
 [`init_prediction`](@ref) method). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
-init_quadprog(E, S_Hp, M_Hp, N_Hc, L_Hp) = 2*Symmetric(E'*M_Hp*E + N_Hc + S_Hp'*L_Hp*S_Hp)
+init_quadprog(Ẽ, S_Hp, M_Hp, N_Hc, L_Hp) = 2*Symmetric(Ẽ'*M_Hp*Ẽ + N_Hc + S_Hp'*L_Hp*S_Hp)
 
 "Return the quadratic programming objective function, see [`init_quadprog`](@ref)."
-obj_quadprog(ΔU, P, q) = 1/2*ΔU'*P*ΔU + q'*ΔU
+obj_quadprog(ΔŨ, P̃, q̃) = 1/2*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ
 
 @doc raw"""
     init_stochpred(estim::StateEstimator, Hp)

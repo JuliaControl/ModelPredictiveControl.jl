@@ -60,7 +60,7 @@ Pages = [
 - ⬜ easy integration with `Plots.jl`
 - ✅ optimization based on `JuMP.jl`:
   - ✅ quickly compare multiple optimizers
-  - ✅ nonlinear solvers relying on automatic differentiation (exact derivative)
+  - ⬜ nonlinear solvers relying on automatic differentiation (exact derivative)
 - ⬜ additional information about the optimum to ease troubleshooting:
   - ✅ optimal input increments over control horizon
   - ✅ slack variable optimum
