@@ -34,8 +34,6 @@ Pages = [
 - ✅ linear and nonlinear plant models exploiting multiple dispatch
 - ⬜ model predictive controllers based on:
   - ✅ linear plant models
-  - ⬜ linear plant models in a nonlinear controller using fast matrix algebra for the
-       predictions (e.g. economic optimization of a linear model)
   - ⬜ nonlinear plant models
 - ⬜ supported objective function terms:
   - ✅ output setpoint tracking

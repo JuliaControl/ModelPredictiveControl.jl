@@ -381,36 +381,38 @@ end
 
 Construct a nonlinear predictive controller based on [`SimModel`](@ref) `model`.
 
-Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The controller minimizes 
-the following objective function at each discrete time ``k``:
+Both [`NonLinModel`](@ref) and [`LinModel`](@ref) are supported (see Extended Help). The 
+controller minimizes the following objective function at each discrete time ``k``:
 ```math
 \min_{\mathbf{ΔU}, ϵ}    \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)}   
                        + \mathbf{(ΔU)}'      \mathbf{N}_{H_c} \mathbf{(ΔU)}  
                        + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
-                       + C ϵ^2  +  E J_E(\mathbf{U}, \mathbf{Ŷ}_E, \mathbf{D̂}_E)
+                       + C ϵ^2  +  E J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E)
 
 ```
-See [`LinMPC`](@ref) for the variable defintions. The custom economic function 
-``J_E`` can penalizes solutions with high economic costs. Setting all the weights to 0 
-except ``E`` produces a pure economic model predictive controller (EMPC). ``J_E`` is a 
-function of ``\mathbf{U}``, the manipulated inputs from ``k`` to ``k+H_p-1``, and also the 
-output and measured disturbance predictions from ``k`` to ``k+H_p``:
+See [`LinMPC`](@ref) for the variable definitions. The custom economic function ``J_E`` can
+penalizes solutions with high economic costs. Setting all the weights to 0 except ``E`` 
+produces a pure economic model predictive controller (EMPC). The arguments of ``J_E`` are 
+the manipulated inputs, the predicted outputs and measured disturbances from ``k`` to 
+``k+H_p`` inclusively:
 ```math
+    \mathbf{U}_E =  \begin{bmatrix} 
+                        \mathbf{U}   \\ 
+                        \mathbf{u}(k+H_p-1) 
+    \end{bmatrix}                                   \text{,} \qquad
     \mathbf{Ŷ}_E =  \begin{bmatrix} 
                         \mathbf{ŷ}(k) \\ 
                         \mathbf{Ŷ} 
-                    \end{bmatrix}                 \quad \text{and} \quad
+                    \end{bmatrix}                   \text{,} \qquad
     \mathbf{D̂}_E =  \begin{bmatrix} 
                         \mathbf{d}(k) \\ 
                         \mathbf{D̂} 
                     \end{bmatrix}
 ```
-to incorporate current values in the 3 arguments. Note that ``\mathbf{U}`` omits the last 
-value at ``k+H_p``.
 
 !!! tip
-    Replace any of the 3 arguments with `_` if they are not needed (see `J_E` argument
-    default value below).
+    Replace any of the 3 arguments with `_` if they are not needed (see `J_E` default value 
+    below).
 
 This method uses the default state estimator, an [`UnscentedKalmanFilter`](@ref) with 
 default arguments.
@@ -424,15 +426,21 @@ default arguments.
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector)
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only
 - `Ewt=1.0` : economic costs weight ``E`` (scalar). 
-- `J_E=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U, D̂, Ŷ})``.
+- `J_E=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{D̂}_E, \mathbf{Ŷ}_E)``.
 - `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector)
-- `optim=JuMP.Model(Ipopt.Optimizez)` : quadratic optimizer used in the predictive 
+- `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive 
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
-  (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer)
+   (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer)
 
 # Examples
 ```jldoctest
 julia> a = 1;
+```
+
+# Extended Help
+`NonLinMPC` controllers based on [`LinModel`](@ref) compute the predictions using fast 
+matrix algebra instead of a `for` loop. This feature can accelerate the optimization and 
+isn't available in any other package, to my knowledge.
 """
 NonLinMPC(model::SimModel; kwargs...) = LinMPC(UnscentedKalmanFilter(model); kwargs...)
 
