@@ -7,6 +7,7 @@ Pkg.activate(".")
 using ModelPredictiveControl
 #using JuMP, DAQP
 #using JuMP, HiGHS
+using JuMP, Ipopt
 using LinearAlgebra
 using ControlSystemsBase
 using MAT
@@ -69,7 +70,19 @@ nmpc = NonLinMPC(uscKalmanFilter1)
 
 nmpc = NonLinMPC(nonLinModel1)
 
+function myfunc()
+    model = Model(Ipopt.Optimizer)
+    nu = 2
+    Hc = 2
+    @variable(model, x[1:nu*Hc] >= 0)
+    f(x...) = sum(x[i]^i for i in eachindex(x))
+    register(model, :f, nu*Hc, f; autodiff = true)
+    @NLobjective(model, Min, f(x...))
+    optimize!(model)
+end
 
+myfunc()
+#=
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
@@ -138,3 +151,4 @@ pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(pd)
 display(pu)
 display(py)
+=#
