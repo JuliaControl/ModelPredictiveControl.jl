@@ -638,7 +638,7 @@ They are assumed constant in the future by default, that is
 to ``H_p``. Current measured outputs `ym` (keyword argument) are only required if 
 `mpc.estim` is a [`InternalModel`](@ref).
 
-See also [`LinMPC`](@ref), @ref[`NonLinMPC`].
+See also [`LinMPC`](@ref), [`NonLinMPC`](@ref).
 
 # Examples
 ```jldoctest
