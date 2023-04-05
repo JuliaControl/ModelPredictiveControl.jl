@@ -315,8 +315,8 @@ function updatestate_kf!(estim::KalmanFilter, u, ym, d)
     return x̂, P̂
 end
 
-struct UnscentedKalmanFilter <: StateEstimator
-    model::SimModel
+struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
+    model::M
     x̂::Vector{Float64}
     P̂::Hermitian{Float64}
     i_ym::IntRangeOrVector
@@ -336,7 +336,7 @@ struct UnscentedKalmanFilter <: StateEstimator
     γ::Float64
     m̂::Vector{Float64}
     Ŝ::Diagonal{Float64}
-    function UnscentedKalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂, α, β, κ)
+    function UnscentedKalmanFilter{M}(model::M, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂, α, β, κ) where {M<:SimModel}
         nx, ny = model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
         nxs = size(Asm,1)
@@ -403,7 +403,7 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s and:
 ```
 """
 function UnscentedKalmanFilter(
-    model::SimModel;
+    model::M;
     i_ym::IntRangeOrVector = 1:model.ny,
     σP0::Vector{<:Real} = fill(10, model.nx),
     σQ::Vector{<:Real} = fill(0.1, model.nx),
@@ -414,7 +414,7 @@ function UnscentedKalmanFilter(
     α::Real = 1e-3,
     β::Real = 2,
     κ::Real = 0
-    )
+    ) where {M<:SimModel}
     if nint_ym == 0 # alias for no output integrator at all :
         nint_ym = fill(0, length(i_ym));
     end
@@ -423,7 +423,7 @@ function UnscentedKalmanFilter(
     P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return UnscentedKalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂, α, β, κ)
+    return UnscentedKalmanFilter{M}(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂, α, β, κ)
 end
 
 @doc raw"""

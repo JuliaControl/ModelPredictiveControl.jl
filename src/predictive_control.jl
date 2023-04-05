@@ -32,9 +32,9 @@ mutable struct OptimInfo
 end
 
 
-struct LinMPC <: PredictiveController
+struct LinMPC{S<:StateEstimator} <: PredictiveController
     model::LinModel
-    estim::StateEstimator
+    estim::S
     optim::JuMP.Model
     info::OptimInfo
     Hp::Int
@@ -76,7 +76,7 @@ struct LinMPC <: PredictiveController
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
-    function LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
+    function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim) where {S<:StateEstimator}
         model = estim.model
         nu, ny = model.nu, model.ny
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
@@ -239,7 +239,7 @@ LinMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
 ```
 """
 function LinMPC(
-    estim::StateEstimator;
+    estim::S;
     Hp::Union{Int, Nothing} = nothing,
     Hc::Int = 2,
     Mwt = fill(1.0, estim.model.ny),
@@ -248,7 +248,7 @@ function LinMPC(
     Cwt = 1e5,
     ru  = estim.model.uop,
     optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
-)
+    ) where {S<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     poles = eigvals(estim.model.A)
     nk = sum(poles .≈ 0)
@@ -259,14 +259,14 @@ function LinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*
               "($nk), the closed-loop system may be zero-gain (unresponsive) or unstable")
     end
-    return LinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
+    return LinMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
 end
 
 
 
-struct NonLinMPC <: PredictiveController
+struct NonLinMPC{S<:StateEstimator} <: PredictiveController
     model::SimModel
-    estim::StateEstimator
+    estim::S
     optim::JuMP.Model
     info::OptimInfo
     Hp::Int
@@ -308,7 +308,7 @@ struct NonLinMPC <: PredictiveController
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
-    function NonLinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, J_E, ru, optim)
+    function NonLinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, J_E, ru, optim) where {S<:StateEstimator}
         model = estim.model
         nu, ny = model.nu, model.ny
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt)
@@ -435,7 +435,7 @@ julia> a = 1;
 ```
 """
 function NonLinMPC(
-    estim::StateEstimator;
+    estim::S;
     Hp::Int = 10,
     Hc::Int = 2,
     Mwt = fill(1.0, estim.model.ny),
@@ -446,8 +446,8 @@ function NonLinMPC(
     J_E = (_,_,_) -> 0.0,
     ru  = estim.model.uop,
     optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
-)
-    return NonLinMPC(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, J_E, ru, optim)
+) where {S<:StateEstimator}
+    return NonLinMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, J_E, ru, optim)
 end
 
 @doc raw"""
@@ -1209,7 +1209,7 @@ repeatdiag(A, n::Int) = kron(I(n), A)
 
 function Base.show(io::IO, mpc::PredictiveController)
     println(io, "$(typeof(mpc)) controller with a sample time "*
-                "Ts = $(mpc.model.Ts) s, $(typeof(mpc.estim)) estimator and:")
+                "Ts = $(mpc.model.Ts) s and:")
     println(io, " $(mpc.model.nu) manipulated inputs u")
     println(io, " $(mpc.estim.nx̂) states x̂")
     println(io, " $(mpc.estim.nym) measured outputs ym")

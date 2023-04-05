@@ -1,5 +1,5 @@
-struct InternalModel <: StateEstimator
-    model::SimModel
+struct InternalModel{M<:SimModel} <: StateEstimator
+    model::M
     x̂::Vector{Float64}
     x̂d::Vector{Float64}
     x̂s::Vector{Float64}
@@ -14,7 +14,7 @@ struct InternalModel <: StateEstimator
     Ds::Matrix{Float64}
     Âs::Matrix{Float64}
     B̂s::Matrix{Float64}
-    function InternalModel(model, i_ym, Asm, Bsm, Csm, Dsm)
+    function InternalModel{M}(model::M, i_ym, Asm, Bsm, Csm, Dsm) where {M<:SimModel}
         ny = model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
         if isa(model, LinModel)
@@ -79,10 +79,10 @@ future. This is the dynamic matrix control (DMC) strategy, which is simple but s
 aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
 """
 function InternalModel(
-    model::SimModel;
+    model::M;
     i_ym::IntRangeOrVector = 1:model.ny,
     stoch_ym::Union{StateSpace, TransferFunction} = ss(1,1,1,1,model.Ts).*I(length(i_ym))
-    )
+    ) where {M<:SimModel}
     if isa(stoch_ym, TransferFunction) 
         stoch_ym = minreal(ss(stoch_ym))
     end
@@ -96,7 +96,7 @@ function InternalModel(
             stoch_ym   = c2d(stoch_ym_c, model.Ts, :tustin)
         end
     end
-    return InternalModel(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
+    return InternalModel{M}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
 end
 
 
