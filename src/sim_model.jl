@@ -272,11 +272,7 @@ struct NonLinModel <: SimModel
     uop::Vector{Float64}
     yop::Vector{Float64}
     dop::Vector{Float64}
-    function NonLinModel(
-            f, h, Ts::Real, 
-            nu::Int, nx::Int, ny::Int, nd::Int = 0; 
-            x0 = nothing
-    )
+    function NonLinModel(f, h, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int = 0)
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_fcts(f, h)
         uop = zeros(nu)
