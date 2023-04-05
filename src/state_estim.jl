@@ -146,8 +146,13 @@ function augment_model(model::LinModel, As, Cs)
     Ĉ   = [model.C Cs]
     B̂d  = [model.Bd; zeros(nxs,nd)]
     D̂d  = model.Dd
-    f̂(x̂, u, d) = Â*x̂ + B̂u*u + B̂d*d
-    ĥ(x̂, d) = Ĉ*x̂ + D̂d*d
+    # the `let` block captures and fixes Â, B̂u, B̂d, Ĉ, D̂d values (faster computations):
+    f̂ = let Â=Â, B̂u=B̂u, B̂d=B̂d
+        (x̂, u, d) -> Â*x̂ + B̂u*u + B̂d*d
+    end
+    ĥ = let Ĉ=Ĉ, D̂d=D̂d
+        (x̂, d) -> Ĉ*x̂ + D̂d*d
+    end
     return f̂, ĥ, Â, B̂u, Ĉ, B̂d, D̂d
 end
 
@@ -157,8 +162,13 @@ end
 Only returns the augmented functions `f̂`, `ĥ` when `model` is a [`NonLinModel`](@ref).
 """
 function augment_model(model::NonLinModel, As, Cs)
-    f̂(x̂, u, d) = [model.f(x̂[1:model.nx], u, d); As*x̂[model.nx+1:end]]
-    ĥ(x̂, d) = model.h(x̂[1:model.nx], d) + Cs*x̂[model.nx+1:end]
+    # the `let` block captures and fixes model.f/h/nx, As and Cs values (faster computations)
+    f̂ = let f=model.f, nx=model.nx, As=As
+        (x̂, u, d) -> [f(x̂[1:nx], u, d); As*x̂[nx+1:end]]
+    end
+    ĥ = let h=model.h, nx=model.nx, Cs=Cs
+        (x̂, d) -> h(x̂[1:nx], d) + Cs*x̂[nx+1:end]
+    end
     return f̂, ĥ
 end
 
@@ -192,7 +202,7 @@ julia> x̂ = initstate!(estim, [1], [3 - 0.1])
   0.0
  -0.10000000000000675
 ```
-
+f̂
 """
 function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     model = estim.model

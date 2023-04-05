@@ -42,8 +42,13 @@ struct LinModel <: SimModel
         size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
         size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
         Ts > 0 || error("Sampling time Ts must be positive")
-        f(x,u,d) = A*x + Bu*u + Bd*d
-        h(x,d) = C*x + Dd*d
+        # the `let` block captures and fixes A, Bu, Bd, C, Dd values (faster computations):
+        f = let A=A, Bu=Bu, Bd=Bd 
+            (x,u,d) -> A*x + Bu*u + Bd*d
+        end
+        h = let C=C, Dd=Dd
+            (x,d) -> C*x + Dd*d
+        end
         uop = zeros(nu)
         yop = zeros(ny)
         dop = zeros(nd)
