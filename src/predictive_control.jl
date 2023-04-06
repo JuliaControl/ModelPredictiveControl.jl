@@ -33,7 +33,6 @@ end
 
 
 struct LinMPC{S<:StateEstimator} <: PredictiveController
-    model::LinModel
     estim::S
     optim::JuMP.Model
     info::OptimInfo
@@ -124,7 +123,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
         info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
         return new(
-            model, estim, optim, info,
+            estim, optim, info,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u,
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
@@ -248,7 +247,7 @@ function LinMPC(
     Cwt = 1e5,
     ru  = estim.model.uop,
     optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
-    ) where {S<:StateEstimator}
+) where {S<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     poles = eigvals(estim.model.A)
     nk = sum(poles .≈ 0)
@@ -265,7 +264,6 @@ end
 
 
 struct NonLinMPC{S<:StateEstimator} <: PredictiveController
-    model::SimModel
     estim::S
     optim::JuMP.Model
     info::OptimInfo
@@ -308,7 +306,9 @@ struct NonLinMPC{S<:StateEstimator} <: PredictiveController
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
-    function NonLinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, J_E, ru, optim) where {S<:StateEstimator}
+    function NonLinMPC{S}(
+        estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, J_E, ru, optim
+    ) where {S<:StateEstimator}
         model = estim.model
         nu, ny = model.nu, model.ny
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt)
@@ -353,7 +353,7 @@ struct NonLinMPC{S<:StateEstimator} <: PredictiveController
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
         info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
         return new(
-            model, estim, optim, info,
+            estim, optim, info,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u,
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
@@ -496,7 +496,7 @@ function setconstraint!(
     c_Δumin = nothing, c_Δumax = nothing,
     c_ŷmin = nothing,  c_ŷmax = nothing
 )
-    model = mpc.model
+    model = mpc.estim.model
     nu, ny = model.ny, model.ny
     Hp, Hc = mpc.Hp, mpc.Hc
     C = mpc.C
@@ -660,11 +660,11 @@ function moveinput!(
     lastu = mpc.info.u
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
-    F, q̃, p = init_prediction(mpc, mpc.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
-    b = init_constraint(mpc, mpc.model, F, lastu)
+    F, q̃, p = init_prediction(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
+    b = init_constraint(mpc, mpc.estim.model, F, lastu)
     ΔŨ, J = optim_objective!(mpc, b, q̃, p)
     write_info!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
-    Δu = ΔŨ[1:mpc.model.nu] # receding horizon principle: only Δu(k) is used (first one)
+    Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
     u = lastu + Δu
     return u
 end
@@ -785,12 +785,13 @@ Optimize the `mpc` quadratic objective function for [`LinMPC`](@ref) type.
 """
 function optim_objective!(mpc::LinMPC, b, q̃, p)
     optim = mpc.optim
+    model = mpc.estim.model
     ΔŨ = optim[:ΔŨ]
     lastΔŨ = mpc.info.ΔŨ
     set_objective_function(optim, obj_quadprog(ΔŨ, mpc.P̃, q̃))
     set_normalized_rhs.(optim[:constraint_lin], b)
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
-    ΔŨ0 = [lastΔŨ[(mpc.model.nu+1):(mpc.Hc*mpc.model.nu)]; zeros(mpc.model.nu)]
+    ΔŨ0 = [lastΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(model.nu)]
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
     set_start_value.(ΔŨ, ΔŨ0)
@@ -825,7 +826,7 @@ function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     mpc.info.ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
     mpc.info.J = J
     mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*lastu
-    mpc.info.u = mpc.info.U[1:mpc.model.nu]
+    mpc.info.u = mpc.info.U[1:mpc.estim.model.nu]
     mpc.info.ŷ = isa(mpc.estim, InternalModel) ? mpc.estim(ym, d) : mpc.estim(d)
     mpc.info.Ŷ = mpc.Ẽ*ΔŨ + F
     mpc.info.ŷs, mpc.info.Ŷs = ŷs, Ŷs
@@ -1209,8 +1210,8 @@ repeatdiag(A, n::Int) = kron(I(n), A)
 
 function Base.show(io::IO, mpc::PredictiveController)
     println(io, "$(typeof(mpc)) controller with a sample time "*
-                "Ts = $(mpc.model.Ts) s and:")
-    println(io, " $(mpc.model.nu) manipulated inputs u")
+                "Ts = $(mpc.estim.model.Ts) s and:")
+    println(io, " $(mpc.estim.model.nu) manipulated inputs u")
     println(io, " $(mpc.estim.nx̂) states x̂")
     println(io, " $(mpc.estim.nym) measured outputs ym")
     println(io, " $(mpc.estim.nyu) unmeasured outputs yu")
