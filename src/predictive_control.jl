@@ -38,9 +38,9 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     info::OptimInfo
     Hp::Int
     Hc::Int
-    M_Hp::Diagonal{Float64}
-    Ñ_Hc::Diagonal{Float64}
-    L_Hp::Diagonal{Float64}
+    M_Hp::Diagonal{Float64, Vector{Float64}}
+    Ñ_Hc::Diagonal{Float64, Vector{Float64}}
+    L_Hp::Diagonal{Float64, Vector{Float64}}
     C::Float64
     R̂u::Vector{Float64}
     Umin   ::Vector{Float64}
@@ -70,7 +70,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     J ::Matrix{Float64}
     Kd::Matrix{Float64}
     Q ::Matrix{Float64}
-    P̃ ::Symmetric{Float64}
+    P̃ ::Hermitian{Float64, Matrix{Float64}}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
@@ -269,9 +269,9 @@ struct NonLinMPC{S<:StateEstimator} <: PredictiveController
     info::OptimInfo
     Hp::Int
     Hc::Int
-    M_Hp::Diagonal{Float64}
-    Ñ_Hc::Diagonal{Float64}
-    L_Hp::Diagonal{Float64}
+    M_Hp::Diagonal{Float64, Vector{Float64}}
+    Ñ_Hc::Diagonal{Float64, Vector{Float64}}
+    L_Hp::Diagonal{Float64, Vector{Float64}}
     C::Float64
     E::Float64
     R̂u::Vector{Float64}
@@ -1136,7 +1136,7 @@ vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period 
 [`init_prediction`](@ref) method). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
-init_quadprog(Ẽ, S_Hp, M_Hp, N_Hc, L_Hp) = 2*Symmetric(Ẽ'*M_Hp*Ẽ + N_Hc + S_Hp'*L_Hp*S_Hp)
+init_quadprog(Ẽ, S_Hp, M_Hp, N_Hc, L_Hp) = 2*Hermitian(Ẽ'*M_Hp*Ẽ + N_Hc + S_Hp'*L_Hp*S_Hp)
 
 "Return the quadratic programming objective function, see [`init_quadprog`](@ref)."
 obj_quadprog(ΔŨ, P̃, q̃) = 1/2*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ

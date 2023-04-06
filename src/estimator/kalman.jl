@@ -18,8 +18,8 @@ struct SteadyKalmanFilter <: StateEstimator
     D̂dm ::Matrix{Float64}
     f̂::Function
     ĥ::Function
-    Q̂::Union{Diagonal{Float64}, Matrix{Float64}}
-    R̂::Union{Diagonal{Float64}, Matrix{Float64}}
+    Q̂::Union{Diagonal{Float64, Vector{Float64}}, Matrix{Float64}}
+    R̂::Union{Diagonal{Float64, Vector{Float64}}, Matrix{Float64}}
     K::Matrix{Float64}
     function SteadyKalmanFilter(model, i_ym, nint_ym, Asm, Csm, Q̂, R̂)
         nx, ny = model.nx, model.ny
@@ -169,7 +169,7 @@ end
 struct KalmanFilter <: StateEstimator
     model::LinModel
     x̂::Vector{Float64}
-    P̂::Hermitian{Float64}
+    P̂::Hermitian{Float64, Matrix{Float64}}
     i_ym::IntRangeOrVector
     nx̂::Int
     nym::Int
@@ -187,9 +187,9 @@ struct KalmanFilter <: StateEstimator
     D̂dm ::Matrix{Float64}
     f̂::Function
     ĥ::Function
-    P̂0::Union{Diagonal{Float64}, Hermitian{Float64}}
-    Q̂::Union{Diagonal{Float64}, Matrix{Float64}}
-    R̂::Union{Diagonal{Float64}, Matrix{Float64}}
+    P̂0::Hermitian{Float64, Matrix{Float64}}
+    Q̂::Union{Diagonal{Float64, Vector{Float64}}, Matrix{Float64}}
+    R̂::Union{Diagonal{Float64, Vector{Float64}}, Matrix{Float64}}
     function KalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂)
         nx, ny = model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
@@ -200,7 +200,8 @@ struct KalmanFilter <: StateEstimator
         f̂, ĥ, Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         x̂ = [copy(model.x); zeros(nxs)]
-        P̂ = Hermitian(Matrix(P̂0), :L)
+        P̂0 = Hermitian(P̂0)
+        P̂ = copy(P̂0)
         return new(
             model, 
             x̂, P̂, 
@@ -318,7 +319,7 @@ end
 struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     model::M
     x̂::Vector{Float64}
-    P̂::Hermitian{Float64}
+    P̂::Hermitian{Float64, Matrix{Float64}}
     i_ym::IntRangeOrVector
     nx̂::Int
     nym::Int
@@ -329,13 +330,13 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     nint_ym::Vector{Int}
     f̂::Function
     ĥ::Function
-    P̂0::Union{Diagonal{Float64}, Hermitian{Float64}}
-    Q̂::Union{Diagonal{Float64}, Matrix{Float64}}
-    R̂::Union{Diagonal{Float64}, Matrix{Float64}}
+    P̂0::Hermitian{Float64, Matrix{Float64}}
+    Q̂::Union{Diagonal{Float64, Vector{Float64}}, Hermitian{Float64, Matrix{Float64}}}
+    R̂::Union{Diagonal{Float64, Vector{Float64}}, Hermitian{Float64, Matrix{Float64}}}
     nσ::Int 
     γ::Float64
     m̂::Vector{Float64}
-    Ŝ::Diagonal{Float64}
+    Ŝ::Diagonal{Float64, Vector{Float64}}
     function UnscentedKalmanFilter{M}(
         model::M, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂, α, β, κ
     ) where {M<:SimModel}
@@ -348,7 +349,8 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         f̂, ĥ = augment_model(model, As, Cs)
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         x̂ = [copy(model.x); zeros(nxs)]
-        P̂ = Hermitian(Matrix(P̂0), :L)
+        P̂0 = Hermitian(P̂0)
+        P̂ = copy(P̂0)
         return new(
             model,
             x̂, P̂, 
