@@ -7,13 +7,13 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
 model = LinModel(sys, Ts, i_d=[3])
 mpc1 = LinMPC(model, Hp=15)
 @test isa(mpc1.estim, SteadyKalmanFilter)
-@test size(mpc1.Ẽ,1) == 15*mpc1.model.ny
+@test size(mpc1.Ẽ,1) == 15*mpc1.estim.model.ny
 
 mpc2 = LinMPC(model, Hc=4, Cwt=Inf)
-@test size(mpc2.Ẽ,2) == 4*mpc2.model.nu
+@test size(mpc2.Ẽ,2) == 4*mpc2.estim.model.nu
 
 mpc3 = LinMPC(model, Hc=4, Cwt=1e5)
-@test size(mpc3.Ẽ,2) == 4*mpc3.model.nu + 1
+@test size(mpc3.Ẽ,2) == 4*mpc3.estim.model.nu + 1
 
 kf = KalmanFilter(model)
 mpc4 = LinMPC(kf)
