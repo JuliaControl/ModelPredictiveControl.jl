@@ -2,7 +2,8 @@ module ModelPredictiveControl
 
 using LinearAlgebra
 using ControlSystemsBase
-using JuMP, OSQP, Ipopt
+using JuMP
+import OSQP, Ipopt
 
 export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput
 export StateEstimator, InternalModel

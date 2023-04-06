@@ -252,7 +252,7 @@ See also [`LinModel`](@ref).
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->-x+u, (x,_)->2x, 10, 1, 1, 1)
+julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10, 1, 1, 1)
 Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
  1 manipulated inputs u
  1 states x

@@ -201,7 +201,7 @@ arguments.
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
 
 julia> mpc = LinMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-LinMPC{SteadyKalmanFilter} controller with a sample time Ts = 4.0 s and:
+LinMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimator and:
  1 manipulated inputs u
  4 states x̂
  2 measured outputs ym
@@ -229,7 +229,7 @@ Use custom state estimator `estim` to construct `LinMPC`.
 julia> estim = KalmanFilter(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4), i_ym=[2]);
 
 julia> mpc = LinMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-LinMPC{KalmanFilter} controller with a sample time Ts = 4.0 s and:
+LinMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
  1 manipulated inputs u
  3 states x̂
  1 measured outputs ym
@@ -413,7 +413,15 @@ default arguments.
 
 # Examples
 ```jldoctest
-julia> a = 1;
+julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10, 1, 1, 1);
+
+julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
+NonLinMPC controller with a sample time Ts = 10.0 s, UnscentedKalmanFilter{NonLinModel} estimator and:
+ 1 manipulated inputs u
+ 2 states x̂
+ 1 measured outputs ym
+ 0 unmeasured outputs yu
+ 0 measured disturbances d
 ```
 
 # Extended Help
@@ -431,7 +439,17 @@ Use custom state estimator `estim` to construct `NonLinMPC`.
 
 # Examples
 ```jldoctest
-julia> a = 1;
+julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10, 1, 1, 1);
+
+julia> estim = UnscentedKalmanFilter(model, σQ_int=[0.05]);
+
+julia> mpc = NonLinMPC(estim, Hp=20, Hc=1, Cwt=1e6)
+NonLinMPC controller with a sample time Ts = 10.0 s, UnscentedKalmanFilter{NonLinModel} estimator and:
+ 1 manipulated inputs u
+ 2 states x̂
+ 1 measured outputs ym
+ 0 unmeasured outputs yu
+ 0 measured disturbances d
 ```
 """
 function NonLinMPC(
@@ -1209,8 +1227,8 @@ repeatdiag(A, n::Int) = kron(I(n), A)
 
 
 function Base.show(io::IO, mpc::PredictiveController)
-    println(io, "$(typeof(mpc)) controller with a sample time "*
-                "Ts = $(mpc.estim.model.Ts) s and:")
+    println(io, "$(typeof(mpc).name.name) controller with a sample time "*
+                "Ts = $(mpc.estim.model.Ts) s, $(typeof(mpc).parameters[1]) estimator and:")
     println(io, " $(mpc.estim.model.nu) manipulated inputs u")
     println(io, " $(mpc.estim.nx̂) states x̂")
     println(io, " $(mpc.estim.nym) measured outputs ym")

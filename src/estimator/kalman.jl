@@ -393,7 +393,7 @@ unmeasured ones, for ``\mathbf{ĥ^u}``).
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->-x+u, (x,_)->2x, 10, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10, 1, 1, 1);
 
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0_int=[1, 1])
 UnscentedKalmanFilter{NonLinModel} estimator with a sample time Ts = 10.0 s and:
