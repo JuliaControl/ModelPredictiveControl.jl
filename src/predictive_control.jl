@@ -202,7 +202,7 @@ arguments.
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
 
 julia> mpc = LinMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-LinMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimator and:
+LinMPC{SteadyKalmanFilter} controller with a sample time Ts = 4.0 s and:
  1 manipulated inputs u
  4 states x̂
  2 measured outputs ym
@@ -230,7 +230,7 @@ Use custom state estimator `estim` to construct `LinMPC`.
 julia> estim = KalmanFilter(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4), i_ym=[2]);
 
 julia> mpc = LinMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-LinMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
+LinMPC{KalmanFilter} controller with a sample time Ts = 4.0 s and:
  1 manipulated inputs u
  3 states x̂
  1 measured outputs ym

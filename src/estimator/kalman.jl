@@ -394,7 +394,7 @@ unmeasured ones, for ``\mathbf{ĥ^u}``).
 julia> model = NonLinModel((x,u,_)->-x+u, (x,_)->2x, 10, 1, 1, 1);
 
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0_int=[1, 1])
-UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s and:
+UnscentedKalmanFilter{NonLinModel} estimator with a sample time Ts = 10.0 s and:
  1 manipulated inputs u
  3 states x̂
  1 measured outputs ym
