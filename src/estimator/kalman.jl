@@ -336,7 +336,9 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     γ::Float64
     m̂::Vector{Float64}
     Ŝ::Diagonal{Float64}
-    function UnscentedKalmanFilter{M}(model::M, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂, α, β, κ) where {M<:SimModel}
+    function UnscentedKalmanFilter{M}(
+        model::M, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂, α, β, κ
+    ) where {M<:SimModel}
         nx, ny = model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
         nxs = size(Asm,1)
@@ -414,7 +416,7 @@ function UnscentedKalmanFilter(
     α::Real = 1e-3,
     β::Real = 2,
     κ::Real = 0
-    ) where {M<:SimModel}
+) where {M<:SimModel}
     if nint_ym == 0 # alias for no output integrator at all :
         nint_ym = fill(0, length(i_ym));
     end
