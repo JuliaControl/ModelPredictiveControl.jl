@@ -21,7 +21,7 @@ abstract type PredictiveController end
 
 mutable struct OptimInfo
     ΔŨ::Vector{Float64}
-    ϵ ::Union{Nothing, Float64}
+    ϵ ::Float64
     J ::Float64
     u ::Vector{Float64}
     U ::Vector{Float64}
@@ -117,7 +117,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         b = b[i_nonInf]
         @constraint(optim, constraint_lin, A*ΔŨ .≤ b)
         ΔŨ0 = zeros(nvar)
-        ϵ = isinf(C) ? nothing : 0.0 # C = Inf means hard constraints only
+        ϵ = isinf(C) ? NaN : 0.0 # C = Inf means hard constraints only
         u, U = copy(model.uop), repeat(model.uop, Hp)
         ŷ, Ŷ = copy(model.yop), repeat(model.yop, Hp)
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
@@ -347,7 +347,7 @@ struct NonLinMPC{S<:StateEstimator} <: PredictiveController
         #b = b[i_nonInf]
         #@constraint(optim, constraint_lin, A*ΔŨ .≤ b)
         ΔŨ0 = zeros(nvar)
-        ϵ = isinf(C) ? nothing : 0.0 # C = Inf means hard constraints only
+        ϵ = isinf(C) ? NaN : 0.0 # C = Inf means hard constraints only
         u, U = copy(model.uop), repeat(model.uop, Hp)
         ŷ, Ŷ = copy(model.yop), repeat(model.yop, Hp)
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
@@ -841,7 +841,7 @@ Write `mpc.info` with the [`LinMPC`](@ref) optimization results.
 """
 function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     mpc.info.ΔŨ = ΔŨ
-    mpc.info.ϵ = isinf(mpc.C) ? nothing : ΔŨ[end]
+    mpc.info.ϵ = isinf(mpc.C) ? NaN : ΔŨ[end]
     mpc.info.J = J
     mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*lastu
     mpc.info.u = mpc.info.U[1:mpc.estim.model.nu]

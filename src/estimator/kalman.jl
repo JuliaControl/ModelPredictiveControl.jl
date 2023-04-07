@@ -1,7 +1,7 @@
 struct SteadyKalmanFilter <: StateEstimator
     model::LinModel
     x̂::Vector{Float64}
-    i_ym::IntRangeOrVector
+    i_ym::Vector{Int}
     nx̂::Int
     nym::Int
     nyu::Int
@@ -39,6 +39,7 @@ struct SteadyKalmanFilter <: StateEstimator
                       "parameter or use the time-varying KalmanFilter.")
             end
         end
+        i_ym = collect(i_ym)
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)
         x̂ = [copy(model.x); zeros(nxs)]
@@ -172,7 +173,7 @@ struct KalmanFilter <: StateEstimator
     model::LinModel
     x̂::Vector{Float64}
     P̂::Hermitian{Float64, Matrix{Float64}}
-    i_ym::IntRangeOrVector
+    i_ym::Vector{Int}
     nx̂::Int
     nym::Int
     nyu::Int
@@ -201,6 +202,7 @@ struct KalmanFilter <: StateEstimator
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         f̂, ĥ, Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
+        i_ym = collect(i_ym)
         x̂ = [copy(model.x); zeros(nxs)]
         P̂0 = Hermitian(P̂0, :L)
         Q̂ = Hermitian(Q̂, :L)
@@ -324,7 +326,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     model::M
     x̂::Vector{Float64}
     P̂::Hermitian{Float64, Matrix{Float64}}
-    i_ym::IntRangeOrVector
+    i_ym::Vector{Int}
     nx̂::Int
     nym::Int
     nyu::Int
@@ -352,6 +354,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         f̂, ĥ = augment_model(model, As, Cs)
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
+        i_ym = collect(i_ym)
         x̂ = [copy(model.x); zeros(nxs)]
         P̂0 = Hermitian(P̂0, :L)
         Q̂ = Hermitian(Q̂, :L)
