@@ -79,9 +79,9 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         model = estim.model
         nu, ny = model.nu, model.ny
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
-        M_Hp = Diagonal(repeat(Mwt, Hp))
-        N_Hc = Diagonal(repeat(Nwt, Hc)) 
-        L_Hp = Diagonal(repeat(Lwt, Hp))
+        M_Hp = Diagonal(convert(Vector{Float64}, repeat(Mwt, Hp)))
+        N_Hc = Diagonal(convert(Vector{Float64}, repeat(Nwt, Hc))) 
+        L_Hp = Diagonal(convert(Vector{Float64}, repeat(Lwt, Hp)))
         C = Cwt
         # manipulated input setpoint predictions are constant over Hp :
         R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[] 
@@ -312,9 +312,9 @@ struct NonLinMPC{S<:StateEstimator} <: PredictiveController
         model = estim.model
         nu, ny = model.nu, model.ny
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt)
-        M_Hp = Diagonal(repeat(Mwt, Hp))
-        N_Hc = Diagonal(repeat(Nwt, Hc)) 
-        L_Hp = Diagonal(repeat(Lwt, Hp))
+        M_Hp = Diagonal(convert(Vector{Float64}, repeat(Mwt, Hp)))
+        N_Hc = Diagonal(convert(Vector{Float64}, repeat(Nwt, Hc)))
+        L_Hp = Diagonal(convert(Vector{Float64}, repeat(Lwt, Hp)))
         C = Cwt
         # manipulated input setpoint predictions are constant over Hp :
         R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[] 
