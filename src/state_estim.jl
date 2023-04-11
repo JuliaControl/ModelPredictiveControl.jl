@@ -207,7 +207,7 @@ f̂
 function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     model = estim.model
     # --- deterministic model states ---
-    x̂d = isa(model, LinModel) ? steadystate(model, u, d) : estim.x̂[1:model.nx]
+    x̂d = init_deterstate(model, estim, u, d)
     # --- stochastic model states (integrators) ---
     ŷd = model.h(x̂d, d - model.dop) + model.yop
     ŷsm = ym - ŷd[estim.i_ym]
@@ -220,6 +220,11 @@ function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     estim.x̂[:] = [x̂d; x̂s]
     return estim.x̂
 end
+
+"Init deterministic state `x̂d` with steady-state value for `LinModel`."
+init_deterstate(model::LinModel, _    , u, d) = steadystate(model, u, d)
+"Keep current deterministic state unchanged for `NonLinModel`."
+init_deterstate(model::SimModel, estim, _, _) = estim.x̂[1:model.nx]
 
 @doc raw"""
     evaloutput(estim::StateEstimator, d=Float64[])

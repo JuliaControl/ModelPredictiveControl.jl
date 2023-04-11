@@ -849,6 +849,7 @@ function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     mpc.info.Ŷ = mpc.Ẽ*ΔŨ + F
     mpc.info.ŷs, mpc.info.Ŷs = ŷs, Ŷs
 end
+
 "Evaluate current output of `InternalModel` estimator."
 eval_ŷ(estim::InternalModel, ym, d) = estim(ym, d)
 "Evaluate current output of the other `StateEstimator`s."
