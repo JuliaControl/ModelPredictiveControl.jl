@@ -845,10 +845,14 @@ function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     mpc.info.J = J
     mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*lastu
     mpc.info.u = mpc.info.U[1:mpc.estim.model.nu]
-    mpc.info.ŷ = isa(mpc.estim, InternalModel) ? mpc.estim(ym, d) : mpc.estim(d)
+    mpc.info.ŷ = eval_ŷ(mpc.estim, ym, d)
     mpc.info.Ŷ = mpc.Ẽ*ΔŨ + F
     mpc.info.ŷs, mpc.info.Ŷs = ŷs, Ŷs
 end
+"Evaluate current output of `InternalModel` estimator."
+eval_ŷ(estim::InternalModel, ym, d) = estim(ym, d)
+"Evaluate current output of the other `StateEstimator`s."
+eval_ŷ(estim::StateEstimator, _, d) = estim(d)
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
 function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
