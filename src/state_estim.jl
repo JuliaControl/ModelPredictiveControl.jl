@@ -34,8 +34,8 @@ end
 
 
 function Base.show(io::IO, estim::StateEstimator)
-    println(io, "$(typeof(estim)) estimator with "*
-                "a sample time Ts = $(estim.model.Ts) s and:")
+    println(io, "$(typeof(estim).name.name) estimator with a sample time "*
+                "Ts = $(estim.model.Ts) s, $(typeof(estim.model).name.name) and:")
     println(io, " $(estim.model.nu) manipulated inputs u")
     println(io, " $(estim.nx̂) states x̂")
     println(io, " $(estim.nym) measured outputs ym")

@@ -130,7 +130,7 @@ function test_mpc(model, mpc)
 end
 
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
-@profview u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
+#@profview u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 #=
 using PlotThemes, Plots
 #theme(:default)

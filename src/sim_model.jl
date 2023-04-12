@@ -1,3 +1,5 @@
+const IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
+
 @doc raw"""
 Abstract supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
 
@@ -18,7 +20,7 @@ julia> y = model()
 """
 abstract type SimModel end
 
-struct LinModel <: SimModel
+struct LinModel{F<:Function, H<:Function} <: SimModel
     A   ::Matrix{Float64}
     Bu  ::Matrix{Float64}
     C   ::Matrix{Float64}
@@ -35,20 +37,15 @@ struct LinModel <: SimModel
     uop::Vector{Float64}
     yop::Vector{Float64}
     dop::Vector{Float64}
-    function LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
+    function LinModel{F, H}(
+        A, Bu, C, Bd, Dd, f::F, h::H, Ts, nu, nx, ny, nd
+    ) where{F<:Function, H<:Function}
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
         size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
         size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
         size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
         Ts > 0 || error("Sampling time Ts must be positive")
-        # the `let` block captures and fixes A, Bu, Bd, C, Dd values (faster computations):
-        f = let A=A, Bu=Bu, Bd=Bd 
-            (x,u,d) -> A*x + Bu*u + Bd*d
-        end
-        h = let C=C, Dd=Dd
-            (x,d) -> C*x + Dd*d
-        end
         uop = zeros(nu)
         yop = zeros(ny)
         dop = zeros(nd)
@@ -57,8 +54,12 @@ struct LinModel <: SimModel
     end
 end
 
-
-const IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
+"Infer the type of state-space `f` and `h` functions and construct the linear model."
+function LinModel_ssfunc(
+    A, Bu, C, Bd, Dd, f::F, h::H, Ts, nu, nx, ny, nd
+) where {F<:Function, H<:Function}
+    return LinModel{F, H}(A, Bu, C, Bd, Dd, f, h, Ts, nu, nx, ny, nd)
+end
 
 @doc raw"""
     LinModel(sys::StateSpace[, Ts]; i_u=1:size(sys,2), i_d=Int[])
@@ -159,7 +160,14 @@ function LinModel(
     Bd  = sys_dis.B[:,nu+1:end]
     C   = sys_dis.C;
     Dd  = sys_dis.D[:,nu+1:end]
-    return LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
+    # the `let` block captures and fixes A, Bu, Bd, C, Dd values (faster computations):
+    f = let A=A, Bu=Bu, Bd=Bd 
+        (x,u,d) -> A*x + Bu*u + Bd*d
+    end
+    h = let C=C, Dd=Dd
+        (x,d) -> C*x + Dd*d
+    end
+    return LinModel_ssfunc(A, Bu, C, Bd, Dd, f, h, Ts, nu, nx, ny, nd)
 end
 
 @doc raw"""
@@ -208,7 +216,6 @@ function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
     return LinModel(sys_dis, Ts; kwargs...)
 end
 
-
 @doc raw"""
     steadystate(model::LinModel, u, d=Float64[])
 
@@ -226,6 +233,28 @@ function steadystate(model::LinModel, u, d=Float64[])
     return pinv(I - model.A)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
 end
 
+struct NonLinModel{F<:Function, H<:Function} <: SimModel
+    x::Vector{Float64}
+    f::F
+    h::H
+    Ts::Float64
+    nu::Int
+    nx::Int
+    ny::Int
+    nd::Int
+    uop::Vector{Float64}
+    yop::Vector{Float64}
+    dop::Vector{Float64}
+    function NonLinModel{F,H}(f::F, h::H, Ts, nu, nx, ny, nd) where {F<:Function,H<:Function}
+        Ts > 0 || error("Sampling time Ts must be positive")
+        validate_fcts(f, h)
+        uop = zeros(nu)
+        yop = zeros(ny)
+        dop = zeros(nd)
+        x = zeros(nx)
+        return new(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
+    end
+end
 
 @doc raw"""
     NonLinModel(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
@@ -260,27 +289,10 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
  0 measured disturbances d
 ```
 """
-struct NonLinModel <: SimModel
-    x::Vector{Float64}
-    f::Function
-    h::Function
-    Ts::Float64
-    nu::Int
-    nx::Int
-    ny::Int
-    nd::Int
-    uop::Vector{Float64}
-    yop::Vector{Float64}
-    dop::Vector{Float64}
-    function NonLinModel(f, h, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int = 0)
-        Ts > 0 || error("Sampling time Ts must be positive")
-        validate_fcts(f, h)
-        uop = zeros(nu)
-        yop = zeros(ny)
-        dop = zeros(nd)
-        x = zeros(nx)
-        return new(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
-    end
+function NonLinModel(
+    f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
+) where {F<:Function, H<:Function}
+    return NonLinModel{F, H}(f, h, Ts, nu, nx, ny, nd)
 end
 
 function validate_fcts(f, h)

@@ -416,7 +416,7 @@ default arguments.
 julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10, 1, 1, 1);
 
 julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
-NonLinMPC controller with a sample time Ts = 10.0 s, UnscentedKalmanFilter{NonLinModel} estimator and:
+NonLinMPC controller with a sample time Ts = 10.0 s, UnscentedKalmanFilter estimator and:
  1 manipulated inputs u
  2 states x̂
  1 measured outputs ym
@@ -444,7 +444,7 @@ julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10, 1, 1, 1);
 julia> estim = UnscentedKalmanFilter(model, σQ_int=[0.05]);
 
 julia> mpc = NonLinMPC(estim, Hp=20, Hc=1, Cwt=1e6)
-NonLinMPC controller with a sample time Ts = 10.0 s, UnscentedKalmanFilter{NonLinModel} estimator and:
+NonLinMPC controller with a sample time Ts = 10.0 s, UnscentedKalmanFilter estimator and:
  1 manipulated inputs u
  2 states x̂
  1 measured outputs ym
@@ -1232,8 +1232,8 @@ repeatdiag(A, n::Int) = kron(I(n), A)
 
 
 function Base.show(io::IO, mpc::PredictiveController)
-    println(io, "$(typeof(mpc).name.name) controller with a sample time "*
-                "Ts = $(mpc.estim.model.Ts) s, $(typeof(mpc).parameters[1]) estimator and:")
+    println(io, "$(typeof(mpc).name.name) controller with a sample time Ts = "*
+                "$(mpc.estim.model.Ts) s, $(typeof(mpc.estim).name.name) estimator and:")
     println(io, " $(mpc.estim.model.nu) manipulated inputs u")
     println(io, " $(mpc.estim.nx̂) states x̂")
     println(io, " $(mpc.estim.nym) measured outputs ym")
