@@ -16,8 +16,6 @@ struct Luenberger <: StateEstimator
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
-    f̂::Function
-    ĥ::Function
     K::Matrix{Float64}
     function Luenberger(model, i_ym, nint_ym, Asm, Csm, L)
         nx, ny = model.nx, model.ny
@@ -38,7 +36,6 @@ struct Luenberger <: StateEstimator
             As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
-            f̂, ĥ,
             Q̂, R̂,
             K
         )

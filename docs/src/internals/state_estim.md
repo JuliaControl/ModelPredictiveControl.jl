@@ -3,6 +3,8 @@
 ```@docs
 ModelPredictiveControl.init_estimstoch
 ModelPredictiveControl.augment_model
+ModelPredictiveControl.f̂
+ModelPredictiveControl.ĥ
 ```
 
 ## KalmanFilter

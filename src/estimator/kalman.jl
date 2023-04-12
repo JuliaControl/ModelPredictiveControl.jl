@@ -16,8 +16,6 @@ struct SteadyKalmanFilter <: StateEstimator
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
-    f̂::Function
-    ĥ::Function
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
     K::Matrix{Float64}
@@ -28,7 +26,7 @@ struct SteadyKalmanFilter <: StateEstimator
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂)
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        f̂, ĥ, Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
+        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         K = try
             kalman(Discrete, Â, Ĉm, Matrix(Q̂), Matrix(R̂)) # Matrix() required for Julia 1.6
@@ -50,7 +48,6 @@ struct SteadyKalmanFilter <: StateEstimator
             As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
-            f̂, ĥ,
             Q̂, R̂,
             K
         )
@@ -188,8 +185,6 @@ struct KalmanFilter <: StateEstimator
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
-    f̂::Function
-    ĥ::Function
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
@@ -200,7 +195,7 @@ struct KalmanFilter <: StateEstimator
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        f̂, ĥ, Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
+        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         i_ym = collect(i_ym)
         x̂ = [copy(model.x); zeros(nxs)]
@@ -215,7 +210,6 @@ struct KalmanFilter <: StateEstimator
             As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
-            f̂, ĥ,
             P̂0, Q̂, R̂
         )
     end
@@ -334,8 +328,6 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     As::Matrix{Float64}
     Cs::Matrix{Float64}
     nint_ym::Vector{Int}
-    f̂::Function
-    ĥ::Function
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
@@ -352,7 +344,6 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        f̂, ĥ = augment_model(model, As, Cs)
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         i_ym = collect(i_ym)
         x̂ = [copy(model.x); zeros(nxs)]
@@ -365,7 +356,6 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
             x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs, nint_ym,
-            f̂, ĥ,
             P̂0, Q̂, R̂,
             nσ, γ, m̂, Ŝ
         )
@@ -526,7 +516,6 @@ noise, respectively.
      ISBN9780470045343.
 """
 function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
-    f̂, ĥ = estim.f̂, estim.ĥ
     x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
@@ -535,7 +524,7 @@ function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
     X̂ = repeat(x̂, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂ -γ*sqrt_P̂]
     Ŷm = Matrix{Float64}(undef, nym, nσ)
     for j in axes(Ŷm, 2)
-        Ŷm[:, j] = ĥ(X̂[:, j], d)[estim.i_ym]
+        Ŷm[:, j] = ĥ(estim, X̂[:, j], d)[estim.i_ym]
     end
     ŷm = Ŷm * m̂
     X̄ = X̂ .- x̂
@@ -549,7 +538,7 @@ function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
     X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂_cor -γ*sqrt_P̂_cor]
     X̂_next = Matrix{Float64}(undef, nx̂, nσ)
     for j in axes(X̂_next, 2)
-        X̂_next[:, j] = f̂(X̂_cor[:, j], u, d)
+        X̂_next[:, j] = f̂(estim, X̂_cor[:, j], u, d)
     end
     x̂[:] = X̂_next * m̂
     X̄_next = X̂_next .- x̂

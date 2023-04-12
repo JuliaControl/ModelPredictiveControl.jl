@@ -128,13 +128,11 @@ Augment [`LinModel`](ref) state-space matrices with the stochastic ones `As` and
 If ``\mathbf{x_d}`` are `model.x` states, and ``\mathbf{x_s}``, the states defined at
 [`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x} = 
 [ \begin{smallmatrix} \mathbf{x_d} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
-returns the augmented model functions `f̂`, `ĥ` and matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
+returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
-                    &= \mathbf{Â x}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
-    \mathbf{y}(k)   &= \mathbf{ĥ}\Big(\mathbf{x}(k), \mathbf{d}(k)\Big) \\
-                    &= \mathbf{Ĉ x}(k) + \mathbf{D̂_d d}(k)
+    \mathbf{x}(k+1) &= \mathbf{Â x}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
+    \mathbf{y}(k)   &= \mathbf{Ĉ x}(k) + \mathbf{D̂_d d}(k)
 \end{aligned}
 ```
 """
@@ -146,31 +144,37 @@ function augment_model(model::LinModel, As, Cs)
     Ĉ   = [model.C Cs]
     B̂d  = [model.Bd; zeros(nxs,nd)]
     D̂d  = model.Dd
-    # the `let` block captures and fixes Â, B̂u, B̂d, Ĉ, D̂d values (faster computations):
-    f̂ = let Â=Â, B̂u=B̂u, B̂d=B̂d
-        (x̂, u, d) -> Â*x̂ + B̂u*u + B̂d*d
-    end
-    ĥ = let Ĉ=Ĉ, D̂d=D̂d
-        (x̂, d) -> Ĉ*x̂ + D̂d*d
-    end
-    return f̂, ĥ, Â, B̂u, Ĉ, B̂d, D̂d
+    return Â, B̂u, Ĉ, B̂d, D̂d
+end
+
+@doc raw"""
+    f̂(estim::StateEstimator, x̂, u, d)
+
+Update the augmented model state for estimation.
+
+By introducing an augmented state vector ``\mathbf{x}`` like in [`augment_model`](@ref) doc,
+this ``\mathbf{f̂}`` method updates it with the augmented model :
+```math
+\begin{aligned}
+    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
+    \mathbf{y}(k)   &= \mathbf{ĥ}\Big(\mathbf{x}(k), \mathbf{d}(k)\Big) 
+\end{aligned}
+```
+"""
+function f̂(estim::StateEstimator, x̂, u, d)
+    # TODO: consider using views : https://docs.julialang.org/en/v1/manual/performance-tips/#man-performance-views
+    return [estim.model.f(x̂[1:estim.model.nx], u, d); estim.As*x̂[estim.model.nx+1:end]]
 end
 
 """
-    augment_model(model::NonLinModel, As, Cs)
+    ĥ(estim::StateEstimator, x̂, d)
 
-Only returns the augmented functions `f̂`, `ĥ` when `model` is a [`NonLinModel`](@ref).
+Calc the augmented model output for estimation, see [`f̂`](@ref) for details.
 """
-function augment_model(model::NonLinModel, As, Cs)
-    # the `let` block captures and fixes model.f/h/nx, As and Cs values (faster computations)
-    f̂ = let f=model.f, nx=model.nx, As=As
-        (x̂, u, d) -> [f(x̂[1:nx], u, d); As*x̂[nx+1:end]]
-    end
-    ĥ = let h=model.h, nx=model.nx, Cs=Cs
-        (x̂, d) -> h(x̂[1:nx], d) + Cs*x̂[nx+1:end]
-    end
-    return f̂, ĥ
+function ĥ(estim::StateEstimator, x̂, d) 
+    return estim.model.h(x̂[1:estim.model.nx], d) + estim.Cs*x̂[estim.model.nx+1:end]
 end
+
 
 
 @doc raw"""
@@ -242,7 +246,7 @@ julia> ŷ = evaloutput(kf)
 ```
 """
 function evaloutput(estim::StateEstimator, d=Float64[]) 
-    return estim.ĥ(estim.x̂, d - estim.model.dop) + estim.model.yop
+    return ĥ(estim, estim.x̂, d - estim.model.dop) + estim.model.yop
 end
 
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
