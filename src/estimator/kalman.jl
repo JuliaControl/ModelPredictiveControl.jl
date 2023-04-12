@@ -371,10 +371,10 @@ Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The unscented K
 is based on the process model :
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) 
+    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) 
                         + \mathbf{w}(k)                                                   \\
-    \mathbf{y^m}(k) &= \mathbf{ĥ^m}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) + \mathbf{v}(k) \\
-    \mathbf{y^u}(k) &= \mathbf{ĥ^u}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big)                 \\
+    \mathbf{y^m}(k) &= \mathbf{ĥ^m}\Big(\mathbf{x}(k), \mathbf{d}(k)\Big) + \mathbf{v}(k) \\
+    \mathbf{y^u}(k) &= \mathbf{ĥ^u}\Big(\mathbf{x}(k), \mathbf{d}(k)\Big)                 \\
 \end{aligned}
 ```
 See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)`` noises and 

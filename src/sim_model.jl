@@ -161,12 +161,8 @@ function LinModel(
     C   = sys_dis.C;
     Dd  = sys_dis.D[:,nu+1:end]
     # the `let` block captures and fixes A, Bu, Bd, C, Dd values (faster computations):
-    f = let A=A, Bu=Bu, Bd=Bd 
-        (x,u,d) -> A*x + Bu*u + Bd*d
-    end
-    h = let C=C, Dd=Dd
-        (x,d) -> C*x + Dd*d
-    end
+    f = (x,u,d) -> A*x + Bu*u + Bd*d
+    h = (x,d) -> C*x + Dd*d
     return LinModel_ssfunc(A, Bu, C, Bd, Dd, f, h, Ts, nu, nx, ny, nd)
 end
 
