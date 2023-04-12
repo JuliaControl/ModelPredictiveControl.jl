@@ -131,9 +131,9 @@ If ``\mathbf{x_d}`` are `model.x` states, and ``\mathbf{x_s}``, the states defin
 returns the augmented model functions `f̂`, `ĥ` and matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
+    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
                     &= \mathbf{Â x}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
-    \mathbf{y}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) \\
+    \mathbf{y}(k)   &= \mathbf{ĥ}\Big(\mathbf{x}(k), \mathbf{d}(k)\Big) \\
                     &= \mathbf{Ĉ x}(k) + \mathbf{D̂_d d}(k)
 \end{aligned}
 ```
@@ -202,7 +202,6 @@ julia> x̂ = initstate!(estim, [1], [3 - 0.1])
   0.0
  -0.10000000000000675
 ```
-f̂
 """
 function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     model = estim.model
