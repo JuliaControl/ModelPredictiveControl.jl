@@ -95,7 +95,7 @@ setconstraint!(mpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
 function test_mpc(model, mpc)
-    N = 200
+    N = 20000
     u_data = zeros(2,N)
     y_data = zeros(2,N)
     r_data = zeros(2,N)
