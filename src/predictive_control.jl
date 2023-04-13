@@ -668,13 +668,13 @@ julia> u = moveinput!(mpc, [5]); round.(u, digits=3)
 ```
 """
 function moveinput!(
-    mpc::PredictiveController, 
+    mpc::C, 
     ry::Vector{<:Real}, 
     d ::Vector{<:Real} = Float64[];
     R̂y::Vector{<:Real} = repeat(ry, mpc.Hp),
     D̂ ::Vector{<:Real} = repeat(d,  mpc.Hp),
     ym::Union{Vector{<:Real}, Nothing} = nothing
-)
+) where{C<:PredictiveController}
     lastu = mpc.info.u
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)

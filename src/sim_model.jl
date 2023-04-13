@@ -27,8 +27,8 @@ struct LinModel{F<:Function, H<:Function} <: SimModel
     Bd  ::Matrix{Float64}
     Dd  ::Matrix{Float64}
     x::Vector{Float64}
-    f::Function
-    h::Function
+    f::F
+    h::H
     Ts::Float64
     nu::Int
     nx::Int
@@ -158,17 +158,14 @@ function LinModel(
     A   = sys_dis.A
     Bu  = sys_dis.B[:,1:nu]
     Bd  = sys_dis.B[:,nu+1:end]
-    C   = sys_dis.C;
+    C   = sys_dis.C
     Dd  = sys_dis.D[:,nu+1:end]
     # the `let` block captures and fixes A, Bu, Bd, C, Dd values (faster computations):
-    f = let A=A, Bu=Bu, Bd=Bd 
-        (x, u, d) -> A*x + Bu*u + Bd*d
-    end
-    h = let C=C, Dd=Dd
-        (x, d) -> C*x + Dd*d
-    end
+    f(x, u, d) = A*x + Bu*u + Bd*d
+    h(x, d) = C*x + Dd*d
     return LinModel_ssfunc(A, Bu, C, Bd, Dd, f, h, Ts, nu, nx, ny, nd)
 end
+
 
 @doc raw"""
     LinModel(sys::TransferFunction[, Ts]; i_u=1:size(sys,2), i_d=Int[])
