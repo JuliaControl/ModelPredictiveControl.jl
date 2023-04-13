@@ -153,7 +153,7 @@ end
 Update the augmented model state for estimation.
 
 By introducing an augmented state vector ``\mathbf{x}`` like in [`augment_model`](@ref) doc,
-this ``\mathbf{f̂}`` method updates it with the augmented model :
+the ``\mathbf{f̂}`` method updates it from the augmented model, defined as :
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
@@ -161,17 +161,17 @@ this ``\mathbf{f̂}`` method updates it with the augmented model :
 \end{aligned}
 ```
 """
-function f̂(estim::StateEstimator, x̂, u, d)
+function f̂(estim::E, x̂, u, d) where {E<:StateEstimator}
     # TODO: consider using views : https://docs.julialang.org/en/v1/manual/performance-tips/#man-performance-views
     return [estim.model.f(x̂[1:estim.model.nx], u, d); estim.As*x̂[estim.model.nx+1:end]]
 end
 
-"""
+@doc raw"""
     ĥ(estim::StateEstimator, x̂, d)
 
-Calc the augmented model output for estimation, see [`f̂`](@ref) for details.
+Output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂`](@ref) for details.
 """
-function ĥ(estim::StateEstimator, x̂, d) 
+function ĥ(estim::E, x̂, d) where {E<:StateEstimator}
     return estim.model.h(x̂[1:estim.model.nx], d) + estim.Cs*x̂[estim.model.nx+1:end]
 end
 

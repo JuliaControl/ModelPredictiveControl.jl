@@ -95,7 +95,7 @@ setconstraint!(mpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
 function test_mpc(model, mpc)
-    N = 2000
+    N = 200
     u_data = zeros(2,N)
     y_data = zeros(2,N)
     r_data = zeros(2,N)
@@ -130,7 +130,7 @@ function test_mpc(model, mpc)
 end
 
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
-@profview u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
+#@profview u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 #=
 using PlotThemes, Plots
 #theme(:default)
