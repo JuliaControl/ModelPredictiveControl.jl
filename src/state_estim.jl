@@ -73,7 +73,7 @@ function stoch_ym2y(model::SimModel, i_ym, Asm, Bsm, Csm, Dsm)
 end
 
 @doc raw"""
-    init_estimstoch(model::SimModel, i_ym, nint_ym::Vector{Int})
+    init_estimstoch(i_ym, nint_ym::Vector{Int})
 
 Calc stochastic model matrices from output integrators specifications for state estimation.
 
@@ -150,10 +150,10 @@ end
 @doc raw"""
     f̂(estim::StateEstimator, x̂, u, d)
 
-Update the augmented model state for estimation.
+State function ``\mathbf{f̂}`` of the augmented model.
 
-By introducing an augmented state vector ``\mathbf{x}`` like in [`augment_model`](@ref) doc,
-the ``\mathbf{f̂}`` method updates it from the augmented model, defined as :
+By introducing an augmented state vector ``\mathbf{x}`` like in [`augment_model`](@ref), the
+function returns the next state of the augmented model, defined as:
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
@@ -162,8 +162,9 @@ the ``\mathbf{f̂}`` method updates it from the augmented model, defined as :
 ```
 """
 function f̂(estim::E, x̂, u, d) where {E<:StateEstimator}
-    # TODO: consider using views : https://docs.julialang.org/en/v1/manual/performance-tips/#man-performance-views
-    return [estim.model.f(x̂[1:estim.model.nx], u, d); estim.As*x̂[estim.model.nx+1:end]]
+    # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
+    nx = estim.model.nx
+    @views return [estim.model.f(x̂[1:nx], u, d); estim.As*x̂[nx+1:end]]
 end
 
 @doc raw"""
@@ -172,7 +173,9 @@ end
 Output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂`](@ref) for details.
 """
 function ĥ(estim::E, x̂, d) where {E<:StateEstimator}
-    return estim.model.h(x̂[1:estim.model.nx], d) + estim.Cs*x̂[estim.model.nx+1:end]
+    # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
+    nx = estim.model.nx
+    @views return estim.model.h(x̂[1:nx], d) + estim.Cs*x̂[nx+1:end]
 end
 
 

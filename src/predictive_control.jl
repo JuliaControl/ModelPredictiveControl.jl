@@ -782,7 +782,7 @@ end
 
 Init `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 """
-function init_constraint(mpc, ::LinModel, F, lastu)
+function init_constraint(mpc::C, ::LinModel, F, lastu) where {C<:PredictiveController}
     b = [
         -mpc.Umin + mpc.T_Hc*lastu
         +mpc.Umax - mpc.T_Hc*lastu 
