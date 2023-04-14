@@ -55,16 +55,16 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     c_ΔUmax::Vector{Float64}
     c_Ŷmin ::Vector{Float64}
     c_Ŷmax ::Vector{Float64}
+    A_Umin ::Matrix{Float64}
+    A_Umax ::Matrix{Float64}
+    A_ΔŨmin::Matrix{Float64}
+    A_ΔŨmax::Matrix{Float64}
+    A_Ŷmin ::Matrix{Float64}
+    A_Ŷmax ::Matrix{Float64}
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     S̃_Hc::Matrix{Bool}
     T_Hc::Matrix{Bool}
-    A_Umin::Matrix{Float64}
-    A_Umax::Matrix{Float64}
-    A_ΔŨmin::Matrix{Float64}
-    A_ΔŨmax::Matrix{Float64}
-    A_Ŷmin::Matrix{Float64}
-    A_Ŷmax::Matrix{Float64}
     Ẽ ::Matrix{Float64}
     G ::Matrix{Float64}
     J ::Matrix{Float64}
@@ -128,8 +128,8 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u,
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
             c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax, 
-            S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
             A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+            S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
             Ẽ, G, J, Kd, Q, P̃,
             Ks, Ps,
             Yop, Dop,
@@ -288,16 +288,16 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     c_ΔUmax::Vector{Float64}
     c_Ŷmin ::Vector{Float64}
     c_Ŷmax ::Vector{Float64}
+    A_Umin ::Matrix{Float64}
+    A_Umax ::Matrix{Float64}
+    A_ΔŨmin::Matrix{Float64}
+    A_ΔŨmax::Matrix{Float64}
+    A_Ŷmin ::Matrix{Float64}
+    A_Ŷmax ::Matrix{Float64}
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     S̃_Hc::Matrix{Bool}
     T_Hc::Matrix{Bool}
-    A_Umin::Matrix{Float64}
-    A_Umax::Matrix{Float64}
-    A_ΔŨmin::Matrix{Float64}
-    A_ΔŨmax::Matrix{Float64}
-    A_Ŷmin::Matrix{Float64}
-    A_Ŷmax::Matrix{Float64}
     Ẽ ::Matrix{Float64}
     G ::Matrix{Float64}
     J ::Matrix{Float64}
@@ -359,8 +359,8 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u,
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
             c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax, 
-            S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
             A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+            S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
             Ẽ, G, J, Kd, Q,
             Ks, Ps,
             Yop, Dop,
