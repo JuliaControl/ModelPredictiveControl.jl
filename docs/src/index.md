@@ -1,6 +1,7 @@
 # ModelPredictiveControl.jl
 
-A model predictive control package for Julia.
+A [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_control) package
+for Julia. package for Julia.
 
 The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl/ControlSystems.jl)
 for the linear systems and [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the solvers.
