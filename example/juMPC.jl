@@ -82,7 +82,7 @@ function myfunc()
     optimize!(model)
 end
 
-#myfunc()
+myfunc()
 
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
@@ -130,8 +130,8 @@ function test_mpc(model, mpc)
     return u_data, y_data, r_data, d_data
 end
 
-@time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
-@profview u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
+u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
+#@profview u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 #=
 using PlotThemes, Plots
 #theme(:default)

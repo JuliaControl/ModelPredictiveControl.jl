@@ -115,7 +115,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         i_nonInf = .!isinf.(b)
         A = A[i_nonInf, :]
         b = b[i_nonInf]
-        @constraint(optim, constraint_lin, A*ΔŨ .≤ b)
+        @constraint(optim, linconstraint, A*ΔŨ .≤ b)
         ΔŨ0 = zeros(nvar)
         ϵ = isinf(C) ? NaN : 0.0 # C = Inf means hard constraints only
         u, U = copy(model.uop), repeat(model.uop, Hp)
@@ -263,7 +263,7 @@ end
 
 
 
-struct NonLinMPC{S<:StateEstimator} <: PredictiveController
+struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     estim::S
     optim::JuMP.Model
     info::OptimInfo
@@ -274,6 +274,7 @@ struct NonLinMPC{S<:StateEstimator} <: PredictiveController
     L_Hp::Diagonal{Float64, Vector{Float64}}
     C::Float64
     E::Float64
+    JE::JEFunc
     R̂u::Vector{Float64}
     Umin   ::Vector{Float64}
     Umax   ::Vector{Float64}
@@ -306,9 +307,9 @@ struct NonLinMPC{S<:StateEstimator} <: PredictiveController
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
-    function NonLinMPC{S}(
-        estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, J_E, ru, optim
-    ) where {S<:StateEstimator}
+    function NonLinMPC{S, JEFunc}(
+        estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE::JEFunc, ru, optim
+    ) where {S<:StateEstimator, JEFunc<:Function}
         model = estim.model
         nu, ny = model.nu, model.ny
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt)
@@ -345,7 +346,7 @@ struct NonLinMPC{S<:StateEstimator} <: PredictiveController
         #i_nonInf = .!isinf.(b)
         #A = A[i_nonInf, :]
         #b = b[i_nonInf]
-        #@constraint(optim, constraint_lin, A*ΔŨ .≤ b)
+        #@constraint(optim, linconstraint, A*ΔŨ .≤ b)
         ΔŨ0 = zeros(nvar)
         ϵ = isinf(C) ? NaN : 0.0 # C = Inf means hard constraints only
         u, U = copy(model.uop), repeat(model.uop, Hp)
@@ -355,7 +356,7 @@ struct NonLinMPC{S<:StateEstimator} <: PredictiveController
         return new(
             estim, optim, info,
             Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u,
+            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u,
             Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
             c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax, 
             S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
@@ -390,8 +391,10 @@ the manipulated inputs, the predicted outputs and measured disturbances from ``k
     \mathbf{Ŷ}_E = \begin{bmatrix} \mathbf{ŷ}(k)   \\ \mathbf{Ŷ}            \end{bmatrix}  \text{,} \qquad
     \mathbf{D̂}_E = \begin{bmatrix} \mathbf{d}(k)   \\ \mathbf{D̂}            \end{bmatrix}
 ```
+since ``H_c ≤ H_p`` implies that ``\mathbf{u}(k+H_p) = \mathbf{u}(k+H_p-1)``.
+
 !!! tip
-    Replace any of the 3 arguments with `_` if not needed (see `J_E` default value below).
+    Replace any of the 3 arguments with `_` if not needed (see `JE` default value below).
 
 This method uses the default state estimator, an [`UnscentedKalmanFilter`](@ref) with 
 default arguments.
@@ -405,7 +408,7 @@ default arguments.
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector)
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only
 - `Ewt=1.0` : economic costs weight ``E`` (scalar). 
-- `J_E=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{D̂}_E, \mathbf{Ŷ}_E)``.
+- `JE=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{D̂}_E, \mathbf{Ŷ}_E)``.
 - `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector)
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive 
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
@@ -461,11 +464,11 @@ function NonLinMPC(
     Lwt = fill(0.0, estim.model.nu),
     Cwt = 1e5,
     Ewt = 1.0,
-    J_E = (_,_,_) -> 0.0,
+    JE::JEFunc = (_,_,_) -> 0.0,
     ru  = estim.model.uop,
     optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
-) where {S<:StateEstimator}
-    return NonLinMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, J_E, ru, optim)
+) where {S<:StateEstimator, JEFunc<:Function}
+    return NonLinMPC{S, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
 end
 
 @doc raw"""
@@ -611,9 +614,9 @@ function setconstraint!(
     A = A[i_nonInf, :]
     b = b[i_nonInf]
     ΔŨ = mpc.optim[:ΔŨ]
-    delete(mpc.optim, mpc.optim[:constraint_lin])
-    unregister(mpc.optim, :constraint_lin)
-    @constraint(mpc.optim, constraint_lin, A*ΔŨ .≤ b)
+    delete(mpc.optim, mpc.optim[:linconstraint])
+    unregister(mpc.optim, :linconstraint)
+    @constraint(mpc.optim, linconstraint, A*ΔŨ .≤ b)
     return mpc
 end
 
@@ -674,12 +677,12 @@ function moveinput!(
     R̂y::Vector{<:Real} = repeat(ry, mpc.Hp),
     D̂ ::Vector{<:Real} = repeat(d,  mpc.Hp),
     ym::Union{Vector{<:Real}, Nothing} = nothing
-) where{C<:PredictiveController}
+) where {C<:PredictiveController}
     lastu = mpc.info.u
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
     F, q̃, p = init_prediction(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
-    b = init_constraint(mpc, mpc.estim.model, F, lastu)
+    b, _ = init_constraint(mpc, mpc.estim.model, lastu, F)
     ΔŨ, J = optim_objective!(mpc, b, q̃, p)
     write_info!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
@@ -760,7 +763,9 @@ Init linear model prediction matrices `F`, `q̃` and `p`.
 
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
-function init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
+function init_prediction(
+    mpc::C, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu
+) where {C<:PredictiveController}
     F = mpc.Kd*x̂d + mpc.Q*(lastu - model.uop) + Ŷs + mpc.Yop
     if model.nd ≠ 0
         F += mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
@@ -778,11 +783,11 @@ end
 
 
 @doc raw"""
-    init_constraint(mpc, ::LinModel, F)
+    init_constraint(mpc::PredictiveController, ::LinModel, lastu, F)
 
 Init `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 """
-function init_constraint(mpc::C, ::LinModel, F, lastu) where {C<:PredictiveController}
+function init_constraint(mpc::C, ::LinModel, lastu, F) where {C<:PredictiveController}
     b = [
         -mpc.Umin + mpc.T_Hc*lastu
         +mpc.Umax - mpc.T_Hc*lastu 
@@ -793,7 +798,24 @@ function init_constraint(mpc::C, ::LinModel, F, lastu) where {C<:PredictiveContr
     ]
     i_nonInf = .!isinf.(b)
     b = b[i_nonInf]
-    return b
+    return b, i_nonInf
+end
+
+@doc raw"""
+    init_constraint(mpc::PredictiveController, ::NonLinModel, lastu)
+
+Init `b` without predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
+"""
+function init_constraint(mpc::C, ::NonLinModel, lastu, _ ) where {C<:PredictiveController}
+    b = [
+        -mpc.Umin + mpc.T_Hc*lastu
+        +mpc.Umax - mpc.T_Hc*lastu 
+        -mpc.ΔŨmin
+        +mpc.ΔŨmax 
+    ]
+    i_nonInf = .!isinf.(b)
+    b = b[i_nonInf]
+    return b, i_nonInf
 end
 
 """
@@ -807,7 +829,7 @@ function optim_objective!(mpc::LinMPC, b, q̃, p)
     ΔŨ = optim[:ΔŨ]
     lastΔŨ = mpc.info.ΔŨ
     set_objective_function(optim, obj_quadprog(ΔŨ, mpc.P̃, q̃))
-    set_normalized_rhs.(optim[:constraint_lin], b)
+    set_normalized_rhs.(optim[:linconstraint], b)
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
     ΔŨ0 = [lastΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(model.nu)]
     # if soft constraints, append the last slack value ϵ_{k-1}:
@@ -1120,8 +1142,8 @@ function relaxŶ(::LinModel, C, c_Ŷmin, c_Ŷmax, E)
     return A_Ŷmin, A_Ŷmax, Ẽ
 end
 
-"Return empty matrices for models different than [`LinModel`](@ref)"
-function relaxŶ(::SimModel, C, c_Ŷmin, c_Ŷmax, E)
+"Return empty matrices if model is a [`NonLinModel`](@ref)"
+function relaxŶ(::NonLinModel, C, c_Ŷmin, c_Ŷmax, E)
     Ẽ = !isinf(C) ? [E zeros(0, 1)] : E
     A_Ŷmin, A_Ŷmax = Ẽ, Ẽ 
     return A_Ŷmin, A_Ŷmax, Ẽ
