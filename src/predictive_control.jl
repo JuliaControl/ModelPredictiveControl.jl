@@ -770,42 +770,6 @@ function init_prediction(
 end
 
 @doc raw"""
-    init_linconstraint(model::LinModel, 
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
-    )
-
-Init `A` matrix and `i_b` for the linear inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
-
-`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers.
-"""
-function init_linconstraint(::LinModel, 
-    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
-)
-    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ŷmin; i_Ŷmax]
-    return A, i_b
-end
-
-@doc raw"""
-    init_linconstraint(model::NonLinModel,
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
-    )
-
-Init the values without predicted output constraints if `model` is not a [`LinModel`](@ref).
-"""
-function init_linconstraint(::SimModel,
-    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ ,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ 
-)
-    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    return A, i_b
-end
-
-@doc raw"""
     linconstraint(mpc::PredictiveController, ::LinModel, lastu, F)
 
 Calc `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
@@ -1248,6 +1212,42 @@ function init_stochpred(estim::InternalModel, Hp)
         Ps[iRow,:] = Ms
     end
     return Ks, Ps 
+end
+
+@doc raw"""
+    init_linconstraint(model::LinModel, 
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
+    )
+
+Init `A` matrix and `i_b` for the linear inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+
+`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers.
+"""
+function init_linconstraint(::LinModel, 
+    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
+)
+    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ŷmin; i_Ŷmax]
+    return A, i_b
+end
+
+@doc raw"""
+    init_linconstraint(model::NonLinModel,
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
+    )
+
+Init the values without predicted output constraints if `model` is not a [`LinModel`](@ref).
+"""
+function init_linconstraint(::SimModel,
+    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ ,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ 
+)
+    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
+    return A, i_b
 end
 
 "Validate predictive controller weight and horizon specified values."
