@@ -40,17 +40,17 @@ model = LinModel(sys, Ts, i_d=[3])
 mpc = LinMPC(model, Hp=1, Hc=1)
 
 setconstraint!(mpc, umin=[5, 9.9], umax=[100,99])
-@test all((mpc.Umin, mpc.Umax) .≈ ([5, 9.9], [100,99]))
+@test all((mpc.con.Umin, mpc.con.Umax) .≈ ([5, 9.9], [100,99]))
 setconstraint!(mpc, Δumin=[-5,-10], Δumax=[6,11])
-@test all((mpc.ΔŨmin, mpc.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
+@test all((mpc.con.ΔŨmin, mpc.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
 setconstraint!(mpc, ŷmin=[5,10],ŷmax=[55, 35])
-@test all((mpc.Ŷmin, mpc.Ŷmax) .≈ ([5,10], [55,35]))
+@test all((mpc.con.Ŷmin, mpc.con.Ŷmax) .≈ ([5,10], [55,35]))
 setconstraint!(mpc, c_umin=[0.1,0.2], c_umax=[0.3,0.4])
-@test all((mpc.c_Umin, mpc.c_Umax) .≈ ([0.1,0.2], [0.3,0.4]))
+@test all((mpc.con.c_Umin, mpc.con.c_Umax) .≈ ([0.1,0.2], [0.3,0.4]))
 setconstraint!(mpc, c_Δumin=[0.05,0.15], c_Δumax=[0.25,0.35])
-@test all((mpc.c_ΔUmin, mpc.c_ΔUmax) .≈ ([0.05,0.15], [0.25,0.35]))
+@test all((mpc.con.c_ΔUmin, mpc.con.c_ΔUmax) .≈ ([0.05,0.15], [0.25,0.35]))
 setconstraint!(mpc, c_ŷmin=[1.0,1.1], c_ŷmax=[1.2,1.3])
-@test all((mpc.c_Ŷmin, mpc.c_Ŷmax) .≈ ([1.0,1.1], [1.2,1.3]))
+@test all((mpc.con.c_Ŷmin, mpc.con.c_Ŷmax) .≈ ([1.0,1.1], [1.2,1.3]))
 
 end
 

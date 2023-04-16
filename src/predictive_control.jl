@@ -19,6 +19,7 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController end
 
+"Include the additional information about the optimum to ease troubleshooting."
 mutable struct OptimInfo
     ΔŨ::Vector{Float64}
     ϵ ::Float64
@@ -31,18 +32,8 @@ mutable struct OptimInfo
     Ŷs::Vector{Float64}
 end
 
-
-struct LinMPC{S<:StateEstimator} <: PredictiveController
-    estim::S
-    optim::JuMP.Model
-    info::OptimInfo
-    Hp::Int
-    Hc::Int
-    M_Hp::Diagonal{Float64, Vector{Float64}}
-    Ñ_Hc::Diagonal{Float64, Vector{Float64}}
-    L_Hp::Diagonal{Float64, Vector{Float64}}
-    C::Float64
-    R̂u::Vector{Float64}
+"Include all the data for the constraints of [`PredictiveController`](@ref)"
+struct ControllerConstraint
     Umin   ::Vector{Float64}
     Umax   ::Vector{Float64}
     ΔŨmin  ::Vector{Float64}
@@ -55,12 +46,24 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     c_ΔUmax::Vector{Float64}
     c_Ŷmin ::Vector{Float64}
     c_Ŷmax ::Vector{Float64}
-    A_Umin ::Matrix{Float64}
-    A_Umax ::Matrix{Float64}
-    A_ΔŨmin::Matrix{Float64}
-    A_ΔŨmax::Matrix{Float64}
-    A_Ŷmin ::Matrix{Float64}
-    A_Ŷmax ::Matrix{Float64}
+    A      ::Matrix{Float64}
+    i_b    ::BitVector
+    i_Ŷmin ::BitVector
+    i_Ŷmax ::BitVector
+end
+
+struct LinMPC{S<:StateEstimator} <: PredictiveController
+    estim::S
+    optim::JuMP.Model
+    info::OptimInfo
+    con::ControllerConstraint
+    Hp::Int
+    Hc::Int
+    M_Hp::Diagonal{Float64, Vector{Float64}}
+    Ñ_Hc::Diagonal{Float64, Vector{Float64}}
+    L_Hp::Diagonal{Float64, Vector{Float64}}
+    C::Float64
+    R̂u::Vector{Float64}
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     S̃_Hc::Matrix{Bool}
@@ -100,21 +103,28 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         A_Umin, A_Umax, S̃_Hp, S̃_Hc = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C,c_ΔUmin,c_ΔUmax,ΔUmin,ΔUmax,N_Hc)
         A_Ŷmin, A_Ŷmax, Ẽ = relaxŶ(model, C, c_Ŷmin, c_Ŷmax, E)
+        i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
+        i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmin)
+        i_Ŷmin,  i_Ŷmax  = .!isinf.(Ŷmin),  .!isinf.(Ŷmax)
+        A, i_b = init_linconstraint(model, 
+            A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+            i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
+        )
+        con = ControllerConstraint(
+            Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ŷmin  , Ŷmax,
+            c_Umin  , c_Umax, c_ΔUmin, c_ΔUmax  , c_Ŷmin, c_Ŷmax,
+            A, i_b  , i_Ŷmin, i_Ŷmax
+        )
         P̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         set_silent(optim)
         @variable(optim, ΔŨ[1:nvar])
-        # dummy q̃ value (the vector is updated just before optimization):
-        q̃ = zeros(nvar)
+        q̃ = zeros(nvar) # dummy q̃ value (vector updated just before optimization)
         @objective(optim, Min, obj_quadprog(ΔŨ, P̃, q̃))
-        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
-        # dummy b vector to detect Inf values (b is updated just before optimization):
-        b = [-Umin; +Umax; -ΔŨmin; +ΔŨmax; -Ŷmin; +Ŷmax]
-        i_nonInf = .!isinf.(b)
-        A = A[i_nonInf, :]
-        b = b[i_nonInf]
+        A = con.A[con.i_b, :]
+        b = zeros(sum(con.i_b)) # dummy b value (vector updated just before optimization)
         @constraint(optim, linconstraint, A*ΔŨ .≤ b)
         ΔŨ0 = zeros(nvar)
         ϵ = isinf(C) ? NaN : 0.0 # C = Inf means hard constraints only
@@ -123,12 +133,9 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
         info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
         return new(
-            estim, optim, info,
+            estim, optim, info, con,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u,
-            Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
-            c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax, 
-            A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
             S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
             Ẽ, G, J, Kd, Q, P̃,
             Ks, Ps,
@@ -267,6 +274,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     estim::S
     optim::JuMP.Model
     info::OptimInfo
+    con::ControllerConstraint
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64, Vector{Float64}}
@@ -276,24 +284,6 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     E::Float64
     JE::JEFunc
     R̂u::Vector{Float64}
-    Umin   ::Vector{Float64}
-    Umax   ::Vector{Float64}
-    ΔŨmin  ::Vector{Float64}
-    ΔŨmax  ::Vector{Float64}
-    Ŷmin   ::Vector{Float64}
-    Ŷmax   ::Vector{Float64}
-    c_Umin ::Vector{Float64}
-    c_Umax ::Vector{Float64}
-    c_ΔUmin::Vector{Float64}
-    c_ΔUmax::Vector{Float64}
-    c_Ŷmin ::Vector{Float64}
-    c_Ŷmax ::Vector{Float64}
-    A_Umin ::Matrix{Float64}
-    A_Umax ::Matrix{Float64}
-    A_ΔŨmin::Matrix{Float64}
-    A_ΔŨmax::Matrix{Float64}
-    A_Ŷmin ::Matrix{Float64}
-    A_Ŷmax ::Matrix{Float64}
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     S̃_Hc::Matrix{Bool}
@@ -334,19 +324,28 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         A_Umin, A_Umax, S̃_Hp, S̃_Hc = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C,c_ΔUmin,c_ΔUmax,ΔUmin,ΔUmax,N_Hc)
         A_Ŷmin, A_Ŷmax, Ẽ = relaxŶ(model, C, c_Ŷmin, c_Ŷmax, E)
+        i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
+        i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmin)
+        i_Ŷmin,  i_Ŷmax  = .!isinf.(Ŷmin),  .!isinf.(Ŷmax)
+        A, i_b = init_linconstraint(model, 
+            A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+            i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
+        )
+        con = ControllerConstraint(
+            Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ŷmin  , Ŷmax,
+            c_Umin  , c_Umax, c_ΔUmin, c_ΔUmax  , c_Ŷmin, c_Ŷmax,
+            A       , i_b   , i_Ŷmin , i_Ŷmax
+        )
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         set_silent(optim)
         @variable(optim, ΔŨ[1:nvar])
         #@objective(optim, Min, obj_quadprog(ΔŨ, P̃, q̃))
-        #A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
-        ## dummy b vector to detect Inf values (b is updated just before optimization):
-        #b = [-Umin; +Umax; -ΔŨmin; +ΔŨmax; -Ŷmin; +Ŷmax]
-        #i_nonInf = .!isinf.(b)
-        #A = A[i_nonInf, :]
-        #b = b[i_nonInf]
-        #@constraint(optim, linconstraint, A*ΔŨ .≤ b)
+        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
+        A = con.A[con.i_b, :]
+        b = zeros(sum(con.i_b)) # dummy b value (vector updated just before optimization)
+        @constraint(optim, linconstraint, A*ΔŨ .≤ b)
         ΔŨ0 = zeros(nvar)
         ϵ = isinf(C) ? NaN : 0.0 # C = Inf means hard constraints only
         u, U = copy(model.uop), repeat(model.uop, Hp)
@@ -354,12 +353,9 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
         info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
         return new(
-            estim, optim, info,
+            estim, optim, info, con,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u,
-            Umin,   Umax,   ΔŨmin,   ΔŨmax,   Ŷmin,   Ŷmax, 
-            c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax, 
-            A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
             S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
             Ẽ, G, J, Kd, Q,
             Ks, Ps,
@@ -510,109 +506,101 @@ and ``\mathbf{ŷ_{max}}`` are soft by default.
 """
 function setconstraint!(
     mpc::PredictiveController; 
-    umin = nothing,    umax  = nothing,
-    Δumin = nothing,   Δumax = nothing,
-    ŷmin = nothing,    ŷmax  = nothing,
-    c_umin = nothing,  c_umax = nothing,
+    umin    = nothing, umax    = nothing,
+    Δumin   = nothing, Δumax   = nothing,
+    ŷmin    = nothing, ŷmax    = nothing,
+    c_umin  = nothing, c_umax  = nothing,
     c_Δumin = nothing, c_Δumax = nothing,
-    c_ŷmin = nothing,  c_ŷmax = nothing
+    c_ŷmin  = nothing, c_ŷmax  = nothing
 )
     model = mpc.estim.model
+    con = mpc.con
     nu, ny = model.ny, model.ny
     Hp, Hc = mpc.Hp, mpc.Hc
     C = mpc.C
-    Umin,  Umax  = mpc.Umin, mpc.Umax
-    ΔUmin, ΔUmax = mpc.ΔŨmin[1:nu*Hc], mpc.ΔŨmax[1:nu*Hc]
-    Ŷmin,  Ŷmax  = mpc.Ŷmin, mpc.Ŷmax
-    c_Umin,  c_Umax  = mpc.c_Umin, mpc.c_Umax
-    c_Ŷmin,  c_Ŷmax  = mpc.c_Ŷmin, mpc.c_Ŷmax
-    c_ΔUmin, c_ΔUmax = mpc.c_ΔUmin, mpc.c_ΔUmax
     if !isnothing(umin)
         size(umin)   == (nu,) || error("umin size must be $((nu,))")
         Umin  = repeat(umin, Hc)
-        mpc.Umin[:] = Umin
+        con.Umin[:] = Umin
     end
     if !isnothing(umax)
         size(umax)   == (nu,) || error("umax size must be $((nu,))")
         Umax  = repeat(umax, Hc)
-        mpc.Umax[:] = Umax
+        con.Umax[:] = Umax
     end
     if !isnothing(Δumin)
         size(Δumin)  == (nu,) || error("Δumin size must be $((nu,))")
         ΔUmin = repeat(Δumin, Hc)
-        mpc.ΔŨmin[1:nu*Hc] = ΔUmin
+        con.ΔŨmin[1:nu*Hc] = ΔUmin
     end
     if !isnothing(Δumax)
         size(Δumax)  == (nu,) || error("Δumax size must be $((nu,))")
         ΔUmax = repeat(Δumax, Hc)
-        mpc.ΔŨmax[1:nu*Hc] = ΔUmax
+        con.ΔŨmax[1:nu*Hc] = ΔUmax
     end
     if !isnothing(ŷmin)
         size(ŷmin)   == (ny,) || error("ŷmin size must be $((ny,))")
         Ŷmin  = repeat(ŷmin, Hp)
-        mpc.Ŷmin[:] = Ŷmin 
+        con.Ŷmin[:] = Ŷmin
     end
     if !isnothing(ŷmax)
         size(ŷmax)   == (ny,) || error("ŷmax size must be $((ny,))")
         Ŷmax  = repeat(ŷmax, Hp)
-        mpc.Ŷmax[:] = Ŷmax
+        con.Ŷmax[:] = Ŷmax
     end
     if !isnothing(c_umin)
         size(c_umin) == (nu,) || error("c_umin size must be $((nu,))")
         any(c_umin .< 0) && error("c_umin weights should be non-negative")
         c_Umin  = repeat(c_umin, Hc)
-        mpc.c_Umin[:] = c_Umin
+        con.c_Umin[:] = c_Umin
     end
     if !isnothing(c_umax)
         size(c_umax) == (nu,) || error("c_umax size must be $((nu,))")
         any(c_umax .< 0) && error("c_umax weights should be non-negative")
         c_Umax  = repeat(c_umax, Hc)
-        mpc.c_Umax[:] = c_Umax
+        con.c_Umax[:] = c_Umax
     end
     if !isnothing(c_Δumin)
         size(c_Δumin) == (nu,) || error("c_Δumin size must be $((nu,))")
         any(c_Δumin .< 0) && error("c_Δumin weights should be non-negative")
         c_ΔUmin  = repeat(c_Δumin, Hc)
-        mpc.c_ΔUmin[:] = c_ΔUmin
+        con.c_ΔUmin[:] = c_ΔUmin
     end
     if !isnothing(c_Δumax)
         size(c_Δumax) == (nu,) || error("c_Δumax size must be $((nu,))")
         any(c_Δumax .< 0) && error("c_Δumax weights should be non-negative")
         c_ΔUmax  = repeat(c_Δumax, Hc)
-        mpc.c_ΔUmax[:] = c_ΔUmax
+        con.c_ΔUmax[:] = c_ΔUmax
     end
     if !isnothing(c_ŷmin)
         size(c_ŷmin) == (ny,) || error("c_ŷmin size must be $((ny,))")
         any(c_ŷmin .< 0) && error("c_ŷmin weights should be non-negative")
         c_Ŷmin  = repeat(c_ŷmin, Hp)
-        mpc.c_Ŷmin[:] = c_Ŷmin
+        con.c_Ŷmin[:] = c_Ŷmin
     end
     if !isnothing(c_ŷmax)
         size(c_ŷmax) == (ny,) || error("c_ŷmax size must be $((ny,))")
         any(c_ŷmax .< 0) && error("c_ŷmax weights should be non-negative")
         c_Ŷmax  = repeat(c_ŷmax, Hp)
-        mpc.c_Ŷmax[:] = c_Ŷmax
-    end
-    if !all(isnothing.((c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)))
-        S_Hp, S_Hc = mpc.S̃_Hp[:, 1:nu*Hc], mpc.S̃_Hc[:, 1:nu*Hc]
-        N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
-        E = mpc.Ẽ[:, 1:nu*Hc]
-        A_Umin, A_Umax   = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
-        A_ΔŨmin, A_ΔŨmax = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
-        A_Ŷmin, A_Ŷmax   = relaxŶ(model, C, c_Ŷmin, c_Ŷmax, E)
-        mpc.A_Umin[:]  = A_Umin
-        mpc.A_Umax[:]  = A_Umax
-        mpc.A_ΔŨmin[:] = A_ΔŨmin
-        mpc.A_ΔŨmax[:] = A_ΔŨmax
-        mpc.A_Ŷmin[:]  = A_Ŷmin  
-        mpc.A_Ŷmax[:]  = A_Ŷmax
-    end
-    A = [mpc.A_Umin; mpc.A_Umax; mpc.A_ΔŨmin; mpc.A_ΔŨmax; mpc.A_Ŷmin; mpc.A_Ŷmax]
-    # dummy b vector to detect Inf values (b is updated just before optimization):
-    b = [-mpc.Umin; +mpc.Umax; -mpc.ΔŨmin; +mpc.ΔŨmax; -mpc.Ŷmin; +mpc.Ŷmax]
-    i_nonInf = .!isinf.(b)
-    A = A[i_nonInf, :]
-    b = b[i_nonInf]
+        con.c_Ŷmax[:] = c_Ŷmax
+    end    
+    S_Hp, S_Hc = mpc.S̃_Hp[:, 1:nu*Hc], mpc.S̃_Hc[:, 1:nu*Hc]
+    N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
+    E    = mpc.Ẽ[:, 1:nu*Hc]
+    ΔUmin, ΔUmax     = con.ΔŨmin[1:nu*Hc], con.ΔŨmax[1:nu*Hc]
+    A_Umin, A_Umax   = relaxU(C, con.c_Umin, con.c_Umax, S_Hp, S_Hc)
+    A_ΔŨmin, A_ΔŨmax = relaxΔU(C, con.c_ΔUmin, con.c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+    A_Ŷmin, A_Ŷmax   = relaxŶ(model, C, con.c_Ŷmin, con.c_Ŷmax, E)
+    i_Umin,  i_Umax  = .!isinf.(con.Umin),  .!isinf.(con.Umax)
+    i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmin)
+    i_Ŷmin,  i_Ŷmax  = .!isinf.(con.Ŷmin),  .!isinf.(con.Ŷmax)    
+    con.A[:], con.i_b[:] = init_linconstraint(model, 
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
+    )
+    con.i_Ŷmin[:], con.i_Ŷmax[:] = i_Ŷmin, i_Ŷmax 
+    A = con.A[con.i_b, :]
+    b = zeros(sum(con.i_b)) # dummy b value (vector updated just before optimization)
     ΔŨ = mpc.optim[:ΔŨ]
     delete(mpc.optim, mpc.optim[:linconstraint])
     unregister(mpc.optim, :linconstraint)
@@ -682,7 +670,7 @@ function moveinput!(
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
     F, q̃, p = init_prediction(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
-    b, _ = init_constraint(mpc, mpc.estim.model, lastu, F)
+    b = linconstraint(mpc, mpc.estim.model, lastu, F)
     ΔŨ, J = optim_objective!(mpc, b, q̃, p)
     write_info!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
@@ -781,41 +769,72 @@ function init_prediction(
     return F, q̃, p
 end
 
-
 @doc raw"""
-    init_constraint(mpc::PredictiveController, ::LinModel, lastu, F)
+    init_linconstraint(model::LinModel, 
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
+    )
 
-Init `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+Init `A` matrix and `i_b` for the linear inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+
+`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers.
 """
-function init_constraint(mpc::C, ::LinModel, lastu, F) where {C<:PredictiveController}
-    b = [
-        -mpc.Umin + mpc.T_Hc*lastu
-        +mpc.Umax - mpc.T_Hc*lastu 
-        -mpc.ΔŨmin
-        +mpc.ΔŨmax 
-        -mpc.Ŷmin + F
-        +mpc.Ŷmax - F
-    ]
-    i_nonInf = .!isinf.(b)
-    b = b[i_nonInf]
-    return b, i_nonInf
+function init_linconstraint(::LinModel, 
+    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
+)
+    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ŷmin; i_Ŷmax]
+    return A, i_b
 end
 
 @doc raw"""
-    init_constraint(mpc::PredictiveController, ::NonLinModel, lastu)
+    init_linconstraint(model::NonLinModel,
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
+    )
 
-Init `b` without predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
+Init the values without predicted output constraints if `model` is not a [`LinModel`](@ref).
 """
-function init_constraint(mpc::C, ::NonLinModel, lastu, _ ) where {C<:PredictiveController}
+function init_linconstraint(::SimModel,
+    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ ,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ 
+)
+    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
+    return A, i_b
+end
+
+@doc raw"""
+    linconstraint(mpc::PredictiveController, ::LinModel, lastu, F)
+
+Calc `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+"""
+function linconstraint(mpc::C, ::LinModel, lastu, F) where {C<:PredictiveController}
     b = [
-        -mpc.Umin + mpc.T_Hc*lastu
-        +mpc.Umax - mpc.T_Hc*lastu 
-        -mpc.ΔŨmin
-        +mpc.ΔŨmax 
+        -mpc.con.Umin + mpc.T_Hc*lastu
+        +mpc.con.Umax - mpc.T_Hc*lastu 
+        -mpc.con.ΔŨmin
+        +mpc.con.ΔŨmax 
+        -mpc.con.Ŷmin + F
+        +mpc.con.Ŷmax - F
     ]
-    i_nonInf = .!isinf.(b)
-    b = b[i_nonInf]
-    return b, i_nonInf
+    return b[mpc.con.i_b]
+end
+
+@doc raw"""
+    linconstraint(mpc::PredictiveController, ::NonLinModel, lastu)
+
+Calc `b` without predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
+"""
+function linconstraint(mpc::C, ::NonLinModel, lastu, _ ) where {C<:PredictiveController}
+    b = [
+        -mpc.con.Umin + mpc.T_Hc*lastu
+        +mpc.con.Umax - mpc.T_Hc*lastu 
+        -mpc.con.ΔŨmin
+        +mpc.con.ΔŨmax 
+    ]
+    return b[mpc.con.i_b]
 end
 
 """
