@@ -726,7 +726,7 @@ Predict the current `ŷs` and future `Ŷs` stochastic model outputs over `Hp`.
 
 See [`init_stochpred`](@ref) for details on `Ŷs` and `Ks` matrices.
 """
-predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ ) = (estim.Cs*x̂s, mpc.Ks*x̂s)
+predict_stoch(mpc, estim::StateEstimator, x̂s, _ , _ ) = (estim.Cs*x̂s, mpc.Ks*x̂s)
 
 """
     predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
@@ -809,7 +809,7 @@ Optimize the `mpc` quadratic objective function for [`LinMPC`](@ref) type.
 function optim_objective!(mpc::LinMPC, b, q̃, p)
     optim = mpc.optim
     model = mpc.estim.model
-    ΔŨ = optim[:ΔŨ]
+    ΔŨ::Vector{VariableRef} = optim[:ΔŨ]
     lastΔŨ = mpc.info.ΔŨ
     set_objective_function(optim, obj_quadprog(ΔŨ, mpc.P̃, q̃))
     set_normalized_rhs.(optim[:linconstraint], b)
@@ -834,9 +834,9 @@ function optim_objective!(mpc::LinMPC, b, q̃, p)
         @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVED ($status)"
         @debug solution_summary(optim)
     end
-    ΔŨ = isfatal(status) ? ΔŨ0 : value.(ΔŨ) # fatal status : use last value
-    J = objective_value(optim) + p # optimal objective value by adding constant p
-    return ΔŨ, J
+    ΔŨ_val = isfatal(status) ? ΔŨ0 : value.(ΔŨ) # fatal status : use last value
+    J_val = objective_value(optim) + p # optimal objective value by adding constant p
+    return ΔŨ_val, J_val
 end
 
 """
