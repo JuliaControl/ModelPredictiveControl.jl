@@ -164,7 +164,7 @@ function returns the next state of the augmented model, defined as:
 function f̂(estim::StateEstimator, x̂, u, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     nx = estim.model.nx
-    @views return [estim.model.f(x̂[1:nx], u, d); estim.As*x̂[nx+1:end]]
+    @views return [f(estim.model, x̂[1:nx], u, d); estim.As*x̂[nx+1:end]]
 end
 
 @doc raw"""
@@ -175,7 +175,7 @@ Output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂`](@ref) for d
 function ĥ(estim::StateEstimator, x̂, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     nx = estim.model.nx
-    @views return estim.model.h(x̂[1:nx], d) + estim.Cs*x̂[nx+1:end]
+    @views return h(estim.model, x̂[1:nx], d) + estim.Cs*x̂[nx+1:end]
 end
 
 
@@ -215,7 +215,7 @@ function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     # --- deterministic model states ---
     x̂d = init_deterstate(model, estim, u, d)
     # --- stochastic model states (integrators) ---
-    ŷd = model.h(x̂d, d - model.dop) + model.yop
+    ŷd = h(model, x̂d, d - model.dop) + model.yop
     ŷsm = ym - ŷd[estim.i_ym]
     nint_ym = estim.nint_ym
     i_nint_nonzero = (nint_ym .≠ 0) 

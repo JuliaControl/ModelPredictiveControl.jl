@@ -1,5 +1,5 @@
-struct SteadyKalmanFilter{M<:LinModel} <: StateEstimator
-    model::M
+struct SteadyKalmanFilter <: StateEstimator
+    model::LinModel
     x̂::Vector{Float64}
     i_ym::Vector{Int}
     nx̂::Int
@@ -19,7 +19,7 @@ struct SteadyKalmanFilter{M<:LinModel} <: StateEstimator
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
     K::Matrix{Float64}
-    function SteadyKalmanFilter{M}(model::M, i_ym, nint_ym, Asm, Csm, Q̂, R̂) where {M<:LinModel}
+    function SteadyKalmanFilter(model, i_ym, nint_ym, Asm, Csm, Q̂, R̂)
         nx, ny = model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
         nxs = size(Asm,1)
@@ -119,13 +119,13 @@ you can use 0 integrator on `model` integrating outputs, or the alternative time
 [`KalmanFilter`](@ref).
 """
 function SteadyKalmanFilter(
-    model::M;
+    model::LinModel;
     i_ym::IntRangeOrVector = 1:model.ny,
     σQ::Vector{<:Real} = fill(0.1, model.nx),
     σR::Vector{<:Real} = fill(0.1, length(i_ym)),
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
     σQ_int::Vector{<:Real} = fill(0.1, max(sum(nint_ym), 0))
-) where {M<:LinModel}
+)
     if nint_ym == 0 # alias for no output integrator at all :
         nint_ym = fill(0, length(i_ym));
     end
@@ -133,7 +133,7 @@ function SteadyKalmanFilter(
     # estimated covariances matrices (variance = σ²) :
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return SteadyKalmanFilter{M}(model, i_ym, nint_ym, Asm, Csm, Q̂ , R̂)
+    return SteadyKalmanFilter(model, i_ym, nint_ym, Asm, Csm, Q̂ , R̂)
 end
 
 @doc raw"""
@@ -166,8 +166,8 @@ function updatestate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
 end
 
 
-struct KalmanFilter{M<:LinModel} <: StateEstimator
-    model::M
+struct KalmanFilter <: StateEstimator
+    model::LinModel
     x̂::Vector{Float64}
     P̂::Hermitian{Float64, Matrix{Float64}}
     i_ym::Vector{Int}
@@ -188,7 +188,7 @@ struct KalmanFilter{M<:LinModel} <: StateEstimator
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
-    function KalmanFilter{M}(model::M, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂) where {M<:LinModel}
+    function KalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂)
         nx, ny = model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
         nxs = size(Asm,1)
@@ -247,7 +247,7 @@ KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 ```
 """
 function KalmanFilter(
-    model::M;
+    model::LinModel;
     i_ym::IntRangeOrVector = 1:model.ny,
     σP0::Vector{<:Real} = fill(10, model.nx),
     σQ::Vector{<:Real} = fill(0.1, model.nx),
@@ -255,7 +255,7 @@ function KalmanFilter(
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
     σP0_int::Vector{<:Real} = fill(10, max(sum(nint_ym), 0)),
     σQ_int::Vector{<:Real} = fill(0.1, max(sum(nint_ym), 0))
-) where {M<:LinModel}
+)
     if nint_ym == 0 # alias for no output integrator at all :
         nint_ym = fill(0, length(i_ym));
     end
@@ -264,7 +264,7 @@ function KalmanFilter(
     P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return KalmanFilter{M}(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂)
+    return KalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂)
 end
 
 @doc raw"""

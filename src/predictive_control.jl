@@ -736,7 +736,7 @@ Use current measured outputs `ym` for prediction when `estim` is a [`InternalMod
 function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
                            "outputs ym in keyword argument to compute control actions u")
-    ŷd = estim.model.h(estim.x̂d, d - estim.model.dop) + estim.model.yop 
+    ŷd = h(estim.model, estim.x̂d, d - estim.model.dop) + estim.model.yop 
     ŷs = zeros(estim.model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
     Ŷs = mpc.Ks*x̂s + mpc.Ps*ŷs

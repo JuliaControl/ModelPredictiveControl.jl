@@ -148,8 +148,8 @@ function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     u, d, ym = remove_op(estim, u, d, ym)
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
-    ŷd = model.h(x̂d, d)
-    x̂d[:] = model.f(x̂d, u, d) # this also updates estim.xhat (they are the same object)
+    ŷd = h(model, x̂d, d)
+    x̂d[:] = f(model, x̂d, u, d) # this also updates estim.xhat (they are the same object)
     # --------------- stochastic model -----------------------
     ŷs = zeros(model.ny,1)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]   # ŷs=0 for unmeasured outputs
@@ -184,7 +184,7 @@ estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that
 ``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` is always true.
 """
 function evaloutput(estim::InternalModel, ym, d=Float64[])
-    ŷ = estim.model.h(estim.x̂d, d - estim.model.dop) + estim.model.yop
+    ŷ = h(estim.model, estim.x̂d, d - estim.model.dop) + estim.model.yop
     ŷ[estim.i_ym] = ym
     return ŷ
 end

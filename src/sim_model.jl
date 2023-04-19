@@ -20,15 +20,13 @@ julia> y = model()
 """
 abstract type SimModel end
 
-struct LinModel{F<:Function, H<:Function} <: SimModel
+struct LinModel <: SimModel
     A   ::Matrix{Float64}
     Bu  ::Matrix{Float64}
     C   ::Matrix{Float64}
     Bd  ::Matrix{Float64}
     Dd  ::Matrix{Float64}
     x::Vector{Float64}
-    f::F
-    h::H
     Ts::Float64
     nu::Int
     nx::Int
@@ -37,9 +35,7 @@ struct LinModel{F<:Function, H<:Function} <: SimModel
     uop::Vector{Float64}
     yop::Vector{Float64}
     dop::Vector{Float64}
-    function LinModel{F, H}(
-        A, Bu, C, Bd, Dd, f::F, h::H, Ts, nu, nx, ny, nd
-    ) where{F<:Function, H<:Function}
+    function LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
         size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
@@ -50,15 +46,8 @@ struct LinModel{F<:Function, H<:Function} <: SimModel
         yop = zeros(ny)
         dop = zeros(nd)
         x = zeros(nx)
-        return new(A, Bu, C, Bd, Dd, x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
+        return new(A, Bu, C, Bd, Dd, x, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
-end
-
-"Infer the type of state-space `f` and `h` functions and construct the linear model."
-function LinModel_ssfunc(
-    A, Bu, C, Bd, Dd, f::F, h::H, Ts, nu, nx, ny, nd
-) where {F<:Function, H<:Function}
-    return LinModel{F, H}(A, Bu, C, Bd, Dd, f, h, Ts, nu, nx, ny, nd)
 end
 
 @doc raw"""
@@ -160,14 +149,7 @@ function LinModel(
     Bd  = sys_dis.B[:,nu+1:end]
     C   = sys_dis.C
     Dd  = sys_dis.D[:,nu+1:end]
-    # the `let` block captures and fixes A, Bu, Bd, C, Dd values (faster computations):
-    f = let A=A, Bu=Bu, Bd=Bd 
-        (x, u, d) -> A*x + Bu*u + Bd*d
-    end
-    h = let C=C, Dd=Dd
-        (x, d) -> C*x + Dd*d
-    end
-    return LinModel_ssfunc(A, Bu, C, Bd, Dd, f, h, Ts, nu, nx, ny, nd)
+    return LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
 end
 
 
@@ -375,6 +357,26 @@ end
 
 
 """
+    f(model::LinModel, x, u, d)
+
+Evaluate ``\\mathbf{A x + B_u u + B_d d}`` when `model` is a [`LinModel`](@ref).
+"""
+f(model::LinModel, x, u, d) = model.A * x + model.Bu * u + model.Bd * d
+"Call ``\\mathbf{f(x, u, d)}`` with `model.f` function for [`NonLinModel`](@ref)."
+f(model::NonLinModel, x, u, d) = model.f(x, u, d)
+
+
+"""
+    h(model::LinModel, x, u, d)
+
+Evaluate ``\\mathbf{C x + D_d d}`` when `model` is a [`LinModel`](@ref).
+"""
+h(model::LinModel, x, d) = model.C*x + model.Dd*d
+"Call ``\\mathbf{h(x, d)}`` with `model.h` function for [`NonLinModel`](@ref)."
+h(model::NonLinModel, x, d) = model.h(x, d)
+
+
+"""
     setstate!(model::SimModel, x)
 
 Set `model.x` states to values specified by `x`. 
@@ -411,7 +413,7 @@ julia> x = updatestate!(model, [1])
 ```
 """
 function updatestate!(model::SimModel, u, d=Float64[])
-    model.x[:] = model.f(model.x, u - model.uop, d - model.dop)
+    model.x[:] = f(model, model.x, u - model.uop, d - model.dop)
     return model.x
 end
 
@@ -431,7 +433,7 @@ julia> y = evaloutput(model)
  20.0
 ```
 """
-evaloutput(model::SimModel, d=Float64[]) = model.h(model.x, d - model.dop) + model.yop
+evaloutput(model::SimModel, d=Float64[]) = h(model, model.x, d - model.dop) + model.yop
 
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
