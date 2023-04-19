@@ -161,7 +161,7 @@ function returns the next state of the augmented model, defined as:
 \end{aligned}
 ```
 """
-function f̂(estim::E, x̂, u, d) where {E<:StateEstimator}
+function f̂(estim::StateEstimator, x̂, u, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     nx = estim.model.nx
     @views return [estim.model.f(x̂[1:nx], u, d); estim.As*x̂[nx+1:end]]
@@ -172,7 +172,7 @@ end
 
 Output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂`](@ref) for details.
 """
-function ĥ(estim::E, x̂, d) where {E<:StateEstimator}
+function ĥ(estim::StateEstimator, x̂, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     nx = estim.model.nx
     @views return estim.model.h(x̂[1:nx], d) + estim.Cs*x̂[nx+1:end]
