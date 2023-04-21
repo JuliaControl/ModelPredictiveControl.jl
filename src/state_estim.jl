@@ -255,6 +255,5 @@ end
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
 (estim::StateEstimator)(d=Float64[]) = evaloutput(estim, d)
 
-
 include("estimator/kalman.jl")
 include("estimator/internal_model.jl")

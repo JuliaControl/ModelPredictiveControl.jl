@@ -25,7 +25,7 @@ Ts  = vars_ml["mMPC"]["Ts"]
 linModel1 = LinModel(ss(A,Bu,C,0,Ts),Ts)
 linModel2 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3])
 sys = [   tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
-        tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]
+          tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]
 linModel3 = LinModel(sys,Ts,i_d=[3])
 linModel4 = LinModel(ss(A,[Bu Bd],C,[Du Dd],Ts),Ts,i_d=[3])
 setop!(linModel4,uop=[10,10],yop=[50,30],dop=[5])
@@ -69,9 +69,12 @@ initstate!(uscKalmanFilter1,[0,0],[2,1])
 
 nmpc = NonLinMPC(uscKalmanFilter1)
 
+moveinput!(nmpc, [10,1])
+#=
 nmpc = NonLinMPC(nonLinModel1)
 
 function myfunc()
+    using JuMP, Ipopt
     model = Model(Ipopt.Optimizer)
     nu = 2
     Hc = 2
@@ -81,13 +84,28 @@ function myfunc()
     @NLobjective(model, Min, f(x...))
     optimize!(model)
 end
+=#
 
+using JuMP, Ipopt
+function myfunc()
+    model = Model(Ipopt.Optimizer)
+    nvar = 3
+    @variable(model, x[1:nvar])
+    @NLparameter(model, a == 3.0)
+    f(a, x...) = sum((x .- a).^2)
+    register(model, :f, 1+nvar, f; autodiff = true)
+    @NLobjective(model, Min, f(a, x...))
+    optimize!(model)
+    value.(x)
+end
 myfunc()
 
+#=
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
 mpc = LinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e5)#, optim=Model(DAQP.Optimizer))#, optim=Model(HiGHS.Optimizer))#, optim=Model(DAQP.Optimizer))
+
 
 setconstraint!(mpc, c_umin=[0,0], c_umax=[0,0])
 setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
@@ -131,7 +149,7 @@ function test_mpc(model, mpc)
 end
 
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
-@profview u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
+#@profview u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 #=
 using PlotThemes, Plots
 #theme(:default)
@@ -153,4 +171,6 @@ pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(pd)
 display(pu)
 display(py)
+=#
+
 =#
