@@ -22,6 +22,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     Kd::Matrix{Float64}
     Q ::Matrix{Float64}
     P̃ ::Hermitian{Float64, Matrix{Float64}}
+    q̃ ::Vector{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
@@ -82,23 +83,18 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
         info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
         # dummy x̂d, F, d0, D̂0, q̃ values (updated just before optimization)
-        @NLparameter(optim, x̂d[i=1:nx]    == zeros(nx)[i])
-        @NLparameter(optim,  F[i=1:ny*Hp] == zeros(ny*Hp)[i])
-        @NLparameter(optim, d0[i=1:nd]    == zeros(nd)[i])
-        @NLparameter(optim, D̂0[i=1:nd*Hp] == zeros(nd*Hp)[i])
-        @NLparameter(optim,  q̃[i=1:nvar]  == zeros(nvar)[i])
         mpc = new(
             estim, optim, info, con,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u,
             S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
-            Ẽ, G, J, Kd, Q, P̃,
+            Ẽ, G, J, Kd, Q, P̃, zeros(nvar),
             Ks, Ps,
             Yop, Dop,
         )
-        J = (ΔŨ...) -> obj_nonlinprog(mpc, model, x̂d, F, d0, D̂0, q̃, ΔŨ...)
-        register(optim, :J, nvar, J, autodiff=true)
-        @NLobjective(optim, Min, J(ΔŨ...))
+        J = (ΔŨ...) -> obj_nonlinprog(mpc, model, ΔŨ)
+        register(mpc.optim, :J, nvar, J, autodiff=true)
+        @NLobjective(mpc.optim, Min, J(ΔŨ...))
         return mpc
     end
 end
@@ -201,42 +197,37 @@ function NonLinMPC(
     Ewt = 1.0,
     JE::JEFunc = (_,_,_) -> 0.0,
     ru  = estim.model.uop,
-    optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
+    optim::JuMP.Model = JuMP.Model(Ipopt.Optimizer)
 ) where {S<:StateEstimator, JEFunc<:Function}
     return NonLinMPC{S, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
 end
 
 
 function init_objective(mpc::NonLinMPC, _ , q̃ , x̂d, F, d0, D̂0)
-    x̂d_par = mpc.optim[:x̂d]
-    F_par = mpc.optim[:F]
-    d0_par = mpc.optim[:d0]
-    D̂0_par = mpc.optim[:D̂0]
-    D̂0_par = mpc.optim[:D̂0]
-    q̃_par = mpc.optim[:q̃]
-    set_value.(x̂d_par, x̂d) 
-    set_value.(F_par, F)
-    set_value.(d0_par, d0)
-    set_value.(D̂0_par, D̂0)
-    set_value.(q̃_par, q̃)
+    #x̂d_par = mpc.optim[:x̂d]
+    #F_par = mpc.optim[:F]
+    #d0_par = mpc.optim[:d0]
+    #D̂0_par = mpc.optim[:D̂0]
+    #D̂0_par = mpc.optim[:D̂0]
+    #q̃_par = mpc.optim[:q̃]
+    #set_value.(x̂d_par, x̂d) 
+    #set_value.(F_par, F)
+    #set_value.(d0_par, d0)
+    #set_value.(D̂0_par, D̂0)
+    #set_value.(q̃_par, q̃)
+    mpc.q̃[:] = q̃
+    println(q̃)
 end
 
-function obj_nonlinprog(
-    mpc::NonLinMPC, ::LinModel, _ , _ , _ , _ , q̃, ΔŨ::T...
-) where {T<:Real}
+function obj_nonlinprog(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {T<:Real, N}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
-    println(value.(q̃))
-    Jqp = obj_quadprog(ΔŨ, mpc.P̃, value.(q̃))
+    Jqp = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
     J = Jqp
-    println("yoLinModel")
     return J
 end
 
 
-
-function obj_nonlinprog(
-    mpc::NonLinMPC, model::SimModel, x̂d, F, d0, D̂0, _ , ΔŨ::T...
-) where {T<:Real}
+function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {T<:Real,N}
     J = 0.0
     println("yoSimModel")
     return J

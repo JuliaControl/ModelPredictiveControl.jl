@@ -69,6 +69,8 @@ initstate!(uscKalmanFilter1,[0,0],[2,1])
 
 nmpc = NonLinMPC(uscKalmanFilter1)
 
+
+
 moveinput!(nmpc, [10,1])
 #=
 nmpc = NonLinMPC(nonLinModel1)
@@ -85,7 +87,7 @@ function myfunc()
     optimize!(model)
 end
 =#
-
+#=
 using JuMP, Ipopt
 function myfunc()
     model = Model(Ipopt.Optimizer)
@@ -99,6 +101,7 @@ function myfunc()
     value.(x)
 end
 myfunc()
+=#
 
 #=
 nx = linModel4.nx
