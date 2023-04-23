@@ -72,9 +72,9 @@ nmpc = NonLinMPC(uscKalmanFilter1)
 
 
 moveinput!(nmpc, [10,1])
-#=
-nmpc = NonLinMPC(nonLinModel1)
 
+nmpc = NonLinMPC(nonLinModel1)
+#=
 function myfunc()
     using JuMP, Ipopt
     model = Model(Ipopt.Optimizer)

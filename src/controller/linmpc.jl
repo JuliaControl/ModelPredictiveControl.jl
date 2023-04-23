@@ -61,7 +61,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             c_Umin  , c_Umax, c_ΔUmin, c_ΔUmax  , c_Ŷmin, c_Ŷmax,
             A, i_b  , i_Ŷmin, i_Ŷmax
         )
-        P̃ = init_quadprog(Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        P̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)

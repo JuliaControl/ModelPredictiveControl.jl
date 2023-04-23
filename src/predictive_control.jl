@@ -610,7 +610,7 @@ function init_deterpred(model::SimModel, Hp, Hc)
 end
 
 @doc raw"""
-    init_quadprog(Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
+    init_quadprog(model::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
 
 Init the quadratic programming optimization matrix `P̃`.
 
@@ -623,7 +623,13 @@ vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period 
 [`init_prediction`](@ref) method). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
-init_quadprog(Ẽ, S_Hp, M_Hp, N_Hc, L_Hp) = 2*Hermitian(Ẽ'*M_Hp*Ẽ + N_Hc + S_Hp'*L_Hp*S_Hp)
+function init_quadprog(::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp) 
+    return 2*Hermitian(Ẽ'*M_Hp*Ẽ + N_Hc + S_Hp'*L_Hp*S_Hp)
+end
+"Return an empty matrix if `model` is not a [`LinModel`](@ref)."
+function init_quadprog(::SimModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
+    return Hermitian(zeros(0, 0))
+end
 
 "Return the quadratic programming objective function, see [`init_quadprog`](@ref)."
 obj_quadprog(ΔŨ, P̃, q̃) = 0.5*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ
