@@ -67,54 +67,29 @@ updatestate!(uscKalmanFilter1,[0,0],[2,1])
 
 initstate!(uscKalmanFilter1,[0,0],[2,1])
 
-nmpc = NonLinMPC(uscKalmanFilter1)
+nmpc1 = NonLinMPC(uscKalmanFilter1)
+
+nmpc2 = NonLinMPC(nonLinModel1)
 
 
-
-moveinput!(nmpc, [10,1])
-
-nmpc = NonLinMPC(nonLinModel1)
-#=
-function myfunc()
-    using JuMP, Ipopt
-    model = Model(Ipopt.Optimizer)
-    nu = 2
-    Hc = 2
-    @variable(model, x[1:nu*Hc] >= 0)
-    f(x...) = sum(x[i]^i for i in eachindex(x))
-    register(model, :f, nu*Hc, f; autodiff = true)
-    @NLobjective(model, Min, f(x...))
-    optimize!(model)
-end
-=#
-#=
-using JuMP, Ipopt
-function myfunc()
-    model = Model(Ipopt.Optimizer)
-    nvar = 3
-    @variable(model, x[1:nvar])
-    @NLparameter(model, a == 3.0)
-    f(a, x...) = sum((x .- a).^2)
-    register(model, :f, 1+nvar, f; autodiff = true)
-    @NLobjective(model, Min, f(a, x...))
-    optimize!(model)
-    value.(x)
-end
-myfunc()
-=#
-
-#=
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
 mpc = LinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e5)#, optim=Model(DAQP.Optimizer))#, optim=Model(HiGHS.Optimizer))#, optim=Model(DAQP.Optimizer))
-
 
 setconstraint!(mpc, c_umin=[0,0], c_umax=[0,0])
 setconstraint!(mpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
 setconstraint!(mpc, umin=[5, 9.9], umax=[Inf,Inf])
 setconstraint!(mpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
+
+nmpc = NonLinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e5)
+
+setconstraint!(nmpc, c_umin=[0,0], c_umax=[0,0])
+setconstraint!(nmpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
+setconstraint!(nmpc, umin=[5, 9.9], umax=[Inf,Inf])
+setconstraint!(nmpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
+setconstraint!(nmpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
 function test_mpc(model, mpc)
     N = 200
@@ -125,6 +100,7 @@ function test_mpc(model, mpc)
     u = model.uop
     d = model.dop
     r = [50,31]
+    setstate!(model, zeros(model.nx))
     initstate!(mpc,u,model(d),d)
     for k = 0:N-1
         if k == 40
@@ -147,13 +123,14 @@ function test_mpc(model, mpc)
         d_data[:,k+1] = d
         updatestate!(mpc, u, y, d)
         updatestate!(model, u, d)
-    end
+    end 
     return u_data, y_data, r_data, d_data
 end
 
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
-#@profview u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
-#=
+
+@time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
+
 using PlotThemes, Plots
 #theme(:default)
 theme(:dark)
@@ -174,6 +151,4 @@ pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(pd)
 display(pu)
 display(py)
-=#
 
-=#

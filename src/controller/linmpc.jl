@@ -20,6 +20,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     Kd::Matrix{Float64}
     Q ::Matrix{Float64}
     P̃ ::Hermitian{Float64, Matrix{Float64}}
+    q̃ ::Vector{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
     Yop::Vector{Float64}
@@ -61,10 +62,11 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             c_Umin  , c_Umax, c_ΔUmin, c_ΔUmax  , c_Ŷmin, c_Ŷmax,
             A, i_b  , i_Ŷmin, i_Ŷmax
         )
+        nvar = size(Ẽ, 2)
         P̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        q̃ = zeros(nvar) # dummy q̃ value (vector updated just before optimization)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
-        nvar = size(Ẽ, 2)
         set_silent(optim)
         @variable(optim, ΔŨ[1:nvar])
         A = con.A[con.i_b, :]
@@ -76,17 +78,17 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         ŷ, Ŷ = copy(model.yop), repeat(model.yop, Hp)
         ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
         info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
-        q̃ = zeros(nvar) # dummy q̃ value (vector updated just before optimization)
-        @objective(optim, Min, obj_quadprog(ΔŨ, P̃, q̃))
-        return new(
+        mpc = new(
             estim, optim, info, con,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u,
             S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
-            Ẽ, G, J, Kd, Q, P̃,
+            Ẽ, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
             Yop, Dop,
         )
+        @objective(optim, Min, obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃))
+        return mpc
     end
 end
 
@@ -214,8 +216,8 @@ function LinMPC(
     return LinMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
 end
 
-function init_objective(mpc::LinMPC, ΔŨ, q̃, _ , _ , _ , _ )
-    set_objective_function(mpc.optim, obj_quadprog(ΔŨ, mpc.P̃, q̃))
+function init_objective(mpc::LinMPC, ΔŨ, _ , _ , _ , _ )
+    set_objective_function(mpc.optim, obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃))
 end
 
 """

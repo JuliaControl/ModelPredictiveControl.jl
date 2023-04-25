@@ -66,10 +66,11 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             c_Umin  , c_Umax, c_ΔUmin, c_ΔUmax  , c_Ŷmin, c_Ŷmax,
             A       , i_b   , i_Ŷmin , i_Ŷmax
         )
+        nvar = size(Ẽ, 2)
         P̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        q̃ = zeros(nvar) # dummy q̃ value (vector updated just before optimization)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
-        nvar = size(Ẽ, 2)
         set_silent(optim)
         @variable(optim, ΔŨ[1:nvar])
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
@@ -88,7 +89,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u,
             S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
-            Ẽ, G, J, Kd, Q, P̃, zeros(nvar),
+            Ẽ, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
             Yop, Dop,
         )
@@ -197,37 +198,24 @@ function NonLinMPC(
     Ewt = 1.0,
     JE::JEFunc = (_,_,_) -> 0.0,
     ru  = estim.model.uop,
-    optim::JuMP.Model = JuMP.Model(Ipopt.Optimizer)
+    optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"))
 ) where {S<:StateEstimator, JEFunc<:Function}
     return NonLinMPC{S, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
 end
 
 
-function init_objective(mpc::NonLinMPC, _ , q̃ , x̂d, F, d0, D̂0)
-    #x̂d_par = mpc.optim[:x̂d]
-    #F_par = mpc.optim[:F]
-    #d0_par = mpc.optim[:d0]
-    #D̂0_par = mpc.optim[:D̂0]
-    #D̂0_par = mpc.optim[:D̂0]
-    #q̃_par = mpc.optim[:q̃]
-    #set_value.(x̂d_par, x̂d) 
-    #set_value.(F_par, F)
-    #set_value.(d0_par, d0)
-    #set_value.(D̂0_par, D̂0)
-    #set_value.(q̃_par, q̃)
-    mpc.q̃[:] = q̃
-    println(q̃)
+function init_objective(mpc::NonLinMPC, _  , x̂d, F, d0, D̂0)
+    return nothing
 end
 
-function obj_nonlinprog(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {T<:Real, N}
+function obj_nonlinprog(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {T, N}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     Jqp = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
-    J = Jqp
-    return J
+    return Jqp
 end
 
 
-function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {T<:Real,N}
+function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {T,N}
     J = 0.0
     #println("yoSimModel")
     return J

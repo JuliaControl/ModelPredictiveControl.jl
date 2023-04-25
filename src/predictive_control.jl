@@ -253,9 +253,9 @@ function moveinput!(
     lastu = mpc.info.u
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
-    F, q̃, p, d0, D̂0 = init_prediction(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
+    F, p, d0, D̂0 = update_prediction!(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
     b = linconstraint(mpc, mpc.estim.model, lastu, F)
-    ΔŨ, J = optim_objective!(mpc, b, q̃, p, x̂d, F, d0, D̂0)
+    ΔŨ, J = optim_objective!(mpc, b, p, x̂d, F, d0, D̂0)
     write_info!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
     u = lastu + Δu
@@ -329,13 +329,13 @@ end
 
 
 @doc raw"""
-    init_prediction(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
+    update_prediction!(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
 
-Init linear model prediction matrices `F`, `q̃` and `p`.
+Update linear model prediction matrices `F`, `q̃` and `p`.
 
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
-function init_prediction(
+function update_prediction!(
     mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu
 )
     F = mpc.Kd*x̂d + mpc.Q*(lastu - model.uop) + Ŷs + mpc.Yop
@@ -343,7 +343,7 @@ function init_prediction(
         F += mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
     end
     Ẑ = F - R̂y
-    q̃ = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
+    mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
     p = Ẑ'*mpc.M_Hp*Ẑ
     if ~isempty(mpc.R̂u)
         V̂ = (mpc.T_Hp*lastu - mpc.R̂u)
@@ -352,26 +352,25 @@ function init_prediction(
     end
     d0 = zeros(model.nd, 0)         # only used for NonLinModel objects
     D̂0 = zeros(model.nd*mpc.Hp, 0)  # only used for NonLinModel objects
-    return F, q̃, p, d0, D̂0
+    return F, p, d0, D̂0
 end
 
 @doc raw"""
-    init_prediction(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _ )
+    update_prediction!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _ )
 
-Init `F`, `d0` and `D̂0` prediction matrices for [`NonLinModel`](@ref)
+Update `F`, `d0` and `D̂0` prediction matrices for [`NonLinModel`](@ref)
 
 For [`NonLinModel`](@ref), the constant matrix `F` is ``\mathbf{F = Ŷ_s + Y_op}``, thus
-it incorporates the stocahstic predictions and the output operating point ``\mathbf{y_op}`` 
+it incorporates the stochastic predictions and the output operating point ``\mathbf{y_op}`` 
 repeated over ``H_p``. `d0` and `D̂0` are the measured disturbances and the predictions 
 without the operating points ``\mathbf{d_{op}}``.
 """
-function init_prediction(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _)
+function update_prediction!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _)
     F = Ŷs + mpc.Yop
-    q̃ = zeros(size(mpc.Ẽ, 2), 0)    # only used for LinModel objects
-    p = 0.0                         # only used for LinModel objects
+    p = 0.0              # only used for LinModel objects
     d0 = d - model.dop
     D̂0 = D̂ - mpc.Dop
-    return F, q̃, p, d0, D̂0
+    return F, p, d0, D̂0
 end
 
 @doc raw"""
@@ -411,7 +410,7 @@ end
 
 Optimize the objective function ``J`` of `mpc` controller. 
 """
-function optim_objective!(mpc::PredictiveController, b, q̃, p, x̂d, F, d0, D̂0)
+function optim_objective!(mpc::PredictiveController, b, p, x̂d, F, d0, D̂0)
     optim = mpc.optim
     model = mpc.estim.model
     ΔŨ::Vector{VariableRef} = optim[:ΔŨ]
@@ -422,7 +421,7 @@ function optim_objective!(mpc::PredictiveController, b, q̃, p, x̂d, F, d0, D̂
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
     set_start_value.(ΔŨ, ΔŨ0)
-    init_objective(mpc, ΔŨ, q̃, x̂d, F, d0, D̂0)
+    init_objective(mpc, ΔŨ, x̂d, F, d0, D̂0)
     try
         optimize!(optim)
     catch err
