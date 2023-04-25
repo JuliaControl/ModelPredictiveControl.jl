@@ -17,6 +17,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     S̃_Hc::Matrix{Bool}
     T_Hc::Matrix{Bool}
     Ẽ ::Matrix{Float64}
+    F ::Vector{Float64}
     G ::Matrix{Float64}
     J ::Matrix{Float64}
     Kd::Matrix{Float64}
@@ -50,32 +51,31 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = 
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
-        E, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
+        E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
         A_Umin, A_Umax, S̃_Hp, S̃_Hc = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C,c_ΔUmin,c_ΔUmax,ΔUmin,ΔUmax,N_Hc)
         A_Ŷmin, A_Ŷmax, Ẽ = relaxŶ(model, C, c_Ŷmin, c_Ŷmax, E)
         i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
-        i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmin)
+        i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
         i_Ŷmin,  i_Ŷmax  = .!isinf.(Ŷmin),  .!isinf.(Ŷmax)
-        A, i_b = init_linconstraint(model, 
+        A, b, i_b = init_linconstraint(model, 
             A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
         )
         con = ControllerConstraint(
             Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ŷmin  , Ŷmax,
             c_Umin  , c_Umax, c_ΔUmin, c_ΔUmax  , c_Ŷmin, c_Ŷmax,
-            A       , i_b   , i_Ŷmin , i_Ŷmax
+            A       , b     , i_b   , i_Ŷmin , i_Ŷmax
         )
         nvar = size(Ẽ, 2)
-        P̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
-        q̃ = zeros(nvar) # dummy q̃ value (vector updated just before optimization)
+        P̃, q̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         set_silent(optim)
         @variable(optim, ΔŨ[1:nvar])
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
         A = con.A[con.i_b, :]
-        b = zeros(sum(con.i_b)) # dummy b value (vector updated just before optimization)
+        b = con.b[con.i_b]
         @constraint(optim, linconstraint, A*ΔŨ .≤ b)
         ΔŨ0 = zeros(nvar)
         ϵ = isinf(C) ? NaN : 0.0 # C = Inf means hard constraints only
@@ -89,7 +89,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u,
             S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
-            Ẽ, G, J, Kd, Q, P̃, q̃,
+            Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
             Yop, Dop,
         )
@@ -204,7 +204,7 @@ function NonLinMPC(
 end
 
 
-function init_objective(mpc::NonLinMPC, _  , x̂d, F, d0, D̂0)
+function init_objective(mpc::NonLinMPC, _ )
     return nothing
 end
 
@@ -223,6 +223,6 @@ end
 
 
 
-function write_info!(mpc::NonLinMPC, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
+function write_info!(mpc::NonLinMPC, ΔŨ, J, ŷs, Ŷs, lastu, ym, d)
     return nothing
 end

@@ -47,11 +47,11 @@ struct ControllerConstraint
     c_Ŷmin ::Vector{Float64}
     c_Ŷmax ::Vector{Float64}
     A      ::Matrix{Float64}
+    b      ::Vector{Float64}
     i_b    ::BitVector
     i_Ŷmin ::BitVector
     i_Ŷmax ::BitVector
 end
-
 
 @doc raw"""
     setconstraint!(mpc::PredictiveController; <keyword arguments>)
@@ -184,9 +184,10 @@ function setconstraint!(
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
     )
+    con.b[:] = zeros(size(con.A, 1)) # dummy b value (vector updated just before optimization)
     con.i_Ŷmin[:], con.i_Ŷmax[:] = i_Ŷmin, i_Ŷmax 
     A = con.A[con.i_b, :]
-    b = zeros(sum(con.i_b)) # dummy b value (vector updated just before optimization)
+    b = con.b[con.i_b]
     ΔŨ = mpc.optim[:ΔŨ]
     delete(mpc.optim, mpc.optim[:linconstraint])
     unregister(mpc.optim, :linconstraint)
@@ -253,10 +254,10 @@ function moveinput!(
     lastu = mpc.info.u
     x̂d, x̂s = split_state(mpc.estim)
     ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
-    F, p, d0, D̂0 = update_prediction!(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
-    b = linconstraint(mpc, mpc.estim.model, lastu, F)
-    ΔŨ, J = optim_objective!(mpc, b, p, x̂d, F, d0, D̂0)
-    write_info!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, F, ym, d)
+    p = initpred!(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
+    linconstaint!(mpc, mpc.estim.model, lastu)
+    ΔŨ, J = optim_objective!(mpc, p)
+    write_info!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, ym, d)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
     u = lastu + Δu
     return u
@@ -329,99 +330,97 @@ end
 
 
 @doc raw"""
-    update_prediction!(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
+    initpred!(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
 
-Update linear model prediction matrices `F`, `q̃` and `p`.
+Init linear model prediction matrices `F`, `q̃` and `p`.
 
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
-function update_prediction!(
+function initpred!(
     mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu
 )
-    F = mpc.Kd*x̂d + mpc.Q*(lastu - model.uop) + Ŷs + mpc.Yop
+    mpc.F[:] = mpc.Kd*x̂d + mpc.Q*(lastu - model.uop) + Ŷs + mpc.Yop
     if model.nd ≠ 0
-        F += mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
+        mpc.F .+= mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
     end
-    Ẑ = F - R̂y
+    Ẑ = mpc.F - R̂y
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
     p = Ẑ'*mpc.M_Hp*Ẑ
     if ~isempty(mpc.R̂u)
         V̂ = (mpc.T_Hp*lastu - mpc.R̂u)
-        q̃ += 2(mpc.L_Hp*mpc.T_Hp)'*V̂
+        mpc.q̃ .+= 2(mpc.L_Hp*mpc.T_Hp)'*V̂
         p += V̂'*mpc.L_Hp*V̂
     end
-    d0 = zeros(model.nd, 0)         # only used for NonLinModel objects
-    D̂0 = zeros(model.nd*mpc.Hp, 0)  # only used for NonLinModel objects
-    return F, p, d0, D̂0
+    #d0 = zeros(model.nd, 0)         # only used for NonLinModel objects
+    #D̂0 = zeros(model.nd*mpc.Hp, 0)  # only used for NonLinModel objects
+    return p
 end
 
 @doc raw"""
-    update_prediction!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _ )
+    initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _ )
 
-Update `F`, `d0` and `D̂0` prediction matrices for [`NonLinModel`](@ref)
+Init `F`, `d0` and `D̂0` prediction matrices for [`NonLinModel`](@ref).
 
 For [`NonLinModel`](@ref), the constant matrix `F` is ``\mathbf{F = Ŷ_s + Y_op}``, thus
 it incorporates the stochastic predictions and the output operating point ``\mathbf{y_op}`` 
 repeated over ``H_p``. `d0` and `D̂0` are the measured disturbances and the predictions 
 without the operating points ``\mathbf{d_{op}}``.
 """
-function update_prediction!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _)
-    F = Ŷs + mpc.Yop
-    p = 0.0              # only used for LinModel objects
-    d0 = d - model.dop
-    D̂0 = D̂ - mpc.Dop
-    return F, p, d0, D̂0
+function initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _)
+    mpc.F[:] = Ŷs + mpc.Yop
+    p = 0.0 # only used for LinModel objects
+    #d0 = d - model.dop
+    #D̂0 = D̂ - mpc.Dop
+    return p
 end
 
 @doc raw"""
-    linconstraint(mpc::PredictiveController, ::LinModel, lastu, F)
+    linconstraint!(mpc::PredictiveController, ::LinModel, lastu)
 
 Calc `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 """
-function linconstraint(mpc::PredictiveController, ::LinModel, lastu, F)
-    b = [
+function linconstaint!(mpc::PredictiveController, ::LinModel, lastu)
+    mpc.con.b[:] = [
         -mpc.con.Umin + mpc.T_Hc*lastu
         +mpc.con.Umax - mpc.T_Hc*lastu 
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
-        -mpc.con.Ŷmin + F
-        +mpc.con.Ŷmax - F
+        -mpc.con.Ŷmin + mpc.F
+        +mpc.con.Ŷmax - mpc.F
     ]
-    return b[mpc.con.i_b]
 end
 
 @doc raw"""
-    linconstraint(mpc::PredictiveController, ::NonLinModel, lastu)
+    linconstraint!(mpc::PredictiveController, ::NonLinModel, lastu)
 
 Calc `b` without predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
 """
-function linconstraint(mpc::PredictiveController, ::NonLinModel, lastu, _ )
-    b = [
+function linconstaint!(mpc::PredictiveController, ::NonLinModel, lastu)
+    mpc.con.b[:] = [
         -mpc.con.Umin + mpc.T_Hc*lastu
         +mpc.con.Umax - mpc.T_Hc*lastu 
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
     ]
-    return b[mpc.con.i_b]
 end
 
 """
-    optim_objective!(mpc::PredictiveController, b, q̃, p, F, d0, D̂0)
+    optim_objective!(mpc::PredictiveController, b, p)
 
 Optimize the objective function ``J`` of `mpc` controller. 
 """
-function optim_objective!(mpc::PredictiveController, b, p, x̂d, F, d0, D̂0)
+function optim_objective!(mpc::PredictiveController, p)
     optim = mpc.optim
     model = mpc.estim.model
     ΔŨ::Vector{VariableRef} = optim[:ΔŨ]
     lastΔŨ = mpc.info.ΔŨ
-    set_normalized_rhs.(optim[:linconstraint], b)
+    set_normalized_rhs.(optim[:linconstraint], mpc.con.b[mpc.con.i_b])
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
     ΔŨ0 = [lastΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(model.nu)]
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
     set_start_value.(ΔŨ, ΔŨ0)
-    init_objective(mpc, ΔŨ, x̂d, F, d0, D̂0)
+    init_objective(mpc, ΔŨ)
     try
         optimize!(optim)
     catch err
@@ -594,7 +593,8 @@ function init_deterpred(model::LinModel, Hp, Hc)
             J[iRow,iCol] = G[iRow .- ny*i,:]
         end
     end
-    return E, G, J, Kd, Q
+    F = zeros(ny*Hp) # dummy value (updated just before optimization)
+    return E, F, G, J, Kd, Q
 end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref)"
@@ -605,29 +605,34 @@ function init_deterpred(model::SimModel, Hp, Hc)
     J  = zeros(0, nd*Hp)
     Kd = zeros(0, nx)
     Q  = zeros(0, nu)
-    return E, G, J, Kd, Q
+    F = zeros(ny*Hp) # dummy value (updated just before optimization)
+    return E, F, G, J, Kd, Q
 end
 
 @doc raw"""
     init_quadprog(model::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
 
-Init the quadratic programming optimization matrix `P̃`.
+Init the quadratic programming optimization matrix `P̃` and `q̃`.
 
-The `P̃` matrix appears in the quadratic general form :
+The matrices appear in the quadratic general form :
 ```math
     J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'P̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
 ```
 ``\mathbf{P̃}`` is constant if the model and weights are linear and time invariant (LTI). The 
 vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k`` (see
-[`init_prediction`](@ref) method). ``p`` does not impact the minima position. It is thus 
+[`initpred!`](@ref) method). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp) 
-    return 2*Hermitian(Ẽ'*M_Hp*Ẽ + N_Hc + S_Hp'*L_Hp*S_Hp)
+function init_quadprog(::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
+    P̃ = 2*Hermitian(Ẽ'*M_Hp*Ẽ + N_Hc + S_Hp'*L_Hp*S_Hp)
+    q̃ = zeros(size(P̃, 1)) # dummy value (updated just before optimization)
+    return P̃, q̃
 end
-"Return an empty matrix if `model` is not a [`LinModel`](@ref)."
+"Return empty matrices if `model` is not a [`LinModel`](@ref)."
 function init_quadprog(::SimModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
-    return Hermitian(zeros(0, 0))
+    P̃ = Hermitian(zeros(0, 0))
+    q̃ = zeros(0)
+    return P̃, q̃
 end
 
 "Return the quadratic programming objective function, see [`init_quadprog`](@ref)."
@@ -812,7 +817,7 @@ end
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
     )
 
-Init `A` matrix and `i_b` for the linear inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+Init `A`, `b` and `i_b` for the linear inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 
 `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers.
 """
@@ -821,8 +826,9 @@ function init_linconstraint(::LinModel,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
 )
     A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
+    b   = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ŷmin; i_Ŷmax]
-    return A, i_b
+    return A, b, i_b
 end
 
 @doc raw"""
@@ -838,8 +844,9 @@ function init_linconstraint(::SimModel,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ 
 )
     A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
+    b   = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    return A, i_b
+    return A, b, i_b
 end
 
 "Validate predictive controller weight and horizon specified values."

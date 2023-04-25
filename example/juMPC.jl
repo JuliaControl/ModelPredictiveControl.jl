@@ -123,7 +123,7 @@ function test_mpc(model, mpc)
         d_data[:,k+1] = d
         updatestate!(mpc, u, y, d)
         updatestate!(model, u, d)
-    end 
+    end
     return u_data, y_data, r_data, d_data
 end
 
