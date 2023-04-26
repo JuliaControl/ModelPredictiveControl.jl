@@ -353,18 +353,18 @@ See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of t
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂y)
     mpc.F[:] = mpc.Kd*mpc.x̂d + mpc.Q*mpc.estim.lastu0 + Ŷs + mpc.Yop
     if model.nd ≠ 0
-        mpc.F .+= mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
+        mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
+        mpc.F[:] = mpc.F + mpc.G*mpc.d0 + mpc.J*mpc.D̂0
     end
     Ẑ = mpc.F - R̂y
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
     p = Ẑ'*mpc.M_Hp*Ẑ
     if ~isempty(mpc.R̂u)
-        V̂ = mpc.T_Hp*(mpc.estim.lastu0 + model.uop) - mpc.R̂u
+        lastu = mpc.estim.lastu0 + model.uop
+        V̂ = mpc.T_Hp*lastu - mpc.R̂u
         mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.T_Hp)'*V̂
         p += V̂'*mpc.L_Hp*V̂
     end
-    #d0 = zeros(model.nd, 0)         # only used for NonLinModel objects
-    #D̂0 = zeros(model.nd*mpc.Hp, 0)  # only used for NonLinModel objects
     return p
 end
 
@@ -380,9 +380,10 @@ without the operating points ``\mathbf{d_{op}}``.
 """
 function initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs , _ )
     mpc.F[:] = Ŷs + mpc.Yop
+    if model.nd ≠ 0
+        mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
+    end
     p = 0.0 # only used for LinModel objects
-    #d0 = d - model.dop
-    #D̂0 = D̂ - mpc.Dop
     return p
 end
 

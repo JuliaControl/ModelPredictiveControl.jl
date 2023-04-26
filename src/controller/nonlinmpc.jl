@@ -28,13 +28,16 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     q̃ ::Vector{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
+    d0::Vector{Float64}
+    D̂0::Vector{Float64}
+    Uop::Vector{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
     function NonLinMPC{S, JEFunc}(
         estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE::JEFunc, ru, optim
     ) where {S<:StateEstimator, JEFunc<:Function}
         model = estim.model
-        nu, nxd, nxs, ny = model.nu, model.nx, estim.nxs, model.ny
+        nu, nxd, nxs, ny, nd = model.nu, model.nx, estim.nxs, model.ny, model.nd
         x̂d, x̂s, ŷ = zeros(nxd), zeros(nxs), zeros(ny)
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt)
         M_Hp = Diagonal(convert(Vector{Float64}, repeat(Mwt, Hp)))
@@ -73,8 +76,8 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         nvar = size(Ẽ, 2)
         P̃, q̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
-        Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
-        set_silent(optim)
+        d0, D̂0 = zeros(nd), zeros(nd*Hp)
+        Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         @variable(optim, ΔŨ[1:nvar])
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
         A = con.A[con.i_b, :]
@@ -95,11 +98,13 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
-            Yop, Dop,
+            d0, D̂0,
+            Uop, Yop, Dop,
         )
         J = (ΔŨ...) -> obj_nonlinprog(mpc, model, ΔŨ)
         register(mpc.optim, :J, nvar, J, autodiff=true)
         @NLobjective(mpc.optim, Min, J(ΔŨ...))
+        set_silent(optim)
         return mpc
     end
 end
