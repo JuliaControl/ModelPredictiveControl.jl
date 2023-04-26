@@ -48,14 +48,14 @@ end
 
 Remove operating points on inputs `u`, measured outputs `ym` and disturbances `d`.
 
-Also store current inputs `u` in `estim.lastu`. This field is used for
-[`PredictiveController`](@ref) computations.
+Also store current inputs without operating points `u0` in `estim.lastu0`. This field is 
+used for [`PredictiveController`](@ref) computations.
 """
 function remove_op!(estim::StateEstimator, u, d, ym)
     u0  = u  - estim.model.uop
     d0  = d  - estim.model.dop
     ym0 = ym - estim.model.yop[estim.i_ym]
-    estim.lastu[:] = u
+    estim.lastu0[:] = u0
     return u0, d0, ym0
 end
 
@@ -220,8 +220,8 @@ julia> x̂ = initstate!(estim, [1], [3 - 0.1])
 """
 function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     model = estim.model
-    # --- init lastu, used in PredictiveController ---
-    estim.lastu[:] = u
+    # --- init lastu0 for PredictiveControllers ---
+    estim.lastu0[:] = u - model.uop
     # --- deterministic model states ---
     x̂d = init_deterstate(model, estim, u, d)
     # --- stochastic model states (integrators) ---

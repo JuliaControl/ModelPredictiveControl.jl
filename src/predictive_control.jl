@@ -263,7 +263,7 @@ function moveinput!(
     ΔŨ, J = optim_objective!(mpc, p)
     write_info!(mpc, ΔŨ, J, ŷs, Ŷs)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
-    u = mpc.estim.lastu + Δu
+    u = mpc.estim.lastu0 + mpc.estim.model.uop + Δu
     return u
 end
 
@@ -344,14 +344,14 @@ end
 
 
 @doc raw"""
-    initpred!(mpc, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu)
+    initpred!(mpc, model::LinModel, d, D̂, Ŷs, R̂y)
 
 Init linear model prediction matrices `F`, `q̃` and `p`.
 
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂y)
-    mpc.F[:] = mpc.Kd*mpc.x̂d + mpc.Q*(mpc.estim.lastu - model.uop) + Ŷs + mpc.Yop
+    mpc.F[:] = mpc.Kd*mpc.x̂d + mpc.Q*mpc.estim.lastu0 + Ŷs + mpc.Yop
     if model.nd ≠ 0
         mpc.F .+= mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
     end
@@ -359,8 +359,8 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
     p = Ẑ'*mpc.M_Hp*Ẑ
     if ~isempty(mpc.R̂u)
-        V̂ = (mpc.T_Hp*mpc.estim.lastu - mpc.R̂u)
-        mpc.q̃ .+= 2(mpc.L_Hp*mpc.T_Hp)'*V̂
+        V̂ = mpc.T_Hp*(mpc.estim.lastu0 + model.uop) - mpc.R̂u
+        mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.T_Hp)'*V̂
         p += V̂'*mpc.L_Hp*V̂
     end
     #d0 = zeros(model.nd, 0)         # only used for NonLinModel objects
@@ -369,7 +369,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _ )
+    initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ )
 
 Init `F`, `d0` and `D̂0` prediction matrices for [`NonLinModel`](@ref).
 
@@ -387,14 +387,14 @@ function initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs ,
 end
 
 @doc raw"""
-    linconstraint!(mpc::PredictiveController, ::LinModel, lastu)
+    linconstraint!(mpc::PredictiveController, model::LinModel)
 
 Calc `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 """
-function linconstaint!(mpc::PredictiveController, ::LinModel)
+function linconstaint!(mpc::PredictiveController, model::LinModel)
     mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T_Hc*mpc.estim.lastu
-        +mpc.con.Umax - mpc.T_Hc*mpc.estim.lastu
+        -mpc.con.Umin + mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
+        +mpc.con.Umax - mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
         -mpc.con.Ŷmin + mpc.F
@@ -403,14 +403,14 @@ function linconstaint!(mpc::PredictiveController, ::LinModel)
 end
 
 @doc raw"""
-    linconstraint!(mpc::PredictiveController, ::NonLinModel, lastu)
+    linconstraint!(mpc::PredictiveController, model::NonLinModel)
 
 Calc `b` without predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
 """
-function linconstaint!(mpc::PredictiveController, ::NonLinModel)
+function linconstaint!(mpc::PredictiveController, model::NonLinModel)
     mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T_Hc*mpc.estim.lastu
-        +mpc.con.Umax - mpc.T_Hc*mpc.estim.lastu
+        -mpc.con.Umin + mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
+        +mpc.con.Umax - mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
     ]

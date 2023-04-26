@@ -1,6 +1,6 @@
 struct InternalModel{M<:SimModel} <: StateEstimator
     model::M
-    lastu::Vector{Float64}
+    lastu0::Vector{Float64}
     x̂::Vector{Float64}
     x̂d::Vector{Float64}
     x̂s::Vector{Float64}
@@ -16,7 +16,7 @@ struct InternalModel{M<:SimModel} <: StateEstimator
     Âs::Matrix{Float64}
     B̂s::Matrix{Float64}
     function InternalModel{M}(model::M, i_ym, Asm, Bsm, Csm, Dsm) where {M<:SimModel}
-        ny = model.ny
+        nu, ny = model.nu, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
         if isa(model, LinModel)
             poles = eigvals(model.A)
@@ -38,12 +38,12 @@ struct InternalModel{M<:SimModel} <: StateEstimator
         nxs = size(As,1)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         i_ym = collect(i_ym)
-        lastu = copy(model.uop)
+        lastu0 = zeros(nu)
         x̂d = x̂ = copy(model.x) # x̂ and x̂d are same object (updating x̂d will update x̂)
         x̂s = zeros(nxs)
         return new(
             model, 
-            lastu, x̂, x̂d, x̂s, 
+            lastu0, x̂, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Âs, B̂s

@@ -233,7 +233,7 @@ function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs)
     mpc.info.ΔŨ = ΔŨ
     mpc.info.ϵ = isinf(mpc.C) ? NaN : ΔŨ[end]
     mpc.info.J = J
-    mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*mpc.estim.lastu
+    mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + mpc.estim.model.uop)
     mpc.info.u = mpc.info.U[1:mpc.estim.model.nu]
     mpc.info.ŷ = mpc.ŷ
     mpc.info.Ŷ = mpc.Ẽ*ΔŨ + mpc.F

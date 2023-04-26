@@ -1,6 +1,6 @@
 struct Luenberger <: StateEstimator
     model::LinModel
-    lastu::Vector{Float64}
+    lastu0::Vector{Float64}
     x̂::Vector{Float64}
     i_ym::Vector{Int}
     nx̂::Int
@@ -19,7 +19,7 @@ struct Luenberger <: StateEstimator
     D̂dm ::Matrix{Float64}
     K::Matrix{Float64}
     function Luenberger(model, i_ym, nint_ym, Asm, Csm, L)
-        nx, ny = model.nx, model.ny
+        nu, nx, ny = model.nu, model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
         nxs = size(Asm,1)
         nx̂ = nx + nxs
@@ -29,11 +29,11 @@ struct Luenberger <: StateEstimator
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         K = L
         i_ym = collect(i_ym)
-        lastu = copy(model.uop)
+        lastu0 = zeros(nu)
         x̂ = [copy(model.x); zeros(nxs)]
         return new(
             model, 
-            lastu, x̂,
+            lastu0, x̂,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
