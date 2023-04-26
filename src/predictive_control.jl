@@ -256,15 +256,14 @@ function moveinput!(
     D̂ ::Vector{<:Real} = repeat(d,  mpc.Hp),
     ym::Union{Vector{<:Real}, Nothing} = nothing
 )
-    lastu = mpc.info.u
-    x̂d, x̂s = split_state(mpc.estim)
-    ŷs, Ŷs = predict_stoch(mpc, mpc.estim, x̂s, d, ym)
-    p = initpred!(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y, x̂d, lastu)
-    linconstaint!(mpc, mpc.estim.model, lastu)
+    getestimates!(mpc, mpc.estim, ym, d)
+    ŷs, Ŷs = predictstoch!(mpc, mpc.estim, d, ym)
+    p = initpred!(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y)
+    linconstaint!(mpc, mpc.estim.model)
     ΔŨ, J = optim_objective!(mpc, p)
-    write_info!(mpc, ΔŨ, J, ŷs, Ŷs, lastu, ym, d)
+    write_info!(mpc, ΔŨ, J, ŷs, Ŷs)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
-    u = lastu + Δu
+    u = mpc.estim.lastu + Δu
     return u
 end
 
@@ -281,7 +280,6 @@ setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return m
 Init `mpc.info` and the states of `mpc.estim` [`StateEstimator`](@ref).
 """
 function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
-    mpc.info.u = u
     mpc.info.ΔŨ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
@@ -296,40 +294,51 @@ updatestate!(mpc::PredictiveController, u, ym, d=Float64[]) = updatestate!(mpc.e
 
 
 """
-    split_state(estim::StateEstimator)
+    getestimates!(mpc::PredictiveController, estim::StateEstimator)
 
-Split `estim.x̂` vector into the deterministic `x̂d` and stochastic `x̂s` states.
+Get estimator output and split `x̂` into the deterministic `x̂d` and stochastic `x̂s` states.
 """
-split_state(estim::StateEstimator) = (nx=estim.model.nx; (estim.x̂[1:nx], estim.x̂[nx+1:end]))
+function getestimates!(mpc::PredictiveController, estim::StateEstimator, _ , d)
+    nx = estim.model.nx
+    mpc.x̂d[:] = estim.x̂[1:nx]
+    mpc.x̂s[:] = estim.x̂[nx+1:end]
+    mpc.ŷ[:]  = evaloutput(estim, d)
+    return mpc.x̂d, mpc.x̂s, mpc.ŷ
+end
 
 """
-    split_state(estim::InternalModel)
+    getestimates!(mpc::PredictiveController, estim::InternalModel)
 
 Get the internal model deterministic `estim.x̂d` and stochastic `estim.x̂s` states.
 """
-split_state(estim::InternalModel)  = (estim.x̂d, estim.x̂s)
+function getestimates!(mpc::PredictiveController, estim::InternalModel, ym, d)
+    isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
+                           "outputs ym in keyword argument to compute control actions u")
+    mpc.x̂d[:] = estim.x̂d
+    mpc.x̂s[:] = estim.x̂s
+    mpc.ŷ[:]  = evaloutput(estim, ym, d)
+    return mpc.x̂d, mpc.x̂s, mpc.ŷ
+end
 
 """
-    predict_stoch(mpc, estim::StateEstimator, x̂s, d, _ )
+    predictstoch!(mpc, estim::StateEstimator, x̂s, d, _ )
 
 Predict the current `ŷs` and future `Ŷs` stochastic model outputs over `Hp`. 
 
 See [`init_stochpred`](@ref) for details on `Ŷs` and `Ks` matrices.
 """
-predict_stoch(mpc, estim::StateEstimator, x̂s, _ , _ ) = (estim.Cs*x̂s, mpc.Ks*x̂s)
+predictstoch!(mpc, estim::StateEstimator, _ , _ ) = (estim.Cs*mpc.x̂s, mpc.Ks*mpc.x̂s)
 
 """
-    predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
+    predictstoch!(mpc, estim::InternalModel, x̂s, d, ym )
 
 Use current measured outputs `ym` for prediction when `estim` is a [`InternalModel`](@ref).
 """
-function predict_stoch(mpc, estim::InternalModel, x̂s, d, ym )
-    isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
-                           "outputs ym in keyword argument to compute control actions u")
-    ŷd = h(estim.model, estim.x̂d, d - estim.model.dop) + estim.model.yop 
+function predictstoch!(mpc, estim::InternalModel, d, ym )
+    ŷd = h(estim.model, mpc.x̂d, d - estim.model.dop) + estim.model.yop 
     ŷs = zeros(estim.model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
-    Ŷs = mpc.Ks*x̂s + mpc.Ps*ŷs
+    Ŷs = mpc.Ks*mpc.x̂s + mpc.Ps*ŷs
     return ŷs, Ŷs
 end
 
@@ -341,10 +350,8 @@ Init linear model prediction matrices `F`, `q̃` and `p`.
 
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
-function initpred!(
-    mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂y, x̂d, lastu
-)
-    mpc.F[:] = mpc.Kd*x̂d + mpc.Q*(lastu - model.uop) + Ŷs + mpc.Yop
+function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂y)
+    mpc.F[:] = mpc.Kd*mpc.x̂d + mpc.Q*(mpc.estim.lastu - model.uop) + Ŷs + mpc.Yop
     if model.nd ≠ 0
         mpc.F .+= mpc.G*(d - model.dop) + mpc.J*(D̂ - mpc.Dop)
     end
@@ -352,7 +359,7 @@ function initpred!(
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
     p = Ẑ'*mpc.M_Hp*Ẑ
     if ~isempty(mpc.R̂u)
-        V̂ = (mpc.T_Hp*lastu - mpc.R̂u)
+        V̂ = (mpc.T_Hp*mpc.estim.lastu - mpc.R̂u)
         mpc.q̃ .+= 2(mpc.L_Hp*mpc.T_Hp)'*V̂
         p += V̂'*mpc.L_Hp*V̂
     end
@@ -371,7 +378,7 @@ it incorporates the stochastic predictions and the output operating point ``\mat
 repeated over ``H_p``. `d0` and `D̂0` are the measured disturbances and the predictions 
 without the operating points ``\mathbf{d_{op}}``.
 """
-function initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ , _ , _)
+function initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs , _ )
     mpc.F[:] = Ŷs + mpc.Yop
     p = 0.0 # only used for LinModel objects
     #d0 = d - model.dop
@@ -384,10 +391,10 @@ end
 
 Calc `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 """
-function linconstaint!(mpc::PredictiveController, ::LinModel, lastu)
+function linconstaint!(mpc::PredictiveController, ::LinModel)
     mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T_Hc*lastu
-        +mpc.con.Umax - mpc.T_Hc*lastu 
+        -mpc.con.Umin + mpc.T_Hc*mpc.estim.lastu
+        +mpc.con.Umax - mpc.T_Hc*mpc.estim.lastu
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
         -mpc.con.Ŷmin + mpc.F
@@ -400,10 +407,10 @@ end
 
 Calc `b` without predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
 """
-function linconstaint!(mpc::PredictiveController, ::NonLinModel, lastu)
+function linconstaint!(mpc::PredictiveController, ::NonLinModel)
     mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T_Hc*lastu
-        +mpc.con.Umax - mpc.T_Hc*lastu 
+        -mpc.con.Umin + mpc.T_Hc*mpc.estim.lastu
+        +mpc.con.Umax - mpc.T_Hc*mpc.estim.lastu
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
     ]
@@ -449,9 +456,9 @@ end
 
 
 "Evaluate current output of `InternalModel` estimator."
-eval_ŷ(estim::InternalModel, ym, d) = estim(ym, d)
+evalŷ!(estim::InternalModel, ym, d) = (mpc.ŷ[:] = estim(ym, d))
 "Evaluate current output of the other `StateEstimator`s."
-eval_ŷ(estim::StateEstimator, _, d) = estim(d)
+evalŷ!(estim::StateEstimator, _, d) = (mpc.ŷ[:] = estim(d))
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
 function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
@@ -506,7 +513,7 @@ where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``,
 measured disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
 ``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. Deterministic state estimates 
 ``\mathbf{x̂_d}(k)`` are extracted from current estimates ``\mathbf{x̂}_{k-1}(k)`` with
-[`split_state`](@ref). Operating points on ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{y}`` 
+[`getestimates!`](@ref). Operating points on ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{y}`` 
 are omitted in above equations.
 
 # Extended Help
@@ -648,11 +655,11 @@ obj_quadprog(ΔŨ, P̃, q̃) = 0.5*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
-Denoting the input increments augmented with the slack variable 
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
-augmented conversion matrices ``\mathbf{S̃}_{H_p}`` and ``\mathbf{S̃}_{H_c}``, similar to the 
-ones described at [`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the
- inequality constraints:
+Denoting the input increments augmented with the slack variable
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
+augmented conversion matrix ``\mathbf{S̃}_{H_p}``, similar to the one described at
+[`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the inequality
+constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{U_{min}}} \\ 
@@ -669,12 +676,12 @@ function relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         # ϵ impacts ΔU → U conversion for constraint calculations:
         A_Umin, A_Umax = -[S_Hc +c_Umin], +[S_Hc -c_Umax] 
         # ϵ has no impact on ΔU → U conversion for prediction calculations:
-        S̃_Hp, S̃_Hc = [S_Hp falses(size(S_Hp, 1))], [S_Hc falses(size(S_Hc, 1))] 
+        S̃_Hp = [S_Hp falses(size(S_Hp, 1))]
     else # ΔŨ = ΔU (only hard constraints)
         A_Umin, A_Umax = -S_Hc, +S_Hc
-        S̃_Hp, S̃_Hc = S_Hp, S_Hc
+        S̃_Hp = S_Hp
     end
-    return A_Umin, A_Umax, S̃_Hp, S̃_Hc
+    return A_Umin, A_Umax, S̃_Hp
 end
 
 @doc raw"""
@@ -766,7 +773,7 @@ integrators):
 ```
 The stochastic predictions ``\mathbf{Ŷ_s}`` are the integrator outputs from ``k+1`` to 
 ``k+H_p``. ``\mathbf{x̂_s}(k)`` is extracted from current estimates ``\mathbf{x̂}_{k-1}(k)``
-with [`split_state`](@ref). The method also returns an empty ``\mathbf{P_s}`` matrix, since 
+with [`getestimates!`](@ref). The method also returns an empty ``\mathbf{P_s}`` matrix, since 
 it is useless except for [`InternalModel`](@ref) estimators.
 """
 function init_stochpred(estim::StateEstimator, Hp)

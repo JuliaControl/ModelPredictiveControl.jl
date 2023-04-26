@@ -1,5 +1,6 @@
 struct SteadyKalmanFilter <: StateEstimator
     model::LinModel
+    lastu::Vector{Float64}
     x̂::Vector{Float64}
     i_ym::Vector{Int}
     nx̂::Int
@@ -38,12 +39,13 @@ struct SteadyKalmanFilter <: StateEstimator
             end
         end
         i_ym = collect(i_ym)
+        lastu = copy(model.uop)
+        x̂ = [copy(model.x); zeros(nxs)]
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)
-        x̂ = [copy(model.x); zeros(nxs)]
         return new(
             model, 
-            x̂,
+            lastu, x̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
@@ -158,7 +160,7 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
 ```
 """
 function updatestate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
-    u, d, ym = remove_op(estim, u, d, ym)
+    u, d, ym = remove_op!(estim, u, d, ym)
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K = estim.x̂, estim.K
     x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K*(ym - Ĉm*x̂ - D̂dm*d)
@@ -168,6 +170,7 @@ end
 
 struct KalmanFilter <: StateEstimator
     model::LinModel
+    lastu::Vector{Float64}
     x̂::Vector{Float64}
     P̂::Hermitian{Float64, Matrix{Float64}}
     i_ym::Vector{Int}
@@ -198,6 +201,7 @@ struct KalmanFilter <: StateEstimator
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         i_ym = collect(i_ym)
+        lastu = copy(model.uop)
         x̂ = [copy(model.x); zeros(nxs)]
         P̂0 = Hermitian(P̂0, :L)
         Q̂ = Hermitian(Q̂, :L)
@@ -205,7 +209,7 @@ struct KalmanFilter <: StateEstimator
         P̂ = copy(P̂0)
         return new(
             model, 
-            x̂, P̂, 
+            lastu, x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
@@ -275,7 +279,7 @@ Update `estim.x̂` \ `P̂` with current inputs `u`, measured outputs `ym` and di
 See [`updatestate_kf!`](@ref) for the implementation details.
 """
 function updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
-    u, d, ym = remove_op(estim, u, d, ym) 
+    u, d, ym = remove_op!(estim, u, d, ym) 
     updatestate_kf!(estim, u, ym, d)
     return estim.x̂
 end
@@ -318,6 +322,7 @@ end
 
 struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     model::M
+    lastu::Vector{Float64}
     x̂::Vector{Float64}
     P̂::Hermitian{Float64, Matrix{Float64}}
     i_ym::Vector{Int}
@@ -346,6 +351,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         i_ym = collect(i_ym)
+        lastu = copy(model.uop)
         x̂ = [copy(model.x); zeros(nxs)]
         P̂0 = Hermitian(P̂0, :L)
         Q̂ = Hermitian(Q̂, :L)
@@ -353,7 +359,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         P̂ = copy(P̂0)
         return new(
             model,
-            x̂, P̂, 
+            lastu, x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs, nint_ym,
             P̂0, Q̂, R̂,
@@ -470,7 +476,7 @@ Same than `KalmanFilter` but using the unscented estimator.
 See [`updatestate_ukf!`](@ref) for the implementation details.
 """
 function updatestate!(estim::UnscentedKalmanFilter, u, ym, d=Float64[])
-    u, d, ym = remove_op(estim, u, d, ym) 
+    u, d, ym = remove_op!(estim, u, d, ym) 
     updatestate_ukf!(estim, u, ym, d)
     return estim.x̂
 end

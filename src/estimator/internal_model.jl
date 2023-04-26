@@ -1,5 +1,6 @@
 struct InternalModel{M<:SimModel} <: StateEstimator
     model::M
+    lastu::Vector{Float64}
     x̂::Vector{Float64}
     x̂d::Vector{Float64}
     x̂s::Vector{Float64}
@@ -37,9 +38,16 @@ struct InternalModel{M<:SimModel} <: StateEstimator
         nxs = size(As,1)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         i_ym = collect(i_ym)
+        lastu = copy(model.uop)
         x̂d = x̂ = copy(model.x) # x̂ and x̂d are same object (updating x̂d will update x̂)
         x̂s = zeros(nxs)
-        return new(model, x̂, x̂d, x̂s, i_ym, nx̂, nym, nyu, nxs, As, Bs, Cs, Ds, Âs, B̂s)
+        return new(
+            model, 
+            lastu, x̂, x̂d, x̂s, 
+            i_ym, nx̂, nym, nyu, nxs, 
+            As, Bs, Cs, Ds, 
+            Âs, B̂s
+        )
     end
 end
 
@@ -145,11 +153,12 @@ Update `estim.x̂` \ `x̂d` \ `x̂s` with current inputs `u`, measured outputs `
 """
 function updatestate!(estim::InternalModel, u, ym, d=Float64[])
     model = estim.model
-    u, d, ym = remove_op(estim, u, d, ym)
+    # ---- remove operating points ----
+    u, d, ym = remove_op!(estim, u, d, ym)
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
     ŷd = h(model, x̂d, d)
-    x̂d[:] = f(model, x̂d, u, d) # this also updates estim.xhat (they are the same object)
+    x̂d[:] = f(model, x̂d, u, d) # this also updates estim.x̂ (they are the same object)
     # --------------- stochastic model -----------------------
     ŷs = zeros(model.ny,1)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]   # ŷs=0 for unmeasured outputs

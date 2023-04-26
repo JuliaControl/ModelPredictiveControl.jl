@@ -3,6 +3,9 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     optim::JuMP.Model
     info::OptimInfo
     con::ControllerConstraint
+    x̂d::Vector{Float64}
+    x̂s::Vector{Float64}
+    ŷ ::Vector{Float64}
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64, Vector{Float64}}
@@ -12,7 +15,6 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     R̂u::Vector{Float64}
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
-    S̃_Hc::Matrix{Bool}
     T_Hc::Matrix{Bool}
     Ẽ ::Matrix{Float64}
     F ::Vector{Float64}
@@ -28,7 +30,8 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     Dop::Vector{Float64}
     function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim) where {S<:StateEstimator}
         model = estim.model
-        nu, ny = model.nu, model.ny
+        nu, nxd, nxs, ny = model.nu, model.nx, estim.nxs, model.ny
+        x̂d, x̂s, ŷ = zeros(nxd), zeros(nxs), zeros(ny)
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         M_Hp = Diagonal{Float64}(repeat(Mwt, Hp))
         N_Hc = Diagonal{Float64}(repeat(Nwt, Hc)) 
@@ -48,7 +51,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
-        A_Umin, A_Umax, S̃_Hp, S̃_Hc = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        A_Umin, A_Umax, S̃_Hp = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C,c_ΔUmin,c_ΔUmax,ΔUmin,ΔUmax,N_Hc)
         A_Ŷmin, A_Ŷmax, Ẽ = relaxŶ(model, C, c_Ŷmin, c_Ŷmax, E)
         i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
@@ -80,9 +83,10 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
         mpc = new(
             estim, optim, info, con,
+            x̂d, x̂s, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u,
-            S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
+            S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
             Yop, Dop,
@@ -225,13 +229,13 @@ end
 
 Write `mpc.info` with the [`LinMPC`](@ref) optimization results.
 """
-function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs, lastu, ym, d)
+function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs)
     mpc.info.ΔŨ = ΔŨ
     mpc.info.ϵ = isinf(mpc.C) ? NaN : ΔŨ[end]
     mpc.info.J = J
-    mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*lastu
+    mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*mpc.estim.lastu
     mpc.info.u = mpc.info.U[1:mpc.estim.model.nu]
-    mpc.info.ŷ = eval_ŷ(mpc.estim, ym, d)
+    mpc.info.ŷ = mpc.ŷ
     mpc.info.Ŷ = mpc.Ẽ*ΔŨ + mpc.F
     mpc.info.ŷs, mpc.info.Ŷs = ŷs, Ŷs
 end

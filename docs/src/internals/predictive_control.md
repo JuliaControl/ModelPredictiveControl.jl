@@ -13,8 +13,8 @@ ModelPredictiveControl.relaxΔU
 ModelPredictiveControl.relaxŶ
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
-ModelPredictiveControl.split_state
-ModelPredictiveControl.init_prediction
 ModelPredictiveControl.init_linconstraint
-ModelPredictiveControl.linconstraint
+ModelPredictiveControl.getestimates!
+ModelPredictiveControl.initprediction!
+ModelPredictiveControl.linconstraint!
 ```

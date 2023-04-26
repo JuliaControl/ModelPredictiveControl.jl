@@ -1,5 +1,6 @@
 struct Luenberger <: StateEstimator
     model::LinModel
+    lastu::Vector{Float64}
     x̂::Vector{Float64}
     i_ym::Vector{Int}
     nx̂::Int
@@ -28,10 +29,11 @@ struct Luenberger <: StateEstimator
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         K = L
         i_ym = collect(i_ym)
+        lastu = copy(model.uop)
         x̂ = [copy(model.x); zeros(nxs)]
         return new(
             model, 
-            x̂,
+            lastu, x̂,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 

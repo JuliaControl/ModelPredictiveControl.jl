@@ -3,6 +3,9 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     optim::JuMP.Model
     info::OptimInfo
     con::ControllerConstraint
+    x̂d::Vector{Float64}
+    x̂s::Vector{Float64}
+    ŷ ::Vector{Float64}
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64, Vector{Float64}}
@@ -14,7 +17,6 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     R̂u::Vector{Float64}
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
-    S̃_Hc::Matrix{Bool}
     T_Hc::Matrix{Bool}
     Ẽ ::Matrix{Float64}
     F ::Vector{Float64}
@@ -32,7 +34,8 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE::JEFunc, ru, optim
     ) where {S<:StateEstimator, JEFunc<:Function}
         model = estim.model
-        nu, nx, ny, nd =  model.nu, model.nx, model.ny, model.nd
+        nu, nxd, nxs, ny = model.nu, model.nx, estim.nxs, model.ny
+        x̂d, x̂s, ŷ = zeros(nxd), zeros(nxs), zeros(ny)
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt)
         M_Hp = Diagonal(convert(Vector{Float64}, repeat(Mwt, Hp)))
         N_Hc = Diagonal(convert(Vector{Float64}, repeat(Nwt, Hc)))
@@ -52,7 +55,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
-        A_Umin, A_Umax, S̃_Hp, S̃_Hc = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+        A_Umin, A_Umax, S̃_Hp = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
         A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C,c_ΔUmin,c_ΔUmax,ΔUmin,ΔUmax,N_Hc)
         A_Ŷmin, A_Ŷmax, Ẽ = relaxŶ(model, C, c_Ŷmin, c_Ŷmax, E)
         i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
@@ -86,9 +89,10 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         # dummy x̂d, F, d0, D̂0, q̃ values (updated just before optimization)
         mpc = new(
             estim, optim, info, con,
+            x̂d, x̂s, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u,
-            S̃_Hp, T_Hp, S̃_Hc, T_Hc, 
+            S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
             Yop, Dop,
@@ -223,6 +227,6 @@ end
 
 
 
-function write_info!(mpc::NonLinMPC, ΔŨ, J, ŷs, Ŷs, lastu, ym, d)
+function write_info!(mpc::NonLinMPC, ΔŨ, J, ŷs, Ŷs)
     return nothing
 end
