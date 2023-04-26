@@ -54,14 +54,14 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
         i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
         i_Ŷmin,  i_Ŷmax  = .!isinf.(Ŷmin),  .!isinf.(Ŷmax)
-        A, b, i_b = init_linconstraint(model, 
+        A, i_b, b = init_linconstraint(model, 
             A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
         )
         con = ControllerConstraint(
             Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ŷmin  , Ŷmax,
-            c_Umin  , c_Umax, c_ΔUmin, c_ΔUmax  , c_Ŷmin, c_Ŷmax,
-            A       , b     , i_b  , i_Ŷmin, i_Ŷmax
+            A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ŷmin, A_Ŷmax,
+            A       , b     , i_b  , i_Ŷmin, i_Ŷmax, c_Ŷmin, c_Ŷmax 
         )
         nvar = size(Ẽ, 2)
         P̃, q̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)

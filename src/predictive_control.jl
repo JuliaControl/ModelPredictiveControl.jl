@@ -40,17 +40,19 @@ struct ControllerConstraint
     ΔŨmax  ::Vector{Float64}
     Ŷmin   ::Vector{Float64}
     Ŷmax   ::Vector{Float64}
-    c_Umin ::Vector{Float64}
-    c_Umax ::Vector{Float64}
-    c_ΔUmin::Vector{Float64}
-    c_ΔUmax::Vector{Float64}
-    c_Ŷmin ::Vector{Float64}
-    c_Ŷmax ::Vector{Float64}
+    A_Umin ::Matrix{Float64}
+    A_Umax ::Matrix{Float64}
+    A_ΔŨmin::Matrix{Float64}
+    A_ΔŨmax::Matrix{Float64}
+    A_Ŷmin ::Matrix{Float64}
+    A_Ŷmax ::Matrix{Float64}
     A      ::Matrix{Float64}
     b      ::Vector{Float64}
     i_b    ::BitVector
     i_Ŷmin ::BitVector
     i_Ŷmax ::BitVector
+    c_Ŷmin ::Vector{Float64}
+    c_Ŷmax ::Vector{Float64}
 end
 
 @doc raw"""
@@ -103,7 +105,7 @@ function setconstraint!(
     con = mpc.con
     nu, ny = model.ny, model.ny
     Hp, Hc = mpc.Hp, mpc.Hc
-    C = mpc.C
+    C, E = mpc.C, mpc.Ẽ[:, 1:nu*Hc]
     if !isnothing(umin)
         size(umin)   == (nu,) || error("umin size must be $((nu,))")
         Umin  = repeat(umin, Hc)
@@ -128,64 +130,67 @@ function setconstraint!(
         size(ŷmin)   == (ny,) || error("ŷmin size must be $((ny,))")
         Ŷmin  = repeat(ŷmin, Hp)
         con.Ŷmin[:] = Ŷmin
+        con.i_Ŷmin[:] = .!isinf.(Ŷmin)
     end
     if !isnothing(ŷmax)
         size(ŷmax)   == (ny,) || error("ŷmax size must be $((ny,))")
         Ŷmax  = repeat(ŷmax, Hp)
         con.Ŷmax[:] = Ŷmax
+        con.i_Ŷmax[:] = .!isinf.(Ŷmax)
     end
     if !isnothing(c_umin)
+        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
         size(c_umin) == (nu,) || error("c_umin size must be $((nu,))")
         any(c_umin .< 0) && error("c_umin weights should be non-negative")
         c_Umin  = repeat(c_umin, Hc)
-        con.c_Umin[:] = c_Umin
+        con.A_Umin[:, end] = +c_Umin
     end
     if !isnothing(c_umax)
+        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
         size(c_umax) == (nu,) || error("c_umax size must be $((nu,))")
         any(c_umax .< 0) && error("c_umax weights should be non-negative")
         c_Umax  = repeat(c_umax, Hc)
-        con.c_Umax[:] = c_Umax
+        con.A_Umax[:, end] = -c_Umax
     end
     if !isnothing(c_Δumin)
+        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
         size(c_Δumin) == (nu,) || error("c_Δumin size must be $((nu,))")
         any(c_Δumin .< 0) && error("c_Δumin weights should be non-negative")
         c_ΔUmin  = repeat(c_Δumin, Hc)
-        con.c_ΔUmin[:] = c_ΔUmin
+        con.A_ΔUmin[1:end-1, end] = +c_ΔUmin
     end
     if !isnothing(c_Δumax)
+        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
         size(c_Δumax) == (nu,) || error("c_Δumax size must be $((nu,))")
         any(c_Δumax .< 0) && error("c_Δumax weights should be non-negative")
         c_ΔUmax  = repeat(c_Δumax, Hc)
-        con.c_ΔUmax[:] = c_ΔUmax
+        con.A_ΔUmax[1:end-1, end] = -c_ΔUmax
     end
     if !isnothing(c_ŷmin)
+        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
         size(c_ŷmin) == (ny,) || error("c_ŷmin size must be $((ny,))")
         any(c_ŷmin .< 0) && error("c_ŷmin weights should be non-negative")
         c_Ŷmin  = repeat(c_ŷmin, Hp)
         con.c_Ŷmin[:] = c_Ŷmin
+        A_Ŷmin ,_ = relaxŶ(model, C, con.c_Ŷmin, con.c_Ŷmax, E)
+        con.A_Ŷmin[:] = A_Ŷmin
     end
     if !isnothing(c_ŷmax)
+        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
         size(c_ŷmax) == (ny,) || error("c_ŷmax size must be $((ny,))")
         any(c_ŷmax .< 0) && error("c_ŷmax weights should be non-negative")
         c_Ŷmax  = repeat(c_ŷmax, Hp)
         con.c_Ŷmax[:] = c_Ŷmax
-    end    
-    S_Hp, S_Hc = mpc.S̃_Hp[:, 1:nu*Hc], mpc.S̃_Hc[:, 1:nu*Hc]
-    N_Hc = mpc.Ñ_Hc[1:nu*Hc, 1:nu*Hc]
-    E    = mpc.Ẽ[:, 1:nu*Hc]
-    ΔUmin, ΔUmax     = con.ΔŨmin[1:nu*Hc], con.ΔŨmax[1:nu*Hc]
-    A_Umin, A_Umax   = relaxU(C, con.c_Umin, con.c_Umax, S_Hp, S_Hc)
-    A_ΔŨmin, A_ΔŨmax = relaxΔU(C, con.c_ΔUmin, con.c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
-    A_Ŷmin, A_Ŷmax   = relaxŶ(model, C, con.c_Ŷmin, con.c_Ŷmax, E)
+        _, A_Ŷmax = relaxŶ(model, C, con.c_Ŷmin, con.c_Ŷmax, E)
+        con.A_Ŷmax[:] = A_Ŷmax
+    end
     i_Umin,  i_Umax  = .!isinf.(con.Umin),  .!isinf.(con.Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmin)
-    i_Ŷmin,  i_Ŷmax  = .!isinf.(con.Ŷmin),  .!isinf.(con.Ŷmax)    
+    i_Ŷmin,  i_Ŷmax  = .!isinf.(con.Ŷmin),  .!isinf.(con.Ŷmax)
     con.A[:], con.i_b[:] = init_linconstraint(model, 
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
+        con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, con.A_Ŷmin, con.A_Ŷmax,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
     )
-    con.b[:] = zeros(size(con.A, 1)) # dummy b value (vector updated just before optimization)
-    con.i_Ŷmin[:], con.i_Ŷmax[:] = i_Ŷmin, i_Ŷmax 
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     ΔŨ = mpc.optim[:ΔŨ]
@@ -826,9 +831,9 @@ function init_linconstraint(::LinModel,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
 )
     A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
-    b   = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ŷmin; i_Ŷmax]
-    return A, b, i_b
+    b   = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
+    return A, i_b, b
 end
 
 @doc raw"""
@@ -844,9 +849,9 @@ function init_linconstraint(::SimModel,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ 
 )
     A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
-    b   = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    return A, b, i_b
+    b   = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
+    return A, i_b, b
 end
 
 "Validate predictive controller weight and horizon specified values."
