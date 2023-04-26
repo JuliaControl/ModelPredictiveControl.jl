@@ -1,8 +1,8 @@
 struct LinMPC{S<:StateEstimator} <: PredictiveController
     estim::S
     optim::JuMP.Model
-    info::OptimInfo
     con::ControllerConstraint
+    ΔŨ::Vector{Float64}
     x̂d::Vector{Float64}
     x̂s::Vector{Float64}
     ŷ ::Vector{Float64}
@@ -74,19 +74,10 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         Ks, Ps = init_stochpred(estim, Hp)
         d0, D̂0 = zeros(nd), zeros(nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
-        @variable(optim, ΔŨ[1:nvar])
-        A = con.A[con.i_b, :]
-        b = con.b[con.i_b]
-        @constraint(optim, linconstraint, A*ΔŨ .≤ b)
-        ΔŨ0 = zeros(nvar)
-        ϵ = isinf(C) ? NaN : 0.0 # C = Inf means hard constraints only
-        u, U = copy(model.uop), repeat(model.uop, Hp)
-        ŷ, Ŷ = copy(model.yop), repeat(model.yop, Hp)
-        ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
-        info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
+        ΔŨ = zeros(nvar)
         mpc = new(
-            estim, optim, info, con,
-            x̂d, x̂s, ŷ,
+            estim, optim, con,
+            ΔŨ, x̂d, x̂s, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u,
             S̃_Hp, T_Hp, T_Hc, 
@@ -95,6 +86,10 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             d0, D̂0,
             Uop, Yop, Dop,
         )
+        @variable(optim, ΔŨ[1:nvar])
+        A = con.A[con.i_b, :]
+        b = con.b[con.i_b]
+        @constraint(optim, linconstraint, A*ΔŨ .≤ b)
         @objective(optim, Min, obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃))
         set_silent(optim)
         return mpc
@@ -227,20 +222,4 @@ end
 
 function init_objective(mpc::LinMPC, ΔŨ)
     set_objective_function(mpc.optim, obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃))
-end
-
-"""
-    write_info!(mpc::LinMPC, ΔŨ, ϵ, J, info, ŷs, Ŷs, lastu, F, ym, d)
-
-Write `mpc.info` with the [`LinMPC`](@ref) optimization results.
-"""
-function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs)
-    mpc.info.ΔŨ = ΔŨ
-    mpc.info.ϵ = isinf(mpc.C) ? NaN : ΔŨ[end]
-    mpc.info.J = J
-    mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + mpc.estim.model.uop)
-    mpc.info.u = mpc.info.U[1:mpc.estim.model.nu]
-    mpc.info.ŷ = mpc.ŷ
-    mpc.info.Ŷ = mpc.Ẽ*ΔŨ + mpc.F
-    mpc.info.ŷs, mpc.info.Ŷs = ŷs, Ŷs
 end

@@ -1,8 +1,8 @@
 struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     estim::S
     optim::JuMP.Model
-    info::OptimInfo
     con::ControllerConstraint
+    ΔŨ::Vector{Float64}
     x̂d::Vector{Float64}
     x̂s::Vector{Float64}
     ŷ ::Vector{Float64}
@@ -78,21 +78,10 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         Ks, Ps = init_stochpred(estim, Hp)
         d0, D̂0 = zeros(nd), zeros(nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
-        @variable(optim, ΔŨ[1:nvar])
-        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ŷmin; A_Ŷmax]
-        A = con.A[con.i_b, :]
-        b = con.b[con.i_b]
-        @constraint(optim, linconstraint, A*ΔŨ .≤ b)
-        ΔŨ0 = zeros(nvar)
-        ϵ = isinf(C) ? NaN : 0.0 # C = Inf means hard constraints only
-        u, U = copy(model.uop), repeat(model.uop, Hp)
-        ŷ, Ŷ = copy(model.yop), repeat(model.yop, Hp)
-        ŷs, Ŷs = zeros(ny), zeros(ny*Hp)
-        info = OptimInfo(ΔŨ0, ϵ, 0, u, U, ŷ, Ŷ, ŷs, Ŷs)
-        # dummy x̂d, F, d0, D̂0, q̃ values (updated just before optimization)
+        ΔŨ = zeros(nvar)
         mpc = new(
-            estim, optim, info, con,
-            x̂d, x̂s, ŷ,
+            estim, optim, con,
+            ΔŨ, x̂d, x̂s, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u,
             S̃_Hp, T_Hp, T_Hc, 
@@ -101,7 +90,13 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             d0, D̂0,
             Uop, Yop, Dop,
         )
-        J = (ΔŨ...) -> obj_nonlinprog(mpc, model, ΔŨ)
+        @variable(optim, ΔŨ[1:nvar])
+        A = con.A[con.i_b, :]
+        b = con.b[con.i_b]
+        @constraint(optim, linconstraint, A*ΔŨ .≤ b)
+        J = let mpc=mpc, model=model # capture mpc and model variables
+            (ΔŨ...) -> obj_nonlinprog(mpc, model, ΔŨ)
+        end
         register(mpc.optim, :J, nvar, J, autodiff=true)
         @NLobjective(mpc.optim, Min, J(ΔŨ...))
         set_silent(optim)
@@ -228,10 +223,4 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     J = 0.0
     #println("yoSimModel")
     return J
-end
-
-
-
-function write_info!(mpc::NonLinMPC, ΔŨ, J, ŷs, Ŷs)
-    return nothing
 end

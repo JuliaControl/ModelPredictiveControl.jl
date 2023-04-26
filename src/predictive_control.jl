@@ -19,19 +19,6 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController end
 
-"Include the additional information about the optimum to ease troubleshooting."
-mutable struct OptimInfo
-    ΔŨ::Vector{Float64}
-    ϵ ::Float64
-    J ::Float64
-    u ::Vector{Float64}
-    U ::Vector{Float64}
-    ŷ ::Vector{Float64}
-    Ŷ ::Vector{Float64}
-    ŷs::Vector{Float64}
-    Ŷs::Vector{Float64}
-end
-
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint
     Umin   ::Vector{Float64}
@@ -260,8 +247,7 @@ function moveinput!(
     ŷs, Ŷs = predictstoch!(mpc, mpc.estim, d, ym)
     p = initpred!(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y)
     linconstaint!(mpc, mpc.estim.model)
-    ΔŨ, J = optim_objective!(mpc, p)
-    write_info!(mpc, ΔŨ, J, ŷs, Ŷs)
+    ΔŨ, _ = optim_objective!(mpc, p)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
     u = mpc.estim.lastu0 + mpc.estim.model.uop + Δu
     return u
@@ -277,10 +263,10 @@ setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return m
 """
     initstate!(mpc::PredictiveController, u, ym, d=Float64[])
 
-Init `mpc.info` and the states of `mpc.estim` [`StateEstimator`](@ref).
+Init `mpc.ΔŨ` for warm-starting and the states of `mpc.estim` [`StateEstimator`](@ref).
 """
 function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
-    mpc.info.ΔŨ .= 0
+    mpc.ΔŨ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
 
@@ -390,7 +376,7 @@ end
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)
 
-Calc `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 """
 function linconstaint!(mpc::PredictiveController, model::LinModel)
     mpc.con.b[:] = [
@@ -401,12 +387,13 @@ function linconstaint!(mpc::PredictiveController, model::LinModel)
         -mpc.con.Ŷmin + mpc.F
         +mpc.con.Ŷmax - mpc.F
     ]
+    set_normalized_rhs.(mpc.optim[:linconstraint], mpc.con.b[mpc.con.i_b])
 end
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::NonLinModel)
 
-Calc `b` without predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
+Set `b` that excludes predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
 """
 function linconstaint!(mpc::PredictiveController, model::NonLinModel)
     mpc.con.b[:] = [
@@ -415,6 +402,7 @@ function linconstaint!(mpc::PredictiveController, model::NonLinModel)
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
     ]
+    set_normalized_rhs.(mpc.optim[:linconstraint], mpc.con.b[mpc.con.i_b])
 end
 
 """
@@ -426,8 +414,7 @@ function optim_objective!(mpc::PredictiveController, p)
     optim = mpc.optim
     model = mpc.estim.model
     ΔŨ::Vector{VariableRef} = optim[:ΔŨ]
-    lastΔŨ = mpc.info.ΔŨ
-    set_normalized_rhs.(optim[:linconstraint], mpc.con.b[mpc.con.i_b])
+    lastΔŨ = mpc.ΔŨ
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
     ΔŨ0 = [lastΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(model.nu)]
     # if soft constraints, append the last slack value ϵ_{k-1}:
@@ -450,9 +437,9 @@ function optim_objective!(mpc::PredictiveController, p)
         @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVED ($status)"
         @debug solution_summary(optim)
     end
-    ΔŨ_val = isfatal(status) ? ΔŨ0 : value.(ΔŨ) # fatal status : use last value
-    J_val = objective_value(optim) + p # optimal objective value by adding constant p
-    return ΔŨ_val, J_val
+    mpc.ΔŨ[:] = isfatal(status) ? ΔŨ0 : value.(ΔŨ) # fatal status : use last value
+    J_val = objective_value(optim) + p # add LinModel p constant (p=0 for NonLinModel) 
+    return mpc.ΔŨ, J_val
 end
 
 
