@@ -46,11 +46,11 @@ setconstraint!(mpc, Δumin=[-5,-10], Δumax=[6,11])
 setconstraint!(mpc, ŷmin=[5,10],ŷmax=[55, 35])
 @test all((mpc.con.Ŷmin, mpc.con.Ŷmax) .≈ ([5,10], [55,35]))
 setconstraint!(mpc, c_umin=[0.1,0.2], c_umax=[0.3,0.4])
-@test all((mpc.con.c_Umin, mpc.con.c_Umax) .≈ ([0.1,0.2], [0.3,0.4]))
+@test all((-mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]) .≈ ([0.1,0.2], [0.3,0.4]))
 setconstraint!(mpc, c_Δumin=[0.05,0.15], c_Δumax=[0.25,0.35])
-@test all((mpc.con.c_ΔUmin, mpc.con.c_ΔUmax) .≈ ([0.05,0.15], [0.25,0.35]))
+@test all((-mpc.con.A_ΔŨmin[1:end-1, end], -mpc.con.A_ΔŨmax[1:end-1, end]) .≈ ([0.05,0.15], [0.25,0.35]))
 setconstraint!(mpc, c_ŷmin=[1.0,1.1], c_ŷmax=[1.2,1.3])
-@test all((mpc.con.c_Ŷmin, mpc.con.c_Ŷmax) .≈ ([1.0,1.1], [1.2,1.3]))
+@test all((-mpc.con.A_Ŷmin[:, end], -mpc.con.A_Ŷmax[:, end]) .≈ ([1.0,1.1], [1.2,1.3]))
 
 end
 

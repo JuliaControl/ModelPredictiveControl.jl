@@ -143,7 +143,7 @@ function setconstraint!(
         size(c_umin) == (nu,) || error("c_umin size must be $((nu,))")
         any(c_umin .< 0) && error("c_umin weights should be non-negative")
         c_Umin  = repeat(c_umin, Hc)
-        con.A_Umin[:, end] = +c_Umin
+        con.A_Umin[:, end] = -c_Umin
     end
     if !isnothing(c_umax)
         !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
@@ -157,14 +157,14 @@ function setconstraint!(
         size(c_Δumin) == (nu,) || error("c_Δumin size must be $((nu,))")
         any(c_Δumin .< 0) && error("c_Δumin weights should be non-negative")
         c_ΔUmin  = repeat(c_Δumin, Hc)
-        con.A_ΔUmin[1:end-1, end] = +c_ΔUmin
+        con.A_ΔŨmin[1:end-1, end] = -c_ΔUmin 
     end
     if !isnothing(c_Δumax)
         !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
         size(c_Δumax) == (nu,) || error("c_Δumax size must be $((nu,))")
         any(c_Δumax .< 0) && error("c_Δumax weights should be non-negative")
         c_ΔUmax  = repeat(c_Δumax, Hc)
-        con.A_ΔUmax[1:end-1, end] = -c_ΔUmax
+        con.A_ΔŨmax[1:end-1, end] = -c_ΔUmax
     end
     if !isnothing(c_ŷmin)
         !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
