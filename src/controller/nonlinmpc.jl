@@ -46,33 +46,9 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         C = Cwt
         # manipulated input setpoint predictions are constant over Hp :
         R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[] 
-        umin,  umax      = fill(-Inf, nu), fill(+Inf, nu)
-        Δumin, Δumax     = fill(-Inf, nu), fill(+Inf, nu)
-        ŷmin,  ŷmax      = fill(-Inf, ny), fill(+Inf, ny)
-        c_umin, c_umax   = fill(0.0, nu),  fill(0.0, nu)
-        c_Δumin, c_Δumax = fill(0.0, nu),  fill(0.0, nu)
-        c_ŷmin, c_ŷmax   = fill(1.0, ny),  fill(1.0, ny)
-        Umin, Umax, ΔUmin, ΔUmax, Ŷmin, Ŷmax = 
-            repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
-        c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = 
-            repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
-        A_Umin, A_Umax, S̃_Hp = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
-        A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C,c_ΔUmin,c_ΔUmax,ΔUmin,ΔUmax,N_Hc)
-        A_Ŷmin, A_Ŷmax, Ẽ = relaxŶ(model, C, c_Ŷmin, c_Ŷmax, E)
-        i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
-        i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
-        i_Ŷmin,  i_Ŷmax  = .!isinf.(Ŷmin),  .!isinf.(Ŷmax)
-        A, i_b, b = init_linconstraint(model, 
-            A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
-            i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
-        )
-        con = ControllerConstraint(
-            Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ŷmin  , Ŷmax,
-            A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ŷmin, A_Ŷmax,
-            A       , b     , i_b  , i_Ŷmin, i_Ŷmax, c_Ŷmin, c_Ŷmax 
-        )
+        con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
         nvar = size(Ẽ, 2)
         P̃, q̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)

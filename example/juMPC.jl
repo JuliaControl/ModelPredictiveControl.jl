@@ -129,7 +129,6 @@ end
 
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 
-
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
 
 using PlotThemes, Plots
