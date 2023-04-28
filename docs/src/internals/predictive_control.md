@@ -15,6 +15,6 @@ ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
 ModelPredictiveControl.init_linconstraint
 ModelPredictiveControl.getestimates!
-ModelPredictiveControl.initprediction!
+ModelPredictiveControl.initpred!
 ModelPredictiveControl.linconstraint!
 ```

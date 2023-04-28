@@ -196,6 +196,7 @@ function LinMPC(
     return LinMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
 end
 
-function init_objective(mpc::LinMPC, ΔŨ)
+function init_objective!(mpc::LinMPC, ΔŨ)
     set_objective_function(mpc.optim, obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃))
+    return nothing
 end

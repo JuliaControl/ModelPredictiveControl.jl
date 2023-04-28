@@ -185,14 +185,16 @@ function NonLinMPC(
 end
 
 
-function init_objective(mpc::NonLinMPC, _ )
-    return nothing
-end
+init_objective!(mpc::NonLinMPC, _ ) = nothing
 
-function obj_nonlinprog(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {T, N}
+function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) where {T, N}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
-    Jqp = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
-    return Jqp
+    U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
+    UE = [U; U[end-model.nu+1:end]]
+    ŶE = [mpc.ŷ; mpc.Ẽ*ΔŨ + mpc.F]
+    mpc.D̂0 + mpc.Dop
+    D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
+    return obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃) + mpc.JE(UE, ŶE, D̂E)
 end
 
 

@@ -246,7 +246,7 @@ function moveinput!(
     getestimates!(mpc, mpc.estim, ym, d)
     ŷs, Ŷs = predictstoch!(mpc, mpc.estim, d, ym)
     p = initpred!(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y)
-    linconstaint!(mpc, mpc.estim.model)
+    linconstraint!(mpc, mpc.estim.model)
     ΔŨ, _ = optim_objective!(mpc, p)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
     u = mpc.estim.lastu0 + mpc.estim.model.uop + Δu
@@ -359,8 +359,8 @@ end
 
 Init `F`, `d0` and `D̂0` prediction matrices for [`NonLinModel`](@ref).
 
-For [`NonLinModel`](@ref), the constant matrix `F` is ``\mathbf{F = Ŷ_s + Y_op}``, thus
-it incorporates the stochastic predictions and the output operating point ``\mathbf{y_op}`` 
+For [`NonLinModel`](@ref), the constant matrix `F` is ``\mathbf{F = Ŷ_s + Y_{op}}``, thus it
+incorporates the stochastic predictions and the output operating point ``\mathbf{y_{op}}`` 
 repeated over ``H_p``. `d0` and `D̂0` are the measured disturbances and the predictions 
 without the operating points ``\mathbf{d_{op}}``.
 """
@@ -378,7 +378,7 @@ end
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 """
-function linconstaint!(mpc::PredictiveController, model::LinModel)
+function linconstraint!(mpc::PredictiveController, model::LinModel)
     mpc.con.b[:] = [
         -mpc.con.Umin + mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
         +mpc.con.Umax - mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
@@ -395,7 +395,7 @@ end
 
 Set `b` that excludes predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
 """
-function linconstaint!(mpc::PredictiveController, model::NonLinModel)
+function linconstraint!(mpc::PredictiveController, model::NonLinModel)
     mpc.con.b[:] = [
         -mpc.con.Umin + mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
         +mpc.con.Umax - mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
@@ -420,7 +420,7 @@ function optim_objective!(mpc::PredictiveController, p)
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
     set_start_value.(ΔŨ, ΔŨ0)
-    init_objective(mpc, ΔŨ)
+    init_objective!(mpc, ΔŨ)
     try
         optimize!(optim)
     catch err
