@@ -130,7 +130,7 @@ arguments.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
   (default to [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html) optimizer)
-``
+
 # Examples
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
@@ -172,7 +172,6 @@ LinMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
  0 measured disturbances d
 ```
 """
-
 function LinMPC(
     estim::S;
     Hp::Union{Int, Nothing} = nothing,
