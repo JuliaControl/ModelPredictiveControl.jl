@@ -131,6 +131,7 @@ end
 
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
 
+#=
 using PlotThemes, Plots
 #theme(:default)
 theme(:dark)
@@ -151,4 +152,5 @@ pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(pd)
 display(pu)
 display(py)
+=#
 
