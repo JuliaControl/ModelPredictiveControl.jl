@@ -94,20 +94,20 @@ in which the weight matrices are repeated ``H_p`` or ``H_c`` times:
 ```
 and with the following nomenclature:
 
-| VAR.              | DESCRIPTION                                        |
-| :---------------- | :------------------------------------------------- |
-| ``H_p``           | prediction horizon                                 |
-| ``H_c``           | control horizon                                    |
-| ``\mathbf{ΔU}``   | manipulated input increments over ``H_c``          |
-| ``\mathbf{Ŷ}``    | predicted outputs over ``H_p``                     |
-| ``\mathbf{U}``    | manipulated inputs over ``H_p``                    |
-| ``\mathbf{R̂_y}``  | predicted output setpoints over ``H_p``            |
-| ``\mathbf{R̂_u}``  | predicted manipulated input setpoints over ``H_p`` |
-| ``\mathbf{M}``    | output setpoint tracking weights                   |
-| ``\mathbf{N}``    | manipulated input increment weights                |
-| ``\mathbf{L}``    | manipulated input setpoint tracking weights        |
-| ``C``             | slack variable weight                              |
-| ``ϵ``             | slack variable for constraint softening            |
+| VARIABLE         | DESCRIPTION                                        | SIZE             |
+| :--------------- | :------------------------------------------------- | :--------------- |
+| ``H_p``          | prediction horizon (integer)                       | `()`             |
+| ``H_c``          | control horizon (integer)                          | `()`             |
+| ``\mathbf{ΔU}``  | manipulated input increments over ``H_c``          | `(nu*Hc,)`       |
+| ``\mathbf{Ŷ}``   | predicted outputs over ``H_p``                     | `(ny*Hp,)`       |
+| ``\mathbf{U}``   | manipulated inputs over ``H_p``                    | `(nu*Hp,)`       |
+| ``\mathbf{R̂_y}`` | predicted output setpoints over ``H_p``            | `(ny*Hp,)`       |
+| ``\mathbf{R̂_u}`` | predicted manipulated input setpoints over ``H_p`` | `(nu*Hp,)`       |
+| ``\mathbf{M}``   | output setpoint tracking weights                   | `(ny*Hp, ny*Hp)` |
+| ``\mathbf{N}``   | manipulated input increment weights                | `(nu*Hc, nu*Hc)` |
+| ``\mathbf{L}``   | manipulated input setpoint tracking weights        | `(nu*Hp, nu*Hp)` |
+| ``C``            | slack variable weight                              | `()`             |
+| ``ϵ``            | slack variable for constraint softening            | `()`             |
 
 The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{Δu}(k+j) = 
 \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to ``H_c-1``, the ``\mathbf{Ŷ}`` vector, 
@@ -130,7 +130,7 @@ arguments.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
   (default to [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html) optimizer)
-
+``
 # Examples
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
@@ -172,6 +172,7 @@ LinMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
  0 measured disturbances d
 ```
 """
+
 function LinMPC(
     estim::S;
     Hp::Union{Int, Nothing} = nothing,
