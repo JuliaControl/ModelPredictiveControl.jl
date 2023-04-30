@@ -342,6 +342,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
         mpc.F[:] = mpc.F + mpc.G*mpc.d0 + mpc.J*mpc.D̂0
     end
+    mpc.R̂y[:] = R̂y
     Ẑ = mpc.F - R̂y
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
     p = Ẑ'*mpc.M_Hp*Ẑ
@@ -355,20 +356,21 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, _ )
+    initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, R̂y )
 
 Init `F`, `d0` and `D̂0` prediction matrices for [`NonLinModel`](@ref).
 
-For [`NonLinModel`](@ref), the constant matrix `F` is ``\mathbf{F = Ŷ_s + Y_{op}}``, thus it
+For [`NonLinModel`](@ref), the constant matrix ``\mathbf{F = Ŷ_s + Y_{op}}``, thus it
 incorporates the stochastic predictions and the output operating point ``\mathbf{y_{op}}`` 
-repeated over ``H_p``. `d0` and `D̂0` are the measured disturbances and the predictions 
+repeated over ``H_p``. `d0` and `D̂0` are the measured disturbances and its predictions 
 without the operating points ``\mathbf{d_{op}}``.
 """
-function initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs , _ )
+function initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs , R̂y )
     mpc.F[:] = Ŷs + mpc.Yop
     if model.nd ≠ 0
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
     end
+    mpc.R̂y[:] = R̂y
     p = 0.0 # only used for LinModel objects
     return p
 end

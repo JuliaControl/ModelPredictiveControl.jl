@@ -15,6 +15,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     E::Float64
     JE::JEFunc
     R̂u::Vector{Float64}
+    R̂y::Vector{Float64}
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     T_Hc::Matrix{Bool}
@@ -46,6 +47,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         C = Cwt
         # manipulated input setpoint predictions are constant over Hp :
         R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[] 
+        R̂y = zeros(ny* Hp) # dummy R̂y (updated just before optimization)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
@@ -59,7 +61,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             estim, optim, con,
             ΔŨ, x̂d, x̂s, ŷ,
             Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u,
+            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
@@ -189,17 +191,47 @@ init_objective!(mpc::NonLinMPC, _ ) = nothing
 
 function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) where {T, N}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
+    Jqp = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
     U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
     UE = [U; U[end-model.nu+1:end]]
     ŶE = [mpc.ŷ; mpc.Ẽ*ΔŨ + mpc.F]
-    mpc.D̂0 + mpc.Dop
     D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
-    return obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃) + mpc.JE(UE, ŶE, D̂E)
+    return Jqp + mpc.JE(UE, ŶE, D̂E)
 end
 
 
 function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {T,N}
-    J = 0.0
-    #println("yoSimModel")
-    return J
+    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
+    U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
+    # --- output setpoint tracking term ---
+    Ŷd0 = Vector{T}(undef, model.ny*mpc.Hp)
+    x̂d = mpc.x̂d
+    d0 = mpc.d0
+    for i=1:mpc.Hp
+        u0 = U0[(1 + model.nu*(i-1)):(model.nu*i)]
+        x̂d = model.f(x̂d, u0, d0)
+        d0 = mpc.D̂0[(1 + model.nd*(i-1)):(model.nd*i)]
+        ŷd0 = model.h(x̂d, d0)
+        Ŷd0[(1 + model.ny*(i-1)):(model.ny*i)] = ŷd0
+    end
+    Ŷ = Ŷd0 + mpc.F
+    êy = mpc.R̂y - Ŷ
+    JR̂y = êy'*mpc.M_Hp*êy  
+    # --- move suppression term ---
+    JΔŨ = ΔŨ'*mpc.Ñ_Hc*ΔŨ 
+    # --- input setpoint tracking term ---
+    U = U0 + mpc.Uop
+    if !isempty(mpc.R̂u)
+        êu = mpc.R̂u - U
+        JR̂u = êu'*mpc.L_Hp*ê
+    else
+        JR̂u = 0.0
+    end
+    # --- slack variable term ---
+    Jϵ = !isinf(mpc.C) ? mpc.C*ΔŨ[end] : 0.0
+    # --- economic term ---
+    UE = [U; U[end-model.nu+1:end]]
+    ŶE = [mpc.ŷ; Ŷ]
+    D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
+    return JR̂y + JΔŨ + JR̂u + Jϵ + mpc.JE(UE, ŶE, D̂E)
 end

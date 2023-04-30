@@ -38,7 +38,7 @@ f2(x,u,d) = A*x + Bu*u + Bd*d
 h2(x,_) = C*x
 
 nonLinModel1 = NonLinModel(f,h,Ts,2,4,2)
-nonLinModel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
+nonLinModel2 = setop!(NonLinModel(f2,h2,Ts,2,4,2,1), uop=[10,10],yop=[50,30],dop=[5])
 
 internalModel1 = InternalModel(linModel1)
 internalModel2 = InternalModel(linModel1,stoch_ym=[tf([1,0],[1,-1],Ts) 0; 0 tf([1,0],[1,-1],Ts)])
@@ -69,7 +69,13 @@ initstate!(uscKalmanFilter1,[0,0],[2,1])
 
 nmpc1 = NonLinMPC(uscKalmanFilter1)
 
-nmpc2 = NonLinMPC(nonLinModel1)
+nmpc2 = NonLinMPC(nonLinModel2, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e5)
+
+setconstraint!(nmpc2, c_umin=[0,0], c_umax=[0,0])
+setconstraint!(nmpc2, c_ŷmin=[1,1], c_ŷmax=[1,1])
+setconstraint!(nmpc2, umin=[5, 9.9], umax=[Inf,Inf])
+setconstraint!(nmpc2, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
+setconstraint!(nmpc2, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
 
 nx = linModel4.nx
@@ -127,11 +133,13 @@ function test_mpc(model, mpc)
     return u_data, y_data, r_data, d_data
 end
 
-@time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
+#@time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 
-@time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
+#@time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
 
-#=
+@time u_data, y_data, r_data, d_data = test_mpc(nonLinModel2, nmpc2)
+
+
 using PlotThemes, Plots
 #theme(:default)
 theme(:dark)
@@ -152,5 +160,5 @@ pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(pd)
 display(pu)
 display(py)
-=#
+
 

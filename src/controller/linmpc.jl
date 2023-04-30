@@ -13,6 +13,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     L_Hp::Diagonal{Float64, Vector{Float64}}
     C::Float64
     R̂u::Vector{Float64}
+    R̂y::Vector{Float64}
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     T_Hc::Matrix{Bool}
@@ -41,7 +42,8 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         L_Hp = Diagonal{Float64}(repeat(Lwt, Hp))
         C = Cwt
         # manipulated input setpoint predictions are constant over Hp :
-        R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[] 
+        R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[]
+        R̂y = zeros(ny* Hp) # dummy R̂y (updated just before optimization)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
@@ -55,7 +57,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             estim, optim, con,
             ΔŨ, x̂d, x̂s, ŷ,
             Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u,
+            M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
