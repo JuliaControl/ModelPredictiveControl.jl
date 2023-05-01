@@ -77,6 +77,13 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         end
         register(mpc.optim, :J, nvar, J, autodiff=true)
         @NLobjective(mpc.optim, Min, J(ΔŨ...))
+        nonlinconstraint = let mpc=mpc, model=model # capture mpc and model variables
+            (ΔŨ...) -> con_nonlinprog(mpc, model, ΔŨ)
+        end
+        register(mpc.optim, :nonlinconstraint, nvar, nonlinconstraint, autodiff=true)
+        ncon = sum(con.i_Ŷmin) + sum(con.i_Ŷmax)
+        @NLconstraint(mpc.optim, [i=1:ncon], nonlinconstraint(ΔŨ...) ≤ zeros(ncon))
+
         set_silent(optim)
         return mpc
     end
@@ -189,32 +196,21 @@ end
 
 init_objective!(mpc::NonLinMPC, _ ) = nothing
 
-function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) where {T, N}
+function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     Jqp = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
     U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
-    UE = [U; U[end-model.nu+1:end]]
+    UE = [U; U[(end - model.nu + 1):end]]
     ŶE = [mpc.ŷ; mpc.Ẽ*ΔŨ + mpc.F]
     D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
-    return Jqp + mpc.JE(UE, ŶE, D̂E)
+    return Jqp + mpc.E*mpc.JE(UE, ŶE, D̂E)
 end
 
-
-function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {T,N}
+function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
     # --- output setpoint tracking term ---
-    Ŷd0 = Vector{T}(undef, model.ny*mpc.Hp)
-    x̂d = mpc.x̂d
-    d0 = mpc.d0
-    for i=1:mpc.Hp
-        u0 = U0[(1 + model.nu*(i-1)):(model.nu*i)]
-        x̂d = model.f(x̂d, u0, d0)
-        d0 = mpc.D̂0[(1 + model.nd*(i-1)):(model.nd*i)]
-        ŷd0 = model.h(x̂d, d0)
-        Ŷd0[(1 + model.ny*(i-1)):(model.ny*i)] = ŷd0
-    end
-    Ŷ = Ŷd0 + mpc.F
+    Ŷ = evalŶ(mpc, model, mpc.x̂d, mpc.d0, mpc.D̂0, U0)
     êy = mpc.R̂y - Ŷ
     JR̂y = êy'*mpc.M_Hp*êy  
     # --- move suppression term ---
@@ -222,7 +218,7 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     # --- input setpoint tracking term ---
     U = U0 + mpc.Uop
     if !isempty(mpc.R̂u)
-        êu = mpc.R̂u - U
+        êu = mpc.R̂u - U 
         JR̂u = êu'*mpc.L_Hp*ê
     else
         JR̂u = 0.0
@@ -230,8 +226,35 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     # --- slack variable term ---
     Jϵ = !isinf(mpc.C) ? mpc.C*ΔŨ[end] : 0.0
     # --- economic term ---
-    UE = [U; U[end-model.nu+1:end]]
+    UE = [U; U[(end - model.nu + 1):end]]
     ŶE = [mpc.ŷ; Ŷ]
     D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
-    return JR̂y + JΔŨ + JR̂u + Jϵ + mpc.JE(UE, ŶE, D̂E)
+    return JR̂y + JΔŨ + JR̂u + Jϵ + mpc.E*mpc.JE(UE, ŶE, D̂E)
 end
+
+function con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
+    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
+    U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
+    Ŷ = evalŶ(mpc, model, mpc.x̂d, mpc.d0, mpc.D̂0, U0)
+    C_Ŷmin = (mpc.con.Ŷmin - Ŷ)[mpc.con.i_Ŷmin]
+    C_Ŷmax = (Ŷ - mpc.con.Ŷmax)[mpc.con.i_Ŷmin]
+    if !isinf(mpc.C) # constraint softening activated :
+        C_Ŷmin = C_Ŷmin - ΔŨ[end]*mpc.con.c_Ŷmin[mpc.con.i_Ŷmin]
+        C_Ŷmax = C_Ŷmax - ΔŨ[end]*mpc.con.c_Ŷmin[mpc.con.i_Ŷmin]
+    end
+    C = [C_Ŷmin; C_Ŷmax]
+    return C
+end
+
+function evalŶ(mpc, model, x̂d, d0, D̂0, U0::Vector{T}) where {T}
+    Ŷd0 = Vector{T}(undef, model.ny*mpc.Hp)
+    x̂d::Vector{T} = x̂d
+    for j=1:mpc.Hp
+        u0    = U0[(1 + model.nu*(j-1)):(model.nu*j)]
+        x̂d[:] = model.f(x̂d, u0, d0)
+        d0    = D̂0[(1 + model.nd*(j-1)):(model.nd*j)]
+        Ŷd0[(1 + model.ny*(j-1)):(model.ny*j)] = model.h(x̂d, d0)
+    end
+    return Ŷd0 + mpc.F
+end
+

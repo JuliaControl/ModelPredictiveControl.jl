@@ -631,7 +631,7 @@ obj_quadprog(ΔŨ, P̃, q̃) = 0.5*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ
 """
     initdefaultcon(model, C, S_Hp, S_Hc, N_Hc, E)
 
-Init `ContollerConstraint` struct with default paramaters.
+Init `ControllerConstraint` struct with default parameters.
 
 Also return `S̃_Hp`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
 """
