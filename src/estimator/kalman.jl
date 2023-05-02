@@ -554,7 +554,7 @@ end
 
 
 """
-    initstate!(estim::{KalmanFilter, UnscentedKalmanFilter}, u, ym, d=Float64[])
+    initstate!(estim::Union{KalmanFilter, UnscentedKalmanFilter}, u, ym, d=Float64[])
 
 Initialize covariance `estim.P̂` and invoke [`initstate!(::StateEstimator)`](@ref).
 """
