@@ -279,12 +279,16 @@ function con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
     Ŷ = evalŶ(mpc, model, mpc.x̂d, mpc.d0, mpc.D̂0, U0)
-    C_Ŷmin = (mpc.con.Ŷmin - Ŷ)
-    C_Ŷmax = (Ŷ - mpc.con.Ŷmax)
+    # replace -Inf with 0 to avoid INVALID_MODEL error
+    C_Ŷmin = zeros(T, length(Ŷ))
+    C_Ŷmax = zeros(T, length(Ŷ))
     if !isinf(mpc.C) # constraint softening activated :
         ϵ = ΔŨ[end]
-        C_Ŷmin = C_Ŷmin - ϵ*mpc.con.c_Ŷmin
-        C_Ŷmax = C_Ŷmax - ϵ*mpc.con.c_Ŷmin
+        C_Ŷmin[mpc.con.i_Ŷmin] = (mpc.con.Ŷmin - Ŷ - ϵ*mpc.con.c_Ŷmin)[mpc.con.i_Ŷmin]
+        C_Ŷmax[mpc.con.i_Ŷmax] = (Ŷ - mpc.con.Ŷmax - ϵ*mpc.con.c_Ŷmax)[mpc.con.i_Ŷmax]
+    else # no constraint softening :
+        C_Ŷmin[mpc.con.i_Ŷmin] = (mpc.con.Ŷmin - Ŷ)[mpc.con.i_Ŷmin]
+        C_Ŷmax[mpc.con.i_Ŷmax] = (Ŷ - mpc.con.Ŷmax)[mpc.con.i_Ŷmax]
     end
     C = [C_Ŷmin; C_Ŷmax]
     return C

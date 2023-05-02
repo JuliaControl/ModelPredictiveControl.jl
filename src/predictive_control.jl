@@ -633,7 +633,7 @@ end
 obj_quadprog(ΔŨ, P̃, q̃) = 0.5*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ
 
 """
-    initdefaultcon(model, C, S_Hp, S_Hc, N_Hc, E)
+    init_defaultcon(model, C, S_Hp, S_Hc, N_Hc, E)
 
 Init `ControllerConstraint` struct with default parameters.
 
@@ -643,7 +643,7 @@ function init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
     nu, ny = model.nu, model.ny
     umin,       umax    = fill(-Inf, nu), fill(+Inf, nu)
     Δumin,      Δumax   = fill(-Inf, nu), fill(+Inf, nu)
-    ŷmin,       ŷmax    = fill(-999, ny), fill(+999, ny)
+    ŷmin,       ŷmax    = fill(-Inf, ny), fill(+Inf, ny)
     c_umin,     c_umax  = fill(0.0, nu),  fill(0.0, nu)
     c_Δumin,    c_Δumax = fill(0.0, nu),  fill(0.0, nu)
     c_ŷmin,     c_ŷmax  = fill(1.0, ny),  fill(1.0, ny)
