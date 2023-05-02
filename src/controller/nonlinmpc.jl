@@ -75,17 +75,21 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         J = let mpc=mpc, model=model # capture mpc and model variables
             (ΔŨ...) -> obj_nonlinprog(mpc, model, ΔŨ)
         end
-        register(mpc.optim, :J, nvar, J, autodiff=true)
-        @NLobjective(mpc.optim, Min, J(ΔŨ...))
+        register(optim, :J, nvar, J, autodiff=true)
+        @NLobjective(optim, Min, J(ΔŨ...))
         nonlinconstraint = let mpc=mpc, model=model # capture mpc and model variables
             (ΔŨ...) -> con_nonlinprog(mpc, model, ΔŨ)
         end
         nonlincon_memoized = memoize(nonlinconstraint, 2*ny*Hp)
-        for i=1:ny*Hp
-            register(mpc.optim, Symbol("C_Ŷmin_$(i)"), nvar, nonlincon_memoized[i], autodiff=true)
+        n = 0
+        for i in eachindex(con.Ŷmin)
+            sym = Symbol("C_Ŷmin_$i")
+            register(optim, sym, nvar, nonlincon_memoized[n + i], autodiff=true)
         end
-        for i=1:ny*Hp
-            register(mpc.optim, Symbol("C_Ŷmax_$(i)"), nvar, nonlincon_memoized[ny*Hp+i], autodiff=true)
+        n = lastindex(con.Ŷmin)
+        for i in eachindex(con.Ŷmax)
+            sym = Symbol("C_Ŷmax_$i")
+            register(optim, sym, nvar, nonlincon_memoized[n + i], autodiff=true)
         end
         set_silent(optim)
         return mpc
