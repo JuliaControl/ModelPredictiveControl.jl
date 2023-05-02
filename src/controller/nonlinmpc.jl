@@ -196,8 +196,10 @@ function NonLinMPC(
     return NonLinMPC{S, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
 end
 
-setnontlincon!(mpc::NonLinMPC, model::LinModel) = nothing
+"No nonlinear constraint for [`NonLinMPC`](@ref) based on [`LinModel`](@ref)."
+setnontlincon!(::NonLinMPC, ::LinModel) = nothing
 
+"Set the nonlinear constraints on the output predictions `Ŷ`."
 function setnonlincon!(mpc::NonLinMPC, model::NonLinModel)
     optim = mpc.optim
     ΔŨ = mpc.optim[:ΔŨ]
@@ -214,8 +216,15 @@ function setnonlincon!(mpc::NonLinMPC, model::NonLinModel)
     return nothing
 end
 
+"Nonlinear programming objective does not require any initialization."
 init_objective!(mpc::NonLinMPC, _ ) = nothing
 
+
+"""
+    obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
+
+TBW
+"""
 function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     Jqp = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
@@ -226,6 +235,11 @@ function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) wh
     return Jqp + mpc.E*mpc.JE(UE, ŶE, D̂E)
 end
 
+"""
+    obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
+
+TBW
+"""
 function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
@@ -252,6 +266,11 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     return JR̂y + JΔŨ + JR̂u + Jϵ + mpc.E*mpc.JE(UE, ŶE, D̂E)
 end
 
+"""
+    con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
+
+TBW
+"""
 function con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
@@ -280,31 +299,31 @@ function evalŶ(mpc, model, x̂d, d0, D̂0, U0::Vector{T}) where {T}
 end
 
 """
-    memoize(myfunc::Function, n_outputs::Int)
+    memoize(f::Function, n_outputs::Int)
 
-Take a function `myfunc` and return a vector of length `n_outputs`, where element
-`i` is a function that returns the equivalent of `myfunc(x...)[i]`.
+Memoize `f` to reduce the computational cost of [`NonLinMPC`](@ref) controllers.
 
-To avoid duplication of work, cache the most-recent evaluations of `myfunc`.
-Because `myfunc_i` is auto-differentiated with ForwardDiff, our cache needs to
-work when `x` is a `Float64` and a `ForwardDiff.Dual`.
+Take a function `f` and return a vector of length `n_outputs`, where element `i` is a
+function that returns the equivalent of `f(x...)[i]`. To avoid duplication of work, cache 
+the most-recent evaluations of `f`. Because `f_i` is auto-differentiated with ForwardDiff, 
+our cache needs to work when `x` is a `Float64` and a `ForwardDiff.Dual`.
 """
 function memoize(f::Function, n_outputs::Int)
-    last_ΔŨ , last_f = nothing, nothing
-    function f_i(i, ΔŨ::Float64...)
-        if ΔŨ !== last_ΔŨ
-            last_f = f(ΔŨ...)
-            last_ΔŨ = ΔŨ
+    last_x , last_f = nothing, nothing
+    function f_i(i, x::NTuple{N, Float64}) where {N}
+        if x !== last_x
+            last_f = f(x...)
+            last_x = x
         end
         return last_f[i]
     end
-    last_dΔŨ, last_dfdΔŨ = nothing, nothing
-    function f_i(i, dΔŨ::T...) where {T<:Real}
-        if dΔŨ !== last_dΔŨ
-            last_dfdΔŨ = f(dΔŨ...)
-            last_dΔŨ = dΔŨ
+    last_dx, last_dfdx = nothing, nothing
+    function f_i(i, dx::NTuple{N, T}) where {N, T<:Real}
+        if dx !== last_dx
+            last_dfdx = f(dx...)
+            last_dx = dx
         end
-        return last_dfdΔŨ[i]
+        return last_dfdx[i]
     end
-    return [(x...) -> f_i(i, x...) for i in 1:n_outputs]
+    return [(x...) -> f_i(i, x) for i in 1:n_outputs]
 end

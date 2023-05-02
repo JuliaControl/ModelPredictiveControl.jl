@@ -188,6 +188,7 @@ function setconstraint!(
     return mpc
 end
 
+"By default, there is no nonlinear constraint"
 setnonlincon!(::PredictiveController, ::SimModel) = nothing
 
 @doc raw"""
