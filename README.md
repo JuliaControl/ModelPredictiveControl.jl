@@ -28,14 +28,14 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 ### Model Predictive Control Features
 
 - ✅ linear and nonlinear plant models exploiting multiple dispatch
-- ⬜ model predictive controllers based on:
+- ✅ model predictive controllers based on:
   - ✅ linear plant models
-  - ⬜ nonlinear plant models
-- ⬜ supported objective function terms:
+  - ✅ nonlinear plant models
+- ✅ supported objective function terms:
   - ✅ output setpoint tracking
   - ✅ move suppression
   - ✅ input setpoint tracking
-  - ⬜ additional custom penalty (e.g. economic costs)
+  - ✅ economic costs (economic model predictive control)
   - ⬜ terminal cost to ensure nominal stability
 - ✅ soft and hard constraints on:
   - ✅ output predictions
@@ -54,14 +54,14 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 - ⬜ easy integration with `Plots.jl`
 - ✅ optimization based on `JuMP.jl`:
   - ✅ quickly compare multiple optimizers
-  - ⬜ nonlinear solvers relying on automatic differentiation (exact derivative)
+  - ✅ nonlinear solvers relying on automatic differentiation (exact derivative)
 - ⬜ additional information about the optimum to ease troubleshooting:
-  - ✅ optimal input increments over control horizon
-  - ✅ slack variable optimum
-  - ✅ objective function optimum
-  - ✅ output predictions at optimum
-  - ✅ current stochastic output predictions
-  - ⬜ custom penalty value at optimum
+  - ⬜ optimal input increments over control horizon
+  - ⬜ slack variable optimum
+  - ⬜ objective function optimum
+  - ⬜ output predictions at optimum
+  - ⬜ current stochastic output predictions
+  - ⬜ optimal economic costs
 
 ### State Estimation Features
 
@@ -70,6 +70,7 @@ using Pkg; Pkg.add("ModelPredictiveControl")
   - ✅ Kalman filter
   - ⬜ Luenberger observer
   - ✅ internal model structure
+  - ⬜ extended Kalman filter
   - ✅ unscented Kalman filter
   - ⬜ moving horizon estimator
 - ✅ observers in predictor form to ease  control applications
