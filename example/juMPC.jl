@@ -4,7 +4,12 @@ using Pkg
 using Revise
 Pkg.activate(".")
 
+
 using ModelPredictiveControl
+using Preferences
+set_preferences!(ModelPredictiveControl, "precompile_workload" => false; force=true)
+
+
 #using JuMP, DAQP
 #using JuMP, HiGHS
 using JuMP, Ipopt
@@ -71,11 +76,14 @@ nmpc1 = NonLinMPC(uscKalmanFilter1)
 
 nmpc2 = NonLinMPC(nonLinModel2, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e5)
 
+
 setconstraint!(nmpc2, c_umin=[0,0], c_umax=[0,0])
 setconstraint!(nmpc2, c_ŷmin=[1,1], c_ŷmax=[1,1])
 setconstraint!(nmpc2, umin=[5, 9.9], umax=[Inf,Inf])
 setconstraint!(nmpc2, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(nmpc2, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
+
+
 
 
 nx = linModel4.nx
@@ -96,6 +104,7 @@ setconstraint!(nmpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
 setconstraint!(nmpc, umin=[5, 9.9], umax=[Inf,Inf])
 setconstraint!(nmpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(nmpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
+
 
 function test_mpc(model, mpc)
     N = 200 
@@ -133,9 +142,9 @@ function test_mpc(model, mpc)
     return u_data, y_data, r_data, d_data
 end
 
-#@time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
+@time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 
-#@time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
+@time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
 
 @time u_data, y_data, r_data, d_data = test_mpc(nonLinModel2, nmpc2)
 
@@ -160,5 +169,3 @@ pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(pd)
 display(pu)
 display(py)
-
-

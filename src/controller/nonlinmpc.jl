@@ -80,10 +80,13 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         nonlinconstraint = let mpc=mpc, model=model # capture mpc and model variables
             (ΔŨ...) -> con_nonlinprog(mpc, model, ΔŨ)
         end
-        register(mpc.optim, :nonlinconstraint, nvar, nonlinconstraint, autodiff=true)
-        ncon = sum(con.i_Ŷmin) + sum(con.i_Ŷmax)
-        @NLconstraint(mpc.optim, [i=1:ncon], nonlinconstraint(ΔŨ...) ≤ zeros(ncon))
-
+        nonlincon_memoized = memoize(nonlinconstraint, 2*ny*Hp)
+        for i=1:ny*Hp
+            register(mpc.optim, Symbol("C_Ŷmin_$(i)"), nvar, nonlincon_memoized[i], autodiff=true)
+        end
+        for i=1:ny*Hp
+            register(mpc.optim, Symbol("C_Ŷmax_$(i)"), nvar, nonlincon_memoized[ny*Hp+i], autodiff=true)
+        end
         set_silent(optim)
         return mpc
     end
@@ -193,6 +196,23 @@ function NonLinMPC(
     return NonLinMPC{S, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
 end
 
+setnontlincon!(mpc::NonLinMPC, model::LinModel) = nothing
+
+function setnonlincon!(mpc::NonLinMPC, model::NonLinModel)
+    optim = mpc.optim
+    ΔŨ = mpc.optim[:ΔŨ]
+    con = mpc.con
+    map(con -> delete(optim, con), all_nonlinear_constraints(optim))
+    for i in findall(con.i_Ŷmin)
+        f_sym = Symbol("C_Ŷmin_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨ...)) <= 0))
+    end
+    for i in findall(con.i_Ŷmax)
+        f_sym = Symbol("C_Ŷmax_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨ...)) <= 0))
+    end
+    return nothing
+end
 
 init_objective!(mpc::NonLinMPC, _ ) = nothing
 
@@ -236,11 +256,12 @@ function con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
     Ŷ = evalŶ(mpc, model, mpc.x̂d, mpc.d0, mpc.D̂0, U0)
-    C_Ŷmin = (mpc.con.Ŷmin - Ŷ)[mpc.con.i_Ŷmin]
-    C_Ŷmax = (Ŷ - mpc.con.Ŷmax)[mpc.con.i_Ŷmin]
+    C_Ŷmin = (mpc.con.Ŷmin - Ŷ)
+    C_Ŷmax = (Ŷ - mpc.con.Ŷmax)
     if !isinf(mpc.C) # constraint softening activated :
-        C_Ŷmin = C_Ŷmin - ΔŨ[end]*mpc.con.c_Ŷmin[mpc.con.i_Ŷmin]
-        C_Ŷmax = C_Ŷmax - ΔŨ[end]*mpc.con.c_Ŷmin[mpc.con.i_Ŷmin]
+        ϵ = ΔŨ[end]
+        C_Ŷmin = C_Ŷmin - ϵ*mpc.con.c_Ŷmin
+        C_Ŷmax = C_Ŷmax - ϵ*mpc.con.c_Ŷmin
     end
     C = [C_Ŷmin; C_Ŷmax]
     return C
@@ -258,3 +279,32 @@ function evalŶ(mpc, model, x̂d, d0, D̂0, U0::Vector{T}) where {T}
     return Ŷd0 + mpc.F
 end
 
+"""
+    memoize(myfunc::Function, n_outputs::Int)
+
+Take a function `myfunc` and return a vector of length `n_outputs`, where element
+`i` is a function that returns the equivalent of `myfunc(x...)[i]`.
+
+To avoid duplication of work, cache the most-recent evaluations of `myfunc`.
+Because `myfunc_i` is auto-differentiated with ForwardDiff, our cache needs to
+work when `x` is a `Float64` and a `ForwardDiff.Dual`.
+"""
+function memoize(f::Function, n_outputs::Int)
+    last_ΔŨ , last_f = nothing, nothing
+    function f_i(i, ΔŨ::Float64...)
+        if ΔŨ !== last_ΔŨ
+            last_f = f(ΔŨ...)
+            last_ΔŨ = ΔŨ
+        end
+        return last_f[i]
+    end
+    last_dΔŨ, last_dfdΔŨ = nothing, nothing
+    function f_i(i, dΔŨ::T...) where {T<:Real}
+        if dΔŨ !== last_dΔŨ
+            last_dfdΔŨ = f(dΔŨ...)
+            last_dΔŨ = dΔŨ
+        end
+        return last_dfdΔŨ[i]
+    end
+    return [(x...) -> f_i(i, x...) for i in 1:n_outputs]
+end

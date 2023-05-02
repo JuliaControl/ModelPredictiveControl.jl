@@ -184,8 +184,11 @@ function setconstraint!(
     delete(mpc.optim, mpc.optim[:linconstraint])
     unregister(mpc.optim, :linconstraint)
     @constraint(mpc.optim, linconstraint, A*ΔŨ .≤ b)
+    setnonlincon!(mpc, model)
     return mpc
 end
+
+setnonlincon!(::PredictiveController, ::SimModel) = nothing
 
 @doc raw"""
     moveinput!(
@@ -639,7 +642,7 @@ function init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
     nu, ny = model.nu, model.ny
     umin,       umax    = fill(-Inf, nu), fill(+Inf, nu)
     Δumin,      Δumax   = fill(-Inf, nu), fill(+Inf, nu)
-    ŷmin,       ŷmax    = fill(-Inf, ny), fill(+Inf, ny)
+    ŷmin,       ŷmax    = fill(-999, ny), fill(+999, ny)
     c_umin,     c_umax  = fill(0.0, nu),  fill(0.0, nu)
     c_Δumin,    c_Δumax = fill(0.0, nu),  fill(0.0, nu)
     c_ŷmin,     c_ŷmax  = fill(1.0, ny),  fill(1.0, ny)
