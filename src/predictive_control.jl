@@ -36,8 +36,6 @@ struct ControllerConstraint
     A      ::Matrix{Float64}
     b      ::Vector{Float64}
     i_b    ::BitVector
-    i_Ŷmin ::BitVector
-    i_Ŷmax ::BitVector
     c_Ŷmin ::Vector{Float64}
     c_Ŷmax ::Vector{Float64}
 end
@@ -117,13 +115,11 @@ function setconstraint!(
         size(ŷmin)   == (ny,) || error("ŷmin size must be $((ny,))")
         Ŷmin  = repeat(ŷmin, Hp)
         con.Ŷmin[:] = Ŷmin
-        con.i_Ŷmin[:] = .!isinf.(Ŷmin)
     end
     if !isnothing(ŷmax)
         size(ŷmax)   == (ny,) || error("ŷmax size must be $((ny,))")
         Ŷmax  = repeat(ŷmax, Hp)
         con.Ŷmax[:] = Ŷmax
-        con.i_Ŷmax[:] = .!isinf.(Ŷmax)
     end
     if !isnothing(c_umin)
         !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
@@ -665,7 +661,7 @@ function init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
     con = ControllerConstraint(
         Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ŷmin  , Ŷmax,
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ŷmin, A_Ŷmax,
-        A       , b     , i_b  , i_Ŷmin, i_Ŷmax, c_Ŷmin, c_Ŷmax 
+        A       , b     , i_b    , c_Ŷmin   , c_Ŷmax 
     )
     return con, S̃_Hp, Ñ_Hc, Ẽ
 end

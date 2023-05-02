@@ -209,11 +209,11 @@ function setnonlincon!(mpc::NonLinMPC, model::NonLinModel)
     ΔŨ = mpc.optim[:ΔŨ]
     con = mpc.con
     map(con -> delete(optim, con), all_nonlinear_constraints(optim))
-    for i in findall(con.i_Ŷmin)
+    for i in findall(.!isinf.(con.Ŷmin))
         f_sym = Symbol("C_Ŷmin_$(i)")
         add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨ...)) <= 0))
     end
-    for i in findall(con.i_Ŷmax)
+    for i in findall(.!isinf.(con.Ŷmax))
         f_sym = Symbol("C_Ŷmax_$(i)")
         add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨ...)) <= 0))
     end
@@ -279,17 +279,17 @@ function con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
     Ŷ = evalŶ(mpc, model, mpc.x̂d, mpc.d0, mpc.D̂0, U0)
-    # replace -Inf with 0 to avoid INVALID_MODEL error
-    C_Ŷmin = zeros(T, length(Ŷ))
-    C_Ŷmax = zeros(T, length(Ŷ))
     if !isinf(mpc.C) # constraint softening activated :
         ϵ = ΔŨ[end]
-        C_Ŷmin[mpc.con.i_Ŷmin] = (mpc.con.Ŷmin - Ŷ - ϵ*mpc.con.c_Ŷmin)[mpc.con.i_Ŷmin]
-        C_Ŷmax[mpc.con.i_Ŷmax] = (Ŷ - mpc.con.Ŷmax - ϵ*mpc.con.c_Ŷmax)[mpc.con.i_Ŷmax]
+        C_Ŷmin = (mpc.con.Ŷmin - Ŷ) - ϵ*mpc.con.c_Ŷmin
+        C_Ŷmax = (Ŷ - mpc.con.Ŷmax) - ϵ*mpc.con.c_Ŷmax
     else # no constraint softening :
-        C_Ŷmin[mpc.con.i_Ŷmin] = (mpc.con.Ŷmin - Ŷ)[mpc.con.i_Ŷmin]
-        C_Ŷmax[mpc.con.i_Ŷmax] = (Ŷ - mpc.con.Ŷmax)[mpc.con.i_Ŷmax]
+        C_Ŷmin = (mpc.con.Ŷmin - Ŷ)
+        C_Ŷmax = (Ŷ - mpc.con.Ŷmax)
     end
+    # replace -Inf with 0 to avoid INVALID_MODEL error :
+    C_Ŷmin[isinf.(C_Ŷmin)] .= 0
+    C_Ŷmax[isinf.(C_Ŷmax)] .= 0
     C = [C_Ŷmin; C_Ŷmax]
     return C
 end
