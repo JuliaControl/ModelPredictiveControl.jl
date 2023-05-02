@@ -270,8 +270,12 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     return JR̂y + JΔŨ + JR̂u + Jϵ + mpc.E*mpc.JE(UE, ŶE, D̂E)
 end
 
+
+function con_nonlinprog(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
+    return zeros(T, 2*mpc.ny*mpc.Hp)
+end
 """
-    con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
+    con_nonlinprog(mpc::NonLinMPC, model::NonLinModel, ΔŨ::NTuple{N, T}) where {N, T}
 
 TBW
 """
@@ -294,14 +298,14 @@ function con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     return C
 end
 
-function evalŶ(mpc, model, x̂d, d0, D̂0, U0::Vector{T}) where {T}
+function evalŶ(mpc::NonLinMPC, model::SimModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
     Ŷd0 = Vector{T}(undef, model.ny*mpc.Hp)
     x̂d::Vector{T} = copy(x̂d)
     for j=1:mpc.Hp
         u0    = U0[(1 + model.nu*(j-1)):(model.nu*j)]
-        x̂d[:] = model.f(x̂d, u0, d0)
+        x̂d[:] = f(model, x̂d, u0, d0)
         d0    = D̂0[(1 + model.nd*(j-1)):(model.nd*j)]
-        Ŷd0[(1 + model.ny*(j-1)):(model.ny*j)] = model.h(x̂d, d0)
+        Ŷd0[(1 + model.ny*(j-1)):(model.ny*j)] = h(model, x̂d, d0)
     end
     return Ŷd0 + mpc.F # mpc.F = Yop + Ŷs
 end

@@ -356,16 +356,16 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs, R̂y )
+    initpred!(mpc::PredictiveController, model::SimModel, d, D̂, Ŷs, R̂y )
 
-Init `F`, `d0` and `D̂0` prediction matrices for [`NonLinModel`](@ref).
+Init `F`, `d0` and `D̂0` prediction matrices when model is not a [`LinModel`](@ref).
 
-For [`NonLinModel`](@ref), the constant matrix ``\mathbf{F = Ŷ_s + Y_{op}}``, thus it
+In such a case, the constant matrix is ``\mathbf{F = Ŷ_s + Y_{op}}``, thus it
 incorporates the stochastic predictions and the output operating point ``\mathbf{y_{op}}`` 
 repeated over ``H_p``. `d0` and `D̂0` are the measured disturbances and its predictions 
 without the operating points ``\mathbf{d_{op}}``.
 """
-function initpred!(mpc::PredictiveController, model::NonLinModel, d, D̂, Ŷs , R̂y )
+function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, Ŷs , R̂y )
     mpc.F[:] = Ŷs + mpc.Yop
     if model.nd ≠ 0
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
@@ -392,12 +392,8 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
     set_normalized_rhs.(mpc.optim[:linconstraint], mpc.con.b[mpc.con.i_b])
 end
 
-@doc raw"""
-    linconstraint!(mpc::PredictiveController, model::NonLinModel)
-
-Set `b` that excludes predicted output ``\mathbf{Ŷ}`` constraints for [`NonLinModel`](@ref). 
-"""
-function linconstraint!(mpc::PredictiveController, model::NonLinModel)
+"Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
+function linconstraint!(mpc::PredictiveController, model::SimModel)
     mpc.con.b[:] = [
         -mpc.con.Umin + mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
         +mpc.con.Umax - mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
@@ -870,14 +866,7 @@ function init_linconstraint(::LinModel,
     return A, i_b, b
 end
 
-@doc raw"""
-    init_linconstraint(model::NonLinModel,
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
-    )
-
-Init the values without predicted output constraints if `model` is not a [`LinModel`](@ref).
-"""
+"Init values without predicted output constraints if `model` is not a [`LinModel`](@ref)."
 function init_linconstraint(::SimModel,
     A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ ,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ 

@@ -1,13 +1,13 @@
 # spell-checker: disable
 
-using Pkg
-using Revise
-Pkg.activate(".")
+#using Pkg
+#using Revise
+#Pkg.activate(".")
 
 
 using ModelPredictiveControl
-using Preferences
-set_preferences!(ModelPredictiveControl, "precompile_workload" => false; force=true)
+#using Preferences
+#set_preferences!(ModelPredictiveControl, "precompile_workload" => false; force=true)
 
 
 #using JuMP, DAQP
