@@ -19,6 +19,12 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController end
 
+const LinConVector = Vector{ConstraintRef{
+    Model, 
+    MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}, 
+    ScalarShape
+}}
+
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint
     Umin   ::Vector{Float64}
@@ -389,7 +395,8 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
         -mpc.con.Ŷmin + mpc.F
         +mpc.con.Ŷmax - mpc.F
     ]
-    set_normalized_rhs.(mpc.optim[:linconstraint], mpc.con.b[mpc.con.i_b])
+    lincon::LinConVector = mpc.optim[:linconstraint]
+    set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
 end
 
 "Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
@@ -400,7 +407,8 @@ function linconstraint!(mpc::PredictiveController, model::SimModel)
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
     ]
-    set_normalized_rhs.(mpc.optim[:linconstraint], mpc.con.b[mpc.con.i_b])
+    lincon::LinConVector = mpc.optim[:linconstraint]
+    set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
 end
 
 """

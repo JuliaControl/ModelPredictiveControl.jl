@@ -134,7 +134,7 @@ function test_mpc(model, mpc)
         u = moveinput!(mpc, r, d)
         u_data[:,k+1] = u
         y_data[:,k+1] = y
-        r_data[:,k+1] = r 
+        r_data[:,k+1] = r
         d_data[:,k+1] = d
         updatestate!(mpc, u, y, d)
         updatestate!(model, u, d)
@@ -142,11 +142,12 @@ function test_mpc(model, mpc)
     return u_data, y_data, r_data, d_data
 end
 
+test_mpc(linModel4, mpc)
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 
-@time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
+#@time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
 
-@time u_data, y_data, r_data, d_data = test_mpc(nonLinModel2, nmpc2)
+#@time u_data, y_data, r_data, d_data = test_mpc(nonLinModel2, nmpc2)
 
 
 using PlotThemes, Plots
