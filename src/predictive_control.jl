@@ -19,6 +19,7 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController end
 
+"Type alias for vector of linear inequality constraints."
 const LinConVector = Vector{ConstraintRef{
     Model, 
     MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}, 
