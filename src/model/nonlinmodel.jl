@@ -43,7 +43,7 @@ Nonlinear continuous-time state-space functions are not supported for now. In su
 manually call a differential equation solver in the `f` function (e.g.: Euler method).
 
 !!! warning
-    The `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref).
+    `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref).
 
 See also [`LinModel`](@ref).
 
