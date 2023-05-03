@@ -334,7 +334,7 @@ end
 Evaluate the outputs predictions ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
 """
 function evalŶ(mpc::NonLinMPC, model::SimModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
-    Ŷd0 = Vector{Float64}(undef, model.ny*mpc.Hp)
+    Ŷd0 = Vector{T}(undef, model.ny*mpc.Hp)
     x̂d::Vector{T} = copy(x̂d)
     for j=1:mpc.Hp
         u0    = U0[(1 + model.nu*(j-1)):(model.nu*j)]
