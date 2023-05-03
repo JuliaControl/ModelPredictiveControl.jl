@@ -77,19 +77,33 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         end
         register(optim, :J, nvar, J, autodiff=true)
         @NLobjective(optim, Min, J(ΔŨ...))
-        nonlinconstraint = let mpc=mpc, model=model # capture mpc and model variables
-            (ΔŨ...) -> con_nonlinprog(mpc, model, ΔŨ)
+        ncon = length(mpc.con.Ŷmin) + length(mpc.con.Ŷmax)
+        C = let mpc=mpc, model=model, ncon=ncon # capture the 3 variables
+            last_ΔŨ, last_C = nothing, nothing
+            function con_nonlinprog_i(i, ΔŨ::NTuple{N, Float64}) where {N}
+                if ΔŨ !== last_ΔŨ
+                    last_C, last_ΔŨ = con_nonlinprog(mpc, model, ΔŨ), ΔŨ
+                end
+                return last_C[i]
+            end
+            last_dΔŨ, last_dCdΔŨ = nothing, nothing
+            function con_nonlinprog_i(i, dΔŨ::NTuple{N, T}) where {N, T<:Real}
+                if dΔŨ !== last_dΔŨ
+                    last_dCdΔŨ, last_dΔŨ = con_nonlinprog(mpc, model, dΔŨ), dΔŨ
+                end
+                return last_dCdΔŨ[i]
+            end
+            [(ΔŨ...) -> con_nonlinprog_i(i, ΔŨ) for i in 1:ncon]
         end
-        nonlincon_memoized = memoize(nonlinconstraint, 2*ny*Hp)
         n = 0
         for i in eachindex(con.Ŷmin)
             sym = Symbol("C_Ŷmin_$i")
-            register(optim, sym, nvar, nonlincon_memoized[n + i], autodiff=true)
+            register(optim, sym, nvar, C[n + i], autodiff=true)
         end
         n = lastindex(con.Ŷmin)
         for i in eachindex(con.Ŷmax)
             sym = Symbol("C_Ŷmax_$i")
-            register(optim, sym, nvar, nonlincon_memoized[n + i], autodiff=true)
+            register(optim, sym, nvar, C[n + i], autodiff=true)
         end
         set_silent(optim)
         return mpc
@@ -227,7 +241,7 @@ init_objective!(mpc::NonLinMPC, _ ) = nothing
 """
     obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
 
-TBW
+Objective function for [`NonLinMPC`] when `model` is a [`LinModel`](@ref).
 """
 function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
@@ -242,7 +256,7 @@ end
 """
     obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
 
-TBW
+Objective function for [`NonLinMPC`] when `model` is not a [`LinModel`](@ref).
 """
 function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
@@ -271,13 +285,18 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
 end
 
 
+"""
+    con_nonlinprog(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
+
+Nonlinear constraints for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
+"""
 function con_nonlinprog(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
     return zeros(T, 2*mpc.ny*mpc.Hp)
 end
 """
     con_nonlinprog(mpc::NonLinMPC, model::NonLinModel, ΔŨ::NTuple{N, T}) where {N, T}
 
-TBW
+Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](ref).
 """
 function con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
@@ -298,6 +317,12 @@ function con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) wh
     return C
 end
 
+
+"""
+    evalŶ(mpc::NonLinMPC, model::SimModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
+
+Evaluate the outputs predictions ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
+"""
 function evalŶ(mpc::NonLinMPC, model::SimModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
     Ŷd0 = Vector{T}(undef, model.ny*mpc.Hp)
     x̂d::Vector{T} = copy(x̂d)
@@ -307,35 +332,5 @@ function evalŶ(mpc::NonLinMPC, model::SimModel, x̂d, d0, D̂0, U0::Vector{T})
         d0    = D̂0[(1 + model.nd*(j-1)):(model.nd*j)]
         Ŷd0[(1 + model.ny*(j-1)):(model.ny*j)] = h(model, x̂d, d0)
     end
-    return Ŷd0 + mpc.F # mpc.F = Yop + Ŷs
-end
-
-"""
-    memoize(f::Function, n_outputs::Int)
-
-Memoize `f` to reduce the computational cost of [`NonLinMPC`](@ref) controllers.
-
-Take a function `f` and return a vector of length `n_outputs`, where element `i` is a
-function that returns the equivalent of `f(x...)[i]`. To avoid duplication of work, cache 
-the most-recent evaluations of `f`. Because `f_i` is auto-differentiated with ForwardDiff, 
-our cache needs to work when `x` is a `Float64` and a `ForwardDiff.Dual`.
-"""
-function memoize(f::Function, n_outputs::Int)
-    last_x , last_f = nothing, nothing
-    function f_i(i, x::NTuple{N, Float64}) where {N}
-        if x !== last_x
-            last_f = f(x...)
-            last_x = x
-        end
-        return last_f[i]
-    end
-    last_dx, last_dfdx = nothing, nothing
-    function f_i(i, dx::NTuple{N, T}) where {N, T<:Real}
-        if dx !== last_dx
-            last_dfdx = f(dx...)
-            last_dx = dx
-        end
-        return last_dfdx[i]
-    end
-    return [(x...) -> f_i(i, x) for i in 1:n_outputs]
+    return Ŷd0 + mpc.F      # F = Yop + Ŷs
 end
