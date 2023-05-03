@@ -28,7 +28,7 @@ Set `estim.x̂` states to values specified by `x̂`.
 """
 function setstate!(estim::StateEstimator, x̂)
     size(x̂) == (estim.nx̂,) || error("x̂ size must be $((estim.nx̂,))")
-    model.x̂[:] = x̂
+    estim.x̂[:] = x̂
     return estim
 end
 
