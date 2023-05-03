@@ -37,10 +37,13 @@ The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined 
 manipulated inputs, states, outputs and measured disturbances. 
 
 !!! tip
-    Replace the `d` argument with `_` if `nd = 0` (see Examples below).  
+    Replace the `d` argument with `_` if `nd = 0` (see Examples below).
 
 Nonlinear continuous-time state-space functions are not supported for now. In such a case, 
 manually call a differential equation solver in the `f` function (e.g.: Euler method).
+
+!!! warning
+    The `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref).
 
 See also [`LinModel`](@ref).
 

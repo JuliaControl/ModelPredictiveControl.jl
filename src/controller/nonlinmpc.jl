@@ -140,7 +140,11 @@ since ``H_c ≤ H_p`` implies that ``\mathbf{u}(k+H_p) = \mathbf{u}(k+H_p-1)``. 
     Replace any of the 3 arguments with `_` if not needed (see `JE` default value below).
 
 This method uses the default state estimator, an [`UnscentedKalmanFilter`](@ref) with 
-default arguments.
+default arguments. 
+
+!!! warning
+    See Extended Help if you get an error like `MethodError: no method matching 
+    Float64(::ForwardDiff.Dual)`
 
 # Arguments
 - `model::SimModel` : model used for controller predictions and state estimations.
@@ -174,6 +178,12 @@ NonLinMPC controller with a sample time Ts = 10.0 s, UnscentedKalmanFilter estim
 `NonLinMPC` controllers based on [`LinModel`](@ref) compute the predictions with matrix 
 algebra instead of a `for` loop. This feature can accelerate the optimization and is not 
 available in any other package, to my knowledge.
+
+The optimizations rely on [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) automatic 
+differentiation (AD) to compute the objective and constraint derivatives. Optimizers 
+generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) `f` 
+and `h` functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+for common mistakes when writing these functions.
 """
 NonLinMPC(model::SimModel; kwargs...) = NonLinMPC(UnscentedKalmanFilter(model); kwargs...)
 
@@ -324,7 +334,7 @@ end
 Evaluate the outputs predictions ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
 """
 function evalŶ(mpc::NonLinMPC, model::SimModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
-    Ŷd0 = Vector{T}(undef, model.ny*mpc.Hp)
+    Ŷd0 = Vector{Float64}(undef, model.ny*mpc.Hp)
     x̂d::Vector{T} = copy(x̂d)
     for j=1:mpc.Hp
         u0    = U0[(1 + model.nu*(j-1)):(model.nu*j)]
