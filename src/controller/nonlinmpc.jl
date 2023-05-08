@@ -6,6 +6,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     x̂d::Vector{Float64}
     x̂s::Vector{Float64}
     ŷ ::Vector{Float64}
+    Ŷs::Vector{Float64}
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64, Vector{Float64}}
@@ -39,7 +40,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     ) where {S<:StateEstimator, JEFunc<:Function}
         model = estim.model
         nu, nxd, nxs, ny, nd = model.nu, model.nx, estim.nxs, model.ny, model.nd
-        x̂d, x̂s, ŷ = zeros(nxd), zeros(nxs), zeros(ny)
+        x̂d, x̂s, ŷ, Ŷs = zeros(nxd), zeros(nxs), zeros(ny), zeros(ny*Hp)
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt)
         M_Hp = Diagonal(convert(Vector{Float64}, repeat(Mwt, Hp)))
         N_Hc = Diagonal(convert(Vector{Float64}, repeat(Nwt, Hc)))
@@ -59,7 +60,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         ΔŨ = zeros(nvar)
         mpc = new(
             estim, optim, con,
-            ΔŨ, x̂d, x̂s, ŷ,
+            ΔŨ, x̂d, x̂s, ŷ, Ŷs,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 
@@ -358,14 +359,14 @@ Evaluate  ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
 function evalŶ(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
-    Ŷd0 = Vector{T}(undef, model.ny*mpc.Hp)
+    Ŷd = Vector{T}(undef, model.ny*mpc.Hp)
     x̂d::Vector{T} = copy(mpc.x̂d)
     d0 = mpc.d0
     for j=1:mpc.Hp
         u0    = U0[(1 + model.nu*(j-1)):(model.nu*j)]
         x̂d[:] = f(model, x̂d, u0, d0)
         d0    = mpc.D̂0[(1 + model.nd*(j-1)):(model.nd*j)]
-        Ŷd0[(1 + model.ny*(j-1)):(model.ny*j)] = h(model, x̂d, d0)
+        Ŷd[(1 + model.ny*(j-1)):(model.ny*j)] = h(model, x̂d, d0) + model.yop
     end
-    return Ŷd0 + mpc.F      # F = Yop + Ŷs
+    return Ŷd + mpc.Ŷs
 end

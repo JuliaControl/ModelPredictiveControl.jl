@@ -6,6 +6,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     x̂d::Vector{Float64}
     x̂s::Vector{Float64}
     ŷ ::Vector{Float64}
+    Ŷs::Vector{Float64}
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64, Vector{Float64}}
@@ -35,7 +36,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim) where {S<:StateEstimator}
         model = estim.model
         nu, nxd, nxs, ny, nd = model.nu, model.nx, estim.nxs, model.ny, model.nd
-        x̂d, x̂s, ŷ = zeros(nxd), zeros(nxs), zeros(ny)
+        x̂d, x̂s, ŷ, Ŷs = zeros(nxd), zeros(nxs), zeros(ny), zeros(ny*Hp)
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         M_Hp = Diagonal{Float64}(repeat(Mwt, Hp))
         N_Hc = Diagonal{Float64}(repeat(Nwt, Hc)) 
@@ -55,7 +56,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         ΔŨ = zeros(nvar)
         mpc = new(
             estim, optim, con,
-            ΔŨ, x̂d, x̂s, ŷ,
+            ΔŨ, x̂d, x̂s, ŷ, Ŷs,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 

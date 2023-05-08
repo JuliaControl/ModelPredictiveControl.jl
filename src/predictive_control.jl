@@ -251,8 +251,8 @@ function moveinput!(
     ym::Union{Vector{<:Real}, Nothing} = nothing
 )
     getestimates!(mpc, mpc.estim, ym, d)
-    ŷs, Ŷs = predictstoch!(mpc, mpc.estim, d, ym)
-    p = initpred!(mpc, mpc.estim.model, d, D̂, Ŷs, R̂y)
+    predictstoch!(mpc, mpc.estim, d, ym)
+    p = initpred!(mpc, mpc.estim.model, d, D̂, R̂y)
     linconstraint!(mpc, mpc.estim.model)
     ΔŨ, _ = optim_objective!(mpc, p)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
@@ -316,11 +316,14 @@ end
 """
     predictstoch!(mpc, estim::StateEstimator, x̂s, d, _ )
 
-Predict the current `ŷs` and future `Ŷs` stochastic model outputs over `Hp`. 
+Predict the future `Ŷs` stochastic model outputs over `Hp`. 
 
 See [`init_stochpred`](@ref) for details on `Ŷs` and `Ks` matrices.
 """
-predictstoch!(mpc, estim::StateEstimator, _ , _ ) = (estim.Cs*mpc.x̂s, mpc.Ks*mpc.x̂s)
+function predictstoch!(mpc, estim::StateEstimator, _ , _ )
+    mpc.Ŷs[:] = mpc.Ks*mpc.x̂s 
+    return mpc.Ŷs
+end
 
 """
     predictstoch!(mpc, estim::InternalModel, x̂s, d, ym )
@@ -331,8 +334,8 @@ function predictstoch!(mpc, estim::InternalModel, d, ym )
     ŷd = h(estim.model, mpc.x̂d, d - estim.model.dop) + estim.model.yop 
     ŷs = zeros(estim.model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
-    Ŷs = mpc.Ks*mpc.x̂s + mpc.Ps*ŷs
-    return ŷs, Ŷs
+    mpc.Ŷs[:] = mpc.Ks*mpc.x̂s + mpc.Ps*ŷs
+    return mpc.Ŷs
 end
 
 
@@ -343,8 +346,8 @@ Init linear model prediction matrices `F`, `q̃` and `p`.
 
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
-function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, Ŷs, R̂y)
-    mpc.F[:] = mpc.Kd*mpc.x̂d + mpc.Q*mpc.estim.lastu0 + Ŷs + mpc.Yop
+function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y)
+    mpc.F[:] = mpc.Kd*mpc.x̂d + mpc.Q*mpc.estim.lastu0 + mpc.Ŷs + mpc.Yop
     if model.nd ≠ 0
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
         mpc.F[:] = mpc.F + mpc.G*mpc.d0 + mpc.J*mpc.D̂0
@@ -365,15 +368,12 @@ end
 @doc raw"""
     initpred!(mpc::PredictiveController, model::SimModel, d, D̂, Ŷs, R̂y )
 
-Init `F`, `d0` and `D̂0` prediction matrices when model is not a [`LinModel`](@ref).
+Init `d0` and `D̂0` prediction matrices when model is not a [`LinModel`](@ref).
 
-In such a case, the constant matrix is ``\mathbf{F = Ŷ_s + Y_{op}}``, thus it
-incorporates the stochastic predictions and the output operating point ``\mathbf{y_{op}}`` 
-repeated over ``H_p``. `d0` and `D̂0` are the measured disturbances and its predictions 
-without the operating points ``\mathbf{d_{op}}``.
+`d0` and `D̂0` are the measured disturbances and its predictions without the operating points 
+``\mathbf{d_{op}}``.
 """
-function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, Ŷs , R̂y )
-    mpc.F[:] = Ŷs + mpc.Yop
+function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y)
     if model.nd ≠ 0
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
     end
@@ -600,7 +600,7 @@ function init_deterpred(model::SimModel, Hp, Hc)
     J  = zeros(0, nd*Hp)
     Kd = zeros(0, nx)
     Q  = zeros(0, nu)
-    F = zeros(ny*Hp) # dummy value (updated just before optimization)
+    F  = zeros(0)
     return E, F, G, J, Kd, Q
 end
 
