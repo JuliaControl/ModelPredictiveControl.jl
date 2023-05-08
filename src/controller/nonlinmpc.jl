@@ -77,7 +77,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         last_ΔŨ, last_C, last_Ŷ = nothing, nothing, nothing
         function Jfunc(ΔŨ::Float64...)
             if ΔŨ !== last_ΔŨ
-                last_Ŷ = predict(mpc, model, ΔŨ)
+                last_Ŷ = predict(mpc, model, collect(ΔŨ))
                 last_C = con_nonlinprog(mpc, model, last_Ŷ, ΔŨ)
                 last_ΔŨ = ΔŨ
             end
@@ -86,7 +86,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         last_dΔŨ, last_dC, last_dŶ = nothing, nothing, nothing
         function Jfunc(dΔŨ::T...) where {T<:Real}
             if dΔŨ !== last_dΔŨ
-                last_dŶ = predict(mpc, model, dΔŨ)
+                last_dŶ = predict(mpc, model, collect(dΔŨ))
                 last_dC = con_nonlinprog(mpc, model, last_dŶ, dΔŨ)
                 last_dΔŨ = dΔŨ
             end
@@ -97,7 +97,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         ncon = length(mpc.con.Ŷmin) + length(mpc.con.Ŷmax)
         function con_nonlinprog_i(i, ΔŨ::NTuple{N, Float64}) where {N}
             if ΔŨ !== last_ΔŨ
-                last_Ŷ = predict(mpc, model, ΔŨ)
+                last_Ŷ = predict(mpc, model, collect(ΔŨ))
                 last_C = con_nonlinprog(mpc, model, last_Ŷ, ΔŨ)
                 last_ΔŨ = ΔŨ
             end
@@ -105,7 +105,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         end
         function con_nonlinprog_i(i, dΔŨ::NTuple{N, T}) where {N, T<:Real}
             if dΔŨ !== last_dΔŨ
-                last_dŶ = predict(mpc, model, dΔŨ)
+                last_dŶ = predict(mpc, model, collect(dΔŨ))
                 last_dC = con_nonlinprog(mpc, model, last_dŶ, dΔŨ)
                 last_dΔŨ = dΔŨ
             end

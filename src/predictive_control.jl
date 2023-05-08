@@ -387,8 +387,7 @@ end
 
 Evaluate the outputs predictions ``\\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
 """
-function predict(mpc::PredictiveController, ::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
-    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
+function predict(mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
     return mpc.Ẽ*ΔŨ + mpc.F
 end
 
@@ -397,8 +396,7 @@ end
 
 Evaluate  ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
 """
-function predict(mpc::PredictiveController, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
-    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
+function predict(mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) where {T<:Real}
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
     Ŷd = Vector{T}(undef, model.ny*mpc.Hp)
     x̂d::Vector{T} = copy(mpc.x̂d)
