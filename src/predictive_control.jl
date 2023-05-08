@@ -347,7 +347,7 @@ Init linear model prediction matrices `F`, `q̃` and `p`.
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y)
-    mpc.F[:] = mpc.Kd*mpc.x̂d + mpc.Q*mpc.estim.lastu0 + mpc.Ŷs + mpc.Yop
+    mpc.F[:] = mpc.Kd*mpc.x̂d + mpc.Q*mpc.estim.lastu0 + mpc.Yop + mpc.Ŷs 
     if model.nd ≠ 0
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
         mpc.F[:] = mpc.F + mpc.G*mpc.d0 + mpc.J*mpc.D̂0
@@ -368,7 +368,7 @@ end
 @doc raw"""
     initpred!(mpc::PredictiveController, model::SimModel, d, D̂, Ŷs, R̂y )
 
-Init `d0` and `D̂0` prediction matrices when model is not a [`LinModel`](@ref).
+Init `d0` and `D̂0` matrices when model is not a [`LinModel`](@ref).
 
 `d0` and `D̂0` are the measured disturbances and its predictions without the operating points 
 ``\mathbf{d_{op}}``.
@@ -380,6 +380,36 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y)
     mpc.R̂y[:] = R̂y
     p = 0.0 # only used for LinModel objects
     return p
+end
+
+"""
+    predict(mpc::PredictiveController, model::LinModel, ΔŨ)
+
+Evaluate the outputs predictions ``\\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
+"""
+function predict(mpc::PredictiveController, ::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
+    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
+    return mpc.Ẽ*ΔŨ + mpc.F
+end
+
+"""
+    predict(mpc::PredictiveController, model::SimModel, ΔŨ)
+
+Evaluate  ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
+"""
+function predict(mpc::PredictiveController, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
+    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
+    U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
+    Ŷd = Vector{T}(undef, model.ny*mpc.Hp)
+    x̂d::Vector{T} = copy(mpc.x̂d)
+    d0 = mpc.d0
+    for j=1:mpc.Hp
+        u0    = U0[(1 + model.nu*(j-1)):(model.nu*j)]
+        x̂d[:] = f(model, x̂d, u0, d0)
+        d0    = mpc.D̂0[(1 + model.nd*(j-1)):(model.nd*j)]
+        Ŷd[(1 + model.ny*(j-1)):(model.ny*j)] = h(model, x̂d, d0) + model.yop
+    end
+    return Ŷd + mpc.Ŷs
 end
 
 @doc raw"""

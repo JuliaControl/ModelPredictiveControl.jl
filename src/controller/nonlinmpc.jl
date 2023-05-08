@@ -77,7 +77,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         last_ΔŨ, last_C, last_Ŷ = nothing, nothing, nothing
         function Jfunc(ΔŨ::Float64...)
             if ΔŨ !== last_ΔŨ
-                last_Ŷ = evalŶ(mpc, model, ΔŨ)
+                last_Ŷ = predict(mpc, model, ΔŨ)
                 last_C = con_nonlinprog(mpc, model, last_Ŷ, ΔŨ)
                 last_ΔŨ = ΔŨ
             end
@@ -86,7 +86,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         last_dΔŨ, last_dC, last_dŶ = nothing, nothing, nothing
         function Jfunc(dΔŨ::T...) where {T<:Real}
             if dΔŨ !== last_dΔŨ
-                last_dŶ = evalŶ(mpc, model, dΔŨ)
+                last_dŶ = predict(mpc, model, dΔŨ)
                 last_dC = con_nonlinprog(mpc, model, last_dŶ, dΔŨ)
                 last_dΔŨ = dΔŨ
             end
@@ -97,7 +97,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         ncon = length(mpc.con.Ŷmin) + length(mpc.con.Ŷmax)
         function con_nonlinprog_i(i, ΔŨ::NTuple{N, Float64}) where {N}
             if ΔŨ !== last_ΔŨ
-                last_Ŷ = evalŶ(mpc, model, ΔŨ)
+                last_Ŷ = predict(mpc, model, ΔŨ)
                 last_C = con_nonlinprog(mpc, model, last_Ŷ, ΔŨ)
                 last_ΔŨ = ΔŨ
             end
@@ -105,7 +105,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         end
         function con_nonlinprog_i(i, dΔŨ::NTuple{N, T}) where {N, T<:Real}
             if dΔŨ !== last_dΔŨ
-                last_dŶ = evalŶ(mpc, model, dΔŨ)
+                last_dŶ = predict(mpc, model, dΔŨ)
                 last_dC = con_nonlinprog(mpc, model, last_dŶ, dΔŨ)
                 last_dΔŨ = dΔŨ
             end
@@ -338,35 +338,4 @@ function con_nonlinprog(mpc::NonLinMPC, ::SimModel, Ŷ, ΔŨ::NTuple{N, T}) wh
     C_Ŷmax[isinf.(C_Ŷmax)] .= 0
     C = [C_Ŷmin; C_Ŷmax]
     return C
-end
-
-
-"""
-    evalŶ(mpc::NonLinMPC, model::LinModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
-
-Evaluate the outputs predictions ``\\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
-"""
-function evalŶ(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
-    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
-    return mpc.Ẽ*ΔŨ + mpc.F
-end
-
-"""
-    evalŶ(mpc::NonLinMPC, model::SimModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
-
-Evaluate  ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
-"""
-function evalŶ(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
-    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
-    U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
-    Ŷd = Vector{T}(undef, model.ny*mpc.Hp)
-    x̂d::Vector{T} = copy(mpc.x̂d)
-    d0 = mpc.d0
-    for j=1:mpc.Hp
-        u0    = U0[(1 + model.nu*(j-1)):(model.nu*j)]
-        x̂d[:] = f(model, x̂d, u0, d0)
-        d0    = mpc.D̂0[(1 + model.nd*(j-1)):(model.nd*j)]
-        Ŷd[(1 + model.ny*(j-1)):(model.ny*j)] = h(model, x̂d, d0) + model.yop
-    end
-    return Ŷd + mpc.Ŷs
 end
