@@ -72,38 +72,54 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
         @constraint(optim, linconstraint, A*ΔŨ .≤ b)
-        J = let mpc=mpc, model=model # capture mpc and model variables
-            (ΔŨ...) -> obj_nonlinprog(mpc, model, ΔŨ)
+
+        last_ΔŨ, last_C, last_Ŷ = nothing, nothing, nothing
+        function Jfunc(ΔŨ::Float64...)
+            if ΔŨ !== last_ΔŨ
+                last_Ŷ = evalŶ(mpc, model, ΔŨ)
+                last_C = con_nonlinprog(mpc, model, last_Ŷ, ΔŨ)
+                last_ΔŨ = ΔŨ
+            end
+            return obj_nonlinprog(mpc, model, last_Ŷ, ΔŨ)
         end
-        register(optim, :J, nvar, J, autodiff=true)
-        @NLobjective(optim, Min, J(ΔŨ...))
+        last_dΔŨ, last_dC, last_dŶ = nothing, nothing, nothing
+        function Jfunc(dΔŨ::T...) where {T<:Real}
+            if dΔŨ !== last_dΔŨ
+                last_dŶ = evalŶ(mpc, model, dΔŨ)
+                last_dC = con_nonlinprog(mpc, model, last_dŶ, dΔŨ)
+                last_dΔŨ = dΔŨ
+            end
+            return obj_nonlinprog(mpc, model, last_dŶ, dΔŨ)
+        end
+        register(optim, :Jfunc, nvar, Jfunc, autodiff=true)
+        @NLobjective(optim, Min, Jfunc(ΔŨ...))
         ncon = length(mpc.con.Ŷmin) + length(mpc.con.Ŷmax)
-        C = let mpc=mpc, model=model, ncon=ncon # capture the 3 variables
-            last_ΔŨ, last_C = nothing, nothing
-            function con_nonlinprog_i(i, ΔŨ::NTuple{N, Float64}) where {N}
-                if ΔŨ !== last_ΔŨ
-                    last_C, last_ΔŨ = con_nonlinprog(mpc, model, ΔŨ), ΔŨ
-                end
-                return last_C[i]
+        function con_nonlinprog_i(i, ΔŨ::NTuple{N, Float64}) where {N}
+            if ΔŨ !== last_ΔŨ
+                last_Ŷ = evalŶ(mpc, model, ΔŨ)
+                last_C = con_nonlinprog(mpc, model, last_Ŷ, ΔŨ)
+                last_ΔŨ = ΔŨ
             end
-            last_dΔŨ, last_dCdΔŨ = nothing, nothing
-            function con_nonlinprog_i(i, dΔŨ::NTuple{N, T}) where {N, T<:Real}
-                if dΔŨ !== last_dΔŨ
-                    last_dCdΔŨ, last_dΔŨ = con_nonlinprog(mpc, model, dΔŨ), dΔŨ
-                end
-                return last_dCdΔŨ[i]
-            end
-            [(ΔŨ...) -> con_nonlinprog_i(i, ΔŨ) for i in 1:ncon]
+            return last_C[i]
         end
+        function con_nonlinprog_i(i, dΔŨ::NTuple{N, T}) where {N, T<:Real}
+            if dΔŨ !== last_dΔŨ
+                last_dŶ = evalŶ(mpc, model, dΔŨ)
+                last_dC = con_nonlinprog(mpc, model, last_dŶ, dΔŨ)
+                last_dΔŨ = dΔŨ
+            end
+            return last_dC[i]
+        end
+        Cfunc = [(ΔŨ...) -> con_nonlinprog_i(i, ΔŨ) for i in 1:ncon]
         n = 0
         for i in eachindex(con.Ŷmin)
             sym = Symbol("C_Ŷmin_$i")
-            register(optim, sym, nvar, C[n + i], autodiff=true)
+            register(optim, sym, nvar, Cfunc[n + i], autodiff=true)
         end
         n = lastindex(con.Ŷmin)
         for i in eachindex(con.Ŷmax)
             sym = Symbol("C_Ŷmax_$i")
-            register(optim, sym, nvar, C[n + i], autodiff=true)
+            register(optim, sym, nvar, Cfunc[n + i], autodiff=true)
         end
         set_silent(optim)
         return mpc
@@ -253,12 +269,12 @@ init_objective!(mpc::NonLinMPC, _ ) = nothing
 
 Objective function for [`NonLinMPC`] when `model` is a [`LinModel`](@ref).
 """
-function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
+function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, Ŷ, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     Jqp = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
     U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
     UE = [U; U[(end - model.nu + 1):end]]
-    ŶE = [mpc.ŷ; mpc.Ẽ*ΔŨ + mpc.F]
+    ŶE = [mpc.ŷ; Ŷ]
     D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
     return Jqp + mpc.E*mpc.JE(UE, ŶE, D̂E)
 end
@@ -268,11 +284,10 @@ end
 
 Objective function for [`NonLinMPC`] when `model` is not a [`LinModel`](@ref).
 """
-function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
+function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::NTuple{N, T}) where {N, T}
     ΔŨ = collect(ΔŨ) # convert NTuple to Vector
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
     # --- output setpoint tracking term ---
-    Ŷ = evalŶ(mpc, model, mpc.x̂d, mpc.d0, mpc.D̂0, U0)
     êy = mpc.R̂y - Ŷ
     JR̂y = êy'*mpc.M_Hp*êy  
     # --- move suppression term ---
@@ -300,18 +315,15 @@ end
 
 Nonlinear constraints for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
 """
-function con_nonlinprog(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
-    return zeros(T, 2*mpc.ny*mpc.Hp)
+function con_nonlinprog(mpc::NonLinMPC, model::LinModel, _, ΔŨ::NTuple{N, T}) where {N, T}
+    return zeros(T, 2*model.ny*mpc.Hp)
 end
 """
     con_nonlinprog(mpc::NonLinMPC, model::NonLinModel, ΔŨ::NTuple{N, T}) where {N, T}
 
 Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](ref).
 """
-function con_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
-    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
-    U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
-    Ŷ = evalŶ(mpc, model, mpc.x̂d, mpc.d0, mpc.D̂0, U0)
+function con_nonlinprog(mpc::NonLinMPC, ::SimModel, Ŷ, ΔŨ::NTuple{N, T}) where {N, T}
     if !isinf(mpc.C) # constraint softening activated :
         ϵ = ΔŨ[end]
         C_Ŷmin = (mpc.con.Ŷmin - Ŷ) - ϵ*mpc.con.c_Ŷmin
@@ -329,17 +341,30 @@ end
 
 
 """
+    evalŶ(mpc::NonLinMPC, model::LinModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
+
+Evaluate the outputs predictions ``\\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
+"""
+function evalŶ(mpc::NonLinMPC, ::LinModel, ΔŨ::NTuple{N, T}) where {N, T}
+    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
+    return mpc.Ẽ*ΔŨ + mpc.F
+end
+
+"""
     evalŶ(mpc::NonLinMPC, model::SimModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
 
-Evaluate the outputs predictions ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
+Evaluate  ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
 """
-function evalŶ(mpc::NonLinMPC, model::SimModel, x̂d, d0, D̂0, U0::Vector{T}) where {T}
+function evalŶ(mpc::NonLinMPC, model::SimModel, ΔŨ::NTuple{N, T}) where {N, T}
+    ΔŨ = collect(ΔŨ) # convert NTuple to Vector
+    U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
     Ŷd0 = Vector{T}(undef, model.ny*mpc.Hp)
-    x̂d::Vector{T} = copy(x̂d)
+    x̂d::Vector{T} = copy(mpc.x̂d)
+    d0 = mpc.d0
     for j=1:mpc.Hp
         u0    = U0[(1 + model.nu*(j-1)):(model.nu*j)]
         x̂d[:] = f(model, x̂d, u0, d0)
-        d0    = D̂0[(1 + model.nd*(j-1)):(model.nd*j)]
+        d0    = mpc.D̂0[(1 + model.nd*(j-1)):(model.nd*j)]
         Ŷd0[(1 + model.ny*(j-1)):(model.ny*j)] = h(model, x̂d, d0)
     end
     return Ŷd0 + mpc.F      # F = Yop + Ŷs

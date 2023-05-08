@@ -84,8 +84,6 @@ setconstraint!(nmpc2, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(nmpc2, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
 
-
-
 nx = linModel4.nx
 kf = KalmanFilter(linModel4, σP0=10*ones(nx), σQ=0.01*ones(nx), σR=[0.1, 0.1], σQ_int=0.05*ones(2), σP0_int=10*ones(2))
 
@@ -116,6 +114,7 @@ function test_mpc(model, mpc)
     d = model.dop
     r = [50,31]
     setstate!(model, zeros(model.nx))
+    setstate!(mpc, zeros(mpc.estim.nx̂))
     initstate!(mpc,u,model(d),d)
     for k = 0:N-1
         if k == 40
