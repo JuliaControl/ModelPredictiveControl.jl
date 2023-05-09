@@ -32,7 +32,6 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     Ps::Matrix{Float64}
     d0::Vector{Float64}
     D̂0::Vector{Float64}
-    Uop::Vector{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
     function NonLinMPC{S, JEFunc}(
@@ -52,11 +51,11 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
-        nvar = size(Ẽ, 2)
         P̃, q̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         d0, D̂0 = zeros(nd), zeros(nd*Hp)
-        Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
+        Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
+        nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
         mpc = new(
             estim, optim, con,
@@ -67,14 +66,9 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
             d0, D̂0,
-            Uop, Yop, Dop,
+            Yop, Dop,
         )
-        @variable(optim, ΔŨ[1:nvar])
-        A = con.A[con.i_b, :]
-        b = con.b[con.i_b]
-        @constraint(optim, linconstraint, A*ΔŨ .≤ b)
-        init_nonlinprog!(mpc, model)
-        set_silent(optim)
+        init_optimization!(mpc)
         return mpc
     end
 end
@@ -194,10 +188,23 @@ function NonLinMPC(
 end
 
 
-function init_nonlinprog!(mpc::NonLinMPC, model::SimModel)
+"""
+    init_optimization!(mpc::NonLinMPC)
+
+Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
+"""
+function init_optimization!(mpc::NonLinMPC)
+    # --- variables and linear constraints ---
     optim, con = mpc.optim, mpc.con
-    ΔŨvar = optim[:ΔŨ]
-    nvar = length(ΔŨvar)
+    nvar = length(mpc.ΔŨ)
+    set_silent(optim)
+    @variable(optim, ΔŨvar[1:nvar])
+    ΔŨvar = optim[:ΔŨvar]
+    A = con.A[con.i_b, :]
+    b = con.b[con.i_b]
+    @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+    # --- nonlinear optimization init ---
+    model = mpc.estim.model
     last_ΔŨtup, C, Ŷ = nothing, nothing, nothing
     last_dΔŨtup, dC, dŶ = nothing, nothing, nothing
     function Jfunc(ΔŨtup::Float64...)
@@ -250,6 +257,7 @@ function init_nonlinprog!(mpc::NonLinMPC, model::SimModel)
         sym = Symbol("C_Ŷmax_$i")
         register(optim, sym, nvar, Cfunc[n + i], autodiff=true)
     end
+    return nothing
 end
 
 
@@ -259,23 +267,19 @@ setnontlincon!(::NonLinMPC, ::LinModel) = nothing
 "Set the nonlinear constraints on the output predictions `Ŷ`."
 function setnonlincon!(mpc::NonLinMPC, model::NonLinModel)
     optim = mpc.optim
-    ΔŨ = mpc.optim[:ΔŨ]
+    ΔŨvar = mpc.optim[:ΔŨvar]
     con = mpc.con
     map(con -> delete(optim, con), all_nonlinear_constraints(optim))
     for i in findall(.!isinf.(con.Ŷmin))
         f_sym = Symbol("C_Ŷmin_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨ...)) <= 0))
+        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
     end
     for i in findall(.!isinf.(con.Ŷmax))
         f_sym = Symbol("C_Ŷmax_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨ...)) <= 0))
+        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
     end
     return nothing
 end
-
-"Nonlinear programming objective does not require any initialization."
-init_objective!(mpc::NonLinMPC, _ ) = nothing
-
 
 """
     obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::Vector{Real})

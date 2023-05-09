@@ -183,15 +183,15 @@ function setconstraint!(
     )
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
-    ΔŨ = mpc.optim[:ΔŨ]
+    ΔŨvar = mpc.optim[:ΔŨvar]
     delete(mpc.optim, mpc.optim[:linconstraint])
     unregister(mpc.optim, :linconstraint)
-    @constraint(mpc.optim, linconstraint, A*ΔŨ .≤ b)
+    @constraint(mpc.optim, linconstraint, A*ΔŨvar .≤ b)
     setnonlincon!(mpc, model)
     return mpc
 end
 
-"By default, there is no nonlinear constraint"
+"By default, there is no nonlinear constraint, thus do nothing."
 setnonlincon!(::PredictiveController, ::SimModel) = nothing
 
 @doc raw"""
@@ -448,14 +448,14 @@ Optimize the objective function ``J`` of `mpc` controller.
 function optim_objective!(mpc::PredictiveController, p)
     optim = mpc.optim
     model = mpc.estim.model
-    ΔŨ::Vector{VariableRef} = optim[:ΔŨ]
+    ΔŨvar::Vector{VariableRef} = optim[:ΔŨvar]
     lastΔŨ = mpc.ΔŨ
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
     ΔŨ0 = [lastΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(model.nu)]
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
-    set_start_value.(ΔŨ, ΔŨ0)
-    init_objective!(mpc, ΔŨ)
+    set_start_value.(ΔŨvar, ΔŨ0)
+    set_objective!(mpc, ΔŨvar)
     try
         optimize!(optim)
     catch err
@@ -472,11 +472,13 @@ function optim_objective!(mpc::PredictiveController, p)
         @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVED ($status)"
         @debug solution_summary(optim)
     end
-    mpc.ΔŨ[:] = isfatal(status) ? ΔŨ0 : value.(ΔŨ) # fatal status : use last value
+    mpc.ΔŨ[:] = isfatal(status) ? ΔŨ0 : value.(ΔŨvar) # fatal status : use last value
     J_val = objective_value(optim) + p # add LinModel p constant (p=0 for NonLinModel) 
     return mpc.ΔŨ, J_val
 end
 
+"By default, no change to the objective function."
+set_objective!(::PredictiveController, _ ) = nothing
 
 "Evaluate current output of `InternalModel` estimator."
 evalŷ!(estim::InternalModel, ym, d) = (mpc.ŷ[:] = estim(ym, d))

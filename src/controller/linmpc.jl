@@ -30,7 +30,6 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     Ps::Matrix{Float64}
     d0::Vector{Float64}
     D̂0::Vector{Float64}
-    Uop::Vector{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
     function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim) where {S<:StateEstimator}
@@ -48,11 +47,11 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
-        nvar = size(Ẽ, 2)
         P̃, q̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         d0, D̂0 = zeros(nd), zeros(nd*Hp)
-        Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
+        Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
+        nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
         mpc = new(
             estim, optim, con,
@@ -63,14 +62,9 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
             d0, D̂0,
-            Uop, Yop, Dop,
+            Yop, Dop,
         )
-        @variable(optim, ΔŨ[1:nvar])
-        A = con.A[con.i_b, :]
-        b = con.b[con.i_b]
-        @constraint(optim, linconstraint, A*ΔŨ .≤ b)
-        @objective(optim, Min, obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃))
-        set_silent(optim)
+        init_optimization!(mpc)
         return mpc
     end
 end
@@ -199,11 +193,27 @@ function LinMPC(
     return LinMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
 end
 
-"No nonlinear constraint for [`LinMPC`](@ref) controller."
-setnonlincon!(::LinMPC, ::LinModel) = nothing
+"""
+    init_optimization!(mpc::LinMPC)
 
-"Init quadratic programming `q̃` vector just before optimization."
-function init_objective!(mpc::LinMPC, ΔŨ)
+Init the quadratic optimization for [`LinMPC`](@ref) controllers.
+"""
+function init_optimization!(mpc::LinMPC)
+    # --- variables and linear constraints ---
+    optim, con = mpc.optim, mpc.con
+    nvar = length(mpc.ΔŨ)
+    set_silent(optim)
+    @variable(optim, ΔŨvar[1:nvar])
+    A = con.A[con.i_b, :]
+    b = con.b[con.i_b]
+    @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+    # --- quadratic optimization init ---
+    @objective(mpc.optim, Min, obj_quadprog(ΔŨvar, mpc.P̃, mpc.q̃))
+    return nothing
+end
+
+"Set quadratic programming `q̃` vector just before optimization."
+function set_objective!(mpc::LinMPC, ΔŨ)
     set_objective_function(mpc.optim, obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃))
     return nothing
 end
