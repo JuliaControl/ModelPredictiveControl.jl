@@ -204,16 +204,20 @@ function init_optimization!(mpc::NonLinMPC)
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- nonlinear optimization init ---
+    model = mpc.estim.model
     ncon = length(mpc.con.Ŷmin) + length(mpc.con.Ŷmax)
-    Jfunc, Cfunc = let mpc=mpc, model=mpc.estim.model, nvar=nvar, ncon=ncon
-        last_ΔŨtup, C, Ŷ = nothing, nothing, nothing
+    npred = mpc.Hp*mpc.estim.model.ny
+    Jfunc, Cfunc = let mpc=mpc, model=model, nvar=nvar, ncon=ncon, npred=npred
+        last_ΔŨ::Vector{Float64} = zeros(nvar)
+        Ŷ::Vector{Float64} = zeros(npred)
+        C::Vector{Float64} = zeros(ncon)
         last_dΔŨtup, dC, dŶ = nothing, nothing, nothing
         function Jfunc(ΔŨtup::Float64...)
             ΔŨ = collect(ΔŨtup)
-            if ΔŨtup !== last_ΔŨtup
+            if ΔŨ ≠ last_ΔŨ
                 Ŷ = predict(mpc, model, ΔŨ)
                 C = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
-                last_ΔŨtup = ΔŨtup
+                last_ΔŨ = ΔŨ
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
         end
@@ -227,11 +231,11 @@ function init_optimization!(mpc::NonLinMPC)
             return obj_nonlinprog(mpc, model, dŶ, dΔŨ)
         end
         function con_nonlinprog_i(i, ΔŨtup::NTuple{N, Float64}) where {N}
-            if ΔŨtup !== last_ΔŨtup
-                ΔŨ = collect(ΔŨtup)
+            ΔŨ = collect(ΔŨtup)
+            if ΔŨ ≠ last_ΔŨ
                 Ŷ = predict(mpc, model, ΔŨ)
                 C = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
-                last_ΔŨtup = ΔŨtup
+                last_ΔŨ = ΔŨ
             end
             return C[i]
         end
