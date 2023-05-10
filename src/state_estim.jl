@@ -131,7 +131,7 @@ end
 @doc raw"""
     augment_model(model::LinModel, As, Cs)
 
-Augment [`LinModel`](ref) state-space matrices with the stochastic ones `As` and `Cs`.
+Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
 If ``\mathbf{x_d}`` are `model.x` states, and ``\mathbf{x_s}``, the states defined at
 [`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x} = 
