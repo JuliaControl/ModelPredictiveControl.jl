@@ -28,8 +28,8 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     q̃ ::Vector{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
-    d0::Vector{Float64}
-    D̂0::Vector{Float64}
+    d::Vector{Float64}
+    D̂::Vector{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
     function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim) where {S<:StateEstimator}
@@ -49,7 +49,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
         P̃, q̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
-        d0, D̂0 = zeros(nd), zeros(nd*Hp)
+        d, D̂ = zeros(nd), zeros(nd*Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
@@ -61,7 +61,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
-            d0, D̂0,
+            d, D̂,
             Yop, Dop,
         )
         init_optimization!(mpc)

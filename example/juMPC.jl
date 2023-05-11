@@ -95,7 +95,7 @@ setconstraint!(mpc, umin=[5, 9.9], umax=[Inf,Inf])
 setconstraint!(mpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
-nmpc = NonLinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e5)
+nmpc = NonLinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e5, Ewt=0.0)
 
 setconstraint!(nmpc, c_umin=[0,0], c_umax=[0,0])
 setconstraint!(nmpc, c_ŷmin=[1,1], c_ŷmax=[1,1])
@@ -112,7 +112,7 @@ function test_mpc(model, mpc)
     d_data = zeros(1,N)
     u = model.uop
     d = model.dop
-    r = [50,31]
+    r = [50,32]
     setstate!(model, zeros(model.nx))
     setstate!(mpc, zeros(mpc.estim.nx̂))
     initstate!(mpc,u,model(d),d)

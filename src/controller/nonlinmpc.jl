@@ -30,8 +30,8 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     q̃ ::Vector{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
-    d0::Vector{Float64}
-    D̂0::Vector{Float64}
+    d::Vector{Float64}
+    D̂::Vector{Float64}
     Yop::Vector{Float64}
     Dop::Vector{Float64}
     function NonLinMPC{S, JEFunc}(
@@ -53,7 +53,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
         P̃, q̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
-        d0, D̂0 = zeros(nd), zeros(nd*Hp)
+        d, D̂ = zeros(nd), zeros(nd*Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
@@ -65,7 +65,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, Kd, Q, P̃, q̃,
             Ks, Ps,
-            d0, D̂0,
+            d, D̂,
             Yop, Dop,
         )
         init_optimization!(mpc)
@@ -117,7 +117,7 @@ default arguments.
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector)
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector)
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only
-- `Ewt=1.0` : economic costs weight ``E`` (scalar). 
+- `Ewt=0.0` : economic costs weight ``E`` (scalar). 
 - `JE=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{D̂}_E, \mathbf{Ŷ}_E)``.
 - `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector)
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive 
@@ -179,7 +179,7 @@ function NonLinMPC(
     Nwt = fill(0.1, estim.model.nu),
     Lwt = fill(0.0, estim.model.nu),
     Cwt = 1e5,
-    Ewt = 1.0,
+    Ewt = 0.0,
     JE::JEFunc = (_,_,_) -> 0.0,
     ru  = estim.model.uop,
     optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"))
@@ -206,18 +206,21 @@ function init_optimization!(mpc::NonLinMPC)
     # --- nonlinear optimization init ---
     model = mpc.estim.model
     ncon = length(mpc.con.Ŷmin) + length(mpc.con.Ŷmax)
-    npred = mpc.Hp*mpc.estim.model.ny
-    Jfunc, Cfunc = let mpc=mpc, model=model, nvar=nvar, ncon=ncon, npred=npred
-        last_ΔŨ::Vector{Float64} = zeros(nvar)
-        Ŷ::Vector{Float64} = zeros(npred)
+    nŶ = mpc.Hp*mpc.estim.model.ny
+    Jfunc, Cfunc = let mpc=mpc, model=model, nvar=nvar, ncon=ncon, nŶ=nŶ
+        # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-functions-with-vector-outputs
+        last_ΔŨtup = nothing
+        Ŷ::Vector{Float64} = zeros(nŶ)
         C::Vector{Float64} = zeros(ncon)
-        last_dΔŨtup, dC, dŶ = nothing, nothing, nothing
+        last_dΔŨtup = nothing
+        dŶ = nothing
+        dC = nothing
         function Jfunc(ΔŨtup::Float64...)
             ΔŨ = collect(ΔŨtup)
-            if ΔŨ ≠ last_ΔŨ
+            if ΔŨtup !== last_ΔŨtup
                 Ŷ = predict(mpc, model, ΔŨ)
                 C = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
-                last_ΔŨ = ΔŨ
+                last_ΔŨtup = ΔŨtup
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
         end
@@ -231,11 +234,11 @@ function init_optimization!(mpc::NonLinMPC)
             return obj_nonlinprog(mpc, model, dŶ, dΔŨ)
         end
         function con_nonlinprog_i(i, ΔŨtup::NTuple{N, Float64}) where {N}
-            ΔŨ = collect(ΔŨtup)
-            if ΔŨ ≠ last_ΔŨ
+            if ΔŨtup ≠ last_ΔŨtup
+                ΔŨ = collect(ΔŨtup)
                 Ŷ = predict(mpc, model, ΔŨ)
                 C = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
-                last_ΔŨ = ΔŨ
+                last_ΔŨtup = ΔŨtup
             end
             return C[i]
         end
@@ -293,12 +296,15 @@ end
 Objective function for [`NonLinMPC`] when `model` is a [`LinModel`](@ref).
 """
 function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
-    Jqp = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
-    U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
-    UE = [U; U[(end - model.nu + 1):end]]
-    ŶE = [mpc.ŷ; Ŷ]
-    D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
-    return Jqp + mpc.E*mpc.JE(UE, ŶE, D̂E)
+    J = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
+    if !iszero(mpc.E)
+        U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
+        UE = [U; U[(end - model.nu + 1):end]]
+        ŶE = [mpc.ŷ; Ŷ]
+        D̂E = [mpc.d; mpc.D̂]
+        J += mpc.E*mpc.JE(UE, ŶE, D̂E)
+    end
+    return J
 end
 
 """
@@ -312,10 +318,13 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{T}) 
     JR̂y = êy'*mpc.M_Hp*êy  
     # --- move suppression term ---
     JΔŨ = ΔŨ'*mpc.Ñ_Hc*ΔŨ 
+    # --- input over prediction horizon ---
+    if !isempty(mpc.R̂u) || !iszero(mpc.E)
+        U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
+    end
     # --- input setpoint tracking term ---
-    U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
     if !isempty(mpc.R̂u)
-        êu = mpc.R̂u - U 
+        êu = mpc.R̂u - U
         JR̂u = êu'*mpc.L_Hp*ê
     else
         JR̂u = 0.0
@@ -323,10 +332,15 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{T}) 
     # --- slack variable term ---
     Jϵ = !isinf(mpc.C) ? mpc.C*ΔŨ[end] : 0.0
     # --- economic term ---
-    UE = [U; U[(end - model.nu + 1):end]]
-    ŶE = [mpc.ŷ; Ŷ]
-    D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
-    return JR̂y + JΔŨ + JR̂u + Jϵ + mpc.E*mpc.JE(UE, ŶE, D̂E)
+    if !iszero(mpc.E)
+        UE = [U; U[(end - model.nu + 1):end]]
+        ŶE = [mpc.ŷ; Ŷ]
+        D̂E = [mpc.d; mpc.D̂]
+        E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E)
+    else
+        E_JE = 0.0
+    end
+    return JR̂y + JΔŨ + JR̂u + Jϵ + E_JE
 end
 
 
@@ -336,7 +350,7 @@ end
 Nonlinear constraints for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
 """
 function con_nonlinprog(mpc::NonLinMPC, model::LinModel, _, ΔŨ::Vector{T}) where {T<:Real}
-    return zeros(T, 2*model.ny*mpc.Hp)
+    return zeros(T, 0)
 end
 """
     con_nonlinprog(mpc::NonLinMPC, model::NonLinModel, ΔŨ::Vector{Real})
