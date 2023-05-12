@@ -1,9 +1,10 @@
 # spell-checker: disable
 
+using ModelPredictiveControl
 using ControlSystemsBase
 using Documenter
 using LinearAlgebra
-using ModelPredictiveControl
+using JuMP
 using Test
 
 
