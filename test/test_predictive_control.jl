@@ -9,9 +9,9 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test size(mpc1.Ẽ,1) == 15*mpc1.estim.model.ny
     mpc2 = LinMPC(model, Hc=4, Cwt=Inf)
     @test size(mpc2.Ẽ,2) == 4*mpc2.estim.model.nu
-    mpc3 = LinMPC(model, Hc=4, Cwt=1e5)
+    mpc3 = LinMPC(model, Hc=4, Cwt=1e6)
     @test size(mpc3.Ẽ,2) == 4*mpc3.estim.model.nu + 1
-    @test mpc3.C ≈ 1e5
+    @test mpc3.C ≈ 1e6
     mpc4 = LinMPC(model, Mwt=[1,2], Hp=15)
     @test mpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     mpc5 = LinMPC(model, Nwt=[3,4], Cwt=1e3, Hc=5)
@@ -84,5 +84,20 @@ end
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
     @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
+    nmpc2 = NonLinMPC(nonlinmodel, Hc=4, Cwt=Inf)
+    @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
+    nmpc3 = NonLinMPC(nonlinmodel, Hc=4, Cwt=1e6)
+    @test size(nmpc3.Ẽ, 2) == 4*nonlinmodel.nu + 1
+    @test nmpc3.C == 1e6
+
+    nmpc4 = NonLinMPC(nonlinmodel, Mwt=[1,2], Hp=15)
+    @test nmpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
+    nmpc5 = NonLinMPC(nonlinmodel, Nwt=[3,4], Cwt=1e3, Hc=5)
+    @test nmpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
+    nmpc6 = NonLinMPC(nonlinmodel, Lwt=[0,1], ru=[0,50], Hp=15)
+    @test nmpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
+    @test nmpc6.R̂u ≈ repeat([0,50], 15)
+    nmpc7 = NonLinMPC
+
 
 end
