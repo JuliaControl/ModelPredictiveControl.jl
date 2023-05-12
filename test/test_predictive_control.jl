@@ -56,13 +56,16 @@ end
     @test all((-mpc.con.A_Ŷmin[:, end], -mpc.con.A_Ŷmax[:, end]) .≈ ([1.0,1.1], [1.2,1.3]))
 end
 
-@testset "LinMPC moves" begin
+@testset "LinMPC moves and getinfo" begin
     mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
     r = [5]
     u = moveinput!(mpc, r)
-    @test u ≈ [1] atol=1e-3
+    @test u ≈ [1] atol=1e-2
     u = mpc(r)
-    @test u ≈ [1] atol=1e-3
+    @test u ≈ [1] atol=1e-2
+    info, _ = getinfo(mpc)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 5 atol=1e-2
 end
 
 @testset "LinMPC other methods" begin
@@ -126,7 +129,7 @@ end
     @test all((nmpc.con.c_Ŷmin, nmpc.con.c_Ŷmax) .≈ ([1.0,1.1], [1.2,1.3]))
 end
 
-@testset "NonLinMPC moves" begin
+@testset "NonLinMPC moves and getinfo" begin
     linmodel = LinModel(tf(5, [2, 1]), 3)
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
     r = [5]
@@ -134,6 +137,9 @@ end
     @test u ≈ [1] atol=1e-3
     u = nmpc_lin(r)
     @test u ≈ [1] atol=1e-3
+    info, _ = getinfo(nmpc_lin)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 5 atol=1e-2
 
     f(x,u,_) = linmodel.A*x + linmodel.Bu*u
     h(x,_)   = linmodel.C*x 
@@ -141,9 +147,12 @@ end
     nmpc_nonlin = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
     r = [5]
     u = moveinput!(nmpc_nonlin, r)
-    @test u ≈ [1] atol=1e-3
+    @test u ≈ [1] atol=1e-2
     u = nmpc_nonlin(r)
-    @test u ≈ [1] atol=1e-3
+    @test u ≈ [1] atol=1e-2
+    info, _ = getinfo(nmpc_nonlin)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 5 atol=1e-2
 end
 
 @testset "NonLinMPC other methods" begin

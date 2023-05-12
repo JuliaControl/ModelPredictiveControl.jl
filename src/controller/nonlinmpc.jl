@@ -188,6 +188,11 @@ function NonLinMPC(
     return NonLinMPC{S, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
 end
 
+"""
+    getinfo(mpc::NonLinMPC)
+
+Invoke [`getinfo(::PredictiveController)`](@ref) and add `:JE` the economic optimum ``J_E``.
+"""
 function getinfo(mpc::NonLinMPC)
     info, sol_summary = invoke(getinfo, Tuple{PredictiveController}, mpc)
     U, Ŷ, D̂ = info[:U], info[:Ŷ], info[:D̂]

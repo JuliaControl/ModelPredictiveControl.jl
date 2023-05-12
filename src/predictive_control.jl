@@ -263,36 +263,39 @@ function moveinput!(
     return u
 end
 
-#=
+@doc raw"""
+    getinfo(mpc::PredictiveController)
 
+Get additional information about `mpc` controller optimum.
 
-"Include the additional information about the optimum to ease troubleshooting."
-mutable struct OptimInfo
-    ΔŨ::Vector{Float64}
-    ϵ ::Float64
-    J ::Float64
-    u ::Vector{Float64}
-    U ::Vector{Float64}
-    ŷ ::Vector{Float64}
-    Ŷ ::Vector{Float64}
-    ŷs::Vector{Float64}
-    Ŷs::Vector{Float64}
-end
-=#
+Return the dictionary `info` with the additional information, and `sol_summary`, the
+optimizer solution summary that can be printed. The dictionary `info` has the following 
+fields:
 
-#=
-function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs)
-    mpc.info.ΔŨ = ΔŨ
-    mpc.info.ϵ = isinf(mpc.C) ? NaN : ΔŨ[end]
-    mpc.info.J = J
-    mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + mpc.estim.model.uop)
-    mpc.info.u = mpc.info.U[1:mpc.estim.model.nu]
-    mpc.info.ŷ = mpc.ŷ
-    mpc.info.Ŷ = mpc.Ẽ*ΔŨ + mpc.F
-    mpc.info.ŷs, mpc.info.Ŷs = ŷs, Ŷs
-end
-=#
+- `:ΔU` : optimal manipulated input increments over `Hc` ``(\mathbf{ΔU})``
+- `:ϵ`  : optimal slack variable ``(ϵ)``
+- `:J`  : objective value optimum ``(J)``
+- `:U`  : optimal manipulated inputs over `Hp` ``(\mathbf{U})``
+- `:u`  : current optimal manipulated input ``(\mathbf{u})``
+- `:d`  : current measured disturbance ``(\mathbf{d})``
+- `:D̂`  : predicted measured disturbances over `Hp` ``(\mathbf{D̂})``
+- `:ŷ`  : current estimated output ``(\mathbf{ŷ})``
+- `:Ŷ`  : predicted outputs over `Hp` ``(\mathbf{Ŷ = Ŷ_d + Ŷ_s})``
+- `:Ŷd` : predicted deterministic output over `Hp` ``(\mathbf{Ŷ_d})``
+- `:Ŷs` : predicted stochastic output over `Hp` ``(\mathbf{Ŷ_s})``
+- `:R̂y` : predicted output setpoint over `Hp` ``(\mathbf{R̂_y})``
+- `:R̂u` : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
 
+# Examples
+```jldoctest
+julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
+
+julia> u = moveinput!(mpc, [5]);
+
+julia> info, sol_summary = getinfo(mpc); round.(info[:Ŷ][end], digits=2)
+5.0
+```
+"""
 function getinfo(mpc::PredictiveController)
     sol_summary = solution_summary(mpc.optim) 
     info = Dict{Symbol, InfoDictType}()

@@ -45,3 +45,9 @@ setconstraint!
 ```@docs
 moveinput!
 ```
+
+## Get Additional Information
+
+```@docs
+getinfo
+```
