@@ -56,7 +56,6 @@ end
     @test all((-mpc.con.A_Ŷmin[:, end], -mpc.con.A_Ŷmax[:, end]) .≈ ([1.0,1.1], [1.2,1.3]))
 end
 
-
 @testset "LinMPC moves" begin
     mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
     r = [5]
@@ -80,7 +79,6 @@ end
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Du*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
-
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
     @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
@@ -89,7 +87,6 @@ end
     nmpc3 = NonLinMPC(nonlinmodel, Hc=4, Cwt=1e6)
     @test size(nmpc3.Ẽ, 2) == 4*nonlinmodel.nu + 1
     @test nmpc3.C == 1e6
-
     nmpc4 = NonLinMPC(nonlinmodel, Mwt=[1,2], Hp=15)
     @test nmpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     nmpc5 = NonLinMPC(nonlinmodel, Nwt=[3,4], Cwt=1e3, Hc=5)
@@ -97,7 +94,65 @@ end
     nmpc6 = NonLinMPC(nonlinmodel, Lwt=[0,1], ru=[0,50], Hp=15)
     @test nmpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
     @test nmpc6.R̂u ≈ repeat([0,50], 15)
-    nmpc7 = NonLinMPC
+    nmpc7 = NonLinMPC(nonlinmodel, Ewt=1e-3, JE=(UE,ŶE,D̂E) -> UE.*ŶE.*D̂E)
+    @test nmpc7.E == 1e-3
+    @test nmpc7.JE([1,2],[3,4],[4,6]) == [12, 48]
+    nmpc8 = NonLinMPC(nonlinmodel, optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer))
+    @test solver_name(nmpc8.optim) == "OSQP"
+    im = InternalModel(nonlinmodel)
+    nmpc9 = NonLinMPC(im)
+    @test isa(nmpc9.estim, InternalModel)
+end
 
+@testset "NonLinMPC constraints" begin
+    linmodel1 = LinModel(sys,Ts,i_d=[3])
+    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h(x,d)   = linmodel1.C*x + linmodel1.Du*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+    nmpc = NonLinMPC(nonlinmodel, Hp=1, Hc=1)
+    setconstraint!(nmpc, umin=[5, 9.9], umax=[100,99])
+    @test all((nmpc.con.Umin, nmpc.con.Umax) .≈ ([5, 9.9], [100,99]))
+    setconstraint!(nmpc, Δumin=[-5,-10], Δumax=[6,11])
+    @test all((nmpc.con.ΔŨmin, nmpc.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
+    setconstraint!(nmpc, ŷmin=[5,10],ŷmax=[55, 35])
+    @test all((nmpc.con.Ŷmin, nmpc.con.Ŷmax) .≈ ([5,10], [55,35]))
+    setconstraint!(nmpc, c_umin=[0.1,0.2], c_umax=[0.3,0.4])
+    @test all((-nmpc.con.A_Umin[:, end], -nmpc.con.A_Umax[:, end]) .≈ ([0.1,0.2], [0.3,0.4]))
+    setconstraint!(nmpc, c_Δumin=[0.05,0.15], c_Δumax=[0.25,0.35])
+    @test all((-nmpc.con.A_ΔŨmin[1:end-1, end], -nmpc.con.A_ΔŨmax[1:end-1, end]) .≈ ([0.05,0.15], [0.25,0.35]))
+    setconstraint!(nmpc, c_ŷmin=[1.0,1.1], c_ŷmax=[1.2,1.3])
+    println(nmpc.con.A_Ŷmin)
+    @test all((-nmpc.con.A_Ŷmin, -nmpc.con.A_Ŷmax) .≈ (zeros(0,3), zeros(0,3)))
+    @test all((nmpc.con.c_Ŷmin, nmpc.con.c_Ŷmax) .≈ ([1.0,1.1], [1.2,1.3]))
+end
 
+@testset "NonLinMPC moves" begin
+    linmodel = LinModel(tf(5, [2, 1]), 3)
+    nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
+    r = [5]
+    u = moveinput!(nmpc_lin, r)
+    @test u ≈ [1] atol=1e-3
+    u = nmpc_lin(r)
+    @test u ≈ [1] atol=1e-3
+
+    f(x,u,_) = linmodel.A*x + linmodel.Bu*u
+    h(x,_)   = linmodel.C*x 
+    nonlinmodel = NonLinModel(f, h, 3, 1, 1, 1)
+    nmpc_nonlin = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
+    r = [5]
+    u = moveinput!(nmpc_nonlin, r)
+    @test u ≈ [1] atol=1e-3
+    u = nmpc_nonlin(r)
+    @test u ≈ [1] atol=1e-3
+end
+
+@testset "NonLinMPC other methods" begin
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    f(x,u,_) = linmodel.A*x + linmodel.Bu*u
+    h(x,_)   = linmodel.C*x
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2) 
+    nmpc1 = NonLinMPC(nonlinmodel)
+    @test initstate!(nmpc1, [10, 50], [20, 25]) ≈ [zeros(2); [20, 25]]
+    setstate!(nmpc1, [1,2,3,4])
+    @test nmpc1.estim.x̂ ≈ [1,2,3,4]
 end

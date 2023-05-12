@@ -112,30 +112,39 @@ end
     @test internalmodel2.nxs == 1
     @test internalmodel2.nx̂ == 4
 
-    stoch_ym_tf = tf([1, -0.3],[1, -0.5],Ts)*tf([1,0],[1,-1],Ts).*I(2)
-    internalmodel3 = InternalModel(linmodel2,stoch_ym=stoch_ym_tf)
+    f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
+    h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 2)
+    internalmodel3 = InternalModel(nonlinmodel)
     @test internalmodel3.nym == 2
     @test internalmodel3.nyu == 0
-    @test internalmodel3.nxs == 4
-    @test internalmodel3.nx̂ == 4
+    @test internalmodel3.nxs == 2
+    @test internalmodel3.nx̂  == 4
 
-    stoch_ym_ss=minreal(ss(stoch_ym_tf))
-    internalmodel4 = InternalModel(linmodel2,stoch_ym=stoch_ym_ss)
+    stoch_ym_tf = tf([1, -0.3],[1, -0.5],Ts)*tf([1,0],[1,-1],Ts).*I(2)
+    internalmodel4 = InternalModel(linmodel2,stoch_ym=stoch_ym_tf)
     @test internalmodel4.nym == 2
     @test internalmodel4.nyu == 0
     @test internalmodel4.nxs == 4
     @test internalmodel4.nx̂ == 4
-    @test internalmodel4.As == stoch_ym_ss.A
-    @test internalmodel4.Bs == stoch_ym_ss.B
-    @test internalmodel4.Cs == stoch_ym_ss.C
-    @test internalmodel4.Ds == stoch_ym_ss.D
+
+    stoch_ym_ss=minreal(ss(stoch_ym_tf))
+    internalmodel5 = InternalModel(linmodel2,stoch_ym=stoch_ym_ss)
+    @test internalmodel5.nym == 2
+    @test internalmodel5.nyu == 0
+    @test internalmodel5.nxs == 4
+    @test internalmodel5.nx̂ == 4
+    @test internalmodel5.As == stoch_ym_ss.A
+    @test internalmodel5.Bs == stoch_ym_ss.B
+    @test internalmodel5.Cs == stoch_ym_ss.C
+    @test internalmodel5.Ds == stoch_ym_ss.D
 
     stoch_ym_resample = c2d(d2c(ss(1,1,1,1,linmodel2.Ts), :tustin), 2linmodel2.Ts, :tustin)
-    internalmodel5 = InternalModel(linmodel2, i_ym=[2], stoch_ym=stoch_ym_resample)
-    @test internalmodel5.As ≈ internalmodel2.As
-    @test internalmodel5.Bs ≈ internalmodel2.Bs
-    @test internalmodel5.Cs ≈ internalmodel2.Cs
-    @test internalmodel5.Ds ≈ internalmodel2.Ds
+    internalmodel6 = InternalModel(linmodel2, i_ym=[2], stoch_ym=stoch_ym_resample)
+    @test internalmodel6.As ≈ internalmodel2.As
+    @test internalmodel6.Bs ≈ internalmodel2.Bs
+    @test internalmodel6.Cs ≈ internalmodel2.Cs
+    @test internalmodel6.Ds ≈ internalmodel2.Ds
 
     unstablemodel = LinModel(ss(diagm([0.5, -0.5, 1.5]), ones(3,1), I, 0, 1))
     @test_throws ErrorException InternalModel(unstablemodel)
