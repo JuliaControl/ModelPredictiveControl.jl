@@ -55,13 +55,15 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 - ✅ optimization based on `JuMP.jl`:
   - ✅ quickly compare multiple optimizers
   - ✅ nonlinear solvers relying on automatic differentiation (exact derivative)
-- ⬜ additional information about the optimum to ease troubleshooting:
-  - ⬜ optimal input increments over control horizon
-  - ⬜ slack variable optimum
-  - ⬜ objective function optimum
-  - ⬜ output predictions at optimum
-  - ⬜ current stochastic output predictions
-  - ⬜ optimal economic costs
+- ✅ additional information about the optimum to ease troubleshooting:
+  - ✅ optimal input increments over control horizon
+  - ✅ slack variable optimum
+  - ✅ objective function optimum
+  - ✅ output predictions at optimum
+  - ✅ current stochastic output predictions
+  - ✅ current deterministic output predictions
+  - ✅ optimal economic costs
+  - ✅ optimizer solution summary
 
 ### State Estimation Features
 

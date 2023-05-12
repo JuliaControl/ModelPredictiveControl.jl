@@ -26,6 +26,8 @@ const LinConVector = Vector{ConstraintRef{
     ScalarShape
 }}
 
+const InfoDictType = Union{Vector{Float64}, Float64}
+
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint
     Umin   ::Vector{Float64}
@@ -249,15 +251,65 @@ function moveinput!(
     R̂y::Vector{<:Real} = repeat(ry, mpc.Hp),
     D̂ ::Vector{<:Real} = repeat(d,  mpc.Hp),
     ym::Union{Vector{<:Real}, Nothing} = nothing
-)
+)   
+    validate_setpointdist(mpc, ry, d, R̂y, D̂)
     getestimates!(mpc, mpc.estim, ym, d)
     predictstoch!(mpc, mpc.estim, d, ym)
-    p = initpred!(mpc, mpc.estim.model, d, D̂, R̂y)
+    initpred!(mpc, mpc.estim.model, d, D̂, R̂y)
     linconstraint!(mpc, mpc.estim.model)
-    ΔŨ, _ = optim_objective!(mpc, p)
+    ΔŨ = optim_objective!(mpc)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
     u = mpc.estim.lastu0 + mpc.estim.model.uop + Δu
     return u
+end
+
+#=
+
+
+"Include the additional information about the optimum to ease troubleshooting."
+mutable struct OptimInfo
+    ΔŨ::Vector{Float64}
+    ϵ ::Float64
+    J ::Float64
+    u ::Vector{Float64}
+    U ::Vector{Float64}
+    ŷ ::Vector{Float64}
+    Ŷ ::Vector{Float64}
+    ŷs::Vector{Float64}
+    Ŷs::Vector{Float64}
+end
+=#
+
+#=
+function write_info!(mpc::LinMPC, ΔŨ, J, ŷs, Ŷs)
+    mpc.info.ΔŨ = ΔŨ
+    mpc.info.ϵ = isinf(mpc.C) ? NaN : ΔŨ[end]
+    mpc.info.J = J
+    mpc.info.U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + mpc.estim.model.uop)
+    mpc.info.u = mpc.info.U[1:mpc.estim.model.nu]
+    mpc.info.ŷ = mpc.ŷ
+    mpc.info.Ŷ = mpc.Ẽ*ΔŨ + mpc.F
+    mpc.info.ŷs, mpc.info.Ŷs = ŷs, Ŷs
+end
+=#
+
+function getinfo(mpc::PredictiveController)
+    sol_summary = solution_summary(mpc.optim) 
+    info = Dict{Symbol, InfoDictType}()
+    info[:ΔU]  = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
+    info[:ϵ]   = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
+    info[:J]   = objective_value(mpc.optim) + mpc.p[begin]
+    info[:U]   = mpc.S̃_Hp*mpc.ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + mpc.estim.model.uop)
+    info[:u]   = info[:U][1:mpc.estim.model.nu]
+    info[:d]   = mpc.d
+    info[:D̂]   = mpc.D̂
+    info[:ŷ]   = mpc.ŷ
+    info[:Ŷ]   = predict(mpc, mpc.estim.model, mpc.ΔŨ)
+    info[:Ŷs]  = mpc.Ŷs
+    info[:Ŷd]  = info[:Ŷ] - info[:Ŷs]
+    info[:R̂y]  = mpc.R̂y
+    info[:R̂u]  = mpc.R̂u
+    return info, sol_summary
 end
 
 """
@@ -285,6 +337,13 @@ Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
 updatestate!(mpc::PredictiveController, u, ym, d=Float64[]) = updatestate!(mpc.estim,u,ym,d)
 
+function validate_setpointdist(mpc::PredictiveController, ry, d, R̂y, D̂)
+    ny, nd, Hp = mpc.estim.model.ny, mpc.estim.model.nd, mpc.Hp
+    size(ry) ≠ (ny,)    && error("ry size $(size(ry)) ≠ output size ($ny,)")
+    size(d)  ≠ (nd,)    && error("d size $(size(d)) ≠ measured dist. size ($nd,)")
+    size(R̂y) ≠ (ny*Hp,) && error("R̂y size $(size(R̂y)) ≠ output size × Hp ($(ny*Hp),)")
+    size(D̂)  ≠ (nd*Hp,) && error("D̂ size $(size(D̂)) ≠ measured dist. size × Hp ($(nd*Hp),)")
+end
 
 """
     getestimates!(mpc::PredictiveController, estim::StateEstimator)
@@ -355,14 +414,14 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y)
     mpc.R̂y[:] = R̂y
     Ẑ = mpc.F - R̂y
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
-    p = Ẑ'*mpc.M_Hp*Ẑ
+    mpc.p[:] = [Ẑ'*mpc.M_Hp*Ẑ]
     if ~isempty(mpc.R̂u)
         lastu = mpc.estim.lastu0 + model.uop
         V̂ = mpc.T_Hp*lastu - mpc.R̂u
-        mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.T_Hp)'*V̂
-        p += V̂'*mpc.L_Hp*V̂
+        mpc.q̃[:] += 2(mpc.L_Hp*mpc.T_Hp)'*V̂
+        mpc.p[:] += [V̂'*mpc.L_Hp*V̂]
     end
-    return p
+    return nothing
 end
 
 @doc raw"""
@@ -378,8 +437,7 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y)
         mpc.d[:], mpc.D̂[:] = d, D̂
     end
     mpc.R̂y[:] = R̂y
-    p = 0.0 # only used for LinModel objects
-    return p
+    return nothing
 end
 
 """
@@ -448,7 +506,7 @@ end
 
 Optimize the objective function ``J`` of `mpc` controller. 
 """
-function optim_objective!(mpc::PredictiveController, p)
+function optim_objective!(mpc::PredictiveController)
     optim = mpc.optim
     model = mpc.estim.model
     ΔŨvar::Vector{VariableRef} = optim[:ΔŨvar]
@@ -476,8 +534,7 @@ function optim_objective!(mpc::PredictiveController, p)
         @debug solution_summary(optim)
     end
     mpc.ΔŨ[:] = isfatal(status) ? ΔŨ0 : value.(ΔŨvar) # fatal status : use last value
-    J_val = objective_value(optim) + p # add LinModel p constant (p=0 for NonLinModel) 
-    return mpc.ΔŨ, J_val
+    return mpc.ΔŨ
 end
 
 "By default, no change to the objective function."
@@ -653,14 +710,16 @@ useless at optimization but required to evaluate the minimal ``J`` value.
 """
 function init_quadprog(::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
     P̃ = 2*Hermitian(Ẽ'*M_Hp*Ẽ + N_Hc + S_Hp'*L_Hp*S_Hp)
-    q̃ = zeros(size(P̃, 1)) # dummy value (updated just before optimization)
-    return P̃, q̃
+    q̃ = zeros(size(P̃, 1))   # dummy value (updated just before optimization)
+    p = zeros(1)            # dummy value (updated just before optimization)
+    return P̃, q̃, p
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
 function init_quadprog(::SimModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
     P̃ = Hermitian(zeros(0, 0))
     q̃ = zeros(0)
-    return P̃, q̃
+    p = zeros(1)            # dummy value (updated just before optimization)
+    return P̃, q̃, p
 end
 
 "Return the quadratic programming objective function, see [`init_quadprog`](@ref)."

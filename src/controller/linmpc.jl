@@ -26,6 +26,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     Q ::Matrix{Float64}
     P̃ ::Hermitian{Float64, Matrix{Float64}}
     q̃ ::Vector{Float64}
+    p ::Vector{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
     d::Vector{Float64}
@@ -47,7 +48,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
-        P̃, q̃ = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        P̃, q̃, p = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         d, D̂ = zeros(nd), zeros(nd*Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
@@ -59,7 +60,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 
-            Ẽ, F, G, J, Kd, Q, P̃, q̃,
+            Ẽ, F, G, J, Kd, Q, P̃, q̃, p,
             Ks, Ps,
             d, D̂,
             Yop, Dop,
