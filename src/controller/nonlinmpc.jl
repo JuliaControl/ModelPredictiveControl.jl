@@ -1,4 +1,4 @@
-struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
+struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
     estim::S
     optim::JuMP.Model
     con::ControllerConstraint
@@ -14,7 +14,7 @@ struct NonLinMPC{S<:StateEstimator, JEFunc<:Function} <: PredictiveController
     L_Hp::Diagonal{Float64, Vector{Float64}}
     C::Float64
     E::Float64
-    JE::JEFunc
+    JE::JEfunc
     R̂u::Vector{Float64}
     R̂y::Vector{Float64}
     S̃_Hp::Matrix{Bool}
@@ -220,19 +220,19 @@ function init_optimization!(mpc::NonLinMPC)
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- nonlinear optimization init ---
     model = mpc.estim.model
-    ncon = length(mpc.con.Ŷmin) + length(mpc.con.Ŷmax)
+    nC = length(mpc.con.Ŷmin) + length(mpc.con.Ŷmax)
     nŶ = mpc.Hp*mpc.estim.model.ny
-    Jfunc, Cfunc = let mpc=mpc, model=model, nvar=nvar, ncon=ncon, nŶ=nŶ
+    Jfunc, Cfunc = let mpc=mpc, model=model, nvar=nvar, ncon=nC, nŶ=nŶ
         # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-functions-with-vector-outputs
         last_ΔŨtup = nothing
         Ŷ::Vector{Float64} = zeros(nŶ)
         C::Vector{Float64} = zeros(ncon)
         last_dΔŨtup = nothing
-        dŶ = nothing
-        dC = nothing
+        dŶ = zeros(nŶ)
+        dC = zeros(ncon)
         function Jfunc(ΔŨtup::Float64...)
             ΔŨ = collect(ΔŨtup)
-            if ΔŨtup !== last_ΔŨtup
+            if ΔŨtup ≠ last_ΔŨtup
                 Ŷ = predict(mpc, model, ΔŨ)
                 C = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
                 last_ΔŨtup = ΔŨtup
@@ -331,8 +331,8 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{T}) 
     # --- output setpoint tracking term ---
     êy = mpc.R̂y - Ŷ
     JR̂y = êy'*mpc.M_Hp*êy  
-    # --- move suppression term ---
-    JΔŨ = ΔŨ'*mpc.Ñ_Hc*ΔŨ 
+    # --- move suppression and slack variable term ---
+    JΔŨ = ΔŨ'*mpc.Ñ_Hc*ΔŨ
     # --- input over prediction horizon ---
     if !isempty(mpc.R̂u) || !iszero(mpc.E)
         U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
@@ -344,8 +344,6 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{T}) 
     else
         JR̂u = 0.0
     end
-    # --- slack variable term ---
-    Jϵ = !isinf(mpc.C) ? mpc.C*ΔŨ[end] : 0.0
     # --- economic term ---
     if !iszero(mpc.E)
         UE = [U; U[(end - model.nu + 1):end]]
@@ -355,7 +353,7 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{T}) 
     else
         E_JE = 0.0
     end
-    return JR̂y + JΔŨ + JR̂u + Jϵ + E_JE
+    return JR̂y + JΔŨ + JR̂u + E_JE
 end
 
 

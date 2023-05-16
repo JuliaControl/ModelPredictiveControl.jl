@@ -466,9 +466,9 @@ function predict(mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) w
     x̂d::Vector{T} = copy(mpc.x̂d)
     d0 = mpc.d - dop
     for j=1:Hp
-        u0[:] = U0[(1 + nu*(j-1)):(nu*j)]
+        u0[:] = @views U0[(1 + nu*(j-1)):(nu*j)]
         x̂d[:] = f(model, x̂d, u0, d0)
-        d0[:] = mpc.D̂[(1 + nd*(j-1)):(nd*j)] - dop
+        d0[:] = @views mpc.D̂[(1 + nd*(j-1)):(nd*j)] - dop
         Ŷd[(1 + ny*(j-1)):(ny*j)] = h(model, x̂d, d0) + yop
     end
     return Ŷd + mpc.Ŷs
