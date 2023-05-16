@@ -76,9 +76,10 @@ end
     @test mpc1.estim.x̂ ≈ [1,2,3,4]
 end
 
-
 @testset "NonLinMPC construction" begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
+    nmpc0 = NonLinMPC(linmodel1, Hp=15)
+    @test isa(nmpc0.estim, SteadyKalmanFilter)
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Du*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)

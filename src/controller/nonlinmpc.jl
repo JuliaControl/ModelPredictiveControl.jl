@@ -105,8 +105,10 @@ since ``H_c ≤ H_p`` implies that ``\mathbf{u}(k+H_p) = \mathbf{u}(k+H_p-1)``. 
 !!! tip
     Replace any of the 3 arguments with `_` if not needed (see `JE` default value below).
 
-This method uses the default state estimator, an [`UnscentedKalmanFilter`](@ref) with 
-default arguments. 
+This method uses the default state estimator :
+
+- if `model` is a [`LinModel`](@ref), a [`SteadyKalmanFilter`](@ref) with default arguments;
+- else, an [`UnscentedKalmanFilter`](@ref) with default arguments. 
 
 !!! warning
     See Extended Help if you get an error like `MethodError: no method matching 
@@ -152,6 +154,7 @@ and `h` functions must be compatible with this feature. See [Automatic different
 for common mistakes when writing these functions.
 """
 NonLinMPC(model::SimModel; kwargs...) = NonLinMPC(UnscentedKalmanFilter(model); kwargs...)
+NonLinMPC(model::LinModel; kwargs...) = NonLinMPC(SteadyKalmanFilter(model); kwargs...)
 
 
 """
