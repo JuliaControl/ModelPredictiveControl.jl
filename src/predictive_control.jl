@@ -266,7 +266,7 @@ end
 @doc raw"""
     getinfo(mpc::PredictiveController)
 
-Get additional information about `mpc` controller optimum.
+Get additional information about `mpc` controller optimum to ease troubleshooting.
 
 Return the dictionary `info` with the additional information, and `sol_summary`, the
 optimizer solution summary that can be printed. The dictionary `info` has the following 
@@ -280,8 +280,8 @@ fields:
 - `:d`  : current measured disturbance ``(\mathbf{d})``
 - `:D̂`  : predicted measured disturbances over `Hp` ``(\mathbf{D̂})``
 - `:ŷ`  : current estimated output ``(\mathbf{ŷ})``
-- `:Ŷ`  : predicted outputs over `Hp` ``(\mathbf{Ŷ = Ŷ_d + Ŷ_s})``
-- `:Ŷd` : predicted deterministic output over `Hp` ``(\mathbf{Ŷ_d})``
+- `:Ŷ`  : optimal predicted outputs over `Hp` ``(\mathbf{Ŷ = Ŷ_d + Ŷ_s})``
+- `:Ŷd` : optimal predicted deterministic output over `Hp` ``(\mathbf{Ŷ_d})``
 - `:Ŷs` : predicted stochastic output over `Hp` ``(\mathbf{Ŷ_s})``
 - `:R̂y` : predicted output setpoint over `Hp` ``(\mathbf{R̂_y})``
 - `:R̂u` : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
