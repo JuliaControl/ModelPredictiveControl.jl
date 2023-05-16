@@ -1,3 +1,5 @@
+const DiffCacheType = DiffCache{Vector{Float64}, Vector{Float64}}
+
 struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
     estim::S
     optim::JuMP.Model
@@ -220,66 +222,73 @@ function init_optimization!(mpc::NonLinMPC)
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- nonlinear optimization init ---
     model = mpc.estim.model
-    nC = length(mpc.con.Ŷmin) + length(mpc.con.Ŷmax)
-    nŶ = mpc.Hp*mpc.estim.model.ny
-    Jfunc, Cfunc = let mpc=mpc, model=model, nvar=nvar, ncon=nC, nŶ=nŶ
-        # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-functions-with-vector-outputs
-        last_ΔŨtup = nothing
-        Ŷ::Vector{Float64} = zeros(nŶ)
-        C::Vector{Float64} = zeros(ncon)
-        last_dΔŨtup = nothing
-        dŶ = zeros(nŶ)
-        dC = zeros(ncon)
+    ny, nu, Hp, Hc = model.ny, model.nu, mpc.Hp, mpc.Hc
+    nC = (2*Hc*nu + 2*Hc*nu + 2*Hp*ny + 2) - length(mpc.con.b)
+    # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-functions-with-vector-outputs
+    Jfunc, Cfunc = let mpc=mpc, model=model, nC=nC, nŶ=Hp*ny
+        last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
+        Ŷ_cache::DiffCacheType = DiffCache(zeros(nŶ))
+        C_cache::DiffCacheType = DiffCache(zeros(nC))
         function Jfunc(ΔŨtup::Float64...)
+            Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
             ΔŨ = collect(ΔŨtup)
-            if ΔŨtup ≠ last_ΔŨtup
-                Ŷ = predict(mpc, model, ΔŨ)
-                C = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
-                last_ΔŨtup = ΔŨtup
+            if ΔŨtup != last_ΔŨtup_float
+                C = get_tmp(C_cache, ΔŨtup[1])
+                Ŷ[:] = predict(mpc, model, ΔŨ)
+                C[:] = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
+                last_ΔŨtup_float = ΔŨtup
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
         end
-        function Jfunc(dΔŨtup::T...) where {T<:Real}
-            dΔŨ = collect(dΔŨtup)
-            if dΔŨtup !== last_dΔŨtup
-                dŶ = predict(mpc, model, dΔŨ)
-                dC = con_nonlinprog(mpc, model, dŶ, dΔŨ)
-                last_dΔŨtup = dΔŨtup
+        function Jfunc(ΔŨtup::Real...)
+            Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
+            ΔŨ = collect(ΔŨtup)
+            if ΔŨtup != last_ΔŨtup_dual
+                C = get_tmp(C_cache, ΔŨtup[1])
+                Ŷ[:] = predict(mpc, model, ΔŨ)
+                C[:] = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
+                last_ΔŨtup_dual = ΔŨtup
             end
-            return obj_nonlinprog(mpc, model, dŶ, dΔŨ)
+            return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
         end
         function con_nonlinprog_i(i, ΔŨtup::NTuple{N, Float64}) where {N}
-            if ΔŨtup ≠ last_ΔŨtup
+            C = get_tmp(C_cache, ΔŨtup[1])
+            if ΔŨtup != last_ΔŨtup_float
+                Ŷ = get_tmp(Ŷ_cache, ΔŨtup_1)
                 ΔŨ = collect(ΔŨtup)
-                Ŷ = predict(mpc, model, ΔŨ)
-                C = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
-                last_ΔŨtup = ΔŨtup
+                Ŷ[:] = predict(mpc, model, ΔŨ)
+                C[:] = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
+                last_ΔŨtup_float = ΔŨtup
             end
             return C[i]
         end
-        function con_nonlinprog_i(i, dΔŨtup::NTuple{N, T}) where {N, T<:Real}
-            if dΔŨtup !== last_dΔŨtup
-                dΔŨ = collect(dΔŨtup)
-                dŶ = predict(mpc, model, dΔŨ)
-                dC = con_nonlinprog(mpc, model, dŶ, dΔŨ)
-                last_dΔŨtup = dΔŨtup
+        function con_nonlinprog_i(i, ΔŨtup::NTuple{N, Real}) where {N}
+            C = get_tmp(C_cache, ΔŨtup[1])
+            if ΔŨtup != last_ΔŨtup_dual
+                Ŷ = get_tmp(Ŷ_cache, ΔŨtup_1)
+                ΔŨ = collect(ΔŨtup)
+                Ŷ[:] = predict(mpc, model, ΔŨ)
+                C[:] = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
+                last_ΔŨtup_dual = ΔŨtup
             end
-            return dC[i]
+            return C[i]
         end
-        Cfunc = [(ΔŨ...) -> con_nonlinprog_i(i, ΔŨ) for i in 1:ncon]
+        Cfunc = [(ΔŨ...) -> con_nonlinprog_i(i, ΔŨ) for i in 1:nC]
         (Jfunc, Cfunc)
     end
     register(optim, :Jfunc, nvar, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(ΔŨvar...))
-    n = 0
-    for i in eachindex(con.Ŷmin)
-        sym = Symbol("C_Ŷmin_$i")
-        register(optim, sym, nvar, Cfunc[n + i], autodiff=true)
-    end
-    n = lastindex(con.Ŷmin)
-    for i in eachindex(con.Ŷmax)
-        sym = Symbol("C_Ŷmax_$i")
-        register(optim, sym, nvar, Cfunc[n + i], autodiff=true)
+    if nC ≠ 0
+        n = 0
+        for i in eachindex(con.Ŷmin)
+            sym = Symbol("C_Ŷmin_$i")
+            register(optim, sym, nvar, Cfunc[n + i], autodiff=true)
+        end
+        n = lastindex(con.Ŷmin)
+        for i in eachindex(con.Ŷmax)
+            sym = Symbol("C_Ŷmax_$i")
+            register(optim, sym, nvar, Cfunc[n + i], autodiff=true)
+        end
     end
     return nothing
 end

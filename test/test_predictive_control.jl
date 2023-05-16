@@ -124,7 +124,6 @@ end
     setconstraint!(nmpc, c_Δumin=[0.05,0.15], c_Δumax=[0.25,0.35])
     @test all((-nmpc.con.A_ΔŨmin[1:end-1, end], -nmpc.con.A_ΔŨmax[1:end-1, end]) .≈ ([0.05,0.15], [0.25,0.35]))
     setconstraint!(nmpc, c_ŷmin=[1.0,1.1], c_ŷmax=[1.2,1.3])
-    println(nmpc.con.A_Ŷmin)
     @test all((-nmpc.con.A_Ŷmin, -nmpc.con.A_Ŷmax) .≈ (zeros(0,3), zeros(0,3)))
     @test all((nmpc.con.c_Ŷmin, nmpc.con.c_Ŷmax) .≈ ([1.0,1.1], [1.2,1.3]))
 end

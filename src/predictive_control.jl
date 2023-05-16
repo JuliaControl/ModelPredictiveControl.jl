@@ -748,7 +748,7 @@ function init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
     c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ŷmin, c_Ŷmax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ŷmin, c_ŷmax)
     A_Umin, A_Umax, S̃_Hp = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
-    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C,c_ΔUmin,c_ΔUmax,ΔUmin,ΔUmax,N_Hc)
+    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     A_Ŷmin, A_Ŷmax, Ẽ = relaxŶ(model, C, c_Ŷmin, c_Ŷmax, E)
     i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
@@ -881,8 +881,8 @@ function relaxŶ(::LinModel, C, c_Ŷmin, c_Ŷmax, E)
     return A_Ŷmin, A_Ŷmax, Ẽ
 end
 
-"Return empty matrices if model is a [`NonLinModel`](@ref)"
-function relaxŶ(::NonLinModel, C, c_Ŷmin, c_Ŷmax, E)
+"Return empty matrices if model is not a [`LinModel`](@ref)"
+function relaxŶ(::SimModel, C, c_Ŷmin, c_Ŷmax, E)
     Ẽ = !isinf(C) ? [E zeros(0, 1)] : E
     A_Ŷmin, A_Ŷmax = Ẽ, Ẽ 
     return A_Ŷmin, A_Ŷmax, Ẽ

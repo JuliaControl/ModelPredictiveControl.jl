@@ -5,7 +5,9 @@ using PrecompileTools
 using LinearAlgebra
 using ControlSystemsBase
 using JuMP
+using PreallocationTools
 import OSQP, Ipopt
+
 
 export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput
 export StateEstimator, InternalModel
