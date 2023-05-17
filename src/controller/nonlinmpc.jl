@@ -228,10 +228,10 @@ function init_optimization!(mpc::NonLinMPC)
     ny, nu, Hp, Hc = model.ny, model.nu, mpc.Hp, mpc.Hc
     nC = (2*Hc*nu + 2*Hc*nu + 2*Hp*ny + 2) - length(mpc.con.b)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-functions-with-vector-outputs
-    Jfunc, Cfunc = let mpc=mpc, model=model, nC=nC, nŶ=Hp*ny
+    Jfunc, Cfunc = let mpc=mpc, model=model, nC=nC, nvar=nvar , nŶ=Hp*ny
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
-        Ŷ_cache::DiffCacheType = DiffCache(zeros(nŶ))
-        C_cache::DiffCacheType = DiffCache(zeros(nC))
+        Ŷ_cache::DiffCacheType = DiffCache(zeros(nŶ), nvar)
+        C_cache::DiffCacheType = DiffCache(zeros(nC), nvar)
         function Jfunc(ΔŨtup::Float64...)
             Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
             ΔŨ = collect(ΔŨtup)
