@@ -315,6 +315,39 @@ function getinfo(mpc::PredictiveController)
     return info, sol_summary
 end
 
+function sim(
+    mpc::PredictiveController, 
+    N::Int = mpc.Hp + 10,
+    ry = mpc.estim.model.yop .+ 1,
+    d  = mpc.estim.model.dop;
+    plant::SimModel = mpc.estim.model,
+    u_step  = zeros(plant.nu),
+    u_noise = zeros(plant.nu),
+    y_step  = zeros(plant.ny),
+    y_noise = zeros(plant.ny),
+    d_step  = zeros(plant.nd),
+    d_noise = zeros(plant.nd),
+    lastu = plant.uop,
+    x0    = plant.x,
+    x̂0    = nothing,
+)
+    model = mpc.estim.model
+    model.Ts ≈ plant.Ts || error("Sampling time Ts of mpc and plant must be equal")
+    setstate!(plant, x0)
+    if isnothing(x̂0)
+        initstate!(mpc, lastu, plant(), d)
+    end
+    ry_data = Matrix{Float64}(undef, plant.ny, N)
+    u_data  = Matrix{Float64}(undef, plant.nu, N)
+    y_data  = Matrix{Float64}(undef, plant.ny, N)
+    d_data  = Matrix{Float64}(undef, plant.nd, N)
+    t_data  = plant.Ts*(0:(N-1))
+    for i=1:N
+    end
+    return nothing
+end
+
+
 """
     setstate!(mpc::PredictiveController, x̂)
 

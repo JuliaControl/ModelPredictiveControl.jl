@@ -151,7 +151,6 @@ test_mpc(linModel4, mpc)
 
 test_mpc(linModel4, nmpc)
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
-@profview test_mpc(linModel4, nmpc)
 
 test_mpc(nonLinModel2, nmpc2)
 @time u_data, y_data, r_data, d_data = test_mpc(nonLinModel2, nmpc2)
