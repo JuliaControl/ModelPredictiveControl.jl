@@ -333,18 +333,46 @@ function sim(
 )
     model = mpc.estim.model
     model.Ts ≈ plant.Ts || error("Sampling time Ts of mpc and plant must be equal")
+    T_data  = collect(plant.Ts*(0:(N-1)))
+    Y_data  = Matrix{Float64}(undef, plant.ny, N)
+    Ŷ_data  = Matrix{Float64}(undef, model.ny, N)
+    Ry_data = Matrix{Float64}(undef, plant.ny, N)
+    U_data  = Matrix{Float64}(undef, plant.nu, N)
+    Ru_data = Matrix{Float64}(undef, plant.nu, N)
+    D_data  = Matrix{Float64}(undef, plant.nd, N)
+    X_data  = Matrix{Float64}(undef, plant.nx, N) 
+    X̂_data  = Matrix{Float64}(undef, mpc.estim.nx̂, N) 
     setstate!(plant, x0)
     if isnothing(x̂0)
-        initstate!(mpc, lastu, plant(), d)
+        initstate!(mpc, lastu, plant(d), d)
+    else
+        setstate!(mpc, x̂0)
     end
-    ry_data = Matrix{Float64}(undef, plant.ny, N)
-    u_data  = Matrix{Float64}(undef, plant.nu, N)
-    y_data  = Matrix{Float64}(undef, plant.ny, N)
-    d_data  = Matrix{Float64}(undef, plant.nd, N)
-    t_data  = plant.Ts*(0:(N-1))
+    lastd = d
+    ru = !isempty(mpc.R̂u) ? mpc.R̂u[:, begin] : fill(NaN, plant.nu)
+    x = plant.x
+    x̂ = mpc.estim.x̂
     for i=1:N
+        d = lastd + d_step + d_noise.*randn(plant.nd)
+        y = plant(d) + y_step + y_noise.*randn(plant.ny)
+        ym = y[mpc.estim.i_ym]
+        u  = moveinput!(mpc, ry, d; ym)
+        up = u + u_step + u_noise.*randn(plant.nu)
+        Y_data[:, i] = y
+        Ŷ_data[:, i] = mpc.ŷ
+        Ry_data[:, i] = ry
+        U_data[:, i] = u
+        Ru_data[:, i] = ru
+        D_data[:, i] = d
+        X_data[:, i] = x
+        X̂_data[:, i] = x̂
+        x = updatestate!(plant, up, d)
+        x̂ = updatestate!(mpc, u, ym, d)
     end
-    return nothing
+    res = SimResult(
+        T_data, Y_data, Ry_data, Ŷ_data, U_data, Ru_data, D_data, X_data, X̂_data
+    )
+    return res
 end
 
 
