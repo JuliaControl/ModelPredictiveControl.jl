@@ -318,15 +318,15 @@ end
 function sim(
     mpc::PredictiveController, 
     N::Int = mpc.Hp + 10,
-    ry = mpc.estim.model.yop .+ 1,
-    d  = mpc.estim.model.dop;
+    ry::Vector{<:Real} = mpc.estim.model.yop .+ 1,
+    d:: Vector{<:Real} = mpc.estim.model.dop;
+    u_step ::Vector{<:Real} = zeros(mpc.estim.model.nu),
+    u_noise::Vector{<:Real} = zeros(mpc.estim.model.nu),
+    y_step ::Vector{<:Real} = zeros(mpc.estim.model.ny),
+    y_noise::Vector{<:Real} = zeros(mpc.estim.model.ny),
+    d_step ::Vector{<:Real} = zeros(mpc.estim.model.nd),
+    d_noise::Vector{<:Real} = zeros(mpc.estim.model.nd),
     plant::SimModel = mpc.estim.model,
-    u_step  = zeros(plant.nu),
-    u_noise = zeros(plant.nu),
-    y_step  = zeros(plant.ny),
-    y_noise = zeros(plant.ny),
-    d_step  = zeros(plant.nd),
-    d_noise = zeros(plant.nd),
     lastu = plant.uop,
     x0    = plant.x,
     x̂0    = nothing,
@@ -370,7 +370,7 @@ function sim(
         x̂ = updatestate!(mpc, u, ym, d)
     end
     res = SimResult(
-        T_data, Y_data, Ry_data, Ŷ_data, U_data, Ru_data, D_data, X_data, X̂_data
+        mpc, T_data, Y_data, Ry_data, Ŷ_data, U_data, Ru_data, D_data, X_data, X̂_data
     )
     return res
 end

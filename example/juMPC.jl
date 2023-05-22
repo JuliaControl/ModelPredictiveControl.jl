@@ -146,11 +146,20 @@ function test_mpc(model, mpc)
     return u_data, y_data, r_data, d_data
 end
 
+using PlotThemes, Plots
+#theme(:default)
+theme(:dark)
+default(fontfamily="Computer Modern"); scalefontsizes(1.1)
+
 test_mpc(linModel4, mpc)
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 
-res =  sim(mpc)
 
+res =  sim(mpc, x0=zeros(mpc.estim.model.nx))
+ps = plot(res)
+display(ps)
+
+#=
 test_mpc(linModel4, nmpc)
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
 
@@ -158,11 +167,8 @@ test_mpc(nonLinModel2, nmpc2)
 @time u_data, y_data, r_data, d_data = test_mpc(nonLinModel2, nmpc2)
 
 
-using PlotThemes, Plots
-#theme(:default)
-theme(:dark)
-default(fontfamily="Computer Modern"); scalefontsizes(1.1)
-N = size(r_data, 2)
+
+N = size(r_data, 2) 
 p1 = plot(0:N-1,y_data[1,:],label=raw"$y_1$")
 plot!(0:N-1,r_data[1,:],label=raw"$r_1$",linestyle=:dash, linetype=:steppost)
 p2 = plot(0:N-1,y_data[2,:],label=raw"$y_2$")
@@ -178,3 +184,5 @@ pd = plot(0:N-1,d_data[1,:],label=raw"$d_1$")
 display(pd)
 display(pu)
 display(py)
+
+=#

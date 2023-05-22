@@ -3,6 +3,7 @@ module ModelPredictiveControl
 using PrecompileTools
 
 using LinearAlgebra
+using RecipesBase
 using ControlSystemsBase
 using JuMP
 using PreallocationTools
@@ -15,10 +16,10 @@ export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter
 export initstate!
 export PredictiveController, LinMPC, NonLinMPC, setconstraint!, moveinput!, getinfo, sim
 
-include("plots.jl")
 include("sim_model.jl")
 include("state_estim.jl")
 include("predictive_control.jl")
+include("plots.jl")
 
 @setup_workload begin
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the
