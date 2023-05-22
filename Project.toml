@@ -20,6 +20,7 @@ JuMP = "1"
 OSQP = "0.8"
 PreallocationTools = "0.4"
 PrecompileTools = "1"
+RecipesBase = "1"
 julia = "1.6"
 
 [extras]
