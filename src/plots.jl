@@ -19,6 +19,7 @@ end
     plotŶ           = false,
     plotRu          = true,
     plotUminUmax    = true,
+    plotD           = true
 )
 
     mpc = res.mpc
@@ -34,7 +35,7 @@ end
     nd = size(res.D_data, 1)
 
 
-    layout := @layout nd ≠ 0 ? [(ny,1) (nu,1) (nd, 1)] : [(ny,1) (nu,1)]
+    layout := @layout (nd ≠ 0 && plotD) ? [(ny,1) (nu,1) (nd, 1)] : [(ny,1) (nu,1)]
 
     # these are common to both marginal histograms
     #fillcolor := :black
@@ -144,14 +145,16 @@ end
         end
     end
     subplot_base += nu
-    for i in 1:nd
-        @series begin
-            xguide  --> "Time (s)"
-            yguide  --> "\$d_$i\$"
-            color   --> 1
-            subplot --> subplot_base + i
-            label   --> ""
-            t, res.D_data[i, :]
+    if plotD
+        for i in 1:nd
+            @series begin
+                xguide  --> "Time (s)"
+                yguide  --> "\$d_$i\$"
+                color   --> 1
+                subplot --> subplot_base + i
+                label   --> ""
+                t, res.D_data[i, :]
+            end
         end
     end
 end

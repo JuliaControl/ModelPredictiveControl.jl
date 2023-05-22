@@ -156,7 +156,7 @@ test_mpc(linModel4, mpc)
 
 
 res =  sim(mpc, x0=zeros(mpc.estim.model.nx))
-ps = plot(res)
+ps = plot(res, plotD=false, plotŶminŶmax=false, plotUminUmax=false)
 display(ps)
 
 #=
