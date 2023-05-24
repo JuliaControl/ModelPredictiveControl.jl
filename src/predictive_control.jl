@@ -315,11 +315,11 @@ function getinfo(mpc::PredictiveController)
     return info, sol_summary
 end
 
-function sim(
+function sim!(
     mpc::PredictiveController, 
     N::Int = mpc.Hp + 10,
     ry::Vector{<:Real} = mpc.estim.model.yop .+ 1,
-    d:: Vector{<:Real} = mpc.estim.model.dop;
+    d ::Vector{<:Real} = mpc.estim.model.dop;
     u_step ::Vector{<:Real} = zeros(mpc.estim.model.nu),
     u_noise::Vector{<:Real} = zeros(mpc.estim.model.nu),
     y_step ::Vector{<:Real} = zeros(mpc.estim.model.ny),
@@ -331,8 +331,10 @@ function sim(
     x0    = plant.x,
     x̂0    = nothing,
 )
-    model = mpc.estim.model
+    model, i_ym = mpc.estim.model, mpc.estim.i_ym
     model.Ts ≈ plant.Ts || error("Sampling time Ts of mpc and plant must be equal")
+    old_x0 = copy(plant.x)
+    old_x̂0 = copy(mpc.estim.x̂)
     T_data  = collect(plant.Ts*(0:(N-1)))
     Y_data  = Matrix{Float64}(undef, plant.ny, N)
     Ŷ_data  = Matrix{Float64}(undef, model.ny, N)
@@ -341,37 +343,36 @@ function sim(
     Ru_data = Matrix{Float64}(undef, plant.nu, N)
     D_data  = Matrix{Float64}(undef, plant.nd, N)
     X_data  = Matrix{Float64}(undef, plant.nx, N) 
-    X̂_data  = Matrix{Float64}(undef, mpc.estim.nx̂, N) 
+    X̂_data  = Matrix{Float64}(undef, mpc.estim.nx̂, N)
     setstate!(plant, x0)
+    lastd, lasty = d, evaloutput(plant, d)
     if isnothing(x̂0)
-        initstate!(mpc, lastu, plant(d), d)
+        initstate!(mpc, lastu, lasty[i_ym], lastd)
     else
         setstate!(mpc, x̂0)
     end
-    lastd = d
     ru = !isempty(mpc.R̂u) ? mpc.R̂u[:, begin] : fill(NaN, plant.nu)
-    x = plant.x
-    x̂ = mpc.estim.x̂
     for i=1:N
         d = lastd + d_step + d_noise.*randn(plant.nd)
-        y = plant(d) + y_step + y_noise.*randn(plant.ny)
-        ym = y[mpc.estim.i_ym]
-        u  = moveinput!(mpc, ry, d; ym)
+        y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
+        u  = moveinput!(mpc, ry, d; ym=y[i_ym])
         up = u + u_step + u_noise.*randn(plant.nu)
-        Y_data[:, i] = y
-        Ŷ_data[:, i] = mpc.ŷ
+        Y_data[:, i]  = y
+        Ŷ_data[:, i]  = mpc.ŷ
         Ry_data[:, i] = ry
-        U_data[:, i] = u
+        U_data[:, i]  = u
         Ru_data[:, i] = ru
-        D_data[:, i] = d
-        X_data[:, i] = x
-        X̂_data[:, i] = x̂
-        x = updatestate!(plant, up, d)
-        x̂ = updatestate!(mpc, u, ym, d)
+        D_data[:, i]  = d
+        X_data[:, i]  = plant.x
+        X̂_data[:, i]  = mpc.estim.x̂
+        updatestate!(plant, up, d)
+        updatestate!(mpc, u, y[i_ym], d)
     end
     res = SimResult(
         mpc, T_data, Y_data, Ry_data, Ŷ_data, U_data, Ru_data, D_data, X_data, X̂_data
     )
+    setstate!(plant, old_x0) 
+    setstate!(mpc, old_x̂0)
     return res
 end
 
