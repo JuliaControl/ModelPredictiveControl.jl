@@ -340,14 +340,14 @@ Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoi
 - `d_step  = zeros(plant.nd)` : step disturbance on measured dist. ``\mathbf{d}``
 - `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
 - `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``
-- `x̂0 = nothing` : `mpc.estim` state estimator initial state ``\mathbf{x̂}(0)``, if `nothing` 
-   [`initstate!(::PredictiveController)`](@ref) is used to init ``\mathbf{x̂}``.
-- `lastu = plant.uop` : last manipulated input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
+- `x̂0 = nothing` : `mpc.estim` state estimator initial state ``\mathbf{x̂}(0)``, if `nothing`
+   then ``\mathbf{x̂}`` is initialized with [`initstate!`](@ref)
+- `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
 
 """
 function sim(
     mpc::PredictiveController, 
-    N::Int = mpc.Hp + 10,
+    N ::Int = mpc.Hp + 10,
     ry::Vector{<:Real} = mpc.estim.model.yop .+ 1,
     d ::Vector{<:Real} = mpc.estim.model.dop;
     plant::SimModel = mpc.estim.model,
