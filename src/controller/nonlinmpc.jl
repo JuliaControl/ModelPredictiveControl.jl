@@ -301,7 +301,7 @@ end
 setnontlincon!(::NonLinMPC, ::LinModel) = nothing
 
 "Set the nonlinear constraints on the output predictions `Ŷ`."
-function setnonlincon!(mpc::NonLinMPC, model::NonLinModel)
+function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     optim = mpc.optim
     ΔŨvar = mpc.optim[:ΔŨvar]
     con = mpc.con

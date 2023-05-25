@@ -27,3 +27,9 @@ initstate!
 ```@docs
 setstate!
 ```
+
+## Quick Simulation
+
+```@docs
+sim
+```

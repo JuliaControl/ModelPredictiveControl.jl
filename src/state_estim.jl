@@ -267,3 +267,8 @@ end
 
 include("estimator/kalman.jl")
 include("estimator/internal_model.jl")
+
+"Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`."
+evalŷ(estim::InternalModel, ym, d) = evaloutput(estim,ym, d)
+"Other [`StateEstimator`](@ref) ignores `ym` to evaluate `ŷ`."
+evalŷ(estim::StateEstimator, _, d) = evaloutput(estim, d)

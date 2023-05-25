@@ -315,21 +315,51 @@ function getinfo(mpc::PredictiveController)
     return info, sol_summary
 end
 
-function sim!(
+@doc raw"""
+    sim(
+        mpc::PredictiveController, 
+        N  = mpc.Hp + 10, 
+        ry = mpc.estim.model.yop .+ 1, 
+        d  = mpc.estim.model.dop; 
+        <keyword arguments>
+    )
+
+Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
+
+# Arguments
+
+- `mpc::PredictiveController` : predictive controller to simulate
+- `N = mpc.Hp + 10` : simulation length in time steps
+- `ry = mpc.estim.model.yop .+ 1` : plant output setpoint ``\mathbf{r_y}`` value
+- `d = mpc.estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value
+- `plant::SimModel = mpc.estim.model` : simulated plant model
+- `u_step  = zeros(plant.nu)` : step disturbance on manipulated input ``\mathbf{u}``
+- `u_noise = zeros(plant.nu)` : additive gaussian noise on manipulated input ``\mathbf{u}``
+- `y_step  = zeros(plant.ny)` : step disturbance on plant outputs ``\mathbf{y}``
+- `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``
+- `d_step  = zeros(plant.nd)` : step disturbance on measured dist. ``\mathbf{d}``
+- `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
+- `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``
+- `x̂0 = nothing` : `mpc.estim` state estimator initial state ``\mathbf{x̂}(0)``, if `nothing` 
+   [`initstate!(::PredictiveController)`](@ref) is used to init ``\mathbf{x̂}``.
+- `lastu = plant.uop` : last manipulated input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
+
+"""
+function sim(
     mpc::PredictiveController, 
     N::Int = mpc.Hp + 10,
     ry::Vector{<:Real} = mpc.estim.model.yop .+ 1,
     d ::Vector{<:Real} = mpc.estim.model.dop;
-    u_step ::Vector{<:Real} = zeros(mpc.estim.model.nu),
-    u_noise::Vector{<:Real} = zeros(mpc.estim.model.nu),
-    y_step ::Vector{<:Real} = zeros(mpc.estim.model.ny),
-    y_noise::Vector{<:Real} = zeros(mpc.estim.model.ny),
-    d_step ::Vector{<:Real} = zeros(mpc.estim.model.nd),
-    d_noise::Vector{<:Real} = zeros(mpc.estim.model.nd),
     plant::SimModel = mpc.estim.model,
+    u_step ::Vector{<:Real} = zeros(plant.nu),
+    u_noise::Vector{<:Real} = zeros(plant.nu),
+    y_step ::Vector{<:Real} = zeros(plant.ny),
+    y_noise::Vector{<:Real} = zeros(plant.ny),
+    d_step ::Vector{<:Real} = zeros(plant.nd),
+    d_noise::Vector{<:Real} = zeros(plant.nd),
+    x0 = zeros(plant.nx),
+    x̂0 = nothing,
     lastu = plant.uop,
-    x0    = plant.x,
-    x̂0    = nothing,
 )
     model, i_ym = mpc.estim.model, mpc.estim.i_ym
     model.Ts ≈ plant.Ts || error("Sampling time Ts of mpc and plant must be equal")
@@ -355,10 +385,11 @@ function sim!(
     for i=1:N
         d = lastd + d_step + d_noise.*randn(plant.nd)
         y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
-        u  = moveinput!(mpc, ry, d; ym=y[i_ym])
+        ym = y[i_ym]
+        u  = moveinput!(mpc, ry, d; ym)
         up = u + u_step + u_noise.*randn(plant.nu)
         Y_data[:, i]  = y
-        Ŷ_data[:, i]  = mpc.ŷ
+        Ŷ_data[:, i]  = evalŷ(mpc.estim, ym, d)
         Ry_data[:, i] = ry
         U_data[:, i]  = u
         Ru_data[:, i] = ru
@@ -366,7 +397,7 @@ function sim!(
         X_data[:, i]  = plant.x
         X̂_data[:, i]  = mpc.estim.x̂
         updatestate!(plant, up, d)
-        updatestate!(mpc, u, y[i_ym], d)
+        updatestate!(mpc, u, ym, d)
     end
     res = SimResult(
         mpc, T_data, Y_data, Ry_data, Ŷ_data, U_data, Ru_data, D_data, X_data, X̂_data
@@ -415,11 +446,11 @@ end
 
 Get estimator output and split `x̂` into the deterministic `x̂d` and stochastic `x̂s` states.
 """
-function getestimates!(mpc::PredictiveController, estim::StateEstimator, _ , d)
+function getestimates!(mpc::PredictiveController, estim::StateEstimator, ym , d)
     nx = estim.model.nx
     mpc.x̂d[:] = estim.x̂[1:nx]
     mpc.x̂s[:] = estim.x̂[nx+1:end]
-    mpc.ŷ[:]  = evaloutput(estim, d)
+    mpc.ŷ[:]  = evalŷ(estim, ym, d)
     return mpc.x̂d, mpc.x̂s, mpc.ŷ
 end
 
@@ -433,7 +464,7 @@ function getestimates!(mpc::PredictiveController, estim::InternalModel, ym, d)
                            "outputs ym in keyword argument to compute control actions u")
     mpc.x̂d[:] = estim.x̂d
     mpc.x̂s[:] = estim.x̂s
-    mpc.ŷ[:]  = evaloutput(estim, ym, d)
+    mpc.ŷ[:]  = evalŷ(estim, ym, d)
     return mpc.x̂d, mpc.x̂s, mpc.ŷ
 end
 
@@ -604,11 +635,6 @@ end
 
 "By default, no change to the objective function."
 set_objective!(::PredictiveController, _ ) = nothing
-
-"Evaluate current output of `InternalModel` estimator."
-evalŷ!(estim::InternalModel, ym, d) = (mpc.ŷ[:] = estim(ym, d))
-"Evaluate current output of the other `StateEstimator`s."
-evalŷ!(estim::StateEstimator, _, d) = (mpc.ŷ[:] = estim(d))
 
 @doc raw"""
     init_ΔUtoU(nu, Hp, Hc, C, c_Umin, c_Umax)
