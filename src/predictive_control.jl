@@ -318,7 +318,7 @@ end
 @doc raw"""
     sim(
         mpc::PredictiveController, 
-        N  = mpc.Hp + 10, 
+        N::Int, 
         ry = mpc.estim.model.yop .+ 1, 
         d  = mpc.estim.model.dop; 
         <keyword arguments>
@@ -326,10 +326,14 @@ end
 
 Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
 
+See Arguments for the option list. The noise arguments are in standard deviations σ. The 
+sensor and process noises of the simulated plant are specified by `y_noise` and `x_noise` 
+arguments, respectively.
+
 # Arguments
 
 - `mpc::PredictiveController` : predictive controller to simulate
-- `N = mpc.Hp + 10` : simulation length in time steps
+- `N::Int` : simulation length in time steps
 - `ry = mpc.estim.model.yop .+ 1` : plant output setpoint ``\mathbf{r_y}`` value
 - `d = mpc.estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value
 - `plant::SimModel = mpc.estim.model` : simulated plant model
@@ -339,6 +343,7 @@ Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoi
 - `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``
 - `d_step  = zeros(plant.nd)` : step disturbance on measured dist. ``\mathbf{d}``
 - `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
+- `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``
 - `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``
 - `x̂0 = nothing` : `mpc.estim` state estimator initial state ``\mathbf{x̂}(0)``, if `nothing`
    then ``\mathbf{x̂}`` is initialized with [`initstate!`](@ref)
@@ -347,7 +352,7 @@ Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoi
 """
 function sim(
     mpc::PredictiveController, 
-    N ::Int = mpc.Hp + 10,
+    N::Int,
     ry::Vector{<:Real} = mpc.estim.model.yop .+ 1,
     d ::Vector{<:Real} = mpc.estim.model.dop;
     plant::SimModel = mpc.estim.model,
@@ -357,6 +362,7 @@ function sim(
     y_noise::Vector{<:Real} = zeros(plant.ny),
     d_step ::Vector{<:Real} = zeros(plant.nd),
     d_noise::Vector{<:Real} = zeros(plant.nd),
+    x_noise::Vector{<:Real} = zeros(plant.nx),
     x0 = zeros(plant.nx),
     x̂0 = nothing,
     lastu = plant.uop,
@@ -396,7 +402,8 @@ function sim(
         D_data[:, i]  = d
         X_data[:, i]  = plant.x
         X̂_data[:, i]  = mpc.estim.x̂
-        updatestate!(plant, up, d)
+        x = updatestate!(plant, up, d); 
+        x[:] += x_noise.*randn(plant.nx)
         updatestate!(mpc, u, ym, d)
     end
     res = SimResult(

@@ -187,7 +187,6 @@ function ĥ(estim::StateEstimator, x̂, d)
 end
 
 
-
 @doc raw"""
     initstate!(estim::StateEstimator, u, ym, d=Float64[])
 
