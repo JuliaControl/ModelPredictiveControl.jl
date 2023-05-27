@@ -51,7 +51,7 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 - ✅ custom predictions for:
   - ✅ output setpoints
   - ✅ measured disturbances
-- ⬜ easy integration with `Plots.jl`
+- ✅ easy integration with `Plots.jl`
 - ✅ optimization based on `JuMP.jl`:
   - ✅ quickly compare multiple optimizers
   - ✅ nonlinear solvers relying on automatic differentiation (exact derivative)
