@@ -151,13 +151,17 @@ using PlotThemes, Plots
 theme(:dark)
 default(fontfamily="Computer Modern"); scalefontsizes(1.1)
 
-test_mpc(linModel4, mpc)
+test_mpc(linModel4 , mpc)
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 
 
 res =  sim(mpc, mpc.Hp+10, x0=zeros(mpc.estim.model.nx))
 ps = plot(res, plotD=false, plotŶminŶmax=false, plotUminUmax=false)
 display(ps)
+
+res2 = sim(uscKalmanFilter1, mpc.Hp+10)
+ps2 = plot(res2)
+display(ps2)
 
 #=
 test_mpc(linModel4, nmpc)

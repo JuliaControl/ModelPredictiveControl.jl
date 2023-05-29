@@ -19,7 +19,7 @@ export PredictiveController, LinMPC, NonLinMPC, setconstraint!, moveinput!, geti
 include("sim_model.jl")
 include("state_estim.jl")
 include("predictive_control.jl")
-include("plots.jl")
+include("plot_sim.jl")
 
 @setup_workload begin
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the
