@@ -317,17 +317,12 @@ end
     nx = size(res.X_data, 1)
     nx̂ = size(res.X̂_data, 1)
 
-    # TODO: @layout macro with dynamic expressions
-    # layout_mat = :([(ny,1) (nu,1)])
-    #if plotD && nd ≠ 0
-    #    (layout_mat = [layout_mat (nd,1)])
-    #end
-    #plotX && (layout_mat = [layout_mat (nx,1)])
-    #plotX̂ && (layout_mat = [layout_mat (nx̂,1)])
+    layout_mat = [(ny, 1) (nu, 1)]
+    (plotD && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
+    plotX && (layout_mat = [layout_mat (nx, 1)])
+    plotX̂ && (layout_mat = [layout_mat (nx̂, 1)])
 
-    #println(layout_mat)
-
-    layout := @layout (nd ≠ 0 && plotD) ? [(ny,1) (nu,1) (nd, 1)] : [(ny,1) (nu,1)]
+    layout := layout_mat
 
     # --- outputs y ---
     subplot_base = 0
@@ -366,7 +361,6 @@ end
         end
     end
     subplot_base += nu
-    #=
     # --- plant states x ---
     if plotX
         for i in 1:nx
@@ -379,6 +373,20 @@ end
                 t, res.X_data[i, :]
             end
         end
+        subplot_base += nx
     end
-    =#
+    # --- estimated states x̂ ---
+    if plotX̂
+        for i in 1:nx̂
+            @series begin
+                xguide     --> "Time (s)"
+                yguide     --> "\$\\hat{x}_$i\$"
+                color      --> 1
+                subplot    --> subplot_base + i
+                label      --> "\$\\mathbf{\\hat{x}}\$"
+                t, res.X̂_data[i, :]
+            end
+        end
+        subplot_base += nx̂
+    end
 end

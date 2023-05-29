@@ -156,7 +156,7 @@ test_mpc(linModel4 , mpc)
 
 
 res =  sim(mpc, mpc.Hp+10, x0=zeros(mpc.estim.model.nx))
-ps = plot(res, plotD=false, plotŶminŶmax=false, plotUminUmax=false)
+ps = plot(res, plotD=false, plotŶ=true, plotŶminŶmax=false, plotUminUmax=false)
 display(ps)
 
 res2 = sim(uscKalmanFilter1, mpc.Hp+10)
