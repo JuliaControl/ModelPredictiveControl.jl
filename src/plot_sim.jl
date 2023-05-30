@@ -59,19 +59,17 @@ end
 
 @doc raw"""
     sim(
-        estim::StateEstimator, 
+        mpc::PredictiveController, 
         N::Int, 
-        u = mpc.estim.model.yop .+ 1, 
-        d = mpc.estim.model.dop; 
+        ry = mpc.estim.model.yop .+ 1, 
+        d  = mpc.estim.model.dop; 
         <keyword arguments>
     )
 
 Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
 
-See Arguments for the option list. The noise arguments are in standard deviations σ. The 
-sensor and process noises of the simulated plant are specified by `y_noise` and `x_noise` 
-arguments, respectively.
-
+`ry` is the output setpoint value applied at ``t = 0`` second. The keyword arguments are
+identical to [`sim(::StateEstimator)`](@ref).
 
 """
 function sim(
@@ -85,9 +83,7 @@ function sim(
 end
 
 
-
-
-
+"Quick simulation function for `SimModel`, `StateEstimator` and `PredictiveController`."
 function sim_all(
     estim_mpc::Union{StateEstimator, PredictiveController}, 
     estim::StateEstimator,
@@ -159,163 +155,21 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
     plotRy          = true,
     plotŶminŶmax    = true,
     plotŶ           = false,
+    plotU           = true,
     plotRu          = true,
     plotUminUmax    = true,
     plotD           = true,
     plotX           = false,
     plotX̂           = false
 )
-
     mpc = res.obj
-    t   = res.T_data
-    Ns  = length(t)
 
-    ny = size(res.Y_data, 1)
-    nu = size(res.U_data, 1)
-    nd = size(res.D_data, 1)
-
-    layout := @layout (nd ≠ 0 && plotD) ? [(ny,1) (nu,1) (nd, 1)] : [(ny,1) (nu,1)]
-    
-    subplot_base = 0
-    for i in 1:ny
-        @series begin
-            xguide  --> "Time (s)"
-            yguide  --> "\$y_$i\$"
-            color   --> 1
-            subplot --> subplot_base + i
-            label   --> "\$\\mathbf{y}\$"
-            t, res.Y_data[i, :]
-        end
-        if plotRy && !iszero(mpc.M_Hp)
-            @series begin
-                xguide    --> "Time (s)"
-                yguide    --> "\$y_$i\$"
-                color     --> 2
-                subplot   --> subplot_base + i
-                linestyle --> :dash
-                label     --> "\$\\mathbf{r_y}\$"
-                t, res.Ry_data[i, :]
-            end
-        end
-        if plotŶminŶmax && !isinf(mpc.con.Ŷmin[i])
-            @series begin
-                xguide    --> "Time (s)"
-                yguide    --> "\$y_$i\$"
-                color     --> 3
-                subplot   --> subplot_base + i
-                linestyle --> :dot
-                linewidth --> 2.0
-                label     --> "\$\\mathbf{\\hat{y}_{min}}\$"
-                t, fill(mpc.con.Ŷmin[i], Ns)
-            end
-        end
-        if plotŶminŶmax && !isinf(mpc.con.Ŷmax[i])
-            @series begin
-                xguide    --> "Time (s)"
-                yguide    --> "\$y_$i\$"
-                color     --> 4
-                subplot   --> subplot_base + i
-                linestyle --> :dot
-                linewidth --> 2.0
-                label     --> "\$\\mathbf{\\hat{y}_{max}}\$"
-                t, fill(mpc.con.Ŷmax[i], Ns)
-            end
-        end
-        if plotŶ
-            @series begin
-                xguide    --> "Time (s)"
-                yguide    --> "\$y_$i\$"
-                color     --> 5
-                subplot   --> subplot_base + i
-                linestyle --> :dashdot
-                label     --> "\$\\mathbf{\\hat{y}}\$"
-                t, res.Ŷ_data[i, :]
-            end
-        end
-    end
-    subplot_base += ny
-    for i in 1:nu
-        @series begin
-            xguide     --> "Time (s)"
-            yguide     --> "\$u_$i\$"
-            color      --> 1
-            subplot    --> subplot_base + i
-            seriestype --> :steppost
-            label      --> "\$\\mathbf{u}\$"
-            t, res.U_data[i, :]
-        end
-        if plotRu && !iszero(mpc.L_Hp) # TODO: 
-            #=
-            @series begin
-                xguide    --> "Time (s)"
-                yguide    --> "\$u_$i\$"
-                color     --> 2
-                subplot   --> subplot_base + i
-                linestyle --> :dash
-                label     --> "\$\\mathbf{r_{u}}\$"
-                t, res.Ry_data[i, :]
-            end
-            =#
-        end
-        if plotUminUmax && !isinf(mpc.con.Umin[i])
-            @series begin
-                xguide    --> "Time (s)"
-                yguide    --> "\$u_$i\$"
-                color     --> 3
-                subplot   --> subplot_base + i
-                linestyle --> :dot
-                linewidth --> 2.0
-                label     --> "\$\\mathbf{u_{min}}\$"
-                t, fill(mpc.con.Umin[i], Ns)
-            end
-        end
-        if plotUminUmax && !isinf(mpc.con.Umax[i])
-            @series begin
-                xguide    --> "Time (s)"
-                yguide    --> "\$u_$i\$"
-                color     --> 4
-                subplot   --> subplot_base + i
-                linestyle --> :dot
-                linewidth --> 2.0
-                label     --> "\$\\mathbf{u_{max}}\$"
-                t, fill(mpc.con.Umax[i], Ns)
-            end
-        end
-    end
-    subplot_base += nu
-    if plotD
-        for i in 1:nd
-            @series begin
-                xguide  --> "Time (s)"
-                yguide  --> "\$d_$i\$"
-                color   --> 1
-                subplot --> subplot_base + i
-                label   --> ""
-                t, res.D_data[i, :]
-            end
-        end
-    end
-end
-
-
-
-@recipe function simresultplot(
-    res::SimResult{<:StateEstimator};
-    plotŶ           = true,
-    plotU           = true,
-    plotD           = true,
-    plotX           = false,
-    plotX̂           = false
-)
-
-    t   = res.T_data
-
+    t  = res.T_data
     ny = size(res.Y_data, 1)
     nu = size(res.U_data, 1)
     nd = size(res.D_data, 1)
     nx = size(res.X_data, 1)
     nx̂ = size(res.X̂_data, 1)
-
     layout_mat = [(ny, 1)]
     plotU && (layout_mat = [layout_mat (nu, 1)])
     (plotD && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
@@ -323,8 +177,7 @@ end
     plotX̂ && (layout_mat = [layout_mat (nx̂, 1)])
 
     layout := layout_mat
-
-    xguide    --> "Time (s)"
+    xguide --> "Time (s)"
 
     # --- outputs y ---
     subplot_base = 0
@@ -340,9 +193,191 @@ end
         if plotŶ
             @series begin
                 yguide    --> "\$y_$i\$"
-                color     --> 5
+                color     --> 2
                 subplot   --> subplot_base + i
                 linestyle --> :dashdot
+                linewidth --> 0.75
+                label     --> "\$\\mathbf{\\hat{y}}\$"
+                legend    --> true
+                t, res.Ŷ_data[i, :]
+            end
+        end
+        if plotRy && !iszero(mpc.M_Hp)
+            @series begin
+                yguide    --> "\$y_$i\$"
+                color     --> 3
+                subplot   --> subplot_base + i
+                linestyle --> :dash
+                linewidth --> 0.75
+                label     --> "\$\\mathbf{r_y}\$"
+                legend    --> true
+                t, res.Ry_data[i, :]
+            end
+        end
+        if plotŶminŶmax && !isinf(mpc.con.Ŷmin[i])
+            @series begin
+                yguide    --> "\$y_$i\$"
+                color     --> 4
+                subplot   --> subplot_base + i
+                linestyle --> :dot
+                linewidth --> 2.0
+                label     --> "\$\\mathbf{\\hat{y}_{min}}\$"
+                legend    --> true
+                t, fill(mpc.con.Ŷmin[i], length(t))
+            end
+        end
+        if plotŶminŶmax && !isinf(mpc.con.Ŷmax[i])
+            @series begin
+                yguide    --> "\$y_$i\$"
+                color     --> 5
+                subplot   --> subplot_base + i
+                linestyle --> :dot
+                linewidth --> 2.0
+                label     --> "\$\\mathbf{\\hat{y}_{max}}\$"
+                legend    --> true
+                t, fill(mpc.con.Ŷmax[i], length(t))
+            end
+        end
+    end
+    subplot_base += ny
+    # --- manipulated inputs u ---
+    if plotU
+        for i in 1:nu
+            @series begin
+                yguide     --> "\$u_$i\$"
+                color      --> 1
+                subplot    --> subplot_base + i
+                seriestype --> :steppost
+                label      --> "\$\\mathbf{u}\$"
+                legend     --> false
+                t, res.U_data[i, :]
+            end
+            if plotRu && !iszero(mpc.L_Hp)
+                @series begin
+                    yguide    --> "\$u_$i\$"
+                    color     --> 3
+                    subplot   --> subplot_base + i
+                    linestyle --> :dash
+                    label     --> "\$\\mathbf{r_{u}}\$"
+                    legend    --> true
+                    t, res.Ry_data[i, :]
+                end
+            end
+            if plotUminUmax && !isinf(mpc.con.Umin[i])
+                @series begin
+                    yguide    --> "\$u_$i\$"
+                    color     --> 4
+                    subplot   --> subplot_base + i
+                    linestyle --> :dot
+                    linewidth --> 2.0
+                    label     --> "\$\\mathbf{u_{min}}\$"
+                    legend    --> true
+                    t, fill(mpc.con.Umin[i], length(t))
+                end
+            end
+            if plotUminUmax && !isinf(mpc.con.Umax[i])
+                @series begin
+                    yguide    --> "\$u_$i\$"
+                    color     --> 5
+                    subplot   --> subplot_base + i
+                    linestyle --> :dot
+                    linewidth --> 2.0
+                    label     --> "\$\\mathbf{u_{max}}\$"
+                    legend    --> true
+                    t, fill(mpc.con.Umax[i], length(t))
+                end
+            end
+        end
+        subplot_base += nu
+    end
+    # --- measured disturbances d ---
+    if plotD
+        for i in 1:nd
+            @series begin
+                xguide  --> "Time (s)"
+                yguide  --> "\$d_$i\$"
+                color   --> 1
+                subplot --> subplot_base + i
+                label   --> "\$\\mathbf{d}\$"
+                legend  --> false
+                t, res.D_data[i, :]
+            end
+        end
+    end
+    # --- plant states x ---
+    if plotX
+        for i in 1:nx
+            @series begin
+                yguide     --> "\$x_$i\$"
+                color      --> 1
+                subplot    --> subplot_base + i
+                label      --> "\$\\mathbf{x}\$"
+                legend     --> false
+                t, res.X_data[i, :]
+            end
+        end
+        subplot_base += nx
+    end
+    # --- estimated states x̂ ---
+    if plotX̂
+        for i in 1:nx̂
+            @series begin
+                yguide     --> "\$\\hat{x}_$i\$"
+                color      --> 2
+                subplot    --> subplot_base + i
+                linestyle --> :dashdot
+                linewidth --> 0.75
+                label      --> "\$\\mathbf{\\hat{x}}\$"
+                legend     --> false
+                t, res.X̂_data[i, :]
+            end
+        end
+    end
+
+end
+
+
+
+@recipe function simresultplot(
+    res::SimResult{<:StateEstimator};
+    plotŶ           = true,
+    plotU           = true,
+    plotD           = true,
+    plotX           = false,
+    plotX̂           = false
+)
+    t   = res.T_data
+    ny = size(res.Y_data, 1)
+    nu = size(res.U_data, 1)
+    nd = size(res.D_data, 1)
+    nx = size(res.X_data, 1)
+    nx̂ = size(res.X̂_data, 1)
+    layout_mat = [(ny, 1)]
+    plotU && (layout_mat = [layout_mat (nu, 1)])
+    (plotD && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
+    plotX && (layout_mat = [layout_mat (nx, 1)])
+    plotX̂ && (layout_mat = [layout_mat (nx̂, 1)])
+
+    layout := layout_mat
+    xguide    --> "Time (s)"
+    # --- outputs y ---
+    subplot_base = 0
+    for i in 1:ny
+        @series begin
+            yguide  --> "\$y_$i\$"
+            color   --> 1
+            subplot --> subplot_base + i
+            label   --> "\$\\mathbf{y}\$"
+            legend  --> false
+            t, res.Y_data[i, :]
+        end
+        if plotŶ
+            @series begin
+                yguide    --> "\$y_$i\$"
+                color     --> 2
+                subplot   --> subplot_base + i
+                linestyle --> :dashdot
+                linewidth --> 0.75
                 label     --> "\$\\mathbf{\\hat{y}}\$"
                 legend    --> true
                 t, res.Ŷ_data[i, :]
@@ -398,9 +433,10 @@ end
         for i in 1:nx̂
             @series begin
                 yguide     --> "\$\\hat{x}_$i\$"
-                color      --> 5
+                color      --> 2
                 subplot    --> subplot_base + i
                 linestyle --> :dashdot
+                linewidth --> 0.75
                 label      --> "\$\\mathbf{\\hat{x}}\$"
                 legend     --> false
                 t, res.X̂_data[i, :]
