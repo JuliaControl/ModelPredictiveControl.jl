@@ -1,18 +1,98 @@
 "Includes all signals of [`sim`](@ref), view them with `plot` on `SimResult` instances."
 struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
-    obj    ::O
-    T_data ::Vector{Float64}
-    Y_data ::Matrix{Float64}
-    Ry_data::Matrix{Float64}
-    Ŷ_data ::Matrix{Float64}
-    U_data ::Matrix{Float64}
-    D_data ::Matrix{Float64}
-    X_data ::Matrix{Float64}
-    X̂_data ::Matrix{Float64}
+    T_data ::Vector{Float64} # time in seconds
+    Y_data ::Matrix{Float64} # plant outputs (both measured and unmeasured)
+    Ry_data::Matrix{Float64} # output setpoints
+    Ŷ_data ::Matrix{Float64} # estimated outputs
+    U_data ::Matrix{Float64} # manipulated inputs
+    Ud_data::Matrix{Float64} # manipulated inputs including load disturbances
+    D_data ::Matrix{Float64} # measured disturbances
+    X_data ::Matrix{Float64} # plant states
+    X̂_data ::Matrix{Float64} # estimated states
+    obj    ::O               # simulated instance
 end
 
 @doc raw"""
-    sim(
+    sim!(
+        plant::SimModel, 
+        N::Int,
+        u::Vector{<:Real} = plant.uop .+ 1,
+        d::Vector{<:Real} = plant.dop;
+        <keyword arguments>
+    )
+
+Open-loop simulation of `plant` model for `N` time steps, default to input bumps.
+
+See Arguments for the available options. The noises are provided as standard deviations σ
+vectors. The simulated sensor and process noises of `plant` are specified by `y_noise` and
+`x_noise` arguments, respectively. The function returns `SimResult` instances that can be
+visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on
+them (see Examples below).
+
+# Arguments
+- `plant::SimModel` : plant model to simulate
+- `N::Int` : simulation length in time steps
+- `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value
+- `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value
+- `u_step  = zeros(plant.nu)` : step disturbance on manipulated input ``\mathbf{u}``
+- `u_noise = zeros(plant.nu)` : additive gaussian noise on manipulated input ``\mathbf{u}``
+- `y_step  = zeros(plant.ny)` : step disturbance on plant outputs ``\mathbf{y}``
+- `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``
+- `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``
+- `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
+- `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``
+- `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``
+
+# Examples
+```julia-repl
+julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10, 1, 1, 1);
+
+julia> res = sim!(plant, 5, [0], [0], x0=[1]);
+
+julia> using Plots; plot(res, plotu=false, plotd=false, plotx=true)
+```
+"""
+function sim!(
+    plant::SimModel, 
+    N::Int,
+    u::Vector{<:Real} = plant.uop .+ 1,
+    d::Vector{<:Real} = plant.dop;
+    u_step ::Vector{<:Real} = zeros(plant.nu),
+    u_noise::Vector{<:Real} = zeros(plant.nu),
+    y_step ::Vector{<:Real} = zeros(plant.ny),
+    y_noise::Vector{<:Real} = zeros(plant.ny),
+    d_step ::Vector{<:Real} = zeros(plant.nd),
+    d_noise::Vector{<:Real} = zeros(plant.nd),
+    x_noise::Vector{<:Real} = zeros(plant.nx),
+    x0 = zeros(plant.nx)
+)
+    T_data  = collect(plant.Ts*(0:(N-1)))
+    Y_data  = Matrix{Float64}(undef, plant.ny, N)
+    U_data  = Matrix{Float64}(undef, plant.nu, N)
+    Ud_data = Matrix{Float64}(undef, plant.nu, N)
+    D_data  = Matrix{Float64}(undef, plant.nd, N)
+    X_data  = Matrix{Float64}(undef, plant.nx, N)
+    setstate!(plant, x0)
+    d0 = d
+    for i=1:N
+        d = d0 + d_step + d_noise.*randn(plant.nd)
+        y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
+        ud = u + u_step + u_noise.*randn(plant.nu)
+        Y_data[:, i]  = y
+        U_data[:, i]  = u
+        Ud_data[:, i] = ud
+        D_data[:, i]  = d
+        X_data[:, i]  = plant.x
+        x = updatestate!(plant, ud, d); 
+        x[:] += x_noise.*randn(plant.nx)
+    end
+    return SimResult(
+        T_data, Y_data, U_data, Y_data, U_data, Ud_data, D_data, X_data, X_data, plant
+    )
+end
+
+@doc raw"""
+    sim!(
         estim::StateEstimator, 
         N::Int, 
         u = estim.model.uop .+ 1, 
@@ -22,43 +102,43 @@ end
 
 Closed-loop simulation of `estim` estimator for `N` time steps, default to input bumps.
 
-See Arguments for the option list. The noise arguments are in standard deviations σ. The 
-sensor and process noises of the simulated plant are specified by `y_noise` and `x_noise` 
-arguments, respectively.
+See Arguments for the available options. 
 
 # Arguments
-
 - `estim::StateEstimator` : state estimator to simulate
 - `N::Int` : simulation length in time steps
-- `u = mpc.estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value
-- `d = mpc.estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value
-- `plant::SimModel = mpc.estim.model` : simulated plant model
-- `u_step  = zeros(plant.nu)` : step disturbance on manipulated input ``\mathbf{u}``
-- `u_noise = zeros(plant.nu)` : additive gaussian noise on manipulated input ``\mathbf{u}``
-- `y_step  = zeros(plant.ny)` : step disturbance on plant outputs ``\mathbf{y}``
-- `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``
-- `d_step  = zeros(plant.nd)` : step disturbance on measured dist. ``\mathbf{d}``
-- `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
-- `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``
-- `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``
+- `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value
+- `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value
+- `plant::SimModel = estim.model` : simulated plant model
 - `x̂0 = nothing` : `mpc.estim` state estimator initial state ``\mathbf{x̂}(0)``, if `nothing`
    then ``\mathbf{x̂}`` is initialized with [`initstate!`](@ref)
 - `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
+- `<keyword arguments>` of [`sim!(::SimModel)`](@ref)
+
+# Examples
+```julia-repl
+julia> model = LinModel(tf(3, [30, 1]), 0.5);
+
+julia> estim = SteadyKalmanFilter(model, σR=[0.5], σQ=[0.25], σQ_int=[0.01]);
+
+julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.25], x0=[-10], x̂0=[0, 0]);
+
+julia> using Plots; plot(res, plotŷ=true, plotu=false, plotx=true, plotx̂=true)
+```
 """
-function sim(
+function sim!(
     estim::StateEstimator, 
     N::Int,
     u::Vector{<:Real} = estim.model.uop .+ 1,
     d::Vector{<:Real} = estim.model.dop;
     kwargs...
 )
-    return sim_all(estim, estim, estim.model, N, u, d; kwargs...)
+    return sim_closedloop!(estim, estim, N, u, d; kwargs...)
 end
 
 
-
 @doc raw"""
-    sim(
+    sim!(
         mpc::PredictiveController, 
         N::Int, 
         ry = mpc.estim.model.yop .+ 1, 
@@ -69,29 +149,38 @@ end
 Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
 
 `ry` is the output setpoint value applied at ``t = 0`` second. The keyword arguments are
-identical to [`sim(::StateEstimator)`](@ref).
+identical to [`sim!(::StateEstimator)`](@ref).
 
+# Examples
+```julia-repl
+julia> model = LinModel([tf(3, [30, 1]); tf(2, [5, 1])], 4);
+
+julia> mpc = setconstraint!(LinMPC(model, Mwt=[0, 1], Nwt=[0.01], Hp=30), ŷmin=[0, -Inf]);
+
+julia> res = sim!(mpc, 25, [0; 0], y_noise=[0.1], y_step=[-10,0]);
+
+julia> using Plots; plot(res, plotRy=true, plotŷ=true, plotŷmin=true, plotu=true)
+```
 """
-function sim(
+function sim!(
     mpc::PredictiveController, 
     N::Int,
     ry::Vector{<:Real} = mpc.estim.model.yop .+ 1,
     d ::Vector{<:Real} = mpc.estim.model.dop;
     kwargs...
 )
-    return sim_all(mpc, mpc.estim, mpc.estim.model, N, ry, d; kwargs...)
+    return sim_closedloop!(mpc, mpc.estim, N, ry, d; kwargs...)
 end
 
 
-"Quick simulation function for `SimModel`, `StateEstimator` and `PredictiveController`."
-function sim_all(
-    estim_mpc::Union{StateEstimator, PredictiveController}, 
+"Quick simulation function for `StateEstimator` and `PredictiveController` instances."
+function sim_closedloop!(
+    est_mpc::Union{StateEstimator, PredictiveController}, 
     estim::StateEstimator,
-    model::SimModel, 
     N::Int,
     u_ry::Vector{<:Real},
     d::Vector{<:Real};
-    plant::SimModel = model,
+    plant::SimModel = estim.model,
     u_step ::Vector{<:Real} = zeros(plant.nu),
     u_noise::Vector{<:Real} = zeros(plant.nu),
     y_step ::Vector{<:Real} = zeros(plant.ny),
@@ -103,64 +192,247 @@ function sim_all(
     x̂0 = nothing,
     lastu = plant.uop,
 )
-    model.Ts ≈ plant.Ts || error("Sampling time Ts of mpc and plant must be equal")
+    model = estim.model
+    model.Ts ≈ plant.Ts || error("Sampling time of controller/estimator ≠ plant.Ts")
     old_x0 = copy(plant.x)
-    old_x̂0 = copy(estim.x̂)
     T_data  = collect(plant.Ts*(0:(N-1)))
     Y_data  = Matrix{Float64}(undef, plant.ny, N)
     Ŷ_data  = Matrix{Float64}(undef, model.ny, N)
     U_Ry_data = Matrix{Float64}(undef, length(u_ry), N)
     U_data  = Matrix{Float64}(undef, plant.nu, N)
+    Ud_data = Matrix{Float64}(undef, plant.nu, N)
     D_data  = Matrix{Float64}(undef, plant.nd, N)
     X_data  = Matrix{Float64}(undef, plant.nx, N) 
     X̂_data  = Matrix{Float64}(undef, estim.nx̂, N)
     setstate!(plant, x0)
     lastd, lasty = d, evaloutput(plant, d)
     if isnothing(x̂0)
-        initstate!(estim_mpc, lastu, lasty[estim.i_ym], lastd)
+        initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
     else
-        setstate!(estim_mpc, x̂0)
+        setstate!(est_mpc, x̂0)
     end
     for i=1:N
         d = lastd + d_step + d_noise.*randn(plant.nd)
         y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
         ym = y[estim.i_ym]
-        u  = sim_getu!(estim_mpc, u_ry, d, ym)
-        up = u + u_step + u_noise.*randn(plant.nu)
+        u  = sim_getu!(est_mpc, u_ry, d, ym)
+        ud = u + u_step + u_noise.*randn(plant.nu)
         Y_data[:, i]  = y
         Ŷ_data[:, i]  = evalŷ(estim, ym, d)
         U_Ry_data[:, i] = u_ry
         U_data[:, i]  = u
+        Ud_data[:, i] = ud
         D_data[:, i]  = d
         X_data[:, i]  = plant.x
         X̂_data[:, i]  = estim.x̂
-        x = updatestate!(plant, up, d); 
+        x = updatestate!(plant, ud, d); 
         x[:] += x_noise.*randn(plant.nx)
-        updatestate!(estim_mpc, u, ym, d)
+        updatestate!(est_mpc, u, ym, d)
     end
     res = SimResult(
-        estim_mpc, T_data, Y_data, U_Ry_data, Ŷ_data, U_data, D_data, X_data, X̂_data
+        T_data, Y_data, U_Ry_data, Ŷ_data, U_data, Ud_data, D_data, X_data, X̂_data, est_mpc
     )
-    setstate!(plant, old_x0) 
-    setstate!(estim, old_x̂0)
+    setstate!(plant, old_x0)
     return res
 end
 
 sim_getu!(::StateEstimator, u, _ , _ ) = u
 sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
 
+@recipe function simresultplot(
+    res::SimResult{<:SimModel};
+    plotu  = true,
+    plotd  = true,
+    plotx  = false,
+)
+    t   = res.T_data
+    ny = size(res.Y_data, 1)
+    nu = size(res.U_data, 1)
+    nd = size(res.D_data, 1)
+    nx = size(res.X_data, 1)
+    layout_mat = [(ny, 1)]
+    plotu && (layout_mat = [layout_mat (nu, 1)])
+    (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
+    plotx && (layout_mat = [layout_mat (nx, 1)])
+
+    layout := layout_mat
+    xguide    --> "Time (s)"
+    # --- outputs y ---
+    subplot_base = 0
+    for i in 1:ny
+        @series begin
+            yguide  --> "\$y_$i\$"
+            color   --> 1
+            subplot --> subplot_base + i
+            label   --> "\$\\mathbf{y}\$"
+            legend  --> false
+            t, res.Y_data[i, :]
+        end
+    end
+    subplot_base += ny
+    # --- manipulated inputs u ---
+    if plotu
+        for i in 1:nu
+            @series begin
+                yguide     --> "\$u_$i\$"
+                color      --> 1
+                subplot    --> subplot_base + i
+                seriestype --> :steppost
+                label      --> "\$\\mathbf{u}\$"
+                legend     --> false
+                t, res.U_data[i, :]
+            end
+        end
+        subplot_base += nu
+    end
+    # --- measured disturbances d ---
+    if plotd
+        for i in 1:nd
+            @series begin
+                xguide  --> "Time (s)"
+                yguide  --> "\$d_$i\$"
+                color   --> 1
+                subplot --> subplot_base + i
+                label   --> "\$\\mathbf{d}\$"
+                legend  --> false
+                t, res.D_data[i, :]
+            end
+        end
+    end
+    # --- plant states x ---
+    if plotx
+        for i in 1:nx
+            @series begin
+                yguide     --> "\$x_$i\$"
+                color      --> 1
+                subplot    --> subplot_base + i
+                label      --> "\$\\mathbf{x}\$"
+                legend     --> false
+                t, res.X_data[i, :]
+            end
+        end
+    end
+end
+
+@recipe function simresultplot(
+    res::SimResult{<:StateEstimator};
+    plotŷ           = true,
+    plotu           = true,
+    plotd           = true,
+    plotx           = false,
+    plotx̂           = false
+)
+    t   = res.T_data
+    ny = size(res.Y_data, 1)
+    nu = size(res.U_data, 1)
+    nd = size(res.D_data, 1)
+    nx = size(res.X_data, 1)
+    nx̂ = size(res.X̂_data, 1)
+    layout_mat = [(ny, 1)]
+    plotu && (layout_mat = [layout_mat (nu, 1)])
+    (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
+    plotx && (layout_mat = [layout_mat (nx, 1)])
+    plotx̂ && (layout_mat = [layout_mat (nx̂, 1)])
+    layout := layout_mat
+    xguide    --> "Time (s)"
+    # --- outputs y ---
+    subplot_base = 0
+    for i in 1:ny
+        @series begin
+            yguide  --> "\$y_$i\$"
+            color   --> 1
+            subplot --> subplot_base + i
+            label   --> "\$\\mathbf{y}\$"
+            legend  --> false
+            t, res.Y_data[i, :]
+        end
+        if plotŷ
+            @series begin
+                yguide    --> "\$y_$i\$"
+                color     --> 2
+                subplot   --> subplot_base + i
+                linestyle --> :dashdot
+                linewidth --> 0.75
+                label     --> "\$\\mathbf{\\hat{y}}\$"
+                legend    --> true
+                t, res.Ŷ_data[i, :]
+            end
+        end
+    end
+    subplot_base += ny
+    # --- manipulated inputs u ---
+    if plotu
+        for i in 1:nu
+            @series begin
+                yguide     --> "\$u_$i\$"
+                color      --> 1
+                subplot    --> subplot_base + i
+                seriestype --> :steppost
+                label      --> "\$\\mathbf{u}\$"
+                legend     --> false
+                t, res.U_data[i, :]
+            end
+        end
+        subplot_base += nu
+    end
+    # --- measured disturbances d ---
+    if plotd
+        for i in 1:nd
+            @series begin
+                xguide  --> "Time (s)"
+                yguide  --> "\$d_$i\$"
+                color   --> 1
+                subplot --> subplot_base + i
+                label   --> "\$\\mathbf{d}\$"
+                legend  --> false
+                t, res.D_data[i, :]
+            end
+        end
+    end
+    # --- plant states x ---
+    if plotx
+        for i in 1:nx
+            @series begin
+                yguide     --> "\$x_$i\$"
+                color      --> 1
+                subplot    --> subplot_base + i
+                label      --> "\$\\mathbf{x}\$"
+                legend     --> false
+                t, res.X_data[i, :]
+            end
+        end
+        subplot_base += nx
+    end
+    # --- estimated states x̂ ---
+    if plotx̂
+        for i in 1:nx̂
+            @series begin
+                yguide     --> "\$\\hat{x}_$i\$"
+                color      --> 2
+                subplot    --> subplot_base + i
+                linestyle --> :dashdot
+                linewidth --> 0.75
+                label      --> "\$\\mathbf{\\hat{x}}\$"
+                legend     --> false
+                t, res.X̂_data[i, :]
+            end
+        end
+    end
+end
 
 @recipe function simresultplot(
     res::SimResult{<:PredictiveController}; 
-    plotRy          = true,
-    plotŶminŶmax    = true,
-    plotŶ           = false,
-    plotU           = true,
-    plotRu          = true,
-    plotUminUmax    = true,
-    plotD           = true,
-    plotX           = false,
-    plotX̂           = false
+    plotry   = true,
+    plotŷmin = true,
+    plotŷmax = true,
+    plotŷ    = false,
+    plotu    = true,
+    plotru   = true,
+    plotumin = true,
+    plotumax = true,
+    plotd    = true,
+    plotx    = false,
+    plotx̂    = false
 )
     mpc = res.obj
 
@@ -171,10 +443,10 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
     nx = size(res.X_data, 1)
     nx̂ = size(res.X̂_data, 1)
     layout_mat = [(ny, 1)]
-    plotU && (layout_mat = [layout_mat (nu, 1)])
-    (plotD && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
-    plotX && (layout_mat = [layout_mat (nx, 1)])
-    plotX̂ && (layout_mat = [layout_mat (nx̂, 1)])
+    plotu && (layout_mat = [layout_mat (nu, 1)])
+    (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
+    plotx && (layout_mat = [layout_mat (nx, 1)])
+    plotx̂ && (layout_mat = [layout_mat (nx̂, 1)])
 
     layout := layout_mat
     xguide --> "Time (s)"
@@ -190,7 +462,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
             legend  --> false
             t, res.Y_data[i, :]
         end
-        if plotŶ
+        if plotŷ
             @series begin
                 yguide    --> "\$y_$i\$"
                 color     --> 2
@@ -202,11 +474,12 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
                 t, res.Ŷ_data[i, :]
             end
         end
-        if plotRy && !iszero(mpc.M_Hp)
+        if plotry && !iszero(mpc.M_Hp[i, i])
             @series begin
                 yguide    --> "\$y_$i\$"
                 color     --> 3
                 subplot   --> subplot_base + i
+                seriestype --> :steppost
                 linestyle --> :dash
                 linewidth --> 0.75
                 label     --> "\$\\mathbf{r_y}\$"
@@ -214,7 +487,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
                 t, res.Ry_data[i, :]
             end
         end
-        if plotŶminŶmax && !isinf(mpc.con.Ŷmin[i])
+        if plotŷmin && !isinf(mpc.con.Ŷmin[i])
             @series begin
                 yguide    --> "\$y_$i\$"
                 color     --> 4
@@ -226,7 +499,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
                 t, fill(mpc.con.Ŷmin[i], length(t))
             end
         end
-        if plotŶminŶmax && !isinf(mpc.con.Ŷmax[i])
+        if plotŷmax && !isinf(mpc.con.Ŷmax[i])
             @series begin
                 yguide    --> "\$y_$i\$"
                 color     --> 5
@@ -241,7 +514,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
     end
     subplot_base += ny
     # --- manipulated inputs u ---
-    if plotU
+    if plotu
         for i in 1:nu
             @series begin
                 yguide     --> "\$u_$i\$"
@@ -252,18 +525,19 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
                 legend     --> false
                 t, res.U_data[i, :]
             end
-            if plotRu && !iszero(mpc.L_Hp)
+            if plotru && !iszero(mpc.L_Hp[i, i])
                 @series begin
                     yguide    --> "\$u_$i\$"
                     color     --> 3
                     subplot   --> subplot_base + i
+                    seriestype --> :steppost
                     linestyle --> :dash
                     label     --> "\$\\mathbf{r_{u}}\$"
                     legend    --> true
                     t, res.Ry_data[i, :]
                 end
             end
-            if plotUminUmax && !isinf(mpc.con.Umin[i])
+            if plotumin && !isinf(mpc.con.Umin[i])
                 @series begin
                     yguide    --> "\$u_$i\$"
                     color     --> 4
@@ -275,7 +549,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
                     t, fill(mpc.con.Umin[i], length(t))
                 end
             end
-            if plotUminUmax && !isinf(mpc.con.Umax[i])
+            if plotumax && !isinf(mpc.con.Umax[i])
                 @series begin
                     yguide    --> "\$u_$i\$"
                     color     --> 5
@@ -291,7 +565,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
         subplot_base += nu
     end
     # --- measured disturbances d ---
-    if plotD
+    if plotd
         for i in 1:nd
             @series begin
                 xguide  --> "Time (s)"
@@ -305,7 +579,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
         end
     end
     # --- plant states x ---
-    if plotX
+    if plotx
         for i in 1:nx
             @series begin
                 yguide     --> "\$x_$i\$"
@@ -319,117 +593,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
         subplot_base += nx
     end
     # --- estimated states x̂ ---
-    if plotX̂
-        for i in 1:nx̂
-            @series begin
-                yguide     --> "\$\\hat{x}_$i\$"
-                color      --> 2
-                subplot    --> subplot_base + i
-                linestyle --> :dashdot
-                linewidth --> 0.75
-                label      --> "\$\\mathbf{\\hat{x}}\$"
-                legend     --> false
-                t, res.X̂_data[i, :]
-            end
-        end
-    end
-
-end
-
-
-
-@recipe function simresultplot(
-    res::SimResult{<:StateEstimator};
-    plotŶ           = true,
-    plotU           = true,
-    plotD           = true,
-    plotX           = false,
-    plotX̂           = false
-)
-    t   = res.T_data
-    ny = size(res.Y_data, 1)
-    nu = size(res.U_data, 1)
-    nd = size(res.D_data, 1)
-    nx = size(res.X_data, 1)
-    nx̂ = size(res.X̂_data, 1)
-    layout_mat = [(ny, 1)]
-    plotU && (layout_mat = [layout_mat (nu, 1)])
-    (plotD && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
-    plotX && (layout_mat = [layout_mat (nx, 1)])
-    plotX̂ && (layout_mat = [layout_mat (nx̂, 1)])
-
-    layout := layout_mat
-    xguide    --> "Time (s)"
-    # --- outputs y ---
-    subplot_base = 0
-    for i in 1:ny
-        @series begin
-            yguide  --> "\$y_$i\$"
-            color   --> 1
-            subplot --> subplot_base + i
-            label   --> "\$\\mathbf{y}\$"
-            legend  --> false
-            t, res.Y_data[i, :]
-        end
-        if plotŶ
-            @series begin
-                yguide    --> "\$y_$i\$"
-                color     --> 2
-                subplot   --> subplot_base + i
-                linestyle --> :dashdot
-                linewidth --> 0.75
-                label     --> "\$\\mathbf{\\hat{y}}\$"
-                legend    --> true
-                t, res.Ŷ_data[i, :]
-            end
-        end
-    end
-    subplot_base += ny
-    # --- manipulated inputs u ---
-    if plotU
-        for i in 1:nu
-            @series begin
-                yguide     --> "\$u_$i\$"
-                color      --> 1
-                subplot    --> subplot_base + i
-                seriestype --> :steppost
-                label      --> "\$\\mathbf{u}\$"
-                legend     --> false
-                t, res.U_data[i, :]
-            end
-        end
-        subplot_base += nu
-    end
-    # --- measured disturbances d ---
-    if plotD
-        for i in 1:nd
-            @series begin
-                xguide  --> "Time (s)"
-                yguide  --> "\$d_$i\$"
-                color   --> 1
-                subplot --> subplot_base + i
-                label   --> "\$\\mathbf{d}\$"
-                legend  --> false
-                t, res.D_data[i, :]
-            end
-        end
-    end
-    # --- plant states x ---
-    if plotX
-        for i in 1:nx
-            @series begin
-                yguide     --> "\$x_$i\$"
-                color      --> 1
-                subplot    --> subplot_base + i
-                label      --> "\$\\mathbf{x}\$"
-                legend     --> false
-                t, res.X_data[i, :]
-            end
-        end
-        subplot_base += nx
-    end
-    # --- estimated states x̂ ---
-    if plotX̂
+    if plotx̂
         for i in 1:nx̂
             @series begin
                 yguide     --> "\$\\hat{x}_$i\$"

@@ -154,12 +154,15 @@ default(fontfamily="Computer Modern"); scalefontsizes(1.1)
 test_mpc(linModel4 , mpc)
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, mpc)
 
+resM = sim!(nonLinModel2, mpc.Hp+10, [1,-1])
+psM  = plot(resM)
+display(psM)
 
-res =  sim(mpc, mpc.Hp+10, x0=zeros(mpc.estim.model.nx))
+res = sim!(mpc, mpc.Hp+10)
 ps = plot(res)
 display(ps)
 
-res2 = sim(uscKalmanFilter1, mpc.Hp+10)
+res2 = sim!(uscKalmanFilter1, mpc.Hp+10)
 ps2 = plot(res2)
 display(ps2)
 

@@ -31,5 +31,5 @@ setstate!
 ## Quick Simulation
 
 ```@docs
-sim
+sim!
 ```
