@@ -302,14 +302,13 @@ end
 @recipe function simresultplot(
     res::SimResult{<:StateEstimator};
     plotŶ           = true,
+    plotU           = true,
     plotD           = true,
     plotX           = false,
     plotX̂           = false
 )
 
-    estim = res.obj
     t   = res.T_data
-    Ns  = length(t)
 
     ny = size(res.Y_data, 1)
     nu = size(res.U_data, 1)
@@ -317,59 +316,78 @@ end
     nx = size(res.X_data, 1)
     nx̂ = size(res.X̂_data, 1)
 
-    layout_mat = [(ny, 1) (nu, 1)]
+    layout_mat = [(ny, 1)]
+    plotU && (layout_mat = [layout_mat (nu, 1)])
     (plotD && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
     plotX && (layout_mat = [layout_mat (nx, 1)])
     plotX̂ && (layout_mat = [layout_mat (nx̂, 1)])
 
     layout := layout_mat
 
+    xguide    --> "Time (s)"
+
     # --- outputs y ---
     subplot_base = 0
     for i in 1:ny
-        @series begin plotX=true
-            xguide  --> "Time (s)"
+        @series begin
             yguide  --> "\$y_$i\$"
             color   --> 1
             subplot --> subplot_base + i
             label   --> "\$\\mathbf{y}\$"
+            legend  --> false
             t, res.Y_data[i, :]
         end
         if plotŶ
             @series begin
-                xguide    --> "Time (s)"
                 yguide    --> "\$y_$i\$"
                 color     --> 5
                 subplot   --> subplot_base + i
                 linestyle --> :dashdot
                 label     --> "\$\\mathbf{\\hat{y}}\$"
+                legend    --> true
                 t, res.Ŷ_data[i, :]
             end
         end
     end
     subplot_base += ny
     # --- manipulated inputs u ---
-    for i in 1:nu
-        @series begin
-            xguide     --> "Time (s)"
-            yguide     --> "\$u_$i\$"
-            color      --> 1
-            subplot    --> subplot_base + i
-            seriestype --> :steppost
-            label      --> "\$\\mathbf{u}\$"
-            t, res.U_data[i, :]
+    if plotU
+        for i in 1:nu
+            @series begin
+                yguide     --> "\$u_$i\$"
+                color      --> 1
+                subplot    --> subplot_base + i
+                seriestype --> :steppost
+                label      --> "\$\\mathbf{u}\$"
+                legend     --> false
+                t, res.U_data[i, :]
+            end
+        end
+        subplot_base += nu
+    end
+    # --- measured disturbances d ---
+    if plotD
+        for i in 1:nd
+            @series begin
+                xguide  --> "Time (s)"
+                yguide  --> "\$d_$i\$"
+                color   --> 1
+                subplot --> subplot_base + i
+                label   --> "\$\\mathbf{d}\$"
+                legend  --> false
+                t, res.D_data[i, :]
+            end
         end
     end
-    subplot_base += nu
     # --- plant states x ---
     if plotX
         for i in 1:nx
             @series begin
-                xguide     --> "Time (s)"
                 yguide     --> "\$x_$i\$"
                 color      --> 1
                 subplot    --> subplot_base + i
                 label      --> "\$\\mathbf{x}\$"
+                legend     --> false
                 t, res.X_data[i, :]
             end
         end
@@ -379,14 +397,14 @@ end
     if plotX̂
         for i in 1:nx̂
             @series begin
-                xguide     --> "Time (s)"
                 yguide     --> "\$\\hat{x}_$i\$"
-                color      --> 1
+                color      --> 5
                 subplot    --> subplot_base + i
+                linestyle --> :dashdot
                 label      --> "\$\\mathbf{\\hat{x}}\$"
+                legend     --> false
                 t, res.X̂_data[i, :]
             end
         end
-        subplot_base += nx̂
     end
 end

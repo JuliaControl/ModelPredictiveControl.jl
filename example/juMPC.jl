@@ -160,7 +160,8 @@ ps = plot(res, plotD=false, plotŶ=true, plotŶminŶmax=false, plotUminUmax=f
 display(ps)
 
 res2 = sim(uscKalmanFilter1, mpc.Hp+10)
-ps2 = plot(res2)
+ps2 = plot(res2,plotŶ=true
+,  plotX=true, plotX̂=true)
 display(ps2)
 
 #=
