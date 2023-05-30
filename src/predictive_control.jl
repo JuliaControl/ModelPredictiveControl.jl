@@ -97,7 +97,7 @@ function setconstraint!(
 )
     model = mpc.estim.model
     con = mpc.con
-    nu, ny = model.ny, model.ny
+    nu, ny = model.nu, model.ny
     Hp, Hc = mpc.Hp, mpc.Hc
     C, E = mpc.C, mpc.Ẽ[:, 1:nu*Hc]
     if !isnothing(umin)
