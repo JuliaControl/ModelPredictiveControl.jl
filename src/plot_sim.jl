@@ -1,4 +1,4 @@
-"Includes all signals of [`sim`](@ref), view them with `plot` on `SimResult` instances."
+"Includes all signals of [`sim!`](@ref), view them with `plot` on `SimResult` instances."
 struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
     T_data ::Vector{Float64} # time in seconds
     Y_data ::Matrix{Float64} # plant outputs (both measured and unmeasured)
