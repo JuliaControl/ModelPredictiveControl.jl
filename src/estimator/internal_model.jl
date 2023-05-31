@@ -91,7 +91,7 @@ function InternalModel(
     model::M;
     i_ym::IntRangeOrVector = 1:model.ny,
     stoch_ym::Union{StateSpace, TransferFunction} = ss(1,1,1,1,model.Ts).*I(length(i_ym))
-    ) where {M<:SimModel}
+) where {M<:SimModel}
     if isa(stoch_ym, TransferFunction) 
         stoch_ym = minreal(ss(stoch_ym))
     end

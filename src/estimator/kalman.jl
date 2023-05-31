@@ -123,10 +123,10 @@ you can use 0 integrator on `model` integrating outputs, or the alternative time
 function SteadyKalmanFilter(
     model::LinModel;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σQ::Vector{<:Real} = fill(0.1, model.nx),
-    σR::Vector{<:Real} = fill(0.1, length(i_ym)),
+    σQ::Vector = fill(0.1, model.nx),
+    σR::Vector = fill(0.1, length(i_ym)),
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
-    σQ_int::Vector{<:Real} = fill(0.1, max(sum(nint_ym), 0))
+    σQ_int::Vector = fill(0.1, max(sum(nint_ym), 0))
 )
     if nint_ym == 0 # alias for no output integrator at all :
         nint_ym = fill(0, length(i_ym));
@@ -253,12 +253,12 @@ KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 function KalmanFilter(
     model::LinModel;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector{<:Real} = fill(10, model.nx),
-    σQ::Vector{<:Real} = fill(0.1, model.nx),
-    σR::Vector{<:Real} = fill(0.1, length(i_ym)),
+    σP0::Vector = fill(10, model.nx),
+    σQ::Vector = fill(0.1, model.nx),
+    σR::Vector = fill(0.1, length(i_ym)),
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
-    σP0_int::Vector{<:Real} = fill(10, max(sum(nint_ym), 0)),
-    σQ_int::Vector{<:Real} = fill(0.1, max(sum(nint_ym), 0))
+    σP0_int::Vector = fill(10, max(sum(nint_ym), 0)),
+    σQ_int::Vector = fill(0.1, max(sum(nint_ym), 0))
 )
     if nint_ym == 0 # alias for no output integrator at all :
         nint_ym = fill(0, length(i_ym));
@@ -400,7 +400,7 @@ unmeasured ones, for ``\mathbf{ĥ^u}``).
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1);
 
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0_int=[1, 1])
 UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
@@ -414,12 +414,12 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
 function UnscentedKalmanFilter(
     model::M;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector{<:Real} = fill(10, model.nx),
-    σQ::Vector{<:Real} = fill(0.1, model.nx),
-    σR::Vector{<:Real} = fill(0.1, length(i_ym)),
+    σP0::Vector = fill(10, model.nx),
+    σQ::Vector = fill(0.1, model.nx),
+    σR::Vector = fill(0.1, length(i_ym)),
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
-    σP0_int::Vector{<:Real} = fill(10, max(sum(nint_ym), 0)),
-    σQ_int::Vector{<:Real} = fill(0.1, max(sum(nint_ym), 0)),
+    σP0_int::Vector = fill(10, max(sum(nint_ym), 0)),
+    σQ_int::Vector = fill(0.1, max(sum(nint_ym), 0)),
     α::Real = 1e-3,
     β::Real = 2,
     κ::Real = 0

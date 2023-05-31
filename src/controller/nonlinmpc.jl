@@ -164,7 +164,7 @@ Use custom state estimator `estim` to construct `NonLinMPC`.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1);
 
 julia> estim = UnscentedKalmanFilter(model, σQ_int=[0.05]);
 

@@ -246,11 +246,11 @@ julia> u = moveinput!(mpc, [5]); round.(u, digits=3)
 """
 function moveinput!(
     mpc::PredictiveController, 
-    ry::Vector{<:Real}, 
-    d ::Vector{<:Real} = Float64[];
-    R̂y::Vector{<:Real} = repeat(ry, mpc.Hp),
-    D̂ ::Vector{<:Real} = repeat(d,  mpc.Hp),
-    ym::Union{Vector{<:Real}, Nothing} = nothing
+    ry::Vector, 
+    d ::Vector = Float64[];
+    R̂y::Vector = repeat(ry, mpc.Hp),
+    D̂ ::Vector = repeat(d,  mpc.Hp),
+    ym::Union{Vector, Nothing} = nothing
 )   
     validate_setpointdist(mpc, ry, d, R̂y, D̂)
     getestimates!(mpc, mpc.estim, ym, d)
@@ -1019,8 +1019,8 @@ end
 
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(
-    ry::Vector{<:Real}, 
-    d ::Vector{<:Real} = Float64[];
+    ry::Vector, 
+    d ::Vector = Float64[];
     kwargs...
 )
     return moveinput!(mpc, ry, d; kwargs...)

@@ -13,75 +13,49 @@ struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
 end
 
 @doc raw"""
-    sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; <keyword arguments>)
+    sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x0=zeros(plant.nx))
 
-Open-loop simulation of `plant` for `N` time steps, default to input bumps.
+Open-loop simulation of `plant` for `N` time steps, default to unit bump test on all inputs.
 
-See Arguments for the available options. The noises are provided as standard deviations σ
-vectors. The simulated sensor and process noises of `plant` are specified by `y_noise` and
-`x_noise` arguments, respectively. The function returns `SimResult` instances that can be
-visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on
+The manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}`` are held
+constant at `u` and `d` values, respectively. The plant initial state ``\mathbf{x}(0)`` is
+specified by `x0` keyword arguments. The function returns `SimResult` instances that can be
+visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on 
 them (see Examples below).
-
-# Arguments
-- `plant::SimModel` : plant model to simulate.
-- `N::Int` : simulation length in time steps.
-- `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value.
-- `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value.
-- `u_step  = zeros(plant.nu)` : step load disturbance on plant inputs ``\mathbf{u}``.
-- `u_noise = zeros(plant.nu)` : additive gaussian noise on plant inputs ``\mathbf{u}``.
-- `y_step  = zeros(plant.ny)` : step disturbance on plant outputs ``\mathbf{y}``.
-- `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``.
-- `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``.
-- `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``.
-- `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``.
-- `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``.
 
 # Examples
 ```julia-repl
-julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10, 1, 1, 1, 1);
+julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10.0, 1, 1, 1, 1);
 
 julia> res = sim!(plant, 15, [0], [0], x0=[1]);
 
 julia> using Plots; plot(res, plotu=false, plotd=false, plotx=true)
+
 ```
 """
 function sim!(
-    plant::SimModel, 
+    plant::SimModel,
     N::Int,
-    u::Vector{<:Real} = plant.uop .+ 1,
-    d::Vector{<:Real} = plant.dop;
-    u_step ::Vector{<:Real} = zeros(plant.nu),
-    u_noise::Vector{<:Real} = zeros(plant.nu),
-    y_step ::Vector{<:Real} = zeros(plant.ny),
-    y_noise::Vector{<:Real} = zeros(plant.ny),
-    d_step ::Vector{<:Real} = zeros(plant.nd),
-    d_noise::Vector{<:Real} = zeros(plant.nd),
-    x_noise::Vector{<:Real} = zeros(plant.nx),
+    u::Vector = plant.uop.+1,
+    d::Vector = plant.dop;
     x0 = zeros(plant.nx)
 )
     T_data  = collect(plant.Ts*(0:(N-1)))
     Y_data  = Matrix{Float64}(undef, plant.ny, N)
     U_data  = Matrix{Float64}(undef, plant.nu, N)
-    Ud_data = Matrix{Float64}(undef, plant.nu, N)
     D_data  = Matrix{Float64}(undef, plant.nd, N)
     X_data  = Matrix{Float64}(undef, plant.nx, N)
     setstate!(plant, x0)
-    d0 = d
     for i=1:N
-        d = d0 + d_step + d_noise.*randn(plant.nd)
-        y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
-        ud = u + u_step + u_noise.*randn(plant.nu)
+        y = evaloutput(plant, d) 
         Y_data[:, i]  = y
         U_data[:, i]  = u
-        Ud_data[:, i] = ud
         D_data[:, i]  = d
         X_data[:, i]  = plant.x
-        x = updatestate!(plant, ud, d); 
-        x[:] += x_noise.*randn(plant.nx)
+        updatestate!(plant, u, d); 
     end
     return SimResult(
-        T_data, Y_data, U_data, Y_data, U_data, Ud_data, D_data, X_data, X_data, plant
+        T_data, Y_data, U_data, Y_data, U_data, U_data, D_data, X_data, X_data, plant
     )
 end
 
@@ -96,7 +70,9 @@ end
 
 Closed-loop simulation of `estim` estimator for `N` time steps, default to input bumps.
 
-See Arguments for the available options. 
+See Arguments for the available options. The noises are provided as standard deviations σ
+vectors. The simulated sensor and process noises of `plant` are specified by `y_noise` and
+`x_noise` arguments, respectively.
 
 # Arguments
 - `estim::StateEstimator` : state estimator to simulate.
@@ -104,10 +80,17 @@ See Arguments for the available options.
 - `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value.
 - `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value.
 - `plant::SimModel = estim.model` : simulated plant model.
+- `u_step  = zeros(plant.nu)` : step load disturbance on plant inputs ``\mathbf{u}``.
+- `u_noise = zeros(plant.nu)` : gaussian load disturbance on plant inputs ``\mathbf{u}``.
+- `y_step  = zeros(plant.ny)` : step disturbance on plant outputs ``\mathbf{y}``.
+- `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``.
+- `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``.
+- `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``.
+- `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``.
+- `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``.
 - `x̂0 = nothing` : `mpc.estim` state estimator initial state ``\mathbf{x̂}(0)``, if `nothing`
    then ``\mathbf{x̂}`` is initialized with [`initstate!`](@ref).
 - `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization.
-- `<keyword arguments>` of [`sim!(::SimModel, ::Int)`](@ref).
 
 # Examples
 ```julia-repl
@@ -118,18 +101,18 @@ julia> estim = SteadyKalmanFilter(model, σR=[0.5], σQ=[0.25], σQ_int=[0.01]);
 julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.25], x0=[-10], x̂0=[0, 0]);
 
 julia> using Plots; plot(res, plotŷ=true, plotu=false, plotx=true, plotx̂=true)
+
 ```
 """
 function sim!(
     estim::StateEstimator, 
     N::Int,
-    u::Vector{<:Real} = estim.model.uop .+ 1,
-    d::Vector{<:Real} = estim.model.dop;
+    u::Vector = estim.model.uop .+ 1,
+    d::Vector = estim.model.dop;
     kwargs...
 )
     return sim_closedloop!(estim, estim, N, u, d; kwargs...)
 end
-
 
 @doc raw"""
     sim!(
@@ -142,8 +125,8 @@ end
 
 Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
 
-The argument `ry` is output setpoint ``\mathbf{r_y}`` value applied at ``t = 0``. The 
-keyword arguments are identical to [`sim!(::StateEstimator, ::Int)`](@ref).
+The output setpoints ``\mathbf{r_y}`` are held constant at `r_y`. The keyword arguments are
+identical to [`sim!(::StateEstimator, ::Int)`](@ref).
 
 # Examples
 ```julia-repl
@@ -154,34 +137,34 @@ julia> mpc = setconstraint!(LinMPC(model, Mwt=[0, 1], Nwt=[0.01], Hp=30), ŷmin
 julia> res = sim!(mpc, 25, [0, 0], y_noise=[0.1], y_step=[-10, 0]);
 
 julia> using Plots; plot(res, plotry=true, plotŷ=true, plotŷmin=true, plotu=true)
+
 ```
 """
 function sim!(
     mpc::PredictiveController, 
     N::Int,
-    ry::Vector{<:Real} = mpc.estim.model.yop .+ 1,
-    d ::Vector{<:Real} = mpc.estim.model.dop;
+    ry::Vector = mpc.estim.model.yop .+ 1,
+    d ::Vector = mpc.estim.model.dop;
     kwargs...
 )
     return sim_closedloop!(mpc, mpc.estim, N, ry, d; kwargs...)
 end
-
 
 "Quick simulation function for `StateEstimator` and `PredictiveController` instances."
 function sim_closedloop!(
     est_mpc::Union{StateEstimator, PredictiveController}, 
     estim::StateEstimator,
     N::Int,
-    u_ry::Vector{<:Real},
-    d::Vector{<:Real};
+    u_ry::Vector,
+    d::Vector;
     plant::SimModel = estim.model,
-    u_step ::Vector{<:Real} = zeros(plant.nu),
-    u_noise::Vector{<:Real} = zeros(plant.nu),
-    y_step ::Vector{<:Real} = zeros(plant.ny),
-    y_noise::Vector{<:Real} = zeros(plant.ny),
-    d_step ::Vector{<:Real} = zeros(plant.nd),
-    d_noise::Vector{<:Real} = zeros(plant.nd),
-    x_noise::Vector{<:Real} = zeros(plant.nx),
+    u_step ::Vector = zeros(plant.nu),
+    u_noise::Vector = zeros(plant.nu),
+    y_step ::Vector = zeros(plant.ny),
+    y_noise::Vector = zeros(plant.ny),
+    d_step ::Vector = zeros(plant.nd),
+    d_noise::Vector = zeros(plant.nd),
+    x_noise::Vector = zeros(plant.nx),
     x0 = zeros(plant.nx),
     x̂0 = nothing,
     lastu = plant.uop,
@@ -230,9 +213,12 @@ function sim_closedloop!(
     return res
 end
 
+"Keep manipulated input `u` unchanged for state estimator simulation."
 sim_getu!(::StateEstimator, u, _ , _ ) = u
+"Compute new `u` for predictive controller simulation."
 sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
 
+"Plots.jl recipe for `SimResult` objects constructed with `SimModel` objects."
 @recipe function simresultplot(
     res::SimResult{<:SimModel};
     plotu  = true,
@@ -308,6 +294,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
     end
 end
 
+"Plots.jl recipe for `SimResult` objects constructed with `StateEstimator` objects."
 @recipe function simresultplot(
     res::SimResult{<:StateEstimator};
     plotŷ           = true,
@@ -414,6 +401,7 @@ end
     end
 end
 
+"Plots.jl recipe for `SimResult` objects constructed with `PredictiveController` objects."
 @recipe function simresultplot(
     res::SimResult{<:PredictiveController}; 
     plotry   = true,
