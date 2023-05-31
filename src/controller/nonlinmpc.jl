@@ -118,16 +118,16 @@ This method uses the default state estimator :
 - `model::SimModel` : model used for controller predictions and state estimations.
 - `Hp=10`: prediction horizon ``H_p``.
 - `Hc=2` : control horizon ``H_c``.
-- `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector)
-- `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector)
-- `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector)
-- `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only
+- `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
+- `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
+- `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
+- `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
 - `JE=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{D̂}_E, \mathbf{Ŷ}_E)``.
-- `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector)
-- `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive 
+- `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector).
+- `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
-   (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer)
+   (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer).
 
 # Examples
 ```jldoctest

@@ -13,15 +13,9 @@ struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
 end
 
 @doc raw"""
-    sim!(
-        plant::SimModel, 
-        N::Int,
-        u::Vector{<:Real} = plant.uop .+ 1,
-        d::Vector{<:Real} = plant.dop;
-        <keyword arguments>
-    )
+    sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; <keyword arguments>)
 
-Open-loop simulation of `plant` model for `N` time steps, default to input bumps.
+Open-loop simulation of `plant` for `N` time steps, default to input bumps.
 
 See Arguments for the available options. The noises are provided as standard deviations σ
 vectors. The simulated sensor and process noises of `plant` are specified by `y_noise` and
@@ -30,24 +24,24 @@ visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plo
 them (see Examples below).
 
 # Arguments
-- `plant::SimModel` : plant model to simulate
-- `N::Int` : simulation length in time steps
-- `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value
-- `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value
-- `u_step  = zeros(plant.nu)` : step disturbance on manipulated input ``\mathbf{u}``
-- `u_noise = zeros(plant.nu)` : additive gaussian noise on manipulated input ``\mathbf{u}``
-- `y_step  = zeros(plant.ny)` : step disturbance on plant outputs ``\mathbf{y}``
-- `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``
-- `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``
-- `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
-- `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``
-- `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``
+- `plant::SimModel` : plant model to simulate.
+- `N::Int` : simulation length in time steps.
+- `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value.
+- `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value.
+- `u_step  = zeros(plant.nu)` : step load disturbance on plant inputs ``\mathbf{u}``.
+- `u_noise = zeros(plant.nu)` : additive gaussian noise on plant inputs ``\mathbf{u}``.
+- `y_step  = zeros(plant.ny)` : step disturbance on plant outputs ``\mathbf{y}``.
+- `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``.
+- `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``.
+- `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``.
+- `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``.
+- `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``.
 
 # Examples
 ```julia-repl
-julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10, 1, 1, 1);
+julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10, 1, 1, 1, 1);
 
-julia> res = sim!(plant, 5, [0], [0], x0=[1]);
+julia> res = sim!(plant, 15, [0], [0], x0=[1]);
 
 julia> using Plots; plot(res, plotu=false, plotd=false, plotx=true)
 ```
@@ -93,10 +87,10 @@ end
 
 @doc raw"""
     sim!(
-        estim::StateEstimator, 
-        N::Int, 
-        u = estim.model.uop .+ 1, 
-        d = estim.model.dop; 
+        estim::StateEstimator,
+        N::Int,
+        u = estim.model.uop .+ 1,
+        d = estim.model.dop;
         <keyword arguments>
     )
 
@@ -105,15 +99,15 @@ Closed-loop simulation of `estim` estimator for `N` time steps, default to input
 See Arguments for the available options. 
 
 # Arguments
-- `estim::StateEstimator` : state estimator to simulate
-- `N::Int` : simulation length in time steps
-- `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value
-- `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value
-- `plant::SimModel = estim.model` : simulated plant model
+- `estim::StateEstimator` : state estimator to simulate.
+- `N::Int` : simulation length in time steps.
+- `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value.
+- `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value.
+- `plant::SimModel = estim.model` : simulated plant model.
 - `x̂0 = nothing` : `mpc.estim` state estimator initial state ``\mathbf{x̂}(0)``, if `nothing`
-   then ``\mathbf{x̂}`` is initialized with [`initstate!`](@ref)
-- `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
-- `<keyword arguments>` of [`sim!(::SimModel)`](@ref)
+   then ``\mathbf{x̂}`` is initialized with [`initstate!`](@ref).
+- `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization.
+- `<keyword arguments>` of [`sim!(::SimModel, ::Int)`](@ref).
 
 # Examples
 ```julia-repl
@@ -140,7 +134,7 @@ end
 @doc raw"""
     sim!(
         mpc::PredictiveController, 
-        N::Int, 
+        N::Int,
         ry = mpc.estim.model.yop .+ 1, 
         d  = mpc.estim.model.dop; 
         <keyword arguments>
@@ -148,8 +142,8 @@ end
 
 Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
 
-`ry` is the output setpoint value applied at ``t = 0`` second. The keyword arguments are
-identical to [`sim!(::StateEstimator)`](@ref).
+The argument `ry` is output setpoint ``\mathbf{r_y}`` value applied at ``t = 0``. The 
+keyword arguments are identical to [`sim!(::StateEstimator, ::Int)`](@ref).
 
 # Examples
 ```julia-repl
@@ -157,9 +151,9 @@ julia> model = LinModel([tf(3, [30, 1]); tf(2, [5, 1])], 4);
 
 julia> mpc = setconstraint!(LinMPC(model, Mwt=[0, 1], Nwt=[0.01], Hp=30), ŷmin=[0, -Inf]);
 
-julia> res = sim!(mpc, 25, [0; 0], y_noise=[0.1], y_step=[-10,0]);
+julia> res = sim!(mpc, 25, [0, 0], y_noise=[0.1], y_step=[-10, 0]);
 
-julia> using Plots; plot(res, plotRy=true, plotŷ=true, plotŷmin=true, plotu=true)
+julia> using Plots; plot(res, plotry=true, plotŷ=true, plotŷmin=true, plotu=true)
 ```
 """
 function sim!(
