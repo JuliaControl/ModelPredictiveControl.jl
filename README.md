@@ -28,9 +28,6 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 ### Model Predictive Control Features
 
 - ✅ linear and nonlinear plant models exploiting multiple dispatch
-- ✅ model predictive controllers based on:
-  - ✅ linear plant models
-  - ✅ nonlinear plant models
 - ✅ supported objective function terms:
   - ✅ output setpoint tracking
   - ✅ move suppression

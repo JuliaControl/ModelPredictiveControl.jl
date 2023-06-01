@@ -159,12 +159,17 @@ psM  = plot(resM)
 display(psM)
 
 res = sim!(mpc, mpc.Hp+10)
-ps = plot(res)
+ps = plot(res, plotx=true)
 display(ps)
 
 res2 = sim!(uscKalmanFilter1, mpc.Hp+10)
 ps2 = plot(res2)
 display(ps2)
+
+res2 = sim!(uscKalmanFilter1, mpc.Hp+10, plant=deepcopy(uscKalmanFilter1.model))
+ps2 = plot(res2, plotx=true, plotx̂=true)
+display(ps2)
+
 
 #=
 test_mpc(linModel4, nmpc)
