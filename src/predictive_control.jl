@@ -288,12 +288,13 @@ fields:
 
 # Examples
 ```jldoctest
-julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
+julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1, Hc=1);
 
 julia> u = moveinput!(mpc, [5]);
 
-julia> info, sol_summary = getinfo(mpc); round.(info[:Ŷ][end], digits=2)
-5.0
+julia> info, sol_summary = getinfo(mpc); round.(info[:Ŷ], digits=3)
+1-element Vector{Float64}:
+ 5.0
 ```
 """
 function getinfo(mpc::PredictiveController)
