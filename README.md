@@ -33,7 +33,7 @@ channel:
 \end{bmatrix}
 ```
 
-We first construct the plant model with a sample time ``T_s = 1`` s:
+We first construct the plant model with a sample time $T_s = 1$ s:
 
 ```julia
 using ModelPredictiveControl, ControlSystemsBase
