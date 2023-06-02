@@ -37,18 +37,18 @@ We first construct the plant model with a sample time $T_s = 1$ s:
 
 ```julia
 using ModelPredictiveControl, ControlSystemsBase
-sys = [
+G = [
     tf( 2 , [10, 1])*delay(20)
     tf( 10, [4,  1])
 ]
 Ts = 1.0
-model = LinModel(sys, Ts)
+model = LinModel(G, Ts)
 ```
 
 Our goal is controlling the first output, but the second one should never exceed 35:
 
 ```julia
-mpc = LinMPC(model, Mwt=[1, 0], Nwt=[0.1], Hp=30, Hc=2)
+mpc = LinMPC(model, Mwt=[1, 0], Nwt=[0.1])
 mpc = setconstraint!(mpc, ŷmax=[Inf, 35])
 ```
 
