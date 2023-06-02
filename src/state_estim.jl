@@ -265,6 +265,7 @@ end
 (estim::StateEstimator)(d=Float64[]) = evaloutput(estim, d)
 
 include("estimator/kalman.jl")
+include("estimator/luenberger.jl")
 include("estimator/internal_model.jl")
 
 "Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`."

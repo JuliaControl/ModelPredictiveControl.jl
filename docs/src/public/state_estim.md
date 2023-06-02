@@ -50,6 +50,12 @@ SteadyKalmanFilter
 KalmanFilter
 ```
 
+## Luenberger
+
+```@docs
+Luenberger
+```
+
 ## UnscentedKalmanFilter
 
 ```@docs

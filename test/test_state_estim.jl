@@ -97,6 +97,48 @@ end
     @test kalmanfilter1.x̂ ≈ [1,2,3,4]
 end   
 
+@testset "Luenberger construction" begin
+    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
+    lo1 = Luenberger(linmodel1)
+    @test lo1.nym == 2
+    @test lo1.nyu == 0
+    @test lo1.nxs == 2
+    @test lo1.nx̂ == 4
+
+    linmodel2 = LinModel(sys,Ts,i_d=[3])
+    lo2 = Luenberger(linmodel2, i_ym=[2])
+    @test lo2.nym == 1
+    @test lo2.nyu == 1
+    @test lo2.nxs == 1
+    @test lo2.nx̂ == 5
+
+    lo3 = Luenberger(linmodel1, nint_ym=0)
+    @test lo3.nxs == 0
+    @test lo3.nx̂ == 2
+
+    lo4 = Luenberger(linmodel1, nint_ym=[2,2])
+    @test lo4.nxs == 4
+    @test lo4.nx̂ == 6
+
+    @test_throws ErrorException Luenberger(linmodel1, nint_ym=[1,1,1])
+    @test_throws ErrorException Luenberger(linmodel1, nint_ym=[-1,0])
+    @test_throws ErrorException Luenberger(linmodel1, p̂=[0.5])
+    @test_throws ErrorException Luenberger(linmodel1, p̂=fill(1.5, lo1.nx̂))
+end    
+    
+@testset "Luenberger estimator methods" begin
+    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    lo1 = Luenberger(linmodel1)
+    @test updatestate!(lo1, [10, 50], [50, 30]) ≈ zeros(4)
+    @test updatestate!(lo1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
+    @test lo1.x̂ ≈ zeros(4)
+    @test evaloutput(lo1) ≈ lo1() ≈ [50, 30]
+    @test evaloutput(lo1, Float64[]) ≈ lo1(Float64[]) ≈ [50, 30]
+    @test initstate!(lo1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    setstate!(lo1, [1,2,3,4])
+    @test lo1.x̂ ≈ [1,2,3,4]
+end
+
 @testset "InternalModel construction" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     internalmodel1 = InternalModel(linmodel1)

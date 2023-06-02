@@ -64,7 +64,7 @@ Pages = [
 - ⬜ supported state estimators/observers:
   - ✅ steady-state Kalman filter
   - ✅ Kalman filter
-  - ⬜ Luenberger observer
+  - ✅ Luenberger observer
   - ✅ internal model structure
   - ⬜ extended Kalman filter
   - ✅ unscented Kalman filter

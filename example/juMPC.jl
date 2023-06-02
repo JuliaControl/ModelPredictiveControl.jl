@@ -51,6 +51,12 @@ internalModel3 = InternalModel(linModel1,i_ym=[2])
 
 initstate!(internalModel1,[0,0],[1,1])
 
+luenberger = Luenberger(linModel1)
+
+updatestate!(luenberger, [0,0], [0,0])
+
+mpcluen = LinMPC(luenberger)
+
 kalmanFilter1 = KalmanFilter(linModel1)
 kalmanFilter2 = KalmanFilter(linModel1,nint_ym=0)
 
