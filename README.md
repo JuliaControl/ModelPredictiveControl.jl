@@ -18,6 +18,55 @@ To install the `ModelPredictiveControl` package, run this command in the Julia R
 using Pkg; Pkg.add("ModelPredictiveControl")
 ```
 
+## Getting Started
+
+To construct model predictive controllers, we must first specify a plant model that is
+typically extracted from input-output data using [system identification](https://github.com/baggepinnen/ControlSystemIdentification.jl).
+The model here is linear with one input, two outputs and a large time delay in the first
+channel:
+
+```math
+\mathbf{G}(s) = \frac{\mathbf{y}(s)}{\mathbf{u}(s)} = 
+\begin{bmatrix}
+    \frac{2e^{-20s}}{10s + 1} \\[3pt]
+    \frac{10}{4s +1}
+\end{bmatrix}
+```
+
+We first construct the plant model with a sample time ``T_s = 1`` s:
+
+```julia
+using ModelPredictiveControl, ControlSystemsBase
+sys = [
+    tf( 2 , [10, 1])*delay(20)
+    tf( 10, [4,  1])
+]
+Ts = 1.0
+model = LinModel(sys, Ts)
+```
+
+Our goal is controlling the first output, but the second one should never exceed 35:
+
+```julia
+mpc = LinMPC(model, Mwt=[1, 0], Nwt=[0.1], Hp=30, Hc=2)
+mpc = setconstraint!(mpc, ŷmax=[Inf, 35])
+```
+
+The keyword arguments `Mwt` and `Nwt` are the setpoint tracking and move suppression
+weights, respectively. We can now test `mpc` controller with a setpoint step change and
+display the result using [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl):
+
+```julia
+using Plots
+ry = [5, 0]
+plot(sim!(mpc, 40, ry), plotry=true, plotŷmax=true)
+```
+
+![StepChangeResponse](/example/readme_result.svg)
+
+See the [manual](https://franckgaga.github.io/ModelPredictiveControl.jl/stable/manual/) for
+more detailed examples.
+
 ## Features
 
 ### Legend
