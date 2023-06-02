@@ -98,7 +98,7 @@ end
 """
     updatestate!(estim::Luenberger, u, ym, d=Float64[])
 
-Same `SteadyKalmanFilter` but using the Luenberger observer.
+Same than `SteadyKalmanFilter` but using the Luenberger observer.
 """
 function updatestate!(estim::Luenberger, u, ym, d=Float64[])
     u, d, ym = remove_op!(estim, u, d, ym)
