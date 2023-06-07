@@ -89,8 +89,7 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 - `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``.
 - `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``.
 - `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``.
-- `x̂0 = nothing` : `mpc.estim` state estimator initial state ``\mathbf{x̂}(0)``, if `nothing`
-   then ``\mathbf{x̂}`` is initialized with [`initstate!`](@ref).
+- `x̂0 = nothing` : initial estimate ``\mathbf{x̂}(0)``, use [`initstate!`](@ref) if `nothing`.
 - `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization.
 
 # Examples
@@ -126,7 +125,7 @@ end
 
 Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
 
-The output setpoints ``\mathbf{r_y}`` are held constant at `r_y`. The keyword arguments are
+The output setpoint ``\mathbf{r_y}`` is held constant at `r_y`. The keyword arguments are
 identical to [`sim!(::StateEstimator, ::Int)`](@ref).
 
 # Examples
