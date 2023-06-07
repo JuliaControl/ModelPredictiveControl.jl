@@ -62,7 +62,7 @@ ry = [5, 0]
 plot(sim!(mpc, 40, ry), plotry=true, plotŷmax=true)
 ```
 
-![StepChangeResponse](/example/readme_result.svg)
+![StepChangeResponse](/docs/src/assets/readme_result.svg)
 
 See the [manual](https://franckgaga.github.io/ModelPredictiveControl.jl/stable/manual/) for
 more detailed examples.

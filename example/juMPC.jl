@@ -177,7 +177,7 @@ ps2 = plot(res2, plotx=true, plotx̂=true)
 display(ps2)
 
 
-#=
+
 test_mpc(linModel4, nmpc)
 @time u_data, y_data, r_data, d_data = test_mpc(linModel4, nmpc)
 
@@ -203,4 +203,3 @@ display(pd)
 display(pu)
 display(py)
 
-=#
