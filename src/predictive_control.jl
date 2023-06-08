@@ -999,13 +999,19 @@ end
 repeatdiag(A, n::Int) = kron(I(n), A)
 
 function Base.show(io::IO, mpc::PredictiveController)
+    Hp, Hc = mpc.Hp, mpc.Hc
+    nu, nd = mpc.estim.model.nu, mpc.estim.model.nd
+    nx̂, nym, nyu = mpc.estim.nx̂, mpc.estim.nym, mpc.estim.nyu
+    n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd)))
     println(io, "$(typeof(mpc).name.name) controller with a sample time Ts = "*
                 "$(mpc.estim.model.Ts) s, $(typeof(mpc.estim).name.name) estimator and:")
-    println(io, " $(mpc.estim.model.nu) manipulated inputs u")
-    println(io, " $(mpc.estim.nx̂) states x̂")
-    println(io, " $(mpc.estim.nym) measured outputs ym")
-    println(io, " $(mpc.estim.nyu) unmeasured outputs yu")
-    print(io,   " $(mpc.estim.model.nd) measured disturbances d")
+    println(io, " $(rpad(Hp, n)) prediction steps Hp")
+    println(io, " $(rpad(Hc, n)) control steps Hc")
+    println(io, " $(rpad(nu, n)) manipulated inputs u")
+    println(io, " $(rpad(nx̂, n)) states x̂")
+    println(io, " $(rpad(nym, n)) measured outputs ym")
+    println(io, " $(rpad(nyu, n)) unmeasured outputs yu")
+    print(io,   " $(rpad(nd, n)) measured disturbances d")
 end
 
 "Verify that the solver termination status means 'no solution available'."

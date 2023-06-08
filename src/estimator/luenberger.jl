@@ -18,7 +18,7 @@ struct Luenberger <: StateEstimator
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
     K::Matrix{Float64}
-    function Luenberger(model, i_ym, nint_ym, Asm, Csm, p)
+    function Luenberger(model, i_ym, nint_ym, Asm, Csm, p̂)
         nu, nx, ny = model.nu, model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
         nxs = size(Asm,1)
@@ -27,9 +27,9 @@ struct Luenberger <: StateEstimator
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         K = try
-            place(Â, Ĉ, p, :o)
+            place(Â, Ĉ, p̂, :o)
         catch
-            error("Cannot compute the Luenberger gain L with specified poles p.")        
+            error("Cannot compute the Luenberger gain L with specified poles p̂.")        
         end
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)

@@ -477,7 +477,6 @@ end
                 yguide    --> "\$y_$i\$"
                 color     --> 3
                 subplot   --> subplot_base + i
-                seriestype --> :steppost
                 linestyle --> :dash
                 linewidth --> 0.75
                 label     --> "\$\\mathbf{r_y}\$"

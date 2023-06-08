@@ -131,15 +131,17 @@ This method uses the default state estimator :
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1);
 
 julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s, UnscentedKalmanFilter estimator and:
- 1 manipulated inputs u
- 2 states x̂
- 1 measured outputs ym
- 0 unmeasured outputs yu
- 0 measured disturbances d
+ 20 prediction steps Hp
+ 1  control steps Hc
+ 1  manipulated inputs u
+ 2  states x̂
+ 1  measured outputs ym
+ 0  unmeasured outputs yu
+ 0  measured disturbances d
 ```
 
 # Extended Help
@@ -170,11 +172,13 @@ julia> estim = UnscentedKalmanFilter(model, σQ_int=[0.05]);
 
 julia> mpc = NonLinMPC(estim, Hp=20, Hc=1, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s, UnscentedKalmanFilter estimator and:
- 1 manipulated inputs u
- 2 states x̂
- 1 measured outputs ym
- 0 unmeasured outputs yu
- 0 measured disturbances d
+ 20 prediction steps Hp
+ 1  control steps Hc
+ 1  manipulated inputs u
+ 2  states x̂
+ 1  measured outputs ym
+ 0  unmeasured outputs yu
+ 0  measured disturbances d
 ```
 """
 function NonLinMPC(

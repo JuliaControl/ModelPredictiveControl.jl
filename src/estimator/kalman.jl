@@ -151,7 +151,7 @@ The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\
 
 # Examples
 ```jldoctest
-julia> kf = SteadyKalmanFilter(LinModel(ss(1, 1, 1, 0, 1)));
+julia> kf = SteadyKalmanFilter(LinModel(ss(1, 1, 1, 0, 1.0)));
 
 julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_ym argument)
 2-element Vector{Float64}:

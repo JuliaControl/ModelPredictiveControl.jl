@@ -2,3 +2,4 @@
 docs/build/
 JuliaSysimage.so
 LocalPreferences.toml
+.vscode/

@@ -37,29 +37,29 @@ We first construct the plant model with a sample time $T_s = 1$ s:
 
 ```julia
 using ModelPredictiveControl, ControlSystemsBase
-G = [
-    tf( 2 , [10, 1])*delay(20)
-    tf( 10, [4,  1])
-]
+G = [ tf( 2 , [10, 1])*delay(20)
+      tf( 10, [4,  1]) ]
 Ts = 1.0
 model = LinModel(G, Ts)
 ```
 
-Our goal is controlling the first output, but the second one should never exceed 35:
+Our goal is controlling the first output $y_1$, but the second one $y_2$ should never exceed
+35:
 
 ```julia
 mpc = LinMPC(model, Mwt=[1, 0], Nwt=[0.1])
 mpc = setconstraint!(mpc, ŷmax=[Inf, 35])
 ```
 
-The keyword arguments `Mwt` and `Nwt` are the setpoint tracking and move suppression
-weights, respectively. We can now test `mpc` controller with a setpoint step change and
-display the result using [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl):
+The keyword arguments `Mwt` and `Nwt` are the output setpoint tracking and move suppression
+weights, respectively. A setpoint step change of five tests `mpc` controller in closed-loop.
+The result is displayed with [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl):
 
 ```julia
 using Plots
 ry = [5, 0]
-plot(sim!(mpc, 40, ry), plotry=true, plotŷmax=true)
+res = sim!(mpc, 40, ry)
+plot(res, plotry=true, plotŷmax=true)
 ```
 
 ![StepChangeResponse](/docs/src/assets/readme_result.svg)

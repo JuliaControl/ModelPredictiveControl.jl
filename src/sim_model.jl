@@ -50,7 +50,7 @@ The structure is similar if `model` is a `NonLinModel`:
 
 # Examples
 ```jldoctest
-julia> model = setop!(LinModel(tf(3, [10, 1]), 2), uop=[50], yop=[20])
+julia> model = setop!(LinModel(tf(3, [10, 1]), 2.0), uop=[50], yop=[20])
 Discrete-time linear model with a sample time Ts = 2.0 s and:
  1 manipulated inputs u
  1 states x
@@ -87,12 +87,15 @@ function setstate!(model::SimModel, x)
 end
 
 function Base.show(io::IO, model::SimModel)
+    nu, nd = model.nu, model.nd
+    nx, ny = model.nx, model.ny
+    n = maximum(ndigits.((nu, nx, ny, nd)))
     println(io, "Discrete-time $(typestr(model)) model with "*
                 "a sample time Ts = $(model.Ts) s and:")
-    println(io, " $(model.nu) manipulated inputs u")
-    println(io, " $(model.nx) states x")
-    println(io, " $(model.ny) outputs y")
-    print(io,   " $(model.nd) measured disturbances d")
+    println(io, " $(rpad(nu, n)) manipulated inputs u")
+    println(io, " $(rpad(nx, n)) states x")
+    println(io, " $(rpad(ny, n)) outputs y")
+    print(io,   " $(rpad(nd, n)) measured disturbances d")
 end
 
 """
@@ -102,7 +105,7 @@ Update `model.x` states with current inputs `u` and measured disturbances `d`.
 
 # Examples
 ```jldoctest
-julia> model = LinModel(ss(1, 1, 1, 0, 1));
+julia> model = LinModel(ss(1, 1, 1, 0, 1.0));
 
 julia> x = updatestate!(model, [1])
 1-element Vector{Float64}:
@@ -123,7 +126,7 @@ Calling a [`SimModel`](@ref) object calls this `evaloutput` method.
 
 # Examples
 ```jldoctest
-julia> model = setop!(LinModel(tf(2, [10, 1]), 5), yop=[20]);
+julia> model = setop!(LinModel(tf(2, [10, 1]), 5.0), yop=[20]);
 
 julia> y = evaloutput(model)
 1-element Vector{Float64}:
