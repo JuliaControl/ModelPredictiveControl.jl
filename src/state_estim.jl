@@ -36,14 +36,14 @@ end
 function Base.show(io::IO, estim::StateEstimator)
     nu, nd = estim.model.nu, estim.model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
-    n = maximum(ndigits.((nu, nx̂, nym, nyu, nd)))
+    n = maximum(ndigits.((nu, nx̂, nym, nyu, nd))) + 1
     println(io, "$(typeof(estim).name.name) estimator with a sample time "*
                 "Ts = $(estim.model.Ts) s, $(typeof(estim.model).name.name) and:")
-    println(io, " $(rpad(nu, n)) manipulated inputs u")
-    println(io, " $(rpad(nx̂, n)) states x̂")
-    println(io, " $(rpad(nym, n)) measured outputs ym")
-    println(io, " $(rpad(nyu, n)) unmeasured outputs yu")
-    print(io,   " $(rpad(nd, n)) measured disturbances d")
+    println(io, "$(lpad(nu, n)) manipulated inputs u")
+    println(io, "$(lpad(nx̂, n)) states x̂")
+    println(io, "$(lpad(nym, n)) measured outputs ym")
+    println(io, "$(lpad(nyu, n)) unmeasured outputs yu")
+    print(io,   "$(lpad(nd, n)) measured disturbances d")
 end
 
 """
