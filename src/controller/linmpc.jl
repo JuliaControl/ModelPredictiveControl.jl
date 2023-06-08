@@ -136,12 +136,12 @@ julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
 julia> mpc = LinMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
 LinMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimator and:
  30 prediction steps Hp
- 1  control steps Hc
- 1  manipulated inputs u
- 4  states x̂
- 2  measured outputs ym
- 0  unmeasured outputs yu
- 0  measured disturbances d
+  1 control steps Hc
+  1 manipulated inputs u
+  4 states x̂
+  2 measured outputs ym
+  0 unmeasured outputs yu
+  0 measured disturbances d
 ```
 
 # Extended Help
@@ -166,12 +166,12 @@ julia> estim = KalmanFilter(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4), i_ym=
 julia> mpc = LinMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
 LinMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
  30 prediction steps Hp
- 1  control steps Hc
- 1  manipulated inputs u
- 3  states x̂
- 1  measured outputs ym
- 1  unmeasured outputs yu
- 0  measured disturbances d
+  1 control steps Hc
+  1 manipulated inputs u
+  3 states x̂
+  1 measured outputs ym
+  1 unmeasured outputs yu
+  0 measured disturbances d
 ```
 """
 function LinMPC(
