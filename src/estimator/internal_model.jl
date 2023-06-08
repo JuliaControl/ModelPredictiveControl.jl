@@ -18,12 +18,7 @@ struct InternalModel{M<:SimModel} <: StateEstimator
     function InternalModel{M}(model::M, i_ym, Asm, Bsm, Csm, Dsm) where {M<:SimModel}
         nu, ny = model.nu, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
-        if isa(model, LinModel)
-            poles = eigvals(model.A)
-            if any(abs.(poles) .≥ 1) 
-                error("InternalModel does not support integrating or unstable model")
-            end
-        end
+        validate_internalmodel(model)
         validate_ym(model, i_ym)
         if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
             error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
@@ -50,7 +45,6 @@ struct InternalModel{M<:SimModel} <: StateEstimator
         )
     end
 end
-
 
 @doc raw"""
     InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(1,1,1,1,model.Ts).*I)
@@ -92,9 +86,7 @@ function InternalModel(
     i_ym::IntRangeOrVector = 1:model.ny,
     stoch_ym::Union{StateSpace, TransferFunction} = ss(1,1,1,1,model.Ts).*I(length(i_ym))
 ) where {M<:SimModel}
-    if isa(stoch_ym, TransferFunction) 
-        stoch_ym = minreal(ss(stoch_ym))
-    end
+    stoch_ym = minreal(ss(stoch_ym))
     if iscontinuous(stoch_ym)
         stoch_ym = c2d(stoch_ym, model.Ts, :tustin)
     else
@@ -108,6 +100,14 @@ function InternalModel(
     return InternalModel{M}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
 end
 
+"Validate if `model` is asymptotically stable for [`LinModel`](@ref)."
+function validate_internalmodel(model::LinModel)
+    poles = eigvals(model.A)
+    if any(abs.(poles) .≥ 1) 
+        error("InternalModel does not support integrating or unstable model")
+    end
+end
+validate_internalmodel(::SimModel) = nothing
 
 @doc raw"""
     init_internalmodel(As, Bs, Cs, Ds)
