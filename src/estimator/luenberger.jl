@@ -33,7 +33,7 @@ struct Luenberger <: StateEstimator
         end
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
-        x̂ = [copy(model.x); zeros(nxs)]
+        x̂ = [zeros(model.nx); zeros(nxs)]
         return new(
             model, 
             lastu0, x̂,
