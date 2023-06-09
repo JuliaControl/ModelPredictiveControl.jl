@@ -155,7 +155,7 @@ The plant model is nonlinear:
 ```math
 \begin{aligned}
     \dot{θ}(t) &= ω(t)                                                                    \\
-    \dot{ω}(t) &= -\frac{g}{L}\sin\big( θ(t) \big) - \frac{k}{m} ω(t) + \frac{m}{L^2}τ(t)
+    \dot{ω}(t) &= -\frac{g}{L}\sin\big( θ(t) \big) - \frac{k}{m} ω(t) + \frac{1}{m L^2} τ(t)
 \end{aligned}
 ```
 
@@ -197,9 +197,9 @@ An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 estim = UnscentedKalmanFilter(model, σQ=[0.5, 2.5], σQ_int=[0.5])
 ```
 
-The standard deviation of the angular velocity ``ω`` is higher here (second value of `σQ`)
-since ``\dot{ω}(t)`` equation includes the friction coefficient ``k``, an uncertain
-parameter. The estimator tuning is tested on a simulated plant with a different ``k`` value:
+The standard deviation of the angular velocity ``ω`` is higher here (`σQ` second value)
+since ``\dot{ω}(t)`` equation includes an uncertain parameter: the friction coefficient
+``k``. The estimator tuning is tested on a plant simulated with a different ``k``:
 
 ```@example 2
 par_plant = (par[1], par[2], par[3] + 0.25, par[4])
@@ -209,20 +209,20 @@ res = sim!(estim, 30, [0.5], plant=plant, y_noise=[0.5]) # τ = 0.5 N m
 p2 = plot(res, plotu=false, plotx=true, plotx̂=true)
 ```
 
-The Kalman filter performance seems sufficient for control applications. As the motor torque
-is limited to -1.5 to 1.5 N m, we incorporate the manipulated input constraints in a
-[`NonLinMPC`](@ref):
+The Kalman filter performance seems sufficient for control. As the motor torque is limited
+to -1.5 to 1.5 N m, we incorporate the input constraints in a [`NonLinMPC`](@ref):
 
 ```@example 2
 mpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.1], Nwt=[1.0], Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
 
-We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted position):
+We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted
+position):
 
 ```@example 2
 res = sim!(mpc, 30, [180.0], x̂0=zeros(mpc.estim.nx̂), plant=plant, x0=zeros(plant.nx))
 plot(res, plotŷ=true)
 ```
 
-The controller here seems robust enough to variations on ``k`` coefficients.
+The controller seems robust enough to variations on ``k`` coefficient.
