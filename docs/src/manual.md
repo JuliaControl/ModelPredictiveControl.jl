@@ -155,11 +155,11 @@ The plant model is nonlinear:
 ```math
 \begin{aligned}
     \dot{θ}(t) &= ω(t)                                                                    \\
-    \dot{ω}(t) &= -\frac{g}{L}\sin\big( θ(t) \big) - \frac{k}{m} ω(t) + \frac{1}{m L^2} τ(t)
+    \dot{ω}(t) &= -\frac{g}{L}\sin\big( θ(t) \big) - \frac{K}{m} ω(t) + \frac{1}{m L^2} τ(t)
 \end{aligned}
 ```
 
-in which ``g`` is the gravitational acceleration, ``L``, the pendulum length, ``k``, the
+in which ``g`` is the gravitational acceleration, ``L``, the pendulum length, ``K``, the
 friction coefficient at the pivot point, and ``m``, the mass attached at the end of the
 pendulum. Here, the explicit Euler method discretizes the system to construct a
 [`NonLinModel`](@ref):
@@ -167,7 +167,7 @@ pendulum. Here, the explicit Euler method discretizes the system to construct a
 ```@example 2
 using ModelPredictiveControl
 function pendulum(par, x, u)
-    g, L, k, m = par        # [m/s], [m], [kg/s], [kg]
+    g, L, K, m = par        # [m/s], [m], [kg/s], [kg]
     θ, ω = x[1], x[2]       # [rad], [rad/s]
     τ  = u[1]               # [N m]
     dθ = ω
@@ -199,7 +199,7 @@ estim = UnscentedKalmanFilter(model, σQ=[0.5, 2.5], σQ_int=[0.5])
 
 The standard deviation of the angular velocity ``ω`` is higher here (`σQ` second value)
 since ``\dot{ω}(t)`` equation includes an uncertain parameter: the friction coefficient
-``k``. The estimator tuning is tested on a plant simulated with a different ``k``:
+``K``. The estimator tuning is tested on a plant simulated with a different ``K``:
 
 ```@example 2
 par_plant = (par[1], par[2], par[3] + 0.25, par[4])
@@ -225,4 +225,4 @@ res = sim!(mpc, 30, [180.0], x̂0=zeros(mpc.estim.nx̂), plant=plant, x0=zeros(p
 plot(res, plotŷ=true)
 ```
 
-The controller seems robust enough to variations on ``k`` coefficient.
+The controller seems robust enough to variations on ``K`` coefficient.
