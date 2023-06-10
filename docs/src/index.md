@@ -11,7 +11,8 @@ for the linear systems and [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for 
 ```@contents
 Pages = [
     "index.md",
-    "manual.md",
+    "manual/linmpc.md",
+    "manual/nonlinmpc.md",
     "public/sim_model.md",
     "public/state_estim.md",
     "public/predictive_control.md",

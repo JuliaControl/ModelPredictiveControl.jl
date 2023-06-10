@@ -21,8 +21,8 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 
 ## Getting Started
 
-To construct model predictive controllers, we must first specify a plant model that is
-typically extracted from input-output data using [system identification](https://github.com/baggepinnen/ControlSystemIdentification.jl).
+To construct model predictive controllers (MPCs), we must first specify a plant model that
+is typically extracted from input-output data using [system identification](https://github.com/baggepinnen/ControlSystemIdentification.jl).
 The model here is linear with one input, two outputs and a large time delay in the first
 channel:
 
