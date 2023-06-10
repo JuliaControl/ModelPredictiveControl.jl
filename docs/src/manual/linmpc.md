@@ -1,4 +1,4 @@
-# Manual
+# [Manual](@id my_manual)
 
 ## Linear model and controller
 

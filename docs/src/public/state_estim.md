@@ -26,7 +26,7 @@ the controller computations, without introducing any additional delays. Moreover
 [`moveinput!`](@ref) method of the predictive controllers does not automatically update the
 estimates with [`updatestate!`](@ref). This allows applying the calculated inputs on the
 real plant before starting the potentially expensive estimator computations (see
-[Manual](@ref) for examples).
+[Manual](@ref my_manual) for examples).
 
 !!! info
     All the estimators support measured ``\mathbf{y^m}`` and unmeasured ``\mathbf{y^u}``
