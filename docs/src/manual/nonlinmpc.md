@@ -1,6 +1,6 @@
 # Manual
 
-## Nonlinear model and controller
+## Nonlinear Model
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum
 attached to a motor. If the manipulated input is the motor torque ``τ``, the vectors
@@ -53,6 +53,8 @@ using Plots
 u = [0.5] # τ = 0.5 N m
 plot(sim!(model, 60, u), plotu=false)
 ```
+
+## Nonlinear Predictive Controller
 
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 

@@ -1,6 +1,6 @@
 # [Manual](@id my_manual)
 
-## Linear model and controller
+## Linear Model
 
 The example considers a well-stirred tank with a cold and hot water inlet as a plant. The
 water flows out of an opening at the bottom of the tank. The manipulated inputs are the cold
@@ -38,14 +38,6 @@ the following linear model accurately describes the plant dynamics:
 \end{bmatrix}
 ```
 
-We want to design a predictive feedback that controls both the water level ``y_L`` and
-temperature ``y_T`` in the tank, at a sampling time of 4 s. The tank level should also never
-fall below 45:
-
-```math
-y_L ≥ 45
-```
-
 We first need to construct a [`LinModel`](@ref) objet with [`setop!`](@ref) to handle the
 operating points:
 
@@ -58,8 +50,19 @@ model = setop!(LinModel(sys, Ts), uop=[10, 10], yop=[50, 30])
 ```
 
 The `model` object will be used for two purposes : to construct our controller, and as a
-plant simulator to test the design. We design our [`LinMPC`](@ref) controllers by including
-the level constraint with [`setconstraint!`](@ref):
+plant simulator to test the design.
+
+## Linear Predictive Controller
+
+A predictive feedback will control both the water level ``y_L`` and temperature ``y_T`` in
+the tank, at a sampling time of 4 s. The tank level should also never fall below 45:
+
+```math
+y_L ≥ 45
+```
+
+We design our [`LinMPC`](@ref) controllers by including the level constraint with
+[`setconstraint!`](@ref):
 
 ```@example 1
 mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2), ŷmin=[45, -Inf])
