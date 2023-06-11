@@ -23,8 +23,10 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "Manual" => [
-            "Linear Designs" => "manual/linmpc.md",
-            "Nonlinear Designs" => "manual/nonlinmpc.md",
+            "Examples" => [
+                "Linear Designs" => "manual/linmpc.md",
+                "Nonlinear Designs" => "manual/nonlinmpc.md",
+            ],
         ],
         "Functions" => [
             "Public" => [
