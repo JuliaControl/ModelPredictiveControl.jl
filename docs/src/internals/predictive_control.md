@@ -1,4 +1,4 @@
-# PredictiveController Internals
+# Functions: PredictiveController Internals
 
 The prediction methodology of this module is mainly based on Maciejowski textbook [^1].
 

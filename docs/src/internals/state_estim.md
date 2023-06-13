@@ -1,4 +1,4 @@
-# StateEstimator Internals
+# Functions: StateEstimator Internals
 
 ```@docs
 ModelPredictiveControl.init_estimstoch
