@@ -65,8 +65,8 @@ plot(res, plotry=true, plotŷmax=true)
 
 ![StepChangeResponse](/docs/src/assets/readme_result.svg)
 
-See the [manual](https://franckgaga.github.io/ModelPredictiveControl.jl/stable/manual/) for
-more detailed examples.
+See the [manual](https://franckgaga.github.io/ModelPredictiveControl.jl/stable/manual/linmpc/)
+for more detailed examples.
 
 ## Features
 

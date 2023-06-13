@@ -24,8 +24,8 @@ makedocs(
         "Home" => "index.md",
         "Manual" => [
             "Examples" => [
-                "Linear Designs" => "manual/linmpc.md",
-                "Nonlinear Designs" => "manual/nonlinmpc.md",
+                "Linear Design" => "manual/linmpc.md",
+                "Nonlinear Design" => "manual/nonlinmpc.md",
             ],
         ],
         "Functions" => [

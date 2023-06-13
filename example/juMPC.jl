@@ -153,8 +153,8 @@ function test_mpc(model, mpc)
 end
 
 using PlotThemes, Plots
-theme(:default)
-#theme(:dark)
+#theme(:default)
+theme(:dark)
 default(fontfamily="Computer Modern"); scalefontsizes(1.1)
 
 test_mpc(linModel4 , mpc)
