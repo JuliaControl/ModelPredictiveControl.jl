@@ -1,4 +1,4 @@
-# Generic Functions
+# Functions: Generic Functions
 
 ```@contents
 Pages = ["generic_func.md"]

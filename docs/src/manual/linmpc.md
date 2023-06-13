@@ -1,4 +1,4 @@
-# [Manual : Linear Design](@id my_manual)
+# [Manual: Linear Design](@id my_manual)
 
 ## Linear Model
 

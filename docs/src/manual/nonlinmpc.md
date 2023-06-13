@@ -1,4 +1,4 @@
-# Manual : Nonlinear Design
+# Manual: Nonlinear Design
 
 ## Nonlinear Model
 

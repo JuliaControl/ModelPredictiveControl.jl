@@ -1,4 +1,4 @@
-# Plant Models
+# Functions: Plant Models
 
 ```@contents
 Pages = ["sim_model.md"]
