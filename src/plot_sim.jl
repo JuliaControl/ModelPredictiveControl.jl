@@ -186,6 +186,7 @@ function sim_closedloop!(
     lastd, lasty = d, evaloutput(plant, d)
     if isnothing(x̂0)
         initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
+
     else
         setstate!(est_mpc, x̂0)
     end

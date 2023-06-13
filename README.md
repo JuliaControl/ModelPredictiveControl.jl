@@ -1,6 +1,7 @@
 # ModelPredictiveControl.jl
 
 [![Build Status](https://github.com/franckgaga/ModelPredictiveControl.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/franckgaga/ModelPredictiveControl.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![codecov](https://codecov.io/gh/franckgaga/ModelPredictiveControl.jl/branch/main/graph/badge.svg?token=K4V0L113M4)](https://codecov.io/gh/franckgaga/ModelPredictiveControl.jl)
 [![doc-stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://franckgaga.github.io/ModelPredictiveControl.jl/stable)
 [![coc-dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://franckgaga.github.io/ModelPredictiveControl.jl/dev)
 
@@ -20,8 +21,8 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 
 ## Getting Started
 
-To construct model predictive controllers, we must first specify a plant model that is
-typically extracted from input-output data using [system identification](https://github.com/baggepinnen/ControlSystemIdentification.jl).
+To construct model predictive controllers (MPCs), we must first specify a plant model that
+is typically extracted from input-output data using [system identification](https://github.com/baggepinnen/ControlSystemIdentification.jl).
 The model here is linear with one input, two outputs and a large time delay in the first
 channel:
 
@@ -64,8 +65,8 @@ plot(res, plotry=true, plotŷmax=true)
 
 ![StepChangeResponse](/docs/src/assets/readme_result.svg)
 
-See the [manual](https://franckgaga.github.io/ModelPredictiveControl.jl/stable/manual/) for
-more detailed examples.
+See the [manual](https://franckgaga.github.io/ModelPredictiveControl.jl/stable/manual/linmpc/)
+for more detailed examples.
 
 ## Features
 

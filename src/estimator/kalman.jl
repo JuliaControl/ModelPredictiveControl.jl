@@ -40,7 +40,7 @@ struct SteadyKalmanFilter <: StateEstimator
         end
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
-        x̂ = [copy(model.x); zeros(nxs)]
+        x̂ = [zeros(model.nx); zeros(nxs)]
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)
         return new(
@@ -202,7 +202,7 @@ struct KalmanFilter <: StateEstimator
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
-        x̂ = [copy(model.x); zeros(nxs)]
+        x̂ = [zeros(model.nx); zeros(nxs)]
         P̂0 = Hermitian(P̂0, :L)
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)
@@ -352,7 +352,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
-        x̂ = [copy(model.x); zeros(nxs)]
+        x̂ = [zeros(model.nx); zeros(nxs)]
         P̂0 = Hermitian(P̂0, :L)
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)

@@ -22,7 +22,12 @@ makedocs(
     ),
     pages = [
         "Home" => "index.md",
-        "Manual" => "manual.md",
+        "Manual" => [
+            "Examples" => [
+                "Linear Design" => "manual/linmpc.md",
+                "Nonlinear Design" => "manual/nonlinmpc.md",
+            ],
+        ],
         "Functions" => [
             "Public" => [
                 "Plant Models" => "public/sim_model.md",

@@ -230,7 +230,7 @@ function init_optimization!(mpc::NonLinMPC)
     # --- nonlinear optimization init ---
     model = mpc.estim.model
     ny, nu, Hp, Hc = model.ny, model.nu, mpc.Hp, mpc.Hc
-    nC = (2*Hc*nu + 2*Hc*nu + 2*Hp*ny + 2) - length(mpc.con.b)
+    nC = (2*Hc*nu + 2*nvar + 2*Hp*ny) - length(mpc.con.b)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-functions-with-vector-outputs
     Jfunc, Cfunc = let mpc=mpc, model=model, nC=nC, nvar=nvar , nŶ=Hp*ny
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
