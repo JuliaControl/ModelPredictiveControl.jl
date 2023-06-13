@@ -1,4 +1,4 @@
-# Manual: Nonlinear Design
+# [Manual: Nonlinear Design](@id man_nonlin)
 
 ## Nonlinear Model
 

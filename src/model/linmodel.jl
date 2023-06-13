@@ -44,7 +44,7 @@ with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{z
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
 in any order. `i_u` provides the indices of ``\mathbf{z}`` that are manipulated, and `i_d`, 
 the measured disturbances. See Extended Help if `sys` is continuous-time, or discrete-time
-and `Ts ≠ sys.Ts`.
+with `Ts ≠ sys.Ts`.
 
 See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.ss),
 [`tf`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.tf).
