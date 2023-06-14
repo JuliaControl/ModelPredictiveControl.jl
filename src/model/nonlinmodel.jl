@@ -40,7 +40,7 @@ manipulated inputs, states, outputs and measured disturbances.
     Replace the `d` argument with `_` if `nd = 0` (see Examples below).
 
 Nonlinear continuous-time state-space functions are not supported for now. In such a case, 
-manually call a differential equation solver in the `f` function (e.g.: Euler method).
+manually call a differential equation solver in `f` (see [Manual](@ref man_nonlin)).
 
 !!! warning
     `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref).
