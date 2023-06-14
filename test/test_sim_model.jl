@@ -55,9 +55,17 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
     @test linmodel6.nx == 6
     @test sum(eigvals(linmodel6.A) .≈ 0) == 2
 
+    linmodel7 = LinModel(
+        ss(diagm( .1: .1: .3), I(3), diagm( .4: .1: .6), 0, 1.0), 
+        i_u=[1, 2],
+        i_d=[3])
+    @test linmodel7.A ≈ diagm( .1: .1: .3)
+    @test linmodel7.C ≈ diagm( .4: .1: .6)
+
     @test_throws ErrorException LinModel(sys)
     @test_throws ErrorException LinModel(sys,-Ts)
     @test_throws ErrorException LinModel(sys,Ts,i_u=[1,1])
+    @test_throws ErrorException LinModel(sys,Ts,i_d=[3,3])
     @test_throws ErrorException LinModel(sys_ss,Ts+1)
     @test_throws ErrorException setop!(linmodel5, uop=[0,0,0,0,0])
     @test_throws ErrorException setop!(linmodel5, yop=[0,0,0,0,0])

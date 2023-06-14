@@ -124,7 +124,8 @@ end
     @test_throws ErrorException Luenberger(linmodel1, nint_ym=[-1,0])
     @test_throws ErrorException Luenberger(linmodel1, p̂=[0.5])
     @test_throws ErrorException Luenberger(linmodel1, p̂=fill(1.5, lo1.nx̂))
-end    
+    @test_throws ErrorException Luenberger(LinModel(tf(1,[1, 0]),0.1), p̂=[0.5,0.6])
+end
     
 @testset "Luenberger estimator methods" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
@@ -176,10 +177,10 @@ end
     @test internalmodel5.nyu == 0
     @test internalmodel5.nxs == 4
     @test internalmodel5.nx̂ == 4
-    @test internalmodel5.As == stoch_ym_ss.A
-    @test internalmodel5.Bs == stoch_ym_ss.B
-    @test internalmodel5.Cs == stoch_ym_ss.C
-    @test internalmodel5.Ds == stoch_ym_ss.D
+    @test internalmodel5.As ≈ stoch_ym_ss.A
+    @test internalmodel5.Bs ≈ stoch_ym_ss.B
+    @test internalmodel5.Cs ≈ stoch_ym_ss.C
+    @test internalmodel5.Ds ≈ stoch_ym_ss.D
 
     stoch_ym_resample = c2d(d2c(ss(1,1,1,1,linmodel2.Ts), :tustin), 2linmodel2.Ts, :tustin)
     internalmodel6 = InternalModel(linmodel2, i_ym=[2], stoch_ym=stoch_ym_resample)
@@ -187,6 +188,14 @@ end
     @test internalmodel6.Bs ≈ internalmodel2.Bs
     @test internalmodel6.Cs ≈ internalmodel2.Cs
     @test internalmodel6.Ds ≈ internalmodel2.Ds
+
+    stoch_ym_cont = ss(zeros(2,2), I(2), I(2), zeros(2,2))
+    stoch_ym_disc = c2d(stoch_ym_cont, linmodel2.Ts, :tustin)
+    internalmodel7 = InternalModel(linmodel2, stoch_ym=stoch_ym_cont)
+    @test internalmodel7.As ≈ stoch_ym_disc.A
+    @test internalmodel7.Bs ≈ stoch_ym_disc.B
+    @test internalmodel7.Cs ≈ stoch_ym_disc.C
+    @test internalmodel7.Ds ≈ stoch_ym_disc.D
 
     unstablemodel = LinModel(ss(diagm([0.5, -0.5, 1.5]), ones(3,1), I, 0, 1))
     @test_throws ErrorException InternalModel(unstablemodel)

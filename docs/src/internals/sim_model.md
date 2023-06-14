@@ -1,4 +1,4 @@
-# SimModel Internals
+# Functions: SimModel Internals
 
 ```@docs
 ModelPredictiveControl.steadystate
