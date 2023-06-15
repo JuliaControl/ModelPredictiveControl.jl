@@ -9,7 +9,6 @@ struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
     D_data ::Matrix{Float64}    # measured disturbances
     X_data ::Matrix{Float64}    # plant states
     X̂_data ::Matrix{Float64}    # estimated states
-    plantIsModel::Bool          # true if simulated plant is identical to estimation model
     obj::O                      # simulated instance
 end
 
@@ -56,7 +55,7 @@ function sim!(
         updatestate!(plant, u, d); 
     end
     return SimResult(
-        T_data, Y_data, U_data, Y_data, U_data, U_data, D_data, X_data, X_data, true, plant
+        T_data, Y_data, U_data, Y_data, U_data, U_data, D_data, X_data, X_data, plant
     )
 end
 
@@ -170,7 +169,6 @@ function sim_closedloop!(
     lastu = plant.uop,
 )
     model = estim.model
-    plantIsModel = (plant === model)
     model.Ts ≈ plant.Ts || error("Sampling time of controller/estimator ≠ plant.Ts")
     old_x0 = copy(plant.x)
     T_data  = collect(plant.Ts*(0:(N-1)))
@@ -211,7 +209,7 @@ function sim_closedloop!(
     res = SimResult(
         T_data, Y_data, U_Ry_data, Ŷ_data, 
         U_data, Ud_data, D_data, X_data, X̂_data, 
-        plantIsModel, est_mpc
+        est_mpc
     )
     setstate!(plant, old_x0)
     return res
@@ -305,10 +303,10 @@ end
     plotu           = true,
     plotd           = true,
     plotx           = false,
-    plotx̂           = false
+    plotx̂           = false,
+    plotxwithx̂      = false
 )
     t   = res.T_data
-    plantIsModel = res.plantIsModel
     ny = size(res.Y_data, 1)
     nu = size(res.U_data, 1)
     nd = size(res.D_data, 1)
@@ -317,14 +315,8 @@ end
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
     (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
-    if plantIsModel && plotx && !plotx̂
-        layout_mat = [layout_mat (nx, 1)]
-    elseif plantIsModel && plotx̂
-        layout_mat = [layout_mat (nx̂, 1)]
-    elseif !plantIsModel
-        plotx && (layout_mat = [layout_mat (nx, 1)])
-        plotx̂ && (layout_mat = [layout_mat (nx̂, 1)])
-    end
+    (plotx && !plotxwithx̂) && (layout_mat = [layout_mat (nx, 1)])
+    (plotx̂ ||  plotxwithx̂) && (layout_mat = [layout_mat (nx̂, 1)])
     layout := layout_mat
     xguide    --> "Time (s)"
     # --- outputs y ---
@@ -383,7 +375,7 @@ end
         subplot_base += nd
     end
     # --- plant states x ---
-    if plotx
+    if plotx || plotxwithx̂
         for i in 1:nx
             @series begin
                 yguide     --> "\$x_$i\$"
@@ -394,13 +386,13 @@ end
                 t, res.X_data[i, :]
             end
         end
-        !plantIsModel && (subplot_base += nx)
+        !plotxwithx̂ && (subplot_base += nx)
     end
     # --- estimated states x̂ ---
-    if plotx̂
+    if plotx̂ || plotxwithx̂
         for i in 1:nx̂
             @series begin
-                withPlantState = plantIsModel && plotx && i ≤ nx
+                withPlantState = plotxwithx̂ && i ≤ nx
                 yguide     --> (withPlantState ? "\$x_$i\$" : "\$\\hat{x}_$i\$")
                 color      --> 2
                 subplot    --> subplot_base + i
@@ -417,21 +409,21 @@ end
 "Plots.jl recipe for `SimResult` objects constructed with `PredictiveController` objects."
 @recipe function simresultplot(
     res::SimResult{<:PredictiveController}; 
-    plotry   = true,
-    plotŷmin = true,
-    plotŷmax = true,
-    plotŷ    = false,
-    plotu    = true,
-    plotru   = true,
-    plotumin = true,
-    plotumax = true,
-    plotd    = true,
-    plotx    = false,
-    plotx̂    = false
+    plotry      = true,
+    plotŷmin    = true,
+    plotŷmax    = true,
+    plotŷ       = false,
+    plotu       = true,
+    plotru      = true,
+    plotumin    = true,
+    plotumax    = true,
+    plotd       = true,
+    plotx       = false,
+    plotx̂       = false,
+    plotxwithx̂  = false
 )
     mpc = res.obj
     t  = res.T_data
-    plantIsModel = res.plantIsModel
     ny = size(res.Y_data, 1)
     nu = size(res.U_data, 1)
     nd = size(res.D_data, 1)
@@ -440,14 +432,8 @@ end
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
     (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
-    if plantIsModel && plotx && !plotx̂
-        layout_mat = [layout_mat (nx, 1)]
-    elseif plantIsModel && plotx̂
-        layout_mat = [layout_mat (nx̂, 1)]
-    elseif !plantIsModel
-        plotx && (layout_mat = [layout_mat (nx, 1)])
-        plotx̂ && (layout_mat = [layout_mat (nx̂, 1)])
-    end
+    (plotx && !plotxwithx̂) && (layout_mat = [layout_mat (nx, 1)])
+    (plotx̂ ||  plotxwithx̂) && (layout_mat = [layout_mat (nx̂, 1)])
     layout := layout_mat
     xguide --> "Time (s)"
     # --- outputs y ---
@@ -578,7 +564,7 @@ end
         subplot_base += nd
     end
     # --- plant states x ---
-    if plotx
+    if plotx || plotxwithx̂
         for i in 1:nx
             @series begin
                 yguide     --> "\$x_$i\$"
@@ -589,13 +575,13 @@ end
                 t, res.X_data[i, :]
             end
         end
-        !plantIsModel && (subplot_base += nx)
+        !plotxwithx̂ && (subplot_base += nx)
     end
     # --- estimated states x̂ ---
-    if plotx̂
+    if plotx̂ || plotxwithx̂
         for i in 1:nx̂
             @series begin
-                withPlantState = plantIsModel && plotx && i ≤ nx
+                withPlantState = plotxwithx̂ && i ≤ nx
                 yguide     --> (withPlantState ? "\$x_$i\$" : "\$\\hat{x}_$i\$")
                 color      --> 2
                 subplot    --> subplot_base + i

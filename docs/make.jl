@@ -14,7 +14,6 @@ DocMeta.setdocmeta!(
 )
 makedocs(
     sitename    = "ModelPredictiveControl.jl",
-    modules     = [ModelPredictiveControl],
     doctest     = true,
     format      = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
@@ -24,6 +23,7 @@ makedocs(
         "Home" => "index.md",
         "Manual" => [
             "Examples" => [
+                "Installation" => "manual/installation.md",
                 "Linear Design" => "manual/linmpc.md",
                 "Nonlinear Design" => "manual/nonlinmpc.md",
             ],

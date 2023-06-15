@@ -4,73 +4,53 @@ A [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_cont
 for Julia.
 
 The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl/ControlSystems.jl)
-for the linear systems and [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the solvers.
+for the linear systems and [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the solving.
 
-## Contents
+The objective is to provide a simple and clear framework to quickly design model predictive
+controllers (MPCs) in Julia, while keeping the flexibility for advanced optimization. Modern
+MPCs based on closed-loop state estimators are the main focus of the package, but classical
+approaches that rely on internal models are also possible. The `JuMP.jl` interface allows
+to easily test different solvers if the performance of the default settings is not
+satisfactory.
+
+The documentation is divided in two parts:
+
+- **[Manual](@ref man_lin)** This section includes step-by-step guides to design
+  predictive controllers or multiple case studies.
+- **[Functions](@ref func_sim_model)** This part contains the documentation of
+  methods and types that are exported by the package. The "Internals" section provides
+  implementation details of functions that are not exported.
+
+## Manual
 
 ```@contents
+Depth = 2
 Pages = [
-    "index.md",
+    "manual/installation.md",
     "manual/linmpc.md",
     "manual/nonlinmpc.md",
+]
+```
+
+## Functions: Public
+
+```@contents
+Depth = 2
+Pages = [
     "public/sim_model.md",
     "public/state_estim.md",
     "public/predictive_control.md",
     "public/generic_func.md",
-    "internals/sim_model.md",
-    "internals/state_estim.md",
-    "internals/predictive_control.md",
-    "func_index.md"
 ]
 ```
 
-## Features
+## Functions: Internals
 
-### Legend
-
-✅ implemented feature  
-⬜ planned feature
-
-### Model Predictive Control Features
-
-- ✅ linear and nonlinear plant models exploiting multiple dispatch
-- ✅ supported objective function terms:
-  - ✅ output setpoint tracking
-  - ✅ move suppression
-  - ✅ input setpoint tracking
-  - ✅ economic costs (economic model predictive control)
-  - ⬜ terminal cost to ensure nominal stability
-- ✅ soft and hard constraints on:
-  - ✅ output predictions
-  - ✅ manipulated inputs
-  - ✅ manipulated inputs increments
-- ⬜ custom manipulated input constraints that are a function of the predictions
-- ✅ supported feedback strategy:
-  - ✅ state estimator (see State Estimation features)
-  - ✅ internal model structure with a custom stochastic model
-- ✅ offset-free tracking with a single or multiple integrators on measured outputs
-- ✅ support for unmeasured model outputs
-- ✅ feedforward action with measured disturbances that supports direct transmission
-- ✅ custom predictions for:
-  - ✅ output setpoints
-  - ✅ measured disturbances
-- ✅ easy integration with `Plots.jl`
-- ✅ optimization based on `JuMP.jl`:
-  - ✅ quickly compare multiple optimizers
-  - ✅ nonlinear solvers relying on automatic differentiation (exact derivative)
-- ✅ additional information about the optimum to ease troubleshooting
-
-### State Estimation Features
-
-- ⬜ supported state estimators/observers:
-  - ✅ steady-state Kalman filter
-  - ✅ Kalman filter
-  - ✅ Luenberger observer
-  - ✅ internal model structure
-  - ⬜ extended Kalman filter
-  - ✅ unscented Kalman filter
-  - ⬜ moving horizon estimator
-- ✅ observers in predictor form to ease  control applications
-- ⬜ moving horizon estimator that supports:
-  - ⬜ inequality state constraints
-  - ⬜ zero process noise equality constraint to reduce the problem size
+```@contents
+Depth = 1
+Pages = [
+    "internals/sim_model.md",
+    "internals/state_estim.md",
+    "internals/predictive_control.md",
+]
+```

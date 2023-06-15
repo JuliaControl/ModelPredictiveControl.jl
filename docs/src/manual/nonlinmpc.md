@@ -50,7 +50,7 @@ is good practice to first simulate `model` using [`sim!`](@ref) as a quick sanit
 
 ```@example 1
 using Plots
-u = [0.5] # τ = 0.5 N m
+u = [0.5]
 plot(sim!(model, 60, u), plotu=false)
 ```
 
@@ -59,7 +59,7 @@ plot(sim!(model, 60, u), plotu=false)
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 
 ```@example 1
-estim = UnscentedKalmanFilter(model, σQ=[0.5, 2.5], σQ_int=[0.5])
+estim = UnscentedKalmanFilter(model, σQ=[0.5, 2.5], σQ_int=[5.0], σR=[0.5])
 ```
 
 The standard deviation of the angular velocity ``ω`` is higher here (`σQ` second value)
@@ -70,15 +70,17 @@ since ``\dot{ω}(t)`` equation includes an uncertain parameter: the friction coe
 par_plant = (par[1], par[2], par[3] + 0.25, par[4])
 f_plant(x, u, _) = x + Ts*pendulum(par_plant, x, u)
 plant = NonLinModel(f_plant, h, Ts, nu, nx, ny)
-res = sim!(estim, 30, [0.5], plant=plant, y_noise=[0.5]) # τ = 0.5 N m
-plot(res, plotu=false, plotx=true, plotx̂=true)
+res = sim!(estim, 60, [0.5], plant=plant, y_noise=[0.5])
+plot(res, plotu=false, plotxwithx̂=true)
 ```
 
-The Kalman filter performance seems sufficient for control. As the motor torque is limited
-to -1.5 to 1.5 N m, we incorporate the input constraints in a [`NonLinMPC`](@ref):
+The estimate ``x̂_3`` is the integrator state that compensates for static errors (`nint_ym`
+parameter of [`UnscentedKalmanFilter`](@ref)). The Kalman filter performance seems
+sufficient for control. As the motor torque is limited to -1.5 to 1.5 N m, we incorporate
+the input constraints in a [`NonLinMPC`](@ref):
 
 ```@example 1
-mpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.1], Nwt=[1.0], Cwt=Inf)
+mpc = NonLinMPC(estim, Hp=20, Hc=4, Mwt=[0.1], Nwt=[1.0], Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -86,8 +88,15 @@ We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (i
 position):
 
 ```@example 1
-res = sim!(mpc, 30, [180.0], x̂0=zeros(mpc.estim.nx̂), plant=plant, x0=zeros(plant.nx))
-plot(res, plotŷ=true)
+res = sim!(mpc, 65, [180.0], plant=plant, x0=zeros(plant.nx), x̂0=zeros(mpc.estim.nx̂))
+plot(res)
 ```
 
-The controller seems robust enough to variations on ``K`` coefficient.
+The controller seems robust enough to variations on ``K`` coefficient. Moreover, starting
+from this inverted position, the closed-loop response to a step disturbances of 10° on ``θ``
+is also satisfactory:
+
+```@example 1
+res = sim!(mpc, 65, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
+plot(res)
+```

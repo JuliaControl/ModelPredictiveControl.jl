@@ -113,8 +113,8 @@ nothing # hide
 The [`LinMPC`](@ref) objects are also callable as an alternative syntax for
 [`moveinput!`](@ref). Calling [`updatestate!`](@ref) on the `mpc` object updates its
 internal state for the *NEXT* control period (this is by design, see
-[State Estimators](@ref) for justifications). That is why the call is done at the end of the
-`for` loop. The same logic applies for `model`.
+[Functions: State Estimators](@ref) for justifications). That is why the call is done at the
+end of the `for` loop. The same logic applies for `model`.
 
 Lastly, we plot the closed-loop test with the `Plots` package:
 
