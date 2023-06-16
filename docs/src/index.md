@@ -15,9 +15,9 @@ satisfactory.
 
 The documentation is divided in two parts:
 
-- **[Manual](@ref man_lin)** This section includes step-by-step guides to design
+- **[Manual](@ref man_lin)** — This section includes step-by-step guides to design
   predictive controllers or multiple case studies.
-- **[Functions](@ref func_sim_model)** This part contains the documentation of
+- **[Functions](@ref func_sim_model)** — This part contains the documentation of
   methods and types that are exported by the package. The "Internals" section provides
   implementation details of functions that are not exported.
 
