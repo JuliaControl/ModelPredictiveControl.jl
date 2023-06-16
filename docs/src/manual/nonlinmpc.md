@@ -92,9 +92,9 @@ res = sim!(mpc, 65, [180.0], plant=plant, x0=zeros(plant.nx), x̂0=zeros(mpc.est
 plot(res)
 ```
 
-The controller seems robust enough to variations on ``K`` coefficient. Moreover, starting
-from this inverted position, the closed-loop response to a step disturbances of 10° on ``θ``
-is also satisfactory:
+The controller seems robust enough to variations on ``K`` coefficient. Starting from this
+inverted position, the closed-loop response to a step disturbances of 10° is also
+satisfactory:
 
 ```@example 1
 res = sim!(mpc, 65, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])

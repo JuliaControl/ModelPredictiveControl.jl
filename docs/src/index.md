@@ -7,19 +7,19 @@ The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl
 for the linear systems and [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the solving.
 
 The objective is to provide a simple and clear framework to quickly design model predictive
-controllers (MPCs) in Julia, while keeping the flexibility for advanced optimization. Modern
-MPCs based on closed-loop state estimators are the main focus of the package, but classical
-approaches that rely on internal models are also possible. The `JuMP.jl` interface allows
-to easily test different solvers if the performance of the default settings is not
-satisfactory.
+controllers (MPCs) in Julia, while preserving the flexibility for advanced real-time
+optimization. Modern MPCs based on closed-loop state estimators are the main focus of the
+package, but classical approaches that rely on internal models are also possible. The
+`JuMP.jl` interface allows to easily test different solvers if the performance of the
+default settings is not satisfactory.
 
 The documentation is divided in two parts:
 
 - **[Manual](@ref man_lin)** — This section includes step-by-step guides to design
-  predictive controllers or multiple case studies.
-- **[Functions](@ref func_sim_model)** — This part contains the documentation of
-  methods and types that are exported by the package. The "Internals" section provides
-  implementation details of functions that are not exported.
+  predictive controllers on multiple case studies.
+- **[Functions](@ref func_sim_model)** — Documentation of methods and types exported by the
+  package. The "Internals" section provides implementation details of functions that are
+  not exported.
 
 ## Manual
 
