@@ -3,8 +3,8 @@
 ## Nonlinear Model
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum
-attached to a motor. If the manipulated input is the motor torque ``τ``, the vectors
-are:
+attached to a motor. Knowing that the manipulated input is the motor torque ``τ``, the I/O
+vectors are:
 
 ```math
 \begin{aligned}
@@ -45,8 +45,8 @@ nu, nx, ny = 1, 2, 1
 model = NonLinModel(f, h, Ts, nu, nx, ny)
 ```
 
-The output function ``\mathbf{h}`` converts the angular position ``θ`` to degrees. It
-is good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
+The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. It is good practice
+to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
 
 ```@example 1
 using Plots
