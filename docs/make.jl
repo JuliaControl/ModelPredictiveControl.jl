@@ -22,8 +22,8 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "Manual" => [
+            "Installation" => "manual/installation.md",
             "Examples" => [
-                "Installation" => "manual/installation.md",
                 "Linear Design" => "manual/linmpc.md",
                 "Nonlinear Design" => "manual/nonlinmpc.md",
             ],

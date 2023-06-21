@@ -422,7 +422,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y)
     if ~isempty(mpc.R̂u)
         lastu = mpc.estim.lastu0 + model.uop
         V̂ = mpc.T_Hp*lastu - mpc.R̂u
-        mpc.q̃[:] += 2(mpc.L_Hp*mpc.T_Hp)'*V̂
+        mpc.q̃[:] += 2(mpc.L_Hp*mpc.S̃_Hp)'*V̂
         mpc.p[:] += [V̂'*mpc.L_Hp*V̂]
     end
     return nothing

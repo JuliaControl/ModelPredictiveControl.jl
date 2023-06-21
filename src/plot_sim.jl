@@ -221,7 +221,7 @@ sim_getu!(::StateEstimator, u, _ , _ ) = u
 sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
 
 "Plots.jl recipe for `SimResult` objects constructed with `SimModel` objects."
-@recipe function simresultplot(
+@recipe function plot(
     res::SimResult{<:SimModel};
     plotu  = true,
     plotd  = true,
@@ -297,7 +297,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
 end
 
 "Plots.jl recipe for `SimResult` objects constructed with `StateEstimator` objects."
-@recipe function simresultplot(
+@recipe function plot(
     res::SimResult{<:StateEstimator};
     plotŷ           = true,
     plotu           = true,
@@ -407,7 +407,7 @@ end
 end
 
 "Plots.jl recipe for `SimResult` objects constructed with `PredictiveController` objects."
-@recipe function simresultplot(
+@recipe function plot(
     res::SimResult{<:PredictiveController}; 
     plotry      = true,
     plotŷmin    = true,

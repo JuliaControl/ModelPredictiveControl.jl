@@ -57,15 +57,21 @@ end
 end
 
 @testset "LinMPC moves and getinfo" begin
-    mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
+    mpc1 = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
     r = [5]
-    u = moveinput!(mpc, r)
+    u = moveinput!(mpc1, r)
     @test u ≈ [1] atol=1e-2
-    u = mpc(r)
+    u = mpc1(r)
     @test u ≈ [1] atol=1e-2
-    info, _ = getinfo(mpc)
+    info, _ = getinfo(mpc1)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 5 atol=1e-2
+    mpc2 = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
+    u = moveinput!(mpc2, [5])
+    @test u ≈ [1] atol=1e-2
+    mpc3 = LinMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1], ru=[12])
+    u = moveinput!(mpc3, [0])
+    @test u ≈ [12] atol=1e-2
 end
 
 @testset "LinMPC other methods" begin
