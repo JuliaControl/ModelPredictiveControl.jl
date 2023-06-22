@@ -99,7 +99,7 @@ julia> estim = KalmanFilter(model, σR=[0.5], σQ=[0.25], σQ_int=[0.01], σP0_i
 
 julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.25], x0=[-10], x̂0=[0, 0]);
 
-julia> using Plots; plot(res, plotŷ=true, plotu=false, plotx=true, plotx̂=true)
+julia> using Plots; plot(res, plotŷ=true, plotu=false, plotxwithx̂=true)
 
 ```
 """

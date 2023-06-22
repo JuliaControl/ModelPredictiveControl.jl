@@ -4,6 +4,9 @@
 Pages = ["generic_func.md"]
 ```
 
+This page contains the documentation of functions that are generic to [`SimModel`](@ref),
+[`StateEstimator`](@ref) and [`PredictiveController`](@ref) types.
+
 ## Evaluate Output y
 
 ```@docs
