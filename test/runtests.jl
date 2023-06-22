@@ -5,7 +5,7 @@ using ControlSystemsBase
 using Documenter
 using LinearAlgebra
 using JuMP, OSQP, Ipopt
-using RecipesBase
+using Plots
 using Test
 
 

@@ -280,6 +280,7 @@ sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
                 t, res.D_data[i, :]
             end
         end
+        subplot_base += nd
     end
     # --- plant states x ---
     if plotx
