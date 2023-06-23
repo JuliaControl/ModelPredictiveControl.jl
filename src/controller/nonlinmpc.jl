@@ -234,8 +234,8 @@ function init_optimization!(mpc::NonLinMPC)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-functions-with-vector-outputs
     Jfunc, Cfunc = let mpc=mpc, model=model, nC=nC, nvar=nvar , nŶ=Hp*ny
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
-        Ŷ_cache::DiffCacheType = DiffCache(zeros(nŶ), nvar)
-        C_cache::DiffCacheType = DiffCache(zeros(nC), nvar)
+        Ŷ_cache::DiffCacheType = DiffCache(zeros(nŶ), nvar + 3)
+        C_cache::DiffCacheType = DiffCache(zeros(nC), nvar + 3)
         function Jfunc(ΔŨtup::Float64...)
             Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
             ΔŨ = collect(ΔŨtup)
@@ -356,7 +356,7 @@ function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{T}) 
     # --- input setpoint tracking term ---
     if !isempty(mpc.R̂u)
         êu = mpc.R̂u - U
-        JR̂u = êu'*mpc.L_Hp*ê
+        JR̂u = êu'*mpc.L_Hp*êu
     else
         JR̂u = 0.0
     end
