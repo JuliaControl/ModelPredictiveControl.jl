@@ -198,13 +198,6 @@ struct KalmanFilter <: StateEstimator
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
-    @doc raw"""
-        KalmanFilter(model, i_ym, nint_ym, P̂0 ,Q̂, R̂)
-    
-    Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
-
-    This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0)\mathbf{, Q̂, R̂}``.
-    """
     function KalmanFilter(model, i_ym, nint_ym, P̂0, Q̂, R̂)
         nu, nx, ny = model.nu, model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
