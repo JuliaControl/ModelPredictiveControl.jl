@@ -20,9 +20,10 @@ struct SteadyKalmanFilter <: StateEstimator
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
     K::Matrix{Float64}
-    function SteadyKalmanFilter(model, i_ym, nint_ym, Asm, Csm, Q̂, R̂)
+    function SteadyKalmanFilter(model, i_ym, nint_ym, Q̂, R̂)
         nu, nx, ny = model.nu, model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
+        Asm, Csm, nint_ym = init_estimstoch(i_ym, nint_ym)
         nxs = size(Asm,1)
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂)
@@ -128,15 +129,21 @@ function SteadyKalmanFilter(
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
     σQ_int::Vector = fill(0.1, max(sum(nint_ym), 0))
 )
-    if nint_ym == 0 # alias for no output integrator at all :
-        nint_ym = fill(0, length(i_ym));
-    end
-    Asm, Csm = init_estimstoch(i_ym, nint_ym)
     # estimated covariances matrices (variance = σ²) :
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return SteadyKalmanFilter(model, i_ym, nint_ym, Asm, Csm, Q̂ , R̂)
+    return SteadyKalmanFilter(model, i_ym, nint_ym, Q̂ , R̂)
 end
+
+@doc raw"""
+    SteadyKalmanFilter(model, i_ym, nint_ym, Q̂, R̂)
+
+Construct the estimator from the augmented covariance matrices `Q̂` and `R̂`.
+
+This syntax allows nonzero off-diagonal elements in ``\mathbf{Q̂, R̂}``.
+"""
+SteadyKalmanFilter(model::LinModel, i_ym, nint_ym, Q̂, R̂)
+
 
 @doc raw"""
     updatestate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
@@ -191,9 +198,17 @@ struct KalmanFilter <: StateEstimator
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
-    function KalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂)
+    @doc raw"""
+        KalmanFilter(model, i_ym, nint_ym, P̂0 ,Q̂, R̂)
+    
+    Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
+
+    This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0)\mathbf{, Q̂, R̂}``.
+    """
+    function KalmanFilter(model, i_ym, nint_ym, P̂0, Q̂, R̂)
         nu, nx, ny = model.nu, model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
+        Asm, Csm, nint_ym = init_estimstoch(i_ym, nint_ym)
         nxs = size(Asm,1)
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
@@ -260,16 +275,22 @@ function KalmanFilter(
     σP0_int::Vector = fill(10, max(sum(nint_ym), 0)),
     σQ_int::Vector = fill(0.1, max(sum(nint_ym), 0))
 )
-    if nint_ym == 0 # alias for no output integrator at all :
-        nint_ym = fill(0, length(i_ym));
-    end
-    Asm, Csm = init_estimstoch(i_ym, nint_ym)
     # estimated covariances matrices (variance = σ²) :
     P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return KalmanFilter(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂)
+    return KalmanFilter(model, i_ym, nint_ym, P̂0, Q̂ , R̂)
 end
+
+@doc raw"""
+    KalmanFilter(model, i_ym, nint_ym, P̂0, Q̂, R̂)
+
+Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
+
+This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
+"""
+KalmanFilter(model::LinModel, i_ym, nint_ym, P̂0 ,Q̂, R̂)
+
 
 @doc raw"""
     updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
@@ -341,10 +362,11 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     m̂::Vector{Float64}
     Ŝ::Diagonal{Float64, Vector{Float64}}
     function UnscentedKalmanFilter{M}(
-        model::M, i_ym, nint_ym, Asm, Csm, P̂0, Q̂, R̂, α, β, κ
+        model::M, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ
     ) where {M<:SimModel}
         nu, nx, ny = model.nu, model.nx, model.ny
         nym, nyu = length(i_ym), ny - length(i_ym)
+        Asm, Csm, nint_ym = init_estimstoch(i_ym, nint_ym)
         nxs = size(Asm,1)
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
@@ -424,16 +446,22 @@ function UnscentedKalmanFilter(
     β::Real = 2,
     κ::Real = 0
 ) where {M<:SimModel}
-    if nint_ym == 0 # alias for no output integrator at all :
-        nint_ym = fill(0, length(i_ym));
-    end
-    Asm, Csm = init_estimstoch(i_ym, nint_ym)
     # estimated covariances matrices (variance = σ²) :
     P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return UnscentedKalmanFilter{M}(model, i_ym, nint_ym, Asm, Csm, P̂0, Q̂ , R̂, α, β, κ)
+    return UnscentedKalmanFilter{M}(model, i_ym, nint_ym, P̂0, Q̂ , R̂, α, β, κ)
 end
+
+@doc raw"""
+    UnscentedKalmanFilter(model, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ)
+
+Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
+
+This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
+"""
+UnscentedKalmanFilter{M}(model::SimModel, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ) where {M}
+
 
 @doc raw"""
     init_ukf(nx̂, α, β, κ)

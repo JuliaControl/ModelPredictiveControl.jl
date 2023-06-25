@@ -100,7 +100,10 @@ be added for each measured output ``\mathbf{y^m}``. The argument generates the `
 where ``\mathbf{e}(k)`` is a conceptual and unknown zero mean white noise. 
 ``\mathbf{B_s^m}`` is not used for closed-loop state estimators thus ignored.
 """
-function init_estimstoch(i_ym, nint_ym::Vector{Int})
+function init_estimstoch(i_ym, nint_ym)
+    if nint_ym == 0 # alias for no output integrator at all
+        nint_ym = fill(0, length(i_ym))
+    end
     nym = length(i_ym);
     if length(nint_ym) ≠ nym
         error("nint_ym size ($(length(nint_ym))) ≠ measured output quantity nym ($nym)")
@@ -128,7 +131,7 @@ function init_estimstoch(i_ym, nint_ym::Vector{Int})
     else    # no stochastic model :
         Asm, Csm = zeros(0, 0), zeros(nym, 0)
     end
-    return Asm, Csm
+    return Asm, Csm, nint_ym
 end
 
 @doc raw"""
