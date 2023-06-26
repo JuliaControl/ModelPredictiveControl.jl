@@ -447,7 +447,7 @@ function UnscentedKalmanFilter(
 end
 
 @doc raw"""
-    UnscentedKalmanFilter(model, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ)
+    UnscentedKalmanFilter{M}(model, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ) where {M <: SimModel}
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
