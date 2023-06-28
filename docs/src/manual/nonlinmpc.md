@@ -59,7 +59,7 @@ plot(sim!(model, 60, u), plotu=false)
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 
 ```@example 1
-estim = UnscentedKalmanFilter(model, σQ=[0.5, 2.5], σQ_int=[5.0], σR=[0.5])
+estim = UnscentedKalmanFilter(model, σQ=[0.1, 0.5], σQ_int=[5.0], σR=[0.5])
 ```
 
 The standard deviation of the angular velocity ``ω`` is higher here (`σQ` second value)
@@ -80,7 +80,7 @@ sufficient for control. As the motor torque is limited to -1.5 to 1.5 N m, we in
 the input constraints in a [`NonLinMPC`](@ref):
 
 ```@example 1
-mpc = NonLinMPC(estim, Hp=20, Hc=4, Mwt=[0.1], Nwt=[1.0], Cwt=Inf)
+mpc = NonLinMPC(estim, Hp=20, Hc=4, Mwt=[0.05], Nwt=[2.5], Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -88,7 +88,7 @@ We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (i
 position):
 
 ```@example 1
-res = sim!(mpc, 65, [180.0], plant=plant, x0=zeros(plant.nx), x̂0=zeros(mpc.estim.nx̂))
+res = sim!(mpc, 60, [180.0], plant=plant, x0=zeros(plant.nx), x̂0=zeros(mpc.estim.nx̂))
 plot(res)
 ```
 
@@ -97,6 +97,6 @@ inverted position, the closed-loop response to a step disturbances of 10° is al
 satisfactory:
 
 ```@example 1
-res = sim!(mpc, 65, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
+res = sim!(mpc, 60, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
 plot(res)
 ```

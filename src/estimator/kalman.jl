@@ -85,13 +85,13 @@ ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 - `model::LinModel` : (deterministic) model for the estimations.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
     are unmeasured ``\mathbf{y^u}``.
-- `σQ=fill(0.1,model.nx)` : main diagonal of the process noise covariance ``\mathbf{Q}`` of
-    `model`, specified as a standard deviation vector.
-- `σR=fill(0.1,length(i_ym))` : main diagonal of the sensor noise covariance ``\mathbf{R}``
+- `σQ=fill(1/model.nx,model.nx)` : main diagonal of the process noise covariance
+    ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
+- `σR=fill(1,length(i_ym))` : main diagonal of the sensor noise covariance ``\mathbf{R}``
     of `model` measured outputs, specified as a standard deviation vector.
 - `nint_ym=fill(1,length(i_ym))` : integrator quantity per measured outputs (vector) for the 
     stochastic model, use `nint_ym=0` for no integrator at all.
-- `σQ_int=fill(0.1,sum(nint_ym))` : same than `σQ` but for the stochastic model covariance
+- `σQ_int=fill(1,sum(nint_ym))` : same than `σQ` but for the stochastic model covariance
     ``\mathbf{Q_{int}}`` (composed of output integrators).
 
 # Examples
@@ -124,10 +124,10 @@ you can use 0 integrator on `model` integrating outputs, or the alternative time
 function SteadyKalmanFilter(
     model::LinModel;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σQ::Vector = fill(0.1, model.nx),
-    σR::Vector = fill(0.1, length(i_ym)),
+    σQ::Vector = fill(1/model.nx, model.nx),
+    σR::Vector = fill(1, length(i_ym)),
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
-    σQ_int::Vector = fill(0.1, max(sum(nint_ym), 0))
+    σQ_int::Vector = fill(1, max(sum(nint_ym), 0))
 )
     # estimated covariances matrices (variance = σ²) :
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
@@ -158,11 +158,11 @@ The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\
 
 # Examples
 ```jldoctest
-julia> kf = SteadyKalmanFilter(LinModel(ss(1, 1, 1, 0, 1.0)));
+julia> kf = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
 
 julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_ym argument)
 2-element Vector{Float64}:
- 1.0
+ 0.5
  0.0
 ```
 """
@@ -239,9 +239,9 @@ with ``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int}}(0)
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
-- `σP0=fill(10,model.nx)` : main diagonal of the initial estimate covariance 
+- `σP0=fill(1/model.nx,model.nx)` : main diagonal of the initial estimate covariance
     ``\mathbf{P}(0)``, specified as a standard deviation vector.
-- `σP0_int=fill(10,sum(nint_ym))` : same than `σP0` but for the stochastic model
+- `σP0_int=fill(1,sum(nint_ym))` : same than `σP0` but for the stochastic model
     covariance ``\mathbf{P_{int}}(0)`` (composed of output integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 
@@ -261,12 +261,12 @@ KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 function KalmanFilter(
     model::LinModel;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector = fill(10, model.nx),
-    σQ::Vector = fill(0.1, model.nx),
-    σR::Vector = fill(0.1, length(i_ym)),
+    σP0::Vector = fill(1/model.nx, model.nx),
+    σQ::Vector  = fill(1/model.nx, model.nx),
+    σR::Vector  = fill(1, length(i_ym)),
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
-    σP0_int::Vector = fill(10, max(sum(nint_ym), 0)),
-    σQ_int::Vector = fill(0.1, max(sum(nint_ym), 0))
+    σP0_int::Vector = fill(1, max(sum(nint_ym), 0)),
+    σQ_int::Vector  = fill(1, max(sum(nint_ym), 0))
 )
     # estimated covariances matrices (variance = σ²) :
     P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
@@ -429,12 +429,12 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
 function UnscentedKalmanFilter(
     model::M;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector = fill(10, model.nx),
-    σQ::Vector = fill(0.1, model.nx),
-    σR::Vector = fill(0.1, length(i_ym)),
+    σP0::Vector = fill(1/model.nx, model.nx),
+    σQ::Vector  = fill(1/model.nx, model.nx),
+    σR::Vector  = fill(1, length(i_ym)),
     nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
-    σP0_int::Vector = fill(10, max(sum(nint_ym), 0)),
-    σQ_int::Vector = fill(0.1, max(sum(nint_ym), 0)),
+    σP0_int::Vector = fill(1, max(sum(nint_ym), 0)),
+    σQ_int::Vector  = fill(1, max(sum(nint_ym), 0)),
     α::Real = 1e-3,
     β::Real = 2,
     κ::Real = 0

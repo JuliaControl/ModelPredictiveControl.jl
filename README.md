@@ -72,49 +72,49 @@ for more detailed examples.
 
 ### Legend
 
-✅ implemented feature  
-⬜ planned feature
+- [x] implemented feature  
+- [ ] planned feature
 
 ### Model Predictive Control Features
 
-- ✅ linear and nonlinear plant models exploiting multiple dispatch
-- ✅ supported objective function terms:
-  - ✅ output setpoint tracking
-  - ✅ move suppression
-  - ✅ input setpoint tracking
-  - ✅ economic costs (economic model predictive control)
-  - ⬜ terminal cost to ensure nominal stability
-- ✅ soft and hard constraints on:
-  - ✅ output predictions
-  - ✅ manipulated inputs
-  - ✅ manipulated inputs increments
-- ⬜ custom manipulated input constraints that are a function of the predictions
-- ✅ supported feedback strategy:
-  - ✅ state estimator (see State Estimation features)
-  - ✅ internal model structure with a custom stochastic model
-- ✅ offset-free tracking with a single or multiple integrators on measured outputs
-- ✅ support for unmeasured model outputs
-- ✅ feedforward action with measured disturbances that supports direct transmission
-- ✅ custom predictions for:
-  - ✅ output setpoints
-  - ✅ measured disturbances
-- ✅ easy integration with `Plots.jl`
-- ✅ optimization based on `JuMP.jl`:
-  - ✅ quickly compare multiple optimizers
-  - ✅ nonlinear solvers relying on automatic differentiation (exact derivative)
-- ✅ additional information about the optimum to ease troubleshooting
+- [x] linear and nonlinear plant models exploiting multiple dispatch
+- [x] supported objective function terms:
+  - [x] output setpoint tracking
+  - [x] move suppression
+  - [x] input setpoint tracking
+  - [x] economic costs (economic model predictive control)
+  - [ ] terminal cost to ensure nominal stability
+- [x] soft and hard constraints on:
+  - [x] output predictions
+  - [x] manipulated inputs
+  - [x] manipulated inputs increments
+- [ ] custom manipulated input constraints that are a function of the predictions
+- [x] supported feedback strategy:
+  - [x] state estimator (see State Estimation features)
+  - [x] internal model structure with a custom stochastic model
+- [x] offset-free tracking with a single or multiple integrators on measured outputs
+- [x] support for unmeasured model outputs
+- [x] feedforward action with measured disturbances that supports direct transmission
+- [x] custom predictions for:
+  - [x] output setpoints
+  - [x] measured disturbances
+- [x] easy integration with `Plots.jl`
+- [x] optimization based on `JuMP.jl`:
+  - [x] quickly compare multiple optimizers
+  - [x] nonlinear solvers relying on automatic differentiation (exact derivative)
+- [x] additional information about the optimum to ease troubleshooting
 
 ### State Estimation Features
 
-- ⬜ supported state estimators/observers:
-  - ✅ steady-state Kalman filter
-  - ✅ Kalman filter
-  - ✅ Luenberger observer
-  - ✅ internal model structure
-  - ⬜ extended Kalman filter
-  - ✅ unscented Kalman filter
-  - ⬜ moving horizon estimator
-- ✅ observers in predictor form to ease  control applications
-- ⬜ moving horizon estimator that supports:
-  - ⬜ inequality state constraints
-  - ⬜ zero process noise equality constraint to reduce the problem size
+- [ ] supported state estimators/observers:
+  - [x] steady-state Kalman filter
+  - [x] Kalman filter
+  - [x] Luenberger observer
+  - [x] internal model structure
+  - [ ] extended Kalman filter
+  - [x] unscented Kalman filter
+  - [ ] moving horizon estimator
+- [x] observers in predictor form to ease  control applications
+- [ ] moving horizon estimator that supports:
+  - [ ] inequality state constraints
+  - [ ] zero process noise equality constraint to reduce the problem size
