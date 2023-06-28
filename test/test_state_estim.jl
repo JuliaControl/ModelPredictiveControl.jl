@@ -33,9 +33,8 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=[-1,0])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σQ=[1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σR=[1,1,1])
-    @test_throws ErrorException SteadyKalmanFilter( # test error compute Kalman gain K
-        LinModel(ss([1 0;0 1], [1; 0], [1 0], 0, 1.0)), nint_ym=[1]
-    )
+    model_unobs = LinModel([1 0;0 1.5], [1; 0;;], [1 0], zeros(2,0), zeros(1,0),1,1,2,1,0)
+    @test_throws ErrorException SteadyKalmanFilter(model_unobs, nint_ym=[1])
 end
     
 @testset "SteadyKalmanFilter estimator methods" begin
