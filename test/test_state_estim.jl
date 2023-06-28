@@ -34,7 +34,7 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σQ=[1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σR=[1,1,1])
     @test_throws ErrorException SteadyKalmanFilter( # test error compute Kalman gain K
-        LinModel(tf(1,[10,1]),1), nint_ym=[2], σQ_int=[0,0]
+        LinModel(tf(1,[1, 0]),1), nint_ym=[1]
     )
 end
     
