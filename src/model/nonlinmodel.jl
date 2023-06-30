@@ -43,7 +43,8 @@ Nonlinear continuous-time state-space functions are not supported for now. In su
 manually call a differential equation solver in `f` (see [Manual](@ref man_nonlin)).
 
 !!! warning
-    `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref).
+    `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref),
+    [`ExtendedKalmanFilter`](@ref) and `MovingHorizonEstimator`.
 
 See also [`LinModel`](@ref).
 

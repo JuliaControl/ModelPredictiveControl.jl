@@ -62,6 +62,12 @@ Luenberger
 UnscentedKalmanFilter
 ```
 
+## ExtendedKalmanFilter
+
+```@docs
+ExtendedKalmanFilter
+```
+
 ## InternalModel
 
 ```@docs

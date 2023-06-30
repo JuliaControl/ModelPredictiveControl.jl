@@ -72,6 +72,13 @@ updatestate!(ssKalmanFilter2,[1, 1],[1,1])
 
 initstate!(ssKalmanFilter1,[0,0],[2,1])
 
+extKalmanFilter = ExtendedKalmanFilter(nonLinModel2)
+
+initstate!(extKalmanFilter, [10,10], [50,30], [5]) 
+updatestate!(extKalmanFilter, [10,11], [50,30], [5])
+
+
+
 uscKalmanFilter1 = UnscentedKalmanFilter(linModel1)
 
 updatestate!(uscKalmanFilter1,[0,0],[2,1])

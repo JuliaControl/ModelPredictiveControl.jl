@@ -133,9 +133,9 @@ optimally update the stochastic estimate ``\mathbf{x̂_s}`` are:
 ```
 with current stochastic outputs estimation ``\mathbf{ŷ_s}(k)``, composed of the measured 
 ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` and unmeasured 
-``\mathbf{ŷ_s^u = 0}`` outputs. See [^3].
+``\mathbf{ŷ_s^u = 0}`` outputs. See [^1].
 
-[^3]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
+[^1]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
     control structure for decoupling setpoint tracking, feedforward compensation and 
     disturbance rejection dynamics", *IEE Proceedings - Control Theory and Applications*, 
     vol. 147, no 4, https://doi.org/10.1049/ip-cta:20000443, p. 465–475, ISSN 1350-2379.
@@ -147,14 +147,22 @@ function init_internalmodel(As, Bs, Cs, Ds)
 end
 
 @doc raw"""
-    updatestate!(estim::InternalModel, u, ym, d=Float64[])
+    update_estimate!(estim::InternalModel, u, ym, d=Float64[])
 
 Update `estim.x̂` \ `x̂d` \ `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
+
+The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂s` estimates with:
+```math
+\begin{aligned}
+    \mathbf{x̂_d}(k+1) &= \mathbf{f}\Big( \mathbf{x̂_d}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \\
+    \mathbf{x̂_s}(k+1) &= \mathbf{Â_s x̂_s}(k) + \mathbf{B̂_s ŷ_s}(k)
+\end{aligned}
+```
+This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
+[`init_internalmodel`](@ref) for details. 
 """
-function updatestate!(estim::InternalModel, u, ym, d=Float64[])
+function update_estimate!(estim::InternalModel, u, ym, d=Float64[])
     model = estim.model
-    # ---- remove operating points ----
-    u, d, ym = remove_op!(estim, u, d, ym)
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
     ŷd = h(model, x̂d, d)

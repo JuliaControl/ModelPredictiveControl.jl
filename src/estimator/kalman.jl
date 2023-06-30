@@ -146,7 +146,7 @@ SteadyKalmanFilter(model::LinModel, i_ym, nint_ym, Q̂, R̂)
 
 
 @doc raw"""
-    updatestate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
+    update_estimate!(estim::SteadyKalmanFilter, u, ym, d)
 
 Update `estim.x̂` estimate with current inputs `u`, measured outputs `ym` and dist. `d`.
 
@@ -155,25 +155,13 @@ The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\
 \mathbf{x̂}_{k}(k+1) = \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
                + \mathbf{K}[\mathbf{y^m}(k) - \mathbf{Ĉ^m x̂}_{k-1}(k) - \mathbf{D̂_d^m d}(k)]
 ```
-
-# Examples
-```jldoctest
-julia> kf = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
-
-julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_ym argument)
-2-element Vector{Float64}:
- 0.5
- 0.0
-```
 """
-function updatestate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
-    u, d, ym = remove_op!(estim, u, d, ym)
+function update_estimate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K = estim.x̂, estim.K
     x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K*(ym - Ĉm*x̂ - D̂dm*d)
     return x̂
 end
-
 
 struct KalmanFilter <: StateEstimator
     model::LinModel
@@ -284,23 +272,8 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 """
 KalmanFilter(model::LinModel, i_ym, nint_ym, P̂0 ,Q̂, R̂)
 
-
 @doc raw"""
-    updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
-
-Update `estim.x̂` \ `P̂` with current inputs `u`, measured outputs `ym` and dist. `d`.
-
-See [`updatestate_kf!`](@ref) for the implementation details.
-"""
-function updatestate!(estim::KalmanFilter, u, ym, d=Float64[])
-    u, d, ym = remove_op!(estim, u, d, ym) 
-    updatestate_kf!(estim, u, ym, d)
-    return estim.x̂
-end
-
-
-@doc raw"""
-    updatestate_kf!(estim::KalmanFilter, u, ym, d)
+    update_estimate!(estim::KalmanFilter, u, ym, d)
 
 Update [`KalmanFilter`](@ref) state `estim.x̂` and estimation error covariance `estim.P̂`.
 
@@ -319,12 +292,12 @@ It implements the time-varying Kalman Filter in its predictor (observer) form :
 ```
 based on the process model described in [`SteadyKalmanFilter`](@ref). The notation 
 ``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` estimated at the last 
-control period ``k-1``. See [^1] for details.
+control period ``k-1``. See [^2] for details.
 
-[^1]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
+[^2]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
      Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
 """
-function updatestate_kf!(estim::KalmanFilter, u, ym, d)
+function update_estimate!(estim::KalmanFilter, u, ym, d)
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
     M = (P̂ * Ĉm') / (Ĉm * P̂ * Ĉm' + R̂)
@@ -475,7 +448,7 @@ covariance are respectively:
     \mathbf{Ŝ} &= \mathrm{diag}\big( 2 - α^2 + β - \tfrac{n_\mathbf{x̂}}{γ^2} \:,\; \tfrac{1}{2γ^2} \:,\; \tfrac{1}{2γ^2} \:,\; \cdots \:,\; \tfrac{1}{2γ^2} \big)
 \end{aligned}
 ```
-See [`updatestate_ukf!`](@ref) for other details.
+See [`update_estimate!(::UnscentedKalmanFilter)`](@ref) for other details.
 """
 function init_ukf(nx̂, α, β, κ)
     nσ = 2nx̂ + 1                                  # number of sigma points
@@ -487,28 +460,14 @@ function init_ukf(nx̂, α, β, κ)
     Ŝ = Diagonal{Float64}([Ŝ_0; fill(w, 2 * nx̂)]) # weights for the covariance
     return nσ, γ, m̂, Ŝ
 end
-  
 
 @doc raw"""
-    updatestate!(estim::UnscentedKalmanFilter, u, ym, d=Float64[])
-
-Same than `KalmanFilter` but using the unscented estimator.
-
-See [`updatestate_ukf!`](@ref) for the implementation details.
-"""
-function updatestate!(estim::UnscentedKalmanFilter, u, ym, d=Float64[])
-    u, d, ym = remove_op!(estim, u, d, ym) 
-    updatestate_ukf!(estim, u, ym, d)
-    return estim.x̂
-end
-
-@doc raw"""
-    updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
+    update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
     
 Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂` and covariance estimate `estim.P̂`.
 
 It implements the unscented Kalman Filter in its predictor (observer) form, based on the 
-generalized unscented transform[^2]. See [`init_ukf`](@ref) for the definition of the 
+generalized unscented transform[^3]. See [`init_ukf`](@ref) for the definition of the 
 constants ``\mathbf{m̂, Ŝ}`` and ``γ``. 
 
 Denoting ``\mathbf{x̂}_{k-1}(k)`` as the state for the current time ``k`` estimated at the 
@@ -538,11 +497,11 @@ to compute ``\sqrt{\mathbf{P̂}_{k-1}(k)}`` and ``\sqrt{\mathbf{P̂}_{k}(k)}``. 
 ``\mathbf{P̂, Q̂, R̂}`` are the covariance of the estimation error, process noise and sensor 
 noise, respectively.
 
-[^2]: Simon, D. 2006, "Chapter 14: The unscented Kalman filter" in "Optimal State Estimation: 
+[^3]: Simon, D. 2006, "Chapter 14: The unscented Kalman filter" in "Optimal State Estimation: 
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, https://doi.org/10.1002/0470045345.ch14, 
      ISBN9780470045343.
 """
-function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
+function update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
     x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
@@ -573,13 +532,138 @@ function updatestate_ukf!(estim::UnscentedKalmanFilter, u, ym, d)
     return x̂, P̂
 end
 
+struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
+    model::M
+    lastu0::Vector{Float64}
+    x̂::Vector{Float64}
+    P̂::Hermitian{Float64, Matrix{Float64}}
+    i_ym::Vector{Int}
+    nx̂::Int
+    nym::Int
+    nyu::Int
+    nxs::Int
+    As::Matrix{Float64}
+    Cs::Matrix{Float64}
+    nint_ym::Vector{Int}
+    P̂0::Hermitian{Float64, Matrix{Float64}}
+    Q̂::Hermitian{Float64, Matrix{Float64}}
+    R̂::Hermitian{Float64, Matrix{Float64}}
+    function ExtendedKalmanFilter{M}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂) where {M<:SimModel}
+        nu, nx, ny = model.nu, model.nx, model.ny
+        nym, nyu = length(i_ym), ny - length(i_ym)
+        Asm, Csm, nint_ym = init_estimstoch(i_ym, nint_ym)
+        nxs = size(Asm,1)
+        nx̂ = nx + nxs
+        validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
+        As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        i_ym = collect(i_ym)
+        lastu0 = zeros(nu)
+        x̂ = [zeros(model.nx); zeros(nxs)]
+        P̂0 = Hermitian(P̂0, :L)
+        Q̂ = Hermitian(Q̂, :L)
+        R̂ = Hermitian(R̂, :L)
+        P̂ = copy(P̂0)
+        return new(
+            model,
+            lastu0, x̂, P̂, 
+            i_ym, nx̂, nym, nyu, nxs, 
+            As, Cs, nint_ym,
+            P̂0, Q̂, R̂
+        )
+    end
+end
+
+@doc raw"""
+    ExtendedKalmanFilter(model::SimModel; <keyword arguments>)
+
+Construct an extended Kalman Filter with the [`SimModel`](@ref) `model`.
+
+Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model is 
+identical to [`UnscentedKalmanFilter`](@ref). The Jacobians of the augmented model 
+``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl)
+automatic differentiation.
+
+!!! warning
+    See Extended Help if you get an error like `MethodError: no method matching (::var"##")
+    (::Vector{ForwardDiff.Dual})`.
+
+# Arguments
+- `model::SimModel` : (deterministic) model for the estimations.
+- `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
+- `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
+
+# Examples
+```jldoctest
+julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1);
+
+julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQ_int=[2], σP0=[0.1], σP0_int=[0.1])
+ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
+ 1 manipulated inputs u
+ 2 states x̂
+ 1 measured outputs ym
+ 0 unmeasured outputs yu
+ 0 measured disturbances d
+```
+
+# Extended Help
+
+Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and `h`
+functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+for common mistakes when writing these functions.
+```
+"""
+function ExtendedKalmanFilter(
+    model::M;
+    i_ym::IntRangeOrVector = 1:model.ny,
+    σP0::Vector = fill(1/model.nx, model.nx),
+    σQ::Vector  = fill(1/model.nx, model.nx),
+    σR::Vector  = fill(1, length(i_ym)),
+    nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
+    σP0_int::Vector = fill(1, max(sum(nint_ym), 0)),
+    σQ_int::Vector  = fill(1, max(sum(nint_ym), 0))
+) where {M<:SimModel}
+    # estimated covariances matrices (variance = σ²) :
+    P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
+    Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
+    R̂  = Diagonal{Float64}(σR.^2);
+    return ExtendedKalmanFilter{M}(model, i_ym, nint_ym, P̂0, Q̂ , R̂)
+end
+
+@doc raw"""
+    update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
+
+TBW
+"""
+function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
+    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
+    F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, x̂, u, d), x̂)
+    Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, x̂, d), x̂)
+    Ĥm = Ĥ[estim.i_ym, :] 
+    M = (P̂ * Ĥm') / (Ĥm * P̂ * Ĥm' + R̂)
+    K = F̂ * M
+    ŷm = ĥ(estim, x̂, d)[estim.i_ym]
+    x̂[:] = f̂(estim, x̂, u, d) + K * (ym - ŷm)
+    P̂.data[:] = F̂ * (P̂ - M * Ĥm * P̂) * F̂' + Q̂ # .data is necessary for Hermitian matrices
+    return x̂, P̂
+end
+
 
 """
-    initstate!(estim::Union{KalmanFilter, UnscentedKalmanFilter}, u, ym, d=Float64[])
+    initstate!(
+        estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}, 
+        u, 
+        ym, 
+        d=Float64[]
+    )
 
 Initialize covariance `estim.P̂` and invoke [`initstate!(::StateEstimator)`](@ref).
 """
-function initstate!(estim::Union{KalmanFilter, UnscentedKalmanFilter}, u, ym, d=Float64[])
+function initstate!(
+    estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter},
+    u, 
+    ym, 
+    d=Float64[]
+)
     estim.P̂.data[:] = estim.P̂0 # .data is necessary for Hermitian matrices
     invoke(initstate!, Tuple{StateEstimator, Any, Any, Any}, estim, u, ym, d)
 end

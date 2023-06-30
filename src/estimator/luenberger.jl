@@ -93,12 +93,11 @@ end
 
 
 """
-    updatestate!(estim::Luenberger, u, ym, d=Float64[])
+    update_estimate!(estim::Luenberger, u, ym, d=Float64[])
 
-Same than `SteadyKalmanFilter` but using the Luenberger observer.
+Same than [`SteadyKalmanFilter`](@ref) but using the [`Luenberger`](@ref) observer.
 """
-function updatestate!(estim::Luenberger, u, ym, d=Float64[])
-    u, d, ym = remove_op!(estim, u, d, ym)
+function update_estimate!(estim::Luenberger, u, ym, d=Float64[])
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K = estim.x̂, estim.K
     x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K*(ym - Ĉm*x̂ - D̂dm*d)

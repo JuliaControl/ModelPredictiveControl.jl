@@ -5,14 +5,15 @@ using PrecompileTools
 using LinearAlgebra, Random
 using RecipesBase
 using ControlSystemsBase
+using ForwardDiff
 using JuMP
 using PreallocationTools
 import OSQP, Ipopt
 
 
 export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput
-export StateEstimator, InternalModel
-export SteadyKalmanFilter, KalmanFilter, Luenberger, UnscentedKalmanFilter
+export StateEstimator, InternalModel, Luenberger
+export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
 export initstate!
 export PredictiveController, LinMPC, NonLinMPC, setconstraint!, moveinput!, getinfo, sim!
 

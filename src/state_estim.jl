@@ -139,14 +139,14 @@ end
 
 Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
-If ``\mathbf{x_d}`` are `model.x` states, and ``\mathbf{x_s}``, the states defined at
-[`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x} = 
-[ \begin{smallmatrix} \mathbf{x_d} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
+If ``\mathbf{x}`` are `model.x` states, and ``\mathbf{x_s}``, the states defined at
+[`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
+[ \begin{smallmatrix} \mathbf{x} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
 returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{Â x}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
-    \mathbf{y}(k)   &= \mathbf{Ĉ x}(k) + \mathbf{D̂_d d}(k)
+    \mathbf{x̂}(k+1) &= \mathbf{Â x̂}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
+    \mathbf{ŷ}(k)   &= \mathbf{Ĉ x̂}(k) + \mathbf{D̂_d d}(k)
 \end{aligned}
 ```
 """
@@ -166,12 +166,12 @@ end
 
 State function ``\mathbf{f̂}`` of the augmented model.
 
-By introducing an augmented state vector ``\mathbf{x}`` like in [`augment_model`](@ref), the
+By introducing an augmented state vector ``\mathbf{x̂}`` like in [`augment_model`](@ref), the
 function returns the next state of the augmented model, defined as:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{f̂}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
-    \mathbf{y}(k)   &= \mathbf{ĥ}\Big(\mathbf{x}(k), \mathbf{d}(k)\Big) 
+    \mathbf{x̂}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
+    \mathbf{ŷ}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) 
 \end{aligned}
 ```
 """
@@ -269,6 +269,31 @@ end
 
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
 (estim::StateEstimator)(d=Float64[]) = evaloutput(estim, d)
+
+
+@doc raw"""
+    updatestate!(estim::StateEstimator, u, ym, d=Float64[])
+
+Update `estim.x̂` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
+
+The method removes the operating points with [`remove_op!`](@ref) and call 
+[`update_estimate!`](@ref).
+
+# Examples
+```jldoctest
+julia> kf = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
+
+julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_ym argument)
+2-element Vector{Float64}:
+ 0.5
+ 0.0
+```
+"""
+function updatestate!(estim::StateEstimator, u, ym, d=Float64[])
+    u0, d0, ym0 = remove_op!(estim, u, d, ym) 
+    update_estimate!(estim, u0, ym0, d0)
+    return estim.x̂
+end
 
 include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
