@@ -643,6 +643,8 @@ substitutions ``\mathbf{Â = F̂}(k)`` and ``\mathbf{Ĉ^m = Ĥ^m}(k)``, and t
 \end{aligned}
 ```
 The matrix ``\mathbf{Ĥ^m}(k)`` is the rows of ``\mathbf{Ĥ}(k)`` that are measured outputs.
+The function [`ForwardDiff.jacobian`](https://juliadiff.org/ForwardDiff.jl/stable/user/api/#ForwardDiff.jacobian)
+computes ``\mathbf{F̂}(k)`` and ``\mathbf{Ĥ}(k)``.
 """
 function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
     x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
