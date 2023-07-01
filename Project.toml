@@ -17,6 +17,7 @@ RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 
 [compat]
 ControlSystemsBase = "1"
+ForwardDiff = "0.10"
 Ipopt = "1"
 JuMP = "1"
 OSQP = "0.8"
