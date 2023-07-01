@@ -95,7 +95,7 @@ end
 """
     update_estimate!(estim::Luenberger, u, ym, d=Float64[])
 
-Same than [`SteadyKalmanFilter`](@ref) but using the [`Luenberger`](@ref) observer.
+Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function update_estimate!(estim::Luenberger, u, ym, d=Float64[])
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm

@@ -632,7 +632,17 @@ end
 @doc raw"""
     update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
 
-TBW
+Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂` and estimation error covariance `estim.P̂`.
+
+The equations are identical to [`update_estimate!(::KalmanFilter)`](@ref) with the 
+substitutions ``\mathbf{Â = F̂}(k)`` and ``\mathbf{Ĉ^m = Ĥ^m}(k)``, and the Jacobians:
+```math
+\begin{aligned}
+    \mathbf{F̂}(k) &= \left. \frac{∂\mathbf{f̂}(\mathbf{x̂}, \mathbf{u}, \mathbf{d})}{∂\mathbf{x̂}} \right|_{\mathbf{x̂ = x̂}_{k-1}(k),\, \mathbf{u = u}(k),\, \mathbf{d = d}(k)}  \\
+    \mathbf{Ĥ}(k) &= \left. \frac{∂\mathbf{ĥ}(\mathbf{x̂}, \mathbf{d})}{∂\mathbf{x̂}}             \right|_{\mathbf{x = x̂}_{k-1}(k),\, \mathbf{d = d}(k)}
+\end{aligned}
+```
+The matrix ``\mathbf{Ĥ^m}(k)`` is the rows of ``\mathbf{Ĥ}(k)`` that are measured outputs.
 """
 function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
     x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
