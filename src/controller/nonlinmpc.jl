@@ -111,8 +111,8 @@ This method uses the default state estimator :
 - else, an [`UnscentedKalmanFilter`](@ref) with default arguments. 
 
 !!! warning
-    See Extended Help if you get an error like `MethodError: no method matching 
-    Float64(::ForwardDiff.Dual)`.
+    See Extended Help if you get an error like:    
+    `MethodError: no method matching Float64(::ForwardDiff.Dual)`.
 
 # Arguments
 - `model::SimModel` : model used for controller predictions and state estimations.

@@ -225,6 +225,8 @@ julia> x̂ = initstate!(estim, [1], [3 - 0.1])
 """
 function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     model = estim.model
+    # --- init covariance error estimate (if applicable) ---
+    initstate_cov!(estim)
     # --- init lastu0 for PredictiveControllers ---
     estim.lastu0[:] = u - model.uop
     # --- deterministic model states ---
@@ -241,6 +243,9 @@ function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     estim.x̂[:] = [x̂d; x̂s]
     return estim.x̂
 end
+
+"By default, state estimators do not need initialization of covariance estimate."
+initstate_cov!(estim::StateEstimator) = nothing
 
 "Init deterministic state `x̂d` with steady-state value for `LinModel`."
 init_deterstate(model::LinModel, _    , u, d) = steadystate(model, u, d)
