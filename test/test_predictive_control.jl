@@ -63,7 +63,7 @@ end
     @test u ≈ [1] atol=1e-2
     u = mpc1(r)
     @test u ≈ [1] atol=1e-2
-    info, _ = getinfo(mpc1)
+    _ , info = getinfo(mpc1)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 5 atol=1e-2
     mpc2 = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
@@ -143,7 +143,7 @@ end
     @test u ≈ [1] atol=1e-3
     u = nmpc_lin(r)
     @test u ≈ [1] atol=1e-3
-    info, _ = getinfo(nmpc_lin)
+    _ , info = getinfo(nmpc_lin)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 5 atol=1e-2
     f(x,u,_) = linmodel.A*x + linmodel.Bu*u
@@ -155,7 +155,7 @@ end
     @test u ≈ [1] atol=1e-2
     u = nmpc1(r)
     @test u ≈ [1] atol=1e-2
-    info, _ = getinfo(nmpc1)
+    _ , info = getinfo(nmpc1)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 5 atol=1e-2
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)

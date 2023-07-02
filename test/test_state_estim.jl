@@ -278,3 +278,57 @@ end
     setstate!(ukf1, [1,2,3,4])
     @test ukf1.x̂ ≈ [1,2,3,4]
 end
+
+@testset "ExtendedKalmanFilter construction" begin
+    linmodel1 = LinModel(sys,Ts,i_d=[3])
+    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h(x,d)   = linmodel1.C*x + linmodel1.Du*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+
+    ekf1 = ExtendedKalmanFilter(linmodel1)
+    @test ekf1.nym == 2
+    @test ekf1.nyu == 0
+    @test ekf1.nxs == 2
+    @test ekf1.nx̂ == 6
+
+    ekf2 = ExtendedKalmanFilter(nonlinmodel)
+    @test ekf2.nym == 2
+    @test ekf2.nyu == 0
+    @test ekf2.nxs == 2
+    @test ekf2.nx̂ == 6
+
+    ekf3 = ExtendedKalmanFilter(nonlinmodel, i_ym=[2])
+    @test ekf3.nym == 1
+    @test ekf3.nyu == 1
+    @test ekf3.nxs == 1
+    @test ekf3.nx̂ == 5
+
+    ekf4 = ExtendedKalmanFilter(nonlinmodel, σQ=[1,2,3,4], σQ_int=[5, 6],  σR=[7, 8])
+    @test ekf4.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    @test ekf4.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
+    
+    ekf5 = ExtendedKalmanFilter(nonlinmodel, nint_ym=[2,2])
+    @test ekf5.nxs == 4
+    @test ekf5.nx̂ == 8
+
+    ekf6 = ExtendedKalmanFilter(nonlinmodel, σP0=[1,2,3,4], σP0_int=[5,6])
+    @test ekf6.P̂0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    @test ekf6.P̂  ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    @test ekf6.P̂0 !== ekf6.P̂
+end
+
+@testset "ExtendedKalmanFilter estimator methods" begin
+    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
+    f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
+    h(x,_)   = linmodel1.C*x
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    ekf1 = ExtendedKalmanFilter(nonlinmodel)
+    @test updatestate!(ekf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
+    @test updatestate!(ekf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
+    @test ekf1.x̂ ≈ zeros(4) atol=1e-9
+    @test evaloutput(ekf1) ≈ ekf1() ≈ [50, 30]
+    @test evaloutput(ekf1, Float64[]) ≈ ekf1(Float64[]) ≈ [50, 30]
+    @test initstate!(ekf1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    setstate!(ekf1, [1,2,3,4])
+    @test ekf1.x̂ ≈ [1,2,3,4]
+end

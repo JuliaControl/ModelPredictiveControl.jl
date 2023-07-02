@@ -203,13 +203,13 @@ end
 Invoke [`getinfo(::PredictiveController)`](@ref) and add `:JE` the economic optimum ``J_E``.
 """
 function getinfo(mpc::NonLinMPC)
-    info, sol_summary = invoke(getinfo, Tuple{PredictiveController}, mpc)
+    sol_summary, info = invoke(getinfo, Tuple{PredictiveController}, mpc)
     U, Ŷ, D̂ = info[:U], info[:Ŷ], info[:D̂]
     UE = [U; U[(end - mpc.estim.model.nu + 1):end]]
     ŶE = [mpc.ŷ; Ŷ]
     D̂E = [mpc.d; D̂]
     info[:JE] = mpc.JE(UE, ŶE, D̂E)
-    return info, sol_summary
+    return sol_summary, info
 end
 
 """

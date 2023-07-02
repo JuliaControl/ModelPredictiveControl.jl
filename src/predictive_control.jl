@@ -268,9 +268,8 @@ end
 
 Get additional information about `mpc` controller optimum to ease troubleshooting.
 
-Return the dictionary `info` with the additional information, and `sol_summary`, the
-optimizer solution summary that can be printed. The dictionary `info` has the following 
-fields:
+Return the optimizer solution summary that can be printed, `sol_summary`, and the dictionary 
+`info` with the following fields:
 
 - `:ΔU` : optimal manipulated input increments over `Hc` ``(\mathbf{ΔU})``
 - `:ϵ`  : optimal slack variable ``(ϵ)``
@@ -292,7 +291,7 @@ julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1, Hc=1);
 
 julia> u = moveinput!(mpc, [10]);
 
-julia> info, sol_summary = getinfo(mpc); round.(info[:Ŷ], digits=3)
+julia> sol_summary, info = getinfo(mpc); round.(info[:Ŷ], digits=3)
 1-element Vector{Float64}:
  10.0
 ```
@@ -313,7 +312,7 @@ function getinfo(mpc::PredictiveController)
     info[:Ŷd]  = info[:Ŷ] - info[:Ŷs]
     info[:R̂y]  = mpc.R̂y
     info[:R̂u]  = mpc.R̂u
-    return info, sol_summary
+    return sol_summary, info
 end
 
 """
