@@ -111,7 +111,7 @@ for more detailed examples.
   - [x] Kalman filter
   - [x] Luenberger observer
   - [x] internal model structure
-  - [ ] extended Kalman filter
+  - [x] extended Kalman filter
   - [x] unscented Kalman filter
   - [ ] moving horizon estimator
 - [x] observers in predictor form to ease  control applications

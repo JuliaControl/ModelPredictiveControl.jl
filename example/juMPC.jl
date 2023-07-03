@@ -109,7 +109,7 @@ setconstraint!(mpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(mpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
 moveinput!(mpc, mpc.estim.model.yop + [0, 2], mpc.estim.model.dop)
-display(getinfo(mpc)[1])
+display(getinfo(mpc)[2])
 
 nmpc = NonLinMPC(kf, Hp=15, Hc=1, Mwt=[1, 1] , Nwt=[0.1, 0.1], Cwt=1e5, Ewt=0.0)
 
@@ -120,7 +120,7 @@ setconstraint!(nmpc, ŷmin=[-Inf,-Inf], ŷmax=[55, 35])
 setconstraint!(nmpc, Δumin=[-Inf,-Inf],Δumax=[+Inf,+Inf])
 
 moveinput!(nmpc, nmpc.estim.model.yop + [0, 2], nmpc.estim.model.dop)
-display(getinfo(nmpc)[1])
+display(getinfo(nmpc)[2])
 
 function test_mpc(model, mpc)
     N = 200 
