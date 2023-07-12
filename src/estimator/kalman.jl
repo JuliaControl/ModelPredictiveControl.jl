@@ -298,13 +298,7 @@ control period ``k-1``. See [^2] for details.
      Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
 """
 function update_estimate!(estim::KalmanFilter, u, ym, d)
-    Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
-    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
-    M = (P̂ * Ĉm') / (Ĉm * P̂ * Ĉm' + R̂)
-    K = Â * M
-    x̂[:] = Â * x̂ + B̂u * u + B̂d * d + K * (ym - Ĉm * x̂ - D̂dm * d)
-    P̂.data[:] = Â * (P̂ - M * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitian matrices
-    return x̂, P̂
+    return update_state_kf!(estim, estim.Â, estim.Ĉm, u, ym, d)
 end
 
 struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
@@ -668,16 +662,10 @@ automatically computes the Jacobians:
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs.
 """
 function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
-    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
-    F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, x̂, u, d), x̂)
-    Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, x̂, d), x̂)
+    F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, x̂, u, d), estim.x̂)
+    Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, x̂, d), estim.x̂)
     Ĥm = Ĥ[estim.i_ym, :] 
-    M = (P̂ * Ĥm') / (Ĥm * P̂ * Ĥm' + R̂)
-    K = F̂ * M
-    ŷm = ĥ(estim, x̂, d)[estim.i_ym]
-    x̂[:] = f̂(estim, x̂, u, d) + K * (ym - ŷm)
-    P̂.data[:] = F̂ * (P̂ - M * Ĥm * P̂) * F̂' + Q̂ # .data is necessary for Hermitian matrices
-    return x̂, P̂
+    return update_state_kf!(estim, F̂, Ĥm, u, ym, d)
 end
 
 "Initialize the covariance estimate `P̂` for the time-varying Kalman Filters" 
@@ -691,7 +679,7 @@ end
 """
     validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
 
-Validate sizes of process Q̂ and sensor R̂ noises covariance matrices.
+Validate sizes of process `Q̂`` and sensor `R̂` noises covariance matrices.
 
 Also validate initial estimate covariance size, if provided.
 """
@@ -703,5 +691,21 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
     end
 end
 
+"""
+    update_state_kf!(estim, Â, Ĉm, u, ym, d)
 
+Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
+Allows code reuse for the time-varying and extended Kalman filters. They update the state
+`x̂` and covariance `P̂` with the same equations. The extended filter substitutes the 
+augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
+"""
+function update_state_kf!(estim, Â, Ĉm, u, ym, d)
+    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
+    M  = (P̂ * Ĉm') / (Ĉm * P̂ * Ĉm' + R̂)
+    K  = Â * M
+    ŷm = ĥ(estim, x̂, d)[estim.i_ym]
+    x̂[:] = f̂(estim, x̂, u, d) +  K * (ym - ŷm)
+    P̂.data[:] = Â * (P̂ - M * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitian matrices
+    return x̂, P̂
+end
