@@ -284,10 +284,10 @@ It implements the time-varying Kalman Filter in its predictor (observer) form :
                            [\mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m + R̂}]^{-1}                 \\
     \mathbf{K}(k)       &= \mathbf{Â M(k)}                                                \\
     \mathbf{ŷ^m}(k)     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k)                  \\
-    \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
+    \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k)
                            + \mathbf{K}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
-    \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k) - 
-                           \mathbf{M}(k)\mathbf{Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}' + \mathbf{Q̂}
+    \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k)
+                           - \mathbf{M}(k)\mathbf{Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}' + \mathbf{Q̂}
 \end{aligned}
 ```
 based on the process model described in [`SteadyKalmanFilter`](@ref). The notation 
@@ -646,14 +646,15 @@ The equations are similar to [`update_estimate!(::KalmanFilter)`](@ref) but with
 substitutions ``\mathbf{Â = F̂}(k)`` and ``\mathbf{Ĉ^m = Ĥ^m}(k)``:
 ```math
 \begin{aligned}
-    \mathbf{M}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}'
-                           [\mathbf{Ĥ^m P̂}_{k-1}(k)\mathbf{Ĥ^m + R̂}]^{-1}                 \\
-    \mathbf{K}(k)       &= \mathbf{F̂ M(k)}                                                \\
+    \mathbf{M}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}'(k)
+                           [\mathbf{Ĥ^m}(k)\mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}(k) + \mathbf{R̂}]^{-1}    \\
+    \mathbf{K}(k)       &= \mathbf{F̂}(k) \mathbf{M}(k)                                    \\
     \mathbf{ŷ^m}(k)     &= \mathbf{ĥ^m}\Big( \mathbf{x̂}_{k-1}(k), \mathbf{d}(k) \Big)     \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{f̂}\Big( \mathbf{x̂}_{k-1}(k), \mathbf{u}(k), \mathbf{d}(k) \Big)
                            + \mathbf{K}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
-    \mathbf{P̂}_{k}(k+1) &= \mathbf{F̂}[\mathbf{P̂}_{k-1}(k) - 
-                           \mathbf{M}(k)\mathbf{Ĥ^m P̂}_{k-1}(k)]\mathbf{F̂}' + \mathbf{Q̂}
+    \mathbf{P̂}_{k}(k+1) &= \mathbf{F̂}(k)[\mathbf{P̂}_{k-1}(k)
+                           - \mathbf{M}(k)\mathbf{Ĥ^m}(k)\mathbf{P̂}_{k-1}(k)]\mathbf{F̂}'(k) 
+                           + \mathbf{Q̂}
 \end{aligned}
 ```
 [`ForwardDiff.jacobian`](https://juliadiff.org/ForwardDiff.jl/stable/user/api/#ForwardDiff.jacobian)

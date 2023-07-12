@@ -75,9 +75,9 @@ plot(res, plotu=false, plotxwithx̂=true)
 ```
 
 The estimate ``x̂_3`` is the integrator state that compensates for static errors (`nint_ym`
-parameter of [`UnscentedKalmanFilter`](@ref)). The Kalman filter performance seems
-sufficient for control. As the motor torque is limited to -1.5 to 1.5 N m, we incorporate
-the input constraints in a [`NonLinMPC`](@ref):
+and `σQ_int` parameters of [`UnscentedKalmanFilter`](@ref)). The Kalman filter performance
+seems sufficient for control. As the motor torque is limited to -1.5 to 1.5 N m, we 
+incorporate the input constraints in a [`NonLinMPC`](@ref):
 
 ```@example 1
 mpc = NonLinMPC(estim, Hp=20, Hc=4, Mwt=[0.05], Nwt=[2.5], Cwt=Inf)
