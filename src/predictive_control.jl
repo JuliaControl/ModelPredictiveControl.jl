@@ -199,7 +199,7 @@ setnonlincon!(::PredictiveController, ::SimModel) = nothing
 @doc raw"""
     moveinput!(
         mpc::PredictiveController, 
-        ry, 
+        ry = mpc.estim.model.yop, 
         d  = Float64[];
         R̂y = repeat(ry, mpc.Hp), 
         D̂  = repeat(d,  mpc.Hp), 
@@ -246,7 +246,7 @@ julia> u = moveinput!(mpc, [5]); round.(u, digits=3)
 """
 function moveinput!(
     mpc::PredictiveController, 
-    ry::Vector, 
+    ry::Vector = mpc.estim.model.yop, 
     d ::Vector = Float64[];
     R̂y::Vector = repeat(ry, mpc.Hp),
     D̂ ::Vector = repeat(d,  mpc.Hp),
@@ -1025,7 +1025,7 @@ end
 
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(
-    ry::Vector, 
+    ry::Vector = mpc.estim.model.yop, 
     d ::Vector = Float64[];
     kwargs...
 )

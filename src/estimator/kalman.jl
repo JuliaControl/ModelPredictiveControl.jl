@@ -298,7 +298,7 @@ control period ``k-1``. See [^2] for details.
      Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
 """
 function update_estimate!(estim::KalmanFilter, u, ym, d)
-    return update_state_kf!(estim, estim.Â, estim.Ĉm, u, ym, d)
+    return update_estimate_kf!(estim, estim.Â, estim.Ĉm, u, ym, d)
 end
 
 struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
@@ -665,7 +665,7 @@ function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
     F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, x̂, u, d), estim.x̂)
     Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, x̂, d), estim.x̂)
     Ĥm = Ĥ[estim.i_ym, :] 
-    return update_state_kf!(estim, F̂, Ĥm, u, ym, d)
+    return update_estimate_kf!(estim, F̂, Ĥm, u, ym, d)
 end
 
 "Initialize the covariance estimate `P̂` for the time-varying Kalman Filters" 
@@ -692,7 +692,7 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
 end
 
 """
-    update_state_kf!(estim, Â, Ĉm, u, ym, d)
+    update_estimate_kf!(estim, Â, Ĉm, u, ym, d)
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
@@ -700,7 +700,7 @@ Allows code reuse for the time-varying and extended Kalman filters. They update 
 `x̂` and covariance `P̂` with the same equations. The extended filter substitutes the 
 augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
 """
-function update_state_kf!(estim, Â, Ĉm, u, ym, d)
+function update_estimate_kf!(estim, Â, Ĉm, u, ym, d)
     x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
     M  = (P̂ * Ĉm') / (Ĉm * P̂ * Ĉm' + R̂)
     K  = Â * M

@@ -164,6 +164,12 @@ end
     nmpc3 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Lwt=[1], ru=[12])
     u = moveinput!(nmpc3, [0])
     @test u ≈ [12] atol=1e-2
+    Hp = 1000
+    R̂y = fill(5, Hp)
+    JE = (_ , ŶE, _ ) -> sum((ŶE[2:end] - R̂y).^2)
+    nmpc4 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
+    u = moveinput!(nmpc4)
+    @test u ≈ [1] atol=1e-2
 end
 
 @testset "NonLinMPC other methods" begin
