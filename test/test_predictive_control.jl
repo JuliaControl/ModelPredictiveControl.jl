@@ -146,29 +146,32 @@ end
     _ , info = getinfo(nmpc_lin)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 5 atol=1e-2
-    f(x,u,_) = linmodel.A*x + linmodel.Bu*u
-    h(x,_)   = linmodel.C*x 
-    nonlinmodel = NonLinModel(f, h, 3, 1, 1, 1)
-    nmpc1 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
-    r = [5]
-    u = moveinput!(nmpc1, r)
-    @test u ≈ [1] atol=1e-2
-    u = nmpc1(r)
-    @test u ≈ [1] atol=1e-2
-    _ , info = getinfo(nmpc1)
-    @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 5 atol=1e-2
-    nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
-    u = moveinput!(nmpc2, [5])
-    @test u ≈ [1] atol=1e-2
-    nmpc3 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Lwt=[1], ru=[12])
-    u = moveinput!(nmpc3, [0])
-    @test u ≈ [12] atol=1e-2
     Hp = 1000
     R̂y = fill(5, Hp)
     JE = (_ , ŶE, _ ) -> sum((ŶE[2:end] - R̂y).^2)
-    nmpc4 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
-    u = moveinput!(nmpc4)
+    nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
+    u = moveinput!(nmpc)
+    @test u ≈ [1] atol=1e-2
+    f(x,u,_) = linmodel.A*x + linmodel.Bu*u
+    h(x,_)   = linmodel.C*x 
+    nonlinmodel = NonLinModel(f, h, 3, 1, 1, 1)
+    nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
+    r = [5]
+    u = moveinput!(nmpc2, r)
+    @test u ≈ [1] atol=1e-2
+    u = nmpc2(r)
+    @test u ≈ [1] atol=1e-2
+    _ , info = getinfo(nmpc2)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 5 atol=1e-2
+    nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
+    u = moveinput!(nmpc3, [5])
+    @test u ≈ [1] atol=1e-2
+    nmpc4 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Lwt=[1], ru=[12])
+    u = moveinput!(nmpc4, [0])
+    @test u ≈ [12] atol=1e-2
+    nmpc5 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
+    u = moveinput!(nmpc5)
     @test u ≈ [1] atol=1e-2
 end
 
