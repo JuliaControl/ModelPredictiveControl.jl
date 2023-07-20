@@ -37,6 +37,8 @@ struct SteadyKalmanFilter <: StateEstimator
                 error("Cannot compute the optimal Kalman gain K for the "* 
                       "SteadyKalmanFilter. You may try to remove integrators with nint_ym "*
                       "parameter or use the time-varying KalmanFilter.")
+            else
+                rethrow()
             end
         end
         i_ym = collect(i_ym)
