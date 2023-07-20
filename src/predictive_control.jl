@@ -796,11 +796,11 @@ constraints:
 function relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
-        A_Umin, A_Umax = -[S_Hc +c_Umin], +[S_Hc -c_Umax] 
+        A_Umin, A_Umax = -[S_Hc  c_Umin],  [S_Hc -c_Umax] 
         # ϵ has no impact on ΔU → U conversion for prediction calculations:
         S̃_Hp = [S_Hp falses(size(S_Hp, 1))]
     else # ΔŨ = ΔU (only hard constraints)
-        A_Umin, A_Umax = -S_Hc, +S_Hc
+        A_Umin, A_Umax = -S_Hc,  S_Hc
         S̃_Hp = S_Hp
     end
     return A_Umin, A_Umax, S̃_Hp
@@ -832,12 +832,12 @@ function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
         # 0 ≤ ϵ ≤ ∞  
         ΔŨmin, ΔŨmax = [ΔUmin; 0.0], [ΔUmax; Inf]
         A_ϵ = [zeros(1, length(ΔUmin)) [1]]
-        A_ΔŨmin, A_ΔŨmax = -[I +c_ΔUmin;  A_ϵ], +[I -c_ΔUmax; A_ϵ]
+        A_ΔŨmin, A_ΔŨmax = -[I  c_ΔUmin; A_ϵ], [I -c_ΔUmax; A_ϵ]
         Ñ_Hc = Diagonal([diag(N_Hc); C])
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
         I_Hc = Matrix{Float64}(I, size(N_Hc))
-        A_ΔŨmin, A_ΔŨmax = -I_Hc, +I_Hc
+        A_ΔŨmin, A_ΔŨmax = -I_Hc,  I_Hc
         Ñ_Hc = N_Hc
     end
     return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
@@ -866,12 +866,12 @@ Denoting the input increments augmented with the slack variable
 function relaxŶ(::LinModel, C, c_Ŷmin, c_Ŷmax, E)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts predicted output constraint calculations:
-        A_Ŷmin, A_Ŷmax = -[E +c_Ŷmin], +[E -c_Ŷmax] 
+        A_Ŷmin, A_Ŷmax = -[E  c_Ŷmin], [E -c_Ŷmax] 
         # ϵ has not impact on output predictions
         Ẽ = [E zeros(size(E, 1), 1)] 
     else # ΔŨ = ΔU (only hard constraints)
         Ẽ = E
-        A_Ŷmin, A_Ŷmax = -E, +E
+        A_Ŷmin, A_Ŷmax = -E,  E
     end
     return A_Ŷmin, A_Ŷmax, Ẽ
 end
