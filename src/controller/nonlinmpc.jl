@@ -261,7 +261,7 @@ function init_optimization!(mpc::NonLinMPC)
         function con_nonlinprog_i(i, ΔŨtup::NTuple{N, Float64}) where {N}
             C = get_tmp(C_cache, ΔŨtup[1])
             if ΔŨtup != last_ΔŨtup_float
-                Ŷ = get_tmp(Ŷ_cache, ΔŨtup_1)
+                Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
                 ΔŨ = collect(ΔŨtup)
                 Ŷ[:] = predict(mpc, model, ΔŨ)
                 C[:] = con_nonlinprog(mpc, model, Ŷ, ΔŨ)
@@ -272,7 +272,7 @@ function init_optimization!(mpc::NonLinMPC)
         function con_nonlinprog_i(i, ΔŨtup::NTuple{N, Real}) where {N}
             C = get_tmp(C_cache, ΔŨtup[1])
             if ΔŨtup != last_ΔŨtup_dual
-                Ŷ = get_tmp(Ŷ_cache, ΔŨtup_1)
+                Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
                 ΔŨ = collect(ΔŨtup)
                 Ŷ[:] = predict(mpc, model, ΔŨ)
                 C[:] = con_nonlinprog(mpc, model, Ŷ, ΔŨ)

@@ -173,6 +173,10 @@ end
     nmpc5 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
     u = moveinput!(nmpc5)
     @test u ≈ [1] atol=1e-2
+    nmpc6 = setconstraint!(NonLinMPC(nonlinmodel, Cwt=Inf), ŷmin=[-1])
+    C_Ŷmax_end = nmpc6.optim.nlp_model.operators.registered_multivariate_operators[end].f
+    @test C_Ŷmax_end(Float64.((1.0, 1.0))) ≤ 0.0 # test con_nonlinprog_i(i,::NTuple{N, Float64})
+    @test C_Ŷmax_end(Float32.((1.0, 1.0))) ≤ 0.0 # test con_nonlinprog_i(i,::NTuple{N, Real})
 end
 
 @testset "NonLinMPC other methods" begin
