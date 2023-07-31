@@ -116,6 +116,11 @@ end
 
 @testset "NonLinMPC constraints" begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
+    nmpc_lin = NonLinMPC(linmodel1, Hp=1, Hc=1)
+    setconstraint!(nmpc_lin, ŷmin=[5,10],ŷmax=[55, 35])
+    @test all((nmpc_lin.con.Ŷmin, nmpc_lin.con.Ŷmax) .≈ ([5,10], [55,35]))
+    setconstraint!(nmpc_lin, c_ŷmin=[1.0,1.1], c_ŷmax=[1.2,1.3])
+    @test all((-nmpc_lin.con.A_Ŷmin[:, end], -nmpc_lin.con.A_Ŷmax[:, end]) .≈ ([1.0,1.1], [1.2,1.3]))
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
