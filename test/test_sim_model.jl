@@ -38,6 +38,7 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
     @test linmodel4.x ≈ [1;-1]
 
     linmodel5 = LinModel(sys,Ts,i_d=[3])
+    setop!(linmodel5, uop=[10,50], yop=[50,30], dop=[20])
     @test linmodel5.nx == 4
     @test linmodel5.nu == 2
     @test linmodel5.nd == 1
@@ -50,6 +51,9 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
     @test linmodel5.Bd  ≈ sys_ss.B[:,3]
     @test linmodel5.C   ≈ sys_ss.C
     @test linmodel5.Dd  ≈ sys_ss.D[:,3]
+    @test linmodel5.uop ≈ [10,50]
+    @test linmodel5.yop ≈ [50,30]
+    @test linmodel5.dop ≈ [20]
 
     linmodel6 = LinModel([delay(4) delay(4)]*sys,Ts,i_d=[3])
     @test linmodel6.nx == 6
