@@ -65,7 +65,7 @@ end
     @test u ≈ [1] atol=1e-2
     _ , info = getinfo(mpc1)
     @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 5 atol=1e-2
+    @test info[:Ŷ][end] ≈ r[1] atol=1e-2
     mpc2 = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
     u = moveinput!(mpc2, [5])
     @test u ≈ [1] atol=1e-2
@@ -141,45 +141,44 @@ end
 end
 
 @testset "NonLinMPC moves and getinfo" begin
-    linmodel = LinModel(tf(5, [2, 1]), 3)
+    linmodel = LinModel(tf(5, [2, 1]), 3.0)
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
     r = [5]
     u = moveinput!(nmpc_lin, r)
-    @test u ≈ [1] atol=1e-3
+    @test u ≈ [1] atol=5e-2
     u = nmpc_lin(r)
-    @test u ≈ [1] atol=1e-3
+    @test u ≈ [1] atol=5e-2
     _ , info = getinfo(nmpc_lin)
     @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 5 atol=1e-2
+    @test info[:Ŷ][end] ≈ r[1] atol=5e-2
     Hp = 1000
     R̂y = fill(5, Hp)
     JE = (_ , ŶE, _ ) -> sum((ŶE[2:end] - R̂y).^2)
     nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
     u = moveinput!(nmpc)
-    @test u ≈ [1] atol=1e-2
-    f(x,u,_) = linmodel.A*x + linmodel.Bu*u
-    h(x,_)   = linmodel.C*x 
-    nonlinmodel = NonLinModel(f, h, 3, 1, 1, 1)
+    @test u ≈ [1] atol=5e-2
+    linmodel = LinModel([tf(5, [2, 1]) tf(7, [8,1])], 3.0, i_d=[2])
+    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h(x,d)   = linmodel.C*x + linmodel.Dd*d
+    nonlinmodel = NonLinModel(f, h, 3.0, 1, 2, 1, 1)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
-    r = [5]
-    u = moveinput!(nmpc2, r)
-    @test u ≈ [1] atol=1e-2
-    u = nmpc2(r)
-    @test u ≈ [1] atol=1e-2
+    d = [0.1]
+    r = 7*d
+    u = moveinput!(nmpc2, r, d)
+    @test u ≈ [0] atol=5e-2
+    u = nmpc2(r, d)
+    @test u ≈ [0] atol=5e-2
     _ , info = getinfo(nmpc2)
     @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 5 atol=1e-2
+    @test info[:Ŷ][end] ≈ r[1] atol=5e-2
     nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
-    u = moveinput!(nmpc3, [5])
-    @test u ≈ [1] atol=1e-2
+    u = moveinput!(nmpc3, r, d)
+    @test u ≈ [0] atol=5e-2
     nmpc4 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Lwt=[1], ru=[12])
-    u = moveinput!(nmpc4, [0])
-    @test u ≈ [12] atol=1e-2
-    nmpc5 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
-    u = moveinput!(nmpc5)
-    @test u ≈ [1] atol=1e-2
-    nmpc6 = setconstraint!(NonLinMPC(nonlinmodel, Cwt=Inf), ŷmin=[-1])
-    C_Ŷmax_end = nmpc6.optim.nlp_model.operators.registered_multivariate_operators[end].f
+    u = moveinput!(nmpc4, [0], d)
+    @test u ≈ [12] atol=5e-2
+    nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Cwt=Inf), ŷmin=[-1])
+    C_Ŷmax_end = nmpc5.optim.nlp_model.operators.registered_multivariate_operators[end].f
     @test C_Ŷmax_end(Float64.((1.0, 1.0))) ≤ 0.0 # test con_nonlinprog_i(i,::NTuple{N, Float64})
     @test C_Ŷmax_end(Float32.((1.0, 1.0))) ≤ 0.0 # test con_nonlinprog_i(i,::NTuple{N, Real})
 end

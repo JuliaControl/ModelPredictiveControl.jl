@@ -85,6 +85,16 @@ and ``\mathbf{ŷ_{max}}`` are soft by default.
 - `c_Δumax=fill(0.0,nu)` : `Δumax` softness weights ``\mathbf{c_{Δu_{max}}}`` 
 - `c_ŷmin=fill(1.0,ny)` : `ŷmin` softness weights ``\mathbf{c_{ŷ_{min}}}`` 
 - `c_ŷmax=fill(1.0,ny)` : `ŷmax` softness weights ``\mathbf{c_{ŷ_{max}}}``
+
+# Examples
+```jldoctest
+julia> mpc = LinMPC(setop!(LinModel(tf(3, [30, 1]), 4), uop=[50], yop=[25]));
+
+julia> mpc = setconstraint!(mpc, umin=[0], umax=[100], c_umin=[0.0], c_umax=[0.0]);
+
+julia> mpc = setconstraint!(mpc, Δumin=[-10], Δumax=[+10], c_Δumin=[1.0], c_Δumax=[1.0])
+
+```
 """
 function setconstraint!(
     mpc::PredictiveController; 
@@ -239,7 +249,7 @@ See also [`LinMPC`](@ref), [`NonLinMPC`](@ref).
 ```jldoctest
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
 
-julia> u = moveinput!(mpc, [5]); round.(u, digits=3)
+julia> ry = [5]; u = moveinput!(mpc, ry); round.(u, digits=3)
 1-element Vector{Float64}:
  1.0
 ```
