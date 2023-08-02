@@ -21,7 +21,7 @@ The manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}`` a
 constant at `u` and `d` values, respectively. The plant initial state ``\mathbf{x}(0)`` is
 specified by `x0` keyword arguments. The function returns `SimResult` instances that can be
 visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on 
-them (see Examples below).
+them (see Examples below). Note that the method mutates `plant` internal states.
 
 # Examples
 ```julia-repl
@@ -182,12 +182,8 @@ function sim_closedloop!(
     X̂_data  = Matrix{Float64}(undef, estim.nx̂, N)
     setstate!(plant, x0)
     lastd, lasty = d, evaloutput(plant, d)
-    if isnothing(x̂0)
-        initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
-
-    else
-        setstate!(est_mpc, x̂0)
-    end
+    initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
+    isnothing(x̂0) || setstate!(est_mpc, x̂0)
     for i=1:N
         d = lastd + d_step + d_noise.*randn(plant.nd)
         y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
