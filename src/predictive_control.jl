@@ -227,28 +227,17 @@ Compute the optimal manipulated input value `u` for the current control period.
 
 Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the 
 results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm discards 
-the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ``... The 
+the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...`` The 
 arguments `ry` and `d` are current output setpoints ``\mathbf{r_y}(k)`` and measured 
-disturbances ``\mathbf{d}(k)``. The predicted output setpoint `R̂y` and measured disturbances 
-`D̂` are defined as:
-```math
-    \mathbf{R̂_y} = \begin{bmatrix}
-        \mathbf{r̂_y}(k+1)   \\
-        \mathbf{r̂_y}(k+2)   \\
-        \vdots              \\
-        \mathbf{r̂_y}(k+H_p)
-    \end{bmatrix}                   \qquad \text{and} \qquad
-    \mathbf{D̂}   = \begin{bmatrix}
-        \mathbf{d̂}(k+1)     \\
-        \mathbf{d̂}(k+2)     \\
-        \vdots              \\
-        \mathbf{d̂}(k+H_p)
-    \end{bmatrix}
-```
-They are assumed constant in the future by default, that is 
-``\mathbf{r̂_y}(k+j) = \mathbf{r_y}(k)`` and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for ``j=1``
-to ``H_p``. Current measured outputs `ym` (keyword argument) are only required if 
-`mpc.estim` is a [`InternalModel`](@ref).
+disturbances ``\mathbf{d}(k)``.
+
+The keyword arguments `R̂y` and `D̂` are the predicted output setpoints ``\mathbf{R̂_y}`` and
+measured disturbances ``\mathbf{D̂}``. They are assumed constant in the future by default, 
+that is ``\mathbf{r̂_y}(k+j) = \mathbf{r_y}(k)`` and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for
+``j=1`` to ``H_p``. Current measured output `ym` is only required if `mpc.estim` is a 
+[`InternalModel`](@ref).
+
+Calling a [`PredictiveController`](@ref) object calls this method.
 
 See also [`LinMPC`](@ref), [`NonLinMPC`](@ref).
 

@@ -64,7 +64,8 @@ end
 
 Construct a steady-state Kalman Filter with the [`LinModel`](@ref) `model`.
 
-The steady-state (or asymptotic) Kalman filter is based on the process model :
+The steady-state (or [asymptotic](https://en.wikipedia.org/wiki/Kalman_filter#Asymptotic_form))
+Kalman filter is based on the process model :
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &= 
