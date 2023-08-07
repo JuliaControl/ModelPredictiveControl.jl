@@ -78,7 +78,7 @@ NonLinMPC
 setconstraint!
 ```
 
-## Move Manipulated Input
+## Move Manipulated Input u
 
 ```@docs
 moveinput!
