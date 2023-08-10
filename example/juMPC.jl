@@ -10,7 +10,7 @@ using Preferences
 set_preferences!(ModelPredictiveControl, "precompile_workload" => false; force=true)
 
 
-#using JuMP, DAQP
+using JuMP, DAQP
 #using JuMP, HiGHS
 using JuMP, Ipopt
 using LinearAlgebra

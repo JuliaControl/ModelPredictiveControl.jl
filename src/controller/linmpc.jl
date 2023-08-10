@@ -217,8 +217,8 @@ function init_optimization!(mpc::LinMPC)
     return nothing
 end
 
-"Set quadratic programming `q̃` vector just before optimization."
-function set_objective!(mpc::LinMPC, ΔŨ)
-    set_objective_function(mpc.optim, obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃))
+"For [`LinMPC`](@ref), set the QP linear coefficient `q̃` just before optimization."
+function set_objective_linear_coef!(mpc::LinMPC, ΔŨvar)
+    set_objective_coefficient.(mpc.optim, ΔŨvar, mpc.q̃)
     return nothing
 end

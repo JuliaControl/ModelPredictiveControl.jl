@@ -525,18 +525,18 @@ function optim_objective!(mpc::PredictiveController)
     # if soft constraints, append the last slack value ϵ_{k-1}:
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
     set_start_value.(ΔŨvar, ΔŨ0)
-    set_objective!(mpc, ΔŨvar)
-    #try
+    set_objective_linear_coef!(mpc, ΔŨvar)
+    try
         optimize!(optim)
-    #catch err
-    #    if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
-    #        # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
-    #        MOIU.reset_optimizer(optim) 
-    #        optimize!(optim)
-    #    else
-    #        rethrow(err)
-    #    end
-    #end
+    catch err
+        if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
+            # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
+            MOIU.reset_optimizer(optim)
+            optimize!(optim)
+        else
+            rethrow(err)
+        end
+    end
     status = termination_status(optim)
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
         @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVED ($status)"
@@ -546,8 +546,8 @@ function optim_objective!(mpc::PredictiveController)
     return mpc.ΔŨ
 end
 
-"By default, no change to the objective function."
-set_objective!(::PredictiveController, _ ) = nothing
+"By default, no need to modify the objective function."
+set_objective_linear_coef!(::PredictiveController, _ ) = nothing
 
 @doc raw"""
     init_ΔUtoU(nu, Hp, Hc, C, c_Umin, c_Umax)

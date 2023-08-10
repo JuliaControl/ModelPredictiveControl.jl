@@ -25,7 +25,7 @@ over the prediction horizon ``H_p`` are defined as:
     \end{bmatrix} \: , \quad
     \mathbf{Ŷ} = \begin{bmatrix}
         \mathbf{ŷ}(k+1)   \\ \mathbf{ŷ}(k+2)   \\ \vdots  \\ \mathbf{ŷ}(k+H_p)
-    \end{bmatrix} \: \text{and} \quad
+    \end{bmatrix} \quad \text{and} \quad
     \mathbf{R̂_y} = \begin{bmatrix}
         \mathbf{r̂_y}(k+1) \\ \mathbf{r̂_y}(k+2) \\ \vdots  \\ \mathbf{r̂_y}(k+H_p)
     \end{bmatrix}
@@ -36,7 +36,7 @@ The vectors for the manipulated input ``\mathbf{u}`` are shifted by one time ste
 ```math
     \mathbf{U} = \begin{bmatrix}
         \mathbf{u}(k+0) \\ \mathbf{u}(k+1) \\ \vdots  \\ \mathbf{u}(k+H_p-1)
-    \end{bmatrix} \: \text{and} \quad
+    \end{bmatrix} \quad \text{and} \quad
     \mathbf{R̂_u} = \begin{bmatrix}
         \mathbf{r_u}    \\ \mathbf{r_u}    \\ \vdots  \\ \mathbf{r_u}
     \end{bmatrix}
