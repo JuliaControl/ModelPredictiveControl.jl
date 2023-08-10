@@ -526,17 +526,17 @@ function optim_objective!(mpc::PredictiveController)
     !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
     set_start_value.(ΔŨvar, ΔŨ0)
     set_objective!(mpc, ΔŨvar)
-    try
+    #try
         optimize!(optim)
-    catch err
-        if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
-            # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
-            MOIU.reset_optimizer(optim) 
-            optimize!(optim)
-        else
-            rethrow(err)
-        end
-    end
+    #catch err
+    #    if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
+    #        # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
+    #        MOIU.reset_optimizer(optim) 
+    #        optimize!(optim)
+    #    else
+    #        rethrow(err)
+    #    end
+    #end
     status = termination_status(optim)
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
         @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVED ($status)"
