@@ -124,7 +124,7 @@ end
 
 Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
 
-The output setpoint ``\mathbf{r_y}`` is held constant at `r_y`. The keyword arguments are
+The output setpoint ``\mathbf{r_y}`` is held constant at `ry`. The keyword arguments are
 identical to [`sim!(::StateEstimator, ::Int)`](@ref).
 
 # Examples
