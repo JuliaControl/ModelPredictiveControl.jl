@@ -137,16 +137,21 @@ plot_data(t_data, u_data, y_data, ry_data)
 For some situations, when [`LinMPC`](@ref) matrices are small/medium and dense, [`DAQP`](https://darnstrom.github.io/daqp/)
 optimizer may be more efficient. To install it, run:
 
-```julia
+```text
 using Pkg; Pkg.add("DAQP")
 ```
 
-Constructing a [`LinMPC`](@ref) with `DAQP` leads to identical results here:
+Constructing a [`LinMPC`](@ref) with `DAQP`:
 
 ```@example 1
 using JuMP, DAQP
 daqp = Model(DAQP.Optimizer)
 mpc2 = setconstraint!(LinMPC(model, Hp=15, Hc=2, optim=daqp), ŷmin=[45, -Inf])
+```
+
+leads to identical results here:
+
+```@example 1
 setstate!(model, zeros(model.nx))
 initstate!(mpc2, model.uop, model())
 u_data2, y_data2, ry_data2 = test_mpc(mpc2, model)
