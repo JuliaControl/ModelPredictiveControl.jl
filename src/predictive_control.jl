@@ -93,7 +93,7 @@ julia> mpc = LinMPC(setop!(LinModel(tf(3, [30, 1]), 4), uop=[50], yop=[25]));
 julia> mpc = setconstraint!(mpc, umin=[0], umax=[100], c_umin=[0.0], c_umax=[0.0]);
 
 julia> mpc = setconstraint!(mpc, Δumin=[-10], Δumax=[+10], c_Δumin=[1.0], c_Δumax=[1.0])
-LinMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimator and:
+LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
  10 prediction steps Hp
   2 control steps Hc
   1 manipulated inputs u
@@ -1009,7 +1009,8 @@ function Base.show(io::IO, mpc::PredictiveController)
     nx̂, nym, nyu = mpc.estim.nx̂, mpc.estim.nym, mpc.estim.nyu
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
     println(io, "$(typeof(mpc).name.name) controller with a sample time Ts = "*
-                "$(mpc.estim.model.Ts) s, $(typeof(mpc.estim).name.name) estimator and:")
+                "$(mpc.estim.model.Ts) s, $(solver_name(mpc.optim)) optimizer, "*
+                "$(typeof(mpc.estim).name.name) estimator and:")
     println(io, "$(lpad(Hp, n)) prediction steps Hp")
     println(io, "$(lpad(Hc, n)) control steps Hc")
     println(io, "$(lpad(nu, n)) manipulated inputs u")

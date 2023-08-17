@@ -68,11 +68,12 @@ We design our [`LinMPC`](@ref) controllers by including the level constraint wit
 mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2), ŷmin=[45, -Inf])
 ```
 
-By default, [`LinMPC`](@ref) controllers use a [`SteadyKalmanFilter`](@ref) to estimate the
-plant states. Before closing the loop, we call [`initstate!`](@ref) with the actual plant
-inputs and measurements to ensure a bumpless transfer. Since `model` simulates our plant
-here, its output will initialize the states. [`LinModel`](@ref) objects are callable for
-this purpose (an alias for [`evaloutput`](@ref)):
+By default, [`LinMPC`](@ref) controllers use [`OSQP`](https://osqp.org/) to solve the
+problem and a [`SteadyKalmanFilter`](@ref) to estimate the plant states. Before closing the
+loop, we call [`initstate!`](@ref) with the actual plant inputs and measurements to ensure a
+bumpless transfer. Since `model` simulates our plant here, its output will initialize the
+states. [`LinModel`](@ref) objects are callable for this purpose (an alias for
+[`evaloutput`](@ref)):
 
 ```@example 1
 u = model.uop
@@ -120,12 +121,34 @@ Lastly, we plot the closed-loop test with the `Plots` package:
 
 ```@example 1
 using Plots
-p1 = plot(t_data, y_data[1,:], label="level"); ylabel!("level")
-plot!(t_data, ry_data[1,:], label="setpoint", linestyle=:dash, linetype=:steppost)
-plot!(t_data, fill(45,size(t_data)), label="min", linestyle=:dot, linetype=:steppost)
-p2 = plot(t_data, y_data[2,:], label="temp."); ylabel!("temp.")
-plot!(t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
-p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost); ylabel!("flow rate")
-plot!(t_data,u_data[2,:],label="hot", linetype=:steppost); xlabel!("time (s)")
-p = plot(p1, p2, p3, layout=(3,1), fmt=:svg)
+function plot_data(t_data, u_data, y_data, ry_data)
+    p1 = plot(t_data, y_data[1,:], label="level"); ylabel!("level")
+    plot!(t_data, ry_data[1,:], label="setpoint", linestyle=:dash, linetype=:steppost)
+    plot!(t_data, fill(45,size(t_data)), label="min", linestyle=:dot, linewidth=1.5)
+    p2 = plot(t_data, y_data[2,:], label="temp."); ylabel!("temp.")
+    plot!(t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
+    p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost); ylabel!("flow rate")
+    plot!(t_data,u_data[2,:],label="hot", linetype=:steppost); xlabel!("time (s)")
+    return plot(p1, p2, p3, layout=(3,1), fmt=:svg)
+end
+plot_data(t_data, u_data, y_data, ry_data)
+```
+
+For some situations, when [`LinMPC`](@ref) matrices are small/medium and dense, [`DAQP`](https://darnstrom.github.io/daqp/)
+optimizer may be more efficient. To install it, run:
+
+```julia
+using Pkg; Pkg.add("DAQP")
+```
+
+Constructing a [`LinMPC`](@ref) with `DAQP` leads to identical results here:
+
+```@example 1
+using JuMP, DAQP
+daqp = Model(DAQP.Optimizer)
+mpc2 = setconstraint!(LinMPC(model, Hp=15, Hc=2, optim=daqp), ŷmin=[45, -Inf])
+setstate!(model, zeros(model.nx))
+initstate!(mpc2, model.uop, model())
+u_data2, y_data2, ry_data2 = test_mpc(mpc2, model)
+plot_data(t_data, u_data2, y_data2, ry_data2)
 ```
