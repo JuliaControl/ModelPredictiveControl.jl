@@ -14,6 +14,7 @@ DocMeta.setdocmeta!(
 )
 makedocs(
     sitename    = "ModelPredictiveControl.jl",
+    #format = Documenter.LaTeX(platform = "none"),
     doctest     = true,
     format      = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",

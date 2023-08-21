@@ -57,6 +57,11 @@ updatestate!(luenberger, [0,0], [0,0])
 
 mpcluen = LinMPC(luenberger)
 
+mhe = NonLinMHE(nonLinModel2)
+
+updatestate!(mhe, [0, 0], [0, 0], [1])
+
+#=
 kalmanFilter1 = KalmanFilter(linModel1)
 kalmanFilter2 = KalmanFilter(linModel1,nint_ym=0)
 
@@ -207,4 +212,5 @@ display(pd)
 display(pu)
 display(py)
 
+=#
 =#

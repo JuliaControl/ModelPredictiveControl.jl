@@ -324,7 +324,7 @@ end
 """
     obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::Vector{Real})
 
-Objective function for [`NonLinMPC`] when `model` is a [`LinModel`](@ref).
+Objective function for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
 """
 function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
     J = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
@@ -341,7 +341,7 @@ end
 """
     obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::Vector{Real})
 
-Objective function for [`NonLinMPC`] when `model` is not a [`LinModel`](@ref).
+Objective function for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
 """
 function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
     # --- output setpoint tracking term ---

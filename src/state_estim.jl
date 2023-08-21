@@ -303,6 +303,7 @@ end
 include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
 include("estimator/internal_model.jl")
+include("estimator/mhe.jl")
 
 "Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`."
 evalŷ(estim::InternalModel, ym, d) = evaloutput(estim,ym, d)

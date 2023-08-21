@@ -14,8 +14,12 @@ import OSQP, Ipopt
 export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput
 export StateEstimator, InternalModel, Luenberger
 export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
+export NonLinMHE
 export initstate!
 export PredictiveController, LinMPC, NonLinMPC, setconstraint!, moveinput!, getinfo, sim!
+
+"Generate a block diagonal matrix repeating `n` times the matrix `A`."
+repeatdiag(A, n::Int) = kron(I(n), A)
 
 include("sim_model.jl")
 include("state_estim.jl")

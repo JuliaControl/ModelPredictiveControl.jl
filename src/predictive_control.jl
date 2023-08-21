@@ -449,19 +449,19 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y)
     return nothing
 end
 
-"""
+@doc raw"""
     predict(mpc::PredictiveController, model::LinModel, ΔŨ)
 
-Evaluate the outputs predictions ``\\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
+Evaluate the outputs predictions ``\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
 """
 function predict(mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
     return mpc.Ẽ*ΔŨ + mpc.F
 end
 
-"""
+@doc raw"""
     predict(mpc::PredictiveController, model::SimModel, ΔŨ)
 
-Evaluate  ``\\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
+Evaluate  ``\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
 """
 function predict(mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) where {T<:Real}
     nu, ny, nd, Hp = model.nu, model.ny, model.nd, mpc.Hp
@@ -999,9 +999,6 @@ function validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt=nothing)
     Cwt < 0     && error("Cwt weight should be ≥ 0")
     !isnothing(Ewt) && size(Ewt) ≠ () && error("Ewt should be a real scalar")
 end
-
-"Generate a block diagonal matrix repeating `n` times the matrix `A`."
-repeatdiag(A, n::Int) = kron(I(n), A)
 
 function Base.show(io::IO, mpc::PredictiveController)
     Hp, Hc = mpc.Hp, mpc.Hc
