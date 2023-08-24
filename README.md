@@ -114,7 +114,8 @@ for more detailed examples.
   - [x] extended Kalman filter
   - [x] unscented Kalman filter
   - [ ] moving horizon estimator
-- [x] observers in predictor form to ease  control applications
+- [x] automatic model augmentation for offset-free tracking
+- [x] observers in predictor form to ease control applications
 - [ ] moving horizon estimator that supports:
   - [ ] inequality state constraints
   - [ ] zero process noise equality constraint to reduce the problem size

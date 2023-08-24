@@ -14,7 +14,6 @@ import OSQP, Ipopt
 export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput
 export StateEstimator, InternalModel, Luenberger
 export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
-export NonLinMHE
 export initstate!
 export PredictiveController, LinMPC, NonLinMPC, setconstraint!, moveinput!, getinfo, sim!
 
