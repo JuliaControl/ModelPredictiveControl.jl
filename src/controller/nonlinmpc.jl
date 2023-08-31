@@ -198,7 +198,7 @@ function NonLinMPC(
 end
 
 """
-    getinfo(mpc::NonLinMPC)
+    getinfo(mpc::NonLinMPC) -> sol_summary, info
 
 Invoke [`getinfo(::PredictiveController)`](@ref) and add `:JE` the economic optimum ``J_E``.
 """

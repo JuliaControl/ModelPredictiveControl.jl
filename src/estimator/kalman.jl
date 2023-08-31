@@ -27,11 +27,14 @@ struct SteadyKalmanFilter <: StateEstimator
         nxs = size(Asm,1)
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂)
-        As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
-        Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
+        As, _ , Cs  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        validate_obsv(model, As, Cs)
+        Â , B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         K = try
-            kalman(Discrete, Â, Ĉm, Matrix(Q̂), Matrix(R̂)) # Matrix() required for Julia 1.6
+            Q̂_kalman = Matrix(Q̂) # Matrix() required for Julia 1.6
+            R̂_kalman = zeros(eltype(R̂), ny, ny)
+            R̂_kalman[i_ym, i_ym] = R̂
+            kalman(Discrete, Â, Ĉ, Q̂_kalman, R̂_kalman)[:, i_ym] 
         catch my_error
             if isa(my_error, ErrorException)
                 error("Cannot compute the optimal Kalman gain K for the "* 
@@ -41,6 +44,7 @@ struct SteadyKalmanFilter <: StateEstimator
                 rethrow()
             end
         end
+        Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
@@ -92,8 +96,8 @@ ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
     ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
 - `σR=fill(1,length(i_ym))` : main diagonal of the sensor noise covariance ``\mathbf{R}``
     of `model` measured outputs, specified as a standard deviation vector.
-- `nint_ym=fill(1,length(i_ym))` : integrator quantity per measured outputs (vector) for the 
-    stochastic model, use `nint_ym=0` for no integrator at all.
+- `nint_ym=default_nint(model,i_ym)` : integrator quantity per measured outputs (vector) for
+    the stochastic model, use `nint_ym=0` for no integrator at all (see Extended Help).
 - `σQ_int=fill(1,sum(nint_ym))` : same than `σQ` but for the stochastic model covariance
     ``\mathbf{Q_{int}}`` (composed of output integrators).
 
@@ -111,25 +115,30 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 ```
 
 # Extended Help
-The model augmentation with `nint_ym` vector produces the integral action when the estimator
-is used in a controller as state feedback. The default is 1 integrator per measured outputs,
-resulting in an offset-free tracking for "step-like" unmeasured output disturbances. Use 2 
-integrators for "ramp-like" disturbances. See [`init_estimstoch`](@ref).
+The model augmentation with `nint_ym` vector adds integrators at model measured outputs
+``\mathbf{y^m}``, producing the integral action when the estimator is used in a controller
+as state feedback. The method [`default_nint`](@ref) computes the default value of 
+`nint_ym`. It can also be tweaked by following these rules on each measured output:
+
+- Use 0 integrator if the model output is integrating (else it will be unobservable)
+- Use 1 integrator if the disturbances on the output are typically "step-like"
+- Use 2 integrators if the disturbances on the output are typically "ramp-like" 
+
+The function [`init_estimstoch`](@ref) builds the stochastic model from `nint_ym`.
 
 !!! tip
     Increasing `σQ_int` values increases the integral action "gain".
 
 The constructor pre-compute the steady-state Kalman gain `K` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
-function. It can sometimes fail, for example when `model` is integrating. In such a case,
-you can use 0 integrator on `model` integrating outputs, or the alternative time-varying 
-[`KalmanFilter`](@ref).
+function. It can sometimes fail, for example when `model` matrices are ill-conditioned. In
+such a case, you can try the alternative time-varying [`KalmanFilter`](@ref).
 """
 function SteadyKalmanFilter(
     model::LinModel;
     i_ym::IntRangeOrVector = 1:model.ny,
     σQ::Vector = fill(1/model.nx, model.nx),
     σR::Vector = fill(1, length(i_ym)),
-    nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym),
     σQ_int::Vector = fill(1, max(sum(nint_ym), 0))
 )
     # estimated covariances matrices (variance = σ²) :
@@ -196,8 +205,9 @@ struct KalmanFilter <: StateEstimator
         nxs = size(Asm,1)
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
-        As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
+        As, _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        Â , B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
+        validate_obsv(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
@@ -255,7 +265,7 @@ function KalmanFilter(
     σP0::Vector = fill(1/model.nx, model.nx),
     σQ::Vector  = fill(1/model.nx, model.nx),
     σR::Vector  = fill(1, length(i_ym)),
-    nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym),
     σP0_int::Vector = fill(1, max(sum(nint_ym), 0)),
     σQ_int::Vector  = fill(1, max(sum(nint_ym), 0))
 )
@@ -333,7 +343,8 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         nxs = size(Asm,1)
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
-        As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        As, _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        validate_obsv(model, As, Cs)
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
@@ -402,7 +413,7 @@ function UnscentedKalmanFilter(
     σP0::Vector = fill(1/model.nx, model.nx),
     σQ::Vector  = fill(1/model.nx, model.nx),
     σR::Vector  = fill(1, length(i_ym)),
-    nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym),
     σP0_int::Vector = fill(1, max(sum(nint_ym), 0)),
     σQ_int::Vector  = fill(1, max(sum(nint_ym), 0)),
     α::Real = 1e-3,
@@ -427,7 +438,7 @@ UnscentedKalmanFilter{M}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ) wh
 
 
 @doc raw"""
-    init_ukf(nx̂, α, β, κ)
+    init_ukf(nx̂, α, β, κ) -> nσ, γ, m̂, Ŝ
 
 Compute the [`UnscentedKalmanFilter`](@ref) constants from ``α, β`` and ``κ``.
 
@@ -553,6 +564,7 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        validate_obsv(model, As, Cs)
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
@@ -614,7 +626,7 @@ function ExtendedKalmanFilter(
     σP0::Vector = fill(1/model.nx, model.nx),
     σQ::Vector  = fill(1/model.nx, model.nx),
     σR::Vector  = fill(1, length(i_ym)),
-    nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym),
     σP0_int::Vector = fill(1, max(sum(nint_ym), 0)),
     σQ_int::Vector  = fill(1, max(sum(nint_ym), 0))
 ) where {M<:SimModel}
@@ -695,7 +707,7 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
 end
 
 """
-    update_estimate_kf!(estim, Â, Ĉm, u, ym, d)
+    update_estimate_kf!(estim, Â, Ĉm, u, ym, d) -> x̂, P̂
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 

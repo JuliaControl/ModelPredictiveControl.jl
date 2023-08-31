@@ -59,7 +59,7 @@ plot(sim!(model, 60, u), plotu=false)
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 
 ```@example 1
-estim = UnscentedKalmanFilter(model, σQ=[0.1, 0.5], σQ_int=[5.0], σR=[0.5])
+estim = UnscentedKalmanFilter(model, σQ=[0.1, 0.5], σR=[0.5], nint_ym=[1], σQ_int=[5.0])
 ```
 
 The standard deviation of the angular velocity ``ω`` is higher here (`σQ` second value)

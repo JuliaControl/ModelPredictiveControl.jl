@@ -110,7 +110,7 @@ end
 validate_internalmodel(::SimModel) = nothing
 
 @doc raw"""
-    init_internalmodel(As, Bs, Cs, Ds)
+    init_internalmodel(As, Bs, Cs, Ds) -> Âs, B̂s
 
 Calc stochastic model update matrices `Âs` and `B̂s` for `InternalModel` estimator.
 

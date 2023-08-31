@@ -47,7 +47,7 @@ function Base.show(io::IO, estim::StateEstimator)
 end
 
 """
-    remove_op!(estim::StateEstimator, u, d, ym)
+    remove_op!(estim::StateEstimator, u, d, ym) -> u0, d0, ym0
 
 Remove operating points on inputs `u`, measured outputs `ym` and disturbances `d`.
 
@@ -84,7 +84,7 @@ function stoch_ym2y(model::SimModel, i_ym, Asm, Bsm, Csm, Dsm)
 end
 
 @doc raw"""
-    init_estimstoch(i_ym, nint_ym::Vector{Int})
+    init_estimstoch(i_ym, nint_ym::Vector{Int}) -> Asm, Csm, nint_ym
 
 Calc stochastic model matrices from output integrators specifications for state estimation.
 
@@ -128,7 +128,7 @@ function init_estimstoch(i_ym, nint_ym)
 end
 
 @doc raw"""
-    augment_model(model::LinModel, As, Cs)
+    augment_model(model::LinModel, As, Cs) -> Â, B̂u, Ĉ, B̂d, D̂d
 
 Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
@@ -153,6 +153,42 @@ function augment_model(model::LinModel, As, Cs)
     D̂d  = model.Dd
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
+
+@doc raw"""
+    default_nint(model::LinModel, i_ym)
+
+Get default integrator quantity per measured outputs `nint_ym` for [`LinModel`](@ref).
+
+By default, one integrator is added on each measured outputs. If ``\mathbf{Â, Ĉ}`` 
+matrices of the augmented model becomes unobservable, the integrator is removed. This 
+approach works well for stable, integrating and unstable `model`.
+"""
+function default_nint(model::LinModel, i_ym)
+    nint_ym = fill(0, length(i_ym))
+    for i in eachindex(i_ym)
+        nint_ym[i]  = 1
+        Asm, Csm    = init_estimstoch(i_ym, nint_ym)
+        As , _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        Â  , _ , Ĉ  = augment_model(model, As, Cs)
+        # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny
+        isobservable(Â, Ĉ) || (nint_ym[i] = 0)
+    end
+    return nint_ym
+end
+"One integrator per measured outputs by default if `model` is not a  [`LinModel`](@ref)."
+default_nint(::SimModel, i_ym) = fill(1, length(i_ym))
+
+"Validate if the augmented model is observable before augmenting it."
+function validate_obsv(model::LinModel, As, Cs)
+    Â , _ , Ĉ  = augment_model(model, As, Cs)
+    # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny:
+    if !isobservable(Â, Ĉ)
+        error("The augmented model is unobservable. You may try to use 0 "*
+              "integrator on model integrating outputs with nint_ym parameter.")
+    end
+end
+"If model is not a [`LinModel`](@ref), the observability is not verified."
+validate_obsv(::SimModel, _ , _ ) = nothing
 
 """
     isobservable(A, C)
@@ -302,12 +338,11 @@ function updatestate!(estim::StateEstimator, u, ym, d=Float64[])
     return estim.x̂
 end
 
+include("estimator/kalman.jl")
+include("estimator/luenberger.jl")
+include("estimator/internal_model.jl")
+
 "Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`."
 evalŷ(estim::InternalModel, ym, d) = evaloutput(estim,ym, d)
 "Other [`StateEstimator`](@ref) ignores `ym` to evaluate `ŷ`."
 evalŷ(estim::StateEstimator, _, d) = evaloutput(estim, d)
-
-
-include("estimator/kalman.jl")
-include("estimator/luenberger.jl")
-include("estimator/internal_model.jl")

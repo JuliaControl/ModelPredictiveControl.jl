@@ -270,7 +270,7 @@ function moveinput!(
 end
 
 @doc raw"""
-    getinfo(mpc::PredictiveController)
+    getinfo(mpc::PredictiveController) -> sol_summary, info
 
 Get additional information about `mpc` controller optimum to ease troubleshooting.
 
@@ -355,7 +355,7 @@ function validate_setpointdist(mpc::PredictiveController, ry, d, R̂y, D̂)
 end
 
 """
-    getestimates!(mpc::PredictiveController, estim::StateEstimator)
+    getestimates!(mpc::PredictiveController, estim::StateEstimator) -> x̂d, x̂s, ŷ
 
 Get estimator output and split `x̂` into the deterministic `x̂d` and stochastic `x̂s` states.
 """
@@ -368,7 +368,7 @@ function getestimates!(mpc::PredictiveController, estim::StateEstimator, ym , d)
 end
 
 """
-    getestimates!(mpc::PredictiveController, estim::InternalModel)
+    getestimates!(mpc::PredictiveController, estim::InternalModel) -> x̂d, x̂s, ŷ
 
 Get the internal model deterministic `estim.x̂d` and stochastic `estim.x̂s` states.
 """
@@ -513,7 +513,7 @@ end
 """
     optim_objective!(mpc::PredictiveController, b, p)
 
-Optimize the objective function ``J`` of `mpc` controller. 
+Optimize the objective function ``J`` of `mpc` controller and return the solution `ΔŨ`.
 """
 function optim_objective!(mpc::PredictiveController)
     optim = mpc.optim
@@ -550,7 +550,7 @@ end
 set_objective_linear_coef!(::PredictiveController, _ ) = nothing
 
 @doc raw"""
-    init_ΔUtoU(nu, Hp, Hc, C, c_Umin, c_Umax)
+    init_ΔUtoU(nu, Hp, Hc, C, c_Umin, c_Umax) -> S_Hp, T_Hp, S_Hc, T_Hc
 
 Init manipulated input increments to inputs conversion matrices.
 
@@ -574,7 +574,7 @@ end
 
 
 @doc raw"""
-    init_deterpred(model::LinModel, Hp, Hc)
+    init_deterpred(model::LinModel, Hp, Hc) -> E, G, J, Kd, Q
 
 Construct deterministic prediction matrices for [`LinModel`](@ref) `model`.
 
@@ -699,7 +699,7 @@ function init_deterpred(model::SimModel, Hp, Hc)
 end
 
 @doc raw"""
-    init_quadprog(model::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
+    init_quadprog(model::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp) -> P̃, q̃, p
 
 Init the quadratic programming optimization matrix `P̃` and `q̃`.
 
@@ -730,7 +730,7 @@ end
 obj_quadprog(ΔŨ, P̃, q̃) = 0.5*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ
 
 """
-    init_defaultcon(model, C, S_Hp, S_Hc, N_Hc, E)
+    init_defaultcon(model, C, S_Hp, S_Hc, N_Hc, E) -> con, S̃_Hp, Ñ_Hc, Ẽ
 
 Init `ControllerConstraint` struct with default parameters.
 
@@ -779,7 +779,7 @@ function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ŷmin, ŷmax)
 end
 
 @doc raw"""
-    relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+    relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc) -> A_Umin, A_Umax, S̃_Hp
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
@@ -813,7 +813,7 @@ function relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
 end
 
 @doc raw"""
-    relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+    relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
 
 Augment input increments constraints with slack variable ϵ for softening.
 
@@ -850,7 +850,7 @@ function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
 end
 
 @doc raw"""
-    relaxŶ(::LinModel, C, c_Ŷmin, c_Ŷmax, E)
+    relaxŶ(::LinModel, C, c_Ŷmin, c_Ŷmax, E) -> A_Ŷmin, A_Ŷmax, Ẽ
 
 Augment linear output prediction constraints with slack variable ϵ for softening.
 
@@ -890,7 +890,7 @@ function relaxŶ(::SimModel, C, c_Ŷmin, c_Ŷmax, E)
 end
 
 @doc raw"""
-    init_stochpred(estim::StateEstimator, Hp)
+    init_stochpred(estim::StateEstimator, Hp) -> Ks, Ps
 
 Init the stochastic prediction matrix `Ks` from `estim` estimator for predictive control.
 
@@ -919,7 +919,7 @@ function init_stochpred(estim::StateEstimator, Hp)
 end
 
 @doc raw"""
-    init_stochpred(estim::InternalModel, Hp)
+    init_stochpred(estim::InternalModel, Hp) -> Ks, Ps
 
 Init the stochastic prediction matrices for [`InternalModel`](@ref).
 
@@ -955,7 +955,7 @@ end
     init_linconstraint(model::LinModel, 
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ŷmin, A_Ŷmax,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ŷmin, i_Ŷmax
-    )
+    ) -> A, i_b, b
 
 Init `A`, `b` and `i_b` for the linear inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 

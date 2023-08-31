@@ -24,14 +24,15 @@ struct Luenberger <: StateEstimator
         Asm, Csm, nint_ym = init_estimstoch(i_ym, nint_ym)
         nxs = size(Asm,1)
         nx̂ = nx + nxs
-        As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
-        Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
+        As, _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        Â , B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
+        validate_obsv(model, As, Cs)
         K = try
-            place(Â, Ĉ, p̂, :o)
+            place(Â, Ĉ, p̂, :o)[:, i_ym]
         catch
-            error("Cannot compute the Luenberger gain L with specified poles p̂.")        
+            error("Cannot compute the Luenberger gain L with specified poles p̂.")
         end
+        Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
@@ -51,7 +52,7 @@ end
     Luenberger(
         model::LinModel; 
         i_ym = 1:model.ny, 
-        nint_ym = fill(1, length(i_ym)),
+        nint_ym = default_nint(model, i_ym),
         p̂ = 1e-3*(0:(model.nx + sum(nint_ym)-1)) .+ 0.5)
     )
 
@@ -80,7 +81,7 @@ Luenberger estimator with a sample time Ts = 0.5 s, LinModel and:
 function Luenberger(
     model::LinModel;
     i_ym::IntRangeOrVector  = 1:model.ny,
-    nint_ym::IntVectorOrInt = fill(1, length(i_ym)),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym),
     p̂ = 1e-3*(0:(model.nx + sum(nint_ym)-1)) .+ 0.5
 )
     nx = model.nx
@@ -101,5 +102,5 @@ function update_estimate!(estim::Luenberger, u, ym, d=Float64[])
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K = estim.x̂, estim.K
     x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K*(ym - Ĉm*x̂ - D̂dm*d)
-    return x̂    
+    return x̂
 end
