@@ -154,6 +154,15 @@ function augment_model(model::LinModel, As, Cs)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 
+"""
+    isobservable(A, C)
+
+Verify if the state-space `A` and `C` matrices of are observable.
+
+Based on the [Popov-Belevitch-Hautus (PBH) test](https://en.wikipedia.org/wiki/Hautus_lemma).
+"""
+isobservable(A, C) = all(map(λ->rank([λ * I - A; C]) == size(A, 1), eigvals(A)))
+
 @doc raw"""
     f̂(estim::StateEstimator, x̂, u, d)
 
@@ -293,11 +302,12 @@ function updatestate!(estim::StateEstimator, u, ym, d=Float64[])
     return estim.x̂
 end
 
-include("estimator/kalman.jl")
-include("estimator/luenberger.jl")
-include("estimator/internal_model.jl")
-
 "Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`."
 evalŷ(estim::InternalModel, ym, d) = evaloutput(estim,ym, d)
 "Other [`StateEstimator`](@ref) ignores `ym` to evaluate `ŷ`."
 evalŷ(estim::StateEstimator, _, d) = evaloutput(estim, d)
+
+
+include("estimator/kalman.jl")
+include("estimator/luenberger.jl")
+include("estimator/internal_model.jl")

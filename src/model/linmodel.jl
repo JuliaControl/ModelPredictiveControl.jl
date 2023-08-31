@@ -182,17 +182,19 @@ end
 
 Evaluate the steady-state vector when `model` is a [`LinModel`](@ref).
 
-Omitting the operating points, the method evaluates the equilibrium ``\mathbf{x}(∞)`` from:
+Following [`setop!`](@ref) notation, the method evaluates the equilibrium ``\mathbf{x}(∞)``
+from:
 ```math
-    \mathbf{x}(∞) = \mathbf{(I - A)^{-1}(B_u u + B_d d)}
+    \mathbf{x}(∞) = \mathbf{(I - A)^{-1}(B_u u_0 + B_d d_0)}
 ```
-with the manipulated inputs held constant at ``\mathbf{u}`` and, the measured disturbances, 
-at ``\mathbf{d}``. The Moore-Penrose pseudo-inverse computes ``\mathbf{(I - A)^{-1}}``
-to support integrating `model` (integrator states will be 0).
+with the manipulated inputs held constant at ``\mathbf{u_0}`` and, the measured
+disturbances, at ``\mathbf{d_0}``. The Moore-Penrose pseudo-inverse computes 
+``\mathbf{(I - A)^{-1}}`` to support integrating `model` (integrator states will be 0).
 """
 function steadystate(model::LinModel, u, d=Float64[])
     return pinv(I - model.A)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
 end
+
 
 """
     f(model::LinModel, x, u, d)
