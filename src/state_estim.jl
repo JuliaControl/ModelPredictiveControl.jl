@@ -88,7 +88,7 @@ end
 
 Calc stochastic model matrices from output integrators specifications for state estimation.
 
-For closed-loop state estimators. `nint_ym is` a vector providing how many integrator should 
+For closed-loop state estimators. `nint_ym` is a vector providing how many integrator should 
 be added for each measured output ``\mathbf{y^m}``. The argument generates the `Asm` and 
 `Csm` matrices:
 ```math
