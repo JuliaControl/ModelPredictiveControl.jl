@@ -28,7 +28,6 @@ struct SteadyKalmanFilter <: StateEstimator
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂)
         As, _ , Cs  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        validate_obsv(model, As, Cs)
         Â , B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         K = try
             Q̂_kalman = Matrix(Q̂) # Matrix() required for Julia 1.6
@@ -207,7 +206,6 @@ struct KalmanFilter <: StateEstimator
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         As, _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         Â , B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
-        validate_obsv(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
@@ -344,7 +342,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         As, _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        validate_obsv(model, As, Cs)
+        augment_model(model, As, Cs) # verify observability for LinModel
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
@@ -564,7 +562,7 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
         nx̂ = nx + nxs
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        validate_obsv(model, As, Cs)
+        augment_model(model, As, Cs) # verify observability for LinModel
         i_ym = collect(i_ym)
         lastu0 = zeros(nu)
         x̂ = [zeros(model.nx); zeros(nxs)]

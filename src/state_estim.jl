@@ -143,7 +143,7 @@ returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 \end{aligned}
 ```
 """
-function augment_model(model::LinModel, As, Cs)
+function augment_model(model::LinModel, As, Cs; verify_obsv=true)
     nu, nx, nd = model.nu, model.nx, model.nd
     nxs = size(As, 1)
     Â   = [model.A zeros(nx,nxs); zeros(nxs,nx) As]
@@ -151,8 +151,15 @@ function augment_model(model::LinModel, As, Cs)
     Ĉ   = [model.C Cs]
     B̂d  = [model.Bd; zeros(nxs,nd)]
     D̂d  = model.Dd
+    # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny:
+    if verify_obsv && !isobservable(Â, Ĉ)
+        error("The augmented model is unobservable. You may try to use 0 "*
+              "integrator on model integrating outputs with nint_ym parameter.")
+    end
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
+"No need to augment the model if `model` is not a [`LinModel`](@ref)."
+augment_model(::SimModel, _ , _ ) = nothing
 
 @doc raw"""
     default_nint(model::LinModel, i_ym)
@@ -169,7 +176,7 @@ function default_nint(model::LinModel, i_ym)
         nint_ym[i]  = 1
         Asm, Csm    = init_estimstoch(i_ym, nint_ym)
         As , _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        Â  , _ , Ĉ  = augment_model(model, As, Cs)
+        Â  , _ , Ĉ  = augment_model(model, As, Cs, verify_obsv=false)
         # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny
         isobservable(Â, Ĉ) || (nint_ym[i] = 0)
     end
@@ -177,18 +184,6 @@ function default_nint(model::LinModel, i_ym)
 end
 "One integrator per measured outputs by default if `model` is not a  [`LinModel`](@ref)."
 default_nint(::SimModel, i_ym) = fill(1, length(i_ym))
-
-"Validate if the augmented model is observable before augmenting it."
-function validate_obsv(model::LinModel, As, Cs)
-    Â , _ , Ĉ  = augment_model(model, As, Cs)
-    # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny:
-    if !isobservable(Â, Ĉ)
-        error("The augmented model is unobservable. You may try to use 0 "*
-              "integrator on model integrating outputs with nint_ym parameter.")
-    end
-end
-"If model is not a [`LinModel`](@ref), the observability is not verified."
-validate_obsv(::SimModel, _ , _ ) = nothing
 
 """
     isobservable(A, C)

@@ -9,6 +9,7 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test skalmanfilter1.nyu == 0
     @test skalmanfilter1.nxs == 2
     @test skalmanfilter1.nx̂ == 4
+    @test skalmanfilter1.nint_ym == [1, 1]
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
     skalmanfilter2 = SteadyKalmanFilter(linmodel2, i_ym=[2])
@@ -16,10 +17,12 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test skalmanfilter2.nyu == 1
     @test skalmanfilter2.nxs == 1
     @test skalmanfilter2.nx̂ == 5
+    @test skalmanfilter2.nint_ym == [1]
 
     skalmanfilter3 = SteadyKalmanFilter(linmodel1, nint_ym=0)
     @test skalmanfilter3.nxs == 0
     @test skalmanfilter3.nx̂ == 2
+    @test skalmanfilter3.nint_ym == [0, 0]
 
     skalmanfilter4 = SteadyKalmanFilter(linmodel1, nint_ym=[2,2])
     @test skalmanfilter4.nxs == 4
@@ -29,14 +32,21 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test skalmanfilter5.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test skalmanfilter5.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
 
+    linmodel3 = LinModel(append(tf(1,[1, 0]),tf(1,[10, 1]),tf(1,[-1, 1])), 0.1)
+    skalmanfilter6 = SteadyKalmanFilter(linmodel3)
+    @test skalmanfilter6.nxs == 2
+    @test skalmanfilter6.nx̂ == 5
+    @test skalmanfilter6.nint_ym == [0, 1, 1]
+
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=[1,1,1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=[-1,0])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σQ=[1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σR=[1,1,1])
+    @test_throws ErrorException SteadyKalmanFilter(linmodel3, nint_ym=[1, 0, 0])
     model_unobs = LinModel([1 0;0 1.5], [1;0][:,:], [1 0], zeros(2,0), zeros(1,0),1,1,2,1,0)
     @test_throws ErrorException SteadyKalmanFilter(model_unobs, nint_ym=[1])
 end
-    
+
 @testset "SteadyKalmanFilter estimator methods" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     skalmanfilter1 = SteadyKalmanFilter(linmodel1)

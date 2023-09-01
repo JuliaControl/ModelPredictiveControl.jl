@@ -26,7 +26,6 @@ struct Luenberger <: StateEstimator
         nx̂ = nx + nxs
         As, _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         Â , B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
-        validate_obsv(model, As, Cs)
         K = try
             place(Â, Ĉ, p̂, :o)[:, i_ym]
         catch
