@@ -80,6 +80,10 @@ end
     @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     setstate!(mpc1, [1,2,3,4])
     @test mpc1.estim.x̂ ≈ [1,2,3,4]
+    setstate!(mpc1, [0,0,0,0])
+    updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
+    @test mpc1.estim.x̂ ≈ [0,0,0,0]
+    @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
 @testset "NonLinMPC construction" begin
@@ -192,4 +196,7 @@ end
     @test initstate!(nmpc1, [10, 50], [20, 25]) ≈ [zeros(2); [20, 25]]
     setstate!(nmpc1, [1,2,3,4])
     @test nmpc1.estim.x̂ ≈ [1,2,3,4]
+    setstate!(nmpc1, [0,0,0,0])
+    updatestate!(nmpc1, nmpc1.estim.model.uop, nmpc1.estim())
+    @test nmpc1.estim.x̂ ≈ [0,0,0,0]
 end

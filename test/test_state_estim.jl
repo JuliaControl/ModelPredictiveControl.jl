@@ -58,6 +58,7 @@ end
     @test initstate!(skalmanfilter1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     setstate!(skalmanfilter1, [1,2,3,4])
     @test skalmanfilter1.x̂ ≈ [1,2,3,4]
+    @test_throws ArgumentError updatestate!(skalmanfilter1, [10, 50])
 end   
     
 @testset "KalmanFilter construction" begin

@@ -333,6 +333,7 @@ function updatestate!(estim::StateEstimator, u, ym, d=Float64[])
     update_estimate!(estim, u0, ym0, d0)
     return estim.x̂
 end
+updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
 include("estimator/kalman.jl")
 include("estimator/luenberger.jl")

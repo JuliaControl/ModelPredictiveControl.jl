@@ -345,6 +345,7 @@ end
 Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
 updatestate!(mpc::PredictiveController, u, ym, d=Float64[]) = updatestate!(mpc.estim,u,ym,d)
+updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
 function validate_setpointdist(mpc::PredictiveController, ry, d, R̂y, D̂)
     ny, nd, Hp = mpc.estim.model.ny, mpc.estim.model.nd, mpc.Hp
