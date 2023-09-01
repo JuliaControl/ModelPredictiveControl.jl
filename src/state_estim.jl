@@ -128,7 +128,7 @@ function init_estimstoch(i_ym, nint_ym)
 end
 
 @doc raw"""
-    augment_model(model::LinModel, As, Cs) -> Â, B̂u, Ĉ, B̂d, D̂d
+    augment_model(model::LinModel, As, Cs; verify_obsv=true) -> Â, B̂u, Ĉ, B̂d, D̂d
 
 Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
@@ -142,6 +142,7 @@ returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
     \mathbf{ŷ}(k)   &= \mathbf{Ĉ x̂}(k) + \mathbf{D̂_d d}(k)
 \end{aligned}
 ```
+An error is thrown if the augmented model is not observable and `verify_obsv == true`.
 """
 function augment_model(model::LinModel, As, Cs; verify_obsv=true)
     nu, nx, nd = model.nu, model.nx, model.nd
