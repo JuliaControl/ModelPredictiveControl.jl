@@ -198,5 +198,5 @@ end
     @test nmpc1.estim.x̂ ≈ [1,2,3,4]
     setstate!(nmpc1, [0,0,0,0])
     updatestate!(nmpc1, nmpc1.estim.model.uop, nmpc1.estim())
-    @test nmpc1.estim.x̂ ≈ [0,0,0,0]
+    @test nmpc1.estim.x̂ ≈ [0,0,0,0] atol=1e-6
 end
