@@ -84,6 +84,7 @@ for more detailed examples.
   - [x] input setpoint tracking
   - [x] economic costs (economic model predictive control)
   - [ ] terminal cost to ensure nominal stability
+- [x] explicit predictive controller for problems without constraint
 - [x] soft and hard constraints on:
   - [x] output predictions
   - [x] manipulated inputs

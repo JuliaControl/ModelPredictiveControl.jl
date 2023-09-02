@@ -15,7 +15,8 @@ export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evalout
 export StateEstimator, InternalModel, Luenberger
 export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
 export initstate!
-export PredictiveController, LinMPC, NonLinMPC, setconstraint!, moveinput!, getinfo, sim!
+export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
+export getinfo, sim!
 
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)

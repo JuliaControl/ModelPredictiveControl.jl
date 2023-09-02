@@ -95,8 +95,10 @@ ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
     ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
 - `σR=fill(1,length(i_ym))` : main diagonal of the sensor noise covariance ``\mathbf{R}``
     of `model` measured outputs, specified as a standard deviation vector.
-- `nint_ym=`[`default_nint`](@ref)`(model,i_ym)` : integrator quantity per measured outputs (vector)
-    for the stochastic model, use `nint_ym=0` for no integrator at all (see Extended Help).
+- `nint_u=0`: integrator quantity per manipulated inputs (vector) for the
+    stochastic model, use `nint_u=0` for no integrator.
+- `nint_ym=`[`default_nint`](@ref)`(model,i_ym)` : integrator quantity per measured outputs 
+    (vector) for the stochastic model, use `nint_ym=0` for no integrator (see Extended Help).
 - `σQ_int=fill(1,sum(nint_ym))` : same than `σQ` but for the stochastic model covariance
     ``\mathbf{Q_{int}}`` (composed of output integrators).
 

@@ -39,6 +39,13 @@ function Base.show(io::IO, estim::StateEstimator)
     n = maximum(ndigits.((nu, nx̂, nym, nyu, nd))) + 1
     println(io, "$(typeof(estim).name.name) estimator with a sample time "*
                 "Ts = $(estim.model.Ts) s, $(typeof(estim.model).name.name) and:")
+    print_estim_dim(io, estim, n)
+end
+
+"Print the overall dimensions of the state estimator `estim` with left padding `n`."
+function print_estim_dim(io::IO, estim::StateEstimator, n)
+    nu, nd = estim.model.nu, estim.model.nd
+    nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     println(io, "$(lpad(nu, n)) manipulated inputs u")
     println(io, "$(lpad(nx̂, n)) states x̂")
     println(io, "$(lpad(nym, n)) measured outputs ym")
@@ -125,6 +132,33 @@ function init_estimstoch(i_ym, nint_ym)
         end
     end
     return Asm, Csm, nint_ym
+end
+
+function init_estimstoch_u(nu, nint_u)
+    if nint_u == 0 # alias for no output integrator at all
+        nint_u = fill(0, length(nu))
+    end
+    #nym = length(i_ym);
+    if length(nint_u) ≠ nu
+        error("nint_u size ($(length(nint_u))) ≠ manipulated input quantity nu ($nu)")
+    end
+    any(nint_u .< 0) && error("nint_u values should be ≥ 0")
+    nxs = sum(nint_u)
+    Asm, Csm = zeros(nxs, nxs), zeros(nym, nxs)
+    if nxs ≠ 0 # construct stochastic model state-space matrices (integrators) :
+        i_Asm, i_Csm = 1, 1
+        for iym = 1:nym
+            nint = nint_u[iym]
+            if nint ≠ 0
+                rows_Asm = (i_Asm):(i_Asm + nint - 1)
+                Asm[rows_Asm, rows_Asm] = Bidiagonal(ones(nint), ones(nint-1), :L)
+                Csm[iym, i_Csm+nint-1] = 1
+                i_Asm += nint
+                i_Csm += nint
+            end
+        end
+    end
+    return Asm, Csm, nint_u
 end
 
 @doc raw"""

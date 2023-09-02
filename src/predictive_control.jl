@@ -512,7 +512,7 @@ function linconstraint!(mpc::PredictiveController, model::SimModel)
 end
 
 """
-    optim_objective!(mpc::PredictiveController, b, p)
+    optim_objective!(mpc::PredictiveController)
 
 Optimize the objective function ``J`` of `mpc` controller and return the solution `ΔŨ`.
 """
@@ -1011,11 +1011,7 @@ function Base.show(io::IO, mpc::PredictiveController)
                 "$(typeof(mpc.estim).name.name) estimator and:")
     println(io, "$(lpad(Hp, n)) prediction steps Hp")
     println(io, "$(lpad(Hc, n)) control steps Hc")
-    println(io, "$(lpad(nu, n)) manipulated inputs u")
-    println(io, "$(lpad(nx̂, n)) states x̂")
-    println(io, "$(lpad(nym, n)) measured outputs ym")
-    println(io, "$(lpad(nyu, n)) unmeasured outputs yu")
-    print(io,   "$(lpad(nd, n)) measured disturbances d")
+    print_estim_dim(io, mpc.estim, n)
 end
 
 "Verify that the solver termination status means 'no solution available'."
@@ -1037,5 +1033,6 @@ function (mpc::PredictiveController)(
     return moveinput!(mpc, ry, d; kwargs...)
 end
 
+include("controller/explicitmpc.jl")
 include("controller/linmpc.jl")
 include("controller/nonlinmpc.jl")
