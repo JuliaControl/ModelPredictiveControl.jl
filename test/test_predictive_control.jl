@@ -86,6 +86,109 @@ end
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+@testset "ExplicitMPC construction" begin
+    model = LinModel(sys, Ts, i_d=[3])
+    mpc1 = ExplicitMPC(model, Hp=15)
+    @test isa(mpc1.estim, SteadyKalmanFilter)
+    @test size(mpc1.Ẽ,1) == 15*mpc1.estim.model.ny
+    mpc4 = ExplicitMPC(model, Mwt=[1,2], Hp=15)
+    @test mpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
+    mpc5 = ExplicitMPC(model, Nwt=[3,4], Hc=5)
+    @test mpc5.Ñ_Hc ≈ Diagonal(diagm(repeat(Float64[3, 4], 5)))
+    mpc6 = ExplicitMPC(model, Lwt=[0,1], ru=[0,50], Hp=15)
+    @test mpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
+    @test mpc6.R̂u ≈ repeat([0,50], 15)
+    kf = KalmanFilter(model)
+    mpc8 = ExplicitMPC(kf)
+    @test isa(mpc8.estim, KalmanFilter)
+
+    @test_throws ErrorException ExplicitMPC(model, Hp=0)
+    @test_throws ErrorException ExplicitMPC(model, Hc=0)
+    @test_throws ErrorException ExplicitMPC(model, Hp=1, Hc=2)
+    @test_throws ErrorException ExplicitMPC(model, Mwt=[1])
+    @test_throws ErrorException ExplicitMPC(model, Mwt=[1])
+    @test_throws ErrorException ExplicitMPC(model, Lwt=[1])
+    @test_throws ErrorException ExplicitMPC(model, ru=[1])
+    @test_throws ErrorException ExplicitMPC(model, Mwt=[-1,1])
+    @test_throws ErrorException ExplicitMPC(model, Nwt=[-1,1])
+    @test_throws ErrorException ExplicitMPC(model, Lwt=[-1,1])
+end
+
+@testset "ExplicitMPC constraints" begin
+    model = LinModel(sys, Ts, i_d=[3])
+    mpc = ExplicitMPC(model, Hp=1, Hc=1)
+    @test_throws ErrorException setconstraint!(mpc, umin=[0.0, 0.0])
+end
+
+@testset "ExplicitMPC moves and getinfo" begin
+    mpc1 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
+    r = [5]
+    u = moveinput!(mpc1, r)
+    @test u ≈ [1] atol=1e-2
+    u = mpc1(r)
+    @test u ≈ [1] atol=1e-2
+    _ , info = getinfo(mpc1)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ r[1] atol=1e-2
+    mpc2 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
+    u = moveinput!(mpc2, [5])
+    @test u ≈ [1] atol=1e-2
+    mpc3 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1], ru=[12])
+    u = moveinput!(mpc3, [0])
+    @test u ≈ [12] atol=1e-2
+end
+
+@testset "ExplicitMPC other methods" begin
+    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    mpc1 = ExplicitMPC(linmodel1)
+    @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    setstate!(mpc1, [1,2,3,4])
+    @test mpc1.estim.x̂ ≈ [1,2,3,4]
+    setstate!(mpc1, [0,0,0,0])
+    updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
+    @test mpc1.estim.x̂ ≈ [0,0,0,0]
+    @test_throws ArgumentError updatestate!(mpc1, [0,0])
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @testset "NonLinMPC construction" begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     nmpc0 = NonLinMPC(linmodel1, Hp=15)

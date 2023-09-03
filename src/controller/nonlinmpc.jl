@@ -321,12 +321,14 @@ function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     return nothing
 end
 
+# TODO: déplacer les 2 prochaines méthodes dans predictive_control.jl
+
 """
-    obj_nonlinprog(mpc::NonLinMPC, model::LinModel, ΔŨ::Vector{Real})
+    obj_nonlinprog(mpc::PredictiveController, model::LinModel, ΔŨ::Vector{Real})
 
 Objective function for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
 """
-function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
+function obj_nonlinprog(mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
     J = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
     if !iszero(mpc.E)
         U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
@@ -339,11 +341,11 @@ function obj_nonlinprog(mpc::NonLinMPC, model::LinModel, Ŷ, ΔŨ::Vector{T}) 
 end
 
 """
-    obj_nonlinprog(mpc::NonLinMPC, model::SimModel, ΔŨ::Vector{Real})
+    obj_nonlinprog(mpc::PredictiveController, model::SimModel, ΔŨ::Vector{Real})
 
 Objective function for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
 """
-function obj_nonlinprog(mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
+function obj_nonlinprog(mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
     # --- output setpoint tracking term ---
     êy = mpc.R̂y - Ŷ
     JR̂y = êy'*mpc.M_Hp*êy  

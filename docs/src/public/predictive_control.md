@@ -66,6 +66,12 @@ PredictiveController
 LinMPC
 ```
 
+## ExplicitMPC
+
+```@docs
+ExplicitMPC
+```
+
 ## NonLinMPC
 
 ```@docs

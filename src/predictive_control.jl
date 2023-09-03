@@ -303,23 +303,30 @@ julia> sol_summary, info = getinfo(mpc); round.(info[:Ŷ], digits=3)
 ```
 """
 function getinfo(mpc::PredictiveController)
-    sol_summary = solution_summary(mpc.optim) 
+    sol_summary = get_summary(mpc) 
+    Ŷ = predict(mpc, mpc.estim.model, mpc.ΔŨ)
     info = Dict{Symbol, InfoDictType}()
     info[:ΔU]  = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]   = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
-    info[:J]   = objective_value(mpc.optim) + mpc.p[begin]
+    info[:J]   = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[begin]
     info[:U]   = mpc.S̃_Hp*mpc.ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + mpc.estim.model.uop)
     info[:u]   = info[:U][1:mpc.estim.model.nu]
     info[:d]   = mpc.d
     info[:D̂]   = mpc.D̂
     info[:ŷ]   = mpc.ŷ
-    info[:Ŷ]   = predict(mpc, mpc.estim.model, mpc.ΔŨ)
+    info[:Ŷ]   = Ŷ
     info[:Ŷs]  = mpc.Ŷs
     info[:Ŷd]  = info[:Ŷ] - info[:Ŷs]
     info[:R̂y]  = mpc.R̂y
     info[:R̂u]  = mpc.R̂u
     return sol_summary, info
 end
+"""
+    get_summary(mpc::PredictiveController)
+
+Get optimizer solution summary `sol_summary`. 
+"""
+get_summary(mpc::PredictiveController) = solution_summary(mpc.optim, verbose=true)
 
 """
     setstate!(mpc::PredictiveController, x̂)
@@ -333,7 +340,7 @@ setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return m
 
 Init `mpc.ΔŨ` for warm-starting and the states of `mpc.estim` [`StateEstimator`](@ref).
 
-Before calling [`initstate!(::StateEstimator, _ , _ )`](@ref), it warm-starts ``\mathbf{ΔŨ}``:
+Before calling [`initstate!(::StateEstimator,_,_)`](@ref), it warm-starts ``\mathbf{ΔŨ}``:
 - If `model` is a [`LinModel`], the vector is filled with the analytical minimum ``J`` of
   the unconstrained problem.
 - Else, the vector is filled with zeros.

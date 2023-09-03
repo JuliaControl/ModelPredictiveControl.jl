@@ -13,6 +13,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     Ñ_Hc::Diagonal{Float64, Vector{Float64}}
     L_Hp::Diagonal{Float64, Vector{Float64}}
     C::Float64
+    E::Float64
     R̂u::Vector{Float64}
     R̂y::Vector{Float64}
     S̃_Hp::Matrix{Bool}
@@ -37,6 +38,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         model = estim.model
         nu, nxd, nxs, ny, nd = model.nu, model.nx, estim.nxs, model.ny, model.nd
         x̂d, x̂s, ŷ, Ŷs = zeros(nxd), zeros(nxs), zeros(ny), zeros(ny*Hp)
+        Ewt = 0   # economic costs not supported for LinMPC
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         M_Hp = Diagonal{Float64}(repeat(Mwt, Hp))
         N_Hc = Diagonal{Float64}(repeat(Nwt, Hc)) 
@@ -58,7 +60,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             estim, optim, con,
             ΔŨ, x̂d, x̂s, ŷ, Ŷs,
             Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, R̂u, R̂y,
+            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, Kd, Q, P̃, q̃, p,
             Ks, Ps,
