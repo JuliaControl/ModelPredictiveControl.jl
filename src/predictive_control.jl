@@ -328,13 +328,18 @@ Set the estimate at `mpc.estim.x̂`.
 """
 setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
 
-"""
+@doc raw"""
     initstate!(mpc::PredictiveController, u, ym, d=Float64[])
 
 Init `mpc.ΔŨ` for warm-starting and the states of `mpc.estim` [`StateEstimator`](@ref).
+
+Before calling [`initstate!(::StateEstimator,::Any,::Any,::Any)`](@ref), it warm-starts ``\mathbf{ΔŨ}``:
+- If `model` is a [`LinModel`], the vector is filled with the analytical minimum ``J`` of
+  the unconstrained problem.
+- Else, the vector is filled with zeros.
 """
 function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
-    mpc.ΔŨ .= 0
+    mpc.ΔŨ[:] = unconstrained_solution(mpc, mpc.estim.model)
     return initstate!(mpc.estim, u, ym, d)
 end
 
@@ -730,6 +735,13 @@ end
 "Return the quadratic programming objective function, see [`init_quadprog`](@ref)."
 obj_quadprog(ΔŨ, P̃, q̃) = 0.5*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ
 
+
+"Calc the analytical unconstrained minimum of ``J`` for [`LinModel`](@ref)."
+unconstrained_solution(mpc::PredictiveController, model::LinModel) = -mpc.P̃\mpc.q̃
+
+"When model is not a `LinModel`(@ref), returns a null vector ``\\mathbf{0}``."
+unconstrained_solution(mpc::PredictiveController, ::SimModel) = zeros(size(mpc.ΔŨ))
+
 """
     init_defaultcon(model, C, S_Hp, S_Hc, N_Hc, E) -> con, S̃_Hp, Ñ_Hc, Ẽ
 
@@ -1023,6 +1035,9 @@ function isfatal(status::TerminationStatusCode)
     ]
     return any(status .== fatalstatuses)
 end
+
+
+
 
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(
