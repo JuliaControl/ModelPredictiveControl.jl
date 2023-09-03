@@ -333,7 +333,7 @@ setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return m
 
 Init `mpc.ΔŨ` for warm-starting and the states of `mpc.estim` [`StateEstimator`](@ref).
 
-Before calling [`initstate!(::StateEstimator,::Any,::Any,::Any)`](@ref), it warm-starts ``\mathbf{ΔŨ}``:
+Before calling [`initstate!(::StateEstimator, _ , _ )`](@ref), it warm-starts ``\mathbf{ΔŨ}``:
 - If `model` is a [`LinModel`], the vector is filled with the analytical minimum ``J`` of
   the unconstrained problem.
 - Else, the vector is filled with zeros.
