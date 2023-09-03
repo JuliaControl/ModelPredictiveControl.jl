@@ -86,19 +86,6 @@ end
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 @testset "ExplicitMPC construction" begin
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = ExplicitMPC(model, Hp=15)
@@ -162,32 +149,6 @@ end
     @test mpc1.estim.x̂ ≈ [0,0,0,0]
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 @testset "NonLinMPC construction" begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])

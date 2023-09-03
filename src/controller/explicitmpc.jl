@@ -82,8 +82,10 @@ The controller minimizes the following objective function at each discrete time 
                        + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
 ```
 
-This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
-arguments.
+See [`LinMPC`](@ref) for the variable definitions. This controller does not support
+constraints but the computational costs are extremely low (array division), therefore 
+suitable for applications that require small sample times. This method uses the default
+state estimator, a [`SteadyKalmanFilter`](@ref) with default arguments.
 
 # Arguments
 - `model::LinModel` : model used for controller predictions and state estimations.
