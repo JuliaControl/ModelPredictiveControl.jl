@@ -117,7 +117,7 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 
 # Extended Help
 The model augmentation with `nint_ym` vector adds integrators at model measured outputs
-``\mathbf{y^m}``, producing the integral action when the estimator is used in a controller
+``\mathbf{y^m}``. It creates the integral action when the estimator is used in a controller
 as state feedback. The method [`default_nint`](@ref) computes the default value of 
 `nint_ym`. It can also be tweaked by following these rules on each measured output:
 
