@@ -187,7 +187,7 @@ function augment_model(model::LinModel, As, Cs; verify_obsv=true)
     B̂d  = [model.Bd; zeros(nxs,nd)]
     D̂d  = model.Dd
     # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny:
-    if verify_obsv && !isobservable(Â, Ĉ)
+    if verify_obsv && !observability(Â, Ĉ)[begin]
         error("The augmented model is unobservable. You may try to use 0 "*
               "integrator on model integrating outputs with nint_ym parameter.")
     end
@@ -213,21 +213,13 @@ function default_nint(model::LinModel, i_ym)
         As , _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         Â  , _ , Ĉ  = augment_model(model, As, Cs, verify_obsv=false)
         # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny
-        isobservable(Â, Ĉ) || (nint_ym[i] = 0)
+        isobservable, = observability(Â, Ĉ)
+        isobservable || (nint_ym[i] = 0)
     end
     return nint_ym
 end
 "One integrator per measured outputs by default if `model` is not a  [`LinModel`](@ref)."
 default_nint(::SimModel, i_ym) = fill(1, length(i_ym))
-
-"""
-    isobservable(A, C)
-
-Verify if the state-space `A` and `C` matrices of are observable.
-
-Based on the [Popov-Belevitch-Hautus (PBH) test](https://en.wikipedia.org/wiki/Hautus_lemma).
-"""
-isobservable(A, C) = all(map(λ->rank([λ * I - A; C]) == size(A, 1), eigvals(A)))
 
 @doc raw"""
     f̂(estim::StateEstimator, x̂, u, d)
