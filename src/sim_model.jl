@@ -99,7 +99,7 @@ function Base.show(io::IO, model::SimModel)
 end
 
 """
-    updatestate!(model::SimModel, u, d=Float64[])
+    updatestate!(model::SimModel, u, d=Float64[]) -> x
 
 Update `model.x` states with current inputs `u` and measured disturbances `d`.
 
@@ -118,7 +118,7 @@ function updatestate!(model::SimModel, u, d=Float64[])
 end
 
 """
-    evaloutput(model::SimModel, d=Float64[])
+    evaloutput(model::SimModel, d=Float64[]) -> y
 
 Evaluate `SimModel` outputs `y` from `model.x` states and measured disturbances `d`.
 

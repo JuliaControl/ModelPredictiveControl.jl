@@ -13,7 +13,7 @@ struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
 end
 
 @doc raw"""
-    sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x0=zeros(plant.nx))
+    sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x0=zeros(plant.nx)) -> res
 
 Open-loop simulation of `plant` for `N` time steps, default to unit bump test on all inputs.
 
@@ -66,7 +66,7 @@ end
         u = estim.model.uop .+ 1,
         d = estim.model.dop;
         <keyword arguments>
-    )
+    ) -> res
 
 Closed-loop simulation of `estim` estimator for `N` time steps, default to input bumps.
 
@@ -120,7 +120,7 @@ end
         ry = mpc.estim.model.yop .+ 1, 
         d  = mpc.estim.model.dop; 
         <keyword arguments>
-    )
+    ) -> res
 
 Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
 

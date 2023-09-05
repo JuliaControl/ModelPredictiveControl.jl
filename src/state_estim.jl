@@ -270,7 +270,7 @@ end
 
 
 @doc raw"""
-    initstate!(estim::StateEstimator, u, ym, d=Float64[])
+    initstate!(estim::StateEstimator, u, ym, d=Float64[]) -> x̂
 
 Init `estim.x̂` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
@@ -329,7 +329,7 @@ init_deterstate(model::LinModel, _    , u, d) = steadystate(model, u, d)
 init_deterstate(model::SimModel, estim, _, _) = estim.x̂[1:model.nx]
 
 @doc raw"""
-    evaloutput(estim::StateEstimator, d=Float64[])
+    evaloutput(estim::StateEstimator, d=Float64[]) -> ŷ
 
 Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂` states and disturbances `d`.
 
@@ -353,7 +353,7 @@ end
 
 
 @doc raw"""
-    updatestate!(estim::StateEstimator, u, ym, d=Float64[])
+    updatestate!(estim::StateEstimator, u, ym, d=Float64[]) -> x̂
 
 Update `estim.x̂` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
 

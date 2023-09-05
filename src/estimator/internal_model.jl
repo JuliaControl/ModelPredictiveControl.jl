@@ -147,7 +147,7 @@ function init_internalmodel(As, Bs, Cs, Ds)
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, u, ym, d=Float64[])
+    update_estimate!(estim::InternalModel, u, ym, d=Float64[]) -> x̂d
 
 Update `estim.x̂` \ `x̂d` \ `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
 
@@ -175,7 +175,7 @@ function update_estimate!(estim::InternalModel, u, ym, d=Float64[])
 end
 
 @doc raw"""
-    initstate!(estim::InternalModel, u, ym, d=Float64[])
+    initstate!(estim::InternalModel, u, ym, d=Float64[]) -> x̂d
 
 Init `estim.x̂d` / `x̂s` states from current inputs `u`, meas. outputs `ym` and disturb. `d`.
 
@@ -192,7 +192,7 @@ function initstate!(estim::InternalModel, u, ym, d=Float64[])
 end
 
 @doc raw"""
-    evaloutput(estim::InternalModel, ym, d=Float64[])
+    evaloutput(estim::InternalModel, ym, d=Float64[]) -> ŷ
 
 Evaluate `InternalModel` outputs `ŷ` from `estim.x̂d` states and measured outputs `ym`.
 
