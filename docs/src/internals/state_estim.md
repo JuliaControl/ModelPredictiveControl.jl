@@ -5,7 +5,6 @@
 ```@docs
 ModelPredictiveControl.init_estimstoch
 ModelPredictiveControl.augment_model
-ModelPredictiveControl.default_nint
 ModelPredictiveControl.init_ukf
 ModelPredictiveControl.init_internalmodel
 ```

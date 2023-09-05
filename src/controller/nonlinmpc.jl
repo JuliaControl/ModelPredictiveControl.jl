@@ -386,7 +386,7 @@ end
 """
     con_nonlinprog(mpc::NonLinMPC, model::NonLinModel, ΔŨ::Vector{Real})
 
-Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](ref).
+Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
 """
 function con_nonlinprog(mpc::NonLinMPC, ::SimModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
     if !isinf(mpc.C) # constraint softening activated :

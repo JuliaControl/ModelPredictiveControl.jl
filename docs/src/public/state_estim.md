@@ -75,3 +75,9 @@ ExtendedKalmanFilter
 ```@docs
 InternalModel
 ```
+
+## Default output integrator quantity
+
+```@docs
+default_nint
+```

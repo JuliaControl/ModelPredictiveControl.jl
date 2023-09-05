@@ -1,7 +1,7 @@
 name = "ModelPredictiveControl"
 uuid = "61f9bdb8-6ae4-484a-811f-bbf86720c31c"
 authors = ["Francis Gagnon"]
-version = "0.7.0"
+version = "0.7.1"
 
 [deps]
 ControlSystemsBase = "aaaaaaaa-a6ca-5380-bf3e-84a91bcd477e"
@@ -16,7 +16,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 
 [compat]
-ControlSystemsBase = "1"
+ControlSystemsBase = "1.9"
 ForwardDiff = "0.10"
 Ipopt = "1"
 JuMP = "1"

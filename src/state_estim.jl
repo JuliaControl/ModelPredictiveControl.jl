@@ -197,15 +197,27 @@ end
 augment_model(::SimModel, _ , _ ) = nothing
 
 @doc raw"""
-    default_nint(model::LinModel, i_ym)
+    default_nint(model::LinModel, i_ym=1:model.ny)
 
 Get default integrator quantity per measured outputs `nint_ym` for [`LinModel`](@ref).
 
-By default, one integrator is added on each measured outputs. If ``\mathbf{Â, Ĉ}`` 
-matrices of the augmented model becomes unobservable, the integrator is removed. This 
-approach works well for stable, integrating and unstable `model`.
+The measured output ``\mathbf{y^m}`` indices are specified by `i_ym` argument. By default, 
+one integrator is added on each measured outputs. If ``\mathbf{Â, Ĉ}`` matrices of the 
+augmented model becomes unobservable, the integrator is removed. This approach works well 
+for stable, integrating and unstable `model` (see Examples).
+
+# Examples
+```jldoctest
+julia> model = LinModel(append(tf(3, [10, 1]), tf(2, [1, 0]), tf(4,[-5, 1])), 1.0);
+
+julia> nint_ym = default_nint(model)
+3-element Vector{Int64}:
+ 1
+ 0
+ 1
+```
 """
-function default_nint(model::LinModel, i_ym)
+function default_nint(model::LinModel, i_ym::IntRangeOrVector = 1:model.ny)
     nint_ym = fill(0, length(i_ym))
     for i in eachindex(i_ym)
         nint_ym[i]  = 1
@@ -218,8 +230,12 @@ function default_nint(model::LinModel, i_ym)
     end
     return nint_ym
 end
-"One integrator per measured outputs by default if `model` is not a  [`LinModel`](@ref)."
-default_nint(::SimModel, i_ym) = fill(1, length(i_ym))
+"""
+    default_nint(model::SimModel, i_ym=1:model.ny)
+
+One integrator on each measured output by default if `model` is not a  [`LinModel`](@ref).
+"""
+default_nint(::SimModel, i_ym::IntRangeOrVector = 1:model.ny) = fill(1, length(i_ym))
 
 @doc raw"""
     f̂(estim::StateEstimator, x̂, u, d)

@@ -119,7 +119,7 @@ The model augmentation with `nint_ym` vector adds integrators at model measured 
 as state feedback. The method [`default_nint`](@ref) computes the default value of 
 `nint_ym`. It can also be tweaked by following these rules on each measured output:
 
-- Use 0 integrator if the model output is integrating (else it will be unobservable)
+- Use 0 integrator if the model output is already integrating (else it will be unobservable)
 - Use 1 integrator if the disturbances on the output are typically "step-like"
 - Use 2 integrators if the disturbances on the output are typically "ramp-like" 
 
