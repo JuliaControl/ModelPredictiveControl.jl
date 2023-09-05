@@ -30,7 +30,7 @@ pendulum. Here, the explicit Euler method discretizes the system to construct a
 ```@example 1
 using ModelPredictiveControl
 function pendulum(par, x, u)
-    g, L, K, m = par        # [m/s], [m], [kg/s], [kg]
+    g, L, K, m = par        # [m/s²], [m], [kg/s], [kg]
     θ, ω = x[1], x[2]       # [rad], [rad/s]
     τ  = u[1]               # [N m]
     dθ = ω

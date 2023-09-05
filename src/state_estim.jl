@@ -203,7 +203,7 @@ Get default integrator quantity per measured outputs `nint_ym` for [`LinModel`](
 
 The measured output ``\mathbf{y^m}`` indices are specified by `i_ym` argument. By default, 
 one integrator is added on each measured outputs. If ``\mathbf{Â, Ĉ}`` matrices of the 
-augmented model becomes unobservable, the integrator is removed. This approach works well 
+augmented model become unobservable, the integrator is removed. This approach works well 
 for stable, integrating and unstable `model` (see Examples).
 
 # Examples
