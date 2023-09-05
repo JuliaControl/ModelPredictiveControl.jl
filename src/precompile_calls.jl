@@ -48,6 +48,12 @@ sim!(nmpc_skf, 3, [55, 30])
 
 sim!(model, 3)
 
+exmpc = ExplicitMPC(model)
+initstate!(exmpc, model.uop, model())
+exmpc.estim()
+u = exmpc([55, 30])
+sim!(exmpc, 3, [55, 30])
+
 f(x,u,_) = model.A*x + model.Bu*u
 h(x,_) = model.C*x
 
