@@ -737,13 +737,6 @@ end
 "Return the quadratic programming objective function, see [`init_quadprog`](@ref)."
 obj_quadprog(ΔŨ, P̃, q̃) = 0.5*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ
 
-
-"Calc the analytical unconstrained minimum of ``J`` for [`LinModel`](@ref)."
-unconstrained_solution(mpc::PredictiveController, model::LinModel) = -mpc.P̃\mpc.q̃
-
-"When model is not a `LinModel`(@ref), returns a null vector ``\\mathbf{0}``."
-unconstrained_solution(mpc::PredictiveController, ::SimModel) = zeros(size(mpc.ΔŨ))
-
 """
     init_defaultcon(model, C, S_Hp, S_Hc, N_Hc, E) -> con, S̃_Hp, Ñ_Hc, Ẽ
 
