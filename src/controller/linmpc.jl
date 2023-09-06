@@ -92,28 +92,12 @@ in which the weight matrices are repeated ``H_p`` or ``H_c`` times:
     \mathbf{L}_{H_p} &= \text{diag}\mathbf{(L,L,...,L)}     
 \end{aligned}
 ```
-and with the following nomenclature:
-
-| VARIABLE         | DESCRIPTION                                        | SIZE             |
-| :--------------- | :------------------------------------------------- | :--------------- |
-| ``H_p``          | prediction horizon (integer)                       | `()`             |
-| ``H_c``          | control horizon (integer)                          | `()`             |
-| ``\mathbf{ΔU}``  | manipulated input increments over ``H_c``          | `(nu*Hc,)`       |
-| ``\mathbf{Ŷ}``   | predicted outputs over ``H_p``                     | `(ny*Hp,)`       |
-| ``\mathbf{U}``   | manipulated inputs over ``H_p``                    | `(nu*Hp,)`       |
-| ``\mathbf{R̂_y}`` | predicted output setpoints over ``H_p``            | `(ny*Hp,)`       |
-| ``\mathbf{R̂_u}`` | predicted manipulated input setpoints over ``H_p`` | `(nu*Hp,)`       |
-| ``\mathbf{M}``   | output setpoint tracking weights                   | `(ny*Hp, ny*Hp)` |
-| ``\mathbf{N}``   | manipulated input increment weights                | `(nu*Hc, nu*Hc)` |
-| ``\mathbf{L}``   | manipulated input setpoint tracking weights        | `(nu*Hp, nu*Hp)` |
-| ``C``            | slack variable weight                              | `()`             |
-| ``ϵ``            | slack variable for constraint softening            | `()`             |
-
 The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{Δu}(k+j) = 
 \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to ``H_c-1``, the ``\mathbf{Ŷ}`` vector, 
 the output predictions ``\mathbf{ŷ}(k+j)`` from ``j=1`` to ``H_p``, and the ``\mathbf{U}`` 
 vector, the manipulated inputs ``\mathbf{u}(k+j)`` from ``j=0`` to ``H_p-1``. The 
 manipulated input setpoint predictions ``\mathbf{R̂_u}`` are constant at ``\mathbf{r_u}``.
+See Extended Help for a detailed nomenclature.
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
 arguments.
@@ -150,6 +134,23 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 Manipulated inputs setpoints ``\mathbf{r_u}`` are not common but they can be interesting
 for over-actuated systems, when `nu > ny` (e.g. prioritize solutions with lower economical 
 costs). The default `Lwt` value implies that this feature is disabled by default.
+
+The objective function follows this nomenclature:
+
+| VARIABLE         | DESCRIPTION                                        | SIZE             |
+| :--------------- | :------------------------------------------------- | :--------------- |
+| ``H_p``          | prediction horizon (integer)                       | `()`             |
+| ``H_c``          | control horizon (integer)                          | `()`             |
+| ``\mathbf{ΔU}``  | manipulated input increments over ``H_c``          | `(nu*Hc,)`       |
+| ``\mathbf{Ŷ}``   | predicted outputs over ``H_p``                     | `(ny*Hp,)`       |
+| ``\mathbf{U}``   | manipulated inputs over ``H_p``                    | `(nu*Hp,)`       |
+| ``\mathbf{R̂_y}`` | predicted output setpoints over ``H_p``            | `(ny*Hp,)`       |
+| ``\mathbf{R̂_u}`` | predicted manipulated input setpoints over ``H_p`` | `(nu*Hp,)`       |
+| ``\mathbf{M}``   | output setpoint tracking weights                   | `(ny*Hp, ny*Hp)` |
+| ``\mathbf{N}``   | manipulated input increment weights                | `(nu*Hc, nu*Hc)` |
+| ``\mathbf{L}``   | manipulated input setpoint tracking weights        | `(nu*Hp, nu*Hp)` |
+| ``C``            | slack variable weight                              | `()`             |
+| ``ϵ``            | slack variable for constraint softening            | `()`             |
 """
 LinMPC(model::LinModel; kwargs...) = LinMPC(SteadyKalmanFilter(model); kwargs...)
 

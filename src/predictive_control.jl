@@ -257,7 +257,7 @@ function moveinput!(
     R̂y::Vector = repeat(ry, mpc.Hp),
     D̂ ::Vector = repeat(d,  mpc.Hp),
     ym::Union{Vector, Nothing} = nothing
-)   
+)
     validate_setpointdist(mpc, ry, d, R̂y, D̂)
     getestimates!(mpc, mpc.estim, ym, d)
     predictstoch!(mpc, mpc.estim, d, ym)
