@@ -290,7 +290,8 @@ end
 
 Init `estim.x̂` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
-The method tries to find a good steady-state to initialize `estim.x̂` estimate :
+The method set the estimation error covariance to `estim.P̂0` (if applicable) and tries to 
+find a good steady-state to initialize `estim.x̂` estimate :
 
 - If `estim.model` is a [`LinModel`](@ref), it evaluates `estim.model` steady-state (using
   [`steadystate`](@ref)) with current inputs `u` and measured disturbances `d`, and saves
