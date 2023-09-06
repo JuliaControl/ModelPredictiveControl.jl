@@ -21,17 +21,12 @@ struct SteadyKalmanFilter <: StateEstimator
     R̂::Hermitian{Float64, Matrix{Float64}}
     K::Matrix{Float64}
     function SteadyKalmanFilter(model, i_ym, nint_ym, Q̂, R̂)
-        nu, nx, ny = model.nu, model.nx, model.ny
-        nym, nyu = length(i_ym), ny - length(i_ym)
-        Asm, Csm, nint_ym = init_estimstoch(i_ym, nint_ym)
-        nxs = size(Asm,1)
-        nx̂ = nx + nxs
+        nym, nyu, nxs, nx̂, As, Cs, nint_ym = init_estimstoch(model, i_ym, nint_ym)
+        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         validate_kfcov(nym, nx̂, Q̂, R̂)
-        As, _ , Cs  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        Â , B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         K = try
             Q̂_kalman = Matrix(Q̂) # Matrix() required for Julia 1.6
-            R̂_kalman = zeros(eltype(R̂), ny, ny)
+            R̂_kalman = zeros(eltype(R̂), model.ny, model.ny)
             R̂_kalman[i_ym, i_ym] = R̂
             kalman(Discrete, Â, Ĉ, Q̂_kalman, R̂_kalman)[:, i_ym] 
         catch my_error
@@ -44,8 +39,7 @@ struct SteadyKalmanFilter <: StateEstimator
             end
         end
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
-        i_ym = collect(i_ym)
-        lastu0 = zeros(nu)
+        lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)
@@ -123,7 +117,7 @@ as state feedback. The method [`default_nint`](@ref) computes the default value 
 - Use 1 integrator if the disturbances on the output are typically "step-like"
 - Use 2 integrators if the disturbances on the output are typically "ramp-like" 
 
-The function [`init_estimstoch`](@ref) builds the stochastic model from `nint_ym`.
+The function [`init_integrators`](@ref) builds the stochastic model from `nint_ym`.
 
 !!! tip
     Increasing `σQ_int` values increases the integral action "gain".
@@ -198,17 +192,11 @@ struct KalmanFilter <: StateEstimator
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
     function KalmanFilter(model, i_ym, nint_ym, P̂0, Q̂, R̂)
-        nu, nx, ny = model.nu, model.nx, model.ny
-        nym, nyu = length(i_ym), ny - length(i_ym)
-        Asm, Csm, nint_ym = init_estimstoch(i_ym, nint_ym)
-        nxs = size(Asm,1)
-        nx̂ = nx + nxs
+        nym, nyu, nxs, nx̂, As, Cs, nint_ym = init_estimstoch(model, i_ym, nint_ym)
+        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
-        As, _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        Â , B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
-        i_ym = collect(i_ym)
-        lastu0 = zeros(nu)
+        lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
         P̂0 = Hermitian(P̂0, :L)
         Q̂ = Hermitian(Q̂, :L)
@@ -335,17 +323,11 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     function UnscentedKalmanFilter{M}(
         model::M, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ
     ) where {M<:SimModel}
-        nu, nx, ny = model.nu, model.nx, model.ny
-        nym, nyu = length(i_ym), ny - length(i_ym)
-        Asm, Csm, nint_ym = init_estimstoch(i_ym, nint_ym)
-        nxs = size(Asm,1)
-        nx̂ = nx + nxs
-        validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
-        As, _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        nym, nyu, nxs, nx̂, As, Cs, nint_ym = init_estimstoch(model, i_ym, nint_ym)
         augment_model(model, As, Cs) # verify observability for LinModel
+        validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
-        i_ym = collect(i_ym)
-        lastu0 = zeros(nu)
+        lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
         P̂0 = Hermitian(P̂0, :L)
         Q̂ = Hermitian(Q̂, :L)
@@ -555,16 +537,10 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
     function ExtendedKalmanFilter{M}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂) where {M<:SimModel}
-        nu, nx, ny = model.nu, model.nx, model.ny
-        nym, nyu = length(i_ym), ny - length(i_ym)
-        Asm, Csm, nint_ym = init_estimstoch(i_ym, nint_ym)
-        nxs = size(Asm,1)
-        nx̂ = nx + nxs
-        validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
-        As, _ , Cs, _  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+        nym, nyu, nxs, nx̂, As, Cs, nint_ym = init_estimstoch(model, i_ym, nint_ym)
         augment_model(model, As, Cs) # verify observability for LinModel
-        i_ym = collect(i_ym)
-        lastu0 = zeros(nu)
+        validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
+        lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
         P̂0 = Hermitian(P̂0, :L)
         Q̂ = Hermitian(Q̂, :L)

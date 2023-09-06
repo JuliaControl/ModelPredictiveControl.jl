@@ -32,7 +32,6 @@ struct InternalModel{M<:SimModel} <: StateEstimator
         nx̂ = model.nx
         nxs = size(As,1)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        i_ym = collect(i_ym)
         lastu0 = zeros(nu)
         x̂d = x̂ = zeros(model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
         x̂s = zeros(nxs)

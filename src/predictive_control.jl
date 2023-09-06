@@ -336,17 +336,12 @@ Set the estimate at `mpc.estim.x̂`.
 setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
 
 @doc raw"""
-    initstate!(mpc::PredictiveController, u, ym, d=Float64[]) -> x̂
+    initstate!(mpc::PredictiveController, u, ym, d=Float64[])
 
-Init `mpc.ΔŨ` for warm-starting and the states of `mpc.estim` [`StateEstimator`](@ref).
-
-Before calling [`initstate!(mpc.estim, u, ym, d)`](@ref), it warm-starts ``\mathbf{ΔŨ}``:
-- If `model` is a [`LinModel`](@ref), the vector is filled with the analytical minimum ``J``
-  of the unconstrained problem.
-- Else, the vector is filled with zeros.
+Init the states of `mpc.estim` [`StateEstimator`](@ref) and warm start `mpc.ΔŨ` at zero.
 """
 function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
-    mpc.ΔŨ[:] = unconstrained_solution(mpc, mpc.estim.model)
+    mpc.ΔŨ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
 

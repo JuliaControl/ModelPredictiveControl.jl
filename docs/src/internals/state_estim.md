@@ -3,7 +3,7 @@
 ## Estimator Initialization
 
 ```@docs
-ModelPredictiveControl.init_estimstoch
+ModelPredictiveControl.init_integrators
 ModelPredictiveControl.augment_model
 ModelPredictiveControl.init_ukf
 ModelPredictiveControl.init_internalmodel

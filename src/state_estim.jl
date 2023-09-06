@@ -69,6 +69,23 @@ function remove_op!(estim::StateEstimator, u, d, ym)
     return u0, d0, ym0
 end
 
+"""
+    init_estimstoch(model, i_ym, nint_ym)
+
+Init stochastic model matrices from integrator specifications for state estimation.
+"""
+function init_estimstoch(model, i_ym, nint_ym)
+    validate_ym(model, i_ym)
+    nx, ny = model.nx, model.ny
+    nym, nyu = length(i_ym), ny - length(i_ym)
+    Asm, Csm, nint_ym = init_integrators(i_ym, nint_ym)
+    nxs = size(Asm,1)
+    nx̂ = nx + nxs
+    As, _ , Cs  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
+    return nym, nyu, nxs, nx̂, As, Cs, nint_ym
+end
+
+"Validate the specified measured output indices `i_ym`."
 function validate_ym(model::SimModel, i_ym)
     if length(unique(i_ym)) ≠ length(i_ym) || maximum(i_ym) > model.ny
         error("Measured output indices i_ym should contains valid and unique indices")
@@ -91,7 +108,7 @@ function stoch_ym2y(model::SimModel, i_ym, Asm, Bsm, Csm, Dsm)
 end
 
 @doc raw"""
-    init_estimstoch(i_ym, nint_ym::Vector{Int}) -> Asm, Csm, nint_ym
+    init_integrators(i_ym, nint_ym::Vector{Int}) -> Asm, Csm, nint_ym
 
 Calc stochastic model matrices from output integrators specifications for state estimation.
 
@@ -107,7 +124,7 @@ be added for each measured output ``\mathbf{y^m}``. The argument generates the `
 where ``\mathbf{e}(k)`` is a conceptual and unknown zero mean white noise. 
 ``\mathbf{B_s^m}`` is not used for closed-loop state estimators thus ignored.
 """
-function init_estimstoch(i_ym, nint_ym)
+function init_integrators(i_ym, nint_ym)
     if nint_ym == 0 # alias for no output integrator at all
         nint_ym = fill(0, length(i_ym))
     end
@@ -134,7 +151,7 @@ function init_estimstoch(i_ym, nint_ym)
     return Asm, Csm, nint_ym
 end
 
-function init_estimstoch_u(nu, nint_u)
+function init_integrators_u(nu, nint_u)
     if nint_u == 0 # alias for no output integrator at all
         nint_u = fill(0, length(nu))
     end
@@ -167,7 +184,7 @@ end
 Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
 If ``\mathbf{x}`` are `model.x` states, and ``\mathbf{x_s}``, the states defined at
-[`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
+[`init_integrators`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
 [ \begin{smallmatrix} \mathbf{x} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
 returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
@@ -187,7 +204,7 @@ function augment_model(model::LinModel, As, Cs; verify_obsv=true)
     B̂d  = [model.Bd; zeros(nxs,nd)]
     D̂d  = model.Dd
     # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny:
-    if verify_obsv && !observability(Â, Ĉ)[begin]
+    if verify_obsv && !observability(Â, Ĉ)[:isobservable]
         error("The augmented model is unobservable. You may try to use 0 "*
               "integrator on model integrating outputs with nint_ym parameter.")
     end
@@ -221,12 +238,11 @@ function default_nint(model::LinModel, i_ym::IntRangeOrVector = 1:model.ny)
     nint_ym = fill(0, length(i_ym))
     for i in eachindex(i_ym)
         nint_ym[i]  = 1
-        Asm, Csm    = init_estimstoch(i_ym, nint_ym)
+        Asm, Csm    = init_integrators(i_ym, nint_ym)
         As , _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
         Â  , _ , Ĉ  = augment_model(model, As, Cs, verify_obsv=false)
         # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny
-        isobservable, = observability(Â, Ĉ)
-        isobservable || (nint_ym[i] = 0)
+        observability(Â, Ĉ)[:isobservable] || (nint_ym[i] = 0)
     end
     return nint_ym
 end
