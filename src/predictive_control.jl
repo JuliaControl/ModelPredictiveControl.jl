@@ -913,14 +913,14 @@ with [`getestimates!`](@ref). The method also returns an empty ``\mathbf{P_s}`` 
 it is useless except for [`InternalModel`](@ref) estimators.
 """
 function init_stochpred(estim::StateEstimator, Hp)
-    As, Cs = estim.As, estim.Cs
+    As, Cs_y = estim.As, estim.Cs_y
     nxs = estim.nxs
     Ms = Matrix{Float64}(undef, Hp*nxs, nxs) 
     for i = 1:Hp
         iRow = (1:nxs) .+ nxs*(i-1)
         Ms[iRow, :] = As^i
     end
-    Js = repeatdiag(Cs, Hp)
+    Js = repeatdiag(Cs_y, Hp)
     Ks = Js*Ms
     Ps = zeros(estim.model.ny*Hp, 0)
     return Ks, Ps

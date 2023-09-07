@@ -70,31 +70,22 @@ function remove_op!(estim::StateEstimator, u, d, ym)
 end
 
 """
-    init_estimstoch(model, i_ym, nint_ym)
+    init_estimstoch(model, i_ym, nint_u, nint_ym)
 
 Init stochastic model matrices from integrator specifications for state estimation.
 """
-function init_estimstoch(model, i_ym, nint_ym; nint_u=0)
-    validate_ym(model, i_ym)
-    nu, nx, ny = model.nu, model.nx, model.ny
-    nym, nyu = length(i_ym), ny - length(i_ym)
+function init_estimstoch(model, i_ym, nint_u, nint_ym)
+    nu, ny, nym = model.nu, model.ny, length(i_ym)
     As_u , Cs_u , nint_u  = init_integrators(nint_u , nu , "u")
     As_ym, Cs_ym, nint_ym = init_integrators(nint_ym, nym, "ym")
     As_y, _ , Cs_y  = stoch_ym2y(model, i_ym, As_ym, [], Cs_ym, [])
     nxs_u, nxs_y = size(As_u, 1), size(As_y, 1)
     # combines input and output stochastic models:
-    As = [As_u zeros(nxs_u, nxs_y); zeros(nxs_y, nxs_u) As_y]
+    As   = [As_u zeros(nxs_u, nxs_y); zeros(nxs_y, nxs_u) As_y]
     Cs_u = [Cs_u zeros(nu, nxs_y)]
     Cs_y = [zeros(ny, nxs_u) Cs_y]
-
-    #Bs = B*Ks (nx × nxs) 
-    #Cs_u # nu x nxs_u
-    #B # nx x nu
-    #K_res = B*Cs_u # (nx × nu) * (nu × nxs_u) = (nx × nxs_u)
-
     nxs = nxs_u + nxs_y
-    nx̂ = nx + nxs
-    return nym, nyu, nx̂, nxs, As, Cs_u, Cs_y, nint_u, nint_ym
+    return As, Cs_u, Cs_y, nxs, nint_u, nint_ym
 end
 
 "Validate the specified measured output indices `i_ym`."
@@ -102,6 +93,8 @@ function validate_ym(model::SimModel, i_ym)
     if length(unique(i_ym)) ≠ length(i_ym) || maximum(i_ym) > model.ny
         error("Measured output indices i_ym should contains valid and unique indices")
     end
+    nym, nyu = length(i_ym), model.ny - length(i_ym)
+    return nym, nyu
 end
 
 "Convert the measured outputs stochastic model `stoch_ym` to all outputs `stoch_y`."
@@ -139,7 +132,7 @@ where ``\mathbf{e}(k)`` is an unknown zero mean white noise. The estimations doe
 1. for the unmodeled disturbances at measured outputs ``\mathbf{y^m}``
 2. for the unmodeled disturbances at manipulated inputs ``\mathbf{u}``
 """
-function init_integrators(nint::Vector{Int}, nys, varname::String)
+function init_integrators(nint::IntVectorOrInt, nys, varname::String)
     if nint == 0 # alias for no integrator at all
         nint = fill(0, nys)
     end
@@ -192,16 +185,17 @@ function augment_model(model::LinModel, As, Cs_u, Cs_y; verify_obsv=true)
     D̂d  = model.Dd
     # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny:
     if verify_obsv && !observability(Â, Ĉ)[:isobservable]
-        error("The augmented model is unobservable. You may try to use 0 "*
-              "integrator on model integrating outputs with nint_ym parameter.")
+        error("The augmented model is unobservable. You may try to use 0 integrator on "*
+              "model integrating outputs with nint_ym parameter. Adding integrators at both "*
+              "inputs (nint_u) and outputs (nint_ym) can also violate observability.")
     end
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 "No need to augment the model if `model` is not a [`LinModel`](@ref)."
-augment_model(::SimModel, _ , _ ) = nothing
+augment_model(::SimModel, _ , _ , _ ) = nothing
 
 @doc raw"""
-    default_nint(model::LinModel, i_ym=1:model.ny)
+    default_nint(model::LinModel, i_ym=1:model.ny, nint_u)
 
 Get default integrator quantity per measured outputs `nint_ym` for [`LinModel`](@ref).
 
@@ -221,24 +215,27 @@ julia> nint_ym = default_nint(model)
  1
 ```
 """
-function default_nint(model::LinModel, i_ym::IntRangeOrVector = 1:model.ny)
+function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0)
+    validate_ym(model, i_ym)
     nint_ym = fill(0, length(i_ym))
     for i in eachindex(i_ym)
         nint_ym[i]  = 1
-        Asm, Csm    = init_integrators(i_ym, nint_ym)
-        As , _ , Cs = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-        Â  , _ , Ĉ  = augment_model(model, As, Cs, verify_obsv=false)
+        As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        Â, _ , Ĉ = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
         # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny
         observability(Â, Ĉ)[:isobservable] || (nint_ym[i] = 0)
     end
     return nint_ym
 end
 """
-    default_nint(model::SimModel, i_ym=1:model.ny)
+    default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
 
 One integrator on each measured output by default if `model` is not a  [`LinModel`](@ref).
 """
-default_nint(::SimModel, i_ym::IntRangeOrVector = 1:model.ny) = fill(1, length(i_ym))
+function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
+    validate_ym(model, i_ym)
+    return fill(1, length(i_ym))
+end
 
 @doc raw"""
     f̂(estim::StateEstimator, x̂, u, d)
