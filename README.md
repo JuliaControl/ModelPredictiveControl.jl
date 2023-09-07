@@ -93,7 +93,7 @@ for more detailed examples.
 - [x] supported feedback strategy:
   - [x] state estimator (see State Estimation features)
   - [x] internal model structure with a custom stochastic model
-- [x] offset-free tracking with a single or multiple integrators on measured outputs
+- [x] automatic model augmentation with integrating states for offset-free tracking
 - [x] support for unmeasured model outputs
 - [x] feedforward action with measured disturbances that supports direct transmission
 - [x] custom predictions for:
@@ -115,7 +115,9 @@ for more detailed examples.
   - [x] extended Kalman filter
   - [x] unscented Kalman filter
   - [ ] moving horizon estimator
-- [x] automatic model augmentation for offset-free tracking
+- [x] easily estimate unmeasured disturbances by adding one or more integrators at the:
+  - [x] manipulated inputs
+  - [x] measured outputs
 - [x] observers in predictor form to ease control applications
 - [ ] moving horizon estimator that supports:
   - [ ] inequality state constraints

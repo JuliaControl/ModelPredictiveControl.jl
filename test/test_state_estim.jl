@@ -90,7 +90,7 @@ end
     @test kalmanfilter5.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test kalmanfilter5.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
 
-    kalmanfilter6 = KalmanFilter(linmodel2, σP0=[1,2,3,4], σP0_int=[5,6])
+    kalmanfilter6 = KalmanFilter(linmodel2, σP0=[1,2,3,4], σP0int_ym=[5,6])
     @test kalmanfilter6.P̂0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test kalmanfilter6.P̂  ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test kalmanfilter6.P̂0 !== kalmanfilter6.P̂
