@@ -28,7 +28,7 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test skalmanfilter4.nxs == 4
     @test skalmanfilter4.nx̂ == 6
 
-    skalmanfilter5 = SteadyKalmanFilter(linmodel2, σQ=[1,2,3,4], σQ_int=[5, 6],  σR=[7, 8])
+    skalmanfilter5 = SteadyKalmanFilter(linmodel2, σQ=[1,2,3,4], σQint_ym=[5, 6],  σR=[7, 8])
     @test skalmanfilter5.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test skalmanfilter5.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
 
@@ -86,7 +86,7 @@ end
     @test kalmanfilter4.nxs == 4
     @test kalmanfilter4.nx̂ == 6
 
-    kalmanfilter5 = KalmanFilter(linmodel2, σQ=[1,2,3,4], σQ_int=[5, 6],  σR=[7, 8])
+    kalmanfilter5 = KalmanFilter(linmodel2, σQ=[1,2,3,4], σQint_ym=[5, 6],  σR=[7, 8])
     @test kalmanfilter5.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test kalmanfilter5.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
 
@@ -258,7 +258,7 @@ end
     @test ukf3.nxs == 1
     @test ukf3.nx̂ == 5
 
-    ukf4 = UnscentedKalmanFilter(nonlinmodel, σQ=[1,2,3,4], σQ_int=[5, 6],  σR=[7, 8])
+    ukf4 = UnscentedKalmanFilter(nonlinmodel, σQ=[1,2,3,4], σQint_ym=[5, 6],  σR=[7, 8])
     @test ukf4.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test ukf4.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
     
@@ -266,7 +266,7 @@ end
     @test ukf5.nxs == 4
     @test ukf5.nx̂ == 8
 
-    ukf6 = UnscentedKalmanFilter(nonlinmodel, σP0=[1,2,3,4], σP0_int=[5,6])
+    ukf6 = UnscentedKalmanFilter(nonlinmodel, σP0=[1,2,3,4], σP0int_ym=[5,6])
     @test ukf6.P̂0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test ukf6.P̂  ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test ukf6.P̂0 !== ukf6.P̂
@@ -316,7 +316,7 @@ end
     @test ekf3.nxs == 1
     @test ekf3.nx̂ == 5
 
-    ekf4 = ExtendedKalmanFilter(nonlinmodel, σQ=[1,2,3,4], σQ_int=[5, 6],  σR=[7, 8])
+    ekf4 = ExtendedKalmanFilter(nonlinmodel, σQ=[1,2,3,4], σQint_ym=[5, 6],  σR=[7, 8])
     @test ekf4.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test ekf4.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
     
@@ -324,7 +324,7 @@ end
     @test ekf5.nxs == 4
     @test ekf5.nx̂ == 8
 
-    ekf6 = ExtendedKalmanFilter(nonlinmodel, σP0=[1,2,3,4], σP0_int=[5,6])
+    ekf6 = ExtendedKalmanFilter(nonlinmodel, σP0=[1,2,3,4], σP0int_ym=[5,6])
     @test ekf6.P̂0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test ekf6.P̂  ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test ekf6.P̂0 !== ekf6.P̂

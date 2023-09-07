@@ -105,7 +105,7 @@ unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
-julia> estim = SteadyKalmanFilter(model, i_ym=[2], σR=[1], σQ_int=[0.01])
+julia> estim = SteadyKalmanFilter(model, i_ym=[2], σR=[1], σQint_ym=[0.01])
 SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
  1 manipulated inputs u
  3 states x̂
@@ -115,19 +115,20 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 ```
 
 # Extended Help
-The model augmentation with `nint_u` vector adds integrators at model manipulated inputs, 
+The model augmentation with `nint_u` vector adds integrators at model manipulated inputs,
 and `nint_ym`, at measured outputs. They create the integral action when the estimator is
-used in a controller as state feedback. The method [`default_nint`](@ref) computes the 
-default value of `nint_ym`. It can also be tweaked by following these rules on each measured output:
+used in a controller as state feedback. By default, the method [`default_nint`](@ref) adds
+one integrator per measured output if feasible. The argument `nint_ym` can also be tweaked
+by following these rules on each measured output:
 
 - Use 0 integrator if the model output is already integrating (else it will be unobservable)
 - Use 1 integrator if the disturbances on the output are typically "step-like"
 - Use 2 integrators if the disturbances on the output are typically "ramp-like" 
 
-The function [`init_integrators`](@ref) builds the stochastic model from `nint_ym`.
+The function [`init_estimstoch`](@ref) builds the stochastic model for estimation.
 
 !!! tip
-    Increasing `σQ_int` values increases the integral action "gain".
+    Increasing `σQint_u` and `σQint_ym` values increases the integral action "gain".
 
 The constructor pre-compute the steady-state Kalman gain `K` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
 function. It can sometimes fail, for example when `model` matrices are ill-conditioned. In
@@ -252,7 +253,7 @@ value with ``\mathbf{P̂}_{-1}(0) =
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
-julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP0=[100, 100], σQ_int=[0.01])
+julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP0=[100, 100], σQint_ym=[0.01])
 KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
  1 manipulated inputs u
  3 states x̂
@@ -400,13 +401,14 @@ unmeasured ones, for ``\mathbf{ĥ^u}``).
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1);
 
-julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0_int=[1, 1])
+julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0int_ym=[1, 1])
 UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
  1 manipulated inputs u
  3 states x̂
  1 measured outputs ym
  0 unmeasured outputs yu
  0 measured disturbances d
+```
 
 # Extended Help
 The Extended Help of [`SteadyKalmanFilter`](@ref) details the augmentation with `nint_ym` 
@@ -439,13 +441,13 @@ function UnscentedKalmanFilter(
 end
 
 @doc raw"""
-    UnscentedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ)
+    UnscentedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-UnscentedKalmanFilter{M}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ) where {M<:SimModel}
+UnscentedKalmanFilter{M}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ) where {M<:SimModel}
 
 
 @doc raw"""
@@ -616,7 +618,7 @@ automatic differentiation.
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1);
 
-julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQ_int=[2], σP0=[0.1], σP0_int=[0.1])
+julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP0=[0.1], σP0int_ym=[0.1])
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
  1 manipulated inputs u
  2 states x̂
@@ -626,7 +628,6 @@ ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
 ```
 
 # Extended Help
-
 Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and `h`
 functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
 for common mistakes when writing these functions.
@@ -652,13 +653,13 @@ function ExtendedKalmanFilter(
 end
 
 @doc raw"""
-    ExtendedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂)
+    ExtendedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-ExtendedKalmanFilter{M}(model::M, i_ym, nint_ym, P̂0 ,Q̂, R̂) where {M<:SimModel}
+ExtendedKalmanFilter{M}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {M<:SimModel}
 
 @doc raw"""
     update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])

@@ -70,11 +70,16 @@ function remove_op!(estim::StateEstimator, u, d, ym)
 end
 
 """
-    init_estimstoch(model, i_ym, nint_u, nint_ym)
+    init_estimstoch(model, i_ym, nint_u, nint_ym) -> As, Cs_u, Cs_y, nxs, nint_u, nint_ym
 
 Init stochastic model matrices from integrator specifications for state estimation.
+
+TBW. 
+
+The function [`init_integrators`](@ref) builds the state-space matrice of the unmeasured
+disturbance models.
 """
-function init_estimstoch(model, i_ym, nint_u, nint_ym)
+function init_estimstoch(model, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVectorOrInt)
     nu, ny, nym = model.nu, model.ny, length(i_ym)
     As_u , Cs_u , nint_u  = init_integrators(nint_u , nu , "u")
     As_ym, Cs_ym, nint_ym = init_integrators(nint_ym, nym, "ym")
@@ -113,7 +118,7 @@ function stoch_ym2y(model::SimModel, i_ym, Asm, Bsm, Csm, Dsm)
 end
 
 @doc raw"""
-    init_integrators(nint::Vector{Int}, nys, varname::String) -> As, Cs, nint
+    init_integrators(nint, nys, varname::String) -> As, Cs, nint
 
 Calc state-space matrices `As, Cs` (stochastic part) from integrator specifications `nint`.
 
