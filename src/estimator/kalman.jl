@@ -243,10 +243,9 @@ value with ``\mathbf{P̂}_{-1}(0) =
 - `σP0=fill(1/model.nx,model.nx)` : main diagonal of the initial estimate covariance
     ``\mathbf{P}(0)``, specified as a standard deviation vector.
 - `σP0int_u=fill(1,sum(nint_u))` : same than `σP0` but for the unmeasured disturbances at 
-    manipulated inputs ``\mathbf{P_{int_u}}`` (composed of integrators).
-    covariance ``\mathbf{P_{int}}(0)`` (composed of output integrators).
+    manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
 - `σP0int_ym=fill(1,sum(nint_ym))` : same than `σP0` but for the unmeasured disturbances at 
-    measured outputs ``\mathbf{P_{int_{ym}}}`` (composed of integrators).
+    measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
