@@ -236,7 +236,7 @@ The process model is identical to [`SteadyKalmanFilter`](@ref). The matrix
 ``\mathbf{P̂}_k(k+1)`` is the estimation error covariance of `model` states augmented with
 the stochastic ones (specified by `nint_ym`). Three keyword arguments modify its initial 
 value with ``\mathbf{P̂}_{-1}(0) = 
-    \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}} \}``.
+    \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``.
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
