@@ -168,7 +168,7 @@ Use custom state estimator `estim` to construct `NonLinMPC`.
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1);
 
-julia> estim = UnscentedKalmanFilter(model, σQ_int=[0.05]);
+julia> estim = UnscentedKalmanFilter(model, σQint_ym=[0.05]);
 
 julia> mpc = NonLinMPC(estim, Hp=20, Hc=1, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:

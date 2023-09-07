@@ -7,8 +7,10 @@ struct SteadyKalmanFilter <: StateEstimator
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Cs::Matrix{Float64}
+    As  ::Matrix{Float64}
+    Cs_u::Matrix{Float64}
+    Cs_y::Matrix{Float64}
+    nint_u ::Vector{Int}
     nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}
@@ -20,9 +22,11 @@ struct SteadyKalmanFilter <: StateEstimator
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
     K::Matrix{Float64}
-    function SteadyKalmanFilter(model, i_ym, nint_ym, Q̂, R̂)
-        nym, nyu, nxs, nx̂, As, Cs, nint_ym = init_estimstoch(model, i_ym, nint_ym)
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
+    function SteadyKalmanFilter(model, i_ym, nint_u, nint_ym, Q̂, R̂)
+        nym, nyu = validate_ym(model, i_ym)
+        As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        nx̂ = model.nx + nxs
+        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂)
         K = try
             Q̂_kalman = Matrix(Q̂) # Matrix() required for Julia 1.6
@@ -41,13 +45,12 @@ struct SteadyKalmanFilter <: StateEstimator
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
-        Q̂ = Hermitian(Q̂, :L)
-        R̂ = Hermitian(R̂, :L)
+        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         return new(
             model, 
             lastu0, x̂, 
             i_ym, nx̂, nym, nyu, nxs, 
-            As, Cs, nint_ym,
+            As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
             Q̂, R̂,
@@ -75,11 +78,11 @@ with sensor ``\mathbf{v}(k)`` and process ``\mathbf{w}(k)`` noises as uncorrelat
 white noise vectors, with a respective covariance of ``\mathbf{R̂}`` and ``\mathbf{Q̂}``. 
 The arguments are in standard deviations σ, i.e. same units than outputs and states. The 
 matrices ``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the stochastic
-model, which is specified by the numbers of output integrator `nint_ym` (see Extended Help). 
-Likewise, the covariance matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, Q_{int})}`` 
-and ``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of 
-``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and unmeasured 
-ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
+model, which is specified by the numbers of integrator `nint_u` and `nint_ym` (see Extended
+Help). Likewise, the covariance matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, 
+Q_{int_u}, Q_{int_{ym}})}`` and ``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are
+the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and 
+unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
@@ -89,16 +92,20 @@ ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
     ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
 - `σR=fill(1,length(i_ym))` : main diagonal of the sensor noise covariance ``\mathbf{R}``
     of `model` measured outputs, specified as a standard deviation vector.
-- `nint_ym=`[`default_nint`](@ref)`(model,i_ym)` : integrator quantity per measured outputs 
-    (vector) for the stochastic model, use `nint_ym=0` for no integrator (see Extended Help).
-- `σQ_int=fill(1,sum(nint_ym))` : same than `σQ` but for the stochastic model covariance
-    ``\mathbf{Q_{int}}`` (composed of output integrators).
+- `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
+    the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
+- `σQint_u=fill(1,sum(nint_u))`: same than `σQ` but for the unmeasured disturbances at 
+    manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
+- `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
+    disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
+- `σQint_ym=fill(1,sum(nint_ym))` : same than `σQ` for the unmeasured disturbances at 
+    measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 
 # Examples
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
-julia> estim = SteadyKalmanFilter(model, i_ym=[2], σR=[1], σQ_int=[0.01])
+julia> estim = SteadyKalmanFilter(model, i_ym=[2], σR=[1], σQint_ym=[0.01])
 SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
  1 manipulated inputs u
  3 states x̂
@@ -108,19 +115,20 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 ```
 
 # Extended Help
-The model augmentation with `nint_ym` vector adds integrators at model measured outputs
-``\mathbf{y^m}``. It creates the integral action when the estimator is used in a controller
-as state feedback. The method [`default_nint`](@ref) computes the default value of 
-`nint_ym`. It can also be tweaked by following these rules on each measured output:
+The model augmentation with `nint_u` vector adds integrators at model manipulated inputs,
+and `nint_ym`, at measured outputs. They create the integral action when the estimator is
+used in a controller as state feedback. By default, the method [`default_nint`](@ref) adds
+one integrator per measured output if feasible. The argument `nint_ym` can also be tweaked
+by following these rules on each measured output:
 
 - Use 0 integrator if the model output is already integrating (else it will be unobservable)
 - Use 1 integrator if the disturbances on the output are typically "step-like"
 - Use 2 integrators if the disturbances on the output are typically "ramp-like" 
 
-The function [`init_integrators`](@ref) builds the stochastic model from `nint_ym`.
+The function [`init_estimstoch`](@ref) builds the stochastic model for estimation.
 
 !!! tip
-    Increasing `σQ_int` values increases the integral action "gain".
+    Increasing `σQint_u` and `σQint_ym` values increases the integral action "gain".
 
 The constructor pre-compute the steady-state Kalman gain `K` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
 function. It can sometimes fail, for example when `model` matrices are ill-conditioned. In
@@ -131,23 +139,25 @@ function SteadyKalmanFilter(
     i_ym::IntRangeOrVector = 1:model.ny,
     σQ::Vector = fill(1/model.nx, model.nx),
     σR::Vector = fill(1, length(i_ym)),
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym),
-    σQ_int::Vector = fill(1, max(sum(nint_ym), 0))
+    nint_u ::IntVectorOrInt = 0,
+    σQint_u::Vector = fill(1, max(sum(nint_u), 0)),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    σQint_ym::Vector = fill(1, max(sum(nint_ym), 0))
 )
     # estimated covariances matrices (variance = σ²) :
-    Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
+    Q̂  = Diagonal{Float64}([σQ; σQint_u; σQint_ym].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return SteadyKalmanFilter(model, i_ym, nint_ym, Q̂ , R̂)
+    return SteadyKalmanFilter(model, i_ym, nint_u, nint_ym, Q̂ , R̂)
 end
 
 @doc raw"""
-    SteadyKalmanFilter(model, i_ym, nint_ym, Q̂, R̂)
+    SteadyKalmanFilter(model, i_ym, nint_u, nint_ym, Q̂, R̂)
 
 Construct the estimator from the augmented covariance matrices `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{Q̂, R̂}``.
 """
-SteadyKalmanFilter(model::LinModel, i_ym, nint_ym, Q̂, R̂)
+SteadyKalmanFilter(model::LinModel, i_ym, nint_u, nint_ym, Q̂, R̂)
 
 
 @doc raw"""
@@ -178,8 +188,10 @@ struct KalmanFilter <: StateEstimator
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Cs::Matrix{Float64}
+    As  ::Matrix{Float64}
+    Cs_u::Matrix{Float64}
+    Cs_y::Matrix{Float64}
+    nint_u ::Vector{Int}
     nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}
@@ -191,22 +203,23 @@ struct KalmanFilter <: StateEstimator
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
-    function KalmanFilter(model, i_ym, nint_ym, P̂0, Q̂, R̂)
-        nym, nyu, nxs, nx̂, As, Cs, nint_ym = init_estimstoch(model, i_ym, nint_ym)
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
+    function KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+        nym, nyu = validate_ym(model, i_ym)
+        As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        nx̂ = model.nx + nxs
+        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
+        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂0 = Hermitian(P̂0, :L)
-        Q̂ = Hermitian(Q̂, :L)
-        R̂ = Hermitian(R̂, :L)
         P̂ = copy(P̂0)
         return new(
             model, 
             lastu0, x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
-            As, Cs, nint_ym,
+            As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
             P̂0, Q̂, R̂
@@ -221,22 +234,26 @@ Construct a time-varying Kalman Filter with the [`LinModel`](@ref) `model`.
 
 The process model is identical to [`SteadyKalmanFilter`](@ref). The matrix 
 ``\mathbf{P̂}_k(k+1)`` is the estimation error covariance of `model` states augmented with
-the stochastic ones (specified by `nint_ym`). Two keyword arguments modify its initial value
-with ``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int}}(0) \}``.
+the stochastic ones (specified by `nint_ym`). Three keyword arguments modify its initial 
+value with ``\mathbf{P̂}_{-1}(0) = 
+    \mathrm{diag}\{ \mathbf{Q}(0), \mathbf{Q_{int_{u}}}(0), \mathbf{Q_{int_{ym}}} \}``.
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
 - `σP0=fill(1/model.nx,model.nx)` : main diagonal of the initial estimate covariance
     ``\mathbf{P}(0)``, specified as a standard deviation vector.
-- `σP0_int=fill(1,sum(nint_ym))` : same than `σP0` but for the stochastic model
+- `σP0int_u=fill(1,sum(nint_u))` : same than `σP0` but for the unmeasured disturbances at 
+    manipulated inputs ``\mathbf{P_{int_u}}`` (composed of integrators).
     covariance ``\mathbf{P_{int}}(0)`` (composed of output integrators).
+- `σQint_ym=fill(1,sum(nint_u))` : same than `σP0` but for the unmeasured disturbances at 
+    measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
-julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP0=[100, 100], σQ_int=[0.01])
+julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP0=[100, 100], σQint_ym=[0.01])
 KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
  1 manipulated inputs u
  3 states x̂
@@ -249,27 +266,30 @@ function KalmanFilter(
     model::LinModel;
     i_ym::IntRangeOrVector = 1:model.ny,
     σP0::Vector = fill(1/model.nx, model.nx),
-    σQ::Vector  = fill(1/model.nx, model.nx),
-    σR::Vector  = fill(1, length(i_ym)),
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym),
-    σP0_int::Vector = fill(1, max(sum(nint_ym), 0)),
-    σQ_int::Vector  = fill(1, max(sum(nint_ym), 0))
+    σQ ::Vector  = fill(1/model.nx, model.nx),
+    σR ::Vector  = fill(1, length(i_ym)),
+    nint_u   ::IntVectorOrInt = 0,
+    σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
+    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
+    nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
+    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0))
 )
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
-    Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
+    P̂0 = Diagonal{Float64}([σP0; σP0int_u; σP0int_ym].^2);
+    Q̂  = Diagonal{Float64}([σQ;  σQint_u;  σQint_ym].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return KalmanFilter(model, i_ym, nint_ym, P̂0, Q̂ , R̂)
+    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
 end
 
 @doc raw"""
-    KalmanFilter(model, i_ym, nint_ym, P̂0, Q̂, R̂)
+    KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-KalmanFilter(model::LinModel, i_ym, nint_ym, P̂0 ,Q̂, R̂)
+KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
 
 @doc raw"""
     update_estimate!(estim::KalmanFilter, u, ym, d)
@@ -310,8 +330,10 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Cs::Matrix{Float64}
+    As  ::Matrix{Float64}
+    Cs_u::Matrix{Float64}
+    Cs_y::Matrix{Float64}
+    nint_u ::Vector{Int}
     nint_ym::Vector{Int}
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
@@ -321,23 +343,24 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     m̂::Vector{Float64}
     Ŝ::Diagonal{Float64, Vector{Float64}}
     function UnscentedKalmanFilter{M}(
-        model::M, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ
+        model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ
     ) where {M<:SimModel}
-        nym, nyu, nxs, nx̂, As, Cs, nint_ym = init_estimstoch(model, i_ym, nint_ym)
-        augment_model(model, As, Cs) # verify observability for LinModel
+        nym, nyu = validate_ym(model, i_ym)
+        As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        nx̂ = model.nx + nxs
+        augment_model(model, As, Cs_u, Cs_y) # verify observability for LinModels
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
+        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂0 = Hermitian(P̂0, :L)
-        Q̂ = Hermitian(Q̂, :L)
-        R̂ = Hermitian(R̂, :L)
         P̂ = copy(P̂0)
         return new(
             model,
             lastu0, x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
-            As, Cs, nint_ym,
+            As, Cs_u, Cs_y, nint_u, nint_ym,
             P̂0, Q̂, R̂,
             nσ, γ, m̂, Ŝ
         )
@@ -362,7 +385,7 @@ is based on the process model :
 See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)`` noises and 
 ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The functions ``\mathbf{f̂, ĥ}`` are `model` 
 state-space functions augmented with the stochastic model, which is specified by the numbers
-of output integrator `nint_ym` (see [`SteadyKalmanFilter`](@ref) for details). The 
+of output integrator `nint_ym` (see Extended Help). The 
 ``\mathbf{ĥ^m}`` function represents the measured outputs of ``\mathbf{ĥ}`` function (and 
 unmeasured ones, for ``\mathbf{ĥ^u}``).
 
@@ -378,13 +401,20 @@ unmeasured ones, for ``\mathbf{ĥ^u}``).
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1);
 
-julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0_int=[1, 1])
+julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0int_ym=[1, 1])
 UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
  1 manipulated inputs u
  3 states x̂
  1 measured outputs ym
  0 unmeasured outputs yu
  0 measured disturbances d
+```
+
+# Extended Help
+The Extended Help of [`SteadyKalmanFilter`](@ref) details the augmentation with `nint_ym` 
+and `nint_u` arguments. Note that the constructor does not validate the observability of
+the resulting augmented [`NonLinModel`]. In such cases, it is the user's responsibility to
+ensure that the augmented model is still observable.
 ```
 """
 function UnscentedKalmanFilter(
@@ -393,28 +423,31 @@ function UnscentedKalmanFilter(
     σP0::Vector = fill(1/model.nx, model.nx),
     σQ::Vector  = fill(1/model.nx, model.nx),
     σR::Vector  = fill(1, length(i_ym)),
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym),
-    σP0_int::Vector = fill(1, max(sum(nint_ym), 0)),
-    σQ_int::Vector  = fill(1, max(sum(nint_ym), 0)),
+    nint_u   ::IntVectorOrInt = 0,
+    σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
+    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
+    nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
+    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
     α::Real = 1e-3,
     β::Real = 2,
     κ::Real = 0
 ) where {M<:SimModel}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
-    Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
+    P̂0 = Diagonal{Float64}([σP0; σP0int_u; σP0int_ym].^2);
+    Q̂  = Diagonal{Float64}([σQ;  σQint_u;  σQint_ym].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return UnscentedKalmanFilter{M}(model, i_ym, nint_ym, P̂0, Q̂ , R̂, α, β, κ)
+    return UnscentedKalmanFilter{M}(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
 end
 
 @doc raw"""
-    UnscentedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ)
+    UnscentedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-UnscentedKalmanFilter{M}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂, α, β, κ) where {M<:SimModel}
+UnscentedKalmanFilter{M}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ) where {M<:SimModel}
 
 
 @doc raw"""
@@ -530,15 +563,21 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Cs::Matrix{Float64}
+    As  ::Matrix{Float64}
+    Cs_u::Matrix{Float64}
+    Cs_y::Matrix{Float64}
+    nint_u ::Vector{Int}
     nint_ym::Vector{Int}
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
-    function ExtendedKalmanFilter{M}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂) where {M<:SimModel}
-        nym, nyu, nxs, nx̂, As, Cs, nint_ym = init_estimstoch(model, i_ym, nint_ym)
-        augment_model(model, As, Cs) # verify observability for LinModel
+    function ExtendedKalmanFilter{M}(
+        model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂
+    ) where {M<:SimModel}
+        nym, nyu = validate_ym(model, i_ym)
+        As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        nx̂ = model.nx + nxs
+        augment_model(model, As, Cs_u, Cs_y) # verify observability for LinModels
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
@@ -550,7 +589,7 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
             model,
             lastu0, x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
-            As, Cs, nint_ym,
+            As, Cs_u, Cs_y, nint_u, nint_ym,
             P̂0, Q̂, R̂
         )
     end
@@ -579,7 +618,7 @@ automatic differentiation.
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1);
 
-julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQ_int=[2], σP0=[0.1], σP0_int=[0.1])
+julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP0=[0.1], σP0int_ym=[0.1])
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
  1 manipulated inputs u
  2 states x̂
@@ -589,7 +628,6 @@ ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
 ```
 
 # Extended Help
-
 Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and `h`
 functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
 for common mistakes when writing these functions.
@@ -600,25 +638,28 @@ function ExtendedKalmanFilter(
     σP0::Vector = fill(1/model.nx, model.nx),
     σQ::Vector  = fill(1/model.nx, model.nx),
     σR::Vector  = fill(1, length(i_ym)),
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym),
-    σP0_int::Vector = fill(1, max(sum(nint_ym), 0)),
-    σQ_int::Vector  = fill(1, max(sum(nint_ym), 0))
+    nint_u   ::IntVectorOrInt = 0,
+    σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
+    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
+    nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
+    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0))
 ) where {M<:SimModel}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Diagonal{Float64}([σP0  ; σP0_int   ].^2);
-    Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
+    P̂0 = Diagonal{Float64}([σP0; σP0int_u; σP0int_ym].^2);
+    Q̂  = Diagonal{Float64}([σQ;  σQint_u;  σQint_ym].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return ExtendedKalmanFilter{M}(model, i_ym, nint_ym, P̂0, Q̂ , R̂)
+    return ExtendedKalmanFilter{M}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
 end
 
 @doc raw"""
-    ExtendedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_ym, P̂0, Q̂, R̂)
+    ExtendedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-ExtendedKalmanFilter{M}(model::M, i_ym, nint_ym, P̂0 ,Q̂, R̂) where {M<:SimModel}
+ExtendedKalmanFilter{M}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {M<:SimModel}
 
 @doc raw"""
     update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])

@@ -59,7 +59,7 @@ plot(sim!(model, 60, u), plotu=false)
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 
 ```@example 1
-estim = UnscentedKalmanFilter(model, σQ=[0.1, 0.5], σR=[0.5], nint_ym=[1], σQ_int=[5.0])
+estim = UnscentedKalmanFilter(model, σQ=[0.1, 0.5], σR=[0.5], nint_ym=[1], σQint_ym=[5.0])
 ```
 
 The standard deviation of the angular velocity ``ω`` is higher here (`σQ` second value)
@@ -75,7 +75,7 @@ plot(res, plotu=false, plotxwithx̂=true)
 ```
 
 The estimate ``x̂_3`` is the integrator state that compensates for static errors (`nint_ym`
-and `σQ_int` parameters of [`UnscentedKalmanFilter`](@ref)). The Kalman filter performance
+and `σQint_ym` parameters of [`UnscentedKalmanFilter`](@ref)). The Kalman filter performance
 seems sufficient for control. As the motor torque is limited to -1.5 to 1.5 N m, we
 incorporate the input constraints in a [`NonLinMPC`](@ref):
 
