@@ -7,8 +7,10 @@ struct Luenberger <: StateEstimator
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Cs::Matrix{Float64}
+    As  ::Matrix{Float64}
+    Cs_u::Matrix{Float64}
+    Cs_y::Matrix{Float64}
+    nint_u ::Vector{Int}
     nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}

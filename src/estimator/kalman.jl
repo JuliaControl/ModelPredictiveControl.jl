@@ -7,8 +7,10 @@ struct SteadyKalmanFilter <: StateEstimator
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Cs::Matrix{Float64}
+    As  ::Matrix{Float64}
+    Cs_u::Matrix{Float64}
+    Cs_y::Matrix{Float64}
+    nint_u ::Vector{Int}
     nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}
@@ -20,9 +22,9 @@ struct SteadyKalmanFilter <: StateEstimator
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
     K::Matrix{Float64}
-    function SteadyKalmanFilter(model, i_ym, nint_ym, Q̂, R̂)
-        nym, nyu, nxs, nx̂, As, Cs, nint_ym = init_estimstoch(model, i_ym, nint_ym)
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs)
+    function SteadyKalmanFilter(model, i_ym, nint_u, nint_ym, Q̂, R̂)
+        nym, nyu, nx̂, nxs, As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_ym; nint_u)
+        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂)
         K = try
             Q̂_kalman = Matrix(Q̂) # Matrix() required for Julia 1.6
@@ -47,7 +49,7 @@ struct SteadyKalmanFilter <: StateEstimator
             model, 
             lastu0, x̂, 
             i_ym, nx̂, nym, nyu, nxs, 
-            As, Cs, nint_ym,
+            As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, B̂d, Ĉ, D̂d, 
             Ĉm, D̂dm,
             Q̂, R̂,
@@ -131,13 +133,14 @@ function SteadyKalmanFilter(
     i_ym::IntRangeOrVector = 1:model.ny,
     σQ::Vector = fill(1/model.nx, model.nx),
     σR::Vector = fill(1, length(i_ym)),
+    nint_u ::IntVectorOrInt = 0,
     nint_ym::IntVectorOrInt = default_nint(model, i_ym),
-    σQ_int::Vector = fill(1, max(sum(nint_ym), 0))
+    σQ_int::Vector = fill(1, max(sum(nint_u) + sum(nint_ym), 0))
 )
     # estimated covariances matrices (variance = σ²) :
     Q̂  = Diagonal{Float64}([σQ   ; σQ_int    ].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return SteadyKalmanFilter(model, i_ym, nint_ym, Q̂ , R̂)
+    return SteadyKalmanFilter(model, i_ym, nint_u, nint_ym, Q̂ , R̂)
 end
 
 @doc raw"""
@@ -178,8 +181,10 @@ struct KalmanFilter <: StateEstimator
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Cs::Matrix{Float64}
+    As  ::Matrix{Float64}
+    Cs_u::Matrix{Float64}
+    Cs_y::Matrix{Float64}
+    nint_u ::Vector{Int}
     nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}
@@ -310,8 +315,10 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Cs::Matrix{Float64}
+    As  ::Matrix{Float64}
+    Cs_u::Matrix{Float64}
+    Cs_y::Matrix{Float64}
+    nint_u ::Vector{Int}
     nint_ym::Vector{Int}
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
@@ -530,8 +537,10 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Cs::Matrix{Float64}
+    As  ::Matrix{Float64}
+    Cs_u::Matrix{Float64}
+    Cs_y::Matrix{Float64}
+    nint_u ::Vector{Int}
     nint_ym::Vector{Int}
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}

@@ -74,15 +74,27 @@ end
 
 Init stochastic model matrices from integrator specifications for state estimation.
 """
-function init_estimstoch(model, i_ym, nint_ym)
+function init_estimstoch(model, i_ym, nint_ym; nint_u=0)
     validate_ym(model, i_ym)
-    nx, ny = model.nx, model.ny
+    nu, nx, ny = model.nu, model.nx, model.ny
     nym, nyu = length(i_ym), ny - length(i_ym)
-    Asm, Csm, nint_ym = init_integrators(i_ym, nint_ym)
-    nxs = size(Asm,1)
+    As_u , Cs_u , nint_u  = init_integrators(nint_u , nu , "u")
+    As_ym, Cs_ym, nint_ym = init_integrators(nint_ym, nym, "ym")
+    As_y, _ , Cs_y  = stoch_ym2y(model, i_ym, As_ym, [], Cs_ym, [])
+    nxs_u, nxs_y = size(As_u, 1), size(As_y, 1)
+    # combines input and output stochastic models:
+    As = [As_u zeros(nxs_u, nxs_y); zeros(nxs_y, nxs_u) As_y]
+    Cs_u = [Cs_u zeros(nu, nxs_y)]
+    Cs_y = [zeros(ny, nxs_u) Cs_y]
+
+    #Bs = B*Ks (nx × nxs) 
+    #Cs_u # nu x nxs_u
+    #B # nx x nu
+    #K_res = B*Cs_u # (nx × nu) * (nu × nxs_u) = (nx × nxs_u)
+
+    nxs = nxs_u + nxs_y
     nx̂ = nx + nxs
-    As, _ , Cs  = stoch_ym2y(model, i_ym, Asm, [], Csm, [])
-    return nym, nyu, nxs, nx̂, As, Cs, nint_ym
+    return nym, nyu, nx̂, nxs, As, Cs_u, Cs_y, nint_u, nint_ym
 end
 
 "Validate the specified measured output indices `i_ym`."
@@ -108,74 +120,49 @@ function stoch_ym2y(model::SimModel, i_ym, Asm, Bsm, Csm, Dsm)
 end
 
 @doc raw"""
-    init_integrators(i_ym, nint_ym::Vector{Int}) -> Asm, Csm, nint_ym
+    init_integrators(nint::Vector{Int}, nys, varname::String) -> As, Cs, nint
 
-Calc stochastic model matrices from output integrators specifications for state estimation.
+Calc state-space matrices `As, Cs` (stochastic part) from integrator specifications `nint`.
 
-For closed-loop state estimators. `nint_ym` is a vector providing how many integrator should 
-be added for each measured output ``\mathbf{y^m}``. The argument generates the `Asm` and 
-`Csm` matrices:
+This function is used to initialize the stochastic part of the augmented model for the
+design of state estimators. The vector `nint` provides how many integrators (in series) 
+should be incorporated for each stochastic output ``\mathbf{y_s}``:
 ```math
 \begin{aligned}
-\mathbf{x_s}(k+1) &= \mathbf{A_s^m x_s}(k) + \mathbf{B_s^m e}(k) \\
-\mathbf{y_s^m}(k) &= \mathbf{C_s^m x_s}(k)
+\mathbf{x_s}(k+1)   &= \mathbf{A_s x_s}(k) + \mathbf{B_s e}(k) \\
+\mathbf{y_s}(k)     &= \mathbf{C_s x_s}(k)
 \end{aligned}
 ```
-where ``\mathbf{e}(k)`` is a conceptual and unknown zero mean white noise. 
-``\mathbf{B_s^m}`` is not used for closed-loop state estimators thus ignored.
-"""
-function init_integrators(i_ym, nint_ym)
-    if nint_ym == 0 # alias for no output integrator at all
-        nint_ym = fill(0, length(i_ym))
-    end
-    nym = length(i_ym);
-    if length(nint_ym) ≠ nym
-        error("nint_ym size ($(length(nint_ym))) ≠ measured output quantity nym ($nym)")
-    end
-    any(nint_ym .< 0) && error("nint_ym values should be ≥ 0")
-    nxs = sum(nint_ym)
-    Asm, Csm = zeros(nxs, nxs), zeros(nym, nxs)
-    if nxs ≠ 0 # construct stochastic model state-space matrices (integrators) :
-        i_Asm, i_Csm = 1, 1
-        for iym = 1:nym
-            nint = nint_ym[iym]
-            if nint ≠ 0
-                rows_Asm = (i_Asm):(i_Asm + nint - 1)
-                Asm[rows_Asm, rows_Asm] = Bidiagonal(ones(nint), ones(nint-1), :L)
-                Csm[iym, i_Csm+nint-1] = 1
-                i_Asm += nint
-                i_Csm += nint
-            end
-        end
-    end
-    return Asm, Csm, nint_ym
-end
+where ``\mathbf{e}(k)`` is an unknown zero mean white noise. The estimations does not use
+``\mathbf{B_s}``, it is thus ignored. Note that this function is called twice :
 
-function init_integrators_u(nu, nint_u)
-    if nint_u == 0 # alias for no output integrator at all
-        nint_u = fill(0, length(nu))
+1. for the unmodeled disturbances at measured outputs ``\mathbf{y^m}``
+2. for the unmodeled disturbances at manipulated inputs ``\mathbf{u}``
+"""
+function init_integrators(nint::Vector{Int}, nys, varname::String)
+    if nint == 0 # alias for no integrator at all
+        nint = fill(0, nys)
     end
-    #nym = length(i_ym);
-    if length(nint_u) ≠ nu
-        error("nint_u size ($(length(nint_u))) ≠ manipulated input quantity nu ($nu)")
+    if length(nint) ≠ nys
+        error("nint_$(varname) size ($(length(nint))) ≠ n$(varname) ($nys)")
     end
-    any(nint_u .< 0) && error("nint_u values should be ≥ 0")
-    nxs = sum(nint_u)
-    Asm, Csm = zeros(nxs, nxs), zeros(nym, nxs)
+    any(nint .< 0) && error("nint_$(varname) values should be ≥ 0")
+    nxs = sum(nint)
+    As, Cs = zeros(nxs, nxs), zeros(nys, nxs)
     if nxs ≠ 0 # construct stochastic model state-space matrices (integrators) :
-        i_Asm, i_Csm = 1, 1
-        for iym = 1:nym
-            nint = nint_u[iym]
-            if nint ≠ 0
-                rows_Asm = (i_Asm):(i_Asm + nint - 1)
-                Asm[rows_Asm, rows_Asm] = Bidiagonal(ones(nint), ones(nint-1), :L)
-                Csm[iym, i_Csm+nint-1] = 1
-                i_Asm += nint
-                i_Csm += nint
+        i_As, i_Cs = 1, 1
+        for i = 1:nys
+            nint_i = nint[i]
+            if nint_i ≠ 0
+                rows_As = (i_As):(i_As + nint_i - 1)
+                As[rows_As, rows_As] = Bidiagonal(ones(nint_i), ones(nint_i-1), :L)
+                Cs[i, i_Cs+nint_i-1] = 1
+                i_As += nint_i
+                i_Cs += nint_i
             end
         end
     end
-    return Asm, Csm, nint_u
+    return As, Cs, nint
 end
 
 @doc raw"""
@@ -195,13 +182,13 @@ returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```
 An error is thrown if the augmented model is not observable and `verify_obsv == true`.
 """
-function augment_model(model::LinModel, As, Cs; verify_obsv=true)
+function augment_model(model::LinModel, As, Cs_u, Cs_y; verify_obsv=true)
     nu, nx, nd = model.nu, model.nx, model.nd
     nxs = size(As, 1)
-    Â   = [model.A zeros(nx,nxs); zeros(nxs,nx) As]
-    B̂u  = [model.Bu; zeros(nxs,nu)]
-    Ĉ   = [model.C Cs]
-    B̂d  = [model.Bd; zeros(nxs,nd)]
+    Â   = [model.A model.Bu*Cs_u; zeros(nxs,nx) As]
+    B̂u  = [model.Bu; zeros(nxs, nu)]
+    Ĉ   = [model.C Cs_y]
+    B̂d  = [model.Bd; zeros(nxs, nd)]
     D̂d  = model.Dd
     # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny:
     if verify_obsv && !observability(Â, Ĉ)[:isobservable]
@@ -269,8 +256,8 @@ function returns the next state of the augmented model, defined as:
 """
 function f̂(estim::StateEstimator, x̂, u, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    nx = estim.model.nx
-    @views return [f(estim.model, x̂[1:nx], u, d); estim.As*x̂[nx+1:end]]
+    @views x̂d, x̂s = x̂[1:estim.model.nx], x̂[estim.model.nx+1:end]
+    return [f(estim.model, x̂d, u + estim.Cs_u*x̂s, d); estim.As*x̂s]
 end
 
 @doc raw"""
@@ -280,8 +267,8 @@ Output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂`](@ref) for d
 """
 function ĥ(estim::StateEstimator, x̂, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    nx = estim.model.nx
-    @views return h(estim.model, x̂[1:nx], d) + estim.Cs*x̂[nx+1:end]
+    @views x̂d, x̂s = x̂[1:estim.model.nx], x̂[estim.model.nx+1:end]
+    return h(estim.model, x̂d, d) + estim.Cs_y*x̂s
 end
 
 
