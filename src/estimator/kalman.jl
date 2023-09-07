@@ -36,8 +36,8 @@ struct SteadyKalmanFilter <: StateEstimator
         catch my_error
             if isa(my_error, ErrorException)
                 error("Cannot compute the optimal Kalman gain K for the "* 
-                      "SteadyKalmanFilter. You may try to remove integrators with nint_ym "*
-                      "parameter or use the time-varying KalmanFilter.")
+                      "SteadyKalmanFilter. You may try to remove integrators with "*
+                      "nint_u/nint_ym parameter or use the time-varying KalmanFilter.")
             else
                 rethrow()
             end
@@ -236,7 +236,7 @@ The process model is identical to [`SteadyKalmanFilter`](@ref). The matrix
 ``\mathbf{P̂}_k(k+1)`` is the estimation error covariance of `model` states augmented with
 the stochastic ones (specified by `nint_ym`). Three keyword arguments modify its initial 
 value with ``\mathbf{P̂}_{-1}(0) = 
-    \mathrm{diag}\{ \mathbf{Q}(0), \mathbf{Q_{int_{u}}}(0), \mathbf{Q_{int_{ym}}} \}``.
+    \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}} \}``.
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
@@ -245,8 +245,8 @@ value with ``\mathbf{P̂}_{-1}(0) =
 - `σP0int_u=fill(1,sum(nint_u))` : same than `σP0` but for the unmeasured disturbances at 
     manipulated inputs ``\mathbf{P_{int_u}}`` (composed of integrators).
     covariance ``\mathbf{P_{int}}(0)`` (composed of output integrators).
-- `σQint_ym=fill(1,sum(nint_u))` : same than `σP0` but for the unmeasured disturbances at 
-    measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
+- `σP0int_ym=fill(1,sum(nint_ym))` : same than `σP0` but for the unmeasured disturbances at 
+    measured outputs ``\mathbf{P_{int_{ym}}}`` (composed of integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
