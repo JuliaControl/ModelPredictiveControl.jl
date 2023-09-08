@@ -130,7 +130,7 @@ function matrices_internalmodel(model::LinModel)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-matrices_internalmodel(::SimModel) = tuple(fill(zeros(0, 0),5)...)
+matrices_internalmodel(::SimModel) = tuple(fill(zeros(0, 0), 5)...)
 
 @doc raw"""
     f̂(estim::InternalModel, x̂, u, d)
