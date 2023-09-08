@@ -886,7 +886,7 @@ function init_stochpred(estim::InternalModel, Hp)
     return Ks, Ps 
 end
 "Return empty matrices if `estim` is not a [`InternalModel`](@ref)."
-init_stochpred(::StateEstimator, _ ) = Float64[;;], Float64[;;]
+init_stochpred(::StateEstimator, _ ) = zeros(0, 0), zeros(0, 0)
 
 
 @doc raw"""
