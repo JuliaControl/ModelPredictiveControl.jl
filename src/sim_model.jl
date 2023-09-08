@@ -135,7 +135,6 @@ julia> y = evaloutput(model)
 """
 evaloutput(model::SimModel, d=Float64[]) = h(model, model.x, d - model.dop) + model.yop
 
-
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=Float64[]) = evaloutput(model::SimModel, d)
 

@@ -41,7 +41,7 @@ the following linear model accurately describes the plant dynamics:
 We first need to construct a [`LinModel`](@ref) objet with [`setop!`](@ref) to handle the
 operating points:
 
-```julia
+```@example 1
 using ModelPredictiveControl, ControlSystemsBase
 sys = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
         tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
@@ -65,7 +65,7 @@ y_L ≥ 45
 We design our [`LinMPC`](@ref) controllers by including the linear level constraint with
 [`setconstraint!`](@ref) (`±Inf` values should be used when there is no bound):
 
-```julia
+```@example 1
 mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2), ŷmin=[45, -Inf])
 ```
 
@@ -83,7 +83,7 @@ measurements to ensure a bumpless transfer. Since `model` simulates our plant he
 output will initialize the states. [`LinModel`](@ref) objects are callable for this purpose
 (an alias for [`evaloutput`](@ref)):
 
-```julia
+```@example 1
 u = model.uop
 y = model() # or equivalently : y = evaloutput(model)
 initstate!(mpc, u, y)
@@ -93,7 +93,7 @@ nothing # hide
 We can then close the loop and test `mpc` performance on the simulator by imposing step
 changes on output setpoints ``\mathbf{r_y}`` and on a load disturbance ``\mathbf{u_d}``:
 
-```julia
+```@example 1
 function test_mpc(mpc, model)
     N = 200
     ry, ud = [50, 30], [0, 0]
@@ -103,15 +103,14 @@ function test_mpc(mpc, model)
     for k = 0:N-1
         y = model() # simulated measurements
         k == 50  && (ry = [50, 35])
-        k == 100 && (ry = [55, 30])
-        k == 150 && (ud = [-25, 0])
+        k == 100 && (ry = [54, 30])
+        k == 150 && (ud = [0, -20])
         u = mpc(ry) # or equivalently : u = moveinput!(mpc, ry)
         u_data[:,k+1]  = u
         y_data[:,k+1]  = y
         ry_data[:,k+1] = ry 
         updatestate!(mpc, u, y) # update mpc state estimate
         updatestate!(model, u + ud) # update simulator with disturbance
-        println(getinfo(mpc)[2][:Ŷs])
     end
     return u_data, y_data, ry_data
 end
@@ -128,7 +127,7 @@ end of the `for` loop. The same logic applies for `model`.
 
 Lastly, we plot the closed-loop test with the `Plots` package:
 
-```julia
+```@example 1
 using Plots
 function plot_data(t_data, u_data, y_data, ry_data)
     p1 = plot(t_data, y_data[1,:], label="meas."); ylabel!("level")
@@ -151,21 +150,23 @@ using Pkg; Pkg.add("DAQP")
 ```
 
 Also, compared to the default setting, adding the integrating states at the model inputs may
-improve the closed-loop performance. Load disturbances are indeed very frequent in real-life
-control problems. Constructing a [`LinMPC`](@ref) with `DAQP` and input integrators:
+improve the closed-loop performance. Load disturbances are indeed very frequent in many
+real-life control problems. Constructing a [`LinMPC`](@ref) with `DAQP` and input integrators:
 
-```julia
+```@example 1
 using JuMP, DAQP
 daqp  = Model(DAQP.Optimizer)
 estim = SteadyKalmanFilter(model, nint_u=[1, 1])
 mpc2  = setconstraint!(LinMPC(estim, Hp=15, Hc=2, optim=daqp), ŷmin=[45, -Inf])
 ```
 
-leads to identical results here:
+leads to similar computational times, but it does accelerate the rejection of the load
+disturbance and eliminates the level constraint violation:
 
-```julia
+```@example 1
 setstate!(model, zeros(model.nx))
 initstate!(mpc2, model.uop, model())
 u_data2, y_data2, ry_data2 = test_mpc(mpc2, model)
 plot_data(t_data, u_data2, y_data2, ry_data2)
 ```
+
