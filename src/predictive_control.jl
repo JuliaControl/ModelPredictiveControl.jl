@@ -362,42 +362,15 @@ function validate_setpointdist(mpc::PredictiveController, ry, d, R̂y, D̂)
 end
 
 """
-    getestimates!(mpc::PredictiveController, estim::StateEstimator) -> x̂d, x̂s, ŷ
-
-Get estimator output and split `x̂` into the deterministic `x̂d` and stochastic `x̂s` states.
-"""
-function getestimates!(mpc::PredictiveController, estim::StateEstimator, ym , d)
-    nx = estim.model.nx
-    mpc.x̂d[:] = estim.x̂[1:nx]
-    mpc.x̂s[:] = estim.x̂[nx+1:end]
-    mpc.ŷ[:]  = evalŷ(estim, ym, d)
-    return mpc.x̂d, mpc.x̂s, mpc.ŷ
-end
-
-"""
-    getestimates!(mpc::PredictiveController, estim::InternalModel) -> x̂d, x̂s, ŷ
-
-Get the internal model deterministic `estim.x̂d` and stochastic `estim.x̂s` states.
-"""
-function getestimates!(mpc::PredictiveController, estim::InternalModel, ym, d)
-    isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
-                           "outputs ym in keyword argument to compute control actions u")
-    mpc.x̂d[:] = estim.x̂d
-    mpc.x̂s[:] = estim.x̂s
-    mpc.ŷ[:]  = evalŷ(estim, ym, d)
-    return mpc.x̂d, mpc.x̂s, mpc.ŷ
-end
-
-"""
     predictstoch!(mpc, estim::InternalModel, x̂s, d, ym )
 
 Use current measured outputs `ym` for prediction when `estim` is a [`InternalModel`](@ref).
 """
 function predictstoch!(mpc, estim::InternalModel, d, ym )
-    ŷd = h(estim.model, mpc.x̂d, d - estim.model.dop) + estim.model.yop 
+    ŷd = h(estim.model, estim.x̂d, d - estim.model.dop) + estim.model.yop 
     ŷs = zeros(estim.model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
-    mpc.Ŷs[:] = mpc.Ks*mpc.x̂s + mpc.Ps*ŷs
+    mpc.Ŷs[:] = mpc.Ks*mpc.estim.x̂s + mpc.Ps*ŷs
     return mpc.Ŷs
 end
 "Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."
@@ -571,7 +544,7 @@ end
 
 
 @doc raw"""
-    init_deterpred(estim::StateEstimator, ::LinModel, Hp, Hc) -> E, G, J, K, Q
+    init_predmat(estim::StateEstimator, ::LinModel, Hp, Hc) -> E, G, J, K, Q
 
 Construct the prediction matrices for [`LinModel`](@ref) `model`.
 
@@ -586,8 +559,9 @@ The linear model predictions are evaluated by :
 where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``, and measured
 disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
 ``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. The vector ``\mathbf{x̂}_{k-1}(k)`` is the
-state estimated at the last control period. Operating points on ``\mathbf{u}``, 
-``\mathbf{d}`` and ``\mathbf{y}`` are omitted in above equations.
+state estimated at the last control period. The stochastic outputs ``\mathbf{Ŷ_s = 0}`` if 
+`estim` is not a [`InternalModel`](@ref). Operating points on ``\mathbf{u}``, ``\mathbf{d}``
+and ``\mathbf{y}`` are omitted in above equations.
 
 # Extended Help
 Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `model` and the equation
@@ -632,7 +606,7 @@ matrices are computed by :
 \end{aligned}
 ```
 """
-function init_deterpred(estim::StateEstimator, model::LinModel, Hp, Hc) #TODO: RENAME THE FUNCTION!
+function init_predmat(estim::StateEstimator, model::LinModel, Hp, Hc)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
     # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ...
@@ -677,7 +651,7 @@ function init_deterpred(estim::StateEstimator, model::LinModel, Hp, Hc) #TODO: R
 end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref)"
-function init_deterpred(estim::StateEstimator, model::SimModel, Hp, Hc)
+function init_predmat(estim::StateEstimator, model::SimModel, Hp, Hc)
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     E = zeros(0, nu*Hc)
     G = zeros(0, nd)
@@ -880,35 +854,6 @@ function relaxŶ(::SimModel, C, c_Ŷmin, c_Ŷmax, E)
 end
 
 @doc raw"""
-    init_stochpred(estim::StateEstimator, Hp) -> Ks, Ps
-
-Init the stochastic prediction matrix `Ks` from `estim` estimator for predictive control.
-
-``\mathbf{K_s}`` is the prediction matrix of the stochastic model (composed exclusively of 
-integrators):
-```math
-    \mathbf{Ŷ_s} = \mathbf{K_s x̂_s}(k)
-```
-The stochastic predictions ``\mathbf{Ŷ_s}`` are the integrator outputs from ``k+1`` to 
-``k+H_p``. ``\mathbf{x̂_s}(k)`` is extracted from current estimates ``\mathbf{x̂}_{k-1}(k)``
-with [`getestimates!`](@ref). The method also returns an empty ``\mathbf{P_s}`` matrix, since 
-it is useless except for [`InternalModel`](@ref) estimators.
-"""
-function init_stochpred(estim::StateEstimator, Hp)
-    As, Cs_y = estim.As, estim.Cs_y
-    nxs = estim.nxs
-    Ms = Matrix{Float64}(undef, Hp*nxs, nxs) 
-    for i = 1:Hp
-        iRow = (1:nxs) .+ nxs*(i-1)
-        Ms[iRow, :] = As^i
-    end
-    Js = repeatdiag(Cs_y, Hp)
-    Ks = Js*Ms
-    Ps = zeros(estim.model.ny*Hp, 0)
-    return Ks, Ps
-end
-
-@doc raw"""
     init_stochpred(estim::InternalModel, Hp) -> Ks, Ps
 
 Init the stochastic prediction matrices for [`InternalModel`](@ref).
@@ -940,6 +885,9 @@ function init_stochpred(estim::InternalModel, Hp)
     end
     return Ks, Ps 
 end
+"Return empty matrices if `estim` is not a [`InternalModel`](@ref)."
+init_stochpred(::StateEstimator, _ ) = Float64[;;], Float64[;;]
+
 
 @doc raw"""
     init_linconstraint(model::LinModel, 

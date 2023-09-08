@@ -50,7 +50,7 @@ struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
         R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[] 
         R̂y = zeros(ny* Hp) # dummy R̂y (updated just before optimization)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
-        E, F, G, J, K, Q = init_deterpred(estim, model, Hp, Hc)
+        E, F, G, J, K, Q = init_predmat(estim, model, Hp, Hc)
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
