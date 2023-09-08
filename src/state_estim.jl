@@ -196,8 +196,9 @@ function augment_model(model::LinModel, As, Cs_u, Cs_y; verify_obsv=true)
     end
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
-"No need to augment the model if `model` is not a [`LinModel`](@ref)."
-augment_model(::SimModel, _ , _ , _ ) = nothing
+"Return empty matrices if `model` is not a [`LinModel`](@ref)."
+augment_model(::SimModel, _ , _ , _ ) = tuple(fill(Float64[;;],5)...)
+
 
 @doc raw"""
     default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0)

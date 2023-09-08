@@ -13,6 +13,11 @@ struct InternalModel{M<:SimModel} <: StateEstimator
     Bs::Matrix{Float64}
     Cs::Matrix{Float64}
     Ds::Matrix{Float64}
+    Â ::Matrix{Float64}
+    B̂u::Matrix{Float64}
+    Ĉ ::Matrix{Float64}
+    B̂d::Matrix{Float64}
+    D̂d::Matrix{Float64}
     Âs::Matrix{Float64}
     B̂s::Matrix{Float64}
     function InternalModel{M}(model::M, i_ym, Asm, Bsm, Csm, Dsm) where {M<:SimModel}
@@ -30,7 +35,7 @@ struct InternalModel{M<:SimModel} <: StateEstimator
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
         nxs = size(As,1)
         nx̂ = model.nx
-        nxs = size(As,1)
+        Â, B̂u, Ĉ, B̂d, D̂d = matrices_intenalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         lastu0 = zeros(nu)
         x̂d = x̂ = zeros(model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
@@ -40,6 +45,7 @@ struct InternalModel{M<:SimModel} <: StateEstimator
             lastu0, x̂, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
+            Â, B̂u, Ĉ, B̂d, D̂d,
             Âs, B̂s
         )
     end
@@ -107,6 +113,25 @@ function validate_internalmodel(model::LinModel)
     end
 end
 validate_internalmodel(::SimModel) = nothing
+
+
+@doc raw"""
+    matrices_internalmodel(model::LinModel)
+
+Get state-space matrices of the [`LinModel`](@ref) `model` for [`InternalModel`](@ref).
+
+The [`InternalModel`](@ref) does not augment the state vector, thus:
+```math
+    \mathbf{Â = A, B̂_u = B_u, Ĉ = C, B̂_d = B_d, D̂_d = D_d }
+```
+"""
+function matrices_internalmodel(model::LinModel)
+    Â, B̂u, Ĉ, B̂d, D̂d = model.A, model.Bu, model.C, model.Bd, model.Dd 
+    return Â, B̂u, Ĉ, B̂d, D̂d
+end
+"Return empty matrices if `model` is not a [`LinModel`](@ref)."
+matrices_intenalmodel(::SimModel) = tuple(fill(Float64[;;],5)...)
+
 
 @doc raw"""
     init_internalmodel(As, Bs, Cs, Ds) -> Âs, B̂s

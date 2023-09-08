@@ -14,8 +14,8 @@ struct Luenberger <: StateEstimator
     nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}
-    B̂d  ::Matrix{Float64}
     Ĉ   ::Matrix{Float64}
+    B̂d  ::Matrix{Float64}
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
@@ -38,7 +38,7 @@ struct Luenberger <: StateEstimator
             lastu0, x̂,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
-            Â, B̂u, B̂d, Ĉ, D̂d, 
+            Â, B̂u, Ĉ, B̂d, D̂d,
             Ĉm, D̂dm,
             K
         )

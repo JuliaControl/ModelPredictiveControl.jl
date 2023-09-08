@@ -259,7 +259,6 @@ function moveinput!(
     ym::Union{Vector, Nothing} = nothing
 )
     validate_setpointdist(mpc, ry, d, R̂y, D̂)
-    getestimates!(mpc, mpc.estim, ym, d)
     predictstoch!(mpc, mpc.estim, d, ym)
     initpred!(mpc, mpc.estim.model, d, D̂, R̂y)
     linconstraint!(mpc, mpc.estim.model)
@@ -390,18 +389,6 @@ function getestimates!(mpc::PredictiveController, estim::InternalModel, ym, d)
 end
 
 """
-    predictstoch!(mpc, estim::StateEstimator, x̂s, d, _ )
-
-Predict the future `Ŷs` stochastic model outputs over `Hp`. 
-
-See [`init_stochpred`](@ref) for details on `Ŷs` and `Ks` matrices.
-"""
-function predictstoch!(mpc, estim::StateEstimator, _ , _ )
-    mpc.Ŷs[:] = mpc.Ks*mpc.x̂s 
-    return mpc.Ŷs
-end
-
-"""
     predictstoch!(mpc, estim::InternalModel, x̂s, d, ym )
 
 Use current measured outputs `ym` for prediction when `estim` is a [`InternalModel`](@ref).
@@ -413,6 +400,8 @@ function predictstoch!(mpc, estim::InternalModel, d, ym )
     mpc.Ŷs[:] = mpc.Ks*mpc.x̂s + mpc.Ps*ŷs
     return mpc.Ŷs
 end
+"Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."
+predictstoch!(mpc, estim::StateEstimator, _ , _ ) = nothing
 
 
 @doc raw"""
@@ -423,7 +412,7 @@ Init linear model prediction matrices `F`, `q̃` and `p`.
 See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y)
-    mpc.F[:] = mpc.Kd*mpc.x̂d + mpc.Q*mpc.estim.lastu0 + mpc.Yop + mpc.Ŷs 
+    mpc.F[:] = mpc.K*mpc.estim.x̂ + mpc.Q*mpc.estim.lastu0 + mpc.Yop + mpc.Ŷs 
     if model.nd ≠ 0
         mpc.d[:], mpc.D̂[:] = d, D̂
         mpc.F[:] = mpc.F + mpc.G*(mpc.d - model.dop) + mpc.J*(mpc.D̂ - mpc.Dop)
@@ -475,17 +464,17 @@ function predict(mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) w
     nu, ny, nd, Hp = model.nu, model.ny, model.nd, mpc.Hp
     yop, dop = model.yop, model.dop
     U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0)
-    Ŷd::Vector{T} = Vector{T}(undef, ny*Hp)
     u0::Vector{T} = Vector{T}(undef, nu)
-    x̂d::Vector{T} = copy(mpc.x̂d)
+    Ŷ ::Vector{T} = Vector{T}(undef, ny*Hp)
+    x̂ ::Vector{T} = copy(mpc.estim.x̂)
     d0 = mpc.d - dop
     for j=1:Hp
         u0[:] = @views U0[(1 + nu*(j-1)):(nu*j)]
-        x̂d[:] = f(model, x̂d, u0, d0)
+        x̂[:]  = f̂(mpc.estim, x̂, u0, d0)
         d0[:] = @views mpc.D̂[(1 + nd*(j-1)):(nd*j)] - dop
-        Ŷd[(1 + ny*(j-1)):(ny*j)] = h(model, x̂d, d0) + yop
+        Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, x̂, d0) + yop
     end
-    return Ŷd + mpc.Ŷs
+    return Ŷ
 end
 
 @doc raw"""
@@ -582,28 +571,27 @@ end
 
 
 @doc raw"""
-    init_deterpred(model::LinModel, Hp, Hc) -> E, G, J, Kd, Q
+    init_deterpred(estim::StateEstimator, ::LinModel, Hp, Hc) -> E, G, J, K, Q
 
-Construct deterministic prediction matrices for [`LinModel`](@ref) `model`.
+Construct the prediction matrices for [`LinModel`](@ref) `model`.
 
 The linear model predictions are evaluated by :
 ```math
 \begin{aligned}
-    \mathbf{Ŷ} &= \mathbf{E ΔU} + \mathbf{G d}(k) + \mathbf{J D̂} + \mathbf{K_d x̂_d}(k) 
+    \mathbf{Ŷ} &= \mathbf{E ΔU} + \mathbf{G d}(k) + \mathbf{J D̂} + \mathbf{K x̂}_{k-1}(k) 
                                                   + \mathbf{Q u}(k-1) + \mathbf{Ŷ_s}     \\
                &= \mathbf{E ΔU} + \mathbf{F}
 \end{aligned}
 ```
-where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``, and 
-measured disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
-``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. Deterministic state estimates 
-``\mathbf{x̂_d}(k)`` are extracted from current estimates ``\mathbf{x̂}_{k-1}(k)`` with
-[`getestimates!`](@ref). Operating points on ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{y}`` 
-are omitted in above equations.
+where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``, and measured
+disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
+``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. The vector ``\mathbf{x̂}_{k-1}(k)`` is the
+state estimated at the last control period. Operating points on ``\mathbf{u}``, 
+``\mathbf{d}`` and ``\mathbf{y}`` are omitted in above equations.
 
 # Extended Help
-Using the ``\mathbf{A, B_u, C, B_d, D_d}`` matrices in `model` and the equation
-``\mathbf{W}_j = \mathbf{C} ( ∑_{i=0}^j \mathbf{A}^i ) \mathbf{B_u}``, the prediction 
+Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `model` and the equation
+``\mathbf{W}_j = \mathbf{Ĉ} ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}``, the prediction 
 matrices are computed by :
 ```math
 \begin{aligned}
@@ -615,24 +603,24 @@ matrices are computed by :
 \end{bmatrix}
 \\
 \mathbf{G} &= \begin{bmatrix}
-\mathbf{C}\mathbf{A}^{0} \mathbf{B_d}     \\ 
-\mathbf{C}\mathbf{A}^{1} \mathbf{B_d}     \\ 
+\mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
+\mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
 \vdots                                    \\
-\mathbf{C}\mathbf{A}^{H_p-1} \mathbf{B_d}
+\mathbf{Ĉ}\mathbf{Â}^{H_p-1} \mathbf{B̂_d}
 \end{bmatrix}
 \\
 \mathbf{J} &= \begin{bmatrix}
-\mathbf{D_d}                              & \mathbf{0}                                & \cdots & \mathbf{0}   \\ 
-\mathbf{C}\mathbf{A}^{0} \mathbf{B_d}     & \mathbf{D_d}                              & \cdots & \mathbf{0}   \\ 
+\mathbf{D̂_d}                              & \mathbf{0}                                & \cdots & \mathbf{0}   \\ 
+\mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     & \mathbf{D̂_d}                              & \cdots & \mathbf{0}   \\ 
 \vdots                                    & \vdots                                    & \ddots & \vdots       \\
-\mathbf{C}\mathbf{A}^{H_p-2} \mathbf{B_d} & \mathbf{C}\mathbf{A}^{H_p-3} \mathbf{B_d} & \cdots & \mathbf{D_d}
+\mathbf{Ĉ}\mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Ĉ}\mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{D̂_d}
 \end{bmatrix}
 \\
-\mathbf{K_d} &= \begin{bmatrix}
-\mathbf{C}\mathbf{A}^{1}      \\
-\mathbf{C}\mathbf{A}^{2}      \\
+\mathbf{K} &= \begin{bmatrix}
+\mathbf{Ĉ}\mathbf{Â}^{1}      \\
+\mathbf{Ĉ}\mathbf{Â}^{2}      \\
 \vdots                        \\
-\mathbf{C}\mathbf{A}^{H_p}
+\mathbf{Ĉ}\mathbf{Â}^{H_p}
 \end{bmatrix}
 \\
 \mathbf{Q} &= \begin{bmatrix}
@@ -643,32 +631,26 @@ matrices are computed by :
 \end{bmatrix}
 \end{aligned}
 ```
-!!! note
-    Stochastic predictions ``\mathbf{Ŷ_s}`` are calculated separately (see 
-    [`init_stochpred`](@ref)) and added to the ``\mathbf{F}`` matrix to support internal 
-    model structure and reduce [`NonLinMPC`](@ref) computational costs. That is also why the 
-    prediction matrices are built on ``\mathbf{A, B_u, C, B_d, D_d}`` instead of the 
-    augmented model ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}``.
 """
-function init_deterpred(model::LinModel, Hp, Hc)
-    A, Bu, C, Bd, Dd = model.A, model.Bu, model.C, model.Bd, model.Dd
-    nu, nx, ny, nd = model.nu, model.nx, model.ny, model.nd
+function init_deterpred(estim::StateEstimator, model::LinModel, Hp, Hc) #TODO: RENAME THE FUNCTION!
+    Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
+    nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
     # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ...
-    Apow = Array{Float64}(undef, size(A,1), size(A,2), Hp+1)
-    Apow[:,:,1] = I(nx)
-    Kd = Matrix{Float64}(undef, Hp*ny, nx)
+    Âpow = Array{Float64}(undef, size(Â,1), size(Â,2), Hp+1)
+    Âpow[:,:,1] = I(nx̂)
+    K = Matrix{Float64}(undef, Hp*ny, nx̂)
     for i=1:Hp
-        Apow[:,:,i+1] = A^i
+        Âpow[:,:,i+1] = Â^i
         iRow = (1:ny) .+ ny*(i-1)
-        Kd[iRow,:] = C*Apow[:,:,i+1]
+        K[iRow,:] = Ĉ*Âpow[:,:,i+1]
     end 
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
-    Apow_csum  = cumsum(Apow, dims=3)
+    Apow_csum  = cumsum(Âpow, dims=3)
     # --- manipulated inputs u ---
     Q = Matrix{Float64}(undef, Hp*ny, nu)
     for i=1:Hp
         iRow = (1:ny) .+ ny*(i-1)
-        Q[iRow,:] = C*Apow_csum[:,:,i]*Bu
+        Q[iRow,:] = Ĉ*Apow_csum[:,:,i]*B̂u
     end
     E = zeros(Hp*ny, Hc*nu) 
     for i=1:Hc # truncated with control horizon
@@ -678,11 +660,11 @@ function init_deterpred(model::LinModel, Hp, Hc)
     end
     # --- measured disturbances d ---
     G = Matrix{Float64}(undef, Hp*ny, nd)
-    J = repeatdiag(Dd, Hp)
+    J = repeatdiag(D̂d, Hp)
     if nd ≠ 0
         for i=1:Hp
             iRow = (1:ny) .+ ny*(i-1)
-            G[iRow,:] = C*Apow[:,:,i]*Bd
+            G[iRow,:] = Ĉ*Âpow[:,:,i]*B̂d
         end
         for i=1:Hp
             iRow = (ny*i+1):(ny*Hp)
@@ -691,19 +673,19 @@ function init_deterpred(model::LinModel, Hp, Hc)
         end
     end
     F = zeros(ny*Hp) # dummy value (updated just before optimization)
-    return E, F, G, J, Kd, Q
+    return E, F, G, J, K, Q
 end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref)"
-function init_deterpred(model::SimModel, Hp, Hc)
-    nu, nx, ny, nd = model.nu, model.nx, model.ny, model.nd
-    E  = zeros(0, nu*Hc)
-    G  = zeros(0, nd)
-    J  = zeros(0, nd*Hp)
-    Kd = zeros(0, nx)
-    Q  = zeros(0, nu)
-    F  = zeros(0)
-    return E, F, G, J, Kd, Q
+function init_deterpred(estim::StateEstimator, model::SimModel, Hp, Hc)
+    nu, nx̂, nd = model.nu, estim.nx̂, model.nd
+    E = zeros(0, nu*Hc)
+    G = zeros(0, nd)
+    J = zeros(0, nd*Hp)
+    K = zeros(0, nx̂)
+    Q = zeros(0, nu)
+    F = zeros(0)
+    return E, F, G, J, K, Q
 end
 
 @doc raw"""

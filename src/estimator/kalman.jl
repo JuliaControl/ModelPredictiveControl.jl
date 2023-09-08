@@ -14,8 +14,8 @@ struct SteadyKalmanFilter <: StateEstimator
     nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}
-    B̂d  ::Matrix{Float64}
     Ĉ   ::Matrix{Float64}
+    B̂d  ::Matrix{Float64}
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
@@ -51,7 +51,7 @@ struct SteadyKalmanFilter <: StateEstimator
             lastu0, x̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
-            Â, B̂u, B̂d, Ĉ, D̂d, 
+            Â, B̂u, Ĉ, B̂d, D̂d,
             Ĉm, D̂dm,
             Q̂, R̂,
             K
@@ -195,8 +195,8 @@ struct KalmanFilter <: StateEstimator
     nint_ym::Vector{Int}
     Â   ::Matrix{Float64}
     B̂u  ::Matrix{Float64}
-    B̂d  ::Matrix{Float64}
     Ĉ   ::Matrix{Float64}
+    B̂d  ::Matrix{Float64}
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
@@ -220,7 +220,7 @@ struct KalmanFilter <: StateEstimator
             lastu0, x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
-            Â, B̂u, B̂d, Ĉ, D̂d, 
+            Â, B̂u, Ĉ, B̂d, D̂d, 
             Ĉm, D̂dm,
             P̂0, Q̂, R̂
         )
@@ -334,6 +334,11 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     Cs_y::Matrix{Float64}
     nint_u ::Vector{Int}
     nint_ym::Vector{Int}
+    Â ::Matrix{Float64}
+    B̂u::Matrix{Float64}
+    Ĉ ::Matrix{Float64}
+    B̂d::Matrix{Float64}
+    D̂d::Matrix{Float64}
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
@@ -347,7 +352,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nx̂ = model.nx + nxs
-        augment_model(model, As, Cs_u, Cs_y) # verify observability for LinModels
+        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         lastu0 = zeros(model.nu)
@@ -360,6 +365,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
             lastu0, x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
+            Â, B̂u, Ĉ, B̂d, D̂d,
             P̂0, Q̂, R̂,
             nσ, γ, m̂, Ŝ
         )
@@ -566,6 +572,11 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
     Cs_y::Matrix{Float64}
     nint_u ::Vector{Int}
     nint_ym::Vector{Int}
+    Â ::Matrix{Float64}
+    B̂u::Matrix{Float64}
+    Ĉ ::Matrix{Float64}
+    B̂d::Matrix{Float64}
+    D̂d::Matrix{Float64}
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
@@ -575,7 +586,7 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nx̂ = model.nx + nxs
-        augment_model(model, As, Cs_u, Cs_y) # verify observability for LinModels
+        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
@@ -588,6 +599,7 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
             lastu0, x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
+            Â, B̂u, Ĉ, B̂d, D̂d,
             P̂0, Q̂, R̂
         )
     end

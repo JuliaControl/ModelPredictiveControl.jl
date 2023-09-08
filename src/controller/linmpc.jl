@@ -3,8 +3,6 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     optim::JuMP.Model
     con::ControllerConstraint
     ΔŨ::Vector{Float64}
-    x̂d::Vector{Float64}
-    x̂s::Vector{Float64}
     ŷ ::Vector{Float64}
     Ŷs::Vector{Float64}
     Hp::Int
@@ -19,15 +17,15 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     T_Hc::Matrix{Bool}
-    Ẽ ::Matrix{Float64}
-    F ::Vector{Float64}
-    G ::Matrix{Float64}
-    J ::Matrix{Float64}
-    Kd::Matrix{Float64}
-    Q ::Matrix{Float64}
-    P̃ ::Hermitian{Float64, Matrix{Float64}}
-    q̃ ::Vector{Float64}
-    p ::Vector{Float64}
+    Ẽ::Matrix{Float64}
+    F::Vector{Float64}
+    G::Matrix{Float64}
+    J::Matrix{Float64}
+    K::Matrix{Float64}
+    Q::Matrix{Float64}
+    P̃::Hermitian{Float64, Matrix{Float64}}
+    q̃::Vector{Float64}
+    p::Vector{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
     d::Vector{Float64}
@@ -36,8 +34,8 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     Dop::Vector{Float64}
     function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim) where {S<:StateEstimator}
         model = estim.model
-        nu, nxd, nxs, ny, nd = model.nu, model.nx, estim.nxs, model.ny, model.nd
-        x̂d, x̂s, ŷ, Ŷs = zeros(nxd), zeros(nxs), zeros(ny), zeros(ny*Hp)
+        nu, ny, nd = model.nu, model.ny, model.nd
+        ŷ, Ŷs = zeros(ny), zeros(ny*Hp)
         Ewt = 0   # economic costs not supported for LinMPC
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         M_Hp = Diagonal{Float64}(repeat(Mwt, Hp))
@@ -48,7 +46,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[]
         R̂y = zeros(ny* Hp) # dummy R̂y (updated just before optimization)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
-        E, F, G, J, Kd, Q = init_deterpred(model, Hp, Hc)
+        E, F, G, J, K, Q = init_deterpred(estim, model, Hp, Hc)
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
@@ -58,11 +56,11 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         ΔŨ = zeros(nvar)
         mpc = new(
             estim, optim, con,
-            ΔŨ, x̂d, x̂s, ŷ, Ŷs,
+            ΔŨ, ŷ, Ŷs,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 
-            Ẽ, F, G, J, Kd, Q, P̃, q̃, p,
+            Ẽ, F, G, J, K, Q, P̃, q̃, p,
             Ks, Ps,
             d, D̂,
             Yop, Dop,
