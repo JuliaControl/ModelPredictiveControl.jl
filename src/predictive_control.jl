@@ -382,7 +382,7 @@ predictstoch!(mpc, estim::StateEstimator, _ , _ ) = nothing
 
 Init linear model prediction matrices `F`, `q̃` and `p`.
 
-See [`init_deterpred`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
+See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y)
     mpc.F[:] = mpc.K*mpc.estim.x̂ + mpc.Q*mpc.estim.lastu0 + mpc.Yop + mpc.Ŷs 

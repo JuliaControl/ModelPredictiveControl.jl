@@ -8,7 +8,7 @@ The prediction methodology of this module is mainly based on Maciejowski textboo
 ## Controller Initialization
 
 ```@docs
-ModelPredictiveControl.init_deterpred
+ModelPredictiveControl.init_predmat
 ModelPredictiveControl.init_ΔUtoU
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
