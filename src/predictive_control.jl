@@ -629,10 +629,10 @@ matrices are computed by :
 \end{bmatrix}
 \\
 \mathbf{K_d} &= \begin{bmatrix}
-\mathbf{C}\mathbf{A}^{0}      \\
 \mathbf{C}\mathbf{A}^{1}      \\
+\mathbf{C}\mathbf{A}^{2}      \\
 \vdots                        \\
-\mathbf{C}\mathbf{A}^{H_p-1}
+\mathbf{C}\mathbf{A}^{H_p}
 \end{bmatrix}
 \\
 \mathbf{Q} &= \begin{bmatrix}

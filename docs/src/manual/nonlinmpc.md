@@ -54,7 +54,7 @@ u = [0.5]
 plot(sim!(model, 60, u), plotu=false)
 ```
 
-## Nonlinear Predictive Controller
+## Nonlinear Model Predictive Controller
 
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 

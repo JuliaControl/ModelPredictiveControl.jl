@@ -9,7 +9,7 @@ predictions. The default [`LinMPC`](@ref) estimator is a [`SteadyKalmanFilter`](
 [`NonLinMPC`](@ref) with nonlinear models, an [`UnscentedKalmanFilter`](@ref). For simpler
 and more classical designs, an [`InternalModel`](@ref) structure is also available, that
 assumes by default that the current model mismatch estimation is constant in the future
-(same approach than dynamic matrix control, DMC).
+(same approach as dynamic matrix control, DMC).
 
 !!! info
     The nomenclature use capital letters for time series (and matrices) and hats for the
