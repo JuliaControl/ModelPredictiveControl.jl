@@ -35,7 +35,7 @@ struct InternalModel{M<:SimModel} <: StateEstimator
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
         nxs = size(As,1)
         nx̂ = model.nx
-        Â, B̂u, Ĉ, B̂d, D̂d = matrices_intenalmodel(model)
+        Â, B̂u, Ĉ, B̂d, D̂d = matrices_internalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         lastu0 = zeros(nu)
         x̂d = x̂ = zeros(model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
@@ -130,7 +130,23 @@ function matrices_internalmodel(model::LinModel)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-matrices_intenalmodel(::SimModel) = tuple(fill(Float64[;;],5)...)
+matrices_internalmodel(::SimModel) = tuple(fill(Float64[;;],5)...)
+
+@doc raw"""
+    f̂(estim::InternalModel, x̂, u, d)
+
+State function ``\mathbf{f̂}`` of the [`InternalModel`].
+
+It calls `f(estim.model, x̂, u ,d)` since this estimator does not augment the state vector.
+"""
+f̂(estim::InternalModel, x̂, u, d) = f(estim.model, x̂, u, d)
+
+@doc raw"""
+    ĥ(estim::InternalModel, x̂, d)
+
+Output function ``\mathbf{ĥ}`` of the [`InternalModel`], it calls `h(estim.model, x̂, d)`.
+"""
+ĥ(estim::InternalModel, x̂, d) = h(estim.model, x̂, d)
 
 
 @doc raw"""

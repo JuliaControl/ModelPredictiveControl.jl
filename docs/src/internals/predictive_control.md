@@ -23,12 +23,6 @@ ModelPredictiveControl.relaxΔU
 ModelPredictiveControl.relaxŶ
 ```
 
-## Get Estimates
-
-```@docs
-ModelPredictiveControl.getestimates!
-```
-
 ## Predictions
 
 ```@docs
