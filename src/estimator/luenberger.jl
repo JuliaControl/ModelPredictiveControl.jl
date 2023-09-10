@@ -51,7 +51,7 @@ end
         i_ym = 1:model.ny, 
         nint_u  = 0,
         nint_ym = default_nint(model, i_ym),
-        p̂ = 1e-3*(0:(model.nx + sum(nint_ym)-1)) .+ 0.5)
+        p̂ = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
     )
 
 Construct a Luenberger observer with the [`LinModel`](@ref) `model`.
@@ -81,10 +81,10 @@ function Luenberger(
     i_ym::IntRangeOrVector  = 1:model.ny,
     nint_u ::IntVectorOrInt = 0,
     nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
-    p̂ = 1e-3*(0:(model.nx + sum(nint_ym)-1)) .+ 0.5
+    p̂ = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
 )
     nx = model.nx
-    if length(p̂) ≠ model.nx + sum(nint_ym)
+    if length(p̂) ≠ model.nx + sum(nint_u) +  sum(nint_ym)
         error("p̂ length ($(length(p̂))) ≠ nx ($nx) + integrator quantity ($(sum(nint_ym)))")
     end
     any(abs.(p̂) .≥ 1) && error("Observer poles p̂ should be inside the unit circles.")
