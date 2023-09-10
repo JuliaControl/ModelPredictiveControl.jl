@@ -156,7 +156,7 @@ real-life control problems. Constructing a [`LinMPC`](@ref) with `DAQP` and inpu
 ```@example 1
 using JuMP, DAQP
 daqp  = Model(DAQP.Optimizer)
-estim = SteadyKalmanFilter(model, nint_u=[1, 1])
+estim = SteadyKalmanFilter(model, nint_u=[1, 1], nint_ym=[0, 0])
 mpc2  = setconstraint!(LinMPC(estim, Hp=15, Hc=2, optim=daqp), ŷmin=[45, -Inf])
 ```
 
