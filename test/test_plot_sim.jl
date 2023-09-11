@@ -72,21 +72,30 @@ end
 end
 
 @testset "PredictiveController quick simulation" begin
-    mpc = LinMPC(LinModel(sys, Ts, i_d=[3]))
-    res = sim!(mpc, 15)
+    mpc1 = LinMPC(LinModel(sys, Ts, i_d=[3]))
+    res = sim!(mpc1, 15)
     @test isa(res.obj, LinMPC)
     @test length(res.T_data) == 15
-    @test res.Ry_data[:, 1] ≈ mpc.estim.model.yop .+ 1
+    @test res.Ry_data[:, 1] ≈ mpc1.estim.model.yop .+ 1
     @test res.Ud_data ≈ res.U_data
-    @test res.D_data[:, 1]  ≈ mpc.estim.model.dop
-    @test res.X_data[:, 1]  ≈ zeros(mpc.estim.model.nx)
-    @test res.X̂_data[:, 1]  ≈ zeros(mpc.estim.nx̂)
+    @test res.D_data[:, 1]  ≈ mpc1.estim.model.dop
+    @test res.X_data[:, 1]  ≈ zeros(mpc1.estim.model.nx)
+    @test res.X̂_data[:, 1]  ≈ zeros(mpc1.estim.nx̂)
+
+    mpc2 = ExplicitMPC(LinModel(sys, Ts, i_d=[3]))
+    res = sim!(mpc2, 15)
+    @test isa(res.obj, ExplicitMPC)
+    @test length(res.T_data) == 15
+    @test res.Ry_data[:, 1] ≈ mpc2.estim.model.yop .+ 1
+    @test res.Ud_data ≈ res.U_data
+    @test res.D_data[:, 1]  ≈ mpc2.estim.model.dop
+    @test res.X_data[:, 1]  ≈ zeros(mpc2.estim.model.nx)
+    @test res.X̂_data[:, 1]  ≈ zeros(mpc2.estim.nx̂)
 end
 
 @testset "PredictiveController Plots" begin
     mpc = LinMPC(LinModel(sys, Ts, i_d=[3]), Lwt=[0.01, 0.01])
     mpc = setconstraint!(mpc, umin=[-50, -51], umax=[52, 53], ymin=[-54,-55], ymax=[56,57])
-    # TODO: ajouter des tests pour umin umax ymin ymax
     res = sim!(mpc, 15)
     p1 = plot(res, plotŷ=true)
     @test p1[1][1][:x] ≈ res.T_data
