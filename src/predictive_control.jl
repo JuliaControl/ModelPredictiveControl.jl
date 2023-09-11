@@ -110,13 +110,35 @@ function setconstraint!(
     ymin    = nothing, ymax    = nothing,
     c_umin  = nothing, c_umax  = nothing,
     c_Δumin = nothing, c_Δumax = nothing,
-    c_ymin  = nothing, c_ymax  = nothing
+    c_ymin  = nothing, c_ymax  = nothing,
+    # will be deleted in the future:
+    ŷmin    = nothing, ŷmax    = nothing,
+    c_ŷmin  = nothing, c_ŷmax  = nothing,
 )
     model = mpc.estim.model
     con = mpc.con
     nu, ny = model.nu, model.ny
     Hp, Hc = mpc.Hp, mpc.Hc
     C, E = mpc.C, mpc.Ẽ[:, 1:nu*Hc]
+    
+    # these 4 if will be deleted in the future:
+    if !isnothing(ŷmin)
+        Base.depwarn("keyword arg ŷmin is deprecated, use ymin instead", :setconstraint!)
+        ymin = ŷmin
+    end
+    if !isnothing(ŷmax)
+        Base.depwarn("keyword arg ŷmax is deprecated, use ymax instead", :setconstraint!)
+        ymax = ŷmax
+    end
+    if !isnothing(c_ŷmin)
+        Base.depwarn("keyword arg ŷmin is deprecated, use ymin instead", :setconstraint!)
+        c_ymin = c_ŷmin
+    end
+    if !isnothing(c_ŷmax)
+        Base.depwarn("keyword arg ŷmax is deprecated, use ymax instead", :setconstraint!)
+        c_ymax = c_ŷmax
+    end
+    
     if !isnothing(umin)
         size(umin)   == (nu,) || error("umin size must be $((nu,))")
         Umin  = repeat(umin, Hc)
@@ -209,6 +231,8 @@ function setconstraint!(
     setnonlincon!(mpc, model)
     return mpc
 end
+
+
 
 "By default, there is no nonlinear constraint, thus do nothing."
 setnonlincon!(::PredictiveController, ::SimModel) = nothing
