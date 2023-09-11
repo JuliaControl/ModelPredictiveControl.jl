@@ -69,10 +69,10 @@ We design our [`LinMPC`](@ref) controllers by including the linear level constra
 mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1]), ymin=[45, -Inf])
 ```
 
-in which `Hp`, `Hc` keyword arguments are respectively the predictive and control horizons,
-and `Mwt` and `Nwt`, the output setpoint tracking and move suppression weights. By default,
-[`LinMPC`](@ref) controllers use [`OSQP`](https://osqp.org/) to solve the problem, soft
-constraints on output predictions ``\mathbf{ŷ}`` to ensure feasibility, and a
+in which `Hp` and `Hc` keyword arguments are respectively the predictive and control
+horizons, and `Mwt` and `Nwt`, the output setpoint tracking and move suppression weights. By
+default, [`LinMPC`](@ref) controllers use [`OSQP`](https://osqp.org/) to solve the problem,
+soft constraints on output predictions ``\mathbf{ŷ}`` to ensure feasibility, and a
 [`SteadyKalmanFilter`](@ref) to estimate the plant states. An attentive reader will also
 notice that the Kalman filter estimates two additional states compared to the plant model.
 These are the integrating states for the unmeasured plant disturbances, and they are

@@ -3,7 +3,7 @@
 To install the `ModelPredictiveControl` package, run this command in the Julia REPL:
 
 ```julia
-using Pkg; Pkg.add("ModelPredictiveControl")
+using Pkg; Pkg.activate(); Pkg.add("ModelPredictiveControl")
 ```
 
 Doing so will install the package to default Julia environnement, that is, accessible
