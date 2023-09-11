@@ -131,11 +131,11 @@ identical to [`sim!(::StateEstimator, ::Int)`](@ref).
 ```julia-repl
 julia> model = LinModel([tf(3, [30, 1]); tf(2, [5, 1])], 4);
 
-julia> mpc = setconstraint!(LinMPC(model, Mwt=[0, 1], Nwt=[0.01], Hp=30), ŷmin=[0, -Inf]);
+julia> mpc = setconstraint!(LinMPC(model, Mwt=[0, 1], Nwt=[0.01], Hp=30), ymin=[0, -Inf]);
 
 julia> res = sim!(mpc, 25, [0, 0], y_noise=[0.1], y_step=[-10, 0]);
 
-julia> using Plots; plot(res, plotry=true, plotŷ=true, plotŷmin=true, plotu=true)
+julia> using Plots; plot(res, plotry=true, plotŷ=true, plotymin=true, plotu=true)
 
 ```
 """
@@ -407,8 +407,8 @@ end
 @recipe function plot(
     res::SimResult{<:PredictiveController}; 
     plotry      = true,
-    plotŷmin    = true,
-    plotŷmax    = true,
+    plotymin    = true,
+    plotymax    = true,
     plotŷ       = false,
     plotu       = true,
     plotru      = true,
@@ -433,6 +433,9 @@ end
     (plotx̂ ||  plotxwithx̂) && (layout_mat = [layout_mat (nx̂, 1)])
     layout := layout_mat
     xguide --> "Time (s)"
+    # --- constraints ---
+    Umin, Umax = getUcon(mpc, nu)
+    Ymin, Ymax = getYcon(mpc, ny)
     # --- outputs y ---
     subplot_base = 0
     for i in 1:ny
@@ -468,7 +471,7 @@ end
                 t, res.Ry_data[i, :]
             end
         end
-        if plotŷmin && !isinf(mpc.con.Ŷmin[i])
+        if plotymin && !isinf(Ymin[i])
             @series begin
                 yguide    --> "\$y_$i\$"
                 color     --> 4
@@ -477,10 +480,10 @@ end
                 linewidth --> 1.5
                 label     --> "\$\\mathbf{\\hat{y}_{min}}\$"
                 legend    --> true
-                t, fill(mpc.con.Ŷmin[i], length(t))
+                t, fill(Ymin[i], length(t))
             end
         end
-        if plotŷmax && !isinf(mpc.con.Ŷmax[i])
+        if plotymax && !isinf(Ymax[i])
             @series begin
                 yguide    --> "\$y_$i\$"
                 color     --> 5
@@ -489,7 +492,7 @@ end
                 linewidth --> 1.5
                 label     --> "\$\\mathbf{\\hat{y}_{max}}\$"
                 legend    --> true
-                t, fill(mpc.con.Ŷmax[i], length(t))
+                t, fill(Ymax[i], length(t))
             end
         end
     end
@@ -518,7 +521,7 @@ end
                     t, res.Ry_data[i, :]
                 end
             end
-            if plotumin && !isinf(mpc.con.Umin[i])
+            if plotumin && !isinf(Umin[i])
                 @series begin
                     yguide    --> "\$u_$i\$"
                     color     --> 4
@@ -527,10 +530,10 @@ end
                     linewidth --> 1.5
                     label     --> "\$\\mathbf{u_{min}}\$"
                     legend    --> true
-                    t, fill(mpc.con.Umin[i], length(t))
+                    t, fill(Umin[i], length(t))
                 end
             end
-            if plotumax && !isinf(mpc.con.Umax[i])
+            if plotumax && !isinf(Umax[i])
                 @series begin
                     yguide    --> "\$u_$i\$"
                     color     --> 5
@@ -539,7 +542,7 @@ end
                     linewidth --> 1.5
                     label     --> "\$\\mathbf{u_{max}}\$"
                     legend    --> true
-                    t, fill(mpc.con.Umax[i], length(t))
+                    t, fill(Umax[i], length(t))
                 end
             end
         end
@@ -591,3 +594,9 @@ end
         end
     end
 end
+
+getUcon(mpc::PredictiveController, _ ) = mpc.con.Umin, mpc.con.Umax
+getUcon(mpc::ExplicitMPC, nu) = fill(-Inf, mpc.Hp*nu), fill(+Inf, mpc.Hp*nu)
+
+getYcon(mpc::PredictiveController, _ ) = mpc.con.Ymin, mpc.con.Ymax
+getYcon(mpc::ExplicitMPC, ny) = fill(-Inf, mpc.Hp*ny), fill(+Inf, mpc.Hp*ny)

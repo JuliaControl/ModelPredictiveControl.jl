@@ -49,7 +49,7 @@ Our goal is controlling the first output $y_1$, but the second one $y_2$ should 
 
 ```julia
 mpc = LinMPC(model, Mwt=[1, 0], Nwt=[0.1])
-mpc = setconstraint!(mpc, ŷmax=[Inf, 35])
+mpc = setconstraint!(mpc, ymax=[Inf, 35])
 ```
 
 The keyword arguments `Mwt` and `Nwt` are the output setpoint tracking and move suppression
@@ -60,7 +60,7 @@ The result is displayed with [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl
 using Plots
 ry = [5, 0]
 res = sim!(mpc, 40, ry)
-plot(res, plotry=true, plotŷmax=true)
+plot(res, plotry=true, plotymax=true)
 ```
 
 ![StepChangeResponse](/docs/src/assets/readme_result.svg)

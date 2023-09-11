@@ -85,8 +85,8 @@ end
 
 @testset "PredictiveController Plots" begin
     mpc = LinMPC(LinModel(sys, Ts, i_d=[3]), Lwt=[0.01, 0.01])
-    mpc = setconstraint!(mpc, umin=[-50, -51], umax=[52, 53], ŷmin=[-54,-55], ŷmax=[56,57])
-    # TODO: ajouter des tests pour umin umax ŷmin ŷmax
+    mpc = setconstraint!(mpc, umin=[-50, -51], umax=[52, 53], ymin=[-54,-55], ymax=[56,57])
+    # TODO: ajouter des tests pour umin umax ymin ymax
     res = sim!(mpc, 15)
     p1 = plot(res, plotŷ=true)
     @test p1[1][1][:x] ≈ res.T_data
@@ -120,19 +120,19 @@ end
     @test p4[end-2][2][:y] ≈ res.X̂_data[4,:]
     @test p4[end-1][1][:y] ≈ res.X̂_data[5,:]
     @test p4[end-0][1][:y] ≈ res.X̂_data[6,:]
-    p5 = plot(res, plotumin=true, plotumax=false, plotŷmin=false, plotŷmax=false)
+    p5 = plot(res, plotumin=true, plotumax=false, plotymin=false, plotymax=false)
     @test p5[1][1][:x] ≈ res.T_data
     @test all(p5[end-2][3][:y] .≈ -50.0)
     @test all(p5[end-1][3][:y] .≈ -51.0)
-    p6 = plot(res, plotumin=false, plotumax=true, plotŷmin=false, plotŷmax=false)
+    p6 = plot(res, plotumin=false, plotumax=true, plotymin=false, plotymax=false)
     @test p6[1][1][:x] ≈ res.T_data
     @test all(p6[end-2][3][:y] .≈ 52.0)
     @test all(p6[end-1][3][:y] .≈ 53.0)
-    p7 = plot(res, plotumin=false, plotumax=false, plotŷmin=true, plotŷmax=false)
+    p7 = plot(res, plotumin=false, plotumax=false, plotymin=true, plotymax=false)
     @test p7[1][1][:x] ≈ res.T_data
     @test all(p7[end-4][3][:y] .≈ -54.0)
     @test all(p7[end-3][3][:y] .≈ -55.0)
-    p8 = plot(res, plotumin=false, plotumax=false, plotŷmin=false, plotŷmax=true)
+    p8 = plot(res, plotumin=false, plotumax=false, plotymin=false, plotymax=true)
     @test p8[1][1][:x] ≈ res.T_data
     @test all(p8[end-4][3][:y] .≈ 56.0)
     @test all(p8[end-3][3][:y] .≈ 57.0)

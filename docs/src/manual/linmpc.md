@@ -66,16 +66,17 @@ We design our [`LinMPC`](@ref) controllers by including the linear level constra
 [`setconstraint!`](@ref) (`±Inf` values should be used when there is no bound):
 
 ```@example 1
-mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2), ŷmin=[45, -Inf])
+mpc = setconstraint!(LinMPC(model, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1]), ymin=[45, -Inf])
 ```
 
-in which `Hp` and `Hc` keyword arguments are the predictive and control horizons
-respectively. By default, [`LinMPC`](@ref) controllers use [`OSQP`](https://osqp.org/) to
-solve the problem, soft constraints on output predictions ``\mathbf{ŷ}`` to ensure
-feasibility, and a [`SteadyKalmanFilter`](@ref) to estimate the plant states. An attentive
-reader will also notice that the Kalman filter estimates two additional states compared to
-the plant model. These are the integrating states for the unmeasured plant disturbances, and
-they are automatically added the model outputs if feasible (see [`SteadyKalmanFilter`](@ref)
+in which `Hp`, `Hc` keyword arguments are respectively the predictive and control horizons,
+and `Mwt` and `Nwt`, the output setpoint tracking and move suppression weights. By default,
+[`LinMPC`](@ref) controllers use [`OSQP`](https://osqp.org/) to solve the problem, soft
+constraints on output predictions ``\mathbf{ŷ}`` to ensure feasibility, and a
+[`SteadyKalmanFilter`](@ref) to estimate the plant states. An attentive reader will also
+notice that the Kalman filter estimates two additional states compared to the plant model.
+These are the integrating states for the unmeasured plant disturbances, and they are
+automatically added to the model outputs by default if feasible (see [`SteadyKalmanFilter`](@ref)
 for details).
 
 Before closing the loop, we call [`initstate!`](@ref) with the actual plant inputs and
@@ -157,7 +158,7 @@ real-life control problems. Constructing a [`LinMPC`](@ref) with `DAQP` and inpu
 using JuMP, DAQP
 daqp  = Model(DAQP.Optimizer)
 estim = SteadyKalmanFilter(model, nint_u=[1, 1], nint_ym=[0, 0])
-mpc2  = setconstraint!(LinMPC(estim, Hp=15, Hc=2, optim=daqp), ŷmin=[45, -Inf])
+mpc2  = setconstraint!(LinMPC(estim, Hp=15, Hc=2, optim=daqp), ymin=[45, -Inf])
 ```
 
 leads to similar computational times, but it does accelerate the rejection of the load
@@ -169,4 +170,3 @@ initstate!(mpc2, model.uop, model())
 u_data2, y_data2, ry_data2 = test_mpc(mpc2, model)
 plot_data(t_data, u_data2, y_data2, ry_data2)
 ```
-

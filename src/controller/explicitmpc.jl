@@ -24,6 +24,7 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
     P̃::Hermitian{Float64, Matrix{Float64}}
     q̃::Vector{Float64}
     p::Vector{Float64}
+    P̃_chol::Cholesky{Float64, Matrix{Float64}}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
     d::Vector{Float64}
@@ -48,6 +49,7 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
         E, F, G, J, K, Q = init_predmat(estim, model, Hp, Hc)
         _ , S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        P̃_chol = cholesky(P̃)
         Ks, Ps = init_stochpred(estim, Hp)
         d, D̂ = zeros(nd), zeros(nd*Hp)
         Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
@@ -60,6 +62,7 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
+            P̃_chol,
             Ks, Ps,
             d, D̂,
             Yop, Dop,
@@ -177,8 +180,7 @@ linconstraint!(::ExplicitMPC, ::LinModel) = nothing
 Analytically solve the optimization problem for [`ExplicitMPC`](@ref).
 """
 function optim_objective!(mpc::ExplicitMPC)
-    mpc.ΔŨ[:] = -mpc.P̃\mpc.q̃
-    return mpc.ΔŨ
+    return ldiv!(mpc.ΔŨ, mpc.P̃_chol, -mpc.q̃)
 end
 
 "For [`ExplicitMPC`](@ref), return an empty summary."

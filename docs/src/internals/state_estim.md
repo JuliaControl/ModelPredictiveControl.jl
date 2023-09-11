@@ -1,5 +1,9 @@
 # Functions: StateEstimator Internals
 
+```@contents
+Pages = ["state_estim.md"]
+```
+
 ## Estimator Initialization
 
 ```@docs

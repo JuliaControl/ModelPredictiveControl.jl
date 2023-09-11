@@ -69,12 +69,14 @@ function remove_op!(estim::StateEstimator, u, d, ym)
     return u0, d0, ym0
 end
 
-"""
+@doc raw"""
     init_estimstoch(model, i_ym, nint_u, nint_ym) -> As, Cs_u, Cs_y, nxs, nint_u, nint_ym
 
 Init stochastic model matrices from integrator specifications for state estimation.
 
-TBW. 
+```math
+\mathbf{}
+```
 
 The function [`init_integrators`](@ref) builds the state-space matrice of the unmeasured
 disturbance models.
@@ -131,11 +133,12 @@ should be incorporated for each stochastic output ``\mathbf{y_s}``:
 \mathbf{y_s}(k)     &= \mathbf{C_s x_s}(k)
 \end{aligned}
 ```
-where ``\mathbf{e}(k)`` is an unknown zero mean white noise. The estimations does not use
-``\mathbf{B_s}``, it is thus ignored. Note that this function is called twice :
+where ``\mathbf{e}(k)`` is an unknown zero mean white noise. The specific case of one
+integrator per stochastic output results in `A_s = I` and `C_s = I`. The estimations does 
+not use ``\mathbf{B_s}``, it is thus ignored. Note that this function is called twice :
 
-1. for the unmodeled disturbances at measured outputs ``\mathbf{y^m}``
-2. for the unmodeled disturbances at manipulated inputs ``\mathbf{u}``
+1. for the unmeasured disturbances at manipulated inputs ``\mathbf{u}``
+2. for the unmeasured disturbances at measured outputs ``\mathbf{y^m}``
 """
 function init_integrators(nint::IntVectorOrInt, nys, varname::String)
     if nint == 0 # alias for no integrator at all

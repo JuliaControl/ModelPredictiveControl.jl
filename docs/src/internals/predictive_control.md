@@ -1,5 +1,9 @@
 # Functions: PredictiveController Internals
 
+```@contents
+Pages = ["predictive_control.md"]
+```
+
 The prediction methodology of this module is mainly based on Maciejowski textbook [^1].
 
 [^1]: Maciejowski, J. 2000, "Predictive control : with constraints", 1st ed., Prentice Hall,

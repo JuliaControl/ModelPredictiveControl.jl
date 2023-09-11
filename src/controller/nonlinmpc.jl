@@ -285,13 +285,13 @@ function init_optimization!(mpc::NonLinMPC)
     @NLobjective(optim, Min, Jfunc(ΔŨvar...))
     if nC ≠ 0
         n = 0
-        for i in eachindex(con.Ŷmin)
-            sym = Symbol("C_Ŷmin_$i")
+        for i in eachindex(con.Ymin)
+            sym = Symbol("C_Ymin_$i")
             register(optim, sym, nvar, Cfunc[n + i], autodiff=true)
         end
-        n = lastindex(con.Ŷmin)
-        for i in eachindex(con.Ŷmax)
-            sym = Symbol("C_Ŷmax_$i")
+        n = lastindex(con.Ymin)
+        for i in eachindex(con.Ymax)
+            sym = Symbol("C_Ymax_$i")
             register(optim, sym, nvar, Cfunc[n + i], autodiff=true)
         end
     end
@@ -308,12 +308,12 @@ function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     ΔŨvar = mpc.optim[:ΔŨvar]
     con = mpc.con
     map(con -> delete(optim, con), all_nonlinear_constraints(optim))
-    for i in findall(.!isinf.(con.Ŷmin))
-        f_sym = Symbol("C_Ŷmin_$(i)")
+    for i in findall(.!isinf.(con.Ymin))
+        f_sym = Symbol("C_Ymin_$(i)")
         add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
     end
-    for i in findall(.!isinf.(con.Ŷmax))
-        f_sym = Symbol("C_Ŷmax_$(i)")
+    for i in findall(.!isinf.(con.Ymax))
+        f_sym = Symbol("C_Ymax_$(i)")
         add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
     end
     return nothing
@@ -389,15 +389,15 @@ Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](
 function con_nonlinprog(mpc::NonLinMPC, ::SimModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
     if !isinf(mpc.C) # constraint softening activated :
         ϵ = ΔŨ[end]
-        C_Ŷmin = (mpc.con.Ŷmin - Ŷ) - ϵ*mpc.con.c_Ŷmin
-        C_Ŷmax = (Ŷ - mpc.con.Ŷmax) - ϵ*mpc.con.c_Ŷmax
+        C_Ymin = (mpc.con.Ymin - Ŷ) - ϵ*mpc.con.c_Ymin
+        C_Ymax = (Ŷ - mpc.con.Ymax) - ϵ*mpc.con.c_Ymax
     else # no constraint softening :
-        C_Ŷmin = (mpc.con.Ŷmin - Ŷ)
-        C_Ŷmax = (Ŷ - mpc.con.Ŷmax)
+        C_Ymin = (mpc.con.Ymin - Ŷ)
+        C_Ymax = (Ŷ - mpc.con.Ymax)
     end
     # replace -Inf with 0 to avoid INVALID_MODEL error :
-    C_Ŷmin[isinf.(C_Ŷmin)] .= 0
-    C_Ŷmax[isinf.(C_Ŷmax)] .= 0
-    C = [C_Ŷmin; C_Ŷmax]
+    C_Ymin[isinf.(C_Ymin)] .= 0
+    C_Ymax[isinf.(C_Ymax)] .= 0
+    C = [C_Ymin; C_Ymax]
     return C
 end
