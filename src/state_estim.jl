@@ -79,13 +79,13 @@ manipulated input and measured outputs. The function returns the state-space mat
 `Cs_u` and `Cs_y` of the stochastic model:
 ```math
 \begin{aligned}
-\mathbf{x_s}(k+1)    &= \mathbf{A_s x_s}(k) + \mathbf{B_s e}(k) \\
-\mathbf{y_s_{u}}(k)  &= \mathbf{C_s_{u}  x_s}(k) \\
-\mathbf{y_s_{ym}}(k) &= \mathbf{C_s_{ym} x_s}(k) \\
+\mathbf{x_{s}}(k+1)     &= \mathbf{A_s x_s}(k) + \mathbf{B_s e}(k) \\
+\mathbf{y_{s_{u}}}(k)   &= \mathbf{C_{s_{u}}  x_s}(k) \\
+\mathbf{y_{s_{ym}}}(k)  &= \mathbf{C_{s_{ym}} x_s}(k) 
 \end{aligned}
 ```
 where ``\mathbf{e}(k)`` is an unknown zero mean white noise and ``\mathbf{A_s} = 
-\mathrm{diag}(\mathbf{A_s_{u}, A_s_{ym}})``. The estimations does not use ``\mathbf{B_s}``,
+\mathrm{diag}(\mathbf{A_{s_{u}}, A_{s_{ym}}})``. The estimations does not use ``\mathbf{B_s}``,
 it is thus ignored. The function [`init_integrators`](@ref) builds the state-space matrices.
 """
 function init_estimstoch(model, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVectorOrInt)
@@ -98,8 +98,7 @@ function init_estimstoch(model, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVector
     As   = [As_u zeros(nxs_u, nxs_y); zeros(nxs_y, nxs_u) As_y]
     Cs_u = [Cs_u zeros(nu, nxs_y)]
     Cs_y = [zeros(ny, nxs_u) Cs_y]
-    nxs = nxs_u + nxs_y
-    return As, Cs_u, Cs_y, nxs, nint_u, nint_ym
+    return As, Cs_u, Cs_y, nint_u, nint_ym
 end
 
 "Validate the specified measured output indices `i_ym`."

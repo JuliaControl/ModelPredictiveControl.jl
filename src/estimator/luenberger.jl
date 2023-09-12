@@ -22,8 +22,9 @@ struct Luenberger <: StateEstimator
     K̂::Matrix{Float64}
     function Luenberger(model, i_ym, nint_u, nint_ym, p̂)
         nym, nyu = validate_ym(model, i_ym)
-        As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
-        nx̂ = model.nx + nxs
+        As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        nxs = size(As, 1)
+        nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         K̂ = try
             place(Â, Ĉ, p̂, :o)[:, i_ym]

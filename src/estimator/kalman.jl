@@ -24,8 +24,9 @@ struct SteadyKalmanFilter <: StateEstimator
     K̂::Matrix{Float64}
     function SteadyKalmanFilter(model, i_ym, nint_u, nint_ym, Q̂, R̂)
         nym, nyu = validate_ym(model, i_ym)
-        As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
-        nx̂ = model.nx + nxs
+        As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        nxs = size(As, 1)
+        nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂)
         K̂ = try
@@ -207,8 +208,9 @@ struct KalmanFilter <: StateEstimator
     M̂::Matrix{Float64}
     function KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
         nym, nyu = validate_ym(model, i_ym)
-        As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
-        nx̂ = model.nx + nxs
+        As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        nxs = size(As, 1)
+        nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
@@ -355,8 +357,9 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ
     ) where {M<:SimModel}
         nym, nyu = validate_ym(model, i_ym)
-        As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
-        nx̂ = model.nx + nxs
+        As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        nxs = size(As, 1)
+        nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
@@ -594,8 +597,9 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
         model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂
     ) where {M<:SimModel}
         nym, nyu = validate_ym(model, i_ym)
-        As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
-        nx̂ = model.nx + nxs
+        As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
+        nxs = size(As, 1)
+        nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         lastu0 = zeros(model.nu)
