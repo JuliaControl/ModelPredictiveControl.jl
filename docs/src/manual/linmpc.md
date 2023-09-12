@@ -236,7 +236,7 @@ end
 nothing # hide
 ```
 
-The new feedforward compensation is able to almost perfectly rejet the load disturbance:
+The new feedforward compensation is able to almost perfectly reject the load disturbance:
 
 ```@example 1
 setstate!(model, zeros(model.nx))
