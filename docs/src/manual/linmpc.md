@@ -203,8 +203,8 @@ model_ff = setop!(LinModel(sys_ff, Ts, i_d=[3]), uop=[20, 20], yop=[50, 30], dop
 A [`LinMPC`](@ref) controller is constructed on this model:
 
 ```@example 1
-mpc_ff   = LinMPC(model_ff, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
-mpc_ff   = setconstraint!(mpc_ff, ymin=[45, -Inf])
+mpc_ff = LinMPC(model_ff, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
+mpc_ff = setconstraint!(mpc_ff, ymin=[45, -Inf])
 ```
 
 A new test function that feeds the measured disturbance ``\mathbf{d}`` to the controller is
