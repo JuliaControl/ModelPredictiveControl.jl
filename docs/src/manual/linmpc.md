@@ -193,11 +193,11 @@ incorporate feedforward compensation in the controller. The new plant model is:
 ```
 
 We need to construct a new [`LinModel`](@ref) that includes the measured disturbance
-``\mathbf{d} = [u_l]`` and the operating point ``\mathbf{d_{op}} = [10]``:
+``\mathbf{d} = [u_l]`` and the operating point ``\mathbf{d_{op}} = [20]``:
 
 ```@example 1
 sys_ff   = [sys sys[1:2, 2]]
-model_ff = setop!(LinModel(sys_ff, Ts, i_d=[3]), uop=[10, 10], yop=[50, 30], dop=[10])
+model_ff = setop!(LinModel(sys_ff, Ts, i_d=[3]), uop=[20, 20], yop=[50, 30], dop=[20])
 ```
 
 A [`LinMPC`](@ref) controller is constructed on this model:
