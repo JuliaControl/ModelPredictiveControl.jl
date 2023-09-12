@@ -74,12 +74,19 @@ end
 
 Init stochastic model matrices from integrator specifications for state estimation.
 
+The arguments `nint_u` and `nint_ym` specify how many integrators are added to each 
+manipulated input and measured outputs. The function returns the state-space matrices `As`, 
+`Cs_u` and `Cs_y` of the stochastic model:
 ```math
-\mathbf{}
+\begin{aligned}
+\mathbf{x_s}(k+1)    &= \mathbf{A_s x_s}(k) + \mathbf{B_s e}(k) \\
+\mathbf{y_s_{u}}(k)  &= \mathbf{C_s_{u}  x_s}(k) \\
+\mathbf{y_s_{ym}}(k) &= \mathbf{C_s_{ym} x_s}(k) \\
+\end{aligned}
 ```
-
-The function [`init_integrators`](@ref) builds the state-space matrice of the unmeasured
-disturbance models.
+where ``\mathbf{e}(k)`` is an unknown zero mean white noise and ``\mathbf{A_s} = 
+\mathrm{diag}(\mathbf{A_s_{u}, A_s_{ym}})``. The estimations does not use ``\mathbf{B_s}``,
+it is thus ignored. The function [`init_integrators`](@ref) builds the state-space matrices.
 """
 function init_estimstoch(model, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVectorOrInt)
     nu, ny, nym = model.nu, model.ny, length(i_ym)
@@ -120,50 +127,44 @@ function stoch_ym2y(model::SimModel, i_ym, Asm, Bsm, Csm, Dsm)
 end
 
 @doc raw"""
-    init_integrators(nint, nys, varname::String) -> As, Cs, nint
+    init_integrators(nint, ny, varname::String) -> A, C, nint
 
-Calc state-space matrices `As, Cs` (stochastic part) from integrator specifications `nint`.
+Calc `A, C` state-space matrices from integrator specifications `nint`.
 
 This function is used to initialize the stochastic part of the augmented model for the
 design of state estimators. The vector `nint` provides how many integrators (in series) 
-should be incorporated for each stochastic output ``\mathbf{y_s}``:
-```math
-\begin{aligned}
-\mathbf{x_s}(k+1)   &= \mathbf{A_s x_s}(k) + \mathbf{B_s e}(k) \\
-\mathbf{y_s}(k)     &= \mathbf{C_s x_s}(k)
-\end{aligned}
-```
-where ``\mathbf{e}(k)`` is an unknown zero mean white noise. The specific case of one
-integrator per stochastic output results in `A_s = I` and `C_s = I`. The estimations does 
-not use ``\mathbf{B_s}``, it is thus ignored. Note that this function is called twice :
+should be incorporated for each output. The argument should have `ny` element, except
+for `nint=0` which is an alias for no integrator at all. The specific case of one integrator
+per output results in `A = I` and `C = I`. The estimation does not use the `B` matrix, it 
+is thus ignored. This function is called twice :
 
 1. for the unmeasured disturbances at manipulated inputs ``\mathbf{u}``
 2. for the unmeasured disturbances at measured outputs ``\mathbf{y^m}``
 """
-function init_integrators(nint::IntVectorOrInt, nys, varname::String)
+function init_integrators(nint::IntVectorOrInt, ny, varname::String)
     if nint == 0 # alias for no integrator at all
-        nint = fill(0, nys)
+        nint = fill(0, ny)
     end
-    if length(nint) ≠ nys
-        error("nint_$(varname) size ($(length(nint))) ≠ n$(varname) ($nys)")
+    if length(nint) ≠ ny
+        error("nint_$(varname) size ($(length(nint))) ≠ n$(varname) ($ny)")
     end
     any(nint .< 0) && error("nint_$(varname) values should be ≥ 0")
-    nxs = sum(nint)
-    As, Cs = zeros(nxs, nxs), zeros(nys, nxs)
-    if nxs ≠ 0 # construct stochastic model state-space matrices (integrators) :
-        i_As, i_Cs = 1, 1
-        for i = 1:nys
+    nx = sum(nint)
+    A, C = zeros(nx, nx), zeros(ny, nx)
+    if nx ≠ 0
+        i_A, i_C = 1, 1
+        for i = 1:ny
             nint_i = nint[i]
             if nint_i ≠ 0
-                rows_As = (i_As):(i_As + nint_i - 1)
-                As[rows_As, rows_As] = Bidiagonal(ones(nint_i), ones(nint_i-1), :L)
-                Cs[i, i_Cs+nint_i-1] = 1
-                i_As += nint_i
-                i_Cs += nint_i
+                rows_A = (i_A):(i_A + nint_i - 1)
+                A[rows_A, rows_A] = Bidiagonal(ones(nint_i), ones(nint_i-1), :L)
+                C[i, i_C+nint_i-1] = 1
+                i_A += nint_i
+                i_C += nint_i
             end
         end
     end
-    return As, Cs, nint
+    return A, C, nint
 end
 
 @doc raw"""
