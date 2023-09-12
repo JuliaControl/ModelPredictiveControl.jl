@@ -21,14 +21,14 @@ struct SteadyKalmanFilter <: StateEstimator
     D̂dm ::Matrix{Float64}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
-    K::Matrix{Float64}
+    K̂::Matrix{Float64}
     function SteadyKalmanFilter(model, i_ym, nint_u, nint_ym, Q̂, R̂)
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nx̂ = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂)
-        K = try
+        K̂ = try
             Q̂_kalman = Matrix(Q̂) # Matrix() required for Julia 1.6
             R̂_kalman = zeros(eltype(R̂), model.ny, model.ny)
             R̂_kalman[i_ym, i_ym] = R̂
@@ -54,7 +54,7 @@ struct SteadyKalmanFilter <: StateEstimator
             Â, B̂u, Ĉ, B̂d, D̂d,
             Ĉm, D̂dm,
             Q̂, R̂,
-            K
+            K̂
         )
     end
 end
@@ -130,7 +130,7 @@ The function [`init_estimstoch`](@ref) builds the stochastic model for estimatio
 !!! tip
     Increasing `σQint_u` and `σQint_ym` values increases the integral action "gain".
 
-The constructor pre-compute the steady-state Kalman gain `K` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
+The constructor pre-compute the steady-state Kalman gain `K̂` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
 function. It can sometimes fail, for example when `model` matrices are ill-conditioned. In
 such a case, you can try the alternative time-varying [`KalmanFilter`](@ref).
 """
@@ -165,16 +165,16 @@ SteadyKalmanFilter(model::LinModel, i_ym, nint_u, nint_ym, Q̂, R̂)
 
 Update `estim.x̂` estimate with current inputs `u`, measured outputs `ym` and dist. `d`.
 
-The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\mathbf{K}``:
+The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\mathbf{K̂}``:
 ```math
 \mathbf{x̂}_{k}(k+1) = \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
-               + \mathbf{K}[\mathbf{y^m}(k) - \mathbf{Ĉ^m x̂}_{k-1}(k) - \mathbf{D̂_d^m d}(k)]
+               + \mathbf{K̂}[\mathbf{y^m}(k) - \mathbf{Ĉ^m x̂}_{k-1}(k) - \mathbf{D̂_d^m d}(k)]
 ```
 """
 function update_estimate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
-    x̂, K = estim.x̂, estim.K
-    x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K*(ym - Ĉm*x̂ - D̂dm*d)
+    x̂, K̂ = estim.x̂, estim.K̂
+    x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K̂*(ym - Ĉm*x̂ - D̂dm*d)
     return x̂
 end
 
@@ -203,6 +203,8 @@ struct KalmanFilter <: StateEstimator
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
+    K̂::Matrix{Float64}
+    M̂::Matrix{Float64}
     function KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -215,6 +217,7 @@ struct KalmanFilter <: StateEstimator
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂0 = Hermitian(P̂0, :L)
         P̂ = copy(P̂0)
+        K̂, M̂ = zeros(nx̂, nym), zeros(nx̂, nym)
         return new(
             model, 
             lastu0, x̂, P̂, 
@@ -222,7 +225,8 @@ struct KalmanFilter <: StateEstimator
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, 
             Ĉm, D̂dm,
-            P̂0, Q̂, R̂
+            P̂0, Q̂, R̂,
+            K̂, M̂
         )
     end
 end
@@ -298,14 +302,14 @@ Update [`KalmanFilter`](@ref) state `estim.x̂` and estimation error covariance 
 It implements the time-varying Kalman Filter in its predictor (observer) form :
 ```math
 \begin{aligned}
-    \mathbf{M}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^m}'
+    \mathbf{M̂}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^m}'
                            [\mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m}' + \mathbf{R̂}]^{-1}       \\
-    \mathbf{K}(k)       &= \mathbf{Â M(k)}                                                \\
+    \mathbf{K̂}(k)       &= \mathbf{Â M̂(k)}                                                \\
     \mathbf{ŷ^m}(k)     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k)                  \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k)
-                           + \mathbf{K}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
+                           + \mathbf{K̂}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
     \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k)
-                           - \mathbf{M}(k)\mathbf{Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}' + \mathbf{Q̂}
+                           - \mathbf{M̂}(k)\mathbf{Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}' + \mathbf{Q̂}
 \end{aligned}
 ```
 based on the process model described in [`SteadyKalmanFilter`](@ref). The notation 
@@ -342,6 +346,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
+    K̂::Matrix{Float64}
     nσ::Int 
     γ::Float64
     m̂::Vector{Float64}
@@ -360,6 +365,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂0 = Hermitian(P̂0, :L)
         P̂ = copy(P̂0)
+        K̂ = zeros(nx̂, nym)
         return new(
             model,
             lastu0, x̂, P̂, 
@@ -367,6 +373,7 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂0, Q̂, R̂,
+            K̂,
             nσ, γ, m̂, Ŝ
         )
     end
@@ -506,10 +513,10 @@ of sigma points, and ``\mathbf{X̂}_{k-1}^j(k)``, the vector at the ``j``th colu
     \mathbf{ŷ^m}(k)     &= \mathbf{Ŷ^m}(k) \mathbf{m̂} \\
     \mathbf{X̄}_{k-1}(k) &= \begin{bmatrix} \mathbf{X̂}_{k-1}^{1}(k) - \mathbf{x̂}_{k-1}(k) & \mathbf{X̂}_{k-1}^{2}(k) - \mathbf{x̂}_{k-1}(k) & \cdots & \mathbf{X̂}_{k-1}^{n_σ}(k) - \mathbf{x̂}_{k-1}(k) \end{bmatrix} \\
     \mathbf{Ȳ^m}(k)     &= \begin{bmatrix} \mathbf{Ŷ^m}^{1}(k)     - \mathbf{ŷ^m}(k)     & \mathbf{Ŷ^m}^{2}(k)     - \mathbf{ŷ^m}(k)     & \cdots & \mathbf{Ŷ^m}^{n_σ}(k)     - \mathbf{ŷ^m}(k)     \end{bmatrix} \\
-    \mathbf{M}(k)       &= \mathbf{Ȳ^m}(k) \mathbf{Ŝ} \mathbf{Ȳ^m}'(k) + \mathbf{R̂} \\
-    \mathbf{K}(k)       &= \mathbf{X̄}_{k-1}(k) \mathbf{Ŝ} \mathbf{Ȳ^m}'(k) \mathbf{M}(k)^{-1} \\
-    \mathbf{x̂}_k(k)     &= \mathbf{x̂}_{k-1}(k) + \mathbf{K}(k) \big[ \mathbf{y^m}(k) - \mathbf{ŷ^m}(k) \big] \\
-    \mathbf{P̂}_k(k)     &= \mathbf{P̂}_{k-1}(k) - \mathbf{K}(k) \mathbf{M}(k) \mathbf{K}'(k) \\
+    \mathbf{M̂}(k)       &= \mathbf{Ȳ^m}(k) \mathbf{Ŝ} \mathbf{Ȳ^m}'(k) + \mathbf{R̂} \\
+    \mathbf{K̂}(k)       &= \mathbf{X̄}_{k-1}(k) \mathbf{Ŝ} \mathbf{Ȳ^m}'(k) \big[\mathbf{M̂}(k)\big]^{-1} \\
+    \mathbf{x̂}_k(k)     &= \mathbf{x̂}_{k-1}(k) + \mathbf{K̂}(k) \big[ \mathbf{y^m}(k) - \mathbf{ŷ^m}(k) \big] \\
+    \mathbf{P̂}_k(k)     &= \mathbf{P̂}_{k-1}(k) - \mathbf{K̂}(k) \mathbf{M̂}(k) \mathbf{K̂}'(k) \\
     \mathbf{X̂}_k(k)     &= \bigg[\begin{matrix} \mathbf{x̂}_{k}(k) & \mathbf{x̂}_{k}(k) & \cdots & \mathbf{x̂}_{k}(k) \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & \gamma \sqrt{\mathbf{P̂}_{k}(k)} & - \gamma \sqrt{\mathbf{P̂}_{k}(k)} \end{matrix}\bigg] \\
     \mathbf{X̂}_{k}(k+1) &= \bigg[\begin{matrix} \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{1}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{2}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \cdots & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{n_σ}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \end{matrix}\bigg] \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{X̂}_{k}(k+1)\mathbf{m̂} \\
@@ -527,7 +534,7 @@ noise, respectively.
      ISBN9780470045343.
 """
 function update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
-    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
+    x̂, P̂, Q̂, R̂, K̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # --- correction step ---
@@ -540,10 +547,11 @@ function update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
     ŷm = Ŷm * m̂
     X̄ = X̂ .- x̂
     Ȳm = Ŷm .- ŷm
-    M = Hermitian(Ȳm * Ŝ * Ȳm' + R̂, :L)
-    K = X̄ * Ŝ * Ȳm' / M
-    x̂_cor = x̂ + K * (ym - ŷm)
-    P̂_cor = P̂ - Hermitian(K * M * K', :L)
+    M̂ = Hermitian(Ȳm * Ŝ * Ȳm' + R̂, :L)
+    mul!(K̂, X̄, lmul!(Ŝ, Ȳm'))
+    rdiv!(K̂, cholesky(M̂))
+    x̂_cor = x̂ + K̂ * (ym - ŷm)
+    P̂_cor = P̂ - Hermitian(K̂ * M̂ * K̂', :L)
     # --- prediction step ---
     sqrt_P̂_cor = cholesky(P̂_cor).L
     X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂_cor -γ*sqrt_P̂_cor]
@@ -553,7 +561,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
     end
     x̂[:] = X̂_next * m̂
     X̄_next = X̂_next .- x̂
-    P̂.data[:] = X̄_next * Ŝ * X̄_next' + Q̂ # .data is necessary for Hermitian matrices
+    P̂.data[:] = X̄_next * Ŝ * X̄_next' + Q̂ # .data is necessary for Hermitians
     return x̂, P̂
 end
 
@@ -580,6 +588,8 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
     P̂0::Hermitian{Float64, Matrix{Float64}}
     Q̂::Hermitian{Float64, Matrix{Float64}}
     R̂::Hermitian{Float64, Matrix{Float64}}
+    K̂::Matrix{Float64}
+    M̂::Matrix{Float64}
     function ExtendedKalmanFilter{M}(
         model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂
     ) where {M<:SimModel}
@@ -594,13 +604,15 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)
         P̂ = copy(P̂0)
+        K̂, M̂ = zeros(nx̂, nym), zeros(nx̂, nym)
         return new(
             model,
             lastu0, x̂, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
-            P̂0, Q̂, R̂
+            P̂0, Q̂, R̂,
+            K̂, M̂
         )
     end
 end
@@ -680,14 +692,14 @@ The equations are similar to [`update_estimate!(::KalmanFilter)`](@ref) but with
 substitutions ``\mathbf{Â = F̂}(k)`` and ``\mathbf{Ĉ^m = Ĥ^m}(k)``:
 ```math
 \begin{aligned}
-    \mathbf{M}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}'(k)
+    \mathbf{M̂}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}'(k)
                            [\mathbf{Ĥ^m}(k)\mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}'(k) + \mathbf{R̂}]^{-1}    \\
-    \mathbf{K}(k)       &= \mathbf{F̂}(k) \mathbf{M}(k)                                    \\
+    \mathbf{K̂}(k)       &= \mathbf{F̂}(k) \mathbf{M̂}(k)                                    \\
     \mathbf{ŷ^m}(k)     &= \mathbf{ĥ^m}\Big( \mathbf{x̂}_{k-1}(k), \mathbf{d}(k) \Big)     \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{f̂}\Big( \mathbf{x̂}_{k-1}(k), \mathbf{u}(k), \mathbf{d}(k) \Big)
-                           + \mathbf{K}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
+                           + \mathbf{K̂}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
     \mathbf{P̂}_{k}(k+1) &= \mathbf{F̂}(k)[\mathbf{P̂}_{k-1}(k)
-                           - \mathbf{M}(k)\mathbf{Ĥ^m}(k)\mathbf{P̂}_{k-1}(k)]\mathbf{F̂}'(k) 
+                           - \mathbf{M̂}(k)\mathbf{Ĥ^m}(k)\mathbf{P̂}_{k-1}(k)]\mathbf{F̂}'(k) 
                            + \mathbf{Q̂}
 \end{aligned}
 ```
@@ -736,16 +748,19 @@ end
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
-Allows code reuse for the time-varying and extended Kalman filters. They update the state
-`x̂` and covariance `P̂` with the same equations. The extended filter substitutes the 
-augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
+Allows code reuse for [`KalmanFilter`](@ref) and [`ExtendedKalmanFilterKalmanFilter`](@ref).
+They update the state `x̂` and covariance `P̂` with the same equations. The extended filter
+substitutes the augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
+The implementation uses in-place operations and explicit factorization to reduce
+allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations.
 """
 function update_estimate_kf!(estim, Â, Ĉm, u, ym, d)
-    x̂, P̂, Q̂, R̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂
-    M  = (P̂ * Ĉm') / (Ĉm * P̂ * Ĉm' + R̂)
-    K  = Â * M
+    x̂, P̂, Q̂, R̂, K̂, M̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂, estim.M̂
+    mul!(M̂, P̂, Ĉm')
+    rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' + R̂)))
+    mul!(K̂, Â, M̂)
     ŷm = ĥ(estim, x̂, d)[estim.i_ym]
-    x̂[:] = f̂(estim, x̂, u, d) +  K * (ym - ŷm)
-    P̂.data[:] = Â * (P̂ - M * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitian matrices
+    x̂[:] = f̂(estim, x̂, u, d) +  K̂ * (ym - ŷm)
+    P̂.data[:] = Â * (P̂ - M̂ * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitians
     return x̂, P̂
 end

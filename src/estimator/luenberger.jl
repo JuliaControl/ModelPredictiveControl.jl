@@ -19,16 +19,16 @@ struct Luenberger <: StateEstimator
     D̂d  ::Matrix{Float64}
     Ĉm  ::Matrix{Float64}
     D̂dm ::Matrix{Float64}
-    K::Matrix{Float64}
+    K̂::Matrix{Float64}
     function Luenberger(model, i_ym, nint_u, nint_ym, p̂)
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nxs, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nx̂ = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
-        K = try
+        K̂ = try
             place(Â, Ĉ, p̂, :o)[:, i_ym]
         catch
-            error("Cannot compute the Luenberger gain L with specified poles p̂.")
+            error("Cannot compute the Luenberger gain K̂ with specified poles p̂.")
         end
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         lastu0 = zeros(model.nu)
@@ -40,7 +40,7 @@ struct Luenberger <: StateEstimator
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             Ĉm, D̂dm,
-            K
+            K̂
         )
     end
 end
@@ -61,7 +61,7 @@ unmeasured ``\mathbf{y^u}``. `model` matrices are augmented with the stochastic 
 is specified by the numbers of integrator `nint_u` and `nint_ym` (see [`SteadyKalmanFilter`](@ref)
 Extended Help). The argument `p̂` is a vector of `model.nx + sum(nint_ym)` elements 
 specifying the observer poles/eigenvalues (near ``z=0.5`` by default). The method computes 
-the observer gain ``\mathbf{K}`` with [`place`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.place).
+the observer gain `K̂` with [`place`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.place).
 
 # Examples
 ```jldoctest
@@ -99,7 +99,7 @@ Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberge
 """
 function update_estimate!(estim::Luenberger, u, ym, d=Float64[])
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
-    x̂, K = estim.x̂, estim.K
-    x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K*(ym - Ĉm*x̂ - D̂dm*d)
+    x̂, K̂ = estim.x̂, estim.K̂
+    x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K̂*(ym - Ĉm*x̂ - D̂dm*d)
     return x̂
 end
