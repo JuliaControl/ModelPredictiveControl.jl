@@ -101,9 +101,9 @@ function LinModel(
     if iscontinuous(sys)
         isnothing(Ts) && error("Sample time Ts must be specified if sys is continuous")
         # manipulated inputs : zero-order hold discretization 
-        sysu_dis = c2d(sysu,Ts,:zoh);
+        sysu_dis = c2d(sysu,Ts,:zoh)
         # measured disturbances : tustin discretization (continuous signals with ADCs)
-        sysd_dis = c2d(sysd,Ts,:tustin)
+        sysd_dis = c2d(sysd,Ts,:zoh)
     else
         if !isnothing(Ts) && !(Ts ≈ sys.Ts)
             @info "LinModel: resampling linear model from Ts = $(sys.Ts) to $Ts s..."
@@ -117,7 +117,7 @@ function LinModel(
             sysd_dis = sysd
         end     
     end
-    sys_dis = sminreal([sysu_dis sysd_dis]) # merge common poles if possible
+    sys_dis = minreal([sysu_dis sysd_dis]) # merge common poles if possible
     nx = size(sys_dis.A,1)
     nu = length(i_u)
     ny = size(sys_dis,1)
