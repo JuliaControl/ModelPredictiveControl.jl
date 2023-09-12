@@ -192,18 +192,23 @@ incorporate feedforward compensation in the controller. The new plant model is:
 \end{bmatrix}
 ```
 
-We construct a new [`LinModel`](@ref) that includes the measured disturbance
+We need to construct a new [`LinModel`](@ref) that includes the measured disturbance
 ``\mathbf{d} = [u_l]`` and the operating point ``\mathbf{d_{op}} = [10]``:
 
 ```@example 1
 sys_ff   = [sys sys[1:2, 2]]
 model_ff = setop!(LinModel(sys_ff, Ts, i_d=[3]), uop=[10, 10], yop=[50, 30], dop=[10])
+```
+
+A [`LinMPC`](@ref) controller is constructed on this model:
+
+```@example 1
 mpc_ff   = LinMPC(model_ff, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
 mpc_ff   = setconstraint!(mpc_ff, ymin=[45, -Inf])
 ```
 
-Also, a new test function that feeds the measured disturbance ``\mathbf{d}`` to the
-controller is defined:
+A new test function that feeds the measured disturbance ``\mathbf{d}`` to the controller is
+also required:
 
 ```@example 1
 function test_mpc_ff(mpc_ff, model)
