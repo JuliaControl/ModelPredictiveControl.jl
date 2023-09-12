@@ -103,7 +103,7 @@ function LinModel(
         # manipulated inputs : zero-order hold discretization 
         sysu_dis = c2d(sysu,Ts,:zoh)
         # measured disturbances : tustin discretization (continuous signals with ADCs)
-        sysd_dis = c2d(sysd,Ts,:zoh)
+        sysd_dis = c2d(sysd,Ts,:tustin)
     else
         if !isnothing(Ts) && !(Ts ≈ sys.Ts)
             @info "LinModel: resampling linear model from Ts = $(sys.Ts) to $Ts s..."
