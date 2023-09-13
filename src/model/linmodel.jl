@@ -67,8 +67,10 @@ and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Las
 `sys` is discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by using 
 the aforementioned discretization methods.
 
-The constructor transforms the system to a more practical form (``\mathbf{D_u=0}`` because 
-of the zero-order hold):
+Note that the constructor transforms the system to its minimal realization using [`minreal`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.minreal)
+to favor observability. As a consequence, the final state-space representation may be 
+different from the one provided in `sys`. It is also converted into a more practical form
+(``\mathbf{D_u=0}`` because of the zero-order hold):
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u}(k) + \mathbf{B_d d}(k) \\
@@ -117,7 +119,8 @@ function LinModel(
             sysd_dis = sysd
         end     
     end
-    sys_dis = minreal([sysu_dis sysd_dis]) # merge common poles if possible
+    # minreal to merge common poles if possible and ensure observability
+    sys_dis = minreal([sysu_dis sysd_dis]) 
     nx = size(sys_dis.A,1)
     nu = length(i_u)
     ny = size(sys_dis,1)
@@ -150,8 +153,7 @@ Discrete-time linear model with a sample time Ts = 0.5 s and:
 ```
 """
 function LinModel(sys::TransferFunction, Ts::Union{Real,Nothing} = nothing; kwargs...)
-    sys_min = minreal(ss(sys)) # remove useless states with pole-zero cancellation
-    return LinModel(sys_min, Ts; kwargs...)
+    return LinModel(ss(sys), Ts; kwargs...) # minreal is called later in the constructor
 end
 
 
@@ -173,8 +175,8 @@ Discrete-time linear model with a sample time Ts = 0.5 s and:
 ```
 """
 function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
-    sys_dis = minreal(c2d(sys, Ts, :zoh)) # c2d only supports :zoh for DelayLtiSystem
-    return LinModel(sys_dis, Ts; kwargs...)
+    # c2d only supports :zoh for DelayLtiSystem
+    return LinModel(c2d(sys, Ts, :zoh), Ts; kwargs...)
 end
 
 

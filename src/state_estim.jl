@@ -296,11 +296,11 @@ find a good steady-state to initialize `estim.x̂` estimate.
 ```jldoctest
 julia> estim = SteadyKalmanFilter(LinModel(tf(3, [10, 1]), 0.5), nint_ym=[2]);
 
-julia> u = [1]; ym = [3 - 0.1]; x̂ = initstate!(estim, u, ym)
+julia> u = [1]; ym = [3 - 0.1]; x̂ = round.(initstate!(estim, u, ym), digits=3)
 3-element Vector{Float64}:
-  5.0000000000000115
+  5.0
   0.0
- -0.10000000000000675
+ -0.1
 
 julia> x̂ ≈ updatestate!(estim, u, ym)
 true

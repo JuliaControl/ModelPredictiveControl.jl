@@ -257,7 +257,7 @@ end
     h(x,_)   = linmodel.C*x
     nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2) 
     nmpc1 = NonLinMPC(nonlinmodel)
-    @test initstate!(nmpc1, [10, 50], [20, 25]) ≈ [zeros(2); [20, 25]]
+    @test initstate!(nmpc1, [10, 50], [20, 25]) ≈ zeros(4)
     setstate!(nmpc1, [1,2,3,4])
     @test nmpc1.estim.x̂ ≈ [1,2,3,4]
     setstate!(nmpc1, [0,0,0,0])
