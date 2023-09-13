@@ -298,7 +298,7 @@ end
     @test internalmodel1.x̂s ≈ ones(2)
     @test evaloutput(internalmodel1, [51,31]) ≈ internalmodel1([51,31]) ≈ [51,31] 
     @test evaloutput(internalmodel1, [51,31], Float64[]) ≈ internalmodel1([51,31], Float64[]) ≈ [51,31]
-    @test initstate!(internalmodel1, [10, 50], [50, 30+1]) ≈ zeros(2)
+    @test initstate!(internalmodel1, [10, 50], [50, 30]) ≈ zeros(2)
     @test internalmodel1.x̂s ≈ zeros(2)
     setstate!(internalmodel1, [1,2])
     @test internalmodel1.x̂ ≈ [1,2]
@@ -357,23 +357,23 @@ end
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h(x,_)   = linmodel1.C*x
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
-    ekf1 = UnscentedKalmanFilter(nonlinmodel)
-    @test updatestate!(ekf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
-    @test updatestate!(ekf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
-    @test ekf1.x̂ ≈ zeros(4) atol=1e-9
-    @test evaloutput(ekf1) ≈ ekf1() ≈ [50, 30]
-    @test evaloutput(ekf1, Float64[]) ≈ ekf1(Float64[]) ≈ [50, 30]
-    @test initstate!(ekf1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
-    setstate!(ekf1, [1,2,3,4])
-    @test ekf1.x̂ ≈ [1,2,3,4]
+    ukf1 = UnscentedKalmanFilter(nonlinmodel)
+    @test updatestate!(ukf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
+    @test updatestate!(ukf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
+    @test ukf1.x̂ ≈ zeros(4) atol=1e-9
+    @test evaloutput(ukf1) ≈ ukf1() ≈ [50, 30]
+    @test evaloutput(ukf1, Float64[]) ≈ ukf1(Float64[]) ≈ [50, 30]
+    @test initstate!(ukf1, [10, 50], [50, 30+1]) ≈ zeros(4)
+    setstate!(ukf1, [1,2,3,4])
+    @test ukf1.x̂ ≈ [1,2,3,4]
     for i in 1:1000
-        updatestate!(ekf1, [11, 52], [50, 30])
+        updatestate!(ukf1, [11, 52], [50, 30])
     end
-    @test ekf1() ≈ [50, 30] atol=1e-3
+    @test ukf1() ≈ [50, 30] atol=1e-3
     for i in 1:1000
-        updatestate!(ekf1, [10, 50], [51, 32])
+        updatestate!(ukf1, [10, 50], [51, 32])
     end
-    @test ekf1() ≈ [51, 32] atol=1e-3
+    @test ukf1() ≈ [51, 32] atol=1e-3
     ukf2 = UnscentedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
     for i in 1:1000
         updatestate!(ukf2, [11, 52], [50, 30])
@@ -439,7 +439,7 @@ end
     @test ekf1.x̂ ≈ zeros(4) atol=1e-9
     @test evaloutput(ekf1) ≈ ekf1() ≈ [50, 30]
     @test evaloutput(ekf1, Float64[]) ≈ ekf1(Float64[]) ≈ [50, 30]
-    @test initstate!(ekf1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    @test initstate!(ekf1, [10, 50], [50, 30+1]) ≈ zeros(4);
     setstate!(ekf1, [1,2,3,4])
     @test ekf1.x̂ ≈ [1,2,3,4]
     for i in 1:1000

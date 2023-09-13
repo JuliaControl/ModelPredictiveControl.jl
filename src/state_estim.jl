@@ -283,31 +283,47 @@ end
 
 Init `estim.x̂` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
-The method set the estimation error covariance to `estim.P̂0` (if applicable) and tries to 
-find a good steady-state to initialize `estim.x̂` estimate :
+The method set the error covariance to `estim.P = estim.P̂0` (if applicable) and tries to 
+find a good steady-state to initialize `estim.x̂` estimate. 
 
-- If `estim.model` is a [`LinModel`](@ref), it evaluates `estim.model` steady-state (using
-  [`steadystate`](@ref)) with current inputs `u` and measured disturbances `d`, and saves
-  the result to `estim.x̂[1:nx].`
-- Else, the current deterministic states `estim.x̂[1:nx]` are left unchanged (use 
-  [`setstate!`](@ref) to manually modify them). 
-  
-It then estimates the measured outputs `ŷm` from these states, and the residual offset with 
-current measured outputs `(ym - ŷm)` initializes the integrators of the stochastic model.
-This approach ensures that ``\mathbf{ŷ^m}(0) = \mathbf{y^m}(0)``. For [`LinModel`](@ref), it 
-also ensures that the estimator starts at steady-state, resulting in a bumpless manual to 
-automatic transfer for control applications.
+- If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
+  using `u` and `d` arguments, and uses the `ym` argument to enforce that ``\mathbf{ŷ^m} = 
+  \mathbf{y^m}``. For control applications, this solution produces a bumpless manual to 
+  automatic transfer. See Extended Help for details.
+- Else, `estim.x̂` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
 
 # Examples
 ```jldoctest
 julia> estim = SteadyKalmanFilter(LinModel(tf(3, [10, 1]), 0.5), nint_ym=[2]);
 
-julia> x̂ = initstate!(estim, [1], [3 - 0.1])
+julia> u = [1]; ym = [3 - 0.1]; x̂ = initstate!(estim, u, ym)
 3-element Vector{Float64}:
   5.0000000000000115
   0.0
  -0.10000000000000675
+
+julia> x̂ ≈ updatestate!(estim, u, ym)
+true
+
+julia> evaloutput(estim) ≈ ym
+true
 ```
+
+# Extended Help
+Based on [`setop!`](@ref) notation, the resulting system to solve for [`LinModel`](@ref) is:
+```math
+\begin{bmatrix}
+    \mathbf{I} - \mathbf{Â}             \\
+    \mathbf{Ĉ}
+\end{bmatrix} \mathbf{x̂} =
+\begin{bmatrix}
+    \mathbf{B̂_u u_0} + \mathbf{B̂_d d_0} \\
+    \mathbf{y_0} - \mathbf{D̂_d d_0}
+\end{bmatrix}
+```
+with ``\mathbf{u_0 = u - u_{op}}`` and ``\mathbf{d_0 = d - d_{op}}``. The vector
+``\mathbf{y_0}`` comprises the measured ``\mathbf{y_0^m = y^m - y_{op}^m}`` and unmeasured
+``\mathbf{y_0^u = 0}`` outputs.
 """
 function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     model = estim.model
@@ -315,28 +331,25 @@ function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     initstate_cov!(estim)
     # --- init lastu0 for PredictiveControllers ---
     estim.lastu0[:] = u - model.uop
-    # --- deterministic model states ---
-    x̂d = init_deterstate(model, estim, u, d)
-    # --- stochastic model states (integrators) ---
-    ŷd = h(model, x̂d, d - model.dop) + model.yop
-    ŷsm = ym - ŷd[estim.i_ym]
-    nint_ym = estim.nint_ym
-    i_nint_nonzero = (nint_ym .≠ 0) 
-    i_lastint = cumsum(nint_ym[i_nint_nonzero])
-    x̂s = zeros(estim.nxs) # xs : integrator states
-    x̂s[i_lastint] = ŷsm[i_nint_nonzero]
-    # --- combine both results ---
-    estim.x̂[:] = [x̂d; x̂s]
+    # --- init state estimate ----
+    init_estimate!(estim, model, u, ym, d)
     return estim.x̂
 end
 
 "By default, state estimators do not need initialization of covariance estimate."
-initstate_cov!(estim::StateEstimator) = nothing
+initstate_cov!(::StateEstimator) = nothing
 
-"Init deterministic state `x̂d` with steady-state value for `LinModel`."
-init_deterstate(model::LinModel, _    , u, d) = steadystate(model, u, d)
-"Keep current deterministic state unchanged for `NonLinModel`."
-init_deterstate(model::SimModel, estim, _, _) = estim.x̂[1:model.nx]
+"Init estimate x̂ with the steady-state solution for if `model` is a [`LinModel`](@ref)."
+function init_estimate!(estim::StateEstimator, model::LinModel, u, ym, d)
+    Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
+    y0 = zeros(model.ny)
+    y0[estim.i_ym] = ym - model.yop[estim.i_ym]
+    u0 = u - model.uop
+    d0 = d - model.dop
+    estim.x̂[:] = [(I - Â); Ĉ]\[B̂u*u0 + B̂d*d0; y0 - D̂d*d0]
+end
+"Do nothing if `model` is not a [`LinModel`](@ref)."
+init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
 
 @doc raw"""
     evaloutput(estim::StateEstimator, d=Float64[]) -> ŷ

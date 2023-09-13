@@ -308,9 +308,8 @@ Return the optimizer solution summary that can be printed, `sol_summary`, and th
 - `:d`  : current measured disturbance ``(\mathbf{d})``
 - `:D̂`  : predicted measured disturbances over `Hp` ``(\mathbf{D̂})``
 - `:ŷ`  : current estimated output ``(\mathbf{ŷ})``
-- `:Ŷ`  : optimal predicted outputs over `Hp` ``(\mathbf{Ŷ = Ŷ_d + Ŷ_s})``
-- `:Ŷd` : optimal predicted deterministic output over `Hp` ``(\mathbf{Ŷ_d})``
-- `:Ŷs` : predicted stochastic output over `Hp` ``(\mathbf{Ŷ_s})``
+- `:Ŷ`  : optimal predicted outputs over `Hp` ``(\mathbf{Ŷ})``
+- `:Ŷs` : predicted stochastic output over `Hp` of [`InternalModel`](@ref) ``(\mathbf{Ŷ_s})``
 - `:R̂y` : predicted output setpoint over `Hp` ``(\mathbf{R̂_y})``
 - `:R̂u` : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
 
@@ -339,7 +338,6 @@ function getinfo(mpc::PredictiveController)
     info[:ŷ]   = mpc.ŷ
     info[:Ŷ]   = Ŷ
     info[:Ŷs]  = mpc.Ŷs
-    info[:Ŷd]  = info[:Ŷ] - info[:Ŷs]
     info[:R̂y]  = mpc.R̂y
     info[:R̂u]  = mpc.R̂u
     return sol_summary, info
@@ -984,8 +982,6 @@ function isfatal(status::TerminationStatusCode)
     ]
     return any(status .== fatalstatuses)
 end
-
-
 
 
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."

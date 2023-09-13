@@ -224,11 +224,10 @@ The deterministic state `estim.x̂d` initialization method is identical to
 """
 function initstate!(estim::InternalModel, u, ym, d=Float64[])
     model = estim.model
-    x̂d = init_deterstate(model, estim, u, d)
-    estim.x̂d[:] = x̂d
+    init_estimate!(estim, model, u, ym, d)
     # TODO: best method to initialize internal model stochastic states ? not sure...
     estim.x̂s[:] = zeros(estim.nxs)
-    return x̂d
+    return estim.x̂d
 end
 
 @doc raw"""
