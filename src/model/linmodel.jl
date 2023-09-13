@@ -77,8 +77,8 @@ form (``\mathbf{D_u=0}`` because of the zero-order hold):
     \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D_d d}(k)
 \end{aligned}
 ```
-Use the syntax [`LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)`](@ref) to force a specific
-state-space representation.
+Use the syntax [`LinModel(A,Bu,C,Bd,Dd,Ts,nu,nx,ny,nd)`](@ref) to force a specific state-
+space representation.
 """
 function LinModel(
     sys::StateSpace,
@@ -187,7 +187,7 @@ end
 
 Construct the model from the discrete state-space matrices `A, Bu, C, Bd, Dd` directly.
 
-This syntax do not modify the state-space representation provided in argument ([`minreal`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.minreal)
+This syntax do not modify the state-space representation provided in argument (`minreal`
 is not called). Care must be taken to ensure that the model is controllable and observable.
 
 """
