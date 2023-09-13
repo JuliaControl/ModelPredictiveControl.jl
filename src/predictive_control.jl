@@ -586,7 +586,7 @@ state estimated at the last control period. The stochastic outputs ``\mathbf{Ŷ
 and ``\mathbf{y}`` are omitted in above equations.
 
 # Extended Help
-Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `model` and the equation
+Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` and the equation
 ``\mathbf{W}_j = \mathbf{Ĉ} ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}``, the prediction 
 matrices are computed by :
 ```math
