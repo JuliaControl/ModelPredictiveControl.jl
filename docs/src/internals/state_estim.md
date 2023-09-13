@@ -4,7 +4,7 @@
 Pages = ["state_estim.md"]
 ```
 
-## Estimator Initialization
+## Estimator Construction
 
 ```@docs
 ModelPredictiveControl.init_estimstoch
@@ -27,12 +27,21 @@ ModelPredictiveControl.ĥ
 ModelPredictiveControl.remove_op!
 ```
 
-## Update Estimate
+## Init Estimate
 
 !!! info
     All these methods assume that the operating points are already removed in `u`, `ym`
     and `d` arguments. Strickly speaking, the arguments should be called `u0`, `ym0` and
     `d0`, following [`setop!`](@ref) notation. The `0` is dropped to simplify the notation.
+
+```@docs
+ModelPredictiveControl.init_estimate!
+```
+
+## Update Estimate
+
+!!! info
+    Same as above: the arguments should be called `u0`, `ym0` and `d0`, strickly speaking.
 
 ```@docs
 ModelPredictiveControl.update_estimate!

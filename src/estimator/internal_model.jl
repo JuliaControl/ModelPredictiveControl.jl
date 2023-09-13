@@ -214,20 +214,11 @@ function update_estimate!(estim::InternalModel, u, ym, d=Float64[])
     return x̂d
 end
 
-@doc raw"""
-    initstate!(estim::InternalModel, u, ym, d=Float64[]) -> x̂d
-
-Init `estim.x̂d` / `x̂s` states from current inputs `u`, meas. outputs `ym` and disturb. `d`.
-
-The deterministic state `estim.x̂d` initialization method is identical to 
-[`initstate!(::StateEstimator)`](@ref). The stochastic states `estim.x̂s` are init at 0. 
-"""
-function initstate!(estim::InternalModel, u, ym, d=Float64[])
-    model = estim.model
-    init_estimate!(estim, model, u, ym, d)
+"Init the stochastic states `estim.x̂s` of [`InternalModel`](@ref) at 0. " 
+function initstate_post!(estim::InternalModel)
     # TODO: best method to initialize internal model stochastic states ? not sure...
     estim.x̂s[:] = zeros(estim.nxs)
-    return estim.x̂d
+    return nothing
 end
 
 @doc raw"""

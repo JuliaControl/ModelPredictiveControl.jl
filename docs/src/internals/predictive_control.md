@@ -9,7 +9,7 @@ The prediction methodology of this module is mainly based on Maciejowski textboo
 [^1]: Maciejowski, J. 2000, "Predictive control : with constraints", 1st ed., Prentice Hall,
      ISBN 978-0201398236.
 
-## Controller Initialization
+## Controller Construction
 
 ```@docs
 ModelPredictiveControl.init_predmat

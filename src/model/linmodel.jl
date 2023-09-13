@@ -68,15 +68,17 @@ and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Las
 the aforementioned discretization methods.
 
 Note that the constructor transforms the system to its minimal realization using [`minreal`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.minreal)
-to favor observability. As a consequence, the final state-space representation may be 
-different from the one provided in `sys`. It is also converted into a more practical form
-(``\mathbf{D_u=0}`` because of the zero-order hold):
+to favor controllability and observability. As a consequence, the final state-space
+representation may be different from the one provided in `sys`. It is also converted into a
+more practical form (``\mathbf{D_u=0}`` because of the zero-order hold):
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u}(k) + \mathbf{B_d d}(k) \\
     \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D_d d}(k)
 \end{aligned}
 ```
+Use the syntax [`LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)`](@ref) to force a specific
+state-space representation.
 """
 function LinModel(
     sys::StateSpace,
@@ -180,6 +182,15 @@ function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
     return LinModel(sys_dis, Ts; kwargs...)
 end
 
+@doc raw"""
+    LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
+
+Construct the model from the discrete state-space matrices `A, Bu, C, Bd, Dd` directly.
+
+This syntax do not modify the state-space representation provided in argument ([`minreal`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.minreal)
+is not called). Care must be taken to ensure that the model is controllable and observable.
+"""
+LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
 
 """
     f(model::LinModel, x, u, d)

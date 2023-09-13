@@ -725,7 +725,7 @@ function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
 end
 
 "Initialize the covariance estimate `P̂` for the time-varying Kalman Filters" 
-function initstate_cov!(
+function initstate_post!(
     estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}
 ) 
     estim.P̂.data[:] = estim.P̂0

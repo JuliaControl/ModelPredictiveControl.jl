@@ -283,73 +283,75 @@ end
 
 Init `estim.x̂` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
-The method set the error covariance to `estim.P = estim.P̂0` (if applicable) and tries to 
-find a good steady-state to initialize `estim.x̂` estimate. 
+The method removes the operating points with [`remove_op!`](@ref) and call 
+[`init_estimate!`](@ref):
 
 - If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
   using `u` and `d` arguments, and uses the `ym` argument to enforce that ``\mathbf{ŷ^m} = 
   \mathbf{y^m}``. For control applications, this solution produces a bumpless manual to 
-  automatic transfer. See Extended Help for details.
+  automatic transfer. See [`init_estimate!`](@ref) for details.
 - Else, `estim.x̂` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
+
+If applicable, it also sets the error covariance to `estim.P = estim.P̂0`.
 
 # Examples
 ```jldoctest
 julia> estim = SteadyKalmanFilter(LinModel(tf(3, [10, 1]), 0.5), nint_ym=[2]);
 
-julia> u = [1]; ym = [3 - 0.1]; x̂ = round.(initstate!(estim, u, ym), digits=3)
+julia> u = [1]; y = [3 - 0.1]; x̂ = round.(initstate!(estim, u, y), digits=3)
 3-element Vector{Float64}:
   5.0
   0.0
  -0.1
 
-julia> x̂ ≈ updatestate!(estim, u, ym)
+julia> x̂ ≈ updatestate!(estim, u, y)
 true
 
-julia> evaloutput(estim) ≈ ym
+julia> evaloutput(estim) ≈ y
 true
 ```
 
-# Extended Help
-Based on [`setop!`](@ref) notation, the resulting system to solve for [`LinModel`](@ref) is:
+"""
+function initstate!(estim::StateEstimator, u, ym, d=Float64[])
+    # --- init state estimate ----
+    u0, d0, ym0 = remove_op!(estim, u, d, ym)
+    init_estimate!(estim, estim.model, u0, ym0, d0)
+    # --- init covariance error estimate, if applicable ---
+    initstate_post!(estim)
+    return estim.x̂
+end
+
+@doc raw"""
+    init_estimate!(estim::StateEstimator, model::LinModel, u, ym, d)
+
+Init `estim.x̂` estimate with the steady-state solution if `model` is a [`LinModel`](@ref).
+
+Using `u`, `ym` and `d` arguments, the steady-state problem combined to the equality 
+constraint ``\mathbf{ŷ^m} = \mathbf{y^m}`` engenders the following system to solve :
 ```math
 \begin{bmatrix}
     \mathbf{I} - \mathbf{Â}             \\
     \mathbf{Ĉ}
 \end{bmatrix} \mathbf{x̂} =
 \begin{bmatrix}
-    \mathbf{B̂_u u_0} + \mathbf{B̂_d d_0} \\
-    \mathbf{y_0} - \mathbf{D̂_d d_0}
+    \mathbf{B̂_u u} + \mathbf{B̂_d d} \\
+    \mathbf{y} - \mathbf{D̂_d d}
 \end{bmatrix}
 ```
-with ``\mathbf{u_0 = u - u_{op}}`` and ``\mathbf{d_0 = d - d_{op}}``. The vector
-``\mathbf{y_0}`` comprises the measured ``\mathbf{y_0^m = y^m - y_{op}^m}`` and unmeasured
-``\mathbf{y_0^u = 0}`` outputs.
+in which ``\mathbf{y}`` comprises the measured ``\mathbf{y^m}`` and unmeasured
+``\mathbf{y^u = 0}`` outputs.
 """
-function initstate!(estim::StateEstimator, u, ym, d=Float64[])
-    model = estim.model
-    # --- init covariance error estimate (if applicable) ---
-    initstate_cov!(estim)
-    # --- init lastu0 for PredictiveControllers ---
-    estim.lastu0[:] = u - model.uop
-    # --- init state estimate ----
-    init_estimate!(estim, model, u, ym, d)
-    return estim.x̂
-end
-
-"By default, state estimators do not need initialization of covariance estimate."
-initstate_cov!(::StateEstimator) = nothing
-
-"Init estimate x̂ with the steady-state solution for if `model` is a [`LinModel`](@ref)."
 function init_estimate!(estim::StateEstimator, model::LinModel, u, ym, d)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
-    y0 = zeros(model.ny)
-    y0[estim.i_ym] = ym - model.yop[estim.i_ym]
-    u0 = u - model.uop
-    d0 = d - model.dop
-    estim.x̂[:] = [(I - Â); Ĉ]\[B̂u*u0 + B̂d*d0; y0 - D̂d*d0]
+    y = zeros(model.ny)
+    y[estim.i_ym] = ym
+    estim.x̂[:] = [(I - Â); Ĉ]\[B̂u*u + B̂d*d; y - D̂d*d]
 end
-"Do nothing if `model` is not a [`LinModel`](@ref)."
+"Left `estim.x̂` estimate unchanged if `model` is not a [`LinModel`](@ref)."
 init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
+
+"By default, do nothing at the end of `initstate!` (used to init the covariance estimate)."
+initstate_post!(::StateEstimator) = nothing
 
 @doc raw"""
     evaloutput(estim::StateEstimator, d=Float64[]) -> ŷ

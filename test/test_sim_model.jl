@@ -57,7 +57,6 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
 
     linmodel6 = LinModel([delay(4) delay(4)]*sys,Ts,i_d=[3])
     @test linmodel6.nx == 3
-    println(eigvals(linmodel6.A))
     @test sum(eigvals(linmodel6.A) .≈ 0) == 1
 
     linmodel7 = LinModel(
