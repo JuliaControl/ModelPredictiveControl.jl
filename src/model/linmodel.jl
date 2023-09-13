@@ -189,6 +189,7 @@ Construct the model from the discrete state-space matrices `A, Bu, C, Bd, Dd` di
 
 This syntax do not modify the state-space representation provided in argument ([`minreal`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.minreal)
 is not called). Care must be taken to ensure that the model is controllable and observable.
+
 """
 LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
 

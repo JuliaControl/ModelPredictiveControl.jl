@@ -27,7 +27,7 @@ ModelPredictiveControl.ĥ
 ModelPredictiveControl.remove_op!
 ```
 
-## Init Estimate
+## Update Estimate
 
 !!! info
     All these methods assume that the operating points are already removed in `u`, `ym`
@@ -35,14 +35,14 @@ ModelPredictiveControl.remove_op!
     `d0`, following [`setop!`](@ref) notation. The `0` is dropped to simplify the notation.
 
 ```@docs
-ModelPredictiveControl.init_estimate!
+ModelPredictiveControl.update_estimate!
 ```
 
-## Update Estimate
+## Init Estimate
 
 !!! info
     Same as above: the arguments should be called `u0`, `ym0` and `d0`, strickly speaking.
 
 ```@docs
-ModelPredictiveControl.update_estimate!
+ModelPredictiveControl.init_estimate!
 ```

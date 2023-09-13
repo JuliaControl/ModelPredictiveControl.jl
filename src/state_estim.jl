@@ -321,37 +321,36 @@ function initstate!(estim::StateEstimator, u, ym, d=Float64[])
     return estim.x̂
 end
 
+"By default, do nothing at the end of `initstate!` (used to init the covariance estimate)."
+initstate_post!(::StateEstimator) = nothing
+
 @doc raw"""
     init_estimate!(estim::StateEstimator, model::LinModel, u, ym, d)
 
 Init `estim.x̂` estimate with the steady-state solution if `model` is a [`LinModel`](@ref).
 
 Using `u`, `ym` and `d` arguments, the steady-state problem combined to the equality 
-constraint ``\mathbf{ŷ^m} = \mathbf{y^m}`` engenders the following system to solve :
+constraint ``\mathbf{ŷ^m} = \mathbf{y^m}`` engenders the following system to solve:
 ```math
 \begin{bmatrix}
     \mathbf{I} - \mathbf{Â}             \\
-    \mathbf{Ĉ}
+    \mathbf{Ĉ^m}
 \end{bmatrix} \mathbf{x̂} =
 \begin{bmatrix}
     \mathbf{B̂_u u} + \mathbf{B̂_d d} \\
-    \mathbf{y} - \mathbf{D̂_d d}
+    \mathbf{y^m} - \mathbf{D̂_d^m d}
 \end{bmatrix}
 ```
-in which ``\mathbf{y}`` comprises the measured ``\mathbf{y^m}`` and unmeasured
-``\mathbf{y^u = 0}`` outputs.
+in which ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of `estim.Ĉ, estim.D̂d`  that correspond to 
+measured outputs ``\mathbf{y^m}``.
 """
-function init_estimate!(estim::StateEstimator, model::LinModel, u, ym, d)
+function init_estimate!(estim::StateEstimator, ::LinModel, u, ym, d)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
-    y = zeros(model.ny)
-    y[estim.i_ym] = ym
-    estim.x̂[:] = [(I - Â); Ĉ]\[B̂u*u + B̂d*d; y - D̂d*d]
+    Ĉm, D̂dm = Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
+    estim.x̂[:] = [(I - Â); Ĉm]\[B̂u*u + B̂d*d; ym - D̂dm*d]
 end
 "Left `estim.x̂` estimate unchanged if `model` is not a [`LinModel`](@ref)."
 init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
-
-"By default, do nothing at the end of `initstate!` (used to init the covariance estimate)."
-initstate_post!(::StateEstimator) = nothing
 
 @doc raw"""
     evaloutput(estim::StateEstimator, d=Float64[]) -> ŷ
