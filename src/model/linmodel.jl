@@ -68,9 +68,9 @@ and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Las
 the aforementioned discretization methods.
 
 Note that the constructor transforms the system to its minimal realization using [`minreal`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.minreal)
-to favor controllability and observability. As a consequence, the final state-space
-representation may be different from the one provided in `sys`. It is also converted into a
-more practical form (``\mathbf{D_u=0}`` because of the zero-order hold):
+for controllability/observability. As a consequence, the final state-space representation 
+may be different from the one provided in `sys`. It is also converted into a more practical
+form (``\mathbf{D_u=0}`` because of the zero-order hold):
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u}(k) + \mathbf{B_d d}(k) \\
