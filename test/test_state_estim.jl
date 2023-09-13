@@ -363,7 +363,7 @@ end
     @test ukf1.x̂ ≈ zeros(4) atol=1e-9
     @test evaloutput(ukf1) ≈ ukf1() ≈ [50, 30]
     @test evaloutput(ukf1, Float64[]) ≈ ukf1(Float64[]) ≈ [50, 30]
-    @test initstate!(ukf1, [10, 50], [50, 30+1]) ≈ zeros(4)
+    @test initstate!(ukf1, [10, 50], [50, 30+1]) ≈ zeros(4) atol=1e-9
     setstate!(ukf1, [1,2,3,4])
     @test ukf1.x̂ ≈ [1,2,3,4]
     for i in 1:1000

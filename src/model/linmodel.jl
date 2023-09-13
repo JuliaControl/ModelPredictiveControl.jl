@@ -153,7 +153,8 @@ Discrete-time linear model with a sample time Ts = 0.5 s and:
 ```
 """
 function LinModel(sys::TransferFunction, Ts::Union{Real,Nothing} = nothing; kwargs...)
-    return LinModel(ss(sys), Ts; kwargs...) # minreal is called later in the constructor
+    sys_min = minreal(ss(sys)) # remove useless states with pole-zero cancellation
+    return LinModel(sys_min, Ts; kwargs...)
 end
 
 
@@ -175,8 +176,8 @@ Discrete-time linear model with a sample time Ts = 0.5 s and:
 ```
 """
 function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
-    # c2d only supports :zoh for DelayLtiSystem
-    return LinModel(c2d(sys, Ts, :zoh), Ts; kwargs...)
+    sys_dis = minreal(c2d(sys, Ts, :zoh)) # c2d only supports :zoh for DelayLtiSystem
+    return LinModel(sys_dis, Ts; kwargs...)
 end
 
 
