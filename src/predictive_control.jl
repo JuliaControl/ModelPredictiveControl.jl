@@ -96,9 +96,9 @@ julia> mpc = setconstraint!(mpc, Δumin=[-10], Δumax=[+10], c_Δumin=[1.0], c_�
 LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
  10 prediction steps Hp
   2 control steps Hc
-  1 manipulated inputs u
+  1 manipulated inputs u (0 integrators)
   2 states x̂
-  1 measured outputs ym
+  1 measured outputs ym (1 integrators)
   0 unmeasured outputs yu
   0 measured disturbances d
 ```
