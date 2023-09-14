@@ -283,8 +283,8 @@ end
 
 Init `estim.x̂` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
-The method removes the operating points with [`remove_op!`](@ref) and call 
-[`init_estimate!`](@ref):
+The method tries to find a good stead-state for the initial esitmate ``\mathbf{x̂}(0)``. It
+removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!`](@ref):
 
 - If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
   using `u` and `d` arguments, and uses the `ym` argument to enforce that ``\mathbf{ŷ^m} = 
@@ -292,7 +292,7 @@ The method removes the operating points with [`remove_op!`](@ref) and call
   automatic transfer. See [`init_estimate!`](@ref) for details.
 - Else, `estim.x̂` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
 
-If applicable, it also sets the error covariance to `estim.P = estim.P̂0`.
+If applicable, it also sets the error covariance `estim.P̂` to ``\mathbf{P̂}(0)``.
 
 # Examples
 ```jldoctest
