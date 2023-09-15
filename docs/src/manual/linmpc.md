@@ -74,11 +74,14 @@ in which `Hp` and `Hc` keyword arguments are respectively the predictive and con
 horizons, and `Mwt` and `Nwt`, the output setpoint tracking and move suppression weights. By
 default, [`LinMPC`](@ref) controllers use [`OSQP`](https://osqp.org/) to solve the problem,
 soft constraints on output predictions ``\mathbf{ŷ}`` to ensure feasibility, and a
-[`SteadyKalmanFilter`](@ref) to estimate the plant states. An attentive reader will also
+[`SteadyKalmanFilter`](@ref) to estimate the plant states[^1]. An attentive reader will also
 notice that the Kalman filter estimates two additional states compared to the plant model.
 These are the integrators for the unmeasured plant disturbances, and they are automatically
 added to the model outputs by default if feasible (see [`SteadyKalmanFilter`](@ref)
 for details).
+
+[^1]: We could have use an [`InternalModel`](@ref) structure to avoid state estimator design.
+    It was tested on the example of this page and it gives similar results.
 
 Before closing the loop, we call [`initstate!`](@ref) with the actual plant inputs and
 measurements to ensure a bumpless transfer. Since `model` simulates our plant here, its
