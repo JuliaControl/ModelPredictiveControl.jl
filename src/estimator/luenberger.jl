@@ -70,9 +70,9 @@ julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
 julia> estim = Luenberger(model, nint_ym=[1, 1], p̂=[0.61, 0.62, 0.63, 0.64])
 Luenberger estimator with a sample time Ts = 0.5 s, LinModel and:
- 1 manipulated inputs u (0 integrators)
+ 1 manipulated inputs u (0 integrating states)
  4 states x̂
- 2 measured outputs ym (2 integrators)
+ 2 measured outputs ym (2 integrating states)
  0 unmeasured outputs yu
  0 measured disturbances d
 ```

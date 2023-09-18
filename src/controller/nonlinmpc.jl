@@ -134,9 +134,9 @@ julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:
  20 prediction steps Hp
   1 control steps Hc
-  1 manipulated inputs u (0 integrators)
+  1 manipulated inputs u (0 integrating states)
   2 states x̂
-  1 measured outputs ym (1 integrators)
+  1 measured outputs ym (1 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d
 ```
@@ -171,9 +171,9 @@ julia> mpc = NonLinMPC(estim, Hp=20, Hc=1, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:
  20 prediction steps Hp
   1 control steps Hc
-  1 manipulated inputs u (0 integrators)
+  1 manipulated inputs u (0 integrating states)
   2 states x̂
-  1 measured outputs ym (1 integrators)
+  1 measured outputs ym (1 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d
 ```

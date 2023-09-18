@@ -46,9 +46,9 @@ end
 function print_estim_dim(io::IO, estim::StateEstimator, n)
     nu, nd = estim.model.nu, estim.model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
-    println(io, "$(lpad(nu, n)) manipulated inputs u ($(sum(estim.nint_u)) integrators)")
+    println(io, "$(lpad(nu, n)) manipulated inputs u ($(sum(estim.nint_u)) integrating states)")
     println(io, "$(lpad(nx̂, n)) states x̂")
-    println(io, "$(lpad(nym, n)) measured outputs ym ($(sum(estim.nint_ym)) integrators)")
+    println(io, "$(lpad(nym, n)) measured outputs ym ($(sum(estim.nint_ym)) integrating states)")
     println(io, "$(lpad(nyu, n)) unmeasured outputs yu")
     print(io,   "$(lpad(nd, n)) measured disturbances d")
 end

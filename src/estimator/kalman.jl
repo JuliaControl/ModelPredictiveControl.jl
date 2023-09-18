@@ -96,11 +96,11 @@ unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 - `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
     the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
 - `σQint_u=fill(1,sum(nint_u))`: same than `σQ` but for the unmeasured disturbances at 
-    manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
+    manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrating states).
 - `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
     disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
 - `σQint_ym=fill(1,sum(nint_ym))` : same than `σQ` for the unmeasured disturbances at 
-    measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
+    measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrating states).
 
 # Examples
 ```jldoctest
@@ -108,9 +108,9 @@ julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
 julia> estim = SteadyKalmanFilter(model, i_ym=[2], σR=[1], σQint_ym=[0.01])
 SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
- 1 manipulated inputs u (0 integrators)
+ 1 manipulated inputs u (0 integrating states)
  3 states x̂
- 1 measured outputs ym (1 integrators)
+ 1 measured outputs ym (1 integrating states)
  1 unmeasured outputs yu
  0 measured disturbances d
 ```
@@ -249,9 +249,9 @@ value with ``\mathbf{P̂}_{-1}(0) =
 - `σP0=fill(1/model.nx,model.nx)` : main diagonal of the initial estimate covariance
     ``\mathbf{P}(0)``, specified as a standard deviation vector.
 - `σP0int_u=fill(1,sum(nint_u))` : same than `σP0` but for the unmeasured disturbances at 
-    manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+    manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrating states).
 - `σP0int_ym=fill(1,sum(nint_ym))` : same than `σP0` but for the unmeasured disturbances at 
-    measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
+    measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrating states).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
@@ -260,9 +260,9 @@ julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
 julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP0=[100, 100], σQint_ym=[0.01])
 KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
- 1 manipulated inputs u (0 integrators)
+ 1 manipulated inputs u (0 integrating states)
  3 states x̂
- 1 measured outputs ym (1 integrators)
+ 1 measured outputs ym (1 integrating states)
  1 unmeasured outputs yu
  0 measured disturbances d
 ```
@@ -418,9 +418,9 @@ julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1);
 
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0int_ym=[1, 1])
 UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
- 1 manipulated inputs u (0 integrators)
+ 1 manipulated inputs u (0 integrating states)
  3 states x̂
- 1 measured outputs ym (2 integrators)
+ 1 measured outputs ym (2 integrating states)
  0 unmeasured outputs yu
  0 measured disturbances d
 ```
@@ -646,9 +646,9 @@ julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1);
 
 julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP0=[0.1], σP0int_ym=[0.1])
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
- 1 manipulated inputs u (0 integrators)
+ 1 manipulated inputs u (0 integrating states)
  2 states x̂
- 1 measured outputs ym (1 integrators)
+ 1 measured outputs ym (1 integrating states)
  0 unmeasured outputs yu
  0 measured disturbances d
 ```

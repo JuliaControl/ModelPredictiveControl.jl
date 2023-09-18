@@ -104,9 +104,9 @@ julia> mpc = ExplicitMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
 ExplicitMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimator and:
  30 prediction steps Hp
   1 control steps Hc
-  1 manipulated inputs u (0 integrators)
+  1 manipulated inputs u (0 integrating states)
   4 states x̂
-  2 measured outputs ym (2 integrators)
+  2 measured outputs ym (2 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d
 ```
@@ -129,9 +129,9 @@ julia> mpc = ExplicitMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
 ExplicitMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
  30 prediction steps Hp
   1 control steps Hc
-  1 manipulated inputs u (0 integrators)
+  1 manipulated inputs u (0 integrating states)
   3 states x̂
-  1 measured outputs ym (1 integrators)
+  1 measured outputs ym (1 integrating states)
   1 unmeasured outputs yu
   0 measured disturbances d
 ```
@@ -179,7 +179,7 @@ linconstraint!(::ExplicitMPC, ::LinModel) = nothing
 Analytically solve the optimization problem for [`ExplicitMPC`](@ref).
 """
 function optim_objective!(mpc::ExplicitMPC)
-    return ldiv!(mpc.ΔŨ, mpc.P̃_chol, -mpc.q̃)
+    return lmul!(-1, ldiv!(mpc.ΔŨ, mpc.P̃_chol, mpc.q̃))
 end
 
 "For [`ExplicitMPC`](@ref), return an empty summary."

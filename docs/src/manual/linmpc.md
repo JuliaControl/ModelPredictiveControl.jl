@@ -76,8 +76,8 @@ default, [`LinMPC`](@ref) controllers use [`OSQP`](https://osqp.org/) to solve t
 soft constraints on output predictions ``\mathbf{ŷ}`` to ensure feasibility, and a
 [`SteadyKalmanFilter`](@ref) to estimate the plant states[^1]. An attentive reader will also
 notice that the Kalman filter estimates two additional states compared to the plant model.
-These are the integrators for the unmeasured plant disturbances, and they are automatically
-added to the model outputs by default if feasible (see [`SteadyKalmanFilter`](@ref)
+These are the integrating states for the unmeasured plant disturbances, and they are
+automatically added to the model outputs by default if feasible (see [`SteadyKalmanFilter`](@ref)
 for details).
 
 [^1]: We could have use an [`InternalModel`](@ref) structure with

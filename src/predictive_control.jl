@@ -96,9 +96,9 @@ julia> mpc = setconstraint!(mpc, Δumin=[-10], Δumax=[+10], c_Δumin=[1.0], c_�
 LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
  10 prediction steps Hp
   2 control steps Hc
-  1 manipulated inputs u (0 integrators)
+  1 manipulated inputs u (0 integrating states)
   2 states x̂
-  1 measured outputs ym (1 integrators)
+  1 measured outputs ym (1 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d
 ```
@@ -296,8 +296,9 @@ end
 
 Get additional information about `mpc` controller optimum to ease troubleshooting.
 
-Return the optimizer solution summary that can be printed, `sol_summary`, and the dictionary 
-`info` with the following fields:
+The function should be called after calling [`moveinput!`](@ref). It returns the optimizer
+solution summary that can be printed, `sol_summary`, and the dictionary `info` with the 
+following fields:
 
 - `:ΔU` : optimal manipulated input increments over `Hc` ``(\mathbf{ΔU})``
 - `:ϵ`  : optimal slack variable ``(ϵ)``
@@ -336,7 +337,7 @@ function getinfo(mpc::PredictiveController)
     info[:D̂]   = mpc.D̂
     info[:ŷ]   = mpc.ŷ
     info[:Ŷ]   = Ŷ
-    info[:Ŷs]  = mpc.Ŷop - repeat(mpc.estim.model.yop, mpc.Hp)
+    info[:Ŷs]  = mpc.Ŷop - repeat(mpc.estim.model.yop, mpc.Hp) # Ŷop = Ŷs + Yop
     info[:R̂y]  = mpc.R̂y
     info[:R̂u]  = mpc.R̂u
     return sol_summary, info
