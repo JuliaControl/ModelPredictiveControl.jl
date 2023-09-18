@@ -77,7 +77,7 @@ ExtendedKalmanFilter
 InternalModel
 ```
 
-## Default model augmentation
+## Default Model Augmentation
 
 ```@docs
 default_nint
