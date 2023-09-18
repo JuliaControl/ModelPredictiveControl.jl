@@ -200,7 +200,16 @@ function augment_model(model::LinModel, As, Cs_u, Cs_y; verify_obsv=true)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-augment_model(::SimModel, _ , _ , _ ) = tuple(fill(zeros(0, 0),5)...)
+function augment_model(model::SimModel, As, _ , _ )
+    nu, nx, nd = model.nu, model.nx, model.nd
+    nxs = size(As, 1)
+    Â   = zeros(0, nx+nxs)
+    B̂u  = zeros(0, nu)
+    Ĉ   = zeros(0, nx+nxs)
+    B̂d  = zeros(0, nd)
+    D̂d  = zeros(0, nd)
+    return Â, B̂u, Ĉ, B̂d, D̂d
+end
 
 
 @doc raw"""

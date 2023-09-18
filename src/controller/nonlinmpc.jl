@@ -6,7 +6,6 @@ struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
     con::ControllerConstraint
     ΔŨ::Vector{Float64}
     ŷ ::Vector{Float64}
-    Ŷs::Vector{Float64}
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64, Vector{Float64}}
@@ -33,14 +32,14 @@ struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
     Ps::Matrix{Float64}
     d::Vector{Float64}
     D̂::Vector{Float64}
-    Yop::Vector{Float64}
+    Ŷop::Vector{Float64}
     Dop::Vector{Float64}
     function NonLinMPC{S, JEFunc}(
         estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE::JEFunc, ru, optim
     ) where {S<:StateEstimator, JEFunc<:Function}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
-        ŷ, Ŷs = zeros(ny), zeros(ny*Hp)
+        ŷ = zeros(ny)
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt)
         M_Hp = Diagonal(convert(Vector{Float64}, repeat(Mwt, Hp)))
         N_Hc = Diagonal(convert(Vector{Float64}, repeat(Nwt, Hc)))
@@ -55,19 +54,19 @@ struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         d, D̂ = zeros(nd), zeros(nd*Hp)
-        Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
+        Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
         mpc = new(
             estim, optim, con,
-            ΔŨ, ŷ, Ŷs,
+            ΔŨ, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
             Ks, Ps,
             d, D̂,
-            Yop, Dop,
+            Ŷop, Dop,
         )
         init_optimization!(mpc)
         return mpc
@@ -317,59 +316,6 @@ function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
         add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
     end
     return nothing
-end
-
-# TODO: déplacer les 2 prochaines méthodes dans predictive_control.jl
-
-"""
-    obj_nonlinprog(mpc::PredictiveController, model::LinModel, ΔŨ::Vector{Real})
-
-Objective function for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
-"""
-function obj_nonlinprog(mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
-    J = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
-    if !iszero(mpc.E)
-        U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
-        UE = [U; U[(end - model.nu + 1):end]]
-        ŶE = [mpc.ŷ; Ŷ]
-        D̂E = [mpc.d; mpc.D̂]
-        J += mpc.E*mpc.JE(UE, ŶE, D̂E)
-    end
-    return J
-end
-
-"""
-    obj_nonlinprog(mpc::PredictiveController, model::SimModel, ΔŨ::Vector{Real})
-
-Objective function for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
-"""
-function obj_nonlinprog(mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
-    # --- output setpoint tracking term ---
-    êy = mpc.R̂y - Ŷ
-    JR̂y = êy'*mpc.M_Hp*êy  
-    # --- move suppression and slack variable term ---
-    JΔŨ = ΔŨ'*mpc.Ñ_Hc*ΔŨ
-    # --- input over prediction horizon ---
-    if !isempty(mpc.R̂u) || !iszero(mpc.E)
-        U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
-    end
-    # --- input setpoint tracking term ---
-    if !isempty(mpc.R̂u)
-        êu = mpc.R̂u - U
-        JR̂u = êu'*mpc.L_Hp*êu
-    else
-        JR̂u = 0.0
-    end
-    # --- economic term ---
-    if !iszero(mpc.E)
-        UE = [U; U[(end - model.nu + 1):end]]
-        ŶE = [mpc.ŷ; Ŷ]
-        D̂E = [mpc.d; mpc.D̂]
-        E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E)
-    else
-        E_JE = 0.0
-    end
-    return JR̂y + JΔŨ + JR̂u + E_JE
 end
 
 

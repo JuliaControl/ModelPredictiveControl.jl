@@ -4,7 +4,6 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     con::ControllerConstraint
     ΔŨ::Vector{Float64}
     ŷ ::Vector{Float64}
-    Ŷs::Vector{Float64}
     Hp::Int
     Hc::Int
     M_Hp::Diagonal{Float64, Vector{Float64}}
@@ -30,12 +29,12 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     Ps::Matrix{Float64}
     d::Vector{Float64}
     D̂::Vector{Float64}
-    Yop::Vector{Float64}
+    Ŷop::Vector{Float64}
     Dop::Vector{Float64}
     function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim) where {S<:StateEstimator}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
-        ŷ, Ŷs = zeros(ny), zeros(ny*Hp)
+        ŷ = zeros(ny)
         Ewt = 0   # economic costs not supported for LinMPC
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
         M_Hp = Diagonal{Float64}(repeat(Mwt, Hp))
@@ -51,19 +50,19 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         d, D̂ = zeros(nd), zeros(nd*Hp)
-        Yop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
+        Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
         mpc = new(
             estim, optim, con,
-            ΔŨ, ŷ, Ŷs,
+            ΔŨ, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y,
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
             Ks, Ps,
             d, D̂,
-            Yop, Dop,
+            Ŷop, Dop,
         )
         init_optimization!(mpc)
         return mpc

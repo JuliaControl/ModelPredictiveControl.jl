@@ -82,7 +82,7 @@ for details).
 
 [^1]: We could have use an [`InternalModel`](@ref) structure with
     `mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])` to avoid
-    state estimator design . It was tested on the example of this page and it gives similar 
+    state estimator design. It was tested on the example of this page and it gives similar
     results.
 
 Before closing the loop, we call [`initstate!`](@ref) with the actual plant inputs and
