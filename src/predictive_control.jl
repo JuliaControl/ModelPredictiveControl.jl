@@ -3,7 +3,7 @@ Abstract supertype of all predictive controllers.
 
 ---
 
-    (mpc::PredictiveController)(ry, d=[]; kwargs...)
+    (mpc::PredictiveController)(ry, d=[]; kwargs...) -> u
 
 Functor allowing callable `PredictiveController` object as an alias for [`moveinput!`](@ref).
 
