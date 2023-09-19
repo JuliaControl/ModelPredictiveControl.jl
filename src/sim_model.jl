@@ -116,6 +116,7 @@ julia> model = LinModel(tf(6, [10, 1]), 2.0);
 julia> u = [1]; x = initstate!(model, u); y = round.(evaloutput(model), digits=3)
 1-element Vector{Float64}:
  6.0
+ 
 julia> x ≈ updatestate!(model, u)
 true
 ```
