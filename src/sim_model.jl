@@ -103,9 +103,9 @@ end
 
 Init `model.x` with manipulated inputs `u` and measured disturbances `d` steady-state.
 
-It calls [`steadystate!(u, d)`](@ref):
+It calls [`steadystate!(model, u, d)`](@ref):
 
-- If `estim.model` is a [`LinModel`](@ref), the method computes the steady-state of current
+- If `model` is a [`LinModel`](@ref), the method computes the steady-state of current
   inputs `u` and measured disturbances `d`.
 - Else, `model.x` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
 
