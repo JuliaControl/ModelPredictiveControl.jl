@@ -187,7 +187,7 @@ function init_internalmodel(As, Bs, Cs, Ds)
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, u, ym, d=Float64[]) -> x̂d
+    update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂)) -> x̂d
 
 Update `estim.x̂` \ `x̂d` \ `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
 
@@ -201,7 +201,7 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(estim::InternalModel, u, ym, d=Float64[])
+function update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂))
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
@@ -232,5 +232,5 @@ function print_estim_dim(io::IO, estim::InternalModel, n)
     print(io,   "$(lpad(nd, n)) measured disturbances d")
 end
 
-(estim::InternalModel)(ym, d=Float64[]) = evaloutput(estim::InternalModel, ym, d)
+(estim::InternalModel)(ym, d=empty(estim.x̂)) = evaloutput(estim::InternalModel, ym, d)
 

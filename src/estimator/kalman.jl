@@ -172,7 +172,7 @@ The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\
                + \mathbf{K̂}[\mathbf{y^m}(k) - \mathbf{Ĉ^m x̂}_{k-1}(k) - \mathbf{D̂_d^m d}(k)]
 ```
 """
-function update_estimate!(estim::SteadyKalmanFilter, u, ym, d=Float64[])
+function update_estimate!(estim::SteadyKalmanFilter, u, ym, d=empty(estim.x̂))
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K̂ = estim.x̂, estim.K̂
     x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K̂*(ym - Ĉm*x̂ - D̂dm*d)
@@ -688,7 +688,7 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 ExtendedKalmanFilter{M}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {M<:SimModel}
 
 @doc raw"""
-    update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
+    update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂))
 
 Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂` and covariance `estim.P̂`.
 
@@ -717,7 +717,7 @@ automatically computes the Jacobians:
 ```
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs.
 """
-function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=Float64[])
+function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂))
     F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, x̂, u, d), estim.x̂)
     Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, x̂, d), estim.x̂)
     Ĥm = Ĥ[estim.i_ym, :] 

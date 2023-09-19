@@ -3,7 +3,7 @@ Abstract supertype of all state estimators.
 
 ---
 
-    (estim::StateEstimator)(d=Float64[])
+    (estim::StateEstimator)(d=[]) -> ŷ
 
 Functor allowing callable `StateEstimator` object as an alias for [`evaloutput`](@ref).
 
@@ -213,7 +213,7 @@ end
 
 
 @doc raw"""
-    default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0)
+    default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0) -> nint_ym
 
 Get default integrator quantity per measured outputs `nint_ym` for [`LinModel`](@ref).
 
@@ -288,7 +288,7 @@ end
 
 
 @doc raw"""
-    initstate!(estim::StateEstimator, u, ym, d=Float64[]) -> x̂
+    initstate!(estim::StateEstimator, u, ym, d=[]) -> x̂
 
 Init `estim.x̂` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
@@ -321,7 +321,7 @@ true
 ```
 
 """
-function initstate!(estim::StateEstimator, u, ym, d=Float64[])
+function initstate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
     # --- init state estimate ----
     u0, d0, ym0 = remove_op!(estim, u, d, ym)
     init_estimate!(estim, estim.model, u0, ym0, d0)
@@ -362,7 +362,7 @@ end
 init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
 
 @doc raw"""
-    evaloutput(estim::StateEstimator, d=Float64[]) -> ŷ
+    evaloutput(estim::StateEstimator, d=[]) -> ŷ
 
 Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂` states and disturbances `d`.
 
@@ -377,16 +377,16 @@ julia> ŷ = evaloutput(kf)
  20.0
 ```
 """
-function evaloutput(estim::StateEstimator, d=Float64[]) 
+function evaloutput(estim::StateEstimator, d=empty(estim.x̂)) 
     return ĥ(estim, estim.x̂, d - estim.model.dop) + estim.model.yop
 end
 
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
-(estim::StateEstimator)(d=Float64[]) = evaloutput(estim, d)
+(estim::StateEstimator)(d=empty(estim.x̂)) = evaloutput(estim, d)
 
 
 @doc raw"""
-    updatestate!(estim::StateEstimator, u, ym, d=Float64[]) -> x̂
+    updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂
 
 Update `estim.x̂` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
 
@@ -403,7 +403,7 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
  0.0
 ```
 """
-function updatestate!(estim::StateEstimator, u, ym, d=Float64[])
+function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
     u0, d0, ym0 = remove_op!(estim, u, d, ym) 
     update_estimate!(estim, u0, ym0, d0)
     return estim.x̂

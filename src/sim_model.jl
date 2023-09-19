@@ -5,7 +5,7 @@ Abstract supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
 
 ---
 
-    (model::SimModel)(d=Float64[])
+    (model::SimModel)(d=[]) -> y
 
 Functor allowing callable `SimModel` object as an alias for [`evaloutput`](@ref).
 
@@ -21,7 +21,7 @@ julia> y = model()
 abstract type SimModel end
 
 @doc raw"""
-    setop!(model::SimModel; uop=nothing, yop=nothing, dop=nothing)
+    setop!(model::SimModel; uop=nothing, yop=nothing, dop=nothing) -> model
 
 Set `model` inputs `uop`, outputs `yop` and measured disturbances `dop` operating points.
 
@@ -99,7 +99,7 @@ function Base.show(io::IO, model::SimModel)
 end
 
 @doc raw"""
-    initstate!(model::SimModel, u, d=Float64[]) -> x
+    initstate!(model::SimModel, u, d=[]) -> x
 
 Init `model.x` with manipulated inputs `u` and measured disturbances `d` steady-state.
 
@@ -121,13 +121,13 @@ true
 ```
 
 """
-function initstate!(model::SimModel, u, d=Float64[])
+function initstate!(model::SimModel, u, d=empty(model.x))
     steadystate!(model, u, d)
     return model.x
 end
 
 """
-    updatestate!(model::SimModel, u, d=Float64[]) -> x
+    updatestate!(model::SimModel, u, d=[]) -> x
 
 Update `model.x` states with current inputs `u` and measured disturbances `d`.
 
@@ -140,13 +140,13 @@ julia> x = updatestate!(model, [1])
  1.0
 ```
 """
-function updatestate!(model::SimModel, u, d=Float64[])
+function updatestate!(model::SimModel, u, d=empty(model.x))
     model.x[:] = f(model, model.x, u - model.uop, d - model.dop)
     return model.x
 end
 
 """
-    evaloutput(model::SimModel, d=Float64[]) -> y
+    evaloutput(model::SimModel, d=[]) -> y
 
 Evaluate `SimModel` outputs `y` from `model.x` states and measured disturbances `d`.
 
@@ -161,10 +161,10 @@ julia> y = evaloutput(model)
  20.0
 ```
 """
-evaloutput(model::SimModel, d=Float64[]) = h(model, model.x, d - model.dop) + model.yop
+evaloutput(model::SimModel, d=empty(model.x)) = h(model, model.x, d - model.dop) + model.yop
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
-(model::SimModel)(d=Float64[]) = evaloutput(model::SimModel, d)
+(model::SimModel)(d=empty(model.x)) = evaloutput(model::SimModel, d)
 
 include("model/linmodel.jl")
 include("model/nonlinmodel.jl")

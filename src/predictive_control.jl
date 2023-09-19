@@ -3,7 +3,7 @@ Abstract supertype of all predictive controllers.
 
 ---
 
-    (mpc::PredictiveController)(ry, d=Float64[]; kwargs...)
+    (mpc::PredictiveController)(ry, d=[]; kwargs...)
 
 Functor allowing callable `PredictiveController` object as an alias for [`moveinput!`](@ref).
 
@@ -50,7 +50,7 @@ struct ControllerConstraint
 end
 
 @doc raw"""
-    setconstraint!(mpc::PredictiveController; <keyword arguments>)
+    setconstraint!(mpc::PredictiveController; <keyword arguments>) -> mpc
 
 Set the constraint parameters of `mpc` predictive controller.
 
@@ -241,7 +241,7 @@ setnonlincon!(::PredictiveController, ::SimModel) = nothing
     moveinput!(
         mpc::PredictiveController, 
         ry = mpc.estim.model.yop, 
-        d  = Float64[];
+        d  = [];
         R̂y = repeat(ry, mpc.Hp), 
         D̂  = repeat(d,  mpc.Hp), 
         ym = nothing
@@ -277,7 +277,7 @@ julia> ry = [5]; u = moveinput!(mpc, ry); round.(u, digits=3)
 function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = Float64[];
+    d ::Vector = empty(mpc.estim.x̂);
     R̂y::Vector = repeat(ry, mpc.Hp),
     D̂ ::Vector = repeat(d,  mpc.Hp),
     ym::Union{Vector, Nothing} = nothing
@@ -357,22 +357,22 @@ Set the estimate at `mpc.estim.x̂`.
 setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
 
 @doc raw"""
-    initstate!(mpc::PredictiveController, u, ym, d=Float64[])
+    initstate!(mpc::PredictiveController, u, ym, d=[]) -> x̂
 
 Init the states of `mpc.estim` [`StateEstimator`](@ref) and warm start `mpc.ΔŨ` at zero.
 """
-function initstate!(mpc::PredictiveController, u, ym, d=Float64[])
+function initstate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂))
     mpc.ΔŨ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
 
 
 """
-    updatestate!(mpc::PredictiveController, u, ym, d=Float64[]) -> x̂
+    updatestate!(mpc::PredictiveController, u, ym, d=[]) -> x̂
 
 Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
-updatestate!(mpc::PredictiveController, u, ym, d=Float64[]) = updatestate!(mpc.estim,u,ym,d)
+updatestate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂)) = updatestate!(mpc.estim,u,ym,d)
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
 function validate_setpointdist(mpc::PredictiveController, ry, d, R̂y, D̂)
@@ -1051,7 +1051,7 @@ end
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(
     ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = Float64[];
+    d ::Vector = empty(mpc.estim.x̂);
     kwargs...
 )
     return moveinput!(mpc, ry, d; kwargs...)

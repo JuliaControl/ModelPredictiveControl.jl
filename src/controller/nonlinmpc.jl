@@ -46,7 +46,7 @@ struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
         L_Hp = Diagonal(convert(Vector{Float64}, repeat(Lwt, Hp)))
         C = Cwt
         # manipulated input setpoint predictions are constant over Hp :
-        R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = Float64[] 
+        R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = empty(estim.x̂) 
         R̂y = zeros(ny* Hp) # dummy R̂y (updated just before optimization)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, K, Q = init_predmat(estim, model, Hp, Hc)
