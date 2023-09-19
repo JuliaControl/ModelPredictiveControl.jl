@@ -85,7 +85,11 @@ end
     @test updatestate!(linmodel1, [10, 50], Float64[]) ≈ zeros(2)
     @test linmodel1.x ≈ zeros(2)
     @test evaloutput(linmodel1) ≈ linmodel1() ≈ [50,30] 
-    @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30] 
+    @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30]
+
+    x = initstate!(linmodel1, [10, 60])
+    @test evaloutput(linmodel1) ≈ [50 + 19.0, 30 + 7.4]
+    @test updatestate!(linmodel1, [10, 60]) ≈ x
 
     @test_throws DimensionMismatch updatestate!(linmodel1, zeros(2), zeros(1))
     @test_throws DimensionMismatch evaloutput(linmodel1, zeros(1))
@@ -135,6 +139,9 @@ end
     @test nonlinmodel.x ≈ zeros(2)
     @test evaloutput(nonlinmodel) ≈ nonlinmodel() ≈ zeros(2)
     @test evaloutput(nonlinmodel, Float64[]) ≈ nonlinmodel(Float64[]) ≈ zeros(2)
+
+    x = initstate!(nonlinmodel, [0, 10]) # do nothing for NonLinModel
+    @test evaloutput(nonlinmodel) ≈ [0, 0]
 
     @test_throws DimensionMismatch updatestate!(nonlinmodel, zeros(2), zeros(1))
     @test_throws DimensionMismatch evaloutput(nonlinmodel, zeros(1))

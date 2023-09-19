@@ -6,7 +6,6 @@ y = model()
 
 mpc_im = setconstraint!(LinMPC(InternalModel(model)), ymin=[45, -Inf])
 initstate!(mpc_im, model.uop, y)
-mpc_im.estim([50, 30])
 u = mpc_im([55, 30], ym=y)
 sim!(mpc_im, 3)
 

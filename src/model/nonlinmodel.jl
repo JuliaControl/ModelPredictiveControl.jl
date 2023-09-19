@@ -87,6 +87,10 @@ function validate_fcts(f, h)
     end
 end
 
+"Do nothing if `model` is a [`NonLinModel`](@ref)."
+steadystate!(::SimModel, _ , _ ) = nothing
+
+
 "Call ``\\mathbf{f(x, u, d)}`` with `model.f` function for [`NonLinModel`](@ref)."
 f(model::NonLinModel, x, u, d) = model.f(x, u, d)
 

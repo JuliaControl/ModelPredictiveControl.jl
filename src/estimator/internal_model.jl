@@ -135,16 +135,16 @@ matrices_internalmodel(::SimModel) = tuple(fill(zeros(0, 0), 5)...)
 @doc raw"""
     f̂(estim::InternalModel, x̂, u, d)
 
-State function ``\mathbf{f̂}`` of the [`InternalModel`].
+State function ``\mathbf{f̂}`` of [`InternalModel`](@ref).
 
-It calls `f(estim.model, x̂, u ,d)` since this estimator does not augment the state vector.
+It calls [`f(estim.model, x̂, u ,d)`](@ref) since this estimator does not augment the states.
 """
 f̂(estim::InternalModel, x̂, u, d) = f(estim.model, x̂, u, d)
 
 @doc raw"""
     ĥ(estim::InternalModel, x̂, d)
 
-Output function ``\mathbf{ĥ}`` of the [`InternalModel`], it calls `h(estim.model, x̂, d)`.
+Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h`](@ref) directly.
 """
 ĥ(estim::InternalModel, x̂, d) = h(estim.model, x̂, d)
 
@@ -219,21 +219,6 @@ function initstate_post!(estim::InternalModel)
     # TODO: best method to initialize internal model stochastic states ? not sure...
     estim.x̂s[:] = zeros(estim.nxs)
     return nothing
-end
-
-@doc raw"""
-    evaloutput(estim::InternalModel, ym, d=Float64[]) -> ŷ
-
-Evaluate `InternalModel` outputs `ŷ` from `estim.x̂d` states and measured outputs `ym`.
-
-[`InternalModel`](@ref) estimator needs current measured outputs ``\mathbf{y^m}(k)`` to 
-estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that 
-``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` is always true.
-"""
-function evaloutput(estim::InternalModel, ym, d=Float64[])
-    ŷ = h(estim.model, estim.x̂d, d - estim.model.dop) + estim.model.yop
-    ŷ[estim.i_ym] = ym
-    return ŷ
 end
 
 "Print InternalModel information without i/o integrators."

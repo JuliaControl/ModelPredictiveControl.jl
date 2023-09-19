@@ -98,6 +98,34 @@ function Base.show(io::IO, model::SimModel)
     print(io,   "$(lpad(nd, n)) measured disturbances d")
 end
 
+@doc raw"""
+    initstate!(model::SimModel, u, d=Float64[]) -> x
+
+Init `model.x` with manipulated inputs `u` and measured disturbances `d` steady-state.
+
+It calls [`steadystate!(u, d)`](@ref):
+
+- If `estim.model` is a [`LinModel`](@ref), the method computes the steady-state of current
+  inputs `u` and measured disturbances `d`.
+- Else, `model.x` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
+
+# Examples
+```jldoctest
+julia> model = LinModel(tf(6, [10, 1]), 2.0);
+
+julia> u = [1]; x = initstate!(model, u); y = round.(evaloutput(model), digits=3)
+1-element Vector{Float64}:
+ 6.0
+julia> x ≈ updatestate!(model, u)
+true
+```
+
+"""
+function initstate!(model::SimModel, u, d=Float64[])
+    steadystate!(model, u, d)
+    return model.x
+end
+
 """
     updatestate!(model::SimModel, u, d=Float64[]) -> x
 

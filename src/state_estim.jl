@@ -296,9 +296,9 @@ The method tries to find a good stead-state for the initial esitmate ``\mathbf{x
 removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!`](@ref):
 
 - If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
-  using `u` and `d` arguments, and uses the `ym` argument to enforce that ``\mathbf{ŷ^m} = 
-  \mathbf{y^m}``. For control applications, this solution produces a bumpless manual to 
-  automatic transfer. See [`init_estimate!`](@ref) for details.
+  using `u` and `d` arguments, and uses the `ym` argument to enforce that 
+  ``\mathbf{ŷ^m}(0) = \mathbf{y^m}(0)``. For control applications, this solution produces a
+  bumpless manual to automatic transfer. See [`init_estimate!`](@ref) for details.
 - Else, `estim.x̂` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
 
 If applicable, it also sets the error covariance `estim.P̂` to ``\mathbf{P̂}(0)``.
@@ -414,7 +414,27 @@ include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
 include("estimator/internal_model.jl")
 
-"Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`."
-evalŷ(estim::InternalModel, ym, d) = evaloutput(estim,ym, d)
-"Other [`StateEstimator`](@ref) ignores `ym` to evaluate `ŷ`."
-evalŷ(estim::StateEstimator, _, d) = evaloutput(estim, d)
+"""
+    evalŷ(estim::StateEstimator, _ , d) -> ŷ
+
+Evaluate [`StateEstimator`](@ref) output `ŷ` from measured disturbance `d` and `estim.x̂`.
+
+Second argument is ignored, except for [`InternalModel`](@ref).
+"""
+evalŷ(estim::StateEstimator, _ , d) = evaloutput(estim, d)
+
+@doc raw"""
+    evalŷ(estim::InternalModel, ym, d) -> ŷ
+
+Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`.
+
+[`InternalModel`](@ref) estimator needs current measured outputs ``\mathbf{y^m}(k)`` to 
+estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that 
+``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` is always true.
+"""
+function evalŷ(estim::InternalModel, ym, d)
+    ŷ = h(estim.model, estim.x̂d, d - estim.model.dop) + estim.model.yop
+    ŷ[estim.i_ym] = ym
+    return ŷ
+end
+    

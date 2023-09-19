@@ -1,5 +1,9 @@
 # [Manual: Linear Design](@id man_lin)
 
+```@contents
+Pages = ["linmpc.md"]
+```
+
 ## Linear Model
 
 The example considers a continuously stirred-tank reactor (CSTR) with a cold and hot water

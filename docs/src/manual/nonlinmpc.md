@@ -1,5 +1,9 @@
 # [Manual: Nonlinear Design](@id man_nonlin)
 
+```@contents
+Pages = ["nonlinmpc.md"]
+```
+
 ## Nonlinear Model
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum

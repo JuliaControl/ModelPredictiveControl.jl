@@ -193,6 +193,26 @@ is not called). Care must be taken to ensure that the model is controllable and 
 """
 LinModel(A, Bu, C, Bd, Dd, Ts, nu, nx, ny, nd)
 
+
+@doc raw"""
+    steadystate!(model::LinModel, u, d)
+
+Set `model.x` to `u` and `d` steady-state if `model` is a [`LinModel`](@ref).
+
+Following [`setop!`](@ref) notation, the method evaluates the equilibrium ``\mathbf{x}``
+from:
+```math
+    \mathbf{x} = \mathbf{(I - A)^{-1}(B_u u_0 + B_d d_0)}
+```
+with constant manipulated inputs ``\mathbf{u_0 = u - u_{op}}`` and measured
+disturbances ``\mathbf{d_0 = d - d_{op}}``. The Moore-Penrose pseudo-inverse computes 
+``\mathbf{(I - A)^{-1}}`` to support integrating `model` (integrator states will be 0).
+"""
+function steadystate!(model::LinModel, u, d)
+    model.x[:] = pinv(I - model.A)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
+    return nothing
+end
+
 """
     f(model::LinModel, x, u, d)
 

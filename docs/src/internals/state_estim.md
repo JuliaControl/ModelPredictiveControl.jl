@@ -21,6 +21,12 @@ ModelPredictiveControl.f̂
 ModelPredictiveControl.ĥ
 ```
 
+## Evaluate Estimated Output
+
+```@docs
+ModelPredictiveControl.evalŷ
+```
+
 ## Remove Operating Points
 
 ```@docs
