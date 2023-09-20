@@ -96,8 +96,9 @@ the manipulated inputs, the predicted outputs and measured disturbances from ``k
     \mathbf{Ŷ}_E = \begin{bmatrix} \mathbf{ŷ}(k)   \\ \mathbf{Ŷ}            \end{bmatrix}  \text{,} \qquad
     \mathbf{D̂}_E = \begin{bmatrix} \mathbf{d}(k)   \\ \mathbf{D̂}            \end{bmatrix}
 ```
-since ``H_c ≤ H_p`` implies that ``\mathbf{u}(k+H_p) = \mathbf{u}(k+H_p-1)``. The vector
-``\mathbf{D̂}`` includes the predicted measured disturbance over ``H_p``.
+since ``H_c ≤ H_p`` implies that ``\mathbf{Δu}(k+H_p) = \mathbf{0}`` or ``\mathbf{u}(k+H_p)=
+\mathbf{u}(k+H_p-1)``. The vector ``\mathbf{D̂}`` includes the predicted measured disturbance
+over ``H_p``.
 
 !!! tip
     Replace any of the 3 arguments with `_` if not needed (see `JE` default value below).

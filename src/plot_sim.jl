@@ -6,6 +6,7 @@ struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
     Ŷ_data ::Matrix{Float64}    # estimated outputs
     U_data ::Matrix{Float64}    # manipulated inputs
     Ud_data::Matrix{Float64}    # manipulated inputs including load disturbances
+    Ru_data::Matrix{Float64}    # manipulated input setpoints
     D_data ::Matrix{Float64}    # measured disturbances
     X_data ::Matrix{Float64}    # plant states
     X̂_data ::Matrix{Float64}    # estimated states
@@ -55,7 +56,9 @@ function sim!(
         updatestate!(plant, u, d); 
     end
     return SimResult(
-        T_data, Y_data, U_data, Y_data, U_data, U_data, D_data, X_data, X_data, plant
+        T_data, Y_data, U_data, Y_data, 
+        U_data, U_data, U_data, D_data, X_data, X_data, 
+        plant
     )
 end
 
@@ -68,7 +71,7 @@ end
         <keyword arguments>
     ) -> res
 
-Closed-loop simulation of `estim` estimator for `N` time steps, default to input bumps.
+Closed-loop simulation of `estim` estimator for `N` steps, default to input bumps.
 
 See Arguments for the available options. The noises are provided as standard deviations σ
 vectors. The simulated sensor and process noises of `plant` are specified by `y_noise` and
@@ -118,14 +121,15 @@ end
         mpc::PredictiveController, 
         N::Int,
         ry = mpc.estim.model.yop .+ 1, 
-        d  = mpc.estim.model.dop; 
+        d  = mpc.estim.model.dop,
+        ru = mpc.estim.model.uop;
         <keyword arguments>
     ) -> res
 
-Closed-loop simulation of `mpc` controller for `N` time steps, default to setpoint bumps.
+Closed-loop simulation of `mpc` controller for `N` steps, default to output setpoint bumps.
 
-The output setpoint ``\mathbf{r_y}`` is held constant at `ry`. The keyword arguments are
-identical to [`sim!(::StateEstimator, ::Int)`](@ref).
+The output and manipulated input setpoints are held constant at `ry` and `ru`, respectively.
+The keyword arguments are identical to [`sim!(::StateEstimator, ::Int)`](@ref).
 
 # Examples
 ```julia-repl
@@ -143,10 +147,11 @@ function sim!(
     mpc::PredictiveController, 
     N::Int,
     ry::Vector = mpc.estim.model.yop .+ 1,
-    d ::Vector = mpc.estim.model.dop;
+    d ::Vector = mpc.estim.model.dop,
+    ru::Vector = mpc.estim.model.uop;
     kwargs...
 )
-    return sim_closedloop!(mpc, mpc.estim, N, ry, d; kwargs...)
+    return sim_closedloop!(mpc, mpc.estim, N, ry, d, ru; kwargs...)
 end
 
 "Quick simulation function for `StateEstimator` and `PredictiveController` instances."
@@ -155,7 +160,8 @@ function sim_closedloop!(
     estim::StateEstimator,
     N::Int,
     u_ry::Vector,
-    d::Vector;
+    d   ::Vector,
+    ru  ::Vector = estim.model.uop;
     plant::SimModel = estim.model,
     u_step ::Vector = zeros(plant.nu),
     u_noise::Vector = zeros(plant.nu),
@@ -177,6 +183,7 @@ function sim_closedloop!(
     U_Ry_data = Matrix{Float64}(undef, length(u_ry), N)
     U_data  = Matrix{Float64}(undef, plant.nu, N)
     Ud_data = Matrix{Float64}(undef, plant.nu, N)
+    Ru_data = Matrix{Float64}(undef, plant.nu, N)
     D_data  = Matrix{Float64}(undef, plant.nd, N)
     X_data  = Matrix{Float64}(undef, plant.nx, N) 
     X̂_data  = Matrix{Float64}(undef, estim.nx̂, N)
@@ -188,13 +195,14 @@ function sim_closedloop!(
         d = lastd + d_step + d_noise.*randn(plant.nd)
         y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
         ym = y[estim.i_ym]
-        u  = sim_getu!(est_mpc, u_ry, d, ym)
+        u  = sim_getu!(est_mpc, u_ry, d, ru, ym)
         ud = u + u_step + u_noise.*randn(plant.nu)
         Y_data[:, i]  = y
         Ŷ_data[:, i]  = evalŷ(estim, ym, d)
         U_Ry_data[:, i] = u_ry
         U_data[:, i]  = u
         Ud_data[:, i] = ud
+        Ru_data[:, i] = ru
         D_data[:, i]  = d
         X_data[:, i]  = plant.x
         X̂_data[:, i]  = estim.x̂
@@ -204,17 +212,19 @@ function sim_closedloop!(
     end
     res = SimResult(
         T_data, Y_data, U_Ry_data, Ŷ_data, 
-        U_data, Ud_data, D_data, X_data, X̂_data, 
+        U_data, Ud_data, Ru_data, D_data, X_data, X̂_data, 
         est_mpc
     )
     setstate!(plant, old_x0)
     return res
 end
 
-"Keep manipulated input `u` unchanged for state estimator simulation."
-sim_getu!(::StateEstimator, u, _ , _ ) = u
 "Compute new `u` for predictive controller simulation."
-sim_getu!(mpc::PredictiveController, ry, d, ym) = moveinput!(mpc, ry, d; ym)
+function sim_getu!(mpc::PredictiveController, ry, d, ru, ym)
+    return moveinput!(mpc, ry, d; R̂u=repeat(ru, mpc.Hp), ym)
+end
+"Keep manipulated input `u` unchanged for state estimator simulation."
+sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
 
 "Plots.jl recipe for `SimResult` objects constructed with `SimModel` objects."
 @recipe function plot(
