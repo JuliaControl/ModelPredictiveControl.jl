@@ -84,10 +84,9 @@ These are the integrating states for the unmeasured plant disturbances, and they
 automatically added to the model outputs by default if feasible (see [`SteadyKalmanFilter`](@ref)
 for details).
 
-[^1]: We could have use an [`InternalModel`](@ref) structure with
-    `mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])` to avoid
-    state estimator design. It was tested on the example of this page and it gives similar
-    results.
+[^1]: To avoid observer design, we could have use an [`InternalModel`](@ref) structure with
+    `mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])` . It was
+    tested on the example of this page and it gives similar results.
 
 Before closing the loop, we call [`initstate!`](@ref) with the actual plant inputs and
 measurements to ensure a bumpless transfer. Since `model` simulates our plant here, its
@@ -165,10 +164,9 @@ real-life control problems. Constructing a [`LinMPC`](@ref) with `DAQP` and inpu
 
 ```@example 1
 using JuMP, DAQP
-daqp  = Model(DAQP.Optimizer)
-estim = SteadyKalmanFilter(model, nint_u=[1, 1], nint_ym=[0, 0])
-mpc2  = LinMPC(estim, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], optim=daqp)
-mpc2  = setconstraint!(mpc2, ymin=[45, -Inf])
+daqp = Model(DAQP.Optimizer)
+mpc2 = LinMPC(model, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], optim=daqp, nint_u=[1, 1])
+mpc2 = setconstraint!(mpc2, ymin=[45, -Inf])
 ```
 
 leads to similar computational times, but it does accelerate the rejection of the load
@@ -212,7 +210,7 @@ model_ff = setop!(LinModel(sys_ff, Ts, i_d=[3]), uop=[20, 20], yop=[50, 30], dop
 A [`LinMPC`](@ref) controller is constructed on this model:
 
 ```@example 1
-mpc_ff = LinMPC(model_ff, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
+mpc_ff = LinMPC(model_ff, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], nint_u=[1, 1])
 mpc_ff = setconstraint!(mpc_ff, ymin=[45, -Inf])
 ```
 
