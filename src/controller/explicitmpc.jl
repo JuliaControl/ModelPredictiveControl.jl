@@ -11,6 +11,7 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
     E::Float64
     R̂u::Vector{Float64}
     R̂y::Vector{Float64}
+    noR̂u::Bool
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     T_Hc::Matrix{Bool}
@@ -30,20 +31,19 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
     D̂::Vector{Float64}
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
-    function ExplicitMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, ru) where {S<:StateEstimator}
+    function ExplicitMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt) where {S<:StateEstimator}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = zeros(ny)
         Cwt = Inf # no slack variable ϵ for ExplicitMPC
         Ewt = 0   # economic costs not supported for ExplicitMPC
-        validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
+        validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt)
         M_Hp = Diagonal{Float64}(repeat(Mwt, Hp))
         N_Hc = Diagonal{Float64}(repeat(Nwt, Hc)) 
         L_Hp = Diagonal{Float64}(repeat(Lwt, Hp))
         C = Cwt
-        # manipulated input setpoint predictions are constant over Hp :
-        R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = empty(estim.x̂)
-        R̂y = zeros(ny* Hp) # dummy R̂y (updated just before optimization)
+        R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
+        noR̂u = iszero(L_Hp)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, K, Q = init_predmat(estim, model, Hp, Hc)
         _ , S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
@@ -58,7 +58,7 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
             estim,
             ΔŨ, ŷ,
             Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y,
+            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y, noR̂u,
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
             P̃_chol,
@@ -94,7 +94,6 @@ state estimator, a [`SteadyKalmanFilter`](@ref) with default arguments.
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
-- `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector).
 - additionnal keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
@@ -120,11 +119,10 @@ function ExplicitMPC(
     Mwt = fill(DEFAULT_MWT, model.ny),
     Nwt = fill(DEFAULT_NWT, model.nu),
     Lwt = fill(DEFAULT_LWT, model.nu),
-    ru  = model.uop,
     kwargs...
 ) 
     estim = SteadyKalmanFilter(model; kwargs...)
-    return ExplicitMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, ru)
+    return ExplicitMPC(estim; Hp, Hc, Mwt, Nwt, Lwt)
 end
 
 """
@@ -155,8 +153,7 @@ function ExplicitMPC(
     Hc::Int = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, estim.model.ny),
     Nwt = fill(DEFAULT_NWT, estim.model.nu),
-    Lwt = fill(DEFAULT_LWT, estim.model.nu),
-    ru  = estim.model.uop,
+    Lwt = fill(DEFAULT_LWT, estim.model.nu)
 ) where {S<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     poles = eigvals(estim.model.A)
@@ -168,7 +165,7 @@ function ExplicitMPC(
         @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*
               "($nk), the closed-loop system may be zero-gain (unresponsive) or unstable")
     end
-    return ExplicitMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, ru)
+    return ExplicitMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt)
 end
 
 setconstraint!(::ExplicitMPC,kwargs...) = error("ExplicitMPC does not support constraints.")

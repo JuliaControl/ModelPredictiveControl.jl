@@ -13,6 +13,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     E::Float64
     R̂u::Vector{Float64}
     R̂y::Vector{Float64}
+    noR̂u::Bool
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     T_Hc::Matrix{Bool}
@@ -31,19 +32,18 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     D̂::Vector{Float64}
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
-    function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim) where {S<:StateEstimator}
+    function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim) where {S<:StateEstimator}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = zeros(ny)
         Ewt = 0   # economic costs not supported for LinMPC
-        validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru)
+        validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt)
         M_Hp = Diagonal{Float64}(repeat(Mwt, Hp))
         N_Hc = Diagonal{Float64}(repeat(Nwt, Hc)) 
         L_Hp = Diagonal{Float64}(repeat(Lwt, Hp))
         C = Cwt
-        # manipulated input setpoint predictions are constant over Hp :
-        R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = empty(estim.x̂)
-        R̂y = zeros(ny* Hp) # dummy R̂y (updated just before optimization)
+        R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
+        noR̂u = iszero(L_Hp)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, K, Q = init_predmat(estim, model, Hp, Hc)
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
@@ -57,7 +57,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y,
+            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y, noR̂u,
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
             Ks, Ps,
@@ -89,12 +89,11 @@ in which the weight matrices are repeated ``H_p`` or ``H_c`` times:
     \mathbf{L}_{H_p} &= \text{diag}\mathbf{(L,L,...,L)}     
 \end{aligned}
 ```
-The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{Δu}(k+j) = 
-\mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to ``H_c-1``, the ``\mathbf{Ŷ}`` vector, 
-the output predictions ``\mathbf{ŷ}(k+j)`` from ``j=1`` to ``H_p``, and the ``\mathbf{U}`` 
-vector, the manipulated inputs ``\mathbf{u}(k+j)`` from ``j=0`` to ``H_p-1``. The 
-manipulated input setpoint predictions ``\mathbf{R̂_u}`` are constant at ``\mathbf{r_u}``.
-See Extended Help for a detailed nomenclature.
+The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{Δu}(k+j) =
+\mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to ``H_c-1``, the ``\mathbf{Ŷ}`` vector,
+the output predictions ``\mathbf{ŷ}(k+j)`` from ``j=1`` to ``H_p``, and the ``\mathbf{U}``
+vector, the manipulated inputs ``\mathbf{u}(k+j)`` from ``j=0`` to ``H_p-1``. See Extended
+Help for a detailed nomenclature.
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
 arguments.
@@ -107,7 +106,6 @@ arguments.
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
-- `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector).
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
   (default to [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html) optimizer).
@@ -158,12 +156,11 @@ function LinMPC(
     Nwt = fill(DEFAULT_NWT, model.nu),
     Lwt = fill(DEFAULT_LWT, model.nu),
     Cwt = DEFAULT_CWT,
-    ru  = model.uop,
     optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
-    return LinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
+    return LinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim)
 end
 
 
@@ -197,7 +194,6 @@ function LinMPC(
     Nwt = fill(DEFAULT_NWT, estim.model.nu),
     Lwt = fill(DEFAULT_LWT, estim.model.nu),
     Cwt = DEFAULT_CWT,
-    ru  = estim.model.uop,
     optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
 ) where {S<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
@@ -210,7 +206,7 @@ function LinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*
               "($nk), the closed-loop system may be zero-gain (unresponsive) or unstable")
     end
-    return LinMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
+    return LinMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim)
 end
 
 """

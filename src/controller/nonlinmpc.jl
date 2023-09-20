@@ -16,6 +16,7 @@ struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
     JE::JEfunc
     R̂u::Vector{Float64}
     R̂y::Vector{Float64}
+    noR̂u::Bool
     S̃_Hp::Matrix{Bool}
     T_Hp::Matrix{Bool}
     T_Hc::Matrix{Bool}
@@ -35,19 +36,18 @@ struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
     function NonLinMPC{S, JEFunc}(
-        estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE::JEFunc, ru, optim
+        estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE::JEFunc, optim
     ) where {S<:StateEstimator, JEFunc<:Function}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = zeros(ny)
-        validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt)
+        validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt)
         M_Hp = Diagonal(convert(Vector{Float64}, repeat(Mwt, Hp)))
         N_Hc = Diagonal(convert(Vector{Float64}, repeat(Nwt, Hc)))
         L_Hp = Diagonal(convert(Vector{Float64}, repeat(Lwt, Hp)))
         C = Cwt
-        # manipulated input setpoint predictions are constant over Hp :
-        R̂u = ~iszero(Lwt) ? repeat(ru, Hp) : R̂u = empty(estim.x̂) 
-        R̂y = zeros(ny* Hp) # dummy R̂y (updated just before optimization)
+        R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
+        noR̂u = iszero(L_Hp)
         S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, K, Q = init_predmat(estim, model, Hp, Hc)
         con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
@@ -61,7 +61,7 @@ struct NonLinMPC{S<:StateEstimator, JEfunc<:Function} <: PredictiveController
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u, R̂y,
+            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u, R̂y, noR̂u,
             S̃_Hp, T_Hp, T_Hc, 
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
             Ks, Ps,
@@ -121,7 +121,6 @@ This method uses the default state estimator :
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
 - `JE=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E)``.
-- `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector).
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
    (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer).
@@ -164,12 +163,11 @@ function NonLinMPC(
     Cwt = DEFAULT_CWT,
     Ewt = DEFAULT_EWT,
     JE::Function = (_,_,_) -> 0.0,
-    ru  = model.uop,
     optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")),
     kwargs...
 )
     estim = UnscentedKalmanFilter(model; kwargs...)
-    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
+    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, optim)
 end
 function NonLinMPC(
     model::LinModel;
@@ -181,12 +179,11 @@ function NonLinMPC(
     Cwt = DEFAULT_CWT,
     Ewt = DEFAULT_EWT,
     JE::Function = (_,_,_) -> 0.0,
-    ru  = model.uop,
     optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
-    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
+    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, optim)
 end
 
 
@@ -222,10 +219,9 @@ function NonLinMPC(
     Cwt = DEFAULT_CWT,
     Ewt = DEFAULT_EWT,
     JE::JEFunc = (_,_,_) -> 0.0,
-    ru  = estim.model.uop,
     optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"))
 ) where {S<:StateEstimator, JEFunc<:Function}
-    return NonLinMPC{S, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
+    return NonLinMPC{S, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, optim)
 end
 
 """

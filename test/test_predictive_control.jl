@@ -16,9 +16,8 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test mpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     mpc5 = LinMPC(model, Nwt=[3,4], Cwt=1e3, Hc=5)
     @test mpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
-    mpc6 = LinMPC(model, Lwt=[0,1], ru=[0,50], Hp=15)
+    mpc6 = LinMPC(model, Lwt=[0,1], Hp=15)
     @test mpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    @test mpc6.R̂u ≈ repeat([0,50], 15)
     mpc7 = LinMPC(model, optim=JuMP.Model(Ipopt.Optimizer))
     @test solver_name(mpc7.optim) == "Ipopt"
     kf = KalmanFilter(model)
@@ -28,18 +27,17 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test mpc9.estim.nint_u  == [1, 1]
     @test mpc9.estim.nint_ym == [0, 0]
 
-    @test_throws ErrorException LinMPC(model, Hp=0)
-    @test_throws ErrorException LinMPC(model, Hc=0)
-    @test_throws ErrorException LinMPC(model, Hp=1, Hc=2)
-    @test_throws ErrorException LinMPC(model, Mwt=[1])
-    @test_throws ErrorException LinMPC(model, Mwt=[1])
-    @test_throws ErrorException LinMPC(model, Lwt=[1])
-    @test_throws ErrorException LinMPC(model, ru=[1])
-    @test_throws ErrorException LinMPC(model, Cwt=[1])
-    @test_throws ErrorException LinMPC(model, Mwt=[-1,1])
-    @test_throws ErrorException LinMPC(model, Nwt=[-1,1])
-    @test_throws ErrorException LinMPC(model, Lwt=[-1,1])
-    @test_throws ErrorException LinMPC(model, Cwt=-1)
+    @test_throws ArgumentError LinMPC(model, Hp=0)
+    @test_throws ArgumentError LinMPC(model, Hc=0)
+    @test_throws ArgumentError LinMPC(model, Hp=1, Hc=2)
+    @test_throws ArgumentError LinMPC(model, Mwt=[1])
+    @test_throws ArgumentError LinMPC(model, Mwt=[1])
+    @test_throws ArgumentError LinMPC(model, Lwt=[1])
+    @test_throws ArgumentError LinMPC(model, Cwt=[1])
+    @test_throws ArgumentError LinMPC(model, Mwt=[-1,1])
+    @test_throws ArgumentError LinMPC(model, Nwt=[-1,1])
+    @test_throws ArgumentError LinMPC(model, Lwt=[-1,1])
+    @test_throws ArgumentError LinMPC(model, Cwt=-1)
 end
 
 @testset "LinMPC constraints" begin
@@ -72,8 +70,8 @@ end
     mpc2 = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
     u = moveinput!(mpc2, [5])
     @test u ≈ [1] atol=1e-2
-    mpc3 = LinMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1], ru=[12])
-    u = moveinput!(mpc3, [0])
+    mpc3 = LinMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1])
+    u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
     mpc_im = LinMPC(InternalModel(LinModel(tf(5, [2, 1]), 3)))
     ym, u = mpc_im.estim.model() - [5], [0.0]
@@ -105,6 +103,12 @@ end
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ [5] atol=1e-2 
+
+    @test_throws ArgumentError moveinput!(mpc1, [0,0,0])
+    @test_throws ArgumentError moveinput!(mpc1, [0], [0,0])
+    @test_throws ArgumentError moveinput!(mpc1; D̂  = fill(0, mpc1.Hp+1))
+    @test_throws ArgumentError moveinput!(mpc1; R̂y = fill(0, mpc1.Hp+1))
+    @test_throws ArgumentError moveinput!(mpc1; R̂u = fill(0, mpc1.Hp+1))
 end
 
 @testset "LinMPC other methods" begin
@@ -128,26 +132,14 @@ end
     @test mpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     mpc5 = ExplicitMPC(model, Nwt=[3,4], Hc=5)
     @test mpc5.Ñ_Hc ≈ Diagonal(diagm(repeat(Float64[3, 4], 5)))
-    mpc6 = ExplicitMPC(model, Lwt=[0,1], ru=[0,50], Hp=15)
+    mpc6 = ExplicitMPC(model, Lwt=[0,1], Hp=15)
     @test mpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    @test mpc6.R̂u ≈ repeat([0,50], 15)
     kf = KalmanFilter(model)
     mpc8 = ExplicitMPC(kf)
     @test isa(mpc8.estim, KalmanFilter)
     mpc9 = ExplicitMPC(model, nint_u=[1, 1], nint_ym=[0, 0])
     @test mpc9.estim.nint_u  == [1, 1]
     @test mpc9.estim.nint_ym == [0, 0]
-
-    @test_throws ErrorException ExplicitMPC(model, Hp=0)
-    @test_throws ErrorException ExplicitMPC(model, Hc=0)
-    @test_throws ErrorException ExplicitMPC(model, Hp=1, Hc=2)
-    @test_throws ErrorException ExplicitMPC(model, Mwt=[1])
-    @test_throws ErrorException ExplicitMPC(model, Mwt=[1])
-    @test_throws ErrorException ExplicitMPC(model, Lwt=[1])
-    @test_throws ErrorException ExplicitMPC(model, ru=[1])
-    @test_throws ErrorException ExplicitMPC(model, Mwt=[-1,1])
-    @test_throws ErrorException ExplicitMPC(model, Nwt=[-1,1])
-    @test_throws ErrorException ExplicitMPC(model, Lwt=[-1,1])
 end
 
 @testset "ExplicitMPC constraints" begin
@@ -169,8 +161,8 @@ end
     mpc2 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
     u = moveinput!(mpc2, [5])
     @test u ≈ [1] atol=1e-2
-    mpc3 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1], ru=[12])
-    u = moveinput!(mpc3, [0])
+    mpc3 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1])
+    u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
     mpc_im = ExplicitMPC(InternalModel(LinModel(tf(5, [2, 1]), 3)))
     ym, u = mpc_im.estim.model() - [5], [0.0]
@@ -235,9 +227,8 @@ end
     @test nmpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     nmpc5 = NonLinMPC(nonlinmodel, Nwt=[3,4], Cwt=1e3, Hc=5)
     @test nmpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
-    nmpc6 = NonLinMPC(nonlinmodel, Lwt=[0,1], ru=[0,50], Hp=15)
+    nmpc6 = NonLinMPC(nonlinmodel, Lwt=[0,1], Hp=15)
     @test nmpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    @test nmpc6.R̂u ≈ repeat([0,50], 15)
     nmpc7 = NonLinMPC(nonlinmodel, Ewt=1e-3, JE=(UE,ŶE,D̂E) -> UE.*ŶE.*D̂E)
     @test nmpc7.E == 1e-3
     @test nmpc7.JE([1,2],[3,4],[4,6]) == [12, 48]
@@ -252,6 +243,8 @@ end
     nmpc11 = NonLinMPC(nonlinmodel, nint_u=[1, 1], nint_ym=[0, 0])
     @test nmpc11.estim.nint_u  == [1, 1]
     @test nmpc11.estim.nint_ym == [0, 0]
+
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Ewt=[1, 1])
 end
 
 @testset "NonLinMPC constraints" begin
@@ -313,8 +306,8 @@ end
     nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
     u = moveinput!(nmpc3, 7d, d)
     @test u ≈ [0] atol=5e-2
-    nmpc4 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Lwt=[1], ru=[12])
-    u = moveinput!(nmpc4, [0], d)
+    nmpc4 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Lwt=[1])
+    u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
     nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Cwt=Inf), ymin=[-1])
     C_Ymax_end = nmpc5.optim.nlp_model.operators.registered_multivariate_operators[end].f

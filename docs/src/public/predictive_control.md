@@ -35,17 +35,17 @@ The vectors for the manipulated input ``\mathbf{u}`` are shifted by one time ste
 
 ```math
     \mathbf{U} = \begin{bmatrix}
-        \mathbf{u}(k+0) \\ \mathbf{u}(k+1) \\ \vdots  \\ \mathbf{u}(k+H_p-1)
+        \mathbf{u}(k+0)   \\ \mathbf{u}(k+1)   \\ \vdots  \\ \mathbf{u}(k+H_p-1)
     \end{bmatrix} \quad \text{and} \quad
     \mathbf{R̂_u} = \begin{bmatrix}
-        \mathbf{r_u}    \\ \mathbf{r_u}    \\ \vdots  \\ \mathbf{r_u}
+        \mathbf{r̂_u}(k+0) \\ \mathbf{r̂_u}(k+1) \\ \vdots  \\ \mathbf{r̂_u}(k+H_p-1)
     \end{bmatrix}
 ```
 
-assuming constant input setpoints at ``\mathbf{r_u}``. Defining the manipulated input
-increment as ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)``, the control horizon
-``H_c`` enforces that ``\mathbf{Δu}(k+j) = \mathbf{0}`` for ``j ≥ H_c``. For this reason,
-the vector that collects them is truncated up to ``k+H_c-1``:
+Defining the manipulated input increment as ``\mathbf{Δu}(k+j) =
+\mathbf{u}(k+j) - \mathbf{u}(k+j-1)``, the control horizon ``H_c`` enforces that
+``\mathbf{Δu}(k+j) = \mathbf{0}`` for ``j ≥ H_c``. For this reason, the vector that collects
+them is truncated up to ``k+H_c-1``:
 
 ```math
     \mathbf{ΔU} =

@@ -247,11 +247,12 @@ setnonlincon!(::PredictiveController, ::SimModel) = nothing
 
 @doc raw"""
     moveinput!(
-        mpc::PredictiveController, 
-        ry = mpc.estim.model.yop, 
+        mpc::PredictiveController,
+        ry = mpc.estim.model.yop,
         d  = [];
-        R̂y = repeat(ry, mpc.Hp), 
-        D̂  = repeat(d,  mpc.Hp), 
+        D̂  = repeat(d,  mpc.Hp),
+        R̂y = repeat(ry, mpc.Hp),
+        R̂u = repeat(mpc.estim.model.uop, mpc.Hp),
         ym = nothing
     )
 
@@ -286,12 +287,13 @@ function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
     d ::Vector = empty(mpc.estim.x̂);
-    R̂y::Vector = repeat(ry, mpc.Hp),
     D̂ ::Vector = repeat(d,  mpc.Hp),
+    R̂y::Vector = repeat(ry, mpc.Hp),
+    R̂u::Vector = repeat(mpc.estim.model.uop, mpc.Hp),
     ym::Union{Vector, Nothing} = nothing
 )
-    validate_setpointdist(mpc, ry, d, R̂y, D̂)
-    initpred!(mpc, mpc.estim.model, d, ym, D̂, R̂y)
+    validate_setpointdist(mpc, ry, d, D̂, R̂y, R̂u)
+    initpred!(mpc, mpc.estim.model, d, ym, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model)
     ΔŨ = optim_objective!(mpc)
     Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
@@ -383,33 +385,34 @@ Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 updatestate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂)) = updatestate!(mpc.estim,u,ym,d)
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
-function validate_setpointdist(mpc::PredictiveController, ry, d, R̂y, D̂)
-    ny, nd, Hp = mpc.estim.model.ny, mpc.estim.model.nd, mpc.Hp
-    size(ry) ≠ (ny,)    && error("ry size $(size(ry)) ≠ output size ($ny,)")
-    size(d)  ≠ (nd,)    && error("d size $(size(d)) ≠ measured dist. size ($nd,)")
-    size(R̂y) ≠ (ny*Hp,) && error("R̂y size $(size(R̂y)) ≠ output size × Hp ($(ny*Hp),)")
-    size(D̂)  ≠ (nd*Hp,) && error("D̂ size $(size(D̂)) ≠ measured dist. size × Hp ($(nd*Hp),)")
+function validate_setpointdist(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
+    ny, nd, nu, Hp = mpc.estim.model.ny, mpc.estim.model.nd, mpc.estim.model.nu, mpc.Hp
+    size(ry) ≠ (ny,)    && throw(ArgumentError("ry size $(size(ry)) ≠ output size ($ny,)"))
+    size(d)  ≠ (nd,)    && throw(ArgumentError("d size $(size(d)) ≠ measured dist. size ($nd,)"))
+    size(D̂)  ≠ (nd*Hp,) && throw(ArgumentError("D̂ size $(size(D̂)) ≠ measured dist. size × Hp ($(nd*Hp),)"))
+    size(R̂y) ≠ (ny*Hp,) && throw(ArgumentError("R̂y size $(size(R̂y)) ≠ output size × Hp ($(ny*Hp),)"))
+    size(R̂u) ≠ (nu*Hp,) && throw(ArgumentError("R̂u size $(size(R̂u)) ≠ manip. input size × Hp ($(nu*Hp),)"))
 end
 
 @doc raw"""
-    initpred!(mpc, model::LinModel, d, ym, D̂, R̂y)
+    initpred!(mpc, model::LinModel, d, ym, D̂, R̂y, R̂u)
 
 Init linear model prediction matrices `F`, `q̃` and `p`.
 
 See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
-function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y)
+function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
     mpc.F[:] = mpc.K*mpc.estim.x̂ + mpc.Q*mpc.estim.lastu0 + mpc.Ŷop
     if model.nd ≠ 0
         mpc.d[:], mpc.D̂[:] = d, D̂
         mpc.F[:] = mpc.F + mpc.G*(mpc.d - model.dop) + mpc.J*(mpc.D̂ - mpc.Dop)
     end
-    mpc.R̂y[:] = R̂y
+    mpc.R̂y[:], mpc.R̂u[:] = R̂y, R̂u
     Ẑ = mpc.F - R̂y
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
     mpc.p[:] = [Ẑ'*mpc.M_Hp*Ẑ]
-    if ~isempty(mpc.R̂u)
+    if ~mpc.noR̂u
         lastu = mpc.estim.lastu0 + model.uop
         V̂ = mpc.T_Hp*lastu - mpc.R̂u
         mpc.q̃[:] += 2(mpc.L_Hp*mpc.S̃_Hp)'*V̂
@@ -419,7 +422,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y)
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y)
+    initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y, R̂u)
 
 Init `Ŷop`, `d0` and `D̂0` matrices when model is not a [`LinModel`](@ref).
 
@@ -427,12 +430,12 @@ Init `Ŷop`, `d0` and `D̂0` matrices when model is not a [`LinModel`](@ref).
 ``\mathbf{d_{op}}``. The vector `Ŷop` is kept unchanged if `mpc.estim` is not an
 [`InternalModel`](@ref).
 """
-function initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y)
+function initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y, R̂u)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
     if model.nd ≠ 0
         mpc.d[:], mpc.D̂[:] = d, D̂
     end
-    mpc.R̂y[:] = R̂y
+    mpc.R̂y[:], mpc.R̂u[:] = R̂y, R̂u
     return nothing
 end
 
@@ -765,11 +768,11 @@ function obj_nonlinprog(mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::
     # --- move suppression and slack variable term ---
     JΔŨ = ΔŨ'*mpc.Ñ_Hc*ΔŨ
     # --- input over prediction horizon ---
-    if !isempty(mpc.R̂u) || !iszero(mpc.E)
+    if !mpc.noR̂u || !iszero(mpc.E)
         U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
     end
     # --- input setpoint tracking term ---
-    if !isempty(mpc.R̂u)
+    if !mpc.noR̂u
         êu = mpc.R̂u - U
         JR̂u = êu'*mpc.L_Hp*êu
     else
@@ -1015,21 +1018,20 @@ function init_linconstraint(::SimModel,
 end
 
 "Validate predictive controller weight and horizon specified values."
-function validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, Ewt=nothing)
+function validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt=nothing)
     nu, ny = model.nu, model.ny
-    Hp < 1  && error("Prediction horizon Hp should be ≥ 1")
-    Hc < 1  && error("Control horizon Hc should be ≥ 1")
-    Hc > Hp && error("Control horizon Hc should be ≤ prediction horizon Hp")
-    size(Mwt) ≠ (ny,) && error("Mwt size $(size(Mwt)) ≠ output size ($ny,)")
-    size(Nwt) ≠ (nu,) && error("Nwt size $(size(Nwt)) ≠ manipulated input size ($nu,)")
-    size(Lwt) ≠ (nu,) && error("Lwt size $(size(Lwt)) ≠ manipulated input size ($nu,)")
-    size(ru)  ≠ (nu,) && error("ru size $(size(ru)) ≠ manipulated input size ($nu,)")
-    size(Cwt) ≠ ()    && error("Cwt should be a real scalar")
-    any(Mwt.<0) && error("Mwt weights should be ≥ 0")
-    any(Nwt.<0) && error("Nwt weights should be ≥ 0")
-    any(Lwt.<0) && error("Lwt weights should be ≥ 0")
-    Cwt < 0     && error("Cwt weight should be ≥ 0")
-    !isnothing(Ewt) && size(Ewt) ≠ () && error("Ewt should be a real scalar")
+    Hp < 1  && throw(ArgumentError("Prediction horizon Hp should be ≥ 1"))
+    Hc < 1  && throw(ArgumentError("Control horizon Hc should be ≥ 1"))
+    Hc > Hp && throw(ArgumentError("Control horizon Hc should be ≤ prediction horizon Hp"))
+    size(Mwt) ≠ (ny,) && throw(ArgumentError("Mwt size $(size(Mwt)) ≠ output size ($ny,)"))
+    size(Nwt) ≠ (nu,) && throw(ArgumentError("Nwt size $(size(Nwt)) ≠ manipulated input size ($nu,)"))
+    size(Lwt) ≠ (nu,) && throw(ArgumentError("Lwt size $(size(Lwt)) ≠ manipulated input size ($nu,)"))
+    size(Cwt) ≠ ()    && throw(ArgumentError("Cwt should be a real scalar"))
+    any(Mwt.<0) && throw(ArgumentError("Mwt weights should be ≥ 0"))
+    any(Nwt.<0) && throw(ArgumentError("Nwt weights should be ≥ 0"))
+    any(Lwt.<0) && throw(ArgumentError("Lwt weights should be ≥ 0"))
+    Cwt < 0     && throw(ArgumentError("Cwt weight should be ≥ 0"))
+    !isnothing(Ewt) && size(Ewt) ≠ () && throw(ArgumentError("Ewt should be a real scalar"))
 end
 
 function Base.show(io::IO, mpc::PredictiveController)
