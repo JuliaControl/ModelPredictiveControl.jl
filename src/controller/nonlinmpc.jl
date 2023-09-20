@@ -125,6 +125,8 @@ This method uses the default state estimator :
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
    (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer).
+- additionnal keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
+  (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
 # Examples
 ```jldoctest
@@ -152,8 +154,40 @@ generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@
 and `h` functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
 for common mistakes when writing these functions.
 """
-NonLinMPC(model::SimModel; kwargs...) = NonLinMPC(UnscentedKalmanFilter(model); kwargs...)
-NonLinMPC(model::LinModel; kwargs...) = NonLinMPC(SteadyKalmanFilter(model); kwargs...)
+function NonLinMPC(
+    model::SimModel;
+    Hp::Int = DEFAULT_HP,
+    Hc::Int = DEFAULT_HC,
+    Mwt = fill(DEFAULT_MWT, model.ny),
+    Nwt = fill(DEFAULT_NWT, model.nu),
+    Lwt = fill(DEFAULT_LWT, model.nu),
+    Cwt = DEFAULT_CWT,
+    Ewt = DEFAULT_EWT,
+    JE::Function = (_,_,_) -> 0.0,
+    ru  = model.uop,
+    optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")),
+    kwargs...
+)
+    estim = UnscentedKalmanFilter(model; kwargs...)
+    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
+end
+function NonLinMPC(
+    model::LinModel;
+    Hp::Int = DEFAULT_HP,
+    Hc::Int = DEFAULT_HC,
+    Mwt = fill(DEFAULT_MWT, model.ny),
+    Nwt = fill(DEFAULT_NWT, model.nu),
+    Lwt = fill(DEFAULT_LWT, model.nu),
+    Cwt = DEFAULT_CWT,
+    Ewt = DEFAULT_EWT,
+    JE::Function = (_,_,_) -> 0.0,
+    ru  = model.uop,
+    optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")),
+    kwargs...
+)
+    estim = SteadyKalmanFilter(model; kwargs...)
+    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, ru, optim)
+end
 
 
 """
@@ -180,13 +214,13 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 """
 function NonLinMPC(
     estim::S;
-    Hp::Int = 10,
-    Hc::Int = 2,
-    Mwt = fill(1.0, estim.model.ny),
-    Nwt = fill(0.1, estim.model.nu),
-    Lwt = fill(0.0, estim.model.nu),
-    Cwt = 1e5,
-    Ewt = 0.0,
+    Hp::Int = DEFAULT_HP,
+    Hc::Int = DEFAULT_HC,
+    Mwt = fill(DEFAULT_MWT, estim.model.ny),
+    Nwt = fill(DEFAULT_NWT, estim.model.nu),
+    Lwt = fill(DEFAULT_LWT, estim.model.nu),
+    Cwt = DEFAULT_CWT,
+    Ewt = DEFAULT_EWT,
     JE::JEFunc = (_,_,_) -> 0.0,
     ru  = estim.model.uop,
     optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"))

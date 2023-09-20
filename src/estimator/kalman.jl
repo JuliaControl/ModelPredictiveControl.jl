@@ -96,11 +96,11 @@ unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 - `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
     the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
 - `σQint_u=fill(1,sum(nint_u))`: same than `σQ` but for the unmeasured disturbances at 
-    manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrating states).
+    manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
 - `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
     disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
 - `σQint_ym=fill(1,sum(nint_ym))` : same than `σQ` for the unmeasured disturbances at 
-    measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrating states).
+    measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 
 # Examples
 ```jldoctest
@@ -240,8 +240,8 @@ Construct a time-varying Kalman Filter with the [`LinModel`](@ref) `model`.
 
 The process model is identical to [`SteadyKalmanFilter`](@ref). The matrix 
 ``\mathbf{P̂}_k(k+1)`` is the estimation error covariance of `model` states augmented with
-the stochastic ones (specified by `nint_ym`). Three keyword arguments modify its initial 
-value with ``\mathbf{P̂}_{-1}(0) = 
+the stochastic ones (specified by `nint_u` and `nint_ym`). Three keyword arguments modify
+its initial value with ``\mathbf{P̂}_{-1}(0) = 
     \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``.
 
 # Arguments
@@ -249,9 +249,9 @@ value with ``\mathbf{P̂}_{-1}(0) =
 - `σP0=fill(1/model.nx,model.nx)` : main diagonal of the initial estimate covariance
     ``\mathbf{P}(0)``, specified as a standard deviation vector.
 - `σP0int_u=fill(1,sum(nint_u))` : same than `σP0` but for the unmeasured disturbances at 
-    manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrating states).
+    manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
 - `σP0int_ym=fill(1,sum(nint_ym))` : same than `σP0` but for the unmeasured disturbances at 
-    measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrating states).
+    measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples

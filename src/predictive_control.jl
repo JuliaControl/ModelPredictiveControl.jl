@@ -19,6 +19,14 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController end
 
+const DEFAULT_HP  = 10
+const DEFAULT_HC  = 2
+const DEFAULT_MWT = 1.0
+const DEFAULT_NWT = 0.1
+const DEFAULT_LWT = 0.0
+const DEFAULT_CWT = 1e5
+const DEFAULT_EWT = 0.0
+
 "Type alias for vector of linear inequality constraints."
 const LinConVector = Vector{ConstraintRef{
     Model, 

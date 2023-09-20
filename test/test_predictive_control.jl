@@ -24,6 +24,9 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     kf = KalmanFilter(model)
     mpc8 = LinMPC(kf)
     @test isa(mpc8.estim, KalmanFilter)
+    mpc9 = LinMPC(model, nint_u=[1, 1], nint_ym=[0, 0])
+    @test mpc9.estim.nint_u  == [1, 1]
+    @test mpc9.estim.nint_ym == [0, 0]
 
     @test_throws ErrorException LinMPC(model, Hp=0)
     @test_throws ErrorException LinMPC(model, Hc=0)
@@ -131,6 +134,9 @@ end
     kf = KalmanFilter(model)
     mpc8 = ExplicitMPC(kf)
     @test isa(mpc8.estim, KalmanFilter)
+    mpc9 = ExplicitMPC(model, nint_u=[1, 1], nint_ym=[0, 0])
+    @test mpc9.estim.nint_u  == [1, 1]
+    @test mpc9.estim.nint_ym == [0, 0]
 
     @test_throws ErrorException ExplicitMPC(model, Hp=0)
     @test_throws ErrorException ExplicitMPC(model, Hc=0)
@@ -240,6 +246,12 @@ end
     im = InternalModel(nonlinmodel)
     nmpc9 = NonLinMPC(im)
     @test isa(nmpc9.estim, InternalModel)
+    nmpc10 = NonLinMPC(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
+    @test nmpc10.estim.nint_u  == [1, 1]
+    @test nmpc10.estim.nint_ym == [0, 0]
+    nmpc11 = NonLinMPC(nonlinmodel, nint_u=[1, 1], nint_ym=[0, 0])
+    @test nmpc11.estim.nint_u  == [1, 1]
+    @test nmpc11.estim.nint_ym == [0, 0]
 end
 
 @testset "NonLinMPC constraints" begin

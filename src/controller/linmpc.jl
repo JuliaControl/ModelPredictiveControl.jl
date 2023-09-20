@@ -111,6 +111,7 @@ arguments.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
   (default to [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html) optimizer).
+- additionnal keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
 ```jldoctest
@@ -149,7 +150,21 @@ The objective function follows this nomenclature:
 | ``C``            | slack variable weight                              | `()`             |
 | ``ϵ``            | slack variable for constraint softening            | `()`             |
 """
-LinMPC(model::LinModel; kwargs...) = LinMPC(SteadyKalmanFilter(model); kwargs...)
+function LinMPC(
+    model::LinModel;
+    Hp::Union{Int, Nothing} = nothing,
+    Hc::Int = DEFAULT_HC,
+    Mwt = fill(DEFAULT_MWT, model.ny),
+    Nwt = fill(DEFAULT_NWT, model.nu),
+    Lwt = fill(DEFAULT_LWT, model.nu),
+    Cwt = DEFAULT_CWT,
+    ru  = model.uop,
+    optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer),
+    kwargs...
+)
+    estim = SteadyKalmanFilter(model; kwargs...)
+    return LinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, ru, optim)
+end
 
 
 """
@@ -176,12 +191,12 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, KalmanFilter es
 """
 function LinMPC(
     estim::S;
-    Hp::Union{Int, Nothing} = nothing,
-    Hc::Int = 2,
-    Mwt = fill(1.0, estim.model.ny),
-    Nwt = fill(0.1, estim.model.nu),
-    Lwt = fill(0.0, estim.model.nu),
-    Cwt = 1e5,
+    Hp::Union{Int, Nothing} = DEFAULT_HP,
+    Hc::Int = DEFAULT_HC,
+    Mwt = fill(DEFAULT_MWT, estim.model.ny),
+    Nwt = fill(DEFAULT_NWT, estim.model.nu),
+    Lwt = fill(DEFAULT_LWT, estim.model.nu),
+    Cwt = DEFAULT_CWT,
     ru  = estim.model.uop,
     optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
 ) where {S<:StateEstimator}
@@ -189,7 +204,7 @@ function LinMPC(
     poles = eigvals(estim.model.A)
     nk = sum(poles .≈ 0)
     if isnothing(Hp)
-        Hp = 10 + nk
+        Hp = DEFAULT_HP + nk
     end
     if Hp ≤ nk
         @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*

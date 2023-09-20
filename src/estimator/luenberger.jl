@@ -57,12 +57,12 @@ end
 
 Construct a Luenberger observer with the [`LinModel`](@ref) `model`.
 
-`i_ym` provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are 
+`i_ym` provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are
 unmeasured ``\mathbf{y^u}``. `model` matrices are augmented with the stochastic model, which
 is specified by the numbers of integrator `nint_u` and `nint_ym` (see [`SteadyKalmanFilter`](@ref)
-Extended Help). The argument `p̂` is a vector of `model.nx + sum(nint_ym)` elements 
-specifying the observer poles/eigenvalues (near ``z=0.5`` by default). The method computes 
-the observer gain `K̂` with [`place`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.place).
+Extended Help). The argument `p̂` is a vector of `model.nx + sum(nint_u) + sum(nint_ym)`
+elements specifying the observer poles/eigenvalues (near ``z=0.5`` by default). The method
+computes the observer gain `K̂` with [`place`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.place).
 
 # Examples
 ```jldoctest

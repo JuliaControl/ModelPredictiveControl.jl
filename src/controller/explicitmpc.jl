@@ -95,6 +95,7 @@ state estimator, a [`SteadyKalmanFilter`](@ref) with default arguments.
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
 - `ru=model.uop` : manipulated input setpoints ``\mathbf{r_u}`` (vector).
+- additionnal keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
 ```jldoctest
@@ -112,7 +113,19 @@ ExplicitMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimat
 ```
 
 """
-ExplicitMPC(model::LinModel; kwargs...) = ExplicitMPC(SteadyKalmanFilter(model); kwargs...)
+function ExplicitMPC(
+    model::LinModel; 
+    Hp::Union{Int, Nothing} = nothing,
+    Hc::Int = DEFAULT_HC,
+    Mwt = fill(DEFAULT_MWT, model.ny),
+    Nwt = fill(DEFAULT_NWT, model.nu),
+    Lwt = fill(DEFAULT_LWT, model.nu),
+    ru  = model.uop,
+    kwargs...
+) 
+    estim = SteadyKalmanFilter(model; kwargs...)
+    return ExplicitMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, ru)
+end
 
 """
     ExplicitMPC(estim::StateEstimator; <keyword arguments>)
@@ -139,17 +152,17 @@ ExplicitMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and
 function ExplicitMPC(
     estim::S;
     Hp::Union{Int, Nothing} = nothing,
-    Hc::Int = 2,
-    Mwt = fill(1.0, estim.model.ny),
-    Nwt = fill(0.1, estim.model.nu),
-    Lwt = fill(0.0, estim.model.nu),
+    Hc::Int = DEFAULT_HC,
+    Mwt = fill(DEFAULT_MWT, estim.model.ny),
+    Nwt = fill(DEFAULT_NWT, estim.model.nu),
+    Lwt = fill(DEFAULT_LWT, estim.model.nu),
     ru  = estim.model.uop,
 ) where {S<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     poles = eigvals(estim.model.A)
     nk = sum(poles .≈ 0)
     if isnothing(Hp)
-        Hp = 10 + nk
+        Hp = DEFAULT_HP + nk
     end
     if Hp ≤ nk
         @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*

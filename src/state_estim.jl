@@ -217,10 +217,11 @@ end
 
 Get default integrator quantity per measured outputs `nint_ym` for [`LinModel`](@ref).
 
-The measured output ``\mathbf{y^m}`` indices are specified by `i_ym` argument. By default, 
-one integrator is added on each measured outputs. If ``\mathbf{Â, Ĉ}`` matrices of the 
-augmented model become unobservable, the integrator is removed. This approach works well 
-for stable, integrating and unstable `model` (see Examples).
+The arguments `i_ym` and `nint_u` are the measured output indices and the integrator
+quantity on each manipulated input, respectively. By default, one integrator is added on
+each measured outputs. If ``\mathbf{Â, Ĉ}`` matrices of the augmented model become
+unobservable, the integrator is removed. This approach works well for stable, integrating
+and unstable `model` (see Examples).
 
 # Examples
 ```jldoctest
