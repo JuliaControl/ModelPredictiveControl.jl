@@ -221,7 +221,7 @@ Init `estim.x̂` \ `x̂d` \ `x̂s` estimate at steady-state for [`InternalModel`
 
 The deterministic estimates `estim.x̂d` start at steady-state using `u` and `d` arguments:
 ```math
-\mathbf{x̂_d} = \mathbf{(I-Â)^{-1} B̂_u u}
+    \mathbf{x̂_d} = \mathbf{(I - Â)^{-1} B̂_u u}
 ```
 Based on `ym` argument and current stochastic outputs estimation ``\mathbf{ŷ_s}``, composed
 of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmeasured 
