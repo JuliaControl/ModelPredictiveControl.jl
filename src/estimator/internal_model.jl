@@ -221,7 +221,7 @@ Init `estim.x̂` \ `x̂d` \ `x̂s` estimate at steady-state for [`InternalModel`
 
 The deterministic estimates `estim.x̂d` start at steady-state using `u` and `d` arguments:
 ```math
-    \mathbf{x̂_d} = \mathbf{(I - Â)^{-1} B̂_u u}
+    \mathbf{x̂_d} = \mathbf{(I - A)^{-1} (B_u u + B_d d)}
 ```
 Based on `ym` argument and current stochastic outputs estimation ``\mathbf{ŷ_s}``, composed
 of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmeasured 
@@ -229,11 +229,12 @@ of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmea
 ```math
     \mathbf{x̂_s} = \mathbf{(I - Â_s)^{-1} B̂_s ŷ_s}
 ```
-See [`init_internalmodel`](@ref) for details.
+This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See
+[`init_internalmodel`](@ref) for details.
 """
 function init_estimate!(estim::InternalModel, model::LinModel, u, ym, d)
     x̂d, x̂s = estim.x̂d, estim.x̂s
-    x̂d[:] = (I - estim.Â)\(estim.B̂u*u + estim.B̂d*d)
+    x̂d[:] = (I - model.A)\(model.Bu*u + model.Bd*d)
     ŷd = h(model, x̂d, d)
     ŷs = zeros(model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
