@@ -349,21 +349,12 @@ function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     return nothing
 end
 
-
 """
-    con_nonlinprog!(C, mpc::NonLinMPC, model::LinModel, ΔŨ::Vector{Real})
-
-Nonlinear constraints for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
-"""
-function con_nonlinprog!(C, ::NonLinMPC, ::LinModel, _ , ::Vector{T}) where {T<:Real}
-    return C
-end
-"""
-    con_nonlinprog!(C, mpc::NonLinMPC, model::NonLinModel, ΔŨ::Vector{Real})
+    con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, ΔŨ)
 
 Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
 """
-function con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
+function con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ)
     ny, Hp = model.ny, mpc.Hp
     if !isinf(mpc.C) # constraint softening activated :
         ϵ = ΔŨ[end]
@@ -376,3 +367,6 @@ function con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ::Vector{
     C[isinf.(C)] .= 0 # replace ±Inf with 0 to avoid INVALID_MODEL error
     return C
 end
+
+"No nonlinear constraints if `model` is a [`LinModel`](@ref), return `C` unchanged."
+con_nonlinprog!(C, ::NonLinMPC, ::LinModel, _ , _ ) = C

@@ -744,7 +744,9 @@ The function is called by the nonlinear optimizer of [`NonLinMPC`](@ref) control
 also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
 at specific input increments `ΔŨ` and predictions `Ŷ` values.
 """
-function obj_nonlinprog(mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
+function obj_nonlinprog(
+    mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{T}
+) where {T<:Real}
     J = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
     if !iszero(mpc.E)
         U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
@@ -761,7 +763,9 @@ end
 
 Nonlinear programming objective function when `model` is not a [`LinModel`](@ref).
 """
-function obj_nonlinprog(mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{T}) where {T<:Real}
+function obj_nonlinprog(
+    mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{T}
+) where {T<:Real}
     # --- output setpoint tracking term ---
     êy = mpc.R̂y - Ŷ
     JR̂y = êy'*mpc.M_Hp*êy  
