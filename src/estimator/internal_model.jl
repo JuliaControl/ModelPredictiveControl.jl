@@ -208,16 +208,36 @@ function update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂))
     ŷd = h(model, x̂d, d)
     x̂d[:] = f(model, x̂d, u, d) # this also updates estim.x̂ (they are the same object)
     # --------------- stochastic model -----------------------
-    ŷs = zeros(model.ny,1)
+    ŷs = zeros(model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]   # ŷs=0 for unmeasured outputs
     x̂s[:] = estim.Âs*x̂s + estim.B̂s*ŷs
     return x̂d
 end
 
-"Init the stochastic states `estim.x̂s` of [`InternalModel`](@ref) at 0. " 
-function initstate_post!(estim::InternalModel)
-    # TODO: best method to initialize internal model stochastic states ? not sure...
-    estim.x̂s[:] = zeros(estim.nxs)
+@doc raw"""
+    init_estimate!(estim::InternalModel, ::LinModel, u, ym, d)
+
+Init `estim.x̂` \ `x̂d` \ `x̂s` estimate at steady-state for [`InternalModel`](@ref)s.
+
+The deterministic estimates `estim.x̂d` start at steady-state using `u` and `d` arguments:
+```math
+\mathbf{x̂_d} = \mathbf{(I-Â)^{-1} B̂_u u}
+```
+Based on `ym` argument and current stochastic outputs estimation ``\mathbf{ŷ_s}``, composed
+of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmeasured 
+``\mathbf{ŷ_s^u = 0}`` outputs, the stochastic estimates also start at steady-state:
+```math
+    \mathbf{x̂_s} = \mathbf{(I - Â_s)^{-1} B̂_s ŷ_s}
+```
+See [`init_internalmodel`](@ref) for details.
+"""
+function init_estimate!(estim::InternalModel, ::LinModel, u, ym, d)
+    x̂d, x̂s = estim.x̂d, estim.x̂s
+    x̂d[:] = (I - estim.Â)\(estim.B̂u*u + estim.B̂d*d)
+    ŷd = h(estim.model, x̂d, d)
+    ŷs = zeros(estim.model.ny)
+    ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
+    x̂s[:] = (I-estim.Âs)\estim.B̂s*ŷs
     return nothing
 end
 
@@ -231,6 +251,4 @@ function print_estim_dim(io::IO, estim::InternalModel, n)
     println(io, "$(lpad(nyu, n)) unmeasured outputs yu")
     print(io,   "$(lpad(nd, n)) measured disturbances d")
 end
-
-(estim::InternalModel)(ym, d=empty(estim.x̂)) = evaloutput(estim::InternalModel, ym, d)
 

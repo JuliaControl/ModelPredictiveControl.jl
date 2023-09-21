@@ -724,11 +724,11 @@ function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂)
     return update_estimate_kf!(estim, F̂, Ĥm, u, ym, d)
 end
 
-"Initialize the covariance estimate `P̂` for the time-varying Kalman Filters" 
-function initstate_post!(
-    estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}
+"Set `estim.P̂` to `estim.P̂0` for the time-varying Kalman Filters."
+function init_estimate_cov!(
+    estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}, _ , _ , _
 ) 
-    estim.P̂.data[:] = estim.P̂0
+    estim.P̂.data[:] = estim.P̂0 # .data is necessary for Hermitians
     return nothing
 end
 

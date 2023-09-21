@@ -64,6 +64,11 @@ end
     @test evaloutput(skalmanfilter1) ≈ skalmanfilter1() ≈ [50, 30]
     @test evaloutput(skalmanfilter1, Float64[]) ≈ skalmanfilter1(Float64[]) ≈ [50, 30]
     @test initstate!(skalmanfilter1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    linmodel2 = LinModel(append(tf(1, [1, 0]), tf(2, [10, 1])), 1.0)
+    skalmanfilter2 = SteadyKalmanFilter(linmodel2, nint_u=[1, 1])
+    x = initstate!(skalmanfilter2, [10, 3], [0.5, 6+0.1])
+    @test evaloutput(skalmanfilter2) ≈ [0.5, 6+0.1]
+    @test updatestate!(skalmanfilter2, [0, 3], [0.5, 6+0.1]) ≈ x
     setstate!(skalmanfilter1, [1,2,3,4])
     @test skalmanfilter1.x̂ ≈ [1,2,3,4]
     for i in 1:100
@@ -299,6 +304,13 @@ end
     @test internalmodel1.x̂s ≈ ones(2)
     @test ModelPredictiveControl.evalŷ(internalmodel1, [51,31], Float64[]) ≈ [51,31]
     @test initstate!(internalmodel1, [10, 50], [50, 30]) ≈ zeros(2)
+    linmodel2 = LinModel(append(tf(3, [5, 1]), tf(2, [10, 1])), 1.0)
+    stoch_ym = append(tf([2.5, 1],[1.2, 1, 0]),tf([1.5, 1], [1.3, 1, 0]))
+    estim = InternalModel(linmodel2; stoch_ym)
+    initstate!(estim, [1, 2], [3+0.1, 4+0.5])
+    @test estim.x̂d ≈ estim.Â*estim.x̂d + estim.B̂u*[1, 2]
+    ŷs = [3+0.1, 4+0.5] - estim()
+    @test estim.x̂s ≈ estim.Âs*estim.x̂s + estim.B̂s*ŷs
     @test internalmodel1.x̂s ≈ zeros(2)
     setstate!(internalmodel1, [1,2])
     @test internalmodel1.x̂ ≈ [1,2]

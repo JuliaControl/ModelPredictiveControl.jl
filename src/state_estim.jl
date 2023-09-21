@@ -54,19 +54,19 @@ function print_estim_dim(io::IO, estim::StateEstimator, n)
 end
 
 """
-    remove_op!(estim::StateEstimator, u, d, ym) -> u0, d0, ym0
+    remove_op!(estim::StateEstimator, u, ym, d) -> u0, ym0, d0
 
 Remove operating points on inputs `u`, measured outputs `ym` and disturbances `d`.
 
 Also store current inputs without operating points `u0` in `estim.lastu0`. This field is 
 used for [`PredictiveController`](@ref) computations.
 """
-function remove_op!(estim::StateEstimator, u, d, ym)
+function remove_op!(estim::StateEstimator, u, ym, d)
     u0  = u  - estim.model.uop
-    d0  = d  - estim.model.dop
     ym0 = ym - estim.model.yop[estim.i_ym]
+    d0  = d  - estim.model.dop
     estim.lastu0[:] = u0
-    return u0, d0, ym0
+    return u0, ym0, d0 
 end
 
 @doc raw"""
@@ -302,7 +302,7 @@ removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!
   bumpless manual to automatic transfer. See [`init_estimate!`](@ref) for details.
 - Else, `estim.x̂` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
 
-If applicable, it also sets the error covariance `estim.P̂` to ``\mathbf{P̂}(0)``.
+If applicable, it also sets the error covariance `estim.P̂` to `estim.P̂0`.
 
 # Examples
 ```jldoctest
@@ -324,15 +324,15 @@ true
 """
 function initstate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
     # --- init state estimate ----
-    u0, d0, ym0 = remove_op!(estim, u, d, ym)
+    u0, ym0, d0 = remove_op!(estim, u, ym, d)
     init_estimate!(estim, estim.model, u0, ym0, d0)
     # --- init covariance error estimate, if applicable ---
-    initstate_post!(estim)
+    init_estimate_cov!(estim, u0, ym0, d0)
     return estim.x̂
 end
 
-"By default, do nothing at the end of `initstate!` (used to init the covariance estimate)."
-initstate_post!(::StateEstimator) = nothing
+"By default, [`StateEstimator`](@ref)s do not need covariance error estimate."
+init_estimate_cov!(::StateEstimator, _ , _ , _ ) = nothing
 
 @doc raw"""
     init_estimate!(estim::StateEstimator, model::LinModel, u, ym, d)
@@ -347,7 +347,7 @@ constraint ``\mathbf{ŷ^m} = \mathbf{y^m}`` engenders the following system to s
     \mathbf{Ĉ^m}
 \end{bmatrix} \mathbf{x̂} =
 \begin{bmatrix}
-    \mathbf{B̂_u u} + \mathbf{B̂_d d} \\
+    \mathbf{B̂_u u} + \mathbf{B̂_d d}     \\
     \mathbf{y^m} - \mathbf{D̂_d^m d}
 \end{bmatrix}
 ```
@@ -358,8 +358,13 @@ function init_estimate!(estim::StateEstimator, ::LinModel, u, ym, d)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     Ĉm, D̂dm = Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
     estim.x̂[:] = [(I - Â); Ĉm]\[B̂u*u + B̂d*d; ym - D̂dm*d]
+    return nothing
 end
-"Left `estim.x̂` estimate unchanged if `model` is not a [`LinModel`](@ref)."
+"""
+    init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ )
+
+Left `estim.x̂` estimate unchanged if `model` is not a [`LinModel`](@ref).
+"""
 init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
 
 @doc raw"""
@@ -405,7 +410,7 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
 ```
 """
 function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
-    u0, d0, ym0 = remove_op!(estim, u, d, ym) 
+    u0, ym0, d0 = remove_op!(estim, u, ym, d) 
     update_estimate!(estim, u0, ym0, d0)
     return estim.x̂
 end

@@ -118,6 +118,7 @@ for more detailed examples.
 - [x] easily estimate unmeasured disturbances by adding one or more integrators at the:
   - [x] manipulated inputs
   - [x] measured outputs
+- [x] bumpless manual to automatic transfer for control with a proper intial estimate
 - [x] observers in predictor form to ease control applications
 - [ ] moving horizon estimator that supports:
   - [ ] inequality state constraints

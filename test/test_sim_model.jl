@@ -80,16 +80,18 @@ end
 
 @testset "LinModel sim methods" begin
     linmodel1 = setop!(LinModel(Gss), uop=[10,50], yop=[50,30])
-
-    @test updatestate!(linmodel1, [10, 50]) ≈ zeros(2) 
+    @test updatestate!(linmodel1, [10, 50]) ≈ zeros(2)
     @test updatestate!(linmodel1, [10, 50], Float64[]) ≈ zeros(2)
     @test linmodel1.x ≈ zeros(2)
-    @test evaloutput(linmodel1) ≈ linmodel1() ≈ [50,30] 
+    @test evaloutput(linmodel1) ≈ linmodel1() ≈ [50,30]
     @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30]
-
     x = initstate!(linmodel1, [10, 60])
     @test evaloutput(linmodel1) ≈ [50 + 19.0, 30 + 7.4]
     @test updatestate!(linmodel1, [10, 60]) ≈ x
+    linmodel2 = LinModel(append(tf(1, [1, 0]), tf(2, [10, 1])), 1.0)
+    x = initstate!(linmodel2, [10, 3])
+    @test evaloutput(linmodel2) ≈ [0, 6]
+    @test updatestate!(linmodel2, [0, 3]) ≈ x
 
     @test_throws DimensionMismatch updatestate!(linmodel1, zeros(2), zeros(1))
     @test_throws DimensionMismatch evaloutput(linmodel1, zeros(1))
