@@ -215,7 +215,7 @@ function update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂))
 end
 
 @doc raw"""
-    init_estimate!(estim::InternalModel, ::LinModel, u, ym, d)
+    init_estimate!(estim::InternalModel, model::LinModel, u, ym, d)
 
 Init `estim.x̂` \ `x̂d` \ `x̂s` estimate at steady-state for [`InternalModel`](@ref)s.
 
@@ -231,11 +231,11 @@ of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmea
 ```
 See [`init_internalmodel`](@ref) for details.
 """
-function init_estimate!(estim::InternalModel, ::LinModel, u, ym, d)
+function init_estimate!(estim::InternalModel, model::LinModel, u, ym, d)
     x̂d, x̂s = estim.x̂d, estim.x̂s
     x̂d[:] = (I - estim.Â)\(estim.B̂u*u + estim.B̂d*d)
-    ŷd = h(estim.model, x̂d, d)
-    ŷs = zeros(estim.model.ny)
+    ŷd = h(model, x̂d, d)
+    ŷs = zeros(model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
     x̂s[:] = (I-estim.Âs)\estim.B̂s*ŷs
     return nothing
