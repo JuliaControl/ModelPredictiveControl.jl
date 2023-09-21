@@ -59,7 +59,7 @@ plant simulator to test the design.
 ## Linear Model Predictive Controller
 
 A linear model predictive controller (MPC) will control both the water level ``y_L`` and
-temperature ``y_T`` in the tank, at a sampling time of 4 s. The tank level should also never
+temperature ``y_T`` in the tank, at a sampling time of 2 s. The tank level should also never
 fall below 45:
 
 ```math
