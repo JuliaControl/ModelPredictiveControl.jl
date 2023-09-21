@@ -123,7 +123,7 @@ This method uses the default state estimator :
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
 - `JE=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E)``.
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
-   controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/reference/models/#JuMP.Model)
+   controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer).
 - additionnal keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
@@ -259,7 +259,7 @@ function init_optimization!(mpc::NonLinMPC)
     model = mpc.estim.model
     ny, nu, Hp, Hc = model.ny, model.nu, mpc.Hp, mpc.Hc
     nC = (2*Hc*nu + 2*nvar + 2*Hp*ny) - length(mpc.con.b)
-    # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-functions-with-vector-outputs
+    # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
     Jfunc, Cfunc = let mpc=mpc, model=model, nC=nC, nvar=nvar , nŶ=Hp*ny
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
         Ŷ_cache::DiffCacheType = DiffCache(zeros(nŶ), nvar + 3)
