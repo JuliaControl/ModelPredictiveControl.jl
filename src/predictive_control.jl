@@ -250,9 +250,11 @@ setnonlincon!(::PredictiveController, ::SimModel) = nothing
 
 Compute the optimal manipulated input value `u` for the current control period.
 
-Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the 
-results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm discards 
-the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...``
+Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the
+results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm discards
+the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...``. Note that
+the method mutates `mpc` internal data but it does not modifies `mpc.estim` states. Call
+[`updatestate!(mpc, u, ym, d)`](@ref) to update `mpc` state estimates.
 
 Calling a [`PredictiveController`](@ref) object calls this method.
 
