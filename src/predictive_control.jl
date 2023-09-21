@@ -334,8 +334,8 @@ julia> sol_summary, info = getinfo(mpc); round.(info[:Ŷ], digits=3)
 ```
 """
 function getinfo(mpc::PredictiveController)
-    sol_summary = get_summary(mpc) 
-    Ŷ = predict(mpc, mpc.estim.model, mpc.ΔŨ)
+    sol_summary = get_summary(mpc)
+    Ŷ = similar(mpc.Ŷop)
     info = Dict{Symbol, InfoDictType}()
     info[:ΔU]  = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]   = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
@@ -345,7 +345,7 @@ function getinfo(mpc::PredictiveController)
     info[:d]   = mpc.d
     info[:D̂]   = mpc.D̂
     info[:ŷ]   = mpc.ŷ
-    info[:Ŷ]   = Ŷ
+    info[:Ŷ]   = predict!(Ŷ, mpc, mpc.estim.model, mpc.ΔŨ)
     info[:Ŷs]  = mpc.Ŷop - repeat(mpc.estim.model.yop, mpc.Hp) # Ŷop = Ŷs + Yop
     info[:R̂y]  = mpc.R̂y
     info[:R̂u]  = mpc.R̂u
@@ -461,34 +461,34 @@ end
 predictstoch!(mpc, estim::StateEstimator, _ , _ ) = nothing
 
 @doc raw"""
-    predict(mpc::PredictiveController, model::LinModel, ΔŨ)
+    predict!(Ŷ, mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ
 
 Evaluate the outputs predictions ``\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
 """
-function predict(mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
-    return mpc.Ẽ*ΔŨ + mpc.F
+function predict!(Ŷ, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
+    Ŷ[:] = mpc.Ẽ*ΔŨ + mpc.F
+    return Ŷ
 end
 
-# TODO: remplacer S_p et T_Hp par un if pour éviter les allocs
 @doc raw"""
-    predict(mpc::PredictiveController, model::SimModel, ΔŨ)
+    predict!(Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ
 
 Evaluate  ``\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
 """
-function predict(mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) where {T<:Real}
-    nu, ny, nd, Hp = model.nu, model.ny, model.nd, mpc.Hp
-    yop, dop = model.yop, model.dop
-    U0 = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*mpc.estim.lastu0
-    Ŷ ::Vector{T} = copy(mpc.Ŷop) # Ŷop = Ŷs + Yop
-    u0::Vector{T} = Vector{T}(undef, nu)
+function predict!(Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) where {T<:Real}
+    nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     x̂ ::Vector{T} = copy(mpc.estim.x̂)
-    d0 = mpc.d - dop
+    u0::Vector{T} = copy(mpc.estim.lastu0)
+    d0 = mpc.d - model.dop
     for j=1:Hp
-        u0[:] = @views U0[(1 + nu*(j-1)):(nu*j)]
+        if j ≤ Hc
+            u0[:] += @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
+        end
         x̂[:]  = f̂(mpc.estim, x̂, u0, d0)
-        d0[:] = @views mpc.D̂[(1 + nd*(j-1)):(nd*j)] - dop
-        Ŷ[(1 + ny*(j-1)):(ny*j)] += ĥ(mpc.estim, x̂, d0)
+        d0[:] = @views mpc.D̂[(1 + nd*(j-1)):(nd*j)] - model.dop
+        Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, x̂, d0)
     end
+    Ŷ[:] += mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
     return Ŷ
 end
 
