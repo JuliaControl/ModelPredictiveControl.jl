@@ -246,7 +246,7 @@ end
 setnonlincon!(::PredictiveController, ::SimModel) = nothing
 
 @doc raw"""
-    moveinput!(mpc::PredictiveController, ry=mpc.estim.model.yop, d=[]; <keyword arguments>) -> u
+    moveinput!(mpc::PredictiveController, ry=mpc.estim.model.yop, d=[]; <keyword args>) -> u
 
 Compute the optimal manipulated input value `u` for the current control period.
 
@@ -256,7 +256,7 @@ the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...``
 
 Calling a [`PredictiveController`](@ref) object calls this method.
 
-See also [`LinMPC`](@ref), [`NonLinMPC`](@ref).
+See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref) [`NonLinMPC`](@ref).
 
 # Arguments
 - `mpc::PredictiveController` : solve optimization problem of `mpc`.
