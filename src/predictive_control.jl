@@ -336,16 +336,17 @@ julia> sol_summary, info = getinfo(mpc); round.(info[:Ŷ], digits=3)
 function getinfo(mpc::PredictiveController)
     sol_summary = get_summary(mpc)
     Ŷ = similar(mpc.Ŷop)
+    Ŷ = predict!(Ŷ, mpc, mpc.estim.model, mpc.ΔŨ)
     info = Dict{Symbol, InfoDictType}()
     info[:ΔU]  = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]   = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
-    info[:J]   = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[begin]
+    info[:J]   = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[]
     info[:U]   = mpc.S̃_Hp*mpc.ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + mpc.estim.model.uop)
     info[:u]   = info[:U][1:mpc.estim.model.nu]
     info[:d]   = mpc.d
     info[:D̂]   = mpc.D̂
     info[:ŷ]   = mpc.ŷ
-    info[:Ŷ]   = predict!(Ŷ, mpc, mpc.estim.model, mpc.ΔŨ)
+    info[:Ŷ]   = Ŷ
     info[:Ŷs]  = mpc.Ŷop - repeat(mpc.estim.model.yop, mpc.Hp) # Ŷop = Ŷs + Yop
     info[:R̂y]  = mpc.R̂y
     info[:R̂u]  = mpc.R̂u
@@ -410,12 +411,12 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
     mpc.R̂y[:], mpc.R̂u[:] = R̂y, R̂u
     Ẑ = mpc.F - R̂y
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
-    mpc.p[:] = [Ẑ'*mpc.M_Hp*Ẑ]
+    mpc.p[]  = Ẑ'*mpc.M_Hp*Ẑ
     if ~mpc.noR̂u
         lastu = mpc.estim.lastu0 + model.uop
         V̂ = mpc.T_Hp*lastu - mpc.R̂u
         mpc.q̃[:] += 2(mpc.L_Hp*mpc.S̃_Hp)'*V̂
-        mpc.p[:] += [V̂'*mpc.L_Hp*V̂]
+        mpc.p[]  += V̂'*mpc.L_Hp*V̂
     end
     return nothing
 end
