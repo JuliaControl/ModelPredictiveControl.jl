@@ -246,33 +246,30 @@ end
 setnonlincon!(::PredictiveController, ::SimModel) = nothing
 
 @doc raw"""
-    moveinput!(
-        mpc::PredictiveController,
-        ry = mpc.estim.model.yop,
-        d  = [];
-        D̂  = repeat(d,  mpc.Hp),
-        R̂y = repeat(ry, mpc.Hp),
-        R̂u = repeat(mpc.estim.model.uop, mpc.Hp),
-        ym = nothing
-    )
+    moveinput!(mpc::PredictiveController, ry=mpc.estim.model.yop, d=[]; <keyword arguments>) -> u
 
 Compute the optimal manipulated input value `u` for the current control period.
 
 Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the 
 results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm discards 
-the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...`` The 
-arguments `ry` and `d` are current output setpoints ``\mathbf{r_y}(k)`` and measured 
-disturbances ``\mathbf{d}(k)``.
-
-The keyword arguments `R̂y` and `D̂` are the predicted output setpoints ``\mathbf{R̂_y}`` and
-measured disturbances ``\mathbf{D̂}``. They are assumed constant in the future by default, 
-that is ``\mathbf{r̂_y}(k+j) = \mathbf{r_y}(k)`` and ``\mathbf{d̂}(k+j) = \mathbf{d}(k)`` for
-``j=1`` to ``H_p``. Current measured output `ym` is only required if `mpc.estim` is a 
-[`InternalModel`](@ref).
+the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...``
 
 Calling a [`PredictiveController`](@ref) object calls this method.
 
 See also [`LinMPC`](@ref), [`NonLinMPC`](@ref).
+
+# Arguments
+- `mpc::PredictiveController` : solve optimization problem of `mpc`.
+- `ry=mpc.estim.model.yop` : current output setpoints ``\mathbf{r_y}(k)``.
+- `d=[]` : current measured disturbances ``\mathbf{d}(k)``.
+- `D̂=repeat(d, mpc.Hp)` : predicted measured disturbances ``\mathbf{D̂}``, constant in the
+  future by default or ``\mathbf{d̂}(k+j)=\mathbf{d}(k)`` for ``j=1`` to ``H_p``.
+- `R̂y=repeat(ry, mpc.Hp)` : predicted output setpoints ``\mathbf{R̂_y}``, constant in the
+  future by default or ``\mathbf{r̂_y}(k+j)=\mathbf{r_y}(k)`` for ``j=1`` to ``H_p``.
+- `R̂u=repeat(mpc.estim.model.uop, mpc.Hp)` : predicted manipulated input setpoints, constant
+  in the future by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for ``j=0`` to ``H_p-1``.
+- `ym=nothing` : current measured outputs ``\mathbf{y^m}(k)``, only required if `mpc.estim` 
+   is an [`InternalModel`](@ref).
 
 # Examples
 ```jldoctest
