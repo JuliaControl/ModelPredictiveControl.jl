@@ -185,12 +185,20 @@ end
 
 linconstraint!(::ExplicitMPC, ::LinModel) = nothing
 
-"""
+@doc raw"""
 Analytically solve the optimization problem for [`ExplicitMPC`](@ref).
+
+The solution is ``\mathbf{ΔŨ = - P̃^{-1} q̃}``, see [`init_quadprog`](@ref).
 """
 function optim_objective!(mpc::ExplicitMPC)
     return lmul!(-1, ldiv!(mpc.ΔŨ, mpc.P̃_chol, mpc.q̃))
 end
 
-"For [`ExplicitMPC`](@ref), return an empty summary."
-get_summary(::ExplicitMPC) = solution_summary(JuMP.Model(), verbose=true)
+"""
+    addinfo!(info, mpc::ExplicitMPC) -> info
+
+For [`ExplicitMPC`](@ref), add nothing to `info`.
+"""
+addinfo!(info, mpc::ExplicitMPC) = info
+
+

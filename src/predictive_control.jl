@@ -34,7 +34,7 @@ const LinConVector = Vector{ConstraintRef{
     ScalarShape
 }}
 
-const InfoDictType = Union{Vector{Float64}, Float64}
+const InfoDictType = Union{JuMP._SolutionSummary, Vector{Float64}, Float64}
 
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint
@@ -301,13 +301,12 @@ function moveinput!(
 end
 
 @doc raw"""
-    getinfo(mpc::PredictiveController) -> sol_summary, info
+    getinfo(mpc::PredictiveController) -> info
 
 Get additional information about `mpc` controller optimum to ease troubleshooting.
 
-The function should be called after calling [`moveinput!`](@ref). It returns the optimizer
-solution summary that can be printed, `sol_summary`, and the dictionary `info` with the 
-following fields:
+The function should be called after calling [`moveinput!`](@ref). It returns the dictionary
+`info` with the following fields:
 
 - `:ΔU` : optimal manipulated input increments over `Hc` ``(\mathbf{ΔU})``
 - `:ϵ`  : optimal slack variable ``(ϵ)``
@@ -322,22 +321,24 @@ following fields:
 - `:R̂y` : predicted output setpoint over `Hp` ``(\mathbf{R̂_y})``
 - `:R̂u` : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
 
+For [`LinMPC`](@ref) and [`NonLinMPC`](ref), the field `:sol` also contains the optimizer
+solution summary that can be printed.
+
 # Examples
 ```jldoctest
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1, Hc=1);
 
 julia> u = moveinput!(mpc, [10]);
 
-julia> sol_summary, info = getinfo(mpc); round.(info[:Ŷ], digits=3)
+julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 1-element Vector{Float64}:
  10.0
 ```
 """
 function getinfo(mpc::PredictiveController)
-    sol_summary = get_summary(mpc)
+    info = Dict{Symbol, InfoDictType}()
     Ŷ = similar(mpc.Ŷop)
     Ŷ = predict!(Ŷ, mpc, mpc.estim.model, mpc.ΔŨ)
-    info = Dict{Symbol, InfoDictType}()
     info[:ΔU]  = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]   = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
     info[:J]   = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[]
@@ -350,14 +351,20 @@ function getinfo(mpc::PredictiveController)
     info[:Ŷs]  = mpc.Ŷop - repeat(mpc.estim.model.yop, mpc.Hp) # Ŷop = Ŷs + Yop
     info[:R̂y]  = mpc.R̂y
     info[:R̂u]  = mpc.R̂u
-    return sol_summary, info
+    info = addinfo!(info, mpc)
+    return info
 end
-"""
-    get_summary(mpc::PredictiveController)
 
-Get optimizer solution summary `sol_summary`. 
 """
-get_summary(mpc::PredictiveController) = solution_summary(mpc.optim, verbose=true)
+    addinfo!(info, mpc::PredictiveController) -> info
+
+By default, add the solution summary `:sol` that can be printed to `info`.
+"""
+function addinfo!(info, mpc::PredictiveController)
+    info[:sol] = solution_summary(mpc.optim, verbose=true)
+    return info
+end
+
 
 """
     setstate!(mpc::PredictiveController, x̂)
