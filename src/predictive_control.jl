@@ -321,7 +321,7 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:R̂y` : predicted output setpoint over `Hp` ``(\mathbf{R̂_y})``
 - `:R̂u` : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
 
-For [`LinMPC`](@ref) and [`NonLinMPC`](ref), the field `:sol` also contains the optimizer
+For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
 solution summary that can be printed.
 
 # Examples
