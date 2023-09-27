@@ -269,13 +269,13 @@ Compute the optimal manipulated input value `u` for the current control period.
 
 Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the
 results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm discards
-the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...``. Note that
+the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...`` Note that
 the method mutates `mpc` internal data but it does not modifies `mpc.estim` states. Call
 [`updatestate!(mpc, u, ym, d)`](@ref) to update `mpc` state estimates.
 
 Calling a [`PredictiveController`](@ref) object calls this method.
 
-See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref) [`NonLinMPC`](@ref).
+See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
 
 # Arguments
 - `mpc::PredictiveController` : solve optimization problem of `mpc`.
@@ -339,7 +339,8 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:R̂u` : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
 
 For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
-solution summary that can be printed.
+solution summary that can be printed. Lastly, the optimal economic cost `:JE` is also
+available for [`NonLinMPC`](@ref).
 
 # Examples
 ```jldoctest
