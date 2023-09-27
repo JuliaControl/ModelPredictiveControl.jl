@@ -70,11 +70,23 @@ The predictive controllers support both soft and hard constraints, defined by:
     \mathbf{y_{min}  - c_{y_{min}}}  ϵ &≤ \mathbf{ŷ}(k+j)  &&≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad j = 1, 2 ,..., H_p \\
 \end{alignat*}
 ```
-and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there 
-is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern 
-for relaxation, are non-negative values that specify the softness of the associated bound. 
-Use `0.0` values for hard constraints. The output constraints ``\mathbf{y_{min}}`` and 
+and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there
+is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern
+for relaxation, are non-negative values that specify the softness of the associated bound.
+Use `0.0` values for hard constraints. The output constraints ``\mathbf{y_{min}}`` and
 ``\mathbf{y_{max}}`` are soft by default.
+
+The bounds can be modified after calling [`moveinput!`](@ref), that is, at runtime, but not
+the softness parameters ``\mathbf{c}``. It is not possible to modify `±Inf` constraints
+at runtime.
+
+!!! tip
+    To keep a variable unconstrained while maintaining the ability to add a constraint later
+    at runtime, set the bound to an absolute value sufficiently large when you create the
+    controller.
+
+Varying the constraints over the prediction/control horizon is not supported yet but it will
+be implemented soon.
 
 # Arguments
 !!! info
@@ -123,13 +135,16 @@ function setconstraint!(
     ŷmin    = nothing, ŷmax    = nothing,
     c_ŷmin  = nothing, c_ŷmax  = nothing,
 )
-    model = mpc.estim.model
-    con = mpc.con
-    nu, ny = model.nu, model.ny
-    Hp, Hc = mpc.Hp, mpc.Hc
+    model, con, optim = mpc.estim.model, mpc.con, mpc.optim
+    nu, ny, Hp, Hc = model.nu, model.ny, mpc.Hp, mpc.Hc
+    notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
     C, E = mpc.C, mpc.Ẽ[:, 1:nu*Hc]
+    if !all(isnothing.([c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax]))
+        !isinf(C) || throw(ArgumentError("Slack variable Cwt must be finite to set softness parameters"))
+        notSolvedYet || error("Cannot set softness parameters after calling moveinput!")
+    end
     
-    # these 4 if will be deleted in the future:
+    # these 4 `if`s will be deleted in the future:
     if !isnothing(ŷmin)
         Base.depwarn("keyword arg ŷmin is deprecated, use ymin instead", :setconstraint!)
         ymin = ŷmin
@@ -148,66 +163,61 @@ function setconstraint!(
     end
     
     if !isnothing(umin)
-        size(umin)   == (nu,) || error("umin size must be $((nu,))")
+        size(umin)   == (nu,) || throw(ArgumentError("umin size must be $((nu,))"))
         Umin  = repeat(umin, Hc)
         con.Umin[:] = Umin
     end
     if !isnothing(umax)
-        size(umax)   == (nu,) || error("umax size must be $((nu,))")
-        Umax  = repeat(umax, Hc)
+        size(umax)   == (nu,) || throw(ArgumentError("umax size must be $((nu,))"))
+               Umax  = repeat(umax, Hc)
         con.Umax[:] = Umax
     end
     if !isnothing(Δumin)
-        size(Δumin)  == (nu,) || error("Δumin size must be $((nu,))")
+        size(Δumin)  == (nu,) || throw(ArgumentError("Δumin size must be $((nu,))"))
         ΔUmin = repeat(Δumin, Hc)
         con.ΔŨmin[1:nu*Hc] = ΔUmin
     end
     if !isnothing(Δumax)
-        size(Δumax)  == (nu,) || error("Δumax size must be $((nu,))")
+        size(Δumax)  == (nu,) || throw(ArgumentError("Δumax size must be $((nu,))"))
         ΔUmax = repeat(Δumax, Hc)
         con.ΔŨmax[1:nu*Hc] = ΔUmax
     end
     if !isnothing(ymin)
-        size(ymin)   == (ny,) || error("ymin size must be $((ny,))")
+        size(ymin)   == (ny,) || throw(ArgumentError("ymin size must be $((ny,))"))
         Ymin  = repeat(ymin, Hp)
         con.Ymin[:] = Ymin
     end
     if !isnothing(ymax)
-        size(ymax)   == (ny,) || error("ymax size must be $((ny,))")
+        size(ymax)   == (ny,) || throw(ArgumentError("ymax size must be $((ny,))"))
         Ymax  = repeat(ymax, Hp)
         con.Ymax[:] = Ymax
     end
     if !isnothing(c_umin)
-        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
-        size(c_umin) == (nu,) || error("c_umin size must be $((nu,))")
+        size(c_umin) == (nu,) || throw(ArgumentError("c_umin size must be $((nu,))"))
         any(c_umin .< 0) && error("c_umin weights should be non-negative")
         c_Umin  = repeat(c_umin, Hc)
         con.A_Umin[:, end] = -c_Umin
     end
     if !isnothing(c_umax)
-        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
-        size(c_umax) == (nu,) || error("c_umax size must be $((nu,))")
+        size(c_umax) == (nu,) || throw(ArgumentError("c_umax size must be $((nu,))"))
         any(c_umax .< 0) && error("c_umax weights should be non-negative")
         c_Umax  = repeat(c_umax, Hc)
         con.A_Umax[:, end] = -c_Umax
     end
     if !isnothing(c_Δumin)
-        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
-        size(c_Δumin) == (nu,) || error("c_Δumin size must be $((nu,))")
+        size(c_Δumin) == (nu,) || throw(ArgumentError("c_Δumin size must be $((nu,))"))
         any(c_Δumin .< 0) && error("c_Δumin weights should be non-negative")
         c_ΔUmin  = repeat(c_Δumin, Hc)
         con.A_ΔŨmin[1:end-1, end] = -c_ΔUmin 
     end
     if !isnothing(c_Δumax)
-        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
-        size(c_Δumax) == (nu,) || error("c_Δumax size must be $((nu,))")
+        size(c_Δumax) == (nu,) || throw(ArgumentError("c_Δumax size must be $((nu,))"))
         any(c_Δumax .< 0) && error("c_Δumax weights should be non-negative")
         c_ΔUmax  = repeat(c_Δumax, Hc)
         con.A_ΔŨmax[1:end-1, end] = -c_ΔUmax
     end
     if !isnothing(c_ymin)
-        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
-        size(c_ymin) == (ny,) || error("c_ymin size must be $((ny,))")
+        size(c_ymin) == (ny,) || throw(ArgumentError("c_ymin size must be $((ny,))"))
         any(c_ymin .< 0) && error("c_ymin weights should be non-negative")
         c_Ymin  = repeat(c_ymin, Hp)
         con.c_Ymin[:] = c_Ymin
@@ -215,8 +225,7 @@ function setconstraint!(
         con.A_Ymin[:] = A_Ymin
     end
     if !isnothing(c_ymax)
-        !isinf(C) || error("Slack variable Cwt must be finite to set softness parameters") 
-        size(c_ymax) == (ny,) || error("c_ymax size must be $((ny,))")
+        size(c_ymax) == (ny,) || throw(ArgumentError("c_ymax size must be $((ny,))"))
         any(c_ymax .< 0) && error("c_ymax weights should be non-negative")
         c_Ymax  = repeat(c_ymax, Hp)
         con.c_Ymax[:] = c_Ymax
@@ -226,17 +235,25 @@ function setconstraint!(
     i_Umin,  i_Umax  = .!isinf.(con.Umin),  .!isinf.(con.Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmin)
     i_Ymin,  i_Ymax  = .!isinf.(con.Ymin),  .!isinf.(con.Ymax)
-    con.A[:], con.i_b[:] = init_linconstraint(model, 
-        con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, con.A_Ymin, con.A_Ymax,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax
-    )
-    A = con.A[con.i_b, :]
-    b = con.b[con.i_b]
-    ΔŨvar = mpc.optim[:ΔŨvar]
-    delete(mpc.optim, mpc.optim[:linconstraint])
-    unregister(mpc.optim, :linconstraint)
-    @constraint(mpc.optim, linconstraint, A*ΔŨvar .≤ b)
-    setnonlincon!(mpc, model)
+    if notSolvedYet 
+        con.i_b[:], con.A[:] = init_linconstraint(model,
+            i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
+            con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, con.A_Ymin, con.A_Ymax
+        )
+        A = con.A[con.i_b, :]
+        b = con.b[con.i_b]
+        ΔŨvar = mpc.optim[:ΔŨvar]
+        delete(mpc.optim, mpc.optim[:linconstraint])
+        unregister(mpc.optim, :linconstraint)
+        @constraint(mpc.optim, linconstraint, A*ΔŨvar .≤ b)
+        setnonlincon!(mpc, model)
+    else
+        i_b, _ = init_linconstraint(model, 
+            i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
+            con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, con.A_Ymin, con.A_Ymax,
+        )
+        i_b == con.i_b || error("Cannot modify ±Inf constraints after calling moveinput!")
+    end
     return mpc
 end
 
@@ -826,11 +843,12 @@ function init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
     i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Ymin),  .!isinf.(Ymax)
-    A, i_b, b = init_linconstraint(
+    i_b, A = init_linconstraint(
         model, 
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax
     )
+    b = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
     con = ControllerConstraint(
         Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ymin  , Ymax,
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin, A_Ymax,
@@ -998,34 +1016,32 @@ init_stochpred(::StateEstimator, _ ) = zeros(0, 0), zeros(0, 0)
 
 
 @doc raw"""
-    init_linconstraint(model::LinModel, 
+    init_linconstraint(model::LinModel,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax
-    ) -> A, i_b, b
+    ) -> i_b, A
 
-Init `A`, `b` and `i_b` for the linear inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+Init `i_b` and `A` for the linear inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 
 `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers.
 """
 function init_linconstraint(::LinModel, 
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
     A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax
 )
-    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax]
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax]
-    b   = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
-    return A, i_b, b
+    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax]
+    return i_b, A
 end
 
 "Init values without predicted output constraints if `model` is not a [`LinModel`](@ref)."
 function init_linconstraint(::SimModel,
-    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ ,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ 
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ ,
+    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ 
 )
-    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    b   = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
-    return A, i_b, b
+    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
+    return i_b, A
 end
 
 "Validate predictive controller weight and horizon specified values."
