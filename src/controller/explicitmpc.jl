@@ -1,5 +1,5 @@
-struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
-    estim::S
+struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
+    estim::SE
     ΔŨ::Vector{Float64}
     ŷ ::Vector{Float64}
     Hp::Int
@@ -12,9 +12,8 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
     R̂u::Vector{Float64}
     R̂y::Vector{Float64}
     noR̂u::Bool
-    S̃_Hp::Matrix{Bool}
-    T_Hp::Matrix{Bool}
-    T_Hc::Matrix{Bool}
+    S̃::Matrix{Bool}
+    T::Matrix{Bool}
     Ẽ::Matrix{Float64}
     F::Vector{Float64}
     G::Matrix{Float64}
@@ -31,7 +30,7 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
     D̂::Vector{Float64}
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
-    function ExplicitMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt) where {S<:StateEstimator}
+    function ExplicitMPC{SE}(estim::SE, Hp, Hc, Mwt, Nwt, Lwt) where {SE<:StateEstimator}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = zeros(ny)
@@ -44,10 +43,10 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
         C = Cwt
         R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
         noR̂u = iszero(L_Hp)
-        S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
+        S, T = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, K, Q = init_predmat(estim, model, Hp, Hc)
-        _ , S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
-        P̃, q̃, p = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        _ , S̃, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S, N_Hc, E)
+        P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         P̃_chol = cholesky(P̃)
         Ks, Ps = init_stochpred(estim, Hp)
         d, D̂ = zeros(nd), zeros(nd*Hp)
@@ -59,7 +58,7 @@ struct ExplicitMPC{S<:StateEstimator} <: PredictiveController
             ΔŨ, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y, noR̂u,
-            S̃_Hp, T_Hp, T_Hc, 
+            S̃, T, 
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
             P̃_chol,
             Ks, Ps,
@@ -148,13 +147,13 @@ ExplicitMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and
 ```
 """
 function ExplicitMPC(
-    estim::S;
+    estim::SE;
     Hp::Union{Int, Nothing} = nothing,
     Hc::Int = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, estim.model.ny),
     Nwt = fill(DEFAULT_NWT, estim.model.nu),
     Lwt = fill(DEFAULT_LWT, estim.model.nu)
-) where {S<:StateEstimator}
+) where {SE<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     poles = eigvals(estim.model.A)
     nk = sum(poles .≈ 0)
@@ -165,7 +164,7 @@ function ExplicitMPC(
         @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*
               "($nk), the closed-loop system may be zero-gain (unresponsive) or unstable")
     end
-    return ExplicitMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt)
+    return ExplicitMPC{SE}(estim, Hp, Hc, Mwt, Nwt, Lwt)
 end
 
 setconstraint!(::ExplicitMPC,kwargs...) = error("ExplicitMPC does not support constraints.")

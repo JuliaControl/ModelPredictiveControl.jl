@@ -1,5 +1,5 @@
-struct LinMPC{S<:StateEstimator} <: PredictiveController
-    estim::S
+struct LinMPC{SE<:StateEstimator} <: PredictiveController
+    estim::SE
     optim::JuMP.Model
     con::ControllerConstraint
     ΔŨ::Vector{Float64}
@@ -14,9 +14,8 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     R̂u::Vector{Float64}
     R̂y::Vector{Float64}
     noR̂u::Bool
-    S̃_Hp::Matrix{Bool}
-    T_Hp::Matrix{Bool}
-    T_Hc::Matrix{Bool}
+    S̃::Matrix{Bool}
+    T::Matrix{Bool}
     Ẽ::Matrix{Float64}
     F::Vector{Float64}
     G::Matrix{Float64}
@@ -32,7 +31,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
     D̂::Vector{Float64}
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
-    function LinMPC{S}(estim::S, Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim) where {S<:StateEstimator}
+    function LinMPC{SE}(estim::SE, Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim) where {SE<:StateEstimator}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = zeros(ny)
@@ -44,10 +43,10 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
         C = Cwt
         R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
         noR̂u = iszero(L_Hp)
-        S_Hp, T_Hp, S_Hc, T_Hc = init_ΔUtoU(nu, Hp, Hc)
+        S, T = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, K, Q = init_predmat(estim, model, Hp, Hc)
-        con, S̃_Hp, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
-        P̃, q̃, p = init_quadprog(model, Ẽ, S̃_Hp, M_Hp, Ñ_Hc, L_Hp)
+        con, S̃, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S, N_Hc, E)
+        P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         d, D̂ = zeros(nd), zeros(nd*Hp)
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
@@ -58,7 +57,7 @@ struct LinMPC{S<:StateEstimator} <: PredictiveController
             ΔŨ, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y, noR̂u,
-            S̃_Hp, T_Hp, T_Hc, 
+            S̃, T,
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
             Ks, Ps,
             d, D̂,
@@ -187,7 +186,7 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, KalmanFilter es
 ```
 """
 function LinMPC(
-    estim::S;
+    estim::SE;
     Hp::Union{Int, Nothing} = DEFAULT_HP,
     Hc::Int = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, estim.model.ny),
@@ -195,7 +194,7 @@ function LinMPC(
     Lwt = fill(DEFAULT_LWT, estim.model.nu),
     Cwt = DEFAULT_CWT,
     optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
-) where {S<:StateEstimator}
+) where {SE<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     poles = eigvals(estim.model.A)
     nk = sum(poles .≈ 0)
@@ -206,7 +205,7 @@ function LinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*
               "($nk), the closed-loop system may be zero-gain (unresponsive) or unstable")
     end
-    return LinMPC{S}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim)
+    return LinMPC{SE}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim)
 end
 
 """

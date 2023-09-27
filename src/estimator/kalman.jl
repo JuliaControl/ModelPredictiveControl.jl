@@ -325,8 +325,8 @@ function update_estimate!(estim::KalmanFilter, u, ym, d)
     return update_estimate_kf!(estim, estim.Â, estim.Ĉm, u, ym, d)
 end
 
-struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
-    model::M
+struct UnscentedKalmanFilter{SM<:SimModel} <: StateEstimator
+    model::SM
     lastu0::Vector{Float64}
     x̂::Vector{Float64}
     P̂::Hermitian{Float64, Matrix{Float64}}
@@ -353,9 +353,9 @@ struct UnscentedKalmanFilter{M<:SimModel} <: StateEstimator
     γ::Float64
     m̂::Vector{Float64}
     Ŝ::Diagonal{Float64, Vector{Float64}}
-    function UnscentedKalmanFilter{M}(
-        model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ
-    ) where {M<:SimModel}
+    function UnscentedKalmanFilter{SM}(
+        model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ
+    ) where {SM<:SimModel}
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
@@ -455,13 +455,13 @@ function UnscentedKalmanFilter(
 end
 
 @doc raw"""
-    UnscentedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
+    UnscentedKalmanFilter{SM<:SimModel}(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-UnscentedKalmanFilter{M}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ) where {M<:SimModel}
+UnscentedKalmanFilter{SM}(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ) where {SM<:SimModel}
 
 
 @doc raw"""
@@ -568,8 +568,8 @@ function update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
     return x̂, P̂
 end
 
-struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
-    model::M
+struct ExtendedKalmanFilter{SM<:SimModel} <: StateEstimator
+    model::SM
     lastu0::Vector{Float64}
     x̂::Vector{Float64}
     P̂::Hermitian{Float64, Matrix{Float64}}
@@ -593,9 +593,9 @@ struct ExtendedKalmanFilter{M<:SimModel} <: StateEstimator
     R̂::Hermitian{Float64, Matrix{Float64}}
     K̂::Matrix{Float64}
     M̂::Matrix{Float64}
-    function ExtendedKalmanFilter{M}(
+    function ExtendedKalmanFilter{SM}(
         model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂
-    ) where {M<:SimModel}
+    ) where {SM<:SimModel}
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
@@ -659,7 +659,7 @@ functions must be compatible with this feature though. See [Automatic differenti
 for common mistakes when writing these functions.
 """
 function ExtendedKalmanFilter(
-    model::M;
+    model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
     σP0::Vector = fill(1/model.nx, model.nx),
     σQ::Vector  = fill(1/model.nx, model.nx),
@@ -670,22 +670,22 @@ function ExtendedKalmanFilter(
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
     σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0))
-) where {M<:SimModel}
+) where {SM<:SimModel}
     # estimated covariances matrices (variance = σ²) :
     P̂0 = Diagonal{Float64}([σP0; σP0int_u; σP0int_ym].^2);
     Q̂  = Diagonal{Float64}([σQ;  σQint_u;  σQint_ym].^2);
     R̂  = Diagonal{Float64}(σR.^2);
-    return ExtendedKalmanFilter{M}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
+    return ExtendedKalmanFilter{SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
 end
 
 @doc raw"""
-    ExtendedKalmanFilter{M<:SimModel}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+    ExtendedKalmanFilter{SM<:SimModel}(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-ExtendedKalmanFilter{M}(model::M, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {M<:SimModel}
+ExtendedKalmanFilter{SM}(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {SM<:SimModel}
 
 @doc raw"""
     update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂))

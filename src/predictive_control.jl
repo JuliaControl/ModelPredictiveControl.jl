@@ -164,12 +164,12 @@ function setconstraint!(
     
     if !isnothing(umin)
         size(umin)   == (nu,) || throw(ArgumentError("umin size must be $((nu,))"))
-        Umin  = repeat(umin, Hc)
+        Umin  = repeat(umin, Hp)
         con.Umin[:] = Umin
     end
     if !isnothing(umax)
         size(umax)   == (nu,) || throw(ArgumentError("umax size must be $((nu,))"))
-               Umax  = repeat(umax, Hc)
+               Umax  = repeat(umax, Hp)
         con.Umax[:] = Umax
     end
     if !isnothing(Δumin)
@@ -195,13 +195,13 @@ function setconstraint!(
     if !isnothing(c_umin)
         size(c_umin) == (nu,) || throw(ArgumentError("c_umin size must be $((nu,))"))
         any(c_umin .< 0) && error("c_umin weights should be non-negative")
-        c_Umin  = repeat(c_umin, Hc)
+        c_Umin  = repeat(c_umin, Hp)
         con.A_Umin[:, end] = -c_Umin
     end
     if !isnothing(c_umax)
         size(c_umax) == (nu,) || throw(ArgumentError("c_umax size must be $((nu,))"))
         any(c_umax .< 0) && error("c_umax weights should be non-negative")
-        c_Umax  = repeat(c_umax, Hc)
+        c_Umax  = repeat(c_umax, Hp)
         con.A_Umax[:, end] = -c_Umax
     end
     if !isnothing(c_Δumin)
@@ -360,7 +360,7 @@ function getinfo(mpc::PredictiveController)
     info[:ΔU]  = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]   = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
     info[:J]   = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[]
-    info[:U]   = mpc.S̃_Hp*mpc.ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + mpc.estim.model.uop)
+    info[:U]   = mpc.S̃*mpc.ΔŨ + mpc.T*(mpc.estim.lastu0 + mpc.estim.model.uop)
     info[:u]   = info[:U][1:mpc.estim.model.nu]
     info[:d]   = mpc.d
     info[:D̂]   = mpc.D̂
@@ -439,8 +439,8 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
     mpc.p[]  = Ẑ'*mpc.M_Hp*Ẑ
     if ~mpc.noR̂u
         lastu = mpc.estim.lastu0 + model.uop
-        V̂ = mpc.T_Hp*lastu - mpc.R̂u
-        mpc.q̃[:] += 2(mpc.L_Hp*mpc.S̃_Hp)'*V̂
+        V̂ = mpc.T*lastu - mpc.R̂u
+        mpc.q̃[:] += 2(mpc.L_Hp*mpc.S̃)'*V̂
         mpc.p[]  += V̂'*mpc.L_Hp*V̂
     end
     return nothing
@@ -525,8 +525,8 @@ Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ �
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
     mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
-        +mpc.con.Umax - mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
+        -mpc.con.Umin + mpc.T*(mpc.estim.lastu0 + model.uop)
+        +mpc.con.Umax - mpc.T*(mpc.estim.lastu0 + model.uop)
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
         -mpc.con.Ymin + mpc.F
@@ -539,8 +539,8 @@ end
 "Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
 function linconstraint!(mpc::PredictiveController, model::SimModel)
     mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
-        +mpc.con.Umax - mpc.T_Hc*(mpc.estim.lastu0 + model.uop)
+        -mpc.con.Umin + mpc.T*(mpc.estim.lastu0 + model.uop)
+        +mpc.con.Umax - mpc.T*(mpc.estim.lastu0 + model.uop)
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
     ]
@@ -588,26 +588,21 @@ end
 set_objective_linear_coef!(::PredictiveController, _ ) = nothing
 
 @doc raw"""
-    init_ΔUtoU(nu, Hp, Hc, C, c_Umin, c_Umax) -> S_Hp, T_Hp, S_Hc, T_Hc
+    init_ΔUtoU(nu, Hp) -> S, T
 
 Init manipulated input increments to inputs conversion matrices.
 
 The conversion from the input increments ``\mathbf{ΔU}`` to manipulated inputs over ``H_p`` 
-and ``H_c`` are calculated by:
+are calculated by:
 ```math
-\begin{aligned}
-\mathbf{U} = 
-    \mathbf{U}_{H_p} &= \mathbf{S}_{H_p} \mathbf{ΔU} + \mathbf{T}_{H_p} \mathbf{u}(k-1) \\
-    \mathbf{U}_{H_c} &= \mathbf{S}_{H_c} \mathbf{ΔU} + \mathbf{T}_{H_c} \mathbf{u}(k-1)
-\end{aligned}
+\mathbf{U} = \mathbf{S} \mathbf{ΔU} + \mathbf{T} \mathbf{u}(k-1) \\
 ```
 """
 function init_ΔUtoU(nu, Hp, Hc)
     S_Hc = LowerTriangular(repeat(I(nu), Hc, Hc))
-    T_Hc = repeat(I(nu), Hc)
-    S_Hp = [S_Hc; repeat(I(nu), Hp - Hc, Hc)]
-    T_Hp = [T_Hc; repeat(I(nu), Hp - Hc, 1)]
-    return S_Hp, T_Hp, S_Hc, T_Hc
+    S = [S_Hc; repeat(I(nu), Hp - Hc, Hc)]
+    T = repeat(I(nu), Hp)
+    return S, T
 end
 
 
@@ -730,7 +725,7 @@ function init_predmat(estim::StateEstimator, model::SimModel, Hp, Hc)
 end
 
 @doc raw"""
-    init_quadprog(model::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp) -> P̃, q̃, p
+    init_quadprog(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> P̃, q̃, p
 
 Init the quadratic programming optimization matrix `P̃` and `q̃`.
 
@@ -743,14 +738,14 @@ vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period 
 [`initpred!`](@ref) method). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
-    P̃ = 2*Hermitian(Ẽ'*M_Hp*Ẽ + N_Hc + S_Hp'*L_Hp*S_Hp)
+function init_quadprog(::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp)
+    P̃ = 2*Hermitian(Ẽ'*M_Hp*Ẽ + N_Hc + S'*L_Hp*S)
     q̃ = zeros(size(P̃, 1))   # dummy value (updated just before optimization)
     p = zeros(1)            # dummy value (updated just before optimization)
     return P̃, q̃, p
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-function init_quadprog(::SimModel, Ẽ, S_Hp, M_Hp, N_Hc, L_Hp)
+function init_quadprog(::SimModel, Ẽ, S, M_Hp, N_Hc, L_Hp)
     P̃ = Hermitian(zeros(0, 0))
     q̃ = zeros(0)
     p = zeros(1)            # dummy value (updated just before optimization)
@@ -774,7 +769,7 @@ function obj_nonlinprog(
 ) where {T<:Real}
     J = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
     if !iszero(mpc.E)
-        U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
+        U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
         UE = [U; U[(end - model.nu + 1):end]]
         ŶE = [mpc.ŷ; Ŷ]
         D̂E = [mpc.d; mpc.D̂]
@@ -798,7 +793,7 @@ function obj_nonlinprog(
     JΔŨ = ΔŨ'*mpc.Ñ_Hc*ΔŨ
     # --- input over prediction horizon ---
     if !mpc.noR̂u || !iszero(mpc.E)
-        U = mpc.S̃_Hp*ΔŨ + mpc.T_Hp*(mpc.estim.lastu0 + model.uop)
+        U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
     end
     # --- input setpoint tracking term ---
     if !mpc.noR̂u
@@ -820,13 +815,13 @@ function obj_nonlinprog(
 end
 
 """
-    init_defaultcon(model, C, S_Hp, S_Hc, N_Hc, E) -> con, S̃_Hp, Ñ_Hc, Ẽ
+    init_defaultcon(model, C, S, N_Hc, E) -> con, S̃, Ñ_Hc, Ẽ
 
 Init `ControllerConstraint` struct with default parameters.
 
-Also return `S̃_Hp`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
+Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
 """
-function init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
+function init_defaultcon(model, Hp, Hc, C, S, N_Hc, E)
     nu, ny = model.nu, model.ny
     umin,       umax    = fill(-Inf, nu), fill(+Inf, nu)
     Δumin,      Δumax   = fill(-Inf, nu), fill(+Inf, nu)
@@ -838,7 +833,7 @@ function init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
         repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
     c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ymin, c_Ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
-    A_Umin, A_Umax, S̃_Hp = relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+    A_Umin, A_Umax, S̃ = relaxU(C, c_Umin, c_Umax, S)
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, c_Ymin, c_Ymax, E)
     i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
@@ -855,13 +850,13 @@ function init_defaultcon(model, Hp, Hc, C, S_Hp, S_Hc, N_Hc, E)
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin, A_Ymax,
         A       , b     , i_b    , c_Ymin   , c_Ymax 
     )
-    return con, S̃_Hp, Ñ_Hc, Ẽ
+    return con, S̃, Ñ_Hc, Ẽ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
 function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
-    Umin  = repeat(umin, Hc)
-    Umax  = repeat(umax, Hc)
+    Umin  = repeat(umin, Hp)
+    Umax  = repeat(umax, Hp)
     ΔUmin = repeat(Δumin, Hc)
     ΔUmax = repeat(Δumax, Hc)
     Ymin  = repeat(ymin, Hp)
@@ -870,13 +865,13 @@ function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
 end
 
 @doc raw"""
-    relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc) -> A_Umin, A_Umax, S̃_Hp
+    relaxU(C, c_Umin, c_Umax, S) -> A_Umin, A_Umax, S̃
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
 Denoting the input increments augmented with the slack variable
 ``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
-augmented conversion matrix ``\mathbf{S̃}_{H_p}``, similar to the one described at
+augmented conversion matrix ``\mathbf{S̃}``, similar to the one described at
 [`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the inequality
 constraints:
 ```math
@@ -885,22 +880,22 @@ constraints:
     \mathbf{A_{U_{max}}} 
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \mathbf{U_{min}} + \mathbf{T}_{H_c} \mathbf{u}(k-1) \\
-    + \mathbf{U_{max}} - \mathbf{T}_{H_c} \mathbf{u}(k-1)
+    - \mathbf{U_{min}} + \mathbf{T} \mathbf{u}(k-1) \\
+    + \mathbf{U_{max}} - \mathbf{T} \mathbf{u}(k-1)
 \end{bmatrix}
 ```
 """
-function relaxU(C, c_Umin, c_Umax, S_Hp, S_Hc)
+function relaxU(C, c_Umin, c_Umax, S)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
-        A_Umin, A_Umax = -[S_Hc  c_Umin],  [S_Hc -c_Umax] 
+        A_Umin, A_Umax = -[S  c_Umin],  [S -c_Umax] 
         # ϵ has no impact on ΔU → U conversion for prediction calculations:
-        S̃_Hp = [S_Hp falses(size(S_Hp, 1))]
+        S̃ = [S falses(size(S, 1))]
     else # ΔŨ = ΔU (only hard constraints)
-        A_Umin, A_Umax = -S_Hc,  S_Hc
-        S̃_Hp = S_Hp
+        A_Umin, A_Umax = -S,  S
+        S̃ = S
     end
-    return A_Umin, A_Umax, S̃_Hp
+    return A_Umin, A_Umax, S̃
 end
 
 @doc raw"""
