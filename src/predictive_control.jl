@@ -136,7 +136,7 @@ It is also possible to specify time-varying constraints over prediction ``H_p`` 
 For this, use the same keyword arguments as above but with a capital letter:
 - `Umin`  \ `Umax`  \ `c_Umin`  \ `c_Umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
 - `ΔUmin` \ `ΔUmax` \ `c_ΔUmin` \ `c_ΔUmax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
-- `Ymin`  \ `Ymax`  \ `c_Ymin`  \ `c_Ymax`  : ``\mathbf{Ŷ}`` constraints `(nu*Hp,)`.
+- `Ymin`  \ `Ymax`  \ `c_Ymin`  \ `c_Ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
 """
 function setconstraint!(
     mpc::PredictiveController; 
