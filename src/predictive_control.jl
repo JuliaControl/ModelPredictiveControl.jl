@@ -67,32 +67,21 @@ The predictive controllers support both soft and hard constraints, defined by:
 \begin{alignat*}{3}
     \mathbf{u_{min}  - c_{u_{min}}}  ϵ &≤ \mathbf{u}(k+j)  &&≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad j = 0, 1 ,..., H_c - 1 \\
     \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ &≤ \mathbf{Δu}(k+j) &&≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad j = 0, 1 ,..., H_c - 1 \\
-    \mathbf{y_{min}  - c_{y_{min}}}  ϵ &≤ \mathbf{ŷ}(k+j)  &&≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad j = 1, 2 ,..., H_p \\
+    \mathbf{y_{min}  - c_{y_{min}}}  ϵ &≤ \mathbf{ŷ}(k+j)  &&≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad j = 1, 2 ,..., H_p
 \end{alignat*}
 ```
 and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there
 is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern
 for relaxation, are non-negative values that specify the softness of the associated bound.
 Use `0.0` values for hard constraints. The output constraints ``\mathbf{y_{min}}`` and
-``\mathbf{y_{max}}`` are soft by default.
-
-The bounds can be modified after calling [`moveinput!`](@ref), that is, at runtime, but not
-the softness parameters ``\mathbf{c}``. It is not possible to modify `±Inf` constraints
-at runtime.
-
-!!! tip
-    To keep a variable unconstrained while maintaining the ability to add a constraint later
-    at runtime, set the bound to an absolute value sufficiently large when you create the
-    controller.
-
-Varying the constraints over the prediction/control horizon is not supported yet but it will
-be implemented soon.
+``\mathbf{y_{max}}`` are soft by default. See Extended Help for time-varying constraints.
 
 # Arguments
 !!! info
     The default constraints are mentioned here for clarity but omitting a keyword argument 
     will not re-assign to its default value (defaults are set at construction only).
 
+- `mpc::PredictiveController` : predictive controller to set constraints.
 - `umin=fill(-Inf,nu)` : manipulated input lower bounds ``\mathbf{u_{min}}`` 
 - `umax=fill(+Inf,nu)` : manipulated input upper bounds ``\mathbf{u_{max}}`` 
 - `Δumin=fill(-Inf,nu)` : manipulated input increment lower bounds ``\mathbf{Δu_{min}}`` 
@@ -105,6 +94,8 @@ be implemented soon.
 - `c_Δumax=fill(0.0,nu)` : `Δumax` softness weights ``\mathbf{c_{Δu_{max}}}`` 
 - `c_ymin=fill(1.0,ny)` : `ymin` softness weights ``\mathbf{c_{y_{min}}}`` 
 - `c_ymax=fill(1.0,ny)` : `ymax` softness weights ``\mathbf{c_{y_{max}}}``
+- all keyword arguments above but with a capital letter e.g. `Ymax` or `c_ΔUmin` : for
+  time-varying constraints (see Extended Help)
 
 # Examples
 ```jldoctest
@@ -122,6 +113,30 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
   0 unmeasured outputs yu
   0 measured disturbances d
 ```
+
+# Extended Help
+The bounds can be modified after calling [`moveinput!`](@ref), that is at runtime, but not
+the softness parameters ``\mathbf{c}``. It is not possible to modify `±Inf` constraints
+at runtime.
+
+!!! tip
+    To keep a variable unconstrained while maintaining the ability to add a constraint later
+    at runtime, set the bound to an absolute value sufficiently large when you create the
+    controller.
+
+It is also possible to specify time-varying constraints over prediction ``H_p`` and control 
+``H_c`` horizons. In such a case, they are defined by:
+```math 
+\begin{alignat*}{3}
+    \mathbf{U_{min}  - c_{U_{min}}}  ϵ &≤ \mathbf{U}  &&≤ \mathbf{U_{max}  + c_{U_{max}}}  ϵ \\
+    \mathbf{ΔU_{min} - c_{ΔU_{min}}} ϵ &≤ \mathbf{ΔU} &&≤ \mathbf{ΔU_{max} + c_{ΔY_{max}}} ϵ \\
+    \mathbf{Y_{min}  - c_{Y_{min}}}  ϵ &≤ \mathbf{Ŷ}  &&≤ \mathbf{Y_{max}  + c_{Y_{max}}}  ϵ
+\end{alignat*}
+```
+For this, use the same keyword arguments as above but with a capital letter:
+- `Umin`  \ `Umax`  \ `c_Umin`  \ `c_Umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
+- `ΔUmin` \ `ΔUmax` \ `c_ΔUmin` \ `c_ΔUmax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
+- `Ymin`  \ `Ymax`  \ `c_Ymin`  \ `c_Ymax`  : ``\mathbf{Ŷ}`` constraints `(nu*Hp,)`.
 """
 function setconstraint!(
     mpc::PredictiveController; 
@@ -131,20 +146,18 @@ function setconstraint!(
     c_umin  = nothing, c_umax  = nothing,
     c_Δumin = nothing, c_Δumax = nothing,
     c_ymin  = nothing, c_ymax  = nothing,
-    # will be deleted in the future:
+    Umin    = nothing, Umax    = nothing,
+    ΔUmin   = nothing, ΔUmax   = nothing,
+    Ymin    = nothing, Ymax    = nothing,
+    c_Umax  = nothing, c_Umin  = nothing,
+    c_ΔUmax = nothing, c_ΔUmin = nothing,
+    c_Ymax  = nothing, c_Ymin  = nothing,
+    # ------------ will be deleted in the future ---------------
     ŷmin    = nothing, ŷmax    = nothing,
     c_ŷmin  = nothing, c_ŷmax  = nothing,
+    # ----------------------------------------------------------
 )
-    model, con, optim = mpc.estim.model, mpc.con, mpc.optim
-    nu, ny, Hp, Hc = model.nu, model.ny, mpc.Hp, mpc.Hc
-    notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
-    C, E = mpc.C, mpc.Ẽ[:, 1:nu*Hc]
-    if !all(isnothing.([c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax]))
-        !isinf(C) || throw(ArgumentError("Slack variable Cwt must be finite to set softness parameters"))
-        notSolvedYet || error("Cannot set softness parameters after calling moveinput!")
-    end
-    
-    # these 4 `if`s will be deleted in the future:
+    # ----- these 4 `if`s will be deleted in the future --------
     if !isnothing(ŷmin)
         Base.depwarn("keyword arg ŷmin is deprecated, use ymin instead", :setconstraint!)
         ymin = ŷmin
@@ -161,73 +174,81 @@ function setconstraint!(
         Base.depwarn("keyword arg ŷmax is deprecated, use ymax instead", :setconstraint!)
         c_ymax = c_ŷmax
     end
-    
-    if !isnothing(umin)
-        size(umin)   == (nu,) || throw(ArgumentError("umin size must be $((nu,))"))
-        Umin  = repeat(umin, Hp)
+    # ----------------------------------------------------------
+    model, con, optim = mpc.estim.model, mpc.con, mpc.optim
+    nu, ny, Hp, Hc = model.nu, model.ny, mpc.Hp, mpc.Hc
+    notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
+    C, E = mpc.C, mpc.Ẽ[:, 1:nu*Hc]
+    isnothing(Umin)     && !isnothing(umin)     && (Umin    = repeat(umin,    Hp))
+    isnothing(Umax)     && !isnothing(umax)     && (Umax    = repeat(umax,    Hp))
+    isnothing(ΔUmin)    && !isnothing(Δumin)    && (ΔUmin   = repeat(Δumin,   Hc))
+    isnothing(ΔUmax)    && !isnothing(Δumax)    && (ΔUmax   = repeat(Δumax,   Hc))
+    isnothing(Ymin)     && !isnothing(ymin)     && (Ymin    = repeat(ymin,    Hp))
+    isnothing(Ymax)     && !isnothing(ymax)     && (Ymax    = repeat(ymax,    Hp))
+    isnothing(c_Umin)   && !isnothing(c_umin)   && (c_Umin  = repeat(c_umin,  Hp))
+    isnothing(c_Umax)   && !isnothing(c_umax)   && (c_Umax  = repeat(c_umax,  Hp))
+    isnothing(c_ΔUmin)  && !isnothing(c_Δumin)  && (c_ΔUmin = repeat(c_Δumin, Hc))
+    isnothing(c_ΔUmax)  && !isnothing(c_Δumax)  && (c_ΔUmax = repeat(c_Δumax, Hc))
+    isnothing(c_Ymin)   && !isnothing(c_ymin)   && (c_Ymin  = repeat(c_ymin,  Hp))
+    isnothing(c_Ymax)   && !isnothing(c_ymax)   && (c_Ymax  = repeat(c_ymax,  Hp))
+    if !all(isnothing.([c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ymin, c_Ymax]))
+        !isinf(C) || throw(ArgumentError("Slack variable Cwt must be finite to set softness parameters"))
+        notSolvedYet || error("Cannot set softness parameters after calling moveinput!")
+    end
+    if !isnothing(Umin)
+        size(Umin)   == (nu*Hp,) || throw(ArgumentError("Umin size must be $((nu*Hp,))"))
         con.Umin[:] = Umin
     end
-    if !isnothing(umax)
-        size(umax)   == (nu,) || throw(ArgumentError("umax size must be $((nu,))"))
-               Umax  = repeat(umax, Hp)
+    if !isnothing(Umax)
+        size(Umax)   == (nu*Hp,) || throw(ArgumentError("Umax size must be $((nu*Hp,))"))
         con.Umax[:] = Umax
     end
-    if !isnothing(Δumin)
-        size(Δumin)  == (nu,) || throw(ArgumentError("Δumin size must be $((nu,))"))
-        ΔUmin = repeat(Δumin, Hc)
+    if !isnothing(ΔUmin)
+        size(ΔUmin)  == (nu*Hc,) || throw(ArgumentError("ΔUmin size must be $((nu*Hc,))"))
         con.ΔŨmin[1:nu*Hc] = ΔUmin
     end
-    if !isnothing(Δumax)
-        size(Δumax)  == (nu,) || throw(ArgumentError("Δumax size must be $((nu,))"))
-        ΔUmax = repeat(Δumax, Hc)
+    if !isnothing(ΔUmax)
+        size(ΔUmax)  == (nu*Hc,) || throw(ArgumentError("ΔUmax size must be $((nu*Hc,))"))
         con.ΔŨmax[1:nu*Hc] = ΔUmax
     end
-    if !isnothing(ymin)
-        size(ymin)   == (ny,) || throw(ArgumentError("ymin size must be $((ny,))"))
-        Ymin  = repeat(ymin, Hp)
+    if !isnothing(Ymin)
+        size(Ymin)   == (ny*Hp,) || throw(ArgumentError("Ymin size must be $((ny*Hp,))"))
         con.Ymin[:] = Ymin
     end
-    if !isnothing(ymax)
-        size(ymax)   == (ny,) || throw(ArgumentError("ymax size must be $((ny,))"))
-        Ymax  = repeat(ymax, Hp)
+    if !isnothing(Ymax)
+        size(Ymax)   == (ny*Hp,) || throw(ArgumentError("Ymax size must be $((ny*Hp,))"))
         con.Ymax[:] = Ymax
     end
-    if !isnothing(c_umin)
-        size(c_umin) == (nu,) || throw(ArgumentError("c_umin size must be $((nu,))"))
-        any(c_umin .< 0) && error("c_umin weights should be non-negative")
-        c_Umin  = repeat(c_umin, Hp)
+    if !isnothing(c_Umin)
+        size(c_Umin) == (nu*Hp,) || throw(ArgumentError("c_Umin size must be $((nu*Hp,))"))
+        any(c_Umin .< 0) && error("c_Umin weights should be non-negative")
         con.A_Umin[:, end] = -c_Umin
     end
-    if !isnothing(c_umax)
-        size(c_umax) == (nu,) || throw(ArgumentError("c_umax size must be $((nu,))"))
-        any(c_umax .< 0) && error("c_umax weights should be non-negative")
-        c_Umax  = repeat(c_umax, Hp)
+    if !isnothing(c_Umax)
+        size(c_Umax) == (nu*Hp,) || throw(ArgumentError("c_Umax size must be $((nu*Hp,))"))
+        any(c_Umax .< 0) && error("c_Umax weights should be non-negative")
         con.A_Umax[:, end] = -c_Umax
     end
-    if !isnothing(c_Δumin)
-        size(c_Δumin) == (nu,) || throw(ArgumentError("c_Δumin size must be $((nu,))"))
-        any(c_Δumin .< 0) && error("c_Δumin weights should be non-negative")
-        c_ΔUmin  = repeat(c_Δumin, Hc)
+    if !isnothing(c_ΔUmin)
+        size(c_ΔUmin) == (nu*Hc,) || throw(ArgumentError("c_ΔUmin size must be $((nu*Hc,))"))
+        any(c_ΔUmin .< 0) && error("c_ΔUmin weights should be non-negative")
         con.A_ΔŨmin[1:end-1, end] = -c_ΔUmin 
     end
-    if !isnothing(c_Δumax)
-        size(c_Δumax) == (nu,) || throw(ArgumentError("c_Δumax size must be $((nu,))"))
-        any(c_Δumax .< 0) && error("c_Δumax weights should be non-negative")
-        c_ΔUmax  = repeat(c_Δumax, Hc)
+    if !isnothing(c_ΔUmax)
+        size(c_ΔUmax) == (nu*Hc,) || throw(ArgumentError("c_ΔUmax size must be $((nu*Hc,))"))
+        any(c_ΔUmax .< 0) && error("c_ΔUmax weights should be non-negative")
         con.A_ΔŨmax[1:end-1, end] = -c_ΔUmax
     end
-    if !isnothing(c_ymin)
-        size(c_ymin) == (ny,) || throw(ArgumentError("c_ymin size must be $((ny,))"))
-        any(c_ymin .< 0) && error("c_ymin weights should be non-negative")
-        c_Ymin  = repeat(c_ymin, Hp)
+    if !isnothing(c_Ymin)
+        size(c_Ymin) == (ny*Hp,) || throw(ArgumentError("c_Ymin size must be $((ny*Hp,))"))
+        any(c_Ymin .< 0) && error("c_Ymin weights should be non-negative")
         con.c_Ymin[:] = c_Ymin
         A_Ymin ,_ = relaxŶ(model, C, con.c_Ymin, con.c_Ymax, E)
         con.A_Ymin[:] = A_Ymin
     end
-    if !isnothing(c_ymax)
-        size(c_ymax) == (ny,) || throw(ArgumentError("c_ymax size must be $((ny,))"))
-        any(c_ymax .< 0) && error("c_ymax weights should be non-negative")
-        c_Ymax  = repeat(c_ymax, Hp)
+    if !isnothing(c_Ymax)
+        size(c_Ymax) == (ny*Hp,) || throw(ArgumentError("c_Ymax size must be $((ny*Hp,))"))
+        any(c_Ymax .< 0) && error("c_Ymax weights should be non-negative")
         con.c_Ymax[:] = c_Ymax
         _, A_Ymax = relaxŶ(model, C, con.c_Ymin, con.c_Ymax, E)
         con.A_Ymax[:] = A_Ymax
@@ -235,7 +256,7 @@ function setconstraint!(
     i_Umin,  i_Umax  = .!isinf.(con.Umin),  .!isinf.(con.Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmin)
     i_Ymin,  i_Ymax  = .!isinf.(con.Ymin),  .!isinf.(con.Ymax)
-    if notSolvedYet 
+    if notSolvedYet
         con.i_b[:], con.A[:] = init_linconstraint(model,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, con.A_Ymin, con.A_Ymax
@@ -1008,7 +1029,7 @@ function init_stochpred(estim::InternalModel, Hp)
     return Ks, Ps 
 end
 "Return empty matrices if `estim` is not a [`InternalModel`](@ref)."
-init_stochpred(::StateEstimator, _ ) = zeros(0, 0), zeros(0, 0)
+init_stochpred(estim::StateEstimator, _ ) = zeros(0, estim.nxs), zeros(0, estim.model.ny)
 
 
 @doc raw"""

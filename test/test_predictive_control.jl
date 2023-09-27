@@ -123,20 +123,47 @@ end
     @test all((-mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]) .≈ ([1.00,1.01], [1.02,1.03]))
 
     model2 = LinModel(tf([2], [10, 1]), 3.0)
-    mpc2 = LinMPC(model2, Hp=25, Hc=2)
+    mpc2 = LinMPC(model2, Hp=50, Hc=5)
+    setconstraint!(mpc2, Umin=-1(1:50).-1, Umax=+1(1:50).+1)
+    @test all((mpc2.con.Umin, mpc2.con.Umax) .≈ (-1(1:50).-1, +1(1:50).+1))
+    setconstraint!(mpc2, ΔUmin=-1(1:5).-2, ΔUmax=+1(1:5).+2)
+    @test all((mpc2.con.ΔŨmin, mpc2.con.ΔŨmax) .≈ ([-1(1:5).-2; 0], [+1(1:5).+2; Inf]))
+    setconstraint!(mpc2, Ymin=-1(1:50).-3, Ymax=+1(1:50).+3)
+    @test all((mpc2.con.Ymin, mpc2.con.Ymax) .≈ (-1(1:50).-3, +1(1:50).+3))
+    setconstraint!(mpc2, c_Umin=+1(1:50).+4, c_Umax=+1(1:50).+4)
+    @test all((-mpc2.con.A_Umin[:, end], -mpc2.con.A_Umax[:, end]) .≈ (+1(1:50).+4, +1(1:50).+4))
+    setconstraint!(mpc2, c_ΔUmin=+1(1:5).+5, c_ΔUmax=+1(1:5).+5)
+    @test all((-mpc2.con.A_ΔŨmin[1:end-1, end], -mpc2.con.A_ΔŨmax[1:end-1, end]) .≈ (+1(1:5).+5, +1(1:5).+5))
+    setconstraint!(mpc2, c_Ymin=+1(1:50).+6, c_Ymax=+1(1:50).+6)
+    @test all((-mpc2.con.A_Ymin[:, end], -mpc2.con.A_Ymax[:, end]) .≈ (+1(1:50).+6, +1(1:50).+6))
+    setconstraint!(mpc2, c_umin=[0], c_umax=[0], c_Δumin=[0], c_Δumax=[0], c_ymin=[1], c_ymax=[1])
+
+
     setconstraint!(mpc2, umin=[-3], umax=[3])
     setconstraint!(mpc2, Δumin=[-1.5], Δumax=[1.5])
     setconstraint!(mpc2, ymin=[-100], ymax=[100])
-    moveinput!(mpc2, [-20])
+    moveinput!(mpc2, [-10])
     info = getinfo(mpc2)
     @test info[:ΔU][begin] ≈ -1.5 atol=1e-2
     @test info[:U][end] ≈ -3 atol=1e-2
+
+
     setconstraint!(mpc2, umin=[-10], umax=[10])
     setconstraint!(mpc2, Δumin=[-15], Δumax=[15])
     setconstraint!(mpc2, ymin=[-0.5], ymax=[0.5])
-    moveinput!(mpc2, [-20])
+    moveinput!(mpc2, [-10])
     info = getinfo(mpc2)
     @test info[:Ŷ][end] ≈ -0.5 atol=1e-2
+
+
+    setconstraint!(mpc2, umin=[-10], umax=[10])
+    setconstraint!(mpc2, Δumin=[-15], Δumax=[15])
+    setconstraint!(mpc2, Ymin=[-0.5; fill(-100, 49)], Ymax=[0.5; fill(+100, 49)])
+    moveinput!(mpc2, [-10])
+    info = getinfo(mpc2)
+    @test info[:Ŷ][end]   ≈ -10  atol=1e-2
+    @test info[:Ŷ][begin] ≈ -0.5 atol=1e-2
+
 
     @test_throws ArgumentError setconstraint!(mpc, umin=[0,0,0])
     @test_throws ArgumentError setconstraint!(mpc, umax=[0,0,0])
@@ -401,7 +428,8 @@ end
     @test all((nmpc.con.c_Ymin, nmpc.con.c_Ymax) .≈ ([1.00,1.01], [1.02,1.03]))
 
     linmodel2 = LinModel(tf([2], [10, 1]), 3.0)
-    nmpc_lin2 = NonLinMPC(linmodel2, Hp=25, Hc=2)
+    nmpc_lin2 = NonLinMPC(linmodel2, Hp=50, Hc=5)
+
     setconstraint!(nmpc_lin2, umin=[-3], umax=[3])
     setconstraint!(nmpc_lin2, Δumin=[-1.5], Δumax=[1.5])
     setconstraint!(nmpc_lin2, ymin=[-100], ymax=[100])
@@ -409,6 +437,7 @@ end
     info = getinfo(nmpc_lin2)
     @test info[:ΔU][begin] ≈ -1.5 atol=1e-2
     @test info[:U][end] ≈ -3 atol=1e-2
+
     setconstraint!(nmpc_lin2, umin=[-10], umax=[10])
     setconstraint!(nmpc_lin2, Δumin=[-15], Δumax=[15])
     setconstraint!(nmpc_lin2, ymin=[-0.5], ymax=[0.5])
@@ -416,10 +445,19 @@ end
     info = getinfo(nmpc_lin2)
     @test info[:Ŷ][end] ≈ -0.5 atol=1e-2
 
+    setconstraint!(nmpc_lin2, umin=[-10], umax=[10])
+    setconstraint!(nmpc_lin2, Δumin=[-15], Δumax=[15])
+    setconstraint!(nmpc_lin2, Ymin=[-0.5; fill(-100, 49)], Ymax=[0.5; fill(+100, 49)])
+    moveinput!(nmpc_lin2, [-10])
+    info = getinfo(nmpc_lin2)
+    @test info[:Ŷ][end]   ≈ -10  atol=1e-2
+    @test info[:Ŷ][begin] ≈ -0.5 atol=1e-2
+
     f2(x,u,_) = linmodel2.A*x + linmodel2.Bu*u
     h2(x,_)   = linmodel2.C*x
     nonlinmodel2 = NonLinModel(f2, h2, Ts, 1, 1, 1)
-    nmpc2 = NonLinMPC(nonlinmodel2, Hp=25, Hc=2)
+    nmpc2 = NonLinMPC(nonlinmodel2, Hp=50, Hc=5)
+
     setconstraint!(nmpc2, umin=[-3], umax=[3])
     setconstraint!(nmpc2, Δumin=[-1.5], Δumax=[1.5])
     setconstraint!(nmpc2, ymin=[-100], ymax=[100])
@@ -427,11 +465,20 @@ end
     info = getinfo(nmpc2)
     @test info[:ΔU][begin] ≈ -1.5 atol=1e-2
     @test info[:U][end] ≈ -3 atol=1e-2
+    
     setconstraint!(nmpc2, umin=[-10], umax=[10])
     setconstraint!(nmpc2, Δumin=[-15], Δumax=[15])
     setconstraint!(nmpc2, ymin=[-0.5], ymax=[0.5])
     moveinput!(nmpc2, [-20])
     info = getinfo(nmpc2)
     @test info[:Ŷ][end] ≈ -0.5 atol=1e-2
+    
+    setconstraint!(nmpc2, umin=[-10], umax=[10])
+    setconstraint!(nmpc2, Δumin=[-15], Δumax=[15])
+    setconstraint!(nmpc2, Ymin=[-0.5; fill(-100, 49)], Ymax=[0.5; fill(+100, 49)])
+    moveinput!(nmpc2, [-10])
+    info = getinfo(nmpc2)
+    @test info[:Ŷ][end]   ≈ -10  atol=1e-2
+    @test info[:Ŷ][begin] ≈ -0.5 atol=1e-2
     
 end
