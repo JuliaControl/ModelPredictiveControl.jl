@@ -30,8 +30,8 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
     p::Vector{Float64}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
-    d::Vector{Float64}
-    D̂::Vector{Float64}
+    d0::Vector{Float64}
+    D̂0::Vector{Float64}
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
     function NonLinMPC{SE, JEFunc}(
@@ -52,7 +52,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
         con, S̃, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S, N_Hc, E)
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
-        d, D̂ = zeros(nd), zeros(nd*Hp)
+        d0, D̂0 = zeros(nd), zeros(nd*Hp)
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
@@ -64,7 +64,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
             S̃, T,  
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
             Ks, Ps,
-            d, D̂,
+            d0, D̂0,
             Ŷop, Dop,
         )
         init_optimization!(mpc)
@@ -230,10 +230,10 @@ end
 For [`NonLinMPC`](@ref), add `:sol` and the optimal economic cost `:JE`.
 """
 function addinfo!(info, mpc::NonLinMPC)
-    U, Ŷ, D̂ = info[:U], info[:Ŷ], info[:D̂]
+    U, Ŷ, D̂, ŷ, d = info[:U], info[:Ŷ], info[:D̂], info[:ŷ], info[:d]
     UE = [U; U[(end - mpc.estim.model.nu + 1):end]]
-    ŶE = [mpc.ŷ; Ŷ]
-    D̂E = [mpc.d; D̂]
+    ŶE = [ŷ; Ŷ]
+    D̂E = [d; D̂]
     info[:JE]  = mpc.JE(UE, ŶE, D̂E)
     info[:sol] = solution_summary(mpc.optim, verbose=true)
     return info

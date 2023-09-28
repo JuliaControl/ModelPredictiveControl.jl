@@ -26,8 +26,8 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
     P̃_chol::Cholesky{Float64, Matrix{Float64}}
     Ks::Matrix{Float64}
     Ps::Matrix{Float64}
-    d::Vector{Float64}
-    D̂::Vector{Float64}
+    d0::Vector{Float64}
+    D̂0::Vector{Float64}
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
     function ExplicitMPC{SE}(estim::SE, Hp, Hc, Mwt, Nwt, Lwt) where {SE<:StateEstimator}
@@ -49,7 +49,7 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         P̃_chol = cholesky(P̃)
         Ks, Ps = init_stochpred(estim, Hp)
-        d, D̂ = zeros(nd), zeros(nd*Hp)
+        d0, D̂0 = zeros(nd), zeros(nd*Hp)
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
@@ -62,7 +62,7 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
             Ẽ, F, G, J, K, Q, P̃, q̃, p,
             P̃_chol,
             Ks, Ps,
-            d, D̂,
+            d0, D̂0,
             Ŷop, Dop,
         )
         return mpc

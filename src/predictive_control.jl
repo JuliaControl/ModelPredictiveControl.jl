@@ -380,8 +380,8 @@ function getinfo(mpc::PredictiveController)
     info[:J]   = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[]
     info[:U]   = mpc.S̃*mpc.ΔŨ + mpc.T*(mpc.estim.lastu0 + mpc.estim.model.uop)
     info[:u]   = info[:U][1:mpc.estim.model.nu]
-    info[:d]   = mpc.d
-    info[:D̂]   = mpc.D̂
+    info[:d]   = mpc.d0 + mpc.estim.model.dop
+    info[:D̂]   = mpc.D̂0 + mpc.Dop
     info[:ŷ]   = mpc.ŷ
     info[:Ŷ]   = Ŷ
     info[:Ŷs]  = mpc.Ŷop - repeat(mpc.estim.model.yop, mpc.Hp) # Ŷop = Ŷs + Yop
@@ -448,8 +448,8 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
     mpc.F[:] = mpc.K*mpc.estim.x̂ + mpc.Q*mpc.estim.lastu0 + mpc.Ŷop
     if model.nd ≠ 0
-        mpc.d[:], mpc.D̂[:] = d, D̂
-        mpc.F[:] = mpc.F + mpc.G*(mpc.d - model.dop) + mpc.J*(mpc.D̂ - mpc.Dop)
+        mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
+        mpc.F[:] = mpc.F + mpc.G*mpc.d0 + mpc.J*mpc.D̂0
     end
     mpc.R̂y[:], mpc.R̂u[:] = R̂y, R̂u
     Ẑ = mpc.F - R̂y
@@ -458,8 +458,8 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
     if ~mpc.noR̂u
         lastu = mpc.estim.lastu0 + model.uop
         V̂ = mpc.T*lastu - mpc.R̂u
-        mpc.q̃[:] += 2(mpc.L_Hp*mpc.S̃)'*V̂
-        mpc.p[]  += V̂'*mpc.L_Hp*V̂
+        mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.S̃)'*V̂
+        mpc.p[]  = mpc.p[] + V̂'*mpc.L_Hp*V̂
     end
     return nothing
 end
@@ -476,7 +476,7 @@ Init `Ŷop`, `d0` and `D̂0` matrices when model is not a [`LinModel`](@ref).
 function initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y, R̂u)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
     if model.nd ≠ 0
-        mpc.d[:], mpc.D̂[:] = d, D̂
+        mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
     end
     mpc.R̂y[:], mpc.R̂u[:] = R̂y, R̂u
     return nothing
@@ -522,13 +522,13 @@ function predict!(Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ::Vector
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     x̂ ::Vector{T} = copy(mpc.estim.x̂)
     u0::Vector{T} = copy(mpc.estim.lastu0)
-    d0 = mpc.d - model.dop
+    d0::Vector{T} = copy(mpc.d0)
     for j=1:Hp
         if j ≤ Hc
-            u0[:] = @views ΔŨ[(1 + nu*(j-1)):(nu*j)] + u0
+            u0[:] = u0 + ΔŨ[(1 + nu*(j-1)):(nu*j)]
         end
         x̂[:]  = f̂(mpc.estim, x̂, u0, d0)
-        d0[:] = @views mpc.D̂[(1 + nd*(j-1)):(nd*j)] - model.dop
+        d0[:] = mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
         Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, x̂, d0)
     end
     Ŷ[:] = Ŷ + mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
@@ -789,7 +789,7 @@ function obj_nonlinprog(
         U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
         UE = [U; U[(end - model.nu + 1):end]]
         ŶE = [mpc.ŷ; Ŷ]
-        D̂E = [mpc.d; mpc.D̂]
+        D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
         J += mpc.E*mpc.JE(UE, ŶE, D̂E)
     end
     return J
@@ -823,7 +823,7 @@ function obj_nonlinprog(
     if !iszero(mpc.E)
         UE = [U; U[(end - model.nu + 1):end]]
         ŶE = [mpc.ŷ; Ŷ]
-        D̂E = [mpc.d; mpc.D̂]
+        D̂E = [mpc.d0 + model.dop; mpc.D̂0 + mpc.Dop]
         E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E)
     else
         E_JE = 0.0
