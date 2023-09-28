@@ -65,7 +65,7 @@ Set the constraint parameters of `mpc` predictive controller.
 The predictive controllers support both soft and hard constraints, defined by:
 ```math 
 \begin{alignat*}{3}
-    \mathbf{u_{min}  - c_{u_{min}}}  ϵ &≤ \mathbf{u}(k+j)  &&≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad j = 0, 1 ,..., H_c - 1 \\
+    \mathbf{u_{min}  - c_{u_{min}}}  ϵ &≤ \mathbf{u}(k+j)  &&≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad j = 0, 1 ,..., H_p - 1 \\
     \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ &≤ \mathbf{Δu}(k+j) &&≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad j = 0, 1 ,..., H_c - 1 \\
     \mathbf{y_{min}  - c_{y_{min}}}  ϵ &≤ \mathbf{ŷ}(k+j)  &&≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad j = 1, 2 ,..., H_p
 \end{alignat*}
@@ -115,17 +115,17 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 ```
 
 # Extended Help
-The bounds can be modified after calling [`moveinput!`](@ref), that is at runtime, but not
-the softness parameters ``\mathbf{c}``. It is not possible to modify `±Inf` constraints
+The constraints can be modified after calling [`moveinput!`](@ref), that is, at runtime, but
+not the softness parameters ``\mathbf{c}``. It is not possible to modify `±Inf` bounds
 at runtime.
 
 !!! tip
     To keep a variable unconstrained while maintaining the ability to add a constraint later
     at runtime, set the bound to an absolute value sufficiently large when you create the
-    controller.
+    controller (but different than `±Inf`).
 
-It is also possible to specify time-varying constraints over prediction ``H_p`` and control 
-``H_c`` horizons. In such a case, they are defined by:
+It is also possible to specify time-varying constraints over ``H_p`` and ``H_c`` horizons. 
+In such a case, they are defined by:
 ```math 
 \begin{alignat*}{3}
     \mathbf{U_{min}  - c_{U_{min}}}  ϵ &≤ \mathbf{U}  &&≤ \mathbf{U_{max}  + c_{U_{max}}}  ϵ \\
@@ -269,10 +269,7 @@ function setconstraint!(
         @constraint(mpc.optim, linconstraint, A*ΔŨvar .≤ b)
         setnonlincon!(mpc, model)
     else
-        i_b, _ = init_linconstraint(model, 
-            i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
-            con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, con.A_Ymin, con.A_Ymax,
-        )
+        i_b, _ = init_linconstraint(model, i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax)
         i_b == con.i_b || error("Cannot modify ±Inf constraints after calling moveinput!")
     end
     return mpc
@@ -486,7 +483,7 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y,
 end
 
 @doc raw"""
-    predictstoch!(mpc, estim::InternalModel, x̂s, d, ym)
+    predictstoch!(mpc::PredictiveController, estim::InternalModel, x̂s, d, ym)
 
 Init `Ŷop` vector when if `estim` is an [`InternalModel`](@ref).
 
@@ -494,7 +491,7 @@ The vector combines the output operating points and the stochastic predictions:
 ``\mathbf{Ŷ_{op} = Ŷ_{s} + Y_{op}}`` (both values are constant between the nonlinear 
 programming iterations).
 """
-function predictstoch!(mpc, estim::InternalModel, d, ym)
+function predictstoch!(mpc::PredictiveController, estim::InternalModel, d, ym)
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
                            "outputs ym in keyword argument to compute control actions u")
     ŷd = h(estim.model, estim.x̂d, d - estim.model.dop) + estim.model.yop 
@@ -505,7 +502,7 @@ function predictstoch!(mpc, estim::InternalModel, d, ym)
     return nothing
 end
 "Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."
-predictstoch!(mpc, estim::StateEstimator, _ , _ ) = nothing
+predictstoch!(::PredictiveController, ::StateEstimator, _ , _ ) = nothing
 
 @doc raw"""
     predict!(Ŷ, mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ
@@ -513,8 +510,7 @@ predictstoch!(mpc, estim::StateEstimator, _ , _ ) = nothing
 Evaluate the outputs predictions ``\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
 """
 function predict!(Ŷ, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
-    Ŷ[:] = mpc.Ẽ*ΔŨ + mpc.F
-    return Ŷ
+    return mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F # in-place operations to reduce allocations
 end
 
 @doc raw"""
@@ -529,13 +525,13 @@ function predict!(Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ::Vector
     d0 = mpc.d - model.dop
     for j=1:Hp
         if j ≤ Hc
-            u0[:] += @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
+            u0[:] = @views ΔŨ[(1 + nu*(j-1)):(nu*j)] + u0
         end
         x̂[:]  = f̂(mpc.estim, x̂, u0, d0)
         d0[:] = @views mpc.D̂[(1 + nd*(j-1)):(nd*j)] - model.dop
         Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, x̂, d0)
     end
-    Ŷ[:] += mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
+    Ŷ[:] = Ŷ + mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
     return Ŷ
 end
 
@@ -1033,31 +1029,41 @@ init_stochpred(estim::StateEstimator, _ ) = zeros(0, estim.nxs), zeros(0, estim.
 
 
 @doc raw"""
-    init_linconstraint(model::LinModel,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax,
+    init_linconstraint(::LinModel,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, args...
     ) -> i_b, A
 
 Init `i_b` and `A` for the linear inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 
-`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers.
+If provided, the arguments in `args` should be all the inequality constraint matrices:
+`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax`. If not provided, it returns an empty `A`
+matrix. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite
+numbers.
 """
 function init_linconstraint(::LinModel, 
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
-    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, args...
 )
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax]
-    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax]
+    if isempty(args)
+        A = zeros(length(i_b), 0)
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax = args
+        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax]
+    end
     return i_b, A
 end
 
 "Init values without predicted output constraints if `model` is not a [`LinModel`](@ref)."
 function init_linconstraint(::SimModel,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ ,
-    A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ 
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ , args...
 )
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
+    if isempty(args)
+        A = zeros(length(i_b), 0)
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ = args
+        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
+    end
     return i_b, A
 end
 
