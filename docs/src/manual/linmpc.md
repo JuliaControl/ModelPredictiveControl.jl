@@ -146,10 +146,13 @@ function plot_data(t_data, u_data, y_data, ry_data)
     plot!(t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
     p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost); ylabel!("flow rate")
     plot!(t_data,u_data[2,:],label="hot", linetype=:steppost); xlabel!("time (s)")
-    return plot(p1, p2, p3, layout=(3,1), fmt=:svg)
+    return plot(p1, p2, p3, layout=(3,1))
 end
 plot_data(t_data, u_data, y_data, ry_data)
+savefig(ans, "plot1_LinMPC.svg"); nothing # hide
 ```
+
+![plot1_LinMPC](plot1_LinMPC.svg)
 
 For some situations, when [`LinMPC`](@ref) matrices are small/medium and dense, [`DAQP`](https://darnstrom.github.io/daqp/)
 optimizer may be more efficient. To install it, run:
@@ -178,7 +181,10 @@ u, y = model.uop, model()
 initstate!(mpc2, u, y)
 u_data, y_data, ry_data = test_mpc(mpc2, model)
 plot_data(t_data, u_data, y_data, ry_data)
+savefig(ans, "plot2_LinMPC.svg"); nothing # hide
 ```
+
+![plot2_LinMPC](plot2_LinMPC.svg)
 
 ## Adding Feedforward Compensation
 
@@ -251,4 +257,7 @@ u, y, d = model.uop, model(), mpc_ff.estim.model.dop
 initstate!(mpc_ff, u, y, d)
 u_data, y_data, ry_data = test_mpc_ff(mpc_ff, model)
 plot_data(t_data, u_data, y_data, ry_data)
+savefig(ans, "plot3_LinMPC.svg"); nothing # hide
 ```
+
+![plot3_LinMPC](plot3_LinMPC.svg)

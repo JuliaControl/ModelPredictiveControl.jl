@@ -56,7 +56,10 @@ to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
 using Plots
 u = [0.5]
 plot(sim!(model, 60, u), plotu=false)
+savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
 ```
+
+![plot1_NonLinMPC](plot1_NonLinMPC.svg)
 
 ## Nonlinear Model Predictive Controller
 
@@ -76,7 +79,10 @@ f_plant(x, u, _) = x + Ts*pendulum(par_plant, x, u)
 plant = NonLinModel(f_plant, h, Ts, nu, nx, ny)
 res = sim!(estim, 60, [0.5], plant=plant, y_noise=[0.5])
 plot(res, plotu=false, plotxwithx̂=true)
+savefig(ans, "plot2_NonLinMPC.svg"); nothing # hide
 ```
+
+![plot2_NonLinMPC](plot2_NonLinMPC.svg)
 
 The estimate ``x̂_3`` is the integrator state that compensates for static errors (`nint_ym`
 and `σQint_ym` parameters of [`UnscentedKalmanFilter`](@ref)). The Kalman filter performance
@@ -94,7 +100,10 @@ position):
 ```@example 1
 res = sim!(mpc, 60, [180.0], plant=plant, x0=zeros(plant.nx), x̂0=zeros(mpc.estim.nx̂))
 plot(res)
+savefig(ans, "plot3_NonLinMPC.svg"); nothing # hide
 ```
+
+![plot3_NonLinMPC](plot3_NonLinMPC.svg)
 
 The controller seems robust enough to variations on ``K`` coefficient. Starting from this
 inverted position, the closed-loop response to a step disturbances of 10° is also
@@ -103,4 +112,7 @@ satisfactory:
 ```@example 1
 res = sim!(mpc, 60, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
 plot(res)
+savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
 ```
+
+![plot4_NonLinMPC](plot4_NonLinMPC.svg)
