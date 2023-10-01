@@ -35,4 +35,5 @@ setstate!
 
 ```@docs
 sim!
+SimResult
 ```

@@ -10,6 +10,12 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test res.U_data[:, 1] ≈ model.uop .+ 1
     @test res.D_data[:, 1] ≈ model.dop
     @test res.X_data[:, 1] ≈ zeros(model.nx)
+
+    res_man = SimResult(model, res.U_data, res.Y_data, res.D_data; X_data=res.X_data)
+    @test res_man.U_data ≈ res.U_data
+    @test res_man.Y_data ≈ res.Y_data
+    @test res_man.D_data ≈ res.D_data
+    @test res_man.X_data ≈ res.X_data
 end
 
 @testset "SimModel Plots" begin
@@ -38,6 +44,16 @@ end
     @test res.D_data[:, 1]  ≈ estim.model.dop
     @test res.X_data[:, 1]  ≈ zeros(estim.model.nx)
     @test res.X̂_data[:, 1]  ≈ zeros(estim.nx̂)
+
+    res_man = SimResult(
+        estim, res.U_data, res.Y_data, res.D_data; 
+        X_data=res.X_data, X̂_data=res.X̂_data
+    )
+    @test res_man.U_data ≈ res.U_data
+    @test res_man.Y_data ≈ res.Y_data
+    @test res_man.D_data ≈ res.D_data
+    @test res_man.X_data ≈ res.X_data
+    @test res_man.X̂_data ≈ res.X̂_data
 end
 
 @testset "StateEstimator Plots" begin
@@ -91,6 +107,18 @@ end
     @test res.D_data[:, 1]  ≈ mpc2.estim.model.dop
     @test res.X_data[:, 1]  ≈ zeros(mpc2.estim.model.nx)
     @test res.X̂_data[:, 1]  ≈ zeros(mpc2.estim.nx̂)
+
+    res_man = SimResult(
+        mpc, res.U_data, res.Y_data, res.D_data; 
+        X_data=res.X_data, X̂_data=res.X̂_data,
+        Ry_data=res.Ry_data
+    )
+    @test res_man.U_data ≈ res.U_data
+    @test res_man.Y_data ≈ res.Y_data
+    @test res_man.D_data ≈ res.D_data
+    @test res_man.X_data ≈ res.X_data
+    @test res_man.X̂_data ≈ res.X̂_data
+    @test res_man.Ry_data ≈ res.Ry_data
 end
 
 @testset "PredictiveController Plots" begin

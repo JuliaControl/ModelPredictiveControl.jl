@@ -1,5 +1,5 @@
-"Includes all signals of [`sim!`](@ref), view them with `plot` on `SimResult` instances."
 struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
+    obj::O                      # simulated instance
     T_data ::Vector{Float64}    # time in seconds
     Y_data ::Matrix{Float64}    # plant outputs (both measured and unmeasured)
     Ry_data::Matrix{Float64}    # output setpoints
@@ -10,8 +10,73 @@ struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
     D_data ::Matrix{Float64}    # measured disturbances
     X_data ::Matrix{Float64}    # plant states
     X̂_data ::Matrix{Float64}    # estimated states
-    obj::O                      # simulated instance
 end
+
+"""
+    SimResult(
+        obj::Union{SimModel, StateEstimator, PredictiveController}, 
+        U_data, 
+        Y_data, 
+        D_data  = [];
+        X_data  = nothing,
+        X̂_data  = nothing, 
+        Ry_data = nothing, 
+        Ru_data = nothing,
+    )
+
+Manually construct a `SimResult` to quickly plot `obj` simulations.
+
+Except for `obj`, all the arguments should be matrices of `N` columns, where `N` is the 
+number of time steps. [`SimResult`](@ref) objects allow to quickly plot simulation results.
+Simply call `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on them.
+
+# Examples
+```julia-repl
+julia> a = 1;
+```
+"""
+function SimResult(
+    obj::Union{SimModel, StateEstimator, PredictiveController}, 
+    U_data, 
+    Y_data, 
+    D_data  = zeros(0, size(U_data, 2));
+    X_data  = nothing,
+    X̂_data  = nothing, 
+    Ry_data = nothing, 
+    Ru_data = nothing,
+)
+    model = get_model(obj)
+    Ts, nu, ny, nx, nx̂ = model.Ts, model.nu, model.ny, model.nx, get_nx̂(obj)
+    N = size(U_data, 2)
+    T_data = collect(Ts*(0:N-1))
+    isnothing(X_data)  && (X_data  = fill(NaN, nx, N))
+    isnothing(X̂_data)  && (X̂_data  = fill(NaN, nx̂, N))
+    isnothing(Ry_data) && (Ry_data = fill(NaN, ny, N))
+    isnothing(Ru_data) && (Ru_data = fill(NaN, nu, N))
+    NU, NY, NX, NX̂ = size(U_data, 2), size(Y_data, 2), size(X_data, 2), size(X̂_data, 2)
+    NRy, NRu = size(Ry_data, 2), size(Ru_data, 2)
+    if !(NU == NY == NX == NX̂ == NRy == NRu)
+        error("All arguments must have the same number of columns (time steps)")
+    end
+    size(Y_data, 2) == N || error("Y_data must be of size ($ny, $N)")
+    return SimResult(obj, T_data, Y_data, Ry_data, Y_data, U_data, U_data, 
+                     Ru_data, D_data, X_data, X̂_data)
+end
+
+get_model(model::SimModel) = model
+get_model(estim::StateEstimator) = estim.model
+get_model(mpc::PredictiveController) = mpc.estim.model
+
+get_nx̂(model::SimModel) = model.nx
+get_nx̂(estim::StateEstimator) = estim.nx̂
+get_nx̂(mpc::PredictiveController) = mpc.estim.nx̂
+
+
+function Base.show(io::IO, res::SimResult) 
+    N = length(res.T_data)
+    print(io, "Simulation results of $(typeof(res.obj)) with $N time steps.")
+end
+
 
 @doc raw"""
     sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x0=zeros(plant.nx)) -> res
@@ -20,9 +85,9 @@ Open-loop simulation of `plant` for `N` time steps, default to unit bump test on
 
 The manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}`` are held
 constant at `u` and `d` values, respectively. The plant initial state ``\mathbf{x}(0)`` is
-specified by `x0` keyword arguments. The function returns `SimResult` instances that can be
-visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on 
-them (see Examples below). Note that the method mutates `plant` internal states.
+specified by `x0` keyword arguments. The function returns [`SimResult`](@ref) instances that
+can be visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) 
+on them (see Examples below). Note that the method mutates `plant` internal states.
 
 # Examples
 ```julia-repl
@@ -55,11 +120,8 @@ function sim!(
         X_data[:, i]  = plant.x
         updatestate!(plant, u, d); 
     end
-    return SimResult(
-        T_data, Y_data, U_data, Y_data, 
-        U_data, U_data, U_data, D_data, X_data, X_data, 
-        plant
-    )
+    return SimResult(plant, T_data, Y_data, U_data, Y_data, 
+                     U_data, U_data, U_data, D_data, X_data, X_data)
 end
 
 @doc raw"""
@@ -210,11 +272,8 @@ function sim_closedloop!(
         x[:] += x_noise.*randn(plant.nx)
         updatestate!(est_mpc, u, ym, d)
     end
-    res = SimResult(
-        T_data, Y_data, U_Ry_data, Ŷ_data, 
-        U_data, Ud_data, Ru_data, D_data, X_data, X̂_data, 
-        est_mpc
-    )
+    res = SimResult(est_mpc, T_data, Y_data, U_Ry_data, Ŷ_data, 
+                    U_data, Ud_data, Ru_data, D_data, X_data, X̂_data)
     setstate!(plant, old_x0)
     return res
 end
