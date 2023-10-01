@@ -21,7 +21,7 @@ end
         X_data  = nothing,
         X̂_data  = nothing, 
         Ry_data = nothing, 
-        Ru_data = nothing,
+        Ru_data = nothing
     )
 
 Manually construct a `SimResult` to quickly plot `obj` simulations.
@@ -43,7 +43,7 @@ function SimResult(
     X_data  = nothing,
     X̂_data  = nothing, 
     Ry_data = nothing, 
-    Ru_data = nothing,
+    Ru_data = nothing
 )
     model = get_model(obj)
     Ts, nu, ny, nx, nx̂ = model.Ts, model.nu, model.ny, model.nx, get_nx̂(obj)
