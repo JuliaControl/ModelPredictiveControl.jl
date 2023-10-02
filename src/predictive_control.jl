@@ -65,16 +65,19 @@ Set the constraint parameters of `mpc` predictive controller.
 The predictive controllers support both soft and hard constraints, defined by:
 ```math 
 \begin{alignat*}{3}
-    \mathbf{u_{min}  - c_{u_{min}}}  ϵ &≤ \mathbf{u}(k+j)  &&≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad j = 0, 1 ,..., H_p - 1 \\
-    \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ &≤ \mathbf{Δu}(k+j) &&≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad j = 0, 1 ,..., H_c - 1 \\
-    \mathbf{y_{min}  - c_{y_{min}}}  ϵ &≤ \mathbf{ŷ}(k+j)  &&≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad j = 1, 2 ,..., H_p
+    \mathbf{u_{min}  - c_{u_{min}}}  ϵ &≤ \mathbf{u}(k+j)        &&≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad j = 0, 1 ,..., H_p - 1 \\
+    \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ &≤ \mathbf{Δu}(k+j)       &&≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad j = 0, 1 ,..., H_c - 1 \\
+    \mathbf{y_{min}  - c_{y_{min}}}  ϵ &≤ \mathbf{ŷ}(k+j)        &&≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad j = 1, 2 ,..., H_p     \\
+    \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ &≤ \mathbf{x̂}_{k-1}(k+j)  &&≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad j = H_p
 \end{alignat*}
 ```
-and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there
-is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern
-for relaxation, are non-negative values that specify the softness of the associated bound.
-Use `0.0` values for hard constraints. The output constraints ``\mathbf{y_{min}}`` and
-``\mathbf{y_{max}}`` are soft by default. See Extended Help for time-varying constraints.
+and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states 
+``\mathbf{x̂}`` at the end of the horizon (see Extended Help). All the constraint parameters
+are vector. Use `±Inf` values when there is no bound. The constraint softness parameters
+``\mathbf{c}``, also called equal concern for relaxation, are non-negative values that
+specify the softness of the associated bound. Use `0.0` values for hard constraints. The
+output and terminal constraints ``\mathbf{y_{min}, y_{max}, x̂_{min}, x̂_{max}}`` are soft by
+default. See Extended Help for time-varying constraints.
 
 # Arguments
 !!! info
@@ -115,9 +118,15 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 ```
 
 # Extended Help
-The constraints can be modified after calling [`moveinput!`](@ref), that is, at runtime, but
-not the softness parameters ``\mathbf{c}``. It is not possible to modify `±Inf` bounds
-at runtime.
+Terminal constraints provide closed-loop stailibility guarantees on the nominal plant
+model. They can render an unfeasible problem however. In practice, a sufficiently large
+prediction horizon ``H_p`` is typically enough for stability. Note that terminal constraints
+are applied on the augmented state ``\mathbf{x̂}`` (see [`SteadyKalmanFilter`](@ref) for
+details on augmentation).
+
+For variable constraints, the bounds can be modified after calling [`moveinput!`](@ref),
+that is, at runtime, but not the softness parameters ``\mathbf{c}``. It is not possible to
+modify `±Inf` bounds at runtime.
 
 !!! tip
     To keep a variable unconstrained while maintaining the ability to add a constraint later
