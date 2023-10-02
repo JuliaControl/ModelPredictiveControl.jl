@@ -71,13 +71,13 @@ The predictive controllers support both soft and hard constraints, defined by:
     \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ &≤ \mathbf{x̂}_{k-1}(k+j)  &&≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad j = H_p
 \end{alignat*}
 ```
-and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states 
-``\mathbf{x̂}`` at the end of the horizon (see Extended Help). All the constraint parameters
-are vector. Use `±Inf` values when there is no bound. The constraint softness parameters
-``\mathbf{c}``, also called equal concern for relaxation, are non-negative values that
-specify the softness of the associated bound. Use `0.0` values for hard constraints. The
-output and terminal constraints ``\mathbf{y_{min}, y_{max}, x̂_{min}, x̂_{max}}`` are soft by
-default. See Extended Help for time-varying constraints.
+and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
+end of the horizon (see Extended Help). All the constraint parameters are vector. Use `±Inf`
+values when there is no bound. The constraint softness parameters ``\mathbf{c}``, also called
+equal concern for relaxation, are non-negative values that specify the softness of the
+associated bound. Use `0.0` values for hard constraints. The output and terminal constraints
+``\mathbf{y_{min}, y_{max}, x̂_{min}, x̂_{max}}`` are all soft by default. See Extended Help
+for time-varying constraints.
 
 # Arguments
 !!! info
@@ -85,20 +85,24 @@ default. See Extended Help for time-varying constraints.
     will not re-assign to its default value (defaults are set at construction only).
 
 - `mpc::PredictiveController` : predictive controller to set constraints.
-- `umin=fill(-Inf,nu)` : manipulated input lower bounds ``\mathbf{u_{min}}`` 
-- `umax=fill(+Inf,nu)` : manipulated input upper bounds ``\mathbf{u_{max}}`` 
-- `Δumin=fill(-Inf,nu)` : manipulated input increment lower bounds ``\mathbf{Δu_{min}}`` 
-- `Δumax=fill(+Inf,nu)` : manipulated input increment upper bounds ``\mathbf{Δu_{max}}`` 
-- `ymin=fill(-Inf,ny)` : predicted output lower bounds ``\mathbf{y_{min}}`` 
-- `ymax=fill(+Inf,ny)` : predicted output upper bounds ``\mathbf{y_{max}}`` 
-- `c_umin=fill(0.0,nu)` : `umin` softness weights ``\mathbf{c_{u_{min}}}`` 
-- `c_umax=fill(0.0,nu)` : `umax` softness weights ``\mathbf{c_{u_{max}}}`` 
-- `c_Δumin=fill(0.0,nu)` : `Δumin` softness weights ``\mathbf{c_{Δu_{min}}}`` 
-- `c_Δumax=fill(0.0,nu)` : `Δumax` softness weights ``\mathbf{c_{Δu_{max}}}`` 
-- `c_ymin=fill(1.0,ny)` : `ymin` softness weights ``\mathbf{c_{y_{min}}}`` 
-- `c_ymax=fill(1.0,ny)` : `ymax` softness weights ``\mathbf{c_{y_{max}}}``
-- all keyword arguments above but with a capital letter e.g. `Ymax` or `c_ΔUmin` : for
-  time-varying constraints (see Extended Help)
+- `umin  = fill(-Inf,nu)` : manipulated input lower bounds ``\mathbf{u_{min}}``.
+- `umax  = fill(+Inf,nu)` : manipulated input upper bounds ``\mathbf{u_{max}}``.
+- `Δumin = fill(-Inf,nu)` : manipulated input increment lower bounds ``\mathbf{Δu_{min}}``.
+- `Δumax = fill(+Inf,nu)` : manipulated input increment upper bounds ``\mathbf{Δu_{max}}``.
+- `ymin  = fill(-Inf,ny)` : predicted output lower bounds ``\mathbf{y_{min}}``.
+- `ymax  = fill(+Inf,ny)` : predicted output upper bounds ``\mathbf{y_{max}}``.
+- `x̂min  = fill(-Inf,nx̂)` : terminal constraint lower bounds ``\mathbf{x̂_{min}}``.
+- `x̂max  = fill(+Inf,nx̂)` : terminal constraint upper bounds ``\mathbf{x̂_{max}}``.
+- `c_umin  = fill(0.0,nu)` : `umin` softness weights ``\mathbf{c_{u_{min}}}``.
+- `c_umax  = fill(0.0,nu)` : `umax` softness weights ``\mathbf{c_{u_{max}}}``.
+- `c_Δumin = fill(0.0,nu)` : `Δumin` softness weights ``\mathbf{c_{Δu_{min}}}``.
+- `c_Δumax = fill(0.0,nu)` : `Δumax` softness weights ``\mathbf{c_{Δu_{max}}}``.
+- `c_ymin  = fill(1.0,ny)` : `ymin` softness weights ``\mathbf{c_{y_{min}}}``.
+- `c_ymax  = fill(1.0,ny)` : `ymax` softness weights ``\mathbf{c_{y_{max}}}``.
+- `c_x̂min  = fill(1.0,nx̂)` : `x̂min` softness weights ``\mathbf{c_{x̂_{min}}}``.
+- `c_x̂max  = fill(1.0,nx̂)` : `x̂max` softness weights ``\mathbf{c_{x̂_{max}}}``.
+- all the keyword arguments above but with a capital letter, except for the terminal
+  constraints, e.g. `Ymax` or `c_ΔUmin` : for time-varying constraints (see Extended Help).
 
 # Examples
 ```jldoctest
@@ -121,8 +125,8 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 Terminal constraints provide closed-loop stailibility guarantees on the nominal plant
 model. They can render an unfeasible problem however. In practice, a sufficiently large
 prediction horizon ``H_p`` is typically enough for stability. Note that terminal constraints
-are applied on the augmented state ``\mathbf{x̂}`` (see [`SteadyKalmanFilter`](@ref) for
-details on augmentation).
+are applied on the augmented state vector ``\mathbf{x̂}`` (see [`SteadyKalmanFilter`](@ref)
+for details on augmentation).
 
 For variable constraints, the bounds can be modified after calling [`moveinput!`](@ref),
 that is, at runtime, but not the softness parameters ``\mathbf{c}``. It is not possible to
