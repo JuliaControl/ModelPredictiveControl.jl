@@ -33,7 +33,14 @@ setstate!
 
 ## Quick Simulation
 
+### Simulate
+
 ```@docs
 sim!
+```
+
+### Simulation Results
+
+```@docs
 SimResult
 ```

@@ -109,7 +109,7 @@ end
     @test res.X̂_data[:, 1]  ≈ zeros(mpc2.estim.nx̂)
 
     res_man = SimResult(
-        mpc, res.U_data, res.Y_data, res.D_data; 
+        mpc1, res.U_data, res.Y_data, res.D_data; 
         X_data=res.X_data, X̂_data=res.X̂_data,
         Ry_data=res.Ry_data
     )

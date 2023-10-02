@@ -32,7 +32,16 @@ Simply call `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on 
 
 # Examples
 ```julia-repl
-julia> a = 1;
+julia> plant = LinModel(tf(1, [1, 1]), 1.0); N = 5; U_data = fill(1.0, 1, N);
+
+julia> Y_data = reduce(hcat, (updatestate!(plant, U_data[:, i]); plant()) for i=1:N)
+1×5 Matrix{Float64}:
+ 0.632121  0.864665  0.950213  0.981684  0.993262
+
+julia> res = SimResult(plant, U_data, Y_data)
+Simulation results of LinModel with 5 time steps.
+
+julia> using Plots; plot(res)
 ```
 """
 function SimResult(
