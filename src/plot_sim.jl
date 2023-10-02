@@ -42,6 +42,7 @@ julia> res = SimResult(plant, U_data, Y_data)
 Simulation results of LinModel with 5 time steps.
 
 julia> using Plots; plot(res)
+
 ```
 """
 function SimResult(
@@ -83,7 +84,7 @@ get_nx̂(mpc::PredictiveController) = mpc.estim.nx̂
 
 function Base.show(io::IO, res::SimResult) 
     N = length(res.T_data)
-    print(io, "Simulation results of $(typeof(res.obj)) with $N time steps.")
+    print(io, "Simulation results of $(typeof(res.obj).name.name) with $N time steps.")
 end
 
 
@@ -102,7 +103,8 @@ on them (see Examples below). Note that the method mutates `plant` internal stat
 ```julia-repl
 julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10.0, 1, 1, 1, 1);
 
-julia> res = sim!(plant, 15, [0], [0], x0=[1]);
+julia> res = sim!(plant, 15, [0], [0], x0=[1])
+Simulation results of NonLinModel with 15 time steps.
 
 julia> using Plots; plot(res, plotu=false, plotd=false, plotx=true)
 
@@ -169,9 +171,10 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 ```julia-repl
 julia> model = LinModel(tf(3, [30, 1]), 0.5);
 
-julia> estim = KalmanFilter(model, σR=[0.5], σQ=[0.25], σQ_int=[0.01], σP0_int=[0.1]);
+julia> estim = KalmanFilter(model, σR=[0.5], σQ=[0.25], σQint_ym=[0.01], σP0int_ym=[0.1]);
 
-julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.25], x0=[-10], x̂0=[0, 0]);
+julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.25], x0=[-10], x̂0=[0, 0])
+Simulation results of KalmanFilter with 50 time steps.
 
 julia> using Plots; plot(res, plotŷ=true, plotu=false, plotxwithx̂=true)
 
@@ -208,7 +211,8 @@ julia> model = LinModel([tf(3, [30, 1]); tf(2, [5, 1])], 4);
 
 julia> mpc = setconstraint!(LinMPC(model, Mwt=[0, 1], Nwt=[0.01], Hp=30), ymin=[0, -Inf]);
 
-julia> res = sim!(mpc, 25, [0, 0], y_noise=[0.1], y_step=[-10, 0]);
+julia> res = sim!(mpc, 25, [0, 0], y_noise=[0.1], y_step=[-10, 0])
+Simulation results of LinMPC with 25 time steps.
 
 julia> using Plots; plot(res, plotry=true, plotŷ=true, plotymin=true, plotu=true)
 
