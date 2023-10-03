@@ -147,9 +147,9 @@ In such a case, they are defined by:
 \end{alignat*}
 ```
 For this, use the same keyword arguments as above but with a capital letter:
-- `Umin`  \ `Umax`  \ `c_Umin`  \ `c_Umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
-- `ΔUmin` \ `ΔUmax` \ `c_ΔUmin` \ `c_ΔUmax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
-- `Ymin`  \ `Ymax`  \ `c_Ymin`  \ `c_Ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
+- `Umin`  / `Umax`  / `c_Umin`  / `c_Umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
+- `ΔUmin` / `ΔUmax` / `c_ΔUmin` / `c_ΔUmax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
+- `Ymin`  / `Ymax`  / `c_Ymin`  / `c_Ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
 """
 function setconstraint!(
     mpc::PredictiveController; 

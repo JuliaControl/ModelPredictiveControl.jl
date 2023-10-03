@@ -192,7 +192,7 @@ end
 @doc raw"""
     update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂)) -> x̂d
 
-Update `estim.x̂` \ `x̂d` \ `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂` / `x̂d` / `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
 
 The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂s` estimates with:
 ```math
@@ -220,7 +220,7 @@ end
 @doc raw"""
     init_estimate!(estim::InternalModel, model::LinModel, u, ym, d)
 
-Init `estim.x̂` \ `x̂d` \ `x̂s` estimate at steady-state for [`InternalModel`](@ref)s.
+Init `estim.x̂` / `x̂d` / `x̂s` estimate at steady-state for [`InternalModel`](@ref)s.
 
 The deterministic estimates `estim.x̂d` start at steady-state using `u` and `d` arguments:
 ```math
