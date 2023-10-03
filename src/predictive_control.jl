@@ -65,19 +65,19 @@ Set the constraint parameters of `mpc` predictive controller.
 The predictive controllers support both soft and hard constraints, defined by:
 ```math 
 \begin{alignat*}{3}
-    \mathbf{u_{min}  - c_{u_{min}}}  ϵ &≤ \mathbf{u}(k+j)        &&≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad j = 0, 1 ,..., H_p - 1 \\
-    \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ &≤ \mathbf{Δu}(k+j)       &&≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad j = 0, 1 ,..., H_c - 1 \\
-    \mathbf{y_{min}  - c_{y_{min}}}  ϵ &≤ \mathbf{ŷ}(k+j)        &&≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad j = 1, 2 ,..., H_p     \\
-    \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ &≤ \mathbf{x̂}_{k-1}(k+j)  &&≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad j = H_p
+    \mathbf{u_{min}  - c_{u_{min}}}  ϵ ≤&&\       \mathbf{u}(k+j) &≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad  j = 0, 1 ,..., H_p - 1 \\
+    \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ ≤&&\      \mathbf{Δu}(k+j) &≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad  j = 0, 1 ,..., H_c - 1 \\
+    \mathbf{y_{min}  - c_{y_{min}}}  ϵ ≤&&\       \mathbf{ŷ}(k+j) &≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad  j = 1, 2 ,..., H_p     \\
+    \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ ≤&&\ \mathbf{x̂}_{k-1}(k+j) &≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad  j = H_p
 \end{alignat*}
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
 end of the horizon (see Extended Help). All the constraint parameters are vector. Use `±Inf`
-values when there is no bound. The constraint softness parameters ``\mathbf{c}``, also called
-equal concern for relaxation, are non-negative values that specify the softness of the
-associated bound. Use `0.0` values for hard constraints. The output and terminal constraints
-``\mathbf{y_{min}, y_{max}, x̂_{min}, x̂_{max}}`` are all soft by default. See Extended Help
-for time-varying constraints.
+values when there is no bound. The constraint softness parameters ``\mathbf{c}``, also
+called equal concern for relaxation, are non-negative values that specify the softness of
+the associated bound. Use `0.0` values for hard constraints. The output ``(\mathbf{y_{min},
+y_{max}})`` and terminal ``(\mathbf{x̂_{min}, x̂_{max}})`` constraints are all soft by
+default. See Extended Help for time-varying constraints.
 
 # Arguments
 !!! info
@@ -141,9 +141,9 @@ It is also possible to specify time-varying constraints over ``H_p`` and ``H_c``
 In such a case, they are defined by:
 ```math 
 \begin{alignat*}{3}
-    \mathbf{U_{min}  - c_{U_{min}}}  ϵ &≤ \mathbf{U}  &&≤ \mathbf{U_{max}  + c_{U_{max}}}  ϵ \\
-    \mathbf{ΔU_{min} - c_{ΔU_{min}}} ϵ &≤ \mathbf{ΔU} &&≤ \mathbf{ΔU_{max} + c_{ΔY_{max}}} ϵ \\
-    \mathbf{Y_{min}  - c_{Y_{min}}}  ϵ &≤ \mathbf{Ŷ}  &&≤ \mathbf{Y_{max}  + c_{Y_{max}}}  ϵ
+    \mathbf{U_{min}  - c_{U_{min}}}  ϵ ≤&&\ \mathbf{U}  &≤ \mathbf{U_{max}  + c_{U_{max}}}  ϵ \\
+    \mathbf{ΔU_{min} - c_{ΔU_{min}}} ϵ ≤&&\ \mathbf{ΔU} &≤ \mathbf{ΔU_{max} + c_{ΔY_{max}}} ϵ \\
+    \mathbf{Y_{min}  - c_{Y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + c_{Y_{max}}}  ϵ
 \end{alignat*}
 ```
 For this, use the same keyword arguments as above but with a capital letter:
