@@ -75,9 +75,8 @@ and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the 
 end of the horizon (see Extended Help). All the constraint parameters are vector. Use `±Inf`
 values when there is no bound. The constraint softness parameters ``\mathbf{c}``, also
 called equal concern for relaxation, are non-negative values that specify the softness of
-the associated bound. Use `0.0` values for hard constraints. The output ``(\mathbf{y_{min},
-y_{max}})`` and terminal ``(\mathbf{x̂_{min}, x̂_{max}})`` constraints are all soft by
-default. See Extended Help for time-varying constraints.
+the associated bound. Use `0.0` values for hard constraints. The output and terminal 
+constraints are all soft by default. See Extended Help for time-varying constraints.
 
 # Arguments
 !!! info
