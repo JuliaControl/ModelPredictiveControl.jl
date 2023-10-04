@@ -155,15 +155,7 @@ function ExplicitMPC(
     Lwt = fill(DEFAULT_LWT, estim.model.nu)
 ) where {SE<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
-    poles = eigvals(estim.model.A)
-    nk = sum(poles .≈ 0)
-    if isnothing(Hp)
-        Hp = DEFAULT_HP + nk
-    end
-    if Hp ≤ nk
-        @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*
-              "($nk), the closed-loop system may be zero-gain (unresponsive) or unstable")
-    end
+    Hp = default_Hp(estim.model, Hp)
     return ExplicitMPC{SE}(estim, Hp, Hc, Mwt, Nwt, Lwt)
 end
 

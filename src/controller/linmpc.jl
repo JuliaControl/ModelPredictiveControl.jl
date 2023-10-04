@@ -187,7 +187,7 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, KalmanFilter es
 """
 function LinMPC(
     estim::SE;
-    Hp::Union{Int, Nothing} = DEFAULT_HP,
+    Hp::Union{Int, Nothing} = nothing,
     Hc::Int = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, estim.model.ny),
     Nwt = fill(DEFAULT_NWT, estim.model.nu),
@@ -196,15 +196,7 @@ function LinMPC(
     optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
 ) where {SE<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
-    poles = eigvals(estim.model.A)
-    nk = sum(poles .≈ 0)
-    if isnothing(Hp)
-        Hp = DEFAULT_HP + nk
-    end
-    if Hp ≤ nk
-        @warn("prediction horizon Hp ($Hp) ≤ number of delays in model "*
-              "($nk), the closed-loop system may be zero-gain (unresponsive) or unstable")
-    end
+    Hp = default_Hp(estim.model, Hp)
     return LinMPC{SE}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim)
 end
 

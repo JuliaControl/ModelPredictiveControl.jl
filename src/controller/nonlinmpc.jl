@@ -113,7 +113,7 @@ This method uses the default state estimator :
 
 # Arguments
 - `model::SimModel` : model used for controller predictions and state estimations.
-- `Hp=10`: prediction horizon ``H_p``.
+- `Hp=nothing`: prediction horizon ``H_p``, must be specified for [`NonLinModel`](@ref).
 - `Hc=2` : control horizon ``H_c``.
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
@@ -155,7 +155,7 @@ for common mistakes when writing these functions.
 """
 function NonLinMPC(
     model::SimModel;
-    Hp::Int = DEFAULT_HP,
+    Hp::Union{Int, Nothing} = nothing,
     Hc::Int = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, model.ny),
     Nwt = fill(DEFAULT_NWT, model.nu),
@@ -169,9 +169,10 @@ function NonLinMPC(
     estim = UnscentedKalmanFilter(model; kwargs...)
     NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, optim)
 end
+
 function NonLinMPC(
     model::LinModel;
-    Hp::Int = DEFAULT_HP,
+    Hp::Union{Int, Nothing} = nothing,
     Hc::Int = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, model.ny),
     Nwt = fill(DEFAULT_NWT, model.nu),
@@ -183,6 +184,7 @@ function NonLinMPC(
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
+    Hp = default_Hp(model, Hp)
     NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, optim)
 end
 
@@ -211,7 +213,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 """
 function NonLinMPC(
     estim::SE;
-    Hp::Int = DEFAULT_HP,
+    Hp::Int = nothing,
     Hc::Int = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, estim.model.ny),
     Nwt = fill(DEFAULT_NWT, estim.model.nu),
@@ -221,6 +223,9 @@ function NonLinMPC(
     JE::JEFunc = (_,_,_) -> 0.0,
     optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"))
 ) where {SE<:StateEstimator, JEFunc<:Function}
+    if !isa(estim.model, LinModel) && isnothing(Hp)
+        error("Prediction horizon Hp must be specified if model is not a LinModel.")
+    end
     return NonLinMPC{SE, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, optim)
 end
 

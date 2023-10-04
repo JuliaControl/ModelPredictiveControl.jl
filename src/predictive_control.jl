@@ -19,7 +19,7 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController end
 
-const DEFAULT_HP  = 10
+const DEFAULT_HP0 = 10
 const DEFAULT_HC  = 2
 const DEFAULT_MWT = 1.0
 const DEFAULT_NWT = 0.1
@@ -72,10 +72,10 @@ The predictive controllers support both soft and hard constraints, defined by:
 \end{alignat*}
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
-end of the horizon (see Extended Help). All the constraint parameters are vector. Use `±Inf`
-values when there is no bound. The constraint softness parameters ``\mathbf{c}``, also
-called equal concern for relaxation, are non-negative values that specify the softness of
-the associated bound. Use `0.0` values for hard constraints. The output and terminal 
+end of the horizon only (see Extended Help). All the constraint parameters are vector. Use
+`±Inf` values when there is no bound. The constraint softness parameters ``\mathbf{c}``,
+also called equal concern for relaxation, are non-negative values that specify the softness
+of the associated bound. Use `0.0` values for hard constraints. The output and terminal 
 constraints are all soft by default. See Extended Help for time-varying constraints.
 
 # Arguments
@@ -155,9 +155,11 @@ function setconstraint!(
     umin    = nothing, umax    = nothing,
     Δumin   = nothing, Δumax   = nothing,
     ymin    = nothing, ymax    = nothing,
+    x̂min    = nothing, x̂max    = nothing,
     c_umin  = nothing, c_umax  = nothing,
     c_Δumin = nothing, c_Δumax = nothing,
     c_ymin  = nothing, c_ymax  = nothing,
+    c_x̂min  = nothing, c_x̂max  = nothing,
     Umin    = nothing, Umax    = nothing,
     ΔUmin   = nothing, ΔUmax   = nothing,
     Ymin    = nothing, Ymax    = nothing,
@@ -203,7 +205,7 @@ function setconstraint!(
     isnothing(c_ΔUmax)  && !isnothing(c_Δumax)  && (c_ΔUmax = repeat(c_Δumax, Hc))
     isnothing(c_Ymin)   && !isnothing(c_ymin)   && (c_Ymin  = repeat(c_ymin,  Hp))
     isnothing(c_Ymax)   && !isnothing(c_ymax)   && (c_Ymax  = repeat(c_ymax,  Hp))
-    if !all(isnothing.([c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ymin, c_Ymax]))
+    if !all(isnothing.([c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ymin, c_Ymax, c_x̂min, c_x̂max]))
         !isinf(C) || throw(ArgumentError("Slack variable Cwt must be finite to set softness parameters"))
         notSolvedYet || error("Cannot set softness parameters after calling moveinput!")
     end
@@ -439,6 +441,22 @@ Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
 updatestate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂)) = updatestate!(mpc.estim,u,ym,d)
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
+
+"Estimate the default prediction horizon `Hp` with a security margin for `LinModel`."
+function default_Hp(model::LinModel, Hp)
+    poles = eigvals(model.A)
+    # atol=1e-3 to overestimate the number of delays : for closed-loop stability, it is
+    # better to overestimate the default value of Hp, as a security margin.
+    nk = sum(isapprox.(abs.(poles), 0.0, atol=1e-3)) # number of delays
+    if isnothing(Hp)
+        Hp = DEFAULT_HP0 + nk
+    end
+    if Hp ≤ nk
+        @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
+              "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
+    end
+    return Hp
+end
 
 function validate_setpointdist(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
     ny, nd, nu, Hp = mpc.estim.model.ny, mpc.estim.model.nd, mpc.estim.model.nu, mpc.Hp
