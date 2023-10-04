@@ -442,7 +442,11 @@ Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 updatestate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂)) = updatestate!(mpc.estim,u,ym,d)
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
-"Estimate the default prediction horizon `Hp` with a security margin for `LinModel`."
+"""
+    default_Hp(model::LinModel, Hp)
+
+Estimate the default prediction horizon `Hp` with a security margin for [`LinModel`](@ref).
+"""
 function default_Hp(model::LinModel, Hp)
     poles = eigvals(model.A)
     # atol=1e-3 to overestimate the number of delays : for closed-loop stability, it is
@@ -454,6 +458,20 @@ function default_Hp(model::LinModel, Hp)
     if Hp ≤ nk
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
+    end
+    return Hp
+end
+
+"""
+    default_Hp(model::SimModel, Hp)
+
+Throw an error if `isnothing(Hp)` when model is not a [`LinModel`](@ref).
+"""
+function default_Hp(::SimModel, Hp)
+    if isnothing(Hp)
+        Hp = 0
+        throw(ArgumentError("Prediction horizon Hp must be explicitly specified if "*
+                            "model is not a LinModel."))
     end
     return Hp
 end

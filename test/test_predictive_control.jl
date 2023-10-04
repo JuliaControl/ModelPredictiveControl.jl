@@ -286,33 +286,34 @@ end
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
     @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
-    nmpc2 = NonLinMPC(nonlinmodel, Hc=4, Cwt=Inf)
+    nmpc2 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=Inf)
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
-    nmpc3 = NonLinMPC(nonlinmodel, Hc=4, Cwt=1e6)
+    nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e6)
     @test size(nmpc3.Ẽ, 2) == 4*nonlinmodel.nu + 1
     @test nmpc3.C == 1e6
-    nmpc4 = NonLinMPC(nonlinmodel, Mwt=[1,2], Hp=15)
+    nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[1,2])
     @test nmpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
-    nmpc5 = NonLinMPC(nonlinmodel, Nwt=[3,4], Cwt=1e3, Hc=5)
+    nmpc5 = NonLinMPC(nonlinmodel, Hp=15 ,Nwt=[3,4], Cwt=1e3, Hc=5)
     @test nmpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
-    nmpc6 = NonLinMPC(nonlinmodel, Lwt=[0,1], Hp=15)
+    nmpc6 = NonLinMPC(nonlinmodel, Hp=15, Lwt=[0,1])
     @test nmpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    nmpc7 = NonLinMPC(nonlinmodel, Ewt=1e-3, JE=(UE,ŶE,D̂E) -> UE.*ŶE.*D̂E)
+    nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(UE,ŶE,D̂E) -> UE.*ŶE.*D̂E)
     @test nmpc7.E == 1e-3
     @test nmpc7.JE([1,2],[3,4],[4,6]) == [12, 48]
-    nmpc8 = NonLinMPC(nonlinmodel, optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer))
+    nmpc8 = NonLinMPC(nonlinmodel, Hp=15, optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer))
     @test solver_name(nmpc8.optim) == "OSQP"
     im = InternalModel(nonlinmodel)
-    nmpc9 = NonLinMPC(im)
+    nmpc9 = NonLinMPC(im, Hp=15)
     @test isa(nmpc9.estim, InternalModel)
     nmpc10 = NonLinMPC(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
     @test nmpc10.estim.nint_u  == [1, 1]
     @test nmpc10.estim.nint_ym == [0, 0]
-    nmpc11 = NonLinMPC(nonlinmodel, nint_u=[1, 1], nint_ym=[0, 0])
+    nmpc11 = NonLinMPC(nonlinmodel, Hp=15, nint_u=[1, 1], nint_ym=[0, 0])
     @test nmpc11.estim.nint_u  == [1, 1]
     @test nmpc11.estim.nint_ym == [0, 0]
 
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, Ewt=[1, 1])
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=nothing)
 end
 
 @testset "NonLinMPC moves and getinfo" begin
@@ -348,10 +349,10 @@ end
     nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
     u = moveinput!(nmpc3, 7d, d)
     @test u ≈ [0] atol=5e-2
-    nmpc4 = NonLinMPC(nonlinmodel, Mwt=[0], Nwt=[0], Lwt=[1])
+    nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[0], Nwt=[0], Lwt=[1])
     u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
-    nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Cwt=Inf), ymin=[-1])
+    nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Hp=15, Cwt=Inf), ymin=[-1])
     C_Ymax_end = nmpc5.optim.nlp_model.operators.registered_multivariate_operators[end].f
     @test C_Ymax_end(Float64.((1.0, 1.0))) ≤ 0.0 # test con_nonlinprog_i(i,::NTuple{N, Float64})
     @test C_Ymax_end(Float32.((1.0, 1.0))) ≤ 0.0 # test con_nonlinprog_i(i,::NTuple{N, Real})
@@ -393,7 +394,7 @@ end
     f(x,u,_) = linmodel.A*x + linmodel.Bu*u
     h(x,_)   = linmodel.C*x
     nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2) 
-    nmpc1 = NonLinMPC(nonlinmodel)
+    nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test initstate!(nmpc1, [10, 50], [20, 25]) ≈ zeros(4)
     setstate!(nmpc1, [1,2,3,4])
     @test nmpc1.estim.x̂ ≈ [1,2,3,4]

@@ -184,7 +184,6 @@ function NonLinMPC(
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
-    Hp = default_Hp(model, Hp)
     NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, optim)
 end
 
@@ -223,9 +222,7 @@ function NonLinMPC(
     JE::JEFunc = (_,_,_) -> 0.0,
     optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"))
 ) where {SE<:StateEstimator, JEFunc<:Function}
-    if !isa(estim.model, LinModel) && isnothing(Hp)
-        error("Prediction horizon Hp must be specified if model is not a LinModel.")
-    end
+    Hp = default_Hp(estim.model, Hp)
     return NonLinMPC{SE, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, optim)
 end
 
