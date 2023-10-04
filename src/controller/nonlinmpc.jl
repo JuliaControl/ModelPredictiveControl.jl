@@ -213,7 +213,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 """
 function NonLinMPC(
     estim::SE;
-    Hp::Int = nothing,
+    Hp::Union{Int, Nothing} = nothing,
     Hc::Int = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, estim.model.ny),
     Nwt = fill(DEFAULT_NWT, estim.model.nu),
