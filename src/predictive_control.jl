@@ -469,9 +469,15 @@ Throw an error if `isnothing(Hp)` when model is not a [`LinModel`](@ref).
 """
 function default_Hp(::SimModel, Hp)
     if isnothing(Hp)
-        Hp = 0
-        throw(ArgumentError("Prediction horizon Hp must be explicitly specified if "*
-                            "model is not a LinModel."))
+        # ------------ will be deleted in the future ------------------------------------
+        Base.depwarn("Hp=nothing is deprecated for NonLinModel, explicitly specify an "*
+                     "integer value", :NonLinMPC)
+        Hp = DEFAULT_HP0
+        # ------------- and replaced by this -------------------------------------------
+        # throw(ArgumentError("Prediction horizon Hp must be explicitly specified if "*
+        #                     "model is not a LinModel."))
+        # Hp = 0
+        # -----------------------------------------------------------------------------
     end
     return Hp
 end
