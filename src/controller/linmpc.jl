@@ -22,6 +22,7 @@ struct LinMPC{SE<:StateEstimator} <: PredictiveController
     J::Matrix{Float64}
     K::Matrix{Float64}
     V::Matrix{Float64}
+    ex̂::Matrix{Float64}
     fx̂::Vector{Float64}
     gx̂::Matrix{Float64}
     jx̂::Matrix{Float64}
@@ -63,7 +64,7 @@ struct LinMPC{SE<:StateEstimator} <: PredictiveController
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y, noR̂u,
             S̃, T,
-            Ẽ, F, G, J, K, V, fx̂, gx̂, jx̂, kx̂, vx̂, P̃, q̃, p,
+            Ẽ, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, P̃, q̃, p,
             Ks, Ps,
             d0, D̂0,
             Ŷop, Dop,

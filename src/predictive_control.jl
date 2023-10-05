@@ -198,7 +198,7 @@ function setconstraint!(
     model, con, optim = mpc.estim.model, mpc.con, mpc.optim
     nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
-    C, E = mpc.C, mpc.Ẽ[:, 1:nu*Hc]
+    C, E, ex̂ = mpc.C, mpc.Ẽ[:, 1:nu*Hc], mpc.ex̂
     isnothing(Umin)     && !isnothing(umin)     && (Umin    = repeat(umin,    Hp))
     isnothing(Umax)     && !isnothing(umax)     && (Umax    = repeat(umax,    Hp))
     isnothing(ΔUmin)    && !isnothing(Δumin)    && (ΔUmin   = repeat(Δumin,   Hc))
@@ -285,14 +285,14 @@ function setconstraint!(
         size(c_x̂min) == (nx̂,) || throw(ArgumentError("c_x̂min size must be $((nx̂,))"))
         any(c_x̂min .< 0) && error("c_x̂min weights should be non-negative")
         con.c_x̂min[:] = c_x̂min
-        A_x̂min ,_ = relaxTerminal(model, C, con.c_x̂min, con.c_x̂max, E)
+        A_x̂min ,_ = relaxterminal(model, C, con.c_x̂min, con.c_x̂max, ex̂)
         con.A_x̂min[:] = A_x̂min
     end
     if !isnothing(c_x̂max)
         size(c_x̂max) == (nx̂,) || throw(ArgumentError("c_x̂max size must be $((nx̂,))"))
         any(c_x̂max .< 0) && error("c_x̂max weights should be non-negative")
         con.c_x̂max[:] = c_x̂max
-        _, A_x̂max = relaxTerminal(model, C, con.c_x̂min, con.c_x̂max, E)
+        _, A_x̂max = relaxterminal(model, C, con.c_x̂min, con.c_x̂max, ex̂)
         con.A_x̂max[:] = A_x̂max
     end
     i_Umin,  i_Umax  = .!isinf.(con.Umin),  .!isinf.(con.Umax)
@@ -533,10 +533,10 @@ See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
-    mpc.F[:] = mpc.K*mpc.estim.x̂ + mpc.V*mpc.estim.lastu0 + mpc.Ŷop
+    mpc.F[:]  = mpc.K  * mpc.estim.x̂  + mpc.V  * mpc.estim.lastu0 + mpc.Ŷop
     if model.nd ≠ 0
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
-        mpc.F[:] = mpc.F + mpc.G*mpc.d0 + mpc.J*mpc.D̂0
+        mpc.F[:]  = mpc.F  + mpc.G  * mpc.d0 + mpc.J  * mpc.D̂0
     end
     mpc.R̂y[:], mpc.R̂u[:] = R̂y, R̂u
     Ẑ = mpc.F - R̂y
@@ -626,8 +626,12 @@ end
     linconstraint!(mpc::PredictiveController, model::LinModel)
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+
+Also init ``\mathbf{f_x̂}`` vector for the terminal constraints, see [`init_predmat`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
+    mpc.fx̂[:] = mpc.kx̂ * mpc.estim.x̂  + mpc.vx̂ * mpc.estim.lastu0
+    mpc.fx̂[:] = model.nd ≠ 0 ? mpc.fx̂ + mpc.gx̂ * mpc.d0 + mpc.jx̂ * mpc.D̂0 : mpc.fx̂
     mpc.con.b[:] = [
         -mpc.con.Umin + mpc.T*(mpc.estim.lastu0 + model.uop)
         +mpc.con.Umax - mpc.T*(mpc.estim.lastu0 + model.uop)
@@ -971,7 +975,7 @@ function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂)
     A_Umin, A_Umax, S̃ = relaxU(C, c_Umin, c_Umax, S)
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, c_Ymin, c_Ymax, E)
-    A_x̂min, A_x̂max = relaxTerminal(model, C, c_x̂min, c_x̂max, ex̂)
+    A_x̂min, A_x̂max = relaxterminal(model, C, c_x̂min, c_x̂max, ex̂)
     i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Ymin),  .!isinf.(Ymax)
@@ -1113,11 +1117,11 @@ function relaxŶ(::SimModel, C, c_Ymin, c_Ymax, E)
 end
 
 """
-    relaxTerminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
+    relaxterminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
 
 TBW
 """
-function relaxTerminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
+function relaxterminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts predicted terminal state calculations:
         A_x̂min, A_x̂max = -[ex̂ c_x̂min], [ex̂ -c_x̂max] 
@@ -1128,7 +1132,7 @@ function relaxTerminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
 end
 
 "Return empty matrices if model is not a [`LinModel`](@ref)"
-relaxTerminal(::SimModel, C, c_x̂min, c_x̂max, ex̂) = -ex̂,  ex̂
+relaxterminal(::SimModel, C, c_x̂min, c_x̂max, ex̂) = -ex̂,  ex̂
 
 
 @doc raw"""
