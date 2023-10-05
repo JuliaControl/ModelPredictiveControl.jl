@@ -25,7 +25,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
     J::Matrix{Float64}
     K::Matrix{Float64}
     V::Matrix{Float64}
-    ex̂::Matrix{Float64}
+    ẽx̂::Matrix{Float64}
     fx̂::Vector{Float64}
     gx̂::Matrix{Float64}
     jx̂::Matrix{Float64}
@@ -55,7 +55,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
-        con, S̃, Ñ_Hc, Ẽ = init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂)
+        con, S̃, Ñ_Hc, Ẽ, ẽx̂ = init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂)
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         d0, D̂0 = zeros(nd), zeros(nd*Hp)
@@ -68,7 +68,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u, R̂y, noR̂u,
             S̃, T,  
-            Ẽ, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, P̃, q̃, p,
+            Ẽ, F, G, J, K, V, ẽx̂, fx̂, gx̂, jx̂, kx̂, vx̂, P̃, q̃, p,
             Ks, Ps,
             d0, D̂0,
             Ŷop, Dop,
@@ -278,8 +278,8 @@ function init_optimization!(mpc::NonLinMPC)
             if ΔŨtup != last_ΔŨtup_float
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 C = get_tmp(C_cache, ΔŨtup[1])
-                predict!(x̂, Ŷ, mpc, model, ΔŨ)
-                con_nonlinprog!(C, mpc, model, x̂, Ŷ, ΔŨ)
+                Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
+                con_nonlinprog!(C, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_float = ΔŨtup
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
@@ -290,8 +290,8 @@ function init_optimization!(mpc::NonLinMPC)
             if ΔŨtup != last_ΔŨtup_dual
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 C = get_tmp(C_cache, ΔŨtup[1])
-                predict!(x̂, Ŷ, mpc, model, ΔŨ)
-                con_nonlinprog!(C, mpc, model, x̂, Ŷ, ΔŨ)
+                Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
+                con_nonlinprog!(C, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_dual = ΔŨtup
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
@@ -302,8 +302,8 @@ function init_optimization!(mpc::NonLinMPC)
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
                 ΔŨ = collect(ΔŨtup)
-                predict!(x̂, Ŷ, mpc, model, ΔŨ)
-                con_nonlinprog!(C, mpc, model, x̂, Ŷ, ΔŨ)
+                Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
+                C = con_nonlinprog!(C, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_float = ΔŨtup
             end
             return C[i]
@@ -314,8 +314,8 @@ function init_optimization!(mpc::NonLinMPC)
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
                 ΔŨ = collect(ΔŨtup)
-                predict!(x̂, Ŷ, mpc, model, ΔŨ)
-                con_nonlinprog!(C, mpc, model, x̂, Ŷ, ΔŨ)
+                Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
+                C = con_nonlinprog!(C, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_dual = ΔŨtup
             end
             return C[i]
@@ -377,11 +377,11 @@ function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
 end
 
 """
-    con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, x̂, Ŷ, ΔŨ)
+    con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, x̂end, Ŷ, ΔŨ)
 
 Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
 """
-function con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, x̂, Ŷ, ΔŨ)
+function con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, x̂end, Ŷ, ΔŨ)
     ny, nx̂, Hp = model.ny, mpc.estim.nx̂, mpc.Hp
     i_end_Ymin, i_end_Ymax = 1Hp*ny      , 2Hp*ny
     i_end_x̂min, i_end_x̂max = 2Hp*ny + 1nx̂, 2Hp*ny + 2nx̂
@@ -389,13 +389,13 @@ function con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, x̂, Ŷ, ΔŨ)
         ϵ = ΔŨ[end]
         C[           1:i_end_Ymin] = (mpc.con.Ymin - Ŷ) - ϵ*mpc.con.c_Ymin
         C[i_end_Ymin+1:i_end_Ymax] = (Ŷ - mpc.con.Ymax) - ϵ*mpc.con.c_Ymax
-        C[i_end_Ymax+1:i_end_x̂min] = (mpc.con.x̂min - x̂) - ϵ*mpc.con.c_x̂min
-        C[i_end_x̂min+1:i_end_x̂max] = (x̂ - mpc.con.x̂max) - ϵ*mpc.con.c_x̂max
+        C[i_end_Ymax+1:i_end_x̂min] = (mpc.con.x̂min - x̂end) - ϵ*mpc.con.c_x̂min
+        C[i_end_x̂min+1:i_end_x̂max] = (x̂end - mpc.con.x̂max) - ϵ*mpc.con.c_x̂max
     else # no constraint softening :
-        C[           1:i_end_Ymin] = (mpc.con.Ymin - Ŷ)
-        C[i_end_Ymin+1:i_end_Ymax] = (Ŷ - mpc.con.Ymax)
-        C[i_end_Ymax+1:i_end_x̂min] = mpc.con.x̂min - x̂
-        C[i_end_x̂min+1:i_end_x̂max] = x̂ - mpc.con.x̂max 
+        C[           1:i_end_Ymin] = mpc.con.Ymin - Ŷ
+        C[i_end_Ymin+1:i_end_Ymax] = Ŷ - mpc.con.Ymax
+        C[i_end_Ymax+1:i_end_x̂min] = mpc.con.x̂min - x̂end
+        C[i_end_x̂min+1:i_end_x̂max] = x̂end - mpc.con.x̂max
     end
     C[isinf.(C)] .= 0 # replace ±Inf with 0 to avoid INVALID_MODEL error
     return C

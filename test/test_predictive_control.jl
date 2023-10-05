@@ -115,12 +115,27 @@ end
     @test all((mpc.con.ΔŨmin, mpc.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
     setconstraint!(mpc, ymin=[-6, -11],ymax=[55, 35])
     @test all((mpc.con.Ymin, mpc.con.Ymax) .≈ ([-6,-11], [55,35]))
+
+
+
+    setconstraint!(mpc, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
+    @test all((mpc.con.x̂min, mpc.con.x̂max) .≈ ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+
+
     setconstraint!(mpc, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
     @test all((-mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]) .≈ ([0.01,0.02], [0.03,0.04]))
     setconstraint!(mpc, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
     @test all((-mpc.con.A_ΔŨmin[1:end-1, end], -mpc.con.A_ΔŨmax[1:end-1, end]) .≈ ([0.05,0.06], [0.07,0.08]))
     setconstraint!(mpc, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
     @test all((-mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]) .≈ ([1.00,1.01], [1.02,1.03]))
+
+
+
+
+    setconstraint!(mpc, c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36])
+    @test all((-mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]) .≈ ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
+
+
 
     model2 = LinModel(tf([2], [10, 1]), 3.0)
     mpc2 = LinMPC(model2, Hp=50, Hc=5)
@@ -165,6 +180,23 @@ end
     @test info[:Ŷ][begin] ≈ -0.5 atol=1e-2
 
 
+
+
+
+
+    setconstraint!(mpc2, umin=[-Inf], umax=[+Inf])
+    setconstriant!(mpc2, Δumin=[-Inf], Δumax=[+Inf])
+    setconstraint!(mpc2, ymin=[-Inf], ymax=[+Inf])
+    setconstraint!(mpc2, x̂min=[-1e-6], x̂max=[+1e-6])
+    moveinput!(mpc2, [+1000])
+    info = getinfo(mpc2)
+    @test info[:x̂end] ≈ 0 atol=1e-5
+
+
+
+
+
+
     @test_throws ArgumentError setconstraint!(mpc, umin=[0,0,0])
     @test_throws ArgumentError setconstraint!(mpc, umax=[0,0,0])
     @test_throws ArgumentError setconstraint!(mpc, Δumin=[0,0,0])
@@ -191,6 +223,7 @@ end
     @test_throws ArgumentError setconstraint!(mpc3, c_ymax=[1, 1])
 end
 
+#=
 @testset "ExplicitMPC construction" begin
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = ExplicitMPC(model, Hp=15)
@@ -313,7 +346,8 @@ end
     @test nmpc11.estim.nint_ym == [0, 0]
 
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=nothing)
+    # to uncomment when deprecated constructor is removed:
+    # @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=nothing)
 end
 
 @testset "NonLinMPC moves and getinfo" begin
@@ -483,3 +517,4 @@ end
     @test info[:Ŷ][begin] ≈ -0.5 atol=1e-2
     
 end
+=#

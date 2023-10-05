@@ -198,7 +198,7 @@ function setconstraint!(
     model, con, optim = mpc.estim.model, mpc.con, mpc.optim
     nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
-    C, E, ex̂ = mpc.C, mpc.Ẽ[:, 1:nu*Hc], mpc.ex̂
+    C, E, ex̂ = mpc.C, mpc.Ẽ[:, 1:nu*Hc], mpc.ẽx̂[:, 1:nu*Hc]
     isnothing(Umin)     && !isnothing(umin)     && (Umin    = repeat(umin,    Hp))
     isnothing(Umax)     && !isnothing(umax)     && (Umax    = repeat(umax,    Hp))
     isnothing(ΔUmin)    && !isnothing(Δumin)    && (ΔUmin   = repeat(Δumin,   Hc))
@@ -386,18 +386,19 @@ Get additional information about `mpc` controller optimum to ease troubleshootin
 The function should be called after calling [`moveinput!`](@ref). It returns the dictionary
 `info` with the following fields:
 
-- `:ΔU` : optimal manipulated input increments over `Hc` ``(\mathbf{ΔU})``
-- `:ϵ`  : optimal slack variable ``(ϵ)``
-- `:J`  : objective value optimum ``(J)``
-- `:U`  : optimal manipulated inputs over `Hp` ``(\mathbf{U})``
-- `:u`  : current optimal manipulated input ``(\mathbf{u})``
-- `:d`  : current measured disturbance ``(\mathbf{d})``
-- `:D̂`  : predicted measured disturbances over `Hp` ``(\mathbf{D̂})``
-- `:ŷ`  : current estimated output ``(\mathbf{ŷ})``
-- `:Ŷ`  : optimal predicted outputs over `Hp` ``(\mathbf{Ŷ})``
-- `:Ŷs` : predicted stochastic output over `Hp` of [`InternalModel`](@ref) ``(\mathbf{Ŷ_s})``
-- `:R̂y` : predicted output setpoint over `Hp` ``(\mathbf{R̂_y})``
-- `:R̂u` : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
+- `:ΔU`  : optimal manipulated input increments over `Hc` ``(\mathbf{ΔU})``
+- `:ϵ`   : optimal slack variable ``(ϵ)``
+- `:J`   : objective value optimum ``(J)``
+- `:U`   : optimal manipulated inputs over `Hp` ``(\mathbf{U})``
+- `:u`   : current optimal manipulated input ``(\mathbf{u})``
+- `:d`   : current measured disturbance ``(\mathbf{d})``
+- `:D̂`   : predicted measured disturbances over `Hp` ``(\mathbf{D̂})``
+- `:ŷ`   : current estimated output ``(\mathbf{ŷ})``
+- `:Ŷ`   : optimal predicted outputs over `Hp` ``(\mathbf{Ŷ})``
+- `:x̂end : optimal terminal states ``(\mathbf{x̂}_{k-1}(k+H_p))``
+- `:Ŷs`  : predicted stochastic output over `Hp` of [`InternalModel`](@ref) ``(\mathbf{Ŷ_s})``
+- `:R̂y`  : predicted output setpoint over `Hp` ``(\mathbf{R̂_y})``
+- `:R̂u`  : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
 
 For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
 solution summary that can be printed. Lastly, the optimal economic cost `:JE` is also
@@ -416,17 +417,18 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 """
 function getinfo(mpc::PredictiveController)
     info = Dict{Symbol, InfoDictType}()
-    x̂, Ŷ = similar(mpc.estim.x̂), similar(mpc.Ŷop)
-    predict!(x̂, Ŷ, mpc, mpc.estim.model, mpc.ΔŨ)
-    info[:ΔU]  = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
-    info[:ϵ]   = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
-    info[:J]   = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[]
-    info[:U]   = mpc.S̃*mpc.ΔŨ + mpc.T*(mpc.estim.lastu0 + mpc.estim.model.uop)
-    info[:u]   = info[:U][1:mpc.estim.model.nu]
-    info[:d]   = mpc.d0 + mpc.estim.model.dop
-    info[:D̂]   = mpc.D̂0 + mpc.Dop
-    info[:ŷ]   = mpc.ŷ
-    info[:Ŷ]   = Ŷ
+    Ŷ, x̂    = similar(mpc.Ŷop), similar(mpc.estim.x̂)
+    Ŷ, x̂end = predict!(Ŷ, x̂, mpc, mpc.estim.model, mpc.ΔŨ)
+    info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
+    info[:ϵ]    = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
+    info[:J]    = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[]
+    info[:U]    = mpc.S̃*mpc.ΔŨ + mpc.T*(mpc.estim.lastu0 + mpc.estim.model.uop)
+    info[:u]    = info[:U][1:mpc.estim.model.nu]
+    info[:d]    = mpc.d0 + mpc.estim.model.dop
+    info[:D̂]    = mpc.D̂0 + mpc.Dop
+    info[:ŷ]    = mpc.ŷ
+    info[:Ŷ]    = Ŷ
+    info[:x̂end] = x̂end
     info[:Ŷs]  = mpc.Ŷop - repeat(mpc.estim.model.yop, mpc.Hp) # Ŷop = Ŷs + Yop
     info[:R̂y]  = mpc.R̂y
     info[:R̂u]  = mpc.R̂u
@@ -592,25 +594,27 @@ end
 predictstoch!(::PredictiveController, ::StateEstimator, _ , _ ) = nothing
 
 @doc raw"""
-    predict!( _ , Ŷ, mpc::PredictiveController, model::LinModel, ΔŨ)
+    predict!(Ŷ, x̂, mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ, x̂end
 
-Compute the outputs predictions ``\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
+Compute the predictions `Ŷ` and terminal states `x̂end` if model is a [`LinModel`](@ref).
+
+The method mutates `Ŷ` and `x̂` vector arguments. The `x̂end` vector is used for
+the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``.
 """
-function predict!( _ , Ŷ, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
-    mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F # in-place operations to reduce allocations
-    return nothing
+function predict!(Ŷ, x̂, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
+     # in-place operations to reduce allocations :
+    mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F
+    mul!(x̂, mpc.ẽx̂, ΔŨ) + mpc.fx̂
+    x̂end = x̂
+    return Ŷ, x̂end
 end
 
 @doc raw"""
-    predict!(x̂, Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ)
+    predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ, x̂end
 
-Compute ``\mathbf{x̂}_{k-1}(k+H_p)``, ``\mathbf{Ŷ}`` if `model` is not a [`LinModel`](@ref). 
-
-The method mutates `x̂` and `Ŷ` vector arguments. After a `predict!` call, `x̂` will contain
-the states at the end of the prediction horizon ``\mathbf{x̂}_{k-1}(k+H_p)`` (used for
-terminal constraints). 
+Compute both vectors if `model` is not a [`LinModel`](@ref).
 """
-function predict!(x̂, Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) where {T<:Real}
+function predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) where {T<:Real}
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     u0::Vector{T} = copy(mpc.estim.lastu0)
     d0::Vector{T} = copy(mpc.d0)
@@ -624,7 +628,8 @@ function predict!(x̂, Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ::V
         Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, x̂, d0)
     end
     Ŷ[:] = Ŷ + mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
-    return nothing
+    x̂end = x̂
+    return Ŷ, x̂end
 end
 
 @doc raw"""
@@ -980,7 +985,7 @@ function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂)
     A_Umin, A_Umax, S̃ = relaxU(C, c_Umin, c_Umax, S)
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, c_Ymin, c_Ymax, E)
-    A_x̂min, A_x̂max = relaxterminal(model, C, c_x̂min, c_x̂max, ex̂)
+    A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, C, c_x̂min, c_x̂max, ex̂)
     i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Ymin),  .!isinf.(Ymax)
@@ -996,7 +1001,7 @@ function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂)
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin, A_Ymax, A_x̂min, A_x̂max,
         A       , b     , i_b    , c_Ymin   , c_Ymax, c_x̂min, c_x̂max,
     )
-    return con, S̃, Ñ_Hc, Ẽ
+    return con, S̃, Ñ_Hc, Ẽ, ẽx̂
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -1105,7 +1110,7 @@ function relaxŶ(::LinModel, C, c_Ymin, c_Ymax, E)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts predicted output constraint calculations:
         A_Ymin, A_Ymax = -[E  c_Ymin], [E -c_Ymax] 
-        # ϵ has not impact on output predictions
+        # ϵ has no impact on output predictions
         Ẽ = [E zeros(size(E, 1), 1)] 
     else # ΔŨ = ΔU (only hard constraints)
         Ẽ = E
@@ -1117,7 +1122,7 @@ end
 "Return empty matrices if model is not a [`LinModel`](@ref)"
 function relaxŶ(::SimModel, C, c_Ymin, c_Ymax, E)
     Ẽ = !isinf(C) ? [E zeros(0, 1)] : E
-    A_Ymin, A_Ymax = Ẽ, Ẽ 
+    A_Ymin, A_Ymax = -Ẽ,  Ẽ 
     return A_Ymin, A_Ymax, Ẽ
 end
 
@@ -1128,16 +1133,23 @@ TBW
 """
 function relaxterminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
-        # ϵ impacts predicted terminal state calculations:
-        A_x̂min, A_x̂max = -[ex̂ c_x̂min], [ex̂ -c_x̂max] 
+        # ϵ impacts terminal constraint calculations:
+        A_x̂min, A_x̂max = -[ex̂ c_x̂min], [ex̂ -c_x̂max]
+        # ϵ has no impact on terminal state predictions
+        ẽx̂ = [ex̂ zeros(size(ex̂, 1), 1)] 
     else # ΔŨ = ΔU (only hard constraints)
+        ẽx̂ = ex̂
         A_x̂min, A_x̂max = -ex̂,  ex̂
     end
-    return A_x̂min, A_x̂max
+    return A_x̂min, A_x̂max, ẽx̂
 end
 
 "Return empty matrices if model is not a [`LinModel`](@ref)"
-relaxterminal(::SimModel, C, c_x̂min, c_x̂max, ex̂) = -ex̂,  ex̂
+function relaxterminal(::SimModel, C, c_x̂min, c_x̂max, ex̂) 
+    ẽx̂ = !isinf(C) ? [ex̂ zeros(0, 1)] : ex̂
+    A_x̂min, A_x̂max = -ẽx̂,  ẽx̂
+    return A_x̂min, A_x̂max, ẽx̂
+end
 
 
 @doc raw"""
