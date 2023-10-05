@@ -24,7 +24,12 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
     G::Matrix{Float64}
     J::Matrix{Float64}
     K::Matrix{Float64}
-    Q::Matrix{Float64}
+    V::Matrix{Float64}
+    fx̂::Vector{Float64}
+    gx̂::Matrix{Float64}
+    jx̂::Matrix{Float64}
+    kx̂::Matrix{Float64}
+    vx̂::Matrix{Float64}
     P̃::Hermitian{Float64, Matrix{Float64}}
     q̃::Vector{Float64}
     p::Vector{Float64}
@@ -48,8 +53,8 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
         R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(nu, Hp, Hc)
-        E, F, G, J, K, Q = init_predmat(estim, model, Hp, Hc)
-        con, S̃, Ñ_Hc, Ẽ = init_defaultcon(model, Hp, Hc, C, S, N_Hc, E)
+        E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
+        con, S̃, Ñ_Hc, Ẽ = init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂)
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         d0, D̂0 = zeros(nd), zeros(nd*Hp)
@@ -62,7 +67,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u, R̂y, noR̂u,
             S̃, T,  
-            Ẽ, F, G, J, K, Q, P̃, q̃, p,
+            Ẽ, F, G, J, K, V, fx̂, gx̂, jx̂, kx̂, vx̂, P̃, q̃, p,
             Ks, Ps,
             d0, D̂0,
             Ŷop, Dop,
@@ -258,8 +263,8 @@ function init_optimization!(mpc::NonLinMPC)
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- nonlinear optimization init ---
     model = mpc.estim.model
-    ny, nu, Hp, Hc = model.ny, model.nu, mpc.Hp, mpc.Hc
-    nC = (2*Hp*nu + 2*nvar + 2*Hp*ny) - length(mpc.con.b)
+    ny, nu, nx̂, Hp = model.ny, model.nu, mpc.estim.nx̂, mpc.Hp
+    nC = (2*Hp*nu + 2*nvar + 2*Hp*ny + 2*nx̂) - length(mpc.con.b)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
     Jfunc, Cfunc = let mpc=mpc, model=model, nC=nC, nvar=nvar , nŶ=Hp*ny
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
@@ -356,14 +361,20 @@ end
 Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
 """
 function con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, Ŷ, ΔŨ)
-    ny, Hp = model.ny, mpc.Hp
+    ny, nx̂, Hp = model.ny, mpc.estim.nx̂, mpc.Hp
+    i_end_Ymin, i_end_Ymax = 1Hp*ny      , 2Hp*ny
+    i_end_x̂min, i_end_x̂max = 2Hp*ny + 1nx̂, 2Hp*ny + 2nx̂
     if !isinf(mpc.C) # constraint softening activated :
         ϵ = ΔŨ[end]
-        C[begin:(Hp*ny)] = (mpc.con.Ymin - Ŷ) - ϵ*mpc.con.c_Ymin
-        C[(Hp*ny+1):end] = (Ŷ - mpc.con.Ymax) - ϵ*mpc.con.c_Ymax
+        C[           1:i_end_Ymin] = (mpc.con.Ymin - Ŷ) - ϵ*mpc.con.c_Ymin
+        C[i_end_Ymin+1:i_end_Ymax] = (Ŷ - mpc.con.Ymax) - ϵ*mpc.con.c_Ymax
+        C[i_end_Ymax+1:i_end_x̂min] = zeros(nx̂) - ϵ*mpc.con.c_x̂min
+        C[i_end_x̂min+1:i_end_x̂max] = zeros(nx̂) - ϵ*mpc.con.c_x̂max
     else # no constraint softening :
-        C[begin:(Hp*ny)] = (mpc.con.Ymin - Ŷ)
-        C[(Hp*ny+1):end] = (Ŷ - mpc.con.Ymax)
+        C[           1:i_end_Ymin] = (mpc.con.Ymin - Ŷ)
+        C[i_end_Ymin+1:i_end_Ymax] = (Ŷ - mpc.con.Ymax)
+        C[i_end_Ymax+1:i_end_x̂min] = zeros(nx̂)
+        C[i_end_x̂min+1:i_end_x̂max] = zeros(nx̂)
     end
     C[isinf.(C)] .= 0 # replace ±Inf with 0 to avoid INVALID_MODEL error
     return C

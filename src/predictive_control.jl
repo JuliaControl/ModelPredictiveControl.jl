@@ -44,17 +44,23 @@ struct ControllerConstraint
     ΔŨmax  ::Vector{Float64}
     Ymin   ::Vector{Float64}
     Ymax   ::Vector{Float64}
+    x̂min   ::Vector{Float64}
+    x̂max   ::Vector{Float64}
     A_Umin ::Matrix{Float64}
     A_Umax ::Matrix{Float64}
     A_ΔŨmin::Matrix{Float64}
     A_ΔŨmax::Matrix{Float64}
     A_Ymin ::Matrix{Float64}
     A_Ymax ::Matrix{Float64}
+    A_x̂min ::Matrix{Float64}
+    A_x̂max ::Matrix{Float64}
     A      ::Matrix{Float64}
     b      ::Vector{Float64}
     i_b    ::BitVector
     c_Ymin ::Vector{Float64}
     c_Ymax ::Vector{Float64}
+    c_x̂min ::Vector{Float64}
+    c_x̂max ::Vector{Float64}
 end
 
 @doc raw"""
@@ -190,7 +196,7 @@ function setconstraint!(
     end
     # ----------------------------------------------------------
     model, con, optim = mpc.estim.model, mpc.con, mpc.optim
-    nu, ny, Hp, Hc = model.nu, model.ny, mpc.Hp, mpc.Hc
+    nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
     C, E = mpc.C, mpc.Ẽ[:, 1:nu*Hc]
     isnothing(Umin)     && !isnothing(umin)     && (Umin    = repeat(umin,    Hp))
@@ -233,6 +239,14 @@ function setconstraint!(
         size(Ymax)   == (ny*Hp,) || throw(ArgumentError("Ymax size must be $((ny*Hp,))"))
         con.Ymax[:] = Ymax
     end
+    if !isnothing(x̂min)
+        size(x̂min)   == (nx̂,) || throw(ArgumentError("x̂min size must be $((nx̂,))"))
+        con.x̂min[:] = x̂min
+    end
+    if !isnothing(x̂max)
+        size(x̂max)   == (nx̂,) || throw(ArgumentError("x̂max size must be $((nx̂,))"))
+        con.x̂max[:] = x̂max
+    end
     if !isnothing(c_Umin)
         size(c_Umin) == (nu*Hp,) || throw(ArgumentError("c_Umin size must be $((nu*Hp,))"))
         any(c_Umin .< 0) && error("c_Umin weights should be non-negative")
@@ -267,13 +281,28 @@ function setconstraint!(
         _, A_Ymax = relaxŶ(model, C, con.c_Ymin, con.c_Ymax, E)
         con.A_Ymax[:] = A_Ymax
     end
+    if !isnothing(c_x̂min)
+        size(c_x̂min) == (nx̂,) || throw(ArgumentError("c_x̂min size must be $((nx̂,))"))
+        any(c_x̂min .< 0) && error("c_x̂min weights should be non-negative")
+        con.c_x̂min[:] = c_x̂min
+        A_x̂min ,_ = relaxTerminal(model, C, con.c_x̂min, con.c_x̂max, E)
+        con.A_x̂min[:] = A_x̂min
+    end
+    if !isnothing(c_x̂max)
+        size(c_x̂max) == (nx̂,) || throw(ArgumentError("c_x̂max size must be $((nx̂,))"))
+        any(c_x̂max .< 0) && error("c_x̂max weights should be non-negative")
+        con.c_x̂max[:] = c_x̂max
+        _, A_x̂max = relaxTerminal(model, C, con.c_x̂min, con.c_x̂max, E)
+        con.A_x̂max[:] = A_x̂max
+    end
     i_Umin,  i_Umax  = .!isinf.(con.Umin),  .!isinf.(con.Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmin)
     i_Ymin,  i_Ymax  = .!isinf.(con.Ymin),  .!isinf.(con.Ymax)
+    i_x̂min,  i_x̂max  = .!isinf.(con.x̂min),  .!isinf.(con.x̂max)
     if notSolvedYet
         con.i_b[:], con.A[:] = init_linconstraint(model,
-            i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
-            con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, con.A_Ymin, con.A_Ymax
+            i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
+            con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, con.A_Ymin, con.A_Ymax, con.A_x̂min, con.A_x̂max
         )
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
@@ -283,7 +312,7 @@ function setconstraint!(
         @constraint(mpc.optim, linconstraint, A*ΔŨvar .≤ b)
         setnonlincon!(mpc, model)
     else
-        i_b, _ = init_linconstraint(model, i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax)
+        i_b, _ = init_linconstraint(model, i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max)
         i_b == con.i_b || error("Cannot modify ±Inf constraints after calling moveinput!")
     end
     return mpc
@@ -448,6 +477,10 @@ updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured
 Estimate the default prediction horizon `Hp` with a security margin for [`LinModel`](@ref).
 """
 function default_Hp(model::LinModel, Hp)
+    # TODO: also check for settling time (poles)
+    # TODO: also check for non minimum phase systems (zeros)
+    # TODO: replace sum with max delay between all the I/O
+    # TODO: use this nk value for default N value in sim!
     poles = eigvals(model.A)
     # atol=1e-3 to overestimate the number of delays : for closed-loop stability, it is
     # better to overestimate the default value of Hp, as a security margin.
@@ -500,7 +533,7 @@ See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
-    mpc.F[:] = mpc.K*mpc.estim.x̂ + mpc.Q*mpc.estim.lastu0 + mpc.Ŷop
+    mpc.F[:] = mpc.K*mpc.estim.x̂ + mpc.V*mpc.estim.lastu0 + mpc.Ŷop
     if model.nd ≠ 0
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
         mpc.F[:] = mpc.F + mpc.G*mpc.d0 + mpc.J*mpc.D̂0
@@ -511,9 +544,9 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
     mpc.p[]  = Ẑ'*mpc.M_Hp*Ẑ
     if ~mpc.noR̂u
         lastu = mpc.estim.lastu0 + model.uop
-        V̂ = mpc.T*lastu - mpc.R̂u
-        mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.S̃)'*V̂
-        mpc.p[]  = mpc.p[] + V̂'*mpc.L_Hp*V̂
+        Ẑ = mpc.T*lastu - mpc.R̂u
+        mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.S̃)'*Ẑ
+        mpc.p[]  = mpc.p[] + Ẑ'*mpc.L_Hp*Ẑ
     end
     return nothing
 end
@@ -602,6 +635,8 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
         +mpc.con.ΔŨmax 
         -mpc.con.Ymin + mpc.F
         +mpc.con.Ymax - mpc.F
+        -mpc.con.x̂min + mpc.fx̂
+        +mpc.con.x̂max - mpc.fx̂
     ]
     lincon::LinConVector = mpc.optim[:linconstraint]
     set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
@@ -678,35 +713,45 @@ end
 
 
 @doc raw"""
-    init_predmat(estim::StateEstimator, ::LinModel, Hp, Hc) -> E, G, J, K, Q
+    init_predmat(estim::StateEstimator, ::LinModel, Hp, Hc) -> E, G, J, K, V
 
 Construct the prediction matrices for [`LinModel`](@ref) `model`.
 
 The linear model predictions are evaluated by :
 ```math
 \begin{aligned}
-    \mathbf{Ŷ} &= \mathbf{E ΔU} + \mathbf{G d}(k) + \mathbf{J D̂} + \mathbf{K x̂}_{k-1}(k) 
-                                                  + \mathbf{Q u}(k-1) \\
+    \mathbf{Ŷ} &= \mathbf{E ΔU} + \mathbf{G d}(k) + \mathbf{J D̂} 
+                                + \mathbf{K x̂}_{k-1}(k) + \mathbf{V u}(k-1) \\
                &= \mathbf{E ΔU} + \mathbf{F}
 \end{aligned}
 ```
 where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``, and measured
 disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
 ``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. The vector ``\mathbf{x̂}_{k-1}(k)`` is the
-state estimated at the last control period. Operating points on ``\mathbf{u}``, ``\mathbf{d}``
-and ``\mathbf{y}`` are omitted in above equations.
+state estimated at the last control period. Similar prediction matrices are also computed 
+for the terminal constraints applied on the states at the end of the horizon ``H_p``:
+```math
+\begin{aligned}
+    \mathbf{x̂}_{k-1}(k+H_p) 
+            &= \mathbf{e_x̂ ΔU} + \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} 
+                               + \mathbf{k_x̂ x̂}_{k-1}(k) + \mathbf{v_x̂ u}(k-1) \\
+            &= \mathbf{e_x̂ ΔU} + \mathbf{f_x̂}
+\end{aligned}
+```
+Operating points on ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{y}`` are omitted in above
+equations.
 
 # Extended Help
-Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` and the equation
-``\mathbf{W}_j = \mathbf{Ĉ} ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}``, the prediction 
+Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` and the function
+``\mathbf{W}(j) = \mathbf{Ĉ} ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}``, the prediction 
 matrices are computed by :
 ```math
 \begin{aligned}
 \mathbf{E} &= \begin{bmatrix}
-\mathbf{W}_{0}      & \mathbf{0}         & \cdots & \mathbf{0}              \\
-\mathbf{W}_{1}      & \mathbf{W}_{0}     & \cdots & \mathbf{0}              \\
-\vdots              & \vdots             & \ddots & \vdots                  \\
-\mathbf{W}_{H_p-1}  & \mathbf{W}_{H_p-2} & \cdots & \mathbf{W}_{H_p-H_c+1}
+\mathbf{W}(0)      & \mathbf{0}        & \cdots & \mathbf{0}              \\
+\mathbf{W}(1)      & \mathbf{W}(0)     & \cdots & \mathbf{0}              \\
+\vdots             & \vdots            & \ddots & \vdots                  \\
+\mathbf{W}(H_p-1)  & \mathbf{W}(H_p-2) & \cdots & \mathbf{W}(H_p-H_c+1)
 \end{bmatrix}
 \\
 \mathbf{G} &= \begin{bmatrix}
@@ -730,14 +775,23 @@ matrices are computed by :
 \mathbf{Ĉ}\mathbf{Â}^{H_p}
 \end{bmatrix}
 \\
-\mathbf{Q} &= \begin{bmatrix}
-\mathbf{W}_0        \\
-\mathbf{W}_1        \\
+\mathbf{V} &= \begin{bmatrix}
+\mathbf{W}(0)        \\
+\mathbf{W}(1)        \\
 \vdots              \\
-\mathbf{W}_{H_p-1}
+\mathbf{W}(H_p-1)
 \end{bmatrix}
 \end{aligned}
 ```
+For the terminal constraints, the matrices are computed with the function
+``\mathbf{w_x̂}(j) = ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}`` and:
+\begin{aligned}
+\mathbf{e_x̂} &= \begin{bmatrix} \mathbf{w_x̂}(H_p-1) & \mathbf{w_x̂}(H_p-2) & \cdots & \mathbf{w_x̂}(H_p-H_c+1) \end{bmatrix}
+\mathbf{g_x̂} &= mathbf{Â}^{H_p-1} \mathbf{B̂_d}
+\mathbf{j_x̂} &= \begin{bmatrix} \mathbf{Ĉ}\mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Ĉ}\mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{0} \end{bmatrix}
+\mathbf{k_x̂} &= \mathbf{Â}^{H_p}
+\mathbf{v_x̂} &= w_x̂(H_p-1)
+\end{aligned}
 """
 function init_predmat(estim::StateEstimator, model::LinModel, Hp, Hc)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
@@ -754,16 +808,16 @@ function init_predmat(estim::StateEstimator, model::LinModel, Hp, Hc)
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Apow_csum  = cumsum(Âpow, dims=3)
     # --- manipulated inputs u ---
-    Q = Matrix{Float64}(undef, Hp*ny, nu)
+    V = Matrix{Float64}(undef, Hp*ny, nu)
     for i=1:Hp
         iRow = (1:ny) .+ ny*(i-1)
-        Q[iRow,:] = Ĉ*Apow_csum[:,:,i]*B̂u
+        V[iRow,:] = Ĉ*Apow_csum[:,:,i]*B̂u
     end
     E = zeros(Hp*ny, Hc*nu) 
     for i=1:Hc # truncated with control horizon
         iRow = (ny*(i-1)+1):(ny*Hp)
         iCol = (1:nu) .+ nu*(i-1)
-        E[iRow,iCol] = Q[iRow .- ny*(i-1),:]
+        E[iRow,iCol] = V[iRow .- ny*(i-1),:]
     end
     # --- measured disturbances d ---
     G = Matrix{Float64}(undef, Hp*ny, nd)
@@ -780,19 +834,28 @@ function init_predmat(estim::StateEstimator, model::LinModel, Hp, Hc)
         end
     end
     F = zeros(ny*Hp) # dummy value (updated just before optimization)
-    return E, F, G, J, K, Q
+
+    #TODELETE:
+    ex̂ = Matrix{Float64}(undef, nx̂, Hc*nu)
+    fx̂ = zeros(nx̂)
+    gx̂ = Matrix{Float64}(undef, nx̂, nd)
+    jx̂ = Matrix{Float64}(undef, nx̂, Hp*nd)
+    kx̂ = Matrix{Float64}(undef, nx̂, nx̂)
+    vx̂ = Matrix{Float64}(undef, nx̂, nu)
+    return E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
 end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref)"
 function init_predmat(estim::StateEstimator, model::SimModel, Hp, Hc)
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
-    E = zeros(0, nu*Hc)
-    G = zeros(0, nd)
-    J = zeros(0, nd*Hp)
-    K = zeros(0, nx̂)
-    Q = zeros(0, nu)
-    F = zeros(0)
-    return E, F, G, J, K, Q
+    E  = zeros(0, nu*Hc)
+    G  = zeros(0, nd)
+    J  = zeros(0, nd*Hp)
+    K  = zeros(0, nx̂)
+    V  = zeros(0, nu)
+    F  = zeros(0)
+    ex̂, gx̂, jx̂, kx̂, vx̂, fx̂ = E, G, J, K, V, F
+    return E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
 end
 
 @doc raw"""
@@ -886,20 +949,23 @@ function obj_nonlinprog(
 end
 
 """
-    init_defaultcon(model, C, S, N_Hc, E) -> con, S̃, Ñ_Hc, Ẽ
+    init_defaultcon(estim, C, S, N_Hc, E, ex̂) -> con, S̃, Ñ_Hc, Ẽ, ẽx̂
 
-Init `ControllerConstraint` struct with default parameters.
+Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
-Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
+Also return `S̃`, `Ñ_Hc`, `Ẽ` and ẽx̂ matrices for the the augmented decision vector `ΔŨ`.
 """
-function init_defaultcon(model, Hp, Hc, C, S, N_Hc, E)
-    nu, ny = model.nu, model.ny
+function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂)
+    model = estim.model
+    nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
     umin,       umax    = fill(-Inf, nu), fill(+Inf, nu)
     Δumin,      Δumax   = fill(-Inf, nu), fill(+Inf, nu)
     ymin,       ymax    = fill(-Inf, ny), fill(+Inf, ny)
+    x̂min,       x̂max    = fill(-Inf, nx̂), fill(+Inf, nx̂)
     c_umin,     c_umax  = fill(0.0, nu),  fill(0.0, nu)
     c_Δumin,    c_Δumax = fill(0.0, nu),  fill(0.0, nu)
     c_ymin,     c_ymax  = fill(1.0, ny),  fill(1.0, ny)
+    c_x̂min,     c_x̂max  = fill(0.0, nx̂),  fill(0.0, nx̂)
     Umin, Umax, ΔUmin, ΔUmax, Ymin, Ymax = 
         repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
     c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ymin, c_Ymax = 
@@ -907,19 +973,21 @@ function init_defaultcon(model, Hp, Hc, C, S, N_Hc, E)
     A_Umin, A_Umax, S̃ = relaxU(C, c_Umin, c_Umax, S)
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
     A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, c_Ymin, c_Ymax, E)
+    A_x̂min, A_x̂max = relaxTerminal(model, C, c_x̂min, c_x̂max, ex̂)
     i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Ymin),  .!isinf.(Ymax)
+    i_x̂min,  i_x̂max  = .!isinf.(x̂min),  .!isinf.(x̂max)
     i_b, A = init_linconstraint(
         model, 
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax,
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min
     )
     b = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
     con = ControllerConstraint(
-        Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ymin  , Ymax,
-        A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin, A_Ymax,
-        A       , b     , i_b    , c_Ymin   , c_Ymax 
+        Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ymin  , Ymax,   x̂min,   x̂max,
+        A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin, A_Ymax, A_x̂min, A_x̂max,
+        A       , b     , i_b    , c_Ymin   , c_Ymax, c_x̂min, c_x̂max,
     )
     return con, S̃, Ñ_Hc, Ẽ
 end
@@ -1046,6 +1114,25 @@ function relaxŶ(::SimModel, C, c_Ymin, c_Ymax, E)
     return A_Ymin, A_Ymax, Ẽ
 end
 
+"""
+    relaxTerminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
+
+TBW
+"""
+function relaxTerminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
+    if !isinf(C) # ΔŨ = [ΔU; ϵ]
+        # ϵ impacts predicted terminal state calculations:
+        A_x̂min, A_x̂max = -[ex̂ c_x̂min], [ex̂ -c_x̂max] 
+    else # ΔŨ = ΔU (only hard constraints)
+        A_x̂min, A_x̂max = -ex̂,  ex̂
+    end
+    return A_x̂min, A_x̂max
+end
+
+"Return empty matrices if model is not a [`LinModel`](@ref)"
+relaxTerminal(::SimModel, C, c_x̂min, c_x̂max, ex̂) = -ex̂,  ex̂
+
+
 @doc raw"""
     init_stochpred(estim::InternalModel, Hp) -> Ks, Ps
 
@@ -1095,27 +1182,27 @@ matrix. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are 
 numbers.
 """
 function init_linconstraint(::LinModel, 
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, args...
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
 )
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax]
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
     if isempty(args)
         A = zeros(length(i_b), 0)
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax = args
-        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax]
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max = args
+        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
     end
     return i_b, A
 end
 
-"Init values without predicted output constraints if `model` is not a [`LinModel`](@ref)."
+"Init values without predicted output and terminal constraints if `model` is not a [`LinModel`](@ref)."
 function init_linconstraint(::SimModel,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ , args...
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, _ , _ , _ , _ , args...
 )
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
     if isempty(args)
         A = zeros(length(i_b), 0)
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ = args
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ = args
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
     end
     return i_b, A
