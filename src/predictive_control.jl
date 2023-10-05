@@ -395,7 +395,7 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:D̂`   : predicted measured disturbances over `Hp` ``(\mathbf{D̂})``
 - `:ŷ`   : current estimated output ``(\mathbf{ŷ})``
 - `:Ŷ`   : optimal predicted outputs over `Hp` ``(\mathbf{Ŷ})``
-- `:x̂end : optimal terminal states ``(\mathbf{x̂}_{k-1}(k+H_p))``
+- `:x̂end`: optimal terminal states ``(\mathbf{x̂}_{k-1}(k+H_p))``
 - `:Ŷs`  : predicted stochastic output over `Hp` of [`InternalModel`](@ref) ``(\mathbf{Ŷ_s})``
 - `:R̂y`  : predicted output setpoint over `Hp` ``(\mathbf{R̂_y})``
 - `:R̂u`  : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
