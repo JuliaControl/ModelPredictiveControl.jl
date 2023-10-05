@@ -713,7 +713,7 @@ end
 
 
 @doc raw"""
-    init_predmat(estim::StateEstimator, ::LinModel, Hp, Hc) -> E, G, J, K, V
+    init_predmat(estim, ::LinModel, Hp, Hc) -> E, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
 
 Construct the prediction matrices for [`LinModel`](@ref) `model`.
 
@@ -728,7 +728,7 @@ The linear model predictions are evaluated by :
 where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``, and measured
 disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
 ``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. The vector ``\mathbf{x̂}_{k-1}(k)`` is the
-state estimated at the last control period. Similar prediction matrices are also computed 
+state estimated at the last control period. The method also computes similar matrices but 
 for the terminal constraints applied on the states at the end of the horizon ``H_p``:
 ```math
 \begin{aligned}
@@ -748,100 +748,98 @@ matrices are computed by :
 ```math
 \begin{aligned}
 \mathbf{E} &= \begin{bmatrix}
-\mathbf{W}(0)      & \mathbf{0}        & \cdots & \mathbf{0}              \\
-\mathbf{W}(1)      & \mathbf{W}(0)     & \cdots & \mathbf{0}              \\
-\vdots             & \vdots            & \ddots & \vdots                  \\
-\mathbf{W}(H_p-1)  & \mathbf{W}(H_p-2) & \cdots & \mathbf{W}(H_p-H_c+1)
-\end{bmatrix}
-\\
+    \mathbf{W}(0)      & \mathbf{0}        & \cdots & \mathbf{0}              \\
+    \mathbf{W}(1)      & \mathbf{W}(0)     & \cdots & \mathbf{0}              \\
+    \vdots             & \vdots            & \ddots & \vdots                  \\
+    \mathbf{W}(H_p-1)  & \mathbf{W}(H_p-2) & \cdots & \mathbf{W}(H_p-H_c+1)   \end{bmatrix} \\
 \mathbf{G} &= \begin{bmatrix}
-\mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
-\mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
-\vdots                                    \\
-\mathbf{Ĉ}\mathbf{Â}^{H_p-1} \mathbf{B̂_d}
-\end{bmatrix}
-\\
+    \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
+    \mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
+    \vdots                                    \\
+    \mathbf{Ĉ}\mathbf{Â}^{H_p-1} \mathbf{B̂_d} \end{bmatrix} \\
 \mathbf{J} &= \begin{bmatrix}
-\mathbf{D̂_d}                              & \mathbf{0}                                & \cdots & \mathbf{0}   \\ 
-\mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     & \mathbf{D̂_d}                              & \cdots & \mathbf{0}   \\ 
-\vdots                                    & \vdots                                    & \ddots & \vdots       \\
-\mathbf{Ĉ}\mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Ĉ}\mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{D̂_d}
-\end{bmatrix}
-\\
+    \mathbf{D̂_d}                              & \mathbf{0}                                & \cdots & \mathbf{0}   \\ 
+    \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     & \mathbf{D̂_d}                              & \cdots & \mathbf{0}   \\ 
+    \vdots                                    & \vdots                                    & \ddots & \vdots       \\
+    \mathbf{Ĉ}\mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Ĉ}\mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{D̂_d} \end{bmatrix} \\
 \mathbf{K} &= \begin{bmatrix}
-\mathbf{Ĉ}\mathbf{Â}^{1}      \\
-\mathbf{Ĉ}\mathbf{Â}^{2}      \\
-\vdots                        \\
-\mathbf{Ĉ}\mathbf{Â}^{H_p}
-\end{bmatrix}
-\\
+    \mathbf{Ĉ}\mathbf{Â}^{1}      \\
+    \mathbf{Ĉ}\mathbf{Â}^{2}      \\
+    \vdots                        \\
+    \mathbf{Ĉ}\mathbf{Â}^{H_p}    \end{bmatrix} \\
 \mathbf{V} &= \begin{bmatrix}
-\mathbf{W}(0)        \\
-\mathbf{W}(1)        \\
-\vdots              \\
-\mathbf{W}(H_p-1)
-\end{bmatrix}
+    \mathbf{W}(0)        \\
+    \mathbf{W}(1)        \\
+    \vdots               \\
+    \mathbf{W}(H_p-1)    \end{bmatrix}
 \end{aligned}
 ```
 For the terminal constraints, the matrices are computed with the function
 ``\mathbf{w_x̂}(j) = ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}`` and:
+```math
 \begin{aligned}
-\mathbf{e_x̂} &= \begin{bmatrix} \mathbf{w_x̂}(H_p-1) & \mathbf{w_x̂}(H_p-2) & \cdots & \mathbf{w_x̂}(H_p-H_c+1) \end{bmatrix}
-\mathbf{g_x̂} &= mathbf{Â}^{H_p-1} \mathbf{B̂_d}
-\mathbf{j_x̂} &= \begin{bmatrix} \mathbf{Ĉ}\mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Ĉ}\mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{0} \end{bmatrix}
-\mathbf{k_x̂} &= \mathbf{Â}^{H_p}
-\mathbf{v_x̂} &= w_x̂(H_p-1)
+\mathbf{e_x̂} &= \begin{bmatrix} \mathbf{w_x̂}(H_p-1) & \mathbf{w_x̂}(H_p-2) & \cdots & \mathbf{w_x̂}(H_p-H_c+1) \end{bmatrix} \\
+\mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
+\mathbf{j_x̂} &= \begin{bmatrix} \mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{0} \end{bmatrix} \\
+\mathbf{k_x̂} &= \mathbf{Â}^{H_p} \\
+\mathbf{v_x̂} &= \mathbf{w_x̂}(H_p-1)
 \end{aligned}
+```
 """
 function init_predmat(estim::StateEstimator, model::LinModel, Hp, Hc)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
-    # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ...
+    # --- pre-compute matrix powers ---
+    # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,Hp+1] = A^Hp
     Âpow = Array{Float64}(undef, size(Â,1), size(Â,2), Hp+1)
     Âpow[:,:,1] = I(nx̂)
-    K = Matrix{Float64}(undef, Hp*ny, nx̂)
-    for i=1:Hp
-        Âpow[:,:,i+1] = Â^i
-        iRow = (1:ny) .+ ny*(i-1)
-        K[iRow,:] = Ĉ*Âpow[:,:,i+1]
-    end 
-    # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
-    Apow_csum  = cumsum(Âpow, dims=3)
-    # --- manipulated inputs u ---
-    V = Matrix{Float64}(undef, Hp*ny, nu)
-    for i=1:Hp
-        iRow = (1:ny) .+ ny*(i-1)
-        V[iRow,:] = Ĉ*Apow_csum[:,:,i]*B̂u
+    for j=2:Hp+1
+        Âpow[:,:,j] = Âpow[:,:,j-1]*Â
     end
-    E = zeros(Hp*ny, Hc*nu) 
-    for i=1:Hc # truncated with control horizon
-        iRow = (ny*(i-1)+1):(ny*Hp)
-        iCol = (1:nu) .+ nu*(i-1)
-        E[iRow,iCol] = V[iRow .- ny*(i-1),:]
+    # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
+    Âpow_csum  = cumsum(Âpow, dims=3)
+    # helper function to improve code clarity and be similar to eqs. in docstring:
+    getpower(array3D, power) = array3D[:,:, power+1]
+    # --- state estimates x̂ ---
+    kx̂ = getpower(Âpow, Hp)
+    K  = Matrix{Float64}(undef, Hp*ny, nx̂)
+    for j=1:Hp
+        iRow = (1:ny) .+ ny*(j-1)
+        K[iRow,:] = Ĉ*getpower(Âpow, j)
+    end    
+    # --- manipulated inputs u ---
+    vx̂ = getpower(Âpow_csum, Hp-1)*B̂u
+    V  = Matrix{Float64}(undef, Hp*ny, nu)
+    for j=1:Hp
+        iRow = (1:ny) .+ ny*(j-1)
+        V[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)*B̂u
+    end
+    ex̂ = Matrix{Float64}(undef, nx̂, Hc*nu)
+    E  = zeros(Hp*ny, Hc*nu) 
+    for j=1:Hc # truncated with control horizon
+        iRow = (ny*(j-1)+1):(ny*Hp)
+        iCol = (1:nu) .+ nu*(j-1)
+        E[iRow, iCol] = V[iRow .- ny*(j-1),:]
+        ex̂[:  , iCol] = getpower(Âpow_csum, Hp-j)*B̂u
     end
     # --- measured disturbances d ---
-    G = Matrix{Float64}(undef, Hp*ny, nd)
-    J = repeatdiag(D̂d, Hp)
+    gx̂ = getpower(Âpow, Hp-1)*B̂d
+    G  = Matrix{Float64}(undef, Hp*ny, nd)
+    jx̂ = Matrix{Float64}(undef, nx̂, Hp*nd)
+    J  = repeatdiag(D̂d, Hp)
     if nd ≠ 0
-        for i=1:Hp
-            iRow = (1:ny) .+ ny*(i-1)
-            G[iRow,:] = Ĉ*Âpow[:,:,i]*B̂d
+        for j=1:Hp
+            iRow = (1:ny) .+ ny*(j-1)
+            G[iRow,:] = Ĉ*getpower(Âpow, j-1)*B̂d
         end
-        for i=1:Hp
-            iRow = (ny*i+1):(ny*Hp)
-            iCol = (1:nd) .+ nd*(i-1)
-            J[iRow,iCol] = G[iRow .- ny*i,:]
+        for j=1:Hp
+            iRow = (ny*j+1):(ny*Hp)
+            iCol = (1:nd) .+ nd*(j-1)
+            J[iRow, iCol] = G[iRow .- ny*j,:]
+            jx̂[:  , iCol] = j < Hp ? getpower(Âpow, Hp-j-1)*B̂d : zeros(nx̂, nd)
         end
     end
-    F = zeros(ny*Hp) # dummy value (updated just before optimization)
-
-    #TODELETE:
-    ex̂ = Matrix{Float64}(undef, nx̂, Hc*nu)
-    fx̂ = zeros(nx̂)
-    gx̂ = Matrix{Float64}(undef, nx̂, nd)
-    jx̂ = Matrix{Float64}(undef, nx̂, Hp*nd)
-    kx̂ = Matrix{Float64}(undef, nx̂, nx̂)
-    vx̂ = Matrix{Float64}(undef, nx̂, nu)
+    F, fx̂  = zeros(ny*Hp), zeros(nx̂) # dummy values (updated just before optimization)
     return E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
 end
 
