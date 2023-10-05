@@ -416,8 +416,8 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 """
 function getinfo(mpc::PredictiveController)
     info = Dict{Symbol, InfoDictType}()
-    Ŷ = similar(mpc.Ŷop)
-    Ŷ = predict!(Ŷ, mpc, mpc.estim.model, mpc.ΔŨ)
+    x̂, Ŷ = similar(mpc.estim.x̂), similar(mpc.Ŷop)
+    predict!(x̂, Ŷ, mpc, mpc.estim.model, mpc.ΔŨ)
     info[:ΔU]  = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]   = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
     info[:J]   = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[]
@@ -592,24 +592,29 @@ end
 predictstoch!(::PredictiveController, ::StateEstimator, _ , _ ) = nothing
 
 @doc raw"""
-    predict!(Ŷ, mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ
+    predict!( _ , Ŷ, mpc::PredictiveController, model::LinModel, ΔŨ)
 
-Evaluate the outputs predictions ``\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
+Compute the outputs predictions ``\mathbf{Ŷ}`` when `model` is a [`LinModel`](@ref).
 """
-function predict!(Ŷ, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
-    return mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F # in-place operations to reduce allocations
+function predict!( _ , Ŷ, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
+    mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F # in-place operations to reduce allocations
+    return nothing
 end
 
 @doc raw"""
-    predict!(Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ
+    predict!(x̂, Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ)
 
-Evaluate  ``\mathbf{Ŷ}`` when `model` is not a [`LinModel`](@ref).
+Compute ``\mathbf{x̂}_{k-1}(k+H_p)``, ``\mathbf{Ŷ}`` if `model` is not a [`LinModel`](@ref). 
+
+The method mutates `x̂` and `Ŷ` vector arguments. After a `predict!` call, `x̂` will contain
+the states at the end of the prediction horizon ``\mathbf{x̂}_{k-1}(k+H_p)`` (used for
+terminal constraints). 
 """
-function predict!(Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) where {T<:Real}
+function predict!(x̂, Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) where {T<:Real}
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
-    x̂ ::Vector{T} = copy(mpc.estim.x̂)
     u0::Vector{T} = copy(mpc.estim.lastu0)
     d0::Vector{T} = copy(mpc.d0)
+    x̂[:] = mpc.estim.x̂
     for j=1:Hp
         if j ≤ Hc
             u0[:] = u0 + ΔŨ[(1 + nu*(j-1)):(nu*j)]
@@ -619,7 +624,7 @@ function predict!(Ŷ, mpc::PredictiveController, model::SimModel, ΔŨ::Vector
         Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, x̂, d0)
     end
     Ŷ[:] = Ŷ + mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
-    return Ŷ
+    return nothing
 end
 
 @doc raw"""
