@@ -130,7 +130,10 @@ function matrices_internalmodel(model::LinModel)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-matrices_internalmodel(::SimModel) = tuple(fill(zeros(0, 0), 5)...)
+function matrices_internalmodel(model::SimModel)
+    nu, nx, nd = model.nu, model.nx, model.nd
+    return zeros(0, nx), zeros(0, nu), zeros(0, nx), zeros(0, nd), zeros(0, nd)
+end
 
 @doc raw"""
     f̂(estim::InternalModel, x̂, u, d)
@@ -189,7 +192,7 @@ end
 @doc raw"""
     update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂)) -> x̂d
 
-Update `estim.x̂` \ `x̂d` \ `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂` / `x̂d` / `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
 
 The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂s` estimates with:
 ```math
@@ -217,7 +220,7 @@ end
 @doc raw"""
     init_estimate!(estim::InternalModel, model::LinModel, u, ym, d)
 
-Init `estim.x̂` \ `x̂d` \ `x̂s` estimate at steady-state for [`InternalModel`](@ref)s.
+Init `estim.x̂` / `x̂d` / `x̂s` estimate at steady-state for [`InternalModel`](@ref)s.
 
 The deterministic estimates `estim.x̂d` start at steady-state using `u` and `d` arguments:
 ```math

@@ -45,7 +45,9 @@ nmpc_skf.estim()
 u = nmpc_skf([55, 30])
 sim!(nmpc_skf, 3, [55, 30])
 
-sim!(model, 3)
+res = sim!(model, 3)
+
+res_man = SimResult(model, res.U_data, res.Y_data; X_data=res.X_data)
 
 exmpc = ExplicitMPC(model)
 initstate!(exmpc, model.uop, model())
@@ -58,12 +60,12 @@ h(x,_) = model.C*x
 
 nlmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10, 10], yop=[50, 30])
 y = nlmodel()
-nmpc_im = setconstraint!(NonLinMPC(InternalModel(nlmodel), Cwt=Inf), ymin=[45, -Inf])
+nmpc_im = setconstraint!(NonLinMPC(InternalModel(nlmodel), Hp=10, Cwt=Inf), ymin=[45, -Inf])
 initstate!(nmpc_im, nlmodel.uop, y)
 u = nmpc_im([55, 30], ym=y)
 sim!(nmpc_im, 3, [55, 30])
 
-nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Cwt=Inf), ymin=[45, -Inf])
+nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=Inf), ymin=[45, -Inf])
 initstate!(nmpc_ukf, nlmodel.uop, y)
 u = nmpc_ukf([55, 30])
 sim!(nmpc_ukf, 3, [55, 30])
