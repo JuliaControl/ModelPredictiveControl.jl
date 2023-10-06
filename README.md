@@ -83,12 +83,12 @@ for more detailed examples.
   - [x] move suppression
   - [x] input setpoint tracking
   - [x] economic costs (economic model predictive control)
-  - [ ] terminal cost to ensure nominal stability
 - [x] explicit predictive controller for problems without constraint
 - [x] soft and hard constraints on:
   - [x] output predictions
   - [x] manipulated inputs
   - [x] manipulated inputs increments
+  - [x] terminal states to ensure nominal stability
 - [ ] custom manipulated input constraints that are a function of the predictions
 - [x] supported feedback strategy:
   - [x] state estimator (see State Estimation features)

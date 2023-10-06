@@ -386,19 +386,19 @@ Get additional information about `mpc` controller optimum to ease troubleshootin
 The function should be called after calling [`moveinput!`](@ref). It returns the dictionary
 `info` with the following fields:
 
-- `:ΔU`  : optimal manipulated input increments over `Hc` ``(\mathbf{ΔU})``
-- `:ϵ`   : optimal slack variable ``(ϵ)``
-- `:J`   : objective value optimum ``(J)``
-- `:U`   : optimal manipulated inputs over `Hp` ``(\mathbf{U})``
-- `:u`   : current optimal manipulated input ``(\mathbf{u})``
-- `:d`   : current measured disturbance ``(\mathbf{d})``
-- `:D̂`   : predicted measured disturbances over `Hp` ``(\mathbf{D̂})``
-- `:ŷ`   : current estimated output ``(\mathbf{ŷ})``
-- `:Ŷ`   : optimal predicted outputs over `Hp` ``(\mathbf{Ŷ})``
-- `:x̂end`: optimal terminal states ``(\mathbf{x̂}_{k-1}(k+H_p))``
-- `:Ŷs`  : predicted stochastic output over `Hp` of [`InternalModel`](@ref) ``(\mathbf{Ŷ_s})``
-- `:R̂y`  : predicted output setpoint over `Hp` ``(\mathbf{R̂_y})``
-- `:R̂u`  : predicted manipulated input setpoint over `Hp` ``(\mathbf{R̂_u})``
+- `:ΔU`  : optimal manipulated input increments over `Hc`, ``\mathbf{ΔU}``.
+- `:ϵ`   : optimal slack variable, ``ϵ``.
+- `:J`   : objective value optimum, ``J``.
+- `:U`   : optimal manipulated inputs over `Hp`, ``\mathbf{U}``.
+- `:u`   : current optimal manipulated input, ``\mathbf{u}``.
+- `:d`   : current measured disturbance, ``\mathbf{d}``.
+- `:D̂`   : predicted measured disturbances over `Hp`, ``\mathbf{D̂}``.
+- `:ŷ`   : current estimated output, ``\mathbf{ŷ}``.
+- `:Ŷ`   : optimal predicted outputs over `Hp`, ``\mathbf{Ŷ}``.
+- `:x̂end`: optimal terminal states, ``\mathbf{x̂}_{k-1}(k+H_p)``.
+- `:Ŷs`  : predicted stochastic output over `Hp` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``.
+- `:R̂y`  : predicted output setpoint over `Hp`, ``\mathbf{R̂_y}``.
+- `:R̂u`  : predicted manipulated input setpoint over `Hp`, ``\mathbf{R̂_u}``.
 
 For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
 solution summary that can be printed. Lastly, the optimal economic cost `:JE` is also
