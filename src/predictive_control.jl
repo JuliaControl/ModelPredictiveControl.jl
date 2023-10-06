@@ -78,10 +78,10 @@ The predictive controllers support both soft and hard constraints, defined by:
 \end{alignat*}
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
-end of the horizon only (see Extended Help). All the constraint parameters are vector. Use
-`±Inf` values when there is no bound. The constraint softness parameters ``\mathbf{c}``,
-also called equal concern for relaxation, are non-negative values that specify the softness
-of the associated bound. Use `0.0` values for hard constraints. The output and terminal 
+end of the horizon (see Extended Help). All the constraint parameters are vector. Use `±Inf`
+values when there is no bound. The constraint softness parameters ``\mathbf{c}``, also
+called equal concern for relaxation, are non-negative values that specify the softness of
+the associated bound. Use `0.0` values for hard constraints. The output and terminal 
 constraints are all soft by default. See Extended Help for time-varying constraints.
 
 # Arguments
@@ -127,11 +127,11 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 ```
 
 # Extended Help
-Terminal constraints provide closed-loop stailibility guarantees on the nominal plant
-model. They can render an unfeasible problem however. In practice, a sufficiently large
-prediction horizon ``H_p`` is typically enough for stability. Note that terminal constraints
-are applied on the augmented state vector ``\mathbf{x̂}`` (see [`SteadyKalmanFilter`](@ref)
-for details on augmentation).
+Terminal constraints provide closed-loop stability guarantees on the nominal plant model.
+They can render an unfeasible problem however. In practice, a sufficiently large prediction
+horizon ``H_p`` without terminal constraints is typically enough for stability. Note that
+terminal constraints are applied on the augmented state vector ``\mathbf{x̂}`` (see
+[`SteadyKalmanFilter`](@ref) for details on augmentation).
 
 For variable constraints, the bounds can be modified after calling [`moveinput!`](@ref),
 that is, at runtime, but not the softness parameters ``\mathbf{c}``. It is not possible to
