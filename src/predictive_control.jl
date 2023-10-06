@@ -390,10 +390,10 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:ϵ`   : optimal slack variable, ``ϵ``.
 - `:J`   : objective value optimum, ``J``.
 - `:U`   : optimal manipulated inputs over `Hp`, ``\mathbf{U}``.
-- `:u`   : current optimal manipulated input, ``\mathbf{u}``.
-- `:d`   : current measured disturbance, ``\mathbf{d}``.
+- `:u`   : current optimal manipulated input, ``\mathbf{u}(k)``.
+- `:d`   : current measured disturbance, ``\mathbf{d}(k)``.
 - `:D̂`   : predicted measured disturbances over `Hp`, ``\mathbf{D̂}``.
-- `:ŷ`   : current estimated output, ``\mathbf{ŷ}``.
+- `:ŷ`   : current estimated output, ``\mathbf{ŷ}(k)``.
 - `:Ŷ`   : optimal predicted outputs over `Hp`, ``\mathbf{Ŷ}``.
 - `:x̂end`: optimal terminal states, ``\mathbf{x̂}_{k-1}(k+H_p)``.
 - `:Ŷs`  : predicted stochastic output over `Hp` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``.
