@@ -743,7 +743,7 @@ where predicted outputs ``\mathbf{Ŷ}``, stochastic outputs ``\mathbf{Ŷ_s}``,
 disturbances ``\mathbf{D̂}`` are from ``k + 1`` to ``k + H_p``. Input increments 
 ``\mathbf{ΔU}`` are from ``k`` to ``k + H_c - 1``. The vector ``\mathbf{x̂}_{k-1}(k)`` is the
 state estimated at the last control period. The method also computes similar matrices but 
-for the terminal constraints applied on the states at the end of the horizon ``H_p``:
+for the predicted terminal states at ``k+H_p``:
 ```math
 \begin{aligned}
     \mathbf{x̂}_{k-1}(k+H_p) 
