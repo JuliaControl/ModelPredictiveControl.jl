@@ -38,29 +38,35 @@ const InfoDictType = Union{JuMP._SolutionSummary, Vector{Float64}, Float64}
 
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint
-    Umin   ::Vector{Float64}
-    Umax   ::Vector{Float64}
-    ΔŨmin  ::Vector{Float64}
-    ΔŨmax  ::Vector{Float64}
-    Ymin   ::Vector{Float64}
-    Ymax   ::Vector{Float64}
-    x̂min   ::Vector{Float64}
-    x̂max   ::Vector{Float64}
-    A_Umin ::Matrix{Float64}
-    A_Umax ::Matrix{Float64}
-    A_ΔŨmin::Matrix{Float64}
-    A_ΔŨmax::Matrix{Float64}
-    A_Ymin ::Matrix{Float64}
-    A_Ymax ::Matrix{Float64}
-    A_x̂min ::Matrix{Float64}
-    A_x̂max ::Matrix{Float64}
-    A      ::Matrix{Float64}
-    b      ::Vector{Float64}
-    i_b    ::BitVector
-    c_Ymin ::Vector{Float64}
-    c_Ymax ::Vector{Float64}
-    c_x̂min ::Vector{Float64}
-    c_x̂max ::Vector{Float64}
+    ẽx̂      ::Matrix{Float64}
+    fx̂      ::Vector{Float64}
+    gx̂      ::Matrix{Float64}
+    jx̂      ::Matrix{Float64}
+    kx̂      ::Matrix{Float64}
+    vx̂      ::Matrix{Float64}
+    Umin    ::Vector{Float64}
+    Umax    ::Vector{Float64}
+    ΔŨmin   ::Vector{Float64}
+    ΔŨmax   ::Vector{Float64}
+    Ymin    ::Vector{Float64}
+    Ymax    ::Vector{Float64}
+    x̂min    ::Vector{Float64}
+    x̂max    ::Vector{Float64}
+    A_Umin  ::Matrix{Float64}
+    A_Umax  ::Matrix{Float64}
+    A_ΔŨmin ::Matrix{Float64}
+    A_ΔŨmax ::Matrix{Float64}
+    A_Ymin  ::Matrix{Float64}
+    A_Ymax  ::Matrix{Float64}
+    A_x̂min  ::Matrix{Float64}
+    A_x̂max  ::Matrix{Float64}
+    A       ::Matrix{Float64}
+    b       ::Vector{Float64}
+    i_b     ::BitVector
+    c_Ymin  ::Vector{Float64}
+    c_Ymax  ::Vector{Float64}
+    c_x̂min  ::Vector{Float64}
+    c_x̂max  ::Vector{Float64}
 end
 
 @doc raw"""
@@ -198,7 +204,7 @@ function setconstraint!(
     model, con, optim = mpc.estim.model, mpc.con, mpc.optim
     nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
-    C, E, ex̂ = mpc.C, mpc.Ẽ[:, 1:nu*Hc], mpc.ẽx̂[:, 1:nu*Hc]
+    C, E, ex̂ = mpc.C, mpc.Ẽ[:, 1:nu*Hc], mpc.con.ẽx̂[:, 1:nu*Hc]
     isnothing(Umin)     && !isnothing(umin)     && (Umin    = repeat(umin,    Hp))
     isnothing(Umax)     && !isnothing(umax)     && (Umax    = repeat(umax,    Hp))
     isnothing(ΔUmin)    && !isnothing(Δumin)    && (ΔUmin   = repeat(Δumin,   Hc))
@@ -604,7 +610,7 @@ the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``.
 function predict!(Ŷ, x̂, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
      # in-place operations to reduce allocations :
     mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F
-    mul!(x̂, mpc.ẽx̂, ΔŨ) + mpc.fx̂
+    mul!(x̂, mpc.con.ẽx̂, ΔŨ) + mpc.con.fx̂
     x̂end = x̂
     return Ŷ, x̂end
 end
@@ -640,8 +646,10 @@ Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ �
 Also init ``\mathbf{f_x̂}`` vector for the terminal constraints, see [`init_predmat`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
-    mpc.fx̂[:] = mpc.kx̂ * mpc.estim.x̂  + mpc.vx̂ * mpc.estim.lastu0
-    mpc.fx̂[:] = model.nd ≠ 0 ? mpc.fx̂ + mpc.gx̂ * mpc.d0 + mpc.jx̂ * mpc.D̂0 : mpc.fx̂
+    mpc.con.fx̂[:] = mpc.con.kx̂ * mpc.estim.x̂  + mpc.con.vx̂ * mpc.estim.lastu0
+    if model.nd ≠ 0
+        mpc.con.fx̂[:] = mpc.con.fx̂ + mpc.con.gx̂ * mpc.d0 + mpc.con.jx̂ * mpc.D̂0
+    end
     mpc.con.b[:] = [
         -mpc.con.Umin + mpc.T*(mpc.estim.lastu0 + model.uop)
         +mpc.con.Umax - mpc.T*(mpc.estim.lastu0 + model.uop)
@@ -649,8 +657,8 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
         +mpc.con.ΔŨmax 
         -mpc.con.Ymin + mpc.F
         +mpc.con.Ymax - mpc.F
-        -mpc.con.x̂min + mpc.fx̂
-        +mpc.con.x̂max - mpc.fx̂
+        -mpc.con.x̂min + mpc.con.fx̂
+        +mpc.con.x̂max - mpc.con.fx̂
     ]
     lincon::LinConVector = mpc.optim[:linconstraint]
     set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
@@ -961,13 +969,13 @@ function obj_nonlinprog(
 end
 
 """
-    init_defaultcon(estim, C, S, N_Hc, E, ex̂) -> con, S̃, Ñ_Hc, Ẽ, ẽx̂
+    init_defaultcon(estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂) -> con, S̃, Ñ_Hc, Ẽ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
-Also return `S̃`, `Ñ_Hc`, `Ẽ` and ẽx̂ matrices for the the augmented decision vector `ΔŨ`.
+Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
 """
-function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂)
+function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
     umin,       umax    = fill(-Inf, nu), fill(+Inf, nu)
@@ -997,11 +1005,12 @@ function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂)
     )
     b = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
     con = ControllerConstraint(
-        Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ymin  , Ymax,   x̂min,   x̂max,
-        A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin, A_Ymax, A_x̂min, A_x̂max,
-        A       , b     , i_b    , c_Ymin   , c_Ymax, c_x̂min, c_x̂max,
+        ẽx̂      , fx̂    , gx̂     , jx̂       , kx̂     , vx̂     ,  
+        Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ymin   , Ymax   , x̂min   , x̂max,
+        A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
+        A       , b     , i_b    , c_Ymin   , c_Ymax , c_x̂min , c_x̂max ,
     )
-    return con, S̃, Ñ_Hc, Ẽ, ẽx̂
+    return con, S̃, Ñ_Hc, Ẽ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -1126,10 +1135,26 @@ function relaxŶ(::SimModel, C, c_Ymin, c_Ymax, E)
     return A_Ymin, A_Ymax, Ẽ
 end
 
-"""
-    relaxterminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
+@doc raw"""
+    relaxterminal(::LinModel, C, c_x̂min, c_x̂max, ex̂) -> A_x̂min, A_x̂max, ẽx̂
 
-TBW
+Augment terminal state constraints with slack variable ϵ for softening.
+
+Denoting the input increments augmented with the slack variable 
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
+``\mathbf{ẽ_{x̂}}`` matrix that appears in the terminal state equation 
+``\mathbf{x̂}_{k-1}(k + H_p) = \mathbf{ẽ_x̂ ΔŨ + f_x̂}``, and the ``\mathbf{A}`` matrices for 
+the inequality constraints:
+```math
+\begin{bmatrix} 
+    \mathbf{A_{x̂_{min}}} \\ 
+    \mathbf{A_{x̂_{max}}}
+\end{bmatrix} \mathbf{ΔŨ} ≤
+\begin{bmatrix}
+    - \mathbf{x̂_{min}} + \mathbf{f_x̂} \\
+    + \mathbf{x̂_{max}} - \mathbf{f_x̂} 
+\end{bmatrix}
+```
 """
 function relaxterminal(::LinModel, C, c_x̂min, c_x̂max, ex̂)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]

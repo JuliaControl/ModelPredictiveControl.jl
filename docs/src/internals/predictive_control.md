@@ -25,6 +25,7 @@ ModelPredictiveControl.init_linconstraint
 ModelPredictiveControl.relaxU
 ModelPredictiveControl.relaxΔU
 ModelPredictiveControl.relaxŶ
+ModelPredictiveControl.relaxterminal
 ```
 
 ## Predictions

@@ -20,12 +20,6 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
     J::Matrix{Float64}
     K::Matrix{Float64}
     V::Matrix{Float64}
-    ẽx̂::Matrix{Float64}
-    fx̂::Vector{Float64}
-    gx̂::Matrix{Float64}
-    jx̂::Matrix{Float64}
-    kx̂::Matrix{Float64}
-    vx̂::Matrix{Float64}
     P̃::Hermitian{Float64, Matrix{Float64}}
     q̃::Vector{Float64}
     p::Vector{Float64}
@@ -50,8 +44,8 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
         R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(nu, Hp, Hc)
-        E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
-        S̃, Ñ_Hc, Ẽ, ẽx̂  = S, N_Hc, E, ex̂ # no slack variable ϵ for ExplicitMPC
+        E, F, G, J, K, V = init_predmat(estim, model, Hp, Hc)
+        S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         P̃_chol = cholesky(P̃)
         Ks, Ps = init_stochpred(estim, Hp)
@@ -65,7 +59,7 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, R̂u, R̂y, noR̂u,
             S̃, T, 
-            Ẽ, F, G, J, K, V, ẽx̂, fx̂, gx̂, jx̂, kx̂, vx̂, P̃, q̃, p,
+            Ẽ, F, G, J, K, V, P̃, q̃, p,
             P̃_chol,
             Ks, Ps,
             d0, D̂0,
@@ -190,6 +184,15 @@ The solution is ``\mathbf{ΔŨ = - P̃^{-1} q̃}``, see [`init_quadprog`](@ref)
 function optim_objective!(mpc::ExplicitMPC)
     return lmul!(-1, ldiv!(mpc.ΔŨ, mpc.P̃_chol, mpc.q̃))
 end
+
+"Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
+function predict!(Ŷ, x̂, mpc::ExplicitMPC, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
+    # in-place operations to reduce allocations :
+    mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F
+    x̂[:] .= NaN
+    return Ŷ, x̂
+end
+
 
 """
     addinfo!(info, mpc::ExplicitMPC) -> info
