@@ -560,7 +560,7 @@ end
                 subplot   --> subplot_base + i
                 linestyle --> :dot
                 linewidth --> 1.5
-                label     --> "\$\\mathbf{\\hat{y}_{min}}\$"
+                label     --> "\$\\mathbf{y_{min}}\$"
                 legend    --> true
                 t, fill(Ymin[i], length(t))
             end
@@ -572,7 +572,7 @@ end
                 subplot   --> subplot_base + i
                 linestyle --> :dot
                 linewidth --> 1.5
-                label     --> "\$\\mathbf{\\hat{y}_{max}}\$"
+                label     --> "\$\\mathbf{y_{max}}\$"
                 legend    --> true
                 t, fill(Ymax[i], length(t))
             end
