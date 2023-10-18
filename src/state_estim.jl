@@ -250,10 +250,14 @@ end
     default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
 
 One integrator on each measured output by default if `model` is not a  [`LinModel`](@ref).
+
+If the integrator quantity per manipulated input `nint_u ≠ 0`, the method returns zero
+integrator on each measured output.
 """
 function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
     validate_ym(model, i_ym)
-    return fill(1, length(i_ym))
+    nint_ym = iszero(nint_u) ? fill(1, length(i_ym)) : fill(0, length(i_ym))
+    return nint_ym
 end
 
 @doc raw"""

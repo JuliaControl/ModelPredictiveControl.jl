@@ -54,13 +54,13 @@ model = setop!(LinModel(sys, Ts), uop=[20, 20], yop=[50, 30])
 ```
 
 The `model` object will be used for two purposes : to construct our controller, and as a
-plant simulator to test the design.
+plant simulator to test the design. Its sampling time is 2 s thus the control period will be
+2 s as well.
 
 ## Linear Model Predictive Controller
 
 A linear model predictive controller (MPC) will control both the water level ``y_L`` and
-temperature ``y_T`` in the tank, at a sampling time of 2 s. The tank level should also never
-fall below 45:
+temperature ``y_T`` in the tank. The tank level should also never fall below 45:
 
 ```math
 y_L ≥ 45

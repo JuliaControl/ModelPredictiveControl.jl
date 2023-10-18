@@ -108,7 +108,7 @@ arguments.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
   (default to [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html) optimizer).
-- additionnal keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
+- additional keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
 ```jldoctest
