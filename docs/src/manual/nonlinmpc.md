@@ -12,24 +12,31 @@ vectors are:
 
 ```math
 \begin{aligned}
-    \mathbf{u} &= \begin{bmatrix} τ \end{bmatrix} \\
-    \mathbf{y} &= \begin{bmatrix} θ \end{bmatrix}
+    \mathbf{u} &= τ \\
+    \mathbf{y} &= θ
 \end{aligned}
+```
+
+The following figure presents the system:
+
+```@raw html
+<img src="../assets/pendulum.svg" alt="pendulum" width=200 style="background-color:white; 
+    border:20px solid white; display: block; margin-left: auto; margin-right: auto;"/>
 ```
 
 The plant model is nonlinear:
 
 ```math
 \begin{aligned}
-    \dot{θ}(t) &= ω(t)                                                                    \\
+    \dot{θ}(t) &= ω(t) \\
     \dot{ω}(t) &= -\frac{g}{L}\sin\big( θ(t) \big) - \frac{K}{m} ω(t) + \frac{1}{m L^2} τ(t)
 \end{aligned}
 ```
 
-in which ``g`` is the gravitational acceleration, ``L``, the pendulum length, ``K``, the
-friction coefficient at the pivot point, and ``m``, the mass attached at the end of the
-pendulum. Here, the explicit Euler method discretizes the system to construct a
-[`NonLinModel`](@ref):
+in which ``g`` is the gravitational acceleration in m/s², ``L``, the pendulum length in m,
+``K``, the friction coefficient at the pivot point in kg/s, and ``m``, the mass attached at
+the end of the pendulum in kg. Here, the explicit Euler method discretizes the system to
+construct a [`NonLinModel`](@ref):
 
 ```@example 1
 using ModelPredictiveControl
@@ -55,42 +62,49 @@ to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
 ```@example 1
 using Plots
 u = [0.5]
-plot(sim!(model, 60, u), plotu=false)
+N = 35
+plot(sim!(model, N, u), plotu=false)
 savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
 
-## Nonlinear Model Predictive Controller
+## Nonlinear State Estimator
 
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 
 ```@example 1
-estim = UnscentedKalmanFilter(model, σQ=[0.1, 0.5], σR=[0.5], nint_ym=[1], σQint_ym=[5.0])
+estim = UnscentedKalmanFilter(model, σQ=[0.1, 0.5], σR=[0.5], nint_u=[1], σQint_u=[0.1])
 ```
 
-The standard deviation of the angular velocity ``ω`` is higher here (`σQ` second value)
-since ``\dot{ω}(t)`` equation includes an uncertain parameter: the friction coefficient
-``K``. The estimator tuning is tested on a plant simulated with a different ``K``:
+The vectors `σQ` and σR `σR` are the standard deviations of the process and sensor noises,
+respectively. The value for the velocity ``ω`` is higher here (`σQ` second value) since
+``\dot{ω}(t)`` equation includes an uncertain parameter: the friction coefficient ``K``.
+Also, the argument `nint_u` explicitly adds one integrating state at the model input, the
+motor torque ``τ`` , with an associated standard deviation `σQint_u` of 0.1 N m. The
+estimator tuning is tested on a plant with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
-par_plant = (par[1], par[2], par[3] + 0.25, par[4])
+par_plant = (par[1], par[2], 1.25*par[3], par[4])
 f_plant(x, u, _) = x + Ts*pendulum(par_plant, x, u)
 plant = NonLinModel(f_plant, h, Ts, nu, nx, ny)
-res = sim!(estim, 60, [0.5], plant=plant, y_noise=[0.5])
+res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
 plot(res, plotu=false, plotxwithx̂=true)
 savefig(ans, "plot2_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot2_NonLinMPC](plot2_NonLinMPC.svg)
 
-The estimate ``x̂_3`` is the integrator state that compensates for static errors (`nint_ym`
-and `σQint_ym` parameters of [`UnscentedKalmanFilter`](@ref)). The Kalman filter performance
-seems sufficient for control. As the motor torque is limited to -1.5 to 1.5 N m, we
-incorporate the input constraints in a [`NonLinMPC`](@ref):
+The estimate ``x̂_3`` is the integrating state on the torque ``τ`` that compensates for
+static errors. The Kalman filter performance seems sufficient for control.
+
+## Nonlinear Model Predictive Controller
+
+As the motor torque is limited to -1.5 to 1.5 N m, we incorporate the input constraints in
+a [`NonLinMPC`](@ref):
 
 ```@example 1
-mpc = NonLinMPC(estim, Hp=20, Hc=4, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
+mpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -98,7 +112,7 @@ We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (i
 position):
 
 ```@example 1
-res = sim!(mpc, 60, [180.0], plant=plant, x0=zeros(plant.nx), x̂0=zeros(mpc.estim.nx̂))
+res = sim!(mpc, N, [180.0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
 plot(res)
 savefig(ans, "plot3_NonLinMPC.svg"); nothing # hide
 ```
@@ -110,7 +124,7 @@ inverted position, the closed-loop response to a step disturbances of 10° is al
 satisfactory:
 
 ```@example 1
-res = sim!(mpc, 60, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
+res = sim!(mpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
 plot(res)
 savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
 ```

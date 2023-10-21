@@ -18,6 +18,13 @@ outputs are the liquid level ``y_L`` and temperature ``y_T``:
 \end{aligned}
 ```
 
+The following figure depicts the instrumentation installed on the CSTR:
+
+```@raw html
+<img src="../assets/cstr.svg" alt="cstr" width=275 style="background-color:white; 
+    border:20px solid white; display: block; margin-left: auto; margin-right: auto;"/>
+```
+
 At the steady-state operating points:
 
 ```math
@@ -30,15 +37,10 @@ At the steady-state operating points:
 the following linear model accurately describes the plant dynamics:
 
 ```math
-\begin{bmatrix}
-    y_L(s) \\ y_T(s)
-\end{bmatrix} = 
+\mathbf{G}(s) = \frac{\mathbf{y}(s)}{\mathbf{u}(s)} =
 \begin{bmatrix}
     \frac{1.90}{18s + 1} & \frac{1.90}{18s + 1} \\[3pt]
     \frac{-0.74}{8s + 1} & \frac{0.74}{8s + 1}
-\end{bmatrix}
-\begin{bmatrix}
-    u_c(s) \\ u_h(s)
 \end{bmatrix}
 ```
 
@@ -47,10 +49,10 @@ operating points:
 
 ```@example 1
 using ModelPredictiveControl, ControlSystemsBase
-sys = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
-        tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
+G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
+      tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
 Ts = 2.0
-model = setop!(LinModel(sys, Ts), uop=[20, 20], yop=[50, 30])
+model = setop!(LinModel(G, Ts), uop=[20, 20], yop=[50, 30])
 ```
 
 The `model` object will be used for two purposes : to construct our controller, and as a
@@ -70,7 +72,7 @@ We design our [`LinMPC`](@ref) controllers by including the linear level constra
 [`setconstraint!`](@ref) (`±Inf` values should be used when there is no bound):
 
 ```@example 1
-mpc = LinMPC(model, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
+mpc = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
 mpc = setconstraint!(mpc, ymin=[45, -Inf])
 ```
 
@@ -81,8 +83,8 @@ soft constraints on output predictions ``\mathbf{ŷ}`` to ensure feasibility, a
 [`SteadyKalmanFilter`](@ref) to estimate the plant states[^1]. An attentive reader will also
 notice that the Kalman filter estimates two additional states compared to the plant model.
 These are the integrating states for the unmeasured plant disturbances, and they are
-automatically added to the model outputs by default if feasible (see [`SteadyKalmanFilter`](@ref)
-for details).
+automatically added to the model outputs by default if observability is preserved (see
+[`SteadyKalmanFilter`](@ref) for details).
 
 [^1]: As an alternative to state observer, we could have use an [`InternalModel`](@ref)
     structure with `mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])` . It was
@@ -106,18 +108,14 @@ changes on output setpoints ``\mathbf{r_y}`` and on a load disturbance ``u_l``:
 function test_mpc(mpc, model)
     N = 200
     ry, ul = [50, 30], 0
-    u_data  = zeros(model.nu, N)
-    y_data  = zeros(model.ny, N)
-    ry_data = zeros(model.ny, N)
-    for k = 0:N-1
-        k == 50  && (ry = [50, 35])
-        k == 100 && (ry = [54, 30])
-        k == 150 && (ul = -20)
+    u_data, y_data, ry_data = zeros(model.nu, N), zeros(model.ny, N), zeros(model.ny, N)
+    for i = 1:N
+        i == 51  && (ry = [50, 35])
+        i == 101 && (ry = [54, 30])
+        i == 151 && (ul = -20)
         y = model() # simulated measurements
         u = mpc(ry) # or equivalently : u = moveinput!(mpc, ry)
-        u_data[:,k+1]  = u
-        y_data[:,k+1]  = y
-        ry_data[:,k+1] = ry 
+        u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
         updatestate!(mpc, u, y) # update mpc state estimate
         updatestate!(model, u + [0; ul]) # update simulator with the load disturbance
     end
@@ -168,7 +166,7 @@ real-life control problems. Constructing a [`LinMPC`](@ref) with `DAQP` and inpu
 ```@example 1
 using JuMP, DAQP
 daqp = Model(DAQP.Optimizer)
-mpc2 = LinMPC(model, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], optim=daqp, nint_u=[1, 1])
+mpc2 = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], optim=daqp, nint_u=[1, 1])
 mpc2 = setconstraint!(mpc2, ymin=[45, -Inf])
 ```
 
@@ -206,42 +204,37 @@ incorporate feedforward compensation in the controller. The new plant model is:
 ```
 
 We need to construct a new [`LinModel`](@ref) that includes the measured disturbance
-``\mathbf{d} = [u_l]`` and the operating point ``\mathbf{d_{op}} = [20]``:
+``\mathbf{d} = u_l`` and the operating point ``\mathbf{d_{op}} = 20``:
 
 ```@example 1
-sys_ff   = [sys sys[1:2, 2]]
-model_ff = setop!(LinModel(sys_ff, Ts, i_d=[3]), uop=[20, 20], yop=[50, 30], dop=[20])
+model_d = setop!(LinModel([G G[1:2, 2]], Ts, i_d=[3]), uop=[20, 20], yop=[50, 30], dop=[20])
 ```
 
 A [`LinMPC`](@ref) controller is constructed on this model:
 
 ```@example 1
-mpc_ff = LinMPC(model_ff, Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], nint_u=[1, 1])
-mpc_ff = setconstraint!(mpc_ff, ymin=[45, -Inf])
+mpc_d = LinMPC(model_d, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
+mpc_d = setconstraint!(mpc_d, ymin=[45, -Inf])
 ```
 
 A new test function that feeds the measured disturbance ``\mathbf{d}`` to the controller is
 also required:
 
 ```@example 1
-function test_mpc_ff(mpc_ff, model)
+function test_mpc_d(mpc_d, model)
     N = 200
     ry, ul = [50, 30], 0
-    dop = mpc_ff.estim.model.dop
-    u_data  = zeros(model.nu, N)
-    y_data  = zeros(model.ny, N)
-    ry_data = zeros(model.ny, N)
-    for k = 0:N-1
-        k == 50  && (ry = [50, 35])
-        k == 100 && (ry = [54, 30])
-        k == 150 && (ul = -20)
+    dop = mpc_d.estim.model.dop
+    u_data, y_data, ry_data = zeros(model.nu, N), zeros(model.ny, N), zeros(model.ny, N)
+    for i = 1:N
+        i == 51  && (ry = [50, 35])
+        i == 101 && (ry = [54, 30])
+        i == 151 && (ul = -20)
         d = ul .+ dop   # simulated measured disturbance
         y = model()     # simulated measurements
-        u = mpc_ff(ry, d) # also feed the measured disturbance d to the controller
-        u_data[:,k+1]  = u
-        y_data[:,k+1]  = y
-        ry_data[:,k+1] = ry 
-        updatestate!(mpc_ff, u, y, d)    # update estimate with the measured disturbance d
+        u = mpc_d(ry, d) # also feed the measured disturbance d to the controller
+        u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
+        updatestate!(mpc_d, u, y, d)    # update estimate with the measured disturbance d
         updatestate!(model, u + [0; ul]) # update simulator
     end
     return u_data, y_data, ry_data
@@ -253,9 +246,9 @@ The new feedforward compensation is able to almost perfectly reject the load dis
 
 ```@example 1
 setstate!(model, zeros(model.nx))
-u, y, d = model.uop, model(), mpc_ff.estim.model.dop
-initstate!(mpc_ff, u, y, d)
-u_data, y_data, ry_data = test_mpc_ff(mpc_ff, model)
+u, y, d = model.uop, model(), mpc_d.estim.model.dop
+initstate!(mpc_d, u, y, d)
+u_data, y_data, ry_data = test_mpc_d(mpc_d, model)
 plot_data(t_data, u_data, y_data, ry_data)
 savefig(ans, "plot3_LinMPC.svg"); nothing # hide
 ```
