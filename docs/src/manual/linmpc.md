@@ -21,7 +21,7 @@ outputs are the liquid level ``y_L`` and temperature ``y_T``:
 The following figure depicts the instrumentation installed on the CSTR:
 
 ```@raw html
-<img src="../assets/cstr.svg" alt="cstr" width=275 style="background-color:white; 
+<img src="cstr.svg" alt="cstr" width=275 style="background-color:white; 
     border:20px solid white; display: block; margin-left: auto; margin-right: auto;"/>
 ```
 

@@ -20,7 +20,7 @@ vectors are:
 The following figure presents the system:
 
 ```@raw html
-<img src="../assets/pendulum.svg" alt="pendulum" width=200 style="background-color:white; 
+<img src="pendulum.svg" alt="pendulum" width=200 style="background-color:white; 
     border:20px solid white; display: block; margin-left: auto; margin-right: auto;"/>
 ```
 
