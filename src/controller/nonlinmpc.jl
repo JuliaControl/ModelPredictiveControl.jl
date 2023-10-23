@@ -258,8 +258,7 @@ function init_optimization!(mpc::NonLinMPC)
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- nonlinear optimization init ---
     model = mpc.estim.model
-    ny, nu, nx̂, Hp = model.ny, model.nu, mpc.estim.nx̂, mpc.Hp
-    nC = (2*Hp*nu + 2*nvar + 2*Hp*ny + 2*nx̂) - length(mpc.con.b)
+    ny, nx̂, Hp, nC = model.ny, mpc.estim.nx̂, mpc.Hp, length(con.i_C)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
     Jfunc, Cfunc = let mpc=mpc, model=model, nC=nC, nvar=nvar , nŶ=Hp*ny, nx̂=nx̂
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
@@ -341,11 +340,7 @@ function init_optimization!(mpc::NonLinMPC)
     return nothing
 end
 
-
-"No nonlinear constraint for [`NonLinMPC`](@ref) based on [`LinModel`](@ref)."
-setnontlincon!(::NonLinMPC, ::LinModel) = nothing
-
-"Set the nonlinear constraints on the output predictions `Ŷ`."
+"Set the nonlinear constraints on the output predictions `Ŷ` ans terminal states `x̂end`."
 function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     optim = mpc.optim
     ΔŨvar = mpc.optim[:ΔŨvar]
@@ -371,27 +366,31 @@ function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
 end
 
 """
-    con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, x̂end, Ŷ, ΔŨ)
+    con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, x̂end, Ŷ, ΔŨ) -> C
 
 Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
+
+The method mutates the `C` vector in argument and returns it.
 """
 function con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, x̂end, Ŷ, ΔŨ)
-    ny, nx̂, Hp = model.ny, mpc.estim.nx̂, mpc.Hp
-    i_end_Ymin, i_end_Ymax = 1Hp*ny      , 2Hp*ny
-    i_end_x̂min, i_end_x̂max = 2Hp*ny + 1nx̂, 2Hp*ny + 2nx̂
-    if !isinf(mpc.C) # constraint softening activated :
-        ϵ = ΔŨ[end]
-        C[           1:i_end_Ymin] = (mpc.con.Ymin - Ŷ) - ϵ*mpc.con.c_Ymin
-        C[i_end_Ymin+1:i_end_Ymax] = (Ŷ - mpc.con.Ymax) - ϵ*mpc.con.c_Ymax
-        C[i_end_Ymax+1:i_end_x̂min] = (mpc.con.x̂min - x̂end) - ϵ*mpc.con.c_x̂min
-        C[i_end_x̂min+1:i_end_x̂max] = (x̂end - mpc.con.x̂max) - ϵ*mpc.con.c_x̂max
-    else # no constraint softening :
-        C[           1:i_end_Ymin] = mpc.con.Ymin - Ŷ
-        C[i_end_Ymin+1:i_end_Ymax] = Ŷ - mpc.con.Ymax
-        C[i_end_Ymax+1:i_end_x̂min] = mpc.con.x̂min - x̂end
-        C[i_end_x̂min+1:i_end_x̂max] = x̂end - mpc.con.x̂max
+    nx̂, nŶ = mpc.estim.nx̂, model.ny*mpc.Hp
+    ϵ = !isinf(mpc.C) ? ΔŨ[end] : 0.0 # ϵ = 0.0 if Cwt=Inf (meaning: no relaxation)
+    for i in eachindex(C)
+        mpc.con.i_C[i] || continue
+        if i ≤ nŶ
+            j = i
+            C[i] = (mpc.con.Ymin[j] - Ŷ[j])     - ϵ*mpc.con.c_Ymin[j]
+        elseif i ≤ 2nŶ
+            j = i - nŶ
+            C[i] = (Ŷ[j] - mpc.con.Ymax[j])     - ϵ*mpc.con.c_Ymax[j]
+        elseif i ≤ 2nŶ + nx̂
+            j = i - 2nŶ
+            C[i] = (mpc.con.x̂min[j] - x̂end[j])  - ϵ*mpc.con.c_x̂min[j]
+        else
+            j = i - 2nŶ - nx̂
+            C[i] = (x̂end[j] - mpc.con.x̂max[j])  - ϵ*mpc.con.c_x̂max[j]
+        end
     end
-    C[isinf.(C)] .= 0 # replace ±Inf with 0 to avoid INVALID_MODEL error
     return C
 end
 

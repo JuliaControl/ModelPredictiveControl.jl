@@ -56,8 +56,10 @@ nu, nx, ny = 1, 2, 1
 model = NonLinModel(f, h, Ts, nu, nx, ny)
 ```
 
-The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. It is good practice
-to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
+The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
+characters like ``θ`` can be typed in the Julia REPL or VS Code by typing `\theta` and
+pressing the `<TAB>` key. It is good practice to first simulate `model` using [`sim!`](@ref)
+as a quick sanity check:
 
 ```@example 1
 using Plots

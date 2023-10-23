@@ -16,7 +16,7 @@ ModelPredictiveControl.init_predmat
 ModelPredictiveControl.init_ΔUtoU
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
-ModelPredictiveControl.init_linconstraint
+ModelPredictiveControl.init_matconstraint
 ```
 
 ## Constraint Relaxation

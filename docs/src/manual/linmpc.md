@@ -87,8 +87,8 @@ automatically added to the model outputs by default if observability is preserve
 [`SteadyKalmanFilter`](@ref) for details).
 
 [^1]: As an alternative to state observer, we could have use an [`InternalModel`](@ref)
-    structure with `mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])` . It was
-    tested on the example of this page and it gives similar results.
+    structure with `mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])`.
+    It was tested on the example of this page and it gives similar results.
 
 Before closing the loop, we call [`initstate!`](@ref) with the actual plant inputs and
 measurements to ensure a bumpless transfer. Since `model` simulates our plant here, its
