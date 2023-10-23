@@ -41,8 +41,9 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
 end
 
 @testset "LinMPC moves and getinfo" begin
-    mpc1 = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
-    r = [5]
+    linmodel = setop!(LinModel(tf(5, [2, 1]), 3), yop=[10])
+    mpc1 = LinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
+    r = [15]
     u = moveinput!(mpc1, r)
     @test u ≈ [1] atol=1e-2
     u = mpc1(r)
@@ -50,48 +51,57 @@ end
     info = getinfo(mpc1)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ r[1] atol=1e-2
-    mpc2 = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
-    u = moveinput!(mpc2, [5])
+    mpc2 = LinMPC(linmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
+    u = moveinput!(mpc2, r)
     @test u ≈ [1] atol=1e-2
-    mpc3 = LinMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1])
+    mpc3 = LinMPC(linmodel, Mwt=[0], Nwt=[0], Lwt=[1])
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
-    mpc_im = LinMPC(InternalModel(LinModel(tf(5, [2, 1]), 3)))
-    ym, u = mpc_im.estim.model() - [5], [0.0]
-    for i=1:25
-        ym = mpc_im.estim.model() - [5]
-        u = moveinput!(mpc_im, r; ym)
-        updatestate!(mpc_im, u, ym)
-        updatestate!(mpc_im.estim.model, u)
-    end
-    @test u  ≈ [2] atol=1e-2
-    @test ym ≈ [5] atol=1e-2
-    mpc_nint_u = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    ym, u = mpc_nint_u.estim.model() - [5], [0.0]
-    for i=1:25
-        ym = mpc_nint_u.estim.model() - [5]
-        u = moveinput!(mpc_nint_u, r; ym)
-        updatestate!(mpc_nint_u, u, ym)
-        updatestate!(mpc_nint_u.estim.model, u)
-    end
-    @test u  ≈ [2] atol=1e-2
-    @test ym ≈ [5] atol=1e-2 
-    mpc_nint_ym = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    ym, u = mpc_nint_ym.estim.model() - [5], [0.0]
-    for i=1:25
-        ym = mpc_nint_ym.estim.model() - [5]
-        u = moveinput!(mpc_nint_ym, r; ym)
-        updatestate!(mpc_nint_ym, u, ym)
-        updatestate!(mpc_nint_ym.estim.model, u)
-    end
-    @test u  ≈ [2] atol=1e-2
-    @test ym ≈ [5] atol=1e-2 
 
     @test_throws ArgumentError moveinput!(mpc1, [0,0,0])
     @test_throws ArgumentError moveinput!(mpc1, [0], [0,0])
     @test_throws ArgumentError moveinput!(mpc1; D̂  = fill(0, mpc1.Hp+1))
     @test_throws ArgumentError moveinput!(mpc1; R̂y = fill(0, mpc1.Hp+1))
     @test_throws ArgumentError moveinput!(mpc1; R̂u = fill(0, mpc1.Hp+1))
+end
+
+@testset "LinMPC step disturbance rejection" begin
+    linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
+    r = [15]
+    outdist = [5]
+    mpc_im = LinMPC(InternalModel(linmodel))
+    linmodel.x[:] .= 0
+    ym, u = linmodel() - outdist, [0.0]
+    for i=1:25
+        ym = linmodel() - outdist
+        u = moveinput!(mpc_im, r; ym)
+        updatestate!(mpc_im, u, ym)
+        updatestate!(linmodel, u)
+    end
+    @test u  ≈ [2] atol=1e-2
+    @test ym ≈ r   atol=1e-2
+    mpc_nint_u = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
+    linmodel.x[:] .= 0
+    ym, u = linmodel() - outdist, [0.0]
+    for i=1:25
+        ym = linmodel() - outdist
+        u = moveinput!(mpc_nint_u, r; ym)
+        updatestate!(mpc_nint_u, u, ym)
+        updatestate!(linmodel, u)
+    end
+    @test u  ≈ [2] atol=1e-2
+    @test ym ≈ r   atol=1e-2 
+    mpc_nint_ym = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
+    linmodel.x[:] .= 0
+    ym, u = linmodel() - outdist, [0.0]
+    for i=1:25
+        ym = linmodel() - outdist
+        u = moveinput!(mpc_nint_ym, r; ym)
+        updatestate!(mpc_nint_ym, u, ym)
+        updatestate!(linmodel, u)
+    end
+    @test u  ≈ [2] atol=1e-2
+    @test ym ≈ r   atol=1e-2 
 end
 
 @testset "LinMPC other methods" begin
@@ -264,36 +274,46 @@ end
     mpc3 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1])
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
-    mpc_im = ExplicitMPC(InternalModel(LinModel(tf(5, [2, 1]), 3)))
-    ym, u = mpc_im.estim.model() - [5], [0.0]
+end
+
+
+@testset "ExplicitMPC step disturbance rejection" begin
+    linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
+    r = [15]
+    outdist = [5]
+    mpc_im = ExplicitMPC(InternalModel(linmodel))
+    linmodel.x[:] .= 0
+    ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = mpc_im.estim.model() - [5]
+        ym = linmodel() - outdist
         u = moveinput!(mpc_im, r; ym)
         updatestate!(mpc_im, u, ym)
-        updatestate!(mpc_im.estim.model, u)
+        updatestate!(linmodel, u)
     end
     @test u  ≈ [2] atol=1e-2
-    @test ym ≈ [5] atol=1e-2
+    @test ym ≈ r   atol=1e-2
     mpc_nint_u = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    ym, u = mpc_nint_u.estim.model() - [5], [0.0]
+    linmodel.x[:] .= 0
+    ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = mpc_nint_u.estim.model() - [5]
+        ym = linmodel() - outdist
         u = moveinput!(mpc_nint_u, r; ym)
         updatestate!(mpc_nint_u, u, ym)
-        updatestate!(mpc_nint_u.estim.model, u)
+        updatestate!(linmodel, u)
     end
     @test u  ≈ [2] atol=1e-2
-    @test ym ≈ [5] atol=1e-2 
+    @test ym ≈ r   atol=1e-2 
     mpc_nint_ym = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    ym, u = mpc_nint_ym.estim.model() - [5], [0.0]
+    linmodel.x[:] .= 0
+    ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = mpc_nint_ym.estim.model() - [5]
+        ym = linmodel() - outdist
         u = moveinput!(mpc_nint_ym, r; ym)
         updatestate!(mpc_nint_ym, u, ym)
-        updatestate!(mpc_nint_ym.estim.model, u)
+        updatestate!(linmodel, u)
     end
     @test u  ≈ [2] atol=1e-2
-    @test ym ≈ [5] atol=1e-2
+    @test ym ≈ r   atol=1e-2 
 end
 
 @testset "ExplicitMPC other methods" begin
@@ -356,9 +376,9 @@ end
 end
 
 @testset "NonLinMPC moves and getinfo" begin
-    linmodel = LinModel(tf(5, [2, 1]), 3.0)
+    linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
-    r = [5]
+    r = [15]
     u = moveinput!(nmpc_lin, r)
     @test u ≈ [1] atol=5e-2
     u = nmpc_lin(r)
@@ -367,14 +387,14 @@ end
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ r[1] atol=5e-2
     Hp = 1000
-    R̂y = fill(5, Hp)
+    R̂y = fill(r[1], Hp)
     JE = (_ , ŶE, _ ) -> sum((ŶE[2:end] - R̂y).^2)
     nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
     u = moveinput!(nmpc)
     @test u ≈ [1] atol=5e-2
-    linmodel = LinModel([tf(5, [2, 1]) tf(7, [8,1])], 3.0, i_d=[2])
-    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
-    h(x,d)   = linmodel.C*x + linmodel.Dd*d
+    linmodel2 = LinModel([tf(5, [2, 1]) tf(7, [8,1])], 3.0, i_d=[2])
+    f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
+    h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel = NonLinModel(f, h, 3.0, 1, 2, 1, 1)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
     d = [0.1]
@@ -395,37 +415,45 @@ end
     C_Ymax_end = nmpc5.optim.nlp_model.operators.registered_multivariate_operators[end].f
     @test C_Ymax_end(Float64.((1.0, 1.0))) ≤ 0.0 # test con_nonlinprog_i(i,::NTuple{N, Float64})
     @test C_Ymax_end(Float32.((1.0, 1.0))) ≤ 0.0 # test con_nonlinprog_i(i,::NTuple{N, Real})
-    nmpc_im = NonLinMPC(InternalModel(LinModel(tf(5, [2, 1]), 3)))
-    ym, u = nmpc_im.estim.model() - [5], [0.0]
+end
+
+@testset "NonLinMPC step disturbance rejection" begin
+    linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
+    r = [15]
+    outdist = [5]
+    nmpc_im = NonLinMPC(InternalModel(linmodel))
+    linmodel.x[:] .= 0
+    ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = nmpc_im.estim.model() - [5]
+        ym = linmodel() - outdist
         u = moveinput!(nmpc_im, r; ym)
         updatestate!(nmpc_im, u, ym)
-        updatestate!(nmpc_im.estim.model, u)
+        updatestate!(linmodel, u)
     end
     @test u  ≈ [2] atol=1e-2
-    @test ym ≈ [5] atol=1e-2    
-    nmpc_nint_u = NonLinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    ym, u = nmpc_nint_u.estim.model() - [5], [0.0]
+    @test ym ≈ r   atol=1e-2
+    nmpc_nint_u = NonLinMPC(SteadyKalmanFilter(linmodel, nint_u=[1]))
+    linmodel.x[:] .= 0
+    ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = nmpc_nint_u.estim.model() - [5]
+        ym = linmodel() - outdist
         u = moveinput!(nmpc_nint_u, r; ym)
         updatestate!(nmpc_nint_u, u, ym)
-        updatestate!(nmpc_nint_u.estim.model, u)
+        updatestate!(linmodel, u)
     end
     @test u  ≈ [2] atol=1e-2
-    @test ym ≈ [5] atol=1e-2 
-    nmpc_nint_ym = NonLinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    ym, u = nmpc_nint_ym.estim.model() - [5], [0.0]
+    @test ym ≈ r   atol=1e-2 
+    nmpc_nint_ym = NonLinMPC(SteadyKalmanFilter(linmodel, nint_ym=[1]))
+    linmodel.x[:] .= 0
+    ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = nmpc_nint_ym.estim.model() - [5]
+        ym = linmodel() - outdist
         u = moveinput!(nmpc_nint_ym, r; ym)
         updatestate!(nmpc_nint_ym, u, ym)
-        updatestate!(nmpc_nint_ym.estim.model, u)
+        updatestate!(linmodel, u)
     end
     @test u  ≈ [2] atol=1e-2
-    @test ym ≈ [5] atol=1e-2
-    
+    @test ym ≈ r   atol=1e-2
 end
 
 @testset "NonLinMPC other methods" begin

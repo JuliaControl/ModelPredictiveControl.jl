@@ -609,8 +609,8 @@ the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``.
 """
 function predict!(Ŷ, x̂, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
      # in-place operations to reduce allocations :
-    mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F
-    mul!(x̂, mpc.con.ẽx̂, ΔŨ) + mpc.con.fx̂
+    Ŷ[:] = mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F
+    x̂[:] = mul!(x̂, mpc.con.ẽx̂, ΔŨ) + mpc.con.fx̂
     x̂end = x̂
     return Ŷ, x̂end
 end
