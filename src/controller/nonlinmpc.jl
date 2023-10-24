@@ -144,8 +144,8 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 
 # Extended Help
 `NonLinMPC` controllers based on [`LinModel`](@ref) compute the predictions with matrix 
-algebra instead of a `for` loop. This feature can accelerate the optimization and is not 
-available in any other package, to my knowledge.
+algebra instead of a `for` loop. This feature can accelerate the optimization, especially
+for the constraint handling, and is not available in any other package, to my knowledge.
 
 The optimizations rely on [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) automatic 
 differentiation (AD) to compute the objective and constraint derivatives. Optimizers 
