@@ -387,7 +387,7 @@ function moveinput!(
     d ::Vector = empty(mpc.estim.x̂);
     D̂ ::Vector = repeat(d,  mpc.Hp),
     R̂y::Vector = repeat(ry, mpc.Hp),
-    R̂u::Vector = ~mpc.noR̂u ? repeat(mpc.estim.model.uop, mpc.Hp) : empty(mpc.estim.x̂),
+    R̂u::Vector = mpc.noR̂u ? empty(mpc.estim.x̂) : repeat(mpc.estim.model.uop, mpc.Hp),
     ym::Union{Vector, Nothing} = nothing
 )
     validate_setpointdist(mpc, ry, d, D̂, R̂y, R̂u)

@@ -62,7 +62,7 @@ end
     @test_throws ArgumentError moveinput!(mpc1, [0], [0,0])
     @test_throws ArgumentError moveinput!(mpc1; D̂  = fill(0, mpc1.Hp+1))
     @test_throws ArgumentError moveinput!(mpc1; R̂y = fill(0, mpc1.Hp+1))
-    @test_throws ArgumentError moveinput!(mpc1; R̂u = fill(0, mpc1.Hp+1))
+    @test_throws ArgumentError moveinput!(mpc3; R̂u = fill(0, mpc1.Hp+1))
 end
 
 @testset "LinMPC step disturbance rejection" begin
