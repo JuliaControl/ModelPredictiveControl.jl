@@ -71,12 +71,13 @@ savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
 
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
 
-## Nonlinear State Estimator
+## Nonlinear Model Predictive Controller
 
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 
 ```@example 1
-estim = UnscentedKalmanFilter(model, σQ=[0.1, 0.5], σR=[0.5], nint_u=[1], σQint_u=[0.1])
+σQ=[0.1, 0.5]; σR=[0.5]; nint_u=[1]; σQint_u=[0.1]
+estim = UnscentedKalmanFilter(model; σQ, σR, nint_u, σQint_u)
 ```
 
 The vectors `σQ` and σR `σR` are the standard deviations of the process and sensor noises,
@@ -100,22 +101,20 @@ savefig(ans, "plot2_NonLinMPC.svg"); nothing # hide
 The estimate ``x̂_3`` is the integrating state on the torque ``τ`` that compensates for
 static errors. The Kalman filter performance seems sufficient for control.
 
-## Nonlinear Model Predictive Controller
-
 As the motor torque is limited to -1.5 to 1.5 N m, we incorporate the input constraints in
 a [`NonLinMPC`](@ref):
 
 ```@example 1
-mpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
-mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
+nmpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
+nmpc = setconstraint!(nmpc, umin=[-1.5], umax=[+1.5])
 ```
 
 We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted
 position):
 
 ```@example 1
-res = sim!(mpc, N, [180.0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
-plot(res)
+res_ry = sim!(nmpc, N, [180.0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
+plot(res_ry)
 savefig(ans, "plot3_NonLinMPC.svg"); nothing # hide
 ```
 
@@ -126,9 +125,100 @@ inverted position, the closed-loop response to a step disturbances of 10° is al
 satisfactory:
 
 ```@example 1
-res = sim!(mpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
-plot(res)
+res_yd = sim!(nmpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
+plot(res_yd)
 savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot4_NonLinMPC](plot4_NonLinMPC.svg)
+
+## Economic Model Predictive Controller
+
+Economic MPC can achieve the same objective but with lower economical costs. For this case
+study, the controller will aim to reduce the energy consumed by the motor. The power (W)
+transmitted by the motor to the pendulum is:
+
+```math
+Ẇ(t) = τ(t) ω(t)
+```
+
+Thus, the work (J) done by the motor from ``t = t_0`` to ``t_{end}`` is:
+
+```math
+W = \int_{t_0}^{t_{end}} Ẇ(t) \mathrm{d}t = \int_{t_0}^{t_{end}} τ(t) ω(t) dt
+```
+
+With the sampling time ``T_s`` in s, the prediction horizon ``H_p``, the limits defined as
+``t_0 = k T_s`` and ``t_{end} = (k+H_p) T_s``, and the left-endpoint rectangle method for
+the integral, we get:
+
+```math
+W ≈ T_s \sum_{j=0}^{H_p-1} τ(k + j) ω(k + j)
+```
+
+The objective function will now include an additive term that penalizes the work done by the
+motor ``W`` to reduce the energy consumption. Notice that ``W`` is a function of the
+manipulated input ``τ`` and the angular speed ``ω``, a state that is not measured (only the
+angle ``θ`` is measured here). As the arguments of [`NonLinMPC`](@ref) economic function
+`JE` do not include the states, the speed is now defined as an unmeasured output to design a
+Kalman Filter similar to the previous one (``\mathbf{y^m} = θ`` and ``\mathbf{y^u} = ω``):
+
+```@example 1
+h2(x, _ ) = [180/π*x[1], x[2]]
+nu, nx, ny = 1, 2, 2
+model2 = NonLinModel(f, h2, Ts, nu, nx, ny)
+estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
+```
+
+We can now define the ``J_E`` function and the `empc` controller:
+
+```@example 1
+function JE(UE, ŶE, _ )
+    τ, ω = UE[1:end-1], ŶE[2:2:end-1]
+    return Ts*sum(τ.*ω)
+end
+empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=4e3, JE=JE)
+empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
+```
+
+The keyword argument `Ewt` weights the economic costs relative to the other terms in the
+objective function. The second element of `Mwt` is zero since the speed ``ω`` is not
+requested to track a setpoint. The closed-loop response to a 180° setpoint is similar:
+
+```@example 1
+res2_ry = sim!(empc, N, [180.0, 0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
+plot(res2_ry)
+savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
+```
+
+![plot5_NonLinMPC](plot5_NonLinMPC.svg)
+
+And the energy consumption is almost identical here:
+
+```@example 1
+function calcW(res)
+    τ = res.U_data[1, 1:end-1]
+    ω = res.X_data[2, 1:end-1]
+    return Ts*sum(τ.*ω)
+end
+Dict(:nmpc => calcW(res_ry), :empc => calcW(res2_ry))
+```
+
+But, for the 10° step disturbance:
+
+```@example 1
+res2_yd = sim!(empc, N, [180.0; 0]; plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
+plot(res2_yd)
+savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
+```
+
+![plot6_NonLinMPC](plot6_NonLinMPC.svg)
+
+the new controller is able to recuperate more energy from the pendulum (i.e. negative work):
+
+```@example 1
+Dict(:nmpc => calcW(res_yd), :empc => calcW(res2_yd))
+```
+
+Of course, this gain is only exploitable if the motor electronic includes some kind of
+regenerative circuitry.
