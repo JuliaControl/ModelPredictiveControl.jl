@@ -199,8 +199,7 @@ and the energy consumption is almost identical:
 
 ```@example 1
 function calcW(res)
-    τ = res.U_data[1, 1:end-1]
-    ω = res.X_data[2, 1:end-1]
+    τ, ω = res.U_data[1, 1:end-1], res.X_data[2, 1:end-1]
     return Ts*sum(τ.*ω)
 end
 Dict(:nmpc => calcW(res_ry), :empc => calcW(res2_ry))

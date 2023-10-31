@@ -219,7 +219,7 @@ function setconstraint!(
     isnothing(c_Ymin)   && !isnothing(c_ymin)   && (c_Ymin  = repeat(c_ymin,  Hp))
     isnothing(c_Ymax)   && !isnothing(c_ymax)   && (c_Ymax  = repeat(c_ymax,  Hp))
     if !all(isnothing.([c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ymin, c_Ymax, c_x̂min, c_x̂max]))
-        !isinf(C) || throw(ArgumentError("Slack variable Cwt must be finite to set softness parameters"))
+        !isinf(C) || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
         notSolvedYet || error("Cannot set softness parameters after calling moveinput!")
     end
     if !isnothing(Umin)
