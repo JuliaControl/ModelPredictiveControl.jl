@@ -65,7 +65,8 @@ as a quick sanity check:
 using Plots
 u = [0.5]
 N = 35
-plot(sim!(model, N, u), plotu=false)
+res = sim!(model, N, u)
+plot(res, plotu=false)
 savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
 ```
 
