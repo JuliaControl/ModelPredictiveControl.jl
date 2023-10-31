@@ -182,8 +182,10 @@ empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
 ```
 
 The keyword argument `Ewt` weights the economic costs relative to the other terms in the
-objective function. The second element of `Mwt` is zero since the speed ``ω`` is not
-requested to track a setpoint. The closed-loop response to a 180° setpoint is similar:
+objective function. The term must be large enough to be significant but a too high value can
+lead to a static error on the angle setpoint. The second element of `Mwt` is zero since the
+speed ``ω`` is not requested to track a setpoint. The closed-loop response to a 180°
+setpoint is similar:
 
 ```@example 1
 res2_ry = sim!(empc, N, [180.0, 0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
