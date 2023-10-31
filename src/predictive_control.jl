@@ -27,6 +27,13 @@ const DEFAULT_LWT = 0.0
 const DEFAULT_CWT = 1e5
 const DEFAULT_EWT = 0.0
 
+"Termination status that means 'no solution available'."
+const FATAL_STATUSES = [
+    INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 
+    SLOW_PROGRESS, NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
+    OTHER_ERROR
+]
+
 "Type alias for vector of linear inequality constraints."
 const LinConVector = Vector{ConstraintRef{
     Model, 
@@ -380,7 +387,7 @@ function moveinput!(
     d ::Vector = empty(mpc.estim.x̂);
     D̂ ::Vector = repeat(d,  mpc.Hp),
     R̂y::Vector = repeat(ry, mpc.Hp),
-    R̂u::Vector = repeat(mpc.estim.model.uop, mpc.Hp),
+    R̂u::Vector = ~mpc.noR̂u ? repeat(mpc.estim.model.uop, mpc.Hp) : empty(mpc.estim.x̂),
     ym::Union{Vector, Nothing} = nothing
 )
     validate_setpointdist(mpc, ry, d, D̂, R̂y, R̂u)
@@ -537,7 +544,9 @@ function validate_setpointdist(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u
     size(d)  ≠ (nd,)    && throw(ArgumentError("d size $(size(d)) ≠ measured dist. size ($nd,)"))
     size(D̂)  ≠ (nd*Hp,) && throw(ArgumentError("D̂ size $(size(D̂)) ≠ measured dist. size × Hp ($(nd*Hp),)"))
     size(R̂y) ≠ (ny*Hp,) && throw(ArgumentError("R̂y size $(size(R̂y)) ≠ output size × Hp ($(ny*Hp),)"))
-    size(R̂u) ≠ (nu*Hp,) && throw(ArgumentError("R̂u size $(size(R̂u)) ≠ manip. input size × Hp ($(nu*Hp),)"))
+    if ~mpc.noR̂u
+        size(R̂u) ≠ (nu*Hp,) && throw(ArgumentError("R̂u size $(size(R̂u)) ≠ manip. input size × Hp ($(nu*Hp),)"))
+    end
 end
 
 @doc raw"""
@@ -554,11 +563,12 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
         mpc.F[:]  = mpc.F  + mpc.G  * mpc.d0 + mpc.J  * mpc.D̂0
     end
-    mpc.R̂y[:], mpc.R̂u[:] = R̂y, R̂u
-    Ẑ = mpc.F - R̂y
+    mpc.R̂y[:] = R̂y
+    Ẑ = mpc.F - mpc.R̂y
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
     mpc.p[]  = Ẑ'*mpc.M_Hp*Ẑ
     if ~mpc.noR̂u
+        mpc.R̂u[:] = R̂u
         lastu = mpc.estim.lastu0 + model.uop
         Ẑ = mpc.T*lastu - mpc.R̂u
         mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.S̃)'*Ẑ
@@ -581,7 +591,10 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y,
     if model.nd ≠ 0
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
     end
-    mpc.R̂y[:], mpc.R̂u[:] = R̂y, R̂u
+    mpc.R̂y[:] = R̂y
+    if ~mpc.noR̂u
+        mpc.R̂u[:] = R̂u
+    end
     return nothing
 end
 
@@ -1301,15 +1314,7 @@ function Base.show(io::IO, mpc::PredictiveController)
 end
 
 "Verify that the solver termination status means 'no solution available'."
-function isfatal(status::TerminationStatusCode)
-    fatalstatuses = [
-        INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 
-        SLOW_PROGRESS, NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
-        OTHER_ERROR
-    ]
-    return any(status .== fatalstatuses)
-end
-
+isfatal(status::TerminationStatusCode) = any(status .== FATAL_STATUSES)
 
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(
