@@ -88,7 +88,7 @@ automatically added to the model outputs by default if observability is preserve
 
 [^1]: As an alternative to state observer, we could have use an [`InternalModel`](@ref)
     structure with `mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])`.
-    It was tested on the example of this page and it gives similar results.
+    It was tested on the example of this page and it gave similar results.
 
 Before closing the loop, we call [`initstate!`](@ref) with the actual plant inputs and
 measurements to ensure a bumpless transfer. Since `model` simulates our plant here, its
@@ -127,7 +127,9 @@ nothing # hide
 ```
 
 The [`LinMPC`](@ref) objects are also callable as an alternative syntax for
-[`moveinput!`](@ref). Calling [`updatestate!`](@ref) on the `mpc` object updates its
+[`moveinput!`](@ref). It is worth mentioning that additional information like the optimal
+output predictions ``\mathbf{Ŷ}`` can be retrieved by calling [`getinfo`](@ref) after
+solving the problem. Also, calling [`updatestate!`](@ref) on the `mpc` object updates its
 internal state for the *NEXT* control period (this is by design, see
 [Functions: State Estimators](@ref) for justifications). That is why the call is done at the
 end of the `for` loop. The same logic applies for `model`.
@@ -254,3 +256,7 @@ savefig(ans, "plot3_LinMPC.svg"); nothing # hide
 ```
 
 ![plot3_LinMPC](plot3_LinMPC.svg)
+
+Note that measured disturbances are assumed constant in the future by default but custom
+``\mathbf{D̂}`` predictions are possible. The same applies for the setpoint predictions
+``\mathbf{R̂_y}``.
