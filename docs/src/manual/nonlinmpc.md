@@ -195,7 +195,7 @@ savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
 
 ![plot5_NonLinMPC](plot5_NonLinMPC.svg)
 
-And the energy consumption is almost identical here:
+and the energy consumption is almost identical:
 
 ```@example 1
 function calcW(res)
@@ -206,7 +206,7 @@ end
 Dict(:nmpc => calcW(res_ry), :empc => calcW(res2_ry))
 ```
 
-But, for the 10° step disturbance:
+But, for a 10° step disturbance:
 
 ```@example 1
 res2_yd = sim!(empc, N, [180.0; 0]; plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
