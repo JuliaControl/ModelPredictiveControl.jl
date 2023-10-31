@@ -145,7 +145,7 @@ Ẇ(t) = τ(t) ω(t)
 Thus, the work (J) done by the motor from ``t = t_0`` to ``t_{end}`` is:
 
 ```math
-W = \int_{t_0}^{t_{end}} Ẇ(t) \mathrm{d}t = \int_{t_0}^{t_{end}} τ(t) ω(t) dt
+W = \int_{t_0}^{t_{end}} Ẇ(t) \mathrm{d}t = \int_{t_0}^{t_{end}} τ(t) ω(t) \mathrm{d}t
 ```
 
 With the sampling time ``T_s`` in s, the prediction horizon ``H_p``, the limits defined as
