@@ -340,7 +340,7 @@ function init_optimization!(mpc::NonLinMPC)
     return nothing
 end
 
-"Set the nonlinear constraints on the output predictions `Ŷ` ans terminal states `x̂end`."
+"Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
 function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     optim = mpc.optim
     ΔŨvar = mpc.optim[:ΔŨvar]
@@ -372,8 +372,8 @@ Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](
 
 The method mutates the `C` vector in argument and returns it.
 """
-function con_nonlinprog!(C, mpc::NonLinMPC, model::SimModel, x̂end, Ŷ, ΔŨ)
-    nx̂, nŶ = mpc.estim.nx̂, model.ny*mpc.Hp
+function con_nonlinprog!(C, mpc::NonLinMPC, ::SimModel, x̂end, Ŷ, ΔŨ)
+    nx̂, nŶ = mpc.estim.nx̂, length(Ŷ)
     ϵ = !isinf(mpc.C) ? ΔŨ[end] : 0.0 # ϵ = 0.0 if Cwt=Inf (meaning: no relaxation)
     for i in eachindex(C)
         mpc.con.i_C[i] || continue

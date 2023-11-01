@@ -671,9 +671,10 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
     if model.nd ≠ 0
         mpc.con.fx̂[:] = mpc.con.fx̂ + mpc.con.gx̂ * mpc.d0 + mpc.con.jx̂ * mpc.D̂0
     end
+    lastu = mpc.estim.lastu0 + model.uop
     mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T*(mpc.estim.lastu0 + model.uop)
-        +mpc.con.Umax - mpc.T*(mpc.estim.lastu0 + model.uop)
+        -mpc.con.Umin + mpc.T*lastu
+        +mpc.con.Umax - mpc.T*lastu
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
         -mpc.con.Ymin + mpc.F
@@ -687,9 +688,10 @@ end
 
 "Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
 function linconstraint!(mpc::PredictiveController, model::SimModel)
+    lastu = mpc.estim.lastu0 + model.uop
     mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T*(mpc.estim.lastu0 + model.uop)
-        +mpc.con.Umax - mpc.T*(mpc.estim.lastu0 + model.uop)
+        -mpc.con.Umin + mpc.T*lastu
+        +mpc.con.Umax - mpc.T*lastu
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
     ]
@@ -707,10 +709,9 @@ function optim_objective!(mpc::PredictiveController)
     model = mpc.estim.model
     ΔŨvar::Vector{VariableRef} = optim[:ΔŨvar]
     lastΔŨ = mpc.ΔŨ
-    # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}]
-    ΔŨ0 = [lastΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(model.nu)]
-    # if soft constraints, append the last slack value ϵ_{k-1}:
-    !isinf(mpc.C) && (ΔŨ0 = [ΔŨ0; lastΔŨ[end]])
+    # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}; ϵ_{k-1}]
+    ϵ0  = !isinf(mpc.C) ? [lastΔŨ[end]] : empty(mpc.ΔŨ)
+    ΔŨ0 = [lastΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(model.nu); ϵ0]
     set_start_value.(ΔŨvar, ΔŨ0)
     set_objective_linear_coef!(mpc, ΔŨvar)
     try
@@ -727,9 +728,9 @@ function optim_objective!(mpc::PredictiveController)
     status = termination_status(optim)
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
         @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVED ($status)"
-        @debug solution_summary(optim)
+        @debug solution_summary(optim, verbose=true)
     end
-    mpc.ΔŨ[:] = isfatal(status) ? value.(ΔŨvar) : value.(ΔŨvar) # fatal status : use last value
+    mpc.ΔŨ[:] = isfatal(status) ? ΔŨ0 : value.(ΔŨvar) # fatal status : use last value
     return mpc.ΔŨ
 end
 
