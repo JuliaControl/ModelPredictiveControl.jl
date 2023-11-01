@@ -114,6 +114,7 @@ We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (i
 position):
 
 ```@example 1
+using Logging; disable_logging(Warn) # hide
 res_ry = sim!(nmpc, N, [180.0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
 plot(res_ry)
 savefig(ans, "plot3_NonLinMPC.svg"); nothing # hide

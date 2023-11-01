@@ -726,11 +726,18 @@ function optim_objective!(mpc::PredictiveController)
         end
     end
     status = termination_status(optim)
+    ΔŨcurr, ΔŨlast = value.(ΔŨvar), ΔŨ0
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
-        @warn "MPC termination status not OPTIMAL or LOCALLY_SOLVED ($status)"
+        if isfatal(status)
+            @error("MPC terminated without solution: returning last solution shifted", 
+                   status, ΔŨcurr, ΔŨlast)
+        else
+            @warn("MPC termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
+                  "solution anyway", status, ΔŨcurr, ΔŨlast)
+        end
         @debug solution_summary(optim, verbose=true)
     end
-    mpc.ΔŨ[:] = isfatal(status) ? ΔŨ0 : value.(ΔŨvar) # fatal status : use last value
+    mpc.ΔŨ[:] = isfatal(status) ? ΔŨlast : ΔŨcurr
     return mpc.ΔŨ
 end
 
