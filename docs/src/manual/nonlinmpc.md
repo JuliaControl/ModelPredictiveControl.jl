@@ -207,7 +207,7 @@ function calcW(res)
     τ, ω = res.U_data[1, 1:end-1], res.X_data[2, 1:end-1]
     return Ts*sum(τ.*ω)
 end
-Dict(:nmpc => calcW(res_ry), :empc => calcW(res2_ry))
+Dict(:W_nmpc => calcW(res_ry), :W_empc => calcW(res2_ry))
 ```
 
 But, for a 10° step disturbance:
@@ -223,7 +223,7 @@ savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
 the new controller is able to recuperate more energy from the pendulum (i.e. negative work):
 
 ```@example 1
-Dict(:nmpc => calcW(res_yd), :empc => calcW(res2_yd))
+Dict(:W_nmpc => calcW(res_yd), :W_empc => calcW(res2_yd))
 ```
 
 Of course, this gain is only exploitable if the motor electronic includes some kind of
