@@ -167,14 +167,14 @@ Kalman Filter similar to the previous one (``\mathbf{y^m} = θ`` and ``\mathbf{y
 ```@example 1
 h2(x, _ ) = [180/π*x[1], x[2]]
 nu, nx, ny = 1, 2, 2
-model2 = NonLinModel(f, h2, Ts, nu, nx, ny)
-estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
+model2 = NonLinModel(f      , h2, Ts, nu, nx, ny)
 plant2 = NonLinModel(f_plant, h2, Ts, nu, nx, ny)
+estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
 ```
 
-The `plant2` object is also required since [`sim!`](@ref) expects that the output vector of
-`plant` argument corresponds to the model output vector in `mpc` argument. We can now define
-the ``J_E`` function and the `empc` controller:
+The `plant2` object based on `h2` is also required since [`sim!`](@ref) expects that the
+output vector of `plant` argument corresponds to the model output vector in `mpc` argument.
+We can now define the ``J_E`` function and the `empc` controller:
 
 ```@example 1
 function JE(UE, ŶE, _ )
