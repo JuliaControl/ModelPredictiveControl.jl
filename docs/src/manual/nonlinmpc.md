@@ -169,9 +169,12 @@ h2(x, _ ) = [180/π*x[1], x[2]]
 nu, nx, ny = 1, 2, 2
 model2 = NonLinModel(f, h2, Ts, nu, nx, ny)
 estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
+plant2 = NonLinModel(f_plant, h2, Ts, nu, nx, ny)
 ```
 
-We can now define the ``J_E`` function and the `empc` controller:
+The `plant2` object is also required since [`sim!`](@ref) expects that the output vector of
+`plant` argument corresponds to the model output vector in `mpc` argument. We can now define
+the ``J_E`` function and the `empc` controller:
 
 ```@example 1
 function JE(UE, ŶE, _ )
@@ -189,7 +192,7 @@ speed ``ω`` is not requested to track a setpoint. The closed-loop response to a
 setpoint is similar:
 
 ```@example 1
-res2_ry = sim!(empc, N, [180.0, 0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
+res2_ry = sim!(empc, N, [180, 0], plant=plant2, x0=[0, 0], x̂0=[0, 0, 0])
 plot(res2_ry)
 savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
 ```
@@ -209,7 +212,7 @@ Dict(:nmpc => calcW(res_ry), :empc => calcW(res2_ry))
 But, for a 10° step disturbance:
 
 ```@example 1
-res2_yd = sim!(empc, N, [180.0; 0]; plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
+res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10, 0])
 plot(res2_yd)
 savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
 ```
