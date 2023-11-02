@@ -74,7 +74,7 @@ struct ControllerConstraint
     C_ymax  ::Vector{Float64}
     c_x̂min  ::Vector{Float64}
     c_x̂max  ::Vector{Float64}
-    i_C     ::BitVector
+    i_g     ::BitVector
 end
 
 @doc raw"""
@@ -314,7 +314,7 @@ function setconstraint!(
     i_Ymin,  i_Ymax  = .!isinf.(con.Ymin),  .!isinf.(con.Ymax)
     i_x̂min,  i_x̂max  = .!isinf.(con.x̂min),  .!isinf.(con.x̂max)
     if notSolvedYet
-        con.i_b[:], con.i_C[:], con.A[:] = init_matconstraint(model,
+        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint(model,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
@@ -328,11 +328,11 @@ function setconstraint!(
         @constraint(mpc.optim, linconstraint, A*ΔŨvar .≤ b)
         setnonlincon!(mpc, model)
     else
-        i_b, i_C = init_matconstraint(model, 
+        i_b, i_g = init_matconstraint(model, 
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max
         )
-        if i_b ≠ con.i_b || i_C ≠ con.i_C
+        if i_b ≠ con.i_b || i_g ≠ con.i_g
             error("Cannot modify ±Inf constraints after calling moveinput!")
         end
     end
@@ -1027,7 +1027,7 @@ function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, k
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Ymin),  .!isinf.(Ymax)
     i_x̂min,  i_x̂max  = .!isinf.(x̂min),  .!isinf.(x̂max)
-    i_b, i_C, A = init_matconstraint(
+    i_b, i_g, A = init_matconstraint(
         model, 
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min
@@ -1037,7 +1037,7 @@ function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, k
         ẽx̂      , fx̂    , gx̂     , jx̂       , kx̂     , vx̂     ,  
         Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ymin   , Ymax   , x̂min   , x̂max,
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
-        A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_C
+        A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_g
     )
     return con, S̃, Ñ_Hc, Ẽ
 end
@@ -1245,19 +1245,19 @@ init_stochpred(estim::StateEstimator, _ ) = zeros(0, estim.nxs), zeros(0, estim.
 @doc raw"""
     init_matconstraint(model::LinModel,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
-    ) -> i_b, i_C, A
+    ) -> i_b, i_g, A
 
-Init `i_b`, `i_C` and `A` matrices for the linear and nonlinear inequality constraints.
+Init `i_b`, `i_g` and `A` matrices for the linear and nonlinear inequality constraints.
 
 The linear and nonlinear inequality constraints are respectively defined as:
 ```math
 \begin{aligned} 
     \mathbf{A ΔŨ } &≤ \mathbf{b} \\ 
-    \mathbf{C(ΔŨ)} &≤ \mathbf{0}
+    \mathbf{g(ΔŨ)} &≤ \mathbf{0}
 \end{aligned}
 ```
 `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. 
-`i_C` is a similar vector but for the indices of ``\mathbf{C}`` (empty if `model` is a 
+`i_g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if `model` is a 
 [`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if `args` is
 provided. In such a case, `args`  needs to contain all the inequality constraint matrices: 
 `A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max`.
@@ -1266,29 +1266,29 @@ function init_matconstraint(::LinModel,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
 )
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
-    i_C = BitVector()
+    i_g = BitVector()
     if isempty(args)
         A = zeros(length(i_b), 0)
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max = args
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
     end
-    return i_b, i_C, A
+    return i_b, i_g, A
 end
 
-"Init `i_b` and `A` without predicted output and terminal constraints if `model` is not a [`LinModel`](@ref)."
+"Init `i_b, A` without outputs and terminal constraints if `model` is not a [`LinModel`](@ref)."
 function init_matconstraint(::SimModel,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
 )
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    i_C = [i_Ymin; i_Ymax; i_x̂min; i_x̂max]
+    i_g = [i_Ymin; i_Ymax; i_x̂min; i_x̂max]
     if isempty(args)
         A = zeros(length(i_b), 0)
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ = args
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
     end
-    return i_b, i_C, A
+    return i_b, i_g, A
 end
 
 "Validate predictive controller weight and horizon specified values."

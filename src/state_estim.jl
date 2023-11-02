@@ -151,15 +151,15 @@ function init_integrators(nint::IntVectorOrInt, ny, varname::String)
     nx = sum(nint)
     A, C = zeros(nx, nx), zeros(ny, nx)
     if nx ≠ 0
-        i_A, i_C = 1, 1
+        i_A, i_g = 1, 1
         for i = 1:ny
             nint_i = nint[i]
             if nint_i ≠ 0
                 rows_A = (i_A):(i_A + nint_i - 1)
                 A[rows_A, rows_A] = Bidiagonal(ones(nint_i), ones(nint_i-1), :L)
-                C[i, i_C+nint_i-1] = 1
+                C[i, i_g+nint_i-1] = 1
                 i_A += nint_i
-                i_C += nint_i
+                i_g += nint_i
             end
         end
     end
