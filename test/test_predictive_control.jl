@@ -148,11 +148,11 @@ end
     setconstraint!(mpc2, Ymin=-1(1:50).-3, Ymax=+1(1:50).+3)
     @test all((mpc2.con.Ymin, mpc2.con.Ymax) .≈ (-1(1:50).-3, +1(1:50).+3))
 
-    setconstraint!(mpc2, c_Umin=+1(1:50).+4, c_Umax=+1(1:50).+4)
+    setconstraint!(mpc2, C_umin=+1(1:50).+4, C_umax=+1(1:50).+4)
     @test all((-mpc2.con.A_Umin[:, end], -mpc2.con.A_Umax[:, end]) .≈ (+1(1:50).+4, +1(1:50).+4))
-    setconstraint!(mpc2, c_ΔUmin=+1(1:5).+5, c_ΔUmax=+1(1:5).+5)
+    setconstraint!(mpc2, C_Δumin=+1(1:5).+5, C_Δumax=+1(1:5).+5)
     @test all((-mpc2.con.A_ΔŨmin[1:end-1, end], -mpc2.con.A_ΔŨmax[1:end-1, end]) .≈ (+1(1:5).+5, +1(1:5).+5))
-    setconstraint!(mpc2, c_Ymin=+1(1:50).+6, c_Ymax=+1(1:50).+6)
+    setconstraint!(mpc2, C_ymin=+1(1:50).+6, C_ymax=+1(1:50).+6)
     @test all((-mpc2.con.A_Ymin[:, end], -mpc2.con.A_Ymax[:, end]) .≈ (+1(1:50).+6, +1(1:50).+6))
     setconstraint!(mpc2, c_umin=[0], c_umax=[0], c_Δumin=[0], c_Δumax=[0], c_ymin=[1], c_ymax=[1])
 
@@ -479,7 +479,7 @@ end
     @test all((-nmpc.con.A_ΔŨmin[1:end-1, end], -nmpc.con.A_ΔŨmax[1:end-1, end]) .≈ ([0.05,0.06], [0.07,0.08]))
     setconstraint!(nmpc, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
     @test all((-nmpc.con.A_Ymin, -nmpc.con.A_Ymax) .≈ (zeros(0,3), zeros(0,3)))
-    @test all((nmpc.con.c_Ymin, nmpc.con.c_Ymax) .≈ ([1.00,1.01], [1.02,1.03]))
+    @test all((nmpc.con.C_ymin, nmpc.con.C_ymax) .≈ ([1.00,1.01], [1.02,1.03]))
     setconstraint!(nmpc, c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36])
     @test all((nmpc.con.c_x̂min, nmpc.con.c_x̂max) .≈ ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
 

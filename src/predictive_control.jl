@@ -70,8 +70,8 @@ struct ControllerConstraint
     A       ::Matrix{Float64}
     b       ::Vector{Float64}
     i_b     ::BitVector
-    c_Ymin  ::Vector{Float64}
-    c_Ymax  ::Vector{Float64}
+    C_ymin  ::Vector{Float64}
+    C_ymax  ::Vector{Float64}
     c_x̂min  ::Vector{Float64}
     c_x̂max  ::Vector{Float64}
     i_C     ::BitVector
@@ -121,7 +121,7 @@ constraints are all soft by default. See Extended Help for time-varying constrai
 - `c_x̂min  = fill(1.0,nx̂)` : `x̂min` softness weights ``\mathbf{c_{x̂_{min}}}``.
 - `c_x̂max  = fill(1.0,nx̂)` : `x̂max` softness weights ``\mathbf{c_{x̂_{max}}}``.
 - all the keyword arguments above but with a capital letter, except for the terminal
-  constraints, e.g. `Ymax` or `c_ΔUmin` : for time-varying constraints (see Extended Help).
+  constraints, e.g. `Ymax` or `C_Δumin` : for time-varying constraints (see Extended Help).
 
 # Examples
 ```jldoctest
@@ -160,15 +160,15 @@ It is also possible to specify time-varying constraints over ``H_p`` and ``H_c``
 In such a case, they are defined by:
 ```math 
 \begin{alignat*}{3}
-    \mathbf{U_{min}  - c_{U_{min}}}  ϵ ≤&&\ \mathbf{U}  &≤ \mathbf{U_{max}  + c_{U_{max}}}  ϵ \\
-    \mathbf{ΔU_{min} - c_{ΔU_{min}}} ϵ ≤&&\ \mathbf{ΔU} &≤ \mathbf{ΔU_{max} + c_{ΔY_{max}}} ϵ \\
-    \mathbf{Y_{min}  - c_{Y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + c_{Y_{max}}}  ϵ
+    \mathbf{U_{min}  - C_{u_{min}}}  ϵ ≤&&\ \mathbf{U}  &≤ \mathbf{U_{max}  + C_{u_{max}}}  ϵ \\
+    \mathbf{ΔU_{min} - C_{Δu_{min}}} ϵ ≤&&\ \mathbf{ΔU} &≤ \mathbf{ΔU_{max} + C_{Δu_{max}}} ϵ \\
+    \mathbf{Y_{min}  - C_{y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + C_{y_{max}}}  ϵ
 \end{alignat*}
 ```
 For this, use the same keyword arguments as above but with a capital letter:
-- `Umin`  / `Umax`  / `c_Umin`  / `c_Umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
-- `ΔUmin` / `ΔUmax` / `c_ΔUmin` / `c_ΔUmax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
-- `Ymin`  / `Ymax`  / `c_Ymin`  / `c_Ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
+- `Umin`  / `Umax`  / `C_umin`  / `C_umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
+- `ΔUmin` / `ΔUmax` / `C_Δumin` / `C_Δumax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
+- `Ymin`  / `Ymax`  / `C_ymin`  / `C_ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
 """
 function setconstraint!(
     mpc::PredictiveController; 
@@ -183,9 +183,9 @@ function setconstraint!(
     Umin    = nothing, Umax    = nothing,
     ΔUmin   = nothing, ΔUmax   = nothing,
     Ymin    = nothing, Ymax    = nothing,
-    c_Umax  = nothing, c_Umin  = nothing,
-    c_ΔUmax = nothing, c_ΔUmin = nothing,
-    c_Ymax  = nothing, c_Ymin  = nothing,
+    C_umax  = nothing, C_umin  = nothing,
+    C_Δumax = nothing, C_Δumin = nothing,
+    C_ymax  = nothing, C_ymin  = nothing,
     # ------------ will be deleted in the future ---------------
     ŷmin    = nothing, ŷmax    = nothing,
     c_ŷmin  = nothing, c_ŷmax  = nothing,
@@ -219,13 +219,13 @@ function setconstraint!(
     isnothing(ΔUmax)    && !isnothing(Δumax)    && (ΔUmax   = repeat(Δumax,   Hc))
     isnothing(Ymin)     && !isnothing(ymin)     && (Ymin    = repeat(ymin,    Hp))
     isnothing(Ymax)     && !isnothing(ymax)     && (Ymax    = repeat(ymax,    Hp))
-    isnothing(c_Umin)   && !isnothing(c_umin)   && (c_Umin  = repeat(c_umin,  Hp))
-    isnothing(c_Umax)   && !isnothing(c_umax)   && (c_Umax  = repeat(c_umax,  Hp))
-    isnothing(c_ΔUmin)  && !isnothing(c_Δumin)  && (c_ΔUmin = repeat(c_Δumin, Hc))
-    isnothing(c_ΔUmax)  && !isnothing(c_Δumax)  && (c_ΔUmax = repeat(c_Δumax, Hc))
-    isnothing(c_Ymin)   && !isnothing(c_ymin)   && (c_Ymin  = repeat(c_ymin,  Hp))
-    isnothing(c_Ymax)   && !isnothing(c_ymax)   && (c_Ymax  = repeat(c_ymax,  Hp))
-    if !all(isnothing.([c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ymin, c_Ymax, c_x̂min, c_x̂max]))
+    isnothing(C_umin)   && !isnothing(c_umin)   && (C_umin  = repeat(c_umin,  Hp))
+    isnothing(C_umax)   && !isnothing(c_umax)   && (C_umax  = repeat(c_umax,  Hp))
+    isnothing(C_Δumin)  && !isnothing(c_Δumin)  && (C_Δumin = repeat(c_Δumin, Hc))
+    isnothing(C_Δumax)  && !isnothing(c_Δumax)  && (C_Δumax = repeat(c_Δumax, Hc))
+    isnothing(C_ymin)   && !isnothing(c_ymin)   && (C_ymin  = repeat(c_ymin,  Hp))
+    isnothing(C_ymax)   && !isnothing(c_ymax)   && (C_ymax  = repeat(c_ymax,  Hp))
+    if !all(isnothing.([C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax, c_x̂min, c_x̂max]))
         !isinf(C) || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
         notSolvedYet || error("Cannot set softness parameters after calling moveinput!")
     end
@@ -261,38 +261,38 @@ function setconstraint!(
         size(x̂max)   == (nx̂,) || throw(ArgumentError("x̂max size must be $((nx̂,))"))
         con.x̂max[:] = x̂max
     end
-    if !isnothing(c_Umin)
-        size(c_Umin) == (nu*Hp,) || throw(ArgumentError("c_Umin size must be $((nu*Hp,))"))
-        any(c_Umin .< 0) && error("c_Umin weights should be non-negative")
-        con.A_Umin[:, end] = -c_Umin
+    if !isnothing(C_umin)
+        size(C_umin) == (nu*Hp,) || throw(ArgumentError("C_umin size must be $((nu*Hp,))"))
+        any(C_umin .< 0) && error("C_umin weights should be non-negative")
+        con.A_Umin[:, end] = -C_umin
     end
-    if !isnothing(c_Umax)
-        size(c_Umax) == (nu*Hp,) || throw(ArgumentError("c_Umax size must be $((nu*Hp,))"))
-        any(c_Umax .< 0) && error("c_Umax weights should be non-negative")
-        con.A_Umax[:, end] = -c_Umax
+    if !isnothing(C_umax)
+        size(C_umax) == (nu*Hp,) || throw(ArgumentError("C_umax size must be $((nu*Hp,))"))
+        any(C_umax .< 0) && error("C_umax weights should be non-negative")
+        con.A_Umax[:, end] = -C_umax
     end
-    if !isnothing(c_ΔUmin)
-        size(c_ΔUmin) == (nu*Hc,) || throw(ArgumentError("c_ΔUmin size must be $((nu*Hc,))"))
-        any(c_ΔUmin .< 0) && error("c_ΔUmin weights should be non-negative")
-        con.A_ΔŨmin[1:end-1, end] = -c_ΔUmin 
+    if !isnothing(C_Δumin)
+        size(C_Δumin) == (nu*Hc,) || throw(ArgumentError("C_Δumin size must be $((nu*Hc,))"))
+        any(C_Δumin .< 0) && error("C_Δumin weights should be non-negative")
+        con.A_ΔŨmin[1:end-1, end] = -C_Δumin 
     end
-    if !isnothing(c_ΔUmax)
-        size(c_ΔUmax) == (nu*Hc,) || throw(ArgumentError("c_ΔUmax size must be $((nu*Hc,))"))
-        any(c_ΔUmax .< 0) && error("c_ΔUmax weights should be non-negative")
-        con.A_ΔŨmax[1:end-1, end] = -c_ΔUmax
+    if !isnothing(C_Δumax)
+        size(C_Δumax) == (nu*Hc,) || throw(ArgumentError("C_Δumax size must be $((nu*Hc,))"))
+        any(C_Δumax .< 0) && error("C_Δumax weights should be non-negative")
+        con.A_ΔŨmax[1:end-1, end] = -C_Δumax
     end
-    if !isnothing(c_Ymin)
-        size(c_Ymin) == (ny*Hp,) || throw(ArgumentError("c_Ymin size must be $((ny*Hp,))"))
-        any(c_Ymin .< 0) && error("c_Ymin weights should be non-negative")
-        con.c_Ymin[:] = c_Ymin
-        A_Ymin ,_ = relaxŶ(model, C, con.c_Ymin, con.c_Ymax, E)
+    if !isnothing(C_ymin)
+        size(C_ymin) == (ny*Hp,) || throw(ArgumentError("C_ymin size must be $((ny*Hp,))"))
+        any(C_ymin .< 0) && error("C_ymin weights should be non-negative")
+        con.C_ymin[:] = C_ymin
+        A_Ymin ,_ = relaxŶ(model, C, con.C_ymin, con.C_ymax, E)
         con.A_Ymin[:] = A_Ymin
     end
-    if !isnothing(c_Ymax)
-        size(c_Ymax) == (ny*Hp,) || throw(ArgumentError("c_Ymax size must be $((ny*Hp,))"))
-        any(c_Ymax .< 0) && error("c_Ymax weights should be non-negative")
-        con.c_Ymax[:] = c_Ymax
-        _, A_Ymax = relaxŶ(model, C, con.c_Ymin, con.c_Ymax, E)
+    if !isnothing(C_ymax)
+        size(C_ymax) == (ny*Hp,) || throw(ArgumentError("C_ymax size must be $((ny*Hp,))"))
+        any(C_ymax .< 0) && error("C_ymax weights should be non-negative")
+        con.C_ymax[:] = C_ymax
+        _, A_Ymax = relaxŶ(model, C, con.C_ymin, con.C_ymax, E)
         con.A_Ymax[:] = A_Ymax
     end
     if !isnothing(c_x̂min)
@@ -1017,11 +1017,11 @@ function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, k
     c_x̂min,     c_x̂max  = fill(0.0, nx̂),  fill(0.0, nx̂)
     Umin, Umax, ΔUmin, ΔUmax, Ymin, Ymax = 
         repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
-    c_Umin, c_Umax, c_ΔUmin, c_ΔUmax, c_Ymin, c_Ymax = 
+    C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
-    A_Umin, A_Umax, S̃ = relaxU(C, c_Umin, c_Umax, S)
-    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
-    A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, c_Ymin, c_Ymax, E)
+    A_Umin, A_Umax, S̃ = relaxU(C, C_umin, C_umax, S)
+    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc)
+    A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, C_ymin, C_ymax, E)
     A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, C, c_x̂min, c_x̂max, ex̂)
     i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
@@ -1037,7 +1037,7 @@ function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, k
         ẽx̂      , fx̂    , gx̂     , jx̂       , kx̂     , vx̂     ,  
         Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ymin   , Ymax   , x̂min   , x̂max,
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
-        A       , b     , i_b    , c_Ymin   , c_Ymax , c_x̂min , c_x̂max , i_C
+        A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_C
     )
     return con, S̃, Ñ_Hc, Ẽ
 end
@@ -1054,7 +1054,7 @@ function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
 end
 
 @doc raw"""
-    relaxU(C, c_Umin, c_Umax, S) -> A_Umin, A_Umax, S̃
+    relaxU(C, C_umin, C_umax, S) -> A_Umin, A_Umax, S̃
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
@@ -1074,10 +1074,10 @@ constraints:
 \end{bmatrix}
 ```
 """
-function relaxU(C, c_Umin, c_Umax, S)
+function relaxU(C, C_umin, C_umax, S)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
-        A_Umin, A_Umax = -[S  c_Umin],  [S -c_Umax] 
+        A_Umin, A_Umax = -[S  C_umin],  [S -C_umax] 
         # ϵ has no impact on ΔU → U conversion for prediction calculations:
         S̃ = [S falses(size(S, 1))]
     else # ΔŨ = ΔU (only hard constraints)
@@ -1088,7 +1088,7 @@ function relaxU(C, c_Umin, c_Umax, S)
 end
 
 @doc raw"""
-    relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
+    relaxΔU(C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
 
 Augment input increments constraints with slack variable ϵ for softening.
 
@@ -1108,12 +1108,12 @@ returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{
 \end{bmatrix}
 ```
 """
-function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
+function relaxΔU(C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # 0 ≤ ϵ ≤ ∞  
         ΔŨmin, ΔŨmax = [ΔUmin; 0.0], [ΔUmax; Inf]
         A_ϵ = [zeros(1, length(ΔUmin)) [1]]
-        A_ΔŨmin, A_ΔŨmax = -[I  c_ΔUmin; A_ϵ], [I -c_ΔUmax; A_ϵ]
+        A_ΔŨmin, A_ΔŨmax = -[I  C_Δumin; A_ϵ], [I -C_Δumax; A_ϵ]
         Ñ_Hc = Diagonal([diag(N_Hc); C])
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
@@ -1125,7 +1125,7 @@ function relaxΔU(C, c_ΔUmin, c_ΔUmax, ΔUmin, ΔUmax, N_Hc)
 end
 
 @doc raw"""
-    relaxŶ(::LinModel, C, c_Ymin, c_Ymax, E) -> A_Ymin, A_Ymax, Ẽ
+    relaxŶ(::LinModel, C, C_ymin, C_ymax, E) -> A_Ymin, A_Ymax, Ẽ
 
 Augment linear output prediction constraints with slack variable ϵ for softening.
 
@@ -1144,10 +1144,10 @@ Denoting the input increments augmented with the slack variable
 \end{bmatrix}
 ```
 """
-function relaxŶ(::LinModel, C, c_Ymin, c_Ymax, E)
+function relaxŶ(::LinModel, C, C_ymin, C_ymax, E)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts predicted output constraint calculations:
-        A_Ymin, A_Ymax = -[E  c_Ymin], [E -c_Ymax] 
+        A_Ymin, A_Ymax = -[E  C_ymin], [E -C_ymax] 
         # ϵ has no impact on output predictions
         Ẽ = [E zeros(size(E, 1), 1)] 
     else # ΔŨ = ΔU (only hard constraints)
@@ -1158,7 +1158,7 @@ function relaxŶ(::LinModel, C, c_Ymin, c_Ymax, E)
 end
 
 "Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxŶ(::SimModel, C, c_Ymin, c_Ymax, E)
+function relaxŶ(::SimModel, C, C_ymin, C_ymax, E)
     Ẽ = !isinf(C) ? [E zeros(0, 1)] : E
     A_Ymin, A_Ymax = -Ẽ,  Ẽ 
     return A_Ymin, A_Ymax, Ẽ

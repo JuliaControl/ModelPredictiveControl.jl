@@ -379,10 +379,10 @@ function con_nonlinprog!(C, mpc::NonLinMPC, ::SimModel, x̂end, Ŷ, ΔŨ)
         mpc.con.i_C[i] || continue
         if i ≤ nŶ
             j = i
-            C[i] = (mpc.con.Ymin[j] - Ŷ[j])     - ϵ*mpc.con.c_Ymin[j]
+            C[i] = (mpc.con.Ymin[j] - Ŷ[j])     - ϵ*mpc.con.C_ymin[j]
         elseif i ≤ 2nŶ
             j = i - nŶ
-            C[i] = (Ŷ[j] - mpc.con.Ymax[j])     - ϵ*mpc.con.c_Ymax[j]
+            C[i] = (Ŷ[j] - mpc.con.Ymax[j])     - ϵ*mpc.con.C_ymax[j]
         elseif i ≤ 2nŶ + nx̂
             j = i - 2nŶ
             C[i] = (mpc.con.x̂min[j] - x̂end[j])  - ϵ*mpc.con.c_x̂min[j]
