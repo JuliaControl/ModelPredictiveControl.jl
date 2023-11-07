@@ -1,3 +1,5 @@
+const DEFAULT_LINMPC_OPTIMIZER = OSQP.MathOptInterfaceOSQP.Optimizer
+
 struct LinMPC{SE<:StateEstimator} <: PredictiveController
     estim::SE
     optim::JuMP.Model
@@ -155,7 +157,7 @@ function LinMPC(
     Nwt = fill(DEFAULT_NWT, model.nu),
     Lwt = fill(DEFAULT_LWT, model.nu),
     Cwt = DEFAULT_CWT,
-    optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer),
+    optim::JuMP.Model = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
@@ -193,7 +195,7 @@ function LinMPC(
     Nwt = fill(DEFAULT_NWT, estim.model.nu),
     Lwt = fill(DEFAULT_LWT, estim.model.nu),
     Cwt = DEFAULT_CWT,
-    optim::JuMP.Model = JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)
+    optim::JuMP.Model = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
 ) where {SE<:StateEstimator}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     Hp = default_Hp(estim.model, Hp)

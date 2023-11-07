@@ -1,3 +1,5 @@
+const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
+
 const DiffCacheType = DiffCache{Vector{Float64}, Vector{Float64}}
 
 struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
@@ -163,7 +165,7 @@ function NonLinMPC(
     Cwt = DEFAULT_CWT,
     Ewt = DEFAULT_EWT,
     JE::Function = (_,_,_) -> 0.0,
-    optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")),
+    optim::JuMP.Model = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = UnscentedKalmanFilter(model; kwargs...)
@@ -180,7 +182,7 @@ function NonLinMPC(
     Cwt = DEFAULT_CWT,
     Ewt = DEFAULT_EWT,
     JE::Function = (_,_,_) -> 0.0,
-    optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")),
+    optim::JuMP.Model = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
@@ -220,7 +222,7 @@ function NonLinMPC(
     Cwt = DEFAULT_CWT,
     Ewt = DEFAULT_EWT,
     JE::JEFunc = (_,_,_) -> 0.0,
-    optim::JuMP.Model = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"))
+    optim::JuMP.Model = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
 ) where {SE<:StateEstimator, JEFunc<:Function}
     Hp = default_Hp(estim.model, Hp)
     return NonLinMPC{SE, JEFunc}(estim, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, optim)

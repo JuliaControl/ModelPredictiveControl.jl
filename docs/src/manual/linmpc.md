@@ -167,7 +167,7 @@ real-life control problems. Constructing a [`LinMPC`](@ref) with `DAQP` and inpu
 
 ```@example 1
 using JuMP, DAQP
-daqp = Model(DAQP.Optimizer)
+daqp = Model(DAQP.Optimizer, add_bridges=false)
 mpc2 = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], optim=daqp, nint_u=[1, 1])
 mpc2 = setconstraint!(mpc2, ymin=[45, -Inf])
 ```
