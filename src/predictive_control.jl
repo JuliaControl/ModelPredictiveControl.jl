@@ -1241,7 +1241,6 @@ end
 "Return empty matrices if `estim` is not a [`InternalModel`](@ref)."
 init_stochpred(estim::StateEstimator, _ ) = zeros(0, estim.nxs), zeros(0, estim.model.ny)
 
-
 @doc raw"""
     init_matconstraint(model::LinModel,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
@@ -1319,6 +1318,19 @@ function Base.show(io::IO, mpc::PredictiveController)
     println(io, "$(lpad(Hp, n)) prediction steps Hp")
     println(io, "$(lpad(Hc, n)) control steps Hc")
     print_estim_dim(io, mpc.estim, n)
+end
+
+"Limit the solving time to `mpc.model.Ts` if supported by `mpc.optim` optimizer."
+function limit_solve_time(mpc::PredictiveController)
+    try
+        set_time_limit_sec(mpc.optim, mpc.estim.model.Ts)
+    catch err
+        if isa(err, MOI.UnsupportedAttribute{MOI.TimeLimitSec})
+            @warn "Solving time limit is not supported by the optimizer."
+        else
+            rethrow(err)
+        end
+    end
 end
 
 "Verify that the solver termination status means 'no solution available'."

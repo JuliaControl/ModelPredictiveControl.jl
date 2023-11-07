@@ -212,6 +212,7 @@ function init_optimization!(mpc::LinMPC)
     optim, con = mpc.optim, mpc.con
     nvar = length(mpc.ΔŨ)
     set_silent(optim)
+    limit_solve_time(mpc)
     @variable(optim, ΔŨvar[1:nvar])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
