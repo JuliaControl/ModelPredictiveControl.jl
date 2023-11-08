@@ -356,7 +356,7 @@ end
 end
 
 @testset "NonLinMPC moves and getinfo" begin
-    linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
+    linmodel = setop!(LinModel(tf(5, [200, 1]), 300.0), yop=[10])
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
     r = [15]
     u = moveinput!(nmpc_lin, r)
@@ -372,10 +372,10 @@ end
     nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
     u = moveinput!(nmpc)
     @test u ≈ [1] atol=5e-2
-    linmodel2 = LinModel([tf(5, [2, 1]) tf(7, [8,1])], 3.0, i_d=[2])
+    linmodel2 = LinModel([tf(5, [200, 1]) tf(7, [800,1])], 300.0, i_d=[2])
     f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
-    nonlinmodel = NonLinModel(f, h, 3.0, 1, 2, 1, 1)
+    nonlinmodel = NonLinModel(f, h, 300.0, 1, 2, 1, 1)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
     d = [0.1]
     u = moveinput!(nmpc2, 7d, d)
@@ -398,7 +398,7 @@ end
 end
 
 @testset "NonLinMPC step disturbance rejection" begin
-    linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
+    linmodel = setop!(LinModel(tf(5, [200, 1]), 300.0), yop=[10])
     r = [15]
     outdist = [5]
     nmpc_im = NonLinMPC(InternalModel(linmodel))
@@ -486,7 +486,7 @@ end
 end
 
 @testset "NonLinMPC constraint violation" begin
-    linmodel = LinModel(tf([2], [10, 1]), 3.0)
+    linmodel = LinModel(tf([2], [1000, 1]), 300.0)
     nmpc_lin = NonLinMPC(linmodel, Hp=50, Hc=5)
 
     setconstraint!(nmpc_lin, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
@@ -523,7 +523,7 @@ end
 
     f(x,u,_) = linmodel.A*x + linmodel.Bu*u
     h(x,_)   = linmodel.C*x
-    nonlinmodel = NonLinModel(f, h, Ts, 1, 1, 1)
+    nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1)
     nmpc = NonLinMPC(nonlinmodel, Hp=50, Hc=5)
 
     setconstraint!(nmpc, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
