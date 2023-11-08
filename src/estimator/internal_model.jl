@@ -140,7 +140,7 @@ end
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls [`model.f(x̂, u ,d)`](@ref) since this estimator does not augment the states.
+It calls `model.f(x̂, u ,d)` since this estimator does not augment the states.
 """
 f̂(::InternalModel, model::NonLinModel, x̂, u, d) = model.f(x̂, u, d)
 
