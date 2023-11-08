@@ -545,7 +545,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
     X̂ = repeat(x̂, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂ -γ*sqrt_P̂]
     Ŷm = Matrix{Float64}(undef, nym, nσ)
     for j in axes(Ŷm, 2)
-        Ŷm[:, j] = ĥ(estim, X̂[:, j], d)[estim.i_ym]
+        Ŷm[:, j] = ĥ(estim, estim.model, X̂[:, j], d)[estim.i_ym]
     end
     ŷm = Ŷm * m̂
     X̄ = X̂ .- x̂
@@ -560,7 +560,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
     X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(nx̂) +γ*sqrt_P̂_cor -γ*sqrt_P̂_cor]
     X̂_next = Matrix{Float64}(undef, nx̂, nσ)
     for j in axes(X̂_next, 2)
-        X̂_next[:, j] = f̂(estim, X̂_cor[:, j], u, d)
+        X̂_next[:, j] = f̂(estim, estim.model, X̂_cor[:, j], u, d)
     end
     x̂[:] = X̂_next * m̂
     X̄_next = X̂_next .- x̂
@@ -718,8 +718,9 @@ automatically computes the Jacobians:
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs.
 """
 function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂))
-    F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, x̂, u, d), estim.x̂)
-    Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, x̂, d), estim.x̂)
+    F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
+    Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
+    println(ĥ(estim, estim.model, estim.x̂, d))
     Ĥm = Ĥ[estim.i_ym, :] 
     return update_estimate_kf!(estim, F̂, Ĥm, u, ym, d)
 end
@@ -763,8 +764,8 @@ function update_estimate_kf!(estim, Â, Ĉm, u, ym, d)
     mul!(M̂, P̂, Ĉm')
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' + R̂)))
     mul!(K̂, Â, M̂)
-    ŷm = ĥ(estim, x̂, d)[estim.i_ym]
-    x̂[:] = f̂(estim, x̂, u, d) +  K̂ * (ym - ŷm)
+    ŷm = ĥ(estim, estim.model, x̂, d)[estim.i_ym]
+    x̂[:] = f̂(estim, estim.model, x̂, u, d) +  K̂ * (ym - ŷm)
     P̂.data[:] = Â * (P̂ - M̂ * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitians
     return x̂, P̂
 end

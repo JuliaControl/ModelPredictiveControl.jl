@@ -650,9 +650,9 @@ function predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ::V
         if j ≤ Hc
             u0[:] = u0 + ΔŨ[(1 + nu*(j-1)):(nu*j)]
         end
-        x̂[:]  = f̂(mpc.estim, x̂, u0, d0)
+        x̂[:]  = f̂(mpc.estim, model, x̂, u0, d0)
         d0[:] = mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
-        Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, x̂, d0)
+        Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, model, x̂, d0)
     end
     Ŷ[:] = Ŷ + mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
     x̂end = x̂

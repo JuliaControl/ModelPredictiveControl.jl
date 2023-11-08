@@ -172,7 +172,7 @@ end
 Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
 If ``\mathbf{x}`` are `model.x` states, and ``\mathbf{x_s}``, the states defined at
-[`init_integrators`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
+[`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
 [ \begin{smallmatrix} \mathbf{x} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
 returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
@@ -261,7 +261,7 @@ function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
 end
 
 @doc raw"""
-    f̂(estim::StateEstimator, x̂, u, d)
+    f̂(estim::StateEstimator, model::SimModel, x̂, u, d)
 
 State function ``\mathbf{f̂}`` of the augmented model.
 
@@ -274,22 +274,26 @@ function returns the next state of the augmented model, defined as:
 \end{aligned}
 ```
 """
-function f̂(estim::StateEstimator, x̂, u, d)
+function f̂(estim::StateEstimator, model::SimModel, x̂, u, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views x̂d, x̂s = x̂[1:estim.model.nx], x̂[estim.model.nx+1:end]
-    return [f(estim.model, x̂d, u + estim.Cs_u*x̂s, d); estim.As*x̂s]
+    @views x̂d, x̂s = x̂[1:model.nx], x̂[model.nx+1:end]
+    return [f(model, x̂d, u + estim.Cs_u*x̂s, d); estim.As*x̂s]
 end
+"Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
+f̂(estim::StateEstimator, ::LinModel, x̂, u, d) = estim.Â * x̂ + estim.B̂u * u + estim.B̂d * d
 
 @doc raw"""
-    ĥ(estim::StateEstimator, x̂, d)
+    ĥ(estim::StateEstimator, model::SimModel, x̂, d)
 
 Output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂`](@ref) for details.
 """
-function ĥ(estim::StateEstimator, x̂, d)
+function ĥ(estim::StateEstimator, model::SimModel, x̂, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views x̂d, x̂s = x̂[1:estim.model.nx], x̂[estim.model.nx+1:end]
-    return h(estim.model, x̂d, d) + estim.Cs_y*x̂s
+    @views x̂d, x̂s = x̂[1:model.nx], x̂[model.nx+1:end]
+    return h(model, x̂d, d) + estim.Cs_y*x̂s
 end
+"Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
+ĥ(estim::StateEstimator, ::LinModel, x̂, d) = estim.Ĉ * x̂ + estim.D̂d * d
 
 
 @doc raw"""
@@ -388,7 +392,7 @@ julia> ŷ = evaloutput(kf)
 ```
 """
 function evaloutput(estim::StateEstimator, d=empty(estim.x̂)) 
-    return ĥ(estim, estim.x̂, d - estim.model.dop) + estim.model.yop
+    return ĥ(estim, estim.model, estim.x̂, d - estim.model.dop) + estim.model.yop
 end
 
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
