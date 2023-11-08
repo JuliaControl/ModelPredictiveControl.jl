@@ -114,7 +114,8 @@ We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (i
 position):
 
 ```@example 1
-using Logging; disable_logging(Warn) # hide
+using Logging; disable_logging(Warn)            # hide
+using JuMP; unset_time_limit_sec(nmpc.optim)    # hide
 res_ry = sim!(nmpc, N, [180.0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
 plot(res_ry)
 savefig(ans, "plot3_NonLinMPC.svg"); nothing # hide
@@ -193,6 +194,7 @@ speed ``ω`` is not requested to track a setpoint. The closed-loop response to a
 setpoint is similar:
 
 ```@example 1
+unset_time_limit_sec(empc.optim) # hide
 res2_ry = sim!(empc, N, [180, 0], plant=plant2, x0=[0, 0], x̂0=[0, 0, 0])
 plot(res2_ry)
 savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
