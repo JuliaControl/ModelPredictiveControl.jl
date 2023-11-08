@@ -136,20 +136,20 @@ function matrices_internalmodel(model::SimModel)
 end
 
 @doc raw"""
-    f̂(::InternalModel, model::SimModel, x̂, u, d)
+    f̂(::InternalModel, model::NonLinModel, x̂, u, d)
 
-State function ``\mathbf{f̂}`` of [`InternalModel`](@ref).
+State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls [`f(model, x̂, u ,d)`](@ref) since this estimator does not augment the states.
+It calls [`model.f(x̂, u ,d)`](@ref) since this estimator does not augment the states.
 """
-f̂(::InternalModel, model::SimModel, x̂, u, d) = f(model, x̂, u, d)
+f̂(::InternalModel, model::NonLinModel, x̂, u, d) = model.f(x̂, u, d)
 
 @doc raw"""
-    ĥ(::InternalModel, model::SimModel, x̂, d)
+    ĥ(::InternalModel, model::NonLinModel, x̂, d)
 
-Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h`](@ref) directly.
+Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.h`.
 """
-ĥ(::InternalModel, model::SimModel, x̂, d) = h(model, x̂, d)
+ĥ(::InternalModel, model::NonLinModel, x̂, d) = model.h(x̂, d)
 
 
 @doc raw"""
