@@ -720,7 +720,6 @@ The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured 
 function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂))
     F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
     Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
-    println(ĥ(estim, estim.model, estim.x̂, d))
     Ĥm = Ĥ[estim.i_ym, :] 
     return update_estimate_kf!(estim, F̂, Ĥm, u, ym, d)
 end
