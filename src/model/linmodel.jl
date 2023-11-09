@@ -222,7 +222,7 @@ f(model::LinModel, x, u, d) = model.A * x + model.Bu * u + model.Bd * d
 
 
 """
-    h(model::LinModel, x, u, d)
+    h(model::LinModel, x, d)
 
 Evaluate ``\\mathbf{C x + D_d d}`` when `model` is a [`LinModel`](@ref).
 """
