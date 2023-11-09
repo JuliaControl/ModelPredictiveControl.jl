@@ -763,7 +763,7 @@ function update_estimate_kf!(estim, Â, Ĉm, u, ym, d)
     mul!(M̂, P̂, Ĉm')
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' + R̂)))
     mul!(K̂, Â, M̂)
-    ŷm = ĥ(estim, estim.model, x̂, d)[estim.i_ym]
+    ŷm = @views ĥ(estim, estim.model, x̂, d)[estim.i_ym]
     x̂[:] = f̂(estim, estim.model, x̂, u, d) +  K̂ * (ym - ŷm)
     P̂.data[:] = Â * (P̂ - M̂ * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitians
     return x̂, P̂

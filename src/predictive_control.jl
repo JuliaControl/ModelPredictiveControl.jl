@@ -566,13 +566,13 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
     mpc.R̂y[:] = R̂y
     Ẑ = mpc.F - mpc.R̂y
     mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
-    mpc.p[]  = Ẑ'*mpc.M_Hp*Ẑ
+    mpc.p[]  = dot(Ẑ, mpc.M_Hp, Ẑ)
     if ~mpc.noR̂u
         mpc.R̂u[:] = R̂u
         lastu = mpc.estim.lastu0 + model.uop
         Ẑ = mpc.T*lastu - mpc.R̂u
         mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.S̃)'*Ẑ
-        mpc.p[]  = mpc.p[] + Ẑ'*mpc.L_Hp*Ẑ
+        mpc.p[]  = mpc.p[] + dot(Ẑ, mpc.L_Hp, Ẑ)
     end
     return nothing
 end
@@ -935,8 +935,14 @@ function init_quadprog(::SimModel, Ẽ, S, M_Hp, N_Hc, L_Hp)
     return P̃, q̃, p
 end
 
-"Return the quadratic programming objective function, see [`init_quadprog`](@ref)."
-obj_quadprog(ΔŨ, P̃, q̃) = 0.5*ΔŨ'*P̃*ΔŨ + q̃'*ΔŨ
+"""
+    obj_quadprog(ΔŨ, P̃, q̃)
+
+Return the quadratic programming objective function, see [`init_quadprog`](@ref).
+
+The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
+"""
+obj_quadprog(ΔŨ, P̃, q̃) = 0.5*dot(ΔŨ, P̃, ΔŨ) + q̃'*ΔŨ
 
 """
     obj_nonlinprog(mpc::PredictiveController, model::LinModel, ΔŨ::Vector{Real})
@@ -964,16 +970,17 @@ end
 """
     obj_nonlinprog(mpc::PredictiveController, model::SimModel, ΔŨ::Vector{Real})
 
-Nonlinear programming objective function when `model` is not a [`LinModel`](@ref).
+Nonlinear programming objective function when `model` is not a [`LinModel`](@ref). The
+function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
 """
 function obj_nonlinprog(
     mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{T}
 ) where {T<:Real}
     # --- output setpoint tracking term ---
     êy = mpc.R̂y - Ŷ
-    JR̂y = êy'*mpc.M_Hp*êy  
+    JR̂y = dot(êy, mpc.M_Hp, êy)
     # --- move suppression and slack variable term ---
-    JΔŨ = ΔŨ'*mpc.Ñ_Hc*ΔŨ
+    JΔŨ = dot(ΔŨ, mpc.Ñ_Hc, ΔŨ)
     # --- input over prediction horizon ---
     if !mpc.noR̂u || !iszero(mpc.E)
         U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
@@ -981,7 +988,7 @@ function obj_nonlinprog(
     # --- input setpoint tracking term ---
     if !mpc.noR̂u
         êu = mpc.R̂u - U
-        JR̂u = êu'*mpc.L_Hp*êu
+        JR̂u = dot(êu, mpc.L_Hp, êu)
     else
         JR̂u = 0.0
     end
