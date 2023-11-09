@@ -1,5 +1,7 @@
-sys = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
-        tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
+sys = [ 
+    tf(1.90, [18, 1]) tf(1.90, [18, 1]);
+    tf(-0.74,[8, 1])  tf(0.74, [8, 1]) 
+]
 Ts = 4.0
 model = setop!(LinModel(sys, Ts), uop=[10, 10], yop=[50, 30])
 y = model()
@@ -65,7 +67,7 @@ initstate!(nmpc_im, nlmodel.uop, y)
 u = nmpc_im([55, 30], ym=y)
 sim!(nmpc_im, 3, [55, 30])
 
-nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=Inf), ymin=[45, -Inf])
+nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=1e3), ymin=[45, -Inf])
 initstate!(nmpc_ukf, nlmodel.uop, y)
 u = nmpc_ukf([55, 30])
 sim!(nmpc_ukf, 3, [55, 30])
@@ -74,3 +76,12 @@ nmpc_ekf = setconstraint!(NonLinMPC(ExtendedKalmanFilter(model), Cwt=Inf), ymin=
 initstate!(nmpc_ekf, model.uop, model())
 u = nmpc_ekf([55, 30])
 sim!(nmpc_ekf, 3, [55, 30])
+
+function JE( _ , ŶE, _ )
+    Ŷ  = ŶE[3:end]
+    Eŷ = repeat([55; 30], 10) - Ŷ
+    return dot(Eŷ, I, Eŷ)
+end
+empc = setconstraint!(NonLinMPC(nlmodel, Mwt=[0, 0], Hp=10, Cwt=Inf, Ewt=1, JE=JE), ymin=[45, -Inf])
+u = empc()
+sim!(empc, 3)
