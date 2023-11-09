@@ -31,6 +31,7 @@ struct LinMPC{SE<:StateEstimator} <: PredictiveController
     Ps::Matrix{Float64}
     d0::Vector{Float64}
     D̂0::Vector{Float64}
+    D̂E::Vector{Float64}
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
     function LinMPC{SE}(estim::SE, Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim) where {SE<:StateEstimator}

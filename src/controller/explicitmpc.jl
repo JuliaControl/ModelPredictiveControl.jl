@@ -28,6 +28,7 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
     Ps::Matrix{Float64}
     d0::Vector{Float64}
     D̂0::Vector{Float64}
+    D̂E::Vector{Float64}
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
     function ExplicitMPC{SE}(estim::SE, Hp, Hc, Mwt, Nwt, Lwt) where {SE<:StateEstimator}
