@@ -191,7 +191,7 @@ The keyword argument `Ewt` weights the economic costs relative to the other term
 objective function. The term must be large enough to be significant but a too high value can
 lead to a static error on the angle setpoint. The second element of `Mwt` is zero since the
 speed ``ω`` is not requested to track a setpoint. The closed-loop response to a 180°
-setpoint is similar:
+setpoint is:
 
 ```@example 1
 unset_time_limit_sec(empc.optim) # hide
@@ -202,7 +202,7 @@ savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
 
 ![plot5_NonLinMPC](plot5_NonLinMPC.svg)
 
-and the energy consumption is almost identical:
+and the energy consumption is slightly lower:
 
 ```@example 1
 function calcW(res)
@@ -212,7 +212,7 @@ end
 Dict(:W_nmpc => calcW(res_ry), :W_empc => calcW(res2_ry))
 ```
 
-But, for a 10° step disturbance:
+Also, for a 10° step disturbance:
 
 ```@example 1
 res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10, 0])

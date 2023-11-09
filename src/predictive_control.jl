@@ -552,7 +552,7 @@ end
 @doc raw"""
     initpred!(mpc, model::LinModel, d, ym, D̂, R̂y, R̂u)
 
-Init linear model prediction matrices `F`, `q̃` and `p`.
+Init linear model prediction matrices `F, q̃, p` and current estimated output `ŷ`.
 
 See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
@@ -581,7 +581,7 @@ end
 @doc raw"""
     initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y, R̂u)
 
-Init `Ŷop`, `d0` and `D̂0` matrices when model is not a [`LinModel`](@ref).
+Init `ŷ, Ŷop, d0, D̂0` matrices when model is not a [`LinModel`](@ref).
 
 `d0` and `D̂0` are the measured disturbances and its predictions without the operating points
 ``\mathbf{d_{op}}``. The vector `Ŷop` is kept unchanged if `mpc.estim` is not an
