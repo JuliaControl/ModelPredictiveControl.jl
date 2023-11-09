@@ -34,6 +34,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
     Ps::Matrix{Float64}
     d0::Vector{Float64}
     D̂0::Vector{Float64}
+    D̂E::Vector{Float64}
     Ŷop::Vector{Float64}
     Dop::Vector{Float64}
     function NonLinMPC{SE, JEFunc}(
@@ -54,7 +55,8 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
         con, S̃, Ñ_Hc, Ẽ = init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
-        d0, D̂0 = zeros(nd), zeros(nd*Hp)
+        # dummy vals (updated just before optimization):
+        d0, D̂0, D̂E = zeros(nd), zeros(nd*Hp), zeros(nd + nd*Hp)
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
@@ -62,11 +64,12 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, R̂u, R̂y, noR̂u,
+            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, 
+            R̂u, R̂y, noR̂u,
             S̃, T,  
             Ẽ, F, G, J, K, V, P̃, q̃, p,
             Ks, Ps,
-            d0, D̂0,
+            d0, D̂0, D̂E,
             Ŷop, Dop,
         )
         init_optimization!(mpc)
