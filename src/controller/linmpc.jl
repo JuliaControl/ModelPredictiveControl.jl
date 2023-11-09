@@ -36,7 +36,7 @@ struct LinMPC{SE<:StateEstimator} <: PredictiveController
     function LinMPC{SE}(estim::SE, Hp, Hc, Mwt, Nwt, Lwt, Cwt, optim) where {SE<:StateEstimator}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
-        ŷ = zeros(ny)
+        ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         Ewt = 0   # economic costs not supported for LinMPC
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt)
         M_Hp = Diagonal{Float64}(repeat(Mwt, Hp))

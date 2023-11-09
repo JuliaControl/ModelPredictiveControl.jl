@@ -41,7 +41,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
     ) where {SE<:StateEstimator, JEFunc<:Function}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
-        ŷ = zeros(ny)
+        ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt)
         M_Hp = Diagonal(convert(Vector{Float64}, repeat(Mwt, Hp)))
         N_Hc = Diagonal(convert(Vector{Float64}, repeat(Nwt, Hc)))

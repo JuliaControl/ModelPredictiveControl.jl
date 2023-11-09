@@ -557,6 +557,7 @@ Init linear model prediction matrices `F`, `q̃` and `p`.
 See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u)
+    mpc.ŷ[:] = evalŷ(mpc.estim, ym, d)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
     mpc.F[:]  = mpc.K  * mpc.estim.x̂  + mpc.V  * mpc.estim.lastu0 + mpc.Ŷop
     if model.nd ≠ 0
@@ -587,6 +588,7 @@ Init `Ŷop`, `d0` and `D̂0` matrices when model is not a [`LinModel`](@ref).
 [`InternalModel`](@ref).
 """
 function initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y, R̂u)
+    mpc.ŷ[:] = evalŷ(mpc.estim, ym, d)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
     if model.nd ≠ 0
         mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop

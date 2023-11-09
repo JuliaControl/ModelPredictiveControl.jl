@@ -33,7 +33,7 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
     function ExplicitMPC{SE}(estim::SE, Hp, Hc, Mwt, Nwt, Lwt) where {SE<:StateEstimator}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
-        ŷ = zeros(ny)
+        ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         Cwt = Inf # no slack variable ϵ for ExplicitMPC
         Ewt = 0   # economic costs not supported for ExplicitMPC
         validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt)
