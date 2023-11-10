@@ -44,6 +44,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
+        M_Hp, N_Hc, L_Hp = float(M_Hp), float(N_Hc), float(L_Hp) # debug julia 1.6
         R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(nu, Hp, Hc)

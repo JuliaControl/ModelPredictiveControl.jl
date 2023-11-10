@@ -40,6 +40,7 @@ struct LinMPC{SE<:StateEstimator} <: PredictiveController
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         Ewt = 0   # economic costs not supported for LinMPC
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
+        M_Hp, N_Hc, L_Hp = float(M_Hp), float(N_Hc), float(L_Hp) # debug julia 1.6
         R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(nu, Hp, Hc)
