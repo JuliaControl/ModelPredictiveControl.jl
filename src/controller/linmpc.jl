@@ -89,11 +89,11 @@ in which the weight matrices are repeated ``H_p`` or ``H_c`` times:
     \mathbf{L}_{H_p} &= \text{diag}\mathbf{(L,L,...,L)}     
 \end{aligned}
 ```
-The ``\mathbf{ΔU}`` vector includes the manipulated input increments ``\mathbf{Δu}(k+j) =
-\mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to ``H_c-1``, the ``\mathbf{Ŷ}`` vector,
-the output predictions ``\mathbf{ŷ}(k+j)`` from ``j=1`` to ``H_p``, and the ``\mathbf{U}``
-vector, the manipulated inputs ``\mathbf{u}(k+j)`` from ``j=0`` to ``H_p-1``. See Extended
-Help for a detailed nomenclature.
+Time-varying weights over the horizons are also supported. The ``\mathbf{ΔU}`` includes the 
+input increments ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to
+``H_c-1``, the ``\mathbf{Ŷ}`` vector, the output predictions ``\mathbf{ŷ}(k+j)`` from
+``j=1`` to ``H_p``, and the ``\mathbf{U}`` vector, the manipulated inputs ``\mathbf{u}(k+j)``
+from ``j=0`` to ``H_p-1``. See Extended Help for a detailed nomenclature.
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
 arguments.
