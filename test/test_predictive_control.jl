@@ -27,6 +27,13 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test mpc9.estim.nint_u  == [1, 1]
     @test mpc9.estim.nint_ym == [0, 0]
 
+    mpc10 = LinMPC(model, M_Hp=Diagonal(1.01:0.01:1.2))
+    @test mpc10.M_Hp ≈ Diagonal(1.01:0.01:1.2)
+    mpc11 = LinMPC(model, N_Hc=Diagonal([0.1,0.11,0.12,0.13]), Cwt=Inf)
+    @test mpc11.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
+    mcp12 = LinMPC(model, L_Hp=Diagonal(0.001:0.001:0.02))
+    @test mcp12.L_Hp ≈ Diagonal(0.001:0.001:0.02)
+
     @test_throws ArgumentError LinMPC(model, Hp=0)
     @test_throws ArgumentError LinMPC(model, Hc=0)
     @test_throws ArgumentError LinMPC(model, Hp=1, Hc=2)
@@ -236,6 +243,12 @@ end
     mpc9 = ExplicitMPC(model, nint_u=[1, 1], nint_ym=[0, 0])
     @test mpc9.estim.nint_u  == [1, 1]
     @test mpc9.estim.nint_ym == [0, 0]
+    mpc10 = ExplicitMPC(model, M_Hp=Diagonal(1.01:0.01:1.2))
+    @test mpc10.M_Hp ≈ Diagonal(1.01:0.01:1.2)
+    mpc11 = ExplicitMPC(model, N_Hc=Diagonal([0.1,0.11,0.12,0.13]))
+    @test mpc11.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
+    mcp12 = ExplicitMPC(model, L_Hp=Diagonal(0.001:0.001:0.02))
+    @test mcp12.L_Hp ≈ Diagonal(0.001:0.001:0.02)
 end
 
 @testset "ExplicitMPC moves and getinfo" begin
@@ -349,6 +362,12 @@ end
     nmpc11 = NonLinMPC(nonlinmodel, Hp=15, nint_u=[1, 1], nint_ym=[0, 0])
     @test nmpc11.estim.nint_u  == [1, 1]
     @test nmpc11.estim.nint_ym == [0, 0]
+    nmpc12 = NonLinMPC(nonlinmodel, M_Hp=Diagonal(1.01:0.01:1.2))
+    @test nmpc12.M_Hp ≈ Diagonal(1.01:0.01:1.2)
+    nmpc13 = NonLinMPC(nonlinmodel, N_Hc=Diagonal([0.1,0.11,0.12,0.13]), Cwt=Inf)
+    @test nmpc13.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
+    nmcp14 = NonLinMPC(nonlinmodel, L_Hp=Diagonal(0.001:0.001:0.02))
+    @test nmcp14.L_Hp ≈ Diagonal(0.001:0.001:0.02)
 
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
     # to uncomment when deprecated constructor is removed:
