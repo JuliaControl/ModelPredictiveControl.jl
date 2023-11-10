@@ -1300,20 +1300,21 @@ function init_matconstraint(::SimModel,
 end
 
 "Validate predictive controller weight and horizon specified values."
-function validate_weights(model, Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt=nothing)
+function validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, C, E=nothing)
     nu, ny = model.nu, model.ny
+    nM, nN, nL = ny*Hp, nu*Hc, nu*Hp
     Hp < 1  && throw(ArgumentError("Prediction horizon Hp should be ≥ 1"))
     Hc < 1  && throw(ArgumentError("Control horizon Hc should be ≥ 1"))
     Hc > Hp && throw(ArgumentError("Control horizon Hc should be ≤ prediction horizon Hp"))
-    size(Mwt) ≠ (ny,) && throw(ArgumentError("Mwt size $(size(Mwt)) ≠ output size ($ny,)"))
-    size(Nwt) ≠ (nu,) && throw(ArgumentError("Nwt size $(size(Nwt)) ≠ manipulated input size ($nu,)"))
-    size(Lwt) ≠ (nu,) && throw(ArgumentError("Lwt size $(size(Lwt)) ≠ manipulated input size ($nu,)"))
-    size(Cwt) ≠ ()    && throw(ArgumentError("Cwt should be a real scalar"))
-    any(Mwt.<0) && throw(ArgumentError("Mwt weights should be ≥ 0"))
-    any(Nwt.<0) && throw(ArgumentError("Nwt weights should be ≥ 0"))
-    any(Lwt.<0) && throw(ArgumentError("Lwt weights should be ≥ 0"))
-    Cwt < 0     && throw(ArgumentError("Cwt weight should be ≥ 0"))
-    !isnothing(Ewt) && size(Ewt) ≠ () && throw(ArgumentError("Ewt should be a real scalar"))
+    size(M_Hp) ≠ (nM,nM) && throw(ArgumentError("M_Hp size $(size(M_Hp)) ≠ (ny*Hp, ny*Hp) ($nM,$nM)"))
+    size(N_Hc) ≠ (nN,nN) && throw(ArgumentError("N_Hc size $(size(N_Hc)) ≠ (nu*Hc, nu*Hc) ($nN,$nN)"))
+    size(L_Hp) ≠ (nL,nL) && throw(ArgumentError("L_Hp size $(size(L_Hp)) ≠ (nu*Hp, nu*Hp) ($nL,$nL)"))
+    (!isdiag(M_Hp) || any(diag(M_Hp).<0)) && throw(ArgumentError("M_Hp should be a positive semidefinite diagonal matrix"))
+    (!isdiag(N_Hc) || any(diag(N_Hc).<0)) && throw(ArgumentError("N_Hc should be a positive semidefinite diagonal matrix"))
+    (!isdiag(L_Hp) || any(diag(L_Hp).<0)) && throw(ArgumentError("L_Hp should be a positive semidefinite diagonal matrix"))
+    size(C) ≠ ()    && throw(ArgumentError("Cwt should be a real scalar"))
+    C < 0     && throw(ArgumentError("Cwt weight should be ≥ 0"))
+    !isnothing(E) && size(E) ≠ () && throw(ArgumentError("Ewt should be a real scalar"))
 end
 
 function Base.show(io::IO, mpc::PredictiveController)
