@@ -48,8 +48,8 @@ function pendulum(par, x, u)
     dω = -g/L*sin(θ) - K/m*ω + τ/m/L^2
     return [dθ, dω]
 end
-Ts  = 0.1                   # [s]
-par = (9.8, 0.4, 1.2, 0.3)
+# declared constants, to avoid type-instability in the f function, for speed:
+const par, Ts = (9.8, 0.4, 1.2, 0.3), 0.1
 f(x, u, _ ) = x + Ts*pendulum(par, x, u) # Euler method
 h(x, _ )    = [180/π*x[1]]  # [°]
 nu, nx, ny = 1, 2, 1
@@ -58,8 +58,9 @@ model = NonLinModel(f, h, Ts, nu, nx, ny)
 
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
 characters like ``θ`` can be typed in the Julia REPL or VS Code by typing `\theta` and
-pressing the `<TAB>` key. It is good practice to first simulate `model` using [`sim!`](@ref)
-as a quick sanity check:
+pressing the `<TAB>` key. The tuple `par` and `Ts` are declared as constants here to improve
+the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
+It is good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
 
 ```@example 1
 using Plots
@@ -89,7 +90,7 @@ motor torque ``τ`` , with an associated standard deviation `σQint_u` of 0.1 N 
 estimator tuning is tested on a plant with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
-par_plant = (par[1], par[2], 1.25*par[3], par[4])
+const par_plant = (par[1], par[2], 1.25*par[3], par[4])
 f_plant(x, u, _) = x + Ts*pendulum(par_plant, x, u)
 plant = NonLinModel(f_plant, h, Ts, nu, nx, ny)
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
