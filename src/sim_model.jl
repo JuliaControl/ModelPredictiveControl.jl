@@ -169,3 +169,4 @@ evaloutput(model::SimModel, d=empty(model.x)) = h(model, model.x, d - model.dop)
 
 include("model/linmodel.jl")
 include("model/nonlinmodel.jl")
+include("model/conversion.jl")

@@ -163,7 +163,7 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 - `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``.
 - `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``.
 - `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``.
-- `x0 = zeros(plant.nx)` : plant initial state ``\mathbf{x}(0)``.
+- `x0 = plant.x` : plant initial state ``\mathbf{x}(0)``.
 - `x̂0 = nothing` : initial estimate ``\mathbf{x̂}(0)``, [`initstate!`](@ref) is used if `nothing`.
 - `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization.
 
@@ -245,7 +245,7 @@ function sim_closedloop!(
     d_step ::Vector = zeros(plant.nd),
     d_noise::Vector = zeros(plant.nd),
     x_noise::Vector = zeros(plant.nx),
-    x0 = zeros(plant.nx),
+    x0 = plant.x,
     x̂0 = nothing,
     lastu = plant.uop,
 )
