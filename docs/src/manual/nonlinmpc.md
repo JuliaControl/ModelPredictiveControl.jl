@@ -130,8 +130,6 @@ satisfactory:
 
 ```@example 1
 res_yd = sim!(nmpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
-using BenchmarkTools
-@btime sim!(nmpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
 plot(res_yd)
 savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
 ```
@@ -142,7 +140,7 @@ savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
 
 Nonlinear MPC are more computationally expensive than [`LinMPC`](@ref). Solving the problem
 should always be faster than the sampling time ``T_s = 0.1`` s for real-time operation. For
-electronic and mechanical systems like here, this requirement is sometimes harder to achieve
+electronic or mechanical systems like here, this requirement is sometimes harder to achieve
 because of their fast dynamics. To ease the design and comparison with [`LinMPC`](@ref), the
 [`linearize`](@ref) function allows automatic linearization of [`NonLinModel`](@ref) based
 on [`ForwardDiff.jl`](https://juliadiff.org/ForwardDiff.jl/stable/). We first linearize
@@ -155,7 +153,7 @@ linmodel = linearize(model, x=[π, 0], u=[0])
 
 It is worth mentionning that the Euler method in `model` object is not the best choice for
 linearization since its accuracy is low (i.e. approximation of a bad approximation). A
-[`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) is designed from `linmodel`:
+[`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
 
 ```@example 1
 kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
@@ -201,8 +199,6 @@ does improve the rejection of the step disturbance:
 
 ```@example 1
 res_lin2 = sim!(mpc2, N, [180.0]; plant, x0=[π, 0], y_step=[10])
-using BenchmarkTools
-@btime sim!(mpc2, N, [180.0]; plant, x0=[π, 0], y_step=[10])
 plot(res_lin2)
 savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
 ```
@@ -211,7 +207,7 @@ savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
 
 The performance is still lower than the nonlinear controller, as expected, but computations
 are about 2000 times faster (0.00002 s versus 0.04 s per time steps on average). Note that
-`linmodel` is only valid for angular position near 180°. Multiple linearized models and
+`linmodel` is only valid for angular positions near 180°. Multiple linearized models and
 controllers are required for large deviations from this operating point. This is known as
 gain scheduling.
 
