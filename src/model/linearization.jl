@@ -1,6 +1,14 @@
 
-@doc raw"""
+"""
     LinModel(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
+
+Call [`linearize(model; x, u, d)`](@ref) and return the resulting linear model.
+```
+"""
+LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
+
+@doc raw"""
+    linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
 
 Linearize `model` around the operating points `x`, `u` and `d`.
 
@@ -11,14 +19,16 @@ Jacobians of ``\mathbf{f}`` and ``\mathbf{h}`` functions are automatically compu
 
 ## Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->x.^3+u, (x,_)->x, 0.1, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->x.^3 + u, (x,_)->x, 0.1, 1, 1, 1);
 
-julia> linmodel = LinModel(model, x=[1.0]); linmodel.A
+julia> linmodel = linearize(model, x=[10.0], u=[0.0]); 
+
+julia> linmodel.A
 1×1 Matrix{Float64}:
- 3.0
+ 300.0
 ```
 """
-function LinModel(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
+function linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
     nu, nx, ny, nd = model.nu, model.nx, model.ny, model.nd
     u0, d0 = u - model.uop, d - model.dop
     y  = model.h(x, d0) + model.yop

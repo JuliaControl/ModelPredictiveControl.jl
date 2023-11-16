@@ -97,7 +97,6 @@ end
     @test_throws DimensionMismatch evaloutput(linmodel1, zeros(1))
 end
 
-
 @testset "NonLinModel construction" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
@@ -147,4 +146,24 @@ end
 
     @test_throws DimensionMismatch updatestate!(nonlinmodel, zeros(2), zeros(1))
     @test_throws DimensionMismatch evaloutput(nonlinmodel, zeros(1))
+end
+
+@testset "NonLinModel linearization" begin
+    Ts = 0.1
+    f1(x,u,d) = x.^5 + u.^4 + d.^3
+    h1(x,d)   = x.^2 + d
+    nonlinmodel1 = NonLinModel(f1,h1,0.1,1,1,1,1)
+    x, u, d = [2.0], [3.0], [4.0]
+    linmodel1 = linearize(nonlinmodel1; x, u, d)
+    @test linmodel1.A  ≈ 5*x.^4
+    @test linmodel1.Bu ≈ 4*u.^3
+    @test linmodel1.Bd ≈ 3*d.^2
+    @test linmodel1.C  ≈ 2*x.^1
+    @test linmodel1.Dd ≈ 1*d.^0
+    linmodel2 = LinModel(nonlinmodel1; x, u, d)
+    @test linmodel1.A  ≈ linmodel2.A
+    @test linmodel1.Bu ≈ linmodel2.Bu
+    @test linmodel1.Bd ≈ linmodel2.Bd
+    @test linmodel1.C  ≈ linmodel2.C
+    @test linmodel1.Dd ≈ linmodel2.Dd 
 end

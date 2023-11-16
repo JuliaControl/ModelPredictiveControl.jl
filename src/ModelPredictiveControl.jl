@@ -11,7 +11,8 @@ using PreallocationTools
 import OSQP, Ipopt
 
 
-export SimModel, LinModel, NonLinModel, setop!, setstate!, updatestate!, evaloutput
+export SimModel, LinModel, NonLinModel
+export setop!, setstate!, updatestate!, evaloutput, linearize
 export StateEstimator, InternalModel, Luenberger
 export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
 export default_nint, initstate!

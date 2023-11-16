@@ -34,3 +34,9 @@ NonLinModel
 ```@docs
 setop!
 ```
+
+## Linearize
+
+```@docs
+linearize
+```
