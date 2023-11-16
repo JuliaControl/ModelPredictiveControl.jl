@@ -8,9 +8,9 @@ Call [`linearize(model; x, u, d)`](@ref) and return the resulting linear model.
 LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 @doc raw"""
-    linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
+    linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop) -> linmodel
 
-Linearize `model` around the operating points `x`, `u` and `d`.
+Linearize `model` at the operating points `x`, `u`, `d` and return the [`LinModel`](@ref).
 
 The arguments `x`, `u` and `d` are the linearization points for the state ``\mathbf{x}``,
 manipulated input ``\mathbf{u}`` and measured disturbance ``\mathbf{d}``, respectively. The
