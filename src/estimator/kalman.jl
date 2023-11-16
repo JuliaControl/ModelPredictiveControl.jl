@@ -632,7 +632,7 @@ identical to [`UnscentedKalmanFilter`](@ref). The Jacobians of the augmented mod
 automatic differentiation.
 
 !!! warning
-    See Extended Help if you get an error like:    
+    See the Extended Help of [`linearize`](@ref) function if you get an error like:    
     `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
 
 # Arguments
@@ -652,11 +652,6 @@ ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
  0 unmeasured outputs yu
  0 measured disturbances d
 ```
-
-# Extended Help
-Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and `h`
-functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
-for common mistakes when writing these functions.
 """
 function ExtendedKalmanFilter(
     model::SM;

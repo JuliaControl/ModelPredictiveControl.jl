@@ -154,26 +154,17 @@ savefig(ans, "plot1_LinMPC.svg"); nothing # hide
 
 ![plot1_LinMPC](plot1_LinMPC.svg)
 
-For some situations, when [`LinMPC`](@ref) matrices are small/medium and dense, [`DAQP`](https://darnstrom.github.io/daqp/)
-optimizer may be more efficient. To install it, run:
-
-```text
-using Pkg; Pkg.add("DAQP")
-```
-
-Also, compared to the default setting, adding the integrating states at the model inputs may
-improve the closed-loop performance. Load disturbances are indeed very frequent in many
-real-life control problems. Constructing a [`LinMPC`](@ref) with `DAQP` and input integrators:
+Compared to the default setting, adding the integrating states at the model inputs may
+improve the closed-loop performance. Load disturbances are indeed very common in many
+real-life control problems. Constructing a [`LinMPC`](@ref) with input integrators:
 
 ```@example 1
-using JuMP, DAQP
-daqp = Model(DAQP.Optimizer, add_bridges=false)
-mpc2 = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], optim=daqp, nint_u=[1, 1])
+mpc2 = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], nint_u=[1, 1])
 mpc2 = setconstraint!(mpc2, ymin=[45, -Inf])
 ```
 
-leads to similar computational times, but it does accelerate the rejection of the load
-disturbance and eliminates the level constraint violation:
+does accelerate the rejection of the load disturbance and eliminates the level constraint
+violation:
 
 ```@example 1
 setstate!(model, zeros(model.nx))

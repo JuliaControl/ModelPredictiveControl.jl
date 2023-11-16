@@ -130,11 +130,90 @@ satisfactory:
 
 ```@example 1
 res_yd = sim!(nmpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
+using BenchmarkTools
+@btime sim!(nmpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
 plot(res_yd)
 savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot4_NonLinMPC](plot4_NonLinMPC.svg)
+
+## Linearizing the Model
+
+Nonlinear MPC are more computationally expensive than [`LinMPC`](@ref). Solving the problem
+should always be faster than the sampling time ``T_s = 0.1`` s for real-time operation. For
+electronic and mechanical systems like here, this requirement is sometimes harder to achieve
+because of their fast dynamics. To ease the design and comparison with [`LinMPC`](@ref), the
+[`linearize`](@ref) function allows automatic linearization of [`NonLinModel`](@ref) based
+on [`ForwardDiff.jl`](https://juliadiff.org/ForwardDiff.jl/stable/). We first linearize
+`model` at the operating points ``\mathbf{x} = [\begin{smallmatrix} π\\0 \end{smallmatrix}]``
+and ``\mathbf{u} = 0`` (inverted position):
+
+```@example 1
+linmodel = linearize(model, x=[π, 0], u=[0])
+```
+
+It is worth mentionning that the Euler method in `model` object is not the best choice for
+linearization since its accuracy is low (i.e. approximation of a bad approximation). A
+[`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) is designed from `linmodel`:
+
+```@example 1
+kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
+mpc = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
+mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
+```
+
+The linear controller has difficulties to reject the 10° step disturbance:
+
+```@example 1
+res_lin = sim!(mpc, N, [180.0]; plant, x0=[π, 0], y_step=[10])
+plot(res_lin)
+savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
+```
+
+![plot5_NonLinMPC](plot5_NonLinMPC.svg)
+
+Some improvements can be achieved by solving the optimization problem of `mpc` with [`DAQP`](https://darnstrom.github.io/daqp/)
+optimizer instead of the default `OSQP` solver. It is indeed documented that `DAQP` can
+perform better on small/medium dense matrices and unstable poles, which is obviously the
+case here (the absolute value of unstable poles are greater than one).:
+
+```@example 1
+using LinearAlgebra; poles = eigvals(linmodel.A)
+```
+
+To install it, run:
+
+```text
+using Pkg; Pkg.add("DAQP")
+```
+
+Constructing a [`LinMPC`](@ref) with `DAQP`:
+
+```@example 1
+using JuMP, DAQP
+daqp = Model(DAQP.Optimizer, add_bridges=false)
+mpc2 = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], optim=daqp)
+mpc2 = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
+```
+
+does improve the rejection of the step disturbance:
+
+```@example 1
+res_lin2 = sim!(mpc2, N, [180.0]; plant, x0=[π, 0], y_step=[10])
+using BenchmarkTools
+@btime sim!(mpc2, N, [180.0]; plant, x0=[π, 0], y_step=[10])
+plot(res_lin2)
+savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
+```
+
+![plot6_NonLinMPC](plot6_NonLinMPC.svg)
+
+The performance is still lower than the nonlinear controller, as expected, but computations
+are about 2000 times faster (0.00002 s versus 0.04 s per time steps on average). Note that
+`linmodel` is only valid for angular position near 180°. Multiple linearized models and
+controllers are required for large deviations from this operating point. This is known as
+gain scheduling.
 
 ## Economic Model Predictive Controller
 
@@ -198,10 +277,10 @@ setpoint is:
 unset_time_limit_sec(empc.optim) # hide
 res2_ry = sim!(empc, N, [180, 0], plant=plant2, x0=[0, 0], x̂0=[0, 0, 0])
 plot(res2_ry)
-savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
+savefig(ans, "plot7_NonLinMPC.svg"); nothing # hide
 ```
 
-![plot5_NonLinMPC](plot5_NonLinMPC.svg)
+![plot7_NonLinMPC](plot7_NonLinMPC.svg)
 
 and the energy consumption is slightly lower:
 
@@ -218,10 +297,10 @@ Also, for a 10° step disturbance:
 ```@example 1
 res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10, 0])
 plot(res2_yd)
-savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
+savefig(ans, "plot8_NonLinMPC.svg"); nothing # hide
 ```
 
-![plot6_NonLinMPC](plot6_NonLinMPC.svg)
+![plot8_NonLinMPC](plot8_NonLinMPC.svg)
 
 the new controller is able to recuperate more energy from the pendulum (i.e. negative work):
 

@@ -17,6 +17,10 @@ manipulated input ``\mathbf{u}`` and measured disturbance ``\mathbf{d}``, respec
 Jacobians of ``\mathbf{f}`` and ``\mathbf{h}`` functions are automatically computed with
 [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl).
 
+!!! warning
+    See Extended Help if you get an error like:    
+    `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
+
 ## Examples
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->x.^3 + u, (x,_)->x, 0.1, 1, 1, 1);
@@ -27,6 +31,11 @@ julia> linmodel.A
 1×1 Matrix{Float64}:
  300.0
 ```
+
+## Extended Help
+Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and `h`
+functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+for common mistakes when writing these functions.
 """
 function linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
     nu, nx, ny, nd = model.nu, model.nx, model.ny, model.nd
