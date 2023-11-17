@@ -78,6 +78,7 @@ for more detailed examples.
 ### Model Predictive Control Features
 
 - [x] linear and nonlinear plant models exploiting multiple dispatch
+- [x] linearization of nonlinear model with automatic differentiation (exact Jacobians)
 - [x] supported objective function terms:
   - [x] output setpoint tracking
   - [x] move suppression
