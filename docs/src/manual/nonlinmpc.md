@@ -234,10 +234,10 @@ regenerative circuitry.
 
 ## Linearizing the Model
 
-Nonlinear MPC are more computationally expensive than [`LinMPC`](@ref). Solving the problem
+Nonlinear MPC is more computationally expensive than [`LinMPC`](@ref). Solving the problem
 should always be faster than the sampling time ``T_s = 0.1`` s for real-time operation. This
-requirement is sometimes hard to meet on electronics or mechanical systems because of fast
-dynamics. To ease the design and comparison with [`LinMPC`](@ref), the [`linearize`](@ref)
+requirement is sometimes hard to meet on electronics or mechanical systems because of the
+fast dynamics. To ease the design and comparison with [`LinMPC`](@ref), the [`linearize`](@ref)
 function allows automatic linearization of [`NonLinModel`](@ref) based on [`ForwardDiff.jl`](https://juliadiff.org/ForwardDiff.jl/stable/).
 We first linearize `model` at the point ``θ = π`` rad and ``ω = τ = 0`` (inverted position):
 
