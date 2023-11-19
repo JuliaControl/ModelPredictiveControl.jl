@@ -13,19 +13,19 @@ import OSQP, Ipopt
 
 export SimModel, LinModel, NonLinModel
 export setop!, setstate!, updatestate!, evaloutput, linearize
-export StateEstimator, InternalModel, Luenberger
-export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
-export default_nint, initstate!
-export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
-export SimResult, getinfo, sim!
+#export StateEstimator, InternalModel, Luenberger
+#export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
+#export default_nint, initstate!
+#export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
+#export SimResult, getinfo, sim!
 
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)
 
 include("sim_model.jl")
-include("state_estim.jl")
-include("predictive_control.jl")
-include("plot_sim.jl")
+#include("state_estim.jl")
+#include("predictive_control.jl")
+#include("plot_sim.jl")
 
 @setup_workload begin
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the size of the

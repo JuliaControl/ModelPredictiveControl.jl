@@ -1,23 +1,25 @@
-struct NonLinModel{F<:Function, H<:Function} <: SimModel
-    x::Vector{Float64}
+struct NonLinModel{F<:Function, H<:Function, T<:Real} <: SimModel
+    x::Vector{T}
     f::F
     h::H
-    Ts::Float64
+    Ts::T
     nu::Int
     nx::Int
     ny::Int
     nd::Int
-    uop::Vector{Float64}
-    yop::Vector{Float64}
-    dop::Vector{Float64}
-    function NonLinModel{F,H}(f::F, h::H, Ts, nu, nx, ny, nd) where {F<:Function,H<:Function}
+    uop::Vector{T}
+    yop::Vector{T}
+    dop::Vector{T}
+    function NonLinModel{T}(
+        f::F, h::H, Ts, nu, nx, ny, nd
+    ) where {F<:Function, H<:Function, T<:Real}
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_fcts(f, h)
-        uop = zeros(nu)
-        yop = zeros(ny)
-        dop = zeros(nd)
-        x = zeros(nx)
-        return new(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
+        uop = zeros(T, nu)
+        yop = zeros(T, ny)
+        dop = zeros(T, nd)
+        x = zeros(T, nx)
+        return new{F, H, T}(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
 end
 
@@ -61,9 +63,22 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
 function NonLinModel(
     f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
 ) where {F<:Function, H<:Function}
-    return NonLinModel{F, H}(f, h, Ts, nu, nx, ny, nd)
+    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd)
 end
 
+#=
+"""
+    NonLinModel{T}(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
+
+Construct the nonlinear model with custom `Real` number type `T` (default to `Float64`).
+"""
+function NonLinModel{T}(
+    f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
+) where {F<:Function, H<:Function, T<:Real}
+    println("YOOIUO")
+    return NonLinModel{F, H, T}(f, h, Ts, nu, nx, ny, nd)
+end
+=#
 
 "Validate `f` and `h` function argument signatures."
 function validate_fcts(f, h)

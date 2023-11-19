@@ -1,5 +1,5 @@
-struct SteadyKalmanFilter <: StateEstimator
-    model::LinModel
+struct SteadyKalmanFilter{LM<:LinModel} <: StateEstimator
+    model::LM
     lastu0::Vector{Float64}
     x̂::Vector{Float64}
     i_ym::Vector{Int}
@@ -179,8 +179,8 @@ function update_estimate!(estim::SteadyKalmanFilter, u, ym, d=empty(estim.x̂))
     return x̂
 end
 
-struct KalmanFilter <: StateEstimator
-    model::LinModel
+struct KalmanFilter{LM<:LinModel} <: StateEstimator
+    model::LM
     lastu0::Vector{Float64}
     x̂::Vector{Float64}
     P̂::Hermitian{Float64, Matrix{Float64}}
