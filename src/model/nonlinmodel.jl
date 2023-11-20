@@ -1,4 +1,4 @@
-struct NonLinModel{F<:Function, H<:Function, T<:Real} <: SimModel
+struct NonLinModel{T<:Real, F<:Function, H<:Function} <: SimModel
     x::Vector{T}
     f::F
     h::H
@@ -10,17 +10,23 @@ struct NonLinModel{F<:Function, H<:Function, T<:Real} <: SimModel
     uop::Vector{T}
     yop::Vector{T}
     dop::Vector{T}
-    function NonLinModel{T}(
+    function NonLinModel{T, F, H}(
         f::F, h::H, Ts, nu, nx, ny, nd
-    ) where {F<:Function, H<:Function, T<:Real}
+    ) where {T<:Real, F<:Function, H<:Function}
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_fcts(f, h)
         uop = zeros(T, nu)
         yop = zeros(T, ny)
         dop = zeros(T, nd)
         x = zeros(T, nx)
-        return new{F, H, T}(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
+        return new{T, F, H}(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
+    function NonLinModel{T}(
+        f::F, h::H, Ts, nu, nx, ny, nd=0
+    ) where {T<:Real, F<:Function, H<:Function}
+        return NonLinModel{T, F, H}(f, h, Ts, nu, nx, ny, nd)
+    end
+
 end
 
 @doc raw"""
@@ -63,22 +69,16 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
 function NonLinModel(
     f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
 ) where {F<:Function, H<:Function}
-    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd)
+    return NonLinModel{Float64, F, H}(f, h, Ts, nu, nx, ny, nd)
 end
 
-#=
+
 """
     NonLinModel{T}(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
 
-Construct the nonlinear model with custom `Real` number type `T` (default to `Float64`).
+Construct the nonlinear model with vectors of element type `T`.
 """
-function NonLinModel{T}(
-    f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
-) where {F<:Function, H<:Function, T<:Real}
-    println("YOOIUO")
-    return NonLinModel{F, H, T}(f, h, Ts, nu, nx, ny, nd)
-end
-=#
+NonLinModel{T}(f::F, h::H, Ts, nu, nx, ny, nd=0) where {T<:Real, F<:Function, H<:Function}
 
 "Validate `f` and `h` function argument signatures."
 function validate_fcts(f, h)

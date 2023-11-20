@@ -78,7 +78,7 @@ form (``\mathbf{D_u=0}`` because of the zero-order hold):
     \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D_d d}(k)
 \end{aligned}
 ```
-Use the syntax [`LinModel{T}(A,Bu,C,Bd,Dd,Ts)`](@ref) to force a specific state-space
+Use the syntax [`LinModel(A, Bu, C, Bd, Dd, Ts)`](@ref) to force a specific state-space
 representation.
 """
 function LinModel(
@@ -187,9 +187,26 @@ Construct the model from the discrete state-space matrices `A, Bu, C, Bd, Dd` di
 
 This syntax do not modify the state-space representation provided in argument (`minreal`
 is not called). Care must be taken to ensure that the model is controllable and observable.
-
+The optional parameter `T` specifies the element type of the matrices.
 """
 LinModel{T}(A, Bu, C, Bd, Dd, Ts) where T<:Real
+
+function LinModel(
+    A::Matrix{T}, Bu::Matrix{T}, C::Matrix{T}, Bd::Matrix{T}, Dd::Matrix{T}, Ts::T
+) where {T<:Real} 
+    return LinModel{T}(A, Bu, C, Bd, Dd, Ts)
+end
+
+function LinModel(
+    A::Matrix{<:Real}, 
+    Bu::Matrix{<:Real}, 
+    C::Matrix{<:Real}, 
+    Bd::Matrix{<:Real}, 
+    Dd::Matrix{<:Real},
+    Ts::Real)
+    A, Bu, C, Bd, Dd, Ts_arr = promote(A, Bu, C, Bd, Dd, [Ts;;])
+    return LinModel(A, Bu, C, Bd, Dd, Ts_arr[])
+end
 
 
 @doc raw"""
