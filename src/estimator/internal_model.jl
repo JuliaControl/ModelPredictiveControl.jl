@@ -1,4 +1,4 @@
-struct InternalModel{T<:Real, SM<:SimModel{T}} <: StateEstimator{T}
+struct InternalModel{T<:Real, SM<:SimModel} <: StateEstimator{T}
     model::SM
     lastu0::Vector{T}
     x̂::Vector{T}
@@ -22,15 +22,9 @@ struct InternalModel{T<:Real, SM<:SimModel{T}} <: StateEstimator{T}
     B̂s::Matrix{T}
     function InternalModel{T, SM}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
-    ) where {T<:Real, SM<:SimModel{T}}
+    ) where {T<:Real, SM<:SimModel}
         nym, nyu = validate_ym(model, i_ym)
-        if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
-            error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
-                  "measured output quantity ($nym)")
-        end
-        if iszero(Dsm)
-            error("Stochastic model requires a nonzero direct transmission matrix D")
-        end
+        validate_internalmodel(model, nym, Csm, Dsm)
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
         nxs = size(As,1)
         nx̂ = model.nx
@@ -105,13 +99,32 @@ function InternalModel(
 end
 
 "Validate if `model` is asymptotically stable for [`LinModel`](@ref)."
-function validate_internalmodel(model::LinModel)
+function validate_internalmodel(model::LinModel, nym, Csm, Dsm)
     poles = eigvals(model.A)
     if any(abs.(poles) .≥ 1) 
         error("InternalModel does not support integrating or unstable model")
     end
+    if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
+        error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
+              "measured output quantity ($nym)")
+    end
+    if iszero(Dsm)
+        error("Stochastic model requires a nonzero direct transmission matrix D")
+    end
+    return nothing
 end
-validate_internalmodel(::SimModel) = nothing
+
+"Only validate stochastic model size is `model` is not a [`LinModel`](@ref)."
+function validate_internalmodel(::SimModel, nym, Csm, Dsm)
+    if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
+        error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
+              "measured output quantity ($nym)")
+    end
+    if iszero(Dsm)
+        error("Stochastic model requires a nonzero direct transmission matrix D")
+    end
+    return nothing
+end
 
 
 @doc raw"""

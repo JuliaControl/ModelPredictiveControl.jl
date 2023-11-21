@@ -427,7 +427,7 @@ function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
-#include("estimator/kalman.jl")
+include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
 include("estimator/internal_model.jl")
 

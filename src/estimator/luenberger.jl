@@ -1,5 +1,5 @@
-struct Luenberger{T<:Real, SM<:LinModel{T}} <: StateEstimator{T}
-    model::LinModel
+struct Luenberger{T<:Real, SM<:LinModel} <: StateEstimator{T}
+    model::SM
     lastu0::Vector{T}
     x̂::Vector{T}
     i_ym::Vector{Int}
@@ -22,13 +22,9 @@ struct Luenberger{T<:Real, SM<:LinModel{T}} <: StateEstimator{T}
     K̂::Matrix{T}
     function Luenberger{T, SM}(
         model, i_ym, nint_u, nint_ym, p̂
-    ) where {T<:Real, SM<:SimModel{T}}
+    ) where {T<:Real, SM<:LinModel}
         nym, nyu = validate_ym(model, i_ym)
-        if length(p̂) ≠ model.nx + sum(nint_u) +  sum(nint_ym)
-            error("p̂ length ($(length(p̂))) ≠ nx ($(model.nx)) + "*
-                  "integrator quantity ($(sum(nint_ym)))")
-        end
-        any(abs.(p̂) .≥ 1) && error("Observer poles p̂ should be inside the unit circles.")
+        validate_luenberger(model, nint_u, nint_ym, p̂)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
@@ -92,6 +88,15 @@ function Luenberger(
     p̂ = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
 ) where{T<:Real, SM<:LinModel{T}}
     return Luenberger{T, SM}(model, i_ym, nint_u, nint_ym, p̂)
+end
+
+"Validate the quantity and stability of the Luenberger poles `p̂`."
+function validate_luenberger(model, nint_u, nint_ym, p̂)
+    if length(p̂) ≠ model.nx + sum(nint_u) +  sum(nint_ym)
+        error("p̂ length ($(length(p̂))) ≠ nx ($(model.nx)) + "*
+              "integrator quantity ($(sum(nint_ym)))")
+    end
+    any(abs.(p̂) .≥ 1) && error("Observer poles p̂ should be inside the unit circles.")
 end
 
 
