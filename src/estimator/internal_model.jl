@@ -1,30 +1,29 @@
-struct InternalModel{SM<:SimModel} <: StateEstimator
+struct InternalModel{T<:Real, SM<:SimModel{T}} <: StateEstimator{T}
     model::SM
-    lastu0::Vector{Float64}
-    x̂::Vector{Float64}
-    x̂d::Vector{Float64}
-    x̂s::Vector{Float64}
+    lastu0::Vector{T}
+    x̂::Vector{T}
+    x̂d::Vector{T}
+    x̂s::Vector{T}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Bs::Matrix{Float64}
-    Cs::Matrix{Float64}
-    Ds::Matrix{Float64}
-    Â ::Matrix{Float64}
-    B̂u::Matrix{Float64}
-    Ĉ ::Matrix{Float64}
-    B̂d::Matrix{Float64}
-    D̂d::Matrix{Float64}
-    Âs::Matrix{Float64}
-    B̂s::Matrix{Float64}
-    function InternalModel{SM}(model::SM, i_ym, Asm, Bsm, Csm, Dsm) where {SM<:SimModel}
-        nu, ny = model.nu, model.ny
-        nym, nyu = length(i_ym), ny - length(i_ym)
-        validate_internalmodel(model)
-        validate_ym(model, i_ym)
+    As::Matrix{T}
+    Bs::Matrix{T}
+    Cs::Matrix{T}
+    Ds::Matrix{T}
+    Â ::Matrix{T}
+    B̂u::Matrix{T}
+    Ĉ ::Matrix{T}
+    B̂d::Matrix{T}
+    D̂d::Matrix{T}
+    Âs::Matrix{T}
+    B̂s::Matrix{T}
+    function InternalModel{T, SM}(
+        model::SM, i_ym, Asm, Bsm, Csm, Dsm
+    ) where {T<:Real, SM<:SimModel{T}}
+        nym, nyu = validate_ym(model, i_ym)
         if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
             error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
                   "measured output quantity ($nym)")
@@ -37,10 +36,10 @@ struct InternalModel{SM<:SimModel} <: StateEstimator
         nx̂ = model.nx
         Â, B̂u, Ĉ, B̂d, D̂d = matrices_internalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        lastu0 = zeros(nu)
-        x̂d = x̂ = zeros(model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
-        x̂s = zeros(nxs)
-        return new(
+        lastu0 = zeros(T, model.nu)
+        x̂d = x̂ = zeros(T, model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
+        x̂s = zeros(T, nxs)
+        return new{T, SM}(
             model, 
             lastu0, x̂, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
@@ -52,7 +51,7 @@ struct InternalModel{SM<:SimModel} <: StateEstimator
 end
 
 @doc raw"""
-    InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(1,1,1,1,model.Ts).*I)
+    InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(I,I,I,I,model.Ts))
 
 Construct an internal model estimator based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
 
@@ -89,8 +88,8 @@ aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
 function InternalModel(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
-    stoch_ym::Union{StateSpace, TransferFunction} = ss(1,1,1,1,model.Ts).*I(length(i_ym))
-) where {SM<:SimModel}
+    stoch_ym::LTISystem = (In = I(length(i_ym)); ss(In, In, In, In, model.Ts))
+) where {T<:Real, SM<:SimModel{T}}
     stoch_ym = minreal(ss(stoch_ym))
     if iscontinuous(stoch_ym)
         stoch_ym = c2d(stoch_ym, model.Ts, :tustin)
@@ -102,7 +101,7 @@ function InternalModel(
             stoch_ym   = c2d(stoch_ym_c, model.Ts, :tustin)
         end
     end
-    return InternalModel{SM}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
+    return InternalModel{T, SM}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
 end
 
 "Validate if `model` is asymptotically stable for [`LinModel`](@ref)."

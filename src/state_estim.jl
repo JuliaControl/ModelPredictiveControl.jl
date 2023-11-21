@@ -16,7 +16,7 @@ julia> ŷ = kf()
  20.0
 ```
 """
-abstract type StateEstimator end
+abstract type StateEstimator{T<:Real} end
 
 const IntVectorOrInt = Union{Int, Vector{Int}}
 
@@ -92,7 +92,7 @@ function init_estimstoch(model, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVector
     nu, ny, nym = model.nu, model.ny, length(i_ym)
     As_u , Cs_u , nint_u  = init_integrators(nint_u , nu , "u")
     As_ym, Cs_ym, nint_ym = init_integrators(nint_ym, nym, "ym")
-    As_y, _ , Cs_y  = stoch_ym2y(model, i_ym, As_ym, [], Cs_ym, [])
+    As_y, _ , Cs_y  = stoch_ym2y(model, i_ym, As_ym, Float64[;;], Cs_ym, Float64[;;])
     nxs_u, nxs_y = size(As_u, 1), size(As_y, 1)
     # combines input and output stochastic models:
     As   = [As_u zeros(nxs_u, nxs_y); zeros(nxs_y, nxs_u) As_y]
@@ -111,15 +111,18 @@ function validate_ym(model::SimModel, i_ym)
 end
 
 "Convert the measured outputs stochastic model `stoch_ym` to all outputs `stoch_y`."
-function stoch_ym2y(model::SimModel, i_ym, Asm, Bsm, Csm, Dsm)
+function stoch_ym2y(
+    model::SimModel, i_ym, 
+    Asm::Matrix{T}, Bsm::Matrix{T}, Csm::Matrix{T}, Dsm::Matrix{T}
+) where {T<:Real}
     As = Asm
     Bs = Bsm
-    Cs = zeros(model.ny, size(Csm,2))
+    Cs = zeros(T, model.ny, size(Csm,2))
     Cs[i_ym,:] = Csm
-    if isempty(Dsm) || Dsm == 0
+    if isempty(Dsm)
         Ds = Dsm
     else
-        Ds = zeros(model.ny, size(Dsm,2))
+        Ds = zeros(T, model.ny, size(Dsm,2))
         Ds[i_ym,:] = Dsm
     end
     return As, Bs, Cs, Ds
@@ -424,7 +427,7 @@ function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
-include("estimator/kalman.jl")
+#include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
 include("estimator/internal_model.jl")
 

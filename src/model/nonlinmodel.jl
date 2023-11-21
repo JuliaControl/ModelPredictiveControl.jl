@@ -1,4 +1,4 @@
-struct NonLinModel{T<:Real, F<:Function, H<:Function} <: SimModel
+struct NonLinModel{T<:Real, F<:Function, H<:Function} <: SimModel{T}
     x::Vector{T}
     f::F
     h::H
@@ -21,16 +21,10 @@ struct NonLinModel{T<:Real, F<:Function, H<:Function} <: SimModel
         x = zeros(T, nx)
         return new{T, F, H}(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
-    function NonLinModel{T}(
-        f::F, h::H, Ts, nu, nx, ny, nd=0
-    ) where {T<:Real, F<:Function, H<:Function}
-        return NonLinModel{T, F, H}(f, h, Ts, nu, nx, ny, nd)
-    end
-
 end
 
 @doc raw"""
-    NonLinModel(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
+    NonLinModel{T=Float64}(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
 
 Construct a nonlinear model from discrete-time state-space functions `f` and `h`.
 
@@ -42,7 +36,8 @@ The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined 
     \end{aligned}
 ```
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
-manipulated inputs, states, outputs and measured disturbances. 
+manipulated inputs, states, outputs and measured disturbances. The optional parameter `T`
+explicitly specifies the element type of vectors.
 
 !!! tip
     Replace the `d` argument with `_` if `nd = 0` (see Examples below).
@@ -52,7 +47,7 @@ manually call a differential equation solver in `f` (see [Manual](@ref man_nonli
 
 !!! warning
     `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref),
-    [`ExtendedKalmanFilter`](@ref) and `MovingHorizonEstimator`.
+    [`ExtendedKalmanFilter`](@ref) and [`linearize`](@ref).
 
 See also [`LinModel`](@ref).
 
@@ -66,19 +61,17 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
  0 measured disturbances d
 ```
 """
+function NonLinModel{T}(
+    f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
+) where {T<:Real, F<:Function, H<:Function}
+    return NonLinModel{T, F, H}(f, h, Ts, nu, nx, ny, nd)
+end
+
 function NonLinModel(
     f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
 ) where {F<:Function, H<:Function}
     return NonLinModel{Float64, F, H}(f, h, Ts, nu, nx, ny, nd)
 end
-
-
-"""
-    NonLinModel{T}(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
-
-Construct the nonlinear model with vectors of element type `T`.
-"""
-NonLinModel{T}(f::F, h::H, Ts, nu, nx, ny, nd=0) where {T<:Real, F<:Function, H<:Function}
 
 "Validate `f` and `h` function argument signatures."
 function validate_fcts(f, h)

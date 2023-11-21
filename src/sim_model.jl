@@ -18,7 +18,7 @@ julia> y = model()
  20.0
 ```
 """
-abstract type SimModel end
+abstract type SimModel{T<:Real} end
 
 @doc raw"""
     setop!(model::SimModel; uop=nothing, yop=nothing, dop=nothing) -> model

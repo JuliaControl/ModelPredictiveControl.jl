@@ -13,9 +13,9 @@ import OSQP, Ipopt
 
 export SimModel, LinModel, NonLinModel
 export setop!, setstate!, updatestate!, evaloutput, linearize
-#export StateEstimator, InternalModel, Luenberger
+export StateEstimator, InternalModel, Luenberger
 #export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
-#export default_nint, initstate!
+export default_nint, initstate!
 #export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
 #export SimResult, getinfo, sim!
 
@@ -23,7 +23,7 @@ export setop!, setstate!, updatestate!, evaloutput, linearize
 repeatdiag(A, n::Int) = kron(I(n), A)
 
 include("sim_model.jl")
-#include("state_estim.jl")
+include("state_estim.jl")
 #include("predictive_control.jl")
 #include("plot_sim.jl")
 
