@@ -540,7 +540,7 @@ noise, respectively.
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, https://doi.org/10.1002/0470045345.ch14, 
      ISBN9780470045343.
 """
-function update_estimate!(estim::UnscentedKalmanFilter{NT, SM}, u, ym, d) where {NT<:Real, SM}
+function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:Real
     x̂, P̂, Q̂, R̂, K̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ

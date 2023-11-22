@@ -49,7 +49,7 @@ function SimResult(
     obj::O, 
     U_data, 
     Y_data, 
-    D_data  = zeros(0, size(U_data, 2));
+    D_data  = zeros(NT, 0, size(U_data, 2));
     X_data  = nothing,
     X̂_data  = nothing, 
     Ry_data = nothing, 
@@ -115,7 +115,7 @@ function sim!(
     N::Int,
     u::Vector = plant.uop.+1,
     d::Vector = plant.dop;
-    x0 = zeros(plant.nx)
+    x0 = zeros(NT, plant.nx)
 ) where {NT<:Real}
     T_data  = collect(plant.Ts*(0:(N-1)))
     Y_data  = Matrix{NT}(undef, plant.ny, N)
@@ -238,13 +238,13 @@ function sim_closedloop!(
     d   ::Vector,
     ru  ::Vector = estim.model.uop;
     plant::SimModel = estim.model,
-    u_step ::Vector = zeros(plant.nu),
-    u_noise::Vector = zeros(plant.nu),
-    y_step ::Vector = zeros(plant.ny),
-    y_noise::Vector = zeros(plant.ny),
-    d_step ::Vector = zeros(plant.nd),
-    d_noise::Vector = zeros(plant.nd),
-    x_noise::Vector = zeros(plant.nx),
+    u_step ::Vector = zeros(NT, plant.nu),
+    u_noise::Vector = zeros(NT, plant.nu),
+    y_step ::Vector = zeros(NT, plant.ny),
+    y_noise::Vector = zeros(NT, plant.ny),
+    d_step ::Vector = zeros(NT, plant.nd),
+    d_noise::Vector = zeros(NT, plant.nd),
+    x_noise::Vector = zeros(NT, plant.nx),
     x0 = plant.x,
     x̂0 = nothing,
     lastu = plant.uop,

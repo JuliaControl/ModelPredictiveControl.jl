@@ -44,6 +44,10 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test skalmanfilter7.nint_u  == [1, 1]
     @test skalmanfilter7.nint_ym == [0, 0]
 
+    linmodel2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    skalmanfilter8 = SteadyKalmanFilter(linmodel2)
+    @test isa(skalmanfilter8, SteadyKalmanFilter{Float32})
+
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=[1,1,1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=[-1,0])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σQ=[1])
@@ -130,6 +134,10 @@ end
     @test kalmanfilter7.nint_u  == [1, 1]
     @test kalmanfilter7.nint_ym == [0, 0]
 
+    linmodel2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    kalmanfilter8 = KalmanFilter(linmodel2)
+    @test isa(kalmanfilter8, KalmanFilter{Float32})
+
     @test_throws ErrorException KalmanFilter(linmodel1, nint_ym=0, σP0=[1])
 end
 
@@ -192,6 +200,10 @@ end
     @test lo5.nx̂  == 4
     @test lo5.nint_u  == [1, 1]
     @test lo5.nint_ym == [0, 0]
+
+    linmodel2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    lo6 = Luenberger(linmodel2)
+    @test isa(lo6, Luenberger{Float32})
 
     @test_throws ErrorException Luenberger(linmodel1, nint_ym=[1,1,1])
     @test_throws ErrorException Luenberger(linmodel1, nint_ym=[-1,0])
@@ -287,6 +299,10 @@ end
     @test internalmodel7.Cs ≈ stoch_ym_disc.C
     @test internalmodel7.Ds ≈ stoch_ym_disc.D
 
+    linmodel3 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    internalmodel8 = InternalModel(linmodel3)
+    @test isa(internalmodel8, InternalModel{Float32})
+
     unstablemodel = LinModel(ss(diagm([0.5, -0.5, 1.5]), ones(3,1), I, 0, 1))
     @test_throws ErrorException InternalModel(unstablemodel)
     @test_throws ErrorException InternalModel(linmodel1, i_ym=[1,4])
@@ -362,6 +378,10 @@ end
     @test ukf8.nx̂  == 6
     @test ukf8.nint_u  == [1, 1]
     @test ukf8.nint_ym == [0, 0]
+
+    linmodel2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    ukf9 = UnscentedKalmanFilter(linmodel2)
+    @test isa(ukf9, UnscentedKalmanFilter{Float32})
 end
 
 @testset "UnscentedKalmanFilter estimator methods" begin
@@ -439,6 +459,10 @@ end
     @test ekf7.nx̂  == 6
     @test ekf7.nint_u  == [1, 1]
     @test ekf7.nint_ym == [0, 0]
+
+    linmodel2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    ekf8 = ExtendedKalmanFilter(linmodel2)
+    @test isa(ekf8, ExtendedKalmanFilter{Float32})
 end
 
 @testset "ExtendedKalmanFilter estimator methods" begin

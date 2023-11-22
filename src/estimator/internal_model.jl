@@ -142,9 +142,10 @@ function matrices_internalmodel(model::LinModel)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-function matrices_internalmodel(model::SimModel)
+function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
-    return zeros(0, nx), zeros(0, nu), zeros(0, nx), zeros(0, nd), zeros(0, nd)
+    Â, B̂u, Ĉ, B̂d, D̂d = zeros(NT,0,nx), zeros(NT,0,nu), zeros(NT,0,nx), zeros(NT,0,nd), zeros(NT,0,nd)
+    return Â, B̂u, Ĉ, B̂d, D̂d
 end
 
 @doc raw"""
@@ -216,14 +217,16 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂))
+function update_estimate!(
+    estim::InternalModel{NT, SM}, u, ym, d=empty(estim.x̂)
+) where {NT<:Real, SM}
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
     ŷd = h(model, x̂d, d)
     x̂d[:] = f(model, x̂d, u, d) # this also updates estim.x̂ (they are the same object)
     # --------------- stochastic model -----------------------
-    ŷs = zeros(model.ny)
+    ŷs = zeros(NT, model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]   # ŷs=0 for unmeasured outputs
     x̂s[:] = estim.Âs*x̂s + estim.B̂s*ŷs
     return x̂d
@@ -247,11 +250,11 @@ of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmea
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See
 [`init_internalmodel`](@ref) for details.
 """
-function init_estimate!(estim::InternalModel, model::LinModel, u, ym, d)
+function init_estimate!(estim::InternalModel, model::LinModel{NT}, u, ym, d) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
     x̂d[:] = (I - model.A)\(model.Bu*u + model.Bd*d)
     ŷd = h(model, x̂d, d)
-    ŷs = zeros(model.ny)
+    ŷs = zeros(NT, model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
     x̂s[:] = (I-estim.Âs)\estim.B̂s*ŷs
     return nothing

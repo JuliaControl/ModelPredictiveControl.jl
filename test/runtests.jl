@@ -4,7 +4,7 @@ using ModelPredictiveControl
 using ControlSystemsBase
 using Documenter
 using LinearAlgebra
-using JuMP, OSQP, Ipopt
+using JuMP, OSQP, Ipopt, ForwardDiff
 using Plots
 using Test
 

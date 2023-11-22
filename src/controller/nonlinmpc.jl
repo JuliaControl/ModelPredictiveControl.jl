@@ -1,8 +1,15 @@
 const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
 
-struct NonLinMPC{NT<:Real, SE<:StateEstimator, JEfunc<:Function} <: PredictiveController{NT}
+struct NonLinMPC{
+    NT<:Real, 
+    SE<:StateEstimator, 
+    JM<:JuMP.GenericModel, 
+    JEfunc<:Function
+} <: PredictiveController{NT}
     estim::SE
-    optim::JuMP.Model
+    # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
+    # different since solvers that support non-Float64 are scarce.
+    optim::JM
     con::ControllerConstraint{NT}
     ΔŨ::Vector{NT}
     ŷ ::Vector{NT}
@@ -35,15 +42,16 @@ struct NonLinMPC{NT<:Real, SE<:StateEstimator, JEfunc<:Function} <: PredictiveCo
     D̂E::Vector{NT}
     Ŷop::Vector{NT}
     Dop::Vector{NT}
-    function NonLinMPC{NT, SE, JEFunc}(
-        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEFunc, optim
-    ) where {NT<:Real, SE<:StateEstimator, JEFunc<:Function}
+    function NonLinMPC{NT, SE, JM, JEFunc}(
+        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEFunc, optim::JM
+    ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel, JEFunc<:Function}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         M_Hp, N_Hc, L_Hp = float(M_Hp), float(N_Hc), float(L_Hp) # debug julia 1.6
-        R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
+        # dummy vals (updated just before optimization):
+        R̂y, R̂u = zeros(NT, ny*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
@@ -51,11 +59,11 @@ struct NonLinMPC{NT<:Real, SE<:StateEstimator, JEfunc<:Function} <: PredictiveCo
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
-        d0, D̂0, D̂E = zeros(nd), zeros(nd*Hp), zeros(nd + nd*Hp)
+        d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
-        ΔŨ = zeros(nvar)
-        mpc = new{NT, SE, JEFunc}(
+        ΔŨ = zeros(NT, nvar)
+        mpc = new{NT, SE, JM, JEFunc}(
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, 
@@ -67,7 +75,7 @@ struct NonLinMPC{NT<:Real, SE<:StateEstimator, JEfunc<:Function} <: PredictiveCo
             d0, D̂0, D̂E,
             Ŷop, Dop,
         )
-        init_optimization!(mpc)
+        init_optimization!(mpc, optim)
         return mpc
     end
 end
@@ -168,7 +176,7 @@ function NonLinMPC(
     M_Hp = nothing,
     N_Hc = nothing,
     L_Hp = nothing,
-    optim::JuMP.Model = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = UnscentedKalmanFilter(model; kwargs...)
@@ -188,7 +196,7 @@ function NonLinMPC(
     M_Hp = nothing,
     N_Hc = nothing,
     L_Hp = nothing,
-    optim::JuMP.Model = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
@@ -231,13 +239,13 @@ function NonLinMPC(
     M_Hp = nothing,
     N_Hc = nothing,
     L_Hp = nothing,
-    optim::JuMP.Model = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
-) where {NT<:Real, SE<:StateEstimator{NT}, JEFunc<:Function}
+    optim::JM = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
+) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel, JEFunc<:Function}
     Hp = default_Hp(estim.model, Hp)
-    isnothing(M_Hp) && (M_Hp = Diagonal(repeat(Mwt, Hp)))
-    isnothing(N_Hc) && (N_Hc = Diagonal(repeat(Nwt, Hc)))
-    isnothing(L_Hp) && (L_Hp = Diagonal(repeat(Lwt, Hp)))
-    return NonLinMPC{NT, SE, JEFunc}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, optim)
+    isnothing(M_Hp) && (M_Hp = Diagonal{NT}(repeat(Mwt, Hp)))
+    isnothing(N_Hc) && (N_Hc = Diagonal{NT}(repeat(Nwt, Hc)))
+    isnothing(L_Hp) && (L_Hp = Diagonal{NT}(repeat(Lwt, Hp)))
+    return NonLinMPC{NT, SE, JM, JEFunc}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, optim)
 end
 
 """
@@ -256,13 +264,13 @@ function addinfo!(info, mpc::NonLinMPC)
 end
 
 """
-    init_optimization!(mpc::NonLinMPC)
+    init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel)
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC{NT, SE, JEFunc}) where {NT<:Real, SE, JEFunc}
+function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
     # --- variables and linear constraints ---
-    optim, con = mpc.optim, mpc.con
+    con = mpc.con
     nvar = length(mpc.ΔŨ)
     set_silent(optim)
     limit_solve_time(mpc)
@@ -277,10 +285,10 @@ function init_optimization!(mpc::NonLinMPC{NT, SE, JEFunc}) where {NT<:Real, SE,
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
     Jfunc, gfunc = let mpc=mpc, model=model, ng=ng, nvar=nvar , nŶ=Hp*ny, nx̂=nx̂
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
-        Ŷ_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nŶ), nvar + 3)
-        g_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, ng), nvar + 3)
-        x̂_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx̂), nvar + 3)
-        function Jfunc(ΔŨtup::NT...)
+        Ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŶ), nvar + 3)
+        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), nvar + 3)
+        x̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), nvar + 3)
+        function Jfunc(ΔŨtup::JNT...)
             Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
             ΔŨ = collect(ΔŨtup)
             if ΔŨtup != last_ΔŨtup_float
@@ -304,7 +312,7 @@ function init_optimization!(mpc::NonLinMPC{NT, SE, JEFunc}) where {NT<:Real, SE,
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
         end
-        function gfunc_i(i, ΔŨtup::NTuple{N, NT}) where N
+        function gfunc_i(i, ΔŨtup::NTuple{N, JNT}) where N
             g = get_tmp(g_cache, ΔŨtup[1])
             if ΔŨtup != last_ΔŨtup_float
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])

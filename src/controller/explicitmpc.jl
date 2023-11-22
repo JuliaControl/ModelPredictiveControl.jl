@@ -51,10 +51,10 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         P̃_chol = cholesky(P̃)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
-        d0, D̂0, D̂E = zeros(nd), zeros(nd*Hp), zeros(nd + nd*Hp)
+        d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
-        ΔŨ = zeros(nvar)
+        ΔŨ = zeros(NT, nvar)
         mpc = new{NT, SE}(
             estim,
             ΔŨ, ŷ,
@@ -167,9 +167,9 @@ function ExplicitMPC(
 ) where {NT<:Real, SE<:StateEstimator{NT}}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     Hp = default_Hp(estim.model, Hp)
-    isnothing(M_Hp) && (M_Hp = Diagonal(repeat(Mwt, Hp)))
-    isnothing(N_Hc) && (N_Hc = Diagonal(repeat(Nwt, Hc)))
-    isnothing(L_Hp) && (L_Hp = Diagonal(repeat(Lwt, Hp)))
+    isnothing(M_Hp) && (M_Hp = Diagonal{NT}(repeat(Mwt, Hp)))
+    isnothing(N_Hc) && (N_Hc = Diagonal{NT}(repeat(Nwt, Hc)))
+    isnothing(L_Hp) && (L_Hp = Diagonal{NT}(repeat(Lwt, Hp)))
     return ExplicitMPC{NT, SE}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp)
 end
 

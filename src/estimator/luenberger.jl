@@ -35,8 +35,8 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             error("Cannot compute the Luenberger gain K̂ with specified poles p̂.")
         end
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
-        lastu0 = zeros(model.nu)
-        x̂ = [zeros(model.nx); zeros(nxs)]
+        lastu0 = zeros(NT, model.nu)
+        x̂ = [zeros(NT, model.nx); zeros(NT, nxs)]
         return new{NT, SM}(
             model, 
             lastu0, x̂,

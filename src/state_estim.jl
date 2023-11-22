@@ -113,10 +113,7 @@ function validate_ym(model::SimModel, i_ym)
 end
 
 "Convert the measured outputs stochastic model `stoch_ym` to all outputs `stoch_y`."
-function stoch_ym2y(
-    model::SimModel, i_ym, 
-    Asm::Matrix{NT}, Bsm::Matrix{NT}, Csm::Matrix{NT}, Dsm::Matrix{NT}
-) where {NT<:Real}
+function stoch_ym2y(model::SimModel{NT}, i_ym, Asm, Bsm, Csm, Dsm) where {NT<:Real}
     As = Asm
     Bs = Bsm
     Cs = zeros(NT, model.ny, size(Csm,2))
@@ -188,13 +185,13 @@ returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```
 An error is thrown if the augmented model is not observable and `verify_obsv == true`.
 """
-function augment_model(model::LinModel, As, Cs_u, Cs_y; verify_obsv=true)
+function augment_model(model::LinModel{NT}, As, Cs_u, Cs_y; verify_obsv=true) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
     nxs = size(As, 1)
-    Â   = [model.A model.Bu*Cs_u; zeros(nxs,nx) As]
-    B̂u  = [model.Bu; zeros(nxs, nu)]
+    Â   = [model.A model.Bu*Cs_u; zeros(NT, nxs,nx) As]
+    B̂u  = [model.Bu; zeros(NT, nxs, nu)]
     Ĉ   = [model.C Cs_y]
-    B̂d  = [model.Bd; zeros(nxs, nd)]
+    B̂d  = [model.Bd; zeros(NT, nxs, nd)]
     D̂d  = model.Dd
     # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny:
     if verify_obsv && !observability(Â, Ĉ)[:isobservable]
@@ -205,14 +202,14 @@ function augment_model(model::LinModel, As, Cs_u, Cs_y; verify_obsv=true)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-function augment_model(model::SimModel, As, _ , _ )
+function augment_model(model::SimModel{NT}, As, _ , _ ) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
     nxs = size(As, 1)
-    Â   = zeros(0, nx+nxs)
-    B̂u  = zeros(0, nu)
-    Ĉ   = zeros(0, nx+nxs)
-    B̂d  = zeros(0, nd)
-    D̂d  = zeros(0, nd)
+    Â   = zeros(NT, 0, nx+nxs)
+    B̂u  = zeros(NT, 0, nu)
+    Ĉ   = zeros(NT, 0, nx+nxs)
+    B̂d  = zeros(NT, 0, nd)
+    D̂d  = zeros(NT, 0, nd)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 

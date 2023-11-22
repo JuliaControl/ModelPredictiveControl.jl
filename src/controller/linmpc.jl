@@ -1,8 +1,14 @@
 const DEFAULT_LINMPC_OPTIMIZER = OSQP.MathOptInterfaceOSQP.Optimizer
 
-struct LinMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
+struct LinMPC{
+    NT<:Real, 
+    SE<:StateEstimator, 
+    JM<:JuMP.GenericModel
+} <: PredictiveController{NT}
     estim::SE
-    optim::JuMP.Model
+    # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
+    # different since solvers that support non-Float64 are scarce.
+    optim::JM
     con::ControllerConstraint{NT}
     ΔŨ::Vector{NT}
     ŷ ::Vector{NT}
@@ -34,9 +40,9 @@ struct LinMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     D̂E::Vector{NT}
     Ŷop::Vector{NT}
     Dop::Vector{NT}
-    function LinMPC{NT, SE}(
-        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim
-    ) where {NT<:Real, SE<:StateEstimator}
+    function LinMPC{NT, SE, JM}(
+        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim::JM
+    ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
@@ -56,7 +62,7 @@ struct LinMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(NT, nvar)
-        mpc = new{NT, SE}(
+        mpc = new{NT, SE, JM}(
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, 
@@ -68,7 +74,7 @@ struct LinMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
             d0, D̂0, D̂E,
             Ŷop, Dop,
         )
-        init_optimization!(mpc)
+        init_optimization!(mpc, optim)
         return mpc
     end
 end
@@ -166,7 +172,7 @@ function LinMPC(
     M_Hp = nothing,
     N_Hc = nothing,
     L_Hp = nothing,
-    optim::JuMP.Model = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
@@ -207,24 +213,24 @@ function LinMPC(
     M_Hp = nothing,
     N_Hc = nothing,
     L_Hp = nothing,
-    optim::JuMP.Model = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
-) where {NT<:Real, SE<:StateEstimator{NT}}
+    optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
+) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     Hp = default_Hp(estim.model, Hp)
-    isnothing(M_Hp) && (M_Hp = Diagonal(repeat(Mwt, Hp)))
-    isnothing(N_Hc) && (N_Hc = Diagonal(repeat(Nwt, Hc)))
-    isnothing(L_Hp) && (L_Hp = Diagonal(repeat(Lwt, Hp)))
-    return LinMPC{NT, SE}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim)
+    isnothing(M_Hp) && (M_Hp = Diagonal{NT}(repeat(Mwt, Hp)))
+    isnothing(N_Hc) && (N_Hc = Diagonal{NT}(repeat(Nwt, Hc)))
+    isnothing(L_Hp) && (L_Hp = Diagonal{NT}(repeat(Lwt, Hp)))
+    return LinMPC{NT, SE, JM}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim)
 end
 
 """
-    init_optimization!(mpc::LinMPC)
+    init_optimization!(mpc::LinMPC, optim::JuMP.GenericModel)
 
 Init the quadratic optimization for [`LinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::LinMPC)
+function init_optimization!(mpc::LinMPC, optim::JuMP.GenericModel)
     # --- variables and linear constraints ---
-    optim, con = mpc.optim, mpc.con
+    con = mpc.con
     nvar = length(mpc.ΔŨ)
     set_silent(optim)
     limit_solve_time(mpc)

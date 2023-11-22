@@ -14,7 +14,7 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function} <: SimModel{NT}
         f::F, h::H, Ts, nu, nx, ny, nd
     ) where {NT<:Real, F<:Function, H<:Function}
         Ts > 0 || error("Sampling time Ts must be positive")
-        validate_fcts(f, h)
+        validate_fcts(NT, f, h)
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
@@ -74,24 +74,18 @@ function NonLinModel(
 end
 
 "Validate `f` and `h` function argument signatures."
-function validate_fcts(f, h)
+function validate_fcts(NT, f, h)
     fargsvalid1 = hasmethod(f,
-        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
+        Tuple{Vector{NT}, Vector{NT}, Vector{NT}}
     )
-    fargsvalid2 = hasmethod(f,
-        Tuple{Vector{ComplexF64}, Vector{Float64}, Vector{Float64}}
-    )
-    if !fargsvalid1 && !fargsvalid2
-        error("state function has no method of type "*
-            "f(x::Vector{Float64}, u::Vector{Float64}, d::Vector{Float64}) or "*
-            "f(x::Vector{ComplexF64}, u::Vector{Float64}, d::Vector{Float64})")
+    if !fargsvalid1
+        error("state function has no method with type signature "*
+              "f(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)})")
     end
-    hargsvalid1 = hasmethod(h,Tuple{Vector{Float64}, Vector{Float64}})
-    hargsvalid2 = hasmethod(h,Tuple{Vector{ComplexF64}, Vector{Float64}})
-    if !hargsvalid1 && !hargsvalid2
-        error("output function has no method of type "*
-            "h(x::Vector{Float64}, d::Vector{Float64}) or "*
-            "h(x::Vector{ComplexF64}, d::Vector{Float64})")
+    hargsvalid1 = hasmethod(h,Tuple{Vector{NT}, Vector{NT}})
+    if !hargsvalid1
+        error("output function has no method with type signature "*
+              "h(x::Vector{$(NT)}, d::Vector{$(NT)})")
     end
 end
 
