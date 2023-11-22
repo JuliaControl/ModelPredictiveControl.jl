@@ -1,30 +1,30 @@
-struct NonLinModel{T<:Real, F<:Function, H<:Function} <: SimModel{T}
-    x::Vector{T}
+struct NonLinModel{NT<:Real, F<:Function, H<:Function} <: SimModel{NT}
+    x::Vector{NT}
     f::F
     h::H
-    Ts::T
+    Ts::NT
     nu::Int
     nx::Int
     ny::Int
     nd::Int
-    uop::Vector{T}
-    yop::Vector{T}
-    dop::Vector{T}
-    function NonLinModel{T, F, H}(
+    uop::Vector{NT}
+    yop::Vector{NT}
+    dop::Vector{NT}
+    function NonLinModel{NT, F, H}(
         f::F, h::H, Ts, nu, nx, ny, nd
-    ) where {T<:Real, F<:Function, H<:Function}
+    ) where {NT<:Real, F<:Function, H<:Function}
         Ts > 0 || error("Sampling time Ts must be positive")
         validate_fcts(f, h)
-        uop = zeros(T, nu)
-        yop = zeros(T, ny)
-        dop = zeros(T, nd)
-        x = zeros(T, nx)
-        return new{T, F, H}(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
+        uop = zeros(NT, nu)
+        yop = zeros(NT, ny)
+        dop = zeros(NT, nd)
+        x = zeros(NT, nx)
+        return new{NT, F, H}(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
 end
 
 @doc raw"""
-    NonLinModel{T=Float64}(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
+    NonLinModel{NT}(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
 
 Construct a nonlinear model from discrete-time state-space functions `f` and `h`.
 
@@ -36,8 +36,8 @@ The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined 
     \end{aligned}
 ```
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
-manipulated inputs, states, outputs and measured disturbances. The optional parameter `T`
-explicitly specifies the element type of vectors.
+manipulated inputs, states, outputs and measured disturbances. The optional parameter `NT`
+explicitly specifies the number type of vectors (default to `Float64`).
 
 !!! tip
     Replace the `d` argument with `_` if `nd = 0` (see Examples below).
@@ -61,10 +61,10 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
  0 measured disturbances d
 ```
 """
-function NonLinModel{T}(
+function NonLinModel{NT}(
     f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
-) where {T<:Real, F<:Function, H<:Function}
-    return NonLinModel{T, F, H}(f, h, Ts, nu, nx, ny, nd)
+) where {NT<:Real, F<:Function, H<:Function}
+    return NonLinModel{NT, F, H}(f, h, Ts, nu, nx, ny, nd)
 end
 
 function NonLinModel(

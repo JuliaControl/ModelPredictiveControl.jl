@@ -18,7 +18,7 @@ julia> y = model()
  20.0
 ```
 """
-abstract type SimModel{T<:Real} end
+abstract type SimModel{NT<:Real} end
 
 @doc raw"""
     setop!(model::SimModel; uop=nothing, yop=nothing, dop=nothing) -> model
@@ -134,7 +134,7 @@ Update `model.x` states with current inputs `u` and measured disturbances `d`.
 
 # Examples
 ```jldoctest
-julia> model = LinModel(ss(1, 1, 1, 0, 1.0));
+julia> model = LinModel(ss(1.0, 1.0, 1.0, 0, 1.0));
 
 julia> x = updatestate!(model, [1])
 1-element Vector{Float64}:

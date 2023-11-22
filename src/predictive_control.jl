@@ -17,7 +17,7 @@ julia> u = mpc([5]); round.(u, digits=3)
 ```
 
 """
-abstract type PredictiveController end
+abstract type PredictiveController{NT<:Real} end
 
 const DEFAULT_HP0 = 10
 const DEFAULT_HC  = 2
@@ -34,46 +34,37 @@ const FATAL_STATUSES = [
     OTHER_ERROR
 ]
 
-"Type alias for vector of linear inequality constraints."
-const LinConVector = Vector{ConstraintRef{
-    Model, 
-    MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}, 
-    ScalarShape
-}}
-
-const InfoDictType = Union{JuMP._SolutionSummary, Vector{Float64}, Float64}
-
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
-struct ControllerConstraint
-    ẽx̂      ::Matrix{Float64}
-    fx̂      ::Vector{Float64}
-    gx̂      ::Matrix{Float64}
-    jx̂      ::Matrix{Float64}
-    kx̂      ::Matrix{Float64}
-    vx̂      ::Matrix{Float64}
-    Umin    ::Vector{Float64}
-    Umax    ::Vector{Float64}
-    ΔŨmin   ::Vector{Float64}
-    ΔŨmax   ::Vector{Float64}
-    Ymin    ::Vector{Float64}
-    Ymax    ::Vector{Float64}
-    x̂min    ::Vector{Float64}
-    x̂max    ::Vector{Float64}
-    A_Umin  ::Matrix{Float64}
-    A_Umax  ::Matrix{Float64}
-    A_ΔŨmin ::Matrix{Float64}
-    A_ΔŨmax ::Matrix{Float64}
-    A_Ymin  ::Matrix{Float64}
-    A_Ymax  ::Matrix{Float64}
-    A_x̂min  ::Matrix{Float64}
-    A_x̂max  ::Matrix{Float64}
-    A       ::Matrix{Float64}
-    b       ::Vector{Float64}
+struct ControllerConstraint{NT<:Real}
+    ẽx̂      ::Matrix{NT}
+    fx̂      ::Vector{NT}
+    gx̂      ::Matrix{NT}
+    jx̂      ::Matrix{NT}
+    kx̂      ::Matrix{NT}
+    vx̂      ::Matrix{NT}
+    Umin    ::Vector{NT}
+    Umax    ::Vector{NT}
+    ΔŨmin   ::Vector{NT}
+    ΔŨmax   ::Vector{NT}
+    Ymin    ::Vector{NT}
+    Ymax    ::Vector{NT}
+    x̂min    ::Vector{NT}
+    x̂max    ::Vector{NT}
+    A_Umin  ::Matrix{NT}
+    A_Umax  ::Matrix{NT}
+    A_ΔŨmin ::Matrix{NT}
+    A_ΔŨmax ::Matrix{NT}
+    A_Ymin  ::Matrix{NT}
+    A_Ymax  ::Matrix{NT}
+    A_x̂min  ::Matrix{NT}
+    A_x̂max  ::Matrix{NT}
+    A       ::Matrix{NT}
+    b       ::Vector{NT}
     i_b     ::BitVector
-    C_ymin  ::Vector{Float64}
-    C_ymax  ::Vector{Float64}
-    c_x̂min  ::Vector{Float64}
-    c_x̂max  ::Vector{Float64}
+    C_ymin  ::Vector{NT}
+    C_ymax  ::Vector{NT}
+    c_x̂min  ::Vector{NT}
+    c_x̂max  ::Vector{NT}
     i_g     ::BitVector
 end
 
@@ -436,8 +427,8 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
  10.0
 ```
 """
-function getinfo(mpc::PredictiveController)
-    info = Dict{Symbol, InfoDictType}()
+function getinfo(mpc::PredictiveController{NT}) where NT<:Real
+    info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
     Ŷ, x̂    = similar(mpc.Ŷop), similar(mpc.estim.x̂)
     Ŷ, x̂end = predict!(Ŷ, x̂, mpc, mpc.estim.model, mpc.ΔŨ)
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
@@ -632,7 +623,7 @@ Compute the predictions `Ŷ` and terminal states `x̂end` if model is a [`LinMo
 The method mutates `Ŷ` and `x̂` vector arguments. The `x̂end` vector is used for
 the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``.
 """
-function predict!(Ŷ, x̂, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
+function predict!(Ŷ, x̂, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{NT}) where {NT<:Real}
      # in-place operations to reduce allocations :
     Ŷ[:] = mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F
     x̂[:] = mul!(x̂, mpc.con.ẽx̂, ΔŨ) + mpc.con.fx̂
@@ -645,10 +636,10 @@ end
 
 Compute both vectors if `model` is not a [`LinModel`](@ref).
 """
-function predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{T}) where {T<:Real}
+function predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{NT}) where {NT<:Real}
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
-    u0::Vector{T} = copy(mpc.estim.lastu0)
-    d0::Vector{T} = copy(mpc.d0)
+    u0::Vector{NT} = copy(mpc.estim.lastu0)
+    d0::Vector{NT} = copy(mpc.d0)
     x̂[:] = mpc.estim.x̂
     for j=1:Hp
         if j ≤ Hc
@@ -670,7 +661,7 @@ Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ �
 
 Also init ``\mathbf{f_x̂}`` vector for the terminal constraints, see [`init_predmat`](@ref).
 """
-function linconstraint!(mpc::PredictiveController, model::LinModel)
+function linconstraint!(mpc::PredictiveController{NT}, model::LinModel) where {NT<:Real}
     mpc.con.fx̂[:] = mpc.con.kx̂ * mpc.estim.x̂  + mpc.con.vx̂ * mpc.estim.lastu0
     if model.nd ≠ 0
         mpc.con.fx̂[:] = mpc.con.fx̂ + mpc.con.gx̂ * mpc.d0 + mpc.con.jx̂ * mpc.D̂0
@@ -686,12 +677,16 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
         -mpc.con.x̂min + mpc.con.fx̂
         +mpc.con.x̂max - mpc.con.fx̂
     ]
-    lincon::LinConVector = mpc.optim[:linconstraint]
+    lincon::Vector{ConstraintRef{
+            Model, 
+            MOI.ConstraintIndex{MOI.ScalarAffineFunction{NT}, MOI.LessThan{NT}}, 
+            ScalarShape
+        }} = mpc.optim[:linconstraint]
     set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
 end
 
 "Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
-function linconstraint!(mpc::PredictiveController, model::SimModel)
+function linconstraint!(mpc::PredictiveController{NT}, model::SimModel) where {NT<:Real}
     lastu = mpc.estim.lastu0 + model.uop
     mpc.con.b[:] = [
         -mpc.con.Umin + mpc.T*lastu
@@ -699,7 +694,11 @@ function linconstraint!(mpc::PredictiveController, model::SimModel)
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
     ]
-    lincon::LinConVector = mpc.optim[:linconstraint]
+    lincon::Vector{ConstraintRef{
+        Model, 
+        MOI.ConstraintIndex{MOI.ScalarAffineFunction{NT}, MOI.LessThan{NT}}, 
+        ScalarShape
+    }} = mpc.optim[:linconstraint]
     set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
 end
 
@@ -841,12 +840,12 @@ For the terminal constraints, the matrices are computed with the function
 \end{aligned}
 ```
 """
-function init_predmat(estim::StateEstimator, model::LinModel, Hp, Hc)
+function init_predmat(estim::StateEstimator, model::LinModel{NT}, Hp, Hc) where {NT<:Real}
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
     # --- pre-compute matrix powers ---
     # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,Hp+1] = A^Hp
-    Âpow = Array{Float64}(undef, size(Â,1), size(Â,2), Hp+1)
+    Âpow = Array{NT}(undef, size(Â,1), size(Â,2), Hp+1)
     Âpow[:,:,1] = I(nx̂)
     for j=2:Hp+1
         Âpow[:,:,j] = Âpow[:,:,j-1]*Â
@@ -857,20 +856,20 @@ function init_predmat(estim::StateEstimator, model::LinModel, Hp, Hc)
     getpower(array3D, power) = array3D[:,:, power+1]
     # --- state estimates x̂ ---
     kx̂ = getpower(Âpow, Hp)
-    K  = Matrix{Float64}(undef, Hp*ny, nx̂)
+    K  = Matrix{NT}(undef, Hp*ny, nx̂)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
         K[iRow,:] = Ĉ*getpower(Âpow, j)
     end    
     # --- manipulated inputs u ---
     vx̂ = getpower(Âpow_csum, Hp-1)*B̂u
-    V  = Matrix{Float64}(undef, Hp*ny, nu)
+    V  = Matrix{NT}(undef, Hp*ny, nu)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
         V[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)*B̂u
     end
-    ex̂ = Matrix{Float64}(undef, nx̂, Hc*nu)
-    E  = zeros(Hp*ny, Hc*nu) 
+    ex̂ = Matrix{NT}(undef, nx̂, Hc*nu)
+    E  = zeros(NT, Hp*ny, Hc*nu) 
     for j=1:Hc # truncated with control horizon
         iRow = (ny*(j-1)+1):(ny*Hp)
         iCol = (1:nu) .+ nu*(j-1)
@@ -879,8 +878,8 @@ function init_predmat(estim::StateEstimator, model::LinModel, Hp, Hc)
     end
     # --- measured disturbances d ---
     gx̂ = getpower(Âpow, Hp-1)*B̂d
-    G  = Matrix{Float64}(undef, Hp*ny, nd)
-    jx̂ = Matrix{Float64}(undef, nx̂, Hp*nd)
+    G  = Matrix{NT}(undef, Hp*ny, nd)
+    jx̂ = Matrix{NT}(undef, nx̂, Hp*nd)
     J  = repeatdiag(D̂d, Hp)
     if nd ≠ 0
         for j=1:Hp
@@ -894,19 +893,20 @@ function init_predmat(estim::StateEstimator, model::LinModel, Hp, Hc)
             jx̂[:  , iCol] = j < Hp ? getpower(Âpow, Hp-j-1)*B̂d : zeros(nx̂, nd)
         end
     end
-    F, fx̂  = zeros(ny*Hp), zeros(nx̂) # dummy values (updated just before optimization)
+    # dummy values (updated just before optimization):
+    F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
     return E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
 end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref)"
-function init_predmat(estim::StateEstimator, model::SimModel, Hp, Hc)
+function init_predmat(estim::StateEstimator, model::SimModel{NT}, Hp, Hc) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
-    E  = zeros(0, nu*Hc)
-    G  = zeros(0, nd)
-    J  = zeros(0, nd*Hp)
-    K  = zeros(0, nx̂)
-    V  = zeros(0, nu)
-    F  = zeros(0)
+    E  = zeros(NT, 0, nu*Hc)
+    G  = zeros(NT, 0, nd)
+    J  = zeros(NT, 0, nd*Hp)
+    K  = zeros(NT, 0, nx̂)
+    V  = zeros(NT, 0, nu)
+    F  = zeros(NT, 0)
     ex̂, gx̂, jx̂, kx̂, vx̂, fx̂ = E, G, J, K, V, F
     return E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
 end
@@ -925,17 +925,17 @@ vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period 
 [`initpred!`](@ref) method). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp)
+function init_quadprog(::LinModel{NT}, Ẽ, S, M_Hp, N_Hc, L_Hp) where {NT<:Real}
     P̃ = 2*Hermitian(Ẽ'*M_Hp*Ẽ + N_Hc + S'*L_Hp*S)
-    q̃ = zeros(size(P̃, 1))   # dummy value (updated just before optimization)
-    p = zeros(1)            # dummy value (updated just before optimization)
+    q̃ = zeros(NT, size(P̃, 1))   # dummy value (updated just before optimization)
+    p = zeros(NT, 1)            # dummy value (updated just before optimization)
     return P̃, q̃, p
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-function init_quadprog(::SimModel, Ẽ, S, M_Hp, N_Hc, L_Hp)
-    P̃ = Hermitian(zeros(0, 0))
-    q̃ = zeros(0)
-    p = zeros(1)            # dummy value (updated just before optimization)
+function init_quadprog(::SimModel{NT}, Ẽ, S, M_Hp, N_Hc, L_Hp) where {NT<:Real}
+    P̃ = Hermitian(zeros(NT, 0, 0))
+    q̃ = zeros(NT, 0)
+    p = zeros(NT, 1)            # dummy value (updated just before optimization)
     return P̃, q̃, p
 end
 
@@ -958,8 +958,8 @@ also be called on any [`PredictiveController`](@ref)s to evaluate the objective 
 at specific input increments `ΔŨ` and predictions `Ŷ` values.
 """
 function obj_nonlinprog(
-    mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{T}
-) where {T<:Real}
+    mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
+) where {NT<:Real}
     J = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
     if !iszero(mpc.E)
         U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
@@ -977,8 +977,8 @@ Nonlinear programming objective function when `model` is not a [`LinModel`](@ref
 function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
 """
 function obj_nonlinprog(
-    mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{T}
-) where {T<:Real}
+    mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{NT}
+) where {NT<:Real}
     # --- output setpoint tracking term ---
     êy = mpc.R̂y - Ŷ
     JR̂y = dot(êy, mpc.M_Hp, êy)
@@ -1013,17 +1013,20 @@ Init `ControllerConstraint` struct with default parameters based on estimator `e
 
 Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
 """
-function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
+function init_defaultcon(
+    estim::StateEstimator{NT}, 
+    Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
+) where {NT<:Real}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
-    umin,       umax    = fill(-Inf, nu), fill(+Inf, nu)
-    Δumin,      Δumax   = fill(-Inf, nu), fill(+Inf, nu)
-    ymin,       ymax    = fill(-Inf, ny), fill(+Inf, ny)
-    x̂min,       x̂max    = fill(-Inf, nx̂), fill(+Inf, nx̂)
-    c_umin,     c_umax  = fill(0.0, nu),  fill(0.0, nu)
-    c_Δumin,    c_Δumax = fill(0.0, nu),  fill(0.0, nu)
-    c_ymin,     c_ymax  = fill(1.0, ny),  fill(1.0, ny)
-    c_x̂min,     c_x̂max  = fill(0.0, nx̂),  fill(0.0, nx̂)
+    umin,       umax    = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
+    Δumin,      Δumax   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
+    ymin,       ymax    = fill(convert(NT,-Inf), ny), fill(convert(NT,+Inf), ny)
+    x̂min,       x̂max    = fill(convert(NT,-Inf), nx̂), fill(convert(NT,+Inf), nx̂)
+    c_umin,     c_umax  = fill(zero(NT), nu), fill(zero(NT), nu)
+    c_Δumin,    c_Δumax = fill(zero(NT), nu), fill(zero(NT), nu)
+    c_ymin,     c_ymax  = fill(one(NT),  ny), fill(one(NT),  ny)
+    c_x̂min,     c_x̂max  = fill(zero(NT), nx̂), fill(zero(NT), nx̂)
     Umin, Umax, ΔUmin, ΔUmax, Ymin, Ymax = 
         repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
@@ -1042,7 +1045,7 @@ function init_defaultcon(estim, Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, k
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min
     )
     b = zeros(size(A, 1)) # dummy b vector (updated just before optimization)
-    con = ControllerConstraint(
+    con = ControllerConstraint{NT}(
         ẽx̂      , fx̂    , gx̂     , jx̂       , kx̂     , vx̂     ,  
         Umin    , Umax  , ΔŨmin  , ΔŨmax    , Ymin   , Ymax   , x̂min   , x̂max,
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,

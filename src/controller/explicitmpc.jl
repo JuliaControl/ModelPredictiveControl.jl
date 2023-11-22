@@ -1,37 +1,39 @@
-struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
+struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     estim::SE
-    ΔŨ::Vector{Float64}
-    ŷ ::Vector{Float64}
+    ΔŨ::Vector{NT}
+    ŷ ::Vector{NT}
     Hp::Int
     Hc::Int
-    M_Hp::Diagonal{Float64, Vector{Float64}}
-    Ñ_Hc::Diagonal{Float64, Vector{Float64}}
-    L_Hp::Diagonal{Float64, Vector{Float64}}
-    C::Float64
-    E::Float64
-    R̂u::Vector{Float64}
-    R̂y::Vector{Float64}
+    M_Hp::Diagonal{NT, Vector{NT}}
+    Ñ_Hc::Diagonal{NT, Vector{NT}}
+    L_Hp::Diagonal{NT, Vector{NT}}
+    C::NT
+    E::NT
+    R̂u::Vector{NT}
+    R̂y::Vector{NT}
     noR̂u::Bool
     S̃::Matrix{Bool}
     T::Matrix{Bool}
-    Ẽ::Matrix{Float64}
-    F::Vector{Float64}
-    G::Matrix{Float64}
-    J::Matrix{Float64}
-    K::Matrix{Float64}
-    V::Matrix{Float64}
-    P̃::Hermitian{Float64, Matrix{Float64}}
-    q̃::Vector{Float64}
-    p::Vector{Float64}
-    P̃_chol::Cholesky{Float64, Matrix{Float64}}
-    Ks::Matrix{Float64}
-    Ps::Matrix{Float64}
-    d0::Vector{Float64}
-    D̂0::Vector{Float64}
-    D̂E::Vector{Float64}
-    Ŷop::Vector{Float64}
-    Dop::Vector{Float64}
-    function ExplicitMPC{SE}(estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp) where {SE<:StateEstimator}
+    Ẽ::Matrix{NT}
+    F::Vector{NT}
+    G::Matrix{NT}
+    J::Matrix{NT}
+    K::Matrix{NT}
+    V::Matrix{NT}
+    P̃::Hermitian{NT, Matrix{NT}}
+    q̃::Vector{NT}
+    p::Vector{NT}
+    P̃_chol::Cholesky{NT, Matrix{NT}}
+    Ks::Matrix{NT}
+    Ps::Matrix{NT}
+    d0::Vector{NT}
+    D̂0::Vector{NT}
+    D̂E::Vector{NT}
+    Ŷop::Vector{NT}
+    Dop::Vector{NT}
+    function ExplicitMPC{NT, SE}(
+        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp
+    ) where {NT<:Real, SE<:StateEstimator}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
@@ -39,7 +41,8 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
         Ewt = 0   # economic costs not supported for ExplicitMPC
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
         M_Hp, N_Hc, L_Hp = float(M_Hp), float(N_Hc), float(L_Hp) # debug julia 1.6
-        R̂y, R̂u = zeros(ny*Hp), zeros(nu*Hp) # dummy vals (updated just before optimization)
+        # dummy vals (updated just before optimization):
+        R̂y, R̂u = zeros(NT, ny*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(nu, Hp, Hc)
         E, F, G, J, K, V = init_predmat(estim, model, Hp, Hc)
@@ -52,7 +55,7 @@ struct ExplicitMPC{SE<:StateEstimator} <: PredictiveController
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
-        mpc = new(
+        mpc = new{NT, SE}(
             estim,
             ΔŨ, ŷ,
             Hp, Hc, 
@@ -161,13 +164,13 @@ function ExplicitMPC(
     M_Hp = nothing,
     N_Hc = nothing,
     L_Hp = nothing
-) where {SE<:StateEstimator}
+) where {NT<:Real, SE<:StateEstimator{NT}}
     isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
     Hp = default_Hp(estim.model, Hp)
     isnothing(M_Hp) && (M_Hp = Diagonal(repeat(Mwt, Hp)))
     isnothing(N_Hc) && (N_Hc = Diagonal(repeat(Nwt, Hc)))
     isnothing(L_Hp) && (L_Hp = Diagonal(repeat(Lwt, Hp)))
-    return ExplicitMPC{SE}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp)
+    return ExplicitMPC{NT, SE}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp)
 end
 
 setconstraint!(::ExplicitMPC,kwargs...) = error("ExplicitMPC does not support constraints.")
@@ -197,7 +200,7 @@ function optim_objective!(mpc::ExplicitMPC)
 end
 
 "Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
-function predict!(Ŷ, x̂, mpc::ExplicitMPC, ::LinModel, ΔŨ::Vector{T}) where {T<:Real}
+function predict!(Ŷ, x̂, mpc::ExplicitMPC, ::LinModel, ΔŨ::Vector{NT}) where {NT<:Real}
     # in-place operations to reduce allocations :
     mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F
     x̂[:] .= NaN

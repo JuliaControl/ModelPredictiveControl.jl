@@ -1,28 +1,28 @@
-struct InternalModel{T<:Real, SM<:SimModel} <: StateEstimator{T}
+struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     model::SM
-    lastu0::Vector{T}
-    x̂::Vector{T}
-    x̂d::Vector{T}
-    x̂s::Vector{T}
+    lastu0::Vector{NT}
+    x̂::Vector{NT}
+    x̂d::Vector{NT}
+    x̂s::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{T}
-    Bs::Matrix{T}
-    Cs::Matrix{T}
-    Ds::Matrix{T}
-    Â ::Matrix{T}
-    B̂u::Matrix{T}
-    Ĉ ::Matrix{T}
-    B̂d::Matrix{T}
-    D̂d::Matrix{T}
-    Âs::Matrix{T}
-    B̂s::Matrix{T}
-    function InternalModel{T, SM}(
+    As::Matrix{NT}
+    Bs::Matrix{NT}
+    Cs::Matrix{NT}
+    Ds::Matrix{NT}
+    Â ::Matrix{NT}
+    B̂u::Matrix{NT}
+    Ĉ ::Matrix{NT}
+    B̂d::Matrix{NT}
+    D̂d::Matrix{NT}
+    Âs::Matrix{NT}
+    B̂s::Matrix{NT}
+    function InternalModel{NT, SM}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
-    ) where {T<:Real, SM<:SimModel}
+    ) where {NT<:Real, SM<:SimModel}
         nym, nyu = validate_ym(model, i_ym)
         validate_internalmodel(model, nym, Csm, Dsm)
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
@@ -30,10 +30,10 @@ struct InternalModel{T<:Real, SM<:SimModel} <: StateEstimator{T}
         nx̂ = model.nx
         Â, B̂u, Ĉ, B̂d, D̂d = matrices_internalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        lastu0 = zeros(T, model.nu)
-        x̂d = x̂ = zeros(T, model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
-        x̂s = zeros(T, nxs)
-        return new{T, SM}(
+        lastu0 = zeros(NT, model.nu)
+        x̂d = x̂ = zeros(NT, model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
+        x̂s = zeros(NT, nxs)
+        return new{NT, SM}(
             model, 
             lastu0, x̂, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
@@ -83,7 +83,7 @@ function InternalModel(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
     stoch_ym::LTISystem = (In = I(length(i_ym)); ss(In, In, In, In, model.Ts))
-) where {T<:Real, SM<:SimModel{T}}
+) where {NT<:Real, SM<:SimModel{NT}}
     stoch_ym = minreal(ss(stoch_ym))
     if iscontinuous(stoch_ym)
         stoch_ym = c2d(stoch_ym, model.Ts, :tustin)
@@ -95,7 +95,7 @@ function InternalModel(
             stoch_ym   = c2d(stoch_ym_c, model.Ts, :tustin)
         end
     end
-    return InternalModel{T, SM}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
+    return InternalModel{NT, SM}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
 end
 
 "Validate if `model` is asymptotically stable for [`LinModel`](@ref)."

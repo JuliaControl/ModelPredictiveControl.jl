@@ -1,45 +1,43 @@
 const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
 
-const DiffCacheType = DiffCache{Vector{Float64}, Vector{Float64}}
-
-struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
+struct NonLinMPC{NT<:Real, SE<:StateEstimator, JEfunc<:Function} <: PredictiveController{NT}
     estim::SE
     optim::JuMP.Model
-    con::ControllerConstraint
-    ΔŨ::Vector{Float64}
-    ŷ ::Vector{Float64}
+    con::ControllerConstraint{NT}
+    ΔŨ::Vector{NT}
+    ŷ ::Vector{NT}
     Hp::Int
     Hc::Int
-    M_Hp::Diagonal{Float64, Vector{Float64}}
-    Ñ_Hc::Diagonal{Float64, Vector{Float64}}
-    L_Hp::Diagonal{Float64, Vector{Float64}}
-    C::Float64
-    E::Float64
+    M_Hp::Diagonal{NT, Vector{NT}}
+    Ñ_Hc::Diagonal{NT, Vector{NT}}
+    L_Hp::Diagonal{NT, Vector{NT}}
+    C::NT
+    E::NT
     JE::JEfunc
-    R̂u::Vector{Float64}
-    R̂y::Vector{Float64}
+    R̂u::Vector{NT}
+    R̂y::Vector{NT}
     noR̂u::Bool
     S̃::Matrix{Bool}
     T::Matrix{Bool}
-    Ẽ::Matrix{Float64}
-    F::Vector{Float64}
-    G::Matrix{Float64}
-    J::Matrix{Float64}
-    K::Matrix{Float64}
-    V::Matrix{Float64}
-    P̃::Hermitian{Float64, Matrix{Float64}}
-    q̃::Vector{Float64}
-    p::Vector{Float64}
-    Ks::Matrix{Float64}
-    Ps::Matrix{Float64}
-    d0::Vector{Float64}
-    D̂0::Vector{Float64}
-    D̂E::Vector{Float64}
-    Ŷop::Vector{Float64}
-    Dop::Vector{Float64}
-    function NonLinMPC{SE, JEFunc}(
+    Ẽ::Matrix{NT}
+    F::Vector{NT}
+    G::Matrix{NT}
+    J::Matrix{NT}
+    K::Matrix{NT}
+    V::Matrix{NT}
+    P̃::Hermitian{NT, Matrix{NT}}
+    q̃::Vector{NT}
+    p::Vector{NT}
+    Ks::Matrix{NT}
+    Ps::Matrix{NT}
+    d0::Vector{NT}
+    D̂0::Vector{NT}
+    D̂E::Vector{NT}
+    Ŷop::Vector{NT}
+    Dop::Vector{NT}
+    function NonLinMPC{NT, SE, JEFunc}(
         estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEFunc, optim
-    ) where {SE<:StateEstimator, JEFunc<:Function}
+    ) where {NT<:Real, SE<:StateEstimator, JEFunc<:Function}
         model = estim.model
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
@@ -57,7 +55,7 @@ struct NonLinMPC{SE<:StateEstimator, JEfunc<:Function} <: PredictiveController
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
         nvar = size(Ẽ, 2)
         ΔŨ = zeros(nvar)
-        mpc = new(
+        mpc = new{NT, SE, JEFunc}(
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, 
@@ -234,12 +232,12 @@ function NonLinMPC(
     N_Hc = nothing,
     L_Hp = nothing,
     optim::JuMP.Model = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
-) where {SE<:StateEstimator, JEFunc<:Function}
+) where {NT<:Real, SE<:StateEstimator{NT}, JEFunc<:Function}
     Hp = default_Hp(estim.model, Hp)
     isnothing(M_Hp) && (M_Hp = Diagonal(repeat(Mwt, Hp)))
     isnothing(N_Hc) && (N_Hc = Diagonal(repeat(Nwt, Hc)))
     isnothing(L_Hp) && (L_Hp = Diagonal(repeat(Lwt, Hp)))
-    return NonLinMPC{SE, JEFunc}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, optim)
+    return NonLinMPC{NT, SE, JEFunc}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, optim)
 end
 
 """
@@ -262,7 +260,7 @@ end
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC)
+function init_optimization!(mpc::NonLinMPC{NT, SE, JEFunc}) where {NT<:Real, SE, JEFunc}
     # --- variables and linear constraints ---
     optim, con = mpc.optim, mpc.con
     nvar = length(mpc.ΔŨ)
@@ -279,10 +277,10 @@ function init_optimization!(mpc::NonLinMPC)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
     Jfunc, gfunc = let mpc=mpc, model=model, ng=ng, nvar=nvar , nŶ=Hp*ny, nx̂=nx̂
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
-        Ŷ_cache::DiffCacheType = DiffCache(zeros(nŶ), nvar + 3)
-        g_cache::DiffCacheType = DiffCache(zeros(ng), nvar + 3)
-        x̂_cache::DiffCacheType = DiffCache(zeros(nx̂), nvar + 3)
-        function Jfunc(ΔŨtup::Float64...)
+        Ŷ_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nŶ), nvar + 3)
+        g_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, ng), nvar + 3)
+        x̂_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx̂), nvar + 3)
+        function Jfunc(ΔŨtup::NT...)
             Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
             ΔŨ = collect(ΔŨtup)
             if ΔŨtup != last_ΔŨtup_float
@@ -294,7 +292,7 @@ function init_optimization!(mpc::NonLinMPC)
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
         end
-        function Jfunc(ΔŨtup::Real...)
+        function Jfunc(ΔŨtup::ForwardDiff.Dual...)
             Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
             ΔŨ = collect(ΔŨtup)
             if ΔŨtup != last_ΔŨtup_dual
@@ -306,7 +304,7 @@ function init_optimization!(mpc::NonLinMPC)
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
         end
-        function gfunc_i(i, ΔŨtup::NTuple{N, Float64}) where {N}
+        function gfunc_i(i, ΔŨtup::NTuple{N, NT}) where N
             g = get_tmp(g_cache, ΔŨtup[1])
             if ΔŨtup != last_ΔŨtup_float
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
@@ -317,8 +315,8 @@ function init_optimization!(mpc::NonLinMPC)
                 last_ΔŨtup_float = ΔŨtup
             end
             return g[i]
-        end
-        function gfunc_i(i, ΔŨtup::NTuple{N, Real}) where {N}
+        end 
+        function gfunc_i(i, ΔŨtup::NTuple{N, ForwardDiff.Dual}) where N
             g = get_tmp(g_cache, ΔŨtup[1])
             if ΔŨtup != last_ΔŨtup_dual
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])

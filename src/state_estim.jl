@@ -16,7 +16,7 @@ julia> ŷ = kf()
  20.0
 ```
 """
-abstract type StateEstimator{T<:Real} end
+abstract type StateEstimator{NT<:Real} end
 
 const IntVectorOrInt = Union{Int, Vector{Int}}
 
@@ -88,16 +88,18 @@ where ``\mathbf{e}(k)`` is an unknown zero mean white noise and ``\mathbf{A_s} =
 \mathrm{diag}(\mathbf{A_{s_{u}}, A_{s_{ym}}})``. The estimations does not use ``\mathbf{B_s}``,
 it is thus ignored. The function [`init_integrators`](@ref) builds the state-space matrices.
 """
-function init_estimstoch(model, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVectorOrInt)
+function init_estimstoch(
+    model::SimModel{NT}, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVectorOrInt
+) where {NT<:Real}
     nu, ny, nym = model.nu, model.ny, length(i_ym)
     As_u , Cs_u , nint_u  = init_integrators(nint_u , nu , "u")
     As_ym, Cs_ym, nint_ym = init_integrators(nint_ym, nym, "ym")
-    As_y, _ , Cs_y  = stoch_ym2y(model, i_ym, As_ym, Float64[;;], Cs_ym, Float64[;;])
+    As_y, _ , Cs_y  = stoch_ym2y(model, i_ym, As_ym, NT[;;], Cs_ym, NT[;;])
     nxs_u, nxs_y = size(As_u, 1), size(As_y, 1)
     # combines input and output stochastic models:
-    As   = [As_u zeros(nxs_u, nxs_y); zeros(nxs_y, nxs_u) As_y]
-    Cs_u = [Cs_u zeros(nu, nxs_y)]
-    Cs_y = [zeros(ny, nxs_u) Cs_y]
+    As   = [As_u zeros(NT, nxs_u, nxs_y); zeros(NT, nxs_y, nxs_u) As_y]
+    Cs_u = [Cs_u zeros(NT, nu, nxs_y)]
+    Cs_y = [zeros(NT, ny, nxs_u) Cs_y]
     return As, Cs_u, Cs_y, nint_u, nint_ym
 end
 
@@ -113,16 +115,16 @@ end
 "Convert the measured outputs stochastic model `stoch_ym` to all outputs `stoch_y`."
 function stoch_ym2y(
     model::SimModel, i_ym, 
-    Asm::Matrix{T}, Bsm::Matrix{T}, Csm::Matrix{T}, Dsm::Matrix{T}
-) where {T<:Real}
+    Asm::Matrix{NT}, Bsm::Matrix{NT}, Csm::Matrix{NT}, Dsm::Matrix{NT}
+) where {NT<:Real}
     As = Asm
     Bs = Bsm
-    Cs = zeros(T, model.ny, size(Csm,2))
+    Cs = zeros(NT, model.ny, size(Csm,2))
     Cs[i_ym,:] = Csm
     if isempty(Dsm)
         Ds = Dsm
     else
-        Ds = zeros(T, model.ny, size(Dsm,2))
+        Ds = zeros(NT, model.ny, size(Dsm,2))
         Ds[i_ym,:] = Dsm
     end
     return As, Bs, Cs, Ds

@@ -1,28 +1,28 @@
-struct Luenberger{T<:Real, SM<:LinModel} <: StateEstimator{T}
+struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     model::SM
-    lastu0::Vector{T}
-    x̂::Vector{T}
+    lastu0::Vector{NT}
+    x̂::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
     nyu::Int
     nxs::Int
-    As  ::Matrix{T}
-    Cs_u::Matrix{T}
-    Cs_y::Matrix{T}
+    As  ::Matrix{NT}
+    Cs_u::Matrix{NT}
+    Cs_y::Matrix{NT}
     nint_u ::Vector{Int}
     nint_ym::Vector{Int}
-    Â   ::Matrix{T}
-    B̂u  ::Matrix{T}
-    Ĉ   ::Matrix{T}
-    B̂d  ::Matrix{T}
-    D̂d  ::Matrix{T}
-    Ĉm  ::Matrix{T}
-    D̂dm ::Matrix{T}
-    K̂::Matrix{T}
-    function Luenberger{T, SM}(
+    Â   ::Matrix{NT}
+    B̂u  ::Matrix{NT}
+    Ĉ   ::Matrix{NT}
+    B̂d  ::Matrix{NT}
+    D̂d  ::Matrix{NT}
+    Ĉm  ::Matrix{NT}
+    D̂dm ::Matrix{NT}
+    K̂::Matrix{NT}
+    function Luenberger{NT, SM}(
         model, i_ym, nint_u, nint_ym, p̂
-    ) where {T<:Real, SM<:LinModel}
+    ) where {NT<:Real, SM<:LinModel}
         nym, nyu = validate_ym(model, i_ym)
         validate_luenberger(model, nint_u, nint_ym, p̂)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -37,7 +37,7 @@ struct Luenberger{T<:Real, SM<:LinModel} <: StateEstimator{T}
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         lastu0 = zeros(model.nu)
         x̂ = [zeros(model.nx); zeros(nxs)]
-        return new{T, SM}(
+        return new{NT, SM}(
             model, 
             lastu0, x̂,
             i_ym, nx̂, nym, nyu, nxs, 
@@ -86,8 +86,8 @@ function Luenberger(
     nint_u ::IntVectorOrInt = 0,
     nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     p̂ = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
-) where{T<:Real, SM<:LinModel{T}}
-    return Luenberger{T, SM}(model, i_ym, nint_u, nint_ym, p̂)
+) where{NT<:Real, SM<:LinModel{NT}}
+    return Luenberger{NT, SM}(model, i_ym, nint_u, nint_ym, p̂)
 end
 
 "Validate the quantity and stability of the Luenberger poles `p̂`."

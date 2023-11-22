@@ -1,15 +1,15 @@
-struct SimResult{O<:Union{SimModel, StateEstimator, PredictiveController}}
-    obj::O                      # simulated instance
-    T_data ::Vector{Float64}    # time in seconds
-    Y_data ::Matrix{Float64}    # plant outputs (both measured and unmeasured)
-    Ry_data::Matrix{Float64}    # output setpoints
-    Ŷ_data ::Matrix{Float64}    # estimated outputs
-    U_data ::Matrix{Float64}    # manipulated inputs
-    Ud_data::Matrix{Float64}    # manipulated inputs including load disturbances
-    Ru_data::Matrix{Float64}    # manipulated input setpoints
-    D_data ::Matrix{Float64}    # measured disturbances
-    X_data ::Matrix{Float64}    # plant states
-    X̂_data ::Matrix{Float64}    # estimated states
+struct SimResult{NT<:Real, O<:Union{SimModel, StateEstimator, PredictiveController}}
+    obj::O                 # simulated instance
+    T_data ::Vector{NT}    # time in seconds
+    Y_data ::Matrix{NT}    # plant outputs (both measured and unmeasured)
+    Ry_data::Matrix{NT}    # output setpoints
+    Ŷ_data ::Matrix{NT}    # estimated outputs
+    U_data ::Matrix{NT}    # manipulated inputs
+    Ud_data::Matrix{NT}    # manipulated inputs including load disturbances
+    Ru_data::Matrix{NT}    # manipulated input setpoints
+    D_data ::Matrix{NT}    # measured disturbances
+    X_data ::Matrix{NT}    # plant states
+    X̂_data ::Matrix{NT}    # estimated states
 end
 
 """
@@ -46,7 +46,7 @@ julia> using Plots; plot(res)
 ```
 """
 function SimResult(
-    obj::Union{SimModel, StateEstimator, PredictiveController}, 
+    obj::O, 
     U_data, 
     Y_data, 
     D_data  = zeros(0, size(U_data, 2));
@@ -54,7 +54,7 @@ function SimResult(
     X̂_data  = nothing, 
     Ry_data = nothing, 
     Ru_data = nothing
-)
+) where {NT<:Real, O<:Union{SimModel{NT}, StateEstimator{NT}, PredictiveController{NT}}}
     model = get_model(obj)
     Ts, nu, ny, nx, nx̂ = model.Ts, model.nu, model.ny, model.nx, get_nx̂(obj)
     N = size(U_data, 2)
@@ -69,7 +69,7 @@ function SimResult(
         error("All arguments must have the same number of columns (time steps)")
     end
     size(Y_data, 2) == N || error("Y_data must be of size ($ny, $N)")
-    return SimResult(obj, T_data, Y_data, Ry_data, Y_data, U_data, U_data, 
+    return SimResult{NT, O}(obj, T_data, Y_data, Ry_data, Y_data, U_data, U_data, 
                      Ru_data, D_data, X_data, X̂_data)
 end
 
@@ -111,17 +111,17 @@ julia> using Plots; plot(res, plotu=false, plotd=false, plotx=true)
 ```
 """
 function sim!(
-    plant::SimModel,
+    plant::SimModel{NT},
     N::Int,
     u::Vector = plant.uop.+1,
     d::Vector = plant.dop;
     x0 = zeros(plant.nx)
-)
+) where {NT<:Real}
     T_data  = collect(plant.Ts*(0:(N-1)))
-    Y_data  = Matrix{Float64}(undef, plant.ny, N)
-    U_data  = Matrix{Float64}(undef, plant.nu, N)
-    D_data  = Matrix{Float64}(undef, plant.nd, N)
-    X_data  = Matrix{Float64}(undef, plant.nx, N)
+    Y_data  = Matrix{NT}(undef, plant.ny, N)
+    U_data  = Matrix{NT}(undef, plant.nu, N)
+    D_data  = Matrix{NT}(undef, plant.nd, N)
+    X_data  = Matrix{NT}(undef, plant.nx, N)
     setstate!(plant, x0)
     for i=1:N
         y = evaloutput(plant, d) 
@@ -231,7 +231,7 @@ end
 
 "Quick simulation function for `StateEstimator` and `PredictiveController` instances."
 function sim_closedloop!(
-    est_mpc::Union{StateEstimator, PredictiveController}, 
+    est_mpc::Union{StateEstimator{NT}, PredictiveController{NT}}, 
     estim::StateEstimator,
     N::Int,
     u_ry::Vector,
@@ -248,20 +248,20 @@ function sim_closedloop!(
     x0 = plant.x,
     x̂0 = nothing,
     lastu = plant.uop,
-)
+) where {NT<:Real}
     model = estim.model
     model.Ts ≈ plant.Ts || error("Sampling time of controller/estimator ≠ plant.Ts")
     old_x0    = copy(plant.x)
     T_data    = collect(plant.Ts*(0:(N-1)))
-    Y_data    = Matrix{Float64}(undef, plant.ny, N)
-    Ŷ_data    = Matrix{Float64}(undef, model.ny, N)
-    U_Ry_data = Matrix{Float64}(undef, length(u_ry), N)
-    U_data    = Matrix{Float64}(undef, plant.nu, N)
-    Ud_data   = Matrix{Float64}(undef, plant.nu, N)
-    Ru_data   = Matrix{Float64}(undef, plant.nu, N)
-    D_data    = Matrix{Float64}(undef, plant.nd, N)
-    X_data    = Matrix{Float64}(undef, plant.nx, N) 
-    X̂_data    = Matrix{Float64}(undef, estim.nx̂, N)
+    Y_data    = Matrix{NT}(undef, plant.ny, N)
+    Ŷ_data    = Matrix{NT}(undef, model.ny, N)
+    U_Ry_data = Matrix{NT}(undef, length(u_ry), N)
+    U_data    = Matrix{NT}(undef, plant.nu, N)
+    Ud_data   = Matrix{NT}(undef, plant.nu, N)
+    Ru_data   = Matrix{NT}(undef, plant.nu, N)
+    D_data    = Matrix{NT}(undef, plant.nd, N)
+    X_data    = Matrix{NT}(undef, plant.nx, N) 
+    X̂_data    = Matrix{NT}(undef, estim.nx̂, N)
     setstate!(plant, x0)
     lastd, lasty = d, evaloutput(plant, d)
     initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
@@ -300,7 +300,7 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
 
 "Plots.jl recipe for `SimResult` objects constructed with `SimModel` objects."
 @recipe function plot(
-    res::SimResult{<:SimModel};
+    res::SimResult{<:Real, <:SimModel};
     plotu  = true,
     plotd  = true,
     plotx  = false,
@@ -377,7 +377,7 @@ end
 
 "Plots.jl recipe for `SimResult` objects constructed with `StateEstimator` objects."
 @recipe function plot(
-    res::SimResult{<:StateEstimator};
+    res::SimResult{<:Real, <:StateEstimator};
     plotŷ           = true,
     plotu           = true,
     plotd           = true,
@@ -487,7 +487,7 @@ end
 
 "Plots.jl recipe for `SimResult` objects constructed with `PredictiveController` objects."
 @recipe function plot(
-    res::SimResult{<:PredictiveController}; 
+    res::SimResult{<:Real, <:PredictiveController}; 
     plotry      = true,
     plotymin    = true,
     plotymax    = true,

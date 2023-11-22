@@ -1,19 +1,19 @@
-struct LinModel{T<:Real} <: SimModel{T}
-    A   ::Matrix{T}
-    Bu  ::Matrix{T}
-    C   ::Matrix{T}
-    Bd  ::Matrix{T}
-    Dd  ::Matrix{T}
-    x::Vector{T}
-    Ts::T
+struct LinModel{NT<:Real} <: SimModel{NT}
+    A   ::Matrix{NT}
+    Bu  ::Matrix{NT}
+    C   ::Matrix{NT}
+    Bd  ::Matrix{NT}
+    Dd  ::Matrix{NT}
+    x::Vector{NT}
+    Ts::NT
     nu::Int
     nx::Int
     ny::Int
     nd::Int
-    uop::Vector{T}
-    yop::Vector{T}
-    dop::Vector{T}
-    function LinModel{T}(A, Bu, C, Bd, Dd, Ts) where {T<:Real}
+    uop::Vector{NT}
+    yop::Vector{NT}
+    dop::Vector{NT}
+    function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
         nu, nx, ny, nd = size(Bu,2), size(A,2), size(C,1), size(Bd,2)
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
@@ -21,10 +21,10 @@ struct LinModel{T<:Real} <: SimModel{T}
         size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
         size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
         Ts > 0 || error("Sampling time Ts must be positive")
-        uop = zeros(T, nu)
-        yop = zeros(T, ny)
-        dop = zeros(T, nd)
-        x = zeros(T, nx)
+        uop = zeros(NT, nu)
+        yop = zeros(NT, ny)
+        dop = zeros(NT, nd)
+        x = zeros(NT, nx)
         return new(A, Bu, C, Bd, Dd, x, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
 end
@@ -78,15 +78,15 @@ form (``\mathbf{D_u=0}`` because of the zero-order hold):
     \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D_d d}(k)
 \end{aligned}
 ```
-Use the syntax [`LinModel{T}(A, Bu, C, Bd, Dd, Ts)`](@ref) to force a specific state-space
+Use the syntax [`LinModel{NT}(A, Bu, C, Bd, Dd, Ts)`](@ref) to force a specific state-space
 representation.
 """
 function LinModel(
-    sys::StateSpace{E, T},
+    sys::StateSpace{E, NT},
     Ts::Union{Real,Nothing} = nothing;
     i_u::IntRangeOrVector = 1:size(sys,2),
     i_d::IntRangeOrVector = Int[]
-) where {E, T<:Real}
+) where {E, NT<:Real}
     if !isempty(i_d)
         # common indexes in i_u and i_d are interpreted as measured disturbances d :
         i_u = collect(i_u);
@@ -130,7 +130,7 @@ function LinModel(
     Bd  = sys_dis.B[:,nu+1:end]
     C   = sys_dis.C
     Dd  = sys_dis.D[:,nu+1:end]
-    return LinModel{T}(A, Bu, C, Bd, Dd, Ts)
+    return LinModel{NT}(A, Bu, C, Bd, Dd, Ts)
 end
 
 
@@ -181,20 +181,20 @@ function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
 end
 
 @doc raw"""
-    LinModel{T}(A, Bu, C, Bd, Dd, Ts)
+    LinModel{NT}(A, Bu, C, Bd, Dd, Ts)
 
 Construct the model from the discrete state-space matrices `A, Bu, C, Bd, Dd` directly.
 
 This syntax do not modify the state-space representation provided in argument (`minreal`
 is not called). Care must be taken to ensure that the model is controllable and observable.
-The optional parameter `T` explicitly specifies the element type of the matrices.
+The optional parameter `NT` explicitly specifies the number type of the matrices.
 """
-LinModel{T}(A, Bu, C, Bd, Dd, Ts) where T<:Real
+LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where NT<:Real
 
 function LinModel(
-    A::Matrix{T}, Bu::Matrix{T}, C::Matrix{T}, Bd::Matrix{T}, Dd::Matrix{T}, Ts::T
-) where {T<:Real} 
-    return LinModel{T}(A, Bu, C, Bd, Dd, Ts)
+    A::Matrix{NT}, Bu::Matrix{NT}, C::Matrix{NT}, Bd::Matrix{NT}, Dd::Matrix{NT}, Ts::NT
+) where {NT<:Real} 
+    return LinModel{NT}(A, Bu, C, Bd, Dd, Ts)
 end
 
 function LinModel(
