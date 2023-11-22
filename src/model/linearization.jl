@@ -3,7 +3,6 @@
     LinModel(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
 
 Call [`linearize(model; x, u, d)`](@ref) and return the resulting linear model.
-```
 """
 LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 

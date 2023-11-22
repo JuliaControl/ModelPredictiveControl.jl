@@ -160,7 +160,10 @@ Construct the estimator from the augmented covariance matrices `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{Q̂, R̂}``.
 """
-SteadyKalmanFilter(model::LinModel, i_ym, nint_u, nint_ym, Q̂, R̂)
+function SteadyKalmanFilter(model::SM, i_ym, nint_u, nint_ym, Q̂, R̂) where {NT<:Real, SM<:LinModel{NT}}
+    return SteadyKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, Q̂ , R̂)
+end
+
 
 
 @doc raw"""
@@ -298,7 +301,9 @@ Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+function KalmanFilter(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {NT<:Real, SM<:LinModel{NT}}
+    return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
+end
 
 @doc raw"""
     update_estimate!(estim::KalmanFilter, u, ym, d)
@@ -366,7 +371,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
-        nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
+        nσ, γ, m̂, Ŝ = init_ukf(model, nx̂, α, β, κ)
         lastu0 = zeros(NT, model.nu)
         x̂ = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
@@ -459,17 +464,21 @@ function UnscentedKalmanFilter(
 end
 
 @doc raw"""
-    UnscentedKalmanFilter{SM<:SimModel}(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
+    UnscentedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-UnscentedKalmanFilter{SM}(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ) where {SM<:SimModel}
+function UnscentedKalmanFilter(
+    model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ
+) where {NT<:Real, SM<:SimModel{NT}}
+    return UnscentedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, α, β, κ)
+end
 
 
 @doc raw"""
-    init_ukf(nx̂, α, β, κ) -> nσ, γ, m̂, Ŝ
+    init_ukf(model, nx̂, α, β, κ) -> nσ, γ, m̂, Ŝ
 
 Compute the [`UnscentedKalmanFilter`](@ref) constants from ``α, β`` and ``κ``.
 
@@ -489,14 +498,14 @@ covariance are respectively:
 ```
 See [`update_estimate!(::UnscentedKalmanFilter)`](@ref) for other details.
 """
-function init_ukf(nx̂, α, β, κ)
+function init_ukf(::SimModel{NT}, nx̂, α, β, κ) where {NT<:Real}
     nσ = 2nx̂ + 1                                  # number of sigma points
     γ = α * √(nx̂ + κ)                             # constant factor of standard deviation √P
     m̂_0 = 1 - nx̂ / γ^2
     Ŝ_0 = m̂_0 + 1 - α^2 + β
     w = 1 / 2 / γ^2
-    m̂ = [m̂_0; fill(w, 2 * nx̂)]                    # weights for the mean
-    Ŝ = Diagonal([Ŝ_0; fill(w, 2 * nx̂)]) # weights for the covariance
+    m̂ = NT[m̂_0; fill(w, 2 * nx̂)]                  # weights for the mean
+    Ŝ = Diagonal(NT[Ŝ_0; fill(w, 2 * nx̂)])        # weights for the covariance
     return nσ, γ, m̂, Ŝ
 end
 
@@ -678,13 +687,16 @@ function ExtendedKalmanFilter(
 end
 
 @doc raw"""
-    ExtendedKalmanFilter{SM<:SimModel}(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+    ExtendedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-ExtendedKalmanFilter{SM}(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {SM<:SimModel}
+function ExtendedKalmanFilter(model::SM, i_ym, nint_u, nint_ym,P̂0, Q̂, R̂) where {NT<:Real, SM<:SimModel{NT}}
+    return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
+end
+
 
 @doc raw"""
     update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂))

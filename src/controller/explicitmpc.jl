@@ -12,8 +12,8 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
     noR̂u::Bool
-    S̃::Matrix{Bool}
-    T::Matrix{Bool}
+    S̃::BitMatrix
+    T::BitMatrix
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}

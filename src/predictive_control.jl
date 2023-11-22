@@ -753,9 +753,10 @@ are calculated by:
 ```
 """
 function init_ΔUtoU(nu, Hp, Hc)
-    S_Hc = LowerTriangular(repeat(I(nu), Hc, Hc))
-    S = [S_Hc; repeat(I(nu), Hp - Hc, Hc)]
-    T = repeat(I(nu), Hp)
+    I_nu = BitMatrix(I(nu))
+    S_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
+    S = [S_Hc; repeat(I_nu, Hp - Hc, Hc)]
+    T = repeat(I_nu, Hp)
     return S, T
 end
 
@@ -834,7 +835,7 @@ For the terminal constraints, the matrices are computed with the function
 \end{aligned}
 ```
 """
-function init_predmat(estim::StateEstimator, model::LinModel{NT}, Hp, Hc) where {NT<:Real}
+function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where {NT<:Real}
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
     # --- pre-compute matrix powers ---
@@ -893,7 +894,7 @@ function init_predmat(estim::StateEstimator, model::LinModel{NT}, Hp, Hc) where 
 end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref)"
-function init_predmat(estim::StateEstimator, model::SimModel{NT}, Hp, Hc) where {NT<:Real}
+function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     E  = zeros(NT, 0, nu*Hc)
     G  = zeros(NT, 0, nd)
@@ -1025,8 +1026,8 @@ function init_defaultcon(
         repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
-    A_Umin, A_Umax, S̃ = relaxU(C, C_umin, C_umax, S)
-    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc)
+    A_Umin, A_Umax, S̃ = relaxU(model, C, C_umin, C_umax, S)
+    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(model, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc)
     A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, C_ymin, C_ymax, E)
     A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, C, c_x̂min, c_x̂max, ex̂)
     i_Umin,  i_Umax  = .!isinf.(Umin),  .!isinf.(Umax)
@@ -1060,7 +1061,7 @@ function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
 end
 
 @doc raw"""
-    relaxU(C, C_umin, C_umax, S) -> A_Umin, A_Umax, S̃
+    relaxU(model, C, C_umin, C_umax, S) -> A_Umin, A_Umax, S̃
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
@@ -1080,21 +1081,24 @@ constraints:
 \end{bmatrix}
 ```
 """
-function relaxU(C, C_umin, C_umax, S)
+function relaxU(::SimModel{NT}, C, C_umin, C_umax, S) where {NT<:Real}
+    S_NT = convert(Matrix{NT}, S)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
-        A_Umin, A_Umax = -[S  C_umin],  [S -C_umax] 
+        A_Umin, A_Umax = -[S_NT  C_umin], [S_NT -C_umax] 
         # ϵ has no impact on ΔU → U conversion for prediction calculations:
         S̃ = [S falses(size(S, 1))]
     else # ΔŨ = ΔU (only hard constraints)
-        A_Umin, A_Umax = -S,  S
+        A_Umin, A_Umax = -S_NT,  S_NT
         S̃ = S
     end
     return A_Umin, A_Umax, S̃
 end
 
 @doc raw"""
-    relaxΔU(C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
+    relaxΔU(
+        model, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc
+    ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
 
 Augment input increments constraints with slack variable ϵ for softening.
 
@@ -1114,18 +1118,19 @@ returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{
 \end{bmatrix}
 ```
 """
-function relaxΔU(C::NT, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) where {NT<:Real}
+function relaxΔU(::SimModel{NT}, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) where {NT<:Real}
+    diag_N_Hc = diag(N_Hc)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # 0 ≤ ϵ ≤ ∞  
-        ΔŨmin, ΔŨmax = [ΔUmin; 0.0], [ΔUmax; Inf]
-        A_ϵ = [zeros(NT, 1, length(ΔUmin)) [1.0]]
+        ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]]
+        A_ϵ = [zeros(NT, 1, length(ΔUmin)) NT[1.0]]
         A_ΔŨmin, A_ΔŨmax = -[I  C_Δumin; A_ϵ], [I -C_Δumax; A_ϵ]
-        Ñ_Hc = Diagonal([diag(N_Hc); C])
+        Ñ_Hc = Diagonal{NT}([diag_N_Hc; C])
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
         I_Hc = Matrix{NT}(I, size(N_Hc))
         A_ΔŨmin, A_ΔŨmax = -I_Hc,  I_Hc
-        Ñ_Hc = N_Hc
+        Ñ_Hc = Diagonal{NT}(diag_N_Hc)
     end
     return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
 end

@@ -205,7 +205,7 @@ function LinModel(
     Dd::Matrix{<:Real},
     Ts::Real
 )
-    A, Bu, C, Bd, Dd, Ts_arr = promote(A, Bu, C, Bd, Dd, [Ts;;])
+    A, Bu, C, Bd, Dd, Ts_arr = promote(A, Bu, C, Bd, Dd, Ts*ones(1,1))
     return LinModel(A, Bu, C, Bd, Dd, Ts_arr[])
 end
 

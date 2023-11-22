@@ -32,7 +32,7 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test mpc11.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
     mcp12 = LinMPC(model, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
     @test mcp12.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
-    model2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc13  = LinMPC(model2)
     @test isa(mpc13, LinMPC{Float32})
     @test isa(mpc13.optim, JuMP.GenericModel{Float64}) # OSQP does not support Float32
@@ -67,7 +67,7 @@ end
     mpc3 = LinMPC(linmodel, Mwt=[0], Nwt=[0], Lwt=[1])
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
-    model2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc4  = LinMPC(model2)
     moveinput!(mpc4, [0]) ≈ [0.0]
 
@@ -255,7 +255,7 @@ end
     @test mpc11.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
     mcp12 = ExplicitMPC(model, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
     @test mcp12.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
-    model2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc13  = ExplicitMPC(model2)
     @test isa(mpc13, ExplicitMPC{Float32})
 end
@@ -276,7 +276,7 @@ end
     mpc3 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1])
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
-    model2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc4  = ExplicitMPC(model2)
     moveinput!(mpc4, [0]) ≈ [0.0]
 end
@@ -434,7 +434,7 @@ end
     @test g_Ymax_end((1.0, 1.0)) ≤ 0.0 # test gfunc_i(i,::NTuple{N, Float64})
     # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
     @test ForwardDiff.gradient(g_Ymax_end, [1.0, 1.0]) ≈ [0.0, 0.0]
-    linmodel3 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     moveinput!(nmpc6, [0]) ≈ [0.0]
     nonlinmodel2 = NonLinModel{Float32}(f, h, 300.0, 1, 2, 1, 1)
