@@ -94,7 +94,7 @@ function init_estimstoch(
     nu, ny, nym = model.nu, model.ny, length(i_ym)
     As_u , Cs_u , nint_u  = init_integrators(nint_u , nu , "u")
     As_ym, Cs_ym, nint_ym = init_integrators(nint_ym, nym, "ym")
-    As_y, _ , Cs_y  = stoch_ym2y(model, i_ym, As_ym, NT[;;], Cs_ym, NT[;;])
+    As_y, _ , Cs_y = stoch_ym2y(model, i_ym, As_ym, zeros(NT, 0, 0), Cs_ym, zeros(NT, 0, 0))
     nxs_u, nxs_y = size(As_u, 1), size(As_y, 1)
     # combines input and output stochastic models:
     As   = [As_u zeros(NT, nxs_u, nxs_y); zeros(NT, nxs_y, nxs_u) As_y]
