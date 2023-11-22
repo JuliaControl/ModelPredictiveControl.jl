@@ -32,6 +32,10 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test mpc11.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
     mcp12 = LinMPC(model, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
     @test mcp12.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
+    model2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    mpc13  = LinMPC(model2)
+    @test isa(mpc13, LinMPC{Float32})
+    @test isa(mpc13.optim, JuMP.GenericModel{Float64}) # OSQP does not support Float32
 
     @test_throws ArgumentError LinMPC(model, Hp=0)
     @test_throws ArgumentError LinMPC(model, Hc=0)
@@ -63,6 +67,9 @@ end
     mpc3 = LinMPC(linmodel, Mwt=[0], Nwt=[0], Lwt=[1])
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
+    model2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    mpc4  = LinMPC(model2)
+    moveinput!(mpc4, [0]) ≈ [0.0]
 
     @test_throws ArgumentError moveinput!(mpc1, [0,0,0])
     @test_throws ArgumentError moveinput!(mpc1, [0], [0,0])
@@ -248,6 +255,9 @@ end
     @test mpc11.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
     mcp12 = ExplicitMPC(model, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
     @test mcp12.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
+    model2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    mpc13  = ExplicitMPC(model2)
+    @test isa(mpc13, ExplicitMPC{Float32})
 end
 
 @testset "ExplicitMPC moves and getinfo" begin
@@ -266,6 +276,9 @@ end
     mpc3 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1])
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
+    model2 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    mpc4  = ExplicitMPC(model2)
+    moveinput!(mpc4, [0]) ≈ [0.0]
 end
 
 
@@ -361,15 +374,20 @@ end
     nmpc11 = NonLinMPC(nonlinmodel, Hp=15, nint_u=[1, 1], nint_ym=[0, 0])
     @test nmpc11.estim.nint_u  == [1, 1]
     @test nmpc11.estim.nint_ym == [0, 0]
-    nmpc12 = NonLinMPC(nonlinmodel, M_Hp=Diagonal(collect(1.01:0.01:1.2)))
+    nmpc12 = NonLinMPC(nonlinmodel, Hp=10, M_Hp=Diagonal(collect(1.01:0.01:1.2)))
     @test nmpc12.M_Hp ≈ Diagonal(collect(1.01:0.01:1.2))
-    nmpc13 = NonLinMPC(nonlinmodel, N_Hc=Diagonal([0.1,0.11,0.12,0.13]), Cwt=Inf)
+    nmpc13 = NonLinMPC(nonlinmodel, Hp=10, N_Hc=Diagonal([0.1,0.11,0.12,0.13]), Cwt=Inf)
     @test nmpc13.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
-    nmcp14 = NonLinMPC(nonlinmodel, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
+    nmcp14 = NonLinMPC(nonlinmodel, Hp=10, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
     @test nmcp14.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
 
+    nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1)
+    nmpc15  = NonLinMPC(nonlinmodel2, Hp=15)
+    @test isa(nmpc15, NonLinMPC{Float32})
+    @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
+
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
-    # to uncomment when deprecated constructor is removed:
+    # TODO: to uncomment when deprecated constructor is removed:
     # @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=nothing)
 end
 
@@ -413,8 +431,16 @@ end
     @test u ≈ [12] atol=5e-2
     nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Hp=15, Cwt=Inf), ymin=[-1])
     g_Ymax_end = nmpc5.optim.nlp_model.operators.registered_multivariate_operators[end].f
-    @test g_Ymax_end(Float64.((1.0, 1.0))) ≤ 0.0 # test gfunc_i(i,::NTuple{N, Float64})
-    @test g_Ymax_end(Float32.((1.0, 1.0))) ≤ 0.0 # test gfunc_i(i,::NTuple{N, Real})
+    @test g_Ymax_end((1.0, 1.0)) ≤ 0.0 # test gfunc_i(i,::NTuple{N, Float64})
+    # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
+    @test ForwardDiff.gradient(g_Ymax_end, [1.0, 1.0]) ≈ [0.0, 0.0]
+    linmodel3 = LinModel{Float32}([0.5;;], [1;;], [1;;], zeros(1,0), zeros(1,0), 1.0)
+    nmpc6  = NonLinMPC(linmodel3, Hp=10)
+    moveinput!(nmpc6, [0]) ≈ [0.0]
+    nonlinmodel2 = NonLinModel{Float32}(f, h, 300.0, 1, 2, 1, 1)
+    nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
+    nonlinmodel2.h(Float32[0,0], Float32[0])
+    moveinput!(nmpc7, [0], [0]) ≈ [0.0]
 end
 
 @testset "NonLinMPC step disturbance rejection" begin

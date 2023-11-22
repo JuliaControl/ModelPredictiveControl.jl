@@ -66,6 +66,9 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
     @test linmodel7.A ≈ diagm( .1: .1: .3)
     @test linmodel7.C ≈ diagm( .4: .1: .6)
 
+    linmodel8 = LinModel{Float32}(Gss.A, Gss.B, Gss.C, zeros(2, 0), zeros(2, 0), Ts)
+    @test isa(linmodel8, LinModel{Float32})
+
     @test_throws ErrorException LinModel(sys)
     @test_throws ErrorException LinModel(sys,-Ts)
     @test_throws ErrorException LinModel(sys,Ts,i_u=[1,1])
@@ -120,6 +123,9 @@ end
     @test nonlinmodel2.ny == 2
     @test nonlinmodel2.f([0,0,0,0],[0,0],[0]) ≈ zeros(4,)
     @test nonlinmodel2.h([0,0,0,0],[0]) ≈ zeros(2,)
+
+    nonlinemodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1)
+    @test isa(nonlinemodel3, NonLinModel{Float32})
 
     @test_throws ErrorException NonLinModel(
         (x,u)->linmodel1.A*x + linmodel1.Bu*u,

@@ -1,27 +1,30 @@
-struct Luenberger <: StateEstimator
-    model::LinModel
-    lastu0::Vector{Float64}
-    x̂::Vector{Float64}
+struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
+    model::SM
+    lastu0::Vector{NT}
+    x̂::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
     nyu::Int
     nxs::Int
-    As  ::Matrix{Float64}
-    Cs_u::Matrix{Float64}
-    Cs_y::Matrix{Float64}
+    As  ::Matrix{NT}
+    Cs_u::Matrix{NT}
+    Cs_y::Matrix{NT}
     nint_u ::Vector{Int}
     nint_ym::Vector{Int}
-    Â   ::Matrix{Float64}
-    B̂u  ::Matrix{Float64}
-    Ĉ   ::Matrix{Float64}
-    B̂d  ::Matrix{Float64}
-    D̂d  ::Matrix{Float64}
-    Ĉm  ::Matrix{Float64}
-    D̂dm ::Matrix{Float64}
-    K̂::Matrix{Float64}
-    function Luenberger(model, i_ym, nint_u, nint_ym, p̂)
+    Â   ::Matrix{NT}
+    B̂u  ::Matrix{NT}
+    Ĉ   ::Matrix{NT}
+    B̂d  ::Matrix{NT}
+    D̂d  ::Matrix{NT}
+    Ĉm  ::Matrix{NT}
+    D̂dm ::Matrix{NT}
+    K̂::Matrix{NT}
+    function Luenberger{NT, SM}(
+        model, i_ym, nint_u, nint_ym, p̂
+    ) where {NT<:Real, SM<:LinModel}
         nym, nyu = validate_ym(model, i_ym)
+        validate_luenberger(model, nint_u, nint_ym, p̂)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
@@ -32,9 +35,9 @@ struct Luenberger <: StateEstimator
             error("Cannot compute the Luenberger gain K̂ with specified poles p̂.")
         end
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
-        lastu0 = zeros(model.nu)
-        x̂ = [zeros(model.nx); zeros(nxs)]
-        return new(
+        lastu0 = zeros(NT, model.nu)
+        x̂ = [zeros(NT, model.nx); zeros(NT, nxs)]
+        return new{NT, SM}(
             model, 
             lastu0, x̂,
             i_ym, nx̂, nym, nyu, nxs, 
@@ -78,18 +81,22 @@ Luenberger estimator with a sample time Ts = 0.5 s, LinModel and:
 ```
 """
 function Luenberger(
-    model::LinModel;
+    model::SM;
     i_ym::IntRangeOrVector  = 1:model.ny,
     nint_u ::IntVectorOrInt = 0,
     nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     p̂ = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
-)
-    nx = model.nx
+) where{NT<:Real, SM<:LinModel{NT}}
+    return Luenberger{NT, SM}(model, i_ym, nint_u, nint_ym, p̂)
+end
+
+"Validate the quantity and stability of the Luenberger poles `p̂`."
+function validate_luenberger(model, nint_u, nint_ym, p̂)
     if length(p̂) ≠ model.nx + sum(nint_u) +  sum(nint_ym)
-        error("p̂ length ($(length(p̂))) ≠ nx ($nx) + integrator quantity ($(sum(nint_ym)))")
+        error("p̂ length ($(length(p̂))) ≠ nx ($(model.nx)) + "*
+              "integrator quantity ($(sum(nint_ym)))")
     end
     any(abs.(p̂) .≥ 1) && error("Observer poles p̂ should be inside the unit circles.")
-    return Luenberger(model, i_ym, nint_u, nint_ym, p̂)
 end
 
 

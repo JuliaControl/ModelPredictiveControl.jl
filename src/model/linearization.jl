@@ -38,7 +38,6 @@ functions must be compatible with this feature though. See [Automatic differenti
 for common mistakes when writing these functions.
 """
 function linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
-    nu, nx, ny, nd = model.nu, model.nx, model.ny, model.nd
     u0, d0 = u - model.uop, d - model.dop
     y  = model.h(x, d0) + model.yop
     A  = ForwardDiff.jacobian(x  -> model.f(x, u0, d0), x)
@@ -46,7 +45,7 @@ function linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
     Bd = ForwardDiff.jacobian(d0 -> model.f(x, u0, d0), d0)
     C  = ForwardDiff.jacobian(x  -> model.h(x, d0), x)
     Dd = ForwardDiff.jacobian(d0 -> model.h(x, d0), d0)
-    linmodel = LinModel(A, Bu, C, Bd, Dd, model.Ts, nu, nx, ny, nd)
+    linmodel = LinModel(A, Bu, C, Bd, Dd, model.Ts)
     setop!(linmodel, uop=u, yop=y, dop=d)
     return linmodel
 end

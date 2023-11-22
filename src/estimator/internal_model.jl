@@ -1,46 +1,39 @@
-struct InternalModel{SM<:SimModel} <: StateEstimator
+struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     model::SM
-    lastu0::Vector{Float64}
-    x̂::Vector{Float64}
-    x̂d::Vector{Float64}
-    x̂s::Vector{Float64}
+    lastu0::Vector{NT}
+    x̂::Vector{NT}
+    x̂d::Vector{NT}
+    x̂s::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
     nyu::Int
     nxs::Int
-    As::Matrix{Float64}
-    Bs::Matrix{Float64}
-    Cs::Matrix{Float64}
-    Ds::Matrix{Float64}
-    Â ::Matrix{Float64}
-    B̂u::Matrix{Float64}
-    Ĉ ::Matrix{Float64}
-    B̂d::Matrix{Float64}
-    D̂d::Matrix{Float64}
-    Âs::Matrix{Float64}
-    B̂s::Matrix{Float64}
-    function InternalModel{SM}(model::SM, i_ym, Asm, Bsm, Csm, Dsm) where {SM<:SimModel}
-        nu, ny = model.nu, model.ny
-        nym, nyu = length(i_ym), ny - length(i_ym)
-        validate_internalmodel(model)
-        validate_ym(model, i_ym)
-        if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
-            error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
-                  "measured output quantity ($nym)")
-        end
-        if iszero(Dsm)
-            error("Stochastic model requires a nonzero direct transmission matrix D")
-        end
+    As::Matrix{NT}
+    Bs::Matrix{NT}
+    Cs::Matrix{NT}
+    Ds::Matrix{NT}
+    Â ::Matrix{NT}
+    B̂u::Matrix{NT}
+    Ĉ ::Matrix{NT}
+    B̂d::Matrix{NT}
+    D̂d::Matrix{NT}
+    Âs::Matrix{NT}
+    B̂s::Matrix{NT}
+    function InternalModel{NT, SM}(
+        model::SM, i_ym, Asm, Bsm, Csm, Dsm
+    ) where {NT<:Real, SM<:SimModel}
+        nym, nyu = validate_ym(model, i_ym)
+        validate_internalmodel(model, nym, Csm, Dsm)
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
         nxs = size(As,1)
         nx̂ = model.nx
         Â, B̂u, Ĉ, B̂d, D̂d = matrices_internalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        lastu0 = zeros(nu)
-        x̂d = x̂ = zeros(model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
-        x̂s = zeros(nxs)
-        return new(
+        lastu0 = zeros(NT, model.nu)
+        x̂d = x̂ = zeros(NT, model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
+        x̂s = zeros(NT, nxs)
+        return new{NT, SM}(
             model, 
             lastu0, x̂, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
@@ -52,7 +45,7 @@ struct InternalModel{SM<:SimModel} <: StateEstimator
 end
 
 @doc raw"""
-    InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(1,1,1,1,model.Ts).*I)
+    InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(I,I,I,I,model.Ts))
 
 Construct an internal model estimator based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
 
@@ -89,8 +82,8 @@ aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
 function InternalModel(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
-    stoch_ym::Union{StateSpace, TransferFunction} = ss(1,1,1,1,model.Ts).*I(length(i_ym))
-) where {SM<:SimModel}
+    stoch_ym::LTISystem = (In = I(length(i_ym)); ss(In, In, In, In, model.Ts))
+) where {NT<:Real, SM<:SimModel{NT}}
     stoch_ym = minreal(ss(stoch_ym))
     if iscontinuous(stoch_ym)
         stoch_ym = c2d(stoch_ym, model.Ts, :tustin)
@@ -102,17 +95,36 @@ function InternalModel(
             stoch_ym   = c2d(stoch_ym_c, model.Ts, :tustin)
         end
     end
-    return InternalModel{SM}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
+    return InternalModel{NT, SM}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
 end
 
 "Validate if `model` is asymptotically stable for [`LinModel`](@ref)."
-function validate_internalmodel(model::LinModel)
+function validate_internalmodel(model::LinModel, nym, Csm, Dsm)
     poles = eigvals(model.A)
     if any(abs.(poles) .≥ 1) 
         error("InternalModel does not support integrating or unstable model")
     end
+    if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
+        error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
+              "measured output quantity ($nym)")
+    end
+    if iszero(Dsm)
+        error("Stochastic model requires a nonzero direct transmission matrix D")
+    end
+    return nothing
 end
-validate_internalmodel(::SimModel) = nothing
+
+"Only validate stochastic model size is `model` is not a [`LinModel`](@ref)."
+function validate_internalmodel(::SimModel, nym, Csm, Dsm)
+    if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
+        error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
+              "measured output quantity ($nym)")
+    end
+    if iszero(Dsm)
+        error("Stochastic model requires a nonzero direct transmission matrix D")
+    end
+    return nothing
+end
 
 
 @doc raw"""
@@ -130,9 +142,10 @@ function matrices_internalmodel(model::LinModel)
     return Â, B̂u, Ĉ, B̂d, D̂d
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-function matrices_internalmodel(model::SimModel)
+function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
-    return zeros(0, nx), zeros(0, nu), zeros(0, nx), zeros(0, nd), zeros(0, nd)
+    Â, B̂u, Ĉ, B̂d, D̂d = zeros(NT,0,nx), zeros(NT,0,nu), zeros(NT,0,nx), zeros(NT,0,nd), zeros(NT,0,nd)
+    return Â, B̂u, Ĉ, B̂d, D̂d
 end
 
 @doc raw"""
@@ -204,14 +217,16 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂))
+function update_estimate!(
+    estim::InternalModel{NT, SM}, u, ym, d=empty(estim.x̂)
+) where {NT<:Real, SM}
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
     ŷd = h(model, x̂d, d)
     x̂d[:] = f(model, x̂d, u, d) # this also updates estim.x̂ (they are the same object)
     # --------------- stochastic model -----------------------
-    ŷs = zeros(model.ny)
+    ŷs = zeros(NT, model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]   # ŷs=0 for unmeasured outputs
     x̂s[:] = estim.Âs*x̂s + estim.B̂s*ŷs
     return x̂d
@@ -235,11 +250,11 @@ of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmea
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See
 [`init_internalmodel`](@ref) for details.
 """
-function init_estimate!(estim::InternalModel, model::LinModel, u, ym, d)
+function init_estimate!(estim::InternalModel, model::LinModel{NT}, u, ym, d) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
     x̂d[:] = (I - model.A)\(model.Bu*u + model.Bd*d)
     ŷd = h(model, x̂d, d)
-    ŷs = zeros(model.ny)
+    ŷs = zeros(NT, model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
     x̂s[:] = (I-estim.Âs)\estim.B̂s*ŷs
     return nothing
