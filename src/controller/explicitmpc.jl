@@ -12,8 +12,8 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
     noR̂u::Bool
-    S̃::BitMatrix
-    T::BitMatrix
+    S̃::Matrix{NT} 
+    T::Matrix{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
@@ -44,7 +44,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         # dummy vals (updated just before optimization):
         R̂y, R̂u = zeros(NT, ny*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
-        S, T = init_ΔUtoU(nu, Hp, Hc)
+        S, T = init_ΔUtoU(model, Hp, Hc)
         E, F, G, J, K, V = init_predmat(estim, model, Hp, Hc)
         S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)

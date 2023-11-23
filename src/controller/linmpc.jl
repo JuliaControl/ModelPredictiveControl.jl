@@ -22,8 +22,8 @@ struct LinMPC{
     R̂u::Vector{NT}
     R̂y::Vector{NT}
     noR̂u::Bool
-    S̃::BitMatrix
-    T::BitMatrix
+    S̃::Matrix{NT} 
+    T::Matrix{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
@@ -52,7 +52,7 @@ struct LinMPC{
         # dummy vals (updated just before optimization):
         R̂y, R̂u = zeros(NT, ny*Hp), zeros(NT, nu*Hp) 
         noR̂u = iszero(L_Hp)
-        S, T = init_ΔUtoU(nu, Hp, Hc)
+        S, T = init_ΔUtoU(model, Hp, Hc)
         E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
         con, S̃, Ñ_Hc, Ẽ = init_defaultcon(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
         P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)

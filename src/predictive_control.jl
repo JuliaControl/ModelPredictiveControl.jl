@@ -742,7 +742,7 @@ end
 set_objective_linear_coef!(::PredictiveController, _ ) = nothing
 
 @doc raw"""
-    init_ΔUtoU(nu, Hp) -> S, T
+    init_ΔUtoU(model, Hp, Hc) -> S, T
 
 Init manipulated input increments to inputs conversion matrices.
 
@@ -752,8 +752,9 @@ are calculated by:
 \mathbf{U} = \mathbf{S} \mathbf{ΔU} + \mathbf{T} \mathbf{u}(k-1) \\
 ```
 """
-function init_ΔUtoU(nu, Hp, Hc)
-    I_nu = BitMatrix(I(nu))
+function init_ΔUtoU(model::SimModel{NT}, Hp, Hc) where {NT<:Real}
+    # S and T are `Matrix{NT}` since conversion is faster than `Matrix{Bool}` or `BitMatrix`
+    I_nu = Matrix{NT}(I, model.nu, model.nu)
     S_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
     S = [S_Hc; repeat(I_nu, Hp - Hc, Hc)]
     T = repeat(I_nu, Hp)
@@ -1082,14 +1083,13 @@ constraints:
 ```
 """
 function relaxU(::SimModel{NT}, C, C_umin, C_umax, S) where {NT<:Real}
-    S_NT = convert(Matrix{NT}, S)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
-        A_Umin, A_Umax = -[S_NT  C_umin], [S_NT -C_umax] 
+        A_Umin, A_Umax = -[S  C_umin], [S -C_umax] 
         # ϵ has no impact on ΔU → U conversion for prediction calculations:
-        S̃ = [S falses(size(S, 1))]
+        S̃ = [S zeros(NT, size(S, 1))]
     else # ΔŨ = ΔU (only hard constraints)
-        A_Umin, A_Umax = -S_NT,  S_NT
+        A_Umin, A_Umax = -S,  S
         S̃ = S
     end
     return A_Umin, A_Umax, S̃
