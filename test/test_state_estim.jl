@@ -96,6 +96,11 @@ end
         updatestate!(skalmanfilter2, [10, 50], [51, 32])
     end
     @test skalmanfilter2() ≈ [51, 32] atol=1e-3
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    skalmanfilter3 = SteadyKalmanFilter(linmodel3)
+    x̂ = updatestate!(skalmanfilter3, [0], [0])
+    @test x̂ ≈ [0, 0]
+    @test isa(x̂, Vector{Float32})
     @test_throws ArgumentError updatestate!(skalmanfilter1, [10, 50])
 end   
     
@@ -152,23 +157,23 @@ end
 
 @testset "KalmanFilter estimator methods" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    lo1 = KalmanFilter(linmodel1)
-    @test updatestate!(lo1, [10, 50], [50, 30]) ≈ zeros(4)
-    @test updatestate!(lo1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
-    @test lo1.x̂ ≈ zeros(4)
-    @test evaloutput(lo1) ≈ lo1() ≈ [50, 30]
-    @test evaloutput(lo1, Float64[]) ≈ lo1(Float64[]) ≈ [50, 30]
-    @test initstate!(lo1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
-    setstate!(lo1, [1,2,3,4])
-    @test lo1.x̂ ≈ [1,2,3,4]
+    kalmanfilter1 = KalmanFilter(linmodel1)
+    @test updatestate!(kalmanfilter1, [10, 50], [50, 30]) ≈ zeros(4)
+    @test updatestate!(kalmanfilter1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
+    @test kalmanfilter1.x̂ ≈ zeros(4)
+    @test evaloutput(kalmanfilter1) ≈ kalmanfilter1() ≈ [50, 30]
+    @test evaloutput(kalmanfilter1, Float64[]) ≈ kalmanfilter1(Float64[]) ≈ [50, 30]
+    @test initstate!(kalmanfilter1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    setstate!(kalmanfilter1, [1,2,3,4])
+    @test kalmanfilter1.x̂ ≈ [1,2,3,4]
     for i in 1:1000
-        updatestate!(lo1, [11, 52], [50, 30])
+        updatestate!(kalmanfilter1, [11, 52], [50, 30])
     end
-    @test lo1() ≈ [50, 30] atol=1e-3
+    @test kalmanfilter1() ≈ [50, 30] atol=1e-3
     for i in 1:100
-        updatestate!(lo1, [10, 50], [51, 32])
+        updatestate!(kalmanfilter1, [10, 50], [51, 32])
     end
-    @test lo1() ≈ [51, 32] atol=1e-3
+    @test kalmanfilter1() ≈ [51, 32] atol=1e-3
     kalmanfilter2 = KalmanFilter(linmodel1, nint_u=[1, 1])
     for i in 1:100
         updatestate!(kalmanfilter2, [11, 52], [50, 30])
@@ -178,7 +183,12 @@ end
         updatestate!(kalmanfilter2, [10, 50], [51, 32])
     end
     @test kalmanfilter2() ≈ [51, 32] atol=1e-3
-    @test_throws ArgumentError updatestate!(lo1, [10, 50])
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    kalmanfilter3 = KalmanFilter(linmodel3)
+    x̂ = updatestate!(kalmanfilter3, [0], [0])
+    @test x̂ ≈ [0, 0]
+    @test isa(x̂, Vector{Float32})
+    @test_throws ArgumentError updatestate!(kalmanfilter1, [10, 50])
 end   
 
 @testset "Luenberger construction" begin
@@ -249,6 +259,11 @@ end
         updatestate!(lo2, [10, 50], [51, 32])
     end
     @test lo2() ≈ [51, 32] atol=1e-3
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    lo3 = Luenberger(linmodel3)
+    x̂ = updatestate!(lo3, [0], [0])
+    @test x̂ ≈ [0, 0]
+    @test isa(x̂, Vector{Float32})
 end
 
 @testset "InternalModel construction" begin
@@ -339,6 +354,12 @@ end
     @test internalmodel1.x̂s ≈ zeros(2)
     setstate!(internalmodel1, [1,2])
     @test internalmodel1.x̂ ≈ [1,2]
+
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    internalmodel3 = InternalModel(linmodel3)
+    x̂ = updatestate!(internalmodel3, [0], [0])
+    @test x̂ ≈ [0]
+    @test isa(x̂, Vector{Float32})
 end
  
 @testset "UnscentedKalmanFilter construction" begin
@@ -429,6 +450,11 @@ end
         updatestate!(ukf2, [10, 50], [51, 32])
     end
     @test ukf2() ≈ [51, 32] atol=1e-3
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    ukf3 = UnscentedKalmanFilter(linmodel3)
+    x̂ = updatestate!(ukf3, [0], [0])
+    @test x̂ ≈ [0, 0]
+    @test isa(x̂, Vector{Float32})
 end
 
 @testset "ExtendedKalmanFilter construction" begin
@@ -515,4 +541,9 @@ end
         updatestate!(ekf2, [10, 50], [51, 32])
     end
     @test ekf2() ≈ [51, 32] atol=1e-3
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    ekf3 = ExtendedKalmanFilter(linmodel3)
+    x̂ = updatestate!(ekf3, [0], [0])
+    @test x̂ ≈ [0, 0]
+    @test isa(x̂, Vector{Float32})
 end
