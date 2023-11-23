@@ -392,7 +392,7 @@ end
 end
 
 @testset "NonLinMPC moves and getinfo" begin
-    linmodel = setop!(LinModel(tf(5, [200, 1]), 300.0), yop=[10])
+    linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
     r = [15]
     u = moveinput!(nmpc_lin, r)
@@ -410,10 +410,10 @@ end
     @test u ≈ [1] atol=5e-2
     # ensure that the current estimated output is updated for correct JE values:
     @test nmpc.ŷ ≈ ModelPredictiveControl.evalŷ(nmpc.estim, nothing, Float64[])
-    linmodel2 = LinModel([tf(5, [200, 1]) tf(7, [800,1])], 300.0, i_d=[2])
+    linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
     f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
-    nonlinmodel = NonLinModel(f, h, 300.0, 1, 2, 1, 1)
+    nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
     d = [0.1]
     u = moveinput!(nmpc2, 7d, d)
@@ -437,14 +437,14 @@ end
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     moveinput!(nmpc6, [0]) ≈ [0.0]
-    nonlinmodel2 = NonLinModel{Float32}(f, h, 300.0, 1, 2, 1, 1)
+    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     nonlinmodel2.h(Float32[0,0], Float32[0])
     moveinput!(nmpc7, [0], [0]) ≈ [0.0]
 end
 
 @testset "NonLinMPC step disturbance rejection" begin
-    linmodel = setop!(LinModel(tf(5, [200, 1]), 300.0), yop=[10])
+    linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     r = [15]
     outdist = [5]
     nmpc_im = NonLinMPC(InternalModel(linmodel))
@@ -532,7 +532,7 @@ end
 end
 
 @testset "NonLinMPC constraint violation" begin
-    linmodel = LinModel(tf([2], [1000, 1]), 300.0)
+    linmodel = LinModel(tf([2], [10000, 1]), 3000.0)
     nmpc_lin = NonLinMPC(linmodel, Hp=50, Hc=5)
 
     setconstraint!(nmpc_lin, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
