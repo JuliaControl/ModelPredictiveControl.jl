@@ -275,7 +275,6 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
     set_silent(optim)
     limit_solve_time(mpc)
     @variable(optim, ΔŨvar[1:nvar])
-    ΔŨvar = optim[:ΔŨvar]
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
