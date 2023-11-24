@@ -15,6 +15,7 @@ export SimModel, LinModel, NonLinModel
 export setop!, setstate!, updatestate!, evaloutput, linearize
 export StateEstimator, InternalModel, Luenberger
 export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
+export MovingHorizonEstimator
 export default_nint, initstate!
 export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
 export SimResult, getinfo, sim!
