@@ -29,17 +29,18 @@ struct MovingHorizonEstimator{
     Ĉ ::Matrix{NT}
     B̂d::Matrix{NT}
     D̂d::Matrix{NT}
-    P̂0::Hermitian{NT, Matrix{NT}}
-    Q̂_He::Hermitian{Float64, Matrix{Float64}}
-    R̂_He::Hermitian{Float64, Matrix{Float64}}
-    X̂min::Vector{Float64}
-    X̂max::Vector{Float64}
-    X̂ ::Vector{Float64}
-    Ym::Vector{Float64}
-    U ::Vector{Float64}
-    D ::Vector{Float64}
-    Ŵ ::Vector{Float64}
-    x̂0_past::Vector{Float64}
+    P̂0  ::Hermitian{NT, Matrix{NT}}
+    Q̂_He::Hermitian{NT, Matrix{NT}}
+    R̂_He::Hermitian{NT, Matrix{NT}}
+    X̂min::Vector{NT}
+    X̂max::Vector{NT}
+    X̂ ::Vector{NT}
+    Ym::Vector{NT}
+    U ::Vector{NT}
+    D ::Vector{NT}
+    Ŵ ::Vector{NT}
+    x̂0_past::Vector{NT}
+    Nk::Vector{Int}
     function MovingHorizonEstimator{NT, SM, JM}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim::JM
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
@@ -63,6 +64,7 @@ struct MovingHorizonEstimator{
         W̃ = zeros(nvar)
         X̂, Ym, U, D, Ŵ = zeros(nx̂*He), zeros(nym*He), zeros(nu*He), zeros(nd*He), zeros(nx̂*He)
         x̂0_past = zeros(nx̂)
+        Nk = [1]
         estim = new{NT, SM, JM}(
             model, optim, W̃,
             lastu0, x̂, P̂, He,
@@ -72,9 +74,9 @@ struct MovingHorizonEstimator{
             P̂0, Q̂_He, R̂_He,
             X̂min, X̂max, 
             X̂, Ym, U, D, Ŵ, 
-            x̂0_past
+            x̂0_past, Nk
         )
-        #init_optimization!(estim, optim)
+        init_optimization!(estim, optim)
         return estim
     end
 end
@@ -159,63 +161,37 @@ function init_optimization!(
     # --- variables and linear constraints ---
     nvar = length(estim.W̃)
     set_silent(optim)
-    limit_solve_time(estim)
+    #limit_solve_time(estim)
     @variable(optim, W̃var[1:nvar])
     # --- nonlinear optimization init ---
-    model = estim.model
-    ny, nx̂, He = model.ny, estim.estim.nx̂, estim.He#, length(i_g)
+    nym, nx̂, He = estim.nym, estim.nx̂, estim.He #, length(i_g)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
-    Jfunc, gfunc = let mpc=estim, model=model, nvar=nvar , nŶ=Hp*ny, nx̂=nx̂
-        last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
-        Ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŶ), nvar + 3)
-        x̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), nvar + 3)
-        function Jfunc(ΔŨtup::JNT...)
-            Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
-            ΔŨ = collect(ΔŨtup)
-            if ΔŨtup != last_ΔŨtup_float
-                x̂ = get_tmp(x̂_cache, ΔŨtup[1])
-                g = get_tmp(g_cache, ΔŨtup[1])
-                Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
-                con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
-                last_ΔŨtup_float = ΔŨtup
+    Jfunc = let estim=estim, model=estim.model, nvar=nvar , nŶm=He*nym, nX̂=He*nx̂
+        last_W̃tup_float, last_W̃tup_dual = nothing, nothing
+        Ŷm_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(nŶm), nvar + 3)
+        X̂_cache ::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(nX̂) , nvar + 3)
+        function Jfunc(W̃tup::Float64...)
+            Ŷm, X̂ = get_tmp(Ŷm_cache, W̃tup[1]), get_tmp(X̂_cache, W̃tup[1])
+            W̃ = collect(W̃tup)
+            if W̃tup != last_W̃tup_float
+                Ŷm, _ = predict!(Ŷm, X̂, estim, model, W̃)
+                last_W̃tup_float = W̃tup
             end
-            return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
+            return obj_nonlinprog(estim, model, Ŷm, W̃)
         end
-        function Jfunc(ΔŨtup::ForwardDiff.Dual...)
-            Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
-            ΔŨ = collect(ΔŨtup)
-            if ΔŨtup != last_ΔŨtup_dual
-                x̂ = get_tmp(x̂_cache, ΔŨtup[1])
-                g = get_tmp(g_cache, ΔŨtup[1])
-                Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
-                con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
-                last_ΔŨtup_dual = ΔŨtup
+        function Jfunc(W̃tup::Real...)
+            Ŷm, X̂ = get_tmp(Ŷm_cache, W̃tup[1]), get_tmp(X̂_cache, W̃tup[1])
+            W̃ = collect(W̃tup)
+            if W̃tup != last_W̃tup_dual
+                Ŷm, _ = predict!(Ŷm, X̂, estim, model, W̃)
+                last_W̃tup_dual = W̃tup
             end
-            return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
+            return obj_nonlinprog(estim, model, Ŷm, W̃)
         end
         Jfunc
     end
     register(optim, :Jfunc, nvar, Jfunc, autodiff=true)
-    @NLobjective(optim, Min, Jfunc(ΔŨvar...))
-    if ng ≠ 0
-        i_end_Ymin, i_end_Ymax, i_end_x̂min = 1Hp*ny, 2Hp*ny, 2Hp*ny + nx̂
-        for i in eachindex(con.Ymin)
-            sym = Symbol("g_Ymin_$i")
-            register(optim, sym, nvar, gfunc[i], autodiff=true)
-        end
-        for i in eachindex(con.Ymax)
-            sym = Symbol("g_Ymax_$i")
-            register(optim, sym, nvar, gfunc[i_end_Ymin+i], autodiff=true)
-        end
-        for i in eachindex(con.x̂min)
-            sym = Symbol("g_x̂min_$i")
-            register(optim, sym, nvar, gfunc[i_end_Ymax+i], autodiff=true)
-        end
-        for i in eachindex(con.x̂max)
-            sym = Symbol("g_x̂max_$i")
-            register(optim, sym, nvar, gfunc[i_end_x̂min+i], autodiff=true)
-        end
-    end
+    @NLobjective(optim, Min, Jfunc(W̃var...))
     return nothing
 end
 
@@ -248,43 +224,49 @@ Objective function for [`NonLinMHE`] when `model` is not a [`LinModel`](@ref).
 function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, Ŷm, W̃::Vector{T}) where {T<:Real}
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̄0 = W̃[1:estim.nx̂] - estim.x̂0_past
-    V̂  = estim.win_Ym - Ŷm
+    V̂  = estim.Ym - Ŷm
     @views Ŵ = W̃[estim.nx̂+1:end]
     return x̄0'/estim.P̂0*x̄0 + Ŵ'/Q̂_He*Ŵ + V̂'/R̂_He*V̂
 end
 
-function predict(estim::NonLinMHE, model::SimModel, W̃::Vector{T}) where {T<:Real}
-    nu, nd, nym, nx̂, He = model.nu, model.nd, estim.nym, estim.nx̂, estim.He
-    Ŷm::Vector{T} = Vector{T}(undef, nym*(He+1))
-    X̂ ::Vector{T} = Vector{T}(undef, nx̂*(He+1))
-    Ŵ ::Vector{T} = @views W̃[nx̂+1:end]
-    u ::Vector{T} = Vector{T}(undef, nu)
-    d ::Vector{T} = Vector{T}(undef, nu)
-    ŵ ::Vector{T} = Vector{T}(undef, nx̂)
-    x̂ ::Vector{T} = W̃[1:nx̂]
+function predict!(
+    Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
+) where {T<:Real}
+    nu, nd, nx̂, He = model.nu, model.nd, estim.nx̂, estim.He
+    u::Vector{T} = Vector{T}(undef, nu)
+    d::Vector{T} = Vector{T}(undef, nu)
+    ŵ::Vector{T} = Vector{T}(undef, nx̂)
+    x̂::Vector{T} = W̃[1:nx̂]
     for j=1:He
-        u[:] = @views estim.U[(1 + nu*(j-1)):(nu*j)]
-        d[:] = @views estim.D[(1 + nd*(j-1)):(nd*j)]
-        ŵ[:] = @views Ŵ[(1 + nx̂*(j-1)):(nx̂*j)]
+        u[:] = estim.U[(1 + nu*(j-1)):(nu*j)]
+        d[:] = estim.D[(1 + nd*(j-1)):(nd*j)]
+        i = j+1
+        ŵ[:] = W̃[(1 + nx̂*(i-1)):(nx̂*i)]
         X̂[(1 + nx̂*(j-1)):(nx̂*j)] = x̂
-        Ŷm[(1 + ny*(j-1)):(ny*j)] = @views ĥ(estim, x̂, d)[estim.i_ym]
-        x̂[:] = f̂(estim, x̂, u, d) + ŵ
+        Ŷm[(1 + ny*(j-1)):(ny*j)] = ĥ(estim, model, x̂, d)[estim.i_ym]
+        x̂[:] = f̂(estim, model, x̂, u, d) + ŵ
     end
-    X̂[end-nx̂+1:end] = x̂
-    Ŷm[end-nx̂+1:end] = @views ĥ(estim, x̂, estin.D[end-nd+1:end])[estim.i_ym]
     return Ŷm, X̂
 end
 
-function update_estimate!(estim::NonLinMHE, u, ym, d)
-    model, x̂ = estim.model, estim.x̂
+function update_estimate!(estim::MovingHorizonEstimator, u, ym, d)
+    model, x̂, P̂ = estim.model, estim.x̂, estim.P̂
     nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
     ŵ = zeros(nŵ) # ŵ(k) = 0 for warm-starting
-    # --- adding new data in time windows ---
-    estim.X̂[:]  = @views [estim.X̂[nx̂+1:end]  ; x̂]
-    estim.Ym[:] = @views [estim.Ym[nym+1:end]; ym]
-    estim.U[:]  = @views [estim.U[nu+1:end]  ; u]
-    estim.D[:]  = @views [estim.D[nd+1:end]  ; d]
-    estim.Ŵ[:]  = @views [estim.Ŵ[nŵ+1:end]  ; ŵ]
-    
+    # --- adding new data in the windows ---
+    estim.X̂[:]  = [estim.X̂[nx̂+1:end]  ; x̂]
+    estim.Ym[:] = [estim.Ym[nym+1:end]; ym]
+    estim.U[:]  = [estim.U[nu+1:end]  ; u]
+    estim.D[:]  = [estim.D[nd+1:end]  ; d]
+    estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
+
+
+
+
+
+
+    Nk, He = estim.Nk, estim.He
+    Nk[] = Nk[] < He ? Nk[] + 1 : He
+    return x̂, P̂
     #estim.x̂0_past[:] =
 end
