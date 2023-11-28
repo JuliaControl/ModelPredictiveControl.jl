@@ -192,7 +192,7 @@ The keyword argument `Ewt` weights the economic costs relative to the other term
 objective function. The term must be large enough to be significant but a too high value can
 lead to a static error on the angle setpoint. The second element of `Mwt` is zero since the
 speed ``ω`` is not requested to track a setpoint. The closed-loop response to a 180°
-setpoint is:
+setpoint is similar:
 
 ```@example 1
 unset_time_limit_sec(empc.optim) # hide
