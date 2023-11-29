@@ -746,15 +746,18 @@ end
 """
     validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
 
-Validate sizes of process `Q̂`` and sensor `R̂` noises covariance matrices.
+Validate sizes and Hermitianity of process `Q̂`` and sensor `R̂` noises covariance matrices.
 
-Also validate initial estimate covariance size, if provided.
+Also validate initial estimate covariance `P̂0`, if provided.
 """
 function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
     size(Q̂)  ≠ (nx̂, nx̂)     && error("Q̂ size $(size(Q̂)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
+    !ishermitian(Q̂)         && error("Q̂ is not Hermitian")
     size(R̂)  ≠ (nym, nym)   && error("R̂ size $(size(R̂)) ≠ nym, nym $((nym, nym))")
+    !ishermitian(R̂)         && error("R̂ is not Hermitian")
     if ~isnothing(P̂0)
         size(P̂0) ≠ (nx̂, nx̂) && error("P̂0 size $(size(P̂0)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
+        !ishermitian(P̂0)    && error("P̂0 is not Hermitian")
     end
 end
 

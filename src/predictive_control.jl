@@ -27,13 +27,6 @@ const DEFAULT_LWT = 0.0
 const DEFAULT_CWT = 1e5
 const DEFAULT_EWT = 0.0
 
-"Termination status that means 'no solution available'."
-const FATAL_STATUSES = [
-    INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 
-    NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
-    OTHER_ERROR
-]
-
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint{NT<:Real}
     ẽx̂      ::Matrix{NT}

@@ -30,17 +30,20 @@ struct MovingHorizonEstimator{
     B̂d::Matrix{NT}
     D̂d::Matrix{NT}
     P̂0  ::Hermitian{NT, Matrix{NT}}
-    Q̂_He::Hermitian{NT, Matrix{NT}}
-    R̂_He::Hermitian{NT, Matrix{NT}}
+    Q̂::Hermitian{NT, Matrix{NT}}
+    R̂::Hermitian{NT, Matrix{NT}}
+    invP̄::Hermitian{NT, Matrix{NT}}
+    invQ̂_He::Hermitian{NT, Matrix{NT}}
+    invR̂_He::Hermitian{NT, Matrix{NT}}
     X̂min::Vector{NT}
     X̂max::Vector{NT}
-    X̂ ::Vector{NT}
-    Ym::Vector{NT}
-    U ::Vector{NT}
-    D ::Vector{NT}
-    Ŵ ::Vector{NT}
+    X̂ ::Union{Vector{NT}, Missing} 
+    Ym::Union{Vector{NT}, Missing}
+    U ::Union{Vector{NT}, Missing}
+    D ::Union{Vector{NT}, Missing}
+    Ŵ ::Union{Vector{NT}, Missing}
     x̂0_past::Vector{NT}
-    Nk::Vector{Int}
+    Nk::Vector{Int} # TODO: remove this field and count missing values in X̂
     function MovingHorizonEstimator{NT, SM, JM}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim::JM
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
@@ -54,12 +57,13 @@ struct MovingHorizonEstimator{
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         lastu0 = zeros(NT, model.nu)
         x̂ = [zeros(NT, model.nx); zeros(NT, nxs)]
-        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂0 = Hermitian(P̂0, :L)
-        Q̂_He = Hermitian(repeatdiag(Q̂, He), :L)
-        R̂_He = Hermitian(repeatdiag(R̂, He), :L)
+        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
+        invP̄ = Hermitian(inv(P̂0), :L)
+        invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
+        invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
         P̂ = copy(P̂0)
-        X̂min, X̂max = fill(-Inf, nx̂*He), fill(+Inf, nx̂*He)
+        X̂min, X̂max = fill(-Inf, nx̂*(He+1)), fill(+Inf, nx̂*(He+1))
         nvar = nx̂*(He + 1) 
         W̃ = zeros(nvar)
         X̂, Ym, U, D, Ŵ = zeros(nx̂*He), zeros(nym*He), zeros(nu*He), zeros(nd*He), zeros(nx̂*He)
@@ -71,7 +75,7 @@ struct MovingHorizonEstimator{
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
-            P̂0, Q̂_He, R̂_He,
+            P̂0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He,
             X̂min, X̂max, 
             X̂, Ym, U, D, Ŵ, 
             x̂0_past, Nk
@@ -105,50 +109,6 @@ function MovingHorizonEstimator(
     )
 end
 
-#=
-@doc raw"""
-    init_stochpred(As, Cs, He)
-
-Construct stochastic model prediction matrices for nonlinear observers.
-   
-It allows separate simulations of the stochastic model (integrators). Stochastic model 
-states and outputs are simulated using :
-```math
-\begin{aligned}
-    \mathbf{X̂_s} &= \mathbf{M_s x̂_s}(k) + \mathbf{N_s Ŵ_s} 
-    \mathbf{Ŷ_s} &= \mathbf{P_s X̂_s}
-\end{aligned}
-```
-where ``\mathbf{X̂_s}`` and ``\mathbf{Ŷ_s}`` are integrator states and outputs from ``k + 1`` 
-to ``k + H_e`` inclusively, and ``\mathbf{Ŵ_s}`` are integrator process noises from ``k`` to
-``k + H_e - 1``. Stochastic simulations are combined with ``\mathbf{f, h}`` results to 
-simulate the augmented model:
-```math
-\begin{aligned}
-    \mathbf{X̂} &= \mathbf{M_s x̂_s}(k) + \mathbf{N_s Ŵ_s} 
-    \mathbf{Ŷ_s} &= \mathbf{P_s X̂_s}
-\end{aligned}
-```
-       Xhat = [XhatD; XhatS]
-       Yhat = YhatD + YhatS
-where XhatD and YhatD are SimulFunc states and outputs from ``k + 1`` to ``k + H_e``.
-"""
-function init_stochpred(As, Cs, He)
-    nxs = size(As,1);
-    Ms = zeros(He*nxs, nxs);
-    for i = 1:Ho
-        iRow = (1:nxs) + nxs*(i-1);
-        Ms[iRow, :] = As^i;
-    end
-    Ns = zeros(Ho*nxs, He*nxs);
-    for i = 1:Ho
-        iCol = (1:nxs) + nxs*(i-1);
-        Ns[nxs*(i-1)+1:end, iCol] = [eye(nxs); Ms(1:nxs*(Ho-i),:)];
-    end
-    Ps = kron(eye(Ho),Cs);
-    return (Ms, Ns, Ps)
-end
-=#
 
 """
     init_optimization!(estim::MovingHorizonEstimator, optim::JuMP.GenericModel)
@@ -170,21 +130,19 @@ function init_optimization!(
         last_W̃tup_float, last_W̃tup_dual = nothing, nothing
         Ŷm_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(nŶm), nvar + 3)
         X̂_cache ::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(nX̂) , nvar + 3)
-        function Jfunc(W̃tup::Float64...)
+        function Jfunc(W̃tup::JNT...)
             Ŷm, X̂ = get_tmp(Ŷm_cache, W̃tup[1]), get_tmp(X̂_cache, W̃tup[1])
             W̃ = collect(W̃tup)
             if W̃tup != last_W̃tup_float
-                println(length(X̂))
                 Ŷm, _ = predict!(Ŷm, X̂, estim, model, W̃)
                 last_W̃tup_float = W̃tup
             end
             return obj_nonlinprog(estim, model, Ŷm, W̃)
         end
-        function Jfunc(W̃tup::Real...)
+        function Jfunc(W̃tup::ForwardDiff.Dual...)
             Ŷm, X̂ = get_tmp(Ŷm_cache, W̃tup[1]), get_tmp(X̂_cache, W̃tup[1])
             W̃ = collect(W̃tup)
             if W̃tup != last_W̃tup_dual
-                println(length(X̂))
                 Ŷm, _ = predict!(Ŷm, X̂, estim, model, W̃)
                 last_W̃tup_dual = W̃tup
             end
@@ -198,41 +156,51 @@ function init_optimization!(
 end
 
 
+"Print the overall dimensions of the state estimator `estim` with left padding `n`."
+function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n)
+    nu, nd = estim.model.nu, estim.model.nd
+    nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
+    He = estim.He
+    println(io, "$(lpad(He, n)) estimation steps He")
+    println(io, "$(lpad(nu, n)) manipulated inputs u ($(sum(estim.nint_u)) integrating states)")
+    println(io, "$(lpad(nx̂, n)) states x̂")
+    println(io, "$(lpad(nym, n)) measured outputs ym ($(sum(estim.nint_ym)) integrating states)")
+    println(io, "$(lpad(nyu, n)) unmeasured outputs yu")
+    print(io,   "$(lpad(nd, n)) measured disturbances d")
+end
+
+
 """
     obj_nonlinprog(estim::MovingHorizonEstimator, model::SimModel, ΔŨ::Vector{Real})
 
-Objective function for [`NonLinMHE`] when `model` is not a [`LinModel`](@ref).
+Objective function for [`MovingHorizonEstimator`](@ref).
+
+The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
 """
 function obj_nonlinprog(
-    estim::MovingHorizonEstimator, model::SimModel, Ŷm, W̃::Vector{T}
+    estim::MovingHorizonEstimator, ::SimModel, Ŷm, W̃::Vector{T}
 ) where {T<:Real}
-    P̂0, Q̂_He, R̂_He = estim.P̂0, estim.Q̂_He, estim.R̂_He
-    nYm, nŴ, nx̂ = estim.Nk[]*estim.nym, estim.Nk[]*estim.nx̂, estim.nx̂
-    x̄0 = W̃[1:nx̂] - estim.x̂0_past  # W̃ = [x̂(k-Nk|k); Ŵ]
-    V̂ = estim.Ym[1:nYm] - Ŷm[1:nYm]
-    Ŵ = W̃[nx̂+1:nx̂+nŴ]
-    return x̄0'*inv(estim.P̂0)*x̄0 + Ŵ'*inv(Q̂_He[1:nŴ, 1:nŴ])*Ŵ + V̂'*inv(R̂_He[1:nYm, 1:nYm])*V̂
+    nYm, nŴ, nx̂, invP̄ = estim.Nk[]*estim.nym, estim.Nk[]*estim.nx̂, estim.nx̂, estim.invP̄
+    invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
+    x̄0 = @views W̃[1:nx̂] - estim.x̂0_past  # W̃ = [x̂(k-Nk|k); Ŵ]
+    V̂  = @views estim.Ym[1:nYm] - Ŷm[1:nYm]
+    Ŵ  = @views W̃[nx̂+1:nx̂+nŴ]
+    return dot(x̄0, invP̄, x̄0) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂)
 end
 
 function predict!(
     Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
 ) where {T<:Real}
     nu, nd, nx̂, nym, Nk = model.nu, model.nd, estim.nx̂, estim.nym, estim.Nk[]
-    u::Vector{T} = Vector{T}(undef, nu)
-    d::Vector{T} = Vector{T}(undef, nd)
-    ŵ::Vector{T} = Vector{T}(undef, nx̂)
-    x̂::Vector{T} = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
+    X̂[1:nx̂] = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
     for j=1:Nk
-        u[:] = estim.U[(1 + nu*(j-1)):(nu*j)]
-        d[:] = estim.D[(1 + nd*(j-1)):(nd*j)]
-        i = j+1
-        ŵ[:] = W̃[(1 + nx̂*(i-1)):(nx̂*i)]
-        X̂[(1 + nx̂*(j-1)):(nx̂*j)] = x̂
+        u = @views estim.U[(1 + nu*(j-1)):(nu*j)]
+        d = @views estim.D[(1 + nd*(j-1)):(nd*j)]
+        ŵ = @views W̃[(1 + nx̂*j):(nx̂*(j+1))]
+        x̂ = @views X̂[(1 + nx̂*(j-1)):(nx̂*j)]
         Ŷm[(1 + nym*(j-1)):(nym*j)] = ĥ(estim, model, x̂, d)[estim.i_ym]
-        x̂[:] = f̂(estim, model, x̂, u, d) + ŵ
+        X̂[(1 + nx̂*j):(nx̂*(j+1))]    = f̂(estim, model, x̂, u, d) + ŵ
     end
-    j = Nk + 1
-    X̂[(1 + nx̂*(j-1)):(nx̂*j)] = x̂
     return Ŷm, X̂
 end
 
@@ -252,10 +220,11 @@ A ref[^4]:
 
 [^4]: TODO
 """
-function update_estimate!(estim::MovingHorizonEstimator, u, ym, d)
+function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<:Real
     model, optim, x̂, P̂ = estim.model, estim.optim, estim.x̂, estim.P̂
     nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
     Nk, He = estim.Nk[], estim.He
+    nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*(Nk+1)
     W̃var::Vector{VariableRef} = optim[:W̃var]
     ŵ = zeros(nŵ) # ŵ(k) = 0 for warm-starting
     if Nk < He
@@ -271,15 +240,46 @@ function update_estimate!(estim::MovingHorizonEstimator, u, ym, d)
         estim.D[:]  = [estim.D[nd+1:end]  ; d]
         estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
     end
+    Ŷm = Vector{NT}(undef, nYm)
+    X̂  = Vector{NT}(undef, nX̂)
     estim.x̂0_past[:] = estim.X̂[1:nx̂]
     W̃0 = [estim.x̂0_past; estim.Ŵ]
+    Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃0)
+    J0 = obj_nonlinprog(estim, model, Ŷm, W̃0)
+    # initial W̃0 with Ŵ=0 if objective or constraint function not finite :
+    isfinite(J0) || (W̃0 = [estim.x̂0_past; zeros(NT, nŴ)])
     set_start_value.(W̃var, W̃0)
-    optimize!(optim)
-    println(solution_summary(optim))
+    unfix.(W̃var[is_fixed.(W̃var)])
+    fix.(W̃var[(nx̂*(Nk+1)+1):end], 0.0)
+    try
+        optimize!(optim)
+    catch err
+        if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
+            # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
+            MOIU.reset_optimizer(optim)
+            optimize!(optim)
+        else
+            rethrow(err)
+        end
+    end
+    status = termination_status(optim)
+    W̃curr = value.(W̃var)
+    if !(status == OPTIMAL || status == LOCALLY_SOLVED)
+        if isfatal(status)
+            @error("MHE terminated without solution: estimation in open-loop", 
+                   status)
+        else
+            @warn("MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
+                  "solution anyway", status)
+        end
+        @debug solution_summary(optim, verbose=true)
+    end
+    #if !isfatal(status)
+    #esimt.W̃[:] = 
+    W̃ = value.(W̃var)
+ 
+    estim.Ŵ[1:nŴ] = W̃[nx̂+1:nx̂+nŴ] # W̃ = [x̂(k-Nk|k); Ŵ]
 
-    W̃  = value.(W̃var)
-    Ŷm = zeros(nym*Nk)
-    X̂  = zeros(nx̂*(Nk+1))
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
     x̂[:] = X̂[(1 + nx̂*Nk):(nx̂*(Nk+1))]
     estim.Nk[] = Nk < He ? Nk + 1 : He
