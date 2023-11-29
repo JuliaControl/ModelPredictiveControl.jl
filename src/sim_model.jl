@@ -143,8 +143,8 @@ julia> x = updatestate!(model, [1])
 """
 function updatestate!(model::SimModel, u, d=empty(model.x))
     nu, nd = model.nu, model.nd
-    size(u) ≠ (nu,) && throw(ArgumentError("u size $(size(u)) ≠ input size ($nu,)"))
-    size(d) ≠ (nd,) && throw(ArgumentError("d size $(size(d)) ≠ input size ($nd,)"))
+    size(u) ≠ (nu,) && throw(ArgumentError("u size $(size(u)) ≠ manip. input size ($nu,)"))
+    size(d) ≠ (nd,) && throw(ArgumentError("d size $(size(d)) ≠ meas. dist. size ($nd,)"))
     model.x[:] = f(model, model.x, u - model.uop, d - model.dop)
     return model.x
 end
