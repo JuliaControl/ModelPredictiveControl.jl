@@ -381,7 +381,7 @@ function moveinput!(
     R̂u::Vector = mpc.noR̂u ? empty(mpc.estim.x̂) : repeat(mpc.estim.model.uop, mpc.Hp),
     ym::Union{Vector, Nothing} = nothing
 )
-    validate_setpointdist(mpc, ry, d, D̂, R̂y, R̂u)
+    validate_args(mpc, ry, d, D̂, R̂y, R̂u)
     initpred!(mpc, mpc.estim.model, d, ym, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model)
     ΔŨ = optim_objective!(mpc)
@@ -529,14 +529,19 @@ function default_Hp(::SimModel, Hp)
     return Hp
 end
 
-function validate_setpointdist(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
+"""
+    validate_args(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
+
+Check the dimensions of the arguments of [`moveinput!`](@ref).
+"""
+function validate_args(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
     ny, nd, nu, Hp = mpc.estim.model.ny, mpc.estim.model.nd, mpc.estim.model.nu, mpc.Hp
-    size(ry) ≠ (ny,)    && throw(ArgumentError("ry size $(size(ry)) ≠ output size ($ny,)"))
-    size(d)  ≠ (nd,)    && throw(ArgumentError("d size $(size(d)) ≠ measured dist. size ($nd,)"))
-    size(D̂)  ≠ (nd*Hp,) && throw(ArgumentError("D̂ size $(size(D̂)) ≠ measured dist. size × Hp ($(nd*Hp),)"))
-    size(R̂y) ≠ (ny*Hp,) && throw(ArgumentError("R̂y size $(size(R̂y)) ≠ output size × Hp ($(ny*Hp),)"))
+    size(ry) ≠ (ny,)    && throw(DimensionMismatch("ry size $(size(ry)) ≠ output size ($ny,)"))
+    size(d)  ≠ (nd,)    && throw(DimensionMismatch("d size $(size(d)) ≠ measured dist. size ($nd,)"))
+    size(D̂)  ≠ (nd*Hp,) && throw(DimensionMismatch("D̂ size $(size(D̂)) ≠ measured dist. size × Hp ($(nd*Hp),)"))
+    size(R̂y) ≠ (ny*Hp,) && throw(DimensionMismatch("R̂y size $(size(R̂y)) ≠ output size × Hp ($(ny*Hp),)"))
     if ~mpc.noR̂u
-        size(R̂u) ≠ (nu*Hp,) && throw(ArgumentError("R̂u size $(size(R̂u)) ≠ manip. input size × Hp ($(nu*Hp),)"))
+        size(R̂u) ≠ (nu*Hp,) && throw(DimensionMismatch("R̂u size $(size(R̂u)) ≠ manip. input size × Hp ($(nu*Hp),)"))
     end
 end
 
