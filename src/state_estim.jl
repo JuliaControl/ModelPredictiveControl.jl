@@ -420,6 +420,10 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
 ```
 """
 function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
+    nu, nym, nd = estim.model.nu, estim.nym, estim.model.nd
+    size(u)  ≠ (nu,)  && throw(ArgumentError("u size $(size(u)) ≠ input size ($nu,)"))
+    size(ym) ≠ (nym,) && throw(ArgumentError("ym size $(size(ym)) ≠ input size ($nym,)"))
+    size(d)  ≠ (nd,)  && throw(ArgumentError("d size $(size(d)) ≠ input size ($nd,)"))
     u0, ym0, d0 = remove_op!(estim, u, ym, d) 
     update_estimate!(estim, u0, ym0, d0)
     return estim.x̂
