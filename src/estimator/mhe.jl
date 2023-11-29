@@ -166,7 +166,7 @@ function init_optimization!(
     # --- nonlinear optimization init ---
     nym, nx̂, He = estim.nym, estim.nx̂, estim.He #, length(i_g)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
-    Jfunc = let estim=estim, model=estim.model, nvar=nvar , nŶm=He*nym, nX̂=He*nx̂
+    Jfunc = let estim=estim, model=estim.model, nvar=nvar , nŶm=He*nym, nX̂=(He+1)*nx̂
         last_W̃tup_float, last_W̃tup_dual = nothing, nothing
         Ŷm_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(nŶm), nvar + 3)
         X̂_cache ::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(nX̂) , nvar + 3)
@@ -174,6 +174,7 @@ function init_optimization!(
             Ŷm, X̂ = get_tmp(Ŷm_cache, W̃tup[1]), get_tmp(X̂_cache, W̃tup[1])
             W̃ = collect(W̃tup)
             if W̃tup != last_W̃tup_float
+                println(length(X̂))
                 Ŷm, _ = predict!(Ŷm, X̂, estim, model, W̃)
                 last_W̃tup_float = W̃tup
             end
@@ -183,6 +184,7 @@ function init_optimization!(
             Ŷm, X̂ = get_tmp(Ŷm_cache, W̃tup[1]), get_tmp(X̂_cache, W̃tup[1])
             W̃ = collect(W̃tup)
             if W̃tup != last_W̃tup_dual
+                println(length(X̂))
                 Ŷm, _ = predict!(Ŷm, X̂, estim, model, W̃)
                 last_W̃tup_dual = W̃tup
             end
@@ -204,19 +206,20 @@ Objective function for [`NonLinMHE`] when `model` is not a [`LinModel`](@ref).
 function obj_nonlinprog(
     estim::MovingHorizonEstimator, model::SimModel, Ŷm, W̃::Vector{T}
 ) where {T<:Real}
+    P̂0, Q̂_He, R̂_He = estim.P̂0, estim.Q̂_He, estim.R̂_He
     nYm, nŴ, nx̂ = estim.Nk[]*estim.nym, estim.Nk[]*estim.nx̂, estim.nx̂
     x̄0 = W̃[1:nx̂] - estim.x̂0_past  # W̃ = [x̂(k-Nk|k); Ŵ]
     V̂ = estim.Ym[1:nYm] - Ŷm[1:nYm]
     Ŵ = W̃[nx̂+1:nx̂+nŴ]
-    return x̄0'/estim.P̂0*x̄0 + Ŵ'/Q̂_He[1:nŴ, 1:nŴ]*Ŵ + V̂'/R̂_He[1:nYm, 1:nYm]*V̂
+    return x̄0'*inv(estim.P̂0)*x̄0 + Ŵ'*inv(Q̂_He[1:nŴ, 1:nŴ])*Ŵ + V̂'*inv(R̂_He[1:nYm, 1:nYm])*V̂
 end
 
 function predict!(
     Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
 ) where {T<:Real}
-    nu, nd, nx̂, Nk = model.nu, model.nd, estim.nx̂, estim.Nk[]
+    nu, nd, nx̂, nym, Nk = model.nu, model.nd, estim.nx̂, estim.nym, estim.Nk[]
     u::Vector{T} = Vector{T}(undef, nu)
-    d::Vector{T} = Vector{T}(undef, nu)
+    d::Vector{T} = Vector{T}(undef, nd)
     ŵ::Vector{T} = Vector{T}(undef, nx̂)
     x̂::Vector{T} = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
     for j=1:Nk
@@ -225,9 +228,11 @@ function predict!(
         i = j+1
         ŵ[:] = W̃[(1 + nx̂*(i-1)):(nx̂*i)]
         X̂[(1 + nx̂*(j-1)):(nx̂*j)] = x̂
-        Ŷm[(1 + ny*(j-1)):(ny*j)] = ĥ(estim, model, x̂, d)[estim.i_ym]
+        Ŷm[(1 + nym*(j-1)):(nym*j)] = ĥ(estim, model, x̂, d)[estim.i_ym]
         x̂[:] = f̂(estim, model, x̂, u, d) + ŵ
     end
+    j = Nk + 1
+    X̂[(1 + nx̂*(j-1)):(nx̂*j)] = x̂
     return Ŷm, X̂
 end
 
@@ -269,17 +274,14 @@ function update_estimate!(estim::MovingHorizonEstimator, u, ym, d)
     estim.x̂0_past[:] = estim.X̂[1:nx̂]
     W̃0 = [estim.x̂0_past; estim.Ŵ]
     set_start_value.(W̃var, W̃0)
-    try
-        optimize!(optim)
-    catch err
-        if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
-            # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
-            MOIU.reset_optimizer(optim)
-            optimize!(optim)
-        else
-            rethrow(err)
-        end
-    end
-    Nk[] = Nk[] < He ? Nk[] + 1 : He
+    optimize!(optim)
+    println(solution_summary(optim))
+
+    W̃  = value.(W̃var)
+    Ŷm = zeros(nym*Nk)
+    X̂  = zeros(nx̂*(Nk+1))
+    Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
+    x̂[:] = X̂[(1 + nx̂*Nk):(nx̂*(Nk+1))]
+    estim.Nk[] = Nk < He ? Nk + 1 : He
     return x̂, P̂
 end
