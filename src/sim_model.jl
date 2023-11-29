@@ -123,6 +123,7 @@ true
 
 """
 function initstate!(model::SimModel, u, d=empty(model.x))
+    validate_args(model::SimModel, u, d)
     steadystate!(model, u, d)
     return model.x
 end
@@ -142,9 +143,7 @@ julia> x = updatestate!(model, [1])
 ```
 """
 function updatestate!(model::SimModel, u, d=empty(model.x))
-    nu, nd = model.nu, model.nd
-    size(u) ≠ (nu,) && throw(ArgumentError("u size $(size(u)) ≠ manip. input size ($nu,)"))
-    size(d) ≠ (nd,) && throw(ArgumentError("d size $(size(d)) ≠ meas. dist. size ($nd,)"))
+    validate_args(model::SimModel, u, d)
     model.x[:] = f(model, model.x, u - model.uop, d - model.dop)
     return model.x
 end
@@ -166,6 +165,17 @@ julia> y = evaloutput(model)
 ```
 """
 evaloutput(model::SimModel, d=empty(model.x)) = h(model, model.x, d - model.dop) + model.yop
+
+"""
+    validate_args(model::SimModel, u, d)
+
+Check `u` and `d` sizes against `model` dimensions.
+"""
+function validate_args(model::SimModel, u, d)
+    nu, nd = model.nu, model.nd
+    size(u) ≠ (nu,) && throw(DimensionMismatch("u size $(size(u)) ≠ manip. input size ($nu,)"))
+    size(d) ≠ (nd,) && throw(DimensionMismatch("d size $(size(d)) ≠ meas. dist. size ($nd,)"))
+end
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=empty(model.x)) = evaloutput(model::SimModel, d)

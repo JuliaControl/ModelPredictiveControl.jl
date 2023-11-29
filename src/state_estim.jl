@@ -333,6 +333,8 @@ true
 
 """
 function initstate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
+    # --- validate arguments ---
+    validate_args(estim, u, ym, d)
     # --- init state estimate ----
     u0, ym0, d0 = remove_op!(estim, u, ym, d)
     init_estimate!(estim, estim.model, u0, ym0, d0)
@@ -420,15 +422,23 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
 ```
 """
 function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
-    nu, nym, nd = estim.model.nu, estim.nym, estim.model.nd
-    size(u)  ≠ (nu,)  && throw(ArgumentError("u size $(size(u)) ≠ manip. input size ($nu,)"))
-    size(ym) ≠ (nym,) && throw(ArgumentError("ym size $(size(ym)) ≠ meas. output size ($nym,)"))
-    size(d)  ≠ (nd,)  && throw(ArgumentError("d size $(size(d)) ≠ meas. dist size ($nd,)"))
+    validate_args(estim, u, ym, d)
     u0, ym0, d0 = remove_op!(estim, u, ym, d) 
     update_estimate!(estim, u0, ym0, d0)
     return estim.x̂
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
+
+"""
+    validate_args(estim::StateEstimator, u, ym, d)
+
+Check `u`, `ym` and `d` sizes against `estim` dimensions.
+"""
+function validate_args(estim::StateEstimator, u, ym, d)
+    validate_args(estim.model, u, d)
+    nym = estim.nym
+    size(ym) ≠ (nym,) && throw(DimensionMismatch("ym size $(size(ym)) ≠ meas. output size ($nym,)"))
+end
 
 include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
