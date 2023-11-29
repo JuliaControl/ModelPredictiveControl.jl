@@ -196,6 +196,41 @@ function init_optimization!(
 end
 
 
+"""
+    obj_nonlinprog(estim::MovingHorizonEstimator, model::SimModel, ΔŨ::Vector{Real})
+
+Objective function for [`NonLinMHE`] when `model` is not a [`LinModel`](@ref).
+"""
+function obj_nonlinprog(
+    estim::MovingHorizonEstimator, model::SimModel, Ŷm, W̃::Vector{T}
+) where {T<:Real}
+    nYm, nŴ, nx̂ = estim.Nk[]*estim.nym, estim.Nk[]*estim.nx̂, estim.nx̂
+    x̄0 = W̃[1:nx̂] - estim.x̂0_past  # W̃ = [x̂(k-Nk|k); Ŵ]
+    V̂ = estim.Ym[1:nYm] - Ŷm[1:nYm]
+    Ŵ = W̃[nx̂+1:nx̂+nŴ]
+    return x̄0'/estim.P̂0*x̄0 + Ŵ'/Q̂_He[1:nŴ, 1:nŴ]*Ŵ + V̂'/R̂_He[1:nYm, 1:nYm]*V̂
+end
+
+function predict!(
+    Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
+) where {T<:Real}
+    nu, nd, nx̂, Nk = model.nu, model.nd, estim.nx̂, estim.Nk[]
+    u::Vector{T} = Vector{T}(undef, nu)
+    d::Vector{T} = Vector{T}(undef, nu)
+    ŵ::Vector{T} = Vector{T}(undef, nx̂)
+    x̂::Vector{T} = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
+    for j=1:Nk
+        u[:] = estim.U[(1 + nu*(j-1)):(nu*j)]
+        d[:] = estim.D[(1 + nd*(j-1)):(nd*j)]
+        i = j+1
+        ŵ[:] = W̃[(1 + nx̂*(i-1)):(nx̂*i)]
+        X̂[(1 + nx̂*(j-1)):(nx̂*j)] = x̂
+        Ŷm[(1 + ny*(j-1)):(ny*j)] = ĥ(estim, model, x̂, d)[estim.i_ym]
+        x̂[:] = f̂(estim, model, x̂, u, d) + ŵ
+    end
+    return Ŷm, X̂
+end
+
 @doc raw"""
     update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
     
@@ -213,60 +248,38 @@ A ref[^4]:
 [^4]: TODO
 """
 function update_estimate!(estim::MovingHorizonEstimator, u, ym, d)
-    return esti.x̂, estim.P̂
-end
-
-"""
-    obj_nonlinprog(estim::MovingHorizonEstimator, model::SimModel, ΔŨ::Vector{Real})
-
-Objective function for [`NonLinMHE`] when `model` is not a [`LinModel`](@ref).
-"""
-function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, Ŷm, W̃::Vector{T}) where {T<:Real}
-    # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views x̄0 = W̃[1:estim.nx̂] - estim.x̂0_past
-    V̂  = estim.Ym - Ŷm
-    @views Ŵ = W̃[estim.nx̂+1:end]
-    return x̄0'/estim.P̂0*x̄0 + Ŵ'/Q̂_He*Ŵ + V̂'/R̂_He*V̂
-end
-
-function predict!(
-    Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
-) where {T<:Real}
-    nu, nd, nx̂, He = model.nu, model.nd, estim.nx̂, estim.He
-    u::Vector{T} = Vector{T}(undef, nu)
-    d::Vector{T} = Vector{T}(undef, nu)
-    ŵ::Vector{T} = Vector{T}(undef, nx̂)
-    x̂::Vector{T} = W̃[1:nx̂]
-    for j=1:He
-        u[:] = estim.U[(1 + nu*(j-1)):(nu*j)]
-        d[:] = estim.D[(1 + nd*(j-1)):(nd*j)]
-        i = j+1
-        ŵ[:] = W̃[(1 + nx̂*(i-1)):(nx̂*i)]
-        X̂[(1 + nx̂*(j-1)):(nx̂*j)] = x̂
-        Ŷm[(1 + ny*(j-1)):(ny*j)] = ĥ(estim, model, x̂, d)[estim.i_ym]
-        x̂[:] = f̂(estim, model, x̂, u, d) + ŵ
-    end
-    return Ŷm, X̂
-end
-
-function update_estimate!(estim::MovingHorizonEstimator, u, ym, d)
-    model, x̂, P̂ = estim.model, estim.x̂, estim.P̂
+    model, optim, x̂, P̂ = estim.model, estim.optim, estim.x̂, estim.P̂
     nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
+    Nk, He = estim.Nk[], estim.He
+    W̃var::Vector{VariableRef} = optim[:W̃var]
     ŵ = zeros(nŵ) # ŵ(k) = 0 for warm-starting
-    # --- adding new data in the windows ---
-    estim.X̂[:]  = [estim.X̂[nx̂+1:end]  ; x̂]
-    estim.Ym[:] = [estim.Ym[nym+1:end]; ym]
-    estim.U[:]  = [estim.U[nu+1:end]  ; u]
-    estim.D[:]  = [estim.D[nd+1:end]  ; d]
-    estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
-
-
-
-
-
-
-    Nk, He = estim.Nk, estim.He
+    if Nk < He
+        estim.X̂[ (1 + nx̂*(Nk-1)):(nx̂*Nk)]   = x̂
+        estim.Ym[(1 + nym*(Nk-1)):(nym*Nk)] = ym
+        estim.U[ (1 + nu*(Nk-1)):(nu*Nk)]   = u
+        estim.D[ (1 + nd*(Nk-1)):(nd*Nk)]   = d
+        estim.Ŵ[ (1 + nŵ*(Nk-1)):(nŵ*Nk)]   = ŵ
+    else
+        estim.X̂[:]  = [estim.X̂[nx̂+1:end]  ; x̂]
+        estim.Ym[:] = [estim.Ym[nym+1:end]; ym]
+        estim.U[:]  = [estim.U[nu+1:end]  ; u]
+        estim.D[:]  = [estim.D[nd+1:end]  ; d]
+        estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
+    end
+    estim.x̂0_past[:] = estim.X̂[1:nx̂]
+    W̃0 = [estim.x̂0_past; estim.Ŵ]
+    set_start_value.(W̃var, W̃0)
+    try
+        optimize!(optim)
+    catch err
+        if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
+            # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
+            MOIU.reset_optimizer(optim)
+            optimize!(optim)
+        else
+            rethrow(err)
+        end
+    end
     Nk[] = Nk[] < He ? Nk[] + 1 : He
     return x̂, P̂
-    #estim.x̂0_past[:] =
 end
