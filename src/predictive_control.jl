@@ -650,7 +650,7 @@ function predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ::V
     d0 = @views mpc.d0[1:end]
     for j=1:Hp
         if j ≤ Hc
-            u0[:] = u0 + ΔŨ[(1 + nu*(j-1)):(nu*j)]
+            u0[:] = @views u0 + ΔŨ[(1 + nu*(j-1)):(nu*j)]
         end
         x̂[:]  = f̂(mpc.estim, model, x̂, u0, d0)
         d0    = @views mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
