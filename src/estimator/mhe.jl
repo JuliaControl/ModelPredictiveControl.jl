@@ -37,13 +37,12 @@ struct MovingHorizonEstimator{
     invR̂_He::Hermitian{NT, Matrix{NT}}
     X̂min::Vector{NT}
     X̂max::Vector{NT}
-    X̂ ::Union{Vector{NT}, Missing} 
-    Ym::Union{Vector{NT}, Missing}
-    U ::Union{Vector{NT}, Missing}
-    D ::Union{Vector{NT}, Missing}
-    Ŵ ::Union{Vector{NT}, Missing}
+    X̂ ::Vector{Union{NT, Missing}}
+    Ym::Vector{Union{NT, Missing}}
+    U ::Vector{Union{NT, Missing}}
+    D ::Vector{Union{NT, Missing}}
+    Ŵ ::Vector{Union{NT, Missing}}
     x̂0_past::Vector{NT}
-    Nk::Vector{Int} # TODO: remove this field and count missing values in X̂
     function MovingHorizonEstimator{NT, SM, JM}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim::JM
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
@@ -66,9 +65,12 @@ struct MovingHorizonEstimator{
         X̂min, X̂max = fill(-Inf, nx̂*(He+1)), fill(+Inf, nx̂*(He+1))
         nvar = nx̂*(He + 1) 
         W̃ = zeros(nvar)
-        X̂, Ym, U, D, Ŵ = zeros(nx̂*He), zeros(nym*He), zeros(nu*He), zeros(nd*He), zeros(nx̂*He)
+        X̂  = fill(missing, nx̂*He)
+        Ym = fill(missing, nym*He)
+        U  = fill(missing, nu*He)
+        D  = fill(missing, nd*He)
+        Ŵ  = fill(missing, nx̂*He)
         x̂0_past = zeros(nx̂)
-        Nk = [1]
         estim = new{NT, SM, JM}(
             model, optim, W̃,
             lastu0, x̂, P̂, He,
@@ -78,7 +80,7 @@ struct MovingHorizonEstimator{
             P̂0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He,
             X̂min, X̂max, 
             X̂, Ym, U, D, Ŵ, 
-            x̂0_past, Nk
+            x̂0_past
         )
         init_optimization!(estim, optim)
         return estim
@@ -180,7 +182,8 @@ The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
 function obj_nonlinprog(
     estim::MovingHorizonEstimator, ::SimModel, Ŷm, W̃::Vector{T}
 ) where {T<:Real}
-    nYm, nŴ, nx̂, invP̄ = estim.Nk[]*estim.nym, estim.Nk[]*estim.nx̂, estim.nx̂, estim.invP̄
+    Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂ + 1
+    nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
     x̄0 = @views W̃[1:nx̂] - estim.x̂0_past  # W̃ = [x̂(k-Nk|k); Ŵ]
     V̂  = @views estim.Ym[1:nYm] - Ŷm[1:nYm]
@@ -191,7 +194,8 @@ end
 function predict!(
     Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
 ) where {T<:Real}
-    nu, nd, nx̂, nym, Nk = model.nu, model.nd, estim.nx̂, estim.nym, estim.Nk[]
+    Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂ + 1
+    nu, nd, nx̂, nym = model.nu, model.nd, estim.nx̂, estim.nym
     X̂[1:nx̂] = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
     for j=1:Nk
         u = @views estim.U[(1 + nu*(j-1)):(nu*j)]
@@ -223,7 +227,8 @@ A ref[^4]:
 function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<:Real
     model, optim, x̂, P̂ = estim.model, estim.optim, estim.x̂, estim.P̂
     nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
-    Nk, He = estim.Nk[], estim.He
+    He = estim.He
+    Nk = He - count(ismissing, estim.X̂) ÷ nx̂ + 1
     nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*(Nk+1)
     W̃var::Vector{VariableRef} = optim[:W̃var]
     ŵ = zeros(nŵ) # ŵ(k) = 0 for warm-starting
@@ -282,6 +287,6 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
 
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
     x̂[:] = X̂[(1 + nx̂*Nk):(nx̂*(Nk+1))]
-    estim.Nk[] = Nk < He ? Nk + 1 : He
+    #estim.Nk[] = Nk < He ? Nk + 1 : He
     return x̂, P̂
 end
