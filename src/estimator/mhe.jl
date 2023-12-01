@@ -181,8 +181,8 @@ The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
 """
 function obj_nonlinprog(
     estim::MovingHorizonEstimator, ::SimModel, Ŷm, W̃::Vector{T}
-) where {T<:Real}
-    Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂ + 1
+) where {T<:Union{Real, Missing}}
+    Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
     x̄0 = @views W̃[1:nx̂] - estim.x̂0_past  # W̃ = [x̂(k-Nk|k); Ŵ]
@@ -193,8 +193,9 @@ end
 
 function predict!(
     Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
-) where {T<:Real}
-    Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂ + 1
+) where {T<:Union{Real, Missing}}
+    Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂
+    println(Nk)
     nu, nd, nx̂, nym = model.nu, model.nd, estim.nx̂, estim.nym
     X̂[1:nx̂] = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
     for j=1:Nk
@@ -226,33 +227,37 @@ A ref[^4]:
 """
 function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<:Real
     model, optim, x̂, P̂ = estim.model, estim.optim, estim.x̂, estim.P̂
-    nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
-    He = estim.He
-    Nk = He - count(ismissing, estim.X̂) ÷ nx̂ + 1
-    nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*(Nk+1)
-    W̃var::Vector{VariableRef} = optim[:W̃var]
+    nx̂, nym, nu, nd, nŵ, He = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂, estim.He
     ŵ = zeros(nŵ) # ŵ(k) = 0 for warm-starting
-    if Nk < He
-        estim.X̂[ (1 + nx̂*(Nk-1)):(nx̂*Nk)]   = x̂
-        estim.Ym[(1 + nym*(Nk-1)):(nym*Nk)] = ym
-        estim.U[ (1 + nu*(Nk-1)):(nu*Nk)]   = u
-        estim.D[ (1 + nd*(Nk-1)):(nd*Nk)]   = d
-        estim.Ŵ[ (1 + nŵ*(Nk-1)):(nŵ*Nk)]   = ŵ
+    n_missing = count(ismissing, estim.X̂) ÷ nx̂
+    if n_missing ≠ 0
+        j = He - n_missing
+        estim.X̂[ (1 + nx̂*j):(nx̂*(j+1))]   = x̂
+        estim.Ym[(1 + nym*j):(nym*(j+1))] = ym
+        estim.U[ (1 + nu*j):(nu*(j+1))]   = u
+        estim.D[ (1 + nd*j):(nd*(j+1))]   = d
+        estim.Ŵ[ (1 + nŵ*j):(nŵ*(j+1))]   = ŵ
+        Nk = j + 1
     else
         estim.X̂[:]  = [estim.X̂[nx̂+1:end]  ; x̂]
         estim.Ym[:] = [estim.Ym[nym+1:end]; ym]
         estim.U[:]  = [estim.U[nu+1:end]  ; u]
         estim.D[:]  = [estim.D[nd+1:end]  ; d]
         estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
+        Nk = He
     end
+    nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*(Nk+1)
     Ŷm = Vector{NT}(undef, nYm)
     X̂  = Vector{NT}(undef, nX̂)
     estim.x̂0_past[:] = estim.X̂[1:nx̂]
     W̃0 = [estim.x̂0_past; estim.Ŵ]
+    
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃0)
     J0 = obj_nonlinprog(estim, model, Ŷm, W̃0)
     # initial W̃0 with Ŵ=0 if objective or constraint function not finite :
     isfinite(J0) || (W̃0 = [estim.x̂0_past; zeros(NT, nŴ)])
+    
+    W̃var::Vector{VariableRef} = optim[:W̃var]
     set_start_value.(W̃var, W̃0)
     unfix.(W̃var[is_fixed.(W̃var)])
     fix.(W̃var[(nx̂*(Nk+1)+1):end], 0.0)
@@ -268,7 +273,6 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         end
     end
     status = termination_status(optim)
-    W̃curr = value.(W̃var)
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
         if isfatal(status)
             @error("MHE terminated without solution: estimation in open-loop", 
