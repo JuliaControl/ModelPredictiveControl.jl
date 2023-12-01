@@ -9,7 +9,7 @@ struct MovingHorizonEstimator{
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
     optim::JM
-    W̃::Vector{NT}
+    W̃::Vector{Union{NT, Missing}}
     lastu0::Vector{NT}
     x̂::Vector{NT}
     P̂::Hermitian{NT, Matrix{NT}}
@@ -195,7 +195,6 @@ function predict!(
     Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
 ) where {T<:Union{Real, Missing}}
     Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂
-    println(Nk)
     nu, nd, nx̂, nym = model.nu, model.nd, estim.nx̂, estim.nym
     X̂[1:nx̂] = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
     for j=1:Nk
@@ -246,17 +245,15 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
         Nk = He
     end
-    nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*(Nk+1)
+    nŴ, nYm, nX̂ = nŵ*Nk, nym*Nk, nx̂*(Nk+1)
     Ŷm = Vector{NT}(undef, nYm)
     X̂  = Vector{NT}(undef, nX̂)
     estim.x̂0_past[:] = estim.X̂[1:nx̂]
     W̃0 = [estim.x̂0_past; estim.Ŵ]
-    
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃0)
     J0 = obj_nonlinprog(estim, model, Ŷm, W̃0)
     # initial W̃0 with Ŵ=0 if objective or constraint function not finite :
     isfinite(J0) || (W̃0 = [estim.x̂0_past; zeros(NT, nŴ)])
-    
     W̃var::Vector{VariableRef} = optim[:W̃var]
     set_start_value.(W̃var, W̃0)
     unfix.(W̃var[is_fixed.(W̃var)])
@@ -273,6 +270,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         end
     end
     status = termination_status(optim)
+    W̃curr, W̃last = value.(W̃var), W̃0
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
         if isfatal(status)
             @error("MHE terminated without solution: estimation in open-loop", 
@@ -283,14 +281,9 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         end
         @debug solution_summary(optim, verbose=true)
     end
-    #if !isfatal(status)
-    #esimt.W̃[:] = 
-    W̃ = value.(W̃var)
- 
-    estim.Ŵ[1:nŴ] = W̃[nx̂+1:nx̂+nŴ] # W̃ = [x̂(k-Nk|k); Ŵ]
-
-    Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
+    estim.W̃[:] = !isfatal(status) ? W̃curr : W̃last
+    estim.Ŵ[1:nŴ] = estim.W̃[nx̂+1:nx̂+nŴ] # update Ŵ with optimum for next time step
+    Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, estim.W̃)
     x̂[:] = X̂[(1 + nx̂*Nk):(nx̂*(Nk+1))]
-    #estim.Nk[] = Nk < He ? Nk + 1 : He
-    return x̂, P̂
+    return nothing
 end

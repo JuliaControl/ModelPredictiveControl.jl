@@ -181,7 +181,7 @@ function update_estimate!(estim::SteadyKalmanFilter, u, ym, d=empty(estim.x̂))
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K̂ = estim.x̂, estim.K̂
     x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K̂*(ym - Ĉm*x̂ - D̂dm*d)
-    return x̂
+    return nothing
 end
 
 struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
@@ -578,7 +578,7 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     x̂[:] = X̂_next * m̂
     X̄_next = X̂_next .- x̂
     P̂.data[:] = X̄_next * Ŝ * X̄_next' + Q̂ # .data is necessary for Hermitians
-    return x̂, P̂
+    return nothing
 end
 
 struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
@@ -780,5 +780,5 @@ function update_estimate_kf!(estim, Â, Ĉm, u, ym, d)
     ŷm = @views ĥ(estim, estim.model, x̂, d)[estim.i_ym]
     x̂[:] = f̂(estim, estim.model, x̂, u, d) +  K̂ * (ym - ŷm)
     P̂.data[:] = Â * (P̂ - M̂ * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitians
-    return x̂, P̂
+    return nothing
 end
