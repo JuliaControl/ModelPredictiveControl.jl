@@ -9,7 +9,7 @@ struct MovingHorizonEstimator{
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
     optim::JM
-    W̃::Vector{Union{NT, Missing}}
+    W̃::Vector{NT}
     lastu0::Vector{NT}
     x̂::Vector{NT}
     P̂::Hermitian{NT, Matrix{NT}}
@@ -123,7 +123,7 @@ function init_optimization!(
     # --- variables and linear constraints ---
     nvar = length(estim.W̃)
     set_silent(optim)
-    #limit_solve_time(estim)
+    #limit_solve_time(estim) #TODO: add this feature
     @variable(optim, W̃var[1:nvar])
     # --- nonlinear optimization init ---
     nym, nx̂, He = estim.nym, estim.nx̂, estim.He #, length(i_g)
@@ -181,19 +181,20 @@ The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
 """
 function obj_nonlinprog(
     estim::MovingHorizonEstimator, ::SimModel, Ŷm, W̃::Vector{T}
-) where {T<:Union{Real, Missing}}
+) where {T<:Real}
     Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
     x̄0 = @views W̃[1:nx̂] - estim.x̂0_past  # W̃ = [x̂(k-Nk|k); Ŵ]
     V̂  = @views estim.Ym[1:nYm] - Ŷm[1:nYm]
     Ŵ  = @views W̃[nx̂+1:nx̂+nŴ]
+    println(dot(x̄0, invP̄, x̄0) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂))
     return dot(x̄0, invP̄, x̄0) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂)
 end
 
 function predict!(
     Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
-) where {T<:Union{Real, Missing}}
+) where {T<:Real}
     Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂
     nu, nd, nx̂, nym = model.nu, model.nd, estim.nx̂, estim.nym
     X̂[1:nx̂] = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
@@ -206,6 +207,20 @@ function predict!(
         X̂[(1 + nx̂*j):(nx̂*(j+1))]    = f̂(estim, model, x̂, u, d) + ŵ
     end
     return Ŷm, X̂
+end
+
+"Reset `estim.P̂`, `estim.invP̄` and the time windows for the moving horizon estimator."
+function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ ) 
+    estim.P̂.data[:]    = estim.P̂0 # .data is necessary for Hermitians
+    estim.invP̄.data[:] = Hermitian(inv(estim.P̂0), :L)
+    estim.x̂0_past     .= 0
+    estim.W̃           .= 0
+    estim.X̂           .= missing
+    estim.Ym          .= missing
+    estim.U           .= missing
+    estim.D           .= missing
+    estim.Ŵ           .= missing
+    return nothing
 end
 
 @doc raw"""
@@ -245,19 +260,21 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
         Nk = He
     end
+    estim.x̂0_past[:] = estim.X̂[1:nx̂]
+    W̃var::Vector{VariableRef} = optim[:W̃var]
     nŴ, nYm, nX̂ = nŵ*Nk, nym*Nk, nx̂*(Nk+1)
     Ŷm = Vector{NT}(undef, nYm)
     X̂  = Vector{NT}(undef, nX̂)
-    estim.x̂0_past[:] = estim.X̂[1:nx̂]
-    W̃0 = [estim.x̂0_past; estim.Ŵ]
+    W̃0 = zeros(length(W̃var))
+    W̃0[1:nx̂] = estim.x̂0_past
+    W̃0[nx̂+1:nx̂+nŴ] = estim.Ŵ[1:nŴ]
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃0)
     J0 = obj_nonlinprog(estim, model, Ŷm, W̃0)
     # initial W̃0 with Ŵ=0 if objective or constraint function not finite :
     isfinite(J0) || (W̃0 = [estim.x̂0_past; zeros(NT, nŴ)])
-    W̃var::Vector{VariableRef} = optim[:W̃var]
     set_start_value.(W̃var, W̃0)
     unfix.(W̃var[is_fixed.(W̃var)])
-    fix.(W̃var[(nx̂*(Nk+1)+1):end], 0.0)
+    fix.(W̃var[(nx̂*(Nk+1)+1):end], 0.0) 
     try
         optimize!(optim)
     catch err
