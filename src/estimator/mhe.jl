@@ -37,12 +37,13 @@ struct MovingHorizonEstimator{
     invR̂_He::Hermitian{NT, Matrix{NT}}
     X̂min::Vector{NT}
     X̂max::Vector{NT}
-    X̂ ::Vector{Union{NT, Missing}}
-    Ym::Vector{Union{NT, Missing}}
-    U ::Vector{Union{NT, Missing}}
-    D ::Vector{Union{NT, Missing}}
-    Ŵ ::Vector{Union{NT, Missing}}
+    X̂ ::Union{Vector{NT}, Missing} 
+    Ym::Union{Vector{NT}, Missing}
+    U ::Union{Vector{NT}, Missing}
+    D ::Union{Vector{NT}, Missing}
+    Ŵ ::Union{Vector{NT}, Missing}
     x̂0_past::Vector{NT}
+    Nk::Vector{Int}
     function MovingHorizonEstimator{NT, SM, JM}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim::JM
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
@@ -65,12 +66,9 @@ struct MovingHorizonEstimator{
         X̂min, X̂max = fill(-Inf, nx̂*(He+1)), fill(+Inf, nx̂*(He+1))
         nvar = nx̂*(He + 1) 
         W̃ = zeros(nvar)
-        X̂  = fill(missing, nx̂*He)
-        Ym = fill(missing, nym*He)
-        U  = fill(missing, nu*He)
-        D  = fill(missing, nd*He)
-        Ŵ  = fill(missing, nx̂*He)
+        X̂, Ym, U, D, Ŵ = zeros(nx̂*He), zeros(nym*He), zeros(nu*He), zeros(nd*He), zeros(nx̂*He)
         x̂0_past = zeros(nx̂)
+        Nk = [1]
         estim = new{NT, SM, JM}(
             model, optim, W̃,
             lastu0, x̂, P̂, He,
@@ -80,7 +78,7 @@ struct MovingHorizonEstimator{
             P̂0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He,
             X̂min, X̂max, 
             X̂, Ym, U, D, Ŵ, 
-            x̂0_past
+            x̂0_past, Nk
         )
         init_optimization!(estim, optim)
         return estim
@@ -182,21 +180,19 @@ The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
 function obj_nonlinprog(
     estim::MovingHorizonEstimator, ::SimModel, Ŷm, W̃::Vector{T}
 ) where {T<:Real}
-    Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂
+    Nk = estim.Nk[]
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
     x̄0 = @views W̃[1:nx̂] - estim.x̂0_past  # W̃ = [x̂(k-Nk|k); Ŵ]
     V̂  = @views estim.Ym[1:nYm] - Ŷm[1:nYm]
     Ŵ  = @views W̃[nx̂+1:nx̂+nŴ]
-    println(dot(x̄0, invP̄, x̄0) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂))
     return dot(x̄0, invP̄, x̄0) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂)
 end
 
 function predict!(
     Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
 ) where {T<:Real}
-    Nk = estim.He - count(ismissing, estim.X̂) ÷ estim.nx̂
-    nu, nd, nx̂, nym = model.nu, model.nd, estim.nx̂, estim.nym
+    nu, nd, nx̂, nym, Nk = model.nu, model.nd, estim.nx̂, estim.nym, estim.Nk[]
     X̂[1:nx̂] = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
     for j=1:Nk
         u = @views estim.U[(1 + nu*(j-1)):(nu*j)]
@@ -215,11 +211,12 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
     estim.invP̄.data[:] = Hermitian(inv(estim.P̂0), :L)
     estim.x̂0_past     .= 0
     estim.W̃           .= 0
-    estim.X̂           .= missing
-    estim.Ym          .= missing
-    estim.U           .= missing
-    estim.D           .= missing
-    estim.Ŵ           .= missing
+    estim.X̂           .= 0
+    estim.Ym          .= 0
+    estim.U           .= 0
+    estim.D           .= 0
+    estim.Ŵ           .= 0
+    estim.Nk          .= 1
     return nothing
 end
 
@@ -241,33 +238,28 @@ A ref[^4]:
 """
 function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<:Real
     model, optim, x̂, P̂ = estim.model, estim.optim, estim.x̂, estim.P̂
-    nx̂, nym, nu, nd, nŵ, He = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂, estim.He
+    nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
+    Nk, He = estim.Nk[], estim.He
+    nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*(Nk+1)
+    W̃var::Vector{VariableRef} = optim[:W̃var]
     ŵ = zeros(nŵ) # ŵ(k) = 0 for warm-starting
-    n_missing = count(ismissing, estim.X̂) ÷ nx̂
-    if n_missing ≠ 0
-        j = He - n_missing
-        estim.X̂[ (1 + nx̂*j):(nx̂*(j+1))]   = x̂
-        estim.Ym[(1 + nym*j):(nym*(j+1))] = ym
-        estim.U[ (1 + nu*j):(nu*(j+1))]   = u
-        estim.D[ (1 + nd*j):(nd*(j+1))]   = d
-        estim.Ŵ[ (1 + nŵ*j):(nŵ*(j+1))]   = ŵ
-        Nk = j + 1
+    if Nk < He
+        estim.X̂[ (1 + nx̂*(Nk-1)):(nx̂*Nk)]   = x̂
+        estim.Ym[(1 + nym*(Nk-1)):(nym*Nk)] = ym
+        estim.U[ (1 + nu*(Nk-1)):(nu*Nk)]   = u
+        estim.D[ (1 + nd*(Nk-1)):(nd*Nk)]   = d
+        estim.Ŵ[ (1 + nŵ*(Nk-1)):(nŵ*Nk)]   = ŵ
     else
         estim.X̂[:]  = [estim.X̂[nx̂+1:end]  ; x̂]
         estim.Ym[:] = [estim.Ym[nym+1:end]; ym]
         estim.U[:]  = [estim.U[nu+1:end]  ; u]
         estim.D[:]  = [estim.D[nd+1:end]  ; d]
         estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
-        Nk = He
     end
-    estim.x̂0_past[:] = estim.X̂[1:nx̂]
-    W̃var::Vector{VariableRef} = optim[:W̃var]
-    nŴ, nYm, nX̂ = nŵ*Nk, nym*Nk, nx̂*(Nk+1)
     Ŷm = Vector{NT}(undef, nYm)
     X̂  = Vector{NT}(undef, nX̂)
-    W̃0 = zeros(length(W̃var))
-    W̃0[1:nx̂] = estim.x̂0_past
-    W̃0[nx̂+1:nx̂+nŴ] = estim.Ŵ[1:nŴ]
+    estim.x̂0_past[:] = estim.X̂[1:nx̂]
+    W̃0 = [estim.x̂0_past; estim.Ŵ]
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃0)
     J0 = obj_nonlinprog(estim, model, Ŷm, W̃0)
     # initial W̃0 with Ŵ=0 if objective or constraint function not finite :
@@ -302,5 +294,6 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     estim.Ŵ[1:nŴ] = estim.W̃[nx̂+1:nx̂+nŴ] # update Ŵ with optimum for next time step
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, estim.W̃)
     x̂[:] = X̂[(1 + nx̂*Nk):(nx̂*(Nk+1))]
+    estim.Nk[] = Nk < He ? Nk + 1 : He
     return nothing
 end
