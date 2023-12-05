@@ -294,7 +294,7 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 g = get_tmp(g_cache, ΔŨtup[1])
                 Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
-                con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
+                g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_float = ΔŨtup
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
@@ -306,7 +306,7 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 g = get_tmp(g_cache, ΔŨtup[1])
                 Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
-                con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
+                g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_dual = ΔŨtup
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)

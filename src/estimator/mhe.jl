@@ -37,6 +37,7 @@ struct MovingHorizonEstimator{
     invR̂_He::Hermitian{NT, Matrix{NT}}
     X̂min::Vector{NT}
     X̂max::Vector{NT}
+    i_g::BitVector
     X̂ ::Union{Vector{NT}, Missing} 
     Ym::Union{Vector{NT}, Missing}
     U ::Union{Vector{NT}, Missing}
@@ -64,6 +65,9 @@ struct MovingHorizonEstimator{
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
         P̂ = copy(P̂0)
         X̂min, X̂max = fill(-Inf, nx̂*(He+1)), fill(+Inf, nx̂*(He+1))
+        X̂max = fill(100, nx̂*(He+1))
+        i_X̂min, i_X̂max  = .!isinf.(X̂min), .!isinf.(X̂max)
+        i_g = [i_X̂min; i_X̂max]
         nvar = nx̂*(He + 1) 
         W̃ = zeros(nvar)
         X̂, Ym, U, D, Ŵ = zeros(nx̂*He), zeros(nym*He), zeros(nu*He), zeros(nd*He), zeros(nx̂*He)
@@ -76,7 +80,7 @@ struct MovingHorizonEstimator{
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He,
-            X̂min, X̂max, 
+            X̂min, X̂max, i_g,
             X̂, Ym, U, D, Ŵ, 
             x̂0_past, Nk
         )
@@ -118,40 +122,86 @@ Init the nonlinear optimization of [`MovingHorizonEstimator`](@ref).
 function init_optimization!(
     estim::MovingHorizonEstimator, optim::JuMP.GenericModel{JNT}
 ) where JNT<:Real
+    He = estim.He
+    nŶm, nX̂, ng = He*estim.nym, (He+1)*estim.nx̂, length(estim.i_g)
+    println(ng)
     # --- variables and linear constraints ---
     nvar = length(estim.W̃)
     set_silent(optim)
+    #set_attribute(optim, "max_iter", 1000*nvar)
     #limit_solve_time(estim) #TODO: add this feature
     @variable(optim, W̃var[1:nvar])
     # --- nonlinear optimization init ---
-    nym, nx̂, He = estim.nym, estim.nx̂, estim.He #, length(i_g)
-    # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
-    Jfunc = let estim=estim, model=estim.model, nvar=nvar , nŶm=He*nym, nX̂=(He+1)*nx̂
+    # see init_optimization!(mpc::NonLinMPC, optim) for details on the inspiration
+    Jfunc, gfunc = let estim=estim, model=estim.model, nvar=nvar , nŶm=nŶm, nX̂=nX̂, ng=ng
         last_W̃tup_float, last_W̃tup_dual = nothing, nothing
-        Ŷm_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(nŶm), nvar + 3)
-        X̂_cache ::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(nX̂) , nvar + 3)
+        Ŷm_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŶm), nvar + 3)
+        g_cache ::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng) , nvar + 3)
+        X̂_cache ::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂) , nvar + 3)
         function Jfunc(W̃tup::JNT...)
-            Ŷm, X̂ = get_tmp(Ŷm_cache, W̃tup[1]), get_tmp(X̂_cache, W̃tup[1])
-            W̃ = collect(W̃tup)
+            Ŷm = get_tmp(Ŷm_cache, W̃tup[1])
+            W̃  = collect(W̃tup)
             if W̃tup != last_W̃tup_float
-                Ŷm, _ = predict!(Ŷm, X̂, estim, model, W̃)
+                g = get_tmp(g_cache, W̃tup[1])
+                X̂ = get_tmp(X̂_cache, W̃tup[1])
+                Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
+                g = con_nonlinprog!(g, estim, model, X̂)
                 last_W̃tup_float = W̃tup
             end
             return obj_nonlinprog(estim, model, Ŷm, W̃)
         end
         function Jfunc(W̃tup::ForwardDiff.Dual...)
-            Ŷm, X̂ = get_tmp(Ŷm_cache, W̃tup[1]), get_tmp(X̂_cache, W̃tup[1])
-            W̃ = collect(W̃tup)
+            Ŷm = get_tmp(Ŷm_cache, W̃tup[1])
+            W̃  = collect(W̃tup)
             if W̃tup != last_W̃tup_dual
-                Ŷm, _ = predict!(Ŷm, X̂, estim, model, W̃)
+                g = get_tmp(g_cache, W̃tup[1])
+                X̂ = get_tmp(X̂_cache, W̃tup[1])
+                Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
+                g = con_nonlinprog!(g, estim, model, X̂)
                 last_W̃tup_dual = W̃tup
             end
             return obj_nonlinprog(estim, model, Ŷm, W̃)
         end
-        Jfunc
+        function gfunc_i(i, W̃tup::NTuple{N, JNT}) where N
+            g = get_tmp(g_cache, W̃tup[1])
+            if W̃tup != last_W̃tup_dual
+                Ŷm = get_tmp(Ŷm_cache, W̃tup[1])
+                X̂ = get_tmp(X̂_cache, W̃tup[1])
+                W̃  = collect(W̃tup)
+                Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
+                g = con_nonlinprog!(g, estim, model, X̂)
+                last_W̃tup_float = ΔŨtup
+            end
+            return g[i]
+        end 
+        function gfunc_i(i, W̃tup::NTuple{N, ForwardDiff.Dual}) where N
+            g = get_tmp(g_cache, W̃tup[1])
+            if W̃tup != last_W̃tup_dual
+                Ŷm = get_tmp(Ŷm_cache, W̃tup[1])
+                X̂ = get_tmp(X̂_cache, W̃tup[1])
+                W̃  = collect(W̃tup)
+                Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
+                g = con_nonlinprog!(g, estim, model, X̂)
+                last_W̃tup_dual = ΔŨtup
+            end
+            return g[i]
+        end
+        gfunc = [(W̃...) -> gfunc_i(i, W̃) for i in 1:ng]
+        Jfunc, gfunc
     end
     register(optim, :Jfunc, nvar, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(W̃var...))
+    if ng ≠ 0
+        i_end_X̂min = nX̂
+        for i in eachindex(estim.X̂min)
+            sym = Symbol("g_X̂min_$i")
+            register(optim, sym, nvar, gfunc[i], autodiff=true)
+        end
+        for i in eachindex(estim.X̂max)
+            sym = Symbol("g_X̂max_$i")
+            register(optim, sym, nvar, gfunc[i_end_X̂min+i], autodiff=true)
+        end
+    end
     return nothing
 end
 
@@ -296,4 +346,48 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     x̂[:] = X̂[(1 + nx̂*Nk):(nx̂*(Nk+1))]
     estim.Nk[] = Nk < He ? Nk + 1 : He
     return nothing
+end
+
+"Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
+function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
+    optim = mpc.optim
+    ΔŨvar = mpc.optim[:ΔŨvar]
+    con = mpc.con
+    map(con -> delete(optim, con), all_nonlinear_constraints(optim))
+    for i in findall(.!isinf.(con.Ymin))
+        f_sym = Symbol("g_Ymin_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+    end
+    for i in findall(.!isinf.(con.Ymax))
+        f_sym = Symbol("g_Ymax_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+    end
+    for i in findall(.!isinf.(con.x̂min))
+        f_sym = Symbol("g_x̂min_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+    end
+    for i in findall(.!isinf.(con.x̂max))
+        f_sym = Symbol("g_x̂max_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+    end
+    return nothing
+end
+
+
+function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂)
+    nX̂ = length(X̂)
+    for i in eachindex(g)
+        estim.i_g[i] || continue
+        if i ≤ nX̂
+            j = i
+            g[i] = (estim.X̂min[j] - X̂[j])
+        else
+            j = i - nX̂
+            g[i] = (X̂[j] - estim.X̂max[j])
+        end
+    end
+    if isa(g, Vector{Float64})
+        println(g)
+    end
+    return g
 end
