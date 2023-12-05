@@ -134,7 +134,7 @@ This method uses the default state estimator :
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer).
-- additionnal keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
+- additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
 # Examples
@@ -365,7 +365,7 @@ end
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
 function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     optim = mpc.optim
-    ΔŨvar = mpc.optim[:ΔŨvar]
+    ΔŨvar = optim[:ΔŨvar]
     con = mpc.con
     map(con -> delete(optim, con), all_nonlinear_constraints(optim))
     for i in findall(.!isinf.(con.Ymin))

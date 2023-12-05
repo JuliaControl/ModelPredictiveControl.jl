@@ -98,7 +98,7 @@ state estimator, a [`SteadyKalmanFilter`](@ref) with default arguments.
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
 - `M_Hp` / `N_Hc` / `L_Hp` : diagonal matrices ``\mathbf{M}_{H_p}, \mathbf{N}_{H_c},
   \mathbf{L}_{H_p}``, for time-varying weights (generated from `Mwt/Nwt/Lwt` args if omitted).
-- additionnal keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
+- additional keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
 ```jldoctest
