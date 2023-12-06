@@ -48,7 +48,7 @@ struct MovingHorizonEstimator{
     function MovingHorizonEstimator{NT, SM, JM}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim::JM
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
-        nu, nd, nx, ny = model.nu, model.nd, model.nx, model.ny
+        nu, nd = model.nu, model.nd
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -64,15 +64,14 @@ struct MovingHorizonEstimator{
         invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
         P̂ = copy(P̂0)
-        X̂min, X̂max = fill(-Inf, nx̂*(He+1)), fill(+Inf, nx̂*(He+1))
-        X̂min = fill(-50, nx̂*(He+1))
-        X̂max = fill(50, nx̂*(He+1))
-        i_X̂min, i_X̂max  = .!isinf.(X̂min), .!isinf.(X̂max)
+        nvar, nX̂ = nx̂*(He + 1), nx̂*(He + 1)
+        X̂min  , X̂max    =   fill(-Inf, nX̂), fill(+Inf, nX̂)
+        i_X̂min, i_X̂max  = .!isinf.(X̂min)  , .!isinf.(X̂max)
         i_g = [i_X̂min; i_X̂max]
-        nvar = nx̂*(He + 1) 
-        W̃ = zeros(nvar)
-        X̂, Ym, U, D, Ŵ = zeros(nx̂*He), zeros(nym*He), zeros(nu*He), zeros(nd*He), zeros(nx̂*He)
-        x̂0_past = zeros(nx̂)
+        W̃ = zeros(NT, nvar)
+        X̂, Ym   = zeros(NT, nx̂*He), zeros(NT, nym*He)
+        U, D, Ŵ = zeros(NT, nu*He), zeros(NT, nd*He), zeros(NT, nx̂*He)
+        x̂0_past = zeros(NT, nx̂)
         Nk = [1]
         estim = new{NT, SM, JM}(
             model, optim, W̃,
@@ -90,6 +89,45 @@ struct MovingHorizonEstimator{
     end
 end
 
+
+@doc raw"""
+    MovingHorizonEstimator(model::SimModel; <keyword arguments>)
+
+Construct a moving horizon estimator based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
+
+It can handle constraints on the estimates. Additionally, `model` is not linearized like
+the [`ExtendedKalmanFilter`](@ref) and the probability distribution is not approximated
+like the [`UnscentedKalmanFilter`](@ref). The computational costs are drastically higher, 
+however, since it minimizes the following objective function at each discrete time ``k``:
+```math
+\min_{\mathbf{x̂}_k(k-N_k+1), Ŵ}   \mathbf{x̄}' \mathbf{P̄}^{-1} \mathbf{x̄}   
+                                + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
+                                + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
+```
+in which the covariance matrices are repeated ``N_k`` times:
+```math
+\begin{aligned}
+    \mathbf{Q̂}_{N_k} &= \text{diag}\mathbf{(Q̂,Q̂,...,Q̂)}  \\
+    \mathbf{R̂}_{N_k} &= \text{diag}\mathbf{(R̂,R̂,...,R̂)} 
+\end{aligned}
+````
+The window length at time ``k`` is truncated at the estimation horizon ``H_e``:
+```math
+N_k = 
+\begin{cases}
+    k + 1   & k < H_e    \\
+    H_e     & k ≥ H_e
+\end{cases}
+```
+The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` incorporate the estimated process noise
+and sensor noise over the time window ``N_k``. The arrival costs are defined by:
+```math
+\begin{aligned}
+    \mathbf{x̄}(k-N_k+1) &= \mathbf{x̂}_k(k-N_k+1) - \mathbf{x̂}_{k-N_k}(k-N_k+1) \\
+    \mathbf{P̄}          &= \mathbf{P̂}_k(k-N_k+1)
+\end{aligned}
+```
+"""
 function MovingHorizonEstimator(
     model::SM;
     He::Int=nothing,
@@ -207,6 +245,65 @@ function init_optimization!(
     return nothing
 end
 
+@doc raw"""
+    setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
+
+Set the constraint parameters of `estim` moving horizon estimator.
+
+The moving horizon estimator constraints are defined by:
+```math 
+\mathbf{x̂_{min}} ≤ \mathbf{x̂}_k(k-j+1) ≤ \mathbf{x̂_{max}} \qquad j = 0, 1, ... , N_k \\
+```
+in which N_k.
+Note that state constraints are applied on the augmented state vector ``\mathbf{x̂}`` (see
+[`SteadyKalmanFilter`](@ref) extended help for details on augmentation).
+
+# Arguments
+!!! info
+    The default constraints are mentioned here for clarity but omitting a keyword argument 
+    will not re-assign to its default value (defaults are set at construction only).
+
+- `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints.
+- `x̂min = fill(-Inf,nx̂)` : augmented state vector lower bounds ``\mathbf{x̂_{min}}``.
+- `x̂max = fill(+Inf,nx̂)` : augmented state vector upper bounds ``\mathbf{x̂_{max}}``.
+
+# Examples
+```jldoctest
+julia> a = 1;
+```
+"""
+function setconstraint!(
+    estim::MovingHorizonEstimator; 
+    x̂min = nothing, x̂max = nothing,
+    X̂min = nothing, X̂max = nothing,
+)
+    model, optim = estim.model, estim.optim
+    nx̂, He = estim.nx̂, estim.He
+    nX̂ = nx̂*(He+1)
+    notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
+    isnothing(X̂min) && !isnothing(x̂min) && (X̂min = repeat(x̂min, He+1))
+    isnothing(X̂max) && !isnothing(x̂max) && (X̂max = repeat(x̂max, He+1))
+    if !isnothing(X̂min)
+        size(X̂min) == (nX̂,) || throw(ArgumentError("X̂min size must be $((nX̂,))"))
+        estim.X̂min[:] = X̂min
+    end
+    if !isnothing(X̂max)
+        size(X̂max) == (nX̂,) || throw(ArgumentError("X̂max size must be $((nX̂,))"))
+        estim.X̂max[:] = X̂max
+    end
+    i_X̂min, i_X̂max  = .!isinf.(estim.X̂min)  , .!isinf.(estim.X̂max)
+    i_g = [i_X̂min; i_X̂max]
+    if notSolvedYet
+        estim.i_g[:] = i_g
+        setnonlincon!(estim, model)
+    else
+        if i_g ≠ estim.i_g
+            error("Cannot modify ±Inf constraints after calling updatestate!")
+        end
+    end
+    return estim
+end
+
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
 function setnonlincon!(estim::MovingHorizonEstimator, ::SimModel)
     optim = estim.optim
@@ -296,6 +393,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     # initial W̃0 with Ŵ=0 if objective or constraint function not finite :
     isfinite(J0) || (W̃0 = [estim.x̂0_past; zeros(NT, nŴ)])
     set_start_value.(W̃var, W̃0)
+    # at start, when time windows are not filled, some decision variables are fixed at 0:
     unfix.(W̃var[is_fixed.(W̃var)])
     fix.(W̃var[(nx̂*(Nk+1)+1):end], 0.0) 
     try
@@ -330,7 +428,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
 end
 
 """
-    obj_nonlinprog(estim::MovingHorizonEstimator, model::SimModel, ΔŨ::Vector{Real})
+    obj_nonlinprog(estim::MovingHorizonEstimator, model::SimModel, W̃)
 
 Objective function for [`MovingHorizonEstimator`](@ref).
 
@@ -370,10 +468,10 @@ function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂)
         estim.i_g[i] || continue
         if i ≤ nX̂
             j = i
-            g[i] = (estim.X̂min[j] - X̂[j])
+            g[i] = estim.X̂min[j] - X̂[j]
         else
             j = i - nX̂
-            g[i] = (X̂[j] - estim.X̂max[j])
+            g[i] = X̂[j] - estim.X̂max[j]
         end
     end
     #if isa(g, Vector{Float64})

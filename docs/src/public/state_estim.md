@@ -20,8 +20,7 @@ error with closed-loop control (offset-free tracking).
 The estimators are all implemented in the predictor form (a.k.a. observer form), that is,
 they all estimates at each discrete time ``k`` the states of the next period
 ``\mathbf{x̂}_k(k+1)``[^1]. In contrast, the filter form that estimates ``\mathbf{x̂}_k(k)``
-is sometimes slightly more accurate. The documentation of the function [`update_estimates!`](@ref)
-details how the estimators predicts them.
+is sometimes slightly more accurate.
 
 [^1]: also denoted ``\mathbf{x̂}_{k+1|k}`` [elsewhere](https://en.wikipedia.org/wiki/Kalman_filter).
 
@@ -70,6 +69,12 @@ UnscentedKalmanFilter
 
 ```@docs
 ExtendedKalmanFilter
+```
+
+## MovingHorizonEstimator
+
+```@docs
+MovingHorizonEstimator
 ```
 
 ## InternalModel
