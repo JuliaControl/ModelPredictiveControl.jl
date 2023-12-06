@@ -136,15 +136,15 @@ function MovingHorizonEstimator(
     model::SM;
     He::Union{Int, Nothing}=nothing,
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector = fill(1/model.nx, model.nx),
-    σQ::Vector  = fill(1/model.nx, model.nx),
-    σR::Vector  = fill(1, length(i_ym)),
+    σQ ::Vector = fill(1/model.nx, model.nx),
+    σR ::Vector = fill(1, length(i_ym)),
+    σP0::Vector = σQ,
     nint_u   ::IntVectorOrInt = 0,
     σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
+    σP0int_u ::Vector = σQint_u,
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
+    σP0int_ym::Vector = σQint_ym,
     optim::JM = JuMP.Model(DEFAULT_MHE_OPTIMIZER, add_bridges=false),
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     # estimated covariances matrices (variance = σ²) :
@@ -279,9 +279,9 @@ julia> estim = MovingHorizonEstimator(LinModel(ss(0.5,1,1,0,1)), He=3);
 
 julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
 MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, LinModel and:
- 2 estimation steps He
+ 3 estimation steps He
  1 manipulated inputs u (0 integrating states)
- 1 states x̂
+ 2 states x̂
  1 measured outputs ym (1 integrating states)
  0 unmeasured outputs yu
  0 measured disturbances d
