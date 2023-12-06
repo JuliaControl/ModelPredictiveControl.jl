@@ -29,12 +29,14 @@ struct MovingHorizonEstimator{
     Ĉ ::Matrix{NT}
     B̂d::Matrix{NT}
     D̂d::Matrix{NT}
-    P̂0  ::Hermitian{NT, Matrix{NT}}
+    P̂0::Hermitian{NT, Matrix{NT}}
     Q̂::Hermitian{NT, Matrix{NT}}
     R̂::Hermitian{NT, Matrix{NT}}
     invP̄::Hermitian{NT, Matrix{NT}}
     invQ̂_He::Hermitian{NT, Matrix{NT}}
     invR̂_He::Hermitian{NT, Matrix{NT}}
+    K̂::Matrix{NT}
+    M̂::Matrix{NT}
     X̂min::Vector{NT}
     X̂max::Vector{NT}
     i_g::BitVector
@@ -64,6 +66,7 @@ struct MovingHorizonEstimator{
         invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
         P̂ = copy(P̂0)
+        K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
         nvar, nX̂ = nx̂*(He + 1), nx̂*(He + 1)
         X̂min  , X̂max    =   fill(-Inf, nX̂), fill(+Inf, nX̂)
         i_X̂min, i_X̂max  = .!isinf.(X̂min)  , .!isinf.(X̂max)
@@ -80,6 +83,7 @@ struct MovingHorizonEstimator{
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He,
+            K̂, M̂,
             X̂min, X̂max, i_g,
             X̂, Ym, U, D, Ŵ, 
             x̂0_past, Nk
@@ -95,42 +99,42 @@ end
 
 Construct a moving horizon estimator based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
 
-It can handle constraints on the estimates. Additionally, `model` is not linearized like
-the [`ExtendedKalmanFilter`](@ref) and the probability distribution is not approximated
-like the [`UnscentedKalmanFilter`](@ref). The computational costs are drastically higher, 
-however, since it minimizes the following objective function at each discrete time ``k``:
+This estimator can handle constraints on the estimates, see [`setconstraint!`](@ref).
+Additionally, `model` is not linearized like the [`ExtendedKalmanFilter`](@ref), and the
+probability distribution is not approximated like the [`UnscentedKalmanFilter`](@ref). The
+computational costs are drastically higher, however, since it minimizes the following
+nonlinear objective function at each discrete time ``k``:
 ```math
-\min_{\mathbf{x̂}_k(k-N_k+1), Ŵ}   \mathbf{x̄}' \mathbf{P̄}^{-1} \mathbf{x̄}   
-                                + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
-                                + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
+\min_{\mathbf{x̂}_k(k-N_k+1), \mathbf{Ŵ}}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
+                                         + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
+                                         + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
 ```
-in which the covariance matrices are repeated ``N_k`` times:
+in which the arrival costs are defined by:
+```math
+\begin{aligned}
+    \mathbf{x̄} &= \mathbf{x̂}_k(k-N_k+1) - \mathbf{x̂}_{k-N_k}(k-N_k+1) \\
+    \mathbf{P̄} &= \mathbf{P̂}_k(k-N_k+1)
+\end{aligned}
+```
+and the covariances are repeated ``N_k`` times:
 ```math
 \begin{aligned}
     \mathbf{Q̂}_{N_k} &= \text{diag}\mathbf{(Q̂,Q̂,...,Q̂)}  \\
     \mathbf{R̂}_{N_k} &= \text{diag}\mathbf{(R̂,R̂,...,R̂)} 
 \end{aligned}
-````
-The window length at time ``k`` is truncated at the estimation horizon ``H_e``:
-```math
-N_k = 
-\begin{cases}
-    k + 1   & k < H_e    \\
-    H_e     & k ≥ H_e
-\end{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` incorporate the estimated process noise
-and sensor noise over the time window ``N_k``. The arrival costs are defined by:
+``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=0`` to ``N_k-1``. The 
+estimation horizon ``H_e`` limits the window length:
 ```math
-\begin{aligned}
-    \mathbf{x̄}(k-N_k+1) &= \mathbf{x̂}_k(k-N_k+1) - \mathbf{x̂}_{k-N_k}(k-N_k+1) \\
-    \mathbf{P̄}          &= \mathbf{P̂}_k(k-N_k+1)
-\end{aligned}
+N_k =                     \begin{cases} 
+    k + 1   &  k < H_e    \\
+    H_e     &  k ≥ H_e    \end{cases}
 ```
 """
 function MovingHorizonEstimator(
     model::SM;
-    He::Int=nothing,
+    He::Union{Int, Nothing}=nothing,
     i_ym::IntRangeOrVector = 1:model.ny,
     σP0::Vector = fill(1/model.nx, model.nx),
     σQ::Vector  = fill(1/model.nx, model.nx),
@@ -147,6 +151,7 @@ function MovingHorizonEstimator(
     P̂0 = Diagonal{NT}([σP0; σP0int_u; σP0int_ym].^2)
     Q̂  = Diagonal{NT}([σQ;  σQint_u;  σQint_ym].^2)
     R̂  = Diagonal{NT}(σR.^2)
+    isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified"))        
     return MovingHorizonEstimator{NT, SM, JM}(
         model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim
     )
@@ -248,15 +253,14 @@ end
 @doc raw"""
     setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
 
-Set the constraint parameters of `estim` moving horizon estimator.
+Set the constraint parameters of `estim` [`MovingHorizonEstimator`](@ref).
 
-The moving horizon estimator constraints are defined by:
+The constraints of the moving horizon estimator are:
 ```math 
 \mathbf{x̂_{min}} ≤ \mathbf{x̂}_k(k-j+1) ≤ \mathbf{x̂_{max}} \qquad j = 0, 1, ... , N_k \\
 ```
-in which N_k.
 Note that state constraints are applied on the augmented state vector ``\mathbf{x̂}`` (see
-[`SteadyKalmanFilter`](@ref) extended help for details on augmentation).
+the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation).
 
 # Arguments
 !!! info
@@ -266,10 +270,21 @@ Note that state constraints are applied on the augmented state vector ``\mathbf{
 - `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints.
 - `x̂min = fill(-Inf,nx̂)` : augmented state vector lower bounds ``\mathbf{x̂_{min}}``.
 - `x̂max = fill(+Inf,nx̂)` : augmented state vector upper bounds ``\mathbf{x̂_{max}}``.
+- all the keyword arguments above but with a capital letter, e.g. `X̂max` or `X̂min` : for
+  time-varying constraints (see Extended Help).
 
 # Examples
 ```jldoctest
-julia> a = 1;
+julia> estim = MovingHorizonEstimator(LinModel(ss(0.5,1,1,0,1)), He=3);
+
+julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
+MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, LinModel and:
+ 2 estimation steps He
+ 1 manipulated inputs u (0 integrating states)
+ 1 states x̂
+ 1 measured outputs ym (1 integrating states)
+ 0 unmeasured outputs yu
+ 0 measured disturbances d
 ```
 """
 function setconstraint!(
@@ -335,7 +350,6 @@ end
 
 "Reset `estim.P̂`, `estim.invP̄` and the time windows for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ ) 
-    estim.P̂.data[:]    = estim.P̂0 # .data is necessary for Hermitians
     estim.invP̄.data[:] = Hermitian(inv(estim.P̂0), :L)
     estim.x̂0_past     .= 0
     estim.W̃           .= 0
@@ -349,23 +363,14 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
 end
 
 @doc raw"""
-    update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
+    update_estimate!(estim::MovingHorizonEstimator, u, ym, d)
     
-Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂` and covariance estimate `estim.P̂`.
+Update [`MovingHorizonEstimator`](@ref) state `estim.x̂`.
 
-A ref[^4]:
-
-```math
-\begin{aligned}
-    \mathbf{Ŷ^m}(k) &= \bigg[\begin{matrix} \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{1}(k) \Big) & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{2}(k) \Big) & \cdots & \mathbf{ĥ^m}\Big( \mathbf{X̂}_{k-1}^{n_σ}(k) \Big) \end{matrix}\bigg] \\
-    \mathbf{ŷ^m}(k) &= \mathbf{Ŷ^m}(k) \mathbf{m̂} 
-\end{aligned} 
-```
-
-[^4]: TODO
+TBW
 """
 function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<:Real
-    model, optim, x̂, P̂ = estim.model, estim.optim, estim.x̂, estim.P̂
+    model, optim, x̂ = estim.model, estim.optim, estim.x̂
     nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
     Nk, He = estim.Nk[], estim.He
     nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*(Nk+1)
@@ -383,6 +388,16 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         estim.U[:]  = [estim.U[nu+1:end]  ; u]
         estim.D[:]  = [estim.D[nd+1:end]  ; d]
         estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
+    end
+    if Nk ≥ He
+        # update the arrival covariance with an Extended Kalman Filter:
+        # TODO: also support UnscentedKalmanFilter, and KalmanFilter for LinModel
+        F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
+        Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
+        Ĥm = Ĥ[estim.i_ym, :] 
+        update_estimate_kf!(estim, F̂, Ĥm, u, ym, d, updatestate=false)
+        P̄ = estim.P̂
+        estim.invP̄.data[:] = Hermitian(inv(P̄), :L) # .data is necessary for Hermitian
     end
     Ŷm = Vector{NT}(undef, nYm)
     X̂  = Vector{NT}(undef, nX̂)
@@ -474,8 +489,5 @@ function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂)
             g[i] = X̂[j] - estim.X̂max[j]
         end
     end
-    #if isa(g, Vector{Float64})
-    #    println(g)
-    #end
     return g
 end

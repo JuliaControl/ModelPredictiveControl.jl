@@ -84,8 +84,7 @@ constraints are all soft by default. See Extended Help for time-varying constrai
 
 # Arguments
 !!! info
-    The default constraints are mentioned here for clarity but omitting a keyword argument 
-    will not re-assign to its default value (defaults are set at construction only).
+    Same as above for the keyword arguments and default constraints.
 
 - `mpc::PredictiveController` : predictive controller to set constraints.
 - `umin  = fill(-Inf,nu)` : manipulated input lower bounds ``\mathbf{u_{min}}``.

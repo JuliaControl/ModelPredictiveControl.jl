@@ -762,7 +762,7 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
 end
 
 """
-    update_estimate_kf!(estim, Â, Ĉm, u, ym, d) -> x̂, P̂
+    update_estimate_kf!(estim, Â, Ĉm, u, ym, d; updatestate=true)
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
@@ -770,15 +770,18 @@ Allows code reuse for [`KalmanFilter`](@ref) and [`ExtendedKalmanFilterKalmanFil
 They update the state `x̂` and covariance `P̂` with the same equations. The extended filter
 substitutes the augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
 The implementation uses in-place operations and explicit factorization to reduce
-allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations.
+allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations. If `updatestate`
+is `false`, only the covariance `P̂` is updated.
 """
-function update_estimate_kf!(estim, Â, Ĉm, u, ym, d)
+function update_estimate_kf!(estim, Â, Ĉm, u, ym, d; updatestate=true)
     x̂, P̂, Q̂, R̂, K̂, M̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂, estim.M̂
     mul!(M̂, P̂, Ĉm')
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' + R̂)))
-    mul!(K̂, Â, M̂)
-    ŷm = @views ĥ(estim, estim.model, x̂, d)[estim.i_ym]
-    x̂[:] = f̂(estim, estim.model, x̂, u, d) +  K̂ * (ym - ŷm)
+    if updatestate
+        mul!(K̂, Â, M̂)
+        ŷm = @views ĥ(estim, estim.model, x̂, d)[estim.i_ym]
+        x̂[:] = f̂(estim, estim.model, x̂, u, d) +  K̂ * (ym - ŷm)
+    end
     P̂.data[:] = Â * (P̂ - M̂ * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitians
     return nothing
 end
