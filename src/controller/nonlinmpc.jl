@@ -290,7 +290,7 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
         function Jfunc(ΔŨtup::JNT...)
             Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
             ΔŨ = collect(ΔŨtup)
-            if ΔŨtup != last_ΔŨtup_float
+            if ΔŨtup !== last_ΔŨtup_float
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 g = get_tmp(g_cache, ΔŨtup[1])
                 Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
@@ -302,7 +302,7 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
         function Jfunc(ΔŨtup::ForwardDiff.Dual...)
             Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
             ΔŨ = collect(ΔŨtup)
-            if ΔŨtup != last_ΔŨtup_dual
+            if ΔŨtup !== last_ΔŨtup_dual
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 g = get_tmp(g_cache, ΔŨtup[1])
                 Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
@@ -313,7 +313,7 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
         end
         function gfunc_i(i, ΔŨtup::NTuple{N, JNT}) where N
             g = get_tmp(g_cache, ΔŨtup[1])
-            if ΔŨtup != last_ΔŨtup_float
+            if ΔŨtup !== last_ΔŨtup_float
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
                 ΔŨ = collect(ΔŨtup)
@@ -325,7 +325,7 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
         end 
         function gfunc_i(i, ΔŨtup::NTuple{N, ForwardDiff.Dual}) where N
             g = get_tmp(g_cache, ΔŨtup[1])
-            if ΔŨtup != last_ΔŨtup_dual
+            if ΔŨtup !== last_ΔŨtup_dual
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
                 ΔŨ = collect(ΔŨtup)
