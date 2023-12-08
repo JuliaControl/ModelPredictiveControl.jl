@@ -108,14 +108,14 @@ for more detailed examples.
 
 ### State Estimation Features
 
-- [ ] supported state estimators/observers:
+- [x] supported state estimators/observers:
   - [x] steady-state Kalman filter
   - [x] Kalman filter
   - [x] Luenberger observer
   - [x] internal model structure
   - [x] extended Kalman filter
   - [x] unscented Kalman filter
-  - [ ] moving horizon estimator
+  - [x] moving horizon estimator
 - [x] easily estimate unmeasured disturbances by adding one or more integrators at the:
   - [x] manipulated inputs
   - [x] measured outputs
