@@ -79,9 +79,11 @@ Construct an explicit linear predictive controller based on [`LinModel`](@ref) `
 
 The controller minimizes the following objective function at each discrete time ``k``:
 ```math
-\min_{\mathbf{ΔU}}       \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)}   
-                       + \mathbf{(ΔU)}'      \mathbf{N}_{H_c} \mathbf{(ΔU)}  
-                       + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
+\begin{aligned}
+\min_{\mathbf{ΔU}}   \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)}     
+                   + \mathbf{(ΔU)}'      \mathbf{N}_{H_c} \mathbf{(ΔU)}        \\
+                   + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
+\end{aligned}
 ```
 
 See [`LinMPC`](@ref) for the variable definitions. This controller does not support

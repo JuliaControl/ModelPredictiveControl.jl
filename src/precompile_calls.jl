@@ -41,6 +41,13 @@ mpc_skf.estim()
 u = mpc_skf([55, 30])
 sim!(mpc_skf, 3, [55, 30])
 
+mpc_mhe = setconstraint!(LinMPC(MovingHorizonEstimator(model, He=2)), ymin=[45, -Inf])
+setconstraint!(mpc_mhe.estim, x̂min=[-50,-50,-50,-50], x̂max=[50,50,50,50])
+initstate!(mpc_mhe, model.uop, model())
+mpc_mhe.estim()
+u = mpc_mhe([55, 30])
+sim!(mpc_mhe, 3, [55, 30])
+
 nmpc_skf = setconstraint!(NonLinMPC(SteadyKalmanFilter(model), Cwt=Inf), ymin=[45, -Inf])
 initstate!(nmpc_skf, model.uop, model())
 nmpc_skf.estim()
@@ -67,7 +74,7 @@ initstate!(nmpc_im, nlmodel.uop, y)
 u = nmpc_im([55, 30], ym=y)
 sim!(nmpc_im, 3, [55, 30])
 
-nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=1e3), ymin=[45, -Inf])
+nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=10), ymin=[45, -Inf])
 initstate!(nmpc_ukf, nlmodel.uop, y)
 u = nmpc_ukf([55, 30])
 sim!(nmpc_ukf, 3, [55, 30])
@@ -76,6 +83,12 @@ nmpc_ekf = setconstraint!(NonLinMPC(ExtendedKalmanFilter(model), Cwt=Inf), ymin=
 initstate!(nmpc_ekf, model.uop, model())
 u = nmpc_ekf([55, 30])
 sim!(nmpc_ekf, 3, [55, 30])
+
+nmpc_mhe = setconstraint!(NonLinMPC(MovingHorizonEstimator(nlmodel, He=2), Hp=10, Cwt=Inf), ymin=[45, -Inf])
+setconstraint!(nmpc_mhe.estim, x̂min=[-50,-50,-50,-50], x̂max=[50,50,50,50])
+initstate!(nmpc_mhe, nlmodel.uop, y)
+u = nmpc_mhe([55, 30])
+sim!(nmpc_mhe, 3, [55, 30])
 
 function JE( _ , ŶE, _ )
     Ŷ  = ŶE[3:end]

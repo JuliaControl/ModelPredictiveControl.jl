@@ -173,9 +173,9 @@ function MovingHorizonEstimator(
     optim::JM = JuMP.Model(DEFAULT_MHE_OPTIMIZER, add_bridges=false),
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Diagonal{NT}([σP0; σP0int_u; σP0int_ym].^2)
-    Q̂  = Diagonal{NT}([σQ;  σQint_u;  σQint_ym].^2)
-    R̂  = Diagonal{NT}(σR.^2)
+    P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
+    Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
+    R̂  = Hermitian(diagm(NT[σR;].^2), :L)
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified"))        
     return MovingHorizonEstimator{NT, SM, JM}(
         model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim

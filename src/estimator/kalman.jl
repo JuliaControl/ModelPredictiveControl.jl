@@ -148,8 +148,8 @@ function SteadyKalmanFilter(
     σQint_ym::Vector = fill(1, max(sum(nint_ym), 0))
 ) where {NT<:Real, SM<:LinModel{NT}}
     # estimated covariances matrices (variance = σ²) :
-    Q̂  = Diagonal{NT}([σQ; σQint_u; σQint_ym].^2)
-    R̂  = Diagonal{NT}(σR.^2)
+    Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
+    R̂  = Hermitian(diagm(NT[σR;].^2), :L)
     return SteadyKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, Q̂ , R̂)
 end
 
@@ -288,9 +288,9 @@ function KalmanFilter(
     σP0int_ym::Vector = σQint_ym,
 ) where {NT<:Real, SM<:LinModel{NT}}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Diagonal{NT}([σP0; σP0int_u; σP0int_ym].^2)
-    Q̂  = Diagonal{NT}([σQ;  σQint_u;  σQint_ym].^2)
-    R̂  = Diagonal{NT}(σR.^2)
+    P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
+    Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
+    R̂  = Hermitian(diagm(NT[σR;].^2), :L)
     return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
 end
 
@@ -457,9 +457,9 @@ function UnscentedKalmanFilter(
     κ::Real = 0
 ) where {NT<:Real, SM<:SimModel{NT}}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Diagonal{NT}([σP0; σP0int_u; σP0int_ym].^2)
-    Q̂  = Diagonal{NT}([σQ;  σQint_u;  σQint_ym].^2)
-    R̂  = Diagonal{NT}(σR.^2)
+    P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
+    Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
+    R̂  = Hermitian(diagm(NT[σR;].^2), :L)
     return UnscentedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
 end
 
@@ -680,9 +680,9 @@ function ExtendedKalmanFilter(
     σP0int_ym::Vector = σQint_ym,
 ) where {NT<:Real, SM<:SimModel{NT}}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Diagonal{NT}([σP0; σP0int_u; σP0int_ym].^2)
-    Q̂  = Diagonal{NT}([σQ;  σQint_u;  σQint_ym].^2)
-    R̂  = Diagonal{NT}(σR.^2)
+    P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
+    Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
+    R̂  = Hermitian(diagm(NT[σR;].^2), :L)
     return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
 end
 
