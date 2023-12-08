@@ -27,13 +27,6 @@ const DEFAULT_LWT = 0.0
 const DEFAULT_CWT = 1e5
 const DEFAULT_EWT = 0.0
 
-"Termination status that means 'no solution available'."
-const FATAL_STATUSES = [
-    INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 
-    NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
-    OTHER_ERROR
-]
-
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint{NT<:Real}
     ẽx̂      ::Matrix{NT}
@@ -91,8 +84,7 @@ constraints are all soft by default. See Extended Help for time-varying constrai
 
 # Arguments
 !!! info
-    The default constraints are mentioned here for clarity but omitting a keyword argument 
-    will not re-assign to its default value (defaults are set at construction only).
+    Same as above for the keyword arguments and default constraints.
 
 - `mpc::PredictiveController` : predictive controller to set constraints.
 - `umin  = fill(-Inf,nu)` : manipulated input lower bounds ``\mathbf{u_{min}}``.
@@ -177,11 +169,13 @@ function setconstraint!(
     C_umax  = nothing, C_umin  = nothing,
     C_Δumax = nothing, C_Δumin = nothing,
     C_ymax  = nothing, C_ymin  = nothing,
+    # TODO:
     # ------------ will be deleted in the future ---------------
     ŷmin    = nothing, ŷmax    = nothing,
     c_ŷmin  = nothing, c_ŷmax  = nothing,
     # ----------------------------------------------------------
 )
+    # TODO:
     # ----- these 4 `if`s will be deleted in the future --------
     if !isnothing(ŷmin)
         Base.depwarn("keyword arg ŷmin is deprecated, use ymin instead", :setconstraint!)
@@ -516,6 +510,7 @@ Throw an error if `isnothing(Hp)` when model is not a [`LinModel`](@ref).
 """
 function default_Hp(::SimModel, Hp)
     if isnothing(Hp)
+        # TODO:
         # ------------ will be deleted in the future ------------------------------------
         Base.depwarn("Hp=nothing is deprecated for NonLinModel, explicitly specify an "*
                      "integer value", :NonLinMPC)

@@ -31,6 +31,12 @@ initstate!
 setstate!
 ```
 
+## Set Constraint
+
+```@docs
+setconstraint!
+```
+
 ## Quick Simulation
 
 ### Simulate

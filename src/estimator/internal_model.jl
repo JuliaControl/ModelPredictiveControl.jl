@@ -229,7 +229,7 @@ function update_estimate!(
     ŷs = zeros(NT, model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]   # ŷs=0 for unmeasured outputs
     x̂s[:] = estim.Âs*x̂s + estim.B̂s*ŷs
-    return x̂d
+    return nothing
 end
 
 @doc raw"""

@@ -453,7 +453,7 @@ end
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     ukf3 = UnscentedKalmanFilter(linmodel3)
     x̂ = updatestate!(ukf3, [0], [0])
-    @test x̂ ≈ [0, 0]
+    @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
 end
 

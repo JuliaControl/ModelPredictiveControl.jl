@@ -134,7 +134,7 @@ This method uses the default state estimator :
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer).
-- additionnal keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
+- additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
 # Examples
@@ -275,7 +275,6 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
     set_silent(optim)
     limit_solve_time(mpc)
     @variable(optim, ΔŨvar[1:nvar])
-    ΔŨvar = optim[:ΔŨvar]
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
@@ -295,7 +294,7 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 g = get_tmp(g_cache, ΔŨtup[1])
                 Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
-                con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
+                g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_float = ΔŨtup
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
@@ -307,7 +306,7 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
                 x̂ = get_tmp(x̂_cache, ΔŨtup[1])
                 g = get_tmp(g_cache, ΔŨtup[1])
                 Ŷ, x̂end = predict!(Ŷ, x̂, mpc, model, ΔŨ)
-                con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
+                g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_dual = ΔŨtup
             end
             return obj_nonlinprog(mpc, model, Ŷ, ΔŨ)
@@ -366,7 +365,7 @@ end
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
 function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     optim = mpc.optim
-    ΔŨvar = mpc.optim[:ΔŨvar]
+    ΔŨvar = optim[:ΔŨvar]
     con = mpc.con
     map(con -> delete(optim, con), all_nonlinear_constraints(optim))
     for i in findall(.!isinf.(con.Ymin))

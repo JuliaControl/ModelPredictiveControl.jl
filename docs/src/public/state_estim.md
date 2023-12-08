@@ -71,6 +71,12 @@ UnscentedKalmanFilter
 ExtendedKalmanFilter
 ```
 
+## MovingHorizonEstimator
+
+```@docs
+MovingHorizonEstimator
+```
+
 ## InternalModel
 
 ```@docs

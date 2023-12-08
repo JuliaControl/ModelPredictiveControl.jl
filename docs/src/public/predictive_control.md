@@ -78,12 +78,6 @@ ExplicitMPC
 NonLinMPC
 ```
 
-## Set Constraint
-
-```@docs
-setconstraint!
-```
-
 ## Move Manipulated Input u
 
 ```@docs
