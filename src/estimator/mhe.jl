@@ -190,9 +190,9 @@ Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function MovingHorizonEstimator(
-    model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim
-) where {NT<:Real, SM<:SimModel{NT}}
-    return MovingHorizonEstimator{NT, SM}(
+    model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim::JM
+) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
+    return MovingHorizonEstimator{NT, SM, JM}(
         model, He, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, optim
     )
 end
@@ -531,7 +531,7 @@ end
 Nonlinear constrains for [`MovingHorizonEstimator`](@ref).
 """
 function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂)
-    nX̂con, nX̂ = length(estim.X̂min), estim.Nk[]*estim.nx̂
+    nX̂con, nX̂ = length(estim.X̂min), estim.nx̂*(estim.Nk[]+1)
     for i in eachindex(g)
         estim.i_g[i] || continue
         if i ≤ nX̂con

@@ -429,7 +429,7 @@ end
     nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[0], Nwt=[0], Lwt=[1])
     u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
-    nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Hp=15, Cwt=Inf), ymin=[-1])
+    nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Hp=15, Cwt=Inf), ymax=[1])
     g_Ymax_end = nmpc5.optim.nlp_model.operators.registered_multivariate_operators[end].f
     @test g_Ymax_end((1.0, 1.0)) ≤ 0.0 # test gfunc_i(i,::NTuple{N, Float64})
     # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
