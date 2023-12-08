@@ -75,7 +75,7 @@ struct MovingHorizonEstimator{
         X̂, Ym   = zeros(NT, nx̂*He), zeros(NT, nym*He)
         U, D, Ŵ = zeros(NT, nu*He), zeros(NT, nd*He), zeros(NT, nx̂*He)
         x̂0_past = zeros(NT, nx̂)
-        Nk = [1]
+        Nk = [0]
         estim = new{NT, SM, JM}(
             model, optim, W̃,
             lastu0, x̂, P̂, He,
@@ -361,7 +361,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
     estim.U           .= 0
     estim.D           .= 0
     estim.Ŵ           .= 0
-    estim.Nk          .= 1
+    estim.Nk          .= 0
     return nothing
 end
 
@@ -374,27 +374,27 @@ TBW
 """
 function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<:Real
     model, optim, x̂ = estim.model, estim.optim, estim.x̂
-    nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
-    Nk, He = estim.Nk[], estim.He
-    nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*(Nk+1)
-    W̃var::Vector{VariableRef} = optim[:W̃var]
+    nx̂, nym, nu, nd, nŵ, He = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂, estim.He
     ŵ = zeros(nŵ) # ŵ(k) = 0 for warm-starting
-    if Nk < He
-        estim.X̂[ (1 + nx̂*(Nk-1)):(nx̂*Nk)]   = x̂
-        estim.Ym[(1 + nym*(Nk-1)):(nym*Nk)] = ym
-        estim.U[ (1 + nu*(Nk-1)):(nu*Nk)]   = u
-        estim.D[ (1 + nd*(Nk-1)):(nd*Nk)]   = d
-        estim.Ŵ[ (1 + nŵ*(Nk-1)):(nŵ*Nk)]   = ŵ
-    else
+    estim.Nk .+= 1
+    Nk = estim.Nk[]
+    if Nk > He
         estim.X̂[:]  = [estim.X̂[nx̂+1:end]  ; x̂]
         estim.Ym[:] = [estim.Ym[nym+1:end]; ym]
         estim.U[:]  = [estim.U[nu+1:end]  ; u]
         estim.D[:]  = [estim.D[nd+1:end]  ; d]
         estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
+        estim.Nk[:] = [He]
+    else
+        estim.X̂[(1 + nx̂*(Nk-1)):(nx̂*Nk)]    = x̂
+        estim.Ym[(1 + nym*(Nk-1)):(nym*Nk)] = ym
+        estim.U[(1 + nu*(Nk-1)):(nu*Nk)]    = u
+        estim.D[(1 + nd*(Nk-1)):(nd*Nk)]    = d
+        estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]    = ŵ
     end
-    # TODO: vérifier pourquoi ya une discontinuité exactement quand k = He,
-    # tout est linéaire ici et les contraintes sont éloignées, ça devrait marcher il me
-    # semble !
+    Nk = estim.Nk[]
+    nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*(Nk+1)
+    W̃var::Vector{VariableRef} = optim[:W̃var]
     Ŷm = Vector{NT}(undef, nYm)
     X̂  = Vector{NT}(undef, nX̂)
     estim.x̂0_past[:] = estim.X̂[1:nx̂]
@@ -434,33 +434,16 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     estim.Ŵ[1:nŴ] = estim.W̃[nx̂+1:nx̂+nŴ] # update Ŵ with optimum for next time step
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, estim.W̃)
     x̂[:] = X̂[(1 + nx̂*Nk):(nx̂*(Nk+1))]
-
-
     if Nk == He
         # update the arrival covariance with an Extended Kalman Filter:
         # TODO: also support UnscentedKalmanFilter, and KalmanFilter for LinModel
         F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
-        println(F̂)
         Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
         Ĥm = Ĥ[estim.i_ym, :] 
         update_estimate_kf!(estim, F̂, Ĥm, u, ym, d, updatestate=false)
         P̄ = estim.P̂
         estim.invP̄.data[:] = Hermitian(inv(P̄), :L) # .data is necessary for Hermitian
     end
-
-    #ng = length(estim.i_g) 
-    #println(ng)
-    #g = zeros(ng)
-    #g = con_nonlinprog!(g, estim, model, X̂)
-    #println(g)
-    J = obj_nonlinprog(estim, model, Ŷm, W̃curr)
-
-    println(J)
-    println(solution_summary(optim, verbose=false))
-
-
-
-    estim.Nk[] = Nk < He ? Nk + 1 : He
     return nothing
 end
 
