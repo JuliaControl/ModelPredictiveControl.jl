@@ -171,9 +171,6 @@ function init_optimization!(
     # --- variables and linear constraints ---
     nvar = length(estim.W̃)
     set_silent(optim)
-    #set_attribute(optim, "max_iter", 1000*nvar)
-    set_attribute(optim, "nlp_scaling_method", "gradient-based")
-    #set_attribute(optim, "nlp_scaling_max_gradient", 1000)
     #limit_solve_time(estim) #TODO: add this feature
     @variable(optim, W̃var[1:nvar])
     # --- nonlinear optimization init ---
