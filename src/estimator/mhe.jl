@@ -132,7 +132,8 @@ N_k =                     \begin{cases}
     H_e     &  k ≥ H_e    \end{cases}
 ```
 See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{R̂}, \mathbf{Q̂}`` covariances and
-model augmentation.
+model augmentation. The process model is identical to the one in [`UnscentedKalmanFilter`](@ref)
+documentation.
 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
