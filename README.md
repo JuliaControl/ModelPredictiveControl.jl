@@ -121,6 +121,6 @@ for more detailed examples.
   - [x] measured outputs
 - [x] bumpless manual to automatic transfer for control with a proper intial estimate
 - [x] observers in predictor form to ease control applications
-- [ ] moving horizon estimator that supports:
-  - [ ] inequality state constraints
+- [x] moving horizon estimator that supports:
+  - [x] inequality state constraints
   - [ ] zero process noise equality constraint to reduce the problem size

@@ -131,6 +131,31 @@ N_k =                     \begin{cases}
     k + 1   &  k < H_e    \\
     H_e     &  k ≥ H_e    \end{cases}
 ```
+See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{R̂}, \mathbf{Q̂}`` covariances and
+model augmentation.
+
+# Arguments
+- `model::SimModel` : (deterministic) model for the estimations.
+- `He=nothing`: estimation horizon ``H_e``, must be specified.
+- `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the moving horizon
+   estimator, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
+   (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer).
+- `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
+- `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
+
+# Examples
+```jldoctest
+julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1);
+
+julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP0=[0.01])
+MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, NonLinModel and:
+ 5 estimation steps He
+ 1 manipulated inputs u (0 integrating states)
+ 2 states x̂
+ 1 measured outputs ym (1 integrating states)
+ 0 unmeasured outputs yu
+ 0 measured disturbances d
+```
 """
 function MovingHorizonEstimator(
     model::SM;
@@ -154,6 +179,21 @@ function MovingHorizonEstimator(
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified"))        
     return MovingHorizonEstimator{NT, SM, JM}(
         model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim
+    )
+end
+
+@doc raw"""
+    MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim)
+
+Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
+
+This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
+"""
+function MovingHorizonEstimator(
+    model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim
+) where {NT<:Real, SM<:SimModel{NT}}
+    return MovingHorizonEstimator{NT, SM}(
+        model, He, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, optim
     )
 end
 
@@ -244,8 +284,6 @@ function init_optimization!(
             register(optim, sym, nvar, gfunc[i_end_X̂min+i], autodiff=true)
         end
     end
-    # TODO: moved this call to setconstraint! when the function will handle MHE
-    setnonlincon!(estim, estim.model)
     return nothing
 end
 
@@ -464,6 +502,13 @@ function obj_nonlinprog(
     return dot(x̄0, invP̄, x̄0) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂)
 end
 
+"""
+    predict!(Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃) -> Ŷm, X̂
+
+Compute the predicted measured outputs `Ŷm` and states `X̂` for the `MovingHorizonEstimator`.
+
+The method mutates `Ŷm` and `X̂` vector arguments.
+"""
 function predict!(
     Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
 ) where {T<:Real}
@@ -480,6 +525,11 @@ function predict!(
     return Ŷm, X̂
 end
 
+"""
+    con_nonlinprog!(g, estim::MovingHorizonEstimator, model::SimModel, X̂)
+
+Nonlinear constrains for [`MovingHorizonEstimator`](@ref).
+"""
 function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂)
     nX̂con, nX̂ = length(estim.X̂min), estim.Nk[]*estim.nx̂
     for i in eachindex(g)
