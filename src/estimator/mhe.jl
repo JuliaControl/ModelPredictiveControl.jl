@@ -172,6 +172,8 @@ function init_optimization!(
     nvar = length(estim.W̃)
     set_silent(optim)
     #set_attribute(optim, "max_iter", 1000*nvar)
+    set_attribute(optim, "nlp_scaling_method", "gradient-based")
+    #set_attribute(optim, "nlp_scaling_max_gradient", 1000)
     #limit_solve_time(estim) #TODO: add this feature
     @variable(optim, W̃var[1:nvar])
     # --- nonlinear optimization init ---
@@ -184,7 +186,7 @@ function init_optimization!(
         function Jfunc(W̃tup::JNT...)
             Ŷm = get_tmp(Ŷm_cache, W̃tup[1])
             W̃  = collect(W̃tup)
-            if W̃tup != last_W̃tup_float
+            if W̃tup !== last_W̃tup_float
                 g = get_tmp(g_cache, W̃tup[1])
                 X̂ = get_tmp(X̂_cache, W̃tup[1])
                 Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
@@ -196,7 +198,7 @@ function init_optimization!(
         function Jfunc(W̃tup::ForwardDiff.Dual...)
             Ŷm = get_tmp(Ŷm_cache, W̃tup[1])
             W̃  = collect(W̃tup)
-            if W̃tup != last_W̃tup_dual
+            if W̃tup !== last_W̃tup_dual
                 g = get_tmp(g_cache, W̃tup[1])
                 X̂ = get_tmp(X̂_cache, W̃tup[1])
                 Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃)
@@ -207,7 +209,7 @@ function init_optimization!(
         end
         function gfunc_i(i, W̃tup::NTuple{N, JNT}) where N
             g = get_tmp(g_cache, W̃tup[1])
-            if W̃tup != last_W̃tup_float
+            if W̃tup !== last_W̃tup_float
                 Ŷm = get_tmp(Ŷm_cache, W̃tup[1])
                 X̂ = get_tmp(X̂_cache, W̃tup[1])
                 W̃  = collect(W̃tup)
@@ -219,7 +221,7 @@ function init_optimization!(
         end 
         function gfunc_i(i, W̃tup::NTuple{N, ForwardDiff.Dual}) where N
             g = get_tmp(g_cache, W̃tup[1])
-            if W̃tup != last_W̃tup_dual
+            if W̃tup !== last_W̃tup_dual
                 Ŷm = get_tmp(Ŷm_cache, W̃tup[1])
                 X̂ = get_tmp(X̂_cache, W̃tup[1])
                 W̃  = collect(W̃tup)
@@ -351,6 +353,7 @@ end
 "Reset `estim.P̂`, `estim.invP̄` and the time windows for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ ) 
     estim.invP̄.data[:] = Hermitian(inv(estim.P̂0), :L)
+    estim.P̂.data[:]    = estim.P̂0
     estim.x̂0_past     .= 0
     estim.W̃           .= 0
     estim.X̂           .= 0
@@ -389,16 +392,9 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         estim.D[:]  = [estim.D[nd+1:end]  ; d]
         estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
     end
-    if Nk ≥ He
-        # update the arrival covariance with an Extended Kalman Filter:
-        # TODO: also support UnscentedKalmanFilter, and KalmanFilter for LinModel
-        F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
-        Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
-        Ĥm = Ĥ[estim.i_ym, :] 
-        update_estimate_kf!(estim, F̂, Ĥm, u, ym, d, updatestate=false)
-        P̄ = estim.P̂
-        estim.invP̄.data[:] = Hermitian(inv(P̄), :L) # .data is necessary for Hermitian
-    end
+    # TODO: vérifier pourquoi ya une discontinuité exactement quand k = He,
+    # tout est linéaire ici et les contraintes sont éloignées, ça devrait marcher il me
+    # semble !
     Ŷm = Vector{NT}(undef, nYm)
     X̂  = Vector{NT}(undef, nX̂)
     estim.x̂0_past[:] = estim.X̂[1:nx̂]
@@ -427,7 +423,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     if !(status == OPTIMAL || status == LOCALLY_SOLVED)
         if isfatal(status)
             @error("MHE terminated without solution: estimation in open-loop", 
-                   status)
+                   status)         
         else
             @warn("MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
                   "solution anyway", status)
@@ -438,6 +434,32 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     estim.Ŵ[1:nŴ] = estim.W̃[nx̂+1:nx̂+nŴ] # update Ŵ with optimum for next time step
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, estim.W̃)
     x̂[:] = X̂[(1 + nx̂*Nk):(nx̂*(Nk+1))]
+
+
+    if Nk == He
+        # update the arrival covariance with an Extended Kalman Filter:
+        # TODO: also support UnscentedKalmanFilter, and KalmanFilter for LinModel
+        F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
+        println(F̂)
+        Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
+        Ĥm = Ĥ[estim.i_ym, :] 
+        update_estimate_kf!(estim, F̂, Ĥm, u, ym, d, updatestate=false)
+        P̄ = estim.P̂
+        estim.invP̄.data[:] = Hermitian(inv(P̄), :L) # .data is necessary for Hermitian
+    end
+
+    #ng = length(estim.i_g) 
+    #println(ng)
+    #g = zeros(ng)
+    #g = con_nonlinprog!(g, estim, model, X̂)
+    #println(g)
+    J = obj_nonlinprog(estim, model, Ŷm, W̃curr)
+
+    println(J)
+    println(solution_summary(optim, verbose=false))
+
+
+
     estim.Nk[] = Nk < He ? Nk + 1 : He
     return nothing
 end
@@ -455,7 +477,8 @@ function obj_nonlinprog(
     Nk = estim.Nk[]
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
-    x̄0 = @views W̃[1:nx̂] - estim.x̂0_past  # W̃ = [x̂(k-Nk|k); Ŵ]
+    x̂0 = @views W̃[1:nx̂] # W̃ = [x̂(k-Nk+1|k); Ŵ]
+    x̄0 = x̂0 - estim.x̂0_past  
     V̂  = @views estim.Ym[1:nYm] - Ŷm[1:nYm]
     Ŵ  = @views W̃[nx̂+1:nx̂+nŴ]
     return dot(x̄0, invP̄, x̄0) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂)
@@ -465,7 +488,7 @@ function predict!(
     Ŷm, X̂, estim::MovingHorizonEstimator, model::SimModel, W̃::Vector{T}
 ) where {T<:Real}
     nu, nd, nx̂, nym, Nk = model.nu, model.nd, estim.nx̂, estim.nym, estim.Nk[]
-    X̂[1:nx̂] = W̃[1:nx̂] # W̃ = [x̂(k-Nk|k); Ŵ]
+    X̂[1:nx̂] = W̃[1:nx̂] # W̃ = [x̂(k-Nk+1|k); Ŵ]
     for j=1:Nk
         u = @views estim.U[(1 + nu*(j-1)):(nu*j)]
         d = @views estim.D[(1 + nd*(j-1)):(nd*j)]
@@ -478,15 +501,19 @@ function predict!(
 end
 
 function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂)
-    nX̂ = length(X̂)
+    nX̂con, nX̂ = length(estim.X̂min), estim.Nk[]*estim.nx̂
     for i in eachindex(g)
         estim.i_g[i] || continue
-        if i ≤ nX̂
+        if i ≤ nX̂con
             j = i
-            g[i] = estim.X̂min[j] - X̂[j]
+            if j ≤ nX̂
+                g[i] = estim.X̂min[j] - X̂[j]
+            end
         else
-            j = i - nX̂
-            g[i] = X̂[j] - estim.X̂max[j]
+            j = i - nX̂con
+            if j ≤ nX̂
+                g[i] = X̂[j] - estim.X̂max[j]
+            end
         end
     end
     return g
