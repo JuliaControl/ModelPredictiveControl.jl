@@ -599,7 +599,9 @@ end
     @test mhe8.nint_u  == [1, 1]
     @test mhe8.nint_ym == [0, 0]
 
-    mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I(6), I(6), I(2), Model(Ipopt.Optimizer))
+    I_6 = Matrix{Float64}(I, 6, 6)
+    I_2 = Matrix{Float64}(I, 2, 2)
+    mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Model(Ipopt.Optimizer))
     @test mhe9.P̂0 ≈ I(6)
     @test mhe9.Q̂ ≈ I(6)
     @test mhe9.R̂ ≈ I(2)
@@ -619,7 +621,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h(x,_)   = linmodel1.C*x
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    nonlinmodel = setop!(NonLinModel(f, h, 1000*Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
     @test updatestate!(mhe1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
     @test updatestate!(mhe1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
