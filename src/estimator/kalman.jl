@@ -253,13 +253,13 @@ its initial value with ``\mathbf{P̂}_{-1}(0) =
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
+- `σP0=fill(1/model.nx,model.nx)` : main diagonal of the initial estimate covariance
+    ``\mathbf{P}(0)``, specified as a standard deviation vector.
+- `σP0int_u=fill(1,sum(nint_u))` : same than `σP0` but for the unmeasured disturbances at 
+    manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+- `σP0int_ym=fill(1,sum(nint_ym))` : same than `σP0` but for the unmeasured disturbances at 
+    measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
-- `σP0=σQ` : main diagonal of the initial estimate covariance ``\mathbf{P}(0)``, specified
-   as a standard deviation vector.
-- `σP0int_u=σQint_u` : same than `σP0` but for the unmeasured disturbances at manipulated
-   inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
-- `σP0int_ym=σQint_ym` : same than `σP0` but for the unmeasured disturbances at measured
-   outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 
 # Examples
 ```jldoctest
@@ -277,15 +277,15 @@ KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 function KalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
+    σP0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
     σR ::Vector = fill(1, length(i_ym)),
-    σP0::Vector = σQ,
     nint_u   ::IntVectorOrInt = 0,
     σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σP0int_u ::Vector = σQint_u,
+    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σP0int_ym::Vector = σQint_ym,
+    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
 ) where {NT<:Real, SM<:LinModel{NT}}
     # estimated covariances matrices (variance = σ²) :
     P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
@@ -443,15 +443,15 @@ responsibility to ensure that the augmented model is still observable.
 function UnscentedKalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
+    σP0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
     σR ::Vector = fill(1, length(i_ym)),
-    σP0::Vector = σQ,
     nint_u   ::IntVectorOrInt = 0,
     σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σP0int_u ::Vector = σQint_u,
+    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σP0int_ym::Vector = σQint_ym,
+    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
     α::Real = 1e-3,
     β::Real = 2,
     κ::Real = 0
@@ -669,15 +669,15 @@ ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
 function ExtendedKalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
+    σP0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
     σR ::Vector = fill(1, length(i_ym)),
-    σP0::Vector = σQ,
     nint_u   ::IntVectorOrInt = 0,
     σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σP0int_u ::Vector = σQint_u,
+    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σP0int_ym::Vector = σQint_ym,
+    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
 ) where {NT<:Real, SM<:SimModel{NT}}
     # estimated covariances matrices (variance = σ²) :
     P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)

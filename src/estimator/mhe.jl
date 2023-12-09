@@ -162,15 +162,15 @@ function MovingHorizonEstimator(
     model::SM;
     He::Union{Int, Nothing}=nothing,
     i_ym::IntRangeOrVector = 1:model.ny,
+    σP0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
     σR ::Vector = fill(1, length(i_ym)),
-    σP0::Vector = σQ,
     nint_u   ::IntVectorOrInt = 0,
     σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σP0int_u ::Vector = σQint_u,
+    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σP0int_ym::Vector = σQint_ym,
+    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
     optim::JM = JuMP.Model(DEFAULT_MHE_OPTIMIZER, add_bridges=false),
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     # estimated covariances matrices (variance = σ²) :
