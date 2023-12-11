@@ -109,11 +109,11 @@ nonlinear objective function at each discrete time ``k``:
                                          + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
                                          + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
 ```
-in which the arrival costs are defined by:
+in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
 ```math
 \begin{aligned}
     \mathbf{x̄} &= \mathbf{x̂}_k(k-N_k+1) - \mathbf{x̂}_{k-N_k}(k-N_k+1) \\
-    \mathbf{P̄} &= \mathbf{P̂}_k(k-N_k+1)
+    \mathbf{P̄} &= \mathbf{P̂}_{k-N_k}(k-N_k+1)
 \end{aligned}
 ```
 and the covariances are repeated ``N_k`` times:
@@ -133,7 +133,12 @@ N_k =                     \begin{cases}
 ```
 See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{R̂}, \mathbf{Q̂}`` covariances and
 model augmentation. The process model is identical to the one in [`UnscentedKalmanFilter`](@ref)
-documentation.
+documentation. Note that the estimation error covariance ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is
+approximated with an [`ExtendedKalmanFilter`](@ref).
+
+!!! warning
+    See the Extended Help of [`NonLinMPC`](@ref) function if you get an error like:    
+    `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
@@ -193,6 +198,7 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim::JM
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
+    P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
     return MovingHorizonEstimator{NT, SM, JM}(
         model, He, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, optim
     )

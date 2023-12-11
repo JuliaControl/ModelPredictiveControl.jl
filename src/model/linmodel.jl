@@ -14,6 +14,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     yop::Vector{NT}
     dop::Vector{NT}
     function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
+        A, Bu, C, Bd, Dd = to_mat(A), to_mat(Bu), to_mat(C), to_mat(Bd), to_mat(Dd)
         nu, nx, ny, nd = size(Bu,2), size(A,2), size(C,1), size(Bd,2)
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
@@ -192,23 +193,23 @@ The optional parameter `NT` explicitly specifies the number type of the matrices
 LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where NT<:Real
 
 function LinModel(
-    A::Matrix{NT}, Bu::Matrix{NT}, C::Matrix{NT}, Bd::Matrix{NT}, Dd::Matrix{NT}, Ts::NT
+    A::Array{NT}, Bu::Array{NT}, C::Array{NT}, Bd::Array{NT}, Dd::Array{NT}, Ts::Real
 ) where {NT<:Real} 
     return LinModel{NT}(A, Bu, C, Bd, Dd, Ts)
 end
 
 function LinModel(
-    A::Matrix{<:Real}, 
-    Bu::Matrix{<:Real}, 
-    C::Matrix{<:Real}, 
-    Bd::Matrix{<:Real}, 
-    Dd::Matrix{<:Real},
+    A::Array{<:Real}, 
+    Bu::Array{<:Real}, 
+    C::Array{<:Real}, 
+    Bd::Array{<:Real}, 
+    Dd::Array{<:Real},
     Ts::Real
 )
-    A, Bu, C, Bd, Dd, Ts_arr = promote(A, Bu, C, Bd, Dd, Ts*ones(1,1))
-    return LinModel(A, Bu, C, Bd, Dd, Ts_arr[])
+    A, Bu, C, Bd, Dd = to_mat(A), to_mat(Bu), to_mat(C), to_mat(Bd), to_mat(Dd)
+    A, Bu, C, Bd, Dd = promote(A, Bu, C, Bd, Dd)
+    return LinModel(A, Bu, C, Bd, Dd, Ts)
 end
-
 
 @doc raw"""
     steadystate!(model::LinModel, u, d)

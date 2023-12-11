@@ -177,6 +177,10 @@ function validate_args(model::SimModel, u, d)
     size(d) ≠ (nd,) && throw(DimensionMismatch("d size $(size(d)) ≠ meas. dist. size ($nd,)"))
 end
 
+"Convert vectors to single column matrices when necessary."
+to_mat(A::AbstractVector) = reshape(A, length(A), 1)
+to_mat(A::AbstractMatrix) = A
+
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=empty(model.x)) = evaloutput(model::SimModel, d)
 

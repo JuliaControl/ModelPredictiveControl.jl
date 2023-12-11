@@ -47,7 +47,7 @@ manually call a differential equation solver in `f` (see [Manual](@ref man_nonli
 
 !!! warning
     `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref),
-    [`ExtendedKalmanFilter`](@ref) and [`linearize`](@ref).
+    [`ExtendedKalmanFilter`](@ref), [`MovingHorizonEstimator`](@ref) and [`linearize`](@ref).
 
 See also [`LinModel`](@ref).
 

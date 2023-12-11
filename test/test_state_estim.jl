@@ -57,8 +57,9 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σQ=[1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σR=[1,1,1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel3, nint_ym=[1, 0, 0])
-    model_unobs = LinModel([1 0;0 1.5], [1;0][:,:], [1 0], zeros(2,0), zeros(1,0), 1.0)
+    model_unobs = LinModel([1 0;0 1.5], [1; 0], [1 0], zeros(2,0), zeros(1,0), 1.0)
     @test_throws ErrorException SteadyKalmanFilter(model_unobs, nint_ym=[1])
+    @test_throws ErrorException SteadyKalmanFilter(LinModel(tf(1,[10, 1]), 1.0), 1:1, 0, 0, [-1], [1])
     @test_throws ErrorException SteadyKalmanFilter(LinModel(tf(1, [1,0]), 1), nint_ym=[1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_u=[1,1], nint_ym=[1,1])
 end
@@ -229,6 +230,7 @@ end
     @test_throws ErrorException Luenberger(linmodel1, p̂=[0.5])
     @test_throws ErrorException Luenberger(linmodel1, p̂=fill(1.5, lo1.nx̂))
     @test_throws ErrorException Luenberger(LinModel(tf(1,[1, 0]),0.1), p̂=[0.5,0.6])
+    @test_throws ErrorException Luenberger(linmodel1, p̂=[0,0,0,0])
 end
     
 @testset "Luenberger estimator methods" begin

@@ -161,6 +161,7 @@ Construct the estimator from the augmented covariance matrices `Q̂` and `R̂`.
 This syntax allows nonzero off-diagonal elements in ``\mathbf{Q̂, R̂}``.
 """
 function SteadyKalmanFilter(model::SM, i_ym, nint_u, nint_ym, Q̂, R̂) where {NT<:Real, SM<:LinModel{NT}}
+    Q̂, R̂ = to_mat(Q̂), to_mat(R̂)
     return SteadyKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, Q̂ , R̂)
 end
 
@@ -302,6 +303,7 @@ Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function KalmanFilter(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {NT<:Real, SM<:LinModel{NT}}
+    P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
     return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
 end
 
@@ -473,6 +475,7 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 function UnscentedKalmanFilter(
     model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ
 ) where {NT<:Real, SM<:SimModel{NT}}
+    P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
     return UnscentedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, α, β, κ)
 end
 
@@ -694,6 +697,7 @@ Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function ExtendedKalmanFilter(model::SM, i_ym, nint_u, nint_ym,P̂0, Q̂, R̂) where {NT<:Real, SM<:SimModel{NT}}
+    P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
     return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
 end
 
