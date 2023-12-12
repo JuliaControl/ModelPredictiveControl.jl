@@ -442,8 +442,8 @@ end
 
 include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
-include("estimator/internal_model.jl")
 include("estimator/mhe.jl")
+include("estimator/internal_model.jl")
 
 """
     evalŷ(estim::StateEstimator, _ , d) -> ŷ

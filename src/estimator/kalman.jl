@@ -333,7 +333,7 @@ control period ``k-1``. See [^2] for details.
      Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
 """
 function update_estimate!(estim::KalmanFilter, u, ym, d)
-    return update_estimate_kf!(estim, estim.Â, estim.Ĉm, u, ym, d)
+    return update_estimate_kf!(estim, u, ym, d, estim.Â, estim.Ĉm, estim.P̂, estim.x̂)
 end
 
 struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
@@ -736,7 +736,7 @@ function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂)
     F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
     Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
     Ĥm = Ĥ[estim.i_ym, :] 
-    return update_estimate_kf!(estim, F̂, Ĥm, u, ym, d)
+    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥm, estim.P̂, estim.x̂)
 end
 
 "Set `estim.P̂` to `estim.P̂0` for the time-varying Kalman Filters."
@@ -766,7 +766,7 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
 end
 
 """
-    update_estimate_kf!(estim, Â, Ĉm, u, ym, d; updatestate=true)
+    update_estimate_kf!(estim, u, ym, d, Â, Ĉm, P̂, x̂=nothing)
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
@@ -774,17 +774,17 @@ Allows code reuse for [`KalmanFilter`](@ref) and [`ExtendedKalmanFilterKalmanFil
 They update the state `x̂` and covariance `P̂` with the same equations. The extended filter
 substitutes the augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
 The implementation uses in-place operations and explicit factorization to reduce
-allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations. If `updatestate`
-is `false`, only the covariance `P̂` is updated.
+allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations. If `isnothing(x̂)`,
+only the covariance `P̂` is updated.
 """
-function update_estimate_kf!(estim, Â, Ĉm, u, ym, d; updatestate=true)
-    x̂, P̂, Q̂, R̂, K̂, M̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂, estim.M̂
+function update_estimate_kf!(estim, u, ym, d, Â, Ĉm, P̂, x̂=nothing)
+    Q̂, R̂, M̂ = estim.Q̂, estim.R̂, estim.M̂
     mul!(M̂, P̂, Ĉm')
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' + R̂)))
-    if updatestate
-        mul!(K̂, Â, M̂)
+    if !isnothing(x̂)
+        mul!(estim.K̂, Â, M̂)
         ŷm = @views ĥ(estim, estim.model, x̂, d)[estim.i_ym]
-        x̂[:] = f̂(estim, estim.model, x̂, u, d) +  K̂ * (ym - ŷm)
+        x̂[:] = f̂(estim, estim.model, x̂, u, d) +  estim.K̂ * (ym - ŷm)
     end
     P̂.data[:] = Â * (P̂ - M̂ * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitians
     return nothing
