@@ -733,10 +733,9 @@ automatically computes the Jacobians:
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs.
 """
 function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂))
-    F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
-    Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
-    Ĥm = Ĥ[estim.i_ym, :] 
-    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥm, estim.P̂, estim.x̂)
+    F̂ = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
+    Ĥ = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
+    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥ[estim.i_ym, :], estim.P̂, estim.x̂)
 end
 
 "Set `estim.P̂` to `estim.P̂0` for the time-varying Kalman Filters."

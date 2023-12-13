@@ -43,8 +43,8 @@ struct MovingHorizonEstimator{
     U ::Union{Vector{NT}, Missing}
     D ::Union{Vector{NT}, Missing}
     Ŵ ::Union{Vector{NT}, Missing}
-    x̂0_past::Vector{NT}
-    P̂0_past::Hermitian{NT, Matrix{NT}}
+    x̂arr_old::Vector{NT}
+    P̂arr_old::Hermitian{NT, Matrix{NT}}
     Nk::Vector{Int}
     function MovingHorizonEstimator{NT, SM, JM}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim::JM
@@ -66,14 +66,14 @@ struct MovingHorizonEstimator{
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
         M̂ = zeros(NT, nx̂, nym)
         nvar, nX̂ = nx̂*(He + 1), nx̂*(He + 1)
-        X̂min  , X̂max    =   fill(-Inf, nX̂), fill(+Inf, nX̂)
+        X̂min, X̂max =   fill(-Inf, nX̂), fill(+Inf, nX̂)
         i_X̂min, i_X̂max  = .!isinf.(X̂min)  , .!isinf.(X̂max)
         i_g = [i_X̂min; i_X̂max]
         W̃ = zeros(NT, nvar)
         X̂, Ym   = zeros(NT, nx̂*He), zeros(NT, nym*He)
         U, D, Ŵ = zeros(NT, nu*He), zeros(NT, nd*He), zeros(NT, nx̂*He)
-        x̂0_past = zeros(NT, nx̂)
-        P̂0_past = copy(P̂0)
+        x̂arr_old = zeros(NT, nx̂)
+        P̂arr_old = copy(P̂0)
         Nk = [0]
         estim = new{NT, SM, JM}(
             model, optim, W̃,
@@ -85,7 +85,7 @@ struct MovingHorizonEstimator{
             M̂,
             X̂min, X̂max, i_g,
             X̂, Ym, U, D, Ŵ, 
-            x̂0_past, P̂0_past, Nk
+            x̂arr_old, P̂arr_old, Nk
         )
         init_optimization!(estim, optim)
         return estim
@@ -386,18 +386,18 @@ function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n)
     print(io,   "$(lpad(nd, n)) measured disturbances d")
 end
 
-"Reset `estim.P̂`, `estim.invP̄` and the time windows for the moving horizon estimator."
+"Reset `estim.P̂arr_old`, `estim.invP̄` and the windows for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ ) 
-    estim.invP̄.data[:]      = Hermitian(inv(estim.P̂0), :L)
-    estim.P̂0_past.data[:]   = estim.P̂0
-    estim.x̂0_past           .= 0
-    estim.W̃                 .= 0
-    estim.X̂                 .= 0
-    estim.Ym                .= 0
-    estim.U                 .= 0
-    estim.D                 .= 0
-    estim.Ŵ                 .= 0
-    estim.Nk                .= 0
+    estim.invP̄.data[:]    = Hermitian(inv(estim.P̂0), :L)
+    estim.P̂arr_old.data[:]    = estim.P̂0
+    estim.x̂arr_old           .= 0
+    estim.W̃                  .= 0
+    estim.X̂                  .= 0
+    estim.Ym                 .= 0
+    estim.U                  .= 0
+    estim.D                  .= 0
+    estim.Ŵ                  .= 0
+    estim.Nk                 .= 0
     return nothing
 end
 
@@ -450,7 +450,7 @@ Once the problem solved, the next estimate ``\mathbf{x̂}_k(k+1)`` is computed b
 the optimal values of ``\mathbf{x̂}_k(k-N_k+1)`` and ``\mathbf{Ŵ}`` in the last equation from
 ``j=N_k-1`` to ``0``, inclusively. Afterward, if ``k ≥ H_e``, the arrival covariance for the
 next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is estimated with the equations of
-[`update_estimate!(::ExtendedKalmanFilter)`](@ref) (or `KalmanFilter`, for [`LinModel`](@ref)).
+[`update_estimate!(::ExtendedKalmanFilter)`](@ref), or `KalmanFilter`, for [`LinModel`](@ref)).
 """
 function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<:Real
     model, optim, x̂ = estim.model, estim.optim, estim.x̂
@@ -477,8 +477,8 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     W̃var::Vector{VariableRef} = optim[:W̃var]
     Ŷm = Vector{NT}(undef, nYm)
     X̂  = Vector{NT}(undef, nX̂)
-    estim.x̂0_past[:] = estim.X̂[1:nx̂]
-    W̃0 = [estim.x̂0_past; estim.Ŵ]
+    estim.x̂arr_old[:] = estim.X̂[1:nx̂]
+    W̃0 = [estim.x̂arr_old; estim.Ŵ]
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, W̃0)
     J0 = obj_nonlinprog(estim, model, Ŷm, W̃0)
     # initial W̃0 with Ŵ=0 if objective or constraint function not finite :
@@ -515,25 +515,23 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     Ŷm, X̂ = predict!(Ŷm, X̂, estim, model, estim.W̃)
     x̂[:] = X̂[(1 + nx̂*Nk):(nx̂*(Nk+1))]
     if Nk == He
-        P̂0_past = update_cov!(estim, model, u, ym, d)
-        estim.invP̄.data[:] = Hermitian(inv(P̂0_past), :L)
+        uarr, ymarr, darr = estim.U[1:nu], estim.Ym[1:nym], estim.D[1:nd]
+        update_cov!(estim.P̂arr_old, estim, model, uarr, ymarr, darr)
+        estim.invP̄.data[:] = Hermitian(inv(estim.P̂arr_old), :L)
     end
     return nothing
 end
 
-"Update the covariance `estim.P̂0_past` with the `KalmanFilter` if `model` is a `LinModel`."
-function update_cov!(estim::MovingHorizonEstimator, ::LinModel, u, ym, d) 
-    update_estimate_kf!(estim, u, ym, d, estim.Â, estim.Ĉ[estim.i_ym, :], estim.P̂0_past)
-    return estim.P̂0_past
+"Update the covariance `P̂` with the `KalmanFilter` if `model` is a `LinModel`."
+function update_cov!(P̂, estim::MovingHorizonEstimator, ::LinModel, u, ym, d) 
+    return update_estimate_kf!(estim, u, ym, d, estim.Â, estim.Ĉ[estim.i_ym, :], P̂)
 end
 "Update it with the `ExtendedKalmanFilter` if model is not a `LinModel`."
-function update_cov!(estim::MovingHorizonEstimator, ::SimModel, u, ym, d) 
+function update_cov!(P̂, estim::MovingHorizonEstimator, ::SimModel, u, ym, d) 
     # TODO: also support UnscentedKalmanFilter
-    F̂  = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
-    Ĥ  = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
-    Ĥm = Ĥ[estim.i_ym, :] 
-    update_estimate_kf!(estim, u, ym, d, F̂, Ĥm, estim.P̂0_past)
-    return estim.P̂0_past
+    F̂ = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
+    Ĥ = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
+    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥ[estim.i_ym, :],  P̂)
 end
 
 """
@@ -549,11 +547,11 @@ function obj_nonlinprog(
     Nk = estim.Nk[]
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
-    x̂0 = @views W̃[1:nx̂] # W̃ = [x̂(k-Nk+1|k); Ŵ]
-    x̄0 = x̂0 - estim.x̂0_past  
-    V̂  = @views estim.Ym[1:nYm] - Ŷm[1:nYm]
-    Ŵ  = @views W̃[nx̂+1:nx̂+nŴ]
-    return dot(x̄0, invP̄, x̄0) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂)
+    x̂arr = @views W̃[1:nx̂] # W̃ = [x̂(k-Nk+1|k); Ŵ]
+    x̄ = x̂arr - estim.x̂arr_old
+    V̂ = @views estim.Ym[1:nYm] - Ŷm[1:nYm]
+    Ŵ = @views W̃[nx̂+1:nx̂+nŴ]
+    return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂)
 end
 
 """
