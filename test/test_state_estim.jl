@@ -583,9 +583,9 @@ end
     @test mhe5.nx̂ == 8
 
     mhe6 = MovingHorizonEstimator(nonlinmodel, He=5, σP0=[1,2,3,4], σP0int_ym=[5,6])
-    @test mhe6.P̂0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
-    @test mhe6.P̂  ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
-    @test mhe6.P̂0 !== mhe6.P̂
+    @test mhe6.P̂0      ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    @test mhe6.P̂0_past ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    @test mhe6.P̂0 !== mhe6.P̂0_past
 
     mhe7 = MovingHorizonEstimator(nonlinmodel, He=10)
     @test mhe7.He == 10
