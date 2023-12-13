@@ -667,11 +667,13 @@ end
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     mhe1 = MovingHorizonEstimator(linmodel1, He=1, nint_ym=0)
     setconstraint!(mhe1, x̂min=[-51,-52], x̂max=[53,54])
-    @test all((mhe1.X̂min, mhe1.X̂max) .≈ ([-51,-52,-51,-52], [53,54,53,54]))
+    @test all((mhe1.con.X̂min, mhe1.con.X̂max) .≈ ([-51,-52], [53,54]))
+    @test all((mhe1.con.x̂min, mhe1.con.x̂max) .≈ ([-51,-52], [53,54]))
 
     mhe2 = MovingHorizonEstimator(linmodel1, He=4, nint_ym=0)
     setconstraint!(mhe2, X̂min=-1(1:10), X̂max=1(1:10))
-    @test all((mhe2.X̂min, mhe2.X̂max) .≈ (-1(1:10), 1(1:10)))
+    @test all((mhe2.con.X̂min, mhe2.con.X̂max) .≈ (-1(3:10), 1(3:10)))
+    @test all((mhe2.con.x̂min, mhe2.con.x̂max) .≈ (-1(1:2),  1(1:2)))
 
     @test_throws ArgumentError setconstraint!(mhe2, x̂min=[-1])
     @test_throws ArgumentError setconstraint!(mhe2, x̂max=[+1])
