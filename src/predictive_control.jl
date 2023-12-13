@@ -307,10 +307,10 @@ function setconstraint!(
         )
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
-        ΔŨvar = mpc.optim[:ΔŨvar]
-        delete(mpc.optim, mpc.optim[:linconstraint])
-        unregister(mpc.optim, :linconstraint)
-        @constraint(mpc.optim, linconstraint, A*ΔŨvar .≤ b)
+        ΔŨvar = optim[:ΔŨvar]
+        delete(optim, optim[:linconstraint])
+        unregister(optim, :linconstraint)
+        @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
         setnonlincon!(mpc, model)
     else
         i_b, i_g = init_matconstraint(model, 
