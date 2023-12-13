@@ -316,11 +316,11 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
     plotx && (layout_mat = [layout_mat (nx, 1)])
 
     layout := layout_mat
-    xguide    --> "Time (s)"
     # --- outputs y ---
     subplot_base = 0
     for i in 1:ny
         @series begin
+            i == ny && (xguide --> "Time (s)")
             yguide  --> "\$y_$i\$"
             color   --> 1
             subplot --> subplot_base + i
@@ -334,6 +334,7 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
     if plotu
         for i in 1:nu
             @series begin
+                i == nu && (xguide --> "Time (s)")
                 yguide     --> "\$u_$i\$"
                 color      --> 1
                 subplot    --> subplot_base + i
@@ -349,7 +350,7 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
     if plotd
         for i in 1:nd
             @series begin
-                xguide  --> "Time (s)"
+                i == nd && (xguide --> "Time (s)")
                 yguide  --> "\$d_$i\$"
                 color   --> 1
                 subplot --> subplot_base + i
@@ -364,6 +365,7 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
     if plotx
         for i in 1:nx
             @series begin
+                i == nx && (xguide --> "Time (s)")
                 yguide     --> "\$x_$i\$"
                 color      --> 1
                 subplot    --> subplot_base + i
@@ -397,11 +399,11 @@ end
     (plotx && !plotxwithx̂) && (layout_mat = [layout_mat (nx, 1)])
     (plotx̂ ||  plotxwithx̂) && (layout_mat = [layout_mat (nx̂, 1)])
     layout := layout_mat
-    xguide    --> "Time (s)"
     # --- outputs y ---
     subplot_base = 0
     for i in 1:ny
         @series begin
+            i == ny && (xguide --> "Time (s)")
             yguide  --> "\$y_$i\$"
             color   --> 1
             subplot --> subplot_base + i
@@ -411,6 +413,7 @@ end
         end
         if plotŷ
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide    --> "\$y_$i\$"
                 color     --> 2
                 subplot   --> subplot_base + i
@@ -427,6 +430,7 @@ end
     if plotu
         for i in 1:nu
             @series begin
+                i == nu && (xguide --> "Time (s)")
                 yguide     --> "\$u_$i\$"
                 color      --> 1
                 subplot    --> subplot_base + i
@@ -442,7 +446,7 @@ end
     if plotd
         for i in 1:nd
             @series begin
-                xguide  --> "Time (s)"
+                i == nd && (xguide --> "Time (s)")
                 yguide  --> "\$d_$i\$"
                 color   --> 1
                 subplot --> subplot_base + i
@@ -457,6 +461,7 @@ end
     if plotx || plotxwithx̂
         for i in 1:nx
             @series begin
+                i == nx && !plotxwithx̂ && (xguide --> "Time (s)")
                 yguide     --> "\$x_$i\$"
                 color      --> 1
                 subplot    --> subplot_base + i
@@ -471,6 +476,7 @@ end
     if plotx̂ || plotxwithx̂
         for i in 1:nx̂
             @series begin
+                i == nx̂ && (xguide --> "Time (s)")
                 withPlantState = plotxwithx̂ && i ≤ nx
                 yguide     --> (withPlantState ? "\$x_$i\$" : "\$\\hat{x}_$i\$")
                 color      --> 2
@@ -514,7 +520,6 @@ end
     (plotx && !plotxwithx̂) && (layout_mat = [layout_mat (nx, 1)])
     (plotx̂ ||  plotxwithx̂) && (layout_mat = [layout_mat (nx̂, 1)])
     layout := layout_mat
-    xguide --> "Time (s)"
     # --- constraints ---
     Umin, Umax = getUcon(mpc, nu)
     Ymin, Ymax = getYcon(mpc, ny)
@@ -522,6 +527,7 @@ end
     subplot_base = 0
     for i in 1:ny
         @series begin
+            i == ny && (xguide --> "Time (s)")
             yguide  --> "\$y_$i\$"
             color   --> 1
             subplot --> subplot_base + i
@@ -531,6 +537,7 @@ end
         end
         if plotŷ
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide    --> "\$y_$i\$"
                 color     --> 2
                 subplot   --> subplot_base + i
@@ -543,6 +550,7 @@ end
         end
         if plotry && !iszero(mpc.M_Hp[i, i])
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide    --> "\$y_$i\$"
                 color     --> 3
                 subplot   --> subplot_base + i
@@ -555,6 +563,7 @@ end
         end
         if plotymin && !isinf(Ymin[i])
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide    --> "\$y_$i\$"
                 color     --> 4
                 subplot   --> subplot_base + i
@@ -567,6 +576,7 @@ end
         end
         if plotymax && !isinf(Ymax[i])
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide    --> "\$y_$i\$"
                 color     --> 5
                 subplot   --> subplot_base + i
@@ -583,6 +593,7 @@ end
     if plotu
         for i in 1:nu
             @series begin
+                i == nu && (xguide --> "Time (s)")
                 yguide     --> "\$u_$i\$"
                 color      --> 1
                 subplot    --> subplot_base + i
@@ -593,6 +604,7 @@ end
             end
             if plotru && !iszero(mpc.L_Hp[i, i])
                 @series begin
+                    i == nu && (xguide --> "Time (s)")
                     yguide    --> "\$u_$i\$"
                     color     --> 3
                     subplot   --> subplot_base + i
@@ -605,6 +617,7 @@ end
             end
             if plotumin && !isinf(Umin[i])
                 @series begin
+                    i == nu && (xguide --> "Time (s)")
                     yguide    --> "\$u_$i\$"
                     color     --> 4
                     subplot   --> subplot_base + i
@@ -617,6 +630,7 @@ end
             end
             if plotumax && !isinf(Umax[i])
                 @series begin
+                    i == nu && (xguide --> "Time (s)")
                     yguide    --> "\$u_$i\$"
                     color     --> 5
                     subplot   --> subplot_base + i
@@ -634,7 +648,7 @@ end
     if plotd
         for i in 1:nd
             @series begin
-                xguide  --> "Time (s)"
+                i == nd && (xguide --> "Time (s)")
                 yguide  --> "\$d_$i\$"
                 color   --> 1
                 subplot --> subplot_base + i
@@ -649,6 +663,7 @@ end
     if plotx || plotxwithx̂
         for i in 1:nx
             @series begin
+                i == nx && !plotxwithx̂ && (xguide --> "Time (s)")
                 yguide     --> "\$x_$i\$"
                 color      --> 1
                 subplot    --> subplot_base + i
@@ -663,6 +678,7 @@ end
     if plotx̂ || plotxwithx̂
         for i in 1:nx̂
             @series begin
+                i == nx̂ && (xguide --> "Time (s)")
                 withPlantState = plotxwithx̂ && i ≤ nx
                 yguide     --> (withPlantState ? "\$x_$i\$" : "\$\\hat{x}_$i\$")
                 color      --> 2
