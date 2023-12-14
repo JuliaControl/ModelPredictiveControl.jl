@@ -187,10 +187,10 @@ The estimated process and sensor noises are defined as:
 ```
 in which ``\mathbf{v̂}(k-j) = 
 \mathbf{y^m}(k-j) - \mathbf{ĥ^m}\big(\mathbf{x̂}_k(k-j), \mathbf{d}(k-j)\big)`` from ``j = 
-N_k-1`` to ``0``. The augmented model ``\mathbf{f̂}`` and the process noise estimate
-recursively generates the state estimates ``\mathbf{x̂}_k(k-j+1) = 
+N_k-1`` to ``0``. The augmented model ``\mathbf{f̂}`` with the process noise recursively
+generates the state estimates ``\mathbf{x̂}_k(k-j+1) = 
 \mathbf{f̂}\big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\big) + \mathbf{ŵ}(k-j)``
-from ``j=N_k-1`` to ``0``, inclusively. 
+from ``j=N_k-1`` to ``0``. 
 """
 function MovingHorizonEstimator(
     model::SM;
