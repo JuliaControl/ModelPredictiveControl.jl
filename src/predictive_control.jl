@@ -841,7 +841,7 @@ function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where 
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
     # --- pre-compute matrix powers ---
     # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,Hp+1] = A^Hp
-    Âpow = Array{NT}(undef, size(Â,1), size(Â,2), Hp+1)
+    Âpow = Array{NT}(undef, nx̂, nx̂, Hp+1)
     Âpow[:,:,1] = I(nx̂)
     for j=2:Hp+1
         Âpow[:,:,j] = Âpow[:,:,j-1]*Â
