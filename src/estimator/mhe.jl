@@ -289,10 +289,10 @@ estimated sensor noise over the time window is given by:
 ```math
 \begin{aligned}
     [\begin{smallmatrix}\mathbf{x̄} \\ \mathbf{V̂} \end{smallmatrix}]  
-        &= \mathbf{Y^m - Ŷ^m}                   \\
-        &= \mathbf{Y^m - (E Z + G U + J D)}     \\
-        &= \mathbf{Y^m - (E Z + F)}
+        &= \mathbf{E Z + G U + J D + L Y^m + K x}_{k-N_k}(k-N_k+1)     \\
+        &= \mathbf{E Z + F}
 \end{aligned}
+```
 in which ``Y^m``, ``U`` and ``D`` contains respectively the measured outputs, manipulated
 inputs and measured disturbances from time ``k-N_k+1`` to ``k``. The method also returns
 similar matrices for the estimation error at arrival ``k-N_k+1``:
