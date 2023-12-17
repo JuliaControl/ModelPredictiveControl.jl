@@ -27,6 +27,9 @@ const FATAL_STATUSES = [
     OTHER_ERROR
 ]
 
+"Evaluate the quadratic programming objective function `0.5x'*H*x + q'*x` at `x`."
+obj_quadprog(x, H, q) = 0.5*dot(x, H, x) + q'*x  # dot(x, H, x) is faster than x'*H*x
+
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)
 

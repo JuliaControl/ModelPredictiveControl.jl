@@ -545,7 +545,7 @@ end
 
 Init linear model prediction matrices `F, q̃, p` and current estimated output `ŷ`.
 
-See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
+See [`init_predmat`](@ref) and [`init_quadprog_mpc`](@ref) for the definition of the matrices.
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u)
     mpc.ŷ[:] = evalŷ(mpc.estim, ym, d)
@@ -775,7 +775,7 @@ The linear model predictions are evaluated by :
                &= \mathbf{E ΔU} + \mathbf{F}
 \end{aligned}
 ```
-where predicted outputs ``\mathbf{Ŷ}`` and measured disturbances ``\mathbf{D̂}`` are from 
+where the predicted outputs ``\mathbf{Ŷ}`` and measured disturbances ``\mathbf{D̂}`` are from 
 ``k + 1`` to ``k + H_p``. Input increments ``\mathbf{ΔU}`` are from ``k`` to
 ``k + H_c - 1``. The vector ``\mathbf{x̂}_{k-1}(k)`` is the state estimated at the last 
 control period. The method also computes similar matrices but for the predicted terminal 
@@ -908,41 +908,32 @@ function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where 
 end
 
 @doc raw"""
-    init_quadprog(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> P̃, q̃, p
+    init_quadprog_mpc(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> H̃, q̃, p
 
-Init the quadratic programming optimization matrix `P̃` and `q̃`.
+Init the quadratic programming optimization matrix `H̃` and `q̃` for MPC.
 
 The matrices appear in the quadratic general form :
 ```math
-    J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'P̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
+    J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'H̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
 ```
-``\mathbf{P̃}`` is constant if the model and weights are linear and time invariant (LTI). The 
+``\mathbf{H̃}`` is constant if the model and weights are linear and time invariant (LTI). The 
 vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k`` (see
 [`initpred!`](@ref) method). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel{NT}, Ẽ, S, M_Hp, N_Hc, L_Hp) where {NT<:Real}
-    P̃ = Hermitian(convert(Matrix{NT}, 2*(Ẽ'*M_Hp*Ẽ + N_Hc + S'*L_Hp*S)), :L)
-    q̃ = zeros(NT, size(P̃, 1))   # dummy value (updated just before optimization)
+function init_quadprog_mpc(::LinModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
+    H̃ = Hermitian(convert(Matrix{NT}, 2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃)), :L)
+    q̃ = zeros(NT, size(H̃, 1))   # dummy value (updated just before optimization)
     p = zeros(NT, 1)            # dummy value (updated just before optimization)
-    return P̃, q̃, p
+    return H̃, q̃, p
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-function init_quadprog(::SimModel{NT}, Ẽ, S, M_Hp, N_Hc, L_Hp) where {NT<:Real}
-    P̃ = Hermitian(zeros(NT, 0, 0))
+function init_quadprog_mpc(::SimModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
+    H̃ = Hermitian(zeros(NT, 0, 0))
     q̃ = zeros(NT, 0)
     p = zeros(NT, 1)            # dummy value (updated just before optimization)
-    return P̃, q̃, p
+    return H̃, q̃, p
 end
-
-"""
-    obj_quadprog(ΔŨ, P̃, q̃)
-
-Return the quadratic programming objective function, see [`init_quadprog`](@ref).
-
-The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
-"""
-obj_quadprog(ΔŨ, P̃, q̃) = 0.5*dot(ΔŨ, P̃, ΔŨ) + q̃'*ΔŨ
 
 """
     obj_nonlinprog(mpc::PredictiveController, model::LinModel, ΔŨ::Vector{Real})
@@ -956,7 +947,7 @@ at specific input increments `ΔŨ` and predictions `Ŷ` values.
 function obj_nonlinprog(
     mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
 ) where {NT<:Real}
-    J = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
+    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃)
     if !iszero(mpc.E)
         U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
         UE = [U; U[(end - model.nu + 1):end]]
@@ -1009,7 +1000,7 @@ Init `ControllerConstraint` struct with default parameters based on estimator `e
 
 Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
 """
-function init_defaultcon(
+function init_defaultcon_mhe(
     estim::StateEstimator{NT}, 
     Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
 ) where {NT<:Real}

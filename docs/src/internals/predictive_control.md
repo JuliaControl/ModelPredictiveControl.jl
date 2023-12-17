@@ -14,7 +14,7 @@ The prediction methodology of this module is mainly based on Maciejowski textboo
 ```@docs
 ModelPredictiveControl.init_predmat
 ModelPredictiveControl.init_ΔUtoU
-ModelPredictiveControl.init_quadprog
+ModelPredictiveControl.init_quadprog_mpc
 ModelPredictiveControl.init_stochpred
 ModelPredictiveControl.init_matconstraint
 ```

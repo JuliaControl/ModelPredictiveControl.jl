@@ -20,10 +20,10 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     J::Matrix{NT}
     K::Matrix{NT}
     V::Matrix{NT}
-    P̃::Hermitian{NT, Matrix{NT}}
+    H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
     p::Vector{NT}
-    P̃_chol::Cholesky{NT, Matrix{NT}}
+    H̃_chol::Cholesky{NT, Matrix{NT}}
     Ks::Matrix{NT}
     Ps::Matrix{NT}
     d0::Vector{NT}
@@ -47,8 +47,8 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, F, G, J, K, V = init_predmat(estim, model, Hp, Hc)
         S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
-        P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
-        P̃_chol = cholesky(P̃)
+        H̃, q̃, p = init_quadprog_mpc(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        H̃_chol = cholesky(H̃)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
@@ -62,8 +62,8 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, 
             R̂u, R̂y, noR̂u,
             S̃, T, 
-            Ẽ, F, G, J, K, V, P̃, q̃, p,
-            P̃_chol,
+            Ẽ, F, G, J, K, V, H̃, q̃, p,
+            H̃_chol,
             Ks, Ps,
             d0, D̂0, D̂E,
             Ŷop, Dop,
@@ -195,10 +195,10 @@ linconstraint!(::ExplicitMPC, ::LinModel) = nothing
 @doc raw"""
 Analytically solve the optimization problem for [`ExplicitMPC`](@ref).
 
-The solution is ``\mathbf{ΔŨ = - P̃^{-1} q̃}``, see [`init_quadprog`](@ref).
+The solution is ``\mathbf{ΔŨ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref).
 """
 function optim_objective!(mpc::ExplicitMPC)
-    return lmul!(-1, ldiv!(mpc.ΔŨ, mpc.P̃_chol, mpc.q̃))
+    return lmul!(-1, ldiv!(mpc.ΔŨ, mpc.H̃_chol, mpc.q̃))
 end
 
 "Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
