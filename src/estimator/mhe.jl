@@ -91,6 +91,7 @@ struct MovingHorizonEstimator{
         Ẽ, F, G, J, ẽx̄, fx̄ = init_predmat_mhe(model, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d)
         con = init_defaultcon_mhe(model, He, nx̂)
         nvar = nx̂+ nŵ*He
+        # dummy values, updated before optimization:
         H̃, q̃, p = Hermitian(zeros(NT, nvar, nvar), :L), zeros(NT, nvar), zeros(NT, 1)
         Z̃ = zeros(NT, nvar)
         X̂, Ym   = zeros(NT, nx̂*He), zeros(NT, nym*He)
@@ -472,10 +473,14 @@ end
     setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
 
 Set the constraint parameters of `estim` [`MovingHorizonEstimator`](@ref).
-
-The constraints of the moving horizon estimator are:
+   
+The constraints of the moving horizon estimator are defined as:
 ```math 
-\mathbf{x̂_{min}} ≤ \mathbf{x̂}_k(k-j+1) ≤ \mathbf{x̂_{max}} \qquad j = 0, 1, ... , N_k \\
+\begin{alignat*}{3}
+    \mathbf{x̂_{min}} ≤&&\   \mathbf{x̂}_k(k-j+1) &≤ \mathbf{x̂_{max}}  &&\qquad  j = N_k, N_k - 1, ... , 0    \\
+    \mathbf{ŵ_{min}} ≤&&\     \mathbf{ŵ}(k-j+1) &≤ \mathbf{ŵ_{max}}  &&\qquad  j = N_k, N_k - 1, ... , 1    \\
+    \mathbf{v̂_{min}} ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max}}  &&\qquad  j = N_k, N_k - 1, ... , 1
+\end{alignat*}
 ```
 Note that state constraints are applied on the augmented state vector ``\mathbf{x̂}`` (see
 the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation).
@@ -688,6 +693,12 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     return nothing
 end
 
+@doc raw"""
+    initpred!(estim, model::LinModel)
+
+The ``H̃`` matrix of the quadratic general form is not constant here because of the 
+time-varying ``\mathbf{P̄}`` weight (estimation error covariance at arrival).
+"""
 function initpred!(estim, model::LinModel)
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
     nYm, nU, nD, nŴ = nym*Nk, model.nu*Nk, model.nd*Nk, nŵ*Nk
