@@ -427,7 +427,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷ, x̂end = predict!(Ŷ, x̂, mpc, mpc.estim.model, mpc.ΔŨ)
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]    = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
-    info[:J]    = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[]
+    info[:J]    = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ)
     info[:U]    = mpc.S̃*mpc.ΔŨ + mpc.T*(mpc.estim.lastu0 + mpc.estim.model.uop)
     info[:u]    = info[:U][1:mpc.estim.model.nu]
     info[:d]    = mpc.d0 + mpc.estim.model.dop
@@ -947,7 +947,7 @@ at specific input increments `ΔŨ` and predictions `Ŷ` values.
 function obj_nonlinprog(
     mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
 ) where {NT<:Real}
-    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃)
+    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
     if !iszero(mpc.E)
         U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
         UE = [U; U[(end - model.nu + 1):end]]
