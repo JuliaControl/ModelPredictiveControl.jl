@@ -55,7 +55,7 @@ struct NonLinMPC{
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
-        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mhe(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
+        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
         H̃, q̃, p = init_quadprog_mpc(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
@@ -344,19 +344,21 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
     register(optim, :Jfunc, nvar, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(ΔŨvar...))
     if ng ≠ 0
-        i_end_Ymin, i_end_Ymax, i_end_x̂min = 1Hp*ny, 2Hp*ny, 2Hp*ny + nx̂
         for i in eachindex(con.Ymin)
             sym = Symbol("g_Ymin_$i")
             register(optim, sym, nvar, gfunc[i], autodiff=true)
         end
+        i_end_Ymin = 1Hp*ny
         for i in eachindex(con.Ymax)
             sym = Symbol("g_Ymax_$i")
             register(optim, sym, nvar, gfunc[i_end_Ymin+i], autodiff=true)
         end
+        i_end_Ymax = 2Hp*ny
         for i in eachindex(con.x̂min)
             sym = Symbol("g_x̂min_$i")
             register(optim, sym, nvar, gfunc[i_end_Ymax+i], autodiff=true)
         end
+        i_end_x̂min = 2Hp*ny + nx̂
         for i in eachindex(con.x̂max)
             sym = Symbol("g_x̂max_$i")
             register(optim, sym, nvar, gfunc[i_end_x̂min+i], autodiff=true)

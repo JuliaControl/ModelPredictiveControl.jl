@@ -994,13 +994,13 @@ function obj_nonlinprog(
 end
 
 """
-    init_defaultcon(estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂) -> con, S̃, Ñ_Hc, Ẽ
+    init_defaultcon_mpc(estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂) -> con, S̃, Ñ_Hc, Ẽ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
 Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
 """
-function init_defaultcon_mhe(
+function init_defaultcon_mpc(
     estim::StateEstimator{NT}, 
     Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
 ) where {NT<:Real}
