@@ -30,7 +30,7 @@ struct LinMPC{
     J::Matrix{NT}
     K::Matrix{NT}
     V::Matrix{NT}
-    P̃::Hermitian{NT, Matrix{NT}}
+    H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
     p::Vector{NT}
     Ks::Matrix{NT}
@@ -54,8 +54,8 @@ struct LinMPC{
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
-        con, S̃, Ñ_Hc, Ẽ = init_defaultcon(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
-        P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
+        H̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
@@ -69,7 +69,7 @@ struct LinMPC{
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, 
             R̂u, R̂y, noR̂u,
             S̃, T,
-            Ẽ, F, G, J, K, V, P̃, q̃, p,
+            Ẽ, F, G, J, K, V, H̃, q̃, p,
             Ks, Ps,
             d0, D̂0, D̂E,
             Ŷop, Dop,
@@ -121,7 +121,7 @@ arguments.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
-  (default to [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html) optimizer).
+  (default to [`OSQP`](https://osqp.org/docs/parsers/jump.html) optimizer).
 - `M_Hp` / `N_Hc` / `L_Hp` : diagonal matrices ``\mathbf{M}_{H_p}, \mathbf{N}_{H_c},
   \mathbf{L}_{H_p}``, for time-varying weights (generated from `Mwt/Nwt/Lwt` args if omitted).
 - additional keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
@@ -241,7 +241,7 @@ function init_optimization!(mpc::LinMPC, optim::JuMP.GenericModel)
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- quadratic optimization init ---
-    @objective(mpc.optim, Min, obj_quadprog(ΔŨvar, mpc.P̃, mpc.q̃))
+    @objective(mpc.optim, Min, obj_quadprog(ΔŨvar, mpc.H̃, mpc.q̃))
     return nothing
 end
 

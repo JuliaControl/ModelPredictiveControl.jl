@@ -299,7 +299,7 @@ function setconstraint!(
     i_Ymin,  i_Ymax  = .!isinf.(con.Ymin),  .!isinf.(con.Ymax)
     i_x̂min,  i_x̂max  = .!isinf.(con.x̂min),  .!isinf.(con.x̂max)
     if notSolvedYet
-        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint(model,
+        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(model,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
@@ -313,7 +313,7 @@ function setconstraint!(
         @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
         setnonlincon!(mpc, model)
     else
-        i_b, i_g = init_matconstraint(model, 
+        i_b, i_g = init_matconstraint_mpc(model, 
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max
         )
@@ -427,7 +427,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷ, x̂end = predict!(Ŷ, x̂, mpc, mpc.estim.model, mpc.ΔŨ)
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]    = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
-    info[:J]    = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ) + mpc.p[]
+    info[:J]    = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ)
     info[:U]    = mpc.S̃*mpc.ΔŨ + mpc.T*(mpc.estim.lastu0 + mpc.estim.model.uop)
     info[:u]    = info[:U][1:mpc.estim.model.nu]
     info[:d]    = mpc.d0 + mpc.estim.model.dop
@@ -775,7 +775,7 @@ The linear model predictions are evaluated by :
                &= \mathbf{E ΔU} + \mathbf{F}
 \end{aligned}
 ```
-where predicted outputs ``\mathbf{Ŷ}`` and measured disturbances ``\mathbf{D̂}`` are from 
+where the predicted outputs ``\mathbf{Ŷ}`` and measured disturbances ``\mathbf{D̂}`` are from 
 ``k + 1`` to ``k + H_p``. Input increments ``\mathbf{ΔU}`` are from ``k`` to
 ``k + H_c - 1``. The vector ``\mathbf{x̂}_{k-1}(k)`` is the state estimated at the last 
 control period. The method also computes similar matrices but for the predicted terminal 
@@ -841,7 +841,7 @@ function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where 
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
     # --- pre-compute matrix powers ---
     # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,Hp+1] = A^Hp
-    Âpow = Array{NT}(undef, size(Â,1), size(Â,2), Hp+1)
+    Âpow = Array{NT}(undef, nx̂, nx̂, Hp+1)
     Âpow[:,:,1] = I(nx̂)
     for j=2:Hp+1
         Âpow[:,:,j] = Âpow[:,:,j-1]*Â
@@ -908,41 +908,32 @@ function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where 
 end
 
 @doc raw"""
-    init_quadprog(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> P̃, q̃, p
+    init_quadprog(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> H̃, q̃, p
 
-Init the quadratic programming optimization matrix `P̃` and `q̃`.
+Init the quadratic programming optimization matrix `H̃` and `q̃` for MPC.
 
 The matrices appear in the quadratic general form :
 ```math
-    J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'P̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
+    J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'H̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
 ```
-``\mathbf{P̃}`` is constant if the model and weights are linear and time invariant (LTI). The 
+``\mathbf{H̃}`` is constant if the model and weights are linear and time invariant (LTI). The 
 vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k`` (see
-[`initpred!`](@ref) method). ``p`` does not impact the minima position. It is thus 
+`initpred!`). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel{NT}, Ẽ, S, M_Hp, N_Hc, L_Hp) where {NT<:Real}
-    P̃ = Hermitian(convert(Matrix{NT}, 2*(Ẽ'*M_Hp*Ẽ + N_Hc + S'*L_Hp*S)), :L)
-    q̃ = zeros(NT, size(P̃, 1))   # dummy value (updated just before optimization)
+function init_quadprog(::LinModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
+    H̃ = Hermitian(convert(Matrix{NT}, 2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃)), :L)
+    q̃ = zeros(NT, size(H̃, 1))   # dummy value (updated just before optimization)
     p = zeros(NT, 1)            # dummy value (updated just before optimization)
-    return P̃, q̃, p
+    return H̃, q̃, p
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-function init_quadprog(::SimModel{NT}, Ẽ, S, M_Hp, N_Hc, L_Hp) where {NT<:Real}
-    P̃ = Hermitian(zeros(NT, 0, 0))
+function init_quadprog(::SimModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
+    H̃ = Hermitian(zeros(NT, 0, 0))
     q̃ = zeros(NT, 0)
     p = zeros(NT, 1)            # dummy value (updated just before optimization)
-    return P̃, q̃, p
+    return H̃, q̃, p
 end
-
-"""
-    obj_quadprog(ΔŨ, P̃, q̃)
-
-Return the quadratic programming objective function, see [`init_quadprog`](@ref).
-
-The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
-"""
-obj_quadprog(ΔŨ, P̃, q̃) = 0.5*dot(ΔŨ, P̃, ΔŨ) + q̃'*ΔŨ
 
 """
     obj_nonlinprog(mpc::PredictiveController, model::LinModel, ΔŨ::Vector{Real})
@@ -956,7 +947,7 @@ at specific input increments `ΔŨ` and predictions `Ŷ` values.
 function obj_nonlinprog(
     mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
 ) where {NT<:Real}
-    J = obj_quadprog(ΔŨ, mpc.P̃, mpc.q̃)
+    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
     if !iszero(mpc.E)
         U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
         UE = [U; U[(end - model.nu + 1):end]]
@@ -1003,13 +994,13 @@ function obj_nonlinprog(
 end
 
 """
-    init_defaultcon(estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂) -> con, S̃, Ñ_Hc, Ẽ
+    init_defaultcon_mpc(estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂) -> con, S̃, Ñ_Hc, Ẽ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
 Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
 """
-function init_defaultcon(
+function init_defaultcon_mpc(
     estim::StateEstimator{NT}, 
     Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
 ) where {NT<:Real}
@@ -1035,7 +1026,7 @@ function init_defaultcon(
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Ymin),  .!isinf.(Ymax)
     i_x̂min,  i_x̂max  = .!isinf.(x̂min),  .!isinf.(x̂max)
-    i_b, i_g, A = init_matconstraint(
+    i_b, i_g, A = init_matconstraint_mpc(
         model, 
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min
@@ -1255,7 +1246,7 @@ function init_stochpred(estim::StateEstimator{NT}, _ ) where NT<:Real
 end
 
 @doc raw"""
-    init_matconstraint(model::LinModel,
+    init_matconstraint_mpc(model::LinModel,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
     ) -> i_b, i_g, A
 
@@ -1274,7 +1265,7 @@ The linear and nonlinear inequality constraints are respectively defined as:
 provided. In such a case, `args`  needs to contain all the inequality constraint matrices: 
 `A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max`.
 """
-function init_matconstraint(::LinModel{NT}, 
+function init_matconstraint_mpc(::LinModel{NT}, 
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
 ) where {NT<:Real}
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
@@ -1289,7 +1280,7 @@ function init_matconstraint(::LinModel{NT},
 end
 
 "Init `i_b, A` without outputs and terminal constraints if `model` is not a [`LinModel`](@ref)."
-function init_matconstraint(::SimModel{NT},
+function init_matconstraint_mpc(::SimModel{NT},
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
 ) where {NT<:Real}
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]

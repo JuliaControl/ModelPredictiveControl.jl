@@ -16,7 +16,7 @@ ModelPredictiveControl.init_predmat
 ModelPredictiveControl.init_ΔUtoU
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
-ModelPredictiveControl.init_matconstraint
+ModelPredictiveControl.init_matconstraint_mpc
 ```
 
 ## Constraint Relaxation
@@ -26,12 +26,6 @@ ModelPredictiveControl.relaxU
 ModelPredictiveControl.relaxΔU
 ModelPredictiveControl.relaxŶ
 ModelPredictiveControl.relaxterminal
-```
-
-## Predictions
-
-```@docs
-ModelPredictiveControl.initpred!
 ```
 
 ## Constraints

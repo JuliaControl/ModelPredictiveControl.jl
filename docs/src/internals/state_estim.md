@@ -4,6 +4,13 @@
 Pages = ["state_estim.md"]
 ```
 
+## Augmented Model
+
+```@docs
+ModelPredictiveControl.f̂
+ModelPredictiveControl.ĥ
+```
+
 ## Estimator Construction
 
 ```@docs
@@ -12,13 +19,8 @@ ModelPredictiveControl.init_integrators
 ModelPredictiveControl.augment_model
 ModelPredictiveControl.init_ukf
 ModelPredictiveControl.init_internalmodel
-```
-
-## Augmented Model
-
-```@docs
-ModelPredictiveControl.f̂
-ModelPredictiveControl.ĥ
+ModelPredictiveControl.init_predmat_mhe
+ModelPredictiveControl.init_matconstraint_mhe
 ```
 
 ## Evaluate Estimated Output

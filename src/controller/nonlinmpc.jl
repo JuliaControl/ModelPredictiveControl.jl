@@ -32,7 +32,7 @@ struct NonLinMPC{
     J::Matrix{NT}
     K::Matrix{NT}
     V::Matrix{NT}
-    P̃::Hermitian{NT, Matrix{NT}}
+    H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
     p::Vector{NT}
     Ks::Matrix{NT}
@@ -55,8 +55,8 @@ struct NonLinMPC{
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
-        con, S̃, Ñ_Hc, Ẽ = init_defaultcon(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
-        P̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
+        H̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
@@ -70,7 +70,7 @@ struct NonLinMPC{
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, 
             R̂u, R̂y, noR̂u,
             S̃, T,  
-            Ẽ, F, G, J, K, V, P̃, q̃, p,
+            Ẽ, F, G, J, K, V, H̃, q̃, p,
             Ks, Ps,
             d0, D̂0, D̂E,
             Ŷop, Dop,
@@ -136,7 +136,7 @@ This method uses the default state estimator :
   \mathbf{L}_{H_p}``, for time-varying weights (generated from `Mwt/Nwt/Lwt` args if omitted).
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
-   (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl) optimizer).
+   (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
@@ -344,19 +344,21 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
     register(optim, :Jfunc, nvar, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(ΔŨvar...))
     if ng ≠ 0
-        i_end_Ymin, i_end_Ymax, i_end_x̂min = 1Hp*ny, 2Hp*ny, 2Hp*ny + nx̂
         for i in eachindex(con.Ymin)
             sym = Symbol("g_Ymin_$i")
             register(optim, sym, nvar, gfunc[i], autodiff=true)
         end
+        i_end_Ymin = 1Hp*ny
         for i in eachindex(con.Ymax)
             sym = Symbol("g_Ymax_$i")
             register(optim, sym, nvar, gfunc[i_end_Ymin+i], autodiff=true)
         end
+        i_end_Ymax = 2Hp*ny
         for i in eachindex(con.x̂min)
             sym = Symbol("g_x̂min_$i")
             register(optim, sym, nvar, gfunc[i_end_Ymax+i], autodiff=true)
         end
+        i_end_x̂min = 2Hp*ny + nx̂
         for i in eachindex(con.x̂max)
             sym = Symbol("g_x̂max_$i")
             register(optim, sym, nvar, gfunc[i_end_x̂min+i], autodiff=true)
