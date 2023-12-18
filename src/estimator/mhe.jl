@@ -1,7 +1,14 @@
 const DEFAULT_LINMHE_OPTIMIZER    = OSQP.MathOptInterfaceOSQP.Optimizer
 const DEFAULT_NONLINMHE_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
 
-"Include all the data for the constraints of [`MovingHorizonEstimator`](@ref)"
+@doc raw"""
+Include all the data for the constraints of [`MovingHorizonEstimator`](@ref).
+
+The bounds on the estimated state at arrival ``\mathbf{x̂}_k(k-N_k+1)`` is separated from
+the other state constraints ``\mathbf{x̂}_k(k-N_k+2), \mathbf{x̂}_k(k-N_k+3), ...`` since
+the former is always a linear inequality constraint (it's a decision variable). The fields
+`x̂min` and `x̂max` refer to the bounds at the arrival, and `X̂min` and `X̂max`, the others.
+"""
 struct EstimatorConstraint{NT<:Real}
     Ẽx̂      ::Matrix{NT}
     Fx̂      ::Vector{NT}
@@ -144,7 +151,7 @@ This estimator can handle constraints on the estimates, see [`setconstraint!`](@
 Additionally, `model` is not linearized like the [`ExtendedKalmanFilter`](@ref), and the
 probability distribution is not approximated like the [`UnscentedKalmanFilter`](@ref). The
 computational costs are drastically higher, however, since it minimizes the following
-nonlinear objective function at each discrete time ``k``:
+objective function at each discrete time ``k``:
 ```math
 \min_{\mathbf{x̂}_k(k-N_k+1), \mathbf{Ŵ}}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
                                          + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
@@ -164,8 +171,11 @@ and the covariances are repeated ``N_k`` times:
     \mathbf{R̂}_{N_k} &= \text{diag}\mathbf{(R̂,R̂,...,R̂)} 
 \end{aligned}
 ```
-The estimation horizon ``H_e`` limits the window length ``N_k = \min(k+1, H_e)``. The 
-vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
+The estimation horizon ``H_e`` limits the window length: 
+```math
+    N_k = \min(k+1, H_e)
+```
+The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
 ``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
 Extended Help explicitly defines the two vectors. See [`SteadyKalmanFilter`](@ref) for
 details on ``\mathbf{R̂}, \mathbf{Q̂}`` covariances and model augmentation. The process
@@ -179,7 +189,7 @@ model is identical to the one in [`UnscentedKalmanFilter`](@ref) documentation. 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
 - `He=nothing`: estimation horizon ``H_e``, must be specified.
-- `optim=default_mhe_optim(model)` : quadratic or nonlinear optimizer used in the moving 
+- `optim=default_optim_mhe(model)` : quadratic or nonlinear optimizer used in the moving 
    horizon estimator, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl), or [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html)
    if `model` is a [`LinModel`](@ref)).
@@ -191,7 +201,7 @@ model is identical to the one in [`UnscentedKalmanFilter`](@ref) documentation. 
 julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1);
 
 julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP0=[0.01])
-MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, NonLinModel and:
+MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer, NonLinModel and:
  5 estimation steps He
  1 manipulated inputs u (0 integrating states)
  2 states x̂
@@ -238,7 +248,7 @@ function MovingHorizonEstimator(
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
     σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
-    optim::JM = default_mhe_optim(model),
+    optim::JM = default_optim_mhe(model),
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     # estimated covariances matrices (variance = σ²) :
     P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
@@ -251,9 +261,9 @@ function MovingHorizonEstimator(
 end
 
 "Return a `JuMP.Model` with OSQP optimizer if `model` is a [`LinModel`](@ref)."
-default_mhe_optim(::LinModel) = JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=false)
+default_optim_mhe(::LinModel) = JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=false)
 "Else, return it with Ipopt optimizer."
-default_mhe_optim(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
+default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
 
 @doc raw"""
     MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, optim)
@@ -618,7 +628,7 @@ end
 
 Set the constraint parameters of `estim` [`MovingHorizonEstimator`](@ref).
    
-The moving horizon estimator supports constraints on the estimated states ``\mathbf{x̂}``,
+The moving horizon estimator supports constraints on the estimated state ``\mathbf{x̂}``,
 process noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
@@ -627,9 +637,9 @@ process noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
     \mathbf{v̂_{min}} ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max}}  &&\qquad  j = N_k, N_k - 1, ... , 1
 \end{alignat*}
 ```
-Note that state and process noise constraints are applied on augmented model vectors (see
-the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation). Also, 
-constraining the estimated sensor noises is equivalent to constraining the innovation term
+Note that the state and process noise constraints are applied on augmented model vectors 
+(see the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation). Also, 
+constraining the estimated sensor noises is equivalent to constraining the innovation term, 
 since ``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)`` in the MHE. See Extended Help
 for time-varying constraints.
 
@@ -653,7 +663,7 @@ for time-varying constraints.
 julia> estim = MovingHorizonEstimator(LinModel(ss(0.5,1,1,0,1)), He=3);
 
 julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
-MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, LinModel and:
+MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, LinModel and:
  3 estimation steps He
  1 manipulated inputs u (0 integrating states)
  2 states x̂
@@ -822,6 +832,16 @@ function setnonlincon!(estim::MovingHorizonEstimator, ::NonLinModel)
     return nothing
 end
 
+function Base.show(io::IO, estim::MovingHorizonEstimator)
+    nu, nd = estim.model.nu, estim.model.nd
+    nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
+    n = maximum(ndigits.((nu, nx̂, nym, nyu, nd))) + 1
+    println(io, "$(typeof(estim).name.name) estimator with a sample time "*
+                "Ts = $(estim.model.Ts) s, $(solver_name(estim.optim)) optimizer, "*
+                "$(typeof(estim.model).name.name) and:")
+    print_estim_dim(io, estim, n)
+end
+
 "Print the overall dimensions of the state estimator `estim` with left padding `n`."
 function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n)
     nu, nd = estim.model.nu, estim.model.nd
@@ -902,9 +922,6 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     isfinite(J0) || (Z̃0 = [estim.x̂arr_old; zeros(NT, nŴ)])
     set_start_value.(Z̃var, Z̃0)
     # ------- solve optimization problem --------------
-    # at start, when time windows are not filled, some decision variables are fixed at 0:
-    # unfix.(Z̃var[is_fixed.(Z̃var)])
-    # fix.(Z̃var[(1 + nx̂*(Nk+1)):end], 0) 
     try
         optimize!(optim)
     catch err
@@ -1043,14 +1060,22 @@ function obj_nonlinprog(
 end
 
 """
-    predict!(V̂, X̂, estim::MovingHorizonEstimator, model::SimModel, Z̃) -> V̂, X̂
+    predict!(V̂, X̂, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂
 
-Compute the `V̂` vector and `X̂` vectors for the `MovingHorizonEstimator`.
+Compute the `V̂` vector and `X̂` vectors for the `MovingHorizonEstimator` and `LinModel`.
 
 The method mutates `V̂` and `X̂` vector arguments. The vector `V̂` is the estimated sensor
 noises `V̂` from ``k-N_k+1`` to ``k``. The `X̂` vector is estimated states from ``k-N_k+2`` to
 ``k+1``.
 """
+function predict!(V̂, X̂, estim::MovingHorizonEstimator, ::LinModel, Z̃)
+    nX̂, nYm = estim.nx̂*estim.Nk[], estim.nym*estim.Nk[]
+    V̂[1:nYm] = estim.Ẽ*Z̃ + estim.F
+    X̂[1:nX̂]  = estim.con.Ẽx̂*Z̃ + estim.con.Fx̂
+    return V̂, X̂
+end
+
+"Compute the two vectors when `model` is not a `LinModel`."
 function predict!(
     V̂, X̂, estim::MovingHorizonEstimator, model::SimModel, Z̃::Vector{T}
 ) where {T<:Real}
