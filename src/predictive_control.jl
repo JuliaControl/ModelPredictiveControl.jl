@@ -918,7 +918,7 @@ The matrices appear in the quadratic general form :
 ```
 ``\mathbf{H̃}`` is constant if the model and weights are linear and time invariant (LTI). The 
 vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k`` (see
-[`initpred!`](@ref) method). ``p`` does not impact the minima position. It is thus 
+`initpred!`). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
 function init_quadprog(::LinModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}

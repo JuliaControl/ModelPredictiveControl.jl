@@ -173,7 +173,9 @@ and the covariances are repeated ``N_k`` times:
 ```
 The estimation horizon ``H_e`` limits the window length: 
 ```math
-    N_k = \min(k+1, H_e)
+N_k =                     \begin{cases} 
+    k + 1   &  k < H_e    \\
+    H_e     &  k ≥ H_e    \end{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
 ``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
@@ -228,12 +230,15 @@ The estimated process and sensor noises are defined as:
     \mathbf{v̂}(k)
 \end{bmatrix}
 ```
-in which ``\mathbf{v̂}(k-j) = 
-\mathbf{y^m}(k-j) - \mathbf{ĥ^m}\big(\mathbf{x̂}_k(k-j), \mathbf{d}(k-j)\big)`` from ``j = 
-N_k-1`` to ``0``. The augmented model ``\mathbf{f̂}`` with the process noise recursively
-generates the state estimates ``\mathbf{x̂}_k(k-j+1) = 
-\mathbf{f̂}\big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\big) + \mathbf{ŵ}(k-j)``
-from ``j=N_k-1`` to ``0``. 
+based on the augmented model ``\mathbf{f̂, ĥ^m}``:
+```math
+\begin{aligned}
+    \mathbf{x̂}_k(k-j+1) &= \mathbf{f̂}\Big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\Big) 
+                           + \mathbf{ŵ}(k-j) \\
+    \mathbf{v̂}(k-j)     &= \mathbf{y^m}(k-j) 
+                           - \mathbf{ĥ^m}\Big(\mathbf{x̂}_k(k-j), \mathbf{d}(k-j)\Big)
+\end{aligned}
+```
 """
 function MovingHorizonEstimator(
     model::SM;
@@ -343,30 +348,34 @@ function relaxV̂(::SimModel{NT}, E) where {NT<:Real}
 end
 
 @doc raw"""
-    init_predmat_mhe(model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d) -> E, F, G, J, ex̄, fx̄
+    init_predmat_mhe(
+        model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d
+    ) -> E, F, G, J, ex̄, fx̄, Ex̂, Fx̂, Gx̂, Jx̂
 
 Construct the MHE prediction matrices for [`LinModel`](@ref) `model`.
 
 Introducing the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂_k}(k-H_e+1) 
-\\ \mathbf{Ŵ} \begin{smallmatrix}]`` with the decision variables, the estimated sensor
+\\ \mathbf{Ŵ} \end{smallmatrix}]`` with the decision variables, the estimated sensor
 noises from time ``k-H_e+1`` to ``k`` are computed by:
 ```math
 \begin{aligned}
-    \mathbf{V̂} = \mathbf{Y^m - Ŷ^m} &= \mathbf{E Z + G U + J D + Y^m}     \\
-                                    &= \mathbf{E Z + F}
+\mathbf{V̂} = \mathbf{Y^m - Ŷ^m} &= \mathbf{E Z + G U + J D + Y^m}     \\
+                                &= \mathbf{E Z + F}
 \end{aligned}
-in which ``U``, ``D`` and ``Y^m`` contains respectively the manipulated inputs and measured
-disturbances and measured outputs from time ``k-H_e+1`` to ``k``. The method also returns
-similar matrices but for the estimation error at arrival:
+```
+in which ``\mathbf{U, D}`` and ``\mathbf{Y^m}`` contains respectively the manipulated inputs
+and measured disturbances and measured outputs from time ``k-H_e+1`` to ``k``. The method 
+also returns similar matrices but for the estimation error at arrival:
 ```math
-    \mathbf{x̄} = \mathbf{x̂}_{k-He}(k-H_e+1) - \mathbf{x̂}_{k}(k-H_e+1) = \mathbf{e_x̄ Z + f_x̄}
+\mathbf{x̄} = \mathbf{x̂}_{k-H_e}(k-H_e+1) - \mathbf{x̂}_{k}(k-H_e+1) = \mathbf{e_x̄ Z + f_x̄}
 ```
 Lastly, the estimated states from time ``k-H_e+2`` to ``k+1`` are given by the equation:
 ```math
 \begin{aligned}
-    \mathbf{X̂}  &= \mathbf{E_x̂ Z + G_x̂ U + J_x̂ D} \\
-                &= \mathbf{E_x̂ Z + F_x̂}
+\mathbf{X̂}  &= \mathbf{E_x̂ Z + G_x̂ U + J_x̂ D} \\
+            &= \mathbf{E_x̂ Z + F_x̂}
 \end{aligned}
+```
 All these equations omit the operating points ``\mathbf{u_{op}, y_{op}, d_{op}}``. These
 matrices are truncated when ``N_k < H_e`` (at the beginning).
 
@@ -377,7 +386,7 @@ for the sensor noises are computed by (notice the minus signs after the equaliti
 \begin{aligned}
 \mathbf{E} &= - \begin{bmatrix}
     \mathbf{Ĉ^m}\mathbf{A}^{0}                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-    \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}                                  & \cdots & \mathbf{0}   \\ 
+    \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{A}^{0}                    & \cdots & \mathbf{0}   \\ 
     \vdots                                      & \vdots                                        & \ddots & \vdots       \\
     \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}              & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}                & \cdots & \mathbf{0}   \end{bmatrix} \\
 \mathbf{G} &= - \begin{bmatrix}
@@ -649,12 +658,12 @@ for time-varying constraints.
     will not re-assign to its default value (defaults are set at construction only).
 
 - `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints.
-- `x̂min = fill(-Inf,nx̂)` : augmented state vector lower bounds ``\mathbf{x̂_{min}}``.
-- `x̂max = fill(+Inf,nx̂)` : augmented state vector upper bounds ``\mathbf{x̂_{max}}``.
-- `ŵmin = fill(-Inf,nx̂)` : augmented process noise vector lower bounds ``\mathbf{ŵ_{min}}``.
-- `ŵmax = fill(+Inf,nx̂)` : augmented process noise vector upper bounds ``\mathbf{ŵ_{max}}``.
-- `v̂min = fill(-Inf,nym)` : sensor noise vector lower bounds ``\mathbf{v̂_{min}}``.
-- `v̂max = fill(+Inf,nym)` : sensor noise vector upper bounds ``\mathbf{v̂_{max}}``.
+- `x̂min = fill(-Inf,nx̂)`  : augmented state lower bounds ``\mathbf{x̂_{min}}``.
+- `x̂max = fill(+Inf,nx̂)`  : augmented state upper bounds ``\mathbf{x̂_{max}}``.
+- `ŵmin = fill(-Inf,nx̂)`  : augmented process noise lower bounds ``\mathbf{ŵ_{min}}``.
+- `ŵmax = fill(+Inf,nx̂)`  : augmented process noise upper bounds ``\mathbf{ŵ_{max}}``.
+- `v̂min = fill(-Inf,nym)` : sensor noise lower bounds ``\mathbf{v̂_{min}}``.
+- `v̂max = fill(+Inf,nym)` : sensor noise upper bounds ``\mathbf{v̂_{max}}``.
 - all the keyword arguments above but with a capital letter, e.g. `X̂max` or `V̂max` : for
   time-varying constraints (see Extended Help).
 
@@ -967,7 +976,7 @@ time-varying ``\mathbf{P̄}`` weight (the estimation error covariance at arrival
 """
 function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
-    nYm, nU, nD, nŴ = nym*Nk, model.nu*Nk, model.nd*Nk, nŵ*Nk
+    nYm, nŴ = nym*Nk, nŵ*Nk
     nZ̃ = nx̂ + nŴ
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
     # --- update F and fx̄ vectors for MHE predictions ---
@@ -1068,10 +1077,12 @@ The method mutates `V̂` and `X̂` vector arguments. The vector `V̂` is the est
 noises `V̂` from ``k-N_k+1`` to ``k``. The `X̂` vector is estimated states from ``k-N_k+2`` to
 ``k+1``.
 """
-function predict!(V̂, X̂, estim::MovingHorizonEstimator, ::LinModel, Z̃)
-    nX̂, nYm = estim.nx̂*estim.Nk[], estim.nym*estim.Nk[]
-    V̂[1:nYm] = estim.Ẽ*Z̃ + estim.F
-    X̂[1:nX̂]  = estim.con.Ẽx̂*Z̃ + estim.con.Fx̂
+function predict!(
+    V̂, X̂, estim::MovingHorizonEstimator, ::LinModel, Z̃::Vector{T}
+) where {T<:Real}
+    nX̂, nYm, nZ̃ = estim.nx̂*estim.Nk[], estim.nym*estim.Nk[], estim.nx̂+estim.nx̂*estim.Nk[]
+    V̂[1:nYm] = @views estim.Ẽ[1:nYm, 1:nZ̃]*Z̃[1:nZ̃] + estim.F[1:nYm]
+    X̂[1:nX̂]  = @views estim.con.Ẽx̂[1:nX̂, 1:nZ̃]*Z̃[1:nZ̃] + estim.con.Fx̂[1:nX̂]
     return V̂, X̂
 end
 

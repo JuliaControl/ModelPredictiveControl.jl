@@ -28,12 +28,6 @@ ModelPredictiveControl.relaxŶ
 ModelPredictiveControl.relaxterminal
 ```
 
-## Predictions
-
-```@docs
-ModelPredictiveControl.initpred!
-```
-
 ## Constraints
 
 ```@docs
