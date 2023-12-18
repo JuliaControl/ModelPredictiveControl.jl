@@ -61,8 +61,8 @@ struct NonLinMPC{
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
-        nvar = size(Ẽ, 2)
-        ΔŨ = zeros(NT, nvar)
+        nΔŨ = size(Ẽ, 2)
+        ΔŨ = zeros(NT, nΔŨ)
         mpc = new{NT, SE, JM, JEFunc}(
             estim, optim, con,
             ΔŨ, ŷ,
@@ -274,10 +274,10 @@ Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
     # --- variables and linear constraints ---
     con = mpc.con
-    nvar = length(mpc.ΔŨ)
+    nΔŨ = length(mpc.ΔŨ)
     set_silent(optim)
     limit_solve_time(mpc)
-    @variable(optim, ΔŨvar[1:nvar])
+    @variable(optim, ΔŨvar[1:nΔŨ])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
@@ -285,11 +285,11 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
     model = mpc.estim.model
     ny, nx̂, Hp, ng = model.ny, mpc.estim.nx̂, mpc.Hp, length(con.i_g)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
-    Jfunc, gfunc = let mpc=mpc, model=model, ng=ng, nvar=nvar , nŶ=Hp*ny, nx̂=nx̂
+    Jfunc, gfunc = let mpc=mpc, model=model, ng=ng, nΔŨ=nΔŨ , nŶ=Hp*ny, nx̂=nx̂
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
-        Ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŶ), nvar + 3)
-        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), nvar + 3)
-        x̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), nvar + 3)
+        Ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŶ), nΔŨ + 3)
+        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), nΔŨ + 3)
+        x̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), nΔŨ + 3)
         function Jfunc(ΔŨtup::JNT...)
             Ŷ = get_tmp(Ŷ_cache, ΔŨtup[1])
             ΔŨ = collect(ΔŨtup)
@@ -341,27 +341,27 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
         gfunc = [(ΔŨ...) -> gfunc_i(i, ΔŨ) for i in 1:ng]
         (Jfunc, gfunc)
     end
-    register(optim, :Jfunc, nvar, Jfunc, autodiff=true)
+    register(optim, :Jfunc, nΔŨ, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(ΔŨvar...))
     if ng ≠ 0
         for i in eachindex(con.Ymin)
             sym = Symbol("g_Ymin_$i")
-            register(optim, sym, nvar, gfunc[i], autodiff=true)
+            register(optim, sym, nΔŨ, gfunc[i], autodiff=true)
         end
         i_end_Ymin = 1Hp*ny
         for i in eachindex(con.Ymax)
             sym = Symbol("g_Ymax_$i")
-            register(optim, sym, nvar, gfunc[i_end_Ymin+i], autodiff=true)
+            register(optim, sym, nΔŨ, gfunc[i_end_Ymin+i], autodiff=true)
         end
         i_end_Ymax = 2Hp*ny
         for i in eachindex(con.x̂min)
             sym = Symbol("g_x̂min_$i")
-            register(optim, sym, nvar, gfunc[i_end_Ymax+i], autodiff=true)
+            register(optim, sym, nΔŨ, gfunc[i_end_Ymax+i], autodiff=true)
         end
         i_end_x̂min = 2Hp*ny + nx̂
         for i in eachindex(con.x̂max)
             sym = Symbol("g_x̂max_$i")
-            register(optim, sym, nvar, gfunc[i_end_x̂min+i], autodiff=true)
+            register(optim, sym, nΔŨ, gfunc[i_end_x̂min+i], autodiff=true)
         end
     end
     return nothing

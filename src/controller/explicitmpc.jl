@@ -53,8 +53,8 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
-        nvar = size(Ẽ, 2)
-        ΔŨ = zeros(NT, nvar)
+        nΔŨ = size(Ẽ, 2)
+        ΔŨ = zeros(NT, nΔŨ)
         mpc = new{NT, SE}(
             estim,
             ΔŨ, ŷ,

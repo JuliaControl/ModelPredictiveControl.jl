@@ -145,7 +145,7 @@ end
 @doc raw"""
     MovingHorizonEstimator(model::SimModel; <keyword arguments>)
 
-Construct a moving horizon estimator based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
+Construct a moving horizon estimator (MHE) based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
 
 This estimator can handle constraints on the estimates, see [`setconstraint!`](@ref).
 Additionally, `model` is not linearized like the [`ExtendedKalmanFilter`](@ref), and the
@@ -519,10 +519,10 @@ function init_optimization!(
     He, con = estim.He, estim.con
     nŶm, nX̂, ng = He*estim.nym, He*estim.nx̂, length(con.i_g)
     # --- variables and linear constraints ---
-    nvar = length(estim.Z̃)
+    nZ̃ = length(estim.Z̃)
     set_silent(optim)
     #limit_solve_time(estim) #TODO: add this feature
-    @variable(optim, Z̃var[1:nvar])
+    @variable(optim, Z̃var[1:nZ̃])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
@@ -541,20 +541,20 @@ function init_optimization!(
     He, con = estim.He, estim.con
     nV̂, nX̂, ng = He*estim.nym, He*estim.nx̂, length(con.i_g)
     # --- variables and linear constraints ---
-    nvar = length(estim.Z̃)
+    nZ̃ = length(estim.Z̃)
     set_silent(optim)
     #limit_solve_time(estim) #TODO: add this feature
-    @variable(optim, Z̃var[1:nvar])
+    @variable(optim, Z̃var[1:nZ̃])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
     # --- nonlinear optimization init ---
     # see init_optimization!(mpc::NonLinMPC, optim) for details on the inspiration
-    Jfunc, gfunc = let estim=estim, model=model, nvar=nvar , nV̂=nV̂, nX̂=nX̂, ng=ng
+    Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃ , nV̂=nV̂, nX̂=nX̂, ng=ng
         last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
-        V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), nvar + 3)
-        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), nvar + 3)
-        X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), nvar + 3)
+        V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), nZ̃ + 3)
+        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), nZ̃ + 3)
+        X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), nZ̃ + 3)
         function Jfunc(Z̃tup::JNT...)
             V̂ = get_tmp(V̂_cache, Z̃tup[1])
             Z̃ = collect(Z̃tup)
@@ -606,27 +606,27 @@ function init_optimization!(
         gfunc = [(Z̃...) -> gfunc_i(i, Z̃) for i in 1:ng]
         Jfunc, gfunc
     end
-    register(optim, :Jfunc, nvar, Jfunc, autodiff=true)
+    register(optim, :Jfunc, nZ̃, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(Z̃var...))
     if ng ≠ 0
         for i in eachindex(con.X̂min)
             sym = Symbol("g_X̂min_$i")
-            register(optim, sym, nvar, gfunc[i], autodiff=true)
+            register(optim, sym, nZ̃, gfunc[i], autodiff=true)
         end
         i_end_X̂min = nX̂
         for i in eachindex(con.X̂max)
             sym = Symbol("g_X̂max_$i")
-            register(optim, sym, nvar, gfunc[i_end_X̂min+i], autodiff=true)
+            register(optim, sym, nZ̃, gfunc[i_end_X̂min+i], autodiff=true)
         end
         i_end_X̂max = 2*nX̂
         for i in eachindex(con.V̂min)
             sym = Symbol("g_V̂min_$i")
-            register(optim, sym, nvar, gfunc[i_end_X̂max+i], autodiff=true)
+            register(optim, sym, nZ̃, gfunc[i_end_X̂max+i], autodiff=true)
         end
         i_end_V̂min = 2*nX̂ + nV̂
         for i in eachindex(con.V̂max)
             sym = Symbol("g_V̂max_$i")
-            register(optim, sym, nvar, gfunc[i_end_V̂min+i], autodiff=true)
+            register(optim, sym, nZ̃, gfunc[i_end_V̂min+i], autodiff=true)
         end
     end
     return nothing
