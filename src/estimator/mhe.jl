@@ -618,7 +618,8 @@ end
 
 Set the constraint parameters of `estim` [`MovingHorizonEstimator`](@ref).
    
-The constraints of the moving horizon estimator are defined as:
+The moving horizon estimator supports constraints on the estimated states ``\mathbf{x̂}``,
+process noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
     \mathbf{x̂_{min}} ≤&&\   \mathbf{x̂}_k(k-j+1) &≤ \mathbf{x̂_{max}}  &&\qquad  j = N_k, N_k - 1, ... , 0    \\
@@ -626,8 +627,11 @@ The constraints of the moving horizon estimator are defined as:
     \mathbf{v̂_{min}} ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max}}  &&\qquad  j = N_k, N_k - 1, ... , 1
 \end{alignat*}
 ```
-Note that state constraints are applied on the augmented state vector ``\mathbf{x̂}`` (see
-the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation).
+Note that state and process noise constraints are applied on augmented model vectors (see
+the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation). Also, 
+constraining the estimated sensor noises is equivalent to constraining the innovation term
+since ``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)`` in the MHE. See Extended Help
+for time-varying constraints.
 
 # Arguments
 !!! info
@@ -637,7 +641,11 @@ the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation).
 - `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints.
 - `x̂min = fill(-Inf,nx̂)` : augmented state vector lower bounds ``\mathbf{x̂_{min}}``.
 - `x̂max = fill(+Inf,nx̂)` : augmented state vector upper bounds ``\mathbf{x̂_{max}}``.
-- all the keyword arguments above but with a capital letter, e.g. `X̂max` or `X̂min` : for
+- `ŵmin = fill(-Inf,nx̂)` : augmented process noise vector lower bounds ``\mathbf{ŵ_{min}}``.
+- `ŵmax = fill(+Inf,nx̂)` : augmented process noise vector upper bounds ``\mathbf{ŵ_{max}}``.
+- `v̂min = fill(-Inf,nym)` : sensor noise vector lower bounds ``\mathbf{v̂_{min}}``.
+- `v̂max = fill(+Inf,nym)` : sensor noise vector upper bounds ``\mathbf{v̂_{max}}``.
+- all the keyword arguments above but with a capital letter, e.g. `X̂max` or `V̂max` : for
   time-varying constraints (see Extended Help).
 
 # Examples
@@ -653,6 +661,23 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, LinModel and:
  0 unmeasured outputs yu
  0 measured disturbances d
 ```
+
+# Extended Help
+
+For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
+that is, at runtime, except for `±Inf` bounds. It is also possible to specify time-varying
+constraints over the horizon. In such a case, they are defined by:
+```math 
+\begin{alignat*}{3}
+    \mathbf{X̂_{min}} ≤&&\ \mathbf{X̂}  &≤ \mathbf{X̂_{max}} \\
+    \mathbf{Ŵ_{min}} ≤&&\ \mathbf{Ŵ}  &≤ \mathbf{Ŵ_{max}} \\
+    \mathbf{V̂_{min}} ≤&&\ \mathbf{V̂}  &≤ \mathbf{V̂_{max}}
+\end{alignat*}
+```
+For this, use the same keyword arguments as above but with a capital letter:
+- `X̂min` / `X̂max` : ``\mathbf{X̂}`` constraints `(nx̂*(He+1),)`.
+- `Ŵmin` / `Ŵmax` : ``\mathbf{Ŵ}`` constraints `(nx̂*He,)`.
+- `V̂min` / `V̂max` : ``\mathbf{V̂}`` constraints `(nym*He,)`.
 """
 function setconstraint!(
     estim::MovingHorizonEstimator; 

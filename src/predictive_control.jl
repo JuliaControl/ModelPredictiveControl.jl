@@ -299,7 +299,7 @@ function setconstraint!(
     i_Ymin,  i_Ymax  = .!isinf.(con.Ymin),  .!isinf.(con.Ymax)
     i_x̂min,  i_x̂max  = .!isinf.(con.x̂min),  .!isinf.(con.x̂max)
     if notSolvedYet
-        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint(model,
+        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(model,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
@@ -313,7 +313,7 @@ function setconstraint!(
         @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
         setnonlincon!(mpc, model)
     else
-        i_b, i_g = init_matconstraint(model, 
+        i_b, i_g = init_matconstraint_mpc(model, 
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max
         )
@@ -545,7 +545,7 @@ end
 
 Init linear model prediction matrices `F, q̃, p` and current estimated output `ŷ`.
 
-See [`init_predmat`](@ref) and [`init_quadprog_mpc`](@ref) for the definition of the matrices.
+See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u)
     mpc.ŷ[:] = evalŷ(mpc.estim, ym, d)
@@ -908,7 +908,7 @@ function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where 
 end
 
 @doc raw"""
-    init_quadprog_mpc(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> H̃, q̃, p
+    init_quadprog(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> H̃, q̃, p
 
 Init the quadratic programming optimization matrix `H̃` and `q̃` for MPC.
 
@@ -921,14 +921,14 @@ vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period 
 [`initpred!`](@ref) method). ``p`` does not impact the minima position. It is thus 
 useless at optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog_mpc(::LinModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
+function init_quadprog(::LinModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
     H̃ = Hermitian(convert(Matrix{NT}, 2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃)), :L)
     q̃ = zeros(NT, size(H̃, 1))   # dummy value (updated just before optimization)
     p = zeros(NT, 1)            # dummy value (updated just before optimization)
     return H̃, q̃, p
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
-function init_quadprog_mpc(::SimModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
+function init_quadprog(::SimModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
     H̃ = Hermitian(zeros(NT, 0, 0))
     q̃ = zeros(NT, 0)
     p = zeros(NT, 1)            # dummy value (updated just before optimization)
@@ -1026,7 +1026,7 @@ function init_defaultcon_mpc(
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Ymin),  .!isinf.(Ymax)
     i_x̂min,  i_x̂max  = .!isinf.(x̂min),  .!isinf.(x̂max)
-    i_b, i_g, A = init_matconstraint(
+    i_b, i_g, A = init_matconstraint_mpc(
         model, 
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min
@@ -1246,7 +1246,7 @@ function init_stochpred(estim::StateEstimator{NT}, _ ) where NT<:Real
 end
 
 @doc raw"""
-    init_matconstraint(model::LinModel,
+    init_matconstraint_mpc(model::LinModel,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
     ) -> i_b, i_g, A
 
@@ -1265,7 +1265,7 @@ The linear and nonlinear inequality constraints are respectively defined as:
 provided. In such a case, `args`  needs to contain all the inequality constraint matrices: 
 `A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max`.
 """
-function init_matconstraint(::LinModel{NT}, 
+function init_matconstraint_mpc(::LinModel{NT}, 
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
 ) where {NT<:Real}
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
@@ -1280,7 +1280,7 @@ function init_matconstraint(::LinModel{NT},
 end
 
 "Init `i_b, A` without outputs and terminal constraints if `model` is not a [`LinModel`](@ref)."
-function init_matconstraint(::SimModel{NT},
+function init_matconstraint_mpc(::SimModel{NT},
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
 ) where {NT<:Real}
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
