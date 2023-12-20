@@ -119,8 +119,13 @@ for more detailed examples.
 - [x] easily estimate unmeasured disturbances by adding one or more integrators at the:
   - [x] manipulated inputs
   - [x] measured outputs
-- [x] bumpless manual to automatic transfer for control with a proper intial estimate
+- [x] bumpless manual to automatic transfer for control with a proper initial estimate
 - [x] observers in predictor form to ease control applications
-- [x] moving horizon estimator that supports:
-  - [x] inequality state constraints
+- [x] moving horizon estimator in two formulations:
+  - [x] linear plant models (quadratic optimization)
+  - [x] nonlinear plant models (nonlinear optimization)
+- [x] moving horizon estimator constraints on:
+  - [x] state estimates
+  - [x] process noise estimates
+  - [x] sensor noise estimates
   - [ ] zero process noise equality constraint to reduce the problem size

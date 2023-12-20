@@ -193,7 +193,7 @@ model is identical to the one in [`UnscentedKalmanFilter`](@ref) documentation. 
 - `He=nothing`: estimation horizon ``H_e``, must be specified.
 - `optim=default_optim_mhe(model)` : quadratic or nonlinear optimizer used in the moving 
    horizon estimator, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
-   (default to [`Ipopt.jl`](https://github.com/jump-dev/Ipopt.jl), or [`OSQP.jl`](https://osqp.org/docs/parsers/jump.html)
+   (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl), or [`OSQP`](https://osqp.org/docs/parsers/jump.html)
    if `model` is a [`LinModel`](@ref)).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 - `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
@@ -562,7 +562,7 @@ function init_optimization!(
                 g = get_tmp(g_cache, Z̃tup[1])
                 X̂ = get_tmp(X̂_cache, Z̃tup[1])
                 V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂)
+                g = con_nonlinprog!(g, estim, model, X̂, V̂)
                 last_Z̃tup_float = Z̃tup
             end
             return obj_nonlinprog(estim, model, V̂, Z̃)
@@ -574,7 +574,7 @@ function init_optimization!(
                 g = get_tmp(g_cache, Z̃tup[1])
                 X̂ = get_tmp(X̂_cache, Z̃tup[1])
                 V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂)
+                g = con_nonlinprog!(g, estim, model, X̂, V̂)
                 last_Z̃tup_dual = Z̃tup
             end
             return obj_nonlinprog(estim, model, V̂, Z̃)
@@ -586,7 +586,7 @@ function init_optimization!(
                 X̂ = get_tmp(X̂_cache, Z̃tup[1])
                 Z̃ = collect(Z̃tup)
                 V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂)
+                g = con_nonlinprog!(g, estim, model, X̂, V̂)
                 last_Z̃tup_float = Z̃tup
             end
             return g[i]
@@ -598,7 +598,7 @@ function init_optimization!(
                 X̂ = get_tmp(X̂_cache, Z̃tup[1])
                 Z̃ = collect(Z̃tup)
                 V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂)
+                g = con_nonlinprog!(g, estim, model, X̂, V̂)
                 last_Z̃tup_dual = Z̃tup
             end
             return g[i]
@@ -715,8 +715,8 @@ function setconstraint!(
     isnothing(X̂max) && !isnothing(x̂max) && (X̂max = repeat(x̂max, He+1))
     isnothing(Ŵmin) && !isnothing(ŵmin) && (Ŵmin = repeat(ŵmin, He))
     isnothing(Ŵmax) && !isnothing(ŵmax) && (Ŵmax = repeat(ŵmax, He))
-    isnothing(V̂min) && !isnothing(V̂min) && (X̂min = repeat(v̂min, He))
-    isnothing(V̂max) && !isnothing(V̂max) && (X̂max = repeat(v̂max, He))
+    isnothing(V̂min) && !isnothing(v̂min) && (V̂min = repeat(v̂min, He))
+    isnothing(V̂max) && !isnothing(v̂max) && (V̂max = repeat(v̂max, He))
     if !isnothing(X̂min)
         size(X̂min) == (nX̂con,) || throw(ArgumentError("X̂min size must be $((nX̂con,))"))
         con.x̂min[:] = X̂min[1:nx̂]
@@ -838,6 +838,14 @@ function setnonlincon!(estim::MovingHorizonEstimator, ::NonLinModel)
         f_sym = Symbol("g_X̂max_$(i)")
         add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
     end
+    for i in findall(.!isinf.(con.V̂min))
+        f_sym = Symbol("g_V̂min_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+    end
+    for i in findall(.!isinf.(con.V̂max))
+        f_sym = Symbol("g_V̂max_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+    end
     return nothing
 end
 
@@ -922,11 +930,11 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     Nk = estim.Nk[]
     nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*Nk
     Z̃var::Vector{VariableRef} = optim[:Z̃var]
-    x̄V̂ = Vector{NT}(undef, nx̂ + nYm)
+    V̂ = Vector{NT}(undef, nYm)
     X̂  = Vector{NT}(undef, nX̂)
     Z̃0 = [estim.x̂arr_old; estim.Ŵ]
-    x̄V̂, X̂ = predict!(x̄V̂, X̂, estim, model, Z̃0)
-    J0 = obj_nonlinprog(estim, model, x̄V̂, Z̃0)
+    V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃0)
+    J0 = obj_nonlinprog(estim, model, V̂, Z̃0)
     # initial Z̃0 with Ŵ=0 if objective or constraint function not finite :
     isfinite(J0) || (Z̃0 = [estim.x̂arr_old; zeros(NT, nŴ)])
     set_start_value.(Z̃var, Z̃0)
@@ -958,7 +966,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     estim.Z̃[:] = !isfatal(status) ? Z̃curr : Z̃last
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŴ] = estim.Z̃[nx̂+1:nx̂+nŴ] # update Ŵ with optimum for next time step
-    x̄V̂, X̂ = predict!(x̄V̂, X̂, estim, model, estim.Z̃)
+    V̂, X̂ = predict!(V̂, X̂, estim, model, estim.Z̃)
     x̂[:] = X̂[(1 + nx̂*(Nk-1)):(nx̂*Nk)]
     if Nk == He
         uarr, ymarr, darr = estim.U[1:nu], estim.Ym[1:nym], estim.D[1:nd]
@@ -1006,29 +1014,47 @@ function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
     if model.nd ≠ 0
         estim.con.Fx̂[:] = estim.con.Fx̂ + estim.con.Jx̂*estim.D
     end
+    X̂min, X̂max = trunc_bounds(estim, estim.con.X̂min, estim.con.X̂max, estim.nx̂)
+    Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, estim.nx̂)
+    V̂min, V̂max = trunc_bounds(estim, estim.con.V̂min, estim.con.V̂max, estim.nym)
     estim.con.b[:] = [
         -estim.con.x̂min
         +estim.con.x̂max
-        -estim.con.X̂min + estim.con.Fx̂
-        +estim.con.X̂max - estim.con.Fx̂
-        -estim.con.Ŵmin
-        +estim.con.Ŵmax
-        -estim.con.V̂min + estim.F
-        +estim.con.V̂max - estim.F
+        -X̂min + estim.con.Fx̂
+        +X̂max - estim.con.Fx̂
+        -Ŵmin
+        +Ŵmax
+        -V̂min + estim.F
+        +V̂max - estim.F
     ]
     lincon = estim.optim[:linconstraint]
     set_normalized_rhs.(lincon, estim.con.b[estim.con.i_b])
 end
 
 function linconstraint!(estim::MovingHorizonEstimator, ::SimModel)
+    Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, estim.nx̂)
     estim.con.b[:] = [
         -estim.con.x̂min
         +estim.con.x̂max
-        -estim.con.Ŵmin
-        +estim.con.Ŵmax
+        -Ŵmin
+        +Ŵmax
     ]
     lincon = estim.optim[:linconstraint]
     set_normalized_rhs.(lincon, estim.con.b[estim.con.i_b])
+end
+
+"Truncate the bounds `Bmin` and `Bmax` to the window size `Nk` if `Nk < He`."
+function trunc_bounds(estim::MovingHorizonEstimator, Bmin, Bmax, n)
+    He, Nk = estim.He, estim.Nk[]
+    if Nk < He
+        nB = n*Nk
+        Bmin_t = @views [Bmin[end-nB+1:end]; fill(-Inf, He*n-nB)]
+        Bmax_t = @views [Bmax[end-nB+1:end]; fill(+Inf, He*n-nB)]
+    else
+        Bmin_t = Bmin
+        Bmax_t = Bmax
+    end
+    return Bmin_t, Bmax_t
 end
 
 "Update the covariance `P̂` with the `KalmanFilter` if `model` is a `LinModel`."
@@ -1105,27 +1131,27 @@ function predict!(
 end
 
 """
-    con_nonlinprog!(g, estim::MovingHorizonEstimator, model::SimModel, X̂)
+    con_nonlinprog!(g, estim::MovingHorizonEstimator, model::SimModel, X̂, V̂)
 
 Nonlinear constrains for [`MovingHorizonEstimator`](@ref).
 """
-function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂)
+function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂, V̂)
     nX̂con, nX̂ = length(estim.con.X̂min), estim.nx̂ *estim.Nk[]
     nV̂con, nV̂ = length(estim.con.V̂min), estim.nym*estim.Nk[]
     for i in eachindex(g)
         estim.con.i_g[i] || continue
         if i ≤ nX̂con
             j = i
-            (j ≤ nX̂) && (g[i] = estim.con.X̂min[j] - X̂[j])
+            g[i] = j > nX̂ ? 0 : estim.con.X̂min[nX̂con-nX̂+j] - X̂[j]
         elseif i ≤ 2nX̂con
             j = i - nX̂con
-            (j ≤ nX̂) && (g[i] = X̂[j] - estim.con.X̂max[j])
+            g[i] = j > nX̂ ? 0 : X̂[j] - estim.con.X̂max[nX̂con-nX̂+j]
         elseif i ≤ 2nX̂con + nV̂con
             j = i - 2nX̂con
-            (j ≤ nV̂) && (g[i] = estim.con.V̂min[j] - V̂[j])
+            g[i] = j > nV̂ ? 0 : estim.con.V̂min[nV̂con-nV̂+j] - V̂[j]
         else
             j = i - 2nX̂con - nV̂con
-            (j ≤ nV̂) && (g[i] = V̂[j] - estim.con.V̂max[j])
+            g[i] = j > nV̂ ? 0 : V̂[j] - estim.con.V̂max[nV̂con-nV̂+j]
         end
     end
     return g
