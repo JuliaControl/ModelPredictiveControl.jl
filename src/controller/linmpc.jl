@@ -235,7 +235,7 @@ function init_optimization!(mpc::LinMPC, optim::JuMP.GenericModel)
     con = mpc.con
     nΔŨ = length(mpc.ΔŨ)
     set_silent(optim)
-    limit_solve_time(mpc)
+    limit_solve_time(mpc.optim, mpc.estim.model.Ts)
     @variable(optim, ΔŨvar[1:nΔŨ])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
