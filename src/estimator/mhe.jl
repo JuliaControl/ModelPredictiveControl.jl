@@ -874,7 +874,7 @@ end
 
 "Reset `estim.P̂arr_old`, `estim.invP̄` and the windows for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ ) 
-    estim.invP̄.data[:]    = Hermitian(inv(estim.P̂0), :L)
+    estim.invP̄.data[:]        = inv(estim.P̂0)
     estim.P̂arr_old.data[:]    = estim.P̂0
     estim.x̂arr_old           .= 0
     estim.Z̃                  .= 0
@@ -884,6 +884,9 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
     estim.D                  .= 0
     estim.Ŵ                  .= 0
     estim.Nk                 .= 0
+    estim.H̃.data             .= 0
+    estim.q̃                  .= 0
+    estim.p                  .= 0
     return nothing
 end
 
@@ -902,41 +905,18 @@ for `LinModel`.
 """
 function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<:Real
     model, optim, x̂ = estim.model, estim.optim, estim.x̂
-    nx̂, nym, nu, nd, nŵ, He = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂, estim.He
-    # ------ add new data to the windows -------------
-    ŵ = zeros(nŵ) # ŵ(k) = 0 for warm-starting
-    estim.Nk .+= 1
-    Nk = estim.Nk[]
-    if Nk > He
-        estim.X̂[:]  = [estim.X̂[nx̂+1:end]  ; x̂]
-        estim.Ym[:] = [estim.Ym[nym+1:end]; ym]
-        estim.U[:]  = [estim.U[nu+1:end]  ; u]
-        estim.D[:]  = [estim.D[nd+1:end]  ; d]
-        estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
-        estim.Nk[:] = [He]
-    else
-        estim.X̂[(1 + nx̂*(Nk-1)):(nx̂*Nk)]    = x̂
-        estim.Ym[(1 + nym*(Nk-1)):(nym*Nk)] = ym
-        estim.U[(1 + nu*(Nk-1)):(nu*Nk)]    = u
-        estim.D[(1 + nd*(Nk-1)):(nd*Nk)]    = d
-        estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]    = ŵ
-    end
-    estim.x̂arr_old[:] = estim.X̂[1:nx̂]
-    # ---------- initialize estimation vectors ------------
+    add_data_windows!(estim::MovingHorizonEstimator, u, d, ym)
     initpred!(estim, model)
-    # ---------- initialize linear constraints ------------
     linconstraint!(estim, model)
-    # ----------- initial guess -----------------------
-    Nk = estim.Nk[]
-    nŴ, nYm, nX̂ = nx̂*Nk, nym*Nk, nx̂*Nk
+    nx̂, nym, nŵ, Nk = estim.nx̂, estim.nym, estim.nx̂, estim.Nk[]
     Z̃var::Vector{VariableRef} = optim[:Z̃var]
-    V̂ = Vector{NT}(undef, nYm)
-    X̂  = Vector{NT}(undef, nX̂)
+    V̂ = Vector{NT}(undef, nym*Nk)
+    X̂  = Vector{NT}(undef, nx̂*Nk)
     Z̃0 = [estim.x̂arr_old; estim.Ŵ]
     V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃0)
     J0 = obj_nonlinprog(estim, model, V̂, Z̃0)
     # initial Z̃0 with Ŵ=0 if objective or constraint function not finite :
-    isfinite(J0) || (Z̃0 = [estim.x̂arr_old; zeros(NT, nŴ)])
+    isfinite(J0) || (Z̃0 = [estim.x̂arr_old; zeros(NT, nŵ*estim.He)])
     set_start_value.(Z̃var, Z̃0)
     # ------- solve optimization problem --------------
     try
@@ -965,14 +945,39 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     end
     estim.Z̃[:] = !isfatal(status) ? Z̃curr : Z̃last
     # --------- update estimate -----------------------
-    estim.Ŵ[1:nŴ] = estim.Z̃[nx̂+1:nx̂+nŴ] # update Ŵ with optimum for next time step
+    estim.Ŵ[1:nŵ*Nk] = estim.Z̃[nx̂+1:nx̂+nŵ*Nk] # update Ŵ with optimum for next time step
     V̂, X̂ = predict!(V̂, X̂, estim, model, estim.Z̃)
-    x̂[:] = X̂[(1 + nx̂*(Nk-1)):(nx̂*Nk)]
-    if Nk == He
-        uarr, ymarr, darr = estim.U[1:nu], estim.Ym[1:nym], estim.D[1:nd]
+    x̂[:] = X̂[end-nx̂+1:end]
+    if Nk == estim.He
+        uarr, ymarr, darr = estim.U[1:model.nu], estim.Ym[1:nym], estim.D[1:model.nd]
         update_cov!(estim.P̂arr_old, estim, model, uarr, ymarr, darr)
         estim.invP̄.data[:] = Hermitian(inv(estim.P̂arr_old), :L)
     end
+    return nothing
+end
+
+"Add data to the observation windows of the moving horizon estimator."
+function add_data_windows!(estim::MovingHorizonEstimator, u, d, ym)
+    model = estim.model
+    nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
+    x̂, ŵ = estim.x̂, zeros(nŵ) # ŵ(k) = 0 for warm-starting
+    estim.Nk .+= 1
+    Nk = estim.Nk[]
+    if Nk > estim.He
+        estim.X̂[:]  = [estim.X̂[nx̂+1:end]  ; x̂]
+        estim.Ym[:] = [estim.Ym[nym+1:end]; ym]
+        estim.U[:]  = [estim.U[nu+1:end]  ; u]
+        estim.D[:]  = [estim.D[nd+1:end]  ; d]
+        estim.Ŵ[:]  = [estim.Ŵ[nŵ+1:end]  ; ŵ]
+        estim.Nk[:] = [estim.He]
+    else
+        estim.X̂[(1 + nx̂*(Nk-1)):(nx̂*Nk)]    = x̂
+        estim.Ym[(1 + nym*(Nk-1)):(nym*Nk)] = ym
+        estim.U[(1 + nu*(Nk-1)):(nu*Nk)]    = u
+        estim.D[(1 + nd*(Nk-1)):(nd*Nk)]    = d
+        estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]    = ŵ
+    end
+    estim.x̂arr_old[:] = estim.X̂[1:nx̂]
     return nothing
 end
 
@@ -1007,6 +1012,7 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     return nothing
 end
 
+"Does nothing if `model` is not a [`LinModel`](@ref)."
 initpred!(estim::MovingHorizonEstimator, model::SimModel) = nothing
 
 function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
