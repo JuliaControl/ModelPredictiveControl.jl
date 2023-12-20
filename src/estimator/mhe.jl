@@ -988,6 +988,7 @@ The ``H̃`` matrix of the quadratic general form is not constant here because of
 time-varying ``\mathbf{P̄}`` weight (the estimation error covariance at arrival).
 """
 function initpred!(estim::MovingHorizonEstimator, model::LinModel)
+    optim = estim.optim
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
     nYm, nŴ = nym*Nk, nŵ*Nk
     nZ̃ = nx̂ + nŴ
@@ -1005,10 +1006,11 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     Ñ_Nk = [zeros(nx̂, nZ̃); zeros(nŴ, nx̂) invQ̂_Nk]
     estim.q̃[1:nZ̃] = 2(M_Nk*Ẽ_Nk)'*F_Nk
     estim.p[] = dot(F_Nk, M_Nk, F_Nk)
-    H̃ = 2*(Ẽ_Nk'*M_Nk*Ẽ_Nk + Ñ_Nk)
-    estim.H̃.data[1:nZ̃, 1:nZ̃] = H̃
-    Z̃var::Vector{VariableRef} = estim.optim[:Z̃var]
-    set_objective_function(estim.optim, obj_quadprog(Z̃var, estim.H̃, estim.q̃))
+    estim.H̃.data[1:nZ̃, 1:nZ̃] = 2*(Ẽ_Nk'*M_Nk*Ẽ_Nk + Ñ_Nk)
+    Z̃var_Nk::Vector{VariableRef} = @views optim[:Z̃var][1:nZ̃]
+    H̃_Nk = @views estim.H̃[1:nZ̃,1:nZ̃]
+    q̃_Nk = @views estim.q̃[1:nZ̃]
+    set_objective_function(optim, obj_quadprog(Z̃var_Nk, H̃_Nk, q̃_Nk))
     return nothing
 end
 
