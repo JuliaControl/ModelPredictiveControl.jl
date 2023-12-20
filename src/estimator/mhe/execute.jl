@@ -1,4 +1,4 @@
-"Reset `estim.P̂arr_old`, `estim.invP̄` and the windows for the moving horizon estimator."
+"Reset the data windows and time-varying variables for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ ) 
     estim.invP̄.data[:]        = inv(estim.P̂0)
     estim.P̂arr_old.data[:]    = estim.P̂0
@@ -71,7 +71,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     end
     estim.Z̃[:] = !isfatal(status) ? Z̃curr : Z̃last
     # --------- update estimate -----------------------
-    estim.Ŵ[1:nŵ*Nk] = estim.Z̃[nx̂+1:nx̂+nŵ*Nk] # update Ŵ with optimum for next time step
+    estim.Ŵ[1:nŵ*Nk] = estim.Z̃[nx̂+1:nx̂+nŵ*Nk] # update Ŵ with optimum for warm-starting
     V̂, X̂ = predict!(V̂, X̂, estim, model, estim.Z̃)
     x̂[:] = X̂[end-nx̂+1:end]
     if Nk == estim.He
