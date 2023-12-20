@@ -1142,16 +1142,20 @@ function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂, V̂)
         estim.con.i_g[i] || continue
         if i ≤ nX̂con
             j = i
-            g[i] = j > nX̂ ? 0 : estim.con.X̂min[nX̂con-nX̂+j] - X̂[j]
+            jcon = nX̂con-nX̂+j
+            g[i] = j > nX̂ ? 0 : estim.con.X̂min[jcon] - X̂[j]
         elseif i ≤ 2nX̂con
             j = i - nX̂con
-            g[i] = j > nX̂ ? 0 : X̂[j] - estim.con.X̂max[nX̂con-nX̂+j]
+            jcon = nX̂con-nX̂+j
+            g[i] = j > nX̂ ? 0 : X̂[j] - estim.con.X̂max[jcon]
         elseif i ≤ 2nX̂con + nV̂con
             j = i - 2nX̂con
-            g[i] = j > nV̂ ? 0 : estim.con.V̂min[nV̂con-nV̂+j] - V̂[j]
+            jcon = nV̂con-nV̂+j
+            g[i] = j > nV̂ ? 0 : estim.con.V̂min[jcon] - V̂[j]
         else
             j = i - 2nX̂con - nV̂con
-            g[i] = j > nV̂ ? 0 : V̂[j] - estim.con.V̂max[nV̂con-nV̂+j]
+            jcon = nV̂con-nV̂+j
+            g[i] = j > nV̂ ? 0 : V̂[j] - estim.con.V̂max[jcon]
         end
     end
     return g
