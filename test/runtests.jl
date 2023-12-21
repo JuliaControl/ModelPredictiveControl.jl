@@ -4,10 +4,9 @@ using ModelPredictiveControl
 using ControlSystemsBase
 using Documenter
 using LinearAlgebra
-using JuMP, OSQP, Ipopt, ForwardDiff
+using JuMP, OSQP, Ipopt, DAQP, ForwardDiff
 using Plots
 using Test
-
 
 @testset "ModelPredictiveControl.jl" begin
 include("test_sim_model.jl")

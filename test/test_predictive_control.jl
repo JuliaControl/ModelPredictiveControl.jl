@@ -18,8 +18,8 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test mpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
     mpc6 = LinMPC(model, Lwt=[0,1], Hp=15)
     @test mpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    mpc7 = LinMPC(model, optim=JuMP.Model(Ipopt.Optimizer))
-    @test solver_name(mpc7.optim) == "Ipopt"
+    mpc7 = LinMPC(model, optim=JuMP.Model(DAQP.Optimizer))
+    @test solver_name(mpc7.optim) == "DAQP"
     kf = KalmanFilter(model)
     mpc8 = LinMPC(kf)
     @test isa(mpc8.estim, KalmanFilter)

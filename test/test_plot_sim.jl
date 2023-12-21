@@ -5,6 +5,7 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
 @testset "SimModel quick simulation" begin
     model = LinModel(sys, Ts, i_d=[3])
     res = sim!(model, 15)
+    display(res)
     @test isa(res.obj, LinModel)
     @test length(res.T_data) == 15
     @test res.U_data[:, 1] ≈ model.uop .+ 1
@@ -16,6 +17,8 @@ sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
     @test res_man.Y_data ≈ res.Y_data
     @test res_man.D_data ≈ res.D_data
     @test res_man.X_data ≈ res.X_data
+
+    @test_throws ArgumentError SimResult(model, [res.U_data model.uop], res.Y_data, res.D_data)
 end
 
 @testset "SimModel Plots" begin

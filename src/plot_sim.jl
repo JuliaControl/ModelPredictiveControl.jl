@@ -66,7 +66,7 @@ function SimResult(
     NU, NY, NX, NX̂ = size(U_data, 2), size(Y_data, 2), size(X_data, 2), size(X̂_data, 2)
     NRy, NRu = size(Ry_data, 2), size(Ru_data, 2)
     if !(NU == NY == NX == NX̂ == NRy == NRu)
-        error("All arguments must have the same number of columns (time steps)")
+        throw(ArgumentError("All arguments must have the same number of columns (time steps)"))
     end
     size(Y_data, 2) == N || error("Y_data must be of size ($ny, $N)")
     return SimResult{NT, O}(obj, T_data, Y_data, Ry_data, Y_data, U_data, U_data, 
