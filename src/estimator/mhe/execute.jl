@@ -91,43 +91,59 @@ Get additional info on `estim` [`MovingHorizonEstimator`](@ref) optimum for trou
 The function should be called after calling [`updatestate!`](@ref). It returns the
 dictionary `info` with the following fields:
 
-- `:Ŵ`   : optimal estimated process noise over `Nk`, ``\mathbf{ΔU}``.
+- `:Ŵ`   : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``.
 - `:x̂arr`: optimal estimated state at arrival, ``\mathbf{x̂}_k(k-N_k+1)``.
 - `:J`   : objective value optimum, ``J``.
-- `:X̂`   : optimal estimated states over `Nk+1`.
+- `:X̂`   : optimal estimated states over ``N_k+1``, ``\mathbf{X̂}``.
 - `:x̂`   : optimal estimated state for the next time step, ``\mathbf{x̂}_k(k+1)``.
-- `:V̂`   : optimal estimated sensor noise over `Nk`, ``\mathbf{V̂}``.
+- `:V̂`   : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``.
 - `:P̄`   : estimation error covariance at arrival, ``\mathbf{P̄}``.
 - `:x̄`   : optimal estimation error at arrival, ``\mathbf{x̄}``.
-- `:Ŷm`  : optimal estimated measured outputs over `Nk`, ``\mathbf{Ŷ^m}``.
-- `:Ym`  : measured outputs over `Nk`, ``\mathbf{Y^m}``.
-- `:U`   : manipulated inputs over `Hp`, ``\mathbf{U}``.
-- `:D`   : measured disturbances over `Nk`, ``\mathbf{D}``.
+- `:Ŷ`   : optimal estimated outputs over ``N_k``, ``\mathbf{Ŷ}``.
+- `:Ŷm`  : optimal estimated measured outputs over ``N_k``, ``\mathbf{Ŷ^m}``.
+- `:Ym`  : measured outputs over ``N_k``, ``\mathbf{Y^m}``.
+- `:U`   : manipulated inputs over ``N_k``, ``\mathbf{U}``.
+- `:D`   : measured disturbances over ``N_k``, ``\mathbf{D}``.
 - `:sol` : solution summary of the optimizer for printing.
 
 # Examples
 ```jldoctest
-julia> a=1;
+julia> estim = MovingHorizonEstimator(LinModel(ss(1.0, 1.0, 1.0, 0, 1)), He=1, nint_ym=0);
+
+julia> updatestate!(estim, [0], [1]);
+
+julia> round.(getinfo(estim)[:Ŷ], digits=3)
+1-element Vector{Float64}:
+ 0.5
 ```
 """
 function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, Nk = estim.model, estim.Nk[]
+    nu, ny, nd = model.nu, model.ny, model.nd
     nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
     MyTypes = Union{JuMP._SolutionSummary, Hermitian{NT, Matrix{NT}}, Vector{NT}, NT}
     info = Dict{Symbol, MyTypes}()
     V̂, X̂ = similar(estim.Ym[1:nym*Nk]), similar(estim.X̂[1:nx̂*Nk])
-    V̂, X̂ = predict!(V̂, X̂, estim, estim.model, estim.Z̃)
+    V̂, X̂ = predict!(V̂, X̂, estim, model, estim.Z̃)
     x̂arr = estim.Z̃[1:nx̂]
-    Ym, U, D = estim.Ym[1:nym*Nk], estim.U[1:model.nu*Nk], estim.D[1:model.nd*Nk]
+    X̂ = [x̂arr; X̂]
+    Ym, U, D = estim.Ym[1:nym*Nk], estim.U[1:nu*Nk], estim.D[1:nd*Nk]
+    Ŷ = Vector{NT}(undef, ny*Nk)
+    for i=1:Nk
+        d = @views D[(1 + nd*(i-1)):(nd*i)] # operating point already removed in estim.D
+        x̂ = @views X̂[(1 + nx̂*(i-1)):(nx̂*i)]
+        Ŷ[(1 + ny*(i-1)):(ny*i)] = ĥ(estim, model, x̂, d) + model.yop
+    end
     Ŷm = Ym - V̂
     info[:Ŵ] = estim.Ŵ[1:Nk*nŵ]
     info[:x̂arr] = x̂arr
     info[:J] = obj_nonlinprog(estim, estim.model, V̂, estim.Z̃)
-    info[:X̂] = [x̂arr; X̂]
-    info[:x̂] = X̂[end-estim.nx̂+1:end]
+    info[:X̂] = X̂
+    info[:x̂] = estim.x̂
     info[:V̂] = V̂
     info[:P̄] = estim.P̂arr_old
     info[:x̄] = estim.x̂arr_old - x̂arr
+    info[:Ŷ] = Ŷ
     info[:Ŷm] = Ŷm
     info[:Ym] = Ym
     info[:U] = U

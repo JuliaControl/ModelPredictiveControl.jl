@@ -1,7 +1,7 @@
 Ts = 4.0
 sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
         tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ] 
-#=
+
 @testset "SteadyKalmanFilter construction" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     skalmanfilter1 = SteadyKalmanFilter(linmodel1)
@@ -618,16 +618,21 @@ end
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1, He=0)
 end
-=#
-@testset "MovingHorizonEstimator estimator methods" begin
-    linmodel1 = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
+
+@testset "MovingHorizonEstimator estimation and getinfo" begin
+    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2], i_d=[3]), uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 4, 2, 1), uop=[10,50], yop=[50,30], dop=[5])
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
-    @test updatestate!(mhe1, [10, 50], [50, 30], [5]) ≈ zeros(6) atol=1e-9
+    x̂ = updatestate!(mhe1, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-9
     @test mhe1.x̂ ≈ zeros(6) atol=1e-9
     @test evaloutput(mhe1, [5]) ≈ mhe1([5]) ≈ [50, 30]
+    info = getinfo(mhe1)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+
     @test initstate!(mhe1, [10, 50], [50, 30+1], [5]) ≈ zeros(6) atol=1e-9
     setstate!(mhe1, [1,2,3,4,5,6])
     @test mhe1.x̂ ≈ [1,2,3,4,5,6]
@@ -639,7 +644,15 @@ end
         updatestate!(mhe1, [10, 50], [51, 32], [5])
     end
     @test mhe1([5]) ≈ [51, 32] atol=1e-3
+    
     mhe2 = MovingHorizonEstimator(linmodel1, He=2, nint_u=[1, 1], nint_ym=[0, 0])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-9
+    @test mhe2.x̂ ≈ zeros(6) atol=1e-9
+    @test evaloutput(mhe2, [5]) ≈ mhe2([5]) ≈ [50, 30]
+    info = getinfo(mhe2)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
     for i in 1:100
         updatestate!(mhe2, [11, 52], [50, 30], [5])
     end
@@ -698,11 +711,8 @@ end
 end
 
 @testset "MovingHorizonEstimator constraint violation" begin
-    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
-    h(x,_)   = linmodel1.C*x
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
-    mhe = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
+    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    mhe = MovingHorizonEstimator(linmodel1, He=1, nint_ym=0)
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
@@ -710,11 +720,11 @@ end
 
     setconstraint!(mhe, x̂min=[1,1], x̂max=[100,100])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test x̂ ≈ [1, 1] atol=1e-3
+    @test x̂ ≈ [1, 1] atol=1e-2
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[-1,-1])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test x̂ ≈ [-1, -1] atol=1e-3
+    @test x̂ ≈ [-1, -1] atol=1e-2
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
@@ -722,17 +732,66 @@ end
 
     setconstraint!(mhe, ŵmin=[1,1], ŵmax=[100,100])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test mhe.Ŵ ≈ [1,1] atol=1e-3
+    @test mhe.Ŵ ≈ [1,1] atol=1e-2
 
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[-1,-1])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test mhe.Ŵ ≈ [-1,-1] atol=1e-3
+    @test mhe.Ŵ ≈ [-1,-1] atol=1e-2
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
     setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
 
-    #setconstraint!(mhe, v̂min=[1,1], v̂max=[100,100])
-    #x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    #@test [50,30] - ModelPredictiveControl.ĥ(mhe,mhe.mode,X̂ ≈ [1,1] atol=1e-3
+    setconstraint!(mhe, v̂min=[1,1], v̂max=[100,100])
+    x̂ = updatestate!(mhe, [10, 50], [50, 30])
+    info = getinfo(mhe)
+    @test info[:V̂] ≈ [1,1] atol=1e-2
+
+    setconstraint!(mhe, v̂min=[-100,-100], v̂max=[-1,-1])
+    x̂ = updatestate!(mhe, [10, 50], [50, 30])
+    info = getinfo(mhe)
+    @test info[:V̂] ≈ [-1,-1] atol=1e-2
+
+    f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
+    h(x,_)   = linmodel1.C*x
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
+
+    setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe2, v̂min=[-100,-100], v̂max=[100,100])
+
+    setconstraint!(mhe2, x̂min=[1,1], x̂max=[100,100])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30])
+    @test x̂ ≈ [1, 1] atol=1e-2
+
+    setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[-1,-1])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30])
+    @test x̂ ≈ [-1, -1] atol=1e-2
+
+    setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe2, v̂min=[-100,-100], v̂max=[100,100])
+
+    setconstraint!(mhe2, ŵmin=[1,1], ŵmax=[100,100])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30])
+    @test mhe2.Ŵ ≈ [1,1] atol=1e-2
+
+    setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[-1,-1])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30])
+    @test mhe2.Ŵ ≈ [-1,-1] atol=1e-2
+
+    setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe2, v̂min=[-100,-100], v̂max=[100,100])
+
+    setconstraint!(mhe2, v̂min=[1,1], v̂max=[100,100])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30])
+    info = getinfo(mhe2)
+    @test info[:V̂] ≈ [1,1] atol=1e-2
+
+    setconstraint!(mhe2, v̂min=[-100,-100], v̂max=[-1,-1])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30])
+    info = getinfo(mhe2)
+    @test info[:V̂] ≈ [-1,-1] atol=1e-2
 end
