@@ -83,9 +83,3 @@ NonLinMPC
 ```@docs
 moveinput!
 ```
-
-## Get Additional Information
-
-```@docs
-getinfo
-```

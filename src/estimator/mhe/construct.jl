@@ -234,7 +234,7 @@ end
 
 Construct the MHE prediction matrices for [`LinModel`](@ref) `model`.
 
-Introducing the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂_k}(k-H_e+1) 
+Introducing the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂}_k(k-H_e+1) 
 \\ \mathbf{Ŵ} \end{smallmatrix}]`` with the decision variables, the estimated sensor
 noises from time ``k-H_e+1`` to ``k`` are computed by:
 ```math
@@ -243,9 +243,9 @@ noises from time ``k-H_e+1`` to ``k`` are computed by:
                                 &= \mathbf{E Z + F}
 \end{aligned}
 ```
-in which ``\mathbf{U, D}`` and ``\mathbf{Y^m}`` contains respectively the manipulated inputs
-and measured disturbances and measured outputs from time ``k-H_e+1`` to ``k``. The method 
-also returns similar matrices but for the estimation error at arrival:
+in which ``\mathbf{U, D}`` and ``\mathbf{Y^m}`` contains respectively the manipulated
+inputs, measured disturbances and measured outputs from time ``k-H_e+1`` to ``k``. The
+method also returns similar matrices but for the estimation error at arrival:
 ```math
 \mathbf{x̄} = \mathbf{x̂}_{k-H_e}(k-H_e+1) - \mathbf{x̂}_{k}(k-H_e+1) = \mathbf{e_x̄ Z + f_x̄}
 ```
@@ -657,7 +657,7 @@ function setconstraint!(
 end
 
 @doc raw"""
-    init_matconstrain_mhe(model::LinModel, 
+    init_matconstraint_mhe(model::LinModel, 
         i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
     ) -> i_b, i_g, A
 

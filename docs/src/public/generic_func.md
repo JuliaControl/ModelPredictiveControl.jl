@@ -50,3 +50,9 @@ sim!
 ```@docs
 SimResult
 ```
+
+## Get Additional Information
+
+```@docs
+getinfo
+```

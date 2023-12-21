@@ -68,7 +68,7 @@ end
 @doc raw"""
     getinfo(mpc::PredictiveController) -> info
 
-Get additional information about `mpc` controller optimum to ease troubleshooting.
+Get additional info about `mpc` controller optimum for troubleshooting.
 
 The function should be called after calling [`moveinput!`](@ref). It returns the dictionary
 `info` with the following fields:

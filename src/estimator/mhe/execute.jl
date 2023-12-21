@@ -82,6 +82,60 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     return nothing
 end
 
+
+@doc raw"""
+    getinfo(estim::MovingHorizonEstimator) -> info
+
+Get additional info on `estim` [`MovingHorizonEstimator`](@ref) optimum for troubleshooting.
+
+The function should be called after calling [`updatestate!`](@ref). It returns the
+dictionary `info` with the following fields:
+
+- `:Ŵ`   : optimal estimated process noise over `Nk`, ``\mathbf{ΔU}``.
+- `:x̂arr`: optimal estimated state at arrival, ``\mathbf{x̂}_k(k-N_k+1)``.
+- `:J`   : objective value optimum, ``J``.
+- `:X̂`   : optimal estimated states over `Nk+1`.
+- `:x̂`   : optimal estimated state for the next time step, ``\mathbf{x̂}_k(k+1)``.
+- `:V̂`   : optimal estimated sensor noise over `Nk`, ``\mathbf{V̂}``.
+- `:P̄`   : estimation error covariance at arrival, ``\mathbf{P̄}``.
+- `:x̄`   : optimal estimation error at arrival, ``\mathbf{x̄}``.
+- `:Ŷm`  : optimal estimated measured outputs over `Nk`, ``\mathbf{Ŷ^m}``.
+- `:Ym`  : measured outputs over `Nk`, ``\mathbf{Y^m}``.
+- `:U`   : manipulated inputs over `Hp`, ``\mathbf{U}``.
+- `:D`   : measured disturbances over `Nk`, ``\mathbf{D}``.
+- `:sol` : solution summary of the optimizer for printing.
+
+# Examples
+```jldoctest
+julia> a=1;
+```
+"""
+function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
+    model, Nk = estim.model, estim.Nk[]
+    nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
+    MyTypes = Union{JuMP._SolutionSummary, Hermitian{NT, Matrix{NT}}, Vector{NT}, NT}
+    info = Dict{Symbol, MyTypes}()
+    V̂, X̂ = similar(estim.Ym[1:nym*Nk]), similar(estim.X̂[1:nx̂*Nk])
+    V̂, X̂ = predict!(V̂, X̂, estim, estim.model, estim.Z̃)
+    x̂arr = estim.Z̃[1:nx̂]
+    Ym, U, D = estim.Ym[1:nym*Nk], estim.U[1:model.nu*Nk], estim.D[1:model.nd*Nk]
+    Ŷm = Ym - V̂
+    info[:Ŵ] = estim.Ŵ[1:Nk*nŵ]
+    info[:x̂arr] = x̂arr
+    info[:J] = obj_nonlinprog(estim, estim.model, V̂, estim.Z̃)
+    info[:X̂] = [x̂arr; X̂]
+    info[:x̂] = X̂[end-estim.nx̂+1:end]
+    info[:V̂] = V̂
+    info[:P̄] = estim.P̂arr_old
+    info[:x̄] = estim.x̂arr_old - x̂arr
+    info[:Ŷm] = Ŷm
+    info[:Ym] = Ym
+    info[:U] = U
+    info[:D] = D
+    info[:sol] = solution_summary(estim.optim, verbose=true)
+    return info
+end
+
 "Add data to the observation windows of the moving horizon estimator."
 function add_data_windows!(estim::MovingHorizonEstimator, u, d, ym)
     model = estim.model
