@@ -371,7 +371,7 @@ function init_predmat_mhe(model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉ, B̂d, D
     end
     # --- F vectors ---
     F  = zeros(NT, nym*He) # dummy F vector (updated just before optimization)
-    fx̄ = zeros(NT, nx̂)     # real  fx̄ vector value
+    fx̄ = zeros(NT, nx̂)     # dummy fx̄ vector (updated just before optimization)
     Fx̂ = zeros(NT, nx̂*He)  # dummy Fx̂ vector (updated just before optimization)
     return E, F, G, J, ex̄, fx̄, Ex̂, Fx̂, Gx̂, Jx̂
 end
