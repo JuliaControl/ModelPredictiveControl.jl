@@ -5,8 +5,8 @@
 [![doc-stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://franckgaga.github.io/ModelPredictiveControl.jl/stable)
 [![coc-dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://franckgaga.github.io/ModelPredictiveControl.jl/dev)
 
-A [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_control) package
-for Julia.
+An open source [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_control)
+package for Julia.
 
 The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl/ControlSystems.jl)
 for the linear systems and [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the solving.
