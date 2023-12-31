@@ -11,7 +11,7 @@ on the estimates to compute a [full state feedback](https://en.wikipedia.org/wik
 integral action by default, since it is generally desired to eliminate the steady-state
 error with closed-loop control (offset-free tracking).
 
-!!! info
+!!! warning
     If you plan to use the estimators for other contexts than this specific package (e.g. :
     filter, parameter estimation, etc.), careful must be taken at construction since the
     integral action is not necessarily desired. The options `nint_u=0` and `nint_ym=0`
