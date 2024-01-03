@@ -1,20 +1,29 @@
 "Termination status that means 'no solution available'."
-const FATAL_STATUSES = [
+const ERROR_STATUSES = [
     INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 
     NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
     OTHER_ERROR
 ]
 
-"Verify that the solver termination status means 'no solution available'."
-isfatal(status::TerminationStatusCode) = any(status .== FATAL_STATUSES)
+"Verify that `optim` termination status is `OPTIMAL` or `LOCALLY_SOLVED`."
+function issolved(optim::JuMP.GenericModel)
+    status = termination_status(optim)
+    return (status == OPTIMAL || status == LOCALLY_SOLVED)
+end
+
+"Verify that `optim` termination status means 'no solution available'."
+function iserror(optim::JuMP.GenericModel) 
+    status = termination_status(optim)
+    return any(status .== ERROR_STATUSES)
+end
 
 "Evaluate the quadratic programming objective function `0.5x'*H*x + q'*x` at `x`."
 obj_quadprog(x, H, q) = 0.5*dot(x, H, x) + q'*x  # dot(x, H, x) is faster than x'*H*x
 
 "Limit the solving time to `Ts` if supported by `optim` optimizer."
-function limit_solve_time(optim, Ts)
+function limit_solve_time(optim::GenericModel, Ts)
     try
-        set_time_limit_sec(optim,Ts)
+        set_time_limit_sec(optim, Ts)
     catch err
         if isa(err, MOI.UnsupportedAttribute{MOI.TimeLimitSec})
             @warn "Solving time limit is not supported by the optimizer."

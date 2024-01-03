@@ -57,10 +57,10 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         end
     end
     # -------- error handling -------------------------
-    status = termination_status(optim)
     Z̃curr, Z̃last = value.(Z̃var), Z̃0
-    if !(status == OPTIMAL || status == LOCALLY_SOLVED)
-        if isfatal(status)
+    if !issolved(optim)
+        status = termination_status(optim)
+        if iserror(optim)
             @error("MHE terminated without solution: estimation in open-loop", 
                    status)
         else
@@ -69,7 +69,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         end
         @debug solution_summary(optim, verbose=true)
     end
-    estim.Z̃[:] = !isfatal(status) ? Z̃curr : Z̃last
+    estim.Z̃[:] = iserror(optim) ? Z̃last : Z̃curr
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] = estim.Z̃[nx̂+1:nx̂+nŵ*Nk] # update Ŵ with optimum for warm-starting
     V̂, X̂ = predict!(V̂, X̂, estim, model, estim.Z̃)
