@@ -229,7 +229,7 @@ end
 
 @doc raw"""
     init_predmat_mhe(
-        model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d
+        model::LinModel, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d
     ) -> E, F, G, J, ex̄, fx̄, Ex̂, Fx̂, Gx̂, Jx̂
 
 Construct the MHE prediction matrices for [`LinModel`](@ref) `model`.

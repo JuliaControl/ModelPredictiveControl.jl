@@ -212,6 +212,46 @@ end
 predictstoch!(::PredictiveController, ::StateEstimator, _ , _ ) = nothing
 
 @doc raw"""
+    linconstraint!(mpc::PredictiveController, model::LinModel)
+
+Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+
+Also init ``\mathbf{f_x̂}`` vector for the terminal constraints, see [`init_predmat`](@ref).
+"""
+function linconstraint!(mpc::PredictiveController, model::LinModel)
+    mpc.con.fx̂[:] = mpc.con.kx̂ * mpc.estim.x̂  + mpc.con.vx̂ * mpc.estim.lastu0
+    if model.nd ≠ 0
+        mpc.con.fx̂[:] = mpc.con.fx̂ + mpc.con.gx̂ * mpc.d0 + mpc.con.jx̂ * mpc.D̂0
+    end
+    lastu = mpc.estim.lastu0 + model.uop
+    mpc.con.b[:] = [
+        -mpc.con.Umin + mpc.T*lastu
+        +mpc.con.Umax - mpc.T*lastu
+        -mpc.con.ΔŨmin
+        +mpc.con.ΔŨmax 
+        -mpc.con.Ymin + mpc.F
+        +mpc.con.Ymax - mpc.F
+        -mpc.con.x̂min + mpc.con.fx̂
+        +mpc.con.x̂max - mpc.con.fx̂
+    ]
+    lincon = mpc.optim[:linconstraint]
+    set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
+end
+
+"Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
+function linconstraint!(mpc::PredictiveController, model::SimModel)
+    lastu = mpc.estim.lastu0 + model.uop
+    mpc.con.b[:] = [
+        -mpc.con.Umin + mpc.T*lastu
+        +mpc.con.Umax - mpc.T*lastu
+        -mpc.con.ΔŨmin
+        +mpc.con.ΔŨmax 
+    ]
+    lincon = mpc.optim[:linconstraint]
+    set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
+end
+
+@doc raw"""
     predict!(Ŷ, x̂, mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ, x̂end
 
 Compute the predictions `Ŷ` and terminal states `x̂end` if model is a [`LinModel`](@ref).
@@ -250,44 +290,62 @@ function predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ::V
     return Ŷ, x̂end
 end
 
-@doc raw"""
-    linconstraint!(mpc::PredictiveController, model::LinModel)
-
-Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
-
-Also init ``\mathbf{f_x̂}`` vector for the terminal constraints, see [`init_predmat`](@ref).
 """
-function linconstraint!(mpc::PredictiveController, model::LinModel)
-    mpc.con.fx̂[:] = mpc.con.kx̂ * mpc.estim.x̂  + mpc.con.vx̂ * mpc.estim.lastu0
-    if model.nd ≠ 0
-        mpc.con.fx̂[:] = mpc.con.fx̂ + mpc.con.gx̂ * mpc.d0 + mpc.con.jx̂ * mpc.D̂0
+    obj_nonlinprog(mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ)
+
+Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
+
+The function is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
+also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
+at specific input increments `ΔŨ` and predictions `Ŷ` values.
+"""
+function obj_nonlinprog(
+    mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
+) where {NT<:Real}
+    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
+    if !iszero(mpc.E)
+        U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
+        UE = [U; U[(end - model.nu + 1):end]]
+        ŶE = [mpc.ŷ; Ŷ]
+        J += mpc.E*mpc.JE(UE, ŶE, mpc.D̂E)
     end
-    lastu = mpc.estim.lastu0 + model.uop
-    mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T*lastu
-        +mpc.con.Umax - mpc.T*lastu
-        -mpc.con.ΔŨmin
-        +mpc.con.ΔŨmax 
-        -mpc.con.Ymin + mpc.F
-        +mpc.con.Ymax - mpc.F
-        -mpc.con.x̂min + mpc.con.fx̂
-        +mpc.con.x̂max - mpc.con.fx̂
-    ]
-    lincon = mpc.optim[:linconstraint]
-    set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
+    return J
 end
 
-"Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
-function linconstraint!(mpc::PredictiveController, model::SimModel)
-    lastu = mpc.estim.lastu0 + model.uop
-    mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T*lastu
-        +mpc.con.Umax - mpc.T*lastu
-        -mpc.con.ΔŨmin
-        +mpc.con.ΔŨmax 
-    ]
-    lincon = mpc.optim[:linconstraint]
-    set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
+"""
+    obj_nonlinprog(mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ)
+
+Nonlinear programming objective function when `model` is not a [`LinModel`](@ref). The
+function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
+"""
+function obj_nonlinprog(
+    mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{NT}
+) where {NT<:Real}
+    # --- output setpoint tracking term ---
+    êy = mpc.R̂y - Ŷ
+    JR̂y = dot(êy, mpc.M_Hp, êy)
+    # --- move suppression and slack variable term ---
+    JΔŨ = dot(ΔŨ, mpc.Ñ_Hc, ΔŨ)
+    # --- input over prediction horizon ---
+    if !mpc.noR̂u || !iszero(mpc.E)
+        U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
+    end
+    # --- input setpoint tracking term ---
+    if !mpc.noR̂u
+        êu = mpc.R̂u - U
+        JR̂u = dot(êu, mpc.L_Hp, êu)
+    else
+        JR̂u = 0.0
+    end
+    # --- economic term ---
+    if !iszero(mpc.E)
+        UE = [U; U[(end - model.nu + 1):end]]
+        ŶE = [mpc.ŷ; Ŷ]
+        E_JE = mpc.E*mpc.JE(UE, ŶE, mpc.D̂E)
+    else
+        E_JE = 0.0
+    end
+    return JR̂y + JΔŨ + JR̂u + E_JE
 end
 
 """

@@ -68,65 +68,6 @@ Set the estimate at `mpc.estim.x̂`.
 """
 setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
 
-
-"""
-    obj_nonlinprog(mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ)
-
-Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
-
-The function is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
-also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
-at specific input increments `ΔŨ` and predictions `Ŷ` values.
-"""
-function obj_nonlinprog(
-    mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
-) where {NT<:Real}
-    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
-    if !iszero(mpc.E)
-        U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
-        UE = [U; U[(end - model.nu + 1):end]]
-        ŶE = [mpc.ŷ; Ŷ]
-        J += mpc.E*mpc.JE(UE, ŶE, mpc.D̂E)
-    end
-    return J
-end
-
-"""
-    obj_nonlinprog(mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ)
-
-Nonlinear programming objective function when `model` is not a [`LinModel`](@ref). The
-function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
-"""
-function obj_nonlinprog(
-    mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{NT}
-) where {NT<:Real}
-    # --- output setpoint tracking term ---
-    êy = mpc.R̂y - Ŷ
-    JR̂y = dot(êy, mpc.M_Hp, êy)
-    # --- move suppression and slack variable term ---
-    JΔŨ = dot(ΔŨ, mpc.Ñ_Hc, ΔŨ)
-    # --- input over prediction horizon ---
-    if !mpc.noR̂u || !iszero(mpc.E)
-        U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
-    end
-    # --- input setpoint tracking term ---
-    if !mpc.noR̂u
-        êu = mpc.R̂u - U
-        JR̂u = dot(êu, mpc.L_Hp, êu)
-    else
-        JR̂u = 0.0
-    end
-    # --- economic term ---
-    if !iszero(mpc.E)
-        UE = [U; U[(end - model.nu + 1):end]]
-        ŶE = [mpc.ŷ; Ŷ]
-        E_JE = mpc.E*mpc.JE(UE, ŶE, mpc.D̂E)
-    else
-        E_JE = 0.0
-    end
-    return JR̂y + JΔŨ + JR̂u + E_JE
-end
-
 function Base.show(io::IO, mpc::PredictiveController)
     Hp, Hc = mpc.Hp, mpc.Hc
     nu, nd = mpc.estim.model.nu, mpc.estim.model.nd
