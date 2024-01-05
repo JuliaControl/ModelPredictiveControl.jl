@@ -497,9 +497,9 @@ The matrices appear in the quadratic general form :
     J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'H̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
 ```
 ``\mathbf{H̃}`` is constant if the model and weights are linear and time invariant (LTI). The 
-vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k`` (see
-`initpred!`). ``p`` does not impact the minima position. It is thus 
-useless at optimization but required to evaluate the minimal ``J`` value.
+vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k``. ``p``
+does not impact the minima position. It is thus useless at optimization but required to 
+evaluate the minimal ``J`` value.
 """
 function init_quadprog(::LinModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
     H̃ = Hermitian(convert(Matrix{NT}, 2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃)), :L)
