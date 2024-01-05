@@ -20,7 +20,7 @@ Jacobians of ``\mathbf{f}`` and ``\mathbf{h}`` functions are automatically compu
     See Extended Help if you get an error like:    
     `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
 
-## Examples
+# Examples
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->x.^3 + u, (x,_)->x, 0.1, 1, 1, 1);
 
@@ -31,10 +31,11 @@ julia> linmodel.A
  300.0
 ```
 
-## Extended Help
-Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and `h`
-functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
-for common mistakes when writing these functions.
+# Extended Help
+!!! details "Extended Help"
+    Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and
+    `h` functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+    for common mistakes when writing these functions.
 """
 function linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
     u0, d0 = u - model.uop, d - model.dop

@@ -1,7 +1,7 @@
 @doc raw"""
     setconstraint!(mpc::PredictiveController; <keyword arguments>) -> mpc
 
-Set the constraint parameters of `mpc` predictive controller.
+Set the constraint parameters of the [`PredictiveController`](@ref) `mpc`.
 
 The predictive controllers support both soft and hard constraints, defined by:
 ```math 
@@ -13,16 +13,11 @@ The predictive controllers support both soft and hard constraints, defined by:
 \end{alignat*}
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
-end of the horizon (see Extended Help). All the constraint parameters are vector. Use `±Inf`
-values when there is no bound. The constraint softness parameters ``\mathbf{c}``, also
-called equal concern for relaxation, are non-negative values that specify the softness of
-the associated bound. Use `0.0` values for hard constraints. The output and terminal 
+end of the horizon (see Extended Help). See [`MovingHorizonEstimator`](@ref) constraints
+for details on bounds and softness parameters ``\mathbf{c}``. The output and terminal 
 constraints are all soft by default. See Extended Help for time-varying constraints.
 
 # Arguments
-!!! info
-    Same as above for the keyword arguments and default constraints.
-
 - `mpc::PredictiveController` : predictive controller to set constraints.
 - `umin  = fill(-Inf,nu)` : manipulated input lower bounds ``\mathbf{u_{min}}``.
 - `umax  = fill(+Inf,nu)` : manipulated input upper bounds ``\mathbf{u_{max}}``.
@@ -61,34 +56,35 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 ```
 
 # Extended Help
-Terminal constraints provide closed-loop stability guarantees on the nominal plant model.
-They can render an unfeasible problem however. In practice, a sufficiently large prediction
-horizon ``H_p`` without terminal constraints is typically enough for stability. Note that
-terminal constraints are applied on the augmented state vector ``\mathbf{x̂}`` (see
-[`SteadyKalmanFilter`](@ref) for details on augmentation).
+!!! details "Extended Help"
+    Terminal constraints provide closed-loop stability guarantees on the nominal plant model.
+    They can render an unfeasible problem however. In practice, a sufficiently large
+    prediction horizon ``H_p`` without terminal constraints is typically enough for 
+    stability. Note that terminal constraints are applied on the augmented state vector 
+    ``\mathbf{x̂}`` (see [`SteadyKalmanFilter`](@ref) for details on augmentation).
 
-For variable constraints, the bounds can be modified after calling [`moveinput!`](@ref),
-that is, at runtime, but not the softness parameters ``\mathbf{c}``. It is not possible to
-modify `±Inf` bounds at runtime.
+    For variable constraints, the bounds can be modified after calling [`moveinput!`](@ref),
+    that is, at runtime, but not the softness parameters ``\mathbf{c}``. It is not possible
+    to modify `±Inf` bounds at runtime.
 
-!!! tip
-    To keep a variable unconstrained while maintaining the ability to add a constraint later
-    at runtime, set the bound to an absolute value sufficiently large when you create the
-    controller (but different than `±Inf`).
+    !!! tip
+        To keep a variable unconstrained while maintaining the ability to add a constraint
+        later at runtime, set the bound to an absolute value sufficiently large when you
+        create the controller (but different than `±Inf`).
 
-It is also possible to specify time-varying constraints over ``H_p`` and ``H_c`` horizons. 
-In such a case, they are defined by:
-```math 
-\begin{alignat*}{3}
-    \mathbf{U_{min}  - C_{u_{min}}}  ϵ ≤&&\ \mathbf{U}  &≤ \mathbf{U_{max}  + C_{u_{max}}}  ϵ \\
-    \mathbf{ΔU_{min} - C_{Δu_{min}}} ϵ ≤&&\ \mathbf{ΔU} &≤ \mathbf{ΔU_{max} + C_{Δu_{max}}} ϵ \\
-    \mathbf{Y_{min}  - C_{y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + C_{y_{max}}}  ϵ
-\end{alignat*}
-```
-For this, use the same keyword arguments as above but with a capital letter:
-- `Umin`  / `Umax`  / `C_umin`  / `C_umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
-- `ΔUmin` / `ΔUmax` / `C_Δumin` / `C_Δumax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
-- `Ymin`  / `Ymax`  / `C_ymin`  / `C_ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
+    It is also possible to specify time-varying constraints over ``H_p`` and ``H_c`` 
+    horizons. In such a case, they are defined by:
+    ```math 
+    \begin{alignat*}{3}
+        \mathbf{U_{min}  - C_{u_{min}}}  ϵ ≤&&\ \mathbf{U}  &≤ \mathbf{U_{max}  + C_{u_{max}}}  ϵ \\
+        \mathbf{ΔU_{min} - C_{Δu_{min}}} ϵ ≤&&\ \mathbf{ΔU} &≤ \mathbf{ΔU_{max} + C_{Δu_{max}}} ϵ \\
+        \mathbf{Y_{min}  - C_{y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + C_{y_{max}}}  ϵ
+    \end{alignat*}
+    ```
+    For this, use the same keyword arguments as above but with a capital letter:
+    - `Umin`  / `Umax`  / `C_umin`  / `C_umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
+    - `ΔUmin` / `ΔUmax` / `C_Δumin` / `C_Δumax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
+    - `Ymin`  / `Ymax`  / `C_ymin`  / `C_ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
 """
 function setconstraint!(
     mpc::PredictiveController; 
@@ -377,49 +373,50 @@ Operating points on ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{y}`` are omitte
 equations.
 
 # Extended Help
-Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` and the function
-``\mathbf{W}(j) = \mathbf{Ĉ} ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}``, the prediction 
-matrices are computed by :
-```math
-\begin{aligned}
-\mathbf{E} &= \begin{bmatrix}
-    \mathbf{W}(0)      & \mathbf{0}        & \cdots & \mathbf{0}              \\
-    \mathbf{W}(1)      & \mathbf{W}(0)     & \cdots & \mathbf{0}              \\
-    \vdots             & \vdots            & \ddots & \vdots                  \\
-    \mathbf{W}(H_p-1)  & \mathbf{W}(H_p-2) & \cdots & \mathbf{W}(H_p-H_c+1)   \end{bmatrix} \\
-\mathbf{G} &= \begin{bmatrix}
-    \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
-    \mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
-    \vdots                                    \\
-    \mathbf{Ĉ}\mathbf{Â}^{H_p-1} \mathbf{B̂_d} \end{bmatrix} \\
-\mathbf{J} &= \begin{bmatrix}
-    \mathbf{D̂_d}                              & \mathbf{0}                                & \cdots & \mathbf{0}   \\ 
-    \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     & \mathbf{D̂_d}                              & \cdots & \mathbf{0}   \\ 
-    \vdots                                    & \vdots                                    & \ddots & \vdots       \\
-    \mathbf{Ĉ}\mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Ĉ}\mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{D̂_d} \end{bmatrix} \\
-\mathbf{K} &= \begin{bmatrix}
-    \mathbf{Ĉ}\mathbf{Â}^{1}      \\
-    \mathbf{Ĉ}\mathbf{Â}^{2}      \\
-    \vdots                        \\
-    \mathbf{Ĉ}\mathbf{Â}^{H_p}    \end{bmatrix} \\
-\mathbf{V} &= \begin{bmatrix}
-    \mathbf{W}(0)        \\
-    \mathbf{W}(1)        \\
-    \vdots               \\
-    \mathbf{W}(H_p-1)    \end{bmatrix}
-\end{aligned}
-```
-For the terminal constraints, the matrices are computed with the function
-``\mathbf{w_x̂}(j) = ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}`` and:
-```math
-\begin{aligned}
-\mathbf{e_x̂} &= \begin{bmatrix} \mathbf{w_x̂}(H_p-1) & \mathbf{w_x̂}(H_p-2) & \cdots & \mathbf{w_x̂}(H_p-H_c+1) \end{bmatrix} \\
-\mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
-\mathbf{j_x̂} &= \begin{bmatrix} \mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{0} \end{bmatrix} \\
-\mathbf{k_x̂} &= \mathbf{Â}^{H_p} \\
-\mathbf{v_x̂} &= \mathbf{w_x̂}(H_p-1)
-\end{aligned}
-```
+!!! details "Extended Help"
+    Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` and the
+    function ``\mathbf{W}(j) = \mathbf{Ĉ} ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}``, the
+    prediction matrices are computed by :
+    ```math
+    \begin{aligned}
+    \mathbf{E} &= \begin{bmatrix}
+        \mathbf{W}(0)      & \mathbf{0}        & \cdots & \mathbf{0}              \\
+        \mathbf{W}(1)      & \mathbf{W}(0)     & \cdots & \mathbf{0}              \\
+        \vdots             & \vdots            & \ddots & \vdots                  \\
+        \mathbf{W}(H_p-1)  & \mathbf{W}(H_p-2) & \cdots & \mathbf{W}(H_p-H_c+1)   \end{bmatrix} \\
+    \mathbf{G} &= \begin{bmatrix}
+        \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
+        \mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
+        \vdots                                    \\
+        \mathbf{Ĉ}\mathbf{Â}^{H_p-1} \mathbf{B̂_d} \end{bmatrix} \\
+    \mathbf{J} &= \begin{bmatrix}
+        \mathbf{D̂_d}                              & \mathbf{0}                                & \cdots & \mathbf{0}   \\ 
+        \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     & \mathbf{D̂_d}                              & \cdots & \mathbf{0}   \\ 
+        \vdots                                    & \vdots                                    & \ddots & \vdots       \\
+        \mathbf{Ĉ}\mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Ĉ}\mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{D̂_d} \end{bmatrix} \\
+    \mathbf{K} &= \begin{bmatrix}
+        \mathbf{Ĉ}\mathbf{Â}^{1}      \\
+        \mathbf{Ĉ}\mathbf{Â}^{2}      \\
+        \vdots                        \\
+        \mathbf{Ĉ}\mathbf{Â}^{H_p}    \end{bmatrix} \\
+    \mathbf{V} &= \begin{bmatrix}
+        \mathbf{W}(0)        \\
+        \mathbf{W}(1)        \\
+        \vdots               \\
+        \mathbf{W}(H_p-1)    \end{bmatrix}
+    \end{aligned}
+    ```
+    For the terminal constraints, the matrices are computed with the function
+    ``\mathbf{w_x̂}(j) = ( ∑_{i=0}^j \mathbf{Â}^i ) \mathbf{B̂_u}`` and:
+    ```math
+    \begin{aligned}
+    \mathbf{e_x̂} &= \begin{bmatrix} \mathbf{w_x̂}(H_p-1) & \mathbf{w_x̂}(H_p-2) & \cdots & \mathbf{w_x̂}(H_p-H_c+1) \end{bmatrix} \\
+    \mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
+    \mathbf{j_x̂} &= \begin{bmatrix} \mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{0} \end{bmatrix} \\
+    \mathbf{k_x̂} &= \mathbf{Â}^{H_p} \\
+    \mathbf{v_x̂} &= \mathbf{w_x̂}(H_p-1)
+    \end{aligned}
+    ```
 """
 function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where {NT<:Real}
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d

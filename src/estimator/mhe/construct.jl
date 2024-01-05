@@ -72,32 +72,31 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
 ```
 
 # Extended Help
-The estimated process and sensor noises are defined as:
-```math
-\mathbf{Ŵ} = 
-\begin{bmatrix}
-    \mathbf{ŵ}(k-N_k+1)     \\
-    \mathbf{ŵ}(k-N_k+2)     \\
-    \vdots                  \\
-    \mathbf{ŵ}(k)
-\end{bmatrix} , \quad
-\mathbf{V̂} =
-\begin{bmatrix}
-    \mathbf{v̂}(k-N_k+1)     \\
-    \mathbf{v̂}(k-N_k+2)     \\
-    \vdots                  \\
-    \mathbf{v̂}(k)
-\end{bmatrix}
-```
-based on the augmented model ``\mathbf{f̂, ĥ^m}``:
-```math
-\begin{aligned}
-    \mathbf{x̂}_k(k-j+1) &= \mathbf{f̂}\Big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\Big) 
-                           + \mathbf{ŵ}(k-j) \\
-    \mathbf{v̂}(k-j)     &= \mathbf{y^m}(k-j) 
-                           - \mathbf{ĥ^m}\Big(\mathbf{x̂}_k(k-j), \mathbf{d}(k-j)\Big)
-\end{aligned}
-```
+!!! details "Extended Help"
+    The estimated process and sensor noises are defined as:
+    ```math
+    \mathbf{Ŵ} = 
+    \begin{bmatrix}
+        \mathbf{ŵ}(k-N_k+1)     \\
+        \mathbf{ŵ}(k-N_k+2)     \\
+        \vdots                  \\
+        \mathbf{ŵ}(k)
+    \end{bmatrix} , \quad
+    \mathbf{V̂} =
+    \begin{bmatrix}
+        \mathbf{v̂}(k-N_k+1)     \\
+        \mathbf{v̂}(k-N_k+2)     \\
+        \vdots                  \\
+        \mathbf{v̂}(k)
+    \end{bmatrix}
+    ```
+    based on the augmented model functions ``\mathbf{f̂, ĥ^m}``:
+    ```math
+    \begin{aligned}
+        \mathbf{v̂}(k-j)     &= \mathbf{y^m}(k-j) - \mathbf{ĥ^m}\Big(\mathbf{x̂}_k(k-j), \mathbf{d}(k-j)\Big) \\
+        \mathbf{x̂}_k(k-j+1) &= \mathbf{f̂}\Big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\Big) + \mathbf{ŵ}(k-j)
+    \end{aligned}
+    ```
 """
 function MovingHorizonEstimator(
     model::SM;
@@ -260,52 +259,53 @@ All these equations omit the operating points ``\mathbf{u_{op}, y_{op}, d_{op}}`
 matrices are truncated when ``N_k < H_e`` (at the beginning).
 
 # Extended Help
-Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}``, the prediction matrices
-for the sensor noises are computed by (notice the minus signs after the equalities):
-```math
-\begin{aligned}
-\mathbf{E} &= - \begin{bmatrix}
-    \mathbf{Ĉ^m}\mathbf{A}^{0}                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-    \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{A}^{0}                    & \cdots & \mathbf{0}   \\ 
-    \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-    \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}              & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}                & \cdots & \mathbf{0}   \end{bmatrix} \\
-\mathbf{G} &= - \begin{bmatrix}
-    \mathbf{0}                                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-    \mathbf{Ĉ^m}\mathbf{A}^{0}\mathbf{B̂_u}      & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-    \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-    \mathbf{Ĉ^m}\mathbf{A}^{H_e-2}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{A}^{H_e-3}\mathbf{B̂_u}    & \cdots & \mathbf{0}   \end{bmatrix} \\
-\mathbf{J} &= - \begin{bmatrix}
-    \mathbf{D̂^m}                                & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-    \mathbf{Ĉ^m}\mathbf{A}^{0}\mathbf{B̂_d}      & \mathbf{D̂^m}                                  & \cdots & \mathbf{0}   \\ 
-    \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-    \mathbf{Ĉ^m}\mathbf{A}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{A}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{D̂^m} \end{bmatrix} 
-\end{aligned}
-```
-for the estimation error at arrival:
-```math
-\mathbf{e_x̄} = \begin{bmatrix}
-    -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{bmatrix}
-```
-and, for the estimated states:
-```math
-\begin{aligned}
-\mathbf{E_x̂} &= \begin{bmatrix}
-    \mathbf{Â}^{1}                      & \mathbf{I}                        & \cdots & \mathbf{0}                   \\
-    \mathbf{Â}^{2}                      & \mathbf{Â}^{1}                    & \cdots & \mathbf{0}                   \\ 
-    \vdots                              & \vdots                            & \ddots & \vdots                       \\
-    \mathbf{Â}^{H_e}                    & \mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Â}^{1}               \end{bmatrix} \\
-\mathbf{G_x̂} &= \begin{bmatrix}
-    \mathbf{Â}^{0}\mathbf{B̂_u}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
-    \mathbf{Â}^{1}\mathbf{B̂_u}          & \mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                   \\ 
-    \vdots                              & \vdots                            & \ddots & \vdots                       \\
-    \mathbf{Â}^{H_e-1}\mathbf{B̂_u}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
-\mathbf{J_x̂} &= \begin{bmatrix}
-    \mathbf{Â}^{0}\mathbf{B̂_d}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
-    \mathbf{Â}^{1}\mathbf{B̂_d}          & \mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                   \\ 
-    \vdots                              & \vdots                            & \ddots & \vdots                       \\
-    \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix}
-\end{aligned}
-```
+!!! details "Extended Help"
+    Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}``, the prediction matrices
+    for the sensor noises are computed by (notice the minus signs after the equalities):
+    ```math
+    \begin{aligned}
+    \mathbf{E} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m}\mathbf{A}^{0}                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{A}^{0}                    & \cdots & \mathbf{0}   \\ 
+        \vdots                                      & \vdots                                        & \ddots & \vdots       \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}              & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}                & \cdots & \mathbf{0}   \end{bmatrix} \\
+    \mathbf{G} &= - \begin{bmatrix}
+        \mathbf{0}                                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
+        \mathbf{Ĉ^m}\mathbf{A}^{0}\mathbf{B̂_u}      & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
+        \vdots                                      & \vdots                                        & \ddots & \vdots       \\
+        \mathbf{Ĉ^m}\mathbf{A}^{H_e-2}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{A}^{H_e-3}\mathbf{B̂_u}    & \cdots & \mathbf{0}   \end{bmatrix} \\
+    \mathbf{J} &= - \begin{bmatrix}
+        \mathbf{D̂^m}                                & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
+        \mathbf{Ĉ^m}\mathbf{A}^{0}\mathbf{B̂_d}      & \mathbf{D̂^m}                                  & \cdots & \mathbf{0}   \\ 
+        \vdots                                      & \vdots                                        & \ddots & \vdots       \\
+        \mathbf{Ĉ^m}\mathbf{A}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{A}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{D̂^m} \end{bmatrix} 
+    \end{aligned}
+    ```
+    for the estimation error at arrival:
+    ```math
+    \mathbf{e_x̄} = \begin{bmatrix}
+        -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{bmatrix}
+    ```
+    and, for the estimated states:
+    ```math
+    \begin{aligned}
+    \mathbf{E_x̂} &= \begin{bmatrix}
+        \mathbf{Â}^{1}                      & \mathbf{I}                        & \cdots & \mathbf{0}                   \\
+        \mathbf{Â}^{2}                      & \mathbf{Â}^{1}                    & \cdots & \mathbf{0}                   \\ 
+        \vdots                              & \vdots                            & \ddots & \vdots                       \\
+        \mathbf{Â}^{H_e}                    & \mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Â}^{1}               \end{bmatrix} \\
+    \mathbf{G_x̂} &= \begin{bmatrix}
+        \mathbf{Â}^{0}\mathbf{B̂_u}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
+        \mathbf{Â}^{1}\mathbf{B̂_u}          & \mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                   \\ 
+        \vdots                              & \vdots                            & \ddots & \vdots                       \\
+        \mathbf{Â}^{H_e-1}\mathbf{B̂_u}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
+    \mathbf{J_x̂} &= \begin{bmatrix}
+        \mathbf{Â}^{0}\mathbf{B̂_d}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
+        \mathbf{Â}^{1}\mathbf{B̂_d}          & \mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                   \\ 
+        \vdots                              & \vdots                            & \ddots & \vdots                       \\
+        \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix}
+    \end{aligned}
+    ```
 """
 function init_predmat_mhe(model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d) where {NT<:Real}
     nu, nd = model.nu, model.nd
@@ -518,27 +518,32 @@ end
 @doc raw"""
     setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
 
-Set the constraint parameters of `estim` [`MovingHorizonEstimator`](@ref).
+Set the constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
    
-The moving horizon estimator supports constraints on the estimated state ``\mathbf{x̂}``,
+The estimator supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``,
 process noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
-    \mathbf{x̂_{min}} ≤&&\   \mathbf{x̂}_k(k-j+1) &≤ \mathbf{x̂_{max}}  &&\qquad  j = N_k, N_k - 1, ... , 0    \\
-    \mathbf{ŵ_{min}} ≤&&\     \mathbf{ŵ}(k-j+1) &≤ \mathbf{ŵ_{max}}  &&\qquad  j = N_k, N_k - 1, ... , 1    \\
-    \mathbf{v̂_{min}} ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max}}  &&\qquad  j = N_k, N_k - 1, ... , 1
+    \mathbf{x̂_{min} - c_{x̂_{min}}} ϵ ≤&&\   \mathbf{x̂}_k(k-j+1) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 0    \\
+    \mathbf{ŵ_{min} - c_{ŵ_{min}}} ϵ ≤&&\     \mathbf{ŵ}(k-j+1) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1    \\
+    \mathbf{v̂_{min} - c_{v̂_{min}}} ϵ ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max} + c_{v̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1
 \end{alignat*}
 ```
-Note that the state and process noise constraints are applied on augmented model vectors 
-(see the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation). Also, 
-constraining the estimated sensor noises is equivalent to constraining the innovation term, 
-since ``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)`` in the MHE. See Extended Help
-for time-varying constraints.
+and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there
+is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern
+for relaxation, are non-negative values that specify the softness of the associated bound.
+Use `0.0` values for hard constraints. The process and sensor noise constraints are all soft
+by default. Note that the state and process noise constraints are applied on the augmented
+vectors (see the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation).
+Also note that constraining the estimated sensor noises is equivalent to bounding the
+innovation term, since ``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See Extended
+Help for time-varying constraints.
 
 # Arguments
 !!! info
     The default constraints are mentioned here for clarity but omitting a keyword argument 
-    will not re-assign to its default value (defaults are set at construction only).
+    will not re-assign to its default value (defaults are set at construction only). The
+    same applies for [`PredictiveController`](@ref).
 
 - `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints.
 - `x̂min = fill(-Inf,nx̂)`  : augmented state lower bounds ``\mathbf{x̂_{min}}``.
@@ -547,7 +552,13 @@ for time-varying constraints.
 - `ŵmax = fill(+Inf,nx̂)`  : augmented process noise upper bounds ``\mathbf{ŵ_{max}}``.
 - `v̂min = fill(-Inf,nym)` : sensor noise lower bounds ``\mathbf{v̂_{min}}``.
 - `v̂max = fill(+Inf,nym)` : sensor noise upper bounds ``\mathbf{v̂_{max}}``.
-- all the keyword arguments above but with a capital letter, e.g. `X̂max` or `V̂max` : for
+- `c_x̂min = fill(0.0,nx̂)`  : `x̂min` softness weights ``\mathbf{c_{x̂_{min}}}``.
+- `c_x̂max = fill(0.0,nx̂)`  : `x̂max` softness weights ``\mathbf{c_{x̂_{max}}}``.
+- `c_ŵmin = fill(1.0,nx̂)`  : `ŵmin` softness weights ``\mathbf{c_{ŵ_{min}}}``.
+- `c_ŵmax = fill(1.0,nx̂)`  : `ŵmax` softness weights ``\mathbf{c_{ŵ_{max}}}``.
+- `c_v̂min = fill(1.0,nym)` : `v̂min` softness weights ``\mathbf{c_{v̂_{min}}}``.
+- `c_v̂max = fill(1.0,nym)` : `v̂max` softness weights ``\mathbf{c_{v̂_{max}}}``.
+- all the keyword arguments above but with a capital letter, e.g. `X̂max` or `C_ŵmax` : for
   time-varying constraints (see Extended Help).
 
 # Examples
@@ -565,21 +576,21 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, 
 ```
 
 # Extended Help
-
-For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
-that is, at runtime, except for `±Inf` bounds. It is also possible to specify time-varying
-constraints over the horizon. In such a case, they are defined by:
-```math 
-\begin{alignat*}{3}
-    \mathbf{X̂_{min}} ≤&&\ \mathbf{X̂}  &≤ \mathbf{X̂_{max}} \\
-    \mathbf{Ŵ_{min}} ≤&&\ \mathbf{Ŵ}  &≤ \mathbf{Ŵ_{max}} \\
-    \mathbf{V̂_{min}} ≤&&\ \mathbf{V̂}  &≤ \mathbf{V̂_{max}}
-\end{alignat*}
-```
-For this, use the same keyword arguments as above but with a capital letter:
-- `X̂min` / `X̂max` : ``\mathbf{X̂}`` constraints `(nx̂*(He+1),)`.
-- `Ŵmin` / `Ŵmax` : ``\mathbf{Ŵ}`` constraints `(nx̂*He,)`.
-- `V̂min` / `V̂max` : ``\mathbf{V̂}`` constraints `(nym*He,)`.
+!!! details "Extended Help"
+    For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
+    that is, at runtime, except for `±Inf` bounds. Time-varying constraints over the
+    estimation horizon ``H_e`` are also possible, mathematically defined as:
+    ```math 
+    \begin{alignat*}{3}
+        \mathbf{X̂_{min} - C_{x̂_{min}}} ϵ ≤&&\ \mathbf{X̂} &≤ \mathbf{X̂_{max} + C_{x̂_{max}}} ϵ \\
+        \mathbf{Ŵ_{min} - C_{ŵ_{min}}} ϵ ≤&&\ \mathbf{Ŵ} &≤ \mathbf{Ŵ_{max} + C_{ŵ_{max}}} ϵ \\
+        \mathbf{V̂_{min} - C_{v̂_{min}}} ϵ ≤&&\ \mathbf{V̂} &≤ \mathbf{V̂_{max} + C_{v̂_{max}}} ϵ
+    \end{alignat*}
+    ```
+    For this, use the same keyword arguments as above but with a capital letter:
+    - `X̂min` / `X̂max` / `C_x̂min` / `C_x̂max` : ``\mathbf{X̂}`` constraints `(nx̂*(He+1),)`.
+    - `Ŵmin` / `Ŵmax` / `C_ŵmin` / `C_ŵmax` : ``\mathbf{Ŵ}`` constraints `(nx̂*He,)`.
+    - `V̂min` / `V̂max` / `C_v̂min` / `C_v̂max` : ``\mathbf{V̂}`` constraints `(nym*He,)`.
 """
 function setconstraint!(
     estim::MovingHorizonEstimator; 

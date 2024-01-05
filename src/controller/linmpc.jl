@@ -142,26 +142,27 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 ```
 
 # Extended Help
-Manipulated inputs setpoints ``\mathbf{r_u}`` are not common but they can be interesting
-for over-actuated systems, when `nu > ny` (e.g. prioritize solutions with lower economical 
-costs). The default `Lwt` value implies that this feature is disabled by default.
+!!! details "Extended Help"
+    Manipulated inputs setpoints ``\mathbf{r_u}`` are not common but they can be interesting
+    for over-actuated systems, when `nu > ny` (e.g. prioritize solutions with lower 
+    economical costs). The default `Lwt` value implies that this feature is disabled by default.
 
-The objective function follows this nomenclature:
+    The objective function follows this nomenclature:
 
-| VARIABLE             | DESCRIPTION                                              | SIZE             |
-| :------------------- | :------------------------------------------------------- | :--------------- |
-| ``H_p``              | prediction horizon (integer)                             | `()`             |
-| ``H_c``              | control horizon (integer)                                | `()`             |
-| ``\mathbf{ΔU}``      | manipulated input increments over ``H_c``                | `(nu*Hc,)`       |
-| ``\mathbf{Ŷ}``       | predicted outputs over ``H_p``                           | `(ny*Hp,)`       |
-| ``\mathbf{U}``       | manipulated inputs over ``H_p``                          | `(nu*Hp,)`       |
-| ``\mathbf{R̂_y}``     | predicted output setpoints over ``H_p``                  | `(ny*Hp,)`       |
-| ``\mathbf{R̂_u}``     | predicted manipulated input setpoints over ``H_p``       | `(nu*Hp,)`       |
-| ``\mathbf{M_{H_p}}`` | output setpoint tracking weights over ``H_p``            | `(ny*Hp, ny*Hp)` |
-| ``\mathbf{N_{H_c}}`` | manipulated input increment weights over ``H_c``         | `(nu*Hc, nu*Hc)` |
-| ``\mathbf{L_{H_p}}`` | manipulated input setpoint tracking weights over ``H_p`` | `(nu*Hp, nu*Hp)` |
-| ``C``                | slack variable weight                                    | `()`             |
-| ``ϵ``                | slack variable for constraint softening                  | `()`             |
+    | VARIABLE             | DESCRIPTION                                              | SIZE             |
+    | :------------------- | :------------------------------------------------------- | :--------------- |
+    | ``H_p``              | prediction horizon (integer)                             | `()`             |
+    | ``H_c``              | control horizon (integer)                                | `()`             |
+    | ``\mathbf{ΔU}``      | manipulated input increments over ``H_c``                | `(nu*Hc,)`       |
+    | ``\mathbf{Ŷ}``       | predicted outputs over ``H_p``                           | `(ny*Hp,)`       |
+    | ``\mathbf{U}``       | manipulated inputs over ``H_p``                          | `(nu*Hp,)`       |
+    | ``\mathbf{R̂_y}``     | predicted output setpoints over ``H_p``                  | `(ny*Hp,)`       |
+    | ``\mathbf{R̂_u}``     | predicted manipulated input setpoints over ``H_p``       | `(nu*Hp,)`       |
+    | ``\mathbf{M_{H_p}}`` | output setpoint tracking weights over ``H_p``            | `(ny*Hp, ny*Hp)` |
+    | ``\mathbf{N_{H_c}}`` | manipulated input increment weights over ``H_c``         | `(nu*Hc, nu*Hc)` |
+    | ``\mathbf{L_{H_p}}`` | manipulated input setpoint tracking weights over ``H_p`` | `(nu*Hp, nu*Hp)` |
+    | ``C``                | slack variable weight                                    | `()`             |
+    | ``ϵ``                | slack variable for constraint softening                  | `()`             |
 """
 function LinMPC(
     model::LinModel;

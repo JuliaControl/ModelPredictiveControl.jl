@@ -72,12 +72,13 @@ InternalModel estimator with a sample time Ts = 0.5 s, LinModel and:
 ```
 
 # Extended Help
-`stoch_ym` is a `TransferFunction` or `StateSpace` object that models disturbances on
-``\mathbf{y^m}``. Its input is a hypothetical zero mean white noise vector. `stoch_ym` 
-supposes 1 integrator per measured outputs by default, assuming that the current stochastic
-estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` is constant in the 
-future. This is the dynamic matrix control (DMC) strategy, which is simple but sometimes too
-aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
+!!! details "Extended Help"
+    `stoch_ym` is a `TransferFunction` or `StateSpace` object that models disturbances on
+    ``\mathbf{y^m}``. Its input is a hypothetical zero mean white noise vector. `stoch_ym` 
+    supposes 1 integrator per measured outputs by default, assuming that the current stochastic
+    estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` is constant in the 
+    future. This is the dynamic matrix control (DMC) strategy, which is simple but sometimes
+    too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
 """
 function InternalModel(
     model::SM;

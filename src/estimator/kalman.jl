@@ -118,24 +118,25 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 ```
 
 # Extended Help
-The model augmentation with `nint_u` vector adds integrators at model manipulated inputs,
-and `nint_ym`, at measured outputs. They create the integral action when the estimator is
-used in a controller as state feedback. By default, the method [`default_nint`](@ref) adds
-one integrator per measured output if feasible. The argument `nint_ym` can also be tweaked
-by following these rules on each measured output:
+!!! details "Extended Help"
+    The model augmentation with `nint_u` vector adds integrators at model manipulated inputs,
+    and `nint_ym`, at measured outputs. They create the integral action when the estimator
+    is used in a controller as state feedback. By default, the method [`default_nint`](@ref)
+    adds one integrator per measured output if feasible. The argument `nint_ym` can also be
+    tweaked by following these rules on each measured output:
 
-- Use 0 integrator if the model output is already integrating (else it will be unobservable)
-- Use 1 integrator if the disturbances on the output are typically "step-like"
-- Use 2 integrators if the disturbances on the output are typically "ramp-like" 
+    - Use 0 integrator if the model output is already integrating (else it will be unobservable)
+    - Use 1 integrator if the disturbances on the output are typically "step-like"
+    - Use 2 integrators if the disturbances on the output are typically "ramp-like" 
 
-The function [`init_estimstoch`](@ref) builds the stochastic model for estimation.
+    The function [`init_estimstoch`](@ref) builds the stochastic model for estimation.
 
-!!! tip
-    Increasing `σQint_u` and `σQint_ym` values increases the integral action "gain".
+    !!! tip
+        Increasing `σQint_u` and `σQint_ym` values increases the integral action "gain".
 
-The constructor pre-compute the steady-state Kalman gain `K̂` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
-function. It can sometimes fail, for example when `model` matrices are ill-conditioned. In
-such a case, you can try the alternative time-varying [`KalmanFilter`](@ref).
+    The constructor pre-compute the steady-state Kalman gain `K̂` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
+    function. It can sometimes fail, for example when `model` matrices are ill-conditioned.
+    In such a case, you can try the alternative time-varying [`KalmanFilter`](@ref).
 """
 function SteadyKalmanFilter(
     model::SM;
@@ -437,10 +438,11 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
 ```
 
 # Extended Help
-The Extended Help of [`SteadyKalmanFilter`](@ref) details the augmentation with `nint_ym` 
-and `nint_u` arguments. Note that the constructor does not validate the observability of
-the resulting augmented [`NonLinModel`](@ref). In such cases, it is the user's 
-responsibility to ensure that the augmented model is still observable.
+!!! details "Extended Help"
+    The Extended Help of [`SteadyKalmanFilter`](@ref) details the augmentation with `nint_ym` 
+    and `nint_u` arguments. Note that the constructor does not validate the observability of
+    the resulting augmented [`NonLinModel`](@ref). In such cases, it is the user's 
+    responsibility to ensure that the augmented model is still observable.
 """
 function UnscentedKalmanFilter(
     model::SM;
