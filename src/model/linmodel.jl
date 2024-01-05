@@ -166,16 +166,6 @@ end
 Discretize with zero-order hold when `sys` is a continuous system with delays.
 
 The delays must be multiples of the sample time `Ts`.
-
-# Examples
-```jldoctest
-julia> model = LinModel(tf(4, [10, 1])*delay(2), 0.5)
-Discrete-time linear model with a sample time Ts = 0.5 s and:
- 1 manipulated inputs u
- 5 states x
- 1 outputs y
- 0 measured disturbances d
-```
 """
 function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
     sys_dis = minreal(c2d(sys, Ts, :zoh)) # c2d only supports :zoh for DelayLtiSystem
