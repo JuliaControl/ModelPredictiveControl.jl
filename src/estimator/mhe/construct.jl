@@ -50,6 +50,7 @@ the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
 - `He=nothing` : estimation horizon ``H_e``, must be specified.
+- `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `optim=default_optim_mhe(model)` : a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    with a quadratic/nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
@@ -64,7 +65,7 @@ julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP0=[0.01])
 MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer, NonLinModel and:
  5 estimation steps He
  1 manipulated inputs u (0 integrating states)
- 2 states x̂
+ 2 estimated states x̂
  1 measured outputs ym (1 integrating states)
  0 unmeasured outputs yu
  0 measured disturbances d
@@ -573,7 +574,7 @@ julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
 MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, LinModel and:
  3 estimation steps He
  1 manipulated inputs u (0 integrating states)
- 2 states x̂
+ 2 estimated states x̂
  1 measured outputs ym (1 integrating states)
  0 unmeasured outputs yu
  0 measured disturbances d

@@ -111,7 +111,7 @@ ExplicitMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimat
  30 prediction steps Hp
   1 control steps Hc
   1 manipulated inputs u (0 integrating states)
-  4 states x̂
+  4 estimated states x̂
   2 measured outputs ym (2 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d
@@ -150,7 +150,7 @@ ExplicitMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and
  30 prediction steps Hp
   1 control steps Hc
   1 manipulated inputs u (0 integrating states)
-  3 states x̂
+  3 estimated states x̂
   1 measured outputs ym (1 integrating states)
   1 unmeasured outputs yu
   0 measured disturbances d

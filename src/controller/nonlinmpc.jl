@@ -149,7 +149,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
  20 prediction steps Hp
   1 control steps Hc
   1 manipulated inputs u (0 integrating states)
-  2 states x̂
+  2 estimated states x̂
   1 measured outputs ym (1 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d
@@ -224,7 +224,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
  20 prediction steps Hp
   1 control steps Hc
   1 manipulated inputs u (0 integrating states)
-  2 states x̂
+  2 estimated states x̂
   1 measured outputs ym (1 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d
