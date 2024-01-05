@@ -1,3 +1,4 @@
+
 @doc raw"""
     setconstraint!(mpc::PredictiveController; <keyword arguments>) -> mpc
 
@@ -253,6 +254,56 @@ function setconstraint!(
         end
     end
     return mpc
+end
+
+
+@doc raw"""
+    init_matconstraint_mpc(model::LinModel,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
+    ) -> i_b, i_g, A
+
+Init `i_b`, `i_g` and `A` matrices for the linear and nonlinear inequality constraints.
+
+The linear and nonlinear inequality constraints are respectively defined as:
+```math
+\begin{aligned} 
+    \mathbf{A ΔŨ } &≤ \mathbf{b} \\ 
+    \mathbf{g(ΔŨ)} &≤ \mathbf{0}
+\end{aligned}
+```
+`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. 
+`i_g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if `model` is a 
+[`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if `args` is
+provided. In such a case, `args`  needs to contain all the inequality constraint matrices: 
+`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max`.
+"""
+function init_matconstraint_mpc(::LinModel{NT}, 
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
+) where {NT<:Real}
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
+    i_g = BitVector()
+    if isempty(args)
+        A = zeros(NT, length(i_b), 0)
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max = args
+        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+    end
+    return i_b, i_g, A
+end
+
+"Init `i_b, A` without outputs and terminal constraints if `model` is not a [`LinModel`](@ref)."
+function init_matconstraint_mpc(::SimModel{NT},
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
+) where {NT<:Real}
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
+    i_g = [i_Ymin; i_Ymax; i_x̂min; i_x̂max]
+    if isempty(args)
+        A = zeros(NT, length(i_b), 0)
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ = args
+        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
+    end
+    return i_b, i_g, A
 end
 
 "By default, there is no nonlinear constraint, thus do nothing."
@@ -767,56 +818,6 @@ end
 "Return empty matrices if `estim` is not a [`InternalModel`](@ref)."
 function init_stochpred(estim::StateEstimator{NT}, _ ) where NT<:Real
     return zeros(NT, 0, estim.nxs), zeros(NT, 0, estim.model.ny)
-end
-
-
-@doc raw"""
-    init_matconstraint_mpc(model::LinModel,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
-    ) -> i_b, i_g, A
-
-Init `i_b`, `i_g` and `A` matrices for the linear and nonlinear inequality constraints.
-
-The linear and nonlinear inequality constraints are respectively defined as:
-```math
-\begin{aligned} 
-    \mathbf{A ΔŨ } &≤ \mathbf{b} \\ 
-    \mathbf{g(ΔŨ)} &≤ \mathbf{0}
-\end{aligned}
-```
-`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. 
-`i_g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if `model` is a 
-[`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if `args` is
-provided. In such a case, `args`  needs to contain all the inequality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max`.
-"""
-function init_matconstraint_mpc(::LinModel{NT}, 
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
-) where {NT<:Real}
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
-    i_g = BitVector()
-    if isempty(args)
-        A = zeros(NT, length(i_b), 0)
-    else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max = args
-        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
-    end
-    return i_b, i_g, A
-end
-
-"Init `i_b, A` without outputs and terminal constraints if `model` is not a [`LinModel`](@ref)."
-function init_matconstraint_mpc(::SimModel{NT},
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
-) where {NT<:Real}
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    i_g = [i_Ymin; i_Ymax; i_x̂min; i_x̂max]
-    if isempty(args)
-        A = zeros(NT, length(i_b), 0)
-    else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ = args
-        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
-    end
-    return i_b, i_g, A
 end
 
 "Validate predictive controller weight and horizon specified values."

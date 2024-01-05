@@ -151,6 +151,236 @@ function MovingHorizonEstimator(
     )
 end
 
+
+@doc raw"""
+    setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
+
+Set the constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
+   
+It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``, process 
+noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
+```math 
+\begin{alignat*}{3}
+    \mathbf{x̂_{min} - c_{x̂_{min}}} ϵ ≤&&\   \mathbf{x̂}_k(k-j+1) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 0    \\
+    \mathbf{ŵ_{min} - c_{ŵ_{min}}} ϵ ≤&&\     \mathbf{ŵ}(k-j+1) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1    \\
+    \mathbf{v̂_{min} - c_{v̂_{min}}} ϵ ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max} + c_{v̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1
+\end{alignat*}
+```
+and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there
+is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern
+for relaxation, are non-negative values that specify the softness of the associated bound.
+Use `0.0` values for hard constraints. The process and sensor noise constraints are all soft
+by default. Notice that constraining the estimated sensor noises is equivalent to bounding 
+the innovation term, since ``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See 
+Extended Help for details on model augmentation and time-varying constraints.
+
+# Arguments
+!!! info
+    The default constraints are mentioned here for clarity but omitting a keyword argument 
+    will not re-assign to its default value (defaults are set at construction only). The
+    same applies for [`PredictiveController`](@ref).
+
+- `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints.
+- `x̂min = fill(-Inf,nx̂)`  : augmented state lower bounds ``\mathbf{x̂_{min}}``.
+- `x̂max = fill(+Inf,nx̂)`  : augmented state upper bounds ``\mathbf{x̂_{max}}``.
+- `ŵmin = fill(-Inf,nx̂)`  : augmented process noise lower bounds ``\mathbf{ŵ_{min}}``.
+- `ŵmax = fill(+Inf,nx̂)`  : augmented process noise upper bounds ``\mathbf{ŵ_{max}}``.
+- `v̂min = fill(-Inf,nym)` : sensor noise lower bounds ``\mathbf{v̂_{min}}``.
+- `v̂max = fill(+Inf,nym)` : sensor noise upper bounds ``\mathbf{v̂_{max}}``.
+- `c_x̂min = fill(0.0,nx̂)`  : `x̂min` softness weights ``\mathbf{c_{x̂_{min}}}``.
+- `c_x̂max = fill(0.0,nx̂)`  : `x̂max` softness weights ``\mathbf{c_{x̂_{max}}}``.
+- `c_ŵmin = fill(1.0,nx̂)`  : `ŵmin` softness weights ``\mathbf{c_{ŵ_{min}}}``.
+- `c_ŵmax = fill(1.0,nx̂)`  : `ŵmax` softness weights ``\mathbf{c_{ŵ_{max}}}``.
+- `c_v̂min = fill(1.0,nym)` : `v̂min` softness weights ``\mathbf{c_{v̂_{min}}}``.
+- `c_v̂max = fill(1.0,nym)` : `v̂max` softness weights ``\mathbf{c_{v̂_{max}}}``.
+- all the keyword arguments above but with a capital letter, e.g. `X̂max` or `C_ŵmax` : for
+  time-varying constraints (see Extended Help).
+
+# Examples
+```jldoctest
+julia> estim = MovingHorizonEstimator(LinModel(ss(0.5,1,1,0,1)), He=3);
+
+julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
+MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, LinModel and:
+ 3 estimation steps He
+ 1 manipulated inputs u (0 integrating states)
+ 2 estimated states x̂
+ 1 measured outputs ym (1 integrating states)
+ 0 unmeasured outputs yu
+ 0 measured disturbances d
+```
+
+# Extended Help
+!!! details "Extended Help"
+    Note that the state ``\mathbf{x̂}`` and process noise ``\mathbf{ŵ}`` constraints are 
+    applied on the augmented model, detailed in [`SteadyKalmanFilter`](@ref) Extended Help. 
+
+    For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
+    that is, at runtime, except for `±Inf` bounds. Time-varying constraints over the
+    estimation horizon ``H_e`` are also possible, mathematically defined as:
+    ```math 
+    \begin{alignat*}{3}
+        \mathbf{X̂_{min} - C_{x̂_{min}}} ϵ ≤&&\ \mathbf{X̂} &≤ \mathbf{X̂_{max} + C_{x̂_{max}}} ϵ \\
+        \mathbf{Ŵ_{min} - C_{ŵ_{min}}} ϵ ≤&&\ \mathbf{Ŵ} &≤ \mathbf{Ŵ_{max} + C_{ŵ_{max}}} ϵ \\
+        \mathbf{V̂_{min} - C_{v̂_{min}}} ϵ ≤&&\ \mathbf{V̂} &≤ \mathbf{V̂_{max} + C_{v̂_{max}}} ϵ
+    \end{alignat*}
+    ```
+    For this, use the same keyword arguments as above but with a capital letter:
+    - `X̂min` / `X̂max` / `C_x̂min` / `C_x̂max` : ``\mathbf{X̂}`` constraints `(nx̂*(He+1),)`.
+    - `Ŵmin` / `Ŵmax` / `C_ŵmin` / `C_ŵmax` : ``\mathbf{Ŵ}`` constraints `(nx̂*He,)`.
+    - `V̂min` / `V̂max` / `C_v̂min` / `C_v̂max` : ``\mathbf{V̂}`` constraints `(nym*He,)`.
+"""
+function setconstraint!(
+    estim::MovingHorizonEstimator; 
+    x̂min = nothing, x̂max = nothing,
+    X̂min = nothing, X̂max = nothing,
+    ŵmin = nothing, ŵmax = nothing,
+    Ŵmin = nothing, Ŵmax = nothing,
+    v̂min = nothing, v̂max = nothing,
+    V̂min = nothing, V̂max = nothing,
+)
+    model, optim, con = estim.model, estim.optim, estim.con
+    nx̂, nŵ, nym, He = estim.nx̂, estim.nx̂, estim.nym, estim.He
+    nX̂con = nx̂*(He+1)
+    notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
+    isnothing(X̂min) && !isnothing(x̂min) && (X̂min = repeat(x̂min, He+1))
+    isnothing(X̂max) && !isnothing(x̂max) && (X̂max = repeat(x̂max, He+1))
+    isnothing(Ŵmin) && !isnothing(ŵmin) && (Ŵmin = repeat(ŵmin, He))
+    isnothing(Ŵmax) && !isnothing(ŵmax) && (Ŵmax = repeat(ŵmax, He))
+    isnothing(V̂min) && !isnothing(v̂min) && (V̂min = repeat(v̂min, He))
+    isnothing(V̂max) && !isnothing(v̂max) && (V̂max = repeat(v̂max, He))
+    if !isnothing(X̂min)
+        size(X̂min) == (nX̂con,) || throw(ArgumentError("X̂min size must be $((nX̂con,))"))
+        con.x̂min[:] = X̂min[1:nx̂]
+        con.X̂min[:] = X̂min[nx̂+1:end]
+    end
+    if !isnothing(X̂max)
+        size(X̂max) == (nX̂con,) || throw(ArgumentError("X̂max size must be $((nX̂con,))"))
+        con.x̂max[:] = X̂max[1:nx̂]
+        con.X̂max[:] = X̂max[nx̂+1:end]
+    end
+    if !isnothing(Ŵmin)
+        size(Ŵmin) == (nŵ*He,) || throw(ArgumentError("Ŵmin size must be $((nŵ*He,))"))
+        con.Ŵmin[:] = Ŵmin
+    end
+    if !isnothing(Ŵmax)
+        size(Ŵmax) == (nŵ*He,) || throw(ArgumentError("Ŵmax size must be $((nŵ*He,))"))
+        con.Ŵmax[:] = Ŵmax
+    end
+    if !isnothing(V̂min)
+        size(V̂min) == (nym*He,) || throw(ArgumentError("V̂min size must be $((nym*He,))"))
+        con.V̂min[:] = V̂min
+    end
+    if !isnothing(V̂max)
+        size(V̂max) == (nym*He,) || throw(ArgumentError("V̂max size must be $((nym*He,))"))
+        con.V̂max[:] = V̂max
+    end
+    i_x̂min, i_x̂max  = .!isinf.(con.x̂min)  , .!isinf.(con.x̂max)
+    i_X̂min, i_X̂max  = .!isinf.(con.X̂min)  , .!isinf.(con.X̂max)
+    i_Ŵmin, i_Ŵmax  = .!isinf.(con.Ŵmin)  , .!isinf.(con.Ŵmax)
+    i_V̂min, i_V̂max  = .!isinf.(con.V̂min)  , .!isinf.(con.V̂max)
+    if notSolvedYet
+        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(model, 
+            i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max,
+            con.A_x̂min, con.A_x̂max, 
+            con.A_X̂min, con.A_X̂max, 
+            con.A_Ŵmin, con.A_Ŵmax, 
+            con.A_V̂min, con.A_V̂max
+        )
+        A = con.A[con.i_b, :]
+        b = con.b[con.i_b]
+        Z̃var = optim[:Z̃var]
+        delete(optim, optim[:linconstraint])
+        unregister(optim, :linconstraint)
+        @constraint(optim, linconstraint, A*Z̃var .≤ b)
+        setnonlincon!(estim, model)
+    else
+        i_b, i_g = init_matconstraint_mhe(model, 
+            i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
+        )
+        if i_b ≠ con.i_b || i_g ≠ con.i_g
+            error("Cannot modify ±Inf constraints after calling updatestate!")
+        end
+    end
+    return estim
+end
+
+@doc raw"""
+    init_matconstraint_mhe(model::LinModel, 
+        i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
+    ) -> i_b, i_g, A
+
+Init `i_b`, `i_g` and `A` matrices for the MHE linear inequality constraints.
+
+The linear and nonlinear inequality constraints are respectively defined as:
+```math
+\begin{aligned} 
+    \mathbf{A Z̃ } &≤ \mathbf{b} \\ 
+    \mathbf{g(Z̃)} &≤ \mathbf{0}
+\end{aligned}
+```
+`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. 
+`i_g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if `model` is a 
+[`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if `args` is
+provided. In such a case, `args`  needs to contain all the inequality constraint matrices: 
+`A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max`.
+"""
+function init_matconstraint_mhe(::LinModel{NT}, 
+    i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
+) where {NT<:Real}
+    i_b = [i_x̂min; i_x̂max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax; i_V̂min; i_V̂max]
+    i_g = BitVector()
+    if isempty(args)
+        A = zeros(NT, length(i_b), 0)
+    else
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max = args
+        A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
+    end
+    return i_b, i_g, A
+end
+
+"Init `i_b, A` without state and sensor noise constraints if `model` is not a [`LinModel`](@ref)."
+function init_matconstraint_mhe(::SimModel{NT}, 
+    i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
+) where {NT<:Real}
+    i_b = [i_x̂min; i_x̂max; i_Ŵmin; i_Ŵmax]
+    i_g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max]
+    if isempty(args)
+        A = zeros(NT, length(i_b), 0)
+    else
+        A_x̂min, A_x̂max, _ , _ , A_Ŵmin, A_Ŵmax, _ , _ = args
+        A = [A_x̂min; A_x̂max; A_Ŵmin; A_Ŵmax]
+    end
+    return i_b, i_g, A
+end
+
+"By default, no nonlinear constraints in the MHE, thus return nothing."
+setnonlincon!(::MovingHorizonEstimator, ::SimModel) = nothing
+
+"Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
+function setnonlincon!(estim::MovingHorizonEstimator, ::NonLinModel)
+    optim, con = estim.optim, estim.con
+    Z̃var = optim[:Z̃var]
+    map(con -> delete(optim, con), all_nonlinear_constraints(optim))
+    for i in findall(.!isinf.(con.X̂min))
+        f_sym = Symbol("g_X̂min_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+    end
+    for i in findall(.!isinf.(con.X̂max))
+        f_sym = Symbol("g_X̂max_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+    end
+    for i in findall(.!isinf.(con.V̂min))
+        f_sym = Symbol("g_V̂min_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+    end
+    for i in findall(.!isinf.(con.V̂max))
+        f_sym = Symbol("g_V̂max_$(i)")
+        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+    end
+    return nothing
+end
+
 """
     init_defaultcon_mhe(model::SimModel, He, nx̂, nym, E, ex̄, Ex̂, Fx̂, Gx̂, Jx̂) -> con, Ẽ, ẽx̄
 
@@ -517,236 +747,6 @@ function init_optimization!(
             sym = Symbol("g_V̂max_$i")
             register(optim, sym, nZ̃, gfunc[i_end_V̂min+i], autodiff=true)
         end
-    end
-    return nothing
-end
-
-
-@doc raw"""
-    setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
-
-Set the constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
-   
-It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``, process 
-noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
-```math 
-\begin{alignat*}{3}
-    \mathbf{x̂_{min} - c_{x̂_{min}}} ϵ ≤&&\   \mathbf{x̂}_k(k-j+1) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 0    \\
-    \mathbf{ŵ_{min} - c_{ŵ_{min}}} ϵ ≤&&\     \mathbf{ŵ}(k-j+1) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1    \\
-    \mathbf{v̂_{min} - c_{v̂_{min}}} ϵ ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max} + c_{v̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1
-\end{alignat*}
-```
-and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there
-is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern
-for relaxation, are non-negative values that specify the softness of the associated bound.
-Use `0.0` values for hard constraints. The process and sensor noise constraints are all soft
-by default. Notice that constraining the estimated sensor noises is equivalent to bounding 
-the innovation term, since ``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See 
-Extended Help for details on model augmentation and time-varying constraints.
-
-# Arguments
-!!! info
-    The default constraints are mentioned here for clarity but omitting a keyword argument 
-    will not re-assign to its default value (defaults are set at construction only). The
-    same applies for [`PredictiveController`](@ref).
-
-- `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints.
-- `x̂min = fill(-Inf,nx̂)`  : augmented state lower bounds ``\mathbf{x̂_{min}}``.
-- `x̂max = fill(+Inf,nx̂)`  : augmented state upper bounds ``\mathbf{x̂_{max}}``.
-- `ŵmin = fill(-Inf,nx̂)`  : augmented process noise lower bounds ``\mathbf{ŵ_{min}}``.
-- `ŵmax = fill(+Inf,nx̂)`  : augmented process noise upper bounds ``\mathbf{ŵ_{max}}``.
-- `v̂min = fill(-Inf,nym)` : sensor noise lower bounds ``\mathbf{v̂_{min}}``.
-- `v̂max = fill(+Inf,nym)` : sensor noise upper bounds ``\mathbf{v̂_{max}}``.
-- `c_x̂min = fill(0.0,nx̂)`  : `x̂min` softness weights ``\mathbf{c_{x̂_{min}}}``.
-- `c_x̂max = fill(0.0,nx̂)`  : `x̂max` softness weights ``\mathbf{c_{x̂_{max}}}``.
-- `c_ŵmin = fill(1.0,nx̂)`  : `ŵmin` softness weights ``\mathbf{c_{ŵ_{min}}}``.
-- `c_ŵmax = fill(1.0,nx̂)`  : `ŵmax` softness weights ``\mathbf{c_{ŵ_{max}}}``.
-- `c_v̂min = fill(1.0,nym)` : `v̂min` softness weights ``\mathbf{c_{v̂_{min}}}``.
-- `c_v̂max = fill(1.0,nym)` : `v̂max` softness weights ``\mathbf{c_{v̂_{max}}}``.
-- all the keyword arguments above but with a capital letter, e.g. `X̂max` or `C_ŵmax` : for
-  time-varying constraints (see Extended Help).
-
-# Examples
-```jldoctest
-julia> estim = MovingHorizonEstimator(LinModel(ss(0.5,1,1,0,1)), He=3);
-
-julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
-MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, LinModel and:
- 3 estimation steps He
- 1 manipulated inputs u (0 integrating states)
- 2 estimated states x̂
- 1 measured outputs ym (1 integrating states)
- 0 unmeasured outputs yu
- 0 measured disturbances d
-```
-
-# Extended Help
-!!! details "Extended Help"
-    Note that the state ``\mathbf{x̂}`` and process noise ``\mathbf{ŵ}`` constraints are 
-    applied on the augmented model, detailed in [`SteadyKalmanFilter`](@ref) Extended Help. 
-
-    For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
-    that is, at runtime, except for `±Inf` bounds. Time-varying constraints over the
-    estimation horizon ``H_e`` are also possible, mathematically defined as:
-    ```math 
-    \begin{alignat*}{3}
-        \mathbf{X̂_{min} - C_{x̂_{min}}} ϵ ≤&&\ \mathbf{X̂} &≤ \mathbf{X̂_{max} + C_{x̂_{max}}} ϵ \\
-        \mathbf{Ŵ_{min} - C_{ŵ_{min}}} ϵ ≤&&\ \mathbf{Ŵ} &≤ \mathbf{Ŵ_{max} + C_{ŵ_{max}}} ϵ \\
-        \mathbf{V̂_{min} - C_{v̂_{min}}} ϵ ≤&&\ \mathbf{V̂} &≤ \mathbf{V̂_{max} + C_{v̂_{max}}} ϵ
-    \end{alignat*}
-    ```
-    For this, use the same keyword arguments as above but with a capital letter:
-    - `X̂min` / `X̂max` / `C_x̂min` / `C_x̂max` : ``\mathbf{X̂}`` constraints `(nx̂*(He+1),)`.
-    - `Ŵmin` / `Ŵmax` / `C_ŵmin` / `C_ŵmax` : ``\mathbf{Ŵ}`` constraints `(nx̂*He,)`.
-    - `V̂min` / `V̂max` / `C_v̂min` / `C_v̂max` : ``\mathbf{V̂}`` constraints `(nym*He,)`.
-"""
-function setconstraint!(
-    estim::MovingHorizonEstimator; 
-    x̂min = nothing, x̂max = nothing,
-    X̂min = nothing, X̂max = nothing,
-    ŵmin = nothing, ŵmax = nothing,
-    Ŵmin = nothing, Ŵmax = nothing,
-    v̂min = nothing, v̂max = nothing,
-    V̂min = nothing, V̂max = nothing,
-)
-    model, optim, con = estim.model, estim.optim, estim.con
-    nx̂, nŵ, nym, He = estim.nx̂, estim.nx̂, estim.nym, estim.He
-    nX̂con = nx̂*(He+1)
-    notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
-    isnothing(X̂min) && !isnothing(x̂min) && (X̂min = repeat(x̂min, He+1))
-    isnothing(X̂max) && !isnothing(x̂max) && (X̂max = repeat(x̂max, He+1))
-    isnothing(Ŵmin) && !isnothing(ŵmin) && (Ŵmin = repeat(ŵmin, He))
-    isnothing(Ŵmax) && !isnothing(ŵmax) && (Ŵmax = repeat(ŵmax, He))
-    isnothing(V̂min) && !isnothing(v̂min) && (V̂min = repeat(v̂min, He))
-    isnothing(V̂max) && !isnothing(v̂max) && (V̂max = repeat(v̂max, He))
-    if !isnothing(X̂min)
-        size(X̂min) == (nX̂con,) || throw(ArgumentError("X̂min size must be $((nX̂con,))"))
-        con.x̂min[:] = X̂min[1:nx̂]
-        con.X̂min[:] = X̂min[nx̂+1:end]
-    end
-    if !isnothing(X̂max)
-        size(X̂max) == (nX̂con,) || throw(ArgumentError("X̂max size must be $((nX̂con,))"))
-        con.x̂max[:] = X̂max[1:nx̂]
-        con.X̂max[:] = X̂max[nx̂+1:end]
-    end
-    if !isnothing(Ŵmin)
-        size(Ŵmin) == (nŵ*He,) || throw(ArgumentError("Ŵmin size must be $((nŵ*He,))"))
-        con.Ŵmin[:] = Ŵmin
-    end
-    if !isnothing(Ŵmax)
-        size(Ŵmax) == (nŵ*He,) || throw(ArgumentError("Ŵmax size must be $((nŵ*He,))"))
-        con.Ŵmax[:] = Ŵmax
-    end
-    if !isnothing(V̂min)
-        size(V̂min) == (nym*He,) || throw(ArgumentError("V̂min size must be $((nym*He,))"))
-        con.V̂min[:] = V̂min
-    end
-    if !isnothing(V̂max)
-        size(V̂max) == (nym*He,) || throw(ArgumentError("V̂max size must be $((nym*He,))"))
-        con.V̂max[:] = V̂max
-    end
-    i_x̂min, i_x̂max  = .!isinf.(con.x̂min)  , .!isinf.(con.x̂max)
-    i_X̂min, i_X̂max  = .!isinf.(con.X̂min)  , .!isinf.(con.X̂max)
-    i_Ŵmin, i_Ŵmax  = .!isinf.(con.Ŵmin)  , .!isinf.(con.Ŵmax)
-    i_V̂min, i_V̂max  = .!isinf.(con.V̂min)  , .!isinf.(con.V̂max)
-    if notSolvedYet
-        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(model, 
-            i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max,
-            con.A_x̂min, con.A_x̂max, 
-            con.A_X̂min, con.A_X̂max, 
-            con.A_Ŵmin, con.A_Ŵmax, 
-            con.A_V̂min, con.A_V̂max
-        )
-        A = con.A[con.i_b, :]
-        b = con.b[con.i_b]
-        Z̃var = optim[:Z̃var]
-        delete(optim, optim[:linconstraint])
-        unregister(optim, :linconstraint)
-        @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        setnonlincon!(estim, model)
-    else
-        i_b, i_g = init_matconstraint_mhe(model, 
-            i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
-        )
-        if i_b ≠ con.i_b || i_g ≠ con.i_g
-            error("Cannot modify ±Inf constraints after calling updatestate!")
-        end
-    end
-    return estim
-end
-
-@doc raw"""
-    init_matconstraint_mhe(model::LinModel, 
-        i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
-    ) -> i_b, i_g, A
-
-Init `i_b`, `i_g` and `A` matrices for the MHE linear inequality constraints.
-
-The linear and nonlinear inequality constraints are respectively defined as:
-```math
-\begin{aligned} 
-    \mathbf{A Z̃ } &≤ \mathbf{b} \\ 
-    \mathbf{g(Z̃)} &≤ \mathbf{0}
-\end{aligned}
-```
-`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. 
-`i_g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if `model` is a 
-[`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if `args` is
-provided. In such a case, `args`  needs to contain all the inequality constraint matrices: 
-`A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max`.
-"""
-function init_matconstraint_mhe(::LinModel{NT}, 
-    i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
-) where {NT<:Real}
-    i_b = [i_x̂min; i_x̂max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax; i_V̂min; i_V̂max]
-    i_g = BitVector()
-    if isempty(args)
-        A = zeros(NT, length(i_b), 0)
-    else
-        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max = args
-        A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
-    end
-    return i_b, i_g, A
-end
-
-"Init `i_b, A` without state and sensor noise constraints if `model` is not a [`LinModel`](@ref)."
-function init_matconstraint_mhe(::SimModel{NT}, 
-    i_x̂min, i_x̂max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
-) where {NT<:Real}
-    i_b = [i_x̂min; i_x̂max; i_Ŵmin; i_Ŵmax]
-    i_g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max]
-    if isempty(args)
-        A = zeros(NT, length(i_b), 0)
-    else
-        A_x̂min, A_x̂max, _ , _ , A_Ŵmin, A_Ŵmax, _ , _ = args
-        A = [A_x̂min; A_x̂max; A_Ŵmin; A_Ŵmax]
-    end
-    return i_b, i_g, A
-end
-
-"By default, no nonlinear constraints in the MHE, thus return nothing."
-setnonlincon!(::MovingHorizonEstimator, ::SimModel) = nothing
-
-"Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
-function setnonlincon!(estim::MovingHorizonEstimator, ::NonLinModel)
-    optim, con = estim.optim, estim.con
-    Z̃var = optim[:Z̃var]
-    map(con -> delete(optim, con), all_nonlinear_constraints(optim))
-    for i in findall(.!isinf.(con.X̂min))
-        f_sym = Symbol("g_X̂min_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
-    end
-    for i in findall(.!isinf.(con.X̂max))
-        f_sym = Symbol("g_X̂max_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
-    end
-    for i in findall(.!isinf.(con.V̂min))
-        f_sym = Symbol("g_V̂min_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
-    end
-    for i in findall(.!isinf.(con.V̂max))
-        f_sym = Symbol("g_V̂max_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
     end
     return nothing
 end
