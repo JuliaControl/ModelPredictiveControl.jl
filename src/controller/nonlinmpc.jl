@@ -161,7 +161,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
     algebra instead of a `for` loop. This feature can accelerate the optimization, especially
     for the constraint handling, and is not available in any other package, to my knowledge.
 
-    The optimizations rely on [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) automatic 
+    The optimization relies on [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) automatic 
     differentiation (AD) to compute the objective and constraint derivatives. Optimizers 
     generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) `f` 
     and `h` functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)

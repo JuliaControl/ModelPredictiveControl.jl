@@ -42,9 +42,7 @@ constraints are all soft by default. See Extended Help for time-varying constrai
 ```jldoctest
 julia> mpc = LinMPC(setop!(LinModel(tf(3, [30, 1]), 4), uop=[50], yop=[25]));
 
-julia> mpc = setconstraint!(mpc, umin=[0], umax=[100], c_umin=[0.0], c_umax=[0.0]);
-
-julia> mpc = setconstraint!(mpc, Δumin=[-10], Δumax=[+10], c_Δumin=[1.0], c_Δumax=[1.0])
+julia> mpc = setconstraint!(mpc, umin=[0], umax=[100], Δumin=[-10], Δumax=[+10])
 LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
  10 prediction steps Hp
   2 control steps Hc

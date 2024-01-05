@@ -6,15 +6,16 @@ const DEFAULT_NONLINMHE_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"s
 
 Construct a moving horizon estimator (MHE) based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
 
-This estimator can handle constraints on the estimates, see [`setconstraint!`](@ref).
-Additionally, `model` is not linearized like the [`ExtendedKalmanFilter`](@ref), and the
-probability distribution is not approximated like the [`UnscentedKalmanFilter`](@ref). The
-computational costs are drastically higher, however, since it minimizes the following
-objective function at each discrete time ``k``:
+It can handle constraints on the estimates, see [`setconstraint!`](@ref). Additionally, 
+`model` is not linearized like the [`ExtendedKalmanFilter`](@ref), and the probability 
+distribution is not approximated like the [`UnscentedKalmanFilter`](@ref). The computational
+costs are drastically higher, however, since it minimizes the following objective function
+at each discrete time ``k``:
 ```math
-\min_{\mathbf{x̂}_k(k-N_k+1), \mathbf{Ŵ}}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
-                                         + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
-                                         + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
+\min_{\mathbf{x̂}_k(k-N_k+1), \mathbf{Ŵ}, ϵ}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
+                                            + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
+                                            + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
+                                            + C ϵ^2
 ```
 in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
 ```math
@@ -38,22 +39,20 @@ N_k =                     \begin{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
 ``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
-Extended Help explicitly defines the two vectors. See [`SteadyKalmanFilter`](@ref) for
-details on ``\mathbf{R̂}, \mathbf{Q̂}`` covariances and model augmentation. The process
-model is identical to the one in [`UnscentedKalmanFilter`](@ref) documentation. The matrix
+Extended Help defines the two vectors. See [`UnscentedKalmanFilter`](@ref) for details on 
+the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The matrix 
 ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated with an [`ExtendedKalmanFilter`](@ref).
 
 !!! warning
-    See the Extended Help of [`NonLinMPC`](@ref) function if you get an error like:    
+    See the Extended Help if you get an error like:    
     `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
-- `He=nothing`: estimation horizon ``H_e``, must be specified.
-- `optim=default_optim_mhe(model)` : quadratic or nonlinear optimizer used in the moving 
-   horizon estimator, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
-   (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl), or [`OSQP`](https://osqp.org/docs/parsers/jump.html)
-   if `model` is a [`LinModel`](@ref)).
+- `He=nothing` : estimation horizon ``H_e``, must be specified.
+- `optim=default_optim_mhe(model)` : a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
+   with a quadratic/nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
+   or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 - `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
 
@@ -97,6 +96,13 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
         \mathbf{x̂}_k(k-j+1) &= \mathbf{f̂}\Big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\Big) + \mathbf{ŵ}(k-j)
     \end{aligned}
     ```
+
+    For [`LinModel`](@ref), the optimization is treated as a quadratic program with a
+    time-varying Hessian, which is generally cheaper than nonlinear programming. For 
+    [`NonLinModel`](@ref), the optimization relies on automatic differentiation (AD).
+    Optimizers generally benefit from exact derivatives like AD. However, the `f` and `h` 
+    functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+    for common mistakes when writing these functions.
 """
 function MovingHorizonEstimator(
     model::SM;
@@ -520,8 +526,8 @@ end
 
 Set the constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
    
-The estimator supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``,
-process noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
+It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``, process 
+noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
     \mathbf{x̂_{min} - c_{x̂_{min}}} ϵ ≤&&\   \mathbf{x̂}_k(k-j+1) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 0    \\
@@ -533,11 +539,9 @@ and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` val
 is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern
 for relaxation, are non-negative values that specify the softness of the associated bound.
 Use `0.0` values for hard constraints. The process and sensor noise constraints are all soft
-by default. Note that the state and process noise constraints are applied on the augmented
-vectors (see the extended help of [`SteadyKalmanFilter`](@ref) for details on augmentation).
-Also note that constraining the estimated sensor noises is equivalent to bounding the
-innovation term, since ``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See Extended
-Help for time-varying constraints.
+by default. Notice that constraining the estimated sensor noises is equivalent to bounding 
+the innovation term, since ``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See 
+Extended Help for details on model augmentation and time-varying constraints.
 
 # Arguments
 !!! info
@@ -577,6 +581,9 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, 
 
 # Extended Help
 !!! details "Extended Help"
+    Note that the state ``\mathbf{x̂}`` and process noise ``\mathbf{ŵ}`` constraints are 
+    applied on the augmented model, detailed in [`SteadyKalmanFilter`](@ref) Extended Help. 
+
     For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
     that is, at runtime, except for `±Inf` bounds. Time-varying constraints over the
     estimation horizon ``H_e`` are also possible, mathematically defined as:

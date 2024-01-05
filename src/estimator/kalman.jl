@@ -410,9 +410,9 @@ is based on the process model :
 \end{aligned}
 ```
 See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)`` noises and
-``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The functions ``\mathbf{f̂, ĥ}`` are `model` state-
-space functions augmented with the stochastic model, which is specified by the numbers of
-integrator `nint_u` and `nint_ym` (see Extended Help). The ``\mathbf{ĥ^m}`` function 
+``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The functions ``\mathbf{f̂, ĥ}`` are `model` 
+state-space functions augmented with the stochastic model, which is specified by the numbers
+of integrator `nint_u` and `nint_ym` (see Extended Help). The ``\mathbf{ĥ^m}`` function 
 represents the measured outputs of ``\mathbf{ĥ}`` function (and unmeasured ones, for 
 ``\mathbf{ĥ^u}``).
 

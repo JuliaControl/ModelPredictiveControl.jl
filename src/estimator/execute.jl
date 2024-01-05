@@ -125,7 +125,7 @@ function init_estimate!(estim::StateEstimator, ::LinModel, u, ym, d)
     return nothing
 end
 """
-    init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ )
+    init_estimate!(estim::StateEstimator, model::SimModel, _ , _ , _ )
 
 Left `estim.x̂` estimate unchanged if `model` is not a [`LinModel`](@ref).
 """
