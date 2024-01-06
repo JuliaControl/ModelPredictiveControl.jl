@@ -357,10 +357,9 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     optim = mpc.optim
     model = mpc.estim.model
     ΔŨvar::Vector{VariableRef} = optim[:ΔŨvar]
-    lastΔŨ = mpc.ΔŨ
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}; ϵ_{k-1}]
-    ϵ0  = !isinf(mpc.C) ? [lastΔŨ[end]] : empty(mpc.ΔŨ)
-    ΔŨ0 = [lastΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(NT, model.nu); ϵ0]
+    ϵ0  = !isinf(mpc.C) ? mpc.ΔŨ[end] : empty(mpc.ΔŨ)
+    ΔŨ0 = [mpc.ΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(NT, model.nu); ϵ0]
     set_start_value.(ΔŨvar, ΔŨ0)
     set_objective_linear_coef!(mpc, ΔŨvar)
     try

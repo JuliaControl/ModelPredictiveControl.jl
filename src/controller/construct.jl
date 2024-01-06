@@ -1,3 +1,36 @@
+"Include all the data for the constraints of [`PredictiveController`](@ref)"
+struct ControllerConstraint{NT<:Real}
+    ẽx̂      ::Matrix{NT}
+    fx̂      ::Vector{NT}
+    gx̂      ::Matrix{NT}
+    jx̂      ::Matrix{NT}
+    kx̂      ::Matrix{NT}
+    vx̂      ::Matrix{NT}
+    Umin    ::Vector{NT}
+    Umax    ::Vector{NT}
+    ΔŨmin   ::Vector{NT}
+    ΔŨmax   ::Vector{NT}
+    Ymin    ::Vector{NT}
+    Ymax    ::Vector{NT}
+    x̂min    ::Vector{NT}
+    x̂max    ::Vector{NT}
+    A_Umin  ::Matrix{NT}
+    A_Umax  ::Matrix{NT}
+    A_ΔŨmin ::Matrix{NT}
+    A_ΔŨmax ::Matrix{NT}
+    A_Ymin  ::Matrix{NT}
+    A_Ymax  ::Matrix{NT}
+    A_x̂min  ::Matrix{NT}
+    A_x̂max  ::Matrix{NT}
+    A       ::Matrix{NT}
+    b       ::Vector{NT}
+    i_b     ::BitVector
+    C_ymin  ::Vector{NT}
+    C_ymax  ::Vector{NT}
+    c_x̂min  ::Vector{NT}
+    c_x̂max  ::Vector{NT}
+    i_g     ::BitVector
+end
 
 @doc raw"""
     setconstraint!(mpc::PredictiveController; <keyword arguments>) -> mpc
@@ -36,8 +69,8 @@ constraints are all soft by default. See Extended Help for time-varying constrai
 - `c_ymax  = fill(1.0,ny)` : `ymax` softness weights ``\mathbf{c_{y_{max}}}``.
 - `c_x̂min  = fill(1.0,nx̂)` : `x̂min` softness weights ``\mathbf{c_{x̂_{min}}}``.
 - `c_x̂max  = fill(1.0,nx̂)` : `x̂max` softness weights ``\mathbf{c_{x̂_{max}}}``.
-- all the keyword arguments above but with a capital letter, except for the terminal
-  constraints, e.g. `Ymax` or `C_Δumin` : for time-varying constraints (see Extended Help).
+- all the keyword arguments above but with a first capital letter, except for the terminal
+  constraints, e.g. `Ymax` or `C_Δumin`: for time-varying constraints (see Extended Help).
 
 # Examples
 ```jldoctest
@@ -80,7 +113,7 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
         \mathbf{Y_{min}  - C_{y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + C_{y_{max}}}  ϵ
     \end{alignat*}
     ```
-    For this, use the same keyword arguments as above but with a capital letter:
+    For this, use the same keyword arguments as above but with a first capital letter:
     - `Umin`  / `Umax`  / `C_umin`  / `C_umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
     - `ΔUmin` / `ΔUmax` / `C_Δumin` / `C_Δumax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
     - `Ymin`  / `Ymax`  / `C_ymin`  / `C_ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
@@ -142,7 +175,7 @@ function setconstraint!(
     isnothing(C_Δumax)  && !isnothing(c_Δumax)  && (C_Δumax = repeat(c_Δumax, Hc))
     isnothing(C_ymin)   && !isnothing(c_ymin)   && (C_ymin  = repeat(c_ymin,  Hp))
     isnothing(C_ymax)   && !isnothing(c_ymax)   && (C_ymax  = repeat(c_ymax,  Hp))
-    if !all(isnothing.([C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax, c_x̂min, c_x̂max]))
+    if !all(isnothing.((C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax, c_x̂min, c_x̂max)))
         !isinf(C) || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
         notSolvedYet || error("Cannot set softness parameters after calling moveinput!")
     end
@@ -725,7 +758,7 @@ function relaxŶ(::LinModel{NT}, C, C_ymin, C_ymax, E) where {NT<:Real}
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # ϵ impacts predicted output constraint calculations:
         A_Ymin, A_Ymax = -[E  C_ymin], [E -C_ymax] 
-        # ϵ has no impact on output predictions
+        # ϵ has no impact on output predictions:
         Ẽ = [E zeros(NT, size(E, 1), 1)] 
     else # ΔŨ = ΔU (only hard constraints)
         Ẽ = E
@@ -764,9 +797,9 @@ the inequality constraints:
 """
 function relaxterminal(::LinModel{NT}, C, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
-        # ϵ impacts terminal constraint calculations:
+        # ϵ impacts terminal state constraint calculations:
         A_x̂min, A_x̂max = -[ex̂ c_x̂min], [ex̂ -c_x̂max]
-        # ϵ has no impact on terminal state predictions
+        # ϵ has no impact on terminal state predictions:
         ẽx̂ = [ex̂ zeros(NT, size(ex̂, 1), 1)] 
     else # ΔŨ = ΔU (only hard constraints)
         ẽx̂ = ex̂
@@ -834,6 +867,6 @@ function validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, C, E=nothing)
     (!isdiag(N_Hc) || any(diag(N_Hc).<0)) && throw(ArgumentError("N_Hc should be a positive semidefinite diagonal matrix"))
     (!isdiag(L_Hp) || any(diag(L_Hp).<0)) && throw(ArgumentError("L_Hp should be a positive semidefinite diagonal matrix"))
     size(C) ≠ ()    && throw(ArgumentError("Cwt should be a real scalar"))
-    C < 0     && throw(ArgumentError("Cwt weight should be ≥ 0"))
+    C < 0           && throw(ArgumentError("Cwt weight should be ≥ 0"))
     !isnothing(E) && size(E) ≠ () && throw(ArgumentError("Ewt should be a real scalar"))
 end

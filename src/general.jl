@@ -1,3 +1,11 @@
+const DEFAULT_HP0 = 10
+const DEFAULT_HC  = 2
+const DEFAULT_MWT = 1.0
+const DEFAULT_NWT = 0.1
+const DEFAULT_LWT = 0.0
+const DEFAULT_CWT = 1e5
+const DEFAULT_EWT = 0.0
+
 "Termination status that means 'no solution available'."
 const ERROR_STATUSES = [
     INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 

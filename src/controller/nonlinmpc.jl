@@ -131,7 +131,7 @@ This method uses the default state estimator :
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
-- `JE=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E)``.
+- `JE=(_,_,_)->0` : economic function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E)``.
 - `M_Hp` / `N_Hc` / `L_Hp` : diagonal matrices ``\mathbf{M}_{H_p}, \mathbf{N}_{H_c},
   \mathbf{L}_{H_p}``, for time-varying weights (generated from `Mwt/Nwt/Lwt` args if omitted).
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
@@ -176,7 +176,7 @@ function NonLinMPC(
     Lwt = fill(DEFAULT_LWT, model.nu),
     Cwt = DEFAULT_CWT,
     Ewt = DEFAULT_EWT,
-    JE::Function = (_,_,_) -> 0.0,
+    JE::Function = (_,_,_) -> 0,
     M_Hp = nothing,
     N_Hc = nothing,
     L_Hp = nothing,
@@ -196,7 +196,7 @@ function NonLinMPC(
     Lwt = fill(DEFAULT_LWT, model.nu),
     Cwt = DEFAULT_CWT,
     Ewt = DEFAULT_EWT,
-    JE::Function = (_,_,_) -> 0.0,
+    JE::Function = (_,_,_) -> 0,
     M_Hp = nothing,
     N_Hc = nothing,
     L_Hp = nothing,
@@ -239,7 +239,7 @@ function NonLinMPC(
     Lwt = fill(DEFAULT_LWT, estim.model.nu),
     Cwt = DEFAULT_CWT,
     Ewt = DEFAULT_EWT,
-    JE::JEFunc = (_,_,_) -> 0.0,
+    JE::JEFunc = (_,_,_) -> 0,
     M_Hp = nothing,
     N_Hc = nothing,
     L_Hp = nothing,
@@ -402,7 +402,7 @@ The method mutates the `g` vector in argument and returns it.
 """
 function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂end, Ŷ, ΔŨ)
     nx̂, nŶ = mpc.estim.nx̂, length(Ŷ)
-    ϵ = !isinf(mpc.C) ? ΔŨ[end] : 0.0 # ϵ = 0.0 if Cwt=Inf (meaning: no relaxation)
+    ϵ = isinf(mpc.C) ? 0 : ΔŨ[end] # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
     for i in eachindex(g)
         mpc.con.i_g[i] || continue
         if i ≤ nŶ

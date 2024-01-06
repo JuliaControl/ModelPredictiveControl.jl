@@ -19,47 +19,11 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController{NT<:Real} end
 
-const DEFAULT_HP0 = 10
-const DEFAULT_HC  = 2
-const DEFAULT_MWT = 1.0
-const DEFAULT_NWT = 0.1
-const DEFAULT_LWT = 0.0
-const DEFAULT_CWT = 1e5
-const DEFAULT_EWT = 0.0
-
-"Include all the data for the constraints of [`PredictiveController`](@ref)"
-struct ControllerConstraint{NT<:Real}
-    ẽx̂      ::Matrix{NT}
-    fx̂      ::Vector{NT}
-    gx̂      ::Matrix{NT}
-    jx̂      ::Matrix{NT}
-    kx̂      ::Matrix{NT}
-    vx̂      ::Matrix{NT}
-    Umin    ::Vector{NT}
-    Umax    ::Vector{NT}
-    ΔŨmin   ::Vector{NT}
-    ΔŨmax   ::Vector{NT}
-    Ymin    ::Vector{NT}
-    Ymax    ::Vector{NT}
-    x̂min    ::Vector{NT}
-    x̂max    ::Vector{NT}
-    A_Umin  ::Matrix{NT}
-    A_Umax  ::Matrix{NT}
-    A_ΔŨmin ::Matrix{NT}
-    A_ΔŨmax ::Matrix{NT}
-    A_Ymin  ::Matrix{NT}
-    A_Ymax  ::Matrix{NT}
-    A_x̂min  ::Matrix{NT}
-    A_x̂max  ::Matrix{NT}
-    A       ::Matrix{NT}
-    b       ::Vector{NT}
-    i_b     ::BitVector
-    C_ymin  ::Vector{NT}
-    C_ymax  ::Vector{NT}
-    c_x̂min  ::Vector{NT}
-    c_x̂max  ::Vector{NT}
-    i_g     ::BitVector
-end
+include("controller/construct.jl")
+include("controller/execute.jl")
+include("controller/explicitmpc.jl")
+include("controller/linmpc.jl")
+include("controller/nonlinmpc.jl")
 
 """
     setstate!(mpc::PredictiveController, x̂)
@@ -89,9 +53,3 @@ function (mpc::PredictiveController)(
 )
     return moveinput!(mpc, ry, d; kwargs...)
 end
-
-include("controller/construct.jl")
-include("controller/execute.jl")
-include("controller/explicitmpc.jl")
-include("controller/linmpc.jl")
-include("controller/nonlinmpc.jl")
