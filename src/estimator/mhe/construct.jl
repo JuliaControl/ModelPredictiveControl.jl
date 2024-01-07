@@ -197,7 +197,7 @@ the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
 - `He=nothing` : estimation horizon ``H_e``, must be specified.
-- `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
+- `Cwt=Inf` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `optim=default_optim_mhe(model)` : a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    with a quadratic/nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
@@ -265,7 +265,7 @@ function MovingHorizonEstimator(
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
     σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
-    Cwt::Real = DEFAULT_CWT,
+    Cwt::Real = Inf,
     optim::JM = default_optim_mhe(model),
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     # estimated covariances matrices (variance = σ²) :
