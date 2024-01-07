@@ -95,6 +95,7 @@ dictionary `info` with the following fields:
 
 - `:Ŵ`   : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``.
 - `:x̂arr`: optimal estimated state at arrival, ``\mathbf{x̂}_k(k-N_k+1)``.
+- `:ϵ`   : optimal slack variable, ``ϵ``.
 - `:J`   : objective value optimum, ``J``.
 - `:X̂`   : optimal estimated states over ``N_k+1``, ``\mathbf{X̂}``.
 - `:x̂`   : optimal estimated state for the next time step, ``\mathbf{x̂}_k(k+1)``.
@@ -123,11 +124,12 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, Nk = estim.model, estim.Nk[]
     nu, ny, nd = model.nu, model.ny, model.nd
     nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
+    nx̃ = !isinf(estim.C) + nx̂
     MyTypes = Union{JuMP._SolutionSummary, Hermitian{NT, Matrix{NT}}, Vector{NT}, NT}
     info = Dict{Symbol, MyTypes}()
     V̂, X̂ = similar(estim.Ym[1:nym*Nk]), similar(estim.X̂[1:nx̂*Nk])
     V̂, X̂ = predict!(V̂, X̂, estim, model, estim.Z̃)
-    x̂arr = estim.Z̃[1:nx̂]
+    x̂arr = estim.Z̃[nx̃-nx̂+1:nx̃]
     X̂ = [x̂arr; X̂]
     Ym, U, D = estim.Ym[1:nym*Nk], estim.U[1:nu*Nk], estim.D[1:nd*Nk]
     Ŷ = Vector{NT}(undef, ny*Nk)
@@ -139,6 +141,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     Ŷm = Ym - V̂
     info[:Ŵ] = estim.Ŵ[1:Nk*nŵ]
     info[:x̂arr] = x̂arr
+    info[:ϵ] = isinf(estim.C) ? NaN : estim.Z̃[begin]
     info[:J] = obj_nonlinprog(estim, estim.model, V̂, estim.Z̃)
     info[:X̂] = X̂
     info[:x̂] = estim.x̂

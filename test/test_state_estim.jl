@@ -603,7 +603,8 @@ end
 
     I_6 = Matrix{Float64}(I, 6, 6)
     I_2 = Matrix{Float64}(I, 2, 2)
-    mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Model(Ipopt.Optimizer))
+    optim = Model(Ipopt.Optimizer)
+    mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, 1e5 ,optim)
     @test mhe9.P̂0 ≈ I(6)
     @test mhe9.Q̂ ≈ I(6)
     @test mhe9.R̂ ≈ I(2)

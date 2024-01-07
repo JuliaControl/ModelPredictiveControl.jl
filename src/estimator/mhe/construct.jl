@@ -440,6 +440,42 @@ function setconstraint!(
         size(V̂max) == (nym*He,) || throw(ArgumentError("V̂max size must be $((nym*He,))"))
         con.V̂max[:] = V̂max
     end
+    if !isnothing(C_x̂min)
+        size(C_x̂min) == (nX̂con,) || throw(ArgumentError("C_x̂min size must be $((nX̂con,))"))
+        any(C_x̂min .< 0) && error("C_x̂min weights should be non-negative")
+        con.A_x̃min[end-nx̂+1:end, end] = -C_x̂min[1:nx̂] # if C is finite : x̃ = [ϵ; x̂]
+        con.C_x̂min[:] = C_x̂min[nx̂+1:end]
+        size(con.A_X̂min) ≠ 0 && (con.A_X̂min[:, end] = -con.C_x̂min) # for LinModel
+    end
+    if !isnothing(C_x̂max)
+        size(C_x̂max) == (nX̂con,) || throw(ArgumentError("C_x̂max size must be $((nX̂con,))"))
+        any(C_x̂max .< 0) && error("C_x̂max weights should be non-negative")
+        con.A_x̃max[end-nx̂+1:end, end] = -C_x̂max[1:nx̂] # if C is finite : x̃ = [ϵ; x̂]
+        con.C_x̂max[:] = C_x̂max[nx̂+1:end]
+        size(con.A_X̂max) ≠ 0 && (con.A_X̂max[:, end] = -con.C_x̂max) # for LinModel
+    end
+    if !isnothing(C_ŵmin)
+        size(C_ŵmin) == (nŵ*He,) || throw(ArgumentError("C_ŵmin size must be $((nŵ*He,))"))
+        any(C_ŵmin .< 0) && error("C_ŵmin weights should be non-negative")
+        con.A_Ŵmin[:, end] = -C_ŵmin
+    end
+    if !isnothing(C_ŵmax)
+        size(C_ŵmax) == (nŵ*He,) || throw(ArgumentError("C_ŵmax size must be $((nŵ*He,))"))
+        any(C_ŵmax .< 0) && error("C_ŵmax weights should be non-negative")
+        con.A_Ŵmax[:, end] = -C_ŵmax
+    end
+    if !isnothing(C_v̂min)
+        size(C_v̂min) == (nym*He,) || throw(ArgumentError("C_v̂min size must be $((nym*He,))"))
+        any(C_v̂min .< 0) && error("C_v̂min weights should be non-negative")
+        con.C_V̂min[:] = C_v̂min
+        size(con.A_V̂min) ≠ 0 && (con.A_V̂min[:, end] = -con.C_V̂min) # for LinModel
+    end
+    if !isnothing(C_v̂max)
+        size(C_v̂max) == (nym*He,) || throw(ArgumentError("C_v̂max size must be $((nym*He,))"))
+        any(C_v̂max .< 0) && error("C_v̂max weights should be non-negative")
+        con.C_V̂max[:] = C_v̂max
+        size(con.A_V̂max) ≠ 0 && (con.A_V̂max[:, end] = -con.C_V̂max) # for LinModel
+    end
     i_x̃min, i_x̃max  = .!isinf.(con.x̃min)  , .!isinf.(con.x̃max)
     i_X̂min, i_X̂max  = .!isinf.(con.X̂min)  , .!isinf.(con.X̂max)
     i_Ŵmin, i_Ŵmax  = .!isinf.(con.Ŵmin)  , .!isinf.(con.Ŵmax)
@@ -447,10 +483,8 @@ function setconstraint!(
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(model, 
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max,
-            con.A_x̃min, con.A_x̃max, 
-            con.A_X̂min, con.A_X̂max, 
-            con.A_Ŵmin, con.A_Ŵmax, 
-            con.A_V̂min, con.A_V̂max
+            con.A_x̃min, con.A_x̃max, con.A_X̂min, con.A_X̂max, 
+            con.A_Ŵmin, con.A_Ŵmax, con.A_V̂min, con.A_V̂max
         )
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
