@@ -235,29 +235,25 @@ function setconstraint!(
         size(C_ymin) == (ny*Hp,) || throw(ArgumentError("C_ymin size must be $((ny*Hp,))"))
         any(C_ymin .< 0) && error("C_ymin weights should be non-negative")
         con.C_ymin[:] = C_ymin
-        A_Ymin ,_ = relaxŶ(model, C, con.C_ymin, con.C_ymax, E)
-        con.A_Ymin[:] = A_Ymin
+        size(con.A_Ymin, 1) ≠ 0 && (con.A_Ymin[:, end] = -C_ymin) # for LinModel
     end
     if !isnothing(C_ymax)
         size(C_ymax) == (ny*Hp,) || throw(ArgumentError("C_ymax size must be $((ny*Hp,))"))
         any(C_ymax .< 0) && error("C_ymax weights should be non-negative")
         con.C_ymax[:] = C_ymax
-        _, A_Ymax = relaxŶ(model, C, con.C_ymin, con.C_ymax, E)
-        con.A_Ymax[:] = A_Ymax
+        size(con.A_Ymax, 1) ≠ 0 && (con.A_Ymax[:, end] = -C_ymax) # for LinModel
     end
     if !isnothing(c_x̂min)
         size(c_x̂min) == (nx̂,) || throw(ArgumentError("c_x̂min size must be $((nx̂,))"))
         any(c_x̂min .< 0) && error("c_x̂min weights should be non-negative")
         con.c_x̂min[:] = c_x̂min
-        A_x̂min ,_ = relaxterminal(model, C, con.c_x̂min, con.c_x̂max, ex̂)
-        con.A_x̂min[:] = A_x̂min
+        size(con.A_x̂min, 1) ≠ 0 && (con.A_x̂min[:, end] = -c_x̂min) # for LinModel
     end
     if !isnothing(c_x̂max)
         size(c_x̂max) == (nx̂,) || throw(ArgumentError("c_x̂max size must be $((nx̂,))"))
         any(c_x̂max .< 0) && error("c_x̂max weights should be non-negative")
         con.c_x̂max[:] = c_x̂max
-        _, A_x̂max = relaxterminal(model, C, con.c_x̂min, con.c_x̂max, ex̂)
-        con.A_x̂max[:] = A_x̂max
+        size(con.A_x̂max, 1) ≠ 0 && (con.A_x̂max[:, end] = -c_x̂max) # for LinModel
     end
     i_Umin,  i_Umax  = .!isinf.(con.Umin),  .!isinf.(con.Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmin)
