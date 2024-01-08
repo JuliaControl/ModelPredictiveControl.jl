@@ -31,7 +31,7 @@ res = sim!(model, N, u)
 plot(res, plotu=false)</code></pre><p><img src="../plot1_NonLinMPC.svg" alt="plot1_NonLinMPC"/></p><h2 id="Nonlinear-Model-Predictive-Controller"><a class="docs-heading-anchor" href="#Nonlinear-Model-Predictive-Controller">Nonlinear Model Predictive Controller</a><a id="Nonlinear-Model-Predictive-Controller-1"></a><a class="docs-heading-anchor-permalink" href="#Nonlinear-Model-Predictive-Controller" title="Permalink"></a></h2><p>An <a href="../../public/state_estim/#ModelPredictiveControl.UnscentedKalmanFilter"><code>UnscentedKalmanFilter</code></a> estimates the plant state :</p><pre><code class="language-julia hljs">σQ=[0.1, 0.5]; σR=[0.5]; nint_u=[1]; σQint_u=[0.1]
 estim = UnscentedKalmanFilter(model; σQ, σR, nint_u, σQint_u)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">UnscentedKalmanFilter estimator with a sample time Ts = 0.1 s, NonLinModel and:
  1 manipulated inputs u (1 integrating states)
- 3 states x̂
+ 3 estimated states x̂
  1 measured outputs ym (0 integrating states)
  0 unmeasured outputs yu
  0 measured disturbances d</code></pre><p>The vectors <code>σQ</code> and σR <code>σR</code> are the standard deviations of the process and sensor noises, respectively. The value for the velocity <span>$ω$</span> is higher here (<code>σQ</code> second value) since <span>$\dot{ω}(t)$</span> equation includes an uncertain parameter: the friction coefficient <span>$K$</span>. Also, the argument <code>nint_u</code> explicitly adds one integrating state at the model input, the motor torque <span>$τ$</span> , with an associated standard deviation <code>σQint_u</code> of 0.1 N m. The estimator tuning is tested on a plant with a 25 % larger friction coefficient <span>$K$</span>:</p><pre><code class="language-julia hljs">const par_plant = (par[1], par[2], 1.25*par[3], par[4])
@@ -43,7 +43,7 @@ nmpc = setconstraint!(nmpc, umin=[-1.5], umax=[+1.5])</code></pre><pre class="do
  20 prediction steps Hp
   2 control steps Hc
   1 manipulated inputs u (1 integrating states)
-  3 states x̂
+  3 estimated states x̂
   1 measured outputs ym (0 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d</code></pre><p>We test <code>mpc</code> performance on <code>plant</code> by imposing an angular setpoint of 180° (inverted position):</p><pre><code class="language-julia hljs">res_ry = sim!(nmpc, N, [180.0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
@@ -54,7 +54,7 @@ model2 = NonLinModel(f      , h2, Ts, nu, nx, ny)
 plant2 = NonLinModel(f_plant, h2, Ts, nu, nx, ny)
 estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">UnscentedKalmanFilter estimator with a sample time Ts = 0.1 s, NonLinModel and:
  1 manipulated inputs u (1 integrating states)
- 3 states x̂
+ 3 estimated states x̂
  1 measured outputs ym (0 integrating states)
  1 unmeasured outputs yu
  0 measured disturbances d</code></pre><p>The <code>plant2</code> object based on <code>h2</code> is also required since <a href="../../public/generic_func/#ModelPredictiveControl.sim!"><code>sim!</code></a> expects that the output vector of <code>plant</code> argument corresponds to the model output vector in <code>mpc</code> argument. We can now define the <span>$J_E$</span> function and the <code>empc</code> controller:</p><pre><code class="language-julia hljs">function JE(UE, ŶE, _ )
@@ -66,7 +66,7 @@ empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])</code></pre><pre class="do
  20 prediction steps Hp
   2 control steps Hc
   1 manipulated inputs u (1 integrating states)
-  3 states x̂
+  3 estimated states x̂
   1 measured outputs ym (0 integrating states)
   1 unmeasured outputs yu
   0 measured disturbances d</code></pre><p>The keyword argument <code>Ewt</code> weights the economic costs relative to the other terms in the objective function. The term must be large enough to be significant but a too high value can lead to a static error on the angle setpoint. The second element of <code>Mwt</code> is zero since the speed <span>$ω$</span> is not requested to track a setpoint. The closed-loop response to a 180° setpoint is similar:</p><pre><code class="language-julia hljs">res2_ry = sim!(empc, N, [180, 0], plant=plant2, x0=[0, 0], x̂0=[0, 0, 0])
@@ -89,7 +89,7 @@ mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])</code></pre><pre class="docu
  20 prediction steps Hp
   2 control steps Hc
   1 manipulated inputs u (1 integrating states)
-  3 states x̂
+  3 estimated states x̂
   1 measured outputs ym (0 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d</code></pre><p>The linear controller has difficulties to reject the 10° step disturbance:</p><pre><code class="language-julia hljs">res_lin = sim!(mpc, N, [180.0]; plant, x0=[π, 0], y_step=[10])
@@ -102,8 +102,8 @@ mpc2 = setconstraint!(mpc2, umin=[-1.5], umax=[+1.5])</code></pre><pre class="do
  20 prediction steps Hp
   2 control steps Hc
   1 manipulated inputs u (1 integrating states)
-  3 states x̂
+  3 estimated states x̂
   1 measured outputs ym (0 integrating states)
   0 unmeasured outputs yu
   0 measured disturbances d</code></pre><p>does improve the rejection of the step disturbance:</p><pre><code class="language-julia hljs">res_lin2 = sim!(mpc2, N, [180.0]; plant, x0=[π, 0], y_step=[10])
-plot(res_lin2)</code></pre><p><img src="../plot8_NonLinMPC.svg" alt="plot8_NonLinMPC"/></p><p>The closed-loop performance is still lower than the nonlinear controller, as expected, but computations are about 2000 times faster (0.00002 s versus 0.04 s per time steps, on average). Note that <code>linmodel</code> is only valid for angular positions near 180°. Multiple linearized models and controllers are required for large deviations from this operating point. This is known as gain scheduling.</p><section class="footnotes is-size-7"><ul><li class="footnote" id="footnote-1"><a class="tag is-link" href="#citeref-1">1</a>Arnström, D., Bemporad, A., and Axehill, D. (2022). A dual active-set solver for embedded quadratic programming using recursive LDLᵀ updates. IEEE Trans. Autom. Contr., 67(8). https://doi.org/doi:10.1109/TAC.2022.3176430.</li></ul></section></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linmpc/">« Linear Design</a><a class="docs-footer-nextpage" href="../../public/sim_model/">Plant Models »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Wednesday 3 January 2024 00:31">Wednesday 3 January 2024</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+plot(res_lin2)</code></pre><p><img src="../plot8_NonLinMPC.svg" alt="plot8_NonLinMPC"/></p><p>The closed-loop performance is still lower than the nonlinear controller, as expected, but computations are about 2000 times faster (0.00002 s versus 0.04 s per time steps, on average). Note that <code>linmodel</code> is only valid for angular positions near 180°. Multiple linearized models and controllers are required for large deviations from this operating point. This is known as gain scheduling.</p><section class="footnotes is-size-7"><ul><li class="footnote" id="footnote-1"><a class="tag is-link" href="#citeref-1">1</a>Arnström, D., Bemporad, A., and Axehill, D. (2022). A dual active-set solver for embedded quadratic programming using recursive LDLᵀ updates. IEEE Trans. Autom. Contr., 67(8). https://doi.org/doi:10.1109/TAC.2022.3176430.</li></ul></section></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../linmpc/">« Linear Design</a><a class="docs-footer-nextpage" href="../../public/sim_model/">Plant Models »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Monday 8 January 2024 01:10">Monday 8 January 2024</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
