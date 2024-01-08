@@ -1,7 +1,7 @@
 Ts = 4.0
 sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
         tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ] 
-#=
+
 @testset "SteadyKalmanFilter construction" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     skalmanfilter1 = SteadyKalmanFilter(linmodel1)
@@ -549,7 +549,7 @@ end
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
 end
-=#
+
 @testset "MovingHorizonEstimator construction" begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d

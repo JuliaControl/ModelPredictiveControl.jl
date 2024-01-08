@@ -253,11 +253,11 @@ end
 
 "Set `b` excluding state and sensor noise bounds if `model` is not a [`LinModel`](@ref)."
 function linconstraint!(estim::MovingHorizonEstimator, ::SimModel)
-    Ŵmax, Ŵmax = trunc_bounds(estim, estim.con.Ŵmax, estim.con.Ŵmax, estim.nx̂)
+    Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, estim.nx̂)
     estim.con.b[:] = [
         -estim.con.x̃min
         +estim.con.x̃max
-        -Ŵmax
+        -Ŵmin
         +Ŵmax
     ]
     lincon = estim.optim[:linconstraint]
