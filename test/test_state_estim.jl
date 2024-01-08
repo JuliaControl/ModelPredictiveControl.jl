@@ -561,12 +561,14 @@ end
     @test mhe1.nyu == 0
     @test mhe1.nxs == 2
     @test mhe1.nx̂ == 6
+    @test size(mhe1.Ẽ, 2) == 6*mhe1.nx̂
 
     mhe2 = MovingHorizonEstimator(nonlinmodel, He=5)
     @test mhe2.nym == 2
     @test mhe2.nyu == 0
     @test mhe2.nxs == 2
     @test mhe2.nx̂ == 6
+    @test size(mhe1.Ẽ, 2) == 6*mhe1.nx̂
 
     mhe3 = MovingHorizonEstimator(nonlinmodel, He=5, i_ym=[2])
     @test mhe3.nym == 1
@@ -612,12 +614,17 @@ end
     mhe10 = MovingHorizonEstimator(nonlinmodel, He=5, optim=Model(OSQP.Optimizer))
     @test solver_name(mhe10.optim) == "OSQP"
 
+    mhe11 = MovingHorizonEstimator(nonlinmodel, He=5, Cwt=1e3)
+    @test size(mhe11.Ẽ, 2) == 6*mhe11.nx̂ + 1
+    @test mhe11.C == 1e3
+
     linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mhe11 = MovingHorizonEstimator(linmodel2, He=5)
     @test isa(mhe11, MovingHorizonEstimator{Float32})
 
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1, He=0)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel1, Cwt=-1)
 end
 
 @testset "MovingHorizonEstimator estimation and getinfo" begin
@@ -677,23 +684,47 @@ end
 
 @testset "MovingHorizonEstimator set constraints" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    mhe1 = MovingHorizonEstimator(linmodel1, He=1, nint_ym=0)
+    mhe1 = MovingHorizonEstimator(linmodel1, He=1, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe1, x̂min=[-51,-52], x̂max=[53,54])
     @test all((mhe1.con.X̂min, mhe1.con.X̂max) .≈ ([-51,-52], [53,54]))
-    @test all((mhe1.con.x̃min, mhe1.con.x̃max) .≈ ([-51,-52], [53,54]))
+    @test all((mhe1.con.x̃min[2:end], mhe1.con.x̃max[2:end]) .≈ ([-51,-52], [53,54]))
     setconstraint!(mhe1, ŵmin=[-55,-56], ŵmax=[57,58])
     @test all((mhe1.con.Ŵmin, mhe1.con.Ŵmax) .≈ ([-55,-56], [57,58]))
     setconstraint!(mhe1, v̂min=[-59,-60], v̂max=[61,62])
     @test all((mhe1.con.V̂min, mhe1.con.V̂max) .≈ ([-59,-60], [61,62]))
+    setconstraint!(mhe1, c_x̂min=[0.01,0.02], c_x̂max=[0.03,0.04])
+    @test all((-mhe1.con.A_X̂min[:, end], -mhe1.con.A_X̂max[:, end]) .≈ ([0.01, 0.02], [0.03,0.04]))
+    @test all((-mhe1.con.A_x̃min[2:end, end], -mhe1.con.A_x̃max[2:end, end]) .≈ ([0.01,0.02], [0.03,0.04]))
+    setconstraint!(mhe1, c_ŵmin=[0.05,0.06], c_ŵmax=[0.07,0.08])
+    @test all((-mhe1.con.A_Ŵmin[:, end], -mhe1.con.A_Ŵmax[:, end]) .≈ ([0.05, 0.06], [0.07,0.08]))
+    setconstraint!(mhe1, c_v̂min=[0.09,0.10], c_v̂max=[0.11,0.12])
+    @test all((-mhe1.con.A_V̂min[:, end], -mhe1.con.A_V̂max[:, end]) .≈ ([0.09, 0.10], [0.11,0.12]))
 
-    mhe2 = MovingHorizonEstimator(linmodel1, He=4, nint_ym=0)
+    mhe2 = MovingHorizonEstimator(linmodel1, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe2, X̂min=-1(1:10), X̂max=1(1:10))
     @test all((mhe2.con.X̂min, mhe2.con.X̂max) .≈ (-1(3:10), 1(3:10)))
-    @test all((mhe2.con.x̃min, mhe2.con.x̃max) .≈ (-1(1:2),  1(1:2)))
+    @test all((mhe2.con.x̃min[2:end], mhe2.con.x̃max[2:end]) .≈ (-1(1:2),  1(1:2)))
     setconstraint!(mhe2, Ŵmin=-1(11:18), Ŵmax=1(11:18))
     @test all((mhe2.con.Ŵmin, mhe2.con.Ŵmax) .≈ (-1(11:18), 1(11:18)))
     setconstraint!(mhe2, V̂min=-1(31:38), V̂max=1(31:38))
     @test all((mhe2.con.V̂min, mhe2.con.V̂max) .≈ (-1(31:38), 1(31:38)))
+    setconstraint!(mhe2, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
+    @test all((-mhe2.con.A_X̂min[:, end], -mhe2.con.A_X̂max[:, end]) .≈ (0.01(3:10), 0.02(3:10)))
+    @test all((-mhe2.con.A_x̃min[2:end, end], -mhe2.con.A_x̃max[2:end, end]) .≈ (0.01(1:2), 0.02(1:2)))
+    setconstraint!(mhe2, C_ŵmin=0.03(11:18), C_ŵmax=0.04(11:18))
+    @test all((-mhe2.con.A_Ŵmin[:, end], -mhe2.con.A_Ŵmax[:, end]) .≈ (0.03(11:18), 0.04(11:18)))
+    setconstraint!(mhe2, C_v̂min=0.05(31:38), C_v̂max=0.06(31:38))
+    @test all((-mhe2.con.A_V̂min[:, end], -mhe2.con.A_V̂max[:, end]) .≈ (0.05(31:38), 0.06(31:38)))
+
+    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u
+    h(x,d)   = linmodel1.C*x 
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+
+    mhe3 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3)
+    setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
+    @test all((mhe3.con.C_x̂min, mhe3.con.C_x̂max) .≈ (0.01(3:10), 0.02(3:10)))
+    setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
+    @test all((mhe3.con.C_v̂min, mhe3.con.C_v̂max) .≈ (0.03(11:18), 0.04(11:18)))
 
     @test_throws ArgumentError setconstraint!(mhe2, x̂min=[-1])
     @test_throws ArgumentError setconstraint!(mhe2, x̂max=[+1])
@@ -701,6 +732,12 @@ end
     @test_throws ArgumentError setconstraint!(mhe2, ŵmax=[+1])
     @test_throws ArgumentError setconstraint!(mhe2, v̂min=[-1])
     @test_throws ArgumentError setconstraint!(mhe2, v̂max=[+1])
+    @test_throws ArgumentError setconstraint!(mhe2, c_x̂min=[-1])
+    @test_throws ArgumentError setconstraint!(mhe2, c_x̂max=[+1])
+    @test_throws ArgumentError setconstraint!(mhe2, c_ŵmin=[-1])
+    @test_throws ArgumentError setconstraint!(mhe2, c_ŵmax=[+1])
+    @test_throws ArgumentError setconstraint!(mhe2, c_v̂min=[-1])
+    @test_throws ArgumentError setconstraint!(mhe2, c_v̂max=[+1])
 
     updatestate!(mhe1, [10, 50], [50, 30])
     @test_throws ErrorException setconstraint!(mhe1, x̂min=[-Inf,-Inf])
@@ -709,6 +746,20 @@ end
     @test_throws ErrorException setconstraint!(mhe1, ŵmax=[+Inf,+Inf])
     @test_throws ErrorException setconstraint!(mhe1, v̂min=[-Inf,-Inf])
     @test_throws ErrorException setconstraint!(mhe1, v̂max=[+Inf,+Inf])
+    @test_throws ErrorException setconstraint!(mhe1, c_x̂min=[100,100])
+    @test_throws ErrorException setconstraint!(mhe1, c_x̂max=[200,200])
+    @test_throws ErrorException setconstraint!(mhe1, c_ŵmin=[300,300])
+    @test_throws ErrorException setconstraint!(mhe1, c_ŵmax=[400,400])
+    @test_throws ErrorException setconstraint!(mhe1, c_v̂min=[500,500])
+    @test_throws ErrorException setconstraint!(mhe1, c_v̂max=[600,600])
+
+    mhe4 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0, Cwt=Inf)
+    @test_throws ArgumentError setconstraint!(mhe4, c_x̂min=[1,1])
+    @test_throws ArgumentError setconstraint!(mhe4, c_x̂max=[1,1])
+    @test_throws ArgumentError setconstraint!(mhe4, c_ŵmin=[1,1])
+    @test_throws ArgumentError setconstraint!(mhe4, c_ŵmax=[1,1])
+    @test_throws ArgumentError setconstraint!(mhe4, c_v̂min=[1,1])
+    @test_throws ArgumentError setconstraint!(mhe4, c_v̂max=[1,1])
 end
 
 @testset "MovingHorizonEstimator constraint violation" begin

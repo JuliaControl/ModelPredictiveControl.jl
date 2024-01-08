@@ -197,7 +197,7 @@ the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
 - `He=nothing` : estimation horizon ``H_e``, must be specified.
-- `Cwt=Inf` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
+- `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
 - `optim=default_optim_mhe(model)` : a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    with a quadratic/nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
@@ -337,10 +337,10 @@ Extended Help for details on model augmentation and time-varying constraints.
 - `v̂max = fill(+Inf,nym)` : sensor noise upper bounds ``\mathbf{v̂_{max}}``.
 - `c_x̂min = fill(0.0,nx̂)`  : `x̂min` softness weights ``\mathbf{c_{x̂_{min}}}``.
 - `c_x̂max = fill(0.0,nx̂)`  : `x̂max` softness weights ``\mathbf{c_{x̂_{max}}}``.
-- `c_ŵmin = fill(1.0,nx̂)`  : `ŵmin` softness weights ``\mathbf{c_{ŵ_{min}}}``.
-- `c_ŵmax = fill(1.0,nx̂)`  : `ŵmax` softness weights ``\mathbf{c_{ŵ_{max}}}``.
-- `c_v̂min = fill(1.0,nym)` : `v̂min` softness weights ``\mathbf{c_{v̂_{min}}}``.
-- `c_v̂max = fill(1.0,nym)` : `v̂max` softness weights ``\mathbf{c_{v̂_{max}}}``.
+- `c_ŵmin = fill(0.0,nx̂)`  : `ŵmin` softness weights ``\mathbf{c_{ŵ_{min}}}``.
+- `c_ŵmax = fill(0.0,nx̂)`  : `ŵmax` softness weights ``\mathbf{c_{ŵ_{max}}}``.
+- `c_v̂min = fill(0.0,nym)` : `v̂min` softness weights ``\mathbf{c_{v̂_{min}}}``.
+- `c_v̂max = fill(0.0,nym)` : `v̂max` softness weights ``\mathbf{c_{v̂_{max}}}``.
 - all the keyword arguments above but with a first capital letter, e.g. `X̂max` or `C_ŵmax`:
   for time-varying constraints (see Extended Help).
 
@@ -412,7 +412,7 @@ function setconstraint!(
     isnothing(C_v̂max) && !isnothing(c_v̂max) && (C_v̂max = repeat(c_v̂max, He))
     if !all(isnothing.((C_x̂min, C_x̂max, C_ŵmin, C_ŵmax, C_v̂min, C_v̂max)))
         !isinf(C) || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
-        notSolvedYet || throw(ArgumentError("Cannot set softness parameters after calling updatestate!"))
+        notSolvedYet || error("Cannot set softness parameters after calling updatestate!")
     end
     if !isnothing(X̂min)
         size(X̂min) == (nX̂con,) || throw(ArgumentError("X̂min size must be $((nX̂con,))"))
@@ -445,14 +445,14 @@ function setconstraint!(
         any(C_x̂min .< 0) && error("C_x̂min weights should be non-negative")
         con.A_x̃min[end-nx̂+1:end, end] = -C_x̂min[1:nx̂] # if C is finite : x̃ = [ϵ; x̂]
         con.C_x̂min[:] = C_x̂min[nx̂+1:end]
-        size(con.A_X̂min) ≠ 0 && (con.A_X̂min[:, end] = -con.C_x̂min) # for LinModel
+        size(con.A_X̂min, 1) ≠ 0 && (con.A_X̂min[:, end] = -con.C_x̂min) # for LinModel
     end
     if !isnothing(C_x̂max)
         size(C_x̂max) == (nX̂con,) || throw(ArgumentError("C_x̂max size must be $((nX̂con,))"))
         any(C_x̂max .< 0) && error("C_x̂max weights should be non-negative")
         con.A_x̃max[end-nx̂+1:end, end] = -C_x̂max[1:nx̂] # if C is finite : x̃ = [ϵ; x̂]
         con.C_x̂max[:] = C_x̂max[nx̂+1:end]
-        size(con.A_X̂max) ≠ 0 && (con.A_X̂max[:, end] = -con.C_x̂max) # for LinModel
+        size(con.A_X̂max, 1) ≠ 0 && (con.A_X̂max[:, end] = -con.C_x̂max) # for LinModel
     end
     if !isnothing(C_ŵmin)
         size(C_ŵmin) == (nŵ*He,) || throw(ArgumentError("C_ŵmin size must be $((nŵ*He,))"))
@@ -467,14 +467,14 @@ function setconstraint!(
     if !isnothing(C_v̂min)
         size(C_v̂min) == (nym*He,) || throw(ArgumentError("C_v̂min size must be $((nym*He,))"))
         any(C_v̂min .< 0) && error("C_v̂min weights should be non-negative")
-        con.C_V̂min[:] = C_v̂min
-        size(con.A_V̂min) ≠ 0 && (con.A_V̂min[:, end] = -con.C_V̂min) # for LinModel
+        con.C_v̂min[:] = C_v̂min
+        size(con.A_V̂min, 1) ≠ 0 && (con.A_V̂min[:, end] = -con.C_v̂min) # for LinModel
     end
     if !isnothing(C_v̂max)
         size(C_v̂max) == (nym*He,) || throw(ArgumentError("C_v̂max size must be $((nym*He,))"))
         any(C_v̂max .< 0) && error("C_v̂max weights should be non-negative")
-        con.C_V̂max[:] = C_v̂max
-        size(con.A_V̂max) ≠ 0 && (con.A_V̂max[:, end] = -con.C_V̂max) # for LinModel
+        con.C_v̂max[:] = C_v̂max
+        size(con.A_V̂max, 1) ≠ 0 && (con.A_V̂max[:, end] = -con.C_v̂max) # for LinModel
     end
     i_x̃min, i_x̃max  = .!isinf.(con.x̃min)  , .!isinf.(con.x̃max)
     i_X̂min, i_X̂max  = .!isinf.(con.X̂min)  , .!isinf.(con.X̂max)
@@ -598,8 +598,8 @@ function init_defaultcon_mhe(
     V̂min, V̂max = fill(convert(NT,-Inf), nYm), fill(convert(NT,+Inf), nYm)
     c_x̂min, c_x̂max = fill(0.0, nx̂),  fill(0.0, nx̂)
     C_x̂min, C_x̂max = fill(0.0, nX̂),  fill(0.0, nX̂)
-    C_ŵmin, C_ŵmax = fill(1.0, nŴ),  fill(1.0, nŴ)
-    C_v̂min, C_v̂max = fill(1.0, nYm), fill(1.0, nYm)
+    C_ŵmin, C_ŵmax = fill(0.0, nŴ),  fill(0.0, nŴ)
+    C_v̂min, C_v̂max = fill(0.0, nYm), fill(0.0, nYm)
     A_x̃min, A_x̃max, x̃min, x̃max, ẽx̄ = relaxarrival(model, C, c_x̂min, c_x̂max, x̂min, x̂max, ex̄)
     A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, C, C_x̂min, C_x̂max, Ex̂)
     A_Ŵmin, A_Ŵmax = relaxŴ(model, C, C_ŵmin, C_ŵmax, nx̂)
