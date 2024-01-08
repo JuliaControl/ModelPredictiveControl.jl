@@ -890,8 +890,7 @@ function init_optimization!(
 )
     nZ̃ = length(estim.Z̃)
     set_silent(optim)
-    #TODO: RE-ENABLE THIS
-    #limit_solve_time(estim.optim, estim.model.Ts)
+    limit_solve_time(estim.optim, estim.model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
     A = estim.con.A[estim.con.i_b, :]
     b = estim.con.b[estim.con.i_b]
@@ -913,8 +912,7 @@ function init_optimization!(
     # --- variables and linear constraints ---
     nZ̃ = length(estim.Z̃)
     set_silent(optim)
-    #TODO: RE-ENABLE THIS
-    #limit_solve_time(estim.optim, estim.model.Ts)
+    limit_solve_time(estim.optim, estim.model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
     A = estim.con.A[con.i_b, :]
     b = estim.con.b[con.i_b]
