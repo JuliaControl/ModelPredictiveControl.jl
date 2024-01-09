@@ -225,7 +225,7 @@ initpred!(::MovingHorizonEstimator, ::SimModel) = nothing
 @doc raw"""
     linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
 
-Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``) of MHE.
+Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MHE.
 
 Also init ``\mathbf{F_x̂}`` vector for the state constraints, see [`init_predmat_mhe`](@ref).
 """
