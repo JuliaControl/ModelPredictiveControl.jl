@@ -31,5 +31,5 @@ ModelPredictiveControl.relaxterminal
 ## Constraints
 
 ```@docs
-ModelPredictiveControl.linconstraint!
+ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel)
 ```

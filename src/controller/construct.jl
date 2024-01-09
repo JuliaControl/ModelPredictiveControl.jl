@@ -672,8 +672,8 @@ constraints:
     \mathbf{A_{U_{max}}} 
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \mathbf{U_{min}} + \mathbf{T} \mathbf{u}(k-1) \\
-    + \mathbf{U_{max}} - \mathbf{T} \mathbf{u}(k-1)
+    - \mathbf{U_{min} + T} \mathbf{u}(k-1) \\
+    + \mathbf{U_{max} - T} \mathbf{u}(k-1)
 \end{bmatrix}
 ```
 """
@@ -745,8 +745,8 @@ Denoting the input increments augmented with the slack variable
     \mathbf{A_{Y_{max}}}
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \mathbf{Y_{min}} + \mathbf{F} \\
-    + \mathbf{Y_{max}} - \mathbf{F} 
+    - \mathbf{Y_{min} + F} \\
+    + \mathbf{Y_{max} - F} 
 \end{bmatrix}
 ```
 """
@@ -786,8 +786,8 @@ the inequality constraints:
     \mathbf{A_{x̂_{max}}}
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \mathbf{x̂_{min}} + \mathbf{f_x̂} \\
-    + \mathbf{x̂_{max}} - \mathbf{f_x̂} 
+    - \mathbf{x̂_{min} + f_x̂} \\
+    + \mathbf{x̂_{max} - f_x̂}
 \end{bmatrix}
 ```
 """

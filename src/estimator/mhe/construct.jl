@@ -633,7 +633,23 @@ end
         model::SimModel, C, c_x̂min, c_x̂max, x̂min, x̂max, ex̄
     ) -> A_x̃min, A_x̃max, x̃min, x̃max, ẽx̄
 
-TBW
+Augment arrival state constraints with slack variable ϵ for softening the MHE.
+
+Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z̃} = 
+[\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{ẽ_x̄}``
+matrix that appears in the estimation error at arrival equation ``\mathbf{x̄} =
+\mathbf{ẽ_x̄ Z̃ + f_x̄}``. It also returns the augmented constraints ``\mathbf{x̃_{min}}`` and
+``\mathbf{x̃_{max}}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
+```math
+\begin{bmatrix} 
+    \mathbf{A_{x̃_{min}}} \\ 
+    \mathbf{A_{x̃_{max}}}
+\end{bmatrix} \mathbf{Z̃} ≤
+\begin{bmatrix}
+    - \mathbf{x̃_{min} + f_x̄} \\
+    + \mathbf{x̃_{max} - f_x̄}
+\end{bmatrix}
+```
 """
 function relaxarrival(::SimModel{NT}, C, c_x̂min, c_x̂max, x̂min, x̂max, ex̄) where {NT<:Real}
     ex̂ = -ex̄
@@ -655,7 +671,22 @@ end
 @doc raw"""
     relaxX̂(model::SimModel, C, C_x̂min, C_x̂max, Ex̂) -> A_X̂min, A_X̂max, Ẽx̂
 
-TBW
+Augment estimated state constraints with slack variable ϵ for softening the MHE.
+
+Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z̃} = 
+[\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{Ẽ_x̂}``
+matrix that appears in estimated states equation ``\mathbf{X̂} = \mathbf{Ẽ_x̂ Z̃ + F_x̂}``. It
+also returns the ``\mathbf{A}`` matrices for the inequality constraints:
+```math
+\begin{bmatrix} 
+    \mathbf{A_{X̂_{min}}} \\ 
+    \mathbf{A_{X̂_{max}}}
+\end{bmatrix} \mathbf{Z̃} ≤
+\begin{bmatrix}
+    - \mathbf{X̂_{min} + F_x̂} \\
+    + \mathbf{X̂_{max} - F_x̂}
+\end{bmatrix}
+```
 """
 function relaxX̂(::LinModel{NT}, C, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
     if !isinf(C) # Z̃ = [ϵ; Z]
@@ -680,7 +711,21 @@ end
 @doc raw"""
     relaxŴ(model::SimModel, C, C_ŵmin, C_ŵmax, nx̂) -> A_Ŵmin, A_Ŵmax
 
-TBW
+Augment estimated process noise constraints with slack variable ϵ for softening the MHE.
+
+Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z̃} = 
+[\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{A}`` 
+matrices for the inequality constraints:
+```math
+\begin{bmatrix} 
+    \mathbf{A_{Ŵ_{min}}} \\ 
+    \mathbf{A_{Ŵ_{max}}}
+\end{bmatrix} \mathbf{Z̃} ≤
+\begin{bmatrix}
+    - \mathbf{Ŵ_{min}} \\
+    + \mathbf{Ŵ_{max}}
+\end{bmatrix}
+```
 """
 function relaxŴ(::SimModel{NT}, C, C_ŵmin, C_ŵmax, nx̂) where {NT<:Real}
     A = [zeros(NT, length(C_ŵmin), nx̂) I]
@@ -695,7 +740,22 @@ end
 @doc raw"""
     relaxV̂(model::SimModel, C, C_v̂min, C_v̂max, E) -> A_V̂min, A_V̂max, Ẽ
 
-TBW
+Augment estimated sensor noise constraints with slack variable ϵ for softening the MHE.
+
+Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z̃} = 
+[\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{Ẽ}``
+matrix that appears in estimated sensor noise equation ``\mathbf{V̂} = \mathbf{Ẽ Z̃ + F}``. It
+also returns the ``\mathbf{A}`` matrices for the inequality constraints:
+```math
+\begin{bmatrix} 
+    \mathbf{A_{V̂_{min}}} \\ 
+    \mathbf{A_{V̂_{max}}}
+\end{bmatrix} \mathbf{Z̃} ≤
+\begin{bmatrix}
+    - \mathbf{V̂_{min} + F} \\
+    + \mathbf{V̂_{max} - F}
+\end{bmatrix}
+```
 """
 function relaxV̂(::LinModel{NT}, C, C_v̂min, C_v̂max, E) where {NT<:Real}
     if !isinf(C) # Z̃ = [ϵ; Z]

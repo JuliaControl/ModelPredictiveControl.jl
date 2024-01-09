@@ -23,6 +23,21 @@ ModelPredictiveControl.init_predmat_mhe
 ModelPredictiveControl.init_matconstraint_mhe
 ```
 
+## Constraint Relaxation
+
+```@docs
+ModelPredictiveControl.relaxarrival
+ModelPredictiveControl.relaxX̂
+ModelPredictiveControl.relaxŴ
+ModelPredictiveControl.relaxV̂
+```
+
+## Constraints
+
+```@docs
+ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel)
+```
+
 ## Evaluate Estimated Output
 
 ```@docs
