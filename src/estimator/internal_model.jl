@@ -99,34 +99,28 @@ function InternalModel(
     return InternalModel{NT, SM}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
 end
 
-"Validate if `model` is asymptotically stable for [`LinModel`](@ref)."
-function validate_internalmodel(model::LinModel, nym, Csm, Dsm)
+"Validate if deterministic `model` and stochastic model `Csm, Dsm` for `InternalModel`s."
+function validate_internalmodel(model::SimModel, nym, Csm, Dsm)
+    validate_poles(model)
+    if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
+        error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
+              "measured output quantity ($nym)")
+    end
+    if iszero(Dsm)
+        error("Stochastic model requires a nonzero direct transmission matrix D")
+    end
+    return nothing
+end
+
+"Validate if `model` is asymptotically stable for `LinModel`s."
+function validate_poles(model::LinModel)
     poles = eigvals(model.A)
     if any(abs.(poles) .≥ 1) 
         error("InternalModel does not support integrating or unstable model")
     end
-    if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
-        error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
-              "measured output quantity ($nym)")
-    end
-    if iszero(Dsm)
-        error("Stochastic model requires a nonzero direct transmission matrix D")
-    end
     return nothing
 end
-
-"Only validate stochastic model size is `model` is not a [`LinModel`](@ref)."
-function validate_internalmodel(::SimModel, nym, Csm, Dsm)
-    if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
-        error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
-              "measured output quantity ($nym)")
-    end
-    if iszero(Dsm)
-        error("Stochastic model requires a nonzero direct transmission matrix D")
-    end
-    return nothing
-end
-
+validate_poles(::SimModel) = nothing
 
 @doc raw"""
     matrices_internalmodel(model::LinModel)

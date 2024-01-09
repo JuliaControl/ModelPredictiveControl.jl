@@ -186,9 +186,9 @@ N_k =                     \begin{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
 ``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
-Extended Help defines the two vectors. See [`UnscentedKalmanFilter`](@ref) for details on 
-the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The matrix 
-``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated with an [`ExtendedKalmanFilter`](@ref).
+Extended Help defines the two vectors and the scalar ``ϵ``. See [`UnscentedKalmanFilter`](@ref)
+for details on he augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The
+matrix ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated with an [`ExtendedKalmanFilter`](@ref).
 
 !!! warning
     See the Extended Help if you get an error like:    
@@ -244,6 +244,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
         \mathbf{x̂}_k(k-j+1) &= \mathbf{f̂}\Big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\Big) + \mathbf{ŵ}(k-j)
     \end{aligned}
     ```
+    The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
+    It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
+    problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
+    state and sensor noise).
 
     For [`LinModel`](@ref), the optimization is treated as a quadratic program with a
     time-varying Hessian, which is generally cheaper than nonlinear programming. For 
@@ -317,10 +321,10 @@ noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
 and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there
 is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern
 for relaxation, are non-negative values that specify the softness of the associated bound.
-Use `0.0` values for hard constraints. The process and sensor noise constraints are all soft
-by default. Notice that constraining the estimated sensor noises is equivalent to bounding 
-the innovation term, since ``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See 
-Extended Help for details on model augmentation and time-varying constraints.
+Use `0.0` values for hard constraints (default for all of them). Notice that constraining
+the estimated sensor noises is equivalent to bounding the innovation term, since 
+``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See Extended Help for details on 
+model augmentation and time-varying constraints.
 
 # Arguments
 !!! info
