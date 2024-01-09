@@ -151,21 +151,21 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 `x_noise` arguments, respectively.
 
 # Arguments
-- `estim::StateEstimator` : state estimator to simulate.
-- `N::Int` : simulation length in time steps.
-- `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value.
-- `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value.
-- `plant::SimModel = estim.model` : simulated plant model.
-- `u_step  = zeros(plant.nu)` : step load disturbance on plant inputs ``\mathbf{u}``.
-- `u_noise = zeros(plant.nu)` : gaussian load disturbance on plant inputs ``\mathbf{u}``.
-- `y_step  = zeros(plant.ny)` : step disturbance on plant outputs ``\mathbf{y}``.
-- `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``.
-- `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``.
-- `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``.
-- `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``.
-- `x0 = plant.x` : plant initial state ``\mathbf{x}(0)``.
-- `x̂0 = nothing` : initial estimate ``\mathbf{x̂}(0)``, [`initstate!`](@ref) is used if `nothing`.
-- `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization.
+- `estim::StateEstimator` : state estimator to simulate
+- `N::Int` : simulation length in time steps
+- `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value
+- `d = estim.model.dop` : plant measured disturbance ``\mathbf{d}`` value
+- `plant::SimModel = estim.model` : simulated plant model
+- `u_step  = zeros(plant.nu)` : step load disturbance on plant inputs ``\mathbf{u}``
+- `u_noise = zeros(plant.nu)` : gaussian load disturbance on plant inputs ``\mathbf{u}``
+- `y_step  = zeros(plant.ny)` : step disturbance on plant outputs ``\mathbf{y}``
+- `y_noise = zeros(plant.ny)` : additive gaussian noise on plant outputs ``\mathbf{y}``
+- `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``
+- `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
+- `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``
+- `x0 = plant.x` : plant initial state ``\mathbf{x}(0)``
+- `x̂0 = nothing` : initial estimate ``\mathbf{x̂}(0)``, [`initstate!`](@ref) is used if `nothing`
+- `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
 
 # Examples
 ```julia-repl

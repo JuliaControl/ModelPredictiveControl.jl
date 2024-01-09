@@ -48,7 +48,7 @@ struct LinMPC{
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         Ewt = 0   # economic costs not supported for LinMPC
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-        M_Hp, N_Hc, L_Hp = float(M_Hp), float(N_Hc), float(L_Hp) # debug julia 1.6
+        M_Hp, N_Hc, L_Hp = Diagonal{NT}(M_Hp), Diagonal{NT}(N_Hc), Diagonal{NT}(L_Hp) # debug julia 1.6
         # dummy vals (updated just before optimization):
         R̂y, R̂u = zeros(NT, ny*Hp), zeros(NT, nu*Hp) 
         noR̂u = iszero(L_Hp)
@@ -93,7 +93,7 @@ The controller minimizes the following objective function at each discrete time 
                       + C ϵ^2
 \end{aligned}
 ```
-in which the weight matrices are repeated ``H_p`` or ``H_c`` times:
+in which the weight matrices are repeated ``H_p`` or ``H_c`` times by default:
 ```math
 \begin{aligned}
     \mathbf{M}_{H_p} &= \text{diag}\mathbf{(M,M,...,M)}     \\
@@ -118,12 +118,14 @@ arguments.
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
+- `M_Hp=Diagonal(repeat(Mwt),Hp)` : diagonal weight matrix ``\mathbf{M}_{H_p}``.
+- `N_Hc=Diagonal(repeat(Nwt),Hc)` : diagonal weight matrix ``\mathbf{N}_{H_c}``.
+- `L_Hp=Diagonal(repeat(Lwt),Hp)` : diagonal weight matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
   (default to [`OSQP`](https://osqp.org/docs/parsers/jump.html) optimizer).
-- `M_Hp` / `N_Hc` / `L_Hp` : diagonal matrices ``\mathbf{M}_{H_p}, \mathbf{N}_{H_c},
-  \mathbf{L}_{H_p}``, for time-varying weights (generated from `Mwt/Nwt/Lwt` args if omitted).
+
 - additional keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
@@ -166,15 +168,15 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 """
 function LinMPC(
     model::LinModel;
-    Hp::Union{Int, Nothing} = nothing,
+    Hp::Int = default_Hp(model),
     Hc::Int = DEFAULT_HC,
-    Mwt = fill(DEFAULT_MWT, model.ny),
-    Nwt = fill(DEFAULT_NWT, model.nu),
-    Lwt = fill(DEFAULT_LWT, model.nu),
+    Mwt  = fill(DEFAULT_MWT, model.ny),
+    Nwt  = fill(DEFAULT_NWT, model.nu),
+    Lwt  = fill(DEFAULT_LWT, model.nu),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt = DEFAULT_CWT,
-    M_Hp = nothing,
-    N_Hc = nothing,
-    L_Hp = nothing,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
@@ -207,22 +209,23 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, KalmanFilter es
 """
 function LinMPC(
     estim::SE;
-    Hp::Union{Int, Nothing} = nothing,
+    Hp::Int = default_Hp(estim.model),
     Hc::Int = DEFAULT_HC,
-    Mwt = fill(DEFAULT_MWT, estim.model.ny),
-    Nwt = fill(DEFAULT_NWT, estim.model.nu),
-    Lwt = fill(DEFAULT_LWT, estim.model.nu),
-    Cwt = DEFAULT_CWT,
-    M_Hp = nothing,
-    N_Hc = nothing,
-    L_Hp = nothing,
+    Mwt  = fill(DEFAULT_MWT, estim.model.ny),
+    Nwt  = fill(DEFAULT_NWT, estim.model.nu),
+    Lwt  = fill(DEFAULT_LWT, estim.model.nu),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
+    Cwt  = DEFAULT_CWT,
     optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
-    isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
-    Hp = default_Hp(estim.model, Hp)
-    isnothing(M_Hp) && (M_Hp = Diagonal{NT}(repeat(Mwt, Hp)))
-    isnothing(N_Hc) && (N_Hc = Diagonal{NT}(repeat(Nwt, Hc)))
-    isnothing(L_Hp) && (L_Hp = Diagonal{NT}(repeat(Lwt, Hp)))
+    isa(estim.model, LinModel) || error("estim.model type must be a LinModel") 
+    nk = estimate_delays(estim.model)
+    if Hp ≤ nk
+        @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
+              "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
+    end
     return LinMPC{NT, SE, JM}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim)
 end
 

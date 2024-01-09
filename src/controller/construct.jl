@@ -52,25 +52,17 @@ for details on bounds and softness parameters ``\mathbf{c}``. The output and ter
 constraints are all soft by default. See Extended Help for time-varying constraints.
 
 # Arguments
-- `mpc::PredictiveController` : predictive controller to set constraints.
-- `umin  = fill(-Inf,nu)` : manipulated input lower bounds ``\mathbf{u_{min}}``.
-- `umax  = fill(+Inf,nu)` : manipulated input upper bounds ``\mathbf{u_{max}}``.
-- `Δumin = fill(-Inf,nu)` : manipulated input increment lower bounds ``\mathbf{Δu_{min}}``.
-- `Δumax = fill(+Inf,nu)` : manipulated input increment upper bounds ``\mathbf{Δu_{max}}``.
-- `ymin  = fill(-Inf,ny)` : predicted output lower bounds ``\mathbf{y_{min}}``.
-- `ymax  = fill(+Inf,ny)` : predicted output upper bounds ``\mathbf{y_{max}}``.
-- `x̂min  = fill(-Inf,nx̂)` : terminal constraint lower bounds ``\mathbf{x̂_{min}}``.
-- `x̂max  = fill(+Inf,nx̂)` : terminal constraint upper bounds ``\mathbf{x̂_{max}}``.
-- `c_umin  = fill(0.0,nu)` : `umin` softness weights ``\mathbf{c_{u_{min}}}``.
-- `c_umax  = fill(0.0,nu)` : `umax` softness weights ``\mathbf{c_{u_{max}}}``.
-- `c_Δumin = fill(0.0,nu)` : `Δumin` softness weights ``\mathbf{c_{Δu_{min}}}``.
-- `c_Δumax = fill(0.0,nu)` : `Δumax` softness weights ``\mathbf{c_{Δu_{max}}}``.
-- `c_ymin  = fill(1.0,ny)` : `ymin` softness weights ``\mathbf{c_{y_{min}}}``.
-- `c_ymax  = fill(1.0,ny)` : `ymax` softness weights ``\mathbf{c_{y_{max}}}``.
-- `c_x̂min  = fill(1.0,nx̂)` : `x̂min` softness weights ``\mathbf{c_{x̂_{min}}}``.
-- `c_x̂max  = fill(1.0,nx̂)` : `x̂max` softness weights ``\mathbf{c_{x̂_{max}}}``.
+- `mpc::PredictiveController` : predictive controller to set constraints
+- `umin=fill(-Inf,nu)` / `umax=fill(+Inf,nu)` : manipulated input bound ``\mathbf{u_{min/max}}``
+- `Δumin=fill(-Inf,nu)` / `Δumax=fill(+Inf,nu)` : manipulated input increment bound ``\mathbf{Δu_{min/max}}``
+- `ymin=fill(-Inf,ny)` / `ymax=fill(+Inf,ny)` : predicted output bound ``\mathbf{y_{min/max}}``
+- `x̂min=fill(-Inf,nx̂)` / `x̂max=fill(+Inf,nx̂)` : terminal constraint bound ``\mathbf{x̂_{min/max}}``
+- `c_umin=fill(0.0,nu)` / `c_umax=fill(0.0,nu)` : `umin` / `umax` softness weight ``\mathbf{c_{u_{min/max}}}``
+- `c_Δumin=fill(0.0,nu)` / `c_Δumax=fill(0.0,nu)` : `Δumin` / `Δumax` softness weight ``\mathbf{c_{Δu_{min/max}}}``
+- `c_ymin=fill(1.0,ny)` / `c_ymax=fill(1.0,ny)` : `ymin` / `ymax` softness weight ``\mathbf{c_{y_{min/max}}}``
+- `c_x̂min=fill(1.0,nx̂)` / `c_x̂max=fill(1.0,nx̂)` : `x̂min` / `x̂max` softness weight ``\mathbf{c_{x̂_{min/max}}}``
 - all the keyword arguments above but with a first capital letter, except for the terminal
-  constraints, e.g. `Ymax` or `C_Δumin`: for time-varying constraints (see Extended Help).
+  constraints, e.g. `Ymax` or `C_Δumin`: for time-varying constraints (see Extended Help)
 
 # Examples
 ```jldoctest
@@ -134,31 +126,7 @@ function setconstraint!(
     C_umax  = nothing, C_umin  = nothing,
     C_Δumax = nothing, C_Δumin = nothing,
     C_ymax  = nothing, C_ymin  = nothing,
-    # TODO:
-    # ------------ will be deleted in the future ---------------
-    ŷmin    = nothing, ŷmax    = nothing,
-    c_ŷmin  = nothing, c_ŷmax  = nothing,
-    # ----------------------------------------------------------
 )
-    # TODO:
-    # ----- these 4 `if`s will be deleted in the future --------
-    if !isnothing(ŷmin)
-        Base.depwarn("keyword arg ŷmin is deprecated, use ymin instead", :setconstraint!)
-        ymin = ŷmin
-    end
-    if !isnothing(ŷmax)
-        Base.depwarn("keyword arg ŷmax is deprecated, use ymax instead", :setconstraint!)
-        ymax = ŷmax
-    end
-    if !isnothing(c_ŷmin)
-        Base.depwarn("keyword arg ŷmin is deprecated, use ymin instead", :setconstraint!)
-        c_ymin = c_ŷmin
-    end
-    if !isnothing(c_ŷmax)
-        Base.depwarn("keyword arg ŷmax is deprecated, use ymax instead", :setconstraint!)
-        c_ymax = c_ŷmax
-    end
-    # ----------------------------------------------------------
     model, con, optim = mpc.estim.model, mpc.con, mpc.optim
     nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
@@ -339,11 +307,22 @@ end
 setnonlincon!(::PredictiveController, ::SimModel) = nothing
 
 """
-    default_Hp(model::LinModel, Hp)
+    default_Hp(model::LinModel)
 
-Estimate the default prediction horizon `Hp` with a security margin for [`LinModel`](@ref).
+Estimate the default prediction horizon `Hp` for [`LinModel`](@ref).
 """
-function default_Hp(model::LinModel, Hp)
+default_Hp(model::LinModel) = DEFAULT_HP0 + estimate_delays(model)
+"Throw an error when model is not a [`LinModel`](@ref)."
+function default_Hp(::SimModel)
+    throw(ArgumentError("Prediction horizon Hp must be explicitly specified if model is not a LinModel."))
+end
+
+"""
+    estimate_delays(model::LinModel)
+
+Estimate the number of delays in `model` with a security margin.
+"""
+function estimate_delays(model::LinModel)
     # TODO: also check for settling time (poles)
     # TODO: also check for non minimum phase systems (zeros)
     # TODO: replace sum with max delay between all the I/O
@@ -352,36 +331,10 @@ function default_Hp(model::LinModel, Hp)
     # atol=1e-3 to overestimate the number of delays : for closed-loop stability, it is
     # better to overestimate the default value of Hp, as a security margin.
     nk = sum(isapprox.(abs.(poles), 0.0, atol=1e-3)) # number of delays
-    if isnothing(Hp)
-        Hp = DEFAULT_HP0 + nk
-    end
-    if Hp ≤ nk
-        @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
-              "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
-    end
-    return Hp
+    return nk
 end
-
-"""
-    default_Hp(model::SimModel, Hp)
-
-Throw an error if `isnothing(Hp)` when model is not a [`LinModel`](@ref).
-"""
-function default_Hp(::SimModel, Hp)
-    if isnothing(Hp)
-        # TODO:
-        # ------------ will be deleted in the future ------------------------------------
-        Base.depwarn("Hp=nothing is deprecated for NonLinModel, explicitly specify an "*
-                     "integer value", :NonLinMPC)
-        Hp = DEFAULT_HP0
-        # ------------- and replaced by this -------------------------------------------
-        # throw(ArgumentError("Prediction horizon Hp must be explicitly specified if "*
-        #                     "model is not a LinModel."))
-        # Hp = 0
-        # -----------------------------------------------------------------------------
-    end
-    return Hp
-end
+"Return `0` when model is not a [`LinModel`](@ref)."
+estimate_delays(::SimModel) = 0
 
 """
     validate_args(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)

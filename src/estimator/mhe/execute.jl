@@ -93,21 +93,21 @@ Get additional info on `estim` [`MovingHorizonEstimator`](@ref) optimum for trou
 The function should be called after calling [`updatestate!`](@ref). It returns the
 dictionary `info` with the following fields:
 
-- `:Ŵ`   : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``.
-- `:x̂arr`: optimal estimated state at arrival, ``\mathbf{x̂}_k(k-N_k+1)``.
-- `:ϵ`   : optimal slack variable, ``ϵ``.
-- `:J`   : objective value optimum, ``J``.
-- `:X̂`   : optimal estimated states over ``N_k+1``, ``\mathbf{X̂}``.
-- `:x̂`   : optimal estimated state for the next time step, ``\mathbf{x̂}_k(k+1)``.
-- `:V̂`   : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``.
-- `:P̄`   : estimation error covariance at arrival, ``\mathbf{P̄}``.
-- `:x̄`   : optimal estimation error at arrival, ``\mathbf{x̄}``.
-- `:Ŷ`   : optimal estimated outputs over ``N_k``, ``\mathbf{Ŷ}``.
-- `:Ŷm`  : optimal estimated measured outputs over ``N_k``, ``\mathbf{Ŷ^m}``.
-- `:Ym`  : measured outputs over ``N_k``, ``\mathbf{Y^m}``.
-- `:U`   : manipulated inputs over ``N_k``, ``\mathbf{U}``.
-- `:D`   : measured disturbances over ``N_k``, ``\mathbf{D}``.
-- `:sol` : solution summary of the optimizer for printing.
+- `:Ŵ`   : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``
+- `:x̂arr`: optimal estimated state at arrival, ``\mathbf{x̂}_k(k-N_k+1)``
+- `:ϵ`   : optimal slack variable, ``ϵ``
+- `:J`   : objective value optimum, ``J``
+- `:X̂`   : optimal estimated states over ``N_k+1``, ``\mathbf{X̂}``
+- `:x̂`   : optimal estimated state for the next time step, ``\mathbf{x̂}_k(k+1)``
+- `:V̂`   : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``
+- `:P̄`   : estimation error covariance at arrival, ``\mathbf{P̄}``
+- `:x̄`   : optimal estimation error at arrival, ``\mathbf{x̄}``
+- `:Ŷ`   : optimal estimated outputs over ``N_k``, ``\mathbf{Ŷ}``
+- `:Ŷm`  : optimal estimated measured outputs over ``N_k``, ``\mathbf{Ŷ^m}``
+- `:Ym`  : measured outputs over ``N_k``, ``\mathbf{Y^m}``
+- `:U`   : manipulated inputs over ``N_k``, ``\mathbf{U}``
+- `:D`   : measured disturbances over ``N_k``, ``\mathbf{D}``
+- `:sol` : solution summary of the optimizer for printing
 
 # Examples
 ```jldoctest

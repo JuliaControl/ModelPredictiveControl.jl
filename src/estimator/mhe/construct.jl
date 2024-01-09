@@ -332,21 +332,15 @@ model augmentation and time-varying constraints.
     will not re-assign to its default value (defaults are set at construction only). The
     same applies for [`PredictiveController`](@ref).
 
-- `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints.
-- `x̂min = fill(-Inf,nx̂)`  : augmented state lower bounds ``\mathbf{x̂_{min}}``.
-- `x̂max = fill(+Inf,nx̂)`  : augmented state upper bounds ``\mathbf{x̂_{max}}``.
-- `ŵmin = fill(-Inf,nx̂)`  : augmented process noise lower bounds ``\mathbf{ŵ_{min}}``.
-- `ŵmax = fill(+Inf,nx̂)`  : augmented process noise upper bounds ``\mathbf{ŵ_{max}}``.
-- `v̂min = fill(-Inf,nym)` : sensor noise lower bounds ``\mathbf{v̂_{min}}``.
-- `v̂max = fill(+Inf,nym)` : sensor noise upper bounds ``\mathbf{v̂_{max}}``.
-- `c_x̂min = fill(0.0,nx̂)`  : `x̂min` softness weights ``\mathbf{c_{x̂_{min}}}``.
-- `c_x̂max = fill(0.0,nx̂)`  : `x̂max` softness weights ``\mathbf{c_{x̂_{max}}}``.
-- `c_ŵmin = fill(0.0,nx̂)`  : `ŵmin` softness weights ``\mathbf{c_{ŵ_{min}}}``.
-- `c_ŵmax = fill(0.0,nx̂)`  : `ŵmax` softness weights ``\mathbf{c_{ŵ_{max}}}``.
-- `c_v̂min = fill(0.0,nym)` : `v̂min` softness weights ``\mathbf{c_{v̂_{min}}}``.
-- `c_v̂max = fill(0.0,nym)` : `v̂max` softness weights ``\mathbf{c_{v̂_{max}}}``.
+- `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints
+- `x̂min=fill(-Inf,nx̂)` / `x̂max=fill(+Inf,nx̂)` : estimated state bound ``\mathbf{x̂_{min/max}}``
+- `ŵmin=fill(-Inf,nx̂)` / `ŵmax=fill(+Inf,nx̂)` : estimated process noise bound ``\mathbf{ŵ_{min/max}}``
+- `v̂min=fill(-Inf,nym)` / `v̂max=fill(+Inf,nym)` : estimated sensor noise bound ``\mathbf{v̂_{min/max}}``
+- `c_x̂min=fill(0.0,nx̂)` / `c_x̂max=fill(0.0,nx̂)` : `x̂min` / `x̂max` softness weight ``\mathbf{c_{x̂_{min/max}}}``
+- `c_ŵmin=fill(0.0,nx̂)` / `c_ŵmax=fill(0.0,nx̂)` : `ŵmin` / `ŵmax` softness weight ``\mathbf{c_{ŵ_{min/max}}}``
+- `c_v̂min=fill(0.0,nym)` / `c_v̂max=fill(0.0,nym)` : `v̂min` / `v̂max` softness weight ``\mathbf{c_{v̂_{min/max}}}``
 - all the keyword arguments above but with a first capital letter, e.g. `X̂max` or `C_ŵmax`:
-  for time-varying constraints (see Extended Help).
+  for time-varying constraints (see Extended Help)
 
 # Examples
 ```jldoctest
@@ -366,7 +360,6 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, 
 !!! details "Extended Help"
     Note that the state ``\mathbf{x̂}`` and process noise ``\mathbf{ŵ}`` constraints are 
     applied on the augmented model, detailed in [`SteadyKalmanFilter`](@ref) Extended Help. 
-
     For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
     that is, at runtime, except for `±Inf` bounds. Time-varying constraints over the
     estimation horizon ``H_e`` are also possible, mathematically defined as:

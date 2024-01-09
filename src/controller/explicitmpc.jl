@@ -40,7 +40,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         Cwt = Inf # no slack variable ϵ for ExplicitMPC
         Ewt = 0   # economic costs not supported for ExplicitMPC
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-        M_Hp, N_Hc, L_Hp = float(M_Hp), float(N_Hc), float(L_Hp) # debug julia 1.6
+        M_Hp, N_Hc, L_Hp = Diagonal{NT}(M_Hp), Diagonal{NT}(N_Hc), Diagonal{NT}(L_Hp) # debug julia 1.6
         # dummy vals (updated just before optimization):
         R̂y, R̂u = zeros(NT, ny*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
@@ -88,19 +88,11 @@ The controller minimizes the following objective function at each discrete time 
 
 See [`LinMPC`](@ref) for the variable definitions. This controller does not support
 constraints but the computational costs are extremely low (array division), therefore 
-suitable for applications that require small sample times. This method uses the default
-state estimator, a [`SteadyKalmanFilter`](@ref) with default arguments.
+suitable for applications that require small sample times. The keyword arguments are
+identical to [`LinMPC`](@ref), except for `Cwt` and `optim` which are not supported. 
 
-# Arguments
-- `model::LinModel` : model used for controller predictions and state estimations.
-- `Hp=10+nk`: prediction horizon ``H_p``, `nk` is the number of delays in `model`.
-- `Hc=2` : control horizon ``H_c``.
-- `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
-- `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
-- `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
-- `M_Hp` / `N_Hc` / `L_Hp` : diagonal matrices ``\mathbf{M}_{H_p}, \mathbf{N}_{H_c},
-  \mathbf{L}_{H_p}``, for time-varying weights (generated from `Mwt/Nwt/Lwt` args if omitted).
-- additional keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
+This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
+arguments.
 
 # Examples
 ```jldoctest
@@ -120,14 +112,14 @@ ExplicitMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimat
 """
 function ExplicitMPC(
     model::LinModel; 
-    Hp::Union{Int, Nothing} = nothing,
+    Hp::Int = default_Hp(model),
     Hc::Int = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, model.ny),
     Nwt = fill(DEFAULT_NWT, model.nu),
     Lwt = fill(DEFAULT_LWT, model.nu),
-    M_Hp = nothing,
-    N_Hc = nothing,
-    L_Hp = nothing,
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     kwargs...
 ) 
     estim = SteadyKalmanFilter(model; kwargs...)
@@ -158,20 +150,21 @@ ExplicitMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and
 """
 function ExplicitMPC(
     estim::SE;
-    Hp::Union{Int, Nothing} = nothing,
+    Hp::Int = default_Hp(estim.model),
     Hc::Int = DEFAULT_HC,
-    Mwt = fill(DEFAULT_MWT, estim.model.ny),
-    Nwt = fill(DEFAULT_NWT, estim.model.nu),
-    Lwt = fill(DEFAULT_LWT, estim.model.nu),
-    M_Hp = nothing,
-    N_Hc = nothing,
-    L_Hp = nothing
+    Mwt  = fill(DEFAULT_MWT, estim.model.ny),
+    Nwt  = fill(DEFAULT_NWT, estim.model.nu),
+    Lwt  = fill(DEFAULT_LWT, estim.model.nu),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
 ) where {NT<:Real, SE<:StateEstimator{NT}}
-    isa(estim.model, LinModel) || error("estim.model type must be LinModel") 
-    Hp = default_Hp(estim.model, Hp)
-    isnothing(M_Hp) && (M_Hp = Diagonal{NT}(repeat(Mwt, Hp)))
-    isnothing(N_Hc) && (N_Hc = Diagonal{NT}(repeat(Nwt, Hc)))
-    isnothing(L_Hp) && (L_Hp = Diagonal{NT}(repeat(Lwt, Hp)))
+    isa(estim.model, LinModel) || error("estim.model type must be a LinModel") 
+    nk = estimate_delays(estim.model)
+    if Hp ≤ nk
+        @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
+              "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
+    end
     return ExplicitMPC{NT, SE}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp)
 end
 

@@ -73,19 +73,19 @@ Get additional info about `mpc` [`PredictiveController`](@ref) optimum for troub
 The function should be called after calling [`moveinput!`](@ref). It returns the dictionary
 `info` with the following fields:
 
-- `:ΔU`  : optimal manipulated input increments over ``H_c``, ``\mathbf{ΔU}``.
-- `:ϵ`   : optimal slack variable, ``ϵ``.
-- `:J`   : objective value optimum, ``J``.
-- `:U`   : optimal manipulated inputs over ``H_p``, ``\mathbf{U}``.
-- `:u`   : current optimal manipulated input, ``\mathbf{u}(k)``.
-- `:d`   : current measured disturbance, ``\mathbf{d}(k)``.
-- `:D̂`   : predicted measured disturbances over ``H_p``, ``\mathbf{D̂}``.
-- `:ŷ`   : current estimated output, ``\mathbf{ŷ}(k)``.
-- `:Ŷ`   : optimal predicted outputs over ``H_p``, ``\mathbf{Ŷ}``.
-- `:x̂end`: optimal terminal states, ``\mathbf{x̂}_{k-1}(k+H_p)``.
-- `:Ŷs`  : predicted stochastic output over ``H_p`` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``.
-- `:R̂y`  : predicted output setpoint over ``H_p``, ``\mathbf{R̂_y}``.
-- `:R̂u`  : predicted manipulated input setpoint over ``H_p``, ``\mathbf{R̂_u}``.
+- `:ΔU`  : optimal manipulated input increments over ``H_c``, ``\mathbf{ΔU}``
+- `:ϵ`   : optimal slack variable, ``ϵ``
+- `:J`   : objective value optimum, ``J``
+- `:U`   : optimal manipulated inputs over ``H_p``, ``\mathbf{U}``
+- `:u`   : current optimal manipulated input, ``\mathbf{u}(k)``
+- `:d`   : current measured disturbance, ``\mathbf{d}(k)``
+- `:D̂`   : predicted measured disturbances over ``H_p``, ``\mathbf{D̂}``
+- `:ŷ`   : current estimated output, ``\mathbf{ŷ}(k)``
+- `:Ŷ`   : optimal predicted outputs over ``H_p``, ``\mathbf{Ŷ}``
+- `:x̂end`: optimal terminal states, ``\mathbf{x̂}_{k-1}(k+H_p)``
+- `:Ŷs`  : predicted stochastic output over ``H_p`` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``
+- `:R̂y`  : predicted output setpoint over ``H_p``, ``\mathbf{R̂_y}``
+- `:R̂u`  : predicted manipulated input setpoint over ``H_p``, ``\mathbf{R̂_u}``
 
 For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
 solution summary that can be printed. Lastly, the optimal economic cost `:JE` is also
