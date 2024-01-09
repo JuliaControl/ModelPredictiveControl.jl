@@ -124,8 +124,8 @@ for more detailed examples.
 - [x] moving horizon estimator in two formulations:
   - [x] linear plant models (quadratic optimization)
   - [x] nonlinear plant models (nonlinear optimization)
-- [x] moving horizon estimator constraints on:
+- [x] moving horizon estimator soft and hard constraints on:
   - [x] state estimates
   - [x] process noise estimates
   - [x] sensor noise estimates
-  - [ ] zero process noise equality constraint to reduce the problem size
+- [ ] moving horizon estimator with no process noise to reduce the problem size
