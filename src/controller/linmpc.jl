@@ -160,9 +160,9 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
     | ``\mathbf{U}``       | manipulated inputs over ``H_p``                          | `(nu*Hp,)`       |
     | ``\mathbf{R̂_y}``     | predicted output setpoints over ``H_p``                  | `(ny*Hp,)`       |
     | ``\mathbf{R̂_u}``     | predicted manipulated input setpoints over ``H_p``       | `(nu*Hp,)`       |
-    | ``\mathbf{M_{H_p}}`` | output setpoint tracking weights over ``H_p``            | `(ny*Hp, ny*Hp)` |
-    | ``\mathbf{N_{H_c}}`` | manipulated input increment weights over ``H_c``         | `(nu*Hc, nu*Hc)` |
-    | ``\mathbf{L_{H_p}}`` | manipulated input setpoint tracking weights over ``H_p`` | `(nu*Hp, nu*Hp)` |
+    | ``\mathbf{M}_{H_p}`` | output setpoint tracking weights over ``H_p``            | `(ny*Hp, ny*Hp)` |
+    | ``\mathbf{N}_{H_c}`` | manipulated input increment weights over ``H_c``         | `(nu*Hc, nu*Hc)` |
+    | ``\mathbf{L}_{H_p}`` | manipulated input setpoint tracking weights over ``H_p`` | `(nu*Hp, nu*Hp)` |
     | ``C``                | slack variable weight                                    | `()`             |
     | ``ϵ``                | slack variable for constraint softening                  | `()`             |
 """
