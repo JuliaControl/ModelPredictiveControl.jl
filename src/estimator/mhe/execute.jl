@@ -183,14 +183,30 @@ function add_data_windows!(estim::MovingHorizonEstimator, u, d, ym)
 end
 
 @doc raw"""
-    initpred!(estim::MovingHorizonEstimator, model::LinModel)
+    initpred!(estim::MovingHorizonEstimator, model::LinModel) -> nothing
 
-Init linear model prediction matrices `F, fx̄, H̃, q̃, p` for [`MovingHorizonEstimator`](@ref).
+Init quadratic optimization matrices `F, fx̄, H̃, q̃, p` for [`MovingHorizonEstimator`](@ref).
 
-Also init `estim.optim` objective function. See [`init_predmat_mhe`](@ref) for the 
-definition of the matrices. The Hessian ``H̃`` matrix of the quadratic general form is not
-constant here because of the time-varying ``\mathbf{P̄}`` weight (the estimation error 
-covariance at arrival).
+See [`init_predmat_mhe`](@ref) for the definition of the vectors ``\mathbf{F, f_x̄}``. It
+also inits `estim.optim` objective function, expressed as the quadratic general form:
+```math
+    J = \min_{\mathbf{Z̃}} \frac{1}{2}\mathbf{Z̃' H̃ Z̃} + \mathbf{q̃' Z̃} + p 
+```
+The Hessian ``\mathbf{H̃}`` matrix of the quadratic general form is not constant here because
+of the time-varying ``\mathbf{P̄}`` covariance . The matrices are computed with:
+```math
+\begin{aligned}
+    \mathbf{F}       &= \mathbf{G U} + \mathbf{J D} + \mathbf{Y^m} \\
+    \mathbf{f_x̄}     &= \mathbf{x̂}_{k-N_k}(k-N_k+1) \\
+    \mathbf{F_Z̃}     &= [\begin{smallmatrix}\mathbf{f_x̄} \\ \mathbf{F} \end{smallmatrix}] \\
+    \mathbf{Ẽ_Z̃}     &= [\begin{smallmatrix}\mathbf{ẽ_x̄} \\ \mathbf{Ẽ} \end{smallmatrix}] \\
+    \mathbf{M}_{N_k} &= \mathrm{diag}(\mathbf{P̄}^{-1}, \mathbf{R̂}_{N_k}^{-1}) \\
+    \mathbf{Ñ}_{N_k} &= \mathrm{diag}(C,  \mathbf{0},  \mathbf{Q̂}_{N_k}^{-1}) \\
+    \mathbf{H̃}       &= 2(\mathbf{Ẽ_Z̃}' \mathbf{M}_{N_k} \mathbf{Ẽ_Z̃} + \mathbf{Ñ}_{N_k}) \\
+    \mathbf{q̃}       &= 2(\mathbf{M}_{N_k} \mathbf{Ẽ_Z̃})' \mathbf{F_Z̃} \\
+            p        &= \mathbf{F_Z̃}' \mathbf{M}_{N_k} \mathbf{F_Z̃}
+\end{aligned}
+```
 """
 function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     C, optim = estim.C, estim.optim
@@ -205,14 +221,14 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     end
     estim.fx̄[:] = estim.x̂arr_old
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
-    Ẽ = @views [estim.ẽx̄[:, 1:nZ̃]; estim.Ẽ[1:nYm, 1:nZ̃]]
-    F = @views [estim.fx̄; estim.F[1:nYm]]
+    ẼZ̃ = @views [estim.ẽx̄[:, 1:nZ̃]; estim.Ẽ[1:nYm, 1:nZ̃]]
+    FZ̃ = @views [estim.fx̄; estim.F[1:nYm]]
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
-    M = [estim.invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
-    Ñ = [fill(C, nϵ, nϵ) zeros(nϵ, nx̂+nŴ); zeros(nx̂, nϵ+nx̂+nŴ); zeros(nŴ, nϵ+nx̂) invQ̂_Nk]
-    estim.q̃[1:nZ̃] = 2(M*Ẽ)'*F
-    estim.p[] = dot(F, M, F)
-    estim.H̃.data[1:nZ̃, 1:nZ̃] = 2*(Ẽ'*M*Ẽ + Ñ)
+    M_Nk = [estim.invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
+    Ñ_Nk = [fill(C, nϵ, nϵ) zeros(nϵ, nx̂+nŴ); zeros(nx̂, nϵ+nx̂+nŴ); zeros(nŴ, nϵ+nx̂) invQ̂_Nk]
+    estim.q̃[1:nZ̃] = 2(M_Nk*ẼZ̃)'*FZ̃
+    estim.p[] = dot(FZ̃, M_Nk, FZ̃)
+    estim.H̃.data[1:nZ̃, 1:nZ̃] = 2*(ẼZ̃'*M_Nk*ẼZ̃ + Ñ_Nk)
     Z̃var_Nk::Vector{VariableRef} = @views optim[:Z̃var][1:nZ̃]
     H̃_Nk = @views estim.H̃[1:nZ̃,1:nZ̃]
     q̃_Nk = @views estim.q̃[1:nZ̃]
@@ -227,7 +243,8 @@ initpred!(::MovingHorizonEstimator, ::SimModel) = nothing
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MHE.
 
-Also init ``\mathbf{F_x̂}`` vector for the state constraints, see [`init_predmat_mhe`](@ref).
+Also init ``\mathbf{F_x̂ = G_x̂ U + J_x̂ D}`` vector for the state constraints, see 
+[`init_predmat_mhe`](@ref).
 """
 function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
     estim.con.Fx̂[:] = estim.con.Gx̂*estim.U

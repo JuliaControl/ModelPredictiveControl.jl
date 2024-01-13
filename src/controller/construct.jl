@@ -523,16 +523,21 @@ end
 @doc raw"""
     init_quadprog(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> H̃, q̃, p
 
-Init the quadratic programming optimization matrix `H̃` and `q̃` for MPC.
+Init the quadratic programming optimization matrix `H̃` and `q̃` and scalar `p` for MPC.
 
 The matrices appear in the quadratic general form :
 ```math
     J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'H̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
 ```
-``\mathbf{H̃}`` is constant if the model and weights are linear and time invariant (LTI). The 
-vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k``. ``p``
-does not impact the minima position. It is thus useless at optimization but required to 
-evaluate the minimal ``J`` value.
+The Hessian matrix is constant if the model and weights are linear and time invariant (LTI): 
+```math
+    \mathbf{H̃} = 2 (  \mathbf{Ẽ}'\mathbf{M}_{H_p}\mathbf{Ẽ} + \mathbf{Ñ}_{H_c} 
+                    + \mathbf{S̃}'\mathbf{L}_{H_p}\mathbf{S̃} )
+```
+The vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k`` (init
+with zeros, the method [`initpred!`](@ref) compute the real values). ``p`` does not impact
+the minima position. It is thus useless at optimization but required to evaluate the minimal
+``J`` value.
 """
 function init_quadprog(::LinModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
     H̃ = Hermitian(convert(Matrix{NT}, 2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃)), :L)

@@ -11,6 +11,12 @@ ModelPredictiveControl.f̂
 ModelPredictiveControl.ĥ
 ```
 
+## Constraint Relaxation
+
+```@docs
+
+```
+
 ## Estimator Construction
 
 ```@docs
@@ -20,21 +26,17 @@ ModelPredictiveControl.augment_model
 ModelPredictiveControl.init_ukf
 ModelPredictiveControl.init_internalmodel
 ModelPredictiveControl.init_predmat_mhe
-ModelPredictiveControl.init_matconstraint_mhe
-```
-
-## Constraint Relaxation
-
-```@docs
 ModelPredictiveControl.relaxarrival
 ModelPredictiveControl.relaxX̂
 ModelPredictiveControl.relaxŴ
 ModelPredictiveControl.relaxV̂
+ModelPredictiveControl.init_matconstraint_mhe
 ```
 
-## Constraints
+## Update Quadratic Optimization
 
 ```@docs
+ModelPredictiveControl.initpred!(::MovingHorizonEstimator, ::LinModel)
 ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel)
 ```
 

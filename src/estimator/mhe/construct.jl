@@ -777,9 +777,9 @@ end
 
 Construct the MHE prediction matrices for [`LinModel`](@ref) `model`.
 
-Introducing the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂}_k(k-H_e+1) 
+Introducing the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂}_k(k-N_k+1) 
 \\ \mathbf{Ŵ} \end{smallmatrix}]`` with the decision variables, the estimated sensor
-noises from time ``k-H_e+1`` to ``k`` are computed by:
+noises from time ``k-N_k+1`` to ``k`` are computed by:
 ```math
 \begin{aligned}
 \mathbf{V̂} = \mathbf{Y^m - Ŷ^m} &= \mathbf{E Z + G U + J D + Y^m}     \\
@@ -787,20 +787,19 @@ noises from time ``k-H_e+1`` to ``k`` are computed by:
 \end{aligned}
 ```
 in which ``\mathbf{U, D}`` and ``\mathbf{Y^m}`` contains respectively the manipulated
-inputs, measured disturbances and measured outputs from time ``k-H_e+1`` to ``k``. The
+inputs, measured disturbances and measured outputs from time ``k-N_k+1`` to ``k``. The
 method also returns similar matrices but for the estimation error at arrival:
 ```math
-\mathbf{x̄} = \mathbf{x̂}_{k-H_e}(k-H_e+1) - \mathbf{x̂}_{k}(k-H_e+1) = \mathbf{e_x̄ Z + f_x̄}
+\mathbf{x̄} = \mathbf{x̂}_{k-N_k}(k-N_k+1) - \mathbf{x̂}_{k}(k-N_k+1) = \mathbf{e_x̄ Z + f_x̄}
 ```
-Lastly, the estimated states from time ``k-H_e+2`` to ``k+1`` are given by the equation:
+Lastly, the estimated states from time ``k-N_k+2`` to ``k+1`` are given by the equation:
 ```math
 \begin{aligned}
 \mathbf{X̂}  &= \mathbf{E_x̂ Z + G_x̂ U + J_x̂ D} \\
             &= \mathbf{E_x̂ Z + F_x̂}
 \end{aligned}
 ```
-All these equations omit the operating points ``\mathbf{u_{op}, y_{op}, d_{op}}``. These
-matrices are truncated when ``N_k < H_e`` (at the beginning).
+All these equations omit the operating points ``\mathbf{u_{op}, y_{op}, d_{op}}``.
 
 # Extended Help
 !!! details "Extended Help"
@@ -850,6 +849,7 @@ matrices are truncated when ``N_k < H_e`` (at the beginning).
         \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix}
     \end{aligned}
     ```
+    All these matrices are truncated when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d) where {NT<:Real}
     nu, nd = model.nu, model.nd

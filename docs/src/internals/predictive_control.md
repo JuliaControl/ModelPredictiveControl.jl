@@ -12,24 +12,20 @@ The prediction methodology of this module is mainly based on Maciejowski textboo
 ## Controller Construction
 
 ```@docs
-ModelPredictiveControl.init_predmat
 ModelPredictiveControl.init_ΔUtoU
+ModelPredictiveControl.init_predmat
+ModelPredictiveControl.relaxU
+ModelPredictiveControl.relaxΔU
+ModelPredictiveControl.relaxŶ
+ModelPredictiveControl.relaxterminal
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
 ModelPredictiveControl.init_matconstraint_mpc
 ```
 
-## Constraint Relaxation
+## Update Quadratic Optimization
 
 ```@docs
-ModelPredictiveControl.relaxU
-ModelPredictiveControl.relaxΔU
-ModelPredictiveControl.relaxŶ
-ModelPredictiveControl.relaxterminal
-```
-
-## Constraints
-
-```@docs
+ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any, ::Any)
 ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel)
 ```

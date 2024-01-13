@@ -135,11 +135,21 @@ end
 
 
 @doc raw"""
-    initpred!(mpc, model::LinModel, d, ym, D̂, R̂y, R̂u)
+    initpred!(mpc, model::LinModel, d, ym, D̂, R̂y, R̂u) -> nothing
 
 Init linear model prediction matrices `F, q̃, p` and current estimated output `ŷ`.
 
 See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
+They are computed with:
+```math
+\begin{aligned}
+    \mathbf{F}   &= \mathbf{G d}(k) + \mathbf{J D̂} + \mathbf{K x̂}_{k-1}(k) + \mathbf{V u}(k-1) \\
+    \mathbf{C_y} &= \mathbf{F}                 - \mathbf{R̂_y} \\
+    \mathbf{C_u} &= \mathbf{T} \mathbf{u}(k-1) - \mathbf{R̂_u} \\
+    \mathbf{q̃}   &= 2[(\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}] \\
+            p    &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
+\end{aligned}
+```
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u)
     mpc.ŷ[:] = evalŷ(mpc.estim, ym, d)
@@ -151,15 +161,15 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
         mpc.F[:]  = mpc.F  + mpc.G  * mpc.d0 + mpc.J  * mpc.D̂0
     end
     mpc.R̂y[:] = R̂y
-    Ẑ = mpc.F - mpc.R̂y
-    mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*Ẑ
-    mpc.p[]  = dot(Ẑ, mpc.M_Hp, Ẑ)
+    C_y = mpc.F - mpc.R̂y
+    mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*C_y
+    mpc.p[]  = dot(C_y, mpc.M_Hp, C_y)
     if ~mpc.noR̂u
         mpc.R̂u[:] = R̂u
         lastu = mpc.estim.lastu0 + model.uop
-        Ẑ = mpc.T*lastu - mpc.R̂u
-        mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.S̃)'*Ẑ
-        mpc.p[]  = mpc.p[] + dot(Ẑ, mpc.L_Hp, Ẑ)
+        C_u = mpc.T*lastu - mpc.R̂u
+        mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.S̃)'*C_u
+        mpc.p[]  = mpc.p[] + dot(C_y, mpc.L_Hp, C_u)
     end
     return nothing
 end
@@ -216,7 +226,8 @@ predictstoch!(::PredictiveController, ::StateEstimator, _ , _ ) = nothing
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 
-Also init ``\mathbf{f_x̂}`` vector for the terminal constraints, see [`init_predmat`](@ref).
+Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} + \mathbf{k_x̂ x̂}_{k-1}(k) + \mathbf{v_x̂ u}(k-1)``
+vector for the terminal constraints, see [`init_predmat`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
     mpc.con.fx̂[:] = mpc.con.kx̂ * mpc.estim.x̂  + mpc.con.vx̂ * mpc.estim.lastu0
