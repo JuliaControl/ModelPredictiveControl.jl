@@ -1,8 +1,8 @@
 sys = [ 
-    tf(1.90, [18, 1]) tf(1.90, [18, 1]);
-    tf(-0.74,[8, 1])  tf(0.74, [8, 1]) 
+    tf(1.90, [1800, 1]) tf(1.90, [1800, 1]);
+    tf(-0.74,[800, 1])  tf(0.74, [800, 1]) 
 ]
-Ts = 4.0
+Ts = 400.0
 model = setop!(LinModel(sys, Ts), uop=[10, 10], yop=[50, 30])
 y = model()
 
@@ -74,7 +74,7 @@ initstate!(nmpc_im, nlmodel.uop, y)
 u = nmpc_im([55, 30], ym=y)
 sim!(nmpc_im, 3, [55, 30])
 
-nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=10), ymin=[45, -Inf])
+nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=1e3), ymin=[45, -Inf])
 initstate!(nmpc_ukf, nlmodel.uop, y)
 u = nmpc_ukf([55, 30])
 sim!(nmpc_ukf, 3, [55, 30])

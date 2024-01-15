@@ -276,7 +276,7 @@ Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
 function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
     # --- variables and linear constraints ---
-    con = mpc.con
+    C, con = mpc.C, mpc.con
     nΔŨ = length(mpc.ΔŨ)
     set_silent(optim)
     limit_solve_time(mpc.optim, mpc.estim.model.Ts)
@@ -285,6 +285,14 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- nonlinear optimization init ---
+    if !isinf(C) && solver_name(optim) == "Ipopt"
+        try
+            get_attribute(optim, "nlp_scaling_max_gradient")
+        catch
+            # default "nlp_scaling_max_gradient" to `10.0/C` if not already set:
+            set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
+        end
+    end
     model = mpc.estim.model
     ny, nx̂, Hp, ng = model.ny, mpc.estim.nx̂, mpc.Hp, length(con.i_g)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs

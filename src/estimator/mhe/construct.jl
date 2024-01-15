@@ -964,10 +964,9 @@ Init the nonlinear optimization of [`MovingHorizonEstimator`](@ref).
 function init_optimization!(
     estim::MovingHorizonEstimator, model::SimModel, optim::JuMP.GenericModel{JNT},
 ) where JNT<:Real
-    He, con = estim.He, estim.con
-    nV̂, nX̂, ng = He*estim.nym, He*estim.nx̂, length(con.i_g)
-    # --- variables and linear constraints ---
+    C, con = estim.C, estim.con
     nZ̃ = length(estim.Z̃)
+    # --- variables and linear constraints ---
     set_silent(optim)
     limit_solve_time(estim.optim, estim.model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
@@ -975,6 +974,16 @@ function init_optimization!(
     b = estim.con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
     # --- nonlinear optimization init ---
+    if !isinf(C) && solver_name(optim) == "Ipopt"
+        try
+            get_attribute(optim, "nlp_scaling_max_gradient")
+        catch
+            # default "nlp_scaling_max_gradient" to `10.0/C` if not already set:
+            set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
+        end
+    end
+    He = estim.He
+    nV̂, nX̂, ng = He*estim.nym, He*estim.nx̂, length(con.i_g)
     # see init_optimization!(mpc::NonLinMPC, optim) for details on the inspiration
     Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃ , nV̂=nV̂, nX̂=nX̂, ng=ng
         last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
