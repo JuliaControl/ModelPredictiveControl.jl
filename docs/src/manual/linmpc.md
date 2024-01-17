@@ -140,12 +140,12 @@ Lastly, we plot the closed-loop test with the `Plots` package:
 using Plots
 function plot_data(t_data, u_data, y_data, ry_data)
     p1 = plot(t_data, y_data[1,:], label="meas."); ylabel!("level")
-    plot!(t_data, ry_data[1,:], label="setpoint", linestyle=:dash, linetype=:steppost)
-    plot!(t_data, fill(45,size(t_data)), label="min", linestyle=:dot, linewidth=1.5)
+    plot!(p1, t_data, ry_data[1,:], label="setpoint", linestyle=:dash, linetype=:steppost)
+    plot!(p1, t_data, fill(45,size(t_data)), label="min", linestyle=:dot, linewidth=1.5)
     p2 = plot(t_data, y_data[2,:], label="meas.", legend=:topleft); ylabel!("temp.")
-    plot!(t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
+    plot!(p2, t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
     p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost); ylabel!("flow rate")
-    plot!(t_data,u_data[2,:],label="hot", linetype=:steppost); xlabel!("time (s)")
+    plot!(p3, t_data,u_data[2,:],label="hot", linetype=:steppost); xlabel!("time (s)")
     return plot(p1, p2, p3, layout=(3,1))
 end
 plot_data(t_data, u_data, y_data, ry_data)
