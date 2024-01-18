@@ -192,9 +192,10 @@ also inits `estim.optim` objective function, expressed as the quadratic general 
 ```math
     J = \min_{\mathbf{Z̃}} \frac{1}{2}\mathbf{Z̃' H̃ Z̃} + \mathbf{q̃' Z̃} + p 
 ```
-in which ``\mathbf{Z̃} = [\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``. The
+in which ``\mathbf{Z̃} = [\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``. Note that
+``p`` is useless at optimization but required to evaluate the objective minima ``J``. The 
 Hessian ``\mathbf{H̃}`` matrix of the quadratic general form is not constant here because
-of the time-varying ``\mathbf{P̄}`` covariance . The computations are:
+of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
 ```math
 \begin{aligned}
     \mathbf{F}       &= \mathbf{G U} + \mathbf{J D} + \mathbf{Y^m} \\

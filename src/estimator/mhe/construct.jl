@@ -250,11 +250,15 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     state and sensor noise).
 
     For [`LinModel`](@ref), the optimization is treated as a quadratic program with a
-    time-varying Hessian, which is generally cheaper than nonlinear programming. For 
-    [`NonLinModel`](@ref), the optimization relies on automatic differentiation (AD).
+    time-varying Hessian, which is generally cheaper than nonlinear programming.
+    
+    For [`NonLinModel`](@ref), the optimization relies on automatic differentiation (AD).
     Optimizers generally benefit from exact derivatives like AD. However, the `f` and `h` 
     functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
-    for common mistakes when writing these functions.
+    for common mistakes when writing these functions. 
+        
+    Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
+    `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
 """
 function MovingHorizonEstimator(
     model::SM;
