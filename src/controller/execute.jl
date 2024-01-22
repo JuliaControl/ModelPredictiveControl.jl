@@ -271,9 +271,9 @@ The method mutates `Ŷ` and `x̂` vector arguments. The `x̂end` vector is used
 the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``.
 """
 function predict!(Ŷ, x̂, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{NT}) where {NT<:Real}
-     # in-place operations to reduce allocations :
-    Ŷ[:] = mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F
-    x̂[:] = mul!(x̂, mpc.con.ẽx̂, ΔŨ) + mpc.con.fx̂
+    # in-place operations to reduce allocations :
+    Ŷ .= mul!(Ŷ, mpc.Ẽ, ΔŨ) .+ mpc.F
+    x̂ .= mul!(x̂, mpc.con.ẽx̂, ΔŨ) .+ mpc.con.fx̂
     x̂end = x̂
     return Ŷ, x̂end
 end
@@ -285,18 +285,18 @@ Compute both vectors if `model` is not a [`LinModel`](@ref).
 """
 function predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{NT}) where {NT<:Real}
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
-    x̂[:] = mpc.estim.x̂
+    x̂ .= mpc.estim.x̂
     u0::Vector{NT} = copy(mpc.estim.lastu0)
     d0 = @views mpc.d0[1:end]
     for j=1:Hp
         if j ≤ Hc
-            u0[:] = @views u0 + ΔŨ[(1 + nu*(j-1)):(nu*j)]
+            u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
         end
         x̂[:]  = f̂(mpc.estim, model, x̂, u0, d0)
         d0    = @views mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
         Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, model, x̂, d0)
     end
-    Ŷ[:] = Ŷ + mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
+    Ŷ .= Ŷ .+ mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
     x̂end = x̂
     return Ŷ, x̂end
 end
