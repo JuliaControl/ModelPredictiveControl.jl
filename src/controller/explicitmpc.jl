@@ -190,15 +190,13 @@ Analytically solve the optimization problem for [`ExplicitMPC`](@ref).
 
 The solution is ``\mathbf{ΔŨ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref).
 """
-function optim_objective!(mpc::ExplicitMPC)
-    return lmul!(-1, ldiv!(mpc.ΔŨ, mpc.H̃_chol, mpc.q̃))
-end
+optim_objective!(mpc::ExplicitMPC) = lmul!(-1, ldiv!(mpc.ΔŨ, mpc.H̃_chol, mpc.q̃))
 
 "Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
 function predict!(Ŷ, x̂, mpc::ExplicitMPC, ::LinModel, ΔŨ::Vector{NT}) where {NT<:Real}
     # in-place operations to reduce allocations :
-    mul!(Ŷ, mpc.Ẽ, ΔŨ) + mpc.F
-    x̂[:] .= NaN
+    Ŷ .= mul!(Ŷ, mpc.Ẽ, ΔŨ) .+ mpc.F
+    x̂ .= NaN
     return Ŷ, x̂
 end
 
