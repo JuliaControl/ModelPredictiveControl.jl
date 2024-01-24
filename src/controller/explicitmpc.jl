@@ -186,6 +186,8 @@ end
 linconstraint!(::ExplicitMPC, ::LinModel) = nothing
 
 @doc raw"""
+    optim_objective!(mpc::ExplicitMPC) -> ΔŨ
+
 Analytically solve the optimization problem for [`ExplicitMPC`](@ref).
 
 The solution is ``\mathbf{ΔŨ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref).

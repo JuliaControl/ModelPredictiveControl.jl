@@ -29,3 +29,9 @@ ModelPredictiveControl.init_matconstraint_mpc
 ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any, ::Any)
 ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel)
 ```
+
+## Solve Optimization Problem
+
+```@docs
+ModelPredictiveControl.optim_objective!
+```

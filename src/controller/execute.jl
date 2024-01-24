@@ -359,10 +359,27 @@ function obj_nonlinprog(
     return JR̂y + JΔŨ + JR̂u + E_JE
 end
 
-"""
-    optim_objective!(mpc::PredictiveController)
+@doc raw"""
+    optim_objective!(mpc::PredictiveController) -> ΔŨ
 
-Optimize the objective function ``J`` of `mpc` controller and return the solution `ΔŨ`.
+Optimize the objective function of `mpc` [`PredictiveController`](@ref) and return the solution `ΔŨ`.
+
+If supported by `mpc.optim`, it warm-starts the solver at:
+```math
+\mathbf{ΔŨ} = 
+\begin{bmatrix}
+    \mathbf{Δu}_{k-1}(k+0)      \\ 
+    \mathbf{Δu}_{k-1}(k+1)      \\ 
+    \vdots                      \\
+    \mathbf{Δu}_{k-1}(k+H_c-2)  \\
+    \mathbf{0}                  \\
+    ϵ_{k-1}
+\end{bmatrix}
+```
+where ``\mathbf{Δu}_{k-1}(k+j)`` is the input increment for time ``k+j`` computed at the 
+last control period ``k-1``. It then calls `JuMP.optimize!(mpc.optim)` and extract the
+solution. A failed optimization prints an `@error` log in the REPL and returns the 
+warm-start value.
 """
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     optim = mpc.optim
