@@ -104,8 +104,8 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 """
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
-    Ŷ, x̂    = similar(mpc.Ŷop), similar(mpc.estim.x̂)
-    Ŷ, x̂end = predict!(Ŷ, x̂, mpc, mpc.estim.model, mpc.ΔŨ)
+    Ŷ, x̂, u0    = similar(mpc.Ŷop), similar(mpc.estim.x̂), similar(mpc.estim.lastu0)
+    Ŷ, x̂end     = predict!(Ŷ, x̂, u0, mpc, mpc.estim.model, mpc.ΔŨ)
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]    = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
     info[:J]    = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ)
@@ -263,14 +263,16 @@ function linconstraint!(mpc::PredictiveController, model::SimModel)
 end
 
 @doc raw"""
-    predict!(Ŷ, x̂, mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ, x̂end
+    predict!(Ŷ, x̂, _ , mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ, x̂end
 
 Compute the predictions `Ŷ` and terminal states `x̂end` if model is a [`LinModel`](@ref).
 
 The method mutates `Ŷ` and `x̂` vector arguments. The `x̂end` vector is used for
 the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``.
 """
-function predict!(Ŷ, x̂, mpc::PredictiveController, ::LinModel, ΔŨ::Vector{NT}) where {NT<:Real}
+function predict!(
+    Ŷ, x̂, _ , mpc::PredictiveController, ::LinModel, ΔŨ::Vector{NT}
+) where {NT<:Real}
     # in-place operations to reduce allocations :
     Ŷ .= mul!(Ŷ, mpc.Ẽ, ΔŨ) .+ mpc.F
     x̂ .= mul!(x̂, mpc.con.ẽx̂, ΔŨ) .+ mpc.con.fx̂
@@ -279,14 +281,19 @@ function predict!(Ŷ, x̂, mpc::PredictiveController, ::LinModel, ΔŨ::Vector
 end
 
 @doc raw"""
-    predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ, x̂end
+    predict!(Ŷ, x̂, u0, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ, x̂end
 
-Compute both vectors if `model` is not a [`LinModel`](@ref).
+Compute both vectors if `model` is not a [`LinModel`](@ref). 
+    
+The method mutates `Ŷ`, `x̂` and `u0` arguments. The latter is the manipulated input without
+the operating points ``\mathbf{u_0}(k) = \mathbf{u}(k) - \mathbf{u_{op}}(k)``.
 """
-function predict!(Ŷ, x̂, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{NT}) where {NT<:Real}
+function predict!(
+    Ŷ, x̂, u0, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{NT}
+) where {NT<:Real}
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
-    x̂ .= mpc.estim.x̂
-    u0::Vector{NT} = copy(mpc.estim.lastu0)
+    x̂  .= mpc.estim.x̂
+    u0 .= mpc.estim.lastu0
     d0 = @views mpc.d0[1:end]
     for j=1:Hp
         if j ≤ Hc
