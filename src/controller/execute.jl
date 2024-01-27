@@ -106,10 +106,13 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
     Ŷ, x̂, u0    = similar(mpc.Ŷop), similar(mpc.estim.x̂), similar(mpc.estim.lastu0)
     Ŷ, x̂end     = predict!(Ŷ, x̂, u0, mpc, mpc.estim.model, mpc.ΔŨ)
+    U           = mpc.S̃*mpc.ΔŨ + mpc.T*(mpc.estim.lastu0 + mpc.estim.model.uop)
+    Ȳ, Ū        = similar(Ŷ), similar(U)
+    J           = obj_nonlinprog!(Ȳ, Ū, mpc, mpc.estim.model, Ŷ, mpc.ΔŨ)
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]    = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
-    info[:J]    = obj_nonlinprog(mpc, mpc.estim.model, Ŷ, mpc.ΔŨ)
-    info[:U]    = mpc.S̃*mpc.ΔŨ + mpc.T*(mpc.estim.lastu0 + mpc.estim.model.uop)
+    info[:J]    = J
+    info[:U]    = U
     info[:u]    = info[:U][1:mpc.estim.model.nu]
     info[:d]    = mpc.d0 + mpc.estim.model.dop
     info[:D̂]    = mpc.D̂0 + mpc.Dop
@@ -309,16 +312,17 @@ function predict!(
 end
 
 """
-    obj_nonlinprog(mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ)
+    obj_nonlinprog!(_ , _ , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ)
 
 Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
 
 The function is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
 also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
-at specific input increments `ΔŨ` and predictions `Ŷ` values.
+at specific input increments `ΔŨ` and predictions `Ŷ` values. This method does not mutate
+its argument.
 """
-function obj_nonlinprog(
-    mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
+function obj_nonlinprog!(
+    _ , _ , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
 ) where {NT<:Real}
     J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
     if !iszero(mpc.E)
@@ -331,17 +335,18 @@ function obj_nonlinprog(
 end
 
 """
-    obj_nonlinprog(mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ)
+    obj_nonlinprog!(Ȳ, Ū. mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ)
 
 Nonlinear programming objective function when `model` is not a [`LinModel`](@ref). The
-function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
+function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
+`Ȳ` and `Ū` vector arguments (output and input setpoint tracking error, respectively).
 """
-function obj_nonlinprog(
-    mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{NT}
+function obj_nonlinprog!(
+    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{NT}
 ) where {NT<:Real}
     # --- output setpoint tracking term ---
-    êy = mpc.R̂y - Ŷ
-    JR̂y = dot(êy, mpc.M_Hp, êy)
+    Ȳ  .= mpc.R̂y .- Ŷ
+    JR̂y = dot(Ȳ, mpc.M_Hp, Ȳ)
     # --- move suppression and slack variable term ---
     JΔŨ = dot(ΔŨ, mpc.Ñ_Hc, ΔŨ)
     # --- input over prediction horizon ---
@@ -350,8 +355,8 @@ function obj_nonlinprog(
     end
     # --- input setpoint tracking term ---
     if !mpc.noR̂u
-        êu = mpc.R̂u - U
-        JR̂u = dot(êu, mpc.L_Hp, êu)
+        Ū  .= mpc.R̂u .- U
+        JR̂u = dot(Ū, mpc.L_Hp, Ū)
     else
         JR̂u = 0.0
     end
