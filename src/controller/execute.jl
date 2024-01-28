@@ -104,11 +104,11 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 """
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
-    Ŷ, x̂, u0    = similar(mpc.Ŷop), similar(mpc.estim.x̂), similar(mpc.estim.lastu0)
-    Ŷ, x̂end     = predict!(Ŷ, x̂, u0, mpc, mpc.estim.model, mpc.ΔŨ)
+    Ŷ, x̂, u     = similar(mpc.Ŷop), similar(mpc.estim.x̂), similar(mpc.estim.lastu0)
+    Ŷ, x̂end     = predict!(Ŷ, x̂, u, mpc, mpc.estim.model, mpc.ΔŨ)
     U           = mpc.S̃*mpc.ΔŨ + mpc.T*(mpc.estim.lastu0 + mpc.estim.model.uop)
     Ȳ, Ū        = similar(Ŷ), similar(U)
-    J           = obj_nonlinprog!(Ȳ, Ū, mpc, mpc.estim.model, Ŷ, mpc.ΔŨ)
+    J           = obj_nonlinprog!(Ȳ, Ū, u, mpc, mpc.estim.model, Ŷ, mpc.ΔŨ)
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
     info[:ϵ]    = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
     info[:J]    = J
@@ -284,20 +284,20 @@ function predict!(
 end
 
 @doc raw"""
-    predict!(Ŷ, x̂, u0, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ, x̂end
+    predict!(Ŷ, x̂, u, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ, x̂end
 
 Compute both vectors if `model` is not a [`LinModel`](@ref). 
     
-The method mutates `Ŷ`, `x̂` and `u0` arguments. The latter is the manipulated input without
-the operating points ``\mathbf{u_0}(k) = \mathbf{u}(k) - \mathbf{u_{op}}(k)``.
+The method mutates `Ŷ`, `x̂` and `u` arguments.
 """
 function predict!(
-    Ŷ, x̂, u0, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{NT}
+    Ŷ, x̂, u, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{NT}
 ) where {NT<:Real}
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
+    u0 = u
     x̂  .= mpc.estim.x̂
     u0 .= mpc.estim.lastu0
-    d0 = @views mpc.d0[1:end]
+    d0  = @views mpc.d0[1:end]
     for j=1:Hp
         if j ≤ Hc
             u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
@@ -312,21 +312,23 @@ function predict!(
 end
 
 """
-    obj_nonlinprog!(_ , _ , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ)
+    obj_nonlinprog!( _ , _ , u , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ)
 
 Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
 
 The function is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
 also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
-at specific input increments `ΔŨ` and predictions `Ŷ` values. This method does not mutate
-its argument.
+at specific input increments `ΔŨ` and predictions `Ŷ` values. This method mutate `u` 
+argument.
 """
 function obj_nonlinprog!(
-    _ , _ , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
+    _ , _ , u , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
 ) where {NT<:Real}
     J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
     if !iszero(mpc.E)
-        U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
+        lastu  = u
+        lastu .= mpc.estim.lastu0 .+ model.uop
+        U = mpc.S̃*ΔŨ + mpc.T*lastu
         UE = [U; U[(end - model.nu + 1):end]]
         ŶE = [mpc.ŷ; Ŷ]
         J += mpc.E*mpc.JE(UE, ŶE, mpc.D̂E)
@@ -335,14 +337,14 @@ function obj_nonlinprog!(
 end
 
 """
-    obj_nonlinprog!(Ȳ, Ū. mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ)
+    obj_nonlinprog!(Ȳ, Ū, u, mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ)
 
 Nonlinear programming objective function when `model` is not a [`LinModel`](@ref). The
 function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
 `Ȳ` and `Ū` vector arguments (output and input setpoint tracking error, respectively).
 """
 function obj_nonlinprog!(
-    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{NT}
+    Ȳ, Ū, u, mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{NT}
 ) where {NT<:Real}
     # --- output setpoint tracking term ---
     Ȳ  .= mpc.R̂y .- Ŷ
@@ -351,7 +353,9 @@ function obj_nonlinprog!(
     JΔŨ = dot(ΔŨ, mpc.Ñ_Hc, ΔŨ)
     # --- input over prediction horizon ---
     if !mpc.noR̂u || !iszero(mpc.E)
-        U = mpc.S̃*ΔŨ + mpc.T*(mpc.estim.lastu0 + model.uop)
+        lastu  = u
+        lastu .= mpc.estim.lastu0 .+ model.uop
+        U = mpc.S̃*ΔŨ + mpc.T*lastu
     end
     # --- input setpoint tracking term ---
     if !mpc.noR̂u
