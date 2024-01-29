@@ -182,7 +182,10 @@ The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\
 function update_estimate!(estim::SteadyKalmanFilter, u, ym, d=empty(estim.x̂))
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K̂ = estim.x̂, estim.K̂
-    x̂[:] = Â*x̂ + B̂u*u + B̂d*d + K̂*(ym - Ĉm*x̂ - D̂dm*d)
+    v̂, x̂LHS = similar(ym), similar(x̂)
+    # in-place operations to recuce allocations:
+    v̂ .= ym .- Ĉm*x̂ .- D̂dm*d
+    x̂ .= mul!(x̂LHS, Â, x̂) .+ mul!(x̂LHS, B̂u, u) .+ mul!(x̂LHS, B̂d, d) .+ mul!(x̂LHS, K̂, v̂)
     return nothing
 end
 
@@ -579,9 +582,9 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     M̂ = Hermitian(Ȳm * Ŝ * Ȳm' + R̂, :L)
     mul!(K̂, X̄, lmul!(Ŝ, Ȳm'))
     rdiv!(K̂, cholesky(M̂))
-    v̂m = ŷm
-    v̂m .= ym .- ŷm
-    x̂_cor = x̂ + K̂ * v̂m
+    v̂ = ŷm
+    v̂ .= ym .- ŷm
+    x̂_cor = x̂ + K̂ * v̂
     P̂_cor = P̂ - Hermitian(K̂ * M̂ * K̂', :L)
     # --- prediction step ---
     X̂_cor, sqrt_P̂_cor = X̂, sqrt_P̂
@@ -594,9 +597,9 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     for j in axes(X̂_next, 2)
         X̂_next[:, j] = @views f̂(estim, estim.model, X̂_cor[:, j], u, d)
     end
-    mul!(x̂, X̂_next, m̂)
+    x̂_next = mul!(x̂, X̂_next, m̂)
     X̄_next = X̂_next
-    X̄_next .= X̂_next .- x̂
+    X̄_next .= X̂_next .- x̂_next
     P̂.data .= X̄_next * Ŝ * X̄_next' .+ Q̂ # .data is necessary for Hermitians
     return nothing
 end
@@ -796,12 +799,14 @@ only the covariance `P̂` is updated.
 function update_estimate_kf!(estim, u, ym, d, Â, Ĉm, P̂, x̂=nothing)
     Q̂, R̂, M̂ = estim.Q̂, estim.R̂, estim.M̂
     mul!(M̂, P̂, Ĉm')
-    rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' + R̂)))
+    rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂)))
     if !isnothing(x̂)
         mul!(estim.K̂, Â, M̂)
         ŷm = @views ĥ(estim, estim.model, x̂, d)[estim.i_ym]
-        x̂ .= f̂(estim, estim.model, x̂, u, d) .+  estim.K̂ * (ym - ŷm)
+        v̂  = ŷm
+        v̂ .= ym .- ŷm
+        x̂ .= f̂(estim, estim.model, x̂, u, d) .+ mul!(x̂, estim.K̂, v̂)
     end
-    P̂.data .= Â * (P̂ - M̂ * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitians
+    P̂.data .= Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂ # .data is necessary for Hermitians
     return nothing
 end
