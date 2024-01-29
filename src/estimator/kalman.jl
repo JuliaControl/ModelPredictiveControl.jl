@@ -558,31 +558,46 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     x̂, P̂, Q̂, R̂, K̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
-    # --- correction step ---
-    sqrt_P̂ = cholesky(P̂).L
-    X̂ = repeat(x̂, 1, nσ) + [zeros(NT, nx̂) +γ*sqrt_P̂ -γ*sqrt_P̂]
+    # --- initialize matrices ---
+    X̂  = Matrix{NT}(undef, nx̂, nσ)
+    ŷm = Vector{NT}(undef, nym)
     Ŷm = Matrix{NT}(undef, nym, nσ)
+    sqrt_P̂ = LowerTriangular{NT, Matrix{NT}}(Matrix{NT}(undef, nx̂, nx̂))
+    # --- correction step ---
+    sqrt_P̂.data .= cholesky(P̂).L
+    γ_sqrt_P̂ = lmul!(γ, sqrt_P̂)
+    X̂ .= x̂
+    X̂[:, 2:nx̂+1]   .+= γ_sqrt_P̂
+    X̂[:, nx̂+2:end] .-= γ_sqrt_P̂
     for j in axes(Ŷm, 2)
-        Ŷm[:, j] = ĥ(estim, estim.model, X̂[:, j], d)[estim.i_ym]
+        Ŷm[:, j] = @views ĥ(estim, estim.model, X̂[:, j], d)[estim.i_ym]
     end
-    ŷm = Ŷm * m̂
-    X̄ = X̂ .- x̂
-    Ȳm = Ŷm .- ŷm
+    mul!(ŷm, Ŷm, m̂)
+    X̄, Ȳm = X̂, Ŷm
+    X̄  .= X̂  .- x̂
+    Ȳm .= Ŷm .- ŷm
     M̂ = Hermitian(Ȳm * Ŝ * Ȳm' + R̂, :L)
     mul!(K̂, X̄, lmul!(Ŝ, Ȳm'))
     rdiv!(K̂, cholesky(M̂))
-    x̂_cor = x̂ + K̂ * (ym - ŷm)
+    v̂m = ŷm
+    v̂m .= ym .- ŷm
+    x̂_cor = x̂ + K̂ * v̂m
     P̂_cor = P̂ - Hermitian(K̂ * M̂ * K̂', :L)
     # --- prediction step ---
-    sqrt_P̂_cor = cholesky(P̂_cor).L
-    X̂_cor = repeat(x̂_cor, 1, nσ) + [zeros(NT, nx̂) +γ*sqrt_P̂_cor -γ*sqrt_P̂_cor]
-    X̂_next = Matrix{NT}(undef, nx̂, nσ)
+    X̂_cor, sqrt_P̂_cor = X̂, sqrt_P̂
+    sqrt_P̂_cor.data .= cholesky(P̂_cor).L
+    γ_sqrt_P̂_cor = lmul!(γ, sqrt_P̂_cor)
+    X̂_cor .= x̂_cor
+    X̂_cor[:, 2:nx̂+1]   .+= γ_sqrt_P̂_cor
+    X̂_cor[:, nx̂+2:end] .-= γ_sqrt_P̂_cor
+    X̂_next = X̂_cor
     for j in axes(X̂_next, 2)
-        X̂_next[:, j] = f̂(estim, estim.model, X̂_cor[:, j], u, d)
+        X̂_next[:, j] = @views f̂(estim, estim.model, X̂_cor[:, j], u, d)
     end
-    x̂[:] = X̂_next * m̂
-    X̄_next = X̂_next .- x̂
-    P̂.data[:] = X̄_next * Ŝ * X̄_next' + Q̂ # .data is necessary for Hermitians
+    mul!(x̂, X̂_next, m̂)
+    X̄_next = X̂_next
+    X̄_next .= X̂_next .- x̂
+    P̂.data .= X̄_next * Ŝ * X̄_next' .+ Q̂ # .data is necessary for Hermitians
     return nothing
 end
 
@@ -744,7 +759,7 @@ end
 function init_estimate_cov!(
     estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}, _ , _ , _
 ) 
-    estim.P̂.data[:] = estim.P̂0 # .data is necessary for Hermitians
+    estim.P̂.data .= estim.P̂0 # .data is necessary for Hermitians
     return nothing
 end
 
@@ -785,8 +800,8 @@ function update_estimate_kf!(estim, u, ym, d, Â, Ĉm, P̂, x̂=nothing)
     if !isnothing(x̂)
         mul!(estim.K̂, Â, M̂)
         ŷm = @views ĥ(estim, estim.model, x̂, d)[estim.i_ym]
-        x̂[:] = f̂(estim, estim.model, x̂, u, d) +  estim.K̂ * (ym - ŷm)
+        x̂ .= f̂(estim, estim.model, x̂, u, d) .+  estim.K̂ * (ym - ŷm)
     end
-    P̂.data[:] = Â * (P̂ - M̂ * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitians
+    P̂.data .= Â * (P̂ - M̂ * Ĉm * P̂) * Â' + Q̂ # .data is necessary for Hermitians
     return nothing
 end
