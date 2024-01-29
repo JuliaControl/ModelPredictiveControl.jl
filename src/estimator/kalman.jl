@@ -182,10 +182,15 @@ The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\
 function update_estimate!(estim::SteadyKalmanFilter, u, ym, d=empty(estim.x̂))
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K̂ = estim.x̂, estim.K̂
-    v̂, x̂LHS = similar(ym), similar(x̂)
+    v̂, ŷm, x̂LHS = similar(ym), similar(ym), similar(x̂)
     # in-place operations to recuce allocations:
-    v̂ .= ym .- Ĉm*x̂ .- D̂dm*d
-    x̂ .= mul!(x̂LHS, Â, x̂) .+ mul!(x̂LHS, B̂u, u) .+ mul!(x̂LHS, B̂d, d) .+ mul!(x̂LHS, K̂, v̂)
+    ŷm  .= mul!(v̂, Ĉm, x̂) 
+    ŷm .+= mul!(v̂, D̂dm, d)
+    v̂   .= ym .- ŷm
+    x̂   .= mul!(x̂LHS, Â, x̂)
+    x̂  .+= mul!(x̂LHS, B̂u, u)
+    x̂  .+= mul!(x̂LHS, B̂d, d)
+    x̂  .+= mul!(x̂LHS, K̂, v̂)
     return nothing
 end
 

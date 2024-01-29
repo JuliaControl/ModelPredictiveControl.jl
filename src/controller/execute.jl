@@ -143,7 +143,7 @@ end
 Init linear model prediction matrices `F, q̃, p` and current estimated output `ŷ`.
 
 See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
-They are computed with:
+They are computed with these equations using in-place operations:
 ```math
 \begin{aligned}
     \mathbf{F}   &= \mathbf{G d}(k) + \mathbf{J D̂} + \mathbf{K x̂}_{k-1}(k) + \mathbf{V u}(k-1) \\
@@ -155,24 +155,32 @@ They are computed with:
 ```
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u)
-    mpc.ŷ[:] = evalŷ(mpc.estim, ym, d)
+    ŷ, F, q̃, p = mpc.ŷ, mpc.F, mpc.q̃, mpc.p
+    ŷ .= evalŷ(mpc.estim, ym, d)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
-    mpc.F[:]  = mpc.K  * mpc.estim.x̂  + mpc.V  * mpc.estim.lastu0 + mpc.Ŷop
+    F_LHS = similar(F) 
+    F  .= mul!(F_LHS, mpc.K, mpc.estim.x̂) 
+    F .+= mul!(F_LHS, mpc.V, mpc.estim.lastu0)
+    F .+= mpc.Ŷop
     if model.nd ≠ 0
-        mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
-        mpc.D̂E[:] = [d; D̂]
-        mpc.F[:]  = mpc.F  + mpc.G  * mpc.d0 + mpc.J  * mpc.D̂0
+        mpc.d0 .= d .- model.dop
+        mpc.D̂0 .= D̂ .- mpc.Dop
+        mpc.D̂E[1:model.nd]     .= mpc.d0
+        mpc.D̂E[model.nd+1:end] .= mpc.D̂0
+        F .+= mul!(F_LHS, mpc.G, mpc.d0)
+        F .+= mul!(F_LHS, mpc.J, mpc.D̂0)
     end
-    mpc.R̂y[:] = R̂y
-    C_y = mpc.F - mpc.R̂y
-    mpc.q̃[:] = 2(mpc.M_Hp*mpc.Ẽ)'*C_y
-    mpc.p[]  = dot(C_y, mpc.M_Hp, C_y)
+    mpc.R̂y .= R̂y
+    C_y  = F_LHS
+    C_y .= mpc.F .- mpc.R̂y
+    q̃   .= lmul!(2,(mpc.M_Hp*mpc.Ẽ)'*C_y)
+    p   .= dot(C_y, mpc.M_Hp, C_y)
     if ~mpc.noR̂u
-        mpc.R̂u[:] = R̂u
+        mpc.R̂u .= R̂u
         lastu = mpc.estim.lastu0 + model.uop
         C_u = mpc.T*lastu - mpc.R̂u
-        mpc.q̃[:] = mpc.q̃ + 2(mpc.L_Hp*mpc.S̃)'*C_u
-        mpc.p[]  = mpc.p[] + dot(C_y, mpc.L_Hp, C_u)
+        mpc.q̃ .+= lmul!(2, (mpc.L_Hp*mpc.S̃)'*C_u)
+        mpc.p .+= dot(C_y, mpc.L_Hp, C_u)
     end
     return nothing
 end
@@ -187,15 +195,17 @@ Init `ŷ, Ŷop, d0, D̂0` matrices when model is not a [`LinModel`](@ref).
 [`InternalModel`](@ref).
 """
 function initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y, R̂u)
-    mpc.ŷ[:] = evalŷ(mpc.estim, ym, d)
+    mpc.ŷ .= evalŷ(mpc.estim, ym, d)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
     if model.nd ≠ 0
-        mpc.d0[:], mpc.D̂0[:] = d - model.dop, D̂ - mpc.Dop
-        mpc.D̂E[:] = [d; D̂]
+        mpc.d0 .= d .- model.dop
+        mpc.D̂0 .= D̂ .- mpc.Dop
+        mpc.D̂E[1:model.nd]     .= mpc.d0
+        mpc.D̂E[model.nd+1:end] .= mpc.D̂0
     end
-    mpc.R̂y[:] = R̂y
+    mpc.R̂y .= R̂y
     if ~mpc.noR̂u
-        mpc.R̂u[:] = R̂u
+        mpc.R̂u .= R̂u
     end
     return nothing
 end
@@ -214,11 +224,16 @@ function predictstoch!(
 ) where {NT<:Real}
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
                            "outputs ym in keyword argument to compute control actions u")
-    ŷd = h(estim.model, estim.x̂d, d - estim.model.dop) + estim.model.yop 
+    Ŷop = mpc.Ŷop
+    ŷd = h(estim.model, estim.x̂d, d - estim.model.dop) .+ estim.model.yop 
     ŷs = zeros(NT, estim.model.ny)
-    ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
-    Ŷs = mpc.Ks*mpc.estim.x̂s + mpc.Ps*ŷs
-    mpc.Ŷop[:] = Ŷs + repeat(estim.model.yop, mpc.Hp)
+    ŷs[estim.i_ym] .= @views ym .- ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
+    Ŷop_LHS = similar(Ŷop)
+    Ŷop  .= mul!(Ŷop_LHS, mpc.Ks, estim.x̂s)
+    Ŷop .+= mul!(Ŷop_LHS, mpc.Ps, ŷs)
+    for j=1:mpc.Hp
+        Ŷop[(1 + estim.model.ny*(j-1)):(estim.model.ny*j)] .+= estim.model.yop
+    end
     return nothing
 end
 "Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."
@@ -233,14 +248,18 @@ Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} + \mathbf{
 vector for the terminal constraints, see [`init_predmat`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
-    mpc.con.fx̂[:] = mpc.con.kx̂ * mpc.estim.x̂  + mpc.con.vx̂ * mpc.estim.lastu0
+    fx̂ = mpc.con.fx̂
+    fx̂_LHS = similar(fx̂)
+    fx̂  .= mul!(fx̂_LHS, mpc.con.kx̂, mpc.estim.x̂)
+    fx̂ .+= mul!(fx̂_LHS, mpc.con.vx̂, mpc.estim.lastu0)
     if model.nd ≠ 0
-        mpc.con.fx̂[:] = mpc.con.fx̂ + mpc.con.gx̂ * mpc.d0 + mpc.con.jx̂ * mpc.D̂0
+        fx̂ .+= mul!(fx̂_LHS, mpc.con.gx̂, mpc.d0)
+        fx̂ .+= mul!(fx̂_LHS, mpc.con.jx̂, mpc.D̂0)
     end
-    lastu = mpc.estim.lastu0 + model.uop
-    mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T*lastu
-        +mpc.con.Umax - mpc.T*lastu
+    T_lastu = mpc.T*(mpc.estim.lastu0 .+ model.uop)
+    mpc.con.b .= [
+        -mpc.con.Umin + T_lastu
+        +mpc.con.Umax - T_lastu
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
         -mpc.con.Ymin + mpc.F
@@ -254,10 +273,10 @@ end
 
 "Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
 function linconstraint!(mpc::PredictiveController, model::SimModel)
-    lastu = mpc.estim.lastu0 + model.uop
-    mpc.con.b[:] = [
-        -mpc.con.Umin + mpc.T*lastu
-        +mpc.con.Umax - mpc.T*lastu
+    T_lastu = mpc.T*(mpc.estim.lastu0 .+ model.uop)
+    mpc.con.b .= [
+        -mpc.con.Umin + T_lastu
+        +mpc.con.Umax - T_lastu
         -mpc.con.ΔŨmin
         +mpc.con.ΔŨmax 
     ]
