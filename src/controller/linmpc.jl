@@ -24,6 +24,7 @@ struct LinMPC{
     noR̂u::Bool
     S̃::Matrix{NT} 
     T::Matrix{NT}
+    T_lastu::Vector{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
@@ -50,7 +51,7 @@ struct LinMPC{
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
         M_Hp, N_Hc, L_Hp = Diagonal{NT}(M_Hp), Diagonal{NT}(N_Hc), Diagonal{NT}(L_Hp) # debug julia 1.6
         # dummy vals (updated just before optimization):
-        R̂y, R̂u = zeros(NT, ny*Hp), zeros(NT, nu*Hp) 
+        R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
@@ -68,7 +69,7 @@ struct LinMPC{
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, 
             R̂u, R̂y, noR̂u,
-            S̃, T,
+            S̃, T, T_lastu,
             Ẽ, F, G, J, K, V, H̃, q̃, p,
             Ks, Ps,
             d0, D̂0, D̂E,

@@ -26,6 +26,7 @@ struct NonLinMPC{
     noR̂u::Bool
     S̃::Matrix{NT}
     T::Matrix{NT}
+    T_lastu::Vector{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
@@ -51,7 +52,7 @@ struct NonLinMPC{
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         M_Hp, N_Hc, L_Hp = Diagonal{NT}(M_Hp), Diagonal{NT}(N_Hc), Diagonal{NT}(L_Hp) # debug julia 1.6
         # dummy vals (updated just before optimization):
-        R̂y, R̂u = zeros(NT, ny*Hp), zeros(NT, nu*Hp)
+        R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
@@ -69,7 +70,7 @@ struct NonLinMPC{
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, 
             R̂u, R̂y, noR̂u,
-            S̃, T,  
+            S̃, T, T_lastu,
             Ẽ, F, G, J, K, V, H̃, q̃, p,
             Ks, Ps,
             d0, D̂0, D̂E,
@@ -309,36 +310,38 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
         Ū_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nU), nΔŨ + 3)
         function Jfunc(ΔŨtup::JNT...)
             ΔŨ1 = ΔŨtup[begin]
-            Ŷ, u = get_tmp(Ŷ_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
+            Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
             ΔŨ = collect(ΔŨtup)
             if ΔŨtup !== last_ΔŨtup_float
-                x̂, g = get_tmp(x̂_cache, ΔŨ1), get_tmp(g_cache, ΔŨ1)
+                x̂, u = get_tmp(x̂_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
                 Ŷ, x̂end = predict!(Ŷ, x̂, u, mpc, model, ΔŨ)
+                g = get_tmp(g_cache, ΔŨ1)
                 g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_float = ΔŨtup
             end
             Ȳ, Ū = get_tmp(Ȳ_cache, ΔŨ1), get_tmp(Ū_cache, ΔŨ1)
-            return obj_nonlinprog!(Ȳ, Ū, u, mpc, model, Ŷ, ΔŨ)
+            return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷ, ΔŨ)
         end
         function Jfunc(ΔŨtup::ForwardDiff.Dual...)
             ΔŨ1 = ΔŨtup[begin]
-            Ŷ, u = get_tmp(Ŷ_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
+            Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
             ΔŨ = collect(ΔŨtup)
             if ΔŨtup !== last_ΔŨtup_dual
-                x̂, g = get_tmp(x̂_cache, ΔŨ1), get_tmp(g_cache, ΔŨ1)
-                g = get_tmp(g_cache, ΔŨ1)
+                x̂, u = get_tmp(x̂_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
                 Ŷ, x̂end = predict!(Ŷ, x̂, u, mpc, model, ΔŨ)
+                g = get_tmp(g_cache, ΔŨ1)
                 g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
                 last_ΔŨtup_dual = ΔŨtup
             end
             Ȳ, Ū = get_tmp(Ȳ_cache, ΔŨ1), get_tmp(Ū_cache, ΔŨ1)
-            return obj_nonlinprog!(Ȳ, Ū, u, mpc, model, Ŷ, ΔŨ)
+            return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷ, ΔŨ)
         end
         function gfunc_i(i, ΔŨtup::NTuple{N, JNT}) where N
             ΔŨ1 = ΔŨtup[begin]
             g = get_tmp(g_cache, ΔŨ1)
             if ΔŨtup !== last_ΔŨtup_float
-                Ŷ, u, x̂ = get_tmp(Ŷ_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1), get_tmp(x̂_cache, ΔŨ1)
+                x̂, u = get_tmp(x̂_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
+                Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
                 ΔŨ = collect(ΔŨtup)
                 Ŷ, x̂end = predict!(Ŷ, x̂, u, mpc, model, ΔŨ)
                 g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
@@ -350,7 +353,8 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
             ΔŨ1 = ΔŨtup[begin]
             g = get_tmp(g_cache, ΔŨ1)
             if ΔŨtup !== last_ΔŨtup_dual
-                Ŷ, u, x̂ = get_tmp(Ŷ_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1), get_tmp(x̂_cache, ΔŨ1)
+                x̂, u = get_tmp(x̂_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
+                Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
                 ΔŨ = collect(ΔŨtup)
                 Ŷ, x̂end = predict!(Ŷ, x̂, u, mpc, model, ΔŨ)
                 g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
