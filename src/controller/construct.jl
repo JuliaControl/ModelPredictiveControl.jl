@@ -149,79 +149,79 @@ function setconstraint!(
     end
     if !isnothing(Umin)
         size(Umin)   == (nu*Hp,) || throw(ArgumentError("Umin size must be $((nu*Hp,))"))
-        con.Umin[:] = Umin
+        con.Umin .= Umin
     end
     if !isnothing(Umax)
         size(Umax)   == (nu*Hp,) || throw(ArgumentError("Umax size must be $((nu*Hp,))"))
-        con.Umax[:] = Umax
+        con.Umax .= Umax
     end
     if !isnothing(ΔUmin)
         size(ΔUmin)  == (nu*Hc,) || throw(ArgumentError("ΔUmin size must be $((nu*Hc,))"))
-        con.ΔŨmin[1:nu*Hc] = ΔUmin
+        con.ΔŨmin[1:nu*Hc] .= ΔUmin
     end
     if !isnothing(ΔUmax)
         size(ΔUmax)  == (nu*Hc,) || throw(ArgumentError("ΔUmax size must be $((nu*Hc,))"))
-        con.ΔŨmax[1:nu*Hc] = ΔUmax
+        con.ΔŨmax[1:nu*Hc] .= ΔUmax
     end
     if !isnothing(Ymin)
         size(Ymin)   == (ny*Hp,) || throw(ArgumentError("Ymin size must be $((ny*Hp,))"))
-        con.Ymin[:] = Ymin
+        con.Ymin .= Ymin
     end
     if !isnothing(Ymax)
         size(Ymax)   == (ny*Hp,) || throw(ArgumentError("Ymax size must be $((ny*Hp,))"))
-        con.Ymax[:] = Ymax
+        con.Ymax .= Ymax
     end
     if !isnothing(x̂min)
         size(x̂min)   == (nx̂,) || throw(ArgumentError("x̂min size must be $((nx̂,))"))
-        con.x̂min[:] = x̂min
+        con.x̂min .= x̂min
     end
     if !isnothing(x̂max)
         size(x̂max)   == (nx̂,) || throw(ArgumentError("x̂max size must be $((nx̂,))"))
-        con.x̂max[:] = x̂max
+        con.x̂max .= x̂max
     end
     if !isnothing(C_umin)
         size(C_umin) == (nu*Hp,) || throw(ArgumentError("C_umin size must be $((nu*Hp,))"))
         any(C_umin .< 0) && error("C_umin weights should be non-negative")
-        con.A_Umin[:, end] = -C_umin
+        con.A_Umin[:, end] .= -C_umin
     end
     if !isnothing(C_umax)
         size(C_umax) == (nu*Hp,) || throw(ArgumentError("C_umax size must be $((nu*Hp,))"))
         any(C_umax .< 0) && error("C_umax weights should be non-negative")
-        con.A_Umax[:, end] = -C_umax
+        con.A_Umax[:, end] .= -C_umax
     end
     if !isnothing(C_Δumin)
         size(C_Δumin) == (nu*Hc,) || throw(ArgumentError("C_Δumin size must be $((nu*Hc,))"))
         any(C_Δumin .< 0) && error("C_Δumin weights should be non-negative")
-        con.A_ΔŨmin[1:end-1, end] = -C_Δumin 
+        con.A_ΔŨmin[1:end-1, end] .= -C_Δumin 
     end
     if !isnothing(C_Δumax)
         size(C_Δumax) == (nu*Hc,) || throw(ArgumentError("C_Δumax size must be $((nu*Hc,))"))
         any(C_Δumax .< 0) && error("C_Δumax weights should be non-negative")
-        con.A_ΔŨmax[1:end-1, end] = -C_Δumax
+        con.A_ΔŨmax[1:end-1, end] .= -C_Δumax
     end
     if !isnothing(C_ymin)
         size(C_ymin) == (ny*Hp,) || throw(ArgumentError("C_ymin size must be $((ny*Hp,))"))
         any(C_ymin .< 0) && error("C_ymin weights should be non-negative")
-        con.C_ymin[:] = C_ymin
-        size(con.A_Ymin, 1) ≠ 0 && (con.A_Ymin[:, end] = -con.C_ymin) # for LinModel
+        con.C_ymin .= C_ymin
+        size(con.A_Ymin, 1) ≠ 0 && (con.A_Ymin[:, end] .= -con.C_ymin) # for LinModel
     end
     if !isnothing(C_ymax)
         size(C_ymax) == (ny*Hp,) || throw(ArgumentError("C_ymax size must be $((ny*Hp,))"))
         any(C_ymax .< 0) && error("C_ymax weights should be non-negative")
-        con.C_ymax[:] = C_ymax
-        size(con.A_Ymax, 1) ≠ 0 && (con.A_Ymax[:, end] = -con.C_ymax) # for LinModel
+        con.C_ymax .= C_ymax
+        size(con.A_Ymax, 1) ≠ 0 && (con.A_Ymax[:, end] .= -con.C_ymax) # for LinModel
     end
     if !isnothing(c_x̂min)
         size(c_x̂min) == (nx̂,) || throw(ArgumentError("c_x̂min size must be $((nx̂,))"))
         any(c_x̂min .< 0) && error("c_x̂min weights should be non-negative")
-        con.c_x̂min[:] = c_x̂min
-        size(con.A_x̂min, 1) ≠ 0 && (con.A_x̂min[:, end] = -con.c_x̂min) # for LinModel
+        con.c_x̂min .= c_x̂min
+        size(con.A_x̂min, 1) ≠ 0 && (con.A_x̂min[:, end] .= -con.c_x̂min) # for LinModel
     end
     if !isnothing(c_x̂max)
         size(c_x̂max) == (nx̂,) || throw(ArgumentError("c_x̂max size must be $((nx̂,))"))
         any(c_x̂max .< 0) && error("c_x̂max weights should be non-negative")
-        con.c_x̂max[:] = c_x̂max
-        size(con.A_x̂max, 1) ≠ 0 && (con.A_x̂max[:, end] = -con.c_x̂max) # for LinModel
+        con.c_x̂max .= c_x̂max
+        size(con.A_x̂max, 1) ≠ 0 && (con.A_x̂max[:, end] .= -con.c_x̂max) # for LinModel
     end
     i_Umin,  i_Umax  = .!isinf.(con.Umin),  .!isinf.(con.Umax)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmin)

@@ -225,7 +225,7 @@ function predictstoch!(
 ) where {NT<:Real}
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
                            "outputs ym in keyword argument to compute control actions u")
-    Ŷop = mpc.Ŷop
+    Ŷop, ny, yop = mpc.Ŷop, estim.model.ny, estim.model.yop
     ŷd = h(estim.model, estim.x̂d, d - estim.model.dop) .+ estim.model.yop 
     ŷs = zeros(NT, estim.model.ny)
     ŷs[estim.i_ym] .= @views ym .- ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
@@ -233,7 +233,7 @@ function predictstoch!(
     Ŷop  .= mul!(Ŷop_LHS, mpc.Ks, estim.x̂s)
     Ŷop .+= mul!(Ŷop_LHS, mpc.Ps, ŷs)
     for j=1:mpc.Hp
-        Ŷop[(1 + estim.model.ny*(j-1)):(estim.model.ny*j)] .+= estim.model.yop
+        Ŷop[(1 + ny*(j-1)):(ny*j)] .+= yop
     end
     return nothing
 end
@@ -249,6 +249,8 @@ Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} + \mathbf{
 vector for the terminal constraints, see [`init_predmat`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
+    nU, nΔŨ, nY = length(mpc.con.Umin), length(mpc.con.ΔŨmin), length(mpc.con.Ymin)
+    nx̂ = mpc.estim.nx̂
     fx̂ = mpc.con.fx̂
     fx̂_LHS = similar(fx̂)
     fx̂  .= mul!(fx̂_LHS, mpc.con.kx̂, mpc.estim.x̂)
@@ -257,28 +259,37 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
         fx̂ .+= mul!(fx̂_LHS, mpc.con.gx̂, mpc.d0)
         fx̂ .+= mul!(fx̂_LHS, mpc.con.jx̂, mpc.D̂0)
     end
-    mpc.con.b .= [
-        -mpc.con.Umin + mpc.T_lastu
-        +mpc.con.Umax - mpc.T_lastu
-        -mpc.con.ΔŨmin
-        +mpc.con.ΔŨmax 
-        -mpc.con.Ymin + mpc.F
-        +mpc.con.Ymax - mpc.F
-        -mpc.con.x̂min + mpc.con.fx̂
-        +mpc.con.x̂max - mpc.con.fx̂
-    ]
+    n = 0
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.Umin + mpc.T_lastu
+    n += nU
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.Umax - mpc.T_lastu
+    n += nU
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
+    n += nΔŨ
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
+    n += nΔŨ
+    mpc.con.b[(n+1):(n+nY)]  .= @. -mpc.con.Ymin + mpc.F
+    n += nY
+    mpc.con.b[(n+1):(n+nY)]  .= @. +mpc.con.Ymax - mpc.F
+    n += nY
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂min + fx̂
+    n += nx̂
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂max - fx̂
     lincon = mpc.optim[:linconstraint]
     set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
 end
 
 "Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
-function linconstraint!(mpc::PredictiveController, model::SimModel)
-    mpc.con.b .= [
-        -mpc.con.Umin + mpc.T_lastu
-        +mpc.con.Umax - mpc.T_lastu
-        -mpc.con.ΔŨmin
-        +mpc.con.ΔŨmax 
-    ]
+function linconstraint!(mpc::PredictiveController, ::SimModel)
+    nU, nΔŨ = length(mpc.con.Umin), length(mpc.con.ΔŨmin)
+    n = 0
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.Umin + mpc.T_lastu
+    n += nU
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.Umax - mpc.T_lastu
+    n += nU
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
+    n += nΔŨ
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
     lincon = mpc.optim[:linconstraint]
     set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
 end
@@ -442,7 +453,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
         end
         @debug solution_summary(optim, verbose=true)
     end
-    mpc.ΔŨ[:] = iserror(optim) ? ΔŨlast : ΔŨcurr
+    mpc.ΔŨ .= iserror(optim) ? ΔŨlast : ΔŨcurr
     return mpc.ΔŨ
 end
 

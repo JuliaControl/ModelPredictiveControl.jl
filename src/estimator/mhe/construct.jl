@@ -418,63 +418,65 @@ function setconstraint!(
     if !isnothing(X̂min)
         size(X̂min) == (nX̂con,) || throw(ArgumentError("X̂min size must be $((nX̂con,))"))
         con.x̃min[end-nx̂+1:end] = X̂min[1:nx̂] # if C is finite : x̃ = [ϵ; x̂]
-        con.X̂min[:] = X̂min[nx̂+1:end]
+        con.X̂min .= X̂min[nx̂+1:end]
     end
     if !isnothing(X̂max)
         size(X̂max) == (nX̂con,) || throw(ArgumentError("X̂max size must be $((nX̂con,))"))
         con.x̃max[end-nx̂+1:end] = X̂max[1:nx̂] # if C is finite : x̃ = [ϵ; x̂]
-        con.X̂max[:] = X̂max[nx̂+1:end]
+        con.X̂max .= X̂max[nx̂+1:end]
     end
     if !isnothing(Ŵmin)
         size(Ŵmin) == (nŵ*He,) || throw(ArgumentError("Ŵmin size must be $((nŵ*He,))"))
-        con.Ŵmin[:] = Ŵmin
+        con.Ŵmin .= Ŵmin
     end
     if !isnothing(Ŵmax)
         size(Ŵmax) == (nŵ*He,) || throw(ArgumentError("Ŵmax size must be $((nŵ*He,))"))
-        con.Ŵmax[:] = Ŵmax
+        con.Ŵmax .= Ŵmax
     end
     if !isnothing(V̂min)
         size(V̂min) == (nym*He,) || throw(ArgumentError("V̂min size must be $((nym*He,))"))
-        con.V̂min[:] = V̂min
+        con.V̂min .= V̂min
     end
     if !isnothing(V̂max)
         size(V̂max) == (nym*He,) || throw(ArgumentError("V̂max size must be $((nym*He,))"))
-        con.V̂max[:] = V̂max
+        con.V̂max .= V̂max
     end
     if !isnothing(C_x̂min)
         size(C_x̂min) == (nX̂con,) || throw(ArgumentError("C_x̂min size must be $((nX̂con,))"))
         any(C_x̂min .< 0) && error("C_x̂min weights should be non-negative")
-        con.A_x̃min[end-nx̂+1:end, end] = -C_x̂min[1:nx̂] # if C is finite : x̃ = [ϵ; x̂]
-        con.C_x̂min[:] = C_x̂min[nx̂+1:end]
+        # if C is finite : x̃ = [ϵ; x̂] 
+        con.A_x̃min[end-nx̂+1:end, end] .= @views -C_x̂min[1:nx̂] 
+        con.C_x̂min .= @views C_x̂min[nx̂+1:end]
         size(con.A_X̂min, 1) ≠ 0 && (con.A_X̂min[:, end] = -con.C_x̂min) # for LinModel
     end
     if !isnothing(C_x̂max)
         size(C_x̂max) == (nX̂con,) || throw(ArgumentError("C_x̂max size must be $((nX̂con,))"))
         any(C_x̂max .< 0) && error("C_x̂max weights should be non-negative")
-        con.A_x̃max[end-nx̂+1:end, end] = -C_x̂max[1:nx̂] # if C is finite : x̃ = [ϵ; x̂]
-        con.C_x̂max[:] = C_x̂max[nx̂+1:end]
+        # if C is finite : x̃ = [ϵ; x̂] :
+        con.A_x̃max[end-nx̂+1:end, end] .= @views -C_x̂max[1:nx̂]
+        con.C_x̂max .= @views C_x̂max[nx̂+1:end]
         size(con.A_X̂max, 1) ≠ 0 && (con.A_X̂max[:, end] = -con.C_x̂max) # for LinModel
     end
     if !isnothing(C_ŵmin)
         size(C_ŵmin) == (nŵ*He,) || throw(ArgumentError("C_ŵmin size must be $((nŵ*He,))"))
         any(C_ŵmin .< 0) && error("C_ŵmin weights should be non-negative")
-        con.A_Ŵmin[:, end] = -C_ŵmin
+        con.A_Ŵmin[:, end] .= -C_ŵmin
     end
     if !isnothing(C_ŵmax)
         size(C_ŵmax) == (nŵ*He,) || throw(ArgumentError("C_ŵmax size must be $((nŵ*He,))"))
         any(C_ŵmax .< 0) && error("C_ŵmax weights should be non-negative")
-        con.A_Ŵmax[:, end] = -C_ŵmax
+        con.A_Ŵmax[:, end] .= -C_ŵmax
     end
     if !isnothing(C_v̂min)
         size(C_v̂min) == (nym*He,) || throw(ArgumentError("C_v̂min size must be $((nym*He,))"))
         any(C_v̂min .< 0) && error("C_v̂min weights should be non-negative")
-        con.C_v̂min[:] = C_v̂min
+        con.C_v̂min .= C_v̂min
         size(con.A_V̂min, 1) ≠ 0 && (con.A_V̂min[:, end] = -con.C_v̂min) # for LinModel
     end
     if !isnothing(C_v̂max)
         size(C_v̂max) == (nym*He,) || throw(ArgumentError("C_v̂max size must be $((nym*He,))"))
         any(C_v̂max .< 0) && error("C_v̂max weights should be non-negative")
-        con.C_v̂max[:] = C_v̂max
+        con.C_v̂max .= C_v̂max
         size(con.A_V̂max, 1) ≠ 0 && (con.A_V̂max[:, end] = -con.C_v̂max) # for LinModel
     end
     i_x̃min, i_x̃max  = .!isinf.(con.x̃min)  , .!isinf.(con.x̃max)
@@ -989,40 +991,46 @@ function init_optimization!(
     He = estim.He
     nV̂, nX̂, ng = He*estim.nym, He*estim.nx̂, length(con.i_g)
     # see init_optimization!(mpc::NonLinMPC, optim) for details on the inspiration
-    Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃ , nV̂=nV̂, nX̂=nX̂, ng=ng
+    Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃ , nV̂=nV̂, nX̂=nX̂, ng=ng, nx̂=estim.nx̂
         last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
         V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), nZ̃ + 3)
         g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), nZ̃ + 3)
         X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), nZ̃ + 3)
+        x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), nZ̃ + 3)
         function Jfunc(Z̃tup::JNT...)
-            V̂ = get_tmp(V̂_cache, Z̃tup[1])
+            Z̃1 = Z̃tup[begin]
+            V̂ = get_tmp(V̂_cache, Z̃1)
             Z̃ = collect(Z̃tup)
             if Z̃tup !== last_Z̃tup_float
-                g = get_tmp(g_cache, Z̃tup[1])
-                X̂ = get_tmp(X̂_cache, Z̃tup[1])
+                g = get_tmp(g_cache, Z̃1)
+                X̂ = get_tmp(X̂_cache, Z̃1)
                 V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
                 last_Z̃tup_float = Z̃tup
             end
-            return obj_nonlinprog(estim, model, V̂, Z̃)
+            x̄ = get_tmp(x̄_cache, Z̃1)
+            return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
         end
         function Jfunc(Z̃tup::ForwardDiff.Dual...)
-            V̂ = get_tmp(V̂_cache, Z̃tup[1])
+            Z̃1 = Z̃tup[begin]
+            V̂ = get_tmp(V̂_cache, Z̃1)
             Z̃ = collect(Z̃tup)
             if Z̃tup !== last_Z̃tup_dual
-                g = get_tmp(g_cache, Z̃tup[1])
-                X̂ = get_tmp(X̂_cache, Z̃tup[1])
+                g = get_tmp(g_cache, Z̃1)
+                X̂ = get_tmp(X̂_cache, Z̃1)
                 V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
                 last_Z̃tup_dual = Z̃tup
             end
-            return obj_nonlinprog(estim, model, V̂, Z̃)
+            x̄ = get_tmp(x̄_cache, Z̃1)
+            return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
         end
         function gfunc_i(i, Z̃tup::NTuple{N, JNT}) where N
-            g = get_tmp(g_cache, Z̃tup[1])
+            Z̃1 = Z̃tup[begin]
+            g = get_tmp(g_cache, Z̃1)
             if Z̃tup !== last_Z̃tup_float
-                V̂ = get_tmp(V̂_cache, Z̃tup[1])
-                X̂ = get_tmp(X̂_cache, Z̃tup[1])
+                V̂ = get_tmp(V̂_cache, Z̃1)
+                X̂ = get_tmp(X̂_cache, Z̃1)
                 Z̃ = collect(Z̃tup)
                 V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
@@ -1031,10 +1039,11 @@ function init_optimization!(
             return g[i]
         end 
         function gfunc_i(i, Z̃tup::NTuple{N, ForwardDiff.Dual}) where N
-            g = get_tmp(g_cache, Z̃tup[1])
+            Z̃1 = Z̃tup[begin]
+            g = get_tmp(g_cache, Z̃1)
             if Z̃tup !== last_Z̃tup_dual
-                V̂ = get_tmp(V̂_cache, Z̃tup[1])
-                X̂ = get_tmp(X̂_cache, Z̃tup[1])
+                V̂ = get_tmp(V̂_cache, Z̃1)
+                X̂ = get_tmp(X̂_cache, Z̃1)
                 Z̃ = collect(Z̃tup)
                 V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
