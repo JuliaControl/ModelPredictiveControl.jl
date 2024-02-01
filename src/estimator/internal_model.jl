@@ -189,7 +189,7 @@ with current stochastic outputs estimation ``\mathbf{ŷ_s}(k)``, composed of th
 [^1]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
     control structure for decoupling setpoint tracking, feedforward compensation and 
     disturbance rejection dynamics", *IEE Proceedings - Control Theory and Applications*, 
-    vol. 147, no 4, https://doi.org/10.1049/ip-cta:20000443, p. 465–475, ISSN 1350-2379.
+    vol. 147, no 4, <https://doi.org/10.1049/ip-cta:20000443>, p. 465–475, ISSN 1350-2379.
 """
 function init_internalmodel(As, Bs, Cs, Ds)
     B̂s = Bs/Ds

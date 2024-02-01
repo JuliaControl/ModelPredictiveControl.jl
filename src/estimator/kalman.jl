@@ -326,7 +326,7 @@ It implements the time-varying Kalman Filter in its predictor (observer) form :
 \begin{aligned}
     \mathbf{M̂}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^m}'
                            [\mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m}' + \mathbf{R̂}]^{-1}       \\
-    \mathbf{K̂}(k)       &= \mathbf{Â M̂(k)}                                                \\
+    \mathbf{K̂}(k)       &= \mathbf{Â M̂}(k)                                                \\
     \mathbf{ŷ^m}(k)     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k)                  \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k)
                            + \mathbf{K̂}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
@@ -339,7 +339,7 @@ based on the process model described in [`SteadyKalmanFilter`](@ref). The notati
 control period ``k-1``. See [^2] for details.
 
 [^2]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
-     Linear Dynamical Systems*, https://web.stanford.edu/class/ee363/lectures/kf.pdf.
+     Linear Dynamical Systems*, <https://web.stanford.edu/class/ee363/lectures/kf.pdf>.
 """
 function update_estimate!(estim::KalmanFilter, u, ym, d)
     return update_estimate_kf!(estim, u, ym, d, estim.Â, estim.Ĉm, estim.P̂, estim.x̂)
@@ -559,7 +559,7 @@ to compute ``\sqrt{\mathbf{P̂}_{k-1}(k)}`` and ``\sqrt{\mathbf{P̂}_{k}(k)}``. 
 noise, respectively.
 
 [^3]: Simon, D. 2006, "Chapter 14: The unscented Kalman filter" in "Optimal State Estimation: 
-     Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, https://doi.org/10.1002/0470045345.ch14, 
+     Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, <https://doi.org/10.1002/0470045345.ch14>, 
      ISBN9780470045343.
 """
 function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:Real

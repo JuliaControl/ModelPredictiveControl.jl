@@ -272,7 +272,7 @@ obviously the case here (absolute value of unstable poles are greater than one):
 
 [^1]: Arnström, D., Bemporad, A., and Axehill, D. (2022). A dual active-set solver for
     embedded quadratic programming using recursive LDLᵀ updates. IEEE Trans. Autom. Contr.,
-    67(8). https://doi.org/doi:10.1109/TAC.2022.3176430.
+    67(8). <https://doi.org/doi:10.1109/TAC.2022.3176430>.
 
 ```@example 1
 using LinearAlgebra; poles = eigvals(linmodel.A)

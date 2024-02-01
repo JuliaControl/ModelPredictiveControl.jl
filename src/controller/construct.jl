@@ -785,7 +785,7 @@ Current stochastic outputs ``\mathbf{ŷ_s}(k)`` comprises the measured outputs
 [^2]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
     control structure for decoupling setpoint tracking, feedforward compensation and 
     disturbance rejection dynamics", *IEE Proceedings - Control Theory and Applications*, 
-    vol. 147, no 4, https://doi.org/10.1049/ip-cta:20000443, p. 465–475, ISSN 1350-2379.
+    vol. 147, no 4, <https://doi.org/10.1049/ip-cta:20000443>, p. 465–475, ISSN 1350-2379.
 """
 function init_stochpred(estim::InternalModel{NT}, Hp) where NT<:Real
     As, B̂s, Cs = estim.As, estim.B̂s, estim.Cs
