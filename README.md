@@ -1,9 +1,9 @@
 # ModelPredictiveControl.jl
 
-[![Build Status](https://github.com/franckgaga/ModelPredictiveControl.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/franckgaga/ModelPredictiveControl.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/franckgaga/ModelPredictiveControl.jl/branch/main/graph/badge.svg?token=K4V0L113M4)](https://codecov.io/gh/franckgaga/ModelPredictiveControl.jl)
-[![doc-stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://franckgaga.github.io/ModelPredictiveControl.jl/stable)
-[![coc-dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://franckgaga.github.io/ModelPredictiveControl.jl/dev)
+[![Build Status](https://github.com/JuliaControl/ModelPredictiveControl.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JuliaControl/ModelPredictiveControl.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![codecov](https://codecov.io/gh/JuliaControl/ModelPredictiveControl.jl/branch/main/graph/badge.svg?token=K4V0L113M4)](https://codecov.io/gh/JuliaControl/ModelPredictiveControl.jl)
+[![doc-stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaControl.github.io/ModelPredictiveControl.jl/stable)
+[![doc-dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaControl.github.io/ModelPredictiveControl.jl/dev)
 
 An open source [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_control)
 package for Julia.
@@ -65,7 +65,7 @@ plot(res, plotry=true, plotymax=true)
 
 ![StepChangeResponse](/docs/src/assets/readme_result.svg)
 
-See the [manual](https://franckgaga.github.io/ModelPredictiveControl.jl/stable/manual/linmpc/)
+See the [manual](https://JuliaControl.github.io/ModelPredictiveControl.jl/stable/manual/linmpc/)
 for more detailed examples.
 
 ## Features
