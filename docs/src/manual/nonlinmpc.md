@@ -78,8 +78,8 @@ savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 
 ```@example 1
-σQ=[0.1, 0.5]; σR=[0.5]; nint_u=[1]; σQint_u=[0.1]
-estim = UnscentedKalmanFilter(model; σQ, σR, nint_u, σQint_u)
+α=0.1; σQ=[0.1, 0.5]; σR=[0.5]; nint_u=[1]; σQint_u=[0.1]
+estim = UnscentedKalmanFilter(model; α, σQ, σR, nint_u, σQint_u)
 ```
 
 The vectors `σQ` and σR `σR` are the standard deviations of the process and sensor noises,
