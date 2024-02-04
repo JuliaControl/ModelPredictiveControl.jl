@@ -83,6 +83,7 @@ for more detailed examples.
   - [x] output setpoint tracking
   - [x] move suppression
   - [x] input setpoint tracking
+  - [-] terminal costs
   - [x] economic costs (economic model predictive control)
 - [x] explicit predictive controller for problems without constraint
 - [x] soft and hard constraints on:
