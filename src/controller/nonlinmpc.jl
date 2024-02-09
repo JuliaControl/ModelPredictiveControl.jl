@@ -131,9 +131,9 @@ This method uses the default state estimator :
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
-- `M_Hp=diagm(repeat(Mwt,Hp))` : positive semidefinite symmetric weight ``\mathbf{M}_{H_p}``.
-- `N_Hc=diagm(repeat(Nwt,Hc))` : positive semidefinite symmetric weight ``\mathbf{N}_{H_c}``.
-- `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric weight ``\mathbf{L}_{H_p}``.
+- `M_Hp=diagm(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
+- `N_Hc=diagm(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
+- `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
 - `JE=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E)``.

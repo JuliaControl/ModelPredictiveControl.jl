@@ -103,8 +103,9 @@ in which the weight matrices are repeated ``H_p`` or ``H_c`` times by default:
     \mathbf{L}_{H_p} &= \text{diag}\mathbf{(L,L,...,L)}     
 \end{aligned}
 ```
-Time-varying weights over the horizons are also supported. The ``\mathbf{ΔU}`` includes the 
-input increments ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to
+Time-varying and non-diagonal weights are also supported. Modify the last block in 
+``\mathbf{M}_{H_p}`` to specify a terminal weight. The ``\mathbf{ΔU}`` includes the input 
+increments ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to
 ``H_c-1``, the ``\mathbf{Ŷ}`` vector, the output predictions ``\mathbf{ŷ}(k+j)`` from
 ``j=1`` to ``H_p``, and the ``\mathbf{U}`` vector, the manipulated inputs ``\mathbf{u}(k+j)``
 from ``j=0`` to ``H_p-1``. The slack variable ``ϵ`` relaxes the constraints, as described
@@ -120,9 +121,9 @@ arguments.
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
-- `M_Hp=diagm(repeat(Mwt,Hp))` : positive semidefinite symmetric weight ``\mathbf{M}_{H_p}``.
-- `N_Hc=diagm(repeat(Nwt,Hc))` : positive semidefinite symmetric weight ``\mathbf{N}_{H_c}``.
-- `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric weight ``\mathbf{L}_{H_p}``.
+- `M_Hp=diagm(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
+- `N_Hc=diagm(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
+- `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
