@@ -14,9 +14,9 @@ struct LinMPC{
     ŷ ::Vector{NT}
     Hp::Int
     Hc::Int
-    M_Hp::Diagonal{NT, Vector{NT}}
-    Ñ_Hc::Diagonal{NT, Vector{NT}}
-    L_Hp::Diagonal{NT, Vector{NT}}
+    M_Hp::Hermitian{NT, Matrix{NT}}
+    Ñ_Hc::Hermitian{NT, Matrix{NT}}
+    L_Hp::Hermitian{NT, Matrix{NT}}
     C::NT
     E::NT
     R̂u::Vector{NT}
@@ -49,7 +49,8 @@ struct LinMPC{
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         Ewt = 0   # economic costs not supported for LinMPC
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-        M_Hp, N_Hc, L_Hp = Diagonal{NT}(M_Hp), Diagonal{NT}(N_Hc), Diagonal{NT}(L_Hp) # debug julia 1.6
+        # Matrix() call is needed to convert `Diagonal` to normal `Matrix`
+        M_Hp, N_Hc, L_Hp = Hermitian(Matrix(M_Hp)), Hermitian(Matrix(N_Hc)), Hermitian(Matrix(L_Hp))
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
@@ -102,8 +103,9 @@ in which the weight matrices are repeated ``H_p`` or ``H_c`` times by default:
     \mathbf{L}_{H_p} &= \text{diag}\mathbf{(L,L,...,L)}     
 \end{aligned}
 ```
-Time-varying weights over the horizons are also supported. The ``\mathbf{ΔU}`` includes the 
-input increments ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to
+Time-varying and non-diagonal weights are also supported. Modify the last block in 
+``\mathbf{M}_{H_p}`` to specify a terminal weight. The ``\mathbf{ΔU}`` includes the input 
+increments ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to
 ``H_c-1``, the ``\mathbf{Ŷ}`` vector, the output predictions ``\mathbf{ŷ}(k+j)`` from
 ``j=1`` to ``H_p``, and the ``\mathbf{U}`` vector, the manipulated inputs ``\mathbf{u}(k+j)``
 from ``j=0`` to ``H_p-1``. The slack variable ``ϵ`` relaxes the constraints, as described
@@ -119,9 +121,9 @@ arguments.
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
-- `M_Hp=Diagonal(repeat(Mwt),Hp)` : diagonal weight matrix ``\mathbf{M}_{H_p}``.
-- `N_Hc=Diagonal(repeat(Nwt),Hc)` : diagonal weight matrix ``\mathbf{N}_{H_c}``.
-- `L_Hp=Diagonal(repeat(Lwt),Hp)` : diagonal weight matrix ``\mathbf{L}_{H_p}``.
+- `M_Hp=diagm(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
+- `N_Hc=diagm(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
+- `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
@@ -174,9 +176,9 @@ function LinMPC(
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
-    M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
-    L_Hp = Diagonal(repeat(Lwt, Hp)),
+    M_Hp = diagm(repeat(Mwt, Hp)),
+    N_Hc = diagm(repeat(Nwt, Hc)),
+    L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt = DEFAULT_CWT,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
@@ -215,9 +217,9 @@ function LinMPC(
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
-    M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
-    L_Hp = Diagonal(repeat(Lwt, Hp)),
+    M_Hp = diagm(repeat(Mwt, Hp)),
+    N_Hc = diagm(repeat(Nwt, Hc)),
+    L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}

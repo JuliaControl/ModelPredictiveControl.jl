@@ -15,9 +15,9 @@ struct NonLinMPC{
     ŷ ::Vector{NT}
     Hp::Int
     Hc::Int
-    M_Hp::Diagonal{NT, Vector{NT}}
-    Ñ_Hc::Diagonal{NT, Vector{NT}}
-    L_Hp::Diagonal{NT, Vector{NT}}
+    M_Hp::Hermitian{NT, Matrix{NT}}
+    Ñ_Hc::Hermitian{NT, Matrix{NT}}
+    L_Hp::Hermitian{NT, Matrix{NT}}
     C::NT
     E::NT
     JE::JEfunc
@@ -50,7 +50,8 @@ struct NonLinMPC{
         nu, ny, nd = model.nu, model.ny, model.nd
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-        M_Hp, N_Hc, L_Hp = Diagonal{NT}(M_Hp), Diagonal{NT}(N_Hc), Diagonal{NT}(L_Hp) # debug julia 1.6
+        # Matrix() call is needed to convert `Diagonal` to normal `Matrix`
+        M_Hp, N_Hc, L_Hp = Hermitian(Matrix(M_Hp)), Hermitian(Matrix(N_Hc)), Hermitian(Matrix(L_Hp))
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
@@ -130,9 +131,9 @@ This method uses the default state estimator :
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
-- `M_Hp=Diagonal(repeat(Mwt),Hp)` : diagonal weight matrix ``\mathbf{M}_{H_p}``.
-- `N_Hc=Diagonal(repeat(Nwt),Hc)` : diagonal weight matrix ``\mathbf{N}_{H_c}``.
-- `L_Hp=Diagonal(repeat(Lwt),Hp)` : diagonal weight matrix ``\mathbf{L}_{H_p}``.
+- `M_Hp=diagm(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
+- `N_Hc=diagm(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
+- `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
 - `JE=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E)``.
@@ -179,9 +180,9 @@ function NonLinMPC(
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
-    M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
-    L_Hp = Diagonal(repeat(Lwt, Hp)),
+    M_Hp = diagm(repeat(Mwt, Hp)),
+    N_Hc = diagm(repeat(Nwt, Hc)),
+    L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE::Function = (_,_,_) -> 0.0,
@@ -199,9 +200,9 @@ function NonLinMPC(
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
-    M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
-    L_Hp = Diagonal(repeat(Lwt, Hp)),
+    M_Hp = diagm(repeat(Mwt, Hp)),
+    N_Hc = diagm(repeat(Nwt, Hc)),
+    L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE::Function = (_,_,_) -> 0.0,
@@ -242,9 +243,9 @@ function NonLinMPC(
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
-    M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
-    L_Hp = Diagonal(repeat(Lwt, Hp)),
+    M_Hp = diagm(repeat(Mwt, Hp)),
+    N_Hc = diagm(repeat(Nwt, Hc)),
+    L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE::JEFunc = (_,_,_) -> 0.0,

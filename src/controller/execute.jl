@@ -180,7 +180,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
         mpc.R̂u .= R̂u
         C_u = mpc.T_lastu .- mpc.R̂u
         mpc.q̃ .+= lmul!(2, (mpc.L_Hp*mpc.S̃)'*C_u)
-        mpc.p .+= dot(C_y, mpc.L_Hp, C_u)
+        mpc.p .+= dot(C_u, mpc.L_Hp, C_u)
     end
     return nothing
 end

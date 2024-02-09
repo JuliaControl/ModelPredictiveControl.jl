@@ -4,9 +4,9 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     ŷ ::Vector{NT}
     Hp::Int
     Hc::Int
-    M_Hp::Diagonal{NT, Vector{NT}}
-    Ñ_Hc::Diagonal{NT, Vector{NT}}
-    L_Hp::Diagonal{NT, Vector{NT}}
+    M_Hp::Hermitian{NT, Matrix{NT}}
+    Ñ_Hc::Hermitian{NT, Matrix{NT}}
+    L_Hp::Hermitian{NT, Matrix{NT}}
     C::NT
     E::NT
     R̂u::Vector{NT}
@@ -41,7 +41,8 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         Cwt = Inf # no slack variable ϵ for ExplicitMPC
         Ewt = 0   # economic costs not supported for ExplicitMPC
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-        M_Hp, N_Hc, L_Hp = Diagonal{NT}(M_Hp), Diagonal{NT}(N_Hc), Diagonal{NT}(L_Hp) # debug julia 1.6
+        # Matrix() call is needed to convert `Diagonal` to normal `Matrix`
+        M_Hp, N_Hc, L_Hp = Hermitian(Matrix(M_Hp)), Hermitian(Matrix(N_Hc)), Hermitian(Matrix(L_Hp))
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
@@ -118,9 +119,9 @@ function ExplicitMPC(
     Mwt = fill(DEFAULT_MWT, model.ny),
     Nwt = fill(DEFAULT_NWT, model.nu),
     Lwt = fill(DEFAULT_LWT, model.nu),
-    M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
-    L_Hp = Diagonal(repeat(Lwt, Hp)),
+    M_Hp = diagm(repeat(Mwt, Hp)),
+    N_Hc = diagm(repeat(Nwt, Hc)),
+    L_Hp = diagm(repeat(Lwt, Hp)),
     kwargs...
 ) 
     estim = SteadyKalmanFilter(model; kwargs...)
@@ -156,9 +157,9 @@ function ExplicitMPC(
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
-    M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
-    L_Hp = Diagonal(repeat(Lwt, Hp)),
+    M_Hp = diagm(repeat(Mwt, Hp)),
+    N_Hc = diagm(repeat(Nwt, Hc)),
+    L_Hp = diagm(repeat(Lwt, Hp)),
 ) where {NT<:Real, SE<:StateEstimator{NT}}
     isa(estim.model, LinModel) || error("estim.model type must be a LinModel") 
     nk = estimate_delays(estim.model)

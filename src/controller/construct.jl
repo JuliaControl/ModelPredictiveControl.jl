@@ -672,18 +672,18 @@ returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{
 ```
 """
 function relaxΔU(::SimModel{NT}, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) where {NT<:Real}
-    diag_N_Hc = diag(N_Hc)
+    nΔU = size(N_Hc, 1)
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
         # 0 ≤ ϵ ≤ ∞  
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]]
         A_ϵ = [zeros(NT, 1, length(ΔUmin)) NT[1.0]]
         A_ΔŨmin, A_ΔŨmax = -[I  C_Δumin; A_ϵ], [I -C_Δumax; A_ϵ]
-        Ñ_Hc = Diagonal{NT}([diag_N_Hc; C])
+        Ñ_Hc = Hermitian([N_Hc zeros(NT, nΔU, 1);zeros(NT, 1, nΔU) C])
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
-        I_Hc = Matrix{NT}(I, size(N_Hc))
+        I_Hc = Matrix{NT}(I, nΔU, nΔU)
         A_ΔŨmin, A_ΔŨmax = -I_Hc,  I_Hc
-        Ñ_Hc = Diagonal{NT}(diag_N_Hc)
+        Ñ_Hc = N_Hc
     end
     return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
 end
@@ -817,9 +817,12 @@ function validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, C, E=nothing)
     size(M_Hp) ≠ (nM,nM) && throw(ArgumentError("M_Hp size $(size(M_Hp)) ≠ (ny*Hp, ny*Hp) ($nM,$nM)"))
     size(N_Hc) ≠ (nN,nN) && throw(ArgumentError("N_Hc size $(size(N_Hc)) ≠ (nu*Hc, nu*Hc) ($nN,$nN)"))
     size(L_Hp) ≠ (nL,nL) && throw(ArgumentError("L_Hp size $(size(L_Hp)) ≠ (nu*Hp, nu*Hp) ($nL,$nL)"))
-    (!isdiag(M_Hp) || any(diag(M_Hp).<0)) && throw(ArgumentError("M_Hp should be a positive semidefinite diagonal matrix"))
-    (!isdiag(N_Hc) || any(diag(N_Hc).<0)) && throw(ArgumentError("N_Hc should be a positive semidefinite diagonal matrix"))
-    (!isdiag(L_Hp) || any(diag(L_Hp).<0)) && throw(ArgumentError("L_Hp should be a positive semidefinite diagonal matrix"))
+    (isdiag(M_Hp) && any(diag(M_Hp) .< 0)) && throw(ArgumentError("Mwt values should be nonnegative"))
+    (isdiag(N_Hc) && any(diag(N_Hc) .< 0)) && throw(ArgumentError("Nwt values should be nonnegative"))
+    (isdiag(L_Hp) && any(diag(L_Hp) .< 0)) && throw(ArgumentError("Lwt values should be nonnegative"))
+    !ishermitian(M_Hp) && throw(ArgumentError("M_Hp should be hermitian"))
+    !ishermitian(N_Hc) && throw(ArgumentError("N_Hc should be hermitian"))
+    !ishermitian(L_Hp) && throw(ArgumentError("L_Hp should be hermitian"))
     size(C) ≠ ()    && throw(ArgumentError("Cwt should be a real scalar"))
     C < 0           && throw(ArgumentError("Cwt weight should be ≥ 0"))
     !isnothing(E) && size(E) ≠ () && throw(ArgumentError("Ewt should be a real scalar"))
