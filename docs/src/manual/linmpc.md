@@ -190,7 +190,7 @@ closed-loop performance of a state feedback controller, like here, depends on th
 of the plant state estimate.
 
 For the CSTR, we will bound the innovation term ``\mathbf{\mathbf{y}(k) - \mathbf{ŷ}(k)} =
-\mathbf{v̂}``, and increase ``\mathbf{Q}_{int_u}`` to accelerate the estimation of the load
+\mathbf{v̂}``, and increase ``\mathbf{Q_{int_u}}`` to accelerate the estimation of the load
 disturbance. The rejection is slightly faster:
 
 ```@example 1
