@@ -398,26 +398,21 @@ function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     ΔŨvar = optim[:ΔŨvar]
     con = mpc.con
     map(con -> delete(optim, con), all_nonlinear_constraints(optim))
-    #=
     for i in findall(.!isinf.(con.Ymin))
-        f_sym = Symbol("g_Ymin_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
-        @constraint(optim, f_sym <= 0)
+        gfunc_i = optim[Symbol("g_Ymin_$(i)")]
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     for i in findall(.!isinf.(con.Ymax))
-        f_sym = Symbol("g_Ymax_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        gfunc_i = optim[Symbol("g_Ymax_$(i)")]
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
-    =#
     for i in findall(.!isinf.(con.x̂min))
-        f_sym = Symbol("g_x̂min_$(i)")
-        #add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
-        #add_constraint(optim, :))
-        #@constraint(optim, (ΔŨvar...) <= 0)
+        gfunc_i = optim[Symbol("g_x̂min_$(i)")]
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     for i in findall(.!isinf.(con.x̂max))
-        f_sym = Symbol("g_x̂max_$(i)")
-        #add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        gfunc_i = optim[Symbol("g_x̂max_$(i)")]
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     return nothing
 end
