@@ -177,6 +177,37 @@ savefig(ans, "plot2_LinMPC.svg"); nothing # hide
 
 ![plot2_LinMPC](plot2_LinMPC.svg)
 
+## Moving Horizon Estimation
+
+The [`SteadyKalmanFilter`](@ref) is a simple observer but it is not able to handle
+constraints at estimation. The [`MovingHorizonEstimator`](@ref) (MHE) can improve the
+accuracy of the state estimate ``\mathbf{x̂}``. It solves a quadratic optimization problem
+under a past time window ``\mathbf{H_e}``, and bounds on the estimated plant state
+``\mathbf{x̂}``, estimated process noise ``\mathbf{ŵ}`` and estimated sensor noise
+``\mathbf{v̂}`` can be included in the problem. This can be useful to include physical
+knowledge in the soft sensor, without adding new physical sensors (e.g. a strictly positive
+concentration). The closed-loop performance of a predictive controller depends on the
+accuracy of the plant state estimate.
+
+For the CSTR, we will bound the innovation term ``\mathbf{\mathbf{y}(k)-\mathbf{ŷ}(k)}``,
+and increase ``\mathbf{Q}_{int_u}`` to accelerate the estimation of the load
+disturbance. The rejection is slightly faster:
+
+```@example 1
+estim = MovingHorizonEstimator(model, He=10, nint_u=[1, 1], σQint_u = [2, 2])
+estim = setconstraint!(estim, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+mpc_mhe = LinMPC(estim, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
+mpc_mhe = setconstraint!(mpc_mhe, ymin=[45, -Inf])
+setstate!(model, zeros(model.nx))
+u, y, d = model.uop, model(), mpc_mhe.estim.model.dop
+initstate!(mpc_mhe, u, y, d)
+u_data, y_data, ry_data = test_mpc(mpc_mhe, model)
+plot_data(t_data, u_data, y_data, ry_data)
+savefig(ans, "plot3_LinMPC.svg"); nothing # hide
+```
+
+![plot3_LinMPC](plot3_LinMPC.svg)
+
 ## Adding Feedforward Compensation
 
 Suppose that the load disturbance ``u_l`` of the last section is in fact caused by a
@@ -243,10 +274,10 @@ u, y, d = model.uop, model(), mpc_d.estim.model.dop
 initstate!(mpc_d, u, y, d)
 u_data, y_data, ry_data = test_mpc_d(mpc_d, model)
 plot_data(t_data, u_data, y_data, ry_data)
-savefig(ans, "plot3_LinMPC.svg"); nothing # hide
+savefig(ans, "plot4_LinMPC.svg"); nothing # hide
 ```
 
-![plot3_LinMPC](plot3_LinMPC.svg)
+![plot4_LinMPC](plot4_LinMPC.svg)
 
 Note that measured disturbances are assumed constant in the future by default but custom
 ``\mathbf{D̂}`` predictions are possible. The same applies for the setpoint predictions
