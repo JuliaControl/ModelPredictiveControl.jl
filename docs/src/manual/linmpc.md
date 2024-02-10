@@ -186,8 +186,8 @@ under a past time window ``H_e``. Bounds on the estimated plant state ``\mathbf{
 estimated process noise ``\mathbf{ŵ}`` and estimated sensor noise ``\mathbf{v̂}`` can be
 included in the problem. This can be useful to add physical knowledge in the soft sensor,
 without adding new physical sensors (e.g. a strictly positive concentration). The
-closed-loop performance of a predictive controller depends on the accuracy of the plant
-state estimate.
+closed-loop performance of a state feedback controller, like here, depends on the accuracy
+of the plant state estimate.
 
 For the CSTR, we will bound the innovation term ``\mathbf{\mathbf{y}(k) - \mathbf{ŷ}(k)} =
 \mathbf{v̂}``, and increase ``\mathbf{Q}_{int_u}`` to accelerate the estimation of the load
