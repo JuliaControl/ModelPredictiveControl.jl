@@ -139,13 +139,13 @@ Lastly, we plot the closed-loop test with the `Plots` package:
 ```@example 1
 using Plots
 function plot_data(t_data, u_data, y_data, ry_data)
-    p1 = plot(t_data, y_data[1,:], label="meas."); ylabel!("level")
+    p1 = plot(t_data, y_data[1,:], label="meas.", ylabel="level")
     plot!(p1, t_data, ry_data[1,:], label="setpoint", linestyle=:dash, linetype=:steppost)
     plot!(p1, t_data, fill(45,size(t_data)), label="min", linestyle=:dot, linewidth=1.5)
-    p2 = plot(t_data, y_data[2,:], label="meas.", legend=:topleft); ylabel!("temp.")
+    p2 = plot(t_data, y_data[2,:], label="meas.", legend=:topleft, ylabel="temp.")
     plot!(p2, t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
-    p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost); ylabel!("flow rate")
-    plot!(p3, t_data,u_data[2,:],label="hot", linetype=:steppost); xlabel!("time (s)")
+    p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost, ylabel="flow rate")
+    plot!(p3, t_data,u_data[2,:],label="hot", linetype=:steppost, xlabel="time (s)")
     return plot(p1, p2, p3, layout=(3,1))
 end
 plot_data(t_data, u_data, y_data, ry_data)
@@ -186,15 +186,16 @@ under a past time window ``H_e``. Bounds on the estimated plant state ``\mathbf{
 estimated process noise ``\mathbf{ŵ}`` and estimated sensor noise ``\mathbf{v̂}`` can be
 included in the problem. This can be useful to add physical knowledge in the soft sensor,
 without adding new physical sensors (e.g. a strictly positive concentration). The
-closed-loop performance of a state feedback controller, like here, depends on the accuracy
+closed-loop performance of any state feedback controller, like here, depends on the accuracy
 of the plant state estimate.
 
 For the CSTR, we will bound the innovation term ``\mathbf{\mathbf{y}(k) - \mathbf{ŷ}(k)} =
-\mathbf{v̂}``, and increase ``\mathbf{Q_{int_u}}`` to accelerate the estimation of the load
-disturbance. The rejection is slightly faster:
+\mathbf{v̂}``, and increase the hot water unmeasured disturbance covariance in
+``\mathbf{Q_{int_u}}``  to accelerate the estimation of the load disturbance. The rejection
+is slightly faster:
 
 ```@example 1
-estim = MovingHorizonEstimator(model, He=10, nint_u=[1, 1], σQint_u = [2, 2])
+estim = MovingHorizonEstimator(model, He=10, nint_u=[1, 1], σQint_u = [1, 2])
 estim = setconstraint!(estim, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
 mpc_mhe = LinMPC(estim, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
 mpc_mhe = setconstraint!(mpc_mhe, ymin=[45, -Inf])
@@ -211,8 +212,9 @@ savefig(ans, "plot3_LinMPC.svg"); nothing # hide
 ## Adding Feedforward Compensation
 
 Suppose that the load disturbance ``u_l`` of the last section is in fact caused by a
-separate hot water pipe that discharges into the tank. Measuring this flow rate allows us to
-incorporate feedforward compensation in the controller. The new plant model is:
+separate hot water pipe that discharges into the tank. Adding a new sensor to measure this
+flow rate allows us to incorporate feedforward compensation in the controller. The new plant
+model is:
 
 ```math
 \begin{bmatrix}
