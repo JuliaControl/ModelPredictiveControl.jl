@@ -182,15 +182,15 @@ savefig(ans, "plot2_LinMPC.svg"); nothing # hide
 The [`SteadyKalmanFilter`](@ref) is a simple observer but it is not able to handle
 constraints at estimation. The [`MovingHorizonEstimator`](@ref) (MHE) can improve the
 accuracy of the state estimate ``\mathbf{x̂}``. It solves a quadratic optimization problem
-under a past time window ``\mathbf{H_e}``, and bounds on the estimated plant state
-``\mathbf{x̂}``, estimated process noise ``\mathbf{ŵ}`` and estimated sensor noise
-``\mathbf{v̂}`` can be included in the problem. This can be useful to include physical
-knowledge in the soft sensor, without adding new physical sensors (e.g. a strictly positive
-concentration). The closed-loop performance of a predictive controller depends on the
-accuracy of the plant state estimate.
+under a past time window ``H_e``. Bounds on the estimated plant state ``\mathbf{x̂}``,
+estimated process noise ``\mathbf{ŵ}`` and estimated sensor noise ``\mathbf{v̂}`` can be
+included in the problem. This can be useful to add physical knowledge in the soft sensor,
+without adding new physical sensors (e.g. a strictly positive concentration). The
+closed-loop performance of a predictive controller depends on the accuracy of the plant
+state estimate.
 
-For the CSTR, we will bound the innovation term ``\mathbf{\mathbf{y}(k)-\mathbf{ŷ}(k)}``,
-and increase ``\mathbf{Q}_{int_u}`` to accelerate the estimation of the load
+For the CSTR, we will bound the innovation term ``\mathbf{\mathbf{y}(k) - \mathbf{ŷ}(k)} =
+\mathbf{v̂}``, and increase ``\mathbf{Q}_{int_u}`` to accelerate the estimation of the load
 disturbance. The rejection is slightly faster:
 
 ```@example 1
