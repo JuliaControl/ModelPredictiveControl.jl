@@ -393,11 +393,13 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
 end
 
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
-function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
-    optim = mpc.optim
+function setnonlincon!(
+    mpc::NonLinMPC, ::NonLinModel, optim::JuMP.GenericModel{JNT}
+) where JNT<:Real
     ΔŨvar = optim[:ΔŨvar]
     con = mpc.con
-    map(con -> delete(optim, con), all_nonlinear_constraints(optim))
+    nonlin_constraints = all_constraints(optim, NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> delete(optim, con_ref), nonlin_constraints)
     for i in findall(.!isinf.(con.Ymin))
         gfunc_i = optim[Symbol("g_Ymin_$(i)")]
         @constraint(optim, gfunc_i(ΔŨvar...) <= 0)

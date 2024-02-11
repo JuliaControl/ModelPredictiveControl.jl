@@ -440,3 +440,6 @@ function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂, V̂,
     end
     return g
 end
+
+"No nonlinear constraints if `model` is a [`LinModel`](@ref), return `g` unchanged."
+con_nonlinprog!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , _ ) = g

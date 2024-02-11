@@ -495,7 +495,7 @@ function setconstraint!(
         delete(optim, optim[:linconstraint])
         unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        setnonlincon!(estim, model)
+        setnonlincon!(estim, model, optim)
     else
         i_b, i_g = init_matconstraint_mhe(model, 
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
@@ -557,28 +557,31 @@ function init_matconstraint_mhe(::SimModel{NT},
 end
 
 "By default, no nonlinear constraints in the MHE, thus return nothing."
-setnonlincon!(::MovingHorizonEstimator, ::SimModel) = nothing
+setnonlincon!(::MovingHorizonEstimator, ::SimModel, ::JuMP.GenericModel) = nothing
 
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
-function setnonlincon!(estim::MovingHorizonEstimator, ::NonLinModel)
+function setnonlincon!(
+    estim::MovingHorizonEstimator, ::NonLinModel, optim::JuMP.GenericModel{JNT}
+) where JNT<:Real
     optim, con = estim.optim, estim.con
     Z̃var = optim[:Z̃var]
-    map(con -> delete(optim, con), all_nonlinear_constraints(optim))
+    nonlin_constraints = all_constraints(optim, NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> delete(optim, con_ref), nonlin_constraints)
     for i in findall(.!isinf.(con.X̂min))
-        f_sym = Symbol("g_X̂min_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+        gfunc_i = optim[Symbol("g_X̂min_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
     end
     for i in findall(.!isinf.(con.X̂max))
-        f_sym = Symbol("g_X̂max_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+        gfunc_i = optim[Symbol("g_X̂max_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
     end
     for i in findall(.!isinf.(con.V̂min))
-        f_sym = Symbol("g_V̂min_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+        gfunc_i = optim[Symbol("g_V̂min_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
     end
     for i in findall(.!isinf.(con.V̂max))
-        f_sym = Symbol("g_V̂max_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+        gfunc_i = optim[Symbol("g_V̂max_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
     end
     return nothing
 end
@@ -1054,27 +1057,27 @@ function init_optimization!(
         gfunc = [(Z̃...) -> gfunc_i(i, Z̃) for i in 1:ng]
         Jfunc, gfunc
     end
-    register(optim, :Jfunc, nZ̃, Jfunc, autodiff=true)
-    @NLobjective(optim, Min, Jfunc(Z̃var...))
+    @operator(optim, J, nZ̃, Jfunc)
+    @objective(optim, Min, J(Z̃var...))
     if ng ≠ 0
         for i in eachindex(con.X̂min)
-            sym = Symbol("g_X̂min_$i")
-            register(optim, sym, nZ̃, gfunc[i], autodiff=true)
+            name = Symbol("g_X̂min_$i")
+            optim[name] = add_nonlinear_operator(optim, nZ̃, gfunc[i]; name)
         end
         i_end_X̂min = nX̂
         for i in eachindex(con.X̂max)
-            sym = Symbol("g_X̂max_$i")
-            register(optim, sym, nZ̃, gfunc[i_end_X̂min+i], autodiff=true)
+            name = Symbol("g_X̂max_$i")
+            optim[name] = add_nonlinear_operator(optim, nZ̃, gfunc[i_end_X̂min + i]; name)
         end
         i_end_X̂max = 2*nX̂
         for i in eachindex(con.V̂min)
-            sym = Symbol("g_V̂min_$i")
-            register(optim, sym, nZ̃, gfunc[i_end_X̂max+i], autodiff=true)
+            name = Symbol("g_V̂min_$i")
+            optim[name] = add_nonlinear_operator(optim, nZ̃, gfunc[i_end_X̂max + i]; name)
         end
         i_end_V̂min = 2*nX̂ + nV̂
         for i in eachindex(con.V̂max)
-            sym = Symbol("g_V̂max_$i")
-            register(optim, sym, nZ̃, gfunc[i_end_V̂min+i], autodiff=true)
+            name = Symbol("g_V̂max_$i")
+            optim[name] = add_nonlinear_operator(optim, nZ̃, gfunc[i_end_V̂min + i]; name)
         end
     end
     return nothing
