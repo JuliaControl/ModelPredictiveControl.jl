@@ -415,8 +415,7 @@ end
     @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
 
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
-    # TODO: to uncomment when deprecated constructor is removed:
-    # @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=nothing)
+    @test_throws ArgumentError NonLinMPC(nonlinmodel)
 end
 
 @testset "NonLinMPC moves and getinfo" begin
