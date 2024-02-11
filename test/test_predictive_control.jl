@@ -389,8 +389,10 @@ end
     nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(UE,ŶE,D̂E) -> UE.*ŶE.*D̂E)
     @test nmpc7.E == 1e-3
     @test nmpc7.JE([1,2],[3,4],[4,6]) == [12, 48]
-    nmpc8 = NonLinMPC(nonlinmodel, Hp=15, optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer))
-    @test solver_name(nmpc8.optim) == "OSQP"
+    optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
+    nmpc8 = NonLinMPC(nonlinmodel, Hp=15, optim=optim)
+    @test solver_name(nmpc8.optim) == "Ipopt"
+    @test get_attribute(nmpc8.optim, "nlp_scaling_max_gradient") == 1.0
     im = InternalModel(nonlinmodel)
     nmpc9 = NonLinMPC(im, Hp=15)
     @test isa(nmpc9.estim, InternalModel)
@@ -455,11 +457,12 @@ end
     nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[0], Nwt=[0], Lwt=[1])
     u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
-    nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Hp=15, Cwt=Inf), ymax=[1])
-    g_Ymax_end = nmpc5.optim.nlp_model.operators.registered_multivariate_operators[end].f
-    @test g_Ymax_end((1.0, 1.0)) ≤ 0.0 # test gfunc_i(i,::NTuple{N, Float64})
+    nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Hp=15, Cwt=Inf), ymin=[1])
+    g_Ymin_end = nmpc5.optim[:g_Ymin_15].func
+    # test gfunc_i(i,::NTuple{N, Float64}):
+    @test g_Ymin_end(20.0, 10.0) ≤ 0.0 
     # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
-    @test ForwardDiff.gradient(g_Ymax_end, [1.0, 1.0]) ≈ [0.0, 0.0]
+    @test ForwardDiff.gradient(vec->g_Ymin_end(vec...), [20.0, 10.0]) ≈ [-5, -5] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     moveinput!(nmpc6, [0]) ≈ [0.0]
