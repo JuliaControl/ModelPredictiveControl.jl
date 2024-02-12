@@ -47,6 +47,6 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/franckgaga/ModelPredictiveControl.jl.git",
+    repo = "github.com/JuliaControl/ModelPredictiveControl.jl.git",
     devbranch = "main",
 )
