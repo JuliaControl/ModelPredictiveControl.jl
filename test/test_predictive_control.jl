@@ -235,7 +235,7 @@ end
 @testset "LinMPC terminal cost" begin
     model = LinModel(ss([0.5 -0.4;0.6 0.5], [1 0;0 1], [1 0; 0 1], 0, 1))
     K = lqr(Discrete, model.A, model.Bu, I, 0.5I)
-    M_end, _ = ControlSystemsBase.ared(model.A, model.Bu, I, 0.5I)
+    M_end = ControlSystemsBase.are(Discrete, model.A, model.Bu, I, 0.5I)
     M_Hp = [I(4) zeros(4,2); zeros(2,4) M_end]
     mpc = LinMPC(model; Hp=3, Hc=3, M_Hp, Nwt=[0; 0], Lwt=[0.5, 0.5], nint_ym=0)
     X_mpc = zeros(2,20)
@@ -255,7 +255,7 @@ end
         X_lqr[:,i] = x
         x = model.A*x + model.Bu*u
     end
-    @test all(isapprox.(X_mpc, X_lqr, atol=1e-3))
+    @test all(isapprox.(X_mpc, X_lqr, atol=1e-5))
 end
 
 @testset "ExplicitMPC construction" begin
