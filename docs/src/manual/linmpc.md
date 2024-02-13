@@ -179,26 +179,30 @@ savefig(ans, "plot2_LinMPC.svg"); nothing # hide
 
 ## Moving Horizon Estimation
 
-The [`SteadyKalmanFilter`](@ref) is a simple observer but it is not able to handle
-constraints at estimation. The [`MovingHorizonEstimator`](@ref) (MHE) can improve the
-accuracy of the state estimate ``\mathbf{x̂}``. It solves a quadratic optimization problem
-under a past time window ``H_e``. Bounds on the estimated plant state ``\mathbf{x̂}``,
-estimated process noise ``\mathbf{ŵ}`` and estimated sensor noise ``\mathbf{v̂}`` can be
-included in the problem. This can be useful to add physical knowledge in the soft sensor,
-without adding new physical sensors (e.g. a strictly positive concentration). The
-closed-loop performance of any state feedback controller, like here, depends on the accuracy
-of the plant state estimate.
+The [`SteadyKalmanFilter`](@ref) is simple but it is not able to handle constraints at
+estimation. The [`MovingHorizonEstimator`](@ref) (MHE) can improve the accuracy of the state
+estimate ``\mathbf{x̂}``. It solves a quadratic optimization problem under a past time window
+``H_e``. Bounds on the estimated plant state ``\mathbf{x̂}``, estimated process noise
+``\mathbf{ŵ}`` and estimated sensor noise ``\mathbf{v̂}`` can be included in the problem.
+This can be useful to add physical knowledge on the plant and its disturbances, and it does
+not require the installation of new physical sensors (e.g. a strictly positive
+concentration). The closed-loop performance of any state feedback controller, like here,
+depends on the accuracy of the plant state estimate.
 
-For the CSTR, we will bound the innovation term ``\mathbf{\mathbf{y}(k) - \mathbf{ŷ}(k)} =
-\mathbf{v̂}``, and increase the hot water unmeasured disturbance covariance in
-``\mathbf{Q_{int_u}}``  to accelerate the estimation of the load disturbance. The rejection
-is slightly faster:
+For the CSTR, we will bound the innovation term ``\mathbf{y}(k) - \mathbf{ŷ}(k) =
+\mathbf{v̂}(k)``, and increase the hot water unmeasured disturbance covariance in
+``\mathbf{Q_{int_u}}`` to accelerate the estimation of the load disturbance:
 
 ```@example 1
 estim = MovingHorizonEstimator(model, He=10, nint_u=[1, 1], σQint_u = [1, 2])
 estim = setconstraint!(estim, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
 mpc_mhe = LinMPC(estim, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
 mpc_mhe = setconstraint!(mpc_mhe, ymin=[45, -Inf])
+```
+
+The rejection is slightly improved:
+
+```@example 1
 setstate!(model, zeros(model.nx))
 u, y, d = model.uop, model(), mpc_mhe.estim.model.dop
 initstate!(mpc_mhe, u, y, d)
