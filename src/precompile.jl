@@ -1,3 +1,4 @@
+#=
 sys = [ 
     tf(1.90, [1800, 1]) tf(1.90, [1800, 1]);
     tf(-0.74,[800, 1])  tf(0.74, [800, 1]) 
@@ -98,3 +99,4 @@ end
 empc = setconstraint!(NonLinMPC(nlmodel, Mwt=[0, 0], Hp=10, Cwt=Inf, Ewt=1, JE=JE), ymin=[45, -Inf])
 u = empc()
 sim!(empc, 3)
+=#

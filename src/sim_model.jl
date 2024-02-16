@@ -144,7 +144,7 @@ julia> x = updatestate!(model, [1])
 """
 function updatestate!(model::SimModel, u, d=empty(model.x))
     validate_args(model::SimModel, u, d)
-    model.x[:] = f(model, model.x, u - model.uop, d - model.dop)
+    model.x .= f!(model.x, model, u - model.uop, d - model.dop)
     return model.x
 end
 

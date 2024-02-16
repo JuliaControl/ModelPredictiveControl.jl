@@ -1,7 +1,7 @@
 struct NonLinModel{NT<:Real, F<:Function, H<:Function} <: SimModel{NT}
     x::Vector{NT}
-    f::F
-    h::H
+    f!::F
+    h!::H
     Ts::NT
     nu::Int
     nx::Int
@@ -11,22 +11,21 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function} <: SimModel{NT}
     yop::Vector{NT}
     dop::Vector{NT}
     function NonLinModel{NT, F, H}(
-        f::F, h::H, Ts, nu, nx, ny, nd
+        f!::F, h!::H, Ts, nu, nx, ny, nd
     ) where {NT<:Real, F<:Function, H<:Function}
         Ts > 0 || error("Sampling time Ts must be positive")
-        validate_fcts(NT, f, h)
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
         x = zeros(NT, nx)
-        return new{NT, F, H}(x, f, h, Ts, nu, nx, ny, nd, uop, yop, dop)
+        return new{NT, F, H}(x, f!, h!, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
 end
 
 @doc raw"""
-    NonLinModel{NT}(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
+    NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0)
 
-Construct a nonlinear model from discrete-time state-space functions `f` and `h`.
+Construct a nonlinear model from discrete-time state-space functions `f!` and `h!`.
 
 The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined as :
 ```math
@@ -46,7 +45,7 @@ Nonlinear continuous-time state-space functions are not supported for now. In su
 manually call a differential equation solver in `f` (see [Manual](@ref man_nonlin)).
 
 !!! warning
-    `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref),
+    `f!` and `h!` must be pure Julia functions to use the model in [`NonLinMPC`](@ref),
     [`ExtendedKalmanFilter`](@ref), [`MovingHorizonEstimator`](@ref) and [`linearize`](@ref).
 
 See also [`LinModel`](@ref).
@@ -62,41 +61,82 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
 ```
 """
 function NonLinModel{NT}(
-    f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
-) where {NT<:Real, F<:Function, H<:Function}
-    return NonLinModel{NT, F, H}(f, h, Ts, nu, nx, ny, nd)
+    f!::Function, h!::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
+) where {NT<:Real}
+    iscontinous = validate_fcts(NT, f!, h!)
+    if iscontinous
+        fc! = f!
+        f! = let nx=nx, Ts=Ts, NT=NT
+            ẋ = zeros(NT, nx)
+            xterm = zeros(NT, nx)
+            k1, k2, k3, k4 = zeros(NT, nx), zeros(NT, nx), zeros(NT, nx), zeros(NT, nx)
+            function rk4!(x, u, d)
+                xterm .= x
+                fc!(ẋ, xterm, u, d)
+                k1 .= ẋ
+                xterm .= @. x + k1 * Ts/2
+                fc!(ẋ, xterm, u, d)
+                k2 .= ẋ 
+                xterm .= @. x + k2 * Ts/2
+                fc!(ẋ, xterm, u, d)
+                k3 .= ẋ
+                xterm .= @. x + k3 * Ts
+                fc!(ẋ, xterm, u, d)
+                k4 .= ẋ
+                x .+= @. (k1 + 2k2 + 2k3 + k4)*Ts/6
+                return x
+            end
+            rk4!
+        end
+    end
+    F, H = getFuncTypes(f!, h!)
+    return NonLinModel{NT, F, H}(f!, h!, Ts, nu, nx, ny, nd)
 end
 
 function NonLinModel(
-    f::F, h::H, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
-) where {F<:Function, H<:Function}
-    return NonLinModel{Float64, F, H}(f, h, Ts, nu, nx, ny, nd)
+    f!::Function, h!::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
+)
+    return NonLinModel{Float64}(f!, h!, Ts, nu, nx, ny, nd)
 end
 
-"Validate `f` and `h` function argument signatures."
-function validate_fcts(NT, f, h)
-    fargsvalid1 = hasmethod(f,
+getFuncTypes(f!::F, h!::H) where {F<:Function, H<:Function} = F, H
+
+
+"""
+    validate_fcts(NT, f!, h!) -> iscontinuous
+
+Validate `f!` and `h!` function argument signatures and return `true` if `f!` is continuous.
+"""
+function validate_fcts(NT, f!, h!)
+    isdiscrete = hasmethod(f!,
         Tuple{Vector{NT}, Vector{NT}, Vector{NT}}
     )
-    if !fargsvalid1
+    iscontinuous = hasmethod(f!,
+        Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}}
+    )
+    if !isdiscrete && !iscontinuous
+        println(isdiscrete)
+        println(iscontinuous)
         error("state function has no method with type signature "*
-              "f(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)})")
+              "f!(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}) or "*
+              "f!(ẋ::Vector{$(NT)}, x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)})")
     end
-    hargsvalid1 = hasmethod(h,Tuple{Vector{NT}, Vector{NT}})
-    if !hargsvalid1
+    hargsvalid = hasmethod(h!,Tuple{Vector{NT}, Vector{NT}})
+    if !hargsvalid
         error("output function has no method with type signature "*
               "h(x::Vector{$(NT)}, d::Vector{$(NT)})")
     end
+    return iscontinuous
 end
 
 "Do nothing if `model` is a [`NonLinModel`](@ref)."
 steadystate!(::SimModel, _ , _ ) = nothing
 
 
-"Call ``\\mathbf{f(x, u, d)}`` with `model.f` function for [`NonLinModel`](@ref)."
-f(model::NonLinModel, x, u, d) = model.f(x, u, d)
+"Call ``\\mathbf{f!(x, u, d)}`` with `model.f!` function for [`NonLinModel`](@ref)."
+f!(x, model::NonLinModel, u, d) = model.f!(x, u, d)
 
 "Call ``\\mathbf{h(x, d)}`` with `model.h` function for [`NonLinModel`](@ref)."
-h(model::NonLinModel, x, d) = model.h(x, d)
+h(model::NonLinModel, x, d) = model.h!(x, d)
 
 typestr(model::NonLinModel) = "nonlinear"
