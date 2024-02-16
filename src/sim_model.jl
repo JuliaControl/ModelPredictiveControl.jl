@@ -144,7 +144,7 @@ julia> x = updatestate!(model, [1])
 """
 function updatestate!(model::SimModel, u, d=empty(model.x))
     validate_args(model::SimModel, u, d)
-    model.x .= f!(model.x, model, u - model.uop, d - model.dop)
+    f!(model.x, model, u - model.uop, d - model.dop)
     return model.x
 end
 
@@ -164,7 +164,11 @@ julia> y = evaloutput(model)
  20.0
 ```
 """
-evaloutput(model::SimModel, d=empty(model.x)) = h(model, model.x, d - model.dop) + model.yop
+function evaloutput(model::SimModel{NT}, d=empty(model.x)) where NT <: Real
+    y = Vector{NT}(undef, model.ny)
+    h!(y, model, model.x, d - model.dop) + model.yop
+    return y
+end
 
 """
     validate_args(model::SimModel, u, d)

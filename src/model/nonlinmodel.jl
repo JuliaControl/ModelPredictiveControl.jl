@@ -121,10 +121,10 @@ function validate_fcts(NT, f!, h!)
               "f!(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}) or "*
               "f!(ẋ::Vector{$(NT)}, x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)})")
     end
-    hargsvalid = hasmethod(h!,Tuple{Vector{NT}, Vector{NT}})
+    hargsvalid = hasmethod(h!, Tuple{Vector{NT}, Vector{NT}, Vector{NT}})
     if !hargsvalid
         error("output function has no method with type signature "*
-              "h(x::Vector{$(NT)}, d::Vector{$(NT)})")
+              "h!(y::Vector{$(NT)}, x::Vector{$(NT)}, d::Vector{$(NT)})")
     end
     return iscontinuous
 end
@@ -136,7 +136,7 @@ steadystate!(::SimModel, _ , _ ) = nothing
 "Call ``\\mathbf{f!(x, u, d)}`` with `model.f!` function for [`NonLinModel`](@ref)."
 f!(x, model::NonLinModel, u, d) = model.f!(x, u, d)
 
-"Call ``\\mathbf{h(x, d)}`` with `model.h` function for [`NonLinModel`](@ref)."
-h(model::NonLinModel, x, d) = model.h!(x, d)
+"Call ``\\mathbf{h!(y, x, d)}`` with `model.h` function for [`NonLinModel`](@ref)."
+h!(y, model::NonLinModel, x, d) = model.h!(y, x, d)
 
 typestr(model::NonLinModel) = "nonlinear"
