@@ -23,9 +23,9 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function} <: SimModel{NT}
 end
 
 @doc raw"""
-    NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0)
+    NonLinModel{NT}(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
 
-Construct a nonlinear model from discrete-time state-space functions `f!` and `h!`.
+Construct a nonlinear model from discrete-time state-space functions `f` and `h`.
 
 The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined as :
 ```math
@@ -45,7 +45,7 @@ Nonlinear continuous-time state-space functions are not supported for now. In su
 manually call a differential equation solver in `f` (see [Manual](@ref man_nonlin)).
 
 !!! warning
-    `f!` and `h!` must be pure Julia functions to use the model in [`NonLinMPC`](@ref),
+    `f` and `h` must be pure Julia functions to use the model in [`NonLinMPC`](@ref),
     [`ExtendedKalmanFilter`](@ref), [`MovingHorizonEstimator`](@ref) and [`linearize`](@ref).
 
 See also [`LinModel`](@ref).
@@ -61,82 +61,75 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
 ```
 """
 function NonLinModel{NT}(
-    f!::Function, h!::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
+    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
 ) where {NT<:Real}
-    iscontinous = validate_fcts(NT, f!, h!)
-    if iscontinous
-        fc! = f!
-        f! = let nx=nx, Ts=Ts, NT=NT
-            ẋ = zeros(NT, nx)
-            xterm = zeros(NT, nx)
-            k1, k2, k3, k4 = zeros(NT, nx), zeros(NT, nx), zeros(NT, nx), zeros(NT, nx)
-            function rk4!(x, u, d)
-                xterm .= x
-                fc!(ẋ, xterm, u, d)
-                k1 .= ẋ
-                xterm .= @. x + k1 * Ts/2
-                fc!(ẋ, xterm, u, d)
-                k2 .= ẋ 
-                xterm .= @. x + k2 * Ts/2
-                fc!(ẋ, xterm, u, d)
-                k3 .= ẋ
-                xterm .= @. x + k3 * Ts
-                fc!(ẋ, xterm, u, d)
-                k4 .= ẋ
-                x .+= @. (k1 + 2k2 + 2k3 + k4)*Ts/6
-                return x
-            end
-            rk4!
-        end
+    ismutating_f = validate_f(NT, f)
+    ismutating_h = validate_h(NT, h)
+    f! = let f = f
+        ismutating_f ? f : (xnext, x, u, d) -> xnext .= f(x, u, d)
+    end
+    h! = let h = h
+        ismutating_h ? h : (y, x, d) -> y .= h(x, d)
     end
     F, H = getFuncTypes(f!, h!)
     return NonLinModel{NT, F, H}(f!, h!, Ts, nu, nx, ny, nd)
 end
 
 function NonLinModel(
-    f!::Function, h!::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
+    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
 )
-    return NonLinModel{Float64}(f!, h!, Ts, nu, nx, ny, nd)
+    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd)
 end
 
-getFuncTypes(f!::F, h!::H) where {F<:Function, H<:Function} = F, H
+getFuncTypes(f::F, h::H) where {F<:Function, H<:Function} = F, H
 
 
 """
-    validate_fcts(NT, f!, h!) -> iscontinuous
+    validate_f(NT, f) -> ismutating
 
-Validate `f!` and `h!` function argument signatures and return `true` if `f!` is continuous.
+Validate `f` function argument signature and return `true` if it is mutating.
 """
-function validate_fcts(NT, f!, h!)
-    isdiscrete = hasmethod(f!,
-        Tuple{Vector{NT}, Vector{NT}, Vector{NT}}
-    )
-    iscontinuous = hasmethod(f!,
-        Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}}
-    )
-    if !isdiscrete && !iscontinuous
-        println(isdiscrete)
-        println(iscontinuous)
-        error("state function has no method with type signature "*
-              "f!(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}) or "*
-              "f!(ẋ::Vector{$(NT)}, x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)})")
+function validate_f(NT, f)
+    ismutating = hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}})
+    if !(ismutating || hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}}))
+        error(
+            "the state function has no method with type signature "*
+            "f(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}) or mutating form "*
+            "f!(xnext::Vector{$(NT)}, x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)})"
+        )
     end
-    hargsvalid = hasmethod(h!, Tuple{Vector{NT}, Vector{NT}, Vector{NT}})
-    if !hargsvalid
-        error("output function has no method with type signature "*
-              "h!(y::Vector{$(NT)}, x::Vector{$(NT)}, d::Vector{$(NT)})")
+    return ismutating
+end
+
+"""
+    validate_h(NT, h) -> ismutating
+
+Validate `h` function argument signature and return `true` if it is mutating.
+"""
+function validate_h(NT, h)
+    ismutating = hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Vector{NT}})
+    if !(ismutating || hasmethod(h, Tuple{Vector{NT}, Vector{NT}}))
+        error(
+            "the output function has no method with type signature "*
+            "h(x::Vector{$(NT)}, d::Vector{$(NT)}) or mutating form "*
+            "h!(y::Vector{$(NT)}, x::Vector{$(NT)}, d::Vector{$(NT)})"
+        )
     end
-    return iscontinuous
+    return ismutating
 end
 
 "Do nothing if `model` is a [`NonLinModel`](@ref)."
 steadystate!(::SimModel, _ , _ ) = nothing
 
 
+
+
+
 "Call ``\\mathbf{f!(x, u, d)}`` with `model.f!` function for [`NonLinModel`](@ref)."
-f!(x, model::NonLinModel, u, d) = model.f!(x, u, d)
+f!(xnext, model::NonLinModel, x, u, d) = model.f!(xnext, x, u, d)
 
 "Call ``\\mathbf{h!(y, x, d)}`` with `model.h` function for [`NonLinModel`](@ref)."
 h!(y, model::NonLinModel, x, d) = model.h!(y, x, d)
 
 typestr(model::NonLinModel) = "nonlinear"
+

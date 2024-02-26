@@ -143,8 +143,8 @@ julia> x = updatestate!(model, [1])
 ```
 """
 function updatestate!(model::SimModel, u, d=empty(model.x))
-    validate_args(model::SimModel, u, d)
-    f!(model.x, model, u - model.uop, d - model.dop)
+    validate_args(model::SimModel, d, u)
+    f!(model.x, model, model.x, u .- model.uop, d .- model.dop)
     return model.x
 end
 
@@ -165,20 +165,23 @@ julia> y = evaloutput(model)
 ```
 """
 function evaloutput(model::SimModel{NT}, d=empty(model.x)) where NT <: Real
+    validate_args(model, d)
     y = Vector{NT}(undef, model.ny)
-    h!(y, model, model.x, d - model.dop) + model.yop
+    h!(y, model, model.x, d .- model.dop) .+ model.yop
     return y
 end
 
 """
-    validate_args(model::SimModel, u, d)
+    validate_args(model::SimModel, d, u=nothing)
 
-Check `u` and `d` sizes against `model` dimensions.
+Check `d` and `u` (if provided) sizes against `model` dimensions.
 """
-function validate_args(model::SimModel, u, d)
+function validate_args(model::SimModel, d, u=nothing)
     nu, nd = model.nu, model.nd
-    size(u) ≠ (nu,) && throw(DimensionMismatch("u size $(size(u)) ≠ manip. input size ($nu,)"))
     size(d) ≠ (nd,) && throw(DimensionMismatch("d size $(size(d)) ≠ meas. dist. size ($nd,)"))
+    if !isnothing(u)
+        size(u) ≠ (nu,) && throw(DimensionMismatch("u size $(size(u)) ≠ manip. input size ($nu,)"))
+    end
 end
 
 "Convert vectors to single column matrices when necessary."
