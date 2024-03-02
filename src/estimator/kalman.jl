@@ -567,7 +567,7 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # --- initialize matrices ---
-    X̂  = Matrix{NT}(undef, nx̂, nσ)
+    X̂, X̂_next = Matrix{NT}(undef, nx̂, nσ), Matrix{NT}(undef, nx̂, nσ)
     ŷm = Vector{NT}(undef, nym)
     ŷ  = Vector{NT}(undef, estim.model.ny)
     Ŷm = Matrix{NT}(undef, nym, nσ)
@@ -600,7 +600,7 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     X̂_cor .= x̂_cor
     X̂_cor[:, 2:nx̂+1]   .+= γ_sqrt_P̂_cor
     X̂_cor[:, nx̂+2:end] .-= γ_sqrt_P̂_cor
-    X̂_next = X̂_cor
+    X̂_next = similar(X̂_cor)
     for j in axes(X̂_next, 2)
         @views f̂!(X̂_next[:, j], estim, estim.model, X̂_cor[:, j], u, d)
     end

@@ -130,3 +130,19 @@ h!(y, model::NonLinModel, x, d) = model.h!(y, x, d)
 
 typestr(model::NonLinModel) = "nonlinear"
 
+function rk4!(x, u, d)
+    xterm .= x
+    fc!(ẋ, xterm, u, d)
+    k1 .= ẋ
+    xterm .= @. x + k1 * Ts/2
+    fc!(ẋ, xterm, u, d)
+    k2 .= ẋ 
+    xterm .= @. x + k2 * Ts/2
+    fc!(ẋ, xterm, u, d)
+    k3 .= ẋ
+    xterm .= @. x + k3 * Ts
+    fc!(ẋ, xterm, u, d)
+    k4 .= ẋ
+    x .+= @. (k1 + 2k2 + 2k3 + k4)*Ts/6
+    return x
+end
