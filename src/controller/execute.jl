@@ -325,15 +325,18 @@ function predict!(
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     u0 = u
     x̂  .= mpc.estim.x̂
+    x̂next = similar(x̂) # TODO: avoid this allocation if possible
     u0 .= mpc.estim.lastu0
     d0  = @views mpc.d0[1:end]
     for j=1:Hp
         if j ≤ Hc
             u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
         end
-        x̂[:]  = f̂(mpc.estim, model, x̂, u0, d0)
-        d0    = @views mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
-        Ŷ[(1 + ny*(j-1)):(ny*j)] = ĥ(mpc.estim, model, x̂, d0)
+        f̂!(x̂next, mpc.estim, model, x̂, u0, d0)
+        x̂ .= x̂next
+        d0 = @views mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
+        ŷ  = @views Ŷ[(1 + ny*(j-1)):(ny*j)]
+        ĥ!(ŷ, mpc.estim, model, x̂, d0)
     end
     Ŷ .= Ŷ .+ mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
     x̂end = x̂

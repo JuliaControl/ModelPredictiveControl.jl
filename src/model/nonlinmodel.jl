@@ -122,13 +122,10 @@ end
 steadystate!(::SimModel, _ , _ ) = nothing
 
 
-
-
-
-"Call ``\\mathbf{f!(x, u, d)}`` with `model.f!` function for [`NonLinModel`](@ref)."
+"Call `f!(xnext, x, u, d)` with `model.f!` method for [`NonLinModel`](@ref)."
 f!(xnext, model::NonLinModel, x, u, d) = model.f!(xnext, x, u, d)
 
-"Call ``\\mathbf{h!(y, x, d)}`` with `model.h` function for [`NonLinModel`](@ref)."
+"Call `h!(y, x, d)` with `model.h` method for [`NonLinModel`](@ref)."
 h!(y, model::NonLinModel, x, d) = model.h!(y, x, d)
 
 typestr(model::NonLinModel) = "nonlinear"

@@ -15,9 +15,9 @@ function remove_op!(estim::StateEstimator, u, ym, d)
 end
 
 @doc raw"""
-    f̂(estim::StateEstimator, model::SimModel, x̂, u, d)
+    f̂!(x̂next, estim::StateEstimator, model::SimModel, x̂, u, d) -> x̂next
 
-State function ``\mathbf{f̂}`` of the augmented model.
+Mutating state function ``\mathbf{f̂}`` of the augmented model.
 
 By introducing an augmented state vector ``\mathbf{x̂}`` like in [`augment_model`](@ref), the
 function returns the next state of the augmented model, defined as:
@@ -26,28 +26,48 @@ function returns the next state of the augmented model, defined as:
     \mathbf{x̂}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
     \mathbf{ŷ}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) 
 \end{aligned}
+where ``\mathbf{x̂}(k+1)`` is stored in `x̂next` argument.
 ```
 """
-function f̂(estim::StateEstimator, model::SimModel, x̂, u, d)
+function f̂!(x̂next, estim::StateEstimator, model::SimModel, x̂, u, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂[1:model.nx], x̂[model.nx+1:end]
-    return [f(model, x̂d, u + estim.Cs_u*x̂s, d); estim.As*x̂s]
+    @views x̂d_next, x̂s_next = x̂next[1:model.nx], x̂next[model.nx+1:end]
+    T = promote_type(eltype(x̂), eltype(u), eltype(d))
+    u_us = Vector{T}(undef, model.nu) # TODO: avoid this allocation if possible
+    u_us .= u .+ mul!(u_us, estim.Cs_u, x̂s)
+    f!(x̂d_next, model, x̂d, u_us, d)
+    mul!(x̂s_next, estim.As, x̂s)
+    return x̂next
 end
 "Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
-f̂(estim::StateEstimator, ::LinModel, x̂, u, d) = estim.Â * x̂ + estim.B̂u * u + estim.B̂d * d
+function f̂!(x̂next, estim::StateEstimator, ::LinModel, x̂, u, d)
+    x̂next .= 0
+    mul!(x̂next, estim.Â,  x̂, 1, 1)
+    mul!(x̂next, estim.B̂u, u, 1, 1)
+    mul!(x̂next, estim.B̂d, d, 1, 1)
+    return x̂next
+end
 
 @doc raw"""
-    ĥ(estim::StateEstimator, model::SimModel, x̂, d)
+    ĥ!(ŷ, estim::StateEstimator, model::SimModel, x̂, d) -> ŷ
 
-Output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂`](@ref) for details.
+Mutating output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂!`](@ref).
 """
-function ĥ(estim::StateEstimator, model::SimModel, x̂, d)
+function ĥ!(ŷ, estim::StateEstimator, model::SimModel, x̂, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂[1:model.nx], x̂[model.nx+1:end]
-    return h(model, x̂d, d) + estim.Cs_y*x̂s
+    h!(ŷ, model, x̂d, d)
+    mul!(ŷ, estim.Cs_y, x̂s, 1, 1)
+    return ŷ
 end
 "Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
-ĥ(estim::StateEstimator, ::LinModel, x̂, d) = estim.Ĉ * x̂ + estim.D̂d * d
+function ĥ!(ŷ, estim::StateEstimator, ::LinModel, x̂, d)
+    ŷ .= 0
+    mul!(ŷ, estim.Ĉ,  x̂, 1, 1)
+    mul!(ŷ, estim.D̂d, d, 1, 1)
+    return ŷ
+end
 
 
 @doc raw"""
@@ -147,8 +167,12 @@ julia> ŷ = evaloutput(kf)
  20.0
 ```
 """
-function evaloutput(estim::StateEstimator, d=empty(estim.x̂)) 
-    return ĥ(estim, estim.model, estim.x̂, d - estim.model.dop) + estim.model.yop
+function evaloutput(estim::StateEstimator{NT}, d=empty(estim.x̂)) where NT <: Real
+    validate_args(estim.model, d)
+    ŷ = Vector{NT}(undef, estim.model.ny)
+    ĥ!(ŷ, estim, estim.model, estim.x̂, d - estim.model.dop)
+    ŷ .+= estim.model.yop
+    return ŷ
 end
 
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
@@ -186,7 +210,7 @@ updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outpu
 Check `u`, `ym` and `d` sizes against `estim` dimensions.
 """
 function validate_args(estim::StateEstimator, u, ym, d)
-    validate_args(estim.model, u, d)
+    validate_args(estim.model, d, u)
     nym = estim.nym
     size(ym) ≠ (nym,) && throw(DimensionMismatch("ym size $(size(ym)) ≠ meas. output size ($nym,)"))
 end
