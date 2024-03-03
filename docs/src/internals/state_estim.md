@@ -7,8 +7,8 @@ Pages = ["state_estim.md"]
 ## Augmented Model
 
 ```@docs
-ModelPredictiveControl.f̂
-ModelPredictiveControl.ĥ
+ModelPredictiveControl.f̂!
+ModelPredictiveControl.ĥ!
 ```
 
 ## Constraint Relaxation

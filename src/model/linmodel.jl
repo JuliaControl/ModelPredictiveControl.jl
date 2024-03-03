@@ -217,23 +217,34 @@ disturbances ``\mathbf{d_0 = d - d_{op}}``. The Moore-Penrose pseudo-inverse com
 ``\mathbf{(I - A)^{-1}}`` to support integrating `model` (integrator states will be 0).
 """
 function steadystate!(model::LinModel, u, d)
-    model.x[:] = pinv(I - model.A)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
+    model.x .= pinv(I - model.A)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
     return nothing
 end
 
 """
-    f(model::LinModel, x, u, d)
+    f!(xnext, model::LinModel, x, u, d) -> xnext
 
-Evaluate ``\\mathbf{A x + B_u u + B_d d}`` when `model` is a [`LinModel`](@ref).
+Evaluate `xnext = A*x + Bu*u + Bd*d` in-place when `model` is a [`LinModel`](@ref).
 """
-f(model::LinModel, x, u, d) = model.A * x + model.Bu * u + model.Bd * d
+function f!(xnext, model::LinModel, x, u, d)
+    xnext .= 0
+    mul!(xnext, model.A,  x, 1, 1)
+    mul!(xnext, model.Bu, u, 1, 1)
+    mul!(xnext, model.Bd, d, 1, 1)
+    return xnext
+end
 
 
 """
-    h(model::LinModel, x, d)
+    h!(y, model::LinModel, x, d) -> y
 
-Evaluate ``\\mathbf{C x + D_d d}`` when `model` is a [`LinModel`](@ref).
+Evaluate `y = C*x + Dd*d` in-place when `model` is a [`LinModel`](@ref).
 """
-h(model::LinModel, x, d) = model.C*x + model.Dd*d
+function h!(y, model::LinModel, x, d)
+    y .= 0
+    mul!(y, model.C,  x, 1, 1)
+    mul!(y, model.Dd, d, 1, 1)
+    return y
+end
 
 typestr(model::LinModel) = "linear"

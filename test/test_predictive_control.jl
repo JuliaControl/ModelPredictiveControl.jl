@@ -464,11 +464,12 @@ end
     @test ForwardDiff.gradient(vec->g_Ymin_end(vec...), [20.0, 10.0]) ≈ [-5, -5] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
-    moveinput!(nmpc6, [0]) ≈ [0.0]
+    @test moveinput!(nmpc6, [0]) ≈ [0.0]
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
-    nonlinmodel2.h(Float32[0,0], Float32[0])
-    moveinput!(nmpc7, [0], [0]) ≈ [0.0]
+    y = similar(nonlinmodel2.yop)
+    nonlinmodel2.h!(y, Float32[0,0], Float32[0])
+    @test moveinput!(nmpc7, [0], [0]) ≈ [0.0]
 end
 
 @testset "NonLinMPC step disturbance rejection" begin

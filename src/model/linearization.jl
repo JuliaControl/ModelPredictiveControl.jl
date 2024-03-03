@@ -39,12 +39,13 @@ julia> linmodel.A
 """
 function linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
     u0, d0 = u - model.uop, d - model.dop
-    y  = model.h(x, d0) + model.yop
-    A  = ForwardDiff.jacobian(x  -> model.f(x, u0, d0), x)
-    Bu = ForwardDiff.jacobian(u0 -> model.f(x, u0, d0), u0)
-    Bd = ForwardDiff.jacobian(d0 -> model.f(x, u0, d0), d0)
-    C  = ForwardDiff.jacobian(x  -> model.h(x, d0), x)
-    Dd = ForwardDiff.jacobian(d0 -> model.h(x, d0), d0)
+    xnext, y = similar(x), similar(model.yop)
+    y = model.h!(y, x, d0) .+ model.yop
+    A  = ForwardDiff.jacobian((xnext, x)  -> model.f!(xnext, x, u0, d0), xnext, x)
+    Bu = ForwardDiff.jacobian((xnext, u0) -> model.f!(xnext, x, u0, d0), xnext, u0)
+    Bd = ForwardDiff.jacobian((xnext, d0) -> model.f!(xnext, x, u0, d0), xnext, d0)
+    C  = ForwardDiff.jacobian((y, x)  -> model.h!(y, x, d0), y, x)
+    Dd = ForwardDiff.jacobian((y, d0) -> model.h!(y, x, d0), y, d0)
     linmodel = LinModel(A, Bu, C, Bd, Dd, model.Ts)
     setop!(linmodel, uop=u, yop=y, dop=d)
     return linmodel
