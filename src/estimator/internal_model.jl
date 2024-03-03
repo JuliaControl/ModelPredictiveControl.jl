@@ -261,6 +261,22 @@ function init_estimate!(estim::InternalModel, model::LinModel{NT}, u, ym, d) whe
     return nothing
 end
 
+@doc raw"""
+    evalŷ(estim::InternalModel, ym, d) -> ŷ
+
+Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`.
+
+[`InternalModel`](@ref) estimator needs current measured outputs ``\mathbf{y^m}(k)`` to 
+estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that 
+``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` is always true.
+"""
+function evalŷ(estim::InternalModel{NT}, ym, d) where NT<:Real
+    ŷ = Vector{NT}(undef, estim.model.ny)
+    ŷ = h!(ŷ, estim.model, estim.x̂d, d - estim.model.dop) .+ estim.model.yop
+    ŷ[estim.i_ym] = ym
+    return ŷ
+end
+
 "Print InternalModel information without i/o integrators."
 function print_estim_dim(io::IO, estim::InternalModel, n)
     nu, nd = estim.model.nu, estim.model.nd
