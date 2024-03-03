@@ -138,7 +138,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     for i=1:Nk
         d0 = @views D[(1 + nd*(i-1)):(nd*i)] # operating point already removed in estim.D
         x̂  = @views X̂[(1 + nx̂*(i-1)):(nx̂*i)]
-        ĥ!(Ŷ[(1 + ny*(i-1)):(ny*i)], estim, model, x̂, d0) 
+        @views ĥ!(Ŷ[(1 + ny*(i-1)):(ny*i)], estim, model, x̂, d0)
         Ŷ[(1 + ny*(i-1)):(ny*i)] .+= model.yop
     end
     Ŷm = Ym - V̂
