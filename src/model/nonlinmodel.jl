@@ -35,7 +35,7 @@ The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined 
     \mathbf{y}(k)   &= \mathbf{h}\Big( \mathbf{x}(k), \mathbf{d}(k) \Big)
     \end{aligned}
 ```
-They can be implemented in two possible ways:
+Denoting ``\mathbf{x}(k+1)`` as `xnext`, they can be implemented in two possible ways:
 
 - non-mutating functions (out-of-place): they must be defined as `f(x, u, d) -> xnext` and
   `h(x, d) -> y`. This syntax is simple and intuitive but it allocates more memory.
