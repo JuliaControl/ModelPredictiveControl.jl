@@ -26,8 +26,8 @@ function returns the next state of the augmented model, defined as:
     \mathbf{x̂}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
     \mathbf{ŷ}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) 
 \end{aligned}
-where ``\mathbf{x̂}(k+1)`` is stored in `x̂next` argument.
 ```
+where ``\mathbf{x̂}(k+1)`` is stored in `x̂next` argument.
 """
 function f̂!(x̂next, estim::StateEstimator, model::SimModel, x̂, u, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
