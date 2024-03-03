@@ -7,8 +7,8 @@ Pages = ["sim_model.md"]
 ## State-Space Functions
 
 ```@docs
-ModelPredictiveControl.f
-ModelPredictiveControl.h
+ModelPredictiveControl.f!
+ModelPredictiveControl.h!
 ```
 
 ## Steady-State Calculation
