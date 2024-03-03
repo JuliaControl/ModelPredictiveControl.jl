@@ -120,7 +120,7 @@ end
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
     f2(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
-    h2(x,_)   = linmodel2.C*x 
+    h2(x,d)   = linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
 
     @test nonlinmodel2.nx == 4
@@ -133,8 +133,28 @@ end
     nonlinmodel2.h!(y,[0,0,0,0],[0])
     @test y ≈ zeros(2,)
 
-    nonlinemodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1)
-    @test isa(nonlinemodel3, NonLinModel{Float32})
+    nonlinmodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1)
+    @test isa(nonlinmodel3, NonLinModel{Float32})
+
+    function f1!(xnext, x, u, d)
+        xnext .= 0
+        mul!(xnext, linmodel2.A,  x, 1, 1)
+        mul!(xnext, linmodel2.Bu, u, 1, 1)
+        mul!(xnext, linmodel2.Bd, d, 1, 1)
+        return nothing
+    end 
+    function h1!(y, x, d)
+        y .= 0
+        mul!(y, linmodel2.C,  x, 1, 1)
+        mul!(y, linmodel2.Dd, d, 1, 1)
+        return nothing
+    end
+    nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1)
+    xnext, y = similar(nonlinmodel4.x), similar(nonlinmodel4.yop)
+    nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0])
+    @test xnext ≈ zeros(4,)
+    nonlinmodel4.h!(y,[0,0,0,0],[0])
+    @test y ≈ zeros(2,)
 
     @test_throws ErrorException NonLinModel(
         (x,u)->linmodel1.A*x + linmodel1.Bu*u,
