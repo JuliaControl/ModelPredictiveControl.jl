@@ -272,7 +272,8 @@ estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that
 """
 function evalŷ(estim::InternalModel{NT}, ym, d) where NT<:Real
     ŷ = Vector{NT}(undef, estim.model.ny)
-    ŷ = h!(ŷ, estim.model, estim.x̂d, d - estim.model.dop) .+ estim.model.yop
+    h!(ŷ, estim.model, estim.x̂d, d - estim.model.dop) 
+    ŷ .+= estim.model.yop
     ŷ[estim.i_ym] = ym
     return ŷ
 end

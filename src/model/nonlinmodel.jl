@@ -23,7 +23,8 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function} <: SimModel{NT}
 end
 
 @doc raw"""
-    NonLinModel{NT}(f::Function, h::Function, Ts, nu, nx, ny, nd=0)
+    NonLinModel{NT}( f::Function,  h::Function, Ts, nu, nx, ny, nd=0)
+    NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0)
 
 Construct a nonlinear model from discrete-time state-space functions `f` and `h`.
 
@@ -34,6 +35,14 @@ The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined 
     \mathbf{y}(k)   &= \mathbf{h}\Big( \mathbf{x}(k), \mathbf{d}(k) \Big)
     \end{aligned}
 ```
+They can be specified in two forms:
+
+- non-mutating functions (out-of-place): they must be defined as `f(x, u, d) -> xnext` and
+  `h(x, d) -> y`
+- mutating functions (in-place): they must be defined as `f!(xnext, x, u, d) -> nothing` and
+  `h!(y, x, d) -> nothing`. This syntax reduces the allocations and potentially the 
+  computational burden as well.
+  
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
 manipulated inputs, states, outputs and measured disturbances. The optional parameter `NT`
 explicitly specifies the number type of vectors (default to `Float64`).

@@ -112,8 +112,11 @@ end
     @test nonlinmodel1.nu == 2
     @test nonlinmodel1.nd == 0
     @test nonlinmodel1.ny == 2
-    @test nonlinmodel1.f!([0,0],[0,0],[0,0],[1]) ≈ zeros(2,)
-    @test nonlinmodel1.h!([0,0],[0,0],[1]) ≈ zeros(2,)
+    xnext, y = similar(nonlinmodel1.x), similar(nonlinmodel1.yop)
+    nonlinmodel1.f!(xnext,[0,0],[0,0],[1])
+    @test xnext ≈ zeros(2,)
+    nonlinmodel1.h!(y,[0,0],[1])
+    @test y ≈ zeros(2,)
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
     f2(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
@@ -124,8 +127,11 @@ end
     @test nonlinmodel2.nu == 2
     @test nonlinmodel2.nd == 1
     @test nonlinmodel2.ny == 2
-    @test nonlinmodel2.f!([0,0,0,0],[0,0,0,0],[0,0],[0]) ≈ zeros(4,)
-    @test nonlinmodel2.h!([0,0],[0,0,0,0],[0]) ≈ zeros(2,)
+    xnext, y = similar(nonlinmodel2.x), similar(nonlinmodel2.yop)
+    nonlinmodel2.f!(xnext,[0,0,0,0],[0,0],[0])
+    @test xnext ≈ zeros(4,)
+    nonlinmodel2.h!(y,[0,0,0,0],[0])
+    @test y ≈ zeros(2,)
 
     nonlinemodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1)
     @test isa(nonlinemodel3, NonLinModel{Float32})

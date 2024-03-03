@@ -226,7 +226,9 @@ function predictstoch!(
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
                            "outputs ym in keyword argument to compute control actions u")
     Ŷop, ny, yop = mpc.Ŷop, estim.model.ny, estim.model.yop
-    ŷd = h(estim.model, estim.x̂d, d - estim.model.dop) .+ estim.model.yop 
+    ŷd = similar(estim.model.yop)
+    h!(ŷd, estim.model, estim.x̂d, d - estim.model.dop)
+    ŷd .+= estim.model.yop 
     ŷs = zeros(NT, estim.model.ny)
     ŷs[estim.i_ym] .= @views ym .- ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
     Ŷop_LHS = similar(Ŷop)
