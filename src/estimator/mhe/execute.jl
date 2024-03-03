@@ -137,8 +137,9 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     Ŷ = Vector{NT}(undef, ny*Nk)
     for i=1:Nk
         d0 = @views D[(1 + nd*(i-1)):(nd*i)] # operating point already removed in estim.D
-        x̂ = @views X̂[(1 + nx̂*(i-1)):(nx̂*i)]
-        Ŷ[(1 + ny*(i-1)):(ny*i)] = ĥ(estim, model, x̂, d0) + model.yop
+        x̂  = @views X̂[(1 + nx̂*(i-1)):(nx̂*i)]
+        @views ĥ!(Ŷ[(1 + ny*(i-1)):(ny*i)], estim, model, x̂, d0)
+        Ŷ[(1 + ny*(i-1)):(ny*i)] .+= model.yop
     end
     Ŷm = Ym - V̂
     info[:Ŵ] = estim.Ŵ[1:Nk*nŵ]
@@ -326,10 +327,11 @@ function update_cov!(P̂, estim::MovingHorizonEstimator, ::LinModel, u, ym, d)
     return update_estimate_kf!(estim, u, ym, d, estim.Â, estim.Ĉ[estim.i_ym, :], P̂)
 end
 "Update it with the `ExtendedKalmanFilter` if model is not a `LinModel`."
-function update_cov!(P̂, estim::MovingHorizonEstimator, ::SimModel, u, ym, d) 
+function update_cov!(P̂, estim::MovingHorizonEstimator, model::SimModel, u, ym, d) 
     # TODO: also support UnscentedKalmanFilter
-    F̂ = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
-    Ĥ = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
+    x̂next, ŷ = similar(estim.x̂), similar(model.yop)
+    F̂ = ForwardDiff.jacobian((x̂next, x̂) -> f̂!(x̂next, estim, estim.model, x̂, u, d), x̂next, estim.x̂)
+    Ĥ = ForwardDiff.jacobian((ŷ, x̂)     -> ĥ!(ŷ, estim, estim.model, x̂, d), ŷ, estim.x̂)
     return update_estimate_kf!(estim, u, ym, d, F̂, Ĥ[estim.i_ym, :],  P̂)
 end
 
@@ -394,16 +396,22 @@ function predict!(
     V̂, X̂, estim::MovingHorizonEstimator, model::SimModel, Z̃::Vector{T}
 ) where {T<:Real}
     Nk = estim.Nk[]
-    nu, nd, nx̂, nŵ, nym = model.nu, model.nd, estim.nx̂, estim.nx̂, estim.nym
+    nu, nd, ny, nx̂, nŵ, nym = model.nu, model.nd, model.ny, estim.nx̂, estim.nx̂, estim.nym
     nx̃ = !isinf(estim.C) + nx̂
+    # TODO: avoid these two allocations if possible:
+    ŷ, x̂next = Vector{T}(undef, ny), Vector{T}(undef, nx̂)
     x̂ = @views Z̃[nx̃-nx̂+1:nx̃]
     for j=1:Nk
         u  = @views estim.U[ (1 + nu  * (j-1)):(nu*j)]
         ym = @views estim.Ym[(1 + nym * (j-1)):(nym*j)]
         d  = @views estim.D[ (1 + nd  * (j-1)):(nd*j)]
         ŵ  = @views Z̃[(1 + nx̃ + nŵ*(j-1)):(nx̃ + nŵ*j)]
-        V̂[(1 + nym*(j-1)):(nym*j)] = ym - ĥ(estim, model, x̂, d)[estim.i_ym]
-        X̂[(1 + nx̂ *(j-1)):(nx̂ *j)] = f̂(estim, model, x̂, u, d) + ŵ
+        ĥ!(ŷ, estim, model, x̂, d)
+        ŷm = @views ŷ[estim.i_ym]
+        V̂[(1 + nym*(j-1)):(nym*j)] .= ym .- ŷm
+        f̂!(x̂next, estim, model, x̂, u, d)
+        x̂next .+= ŵ
+        X̂[(1 + nx̂ *(j-1)):(nx̂ *j)] = x̂next
         x̂ = @views X̂[(1 + nx̂*(j-1)):(nx̂*j)]
     end
     return V̂, X̂

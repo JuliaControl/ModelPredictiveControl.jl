@@ -144,20 +144,20 @@ function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂(::InternalModel, model::NonLinModel, x̂, u, d)
+    f̂!(x̂next, ::InternalModel, model::NonLinModel, x̂, u, d)
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls `model.f(x̂, u ,d)` since this estimator does not augment the states.
+It calls `model.f!(x̂next, x̂, u ,d)` since this estimator does not augment the states.
 """
-f̂(::InternalModel, model::NonLinModel, x̂, u, d) = model.f(x̂, u, d)
+f̂!(x̂next, ::InternalModel, model::NonLinModel, x̂, u, d) = model.f!(x̂next, x̂, u, d)
 
 @doc raw"""
-    ĥ(::InternalModel, model::NonLinModel, x̂, d)
+    ĥ!(ŷ, ::InternalModel, model::NonLinModel, x̂, d)
 
-Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.h`.
+Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.h!`.
 """
-ĥ(::InternalModel, model::NonLinModel, x̂, d) = model.h(x̂, d)
+ĥ!(x̂next, ::InternalModel, model::NonLinModel, x̂, d) = model.h!(x̂next, x̂, d)
 
 
 @doc raw"""
@@ -218,12 +218,17 @@ function update_estimate!(
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
-    ŷd = h(model, x̂d, d)
-    x̂d[:] = f(model, x̂d, u, d) # this also updates estim.x̂ (they are the same object)
+    ŷd, x̂dnext = Vector{NT}(undef, model.ny), Vector{NT}(undef, model.nx)
+    h!(ŷd, model, x̂d, d)
+    f!(x̂dnext, model, x̂d, u, d) 
+    x̂d .= x̂dnext # this also updates estim.x̂ (they are the same object)
     # --------------- stochastic model -----------------------
+    x̂snext = Vector{NT}(undef, estim.nxs)
     ŷs = zeros(NT, model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]   # ŷs=0 for unmeasured outputs
-    x̂s[:] = estim.Âs*x̂s + estim.B̂s*ŷs
+    mul!(x̂snext, estim.Âs, x̂s)
+    mul!(x̂snext, estim.B̂s, ŷs, 1, 1)
+    x̂s .= x̂snext
     return nothing
 end
 
@@ -247,12 +252,30 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 """
 function init_estimate!(estim::InternalModel, model::LinModel{NT}, u, ym, d) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
-    x̂d[:] = (I - model.A)\(model.Bu*u + model.Bd*d)
-    ŷd = h(model, x̂d, d)
+    x̂d .= (I - model.A)\(model.Bu*u + model.Bd*d)
+    ŷd = Vector{NT}(undef, model.ny)
+    h!(ŷd, model, x̂d, d)
     ŷs = zeros(NT, model.ny)
     ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
-    x̂s[:] = (I-estim.Âs)\estim.B̂s*ŷs
+    x̂s .= (I-estim.Âs)\estim.B̂s*ŷs
     return nothing
+end
+
+@doc raw"""
+    evalŷ(estim::InternalModel, ym, d) -> ŷ
+
+Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`.
+
+[`InternalModel`](@ref) estimator needs current measured outputs ``\mathbf{y^m}(k)`` to 
+estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that 
+``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` is always true.
+"""
+function evalŷ(estim::InternalModel{NT}, ym, d) where NT<:Real
+    ŷ = Vector{NT}(undef, estim.model.ny)
+    h!(ŷ, estim.model, estim.x̂d, d - estim.model.dop) 
+    ŷ .+= estim.model.yop
+    ŷ[estim.i_ym] = ym
+    return ŷ
 end
 
 "Print InternalModel information without i/o integrators."

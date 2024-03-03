@@ -567,8 +567,9 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # --- initialize matrices ---
-    X̂  = Matrix{NT}(undef, nx̂, nσ)
+    X̂, X̂_next = Matrix{NT}(undef, nx̂, nσ), Matrix{NT}(undef, nx̂, nσ)
     ŷm = Vector{NT}(undef, nym)
+    ŷ  = Vector{NT}(undef, estim.model.ny)
     Ŷm = Matrix{NT}(undef, nym, nσ)
     sqrt_P̂ = LowerTriangular{NT, Matrix{NT}}(Matrix{NT}(undef, nx̂, nx̂))
     # --- correction step ---
@@ -578,7 +579,8 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     X̂[:, 2:nx̂+1]   .+= γ_sqrt_P̂
     X̂[:, nx̂+2:end] .-= γ_sqrt_P̂
     for j in axes(Ŷm, 2)
-        Ŷm[:, j] = @views ĥ(estim, estim.model, X̂[:, j], d)[estim.i_ym]
+        @views ĥ!(ŷ, estim, estim.model, X̂[:, j], d)
+        @views Ŷm[:, j] .= ŷ[estim.i_ym]
     end
     mul!(ŷm, Ŷm, m̂)
     X̄, Ȳm = X̂, Ŷm
@@ -598,9 +600,9 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     X̂_cor .= x̂_cor
     X̂_cor[:, 2:nx̂+1]   .+= γ_sqrt_P̂_cor
     X̂_cor[:, nx̂+2:end] .-= γ_sqrt_P̂_cor
-    X̂_next = X̂_cor
+    X̂_next = similar(X̂_cor)
     for j in axes(X̂_next, 2)
-        X̂_next[:, j] = @views f̂(estim, estim.model, X̂_cor[:, j], u, d)
+        @views f̂!(X̂_next[:, j], estim, estim.model, X̂_cor[:, j], u, d)
     end
     x̂_next = mul!(x̂, X̂_next, m̂)
     X̄_next = X̂_next
@@ -757,9 +759,13 @@ automatically computes the Jacobians:
 ```
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs.
 """
-function update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂))
-    F̂ = ForwardDiff.jacobian(x̂ -> f̂(estim, estim.model, x̂, u, d), estim.x̂)
-    Ĥ = ForwardDiff.jacobian(x̂ -> ĥ(estim, estim.model, x̂, d), estim.x̂)
+function update_estimate!(
+    estim::ExtendedKalmanFilter{NT}, u, ym, d=empty(estim.x̂)
+) where NT<:Real
+    model = estim.model
+    x̂next, ŷ = Vector{NT}(undef, estim.nx̂), Vector{NT}(undef, model.ny)
+    F̂ = ForwardDiff.jacobian((x̂next, x̂) -> f̂!(x̂next, estim, model, x̂, u, d), x̂next, estim.x̂)
+    Ĥ = ForwardDiff.jacobian((ŷ, x̂)     -> ĥ!(ŷ, estim, model, x̂, d), ŷ, estim.x̂)
     return update_estimate_kf!(estim, u, ym, d, F̂, Ĥ[estim.i_ym, :], estim.P̂, estim.x̂)
 end
 
@@ -790,7 +796,7 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
 end
 
 """
-    update_estimate_kf!(estim, u, ym, d, Â, Ĉm, P̂, x̂=nothing)
+    update_estimate_kf!(estim::StateEstimator, u, ym, d, Â, Ĉm, P̂, x̂=nothing)
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
@@ -801,16 +807,22 @@ The implementation uses in-place operations and explicit factorization to reduce
 allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations. If `isnothing(x̂)`,
 only the covariance `P̂` is updated.
 """
-function update_estimate_kf!(estim, u, ym, d, Â, Ĉm, P̂, x̂=nothing)
+function update_estimate_kf!(
+    estim::StateEstimator{NT}, u, ym, d, Â, Ĉm, P̂, x̂=nothing
+) where NT<:Real
     Q̂, R̂, M̂ = estim.Q̂, estim.R̂, estim.M̂
     mul!(M̂, P̂, Ĉm')
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂)))
     if !isnothing(x̂)
         mul!(estim.K̂, Â, M̂)
-        ŷm = @views ĥ(estim, estim.model, x̂, d)[estim.i_ym]
+        x̂next, ŷ = Vector{NT}(undef, estim.nx̂), Vector{NT}(undef, estim.model.ny)
+        ĥ!(ŷ, estim, estim.model, x̂, d)
+        ŷm = @views ŷ[estim.i_ym]
         v̂  = ŷm
         v̂ .= ym .- ŷm
-        x̂ .= f̂(estim, estim.model, x̂, u, d) .+ mul!(x̂, estim.K̂, v̂)
+        f̂!(x̂next, estim, estim.model, x̂, u, d)
+        mul!(x̂next, estim.K̂, v̂, 1, 1)
+        estim.x̂ .= x̂next
     end
     P̂.data .= Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂ # .data is necessary for Hermitians
     return nothing
