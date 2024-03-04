@@ -992,11 +992,12 @@ function init_optimization!(
     nV̂, nX̂, ng = He*estim.nym, He*estim.nx̂, length(con.i_g)
     # see init_optimization!(mpc::NonLinMPC, optim) for details on the inspiration
     Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃ , nV̂=nV̂, nX̂=nX̂, ng=ng, nx̂=estim.nx̂
+        Nc = nZ̃ + 3
         last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
-        V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), nZ̃ + 3)
-        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), nZ̃ + 3)
-        X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), nZ̃ + 3)
-        x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), nZ̃ + 3)
+        V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), Nc)
+        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), Nc)
+        X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), Nc)
+        x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
         function Jfunc(Z̃tup::JNT...)
             Z̃1 = Z̃tup[begin]
             V̂ = get_tmp(V̂_cache, Z̃1)

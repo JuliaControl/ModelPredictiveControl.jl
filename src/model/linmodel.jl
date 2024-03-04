@@ -222,7 +222,7 @@ function steadystate!(model::LinModel, u, d)
 end
 
 """
-    f!(xnext, model::LinModel, x, u, d) -> xnext
+    f!(xnext, model::LinModel, x, u, d) -> nothing
 
 Evaluate `xnext = A*x + Bu*u + Bd*d` in-place when `model` is a [`LinModel`](@ref).
 """
@@ -231,12 +231,12 @@ function f!(xnext, model::LinModel, x, u, d)
     mul!(xnext, model.A,  x, 1, 1)
     mul!(xnext, model.Bu, u, 1, 1)
     mul!(xnext, model.Bd, d, 1, 1)
-    return xnext
+    return nothing
 end
 
 
 """
-    h!(y, model::LinModel, x, d) -> y
+    h!(y, model::LinModel, x, d) -> nothing
 
 Evaluate `y = C*x + Dd*d` in-place when `model` is a [`LinModel`](@ref).
 """
@@ -244,7 +244,7 @@ function h!(y, model::LinModel, x, d)
     y .= 0
     mul!(y, model.C,  x, 1, 1)
     mul!(y, model.Dd, d, 1, 1)
-    return y
+    return nothing
 end
 
 typestr(model::LinModel) = "linear"
