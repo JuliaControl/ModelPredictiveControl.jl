@@ -26,7 +26,7 @@ end
     NonLinModel{NT}(f::Function,  h::Function,  Ts, nu, nx, ny, nd=0)
     NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0)
 
-Construct a nonlinear model from discrete-time state-space functions `f` and `h`.
+Construct a nonlinear model from discrete-time state-space functions `f`/`f!` and `h`/`h!`.
 
 The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined as :
 ```math

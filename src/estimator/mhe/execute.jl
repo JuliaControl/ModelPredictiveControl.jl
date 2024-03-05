@@ -34,15 +34,16 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     add_data_windows!(estim::MovingHorizonEstimator, u, d, ym)
     initpred!(estim, model)
     linconstraint!(estim, model)
-    nx̂, nym, nŵ, Nk = estim.nx̂, estim.nym, estim.nx̂, estim.Nk[]
+    nŷ, nx̂, nym, nŵ, Nk = model.ny, estim.nx̂, estim.nym, estim.nx̂, estim.Nk[]
     nx̃ = !isinf(estim.C) + nx̂
     Z̃var::Vector{VariableRef} = optim[:Z̃var]
     V̂  = Vector{NT}(undef, nym*Nk)
     X̂  = Vector{NT}(undef, nx̂*Nk)
+    ŷ  = Vector{NT}(undef, nŷ)
     x̄  = Vector{NT}(undef, nx̂)
     ϵ0 = isinf(estim.C) ? empty(estim.Z̃) : estim.Z̃[begin]
     Z̃0 = [ϵ0; estim.x̂arr_old; estim.Ŵ]
-    V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃0)
+    V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, Z̃0)
     J0 = obj_nonlinprog!(x̄, estim, model, V̂, Z̃0)
     # initial Z̃0 with Ŵ=0 if objective or constraint function not finite :
     isfinite(J0) || (Z̃0 = [ϵ0; estim.x̂arr_old; zeros(NT, nŵ*estim.He)])
@@ -75,7 +76,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     estim.Z̃ .= iserror(optim) ? Z̃last : Z̃curr
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
-    V̂, X̂ = predict!(V̂, X̂, estim, model, estim.Z̃)
+    V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, estim.Z̃)
     x̂ .= X̂[end-nx̂+1:end]
     if Nk == estim.He
         uarr, ymarr, darr = estim.U[1:model.nu], estim.Ym[1:nym], estim.D[1:model.nd]
@@ -129,7 +130,8 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     MyTypes = Union{JuMP._SolutionSummary, Hermitian{NT, Matrix{NT}}, Vector{NT}, NT}
     info = Dict{Symbol, MyTypes}()
     V̂, X̂ = similar(estim.Ym[1:nym*Nk]), similar(estim.X̂[1:nx̂*Nk])
-    V̂, X̂ = predict!(V̂, X̂, estim, model, estim.Z̃)
+    ŷ    = similar(model.yop)
+    V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, estim.Z̃)
     x̂arr = estim.Z̃[nx̃-nx̂+1:nx̃]
     x̄ = estim.x̂arr_old - x̂arr
     X̂ = [x̂arr; X̂]
@@ -372,16 +374,16 @@ function obj_nonlinprog!(
 end
 
 """
-    predict!(V̂, X̂, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂
+    predict!(V̂, X̂, ŷ, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂
 
 Compute the `V̂` vector and `X̂` vectors for the `MovingHorizonEstimator` and `LinModel`.
 
-The method mutates `V̂` and `X̂` vector arguments. The vector `V̂` is the estimated sensor
+The function mutates `V̂`, `X̂` and ŷ vector arguments. The vector `V̂` is the estimated sensor
 noises `V̂` from ``k-N_k+1`` to ``k``. The `X̂` vector is estimated states from ``k-N_k+2`` to
 ``k+1``.
 """
 function predict!(
-    V̂, X̂, estim::MovingHorizonEstimator, ::LinModel, Z̃::Vector{T}
+    V̂, X̂, _ , estim::MovingHorizonEstimator, ::LinModel, Z̃::Vector{T}
 ) where {T<:Real}
     Nk, nϵ = estim.Nk[], !isinf(estim.C)
     nX̂, nŴ, nYm = estim.nx̂*Nk, estim.nx̂*Nk, estim.nym*Nk
@@ -393,13 +395,11 @@ end
 
 "Compute the two vectors when `model` is not a `LinModel`."
 function predict!(
-    V̂, X̂, estim::MovingHorizonEstimator, model::SimModel, Z̃::Vector{T}
+    V̂, X̂, ŷ, estim::MovingHorizonEstimator, model::SimModel, Z̃::Vector{T}
 ) where {T<:Real}
     Nk = estim.Nk[]
     nu, nd, ny, nx̂, nŵ, nym = model.nu, model.nd, model.ny, estim.nx̂, estim.nx̂, estim.nym
     nx̃ = !isinf(estim.C) + nx̂
-    # TODO: avoid these two allocations if possible:
-    ŷ, x̂next = Vector{T}(undef, ny), Vector{T}(undef, nx̂)
     x̂ = @views Z̃[nx̃-nx̂+1:nx̃]
     for j=1:Nk
         u  = @views estim.U[ (1 + nu  * (j-1)):(nu*j)]
@@ -409,10 +409,10 @@ function predict!(
         ĥ!(ŷ, estim, model, x̂, d)
         ŷm = @views ŷ[estim.i_ym]
         V̂[(1 + nym*(j-1)):(nym*j)] .= ym .- ŷm
+        x̂next = @views X̂[(1 + nx̂ *(j-1)):(nx̂ *j)]
         f̂!(x̂next, estim, model, x̂, u, d)
         x̂next .+= ŵ
-        X̂[(1 + nx̂ *(j-1)):(nx̂ *j)] = x̂next
-        x̂ = @views X̂[(1 + nx̂*(j-1)):(nx̂*j)]
+        x̂ = x̂next
     end
     return V̂, X̂
 end
