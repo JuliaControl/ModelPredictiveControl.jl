@@ -15,7 +15,7 @@ function remove_op!(estim::StateEstimator, u, ym, d)
 end
 
 @doc raw"""
-    f̂!(x̂next, estim::StateEstimator, model::SimModel, x̂, u, d) -> x̂next
+    f̂!(x̂next, estim::StateEstimator, model::SimModel, x̂, u, d) -> nothing
 
 Mutating state function ``\mathbf{f̂}`` of the augmented model.
 
@@ -33,24 +33,25 @@ function f̂!(x̂next, estim::StateEstimator, model::SimModel, x̂, u, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂[1:model.nx], x̂[model.nx+1:end]
     @views x̂d_next, x̂s_next = x̂next[1:model.nx], x̂next[model.nx+1:end]
-    T = promote_type(eltype(x̂), eltype(u), eltype(d))
-    u_us = Vector{T}(undef, model.nu) # TODO: avoid this allocation if possible
-    u_us .= u .+ mul!(u_us, estim.Cs_u, x̂s)
-    f!(x̂d_next, model, x̂d, u_us, d)
+    T  = promote_type(eltype(x̂), eltype(u))
+    û  = Vector{T}(undef, model.nu) # TODO: avoid this allocation if possible
+    û .= u .+ mul!(û, estim.Cs_u, x̂s)
+    f!(x̂d_next, model, x̂d, û, d)
     mul!(x̂s_next, estim.As, x̂s)
-    return x̂next
+    return nothing
 end
+
 "Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
 function f̂!(x̂next, estim::StateEstimator, ::LinModel, x̂, u, d)
     x̂next .= 0
     mul!(x̂next, estim.Â,  x̂, 1, 1)
     mul!(x̂next, estim.B̂u, u, 1, 1)
     mul!(x̂next, estim.B̂d, d, 1, 1)
-    return x̂next
+    return nothing
 end
 
 @doc raw"""
-    ĥ!(ŷ, estim::StateEstimator, model::SimModel, x̂, d) -> ŷ
+    ĥ!(ŷ, estim::StateEstimator, model::SimModel, x̂, d) -> nothing
 
 Mutating output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂!`](@ref).
 """
@@ -59,14 +60,14 @@ function ĥ!(ŷ, estim::StateEstimator, model::SimModel, x̂, d)
     @views x̂d, x̂s = x̂[1:model.nx], x̂[model.nx+1:end]
     h!(ŷ, model, x̂d, d)
     mul!(ŷ, estim.Cs_y, x̂s, 1, 1)
-    return ŷ
+    return nothing
 end
 "Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
 function ĥ!(ŷ, estim::StateEstimator, ::LinModel, x̂, d)
     ŷ .= 0
     mul!(ŷ, estim.Ĉ,  x̂, 1, 1)
     mul!(ŷ, estim.D̂d, d, 1, 1)
-    return ŷ
+    return nothing
 end
 
 
