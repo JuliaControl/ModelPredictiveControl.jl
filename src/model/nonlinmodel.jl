@@ -1,7 +1,8 @@
-struct NonLinModel{NT<:Real, F<:Function, H<:Function} <: SimModel{NT}
+struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimModel{NT}
     x::Vector{NT}
     f!::F
     h!::H
+    solver::DS
     Ts::NT
     nu::Int
     nx::Int
@@ -10,23 +11,23 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function} <: SimModel{NT}
     uop::Vector{NT}
     yop::Vector{NT}
     dop::Vector{NT}
-    function NonLinModel{NT, F, H}(
-        f!::F, h!::H, Ts, nu, nx, ny, nd
-    ) where {NT<:Real, F<:Function, H<:Function}
+    function NonLinModel{NT, F, H, DS}(
+        f!::F, h!::H, solver::DS, Ts, nu, nx, ny, nd
+    ) where {NT<:Real, F<:Function, H<:Function, DS<:DiffSolver}
         Ts > 0 || error("Sampling time Ts must be positive")
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
         x = zeros(NT, nx)
-        return new{NT, F, H}(x, f!, h!, Ts, nu, nx, ny, nd, uop, yop, dop)
+        return new{NT, F, H, DS}(x, f!, h!, solver, Ts, nu, nx, ny, nd, uop, yop, dop)
     end
 end
 
 @doc raw"""
-    NonLinModel{NT}(f::Function,  h::Function,  Ts, nu, nx, ny, nd=0)
-    NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0)
+    NonLinModel{NT}(f::Function,  h::Function,  Ts, nu, nx, ny, nd=0; solver=nothing)
+    NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0; solver=nothing)
 
-Construct a nonlinear model from discrete-time state-space functions `f`/`f!` and `h`/`h!`.
+Construct a nonlinear model from state-space functions `f`/`f!` and `h`/`h!`.
 
 The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined as :
 ```math
@@ -44,8 +45,11 @@ Denoting ``\mathbf{x}(k+1)`` as `xnext`, they can be implemented in two possible
   computational burden as well.
 
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
-manipulated inputs, states, outputs and measured disturbances. The optional parameter `NT`
-explicitly specifies the number type of vectors (default to `Float64`).
+manipulated inputs, states, outputs and measured disturbances. For continuous-time models,
+the keyword argument `solver` is a [`DiffSolver`](@ref) instance that specifies the 
+differential equation solver. Choose `solver=nothing` for discrete-time state-space
+representation (the default). The optional parameter `NT` explicitly specifies the number 
+type of vectors (default to `Float64`).
 
 !!! tip
     Replace the `d` argument with `_` if `nd = 0` (see Examples below).
@@ -81,8 +85,9 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
 ```
 """
 function NonLinModel{NT}(
-    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
+    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0; solver=nothing
 ) where {NT<:Real}
+    isnothing(solver) && (solver=EmptySolver())
     ismutating_f = validate_f(NT, f)
     ismutating_h = validate_h(NT, h)
     f! = let f = f
@@ -91,18 +96,18 @@ function NonLinModel{NT}(
     h! = let h = h
         ismutating_h ? h : (y, x, d) -> y .= h(x, d)
     end
-    F, H = getFuncTypes(f!, h!)
-    return NonLinModel{NT, F, H}(f!, h!, Ts, nu, nx, ny, nd)
+    f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
+    F, H, DS = get_types(f!, h!, solver)
+    return NonLinModel{NT, F, H, DS}(f!, h!, solver, Ts, nu, nx, ny, nd)
 end
 
 function NonLinModel(
-    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0
+    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0; solver=nothing
 )
-    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd)
+    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; solver)
 end
 
-getFuncTypes(f::F, h::H) where {F<:Function, H<:Function} = F, H
-
+get_types(f!::F, h!::H, solver::DS) where {F<:Function, H<:Function, DS<:DiffSolver} = F, H, DS
 
 """
     validate_f(NT, f) -> ismutating
@@ -149,20 +154,3 @@ f!(xnext, model::NonLinModel, x, u, d) = model.f!(xnext, x, u, d)
 h!(y, model::NonLinModel, x, d) = model.h!(y, x, d)
 
 typestr(model::NonLinModel) = "nonlinear"
-
-function rk4!(x, u, d)
-    xterm .= x
-    fc!(ẋ, xterm, u, d)
-    k1 .= ẋ
-    xterm .= @. x + k1 * Ts/2
-    fc!(ẋ, xterm, u, d)
-    k2 .= ẋ 
-    xterm .= @. x + k2 * Ts/2
-    fc!(ẋ, xterm, u, d)
-    k3 .= ẋ
-    xterm .= @. x + k3 * Ts
-    fc!(ẋ, xterm, u, d)
-    k4 .= ẋ
-    x .+= @. (k1 + 2k2 + 2k3 + k4)*Ts/6
-    return x
-end

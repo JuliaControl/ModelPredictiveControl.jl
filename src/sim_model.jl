@@ -195,5 +195,6 @@ to_mat(A::AbstractMatrix) = A
 (model::SimModel)(d=empty(model.x)) = evaloutput(model::SimModel, d)
 
 include("model/linmodel.jl")
+include("model/solver.jl")
 include("model/nonlinmodel.jl")
 include("model/linearization.jl")
