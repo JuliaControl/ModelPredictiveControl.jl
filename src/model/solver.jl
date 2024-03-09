@@ -45,7 +45,7 @@ function get_solver_functions(NT::DataType, ::RungeKutta, f!, h!, Ts, _ , nx, _ 
         k2 = zeros(NT, nx)
         k3 = zeros(NT, nx)
         k4 = zeros(NT, nx)
-        f! = (xnext, x, u, d) -> begin
+        f! = function inner_solver(xnext, x, u, d)
             xterm = xnext
             @. xterm = x
             fc!(k1, xterm, u, d)
