@@ -39,35 +39,36 @@ function RungeKutta(order::Int=4; supersample::Int=1)
 end
 
 function get_solver_functions(NT::DataType, solver::RungeKutta, f!, h!, Ts, _ , nx, _ , _ )
-    f! = let fc! = f!, Ts=(Ts/solver.supersample), nx=nx
-        xcur_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx))
-        k1_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx))
-        k2_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx))
-        k3_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx))
-        k4_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx))
-        f! = function inner_solver(xnext, x, u, d)
-            x1 = x[begin]
-            xcur = get_tmp(xcur_cache, x1)
-            k1   = get_tmp(k1_cache, x1)
-            k2   = get_tmp(k2_cache, x1)
-            k3   = get_tmp(k3_cache, x1)
-            k4   = get_tmp(k4_cache, x1)
-            xcur .= x
-            for i=1:solver.supersample
-                xterm = xnext
-                @. xterm = xcur
-                fc!(k1, xterm, u, d)
-                @. xterm = xcur + k1 * Ts/2
-                fc!(k2, xterm, u, d)
-                @. xterm = xcur + k2 * Ts/2
-                fc!(k3, xterm, u, d)
-                @. xterm = xcur + k3 * Ts
-                fc!(k4, xterm, u, d)
-                @. xnext = xcur + (k1 + 2k2 + 2k3 + k4)*Ts/6
-                @. xcur = xnext
-            end
-            return nothing
+    fc! = f!
+    Ts_inner = Ts/solver.supersample
+    Nc = nx + 1
+    xcur_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx), Nc)
+    k1_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
+    k2_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
+    k3_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
+    k4_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
+    f! = function inner_solver(xnext, x, u, d)
+        x1 = x[begin]
+        xcur = get_tmp(xcur_cache, x1)
+        k1   = get_tmp(k1_cache, x1)
+        k2   = get_tmp(k2_cache, x1)
+        k3   = get_tmp(k3_cache, x1)
+        k4   = get_tmp(k4_cache, x1)
+        @. xcur = x
+        for i=1:solver.supersample
+            xterm = xnext
+            @. xterm = xcur
+            fc!(k1, xterm, u, d)
+            @. xterm = xcur + k1 * Ts_inner/2
+            fc!(k2, xterm, u, d)
+            @. xterm = xcur + k2 * Ts_inner/2
+            fc!(k3, xterm, u, d)
+            @. xterm = xcur + k3 * Ts_inner
+            fc!(k4, xterm, u, d)
+            @. xcur = xcur + (k1 + 2k2 + 2k3 + k4)*Ts_inner/6
         end
+        @. xnext = xcur
+        return nothing
     end
     return f!, h!
 end

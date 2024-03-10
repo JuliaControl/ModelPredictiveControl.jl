@@ -29,7 +29,8 @@ end
 
 Construct a nonlinear model from state-space functions `f`/`f!` and `h`/`h!`.
 
-The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined as :
+Default arguments assume discrete-time dynamics, in which the state update ``\mathbf{f}``
+and output ``\mathbf{h}`` functions are defined as :
 ```math
     \begin{aligned}
     \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \\
@@ -38,24 +39,21 @@ The state update ``\mathbf{f}`` and output ``\mathbf{h}`` functions are defined 
 ```
 Denoting ``\mathbf{x}(k+1)`` as `xnext`, they can be implemented in two possible ways:
 
-- non-mutating functions (out-of-place): they must be defined as `f(x, u, d) -> xnext` and
+- Non-mutating functions (out-of-place): they must be defined as `f(x, u, d) -> xnext` and
   `h(x, d) -> y`. This syntax is simple and intuitive but it allocates more memory.
-- mutating functions (in-place): they must be defined as `f!(xnext, x, u, d) -> nothing` and
+- Mutating functions (in-place): they must be defined as `f!(xnext, x, u, d) -> nothing` and
   `h!(y, x, d) -> nothing`. This syntax reduces the allocations and potentially the 
   computational burden as well.
 
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
-manipulated inputs, states, outputs and measured disturbances. For continuous-time models,
-the keyword argument `solver` is a [`DiffSolver`](@ref) instance that specifies the 
-differential equation solver. Choose `solver=nothing` for discrete-time state-space
-representation (the default). The optional parameter `NT` explicitly specifies the number 
-type of vectors (default to `Float64`).
+manipulated inputs, states, outputs and measured disturbances. 
 
 !!! tip
     Replace the `d` argument with `_` if `nd = 0` (see Examples below).
 
-Nonlinear continuous-time state-space functions are not supported for now. In such a case, 
-manually call a differential equation solver in `f` / `f!` (see [Manual](@ref man_nonlin)).
+Specifying a differential equation solver with the the `solver` keyword argument implies a
+continuous-time model (see Extended Help for details). The optional parameter `NT`
+explicitly set the number type of vectors (default to `Float64`).
 
 !!! warning
     The two functions must be in pure Julia to use the model in [`NonLinMPC`](@ref),
@@ -72,17 +70,28 @@ Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
  1 outputs y
  0 measured disturbances d
 
-julia> f!(xnext,x,u,_) = (xnext .= 0.1x .+ u; nothing);
+julia> f!(ẋ, x, u, _ ) = (ẋ .= -0.1x .+ u; nothing);
 
-julia> h!(y,x,_) = (y .= 2x; nothing);
+julia> h!(y, x, _ ) = (y .= 2x; nothing);
 
-julia> model2 = NonLinModel(f!, h!, 10.0, 1, 1, 1) 
+julia> model2 = NonLinModel(f!, h!, 5.0, 1, 1, 1, solver=RungeKutta()) 
 Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
  1 manipulated inputs u
  1 states x
  1 outputs y
  0 measured disturbances d
 ```
+
+# Extended Help
+!!! details "Extended Help"
+    State-space equations are similar for continuous-time models (replace ``\mathbf{x}(k+1)``
+    with ``\mathbf{ẋ}(t)`` and ``k`` with ``t`` on the LHS), with also two possible 
+    implementations (second one to reduce the allocations):
+
+    - Non-mutating functions (out-of-place): they must be defined as `f(x, u, d) -> ẋ` and
+      `h(x, d) -> y`.
+    - Mutating functions (in-place): they must be defined as `f!(ẋ, x, u, d) -> nothing` and
+      `h!(y, x, d) -> nothing`. 
 """
 function NonLinModel{NT}(
     f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0; solver=nothing
