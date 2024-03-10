@@ -35,8 +35,8 @@ The plant model is nonlinear:
 
 in which ``g`` is the gravitational acceleration in m/s², ``L``, the pendulum length in m,
 ``K``, the friction coefficient at the pivot point in kg/s, and ``m``, the mass attached at
-the end of the pendulum in kg. Here, the explicit Euler method discretizes the system to
-construct a [`NonLinModel`](@ref):
+the end of the pendulum in kg. Here, a [fourth order Runge-Kutta method](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods)
+solves the differential equations to construct a [`NonLinModel`](@ref):
 
 ```@example 1
 using ModelPredictiveControl
@@ -49,11 +49,12 @@ function pendulum(par, x, u)
     return [dθ, dω]
 end
 # declared constants, to avoid type-instability in the f function, for speed:
-const par, Ts = (9.8, 0.4, 1.2, 0.3), 0.1
-f(x, u, _ ) = x + Ts*pendulum(par, x, u) # Euler method
+const par  = (9.8, 0.4, 1.2, 0.3)
+f(x, u, _ ) = pendulum(par, x, u)
 h(x, _ )    = [180/π*x[1]]  # [°]
-nu, nx, ny = 1, 2, 1
-model = NonLinModel(f, h, Ts, nu, nx, ny)
+Ts, nu, nx, ny = 0.1, 1, 2, 1
+solver = RungeKutta()
+model = NonLinModel(f, h, Ts, nu, nx, ny; solver)
 ```
 
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
@@ -91,8 +92,8 @@ estimator tuning is tested on a plant with a 25 % larger friction coefficient ``
 
 ```@example 1
 const par_plant = (par[1], par[2], 1.25*par[3], par[4])
-f_plant(x, u, _) = x + Ts*pendulum(par_plant, x, u)
-plant = NonLinModel(f_plant, h, Ts, nu, nx, ny)
+f_plant(x, u, _ ) = pendulum(par_plant, x, u)
+plant = NonLinModel(f_plant, h, Ts, nu, nx, ny; solver)
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
 plot(res, plotu=false, plotxwithx̂=true)
 savefig(ans, "plot2_NonLinMPC.svg"); nothing # hide
@@ -170,8 +171,8 @@ Kalman Filter similar to the previous one (``\mathbf{y^m} = θ`` and ``\mathbf{y
 ```@example 1
 h2(x, _ ) = [180/π*x[1], x[2]]
 nu, nx, ny = 1, 2, 2
-model2 = NonLinModel(f      , h2, Ts, nu, nx, ny)
-plant2 = NonLinModel(f_plant, h2, Ts, nu, nx, ny)
+model2 = NonLinModel(f      , h2, Ts, nu, nx, ny; solver)
+plant2 = NonLinModel(f_plant, h2, Ts, nu, nx, ny; solver)
 estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
 ```
 
@@ -184,7 +185,7 @@ function JE(UE, ŶE, _ )
     τ, ω = UE[1:end-1], ŶE[2:2:end-1]
     return Ts*sum(τ.*ω)
 end
-empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=4.5e3, JE=JE)
+empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=4.0e3, JE=JE)
 empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
 ```
 

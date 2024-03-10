@@ -74,8 +74,8 @@ julia> f!(ẋ, x, u, _ ) = (ẋ .= -0.1x .+ u; nothing);
 
 julia> h!(y, x, _ ) = (y .= 2x; nothing);
 
-julia> model2 = NonLinModel(f!, h!, 5.0, 1, 1, 1, solver=RungeKutta()) 
-Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
+julia> model2 = NonLinModel(f!, h!, 5.0, 1, 1, 1, solver=RungeKutta())
+Discrete-time nonlinear model with a sample time Ts = 5.0 s and:
  1 manipulated inputs u
  1 states x
  1 outputs y

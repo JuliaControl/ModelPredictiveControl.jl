@@ -152,10 +152,44 @@ end
     nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1)
     xnext, y = similar(nonlinmodel4.x), similar(nonlinmodel4.yop)
     nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0])
-    @test xnext ≈ zeros(4,)
+    @test xnext ≈ zeros(4)
     nonlinmodel4.h!(y,[0,0,0,0],[0])
-    @test y ≈ zeros(2,)
+    @test y ≈ zeros(2)
 
+    A  = [0 0.5; -0.2 -0.1]
+    Bu = reshape([0; 0.5], 2, 1)
+    Bd = reshape([0; 0.5], 2, 1)
+    C  = [0.4 0]
+    Dd = reshape([0], 1, 1)
+    f3(x, u, d) = A*x + Bu*u+ Bd*d
+    h3(x, d) = C*x + Dd*d
+    nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=RungeKutta())
+    xnext, y = similar(nonlinmodel5.x), similar(nonlinmodel5.yop)
+    nonlinmodel5.f!(xnext, [0; 0], [0], [0])
+    @test xnext ≈ zeros(2)
+    nonlinmodel5.h!(y, [0; 0], [0])
+    @test y ≈ zeros(1)
+
+    function f2!(ẋ, x, u , d)
+        ẋ .= 0
+        mul!(ẋ, A, x, 1, 1)
+        mul!(ẋ, Bu, u, 1, 1)
+        mul!(ẋ, Bd, d, 1, 1)
+        return nothing
+    end
+    function h2!(y, x, d)
+        y .= 0
+        mul!(y, C, x, 1, 1)
+        mul!(y, Dd, d, 1, 1)
+        return nothing
+    end
+    nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta())
+    xnext, y = similar(nonlinmodel6.x), similar(nonlinmodel6.yop)
+    nonlinmodel6.f!(xnext, [0; 0], [0], [0])
+    @test xnext ≈ zeros(2)
+    nonlinmodel6.h!(y, [0; 0], [0])
+    @test y ≈ zeros(1)
+    
     @test_throws ErrorException NonLinModel(
         (x,u)->linmodel1.A*x + linmodel1.Bu*u,
         (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1)
