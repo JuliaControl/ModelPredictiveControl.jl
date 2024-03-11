@@ -155,7 +155,6 @@ end
 "Do nothing if `model` is a [`NonLinModel`](@ref)."
 steadystate!(::SimModel, _ , _ ) = nothing
 
-
 "Call `f!(xnext, x, u, d)` with `model.f!` method for [`NonLinModel`](@ref)."
 f!(xnext, model::NonLinModel, x, u, d) = model.f!(xnext, x, u, d)
 

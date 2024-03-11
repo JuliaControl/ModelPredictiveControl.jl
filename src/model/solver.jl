@@ -5,6 +5,9 @@ abstract type DiffSolver end
 struct EmptySolver <: DiffSolver end
 get_solver_functions(::DataType, ::EmptySolver, f!, h!, _ ... ) = f!, h!
 
+function Base.show(io::IO, solver::EmptySolver)
+    print(io, "Empty differential equation solver.")
+end
 
 struct RungeKutta <: DiffSolver
     order::Int
@@ -48,12 +51,12 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, f!, h!, Ts, _ , 
     k3_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     k4_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     f! = function inner_solver(xnext, x, u, d)
-        x1 = x[begin]
-        xcur = get_tmp(xcur_cache, x1)
-        k1   = get_tmp(k1_cache, x1)
-        k2   = get_tmp(k2_cache, x1)
-        k3   = get_tmp(k3_cache, x1)
-        k4   = get_tmp(k4_cache, x1)
+        T = promote_type(eltype(x), eltype(u), eltype(d))
+        xcur = get_tmp(xcur_cache, T)
+        k1   = get_tmp(k1_cache, T)
+        k2   = get_tmp(k2_cache, T)
+        k3   = get_tmp(k3_cache, T)
+        k4   = get_tmp(k4_cache, T)
         @. xcur = x
         for i=1:solver.supersample
             xterm = xnext
@@ -71,4 +74,9 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, f!, h!, Ts, _ , 
         return nothing
     end
     return f!, h!
+end
+
+function Base.show(io::IO, solver::RungeKutta)
+    N, n = solver.order, solver.supersample
+    print(io, "$(N)th order Runge-Kutta differential equation solver with $n supersamples.")
 end
