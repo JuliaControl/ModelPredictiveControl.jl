@@ -128,8 +128,7 @@ The controller seems robust enough to variations on ``K`` coefficient. Starting 
 inverted position, the closed-loop response to a step disturbances of 10° is also
 satisfactory:
 
-```@example 1block is unnecessary. I guess you have added it to avoid the closure bug? That bug only appears if the captured variables have been modified in the function body before capture, which they have not been here.
-
+```@example 1
 res_yd = sim!(nmpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
 plot(res_yd)
 savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
