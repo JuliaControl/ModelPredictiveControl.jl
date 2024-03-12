@@ -49,7 +49,7 @@ function pendulum(par, x, u)
     return [dθ, dω]
 end
 # declared constants, to avoid type-instability in the f function, for speed:
-const par  = (9.8, 0.4, 1.2, 0.3)
+const par = (9.8, 0.4, 1.2, 0.3)
 f(x, u, _ ) = pendulum(par, x, u)
 h(x, _ )    = [180/π*x[1]]  # [°]
 Ts, nu, nx, ny = 0.1, 1, 2, 1
@@ -59,8 +59,7 @@ model = NonLinModel(f, h, Ts, nu, nx, ny; solver)
 
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
 characters like ``θ`` can be typed in the Julia REPL or VS Code by typing `\theta` and
-pressing the `<TAB>` key. The tuple `par` and `Ts` are declared as constants here to improve
-the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
+pressing the `<TAB>` key. The tuple `par` is constant here to improve the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
 It is good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
 
 ```@example 1
@@ -129,7 +128,8 @@ The controller seems robust enough to variations on ``K`` coefficient. Starting 
 inverted position, the closed-loop response to a step disturbances of 10° is also
 satisfactory:
 
-```@example 1
+```@example 1block is unnecessary. I guess you have added it to avoid the closure bug? That bug only appears if the captured variables have been modified in the function body before capture, which they have not been here.
+
 res_yd = sim!(nmpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
 plot(res_yd)
 savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
@@ -185,7 +185,7 @@ function JE(UE, ŶE, _ )
     τ, ω = UE[1:end-1], ŶE[2:2:end-1]
     return Ts*sum(τ.*ω)
 end
-empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=4.0e3, JE=JE)
+empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=4e3, JE=JE)
 empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -246,9 +246,7 @@ We first linearize `model` at the point ``θ = π`` rad and ``ω = τ = 0`` (inv
 linmodel = linearize(model, x=[π, 0], u=[0])
 ```
 
-It is worth mentioning that the Euler method in `model` object is not the best choice for
-linearization since its accuracy is low (approximation of a poor approximation). A
-[`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
+A [`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
 
 ```@example 1
 kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)

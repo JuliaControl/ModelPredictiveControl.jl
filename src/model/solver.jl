@@ -42,7 +42,7 @@ function RungeKutta(order::Int=4; supersample::Int=1)
 end
 
 "Get the `f!` and `h!` functions for Runge-Kutta solver."
-function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts,_ , nx, _, _)
+function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ , nx, _ , _ )
     Ts_inner = Ts/solver.supersample
     Nc = nx + 1
     xcur_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx), Nc)
@@ -51,12 +51,14 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts,_ ,
     k3_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     k4_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     f! = function inner_solver(xnext, x, u, d)
-        T = promote_type(eltype(x), eltype(u), eltype(d))
-        xcur = get_tmp(xcur_cache, T)
-        k1   = get_tmp(k1_cache, T)
-        k2   = get_tmp(k2_cache, T)
-        k3   = get_tmp(k3_cache, T)
-        k4   = get_tmp(k4_cache, T)
+        CT = promote_type(eltype(x), eltype(u), eltype(d))
+        # dummy variable for get_tmp, necessary for PreallocationTools + Julia 1.6 :
+        var::CT = 0
+        xcur = get_tmp(xcur_cache, var)
+        k1   = get_tmp(k1_cache, var)
+        k2   = get_tmp(k2_cache, var)
+        k3   = get_tmp(k3_cache, var)
+        k4   = get_tmp(k4_cache, var)
         @. xcur = x
         for i=1:solver.supersample
             xterm = xnext
