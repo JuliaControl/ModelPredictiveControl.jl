@@ -91,12 +91,15 @@ function Base.show(io::IO, model::SimModel)
     nx, ny = model.nx, model.ny
     n = maximum(ndigits.((nu, nx, ny, nd))) + 1
     println(io, "Discrete-time $(typestr(model)) model with "*
-                "a sample time Ts = $(model.Ts) s and:")
+                "a sample time Ts = $(model.Ts) s$(detailstr(model)) and:")
     println(io, "$(lpad(nu, n)) manipulated inputs u")
     println(io, "$(lpad(nx, n)) states x")
     println(io, "$(lpad(ny, n)) outputs y")
     print(io,   "$(lpad(nd, n)) measured disturbances d")
 end
+
+typestr(model::SimModel) = "SimModel"
+detailstr(model::SimModel) = ""
 
 @doc raw"""
     initstate!(model::SimModel, u, d=[]) -> x

@@ -64,7 +64,7 @@ See also [`LinModel`](@ref).
 # Examples
 ```jldoctest
 julia> model1 = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1)
-Discrete-time nonlinear model with a sample time Ts = 10.0 s and:
+Discrete-time nonlinear model with a sample time Ts = 10.0 s, empty solver and:
  1 manipulated inputs u
  1 states x
  1 outputs y
@@ -75,7 +75,7 @@ julia> f!(ẋ, x, u, _ ) = (ẋ .= -0.1x .+ u; nothing);
 julia> h!(y, x, _ ) = (y .= 2x; nothing);
 
 julia> model2 = NonLinModel(f!, h!, 5.0, 1, 1, 1, solver=RungeKutta())
-Discrete-time nonlinear model with a sample time Ts = 5.0 s and:
+Discrete-time nonlinear model with a sample time Ts = 5.0 s, RungeKutta solver and:
  1 manipulated inputs u
  1 states x
  1 outputs y
@@ -99,12 +99,8 @@ function NonLinModel{NT}(
     isnothing(solver) && (solver=EmptySolver())
     ismutating_f = validate_f(NT, f)
     ismutating_h = validate_h(NT, h)
-    f! = let f = f
-        ismutating_f ? f : (xnext, x, u, d) -> xnext .= f(x, u, d)
-    end
-    h! = let h = h
-        ismutating_h ? h : (y, x, d) -> y .= h(x, d)
-    end
+    f! = ismutating_f ? f : (xnext, x, u, d) -> xnext .= f(x, u, d)
+    h! = ismutating_h ? h : (y, x, d) -> y .= h(x, d)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
     F, H, DS = get_types(f!, h!, solver)
     return NonLinModel{NT, F, H, DS}(f!, h!, solver, Ts, nu, nx, ny, nd)
@@ -116,7 +112,8 @@ function NonLinModel(
     return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; solver)
 end
 
-get_types(f!::F, h!::H, solver::DS) where {F<:Function, H<:Function, DS<:DiffSolver} = F, H, DS
+"Get the types of `f!`, `h!` and `solver` to construct a `NonLinModel`."
+get_types(::F, ::H, ::DS) where {F<:Function, H<:Function, DS<:DiffSolver} = F, H, DS
 
 """
     validate_f(NT, f) -> ismutating
@@ -162,3 +159,5 @@ f!(xnext, model::NonLinModel, x, u, d) = model.f!(xnext, x, u, d)
 h!(y, model::NonLinModel, x, d) = model.h!(y, x, d)
 
 typestr(model::NonLinModel) = "nonlinear"
+detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name) solver"
+detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:EmptySolver}) = ", empty solver"

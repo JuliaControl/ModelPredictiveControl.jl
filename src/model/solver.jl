@@ -41,8 +41,8 @@ function RungeKutta(order::Int=4; supersample::Int=1)
     return RungeKutta(order, supersample)
 end
 
-function get_solver_functions(NT::DataType, solver::RungeKutta, f!, h!, Ts, _ , nx, _ , _ )
-    fc! = f!
+"Get the `f!` and `h!` functions for Runge-Kutta solver."
+function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts,_ , nx, _, _)
     Ts_inner = Ts/solver.supersample
     Nc = nx + 1
     xcur_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx), Nc)
@@ -73,6 +73,7 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, f!, h!, Ts, _ , 
         @. xnext = xcur
         return nothing
     end
+    h! = hc!
     return f!, h!
 end
 
