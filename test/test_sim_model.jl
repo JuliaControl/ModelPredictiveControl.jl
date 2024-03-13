@@ -107,7 +107,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h1(x,_)   = linmodel1.C*x
-    nonlinmodel1 = NonLinModel(f1,h1,Ts,2,2,2)
+    nonlinmodel1 = NonLinModel(f1,h1,Ts,2,2,2,solver=nothing)
     @test nonlinmodel1.nx == 2
     @test nonlinmodel1.nu == 2
     @test nonlinmodel1.nd == 0
@@ -121,7 +121,7 @@ end
     linmodel2 = LinModel(sys,Ts,i_d=[3])
     f2(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h2(x,d)   = linmodel2.C*x + linmodel2.Dd*d
-    nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1)
+    nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1,solver=nothing)
 
     @test nonlinmodel2.nx == 4
     @test nonlinmodel2.nu == 2
@@ -133,7 +133,7 @@ end
     nonlinmodel2.h!(y,[0,0,0,0],[0])
     @test y ≈ zeros(2,)
 
-    nonlinmodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1)
+    nonlinmodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1,solver=nothing)
     @test isa(nonlinmodel3, NonLinModel{Float32})
 
     function f1!(xnext, x, u, d)
@@ -149,7 +149,7 @@ end
         mul!(y, linmodel2.Dd, d, 1, 1)
         return nothing
     end
-    nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1)
+    nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1, solver=nothing)
     xnext, y = similar(nonlinmodel4.x), similar(nonlinmodel4.yop)
     nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0])
     @test xnext ≈ zeros(4)
@@ -192,17 +192,17 @@ end
     
     @test_throws ErrorException NonLinModel(
         (x,u)->linmodel1.A*x + linmodel1.Bu*u,
-        (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1)
+        (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
     @test_throws ErrorException NonLinModel(
         (x,u,_)->linmodel1.A*x + linmodel1.Bu*u,
-        (x)->linmodel1.C*x, Ts, 2, 4, 2, 1)
+        (x)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
 end
 
 @testset "NonLinModel sim methods" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h1(x,_)   = linmodel1.C*x
-    nonlinmodel = NonLinModel(f1,h1,Ts,2,2,2)
+    nonlinmodel = NonLinModel(f1,h1,Ts,2,2,2,solver=nothing)
 
     @test updatestate!(nonlinmodel, zeros(2,)) ≈ zeros(2) 
     @test updatestate!(nonlinmodel, zeros(2,), Float64[]) ≈ zeros(2)
@@ -221,7 +221,7 @@ end
     Ts = 1.0
     f1(x,u,d) = x.^5 + u.^4 + d.^3
     h1(x,d)   = x.^2 + d
-    nonlinmodel1 = NonLinModel(f1,h1,Ts,1,1,1,1)
+    nonlinmodel1 = NonLinModel(f1,h1,Ts,1,1,1,1,solver=nothing)
     x, u, d = [2.0], [3.0], [4.0]
     linmodel1 = linearize(nonlinmodel1; x, u, d)
     @test linmodel1.A  ≈ 5*x.^4

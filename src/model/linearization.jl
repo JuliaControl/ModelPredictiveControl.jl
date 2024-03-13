@@ -22,7 +22,7 @@ Jacobians of ``\mathbf{f}`` and ``\mathbf{h}`` functions are automatically compu
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->x.^3 + u, (x,_)->x, 0.1, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->x.^3 + u, (x,_)->x, 0.1, 1, 1, 1, solver=nothing);
 
 julia> linmodel = linearize(model, x=[10.0], u=[0.0]); 
 

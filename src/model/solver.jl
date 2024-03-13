@@ -24,11 +24,11 @@ struct RungeKutta <: DiffSolver
 end
 
 """
-    RungeKutta(order::Int=4; supersample::Int=1)
+    RungeKutta(order=4; supersample=1)
 
 Create a Runge-Kutta solver with optional super-sampling.
 
-Only the fourth order Runge-Kutta is supported for now. The keyword argument `supersample`
+Only the 4th order Runge-Kutta is supported for now. The keyword argument `supersample`
 provides the number of internal steps (default to 1 step).
 """
 function RungeKutta(order::Int=4; supersample::Int=1)

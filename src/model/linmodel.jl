@@ -35,26 +35,35 @@ end
 
 Construct a linear model from state-space model `sys` with sampling time `Ts` in second.
 
-`Ts` can be omitted when `sys` is discrete-time. Its state-space matrices are:
+The system `sys` can be continuous or discrete-time (`Ts` can be omitted for the latter).
+For continuous dynamics, its state-space equations are (discrete case in Extended Help):
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{A x}(k) + \mathbf{B z}(k) \\
-    \mathbf{y}(k)   &= \mathbf{C x}(k) + \mathbf{D z}(k)
+    \mathbf{ẋ}(t) &= \mathbf{A x}(t) + \mathbf{B z}(t) \\
+    \mathbf{y}(t) &= \mathbf{C x}(t) + \mathbf{D z}(t)
 \end{aligned}
 ```
 with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{z}`` vector 
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
 in any order. `i_u` provides the indices of ``\mathbf{z}`` that are manipulated, and `i_d`, 
-the measured disturbances. See Extended Help if `sys` is continuous-time, or discrete-time
-with `Ts ≠ sys.Ts`.
+the measured disturbances. The constructor automatically discretizes continuous systems,
+resamples discrete ones if `Ts ≠ sys.Ts`, compute a new realization if not minimal, and 
+separate the ``\mathbf{z}`` terms in two parts (details in Extended Help). The rest of the
+documentation assumes discrete dynamics since all systems end up in this form.
 
-See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.ss),
-[`tf`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.tf).
+See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.ss)
 
 # Examples
 ```jldoctest
-julia> model = LinModel(ss(0.4, 0.2, 0.3, 0, 0.1))
-Discrete-time linear model with a sample time Ts = 0.1 s and:
+julia> model1 = LinModel(ss(-0.1, 1.0, 1.0, 0), 2.0) # continuous-time StateSpace
+LinModel with a sample time Ts = 2.0 s and:
+ 1 manipulated inputs u
+ 1 states x
+ 1 outputs y
+ 0 measured disturbances d
+
+julia> model2 = LinModel(ss(0.4, 0.2, 0.3, 0, 0.1)) # discrete-time StateSpace
+LinModel with a sample time Ts = 0.1 s and:
  1 manipulated inputs u
  1 states x
  1 outputs y
@@ -63,9 +72,9 @@ Discrete-time linear model with a sample time Ts = 0.1 s and:
 
 # Extended Help
 !!! details "Extended Help"
-    State-space matrices are similar if `sys` is continuous (replace ``\mathbf{x}(k+1)``
-    with ``\mathbf{ẋ}(t)`` and ``k`` with ``t`` on the LHS). In such a case, it's 
-    discretized with [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
+    State-space equations are similar if `sys` is discrete-time (replace ``\mathbf{ẋ}(t)``
+    with ``\mathbf{x}(k+1)`` and ``k`` with ``t`` on the LHS). Continuous dynamics are 
+    internally discretized using [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
     and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Lastly, if 
     `sys` is discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by
     using the aforementioned discretization methods.
@@ -124,8 +133,8 @@ function LinModel(
             sysd_dis = sysd
         end     
     end
-    # minreal to merge common poles if possible and ensure observability
-    sys_dis = minreal([sysu_dis sysd_dis])
+    # minreal to merge common poles if possible and ensure controllability/observability:
+    sys_dis = minreal([sysu_dis sysd_dis]) # same realization if already minimal
     nu  = length(i_u)
     A   = sys_dis.A
     Bu  = sys_dis.B[:,1:nu]
@@ -144,10 +153,12 @@ Convert to minimal realization state-space when `sys` is a transfer function.
 `sys` is equal to ``\frac{\mathbf{y}(s)}{\mathbf{z}(s)}`` for continuous-time, and 
 ``\frac{\mathbf{y}(z)}{\mathbf{z}(z)}``, for discrete-time.
 
+See also [`tf`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.tf)
+
 # Examples
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]) tf(-2, [5, 1])], 0.5, i_d=[2])
-Discrete-time linear model with a sample time Ts = 0.5 s and:
+LinModel with a sample time Ts = 0.5 s and:
  1 manipulated inputs u
  2 states x
  1 outputs y
@@ -246,5 +257,3 @@ function h!(y, model::LinModel, x, d)
     mul!(y, model.Dd, d, 1, 1)
     return nothing
 end
-
-typestr(model::LinModel) = "linear"
