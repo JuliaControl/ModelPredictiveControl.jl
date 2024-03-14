@@ -40,11 +40,11 @@ functions are defined as:
 ```
 They can be implemented in two possible ways:
 
-- Non-mutating functions (out-of-place): defined them as `f(x, u, d) -> ẋ` and
-  `h(x, d) -> y`. This syntax is simple and intuitive but it allocates more memory.
-- Mutating functions (in-place): defined them as `f!(ẋ, x, u, d) -> nothing` and
-  `h!(y, x, d) -> nothing`. This syntax reduces the allocations and potentially the 
-  computational burden as well.
+1. **Non-mutating functions** (out-of-place): define them as `f(x, u, d) -> ẋ` and
+   `h(x, d) -> y`. This syntax is simple and intuitive but it allocates more memory.
+2. **Mutating functions** (in-place): define them as `f!(ẋ, x, u, d) -> nothing` and
+   `h!(y, x, d) -> nothing`. This syntax reduces the allocations and potentially the 
+   computational burden as well.
 
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
 manipulated inputs, states, outputs and measured disturbances. 
@@ -99,9 +99,9 @@ NonLinModel with a sample time Ts = 2.0 s, empty solver and:
     ```
     with two possible implementations as well:
 
-    - Non-mutating functions: defined them as `f(x, u, d) -> xnext` and `h(x, d) -> y`.
-    - Mutating functions: defined them as `f!(xnext, x, u, d) -> nothing` and
-      `h!(y, x, d) -> nothing`.
+    1. **Non-mutating functions**: define them as `f(x, u, d) -> xnext` and `h(x, d) -> y`.
+    2. **Mutating functions**: define them as `f!(xnext, x, u, d) -> nothing` and
+       `h!(y, x, d) -> nothing`.
 """
 function NonLinModel{NT}(
     f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0; 

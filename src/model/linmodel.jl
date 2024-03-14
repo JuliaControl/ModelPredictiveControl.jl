@@ -188,9 +188,10 @@ end
 
 Construct the model from the discrete state-space matrices `A, Bu, C, Bd, Dd` directly.
 
-This syntax do not modify the state-space representation provided in argument (`minreal`
-is not called). Care must be taken to ensure that the model is controllable and observable.
-The optional parameter `NT` explicitly specifies the number type of the matrices.
+See [`LinModel(::StateSpace)`](@ref) Extended Help for the meaning of the matrices. This
+syntax do not modify the state-space representation provided in argument (`minreal` is not
+called). Care must be taken to ensure that the model is controllable and observable. The
+optional parameter `NT` explicitly specifies the number type of the matrices.
 """
 LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where NT<:Real
 
