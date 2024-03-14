@@ -184,7 +184,7 @@ function JE(UE, ŶE, _ )
     τ, ω = UE[1:end-1], ŶE[2:2:end-1]
     return Ts*sum(τ.*ω)
 end
-empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=3e9, JE=JE)
+empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=3.5e3, JE=JE)
 empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
 ```
 
