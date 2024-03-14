@@ -35,8 +35,8 @@ The plant model is nonlinear:
 
 in which ``g`` is the gravitational acceleration in m/s², ``L``, the pendulum length in m,
 ``K``, the friction coefficient at the pivot point in kg/s, and ``m``, the mass attached at
-the end of the pendulum in kg. Here, the explicit Euler method discretizes the system to
-construct a [`NonLinModel`](@ref):
+the end of the pendulum in kg. Here, a [fourth order Runge-Kutta method](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods)
+solves the differential equations to construct a [`NonLinModel`](@ref):
 
 ```@example 1
 using ModelPredictiveControl
@@ -49,17 +49,17 @@ function pendulum(par, x, u)
     return [dθ, dω]
 end
 # declared constants, to avoid type-instability in the f function, for speed:
-const par, Ts = (9.8, 0.4, 1.2, 0.3), 0.1
-f(x, u, _ ) = x + Ts*pendulum(par, x, u) # Euler method
+const par = (9.8, 0.4, 1.2, 0.3)
+f(x, u, _ ) = pendulum(par, x, u)
 h(x, _ )    = [180/π*x[1]]  # [°]
-nu, nx, ny = 1, 2, 1
+Ts, nu, nx, ny = 0.1, 1, 2, 1
 model = NonLinModel(f, h, Ts, nu, nx, ny)
 ```
 
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
 characters like ``θ`` can be typed in the Julia REPL or VS Code by typing `\theta` and
-pressing the `<TAB>` key. The tuple `par` and `Ts` are declared as constants here to improve
-the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
+pressing the `<TAB>` key. The tuple `par` is constant here to improve the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
+Note that a 4th order [`RungeKutta`](@ref) differential equation solver is used by default.
 It is good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
 
 ```@example 1
@@ -91,7 +91,7 @@ estimator tuning is tested on a plant with a 25 % larger friction coefficient ``
 
 ```@example 1
 const par_plant = (par[1], par[2], 1.25*par[3], par[4])
-f_plant(x, u, _) = x + Ts*pendulum(par_plant, x, u)
+f_plant(x, u, _ ) = pendulum(par_plant, x, u)
 plant = NonLinModel(f_plant, h, Ts, nu, nx, ny)
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
 plot(res, plotu=false, plotxwithx̂=true)
@@ -184,7 +184,7 @@ function JE(UE, ŶE, _ )
     τ, ω = UE[1:end-1], ŶE[2:2:end-1]
     return Ts*sum(τ.*ω)
 end
-empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=4.5e3, JE=JE)
+empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=3.5e3, JE=JE)
 empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -245,9 +245,7 @@ We first linearize `model` at the point ``θ = π`` rad and ``ω = τ = 0`` (inv
 linmodel = linearize(model, x=[π, 0], u=[0])
 ```
 
-It is worth mentioning that the Euler method in `model` object is not the best choice for
-linearization since its accuracy is low (approximation of a poor approximation). A
-[`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
+A [`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
 
 ```@example 1
 kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)

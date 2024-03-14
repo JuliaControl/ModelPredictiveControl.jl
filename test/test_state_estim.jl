@@ -284,7 +284,7 @@ end
 
     f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 2)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 2, solver=nothing)
     internalmodel3 = InternalModel(nonlinmodel)
     @test internalmodel3.nym == 2
     @test internalmodel3.nyu == 0
@@ -367,7 +367,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Du*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
 
     ukf1 = UnscentedKalmanFilter(linmodel1)
     @test ukf1.nym == 2
@@ -424,7 +424,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h(x,_)   = linmodel1.C*x
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     ukf1 = UnscentedKalmanFilter(nonlinmodel)
     @test updatestate!(ukf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
     @test updatestate!(ukf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
@@ -462,7 +462,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Du*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
 
     ekf1 = ExtendedKalmanFilter(linmodel1)
     @test ekf1.nym == 2
@@ -515,7 +515,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h(x,_)   = linmodel1.C*x
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     ekf1 = ExtendedKalmanFilter(nonlinmodel)
     @test updatestate!(ekf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
     @test updatestate!(ekf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
@@ -553,7 +553,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Du*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
 
     mhe1 = MovingHorizonEstimator(linmodel1, He=5)
     @test mhe1.nym == 2
@@ -630,7 +630,7 @@ end
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2], i_d=[3]), uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 4, 2, 1), uop=[10,50], yop=[50,30], dop=[5])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing), uop=[10,50], yop=[50,30], dop=[5])
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
     x̂ = updatestate!(mhe1, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
@@ -717,7 +717,7 @@ end
 
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u
     h(x,d)   = linmodel1.C*x 
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
 
     mhe3 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
@@ -805,7 +805,7 @@ end
 
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h(x,_)   = linmodel1.C*x
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
 
     setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[100,100])

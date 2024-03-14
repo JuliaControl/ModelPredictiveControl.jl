@@ -67,7 +67,7 @@ sim!(exmpc, 3, [55, 30])
 f(x,u,_) = model.A*x + model.Bu*u
 h(x,_) = model.C*x
 
-nlmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10, 10], yop=[50, 30])
+nlmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10, 10], yop=[50, 30])
 y = nlmodel()
 nmpc_im = setconstraint!(NonLinMPC(InternalModel(nlmodel), Hp=10, Cwt=Inf), ymin=[45, -Inf])
 initstate!(nmpc_im, nlmodel.uop, y)

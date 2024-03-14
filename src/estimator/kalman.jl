@@ -434,7 +434,7 @@ represents the measured outputs of ``\mathbf{ĥ}`` function (and unmeasured one
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0int_ym=[1, 1])
 UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
@@ -685,7 +685,7 @@ automatic differentiation.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1, solver=nothing);
 
 julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP0=[0.1], σP0int_ym=[0.1])
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:

@@ -12,6 +12,7 @@ import OSQP, Ipopt
 
 
 export SimModel, LinModel, NonLinModel
+export DiffSolver, RungeKutta
 export setop!, setstate!, updatestate!, evaloutput, linearize
 export StateEstimator, InternalModel, Luenberger
 export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter

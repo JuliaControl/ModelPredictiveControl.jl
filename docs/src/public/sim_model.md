@@ -29,6 +29,20 @@ LinModel
 NonLinModel
 ```
 
+## Differential Equation Solvers
+
+### DiffSolver
+
+```@docs
+ModelPredictiveControl.DiffSolver
+```
+
+### RungeKutta
+
+```@docs
+RungeKutta
+```
+
 ## Set Operating Points
 
 ```@docs

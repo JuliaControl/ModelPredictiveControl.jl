@@ -11,7 +11,7 @@ Functor allowing callable `SimModel` object as an alias for [`evaloutput`](@ref)
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->-x + u, (x,_)->x .+ 20, 10.0, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->-x + u, (x,_)->x .+ 20, 10.0, 1, 1, 1, solver=nothing);
 
 julia> y = model()
 1-element Vector{Float64}:
@@ -28,8 +28,8 @@ Set `model` inputs `uop`, outputs `yop` and measured disturbances `dop` operatin
 The state-space model with operating points (a.k.a. nominal values) is:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) \\
-    \mathbf{y_0}(k) &=  \mathbf{C x}(k) + \mathbf{D_d d_0}(k)
+    \mathbf{x}(k+1) &= \mathbf{A x}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) \\
+    \mathbf{y_0}(k) &= \mathbf{C x}(k) + \mathbf{D_d d_0}(k)
 \end{aligned}
 ```
 in which the `uop`, `yop` and `dop` vectors evaluate:
@@ -51,7 +51,7 @@ The structure is similar if `model` is a `NonLinModel`:
 # Examples
 ```jldoctest
 julia> model = setop!(LinModel(tf(3, [10, 1]), 2.0), uop=[50], yop=[20])
-Discrete-time linear model with a sample time Ts = 2.0 s and:
+LinModel with a sample time Ts = 2.0 s and:
  1 manipulated inputs u
  1 states x
  1 outputs y
@@ -90,13 +90,15 @@ function Base.show(io::IO, model::SimModel)
     nu, nd = model.nu, model.nd
     nx, ny = model.nx, model.ny
     n = maximum(ndigits.((nu, nx, ny, nd))) + 1
-    println(io, "Discrete-time $(typestr(model)) model with "*
-                "a sample time Ts = $(model.Ts) s and:")
+    println(io, "$(typeof(model).name.name) with a sample time Ts = $(model.Ts) s"*
+                "$(detailstr(model)) and:")
     println(io, "$(lpad(nu, n)) manipulated inputs u")
     println(io, "$(lpad(nx, n)) states x")
     println(io, "$(lpad(ny, n)) outputs y")
     print(io,   "$(lpad(nd, n)) measured disturbances d")
 end
+
+detailstr(model::SimModel) = ""
 
 @doc raw"""
     initstate!(model::SimModel, u, d=[]) -> x
@@ -195,5 +197,6 @@ to_mat(A::AbstractMatrix) = A
 (model::SimModel)(d=empty(model.x)) = evaloutput(model::SimModel, d)
 
 include("model/linmodel.jl")
+include("model/solver.jl")
 include("model/nonlinmodel.jl")
 include("model/linearization.jl")
