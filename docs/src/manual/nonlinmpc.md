@@ -35,8 +35,9 @@ The plant model is nonlinear:
 
 in which ``g`` is the gravitational acceleration in m/s², ``L``, the pendulum length in m,
 ``K``, the friction coefficient at the pivot point in kg/s, and ``m``, the mass attached at
-the end of the pendulum in kg. Here, a [fourth order Runge-Kutta method](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods)
-solves the differential equations to construct a [`NonLinModel`](@ref):
+the end of the pendulum in kg. The [`NonLinModel`](@ref) constructor assumes by default
+that the state function `f` is continuous in time, that is, an ordinary differential
+equation system (like here):
 
 ```@example 1
 using ModelPredictiveControl
