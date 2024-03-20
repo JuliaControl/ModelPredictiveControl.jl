@@ -160,26 +160,26 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
     ŷ, F, q̃, p = mpc.ŷ, mpc.F, mpc.q̃, mpc.p
     ŷ .= evalŷ(mpc.estim, ym, d)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
-    F_LHS = similar(F) 
-    F  .= mul!(F_LHS, mpc.K, mpc.estim.x̂) 
-    F .+= mul!(F_LHS, mpc.V, mpc.estim.lastu0)
-    F .+= mpc.Ŷop
+    F .= mpc.Ŷop
+    mul!(F, mpc.K, mpc.estim.x̂, 1, 1) 
+    mul!(F, mpc.V, mpc.estim.lastu0, 1, 1)
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
         mpc.D̂0 .= D̂ .- mpc.Dop
         mpc.D̂E[1:model.nd]     .= mpc.d0
         mpc.D̂E[model.nd+1:end] .= mpc.D̂0
-        F .+= mul!(F_LHS, mpc.G, mpc.d0)
-        F .+= mul!(F_LHS, mpc.J, mpc.D̂0)
+        mul!(F, mpc.G, mpc.d0, 1, 1)
+        mul!(F, mpc.J, mpc.D̂0, 1, 1)
     end
     mpc.R̂y .= R̂y
-    C_y  = F_LHS
+    C_y  = similar(F)
     C_y .= mpc.F .- mpc.R̂y
     q̃   .= lmul!(2,(mpc.M_Hp*mpc.Ẽ)'*C_y)
     p   .= dot(C_y, mpc.M_Hp, C_y)
     if ~mpc.noR̂u
         mpc.R̂u .= R̂u
-        C_u = mpc.T_lastu .- mpc.R̂u
+        C_u  = similar(mpc.T_lastu)
+        C_u .= mpc.T_lastu .- mpc.R̂u
         mpc.q̃ .+= lmul!(2, (mpc.L_Hp*mpc.S̃)'*C_u)
         mpc.p .+= dot(C_u, mpc.L_Hp, C_u)
     end
@@ -232,12 +232,11 @@ function predictstoch!(
     ŷd .+= estim.model.yop 
     ŷs = zeros(NT, estim.model.ny)
     ŷs[estim.i_ym] .= @views ym .- ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
-    Ŷop_LHS = similar(Ŷop)
-    Ŷop  .= mul!(Ŷop_LHS, mpc.Ks, estim.x̂s)
-    Ŷop .+= mul!(Ŷop_LHS, mpc.Ps, ŷs)
     for j=1:mpc.Hp
-        Ŷop[(1 + ny*(j-1)):(ny*j)] .+= yop
+        Ŷop[(1 + ny*(j-1)):(ny*j)] .= yop
     end
+    mul!(Ŷop, mpc.Ks, estim.x̂s, 1, 1)
+    mul!(Ŷop, mpc.Ps, ŷs, 1, 1)
     return nothing
 end
 "Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."
@@ -255,12 +254,11 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
     nU, nΔŨ, nY = length(mpc.con.Umin), length(mpc.con.ΔŨmin), length(mpc.con.Ymin)
     nx̂ = mpc.estim.nx̂
     fx̂ = mpc.con.fx̂
-    fx̂_LHS = similar(fx̂)
-    fx̂  .= mul!(fx̂_LHS, mpc.con.kx̂, mpc.estim.x̂)
-    fx̂ .+= mul!(fx̂_LHS, mpc.con.vx̂, mpc.estim.lastu0)
+    mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂)
+    mul!(fx̂, mpc.con.vx̂, mpc.estim.lastu0, 1, 1)
     if model.nd ≠ 0
-        fx̂ .+= mul!(fx̂_LHS, mpc.con.gx̂, mpc.d0)
-        fx̂ .+= mul!(fx̂_LHS, mpc.con.jx̂, mpc.D̂0)
+        mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
+        mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
     end
     n = 0
     mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.Umin + mpc.T_lastu

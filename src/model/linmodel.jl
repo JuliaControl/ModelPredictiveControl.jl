@@ -239,8 +239,7 @@ end
 Evaluate `xnext = A*x + Bu*u + Bd*d` in-place when `model` is a [`LinModel`](@ref).
 """
 function f!(xnext, model::LinModel, x, u, d)
-    xnext .= 0
-    mul!(xnext, model.A,  x, 1, 1)
+    mul!(xnext, model.A,  x)
     mul!(xnext, model.Bu, u, 1, 1)
     mul!(xnext, model.Bd, d, 1, 1)
     return nothing
@@ -253,8 +252,7 @@ end
 Evaluate `y = C*x + Dd*d` in-place when `model` is a [`LinModel`](@ref).
 """
 function h!(y, model::LinModel, x, d)
-    y .= 0
-    mul!(y, model.C,  x, 1, 1)
+    mul!(y, model.C,  x)
     mul!(y, model.Dd, d, 1, 1)
     return nothing
 end
