@@ -229,7 +229,9 @@ disturbances ``\mathbf{d_0 = d - d_{op}}``. The Moore-Penrose pseudo-inverse com
 ``\mathbf{(I - A)^{-1}}`` to support integrating `model` (integrator states will be 0).
 """
 function steadystate!(model::LinModel, u, d)
-    model.x .= pinv(I - model.A)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
+    M = I - model.A
+    rtol = sqrt(eps(real(float(oneunit(eltype(M)))))) # pinv docstring recommendation
+    model.x .= pinv(M; rtol)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
     return nothing
 end
 
