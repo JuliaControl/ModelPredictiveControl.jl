@@ -187,7 +187,7 @@ N_k =                     \begin{cases}
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
 ``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
 Extended Help defines the two vectors and the scalar ``ϵ``. See [`UnscentedKalmanFilter`](@ref)
-for details on he augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The
+for details on the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The
 matrix ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated with an [`ExtendedKalmanFilter`](@ref).
 
 !!! warning

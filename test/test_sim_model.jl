@@ -137,15 +137,13 @@ end
     @test isa(nonlinmodel3, NonLinModel{Float32})
 
     function f1!(xnext, x, u, d)
-        xnext .= 0
-        mul!(xnext, linmodel2.A,  x, 1, 1)
+        mul!(xnext, linmodel2.A,  x)
         mul!(xnext, linmodel2.Bu, u, 1, 1)
         mul!(xnext, linmodel2.Bd, d, 1, 1)
         return nothing
     end 
     function h1!(y, x, d)
-        y .= 0
-        mul!(y, linmodel2.C,  x, 1, 1)
+        mul!(y, linmodel2.C,  x)
         mul!(y, linmodel2.Dd, d, 1, 1)
         return nothing
     end
@@ -171,15 +169,13 @@ end
     @test y ≈ zeros(1)
 
     function f2!(ẋ, x, u , d)
-        ẋ .= 0
-        mul!(ẋ, A, x, 1, 1)
+        mul!(ẋ, A, x)
         mul!(ẋ, Bu, u, 1, 1)
         mul!(ẋ, Bd, d, 1, 1)
         return nothing
     end
     function h2!(y, x, d)
-        y .= 0
-        mul!(y, C, x, 1, 1)
+        mul!(y, C, x)
         mul!(y, Dd, d, 1, 1)
         return nothing
     end

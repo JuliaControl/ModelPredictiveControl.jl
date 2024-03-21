@@ -221,17 +221,16 @@ of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
 ```
 """
 function initpred!(estim::MovingHorizonEstimator, model::LinModel)
-    C, optim = estim.C, estim.optim
+    F, C, optim = estim.F, estim.C, estim.optim
     nϵ = isinf(C) ? 0 : 1
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
     nYm, nŴ = nym*Nk, nŵ*Nk
     nZ̃ = nϵ + nx̂ + nŴ
     # --- update F and fx̄ vectors for MHE predictions ---
-    F_LHS = similar(estim.F)
-    estim.F  .= mul!(F_LHS, estim.G, estim.U)
-    estim.F .+= estim.Ym
+    F .= estim.Ym
+    mul!(F, estim.G, estim.U, 1, 1)
     if model.nd ≠ 0
-        estim.F .+= mul!(F_LHS, estim.J, estim.D)
+        mul!(F, estim.J, estim.D, 1, 1)
     end
     estim.fx̄ .= estim.x̂arr_old
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
@@ -261,10 +260,10 @@ Also init ``\mathbf{F_x̂ = G_x̂ U + J_x̂ D}`` vector for the state constraint
 [`init_predmat_mhe`](@ref).
 """
 function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
-    Fx̂_LHS = similar(estim.con.Fx̂)
-    estim.con.Fx̂ .= mul!(Fx̂_LHS, estim.con.Gx̂, estim.U)
+    Fx̂ = estim.con.Fx̂
+    mul!(Fx̂, estim.con.Gx̂, estim.U)
     if model.nd ≠ 0
-        estim.con.Fx̂ .+= mul!(Fx̂_LHS, estim.con.Jx̂, estim.D)
+        mul!(Fx̂, estim.con.Jx̂, estim.D, 1, 1)
     end
     X̂min, X̂max = trunc_bounds(estim, estim.con.X̂min, estim.con.X̂max, estim.nx̂)
     Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, estim.nx̂)
@@ -276,9 +275,9 @@ function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
     n += nx̃
     estim.con.b[(n+1):(n+nx̃)] .= @. +estim.con.x̃max
     n += nx̃
-    estim.con.b[(n+1):(n+nX̂)] .= @. -X̂min + estim.con.Fx̂
+    estim.con.b[(n+1):(n+nX̂)] .= @. -X̂min + Fx̂
     n += nX̂
-    estim.con.b[(n+1):(n+nX̂)] .= @. +X̂max - estim.con.Fx̂
+    estim.con.b[(n+1):(n+nX̂)] .= @. +X̂max - Fx̂
     n += nX̂
     estim.con.b[(n+1):(n+nŴ)] .= @. -Ŵmin
     n += nŴ

@@ -43,8 +43,7 @@ end
 
 "Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
 function f̂!(x̂next, estim::StateEstimator, ::LinModel, x̂, u, d)
-    x̂next .= 0
-    mul!(x̂next, estim.Â,  x̂, 1, 1)
+    mul!(x̂next, estim.Â,  x̂)
     mul!(x̂next, estim.B̂u, u, 1, 1)
     mul!(x̂next, estim.B̂d, d, 1, 1)
     return nothing
@@ -64,8 +63,7 @@ function ĥ!(ŷ, estim::StateEstimator, model::SimModel, x̂, d)
 end
 "Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
 function ĥ!(ŷ, estim::StateEstimator, ::LinModel, x̂, d)
-    ŷ .= 0
-    mul!(ŷ, estim.Ĉ,  x̂, 1, 1)
+    mul!(ŷ, estim.Ĉ,  x̂)
     mul!(ŷ, estim.D̂d, d, 1, 1)
     return nothing
 end

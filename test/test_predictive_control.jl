@@ -83,7 +83,7 @@ end
     r = [15]
     outdist = [5]
     mpc_im = LinMPC(InternalModel(linmodel))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -94,7 +94,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
     mpc_nint_u = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -105,7 +105,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
     mpc_nint_ym = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -313,7 +313,7 @@ end
     r = [15]
     outdist = [5]
     mpc_im = ExplicitMPC(InternalModel(linmodel))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -324,7 +324,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
     mpc_nint_u = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -335,7 +335,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
     mpc_nint_ym = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -475,7 +475,7 @@ end
     r = [15]
     outdist = [5]
     nmpc_im = NonLinMPC(InternalModel(linmodel))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -486,7 +486,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
     nmpc_nint_u = NonLinMPC(SteadyKalmanFilter(linmodel, nint_u=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -497,7 +497,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
     nmpc_nint_ym = NonLinMPC(SteadyKalmanFilter(linmodel, nint_ym=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
