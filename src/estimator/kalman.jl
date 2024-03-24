@@ -568,6 +568,21 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     x̂, P̂, Q̂, R̂, K̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
+    return update_estimate_ukf!(estim, u, ym, d, P̂, x̂)
+end
+
+"""
+    update_estimate_ukf!(estim::StateEstimator, u, ym, d, P̂, x̂=nothing)
+
+Update Unscented Kalman Filter estimates and covariance matrices.
+
+Allows code reuse for [`UnscentedKalmanFilter`](@ref) and [`MovingHorizonEstimator`](@ref).
+See  [`update_estimate!(::UnscentedKalmanFilter, ::Any, ::Any, ::Any)`(@ref) docstring
+for the equations. If `isnothing(x̂)`, only the covariance `P̂` is updated.
+"""
+function update_estimate_ukf!(
+    estim::StateEstimator{NT}, u, ym, d, P̂, x̂=nothing
+) where NT<:Real
     # --- initialize matrices ---
     X̂, X̂_next = Matrix{NT}(undef, nx̂, nσ), Matrix{NT}(undef, nx̂, nσ)
     ŷm = Vector{NT}(undef, nym)
@@ -802,7 +817,7 @@ end
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
-Allows code reuse for [`KalmanFilter`](@ref) and [`ExtendedKalmanFilterKalmanFilter`](@ref).
+Allows code reuse for [`KalmanFilter`](@ref), [`ExtendedKalmanFilterKalmanFilter`](@ref).
 They update the state `x̂` and covariance `P̂` with the same equations. The extended filter
 substitutes the augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
 The implementation uses in-place operations and explicit factorization to reduce

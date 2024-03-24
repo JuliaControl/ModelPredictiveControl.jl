@@ -80,7 +80,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     x̂ .= X̂[end-nx̂+1:end]
     if Nk == estim.He
         uarr, ymarr, darr = estim.U[1:model.nu], estim.Ym[1:nym], estim.D[1:model.nd]
-        update_cov!(estim.P̂arr_old, estim, model, uarr, ymarr, darr)
+        update_cov!(estim, model, estim.x̂arr_old, estim.P̂arr_old, uarr, ymarr, darr)
         estim.invP̄.data .= Hermitian(inv(estim.P̂arr_old), :L)
     end
     return nothing
@@ -324,16 +324,16 @@ function trunc_bounds(estim::MovingHorizonEstimator{NT}, Bmin, Bmax, n) where NT
 end
 
 "Update the covariance `P̂` with the `KalmanFilter` if `model` is a `LinModel`."
-function update_cov!(P̂, estim::MovingHorizonEstimator, ::LinModel, u, ym, d) 
+function update_cov!(estim::MovingHorizonEstimator, ::LinModel, _ , P̂, u, ym, d) 
     return update_estimate_kf!(estim, u, ym, d, estim.Â, estim.Ĉ[estim.i_ym, :], P̂)
 end
 "Update it with the `ExtendedKalmanFilter` if model is not a `LinModel`."
-function update_cov!(P̂, estim::MovingHorizonEstimator, model::SimModel, u, ym, d) 
+function update_cov!(estim::MovingHorizonEstimator, model::SimModel, x̂, P̂, u, ym, d) 
     # TODO: also support UnscentedKalmanFilter
     x̂next, ŷ = similar(estim.x̂), similar(model.yop)
-    F̂ = ForwardDiff.jacobian((x̂next, x̂) -> f̂!(x̂next, estim, estim.model, x̂, u, d), x̂next, estim.x̂)
-    Ĥ = ForwardDiff.jacobian((ŷ, x̂)     -> ĥ!(ŷ, estim, estim.model, x̂, d), ŷ, estim.x̂)
-    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥ[estim.i_ym, :],  P̂)
+    F̂ = ForwardDiff.jacobian((x̂next, x̂) -> f̂!(x̂next, estim, estim.model, x̂, u, d), x̂next, x̂)
+    Ĥ = ForwardDiff.jacobian((ŷ, x̂)     -> ĥ!(ŷ, estim, estim.model, x̂, d), ŷ, x̂)
+    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥ[estim.i_ym, :], P̂)
 end
 
 
