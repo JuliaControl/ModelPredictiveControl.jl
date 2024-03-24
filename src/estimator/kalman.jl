@@ -565,10 +565,7 @@ noise, respectively.
      ISBN9780470045343.
 """
 function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:Real
-    x̂, P̂, Q̂, R̂, K̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂
-    nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
-    γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
-    return update_estimate_ukf!(estim, u, ym, d, P̂, x̂)
+    return update_estimate_ukf!(estim, u, ym, d, estim.P̂, estim.x̂)
 end
 
 """
@@ -583,6 +580,9 @@ for the equations. If `isnothing(x̂)`, only the covariance `P̂` is updated.
 function update_estimate_ukf!(
     estim::StateEstimator{NT}, u, ym, d, P̂, x̂=nothing
 ) where NT<:Real
+    Q̂, R̂, K̂ = estim.Q̂, estim.R̂, estim.K̂
+    nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
+    γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # --- initialize matrices ---
     X̂, X̂_next = Matrix{NT}(undef, nx̂, nσ), Matrix{NT}(undef, nx̂, nσ)
     ŷm = Vector{NT}(undef, nym)
