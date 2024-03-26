@@ -47,8 +47,8 @@ with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{z
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
 in any order. `i_u` provides the indices of ``\mathbf{z}`` that are manipulated, and `i_d`, 
 the measured disturbances. The constructor automatically discretizes continuous systems,
-resamples discrete ones if `Ts ≠ sys.Ts`, compute a new realization if not minimal, and 
-separate the ``\mathbf{z}`` terms in two parts (details in Extended Help). The rest of the
+resamples discrete ones if `Ts ≠ sys.Ts`, computes a new realization if not minimal, and 
+separates the ``\mathbf{z}`` terms in two parts (details in Extended Help). The rest of the
 documentation assumes discrete dynamics since all systems end up in this form.
 
 See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.ss)
