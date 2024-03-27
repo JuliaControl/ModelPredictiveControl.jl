@@ -43,14 +43,16 @@ end
 
 struct MovingHorizonEstimator{
     NT<:Real, 
-    SM<:SimModel, 
-    JM<:JuMP.GenericModel
+    SM<:SimModel,
+    JM<:JuMP.GenericModel,
+    CE<:StateEstimator,
 } <: StateEstimator{NT}
     model::SM
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
     optim::JM
     con::EstimatorConstraint{NT}
+    covestim::CE
     Z̃::Vector{NT}
     lastu0::Vector{NT}
     x̂::Vector{NT}
@@ -95,9 +97,9 @@ struct MovingHorizonEstimator{
     x̂arr_old::Vector{NT}
     P̂arr_old::Hermitian{NT, Matrix{NT}}
     Nk::Vector{Int}
-    function MovingHorizonEstimator{NT, SM, JM}(
-        model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM
-    ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
+    function MovingHorizonEstimator{NT, SM, JM, CE}(
+        model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM, covestim::CE
+    ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
         nu, nd = model.nu, model.nd
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
@@ -105,7 +107,6 @@ struct MovingHorizonEstimator{
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        nŵ = nx̂
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         lastu0 = zeros(NT, model.nu)
@@ -129,8 +130,8 @@ struct MovingHorizonEstimator{
         x̂arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(P̂0)
         Nk = [0]
-        estim = new{NT, SM, JM}(
-            model, optim, con, 
+        estim = new{NT, SM, JM, CE}(
+            model, optim, con, covestim,  
             Z̃, lastu0, x̂, 
             He,
             i_ym, nx̂, nym, nyu, nxs, 
@@ -188,7 +189,7 @@ The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated proces
 ``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
 Extended Help defines the two vectors and the scalar ``ϵ``. See [`UnscentedKalmanFilter`](@ref)
 for details on the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The
-matrix ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated with an [`ExtendedKalmanFilter`](@ref).
+covariance ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated with an [`ExtendedKalmanFilter`](@ref).
 
 !!! warning
     See the Extended Help if you get an error like:    
@@ -262,7 +263,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
 """
 function MovingHorizonEstimator(
     model::SM;
-    He::Union{Int, Nothing}=nothing,
+    He::Union{Int, Nothing} = nothing,
     i_ym::IntRangeOrVector = 1:model.ny,
     σP0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
@@ -280,33 +281,40 @@ function MovingHorizonEstimator(
     P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified"))        
-    return MovingHorizonEstimator{NT, SM, JM}(
-        model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim
-    )
+    isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
+    return MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim)
 end
 
-"Return a `JuMP.Model` with OSQP optimizer if `model` is a [`LinModel`](@ref)."
 default_optim_mhe(::LinModel) = JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=false)
-"Else, return it with Ipopt optimizer."
 default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
 
 @doc raw"""
-    MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim)
+    MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim[, covestim])
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
+The final argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) 
+object for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. The
+supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and 
+[`ExtendedKalmanFilter`](@ref).
 """
 function MovingHorizonEstimator(
-    model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM
-) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
+    model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM, 
+    covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
-    return MovingHorizonEstimator{NT, SM, JM}(
-        model, He, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, Cwt, optim
+    return MovingHorizonEstimator{NT, SM, JM, CE}(
+        model, He, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, Cwt, optim, covestim
     )
 end
 
+function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+end
+function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+    return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+end
 
 @doc raw"""
     setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
