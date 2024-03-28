@@ -610,16 +610,22 @@ end
     @test mhe9.Q̂ ≈ I(6)
     @test mhe9.R̂ ≈ I(2)
 
-    mhe10 = MovingHorizonEstimator(nonlinmodel, He=5, optim=Model(OSQP.Optimizer))
-    @test solver_name(mhe10.optim) == "OSQP"
+    optim = Model(Ipopt.Optimizer)
+    covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, [1, 1], I_6, I_6, I_2)
+    mhe10 = MovingHorizonEstimator(
+        nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf, optim, covestim
+    )
 
-    mhe11 = MovingHorizonEstimator(nonlinmodel, He=5, Cwt=1e3)
-    @test size(mhe11.Ẽ, 2) == 6*mhe11.nx̂ + 1
-    @test mhe11.C == 1e3
+    mhe11 = MovingHorizonEstimator(nonlinmodel, He=5, optim=Model(OSQP.Optimizer))
+    @test solver_name(mhe11.optim) == "OSQP"
+
+    mhe12 = MovingHorizonEstimator(nonlinmodel, He=5, Cwt=1e3)
+    @test size(mhe12.Ẽ, 2) == 6*mhe12.nx̂ + 1
+    @test mhe12.C == 1e3
 
     linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
-    mhe11 = MovingHorizonEstimator(linmodel2, He=5)
-    @test isa(mhe11, MovingHorizonEstimator{Float32})
+    mhe13 = MovingHorizonEstimator(linmodel2, He=5)
+    @test isa(mhe13, MovingHorizonEstimator{Float32})
 
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1, He=0)
@@ -679,6 +685,19 @@ end
     @test g_X̂max_end((1.0, 1.0, 1.0, 1.0)) ≤ 0.0 # test gfunc_i(i,::NTuple{N, Float64})
     # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
     @test ForwardDiff.gradient(g_X̂max_end, [1.0, 1.0, 1.0, 1.0]) ≈ [0.0, 0.0, 0.0, 0.0]
+
+    Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
+    R̂ = diagm([1, 1].^2)
+    optim = Model(Ipopt.Optimizer)
+    covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, 0, Q̂, Q̂, R̂)
+    mhe5 = MovingHorizonEstimator(nonlinmodel, 1, 1:2, 0, 0, Q̂, Q̂, R̂, Inf, optim, covestim)
+    x̂ = updatestate!(mhe5, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(4) atol=1e-9
+    @test mhe5.x̂ ≈ zeros(4) atol=1e-9
+    @test evaloutput(mhe5, [5]) ≈ mhe5([5]) ≈ [50, 30]
+    info = getinfo(mhe5)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
 end
 
 @testset "MovingHorizonEstimator set constraints" begin
