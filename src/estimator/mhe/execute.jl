@@ -78,11 +78,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
     V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, estim.Z̃)
     x̂ .= X̂[end-nx̂+1:end]
-    if Nk == estim.He
-        uarr, ymarr, darr = estim.U[1:model.nu], estim.Ym[1:nym], estim.D[1:model.nd]
-        update_cov!(estim, model, estim.x̂arr_old, estim.P̂arr_old, uarr, ymarr, darr)
-        estim.invP̄.data .= Hermitian(inv(estim.P̂arr_old), :L)
-    end
+    Nk == estim.He && update_cov!(estim::MovingHorizonEstimator)
     return nothing
 end
 
@@ -323,19 +319,17 @@ function trunc_bounds(estim::MovingHorizonEstimator{NT}, Bmin, Bmax, n) where NT
     return Bmin_t, Bmax_t
 end
 
-"Update the covariance `P̂` with the `KalmanFilter` if `model` is a `LinModel`."
-function update_cov!(estim::MovingHorizonEstimator, ::LinModel, _ , P̂, u, ym, d) 
-    return update_estimate_kf!(estim, u, ym, d, estim.Â, estim.Ĉ[estim.i_ym, :], P̂)
+"Update the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
+function update_cov!(estim::MovingHorizonEstimator)
+    nu, nd, nym = estim.model.nu, estim.model.nd, estim.nym
+    uarr, ymarr, darr = @views estim.U[1:nu], estim.Ym[1:nym], estim.D[1:nd]
+    estim.covestim.x̂      .= estim.x̂arr_old
+    estim.covestim.P̂.data .= estim.P̂arr_old # .data is necessary for Hermitian
+    update_estimate!(estim.covestim, uarr, ymarr, darr)
+    estim.P̂arr_old.data   .= estim.covestim.P̂
+    estim.invP̄.data       .= Hermitian(inv(estim.P̂arr_old), :L)
+    return nothing
 end
-"Update it with the `ExtendedKalmanFilter` if model is not a `LinModel`."
-function update_cov!(estim::MovingHorizonEstimator, model::SimModel, x̂, P̂, u, ym, d) 
-    # TODO: also support UnscentedKalmanFilter
-    x̂next, ŷ = similar(estim.x̂), similar(model.yop)
-    F̂ = ForwardDiff.jacobian((x̂next, x̂) -> f̂!(x̂next, estim, estim.model, x̂, u, d), x̂next, x̂)
-    Ĥ = ForwardDiff.jacobian((ŷ, x̂)     -> ĥ!(ŷ, estim, estim.model, x̂, d), ŷ, x̂)
-    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥ[estim.i_ym, :], P̂)
-end
-
 
 """
     obj_nonlinprog!( _ , estim::MovingHorizonEstimator, ::LinModel, _ , Z̃) 
