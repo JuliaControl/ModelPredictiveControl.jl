@@ -428,7 +428,7 @@ represents the measured outputs of ``\mathbf{ĥ}`` function (and unmeasured one
 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
-- `α=1e-3` : alpha parameter, spread of the state distribution ``(0 ≤ α ≤ 1)``.
+- `α=1e-3` : alpha parameter, spread of the state distribution ``(0 < α ≤ 1)``.
 - `β=2` : beta parameter, skewness and kurtosis of the states distribution ``(β ≥ 0)``.
 - `κ=0` : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
@@ -565,22 +565,7 @@ noise, respectively.
      ISBN9780470045343.
 """
 function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:Real
-    return update_estimate_ukf!(estim, u, ym, d, estim.P̂, estim.x̂)
-end
-
-"""
-    update_estimate_ukf!(estim::StateEstimator, u, ym, d, P̂, x̂=nothing)
-
-Update Unscented Kalman Filter estimates and covariance matrices.
-
-Allows code reuse for [`UnscentedKalmanFilter`](@ref) and [`MovingHorizonEstimator`](@ref).
-See  [`update_estimate!(::UnscentedKalmanFilter, ::Any, ::Any, ::Any)`(@ref) docstring
-for the equations. If `isnothing(x̂)`, only the covariance `P̂` is updated.
-"""
-function update_estimate_ukf!(
-    estim::StateEstimator{NT}, u, ym, d, P̂, x̂=nothing
-) where NT<:Real
-    Q̂, R̂, K̂ = estim.Q̂, estim.R̂, estim.K̂
+    x̂, P̂, Q̂, R̂, K̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # --- initialize matrices ---
@@ -815,7 +800,7 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
 end
 
 """
-    update_estimate_kf!(estim::StateEstimator, u, ym, d, Â, Ĉm, P̂, x̂=nothing)
+    update_estimate_kf!(estim::StateEstimator, u, ym, d, Â, Ĉm, P̂, x̂)
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
@@ -823,26 +808,21 @@ Allows code reuse for [`KalmanFilter`](@ref), [`ExtendedKalmanFilterKalmanFilter
 They update the state `x̂` and covariance `P̂` with the same equations. The extended filter
 substitutes the augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
 The implementation uses in-place operations and explicit factorization to reduce
-allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations. If `isnothing(x̂)`,
-only the covariance `P̂` is updated.
+allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations.
 """
-function update_estimate_kf!(
-    estim::StateEstimator{NT}, u, ym, d, Â, Ĉm, P̂, x̂=nothing
-) where NT<:Real
-    Q̂, R̂, M̂ = estim.Q̂, estim.R̂, estim.M̂
+function update_estimate_kf!(estim::StateEstimator{NT}, u, ym, d, Â, Ĉm, P̂, x̂) where NT<:Real
+    Q̂, R̂, M̂, K̂ = estim.Q̂, estim.R̂, estim.M̂, estim.K̂
     mul!(M̂, P̂, Ĉm')
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂)))
-    if !isnothing(x̂)
-        mul!(estim.K̂, Â, M̂)
-        x̂next, ŷ = Vector{NT}(undef, estim.nx̂), Vector{NT}(undef, estim.model.ny)
-        ĥ!(ŷ, estim, estim.model, x̂, d)
-        ŷm = @views ŷ[estim.i_ym]
-        v̂  = ŷm
-        v̂ .= ym .- ŷm
-        f̂!(x̂next, estim, estim.model, x̂, u, d)
-        mul!(x̂next, estim.K̂, v̂, 1, 1)
-        estim.x̂ .= x̂next
-    end
+    mul!(K̂, Â, M̂)
+    x̂next, ŷ = Vector{NT}(undef, estim.nx̂), Vector{NT}(undef, estim.model.ny)
+    ĥ!(ŷ, estim, estim.model, x̂, d)
+    ŷm = @views ŷ[estim.i_ym]
+    v̂  = ŷm
+    v̂ .= ym .- ŷm
+    f̂!(x̂next, estim, estim.model, x̂, u, d)
+    mul!(x̂next, K̂, v̂, 1, 1)
+    estim.x̂ .= x̂next
     P̂.data .= Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂ # .data is necessary for Hermitians
     return nothing
 end

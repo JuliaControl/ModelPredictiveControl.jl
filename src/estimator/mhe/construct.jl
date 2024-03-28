@@ -187,9 +187,9 @@ N_k =                     \begin{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
 ``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
-Extended Help defines the two vectors and the scalar ``ϵ``. See [`UnscentedKalmanFilter`](@ref)
-for details on the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The
-covariance ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated with an [`ExtendedKalmanFilter`](@ref).
+Extended Help defines the two vectors, the slack variable ``ϵ``, and the estimation of the
+covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. See [`UnscentedKalmanFilter`](@ref)
+for details on the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances.
 
 !!! warning
     See the Extended Help if you get an error like:    
@@ -248,18 +248,23 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
     problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
-    state and sensor noise).
-
-    For [`LinModel`](@ref), the optimization is treated as a quadratic program with a
-    time-varying Hessian, which is generally cheaper than nonlinear programming.
+    state and sensor noise). 
     
-    For [`NonLinModel`](@ref), the optimization relies on automatic differentiation (AD).
-    Optimizers generally benefit from exact derivatives like AD. However, the `f` and `h` 
-    functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
-    for common mistakes when writing these functions. 
+    The optimization and the estimation of the covariance at arrival 
+    ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` depend on `model`:
+
+    - If `model` is a [`LinModel`](@ref), the optimization is treated as a quadratic program
+      with a time-varying Hessian, which is generally cheaper than nonlinear programming. By
+      default, a [`KalmanFilter`](@ref) estimates the arrival covariance (customizable).
+    - Else, a nonlinear program with automatic differentiation (AD) solves the optimization.
+      Optimizers generally benefit from exact derivatives like AD. However, the `f` and `h` 
+      functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+      for common mistakes when writing these functions. An [`UnscentedKalmanFilter`](@ref)
+      estimates the arrival covariance by default.
         
     Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
-    `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
+    `10/Cwt` (if not already set), to scale the small values of ``ϵ``. Use the second
+    constructor to specify the covariance estimation method.
 """
 function MovingHorizonEstimator(
     model::SM;
