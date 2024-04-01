@@ -144,16 +144,16 @@ function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂next, ::InternalModel, model::NonLinModel, x̂, u, d)
+    f̂!(x̂next, _ , estim::InternalModel, model::NonLinModel, x̂, u, d)
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
 It calls `model.f!(x̂next, x̂, u ,d)` since this estimator does not augment the states.
 """
-f̂!(x̂next, ::InternalModel, model::NonLinModel, x̂, u, d) = model.f!(x̂next, x̂, u, d)
+f̂!(x̂next, _ , ::InternalModel, model::NonLinModel, x̂, u, d) = model.f!(x̂next, x̂, u, d)
 
 @doc raw"""
-    ĥ!(ŷ, ::InternalModel, model::NonLinModel, x̂, d)
+    ĥ!(ŷ, estim::InternalModel, model::NonLinModel, x̂, d)
 
 Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.h!`.
 """

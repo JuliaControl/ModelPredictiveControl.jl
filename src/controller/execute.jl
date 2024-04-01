@@ -103,24 +103,25 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 ```
 """
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
+    model = mpc.estim.model
     info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
-    Ŷ, u        = similar(mpc.Ŷop), similar(mpc.estim.lastu0)
+    Ŷ, u, û     = similar(mpc.Ŷop), similar(model.uop), similar(model.uop)
     x̂, x̂next    = similar(mpc.estim.x̂), similar(mpc.estim.x̂)
-    Ŷ, x̂end     = predict!(Ŷ, x̂, x̂next, u, mpc, mpc.estim.model, mpc.ΔŨ)
+    Ŷ, x̂end     = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, mpc.ΔŨ)
     U           = mpc.S̃*mpc.ΔŨ + mpc.T_lastu
     Ȳ, Ū        = similar(Ŷ), similar(U)
-    J           = obj_nonlinprog!(U, Ȳ, Ū, mpc, mpc.estim.model, Ŷ, mpc.ΔŨ)
-    info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*mpc.estim.model.nu]
+    J           = obj_nonlinprog!(U, Ȳ, Ū, mpc, model, Ŷ, mpc.ΔŨ)
+    info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
     info[:ϵ]    = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
     info[:J]    = J
     info[:U]    = U
-    info[:u]    = info[:U][1:mpc.estim.model.nu]
-    info[:d]    = mpc.d0 + mpc.estim.model.dop
+    info[:u]    = info[:U][1:model.nu]
+    info[:d]    = mpc.d0 + model.dop
     info[:D̂]    = mpc.D̂0 + mpc.Dop
     info[:ŷ]    = mpc.ŷ
     info[:Ŷ]    = Ŷ
     info[:x̂end] = x̂end
-    info[:Ŷs]  = mpc.Ŷop - repeat(mpc.estim.model.yop, mpc.Hp) # Ŷop = Ŷs + Yop
+    info[:Ŷs]  = mpc.Ŷop - repeat(model.yop, mpc.Hp) # Ŷop = Ŷs + Yop
     info[:R̂y]  = mpc.R̂y
     info[:R̂u]  = mpc.R̂u
     info = addinfo!(info, mpc)
@@ -296,16 +297,14 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
 end
 
 @doc raw"""
-    predict!(Ŷ, x̂, _ , _ , mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ, x̂end
+    predict!(Ŷ, x̂, _ , _ , _ , mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ, x̂end
 
 Compute the predictions `Ŷ` and terminal states `x̂end` if model is a [`LinModel`](@ref).
 
 The method mutates `Ŷ` and `x̂` vector arguments. The `x̂end` vector is used for
 the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``.
 """
-function predict!(
-    Ŷ, x̂, _ , _ , mpc::PredictiveController, ::LinModel, ΔŨ::Vector{NT}
-) where {NT<:Real}
+function predict!(Ŷ, x̂, _ , _ , _ , mpc::PredictiveController, ::LinModel, ΔŨ)
     # in-place operations to reduce allocations :
     Ŷ .= mul!(Ŷ, mpc.Ẽ, ΔŨ) .+ mpc.F
     x̂ .= mul!(x̂, mpc.con.ẽx̂, ΔŨ) .+ mpc.con.fx̂
@@ -314,15 +313,13 @@ function predict!(
 end
 
 @doc raw"""
-    predict!(Ŷ, x̂, x̂next, u, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ, x̂end
+    predict!(Ŷ, x̂, x̂next, u, û, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ, x̂end
 
 Compute both vectors if `model` is not a [`LinModel`](@ref). 
     
-The method mutates `Ŷ`, `x̂`, `x̂next` and `u` arguments.
+The method mutates `Ŷ`, `x̂`, `x̂next`, `u` and `û` arguments.
 """
-function predict!(
-    Ŷ, x̂, x̂next, u, mpc::PredictiveController, model::SimModel, ΔŨ::Vector{NT}
-) where {NT<:Real}
+function predict!(Ŷ, x̂, x̂next, u, û, mpc::PredictiveController, model::SimModel, ΔŨ)
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     u0 = u
     x̂  .= mpc.estim.x̂
@@ -332,7 +329,7 @@ function predict!(
         if j ≤ Hc
             u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
         end
-        f̂!(x̂next, mpc.estim, model, x̂, u0, d0)
+        f̂!(x̂next, û, mpc.estim, model, x̂, u0, d0)
         x̂ .= x̂next
         d0 = @views mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ  = @views Ŷ[(1 + ny*(j-1)):(ny*j)]
@@ -352,9 +349,7 @@ The function is called by the nonlinear optimizer of [`NonLinMPC`](@ref) control
 also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
 at specific input increments `ΔŨ` and predictions `Ŷ` values. It mutates the `U` argument.
 """
-function obj_nonlinprog!(
-    U , _ , _ , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ::Vector{NT}
-) where {NT<:Real}
+function obj_nonlinprog!(U, _ , _ , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ)
     J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
     if !iszero(mpc.E)
         U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu
@@ -373,9 +368,7 @@ function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method
 `U`, `Ȳ` and `Ū` arguments (input over `Hp`, and output and input setpoint tracking error, 
 respectively).
 """
-function obj_nonlinprog!(
-    U, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ::Vector{NT}
-) where {NT<:Real}
+function obj_nonlinprog!(U, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ)
     # --- output setpoint tracking term ---
     Ȳ  .= mpc.R̂y .- Ŷ
     JR̂y = dot(Ȳ, mpc.M_Hp, Ȳ)

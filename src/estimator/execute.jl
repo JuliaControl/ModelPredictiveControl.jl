@@ -15,7 +15,7 @@ function remove_op!(estim::StateEstimator, u, ym, d)
 end
 
 @doc raw"""
-    f̂!(x̂next, estim::StateEstimator, model::SimModel, x̂, u, d) -> nothing
+    f̂!(x̂next, û, estim::StateEstimator, model::SimModel, x̂, u, d) -> nothing
 
 Mutating state function ``\mathbf{f̂}`` of the augmented model.
 
@@ -27,22 +27,26 @@ function returns the next state of the augmented model, defined as:
     \mathbf{ŷ}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) 
 \end{aligned}
 ```
-where ``\mathbf{x̂}(k+1)`` is stored in `x̂next` argument.
+where ``\mathbf{x̂}(k+1)`` is stored in `x̂next` argument. The method mutates `x̂next` and `û`
+in place, the latter stores the input vector of the augmented model ``\mathbf{u + ŷ_{s_u}}``.
 """
-function f̂!(x̂next, estim::StateEstimator, model::SimModel, x̂, u, d)
+function f̂!(x̂next, û, estim::StateEstimator, model::SimModel, x̂, u, d)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂[1:model.nx], x̂[model.nx+1:end]
     @views x̂d_next, x̂s_next = x̂next[1:model.nx], x̂next[model.nx+1:end]
-    T  = promote_type(eltype(x̂), eltype(u))
-    û  = Vector{T}(undef, model.nu) # TODO: avoid this allocation if possible
-    û .= u .+ mul!(û, estim.Cs_u, x̂s)
+    mul!(û, estim.Cs_u, x̂s)
+    û .+= u
     f!(x̂d_next, model, x̂d, û, d)
     mul!(x̂s_next, estim.As, x̂s)
     return nothing
 end
 
-"Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
-function f̂!(x̂next, estim::StateEstimator, ::LinModel, x̂, u, d)
+"""
+    f̂!(x̂next, _ , estim::StateEstimator, model::LinModel, x̂, u, d) -> nothing
+
+Use the augmented model matrices if `model` is a [`LinModel`](@ref).
+"""
+function f̂!(x̂next, _ , estim::StateEstimator, ::LinModel, x̂, u, d)
     mul!(x̂next, estim.Â,  x̂)
     mul!(x̂next, estim.B̂u, u, 1, 1)
     mul!(x̂next, estim.B̂d, d, 1, 1)
@@ -61,7 +65,11 @@ function ĥ!(ŷ, estim::StateEstimator, model::SimModel, x̂, d)
     mul!(ŷ, estim.Cs_y, x̂s, 1, 1)
     return nothing
 end
-"Use the augmented model matrices if `model` is a [`LinModel`](@ref)."
+"""
+    ĥ!(ŷ, estim::StateEstimator, model::LinModel, x̂, d) -> nothing
+
+Use the augmented model matrices if `model` is a [`LinModel`](@ref).
+"""
 function ĥ!(ŷ, estim::StateEstimator, ::LinModel, x̂, d)
     mul!(ŷ, estim.Ĉ,  x̂)
     mul!(ŷ, estim.D̂d, d, 1, 1)
