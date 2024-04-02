@@ -570,6 +570,7 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # --- initialize matrices ---
     X̂, X̂_next = Matrix{NT}(undef, nx̂, nσ), Matrix{NT}(undef, nx̂, nσ)
+    û  = Vector{NT}(undef, estim.model.nu)
     ŷm = Vector{NT}(undef, nym)
     ŷ  = Vector{NT}(undef, estim.model.ny)
     Ŷm = Matrix{NT}(undef, nym, nσ)
@@ -604,7 +605,7 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     X̂_cor[:, nx̂+2:end] .-= γ_sqrt_P̂_cor
     X̂_next = similar(X̂_cor)
     for j in axes(X̂_next, 2)
-        @views f̂!(X̂_next[:, j], estim, estim.model, X̂_cor[:, j], u, d)
+        @views f̂!(X̂_next[:, j], û, estim, estim.model, X̂_cor[:, j], u, d)
     end
     x̂_next = mul!(x̂, X̂_next, m̂)
     X̄_next = X̂_next
@@ -765,10 +766,15 @@ function update_estimate!(
     estim::ExtendedKalmanFilter{NT}, u, ym, d=empty(estim.x̂)
 ) where NT<:Real
     model = estim.model
-    x̂next, ŷ = Vector{NT}(undef, estim.nx̂), Vector{NT}(undef, model.ny)
-    F̂ = ForwardDiff.jacobian((x̂next, x̂) -> f̂!(x̂next, estim, model, x̂, u, d), x̂next, estim.x̂)
-    Ĥ = ForwardDiff.jacobian((ŷ, x̂)     -> ĥ!(ŷ, estim, model, x̂, d), ŷ, estim.x̂)
-    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥ[estim.i_ym, :], estim.P̂, estim.x̂)
+    nx̂, nu, ny = estim.nx̂, model.nu, model.ny
+    x̂, P̂ = estim.x̂, estim.P̂
+    # concatenate x̂next and û vectors to allows û vector with dual numbers for auto diff:
+    x̂nextû, ŷ = Vector{NT}(undef, nx̂ + nu), Vector{NT}(undef, ny)
+    f̂AD! = (x̂nextû, x̂) -> @views f̂!(x̂nextû[1:nx̂], x̂nextû[nx̂+1:end], estim, model, x̂, u, d)
+    ĥAD! = (ŷ, x̂) -> ĥ!(ŷ, estim, model, x̂, d)
+    F̂  = ForwardDiff.jacobian(f̂AD!, x̂nextû, x̂)[1:nx̂, :]
+    Ĥm = ForwardDiff.jacobian(ĥAD!, ŷ, x̂)[estim.i_ym, :]
+    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥm, P̂, x̂)
 end
 
 "Set `estim.P̂` to `estim.P̂0` for the time-varying Kalman Filters."
@@ -810,15 +816,16 @@ allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations.
 """
 function update_estimate_kf!(estim::StateEstimator{NT}, u, ym, d, Â, Ĉm, P̂, x̂) where NT<:Real
     Q̂, R̂, M̂, K̂ = estim.Q̂, estim.R̂, estim.M̂, estim.K̂
+    nx̂, nu, ny = estim.nx̂, estim.model.nu, estim.model.ny
+    x̂next, û, ŷ = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu), Vector{NT}(undef, ny)
     mul!(M̂, P̂, Ĉm')
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂)))
     mul!(K̂, Â, M̂)
-    x̂next, ŷ = Vector{NT}(undef, estim.nx̂), Vector{NT}(undef, estim.model.ny)
     ĥ!(ŷ, estim, estim.model, x̂, d)
     ŷm = @views ŷ[estim.i_ym]
     v̂  = ŷm
     v̂ .= ym .- ŷm
-    f̂!(x̂next, estim, estim.model, x̂, u, d)
+    f̂!(x̂next, û, estim, estim.model, x̂, u, d)
     mul!(x̂next, K̂, v̂, 1, 1)
     estim.x̂ .= x̂next
     P̂.data .= Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂ # .data is necessary for Hermitians

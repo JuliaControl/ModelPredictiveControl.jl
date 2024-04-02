@@ -34,16 +34,17 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     add_data_windows!(estim::MovingHorizonEstimator, u, d, ym)
     initpred!(estim, model)
     linconstraint!(estim, model)
-    nŷ, nx̂, nym, nŵ, Nk = model.ny, estim.nx̂, estim.nym, estim.nx̂, estim.Nk[]
+    nu, ny, nx̂, nym, nŵ, Nk = model.nu, model.ny, estim.nx̂, estim.nym, estim.nx̂, estim.Nk[]
     nx̃ = !isinf(estim.C) + nx̂
     Z̃var::Vector{VariableRef} = optim[:Z̃var]
     V̂  = Vector{NT}(undef, nym*Nk)
     X̂  = Vector{NT}(undef, nx̂*Nk)
-    ŷ  = Vector{NT}(undef, nŷ)
+    û  = Vector{NT}(undef, nu)
+    ŷ  = Vector{NT}(undef, ny)
     x̄  = Vector{NT}(undef, nx̂)
     ϵ0 = isinf(estim.C) ? empty(estim.Z̃) : estim.Z̃[begin]
     Z̃0 = [ϵ0; estim.x̂arr_old; estim.Ŵ]
-    V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, Z̃0)
+    V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃0)
     J0 = obj_nonlinprog!(x̄, estim, model, V̂, Z̃0)
     # initial Z̃0 with Ŵ=0 if objective or constraint function not finite :
     isfinite(J0) || (Z̃0 = [ϵ0; estim.x̂arr_old; zeros(NT, nŵ*estim.He)])
@@ -76,7 +77,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     estim.Z̃ .= iserror(optim) ? Z̃last : Z̃curr
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
-    V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, estim.Z̃)
+    V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, estim.Z̃)
     x̂ .= X̂[end-nx̂+1:end]
     Nk == estim.He && update_cov!(estim::MovingHorizonEstimator)
     return nothing
@@ -126,8 +127,8 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     MyTypes = Union{JuMP._SolutionSummary, Hermitian{NT, Matrix{NT}}, Vector{NT}, NT}
     info = Dict{Symbol, MyTypes}()
     V̂, X̂ = similar(estim.Ym[1:nym*Nk]), similar(estim.X̂[1:nx̂*Nk])
-    ŷ    = similar(model.yop)
-    V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, estim.Z̃)
+    û, ŷ = similar(model.uop), similar(model.yop)
+    V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, estim.Z̃)
     x̂arr = estim.Z̃[nx̃-nx̂+1:nx̃]
     x̄ = estim.x̂arr_old - x̂arr
     X̂ = [x̂arr; X̂]
@@ -339,9 +340,7 @@ Objective function of [`MovingHorizonEstimator`](@ref) when `model` is a [`LinMo
 It can be called on a [`MovingHorizonEstimator`](@ref) object to evaluate the objective 
 function at specific `Z̃` and `V̂` values.
 """
-function obj_nonlinprog!(
-    _ , estim::MovingHorizonEstimator, ::LinModel, _ , Z̃::Vector{T}
-) where {T<:Real}
+function obj_nonlinprog!( _ , estim::MovingHorizonEstimator, ::LinModel, _ , Z̃)
     return obj_quadprog(Z̃, estim.H̃, estim.q̃) + estim.p[]
 end
 
@@ -353,9 +352,7 @@ Objective function of the MHE when `model` is not a [`LinModel`](@ref).
 The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
 `x̄` vector arguments.
 """
-function obj_nonlinprog!(
-    x̄, estim::MovingHorizonEstimator, ::SimModel, V̂, Z̃::Vector{T}
-) where {T<:Real}
+function obj_nonlinprog!(x̄, estim::MovingHorizonEstimator, ::SimModel, V̂, Z̃) 
     Nk, nϵ = estim.Nk[], !isinf(estim.C)
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
     nx̃ = nϵ + nx̂
@@ -367,17 +364,15 @@ function obj_nonlinprog!(
 end
 
 """
-    predict!(V̂, X̂, ŷ, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂
+    predict!(V̂, X̂, û, ŷ, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂
 
 Compute the `V̂` vector and `X̂` vectors for the `MovingHorizonEstimator` and `LinModel`.
 
-The function mutates `V̂`, `X̂` and ŷ vector arguments. The vector `V̂` is the estimated sensor
-noises `V̂` from ``k-N_k+1`` to ``k``. The `X̂` vector is estimated states from ``k-N_k+2`` to
-``k+1``.
+The function mutates `V̂`, `X̂`, `û` and `ŷ` vector arguments. The vector `V̂` is the estimated
+sensor noises `V̂` from ``k-N_k+1`` to ``k``. The `X̂` vector is estimated states from 
+``k-N_k+2`` to ``k+1``.
 """
-function predict!(
-    V̂, X̂, _ , estim::MovingHorizonEstimator, ::LinModel, Z̃::Vector{T}
-) where {T<:Real}
+function predict!(V̂, X̂, _ , _ , estim::MovingHorizonEstimator, ::LinModel, Z̃) 
     Nk, nϵ = estim.Nk[], !isinf(estim.C)
     nX̂, nŴ, nYm = estim.nx̂*Nk, estim.nx̂*Nk, estim.nym*Nk
     nZ̃ = nϵ + estim.nx̂ + nŴ
@@ -387,9 +382,7 @@ function predict!(
 end
 
 "Compute the two vectors when `model` is not a `LinModel`."
-function predict!(
-    V̂, X̂, ŷ, estim::MovingHorizonEstimator, model::SimModel, Z̃::Vector{T}
-) where {T<:Real}
+function predict!(V̂, X̂, û, ŷ, estim::MovingHorizonEstimator, model::SimModel, Z̃)
     Nk = estim.Nk[]
     nu, nd, ny, nx̂, nŵ, nym = model.nu, model.nd, model.ny, estim.nx̂, estim.nx̂, estim.nym
     nx̃ = !isinf(estim.C) + nx̂
@@ -403,7 +396,7 @@ function predict!(
         ŷm = @views ŷ[estim.i_ym]
         V̂[(1 + nym*(j-1)):(nym*j)] .= ym .- ŷm
         x̂next = @views X̂[(1 + nx̂ *(j-1)):(nx̂ *j)]
-        f̂!(x̂next, estim, model, x̂, u, d)
+        f̂!(x̂next, û, estim, model, x̂, u, d)
         x̂next .+= ŵ
         x̂ = x̂next
     end

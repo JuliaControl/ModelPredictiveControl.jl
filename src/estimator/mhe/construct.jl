@@ -1003,15 +1003,16 @@ function init_optimization!(
     end
     He = estim.He
     nV̂, nX̂, ng = He*estim.nym, He*estim.nx̂, length(con.i_g)
-    nx̂, nŷ = estim.nx̂, model.ny
+    nx̂, nŷ, nu = estim.nx̂, model.ny, model.nu
     # see init_optimization!(mpc::NonLinMPC, optim) for details on the inspiration
-    Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃ , nV̂=nV̂, nX̂=nX̂, ng=ng, nx̂=nx̂, nŷ=nŷ
+    Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃, nV̂=nV̂, nX̂=nX̂, ng=ng, nx̂=nx̂, nu=nu, nŷ=nŷ
         Nc = nZ̃ + 3
         last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
         V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), Nc)
         g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), Nc)
         X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), Nc)
         x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
+        û_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu), Nc)
         ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ), Nc)
         function Jfunc(Z̃tup::JNT...)
             Z̃1 = Z̃tup[begin]
@@ -1020,8 +1021,8 @@ function init_optimization!(
             if Z̃tup !== last_Z̃tup_float
                 g = get_tmp(g_cache, Z̃1)
                 X̂ = get_tmp(X̂_cache, Z̃1)
-                ŷ = get_tmp(ŷ_cache, Z̃1)
-                V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, Z̃)
+                û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+                V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
                 last_Z̃tup_float = Z̃tup
             end
@@ -1035,8 +1036,8 @@ function init_optimization!(
             if Z̃tup !== last_Z̃tup_dual
                 g = get_tmp(g_cache, Z̃1)
                 X̂ = get_tmp(X̂_cache, Z̃1)
-                ŷ = get_tmp(ŷ_cache, Z̃1)
-                V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, Z̃)
+                û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+                V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
                 last_Z̃tup_dual = Z̃tup
             end
@@ -1050,8 +1051,8 @@ function init_optimization!(
                 Z̃ = collect(Z̃tup)
                 V̂ = get_tmp(V̂_cache, Z̃1)
                 X̂ = get_tmp(X̂_cache, Z̃1)
-                ŷ = get_tmp(ŷ_cache, Z̃1)
-                V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, Z̃)
+                û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+                V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
                 last_Z̃tup_float = Z̃tup
             end
@@ -1064,8 +1065,8 @@ function init_optimization!(
                 Z̃ = collect(Z̃tup)
                 V̂ = get_tmp(V̂_cache, Z̃1)
                 X̂ = get_tmp(X̂_cache, Z̃1)
-                ŷ = get_tmp(ŷ_cache, Z̃1)
-                V̂, X̂ = predict!(V̂, X̂, ŷ, estim, model, Z̃)
+                û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+                V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
                 last_Z̃tup_dual = Z̃tup
             end
