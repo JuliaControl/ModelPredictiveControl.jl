@@ -173,17 +173,18 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
         mul!(F, mpc.J, mpc.D̂0, 1, 1)
     end
     mpc.R̂y .= R̂y
-    C_y  = similar(F)
-    C_y .= mpc.F .- mpc.R̂y
-    q̃   .= lmul!(2,(mpc.M_Hp*mpc.Ẽ)'*C_y)
-    p   .= dot(C_y, mpc.M_Hp, C_y)
+    C_y = F .- mpc.R̂y
+    M_Hp_Ẽ = mpc.M_Hp*mpc.Ẽ
+    mul!(q̃, M_Hp_Ẽ', C_y)
+    p .= dot(C_y, mpc.M_Hp, C_y)
     if ~mpc.noR̂u
         mpc.R̂u .= R̂u
-        C_u  = similar(mpc.T_lastu)
-        C_u .= mpc.T_lastu .- mpc.R̂u
-        mpc.q̃ .+= lmul!(2, (mpc.L_Hp*mpc.S̃)'*C_u)
-        mpc.p .+= dot(C_u, mpc.L_Hp, C_u)
+        C_u = mpc.T_lastu .- mpc.R̂u
+        L_Hp_S̃ = mpc.L_Hp*mpc.S̃
+        mul!(q̃, L_Hp_S̃', C_u, 1, 1)
+        p .+= dot(C_u, mpc.L_Hp, C_u)
     end
+    lmul!(2, q̃)
     return nothing
 end
 

@@ -818,7 +818,7 @@ function update_estimate_kf!(estim::StateEstimator{NT}, u, ym, d, Â, Ĉm, P̂
     Q̂, R̂, M̂, K̂ = estim.Q̂, estim.R̂, estim.M̂, estim.K̂
     nx̂, nu, ny = estim.nx̂, estim.model.nu, estim.model.ny
     x̂next, û, ŷ = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu), Vector{NT}(undef, ny)
-    mul!(M̂, P̂, Ĉm')
+    mul!(M̂, P̂.data, Ĉm') # the ".data" weirdly remove a type instability in mul!
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂)))
     mul!(K̂, Â, M̂)
     ĥ!(ŷ, estim, estim.model, x̂, d)
