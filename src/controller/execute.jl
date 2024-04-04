@@ -279,7 +279,7 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
     n += nx̂
     mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂max - fx̂
     lincon = mpc.optim[:linconstraint]
-    set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
+    set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
 end
 
 "Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."

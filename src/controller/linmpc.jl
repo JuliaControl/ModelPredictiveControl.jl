@@ -254,6 +254,6 @@ end
 
 "For [`LinMPC`](@ref), set the QP linear coefficient `q̃` just before optimization."
 function set_objective_linear_coef!(mpc::LinMPC, ΔŨvar)
-    set_objective_coefficient.(mpc.optim, ΔŨvar, mpc.q̃)
+    set_objective_coefficient(mpc.optim, ΔŨvar, mpc.q̃)
     return nothing
 end
