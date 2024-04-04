@@ -236,9 +236,13 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
     M_Nk = [estim.invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
     Ñ_Nk = [fill(C, nϵ, nϵ) zeros(nϵ, nx̂+nŴ); zeros(nx̂, nϵ+nx̂+nŴ); zeros(nŴ, nϵ+nx̂) invQ̂_Nk]
-    estim.q̃[1:nZ̃] .= lmul!(2, (M_Nk*ẼZ̃)'*FZ̃)
-    estim.p       .= dot(FZ̃, M_Nk, FZ̃)
-    estim.H̃.data[1:nZ̃, 1:nZ̃] .= lmul!(2, (ẼZ̃'*M_Nk*ẼZ̃ .+ Ñ_Nk))
+    M_Nk_ẼZ̃ = M_Nk*ẼZ̃
+    @views mul!(estim.q̃[1:nZ̃], M_Nk_ẼZ̃', FZ̃)
+    @views lmul!(2, estim.q̃[1:nZ̃])
+    estim.p .= dot(FZ̃, M_Nk, FZ̃)
+    estim.H̃.data[1:nZ̃, 1:nZ̃] = Ñ_Nk
+    @views mul!(estim.H̃.data[1:nZ̃, 1:nZ̃], ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
+    @views lmul!(2, estim.H̃.data[1:nZ̃, 1:nZ̃])
     Z̃var_Nk::Vector{VariableRef} = @views optim[:Z̃var][1:nZ̃]
     H̃_Nk = @views estim.H̃[1:nZ̃,1:nZ̃]
     q̃_Nk = @views estim.q̃[1:nZ̃]
@@ -283,8 +287,11 @@ function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
     estim.con.b[(n+1):(n+nV̂)] .= @. -V̂min + estim.F
     n += nV̂
     estim.con.b[(n+1):(n+nV̂)] .= @. +V̂max - estim.F
-    lincon = estim.optim[:linconstraint]
-    set_normalized_rhs.(lincon, estim.con.b[estim.con.i_b])
+    if any(estim.con.i_b) 
+        lincon = estim.optim[:linconstraint]
+        set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
+    end
+    return nothing
 end
 
 "Set `b` excluding state and sensor noise bounds if `model` is not a [`LinModel`](@ref)."
@@ -299,8 +306,11 @@ function linconstraint!(estim::MovingHorizonEstimator, ::SimModel)
     estim.con.b[(n+1):(n+nŴ)] .= @. -Ŵmin
     n += nŴ
     estim.con.b[(n+1):(n+nŴ)] .= @. +Ŵmax
-    lincon = estim.optim[:linconstraint]
-    set_normalized_rhs.(lincon, estim.con.b[estim.con.i_b])
+    if any(estim.con.i_b) 
+        lincon = estim.optim[:linconstraint]
+        set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
+    end
+    return nothing
 end
 
 "Truncate the bounds `Bmin` and `Bmax` to the window size `Nk` if `Nk < He`."

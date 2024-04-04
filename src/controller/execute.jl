@@ -173,17 +173,18 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
         mul!(F, mpc.J, mpc.D̂0, 1, 1)
     end
     mpc.R̂y .= R̂y
-    C_y  = similar(F)
-    C_y .= mpc.F .- mpc.R̂y
-    q̃   .= lmul!(2,(mpc.M_Hp*mpc.Ẽ)'*C_y)
-    p   .= dot(C_y, mpc.M_Hp, C_y)
+    Cy = F .- mpc.R̂y
+    M_Hp_Ẽ = mpc.M_Hp*mpc.Ẽ
+    mul!(q̃, M_Hp_Ẽ', Cy)
+    p .= dot(Cy, mpc.M_Hp, Cy)
     if ~mpc.noR̂u
         mpc.R̂u .= R̂u
-        C_u  = similar(mpc.T_lastu)
-        C_u .= mpc.T_lastu .- mpc.R̂u
-        mpc.q̃ .+= lmul!(2, (mpc.L_Hp*mpc.S̃)'*C_u)
-        mpc.p .+= dot(C_u, mpc.L_Hp, C_u)
+        Cu = mpc.T_lastu .- mpc.R̂u
+        L_Hp_S̃ = mpc.L_Hp*mpc.S̃
+        mul!(q̃, L_Hp_S̃', Cu, 1, 1)
+        p .+= dot(Cu, mpc.L_Hp, Cu)
     end
+    lmul!(2, q̃)
     return nothing
 end
 
@@ -277,8 +278,11 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
     mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂min + fx̂
     n += nx̂
     mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂max - fx̂
-    lincon = mpc.optim[:linconstraint]
-    set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
+    if any(mpc.con.i_b) 
+        lincon = mpc.optim[:linconstraint]
+        set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
+    end
+    return nothing
 end
 
 "Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
@@ -292,8 +296,11 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
-    lincon = mpc.optim[:linconstraint]
-    set_normalized_rhs.(lincon, mpc.con.b[mpc.con.i_b])
+    if any(mpc.con.i_b) 
+        lincon = mpc.optim[:linconstraint]
+        set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
+    end
+    return nothing
 end
 
 @doc raw"""
