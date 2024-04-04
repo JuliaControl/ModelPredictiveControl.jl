@@ -237,10 +237,12 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     M_Nk = [estim.invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
     Ñ_Nk = [fill(C, nϵ, nϵ) zeros(nϵ, nx̂+nŴ); zeros(nx̂, nϵ+nx̂+nŴ); zeros(nŴ, nϵ+nx̂) invQ̂_Nk]
     M_Nk_ẼZ̃ = M_Nk*ẼZ̃
-    mul!(estim.q̃[1:nZ̃], M_Nk_ẼZ̃', FZ̃)
-    lmul!(2, estim.q̃[1:nZ̃])
+    @views mul!(estim.q̃[1:nZ̃], M_Nk_ẼZ̃', FZ̃)
+    @views lmul!(2, estim.q̃[1:nZ̃])
     estim.p .= dot(FZ̃, M_Nk, FZ̃)
-    estim.H̃.data[1:nZ̃, 1:nZ̃] .= lmul!(2, (ẼZ̃'*M_Nk*ẼZ̃ .+ Ñ_Nk))
+    estim.H̃.data[1:nZ̃, 1:nZ̃] = Ñ_Nk
+    @views mul!(estim.H̃.data[1:nZ̃, 1:nZ̃], ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
+    @views lmul!(2, estim.H̃.data[1:nZ̃, 1:nZ̃])
     Z̃var_Nk::Vector{VariableRef} = @views optim[:Z̃var][1:nZ̃]
     H̃_Nk = @views estim.H̃[1:nZ̃,1:nZ̃]
     q̃_Nk = @views estim.q̃[1:nZ̃]
