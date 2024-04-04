@@ -285,8 +285,11 @@ function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
     estim.con.b[(n+1):(n+nV̂)] .= @. -V̂min + estim.F
     n += nV̂
     estim.con.b[(n+1):(n+nV̂)] .= @. +V̂max - estim.F
-    lincon = estim.optim[:linconstraint]
-    set_normalized_rhs.(lincon, estim.con.b[estim.con.i_b])
+    if any(estim.con.i_b) 
+        lincon = estim.optim[:linconstraint]
+        set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
+    end
+    return nothing
 end
 
 "Set `b` excluding state and sensor noise bounds if `model` is not a [`LinModel`](@ref)."
@@ -301,8 +304,11 @@ function linconstraint!(estim::MovingHorizonEstimator, ::SimModel)
     estim.con.b[(n+1):(n+nŴ)] .= @. -Ŵmin
     n += nŴ
     estim.con.b[(n+1):(n+nŴ)] .= @. +Ŵmax
-    lincon = estim.optim[:linconstraint]
-    set_normalized_rhs.(lincon, estim.con.b[estim.con.i_b])
+    if any(estim.con.i_b) 
+        lincon = estim.optim[:linconstraint]
+        set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
+    end
+    return nothing
 end
 
 "Truncate the bounds `Bmin` and `Bmax` to the window size `Nk` if `Nk < He`."
