@@ -62,7 +62,6 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         end
     end
     # -------- error handling -------------------------
-    Z̃curr, Z̃last = value.(Z̃var), Z̃0
     if !issolved(optim)
         status = termination_status(optim)
         if iserror(optim)
@@ -74,7 +73,11 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         end
         @debug solution_summary(optim, verbose=true)
     end
-    estim.Z̃ .= iserror(optim) ? Z̃last : Z̃curr
+    if iserror(optim)
+        mpc.Z̃ .= Z̃0
+    else
+        mpc.Z̃ .= value.(Z̃var)
+    end
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
     V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, estim.Z̃)

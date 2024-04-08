@@ -445,7 +445,6 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
             rethrow(err)
         end
     end
-    ΔŨcurr, ΔŨlast = value.(ΔŨvar), ΔŨ0
     if !issolved(optim)
         status = termination_status(optim)
         if iserror(optim)
@@ -457,7 +456,11 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
         end
         @debug solution_summary(optim, verbose=true)
     end
-    mpc.ΔŨ .= iserror(optim) ? ΔŨlast : ΔŨcurr
+    if iserror(optim)
+        mpc.ΔŨ .= ΔŨ0
+    else
+        mpc.ΔŨ .= value.(ΔŨvar)
+    end
     return mpc.ΔŨ
 end
 
