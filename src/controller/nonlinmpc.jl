@@ -314,24 +314,20 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
         û_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu), Nc)
         Ȳ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶ), Nc)
         Ū_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU), Nc)
-        function Jfunc(ΔŨtup::T...)::T where T <: Real
+        function Jfunc(ΔŨtup::T...)::T where {T <: Real}
             ΔŨ1 = ΔŨtup[begin]
-            ΔŨ, Ŷ = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(Ŷ_cache, ΔŨ1)
             if T == JNT
-                isnewvalue = (ΔŨtup !== last_ΔŨtup_float)
-                isnewvalue && (last_ΔŨtup_float = ΔŨtup)
+                last_ΔŨtup_float = ΔŨtup
             else
-                isnewvalue = (ΔŨtup !== last_ΔŨtup_dual)
-                isnewvalue && (last_ΔŨtup_dual = ΔŨtup)
+                last_ΔŨtup_dual  = ΔŨtup
             end
-            if isnewvalue
-                x̂, x̂next = get_tmp(x̂_cache, ΔŨ1), get_tmp(x̂next_cache, ΔŨ1)
-                u, û = get_tmp(u_cache, ΔŨ1), get_tmp(û_cache, ΔŨ1)
-                ΔŨ .= ΔŨtup
-                Ŷ, x̂end = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, ΔŨ)
-                g = get_tmp(g_cache, ΔŨ1)
-                g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
-            end
+            ΔŨ, Ŷ = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(Ŷ_cache, ΔŨ1)
+            x̂, x̂next = get_tmp(x̂_cache, ΔŨ1), get_tmp(x̂next_cache, ΔŨ1)
+            u, û = get_tmp(u_cache, ΔŨ1), get_tmp(û_cache, ΔŨ1)
+            ΔŨ .= ΔŨtup
+            Ŷ, x̂end = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, ΔŨ)
+            g = get_tmp(g_cache, ΔŨ1)
+            g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
             U, Ȳ, Ū = get_tmp(U_cache, ΔŨ1), get_tmp(Ȳ_cache, ΔŨ1), get_tmp(Ū_cache, ΔŨ1)
             return obj_nonlinprog!(U, Ȳ, Ū, mpc, model, Ŷ, ΔŨ)::T
         end
