@@ -74,9 +74,9 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
         @debug solution_summary(optim, verbose=true)
     end
     if iserror(optim)
-        mpc.Z̃ .= Z̃0
+        estim.Z̃ .= Z̃0
     else
-        mpc.Z̃ .= value.(Z̃var)
+        estim.Z̃ .= value.(Z̃var)
     end
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
