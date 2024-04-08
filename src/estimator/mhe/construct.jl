@@ -1008,72 +1008,52 @@ function init_optimization!(
     Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃, nV̂=nV̂, nX̂=nX̂, ng=ng, nx̂=nx̂, nu=nu, nŷ=nŷ
         Nc = nZ̃ + 3
         last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
+        Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nZ̃), Nc)
         V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), Nc)
         g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), Nc)
         X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), Nc)
         x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
         û_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu), Nc)
         ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ), Nc)
-        function Jfunc(Z̃tup::JNT...)
+        function Jfunc(Z̃tup::T...)::T where {T <: Real}
             Z̃1 = Z̃tup[begin]
-            V̂ = get_tmp(V̂_cache, Z̃1)
-            Z̃ = collect(Z̃tup)
-            if Z̃tup !== last_Z̃tup_float
-                g = get_tmp(g_cache, Z̃1)
-                X̂ = get_tmp(X̂_cache, Z̃1)
-                û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
-                V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
+            if T == JNT
                 last_Z̃tup_float = Z̃tup
-            end
-            x̄ = get_tmp(x̄_cache, Z̃1)
-            return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
-        end
-        function Jfunc(Z̃tup::ForwardDiff.Dual...)
-            Z̃1 = Z̃tup[begin]
-            V̂ = get_tmp(V̂_cache, Z̃1)
-            Z̃ = collect(Z̃tup)
-            if Z̃tup !== last_Z̃tup_dual
-                g = get_tmp(g_cache, Z̃1)
-                X̂ = get_tmp(X̂_cache, Z̃1)
-                û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
-                V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
+            else
                 last_Z̃tup_dual = Z̃tup
             end
+            Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
+            X̂ = get_tmp(X̂_cache, Z̃1)
+            û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+            Z̃ .= Z̃tup
+            V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
+            g = get_tmp(g_cache, Z̃1)
+            g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
             x̄ = get_tmp(x̄_cache, Z̃1)
-            return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
+            return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
         end
-        function gfunc_i(i, Z̃tup::NTuple{N, JNT}) where N
+        function gfunc_i(i, Z̃tup::NTuple{N, T})::T where {N, T <:Real}
             Z̃1 = Z̃tup[begin]
             g = get_tmp(g_cache, Z̃1)
-            if Z̃tup !== last_Z̃tup_float
-                Z̃ = collect(Z̃tup)
-                V̂ = get_tmp(V̂_cache, Z̃1)
-                X̂ = get_tmp(X̂_cache, Z̃1)
-                û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
-                V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
-                last_Z̃tup_float = Z̃tup
+            if T == JNT
+                isnewvalue = (Z̃tup !== last_Z̃tup_float)
+                isnewvalue && (last_Z̃tup_float = Z̃tup)
+            else
+                isnewvalue = (Z̃tup !== last_Z̃tup_dual)
+                isnewvalue && (last_Z̃tup_dual = Z̃tup)
             end
-            return g[i]
-        end 
-        function gfunc_i(i, Z̃tup::NTuple{N, ForwardDiff.Dual}) where N
-            Z̃1 = Z̃tup[begin]
-            g = get_tmp(g_cache, Z̃1)
-            if Z̃tup !== last_Z̃tup_dual
-                Z̃ = collect(Z̃tup)
-                V̂ = get_tmp(V̂_cache, Z̃1)
+            if isnewvalue
+                Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
                 X̂ = get_tmp(X̂_cache, Z̃1)
                 û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+                Z̃ .= Z̃tup
                 V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
-                last_Z̃tup_dual = Z̃tup
             end
             return g[i]
         end
         gfunc = [(Z̃...) -> gfunc_i(i, Z̃) for i in 1:ng]
-        Jfunc, gfunc
+        (Jfunc, gfunc)
     end
     register(optim, :Jfunc, nZ̃, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(Z̃var...))

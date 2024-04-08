@@ -87,7 +87,7 @@ The vectors `σQ` and σR `σR` are the standard deviations of the process and s
 respectively. The value for the velocity ``ω`` is higher here (`σQ` second value) since
 ``\dot{ω}(t)`` equation includes an uncertain parameter: the friction coefficient ``K``.
 Also, the argument `nint_u` explicitly adds one integrating state at the model input, the
-motor torque ``τ`` , with an associated standard deviation `σQint_u` of 0.1 N m. The
+motor torque ``τ``, with an associated standard deviation `σQint_u` of 0.1 N m. The
 estimator tuning is tested on a plant with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
@@ -108,12 +108,12 @@ As the motor torque is limited to -1.5 to 1.5 N m, we incorporate the input cons
 a [`NonLinMPC`](@ref):
 
 ```@example 1
-nmpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
+nmpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
 nmpc = setconstraint!(nmpc, umin=[-1.5], umax=[+1.5])
 ```
 
-We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted
-position):
+The option `Cwt=Inf` disables constraint softening. We test `mpc` performance on `plant` by
+imposing an angular setpoint of 180° (inverted position):
 
 ```@example 1
 using Logging; disable_logging(Warn)            # hide
@@ -185,7 +185,7 @@ function JE(UE, ŶE, _ )
     τ, ω = UE[1:end-1], ŶE[2:2:end-1]
     return Ts*sum(τ.*ω)
 end
-empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=3.5e3, JE=JE)
+empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Cwt=Inf, Ewt=3.5e3, JE=JE)
 empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -250,7 +250,7 @@ A [`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmode
 
 ```@example 1
 kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
-mpc = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
+mpc = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -288,7 +288,7 @@ Constructing a [`LinMPC`](@ref) with `DAQP`:
 ```@example 1
 using JuMP, DAQP
 daqp = Model(DAQP.Optimizer, add_bridges=false)
-mpc2 = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], optim=daqp)
+mpc2 = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf, optim=daqp)
 mpc2 = setconstraint!(mpc2, umin=[-1.5], umax=[+1.5])
 ```
 

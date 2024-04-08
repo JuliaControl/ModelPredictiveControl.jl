@@ -682,10 +682,12 @@ end
 
     mhe4 = setconstraint!(MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0), x̂max=[50,50,50,50])
     g_X̂max_end = mhe4.optim.nlp_model.operators.registered_multivariate_operators[end].f
-    @test g_X̂max_end((1.0, 1.0, 1.0, 1.0)) ≤ 0.0 # test gfunc_i(i,::NTuple{N, Float64})
-    # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
-    @test ForwardDiff.gradient(g_X̂max_end, [1.0, 1.0, 1.0, 1.0]) ≈ [0.0, 0.0, 0.0, 0.0]
-
+    # test gfunc_i(i,::NTuple{N, Float64}):
+    @test g_X̂max_end(
+        (1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0)) ≤ 0.0 
+    # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}): 
+    @test ForwardDiff.gradient(
+        g_X̂max_end, [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]) ≈ [0, 0, 0, 0, 0, 0, 0, 0]
     Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
     R̂ = diagm([1, 1].^2)
     optim = Model(Ipopt.Optimizer)

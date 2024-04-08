@@ -129,7 +129,7 @@ function sim!(
         U_data[:, i]  = u
         D_data[:, i]  = d
         X_data[:, i]  = plant.x
-        x = updatestate!(plant, u, d)
+        updatestate!(plant, u, d)
     end
     return SimResult(plant, T_data, Y_data, U_data, Y_data, 
                      U_data, U_data, U_data, D_data, X_data, X_data)
