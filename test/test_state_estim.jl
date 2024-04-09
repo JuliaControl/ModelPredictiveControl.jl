@@ -284,7 +284,7 @@ end
 
     f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 2)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 2, solver=nothing)
     internalmodel3 = InternalModel(nonlinmodel)
     @test internalmodel3.nym == 2
     @test internalmodel3.nyu == 0
@@ -367,7 +367,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Du*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
 
     ukf1 = UnscentedKalmanFilter(linmodel1)
     @test ukf1.nym == 2
@@ -424,7 +424,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h(x,_)   = linmodel1.C*x
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     ukf1 = UnscentedKalmanFilter(nonlinmodel)
     @test updatestate!(ukf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
     @test updatestate!(ukf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
@@ -462,7 +462,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Du*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
 
     ekf1 = ExtendedKalmanFilter(linmodel1)
     @test ekf1.nym == 2
@@ -515,7 +515,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h(x,_)   = linmodel1.C*x
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     ekf1 = ExtendedKalmanFilter(nonlinmodel)
     @test updatestate!(ekf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
     @test updatestate!(ekf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
@@ -553,7 +553,7 @@ end
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Du*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
 
     mhe1 = MovingHorizonEstimator(linmodel1, He=5)
     @test mhe1.nym == 2
@@ -611,16 +611,19 @@ end
     @test mhe9.R̂ ≈ I(2)
 
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
-    mhe10 = MovingHorizonEstimator(nonlinmodel, He=5, optim=optim)
+    covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, [1, 1], I_6, I_6, I_2)
+    mhe10 = MovingHorizonEstimator(
+        nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf, optim, covestim
+    )
     @test solver_name(mhe10.optim) == "Ipopt"
 
-    mhe11 = MovingHorizonEstimator(nonlinmodel, He=5, Cwt=1e3)
-    @test size(mhe11.Ẽ, 2) == 6*mhe11.nx̂ + 1
-    @test mhe11.C == 1e3
+    mhe12 = MovingHorizonEstimator(nonlinmodel, He=5, Cwt=1e3)
+    @test size(mhe12.Ẽ, 2) == 6*mhe12.nx̂ + 1
+    @test mhe12.C == 1e3
 
     linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
-    mhe11 = MovingHorizonEstimator(linmodel2, He=5)
-    @test isa(mhe11, MovingHorizonEstimator{Float32})
+    mhe13 = MovingHorizonEstimator(linmodel2, He=5)
+    @test isa(mhe13, MovingHorizonEstimator{Float32})
 
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1, He=0)
@@ -631,7 +634,7 @@ end
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2], i_d=[3]), uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 4, 2, 1), uop=[10,50], yop=[50,30], dop=[5])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing), uop=[10,50], yop=[50,30], dop=[5])
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
     x̂ = updatestate!(mhe1, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
@@ -676,12 +679,24 @@ end
     @test isa(x̂, Vector{Float32})
     
     mhe4 = setconstraint!(MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0), v̂max=[50,50])
-
     g_V̂max_end = mhe4.optim[:g_V̂max_2].func
      # test gfunc_i(i,::NTuple{N, Float64})
     @test g_V̂max_end(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) ≤ 0.0 
     # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
     @test ForwardDiff.gradient(vec->g_V̂max_end(vec...), zeros(8)) ≈ zeros(8)
+
+    Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
+    R̂ = diagm([1, 1].^2)
+    optim = Model(Ipopt.Optimizer)
+    covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, 0, Q̂, Q̂, R̂)
+    mhe5 = MovingHorizonEstimator(nonlinmodel, 1, 1:2, 0, 0, Q̂, Q̂, R̂, Inf, optim, covestim)
+    x̂ = updatestate!(mhe5, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(4) atol=1e-9
+    @test mhe5.x̂ ≈ zeros(4) atol=1e-9
+    @test evaloutput(mhe5, [5]) ≈ mhe5([5]) ≈ [50, 30]
+    info = getinfo(mhe5)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
 end
 
 @testset "MovingHorizonEstimator set constraints" begin
@@ -720,7 +735,7 @@ end
 
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u
     h(x,d)   = linmodel1.C*x 
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
 
     mhe3 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
@@ -808,7 +823,7 @@ end
 
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h(x,_)   = linmodel1.C*x
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2), uop=[10,50], yop=[50,30])
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
 
     setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[100,100])

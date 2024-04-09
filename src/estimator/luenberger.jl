@@ -108,14 +108,16 @@ Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberge
 function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂))
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K̂ = estim.x̂, estim.K̂
-    v̂, ŷm, x̂LHS = similar(ym), similar(ym), similar(x̂)
-    # in-place operations to recuce allocations:
-    ŷm  .= mul!(v̂, Ĉm, x̂) 
-    ŷm .+= mul!(v̂, D̂dm, d)
-    v̂   .= ym .- ŷm
-    x̂   .= mul!(x̂LHS, Â, x̂)
-    x̂  .+= mul!(x̂LHS, B̂u, u)
-    x̂  .+= mul!(x̂LHS, B̂d, d)
-    x̂  .+= mul!(x̂LHS, K̂, v̂)
+    ŷm, x̂next = similar(ym), similar(x̂)
+    # in-place operations to reduce allocations:
+    mul!(ŷm, Ĉm, x̂) 
+    mul!(ŷm, D̂dm, d, 1, 1)
+    v̂  = ŷm
+    v̂ .= ym .- ŷm
+    mul!(x̂next, Â, x̂)
+    mul!(x̂next, B̂u, u, 1, 1)
+    mul!(x̂next, B̂d, d, 1, 1)
+    mul!(x̂next, K̂, v̂, 1, 1)
+    x̂ .= x̂next
     return nothing
 end

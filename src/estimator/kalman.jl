@@ -163,7 +163,7 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{Q̂, R̂}``.
 """
 function SteadyKalmanFilter(model::SM, i_ym, nint_u, nint_ym, Q̂, R̂) where {NT<:Real, SM<:LinModel{NT}}
     Q̂, R̂ = to_mat(Q̂), to_mat(R̂)
-    return SteadyKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, Q̂ , R̂)
+    return SteadyKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, Q̂, R̂)
 end
 
 
@@ -182,15 +182,17 @@ The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\
 function update_estimate!(estim::SteadyKalmanFilter, u, ym, d=empty(estim.x̂))
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K̂ = estim.x̂, estim.K̂
-    v̂, ŷm, x̂LHS = similar(ym), similar(ym), similar(x̂)
-    # in-place operations to recuce allocations:
-    ŷm  .= mul!(v̂, Ĉm, x̂) 
-    ŷm .+= mul!(v̂, D̂dm, d)
-    v̂   .= ym .- ŷm
-    x̂   .= mul!(x̂LHS, Â, x̂)
-    x̂  .+= mul!(x̂LHS, B̂u, u)
-    x̂  .+= mul!(x̂LHS, B̂d, d)
-    x̂  .+= mul!(x̂LHS, K̂, v̂)
+    ŷm, x̂next = similar(ym), similar(x̂)
+    # in-place operations to reduce allocations:
+    mul!(ŷm, Ĉm, x̂) 
+    mul!(ŷm, D̂dm, d, 1, 1)
+    v̂  = ŷm
+    v̂ .= ym .- ŷm
+    mul!(x̂next, Â, x̂)
+    mul!(x̂next, B̂u, u, 1, 1)
+    mul!(x̂next, B̂d, d, 1, 1)
+    mul!(x̂next, K̂, v̂, 1, 1)
+    x̂ .= x̂next
     return nothing
 end
 
@@ -313,7 +315,7 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 """
 function KalmanFilter(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {NT<:Real, SM<:LinModel{NT}}
     P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
-    return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
+    return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
 end
 
 @doc raw"""
@@ -426,7 +428,7 @@ represents the measured outputs of ``\mathbf{ĥ}`` function (and unmeasured one
 
 # Arguments
 - `model::SimModel` : (deterministic) model for the estimations.
-- `α=1e-3` : alpha parameter, spread of the state distribution ``(0 ≤ α ≤ 1)``.
+- `α=1e-3` : alpha parameter, spread of the state distribution ``(0 < α ≤ 1)``.
 - `β=2` : beta parameter, skewness and kurtosis of the states distribution ``(β ≥ 0)``.
 - `κ=0` : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
@@ -434,7 +436,7 @@ represents the measured outputs of ``\mathbf{ĥ}`` function (and unmeasured one
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0int_ym=[1, 1])
 UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
@@ -476,14 +478,14 @@ function UnscentedKalmanFilter(
 end
 
 @doc raw"""
-    UnscentedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
+    UnscentedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α=1e-3, β=2, κ=0)
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function UnscentedKalmanFilter(
-    model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ
+    model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α=1e-3, β=2, κ=0
 ) where {NT<:Real, SM<:SimModel{NT}}
     P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
     return UnscentedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, α, β, κ)
@@ -568,6 +570,7 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # --- initialize matrices ---
     X̂, X̂_next = Matrix{NT}(undef, nx̂, nσ), Matrix{NT}(undef, nx̂, nσ)
+    û  = Vector{NT}(undef, estim.model.nu)
     ŷm = Vector{NT}(undef, nym)
     ŷ  = Vector{NT}(undef, estim.model.ny)
     Ŷm = Matrix{NT}(undef, nym, nσ)
@@ -602,7 +605,7 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     X̂_cor[:, nx̂+2:end] .-= γ_sqrt_P̂_cor
     X̂_next = similar(X̂_cor)
     for j in axes(X̂_next, 2)
-        @views f̂!(X̂_next[:, j], estim, estim.model, X̂_cor[:, j], u, d)
+        @views f̂!(X̂_next[:, j], û, estim, estim.model, X̂_cor[:, j], u, d)
     end
     x̂_next = mul!(x̂, X̂_next, m̂)
     X̄_next = X̂_next
@@ -685,7 +688,7 @@ automatic differentiation.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1, solver=nothing);
 
 julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP0=[0.1], σP0int_ym=[0.1])
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
@@ -725,7 +728,7 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 """
 function ExtendedKalmanFilter(model::SM, i_ym, nint_u, nint_ym,P̂0, Q̂, R̂) where {NT<:Real, SM<:SimModel{NT}}
     P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
-    return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
+    return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
 end
 
 
@@ -763,10 +766,15 @@ function update_estimate!(
     estim::ExtendedKalmanFilter{NT}, u, ym, d=empty(estim.x̂)
 ) where NT<:Real
     model = estim.model
-    x̂next, ŷ = Vector{NT}(undef, estim.nx̂), Vector{NT}(undef, model.ny)
-    F̂ = ForwardDiff.jacobian((x̂next, x̂) -> f̂!(x̂next, estim, model, x̂, u, d), x̂next, estim.x̂)
-    Ĥ = ForwardDiff.jacobian((ŷ, x̂)     -> ĥ!(ŷ, estim, model, x̂, d), ŷ, estim.x̂)
-    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥ[estim.i_ym, :], estim.P̂, estim.x̂)
+    nx̂, nu, ny = estim.nx̂, model.nu, model.ny
+    x̂, P̂ = estim.x̂, estim.P̂
+    # concatenate x̂next and û vectors to allows û vector with dual numbers for auto diff:
+    x̂nextû, ŷ = Vector{NT}(undef, nx̂ + nu), Vector{NT}(undef, ny)
+    f̂AD! = (x̂nextû, x̂) -> @views f̂!(x̂nextû[1:nx̂], x̂nextû[nx̂+1:end], estim, model, x̂, u, d)
+    ĥAD! = (ŷ, x̂) -> ĥ!(ŷ, estim, model, x̂, d)
+    F̂  = ForwardDiff.jacobian(f̂AD!, x̂nextû, x̂)[1:nx̂, :]
+    Ĥm = ForwardDiff.jacobian(ĥAD!, ŷ, x̂)[estim.i_ym, :]
+    return update_estimate_kf!(estim, u, ym, d, F̂, Ĥm, P̂, x̂)
 end
 
 "Set `estim.P̂` to `estim.P̂0` for the time-varying Kalman Filters."
@@ -796,34 +804,30 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
 end
 
 """
-    update_estimate_kf!(estim::StateEstimator, u, ym, d, Â, Ĉm, P̂, x̂=nothing)
+    update_estimate_kf!(estim::StateEstimator, u, ym, d, Â, Ĉm, P̂, x̂)
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
-Allows code reuse for [`KalmanFilter`](@ref) and [`ExtendedKalmanFilterKalmanFilter`](@ref).
+Allows code reuse for [`KalmanFilter`](@ref), [`ExtendedKalmanFilterKalmanFilter`](@ref).
 They update the state `x̂` and covariance `P̂` with the same equations. The extended filter
 substitutes the augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
 The implementation uses in-place operations and explicit factorization to reduce
-allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations. If `isnothing(x̂)`,
-only the covariance `P̂` is updated.
+allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations.
 """
-function update_estimate_kf!(
-    estim::StateEstimator{NT}, u, ym, d, Â, Ĉm, P̂, x̂=nothing
-) where NT<:Real
-    Q̂, R̂, M̂ = estim.Q̂, estim.R̂, estim.M̂
-    mul!(M̂, P̂, Ĉm')
+function update_estimate_kf!(estim::StateEstimator{NT}, u, ym, d, Â, Ĉm, P̂, x̂) where NT<:Real
+    Q̂, R̂, M̂, K̂ = estim.Q̂, estim.R̂, estim.M̂, estim.K̂
+    nx̂, nu, ny = estim.nx̂, estim.model.nu, estim.model.ny
+    x̂next, û, ŷ = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu), Vector{NT}(undef, ny)
+    mul!(M̂, P̂.data, Ĉm') # the ".data" weirdly removes a type instability in mul!
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂)))
-    if !isnothing(x̂)
-        mul!(estim.K̂, Â, M̂)
-        x̂next, ŷ = Vector{NT}(undef, estim.nx̂), Vector{NT}(undef, estim.model.ny)
-        ĥ!(ŷ, estim, estim.model, x̂, d)
-        ŷm = @views ŷ[estim.i_ym]
-        v̂  = ŷm
-        v̂ .= ym .- ŷm
-        f̂!(x̂next, estim, estim.model, x̂, u, d)
-        mul!(x̂next, estim.K̂, v̂, 1, 1)
-        estim.x̂ .= x̂next
-    end
+    mul!(K̂, Â, M̂)
+    ĥ!(ŷ, estim, estim.model, x̂, d)
+    ŷm = @views ŷ[estim.i_ym]
+    v̂  = ŷm
+    v̂ .= ym .- ŷm
+    f̂!(x̂next, û, estim, estim.model, x̂, u, d)
+    mul!(x̂next, K̂, v̂, 1, 1)
+    estim.x̂ .= x̂next
     P̂.data .= Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂ # .data is necessary for Hermitians
     return nothing
 end

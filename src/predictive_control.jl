@@ -34,6 +34,7 @@ setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return m
 
 function Base.show(io::IO, mpc::PredictiveController)
     Hp, Hc = mpc.Hp, mpc.Hc
+    nϵ = isinf(mpc.C) ? 0 : 1
     nu, nd = mpc.estim.model.nu, mpc.estim.model.nd
     nx̂, nym, nyu = mpc.estim.nx̂, mpc.estim.nym, mpc.estim.nyu
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
@@ -42,6 +43,7 @@ function Base.show(io::IO, mpc::PredictiveController)
                 "$(typeof(mpc.estim).name.name) estimator and:")
     println(io, "$(lpad(Hp, n)) prediction steps Hp")
     println(io, "$(lpad(Hc, n)) control steps Hc")
+    println(io, "$(lpad(nϵ, n)) slack variable ϵ (control constraints)")
     print_estim_dim(io, mpc.estim, n)
 end
 

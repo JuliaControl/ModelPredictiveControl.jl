@@ -145,12 +145,13 @@ This method uses the default state estimator :
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:
  20 prediction steps Hp
   1 control steps Hc
+  1 slack variable ϵ (control constraints)
   1 manipulated inputs u (0 integrating states)
   2 estimated states x̂
   1 measured outputs ym (1 integrating states)
@@ -166,8 +167,8 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 
     The optimization relies on [`JuMP`](https://github.com/jump-dev/JuMP.jl) automatic 
     differentiation (AD) to compute the objective and constraint derivatives. Optimizers 
-    generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) `f` 
-    and `h` functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+    generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
+    state-space functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
     for common mistakes when writing these functions.
 
     Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
@@ -221,7 +222,7 @@ Use custom state estimator `estim` to construct `NonLinMPC`.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> estim = UnscentedKalmanFilter(model, σQint_ym=[0.05]);
 
@@ -229,6 +230,7 @@ julia> mpc = NonLinMPC(estim, Hp=20, Hc=1, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:
  20 prediction steps Hp
   1 control steps Hc
+  1 slack variable ϵ (control constraints)
   1 manipulated inputs u (0 integrating states)
   2 estimated states x̂
   1 measured outputs ym (1 integrating states)
@@ -302,66 +304,54 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
     nu, ny, nx̂, Hp, ng = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, length(con.i_g)
     # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
     Jfunc, gfunc = let mpc=mpc, model=model, ng=ng, nΔŨ=nΔŨ, nŶ=Hp*ny, nx̂=nx̂, nu=nu, nU=Hp*nu
+        Nc = nΔŨ + 3
         last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
-        Ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŶ), nΔŨ + 3)
-        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), nΔŨ + 3)
-        x̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), nΔŨ + 3)
-        u_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu), nΔŨ + 3)
-        Ȳ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŶ), nΔŨ + 3)
-        Ū_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nU), nΔŨ + 3)
-        function Jfunc(ΔŨtup::JNT...)
+        ΔŨ_cache::DiffCache{Vector{JNT}, Vector{JNT}}    = DiffCache(zeros(JNT, nΔŨ), Nc)
+        Ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶ), Nc)
+        U_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU), Nc)
+        g_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, ng), Nc)
+        x̂_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nx̂), Nc)
+        x̂next_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
+        u_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu), Nc)
+        û_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu), Nc)
+        Ȳ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶ), Nc)
+        Ū_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU), Nc)
+        function Jfunc(ΔŨtup::T...)::T where {T <: Real}
             ΔŨ1 = ΔŨtup[begin]
-            Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
-            ΔŨ = collect(ΔŨtup)
-            if ΔŨtup !== last_ΔŨtup_float
-                x̂, u = get_tmp(x̂_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
-                Ŷ, x̂end = predict!(Ŷ, x̂, u, mpc, model, ΔŨ)
-                g = get_tmp(g_cache, ΔŨ1)
-                g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
+            if T == JNT
                 last_ΔŨtup_float = ΔŨtup
+            else
+                last_ΔŨtup_dual  = ΔŨtup
             end
-            Ȳ, Ū = get_tmp(Ȳ_cache, ΔŨ1), get_tmp(Ū_cache, ΔŨ1)
-            return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷ, ΔŨ)
+            ΔŨ, Ŷ = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(Ŷ_cache, ΔŨ1)
+            x̂, x̂next = get_tmp(x̂_cache, ΔŨ1), get_tmp(x̂next_cache, ΔŨ1)
+            u, û = get_tmp(u_cache, ΔŨ1), get_tmp(û_cache, ΔŨ1)
+            ΔŨ .= ΔŨtup
+            Ŷ, x̂end = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, ΔŨ)
+            g = get_tmp(g_cache, ΔŨ1)
+            g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
+            U, Ȳ, Ū = get_tmp(U_cache, ΔŨ1), get_tmp(Ȳ_cache, ΔŨ1), get_tmp(Ū_cache, ΔŨ1)
+            return obj_nonlinprog!(U, Ȳ, Ū, mpc, model, Ŷ, ΔŨ)::T
         end
-        function Jfunc(ΔŨtup::ForwardDiff.Dual...)
-            ΔŨ1 = ΔŨtup[begin]
-            Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
-            ΔŨ = collect(ΔŨtup)
-            if ΔŨtup !== last_ΔŨtup_dual
-                x̂, u = get_tmp(x̂_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
-                Ŷ, x̂end = predict!(Ŷ, x̂, u, mpc, model, ΔŨ)
-                g = get_tmp(g_cache, ΔŨ1)
-                g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
-                last_ΔŨtup_dual = ΔŨtup
-            end
-            Ȳ, Ū = get_tmp(Ȳ_cache, ΔŨ1), get_tmp(Ū_cache, ΔŨ1)
-            return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷ, ΔŨ)
-        end
-        function gfunc_i(i, ΔŨtup::NTuple{N, JNT}) where N
+        function gfunc_i(i, ΔŨtup::NTuple{N, T})::T where {N, T <:Real}
             ΔŨ1 = ΔŨtup[begin]
             g = get_tmp(g_cache, ΔŨ1)
-            if ΔŨtup !== last_ΔŨtup_float
-                x̂, u = get_tmp(x̂_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
-                Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
-                ΔŨ = collect(ΔŨtup)
-                Ŷ, x̂end = predict!(Ŷ, x̂, u, mpc, model, ΔŨ)
-                g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
-                last_ΔŨtup_float = ΔŨtup
+            if T == JNT
+                isnewvalue = (ΔŨtup !== last_ΔŨtup_float)
+                isnewvalue && (last_ΔŨtup_float = ΔŨtup)
+            else
+                isnewvalue = (ΔŨtup !== last_ΔŨtup_dual)
+                isnewvalue && (last_ΔŨtup_dual = ΔŨtup)
             end
-            return g[i]
-        end 
-        function gfunc_i(i, ΔŨtup::NTuple{N, ForwardDiff.Dual}) where N
-            ΔŨ1 = ΔŨtup[begin]
-            g = get_tmp(g_cache, ΔŨ1)
-            if ΔŨtup !== last_ΔŨtup_dual
-                x̂, u = get_tmp(x̂_cache, ΔŨ1), get_tmp(u_cache, ΔŨ1)
-                Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
-                ΔŨ = collect(ΔŨtup)
-                Ŷ, x̂end = predict!(Ŷ, x̂, u, mpc, model, ΔŨ)
+            if isnewvalue
+                ΔŨ, Ŷ = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(Ŷ_cache, ΔŨ1)
+                x̂, x̂next = get_tmp(x̂_cache, ΔŨ1), get_tmp(x̂next_cache, ΔŨ1)
+                u, û = get_tmp(u_cache, ΔŨ1), get_tmp(û_cache, ΔŨ1)
+                ΔŨ .= ΔŨtup
+                Ŷ, x̂end = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, ΔŨ)
                 g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
-                last_ΔŨtup_dual = ΔŨtup
             end
-            return g[i]
+            return g[i]::T
         end
         gfunc = [(ΔŨ...) -> gfunc_i(i, ΔŨ) for i in 1:ng]
         (Jfunc, gfunc)

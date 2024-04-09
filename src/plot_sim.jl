@@ -101,7 +101,7 @@ on them (see Examples below). Note that the method mutates `plant` internal stat
 
 # Examples
 ```julia-repl
-julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10.0, 1, 1, 1, 1);
+julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10.0, 1, 1, 1, 1, solver=nothing);
 
 julia> res = sim!(plant, 15, [0], [0], x0=[1])
 Simulation results of NonLinModel with 15 time steps.
@@ -129,7 +129,7 @@ function sim!(
         U_data[:, i]  = u
         D_data[:, i]  = d
         X_data[:, i]  = plant.x
-        x = updatestate!(plant, u, d)
+        updatestate!(plant, u, d)
     end
     return SimResult(plant, T_data, Y_data, U_data, Y_data, 
                      U_data, U_data, U_data, D_data, X_data, X_data)

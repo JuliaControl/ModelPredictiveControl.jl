@@ -35,8 +35,9 @@ The plant model is nonlinear:
 
 in which ``g`` is the gravitational acceleration in m/s², ``L``, the pendulum length in m,
 ``K``, the friction coefficient at the pivot point in kg/s, and ``m``, the mass attached at
-the end of the pendulum in kg. Here, the explicit Euler method discretizes the system to
-construct a [`NonLinModel`](@ref):
+the end of the pendulum in kg. The [`NonLinModel`](@ref) constructor assumes by default
+that the state function `f` is continuous in time, that is, an ordinary differential
+equation system (like here):
 
 ```@example 1
 using ModelPredictiveControl
@@ -49,17 +50,17 @@ function pendulum(par, x, u)
     return [dθ, dω]
 end
 # declared constants, to avoid type-instability in the f function, for speed:
-const par, Ts = (9.8, 0.4, 1.2, 0.3), 0.1
-f(x, u, _ ) = x + Ts*pendulum(par, x, u) # Euler method
+const par = (9.8, 0.4, 1.2, 0.3)
+f(x, u, _ ) = pendulum(par, x, u)
 h(x, _ )    = [180/π*x[1]]  # [°]
-nu, nx, ny = 1, 2, 1
+Ts, nu, nx, ny = 0.1, 1, 2, 1
 model = NonLinModel(f, h, Ts, nu, nx, ny)
 ```
 
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
 characters like ``θ`` can be typed in the Julia REPL or VS Code by typing `\theta` and
-pressing the `<TAB>` key. The tuple `par` and `Ts` are declared as constants here to improve
-the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
+pressing the `<TAB>` key. The tuple `par` is constant here to improve the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
+Note that a 4th order [`RungeKutta`](@ref) differential equation solver is used by default.
 It is good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
 
 ```@example 1
@@ -78,7 +79,7 @@ savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 
 ```@example 1
-α=0.1; σQ=[0.1, 0.5]; σR=[0.5]; nint_u=[1]; σQint_u=[0.1]
+α=0.01; σQ=[0.1, 0.5]; σR=[0.5]; nint_u=[1]; σQint_u=[0.1]
 estim = UnscentedKalmanFilter(model; α, σQ, σR, nint_u, σQint_u)
 ```
 
@@ -86,12 +87,12 @@ The vectors `σQ` and σR `σR` are the standard deviations of the process and s
 respectively. The value for the velocity ``ω`` is higher here (`σQ` second value) since
 ``\dot{ω}(t)`` equation includes an uncertain parameter: the friction coefficient ``K``.
 Also, the argument `nint_u` explicitly adds one integrating state at the model input, the
-motor torque ``τ`` , with an associated standard deviation `σQint_u` of 0.1 N m. The
+motor torque ``τ``, with an associated standard deviation `σQint_u` of 0.1 N m. The
 estimator tuning is tested on a plant with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
 const par_plant = (par[1], par[2], 1.25*par[3], par[4])
-f_plant(x, u, _) = x + Ts*pendulum(par_plant, x, u)
+f_plant(x, u, _ ) = pendulum(par_plant, x, u)
 plant = NonLinModel(f_plant, h, Ts, nu, nx, ny)
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
 plot(res, plotu=false, plotxwithx̂=true)
@@ -107,12 +108,11 @@ As the motor torque is limited to -1.5 to 1.5 N m, we incorporate the input cons
 a [`NonLinMPC`](@ref):
 
 ```@example 1
-nmpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
+nmpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
 nmpc = setconstraint!(nmpc, umin=[-1.5], umax=[+1.5])
 ```
 
-We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted
-position):
+The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted position):
 
 ```@example 1
 using Logging; disable_logging(Warn)            # hide
@@ -184,7 +184,7 @@ function JE(UE, ŶE, _ )
     τ, ω = UE[1:end-1], ŶE[2:2:end-1]
     return Ts*sum(τ.*ω)
 end
-empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Ewt=4.5e3, JE=JE)
+empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Cwt=Inf, Ewt=3.5e3, JE=JE)
 empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -245,13 +245,11 @@ We first linearize `model` at the point ``θ = π`` rad and ``ω = τ = 0`` (inv
 linmodel = linearize(model, x=[π, 0], u=[0])
 ```
 
-It is worth mentioning that the Euler method in `model` object is not the best choice for
-linearization since its accuracy is low (approximation of a poor approximation). A
-[`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
+A [`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
 
 ```@example 1
 kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
-mpc = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
+mpc = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -289,7 +287,7 @@ Constructing a [`LinMPC`](@ref) with `DAQP`:
 ```@example 1
 using JuMP, DAQP
 daqp = Model(DAQP.Optimizer, add_bridges=false)
-mpc2 = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], optim=daqp)
+mpc2 = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf, optim=daqp)
 mpc2 = setconstraint!(mpc2, umin=[-1.5], umax=[+1.5])
 ```
 

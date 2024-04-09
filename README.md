@@ -130,4 +130,3 @@ for more detailed examples.
   - [x] state estimates
   - [x] process noise estimates
   - [x] sensor noise estimates
-- [ ] moving horizon estimator with no process noise to reduce the problem size

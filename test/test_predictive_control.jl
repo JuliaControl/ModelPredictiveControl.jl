@@ -83,7 +83,7 @@ end
     r = [15]
     outdist = [5]
     mpc_im = LinMPC(InternalModel(linmodel))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -94,7 +94,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
     mpc_nint_u = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -105,7 +105,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
     mpc_nint_ym = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -313,7 +313,7 @@ end
     r = [15]
     outdist = [5]
     mpc_im = ExplicitMPC(InternalModel(linmodel))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -324,7 +324,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
     mpc_nint_u = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -335,7 +335,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
     mpc_nint_ym = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -371,7 +371,7 @@ end
     @test isa(nmpc0.estim, SteadyKalmanFilter)
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
     @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
@@ -409,7 +409,7 @@ end
     nmcp14 = NonLinMPC(nonlinmodel, Hp=10, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
     @test nmcp14.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
 
-    nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1)
+    nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc15  = NonLinMPC(nonlinmodel2, Hp=15)
     @test isa(nmpc15, NonLinMPC{Float32})
     @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
@@ -440,7 +440,7 @@ end
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
     f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
-    nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1)
+    nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
     d = [0.1]
     u = moveinput!(nmpc2, 7d, d)
@@ -465,7 +465,7 @@ end
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     @test moveinput!(nmpc6, [0]) ≈ [0.0]
-    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1)
+    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
     nonlinmodel2.h!(y, Float32[0,0], Float32[0])
@@ -477,7 +477,7 @@ end
     r = [15]
     outdist = [5]
     nmpc_im = NonLinMPC(InternalModel(linmodel))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -488,7 +488,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
     nmpc_nint_u = NonLinMPC(SteadyKalmanFilter(linmodel, nint_u=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -499,7 +499,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
     nmpc_nint_ym = NonLinMPC(SteadyKalmanFilter(linmodel, nint_ym=[1]))
-    linmodel.x[:] .= 0
+    linmodel.x .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -515,7 +515,7 @@ end
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     f(x,u,_) = linmodel.A*x + linmodel.Bu*u
     h(x,_)   = linmodel.C*x
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2) 
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing) 
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test initstate!(nmpc1, [10, 50], [20, 25]) ≈ zeros(4)
     setstate!(nmpc1, [1,2,3,4])
@@ -536,7 +536,7 @@ end
 
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc = NonLinMPC(nonlinmodel, Hp=1, Hc=1)
 
     setconstraint!(nmpc, umin=[-5, -9.9], umax=[100,99])
@@ -598,7 +598,7 @@ end
 
     f(x,u,_) = linmodel.A*x + linmodel.Bu*u
     h(x,_)   = linmodel.C*x
-    nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1)
+    nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing)
     nmpc = NonLinMPC(nonlinmodel, Hp=50, Hc=5)
 
     setconstraint!(nmpc, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])

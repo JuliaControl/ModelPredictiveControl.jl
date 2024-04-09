@@ -133,22 +133,7 @@ end
 
 Use custom state estimator `estim` to construct `ExplicitMPC`.
 
-`estim.model` must be a [`LinModel`](@ref). Else, a [`NonLinMPC`](@ref) is required. 
-
-# Examples
-```jldoctest
-julia> estim = KalmanFilter(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4), i_ym=[2]);
-
-julia> mpc = ExplicitMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-ExplicitMPC controller with a sample time Ts = 4.0 s, KalmanFilter estimator and:
- 30 prediction steps Hp
-  1 control steps Hc
-  1 manipulated inputs u (0 integrating states)
-  3 estimated states x̂
-  1 measured outputs ym (1 integrating states)
-  1 unmeasured outputs yu
-  0 measured disturbances d
-```
+`estim.model` must be a [`LinModel`](@ref). Else, a [`NonLinMPC`](@ref) is required.
 """
 function ExplicitMPC(
     estim::SE;
@@ -197,7 +182,7 @@ The solution is ``\mathbf{ΔŨ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref)
 optim_objective!(mpc::ExplicitMPC) = lmul!(-1, ldiv!(mpc.ΔŨ, mpc.H̃_chol, mpc.q̃))
 
 "Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
-function predict!(Ŷ, x̂, _ , mpc::ExplicitMPC, ::LinModel, ΔŨ::Vector{NT}) where {NT<:Real}
+function predict!(Ŷ, x̂, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, ΔŨ)
     # in-place operations to reduce allocations :
     Ŷ .= mul!(Ŷ, mpc.Ẽ, ΔŨ) .+ mpc.F
     x̂ .= NaN

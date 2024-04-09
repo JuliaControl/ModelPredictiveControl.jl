@@ -43,14 +43,16 @@ end
 
 struct MovingHorizonEstimator{
     NT<:Real, 
-    SM<:SimModel, 
-    JM<:JuMP.GenericModel
+    SM<:SimModel,
+    JM<:JuMP.GenericModel,
+    CE<:StateEstimator,
 } <: StateEstimator{NT}
     model::SM
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
     optim::JM
     con::EstimatorConstraint{NT}
+    covestim::CE
     Z̃::Vector{NT}
     lastu0::Vector{NT}
     x̂::Vector{NT}
@@ -95,9 +97,9 @@ struct MovingHorizonEstimator{
     x̂arr_old::Vector{NT}
     P̂arr_old::Hermitian{NT, Matrix{NT}}
     Nk::Vector{Int}
-    function MovingHorizonEstimator{NT, SM, JM}(
-        model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM
-    ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
+    function MovingHorizonEstimator{NT, SM, JM, CE}(
+        model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM, covestim::CE
+    ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
         nu, nd = model.nu, model.nd
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
@@ -105,7 +107,6 @@ struct MovingHorizonEstimator{
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        nŵ = nx̂
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
         lastu0 = zeros(NT, model.nu)
@@ -129,8 +130,8 @@ struct MovingHorizonEstimator{
         x̂arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(P̂0)
         Nk = [0]
-        estim = new{NT, SM, JM}(
-            model, optim, con, 
+        estim = new{NT, SM, JM, CE}(
+            model, optim, con, covestim,  
             Z̃, lastu0, x̂, 
             He,
             i_ym, nx̂, nym, nyu, nxs, 
@@ -186,9 +187,9 @@ N_k =                     \begin{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
 ``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
-Extended Help defines the two vectors and the scalar ``ϵ``. See [`UnscentedKalmanFilter`](@ref)
-for details on he augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The
-matrix ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated with an [`ExtendedKalmanFilter`](@ref).
+Extended Help defines the two vectors, the slack variable ``ϵ``, and the estimation of the
+covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. See [`UnscentedKalmanFilter`](@ref)
+for details on the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances.
 
 !!! warning
     See the Extended Help if you get an error like:    
@@ -206,11 +207,12 @@ matrix ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated with an [`ExtendedKalmanFi
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1);
+julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP0=[0.01])
 MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer, NonLinModel and:
  5 estimation steps He
+ 0 slack variable ϵ (estimation constraints)
  1 manipulated inputs u (0 integrating states)
  2 estimated states x̂
  1 measured outputs ym (1 integrating states)
@@ -247,22 +249,27 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
     problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
-    state and sensor noise).
-
-    For [`LinModel`](@ref), the optimization is treated as a quadratic program with a
-    time-varying Hessian, which is generally cheaper than nonlinear programming.
+    state and sensor noise). 
     
-    For [`NonLinModel`](@ref), the optimization relies on automatic differentiation (AD).
-    Optimizers generally benefit from exact derivatives like AD. However, the `f` and `h` 
-    functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
-    for common mistakes when writing these functions. 
+    The optimization and the estimation of the covariance at arrival 
+    ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` depend on `model`:
+
+    - If `model` is a [`LinModel`](@ref), the optimization is treated as a quadratic program
+      with a time-varying Hessian, which is generally cheaper than nonlinear programming. By
+      default, a [`KalmanFilter`](@ref) estimates the arrival covariance (customizable).
+    - Else, a nonlinear program with automatic differentiation (AD) solves the optimization.
+      Optimizers generally benefit from exact derivatives like AD. However, the `f` and `h` 
+      functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+      for common mistakes when writing these functions. An [`UnscentedKalmanFilter`](@ref)
+      estimates the arrival covariance by default.
         
     Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
-    `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
+    `10/Cwt` (if not already set), to scale the small values of ``ϵ``. Use the second
+    constructor to specify the covariance estimation method.
 """
 function MovingHorizonEstimator(
     model::SM;
-    He::Union{Int, Nothing}=nothing,
+    He::Union{Int, Nothing} = nothing,
     i_ym::IntRangeOrVector = 1:model.ny,
     σP0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
@@ -280,33 +287,40 @@ function MovingHorizonEstimator(
     P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified"))        
-    return MovingHorizonEstimator{NT, SM, JM}(
-        model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim
-    )
+    isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
+    return MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim)
 end
 
-"Return a `JuMP.Model` with OSQP optimizer if `model` is a [`LinModel`](@ref)."
 default_optim_mhe(::LinModel) = JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=false)
-"Else, return it with Ipopt optimizer."
 default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
 
 @doc raw"""
-    MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim)
+    MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim[, covestim])
 
 Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
+The final argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) 
+object for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. The
+supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and 
+[`ExtendedKalmanFilter`](@ref).
 """
 function MovingHorizonEstimator(
-    model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM
-) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
+    model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM, 
+    covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
-    return MovingHorizonEstimator{NT, SM, JM}(
-        model, He, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, Cwt, optim
+    return MovingHorizonEstimator{NT, SM, JM, CE}(
+        model, He, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, Cwt, optim, covestim
     )
 end
 
+function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+end
+function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+    return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+end
 
 @doc raw"""
     setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
@@ -353,6 +367,7 @@ julia> estim = MovingHorizonEstimator(LinModel(ss(0.5,1,1,0,1)), He=3);
 julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
 MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, LinModel and:
  3 estimation steps He
+ 0 slack variable ϵ (estimation constraints)
  1 manipulated inputs u (0 integrating states)
  2 estimated states x̂
  1 measured outputs ym (1 integrating states)
@@ -993,69 +1008,57 @@ function init_optimization!(
     end
     He = estim.He
     nV̂, nX̂, ng = He*estim.nym, He*estim.nx̂, length(con.i_g)
+    nx̂, nŷ, nu = estim.nx̂, model.ny, model.nu
     # see init_optimization!(mpc::NonLinMPC, optim) for details on the inspiration
-    Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃ , nV̂=nV̂, nX̂=nX̂, ng=ng, nx̂=estim.nx̂
+    Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃, nV̂=nV̂, nX̂=nX̂, ng=ng, nx̂=nx̂, nu=nu, nŷ=nŷ
+        Nc = nZ̃ + 3
         last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
-        V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), nZ̃ + 3)
-        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), nZ̃ + 3)
-        X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), nZ̃ + 3)
-        x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), nZ̃ + 3)
-        function Jfunc(Z̃tup::JNT...)
+        Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nZ̃), Nc)
+        V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), Nc)
+        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), Nc)
+        X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), Nc)
+        x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
+        û_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu), Nc)
+        ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ), Nc)
+        function Jfunc(Z̃tup::T...)::T where {T <: Real}
             Z̃1 = Z̃tup[begin]
-            V̂ = get_tmp(V̂_cache, Z̃1)
-            Z̃ = collect(Z̃tup)
-            if Z̃tup !== last_Z̃tup_float
-                g = get_tmp(g_cache, Z̃1)
-                X̂ = get_tmp(X̂_cache, Z̃1)
-                V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
+            if T == JNT
                 last_Z̃tup_float = Z̃tup
-            end
-            x̄ = get_tmp(x̄_cache, Z̃1)
-            return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
-        end
-        function Jfunc(Z̃tup::ForwardDiff.Dual...)
-            Z̃1 = Z̃tup[begin]
-            V̂ = get_tmp(V̂_cache, Z̃1)
-            Z̃ = collect(Z̃tup)
-            if Z̃tup !== last_Z̃tup_dual
-                g = get_tmp(g_cache, Z̃1)
-                X̂ = get_tmp(X̂_cache, Z̃1)
-                V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
+            else
                 last_Z̃tup_dual = Z̃tup
             end
+            Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
+            X̂ = get_tmp(X̂_cache, Z̃1)
+            û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+            Z̃ .= Z̃tup
+            V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
+            g = get_tmp(g_cache, Z̃1)
+            g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
             x̄ = get_tmp(x̄_cache, Z̃1)
-            return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
+            return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
         end
-        function gfunc_i(i, Z̃tup::NTuple{N, JNT}) where N
+        function gfunc_i(i, Z̃tup::NTuple{N, T})::T where {N, T <:Real}
             Z̃1 = Z̃tup[begin]
             g = get_tmp(g_cache, Z̃1)
-            if Z̃tup !== last_Z̃tup_float
-                V̂ = get_tmp(V̂_cache, Z̃1)
-                X̂ = get_tmp(X̂_cache, Z̃1)
-                Z̃ = collect(Z̃tup)
-                V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
-                last_Z̃tup_float = Z̃tup
+            if T == JNT
+                isnewvalue = (Z̃tup !== last_Z̃tup_float)
+                isnewvalue && (last_Z̃tup_float = Z̃tup)
+            else
+                isnewvalue = (Z̃tup !== last_Z̃tup_dual)
+                isnewvalue && (last_Z̃tup_dual = Z̃tup)
             end
-            return g[i]
-        end 
-        function gfunc_i(i, Z̃tup::NTuple{N, ForwardDiff.Dual}) where N
-            Z̃1 = Z̃tup[begin]
-            g = get_tmp(g_cache, Z̃1)
-            if Z̃tup !== last_Z̃tup_dual
-                V̂ = get_tmp(V̂_cache, Z̃1)
+            if isnewvalue
+                Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
                 X̂ = get_tmp(X̂_cache, Z̃1)
-                Z̃ = collect(Z̃tup)
-                V̂, X̂ = predict!(V̂, X̂, estim, model, Z̃)
+                û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+                Z̃ .= Z̃tup
+                V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
                 g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
-                last_Z̃tup_dual = Z̃tup
             end
             return g[i]
         end
         gfunc = [(Z̃...) -> gfunc_i(i, Z̃) for i in 1:ng]
-        Jfunc, gfunc
+        (Jfunc, gfunc)
     end
     @operator(optim, J, nZ̃, Jfunc)
     @objective(optim, Min, J(Z̃var...))
