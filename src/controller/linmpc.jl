@@ -139,6 +139,7 @@ julia> mpc = LinMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
 LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
  30 prediction steps Hp
   1 control steps Hc
+  1 slack variable ϵ (control constraints)
   1 manipulated inputs u (0 integrating states)
   4 estimated states x̂
   2 measured outputs ym (2 integrating states)
@@ -203,6 +204,7 @@ julia> mpc = LinMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
 LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, KalmanFilter estimator and:
  30 prediction steps Hp
   1 control steps Hc
+  1 slack variable ϵ (control constraints)
   1 manipulated inputs u (0 integrating states)
   3 estimated states x̂
   1 measured outputs ym (1 integrating states)

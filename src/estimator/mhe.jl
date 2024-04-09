@@ -16,7 +16,9 @@ function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n)
     nu, nd = estim.model.nu, estim.model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     He = estim.He
+    nϵ = isinf(estim.C) ? 0 : 1
     println(io, "$(lpad(He, n)) estimation steps He")
+    println(io, "$(lpad(nϵ, n)) slack variable ϵ (estimation constraints)")
     println(io, "$(lpad(nu, n)) manipulated inputs u ($(sum(estim.nint_u)) integrating states)")
     println(io, "$(lpad(nx̂, n)) estimated states x̂")
     println(io, "$(lpad(nym, n)) measured outputs ym ($(sum(estim.nint_ym)) integrating states)")
