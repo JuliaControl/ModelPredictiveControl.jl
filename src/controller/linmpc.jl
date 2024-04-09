@@ -243,7 +243,7 @@ function init_optimization!(mpc::LinMPC, optim::JuMP.GenericModel)
     # --- variables and linear constraints ---
     con = mpc.con
     nΔŨ = length(mpc.ΔŨ)
-    set_silent(optim)
+    JuMP.set_silent(optim)
     limit_solve_time(mpc.optim, mpc.estim.model.Ts)
     @variable(optim, ΔŨvar[1:nΔŨ])
     A = con.A[con.i_b, :]
@@ -256,6 +256,6 @@ end
 
 "For [`LinMPC`](@ref), set the QP linear coefficient `q̃` just before optimization."
 function set_objective_linear_coef!(mpc::LinMPC, ΔŨvar)
-    set_objective_coefficient(mpc.optim, ΔŨvar, mpc.q̃)
+    JuMP.set_objective_coefficient(mpc.optim, ΔŨvar, mpc.q̃)
     return nothing
 end

@@ -6,7 +6,7 @@ function Base.show(io::IO, estim::MovingHorizonEstimator)
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     n = maximum(ndigits.((nu, nx̂, nym, nyu, nd))) + 1
     println(io, "$(typeof(estim).name.name) estimator with a sample time "*
-                "Ts = $(estim.model.Ts) s, $(solver_name(estim.optim)) optimizer, "*
+                "Ts = $(estim.model.Ts) s, $(JuMP.solver_name(estim.optim)) optimizer, "*
                 "$(typeof(estim.model).name.name) and:")
     print_estim_dim(io, estim, n)
 end

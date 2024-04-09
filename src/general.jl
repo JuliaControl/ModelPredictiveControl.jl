@@ -8,20 +8,20 @@ const DEFAULT_EWT = 0.0
 
 "Termination status that means 'no solution available'."
 const ERROR_STATUSES = (
-    INFEASIBLE, DUAL_INFEASIBLE, LOCALLY_INFEASIBLE, INFEASIBLE_OR_UNBOUNDED, 
-    NUMERICAL_ERROR, INVALID_MODEL, INVALID_OPTION, INTERRUPTED, 
-    OTHER_ERROR
+    JuMP.INFEASIBLE, JuMP.DUAL_INFEASIBLE, JuMP.LOCALLY_INFEASIBLE, 
+    JuMP.INFEASIBLE_OR_UNBOUNDED, JuMP.NUMERICAL_ERROR, JuMP.INVALID_MODEL, 
+    JuMP.INVALID_OPTION, JuMP.INTERRUPTED, JuMP.OTHER_ERROR
 )
 
 "Verify that `optim` termination status is `OPTIMAL` or `LOCALLY_SOLVED`."
 function issolved(optim::JuMP.GenericModel)
-    status = termination_status(optim)
-    return (status == OPTIMAL || status == LOCALLY_SOLVED)
+    status = JuMP.termination_status(optim)
+    return (status == JuMP.OPTIMAL || status == JuMP.LOCALLY_SOLVED)
 end
 
 "Verify that `optim` termination status means 'no solution available'."
 function iserror(optim::JuMP.GenericModel) 
-    status = termination_status(optim)
+    status = JuMP.termination_status(optim)
     return any(errstatus->isequal(status, errstatus), ERROR_STATUSES)
 end
 
@@ -31,7 +31,7 @@ obj_quadprog(x, H, q) = 0.5*dot(x, H, x) + q'*x  # dot(x, H, x) is faster than x
 "Limit the solving time to `Ts` if supported by `optim` optimizer."
 function limit_solve_time(optim::GenericModel, Ts)
     try
-        set_time_limit_sec(optim, Ts)
+        JuMP.set_time_limit_sec(optim, Ts)
     catch err
         if isa(err, MOI.UnsupportedAttribute{MOI.TimeLimitSec})
             @warn "Solving time limit is not supported by the optimizer."

@@ -272,7 +272,7 @@ function addinfo!(info, mpc::NonLinMPC)
     ŶE = [ŷ; Ŷ]
     D̂E = [d; D̂]
     info[:JE]  = mpc.JE(UE, ŶE, D̂E)
-    info[:sol] = solution_summary(mpc.optim, verbose=true)
+    info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
     return info
 end
 
@@ -285,19 +285,19 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
     # --- variables and linear constraints ---
     C, con = mpc.C, mpc.con
     nΔŨ = length(mpc.ΔŨ)
-    set_silent(optim)
+    JuMP.set_silent(optim)
     limit_solve_time(mpc.optim, mpc.estim.model.Ts)
     @variable(optim, ΔŨvar[1:nΔŨ])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- nonlinear optimization init ---
-    if !isinf(C) && solver_name(optim) == "Ipopt"
+    if !isinf(C) && JuMP.solver_name(optim) == "Ipopt"
         try
-            get_attribute(optim, "nlp_scaling_max_gradient")
+            JuMP.get_attribute(optim, "nlp_scaling_max_gradient")
         catch
             # default "nlp_scaling_max_gradient" to `10.0/C` if not already set:
-            set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
+            JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
     model = mpc.estim.model
@@ -387,22 +387,22 @@ function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
     optim = mpc.optim
     ΔŨvar = optim[:ΔŨvar]
     con = mpc.con
-    map(con -> delete(optim, con), all_nonlinear_constraints(optim))
+    map(con -> JuMP.delete(optim, con), JuMP.all_nonlinear_constraints(optim))
     for i in findall(.!isinf.(con.Ymin))
         f_sym = Symbol("g_Ymin_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
     end
     for i in findall(.!isinf.(con.Ymax))
         f_sym = Symbol("g_Ymax_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
     end
     for i in findall(.!isinf.(con.x̂min))
         f_sym = Symbol("g_x̂min_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
     end
     for i in findall(.!isinf.(con.x̂max))
         f_sym = Symbol("g_x̂max_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
     end
     return nothing
 end

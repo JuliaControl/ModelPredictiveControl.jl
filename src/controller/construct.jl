@@ -130,8 +130,8 @@ function setconstraint!(
 )
     model, con, optim = mpc.estim.model, mpc.con, mpc.optim
     nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
-    notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
-    C, E, ex̂ = mpc.C, mpc.Ẽ[:, 1:nu*Hc], mpc.con.ẽx̂[:, 1:nu*Hc]
+    notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
+    C = mpc.C
     isnothing(Umin)     && !isnothing(umin)     && (Umin    = repeat(umin,    Hp))
     isnothing(Umax)     && !isnothing(umax)     && (Umax    = repeat(umax,    Hp))
     isnothing(ΔUmin)    && !isnothing(Δumin)    && (ΔUmin   = repeat(Δumin,   Hc))
@@ -238,8 +238,8 @@ function setconstraint!(
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
         ΔŨvar = optim[:ΔŨvar]
-        delete(optim, optim[:linconstraint])
-        unregister(optim, :linconstraint)
+        JuMP.delete(optim, optim[:linconstraint])
+        JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
         setnonlincon!(mpc, model)
     else

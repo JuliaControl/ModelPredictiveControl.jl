@@ -35,7 +35,7 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             Q̂_kalman = Matrix(Q̂) # Matrix() required for Julia 1.6
             R̂_kalman = zeros(NT, model.ny, model.ny)
             R̂_kalman[i_ym, i_ym] = R̂
-            kalman(Discrete, Â, Ĉ, Q̂_kalman, R̂_kalman)[:, i_ym] 
+            ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂_kalman, R̂_kalman)[:, i_ym] 
         catch my_error
             if isa(my_error, ErrorException)
                 error("Cannot compute the optimal Kalman gain K for the "* 

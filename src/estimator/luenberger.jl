@@ -30,7 +30,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
         K̂ = try
-            place(Â, Ĉ, p̂, :o)[:, i_ym]
+            ControlSystemsBase.place(Â, Ĉ, p̂, :o)[:, i_ym]
         catch
             error("Cannot compute the Luenberger gain K̂ with specified poles p̂.")
         end
