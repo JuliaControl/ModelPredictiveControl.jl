@@ -112,8 +112,7 @@ nmpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
 nmpc = setconstraint!(nmpc, umin=[-1.5], umax=[+1.5])
 ```
 
-The option `Cwt=Inf` disables constraint softening. We test `mpc` performance on `plant` by
-imposing an angular setpoint of 180° (inverted position):
+The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted position):
 
 ```@example 1
 using Logging; disable_logging(Warn)            # hide

@@ -212,6 +212,7 @@ julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=not
 julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP0=[0.01])
 MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer, NonLinModel and:
  5 estimation steps He
+ 0 slack variable ϵ (estimation constraints)
  1 manipulated inputs u (0 integrating states)
  2 estimated states x̂
  1 measured outputs ym (1 integrating states)
@@ -366,6 +367,7 @@ julia> estim = MovingHorizonEstimator(LinModel(ss(0.5,1,1,0,1)), He=3);
 julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
 MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, LinModel and:
  3 estimation steps He
+ 0 slack variable ϵ (estimation constraints)
  1 manipulated inputs u (0 integrating states)
  2 estimated states x̂
  1 measured outputs ym (1 integrating states)
