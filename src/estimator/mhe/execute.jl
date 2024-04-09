@@ -36,7 +36,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     linconstraint!(estim, model)
     nu, ny, nx̂, nym, nŵ, Nk = model.nu, model.ny, estim.nx̂, estim.nym, estim.nx̂, estim.Nk[]
     nx̃ = !isinf(estim.C) + nx̂
-    Z̃var::Vector{VariableRef} = optim[:Z̃var]
+    Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     V̂  = Vector{NT}(undef, nym*Nk)
     X̂  = Vector{NT}(undef, nx̂*Nk)
     û  = Vector{NT}(undef, nu)
@@ -48,22 +48,22 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     J0 = obj_nonlinprog!(x̄, estim, model, V̂, Z̃0)
     # initial Z̃0 with Ŵ=0 if objective or constraint function not finite :
     isfinite(J0) || (Z̃0 = [ϵ0; estim.x̂arr_old; zeros(NT, nŵ*estim.He)])
-    set_start_value.(Z̃var, Z̃0)
+    JuMP.set_start_value.(Z̃var, Z̃0)
     # ------- solve optimization problem --------------
     try
-        optimize!(optim)
+        JuMP.optimize!(optim)
     catch err
         if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
             # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
             MOIU.reset_optimizer(optim)
-            optimize!(optim)
+            JuMP.optimize!(optim)
         else
             rethrow(err)
         end
     end
     # -------- error handling -------------------------
     if !issolved(optim)
-        status = termination_status(optim)
+        status = JuMP.termination_status(optim)
         if iserror(optim)
             @error("MHE terminated without solution: estimation in open-loop", 
                    status)
@@ -71,12 +71,12 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
             @warn("MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
                   "solution anyway", status)
         end
-        @debug solution_summary(optim, verbose=true)
+        @debug JuMP.solution_summary(optim, verbose=true)
     end
     if iserror(optim)
         estim.Z̃ .= Z̃0
     else
-        estim.Z̃ .= value.(Z̃var)
+        estim.Z̃ .= JuMP.value.(Z̃var)
     end
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
@@ -158,7 +158,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:Ym] = Ym
     info[:U] = U
     info[:D] = D
-    info[:sol] = solution_summary(estim.optim, verbose=true)
+    info[:sol] = JuMP.solution_summary(estim.optim, verbose=true)
     return info
 end
 
@@ -246,10 +246,10 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     estim.H̃.data[1:nZ̃, 1:nZ̃] = Ñ_Nk
     @views mul!(estim.H̃.data[1:nZ̃, 1:nZ̃], ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
     @views lmul!(2, estim.H̃.data[1:nZ̃, 1:nZ̃])
-    Z̃var_Nk::Vector{VariableRef} = @views optim[:Z̃var][1:nZ̃]
+    Z̃var_Nk::Vector{JuMP.VariableRef} = @views optim[:Z̃var][1:nZ̃]
     H̃_Nk = @views estim.H̃[1:nZ̃,1:nZ̃]
     q̃_Nk = @views estim.q̃[1:nZ̃]
-    set_objective_function(optim, obj_quadprog(Z̃var_Nk, H̃_Nk, q̃_Nk))
+    JuMP.set_objective_function(optim, obj_quadprog(Z̃var_Nk, H̃_Nk, q̃_Nk))
     return nothing
 end
 "Does nothing if `model` is not a [`LinModel`](@ref)."
@@ -292,7 +292,7 @@ function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
     estim.con.b[(n+1):(n+nV̂)] .= @. +V̂max - estim.F
     if any(estim.con.i_b) 
         lincon = estim.optim[:linconstraint]
-        set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
+        JuMP.set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
     end
     return nothing
 end
@@ -311,7 +311,7 @@ function linconstraint!(estim::MovingHorizonEstimator, ::SimModel)
     estim.con.b[(n+1):(n+nŴ)] .= @. +Ŵmax
     if any(estim.con.i_b) 
         lincon = estim.optim[:linconstraint]
-        set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
+        JuMP.set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
     end
     return nothing
 end

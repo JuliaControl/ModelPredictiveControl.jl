@@ -134,7 +134,7 @@ end
 By default, add the solution summary `:sol` that can be printed to `info`.
 """
 function addinfo!(info, mpc::PredictiveController)
-    info[:sol] = solution_summary(mpc.optim, verbose=true)
+    info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
     return info
 end
 
@@ -280,7 +280,7 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
     mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂max - fx̂
     if any(mpc.con.i_b) 
         lincon = mpc.optim[:linconstraint]
-        set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
+        JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
     end
     return nothing
 end
@@ -298,7 +298,7 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
     if any(mpc.con.i_b) 
         lincon = mpc.optim[:linconstraint]
-        set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
+        JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
     end
     return nothing
 end
@@ -428,25 +428,25 @@ warm-start value.
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     optim = mpc.optim
     model = mpc.estim.model
-    ΔŨvar::Vector{VariableRef} = optim[:ΔŨvar]
+    ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}; ϵ_{k-1}]
     ϵ0  = !isinf(mpc.C) ? mpc.ΔŨ[end] : empty(mpc.ΔŨ)
     ΔŨ0 = [mpc.ΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(NT, model.nu); ϵ0]
-    set_start_value.(ΔŨvar, ΔŨ0)
+    JuMP.set_start_value.(ΔŨvar, ΔŨ0)
     set_objective_linear_coef!(mpc, ΔŨvar)
     try
-        optimize!(optim)
+        JuMP.optimize!(optim)
     catch err
         if isa(err, MOI.UnsupportedAttribute{MOI.VariablePrimalStart})
             # reset_optimizer to unset warm-start, set_start_value.(nothing) seems buggy
             MOIU.reset_optimizer(optim)
-            optimize!(optim)
+            JuMP.optimize!(optim)
         else
             rethrow(err)
         end
     end
     if !issolved(optim)
-        status = termination_status(optim)
+        status = JuMP.termination_status(optim)
         if iserror(optim)
             @error("MPC terminated without solution: returning last solution shifted", 
                    status)
@@ -454,12 +454,12 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
             @warn("MPC termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
                   "solution anyway", status)
         end
-        @debug solution_summary(optim, verbose=true)
+        @debug JuMP.solution_summary(optim, verbose=true)
     end
     if iserror(optim)
         mpc.ΔŨ .= ΔŨ0
     else
-        mpc.ΔŨ .= value.(ΔŨvar)
+        mpc.ΔŨ .= JuMP.value.(ΔŨvar)
     end
     return mpc.ΔŨ
 end

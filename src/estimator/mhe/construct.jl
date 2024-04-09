@@ -412,7 +412,7 @@ function setconstraint!(
     model, optim, con = estim.model, estim.optim, estim.con
     nx̂, nŵ, nym, He = estim.nx̂, estim.nx̂, estim.nym, estim.He
     nX̂con = nx̂*(He+1)
-    notSolvedYet = (termination_status(optim) == OPTIMIZE_NOT_CALLED)
+    notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
     C = estim.C
     isnothing(X̂min)   && !isnothing(x̂min)   && (X̂min = repeat(x̂min, He+1))
     isnothing(X̂max)   && !isnothing(x̂max)   && (X̂max = repeat(x̂max, He+1))
@@ -507,8 +507,8 @@ function setconstraint!(
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
         Z̃var = optim[:Z̃var]
-        delete(optim, optim[:linconstraint])
-        unregister(optim, :linconstraint)
+        JuMP.delete(optim, optim[:linconstraint])
+        JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
         setnonlincon!(estim, model)
     else
@@ -578,22 +578,22 @@ setnonlincon!(::MovingHorizonEstimator, ::SimModel) = nothing
 function setnonlincon!(estim::MovingHorizonEstimator, ::NonLinModel)
     optim, con = estim.optim, estim.con
     Z̃var = optim[:Z̃var]
-    map(con -> delete(optim, con), all_nonlinear_constraints(optim))
+    map(con -> JuMP.delete(optim, con), JuMP.all_nonlinear_constraints(optim))
     for i in findall(.!isinf.(con.X̂min))
         f_sym = Symbol("g_X̂min_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
     end
     for i in findall(.!isinf.(con.X̂max))
         f_sym = Symbol("g_X̂max_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
     end
     for i in findall(.!isinf.(con.V̂min))
         f_sym = Symbol("g_V̂min_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
     end
     for i in findall(.!isinf.(con.V̂max))
         f_sym = Symbol("g_V̂max_$(i)")
-        add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
+        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(Z̃var...)) <= 0))
     end
     return nothing
 end
@@ -967,7 +967,7 @@ function init_optimization!(
     estim::MovingHorizonEstimator, ::LinModel, optim::JuMP.GenericModel
 )
     nZ̃ = length(estim.Z̃)
-    set_silent(optim)
+    JuMP.set_silent(optim)
     limit_solve_time(estim.optim, estim.model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
     A = estim.con.A[estim.con.i_b, :]
@@ -988,19 +988,19 @@ function init_optimization!(
     C, con = estim.C, estim.con
     nZ̃ = length(estim.Z̃)
     # --- variables and linear constraints ---
-    set_silent(optim)
+    JuMP.set_silent(optim)
     limit_solve_time(estim.optim, estim.model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
     A = estim.con.A[con.i_b, :]
     b = estim.con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
     # --- nonlinear optimization init ---
-    if !isinf(C) && solver_name(optim) == "Ipopt"
+    if !isinf(C) && JuMP.solver_name(optim) == "Ipopt"
         try
-            get_attribute(optim, "nlp_scaling_max_gradient")
+            JuMP.get_attribute(optim, "nlp_scaling_max_gradient")
         catch
             # default "nlp_scaling_max_gradient" to `10.0/C` if not already set:
-            set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
+            JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
     He = estim.He

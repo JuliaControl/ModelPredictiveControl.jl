@@ -126,7 +126,7 @@ function augment_model(model::LinModel{NT}, As, Cs_u, Cs_y; verify_obsv=true) wh
     B̂d  = [model.Bd; zeros(NT, nxs, nd)]
     D̂d  = model.Dd
     # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny:
-    if verify_obsv && !observability(Â, Ĉ)[:isobservable]
+    if verify_obsv && !ControlSystemsBase.observability(Â, Ĉ)[:isobservable]
         error("The augmented model is unobservable. You may try to use 0 integrator on "*
               "model integrating outputs with nint_ym parameter. Adding integrators at both "*
               "inputs (nint_u) and outputs (nint_ym) can also violate observability.")
@@ -175,7 +175,7 @@ function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0)
         As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
         Â, _ , Ĉ = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
         # observability on Ĉ instead of Ĉm, since it would always return false when nym ≠ ny
-        observability(Â, Ĉ)[:isobservable] || (nint_ym[i] = 0)
+        ControlSystemsBase.observability(Â, Ĉ)[:isobservable] || (nint_ym[i] = 0)
     end
     return nint_ym
 end

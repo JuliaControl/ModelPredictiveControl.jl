@@ -109,8 +109,8 @@ function LinModel(
     if length(unique(i_d)) ≠ length(i_d)
         error("Measured disturbances indices i_d should contains valid and unique indices")
     end
-    sysu = sminreal(sys[:,i_u])  # remove states associated to measured disturbances d
-    sysd = sminreal(sys[:,i_d])  # remove states associated to manipulates inputs u
+    sysu = sminreal(sys[:,i_u]) # remove states associated to measured disturbances d
+    sysd = sminreal(sys[:,i_d]) # remove states associated to manipulates inputs u
     if !iszero(sysu.D)
         error("State matrix D must be 0 for columns associated to manipulated inputs u")
     end
