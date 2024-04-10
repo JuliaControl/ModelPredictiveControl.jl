@@ -1,18 +1,18 @@
 "Reset the data windows and time-varying variables for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ ) 
-    estim.invP̄.data          .= inv(estim.P̂0)
-    estim.P̂arr_old.data      .= estim.P̂0
-    estim.x̂arr_old           .= 0
-    estim.Z̃                  .= 0
-    estim.X̂                  .= 0
-    estim.Ym                 .= 0
-    estim.U                  .= 0
-    estim.D                  .= 0
-    estim.Ŵ                  .= 0
-    estim.Nk                 .= 0
-    estim.H̃.data             .= 0
-    estim.q̃                  .= 0
-    estim.p                  .= 0
+    estim.invP̄     .= inv(estim.P̂0)
+    estim.P̂arr_old .= estim.P̂0
+    estim.x̂arr_old .= 0
+    estim.Z̃        .= 0
+    estim.X̂        .= 0
+    estim.Ym       .= 0
+    estim.U        .= 0
+    estim.D        .= 0
+    estim.Ŵ        .= 0
+    estim.Nk       .= 0
+    estim.H̃        .= 0
+    estim.q̃        .= 0
+    estim.p        .= 0
     return nothing
 end
 
@@ -243,7 +243,7 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     @views mul!(estim.q̃[1:nZ̃], M_Nk_ẼZ̃', FZ̃)
     @views lmul!(2, estim.q̃[1:nZ̃])
     estim.p .= dot(FZ̃, M_Nk, FZ̃)
-    estim.H̃.data[1:nZ̃, 1:nZ̃] = Ñ_Nk
+    estim.H̃.data[1:nZ̃, 1:nZ̃] .= Ñ_Nk
     @views mul!(estim.H̃.data[1:nZ̃, 1:nZ̃], ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
     @views lmul!(2, estim.H̃.data[1:nZ̃, 1:nZ̃])
     Z̃var_Nk::Vector{JuMP.VariableRef} = @views optim[:Z̃var][1:nZ̃]
@@ -337,11 +337,11 @@ end
 function update_cov!(estim::MovingHorizonEstimator)
     nu, nd, nym = estim.model.nu, estim.model.nd, estim.nym
     uarr, ymarr, darr = @views estim.U[1:nu], estim.Ym[1:nym], estim.D[1:nd]
-    estim.covestim.x̂      .= estim.x̂arr_old
-    estim.covestim.P̂.data .= estim.P̂arr_old # .data is necessary for Hermitian
+    estim.covestim.x̂ .= estim.x̂arr_old
+    estim.covestim.P̂ .= estim.P̂arr_old
     update_estimate!(estim.covestim, uarr, ymarr, darr)
-    estim.P̂arr_old.data   .= estim.covestim.P̂
-    estim.invP̄.data       .= Hermitian(inv(estim.P̂arr_old), :L)
+    estim.P̂arr_old   .= estim.covestim.P̂
+    estim.invP̄       .= inv(estim.P̂arr_old)
     return nothing
 end
 

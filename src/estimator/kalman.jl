@@ -368,9 +368,12 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     B̂d::Matrix{NT}
     D̂d::Matrix{NT}
     P̂0::Hermitian{NT, Matrix{NT}}
-    Q̂::Hermitian{NT, Matrix{NT}}
-    R̂::Hermitian{NT, Matrix{NT}}
+    Q̂ ::Hermitian{NT, Matrix{NT}}
+    R̂ ::Hermitian{NT, Matrix{NT}}
     K̂::Matrix{NT}
+    M̂::Hermitian{NT, Matrix{NT}}
+    X̂ ::Matrix{NT}
+    Ŷm::Matrix{NT}
     nσ::Int 
     γ::NT
     m̂::Vector{NT}
@@ -391,6 +394,8 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         P̂0 = Hermitian(P̂0, :L)
         P̂ = copy(P̂0)
         K̂ = zeros(NT, nx̂, nym)
+        M̂ = Hermitian(zeros(NT, nym, nym), :L)
+        X̂, Ŷm = zeros(NT, nx̂, nσ), zeros(NT, nym, nσ)
         return new{NT, SM}(
             model,
             lastu0, x̂, P̂, 
@@ -398,7 +403,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂0, Q̂, R̂,
-            K̂,
+            K̂, M̂, X̂, Ŷm,
             nσ, γ, m̂, Ŝ
         )
     end
@@ -565,18 +570,18 @@ noise, respectively.
      ISBN9780470045343.
 """
 function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:Real
-    x̂, P̂, Q̂, R̂, K̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂
+    x̂, P̂, Q̂, R̂, K̂, M̂ = estim.x̂, estim.P̂, estim.Q̂, estim.R̂, estim.K̂, estim.M̂
+    X̂, Ŷm = estim.X̂, estim.Ŷm
     nym, nx̂, nσ = estim.nym, estim.nx̂, estim.nσ
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # --- initialize matrices ---
-    X̂, X̂_next = Matrix{NT}(undef, nx̂, nσ), Matrix{NT}(undef, nx̂, nσ)
+    X̂_next = Matrix{NT}(undef, nx̂, nσ)
     û  = Vector{NT}(undef, estim.model.nu)
     ŷm = Vector{NT}(undef, nym)
     ŷ  = Vector{NT}(undef, estim.model.ny)
-    Ŷm = Matrix{NT}(undef, nym, nσ)
     sqrt_P̂ = LowerTriangular{NT, Matrix{NT}}(Matrix{NT}(undef, nx̂, nx̂))
     # --- correction step ---
-    sqrt_P̂.data .= cholesky(P̂).L
+    sqrt_P̂ .= cholesky(P̂).L
     γ_sqrt_P̂ = lmul!(γ, sqrt_P̂)
     X̂ .= x̂
     X̂[:, 2:nx̂+1]   .+= γ_sqrt_P̂
@@ -589,7 +594,7 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     X̄, Ȳm = X̂, Ŷm
     X̄  .= X̂  .- x̂
     Ȳm .= Ŷm .- ŷm
-    M̂ = Hermitian(Ȳm * Ŝ * Ȳm' + R̂, :L)
+    M̂ .= Hermitian(Ȳm * Ŝ * Ȳm' .+ R̂)
     mul!(K̂, X̄, lmul!(Ŝ, Ȳm'))
     rdiv!(K̂, cholesky(M̂))
     v̂ = ŷm
@@ -598,19 +603,18 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:
     P̂_cor = P̂ - Hermitian(K̂ * M̂ * K̂', :L)
     # --- prediction step ---
     X̂_cor, sqrt_P̂_cor = X̂, sqrt_P̂
-    sqrt_P̂_cor.data .= cholesky(P̂_cor).L
+    sqrt_P̂_cor .= cholesky(P̂_cor).L
     γ_sqrt_P̂_cor = lmul!(γ, sqrt_P̂_cor)
     X̂_cor .= x̂_cor
     X̂_cor[:, 2:nx̂+1]   .+= γ_sqrt_P̂_cor
     X̂_cor[:, nx̂+2:end] .-= γ_sqrt_P̂_cor
-    X̂_next = similar(X̂_cor)
     for j in axes(X̂_next, 2)
         @views f̂!(X̂_next[:, j], û, estim, estim.model, X̂_cor[:, j], u, d)
     end
     x̂_next = mul!(x̂, X̂_next, m̂)
     X̄_next = X̂_next
     X̄_next .= X̂_next .- x̂_next
-    P̂.data .= X̄_next * Ŝ * X̄_next' .+ Q̂ # .data is necessary for Hermitians
+    P̂ .= Hermitian(X̄_next * Ŝ * X̄_next' .+ Q̂)
     return nothing
 end
 
@@ -781,7 +785,7 @@ end
 function init_estimate_cov!(
     estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}, _ , _ , _
 ) 
-    estim.P̂.data .= estim.P̂0 # .data is necessary for Hermitians
+    estim.P̂ .= estim.P̂0
     return nothing
 end
 
@@ -818,6 +822,7 @@ function update_estimate_kf!(estim::StateEstimator{NT}, u, ym, d, Â, Ĉm, P̂
     Q̂, R̂, M̂, K̂ = estim.Q̂, estim.R̂, estim.M̂, estim.K̂
     nx̂, nu, ny = estim.nx̂, estim.model.nu, estim.model.ny
     x̂next, û, ŷ = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu), Vector{NT}(undef, ny)
+    P̂next = similar(P̂)
     mul!(M̂, P̂.data, Ĉm') # the ".data" weirdly removes a type instability in mul!
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂)))
     mul!(K̂, Â, M̂)
@@ -828,6 +833,6 @@ function update_estimate_kf!(estim::StateEstimator{NT}, u, ym, d, Â, Ĉm, P̂
     f̂!(x̂next, û, estim, estim.model, x̂, u, d)
     mul!(x̂next, K̂, v̂, 1, 1)
     estim.x̂ .= x̂next
-    P̂.data .= Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂ # .data is necessary for Hermitians
+    P̂ .= Hermitian(Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂)
     return nothing
 end
