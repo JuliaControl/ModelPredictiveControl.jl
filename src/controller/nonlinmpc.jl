@@ -77,7 +77,7 @@ struct NonLinMPC{
             d0, D̂0, D̂E,
             Ŷop, Dop,
         )
-        init_optimization!(mpc, optim)
+        init_optimization!(mpc, model, optim)
         return mpc
     end
 end
@@ -277,11 +277,11 @@ function addinfo!(info, mpc::NonLinMPC)
 end
 
 """
-    init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel)
+    init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC, optim)
+function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     # --- variables and linear constraints ---
     C, con = mpc.C, mpc.con
     nΔŨ = length(mpc.ΔŨ)
@@ -303,7 +303,6 @@ function init_optimization!(mpc::NonLinMPC, optim)
     Jfunc, gfunc = get_optim_functions(mpc, mpc.optim)
     register(optim, :Jfunc, nΔŨ, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(ΔŨvar...))
-    model = mpc.estim.model
     ny, nx̂, Hp = model.ny, mpc.estim.nx̂, mpc.Hp
     if length(con.i_g) ≠ 0
         for i in eachindex(con.Ymin)

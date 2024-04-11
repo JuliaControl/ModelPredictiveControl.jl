@@ -76,7 +76,7 @@ struct LinMPC{
             d0, D̂0, D̂E,
             Ŷop, Dop,
         )
-        init_optimization!(mpc, optim)
+        init_optimization!(mpc, model, optim)
         return mpc
     end
 end
@@ -235,16 +235,16 @@ function LinMPC(
 end
 
 """
-    init_optimization!(mpc::LinMPC, optim::JuMP.GenericModel)
+    init_optimization!(mpc::LinMPC, model::LinModel, optim)
 
 Init the quadratic optimization for [`LinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::LinMPC, optim::JuMP.GenericModel)
+function init_optimization!(mpc::LinMPC, model::LinModel, optim)
     # --- variables and linear constraints ---
     con = mpc.con
     nΔŨ = length(mpc.ΔŨ)
     JuMP.set_silent(optim)
-    limit_solve_time(mpc.optim, mpc.estim.model.Ts)
+    limit_solve_time(mpc.optim, model.Ts)
     @variable(optim, ΔŨvar[1:nΔŨ])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
