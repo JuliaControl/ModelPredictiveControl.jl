@@ -1003,63 +1003,11 @@ function init_optimization!(
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    He = estim.He
-    nV̂, nX̂, ng = He*estim.nym, He*estim.nx̂, length(con.i_g)
-    nx̂, nŷ, nu = estim.nx̂, model.ny, model.nu
-    # see init_optimization!(mpc::NonLinMPC, optim) for details on the inspiration
-    Jfunc, gfunc = let estim=estim, model=model, nZ̃=nZ̃, nV̂=nV̂, nX̂=nX̂, ng=ng, nx̂=nx̂, nu=nu, nŷ=nŷ
-        Nc = nZ̃ + 3
-        last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
-        Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nZ̃), Nc)
-        V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), Nc)
-        g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), Nc)
-        X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), Nc)
-        x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
-        û_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu), Nc)
-        ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ), Nc)
-        function Jfunc(Z̃tup::T...)::T where {T <: Real}
-            Z̃1 = Z̃tup[begin]
-            if T == JNT
-                last_Z̃tup_float = Z̃tup
-            else
-                last_Z̃tup_dual = Z̃tup
-            end
-            Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
-            X̂ = get_tmp(X̂_cache, Z̃1)
-            û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
-            Z̃ .= Z̃tup
-            V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
-            g = get_tmp(g_cache, Z̃1)
-            g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
-            x̄ = get_tmp(x̄_cache, Z̃1)
-            return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
-        end
-        function gfunc_i(i, Z̃tup::NTuple{N, T})::T where {N, T <:Real}
-            Z̃1 = Z̃tup[begin]
-            g = get_tmp(g_cache, Z̃1)
-            if T == JNT
-                isnewvalue = (Z̃tup !== last_Z̃tup_float)
-                isnewvalue && (last_Z̃tup_float = Z̃tup)
-            else
-                isnewvalue = (Z̃tup !== last_Z̃tup_dual)
-                isnewvalue && (last_Z̃tup_dual = Z̃tup)
-            end
-            if isnewvalue
-                Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
-                X̂ = get_tmp(X̂_cache, Z̃1)
-                û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
-                Z̃ .= Z̃tup
-                V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
-                g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
-            end
-            return g[i]
-        end
-        gfunc = [(Z̃...) -> gfunc_i(i, Z̃) for i in 1:ng]
-        (Jfunc, gfunc)
-    end
+    Jfunc, gfunc = get_optim_functions(estim, optim)
     register(optim, :Jfunc, nZ̃, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(Z̃var...))
-    if ng ≠ 0
+    nV̂, nX̂ = estim.He*estim.nym, estim.He*estim.nx̂
+    if length(con.i_g) ≠ 0
         for i in eachindex(con.X̂min)
             sym = Symbol("g_X̂min_$i")
             register(optim, sym, nZ̃, gfunc[i], autodiff=true)
@@ -1081,4 +1029,72 @@ function init_optimization!(
         end
     end
     return nothing
+end
+
+
+"""
+    get_optim_functions(estim::MovingHorizonEstimator, ::JuMP.GenericModel) -> Jfunc, gfunc
+
+Get the objective `Jfunc` and constraints `gfunc` functions for [`MovingHorizonEstimator`](@ref).
+
+Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
+"""
+function get_optim_functions(
+    estim::MovingHorizonEstimator, ::JuMP.GenericModel{JNT}
+) where {JNT <: Real}
+    model, con = estim.model, estim.con
+    nx̂, nym, nŷ, nu, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.He
+    nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
+    Nc = nZ̃ + 3
+    last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
+    Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nZ̃), Nc)
+    V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), Nc)
+    g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), Nc)
+    X̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), Nc)
+    x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
+    û_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu), Nc)
+    ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ), Nc)
+    function Jfunc(Z̃tup::T...)::T where {T <: Real}
+        Z̃1 = Z̃tup[begin]
+        if T == JNT
+            last_Z̃tup_float = Z̃tup
+        else
+            last_Z̃tup_dual = Z̃tup
+        end
+        Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
+        X̂ = get_tmp(X̂_cache, Z̃1)
+        û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+        for i in eachindex(Z̃tup)
+            Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
+        end
+        V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
+        g = get_tmp(g_cache, Z̃1)
+        g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
+        x̄ = get_tmp(x̄_cache, Z̃1)
+        return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
+    end
+    function gfunc_i(i, Z̃tup::NTuple{N, T})::T where {N, T <:Real}
+        Z̃1 = Z̃tup[begin]
+        g = get_tmp(g_cache, Z̃1)
+        if T == JNT
+            isnewvalue = (Z̃tup !== last_Z̃tup_float)
+            isnewvalue && (last_Z̃tup_float = Z̃tup)
+        else
+            isnewvalue = (Z̃tup !== last_Z̃tup_dual)
+            isnewvalue && (last_Z̃tup_dual = Z̃tup)
+        end
+        if isnewvalue
+            Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
+            X̂ = get_tmp(X̂_cache, Z̃1)
+            û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+            for i in eachindex(Z̃tup)
+                Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
+            end
+            V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
+            g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
+        end
+        return g[i]
+    end
+    gfunc = [(Z̃...) -> gfunc_i(i, Z̃) for i in 1:ng]
+    return Jfunc, gfunc
 end
