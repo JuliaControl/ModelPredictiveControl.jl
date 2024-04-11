@@ -77,7 +77,7 @@ struct NonLinMPC{
             d0, D̂0, D̂E,
             Ŷop, Dop,
         )
-        init_optimization!(mpc, optim)
+        init_optimization!(mpc, model, optim)
         return mpc
     end
 end
@@ -277,11 +277,11 @@ function addinfo!(info, mpc::NonLinMPC)
 end
 
 """
-    init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel)
+    init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
+function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     # --- variables and linear constraints ---
     C, con = mpc.C, mpc.con
     nΔŨ = length(mpc.ΔŨ)
@@ -300,65 +300,11 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    model = mpc.estim.model
-    nu, ny, nx̂, Hp, ng = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, length(con.i_g)
-    # inspired from https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
-    Jfunc, gfunc = let mpc=mpc, model=model, ng=ng, nΔŨ=nΔŨ, nŶ=Hp*ny, nx̂=nx̂, nu=nu, nU=Hp*nu
-        Nc = nΔŨ + 3
-        last_ΔŨtup_float, last_ΔŨtup_dual = nothing, nothing
-        ΔŨ_cache::DiffCache{Vector{JNT}, Vector{JNT}}    = DiffCache(zeros(JNT, nΔŨ), Nc)
-        Ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶ), Nc)
-        U_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU), Nc)
-        g_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, ng), Nc)
-        x̂_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nx̂), Nc)
-        x̂next_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
-        u_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu), Nc)
-        û_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu), Nc)
-        Ȳ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶ), Nc)
-        Ū_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU), Nc)
-        function Jfunc(ΔŨtup::T...)::T where {T <: Real}
-            ΔŨ1 = ΔŨtup[begin]
-            if T == JNT
-                last_ΔŨtup_float = ΔŨtup
-            else
-                last_ΔŨtup_dual  = ΔŨtup
-            end
-            ΔŨ, Ŷ = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(Ŷ_cache, ΔŨ1)
-            x̂, x̂next = get_tmp(x̂_cache, ΔŨ1), get_tmp(x̂next_cache, ΔŨ1)
-            u, û = get_tmp(u_cache, ΔŨ1), get_tmp(û_cache, ΔŨ1)
-            ΔŨ .= ΔŨtup
-            Ŷ, x̂end = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, ΔŨ)
-            g = get_tmp(g_cache, ΔŨ1)
-            g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
-            U, Ȳ, Ū = get_tmp(U_cache, ΔŨ1), get_tmp(Ȳ_cache, ΔŨ1), get_tmp(Ū_cache, ΔŨ1)
-            return obj_nonlinprog!(U, Ȳ, Ū, mpc, model, Ŷ, ΔŨ)::T
-        end
-        function gfunc_i(i, ΔŨtup::NTuple{N, T})::T where {N, T <:Real}
-            ΔŨ1 = ΔŨtup[begin]
-            g = get_tmp(g_cache, ΔŨ1)
-            if T == JNT
-                isnewvalue = (ΔŨtup !== last_ΔŨtup_float)
-                isnewvalue && (last_ΔŨtup_float = ΔŨtup)
-            else
-                isnewvalue = (ΔŨtup !== last_ΔŨtup_dual)
-                isnewvalue && (last_ΔŨtup_dual = ΔŨtup)
-            end
-            if isnewvalue
-                ΔŨ, Ŷ = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(Ŷ_cache, ΔŨ1)
-                x̂, x̂next = get_tmp(x̂_cache, ΔŨ1), get_tmp(x̂next_cache, ΔŨ1)
-                u, û = get_tmp(u_cache, ΔŨ1), get_tmp(û_cache, ΔŨ1)
-                ΔŨ .= ΔŨtup
-                Ŷ, x̂end = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, ΔŨ)
-                g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
-            end
-            return g[i]::T
-        end
-        gfunc = [(ΔŨ...) -> gfunc_i(i, ΔŨ) for i in 1:ng]
-        (Jfunc, gfunc)
-    end
+    Jfunc, gfunc = get_optim_functions(mpc, mpc.optim)
     register(optim, :Jfunc, nΔŨ, Jfunc, autodiff=true)
     @NLobjective(optim, Min, Jfunc(ΔŨvar...))
-    if ng ≠ 0
+    ny, nx̂, Hp = model.ny, mpc.estim.nx̂, mpc.Hp
+    if length(con.i_g) ≠ 0
         for i in eachindex(con.Ymin)
             sym = Symbol("g_Ymin_$i")
             register(optim, sym, nΔŨ, gfunc[i], autodiff=true)
@@ -380,6 +326,62 @@ function init_optimization!(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where
         end
     end
     return nothing
+end
+
+"""
+    get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel) -> Jfunc, gfunc
+
+Get the objective `Jfunc` and constraints `gfunc` functions for [`NonLinMPC`](@ref).
+
+Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
+"""
+function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
+    model = mpc.estim.model
+    nu, ny, nx̂, Hp = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp
+    ng, nΔŨ, nU, nŶ = length(mpc.con.i_g), length(mpc.ΔŨ), Hp*nu, Hp*ny
+    Nc = nΔŨ + 3
+    ΔŨ_cache::DiffCache{Vector{JNT}, Vector{JNT}}    = DiffCache(zeros(JNT, nΔŨ), Nc)
+    Ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶ), Nc)
+    U_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU), Nc)
+    g_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, ng), Nc)
+    x̂_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nx̂), Nc)
+    x̂next_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
+    u_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu), Nc)
+    û_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu), Nc)
+    Ȳ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶ), Nc)
+    Ū_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU), Nc)
+    function Jfunc(ΔŨtup::T...) where T<:Real
+        ΔŨ1 = ΔŨtup[begin]
+        ΔŨ, g = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(g_cache, ΔŨ1) 
+        for i in eachindex(ΔŨtup)
+            ΔŨ[i] = ΔŨtup[i] # ΔŨ .= ΔŨtup seems to produce a type instability
+        end 
+        Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
+        x̂, x̂next = get_tmp(x̂_cache, ΔŨ1), get_tmp(x̂next_cache, ΔŨ1)
+        u, û = get_tmp(u_cache, ΔŨ1), get_tmp(û_cache, ΔŨ1)
+        Ŷ, x̂end = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, ΔŨ)
+        g = get_tmp(g_cache, ΔŨ1)
+        g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
+        U, Ȳ, Ū = get_tmp(U_cache, ΔŨ1), get_tmp(Ȳ_cache, ΔŨ1), get_tmp(Ū_cache, ΔŨ1)
+        return obj_nonlinprog!(U, Ȳ, Ū, mpc, model, Ŷ, ΔŨ)::T
+    end
+    function gfunc_i(i, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
+        ΔŨ1 = ΔŨtup[begin]
+        ΔŨ, g = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(g_cache, ΔŨ1)     
+        if any(new !== old for (new, old) in zip(ΔŨtup, ΔŨ)) # new ΔŨtup, update predictions:
+            for i in eachindex(ΔŨtup)
+                ΔŨ[i] = ΔŨtup[i] # ΔŨ .= ΔŨtup seems to produce a type instability
+            end
+            Ŷ = get_tmp(Ŷ_cache, ΔŨ1)
+            x̂, x̂next = get_tmp(x̂_cache, ΔŨ1), get_tmp(x̂next_cache, ΔŨ1)
+            u, û = get_tmp(u_cache, ΔŨ1), get_tmp(û_cache, ΔŨ1)
+            Ŷ, x̂end = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, ΔŨ)
+            g = con_nonlinprog!(g, mpc, model, x̂end, Ŷ, ΔŨ)
+        end
+        return g[i]::T
+    end
+    gfunc = [(ΔŨ...) -> gfunc_i(i, ΔŨ) for i in 1:ng]
+    return Jfunc, gfunc
 end
 
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
