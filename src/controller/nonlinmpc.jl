@@ -368,7 +368,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     function gfunc_i(i, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
         ΔŨ1 = ΔŨtup[begin]
         ΔŨ, g = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(g_cache, ΔŨ1)     
-        if any(new ≠ old for (new, old) in zip(ΔŨtup, ΔŨ)) # new ΔŨtup, update predictions:
+        if any(new !== old for (new, old) in zip(ΔŨtup, ΔŨ)) # new ΔŨtup, update predictions:
             for i in eachindex(ΔŨtup)
                 ΔŨ[i] = ΔŨtup[i] # ΔŨ .= ΔŨtup seems to produce a type instability
             end

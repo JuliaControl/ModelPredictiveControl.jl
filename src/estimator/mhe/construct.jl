@@ -1046,7 +1046,6 @@ function get_optim_functions(
     nx̂, nym, nŷ, nu, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.He
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
     Nc = nZ̃ + 3
-    last_Z̃tup_float, last_Z̃tup_dual = nothing, nothing
     Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nZ̃), Nc)
     V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nV̂), Nc)
     g_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, ng), Nc)
@@ -1056,17 +1055,12 @@ function get_optim_functions(
     ŷ_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ), Nc)
     function Jfunc(Z̃tup::T...)::T where {T <: Real}
         Z̃1 = Z̃tup[begin]
-        if T == JNT
-            last_Z̃tup_float = Z̃tup
-        else
-            last_Z̃tup_dual = Z̃tup
-        end
-        Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
-        X̂ = get_tmp(X̂_cache, Z̃1)
-        û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
+        Z̃, g = get_tmp(Z̃_cache, Z̃1), get_tmp(g_cache, Z̃1)
         for i in eachindex(Z̃tup)
             Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
         end
+        V̂, X̂ = get_tmp(V̂_cache, Z̃1), get_tmp(X̂_cache, Z̃1)
+        û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
         V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, Z̃)
         g = get_tmp(g_cache, Z̃1)
         g = con_nonlinprog!(g, estim, model, X̂, V̂, Z̃)
@@ -1075,17 +1069,9 @@ function get_optim_functions(
     end
     function gfunc_i(i, Z̃tup::NTuple{N, T})::T where {N, T <:Real}
         Z̃1 = Z̃tup[begin]
-        g = get_tmp(g_cache, Z̃1)
-        if T == JNT
-            isnewvalue = (Z̃tup !== last_Z̃tup_float)
-            isnewvalue && (last_Z̃tup_float = Z̃tup)
-        else
-            isnewvalue = (Z̃tup !== last_Z̃tup_dual)
-            isnewvalue && (last_Z̃tup_dual = Z̃tup)
-        end
-        if isnewvalue
-            Z̃, V̂ = get_tmp(Z̃_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
-            X̂ = get_tmp(X̂_cache, Z̃1)
+        Z̃, g = get_tmp(Z̃_cache, Z̃1), get_tmp(g_cache, Z̃1)
+        if any(new !== old for (new, old) in zip(Z̃tup, Z̃)) # new Z̃tup, update predictions:
+            V̂, X̂ = get_tmp(V̂_cache, Z̃1), get_tmp(X̂_cache, Z̃1)
             û, ŷ = get_tmp(û_cache, Z̃1), get_tmp(ŷ_cache, Z̃1)
             for i in eachindex(Z̃tup)
                 Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
