@@ -73,8 +73,11 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
     @test isa(linmodel10, LinModel{Float64})
     @test linmodel10.nd == 0
 
-    linmodel11 = LinModel{Float32}(Gss.A, Gss.B, Gss.C, zeros(2, 0), zeros(2, 0), Ts)
-    @test isa(linmodel11, LinModel{Float32})
+    linmodel11 = LinModel(Gss.A, Gss.B, I, 0, 0, Ts)
+    @test linmodel11.ny == linmodel11.nx
+
+    linmodel12 = LinModel{Float32}(Gss.A, Gss.B, Gss.C, zeros(2, 0), zeros(2, 0), Ts)
+    @test isa(linmodel12, LinModel{Float32})
 
 
     @test_throws ErrorException LinModel(sys)

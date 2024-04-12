@@ -14,8 +14,11 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     yop::Vector{NT}
     dop::Vector{NT}
     function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
-        A, Bu, C = to_mat(A, 1, 1), to_mat(Bu, 1, 1), to_mat(C, 1, 1)
-        nu, nx, ny = size(Bu, 2), size(A, 2), size(C, 1)
+        A, Bu = to_mat(A, 1, 1), to_mat(Bu, 1, 1)
+        nu, nx = size(Bu, 2), size(A, 2)
+        (C == I) && (C = Matrix{NT}(I, nx, nx))
+        C = to_mat(C, 1, 1)
+        ny = size(C, 1)
         Bd = to_mat(Bd, nx, Bd ≠ 0)
         nd = size(Bd, 2)
         Dd = to_mat(Dd, ny, nd)
