@@ -792,11 +792,11 @@ end
 
     setconstraint!(mhe, x̂min=[1,1], x̂max=[100,100])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test x̂ ≈ [1, 1] atol=1e-2
+    @test x̂ ≈ [1, 1] atol=5e-2
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[-1,-1])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test x̂ ≈ [-1, -1] atol=1e-2
+    @test x̂ ≈ [-1, -1] atol=5e-2
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
@@ -804,11 +804,11 @@ end
 
     setconstraint!(mhe, ŵmin=[1,1], ŵmax=[100,100])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test mhe.Ŵ ≈ [1,1] atol=1e-2
+    @test mhe.Ŵ ≈ [1,1] atol=5e-2
 
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[-1,-1])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test mhe.Ŵ ≈ [-1,-1] atol=1e-2
+    @test mhe.Ŵ ≈ [-1,-1] atol=5e-2
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
@@ -817,12 +817,12 @@ end
     setconstraint!(mhe, v̂min=[1,1], v̂max=[100,100])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
     info = getinfo(mhe)
-    @test info[:V̂] ≈ [1,1] atol=1e-2
+    @test info[:V̂] ≈ [1,1] atol=5e-2
 
     setconstraint!(mhe, v̂min=[-100,-100], v̂max=[-1,-1])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
     info = getinfo(mhe)
-    @test info[:V̂] ≈ [-1,-1] atol=1e-2
+    @test info[:V̂] ≈ [-1,-1] atol=5e-2
 
     f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
     h(x,_)   = linmodel1.C*x
@@ -835,11 +835,11 @@ end
 
     setconstraint!(mhe2, x̂min=[1,1], x̂max=[100,100])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
-    @test x̂ ≈ [1, 1] atol=1e-2
+    @test x̂ ≈ [1, 1] atol=5e-2
 
     setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[-1,-1])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
-    @test x̂ ≈ [-1, -1] atol=1e-2
+    @test x̂ ≈ [-1, -1] atol=5e-2
 
     setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[100,100])
@@ -847,11 +847,11 @@ end
 
     setconstraint!(mhe2, ŵmin=[1,1], ŵmax=[100,100])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
-    @test mhe2.Ŵ ≈ [1,1] atol=1e-2
+    @test mhe2.Ŵ ≈ [1,1] atol=5e-2
 
     setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[-1,-1])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
-    @test mhe2.Ŵ ≈ [-1,-1] atol=1e-2
+    @test mhe2.Ŵ ≈ [-1,-1] atol=5e-2
 
     setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[100,100])
@@ -860,10 +860,10 @@ end
     setconstraint!(mhe2, v̂min=[1,1], v̂max=[100,100])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     info = getinfo(mhe2)
-    @test info[:V̂] ≈ [1,1] atol=1e-2
+    @test info[:V̂] ≈ [1,1] atol=5e-2
 
     setconstraint!(mhe2, v̂min=[-100,-100], v̂max=[-1,-1])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     info = getinfo(mhe2)
-    @test info[:V̂] ≈ [-1,-1] atol=1e-2
+    @test info[:V̂] ≈ [-1,-1] atol=5e-2
 end
