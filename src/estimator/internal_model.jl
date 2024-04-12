@@ -197,6 +197,9 @@ function init_internalmodel(As, Bs, Cs, Ds)
     return Âs, B̂s
 end
 
+"Do nothing else for `InternalModel` estimator."
+setmodel_estimator!(estim::InternalModel, ::LinModel) = nothing
+
 @doc raw"""
     update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂)) -> x̂d
 

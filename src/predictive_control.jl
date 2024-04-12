@@ -25,13 +25,6 @@ include("controller/explicitmpc.jl")
 include("controller/linmpc.jl")
 include("controller/nonlinmpc.jl")
 
-"""
-    setstate!(mpc::PredictiveController, x̂)
-
-Set the estimate at `mpc.estim.x̂`.
-"""
-setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
-
 function Base.show(io::IO, mpc::PredictiveController)
     Hp, Hc = mpc.Hp, mpc.Hc
     nϵ = isinf(mpc.C) ? 0 : 1

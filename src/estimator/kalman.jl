@@ -166,6 +166,10 @@ function SteadyKalmanFilter(model::SM, i_ym, nint_u, nint_ym, Q̂, R̂) where {N
     return SteadyKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, Q̂, R̂)
 end
 
+"Throw an error if `setmodel!` is called on a SteadyKalmanFilter"
+function setmodel_estimator!(estim::SteadyKalmanFilter, _ )
+    error("SteadyKalmanFilter does not support setmodel! (use KalmanFilter instead)")
+end
 
 
 @doc raw"""

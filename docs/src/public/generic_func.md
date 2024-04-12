@@ -37,6 +37,12 @@ initstate!
 setstate!
 ```
 
+## Set Plant Model
+
+```@docs
+setmodel!
+```
+
 ## Quick Simulation
 
 ### Simulate
