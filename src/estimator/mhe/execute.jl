@@ -81,7 +81,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
     V̂, X̂ = predict!(V̂, X̂, û, ŷ, estim, model, estim.Z̃)
-    x̂ .= X̂[end-nx̂+1:end]
+    estim.x̂ .= @views X̂[end-nx̂+1:end]
     Nk == estim.He && update_cov!(estim::MovingHorizonEstimator)
     return nothing
 end

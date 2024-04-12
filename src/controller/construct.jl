@@ -548,7 +548,7 @@ function init_quadprog(::LinModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
 function init_quadprog(::SimModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
-    H̃ = Hermitian(zeros(NT, 0, 0))
+    H̃ = Hermitian(zeros(NT, 0, 0), :L)
     q̃ = zeros(NT, 0)
     p = zeros(NT, 1)            # dummy value (updated just before optimization)
     return H̃, q̃, p
@@ -679,7 +679,7 @@ function relaxΔU(::SimModel{NT}, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) w
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]]
         A_ϵ = [zeros(NT, 1, length(ΔUmin)) NT[1.0]]
         A_ΔŨmin, A_ΔŨmax = -[I  C_Δumin; A_ϵ], [I -C_Δumax; A_ϵ]
-        Ñ_Hc = Hermitian([N_Hc zeros(NT, nΔU, 1);zeros(NT, 1, nΔU) C])
+        Ñ_Hc = Hermitian([N_Hc zeros(NT, nΔU, 1);zeros(NT, 1, nΔU) C], :L)
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
         I_Hc = Matrix{NT}(I, nΔU, nΔU)
