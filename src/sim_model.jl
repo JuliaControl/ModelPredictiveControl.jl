@@ -190,8 +190,10 @@ function validate_args(model::SimModel, d, u=nothing)
 end
 
 "Convert vectors to single column matrices when necessary."
-to_mat(A::AbstractVector) = reshape(A, length(A), 1)
-to_mat(A::AbstractMatrix) = A
+to_mat(A::AbstractVector, _ ...) = reshape(A, length(A), 1)
+to_mat(A::AbstractMatrix, _ ...) = A
+to_mat(A::Real, dims...) = fill(A, dims)
+
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=empty(model.x)) = evaloutput(model::SimModel, d)

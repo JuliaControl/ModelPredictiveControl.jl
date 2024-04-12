@@ -14,8 +14,11 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     yop::Vector{NT}
     dop::Vector{NT}
     function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
-        A, Bu, C, Bd, Dd = to_mat(A), to_mat(Bu), to_mat(C), to_mat(Bd), to_mat(Dd)
-        nu, nx, ny, nd = size(Bu,2), size(A,2), size(C,1), size(Bd,2)
+        A, Bu, C = to_mat(A, 1, 1), to_mat(Bu, 1, 1), to_mat(C, 1, 1)
+        nu, nx, ny = size(Bu, 2), size(A, 2), size(C, 1)
+        Bd = to_mat(Bd, nx, Bd ≠ 0)
+        nd = size(Bd, 2)
+        Dd = to_mat(Dd, ny, nd)
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
         size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
@@ -188,31 +191,14 @@ end
 
 Construct the model from the discrete state-space matrices `A, Bu, C, Bd, Dd` directly.
 
-See [`LinModel(::StateSpace)`](@ref) Extended Help for the meaning of the matrices. This
+See [`LinModel(::StateSpace)`](@ref) Extended Help for the meaning of the matrices. The
+arguments `Bd` and `Dd` can be the scalar `0` is there is no measured disturbances. This
 syntax do not modify the state-space representation provided in argument (`minreal` is not
-called). Care must be taken to ensure that the model is controllable and observable. The
-optional parameter `NT` explicitly specifies the number type of the matrices.
+called). Care must be taken to ensure that the model is controllable and observable. The 
+optional parameter `NT` explicitly set the number type of vectors (default to `Float64`).
 """
 LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where NT<:Real
-
-function LinModel(
-    A::Array{NT}, Bu::Array{NT}, C::Array{NT}, Bd::Array{NT}, Dd::Array{NT}, Ts::Real
-) where {NT<:Real} 
-    return LinModel{NT}(A, Bu, C, Bd, Dd, Ts)
-end
-
-function LinModel(
-    A::Array{<:Real}, 
-    Bu::Array{<:Real}, 
-    C::Array{<:Real}, 
-    Bd::Array{<:Real}, 
-    Dd::Array{<:Real},
-    Ts::Real
-)
-    A, Bu, C, Bd, Dd = to_mat(A), to_mat(Bu), to_mat(C), to_mat(Bd), to_mat(Dd)
-    A, Bu, C, Bd, Dd = promote(A, Bu, C, Bd, Dd)
-    return LinModel(A, Bu, C, Bd, Dd, Ts)
-end
+LinModel(A, Bu, C, Bd, Dd, Ts) = LinModel{Float64}(A, Bu, C, Bd, Dd, Ts)
 
 @doc raw"""
     steadystate!(model::LinModel, u, d)
