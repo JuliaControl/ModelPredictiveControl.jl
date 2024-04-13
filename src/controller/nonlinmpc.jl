@@ -51,7 +51,9 @@ struct NonLinMPC{
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # Matrix() call is needed to convert `Diagonal` to normal `Matrix`
-        M_Hp, N_Hc, L_Hp = Hermitian(Matrix(M_Hp)), Hermitian(Matrix(N_Hc)), Hermitian(Matrix(L_Hp))
+        M_Hp = Hermitian(Matrix(M_Hp), :L) 
+        N_Hc = Hermitian(Matrix(N_Hc), :L)
+        L_Hp = Hermitian(Matrix(L_Hp), :L)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)

@@ -118,6 +118,9 @@ function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂))
     mul!(x̂next, B̂u, u, 1, 1)
     mul!(x̂next, B̂d, d, 1, 1)
     mul!(x̂next, K̂, v̂, 1, 1)
-    x̂ .= x̂next
+    estim.x̂ .= x̂next
     return nothing
 end
+
+"Throw an error if `setmodel!` is called on `Luenberger` observer."
+setmodel_estimator!(estim::Luenberger, ::LinModel) = error("Luenberger does not support setmodel!")

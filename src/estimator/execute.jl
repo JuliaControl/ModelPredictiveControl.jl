@@ -221,3 +221,60 @@ function validate_args(estim::StateEstimator, u, ym, d)
     nym = estim.nym
     size(ym) ≠ (nym,) && throw(DimensionMismatch("ym size $(size(ym)) ≠ meas. output size ($nym,)"))
 end
+
+"""
+    setstate!(estim::StateEstimator, x̂)
+
+Set `estim.x̂` states to values specified by `x̂`. 
+"""
+function setstate!(estim::StateEstimator, x̂)
+    size(x̂) == (estim.nx̂,) || error("x̂ size must be $((estim.nx̂,))")
+    estim.x̂[:] = x̂
+    return estim
+end
+
+"""
+    setmodel!(estim::StateEstimator, model::LinModel) -> estim
+
+Set `estim.model` state-space matrices and operating points to `model` values.
+
+Not supported by [`Luenberger`](@ref) and [`SteadyKalmanFilter`](@ref) estimators, use the
+time-varying [`KalmanFilter`](@ref) instead. The matrix dimensions and sample time must stay
+the same. The observability and controllability of the new augmented model is not verified.
+"""
+function setmodel!(estim::StateEstimator, model::LinModel)
+    validate_model(estim, model)
+    estim.model.A   .= model.A
+    estim.model.Bu  .= model.Bu
+    estim.model.C   .= model.C
+    estim.model.Bd  .= model.Bd
+    estim.model.Dd  .= model.Dd
+    estim.model.uop .= model.uop
+    estim.model.yop .= model.yop
+    estim.model.dop .= model.dop
+    setmodel_estimator!(estim, model)
+    return estim
+end
+
+"Validate the dimensions and sample time of `model` against `estim.model`."
+function validate_model(estim::StateEstimator, model::LinModel)
+    model.Ts == estim.model.Ts || throw(ArgumentError("model.Ts must be $(estim.model.Ts) s"))
+    model.nu == estim.model.nu || throw(ArgumentError("model.nu must be $(estim.model.nu)"))
+    model.nx == estim.model.nx || throw(ArgumentError("model.nx must be $(estim.model.nx)"))
+    model.ny == estim.model.ny || throw(ArgumentError("model.ny must be $(estim.model.ny)"))
+    model.nd == estim.model.nd || throw(ArgumentError("model.nd must be $(estim.model.nd)"))
+end
+
+"Update the augmented model matrices of `estim` by default."
+function setmodel_estimator!(estim::StateEstimator, model::LinModel)
+    As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
+    Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
+    estim.Â  .= Â
+    estim.B̂u .= B̂u
+    estim.Ĉ  .= Ĉ
+    estim.B̂d .= B̂d
+    estim.D̂d .= D̂d
+    estim.Ĉm  .= @views Ĉ[estim.i_ym, :]
+    estim.D̂dm .= @views D̂d[estim.i_ym, :]
+    return nothing
+end
