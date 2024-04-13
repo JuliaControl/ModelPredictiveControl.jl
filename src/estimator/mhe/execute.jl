@@ -447,3 +447,20 @@ function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂, V̂,
     end
     return g
 end
+
+
+"Update the augmented model matrices of `estim` by default."
+function setmodel_estimator!(estim::MovingHorizonEstimator, model::LinModel)
+    As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.   Cs_y
+    Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
+    estim.Â  .= Â
+    estim.B̂u .= B̂u
+    estim.Ĉ  .= Ĉ
+    estim.B̂d .= B̂d
+    estim.D̂d .= D̂d
+    estim.Ĉm  .= @views Ĉ[estim.i_ym, :]
+    estim.D̂dm .= @views D̂d[estim.i_ym, :]
+    # TODO: re-construct the MHE prediction matrices here:
+    error("setmodel! for MovingHorizonEstimator is not implemented yet.")
+    return nothing
+end
