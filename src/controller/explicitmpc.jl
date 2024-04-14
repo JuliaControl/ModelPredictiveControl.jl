@@ -207,9 +207,10 @@ addinfo!(info, mpc::ExplicitMPC) = info
 "Update the prediction matrices and Cholesky factorization."
 function setmodel_controller!(mpc::ExplicitMPC, model::LinModel)
     estim = mpc.estim
-    nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nu, mpc.Hp, mpc.Hc
+    nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
     E, G, J, K, V = init_predmat(estim, model, Hp, Hc)
+    Ẽ = E  # no slack variable ϵ for ExplicitMPC
     mpc.Ẽ .= Ẽ
     mpc.G .= G
     mpc.J .= J
@@ -229,6 +230,7 @@ end
 
 "Update the Cholesky factorization of the Hessian matrix."
 function set_objective_hessian!(mpc::ExplicitMPC)
-    mpc.H̃_chol .= cholesky(mpc.H̃)
+    H̃_chol = cholesky(mpc.H̃)
+    mpc.H̃_chol.factors .= H̃_chol.factors
     return nothing
 end
