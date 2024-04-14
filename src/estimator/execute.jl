@@ -223,13 +223,13 @@ function validate_args(estim::StateEstimator, u, ym, d)
 end
 
 """
-    setstate!(estim::StateEstimator, x̂)
+    setstate!(estim::StateEstimator, x̂) -> estim
 
 Set `estim.x̂` states to values specified by `x̂`. 
 """
 function setstate!(estim::StateEstimator, x̂)
     size(x̂) == (estim.nx̂,) || error("x̂ size must be $((estim.nx̂,))")
-    estim.x̂[:] = x̂
+    estim.x̂ .= x̂
     return estim
 end
 
@@ -238,9 +238,10 @@ end
 
 Set `estim.model` state-space matrices and operating points to `model` values.
 
-Not supported by [`Luenberger`](@ref) and [`SteadyKalmanFilter`](@ref) estimators, use the
-time-varying [`KalmanFilter`](@ref) instead. The matrix dimensions and sample time must stay
-the same. The observability and controllability of the new augmented model is not verified.
+Only [`LinModel`](@ref) objects are supported. Also not supported by [`Luenberger`](@ref) 
+and [`SteadyKalmanFilter`](@ref) estimators, use the time-varying [`KalmanFilter`](@ref)
+instead. The matrix dimensions and sample time must stay the same. The observability and
+controllability of the new augmented model is not verified.
 """
 function setmodel!(estim::StateEstimator, model::LinModel)
     validate_model(estim, model)

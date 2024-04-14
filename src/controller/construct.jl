@@ -237,7 +237,7 @@ function setconstraint!(
         )
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
-        ΔŨvar = optim[:ΔŨvar]
+        ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
@@ -376,7 +376,7 @@ end
 
 
 @doc raw"""
-    init_predmat(estim, ::LinModel, Hp, Hc) -> E, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
+    init_predmat(estim, ::LinModel, Hp, Hc, =true) -> E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
 
 Construct the prediction matrices for [`LinModel`](@ref) `model`.
 
@@ -389,10 +389,9 @@ The linear model predictions are evaluated by :
 \end{aligned}
 ```
 where the predicted outputs ``\mathbf{Ŷ}`` and measured disturbances ``\mathbf{D̂}`` are from 
-``k + 1`` to ``k + H_p``. Input increments ``\mathbf{ΔU}`` are from ``k`` to
-``k + H_c - 1``. The vector ``\mathbf{x̂}_{k-1}(k)`` is the state estimated at the last 
-control period. The method also computes similar matrices but for the predicted terminal 
-states at ``k+H_p``:
+``k+1`` to ``k+H_p``. Input increments ``\mathbf{ΔU}`` are from ``k`` to ``k+H_c-1``. The 
+vector ``\mathbf{x̂}_{k-1}(k)`` is the state estimated at the last control period. The method
+also computes similar matrices but for the predicted terminal states at ``k+H_p``:
 ```math
 \begin{aligned}
     \mathbf{x̂}_{k-1}(k+H_p) 
@@ -402,7 +401,8 @@ states at ``k+H_p``:
 \end{aligned}
 ```
 Operating points on ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{y}`` are omitted in above
-equations.
+equations. The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are recalculated at each control
+period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
 
 # Extended Help
 !!! details "Extended Help"
@@ -458,12 +458,12 @@ function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where 
     Âpow = Array{NT}(undef, nx̂, nx̂, Hp+1)
     Âpow[:,:,1] = I(nx̂)
     for j=2:Hp+1
-        Âpow[:,:,j] = Âpow[:,:,j-1]*Â
+        Âpow[:,:,j] = @views Âpow[:,:,j-1]*Â
     end
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Âpow_csum  = cumsum(Âpow, dims=3)
     # helper function to improve code clarity and be similar to eqs. in docstring:
-    getpower(array3D, power) = array3D[:,:, power+1]
+    getpower(array3D, power) = @views array3D[:,:, power+1]
     # --- state estimates x̂ ---
     kx̂ = getpower(Âpow, Hp)
     K  = Matrix{NT}(undef, Hp*ny, nx̂)
@@ -503,9 +503,7 @@ function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where 
             jx̂[:  , iCol] = j < Hp ? getpower(Âpow, Hp-j-1)*B̂d : zeros(NT, nx̂, nd)
         end
     end
-    # dummy values (updated just before optimization):
-    F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-    return E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
+    return E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
 end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref)"
@@ -516,17 +514,16 @@ function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where 
     J  = zeros(NT, 0, nd*Hp)
     K  = zeros(NT, 0, nx̂)
     V  = zeros(NT, 0, nu)
-    F  = zeros(NT, 0)
-    ex̂, gx̂, jx̂, kx̂, vx̂, fx̂ = E, G, J, K, V, F
-    return E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂
+    ex̂, gx̂, jx̂, kx̂, vx̂ = E, G, J, K, V
+    return E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
 end
 
 @doc raw"""
-    init_quadprog(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> H̃, q̃, p
+    init_quadprog(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> H̃
 
-Init the quadratic programming optimization matrix `H̃` and `q̃` and scalar `p` for MPC.
+Init the quadratic programming Hessian `H̃` for MPC.
 
-The matrices appear in the quadratic general form :
+The matrix appear in the quadratic general form:
 ```math
     J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'H̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
 ```
@@ -535,23 +532,18 @@ The Hessian matrix is constant if the model and weights are linear and time inva
     \mathbf{H̃} = 2 (  \mathbf{Ẽ}'\mathbf{M}_{H_p}\mathbf{Ẽ} + \mathbf{Ñ}_{H_c} 
                     + \mathbf{S̃}'\mathbf{L}_{H_p}\mathbf{S̃} )
 ```
-The vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k`` (init
-with zeros, the method [`initpred!`](@ref) compute the real values). ``p`` does not impact
-the minima position. It is thus useless at optimization but required to evaluate the minimal
-``J`` value.
+The vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k``, see
+[`initpred!`](@ref). ``p`` does not impact the minima position. It is thus useless at
+optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
-    H̃ = Hermitian(convert(Matrix{NT}, 2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃)), :L)
-    q̃ = zeros(NT, size(H̃, 1))   # dummy value (updated just before optimization)
-    p = zeros(NT, 1)            # dummy value (updated just before optimization)
-    return H̃, q̃, p
+function init_quadprog(::LinModel, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+    H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃), :L)
+    return H̃
 end
 "Return empty matrices if `model` is not a [`LinModel`](@ref)."
 function init_quadprog(::SimModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
     H̃ = Hermitian(zeros(NT, 0, 0), :L)
-    q̃ = zeros(NT, 0)
-    p = zeros(NT, 1)            # dummy value (updated just before optimization)
-    return H̃, q̃, p
+    return H̃
 end
 
 """
@@ -783,7 +775,7 @@ Current stochastic outputs ``\mathbf{ŷ_s}(k)`` comprises the measured outputs
 ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` and unmeasured 
 ``\mathbf{ŷ_s^u}(k) = \mathbf{0}``. See [^2].
 
-[^2]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control : a unified
+[^2]: Desbiens, A., D. Hodouin & É. Plamondon. 2000, "Global predictive control: a unified
     control structure for decoupling setpoint tracking, feedforward compensation and 
     disturbance rejection dynamics", *IEE Proceedings - Control Theory and Applications*, 
     vol. 147, no 4, <https://doi.org/10.1049/ip-cta:20000443>, p. 465–475, ISSN 1350-2379.

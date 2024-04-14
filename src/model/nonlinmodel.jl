@@ -90,7 +90,7 @@ NonLinModel with a sample time Ts = 2.0 s, empty solver and:
 
 # Extended Help
 !!! details "Extended Help"
-    The state-space functions are similar for discrete dynamics:
+    State-space functions are similar for discrete dynamics:
     ```math
     \begin{aligned}
         \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \\

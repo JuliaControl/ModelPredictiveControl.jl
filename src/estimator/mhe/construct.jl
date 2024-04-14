@@ -882,10 +882,10 @@ function init_predmat_mhe(model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉ, B̂d, D
     Âpow = Array{NT}(undef, nx̂, nx̂, He+1)
     Âpow[:,:,1] = I(nx̂)
     for j=2:He+1
-        Âpow[:,:,j] = Âpow[:,:,j-1]*Â
+        Âpow[:,:,j] = @views Âpow[:,:,j-1]*Â
     end
     # helper function to improve code clarity and be similar to eqs. in docstring:
-    getpower(array3D, power) = array3D[:,:, power+1]
+    getpower(array3D, power) = @views array3D[:,:, power+1]
     # --- decision variables Z ---
     nĈm_Âpow = reduce(vcat, -Ĉm*getpower(Âpow, i) for i=0:He-1)
     E = zeros(NT, nym*He, nx̂ + nŵ*He)

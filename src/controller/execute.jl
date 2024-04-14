@@ -140,7 +140,7 @@ end
 
 
 @doc raw"""
-    initpred!(mpc, model::LinModel, d, ym, D̂, R̂y, R̂u) -> nothing
+    initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u) -> nothing
 
 Init linear model prediction matrices `F, q̃, p` and current estimated output `ŷ`.
 
@@ -476,8 +476,69 @@ updatestate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂)) = updates
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
 """
-    setstate!(mpc::PredictiveController, x̂)
+    setstate!(mpc::PredictiveController, x̂) -> mpc
 
 Set the estimate at `mpc.estim.x̂`.
 """
 setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
+
+
+
+"""
+    setmodel!(mpc::PredictiveController, model::LinModel) -> mpc
+
+Set `mpc.estim.model` to `model` and update the prediction matrices.
+"""
+function setmodel!(mpc::PredictiveController, model::LinModel)
+    setmodel!(mpc.estim, model)
+    setmodel_controller!(mpc, model)
+    return mpc
+end
+
+"Update the prediction matrices, linear constraints and JuMP optimization."
+function setmodel_controller!(mpc::PredictiveController, model::LinModel)
+    estim = mpc.estim
+    nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
+    optim, con = mpc.optim, mpc.con
+    # --- predictions matrices ---
+    E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
+    C, E, ex̂ = @views mpc.C, mpc.Ẽ[:, 1:nu*Hc], con.ẽx̂[:, 1:nu*Hc]
+    A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, con.C_ymin, con.C_ymax, E)
+    A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, C, con.c_x̂min, con.c_x̂max, ex̂)
+    mpc.Ẽ .= Ẽ
+    mpc.G .= G
+    mpc.J .= J
+    mpc.K .= K
+    mpc.V .= V
+    # --- linear inequality constraints ---
+    con.ẽx̂ .= ẽx̂ 
+    con.gx̂ .= gx̂
+    con.jx̂ .= jx̂
+    con.kx̂ .= kx̂
+    con.vx̂ .= vx̂
+    con.A_Ymin .= A_Ymin
+    con.A_Ymax .= A_Ymax
+    con.A_x̂min .= A_x̂min
+    con.A_x̂max .= A_x̂max
+    nUandΔŨ = length(con.Umin) + length(con.Umax) + length(con.ΔŨmin) + length(con.ΔŨmax)
+    con.A[nUandΔŨ+1:end, :] = [con.A_Ymin; con.A_Ymax; con.A_x̂min; con.A_x̂max]
+    A = con.A[con.i_b, :]
+    b = con.b[con.i_b]
+    ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
+    JuMP.delete(optim, optim[:linconstraint])
+    JuMP.unregister(optim, :linconstraint)
+    @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+    # --- quadratic programming Hessian matrix ---
+    H̃ = init_quadprog(model, mpc.Ẽ, mpc.S̃, mpc.M_Hp, mpc.Ñ_Hc, mpc.L_Hp)
+    mpc.H̃ .= H̃
+    set_objective_hessian!(mpc, ΔŨvar)
+    # --- operating points ---
+    for i in 0:Hp-1
+        mpc.Ŷop[(1+ny*i):(ny+ny*i)] .= model.yop
+        mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
+    end
+    return nothing
+end
+
+"No need to modify the Hessian by default (only needed for quadratic optimization)."
+set_objective_hessian!(::PredictiveController, _ ) = nothing

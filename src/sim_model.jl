@@ -76,13 +76,13 @@ function setop!(model::SimModel; uop = nothing, yop = nothing, dop = nothing)
 end
 
 """
-    setstate!(model::SimModel, x)
+    setstate!(model::SimModel, x) -> model
 
 Set `model.x` states to values specified by `x`. 
 """
 function setstate!(model::SimModel, x)
     size(x) == (model.nx,) || error("x size must be $((model.nx,))")
-    model.x[:] = x
+    model.x .= x
     return model
 end
 

@@ -49,9 +49,13 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
-        E, F, G, J, K, V = init_predmat(estim, model, Hp, Hc)
+        E, G, J, K, V = init_predmat(estim, model, Hp, Hc)
+        # dummy val (updated just before optimization):
+        F = zeros(NT, size(E, 1))
         S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
-        H̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        # dummy vals (updated just before optimization):
+        q̃, p = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         H̃_chol = cholesky(H̃)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
@@ -200,3 +204,31 @@ For [`ExplicitMPC`](@ref), add nothing to `info`.
 addinfo!(info, mpc::ExplicitMPC) = info
 
 
+"Update the prediction matrices and Cholesky factorization."
+function setmodel_controller!(mpc::ExplicitMPC, model::LinModel)
+    estim = mpc.estim
+    nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nu, mpc.Hp, mpc.Hc
+    # --- predictions matrices ---
+    E, G, J, K, V = init_predmat(estim, model, Hp, Hc)
+    mpc.Ẽ .= Ẽ
+    mpc.G .= G
+    mpc.J .= J
+    mpc.K .= K
+    mpc.V .= V
+    # --- quadratic programming Hessian matrix ---
+    H̃ = init_quadprog(model, mpc.Ẽ, mpc.S̃, mpc.M_Hp, mpc.Ñ_Hc, mpc.L_Hp)
+    mpc.H̃ .= H̃
+    set_objective_hessian!(mpc)
+    # --- operating points ---
+    for i in 0:Hp-1
+        mpc.Ŷop[(1+ny*i):(ny+ny*i)] .= model.yop
+        mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
+    end
+    return nothing
+end
+
+"Update the Cholesky factorization of the Hessian matrix."
+function set_objective_hessian!(mpc::ExplicitMPC)
+    mpc.H̃_chol .= cholesky(mpc.H̃)
+    return nothing
+end

@@ -57,9 +57,13 @@ struct LinMPC{
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
-        E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
+        E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
+        # dummy vals (updated just before optimization):
+        F, fx̂  = zeros(NT, size(E, 1)), zeros(NT, size(ex̂, 1))
         con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
-        H̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        # dummy vals (updated just before optimization):
+        q̃, p = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
@@ -251,13 +255,18 @@ function init_optimization!(mpc::LinMPC, model::LinModel, optim)
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
-    # --- quadratic optimization init ---
-    @objective(mpc.optim, Min, obj_quadprog(ΔŨvar, mpc.H̃, mpc.q̃))
+    set_objective_hessian!(mpc, ΔŨvar)
     return nothing
 end
 
 "For [`LinMPC`](@ref), set the QP linear coefficient `q̃` just before optimization."
 function set_objective_linear_coef!(mpc::LinMPC, ΔŨvar)
     JuMP.set_objective_coefficient(mpc.optim, ΔŨvar, mpc.q̃)
+    return nothing
+end
+
+"Update the quadratic objective function for [`LinMPC`](@ref) controllers."
+function set_objective_hessian!(mpc::LinMPC, ΔŨvar)
+    @objective(mpc.optim, Min, obj_quadprog(ΔŨvar, mpc.H̃, mpc.q̃))
     return nothing
 end

@@ -78,9 +78,14 @@ LinModel with a sample time Ts = 0.1 s and:
 
 # Extended Help
 !!! details "Extended Help"
-    State-space equations are similar if `sys` is discrete-time (replace ``\mathbf{ẋ}(t)``
-    with ``\mathbf{x}(k+1)`` and ``k`` with ``t`` on the LHS). Continuous dynamics are 
-    internally discretized using [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
+    The state-space equations are similar if `sys` is discrete-time:
+    ```math
+    \begin{aligned}
+        \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B z}(k) \\
+        \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D z}(k)
+    \end{aligned}
+    ```
+    Continuous dynamics are internally discretized using [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
     and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Lastly, if 
     `sys` is discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by
     using the aforementioned discretization methods.
