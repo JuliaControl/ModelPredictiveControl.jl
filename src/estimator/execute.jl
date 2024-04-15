@@ -236,12 +236,25 @@ end
 """
     setmodel!(estim::StateEstimator, model::LinModel) -> estim
 
-Set `estim.model` state-space matrices and operating points to `model` values.
+Set model and operating points of `estim` [`StateEstimator`](@ref) to `model` values.
 
 Only [`LinModel`](@ref) objects are supported. Also not supported by [`Luenberger`](@ref) 
 and [`SteadyKalmanFilter`](@ref) estimators, use the time-varying [`KalmanFilter`](@ref)
 instead. The matrix dimensions and sample time must stay the same. The observability and
 controllability of the new augmented model is not verified.
+
+# Examples
+```jldoctest
+julia> kf = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
+
+julia> kf.model.A
+1×1 Matrix{Float64}:
+ 0.1
+
+julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); kf.model.A
+1×1 Matrix{Float64}:
+ 0.42
+```
 """
 function setmodel!(estim::StateEstimator, model::LinModel)
     validate_model(estim, model)

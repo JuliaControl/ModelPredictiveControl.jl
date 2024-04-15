@@ -483,11 +483,29 @@ Set the estimate at `mpc.estim.x̂`.
 setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
 
 
-
 """
     setmodel!(mpc::PredictiveController, model::LinModel) -> mpc
 
-Set `mpc.estim.model` to `model` and update the prediction matrices.
+Set model and operating points of `mpc` [`PredictiveController`](@ref) to `model` values.
+
+The [`StateEstimator`](@ref) `mpc.estim` cannot be a [`Luenberger`](@ref) observer or a
+[`SteadyKalmanFilter`](@ref), the default estimator for controllers based on [`LinModel`](@ref).
+Construct the `mpc` object with a time-varying [`KalmanFilter`](@ref) instead.
+
+# Examples
+```jldoctest
+julia> kf = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
+
+julia> mpc = LinMPC(kf);
+
+julia> mpc.estim.model.A
+1×1 Matrix{Float64}:
+ 0.1
+
+julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); kf.model.A
+1×1 Matrix{Float64}:
+ 0.42
+```
 """
 function setmodel!(mpc::PredictiveController, model::LinModel)
     setmodel!(mpc.estim, model)
