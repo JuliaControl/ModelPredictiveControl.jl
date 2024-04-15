@@ -43,8 +43,8 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
         # convert `Diagonal` to normal `Matrix` if required:
         M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
-        N_Hc = Hermitian(convert(Matrix{NT}, M_Hp), :L)
-        L_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L)
+        N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
+        L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
