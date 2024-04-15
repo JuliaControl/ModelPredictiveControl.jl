@@ -41,10 +41,10 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         Cwt = Inf # no slack variable ϵ for ExplicitMPC
         Ewt = 0   # economic costs not supported for ExplicitMPC
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-        # Matrix() call is needed to convert `Diagonal` to normal `Matrix`
-        M_Hp = Hermitian(Matrix{NT}(M_Hp), :L) 
-        N_Hc = Hermitian(Matrix{NT}(N_Hc), :L)
-        L_Hp = Hermitian(Matrix{NT}(L_Hp), :L)
+        # convert `Diagonal` to normal `Matrix` if required:
+        M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
+        N_Hc = Hermitian(convert(Matrix{NT}, M_Hp), :L)
+        L_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
