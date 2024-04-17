@@ -21,30 +21,30 @@ julia> y = model()
 abstract type SimModel{NT<:Real} end
 
 @doc raw"""
-    setop!(model::SimModel; uop=nothing, yop=nothing, dop=nothing) -> model
+    setop!(model::SimModel; uop=nothing, yop=nothing, dop=nothing, xop=nothing) -> model
 
-Set `model` inputs `uop`, outputs `yop` and measured disturbances `dop` operating points.
+Set `model` input `uop`, output `yop`, meas. dist. `dop` and state `xop` operating points.
 
 The state-space model with operating points (a.k.a. nominal values) is:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{A x}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) \\
-    \mathbf{y_0}(k) &= \mathbf{C x}(k) + \mathbf{D_d d_0}(k)
+    \mathbf{x_0}(k+1) &= \mathbf{A x_0}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) + \mathbf{x_{op}} \\
+    \mathbf{y}(k)     &= \mathbf{C x_0}(k) + \mathbf{D_d d_0}(k) + \mathbf{y_{op}}
 \end{aligned}
 ```
-in which the `uop`, `yop` and `dop` vectors evaluate:
+in which the `uop` and `dop` vectors evaluate:
 ```math
 \begin{aligned}
     \mathbf{u_0}(k) &= \mathbf{u}(k) - \mathbf{u_{op}} \\
-    \mathbf{y_0}(k) &= \mathbf{y}(k) - \mathbf{y_{op}} \\
-    \mathbf{d_0}(k) &= \mathbf{d}(k) - \mathbf{d_{op}} 
+    \mathbf{d_0}(k) &= \mathbf{d}(k) - \mathbf{d_{op}} \\
 \end{aligned}
 ```
-The structure is similar if `model` is a `NonLinModel`:
+The state update operating point `xop` is generally zero (internally used by [`linearize`](@ref)
+for non-equilibrium points). The structure is similar if `model` is a `NonLinModel`:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{f}\Big(\mathbf{x}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big)\\
-    \mathbf{y_0}(k) &= \mathbf{h}\Big(\mathbf{x}(k), \mathbf{d_0}(k)\Big)
+    \mathbf{x_0}(k+1) &= \mathbf{f}\Big(\mathbf{x_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) + \mathbf{x_{op}}\\
+    \mathbf{y}(k)     &= \mathbf{h}\Big(\mathbf{x_0}(k), \mathbf{d_0}(k)\Big) + \mathbf{y_{op}}
 \end{aligned}
 ```
 
@@ -56,10 +56,14 @@ LinModel with a sample time Ts = 2.0 s and:
  1 states x
  1 outputs y
  0 measured disturbances d
+
+julia> model()
+1-element Vector{Float64}:
+ 20.0
 ```
 
 """
-function setop!(model::SimModel; uop = nothing, yop = nothing, dop = nothing)
+function setop!(model::SimModel; uop=nothing, yop=nothing, dop=nothing, xop=nothing)
     if !isnothing(uop) 
         size(uop) == (model.nu,) || error("uop size must be $((model.nu,))")
         model.uop[:] = uop
@@ -71,6 +75,10 @@ function setop!(model::SimModel; uop = nothing, yop = nothing, dop = nothing)
     if !isnothing(dop)
         size(dop) == (model.nd,) || error("dop size must be $((model.nd,))")
         model.dop[:] = dop
+    end
+    if !isnothing(xop)
+        size(xop) == (model.nx,) || error("xop size must be $((model.nx,))")
+        model.xop[:] = xop
     end
     return model
 end
@@ -148,6 +156,7 @@ function updatestate!(model::SimModel{NT}, u, d=empty(model.x)) where NT <: Real
     validate_args(model::SimModel, d, u)
     xnext = Vector{NT}(undef, model.nx)
     f!(xnext, model, model.x, u - model.uop, d - model.dop)
+    xnext .+= model.xop
     model.x .= xnext
     return model.x
 end

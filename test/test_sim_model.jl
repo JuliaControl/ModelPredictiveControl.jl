@@ -242,18 +242,36 @@ end
 
     f1!(ẋ, x, u, d) = (ẋ .= x.^5 + u.^4 + d.^3; nothing)
     h1!(y, x, d) = (y .= x.^2 + d; nothing)
-    nonlinmodel2 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=RungeKutta())
-    linmodel3 = linearize(nonlinmodel2; x, u, d)
-    u0, d0 = u - nonlinmodel2.uop, d - nonlinmodel2.dop
-    xnext, y = similar(nonlinmodel2.x), similar(nonlinmodel2.yop)
-    A  = ForwardDiff.jacobian((xnext, x)  -> nonlinmodel2.f!(xnext, x, u0, d0), xnext, x)
-    Bu = ForwardDiff.jacobian((xnext, u0) -> nonlinmodel2.f!(xnext, x, u0, d0), xnext, u0)
-    Bd = ForwardDiff.jacobian((xnext, d0) -> nonlinmodel2.f!(xnext, x, u0, d0), xnext, d0)
-    C  = ForwardDiff.jacobian((y, x)  -> nonlinmodel2.h!(y, x, d0), y, x)
-    Dd = ForwardDiff.jacobian((y, d0) -> nonlinmodel2.h!(y, x, d0), y, d0)
+    nonlinmodel3 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=RungeKutta())
+    linmodel3 = linearize(nonlinmodel3; x, u, d)
+    u0, d0 = u - nonlinmodel3.uop, d - nonlinmodel3.dop
+    xnext, y = similar(nonlinmodel3.x), similar(nonlinmodel3.yop)
+    A  = ForwardDiff.jacobian((xnext, x)  -> nonlinmodel3.f!(xnext, x, u0, d0), xnext, x)
+    Bu = ForwardDiff.jacobian((xnext, u0) -> nonlinmodel3.f!(xnext, x, u0, d0), xnext, u0)
+    Bd = ForwardDiff.jacobian((xnext, d0) -> nonlinmodel3.f!(xnext, x, u0, d0), xnext, d0)
+    C  = ForwardDiff.jacobian((y, x)  -> nonlinmodel3.h!(y, x, d0), y, x)
+    Dd = ForwardDiff.jacobian((y, d0) -> nonlinmodel3.h!(y, x, d0), y, d0)
     @test linmodel3.A  ≈ A
     @test linmodel3.Bu ≈ Bu
     @test linmodel3.Bd ≈ Bd
     @test linmodel3.C  ≈ C
     @test linmodel3.Dd ≈ Dd
+
+    # test `linearize` at a non-equilibrium point:
+    N = 5
+    x, u, d = [0.2], [0.0], [0.0]
+    Ynl = zeros(N)
+    Yl  = zeros(N)
+    setstate!(nonlinmodel3, x)
+    linmodel3 = linearize(nonlinmodel3; x, u, d)
+    for i=1:N
+        ynl = nonlinmodel3(d)
+        yl  = linmodel3(d)
+        Ynl[i] = ynl[1]
+        Yl[i]  = yl[1]
+        linmodel3 = linearize(nonlinmodel3; u, d)
+        updatestate!(nonlinmodel3, u, d)
+        updatestate!(linmodel3, u, d)
+    end
+    @test all(isapprox.(Ynl, Yl, atol=1e-6))
 end

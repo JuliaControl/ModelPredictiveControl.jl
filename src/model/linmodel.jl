@@ -13,6 +13,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     uop::Vector{NT}
     yop::Vector{NT}
     dop::Vector{NT}
+    xop::Vector{NT}
     function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
         A, Bu = to_mat(A, 1, 1), to_mat(Bu, 1, 1)
         nu, nx = size(Bu, 2), size(A, 2)
@@ -31,8 +32,9 @@ struct LinModel{NT<:Real} <: SimModel{NT}
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
+        xop = zeros(NT, nx)
         x = zeros(NT, nx)
-        return new(A, Bu, C, Bd, Dd, x, Ts, nu, nx, ny, nd, uop, yop, dop)
+        return new(A, Bu, C, Bd, Dd, x, Ts, nu, nx, ny, nd, uop, yop, dop, xop)
     end
 end
 
@@ -225,7 +227,7 @@ disturbances ``\mathbf{d_0 = d - d_{op}}``. The Moore-Penrose pseudo-inverse com
 function steadystate!(model::LinModel, u, d)
     M = I - model.A
     rtol = sqrt(eps(real(float(oneunit(eltype(M)))))) # pinv docstring recommendation
-    model.x .= pinv(M; rtol)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
+    model.x .= pinv(M; rtol)*(model.Bu*(u-model.uop) + model.Bd*(d-model.dop) + model.xop)
     return nothing
 end
 

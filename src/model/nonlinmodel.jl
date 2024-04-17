@@ -11,6 +11,7 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
     uop::Vector{NT}
     yop::Vector{NT}
     dop::Vector{NT}
+    xop::Vector{NT}
     function NonLinModel{NT, F, H, DS}(
         f!::F, h!::H, solver::DS, Ts, nu, nx, ny, nd
     ) where {NT<:Real, F<:Function, H<:Function, DS<:DiffSolver}
@@ -18,8 +19,9 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
+        xop = zeros(NT, nx)
         x = zeros(NT, nx)
-        return new{NT, F, H, DS}(x, f!, h!, solver, Ts, nu, nx, ny, nd, uop, yop, dop)
+        return new{NT, F, H, DS}(x, f!, h!, solver, Ts, nu, nx, ny, nd, uop, yop, dop, xop)
     end
 end
 
