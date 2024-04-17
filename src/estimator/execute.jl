@@ -148,7 +148,7 @@ measured outputs ``\mathbf{y^m}``.
 function init_estimate!(estim::StateEstimator, ::LinModel, u, ym, d)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     Ĉm, D̂dm = Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
-    estim.x̂[:] = [(I - Â); Ĉm]\[B̂u*u + B̂d*d; ym - D̂dm*d]
+    estim.x̂[:] = [(I - Â); Ĉm]\[B̂u*u + B̂d*d + estim.x̂op; ym - D̂dm*d]
     return nothing
 end
 """
@@ -205,9 +205,11 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
 """
 function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
     validate_args(estim, u, ym, d)
+    x̂ = estim.x̂
     u0, ym0, d0 = remove_op!(estim, u, ym, d) 
     update_estimate!(estim, u0, ym0, d0)
-    return estim.x̂
+    x̂ .+= estim.x̂op
+    return x̂
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
@@ -258,6 +260,7 @@ julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); kf.model.A
 """
 function setmodel!(estim::StateEstimator, model::LinModel)
     validate_model(estim, model)
+    nx = model.nx
     estim.model.A   .= model.A
     estim.model.Bu  .= model.Bu
     estim.model.C   .= model.C
@@ -266,6 +269,8 @@ function setmodel!(estim::StateEstimator, model::LinModel)
     estim.model.uop .= model.uop
     estim.model.yop .= model.yop
     estim.model.dop .= model.dop
+    estim.model.xop .= model.xop
+    estim.x̂op[1:nx] .= model.xop
     setmodel_estimator!(estim, model)
     return estim
 end

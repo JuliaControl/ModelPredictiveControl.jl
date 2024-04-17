@@ -1,7 +1,8 @@
 struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     model::SM
     lastu0::Vector{NT}
-    x̂::Vector{NT}
+    x̂op::Vector{NT}
+    x̂  ::Vector{NT}
     x̂d::Vector{NT}
     x̂s::Vector{NT}
     i_ym::Vector{Int}
@@ -31,11 +32,12 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         Â, B̂u, Ĉ, B̂d, D̂d = matrices_internalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         lastu0 = zeros(NT, model.nu)
+        x̂op = copy(model.xop)
         x̂d = x̂ = zeros(NT, model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
         x̂s = zeros(NT, nxs)
         return new{NT, SM}(
             model, 
-            lastu0, x̂, x̂d, x̂s, 
+            lastu0, x̂op, x̂, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d,
@@ -255,7 +257,7 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 """
 function init_estimate!(estim::InternalModel, model::LinModel{NT}, u, ym, d) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
-    x̂d .= (I - model.A)\(model.Bu*u + model.Bd*d)
+    x̂d .= (I - model.A)\(model.Bu*u + model.Bd*d + estim.x̂op) # also updates estim.x̂
     ŷd = Vector{NT}(undef, model.ny)
     h!(ŷd, model, x̂d, d)
     ŷs = zeros(NT, model.ny)

@@ -1,7 +1,8 @@
 struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     model::SM
     lastu0::Vector{NT}
-    x̂::Vector{NT}
+    x̂op::Vector{NT}
+    x̂  ::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
@@ -36,10 +37,11 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         end
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         lastu0 = zeros(NT, model.nu)
+        x̂op = [model.xop; zeros(NT, nxs)]
         x̂ = [zeros(NT, model.nx); zeros(NT, nxs)]
         return new{NT, SM}(
             model, 
-            lastu0, x̂,
+            lastu0, x̂op, x̂,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,

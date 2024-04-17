@@ -376,7 +376,7 @@ end
 
 
 @doc raw"""
-    init_predmat(estim, ::LinModel, Hp, Hc, =true) -> E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
+    init_predmat(estim, model::LinModel, Hp, Hc) -> E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
 
 Construct the prediction matrices for [`LinModel`](@ref) `model`.
 

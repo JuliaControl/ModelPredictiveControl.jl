@@ -43,11 +43,11 @@ julia> linmodel.A
     its linearization at the points ``\mathbf{x̄, ū}`` and ``\mathbf{d̄}`` is:
     ```math
     \begin{align*}
-        \mathbf{x_0}(k+1) &≈ \mathbf{A}(k) \mathbf{x_0}(k) 
-                                + \mathbf{B_u}(k) \big(\mathbf{u}(k) - \mathbf{ū}\big) 
-                                + \mathbf{B_d}(k) \big(\mathbf{d}(k) - \mathbf{d̄}\big)  
+        \mathbf{x_0}(k+1) &≈ \mathbf{A} \mathbf{x_0}(k) 
+                                + \mathbf{B_u} \big(\mathbf{u}(k) - \mathbf{ū}\big) 
+                                + \mathbf{B_d} \big(\mathbf{d}(k) - \mathbf{d̄}\big)  
                                 + \mathbf{f\big(x̄, ū, d̄\big)} - \mathbf{x̄}               \\
-        \mathbf{y}(k)     &≈ \mathbf{C}(k) \mathbf{x_0}(k) 
+        \mathbf{y}(k)     &≈ \mathbf{C} \mathbf{x_0}(k) 
                                 + \mathbf{D_d} \big(\mathbf{d}(k) - \mathbf{d̄}\big)
                                 + \mathbf{h\big(x̄, d̄\big)}
     \end{align*}
@@ -55,11 +55,11 @@ julia> linmodel.A
     in which the Jacobians are:
     ```math
     \begin{align*}
-        \mathbf{A}(k)   &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{x}} \right|_{\mathbf{x = x̄,\, u = ū,\, d = x̄}} \\
-        \mathbf{B_u}(k) &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{u}} \right|_{\mathbf{x = x̄,\, u = ū,\, d = x̄}} \\
-        \mathbf{B_d}(k) &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{d}} \right|_{\mathbf{x = x̄,\, u = ū,\, d = x̄}} \\
-        \mathbf{C}(k)   &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{x}}    \right|_{\mathbf{x = x̄,\, d = x̄}}          \\
-        \mathbf{D_d}(k) &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{d}}    \right|_{\mathbf{x = x̄,\, d = x̄}}
+        \mathbf{A}   &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{x}} \right|_{\mathbf{x = x̄,\, u = ū,\, d = d̄}} \\
+        \mathbf{B_u} &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{u}} \right|_{\mathbf{x = x̄,\, u = ū,\, d = d̄}} \\
+        \mathbf{B_d} &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{d}} \right|_{\mathbf{x = x̄,\, u = ū,\, d = d̄}} \\
+        \mathbf{C}   &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{x}}    \right|_{\mathbf{x = x̄,\, d = d̄}}          \\
+        \mathbf{D_d} &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{d}}    \right|_{\mathbf{x = x̄,\, d = d̄}}
     \end{align*}
     ```
     Following [`setop!`](@ref) notation, we find:
