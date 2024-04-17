@@ -57,7 +57,7 @@ LinModel with a sample time Ts = 2.0 s and:
  1 outputs y
  0 measured disturbances d
 
-julia> model()
+julia> y = model()
 1-element Vector{Float64}:
  20.0
 ```
