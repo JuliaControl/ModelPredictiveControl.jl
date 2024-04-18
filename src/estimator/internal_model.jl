@@ -204,9 +204,9 @@ end
 setmodel_estimator!(estim::InternalModel, ::LinModel) = nothing
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂0)) -> x̂d
+    update_estimate!(estim::InternalModel, u, ym, d=[])
 
-Update `estim.x̂` / `x̂d` / `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
 
 The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂s` estimates with:
 ```math
@@ -227,7 +227,7 @@ function update_estimate!(
     ŷd, x̂dnext = Vector{NT}(undef, model.ny), Vector{NT}(undef, model.nx)
     h!(ŷd, model, x̂d, d)
     f!(x̂dnext, model, x̂d, u, d) 
-    x̂d .= x̂dnext # this also updates estim.x̂ (they are the same object)
+    x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = Vector{NT}(undef, estim.nxs)
     ŷs = zeros(NT, model.ny)
@@ -239,11 +239,11 @@ function update_estimate!(
 end
 
 @doc raw"""
-    init_estimate!(estim::InternalModel, model::LinModel, u, ym, d)
+    init_estimate!(estim::InternalModel, model::LinModel, u0, ym0, d0)
 
-Init `estim.x̂` / `x̂d` / `x̂s` estimate at steady-state for [`InternalModel`](@ref)s.
+Init `estim.x̂0`/`x̂d`/`x̂s` estimate at steady-state for [`InternalModel`](@ref).
 
-The deterministic estimates `estim.x̂d` start at steady-state using `u` and `d` arguments:
+The deterministic estimates `estim.x̂d` start at steady-state using `u0` and `d0` arguments:
 ```math
     \mathbf{x̂_d} = \mathbf{(I - A)^{-1} (B_u u + B_d d)}
 ```
@@ -256,13 +256,14 @@ of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmea
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See
 [`init_internalmodel`](@ref) for details.
 """
-function init_estimate!(estim::InternalModel, model::LinModel{NT}, u, ym, d) where NT<:Real
+function init_estimate!(estim::InternalModel, model::LinModel{NT}, u0, ym0, d0) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
-    x̂d .= (I - model.A)\(model.Bu*u + model.Bd*d + estim.x̂op) # also updates estim.x̂
-    ŷd = Vector{NT}(undef, model.ny)
-    h!(ŷd, model, x̂d, d)
+    # also updates estim.x̂0 (they are the same object):
+    x̂d .= (I - model.A)\(model.Bu*u0 + model.Bd*d0 - estim.f̂op + estim.x̂op)
+    ŷd0 = Vector{NT}(undef, model.ny)
+    h!(ŷd0, model, x̂d, d0)
     ŷs = zeros(NT, model.ny)
-    ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
+    ŷs[estim.i_ym] = ym0 - ŷd0[estim.i_ym]  # ŷs=0 for unmeasured outputs
     x̂s .= (I-estim.Âs)\estim.B̂s*ŷs
     return nothing
 end

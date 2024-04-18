@@ -279,8 +279,8 @@ function sim_closedloop!(
         Ud_data[:, i] = ud
         Ru_data[:, i] = ru
         D_data[:, i]  = d
-        X_data[:, i]  = plant.x
-        X̂_data[:, i]  = estim.x̂
+        X_data[:, i] .= plant.x0 .+ plant.xop
+        X̂_data[:, i] .= estim.x̂0 .+ estim.x̂op
         x = updatestate!(plant, ud, d); 
         x[:] += x_noise.*randn(plant.nx)
         updatestate!(est_mpc, u, ym, d)

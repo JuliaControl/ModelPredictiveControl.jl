@@ -17,7 +17,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
 end
 
 @doc raw"""
-    update_estimate!(estim::MovingHorizonEstimator, u, ym, d)
+    update_estimate!(estim::MovingHorizonEstimator, u, ym, d=[])
     
 Update [`MovingHorizonEstimator`](@ref) state `estim.x̂`.
 
@@ -29,7 +29,9 @@ arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is
 with the equations of [`update_estimate!(::ExtendedKalmanFilter)`](@ref), or `KalmanFilter`,
 for `LinModel`.
 """
-function update_estimate!(estim::MovingHorizonEstimator{NT}, u, ym, d) where NT<:Real
+function update_estimate!(
+    estim::MovingHorizonEstimator{NT}, u, ym, d=empty(estim.x̂)
+) where NT<:Real
     model, optim, x̂ = estim.model, estim.optim, estim.x̂
     add_data_windows!(estim::MovingHorizonEstimator, u, d, ym)
     initpred!(estim, model)

@@ -104,13 +104,13 @@ end
 
 
 """
-    update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂0))
+    update_estimate!(estim::Luenberger, u, ym, d=[])
 
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂0))
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
-    x̂, K̂ = estim.x̂, estim.K̂
+    x̂, K̂ = estim.x̂0, estim.K̂
     ŷm, x̂next = similar(ym), similar(x̂)
     # in-place operations to reduce allocations:
     mul!(ŷm, Ĉm, x̂) 

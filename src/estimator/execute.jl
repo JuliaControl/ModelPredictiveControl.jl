@@ -89,7 +89,7 @@ removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!
   using `u` and `d` arguments, and uses the `ym` argument to enforce that 
   ``\mathbf{ŷ^m}(0) = \mathbf{y^m}(0)``. For control applications, this solution produces a
   bumpless manual to automatic transfer. See [`init_estimate!`](@ref) for details.
-- Else, `estim.x̂` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
+- Else, `estim.x̂0` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
 
 If applicable, it also sets the error covariance `estim.P̂` to `estim.P̂0`.
 

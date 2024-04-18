@@ -176,7 +176,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::SteadyKalmanFilter, u, ym, d)
+    update_estimate!(estim::SteadyKalmanFilter, u, ym, d=[])
 
 Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`.
 
@@ -329,7 +329,7 @@ function KalmanFilter(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {N
 end
 
 @doc raw"""
-    update_estimate!(estim::KalmanFilter, u, ym, d)
+    update_estimate!(estim::KalmanFilter, u, ym, d=[])
 
 Update [`KalmanFilter`](@ref) state `estim.x̂0` and estimation error covariance `estim.P̂`.
 
@@ -353,7 +353,7 @@ control period ``k-1``. See [^2] for details.
 [^2]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
      Linear Dynamical Systems*, <https://web.stanford.edu/class/ee363/lectures/kf.pdf>.
 """
-function update_estimate!(estim::KalmanFilter, u, ym, d)
+function update_estimate!(estim::KalmanFilter, u, ym, d=empty(estim.x̂0))
     return update_estimate_kf!(estim, u, ym, d, estim.Â, estim.Ĉm, estim.P̂, estim.x̂0)
 end
 
@@ -546,7 +546,7 @@ function init_ukf(::SimModel{NT}, nx̂, α, β, κ) where {NT<:Real}
 end
 
 @doc raw"""
-    update_estimate!(estim::UnscentedKalmanFilter, u, ym, d)
+    update_estimate!(estim::UnscentedKalmanFilter, u, ym, d=[])
     
 Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂0` and covariance estimate `estim.P̂`.
 
@@ -585,7 +585,9 @@ noise, respectively.
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, <https://doi.org/10.1002/0470045345.ch14>, 
      ISBN9780470045343.
 """
-function update_estimate!(estim::UnscentedKalmanFilter{NT}, u, ym, d) where NT<:Real
+function update_estimate!(
+    estim::UnscentedKalmanFilter{NT}, u, ym, d=empty(estim.x̂0)
+) where NT<:Real
     x̂, P̂, Q̂, R̂, K̂, M̂ = estim.x̂0, estim.P̂, estim.Q̂, estim.R̂, estim.K̂, estim.M̂
     nym, nx̂ = estim.nym, estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
@@ -767,7 +769,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=empty(estim.x̂0))
+    update_estimate!(estim::ExtendedKalmanFilter, u, ym, d=[])
 
 Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂0` and covariance `estim.P̂`.
 
