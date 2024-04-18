@@ -79,6 +79,9 @@ for more detailed examples.
 
 - [x] linear and nonlinear plant models exploiting multiple dispatch
 - [x] model linearization based on automatic differentiation (exact Jacobians)
+- [ ] adaptive linear model predictive controller
+  - [x] manual model modification
+  - [ ] automatic successive linearization of a nonlinear model
 - [x] supported objective function terms:
   - [x] output setpoint tracking
   - [x] move suppression
@@ -86,7 +89,7 @@ for more detailed examples.
   - [x] terminal costs
   - [x] economic costs (economic model predictive control)
 - [x] explicit predictive controller for problems without constraint
-- [x] soft and hard constraints on:
+- [x] online-tunable soft and hard constraints on:
   - [x] output predictions
   - [x] manipulated inputs
   - [x] manipulated inputs increments
@@ -126,7 +129,7 @@ for more detailed examples.
 - [x] moving horizon estimator in two formulations:
   - [x] linear plant models (quadratic optimization)
   - [x] nonlinear plant models (nonlinear optimization)
-- [x] moving horizon estimator soft and hard constraints on:
+- [x] moving horizon estimator online-tunable soft and hard constraints on:
   - [x] state estimates
   - [x] process noise estimates
   - [x] sensor noise estimates
