@@ -53,4 +53,5 @@ setop!
 
 ```@docs
 linearize
+linearize!
 ```

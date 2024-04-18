@@ -2,6 +2,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     model::SM
     lastu0::Vector{NT}
     x̂op::Vector{NT}
+    f̂op::Vector{NT}
     x̂  ::Vector{NT}
     x̂d::Vector{NT}
     x̂s::Vector{NT}
@@ -32,12 +33,12 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         Â, B̂u, Ĉ, B̂d, D̂d = matrices_internalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         lastu0 = zeros(NT, model.nu)
-        x̂op = copy(model.xop)
+        x̂op = copy(model.xop), copy(model.fop)
         x̂d = x̂ = zeros(NT, model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
         x̂s = zeros(NT, nxs)
         return new{NT, SM}(
             model, 
-            lastu0, x̂op, x̂, x̂d, x̂s, 
+            lastu0, x̂op, f̂op, x̂, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d,
@@ -203,7 +204,7 @@ end
 setmodel_estimator!(estim::InternalModel, ::LinModel) = nothing
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂)) -> x̂d
+    update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂0)) -> x̂d
 
 Update `estim.x̂` / `x̂d` / `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
 
@@ -218,7 +219,7 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 [`init_internalmodel`](@ref) for details. 
 """
 function update_estimate!(
-    estim::InternalModel{NT, SM}, u, ym, d=empty(estim.x̂)
+    estim::InternalModel{NT, SM}, u, ym, d=empty(estim.x̂0)
 ) where {NT<:Real, SM}
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s

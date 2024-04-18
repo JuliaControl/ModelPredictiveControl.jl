@@ -80,9 +80,9 @@ end
 @doc raw"""
     initstate!(estim::StateEstimator, u, ym, d=[]) -> x̂
 
-Init `estim.x̂` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
+Init `estim.x̂0` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
-The method tries to find a good stead-state for the initial esitmate ``\mathbf{x̂}(0)``. It
+The method tries to find a good stead-state for the initial estimate ``\mathbf{x̂}(0)``. It
 removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!`](@ref):
 
 - If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
@@ -109,9 +109,8 @@ true
 julia> evaloutput(estim) ≈ y
 true
 ```
-
 """
-function initstate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
+function initstate!(estim::StateEstimator, u, ym, d=empty(estim.x̂0))
     # --- validate arguments ---
     validate_args(estim, u, ym, d)
     # --- init state estimate ----
@@ -119,49 +118,50 @@ function initstate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
     init_estimate!(estim, estim.model, u0, ym0, d0)
     # --- init covariance error estimate, if applicable ---
     init_estimate_cov!(estim, u0, ym0, d0)
-    return estim.x̂
+    x̂ = estim.x̂0 + estim.x̂op
+    return x̂
 end
 
 "By default, [`StateEstimator`](@ref)s do not need covariance error estimate."
 init_estimate_cov!(::StateEstimator, _ , _ , _ ) = nothing
 
 @doc raw"""
-    init_estimate!(estim::StateEstimator, model::LinModel, u, ym, d)
+    init_estimate!(estim::StateEstimator, model::LinModel, u0, ym0, d0)
 
-Init `estim.x̂` estimate with the steady-state solution if `model` is a [`LinModel`](@ref).
+Init `estim.x̂0` estimate with the steady-state solution if `model` is a [`LinModel`](@ref).
 
-Using `u`, `ym` and `d` arguments, the steady-state problem combined to the equality 
-constraint ``\mathbf{ŷ^m} = \mathbf{y^m}`` engenders the following system to solve:
+Using `u0`, `ym0` and `d0` arguments, the steady-state problem combined to the equality 
+constraint ``\mathbf{ŷ_0^m} = \mathbf{y_0^m}`` engenders the following system to solve:
 ```math
 \begin{bmatrix}
-    \mathbf{I} - \mathbf{Â}             \\
+    \mathbf{I} - \mathbf{Â}                         \\
     \mathbf{Ĉ^m}
-\end{bmatrix} \mathbf{x̂} =
+\end{bmatrix} \mathbf{x̂_0} =
 \begin{bmatrix}
-    \mathbf{B̂_u u} + \mathbf{B̂_d d}     \\
-    \mathbf{y^m} - \mathbf{D̂_d^m d}
+    \mathbf{B̂_u u_0 + B̂_d d_0 + f̂_{op} - x̂_{op}}    \\
+    \mathbf{y_0^m - D̂_d^m d_0}
 \end{bmatrix}
 ```
 in which ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of `estim.Ĉ, estim.D̂d`  that correspond to 
 measured outputs ``\mathbf{y^m}``.
 """
-function init_estimate!(estim::StateEstimator, ::LinModel, u, ym, d)
+function init_estimate!(estim::StateEstimator, ::LinModel, u0, ym0, d0)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
-    Ĉm, D̂dm = Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
-    estim.x̂[:] = [(I - Â); Ĉm]\[B̂u*u + B̂d*d + estim.x̂op; ym - D̂dm*d]
+    Ĉm, D̂dm   = Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
+    estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; ym0 - D̂dm*d0]
     return nothing
 end
 """
     init_estimate!(estim::StateEstimator, model::SimModel, _ , _ , _ )
 
-Left `estim.x̂` estimate unchanged if `model` is not a [`LinModel`](@ref).
+Left `estim.x̂0` estimate unchanged if `model` is not a [`LinModel`](@ref).
 """
 init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
 
 @doc raw"""
     evaloutput(estim::StateEstimator, d=[]) -> ŷ
 
-Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂` states and disturbances `d`.
+Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂0` states and disturbances `d`.
 
 Calling a [`StateEstimator`](@ref) object calls this `evaloutput` method.
 
@@ -174,21 +174,23 @@ julia> ŷ = evaloutput(kf)
  20.0
 ```
 """
-function evaloutput(estim::StateEstimator{NT}, d=empty(estim.x̂)) where NT <: Real
+function evaloutput(estim::StateEstimator{NT}, d=empty(estim.x̂0)) where NT <: Real
     validate_args(estim.model, d)
-    ŷ = Vector{NT}(undef, estim.model.ny)
-    ĥ!(ŷ, estim, estim.model, estim.x̂, d - estim.model.dop)
+    ŷ0 = Vector{NT}(undef, estim.model.ny)
+    d0 = d - estim.model.dop
+    ĥ!(ŷ0, estim, estim.model, estim.x̂0, d0)
+    ŷ   = ŷ0
     ŷ .+= estim.model.yop
     return ŷ
 end
 
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
-(estim::StateEstimator)(d=empty(estim.x̂)) = evaloutput(estim, d)
+(estim::StateEstimator)(d=empty(estim.x̂0)) = evaloutput(estim, d)
 
 @doc raw"""
     updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂
 
-Update `estim.x̂` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
+Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
 
 The method removes the operating points with [`remove_op!`](@ref) and call 
 [`update_estimate!`](@ref).
@@ -203,13 +205,12 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
  0.0
 ```
 """
-function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂))
+function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂0))
     validate_args(estim, u, ym, d)
-    x̂ = estim.x̂
     u0, ym0, d0 = remove_op!(estim, u, ym, d) 
     update_estimate!(estim, u0, ym0, d0)
-    x̂ .+= estim.x̂op
-    return x̂
+    estim.x̂0 .+= estim.f̂op .- estim.x̂op
+    return estim.x̂0 + estim.x̂op
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
@@ -227,11 +228,11 @@ end
 """
     setstate!(estim::StateEstimator, x̂) -> estim
 
-Set `estim.x̂` states to values specified by `x̂`. 
+Set `estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`. 
 """
 function setstate!(estim::StateEstimator, x̂)
     size(x̂) == (estim.nx̂,) || error("x̂ size must be $((estim.nx̂,))")
-    estim.x̂ .= x̂
+    estim.x̂0 .= x̂ .- estim.x̂op
     return estim
 end
 
@@ -242,8 +243,8 @@ Set model and operating points of `estim` [`StateEstimator`](@ref) to `model` va
 
 Only [`LinModel`](@ref) objects are supported. Also not supported by [`Luenberger`](@ref) 
 and [`SteadyKalmanFilter`](@ref) estimators, use the time-varying [`KalmanFilter`](@ref)
-instead. The matrix dimensions and sample time must stay the same. The observability and
-controllability of the new augmented model is not verified.
+instead. The matrix dimensions and sample time must stay the same. Note that the
+observability and controllability of the new augmented model is not verified.
 
 # Examples
 ```jldoctest
@@ -260,7 +261,7 @@ julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); kf.model.A
 """
 function setmodel!(estim::StateEstimator, model::LinModel)
     validate_model(estim, model)
-    nx = model.nx
+    # --- update model matrices and its operating points ---
     estim.model.A   .= model.A
     estim.model.Bu  .= model.Bu
     estim.model.C   .= model.C
@@ -270,7 +271,12 @@ function setmodel!(estim::StateEstimator, model::LinModel)
     estim.model.yop .= model.yop
     estim.model.dop .= model.dop
     estim.model.xop .= model.xop
-    estim.x̂op[1:nx] .= model.xop
+    estim.model.fop .= model.fop
+    # --- update state estimator and its operating points ---
+    estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
+    estim.x̂op[1:model.nx] .= model.xop
+    estim.f̂op[1:model.nx] .= model.fop
+    estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point    
     setmodel_estimator!(estim, model)
     return estim
 end

@@ -14,7 +14,10 @@ ModelPredictiveControl.ĥ!
 ## Constraint Relaxation
 
 ```@docs
-
+ModelPredictiveControl.relaxarrival
+ModelPredictiveControl.relaxX̂
+ModelPredictiveControl.relaxŴ
+ModelPredictiveControl.relaxV̂
 ```
 
 ## Estimator Construction
@@ -52,6 +55,12 @@ ModelPredictiveControl.evalŷ
 ModelPredictiveControl.remove_op!
 ```
 
+## Init Estimate
+
+```@docs
+ModelPredictiveControl.init_estimate!
+```
+
 ## Update Estimate
 
 !!! info
@@ -61,13 +70,4 @@ ModelPredictiveControl.remove_op!
 
 ```@docs
 ModelPredictiveControl.update_estimate!
-```
-
-## Init Estimate
-
-!!! info
-    Same as above: the arguments should be called `u0`, `ym0` and `d0`, strickly speaking.
-
-```@docs
-ModelPredictiveControl.init_estimate!
 ```

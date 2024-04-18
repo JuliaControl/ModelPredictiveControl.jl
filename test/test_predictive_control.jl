@@ -244,7 +244,7 @@ end
     for i=1:20
         y = model()
         u = moveinput!(mpc, [0, 0])
-        X_mpc[:,i] = model.x
+        X_mpc[:,i] = model.x0
         updatestate!(mpc, u, y)
         updatestate!(model, u)
     end

@@ -1,13 +1,12 @@
-
 """
-    LinModel(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
+    LinModel(model::NonLinModel; x=model.x0+model.xop, u=model.uop, d=model.dop)
 
 Call [`linearize(model; x, u, d)`](@ref) and return the resulting linear model.
 """
 LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 @doc raw"""
-    linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop) -> linmodel
+    linearize(model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop) -> linmodel
 
 Linearize `model` at the operating points `x`, `u`, `d` and return the [`LinModel`](@ref).
 
@@ -36,70 +35,98 @@ julia> linmodel.A
     With the nonlinear state-space model:
     ```math
     \begin{align*}
-        \mathbf{x}(k+1) &= \mathbf{f}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
+        \mathbf{x}(k+1) &= \mathbf{f}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big)  \\
         \mathbf{y}(k)   &= \mathbf{h}\Big(\mathbf{x}(k), \mathbf{d}(k)\Big)
     \end{align*}
     ```
-    its linearization at the points ``\mathbf{x̄, ū}`` and ``\mathbf{d̄}`` is:
+    its linearization at the operating point ``\mathbf{x_{op}, u_{op}, d_{op}}`` is:
     ```math
     \begin{align*}
-        \mathbf{x_0}(k+1) &≈ \mathbf{A} \mathbf{x_0}(k) 
-                                + \mathbf{B_u} \big(\mathbf{u}(k) - \mathbf{ū}\big) 
-                                + \mathbf{B_d} \big(\mathbf{d}(k) - \mathbf{d̄}\big)  
-                                + \mathbf{f\big(x̄, ū, d̄\big)} - \mathbf{x̄}               \\
-        \mathbf{y}(k)     &≈ \mathbf{C} \mathbf{x_0}(k) 
-                                + \mathbf{D_d} \big(\mathbf{d}(k) - \mathbf{d̄}\big)
-                                + \mathbf{h\big(x̄, d̄\big)}
+        \mathbf{x_0}(k+1) &≈ \mathbf{A x_0}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k)  
+                            + \mathbf{f(x_{op}, u_{op}, d_{op})} - \mathbf{x_{op}}         \\
+        \mathbf{y_0}(k)   &≈ \mathbf{C x_0}(k) + \mathbf{D_d d_0}(k) 
     \end{align*}
     ```
-    in which the Jacobians are:
+    based on the deviation vectors ``\mathbf{x_0, u_0, d_0, y_0}`` introduced in [`setop!`](@ref)
+    documentation, and the Jacobian matrices:
     ```math
     \begin{align*}
-        \mathbf{A}   &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{x}} \right|_{\mathbf{x = x̄,\, u = ū,\, d = d̄}} \\
-        \mathbf{B_u} &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{u}} \right|_{\mathbf{x = x̄,\, u = ū,\, d = d̄}} \\
-        \mathbf{B_d} &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{d}} \right|_{\mathbf{x = x̄,\, u = ū,\, d = d̄}} \\
-        \mathbf{C}   &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{x}}    \right|_{\mathbf{x = x̄,\, d = d̄}}          \\
-        \mathbf{D_d} &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{d}}    \right|_{\mathbf{x = x̄,\, d = d̄}}
+        \mathbf{A}   &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{x}} \right|_{\mathbf{x=x_{op},\, u=u_{op},\, d=d_{op}}} \\
+        \mathbf{B_u} &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{u}} \right|_{\mathbf{x=x_{op},\, u=u_{op},\, d=d_{op}}} \\
+        \mathbf{B_d} &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{d}} \right|_{\mathbf{x=x_{op},\, u=u_{op},\, d=d_{op}}} \\
+        \mathbf{C}   &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{x}}    \right|_{\mathbf{x=x_{op},\, d=d_{op}}}             \\
+        \mathbf{D_d} &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{d}}    \right|_{\mathbf{x=x_{op},\, d=d_{op}}}
     \end{align*}
     ```
     Following [`setop!`](@ref) notation, we find:
     ```math
-    \begin{align*}
-        \mathbf{u_{op}} &= \mathbf{ū}                         \\
-        \mathbf{d_{op}} &= \mathbf{d̄}                         \\
-        \mathbf{y_{op}} &= \mathbf{h\big(x̄, d̄\big)}           \\
-        \mathbf{x_{op}} &= \mathbf{f\big(x̄, ū, d̄\big)} - \mathbf{x̄}
+        \mathbf{f_{op}} &= \mathbf{f(x_{op}, u_{op}, d_{op})} \\
+        \mathbf{y_{op}} &= \mathbf{h(x_{op}, d_{op})}
     \end{align*}
     ```
-    Notice that ``\mathbf{x_{op} = 0}`` if the point is an equilibrium. The equations are
-    similar if the nonlinear model has nonzero operating points.
+    Notice that ``\mathbf{f_{op} - x_{op} = 0}`` if the point is an equilibrium. The 
+    equations are similar if the nonlinear model has nonzero operating points.
 
     Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and
     `h` functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
     for common mistakes when writing these functions.
 """
-function linearize(model::NonLinModel; x=model.x, u=model.uop, d=model.dop)
+function linearize(model::SimModel{NT}; kwargs...) where NT<:Real
+    nu, nx, ny, nd = model.nu, model.nx, model.ny, model.nd
+    A  = Matrix{NT}(undef, nx, nx)
+    Bu = Matrix{NT}(undef, nx, nu) 
+    C  = Matrix{NT}(undef, ny, nx)
+    Bd = Matrix{NT}(undef, nx, nd)
+    Dd = Matrix{NT}(undef, ny, nd)
+    linmodel = LinModel(A, Bu, C, Bd, Dd, model.Ts)
+    return linearize!(linmodel, model; kwargs...)
+end
+
+"""
+    linearize!(linmodel::LinModel, model::SimModel; <keyword arguments>) -> linmodel
+
+Linearize `model` and store the result in `linmodel`.
+
+The keyword arguments are identical to [`linearize`](@ref).
+
+# Examples
+```jldoctest
+julia> model = NonLinModel((x,u,_)->x.^3 + u, (x,_)->x, 0.1, 1, 1, 1, solver=nothing);
+
+julia> linmodel = linearize(model, x=[10.0], u=[0.0]); linmodel.A
+1×1 Matrix{Float64}:
+ 300.0
+
+julia> linearize!(linmodel, model, x=[20.0], u=[0.0]); linmodel.A
+1×1 Matrix{Float64}:
+ 1200.0
+"""
+function linearize!(
+    linmodel::LinModel, model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop
+)
     nonlinmodel = model
     u0, d0 = u - nonlinmodel.uop, d - nonlinmodel.dop
     xnext, y = similar(x), similar(nonlinmodel.yop)
-    # --- compute the nonlinear model output at linearization points ---
+    # --- compute the nonlinear model output at operating points ---
     h!(y, nonlinmodel, x, d0)
     y .= y .+ nonlinmodel.yop
     # --- compute the Jacobians at linearization points ---
-    A  = ForwardDiff.jacobian((xnext, x)  -> nonlinmodel.f!(xnext, x, u0, d0), xnext, x)
-    Bu = ForwardDiff.jacobian((xnext, u0) -> nonlinmodel.f!(xnext, x, u0, d0), xnext, u0)
-    Bd = ForwardDiff.jacobian((xnext, d0) -> nonlinmodel.f!(xnext, x, u0, d0), xnext, d0)
-    C  = ForwardDiff.jacobian((y, x)  -> nonlinmodel.h!(y, x, d0), y, x)
-    Dd = ForwardDiff.jacobian((y, d0) -> nonlinmodel.h!(y, x, d0), y, d0)
-    # --- construct the linear model ---
-    linmodel = LinModel(A, Bu, C, Bd, Dd, nonlinmodel.Ts)
-    # --- compute the nonlinear model next state at linearization points ---
+    A, Bu, Bd, C, Dd = linmodel.A, linmodel.Bu, linmodel.Bd, linmodel.C, linmodel.Dd
+    ForwardDiff.jacobian!(A,  (xnext, x)  -> f!(xnext, nonlinmodel, x, u0, d0), xnext, x)
+    ForwardDiff.jacobian!(Bu, (xnext, u0) -> f!(xnext, nonlinmodel, x, u0, d0), xnext, u0)
+    ForwardDiff.jacobian!(Bd, (xnext, d0) -> f!(xnext, nonlinmodel, x, u0, d0), xnext, d0)
+    ForwardDiff.jacobian!(C,  (y, x)  -> h!(y, nonlinmodel, x, d0), y, x)
+    ForwardDiff.jacobian!(Dd, (y, d0) -> h!(y, nonlinmodel, x, d0), y, d0)
+    # --- compute the nonlinear model next state at operating points ---
     f!(xnext, nonlinmodel, x, u, d)
-    xnext .= xnext .+ nonlinmodel.xop
-    # --- set the operating points of the linear model ---
-    uop, dop, yop = u, d, y
-    xop   = xnext
-    xop .-= x
-    setop!(linmodel; uop, yop, dop, xop)    
+    xnext .+= nonlinmodel.fop .- nonlinmodel.xop
+    # --- modify the linear model operating points ---
+    linmodel.uop .= u
+    linmodel.yop .= y
+    linmodel.dop .= d
+    linmodel.xop .= x
+    linmodel.fop .= xnext
+    # --- reset the state of the linear model ---
+    linmodel.x0 .= 0 # state deviation vector is always x0=0 after a linearization
     return linmodel
 end

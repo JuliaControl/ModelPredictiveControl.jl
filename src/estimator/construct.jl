@@ -105,7 +105,7 @@ end
 
 Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
-If ``\mathbf{x}`` are `model.x` states, and ``\mathbf{x_s}``, the states defined at
+If ``\mathbf{x}`` are `model.x0` states, and ``\mathbf{x_s}``, the states defined at
 [`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
 [ \begin{smallmatrix} \mathbf{x} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
 returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:

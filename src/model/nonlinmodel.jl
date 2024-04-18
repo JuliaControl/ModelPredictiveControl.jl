@@ -1,5 +1,5 @@
 struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimModel{NT}
-    x::Vector{NT}
+    x0::Vector{NT}
     f!::F
     h!::H
     solver::DS
@@ -12,6 +12,7 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
     yop::Vector{NT}
     dop::Vector{NT}
     xop::Vector{NT}
+    fop::Vector{NT}
     function NonLinModel{NT, F, H, DS}(
         f!::F, h!::H, solver::DS, Ts, nu, nx, ny, nd
     ) where {NT<:Real, F<:Function, H<:Function, DS<:DiffSolver}
@@ -20,8 +21,11 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
         xop = zeros(NT, nx)
-        x = zeros(NT, nx)
-        return new{NT, F, H, DS}(x, f!, h!, solver, Ts, nu, nx, ny, nd, uop, yop, dop, xop)
+        fop = zeros(NT, nx)
+        x0  = zeros(NT, nx)
+        return new{NT, F, H, DS}(
+            x0, f!, h!, solver, Ts, nu, nx, ny, nd, uop, yop, dop, xop, fop
+        )
     end
 end
 
@@ -166,11 +170,11 @@ end
 "Do nothing if `model` is a [`NonLinModel`](@ref)."
 steadystate!(::SimModel, _ , _ ) = nothing
 
-"Call `f!(xnext, x, u, d)` with `model.f!` method for [`NonLinModel`](@ref)."
-f!(xnext, model::NonLinModel, x, u, d) = model.f!(xnext, x, u, d)
+"Call `f!(xnext0, x0, u0, d0)` with `model.f!` method for [`NonLinModel`](@ref)."
+f!(xnext0, model::NonLinModel, x0, u0, d0) = model.f!(xnext0, x0, u0, d0)
 
-"Call `h!(y, x, d)` with `model.h` method for [`NonLinModel`](@ref)."
-h!(y, model::NonLinModel, x, d) = model.h!(y, x, d)
+"Call `h!(y0, x0, d0)` with `model.h` method for [`NonLinModel`](@ref)."
+h!(y0, model::NonLinModel, x0, d0) = model.h!(y0, x0, d0)
 
 detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name) solver"
 detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:EmptySolver}) = ", empty solver"

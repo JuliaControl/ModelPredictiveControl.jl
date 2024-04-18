@@ -4,7 +4,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     C   ::Matrix{NT}
     Bd  ::Matrix{NT}
     Dd  ::Matrix{NT}
-    x::Vector{NT}
+    x0::Vector{NT}
     Ts::NT
     nu::Int
     nx::Int
@@ -14,6 +14,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     yop::Vector{NT}
     dop::Vector{NT}
     xop::Vector{NT}
+    fop::Vector{NT}
     function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
         A, Bu = to_mat(A, 1, 1), to_mat(Bu, 1, 1)
         nu, nx = size(Bu, 2), size(A, 2)
@@ -33,8 +34,9 @@ struct LinModel{NT<:Real} <: SimModel{NT}
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
         xop = zeros(NT, nx)
-        x = zeros(NT, nx)
-        return new(A, Bu, C, Bd, Dd, x, Ts, nu, nx, ny, nd, uop, yop, dop, xop)
+        fop = zeros(NT, nx)
+        x0  = zeros(NT, nx)
+        return new(A, Bu, C, Bd, Dd, x0, Ts, nu, nx, ny, nd, uop, yop, dop, xop, fop)
     end
 end
 
@@ -211,46 +213,45 @@ LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where NT<:Real
 LinModel(A, Bu, C, Bd, Dd, Ts) = LinModel{Float64}(A, Bu, C, Bd, Dd, Ts)
 
 @doc raw"""
-    steadystate!(model::LinModel, u, d)
+    steadystate!(model::LinModel, u0, d0)
 
-Set `model.x` to `u` and `d` steady-state if `model` is a [`LinModel`](@ref).
+Set `model.x0` to `u0` and `d0` steady-state if `model` is a [`LinModel`](@ref).
 
-Following [`setop!`](@ref) notation, the method evaluates the equilibrium ``\mathbf{x}``
-from:
+Following [`setop!`](@ref) notation, the method evaluates the equilibrium from:
 ```math
-    \mathbf{x} = \mathbf{(I - A)^{-1}(B_u u_0 + B_d d_0)}
+    \mathbf{x_0} = \mathbf{(I - A)^{-1}(B_u u_0 + B_d d_0 + f_{op} - x_{op})}
 ```
 with constant manipulated inputs ``\mathbf{u_0 = u - u_{op}}`` and measured
 disturbances ``\mathbf{d_0 = d - d_{op}}``. The Moore-Penrose pseudo-inverse computes 
 ``\mathbf{(I - A)^{-1}}`` to support integrating `model` (integrator states will be 0).
 """
-function steadystate!(model::LinModel, u, d)
+function steadystate!(model::LinModel, u0, d0)
     M = I - model.A
     rtol = sqrt(eps(real(float(oneunit(eltype(M)))))) # pinv docstring recommendation
-    model.x .= pinv(M; rtol)*(model.Bu*(u-model.uop) + model.Bd*(d-model.dop) + model.xop)
+    model.x0 .= pinv(M; rtol)*(model.Bu*u0 + model.Bd*d0 + model.fop - model.xop)
     return nothing
 end
 
 """
-    f!(xnext, model::LinModel, x, u, d) -> nothing
+    f!(xnext0, model::LinModel, x0, u0, d0) -> nothing
 
-Evaluate `xnext = A*x + Bu*u + Bd*d` in-place when `model` is a [`LinModel`](@ref).
+Evaluate `xnext0 = A*x0 + Bu*u0 + Bd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function f!(xnext, model::LinModel, x, u, d)
-    mul!(xnext, model.A,  x)
-    mul!(xnext, model.Bu, u, 1, 1)
-    mul!(xnext, model.Bd, d, 1, 1)
+function f!(xnext0, model::LinModel, x0, u0, d0)
+    mul!(xnext0, model.A,  x0)
+    mul!(xnext0, model.Bu, u0, 1, 1)
+    mul!(xnext0, model.Bd, d0, 1, 1)
     return nothing
 end
 
 
 """
-    h!(y, model::LinModel, x, d) -> nothing
+    h!(y0, model::LinModel, x0, d0) -> nothing
 
-Evaluate `y = C*x + Dd*d` in-place when `model` is a [`LinModel`](@ref).
+Evaluate `y0 = C*x0 + Dd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function h!(y, model::LinModel, x, d)
-    mul!(y, model.C,  x)
-    mul!(y, model.Dd, d, 1, 1)
+function h!(y0, model::LinModel, x0, d0)
+    mul!(y0, model.C,  x0)
+    mul!(y0, model.Dd, d0, 1, 1)
     return nothing
 end

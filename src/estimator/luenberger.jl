@@ -2,7 +2,8 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     model::SM
     lastu0::Vector{NT}
     x̂op::Vector{NT}
-    x̂  ::Vector{NT}
+    f̂op::Vector{NT}
+    x̂0 ::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
@@ -37,11 +38,11 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         end
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         lastu0 = zeros(NT, model.nu)
-        x̂op = [model.xop; zeros(NT, nxs)]
-        x̂ = [zeros(NT, model.nx); zeros(NT, nxs)]
+        x̂op, f̂op = [model.xop; zeros(NT, nxs)], [model.fop; zeros(NT, nxs)]
+        x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         return new{NT, SM}(
             model, 
-            lastu0, x̂op, x̂,
+            lastu0, x̂op, f̂op, x̂0,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
@@ -103,11 +104,11 @@ end
 
 
 """
-    update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂))
+    update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂0))
 
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
-function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂))
+function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂0))
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K̂ = estim.x̂, estim.K̂
     ŷm, x̂next = similar(ym), similar(x̂)

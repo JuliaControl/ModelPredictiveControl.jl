@@ -35,7 +35,7 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
 
     linmodel4 = LinModel(Gss)
     setstate!(linmodel4, [1;-1])
-    @test linmodel4.x ≈ [1;-1]
+    @test linmodel4.x0 ≈ [1;-1]
 
     linmodel5 = LinModel(sys,Ts,i_d=[3])
     setop!(linmodel5, uop=[10,50], yop=[50,30], dop=[20])
@@ -96,7 +96,7 @@ end
     linmodel1 = setop!(LinModel(Gss), uop=[10,50], yop=[50,30])
     @test updatestate!(linmodel1, [10, 50]) ≈ zeros(2)
     @test updatestate!(linmodel1, [10, 50], Float64[]) ≈ zeros(2)
-    @test linmodel1.x ≈ zeros(2)
+    @test linmodel1.x0 ≈ zeros(2)
     @test evaloutput(linmodel1) ≈ linmodel1() ≈ [50,30]
     @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30]
     x = initstate!(linmodel1, [10, 60])
@@ -120,7 +120,7 @@ end
     @test nonlinmodel1.nu == 2
     @test nonlinmodel1.nd == 0
     @test nonlinmodel1.ny == 2
-    xnext, y = similar(nonlinmodel1.x), similar(nonlinmodel1.yop)
+    xnext, y = similar(nonlinmodel1.x0), similar(nonlinmodel1.yop)
     nonlinmodel1.f!(xnext,[0,0],[0,0],[1])
     @test xnext ≈ zeros(2,)
     nonlinmodel1.h!(y,[0,0],[1])
@@ -135,7 +135,7 @@ end
     @test nonlinmodel2.nu == 2
     @test nonlinmodel2.nd == 1
     @test nonlinmodel2.ny == 2
-    xnext, y = similar(nonlinmodel2.x), similar(nonlinmodel2.yop)
+    xnext, y = similar(nonlinmodel2.x0), similar(nonlinmodel2.yop)
     nonlinmodel2.f!(xnext,[0,0,0,0],[0,0],[0])
     @test xnext ≈ zeros(4,)
     nonlinmodel2.h!(y,[0,0,0,0],[0])
@@ -156,7 +156,7 @@ end
         return nothing
     end
     nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1, solver=nothing)
-    xnext, y = similar(nonlinmodel4.x), similar(nonlinmodel4.yop)
+    xnext, y = similar(nonlinmodel4.x0), similar(nonlinmodel4.yop)
     nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0])
     @test xnext ≈ zeros(4)
     nonlinmodel4.h!(y,[0,0,0,0],[0])
@@ -170,7 +170,7 @@ end
     f3(x, u, d) = A*x + Bu*u+ Bd*d
     h3(x, d) = C*x + Dd*d
     nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=RungeKutta())
-    xnext, y = similar(nonlinmodel5.x), similar(nonlinmodel5.yop)
+    xnext, y = similar(nonlinmodel5.x0), similar(nonlinmodel5.yop)
     nonlinmodel5.f!(xnext, [0; 0], [0], [0])
     @test xnext ≈ zeros(2)
     nonlinmodel5.h!(y, [0; 0], [0])
@@ -188,7 +188,7 @@ end
         return nothing
     end
     nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta())
-    xnext, y = similar(nonlinmodel6.x), similar(nonlinmodel6.yop)
+    xnext, y = similar(nonlinmodel6.x0), similar(nonlinmodel6.yop)
     nonlinmodel6.f!(xnext, [0; 0], [0], [0])
     @test xnext ≈ zeros(2)
     nonlinmodel6.h!(y, [0; 0], [0])
@@ -210,7 +210,7 @@ end
 
     @test updatestate!(nonlinmodel, zeros(2,)) ≈ zeros(2) 
     @test updatestate!(nonlinmodel, zeros(2,), Float64[]) ≈ zeros(2)
-    @test nonlinmodel.x ≈ zeros(2)
+    @test nonlinmodel.x0 ≈ zeros(2)
     @test evaloutput(nonlinmodel) ≈ nonlinmodel() ≈ zeros(2)
     @test evaloutput(nonlinmodel, Float64[]) ≈ nonlinmodel(Float64[]) ≈ zeros(2)
 
@@ -245,7 +245,7 @@ end
     nonlinmodel3 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=RungeKutta())
     linmodel3 = linearize(nonlinmodel3; x, u, d)
     u0, d0 = u - nonlinmodel3.uop, d - nonlinmodel3.dop
-    xnext, y = similar(nonlinmodel3.x), similar(nonlinmodel3.yop)
+    xnext, y = similar(nonlinmodel3.x0), similar(nonlinmodel3.yop)
     A  = ForwardDiff.jacobian((xnext, x)  -> nonlinmodel3.f!(xnext, x, u0, d0), xnext, x)
     Bu = ForwardDiff.jacobian((xnext, u0) -> nonlinmodel3.f!(xnext, x, u0, d0), xnext, u0)
     Bd = ForwardDiff.jacobian((xnext, d0) -> nonlinmodel3.f!(xnext, x, u0, d0), xnext, d0)
