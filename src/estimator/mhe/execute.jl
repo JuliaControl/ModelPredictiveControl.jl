@@ -460,8 +460,6 @@ function setmodel_estimator!(estim::MovingHorizonEstimator, model::LinModel)
     estim.Ĉ  .= Ĉ
     estim.B̂d .= B̂d
     estim.D̂d .= D̂d
-    estim.Ĉm  .= @views Ĉ[estim.i_ym, :]
-    estim.D̂dm .= @views D̂d[estim.i_ym, :]
     # TODO: re-construct the MHE prediction matrices here:
     error("setmodel! for MovingHorizonEstimator is not implemented yet.")
     return nothing

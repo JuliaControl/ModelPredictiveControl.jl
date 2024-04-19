@@ -19,18 +19,19 @@ struct LinMPC{
     L_Hp::Hermitian{NT, Matrix{NT}}
     C::NT
     E::NT
-    R̂u::Vector{NT}
-    R̂y::Vector{NT}
+    R̂u0::Vector{NT}
+    R̂y0::Vector{NT}
     noR̂u::Bool
     S̃::Matrix{NT} 
     T::Matrix{NT}
-    T_lastu::Vector{NT}
+    T_lastu0::Vector{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
     J::Matrix{NT}
     K::Matrix{NT}
     V::Matrix{NT}
+    B::Vector{NT}
     H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
     p::Vector{NT}
@@ -39,7 +40,8 @@ struct LinMPC{
     d0::Vector{NT}
     D̂0::Vector{NT}
     D̂E::Vector{NT}
-    Ŷop::Vector{NT}
+    Uop::Vector{NT}
+    Yop::Vector{NT}
     Dop::Vector{NT}
     function LinMPC{NT, SE, JM}(
         estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim::JM
@@ -54,20 +56,22 @@ struct LinMPC{
         N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
         L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
-        R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        R̂y0, R̂u0, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
-        E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
+        E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, size(E, 1)), zeros(NT, size(ex̂, 1))
-        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
+        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
+            estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
+        )
         H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         # dummy vals (updated just before optimization):
         q̃, p = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
-        Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
+        Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
         mpc = new{NT, SE, JM}(
@@ -75,12 +79,13 @@ struct LinMPC{
             ΔŨ, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, 
-            R̂u, R̂y, noR̂u,
-            S̃, T, T_lastu,
-            Ẽ, F, G, J, K, V, H̃, q̃, p,
+            R̂u0, R̂y0, noR̂u,
+            S̃, T, T_lastu0,
+            Ẽ, F, G, J, K, V, B, 
+            H̃, q̃, p,
             Ks, Ps,
             d0, D̂0, D̂E,
-            Ŷop, Dop,
+            Uop, Yop, Dop,
         )
         init_optimization!(mpc, model, optim)
         return mpc

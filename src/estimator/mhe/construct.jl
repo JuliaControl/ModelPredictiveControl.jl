@@ -56,7 +56,8 @@ struct MovingHorizonEstimator{
     Z̃::Vector{NT}
     lastu0::Vector{NT}
     x̂op::Vector{NT}
-    x̂  ::Vector{NT}
+    f̂op::Vector{NT}
+    x̂0 ::Vector{NT}
     He::Int
     i_ym::Vector{Int}
     nx̂ ::Int
@@ -108,11 +109,10 @@ struct MovingHorizonEstimator{
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, model.nu)
-        x̂op = [model.xop; zeros(NT, nxs)]
-        x̂ = [zeros(NT, model.nx); zeros(NT, nxs)]
+        x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         P̂_0 = Hermitian(P̂_0, :L)
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         invP̄ = Hermitian(inv(P̂_0), :L)
@@ -134,7 +134,7 @@ struct MovingHorizonEstimator{
         Nk = [0]
         estim = new{NT, SM, JM, CE}(
             model, optim, con, covestim,  
-            Z̃, lastu0, x̂op, x̂, 
+            Z̃, lastu0, x̂op, x̂0, 
             He,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,

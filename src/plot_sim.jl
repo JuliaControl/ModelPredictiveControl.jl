@@ -693,8 +693,8 @@ end
     end
 end
 
-getUcon(mpc::PredictiveController, _ ) = mpc.con.Umin, mpc.con.Umax
+getUcon(mpc::PredictiveController, _ ) = mpc.con.U0min+mpc.Uop, mpc.con.U0max+mpc.Uop
 getUcon(mpc::ExplicitMPC, nu) = fill(-Inf, mpc.Hp*nu), fill(+Inf, mpc.Hp*nu)
 
-getYcon(mpc::PredictiveController, _ ) = mpc.con.Ymin, mpc.con.Ymax
+getYcon(mpc::PredictiveController, _ ) = mpc.con.Y0min+mpc.Yop, mpc.con.Y0max+mpc.Yop
 getYcon(mpc::ExplicitMPC, ny) = fill(-Inf, mpc.Hp*ny), fill(+Inf, mpc.Hp*ny)

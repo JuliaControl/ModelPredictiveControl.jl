@@ -3,7 +3,7 @@
 
 Init the states of `mpc.estim` [`StateEstimator`](@ref) and warm start `mpc.ΔŨ` at zero.
 """
-function initstate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂))
+function initstate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂0))
     mpc.ΔŨ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
@@ -48,10 +48,10 @@ julia> ry = [5]; u = moveinput!(mpc, ry); round.(u, digits=3)
 function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = empty(mpc.estim.x̂);
+    d ::Vector = empty(mpc.estim.x̂0);
     D̂ ::Vector = repeat(d,  mpc.Hp),
     R̂y::Vector = repeat(ry, mpc.Hp),
-    R̂u::Vector = mpc.noR̂u ? empty(mpc.estim.x̂) : repeat(mpc.estim.model.uop, mpc.Hp),
+    R̂u::Vector = mpc.noR̂u ? empty(mpc.estim.x̂0) : repeat(mpc.estim.model.uop, mpc.Hp),
     ym::Union{Vector, Nothing} = nothing
 )
     validate_args(mpc, ry, d, D̂, R̂y, R̂u)
@@ -108,7 +108,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷ, u, û     = similar(mpc.Ŷop), similar(model.uop), similar(model.uop)
     x̂, x̂next    = similar(mpc.estim.x̂), similar(mpc.estim.x̂)
     Ŷ, x̂end     = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, mpc.ΔŨ)
-    U           = mpc.S̃*mpc.ΔŨ + mpc.T_lastu
+    U           = mpc.S̃*mpc.ΔŨ + mpc.T_lastu0 + mpc.Uop
     Ȳ, Ū        = similar(Ŷ), similar(U)
     J           = obj_nonlinprog!(U, Ȳ, Ū, mpc, model, Ŷ, mpc.ΔŨ)
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
@@ -148,38 +148,40 @@ See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the
 They are computed with these equations using in-place operations:
 ```math
 \begin{aligned}
-    \mathbf{F}   &= \mathbf{G d}(k) + \mathbf{J D̂} + \mathbf{K x̂}_{k-1}(k) + \mathbf{V u}(k-1) \\
-    \mathbf{C_y} &= \mathbf{F}                 - \mathbf{R̂_y} \\
-    \mathbf{C_u} &= \mathbf{T} \mathbf{u}(k-1) - \mathbf{R̂_u} \\
-    \mathbf{q̃}   &= 2[(\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}] \\
-            p    &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
+    \mathbf{F}   &= \mathbf{G d_0}(k) + \mathbf{J D̂_0} + \mathbf{K x̂_0}(k) 
+                        + \mathbf{V u_0}(k-1) + \mathbf{B} + \mathbf{Ŷ_s}           \\
+    \mathbf{C_y} &= \mathbf{F}                 - \mathbf{R̂_{y_{0}}}                 \\
+    \mathbf{C_u} &= \mathbf{T} \mathbf{u}(k-1) - \mathbf{R̂_{u_{0}}}                 \\
+    \mathbf{q̃}   &= 2[(\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} 
+                        + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}]              \\
+            p    &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
+                        + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
 \end{aligned}
 ```
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y, R̂u)
-    mul!(mpc.T_lastu, mpc.T, mpc.estim.lastu0 .+ model.uop)
+    mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
     ŷ, F, q̃, p = mpc.ŷ, mpc.F, mpc.q̃, mpc.p
     ŷ .= evalŷ(mpc.estim, ym, d)
-    predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
-    F .= mpc.Ŷop
-    mul!(F, mpc.K, mpc.estim.x̂, 1, 1) 
+    predictstoch!(mpc, mpc.estim, d, ym) # init mpc.F with Ŷs for InternalModel
+    mul!(F, mpc.K, mpc.estim.x̂0, 1, 1) 
     mul!(F, mpc.V, mpc.estim.lastu0, 1, 1)
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
         mpc.D̂0 .= D̂ .- mpc.Dop
-        mpc.D̂E[1:model.nd]     .= mpc.d0
-        mpc.D̂E[model.nd+1:end] .= mpc.D̂0
+        mpc.D̂E[1:model.nd]     .= d
+        mpc.D̂E[model.nd+1:end] .= D̂
         mul!(F, mpc.G, mpc.d0, 1, 1)
         mul!(F, mpc.J, mpc.D̂0, 1, 1)
     end
-    mpc.R̂y .= R̂y
-    Cy = F .- mpc.R̂y
+    mpc.R̂y0 .= R̂y .- mpc.Yop
+    Cy = F .- mpc.R̂y0
     M_Hp_Ẽ = mpc.M_Hp*mpc.Ẽ
     mul!(q̃, M_Hp_Ẽ', Cy)
     p .= dot(Cy, mpc.M_Hp, Cy)
     if ~mpc.noR̂u
-        mpc.R̂u .= R̂u
-        Cu = mpc.T_lastu .- mpc.R̂u
+        mpc.R̂u0 .= R̂u .- mpc.Uop
+        Cu = mpc.T_lastu0 .- mpc.R̂u0
         L_Hp_S̃ = mpc.L_Hp*mpc.S̃
         mul!(q̃, L_Hp_S̃', Cu, 1, 1)
         p .+= dot(Cu, mpc.L_Hp, Cu)
@@ -191,25 +193,21 @@ end
 @doc raw"""
     initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y, R̂u)
 
-Init `ŷ, Ŷop, d0, D̂0` matrices when model is not a [`LinModel`](@ref).
-
-`d0` and `D̂0` are the measured disturbances and its predictions without the operating points
-``\mathbf{d_{op}}``. The vector `Ŷop` is kept unchanged if `mpc.estim` is not an
-[`InternalModel`](@ref).
+Init `ŷ, F, d0, D̂0, D̂E, R̂y0, R̂u0` vectors when model is not a [`LinModel`](@ref).
 """
 function initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y, R̂u)
-    mul!(mpc.T_lastu, mpc.T, mpc.estim.lastu0 .+ model.uop)
+    mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
     mpc.ŷ .= evalŷ(mpc.estim, ym, d)
-    predictstoch!(mpc, mpc.estim, d, ym) # init mpc.Ŷop for InternalModel
+    predictstoch!(mpc, mpc.estim, d, ym) # init mpc.F with Ŷs for InternalModel
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
         mpc.D̂0 .= D̂ .- mpc.Dop
-        mpc.D̂E[1:model.nd]     .= mpc.d0
-        mpc.D̂E[model.nd+1:end] .= mpc.D̂0
+        mpc.D̂E[1:model.nd]     .= d̂
+        mpc.D̂E[model.nd+1:end] .= D̂
     end
-    mpc.R̂y .= R̂y
+    mpc.R̂y0 .= (R̂y .- mpc.Yop)
     if ~mpc.noR̂u
-        mpc.R̂u .= R̂u
+        mpc.R̂u0 .= (R̂u .- mpc.Uop)
     end
     return nothing
 end
@@ -217,28 +215,21 @@ end
 @doc raw"""
     predictstoch!(mpc::PredictiveController, estim::InternalModel, x̂s, d, ym)
 
-Init `Ŷop` vector when if `estim` is an [`InternalModel`](@ref).
-
-The vector combines the output operating points and the stochastic predictions:
-``\mathbf{Ŷ_{op} = Ŷ_{s} + Y_{op}}`` (both values are constant between the nonlinear 
-programming iterations).
+Init `mpc.F` vector with ``\mathbf{F = Ŷ_s}`` when `estim` is an [`InternalModel`](@ref).
 """
 function predictstoch!(
     mpc::PredictiveController{NT}, estim::InternalModel, d, ym
 ) where {NT<:Real}
     isnothing(ym) && error("Predictive controllers with InternalModel need the measured "*
                            "outputs ym in keyword argument to compute control actions u")
-    Ŷop, ny, yop = mpc.Ŷop, estim.model.ny, estim.model.yop
+    F, ny = mpc.F, estim.model.ny
     ŷd = similar(estim.model.yop)
     h!(ŷd, estim.model, estim.x̂d, d - estim.model.dop)
     ŷd .+= estim.model.yop 
     ŷs = zeros(NT, estim.model.ny)
     ŷs[estim.i_ym] .= @views ym .- ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
-    for j=1:mpc.Hp
-        Ŷop[(1 + ny*(j-1)):(ny*j)] .= yop
-    end
-    mul!(Ŷop, mpc.Ks, estim.x̂s, 1, 1)
-    mul!(Ŷop, mpc.Ps, ŷs, 1, 1)
+    mul!(Ŷs, mpc.Ks, estim.x̂s)
+    mul!(Ŷs, mpc.Ps, ŷs, 1, 1)
     return nothing
 end
 "Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."
@@ -253,31 +244,31 @@ Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} + \mathbf{
 vector for the terminal constraints, see [`init_predmat`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
-    nU, nΔŨ, nY = length(mpc.con.Umin), length(mpc.con.ΔŨmin), length(mpc.con.Ymin)
+    nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
     nx̂ = mpc.estim.nx̂
     fx̂ = mpc.con.fx̂
-    mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂)
+    mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂0)
     mul!(fx̂, mpc.con.vx̂, mpc.estim.lastu0, 1, 1)
     if model.nd ≠ 0
         mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
         mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
     end
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.Umin + mpc.T_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.T_lastu0
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.Umax - mpc.T_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.T_lastu0
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
     n += nΔŨ
-    mpc.con.b[(n+1):(n+nY)]  .= @. -mpc.con.Ymin + mpc.F
+    mpc.con.b[(n+1):(n+nY)]  .= @. -mpc.con.Y0min + mpc.F
     n += nY
-    mpc.con.b[(n+1):(n+nY)]  .= @. +mpc.con.Ymax - mpc.F
+    mpc.con.b[(n+1):(n+nY)]  .= @. +mpc.con.Y0max - mpc.F
     n += nY
-    mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂min + fx̂
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂0min + fx̂
     n += nx̂
-    mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂max - fx̂
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂0max - fx̂
     if any(mpc.con.i_b) 
         lincon = mpc.optim[:linconstraint]
         JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
@@ -289,9 +280,9 @@ end
 function linconstraint!(mpc::PredictiveController, ::SimModel)
     nU, nΔŨ = length(mpc.con.Umin), length(mpc.con.ΔŨmin)
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.Umin + mpc.T_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.Umin0 + mpc.T_lastu0
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.Umax - mpc.T_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.Umax0 - mpc.T_lastu0
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
@@ -304,99 +295,112 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
 end
 
 @doc raw"""
-    predict!(Ŷ, x̂, _ , _ , _ , mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ, x̂end
+    predict!(Ŷ0, x̂0, _, _, _, mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ0, x̂0end
 
-Compute the predictions `Ŷ` and terminal states `x̂end` if model is a [`LinModel`](@ref).
+Compute the predictions `Ŷ0` and terminal states `x̂0end` if model is a [`LinModel`](@ref).
 
-The method mutates `Ŷ` and `x̂` vector arguments. The `x̂end` vector is used for
+The method mutates `Ŷ0` and `x̂0` vector arguments. The `x̂end` vector is used for
 the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``.
 """
-function predict!(Ŷ, x̂, _ , _ , _ , mpc::PredictiveController, ::LinModel, ΔŨ)
+function predict!(Ŷ0, x̂0, _ , _ , _ , mpc::PredictiveController, ::LinModel, ΔŨ)
     # in-place operations to reduce allocations :
-    Ŷ .= mul!(Ŷ, mpc.Ẽ, ΔŨ) .+ mpc.F
-    x̂ .= mul!(x̂, mpc.con.ẽx̂, ΔŨ) .+ mpc.con.fx̂
-    x̂end = x̂
-    return Ŷ, x̂end
+    Ŷ0 .= mul!(Ŷ0, mpc.Ẽ, ΔŨ) .+ mpc.F
+    x̂0 .= mul!(x̂0, mpc.con.ẽx̂, ΔŨ) .+ mpc.con.fx̂
+    x̂0end = x̂0
+    return Ŷ0, x̂0end
 end
 
 @doc raw"""
-    predict!(Ŷ, x̂, x̂next, u, û, mpc::PredictiveController, model::SimModel, ΔŨ) -> Ŷ, x̂end
+    predict!(
+        Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, model::SimModel, ΔŨ
+    ) -> Ŷ0, x̂end
 
 Compute both vectors if `model` is not a [`LinModel`](@ref). 
     
-The method mutates `Ŷ`, `x̂`, `x̂next`, `u` and `û` arguments.
+The method mutates `Ŷ0`, `x̂0`, `x̂0next`, `u0` and `û0` arguments.
 """
-function predict!(Ŷ, x̂, x̂next, u, û, mpc::PredictiveController, model::SimModel, ΔŨ)
+function predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, model::SimModel, ΔŨ)
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
-    u0 = u
-    x̂  .= mpc.estim.x̂
+    x̂0 .= mpc.estim.x̂0
     u0 .= mpc.estim.lastu0
     d0  = @views mpc.d0[1:end]
     for j=1:Hp
         if j ≤ Hc
             u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
         end
-        f̂!(x̂next, û, mpc.estim, model, x̂, u0, d0)
-        x̂ .= x̂next
+        f̂!(x̂0next, û0, mpc.estim, model, x̂0, u0, d0)
+        x̂0 .= x̂0next
         d0 = @views mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
-        ŷ  = @views Ŷ[(1 + ny*(j-1)):(ny*j)]
-        ĥ!(ŷ, mpc.estim, model, x̂, d0)
+        ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
+        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
     end
-    Ŷ .= Ŷ .+ mpc.Ŷop # Ŷop = Ŷs + Yop, and Ŷs=0 if mpc.estim is not an InternalModel
-    x̂end = x̂
-    return Ŷ, x̂end
+    Ŷ0 .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
+    x̂end = x̂0
+    return Ŷ0, x̂end
 end
 
 """
-    obj_nonlinprog!(U , _ , _ , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ)
+    obj_nonlinprog!(U0 , _ , _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ)
 
 Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
 
 The function is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
 also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
-at specific input increments `ΔŨ` and predictions `Ŷ` values. It mutates the `U` argument.
+at specific input increments `ΔŨ` and predictions `Ŷ0` values. It mutates the `U0` argument.
 """
-function obj_nonlinprog!(U, _ , _ , mpc::PredictiveController, model::LinModel, Ŷ, ΔŨ)
+function obj_nonlinprog!(
+    U0, _ , _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ::Vector{NT}
+) where NT <: Real
     J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
     if !iszero(mpc.E)
-        U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu
-        UE = [U; U[(end - model.nu + 1):end]]
-        ŶE = [mpc.ŷ; Ŷ]
-        J += mpc.E*mpc.JE(UE, ŶE, mpc.D̂E)
+        ny, Hp, D̂E = model.ny, mpc.Hp, mpc.D̂E
+        U  = U0
+        mul!(U, mpc.S̃, ΔŨ)
+        U .+= mpc.T_lastu0 .+ mpc.Uop
+        UE = @views [U; U[(end - model.nu + 1):end]]
+        ŶE = Vector{NT}(undef, ny + ny*Hp)
+        ŶE[1:ny]     .= mpc.ŷ
+        ŶE[1+ny:end] .= Ŷ0 .+ mpc.Ŷop
+        J += mpc.E*mpc.JE(UE, ŶE, D̂E)
     end
     return J
 end
 
 """
-    obj_nonlinprog!(U, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ)
+    obj_nonlinprog!(U0, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ0, ΔŨ)
 
 Nonlinear programming objective function when `model` is not a [`LinModel`](@ref). The
 function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
-`U`, `Ȳ` and `Ū` arguments (input over `Hp`, and output and input setpoint tracking error, 
+`U0`, `Ȳ` and `Ū` arguments (input over `Hp`, and output and input setpoint tracking error, 
 respectively).
 """
-function obj_nonlinprog!(U, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ, ΔŨ)
+function obj_nonlinprog!(U0, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ0, ΔŨ)
     # --- output setpoint tracking term ---
-    Ȳ  .= mpc.R̂y .- Ŷ
+    Ȳ  .= mpc.R̂y0 .- Ŷ0
     JR̂y = dot(Ȳ, mpc.M_Hp, Ȳ)
     # --- move suppression and slack variable term ---
     JΔŨ = dot(ΔŨ, mpc.Ñ_Hc, ΔŨ)
     # --- input over prediction horizon ---
     if !mpc.noR̂u || !iszero(mpc.E)
-        U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu
+        U0 .= mul!(U0, mpc.S̃, ΔŨ) .+ mpc.T_lastu0
     end
     # --- input setpoint tracking term ---
     if !mpc.noR̂u
-        Ū  .= mpc.R̂u .- U
+        Ū  .= mpc.R̂u0 .- U0
         JR̂u = dot(Ū, mpc.L_Hp, Ū)
     else
         JR̂u = 0.0
     end
     # --- economic term ---
     if !iszero(mpc.E)
-        UE = [U; U[(end - model.nu + 1):end]]
-        ŶE = [mpc.ŷ; Ŷ]
-        E_JE = mpc.E*mpc.JE(UE, ŶE, mpc.D̂E)
+        ny, Hp, D̂E = model.ny, mpc.Hp, mpc.D̂E
+        U = U0
+        U .+= mpc.Uop
+        UE = @views [U; U[(end - model.nu + 1):end]]
+        ŶE = Vector{NT}(undef, ny + ny*Hp)
+        ŶE[1:ny]     .= mpc.ŷ
+        ŶE[1+ny:end] .= Ŷ0 .+ mpc.Ŷop
+        E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E)
     else
         E_JE = 0.0
     end
@@ -472,7 +476,9 @@ set_objective_linear_coef!(::PredictiveController, _ ) = nothing
 
 Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
-updatestate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂)) = updatestate!(mpc.estim,u,ym,d)
+function updatestate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂0))
+    return updatestate!(mpc.estim,u,ym,d)
+end
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
 """
@@ -519,7 +525,7 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel)
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     optim, con = mpc.optim, mpc.con
     # --- predictions matrices ---
-    E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
+    E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
     C, E, ex̂ = @views mpc.C, mpc.Ẽ[:, 1:nu*Hc], con.ẽx̂[:, 1:nu*Hc]
     A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, con.C_ymin, con.C_ymax, E)
     A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, C, con.c_x̂min, con.c_x̂max, ex̂)
@@ -528,12 +534,14 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel)
     mpc.J .= J
     mpc.K .= K
     mpc.V .= V
+    mpc.B .= B
     # --- linear inequality constraints ---
     con.ẽx̂ .= ẽx̂ 
     con.gx̂ .= gx̂
     con.jx̂ .= jx̂
     con.kx̂ .= kx̂
     con.vx̂ .= vx̂
+    con.bx̂ .= bx̂
     con.A_Ymin .= A_Ymin
     con.A_Ymax .= A_Ymax
     con.A_x̂min .= A_x̂min

@@ -147,7 +147,7 @@ measured outputs ``\mathbf{y^m}``.
 """
 function init_estimate!(estim::StateEstimator, ::LinModel, u0, ym0, d0)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
-    Ĉm, D̂dm   = Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
+    Ĉm, D̂dm = @views Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
     estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; ym0 - D̂dm*d0]
     return nothing
 end
@@ -272,11 +272,6 @@ function setmodel!(estim::StateEstimator, model::LinModel)
     estim.model.dop .= model.dop
     estim.model.xop .= model.xop
     estim.model.fop .= model.fop
-    # --- update state estimator and its operating points ---
-    estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
-    estim.x̂op[1:model.nx] .= model.xop
-    estim.f̂op[1:model.nx] .= model.fop
-    estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point    
     setmodel_estimator!(estim, model)
     return estim
 end
@@ -293,13 +288,17 @@ end
 "Update the augmented model matrices of `estim` by default."
 function setmodel_estimator!(estim::StateEstimator, model::LinModel)
     As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
-    Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
+    Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
+    # --- update augmented state-space matrices ---
     estim.Â  .= Â
     estim.B̂u .= B̂u
     estim.Ĉ  .= Ĉ
     estim.B̂d .= B̂d
     estim.D̂d .= D̂d
-    estim.Ĉm  .= @views Ĉ[estim.i_ym, :]
-    estim.D̂dm .= @views D̂d[estim.i_ym, :]
+    # --- update state estimate and its operating points ---
+    estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
+    estim.x̂op .= x̂op
+    estim.f̂op .= f̂op
+    estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     return nothing
 end

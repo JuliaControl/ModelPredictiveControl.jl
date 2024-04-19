@@ -3,7 +3,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     lastu0::Vector{NT}
     x̂op::Vector{NT}
     f̂op::Vector{NT}
-    x̂  ::Vector{NT}
+    x̂0 ::Vector{NT}
     x̂d::Vector{NT}
     x̂s::Vector{NT}
     i_ym::Vector{Int}
@@ -30,15 +30,15 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
         nxs = size(As,1)
         nx̂ = model.nx
-        Â, B̂u, Ĉ, B̂d, D̂d = matrices_internalmodel(model)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         lastu0 = zeros(NT, model.nu)
-        x̂op = copy(model.xop), copy(model.fop)
-        x̂d = x̂ = zeros(NT, model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
+        # x̂0 and x̂d are same object (updating x̂d will update x̂0):
+        x̂d = x̂0 = zeros(NT, model.nx) 
         x̂s = zeros(NT, nxs)
         return new{NT, SM}(
             model, 
-            lastu0, x̂op, f̂op, x̂, x̂d, x̂s, 
+            lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d,
@@ -126,24 +126,26 @@ end
 validate_poles(::SimModel) = nothing
 
 @doc raw"""
-    matrices_internalmodel(model::LinModel)
+    matrices_internalmodel(model::LinModel) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 
 Get state-space matrices of the [`LinModel`](@ref) `model` for [`InternalModel`](@ref).
 
 The [`InternalModel`](@ref) does not augment the state vector, thus:
 ```math
-    \mathbf{Â = A, B̂_u = B_u, Ĉ = C, B̂_d = B_d, D̂_d = D_d }
+    \mathbf{Â = A, B̂_u = B_u, Ĉ = C, B̂_d = B_d, D̂_d = D_d, x̂_{op} = x_{op}, f̂_{op} = f_{op}}
 ```
 """
 function matrices_internalmodel(model::LinModel)
-    Â, B̂u, Ĉ, B̂d, D̂d = model.A, model.Bu, model.C, model.Bd, model.Dd 
-    return Â, B̂u, Ĉ, B̂d, D̂d
+    Â, B̂u, Ĉ, B̂d, D̂d = model.A, model.Bu, model.C, model.Bd, model.Dd
+    x̂op, f̂op = model.xop, model.fop
+    return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
-"Return empty matrices if `model` is not a [`LinModel`](@ref)."
+"Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref)."
 function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
     Â, B̂u, Ĉ, B̂d, D̂d = zeros(NT,0,nx), zeros(NT,0,nu), zeros(NT,0,nx), zeros(NT,0,nd), zeros(NT,0,nd)
-    return Â, B̂u, Ĉ, B̂d, D̂d
+    x̂op, f̂op = model.xop, model.fop
+    return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
 
 @doc raw"""
@@ -200,8 +202,21 @@ function init_internalmodel(As, Bs, Cs, Ds)
     return Âs, B̂s
 end
 
-"Do nothing else for `InternalModel` estimator."
-setmodel_estimator!(estim::InternalModel, ::LinModel) = nothing
+"Update similar values for [`InternalModel`](@ref) estimator."
+function setmodel_estimator!(estim::InternalModel, model::LinModel)
+    Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)
+    # --- update augmented state-space matrices ---
+    estim.Â  .= Â
+    estim.B̂u .= B̂u
+    estim.Ĉ  .= Ĉ
+    estim.B̂d .= B̂d
+    estim.D̂d .= D̂d
+    # --- update state estimate and its operating points ---
+    estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
+    estim.x̂op .= x̂op
+    estim.f̂op .= f̂op
+    estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+end
 
 @doc raw"""
     update_estimate!(estim::InternalModel, u, ym, d=[])

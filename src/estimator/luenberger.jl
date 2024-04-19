@@ -19,8 +19,6 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     Ĉ   ::Matrix{NT}
     B̂d  ::Matrix{NT}
     D̂d  ::Matrix{NT}
-    Ĉm  ::Matrix{NT}
-    D̂dm ::Matrix{NT}
     K̂::Matrix{NT}
     function Luenberger{NT, SM}(
         model, i_ym, nint_u, nint_ym, p̂
@@ -30,15 +28,13 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         K̂ = try
             ControlSystemsBase.place(Â, Ĉ, p̂, :o)[:, i_ym]
         catch
             error("Cannot compute the Luenberger gain K̂ with specified poles p̂.")
         end
-        Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         lastu0 = zeros(NT, model.nu)
-        x̂op, f̂op = [model.xop; zeros(NT, nxs)], [model.fop; zeros(NT, nxs)]
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         return new{NT, SM}(
             model, 
@@ -46,7 +42,6 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
-            Ĉm, D̂dm,
             K̂
         )
     end
@@ -111,6 +106,7 @@ Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberge
 function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂0))
     Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
     x̂, K̂ = estim.x̂0, estim.K̂
+    Ĉm, D̂dm = @views estim.Ĉ[estim.i_ym, :], estim.D̂d[estim.i_ym, :]
     ŷm, x̂next = similar(ym), similar(x̂)
     # in-place operations to reduce allocations:
     mul!(ŷm, Ĉm, x̂) 
