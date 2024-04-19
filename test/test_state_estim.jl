@@ -133,10 +133,10 @@ end
     @test kalmanfilter5.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test kalmanfilter5.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
 
-    kalmanfilter6 = KalmanFilter(linmodel2, σP0=[1,2,3,4], σP0int_ym=[5,6])
-    @test kalmanfilter6.P̂0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    kalmanfilter6 = KalmanFilter(linmodel2, σP_0=[1,2,3,4], σPint_ym_0=[5,6])
+    @test kalmanfilter6.P̂_0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test kalmanfilter6.P̂  ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
-    @test kalmanfilter6.P̂0 !== kalmanfilter6.P̂
+    @test kalmanfilter6.P̂_0 !== kalmanfilter6.P̂
 
     kalmanfilter7 = KalmanFilter(linmodel1, nint_u=[1,1])
     @test kalmanfilter7.nxs == 2
@@ -145,7 +145,7 @@ end
     @test kalmanfilter7.nint_ym == [0, 0]
 
     kalmanfilter8 = KalmanFilter(linmodel1, 1:2, 0, [1, 1], I(4), I(4), I(2))
-    @test kalmanfilter8.P̂0 ≈ I(4)
+    @test kalmanfilter8.P̂_0 ≈ I(4)
     @test kalmanfilter8.Q̂ ≈ I(4)
     @test kalmanfilter8.R̂ ≈ I(2)
 
@@ -153,7 +153,7 @@ end
     kalmanfilter8 = KalmanFilter(linmodel2)
     @test isa(kalmanfilter8, KalmanFilter{Float32})
 
-    @test_throws ErrorException KalmanFilter(linmodel1, nint_ym=0, σP0=[1])
+    @test_throws ErrorException KalmanFilter(linmodel1, nint_ym=0, σP_0=[1])
 end
 
 @testset "KalmanFilter estimator methods" begin
@@ -395,10 +395,10 @@ end
     @test ukf5.nxs == 4
     @test ukf5.nx̂ == 8
 
-    ukf6 = UnscentedKalmanFilter(nonlinmodel, σP0=[1,2,3,4], σP0int_ym=[5,6])
-    @test ukf6.P̂0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    ukf6 = UnscentedKalmanFilter(nonlinmodel, σP_0=[1,2,3,4], σPint_ym_0=[5,6])
+    @test ukf6.P̂_0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test ukf6.P̂  ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
-    @test ukf6.P̂0 !== ukf6.P̂
+    @test ukf6.P̂_0 !== ukf6.P̂
 
     ukf7 = UnscentedKalmanFilter(nonlinmodel, α=0.1, β=4, κ=0.2)
     @test ukf7.γ ≈ 0.1*√(ukf7.nx̂+0.2)
@@ -411,7 +411,7 @@ end
     @test ukf8.nint_ym == [0, 0]
 
     ukf9 = UnscentedKalmanFilter(nonlinmodel, 1:2, 0, [1, 1], I(6), I(6), I(2), 0.1, 2, 0)
-    @test ukf9.P̂0 ≈ I(6)
+    @test ukf9.P̂_0 ≈ I(6)
     @test ukf9.Q̂ ≈ I(6)
     @test ukf9.R̂ ≈ I(2)
 
@@ -490,10 +490,10 @@ end
     @test ekf5.nxs == 4
     @test ekf5.nx̂ == 8
 
-    ekf6 = ExtendedKalmanFilter(nonlinmodel, σP0=[1,2,3,4], σP0int_ym=[5,6])
-    @test ekf6.P̂0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    ekf6 = ExtendedKalmanFilter(nonlinmodel, σP_0=[1,2,3,4], σPint_ym_0=[5,6])
+    @test ekf6.P̂_0 ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test ekf6.P̂  ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
-    @test ekf6.P̂0 !== ekf6.P̂
+    @test ekf6.P̂_0 !== ekf6.P̂
 
     ekf7 = ExtendedKalmanFilter(nonlinmodel, nint_u=[1,1], nint_ym=[0,0])
     @test ekf7.nxs == 2
@@ -502,7 +502,7 @@ end
     @test ekf7.nint_ym == [0, 0]
 
     ekf8 = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, [1, 1], I(6), I(6), I(2))
-    @test ekf8.P̂0 ≈ I(6)
+    @test ekf8.P̂_0 ≈ I(6)
     @test ekf8.Q̂ ≈ I(6)
     @test ekf8.R̂ ≈ I(2)
 
@@ -583,10 +583,10 @@ end
     @test mhe5.nxs == 4
     @test mhe5.nx̂ == 8
 
-    mhe6 = MovingHorizonEstimator(nonlinmodel, He=5, σP0=[1,2,3,4], σP0int_ym=[5,6])
-    @test mhe6.P̂0       ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    mhe6 = MovingHorizonEstimator(nonlinmodel, He=5, σP_0=[1,2,3,4], σPint_ym_0=[5,6])
+    @test mhe6.P̂_0       ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test mhe6.P̂arr_old ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
-    @test mhe6.P̂0 !== mhe6.P̂arr_old
+    @test mhe6.P̂_0 !== mhe6.P̂arr_old
 
     mhe7 = MovingHorizonEstimator(nonlinmodel, He=10)
     @test mhe7.He == 10
@@ -606,7 +606,7 @@ end
     I_2 = Matrix{Float64}(I, 2, 2)
     optim = Model(Ipopt.Optimizer)
     mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, 1e5 ,optim)
-    @test mhe9.P̂0 ≈ I(6)
+    @test mhe9.P̂_0 ≈ I(6)
     @test mhe9.Q̂ ≈ I(6)
     @test mhe9.R̂ ≈ I(2)
 

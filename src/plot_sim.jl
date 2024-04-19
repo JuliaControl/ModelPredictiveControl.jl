@@ -89,21 +89,21 @@ end
 
 
 @doc raw"""
-    sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x0=zeros(plant.nx)) -> res
+    sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x_0=plant.xop) -> res
 
 Open-loop simulation of `plant` for `N` time steps, default to unit bump test on all inputs.
 
 The manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}`` are held
 constant at `u` and `d` values, respectively. The plant initial state ``\mathbf{x}(0)`` is
-specified by `x0` keyword arguments. The function returns [`SimResult`](@ref) instances that
-can be visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) 
+specified by `x_0` keyword arguments. The function returns [`SimResult`](@ref) instances 
+that can be visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) 
 on them (see Examples below). Note that the method mutates `plant` internal states.
 
 # Examples
 ```julia-repl
 julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10.0, 1, 1, 1, 1, solver=nothing);
 
-julia> res = sim!(plant, 15, [0], [0], x0=[1])
+julia> res = sim!(plant, 15, [0], [0], x_0=[1])
 Simulation results of NonLinModel with 15 time steps.
 
 julia> using Plots; plot(res, plotu=false, plotd=false, plotx=true)
@@ -115,14 +115,14 @@ function sim!(
     N::Int,
     u::Vector = plant.uop.+1,
     d::Vector = plant.dop;
-    x0 = zeros(NT, plant.nx)
+    x_0 = plant.xop
 ) where {NT<:Real}
     T_data  = collect(plant.Ts*(0:(N-1)))
     Y_data  = Matrix{NT}(undef, plant.ny, N)
     U_data  = Matrix{NT}(undef, plant.nu, N)
     D_data  = Matrix{NT}(undef, plant.nd, N)
     X_data  = Matrix{NT}(undef, plant.nx, N)
-    setstate!(plant, x0)
+    setstate!(plant, x_0)
     for i=1:N
         y = evaloutput(plant, d) 
         Y_data[:, i]  = y
@@ -163,17 +163,17 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 - `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``
 - `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
 - `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``
-- `x0 = plant.x` : plant initial state ``\mathbf{x}(0)``
-- `x̂0 = nothing` : initial estimate ``\mathbf{x̂}(0)``, [`initstate!`](@ref) is used if `nothing`
+- `x_0 = plant.xop` : plant initial state ``\mathbf{x}(0)``
+- `x̂_0 = nothing` : initial estimate ``\mathbf{x̂}(0)``, [`initstate!`](@ref) is used if `nothing`
 - `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
 
 # Examples
 ```julia-repl
 julia> model = LinModel(tf(3, [30, 1]), 0.5);
 
-julia> estim = KalmanFilter(model, σR=[0.5], σQ=[0.25], σQint_ym=[0.01], σP0int_ym=[0.1]);
+julia> estim = KalmanFilter(model, σR=[0.5], σQ=[0.25], σQint_ym=[0.01], σPint_ym_0=[0.1]);
 
-julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.25], x0=[-10], x̂0=[0, 0])
+julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.25], x_0=[-10], x̂_0=[0, 0])
 Simulation results of KalmanFilter with 50 time steps.
 
 julia> using Plots; plot(res, plotŷ=true, plotu=false, plotxwithx̂=true)
@@ -245,13 +245,13 @@ function sim_closedloop!(
     d_step ::Vector = zeros(NT, plant.nd),
     d_noise::Vector = zeros(NT, plant.nd),
     x_noise::Vector = zeros(NT, plant.nx),
-    x0 = plant.x,
-    x̂0 = nothing,
+    x_0 = plant.xop,
+    x̂_0 = nothing,
     lastu = plant.uop,
 ) where {NT<:Real}
     model = estim.model
     model.Ts ≈ plant.Ts || error("Sampling time of controller/estimator ≠ plant.Ts")
-    old_x0    = copy(plant.x)
+    old_x0    = copy(plant.x0)
     T_data    = collect(plant.Ts*(0:(N-1)))
     Y_data    = Matrix{NT}(undef, plant.ny, N)
     Ŷ_data    = Matrix{NT}(undef, model.ny, N)
@@ -262,10 +262,10 @@ function sim_closedloop!(
     D_data    = Matrix{NT}(undef, plant.nd, N)
     X_data    = Matrix{NT}(undef, plant.nx, N) 
     X̂_data    = Matrix{NT}(undef, estim.nx̂, N)
-    setstate!(plant, x0)
+    setstate!(plant, x_0)
     lastd, lasty = d, evaloutput(plant, d)
     initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
-    isnothing(x̂0) || setstate!(est_mpc, x̂0)
+    isnothing(x̂_0) || setstate!(est_mpc, x̂_0)
     for i=1:N
         d = lastd + d_step + d_noise.*randn(plant.nd)
         y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)

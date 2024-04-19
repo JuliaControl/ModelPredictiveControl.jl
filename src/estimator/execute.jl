@@ -91,7 +91,7 @@ removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!
   bumpless manual to automatic transfer. See [`init_estimate!`](@ref) for details.
 - Else, `estim.x̂0` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
 
-If applicable, it also sets the error covariance `estim.P̂` to `estim.P̂0`.
+If applicable, it also sets the error covariance `estim.P̂` to `estim.P̂_0`.
 
 # Examples
 ```jldoctest

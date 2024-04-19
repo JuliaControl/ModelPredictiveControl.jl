@@ -1,7 +1,7 @@
 "Reset the data windows and time-varying variables for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ ) 
-    estim.invP̄     .= inv(estim.P̂0)
-    estim.P̂arr_old .= estim.P̂0
+    estim.invP̄     .= inv(estim.P̂_0)
+    estim.P̂arr_old .= estim.P̂_0
     estim.x̂arr_old .= 0
     estim.Z̃        .= 0
     estim.X̂        .= 0

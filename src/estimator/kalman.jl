@@ -227,27 +227,27 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     D̂d  ::Matrix{NT}
     Ĉm  ::Matrix{NT}
     D̂dm ::Matrix{NT}
-    P̂0::Hermitian{NT, Matrix{NT}}
+    P̂_0::Hermitian{NT, Matrix{NT}}
     Q̂::Hermitian{NT, Matrix{NT}}
     R̂::Hermitian{NT, Matrix{NT}}
     K̂::Matrix{NT}
     M̂::Matrix{NT}
     function KalmanFilter{NT, SM}(
-        model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂
+        model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂
     ) where {NT<:Real, SM<:LinModel}
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
-        validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
+        validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         lastu0 = zeros(NT, model.nu)
         x̂op, f̂op = [model.xop; zeros(NT, nxs)], [model.fop; zeros(NT, nxs)]
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
-        P̂0 = Hermitian(P̂0, :L)
-        P̂ = copy(P̂0)
+        P̂_0 = Hermitian(P̂_0, :L)
+        P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
         return new{NT, SM}(
             model, 
@@ -256,7 +256,7 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, 
             Ĉm, D̂dm,
-            P̂0, Q̂, R̂,
+            P̂_0, Q̂, R̂,
             K̂, M̂
         )
     end
@@ -275,19 +275,19 @@ its initial value with ``\mathbf{P̂}_{-1}(0) =
 
 # Arguments
 - `model::LinModel` : (deterministic) model for the estimations.
-- `σP0=fill(1/model.nx,model.nx)` : main diagonal of the initial estimate covariance
+- `σP_0=fill(1/model.nx,model.nx)` : main diagonal of the initial estimate covariance
     ``\mathbf{P}(0)``, specified as a standard deviation vector.
-- `σP0int_u=fill(1,sum(nint_u))` : same than `σP0` but for the unmeasured disturbances at 
+- `σPint_u_0=fill(1,sum(nint_u))` : same than `σP_0` but for the unmeasured disturbances at 
     manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
-- `σP0int_ym=fill(1,sum(nint_ym))` : same than `σP0` but for the unmeasured disturbances at 
-    measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
+- `σPint_ym_0=fill(1,sum(nint_ym))` : same than `σP_0` but for the unmeasured disturbances
+    at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
-julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP0=[100, 100], σQint_ym=[0.01])
+julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP_0=[100, 100], σQint_ym=[0.01])
 KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
  1 manipulated inputs u (0 integrating states)
  3 estimated states x̂
@@ -299,33 +299,33 @@ KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 function KalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector = fill(1/model.nx, model.nx),
+    σP_0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
     σR ::Vector = fill(1, length(i_ym)),
     nint_u   ::IntVectorOrInt = 0,
     σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
+    σPint_u_0 ::Vector = fill(1, max(sum(nint_u), 0)),
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
+    σPint_ym_0::Vector = fill(1, max(sum(nint_ym), 0)),
 ) where {NT<:Real, SM<:LinModel{NT}}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
+    P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
+    return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂)
 end
 
 @doc raw"""
-    KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+    KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
 
-Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
+Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-function KalmanFilter(model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂) where {NT<:Real, SM<:LinModel{NT}}
-    P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
-    return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+function KalmanFilter(model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂) where {NT<:Real, SM<:LinModel{NT}}
+    P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
+    return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
 end
 
 @doc raw"""
@@ -380,7 +380,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     Ĉ ::Matrix{NT}
     B̂d::Matrix{NT}
     D̂d::Matrix{NT}
-    P̂0::Hermitian{NT, Matrix{NT}}
+    P̂_0::Hermitian{NT, Matrix{NT}}
     Q̂::Hermitian{NT, Matrix{NT}}
     R̂::Hermitian{NT, Matrix{NT}}
     K̂::Matrix{NT}
@@ -393,21 +393,21 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     m̂::Vector{NT}
     Ŝ::Diagonal{NT, Vector{NT}}
     function UnscentedKalmanFilter{NT, SM}(
-        model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ
+        model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ
     ) where {NT<:Real, SM<:SimModel{NT}}
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
-        validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
+        validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         nσ, γ, m̂, Ŝ = init_ukf(model, nx̂, α, β, κ)
         lastu0 = zeros(NT, model.nu)
         x̂op, f̂op = [model.xop; zeros(NT, nxs)], [model.fop; zeros(NT, nxs)]
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
-        P̂0 = Hermitian(P̂0, :L)
-        P̂ = copy(P̂0)
+        P̂_0 = Hermitian(P̂_0, :L)
+        P̂ = copy(P̂_0)
         K̂ = zeros(NT, nx̂, nym)
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
         X̂, Ŷm = zeros(NT, nx̂, nσ), zeros(NT, nym, nσ)
@@ -418,7 +418,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
-            P̂0, Q̂, R̂,
+            P̂_0, Q̂, R̂,
             K̂, M̂, X̂, Ŷm, sqrtP̂,
             nσ, γ, m̂, Ŝ
         )
@@ -459,7 +459,7 @@ represents the measured outputs of ``\mathbf{ĥ}`` function (and unmeasured one
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
-julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σP0int_ym=[1, 1])
+julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σPint_ym_0=[1, 1])
 UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
  1 manipulated inputs u (0 integrating states)
  3 estimated states x̂
@@ -478,38 +478,38 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
 function UnscentedKalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector = fill(1/model.nx, model.nx),
+    σP_0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
     σR ::Vector = fill(1, length(i_ym)),
     nint_u   ::IntVectorOrInt = 0,
     σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
+    σPint_u_0 ::Vector = fill(1, max(sum(nint_u), 0)),
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
+    σPint_ym_0::Vector = fill(1, max(sum(nint_ym), 0)),
     α::Real = 1e-3,
     β::Real = 2,
     κ::Real = 0
 ) where {NT<:Real, SM<:SimModel{NT}}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
+    P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    return UnscentedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α, β, κ)
+    return UnscentedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ)
 end
 
 @doc raw"""
-    UnscentedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α=1e-3, β=2, κ=0)
+    UnscentedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α=1e-3, β=2, κ=0)
 
-Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
+Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function UnscentedKalmanFilter(
-    model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, α=1e-3, β=2, κ=0
+    model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α=1e-3, β=2, κ=0
 ) where {NT<:Real, SM<:SimModel{NT}}
-    P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
-    return UnscentedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, α, β, κ)
+    P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
+    return UnscentedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂, α, β, κ)
 end
 
 
@@ -669,27 +669,27 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     Ĉ ::Matrix{NT}
     B̂d::Matrix{NT}
     D̂d::Matrix{NT}
-    P̂0::Hermitian{NT, Matrix{NT}}
+    P̂_0::Hermitian{NT, Matrix{NT}}
     Q̂::Hermitian{NT, Matrix{NT}}
     R̂::Hermitian{NT, Matrix{NT}}
     K̂::Matrix{NT}
     M̂::Matrix{NT}
     function ExtendedKalmanFilter{NT, SM}(
-        model::SM, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂
+        model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂
     ) where {NT<:Real, SM<:SimModel}
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
-        validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
+        validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, model.nu)
         x̂op, f̂op = [model.xop; zeros(NT, nxs)], [model.fop; zeros(NT, nxs)]
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
-        P̂0 = Hermitian(P̂0, :L)
+        P̂_0 = Hermitian(P̂_0, :L)
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)
-        P̂ = copy(P̂0)
+        P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
         return new{NT, SM}(
             model,
@@ -697,7 +697,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
-            P̂0, Q̂, R̂,
+            P̂_0, Q̂, R̂,
             K̂, M̂
         )
     end
@@ -726,7 +726,7 @@ automatic differentiation.
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1, solver=nothing);
 
-julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP0=[0.1], σP0int_ym=[0.1])
+julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP_0=[0.1], σPint_ym_0=[0.1])
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
  1 manipulated inputs u (0 integrating states)
  2 estimated states x̂
@@ -738,33 +738,33 @@ ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
 function ExtendedKalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector = fill(1/model.nx, model.nx),
+    σP_0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
     σR ::Vector = fill(1, length(i_ym)),
     nint_u   ::IntVectorOrInt = 0,
     σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
+    σPint_u_0 ::Vector = fill(1, max(sum(nint_u), 0)),
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
+    σPint_ym_0::Vector = fill(1, max(sum(nint_ym), 0)),
 ) where {NT<:Real, SM<:SimModel{NT}}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
+    P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂)
+    return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂)
 end
 
 @doc raw"""
-    ExtendedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+    ExtendedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
 
-Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
+Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
-function ExtendedKalmanFilter(model::SM, i_ym, nint_u, nint_ym,P̂0, Q̂, R̂) where {NT<:Real, SM<:SimModel{NT}}
-    P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
-    return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+function ExtendedKalmanFilter(model::SM, i_ym, nint_u, nint_ym,P̂_0, Q̂, R̂) where {NT<:Real, SM<:SimModel{NT}}
+    P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
+    return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
 end
 
 
@@ -813,29 +813,29 @@ function update_estimate!(
     return update_estimate_kf!(estim, u, ym, d, F̂, Ĥm, P̂, x̂)
 end
 
-"Set `estim.P̂` to `estim.P̂0` for the time-varying Kalman Filters."
+"Set `estim.P̂` to `estim.P̂_0` for the time-varying Kalman Filters."
 function init_estimate_cov!(
     estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}, _ , _ , _
 ) 
-    estim.P̂ .= estim.P̂0
+    estim.P̂ .= estim.P̂_0
     return nothing
 end
 
 """
-    validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
+    validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0=nothing)
 
 Validate sizes and Hermitianity of process `Q̂`` and sensor `R̂` noises covariance matrices.
 
-Also validate initial estimate covariance `P̂0`, if provided.
+Also validate initial estimate covariance `P̂_0`, if provided.
 """
-function validate_kfcov(nym, nx̂, Q̂, R̂, P̂0=nothing)
+function validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0=nothing)
     size(Q̂)  ≠ (nx̂, nx̂)     && error("Q̂ size $(size(Q̂)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
     !ishermitian(Q̂)         && error("Q̂ is not Hermitian")
     size(R̂)  ≠ (nym, nym)   && error("R̂ size $(size(R̂)) ≠ nym, nym $((nym, nym))")
     !ishermitian(R̂)         && error("R̂ is not Hermitian")
-    if ~isnothing(P̂0)
-        size(P̂0) ≠ (nx̂, nx̂) && error("P̂0 size $(size(P̂0)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
-        !ishermitian(P̂0)    && error("P̂0 is not Hermitian")
+    if ~isnothing(P̂_0)
+        size(P̂_0) ≠ (nx̂, nx̂) && error("P̂_0 size $(size(P̂_0)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
+        !ishermitian(P̂_0)    && error("P̂_0 is not Hermitian")
     end
 end
 
