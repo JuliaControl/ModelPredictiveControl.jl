@@ -278,11 +278,11 @@ end
 
 "Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
 function linconstraint!(mpc::PredictiveController, ::SimModel)
-    nU, nΔŨ = length(mpc.con.Umin), length(mpc.con.ΔŨmin)
+    nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.Umin0 + mpc.T_lastu0
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.T_lastu0
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.Umax0 - mpc.T_lastu0
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.T_lastu0
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ

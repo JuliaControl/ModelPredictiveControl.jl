@@ -47,7 +47,7 @@ struct LinMPC{
         estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim::JM
     ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel}
         model = estim.model
-        nu, ny, nd = model.nu, model.ny, model.nd
+        nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         Ewt = 0   # economic costs not supported for LinMPC
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
@@ -61,7 +61,7 @@ struct LinMPC{
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
         # dummy vals (updated just before optimization):
-        F, fx̂  = zeros(NT, size(E, 1)), zeros(NT, size(ex̂, 1))
+        F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
         con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
             estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
         )

@@ -38,7 +38,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp
     ) where {NT<:Real, SE<:StateEstimator}
         model = estim.model
-        nu, ny, nd = model.nu, model.ny, model.nd
+        nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         Cwt = Inf # no slack variable ϵ for ExplicitMPC
         Ewt = 0   # economic costs not supported for ExplicitMPC
@@ -53,7 +53,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc)
         # dummy val (updated just before optimization):
-        F = zeros(NT, size(E, 1))
+        F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
         S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
         H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         # dummy vals (updated just before optimization):

@@ -544,7 +544,7 @@ function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where 
     J  = zeros(NT, 0, nd*Hp)
     K  = zeros(NT, 0, nx̂)
     V  = zeros(NT, 0, nu)
-    B  = zeros(NT, 0, nx̂)
+    B  = zeros(NT, 0)
     ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V, B
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
