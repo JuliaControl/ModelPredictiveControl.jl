@@ -233,7 +233,7 @@ function predictstoch!(
     return nothing
 end
 "Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."
-predictstoch!(::PredictiveController, ::StateEstimator, _ , _ ) = nothing
+predictstoch!(mpc::PredictiveController, ::StateEstimator, _ , _ ) = (mpc.F .= 0; nothing)
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)
