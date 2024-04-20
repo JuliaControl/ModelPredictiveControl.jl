@@ -355,7 +355,7 @@ also be called on any [`PredictiveController`](@ref)s to evaluate the objective 
 at specific input increments `ΔŨ` and predictions `Ŷ0` values. It mutates the `U0` argument.
 """
 function obj_nonlinprog!(
-    U0, _ , _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ::Vector{NT}
+    U0, _ , _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ::AbstractVector{NT}
 ) where NT <: Real
     J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
     if !iszero(mpc.E)
@@ -366,7 +366,7 @@ function obj_nonlinprog!(
         UE = @views [U; U[(end - model.nu + 1):end]]
         ŶE = Vector{NT}(undef, ny + ny*Hp)
         ŶE[1:ny]     .= mpc.ŷ
-        ŶE[1+ny:end] .= Ŷ0 .+ mpc.Ŷop
+        ŶE[1+ny:end] .= Ŷ0 .+ mpc.Yop
         J += mpc.E*mpc.JE(UE, ŶE, D̂E)
     end
     return J
@@ -380,7 +380,9 @@ function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method
 `U0`, `Ȳ` and `Ū` arguments (input over `Hp`, and output and input setpoint tracking error, 
 respectively).
 """
-function obj_nonlinprog!(U0, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ0, ΔŨ)
+function obj_nonlinprog!(
+    U0, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ0, ΔŨ::AbstractVector{NT}
+) where NT<:Real
     # --- output setpoint tracking term ---
     Ȳ  .= mpc.R̂y0 .- Ŷ0
     JR̂y = dot(Ȳ, mpc.M_Hp, Ȳ)

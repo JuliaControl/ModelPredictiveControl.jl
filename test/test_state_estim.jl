@@ -77,7 +77,7 @@ end
     skalmanfilter2 = SteadyKalmanFilter(linmodel2, nint_u=[1, 1])
     x = initstate!(skalmanfilter2, [10, 3], [0.5, 6+0.1])
     @test evaloutput(skalmanfilter2) ≈ [0.5, 6+0.1]
-    @test updatestate!(skalmanfilter2, [0, 3], [0.5, 6+0.1]) ≈ x
+    @test updatestate!(skalmanfilter2, [10, 3], [0.5, 6+0.1]) ≈ x
     setstate!(skalmanfilter1, [1,2,3,4])
     @test skalmanfilter1.x̂0 ≈ [1,2,3,4]
     for i in 1:100

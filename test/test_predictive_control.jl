@@ -83,7 +83,7 @@ end
     r = [15]
     outdist = [5]
     mpc_im = LinMPC(InternalModel(linmodel))
-    linmodel.x .= 0
+    linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -94,7 +94,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
     mpc_nint_u = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    linmodel.x .= 0
+    linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -105,7 +105,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
     mpc_nint_ym = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    linmodel.x .= 0
+    linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -134,13 +134,13 @@ end
     mpc = LinMPC(model, Hp=1, Hc=1)
 
     setconstraint!(mpc, umin=[-5, -9.9], umax=[100,99])
-    @test all((mpc.con.Umin, mpc.con.Umax) .≈ ([-5, -9.9], [100,99]))
+    @test all((mpc.con.U0min, mpc.con.U0max) .≈ ([-5, -9.9], [100,99]))
     setconstraint!(mpc, Δumin=[-5,-10], Δumax=[6,11])
     @test all((mpc.con.ΔŨmin, mpc.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
     setconstraint!(mpc, ymin=[-6, -11],ymax=[55, 35])
-    @test all((mpc.con.Ymin, mpc.con.Ymax) .≈ ([-6,-11], [55,35]))
+    @test all((mpc.con.Y0min, mpc.con.Y0max) .≈ ([-6,-11], [55,35]))
     setconstraint!(mpc, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((mpc.con.x̂min, mpc.con.x̂max) .≈ ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test all((mpc.con.x̂0min, mpc.con.x̂0max) .≈ ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
 
     setconstraint!(mpc, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
     @test all((-mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]) .≈ ([0.01,0.02], [0.03,0.04]))
@@ -155,11 +155,11 @@ end
     mpc2 = LinMPC(model2, Hp=50, Hc=5)
 
     setconstraint!(mpc2, Umin=-1(1:50).-1, Umax=+1(1:50).+1)
-    @test all((mpc2.con.Umin, mpc2.con.Umax) .≈ (-1(1:50).-1, +1(1:50).+1))
+    @test all((mpc2.con.U0min, mpc2.con.U0max) .≈ (-1(1:50).-1, +1(1:50).+1))
     setconstraint!(mpc2, ΔUmin=-1(1:5).-2, ΔUmax=+1(1:5).+2)
     @test all((mpc2.con.ΔŨmin, mpc2.con.ΔŨmax) .≈ ([-1(1:5).-2; 0], [+1(1:5).+2; Inf]))
     setconstraint!(mpc2, Ymin=-1(1:50).-3, Ymax=+1(1:50).+3)
-    @test all((mpc2.con.Ymin, mpc2.con.Ymax) .≈ (-1(1:50).-3, +1(1:50).+3))
+    @test all((mpc2.con.Y0min, mpc2.con.Y0max) .≈ (-1(1:50).-3, +1(1:50).+3))
 
     setconstraint!(mpc2, C_umin=+1(1:50).+4, C_umax=+1(1:50).+4)
     @test all((-mpc2.con.A_Umin[:, end], -mpc2.con.A_Umax[:, end]) .≈ (+1(1:50).+4, +1(1:50).+4))
@@ -313,7 +313,7 @@ end
     r = [15]
     outdist = [5]
     mpc_im = ExplicitMPC(InternalModel(linmodel))
-    linmodel.x .= 0
+    linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -324,7 +324,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
     mpc_nint_u = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    linmodel.x .= 0
+    linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -335,7 +335,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
     mpc_nint_ym = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    linmodel.x .= 0
+    linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -374,7 +374,7 @@ end
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
-    @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
+    @test size(nmpc1.R̂y0, 1) == 15*nmpc1.estim.model.ny
     nmpc2 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=Inf)
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
     nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e6)
@@ -413,8 +413,7 @@ end
     @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
 
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
-    # TODO: to uncomment when deprecated constructor is removed:
-    # @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=nothing)
+    @test_throws ArgumentError NonLinMPC(nonlinmodel)
 end
 
 @testset "NonLinMPC moves and getinfo" begin
@@ -486,7 +485,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
     nmpc_nint_u = NonLinMPC(SteadyKalmanFilter(linmodel, nint_u=[1]))
-    linmodel.x .= 0
+    linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -497,7 +496,7 @@ end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
     nmpc_nint_ym = NonLinMPC(SteadyKalmanFilter(linmodel, nint_ym=[1]))
-    linmodel.x .= 0
+    linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
