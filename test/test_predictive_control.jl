@@ -122,10 +122,10 @@ end
     mpc1 = LinMPC(linmodel1)
     @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     setstate!(mpc1, [1,2,3,4])
-    @test mpc1.estim.x̂ ≈ [1,2,3,4]
+    @test mpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(mpc1, [0,0,0,0])
     updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
-    @test mpc1.estim.x̂ ≈ [0,0,0,0]
+    @test mpc1.estim.x̂0 ≈ [0,0,0,0]
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -352,10 +352,10 @@ end
     mpc1 = ExplicitMPC(linmodel1)
     @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     setstate!(mpc1, [1,2,3,4])
-    @test mpc1.estim.x̂ ≈ [1,2,3,4]
+    @test mpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(mpc1, [0,0,0,0])
     updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
-    @test mpc1.estim.x̂ ≈ [0,0,0,0]
+    @test mpc1.estim.x̂0 ≈ [0,0,0,0]
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -475,7 +475,7 @@ end
     r = [15]
     outdist = [5]
     nmpc_im = NonLinMPC(InternalModel(linmodel))
-    linmodel.x .= 0
+    linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
@@ -517,10 +517,10 @@ end
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test initstate!(nmpc1, [10, 50], [20, 25]) ≈ zeros(4)
     setstate!(nmpc1, [1,2,3,4])
-    @test nmpc1.estim.x̂ ≈ [1,2,3,4]
+    @test nmpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(nmpc1, [0,0,0,0])
     updatestate!(nmpc1, nmpc1.estim.model.uop, nmpc1.estim())
-    @test nmpc1.estim.x̂ ≈ [0,0,0,0] atol=1e-6
+    @test nmpc1.estim.x̂0 ≈ [0,0,0,0] atol=1e-6
 end
 
 @testset "NonLinMPC set constraints" begin
@@ -528,7 +528,7 @@ end
     nmpc_lin = NonLinMPC(linmodel1, Hp=1, Hc=1)
 
     setconstraint!(nmpc_lin, ymin=[5,10],ymax=[55, 35])
-    @test all((nmpc_lin.con.Ymin, nmpc_lin.con.Ymax) .≈ ([5,10], [55,35]))
+    @test all((nmpc_lin.con.Y0min, nmpc_lin.con.Y0max) .≈ ([5,10], [55,35]))
     setconstraint!(nmpc_lin, c_ymin=[1.0,1.1], c_ymax=[1.2,1.3])
     @test all((-nmpc_lin.con.A_Ymin[:, end], -nmpc_lin.con.A_Ymax[:, end]) .≈ ([1.0,1.1], [1.2,1.3]))
 
@@ -538,13 +538,13 @@ end
     nmpc = NonLinMPC(nonlinmodel, Hp=1, Hc=1)
 
     setconstraint!(nmpc, umin=[-5, -9.9], umax=[100,99])
-    @test all((nmpc.con.Umin, nmpc.con.Umax) .≈ ([-5, -9.9], [100,99]))
+    @test all((nmpc.con.U0min, nmpc.con.U0max) .≈ ([-5, -9.9], [100,99]))
     setconstraint!(nmpc, Δumin=[-5,-10], Δumax=[6,11])
     @test all((nmpc.con.ΔŨmin, nmpc.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
     setconstraint!(nmpc, ymin=[-6, -11],ymax=[55, 35])
-    @test all((nmpc.con.Ymin, nmpc.con.Ymax) .≈ ([-6,-11], [55,35]))
+    @test all((nmpc.con.Y0min, nmpc.con.Y0max) .≈ ([-6,-11], [55,35]))
     setconstraint!(nmpc, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((nmpc.con.x̂min, nmpc.con.x̂max) .≈ ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test all((nmpc.con.x̂0min, nmpc.con.x̂0max) .≈ ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
 
     setconstraint!(nmpc, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
     @test all((-nmpc.con.A_Umin[:, end], -nmpc.con.A_Umax[:, end]) .≈ ([0.01,0.02], [0.03,0.04]))

@@ -105,25 +105,30 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     model = mpc.estim.model
     info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
-    Ŷ, u, û     = similar(mpc.Ŷop), similar(model.uop), similar(model.uop)
-    x̂, x̂next    = similar(mpc.estim.x̂), similar(mpc.estim.x̂)
-    Ŷ, x̂end     = predict!(Ŷ, x̂, x̂next, u, û, mpc, model, mpc.ΔŨ)
-    U           = mpc.S̃*mpc.ΔŨ + mpc.T_lastu0 + mpc.Uop
-    Ȳ, Ū        = similar(Ŷ), similar(U)
-    J           = obj_nonlinprog!(U, Ȳ, Ū, mpc, model, Ŷ, mpc.ΔŨ)
+    Ŷ0, u0, û0  = similar(mpc.Yop), similar(model.uop), similar(model.uop)
+    Ŷs          = similar(mpc.Yop)
+    x̂0, x̂0next  = similar(mpc.estim.x̂0), similar(mpc.estim.x̂0)
+    Ȳ, Ū        = similar(mpc.Yop), similar(mpc.Uop)
+    Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
+    U0 = mpc.S̃*mpc.ΔŨ + mpc.T_lastu0
+    J  = obj_nonlinprog!(U0, Ȳ, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
+    oldF = copy(mpc.F)
+    predictstoch!(mpc, mpc.estim, mpc.d0 + model.dop, mpc.ŷ[mpc.estim.i_ym]) 
+    Ŷs .= mpc.F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
+    mpc.F .= oldF  # restore old F value
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
     info[:ϵ]    = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
     info[:J]    = J
-    info[:U]    = U
+    info[:U]    = U0 + mpc.Uop
     info[:u]    = info[:U][1:model.nu]
     info[:d]    = mpc.d0 + model.dop
     info[:D̂]    = mpc.D̂0 + mpc.Dop
     info[:ŷ]    = mpc.ŷ
-    info[:Ŷ]    = Ŷ
-    info[:x̂end] = x̂end
-    info[:Ŷs]  = mpc.Ŷop - repeat(model.yop, mpc.Hp) # Ŷop = Ŷs + Yop
-    info[:R̂y]  = mpc.R̂y
-    info[:R̂u]  = mpc.R̂u
+    info[:Ŷ]    = Ŷ0 + mpc.Yop
+    info[:x̂end] = x̂0end + mpc.estim.x̂op
+    info[:Ŷs]   = Ŷs
+    info[:R̂y]   = mpc.R̂y0 + mpc.Yop
+    info[:R̂u]   = mpc.R̂u0 + mpc.Uop
     info = addinfo!(info, mpc)
     return info
 end
@@ -202,7 +207,7 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, ym, D̂, R̂y,
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
         mpc.D̂0 .= D̂ .- mpc.Dop
-        mpc.D̂E[1:model.nd]     .= d̂
+        mpc.D̂E[1:model.nd]     .= d
         mpc.D̂E[model.nd+1:end] .= D̂
     end
     mpc.R̂y0 .= (R̂y .- mpc.Yop)
@@ -228,6 +233,7 @@ function predictstoch!(
     ŷd .+= estim.model.yop 
     ŷs = zeros(NT, estim.model.ny)
     ŷs[estim.i_ym] .= @views ym .- ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
+    Ŷs = F
     mul!(Ŷs, mpc.Ks, estim.x̂s)
     mul!(Ŷs, mpc.Ps, ŷs, 1, 1)
     return nothing
@@ -546,7 +552,7 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel)
     con.A_Ymax .= A_Ymax
     con.A_x̂min .= A_x̂min
     con.A_x̂max .= A_x̂max
-    nUandΔŨ = length(con.Umin) + length(con.Umax) + length(con.ΔŨmin) + length(con.ΔŨmax)
+    nUandΔŨ = length(con.U0min) + length(con.U0max) + length(con.ΔŨmin) + length(con.ΔŨmax)
     con.A[nUandΔŨ+1:end, :] = [con.A_Ymin; con.A_Ymax; con.A_x̂min; con.A_x̂max]
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
@@ -560,7 +566,7 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel)
     set_objective_hessian!(mpc, ΔŨvar)
     # --- operating points ---
     for i in 0:Hp-1
-        mpc.Ŷop[(1+ny*i):(ny+ny*i)] .= model.yop
+        mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop
         mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
     end
     return nothing

@@ -590,10 +590,10 @@ function init_defaultcon_mpc(
 ) where {NT<:Real}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
-    u0min,      u0max    = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
+    u0min,      u0max   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     Δumin,      Δumax   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
-    y0min,      y0max    = fill(convert(NT,-Inf), ny), fill(convert(NT,+Inf), ny)
-    x̂0min,      x̂0max    = fill(convert(NT,-Inf), nx̂), fill(convert(NT,+Inf), nx̂)
+    y0min,      y0max   = fill(convert(NT,-Inf), ny), fill(convert(NT,+Inf), ny)
+    x̂0min,      x̂0max   = fill(convert(NT,-Inf), nx̂), fill(convert(NT,+Inf), nx̂)
     c_umin,     c_umax  = fill(zero(NT), nu), fill(zero(NT), nu)
     c_Δumin,    c_Δumax = fill(zero(NT), nu), fill(zero(NT), nu)
     c_ymin,     c_ymax  = fill(one(NT),  ny), fill(one(NT),  ny)

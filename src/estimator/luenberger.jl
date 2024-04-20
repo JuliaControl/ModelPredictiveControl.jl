@@ -104,7 +104,7 @@ end
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂0))
-    Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
+    Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     x̂, K̂ = estim.x̂0, estim.K̂
     Ĉm, D̂dm = @views estim.Ĉ[estim.i_ym, :], estim.D̂d[estim.i_ym, :]
     ŷm, x̂next = similar(ym), similar(x̂)
@@ -117,7 +117,7 @@ function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂0))
     mul!(x̂next, B̂u, u, 1, 1)
     mul!(x̂next, B̂d, d, 1, 1)
     mul!(x̂next, K̂, v̂, 1, 1)
-    estim.x̂ .= x̂next
+    estim.x̂0 .= x̂next
     return nothing
 end
 

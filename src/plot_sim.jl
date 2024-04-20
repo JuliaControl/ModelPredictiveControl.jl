@@ -125,10 +125,10 @@ function sim!(
     setstate!(plant, x_0)
     for i=1:N
         y = evaloutput(plant, d) 
-        Y_data[:, i]  = y
-        U_data[:, i]  = u
-        D_data[:, i]  = d
-        X_data[:, i]  = plant.x
+        Y_data[:, i] .= y
+        U_data[:, i] .= u
+        D_data[:, i] .= d
+        X_data[:, i] .= plant.x0 .+ plant.xop
         updatestate!(plant, u, d)
     end
     return SimResult(plant, T_data, Y_data, U_data, Y_data, 
@@ -272,22 +272,22 @@ function sim_closedloop!(
         ym = y[estim.i_ym]
         u  = sim_getu!(est_mpc, u_ry, d, ru, ym)
         ud = u + u_step + u_noise.*randn(plant.nu)
-        Y_data[:, i]  = y
-        Ŷ_data[:, i]  = evalŷ(estim, ym, d)
-        U_Ry_data[:, i] = u_ry
-        U_data[:, i]  = u
-        Ud_data[:, i] = ud
-        Ru_data[:, i] = ru
-        D_data[:, i]  = d
-        X_data[:, i] .= plant.x0 .+ plant.xop
-        X̂_data[:, i] .= estim.x̂0 .+ estim.x̂op
+        Y_data[:, i] .= y
+        Ŷ_data[:, i] .= evalŷ(estim, ym, d)
+        U_Ry_data[:, i] .= u_ry
+        U_data[:, i]  .= u
+        Ud_data[:, i] .= ud
+        Ru_data[:, i] .= ru
+        D_data[:, i]  .= d
+        X_data[:, i]  .= plant.x0 .+ plant.xop
+        X̂_data[:, i]  .= estim.x̂0 .+ estim.x̂op
         x = updatestate!(plant, ud, d); 
         x[:] += x_noise.*randn(plant.nx)
         updatestate!(est_mpc, u, ym, d)
     end
     res = SimResult(est_mpc, T_data, Y_data, U_Ry_data, Ŷ_data, 
                     U_data, Ud_data, Ru_data, D_data, X_data, X̂_data)
-    setstate!(plant, old_x0)
+    plant.x0 .= old_x0
     return res
 end
 
