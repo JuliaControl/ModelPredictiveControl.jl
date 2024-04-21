@@ -407,7 +407,7 @@ function obj_nonlinprog!(
         UE = @views [U; U[(end - model.nu + 1):end]]
         ŶE = Vector{NT}(undef, ny + ny*Hp)
         ŶE[1:ny]     .= mpc.ŷ
-        ŶE[1+ny:end] .= Ŷ0 .+ mpc.Ŷop
+        ŶE[1+ny:end] .= Ŷ0 .+ mpc.Yop
         E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E)
     else
         E_JE = 0.0

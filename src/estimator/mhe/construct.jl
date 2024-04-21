@@ -134,7 +134,7 @@ struct MovingHorizonEstimator{
         Nk = [0]
         estim = new{NT, SM, JM, CE}(
             model, optim, con, covestim,  
-            Z̃, lastu0, x̂op, x̂0, 
+            Z̃, lastu0, x̂op, f̂op, x̂0, 
             He,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
