@@ -588,7 +588,6 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel, x̂op_
     H̃ = init_quadprog(model, mpc.Ẽ, mpc.S̃, mpc.M_Hp, mpc.Ñ_Hc, mpc.L_Hp)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc, ΔŨvar)
-
     return nothing
 end
 

@@ -248,7 +248,7 @@ linmodel = linearize(model, x=[π, 0], u=[0])
 A [`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
 
 ```@example 1
-kf  = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)#SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
+kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
 mpc = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
@@ -311,17 +311,21 @@ a [`LinMPC`](@ref) instance with repeated online linearization.
 ## Adapting the Model with Successive Linearization
 
 ```@example 1
-function adapt_mpc(plant, model, linmodel, mpc)
-    N = 200
+function adapt_mpc(plant, model, mpc)
+    N = 35
     ry = [180]
-    setstate!(plant, [π, 0])
-    #initstate!(mpc, plant.uop, plant())
     U_data, Y_data, Ry_data = zeros(plant.nu, N), zeros(plant.ny, N), zeros(plant.ny, N)
+    setstate!(plant, [π, 0])
+    setstate!(model, [π, 0])
+    u, y = [0.0], plant()
+    linmodel = linearize(model, x=[π, 0], u=[0])
+    setmodel!(mpc, linmodel)
+    initstate!(mpc, u, y)
     for i = 1:N
         y = plant() .+ 10
         u = mpc(ry)
         U_data[:,i], Y_data[:,i], Ry_data[:,i] = u, y, ry
-        linmodel = linearize(model; u=u, x=plant.x0)
+        linmodel = linearize!(linmodel, model, u=u)
         mpc = setmodel!(mpc, linmodel)
         updatestate!(mpc, u, y) # update mpc state estimate
         updatestate!(model, u)  # update nonlinear model
@@ -329,7 +333,11 @@ function adapt_mpc(plant, model, linmodel, mpc)
     end
     return U_data, Y_data, Ry_data
 end
-U_data, Y_data, Ry_data = adapt_mpc(plant, model, linmodel, mpc)
+linmodel = linearize(model, x=[π, 0], u=[0])
+kf3  = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
+mpc3 = LinMPC(kf3, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
+mpc3 = setconstraint!(mpc3, umin=[-1.5], umax=[+1.5])
+U_data, Y_data, Ry_data = adapt_mpc(plant, model, mpc3)
 res = SimResult(mpc, U_data, Y_data; Ry_data)
 plot(res)
 ```
