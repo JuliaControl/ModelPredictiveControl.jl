@@ -169,6 +169,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, ym, D̂, R̂y,
     ŷ, F, q̃, p = mpc.ŷ, mpc.F, mpc.q̃, mpc.p
     ŷ .= evalŷ(mpc.estim, ym, d)
     predictstoch!(mpc, mpc.estim, d, ym) # init mpc.F with Ŷs for InternalModel
+    F .+= mpc.B
     mul!(F, mpc.K, mpc.estim.x̂0, 1, 1) 
     mul!(F, mpc.V, mpc.estim.lastu0, 1, 1)
     if model.nd ≠ 0
@@ -246,14 +247,15 @@ predictstoch!(mpc::PredictiveController, ::StateEstimator, _ , _ ) = (mpc.F .= 0
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 
-Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} + \mathbf{k_x̂ x̂}_{k-1}(k) + \mathbf{v_x̂ u}(k-1)``
-vector for the terminal constraints, see [`init_predmat`](@ref).
+Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} + \mathbf{k_x̂ x̂}_{k-1}(k) 
++ \mathbf{v_x̂ u}(k-1) + \mathbf{b_x̂}`` vector for the terminal constraints, see 
+[`init_predmat`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
     nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
-    nx̂ = mpc.estim.nx̂
-    fx̂ = mpc.con.fx̂
-    mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂0)
+    nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
+    fx̂ .= mpc.con.bx̂
+    mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂0, 1, 1)
     mul!(fx̂, mpc.con.vx̂, mpc.estim.lastu0, 1, 1)
     if model.nd ≠ 0
         mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
@@ -335,6 +337,7 @@ function predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, mod
             u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
         end
         f̂!(x̂0next, û0, mpc.estim, model, x̂0, u0, d0)
+        x̂0next .+= mpc.estim.f̂op .+ mpc.estim.x̂op
         x̂0 .= x̂0next
         d0 = @views mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
@@ -522,13 +525,14 @@ julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); kf.model.A
 ```
 """
 function setmodel!(mpc::PredictiveController, model::LinModel)
+    x̂op_old = copy(mpc.estim.x̂op)
     setmodel!(mpc.estim, model)
-    setmodel_controller!(mpc, model)
+    setmodel_controller!(mpc, model, x̂op_old)
     return mpc
 end
 
 "Update the prediction matrices, linear constraints and JuMP optimization."
-function setmodel_controller!(mpc::PredictiveController, model::LinModel)
+function setmodel_controller!(mpc::PredictiveController, model::LinModel, x̂op_old)
     estim = mpc.estim
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     optim, con = mpc.optim, mpc.con
@@ -550,6 +554,24 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel)
     con.kx̂ .= kx̂
     con.vx̂ .= vx̂
     con.bx̂ .= bx̂
+    con.U0min .+= mpc.Uop # convert U0 to U with the old operating point
+    con.U0max .+= mpc.Uop # convert U0 to U with the old operating point
+    con.Y0min .+= mpc.Yop # convert Y0 to Y with the old operating point
+    con.Y0max .+= mpc.Yop # convert Y0 to Y with the old operating point
+    con.x̂0min .+= x̂op_old # convert x̂0 to x̂ with the old operating point
+    con.x̂0max .+= x̂op_old # convert x̂0 to x̂ with the old operating point
+    # --- operating points ---
+    for i in 0:Hp-1
+        mpc.Uop[(1+nu*i):(nu+nu*i)] .= model.uop
+        mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop
+        mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
+    end
+    con.U0min .-= mpc.Uop # convert U0 to U with the new operating point
+    con.U0max .-= mpc.Uop # convert U0 to U with the new operating point
+    con.Y0min .-= mpc.Yop # convert Y0 to Y with the new operating point
+    con.Y0max .-= mpc.Yop # convert Y0 to Y with the new operating point
+    con.x̂0min .-= estim.x̂op # convert x̂0 to x̂ with the new operating point
+    con.x̂0max .-= estim.x̂op # convert x̂0 to x̂ with the new operating point
     con.A_Ymin .= A_Ymin
     con.A_Ymax .= A_Ymax
     con.A_x̂min .= A_x̂min
@@ -566,11 +588,7 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel)
     H̃ = init_quadprog(model, mpc.Ẽ, mpc.S̃, mpc.M_Hp, mpc.Ñ_Hc, mpc.L_Hp)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc, ΔŨvar)
-    # --- operating points ---
-    for i in 0:Hp-1
-        mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop
-        mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
-    end
+
     return nothing
 end
 

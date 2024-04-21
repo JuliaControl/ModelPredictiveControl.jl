@@ -260,14 +260,16 @@ julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); kf.model.A
 ```
 """
 function setmodel!(estim::StateEstimator, model::LinModel)
-    validate_model(estim, model)
+    validate_model(estim.model, model)
     # --- update model matrices and its operating points ---
     estim.model.A   .= model.A
     estim.model.Bu  .= model.Bu
     estim.model.C   .= model.C
     estim.model.Bd  .= model.Bd
     estim.model.Dd  .= model.Dd
+    estim.lastu0   .+= estim.model.uop # convert u0 to u with the old operating point
     estim.model.uop .= model.uop
+    estim.lastu0   .-= estim.model.uop # convert u to u0 with the new operating point
     estim.model.yop .= model.yop
     estim.model.dop .= model.dop
     estim.model.xop .= model.xop
@@ -276,14 +278,15 @@ function setmodel!(estim::StateEstimator, model::LinModel)
     return estim
 end
 
-"Validate the dimensions and sample time of `model` against `estim.model`."
-function validate_model(estim::StateEstimator, model::LinModel)
-    model.Ts == estim.model.Ts || throw(ArgumentError("model.Ts must be $(estim.model.Ts) s"))
-    model.nu == estim.model.nu || throw(ArgumentError("model.nu must be $(estim.model.nu)"))
-    model.nx == estim.model.nx || throw(ArgumentError("model.nx must be $(estim.model.nx)"))
-    model.ny == estim.model.ny || throw(ArgumentError("model.ny must be $(estim.model.ny)"))
-    model.nd == estim.model.nd || throw(ArgumentError("model.nd must be $(estim.model.nd)"))
+"Validate the type and dimension of the new model for adaptation."
+function validate_model(old::LinModel, new::LinModel)
+    new.Ts == old.Ts || throw(ArgumentError("model.Ts must be $(old.Ts) s"))
+    new.nu == old.nu || throw(ArgumentError("model.nu must be $(old.nu)"))
+    new.nx == old.nx || throw(ArgumentError("model.nx must be $(old.nx)"))
+    new.ny == old.ny || throw(ArgumentError("model.ny must be $(old.ny)"))
+    new.nd == old.nd || throw(ArgumentError("model.nd must be $(old.nd)"))
 end
+validate_model(::SimModel, ::SimModel) = error("Only LinModel is supported for setmodel!")
 
 "Update the augmented model matrices of `estim` by default."
 function setmodel_estimator!(estim::StateEstimator, model::LinModel)

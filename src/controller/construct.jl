@@ -390,15 +390,16 @@ The model predictions are evaluated from the deviation vectors (see [`setop!`](@
                  &= \mathbf{E ΔU} + \mathbf{F}
 \end{aligned}
 ```
-in which ``\mathbf{x̂_0} = \mathbf{x̂}_{k-1}(k)-\mathbf{x̂_{op}}`` and ``\mathbf{x̂}_{k-1}(k)``
-is the state estimated at the last control period. The predicted outputs ``\mathbf{Ŷ_0}`` and
-measured disturbances ``\mathbf{D̂_0}`` include values from ``k+1`` to ``k+H_p``, and input
-increments ``\mathbf{ΔU}``, from ``k`` to ``k+H_c-1``. The vector ``\mathbf{B}`` contains
-the contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}``
-operating points (for linearization at non-equilibrium point, see [`linearize`](@ref)). The
-stochastic predictions ``\mathbf{Ŷ_s=0}`` if `estim` is not a [`InternalModel`](@ref) (see
-[`init_stochpred`](@ref)). The method also computes similar matrices for the predicted
-terminal states at ``k+H_p``:
+in which ``\mathbf{x̂_0}(k) = \mathbf{x̂}_{k-1}(k) - \mathbf{x̂_{op}}`` and
+``\mathbf{x̂}_{k-1}(k)`` is the state estimated at the last control period. The predicted
+outputs ``\mathbf{Ŷ_0}`` and measured disturbances ``\mathbf{D̂_0}`` respectively include
+``\mathbf{ŷ_0}(k+j)`` and ``\mathbf{d̂_0}(k+j)`` values with ``j=1`` to ``H_p``, and input
+increments ``\mathbf{ΔU}``, ``\mathbf{Δu}(k+j)`` from ``j=0`` to ``H_c-1``. The vector
+``\mathbf{B}`` contains the contribution for non-zero state ``\mathbf{x̂_{op}}`` and state
+update ``\mathbf{f̂_{op}}`` operating points (for linearization at non-equilibrium point, see
+[`linearize`](@ref)). The stochastic predictions ``\mathbf{Ŷ_s=0}`` if `estim` is not a
+[`InternalModel`](@ref), see [`init_stochpred`](@ref). The method also computes similar
+matrices for the predicted terminal states at ``k+H_p``:
 ```math
 \begin{aligned}
     \mathbf{x̂_0}(k+H_p) &= \mathbf{e_x̂ ΔU} + \mathbf{g_x̂ d}(k)   + \mathbf{j_x̂ D̂} 
@@ -407,8 +408,8 @@ terminal states at ``k+H_p``:
                         &= \mathbf{e_x̂ ΔU} + \mathbf{f_x̂}
 \end{aligned}
 ```
-The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are recalculated at each control
-period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
+The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are recalculated at each control period
+``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
 
 # Extended Help
 !!! details "Extended Help"
@@ -531,8 +532,8 @@ function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where 
         iRow = (1:ny) .+ ny*(j-1)
         coef_B[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)
     end
-    bx̂ = coef_bx̂ * (estim.x̂op + estim.f̂op)
-    B  = coef_B  * (estim.x̂op + estim.f̂op)
+    bx̂ = coef_bx̂ * (estim.f̂op - estim.x̂op)
+    B  = coef_B  * (estim.f̂op - estim.x̂op)
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 

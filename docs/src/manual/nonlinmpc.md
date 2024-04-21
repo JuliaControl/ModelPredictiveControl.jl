@@ -232,7 +232,7 @@ Dict(:W_nmpc => calcW(res_yd), :W_empc => calcW(res2_yd))
 Of course, this gain is only exploitable if the motor electronic includes some kind of
 regenerative circuitry.
 
-## Linearizing the Model
+## Model Linearization
 
 Nonlinear MPC is more computationally expensive than [`LinMPC`](@ref). Solving the problem
 should always be faster than the sampling time ``T_s = 0.1`` s for real-time operation. This
@@ -248,7 +248,7 @@ linmodel = linearize(model, x=[π, 0], u=[0])
 A [`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
 
 ```@example 1
-kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
+kf  = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)#SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
 mpc = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
@@ -304,5 +304,32 @@ savefig(ans, "plot8_NonLinMPC.svg"); nothing # hide
 The closed-loop performance is still lower than the nonlinear controller, as expected, but
 computations are about 2000 times faster (0.00002 s versus 0.04 s per time steps, on
 average). Note that `linmodel` is only valid for angular positions near 180°. Multiple
-linearized models and controllers are required for large deviations from this operating
-point. This is known as gain scheduling.
+linearized model and controller objects are required for large deviations from this
+operating point. This is known as gain scheduling. Another approach is adapting the model of
+a [`LinMPC`](@ref) instance with repeated online linearization.
+
+## Adapting the Model with Successive Linearization
+
+```@example 1
+function adapt_mpc(plant, model, linmodel, mpc)
+    N = 200
+    ry = [180]
+    setstate!(plant, [π, 0])
+    #initstate!(mpc, plant.uop, plant())
+    U_data, Y_data, Ry_data = zeros(plant.nu, N), zeros(plant.ny, N), zeros(plant.ny, N)
+    for i = 1:N
+        y = plant() .+ 10
+        u = mpc(ry)
+        U_data[:,i], Y_data[:,i], Ry_data[:,i] = u, y, ry
+        linmodel = linearize(model; u=u, x=plant.x0)
+        mpc = setmodel!(mpc, linmodel)
+        updatestate!(mpc, u, y) # update mpc state estimate
+        updatestate!(model, u)  # update nonlinear model
+        updatestate!(plant, u)  # update plant simulator
+    end
+    return U_data, Y_data, Ry_data
+end
+U_data, Y_data, Ry_data = adapt_mpc(plant, model, linmodel, mpc)
+res = SimResult(mpc, U_data, Y_data; Ry_data)
+plot(res)
+```

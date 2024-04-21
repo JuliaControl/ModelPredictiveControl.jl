@@ -208,7 +208,7 @@ addinfo!(info, mpc::ExplicitMPC) = info
 
 
 "Update the prediction matrices and Cholesky factorization."
-function setmodel_controller!(mpc::ExplicitMPC, model::LinModel)
+function setmodel_controller!(mpc::ExplicitMPC, model::LinModel, _ )
     estim = mpc.estim
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
@@ -226,7 +226,8 @@ function setmodel_controller!(mpc::ExplicitMPC, model::LinModel)
     set_objective_hessian!(mpc)
     # --- operating points ---
     for i in 0:Hp-1
-        mpc.Ŷop[(1+ny*i):(ny+ny*i)] .= model.yop
+        mpc.Uop[(1+nu*i):(nu+nu*i)] .= model.uop
+        mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop
         mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
     end
     return nothing

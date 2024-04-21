@@ -35,24 +35,25 @@ disturbance `dop`, and model state `xop` operating points (a.k.a. nominal values
     \mathbf{x_0}(k) &= \mathbf{x}(k) - \mathbf{x_{op}} \\
 \end{align*}
 ```
-The state-space model around the operating points is:
+The state-space description of [`LinModel`](@ref) around the operating points is:
 ```math
 \begin{aligned}
     \mathbf{x_0}(k+1) &= \mathbf{A x_0}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) 
-                         + \mathbf{f_op}   - \mathbf{x_{op}} \\
+                         + \mathbf{f_{op}}   - \mathbf{x_{op}}                                 \\
     \mathbf{y_0}(k)   &= \mathbf{C x_0}(k) + \mathbf{D_d d_0}(k) 
 \end{aligned}
 ```
-The state `xop` and the additional `fop` operating points are frequently set to zero e.g.: 
-when `model` is extracted from system identification. The two vectors are internally used by
-[`linearize`](@ref) for non-equilibrium points. The structure is similar for `NonLinModel`:
+and, for [`NonLinModel`](@ref):
 ```math
 \begin{aligned}
     \mathbf{x_0}(k+1) &= \mathbf{f}\Big(\mathbf{x_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) 
-                         + \mathbf{f_op}   - \mathbf{x_{op}} \\
+                            + \mathbf{f_op} - \mathbf{x_{op}}                                  \\
     \mathbf{y_0}(k)   &= \mathbf{h}\Big(\mathbf{x_0}(k), \mathbf{d_0}(k)\Big)
 \end{aligned}
 ```
+The state `xop` and the additional `fop` operating points are frequently zero e.g.: when 
+`model` comes from system identification. The two vectors are internally used by
+[`linearize`](@ref) for non-equilibrium points.
 
 # Examples
 ```jldoctest
