@@ -117,7 +117,7 @@ The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. 
 ```@example 1
 using Logging; disable_logging(Warn)            # hide
 using JuMP; unset_time_limit_sec(nmpc.optim)    # hide
-res_ry = sim!(nmpc, N, [180.0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
+res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res_ry)
 savefig(ans, "plot3_NonLinMPC.svg"); nothing # hide
 ```
@@ -129,7 +129,7 @@ inverted position, the closed-loop response to a step disturbances of 10° is al
 satisfactory:
 
 ```@example 1
-res_yd = sim!(nmpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
+res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
 plot(res_yd)
 savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
 ```
@@ -196,7 +196,7 @@ setpoint is similar:
 
 ```@example 1
 unset_time_limit_sec(empc.optim) # hide
-res2_ry = sim!(empc, N, [180, 0], plant=plant2, x0=[0, 0], x̂0=[0, 0, 0])
+res2_ry = sim!(empc, N, [180, 0], plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res2_ry)
 savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
 ```
@@ -216,7 +216,7 @@ Dict(:W_nmpc => calcW(res_ry), :W_empc => calcW(res2_ry))
 Also, for a 10° step disturbance:
 
 ```@example 1
-res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10, 0])
+res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10, 0])
 plot(res2_yd)
 savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
 ```
@@ -256,7 +256,7 @@ mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 The linear controller has difficulties to reject the 10° step disturbance:
 
 ```@example 1
-res_lin = sim!(mpc, N, [180.0]; plant, x0=[π, 0], y_step=[10])
+res_lin = sim!(mpc, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin)
 savefig(ans, "plot7_NonLinMPC.svg"); nothing # hide
 ```
@@ -294,7 +294,7 @@ mpc2 = setconstraint!(mpc2, umin=[-1.5], umax=[+1.5])
 does improve the rejection of the step disturbance:
 
 ```@example 1
-res_lin2 = sim!(mpc2, N, [180.0]; plant, x0=[π, 0], y_step=[10])
+res_lin2 = sim!(mpc2, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin2)
 savefig(ans, "plot8_NonLinMPC.svg"); nothing # hide
 ```

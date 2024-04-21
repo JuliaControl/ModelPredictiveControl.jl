@@ -11,15 +11,6 @@ ModelPredictiveControl.f̂!
 ModelPredictiveControl.ĥ!
 ```
 
-## Constraint Relaxation
-
-```@docs
-ModelPredictiveControl.relaxarrival
-ModelPredictiveControl.relaxX̂
-ModelPredictiveControl.relaxŴ
-ModelPredictiveControl.relaxV̂
-```
-
 ## Estimator Construction
 
 ```@docs
