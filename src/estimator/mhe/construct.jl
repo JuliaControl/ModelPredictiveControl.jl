@@ -969,6 +969,7 @@ function init_optimization!(
     estim::MovingHorizonEstimator, ::LinModel, optim::JuMP.GenericModel
 )
     nZ̃ = length(estim.Z̃)
+    JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(estim.optim, estim.model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
@@ -990,6 +991,7 @@ function init_optimization!(
     C, con = estim.C, estim.con
     nZ̃ = length(estim.Z̃)
     # --- variables and linear constraints ---
+    JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(estim.optim, estim.model.Ts)
     @variable(optim, Z̃var[1:nZ̃])

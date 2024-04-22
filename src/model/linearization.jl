@@ -79,7 +79,7 @@ function linearize(model::SimModel{NT}; kwargs...) where NT<:Real
     C  = Matrix{NT}(undef, ny, nx)
     Bd = Matrix{NT}(undef, nx, nd)
     Dd = Matrix{NT}(undef, ny, nd)
-    linmodel = LinModel(A, Bu, C, Bd, Dd, model.Ts)
+    linmodel = LinModel{NT}(A, Bu, C, Bd, Dd, model.Ts)
     return linearize!(linmodel, model; kwargs...)
 end
 
@@ -104,11 +104,11 @@ julia> linearize!(linmodel, model, x=[20.0], u=[0.0]); linmodel.A
 ```
 """
 function linearize!(
-    linmodel::LinModel, model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop
-)
+    linmodel::LinModel{NT}, model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop
+) where NT<:Real
     nonlinmodel = model
     u0, d0 = u - nonlinmodel.uop, d - nonlinmodel.dop
-    xnext, y = similar(x), similar(nonlinmodel.yop)
+    xnext, y = Vector{NT}(undef, model.nx), Vector{NT}(undef, model.ny)
     # --- compute the nonlinear model output at operating points ---
     h!(y, nonlinmodel, x, d0)
     y .= y .+ nonlinmodel.yop

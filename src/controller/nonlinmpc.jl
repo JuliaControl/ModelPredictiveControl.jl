@@ -296,6 +296,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     # --- variables and linear constraints ---
     C, con = mpc.C, mpc.con
     nΔŨ = length(mpc.ΔŨ)
+    JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(mpc.optim, mpc.estim.model.Ts)
     @variable(optim, ΔŨvar[1:nΔŨ])

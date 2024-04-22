@@ -21,7 +21,8 @@ end
         X_data  = nothing,
         X̂_data  = nothing, 
         Ry_data = nothing, 
-        Ru_data = nothing
+        Ru_data = nothing,
+        Ŷ_data  = nothing
     )
 
 Manually construct a `SimResult` to quickly plot `obj` simulations.
@@ -53,7 +54,8 @@ function SimResult(
     X_data  = nothing,
     X̂_data  = nothing, 
     Ry_data = nothing, 
-    Ru_data = nothing
+    Ru_data = nothing,
+    Ŷ_data  = nothing
 ) where {NT<:Real, O<:Union{SimModel{NT}, StateEstimator{NT}, PredictiveController{NT}}}
     model = get_model(obj)
     Ts, nu, ny, nx, nx̂ = model.Ts, model.nu, model.ny, model.nx, get_nx̂(obj)
@@ -63,13 +65,14 @@ function SimResult(
     isnothing(X̂_data)  && (X̂_data  = fill(NaN, nx̂, N))
     isnothing(Ry_data) && (Ry_data = fill(NaN, ny, N))
     isnothing(Ru_data) && (Ru_data = fill(NaN, nu, N))
+    isnothing(Ŷ_data)  && (Ŷ_data  = fill(NaN, ny, N))
     NU, NY, NX, NX̂ = size(U_data, 2), size(Y_data, 2), size(X_data, 2), size(X̂_data, 2)
     NRy, NRu = size(Ry_data, 2), size(Ru_data, 2)
     if !(NU == NY == NX == NX̂ == NRy == NRu)
         throw(ArgumentError("All arguments must have the same number of columns (time steps)"))
     end
     size(Y_data, 2) == N || error("Y_data must be of size ($ny, $N)")
-    return SimResult{NT, O}(obj, T_data, Y_data, Ry_data, Y_data, U_data, U_data, 
+    return SimResult{NT, O}(obj, T_data, Y_data, Ry_data, Ŷ_data, U_data, U_data, 
                      Ru_data, D_data, X_data, X̂_data)
 end
 
