@@ -108,11 +108,14 @@ As the motor torque is limited to -1.5 to 1.5 N m, we incorporate the input cons
 a [`NonLinMPC`](@ref):
 
 ```@example 1
-nmpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
-nmpc = setconstraint!(nmpc, umin=[-1.5], umax=[+1.5])
+Hp, Hc, Mwt, Nwt = 20, 2, [0.5], [2.5]
+nmpc = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt=Inf)
+umin, umax = [-1.5], [+1.5]
+nmpc = setconstraint!(nmpc; umin, umax)
 ```
 
-The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted position):
+The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. We test `mpc`
+performance on `plant` by imposing an angular setpoint of 180° (inverted position):
 
 ```@example 1
 using Logging; disable_logging(Warn)            # hide
@@ -184,8 +187,8 @@ function JE(UE, ŶE, _ )
     τ, ω = UE[1:end-1], ŶE[2:2:end-1]
     return Ts*sum(τ.*ω)
 end
-empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Cwt=Inf, Ewt=3.5e3, JE=JE)
-empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
+empc = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=[0.5, 0], Cwt=Inf, Ewt=3.5e3, JE=JE)
+empc = setconstraint!(empc; umin, umax)
 ```
 
 The keyword argument `Ewt` weights the economic costs relative to the other terms in the
@@ -248,8 +251,8 @@ linmodel = linearize(model, x=[π, 0], u=[0])
 A [`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
 
 ```@example 1
-kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
-mpc = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
+skf = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
+mpc = LinMPC(skf; Hp, Hc, Mwt, Nwt, Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
 
@@ -287,8 +290,8 @@ Constructing a [`LinMPC`](@ref) with `DAQP`:
 ```@example 1
 using JuMP, DAQP
 daqp = Model(DAQP.Optimizer, add_bridges=false)
-mpc2 = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf, optim=daqp)
-mpc2 = setconstraint!(mpc2, umin=[-1.5], umax=[+1.5])
+mpc2 = LinMPC(skf; Hp, Hc, Mwt, Nwt, Cwt=Inf, optim=daqp)
+mpc2 = setconstraint!(mpc2; umin, umax)
 ```
 
 does improve the rejection of the step disturbance:
@@ -303,41 +306,55 @@ savefig(ans, "plot8_NonLinMPC.svg"); nothing # hide
 
 The closed-loop performance is still lower than the nonlinear controller, as expected, but
 computations are about 2000 times faster (0.00002 s versus 0.04 s per time steps, on
-average). Note that `linmodel` is only valid for angular positions near 180°. Multiple
-linearized model and controller objects are required for large deviations from this
-operating point. This is known as gain scheduling. Another approach is adapting the model of
-a [`LinMPC`](@ref) instance with repeated online linearization.
-
-## Adapting the Model with Successive Linearization
+average). However, keep in mind that `linmodel` is only valid for angular positions near
+180°. For example, the 180° setpoint response from 0° is unsatisfactory since the
+predictions are poor in the first quadrant:
 
 ```@example 1
-function adapt_mpc(plant, model, mpc)
+res_lin3 = sim!(mpc2, N, [180.0]; plant, x_0=[0, 0])
+plot(res_lin3)
+```
+
+Multiple linearized model and controller objects are required for large deviations from this
+operating point. This is known as gain scheduling. Another approach is adapting the model of
+the [`LinMPC`](@ref) instance based on repeated online linearization.
+
+## Adapting the Model via Successive Linearization
+
+```@example 1
+kf   = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
+mpc3 = LinMPC(kf; Hc, Mwt, Nwt, Hp=5, Cwt=Inf, optim=daqp)
+mpc3 = setconstraint!(mpc3; umin, umax)
+```
+
+```@example 1
+function test_slmpc(nonlinmodel, mpc, ry, plant; x_0=plant.xop, y_step=0)
     N = 35
-    ry = [180]
     U_data, Y_data, Ry_data = zeros(plant.nu, N), zeros(plant.ny, N), zeros(plant.ny, N)
-    setstate!(plant, [π, 0])
-    setstate!(model, [π, 0])
+    setstate!(plant, x_0)
     u, y = [0.0], plant()
-    linmodel = linearize(model, x=[π, 0], u=[0])
-    setmodel!(mpc, linmodel)
-    initstate!(mpc, u, y)
+    x̂ = initstate!(mpc, u, y)
+    linmodel = linearize(nonlinmodel, x=x̂[1:2], u=u)
     for i = 1:N
-        y = plant() .+ 10
+        y = plant() .+ y_step
         u = mpc(ry)
         U_data[:,i], Y_data[:,i], Ry_data[:,i] = u, y, ry
-        linmodel = linearize!(linmodel, model, u=u)
-        mpc = setmodel!(mpc, linmodel)
-        updatestate!(mpc, u, y) # update mpc state estimate
-        updatestate!(model, u)  # update nonlinear model
-        updatestate!(plant, u)  # update plant simulator
+        linearize!(linmodel, nonlinmodel; u, x=x̂[1:2])
+        setmodel!(mpc, linmodel)
+        x̂ = updatestate!(mpc, u, y) # update mpc state estimate
+        updatestate!(plant, u)      # update plant simulator
     end
-    return U_data, Y_data, Ry_data
+    res = SimResult(mpc, U_data, Y_data; Ry_data)
+    return res
 end
-linmodel = linearize(model, x=[π, 0], u=[0])
-kf3  = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
-mpc3 = LinMPC(kf3, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5])
-mpc3 = setconstraint!(mpc3, umin=[-1.5], umax=[+1.5])
-U_data, Y_data, Ry_data = adapt_mpc(plant, model, mpc3)
-res = SimResult(mpc, U_data, Y_data; Ry_data)
-plot(res)
+```
+
+```@example 1
+res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[0, 0]) 
+plot(res_slin, plotu=false)
+```
+
+```@example 1
+res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[π, 0], y_step=[10]) 
+plot(res_slin, plotu=false)
 ```
