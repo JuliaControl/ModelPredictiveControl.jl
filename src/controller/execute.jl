@@ -507,7 +507,8 @@ Set model and operating points of `mpc` [`PredictiveController`](@ref) to `model
 
 The [`StateEstimator`](@ref) `mpc.estim` cannot be a [`Luenberger`](@ref) observer or a
 [`SteadyKalmanFilter`](@ref), the default estimator for controllers based on [`LinModel`](@ref).
-Construct the `mpc` object with a time-varying [`KalmanFilter`](@ref) instead.
+Construct the `mpc` object with a time-varying [`KalmanFilter`](@ref) instead. Note that
+model is constant over the prediction horizon ``H_p``.
 
 # Examples
 ```jldoctest

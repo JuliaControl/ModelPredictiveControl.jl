@@ -305,15 +305,18 @@ savefig(ans, "plot8_NonLinMPC.svg"); nothing # hide
 ![plot8_NonLinMPC](plot8_NonLinMPC.svg)
 
 The closed-loop performance is still lower than the nonlinear controller, as expected, but
-computations are about 2000 times faster (0.00002 s versus 0.04 s per time steps, on
-average). However, keep in mind that `linmodel` is only valid for angular positions near
-180°. For example, the 180° setpoint response from 0° is unsatisfactory since the
-predictions are poor in the first quadrant:
+computations are about 350 times faster (0.000045 s versus 0.0157 s per time steps, on
+average). However, remember that `linmodel` is only valid for angular positions near 180°.
+For example, the 180° setpoint response from 0° is unsatisfactory since the predictions are
+poor in the first quadrant:
 
 ```@example 1
 res_lin3 = sim!(mpc2, N, [180.0]; plant, x_0=[0, 0])
 plot(res_lin3)
+savefig(ans, "plot9_NonLinMPC.svg"); nothing # hide
 ```
+
+![plot9_NonLinMPC](plot9_NonLinMPC.svg)
 
 Multiple linearized model and controller objects are required for large deviations from this
 operating point. This is known as gain scheduling. Another approach is adapting the model of
@@ -321,11 +324,22 @@ the [`LinMPC`](@ref) instance based on repeated online linearization.
 
 ## Adapting the Model via Successive Linearization
 
+The [`setmodel!`](@ref) method allows online adaptation of a linear plant model. Combined
+with the automatic linearization of [`linearize`](@ref), a successive linearization MPC can
+be designed with minimal efforts. The [`SteadyKalmanFilter`](@ref) does not support
+[`setmodel!`](@ref), so we need to use the time-varying [`KalmanFilter`](@ref) instead:
+
 ```@example 1
 kf   = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
 mpc3 = LinMPC(kf; Hc, Mwt, Nwt, Hp=5, Cwt=Inf, optim=daqp)
 mpc3 = setconstraint!(mpc3; umin, umax)
 ```
+
+Note that the prediction horizon `Hp` is reduced to 5 since the successive local
+linearization generates predictions that are valid only for a few time steps in the future.
+Predicting too far ahead can lead to instability, especially when the open-loop system is
+unstable like here. We create a function that simulates the plant and the adaptive
+controller:
 
 ```@example 1
 function test_slmpc(nonlinmodel, mpc, ry, plant; x_0=plant.xop, y_step=0)
@@ -334,27 +348,43 @@ function test_slmpc(nonlinmodel, mpc, ry, plant; x_0=plant.xop, y_step=0)
     setstate!(plant, x_0)
     u, y = [0.0], plant()
     x̂ = initstate!(mpc, u, y)
-    linmodel = linearize(nonlinmodel, x=x̂[1:2], u=u)
     for i = 1:N
         y = plant() .+ y_step
-        u = mpc(ry)
+        u = moveinput!(mpc, ry)
+        setmodel!(mpc, linearize(nonlinmodel; u, x=x̂[1:2]))
         U_data[:,i], Y_data[:,i], Ry_data[:,i] = u, y, ry
-        linearize!(linmodel, nonlinmodel; u, x=x̂[1:2])
-        setmodel!(mpc, linmodel)
         x̂ = updatestate!(mpc, u, y) # update mpc state estimate
         updatestate!(plant, u)      # update plant simulator
     end
     res = SimResult(mpc, U_data, Y_data; Ry_data)
     return res
 end
+nothing # hide
 ```
+
+The [`setmodel!`](@ref) method must be called after solving the optimization problem with
+[`moveinput!`](@ref), and before updating the state estimate with [`updatestate!`](@ref).
+The [`SimResult`](@ref) object is for plotting purposes only. The adaptive [`LinMPC`](@ref)
+performances are similar to the nonlinear MPC, both for the 180° setpoint:
 
 ```@example 1
 res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[0, 0]) 
-plot(res_slin, plotu=false)
+plot(res_slin)
+savefig(ans, "plot10_NonLinMPC.svg"); nothing # hide
 ```
+
+![plot10_NonLinMPC](plot10_NonLinMPC.svg)
+
+and the 10° step disturbance:
 
 ```@example 1
 res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[π, 0], y_step=[10]) 
-plot(res_slin, plotu=false)
+plot(res_slin)
+savefig(ans, "plot11_NonLinMPC.svg"); nothing # hide
 ```
+
+![plot11_NonLinMPC](plot11_NonLinMPC.svg)
+
+The computations of the successive linearization MPC are about 230 times faster than the
+nonlinear MPC (0.000068 s per time steps versus 0.0157 s per time steps, on average), an
+impressive gain for similar closed-loop performances!
