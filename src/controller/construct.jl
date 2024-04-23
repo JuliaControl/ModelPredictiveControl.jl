@@ -402,8 +402,8 @@ update ``\mathbf{f̂_{op}}`` operating points (for linearization at non-equilibr
 matrices for the predicted terminal states at ``k+H_p``:
 ```math
 \begin{aligned}
-    \mathbf{x̂_0}(k+H_p) &= \mathbf{e_x̂ ΔU} + \mathbf{g_x̂ d}(k)   + \mathbf{j_x̂ D̂} 
-                                           + \mathbf{k_x̂ x̂_0}(k) + \mathbf{v_x̂ u}(k-1)
+    \mathbf{x̂_0}(k+H_p) &= \mathbf{e_x̂ ΔU} + \mathbf{g_x̂ d_0}(k)   + \mathbf{j_x̂ D̂_0} 
+                                           + \mathbf{k_x̂ x̂_0}(k) + \mathbf{v_x̂ u_0}(k-1)
                                            + \mathbf{b_x̂}                                 \\
                         &= \mathbf{e_x̂ ΔU} + \mathbf{f_x̂}
 \end{aligned}
