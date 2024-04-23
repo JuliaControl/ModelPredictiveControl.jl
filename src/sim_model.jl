@@ -47,7 +47,7 @@ and, for [`NonLinModel`](@ref):
 ```math
 \begin{aligned}
     \mathbf{x_0}(k+1) &= \mathbf{f}\Big(\mathbf{x_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) 
-                            + \mathbf{f_op} - \mathbf{x_{op}}                                  \\
+                            + \mathbf{f_{op}} - \mathbf{x_{op}}                                \\
     \mathbf{y_0}(k)   &= \mathbf{h}\Big(\mathbf{x_0}(k), \mathbf{d_0}(k)\Big)
 \end{aligned}
 ```

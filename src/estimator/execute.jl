@@ -241,10 +241,11 @@ end
 
 Set model and operating points of `estim` [`StateEstimator`](@ref) to `model` values.
 
-Only [`LinModel`](@ref) objects are supported. Also not supported by [`Luenberger`](@ref) 
-and [`SteadyKalmanFilter`](@ref) estimators, use the time-varying [`KalmanFilter`](@ref)
-instead. The matrix dimensions and sample time must stay the same. Note that the
-observability and controllability of the new augmented model is not verified.
+Allows model adaptation of estimators based on [`LinModel`](@ref) at runtime ([`NonLinModel`](@ref)
+is not supported). Not supported by [`Luenberger`](@ref) and [`SteadyKalmanFilter`](@ref),
+use the time-varying [`KalmanFilter`](@ref) instead. The matrix dimensions and sample time
+must stay the same. Note that the observability and controllability of the new augmented
+model is not verified (see Extended Help for details).
 
 # Examples
 ```jldoctest
@@ -258,6 +259,14 @@ julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); kf.model.A
 1×1 Matrix{Float64}:
  0.42
 ```
+
+# Extended Help
+
+!!! details "Extended Help"
+    Using the default model augmentation computed by the [`default_nint`](@ref) method, 
+    switching from a non-integrating plant model to an integrating one will produce
+    an augmented model that is not observable. Moving the unmeasured disturbances at the 
+    model input (`nint_u` parameter) can fix this issue.
 """
 function setmodel!(estim::StateEstimator, model::LinModel)
     validate_model(estim.model, model)

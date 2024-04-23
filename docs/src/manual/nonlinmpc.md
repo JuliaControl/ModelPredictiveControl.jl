@@ -305,7 +305,7 @@ savefig(ans, "plot8_NonLinMPC.svg"); nothing # hide
 ![plot8_NonLinMPC](plot8_NonLinMPC.svg)
 
 The closed-loop performance is still lower than the nonlinear controller, as expected, but
-computations are about 350 times faster (0.000045 s versus 0.0157 s per time steps, on
+computations are about 210 times faster (0.000071 s versus 0.015 s per time steps, on
 average). However, remember that `linmodel` is only valid for angular positions near 180°.
 For example, the 180° setpoint response from 0° is unsatisfactory since the predictions are
 poor in the first quadrant:
@@ -382,6 +382,6 @@ savefig(ans, "plot11_NonLinMPC.svg"); nothing # hide
 
 ![plot11_NonLinMPC](plot11_NonLinMPC.svg)
 
-The computations of the successive linearization MPC are about 230 times faster than the
-nonlinear MPC (0.000068 s per time steps versus 0.0157 s per time steps, on average), an
+The computations of the successive linearization MPC are about 125 times faster than the
+nonlinear MPC (0.00012 s per time steps versus 0.015 s per time steps, on average), an
 impressive gain for similar closed-loop performances!

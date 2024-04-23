@@ -258,6 +258,36 @@ end
     @test all(isapprox.(X_mpc, X_lqr, atol=1e-5))
 end
 
+@testset "LinMPC set model" begin
+    estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
+    mpc = LinMPC(estim, Nwt=[0], Hp=1000, Hc=1)
+    mpc = setconstraint!(mpc, umin=[-24], umax=[26])
+    mpc = setconstraint!(mpc, ymin=[-54], ymax=[56])
+    @test mpc.Yop ≈ fill(10.0, 1000)
+    @test mpc.Uop ≈ fill(1.0, 1000)
+    @test mpc.con.U0min ≈ fill(-24.0 -1,  1000)
+    @test mpc.con.U0max ≈ fill(26.0  -1,  1000)
+    @test mpc.con.Y0min ≈ fill(-54.0 -10, 1000)
+    @test mpc.con.Y0max ≈ fill(56.0  -10, 1000)
+    r = [15]
+    u = moveinput!(mpc, r)
+    @test u ≈ [2] atol=1e-2
+    setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))
+    @test mpc.Yop ≈ fill(20.0, 1000)
+    @test mpc.Uop ≈ fill(11.0, 1000)
+    @test mpc.con.U0min ≈ fill(-24.0 - 1  + 1  - 11,  1000)
+    @test mpc.con.U0max ≈ fill(26.0  - 1  + 1  - 11,  1000)
+    @test mpc.con.Y0min ≈ fill(-54.0 - 10 + 10 - 20, 1000)
+    @test mpc.con.Y0max ≈ fill(56.0  - 10 + 10 - 20, 1000)
+    r = [40]
+    u = moveinput!(mpc, r)
+    @test u ≈ [15] atol=1e-2
+    setmodel!(mpc, setop!(LinModel(tf(10, [2, 1]), 3), yop=[20], uop=[11]))
+    r = [40]
+    u = moveinput!(mpc, r)
+    @test u ≈ [13] atol=1e-2
+end
+
 @testset "ExplicitMPC construction" begin
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = ExplicitMPC(model, Hp=15)
@@ -363,6 +393,26 @@ end
     model = LinModel(sys, Ts, i_d=[3])
     mpc = ExplicitMPC(model, Hp=1, Hc=1)
     @test_throws ErrorException setconstraint!(mpc, umin=[0.0, 0.0])
+end
+
+@testset "ExplicitMPC set model" begin
+    estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
+    mpc = ExplicitMPC(estim, Nwt=[0], Hp=1000, Hc=1)
+    @test mpc.Yop ≈ fill(10.0, 1000)
+    @test mpc.Uop ≈ fill(1.0, 1000)
+    r = [15]
+    u = moveinput!(mpc, r)
+    @test u ≈ [2] atol=1e-2
+    setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))
+    @test mpc.Yop ≈ fill(20.0, 1000)
+    @test mpc.Uop ≈ fill(11.0, 1000)
+    r = [40]
+    u = moveinput!(mpc, r)
+    @test u ≈ [15] atol=1e-2
+    setmodel!(mpc, setop!(LinModel(tf(10, [2, 1]), 3), yop=[20], uop=[11]))
+    r = [40]
+    u = moveinput!(mpc, r)
+    @test u ≈ [13] atol=1e-2
 end
 
 @testset "NonLinMPC construction" begin
@@ -630,3 +680,34 @@ end
     info = getinfo(nmpc)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
 end
+
+@testset "NonLinMPC set model" begin
+    estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
+    mpc = NonLinMPC(estim, Nwt=[0], Hp=1000, Hc=1)
+    mpc = setconstraint!(mpc, umin=[-24], umax=[26])
+    mpc = setconstraint!(mpc, ymin=[-54], ymax=[56])
+    @test mpc.Yop ≈ fill(10.0, 1000)
+    @test mpc.Uop ≈ fill(1.0, 1000)
+    @test mpc.con.U0min ≈ fill(-24.0 -1,  1000)
+    @test mpc.con.U0max ≈ fill(26.0  -1,  1000)
+    @test mpc.con.Y0min ≈ fill(-54.0 -10, 1000)
+    @test mpc.con.Y0max ≈ fill(56.0  -10, 1000)
+    r = [15]
+    u = moveinput!(mpc, r)
+    @test u ≈ [2] atol=1e-2
+    setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))
+    @test mpc.Yop ≈ fill(20.0, 1000)
+    @test mpc.Uop ≈ fill(11.0, 1000)
+    @test mpc.con.U0min ≈ fill(-24.0 - 1  + 1  - 11,  1000)
+    @test mpc.con.U0max ≈ fill(26.0  - 1  + 1  - 11,  1000)
+    @test mpc.con.Y0min ≈ fill(-54.0 - 10 + 10 - 20, 1000)
+    @test mpc.con.Y0max ≈ fill(56.0  - 10 + 10 - 20, 1000)
+    r = [40]
+    u = moveinput!(mpc, r)
+    @test u ≈ [15] atol=1e-2
+    setmodel!(mpc, setop!(LinModel(tf(10, [2, 1]), 3), yop=[20], uop=[11]))
+    r = [40]
+    u = moveinput!(mpc, r)
+    @test u ≈ [13] atol=1e-2
+end
+

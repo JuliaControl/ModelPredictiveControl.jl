@@ -79,15 +79,16 @@ for more detailed examples.
 
 - [x] linear and nonlinear plant models exploiting multiple dispatch
 - [x] model linearization based on automatic differentiation (exact Jacobians)
-- [ ] adaptive linear model predictive controller
-  - [x] manual model modification
-  - [ ] automatic successive linearization of a nonlinear model
 - [x] supported objective function terms:
   - [x] output setpoint tracking
   - [x] move suppression
   - [x] input setpoint tracking
   - [x] terminal costs
   - [x] economic costs (economic model predictive control)
+- [ ] adaptive linear model predictive controller
+  - [x] manual model modification
+  - [x] automatic successive linearization of a nonlinear model
+  - [ ] objective function weights modification
 - [x] explicit predictive controller for problems without constraint
 - [x] online-tunable soft and hard constraints on:
   - [x] output predictions
