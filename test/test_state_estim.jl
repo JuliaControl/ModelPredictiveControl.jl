@@ -190,7 +190,28 @@ end
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
     @test_throws ArgumentError updatestate!(kalmanfilter1, [10, 50])
-end   
+end
+
+@testset "KalmanFilter set model" begin
+    linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
+    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
+    kalmanfilter = KalmanFilter(linmodel, nint_ym=0)
+    @test kalmanfilter.Â ≈ [0.5]
+    @test evaloutput(kalmanfilter) ≈ [50.0]
+    x̂ = updatestate!(kalmanfilter, [2.0], [50.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[3.0], fop=[3.0])
+    setmodel!(kalmanfilter, newlinmodel)
+    @test kalmanfilter.Â ≈ [0.2]
+    @test evaloutput(kalmanfilter) ≈ [55.0]
+    @test kalmanfilter.lastu0 ≈ [2.0 - 3.0]
+    x̂ = updatestate!(kalmanfilter, [3.0], [55.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
+    setmodel!(kalmanfilter, newlinmodel)
+    @test kalmanfilter.x̂0 ≈ [3.0 - 8.0]
+end
 
 @testset "Luenberger construction" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
@@ -361,6 +382,27 @@ end
     x̂ = updatestate!(internalmodel3, [0], [0])
     @test x̂ ≈ [0]
     @test isa(x̂, Vector{Float32})
+end
+
+@testset "InternalModel set model" begin
+    linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
+    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
+    internalmodel = InternalModel(linmodel)
+    @test internalmodel.Â ≈ [0.5]
+    @test evaloutput(internalmodel) ≈ [50.0]
+    x̂ = updatestate!(internalmodel, [2.0], [50.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[3.0], fop=[3.0])
+    setmodel!(internalmodel, newlinmodel)
+    @test internalmodel.Â ≈ [0.2]
+    @test evaloutput(internalmodel) ≈ [55.0]
+    @test internalmodel.lastu0 ≈ [2.0 - 3.0]
+    x̂ = updatestate!(internalmodel, [3.0], [55.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
+    setmodel!(internalmodel, newlinmodel)
+    @test internalmodel.x̂0 ≈ [3.0 - 8.0]
 end
  
 @testset "UnscentedKalmanFilter construction" begin

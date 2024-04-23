@@ -137,14 +137,14 @@ The [`InternalModel`](@ref) does not augment the state vector, thus:
 """
 function matrices_internalmodel(model::LinModel)
     Â, B̂u, Ĉ, B̂d, D̂d = model.A, model.Bu, model.C, model.Bd, model.Dd
-    x̂op, f̂op = model.xop, model.fop
+    x̂op, f̂op = copy(model.xop), copy(model.fop)
     return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
 "Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref)."
 function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
     Â, B̂u, Ĉ, B̂d, D̂d = zeros(NT,0,nx), zeros(NT,0,nu), zeros(NT,0,nx), zeros(NT,0,nd), zeros(NT,0,nd)
-    x̂op, f̂op = model.xop, model.fop
+    x̂op, f̂op = copy(model.xop), copy(model.fop)
     return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
 
@@ -215,7 +215,7 @@ function setmodel_estimator!(estim::InternalModel, model::LinModel)
     estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
     estim.x̂op .= x̂op
     estim.f̂op .= f̂op
-    estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    println(x̂op)
 end
 
 @doc raw"""
