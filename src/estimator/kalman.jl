@@ -665,6 +665,8 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     R̂::Hermitian{NT, Matrix{NT}}
     K̂::Matrix{NT}
     M̂::Matrix{NT}
+    F̂_û::Matrix{NT}
+    Ĥ  ::Matrix{NT}
     function ExtendedKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂
     ) where {NT<:Real, SM<:SimModel}
@@ -681,6 +683,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         R̂ = Hermitian(R̂, :L)
         P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
+        F̂_û, Ĥ = zeros(NT, nx̂+model.nu, nx̂), zeros(NT, model.ny, nx̂)
         return new{NT, SM}(
             model,
             lastu0, x̂op, f̂op, x̂0, P̂, 
@@ -688,7 +691,8 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂_0, Q̂, R̂,
-            K̂, M̂
+            K̂, M̂,
+            F̂_û, Ĥ
         )
     end
 end
@@ -798,8 +802,10 @@ function update_estimate!(
     x̂nextû, ŷ = Vector{NT}(undef, nx̂ + nu), Vector{NT}(undef, ny)
     f̂AD! = (x̂nextû, x̂) -> @views f̂!(x̂nextû[1:nx̂], x̂nextû[nx̂+1:end], estim, model, x̂, u, d)
     ĥAD! = (ŷ, x̂) -> ĥ!(ŷ, estim, model, x̂, d)
-    F̂  = ForwardDiff.jacobian(f̂AD!, x̂nextû, x̂)[1:nx̂, :]
-    Ĥm = ForwardDiff.jacobian(ĥAD!, ŷ, x̂)[estim.i_ym, :]
+    ForwardDiff.jacobian!(estim.F̂_û, f̂AD!, x̂nextû, x̂)
+    ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ, x̂)
+    F̂  = @views estim.F̂_û[1:nx̂, :]
+    Ĥm = @views estim.Ĥ[estim.i_ym, :]
     return update_estimate_kf!(estim, u, ym, d, F̂, Ĥm, P̂, x̂)
 end
 
