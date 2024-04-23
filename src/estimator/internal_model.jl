@@ -215,7 +215,7 @@ function setmodel_estimator!(estim::InternalModel, model::LinModel)
     estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
     estim.x̂op .= x̂op
     estim.f̂op .= f̂op
-    println(x̂op)
+    estim.x̂0 .-= estim.x̂op # convert x̂0 to x̂ with the new operating point
 end
 
 @doc raw"""

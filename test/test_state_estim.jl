@@ -103,7 +103,14 @@ end
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
     @test_throws ArgumentError updatestate!(skalmanfilter1, [10, 50])
-end   
+end 
+
+@testset "SteadyKalmanFilter set model" begin
+    linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
+    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
+    skalmanfilter = SteadyKalmanFilter(linmodel, nint_ym=0)
+    @test_throws ErrorException setmodel!(skalmanfilter, linmodel)
+end
     
 @testset "KalmanFilter construction" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
@@ -286,6 +293,13 @@ end
     x̂ = updatestate!(lo3, [0], [0])
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
+end
+
+@testset "Luenberger set model" begin
+    linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
+    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
+    lo = Luenberger(linmodel, nint_ym=0)
+    @test_throws ErrorException setmodel!(lo, linmodel)
 end
 
 @testset "InternalModel construction" begin

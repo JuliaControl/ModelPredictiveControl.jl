@@ -539,9 +539,8 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel, x̂op_
     optim, con = mpc.optim, mpc.con
     # --- predictions matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
-    C, E, ex̂ = @views mpc.C, mpc.Ẽ[:, 1:nu*Hc], con.ẽx̂[:, 1:nu*Hc]
-    A_Ymin, A_Ymax, Ẽ = relaxŶ(model, C, con.C_ymin, con.C_ymax, E)
-    A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, C, con.c_x̂min, con.c_x̂max, ex̂)
+    A_Ymin, A_Ymax, Ẽ = relaxŶ(model, mpc.C, con.C_ymin, con.C_ymax, E)
+    A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, mpc.C, con.c_x̂min, con.c_x̂max, ex̂)
     mpc.Ẽ .= Ẽ
     mpc.G .= G
     mpc.J .= J

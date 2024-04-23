@@ -331,15 +331,11 @@ be designed with minimal efforts. The [`SteadyKalmanFilter`](@ref) does not supp
 
 ```@example 1
 kf   = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
-mpc3 = LinMPC(kf; Hc, Mwt, Nwt, Hp=5, Cwt=Inf, optim=daqp)
+mpc3 = LinMPC(kf; Hc, Mwt, Nwt, Hp, Cwt=Inf, optim=daqp)
 mpc3 = setconstraint!(mpc3; umin, umax)
 ```
 
-Note that the prediction horizon `Hp` is reduced to 5 since the successive local
-linearization generates predictions that are valid only for a few time steps in the future.
-Predicting too far ahead can lead to instability, especially when the open-loop system is
-unstable like here. We create a function that simulates the plant and the adaptive
-controller:
+We create a function that simulates the plant and the adaptive controller:
 
 ```@example 1
 function test_slmpc(nonlinmodel, mpc, ry, plant; x_0=plant.xop, y_step=0)
@@ -351,7 +347,8 @@ function test_slmpc(nonlinmodel, mpc, ry, plant; x_0=plant.xop, y_step=0)
     for i = 1:N
         y = plant() .+ y_step
         u = moveinput!(mpc, ry)
-        setmodel!(mpc, linearize(nonlinmodel; u, x=x̂[1:2]))
+        linmodel = linearize(nonlinmodel; u, x=x̂[1:2])
+        setmodel!(mpc, linmodel)
         U_data[:,i], Y_data[:,i], Ry_data[:,i] = u, y, ry
         x̂ = updatestate!(mpc, u, y) # update mpc state estimate
         updatestate!(plant, u)      # update plant simulator
