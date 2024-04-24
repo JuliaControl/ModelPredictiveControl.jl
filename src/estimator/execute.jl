@@ -15,64 +15,65 @@ function remove_op!(estim::StateEstimator, u, ym, d)
 end
 
 @doc raw"""
-    f̂!(x̂next, û, estim::StateEstimator, model::SimModel, x̂, u, d) -> nothing
+    f̂!(x̂next0, û0, estim::StateEstimator, model::SimModel, x̂0, u0, d0) -> nothing
 
 Mutating state function ``\mathbf{f̂}`` of the augmented model.
 
-By introducing an augmented state vector ``\mathbf{x̂}`` like in [`augment_model`](@ref), the
+By introducing an augmented state vector ``\mathbf{x̂_0}`` like in [`augment_model`](@ref), the
 function returns the next state of the augmented model, defined as:
 ```math
 \begin{aligned}
-    \mathbf{x̂}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂}(k), \mathbf{u}(k), \mathbf{d}(k)\Big) \\
-    \mathbf{ŷ}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂}(k), \mathbf{d}(k)\Big) 
+    \mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) \\
+    \mathbf{ŷ_0}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k)\Big) 
 \end{aligned}
 ```
-where ``\mathbf{x̂}(k+1)`` is stored in `x̂next` argument. The method mutates `x̂next` and `û`
-in place, the latter stores the input vector of the augmented model ``\mathbf{u + ŷ_{s_u}}``.
+where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂next0` argument. The method mutates `x̂next0` and
+`û0` in place, the latter stores the input vector of the augmented model 
+``\mathbf{u0 + ŷ_{s_u}}``.
 """
-function f̂!(x̂next, û, estim::StateEstimator, model::SimModel, x̂, u, d)
+function f̂!(x̂next0, û0, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views x̂d, x̂s = x̂[1:model.nx], x̂[model.nx+1:end]
-    @views x̂d_next, x̂s_next = x̂next[1:model.nx], x̂next[model.nx+1:end]
-    mul!(û, estim.Cs_u, x̂s)
-    û .+= u
-    f!(x̂d_next, model, x̂d, û, d)
+    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    @views x̂d_next, x̂s_next = x̂next0[1:model.nx], x̂next0[model.nx+1:end]
+    mul!(û0, estim.Cs_u, x̂s)
+    û0 .+= u0
+    f!(x̂d_next, model, x̂d, û0, d0)
     mul!(x̂s_next, estim.As, x̂s)
     return nothing
 end
 
 """
-    f̂!(x̂next, _ , estim::StateEstimator, model::LinModel, x̂, u, d) -> nothing
+    f̂!(x̂next0, _ , estim::StateEstimator, model::LinModel, x̂0, u0, d0) -> nothing
 
 Use the augmented model matrices if `model` is a [`LinModel`](@ref).
 """
-function f̂!(x̂next, _ , estim::StateEstimator, ::LinModel, x̂, u, d)
-    mul!(x̂next, estim.Â,  x̂)
-    mul!(x̂next, estim.B̂u, u, 1, 1)
-    mul!(x̂next, estim.B̂d, d, 1, 1)
+function f̂!(x̂next0, _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
+    mul!(x̂next0, estim.Â,  x̂0)
+    mul!(x̂next0, estim.B̂u, u0, 1, 1)
+    mul!(x̂next0, estim.B̂d, d0, 1, 1)
     return nothing
 end
 
 @doc raw"""
-    ĥ!(ŷ, estim::StateEstimator, model::SimModel, x̂, d) -> nothing
+    ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, d0) -> nothing
 
 Mutating output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂!`](@ref).
 """
-function ĥ!(ŷ, estim::StateEstimator, model::SimModel, x̂, d)
+function ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views x̂d, x̂s = x̂[1:model.nx], x̂[model.nx+1:end]
-    h!(ŷ, model, x̂d, d)
-    mul!(ŷ, estim.Cs_y, x̂s, 1, 1)
+    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    h!(ŷ0, model, x̂d, d0)
+    mul!(ŷ0, estim.Cs_y, x̂s, 1, 1)
     return nothing
 end
 """
-    ĥ!(ŷ, estim::StateEstimator, model::LinModel, x̂, d) -> nothing
+    ĥ!(ŷ0, estim::StateEstimator, model::LinModel, x̂0, d0) -> nothing
 
 Use the augmented model matrices if `model` is a [`LinModel`](@ref).
 """
-function ĥ!(ŷ, estim::StateEstimator, ::LinModel, x̂, d)
-    mul!(ŷ, estim.Ĉ,  x̂)
-    mul!(ŷ, estim.D̂d, d, 1, 1)
+function ĥ!(ŷ0, estim::StateEstimator, ::LinModel, x̂0, d0)
+    mul!(ŷ0, estim.Ĉ,  x̂0)
+    mul!(ŷ0, estim.D̂d, d0, 1, 1)
     return nothing
 end
 
@@ -130,8 +131,9 @@ init_estimate_cov!(::StateEstimator, _ , _ , _ ) = nothing
 
 Init `estim.x̂0` estimate with the steady-state solution if `model` is a [`LinModel`](@ref).
 
-Using `u0`, `ym0` and `d0` arguments, the steady-state problem combined to the equality 
-constraint ``\mathbf{ŷ_0^m} = \mathbf{y_0^m}`` engenders the following system to solve:
+Using `u0`, `ym0` and `d0` arguments (deviation values, see [`setop!`](@ref)), the
+steadystate problem combined to the equality constraint ``\mathbf{ŷ_0^m} = \mathbf{y_0^m}``
+engenders the following system to solve:
 ```math
 \begin{bmatrix}
     \mathbf{I} - \mathbf{Â}                         \\

@@ -247,9 +247,8 @@ predictstoch!(mpc::PredictiveController, ::StateEstimator, _ , _ ) = (mpc.F .= 0
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
 
-Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} + \mathbf{k_x̂ x̂}_{k-1}(k) 
-+ \mathbf{v_x̂ u}(k-1) + \mathbf{b_x̂}`` vector for the terminal constraints, see 
-[`init_predmat`](@ref).
+Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} + \mathbf{k_x̂ x̂}_{k-1}(k) + \mathbf{v_x̂ u}(k-1) + \mathbf{b_x̂}``
+vector for the terminal constraints, see [`init_predmat`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
     nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)

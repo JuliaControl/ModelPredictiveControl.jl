@@ -105,18 +105,18 @@ end
 
 Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
-If ``\mathbf{x}`` are `model.x0` states, and ``\mathbf{x_s}``, the states defined at
+If ``\mathbf{x_0}`` are `model.x0` states, and ``\mathbf{x_s}``, the states defined at
 [`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
-[ \begin{smallmatrix} \mathbf{x} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
+[ \begin{smallmatrix} \mathbf{x_0} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
 returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
 \begin{aligned}
-    \mathbf{x̂}(k+1) &= \mathbf{Â x̂}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
-    \mathbf{ŷ}(k)   &= \mathbf{Ĉ x̂}(k) + \mathbf{D̂_d d}(k)
+    \mathbf{x̂_0}(k+1) &= \mathbf{Â x̂_0}(k) + \mathbf{B̂_u u_0}(k) + \mathbf{B̂_d d_0}(k) \\
+    \mathbf{ŷ_0}(k)   &= \mathbf{Ĉ x̂_0}(k) + \mathbf{D̂_d d_0}(k)
 \end{aligned}
 ```
 An error is thrown if the augmented model is not observable and `verify_obsv == true`. The
-augmented operating points `x̂_{op}` and `f̂_{op}` are simply ``\mathbf{x_{op}}`` and
+augmented operating points `x̂op` and `f̂op` are simply ``\mathbf{x_{op}}`` and
 ``\mathbf{f_{op}}`` vectors appended with zeros (see [`setop!`](@ref)).
 """
 function augment_model(model::LinModel{NT}, As, Cs_u, Cs_y; verify_obsv=true) where NT<:Real

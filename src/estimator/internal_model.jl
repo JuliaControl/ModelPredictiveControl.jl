@@ -149,20 +149,20 @@ function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂next, _ , estim::InternalModel, model::NonLinModel, x̂, u, d)
+    f̂!(x̂next0, _ , estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls `model.f!(x̂next, x̂, u ,d)` since this estimator does not augment the states.
+It calls `model.f!(x̂next0, x̂0, u0 ,d0)` since this estimator does not augment the states.
 """
-f̂!(x̂next, _ , ::InternalModel, model::NonLinModel, x̂, u, d) = model.f!(x̂next, x̂, u, d)
+f̂!(x̂next0, _, ::InternalModel, model::NonLinModel, x̂0, u0, d0) = model.f!(x̂next0, x̂0, u0, d0)
 
 @doc raw"""
-    ĥ!(ŷ, estim::InternalModel, model::NonLinModel, x̂, d)
+    ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
 
 Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.h!`.
 """
-ĥ!(x̂next, ::InternalModel, model::NonLinModel, x̂, d) = model.h!(x̂next, x̂, d)
+ĥ!(x̂next0, ::InternalModel, model::NonLinModel, x̂0, d0) = model.h!(x̂next0, x̂0, d0)
 
 
 @doc raw"""
@@ -260,10 +260,10 @@ Init `estim.x̂0`/`x̂d`/`x̂s` estimate at steady-state for [`InternalModel`](@
 
 The deterministic estimates `estim.x̂d` start at steady-state using `u0` and `d0` arguments:
 ```math
-    \mathbf{x̂_d} = \mathbf{(I - A)^{-1} (B_u u + B_d d)}
+    \mathbf{x̂_d} = \mathbf{(I - A)^{-1} (B_u u_0 + B_d d_0 + f_{op} - x_{op})}
 ```
-Based on `ym` argument and current stochastic outputs estimation ``\mathbf{ŷ_s}``, composed
-of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmeasured 
+Based on `ym0` argument and current stochastic outputs estimation ``\mathbf{ŷ_s}``, composed
+of the measured ``\mathbf{ŷ_s^m} = \mathbf{y_0^m} - \mathbf{ŷ_{d0}^m}`` and unmeasured 
 ``\mathbf{ŷ_s^u = 0}`` outputs, the stochastic estimates also start at steady-state:
 ```math
     \mathbf{x̂_s} = \mathbf{(I - Â_s)^{-1} B̂_s ŷ_s}
@@ -274,7 +274,7 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 function init_estimate!(estim::InternalModel, model::LinModel{NT}, u0, ym0, d0) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # also updates estim.x̂0 (they are the same object):
-    x̂d .= (I - model.A)\(model.Bu*u0 + model.Bd*d0 - estim.f̂op + estim.x̂op)
+    x̂d .= (I - model.A)\(model.Bu*u0 + model.Bd*d0 + model.fop - model.xop)
     ŷd0 = Vector{NT}(undef, model.ny)
     h!(ŷd0, model, x̂d, d0)
     ŷs = zeros(NT, model.ny)
