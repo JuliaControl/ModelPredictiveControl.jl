@@ -336,7 +336,7 @@ function predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, mod
             u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
         end
         f̂!(x̂0next, û0, mpc.estim, model, x̂0, u0, d0)
-        x̂0next .+= mpc.estim.f̂op .+ mpc.estim.x̂op
+        x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
         x̂0 .= x̂0next
         d0 = @views mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
@@ -589,5 +589,5 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel, x̂op_
     return nothing
 end
 
-"No need to modify the Hessian by default (only needed for quadratic optimization)."
+"No need to set the objective Hessian by default (only needed for quadratic optimization)."
 set_objective_hessian!(::PredictiveController, _ ) = nothing
