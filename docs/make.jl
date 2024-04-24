@@ -49,4 +49,5 @@ makedocs(
 deploydocs(
     repo = "github.com/JuliaControl/ModelPredictiveControl.jl.git",
     devbranch = "main",
+    push_preview = true
 )
