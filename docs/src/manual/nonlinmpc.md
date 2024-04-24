@@ -331,7 +331,7 @@ be designed with minimal efforts. The [`SteadyKalmanFilter`](@ref) does not supp
 
 ```@example 1
 kf   = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
-mpc3 = LinMPC(kf; Hc, Mwt, Nwt, Hp, Cwt=Inf, optim=daqp)
+mpc3 = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt=Inf, optim=daqp)
 mpc3 = setconstraint!(mpc3; umin, umax)
 ```
 
