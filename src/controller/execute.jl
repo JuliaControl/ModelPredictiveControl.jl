@@ -153,14 +153,14 @@ See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the
 They are computed with these equations using in-place operations:
 ```math
 \begin{aligned}
-    \mathbf{F}   &= \mathbf{G d_0}(k) + \mathbf{J D̂_0} + \mathbf{K x̂_0}(k) 
-                        + \mathbf{V u_0}(k-1) + \mathbf{B} + \mathbf{Ŷ_s}           \\
-    \mathbf{C_y} &= \mathbf{F}                 - \mathbf{R̂_{y_{0}}}                 \\
-    \mathbf{C_u} &= \mathbf{T} \mathbf{u}(k-1) - \mathbf{R̂_{u_{0}}}                 \\
-    \mathbf{q̃}   &= 2[(\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} 
-                        + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}]              \\
-            p    &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
-                        + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
+    \mathbf{F}       &= \mathbf{G d_0}(k) + \mathbf{J D̂_0} + \mathbf{K x̂_0}(k) 
+                            + \mathbf{V u_0}(k-1) + \mathbf{B} + \mathbf{Ŷ_s}           \\
+    \mathbf{C_y}     &= \mathbf{F}                 - (\mathbf{R̂_y - Y_{op}})            \\
+    \mathbf{C_u}     &= \mathbf{T} \mathbf{u_0}(k-1) - (\mathbf{R̂_u - U_{op}})          \\
+    \mathbf{q̃}       &= 2[(\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} 
+                            + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}]              \\
+    p                &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
+                            + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
 \end{aligned}
 ```
 """

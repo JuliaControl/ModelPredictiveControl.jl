@@ -413,9 +413,9 @@ The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are recalculated at each contr
 
 # Extended Help
 !!! details "Extended Help"
-    Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` and the
-    function ``\mathbf{W}(j) = ∑_{i=0}^j \mathbf{Â}^i``, the prediction matrices are
-    computed by :
+    Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` (see 
+    [`augment_model`](@ref)) and the function ``\mathbf{W}(j) = ∑_{i=0}^j \mathbf{Â}^i``,
+    the prediction matrices are computed by :
     ```math
     \begin{aligned}
     \mathbf{E} &= \begin{bmatrix}
@@ -657,10 +657,12 @@ constraints:
     \mathbf{A_{U_{max}}} 
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \mathbf{U_{min} + T} \mathbf{u}(k-1) \\
-    + \mathbf{U_{max} - T} \mathbf{u}(k-1)
+    - \mathbf{(U_{min} - U_{op}) + T} \mathbf{u_0}(k-1) \\
+    + \mathbf{(U_{max} - U_{op}) - T} \mathbf{u_0}(k-1)
 \end{bmatrix}
 ```
+in which ``\mathbf{U_{min}, U_{max}}`` and ``\mathbf{U_{op}}`` vectors respectively contains
+``\mathbf{u_{min}, u_{max}}`` and ``\mathbf{u_{op}}`` repeated ``H_p`` times.
 """
 function relaxU(::SimModel{NT}, C, C_umin, C_umax, S) where {NT<:Real}
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
@@ -723,17 +725,19 @@ Augment linear output prediction constraints with slack variable ϵ for softenin
 Denoting the input increments augmented with the slack variable 
 ``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
 ``\mathbf{Ẽ}`` matrix that appears in the linear model prediction equation 
-``\mathbf{Ŷ = Ẽ ΔŨ + F}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
+``\mathbf{Ŷ_0 = Ẽ ΔŨ + F}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{Y_{min}}} \\ 
     \mathbf{A_{Y_{max}}}
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \mathbf{Y_{min} + F} \\
-    + \mathbf{Y_{max} - F} 
+    - \mathbf{(Y_{min} - Y_{op}) + F} \\
+    + \mathbf{(Y_{max} - Y_{op}) - F} 
 \end{bmatrix}
 ```
+in which ``\mathbf{Y_{min}, Y_{max}}`` and ``\mathbf{Y_{op}}`` vectors respectively contains
+``\mathbf{y_{min}, y_{max}}`` and ``\mathbf{y_{op}}`` repeated ``H_p`` times.
 """
 function relaxŶ(::LinModel{NT}, C, C_ymin, C_ymax, E) where {NT<:Real}
     if !isinf(C) # ΔŨ = [ΔU; ϵ]
@@ -763,7 +767,7 @@ Augment terminal state constraints with slack variable ϵ for softening.
 Denoting the input increments augmented with the slack variable 
 ``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
 ``\mathbf{ẽ_{x̂}}`` matrix that appears in the terminal state equation 
-``\mathbf{x̂}_{k-1}(k + H_p) = \mathbf{ẽ_x̂ ΔŨ + f_x̂}``, and the ``\mathbf{A}`` matrices for 
+``\mathbf{x̂_0}(k + H_p) = \mathbf{ẽ_x̂ ΔŨ + f_x̂}``, and the ``\mathbf{A}`` matrices for 
 the inequality constraints:
 ```math
 \begin{bmatrix} 
@@ -771,8 +775,8 @@ the inequality constraints:
     \mathbf{A_{x̂_{max}}}
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \mathbf{x̂_{min} + f_x̂} \\
-    + \mathbf{x̂_{max} - f_x̂}
+    - \mathbf{(x̂_{min} - x̂_{op}) + f_x̂} \\
+    + \mathbf{(x̂_{max} - x̂_{op}) - f_x̂}
 \end{bmatrix}
 ```
 """

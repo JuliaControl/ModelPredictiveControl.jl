@@ -29,7 +29,7 @@ function returns the next state of the augmented model, defined as:
 ```
 where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂next0` argument. The method mutates `x̂next0` and
 `û0` in place, the latter stores the input vector of the augmented model 
-``\mathbf{u0 + ŷ_{s_u}}``.
+``\mathbf{u_0 + ŷ_{s_u}}``.
 """
 function f̂!(x̂next0, û0, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
@@ -83,7 +83,7 @@ end
 
 Init `estim.x̂0` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
-The method tries to find a good stead-state for the initial estimate ``\mathbf{x̂}(0)``. It
+The method tries to find a good steady-state for the initial estimate ``\mathbf{x̂}(0)``. It
 removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!`](@ref):
 
 - If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
