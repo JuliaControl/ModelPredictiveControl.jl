@@ -8,7 +8,7 @@ The [`SimModel`](@ref) types represents discrete state-space models that can be 
 construct [`StateEstimator`](@ref)s and [`PredictiveController`](@ref)s, or as plant
 simulators by calling [`evaloutput`](@ref) and [`updatestate!`](@ref) methods on
 [`SimModel`](@ref) instances (to test estimator/controller designs). For time simulations,
-the states `x` are stored inside [`SimModel`](@ref) instances. Use [`setstate!`](@ref)
+the states ``\mathbf{x}`` are stored inside [`SimModel`](@ref) instances. Use [`setstate!`](@ref)
 method to manually modify them.
 
 ## SimModel
