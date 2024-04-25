@@ -461,80 +461,95 @@ end
 
 
 "Update the augmented model matrices of `estim` by default."
-function setmodel_estimator!(estim::MovingHorizonEstimator, model::LinModel)
-    As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.   Cs_y
-    Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
+function setmodel_estimator!(
+    estim::MovingHorizonEstimator, model::LinModel, uop_old, yop_old, dop_old
+)
+    con = estim.con
+    nx̂, nym, nu, nd, He = estim.nx̂, estim.nym, model.nu, model.nd, estim.He
+    nϵ = isinf(estim.C) ? 0 : 1
+    As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
+    Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
+    # --- update augmented state-space matrices ---
     estim.Â  .= Â
     estim.B̂u .= B̂u
     estim.Ĉ  .= Ĉ
     estim.B̂d .= B̂d
     estim.D̂d .= D̂d
-    # TODO: re-construct the MHE prediction matrices here:
-    error("setmodel! for MovingHorizonEstimator is not implemented yet.")
-
-
-
-
-
-
-
-
-
-
-
-    # LINMPC:
+    # --- update state estimate and its operating points ---
+    x̂op_old = copy(estim.x̂op)
+    X̂op_old = copy(estim.X̂op)
+    estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
+    estim.x̂op .= x̂op
+    estim.f̂op .= f̂op
+    estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     # --- predictions matrices ---
-    E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
-    A_Ymin, A_Ymax, Ẽ = relaxŶ(model, mpc.C, con.C_ymin, con.C_ymax, E)
-    A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, mpc.C, con.c_x̂min, con.c_x̂max, ex̂)
-    mpc.Ẽ .= Ẽ
-    mpc.G .= G
-    mpc.J .= J
-    mpc.K .= K
-    mpc.V .= V
-    mpc.B .= B
+    E, G, J, B, _ , Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
+        model, He, estim.i_ym, Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
+    )
+    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, estim.C, con.C_x̂min, con.C_x̂max, Ex̂)   
+    A_V̂min, A_V̂max, Ẽ  = relaxV̂(model, estim.C, con.C_v̂min, con.C_v̂max, E) 
+    estim.Ẽ .= Ẽ
+    estim.G .= G
+    estim.J .= J
+    estim.B .= B
     # --- linear inequality constraints ---
-    con.ẽx̂ .= ẽx̂ 
-    con.gx̂ .= gx̂
-    con.jx̂ .= jx̂
-    con.kx̂ .= kx̂
-    con.vx̂ .= vx̂
-    con.bx̂ .= bx̂
-    con.U0min .+= mpc.Uop # convert U0 to U with the old operating point
-    con.U0max .+= mpc.Uop # convert U0 to U with the old operating point
-    con.Y0min .+= mpc.Yop # convert Y0 to Y with the old operating point
-    con.Y0max .+= mpc.Yop # convert Y0 to Y with the old operating point
-    con.x̂0min .+= x̂op_old # convert x̂0 to x̂ with the old operating point
-    con.x̂0max .+= x̂op_old # convert x̂0 to x̂ with the old operating point
-    # --- operating points ---
-    for i in 0:Hp-1
-        mpc.Uop[(1+nu*i):(nu+nu*i)] .= model.uop
-        mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop
-        mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
+    con.Ẽx̂ .= Ẽx̂
+    con.Gx̂ .= Gx̂
+    con.Jx̂ .= Jx̂
+    con.Bx̂ .= Bx̂
+    # convert x̃0 to x̃ with the old operating point:
+    con.x̃0min[end-nx̂+1:end] .-= x̂op_old 
+    con.x̃0max[end-nx̂+1:end] .-= x̂op_old
+    # convert X̂0 to X̂ with the old operating point:
+    con.X̂0min .-= X̂op_old
+    con.X̂0max .-= X̂op_old
+    for i in 0:He-1
+        estim.X̂op[(1+nx̂*i):(nx̂+nx̂*i)] .= estim.x̂op
     end
-    con.U0min .-= mpc.Uop # convert U0 to U with the new operating point
-    con.U0max .-= mpc.Uop # convert U0 to U with the new operating point
-    con.Y0min .-= mpc.Yop # convert Y0 to Y with the new operating point
-    con.Y0max .-= mpc.Yop # convert Y0 to Y with the new operating point
-    con.x̂0min .-= estim.x̂op # convert x̂0 to x̂ with the new operating point
-    con.x̂0max .-= estim.x̂op # convert x̂0 to x̂ with the new operating point
-    con.A_Ymin .= A_Ymin
-    con.A_Ymax .= A_Ymax
-    con.A_x̂min .= A_x̂min
-    con.A_x̂max .= A_x̂max
-    nUandΔŨ = length(con.U0min) + length(con.U0max) + length(con.ΔŨmin) + length(con.ΔŨmax)
-    con.A[nUandΔŨ+1:end, :] = [con.A_Ymin; con.A_Ymax; con.A_x̂min; con.A_x̂max]
+    # convert x̃ to x̃0 with the new operating point:
+    con.x̃0min[end-nx̂+1:end] .+= estim.x̂op 
+    con.x̃0max[end-nx̂+1:end] .+= estim.x̂op 
+    # convert X̂ to X̂0 with the new operating point:
+    con.X̂0min .+= estim.X̂op
+    con.X̂0max .+= estim.X̂op
+    con.A
+    con.A_X̂min .= A_X̂min
+    con.A_X̂max .= A_X̂max
+    con.A_V̂min .= A_V̂min
+    con.A_V̂max .= A_V̂max
+    nx̃ = length(con.x̃0min) + length(con.x̃0max)
+    nX̂ = length(con.X̂0min) + length(con.X̂0max)
+    con.A[nx̃+1:nx̃+nX̂,:]     .= [con.A_X̂min; con.A_X̂max]
+    nŴ = length(con.Ŵmin) + length(con.Ŵmax)
+    con.A[nx̃+nX̂+nŴ+1:end,:] .= [con.A_V̂min; con.A_V̂max]
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
-    ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
-    JuMP.delete(optim, optim[:linconstraint])
-    JuMP.unregister(optim, :linconstraint)
-    @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
-    # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.Ẽ, mpc.S̃, mpc.M_Hp, mpc.Ñ_Hc, mpc.L_Hp)
-    mpc.H̃ .= H̃
-    set_objective_hessian!(mpc, ΔŨvar)
-
-
+    Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
+    JuMP.delete(estim.optim, estim.optim[:linconstraint])
+    JuMP.unregister(estim.optim, :linconstraint)
+    @constraint(estim.optim, linconstraint, A*Z̃var .≤ b)
+    # --- data windows ---
+    for i in 1:He
+        # convert x̂0 to x̂ with the old operating point:
+        estim.X̂0[(1+nx̂*(i-1)):(nx̂*i)]    .-= x̂op_old 
+        # convert ym0 to ym with the old operating point:
+        estim.Y0m[(1+nym*(i-1)):(nym*i)] .-= @views yop_old[estim.i_ym]
+        # convert u0 to u with the old operating point:
+        estim.U0[(1+nu*(i-1)):(nu*i)]    .-= uop_old
+        # convert d0 to d with the old operating point:
+        estim.D0[(1+nd*(i-1)):(nd*i)]    .-= dop_old
+        # convert x̂ to x̂0 with the new operating point:
+        estim.X̂0[(1+nx̂*(i-1)):(nx̂*i)]    .+= x̂op
+        # convert ym to y0m with the new operating point:
+        estim.Y0m[(1+nym*(i-1)):(nym*i)] .+= @views yop_old[estim.i_ym]
+        # convert u to u0 with the new operating point:
+        estim.U0[(1+nu*(i-1)):(nu*i)]    .+= uop_old
+        # convert d to d0 with the new operating point:
+        estim.D0[(1+nd*(i-1)):(nd*i)]    .+= dop_old
+    end
+    estim.Z̃[nϵ+1:nϵ+nx̂] .-= x̂op_old
+    estim.Z̃[nϵ+1:nϵ+nx̂] .+= x̂op
+    estim.x̂0arr_old .-= x̂op_old
+    estim.x̂0arr_old .+= x̂op
     return nothing
 end

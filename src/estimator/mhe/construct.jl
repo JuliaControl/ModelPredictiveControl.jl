@@ -92,7 +92,6 @@ struct MovingHorizonEstimator{
     invQ̂_He::Hermitian{NT, Matrix{NT}}
     invR̂_He::Hermitian{NT, Matrix{NT}}
     C::NT
-    M̂::Matrix{NT}
     X̂op::Vector{NT}
     X̂0 ::Vector{NT}
     Y0m::Vector{NT}
@@ -121,10 +120,11 @@ struct MovingHorizonEstimator{
         invP̄ = Hermitian(inv(P̂_0), :L)
         invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
-        M̂ = zeros(NT, nx̂, nym)
-        E, F, G, J, B, ex̄, fx̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
+        E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
             model, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
         )
+        # dummy values (updated just before optimization):
+        F, fx̄, Fx̂ = zeros(NT, nym*He), zeros(NT, nx̂), zeros(NT, nx̂*He)
         con, Ẽ, ẽx̄ = init_defaultcon_mhe(model, He, Cwt, nx̂, nym, E, ex̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂)
         nZ̃ = size(Ẽ, 2)
         # dummy values, updated before optimization:
@@ -147,9 +147,7 @@ struct MovingHorizonEstimator{
             Ẽ, F, G, J, B, ẽx̄, fx̄,
             H̃, q̃, p,
             P̂_0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He, Cwt,
-            M̂,
-            X̂op, 
-            X̂0, Y0m, U0, D0, Ŵ, 
+            X̂op, X̂0, Y0m, U0, D0, Ŵ, 
             x̂0arr_old, P̂arr_old, Nk
         )
         init_optimization!(estim, model, optim)
@@ -558,8 +556,8 @@ function init_matconstraint_mhe(::LinModel{NT},
     if isempty(args)
         A = zeros(NT, length(i_b), 0)
     else
-        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max = args
-        A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
+        A_x̃min, A_x̃max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max = args
+        A = [A_x̃min; A_x̃max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
     end
     return i_b, i_g, A
 end
@@ -811,7 +809,7 @@ end
 @doc raw"""
     init_predmat_mhe(
         model::LinModel, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
-    ) -> E, F, G, J, ex̄, fx̄, Ex̂, Fx̂, Gx̂, Jx̂
+    ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 
 Construct the MHE prediction matrices for [`LinModel`](@ref) `model`.
 
@@ -987,11 +985,7 @@ function init_predmat_mhe(
         coef_Bx̂[iRow,:] = getpower(Âpow_csum, j)
     end
     Bx̂ = coef_Bx̂*f̂_op_n_x̂op
-    # --- F vectors ---
-    F  = zeros(NT, nym*He) # dummy F vector (updated just before optimization)
-    fx̄ = zeros(NT, nx̂)     # dummy fx̄ vector (updated just before optimization)
-    Fx̂ = zeros(NT, nx̂*He)  # dummy Fx̂ vector (updated just before optimization)
-    return E, F, G, J, B, ex̄, fx̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂
+    return E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref), except for `ex̄`."
@@ -1009,10 +1003,7 @@ function init_predmat_mhe(
     Jx̂ = zeros(NT, 0, model.nd*He)
     B  = zeros(NT, nym*He)
     Bx̂ = zeros(NT, nx̂*He)
-    F  = zeros(NT, nym*He)
-    fx̄ = zeros(NT, nx̂)
-    Fx̂ = zeros(NT, nx̂*He)
-    return E, F, G, J, B, ex̄, fx̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂
+    return E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 end
 
 """

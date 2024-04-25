@@ -165,7 +165,7 @@ function SteadyKalmanFilter(model::SM, i_ym, nint_u, nint_ym, Q̂, R̂) where {N
 end
 
 "Throw an error if `setmodel!` is called on a SteadyKalmanFilter"
-function setmodel_estimator!(estim::SteadyKalmanFilter, model::LinModel)
+function setmodel_estimator!(::SteadyKalmanFilter, ::LinModel, _ , _ , _)
     error("SteadyKalmanFilter does not support setmodel! (use KalmanFilter instead)")
 end
 

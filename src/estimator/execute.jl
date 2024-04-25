@@ -273,6 +273,9 @@ julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); kf.model.A
 """
 function setmodel!(estim::StateEstimator, model::LinModel)
     validate_model(estim.model, model)
+    uop_old = copy(estim.model.uop)
+    yop_old = copy(estim.model.yop)
+    dop_old = copy(estim.model.dop)
     # --- update model matrices and its operating points ---
     estim.model.A   .= model.A
     estim.model.Bu  .= model.Bu
@@ -286,7 +289,7 @@ function setmodel!(estim::StateEstimator, model::LinModel)
     estim.model.dop .= model.dop
     estim.model.xop .= model.xop
     estim.model.fop .= model.fop
-    setmodel_estimator!(estim, model)
+    setmodel_estimator!(estim, model, uop_old, yop_old, dop_old)
     return estim
 end
 
@@ -301,7 +304,7 @@ end
 validate_model(::SimModel, ::SimModel) = error("Only LinModel is supported for setmodel!")
 
 "Update the augmented model matrices of `estim` by default."
-function setmodel_estimator!(estim::StateEstimator, model::LinModel)
+function setmodel_estimator!(estim::StateEstimator, model::LinModel, _ , _ , _)
     As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
     Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
     # --- update augmented state-space matrices ---
