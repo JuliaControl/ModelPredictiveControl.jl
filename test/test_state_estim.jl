@@ -923,3 +923,34 @@ end
     info = getinfo(mhe2)
     @test info[:V̂] ≈ [-1,-1] atol=5e-2
 end
+
+@testset "MovingHorizonEstimator set model" begin
+    linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
+    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
+    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0)
+    setconstraint!(mhe, x̂min=[-1000], x̂max=[1000])
+    @test mhe.Â ≈ [0.5]
+    @test evaloutput(mhe) ≈ [50.0]
+    x̂ = updatestate!(mhe, [2.0], [50.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[3.0], fop=[3.0])
+    setmodel!(mhe, newlinmodel)
+    @test mhe.Â ≈ [0.2]
+    @test evaloutput(mhe) ≈ [55.0]
+    @test mhe.lastu0 ≈ [2.0 - 3.0]
+    @test mhe.U0 ≈ [2.0 - 3.0]
+    @test mhe.Y0m ≈ [50.0 - 55.0]
+    x̂ = updatestate!(mhe, [3.0], [55.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
+    setmodel!(mhe, newlinmodel)
+    @test mhe.x̂0   ≈ [3.0 - 8.0]
+    @test mhe.Z̃[1] ≈ 3.0 - 8.0
+    @test mhe.X̂0   ≈ [3.0 - 8.0]
+    @test mhe.x̂0arr_old ≈ [3.0 - 8.0]
+    @test mhe.con.X̂0min ≈ [-1000 - 8.0]
+    @test mhe.con.X̂0max ≈ [+1000 - 8.0]
+    @test mhe.con.x̃0min ≈ [-1000 - 8.0]
+    @test mhe.con.x̃0max ≈ [+1000 - 8.0]
+end
