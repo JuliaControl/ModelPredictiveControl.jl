@@ -132,9 +132,9 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     nx̃ = !isinf(estim.C) + nx̂
     MyTypes = Union{JuMP._SolutionSummary, Hermitian{NT, Matrix{NT}}, Vector{NT}, NT}
     info = Dict{Symbol, MyTypes}()
-    V̂, X̂0  = similar(estim.Y0m[1:nym*Nk]), similar(estim.X̂0[1:nx̂*Nk])
+    V̂,  X̂0 = similar(estim.Y0m[1:nym*Nk]), similar(estim.X̂0[1:nx̂*Nk])
     û0, ŷ0 = similar(model.uop), similar(model.yop)
-    V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
+    V̂,  X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
     x̂0arr  = @views estim.Z̃[nx̃-nx̂+1:nx̃]
     x̄ = estim.x̂0arr_old - x̂0arr
     X̂0 = [x̂0arr; X̂0]
@@ -158,8 +158,8 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:x̂arr] = x̂0arr + estim.x̂op
     info[:ϵ]  = isinf(estim.C) ? NaN : estim.Z̃[begin]
     info[:J]  = obj_nonlinprog!(x̄, estim, estim.model, V̂, estim.Z̃)
-    info[:X̂]  = X̂0       + [estim.x̂op; estim.X̂op]
-    info[:x̂]  = estim.x̂0 +  estim.x̂op
+    info[:X̂]  = X̂0       .+ @views [estim.x̂op; estim.X̂op[1:nx̂*Nk]]
+    info[:x̂]  = estim.x̂0 .+ estim.x̂op
     info[:V̂]  = V̂
     info[:P̄]  = estim.P̂arr_old
     info[:x̄]  = x̄
