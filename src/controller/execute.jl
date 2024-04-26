@@ -564,12 +564,12 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel, x̂op_
         mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop
         mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
     end
-    con.U0min .-= mpc.Uop # convert U0 to U with the new operating point
-    con.U0max .-= mpc.Uop # convert U0 to U with the new operating point
-    con.Y0min .-= mpc.Yop # convert Y0 to Y with the new operating point
-    con.Y0max .-= mpc.Yop # convert Y0 to Y with the new operating point
-    con.x̂0min .-= estim.x̂op # convert x̂0 to x̂ with the new operating point
-    con.x̂0max .-= estim.x̂op # convert x̂0 to x̂ with the new operating point
+    con.U0min .-= mpc.Uop # convert U to U0 with the new operating point
+    con.U0max .-= mpc.Uop # convert U to U0 with the new operating point
+    con.Y0min .-= mpc.Yop # convert Y to Y0 with the new operating point
+    con.Y0max .-= mpc.Yop # convert Y to Y0 with the new operating point
+    con.x̂0min .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    con.x̂0max .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     con.A_Ymin .= A_Ymin
     con.A_Ymax .= A_Ymax
     con.A_x̂min .= A_x̂min

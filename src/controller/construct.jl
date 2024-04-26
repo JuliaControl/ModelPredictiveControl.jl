@@ -414,7 +414,7 @@ The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are recalculated at each contr
 # Extended Help
 !!! details "Extended Help"
     Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` (see 
-    [`augment_model`](@ref)) and the function ``\mathbf{W}(j) = ∑_{i=0}^j \mathbf{Â}^i``,
+    [`augment_model`](@ref)), and the function ``\mathbf{W}(j) = ∑_{i=0}^j \mathbf{Â}^i``,
     the prediction matrices are computed by :
     ```math
     \begin{aligned}
@@ -447,8 +447,7 @@ The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are recalculated at each contr
         \mathbf{Ĉ W}(0)                 \\
         \mathbf{Ĉ W}(1)                 \\
         \vdots                          \\
-        \mathbf{Ĉ W}(H_p-1)             \end{bmatrix} 
-            \mathbf{\big(x̂_{op} + f̂_{op}\big)} 
+        \mathbf{Ĉ W}(H_p-1)             \end{bmatrix}   \mathbf{\big(x̂_{op} + f̂_{op}\big)} 
     \end{aligned}
     ```
     For the terminal constraints, the matrices are computed with:
@@ -468,7 +467,7 @@ The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are recalculated at each contr
                     \end{bmatrix} \\
     \mathbf{k_x̂} &= \mathbf{Â}^{H_p} \\
     \mathbf{v_x̂} &= \mathbf{W}(H_p-1)\mathbf{B̂_u} \\
-    \mathbf{b_x̂} &= \mathbf{W}(H_p-1) \mathbf{\big(x̂_{op} + f̂_{op}\big)}
+    \mathbf{b_x̂} &= \mathbf{W}(H_p-1)    \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
 """
@@ -525,15 +524,16 @@ function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where 
             jx̂[:  , iCol] = j < Hp ? getpower(Âpow, Hp-j-1)*B̂d : zeros(NT, nx̂, nd)
         end
     end
-    # --- state x̂ and state update f̂op operating points ---
+    # --- state x̂op and state update f̂op operating points ---
     coef_bx̂ = getpower(Âpow_csum, Hp-1)
     coef_B  = Matrix{NT}(undef, ny*Hp, nx̂)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
         coef_B[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)
     end
-    bx̂ = coef_bx̂ * (estim.f̂op - estim.x̂op)
-    B  = coef_B  * (estim.f̂op - estim.x̂op)
+    f̂op_n_x̂op = estim.f̂op - estim.x̂op
+    bx̂ = coef_bx̂ * f̂op_n_x̂op
+    B  = coef_B  * f̂op_n_x̂op
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
