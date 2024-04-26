@@ -447,7 +447,7 @@ The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are recalculated at each contr
         \mathbf{Ĉ W}(0)                 \\
         \mathbf{Ĉ W}(1)                 \\
         \vdots                          \\
-        \mathbf{Ĉ W}(H_p-1)             \end{bmatrix}   \mathbf{(f̂_{op} - \big(x̂_{op}\big)} 
+        \mathbf{Ĉ W}(H_p-1)             \end{bmatrix}   \mathbf{\big(f̂_{op} - x̂_{op}\big)} 
     \end{aligned}
     ```
     For the terminal constraints, the matrices are computed with:
