@@ -55,7 +55,9 @@ struct MovingHorizonEstimator{
     covestim::CE
     Z̃::Vector{NT}
     lastu0::Vector{NT}
-    x̂::Vector{NT}
+    x̂op::Vector{NT}
+    f̂op::Vector{NT}
+    x̂0 ::Vector{NT}
     He::Int
     i_ym::Vector{Int}
     nx̂ ::Int
@@ -81,7 +83,7 @@ struct MovingHorizonEstimator{
     H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
     p::Vector{NT}
-    P̂0::Hermitian{NT, Matrix{NT}}
+    P̂_0::Hermitian{NT, Matrix{NT}}
     Q̂::Hermitian{NT, Matrix{NT}}
     R̂::Hermitian{NT, Matrix{NT}}
     invP̄::Hermitian{NT, Matrix{NT}}
@@ -98,7 +100,7 @@ struct MovingHorizonEstimator{
     P̂arr_old::Hermitian{NT, Matrix{NT}}
     Nk::Vector{Int}
     function MovingHorizonEstimator{NT, SM, JM, CE}(
-        model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM, covestim::CE
+        model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim::JM, covestim::CE
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
         nu, nd = model.nu, model.nd
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
@@ -107,13 +109,13 @@ struct MovingHorizonEstimator{
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
-        validate_kfcov(nym, nx̂, Q̂, R̂, P̂0)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, model.nu)
-        x̂ = [zeros(NT, model.nx); zeros(NT, nxs)]
-        P̂0 = Hermitian(P̂0, :L)
+        x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
+        P̂_0 = Hermitian(P̂_0, :L)
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
-        invP̄ = Hermitian(inv(P̂0), :L)
+        invP̄ = Hermitian(inv(P̂_0), :L)
         invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
         M̂ = zeros(NT, nx̂, nym)
@@ -128,18 +130,18 @@ struct MovingHorizonEstimator{
         X̂, Ym   = zeros(NT, nx̂*He), zeros(NT, nym*He)
         U, D, Ŵ = zeros(NT, nu*He), zeros(NT, nd*He), zeros(NT, nx̂*He)
         x̂arr_old = zeros(NT, nx̂)
-        P̂arr_old = copy(P̂0)
+        P̂arr_old = copy(P̂_0)
         Nk = [0]
         estim = new{NT, SM, JM, CE}(
             model, optim, con, covestim,  
-            Z̃, lastu0, x̂, 
+            Z̃, lastu0, x̂op, f̂op, x̂0, 
             He,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             Ẽ, F, G, J, ẽx̄, fx̄,
             H̃, q̃, p,
-            P̂0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He, Cwt,
+            P̂_0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He, Cwt,
             M̂,
             X̂, Ym, U, D, Ŵ, 
             x̂arr_old, P̂arr_old, Nk
@@ -209,7 +211,7 @@ for details on the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` co
 ```jldoctest
 julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
-julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP0=[0.01])
+julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP_0=[0.01])
 MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer, NonLinModel and:
  5 estimation steps He
  0 slack variable ϵ (estimation constraints)
@@ -271,33 +273,33 @@ function MovingHorizonEstimator(
     model::SM;
     He::Union{Int, Nothing} = nothing,
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP0::Vector = fill(1/model.nx, model.nx),
+    σP_0::Vector = fill(1/model.nx, model.nx),
     σQ ::Vector = fill(1/model.nx, model.nx),
     σR ::Vector = fill(1, length(i_ym)),
     nint_u   ::IntVectorOrInt = 0,
     σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σP0int_u ::Vector = fill(1, max(sum(nint_u), 0)),
+    σPint_u_0 ::Vector = fill(1, max(sum(nint_u), 0)),
     nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σP0int_ym::Vector = fill(1, max(sum(nint_ym), 0)),
+    σPint_ym_0::Vector = fill(1, max(sum(nint_ym), 0)),
     Cwt::Real = Inf,
     optim::JM = default_optim_mhe(model),
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     # estimated covariances matrices (variance = σ²) :
-    P̂0 = Hermitian(diagm(NT[σP0; σP0int_u; σP0int_ym].^2), :L)
+    P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
-    return MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim)
+    return MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim)
 end
 
 default_optim_mhe(::LinModel) = JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=false)
 default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
 
 @doc raw"""
-    MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim[, covestim])
+    MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim[, covestim])
 
-Construct the estimator from the augmented covariance matrices `P̂0`, `Q̂` and `R̂`.
+Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 The final argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) 
@@ -306,20 +308,20 @@ supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and
 [`ExtendedKalmanFilter`](@ref).
 """
 function MovingHorizonEstimator(
-    model::SM, He, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂, Cwt, optim::JM, 
-    covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+    model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim::JM, 
+    covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
-    P̂0, Q̂, R̂ = to_mat(P̂0), to_mat(Q̂), to_mat(R̂)
+    P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     return MovingHorizonEstimator{NT, SM, JM, CE}(
-        model, He, i_ym, nint_u, nint_ym, P̂0, Q̂ , R̂, Cwt, optim, covestim
+        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂, Cwt, optim, covestim
     )
 end
 
-function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
-    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
+    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
 end
-function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
-    return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂0, Q̂, R̂)
+function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
+    return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
 end
 
 @doc raw"""
@@ -829,20 +831,20 @@ All these equations omit the operating points ``\mathbf{u_{op}, y_{op}, d_{op}}`
     ```math
     \begin{aligned}
     \mathbf{E} &= - \begin{bmatrix}
-        \mathbf{Ĉ^m}\mathbf{A}^{0}                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-        \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{A}^{0}                    & \cdots & \mathbf{0}   \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{0}                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{Â}^{0}                    & \cdots & \mathbf{0}   \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots       \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}              & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}                & \cdots & \mathbf{0}   \end{bmatrix} \\
     \mathbf{G} &= - \begin{bmatrix}
         \mathbf{0}                                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-        \mathbf{Ĉ^m}\mathbf{A}^{0}\mathbf{B̂_u}      & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}      & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-        \mathbf{Ĉ^m}\mathbf{A}^{H_e-2}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{A}^{H_e-3}\mathbf{B̂_u}    & \cdots & \mathbf{0}   \end{bmatrix} \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_u}    & \cdots & \mathbf{0}   \end{bmatrix} \\
     \mathbf{J} &= - \begin{bmatrix}
         \mathbf{D̂^m}                                & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-        \mathbf{Ĉ^m}\mathbf{A}^{0}\mathbf{B̂_d}      & \mathbf{D̂^m}                                  & \cdots & \mathbf{0}   \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂^m}                                  & \cdots & \mathbf{0}   \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-        \mathbf{Ĉ^m}\mathbf{A}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{A}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{D̂^m} \end{bmatrix} 
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{D̂^m} \end{bmatrix} 
     \end{aligned}
     ```
     for the estimation error at arrival:
@@ -882,10 +884,10 @@ function init_predmat_mhe(model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉ, B̂d, D
     Âpow = Array{NT}(undef, nx̂, nx̂, He+1)
     Âpow[:,:,1] = I(nx̂)
     for j=2:He+1
-        Âpow[:,:,j] = Âpow[:,:,j-1]*Â
+        Âpow[:,:,j] = @views Âpow[:,:,j-1]*Â
     end
     # helper function to improve code clarity and be similar to eqs. in docstring:
-    getpower(array3D, power) = array3D[:,:, power+1]
+    getpower(array3D, power) = @views array3D[:,:, power+1]
     # --- decision variables Z ---
     nĈm_Âpow = reduce(vcat, -Ĉm*getpower(Âpow, i) for i=0:He-1)
     E = zeros(NT, nym*He, nx̂ + nŵ*He)
@@ -967,6 +969,7 @@ function init_optimization!(
     estim::MovingHorizonEstimator, ::LinModel, optim::JuMP.GenericModel
 )
     nZ̃ = length(estim.Z̃)
+    JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(estim.optim, estim.model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
@@ -988,6 +991,7 @@ function init_optimization!(
     C, con = estim.C, estim.con
     nZ̃ = length(estim.Z̃)
     # --- variables and linear constraints ---
+    JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(estim.optim, estim.model.Ts)
     @variable(optim, Z̃var[1:nZ̃])

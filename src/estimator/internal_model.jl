@@ -1,7 +1,9 @@
 struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     model::SM
     lastu0::Vector{NT}
-    x̂::Vector{NT}
+    x̂op::Vector{NT}
+    f̂op::Vector{NT}
+    x̂0 ::Vector{NT}
     x̂d::Vector{NT}
     x̂s::Vector{NT}
     i_ym::Vector{Int}
@@ -28,14 +30,15 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
         nxs = size(As,1)
         nx̂ = model.nx
-        Â, B̂u, Ĉ, B̂d, D̂d = matrices_internalmodel(model)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         lastu0 = zeros(NT, model.nu)
-        x̂d = x̂ = zeros(NT, model.nx) # x̂ and x̂d are same object (updating x̂d will update x̂)
+        # x̂0 and x̂d are same object (updating x̂d will update x̂0):
+        x̂d = x̂0 = zeros(NT, model.nx) 
         x̂s = zeros(NT, nxs)
         return new{NT, SM}(
             model, 
-            lastu0, x̂, x̂d, x̂s, 
+            lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d,
@@ -123,41 +126,43 @@ end
 validate_poles(::SimModel) = nothing
 
 @doc raw"""
-    matrices_internalmodel(model::LinModel)
+    matrices_internalmodel(model::LinModel) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 
 Get state-space matrices of the [`LinModel`](@ref) `model` for [`InternalModel`](@ref).
 
 The [`InternalModel`](@ref) does not augment the state vector, thus:
 ```math
-    \mathbf{Â = A, B̂_u = B_u, Ĉ = C, B̂_d = B_d, D̂_d = D_d }
+    \mathbf{Â = A, B̂_u = B_u, Ĉ = C, B̂_d = B_d, D̂_d = D_d, x̂_{op} = x_{op}, f̂_{op} = f_{op}}
 ```
 """
 function matrices_internalmodel(model::LinModel)
-    Â, B̂u, Ĉ, B̂d, D̂d = model.A, model.Bu, model.C, model.Bd, model.Dd 
-    return Â, B̂u, Ĉ, B̂d, D̂d
+    Â, B̂u, Ĉ, B̂d, D̂d = model.A, model.Bu, model.C, model.Bd, model.Dd
+    x̂op, f̂op = copy(model.xop), copy(model.fop)
+    return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
-"Return empty matrices if `model` is not a [`LinModel`](@ref)."
+"Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref)."
 function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
     Â, B̂u, Ĉ, B̂d, D̂d = zeros(NT,0,nx), zeros(NT,0,nu), zeros(NT,0,nx), zeros(NT,0,nd), zeros(NT,0,nd)
-    return Â, B̂u, Ĉ, B̂d, D̂d
+    x̂op, f̂op = copy(model.xop), copy(model.fop)
+    return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
 
 @doc raw"""
-    f̂!(x̂next, _ , estim::InternalModel, model::NonLinModel, x̂, u, d)
+    f̂!(x̂next0, _ , estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls `model.f!(x̂next, x̂, u ,d)` since this estimator does not augment the states.
+It calls `model.f!(x̂next0, x̂0, u0 ,d0)` since this estimator does not augment the states.
 """
-f̂!(x̂next, _ , ::InternalModel, model::NonLinModel, x̂, u, d) = model.f!(x̂next, x̂, u, d)
+f̂!(x̂next0, _, ::InternalModel, model::NonLinModel, x̂0, u0, d0) = model.f!(x̂next0, x̂0, u0, d0)
 
 @doc raw"""
-    ĥ!(ŷ, estim::InternalModel, model::NonLinModel, x̂, d)
+    ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
 
 Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.h!`.
 """
-ĥ!(x̂next, ::InternalModel, model::NonLinModel, x̂, d) = model.h!(x̂next, x̂, d)
+ĥ!(x̂next0, ::InternalModel, model::NonLinModel, x̂0, d0) = model.h!(x̂next0, x̂0, d0)
 
 
 @doc raw"""
@@ -197,13 +202,26 @@ function init_internalmodel(As, Bs, Cs, Ds)
     return Âs, B̂s
 end
 
-"Do nothing else for `InternalModel` estimator."
-setmodel_estimator!(estim::InternalModel, ::LinModel) = nothing
+"Update similar values for [`InternalModel`](@ref) estimator."
+function setmodel_estimator!(estim::InternalModel, model::LinModel)
+    Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)
+    # --- update augmented state-space matrices ---
+    estim.Â  .= Â
+    estim.B̂u .= B̂u
+    estim.Ĉ  .= Ĉ
+    estim.B̂d .= B̂d
+    estim.D̂d .= D̂d
+    # --- update state estimate and its operating points ---
+    estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
+    estim.x̂op .= x̂op
+    estim.f̂op .= f̂op
+    estim.x̂0 .-= estim.x̂op # convert x̂0 to x̂ with the new operating point
+end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, u, ym, d=empty(estim.x̂)) -> x̂d
+    update_estimate!(estim::InternalModel, u, ym, d=[])
 
-Update `estim.x̂` / `x̂d` / `x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
 
 The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂s` estimates with:
 ```math
@@ -216,7 +234,7 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 [`init_internalmodel`](@ref) for details. 
 """
 function update_estimate!(
-    estim::InternalModel{NT, SM}, u, ym, d=empty(estim.x̂)
+    estim::InternalModel{NT, SM}, u, ym, d=empty(estim.x̂0)
 ) where {NT<:Real, SM}
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s
@@ -224,7 +242,7 @@ function update_estimate!(
     ŷd, x̂dnext = Vector{NT}(undef, model.ny), Vector{NT}(undef, model.nx)
     h!(ŷd, model, x̂d, d)
     f!(x̂dnext, model, x̂d, u, d) 
-    x̂d .= x̂dnext # this also updates estim.x̂ (they are the same object)
+    x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = Vector{NT}(undef, estim.nxs)
     ŷs = zeros(NT, model.ny)
@@ -236,16 +254,16 @@ function update_estimate!(
 end
 
 @doc raw"""
-    init_estimate!(estim::InternalModel, model::LinModel, u, ym, d)
+    init_estimate!(estim::InternalModel, model::LinModel, u0, ym0, d0)
 
-Init `estim.x̂` / `x̂d` / `x̂s` estimate at steady-state for [`InternalModel`](@ref)s.
+Init `estim.x̂0`/`x̂d`/`x̂s` estimate at steady-state for [`InternalModel`](@ref).
 
-The deterministic estimates `estim.x̂d` start at steady-state using `u` and `d` arguments:
+The deterministic estimates `estim.x̂d` start at steady-state using `u0` and `d0` arguments:
 ```math
-    \mathbf{x̂_d} = \mathbf{(I - A)^{-1} (B_u u + B_d d)}
+    \mathbf{x̂_d} = \mathbf{(I - A)^{-1} (B_u u_0 + B_d d_0 + f_{op} - x_{op})}
 ```
-Based on `ym` argument and current stochastic outputs estimation ``\mathbf{ŷ_s}``, composed
-of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmeasured 
+Based on `ym0` argument and current stochastic outputs estimation ``\mathbf{ŷ_s}``, composed
+of the measured ``\mathbf{ŷ_s^m} = \mathbf{y_0^m} - \mathbf{ŷ_{d0}^m}`` and unmeasured 
 ``\mathbf{ŷ_s^u = 0}`` outputs, the stochastic estimates also start at steady-state:
 ```math
     \mathbf{x̂_s} = \mathbf{(I - Â_s)^{-1} B̂_s ŷ_s}
@@ -253,13 +271,14 @@ of the measured ``\mathbf{ŷ_s^m} = \mathbf{y^m} - \mathbf{ŷ_d^m}`` and unmea
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See
 [`init_internalmodel`](@ref) for details.
 """
-function init_estimate!(estim::InternalModel, model::LinModel{NT}, u, ym, d) where NT<:Real
+function init_estimate!(estim::InternalModel, model::LinModel{NT}, u0, ym0, d0) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
-    x̂d .= (I - model.A)\(model.Bu*u + model.Bd*d)
-    ŷd = Vector{NT}(undef, model.ny)
-    h!(ŷd, model, x̂d, d)
+    # also updates estim.x̂0 (they are the same object):
+    x̂d .= (I - model.A)\(model.Bu*u0 + model.Bd*d0 + model.fop - model.xop)
+    ŷd0 = Vector{NT}(undef, model.ny)
+    h!(ŷd0, model, x̂d, d0)
     ŷs = zeros(NT, model.ny)
-    ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
+    ŷs[estim.i_ym] = ym0 - ŷd0[estim.i_ym]  # ŷs=0 for unmeasured outputs
     x̂s .= (I-estim.Âs)\estim.B̂s*ŷs
     return nothing
 end

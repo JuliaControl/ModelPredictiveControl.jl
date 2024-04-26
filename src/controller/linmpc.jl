@@ -19,18 +19,19 @@ struct LinMPC{
     L_Hp::Hermitian{NT, Matrix{NT}}
     C::NT
     E::NT
-    R̂u::Vector{NT}
-    R̂y::Vector{NT}
+    R̂u0::Vector{NT}
+    R̂y0::Vector{NT}
     noR̂u::Bool
     S̃::Matrix{NT} 
     T::Matrix{NT}
-    T_lastu::Vector{NT}
+    T_lastu0::Vector{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
     J::Matrix{NT}
     K::Matrix{NT}
     V::Matrix{NT}
+    B::Vector{NT}
     H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
     p::Vector{NT}
@@ -39,31 +40,38 @@ struct LinMPC{
     d0::Vector{NT}
     D̂0::Vector{NT}
     D̂E::Vector{NT}
-    Ŷop::Vector{NT}
+    Uop::Vector{NT}
+    Yop::Vector{NT}
     Dop::Vector{NT}
     function LinMPC{NT, SE, JM}(
         estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim::JM
     ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel}
         model = estim.model
-        nu, ny, nd = model.nu, model.ny, model.nd
+        nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         Ewt = 0   # economic costs not supported for LinMPC
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-        # Matrix() call is needed to convert `Diagonal` to normal `Matrix`
-        M_Hp = Hermitian(Matrix(M_Hp), :L) 
-        N_Hc = Hermitian(Matrix(N_Hc), :L)
-        L_Hp = Hermitian(Matrix(L_Hp), :L)
+        # convert `Diagonal` to normal `Matrix` if required:
+        M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
+        N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
+        L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
-        R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        R̂y0, R̂u0, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
-        E, F, G, J, K, V, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂ = init_predmat(estim, model, Hp, Hc)
-        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂)
-        H̃, q̃, p = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
+        # dummy vals (updated just before optimization):
+        F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
+        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
+            estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
+        )
+        H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        # dummy vals (updated just before optimization):
+        q̃, p = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
-        Ŷop, Dop = repeat(model.yop, Hp), repeat(model.dop, Hp)
+        Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
         mpc = new{NT, SE, JM}(
@@ -71,12 +79,13 @@ struct LinMPC{
             ΔŨ, ŷ,
             Hp, Hc, 
             M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, 
-            R̂u, R̂y, noR̂u,
-            S̃, T, T_lastu,
-            Ẽ, F, G, J, K, V, H̃, q̃, p,
+            R̂u0, R̂y0, noR̂u,
+            S̃, T, T_lastu0,
+            Ẽ, F, G, J, K, V, B, 
+            H̃, q̃, p,
             Ks, Ps,
             d0, D̂0, D̂E,
-            Ŷop, Dop,
+            Uop, Yop, Dop,
         )
         init_optimization!(mpc, model, optim)
         return mpc
@@ -245,19 +254,25 @@ function init_optimization!(mpc::LinMPC, model::LinModel, optim)
     # --- variables and linear constraints ---
     con = mpc.con
     nΔŨ = length(mpc.ΔŨ)
+    JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(mpc.optim, model.Ts)
     @variable(optim, ΔŨvar[1:nΔŨ])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
-    # --- quadratic optimization init ---
-    @objective(mpc.optim, Min, obj_quadprog(ΔŨvar, mpc.H̃, mpc.q̃))
+    set_objective_hessian!(mpc, ΔŨvar)
     return nothing
 end
 
 "For [`LinMPC`](@ref), set the QP linear coefficient `q̃` just before optimization."
 function set_objective_linear_coef!(mpc::LinMPC, ΔŨvar)
     JuMP.set_objective_coefficient(mpc.optim, ΔŨvar, mpc.q̃)
+    return nothing
+end
+
+"Update the quadratic objective function for [`LinMPC`](@ref) controllers."
+function set_objective_hessian!(mpc::LinMPC, ΔŨvar)
+    @objective(mpc.optim, Min, obj_quadprog(ΔŨvar, mpc.H̃, mpc.q̃))
     return nothing
 end

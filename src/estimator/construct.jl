@@ -101,21 +101,23 @@ end
 
 
 @doc raw"""
-    augment_model(model::LinModel, As, Cs; verify_obsv=true) -> Â, B̂u, Ĉ, B̂d, D̂d
+    augment_model(model::LinModel, As, Cs; verify_obsv=true) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 
 Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
 
-If ``\mathbf{x}`` are `model.x` states, and ``\mathbf{x_s}``, the states defined at
+If ``\mathbf{x_0}`` are `model.x0` states, and ``\mathbf{x_s}``, the states defined at
 [`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
-[ \begin{smallmatrix} \mathbf{x} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
+[ \begin{smallmatrix} \mathbf{x_0} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
 returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
 \begin{aligned}
-    \mathbf{x̂}(k+1) &= \mathbf{Â x̂}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) \\
-    \mathbf{ŷ}(k)   &= \mathbf{Ĉ x̂}(k) + \mathbf{D̂_d d}(k)
+    \mathbf{x̂_0}(k+1) &= \mathbf{Â x̂_0}(k) + \mathbf{B̂_u u_0}(k) + \mathbf{B̂_d d_0}(k) \\
+    \mathbf{ŷ_0}(k)   &= \mathbf{Ĉ x̂_0}(k) + \mathbf{D̂_d d_0}(k)
 \end{aligned}
 ```
-An error is thrown if the augmented model is not observable and `verify_obsv == true`.
+An error is thrown if the augmented model is not observable and `verify_obsv == true`. The
+augmented operating points `x̂op` and `f̂op` are simply ``\mathbf{x_{op}}`` and
+``\mathbf{f_{op}}`` vectors appended with zeros (see [`setop!`](@ref)).
 """
 function augment_model(model::LinModel{NT}, As, Cs_u, Cs_y; verify_obsv=true) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
@@ -131,9 +133,14 @@ function augment_model(model::LinModel{NT}, As, Cs_u, Cs_y; verify_obsv=true) wh
               "model integrating outputs with nint_ym parameter. Adding integrators at both "*
               "inputs (nint_u) and outputs (nint_ym) can also violate observability.")
     end
-    return Â, B̂u, Ĉ, B̂d, D̂d
+    x̂op, f̂op = [model.xop; zeros(nxs)], [model.fop; zeros(nxs)]
+    return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
-"Return empty matrices if `model` is not a [`LinModel`](@ref)."
+"""
+    augment_model(model::SimModel, As, _ , _ ) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
+
+Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref).
+"""
 function augment_model(model::SimModel{NT}, As, _ , _ ) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
     nxs = size(As, 1)
@@ -142,7 +149,8 @@ function augment_model(model::SimModel{NT}, As, _ , _ ) where NT<:Real
     Ĉ   = zeros(NT, 0, nx+nxs)
     B̂d  = zeros(NT, 0, nd)
     D̂d  = zeros(NT, 0, nd)
-    return Â, B̂u, Ĉ, B̂d, D̂d
+    x̂op, f̂op = [model.xop; zeros(nxs)], [model.fop; zeros(nxs)]
+    return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
 
 @doc raw"""

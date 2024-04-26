@@ -21,32 +21,39 @@ julia> y = model()
 abstract type SimModel{NT<:Real} end
 
 @doc raw"""
-    setop!(model::SimModel; uop=nothing, yop=nothing, dop=nothing) -> model
+    setop!(model; uop=nothing, yop=nothing, dop=nothing, xop=nothing, fop=nothing) -> model
 
-Set `model` inputs `uop`, outputs `yop` and measured disturbances `dop` operating points.
+Set the operating points of `model` (both [`LinModel`](@ref) and [`NonLinModel`](@ref)).
 
-The state-space model with operating points (a.k.a. nominal values) is:
+Introducing deviations vectors around manipulated input `uop`, model output `yop`, measured
+disturbance `dop`, and model state `xop` operating points (a.k.a. nominal values):
 ```math
-\begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{A x}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) \\
-    \mathbf{y_0}(k) &= \mathbf{C x}(k) + \mathbf{D_d d_0}(k)
-\end{aligned}
-```
-in which the `uop`, `yop` and `dop` vectors evaluate:
-```math
-\begin{aligned}
+\begin{align*}
     \mathbf{u_0}(k) &= \mathbf{u}(k) - \mathbf{u_{op}} \\
+    \mathbf{d_0}(k) &= \mathbf{d}(k) - \mathbf{d_{op}} \\
     \mathbf{y_0}(k) &= \mathbf{y}(k) - \mathbf{y_{op}} \\
-    \mathbf{d_0}(k) &= \mathbf{d}(k) - \mathbf{d_{op}} 
-\end{aligned}
+    \mathbf{x_0}(k) &= \mathbf{x}(k) - \mathbf{x_{op}} \\
+\end{align*}
 ```
-The structure is similar if `model` is a `NonLinModel`:
+The state-space description of [`LinModel`](@ref) around the operating points is:
 ```math
 \begin{aligned}
-    \mathbf{x}(k+1) &= \mathbf{f}\Big(\mathbf{x}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big)\\
-    \mathbf{y_0}(k) &= \mathbf{h}\Big(\mathbf{x}(k), \mathbf{d_0}(k)\Big)
+    \mathbf{x_0}(k+1) &= \mathbf{A x_0}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) 
+                         + \mathbf{f_{op}}   - \mathbf{x_{op}}                                 \\
+    \mathbf{y_0}(k)   &= \mathbf{C x_0}(k) + \mathbf{D_d d_0}(k) 
 \end{aligned}
 ```
+and, for [`NonLinModel`](@ref):
+```math
+\begin{aligned}
+    \mathbf{x_0}(k+1) &= \mathbf{f}\Big(\mathbf{x_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) 
+                            + \mathbf{f_{op}} - \mathbf{x_{op}}                                \\
+    \mathbf{y_0}(k)   &= \mathbf{h}\Big(\mathbf{x_0}(k), \mathbf{d_0}(k)\Big)
+\end{aligned}
+```
+The state `xop` and the additional `fop` operating points are frequently zero e.g.: when 
+`model` comes from system identification. The two vectors are internally used by
+[`linearize`](@ref) for non-equilibrium points.
 
 # Examples
 ```jldoctest
@@ -56,10 +63,16 @@ LinModel with a sample time Ts = 2.0 s and:
  1 states x
  1 outputs y
  0 measured disturbances d
+
+julia> y = model()
+1-element Vector{Float64}:
+ 20.0
 ```
 
 """
-function setop!(model::SimModel; uop = nothing, yop = nothing, dop = nothing)
+function setop!(
+    model::SimModel; uop=nothing, yop=nothing, dop=nothing, xop=nothing, fop=nothing
+)
     if !isnothing(uop) 
         size(uop) == (model.nu,) || error("uop size must be $((model.nu,))")
         model.uop[:] = uop
@@ -72,17 +85,25 @@ function setop!(model::SimModel; uop = nothing, yop = nothing, dop = nothing)
         size(dop) == (model.nd,) || error("dop size must be $((model.nd,))")
         model.dop[:] = dop
     end
+    if !isnothing(xop)
+        size(xop) == (model.nx,) || error("xop size must be $((model.nx,))")
+        model.xop[:] = xop
+    end
+    if !isnothing(fop)
+        size(fop) == (model.nx,) || error("fop size must be $((model.nx,))")
+        model.fop[:] = fop
+    end
     return model
 end
 
 """
-    setstate!(model::SimModel, x)
+    setstate!(model::SimModel, x) -> model
 
-Set `model.x` states to values specified by `x`. 
+Set `model.x0` to `x - model.xop` from the argument `x`. 
 """
 function setstate!(model::SimModel, x)
     size(x) == (model.nx,) || error("x size must be $((model.nx,))")
-    model.x[:] = x
+    model.x0 .= x .- model.xop
     return model
 end
 
@@ -103,13 +124,13 @@ detailstr(model::SimModel) = ""
 @doc raw"""
     initstate!(model::SimModel, u, d=[]) -> x
 
-Init `model.x` with manipulated inputs `u` and measured disturbances `d` steady-state.
+Init `model.x0` with manipulated inputs `u` and measured disturbances `d` steady-state.
 
-It calls [`steadystate!(model, u, d)`](@ref):
+It removes the operating points on `u` and `d` and calls [`steadystate!`](@ref):
 
 - If `model` is a [`LinModel`](@ref), the method computes the steady-state of current
   inputs `u` and measured disturbances `d`.
-- Else, `model.x` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
+- Else, `model.x0` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
 
 # Examples
 ```jldoctest
@@ -122,18 +143,19 @@ julia> u = [1]; x = initstate!(model, u); y = round.(evaloutput(model), digits=3
 julia> x ≈ updatestate!(model, u)
 true
 ```
-
 """
-function initstate!(model::SimModel, u, d=empty(model.x))
+function initstate!(model::SimModel, u, d=empty(model.x0))
     validate_args(model::SimModel, d, u)
-    steadystate!(model, u, d)
-    return model.x
+    u0, d0 = u - model.uop, d - model.dop
+    steadystate!(model, u0, d0)
+    x = model.x0 + model.xop
+    return x
 end
 
 """
     updatestate!(model::SimModel, u, d=[]) -> x
 
-Update `model.x` states with current inputs `u` and measured disturbances `d`.
+Update `model.x0` states with current inputs `u` and measured disturbances `d`.
 
 # Examples
 ```jldoctest
@@ -144,18 +166,22 @@ julia> x = updatestate!(model, [1])
  1.0
 ```
 """
-function updatestate!(model::SimModel{NT}, u, d=empty(model.x)) where NT <: Real
+function updatestate!(model::SimModel{NT}, u, d=empty(model.x0)) where NT <: Real
     validate_args(model::SimModel, d, u)
-    xnext = Vector{NT}(undef, model.nx)
-    f!(xnext, model, model.x, u - model.uop, d - model.dop)
-    model.x .= xnext
-    return model.x
+    xnext0 = Vector{NT}(undef, model.nx)
+    u0, d0 = u - model.uop, d - model.dop
+    f!(xnext0, model, model.x0, u0, d0)
+    xnext0  .+= model.fop .- model.xop
+    model.x0 .= xnext0
+    xnext   = xnext0
+    xnext .+= model.xop
+    return xnext
 end
 
 """
     evaloutput(model::SimModel, d=[]) -> y
 
-Evaluate `SimModel` outputs `y` from `model.x` states and measured disturbances `d`.
+Evaluate `SimModel` outputs `y` from `model.x0` states and measured disturbances `d`.
 
 Calling a [`SimModel`](@ref) object calls this `evaloutput` method.
 
@@ -168,10 +194,12 @@ julia> y = evaloutput(model)
  20.0
 ```
 """
-function evaloutput(model::SimModel{NT}, d=empty(model.x)) where NT <: Real
+function evaloutput(model::SimModel{NT}, d=empty(model.x0)) where NT <: Real
     validate_args(model, d)
-    y = Vector{NT}(undef, model.ny)
-    h!(y, model, model.x, d - model.dop)
+    y0 = Vector{NT}(undef, model.ny)
+    d0 = d - model.dop
+    h!(y0, model, model.x0, d0)
+    y   = y0
     y .+= model.yop
     return y
 end
@@ -196,7 +224,7 @@ to_mat(A::Real, dims...) = fill(A, dims)
 
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
-(model::SimModel)(d=empty(model.x)) = evaloutput(model::SimModel, d)
+(model::SimModel)(d=empty(model.x0)) = evaloutput(model::SimModel, d)
 
 include("model/linmodel.jl")
 include("model/solver.jl")
