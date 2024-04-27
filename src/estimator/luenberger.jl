@@ -99,25 +99,25 @@ end
 
 
 """
-    update_estimate!(estim::Luenberger, u, ym, d=[])
+    update_estimate!(estim::Luenberger, u0, y0m, d0=[])
 
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
-function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂0))
+function update_estimate!(estim::Luenberger, u0, y0m, d0=empty(estim.x̂0))
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
-    x̂, K̂ = estim.x̂0, estim.K̂
+    x̂0, K̂ = estim.x̂0, estim.K̂
     Ĉm, D̂dm = @views estim.Ĉ[estim.i_ym, :], estim.D̂d[estim.i_ym, :]
-    ŷm, x̂next = similar(ym), similar(x̂)
+    ŷ0m, x̂0next = similar(y0m), similar(x̂0)
     # in-place operations to reduce allocations:
-    mul!(ŷm, Ĉm, x̂) 
-    mul!(ŷm, D̂dm, d, 1, 1)
-    v̂  = ŷm
-    v̂ .= ym .- ŷm
-    mul!(x̂next, Â, x̂)
-    mul!(x̂next, B̂u, u, 1, 1)
-    mul!(x̂next, B̂d, d, 1, 1)
-    mul!(x̂next, K̂, v̂, 1, 1)
-    estim.x̂0 .= x̂next
+    mul!(ŷ0m, Ĉm, x̂0) 
+    mul!(ŷ0m, D̂dm, d0, 1, 1)
+    v̂  = ŷ0m
+    v̂ .= y0m .- ŷ0m
+    mul!(x̂0next, Â, x̂0)
+    mul!(x̂0next, B̂u, u0, 1, 1)
+    mul!(x̂0next, B̂d, d0, 1, 1)
+    mul!(x̂0next, K̂, v̂, 1, 1)
+    estim.x̂0 .= x̂0next
     return nothing
 end
 

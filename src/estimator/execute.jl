@@ -245,10 +245,10 @@ Set model and operating points of `estim` [`StateEstimator`](@ref) to `model` va
 
 Allows model adaptation of estimators based on [`LinModel`](@ref) at runtime ([`NonLinModel`](@ref)
 is not supported). Not supported by [`Luenberger`](@ref) and [`SteadyKalmanFilter`](@ref),
-use the time-varying [`KalmanFilter`](@ref) instead.  The [`MovingHorizonEstimator`] model 
-is kept constant over the estimation horizon ``H_e``. The matrix dimensions and sample time
-must stay the same. Note that the observability and controllability of the new augmented
-model is not verified (see Extended Help for details).
+use the time-varying [`KalmanFilter`](@ref) instead.  The [`MovingHorizonEstimator`](@ref)
+model is kept constant over the estimation horizon ``H_e``. The matrix dimensions and sample
+time must stay the same. Note that the observability and controllability of the new
+augmented model is not verified (see Extended Help for more info).
 
 # Examples
 ```jldoctest
