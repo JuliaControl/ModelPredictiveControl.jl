@@ -84,7 +84,7 @@ InternalModel estimator with a sample time Ts = 0.5 s, LinModel and:
     too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this. The following
     block diagram summarizes the internal model structure.
 
-    ![block diagram of the internal model structure](assets/imc.svg)
+    ![block diagram of the internal model structure](../assets/imc.svg)
 """
 function InternalModel(
     model::SM;
