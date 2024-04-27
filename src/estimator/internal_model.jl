@@ -56,7 +56,7 @@ Construct an internal model estimator based on `model` ([`LinModel`](@ref) or [`
 unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions 
 ``\mathbf{ŷ_d}``, and `stoch_ym`, the stochastic predictions of the measured outputs 
 ``\mathbf{ŷ_s^m}`` (the unmeasured ones being ``\mathbf{ŷ_s^u=0}``). The predicted outputs
-sum both values : ``\mathbf{ŷ = ŷ_d + ŷ_s}``.
+sum both values : ``\mathbf{ŷ = ŷ_d + ŷ_s}``. See the Extended Help for more details.
 
 !!! warning
     `InternalModel` estimator does not work if `model` is integrating or unstable. The 
@@ -81,7 +81,10 @@ InternalModel estimator with a sample time Ts = 0.5 s, LinModel and:
     supposes 1 integrator per measured outputs by default, assuming that the current stochastic
     estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` is constant in the 
     future. This is the dynamic matrix control (DMC) strategy, which is simple but sometimes
-    too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this.
+    too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this. The following
+    block diagram summarizes the internal model structure.
+
+    ![block diagram of the internal model structure](../assets/imc.svg)
 """
 function InternalModel(
     model::SM;
@@ -219,9 +222,9 @@ function setmodel_estimator!(estim::InternalModel, model::LinModel, _ , _ , _)
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, u, ym, d=[])
+    update_estimate!(estim::InternalModel, u0, y0m, d0=[])
 
-Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u`, measured outputs `ym` and dist. `d`.
+Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
 The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂s` estimates with:
 ```math
@@ -234,19 +237,19 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 [`init_internalmodel`](@ref) for details. 
 """
 function update_estimate!(
-    estim::InternalModel{NT, SM}, u, ym, d=empty(estim.x̂0)
+    estim::InternalModel{NT, SM}, u0, y0m, d0=empty(estim.x̂0)
 ) where {NT<:Real, SM}
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
-    ŷd, x̂dnext = Vector{NT}(undef, model.ny), Vector{NT}(undef, model.nx)
-    h!(ŷd, model, x̂d, d)
-    f!(x̂dnext, model, x̂d, u, d) 
+    ŷ0d, x̂dnext = Vector{NT}(undef, model.ny), Vector{NT}(undef, model.nx)
+    h!(ŷ0d, model, x̂d, d0)
+    f!(x̂dnext, model, x̂d, u0, d0) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = Vector{NT}(undef, estim.nxs)
     ŷs = zeros(NT, model.ny)
-    ŷs[estim.i_ym] = ym - ŷd[estim.i_ym]   # ŷs=0 for unmeasured outputs
+    ŷs[estim.i_ym] = y0m - ŷ0d[estim.i_ym]   # ŷs=0 for unmeasured outputs
     mul!(x̂snext, estim.Âs, x̂s)
     mul!(x̂snext, estim.B̂s, ŷs, 1, 1)
     x̂s .= x̂snext

@@ -715,7 +715,6 @@ also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 ```
 in which ``\mathbf{X̂_{min}, X̂_{max}}`` and ``\mathbf{X̂_{op}}`` vectors respectively contains
 ``\mathbf{x̂_{min}, x̂_{max}}`` and ``\mathbf{x̂_{op}}`` repeated ``H_e`` times.
-```
 """
 function relaxX̂(::LinModel{NT}, C, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
     if !isinf(C) # Z̃ = [ϵ; Z]

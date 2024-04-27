@@ -348,30 +348,33 @@ function predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, mod
 end
 
 """
-    obj_nonlinprog!(U0 , _ , _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ)
+    obj_nonlinprog!(U0 , Ȳ, _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ)
 
 Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
 
 The function is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
 also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
-at specific input increments `ΔŨ` and predictions `Ŷ0` values. It mutates the `U0` argument.
+at specific input increments `ΔŨ` and predictions `Ŷ0` values. It mutates the `U0` and
+`Ȳ` arguments.
 """
 function obj_nonlinprog!(
-    U0, _ , _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ::AbstractVector{NT}
+    U0, Ȳ, _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ::AbstractVector{NT}
 ) where NT <: Real
     J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
     if !iszero(mpc.E)
-        ny, Hp, D̂E = model.ny, mpc.Hp, mpc.D̂E
-        U  = U0
-        mul!(U, mpc.S̃, ΔŨ)
-        U .+= mpc.T_lastu0 .+ mpc.Uop
-        UE = @views [U; U[(end - model.nu + 1):end]]
-        ŶE = Vector{NT}(undef, ny + ny*Hp)
-        ŶE[1:ny]     .= mpc.ŷ
-        ŶE[1+ny:end] .= Ŷ0 .+ mpc.Yop
-        J += mpc.E*mpc.JE(UE, ŶE, D̂E)
+        ny, Hp, ŷ, D̂E = model.ny, mpc.Hp, mpc.ŷ, mpc.D̂E
+        U = U0
+        U  .+= mpc.Uop
+        uend = @views U[(end-model.nu+1):end]
+        Ŷ  = Ȳ
+        Ŷ .= Ŷ0 .+ mpc.Yop
+        UE = [U; uend]
+        ŶE = [ŷ; Ŷ]
+        E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E)
+    else
+        E_JE = 0.0
     end
-    return J
+    return J + E_JE
 end
 
 """
@@ -403,13 +406,14 @@ function obj_nonlinprog!(
     end
     # --- economic term ---
     if !iszero(mpc.E)
-        ny, Hp, D̂E = model.ny, mpc.Hp, mpc.D̂E
+        ny, Hp, ŷ, D̂E = model.ny, mpc.Hp, mpc.ŷ, mpc.D̂E
         U = U0
-        U .+= mpc.Uop
-        UE = @views [U; U[(end - model.nu + 1):end]]
-        ŶE = Vector{NT}(undef, ny + ny*Hp)
-        ŶE[1:ny]     .= mpc.ŷ
-        ŶE[1+ny:end] .= Ŷ0 .+ mpc.Yop
+        U  .+= mpc.Uop
+        uend = @views U[(end-model.nu+1):end]
+        Ŷ  = Ȳ
+        Ŷ .= Ŷ0 .+ mpc.Yop
+        UE = [U; uend]
+        ŶE = [ŷ; Ŷ]
         E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E)
     else
         E_JE = 0.0

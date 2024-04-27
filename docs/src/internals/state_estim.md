@@ -55,9 +55,12 @@ ModelPredictiveControl.init_estimate!
 ## Update Estimate
 
 !!! info
-    All these methods assume that the operating points are already removed in `u`, `ym`
-    and `d` arguments. Strickly speaking, the arguments should be called `u0`, `ym0` and
-    `d0`, following [`setop!`](@ref) notation. The `0` is dropped to simplify the notation.
+    All these methods assume that the `u0`, `y0m` and `d0` arguments are deviation vectors
+    from their respective operating points (see [`setop!`](@ref)). The associated equations
+    in the documentation drops the ``\mathbf{0}`` in subscript to simplify the notation.
+    Strictly speaking, the manipulated inputs, measured outputs, measured disturbances and
+    estimated states should be denoted with ``\mathbf{u_0, y_0^m, d_0}`` and
+    ``\mathbf{x̂_0}``, respectively.
 
 ```@docs
 ModelPredictiveControl.update_estimate!

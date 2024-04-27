@@ -17,23 +17,22 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
 end
 
 @doc raw"""
-    update_estimate!(estim::MovingHorizonEstimator, u, ym, d=[])
+    update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0=[])
     
-Update [`MovingHorizonEstimator`](@ref) state `estim.x̂`.
+Update [`MovingHorizonEstimator`](@ref) state `estim.x̂0`.
 
 The optimization problem of [`MovingHorizonEstimator`](@ref) documentation is solved at
 each discrete time ``k``. Once solved, the next estimate ``\mathbf{x̂}_k(k+1)`` is computed
 by inserting the optimal values of ``\mathbf{x̂}_k(k-N_k+1)`` and ``\mathbf{Ŵ}`` in the
 augmented model from ``j = N_k-1`` to ``0`` inclusively. Afterward, if ``k ≥ H_e``, the
 arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is estimated
-with the equations of [`update_estimate!(::ExtendedKalmanFilter)`](@ref), or `KalmanFilter`,
-for `LinModel`.
+using `estim.covestim` object.
 """
 function update_estimate!(
-    estim::MovingHorizonEstimator{NT}, u, ym, d=empty(estim.x̂)
+    estim::MovingHorizonEstimator{NT}, u0, y0m, d0=empty(estim.x̂0)
 ) where NT<:Real
     model, optim, x̂0 = estim.model, estim.optim, estim.x̂0
-    add_data_windows!(estim::MovingHorizonEstimator, u, d, ym)
+    add_data_windows!(estim::MovingHorizonEstimator, u0, d0, y0m)
     initpred!(estim, model)
     linconstraint!(estim, model)
     nu, ny, nx̂, nym, nŵ, Nk = model.nu, model.ny, estim.nx̂, estim.nym, estim.nx̂, estim.Nk[]
