@@ -209,10 +209,11 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
 """
 function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂0))
     validate_args(estim, u, ym, d)
-    u0, ym0, d0 = remove_op!(estim, u, ym, d) 
-    update_estimate!(estim, u0, ym0, d0)
-    estim.x̂0 .+= estim.f̂op .- estim.x̂op
-    return estim.x̂0 + estim.x̂op
+    u0, ym0, d0 = remove_op!(estim, u, ym, d)
+    x̂0next = update_estimate!(estim, u0, ym0, d0)
+    x̂next   = x̂0next
+    x̂next .+= estim.x̂op
+    return x̂next
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 

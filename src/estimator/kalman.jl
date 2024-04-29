@@ -171,7 +171,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0=[])
+    update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0) -> x̂0next
 
 Update `estim.x̂0` estimate with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -181,7 +181,7 @@ The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\
                + \mathbf{K̂}[\mathbf{y^m}(k) - \mathbf{Ĉ^m x̂}_{k-1}(k) - \mathbf{D̂_d^m d}(k)]
 ```
 """
-function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0=empty(estim.x̂0))
+function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     x̂0, K̂ = estim.x̂0, estim.K̂
     ŷ0m, x̂0next = similar(y0m), similar(x̂0)
@@ -195,8 +195,9 @@ function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0=empty(estim.x̂
     mul!(x̂0next, B̂u, u0, 1, 1)
     mul!(x̂0next, B̂d, d0, 1, 1)
     mul!(x̂0next, K̂, v̂, 1, 1)
+    x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
-    return nothing
+    return x̂0next
 end
 
 struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
@@ -320,7 +321,7 @@ function KalmanFilter(model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂) where {
 end
 
 @doc raw"""
-    update_estimate!(estim::KalmanFilter, u0, y0m, d0=[])
+    update_estimate!(estim::KalmanFilter, u0, y0m, d0) -> x̂0next
 
 Update [`KalmanFilter`](@ref) state `estim.x̂0` and estimation error covariance `estim.P̂`.
 
@@ -344,7 +345,7 @@ control period ``k-1``. See [^2] for details.
 [^2]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
      Linear Dynamical Systems*, <https://web.stanford.edu/class/ee363/lectures/kf.pdf>.
 """
-function update_estimate!(estim::KalmanFilter, u0, y0m, d0=empty(estim.x̂0))
+function update_estimate!(estim::KalmanFilter, u0, y0m, d0)
     Ĉm = @views estim.Ĉ[estim.i_ym, :]
     return update_estimate_kf!(estim, u0, y0m, d0, estim.Â, Ĉm)
 end
@@ -537,7 +538,7 @@ function init_ukf(::SimModel{NT}, nx̂, α, β, κ) where {NT<:Real}
 end
 
 @doc raw"""
-    update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0=[])
+    update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0) -> x̂0next
     
 Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂0` and covariance estimate `estim.P̂`.
 
@@ -576,9 +577,7 @@ noise, respectively.
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, <https://doi.org/10.1002/0470045345.ch14>, 
      ISBN9780470045343.
 """
-function update_estimate!(
-    estim::UnscentedKalmanFilter{NT}, u0, y0m, d0=empty(estim.x̂0)
-) where NT<:Real
+function update_estimate!(estim::UnscentedKalmanFilter{NT}, u0, y0m, d0) where NT<:Real
     x̂0, P̂, Q̂, R̂, K̂, M̂ = estim.x̂0, estim.P̂, estim.Q̂, estim.R̂, estim.K̂, estim.M̂
     nym, nx̂ = estim.nym, estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
@@ -633,9 +632,10 @@ function update_estimate!(
     X̄next .= X̂0next .- x̂0next
     P̂next  = P̂cor
     P̂next.data .= X̄next * Ŝ * X̄next' .+ Q̂
+    x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
     estim.P̂  .= P̂next
-    return nothing
+    return x̂0next
 end
 
 struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
@@ -763,7 +763,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::ExtendedKalmanFilter, u0, y0m, d0=[])
+    update_estimate!(estim::ExtendedKalmanFilter, u0, y0m, d0) -> x̂0next
 
 Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂0` and covariance `estim.P̂`.
 
@@ -792,9 +792,7 @@ automatically computes the Jacobians:
 ```
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs.
 """
-function update_estimate!(
-    estim::ExtendedKalmanFilter{NT}, u0, y0m, d0=empty(estim.x̂0)
-) where NT<:Real
+function update_estimate!(estim::ExtendedKalmanFilter{NT}, u0, y0m, d0) where NT<:Real
     model = estim.model
     nx̂, nu, ny = estim.nx̂, model.nu, model.ny
     x̂0 = estim.x̂0
@@ -838,7 +836,7 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0=nothing)
 end
 
 """
-    update_estimate_kf!(estim::StateEstimator, u0, y0m, d0, Â, Ĉm)
+    update_estimate_kf!(estim::StateEstimator, u0, y0m, d0, Â, Ĉm) -> x̂0next
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
@@ -848,9 +846,7 @@ substitutes the augmented model matrices with its Jacobians (`Â = F̂` and `C�
 The implementation uses in-place operations and explicit factorization to reduce
 allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations.
 """
-function update_estimate_kf!(
-    estim::StateEstimator{NT}, u0, y0m, d0, Â, Ĉm
-) where NT<:Real
+function update_estimate_kf!(estim::StateEstimator{NT}, u0, y0m, d0, Â, Ĉm) where NT<:Real
     Q̂, R̂, M̂, K̂ = estim.Q̂, estim.R̂, estim.M̂, estim.K̂
     x̂0, P̂ = estim.x̂0, estim.P̂
     nx̂, nu, ny = estim.nx̂, estim.model.nu, estim.model.ny
@@ -865,7 +861,8 @@ function update_estimate_kf!(
     f̂!(x̂0next, û0, estim, estim.model, x̂0, u0, d0)
     mul!(x̂0next, K̂, v̂, 1, 1)
     P̂next = Hermitian(Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂, :L)
+    x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
     estim.P̂  .= P̂next
-    return nothing
+    return x̂0next
 end

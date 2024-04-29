@@ -491,7 +491,7 @@ set_objective_linear_coef!(::PredictiveController, _ ) = nothing
 Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
 function updatestate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂0))
-    return updatestate!(mpc.estim,u,ym,d)
+    return updatestate!(mpc.estim, u, ym, d)
 end
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
