@@ -222,7 +222,7 @@ function setmodel_estimator!(estim::InternalModel, model::LinModel, _ , _ , _)
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, u0, y0m, d0=[])
+    update_estimate!(estim::InternalModel, u0, y0m, d0) -> x̂0next
 
 Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -236,9 +236,7 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(
-    estim::InternalModel{NT, SM}, u0, y0m, d0=empty(estim.x̂0)
-) where {NT<:Real, SM}
+function update_estimate!(estim::InternalModel{NT, SM}, u0, y0m, d0) where {NT<:Real, SM}
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
@@ -253,7 +251,10 @@ function update_estimate!(
     mul!(x̂snext, estim.Âs, x̂s)
     mul!(x̂snext, estim.B̂s, ŷs, 1, 1)
     x̂s .= x̂snext
-    return nothing
+    x̂0next    = x̂dnext
+    x̂0next  .+= estim.f̂op .- estim.x̂op
+    estim.x̂0 .= x̂0next
+    return x̂0next
 end
 
 @doc raw"""

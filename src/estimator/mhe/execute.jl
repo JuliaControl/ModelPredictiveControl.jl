@@ -17,7 +17,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
 end
 
 @doc raw"""
-    update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0=[])
+    update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0) -> x̂0next
     
 Update [`MovingHorizonEstimator`](@ref) state `estim.x̂0`.
 
@@ -28,9 +28,7 @@ augmented model from ``j = N_k-1`` to ``0`` inclusively. Afterward, if ``k ≥ H
 arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is estimated
 using `estim.covestim` object.
 """
-function update_estimate!(
-    estim::MovingHorizonEstimator{NT}, u0, y0m, d0=empty(estim.x̂0)
-) where NT<:Real
+function update_estimate!(estim::MovingHorizonEstimator{NT}, u0, y0m, d0) where NT<:Real
     model, optim, x̂0 = estim.model, estim.optim, estim.x̂0
     add_data_windows!(estim::MovingHorizonEstimator, u0, d0, y0m)
     initpred!(estim, model)
@@ -39,9 +37,9 @@ function update_estimate!(
     nx̃ = !isinf(estim.C) + nx̂
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     V̂  = Vector{NT}(undef, nym*Nk)
-    X̂0  = Vector{NT}(undef, nx̂*Nk)
-    û0  = Vector{NT}(undef, nu)
-    ŷ0  = Vector{NT}(undef, ny)
+    X̂0 = Vector{NT}(undef, nx̂*Nk)
+    û0 = Vector{NT}(undef, nu)
+    ŷ0 = Vector{NT}(undef, ny)
     x̄  = Vector{NT}(undef, nx̂)
     ϵ_0 = isinf(estim.C) ? empty(estim.Z̃) : estim.Z̃[begin]
     Z̃_0 = [ϵ_0; estim.x̂0arr_old; estim.Ŵ]
@@ -82,10 +80,10 @@ function update_estimate!(
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
     V̂, X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
-    # remove constant (f̂op - x̂op), since it is added in updatestate! method:
-    estim.x̂0 .= @views X̂0[end-nx̂+1:end] .- (estim.f̂op .- estim.x̂op)
     Nk == estim.He && update_cov!(estim::MovingHorizonEstimator)
-    return nothing
+    x̂0next    = X̂0[end-nx̂+1:end] 
+    estim.x̂0 .= x̂0next
+    return x̂0next
 end
 
 
