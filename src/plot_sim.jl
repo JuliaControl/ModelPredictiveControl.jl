@@ -615,7 +615,7 @@ end
                     linestyle --> :dash
                     label     --> "\$\\mathbf{r_{u}}\$"
                     legend    --> true
-                    t, res.Ry_data[i, :]
+                    t, res.Ru_data[i, :]
                 end
             end
             if plotumin && !isinf(Umin[i])
