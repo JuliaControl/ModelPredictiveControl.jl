@@ -106,7 +106,7 @@ used in the plotting functions.
 
 # Examples
 ```jldoctest
-model = setname!(LinModel(tf(3, [10, 1]), 2.0), u=[raw"$A$ (%)"], y=[raw"$T$ (∘C)"])
+model = setname!(LinModel(tf(3, [10, 1]), 2.0), u=["\$A\$ (%)"], y=["\$T\$ (∘C)"])
 LinModel with a sample time Ts = 2.0 s and:
  1 manipulated inputs u
  1 states x
