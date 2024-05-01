@@ -53,8 +53,9 @@ end
 const par = (9.8, 0.4, 1.2, 0.3)
 f(x, u, _ ) = pendulum(par, x, u)
 h(x, _ )    = [180/π*x[1]]  # [°]
-Ts, nu, nx, ny = 0.1, 1, 2, 1
-model = NonLinModel(f, h, Ts, nu, nx, ny)
+nu, nx, ny, Ts = 1, 2, 1, 0.1
+vu, vx, vy = ["\$τ\$ (N m)"], ["\$θ\$ (rad)", "\$ω\$ (rad/s)"], ["\$θ\$ (°)"]
+model = setname!(NonLinModel(f, h, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
 ```
 
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
@@ -71,6 +72,8 @@ res = sim!(model, N, u)
 plot(res, plotu=false)
 savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
 ```
+
+The [`setname!`](@ref) function allows customizing the Y-axis labels.
 
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
 
@@ -93,7 +96,7 @@ estimator tuning is tested on a plant with a 25 % larger friction coefficient ``
 ```@example 1
 const par_plant = (par[1], par[2], 1.25*par[3], par[4])
 f_plant(x, u, _ ) = pendulum(par_plant, x, u)
-plant = NonLinModel(f_plant, h, Ts, nu, nx, ny)
+plant = setname!(NonLinModel(f_plant, h, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
 plot(res, plotu=false, plotxwithx̂=true)
 savefig(ans, "plot2_NonLinMPC.svg"); nothing # hide
@@ -173,8 +176,8 @@ Kalman Filter similar to the previous one (``\mathbf{y^m} = θ`` and ``\mathbf{y
 ```@example 1
 h2(x, _ ) = [180/π*x[1], x[2]]
 nu, nx, ny = 1, 2, 2
-model2 = NonLinModel(f      , h2, Ts, nu, nx, ny)
-plant2 = NonLinModel(f_plant, h2, Ts, nu, nx, ny)
+model2 = setname!(NonLinModel(f      , h2, Ts, nu, nx, ny), u=vu, x=vx, y=[vy; vx[2]])
+plant2 = setname!(NonLinModel(f_plant, h2, Ts, nu, nx, ny), u=vu, x=vx, y=[vy; vx[2]])
 estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
 ```
 
