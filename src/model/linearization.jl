@@ -80,13 +80,17 @@ function linearize(model::SimModel{NT}; kwargs...) where NT<:Real
     Bd = Matrix{NT}(undef, nx, nd)
     Dd = Matrix{NT}(undef, ny, nd)
     linmodel = LinModel{NT}(A, Bu, C, Bd, Dd, model.Ts)
+    linmodel.uname .= model.uname
+    linmodel.xname .= model.xname
+    linmodel.yname .= model.yname
+    linmodel.dname .= model.dname
     return linearize!(linmodel, model; kwargs...)
 end
 
 """
     linearize!(linmodel::LinModel, model::SimModel; <keyword arguments>) -> linmodel
 
-Linearize `model` and store the result in `linmodel`.
+Linearize `model` and store the result in `linmodel` (in-place).
 
 The keyword arguments are identical to [`linearize`](@ref).
 

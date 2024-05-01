@@ -75,23 +75,61 @@ function setop!(
 )
     if !isnothing(uop) 
         size(uop) == (model.nu,) || error("uop size must be $((model.nu,))")
-        model.uop[:] = uop
+        model.uop .= uop
     end
     if !isnothing(yop)
         size(yop) == (model.ny,) || error("yop size must be $((model.ny,))")
-        model.yop[:] = yop
+        model.yop .= yop
     end
     if !isnothing(dop)
         size(dop) == (model.nd,) || error("dop size must be $((model.nd,))")
-        model.dop[:] = dop
+        model.dop .= dop
     end
     if !isnothing(xop)
         size(xop) == (model.nx,) || error("xop size must be $((model.nx,))")
-        model.xop[:] = xop
+        model.xop .= xop
     end
     if !isnothing(fop)
         size(fop) == (model.nx,) || error("fop size must be $((model.nx,))")
-        model.fop[:] = fop
+        model.fop .= fop
+    end
+    return model
+end
+
+@doc raw"""
+    setname!(model::SimModel; u=nothing, y=nothing, d=nothing, x=nothing) -> model
+
+Set the names of `model` inputs `u`, outputs `y`, disturbances `d`, and states `x`.
+
+The keyword arguments `u`, `y`, `d`, and `x` must be vectors of strings. The strings are
+used in the plotting functions.
+
+# Examples
+```jldoctest
+model = setname!(LinModel(tf(3, [10, 1]), 2.0), u=[raw"$A$ (%)"], y=[raw"$T$ (∘C)"])
+LinModel with a sample time Ts = 2.0 s and:
+ 1 manipulated inputs u
+ 1 states x
+ 1 outputs y
+ 0 measured disturbances d
+```
+"""
+function setname!(model::SimModel; u=nothing, y=nothing, d=nothing, x=nothing)
+    if !isnothing(u)
+        size(u) == (model.nu,) || error("u size must be $((model.nu,))")
+        model.uname .= u
+    end
+    if !isnothing(y)
+        size(y) == (model.ny,) || error("y size must be $((model.ny,))")
+        model.yname .= y
+    end
+    if !isnothing(d)
+        size(d) == (model.nd,) || error("d size must be $((model.nd,))")
+        model.dname .= d
+    end
+    if !isnothing(x)
+        size(x) == (model.nx,) || error("x size must be $((model.nx,))")
+        model.xname .= x
     end
     return model
 end

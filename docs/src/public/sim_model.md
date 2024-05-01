@@ -29,18 +29,10 @@ LinModel
 NonLinModel
 ```
 
-## Differential Equation Solvers
-
-### DiffSolver
+## Set Variable Names
 
 ```@docs
-ModelPredictiveControl.DiffSolver
-```
-
-### RungeKutta
-
-```@docs
-RungeKutta
+setname!
 ```
 
 ## Set Operating Points
@@ -54,4 +46,18 @@ setop!
 ```@docs
 linearize
 linearize!
+```
+
+## Differential Equation Solvers
+
+### DiffSolver
+
+```@docs
+ModelPredictiveControl.DiffSolver
+```
+
+### RungeKutta
+
+```@docs
+RungeKutta
 ```

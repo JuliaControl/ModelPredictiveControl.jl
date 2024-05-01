@@ -13,6 +13,10 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
     dop::Vector{NT}
     xop::Vector{NT}
     fop::Vector{NT}
+    uname::Vector{String}
+    yname::Vector{String}
+    dname::Vector{String}
+    xname::Vector{String}
     function NonLinModel{NT, F, H, DS}(
         f!::F, h!::H, solver::DS, Ts, nu, nx, ny, nd
     ) where {NT<:Real, F<:Function, H<:Function, DS<:DiffSolver}
@@ -22,9 +26,18 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
         dop = zeros(NT, nd)
         xop = zeros(NT, nx)
         fop = zeros(NT, nx)
+        uname = ["\$u_{$i}\$" for i in 1:nu]
+        yname = ["\$y_{$i}\$" for i in 1:ny]
+        dname = ["\$d_{$i}\$" for i in 1:nd]
+        xname = ["\$x_{$i}\$" for i in 1:nx]
         x0  = zeros(NT, nx)
         return new{NT, F, H, DS}(
-            x0, f!, h!, solver, Ts, nu, nx, ny, nd, uop, yop, dop, xop, fop
+            x0, 
+            f!, h!, 
+            solver, Ts, 
+            nu, nx, ny, nd, 
+            uop, yop, dop, xop, fop,
+            uname, yname, dname, xname
         )
     end
 end

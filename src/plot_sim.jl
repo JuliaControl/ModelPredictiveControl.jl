@@ -313,6 +313,11 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
     nu = size(res.U_data, 1)
     nd = size(res.D_data, 1)
     nx = size(res.X_data, 1)
+    model = res.obj
+    uname = model.uname
+    yname = model.yname
+    dname = model.dname
+    xname = model.xname
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
     (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
@@ -324,7 +329,7 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
     for i in 1:ny
         @series begin
             i == ny && (xguide --> "Time (s)")
-            yguide  --> "\$y_$i\$"
+            yguide  --> yname[i]
             color   --> 1
             subplot --> subplot_base + i
             label   --> "\$\\mathbf{y}\$"
@@ -338,7 +343,7 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
         for i in 1:nu
             @series begin
                 i == nu && (xguide --> "Time (s)")
-                yguide     --> "\$u_$i\$"
+                yguide     --> uname[i]
                 color      --> 1
                 subplot    --> subplot_base + i
                 seriestype --> :steppost
@@ -354,7 +359,7 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
         for i in 1:nd
             @series begin
                 i == nd && (xguide --> "Time (s)")
-                yguide  --> "\$d_$i\$"
+                yguide  --> dname[i]
                 color   --> 1
                 subplot --> subplot_base + i
                 label   --> "\$\\mathbf{d}\$"
@@ -369,7 +374,7 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
         for i in 1:nx
             @series begin
                 i == nx && (xguide --> "Time (s)")
-                yguide     --> "\$x_$i\$"
+                yguide     --> xname[i]
                 color      --> 1
                 subplot    --> subplot_base + i
                 label      --> "\$\\mathbf{x}\$"
@@ -396,6 +401,11 @@ end
     nd = size(res.D_data, 1)
     nx = size(res.X_data, 1)
     nx̂ = size(res.X̂_data, 1)
+    model = res.obj.model
+    uname = model.uname
+    yname = model.yname
+    dname = model.dname
+    xname = model.xname
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
     (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
@@ -407,7 +417,7 @@ end
     for i in 1:ny
         @series begin
             i == ny && (xguide --> "Time (s)")
-            yguide  --> "\$y_$i\$"
+            yguide  --> yname[i]
             color   --> 1
             subplot --> subplot_base + i
             label   --> "\$\\mathbf{y}\$"
@@ -417,7 +427,7 @@ end
         if plotŷ
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> "\$y_$i\$"
+                yguide    --> yname[i]
                 color     --> 2
                 subplot   --> subplot_base + i
                 linestyle --> :dashdot
@@ -434,7 +444,7 @@ end
         for i in 1:nu
             @series begin
                 i == nu && (xguide --> "Time (s)")
-                yguide     --> "\$u_$i\$"
+                yguide     --> uname[i]
                 color      --> 1
                 subplot    --> subplot_base + i
                 seriestype --> :steppost
@@ -450,7 +460,7 @@ end
         for i in 1:nd
             @series begin
                 i == nd && (xguide --> "Time (s)")
-                yguide  --> "\$d_$i\$"
+                yguide  --> dname[i]
                 color   --> 1
                 subplot --> subplot_base + i
                 label   --> "\$\\mathbf{d}\$"
@@ -465,7 +475,7 @@ end
         for i in 1:nx
             @series begin
                 i == nx && !plotxwithx̂ && (xguide --> "Time (s)")
-                yguide     --> "\$x_$i\$"
+                yguide     --> xname[i]
                 color      --> 1
                 subplot    --> subplot_base + i
                 label      --> "\$\\mathbf{x}\$"
@@ -481,11 +491,11 @@ end
             @series begin
                 i == nx̂ && (xguide --> "Time (s)")
                 withPlantState = plotxwithx̂ && i ≤ nx
-                yguide     --> (withPlantState ? "\$x_$i\$" : "\$\\hat{x}_$i\$")
+                yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
                 color      --> 2
                 subplot    --> subplot_base + i
-                linestyle --> :dashdot
-                linewidth --> 0.75
+                linestyle  --> :dashdot
+                linewidth  --> 0.75
                 label      --> "\$\\mathbf{\\hat{x}}\$"
                 legend     --> (withPlantState ? true : false)
                 t, res.X̂_data[i, :]
@@ -517,6 +527,11 @@ end
     nd = size(res.D_data, 1)
     nx = size(res.X_data, 1)
     nx̂ = size(res.X̂_data, 1)
+    model = res.obj.estim.model
+    uname = model.uname
+    yname = model.yname
+    dname = model.dname
+    xname = model.xname
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
     (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
@@ -531,7 +546,7 @@ end
     for i in 1:ny
         @series begin
             i == ny && (xguide --> "Time (s)")
-            yguide  --> "\$y_$i\$"
+            yguide  --> yname[i]
             color   --> 1
             subplot --> subplot_base + i
             label   --> "\$\\mathbf{y}\$"
@@ -541,7 +556,7 @@ end
         if plotŷ
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> "\$y_$i\$"
+                yguide    --> yname[i]
                 color     --> 2
                 subplot   --> subplot_base + i
                 linestyle --> :dashdot
@@ -554,7 +569,7 @@ end
         if plotry && !iszero(mpc.M_Hp[i, i])
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> "\$y_$i\$"
+                yguide    --> yname[i]
                 color     --> 3
                 subplot   --> subplot_base + i
                 linestyle --> :dash
@@ -567,7 +582,7 @@ end
         if plotymin && !isinf(Ymin[i])
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> "\$y_$i\$"
+                yguide    --> yname[i]
                 color     --> 4
                 subplot   --> subplot_base + i
                 linestyle --> :dot
@@ -580,7 +595,7 @@ end
         if plotymax && !isinf(Ymax[i])
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> "\$y_$i\$"
+                yguide    --> yname[i]
                 color     --> 5
                 subplot   --> subplot_base + i
                 linestyle --> :dot
@@ -597,7 +612,7 @@ end
         for i in 1:nu
             @series begin
                 i == nu && (xguide --> "Time (s)")
-                yguide     --> "\$u_$i\$"
+                yguide     --> uname[i]
                 color      --> 1
                 subplot    --> subplot_base + i
                 seriestype --> :steppost
@@ -608,7 +623,7 @@ end
             if plotru && !iszero(mpc.L_Hp[i, i])
                 @series begin
                     i == nu && (xguide --> "Time (s)")
-                    yguide    --> "\$u_$i\$"
+                    yguide    --> uname[i]
                     color     --> 3
                     subplot   --> subplot_base + i
                     seriestype --> :steppost
@@ -621,7 +636,7 @@ end
             if plotumin && !isinf(Umin[i])
                 @series begin
                     i == nu && (xguide --> "Time (s)")
-                    yguide    --> "\$u_$i\$"
+                    yguide    --> uname[i]
                     color     --> 4
                     subplot   --> subplot_base + i
                     linestyle --> :dot
@@ -634,7 +649,7 @@ end
             if plotumax && !isinf(Umax[i])
                 @series begin
                     i == nu && (xguide --> "Time (s)")
-                    yguide    --> "\$u_$i\$"
+                    yguide    --> uname[i]
                     color     --> 5
                     subplot   --> subplot_base + i
                     linestyle --> :dot
@@ -652,7 +667,7 @@ end
         for i in 1:nd
             @series begin
                 i == nd && (xguide --> "Time (s)")
-                yguide  --> "\$d_$i\$"
+                yguide  --> dname[i]
                 color   --> 1
                 subplot --> subplot_base + i
                 label   --> "\$\\mathbf{d}\$"
@@ -667,7 +682,7 @@ end
         for i in 1:nx
             @series begin
                 i == nx && !plotxwithx̂ && (xguide --> "Time (s)")
-                yguide     --> "\$x_$i\$"
+                yguide     --> xname[i]
                 color      --> 1
                 subplot    --> subplot_base + i
                 label      --> "\$\\mathbf{x}\$"
@@ -683,7 +698,7 @@ end
             @series begin
                 i == nx̂ && (xguide --> "Time (s)")
                 withPlantState = plotxwithx̂ && i ≤ nx
-                yguide     --> (withPlantState ? "\$x_$i\$" : "\$\\hat{x}_$i\$")
+                yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
                 color      --> 2
                 subplot    --> subplot_base + i
                 linestyle --> :dashdot
