@@ -255,9 +255,9 @@ end
 
     @test_throws ErrorException Luenberger(linmodel1, nint_ym=[1,1,1])
     @test_throws ErrorException Luenberger(linmodel1, nint_ym=[-1,0])
-    @test_throws ErrorException Luenberger(linmodel1, p̂=[0.5])
-    @test_throws ErrorException Luenberger(linmodel1, p̂=fill(1.5, lo1.nx̂))
-    @test_throws ErrorException Luenberger(LinModel(tf(1,[1, 0]),0.1), p̂=[0.5,0.6])
+    @test_throws ErrorException Luenberger(linmodel1, poles=[0.5])
+    @test_throws ErrorException Luenberger(linmodel1, poles=fill(1.5, lo1.nx̂))
+    @test_throws ErrorException Luenberger(LinModel(tf(1,[1, 0]),0.1), poles=[0.5,0.6])
 end
     
 @testset "Luenberger estimator methods" begin

@@ -277,17 +277,24 @@ function MovingHorizonEstimator(
     model::SM;
     He::Union{Int, Nothing} = nothing,
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP_0::Vector = fill(1/model.nx, model.nx),
-    σQ ::Vector = fill(1/model.nx, model.nx),
-    σR ::Vector = fill(1, length(i_ym)),
-    nint_u   ::IntVectorOrInt = 0,
-    σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σPint_u_0 ::Vector = fill(1, max(sum(nint_u), 0)),
-    nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
-    σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σPint_ym_0::Vector = fill(1, max(sum(nint_ym), 0)),
+    sigmaP_0 = fill(1/model.nx, model.nx),
+    sigmaQ   = fill(1/model.nx, model.nx),
+    sigmaR   = fill(1, length(i_ym)),
+    nint_u ::IntVectorOrInt = 0,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
+    sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
+    sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
+    sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
     Cwt::Real = Inf,
     optim::JM = default_optim_mhe(model),
+    σP_0       = sigmaP_0,
+    σQ         = sigmaQ,
+    σR         = sigmaR,
+    σPint_u_0  = sigmaPint_u_0,
+    σQint_u    = sigmaQint_u,
+    σPint_ym_0 = sigmaPint_ym_0,
+    σQint_ym   = sigmaQint_ym,
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     # estimated covariances matrices (variance = σ²) :
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
@@ -352,9 +359,10 @@ model augmentation and time-varying constraints.
 
 # Arguments
 !!! info
+    All the keyword arguments have non-Unicode alternatives e.g. *`xhatmin`* or *`Vhatmax`*. 
+
     The default constraints are mentioned here for clarity but omitting a keyword argument 
-    will not re-assign to its default value (defaults are set at construction only). The
-    same applies for [`PredictiveController`](@ref).
+    will not re-assign to its default value (defaults are set at construction only).
 
 - `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints
 - `x̂min=fill(-Inf,nx̂)` / `x̂max=fill(+Inf,nx̂)` : estimated state bound ``\mathbf{x̂_{min/max}}``
@@ -363,8 +371,8 @@ model augmentation and time-varying constraints.
 - `c_x̂min=fill(0.0,nx̂)` / `c_x̂max=fill(0.0,nx̂)` : `x̂min` / `x̂max` softness weight ``\mathbf{c_{x̂_{min/max}}}``
 - `c_ŵmin=fill(0.0,nx̂)` / `c_ŵmax=fill(0.0,nx̂)` : `ŵmin` / `ŵmax` softness weight ``\mathbf{c_{ŵ_{min/max}}}``
 - `c_v̂min=fill(0.0,nym)` / `c_v̂max=fill(0.0,nym)` : `v̂min` / `v̂max` softness weight ``\mathbf{c_{v̂_{min/max}}}``
-- all the keyword arguments above but with a first capital letter, e.g. `X̂max` or `C_ŵmax`:
-  for time-varying constraints (see Extended Help)
+-  all the keyword arguments above but with a first capital letter, e.g. `X̂max` or `C_ŵmax`:
+   for time-varying constraints (see Extended Help)
 
 # Examples
 ```jldoctest
@@ -402,18 +410,30 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, 
 """
 function setconstraint!(
     estim::MovingHorizonEstimator; 
-    x̂min   = nothing, x̂max   = nothing,
-    ŵmin   = nothing, ŵmax   = nothing,
-    v̂min   = nothing, v̂max   = nothing,
-    c_x̂min = nothing, c_x̂max = nothing,
-    c_ŵmin = nothing, c_ŵmax = nothing,
-    c_v̂min = nothing, c_v̂max = nothing,
-    X̂min   = nothing, X̂max   = nothing,
-    Ŵmin   = nothing, Ŵmax   = nothing,
-    V̂min   = nothing, V̂max   = nothing,
-    C_x̂min = nothing, C_x̂max = nothing,
-    C_ŵmin = nothing, C_ŵmax = nothing,
-    C_v̂min = nothing, C_v̂max = nothing,
+    xhatmin   = nothing, xhatmax   = nothing,
+    whatmin   = nothing, whatmax   = nothing,
+    vhatmin   = nothing, vhatmax   = nothing,
+    c_xhatmin = nothing, c_xhatmax = nothing,
+    c_whatmin = nothing, c_whatmax = nothing,
+    c_vhatmin = nothing, c_vhatmax = nothing,
+    Xhatmin   = nothing, Xhatmax   = nothing,
+    Whatmin   = nothing, Whatmax   = nothing,
+    Vhatmin   = nothing, Vhatmax   = nothing,
+    C_xhatmin = nothing, C_xhatmax = nothing,
+    C_whatmin = nothing, C_whatmax = nothing,
+    C_vhatmin = nothing, C_vhatmax = nothing,
+    x̂min   = xhatmin,   x̂max   = xhatmax,
+    ŵmin   = whatmin,   ŵmax   = whatmax,
+    v̂min   = vhatmin,   v̂max   = vhatmax,
+    c_x̂min = c_xhatmin, c_x̂max = c_xhatmax,
+    c_ŵmin = c_whatmin, c_ŵmax = c_whatmax,
+    c_v̂min = c_vhatmin, c_v̂max = c_vhatmax,
+    X̂min   = Xhatmin,   X̂max   = Xhatmax,
+    Ŵmin   = Whatmin,   Ŵmax   = Whatmax,
+    V̂min   = Vhatmin,   V̂max   = Vhatmax,
+    C_x̂min = C_xhatmin, C_x̂max = C_xhatmax,
+    C_ŵmin = C_whatmin, C_ŵmax = C_whatmax,
+    C_v̂min = C_vhatmin, C_v̂max = C_vhatmax,
 )
     model, optim, con = estim.model, estim.optim, estim.con
     nx̂, nŵ, nym, He = estim.nx̂, estim.nx̂, estim.nym, estim.He

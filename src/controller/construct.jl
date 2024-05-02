@@ -53,6 +53,14 @@ for details on bounds and softness parameters ``\mathbf{c}``. The output and ter
 constraints are all soft by default. See Extended Help for time-varying constraints.
 
 # Arguments
+!!! info
+    The keyword arguments `Δumin`, `Δumax`, `c_Δumin`, `c_Δumax`, `x̂min`, `x̂max`, `c_x̂min`,
+    `c_x̂max` and their capital letter versions have non-Unicode alternatives e.g. 
+    *`Deltaumin`*, *`xhatmax`* and *`C_Deltaumin`*
+
+    The default constraints are mentioned here for clarity but omitting a keyword argument 
+    will not re-assign to its default value (defaults are set at construction only).
+
 - `mpc::PredictiveController` : predictive controller to set constraints
 - `umin=fill(-Inf,nu)` / `umax=fill(+Inf,nu)` : manipulated input bound ``\mathbf{u_{min/max}}``
 - `Δumin=fill(-Inf,nu)` / `Δumax=fill(+Inf,nu)` : manipulated input increment bound ``\mathbf{Δu_{min/max}}``
@@ -114,20 +122,26 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 """
 function setconstraint!(
     mpc::PredictiveController; 
-    umin    = nothing, umax    = nothing,
-    Δumin   = nothing, Δumax   = nothing,
-    ymin    = nothing, ymax    = nothing,
-    x̂min    = nothing, x̂max    = nothing,
-    c_umin  = nothing, c_umax  = nothing,
-    c_Δumin = nothing, c_Δumax = nothing,
-    c_ymin  = nothing, c_ymax  = nothing,
-    c_x̂min  = nothing, c_x̂max  = nothing,
-    Umin    = nothing, Umax    = nothing,
-    ΔUmin   = nothing, ΔUmax   = nothing,
-    Ymin    = nothing, Ymax    = nothing,
-    C_umax  = nothing, C_umin  = nothing,
-    C_Δumax = nothing, C_Δumin = nothing,
-    C_ymax  = nothing, C_ymin  = nothing,
+    umin        = nothing, umax        = nothing,
+    Deltaumin   = nothing, Deltaumax   = nothing,
+    ymin        = nothing, ymax        = nothing,
+    xhatmin     = nothing, xhatmax     = nothing,
+    c_umin      = nothing, c_umax      = nothing,
+    c_Deltaumin = nothing, c_Deltaumax = nothing,
+    c_ymin      = nothing, c_ymax      = nothing,
+    c_xhatmin   = nothing, c_xhatmax   = nothing,
+    Umin        = nothing, Umax        = nothing,
+    DeltaUmin   = nothing, DeltaUmax   = nothing,
+    Ymin        = nothing, Ymax        = nothing,
+    C_umax      = nothing, C_umin      = nothing,
+    C_Deltaumax = nothing, C_Deltaumin = nothing,
+    C_ymax      = nothing, C_ymin      = nothing,
+    Δumin   = Deltaumin,   Δumax = Deltaumax,
+    x̂min    = xhatmin,     x̂max = xhatmax,
+    c_Δumin = c_Deltaumin, c_Δumax = c_Deltaumax,
+    c_x̂min  = c_xhatmin,   c_x̂max = c_xhatmax,
+    ΔUmin   = DeltaUmin,   ΔUmax = DeltaUmax,
+    C_Δumin = C_Deltaumin, C_Δumax = C_Deltaumax,
 )
     model, con, optim = mpc.estim.model, mpc.con, mpc.optim
     nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc

@@ -154,6 +154,9 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 `x_noise` arguments, respectively.
 
 # Arguments
+!!! info
+    Keyword arguments in *`italic`* are non-Unicode alternatives.
+
 - `estim::StateEstimator` : state estimator to simulate
 - `N::Int` : simulation length in time steps
 - `u = estim.model.uop .+ 1` : manipulated input ``\mathbf{u}`` value
@@ -167,7 +170,8 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 - `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
 - `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``
 - `x_0 = plant.xop` : plant initial state ``\mathbf{x}(0)``
-- `x̂_0 = nothing` : initial estimate ``\mathbf{x̂}(0)``, [`initstate!`](@ref) is used if `nothing`
+- `x̂_0 = nothing` or *`xhat_0`* : initial estimate ``\mathbf{x̂}(0)``, [`initstate!`](@ref)
+   is used if `nothing`
 - `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
 
 # Examples
@@ -248,9 +252,10 @@ function sim_closedloop!(
     d_step ::Vector = zeros(NT, plant.nd),
     d_noise::Vector = zeros(NT, plant.nd),
     x_noise::Vector = zeros(NT, plant.nx),
-    x_0 = plant.xop,
-    x̂_0 = nothing,
-    lastu = plant.uop,
+    x_0    = plant.xop,
+    xhat_0 = nothing,
+    lastu  = plant.uop,
+    x̂_0 = xhat_0
 ) where {NT<:Real}
     model = estim.model
     model.Ts ≈ plant.Ts || error("Sampling time of controller/estimator ≠ plant.Ts")

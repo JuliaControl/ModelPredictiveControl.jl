@@ -24,15 +24,19 @@ Calling a [`PredictiveController`](@ref) object calls this method.
 See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
 
 # Arguments
+
+Keyword arguments in *`italic`* are non-Unicode alternatives.
+
 - `mpc::PredictiveController` : solve optimization problem of `mpc`.
 - `ry=mpc.estim.model.yop` : current output setpoints ``\mathbf{r_y}(k)``.
 - `d=[]` : current measured disturbances ``\mathbf{d}(k)``.
-- `D̂=repeat(d, mpc.Hp)` : predicted measured disturbances ``\mathbf{D̂}``, constant in the
-  future by default or ``\mathbf{d̂}(k+j)=\mathbf{d}(k)`` for ``j=1`` to ``H_p``.
-- `R̂y=repeat(ry, mpc.Hp)` : predicted output setpoints ``\mathbf{R̂_y}``, constant in the
-  future by default or ``\mathbf{r̂_y}(k+j)=\mathbf{r_y}(k)`` for ``j=1`` to ``H_p``.
-- `R̂u=repeat(mpc.estim.model.uop, mpc.Hp)` : predicted manipulated input setpoints, constant
-  in the future by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for ``j=0`` to ``H_p-1``.
+- `D̂=repeat(d, mpc.Hp)` or *`Dhat`* : predicted measured disturbances ``\mathbf{D̂}``, constant
+   in the future by default or ``\mathbf{d̂}(k+j)=\mathbf{d}(k)`` for ``j=1`` to ``H_p``.
+- `R̂y=repeat(ry, mpc.Hp)` or *`Rhaty`* : predicted output setpoints ``\mathbf{R̂_y}``, constant
+   in the future by default or ``\mathbf{r̂_y}(k+j)=\mathbf{r_y}(k)`` for ``j=1`` to ``H_p``.
+- `R̂u=repeat(mpc.estim.model.uop, mpc.Hp)` or *`Rhatu`* : predicted manipulated input
+   setpoints, constant in the future by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for
+   ``j=0`` to ``H_p-1``. 
 - `ym=nothing` : current measured outputs ``\mathbf{y^m}(k)``, only required if `mpc.estim` 
    is an [`InternalModel`](@ref).
 
@@ -49,10 +53,13 @@ function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
     d ::Vector = empty(mpc.estim.x̂0);
-    D̂ ::Vector = repeat(d,  mpc.Hp),
-    R̂y::Vector = repeat(ry, mpc.Hp),
-    R̂u::Vector = mpc.noR̂u ? empty(mpc.estim.x̂0) : repeat(mpc.estim.model.uop, mpc.Hp),
-    ym::Union{Vector, Nothing} = nothing
+    Dhat ::Vector = repeat(d,  mpc.Hp),
+    Rhaty::Vector = repeat(ry, mpc.Hp),
+    Rhatu::Vector = mpc.noR̂u ? empty(mpc.estim.x̂0) : repeat(mpc.estim.model.uop, mpc.Hp),
+    ym::Union{Vector, Nothing} = nothing,
+    D̂  = Dhat,
+    R̂y = Rhaty,
+    R̂u = Rhatu
 )
     validate_args(mpc, ry, d, D̂, R̂y, R̂u)
     initpred!(mpc, mpc.estim.model, d, ym, D̂, R̂y, R̂u)
@@ -73,19 +80,22 @@ Get additional info about `mpc` [`PredictiveController`](@ref) optimum for troub
 The function should be called after calling [`moveinput!`](@ref). It returns the dictionary
 `info` with the following fields:
 
-- `:ΔU`  : optimal manipulated input increments over ``H_c``, ``\mathbf{ΔU}``
-- `:ϵ`   : optimal slack variable, ``ϵ``
+!!! info
+    Fields in *`italic`* are non-Unicode alternatives.
+
+- `:ΔU` or *`:DeltaU`* : optimal manipulated input increments over ``H_c``, ``\mathbf{ΔU}``
+- `:ϵ` or *`:epsilon`* : optimal slack variable, ``ϵ``
+- `:D̂` or *`:Dhat`* : predicted measured disturbances over ``H_p``, ``\mathbf{D̂}``
+- `:ŷ` or *`:yhat`* : current estimated output, ``\mathbf{ŷ}(k)``
+- `:Ŷ` or *`:Yhat`* : optimal predicted outputs over ``H_p``, ``\mathbf{Ŷ}``
+- `:Ŷs` or *`:Yhats`* : predicted stochastic output over ``H_p`` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``
+- `:R̂y` or *`:Rhaty`* : predicted output setpoint over ``H_p``, ``\mathbf{R̂_y}``
+- `:R̂u` or *`:Rhatu`* : predicted manipulated input setpoint over ``H_p``, ``\mathbf{R̂_u}``
+- `:x̂end` or *`:xhatend`* : optimal terminal states, ``\mathbf{x̂}_{k-1}(k+H_p)``
 - `:J`   : objective value optimum, ``J``
 - `:U`   : optimal manipulated inputs over ``H_p``, ``\mathbf{U}``
 - `:u`   : current optimal manipulated input, ``\mathbf{u}(k)``
 - `:d`   : current measured disturbance, ``\mathbf{d}(k)``
-- `:D̂`   : predicted measured disturbances over ``H_p``, ``\mathbf{D̂}``
-- `:ŷ`   : current estimated output, ``\mathbf{ŷ}(k)``
-- `:Ŷ`   : optimal predicted outputs over ``H_p``, ``\mathbf{Ŷ}``
-- `:x̂end`: optimal terminal states, ``\mathbf{x̂}_{k-1}(k+H_p)``
-- `:Ŷs`  : predicted stochastic output over ``H_p`` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``
-- `:R̂y`  : predicted output setpoint over ``H_p``, ``\mathbf{R̂_y}``
-- `:R̂u`  : predicted manipulated input setpoint over ``H_p``, ``\mathbf{R̂_u}``
 
 For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
 solution summary that can be printed. Lastly, the optimal economic cost `:JE` is also
@@ -129,6 +139,16 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info[:Ŷs]   = Ŷs
     info[:R̂y]   = mpc.R̂y0 + mpc.Yop
     info[:R̂u]   = mpc.R̂u0 + mpc.Uop
+    # --- non-Unicode fields ---
+    info[:DeltaU] = info[:ΔU]
+    info[:epsilon] = info[:ϵ]
+    info[:Dhat] = info[:D̂]
+    info[:yhat] = info[:ŷ]
+    info[:Yhat] = info[:Ŷ]
+    info[:xhatend] = info[:x̂end]
+    info[:Yhats] = info[:Ŷs]
+    info[:Rhaty] = info[:R̂y]
+    info[:Rhatu] = info[:R̂u]
     info = addinfo!(info, mpc)
     return info
 end
