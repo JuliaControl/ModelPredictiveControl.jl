@@ -86,21 +86,24 @@ the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathb
 unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 
 # Arguments
+!!! info
+    Keyword arguments in *`italic`* are non-Unicode alternatives.
+
 - `model::LinModel` : (deterministic) model for the estimations.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
     are unmeasured ``\mathbf{y^u}``.
-- `σQ=fill(1/model.nx,model.nx)` : main diagonal of the process noise covariance
-    ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
-- `σR=fill(1,length(i_ym))` : main diagonal of the sensor noise covariance ``\mathbf{R}``
-    of `model` measured outputs, specified as a standard deviation vector.
+- `σQ=fill(1/model.nx,model.nx)` or *`sigmaQ`* : main diagonal of the process noise
+    covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
+- `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
+    ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
 - `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
     the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
-- `σQint_u=fill(1,sum(nint_u))`: same than `σQ` but for the unmeasured disturbances at 
-    manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
 - `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
     disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
-- `σQint_ym=fill(1,sum(nint_ym))` : same than `σQ` for the unmeasured disturbances at 
-    measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
+- `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
+- `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
+    disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 
 # Examples
 ```jldoctest
@@ -139,12 +142,16 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 function SteadyKalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σQ::Vector = fill(1/model.nx, model.nx),
-    σR::Vector = fill(1, length(i_ym)),
+    sigmaQ = fill(1/model.nx, model.nx),
+    sigmaR = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
-    σQint_u::Vector = fill(1, max(sum(nint_u), 0)),
     nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
-    σQint_ym::Vector = fill(1, max(sum(nint_ym), 0))
+    sigmaQint_u  = fill(1, max(sum(nint_u),  0)),
+    sigmaQint_ym = fill(1, max(sum(nint_ym), 0)),
+    σQ       = sigmaQ,
+    σR       = sigmaR,
+    σQint_u  = sigmaQint_u,
+    σQint_ym = sigmaQint_ym,
 ) where {NT<:Real, SM<:LinModel{NT}}
     # estimated covariances matrices (variance = σ²) :
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
@@ -266,13 +273,16 @@ its initial value with ``\mathbf{P̂}_{-1}(0) =
     \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``.
 
 # Arguments
+!!! info
+    Keyword arguments in *`italic`* are non-Unicode alternatives.
+
 - `model::LinModel` : (deterministic) model for the estimations.
-- `σP_0=fill(1/model.nx,model.nx)` : main diagonal of the initial estimate covariance
-    ``\mathbf{P}(0)``, specified as a standard deviation vector.
-- `σPint_u_0=fill(1,sum(nint_u))` : same than `σP_0` but for the unmeasured disturbances at 
-    manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
-- `σPint_ym_0=fill(1,sum(nint_ym))` : same than `σP_0` but for the unmeasured disturbances
-    at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
+- `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
+    covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
+- `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+- `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
+    disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
@@ -291,15 +301,22 @@ KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 function KalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP_0::Vector = fill(1/model.nx, model.nx),
-    σQ ::Vector = fill(1/model.nx, model.nx),
-    σR ::Vector = fill(1, length(i_ym)),
-    nint_u   ::IntVectorOrInt = 0,
-    σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σPint_u_0 ::Vector = fill(1, max(sum(nint_u), 0)),
-    nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
-    σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σPint_ym_0::Vector = fill(1, max(sum(nint_ym), 0)),
+    sigmaP_0 = fill(1/model.nx, model.nx),
+    sigmaQ   = fill(1/model.nx, model.nx),
+    sigmaR   = fill(1, length(i_ym)),
+    nint_u ::IntVectorOrInt = 0,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
+    sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
+    sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
+    sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
+    σP_0       = sigmaP_0,
+    σQ         = sigmaQ,
+    σR         = sigmaR,
+    σPint_u_0  = sigmaPint_u_0,
+    σQint_u    = sigmaQint_u,
+    σPint_ym_0 = sigmaPint_ym_0,
+    σQint_ym   = sigmaQint_ym,
 ) where {NT<:Real, SM<:LinModel{NT}}
     # estimated covariances matrices (variance = σ²) :
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
@@ -440,10 +457,13 @@ represents the measured outputs of ``\mathbf{ĥ}`` function (and unmeasured one
 ``\mathbf{ĥ^u}``).
 
 # Arguments
+!!! info
+    Keyword arguments in *`italic`* are non-Unicode alternatives.
+
 - `model::SimModel` : (deterministic) model for the estimations.
-- `α=1e-3` : alpha parameter, spread of the state distribution ``(0 < α ≤ 1)``.
-- `β=2` : beta parameter, skewness and kurtosis of the states distribution ``(β ≥ 0)``.
-- `κ=0` : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
+- `α=1e-3` or *`alpha`* : alpha parameter, spread of the state distribution ``(0 < α ≤ 1)``.
+- `β=2` or *`beta`* : beta parameter, skewness and kurtosis of the states distribution ``(β ≥ 0)``.
+- `κ=0` or *`kappa`* : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
 - `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
 - `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
 
@@ -470,18 +490,28 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
 function UnscentedKalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP_0::Vector = fill(1/model.nx, model.nx),
-    σQ ::Vector = fill(1/model.nx, model.nx),
-    σR ::Vector = fill(1, length(i_ym)),
-    nint_u   ::IntVectorOrInt = 0,
-    σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σPint_u_0 ::Vector = fill(1, max(sum(nint_u), 0)),
-    nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
-    σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σPint_ym_0::Vector = fill(1, max(sum(nint_ym), 0)),
-    α::Real = 1e-3,
-    β::Real = 2,
-    κ::Real = 0
+    sigmaP_0 = fill(1/model.nx, model.nx),
+    sigmaQ   = fill(1/model.nx, model.nx),
+    sigmaR   = fill(1, length(i_ym)),
+    nint_u ::IntVectorOrInt = 0,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
+    sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
+    sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
+    sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
+    alpha::Real = 1e-3,
+    beta ::Real = 2,
+    kappa::Real = 0,
+    σP_0       = sigmaP_0,
+    σQ         = sigmaQ,
+    σR         = sigmaR,
+    σPint_u_0  = sigmaPint_u_0,
+    σQint_u    = sigmaQint_u,
+    σPint_ym_0 = sigmaPint_ym_0,
+    σQint_ym   = sigmaQint_ym,
+    α = alpha,
+    β = beta,
+    κ = kappa,
 ) where {NT<:Real, SM<:SimModel{NT}}
     # estimated covariances matrices (variance = σ²) :
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
@@ -732,15 +762,22 @@ ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
 function ExtendedKalmanFilter(
     model::SM;
     i_ym::IntRangeOrVector = 1:model.ny,
-    σP_0::Vector = fill(1/model.nx, model.nx),
-    σQ ::Vector = fill(1/model.nx, model.nx),
-    σR ::Vector = fill(1, length(i_ym)),
-    nint_u   ::IntVectorOrInt = 0,
-    σQint_u  ::Vector = fill(1, max(sum(nint_u), 0)),
-    σPint_u_0 ::Vector = fill(1, max(sum(nint_u), 0)),
-    nint_ym  ::IntVectorOrInt = default_nint(model, i_ym, nint_u),
-    σQint_ym ::Vector = fill(1, max(sum(nint_ym), 0)),
-    σPint_ym_0::Vector = fill(1, max(sum(nint_ym), 0)),
+    sigmaP_0 = fill(1/model.nx, model.nx),
+    sigmaQ   = fill(1/model.nx, model.nx),
+    sigmaR   = fill(1, length(i_ym)),
+    nint_u ::IntVectorOrInt = 0,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
+    sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
+    sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
+    sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
+    σP_0       = sigmaP_0,
+    σQ         = sigmaQ,
+    σR         = sigmaR,
+    σPint_u_0  = sigmaPint_u_0,
+    σQint_u    = sigmaQint_u,
+    σPint_ym_0 = sigmaPint_ym_0,
+    σQint_ym   = sigmaQint_ym,
 ) where {NT<:Real, SM<:SimModel{NT}}
     # estimated covariances matrices (variance = σ²) :
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)

@@ -95,17 +95,20 @@ Get additional info on `estim` [`MovingHorizonEstimator`](@ref) optimum for trou
 The function should be called after calling [`updatestate!`](@ref). It returns the
 dictionary `info` with the following fields:
 
-- `:Ŵ`   : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``
-- `:x̂arr`: optimal estimated state at arrival, ``\mathbf{x̂}_k(k-N_k+1)``
-- `:ϵ`   : optimal slack variable, ``ϵ``
+!!! info
+    Fields in *`italic`* are non-Unicode alternatives.
+
+- `:Ŵ` or *`:What`* : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``
+- `:ϵ` or *`:epsilon`* : optimal slack variable, ``ϵ``
+- `:X̂` or *`:Xhat`* : optimal estimated states over ``N_k+1``, ``\mathbf{X̂}``
+- `:x̂` or *`:xhat`* : optimal estimated state for the next time step, ``\mathbf{x̂}_k(k+1)``
+- `:V̂` or *`:Vhat`* : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``
+- `:P̄` or *`:Pbar`* : estimation error covariance at arrival, ``\mathbf{P̄}``
+- `:x̄` or *`:xbar`* : optimal estimation error at arrival, ``\mathbf{x̄}``
+- `:Ŷ` or *`:Yhat`* : optimal estimated outputs over ``N_k``, ``\mathbf{Ŷ}``
+- `:Ŷm` or *`:Yhatm`* : optimal estimated measured outputs over ``N_k``, ``\mathbf{Ŷ^m}``
+- `:x̂arr` or *`:xhatarr`* : optimal estimated state at arrival, ``\mathbf{x̂}_k(k-N_k+1)``
 - `:J`   : objective value optimum, ``J``
-- `:X̂`   : optimal estimated states over ``N_k+1``, ``\mathbf{X̂}``
-- `:x̂`   : optimal estimated state for the next time step, ``\mathbf{x̂}_k(k+1)``
-- `:V̂`   : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``
-- `:P̄`   : estimation error covariance at arrival, ``\mathbf{P̄}``
-- `:x̄`   : optimal estimation error at arrival, ``\mathbf{x̄}``
-- `:Ŷ`   : optimal estimated outputs over ``N_k``, ``\mathbf{Ŷ}``
-- `:Ŷm`  : optimal estimated measured outputs over ``N_k``, ``\mathbf{Ŷ^m}``
 - `:Ym`  : measured outputs over ``N_k``, ``\mathbf{Y^m}``
 - `:U`   : manipulated inputs over ``N_k``, ``\mathbf{U}``
 - `:D`   : measured disturbances over ``N_k``, ``\mathbf{D}``
@@ -166,6 +169,17 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:U]  = U 
     info[:D]  = D
     info[:sol] = JuMP.solution_summary(estim.optim, verbose=true)
+    # --- non-Unicode fields ---
+    info[:What] = info[:Ŵ]
+    info[:xhatarr] = info[:x̂arr]
+    info[:epsilon] = info[:ϵ]
+    info[:Xhat] = info[:X̂]
+    info[:xhat] = info[:x̂]
+    info[:Vhat] = info[:V̂]
+    info[:Pbar] = info[:P̄]
+    info[:xbar] = info[:x̄]
+    info[:Yhat] = info[:Ŷ]
+    info[:Yhatm] = info[:Ŷm]
     return info
 end
 

@@ -73,9 +73,9 @@ plot(res, plotu=false)
 savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
 ```
 
-The [`setname!`](@ref) function allows customizing the Y-axis labels.
-
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
+
+The [`setname!`](@ref) function allows customizing the Y-axis labels.
 
 ## Nonlinear Model Predictive Controller
 
