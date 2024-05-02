@@ -498,7 +498,7 @@ updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured
 """
     setstate!(mpc::PredictiveController, x̂) -> mpc
 
-Set the estimate at `mpc.estim.x̂`.
+Set `mpc.estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`.
 """
 setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
 
