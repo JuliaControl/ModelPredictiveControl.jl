@@ -475,7 +475,7 @@ end
 function setmodel_estimator!(
     estim::MovingHorizonEstimator, model::LinModel, uop_old, yop_old, dop_old
 )
-    con = estim.con
+    optim, con = estim.optim, estim.con
     nx̂, nym, nu, nd, He = estim.nx̂, estim.nym, model.nu, model.nd, estim.He
     nϵ = isinf(estim.C) ? 0 : 1
     As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
@@ -531,12 +531,16 @@ function setmodel_estimator!(
     con.A[nx̃+1:nx̃+nX̂,:]     .= [con.A_X̂min; con.A_X̂max]
     nŴ = length(con.Ŵmin) + length(con.Ŵmax)
     con.A[nx̃+nX̂+nŴ+1:end,:] .= [con.A_V̂min; con.A_V̂max]
-    A = con.A[con.i_b, :]
-    b = con.b[con.i_b]
-    Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
-    JuMP.delete(estim.optim, estim.optim[:linconstraint])
-    JuMP.unregister(estim.optim, :linconstraint)
-    @constraint(estim.optim, linconstraint, A*Z̃var .≤ b)
+    if any(con.i_b)
+        A = con.A[con.i_b, :]
+        lincon = optim[:linconstraint]
+        Z̃var = optim[:Z̃var]
+        vars = Vector{JuMP.VariableRef}(undef, size(A, 1))
+        for i in eachindex(Z̃var)
+            vars .= Z̃var[i]
+            JuMP.set_normalized_coefficient(lincon, vars, A[:, i])
+        end
+    end
     # --- data windows ---
     for i in 1:He
         # convert x̂0 to x̂ with the old operating point:

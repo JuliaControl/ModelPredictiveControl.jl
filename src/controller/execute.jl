@@ -600,12 +600,16 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel, x̂op_
     con.A_x̂max .= A_x̂max
     nUandΔŨ = length(con.U0min) + length(con.U0max) + length(con.ΔŨmin) + length(con.ΔŨmax)
     con.A[nUandΔŨ+1:end, :] = [con.A_Ymin; con.A_Ymax; con.A_x̂min; con.A_x̂max]
-    A = con.A[con.i_b, :]
-    b = con.b[con.i_b]
-    ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
-    JuMP.delete(optim, optim[:linconstraint])
-    JuMP.unregister(optim, :linconstraint)
-    @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+    if any(con.i_b)
+        A = con.A[con.i_b, :]
+        lincon = optim[:linconstraint]
+        ΔŨvar = optim[:ΔŨvar]
+        vars = Vector{JuMP.VariableRef}(undef, size(A, 1))
+        for i in eachindex(ΔŨvar)
+            vars .= ΔŨvar[i]
+            JuMP.set_normalized_coefficient(lincon, vars, A[:, i])
+        end
+    end
     # --- quadratic programming Hessian matrix ---
     H̃ = init_quadprog(model, mpc.Ẽ, mpc.S̃, mpc.M_Hp, mpc.Ñ_Hc, mpc.L_Hp)
     mpc.H̃ .= H̃
