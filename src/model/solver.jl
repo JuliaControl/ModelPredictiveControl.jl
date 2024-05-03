@@ -44,7 +44,7 @@ end
 "Get the `f!` and `h!` functions for Runge-Kutta solver."
 function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ , nx, _ , _ )
     Ts_inner = Ts/solver.supersample
-    Nc = nx + 1
+    Nc = nx + 2
     xcur_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx), Nc)
     k1_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     k2_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
