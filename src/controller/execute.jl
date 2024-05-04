@@ -24,8 +24,8 @@ Calling a [`PredictiveController`](@ref) object calls this method.
 See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
 
 # Arguments
-
-Keyword arguments in *`italic`* are non-Unicode alternatives.
+!!! info    
+    Keyword arguments in *`italic`* are non-Unicode alternatives.
 
 - `mpc::PredictiveController` : solve optimization problem of `mpc`.
 - `ry=mpc.estim.model.yop` : current output setpoints ``\mathbf{r_y}(k)``.
