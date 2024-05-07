@@ -393,12 +393,19 @@ end
 "Plots.jl recipe for `SimResult` objects constructed with `StateEstimator` objects."
 @recipe function plot(
     res::SimResult{<:Real, <:StateEstimator};
-    plotŷ           = true,
+    plotyhat        = true,
     plotu           = true,
     plotd           = true,
     plotx           = false,
-    plotx̂           = false,
-    plotxwithx̂      = false
+    plotxhat        = false,
+    plotxwithxhat   = false,
+    plotxhatmin     = true,
+    plotxhatmax     = true,
+    plotŷ      = plotyhat,
+    plotx̂      = plotxhat,
+    plotxwithx̂ = plotxwithxhat,
+    plotx̂min   = plotxhatmin,
+    plotx̂max   = plotxhatmax
 )
     t   = res.T_data
     ny = size(res.Y_data, 1)
@@ -406,7 +413,8 @@ end
     nd = size(res.D_data, 1)
     nx = size(res.X_data, 1)
     nx̂ = size(res.X̂_data, 1)
-    model = res.obj.model
+    estim = res.obj
+    model = estim.model
     uname = model.uname
     yname = model.yname
     dname = model.dname
@@ -417,6 +425,7 @@ end
     (plotx && !plotxwithx̂) && (layout_mat = [layout_mat (nx, 1)])
     (plotx̂ ||  plotxwithx̂) && (layout_mat = [layout_mat (nx̂, 1)])
     layout := layout_mat
+    X̂min, X̂max = getX̂con(estim, nx̂)
     # --- outputs y ---
     subplot_base = 0
     for i in 1:ny
@@ -493,9 +502,9 @@ end
     # --- estimated states x̂ ---
     if plotx̂ || plotxwithx̂
         for i in 1:nx̂
+            withPlantState = plotxwithx̂ && i ≤ nx
             @series begin
                 i == nx̂ && (xguide --> "Time (s)")
-                withPlantState = plotxwithx̂ && i ≤ nx
                 yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
                 color      --> 2
                 subplot    --> subplot_base + i
@@ -505,6 +514,32 @@ end
                 legend     --> (withPlantState ? true : false)
                 t, res.X̂_data[i, :]
             end
+            if plotx̂min && !isinf(X̂min[end-2*nx̂+i])
+                @series begin
+                    i == nx̂ && (xguide --> "Time (s)")
+                    yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                    color      --> 3
+                    subplot    --> subplot_base + i
+                    linestyle  --> :dot
+                    linewidth  --> 1.5
+                    label      --> "\$\\mathbf{\\hat{x}_{min}}\$"
+                    legend     --> true
+                    t, fill(X̂min[end-2*nx̂+i], length(t))
+                end
+            end
+            if plotx̂max && !isinf(X̂max[end-2*nx̂+i])
+                @series begin
+                    i == nx̂ && (xguide --> "Time (s)")
+                    yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                    color      --> 4
+                    subplot    --> subplot_base + i
+                    linestyle  --> :dot
+                    linewidth  --> 1.5
+                    label      --> "\$\\mathbf{\\hat{x}_{max}}\$"
+                    legend     --> true
+                    t, fill(X̂max[end-2*nx̂+i], length(t))
+                end
+            end
         end
     end
 end
@@ -512,18 +547,25 @@ end
 "Plots.jl recipe for `SimResult` objects constructed with `PredictiveController` objects."
 @recipe function plot(
     res::SimResult{<:Real, <:PredictiveController}; 
-    plotry      = true,
-    plotymin    = true,
-    plotymax    = true,
-    plotŷ       = false,
-    plotu       = true,
-    plotru      = true,
-    plotumin    = true,
-    plotumax    = true,
-    plotd       = true,
-    plotx       = false,
-    plotx̂       = false,
-    plotxwithx̂  = false
+    plotry          = true,
+    plotymin        = true,
+    plotymax        = true,
+    plotyhat        = false,
+    plotu           = true,
+    plotru          = true,
+    plotumin        = true,
+    plotumax        = true,
+    plotd           = true,
+    plotx           = false,
+    plotxhat        = false,
+    plotxwithxhat   = false,
+    plotxhatmin     = true,
+    plotxhatmax     = true,
+    plotŷ       = plotyhat,
+    plotx̂       = plotxhat,
+    plotxwithx̂  = plotxwithxhat,
+    plotx̂min    = plotxhatmin,
+    plotx̂max    = plotxhatmax
 )
     mpc = res.obj
     t  = res.T_data
@@ -546,6 +588,7 @@ end
     # --- constraints ---
     Umin, Umax = getUcon(mpc, nu)
     Ymin, Ymax = getYcon(mpc, ny)
+    X̂min, X̂max = getX̂con(mpc.estim, nx̂)
     # --- outputs y ---
     subplot_base = 0
     for i in 1:ny
@@ -700,24 +743,48 @@ end
     # --- estimated states x̂ ---
     if plotx̂ || plotxwithx̂
         for i in 1:nx̂
+            withPlantState = plotxwithx̂ && i ≤ nx
             @series begin
                 i == nx̂ && (xguide --> "Time (s)")
-                withPlantState = plotxwithx̂ && i ≤ nx
                 yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
                 color      --> 2
                 subplot    --> subplot_base + i
-                linestyle --> :dashdot
-                linewidth --> 0.75
+                linestyle  --> :dashdot
+                linewidth  --> 0.75
                 label      --> "\$\\mathbf{\\hat{x}}\$"
                 legend     --> (withPlantState ? true : false)
                 t, res.X̂_data[i, :]
+            end
+            if plotx̂min && !isinf(X̂min[end-2*nx̂+i])
+                @series begin
+                    i == nx̂ && (xguide --> "Time (s)")
+                    yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                    color      --> 3
+                    subplot    --> subplot_base + i
+                    linestyle  --> :dot
+                    linewidth  --> 1.5
+                    label      --> "\$\\mathbf{\\hat{x}_{min}}\$"
+                    legend     --> true
+                    t, fill(X̂min[end-2*nx̂+i], length(t))
+                end
+            end
+            if plotx̂max && !isinf(X̂max[end-2*nx̂+i])
+                @series begin
+                    i == nx̂ && (xguide --> "Time (s)")
+                    yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                    color      --> 4
+                    subplot    --> subplot_base + i
+                    linestyle  --> :dot
+                    linewidth  --> 1.5
+                    label      --> "\$\\mathbf{\\hat{x}_{max}}\$"
+                    legend     --> true
+                    t, fill(X̂max[end-2*nx̂+i], length(t))
+                end
             end
         end
     end
 end
 
 getUcon(mpc::PredictiveController, _ ) = mpc.con.U0min+mpc.Uop, mpc.con.U0max+mpc.Uop
-getUcon(mpc::ExplicitMPC, nu) = fill(-Inf, mpc.Hp*nu), fill(+Inf, mpc.Hp*nu)
-
 getYcon(mpc::PredictiveController, _ ) = mpc.con.Y0min+mpc.Yop, mpc.con.Y0max+mpc.Yop
-getYcon(mpc::ExplicitMPC, ny) = fill(-Inf, mpc.Hp*ny), fill(+Inf, mpc.Hp*ny)
+getX̂con(estim::StateEstimator, nx̂) = fill(-Inf, 2nx̂), fill(+Inf, 2nx̂)

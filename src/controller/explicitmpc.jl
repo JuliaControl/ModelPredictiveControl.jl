@@ -239,3 +239,9 @@ function set_objective_hessian!(mpc::ExplicitMPC)
     mpc.H̃_chol.factors .= H̃_chol.factors
     return nothing
 end
+
+"Called by plots recipes for manipulated inputs constraints."
+getUcon(mpc::ExplicitMPC, nu) = fill(-Inf, mpc.Hp*nu), fill(+Inf, mpc.Hp*nu)
+
+"Called by plots recipes for predicted output constraints."
+getYcon(mpc::ExplicitMPC, ny) = fill(-Inf, mpc.Hp*ny), fill(+Inf, mpc.Hp*ny)

@@ -562,3 +562,6 @@ function setmodel_estimator!(
     estim.x̂0arr_old     .-= x̂op
     return nothing
 end
+
+"Called by plots recipes for the estimated states constraints."
+getX̂con(estim::MovingHorizonEstimator, _ ) = estim.con.X̂0min+estim.X̂op, estim.con.X̂0max+estim.X̂op
