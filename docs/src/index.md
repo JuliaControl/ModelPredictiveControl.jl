@@ -41,6 +41,7 @@ Pages = [
     "public/state_estim.md",
     "public/predictive_control.md",
     "public/generic_func.md",
+    "public/plot_sim.md",
 ]
 ```
 

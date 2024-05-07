@@ -14,15 +14,8 @@ end
 
 """
     SimResult(
-        obj::Union{SimModel, StateEstimator, PredictiveController}, 
-        U_data, 
-        Y_data, 
-        D_data  = [];
-        X_data  = nothing,
-        X̂_data  = nothing, 
-        Ry_data = nothing, 
-        Ru_data = nothing,
-        Ŷ_data  = nothing
+        obj::Union{SimModel,StateEstimator,PredictiveController}, U_data, Y_data, D_data=[];
+        <keyword arguments>
     )
 
 Manually construct a `SimResult` to quickly plot `obj` simulations.
@@ -30,6 +23,20 @@ Manually construct a `SimResult` to quickly plot `obj` simulations.
 Except for `obj`, all the arguments should be matrices of `N` columns, where `N` is the 
 number of time steps. [`SimResult`](@ref) objects allow to quickly plot simulation results.
 Simply call `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on them.
+
+# Arguments
+!!! info
+    Keyword arguments in *`italic`* are non-Unicode alternatives.
+
+- `obj::Union{SimModel,StateEstimator,PredictiveController}` : simulated object
+- `U_data` : manipulated inputs
+- `Y_data` : plant outputs
+- `D_data` : measured disturbances
+- `X_data` : plant states
+- `X̂_data` or *`Xhat_data`* : estimated states
+- `Ŷ_data` or *`Yhat_data`* : estimated outputs
+- `Ry_data` : plant output setpoints
+- `Ru_data` : manipulated input setpoints
 
 # Examples
 ```julia-repl
@@ -50,12 +57,14 @@ function SimResult(
     obj::O, 
     U_data, 
     Y_data, 
-    D_data  = zeros(NT, 0, size(U_data, 2));
-    X_data  = nothing,
-    X̂_data  = nothing, 
-    Ry_data = nothing, 
-    Ru_data = nothing,
-    Ŷ_data  = nothing
+    D_data      = zeros(NT, 0, size(U_data, 2));
+    X_data      = nothing,
+    Xhat_data   = nothing,
+    Yhat_data   = nothing,
+    Ry_data     = nothing, 
+    Ru_data     = nothing,
+    X̂_data = Xhat_data,
+    Ŷ_data = Yhat_data
 ) where {NT<:Real, O<:Union{SimModel{NT}, StateEstimator{NT}, PredictiveController{NT}}}
     model = get_model(obj)
     Ts, nu, ny, nx, nx̂ = model.Ts, model.nu, model.ny, model.nx, get_nx̂(obj)
@@ -306,8 +315,27 @@ end
 "Keep manipulated input `u` unchanged for state estimator simulation."
 sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
 
-"Plots.jl recipe for `SimResult` objects constructed with `SimModel` objects."
-@recipe function plot(
+
+# dummy plot methods to document recipes (both in ?-mode and web documentation)
+plot(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
+plot(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
+plot(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
+
+@doc raw"""
+    plot(res::SimResult{<:Real, <:SimModel}; <keyword arguments>)
+
+Plot the simulation results of a [`SimModel`](@ref).
+
+# Arguments
+
+- `res::SimResult{<:Real, <:SimModel}` : simulation results to plot
+- `plotu=true` : plot manipulated inputs ``\mathbf{u}``
+- `plotd=true` : plot measured disturbances ``\mathbf{d}`` if applicable
+- `plotx=false` : plot plant states ``\mathbf{x}``
+"""
+plot(::Nothing, ::SimResult{<:Real, <:SimModel})
+
+@recipe function plot_recipe(
     res::SimResult{<:Real, <:SimModel};
     plotu  = true,
     plotd  = true,
@@ -390,8 +418,29 @@ sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
     end
 end
 
-"Plots.jl recipe for `SimResult` objects constructed with `StateEstimator` objects."
-@recipe function plot(
+@doc raw"""
+    plot(res::SimResult{<:Real, <:StateEstimator}; <keyword arguments>)
+
+Plot the simulation results of a [`StateEstimator`](@ref).
+
+# Arguments
+!!! info
+    Keyword arguments in *`italic`* are non-Unicode alternatives.
+
+- `res::SimResult{<:Real, <:StateEstimator}` : simulation results to plot
+- `plotŷ=true` or *`plotyhat`* : plot estimated outputs ``\mathbf{ŷ}``
+- `plotx̂=false` or *`plotxhat`* : plot estimated states ``\mathbf{x̂}``
+- `plotxwithx̂=false` or *`plotxwithxhat`* : plot plant states ``\mathbf{x}`` and estimated 
+   states ``\mathbf{x̂}`` together
+- `plotx̂min=true` or *`plotxhatmin`* : plot estimated state lower bounds ``\mathbf{x̂_{min}}``
+   if applicable
+- `plotx̂max=true` or *`plotxhatmax`* : plot estimated state upper bounds ``\mathbf{x̂_{max}}``
+   if applicable
+- `<keyword arguments>` of [`plot(::SimResult{<:Real, <:SimModel})`](@ref)
+"""
+plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
+
+@recipe function plot_recipe(
     res::SimResult{<:Real, <:StateEstimator};
     plotyhat        = true,
     plotu           = true,
@@ -544,8 +593,29 @@ end
     end
 end
 
-"Plots.jl recipe for `SimResult` objects constructed with `PredictiveController` objects."
-@recipe function plot(
+@doc raw"""
+    plot(res::SimResult{<:Real, <:PredictiveController}; <keyword arguments>)
+
+Plot the simulation results of a [`PredictiveController`](@ref).
+
+# Arguments
+!!! info
+    Keyword arguments in *`italic`* are non-Unicode alternatives.
+
+- `res::SimResult{<:Real, <:PredictiveController}` : simulation results to plot
+- `plotry=true` : plot plant output setpoints ``\mathbf{r_y}`` if applicable
+- `plotymin=true` : plot predicted output lower bounds ``\mathbf{y_{min}}`` if applicable
+- `plotymax=true` : plot predicted output upper bounds ``\mathbf{y_{max}}`` if applicable
+- `plotru=true` : plot manipulated input setpoints ``\mathbf{r_u}`` if applicable
+- `plotumin=true` : plot manipulated input lower bounds ``\mathbf{u_{min}}`` if applicable
+- `plotumax=true` : plot manipulated input upper bounds ``\mathbf{u_{max}}`` if applicable
+- `<keyword arguments>` of [`plot(::SimResult{<:Real, <:SimModel})`](@ref)
+- `<keyword arguments>` of [`plot(::SimResult{<:Real, <:StateEstimator})`](@ref)
+
+"""
+plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
+
+@recipe function plot_recipe(
     res::SimResult{<:Real, <:PredictiveController}; 
     plotry          = true,
     plotymin        = true,
