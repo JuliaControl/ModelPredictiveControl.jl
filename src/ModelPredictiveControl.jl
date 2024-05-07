@@ -5,6 +5,7 @@ using LinearAlgebra
 using Random: randn
 
 using RecipesBase
+using ProgressLogging
 using ForwardDiff
 
 import ControlSystemsBase
