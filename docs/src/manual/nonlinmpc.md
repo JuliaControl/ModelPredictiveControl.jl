@@ -126,7 +126,7 @@ The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. 
 performance on `plant` by imposing an angular setpoint of 180° (inverted position):
 
 ```@example 1
-using JuMP; unset_time_limit_sec(nmpc.optim)            # hide        
+using JuMP; unset_time_limit_sec(nmpc.optim) # hide
 res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res_ry)
 savefig("plot3_NonLinMPC.svg"); nothing # hide
@@ -205,7 +205,7 @@ speed ``ω`` is not requested to track a setpoint. The closed-loop response to a
 setpoint is similar:
 
 ```@example 1
-unset_time_limit_sec(empc.optim)    # hide 
+unset_time_limit_sec(empc.optim)    # hide
 res2_ry = sim!(empc, N, [180, 0], plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res2_ry)
 savefig("plot5_NonLinMPC.svg"); nothing # hide
