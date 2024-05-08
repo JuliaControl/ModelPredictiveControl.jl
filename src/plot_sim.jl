@@ -1,15 +1,16 @@
 struct SimResult{NT<:Real, O<:Union{SimModel, StateEstimator, PredictiveController}}
-    obj::O                 # simulated instance
-    T_data ::Vector{NT}    # time in seconds
-    Y_data ::Matrix{NT}    # plant outputs (both measured and unmeasured)
-    Ry_data::Matrix{NT}    # output setpoints
-    Ŷ_data ::Matrix{NT}    # estimated outputs
-    U_data ::Matrix{NT}    # manipulated inputs
-    Ud_data::Matrix{NT}    # manipulated inputs including load disturbances
-    Ru_data::Matrix{NT}    # manipulated input setpoints
-    D_data ::Matrix{NT}    # measured disturbances
-    X_data ::Matrix{NT}    # plant states
-    X̂_data ::Matrix{NT}    # estimated states
+    obj::O                  # simulated instance
+    xname  ::Vector{String} # plant state names
+    T_data ::Vector{NT}     # time in seconds
+    Y_data ::Matrix{NT}     # plant outputs (both measured and unmeasured)
+    Ry_data::Matrix{NT}     # output setpoints
+    Ŷ_data ::Matrix{NT}     # estimated outputs
+    U_data ::Matrix{NT}     # manipulated inputs
+    Ud_data::Matrix{NT}     # manipulated inputs including load disturbances
+    Ru_data::Matrix{NT}     # manipulated input setpoints
+    D_data ::Matrix{NT}     # measured disturbances
+    X_data ::Matrix{NT}     # plant states
+    X̂_data ::Matrix{NT}     # estimated states
 end
 
 """
@@ -36,16 +37,17 @@ Simply call `plot` on them.
 - `Ŷ_data=nothing` or *`Yhat_data`* : estimated outputs
 - `Ry_data=nothing` : plant output setpoints
 - `Ru_data=nothing` : manipulated input setpoints
+- `plant=get_model(obj)` : simulated plant model, default to `obj` internal plant model
 
 # Examples
 ```jldoctest
-julia> plant = LinModel(tf(1, [1, 1]), 1.0); N = 5; U_data = fill(1.0, 1, N);
+julia> model = LinModel(tf(1, [1, 1]), 1.0); N = 5; U_data = fill(1.0, 1, N);
 
-julia> Y_data = reduce(hcat, (updatestate!(plant, U_data[:, i]); plant()) for i=1:N)
+julia> Y_data = reduce(hcat, (updatestate!(model, U_data[:, i]); model()) for i=1:N)
 1×5 Matrix{Float64}:
  0.632121  0.864665  0.950213  0.981684  0.993262
 
-julia> res = SimResult(plant, U_data, Y_data)
+julia> res = SimResult(model, U_data, Y_data)
 Simulation results of LinModel with 5 time steps.
 ```
 """
@@ -60,10 +62,12 @@ function SimResult(
     Ry_data     = nothing, 
     Ru_data     = nothing,
     X̂_data = Xhat_data,
-    Ŷ_data = Yhat_data
+    Ŷ_data = Yhat_data,
+    plant  = get_model(obj)
 ) where {NT<:Real, O<:Union{SimModel{NT}, StateEstimator{NT}, PredictiveController{NT}}}
     model = get_model(obj)
-    Ts, nu, ny, nx, nx̂ = model.Ts, model.nu, model.ny, model.nx, get_nx̂(obj)
+    Ts, nu, ny, nx̂ = model.Ts, model.nu, model.ny, get_nx̂(obj)
+    nx = plant.nx
     N = size(U_data, 2)
     T_data = collect(Ts*(0:N-1))
     isnothing(X_data)  && (X_data  = fill(NaN, nx, N))
@@ -72,13 +76,16 @@ function SimResult(
     isnothing(Ru_data) && (Ru_data = fill(NaN, nu, N))
     isnothing(Ŷ_data)  && (Ŷ_data  = fill(NaN, ny, N))
     NU, NY, NX, NX̂ = size(U_data, 2), size(Y_data, 2), size(X_data, 2), size(X̂_data, 2)
-    NRy, NRu = size(Ry_data, 2), size(Ru_data, 2)
-    if !(NU == NY == NX == NX̂ == NRy == NRu)
+    NRy, NRu, NŶ = size(Ry_data, 2), size(Ru_data, 2), size(Ŷ_data, 2)
+    if !(NU == NY == NX == NX̂ == NRy == NRu == NŶ)
         throw(ArgumentError("All arguments must have the same number of columns (time steps)"))
     end
     size(Y_data, 2) == N || error("Y_data must be of size ($ny, $N)")
-    return SimResult{NT, O}(obj, T_data, Y_data, Ry_data, Ŷ_data, U_data, U_data, 
-                     Ru_data, D_data, X_data, X̂_data)
+    return SimResult{NT, O}(
+        obj, plant.xname, 
+        T_data, Y_data, Ry_data, Ŷ_data, 
+        U_data, U_data, Ru_data, D_data, X_data, X̂_data
+    )
 end
 
 get_model(model::SimModel) = model
@@ -136,8 +143,11 @@ function sim!(
         X_data[:, i] .= plant.x0 .+ plant.xop
         updatestate!(plant, u, d)
     end
-    return SimResult(plant, T_data, Y_data, U_data, Y_data, 
-                     U_data, U_data, U_data, D_data, X_data, X_data)
+    return SimResult(
+        plant, plant.xname, 
+        T_data, Y_data, U_data, Y_data, 
+        U_data, U_data, U_data, D_data, X_data, X_data
+    )
 end
 
 @doc raw"""
@@ -289,8 +299,11 @@ function sim_closedloop!(
         x[:] += x_noise.*randn(plant.nx)
         updatestate!(est_mpc, u, ym, d)
     end
-    res = SimResult(est_mpc, T_data, Y_data, U_Ry_data, Ŷ_data, 
-                    U_data, Ud_data, Ru_data, D_data, X_data, X̂_data)
+    res = SimResult(
+        est_mpc, plant.xname,
+        T_data, Y_data, U_Ry_data, Ŷ_data, 
+        U_data, Ud_data, Ru_data, D_data, X_data, X̂_data
+    )
     plant.x0 .= old_x0
     return res
 end
@@ -319,6 +332,13 @@ Plot the simulation results of a [`SimModel`](@ref).
 - `plotu=true` : plot manipulated inputs ``\mathbf{u}``
 - `plotd=true` : plot measured disturbances ``\mathbf{d}`` if applicable
 - `plotx=false` : plot plant states ``\mathbf{x}``
+
+# Examples
+```julia-repl
+julia> res = sim!(LinModel(tf(2, [10, 1]), 2.0), 25);
+
+julia> plot(res, plotu=false);
+```
 """
 plot(::Nothing, ::SimResult{<:Real, <:SimModel})
 
@@ -337,7 +357,7 @@ plot(::Nothing, ::SimResult{<:Real, <:SimModel})
     uname = model.uname
     yname = model.yname
     dname = model.dname
-    xname = model.xname
+    xname = res.xname
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
     (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
@@ -424,6 +444,13 @@ Plot the simulation results of a [`StateEstimator`](@ref).
 - `plotx̂max=true` or *`plotxhatmax`* : plot estimated state upper bounds ``\mathbf{x̂_{max}}``
    if applicable
 - `<keyword arguments>` of [`plot(::SimResult{<:Real, <:SimModel})`](@ref)
+
+# Examples
+```julia-repl
+julia> res = sim!(KalmanFilter(LinModel(tf(3, [2.0, 1]), 1.0)), 25, [0], y_step=[1]);
+
+julia> plot(res, plotu=false, plotŷ=true, plotxwithx̂=true);
+```
 """
 plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
 
@@ -454,7 +481,8 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
     uname = model.uname
     yname = model.yname
     dname = model.dname
-    xname = model.xname
+    x̂name = [model.xname; ["\$x_{$i}\$" for i in (nx+1):(nx̂)]]
+    xname = res.xname
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
     (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
@@ -541,7 +569,7 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
             withPlantState = plotxwithx̂ && i ≤ nx
             @series begin
                 i == nx̂ && (xguide --> "Time (s)")
-                yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                yguide     --> (withPlantState ? xname[i] : x̂name[i])
                 color      --> 2
                 subplot    --> subplot_base + i
                 linestyle  --> :dashdot
@@ -553,7 +581,7 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
             if plotx̂min && !isinf(X̂min[end-2*nx̂+i])
                 @series begin
                     i == nx̂ && (xguide --> "Time (s)")
-                    yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                    yguide     --> (withPlantState ? xname[i] : x̂name[i])
                     color      --> 3
                     subplot    --> subplot_base + i
                     linestyle  --> :dot
@@ -566,7 +594,7 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
             if plotx̂max && !isinf(X̂max[end-2*nx̂+i])
                 @series begin
                     i == nx̂ && (xguide --> "Time (s)")
-                    yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                    yguide     --> (withPlantState ? xname[i] : x̂name[i])
                     color      --> 4
                     subplot    --> subplot_base + i
                     linestyle  --> :dot
@@ -598,6 +626,15 @@ Plot the simulation results of a [`PredictiveController`](@ref).
 - `plotumax=true` : plot manipulated input upper bounds ``\mathbf{u_{max}}`` if applicable
 - `<keyword arguments>` of [`plot(::SimResult{<:Real, <:SimModel})`](@ref)
 - `<keyword arguments>` of [`plot(::SimResult{<:Real, <:StateEstimator})`](@ref)
+
+# Examples
+```julia-repl
+julia> model = LinModel(tf(2, [5.0, 1]), 1.0);
+
+julia> res = sim!(setconstraint!(LinMPC(model), umax=[1.0]), 30, [0], u_step=[-1]);
+
+julia> plot(res, plotŷ=true, plotry=true, plotumax=true);
+```
 
 """
 plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
@@ -635,7 +672,8 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
     uname = model.uname
     yname = model.yname
     dname = model.dname
-    xname = model.xname
+    x̂name = [model.xname; ["\$x_{$i}\$" for i in (nx+1):(nx̂)]]
+    xname = res.xname
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
     (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
@@ -803,7 +841,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
             withPlantState = plotxwithx̂ && i ≤ nx
             @series begin
                 i == nx̂ && (xguide --> "Time (s)")
-                yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                yguide     --> (withPlantState ? xname[i] : x̂name[i])
                 color      --> 2
                 subplot    --> subplot_base + i
                 linestyle  --> :dashdot
@@ -815,7 +853,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
             if plotx̂min && !isinf(X̂min[end-2*nx̂+i])
                 @series begin
                     i == nx̂ && (xguide --> "Time (s)")
-                    yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                    yguide     --> (withPlantState ? xname[i] : x̂name[i])
                     color      --> 3
                     subplot    --> subplot_base + i
                     linestyle  --> :dot
@@ -828,7 +866,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
             if plotx̂max && !isinf(X̂max[end-2*nx̂+i])
                 @series begin
                     i == nx̂ && (xguide --> "Time (s)")
-                    yguide     --> (withPlantState ? xname[i] : "\$\\hat{x}_{$i}\$")
+                    yguide     --> (withPlantState ? xname[i] : x̂name[i])
                     color      --> 4
                     subplot    --> subplot_base + i
                     linestyle  --> :dot

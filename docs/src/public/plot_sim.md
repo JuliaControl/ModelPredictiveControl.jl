@@ -22,7 +22,7 @@ sim!
 SimResult
 ```
 
-## Plots
+## Plotting Results
 
 ```@docs
 ModelPredictiveControl.plot
