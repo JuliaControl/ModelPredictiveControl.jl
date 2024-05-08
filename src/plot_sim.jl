@@ -13,10 +13,9 @@ struct SimResult{NT<:Real, O<:Union{SimModel, StateEstimator, PredictiveControll
 end
 
 """
-    SimResult(
-        obj::Union{SimModel,StateEstimator,PredictiveController}, U_data, Y_data, D_data=[];
-        <keyword arguments>
-    )
+    SimResult(obj::SimModel,             U_data, Y_data, D_data=[]; <keyword arguments>)
+    SimResult(obj::StateEstimator,       U_data, Y_data, D_data=[]; <keyword arguments>)
+    SimResult(obj::PredictiveController, U_data, Y_data, D_data=[]; <keyword arguments>)
 
 Manually construct a `SimResult` to quickly plot `obj` simulations.
 
@@ -28,15 +27,15 @@ Simply call `plot` on them.
 !!! info
     Keyword arguments in *`italic`* are non-Unicode alternatives.
 
-- `obj::Union{SimModel,StateEstimator,PredictiveController}` : simulated object
+- `obj` : simulated [`SimModel`](@ref)/[`StateEstimator`](@ref)/[`PredictiveController`](@ref)
 - `U_data` : manipulated inputs
 - `Y_data` : plant outputs
-- `D_data` : measured disturbances
-- `X_data` : plant states
-- `X̂_data` or *`Xhat_data`* : estimated states
-- `Ŷ_data` or *`Yhat_data`* : estimated outputs
-- `Ry_data` : plant output setpoints
-- `Ru_data` : manipulated input setpoints
+- `D_data=[]` : measured disturbances
+- `X_data=nothing` : plant states
+- `X̂_data=nothing` or *`Xhat_data`* : estimated states
+- `Ŷ_data=nothing` or *`Yhat_data`* : estimated outputs
+- `Ry_data=nothing` : plant output setpoints
+- `Ru_data=nothing` : manipulated input setpoints
 
 # Examples
 ```jldoctest
