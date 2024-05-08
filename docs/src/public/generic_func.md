@@ -43,20 +43,6 @@ setstate!
 setmodel!
 ```
 
-## Quick Simulation
-
-### Simulate
-
-```@docs
-sim!
-```
-
-### Simulation Results
-
-```@docs
-SimResult
-```
-
 ## Get Additional Information
 
 ```@docs

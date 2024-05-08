@@ -4,6 +4,11 @@
 Pages = ["nonlinmpc.md"]
 ```
 
+```@setup 1
+using Logging; errlogger = ConsoleLogger(stderr, Error);
+old_logger = global_logger(); global_logger(errlogger);
+```
+
 ## Nonlinear Model
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum
@@ -70,7 +75,7 @@ u = [0.5]
 N = 35
 res = sim!(model, N, u)
 plot(res, plotu=false)
-savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
+savefig("plot1_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
@@ -99,7 +104,7 @@ f_plant(x, u, _ ) = pendulum(par_plant, x, u)
 plant = setname!(NonLinModel(f_plant, h, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
 plot(res, plotu=false, plotxwithx̂=true)
-savefig(ans, "plot2_NonLinMPC.svg"); nothing # hide
+savefig("plot2_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot2_NonLinMPC](plot2_NonLinMPC.svg)
@@ -121,11 +126,10 @@ The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. 
 performance on `plant` by imposing an angular setpoint of 180° (inverted position):
 
 ```@example 1
-using Logging; disable_logging(Warn)            # hide
-using JuMP; unset_time_limit_sec(nmpc.optim)    # hide
+using JuMP; unset_time_limit_sec(nmpc.optim) # hide
 res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res_ry)
-savefig(ans, "plot3_NonLinMPC.svg"); nothing # hide
+savefig("plot3_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot3_NonLinMPC](plot3_NonLinMPC.svg)
@@ -137,7 +141,7 @@ satisfactory:
 ```@example 1
 res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
 plot(res_yd)
-savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
+savefig("plot4_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot4_NonLinMPC](plot4_NonLinMPC.svg)
@@ -201,10 +205,10 @@ speed ``ω`` is not requested to track a setpoint. The closed-loop response to a
 setpoint is similar:
 
 ```@example 1
-unset_time_limit_sec(empc.optim) # hide
+unset_time_limit_sec(empc.optim)    # hide
 res2_ry = sim!(empc, N, [180, 0], plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res2_ry)
-savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
+savefig("plot5_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot5_NonLinMPC](plot5_NonLinMPC.svg)
@@ -224,7 +228,7 @@ Also, for a 10° step disturbance:
 ```@example 1
 res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10, 0])
 plot(res2_yd)
-savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
+savefig("plot6_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot6_NonLinMPC](plot6_NonLinMPC.svg)
@@ -264,7 +268,7 @@ The linear controller has difficulties to reject the 10° step disturbance:
 ```@example 1
 res_lin = sim!(mpc, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin)
-savefig(ans, "plot7_NonLinMPC.svg"); nothing # hide
+savefig("plot7_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot7_NonLinMPC](plot7_NonLinMPC.svg)
@@ -302,7 +306,7 @@ does improve the rejection of the step disturbance:
 ```@example 1
 res_lin2 = sim!(mpc2, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin2)
-savefig(ans, "plot8_NonLinMPC.svg"); nothing # hide
+savefig("plot8_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot8_NonLinMPC](plot8_NonLinMPC.svg)
@@ -316,7 +320,7 @@ poor in the first quadrant:
 ```@example 1
 res_lin3 = sim!(mpc2, N, [180.0]; plant, x_0=[0, 0])
 plot(res_lin3)
-savefig(ans, "plot9_NonLinMPC.svg"); nothing # hide
+savefig("plot9_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot9_NonLinMPC](plot9_NonLinMPC.svg)
@@ -370,7 +374,7 @@ performances are similar to the nonlinear MPC, both for the 180° setpoint:
 ```@example 1
 res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[0, 0]) 
 plot(res_slin)
-savefig(ans, "plot10_NonLinMPC.svg"); nothing # hide
+savefig("plot10_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot10_NonLinMPC](plot10_NonLinMPC.svg)
@@ -380,7 +384,7 @@ and the 10° step disturbance:
 ```@example 1
 res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[π, 0], y_step=[10]) 
 plot(res_slin)
-savefig(ans, "plot11_NonLinMPC.svg"); nothing # hide
+savefig("plot11_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot11_NonLinMPC](plot11_NonLinMPC.svg)
@@ -388,3 +392,7 @@ savefig(ans, "plot11_NonLinMPC.svg"); nothing # hide
 The computations of the successive linearization MPC are about 125 times faster than the
 nonlinear MPC (0.00012 s per time steps versus 0.015 s per time steps, on average), an
 impressive gain for similar closed-loop performances!
+
+```@setup 1
+global_logger(old_logger);
+```

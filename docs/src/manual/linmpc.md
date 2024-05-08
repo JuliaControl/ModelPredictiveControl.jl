@@ -149,7 +149,7 @@ function plot_data(t_data, u_data, y_data, ry_data)
     return plot(p1, p2, p3, layout=(3,1))
 end
 plot_data(t_data, u_data, y_data, ry_data)
-savefig(ans, "plot1_LinMPC.svg"); nothing # hide
+savefig("plot1_LinMPC.svg"); nothing # hide
 ```
 
 ![plot1_LinMPC](plot1_LinMPC.svg)
@@ -172,7 +172,7 @@ u, y = model.uop, model()
 initstate!(mpc2, u, y)
 u_data, y_data, ry_data = test_mpc(mpc2, model)
 plot_data(t_data, u_data, y_data, ry_data)
-savefig(ans, "plot2_LinMPC.svg"); nothing # hide
+savefig("plot2_LinMPC.svg"); nothing # hide
 ```
 
 ![plot2_LinMPC](plot2_LinMPC.svg)
@@ -208,7 +208,7 @@ u, y, d = model.uop, model(), mpc_mhe.estim.model.dop
 initstate!(mpc_mhe, u, y, d)
 u_data, y_data, ry_data = test_mpc(mpc_mhe, model)
 plot_data(t_data, u_data, y_data, ry_data)
-savefig(ans, "plot3_LinMPC.svg"); nothing # hide
+savefig("plot3_LinMPC.svg"); nothing # hide
 ```
 
 ![plot3_LinMPC](plot3_LinMPC.svg)
@@ -280,7 +280,7 @@ u, y, d = model.uop, model(), mpc_d.estim.model.dop
 initstate!(mpc_d, u, y, d)
 u_data, y_data, ry_data = test_mpc_d(mpc_d, model)
 plot_data(t_data, u_data, y_data, ry_data)
-savefig(ans, "plot4_LinMPC.svg"); nothing # hide
+savefig("plot4_LinMPC.svg"); nothing # hide
 ```
 
 ![plot4_LinMPC](plot4_LinMPC.svg)
