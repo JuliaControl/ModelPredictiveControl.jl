@@ -22,7 +22,7 @@ Manually construct a `SimResult` to quickly plot `obj` simulations.
 
 Except for `obj`, all the arguments should be matrices of `N` columns, where `N` is the 
 number of time steps. [`SimResult`](@ref) objects allow to quickly plot simulation results.
-Simply call `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on them.
+Simply call `plot` on them.
 
 # Arguments
 !!! info
@@ -39,7 +39,7 @@ Simply call `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) on 
 - `Ru_data` : manipulated input setpoints
 
 # Examples
-```julia-repl
+```jldoctest
 julia> plant = LinModel(tf(1, [1, 1]), 1.0); N = 5; U_data = fill(1.0, 1, N);
 
 julia> Y_data = reduce(hcat, (updatestate!(plant, U_data[:, i]); plant()) for i=1:N)
@@ -48,9 +48,6 @@ julia> Y_data = reduce(hcat, (updatestate!(plant, U_data[:, i]); plant()) for i=
 
 julia> res = SimResult(plant, U_data, Y_data)
 Simulation results of LinModel with 5 time steps.
-
-julia> using Plots; plot(res)
-
 ```
 """
 function SimResult(
@@ -108,18 +105,15 @@ Open-loop simulation of `plant` for `N` time steps, default to unit bump test on
 The manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}`` are held
 constant at `u` and `d` values, respectively. The plant initial state ``\mathbf{x}(0)`` is
 specified by `x_0` keyword arguments. The function returns [`SimResult`](@ref) instances 
-that can be visualized by calling `plot` from [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) 
-on them (see Examples below). Note that the method mutates `plant` internal states.
+that can be visualized by calling `plot` on them. Note that the method mutates `plant`
+internal states.
 
 # Examples
-```julia-repl
+```jldoctest
 julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10.0, 1, 1, 1, 1, solver=nothing);
 
 julia> res = sim!(plant, 15, [0], [0], x_0=[1])
 Simulation results of NonLinModel with 15 time steps.
-
-julia> using Plots; plot(res, plotu=false, plotd=false, plotx=true)
-
 ```
 """
 function sim!(
@@ -184,16 +178,13 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 - `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
 
 # Examples
-```julia-repl
+```jldoctest
 julia> model = LinModel(tf(3, [30, 1]), 0.5);
 
 julia> estim = KalmanFilter(model, σR=[0.5], σQ=[0.25], σQint_ym=[0.01], σPint_ym_0=[0.1]);
 
 julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.25], x_0=[-10], x̂_0=[0, 0])
 Simulation results of KalmanFilter with 50 time steps.
-
-julia> using Plots; plot(res, plotŷ=true, plotu=false, plotxwithx̂=true)
-
 ```
 """
 function sim!(
@@ -222,16 +213,13 @@ The output and manipulated input setpoints are held constant at `ry` and `ru`, r
 The keyword arguments are identical to [`sim!(::StateEstimator, ::Int)`](@ref).
 
 # Examples
-```julia-repl
+```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(2, [5, 1])], 4);
 
 julia> mpc = setconstraint!(LinMPC(model, Mwt=[0, 1], Nwt=[0.01], Hp=30), ymin=[0, -Inf]);
 
 julia> res = sim!(mpc, 25, [0, 0], y_noise=[0.1], y_step=[-10, 0])
 Simulation results of LinMPC with 25 time steps.
-
-julia> using Plots; plot(res, plotry=true, plotŷ=true, plotymin=true, plotu=true)
-
 ```
 """
 function sim!(
