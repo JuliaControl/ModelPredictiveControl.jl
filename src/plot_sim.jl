@@ -481,7 +481,7 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
     uname = model.uname
     yname = model.yname
     dname = model.dname
-    x̂name = [model.xname; ["\$x_{$i}\$" for i in (nx+1):(nx̂)]]
+    x̂name = [model.xname; ["\$\\hat{x}_{$i}\$" for i in (nx+1):(nx̂)]]
     xname = res.xname
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
@@ -672,7 +672,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
     uname = model.uname
     yname = model.yname
     dname = model.dname
-    x̂name = [model.xname; ["\$x_{$i}\$" for i in (nx+1):(nx̂)]]
+    x̂name = [model.xname; ["\$\\hat{x}_{$i}\$" for i in (nx+1):(nx̂)]]
     xname = res.xname
     layout_mat = [(ny, 1)]
     plotu && (layout_mat = [layout_mat (nu, 1)])
