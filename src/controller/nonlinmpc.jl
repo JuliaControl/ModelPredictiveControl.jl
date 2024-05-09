@@ -319,22 +319,22 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     if length(con.i_g) ≠ 0
         for i in eachindex(con.Y0min)
             name = Symbol("g_Y0min_$i")
-            optim[name] = add_nonlinear_operator(optim, nΔŨ, gfunc[i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i]; name)
         end
         i_end_Ymin = 1Hp*ny
         for i in eachindex(con.Y0max)
             name = Symbol("g_Y0max_$i")
-            optim[name] = add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_Ymin+i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_Ymin+i]; name)
         end
         i_end_Ymax = 2Hp*ny
         for i in eachindex(con.x̂0min)
             name = Symbol("g_x̂0min_$i")
-            optim[name] = add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_Ymax+i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_Ymax+i]; name)
         end
         i_end_x̂min = 2Hp*ny + nx̂
         for i in eachindex(con.x̂0max)
             name = Symbol("g_x̂0max_$i")
-            optim[name] = add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_x̂min+i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_x̂min+i]; name)
         end
     end
     return nothing
@@ -402,23 +402,23 @@ function setnonlincon!(
 ) where JNT<:Real
     ΔŨvar = optim[:ΔŨvar]
     con = mpc.con
-    nonlin_constraints = all_constraints(optim, NonlinearExpr, MOI.LessThan{JNT})
-    map(con_ref -> JuMP.delete(optim, con_ref), JuMP.nonlin_constraints)
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
     for i in findall(.!isinf.(con.Y0min))
         gfunc_i = optim[Symbol("g_Y0min_$(i)")]
-        JuMP.@constraint(optim, gfunc_i(ΔŨvar...) <= 0)
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     for i in findall(.!isinf.(con.Y0max))
         gfunc_i = optim[Symbol("g_Y0max_$(i)")]
-        JuMP.@constraint(optim, gfunc_i(ΔŨvar...) <= 0)
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     for i in findall(.!isinf.(con.x̂0min))
         gfunc_i = optim[Symbol("g_x̂0min_$(i)")]
-        JuMP.@constraint(optim, gfunc_i(ΔŨvar...) <= 0)
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     for i in findall(.!isinf.(con.x̂0max))
         gfunc_i = optim[Symbol("g_x̂0max_$(i)")]
-        JuMP.@constraint(optim, gfunc_i(ΔŨvar...) <= 0)
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     return nothing
 end
