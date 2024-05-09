@@ -85,8 +85,12 @@ for more detailed examples.
   - [x] input setpoint tracking
   - [x] terminal costs
   - [x] economic costs (economic model predictive control)
+- [ ] adaptive linear model predictive controller
+  - [x] manual model modification
+  - [x] automatic successive linearization of a nonlinear model
+  - [ ] objective function weights modification
 - [x] explicit predictive controller for problems without constraint
-- [x] soft and hard constraints on:
+- [x] online-tunable soft and hard constraints on:
   - [x] output predictions
   - [x] manipulated inputs
   - [x] manipulated inputs increments
@@ -126,7 +130,7 @@ for more detailed examples.
 - [x] moving horizon estimator in two formulations:
   - [x] linear plant models (quadratic optimization)
   - [x] nonlinear plant models (nonlinear optimization)
-- [x] moving horizon estimator soft and hard constraints on:
+- [x] moving horizon estimator online-tunable soft and hard constraints on:
   - [x] state estimates
   - [x] process noise estimates
   - [x] sensor noise estimates

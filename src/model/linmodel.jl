@@ -4,7 +4,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     C   ::Matrix{NT}
     Bd  ::Matrix{NT}
     Dd  ::Matrix{NT}
-    x::Vector{NT}
+    x0::Vector{NT}
     Ts::NT
     nu::Int
     nx::Int
@@ -13,9 +13,21 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     uop::Vector{NT}
     yop::Vector{NT}
     dop::Vector{NT}
+    xop::Vector{NT}
+    fop::Vector{NT}
+    uname::Vector{String}
+    yname::Vector{String}
+    dname::Vector{String}
+    xname::Vector{String}
     function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
-        A, Bu, C, Bd, Dd = to_mat(A), to_mat(Bu), to_mat(C), to_mat(Bd), to_mat(Dd)
-        nu, nx, ny, nd = size(Bu,2), size(A,2), size(C,1), size(Bd,2)
+        A, Bu = to_mat(A, 1, 1), to_mat(Bu, 1, 1)
+        nu, nx = size(Bu, 2), size(A, 2)
+        (C == I) && (C = Matrix{NT}(I, nx, nx))
+        C = to_mat(C, 1, 1)
+        ny = size(C, 1)
+        Bd = to_mat(Bd, nx, Bd ≠ 0)
+        nd = size(Bd, 2)
+        Dd = to_mat(Dd, ny, nd)
         size(A)  == (nx,nx) || error("A size must be $((nx,nx))")
         size(Bu) == (nx,nu) || error("Bu size must be $((nx,nu))")
         size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
@@ -25,8 +37,21 @@ struct LinModel{NT<:Real} <: SimModel{NT}
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
-        x = zeros(NT, nx)
-        return new(A, Bu, C, Bd, Dd, x, Ts, nu, nx, ny, nd, uop, yop, dop)
+        xop = zeros(NT, nx)
+        fop = zeros(NT, nx)
+        uname = ["\$u_{$i}\$" for i in 1:nu]
+        yname = ["\$y_{$i}\$" for i in 1:ny]
+        dname = ["\$d_{$i}\$" for i in 1:nd]
+        xname = ["\$x_{$i}\$" for i in 1:nx]
+        x0  = zeros(NT, nx)
+        return new{NT}(
+            A, Bu, C, Bd, Dd, 
+            x0, 
+            Ts, 
+            nu, nx, ny, nd, 
+            uop, yop, dop, xop, fop,
+            uname, yname, dname, xname
+        )
     end
 end
 
@@ -72,9 +97,14 @@ LinModel with a sample time Ts = 0.1 s and:
 
 # Extended Help
 !!! details "Extended Help"
-    State-space equations are similar if `sys` is discrete-time (replace ``\mathbf{ẋ}(t)``
-    with ``\mathbf{x}(k+1)`` and ``k`` with ``t`` on the LHS). Continuous dynamics are 
-    internally discretized using [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
+    The state-space equations are similar if `sys` is discrete-time:
+    ```math
+    \begin{aligned}
+        \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B z}(k) \\
+        \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D z}(k)
+    \end{aligned}
+    ```
+    Continuous dynamics are internally discretized using [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
     and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Lastly, if 
     `sys` is discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by
     using the aforementioned discretization methods.
@@ -109,8 +139,8 @@ function LinModel(
     if length(unique(i_d)) ≠ length(i_d)
         error("Measured disturbances indices i_d should contains valid and unique indices")
     end
-    sysu = sminreal(sys[:,i_u])  # remove states associated to measured disturbances d
-    sysd = sminreal(sys[:,i_d])  # remove states associated to manipulates inputs u
+    sysu = sminreal(sys[:,i_u]) # remove states associated to measured disturbances d
+    sysd = sminreal(sys[:,i_d]) # remove states associated to manipulates inputs u
     if !iszero(sysu.D)
         error("State matrix D must be 0 for columns associated to manipulated inputs u")
     end
@@ -188,73 +218,55 @@ end
 
 Construct the model from the discrete state-space matrices `A, Bu, C, Bd, Dd` directly.
 
-See [`LinModel(::StateSpace)`](@ref) Extended Help for the meaning of the matrices. This
+See [`LinModel(::StateSpace)`](@ref) Extended Help for the meaning of the matrices. The
+arguments `Bd` and `Dd` can be the scalar `0` if there is no measured disturbance. This
 syntax do not modify the state-space representation provided in argument (`minreal` is not
-called). Care must be taken to ensure that the model is controllable and observable. The
-optional parameter `NT` explicitly specifies the number type of the matrices.
+called). Care must be taken to ensure that the model is controllable and observable. The 
+optional parameter `NT` explicitly set the number type of vectors (default to `Float64`).
 """
 LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where NT<:Real
-
-function LinModel(
-    A::Array{NT}, Bu::Array{NT}, C::Array{NT}, Bd::Array{NT}, Dd::Array{NT}, Ts::Real
-) where {NT<:Real} 
-    return LinModel{NT}(A, Bu, C, Bd, Dd, Ts)
-end
-
-function LinModel(
-    A::Array{<:Real}, 
-    Bu::Array{<:Real}, 
-    C::Array{<:Real}, 
-    Bd::Array{<:Real}, 
-    Dd::Array{<:Real},
-    Ts::Real
-)
-    A, Bu, C, Bd, Dd = to_mat(A), to_mat(Bu), to_mat(C), to_mat(Bd), to_mat(Dd)
-    A, Bu, C, Bd, Dd = promote(A, Bu, C, Bd, Dd)
-    return LinModel(A, Bu, C, Bd, Dd, Ts)
-end
+LinModel(A, Bu, C, Bd, Dd, Ts) = LinModel{Float64}(A, Bu, C, Bd, Dd, Ts)
 
 @doc raw"""
-    steadystate!(model::LinModel, u, d)
+    steadystate!(model::LinModel, u0, d0)
 
-Set `model.x` to `u` and `d` steady-state if `model` is a [`LinModel`](@ref).
+Set `model.x0` to `u0` and `d0` steady-state if `model` is a [`LinModel`](@ref).
 
-Following [`setop!`](@ref) notation, the method evaluates the equilibrium ``\mathbf{x}``
-from:
+Following [`setop!`](@ref) notation, the method evaluates the equilibrium from:
 ```math
-    \mathbf{x} = \mathbf{(I - A)^{-1}(B_u u_0 + B_d d_0)}
+    \mathbf{x_0} = \mathbf{(I - A)^{-1}(B_u u_0 + B_d d_0 + f_{op} - x_{op})}
 ```
 with constant manipulated inputs ``\mathbf{u_0 = u - u_{op}}`` and measured
 disturbances ``\mathbf{d_0 = d - d_{op}}``. The Moore-Penrose pseudo-inverse computes 
 ``\mathbf{(I - A)^{-1}}`` to support integrating `model` (integrator states will be 0).
 """
-function steadystate!(model::LinModel, u, d)
+function steadystate!(model::LinModel, u0, d0)
     M = I - model.A
     rtol = sqrt(eps(real(float(oneunit(eltype(M)))))) # pinv docstring recommendation
-    model.x .= pinv(M; rtol)*(model.Bu*(u - model.uop) + model.Bd*(d - model.dop))
+    model.x0 .= pinv(M; rtol)*(model.Bu*u0 + model.Bd*d0 + model.fop - model.xop)
     return nothing
 end
 
 """
-    f!(xnext, model::LinModel, x, u, d) -> nothing
+    f!(xnext0, model::LinModel, x0, u0, d0) -> nothing
 
-Evaluate `xnext = A*x + Bu*u + Bd*d` in-place when `model` is a [`LinModel`](@ref).
+Evaluate `xnext0 = A*x0 + Bu*u0 + Bd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function f!(xnext, model::LinModel, x, u, d)
-    mul!(xnext, model.A,  x)
-    mul!(xnext, model.Bu, u, 1, 1)
-    mul!(xnext, model.Bd, d, 1, 1)
+function f!(xnext0, model::LinModel, x0, u0, d0)
+    mul!(xnext0, model.A,  x0)
+    mul!(xnext0, model.Bu, u0, 1, 1)
+    mul!(xnext0, model.Bd, d0, 1, 1)
     return nothing
 end
 
 
 """
-    h!(y, model::LinModel, x, d) -> nothing
+    h!(y0, model::LinModel, x0, d0) -> nothing
 
-Evaluate `y = C*x + Dd*d` in-place when `model` is a [`LinModel`](@ref).
+Evaluate `y0 = C*x0 + Dd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function h!(y, model::LinModel, x, d)
-    mul!(y, model.C,  x)
-    mul!(y, model.Dd, d, 1, 1)
+function h!(y0, model::LinModel, x0, d0)
+    mul!(y0, model.C,  x0)
+    mul!(y0, model.Dd, d0, 1, 1)
     return nothing
 end

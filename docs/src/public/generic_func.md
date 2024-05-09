@@ -37,18 +37,10 @@ initstate!
 setstate!
 ```
 
-## Quick Simulation
-
-### Simulate
+## Set Plant Model
 
 ```@docs
-sim!
-```
-
-### Simulation Results
-
-```@docs
-SimResult
+setmodel!
 ```
 
 ## Get Additional Information

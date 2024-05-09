@@ -25,13 +25,6 @@ include("controller/explicitmpc.jl")
 include("controller/linmpc.jl")
 include("controller/nonlinmpc.jl")
 
-"""
-    setstate!(mpc::PredictiveController, x̂)
-
-Set the estimate at `mpc.estim.x̂`.
-"""
-setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
-
 function Base.show(io::IO, mpc::PredictiveController)
     Hp, Hc = mpc.Hp, mpc.Hc
     nϵ = isinf(mpc.C) ? 0 : 1
@@ -39,7 +32,7 @@ function Base.show(io::IO, mpc::PredictiveController)
     nx̂, nym, nyu = mpc.estim.nx̂, mpc.estim.nym, mpc.estim.nyu
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
     println(io, "$(typeof(mpc).name.name) controller with a sample time Ts = "*
-                "$(mpc.estim.model.Ts) s, $(solver_name(mpc.optim)) optimizer, "*
+                "$(mpc.estim.model.Ts) s, $(JuMP.solver_name(mpc.optim)) optimizer, "*
                 "$(typeof(mpc.estim).name.name) estimator and:")
     println(io, "$(lpad(Hp, n)) prediction steps Hp")
     println(io, "$(lpad(Hc, n)) control steps Hc")
@@ -50,7 +43,7 @@ end
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(
     ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = empty(mpc.estim.x̂);
+    d ::Vector = empty(mpc.estim.x̂0);
     kwargs...
 )
     return moveinput!(mpc, ry, d; kwargs...)

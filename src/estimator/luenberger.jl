@@ -1,7 +1,9 @@
 struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     model::SM
     lastu0::Vector{NT}
-    x̂::Vector{NT}
+    x̂op::Vector{NT}
+    f̂op::Vector{NT}
+    x̂0 ::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
@@ -17,33 +19,29 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     Ĉ   ::Matrix{NT}
     B̂d  ::Matrix{NT}
     D̂d  ::Matrix{NT}
-    Ĉm  ::Matrix{NT}
-    D̂dm ::Matrix{NT}
     K̂::Matrix{NT}
     function Luenberger{NT, SM}(
-        model, i_ym, nint_u, nint_ym, p̂
+        model, i_ym, nint_u, nint_ym, poles
     ) where {NT<:Real, SM<:LinModel}
         nym, nyu = validate_ym(model, i_ym)
-        validate_luenberger(model, nint_u, nint_ym, p̂)
+        validate_luenberger(model, nint_u, nint_ym, poles)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         K̂ = try
-            place(Â, Ĉ, p̂, :o)[:, i_ym]
+            ControlSystemsBase.place(Â, Ĉ, poles, :o)[:, i_ym]
         catch
-            error("Cannot compute the Luenberger gain K̂ with specified poles p̂.")
+            error("Cannot compute the Luenberger gain K̂ with specified poles.")
         end
-        Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :] # measured outputs ym only
         lastu0 = zeros(NT, model.nu)
-        x̂ = [zeros(NT, model.nx); zeros(NT, nxs)]
+        x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         return new{NT, SM}(
             model, 
-            lastu0, x̂,
+            lastu0, x̂op, f̂op, x̂0,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
-            Ĉm, D̂dm,
             K̂
         )
     end
@@ -55,7 +53,7 @@ end
         i_ym = 1:model.ny, 
         nint_u  = 0,
         nint_ym = default_nint(model, i_ym),
-        p̂ = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
+        poles = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
     )
 
 Construct a Luenberger observer with the [`LinModel`](@ref) `model`.
@@ -63,7 +61,7 @@ Construct a Luenberger observer with the [`LinModel`](@ref) `model`.
 `i_ym` provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are
 unmeasured ``\mathbf{y^u}``. `model` matrices are augmented with the stochastic model, which
 is specified by the numbers of integrator `nint_u` and `nint_ym` (see [`SteadyKalmanFilter`](@ref)
-Extended Help). The argument `p̂` is a vector of `model.nx + sum(nint_u) + sum(nint_ym)`
+Extended Help). The argument `poles` is a vector of `model.nx + sum(nint_u) + sum(nint_ym)`
 elements specifying the observer poles/eigenvalues (near ``z=0.5`` by default). The method
 computes the observer gain `K̂` with [`place`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.place).
 
@@ -71,7 +69,7 @@ computes the observer gain `K̂` with [`place`](https://juliacontrol.github.io/C
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
-julia> estim = Luenberger(model, nint_ym=[1, 1], p̂=[0.61, 0.62, 0.63, 0.64])
+julia> estim = Luenberger(model, nint_ym=[1, 1], poles=[0.61, 0.62, 0.63, 0.64])
 Luenberger estimator with a sample time Ts = 0.5 s, LinModel and:
  1 manipulated inputs u (0 integrating states)
  4 estimated states x̂
@@ -85,39 +83,44 @@ function Luenberger(
     i_ym::IntRangeOrVector  = 1:model.ny,
     nint_u ::IntVectorOrInt = 0,
     nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
-    p̂ = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
+    poles = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
 ) where{NT<:Real, SM<:LinModel{NT}}
-    return Luenberger{NT, SM}(model, i_ym, nint_u, nint_ym, p̂)
+    return Luenberger{NT, SM}(model, i_ym, nint_u, nint_ym, poles)
 end
 
-"Validate the quantity and stability of the Luenberger poles `p̂`."
-function validate_luenberger(model, nint_u, nint_ym, p̂)
-    if length(p̂) ≠ model.nx + sum(nint_u) +  sum(nint_ym)
-        error("p̂ length ($(length(p̂))) ≠ nx ($(model.nx)) + "*
+"Validate the quantity and stability of the Luenberger `poles`."
+function validate_luenberger(model, nint_u, nint_ym, poles)
+    if length(poles) ≠ model.nx + sum(nint_u) +  sum(nint_ym)
+        error("poles length ($(length(poles))) ≠ nx ($(model.nx)) + "*
               "integrator quantity ($(sum(nint_ym)))")
     end
-    any(abs.(p̂) .≥ 1) && error("Observer poles p̂ should be inside the unit circles.")
+    any(abs.(poles) .≥ 1) && error("Observer poles should be inside the unit circles.")
 end
 
 
 """
-    update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂))
+    update_estimate!(estim::Luenberger, u0, y0m, d0) -> x̂0next
 
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
-function update_estimate!(estim::Luenberger, u, ym, d=empty(estim.x̂))
-    Â, B̂u, B̂d, Ĉm, D̂dm = estim.Â, estim.B̂u, estim.B̂d, estim.Ĉm, estim.D̂dm
-    x̂, K̂ = estim.x̂, estim.K̂
-    ŷm, x̂next = similar(ym), similar(x̂)
+function update_estimate!(estim::Luenberger, u0, y0m, d0)
+    Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
+    x̂0, K̂ = estim.x̂0, estim.K̂
+    Ĉm, D̂dm = @views estim.Ĉ[estim.i_ym, :], estim.D̂d[estim.i_ym, :]
+    ŷ0m, x̂0next = similar(y0m), similar(x̂0)
     # in-place operations to reduce allocations:
-    mul!(ŷm, Ĉm, x̂) 
-    mul!(ŷm, D̂dm, d, 1, 1)
-    v̂  = ŷm
-    v̂ .= ym .- ŷm
-    mul!(x̂next, Â, x̂)
-    mul!(x̂next, B̂u, u, 1, 1)
-    mul!(x̂next, B̂d, d, 1, 1)
-    mul!(x̂next, K̂, v̂, 1, 1)
-    x̂ .= x̂next
-    return nothing
+    mul!(ŷ0m, Ĉm, x̂0) 
+    mul!(ŷ0m, D̂dm, d0, 1, 1)
+    v̂  = ŷ0m
+    v̂ .= y0m .- ŷ0m
+    mul!(x̂0next, Â, x̂0)
+    mul!(x̂0next, B̂u, u0, 1, 1)
+    mul!(x̂0next, B̂d, d0, 1, 1)
+    mul!(x̂0next, K̂, v̂, 1, 1)
+    x̂0next  .+= estim.f̂op .- estim.x̂op
+    estim.x̂0 .= x̂0next
+    return x̂0next
 end
+
+"Throw an error if `setmodel!` is called on `Luenberger` observer."
+setmodel_estimator!(::Luenberger,::LinModel,_,_,_) = error("Luenberger does not support setmodel!")

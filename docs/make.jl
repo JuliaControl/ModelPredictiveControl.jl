@@ -35,6 +35,7 @@ makedocs(
                 "State Estimators" => "public/state_estim.md",
                 "Predictive Controllers" => "public/predictive_control.md",
                 "Generic Functions" => "public/generic_func.md",
+                "Simulations and Plots" => "public/plot_sim.md",
             ],
             "Internals" => [
                 "Plant Models" => "internals/sim_model.md",
@@ -49,4 +50,5 @@ makedocs(
 deploydocs(
     repo = "github.com/JuliaControl/ModelPredictiveControl.jl.git",
     devbranch = "main",
+    push_preview = true
 )

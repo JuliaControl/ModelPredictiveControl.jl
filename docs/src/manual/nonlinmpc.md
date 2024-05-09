@@ -4,6 +4,11 @@
 Pages = ["nonlinmpc.md"]
 ```
 
+```@setup 1
+using Logging; errlogger = ConsoleLogger(stderr, Error);
+old_logger = global_logger(); global_logger(errlogger);
+```
+
 ## Nonlinear Model
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum
@@ -53,15 +58,16 @@ end
 const par = (9.8, 0.4, 1.2, 0.3)
 f(x, u, _ ) = pendulum(par, x, u)
 h(x, _ )    = [180/π*x[1]]  # [°]
-Ts, nu, nx, ny = 0.1, 1, 2, 1
-model = NonLinModel(f, h, Ts, nu, nx, ny)
+nu, nx, ny, Ts = 1, 2, 1, 0.1
+vu, vx, vy = ["\$τ\$ (N m)"], ["\$θ\$ (rad)", "\$ω\$ (rad/s)"], ["\$θ\$ (°)"]
+model = setname!(NonLinModel(f, h, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
 ```
 
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
 characters like ``θ`` can be typed in the Julia REPL or VS Code by typing `\theta` and
 pressing the `<TAB>` key. The tuple `par` is constant here to improve the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
-Note that a 4th order [`RungeKutta`](@ref) differential equation solver is used by default.
-It is good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
+A 4th order [`RungeKutta`](@ref) method solves the differential equations by default. It is
+good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
 
 ```@example 1
 using Plots
@@ -69,10 +75,14 @@ u = [0.5]
 N = 35
 res = sim!(model, N, u)
 plot(res, plotu=false)
-savefig(ans, "plot1_NonLinMPC.svg"); nothing # hide
+savefig("plot1_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
+
+The [`setname!`](@ref) function allows customized Y-axis labels. The available plotting
+options are detailed in the documentation of the corresponding [`plot`](@ref ModelPredictiveControl.plot)
+method.
 
 ## Nonlinear Model Predictive Controller
 
@@ -93,10 +103,10 @@ estimator tuning is tested on a plant with a 25 % larger friction coefficient ``
 ```@example 1
 const par_plant = (par[1], par[2], 1.25*par[3], par[4])
 f_plant(x, u, _ ) = pendulum(par_plant, x, u)
-plant = NonLinModel(f_plant, h, Ts, nu, nx, ny)
+plant = setname!(NonLinModel(f_plant, h, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
 plot(res, plotu=false, plotxwithx̂=true)
-savefig(ans, "plot2_NonLinMPC.svg"); nothing # hide
+savefig("plot2_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot2_NonLinMPC](plot2_NonLinMPC.svg)
@@ -108,18 +118,20 @@ As the motor torque is limited to -1.5 to 1.5 N m, we incorporate the input cons
 a [`NonLinMPC`](@ref):
 
 ```@example 1
-nmpc = NonLinMPC(estim, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
-nmpc = setconstraint!(nmpc, umin=[-1.5], umax=[+1.5])
+Hp, Hc, Mwt, Nwt = 20, 2, [0.5], [2.5]
+nmpc = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt=Inf)
+umin, umax = [-1.5], [+1.5]
+nmpc = setconstraint!(nmpc; umin, umax)
 ```
 
-The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. We test `mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted position):
+The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. We test `mpc`
+performance on `plant` by imposing an angular setpoint of 180° (inverted position):
 
 ```@example 1
-using Logging; disable_logging(Warn)            # hide
-using JuMP; unset_time_limit_sec(nmpc.optim)    # hide
-res_ry = sim!(nmpc, N, [180.0], plant=plant, x0=[0, 0], x̂0=[0, 0, 0])
+using JuMP; unset_time_limit_sec(nmpc.optim) # hide
+res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res_ry)
-savefig(ans, "plot3_NonLinMPC.svg"); nothing # hide
+savefig("plot3_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot3_NonLinMPC](plot3_NonLinMPC.svg)
@@ -129,12 +141,14 @@ inverted position, the closed-loop response to a step disturbances of 10° is al
 satisfactory:
 
 ```@example 1
-res_yd = sim!(nmpc, N, [180.0], plant=plant, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10])
+res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
 plot(res_yd)
-savefig(ans, "plot4_NonLinMPC.svg"); nothing # hide
+savefig("plot4_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot4_NonLinMPC](plot4_NonLinMPC.svg)
+
+See [`sim!`](@ref) documentation for details on the possible simulation scenarios.
 
 ## Economic Model Predictive Controller
 
@@ -170,8 +184,8 @@ Kalman Filter similar to the previous one (``\mathbf{y^m} = θ`` and ``\mathbf{y
 ```@example 1
 h2(x, _ ) = [180/π*x[1], x[2]]
 nu, nx, ny = 1, 2, 2
-model2 = NonLinModel(f      , h2, Ts, nu, nx, ny)
-plant2 = NonLinModel(f_plant, h2, Ts, nu, nx, ny)
+model2 = setname!(NonLinModel(f      , h2, Ts, nu, nx, ny), u=vu, x=vx, y=[vy; vx[2]])
+plant2 = setname!(NonLinModel(f_plant, h2, Ts, nu, nx, ny), u=vu, x=vx, y=[vy; vx[2]])
 estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
 ```
 
@@ -184,8 +198,8 @@ function JE(UE, ŶE, _ )
     τ, ω = UE[1:end-1], ŶE[2:2:end-1]
     return Ts*sum(τ.*ω)
 end
-empc = NonLinMPC(estim2, Hp=20, Hc=2, Mwt=[0.5, 0], Nwt=[2.5], Cwt=Inf, Ewt=3.5e3, JE=JE)
-empc = setconstraint!(empc, umin=[-1.5], umax=[+1.5])
+empc = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=[0.5, 0], Cwt=Inf, Ewt=3.5e3, JE=JE)
+empc = setconstraint!(empc; umin, umax)
 ```
 
 The keyword argument `Ewt` weights the economic costs relative to the other terms in the
@@ -195,10 +209,10 @@ speed ``ω`` is not requested to track a setpoint. The closed-loop response to a
 setpoint is similar:
 
 ```@example 1
-unset_time_limit_sec(empc.optim) # hide
-res2_ry = sim!(empc, N, [180, 0], plant=plant2, x0=[0, 0], x̂0=[0, 0, 0])
+unset_time_limit_sec(empc.optim)    # hide
+res2_ry = sim!(empc, N, [180, 0], plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res2_ry)
-savefig(ans, "plot5_NonLinMPC.svg"); nothing # hide
+savefig("plot5_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot5_NonLinMPC](plot5_NonLinMPC.svg)
@@ -216,9 +230,9 @@ Dict(:W_nmpc => calcW(res_ry), :W_empc => calcW(res2_ry))
 Also, for a 10° step disturbance:
 
 ```@example 1
-res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x0=[π, 0], x̂0=[π, 0, 0], y_step=[10, 0])
+res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10, 0])
 plot(res2_yd)
-savefig(ans, "plot6_NonLinMPC.svg"); nothing # hide
+savefig("plot6_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot6_NonLinMPC](plot6_NonLinMPC.svg)
@@ -232,7 +246,7 @@ Dict(:W_nmpc => calcW(res_yd), :W_empc => calcW(res2_yd))
 Of course, this gain is only exploitable if the motor electronic includes some kind of
 regenerative circuitry.
 
-## Linearizing the Model
+## Model Linearization
 
 Nonlinear MPC is more computationally expensive than [`LinMPC`](@ref). Solving the problem
 should always be faster than the sampling time ``T_s = 0.1`` s for real-time operation. This
@@ -248,17 +262,17 @@ linmodel = linearize(model, x=[π, 0], u=[0])
 A [`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
 
 ```@example 1
-kf  = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
-mpc = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf)
+skf = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
+mpc = LinMPC(skf; Hp, Hc, Mwt, Nwt, Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
 
 The linear controller has difficulties to reject the 10° step disturbance:
 
 ```@example 1
-res_lin = sim!(mpc, N, [180.0]; plant, x0=[π, 0], y_step=[10])
+res_lin = sim!(mpc, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin)
-savefig(ans, "plot7_NonLinMPC.svg"); nothing # hide
+savefig("plot7_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot7_NonLinMPC](plot7_NonLinMPC.svg)
@@ -287,22 +301,102 @@ Constructing a [`LinMPC`](@ref) with `DAQP`:
 ```@example 1
 using JuMP, DAQP
 daqp = Model(DAQP.Optimizer, add_bridges=false)
-mpc2 = LinMPC(kf, Hp=20, Hc=2, Mwt=[0.5], Nwt=[2.5], Cwt=Inf, optim=daqp)
-mpc2 = setconstraint!(mpc2, umin=[-1.5], umax=[+1.5])
+mpc2 = LinMPC(skf; Hp, Hc, Mwt, Nwt, Cwt=Inf, optim=daqp)
+mpc2 = setconstraint!(mpc2; umin, umax)
 ```
 
 does improve the rejection of the step disturbance:
 
 ```@example 1
-res_lin2 = sim!(mpc2, N, [180.0]; plant, x0=[π, 0], y_step=[10])
+res_lin2 = sim!(mpc2, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin2)
-savefig(ans, "plot8_NonLinMPC.svg"); nothing # hide
+savefig("plot8_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot8_NonLinMPC](plot8_NonLinMPC.svg)
 
 The closed-loop performance is still lower than the nonlinear controller, as expected, but
-computations are about 2000 times faster (0.00002 s versus 0.04 s per time steps, on
-average). Note that `linmodel` is only valid for angular positions near 180°. Multiple
-linearized models and controllers are required for large deviations from this operating
-point. This is known as gain scheduling.
+computations are about 210 times faster (0.000071 s versus 0.015 s per time steps, on
+average). However, remember that `linmodel` is only valid for angular positions near 180°.
+For example, the 180° setpoint response from 0° is unsatisfactory since the predictions are
+poor in the first quadrant:
+
+```@example 1
+res_lin3 = sim!(mpc2, N, [180.0]; plant, x_0=[0, 0])
+plot(res_lin3)
+savefig("plot9_NonLinMPC.svg"); nothing # hide
+```
+
+![plot9_NonLinMPC](plot9_NonLinMPC.svg)
+
+Multiple linearized model and controller objects are required for large deviations from this
+operating point. This is known as gain scheduling. Another approach is adapting the model of
+the [`LinMPC`](@ref) instance based on repeated online linearization.
+
+## Adapting the Model via Successive Linearization
+
+The [`setmodel!`](@ref) method allows online adaptation of a linear plant model. Combined
+with the automatic linearization of [`linearize`](@ref), a successive linearization MPC can
+be designed with minimal efforts. The [`SteadyKalmanFilter`](@ref) does not support
+[`setmodel!`](@ref), so we need to use the time-varying [`KalmanFilter`](@ref) instead:
+
+```@example 1
+kf   = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
+mpc3 = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt=Inf, optim=daqp)
+mpc3 = setconstraint!(mpc3; umin, umax)
+```
+
+We create a function that simulates the plant and the adaptive controller:
+
+```@example 1
+function test_slmpc(nonlinmodel, mpc, ry, plant; x_0=plant.xop, y_step=0)
+    N = 35
+    U_data, Y_data, Ry_data = zeros(plant.nu, N), zeros(plant.ny, N), zeros(plant.ny, N)
+    setstate!(plant, x_0)
+    u, y = [0.0], plant()
+    x̂ = initstate!(mpc, u, y)
+    for i = 1:N
+        y = plant() .+ y_step
+        u = moveinput!(mpc, ry)
+        linmodel = linearize(nonlinmodel; u, x=x̂[1:2])
+        setmodel!(mpc, linmodel)
+        U_data[:,i], Y_data[:,i], Ry_data[:,i] = u, y, ry
+        x̂ = updatestate!(mpc, u, y) # update mpc state estimate
+        updatestate!(plant, u)      # update plant simulator
+    end
+    res = SimResult(mpc, U_data, Y_data; Ry_data)
+    return res
+end
+nothing # hide
+```
+
+The [`setmodel!`](@ref) method must be called after solving the optimization problem with
+[`moveinput!`](@ref), and before updating the state estimate with [`updatestate!`](@ref).
+The [`SimResult`](@ref) object is for plotting purposes only. The adaptive [`LinMPC`](@ref)
+performances are similar to the nonlinear MPC, both for the 180° setpoint:
+
+```@example 1
+res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[0, 0]) 
+plot(res_slin)
+savefig("plot10_NonLinMPC.svg"); nothing # hide
+```
+
+![plot10_NonLinMPC](plot10_NonLinMPC.svg)
+
+and the 10° step disturbance:
+
+```@example 1
+res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[π, 0], y_step=[10]) 
+plot(res_slin)
+savefig("plot11_NonLinMPC.svg"); nothing # hide
+```
+
+![plot11_NonLinMPC](plot11_NonLinMPC.svg)
+
+The computations of the successive linearization MPC are about 125 times faster than the
+nonlinear MPC (0.00012 s per time steps versus 0.015 s per time steps, on average), an
+impressive gain for similar closed-loop performances!
+
+```@setup 1
+global_logger(old_logger);
+```

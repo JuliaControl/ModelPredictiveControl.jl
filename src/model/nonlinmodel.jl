@@ -1,5 +1,5 @@
 struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimModel{NT}
-    x::Vector{NT}
+    x0::Vector{NT}
     f!::F
     h!::H
     solver::DS
@@ -11,6 +11,12 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
     uop::Vector{NT}
     yop::Vector{NT}
     dop::Vector{NT}
+    xop::Vector{NT}
+    fop::Vector{NT}
+    uname::Vector{String}
+    yname::Vector{String}
+    dname::Vector{String}
+    xname::Vector{String}
     function NonLinModel{NT, F, H, DS}(
         f!::F, h!::H, solver::DS, Ts, nu, nx, ny, nd
     ) where {NT<:Real, F<:Function, H<:Function, DS<:DiffSolver}
@@ -18,8 +24,21 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
-        x = zeros(NT, nx)
-        return new{NT, F, H, DS}(x, f!, h!, solver, Ts, nu, nx, ny, nd, uop, yop, dop)
+        xop = zeros(NT, nx)
+        fop = zeros(NT, nx)
+        uname = ["\$u_{$i}\$" for i in 1:nu]
+        yname = ["\$y_{$i}\$" for i in 1:ny]
+        dname = ["\$d_{$i}\$" for i in 1:nd]
+        xname = ["\$x_{$i}\$" for i in 1:nx]
+        x0  = zeros(NT, nx)
+        return new{NT, F, H, DS}(
+            x0, 
+            f!, h!, 
+            solver, Ts, 
+            nu, nx, ny, nd, 
+            uop, yop, dop, xop, fop,
+            uname, yname, dname, xname
+        )
     end
 end
 
@@ -90,7 +109,7 @@ NonLinModel with a sample time Ts = 2.0 s, empty solver and:
 
 # Extended Help
 !!! details "Extended Help"
-    The state-space functions are similar for discrete dynamics:
+    State-space functions are similar for discrete dynamics:
     ```math
     \begin{aligned}
         \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \\
@@ -164,11 +183,11 @@ end
 "Do nothing if `model` is a [`NonLinModel`](@ref)."
 steadystate!(::SimModel, _ , _ ) = nothing
 
-"Call `f!(xnext, x, u, d)` with `model.f!` method for [`NonLinModel`](@ref)."
-f!(xnext, model::NonLinModel, x, u, d) = model.f!(xnext, x, u, d)
+"Call `f!(xnext0, x0, u0, d0)` with `model.f!` method for [`NonLinModel`](@ref)."
+f!(xnext0, model::NonLinModel, x0, u0, d0) = model.f!(xnext0, x0, u0, d0)
 
-"Call `h!(y, x, d)` with `model.h` method for [`NonLinModel`](@ref)."
-h!(y, model::NonLinModel, x, d) = model.h!(y, x, d)
+"Call `h!(y0, x0, d0)` with `model.h` method for [`NonLinModel`](@ref)."
+h!(y0, model::NonLinModel, x0, d0) = model.h!(y0, x0, d0)
 
 detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name) solver"
 detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:EmptySolver}) = ", empty solver"

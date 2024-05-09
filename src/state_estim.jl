@@ -20,17 +20,6 @@ abstract type StateEstimator{NT<:Real} end
 
 const IntVectorOrInt = Union{Int, Vector{Int}}
 
-"""
-    setstate!(estim::StateEstimator, x̂)
-
-Set `estim.x̂` states to values specified by `x̂`. 
-"""
-function setstate!(estim::StateEstimator, x̂)
-    size(x̂) == (estim.nx̂,) || error("x̂ size must be $((estim.nx̂,))")
-    estim.x̂[:] = x̂
-    return estim
-end
-
 function Base.show(io::IO, estim::StateEstimator)
     nu, nd = estim.model.nu, estim.model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
@@ -61,7 +50,7 @@ include("estimator/internal_model.jl")
 """
     evalŷ(estim::StateEstimator, _ , d) -> ŷ
 
-Evaluate [`StateEstimator`](@ref) output `ŷ` from measured disturbance `d` and `estim.x̂`.
+Evaluate [`StateEstimator`](@ref) output `ŷ` from measured disturbance `d` and `estim.x̂0`.
 
 Second argument is ignored, except for [`InternalModel`](@ref).
 """

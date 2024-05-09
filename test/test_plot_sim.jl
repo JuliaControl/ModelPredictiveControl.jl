@@ -1,6 +1,6 @@
 Ts = 400.0
-sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
-        tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ]
+sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
+        tf(-0.74,[800.0,1])   tf(0.74,[800.0,1])    tf(-0.74,[800.0,1])   ]
 
 @testset "SimModel quick simulation" begin
     model = LinModel(sys, Ts, i_d=[3])
@@ -60,7 +60,9 @@ end
 end
 
 @testset "StateEstimator Plots" begin
-    estim = SteadyKalmanFilter(LinModel(sys, Ts, i_d=[3]))
+    estim = MovingHorizonEstimator(LinModel(sys, Ts, i_d=[3]), He=5)
+    estim = setconstraint!(estim, x̂min=[-100,-101,-102,-103,-Inf,-Inf])
+    estim = setconstraint!(estim, x̂max=[+100,+101,+102,+103,+Inf,+Inf])
     res = sim!(estim, 15, [1, 3], [-10])
     p1 = plot(res, plotx=true)
     @test p1[1][1][:x] ≈ res.T_data
@@ -68,7 +70,7 @@ end
     @test p1[end-2][1][:y] ≈ res.X_data[2,:]
     @test p1[end-1][1][:y] ≈ res.X_data[3,:]
     @test p1[end-0][1][:y] ≈ res.X_data[4,:]
-    p2 = plot(res, plotx̂=true)
+    p2 = plot(res, plotx̂=true, plotx̂min=false, plotx̂max=false)
     @test p2[1][1][:x] ≈ res.T_data
     @test p2[end-5][1][:y] ≈ res.X̂_data[1,:]
     @test p2[end-4][1][:y] ≈ res.X̂_data[2,:]
@@ -76,7 +78,7 @@ end
     @test p2[end-2][1][:y] ≈ res.X̂_data[4,:]
     @test p2[end-1][1][:y] ≈ res.X̂_data[5,:]
     @test p2[end-0][1][:y] ≈ res.X̂_data[6,:]
-    p3 = plot(res, plotxwithx̂=true)
+    p3 = plot(res, plotxwithx̂=true, plotx̂min=false, plotx̂max=false)
     @test p3[1][1][:x] ≈ res.T_data
     @test p3[end-5][1][:y] ≈ res.X_data[1,:]
     @test p3[end-5][2][:y] ≈ res.X̂_data[1,:]
@@ -88,6 +90,18 @@ end
     @test p3[end-2][2][:y] ≈ res.X̂_data[4,:]
     @test p3[end-1][1][:y] ≈ res.X̂_data[5,:]
     @test p3[end-0][1][:y] ≈ res.X̂_data[6,:]
+    p4 = plot(res, plotx̂=true, plotx̂min=true, plotx̂max=false)
+    @test p4[1][1][:x] ≈ res.T_data
+    @test all(p4[end-5][2][:y] .≈ -100) 
+    @test all(p4[end-4][2][:y] .≈ -101)
+    @test all(p4[end-3][2][:y] .≈ -102)
+    @test all(p4[end-2][2][:y] .≈ -103)
+    p5 = plot(res, plotx̂=true, plotx̂min=false, plotx̂max=true)
+    @test p5[1][1][:x] ≈ res.T_data
+    @test all(p5[end-5][2][:y] .≈ +100)
+    @test all(p5[end-4][2][:y] .≈ +101)
+    @test all(p5[end-3][2][:y] .≈ +102)
+    @test all(p5[end-2][2][:y] .≈ +103)
 end
 
 @testset "PredictiveController quick simulation" begin
