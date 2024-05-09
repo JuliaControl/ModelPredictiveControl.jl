@@ -614,8 +614,6 @@ end
 Plot the simulation results of a [`PredictiveController`](@ref).
 
 # Arguments
-!!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
 
 - `res::SimResult{<:Real, <:PredictiveController}` : simulation results to plot
 - `plotry=true` : plot plant output setpoints ``\mathbf{r_y}`` if applicable

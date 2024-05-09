@@ -66,8 +66,8 @@ model = setname!(NonLinModel(f, h, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
 characters like ``θ`` can be typed in the Julia REPL or VS Code by typing `\theta` and
 pressing the `<TAB>` key. The tuple `par` is constant here to improve the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
-Note that a 4th order [`RungeKutta`](@ref) differential equation solver is used by default.
-It is good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
+A 4th order [`RungeKutta`](@ref) method solves the differential equations by default. It is
+good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
 
 ```@example 1
 using Plots
@@ -80,7 +80,9 @@ savefig("plot1_NonLinMPC.svg"); nothing # hide
 
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
 
-The [`setname!`](@ref) function allows customizing the Y-axis labels.
+The [`setname!`](@ref) function allows customized Y-axis labels. The available plotting
+options are detailed in the documentation of the corresponding [`plot`](@ref ModelPredictiveControl.plot)
+method.
 
 ## Nonlinear Model Predictive Controller
 
@@ -145,6 +147,8 @@ savefig("plot4_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot4_NonLinMPC](plot4_NonLinMPC.svg)
+
+See [`sim!`](@ref) documentation for details on the possible simulation scenarios.
 
 ## Economic Model Predictive Controller
 

@@ -451,10 +451,10 @@ is based on the process model :
 ```
 See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)`` noises and
 ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. The functions ``\mathbf{f̂, ĥ}`` are `model` 
-state-space functions augmented with the stochastic model, which is specified by the numbers
-of integrator `nint_u` and `nint_ym` (see Extended Help). The ``\mathbf{ĥ^m}`` function 
-represents the measured outputs of ``\mathbf{ĥ}`` function (and unmeasured ones, for 
-``\mathbf{ĥ^u}``).
+state-space functions augmented with the stochastic model of the unmeasured disturbances,
+which is specified by the numbers of integrator `nint_u` and `nint_ym` (see Extended Help).
+The ``\mathbf{ĥ^m}`` function represents the measured outputs of ``\mathbf{ĥ}`` function
+(and unmeasured ones, for ``\mathbf{ĥ^u}``).
 
 # Arguments
 !!! info
@@ -483,9 +483,10 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
 # Extended Help
 !!! details "Extended Help"
     The Extended Help of [`SteadyKalmanFilter`](@ref) details the augmentation with `nint_ym` 
-    and `nint_u` arguments. Note that the constructor does not validate the observability of
-    the resulting augmented [`NonLinModel`](@ref). In such cases, it is the user's 
-    responsibility to ensure that the augmented model is still observable.
+    and `nint_u` arguments. The default augmentation scheme is identical, that is `nint_u=0`
+    and `nint_ym` computed by [`default_nint`](@ref). Note that the constructor does not
+    validate the observability of the resulting augmented [`NonLinModel`](@ref). In such
+    cases, it is the user's responsibility to ensure that it is still observable.
 """
 function UnscentedKalmanFilter(
     model::SM;
