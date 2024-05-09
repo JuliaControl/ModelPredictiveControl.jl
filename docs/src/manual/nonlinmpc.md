@@ -148,7 +148,7 @@ savefig("plot4_NonLinMPC.svg"); nothing # hide
 
 ![plot4_NonLinMPC](plot4_NonLinMPC.svg)
 
-See [`sim!`] documentation for details on the possible simulation scenarios.
+See [`sim!`](@ref) documentation for details on the possible simulation scenarios.
 
 ## Economic Model Predictive Controller
 
