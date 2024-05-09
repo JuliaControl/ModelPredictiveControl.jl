@@ -80,7 +80,9 @@ savefig("plot1_NonLinMPC.svg"); nothing # hide
 
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
 
-The [`setname!`](@ref) function allows customizing the Y-axis labels.
+The [`setname!`](@ref) function allows customized Y-axis labels. The available plotting
+options are detailed in the documentation of the corresponding [`plot`](@ref ModelPredictiveControl.plot)
+method.
 
 ## Nonlinear Model Predictive Controller
 
@@ -145,6 +147,8 @@ savefig("plot4_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot4_NonLinMPC](plot4_NonLinMPC.svg)
+
+See [`sim!`] documentation for details on the possible simulation scenarios.
 
 ## Economic Model Predictive Controller
 
