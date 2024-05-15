@@ -26,7 +26,7 @@ Simply call `plot` on them.
 
 # Arguments
 !!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `obj` : simulated [`SimModel`](@ref)/[`StateEstimator`](@ref)/[`PredictiveController`](@ref)
 - `U_data` : manipulated inputs
@@ -167,7 +167,7 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 
 # Arguments
 !!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `estim::StateEstimator` : state estimator to simulate
 - `N::Int` : simulation length in time steps
@@ -337,8 +337,9 @@ Plot the simulation results of a [`SimModel`](@ref).
 ```julia-repl
 julia> res = sim!(LinModel(tf(2, [10, 1]), 2.0), 25);
 
-julia> plot(res, plotu=false);
+julia> plot(res, plotu=false)
 ```
+![plot_model](../assets/plot_model.svg)
 """
 plot(::Nothing, ::SimResult{<:Real, <:SimModel})
 
@@ -432,7 +433,7 @@ Plot the simulation results of a [`StateEstimator`](@ref).
 
 # Arguments
 !!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `res::SimResult{<:Real, <:StateEstimator}` : simulation results to plot
 - `plotŷ=true` or *`plotyhat`* : plot estimated outputs ``\mathbf{ŷ}``
@@ -449,8 +450,9 @@ Plot the simulation results of a [`StateEstimator`](@ref).
 ```julia-repl
 julia> res = sim!(KalmanFilter(LinModel(tf(3, [2.0, 1]), 1.0)), 25, [0], y_step=[1]);
 
-julia> plot(res, plotu=false, plotŷ=true, plotxwithx̂=true);
+julia> plot(res, plotu=false, plotŷ=true, plotxwithx̂=true)
 ```
+![plot_estimator](../assets/plot_estimator.svg)
 """
 plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
 
@@ -631,9 +633,9 @@ julia> model = LinModel(tf(2, [5.0, 1]), 1.0);
 
 julia> res = sim!(setconstraint!(LinMPC(model), umax=[1.0]), 30, [0], u_step=[-1]);
 
-julia> plot(res, plotŷ=true, plotry=true, plotumax=true);
+julia> plot(res, plotŷ=true, plotry=true, plotumax=true)
 ```
-
+![plot_controller](../assets/plot_controller.svg)
 """
 plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
 

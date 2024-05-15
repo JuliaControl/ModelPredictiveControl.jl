@@ -25,7 +25,7 @@ See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
 
 # Arguments
 !!! info    
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `mpc::PredictiveController` : solve optimization problem of `mpc`.
 - `ry=mpc.estim.model.yop` : current output setpoints ``\mathbf{r_y}(k)``.
@@ -81,7 +81,7 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 `info` with the following fields:
 
 !!! info
-    Fields in *`italic`* are non-Unicode alternatives.
+    Fields with *`emphasis`* are non-Unicode alternatives.
 
 - `:ΔU` or *`:DeltaU`* : optimal manipulated input increments over ``H_c``, ``\mathbf{ΔU}``
 - `:ϵ` or *`:epsilon`* : optimal slack variable, ``ϵ``
