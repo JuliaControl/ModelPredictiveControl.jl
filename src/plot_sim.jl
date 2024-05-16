@@ -712,6 +712,7 @@ end
 Plot the simulation results of a [`PredictiveController`](@ref).
 
 # Arguments
+!!! info
     The keyword arguments can be `Bool`s, index ranges e.g. `2:4` or vectors e.g. `[1, 3]`, 
     to select the variables to plot.
 

@@ -35,6 +35,14 @@ end
     @test p[7][1][:y] ≈ res.X_data[2, :]
     @test p[8][1][:y] ≈ res.X_data[3, :]
     @test p[9][1][:y] ≈ res.X_data[4, :]
+    p = plot(res, ploty=[2])
+    @test p[1][1][:x] ≈ res.T_data
+    @test p[1][1][:y] ≈ res.Y_data[2, :]
+    p = plot(res, ploty=false, plotu=false, plotd=false, plotx=2:4)
+    @test p[1][1][:x] ≈ res.T_data
+    @test p[1][1][:y] ≈ res.X_data[2, :]
+    @test p[2][1][:y] ≈ res.X_data[3, :]
+    @test p[3][1][:y] ≈ res.X_data[4, :]
 end
 
 @testset "StateEstimator quick simulation" begin
