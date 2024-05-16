@@ -327,6 +327,9 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
 Plot the simulation results of a [`SimModel`](@ref).
 
 # Arguments
+!!! info
+    The keyword arguments can be `Bool`s, index ranges e.g. `2:4` or vectors e.g. `[1, 3]`, 
+    to select the variables to plot.
 
 - `res::SimResult{<:Real, <:SimModel}` : simulation results to plot
 - `ploty=true` : plot plant outputs ``\mathbf{y}``
@@ -450,7 +453,8 @@ Plot the simulation results of a [`StateEstimator`](@ref).
 
 # Arguments
 !!! info
-    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
+    The keyword arguments can be `Bool`s, index ranges e.g. `2:4` or vectors e.g. `[1, 3]`, 
+    to select the variables to plot. Keywords in *`emphasis`* are non-Unicode alternatives.
 
 - `res::SimResult{<:Real, <:StateEstimator}` : simulation results to plot
 - `plotŷ=true` or *`plotyhat`* : plot estimated outputs ``\mathbf{ŷ}``
@@ -544,6 +548,7 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
         end
         if i_y in indices_ŷ
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide  --> yname[i_y]
                 color     --> 2
                 subplot   --> subplot_base + i
@@ -616,6 +621,7 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
         x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_x̂], X̂max[end-2*estim.nx̂+i_x̂]
         if i_x̂ in indices_x̂min && !isinf(x̂min_i)
             @series begin
+                i == nx̂ && (xguide --> "Time (s)")
                 yguide     --> x̂name[i_x̂]
                 color      --> 4
                 subplot    --> subplot_base + i
@@ -628,6 +634,7 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
         end
         if i_x̂ in indices_x̂max && !isinf(x̂max_i)
             @series begin
+                i == nx̂ && (xguide --> "Time (s)")
                 yguide     --> x̂name[i_x̂]
                 color      --> 5
                 subplot    --> subplot_base + i
@@ -671,6 +678,7 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
             x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_xx̂], X̂max[end-2*estim.nx̂+i_xx̂]
             if i_xx̂ in indices_x̂min && !isinf(x̂min_i)
                 @series begin
+                    i == nxx̂ && (xguide --> "Time (s)")
                     yguide     --> xx̂name[i_xx̂]
                     color      --> 4
                     subplot    --> subplot_base + i
@@ -683,6 +691,7 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
             end
             if i_xx̂ in indices_x̂max && !isinf(x̂max_i)
                 @series begin
+                    i == nxx̂ && (xguide --> "Time (s)")
                     yguide     --> xx̂name[i_xx̂]
                     color      --> 5
                     subplot    --> subplot_base + i
@@ -703,6 +712,8 @@ end
 Plot the simulation results of a [`PredictiveController`](@ref).
 
 # Arguments
+    The keyword arguments can be `Bool`s, index ranges e.g. `2:4` or vectors e.g. `[1, 3]`, 
+    to select the variables to plot.
 
 - `res::SimResult{<:Real, <:PredictiveController}` : simulation results to plot
 - `plotry=true` : plot plant output setpoints ``\mathbf{r_y}`` if applicable
@@ -718,9 +729,9 @@ Plot the simulation results of a [`PredictiveController`](@ref).
 ```julia-repl
 julia> model = LinModel(tf(2, [5.0, 1]), 1.0);
 
-julia> res = sim!(setconstraint!(LinMPC(model), umax=[1.0]), 30, [0], u_step=[-1]);
+julia> res = sim!(setconstraint!(LinMPC(model), umax=[1.0]), 25, [0], u_step=[-1]);
 
-julia> using Plots; plot(res, plotŷ=true, plotry=true, plotumax=true)
+julia> using Plots; plot(res, plotŷ=true, plotry=true, plotumax=true, plotx̂=[2])
 ```
 ![plot_controller](../assets/plot_controller.svg)
 """
@@ -818,6 +829,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
         end
         if i_y in indices_ŷ
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide  --> yname[i_y]
                 color     --> 2
                 subplot   --> subplot_base + i
@@ -831,6 +843,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
         M_Hp_i = mpc.M_Hp[i_y, i_y]
         if i_y in indices_ry && !iszero(M_Hp_i)
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide    --> yname[i_y]
                 color     --> 3
                 subplot   --> subplot_base + i
@@ -844,6 +857,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
         ymin_i, ymax_i = Ymin[i_y], Ymax[i_y]
         if i_y in indices_ymin && !isinf(ymin_i)
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide    --> yname[i_y]
                 color     --> 4
                 subplot   --> subplot_base + i
@@ -856,6 +870,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
         end
         if i_y in indices_ymax && !isinf(ymax_i)
             @series begin
+                i == ny && (xguide --> "Time (s)")
                 yguide    --> yname[i_y]
                 color     --> 5
                 subplot   --> subplot_base + i
@@ -884,6 +899,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
         L_Hp_i = mpc.L_Hp[i_u, i_u]
         if i_u in indices_ru && !iszero(L_Hp_i)
             @series begin
+                i == nu && (xguide --> "Time (s)")
                 yguide    --> uname[i_u]
                 color     --> 3
                 subplot   --> subplot_base + i
@@ -897,6 +913,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
         umin_i, umax_i = Umin[i_u], Umax[i_u]
         if i_u in indices_umin && !isinf(umin_i)
             @series begin
+                i == nu && (xguide --> "Time (s)")
                 yguide    --> uname[i_u]
                 color     --> 4
                 subplot   --> subplot_base + i
@@ -909,6 +926,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
         end
         if i_u in indices_umax && !isinf(umax_i)
             @series begin
+                i == nu && (xguide --> "Time (s)")
                 yguide    --> uname[i_u]
                 color     --> 5
                 subplot   --> subplot_base + i
@@ -966,6 +984,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
         x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_x̂], X̂max[end-2*estim.nx̂+i_x̂]
         if i_x̂ in indices_x̂min && !isinf(x̂min_i)
             @series begin
+                i == nx̂ && (xguide --> "Time (s)")
                 yguide     --> x̂name[i_x̂]
                 color      --> 4
                 subplot    --> subplot_base + i
@@ -978,6 +997,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
         end
         if i_x̂ in indices_x̂max && !isinf(x̂max_i)
             @series begin
+                i == nx̂ && (xguide --> "Time (s)")
                 yguide     --> x̂name[i_x̂]
                 color      --> 5
                 subplot    --> subplot_base + i
@@ -1021,6 +1041,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
             x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_xx̂], X̂max[end-2*estim.nx̂+i_xx̂]
             if i_xx̂ in indices_x̂min && !isinf(x̂min_i)
                 @series begin
+                    i == nxx̂ && (xguide --> "Time (s)")
                     yguide     --> xx̂name[i_xx̂]
                     color      --> 4
                     subplot    --> subplot_base + i
@@ -1033,6 +1054,7 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
             end
             if i_xx̂ in indices_x̂max && !isinf(x̂max_i)
                 @series begin
+                    i == nxx̂ && (xguide --> "Time (s)")
                     yguide     --> xx̂name[i_xx̂]
                     color      --> 5
                     subplot    --> subplot_base + i
