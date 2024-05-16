@@ -4,3 +4,4 @@ JuliaSysimage.so
 LocalPreferences.toml
 .vscode/
 *.cov
+docs/Manifest.toml

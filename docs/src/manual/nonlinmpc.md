@@ -211,7 +211,7 @@ setpoint is similar:
 ```@example 1
 unset_time_limit_sec(empc.optim)    # hide
 res2_ry = sim!(empc, N, [180, 0], plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
-plot(res2_ry)
+plot(res2_ry, ploty=[1])
 savefig("plot5_NonLinMPC.svg"); nothing # hide
 ```
 
@@ -231,7 +231,7 @@ Also, for a 10° step disturbance:
 
 ```@example 1
 res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10, 0])
-plot(res2_yd)
+plot(res2_yd, ploty=[1])
 savefig("plot6_NonLinMPC.svg"); nothing # hide
 ```
 
