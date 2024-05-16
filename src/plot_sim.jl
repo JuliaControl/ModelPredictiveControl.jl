@@ -328,8 +328,8 @@ Plot the simulation results of a [`SimModel`](@ref).
 
 # Arguments
 !!! info
-    The keyword arguments can be `Bool`s, index ranges e.g. `2:4` or vectors e.g. `[1, 3]`, 
-    to select the variables to plot.
+    The keyword arguments can be `Bool`s, index ranges (`2:4`) or vectors (`[1, 3]`), to
+    select the variables to plot.
 
 - `res::SimResult{<:Real, <:SimModel}` : simulation results to plot
 - `ploty=true` : plot plant outputs ``\mathbf{y}``
@@ -453,8 +453,8 @@ Plot the simulation results of a [`StateEstimator`](@ref).
 
 # Arguments
 !!! info
-    The keyword arguments can be `Bool`s, index ranges e.g. `2:4` or vectors e.g. `[1, 3]`, 
-    to select the variables to plot. Keywords in *`emphasis`* are non-Unicode alternatives.
+    The keyword arguments can be `Bool`s, index ranges (`2:4`) or vectors (`[1, 3]`), to
+    select the variables to plot. Keywords in *`emphasis`* are non-Unicode alternatives.
 
 - `res::SimResult{<:Real, <:StateEstimator}` : simulation results to plot
 - `plotŷ=true` or *`plotyhat`* : plot estimated outputs ``\mathbf{ŷ}``
@@ -713,8 +713,8 @@ Plot the simulation results of a [`PredictiveController`](@ref).
 
 # Arguments
 !!! info
-    The keyword arguments can be `Bool`s, index ranges e.g. `2:4` or vectors e.g. `[1, 3]`, 
-    to select the variables to plot.
+    The keyword arguments can be `Bool`s, index ranges (`2:4`) or vectors (`[1, 3]`), to
+    select the variables to plot.
 
 - `res::SimResult{<:Real, <:PredictiveController}` : simulation results to plot
 - `plotry=true` : plot plant output setpoints ``\mathbf{r_y}`` if applicable
