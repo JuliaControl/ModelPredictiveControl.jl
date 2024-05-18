@@ -87,7 +87,7 @@ unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 
 # Arguments
 !!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `model::LinModel` : (deterministic) model for the estimations.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
@@ -274,7 +274,7 @@ its initial value with ``\mathbf{P̂}_{-1}(0) =
 
 # Arguments
 !!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `model::LinModel` : (deterministic) model for the estimations.
 - `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
@@ -458,7 +458,7 @@ The ``\mathbf{ĥ^m}`` function represents the measured outputs of ``\mathbf{ĥ
 
 # Arguments
 !!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `model::SimModel` : (deterministic) model for the estimations.
 - `α=1e-3` or *`alpha`* : alpha parameter, spread of the state distribution ``(0 < α ≤ 1)``.

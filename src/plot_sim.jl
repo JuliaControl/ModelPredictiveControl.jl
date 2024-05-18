@@ -26,7 +26,7 @@ Simply call `plot` on them.
 
 # Arguments
 !!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `obj` : simulated [`SimModel`](@ref)/[`StateEstimator`](@ref)/[`PredictiveController`](@ref)
 - `U_data` : manipulated inputs
@@ -167,7 +167,7 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 
 # Arguments
 !!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `estim::StateEstimator` : state estimator to simulate
 - `N::Int` : simulation length in time steps
@@ -327,8 +327,12 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
 Plot the simulation results of a [`SimModel`](@ref).
 
 # Arguments
+!!! info
+    The keyword arguments can be `Bool`s, index ranges (`2:4`) or vectors (`[1, 3]`), to
+    select the variables to plot.
 
 - `res::SimResult{<:Real, <:SimModel}` : simulation results to plot
+- `ploty=true` : plot plant outputs ``\mathbf{y}``
 - `plotu=true` : plot manipulated inputs ``\mathbf{u}``
 - `plotd=true` : plot measured disturbances ``\mathbf{d}`` if applicable
 - `plotx=false` : plot plant states ``\mathbf{x}``
@@ -337,90 +341,107 @@ Plot the simulation results of a [`SimModel`](@ref).
 ```julia-repl
 julia> res = sim!(LinModel(tf(2, [10, 1]), 2.0), 25);
 
-julia> plot(res, plotu=false);
+julia> using Plots; plot(res, plotu=false)
 ```
+![plot_model](../assets/plot_model.svg)
 """
 plot(::Nothing, ::SimResult{<:Real, <:SimModel})
 
+function get_indices(arg::IntRangeOrVector, n)
+    if length(unique(arg)) ≠ length(arg) || maximum(arg) > n
+        error("Plot keyword argument arguments should contains valid and unique indices")
+    end
+    return arg
+end
+get_indices(arg::Bool, n) = arg ? (1:n) : Int64[]
+
 @recipe function plot_recipe(
     res::SimResult{<:Real, <:SimModel};
+    ploty  = true,
     plotu  = true,
     plotd  = true,
     plotx  = false,
 )
     t   = res.T_data
-    ny = size(res.Y_data, 1)
-    nu = size(res.U_data, 1)
-    nd = size(res.D_data, 1)
-    nx = size(res.X_data, 1)
+
     model = res.obj
     uname = model.uname
     yname = model.yname
     dname = model.dname
     xname = res.xname
-    layout_mat = [(ny, 1)]
-    plotu && (layout_mat = [layout_mat (nu, 1)])
-    (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
-    plotx && (layout_mat = [layout_mat (nx, 1)])
 
+    indices_y = get_indices(ploty, size(res.Y_data, 1))
+    indices_u = get_indices(plotu, size(res.U_data, 1))
+    indices_d = get_indices(plotd, size(res.D_data, 1))
+    indices_x = get_indices(plotx, size(res.X_data, 1))
+
+    ny = length(indices_y)
+    nu = length(indices_u)
+    nd = length(indices_d)
+    nx = length(indices_x)
+
+    layout_mat = Matrix{Tuple{Int64, Int64}}(undef, 1, 0)
+    ny ≠ 0 && (layout_mat = [layout_mat (ny, 1)])
+    nu ≠ 0 && (layout_mat = [layout_mat (nu, 1)])
+    nd ≠ 0 && (layout_mat = [layout_mat (nd, 1)])
+    nx ≠ 0 && (layout_mat = [layout_mat (nx, 1)])
     layout := layout_mat
+
     # --- outputs y ---
     subplot_base = 0
     for i in 1:ny
+        i_y = indices_y[i]
         @series begin
             i == ny && (xguide --> "Time (s)")
-            yguide  --> yname[i]
+            yguide  --> yname[i_y]
             color   --> 1
             subplot --> subplot_base + i
             label   --> "\$\\mathbf{y}\$"
             legend  --> false
-            t, res.Y_data[i, :]
+            t, res.Y_data[i_y, :]
         end
     end
     subplot_base += ny
     # --- manipulated inputs u ---
-    if plotu
-        for i in 1:nu
-            @series begin
-                i == nu && (xguide --> "Time (s)")
-                yguide     --> uname[i]
-                color      --> 1
-                subplot    --> subplot_base + i
-                seriestype --> :steppost
-                label      --> "\$\\mathbf{u}\$"
-                legend     --> false
-                t, res.U_data[i, :]
-            end
+    for i in 1:nu
+        i_u = indices_u[i]
+        @series begin
+            i == nu && (xguide --> "Time (s)")
+            yguide     --> uname[i_u]
+            color      --> 1
+            subplot    --> subplot_base + i
+            seriestype --> :steppost
+            label      --> "\$\\mathbf{u}\$"
+            legend     --> false
+            t, res.U_data[i_u, :]
         end
-        subplot_base += nu
     end
+    subplot_base += nu
     # --- measured disturbances d ---
-    if plotd
-        for i in 1:nd
-            @series begin
-                i == nd && (xguide --> "Time (s)")
-                yguide  --> dname[i]
-                color   --> 1
-                subplot --> subplot_base + i
-                label   --> "\$\\mathbf{d}\$"
-                legend  --> false
-                t, res.D_data[i, :]
-            end
+    for i in 1:nd
+        i_d = indices_d[i]
+        @series begin
+            i == nd && (xguide --> "Time (s)")
+            yguide  --> dname[i_d]
+            color   --> 1
+            subplot --> subplot_base + i
+            label   --> "\$\\mathbf{d}\$"
+            legend  --> false
+            t, res.D_data[i_d, :]
         end
-        subplot_base += nd
     end
+    subplot_base += nd
     # --- plant states x ---
-    if plotx
-        for i in 1:nx
-            @series begin
-                i == nx && (xguide --> "Time (s)")
-                yguide     --> xname[i]
-                color      --> 1
-                subplot    --> subplot_base + i
-                label      --> "\$\\mathbf{x}\$"
-                legend     --> false
-                t, res.X_data[i, :]
-            end
+    for i in 1:nx
+        i_x = indices_x[i]
+        @series begin
+            i == nx && (xguide --> "Time (s)")
+            yguide     --> xname[i_x]
+            color      --> 1
+            subplot    --> subplot_base + i
+            label      --> "\$\\mathbf{x}\$"
+            legend     --> false
+            t, res.X_data[i_x, :]
         end
     end
 end
@@ -432,7 +453,8 @@ Plot the simulation results of a [`StateEstimator`](@ref).
 
 # Arguments
 !!! info
-    Keyword arguments in *`italic`* are non-Unicode alternatives.
+    The keyword arguments can be `Bool`s, index ranges (`2:4`) or vectors (`[1, 3]`), to
+    select the variables to plot. Keywords in *`emphasis`* are non-Unicode alternatives.
 
 - `res::SimResult{<:Real, <:StateEstimator}` : simulation results to plot
 - `plotŷ=true` or *`plotyhat`* : plot estimated outputs ``\mathbf{ŷ}``
@@ -449,13 +471,15 @@ Plot the simulation results of a [`StateEstimator`](@ref).
 ```julia-repl
 julia> res = sim!(KalmanFilter(LinModel(tf(3, [2.0, 1]), 1.0)), 25, [0], y_step=[1]);
 
-julia> plot(res, plotu=false, plotŷ=true, plotxwithx̂=true);
+julia> using Plots; plot(res, plotu=false, plotŷ=true, plotxwithx̂=true)
 ```
+![plot_estimator](../assets/plot_estimator.svg)
 """
 plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
 
 @recipe function plot_recipe(
     res::SimResult{<:Real, <:StateEstimator};
+    ploty           = true,
     plotyhat        = true,
     plotu           = true,
     plotd           = true,
@@ -470,138 +494,212 @@ plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
     plotx̂min   = plotxhatmin,
     plotx̂max   = plotxhatmax
 )
-    t   = res.T_data
-    ny = size(res.Y_data, 1)
-    nu = size(res.U_data, 1)
-    nd = size(res.D_data, 1)
-    nx = size(res.X_data, 1)
-    nx̂ = size(res.X̂_data, 1)
+    t     = res.T_data
     estim = res.obj
     model = estim.model
+
+    X̂min, X̂max = getX̂con(estim, estim.nx̂)
+
     uname = model.uname
     yname = model.yname
     dname = model.dname
-    x̂name = [model.xname; ["\$\\hat{x}_{$i}\$" for i in (nx+1):(nx̂)]]
     xname = res.xname
-    layout_mat = [(ny, 1)]
-    plotu && (layout_mat = [layout_mat (nu, 1)])
-    (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
-    (plotx && !plotxwithx̂) && (layout_mat = [layout_mat (nx, 1)])
-    (plotx̂ ||  plotxwithx̂) && (layout_mat = [layout_mat (nx̂, 1)])
+    x̂name = [model.xname; ["\$\\hat{x}_{$i}\$" for i in (length(xname)+1):(estim.nx̂)]]
+    xx̂name = size(res.X̂_data, 1) ≥ size(res.X_data, 1) ? x̂name : xname
+   
+    indices_y    = get_indices(ploty, size(res.Y_data, 1))
+    indices_u    = get_indices(plotu, size(res.U_data, 1))
+    indices_d    = get_indices(plotd, size(res.D_data, 1))
+    indices_x    = get_indices(plotx, size(res.X_data, 1))
+    indices_ŷ    = get_indices(plotŷ, size(res.Ŷ_data, 1))
+    indices_x̂    = get_indices(plotx̂, size(res.X̂_data, 1))
+    indices_xx̂   = get_indices(plotxwithx̂, max(size(res.X_data, 1), size(res.X̂_data, 1)))
+    indices_x̂min = get_indices(plotx̂min, size(res.X̂_data, 1))
+    indices_x̂max = get_indices(plotx̂max, size(res.X̂_data, 1))
+
+    ny  = length(indices_y)
+    nu  = length(indices_u)
+    nd  = length(indices_d)
+    nx  = length(indices_x)
+    nx̂  = length(indices_x̂)
+    nxx̂ = length(indices_xx̂)
+    
+    layout_mat = Matrix{Tuple{Int64, Int64}}(undef, 1, 0)
+    ny  ≠ 0 && (layout_mat = [layout_mat (ny, 1)])
+    nu  ≠ 0 && (layout_mat = [layout_mat (nu, 1)])
+    nd  ≠ 0 && (layout_mat = [layout_mat (nd, 1)])
+    nx  ≠ 0 && (layout_mat = [layout_mat (nx, 1)])
+    nx̂  ≠ 0 && (layout_mat = [layout_mat (nx̂, 1)])
+    nxx̂ ≠ 0 && (layout_mat = [layout_mat (nxx̂, 1)])
     layout := layout_mat
-    X̂min, X̂max = getX̂con(estim, nx̂)
+
     # --- outputs y ---
     subplot_base = 0
     for i in 1:ny
+        i_y = indices_y[i]
         @series begin
             i == ny && (xguide --> "Time (s)")
-            yguide  --> yname[i]
+            yguide  --> yname[i_y]
             color   --> 1
             subplot --> subplot_base + i
             label   --> "\$\\mathbf{y}\$"
             legend  --> false
-            t, res.Y_data[i, :]
+            t, res.Y_data[i_y, :]
         end
-        if plotŷ
+        if i_y in indices_ŷ
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> yname[i]
+                yguide  --> yname[i_y]
                 color     --> 2
                 subplot   --> subplot_base + i
                 linestyle --> :dashdot
                 linewidth --> 0.75
                 label     --> "\$\\mathbf{\\hat{y}}\$"
                 legend    --> true
-                t, res.Ŷ_data[i, :]
+                t, res.Ŷ_data[i_y, :]
             end
         end
     end
     subplot_base += ny
     # --- manipulated inputs u ---
-    if plotu
-        for i in 1:nu
-            @series begin
-                i == nu && (xguide --> "Time (s)")
-                yguide     --> uname[i]
-                color      --> 1
-                subplot    --> subplot_base + i
-                seriestype --> :steppost
-                label      --> "\$\\mathbf{u}\$"
-                legend     --> false
-                t, res.U_data[i, :]
-            end
+    for i in 1:nu
+        i_u = indices_u[i]
+        @series begin
+            i == nu && (xguide --> "Time (s)")
+            yguide     --> uname[i_u]
+            color      --> 1
+            subplot    --> subplot_base + i
+            seriestype --> :steppost
+            label      --> "\$\\mathbf{u}\$"
+            legend     --> false
+            t, res.U_data[i_u, :]
         end
-        subplot_base += nu
     end
+    subplot_base += nu
     # --- measured disturbances d ---
-    if plotd
-        for i in 1:nd
+    for i in 1:nd
+        i_d = indices_d[i]
+        @series begin
+            i == nd && (xguide --> "Time (s)")
+            yguide  --> dname[i_d]
+            color   --> 1
+            subplot --> subplot_base + i
+            label   --> "\$\\mathbf{d}\$"
+            legend  --> false
+            t, res.D_data[i_d, :]
+        end
+    end
+    subplot_base += nd
+    # --- plant states x ---
+    for i in 1:nx
+        i_x = indices_x[i]
+        @series begin
+            i == nx && (xguide --> "Time (s)")
+            yguide     --> xname[i_x]
+            color      --> 1
+            subplot    --> subplot_base + i
+            label      --> "\$\\mathbf{x}\$"
+            legend     --> false
+            t, res.X_data[i_x, :]
+        end
+    end
+    subplot_base += nx
+    # --- estimated states x̂ ---
+    for i in 1:nx̂
+        i_x̂ = indices_x̂[i]
+        @series begin
+            i == nx̂ && (xguide --> "Time (s)")
+            yguide     --> x̂name[i_x̂]
+            color      --> 2
+            subplot    --> subplot_base + i
+            linestyle  --> :dashdot
+            linewidth  --> 0.75
+            label      --> "\$\\mathbf{\\hat{x}}\$"
+            legend     --> false
+            t, res.X̂_data[i_x̂, :]
+        end
+        x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_x̂], X̂max[end-2*estim.nx̂+i_x̂]
+        if i_x̂ in indices_x̂min && !isinf(x̂min_i)
             @series begin
-                i == nd && (xguide --> "Time (s)")
-                yguide  --> dname[i]
-                color   --> 1
-                subplot --> subplot_base + i
-                label   --> "\$\\mathbf{d}\$"
-                legend  --> false
-                t, res.D_data[i, :]
+                i == nx̂ && (xguide --> "Time (s)")
+                yguide     --> x̂name[i_x̂]
+                color      --> 4
+                subplot    --> subplot_base + i
+                linestyle  --> :dot
+                linewidth  --> 1.5
+                label      --> "\$\\mathbf{\\hat{x}_{min}}\$"
+                legend     --> true
+                t, fill(x̂min_i, length(t))
             end
         end
-        subplot_base += nd
-    end
-    # --- plant states x ---
-    if plotx || plotxwithx̂
-        for i in 1:nx
+        if i_x̂ in indices_x̂max && !isinf(x̂max_i)
             @series begin
-                i == nx && !plotxwithx̂ && (xguide --> "Time (s)")
-                yguide     --> xname[i]
+                i == nx̂ && (xguide --> "Time (s)")
+                yguide     --> x̂name[i_x̂]
+                color      --> 5
+                subplot    --> subplot_base + i
+                linestyle  --> :dot
+                linewidth  --> 1.5
+                label      --> "\$\\mathbf{\\hat{x}_{max}}\$"
+                legend     --> true
+                t, fill(x̂max_i, length(t))
+            end
+        end
+    end
+    subplot_base += nx̂
+    # --- plant states x and estimated states x̂ together ---
+    for i in 1:nxx̂
+        i_xx̂ = indices_xx̂[i]
+        isplotted_x = i_xx̂ ≤ size(res.X_data, 1)
+        isplotted_x̂ = i_xx̂ ≤ size(res.X̂_data, 1)
+        if isplotted_x
+            @series begin
+                i == nxx̂ && (xguide --> "Time (s)")
+                yguide     --> xx̂name[i_xx̂]
                 color      --> 1
                 subplot    --> subplot_base + i
                 label      --> "\$\\mathbf{x}\$"
-                legend     --> false
-                t, res.X_data[i, :]
+                legend     --> (isplotted_x && isplotted_x̂)
+                t, res.X_data[i_xx̂, :]
             end
         end
-        !plotxwithx̂ && (subplot_base += nx)
-    end
-    # --- estimated states x̂ ---
-    if plotx̂ || plotxwithx̂
-        for i in 1:nx̂
-            withPlantState = plotxwithx̂ && i ≤ nx
+        if isplotted_x̂
             @series begin
-                i == nx̂ && (xguide --> "Time (s)")
-                yguide     --> (withPlantState ? xname[i] : x̂name[i])
+                i == nxx̂ && (xguide --> "Time (s)")
+                yguide     --> xx̂name[i_xx̂]
                 color      --> 2
                 subplot    --> subplot_base + i
                 linestyle  --> :dashdot
                 linewidth  --> 0.75
                 label      --> "\$\\mathbf{\\hat{x}}\$"
-                legend     --> (withPlantState ? true : false)
-                t, res.X̂_data[i, :]
+                legend     --> (isplotted_x && isplotted_x̂)
+                t, res.X̂_data[i_xx̂, :]
             end
-            if plotx̂min && !isinf(X̂min[end-2*nx̂+i])
+            x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_xx̂], X̂max[end-2*estim.nx̂+i_xx̂]
+            if i_xx̂ in indices_x̂min && !isinf(x̂min_i)
                 @series begin
-                    i == nx̂ && (xguide --> "Time (s)")
-                    yguide     --> (withPlantState ? xname[i] : x̂name[i])
-                    color      --> 3
+                    i == nxx̂ && (xguide --> "Time (s)")
+                    yguide     --> xx̂name[i_xx̂]
+                    color      --> 4
                     subplot    --> subplot_base + i
                     linestyle  --> :dot
                     linewidth  --> 1.5
                     label      --> "\$\\mathbf{\\hat{x}_{min}}\$"
                     legend     --> true
-                    t, fill(X̂min[end-2*nx̂+i], length(t))
+                    t, fill(x̂min_i, length(t))
                 end
             end
-            if plotx̂max && !isinf(X̂max[end-2*nx̂+i])
+            if i_xx̂ in indices_x̂max && !isinf(x̂max_i)
                 @series begin
-                    i == nx̂ && (xguide --> "Time (s)")
-                    yguide     --> (withPlantState ? xname[i] : x̂name[i])
-                    color      --> 4
+                    i == nxx̂ && (xguide --> "Time (s)")
+                    yguide     --> xx̂name[i_xx̂]
+                    color      --> 5
                     subplot    --> subplot_base + i
                     linestyle  --> :dot
                     linewidth  --> 1.5
                     label      --> "\$\\mathbf{\\hat{x}_{max}}\$"
                     legend     --> true
-                    t, fill(X̂max[end-2*nx̂+i], length(t))
+                    t, fill(x̂max_i, length(t))
                 end
             end
         end
@@ -614,6 +712,9 @@ end
 Plot the simulation results of a [`PredictiveController`](@ref).
 
 # Arguments
+!!! info
+    The keyword arguments can be `Bool`s, index ranges (`2:4`) or vectors (`[1, 3]`), to
+    select the variables to plot.
 
 - `res::SimResult{<:Real, <:PredictiveController}` : simulation results to plot
 - `plotry=true` : plot plant output setpoints ``\mathbf{r_y}`` if applicable
@@ -629,16 +730,17 @@ Plot the simulation results of a [`PredictiveController`](@ref).
 ```julia-repl
 julia> model = LinModel(tf(2, [5.0, 1]), 1.0);
 
-julia> res = sim!(setconstraint!(LinMPC(model), umax=[1.0]), 30, [0], u_step=[-1]);
+julia> res = sim!(setconstraint!(LinMPC(model), umax=[1.0]), 25, [0], u_step=[-1]);
 
-julia> plot(res, plotŷ=true, plotry=true, plotumax=true);
+julia> using Plots; plot(res, plotŷ=true, plotry=true, plotumax=true, plotx̂=[2])
 ```
-
+![plot_controller](../assets/plot_controller.svg)
 """
 plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
 
 @recipe function plot_recipe(
-    res::SimResult{<:Real, <:PredictiveController}; 
+    res::SimResult{<:Real, <:PredictiveController};
+    ploty           = true,
     plotry          = true,
     plotymin        = true,
     plotymax        = true,
@@ -659,219 +761,309 @@ plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
     plotx̂min    = plotxhatmin,
     plotx̂max    = plotxhatmax
 )
-    mpc = res.obj
-    t  = res.T_data
+    t     = res.T_data
+    mpc   = res.obj
+    estim = mpc.estim
+    model = mpc.estim.model
+
+    Umin, Umax = getUcon(mpc, model.nu)
+    Ymin, Ymax = getYcon(mpc, model.ny)
+    X̂min, X̂max = getX̂con(mpc.estim, estim.nx̂)
+
+    uname = model.uname
+    yname = model.yname
+    dname = model.dname
+    xname = res.xname
+    x̂name = [model.xname; ["\$\\hat{x}_{$i}\$" for i in (length(xname)+1):(estim.nx̂)]]
+    xx̂name = size(res.X̂_data, 1) ≥ size(res.X_data, 1) ? x̂name : xname
+
     ny = size(res.Y_data, 1)
     nu = size(res.U_data, 1)
     nd = size(res.D_data, 1)
     nx = size(res.X_data, 1)
     nx̂ = size(res.X̂_data, 1)
-    model = res.obj.estim.model
-    uname = model.uname
-    yname = model.yname
-    dname = model.dname
-    x̂name = [model.xname; ["\$\\hat{x}_{$i}\$" for i in (nx+1):(nx̂)]]
-    xname = res.xname
-    layout_mat = [(ny, 1)]
-    plotu && (layout_mat = [layout_mat (nu, 1)])
-    (plotd && nd ≠ 0) && (layout_mat = [layout_mat (nd, 1)])
-    (plotx && !plotxwithx̂) && (layout_mat = [layout_mat (nx, 1)])
-    (plotx̂ ||  plotxwithx̂) && (layout_mat = [layout_mat (nx̂, 1)])
+
+    indices_y    = get_indices(ploty, size(res.Y_data, 1))
+    indices_ry   = get_indices(plotry, size(res.Ry_data, 1))
+    indices_ymin = get_indices(plotymin, size(res.Y_data, 1))
+    indices_ymax = get_indices(plotymax, size(res.Y_data, 1))
+    indices_u    = get_indices(plotu, size(res.U_data, 1))
+    indices_ru   = get_indices(plotru, size(res.Ru_data, 1))
+    indices_umin = get_indices(plotumin, size(res.U_data, 1))
+    indices_umax = get_indices(plotumax, size(res.U_data, 1))
+    indices_d    = get_indices(plotd, size(res.D_data, 1))
+    indices_x    = get_indices(plotx, size(res.X_data, 1))
+    indices_ŷ    = get_indices(plotŷ, size(res.Ŷ_data, 1))
+    indices_x̂    = get_indices(plotx̂, size(res.X̂_data, 1))
+    indices_xx̂   = get_indices(plotxwithx̂, max(size(res.X_data, 1), size(res.X̂_data, 1)))
+    indices_x̂min = get_indices(plotx̂min, size(res.X̂_data, 1))
+    indices_x̂max = get_indices(plotx̂max, size(res.X̂_data, 1))
+    
+    ny  = length(indices_y)
+    nu  = length(indices_u)
+    nd  = length(indices_d)
+    nx  = length(indices_x)
+    nx̂  = length(indices_x̂)
+    nxx̂ = length(indices_xx̂)
+
+    layout_mat = Matrix{Tuple{Int64, Int64}}(undef, 1, 0)
+    ny  ≠ 0 && (layout_mat = [layout_mat (ny, 1)])
+    nu  ≠ 0 && (layout_mat = [layout_mat (nu, 1)])
+    nd  ≠ 0 && (layout_mat = [layout_mat (nd, 1)])
+    nx  ≠ 0 && (layout_mat = [layout_mat (nx, 1)])
+    nx̂  ≠ 0 && (layout_mat = [layout_mat (nx̂, 1)])
+    nxx̂ ≠ 0 && (layout_mat = [layout_mat (nxx̂, 1)])
     layout := layout_mat
-    # --- constraints ---
-    Umin, Umax = getUcon(mpc, nu)
-    Ymin, Ymax = getYcon(mpc, ny)
-    X̂min, X̂max = getX̂con(mpc.estim, nx̂)
+    
     # --- outputs y ---
     subplot_base = 0
     for i in 1:ny
+        i_y = indices_y[i]
         @series begin
             i == ny && (xguide --> "Time (s)")
-            yguide  --> yname[i]
+            yguide  --> yname[i_y]
             color   --> 1
             subplot --> subplot_base + i
             label   --> "\$\\mathbf{y}\$"
             legend  --> false
-            t, res.Y_data[i, :]
+            t, res.Y_data[i_y, :]
         end
-        if plotŷ
+        if i_y in indices_ŷ
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> yname[i]
+                yguide  --> yname[i_y]
                 color     --> 2
                 subplot   --> subplot_base + i
                 linestyle --> :dashdot
                 linewidth --> 0.75
                 label     --> "\$\\mathbf{\\hat{y}}\$"
                 legend    --> true
-                t, res.Ŷ_data[i, :]
+                t, res.Ŷ_data[i_y, :]
             end
         end
-        if plotry && !iszero(mpc.M_Hp[i, i])
+        M_Hp_i = mpc.M_Hp[i_y, i_y]
+        if i_y in indices_ry && !iszero(M_Hp_i)
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> yname[i]
+                yguide    --> yname[i_y]
                 color     --> 3
                 subplot   --> subplot_base + i
                 linestyle --> :dash
                 linewidth --> 0.75
                 label     --> "\$\\mathbf{r_y}\$"
                 legend    --> true
-                t, res.Ry_data[i, :]
+                t, res.Ry_data[i_y, :]
             end
         end
-        if plotymin && !isinf(Ymin[i])
+        ymin_i, ymax_i = Ymin[i_y], Ymax[i_y]
+        if i_y in indices_ymin && !isinf(ymin_i)
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> yname[i]
+                yguide    --> yname[i_y]
                 color     --> 4
                 subplot   --> subplot_base + i
                 linestyle --> :dot
                 linewidth --> 1.5
                 label     --> "\$\\mathbf{y_{min}}\$"
                 legend    --> true
-                t, fill(Ymin[i], length(t))
+                t, fill(ymin_i, length(t))
             end
         end
-        if plotymax && !isinf(Ymax[i])
+        if i_y in indices_ymax && !isinf(ymax_i)
             @series begin
                 i == ny && (xguide --> "Time (s)")
-                yguide    --> yname[i]
+                yguide    --> yname[i_y]
                 color     --> 5
                 subplot   --> subplot_base + i
                 linestyle --> :dot
                 linewidth --> 1.5
                 label     --> "\$\\mathbf{y_{max}}\$"
                 legend    --> true
-                t, fill(Ymax[i], length(t))
+                t, fill(ymax_i, length(t))
             end
         end
     end
     subplot_base += ny
     # --- manipulated inputs u ---
-    if plotu
-        for i in 1:nu
+    for i in 1:nu
+        i_u = indices_u[i]
+        @series begin
+            i == nu && (xguide --> "Time (s)")
+            yguide     --> uname[i_u]
+            color      --> 1
+            subplot    --> subplot_base + i
+            seriestype --> :steppost
+            label      --> "\$\\mathbf{u}\$"
+            legend     --> false
+            t, res.U_data[i_u, :]
+        end
+        L_Hp_i = mpc.L_Hp[i_u, i_u]
+        if i_u in indices_ru && !iszero(L_Hp_i)
             @series begin
                 i == nu && (xguide --> "Time (s)")
-                yguide     --> uname[i]
-                color      --> 1
-                subplot    --> subplot_base + i
-                seriestype --> :steppost
-                label      --> "\$\\mathbf{u}\$"
-                legend     --> false
-                t, res.U_data[i, :]
-            end
-            if plotru && !iszero(mpc.L_Hp[i, i])
-                @series begin
-                    i == nu && (xguide --> "Time (s)")
-                    yguide    --> uname[i]
-                    color     --> 3
-                    subplot   --> subplot_base + i
-                    seriestype --> :steppost
-                    linestyle --> :dash
-                    label     --> "\$\\mathbf{r_{u}}\$"
-                    legend    --> true
-                    t, res.Ru_data[i, :]
-                end
-            end
-            if plotumin && !isinf(Umin[i])
-                @series begin
-                    i == nu && (xguide --> "Time (s)")
-                    yguide    --> uname[i]
-                    color     --> 4
-                    subplot   --> subplot_base + i
-                    linestyle --> :dot
-                    linewidth --> 1.5
-                    label     --> "\$\\mathbf{u_{min}}\$"
-                    legend    --> true
-                    t, fill(Umin[i], length(t))
-                end
-            end
-            if plotumax && !isinf(Umax[i])
-                @series begin
-                    i == nu && (xguide --> "Time (s)")
-                    yguide    --> uname[i]
-                    color     --> 5
-                    subplot   --> subplot_base + i
-                    linestyle --> :dot
-                    linewidth --> 1.5
-                    label     --> "\$\\mathbf{u_{max}}\$"
-                    legend    --> true
-                    t, fill(Umax[i], length(t))
-                end
+                yguide    --> uname[i_u]
+                color     --> 3
+                subplot   --> subplot_base + i
+                linestyle --> :dash
+                linewidth --> 0.75
+                label     --> "\$\\mathbf{r_{u}}\$"
+                legend    --> true
+                t, res.Ru_data[i_u, :]
             end
         end
-        subplot_base += nu
+        umin_i, umax_i = Umin[i_u], Umax[i_u]
+        if i_u in indices_umin && !isinf(umin_i)
+            @series begin
+                i == nu && (xguide --> "Time (s)")
+                yguide    --> uname[i_u]
+                color     --> 4
+                subplot   --> subplot_base + i
+                linestyle --> :dot
+                linewidth --> 1.5
+                label     --> "\$\\mathbf{u_{min}}\$"
+                legend    --> true
+                t, fill(umin_i, length(t))
+            end
+        end
+        if i_u in indices_umax && !isinf(umax_i)
+            @series begin
+                i == nu && (xguide --> "Time (s)")
+                yguide    --> uname[i_u]
+                color     --> 5
+                subplot   --> subplot_base + i
+                linestyle --> :dot
+                linewidth --> 1.5
+                label     --> "\$\\mathbf{u_{max}}\$"
+                legend    --> true
+                t, fill(umax_i, length(t))
+            end
+        end
     end
+    subplot_base += nu
     # --- measured disturbances d ---
-    if plotd
-        for i in 1:nd
+    for i in 1:nd
+        i_d = indices_d[i]
+        @series begin
+            i == nd && (xguide --> "Time (s)")
+            yguide  --> dname[i_d]
+            color   --> 1
+            subplot --> subplot_base + i
+            label   --> "\$\\mathbf{d}\$"
+            legend  --> false
+            t, res.D_data[i_d, :]
+        end
+    end
+    subplot_base += nd
+    # --- plant states x ---
+    for i in 1:nx
+        i_x = indices_x[i]
+        @series begin
+            i == nx && (xguide --> "Time (s)")
+            yguide     --> xname[i_x]
+            color      --> 1
+            subplot    --> subplot_base + i
+            label      --> "\$\\mathbf{x}\$"
+            legend     --> false
+            t, res.X_data[i_x, :]
+        end
+    end
+    subplot_base += nx
+    # --- estimated states x̂ ---
+    for i in 1:nx̂
+        i_x̂ = indices_x̂[i]
+        @series begin
+            i == nx̂ && (xguide --> "Time (s)")
+            yguide     --> x̂name[i_x̂]
+            color      --> 2
+            subplot    --> subplot_base + i
+            linestyle  --> :dashdot
+            linewidth  --> 0.75
+            label      --> "\$\\mathbf{\\hat{x}}\$"
+            legend     --> false
+            t, res.X̂_data[i_x̂, :]
+        end
+        x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_x̂], X̂max[end-2*estim.nx̂+i_x̂]
+        if i_x̂ in indices_x̂min && !isinf(x̂min_i)
             @series begin
-                i == nd && (xguide --> "Time (s)")
-                yguide  --> dname[i]
-                color   --> 1
-                subplot --> subplot_base + i
-                label   --> "\$\\mathbf{d}\$"
-                legend  --> false
-                t, res.D_data[i, :]
+                i == nx̂ && (xguide --> "Time (s)")
+                yguide     --> x̂name[i_x̂]
+                color      --> 4
+                subplot    --> subplot_base + i
+                linestyle  --> :dot
+                linewidth  --> 1.5
+                label      --> "\$\\mathbf{\\hat{x}_{min}}\$"
+                legend     --> true
+                t, fill(x̂min_i, length(t))
             end
         end
-        subplot_base += nd
-    end
-    # --- plant states x ---
-    if plotx || plotxwithx̂
-        for i in 1:nx
+        if i_x̂ in indices_x̂max && !isinf(x̂max_i)
             @series begin
-                i == nx && !plotxwithx̂ && (xguide --> "Time (s)")
-                yguide     --> xname[i]
+                i == nx̂ && (xguide --> "Time (s)")
+                yguide     --> x̂name[i_x̂]
+                color      --> 5
+                subplot    --> subplot_base + i
+                linestyle  --> :dot
+                linewidth  --> 1.5
+                label      --> "\$\\mathbf{\\hat{x}_{max}}\$"
+                legend     --> true
+                t, fill(x̂max_i, length(t))
+            end
+        end
+    end
+    subplot_base += nx̂
+    # --- plant states x and estimated states x̂ together ---
+    for i in 1:nxx̂
+        i_xx̂ = indices_xx̂[i]
+        isplotted_x = i_xx̂ ≤ size(res.X_data, 1)
+        isplotted_x̂ = i_xx̂ ≤ size(res.X̂_data, 1)
+        if isplotted_x
+            @series begin
+                i == nxx̂ && (xguide --> "Time (s)")
+                yguide     --> xx̂name[i_xx̂]
                 color      --> 1
                 subplot    --> subplot_base + i
                 label      --> "\$\\mathbf{x}\$"
-                legend     --> false
-                t, res.X_data[i, :]
+                legend     --> (isplotted_x && isplotted_x̂)
+                t, res.X_data[i_xx̂, :]
             end
         end
-        !plotxwithx̂ && (subplot_base += nx)
-    end
-    # --- estimated states x̂ ---
-    if plotx̂ || plotxwithx̂
-        for i in 1:nx̂
-            withPlantState = plotxwithx̂ && i ≤ nx
+        if isplotted_x̂
             @series begin
-                i == nx̂ && (xguide --> "Time (s)")
-                yguide     --> (withPlantState ? xname[i] : x̂name[i])
+                i == nxx̂ && (xguide --> "Time (s)")
+                yguide     --> xx̂name[i_xx̂]
                 color      --> 2
                 subplot    --> subplot_base + i
                 linestyle  --> :dashdot
                 linewidth  --> 0.75
                 label      --> "\$\\mathbf{\\hat{x}}\$"
-                legend     --> (withPlantState ? true : false)
-                t, res.X̂_data[i, :]
+                legend     --> (isplotted_x && isplotted_x̂)
+                t, res.X̂_data[i_xx̂, :]
             end
-            if plotx̂min && !isinf(X̂min[end-2*nx̂+i])
+            x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_xx̂], X̂max[end-2*estim.nx̂+i_xx̂]
+            if i_xx̂ in indices_x̂min && !isinf(x̂min_i)
                 @series begin
-                    i == nx̂ && (xguide --> "Time (s)")
-                    yguide     --> (withPlantState ? xname[i] : x̂name[i])
-                    color      --> 3
+                    i == nxx̂ && (xguide --> "Time (s)")
+                    yguide     --> xx̂name[i_xx̂]
+                    color      --> 4
                     subplot    --> subplot_base + i
                     linestyle  --> :dot
                     linewidth  --> 1.5
                     label      --> "\$\\mathbf{\\hat{x}_{min}}\$"
                     legend     --> true
-                    t, fill(X̂min[end-2*nx̂+i], length(t))
+                    t, fill(x̂min_i, length(t))
                 end
             end
-            if plotx̂max && !isinf(X̂max[end-2*nx̂+i])
+            if i_xx̂ in indices_x̂max && !isinf(x̂max_i)
                 @series begin
-                    i == nx̂ && (xguide --> "Time (s)")
-                    yguide     --> (withPlantState ? xname[i] : x̂name[i])
-                    color      --> 4
+                    i == nxx̂ && (xguide --> "Time (s)")
+                    yguide     --> xx̂name[i_xx̂]
+                    color      --> 5
                     subplot    --> subplot_base + i
                     linestyle  --> :dot
                     linewidth  --> 1.5
                     label      --> "\$\\mathbf{\\hat{x}_{max}}\$"
                     legend     --> true
-                    t, fill(X̂max[end-2*nx̂+i], length(t))
+                    t, fill(x̂max_i, length(t))
                 end
             end
         end

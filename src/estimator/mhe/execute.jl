@@ -96,7 +96,7 @@ The function should be called after calling [`updatestate!`](@ref). It returns t
 dictionary `info` with the following fields:
 
 !!! info
-    Fields in *`italic`* are non-Unicode alternatives.
+    Fields with *`emphasis`* are non-Unicode alternatives.
 
 - `:Ŵ` or *`:What`* : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``
 - `:ϵ` or *`:epsilon`* : optimal slack variable, ``ϵ``
