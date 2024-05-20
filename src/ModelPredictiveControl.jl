@@ -16,7 +16,7 @@ import ControlSystemsBase: iscontinuous, isdiscrete, sminreal, minreal, c2d, d2c
 
 import JuMP
 import JuMP: MOIU, MOI, GenericModel, Model, optimizer_with_attributes, register
-import JuMP: @variable, @constraint, @objective, @NLconstraint, @NLobjective
+import JuMP: @variable, @operator, @constraint, @objective
 
 import PreallocationTools: DiffCache, get_tmp
 

@@ -565,3 +565,6 @@ end
 
 "Called by plots recipes for the estimated states constraints."
 getX̂con(estim::MovingHorizonEstimator, _ ) = estim.con.X̂0min+estim.X̂op, estim.con.X̂0max+estim.X̂op
+
+"No nonlinear constraints if `model` is a [`LinModel`](@ref), return `g` unchanged."
+con_nonlinprog!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , _ ) = g

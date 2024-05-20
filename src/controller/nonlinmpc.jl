@@ -313,28 +313,28 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
         end
     end
     Jfunc, gfunc = get_optim_functions(mpc, mpc.optim)
-    register(optim, :Jfunc, nΔŨ, Jfunc, autodiff=true)
-    @NLobjective(optim, Min, Jfunc(ΔŨvar...))
+    @operator(optim, J, nΔŨ, Jfunc)
+    @objective(optim, Min, J(ΔŨvar...))
     ny, nx̂, Hp = model.ny, mpc.estim.nx̂, mpc.Hp
     if length(con.i_g) ≠ 0
         for i in eachindex(con.Y0min)
-            sym = Symbol("g_Y0min_$i")
-            register(optim, sym, nΔŨ, gfunc[i], autodiff=true)
+            name = Symbol("g_Y0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i]; name)
         end
         i_end_Ymin = 1Hp*ny
         for i in eachindex(con.Y0max)
-            sym = Symbol("g_Y0max_$i")
-            register(optim, sym, nΔŨ, gfunc[i_end_Ymin+i], autodiff=true)
+            name = Symbol("g_Y0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_Ymin+i]; name)
         end
         i_end_Ymax = 2Hp*ny
         for i in eachindex(con.x̂0min)
-            sym = Symbol("g_x̂0min_$i")
-            register(optim, sym, nΔŨ, gfunc[i_end_Ymax+i], autodiff=true)
+            name = Symbol("g_x̂0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_Ymax+i]; name)
         end
         i_end_x̂min = 2Hp*ny + nx̂
         for i in eachindex(con.x̂0max)
-            sym = Symbol("g_x̂0max_$i")
-            register(optim, sym, nΔŨ, gfunc[i_end_x̂min+i], autodiff=true)
+            name = Symbol("g_x̂0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_x̂min+i]; name)
         end
     end
     return nothing
@@ -397,26 +397,28 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
 end
 
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
-function setnonlincon!(mpc::NonLinMPC, ::NonLinModel)
-    optim = mpc.optim
+function setnonlincon!(
+    mpc::NonLinMPC, ::NonLinModel, optim::JuMP.GenericModel{JNT}
+) where JNT<:Real
     ΔŨvar = optim[:ΔŨvar]
     con = mpc.con
-    map(con -> JuMP.delete(optim, con), JuMP.all_nonlinear_constraints(optim))
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
     for i in findall(.!isinf.(con.Y0min))
-        f_sym = Symbol("g_Y0min_$(i)")
-        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        gfunc_i = optim[Symbol("g_Y0min_$(i)")]
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     for i in findall(.!isinf.(con.Y0max))
-        f_sym = Symbol("g_Y0max_$(i)")
-        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        gfunc_i = optim[Symbol("g_Y0max_$(i)")]
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     for i in findall(.!isinf.(con.x̂0min))
-        f_sym = Symbol("g_x̂0min_$(i)")
-        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        gfunc_i = optim[Symbol("g_x̂0min_$(i)")]
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     for i in findall(.!isinf.(con.x̂0max))
-        f_sym = Symbol("g_x̂0max_$(i)")
-        JuMP.add_nonlinear_constraint(optim, :($(f_sym)($(ΔŨvar...)) <= 0))
+        gfunc_i = optim[Symbol("g_x̂0max_$(i)")]
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
     end
     return nothing
 end

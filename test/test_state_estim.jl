@@ -666,14 +666,12 @@ end
     @test mhe9.Q̂ ≈ I(6)
     @test mhe9.R̂ ≈ I(2)
 
-    optim = Model(Ipopt.Optimizer)
+    optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, [1, 1], I_6, I_6, I_2)
     mhe10 = MovingHorizonEstimator(
         nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf, optim, covestim
     )
-
-    mhe11 = MovingHorizonEstimator(nonlinmodel, He=5, optim=Model(OSQP.Optimizer))
-    @test solver_name(mhe11.optim) == "OSQP"
+    @test solver_name(mhe10.optim) == "Ipopt"
 
     mhe12 = MovingHorizonEstimator(nonlinmodel, He=5, Cwt=1e3)
     @test size(mhe12.Ẽ, 2) == 6*mhe12.nx̂ + 1
@@ -735,15 +733,14 @@ end
     x̂ = updatestate!(mhe3, [0], [0])
     @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
+    
+    mhe4 = setconstraint!(MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0), v̂max=[50,50])
+    g_V̂max_end = mhe4.optim[:g_V̂max_2].func
+     # test gfunc_i(i,::NTuple{N, Float64})
+    @test g_V̂max_end(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) ≤ 0.0 
+    # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
+    @test ForwardDiff.gradient(vec->g_V̂max_end(vec...), zeros(8)) ≈ zeros(8)
 
-    mhe4 = setconstraint!(MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0), x̂max=[50,50,50,50])
-    g_X̂max_end = mhe4.optim.nlp_model.operators.registered_multivariate_operators[end].f
-    # test gfunc_i(i,::NTuple{N, Float64}):
-    @test g_X̂max_end(
-        (1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0)) ≤ 0.0 
-    # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}): 
-    @test ForwardDiff.gradient(
-        g_X̂max_end, [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]) ≈ [0, 0, 0, 0, 0, 0, 0, 0]
     Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
     R̂ = diagm([1, 1].^2)
     optim = Model(Ipopt.Optimizer)
