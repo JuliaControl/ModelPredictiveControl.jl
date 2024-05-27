@@ -12,8 +12,8 @@ old_logger = global_logger(); global_logger(errlogger);
 ## Nonlinear Model
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum
-attached to a motor. Knowing that the manipulated input is the motor torque ``τ``, the I/O
-vectors are:
+attached to a motor. Knowing that the manipulated input is the motor torque ``τ`` in Nm, the
+I/O vectors are:
 
 ```math
 \begin{aligned}
@@ -49,7 +49,7 @@ using ModelPredictiveControl
 function pendulum(par, x, u)
     g, L, K, m = par        # [m/s²], [m], [kg/s], [kg]
     θ, ω = x[1], x[2]       # [rad], [rad/s]
-    τ  = u[1]               # [N m]
+    τ  = u[1]               # [Nm]
     dθ = ω
     dω = -g/L*sin(θ) - K/m*ω + τ/m/L^2
     return [dθ, dω]
@@ -59,7 +59,7 @@ const par = (9.8, 0.4, 1.2, 0.3)
 f(x, u, _ ) = pendulum(par, x, u)
 h(x, _ )    = [180/π*x[1]]  # [°]
 nu, nx, ny, Ts = 1, 2, 1, 0.1
-vu, vx, vy = ["\$τ\$ (N m)"], ["\$θ\$ (rad)", "\$ω\$ (rad/s)"], ["\$θ\$ (°)"]
+vu, vx, vy = ["\$τ\$ (Nm)"], ["\$θ\$ (rad)", "\$ω\$ (rad/s)"], ["\$θ\$ (°)"]
 model = setname!(NonLinModel(f, h, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
 ```
 
