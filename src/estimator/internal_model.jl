@@ -206,7 +206,7 @@ function init_internalmodel(As, Bs, Cs, Ds)
 end
 
 "Update similar values for [`InternalModel`](@ref) estimator."
-function setmodel_estimator!(estim::InternalModel, model::LinModel, _ , _ , _)
+function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
     Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)
     # --- update augmented state-space matrices ---
     estim.Â  .= Â

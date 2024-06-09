@@ -144,9 +144,8 @@ function setconstraint!(
     C_Δumin = C_Deltaumin, C_Δumax = C_Deltaumax,
 )
     model, con, optim = mpc.estim.model, mpc.con, mpc.optim
-    nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
+    nu, ny, nx̂, Hp, Hc, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.nϵ
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
-    C = mpc.C
     isnothing(Umin)     && !isnothing(umin)     && (Umin    = repeat(umin,    Hp))
     isnothing(Umax)     && !isnothing(umax)     && (Umax    = repeat(umax,    Hp))
     isnothing(ΔUmin)    && !isnothing(Δumin)    && (ΔUmin   = repeat(Δumin,   Hc))
@@ -160,7 +159,7 @@ function setconstraint!(
     isnothing(C_ymin)   && !isnothing(c_ymin)   && (C_ymin  = repeat(c_ymin,  Hp))
     isnothing(C_ymax)   && !isnothing(c_ymax)   && (C_ymax  = repeat(c_ymax,  Hp))
     if !all(isnothing.((C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax, c_x̂min, c_x̂max)))
-        !isinf(C) || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
+        nϵ == 1 || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
         notSolvedYet || error("Cannot set softness parameters after calling moveinput!")
     end
     if !isnothing(Umin)
@@ -605,6 +604,7 @@ function init_defaultcon_mpc(
 ) where {NT<:Real}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
+    nϵ = isinf(C) ? 0 : 1
     u0min,      u0max   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     Δumin,      Δumax   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     y0min,      y0max   = fill(convert(NT,-Inf), ny), fill(convert(NT,+Inf), ny)
@@ -617,12 +617,12 @@ function init_defaultcon_mpc(
         repeat_constraints(Hp, Hc, u0min, u0max, Δumin, Δumax, y0min, y0max)
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
-    A_Umin,  A_Umax, S̃  = relaxU(model, C, C_umin, C_umax, S)
+    A_Umin,  A_Umax, S̃  = relaxU(model, nϵ, C_umin, C_umax, S)
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(
-        model, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc
+        model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc
     )
-    A_Ymin,  A_Ymax, Ẽ  = relaxŶ(model, C, C_ymin, C_ymax, E)
-    A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(model, C, c_x̂min, c_x̂max, ex̂)
+    A_Ymin,  A_Ymax, Ẽ  = relaxŶ(model, nϵ, C_ymin, C_ymax, E)
+    A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(model, nϵ, c_x̂min, c_x̂max, ex̂)
     i_Umin,  i_Umax  = .!isinf.(U0min),  .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Y0min),  .!isinf.(Y0max)
@@ -639,7 +639,7 @@ function init_defaultcon_mpc(
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
         A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_g
     )
-    return con, S̃, Ñ_Hc, Ẽ
+    return con, nϵ, S̃, Ñ_Hc, Ẽ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -656,7 +656,7 @@ end
 
 
 @doc raw"""
-    relaxU(model, C, C_umin, C_umax, S) -> A_Umin, A_Umax, S̃
+    relaxU(model, nϵ, C_umin, C_umax, S) -> A_Umin, A_Umax, S̃
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
@@ -678,8 +678,8 @@ constraints:
 in which ``\mathbf{U_{min}, U_{max}}`` and ``\mathbf{U_{op}}`` vectors respectively contains
 ``\mathbf{u_{min}, u_{max}}`` and ``\mathbf{u_{op}}`` repeated ``H_p`` times.
 """
-function relaxU(::SimModel{NT}, C, C_umin, C_umax, S) where {NT<:Real}
-    if !isinf(C) # ΔŨ = [ΔU; ϵ]
+function relaxU(::SimModel{NT}, nϵ, C_umin, C_umax, S) where NT<:Real
+    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
         # ϵ impacts ΔU → U conversion for constraint calculations:
         A_Umin, A_Umax = -[S  C_umin], [S -C_umax] 
         # ϵ has no impact on ΔU → U conversion for prediction calculations:
@@ -693,7 +693,7 @@ end
 
 @doc raw"""
     relaxΔU(
-        model, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc
+        model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc
     ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
 
 Augment input increments constraints with slack variable ϵ for softening.
@@ -714,9 +714,9 @@ returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{
 \end{bmatrix}
 ```
 """
-function relaxΔU(::SimModel{NT}, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) where {NT<:Real}
+function relaxΔU(::SimModel{NT}, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) where NT<:Real
     nΔU = size(N_Hc, 1)
-    if !isinf(C) # ΔŨ = [ΔU; ϵ]
+    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
         # 0 ≤ ϵ ≤ ∞  
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]]
         A_ϵ = [zeros(NT, 1, length(ΔUmin)) NT[1.0]]
@@ -732,7 +732,7 @@ function relaxΔU(::SimModel{NT}, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) w
 end
 
 @doc raw"""
-    relaxŶ(::LinModel, C, C_ymin, C_ymax, E) -> A_Ymin, A_Ymax, Ẽ
+    relaxŶ(::LinModel, nϵ, C_ymin, C_ymax, E) -> A_Ymin, A_Ymax, Ẽ
 
 Augment linear output prediction constraints with slack variable ϵ for softening.
 
@@ -753,8 +753,8 @@ Denoting the input increments augmented with the slack variable
 in which ``\mathbf{Y_{min}, Y_{max}}`` and ``\mathbf{Y_{op}}`` vectors respectively contains
 ``\mathbf{y_{min}, y_{max}}`` and ``\mathbf{y_{op}}`` repeated ``H_p`` times.
 """
-function relaxŶ(::LinModel{NT}, C, C_ymin, C_ymax, E) where {NT<:Real}
-    if !isinf(C) # ΔŨ = [ΔU; ϵ]
+function relaxŶ(::LinModel{NT}, nϵ, C_ymin, C_ymax, E) where NT<:Real
+    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
         # ϵ impacts predicted output constraint calculations:
         A_Ymin, A_Ymax = -[E  C_ymin], [E -C_ymax] 
         # ϵ has no impact on output predictions:
@@ -767,14 +767,14 @@ function relaxŶ(::LinModel{NT}, C, C_ymin, C_ymax, E) where {NT<:Real}
 end
 
 "Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxŶ(::SimModel{NT}, C, C_ymin, C_ymax, E) where {NT<:Real}
-    Ẽ = !isinf(C) ? [E zeros(NT, 0, 1)] : E
+function relaxŶ(::SimModel{NT}, nϵ, C_ymin, C_ymax, E) where NT<:Real
+    Ẽ = [E zeros(NT, 0, nϵ)]
     A_Ymin, A_Ymax = -Ẽ,  Ẽ 
     return A_Ymin, A_Ymax, Ẽ
 end
 
 @doc raw"""
-    relaxterminal(::LinModel, C, c_x̂min, c_x̂max, ex̂) -> A_x̂min, A_x̂max, ẽx̂
+    relaxterminal(::LinModel, nϵ, c_x̂min, c_x̂max, ex̂) -> A_x̂min, A_x̂max, ẽx̂
 
 Augment terminal state constraints with slack variable ϵ for softening.
 
@@ -794,8 +794,8 @@ the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxterminal(::LinModel{NT}, C, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
-    if !isinf(C) # ΔŨ = [ΔU; ϵ]
+function relaxterminal(::LinModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
+    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
         # ϵ impacts terminal state constraint calculations:
         A_x̂min, A_x̂max = -[ex̂ c_x̂min], [ex̂ -c_x̂max]
         # ϵ has no impact on terminal state predictions:
@@ -808,8 +808,8 @@ function relaxterminal(::LinModel{NT}, C, c_x̂min, c_x̂max, ex̂) where {NT<:R
 end
 
 "Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxterminal(::SimModel{NT}, C, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
-    ẽx̂ = !isinf(C) ? [ex̂ zeros(NT, 0, 1)] : ex̂
+function relaxterminal(::SimModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
+    ẽx̂ = [ex̂ zeros(NT, 0, nϵ)]
     A_x̂min, A_x̂max = -ẽx̂,  ẽx̂
     return A_x̂min, A_x̂max, ẽx̂
 end
@@ -853,7 +853,7 @@ function init_stochpred(estim::StateEstimator{NT}, _ ) where NT<:Real
 end
 
 "Validate predictive controller weight and horizon specified values."
-function validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, C, E=nothing)
+function validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, C=Inf, E=nothing)
     nu, ny = model.nu, model.ny
     nM, nN, nL = ny*Hp, nu*Hc, nu*Hp
     Hp < 1  && throw(ArgumentError("Prediction horizon Hp should be ≥ 1"))

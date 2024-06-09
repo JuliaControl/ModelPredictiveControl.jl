@@ -473,7 +473,7 @@ end
 
 "Update the augmented model, prediction matrices, constrains and data windows for MHE."
 function setmodel_estimator!(
-    estim::MovingHorizonEstimator, model::LinModel, uop_old, yop_old, dop_old
+    estim::MovingHorizonEstimator, model, uop_old, yop_old, dop_old, Q̂, R̂
 )
     con = estim.con
     nx̂, nym, nu, nd, He = estim.nx̂, estim.nym, model.nu, model.nd, estim.He
@@ -560,6 +560,15 @@ function setmodel_estimator!(
     estim.x̂0arr_old     .+= x̂op_old
     estim.Z̃[nϵ+1:nϵ+nx̂] .-= x̂op
     estim.x̂0arr_old     .-= x̂op
+    # --- covariance matrices ---
+    if !isnothing(Q̂)
+        estim.Q̂ .= to_hermitian(Q̂)
+        estim.invQ̂_He .= repeatdiag(inv(estim.Q̂), He)
+    end
+    if !isnothing(R̂) 
+        estim.R̂ .= to_hermitian(R̂)
+        estim.invR̂_He .= repeatdiag(inv(estim.R̂), He)
+    end
     return nothing
 end
 

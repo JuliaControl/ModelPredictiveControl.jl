@@ -43,3 +43,8 @@ end
 
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)
+
+"Convert 1-element vectors and normal matrices to Hermitians."
+to_hermitian(A::AbstractVector) = Hermitian(reshape(A, 1, 1), :L)
+to_hermitian(A::AbstractMatrix) = Hermitian(A, :L)
+to_hermitian(A::Hermitian) = A
