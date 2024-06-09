@@ -37,7 +37,7 @@ initstate!
 setstate!
 ```
 
-## Set Plant Model
+## Set Model and Weights
 
 ```@docs
 setmodel!

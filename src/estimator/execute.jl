@@ -246,7 +246,7 @@ Set `model` and covariance matrices of `estim` [`StateEstimator`](@ref).
 
 Allows model adaptation of estimators based on [`LinModel`](@ref) at runtime. Modification 
 of [`NonLinModel`](@ref) is not supported. New covariance matrices can be specified with the
-keyword arguments (see [`SteadyKalmanFilter`](ref) documentation for the nomenclature). Not 
+keyword arguments (see [`SteadyKalmanFilter`](@ref) documentation for the nomenclature). Not 
 supported by [`Luenberger`](@ref) and [`SteadyKalmanFilter`](@ref), use the time-varying
 [`KalmanFilter`](@ref) instead.  The [`MovingHorizonEstimator`](@ref) model is kept constant
 over the estimation horizon ``H_e``. The matrix dimensions and sample time must stay the

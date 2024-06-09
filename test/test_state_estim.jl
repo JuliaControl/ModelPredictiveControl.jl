@@ -546,6 +546,7 @@ end
     setmodel!(ukf2, Q̂=[1e-3], R̂=[1e-6])
     @test ukf2.Q̂ ≈ [1e-3]
     @test ukf2.R̂ ≈ [1e-6]
+    @test_throws ErrorException setmodel!(ukf2, deepcopy(nonlinmodel))
 end
 
 @testset "ExtendedKalmanFilter construction" begin
@@ -668,6 +669,7 @@ end
     setmodel!(ekf2, Q̂=[1e-3], R̂=[1e-6])
     @test ekf2.Q̂ ≈ [1e-3]
     @test ekf2.R̂ ≈ [1e-6]
+    @test_throws ErrorException setmodel!(ekf2, deepcopy(nonlinmodel))
 end
 
 @testset "MovingHorizonEstimator construction" begin
@@ -1055,4 +1057,5 @@ end
     setmodel!(mhe2, Q̂=[1e-3], R̂=[1e-6])
     @test mhe2.Q̂ ≈ [1e-3]
     @test mhe2.R̂ ≈ [1e-6]
+    @test_throws ErrorException setmodel!(mhe2, deepcopy(nonlinmodel))
 end

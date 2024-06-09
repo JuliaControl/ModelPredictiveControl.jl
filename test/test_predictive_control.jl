@@ -286,6 +286,10 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
+    setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
+    @test mpc.M_Hp ≈ diagm(1:1000)
+    @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
+    @test mpc.L_Hp ≈ diagm(1.1:1000.1)
 end
 
 @testset "ExplicitMPC construction" begin
@@ -413,6 +417,10 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
+    setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=[0.1], L_Hp=diagm(1.1:1000.1))
+    @test mpc.M_Hp ≈ diagm(1:1000)
+    @test mpc.Ñ_Hc ≈ [0.1]
+    @test mpc.L_Hp ≈ diagm(1.1:1000.1)
 end
 
 @testset "NonLinMPC construction" begin
@@ -712,5 +720,18 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
+    setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
+    @test mpc.M_Hp ≈ diagm(1:1000)
+    @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
+    @test mpc.L_Hp ≈ diagm(1.1:1000.1)
+    f(x,u,d) = estim.model.A*x + estim.model.Bu*u + estim.model.Bd*d
+    h(x,d)   = estim.model.C*x + estim.model.Du*d
+    nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
+    nmpc = NonLinMPC(nonlinmodel, Hp=1000, Hc=1)
+    setmodel!(nmpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
+    @test nmpc.M_Hp ≈ diagm(1:1000)
+    @test nmpc.Ñ_Hc ≈ diagm([0.1;1e6])
+    @test nmpc.L_Hp ≈ diagm(1.1:1000.1)
+    @test_throws ErrorException setmodel!(nmpc, deepcopy(nonlinmodel))
 end
 
