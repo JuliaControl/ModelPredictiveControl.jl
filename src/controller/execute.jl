@@ -621,8 +621,16 @@ function setmodel_controller!(mpc::PredictiveController, x̂op_old, M_Hp, Ñ_Hc
     con.A_Ymax .= A_Ymax
     con.A_x̂min .= A_x̂min
     con.A_x̂max .= A_x̂max
-    nUandΔŨ = length(con.U0min) + length(con.U0max) + length(con.ΔŨmin) + length(con.ΔŨmax)
-    con.A[nUandΔŨ+1:end, :] = [con.A_Ymin; con.A_Ymax; con.A_x̂min; con.A_x̂max]
+    con.A .= [
+        con.A_Umin
+        con.A_Umax 
+        con.A_ΔŨmin 
+        con.A_ΔŨmax 
+        con.A_Ymin  
+        con.A_Ymax 
+        con.A_x̂min  
+        con.A_x̂max
+    ]
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]

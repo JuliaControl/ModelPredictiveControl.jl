@@ -526,11 +526,16 @@ function setmodel_estimator!(
     con.A_X̂max .= A_X̂max
     con.A_V̂min .= A_V̂min
     con.A_V̂max .= A_V̂max
-    nx̃ = length(con.x̃0min) + length(con.x̃0max)
-    nX̂ = length(con.X̂0min) + length(con.X̂0max)
-    con.A[nx̃+1:nx̃+nX̂,:]     .= [con.A_X̂min; con.A_X̂max]
-    nŴ = length(con.Ŵmin) + length(con.Ŵmax)
-    con.A[nx̃+nX̂+nŴ+1:end,:] .= [con.A_V̂min; con.A_V̂max]
+    con.A .= [
+        con.A_x̃min
+        con.A_x̃max
+        con.A_X̂min
+        con.A_X̂max
+        con.A_Ŵmin
+        con.A_Ŵmax
+        con.A_V̂min
+        con.A_V̂max
+    ]
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]

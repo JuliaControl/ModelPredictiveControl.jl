@@ -246,7 +246,7 @@ Set `model` and covariance matrices of `estim` [`StateEstimator`](@ref).
 
 Allows model adaptation of estimators based on [`LinModel`](@ref) at runtime. Modification 
 of [`NonLinModel`](@ref) is not supported. New covariance matrices can be specified with the
-keyword arguments (see [`SteadyKalmanFilter`] documentation for the nomenclature). Not 
+keyword arguments (see [`SteadyKalmanFilter`](ref) documentation for the nomenclature). Not 
 supported by [`Luenberger`](@ref) and [`SteadyKalmanFilter`](@ref), use the time-varying
 [`KalmanFilter`](@ref) instead.  The [`MovingHorizonEstimator`](@ref) model is kept constant
 over the estimation horizon ``H_e``. The matrix dimensions and sample time must stay the
@@ -286,39 +286,37 @@ function setmodel!(
         Q̂ = nothing,
         R̂ = nothing
     )
-    validate_model(estim.model, model)
     uop_old = copy(estim.model.uop)
     yop_old = copy(estim.model.yop)
     dop_old = copy(estim.model.dop)
-    # --- update model matrices and its operating points ---
-    estim.model.A   .= model.A
-    estim.model.Bu  .= model.Bu
-    estim.model.C   .= model.C
-    estim.model.Bd  .= model.Bd
-    estim.model.Dd  .= model.Dd
-    estim.lastu0   .+= estim.model.uop # convert u0 to u with the old operating point
-    estim.model.uop .= model.uop
-    estim.lastu0   .-= estim.model.uop # convert u to u0 with the new operating point
-    estim.model.yop .= model.yop
-    estim.model.dop .= model.dop
-    estim.model.xop .= model.xop
-    estim.model.fop .= model.fop
+    setmodel_linmodel!(estim.model, model)
+    estim.lastu0 .+= uop_old .- model.uop
     setmodel_estimator!(estim, model, uop_old, yop_old, dop_old, Q̂, R̂)
     return estim
 end
 
-"Validate the type and dimension of the new model for adaptation."
-function validate_model(old::LinModel, new::LinModel)
+"Update LinModel matrices and its operating points."
+function setmodel_linmodel!(old::LinModel, new::LinModel)
     new.Ts == old.Ts || throw(ArgumentError("model.Ts must be $(old.Ts) s"))
     new.nu == old.nu || throw(ArgumentError("model.nu must be $(old.nu)"))
     new.nx == old.nx || throw(ArgumentError("model.nx must be $(old.nx)"))
     new.ny == old.ny || throw(ArgumentError("model.ny must be $(old.ny)"))
     new.nd == old.nd || throw(ArgumentError("model.nd must be $(old.nd)"))
+    old.A   .= new.A
+    old.Bu  .= new.Bu
+    old.C   .= new.C
+    old.Bd  .= new.Bd
+    old.Dd  .= new.Dd
+    old.uop .= new.uop
+    old.yop .= new.yop
+    old.dop .= new.dop
+    old.xop .= new.xop
+    old.fop .= new.fop
+    return nothing
 end
-function validate_model(old::SimModel, new::SimModel)
-    if new !== old
-        error("Only LinModel can be modified in setmodel!")
-    end
+function setmodel_linmodel!(old::SimModel, new::SimModel)
+    (new !== old) && error("Only LinModel can be modified in setmodel!")
+    return nothing
 end
 
 "Update the augmented model matrices of `estim` by default."
