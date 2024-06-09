@@ -208,12 +208,18 @@ end
 "Update similar values for [`InternalModel`](@ref) estimator."
 function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
     Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)
-    # --- update augmented state-space matrices ---
+    # --- update internal model state-space matrices ---
     estim.Â  .= Â
     estim.B̂u .= B̂u
     estim.Ĉ  .= Ĉ
     estim.B̂d .= B̂d
     estim.D̂d .= D̂d
+    # --- update state estimate and its operating points ---
+    estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
+    estim.x̂op .= x̂op
+    estim.f̂op .= f̂op
+    estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    return nothing
 end
 
 @doc raw"""
