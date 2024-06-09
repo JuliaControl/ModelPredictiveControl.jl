@@ -529,13 +529,14 @@ setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return m
 Set `model` and objective function weights of `mpc` [`PredictiveController`](@ref).
 
 Allows model adaptation of controllers based on [`LinModel`](@ref) at runtime. Modification
-of [`NonLinModel`](@ref) is not supported. New weight matrices in the objective function can
-be specified with the keyword arguments (see [`LinMPC`](@ref) for the nomenclature). If 
-`Cwt ≠ Inf`, the augmented move suppression weight is ``\mathbf{Ñ}_{H_c} = \mathrm{diag}(
-\mathbf{N}_{H_c}, C)``, else ``\mathbf{Ñ}_{H_c} = \mathbf{N}_{H_c}``. The [`StateEstimator`](@ref)
-`mpc.estim` cannot be a [`Luenberger`](@ref) observer or a [`SteadyKalmanFilter`](@ref) (the
-default estimator). Construct the `mpc` object with a time-varying [`KalmanFilter`](@ref)
-instead. Note that the model is constant over the prediction horizon ``H_p``.
+of [`NonLinModel`](@ref) state-space functions is not supported. New weight matrices in the
+objective function can be specified with the keyword arguments (see [`LinMPC`](@ref) for the
+nomenclature). If `Cwt ≠ Inf`, the augmented move suppression weight is ``\mathbf{Ñ}_{H_c} =
+\mathrm{diag}(\mathbf{N}_{H_c}, C)``, else ``\mathbf{Ñ}_{H_c} = \mathbf{N}_{H_c}``. The
+[`StateEstimator`](@ref) `mpc.estim` cannot be a [`Luenberger`](@ref) observer or a
+[`SteadyKalmanFilter`](@ref) (the default estimator). Construct the `mpc` object with a
+time-varying [`KalmanFilter`](@ref) instead. Note that the model is constant over the
+prediction horizon ``H_p``.
 
 # Arguments
 

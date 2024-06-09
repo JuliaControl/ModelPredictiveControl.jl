@@ -11,7 +11,7 @@ sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
     @test size(mpc2.Ẽ,2) == 4*mpc2.estim.model.nu
     mpc3 = LinMPC(model, Hc=4, Cwt=1e6)
     @test size(mpc3.Ẽ,2) == 4*mpc3.estim.model.nu + 1
-    @test mpc3.C ≈ 1e6
+    @test mpc3.Ñ_Hc[end] ≈ 1e6
     mpc4 = LinMPC(model, Mwt=[1,2], Hp=15)
     @test mpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     mpc5 = LinMPC(model, Nwt=[3,4], Cwt=1e3, Hc=5)
@@ -437,7 +437,7 @@ end
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
     nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e6)
     @test size(nmpc3.Ẽ, 2) == 4*nonlinmodel.nu + 1
-    @test nmpc3.C == 1e6
+    @test nmpc3.Ñ_Hc[end] == 1e6
     nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[1,2])
     @test nmpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     nmpc5 = NonLinMPC(nonlinmodel, Hp=15 ,Nwt=[3,4], Cwt=1e3, Hc=5)
