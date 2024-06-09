@@ -11,7 +11,7 @@ sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
     @test size(mpc2.Ẽ,2) == 4*mpc2.estim.model.nu
     mpc3 = LinMPC(model, Hc=4, Cwt=1e6)
     @test size(mpc3.Ẽ,2) == 4*mpc3.estim.model.nu + 1
-    @test mpc3.C ≈ 1e6
+    @test mpc3.Ñ_Hc[end] ≈ 1e6
     mpc4 = LinMPC(model, Mwt=[1,2], Hp=15)
     @test mpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     mpc5 = LinMPC(model, Nwt=[3,4], Cwt=1e3, Hc=5)
@@ -286,6 +286,10 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
+    setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
+    @test mpc.M_Hp ≈ diagm(1:1000)
+    @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
+    @test mpc.L_Hp ≈ diagm(1.1:1000.1)
 end
 
 @testset "ExplicitMPC construction" begin
@@ -413,6 +417,10 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
+    setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=[0.1], L_Hp=diagm(1.1:1000.1))
+    @test mpc.M_Hp ≈ diagm(1:1000)
+    @test mpc.Ñ_Hc ≈ [0.1]
+    @test mpc.L_Hp ≈ diagm(1.1:1000.1)
 end
 
 @testset "NonLinMPC construction" begin
@@ -429,7 +437,7 @@ end
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
     nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e6)
     @test size(nmpc3.Ẽ, 2) == 4*nonlinmodel.nu + 1
-    @test nmpc3.C == 1e6
+    @test nmpc3.Ñ_Hc[end] == 1e6
     nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[1,2])
     @test nmpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     nmpc5 = NonLinMPC(nonlinmodel, Hp=15 ,Nwt=[3,4], Cwt=1e3, Hc=5)
@@ -712,5 +720,18 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
+    setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
+    @test mpc.M_Hp ≈ diagm(1:1000)
+    @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
+    @test mpc.L_Hp ≈ diagm(1.1:1000.1)
+    f(x,u,d) = estim.model.A*x + estim.model.Bu*u + estim.model.Bd*d
+    h(x,d)   = estim.model.C*x + estim.model.Du*d
+    nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
+    nmpc = NonLinMPC(nonlinmodel, Hp=1000, Hc=1)
+    setmodel!(nmpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
+    @test nmpc.M_Hp ≈ diagm(1:1000)
+    @test nmpc.Ñ_Hc ≈ diagm([0.1;1e6])
+    @test nmpc.L_Hp ≈ diagm(1.1:1000.1)
+    @test_throws ErrorException setmodel!(nmpc, deepcopy(nonlinmodel))
 end
 

@@ -60,6 +60,7 @@ struct MovingHorizonEstimator{
     f̂op::Vector{NT}
     x̂0 ::Vector{NT}
     He::Int
+    nϵ::Int
     i_ym::Vector{Int}
     nx̂ ::Int
     nym::Int
@@ -125,7 +126,9 @@ struct MovingHorizonEstimator{
         )
         # dummy values (updated just before optimization):
         F, fx̄, Fx̂ = zeros(NT, nym*He), zeros(NT, nx̂), zeros(NT, nx̂*He)
-        con, Ẽ, ẽx̄ = init_defaultcon_mhe(model, He, Cwt, nx̂, nym, E, ex̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂)
+        con, nϵ, Ẽ, ẽx̄ = init_defaultcon_mhe(
+            model, He, Cwt, nx̂, nym, E, ex̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂
+        )
         nZ̃ = size(Ẽ, 2)
         # dummy values, updated before optimization:
         H̃, q̃, p = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
@@ -140,7 +143,7 @@ struct MovingHorizonEstimator{
         estim = new{NT, SM, JM, CE}(
             model, optim, con, covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
-            He,
+            He, nϵ,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
@@ -641,6 +644,7 @@ function init_defaultcon_mhe(
 ) where {NT<:Real}
     nŵ = nx̂
     nZ̃, nX̂, nŴ, nYm = nx̂+nŵ*He, nx̂*He, nŵ*He, nym*He
+    nϵ = isinf(C) ? 0 : 1
     x̂min, x̂max = fill(convert(NT,-Inf), nx̂),  fill(convert(NT,+Inf), nx̂)
     X̂min, X̂max = fill(convert(NT,-Inf), nX̂),  fill(convert(NT,+Inf), nX̂)
     Ŵmin, Ŵmax = fill(convert(NT,-Inf), nŴ),  fill(convert(NT,+Inf), nŴ)
@@ -649,10 +653,10 @@ function init_defaultcon_mhe(
     C_x̂min, C_x̂max = fill(0.0, nX̂),  fill(0.0, nX̂)
     C_ŵmin, C_ŵmax = fill(0.0, nŴ),  fill(0.0, nŴ)
     C_v̂min, C_v̂max = fill(0.0, nYm), fill(0.0, nYm)
-    A_x̃min, A_x̃max, x̃min, x̃max, ẽx̄ = relaxarrival(model, C, c_x̂min, c_x̂max, x̂min, x̂max, ex̄)
-    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, C, C_x̂min, C_x̂max, Ex̂)
-    A_Ŵmin, A_Ŵmax = relaxŴ(model, C, C_ŵmin, C_ŵmax, nx̂)
-    A_V̂min, A_V̂max, Ẽ = relaxV̂(model, C, C_v̂min, C_v̂max, E)
+    A_x̃min, A_x̃max, x̃min, x̃max, ẽx̄ = relaxarrival(model, nϵ, c_x̂min, c_x̂max, x̂min, x̂max, ex̄)
+    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nϵ, C_x̂min, C_x̂max, Ex̂)
+    A_Ŵmin, A_Ŵmax = relaxŴ(model, nϵ, C_ŵmin, C_ŵmax, nx̂)
+    A_V̂min, A_V̂max, Ẽ = relaxV̂(model, nϵ, C_v̂min, C_v̂max, E)
     i_x̃min, i_x̃max = .!isinf.(x̃min), .!isinf.(x̃max)
     i_X̂min, i_X̂max = .!isinf.(X̂min), .!isinf.(X̂max)
     i_Ŵmin, i_Ŵmax = .!isinf.(Ŵmin), .!isinf.(Ŵmax)
@@ -670,12 +674,12 @@ function init_defaultcon_mhe(
         C_x̂min, C_x̂max, C_v̂min, C_v̂max,
         i_b, i_g
     )
-    return con, Ẽ, ẽx̄
+    return con, nϵ, Ẽ, ẽx̄
 end
 
 @doc raw"""
     relaxarrival(
-        model::SimModel, C, c_x̂min, c_x̂max, x̂min, x̂max, ex̄
+        model::SimModel, nϵ, c_x̂min, c_x̂max, x̂min, x̂max, ex̄
     ) -> A_x̃min, A_x̃max, x̃min, x̃max, ẽx̄
 
 Augment arrival state constraints with slack variable ϵ for softening the MHE.
@@ -700,9 +704,9 @@ in which
 ``\mathbf{x̃_{max}} = [\begin{smallmatrix} ∞ \\ \mathbf{x̂_{max}} \end{smallmatrix}]`` and
 ``\mathbf{x̃_{op}}  = [\begin{smallmatrix} 0 \\ \mathbf{x̂_{op}}  \end{smallmatrix}]``
 """
-function relaxarrival(::SimModel{NT}, C, c_x̂min, c_x̂max, x̂min, x̂max, ex̄) where {NT<:Real}
+function relaxarrival(::SimModel{NT}, nϵ, c_x̂min, c_x̂max, x̂min, x̂max, ex̄) where {NT<:Real}
     ex̂ = -ex̄
-    if !isinf(C) # Z̃ = [ϵ; Z]
+    if nϵ ≠ 0 # Z̃ = [ϵ; Z]
         x̃min, x̃max = [NT[0.0]; x̂min], [NT[Inf]; x̂max]
         A_ϵ = [NT[1.0] zeros(NT, 1, size(ex̂, 2))]
         # ϵ impacts arrival state constraint calculations:
@@ -718,7 +722,7 @@ function relaxarrival(::SimModel{NT}, C, c_x̂min, c_x̂max, x̂min, x̂max, ex�
 end
 
 @doc raw"""
-    relaxX̂(model::SimModel, C, C_x̂min, C_x̂max, Ex̂) -> A_X̂min, A_X̂max, Ẽx̂
+    relaxX̂(model::SimModel, nϵ, C_x̂min, C_x̂max, Ex̂) -> A_X̂min, A_X̂max, Ẽx̂
 
 Augment estimated state constraints with slack variable ϵ for softening the MHE.
 
@@ -739,8 +743,8 @@ also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 in which ``\mathbf{X̂_{min}, X̂_{max}}`` and ``\mathbf{X̂_{op}}`` vectors respectively contains
 ``\mathbf{x̂_{min}, x̂_{max}}`` and ``\mathbf{x̂_{op}}`` repeated ``H_e`` times.
 """
-function relaxX̂(::LinModel{NT}, C, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
-    if !isinf(C) # Z̃ = [ϵ; Z]
+function relaxX̂(::LinModel{NT}, nϵ, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
+    if nϵ ≠ 0 # Z̃ = [ϵ; Z]
         # ϵ impacts estimated process noise constraint calculations:
         A_X̂min, A_X̂max = -[C_x̂min Ex̂], [-C_x̂max Ex̂]
         # ϵ has no impact on estimated process noises:
@@ -753,14 +757,14 @@ function relaxX̂(::LinModel{NT}, C, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
 end
 
 "Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxX̂(::SimModel{NT}, C, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
-    Ẽx̂ = !isinf(C) ? [zeros(NT, 0, 1) Ex̂] : Ex̂
+function relaxX̂(::SimModel{NT}, nϵ, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
+    Ẽx̂ = [zeros(NT, 0, nϵ) Ex̂]
     A_X̂min, A_X̂max = -Ẽx̂,  Ẽx̂
     return A_X̂min, A_X̂max, Ẽx̂
 end
 
 @doc raw"""
-    relaxŴ(model::SimModel, C, C_ŵmin, C_ŵmax, nx̂) -> A_Ŵmin, A_Ŵmax
+    relaxŴ(model::SimModel, nϵ, C_ŵmin, C_ŵmax, nx̂) -> A_Ŵmin, A_Ŵmax
 
 Augment estimated process noise constraints with slack variable ϵ for softening the MHE.
 
@@ -778,9 +782,9 @@ matrices for the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxŴ(::SimModel{NT}, C, C_ŵmin, C_ŵmax, nx̂) where {NT<:Real}
+function relaxŴ(::SimModel{NT}, nϵ, C_ŵmin, C_ŵmax, nx̂) where {NT<:Real}
     A = [zeros(NT, length(C_ŵmin), nx̂) I]
-    if !isinf(C) # Z̃ = [ϵ; Z]
+    if nϵ ≠ 0 # Z̃ = [ϵ; Z]
         A_Ŵmin, A_Ŵmax = -[C_ŵmin A], [-C_ŵmax A]
     else # Z̃ = Z (only hard constraints)
         A_Ŵmin, A_Ŵmax = -A, A
@@ -789,7 +793,7 @@ function relaxŴ(::SimModel{NT}, C, C_ŵmin, C_ŵmax, nx̂) where {NT<:Real}
 end
 
 @doc raw"""
-    relaxV̂(model::SimModel, C, C_v̂min, C_v̂max, E) -> A_V̂min, A_V̂max, Ẽ
+    relaxV̂(model::SimModel, nϵ, C_v̂min, C_v̂max, E) -> A_V̂min, A_V̂max, Ẽ
 
 Augment estimated sensor noise constraints with slack variable ϵ for softening the MHE.
 
@@ -808,8 +812,8 @@ also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxV̂(::LinModel{NT}, C, C_v̂min, C_v̂max, E) where {NT<:Real}
-    if !isinf(C) # Z̃ = [ϵ; Z]
+function relaxV̂(::LinModel{NT}, nϵ, C_v̂min, C_v̂max, E) where {NT<:Real}
+    if nϵ ≠ 0 # Z̃ = [ϵ; Z]
         # ϵ impacts estimated sensor noise constraint calculations:
         A_V̂min, A_V̂max = -[C_v̂min E], [-C_v̂max E]
         # ϵ has no impact on estimated sensor noises:
@@ -822,8 +826,8 @@ function relaxV̂(::LinModel{NT}, C, C_v̂min, C_v̂max, E) where {NT<:Real}
 end
 
 "Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxV̂(::SimModel{NT}, C, C_v̂min, C_v̂max, E) where {NT<:Real}
-    Ẽ = !isinf(C) ? [zeros(NT, 0, 1) E] : E
+function relaxV̂(::SimModel{NT}, nϵ, C_v̂min, C_v̂max, E) where {NT<:Real}
+    Ẽ = [zeros(NT, 0, nϵ) E]
     A_V̂min, A_V̂max = -Ẽ, Ẽ
     return A_V̂min, A_V̂max, Ẽ
 end

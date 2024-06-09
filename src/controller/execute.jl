@@ -127,7 +127,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷs .= mpc.F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
     mpc.F .= oldF  # restore old F value
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
-    info[:ϵ]    = isinf(mpc.C) ? NaN : mpc.ΔŨ[end]
+    info[:ϵ]    = mpc.nϵ == 1 ? mpc.ΔŨ[end] : NaN
     info[:J]    = J
     info[:U]    = U0 + mpc.Uop
     info[:u]    = info[:U][1:model.nu]
@@ -468,7 +468,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model = mpc.estim.model
     ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}; ϵ_{k-1}]
-    ϵ0  = !isinf(mpc.C) ? mpc.ΔŨ[end] : empty(mpc.ΔŨ)
+    ϵ0  = (mpc.nϵ == 1) ? mpc.ΔŨ[end] : empty(mpc.ΔŨ)
     ΔŨ0 = [mpc.ΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(NT, model.nu); ϵ0]
     JuMP.set_start_value.(ΔŨvar, ΔŨ0)
     set_objective_linear_coef!(mpc, ΔŨvar)
@@ -523,46 +523,70 @@ Set `mpc.estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`.
 setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
 
 
-"""
-    setmodel!(mpc::PredictiveController, model::LinModel) -> mpc
+@doc raw"""
+    setmodel!(mpc::PredictiveController, model=mpc.estim.model, <keyword arguments>) -> mpc
 
-Set model and operating points of `mpc` [`PredictiveController`](@ref) to `model` values.
+Set `model` and objective function weights of `mpc` [`PredictiveController`](@ref).
 
-Allows model adaptation of controllers based on [`LinModel`](@ref) at runtime ([`NonLinModel`](@ref)
-is not supported). The [`StateEstimator`](@ref) `mpc.estim` cannot be a [`Luenberger`](@ref)
-observer or a [`SteadyKalmanFilter`](@ref) (the default estimator). Construct the `mpc`
-object with a time-varying [`KalmanFilter`](@ref) instead. Note that the model is constant
-over the prediction horizon ``H_p``.
+Allows model adaptation of controllers based on [`LinModel`](@ref) at runtime. Modification
+of [`NonLinModel`](@ref) state-space functions is not supported. New weight matrices in the
+objective function can be specified with the keyword arguments (see [`LinMPC`](@ref) for the
+nomenclature). If `Cwt ≠ Inf`, the augmented move suppression weight is ``\mathbf{Ñ}_{H_c} =
+\mathrm{diag}(\mathbf{N}_{H_c}, C)``, else ``\mathbf{Ñ}_{H_c} = \mathbf{N}_{H_c}``. The
+[`StateEstimator`](@ref) `mpc.estim` cannot be a [`Luenberger`](@ref) observer or a
+[`SteadyKalmanFilter`](@ref) (the default estimator). Construct the `mpc` object with a
+time-varying [`KalmanFilter`](@ref) instead. Note that the model is constant over the
+prediction horizon ``H_p``.
+
+# Arguments
+
+- `mpc::PredictiveController` : controller to set model and weights.
+- `model=mpc.estim.model` : new plant model ([`NonLinModel`](@ref) not supported).
+- `M_Hp=mpc.M_Hp` : new ``\mathbf{M_{H_p}}`` weight matrix.
+- `Ñ_Hc=mpc.Ñ_Hc` : new ``\mathbf{Ñ_{H_c}}`` weight matrix (see definition above).
+- `L_Hp=mpc.L_Hp` : new ``\mathbf{L_{H_p}}`` weight matrix.
+- additional keyword arguments are passed to `setmodel!(::StateEstimator)`.
 
 # Examples
 ```jldoctest
-julia> kf = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
+julia> mpc = LinMPC(KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σR=[√25]), Hp=1, Hc=1);
 
-julia> mpc = LinMPC(kf); mpc.estim.model.A
-1×1 Matrix{Float64}:
- 0.1
+julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
+(0.1, 25.0, 1.0)
 
-julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); mpc.estim.model.A
-1×1 Matrix{Float64}:
- 0.42
+julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0)); R̂=[9], M_Hp=[0]);
+
+julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
+(0.42, 9.0, 0.0)
 ```
 """
-function setmodel!(mpc::PredictiveController, model::LinModel)
+function setmodel!(
+        mpc::PredictiveController, 
+        model = mpc.estim.model;
+        M_Hp = mpc.M_Hp,
+        Ñ_Hc = mpc.Ñ_Hc,
+        L_Hp = mpc.L_Hp,
+        kwargs...
+    )
     x̂op_old = copy(mpc.estim.x̂op)
-    setmodel!(mpc.estim, model)
-    setmodel_controller!(mpc, model, x̂op_old)
+    nu, ny, Hp, Hc, nϵ = model.nu, model.ny, mpc.Hp, mpc.Hc, mpc.nϵ
+    setmodel!(mpc.estim, model; kwargs...)
+    mpc.M_Hp .= to_hermitian(M_Hp)
+    mpc.Ñ_Hc .= to_hermitian(Ñ_Hc)
+    mpc.L_Hp .= to_hermitian(L_Hp)
+    setmodel_controller!(mpc, x̂op_old, M_Hp, Ñ_Hc, L_Hp)
     return mpc
 end
 
 "Update the prediction matrices, linear constraints and JuMP optimization."
-function setmodel_controller!(mpc::PredictiveController, model::LinModel, x̂op_old)
-    estim = mpc.estim
+function setmodel_controller!(mpc::PredictiveController, x̂op_old, M_Hp, Ñ_Hc, L_Hp)
+    estim, model = mpc.estim, mpc.estim.model
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     optim, con = mpc.optim, mpc.con
     # --- predictions matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
-    A_Ymin, A_Ymax, Ẽ = relaxŶ(model, mpc.C, con.C_ymin, con.C_ymax, E)
-    A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, mpc.C, con.c_x̂min, con.c_x̂max, ex̂)
+    A_Ymin, A_Ymax, Ẽ = relaxŶ(model, mpc.nϵ, con.C_ymin, con.C_ymax, E)
+    A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, mpc.nϵ, con.c_x̂min, con.c_x̂max, ex̂)
     mpc.Ẽ .= Ẽ
     mpc.G .= G
     mpc.J .= J
@@ -598,11 +622,20 @@ function setmodel_controller!(mpc::PredictiveController, model::LinModel, x̂op_
     con.A_Ymax .= A_Ymax
     con.A_x̂min .= A_x̂min
     con.A_x̂max .= A_x̂max
-    nUandΔŨ = length(con.U0min) + length(con.U0max) + length(con.ΔŨmin) + length(con.ΔŨmax)
-    con.A[nUandΔŨ+1:end, :] = [con.A_Ymin; con.A_Ymax; con.A_x̂min; con.A_x̂max]
+    con.A .= [
+        con.A_Umin
+        con.A_Umax 
+        con.A_ΔŨmin 
+        con.A_ΔŨmax 
+        con.A_Ymin  
+        con.A_Ymax 
+        con.A_x̂min  
+        con.A_x̂max
+    ]
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
+    # deletion is required for sparse solvers like OSQP, when the sparsity pattern changes
     JuMP.delete(optim, optim[:linconstraint])
     JuMP.unregister(optim, :linconstraint)
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)

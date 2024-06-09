@@ -4,10 +4,10 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     ŷ ::Vector{NT}
     Hp::Int
     Hc::Int
+    nϵ::Int
     M_Hp::Hermitian{NT, Matrix{NT}}
     Ñ_Hc::Hermitian{NT, Matrix{NT}}
     L_Hp::Hermitian{NT, Matrix{NT}}
-    C::NT
     E::NT
     R̂u0::Vector{NT}
     R̂y0::Vector{NT}
@@ -40,9 +40,9 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
-        Cwt = Inf # no slack variable ϵ for ExplicitMPC
+        nϵ = 0    # no slack variable ϵ for ExplicitMPC
         Ewt = 0   # economic costs not supported for ExplicitMPC
-        validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
+        validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp)
         # convert `Diagonal` to normal `Matrix` if required:
         M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
         N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
@@ -68,8 +68,8 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         mpc = new{NT, SE}(
             estim,
             ΔŨ, ŷ,
-            Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, 
+            Hp, Hc, nϵ,
+            M_Hp, Ñ_Hc, L_Hp, Ewt,  
             R̂u0, R̂y0, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
@@ -208,8 +208,8 @@ addinfo!(info, mpc::ExplicitMPC) = info
 
 
 "Update the prediction matrices and Cholesky factorization."
-function setmodel_controller!(mpc::ExplicitMPC, model::LinModel, _ )
-    estim = mpc.estim
+function setmodel_controller!(mpc::ExplicitMPC, _ , M_Hp, Ñ_Hc, L_Hp)
+    estim, model = mpc.estim, mpc.estim.model
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
     E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc)

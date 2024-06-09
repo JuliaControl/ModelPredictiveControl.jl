@@ -15,10 +15,10 @@ struct NonLinMPC{
     ŷ ::Vector{NT}
     Hp::Int
     Hc::Int
+    nϵ::Int
     M_Hp::Hermitian{NT, Matrix{NT}}
     Ñ_Hc::Hermitian{NT, Matrix{NT}}
     L_Hp::Hermitian{NT, Matrix{NT}}
-    C::NT
     E::NT
     JE::JEfunc
     R̂u0::Vector{NT}
@@ -63,7 +63,7 @@ struct NonLinMPC{
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
+        con, nϵ, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
             estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
         )
         H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
@@ -78,8 +78,8 @@ struct NonLinMPC{
         mpc = new{NT, SE, JM, JEFunc}(
             estim, optim, con,
             ΔŨ, ŷ,
-            Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, JE, 
+            Hp, Hc, nϵ,
+            M_Hp, Ñ_Hc, L_Hp, Ewt, JE, 
             R̂u0, R̂y0, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
@@ -294,7 +294,7 @@ Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
 function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     # --- variables and linear constraints ---
-    C, con = mpc.C, mpc.con
+    con = mpc.con
     nΔŨ = length(mpc.ΔŨ)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
@@ -304,7 +304,8 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- nonlinear optimization init ---
-    if !isinf(C) && JuMP.solver_name(optim) == "Ipopt"
+    if mpc.nϵ == 1 && JuMP.solver_name(optim) == "Ipopt"
+        C = mpc.Ñ_Hc[end]
         try
             JuMP.get_attribute(optim, "nlp_scaling_max_gradient")
         catch
@@ -432,7 +433,7 @@ The method mutates the `g` vector in argument and returns it.
 """
 function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, Ŷ0, ΔŨ)
     nx̂, nŶ = mpc.estim.nx̂, length(Ŷ0)
-    ϵ = isinf(mpc.C) ? 0 : ΔŨ[end] # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
+    ϵ = mpc.nϵ == 1 ? ΔŨ[end] : 0 # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
     for i in eachindex(g)
         mpc.con.i_g[i] || continue
         if i ≤ nŶ

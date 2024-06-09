@@ -123,4 +123,4 @@ function update_estimate!(estim::Luenberger, u0, y0m, d0)
 end
 
 "Throw an error if `setmodel!` is called on `Luenberger` observer."
-setmodel_estimator!(::Luenberger,::LinModel,_,_,_) = error("Luenberger does not support setmodel!")
+setmodel_estimator!(::Luenberger, args...) = error("Luenberger does not support setmodel!")

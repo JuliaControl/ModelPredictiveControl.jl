@@ -14,10 +14,10 @@ struct LinMPC{
     ŷ ::Vector{NT}
     Hp::Int
     Hc::Int
+    nϵ::Int
     M_Hp::Hermitian{NT, Matrix{NT}}
     Ñ_Hc::Hermitian{NT, Matrix{NT}}
     L_Hp::Hermitian{NT, Matrix{NT}}
-    C::NT
     E::NT
     R̂u0::Vector{NT}
     R̂y0::Vector{NT}
@@ -62,7 +62,7 @@ struct LinMPC{
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-        con, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
+        con, nϵ, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
             estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
         )
         H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
@@ -77,8 +77,8 @@ struct LinMPC{
         mpc = new{NT, SE, JM}(
             estim, optim, con,
             ΔŨ, ŷ,
-            Hp, Hc, 
-            M_Hp, Ñ_Hc, L_Hp, Cwt, Ewt, 
+            Hp, Hc, nϵ,
+            M_Hp, Ñ_Hc, L_Hp, Ewt, 
             R̂u0, R̂y0, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B, 

@@ -239,73 +239,88 @@ function setstate!(estim::StateEstimator, x̂)
     return estim
 end
 
-"""
-    setmodel!(estim::StateEstimator, model::LinModel) -> estim
+@doc raw"""
+    setmodel!(estim::StateEstimator, model=estim.model, <keyword arguments>) -> estim
 
-Set model and operating points of `estim` [`StateEstimator`](@ref) to `model` values.
+Set `model` and covariance matrices of `estim` [`StateEstimator`](@ref).
 
-Allows model adaptation of estimators based on [`LinModel`](@ref) at runtime ([`NonLinModel`](@ref)
-is not supported). Not supported by [`Luenberger`](@ref) and [`SteadyKalmanFilter`](@ref),
-use the time-varying [`KalmanFilter`](@ref) instead.  The [`MovingHorizonEstimator`](@ref)
+Allows model adaptation of estimators based on [`LinModel`](@ref) at runtime. Modification 
+of [`NonLinModel`](@ref) state-space functions is not supported. New covariance matrices can
+be specified with the keyword arguments (see [`SteadyKalmanFilter`](@ref) documentation for
+the nomenclature). Not supported by [`Luenberger`](@ref) and [`SteadyKalmanFilter`](@ref), 
+use the time-varying [`KalmanFilter`](@ref) instead. The [`MovingHorizonEstimator`](@ref)
 model is kept constant over the estimation horizon ``H_e``. The matrix dimensions and sample
 time must stay the same. Note that the observability and controllability of the new
 augmented model is not verified (see Extended Help for more info).
 
+# Arguments
+
+- `estim::StateEstimator` : estimator to set model and covariances.
+- `model=estim.model` : new plant model ([`NonLinModel`](@ref) not supported).
+- `Q̂=nothing` : new augmented model ``\mathbf{Q̂}`` covariance matrix.
+- `R̂=nothing` : new augmented model ``\mathbf{R̂}`` covariance matrix.
+
 # Examples
 ```jldoctest
-julia> kf = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
+julia> kf = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σQ=[√4.0], σQint_ym=[√0.25]);
 
-julia> kf.model.A
-1×1 Matrix{Float64}:
- 0.1
+julia> kf.model.A[], kf.Q̂[1, 1], kf.Q̂[2, 2] 
+(0.1, 4.0, 0.25)
 
-julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0))); kf.model.A
-1×1 Matrix{Float64}:
- 0.42
+julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0)), Q̂=[1 0;0 0.5]);
+
+julia> kf.model.A[], kf.Q̂[1, 1], kf.Q̂[2, 2] 
+(0.42, 1.0, 0.5)
 ```
 
 # Extended Help
-
 !!! details "Extended Help"
     Using the default model augmentation computed by the [`default_nint`](@ref) method, 
     switching from a non-integrating plant model to an integrating one will produce
     an augmented model that is not observable. Moving the unmeasured disturbances at the 
     model input (`nint_u` parameter) can fix this issue.
 """
-function setmodel!(estim::StateEstimator, model::LinModel)
-    validate_model(estim.model, model)
+function setmodel!(
+        estim::StateEstimator, 
+        model = estim.model;
+        Q̂ = nothing,
+        R̂ = nothing
+    )
     uop_old = copy(estim.model.uop)
     yop_old = copy(estim.model.yop)
     dop_old = copy(estim.model.dop)
-    # --- update model matrices and its operating points ---
-    estim.model.A   .= model.A
-    estim.model.Bu  .= model.Bu
-    estim.model.C   .= model.C
-    estim.model.Bd  .= model.Bd
-    estim.model.Dd  .= model.Dd
-    estim.lastu0   .+= estim.model.uop # convert u0 to u with the old operating point
-    estim.model.uop .= model.uop
-    estim.lastu0   .-= estim.model.uop # convert u to u0 with the new operating point
-    estim.model.yop .= model.yop
-    estim.model.dop .= model.dop
-    estim.model.xop .= model.xop
-    estim.model.fop .= model.fop
-    setmodel_estimator!(estim, model, uop_old, yop_old, dop_old)
+    setmodel_linmodel!(estim.model, model)
+    estim.lastu0 .+= uop_old .- model.uop
+    setmodel_estimator!(estim, model, uop_old, yop_old, dop_old, Q̂, R̂)
     return estim
 end
 
-"Validate the type and dimension of the new model for adaptation."
-function validate_model(old::LinModel, new::LinModel)
+"Update LinModel matrices and its operating points."
+function setmodel_linmodel!(old::LinModel, new::LinModel)
     new.Ts == old.Ts || throw(ArgumentError("model.Ts must be $(old.Ts) s"))
     new.nu == old.nu || throw(ArgumentError("model.nu must be $(old.nu)"))
     new.nx == old.nx || throw(ArgumentError("model.nx must be $(old.nx)"))
     new.ny == old.ny || throw(ArgumentError("model.ny must be $(old.ny)"))
     new.nd == old.nd || throw(ArgumentError("model.nd must be $(old.nd)"))
+    old.A   .= new.A
+    old.Bu  .= new.Bu
+    old.C   .= new.C
+    old.Bd  .= new.Bd
+    old.Dd  .= new.Dd
+    old.uop .= new.uop
+    old.yop .= new.yop
+    old.dop .= new.dop
+    old.xop .= new.xop
+    old.fop .= new.fop
+    return nothing
 end
-validate_model(::SimModel, ::SimModel) = error("Only LinModel is supported for setmodel!")
+function setmodel_linmodel!(old::SimModel, new::SimModel)
+    (new !== old) && error("Only LinModel can be modified in setmodel!")
+    return nothing
+end
 
 "Update the augmented model matrices of `estim` by default."
-function setmodel_estimator!(estim::StateEstimator, model::LinModel, _ , _ , _)
+function setmodel_estimator!(estim::StateEstimator, model, _ , _ , _ , Q̂, R̂)
     As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
     Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
     # --- update augmented state-space matrices ---
@@ -319,5 +334,8 @@ function setmodel_estimator!(estim::StateEstimator, model::LinModel, _ , _ , _)
     estim.x̂op .= x̂op
     estim.f̂op .= f̂op
     estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    # --- update covariance matrices ---
+    !isnothing(Q̂) && (estim.Q̂ .= to_hermitian(Q̂))
+    !isnothing(R̂) && (estim.R̂ .= to_hermitian(R̂))
     return nothing
 end

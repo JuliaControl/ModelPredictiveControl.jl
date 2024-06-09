@@ -218,6 +218,9 @@ end
     newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
     setmodel!(kalmanfilter, newlinmodel)
     @test kalmanfilter.x̂0 ≈ [3.0 - 8.0]
+    setmodel!(kalmanfilter, Q̂=[1e-3], R̂=[1e-6])
+    @test kalmanfilter.Q̂ ≈ [1e-3]
+    @test kalmanfilter.R̂ ≈ [1e-6]
 end
 
 @testset "Luenberger construction" begin
@@ -514,6 +517,38 @@ end
     @test isa(x̂, Vector{Float32})
 end
 
+@testset "UnscentedKalmanFilter set model" begin
+    linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
+    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
+    ukf1 = UnscentedKalmanFilter(linmodel, nint_ym=0)
+    @test ukf1.Â ≈ [0.5]
+    @test evaloutput(ukf1) ≈ [50.0]
+    x̂ = updatestate!(ukf1, [2.0], [50.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[3.0], fop=[3.0])
+    setmodel!(ukf1, newlinmodel)
+    @test ukf1.Â ≈ [0.2]
+    @test evaloutput(ukf1) ≈ [55.0]
+    @test ukf1.lastu0 ≈ [2.0 - 3.0]
+    x̂ = updatestate!(ukf1, [3.0], [55.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
+    setmodel!(ukf1, newlinmodel)
+    @test ukf1.x̂0 ≈ [3.0 - 8.0]
+    setmodel!(ukf1, Q̂=[1e-3], R̂=[1e-6])
+    @test ukf1.Q̂ ≈ [1e-3]
+    @test ukf1.R̂ ≈ [1e-6]
+    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h(x,d)   = linmodel.C*x + linmodel.Du*d
+    nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
+    ukf2 = UnscentedKalmanFilter(nonlinmodel, nint_ym=0)
+    setmodel!(ukf2, Q̂=[1e-3], R̂=[1e-6])
+    @test ukf2.Q̂ ≈ [1e-3]
+    @test ukf2.R̂ ≈ [1e-6]
+    @test_throws ErrorException setmodel!(ukf2, deepcopy(nonlinmodel))
+end
+
 @testset "ExtendedKalmanFilter construction" begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
@@ -603,6 +638,38 @@ end
     x̂ = updatestate!(ekf3, [0], [0])
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
+end
+
+@testset "ExtendedKalmanFilter set model" begin
+    linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
+    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
+    ekf1 = ExtendedKalmanFilter(linmodel, nint_ym=0)
+    @test ekf1.Â ≈ [0.5]
+    @test evaloutput(ekf1) ≈ [50.0]
+    x̂ = updatestate!(ekf1, [2.0], [50.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[3.0], fop=[3.0])
+    setmodel!(ekf1, newlinmodel)
+    @test ekf1.Â ≈ [0.2]
+    @test evaloutput(ekf1) ≈ [55.0]
+    @test ekf1.lastu0 ≈ [2.0 - 3.0]
+    x̂ = updatestate!(ekf1, [3.0], [55.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
+    setmodel!(ekf1, newlinmodel)
+    @test ekf1.x̂0 ≈ [3.0 - 8.0]
+    setmodel!(ekf1, Q̂=[1e-3], R̂=[1e-6])
+    @test ekf1.Q̂ ≈ [1e-3]
+    @test ekf1.R̂ ≈ [1e-6]
+    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h(x,d)   = linmodel.C*x + linmodel.Du*d
+    nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
+    ekf2 = ExtendedKalmanFilter(nonlinmodel, nint_ym=0)
+    setmodel!(ekf2, Q̂=[1e-3], R̂=[1e-6])
+    @test ekf2.Q̂ ≈ [1e-3]
+    @test ekf2.R̂ ≈ [1e-6]
+    @test_throws ErrorException setmodel!(ekf2, deepcopy(nonlinmodel))
 end
 
 @testset "MovingHorizonEstimator construction" begin
@@ -980,4 +1047,15 @@ end
     @test mhe.con.X̂0max ≈ [+1000 - 8.0]
     @test mhe.con.x̃0min ≈ [-1000 - 8.0]
     @test mhe.con.x̃0max ≈ [+1000 - 8.0]
+    setmodel!(mhe, Q̂=[1e-3], R̂=[1e-6])
+    @test mhe.Q̂ ≈ [1e-3]
+    @test mhe.R̂ ≈ [1e-6]
+    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h(x,d)   = linmodel.C*x + linmodel.Du*d
+    nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
+    mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
+    setmodel!(mhe2, Q̂=[1e-3], R̂=[1e-6])
+    @test mhe2.Q̂ ≈ [1e-3]
+    @test mhe2.R̂ ≈ [1e-6]
+    @test_throws ErrorException setmodel!(mhe2, deepcopy(nonlinmodel))
 end

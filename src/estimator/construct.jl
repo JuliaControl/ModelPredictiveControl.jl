@@ -101,9 +101,11 @@ end
 
 
 @doc raw"""
-    augment_model(model::LinModel, As, Cs; verify_obsv=true) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
+    augment_model(
+        model::LinModel, As, Cs_u, Cs_y; verify_obsv=true
+    ) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 
-Augment [`LinModel`](@ref) state-space matrices with the stochastic ones `As` and `Cs`.
+Augment [`LinModel`](@ref) state-space matrices with stochastic ones `As`, `Cs_u`, `Cs_y`.
 
 If ``\mathbf{x_0}`` are `model.x0` states, and ``\mathbf{x_s}``, the states defined at
 [`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
@@ -137,11 +139,13 @@ function augment_model(model::LinModel{NT}, As, Cs_u, Cs_y; verify_obsv=true) wh
     return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
 """
-    augment_model(model::SimModel, As, _ , _ ) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
+    augment_model(
+        model::SimModel, As, Cs_u, Cs_y; verify_obsv=false
+    ) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 
 Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref).
 """
-function augment_model(model::SimModel{NT}, As, _ , _ ) where NT<:Real
+function augment_model(model::SimModel{NT}, As, args... ; verify_obsv=false) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd
     nxs = size(As, 1)
     Â   = zeros(NT, 0, nx+nxs)

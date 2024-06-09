@@ -26,8 +26,7 @@ include("controller/linmpc.jl")
 include("controller/nonlinmpc.jl")
 
 function Base.show(io::IO, mpc::PredictiveController)
-    Hp, Hc = mpc.Hp, mpc.Hc
-    nϵ = isinf(mpc.C) ? 0 : 1
+    Hp, Hc, nϵ = mpc.Hp, mpc.Hc, mpc.nϵ
     nu, nd = mpc.estim.model.nu, mpc.estim.model.nd
     nx̂, nym, nyu = mpc.estim.nx̂, mpc.estim.nym, mpc.estim.nyu
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
