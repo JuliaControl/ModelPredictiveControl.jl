@@ -85,10 +85,10 @@ for more detailed examples.
   - [x] input setpoint tracking
   - [x] terminal costs
   - [x] economic costs (economic model predictive control)
-- [ ] adaptive linear model predictive controller
+- [x] adaptive linear model predictive controller
   - [x] manual model modification
   - [x] automatic successive linearization of a nonlinear model
-  - [ ] objective function weights modification
+  - [x] objective function weights and covariance matrices modification
 - [x] explicit predictive controller for problems without constraint
 - [x] online-tunable soft and hard constraints on:
   - [x] output predictions
@@ -126,7 +126,7 @@ for more detailed examples.
   - [x] manipulated inputs
   - [x] measured outputs
 - [x] bumpless manual to automatic transfer for control with a proper initial estimate
-- [ ] estimators in two forms:
+- [ ] estimators in two possible forms:
   - [x] predictor (or delayed) form to reduce computational load
   - [ ] filter (or current) form to improve accuracy and robustness
 - [x] moving horizon estimator in two formulations:
