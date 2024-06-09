@@ -552,12 +552,12 @@ prediction horizon ``H_p``.
 julia> mpc = LinMPC(KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σR=[√25]), Hp=1, Hc=1);
 
 julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
-(0.1, 25.0)
+(0.1, 25.0, 1.0)
 
-julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0)); R̂=[9], M_Hp=[0]); 
+julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0)); R̂=[9], M_Hp=[0]);
 
 julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
-(0.42, 9.0)
+(0.42, 9.0, 0.0)
 ```
 """
 function setmodel!(
