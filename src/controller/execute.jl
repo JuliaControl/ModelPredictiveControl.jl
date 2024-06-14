@@ -569,7 +569,7 @@ function setmodel!(
         M_Hp      = mpc.M_Hp,
         Ntilde_Hc = mpc.Ñ_Hc,
         L_Hp      = mpc.L_Hp,
-        Ñ_Hc      = Ntilde_Hc 
+        Ñ_Hc      = Ntilde_Hc,
         kwargs...
     )
     x̂op_old = copy(mpc.estim.x̂op)
