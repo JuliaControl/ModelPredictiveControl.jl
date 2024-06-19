@@ -544,10 +544,10 @@ prediction horizon ``H_p``.
 
 - `mpc::PredictiveController` : controller to set model and weights.
 - `model=mpc.estim.model` : new plant model ([`NonLinModel`](@ref) not supported).
-- `M_Hp=mpc.M_Hp` : new ``\mathbf{M_{H_p}}`` weight matrix.
-- `Ñ_Hc=mpc.Ñ_Hc` or *`Ntilde_Hc`* : new ``\mathbf{Ñ_{H_c}}`` weight matrix (see definition
+- `M_Hp=mpc.M_Hp` : new ``\mathbf{M}_{H_p}`` weight matrix.
+- `Ñ_Hc=mpc.Ñ_Hc` or *`Ntilde_Hc`* : new ``\mathbf{Ñ}_{H_c}`` weight matrix (see definition
    above).
-- `L_Hp=mpc.L_Hp` : new ``\mathbf{L_{H_p}}`` weight matrix.
+- `L_Hp=mpc.L_Hp` : new ``\mathbf{L}_{H_p}`` weight matrix.
 - additional keyword arguments are passed to `setmodel!(mpc.estim)`.
 
 # Examples
