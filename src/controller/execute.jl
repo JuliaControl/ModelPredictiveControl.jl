@@ -539,11 +539,14 @@ time-varying [`KalmanFilter`](@ref) instead. Note that the model is constant ove
 prediction horizon ``H_p``.
 
 # Arguments
+!!! info
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `mpc::PredictiveController` : controller to set model and weights.
 - `model=mpc.estim.model` : new plant model ([`NonLinModel`](@ref) not supported).
 - `M_Hp=mpc.M_Hp` : new ``\mathbf{M_{H_p}}`` weight matrix.
-- `Ñ_Hc=mpc.Ñ_Hc` : new ``\mathbf{Ñ_{H_c}}`` weight matrix (see definition above).
+- `Ñ_Hc=mpc.Ñ_Hc` or *`Ntilde_Hc`* : new ``\mathbf{Ñ_{H_c}}`` weight matrix (see definition
+   above).
 - `L_Hp=mpc.L_Hp` : new ``\mathbf{L_{H_p}}`` weight matrix.
 - additional keyword arguments are passed to `setmodel!(::StateEstimator)`.
 
@@ -563,9 +566,10 @@ julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
 function setmodel!(
         mpc::PredictiveController, 
         model = mpc.estim.model;
-        M_Hp = mpc.M_Hp,
-        Ñ_Hc = mpc.Ñ_Hc,
-        L_Hp = mpc.L_Hp,
+        M_Hp      = mpc.M_Hp,
+        Ntilde_Hc = mpc.Ñ_Hc,
+        L_Hp      = mpc.L_Hp,
+        Ñ_Hc      = Ntilde_Hc,
         kwargs...
     )
     x̂op_old = copy(mpc.estim.x̂op)
