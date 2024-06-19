@@ -548,7 +548,7 @@ prediction horizon ``H_p``.
 - `Ñ_Hc=mpc.Ñ_Hc` or *`Ntilde_Hc`* : new ``\mathbf{Ñ_{H_c}}`` weight matrix (see definition
    above).
 - `L_Hp=mpc.L_Hp` : new ``\mathbf{L_{H_p}}`` weight matrix.
-- additional keyword arguments are passed to `setmodel!(::StateEstimator)`.
+- additional keyword arguments are passed to `setmodel!(mpc.estim)`.
 
 # Examples
 ```jldoctest
