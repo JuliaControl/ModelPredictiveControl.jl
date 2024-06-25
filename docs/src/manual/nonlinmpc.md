@@ -351,14 +351,14 @@ mpc3 = setconstraint!(mpc3; umin, umax)
 We create a function that simulates the plant and the adaptive controller:
 
 ```@example 1
-function test_slmpc(nonlinmodel, mpc, ry, plant; x_0=plant.xop, y_step=0)
-    N = 35
+function sim_adapt!(mpc, nonlinmodel, N, ry, plant, x_0, x̂_0, y_step=[0])
     U_data, Y_data, Ry_data = zeros(plant.nu, N), zeros(plant.ny, N), zeros(plant.ny, N)
     setstate!(plant, x_0)
-    u, y = [0.0], plant()
-    x̂ = initstate!(mpc, u, y)
+    initstate!(mpc, [0], plant())
+    setstate!(mpc, x̂_0)
+    x̂ = x̂_0
     for i = 1:N
-        y = plant() .+ y_step
+        y = plant() + y_step
         u = moveinput!(mpc, ry)
         linmodel = linearize(nonlinmodel; u, x=x̂[1:2])
         setmodel!(mpc, linmodel)
@@ -378,7 +378,8 @@ The [`SimResult`](@ref) object is for plotting purposes only. The adaptive [`Lin
 performances are similar to the nonlinear MPC, both for the 180° setpoint:
 
 ```@example 1
-res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[0, 0]) 
+x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180]
+res_slin = sim_adapt!(mpc3, model, N, ry, plant, x_0, x̂_0)
 plot(res_slin)
 savefig("plot10_NonLinMPC.svg"); nothing # hide
 ```
@@ -388,7 +389,8 @@ savefig("plot10_NonLinMPC.svg"); nothing # hide
 and the 10° step disturbance:
 
 ```@example 1
-res_slin = test_slmpc(model, mpc3, [180], plant, x_0=[π, 0], y_step=[10]) 
+x_0 = [π, 0]; x̂_0 = [π, 0, 0]; y_step = [10]
+res_slin = sim_adapt!(mpc3, model, N, ry, plant, x_0, x̂_0, y_step)
 plot(res_slin)
 savefig("plot11_NonLinMPC.svg"); nothing # hide
 ```
