@@ -338,10 +338,12 @@ the [`LinMPC`](@ref) instance based on repeated online linearization.
 The [`setmodel!`](@ref) method allows online adaptation of a linear plant model. Combined
 with the automatic linearization of [`linearize`](@ref), a successive linearization MPC can
 be designed with minimal efforts. The [`SteadyKalmanFilter`](@ref) does not support
-[`setmodel!`](@ref), so we need to use the time-varying [`KalmanFilter`](@ref) instead:
+[`setmodel!`](@ref) so we need to use the time-varying [`KalmanFilter`](@ref), and we
+initialize it with a linearization at ``θ = ω = τ = 0``:
 
 ```@example 1
-kf   = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
+linmodel = linearize(model, x=[0, 0], u=[0])
+kf = KalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
 mpc3 = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt=Inf, optim=daqp)
 mpc3 = setconstraint!(mpc3; umin, umax)
 ```
