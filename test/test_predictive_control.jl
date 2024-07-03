@@ -260,7 +260,7 @@ end
 
 @testset "LinMPC set model" begin
     estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
-    mpc = LinMPC(estim, Nwt=[0], Hp=1000, Hc=1)
+    mpc = LinMPC(estim, Nwt=[0], Cwt=1e4, Hp=1000, Hc=1)
     mpc = setconstraint!(mpc, umin=[-24], umax=[26])
     mpc = setconstraint!(mpc, ymin=[-54], ymax=[56])
     @test mpc.Yop ≈ fill(10.0, 1000)
@@ -286,6 +286,10 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
+    setmodel!(mpc, Mwt=[100], Nwt=[200], Lwt=[300])
+    @test mpc.M_Hp ≈ diagm(fill(100, 1000))
+    @test mpc.Ñ_Hc ≈ diagm([200, 1e4])
+    @test mpc.L_Hp ≈ diagm(fill(300, 1000))
     setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
     @test mpc.M_Hp ≈ diagm(1:1000)
     @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
@@ -417,6 +421,10 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
+    setmodel!(mpc, Mwt=[100], Nwt=[200], Lwt=[300])
+    @test mpc.M_Hp ≈ diagm(fill(100, 1000))
+    @test mpc.Ñ_Hc ≈ diagm([200])
+    @test mpc.L_Hp ≈ diagm(fill(300, 1000))
     setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=[0.1], L_Hp=diagm(1.1:1000.1))
     @test mpc.M_Hp ≈ diagm(1:1000)
     @test mpc.Ñ_Hc ≈ [0.1]
@@ -694,7 +702,7 @@ end
 
 @testset "NonLinMPC set model" begin
     estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
-    mpc = NonLinMPC(estim, Nwt=[0], Hp=1000, Hc=1)
+    mpc = NonLinMPC(estim, Nwt=[0], Cwt=1e4, Hp=1000, Hc=1)
     mpc = setconstraint!(mpc, umin=[-24], umax=[26])
     mpc = setconstraint!(mpc, ymin=[-54], ymax=[56])
     @test mpc.Yop ≈ fill(10.0, 1000)
@@ -720,6 +728,10 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
+    setmodel!(mpc, Mwt=[100], Nwt=[200], Lwt=[300])
+    @test mpc.M_Hp ≈ diagm(fill(100, 1000))
+    @test mpc.Ñ_Hc ≈ diagm([200, 1e4])
+    @test mpc.L_Hp ≈ diagm(fill(300, 1000))
     setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
     @test mpc.M_Hp ≈ diagm(1:1000)
     @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
@@ -727,10 +739,14 @@ end
     f(x,u,d) = estim.model.A*x + estim.model.Bu*u + estim.model.Bd*d
     h(x,d)   = estim.model.C*x + estim.model.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
-    nmpc = NonLinMPC(nonlinmodel, Hp=1000, Hc=1)
-    setmodel!(nmpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
+    nmpc = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=1e4, Hp=1000, Hc=10)
+    setmodel!(nmpc, Mwt=[100], Nwt=[200], Lwt=[300])
+    @test nmpc.M_Hp ≈ diagm(fill(100, 1000))
+    @test nmpc.Ñ_Hc ≈ diagm([fill(200, 10); 1e4])
+    @test nmpc.L_Hp ≈ diagm(fill(300, 1000))
+    setmodel!(nmpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([fill(0.1, 10);1e6]), L_Hp=diagm(1.1:1000.1))
     @test nmpc.M_Hp ≈ diagm(1:1000)
-    @test nmpc.Ñ_Hc ≈ diagm([0.1;1e6])
+    @test nmpc.Ñ_Hc ≈ diagm([fill(0.1, 10);1e6])
     @test nmpc.L_Hp ≈ diagm(1.1:1000.1)
     @test_throws ErrorException setmodel!(nmpc, deepcopy(nonlinmodel))
 end

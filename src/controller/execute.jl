@@ -543,11 +543,13 @@ prediction horizon ``H_p``.
     Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `mpc::PredictiveController` : controller to set model and weights.
-- `model=mpc.estim.model` : new plant model ([`NonLinModel`](@ref) not supported).
-- `M_Hp=mpc.M_Hp` : new ``\mathbf{M}_{H_p}`` weight matrix.
-- `Ñ_Hc=mpc.Ñ_Hc` or *`Ntilde_Hc`* : new ``\mathbf{Ñ}_{H_c}`` weight matrix (see definition
-   above).
-- `L_Hp=mpc.L_Hp` : new ``\mathbf{L}_{H_p}`` weight matrix.
+- `model=mpc.estim.model` : new plant model (not supported by [`NonLinModel`](@ref)).
+- `Mwt=nothing` : new main diagonal in ``\mathbf{M}`` weight matrix (vector).
+- `Nwt=nothing` : new main diagonal in ``\mathbf{N}`` weight matrix (vector).
+- `Lwt=nothing` : new main diagonal in ``\mathbf{L}`` weight matrix (vector).
+- `M_Hp=nothing` : new ``\mathbf{M}_{H_p}`` weight matrix.
+- `Ñ_Hc=nothing` or *`Ntilde_Hc`* : new ``\mathbf{Ñ}_{H_c}`` weight matrix (see def. above).
+- `L_Hp=nothing` : new ``\mathbf{L}_{H_p}`` weight matrix.
 - additional keyword arguments are passed to `setmodel!(mpc.estim)`.
 
 # Examples
@@ -566,18 +568,48 @@ julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
 function setmodel!(
         mpc::PredictiveController, 
         model = mpc.estim.model;
-        M_Hp      = mpc.M_Hp,
-        Ntilde_Hc = mpc.Ñ_Hc,
-        L_Hp      = mpc.L_Hp,
+        Mwt       = nothing,
+        Nwt       = nothing,
+        Lwt       = nothing,
+        M_Hp      = nothing,
+        Ntilde_Hc = nothing,
+        L_Hp      = nothing,
         Ñ_Hc      = Ntilde_Hc,
         kwargs...
     )
     x̂op_old = copy(mpc.estim.x̂op)
     nu, ny, Hp, Hc, nϵ = model.nu, model.ny, mpc.Hp, mpc.Hc, mpc.nϵ
     setmodel!(mpc.estim, model; kwargs...)
-    mpc.M_Hp .= to_hermitian(M_Hp)
-    mpc.Ñ_Hc .= to_hermitian(Ñ_Hc)
-    mpc.L_Hp .= to_hermitian(L_Hp)
+    if isnothing(M_Hp) && !isnothing(Mwt)
+        size(Mwt) == (ny,) || throw(ArgumentError("Mwt should be a vector of length ny"))
+        any(x -> x < 0, Mwt) && throw(ArgumentError("Mwt values should be nonnegative"))
+        for i=1:ny*Hp
+            mpc.M_Hp[i, i] = Mwt[(i-1) % ny + 1]
+        end
+    elseif !isnothing(M_Hp)
+        size(M_Hp) == (ny*Hp, ny*Hp) || throw(ArgumentError("M_Hp size should be (ny*Hp, ny*Hp)"))
+        mpc.M_Hp .= to_hermitian(M_Hp)
+    end
+    if isnothing(Ñ_Hc) && !isnothing(Nwt)
+        size(Nwt) == (nu,) || throw(ArgumentError("Nwt should be a vector of length nu"))
+        any(x -> x < 0, Nwt) && throw(ArgumentError("Nwt values should be nonnegative"))
+        for i=1:nu*Hc
+            mpc.Ñ_Hc[i, i] = Nwt[(i-1) % nu + 1]
+        end
+    elseif !isnothing(Ñ_Hc)
+        size(Ñ_Hc) == (nu*Hc+nϵ, nu*Hc+nϵ) || throw(ArgumentError("Ñ_Hc size should be (nu*Hc+nϵ, nu*Hc+nϵ)"))
+        mpc.Ñ_Hc .= to_hermitian(Ñ_Hc)
+    end
+    if isnothing(L_Hp) && !isnothing(Lwt)
+        size(Lwt) == (nu,) || throw(ArgumentError("Lwt should be a vector of length nu"))
+        any(x -> x < 0, Lwt) && throw(ArgumentError("Lwt values should be nonnegative"))
+        for i=1:nu*Hp
+            mpc.L_Hp[i, i] = Lwt[(i-1) % nu + 1]
+        end
+    elseif !isnothing(L_Hp)
+        size(L_Hp) == (nu*Hp, nu*Hp) || throw(ArgumentError("L_Hp size should be (nu*Hp, nu*Hp)"))
+        mpc.L_Hp .= to_hermitian(L_Hp)
+    end
     setmodel_controller!(mpc, x̂op_old, M_Hp, Ñ_Hc, L_Hp)
     return mpc
 end

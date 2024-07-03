@@ -268,7 +268,6 @@ function setconstraint!(
             size(con.A_x̂max, 1) ≠ 0 && (con.A_x̂max[:, end] .= -con.c_x̂max) # for LinModel
         end
     end
-    # TODO: test setmodel! new arguments
     i_Umin,  i_Umax  = .!isinf.(con.U0min), .!isinf.(con.U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(con.Y0min), .!isinf.(con.Y0max)
