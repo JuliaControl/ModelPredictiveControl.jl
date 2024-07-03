@@ -258,7 +258,7 @@ augmented model is not verified (see Extended Help for more info).
     Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `estim::StateEstimator` : estimator to set model and covariances.
-- `model=estim.model` : new plant model ([`NonLinModel`](@ref) not supported).
+- `model=estim.model` : new plant model (not supported by [`NonLinModel`](@ref)).
 - `Q̂=nothing` or *`Qhat`* : new augmented model ``\mathbf{Q̂}`` covariance matrix.
 - `R̂=nothing` or *`Rhat`* : new augmented model ``\mathbf{R̂}`` covariance matrix.
 
