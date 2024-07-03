@@ -443,85 +443,117 @@ function setconstraint!(
     nX̂con = nx̂*(He+1)
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
     C = estim.C
-    isnothing(X̂min)   && !isnothing(x̂min)   && (X̂min = repeat(x̂min, He+1))
-    isnothing(X̂max)   && !isnothing(x̂max)   && (X̂max = repeat(x̂max, He+1))
-    isnothing(Ŵmin)   && !isnothing(ŵmin)   && (Ŵmin = repeat(ŵmin, He))
-    isnothing(Ŵmax)   && !isnothing(ŵmax)   && (Ŵmax = repeat(ŵmax, He))
-    isnothing(V̂min)   && !isnothing(v̂min)   && (V̂min = repeat(v̂min, He))
-    isnothing(V̂max)   && !isnothing(v̂max)   && (V̂max = repeat(v̂max, He))
-    isnothing(C_x̂min) && !isnothing(c_x̂min) && (C_x̂min = repeat(c_x̂min, He+1))
-    isnothing(C_x̂max) && !isnothing(c_x̂max) && (C_x̂max = repeat(c_x̂max, He+1))
-    isnothing(C_ŵmin) && !isnothing(c_ŵmin) && (C_ŵmin = repeat(c_ŵmin, He))
-    isnothing(C_ŵmax) && !isnothing(c_ŵmax) && (C_ŵmax = repeat(c_ŵmax, He))
-    isnothing(C_v̂min) && !isnothing(c_v̂min) && (C_v̂min = repeat(c_v̂min, He))
-    isnothing(C_v̂max) && !isnothing(c_v̂max) && (C_v̂max = repeat(c_v̂max, He))
-    if !all(isnothing.((C_x̂min, C_x̂max, C_ŵmin, C_ŵmax, C_v̂min, C_v̂max)))
-        !isinf(C) || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
-        notSolvedYet || error("Cannot set softness parameters after calling updatestate!")
-    end
-    if !isnothing(X̂min)
+    if isnothing(X̂min) && !isnothing(x̂min)
+        size(x̂min) == (nx̂,) || throw(ArgumentError("x̂min size must be $((nx̂,))"))
+        con.x̃0min[end-nx̂+1:end] .= x̂min .- estim.x̂op # if C is finite : x̃ = [ϵ; x̂]
+        for i in 1:nx̂*He
+            con.X̂0min[i] = x̂min[(i-1) % nx̂ + 1] - estim.X̂op[i]
+        end
+    elseif !isnothing(X̂min)
         size(X̂min) == (nX̂con,) || throw(ArgumentError("X̂min size must be $((nX̂con,))"))
-        con.x̃0min[end-nx̂+1:end] .= X̂min[1:nx̂] .- estim.x̂op # if C is finite : x̃ = [ϵ; x̂]
-        con.X̂0min .= X̂min[nx̂+1:end]           .- estim.X̂op
+        con.x̃0min[end-nx̂+1:end] .= X̂min[1:nx̂] .- estim.x̂op
+        con.X̂0min .= @views X̂min[nx̂+1:end] .- estim.X̂op
     end
-    if !isnothing(X̂max)
+    if isnothing(X̂max) && !isnothing(x̂max)
+        size(x̂max) == (nx̂,) || throw(ArgumentError("x̂max size must be $((nx̂,))"))
+        con.x̃0max[end-nx̂+1:end] .= x̂max .- estim.x̂op # if C is finite : x̃ = [ϵ; x̂]
+        for i in 1:nx̂*He
+            con.X̂0max[i] = x̂max[(i-1) % nx̂ + 1] - estim.X̂op[i]
+        end
+    elseif !isnothing(X̂max)
         size(X̂max) == (nX̂con,) || throw(ArgumentError("X̂max size must be $((nX̂con,))"))
-        con.x̃0max[end-nx̂+1:end] .= X̂max[1:nx̂] .- estim.x̂op # if C is finite : x̃ = [ϵ; x̂]
-        con.X̂0max .= X̂max[nx̂+1:end]           .- estim.X̂op
+        con.x̃0max[end-nx̂+1:end] .= X̂max[1:nx̂] .- estim.x̂op
+        con.X̂0max .= @views X̂max[nx̂+1:end] .- estim.X̂op
     end
-    if !isnothing(Ŵmin)
+    if isnothing(Ŵmin) && !isnothing(ŵmin)
+        size(ŵmin) == (nŵ,) || throw(ArgumentError("ŵmin size must be $((nŵ,))"))
+        for i in 1:nŵ*He
+            con.Ŵmin[i] = ŵmin[(i-1) % nŵ + 1]
+        end
+    elseif !isnothing(Ŵmin)
         size(Ŵmin) == (nŵ*He,) || throw(ArgumentError("Ŵmin size must be $((nŵ*He,))"))
         con.Ŵmin .= Ŵmin
     end
-    if !isnothing(Ŵmax)
+    if isnothing(Ŵmax) && !isnothing(ŵmax)
+        size(ŵmax) == (nŵ,) || throw(ArgumentError("ŵmax size must be $((nŵ,))"))
+        for i in 1:nŵ*He
+            con.Ŵmax[i] = ŵmax[(i-1) % nŵ + 1]
+        end
+    elseif !isnothing(Ŵmax)
         size(Ŵmax) == (nŵ*He,) || throw(ArgumentError("Ŵmax size must be $((nŵ*He,))"))
         con.Ŵmax .= Ŵmax
     end
-    if !isnothing(V̂min)
+    if isnothing(V̂min) && !isnothing(v̂min)
+        size(v̂min) == (nym,) || throw(ArgumentError("v̂min size must be $((nym,))"))
+        for i in 1:nym*He
+            con.V̂min[i] = v̂min[(i-1) % nym + 1]
+        end
+    elseif !isnothing(V̂min)
         size(V̂min) == (nym*He,) || throw(ArgumentError("V̂min size must be $((nym*He,))"))
         con.V̂min .= V̂min
     end
-    if !isnothing(V̂max)
+    if isnothing(V̂max) && !isnothing(v̂max)
+        size(v̂max) == (nym,) || throw(ArgumentError("v̂max size must be $((nym,))"))
+        for i in 1:nym*He
+            con.V̂max[i] = v̂max[(i-1) % nym + 1]
+        end
+    elseif !isnothing(V̂max)
         size(V̂max) == (nym*He,) || throw(ArgumentError("V̂max size must be $((nym*He,))"))
         con.V̂max .= V̂max
     end
-    if !isnothing(C_x̂min)
-        size(C_x̂min) == (nX̂con,) || throw(ArgumentError("C_x̂min size must be $((nX̂con,))"))
-        any(C_x̂min .< 0) && error("C_x̂min weights should be non-negative")
-        # if C is finite : x̃ = [ϵ; x̂] 
-        con.A_x̃min[end-nx̂+1:end, end] .= @views -C_x̂min[1:nx̂] 
-        con.C_x̂min .= @views C_x̂min[nx̂+1:end]
-        size(con.A_X̂min, 1) ≠ 0 && (con.A_X̂min[:, end] = -con.C_x̂min) # for LinModel
+    allECRs = (
+        c_x̂min, c_x̂max, c_ŵmin, c_ŵmax, c_v̂min, c_v̂max,
+        C_x̂min, C_x̂max, C_ŵmin, C_ŵmax, C_v̂min, C_v̂max,
+    )
+    if any(ECR -> !isnothing(ECR), allECRs)
+        !isinf(C) || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
+        notSolvedYet || error("Cannot set softness parameters after calling updatestate!")
     end
-    if !isnothing(C_x̂max)
-        size(C_x̂max) == (nX̂con,) || throw(ArgumentError("C_x̂max size must be $((nX̂con,))"))
-        any(C_x̂max .< 0) && error("C_x̂max weights should be non-negative")
-        # if C is finite : x̃ = [ϵ; x̂] :
-        con.A_x̃max[end-nx̂+1:end, end] .= @views -C_x̂max[1:nx̂]
-        con.C_x̂max .= @views C_x̂max[nx̂+1:end]
-        size(con.A_X̂max, 1) ≠ 0 && (con.A_X̂max[:, end] = -con.C_x̂max) # for LinModel
-    end
-    if !isnothing(C_ŵmin)
-        size(C_ŵmin) == (nŵ*He,) || throw(ArgumentError("C_ŵmin size must be $((nŵ*He,))"))
-        any(C_ŵmin .< 0) && error("C_ŵmin weights should be non-negative")
-        con.A_Ŵmin[:, end] .= -C_ŵmin
-    end
-    if !isnothing(C_ŵmax)
-        size(C_ŵmax) == (nŵ*He,) || throw(ArgumentError("C_ŵmax size must be $((nŵ*He,))"))
-        any(C_ŵmax .< 0) && error("C_ŵmax weights should be non-negative")
-        con.A_Ŵmax[:, end] .= -C_ŵmax
-    end
-    if !isnothing(C_v̂min)
-        size(C_v̂min) == (nym*He,) || throw(ArgumentError("C_v̂min size must be $((nym*He,))"))
-        any(C_v̂min .< 0) && error("C_v̂min weights should be non-negative")
-        con.C_v̂min .= C_v̂min
-        size(con.A_V̂min, 1) ≠ 0 && (con.A_V̂min[:, end] = -con.C_v̂min) # for LinModel
-    end
-    if !isnothing(C_v̂max)
-        size(C_v̂max) == (nym*He,) || throw(ArgumentError("C_v̂max size must be $((nym*He,))"))
-        any(C_v̂max .< 0) && error("C_v̂max weights should be non-negative")
-        con.C_v̂max .= C_v̂max
-        size(con.A_V̂max, 1) ≠ 0 && (con.A_V̂max[:, end] = -con.C_v̂max) # for LinModel
+    if notSolvedYet
+        isnothing(C_x̂min) && !isnothing(c_x̂min) && (C_x̂min = repeat(c_x̂min, He+1))
+        isnothing(C_x̂max) && !isnothing(c_x̂max) && (C_x̂max = repeat(c_x̂max, He+1))
+        isnothing(C_ŵmin) && !isnothing(c_ŵmin) && (C_ŵmin = repeat(c_ŵmin, He))
+        isnothing(C_ŵmax) && !isnothing(c_ŵmax) && (C_ŵmax = repeat(c_ŵmax, He))
+        isnothing(C_v̂min) && !isnothing(c_v̂min) && (C_v̂min = repeat(c_v̂min, He))
+        isnothing(C_v̂max) && !isnothing(c_v̂max) && (C_v̂max = repeat(c_v̂max, He))
+        if !isnothing(C_x̂min)
+            size(C_x̂min) == (nX̂con,) || throw(ArgumentError("C_x̂min size must be $((nX̂con,))"))
+            any(C_x̂min .< 0) && error("C_x̂min weights should be non-negative")
+            # if C is finite : x̃ = [ϵ; x̂] 
+            con.A_x̃min[end-nx̂+1:end, end] .= @views -C_x̂min[1:nx̂] 
+            con.C_x̂min .= @views C_x̂min[nx̂+1:end]
+            size(con.A_X̂min, 1) ≠ 0 && (con.A_X̂min[:, end] = -con.C_x̂min) # for LinModel
+        end
+        if !isnothing(C_x̂max)
+            size(C_x̂max) == (nX̂con,) || throw(ArgumentError("C_x̂max size must be $((nX̂con,))"))
+            any(C_x̂max .< 0) && error("C_x̂max weights should be non-negative")
+            # if C is finite : x̃ = [ϵ; x̂] :
+            con.A_x̃max[end-nx̂+1:end, end] .= @views -C_x̂max[1:nx̂]
+            con.C_x̂max .= @views C_x̂max[nx̂+1:end]
+            size(con.A_X̂max, 1) ≠ 0 && (con.A_X̂max[:, end] = -con.C_x̂max) # for LinModel
+        end
+        if !isnothing(C_ŵmin)
+            size(C_ŵmin) == (nŵ*He,) || throw(ArgumentError("C_ŵmin size must be $((nŵ*He,))"))
+            any(C_ŵmin .< 0) && error("C_ŵmin weights should be non-negative")
+            con.A_Ŵmin[:, end] .= -C_ŵmin
+        end
+        if !isnothing(C_ŵmax)
+            size(C_ŵmax) == (nŵ*He,) || throw(ArgumentError("C_ŵmax size must be $((nŵ*He,))"))
+            any(C_ŵmax .< 0) && error("C_ŵmax weights should be non-negative")
+            con.A_Ŵmax[:, end] .= -C_ŵmax
+        end
+        if !isnothing(C_v̂min)
+            size(C_v̂min) == (nym*He,) || throw(ArgumentError("C_v̂min size must be $((nym*He,))"))
+            any(C_v̂min .< 0) && error("C_v̂min weights should be non-negative")
+            con.C_v̂min .= C_v̂min
+            size(con.A_V̂min, 1) ≠ 0 && (con.A_V̂min[:, end] = -con.C_v̂min) # for LinModel
+        end
+        if !isnothing(C_v̂max)
+            size(C_v̂max) == (nym*He,) || throw(ArgumentError("C_v̂max size must be $((nym*He,))"))
+            any(C_v̂max .< 0) && error("C_v̂max weights should be non-negative")
+            con.C_v̂max .= C_v̂max
+            size(con.A_V̂max, 1) ≠ 0 && (con.A_V̂max[:, end] = -con.C_v̂max) # for LinModel
+        end
     end
     i_x̃min, i_x̃max  = .!isinf.(con.x̃0min), .!isinf.(con.x̃0max)
     i_X̂min, i_X̂max  = .!isinf.(con.X̂0min), .!isinf.(con.X̂0max)

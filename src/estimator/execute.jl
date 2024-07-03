@@ -254,11 +254,13 @@ time must stay the same. Note that the observability and controllability of the 
 augmented model is not verified (see Extended Help for more info).
 
 # Arguments
+!!! info
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `estim::StateEstimator` : estimator to set model and covariances.
-- `model=estim.model` : new plant model ([`NonLinModel`](@ref) not supported).
-- `Q̂=nothing` : new augmented model ``\mathbf{Q̂}`` covariance matrix.
-- `R̂=nothing` : new augmented model ``\mathbf{R̂}`` covariance matrix.
+- `model=estim.model` : new plant model (not supported by [`NonLinModel`](@ref)).
+- `Q̂=nothing` or *`Qhat`* : new augmented model ``\mathbf{Q̂}`` covariance matrix.
+- `R̂=nothing` or *`Rhat`* : new augmented model ``\mathbf{R̂}`` covariance matrix.
 
 # Examples
 ```jldoctest
@@ -283,8 +285,10 @@ julia> kf.model.A[], kf.Q̂[1, 1], kf.Q̂[2, 2]
 function setmodel!(
         estim::StateEstimator, 
         model = estim.model;
-        Q̂ = nothing,
-        R̂ = nothing
+        Qhat = nothing,
+        Rhat = nothing,
+        Q̂ = Qhat,
+        R̂ = Rhat
     )
     uop_old = copy(estim.model.uop)
     yop_old = copy(estim.model.yop)

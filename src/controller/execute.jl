@@ -543,41 +543,79 @@ prediction horizon ``H_p``.
     Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `mpc::PredictiveController` : controller to set model and weights.
-- `model=mpc.estim.model` : new plant model ([`NonLinModel`](@ref) not supported).
-- `M_Hp=mpc.M_Hp` : new ``\mathbf{M}_{H_p}`` weight matrix.
-- `Ñ_Hc=mpc.Ñ_Hc` or *`Ntilde_Hc`* : new ``\mathbf{Ñ}_{H_c}`` weight matrix (see definition
-   above).
-- `L_Hp=mpc.L_Hp` : new ``\mathbf{L}_{H_p}`` weight matrix.
+- `model=mpc.estim.model` : new plant model (not supported by [`NonLinModel`](@ref)).
+- `Mwt=nothing` : new main diagonal in ``\mathbf{M}`` weight matrix (vector).
+- `Nwt=nothing` : new main diagonal in ``\mathbf{N}`` weight matrix (vector).
+- `Lwt=nothing` : new main diagonal in ``\mathbf{L}`` weight matrix (vector).
+- `M_Hp=nothing` : new ``\mathbf{M}_{H_p}`` weight matrix.
+- `Ñ_Hc=nothing` or *`Ntilde_Hc`* : new ``\mathbf{Ñ}_{H_c}`` weight matrix (see def. above).
+- `L_Hp=nothing` : new ``\mathbf{L}_{H_p}`` weight matrix.
 - additional keyword arguments are passed to `setmodel!(mpc.estim)`.
 
 # Examples
 ```jldoctest
 julia> mpc = LinMPC(KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σR=[√25]), Hp=1, Hc=1);
 
-julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
-(0.1, 25.0, 1.0)
+julia> mpc.estim.model.A[1], mpc.estim.R̂[1], mpc.M_Hp[1], mpc.Ñ_Hc[1]
+(0.1, 25.0, 1.0, 0.1)
 
-julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0)); R̂=[9], M_Hp=[0]);
+julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0)); R̂=[9], M_Hp=[10], Nwt=[0.666]);
 
-julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
-(0.42, 9.0, 0.0)
+julia> mpc.estim.model.A[1], mpc.estim.R̂[1], mpc.M_Hp[1], mpc.Ñ_Hc[1]
+(0.42, 9.0, 10.0, 0.666)
 ```
 """
 function setmodel!(
         mpc::PredictiveController, 
         model = mpc.estim.model;
-        M_Hp      = mpc.M_Hp,
-        Ntilde_Hc = mpc.Ñ_Hc,
-        L_Hp      = mpc.L_Hp,
+        Mwt       = nothing,
+        Nwt       = nothing,
+        Lwt       = nothing,
+        M_Hp      = nothing,
+        Ntilde_Hc = nothing,
+        L_Hp      = nothing,
         Ñ_Hc      = Ntilde_Hc,
         kwargs...
     )
     x̂op_old = copy(mpc.estim.x̂op)
     nu, ny, Hp, Hc, nϵ = model.nu, model.ny, mpc.Hp, mpc.Hc, mpc.nϵ
     setmodel!(mpc.estim, model; kwargs...)
-    mpc.M_Hp .= to_hermitian(M_Hp)
-    mpc.Ñ_Hc .= to_hermitian(Ñ_Hc)
-    mpc.L_Hp .= to_hermitian(L_Hp)
+    if isnothing(M_Hp) && !isnothing(Mwt)
+        size(Mwt) == (ny,) || throw(ArgumentError("Mwt should be a vector of length $ny"))
+        any(x -> x < 0, Mwt) && throw(ArgumentError("Mwt values should be nonnegative"))
+        for i=1:ny*Hp
+            mpc.M_Hp[i, i] = Mwt[(i-1) % ny + 1]
+        end
+    elseif !isnothing(M_Hp)
+        M_Hp = to_hermitian(M_Hp)
+        nŶ = ny*Hp
+        size(M_Hp) == (nŶ, nŶ) || throw(ArgumentError("M_Hp size should be ($nŶ, $nŶ)"))
+        mpc.M_Hp .= M_Hp
+    end
+    if isnothing(Ñ_Hc) && !isnothing(Nwt)
+        size(Nwt) == (nu,) || throw(ArgumentError("Nwt should be a vector of length $nu"))
+        any(x -> x < 0, Nwt) && throw(ArgumentError("Nwt values should be nonnegative"))
+        for i=1:nu*Hc
+            mpc.Ñ_Hc[i, i] = Nwt[(i-1) % nu + 1]
+        end
+    elseif !isnothing(Ñ_Hc)
+        Ñ_Hc = to_hermitian(Ñ_Hc)
+        nΔŨ = nu*Hc+nϵ
+        size(Ñ_Hc) == (nΔŨ, nΔŨ) || throw(ArgumentError("Ñ_Hc size should be ($nΔŨ, $nΔŨ)"))
+        mpc.Ñ_Hc .= Ñ_Hc
+    end
+    if isnothing(L_Hp) && !isnothing(Lwt)
+        size(Lwt) == (nu,) || throw(ArgumentError("Lwt should be a vector of length $nu"))
+        any(x -> x < 0, Lwt) && throw(ArgumentError("Lwt values should be nonnegative"))
+        for i=1:nu*Hp
+            mpc.L_Hp[i, i] = Lwt[(i-1) % nu + 1]
+        end
+    elseif !isnothing(L_Hp)
+        L_Hp = to_hermitian(L_Hp)
+        nU = nu*Hp
+        size(L_Hp) == (nU, nU) || throw(ArgumentError("L_Hp size should be ($nU, $nU)"))
+        mpc.L_Hp .= L_Hp
+    end
     setmodel_controller!(mpc, x̂op_old, M_Hp, Ñ_Hc, L_Hp)
     return mpc
 end

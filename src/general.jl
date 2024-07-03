@@ -48,3 +48,4 @@ repeatdiag(A, n::Int) = kron(I(n), A)
 to_hermitian(A::AbstractVector) = Hermitian(reshape(A, 1, 1), :L)
 to_hermitian(A::AbstractMatrix) = Hermitian(A, :L)
 to_hermitian(A::Hermitian) = A
+to_hermitian(A) = A
