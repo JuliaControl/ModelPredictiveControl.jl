@@ -556,13 +556,13 @@ prediction horizon ``H_p``.
 ```jldoctest
 julia> mpc = LinMPC(KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σR=[√25]), Hp=1, Hc=1);
 
-julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
-(0.1, 25.0, 1.0)
+julia> mpc.estim.model.A[1], mpc.estim.R̂[1], mpc.M_Hp[1], mpc.Ñ_Hc[1]
+(0.1, 25.0, 1.0, 0.1)
 
-julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0)); R̂=[9], M_Hp=[0]);
+julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0)); R̂=[9], M_Hp=[10], Nwt=[0.666]);
 
-julia> mpc.estim.model.A[], mpc.estim.R̂[], mpc.M_Hp[]
-(0.42, 9.0, 0.0)
+julia> mpc.estim.model.A[1], mpc.estim.R̂[1], mpc.M_Hp[1], mpc.Ñ_Hc[1]
+(0.42, 9.0, 10.0, 0.666)
 ```
 """
 function setmodel!(
@@ -587,9 +587,10 @@ function setmodel!(
             mpc.M_Hp[i, i] = Mwt[(i-1) % ny + 1]
         end
     elseif !isnothing(M_Hp)
+        M_Hp = to_hermitian(M_Hp)
         nŶ = ny*Hp
         size(M_Hp) == (nŶ, nŶ) || throw(ArgumentError("M_Hp size should be ($nŶ, $nŶ)"))
-        mpc.M_Hp .= to_hermitian(M_Hp)
+        mpc.M_Hp .= M_Hp
     end
     if isnothing(Ñ_Hc) && !isnothing(Nwt)
         size(Nwt) == (nu,) || throw(ArgumentError("Nwt should be a vector of length $nu"))
@@ -598,9 +599,10 @@ function setmodel!(
             mpc.Ñ_Hc[i, i] = Nwt[(i-1) % nu + 1]
         end
     elseif !isnothing(Ñ_Hc)
+        Ñ_Hc = to_hermitian(Ñ_Hc)
         nΔŨ = nu*Hc+nϵ
         size(Ñ_Hc) == (nΔŨ, nΔŨ) || throw(ArgumentError("Ñ_Hc size should be ($nΔŨ, $nΔŨ)"))
-        mpc.Ñ_Hc .= to_hermitian(Ñ_Hc)
+        mpc.Ñ_Hc .= Ñ_Hc
     end
     if isnothing(L_Hp) && !isnothing(Lwt)
         size(Lwt) == (nu,) || throw(ArgumentError("Lwt should be a vector of length $nu"))
@@ -609,9 +611,10 @@ function setmodel!(
             mpc.L_Hp[i, i] = Lwt[(i-1) % nu + 1]
         end
     elseif !isnothing(L_Hp)
+        L_Hp = to_hermitian(L_Hp)
         nU = nu*Hp
         size(L_Hp) == (nU, nU) || throw(ArgumentError("L_Hp size should be ($nU, $nU)"))
-        mpc.L_Hp .= to_hermitian(L_Hp)
+        mpc.L_Hp .= L_Hp
     end
     setmodel_controller!(mpc, x̂op_old, M_Hp, Ñ_Hc, L_Hp)
     return mpc
