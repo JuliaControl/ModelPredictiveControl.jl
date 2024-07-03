@@ -466,7 +466,7 @@ function setconstraint!(
         con.X̂0max .= @views X̂max[nx̂+1:end] .- estim.X̂op
     end
     if isnothing(Ŵmin) && !isnothing(ŵmin)
-        size(ŵmin) == (nŵ*He,) || throw(ArgumentError("ŵmin size must be $((nŵ*He,))"))
+        size(ŵmin) == (nŵ,) || throw(ArgumentError("ŵmin size must be $((nŵ,))"))
         for i in 1:nŵ*He
             con.Ŵmin[i] = ŵmin[(i-1) % nŵ + 1]
         end
@@ -475,7 +475,7 @@ function setconstraint!(
         con.Ŵmin .= Ŵmin
     end
     if isnothing(Ŵmax) && !isnothing(ŵmax)
-        size(ŵmax) == (nŵ*He,) || throw(ArgumentError("ŵmax size must be $((nŵ*He,))"))
+        size(ŵmax) == (nŵ,) || throw(ArgumentError("ŵmax size must be $((nŵ,))"))
         for i in 1:nŵ*He
             con.Ŵmax[i] = ŵmax[(i-1) % nŵ + 1]
         end
@@ -484,7 +484,7 @@ function setconstraint!(
         con.Ŵmax .= Ŵmax
     end
     if isnothing(V̂min) && !isnothing(v̂min)
-        size(v̂min) == (nym*He,) || throw(ArgumentError("v̂min size must be $((nym*He,))"))
+        size(v̂min) == (nym,) || throw(ArgumentError("v̂min size must be $((nym,))"))
         for i in 1:nym*He
             con.V̂min[i] = v̂min[(i-1) % nym + 1]
         end
@@ -493,7 +493,7 @@ function setconstraint!(
         con.V̂min .= V̂min
     end
     if isnothing(V̂max) && !isnothing(v̂max)
-        size(v̂max) == (nym*He,) || throw(ArgumentError("v̂max size must be $((nym*He,))"))
+        size(v̂max) == (nym,) || throw(ArgumentError("v̂max size must be $((nym,))"))
         for i in 1:nym*He
             con.V̂max[i] = v̂max[(i-1) % nym + 1]
         end

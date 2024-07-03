@@ -581,33 +581,36 @@ function setmodel!(
     nu, ny, Hp, Hc, nϵ = model.nu, model.ny, mpc.Hp, mpc.Hc, mpc.nϵ
     setmodel!(mpc.estim, model; kwargs...)
     if isnothing(M_Hp) && !isnothing(Mwt)
-        size(Mwt) == (ny,) || throw(ArgumentError("Mwt should be a vector of length ny"))
+        size(Mwt) == (ny,) || throw(ArgumentError("Mwt should be a vector of length $ny"))
         any(x -> x < 0, Mwt) && throw(ArgumentError("Mwt values should be nonnegative"))
         for i=1:ny*Hp
             mpc.M_Hp[i, i] = Mwt[(i-1) % ny + 1]
         end
     elseif !isnothing(M_Hp)
-        size(M_Hp) == (ny*Hp, ny*Hp) || throw(ArgumentError("M_Hp size should be (ny*Hp, ny*Hp)"))
+        nŶ = ny*Hp
+        size(M_Hp) == (nŶ, nŶ) || throw(ArgumentError("M_Hp size should be ($nŶ, $nŶ)"))
         mpc.M_Hp .= to_hermitian(M_Hp)
     end
     if isnothing(Ñ_Hc) && !isnothing(Nwt)
-        size(Nwt) == (nu,) || throw(ArgumentError("Nwt should be a vector of length nu"))
+        size(Nwt) == (nu,) || throw(ArgumentError("Nwt should be a vector of length $nu"))
         any(x -> x < 0, Nwt) && throw(ArgumentError("Nwt values should be nonnegative"))
         for i=1:nu*Hc
             mpc.Ñ_Hc[i, i] = Nwt[(i-1) % nu + 1]
         end
     elseif !isnothing(Ñ_Hc)
-        size(Ñ_Hc) == (nu*Hc+nϵ, nu*Hc+nϵ) || throw(ArgumentError("Ñ_Hc size should be (nu*Hc+nϵ, nu*Hc+nϵ)"))
+        nΔŨ = nu*Hc+nϵ
+        size(Ñ_Hc) == (nΔŨ, nΔŨ) || throw(ArgumentError("Ñ_Hc size should be ($nΔŨ, $nΔŨ)"))
         mpc.Ñ_Hc .= to_hermitian(Ñ_Hc)
     end
     if isnothing(L_Hp) && !isnothing(Lwt)
-        size(Lwt) == (nu,) || throw(ArgumentError("Lwt should be a vector of length nu"))
+        size(Lwt) == (nu,) || throw(ArgumentError("Lwt should be a vector of length $nu"))
         any(x -> x < 0, Lwt) && throw(ArgumentError("Lwt values should be nonnegative"))
         for i=1:nu*Hp
             mpc.L_Hp[i, i] = Lwt[(i-1) % nu + 1]
         end
     elseif !isnothing(L_Hp)
-        size(L_Hp) == (nu*Hp, nu*Hp) || throw(ArgumentError("L_Hp size should be (nu*Hp, nu*Hp)"))
+        nU = nu*Hp
+        size(L_Hp) == (nU, nU) || throw(ArgumentError("L_Hp size should be ($nU, $nU)"))
         mpc.L_Hp .= to_hermitian(L_Hp)
     end
     setmodel_controller!(mpc, x̂op_old, M_Hp, Ñ_Hc, L_Hp)
