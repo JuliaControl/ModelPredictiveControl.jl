@@ -12,7 +12,7 @@ assumes by default that the current model mismatch estimation is constant in the
 (same approach as dynamic matrix control, DMC).
 
 !!! info
-    The nomenclature use capital letters for time series (and matrices) and hats for the
+    The nomenclature uses capital letters for time series (and matrices) and hats for the
     predictions (and estimations, for state estimators).
 
 To be precise, at the ``k``th control period, the vectors that encompass the future measured
