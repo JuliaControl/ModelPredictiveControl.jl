@@ -373,9 +373,10 @@ nothing # hide
 ```
 
 The [`setmodel!`](@ref) method must be called after solving the optimization problem with
-[`moveinput!`](@ref), and before updating the state estimate with [`updatestate!`](@ref).
-The [`SimResult`](@ref) object is for plotting purposes only. The adaptive [`LinMPC`](@ref)
-performances are similar to the nonlinear MPC, both for the 180° setpoint:
+[`moveinput!`](@ref) and before updating the state estimate with [`updatestate!`](@ref),
+that is, when both ``\mathbf{u}(k)`` and ``\mathbf{x̂}_{k-1}(k)`` are available as the new
+operating point. The [`SimResult`](@ref) object is for plotting purposes only. The adaptive
+[`LinMPC`](@ref) performances are similar to the nonlinear MPC, both for the 180° setpoint:
 
 ```@example 1
 x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180]

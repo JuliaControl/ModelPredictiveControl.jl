@@ -90,10 +90,12 @@ automatically added to the model outputs by default if observability is preserve
     structure with `mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])`.
     It was tested on the example of this page and it gave similar results.
 
-Before closing the loop, we call [`initstate!`](@ref) with the actual plant inputs and
-measurements to ensure a bumpless transfer. Since `model` simulates our plant here, its
-output will initialize the states. [`LinModel`](@ref) objects are callable for this purpose
-(an alias for [`evaloutput`](@ref)):
+Before closing the loop, the actual plant input ``\mathbf{u}`` and measurement ``\mathbf{y}``
+should initialize the estimates ``\mathbf{x̂}`` at the steady-state solution that leads to
+``\mathbf{ŷ}(0) = \mathbf{y}(0)``. This approach results in a bumpless transfer. The
+[`initstate!`](@ref) function finds this solution for [`LinModel`](@ref). Since `model`
+simulates our plant here, its output will initialize the states. [`LinModel`](@ref) objects
+are callable for this purpose (an alias for [`evaloutput`](@ref)):
 
 ```@example 1
 u, y = model.uop, model() # or equivalently : y = evaloutput(model)
