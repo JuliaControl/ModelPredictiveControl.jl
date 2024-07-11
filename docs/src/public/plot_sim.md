@@ -24,6 +24,9 @@ SimResult
 
 ## Plotting Results
 
+The `plot` methods are based on [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl) package.
+To install it run `using Pkg; Pkg.add("Plots")` in the Julia REPL.
+
 ```@docs
 ModelPredictiveControl.plot
 ```
