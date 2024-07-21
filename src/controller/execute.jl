@@ -524,7 +524,7 @@ setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return m
 
 
 @doc raw"""
-    setmodel!(mpc::PredictiveController, model=mpc.estim.model, <keyword arguments>) -> mpc
+    setmodel!(mpc::PredictiveController, model=mpc.estim.model; <keyword arguments>) -> mpc
 
 Set `model` and objective function weights of `mpc` [`PredictiveController`](@ref).
 

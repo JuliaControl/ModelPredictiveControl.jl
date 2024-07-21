@@ -240,7 +240,7 @@ function setstate!(estim::StateEstimator, x̂)
 end
 
 @doc raw"""
-    setmodel!(estim::StateEstimator, model=estim.model, <keyword arguments>) -> estim
+    setmodel!(estim::StateEstimator, model=estim.model; <keyword arguments>) -> estim
 
 Set `model` and covariance matrices of `estim` [`StateEstimator`](@ref).
 
