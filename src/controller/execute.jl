@@ -1,15 +1,18 @@
 @doc raw"""
-    initstate!(mpc::PredictiveController, u, ym, d=[]) -> x̂
+    initstate!(mpc::PredictiveController, u, ym, d=mpc.estim.model.dop) -> x̂
 
 Init the states of `mpc.estim` [`StateEstimator`](@ref) and warm start `mpc.ΔŨ` at zero.
 """
-function initstate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂0))
+function initstate!(mpc::PredictiveController, u, ym, d=mpc.estim.model.dop)
     mpc.ΔŨ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
 
 @doc raw"""
-    moveinput!(mpc::PredictiveController, ry=mpc.estim.model.yop, d=[]; <keyword args>) -> u
+    moveinput!(
+        mpc::PredictiveController, ry=mpc.estim.model.yop, d=mpc.estim.model.dop; 
+        <keyword arguments>
+    ) -> u
 
 Compute the optimal manipulated input value `u` for the current control period.
 
@@ -29,14 +32,13 @@ See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
 
 - `mpc::PredictiveController` : solve optimization problem of `mpc`.
 - `ry=mpc.estim.model.yop` : current output setpoints ``\mathbf{r_y}(k)``.
-- `d=[]` : current measured disturbances ``\mathbf{d}(k)``.
+- `d=mpc.estim.model.dop` : current measured disturbances ``\mathbf{d}(k)``.
 - `D̂=repeat(d, mpc.Hp)` or *`Dhat`* : predicted measured disturbances ``\mathbf{D̂}``, constant
    in the future by default or ``\mathbf{d̂}(k+j)=\mathbf{d}(k)`` for ``j=1`` to ``H_p``.
 - `R̂y=repeat(ry, mpc.Hp)` or *`Rhaty`* : predicted output setpoints ``\mathbf{R̂_y}``, constant
    in the future by default or ``\mathbf{r̂_y}(k+j)=\mathbf{r_y}(k)`` for ``j=1`` to ``H_p``.
-- `R̂u=repeat(mpc.estim.model.uop, mpc.Hp)` or *`Rhatu`* : predicted manipulated input
-   setpoints, constant in the future by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for
-   ``j=0`` to ``H_p-1``. 
+- `R̂u=mpc.Uop` or *`Rhatu`* : predicted manipulated input setpoints, constant in the future 
+   by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for ``j=0`` to ``H_p-1``. 
 - `ym=nothing` : current measured outputs ``\mathbf{y^m}(k)``, only required if `mpc.estim` 
    is an [`InternalModel`](@ref).
 
@@ -52,10 +54,10 @@ julia> ry = [5]; u = moveinput!(mpc, ry); round.(u, digits=3)
 function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = empty(mpc.estim.x̂0);
+    d ::Vector = mpc.estim.model.dop;
     Dhat ::Vector = repeat(d,  mpc.Hp),
     Rhaty::Vector = repeat(ry, mpc.Hp),
-    Rhatu::Vector = mpc.noR̂u ? empty(mpc.estim.x̂0) : repeat(mpc.estim.model.uop, mpc.Hp),
+    Rhatu::Vector = mpc.Uop,
     ym::Union{Vector, Nothing} = nothing,
     D̂  = Dhat,
     R̂y = Rhaty,
@@ -506,11 +508,11 @@ end
 set_objective_linear_coef!(::PredictiveController, _ ) = nothing
 
 """
-    updatestate!(mpc::PredictiveController, u, ym, d=[]) -> x̂
+    updatestate!(mpc::PredictiveController, u, ym, d=mpc.estim.model.dop) -> x̂
 
 Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
-function updatestate!(mpc::PredictiveController, u, ym, d=empty(mpc.estim.x̂0))
+function updatestate!(mpc::PredictiveController, u, ym, d=mpc.estim.model.dop)
     return updatestate!(mpc.estim, u, ym, d)
 end
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
