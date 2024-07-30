@@ -106,8 +106,8 @@ unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
     disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
 - `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
     disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
-- `direct=true`: construct with a direct transmission (a.k.a. current form, in opposition 
-   to the delayed/predictor version).
+- `direct=true`: construct with a direct transmission (a.k.a. current estimator, in
+   opposition to the delayed/predictor form).
 
 # Examples
 ```jldoctest
@@ -152,7 +152,7 @@ function SteadyKalmanFilter(
     nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     sigmaQint_u  = fill(1, max(sum(nint_u),  0)),
     sigmaQint_ym = fill(1, max(sum(nint_ym), 0)),
-    direct   = true
+    direct   = true,
     σQ       = sigmaQ,
     σR       = sigmaR,
     σQint_u  = sigmaQint_u,
@@ -513,7 +513,7 @@ function UnscentedKalmanFilter(
     alpha::Real = 1e-3,
     beta ::Real = 2,
     kappa::Real = 0,
-    direct = true
+    direct = true,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
     σR         = sigmaR,
