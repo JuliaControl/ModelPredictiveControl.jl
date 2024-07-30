@@ -3,7 +3,7 @@ Abstract supertype of all state estimators.
 
 ---
 
-    (estim::StateEstimator)(d=[]) -> ŷ
+    (estim::StateEstimator)(d=estim.model.dop) -> ŷ
 
 Functor allowing callable `StateEstimator` object as an alias for [`evaloutput`](@ref).
 

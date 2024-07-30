@@ -79,7 +79,7 @@ end
 
 
 @doc raw"""
-    initstate!(estim::StateEstimator, u, ym, d=[]) -> x̂
+    initstate!(estim::StateEstimator, u, ym, d=estim.model.dop) -> x̂
 
 Init `estim.x̂0` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
@@ -111,7 +111,7 @@ julia> evaloutput(estim) ≈ y
 true
 ```
 """
-function initstate!(estim::StateEstimator, u, ym, d=empty(estim.x̂0))
+function initstate!(estim::StateEstimator, u, ym, d=estim.model.dop)
     # --- validate arguments ---
     validate_args(estim, u, ym, d)
     # --- init state estimate ----
@@ -161,7 +161,7 @@ Left `estim.x̂0` estimate unchanged if `model` is not a [`LinModel`](@ref).
 init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
 
 @doc raw"""
-    evaloutput(estim::StateEstimator, d=[]) -> ŷ
+    evaloutput(estim::StateEstimator, d=estim.model.dop) -> ŷ
 
 Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂0` states and disturbances `d`.
 
@@ -176,7 +176,7 @@ julia> ŷ = evaloutput(kf)
  20.0
 ```
 """
-function evaloutput(estim::StateEstimator{NT}, d=empty(estim.x̂0)) where NT <: Real
+function evaloutput(estim::StateEstimator{NT}, d=estim.model.dop) where NT <: Real
     validate_args(estim.model, d)
     ŷ0 = Vector{NT}(undef, estim.model.ny)
     d0 = d - estim.model.dop
@@ -187,10 +187,10 @@ function evaloutput(estim::StateEstimator{NT}, d=empty(estim.x̂0)) where NT <: 
 end
 
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
-(estim::StateEstimator)(d=empty(estim.x̂0)) = evaloutput(estim, d)
+(estim::StateEstimator)(d=estim.model.dop) = evaloutput(estim, d)
 
 @doc raw"""
-    updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂
+    updatestate!(estim::StateEstimator, u, ym, d=estim.model.dop) -> x̂
 
 Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
 
@@ -207,7 +207,7 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
  0.0
 ```
 """
-function updatestate!(estim::StateEstimator, u, ym, d=empty(estim.x̂0))
+function updatestate!(estim::StateEstimator, u, ym, d=estim.model.dop)
     validate_args(estim, u, ym, d)
     u0, ym0, d0 = remove_op!(estim, u, ym, d)
     x̂0next = update_estimate!(estim, u0, ym0, d0)
