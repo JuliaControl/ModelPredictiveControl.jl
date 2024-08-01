@@ -48,11 +48,9 @@ include("estimator/mhe.jl")
 include("estimator/internal_model.jl")
 
 """
-    evalŷ(estim::StateEstimator, _ , d) -> ŷ
+    evalŷ(estim::StateEstimator, d) -> ŷ
 
 Evaluate [`StateEstimator`](@ref) output `ŷ` from measured disturbance `d` and `estim.x̂0`.
-
-Second argument is ignored, except for [`InternalModel`](@ref).
 """
-evalŷ(estim::StateEstimator, _ , d) = evaloutput(estim, d)
+evalŷ(estim::StateEstimator, d) = evaloutput(estim, d)
     

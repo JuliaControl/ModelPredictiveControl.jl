@@ -6,6 +6,8 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     x̂0 ::Vector{NT}
     x̂d::Vector{NT}
     x̂s::Vector{NT}
+    y0m::Vector{NT}
+    d0 ::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
@@ -22,6 +24,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     D̂d::Matrix{NT}
     Âs::Matrix{NT}
     B̂s::Matrix{NT}
+    direct::Bool
     function InternalModel{NT, SM}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
     ) where {NT<:Real, SM<:SimModel}
@@ -36,13 +39,17 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         # x̂0 and x̂d are same object (updating x̂d will update x̂0):
         x̂d = x̂0 = zeros(NT, model.nx) 
         x̂s = zeros(NT, nxs)
+        y0m, d0 = zeros(NT, nym), zeros(NT, model.nd)
+        direct = true # InternalModel always uses direct transmission from ym
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, 
+            y0m, d0,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d,
-            Âs, B̂s
+            Âs, B̂s,
+            direct
         )
     end
 end
@@ -222,6 +229,17 @@ function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
     return nothing
 end
 
+"""
+    prepare_estimate!(estim::InternalModel, y0m, d0) -> x̂0
+
+Save the current measured output `y0m` and disturbance `d0` for the stochastic predictions.
+"""
+function prepare_estimate!(estim::InternalModel, y0m, d0)
+    estim.y0m .= y0m
+    estim.d0  .= d0
+    return estim.x̂0
+end
+
 @doc raw"""
     update_estimate!(estim::InternalModel, y0m, d0, u0) -> x̂0next
 
@@ -289,19 +307,21 @@ function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) 
 end
 
 @doc raw"""
-    evalŷ(estim::InternalModel, ym, d) -> ŷ
+    evalŷ(estim::InternalModel, _ ) -> ŷ
 
-Get [`InternalModel`](@ref) output `ŷ` from current measured outputs `ym` and dist. `d`.
+Get [`InternalModel`](@ref) estimated output `ŷ`.
 
 [`InternalModel`](@ref) estimator needs current measured outputs ``\mathbf{y^m}(k)`` to 
 estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that 
-``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` is always true.
+``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` is always true. The method [`preparestate!`](@ref)
+store the current measured outputs and disturbances inside `estim` object, it should be thus
+called before `evalŷ`.
 """
-function evalŷ(estim::InternalModel{NT}, ym, d) where NT<:Real
+function evalŷ(estim::InternalModel{NT}, _ ) where NT<:Real
     ŷ = Vector{NT}(undef, estim.model.ny)
-    h!(ŷ, estim.model, estim.x̂d, d - estim.model.dop) 
+    h!(ŷ, estim.model, estim.x̂d, estim.d0) 
     ŷ .+= estim.model.yop
-    ŷ[estim.i_ym] = ym
+    ŷ[estim.i_ym] = @views estim.y0m .+ estim.model.yop[estim.i_ym] 
     return ŷ
 end
 
