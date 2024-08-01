@@ -32,6 +32,8 @@ end
     SimModelBuffer(nu, nx, ny, nd) -> SimModelBuffer{NT}
 
 Create a buffer for `SimModel` objects for inputs, states, outputs, and disturbances.
+
+The buffer is used to store intermediate results during simulation without allocating.
 """
 function SimModelBuffer{NT}(nu, nx, ny, nd) where NT <: Real
     u = Vector{NT}(undef, nu)
@@ -207,9 +209,12 @@ true
 """
 function initstate!(model::SimModel, u, d=model.buffer.empty)
     validate_args(model::SimModel, d, u)
-    u0, d0 = u - model.uop, d - model.dop
+    u0, d0 = model.buffer.u, model.buffer.d
+    u0 .= u .- model.uop
+    d0 .= d .- model.dop
     steadystate!(model, u0, d0)
-    x = model.x0 + model.xop
+    x  = model.buffer.x
+    x .= model.x0 .+ model.xop
     return x
 end
 
@@ -229,13 +234,15 @@ julia> x = updatestate!(model, [1])
 """
 function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: Real
     validate_args(model::SimModel, d, u)
-    xnext0 = Vector{NT}(undef, model.nx)
-    u0, d0 = u - model.uop, d - model.dop
+    u0, d0 = model.buffer.u, model.buffer.d
+    u0 .= u .- model.uop
+    d0 .= d .- model.dop
+    xnext0 = model.buffer.x
     f!(xnext0, model, model.x0, u0, d0)
     xnext0  .+= model.fop .- model.xop
     model.x0 .= xnext0
-    xnext   = xnext0
-    xnext .+= model.xop
+    xnext  = model.buffer.x
+    xnext .= xnext0 .+ model.xop
     return xnext
 end
 
@@ -257,11 +264,12 @@ julia> y = evaloutput(model)
 """
 function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
     validate_args(model, d)
-    y0 = Vector{NT}(undef, model.ny)
-    d0 = d - model.dop
+    d0  = model.buffer.d
+    d0 .= d .- model.dop
+    y0 = model.buffer.y
     h!(y0, model, model.x0, d0)
-    y   = y0
-    y .+= model.yop
+    y  = model.buffer.y
+    y .= y0 .+ model.yop
     return y
 end
 

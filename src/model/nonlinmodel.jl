@@ -32,7 +32,7 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0  = zeros(NT, nx)
-        buffer = SimModelBuffer{NT}(nx, nu, ny, nd)
+        buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         return new{NT, F, H, DS}(
             x0, 
             f!, h!, 

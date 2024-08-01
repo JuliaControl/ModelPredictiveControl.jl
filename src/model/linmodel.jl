@@ -45,7 +45,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0  = zeros(NT, nx)
-        buffer = SimModelBuffer{NT}(nx, nu, ny, nd)
+        buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         return new{NT}(
             A, Bu, C, Bd, Dd, 
             x0, 
@@ -246,6 +246,7 @@ disturbances ``\mathbf{d_0 = d - d_{op}}``. The Moore-Penrose pseudo-inverse com
 function steadystate!(model::LinModel, u0, d0)
     M = I - model.A
     rtol = sqrt(eps(real(float(oneunit(eltype(M)))))) # pinv docstring recommendation
+    #TODO: use model.buffer.x to reduce allocations
     model.x0 .= pinv(M; rtol)*(model.Bu*u0 + model.Bd*d0 + model.fop - model.xop)
     return nothing
 end
