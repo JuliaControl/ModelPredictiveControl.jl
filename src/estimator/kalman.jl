@@ -22,6 +22,7 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     Q̂::Hermitian{NT, Matrix{NT}}
     R̂::Hermitian{NT, Matrix{NT}}
     K̂::Matrix{NT}
+    buffer::StateEstimatorBuffer{NT}
     function SteadyKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, Q̂, R̂
     ) where {NT<:Real, SM<:LinModel}
@@ -48,6 +49,7 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         lastu0 = zeros(NT, model.nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
+        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0, 
@@ -55,7 +57,8 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             Q̂, R̂,
-            K̂
+            K̂,
+            buffer
         )
     end
 end
@@ -234,6 +237,7 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     R̂::Hermitian{NT, Matrix{NT}}
     K̂::Matrix{NT}
     M̂::Matrix{NT}
+    buffer::StateEstimatorBuffer{NT}
     function KalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂
     ) where {NT<:Real, SM<:LinModel}
@@ -249,6 +253,7 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         P̂_0 = Hermitian(P̂_0, :L)
         P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
+        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0, P̂, 
@@ -256,7 +261,8 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂_0, Q̂, R̂,
-            K̂, M̂
+            K̂, M̂,
+            buffer
         )
     end
 end
@@ -402,6 +408,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     γ::NT
     m̂::Vector{NT}
     Ŝ::Diagonal{NT, Vector{NT}}
+    buffer::StateEstimatorBuffer{NT}
     function UnscentedKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ
     ) where {NT<:Real, SM<:SimModel{NT}}
@@ -421,6 +428,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
         X̂0, Ŷ0m = zeros(NT, nx̂, nσ), zeros(NT, nym, nσ)
         sqrtP̂ = LowerTriangular(zeros(NT, nx̂, nx̂))
+        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
         return new{NT, SM}(
             model,
             lastu0, x̂op, f̂op, x̂0, P̂, 
@@ -429,7 +437,8 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂_0, Q̂, R̂,
             K̂, M̂, X̂0, Ŷ0m, sqrtP̂,
-            nσ, γ, m̂, Ŝ
+            nσ, γ, m̂, Ŝ,
+            buffer
         )
     end
 end
@@ -698,6 +707,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     M̂::Matrix{NT}
     F̂_û::Matrix{NT}
     Ĥ  ::Matrix{NT}
+    buffer::StateEstimatorBuffer{NT}
     function ExtendedKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂
     ) where {NT<:Real, SM<:SimModel}
@@ -715,6 +725,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
         F̂_û, Ĥ = zeros(NT, nx̂+model.nu, nx̂), zeros(NT, model.ny, nx̂)
+        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
         return new{NT, SM}(
             model,
             lastu0, x̂op, f̂op, x̂0, P̂, 
@@ -723,7 +734,8 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂_0, Q̂, R̂,
             K̂, M̂,
-            F̂_û, Ĥ
+            F̂_û, Ĥ,
+            buffer
         )
     end
 end

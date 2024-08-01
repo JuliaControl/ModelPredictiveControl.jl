@@ -22,6 +22,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     D̂d::Matrix{NT}
     Âs::Matrix{NT}
     B̂s::Matrix{NT}
+    buffer::StateEstimatorBuffer{NT}
     function InternalModel{NT, SM}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
     ) where {NT<:Real, SM<:SimModel}
@@ -36,13 +37,15 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         # x̂0 and x̂d are same object (updating x̂d will update x̂0):
         x̂d = x̂0 = zeros(NT, model.nx) 
         x̂s = zeros(NT, nxs)
+        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d,
-            Âs, B̂s
+            Âs, B̂s,
+            buffer
         )
     end
 end

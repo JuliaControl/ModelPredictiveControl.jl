@@ -18,6 +18,24 @@ julia> ŷ = kf()
 """
 abstract type StateEstimator{NT<:Real} end
 
+struct StateEstimatorBuffer{NT<:Real}
+    x̂ ::Vector{NT}
+    ym::Vector{NT}
+end
+
+@doc raw"""
+    StateEstimatorBuffer(nx̂::Int, nym::Int) -> StateEstimatorBuffer{NT}
+
+Create a buffer for `StateEstimator` objects for estimated states and measured outputs.
+
+The buffer is used to store intermediate results during simulation without allocating.
+"""
+function StateEstimatorBuffer{NT}(nx̂::Int, nym::Int) where NT <: Real
+    x̂  = Vector{NT}(undef, nx̂)
+    ym = Vector{NT}(undef, nym)
+    return StateEstimatorBuffer{NT}(x̂, ym)
+end
+
 const IntVectorOrInt = Union{Int, Vector{Int}}
 
 function Base.show(io::IO, estim::StateEstimator)

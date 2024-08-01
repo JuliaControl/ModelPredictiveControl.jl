@@ -7,11 +7,13 @@ Also store current inputs without operating points `u0` in `estim.lastu0`. This 
 used for [`PredictiveController`](@ref) computations.
 """
 function remove_op!(estim::StateEstimator, u, ym, d)
-    u0  = u  - estim.model.uop
-    ym0 = ym - estim.model.yop[estim.i_ym]
-    d0  = d  - estim.model.dop
-    estim.lastu0[:] = u0
-    return u0, ym0, d0 
+    u0, d0 = estim.model.buffer.u, estim.model.buffer.d
+    y0m = estim.buffer.ym
+    u0  .= u  .- estim.model.uop
+    y0m .= @views ym .- estim.model.yop[estim.i_ym]
+    d0  .= d  .- estim.model.dop
+    estim.lastu0 .= u0
+    return u0, y0m, d0 
 end
 
 @doc raw"""
@@ -150,6 +152,7 @@ measured outputs ``\mathbf{y^m}``.
 function init_estimate!(estim::StateEstimator, ::LinModel, u0, ym0, d0)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     Ĉm, D̂dm = @views Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
+    # TODO: use estim.buffer.x̂ to reduce allocations
     estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; ym0 - D̂dm*d0]
     return nothing
 end
@@ -178,11 +181,11 @@ julia> ŷ = evaloutput(kf)
 """
 function evaloutput(estim::StateEstimator{NT}, d=estim.model.buffer.empty) where NT <: Real
     validate_args(estim.model, d)
-    ŷ0 = Vector{NT}(undef, estim.model.ny)
-    d0 = d - estim.model.dop
+    ŷ0, d0 = estim.model.buffer.y, estim.model.buffer.d
+    d0 .= d .- estim.model.dop
     ĥ!(ŷ0, estim, estim.model, estim.x̂0, d0)
-    ŷ   = ŷ0
-    ŷ .+= estim.model.yop
+    ŷ  = estim.model.buffer.y
+    ŷ .= ŷ0 .+ estim.model.yop
     return ŷ
 end
 
@@ -207,7 +210,7 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
  0.0
 ```
 """
-function updatestate!(estim::StateEstimator, u, ym, d=[])
+function updatestate!(estim::StateEstimator, u, ym, d=estim.model.buffer.empty)
     validate_args(estim, u, ym, d)
     u0, ym0, d0 = remove_op!(estim, u, ym, d)
     x̂0next = update_estimate!(estim, u0, ym0, d0)

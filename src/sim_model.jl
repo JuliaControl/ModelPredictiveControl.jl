@@ -29,13 +29,13 @@ struct SimModelBuffer{NT<:Real}
 end
 
 @doc raw"""
-    SimModelBuffer(nu, nx, ny, nd) -> SimModelBuffer{NT}
+    SimModelBuffer(nu::Int, nx::Int, ny::Int, nd::Int) -> SimModelBuffer{NT}
 
 Create a buffer for `SimModel` objects for inputs, states, outputs, and disturbances.
 
 The buffer is used to store intermediate results during simulation without allocating.
 """
-function SimModelBuffer{NT}(nu, nx, ny, nd) where NT <: Real
+function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int) where NT <: Real
     u = Vector{NT}(undef, nu)
     x = Vector{NT}(undef, nx)
     y = Vector{NT}(undef, ny)

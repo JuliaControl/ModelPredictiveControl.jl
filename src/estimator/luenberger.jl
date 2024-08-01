@@ -20,6 +20,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     B̂d  ::Matrix{NT}
     D̂d  ::Matrix{NT}
     K̂::Matrix{NT}
+    buffer::StateEstimatorBuffer{NT}
     function Luenberger{NT, SM}(
         model, i_ym, nint_u, nint_ym, poles
     ) where {NT<:Real, SM<:LinModel}
@@ -36,13 +37,15 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         end
         lastu0 = zeros(NT, model.nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
+        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
-            K̂
+            K̂,
+            buffer
         )
     end
 end
