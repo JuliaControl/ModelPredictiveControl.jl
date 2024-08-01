@@ -223,7 +223,7 @@ function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, u0, y0m, d0) -> x̂0next
+    update_estimate!(estim::InternalModel, y0m, d0, u0) -> x̂0next
 
 Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -237,7 +237,7 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(estim::InternalModel{NT, SM}, u0, y0m, d0) where {NT<:Real, SM}
+function update_estimate!(estim::InternalModel{NT, SM}, y0m, d0, u0) where {NT<:Real, SM}
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
@@ -259,7 +259,7 @@ function update_estimate!(estim::InternalModel{NT, SM}, u0, y0m, d0) where {NT<:
 end
 
 @doc raw"""
-    init_estimate!(estim::InternalModel, model::LinModel, u0, ym0, d0)
+    init_estimate!(estim::InternalModel, model::LinModel, y0m, d0, u0)
 
 Init `estim.x̂0`/`x̂d`/`x̂s` estimate at steady-state for [`InternalModel`](@ref).
 
@@ -267,7 +267,7 @@ The deterministic estimates `estim.x̂d` start at steady-state using `u0` and `d
 ```math
     \mathbf{x̂_d} = \mathbf{(I - A)^{-1} (B_u u_0 + B_d d_0 + f_{op} - x_{op})}
 ```
-Based on `ym0` argument and current stochastic outputs estimation ``\mathbf{ŷ_s}``, composed
+Based on `y0m` argument and current stochastic outputs estimation ``\mathbf{ŷ_s}``, composed
 of the measured ``\mathbf{ŷ_s^m} = \mathbf{y_0^m} - \mathbf{ŷ_{d0}^m}`` and unmeasured 
 ``\mathbf{ŷ_s^u = 0}`` outputs, the stochastic estimates also start at steady-state:
 ```math
@@ -276,14 +276,14 @@ of the measured ``\mathbf{ŷ_s^m} = \mathbf{y_0^m} - \mathbf{ŷ_{d0}^m}`` and 
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See
 [`init_internalmodel`](@ref) for details.
 """
-function init_estimate!(estim::InternalModel, model::LinModel{NT}, u0, ym0, d0) where NT<:Real
+function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # also updates estim.x̂0 (they are the same object):
     x̂d .= (I - model.A)\(model.Bu*u0 + model.Bd*d0 + model.fop - model.xop)
     ŷd0 = Vector{NT}(undef, model.ny)
     h!(ŷd0, model, x̂d, d0)
     ŷs = zeros(NT, model.ny)
-    ŷs[estim.i_ym] = ym0 - ŷd0[estim.i_ym]  # ŷs=0 for unmeasured outputs
+    ŷs[estim.i_ym] = y0m - ŷd0[estim.i_ym]  # ŷs=0 for unmeasured outputs
     x̂s .= (I-estim.Âs)\estim.B̂s*ŷs
     return nothing
 end

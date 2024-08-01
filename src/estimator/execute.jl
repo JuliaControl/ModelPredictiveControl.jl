@@ -1,17 +1,21 @@
 """
-    remove_op!(estim::StateEstimator, u, ym, d) -> u0, ym0, d0
+    remove_op!(estim::StateEstimator, ym, d, u=nothing) -> y0m, d0, u0
 
-Remove operating points on inputs `u`, measured outputs `ym` and disturbances `d`.
+Remove operating pts on measured outputs `ym`, disturbances `d` and inputs `u` (if provided).
 
-Also store current inputs without operating points `u0` in `estim.lastu0`. This field is 
-used for [`PredictiveController`](@ref) computations.
+If `u` is provided, also store current inputs without operating points `u0` in 
+`estim.lastu0`. This field is used for [`PredictiveController`](@ref) computations.
 """
-function remove_op!(estim::StateEstimator, u, ym, d)
-    u0  = u  - estim.model.uop
-    ym0 = ym - estim.model.yop[estim.i_ym]
+function remove_op!(estim::StateEstimator, ym, d, u=nothing)
+    y0m = ym - estim.model.yop[estim.i_ym]
     d0  = d  - estim.model.dop
-    estim.lastu0[:] = u0
-    return u0, ym0, d0 
+    if isnothing(u)
+        u0 = estim.model.uop
+    else
+        u0  = u - estim.model.uop
+        estim.lastu0[:] = u0
+    end
+    return y0m, d0, u0
 end
 
 @doc raw"""
@@ -113,12 +117,12 @@ true
 """
 function initstate!(estim::StateEstimator, u, ym, d=estim.model.dop)
     # --- validate arguments ---
-    validate_args(estim, u, ym, d)
+    validate_args(estim, ym, d, u)
     # --- init state estimate ----
-    u0, ym0, d0 = remove_op!(estim, u, ym, d)
-    init_estimate!(estim, estim.model, u0, ym0, d0)
+    y0m, d0, u0 = remove_op!(estim, ym, d, u)
+    init_estimate!(estim, estim.model, y0m, d0, u0)
     # --- init covariance error estimate, if applicable ---
-    init_estimate_cov!(estim, u0, ym0, d0)
+    init_estimate_cov!(estim, y0m, d0, u0)
     x̂ = estim.x̂0 + estim.x̂op
     return x̂
 end
@@ -127,11 +131,11 @@ end
 init_estimate_cov!(::StateEstimator, _ , _ , _ ) = nothing
 
 @doc raw"""
-    init_estimate!(estim::StateEstimator, model::LinModel, u0, ym0, d0)
+    init_estimate!(estim::StateEstimator, model::LinModel, y0m, d0, u0)
 
 Init `estim.x̂0` estimate with the steady-state solution if `model` is a [`LinModel`](@ref).
 
-Using `u0`, `ym0` and `d0` arguments (deviation values, see [`setop!`](@ref)), the
+Using `u0`, `y0m` and `d0` arguments (deviation values, see [`setop!`](@ref)), the
 steadystate problem combined to the equality constraint ``\mathbf{ŷ_0^m} = \mathbf{y_0^m}``
 engenders the following system to solve:
 ```math
@@ -147,10 +151,10 @@ engenders the following system to solve:
 in which ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of `estim.Ĉ, estim.D̂d`  that correspond to 
 measured outputs ``\mathbf{y^m}``.
 """
-function init_estimate!(estim::StateEstimator, ::LinModel, u0, ym0, d0)
+function init_estimate!(estim::StateEstimator, ::LinModel, y0m, d0, u0)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     Ĉm, D̂dm = @views Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
-    estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; ym0 - D̂dm*d0]
+    estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; y0m - D̂dm*d0]
     return nothing
 end
 """
@@ -190,6 +194,25 @@ end
 (estim::StateEstimator)(d=estim.model.dop) = evaloutput(estim, d)
 
 @doc raw"""
+    preparestate!(estim::StateEstimator, ym, d=estim.model.dop) -> x̂
+
+Prepare `estim.x̂0` estimate with measured outputs `ym` and dist. `d` for current time step.
+
+This method does nothing if `estim.direct==false` (for delayed estimators). Otherwise, it
+removes the operating points with [`remove_op!`](@ref) and call [`prepare_estimate!`](@ref).
+"""
+function preparestate!(estim::StateEstimator, ym, d=estim.model.dop)
+    if estim.direct
+        validate_args(estim, ym, d)
+        y0m, d0 = remove_op!(estim, ym, d)
+        prepare_estimate!(estim, y0m, d0) # compute x̂0corr
+    end
+    x̂   = copy(estim.x̂0)
+    x̂ .+= estim.x̂op
+    return x̂
+end
+
+@doc raw"""
     updatestate!(estim::StateEstimator, u, ym, d=estim.model.dop) -> x̂
 
 Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
@@ -208,9 +231,9 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
 ```
 """
 function updatestate!(estim::StateEstimator, u, ym, d=estim.model.dop)
-    validate_args(estim, u, ym, d)
-    u0, ym0, d0 = remove_op!(estim, u, ym, d)
-    x̂0next = update_estimate!(estim, u0, ym0, d0)
+    validate_args(estim, ym, d, u)
+    y0m, d0, u0 = remove_op!(estim, ym, d, u)
+    x̂0next  = update_estimate!(estim, y0m, d0, u0)
     x̂next   = x̂0next
     x̂next .+= estim.x̂op
     return x̂next
@@ -218,11 +241,11 @@ end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
 """
-    validate_args(estim::StateEstimator, u, ym, d)
+    validate_args(estim::StateEstimator, ym, d, u=nothing)
 
-Check `u`, `ym` and `d` sizes against `estim` dimensions.
+Check `ym`, `d` and `u` sizes against `estim` dimensions.
 """
-function validate_args(estim::StateEstimator, u, ym, d)
+function validate_args(estim::StateEstimator, ym, d, u=nothing)
     validate_args(estim.model, d, u)
     nym = estim.nym
     size(ym) ≠ (nym,) && throw(DimensionMismatch("ym size $(size(ym)) ≠ meas. output size ($nym,)"))

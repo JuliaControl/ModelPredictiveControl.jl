@@ -19,6 +19,12 @@ setconstraint!
 evaloutput
 ```
 
+## Prepare State x
+
+```@docs
+preparestate!
+```
+
 ## Update State x
 
 ```@docs

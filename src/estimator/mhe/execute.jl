@@ -17,7 +17,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
 end
 
 @doc raw"""
-    update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0) -> x̂0next
+    update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0) -> x̂0next
     
 Update [`MovingHorizonEstimator`](@ref) state `estim.x̂0`.
 
@@ -28,7 +28,7 @@ augmented model from ``j = N_k-1`` to ``0`` inclusively. Afterward, if ``k ≥ H
 arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is estimated
 using `estim.covestim` object.
 """
-function update_estimate!(estim::MovingHorizonEstimator{NT}, u0, y0m, d0) where NT<:Real
+function update_estimate!(estim::MovingHorizonEstimator{NT}, y0m, d0, u0) where NT<:Real
     model, optim, x̂0 = estim.model, estim.optim, estim.x̂0
     add_data_windows!(estim::MovingHorizonEstimator, u0, d0, y0m)
     initpred!(estim, model)
@@ -545,7 +545,7 @@ function setmodel_estimator!(
     for i in 1:He
         # convert x̂0 to x̂ with the old operating point:
         estim.X̂0[(1+nx̂*(i-1)):(nx̂*i)]    .+= x̂op_old 
-        # convert ym0 to ym with the old operating point:
+        # convert y0m to ym with the old operating point:
         estim.Y0m[(1+nym*(i-1)):(nym*i)] .+= @views yop_old[estim.i_ym]
         # convert u0 to u with the old operating point:
         estim.U0[(1+nu*(i-1)):(nu*i)]    .+= uop_old

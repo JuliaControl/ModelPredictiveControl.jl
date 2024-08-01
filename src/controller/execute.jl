@@ -254,7 +254,7 @@ function predictstoch!(
     ŷd = similar(estim.model.yop)
     h!(ŷd, estim.model, estim.x̂d, d - estim.model.dop)
     ŷd .+= estim.model.yop 
-    ŷs = zeros(NT, estim.model.ny)
+    ŷs = zeros(NT, ny)
     ŷs[estim.i_ym] .= @views ym .- ŷd[estim.i_ym]  # ŷs=0 for unmeasured outputs
     Ŷs = F
     mul!(Ŷs, mpc.Ks, estim.x̂s)
