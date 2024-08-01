@@ -17,6 +17,7 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    buffer::SimModelBuffer{NT}
     function NonLinModel{NT, F, H, DS}(
         f!::F, h!::H, solver::DS, Ts, nu, nx, ny, nd
     ) where {NT<:Real, F<:Function, H<:Function, DS<:DiffSolver}
@@ -31,13 +32,15 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0  = zeros(NT, nx)
+        buffer = SimModelBuffer{NT}(nx, nu, ny, nd)
         return new{NT, F, H, DS}(
             x0, 
             f!, h!, 
             solver, Ts, 
             nu, nx, ny, nd, 
             uop, yop, dop, xop, fop,
-            uname, yname, dname, xname
+            uname, yname, dname, xname,
+            buffer
         )
     end
 end

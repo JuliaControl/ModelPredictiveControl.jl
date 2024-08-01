@@ -19,6 +19,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    buffer::SimModelBuffer{NT}
     function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
         A, Bu = to_mat(A, 1, 1), to_mat(Bu, 1, 1)
         nu, nx = size(Bu, 2), size(A, 2)
@@ -44,13 +45,15 @@ struct LinModel{NT<:Real} <: SimModel{NT}
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0  = zeros(NT, nx)
+        buffer = SimModelBuffer{NT}(nx, nu, ny, nd)
         return new{NT}(
             A, Bu, C, Bd, Dd, 
             x0, 
             Ts, 
             nu, nx, ny, nd, 
             uop, yop, dop, xop, fop,
-            uname, yname, dname, xname
+            uname, yname, dname, xname,
+            buffer
         )
     end
 end
