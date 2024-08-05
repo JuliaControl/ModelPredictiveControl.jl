@@ -41,9 +41,11 @@ Simply call `plot` on them.
 
 # Examples
 ```jldoctest
-julia> model = LinModel(tf(1, [1, 1]), 1.0); N = 5; U_data = fill(1.0, 1, N);
+julia> model = LinModel(tf(1, [1, 1]), 1.0);
 
-julia> Y_data = reduce(hcat, (updatestate!(model, U_data[:, i]); model()) for i=1:N)
+julia> N = 5; U_data = fill(1.0, 1, N); Y_data = zeros(1, N);
+
+julia> for i=1:N; updatestate!(model, U_data[:, i]); Y_data[:, i] = model(); end; Y_data
 1×5 Matrix{Float64}:
  0.632121  0.864665  0.950213  0.981684  0.993262
 

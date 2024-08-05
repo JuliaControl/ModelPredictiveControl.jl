@@ -21,9 +21,11 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     D̂d  ::Matrix{NT}
     K̂::Matrix{NT}
     direct::Bool
+    buffer::StateEstimatorBuffer{NT}
     function Luenberger{NT, SM}(
         model, i_ym, nint_u, nint_ym, poles; direct=true
     ) where {NT<:Real, SM<:LinModel}
+        nu, ny, nd = model.nu, model.ny, model.nd
         nym, nyu = validate_ym(model, i_ym)
         validate_luenberger(model, nint_u, nint_ym, poles)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -35,8 +37,9 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         catch
             error("Cannot compute the Luenberger gain K̂ with specified poles.")
         end
-        lastu0 = zeros(NT, model.nu)
+        lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0,
@@ -44,7 +47,8 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             K̂,
-            direct
+            direct,
+            buffer
         )
     end
 end

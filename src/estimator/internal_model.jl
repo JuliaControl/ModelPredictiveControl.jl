@@ -25,9 +25,11 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     Âs::Matrix{NT}
     B̂s::Matrix{NT}
     direct::Bool
+    buffer::StateEstimatorBuffer{NT}
     function InternalModel{NT, SM}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
     ) where {NT<:Real, SM<:SimModel}
+        nu, ny, nd = model.nu, model.ny, model.nd
         nym, nyu = validate_ym(model, i_ym)
         validate_internalmodel(model, nym, Csm, Dsm)
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
@@ -35,12 +37,13 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         nx̂ = model.nx
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        lastu0 = zeros(NT, model.nu)
+        lastu0 = zeros(NT, nu)
         # x̂0 and x̂d are same object (updating x̂d will update x̂0):
         x̂d = x̂0 = zeros(NT, model.nx) 
         x̂s = zeros(NT, nxs)
         y0m, d0 = zeros(NT, nym), zeros(NT, model.nd)
         direct = true # InternalModel always uses direct transmission from ym
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, 
@@ -49,7 +52,8 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d,
             Âs, B̂s,
-            direct
+            direct,
+            buffer
         )
     end
 end
