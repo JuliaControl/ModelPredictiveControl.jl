@@ -109,7 +109,7 @@ end
 
 
 """
-    prepare_estimate_obsv!(estim::Luenberger, y0m, d0, _ ) -> x̂0corr
+    prepare_estimate_obsv!(estim::Luenberger, y0m, d0, _ )
 
 Same than [`prepare_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
@@ -119,7 +119,7 @@ end
 
 
 """
-    update_estimate!(estim::Luenberger, y0m, d0, u0) -> x̂0next
+    update_estimate!(estim::Luenberger, y0m, d0, u0)
 
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """

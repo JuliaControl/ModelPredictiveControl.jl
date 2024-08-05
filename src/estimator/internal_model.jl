@@ -234,18 +234,18 @@ function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
 end
 
 """
-    prepare_estimate!(estim::InternalModel, y0m, d0) -> x̂0
+    prepare_estimate!(estim::InternalModel, y0m, d0)
 
 Save the current measured output `y0m` and disturbance `d0` for the stochastic predictions.
 """
 function prepare_estimate!(estim::InternalModel, y0m, d0)
     estim.y0m .= y0m
     estim.d0  .= d0
-    return estim.x̂0
+    return nothing
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, y0m, d0, u0) -> x̂0next
+    update_estimate!(estim::InternalModel, y0m, d0, u0)
 
 Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -277,7 +277,7 @@ function update_estimate!(estim::InternalModel{NT, SM}, y0m, d0, u0) where {NT<:
     x̂0next    = x̂dnext
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
-    return x̂0next
+    return nothing
 end
 
 @doc raw"""

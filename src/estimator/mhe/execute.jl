@@ -17,7 +17,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
 end
 
 @doc raw"""
-    update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0) -> x̂0next
+    update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0)
     
 Update [`MovingHorizonEstimator`](@ref) state `estim.x̂0`.
 
@@ -84,7 +84,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, y0m, d0, u0) where 
     Nk == estim.He && update_cov!(estim::MovingHorizonEstimator)
     x̂0next    = X̂0[end-nx̂+1:end] 
     estim.x̂0 .= x̂0next
-    return x̂0next
+    return nothing
 end
 
 

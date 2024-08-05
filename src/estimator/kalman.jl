@@ -188,7 +188,7 @@ function setmodel_estimator!(::SteadyKalmanFilter, args...)
 end
 
 @doc raw"""
-    prepare_estimate!(estim::SteadyKalmanFilter, y0m, d0) -> x̂0corr
+    prepare_estimate!(estim::SteadyKalmanFilter, y0m, d0)
 
 Prepare `estim.x̂0` with measured outputs `y0m` and disturbances `d0` for current time step.
 """
@@ -208,11 +208,11 @@ function prepare_estimate_obsv!(estim::StateEstimator, y0m, d0)
     v̂ .= y0m .- ŷ0m
     x̂0corr = x̂0
     mul!(x̂0corr, K̂, v̂, 1, 1)
-    return x̂0corr
+    return nothing
 end
 
 @doc raw"""
-    update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0) -> x̂0next
+    update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
 
 Update `estim.x̂0` estimate with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -240,7 +240,7 @@ function update_estimate_obsv!(estim::StateEstimator, y0m, d0, u0)
     mul!(x̂0next, B̂d, d0, 1, 1)
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
-    return x̂0next
+    return nothing
 end
 
 struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
@@ -389,7 +389,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::KalmanFilter, y0m, d0, u0) -> x̂0next
+    update_estimate!(estim::KalmanFilter, y0m, d0, u0)
 
 Update [`KalmanFilter`](@ref) state `estim.x̂0` and estimation error covariance `estim.P̂`.
 
@@ -633,7 +633,7 @@ function init_ukf(::SimModel{NT}, nx̂, α, β, κ) where {NT<:Real}
 end
 
 @doc raw"""
-    update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0) -> x̂0next
+    update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     
 Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂0` and covariance estimate `estim.P̂`.
 
@@ -730,7 +730,7 @@ function update_estimate!(estim::UnscentedKalmanFilter{NT}, y0m, d0, u0) where N
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
     estim.P̂  .= P̂next
-    return x̂0next
+    return nothing
 end
 
 struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
@@ -885,7 +885,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::ExtendedKalmanFilter, y0m, d0, u0) -> x̂0next
+    update_estimate!(estim::ExtendedKalmanFilter, y0m, d0, u0)
 
 Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂0` and covariance `estim.P̂`.
 
@@ -980,12 +980,12 @@ function prepare_estimate_kf!(
     v̂ .= y0m .- ŷ0m
     x̂0corr = x̂0
     mul!(x̂0corr, K̂, v̂, 1, 1)
-    return x̂0corr
+    return nothing
 end
 
 
 """
-    update_estimate_kf!(estim::StateEstimator, y0m, d0, u0, Ĉm, Â) -> x̂0next
+    update_estimate_kf!(estim::StateEstimator, y0m, d0, u0, Ĉm, Â)
 
 Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
 
@@ -1008,5 +1008,5 @@ function update_estimate_kf!(estim::StateEstimator{NT}, y0m, d0, u0, Ĉm, Â) 
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
     estim.P̂  .= P̂next
-    return x̂0next
+    return nothing
 end
