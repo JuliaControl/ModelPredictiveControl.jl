@@ -5,7 +5,7 @@ Abstract supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
 
 ---
 
-    (model::SimModel)(d=model.dop) -> y
+    (model::SimModel)(d=[]) -> y
 
 Functor allowing callable `SimModel` object as an alias for [`evaloutput`](@ref).
 
@@ -19,6 +19,31 @@ julia> y = model()
 ```
 """
 abstract type SimModel{NT<:Real} end
+
+struct SimModelBuffer{NT<:Real}
+    u::Vector{NT}
+    x::Vector{NT}
+    y::Vector{NT}
+    d::Vector{NT}
+    empty::Vector{NT}
+end
+
+@doc raw"""
+    SimModelBuffer(nu::Int, nx::Int, ny::Int, nd::Int) -> SimModelBuffer{NT}
+
+Create a buffer for `SimModel` objects for inputs, states, outputs, and disturbances.
+
+The buffer is used to store intermediate results during simulation without allocating.
+"""
+function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int) where NT <: Real
+    u = Vector{NT}(undef, nu)
+    x = Vector{NT}(undef, nx)
+    y = Vector{NT}(undef, ny)
+    d = Vector{NT}(undef, nd)
+    empty = Vector{NT}(undef, 0)
+    return SimModelBuffer{NT}(u, x, y, d, empty)
+end
+
 
 @doc raw"""
     setop!(model; uop=nothing, yop=nothing, dop=nothing, xop=nothing, fop=nothing) -> model
@@ -160,7 +185,7 @@ end
 detailstr(model::SimModel) = ""
 
 @doc raw"""
-    initstate!(model::SimModel, u, d=model.dop) -> x
+    initstate!(model::SimModel, u, d=[]) -> x
 
 Init `model.x0` with manipulated inputs `u` and measured disturbances `d` steady-state.
 
@@ -182,16 +207,19 @@ julia> x ≈ updatestate!(model, u)
 true
 ```
 """
-function initstate!(model::SimModel, u, d=model.dop)
+function initstate!(model::SimModel, u, d=model.buffer.empty)
     validate_args(model::SimModel, d, u)
-    u0, d0 = u - model.uop, d - model.dop
+    u0, d0 = model.buffer.u, model.buffer.d
+    u0 .= u .- model.uop
+    d0 .= d .- model.dop
     steadystate!(model, u0, d0)
-    x = model.x0 + model.xop
+    x  = model.buffer.x
+    x .= model.x0 .+ model.xop
     return x
 end
 
 """
-    updatestate!(model::SimModel, u, d=model.dop) -> x
+    updatestate!(model::SimModel, u, d=[]) -> x
 
 Update `model.x0` states with current inputs `u` and measured disturbances `d`.
 
@@ -204,10 +232,11 @@ julia> x = updatestate!(model, [1])
  1.0
 ```
 """
-function updatestate!(model::SimModel{NT}, u, d=model.dop) where NT <: Real
+function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: Real
     validate_args(model::SimModel, d, u)
-    xnext0 = Vector{NT}(undef, model.nx)
-    u0, d0 = u - model.uop, d - model.dop
+    u0, d0, xnext0 = model.buffer.u, model.buffer.d, model.buffer.x
+    u0 .= u .- model.uop
+    d0 .= d .- model.dop
     f!(xnext0, model, model.x0, u0, d0)
     xnext0  .+= model.fop .- model.xop
     model.x0 .= xnext0
@@ -217,7 +246,7 @@ function updatestate!(model::SimModel{NT}, u, d=model.dop) where NT <: Real
 end
 
 """
-    evaloutput(model::SimModel, d=model.dop) -> y
+    evaloutput(model::SimModel, d=[]) -> y
 
 Evaluate `SimModel` outputs `y` from `model.x0` states and measured disturbances `d`.
 
@@ -232,10 +261,10 @@ julia> y = evaloutput(model)
  20.0
 ```
 """
-function evaloutput(model::SimModel{NT}, d=model.dop) where NT <: Real
+function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
     validate_args(model, d)
-    y0 = Vector{NT}(undef, model.ny)
-    d0 = d - model.dop
+    d0, y0  = model.buffer.d, model.buffer.y
+    d0 .= d .- model.dop
     h!(y0, model, model.x0, d0)
     y   = y0
     y .+= model.yop
@@ -262,7 +291,7 @@ to_mat(A::Real, dims...) = fill(A, dims)
 
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
-(model::SimModel)(d=model.dop) = evaloutput(model::SimModel, d)
+(model::SimModel)(d=model.buffer.empty) = evaloutput(model::SimModel, d)
 
 include("model/linmodel.jl")
 include("model/solver.jl")

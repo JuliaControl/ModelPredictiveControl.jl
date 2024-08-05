@@ -102,10 +102,11 @@ struct MovingHorizonEstimator{
     x̂0arr_old::Vector{NT}
     P̂arr_old ::Hermitian{NT, Matrix{NT}}
     Nk::Vector{Int}
+    buffer::StateEstimatorBuffer{NT}
     function MovingHorizonEstimator{NT, SM, JM, CE}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim::JM, covestim::CE
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
-        nu, nd = model.nu, model.nd
+        nu, ny, nd = model.nu, model.ny, model.nd
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
@@ -114,7 +115,7 @@ struct MovingHorizonEstimator{
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
-        lastu0 = zeros(NT, model.nu)
+        lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         P̂_0 = Hermitian(P̂_0, :L)
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
@@ -140,6 +141,7 @@ struct MovingHorizonEstimator{
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(P̂_0)
         Nk = [0]
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         estim = new{NT, SM, JM, CE}(
             model, optim, con, covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
@@ -151,7 +153,8 @@ struct MovingHorizonEstimator{
             H̃, q̃, p,
             P̂_0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He, Cwt,
             X̂op, X̂0, Y0m, U0, D0, Ŵ, 
-            x̂0arr_old, P̂arr_old, Nk
+            x̂0arr_old, P̂arr_old, Nk,
+            buffer
         )
         init_optimization!(estim, model, optim)
         return estim

@@ -3,7 +3,7 @@ Abstract supertype of all state estimators.
 
 ---
 
-    (estim::StateEstimator)(d=estim.model.dop) -> ŷ
+    (estim::StateEstimator)(d=[]) -> ŷ
 
 Functor allowing callable `StateEstimator` object as an alias for [`evaloutput`](@ref).
 
@@ -17,6 +17,34 @@ julia> ŷ = kf()
 ```
 """
 abstract type StateEstimator{NT<:Real} end
+
+struct StateEstimatorBuffer{NT<:Real}
+    u ::Vector{NT}
+    x̂ ::Vector{NT}
+    ym::Vector{NT}
+    ŷ ::Vector{NT}
+    d ::Vector{NT}
+    empty::Vector{NT}
+end
+
+@doc raw"""
+    StateEstimatorBuffer(nx̂::Int, nym::Int) -> StateEstimatorBuffer{NT}
+
+Create a buffer for `StateEstimator` objects for estimated states and measured outputs.
+
+The buffer is used to store intermediate results during simulation without allocating.
+"""
+function StateEstimatorBuffer{NT}(
+    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int
+) where NT <: Real
+    u  = Vector{NT}(undef, nu)
+    x̂  = Vector{NT}(undef, nx̂)
+    ym = Vector{NT}(undef, nym)
+    ŷ  = Vector{NT}(undef, ny)
+    d  = Vector{NT}(undef, nd)
+    empty = Vector{NT}(undef, 0)
+    return StateEstimatorBuffer{NT}(u, x̂, ym, ŷ, d, empty)
+end
 
 const IntVectorOrInt = Union{Int, Vector{Int}}
 

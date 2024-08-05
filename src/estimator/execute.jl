@@ -7,11 +7,13 @@ Also store current inputs without operating points `u0` in `estim.lastu0`. This 
 used for [`PredictiveController`](@ref) computations.
 """
 function remove_op!(estim::StateEstimator, u, ym, d)
-    u0  = u  - estim.model.uop
-    ym0 = ym - estim.model.yop[estim.i_ym]
-    d0  = d  - estim.model.dop
-    estim.lastu0[:] = u0
-    return u0, ym0, d0 
+    u0, d0 = estim.buffer.u, estim.buffer.d
+    y0m = estim.buffer.ym
+    u0  .= u  .- estim.model.uop
+    y0m .= @views ym .- estim.model.yop[estim.i_ym]
+    d0  .= d  .- estim.model.dop
+    estim.lastu0 .= u0
+    return u0, y0m, d0 
 end
 
 @doc raw"""
@@ -79,7 +81,7 @@ end
 
 
 @doc raw"""
-    initstate!(estim::StateEstimator, u, ym, d=estim.model.dop) -> x̂
+    initstate!(estim::StateEstimator, u, ym, d=[]) -> x̂
 
 Init `estim.x̂0` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
@@ -111,7 +113,7 @@ julia> evaloutput(estim) ≈ y
 true
 ```
 """
-function initstate!(estim::StateEstimator, u, ym, d=estim.model.dop)
+function initstate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     # --- validate arguments ---
     validate_args(estim, u, ym, d)
     # --- init state estimate ----
@@ -150,6 +152,7 @@ measured outputs ``\mathbf{y^m}``.
 function init_estimate!(estim::StateEstimator, ::LinModel, u0, ym0, d0)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     Ĉm, D̂dm = @views Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
+    # TODO: use estim.buffer.x̂ to reduce allocations
     estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; ym0 - D̂dm*d0]
     return nothing
 end
@@ -161,7 +164,7 @@ Left `estim.x̂0` estimate unchanged if `model` is not a [`LinModel`](@ref).
 init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
 
 @doc raw"""
-    evaloutput(estim::StateEstimator, d=estim.model.dop) -> ŷ
+    evaloutput(estim::StateEstimator, d=[]) -> ŷ
 
 Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂0` states and disturbances `d`.
 
@@ -176,10 +179,10 @@ julia> ŷ = evaloutput(kf)
  20.0
 ```
 """
-function evaloutput(estim::StateEstimator{NT}, d=estim.model.dop) where NT <: Real
+function evaloutput(estim::StateEstimator{NT}, d=estim.buffer.empty) where NT <: Real
     validate_args(estim.model, d)
-    ŷ0 = Vector{NT}(undef, estim.model.ny)
-    d0 = d - estim.model.dop
+    ŷ0, d0 = estim.buffer.ŷ, estim.buffer.d
+    d0 .= d .- estim.model.dop
     ĥ!(ŷ0, estim, estim.model, estim.x̂0, d0)
     ŷ   = ŷ0
     ŷ .+= estim.model.yop
@@ -187,10 +190,10 @@ function evaloutput(estim::StateEstimator{NT}, d=estim.model.dop) where NT <: Re
 end
 
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
-(estim::StateEstimator)(d=estim.model.dop) = evaloutput(estim, d)
+(estim::StateEstimator)(d=estim.buffer.empty) = evaloutput(estim, d)
 
 @doc raw"""
-    updatestate!(estim::StateEstimator, u, ym, d=estim.model.dop) -> x̂
+    updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂
 
 Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
 
@@ -207,10 +210,10 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
  0.0
 ```
 """
-function updatestate!(estim::StateEstimator, u, ym, d=estim.model.dop)
+function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     validate_args(estim, u, ym, d)
     u0, ym0, d0 = remove_op!(estim, u, ym, d)
-    x̂0next = update_estimate!(estim, u0, ym0, d0)
+    x̂0next  = update_estimate!(estim, u0, ym0, d0)
     x̂next   = x̂0next
     x̂next .+= estim.x̂op
     return x̂next
