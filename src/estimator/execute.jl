@@ -7,23 +7,14 @@ If `u` is provided, also store current inputs without operating points `u0` in
 `estim.lastu0`. This field is used for [`PredictiveController`](@ref) computations.
 """
 function remove_op!(estim::StateEstimator, ym, d, u=nothing)
-    y0m = ym - estim.model.yop[estim.i_ym]
-    d0  = d  - estim.model.dop
-    if isnothing(u)
-        u0 = estim.model.uop
-    else
-        u0  = u - estim.model.uop
-        estim.lastu0[:] = u0
-    end
-    return y0m, d0, u0
-function remove_op!(estim::StateEstimator, u, ym, d)
-    u0, d0 = estim.buffer.u, estim.buffer.d
-    y0m = estim.buffer.ym
-    u0  .= u  .- estim.model.uop
+    y0m, u0, d0 = estim.buffer.ym, estim.buffer.u, estim.buffer.d
     y0m .= @views ym .- estim.model.yop[estim.i_ym]
     d0  .= d  .- estim.model.dop
-    estim.lastu0 .= u0
-    return u0, y0m, d0 
+    if !isnothing(u)
+        u0 .= u .- estim.model.uop
+        estim.lastu0 .= u0
+    end
+    return y0m, d0, u0
 end
 
 @doc raw"""
