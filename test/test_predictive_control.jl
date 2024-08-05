@@ -87,7 +87,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_im, r; ym)
+        preparestate!(mpc_im, ym)
+        u = moveinput!(mpc_im, r)
         updatestate!(mpc_im, u, ym)
         updatestate!(linmodel, u)
     end
@@ -98,7 +99,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_nint_u, r; ym)
+        preparestate!(mpc_nint_u, ym)
+        u = moveinput!(mpc_nint_u, r)
         updatestate!(mpc_nint_u, u, ym)
         updatestate!(linmodel, u)
     end
@@ -109,7 +111,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_nint_ym, r; ym)
+        preparestate!(mpc_nint_ym, ym)
+        u = moveinput!(mpc_nint_ym, r)
         updatestate!(mpc_nint_ym, u, ym)
         updatestate!(linmodel, u)
     end
@@ -355,7 +358,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_im, r; ym)
+        preparestate!(mpc_im, ym)
+        u = moveinput!(mpc_im, r)
         updatestate!(mpc_im, u, ym)
         updatestate!(linmodel, u)
     end
@@ -366,7 +370,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_nint_u, r; ym)
+        preparestate!(mpc_nint_u, ym)
+        u = moveinput!(mpc_nint_u, r)
         updatestate!(mpc_nint_u, u, ym)
         updatestate!(linmodel, u)
     end
@@ -377,7 +382,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_nint_ym, r; ym)
+        preparestate!(mpc_nint_ym, ym)
+        u = moveinput!(mpc_nint_ym, r)
         updatestate!(mpc_nint_ym, u, ym)
         updatestate!(linmodel, u)
     end
@@ -547,7 +553,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(nmpc_im, r; ym)
+        preparestate!(nmpc_im, ym)
+        u = moveinput!(nmpc_im, r)
         updatestate!(nmpc_im, u, ym)
         updatestate!(linmodel, u)
     end
@@ -558,7 +565,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(nmpc_nint_u, r; ym)
+        preparestate!(nmpc_nint_u, ym)
+        u = moveinput!(nmpc_nint_u, r)
         updatestate!(nmpc_nint_u, u, ym)
         updatestate!(linmodel, u)
     end
@@ -569,7 +577,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(nmpc_nint_ym, r; ym)
+        preparestate!(nmpc_nint_ym, ym)
+        u = moveinput!(nmpc_nint_ym, r)
         updatestate!(nmpc_nint_ym, u, ym)
         updatestate!(linmodel, u)
     end
