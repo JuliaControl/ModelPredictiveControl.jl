@@ -81,19 +81,23 @@ end
     setstate!(skalmanfilter1, [1,2,3,4])
     @test skalmanfilter1.x̂0 ≈ [1,2,3,4]
     for i in 1:100
+        preparestate!(skalmanfilter1, [50, 30])
         updatestate!(skalmanfilter1, [11, 52], [50, 30])
     end
     @test skalmanfilter1() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(skalmanfilter1, [51, 32])
         updatestate!(skalmanfilter1, [10, 50], [51, 32])
     end
     @test skalmanfilter1() ≈ [51, 32] atol=1e-3
-    skalmanfilter2 = SteadyKalmanFilter(linmodel1, nint_u=[1, 1])
+    skalmanfilter2 = SteadyKalmanFilter(linmodel1, nint_u=[1, 1], direct=false)
     for i in 1:100
+        preparestate!(skalmanfilter2, [50, 30])
         updatestate!(skalmanfilter2, [11, 52], [50, 30])
     end
     @test skalmanfilter2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(skalmanfilter2, [51, 32])
         updatestate!(skalmanfilter2, [10, 50], [51, 32])
     end
     @test skalmanfilter2() ≈ [51, 32] atol=1e-3
@@ -175,19 +179,23 @@ end
     setstate!(kalmanfilter1, [1,2,3,4])
     @test kalmanfilter1.x̂0 ≈ [1,2,3,4]
     for i in 1:1000
+        preparestate!(kalmanfilter1, [50, 30])
         updatestate!(kalmanfilter1, [11, 52], [50, 30])
     end
     @test kalmanfilter1() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(kalmanfilter1, [51, 32])
         updatestate!(kalmanfilter1, [10, 50], [51, 32])
     end
     @test kalmanfilter1() ≈ [51, 32] atol=1e-3
-    kalmanfilter2 = KalmanFilter(linmodel1, nint_u=[1, 1])
+    kalmanfilter2 = KalmanFilter(linmodel1, nint_u=[1, 1], direct=false)
     for i in 1:100
+        preparestate!(kalmanfilter2, [50, 30])
         updatestate!(kalmanfilter2, [11, 52], [50, 30])
     end
     @test kalmanfilter2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(kalmanfilter2, [51, 32])
         updatestate!(kalmanfilter2, [10, 50], [51, 32])
     end
     @test kalmanfilter2() ≈ [51, 32] atol=1e-3
@@ -265,29 +273,33 @@ end
     
 @testset "Luenberger estimator methods" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    ukf1 = Luenberger(linmodel1, nint_ym=[1, 1])
-    @test updatestate!(ukf1, [10, 50], [50, 30]) ≈ zeros(4)
-    @test updatestate!(ukf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
-    @test ukf1.x̂0 ≈ zeros(4)
-    @test evaloutput(ukf1) ≈ ukf1() ≈ [50, 30]
-    @test evaloutput(ukf1, Float64[]) ≈ ukf1(Float64[]) ≈ [50, 30]
-    @test initstate!(ukf1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
-    setstate!(ukf1, [1,2,3,4])
-    @test ukf1.x̂0 ≈ [1,2,3,4]
+    lo1 = Luenberger(linmodel1, nint_ym=[1, 1])
+    @test updatestate!(lo1, [10, 50], [50, 30]) ≈ zeros(4)
+    @test updatestate!(lo1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
+    @test lo1.x̂0 ≈ zeros(4)
+    @test evaloutput(lo1) ≈ lo1() ≈ [50, 30]
+    @test evaloutput(lo1, Float64[]) ≈ lo1(Float64[]) ≈ [50, 30]
+    @test initstate!(lo1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    setstate!(lo1, [1,2,3,4])
+    @test lo1.x̂0 ≈ [1,2,3,4]
     for i in 1:100
-        updatestate!(ukf1, [11, 52], [50, 30])
+        preparestate!(lo1, [50, 30])
+        updatestate!(lo1, [11, 52], [50, 30])
     end
-    @test ukf1() ≈ [50, 30] atol=1e-3
+    @test lo1() ≈ [50, 30] atol=1e-3
     for i in 1:100
-        updatestate!(ukf1, [10, 50], [51, 32])
+        preparestate!(lo1, [51, 32])
+        updatestate!(lo1, [10, 50], [51, 32])
     end
-    @test ukf1() ≈ [51, 32] atol=1e-3
-    lo2 = Luenberger(linmodel1, nint_u=[1, 1])
+    @test lo1() ≈ [51, 32] atol=1e-3
+    lo2 = Luenberger(linmodel1, nint_u=[1, 1], direct=false)
     for i in 1:100
+        preparestate!(lo2, [50, 30])
         updatestate!(lo2, [11, 52], [50, 30])
     end
     @test lo2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(lo2, [51, 32])
         updatestate!(lo2, [10, 50], [51, 32])
     end
     @test lo2() ≈ [51, 32] atol=1e-3
@@ -494,19 +506,23 @@ end
     setstate!(ukf1, [1,2,3,4])
     @test ukf1.x̂0 ≈ [1,2,3,4]
     for i in 1:100
+        preparestate!(ukf1, [50, 30])
         updatestate!(ukf1, [11, 52], [50, 30])
     end
     @test ukf1() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(ukf1, [51, 32])
         updatestate!(ukf1, [10, 50], [51, 32])
     end
     @test ukf1() ≈ [51, 32] atol=1e-3
-    ukf2 = UnscentedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
+    ukf2 = UnscentedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     for i in 1:100
+        preparestate!(ukf2, [50, 30])
         updatestate!(ukf2, [11, 52], [50, 30])
     end
     @test ukf2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(ukf2, [51, 32])
         updatestate!(ukf2, [10, 50], [51, 32])
     end
     @test ukf2() ≈ [51, 32] atol=1e-3
@@ -617,19 +633,23 @@ end
     setstate!(ekf1, [1,2,3,4])
     @test ekf1.x̂0 ≈ [1,2,3,4]
     for i in 1:100
+        preparestate!(ekf1, [50, 30])
         updatestate!(ekf1, [11, 52], [50, 30])
     end
     @test ekf1() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(ekf1, [51, 32])
         updatestate!(ekf1, [10, 50], [51, 32])
     end
     @test ekf1() ≈ [51, 32] atol=1e-3
-    ekf2 = ExtendedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
+    ekf2 = ExtendedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     for i in 1:100
+        preparestate!(ekf2, [50, 30])
         updatestate!(ekf2, [11, 52], [50, 30])
     end
     @test ekf2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(ekf2, [51, 32])
         updatestate!(ekf2, [10, 50], [51, 32])
     end
     @test ekf2() ≈ [51, 32] atol=1e-3
