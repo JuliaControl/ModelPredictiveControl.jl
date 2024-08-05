@@ -359,12 +359,13 @@ function sim_adapt!(mpc, nonlinmodel, N, ry, plant, x_0, x̂_0, y_step=[0])
     x̂ = x̂_0
     for i = 1:N
         y = plant() + y_step
+        x̂ = preparestate!(mpc, y)
         u = moveinput!(mpc, ry)
         linmodel = linearize(nonlinmodel; u, x=x̂[1:2])
         setmodel!(mpc, linmodel)
         U_data[:,i], Y_data[:,i], Ry_data[:,i] = u, y, ry
-        x̂ = updatestate!(mpc, u, y) # update mpc state estimate
-        updatestate!(plant, u)      # update plant simulator
+        updatestate!(mpc, u, y) # update mpc state estimate
+        updatestate!(plant, u)  # update plant simulator
     end
     res = SimResult(mpc, U_data, Y_data; Ry_data)
     return res
