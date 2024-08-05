@@ -198,17 +198,37 @@ end
 
 Prepare `estim.x̂0` estimate with measured outputs `ym` and dist. `d` for current time step.
 
-This method does nothing if `estim.direct==false` (for delayed estimators). Otherwise, it
-removes the operating points with [`remove_op!`](@ref) and call [`prepare_estimate!`](@ref).
+This function should be called at the beginning of each discrete time step. Its behavior
+depends if `estim` is a [`StateEstimator`] in the current/filter (1) or delayed/predictor (2) 
+form:
+
+1. If `estim.direct` is `true`, it removes the operating points with [`remove_op!`](@ref),
+   calls [`correct_estimate!`](@ref) and returns the corrected state estimate 
+   ``\mathbf{x̂}_k(k)``.
+2. Else, it does nothing and returns the current best estimate ``\mathbf{x̂}_{k-1}(k)``.
+
+# Examples
+```jldoctest
+julia> estim1 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=false);
+
+julia> preparestate!(estim1, [1])
+1-element Vector{Float64}:
+ 0.0
+
+julia> estim2 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=true);
+
+julia> round.(preparestate!(estim2, [1]), digits=3)
+1-element Vector{Float64}:
+ 0.01
 """
 function preparestate!(estim::StateEstimator, ym, d=estim.model.dop)
     if estim.direct
         validate_args(estim, ym, d)
         y0m, d0 = remove_op!(estim, ym, d)
-        prepare_estimate!(estim, y0m, d0) # compute x̂0corr
+        correct_estimate!(estim, y0m, d0) # compute x̂0corr
     end
-    x̂   = copy(estim.x̂0)
-    x̂ .+= estim.x̂op
+    x̂  = estim.buffer.x̂
+    x̂ .= estim.x̂0 .+ estim.x̂op
     return x̂
 end
 
@@ -217,12 +237,17 @@ end
 
 Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
 
-The method removes the operating points with [`remove_op!`](@ref) and call 
-[`update_estimate!`](@ref).
+This function should be called at the end of each discrete time step. It removes the 
+operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and returns the
+state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
+should be called prior to this one to correct the estimate when applicable (`estim.direct ==
+true`). 
 
 # Examples
 ```jldoctest
 julia> kf = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
+
+julia> preparestate!(kf, [0]);
 
 julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_ym argument)
 2-element Vector{Float64}:
@@ -233,9 +258,9 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
 function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     validate_args(estim, ym, d, u)
     y0m, d0, u0 = remove_op!(estim, ym, d, u)
-    x̂0next   = update_estimate!(estim, y0m, d0, u0)
-    x̂next   = x̂0next
-    x̂next .+= estim.x̂op
+    update_estimate!(estim, y0m, d0, u0)
+    x̂next  = estim.buffer.x̂
+    x̂next .= estim.x̂0 .+ estim.x̂op
     return x̂next
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))

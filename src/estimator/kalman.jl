@@ -192,21 +192,21 @@ end
 
 Prepare `estim.x̂0` with measured outputs `y0m` and disturbances `d0` for current time step.
 """
-function prepare_estimate!(estim::SteadyKalmanFilter, y0m, d0)
-    return prepare_estimate_obsv!(estim, y0m, d0)
+function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
+    return correct_estimate_obsv!(estim, y0m, d0)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function prepare_estimate_obsv!(estim::StateEstimator, y0m, d0)
-    x̂0, K̂ = estim.x̂0, estim.K̂
-    ŷ0m = similar(y0m)
+function correct_estimate_obsv!(estim::StateEstimator, y0m, d0)
+    K̂ = estim.K̂
     Ĉm, D̂dm = @views estim.Ĉ[estim.i_ym, :], estim.D̂d[estim.i_ym, :]
+    ŷ0m = @views estim.buffer.ŷ[estim.i_ym]
     # in-place operations to reduce allocations:
-    mul!(ŷ0m, Ĉm, x̂0) 
+    mul!(ŷ0m, Ĉm, estim.x̂0) 
     mul!(ŷ0m, D̂dm, d0, 1, 1)
     v̂  = ŷ0m
     v̂ .= y0m .- ŷ0m
-    x̂0corr = x̂0
+    x̂0corr = estim.x̂0
     mul!(x̂0corr, K̂, v̂, 1, 1)
     return nothing
 end
@@ -229,11 +229,11 @@ end
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
 function update_estimate_obsv!(estim::StateEstimator, y0m, d0, u0)
     if !estim.direct
-        prepare_estimate_obsv!(estim, y0m, d0)
+        correct_estimate_obsv!(estim, y0m, d0)
     end
     x̂0corr = estim.x̂0
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
-    x̂0next = similar(estim.x̂0)
+    x̂0next = estim.buffer.x̂
     # in-place operations to reduce allocations:
     mul!(x̂0next, Â, x̂0corr)
     mul!(x̂0next, B̂u, u0, 1, 1)
@@ -382,9 +382,14 @@ function KalmanFilter(
     return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 
-function prepare_estimate!(estim::KalmanFilter, y0m, d0)
+"""
+    correct_estimate!(estim::KalmanFilter, y0m, d0)
+
+
+"""
+function correct_estimate!(estim::KalmanFilter, y0m, d0)
     Ĉm = @views estim.Ĉ[estim.i_ym, :]
-    return prepare_estimate_kf!(estim, y0m, d0, Ĉm)
+    return correct_estimate_kf!(estim, y0m, d0, Ĉm)
 end
 
 
@@ -872,15 +877,13 @@ function ExtendedKalmanFilter(
     return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 
-function prepare_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0) where NT<:Real
-    model = estim.model
-    nx̂, ny = estim.nx̂, model.ny
-    x̂0 = estim.x̂0
-    ŷ0 = Vector{NT}(undef, ny)
+function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
+    model, x̂0 = estim.model, estim.x̂0
+    ŷ0 = estim.buffer.ŷ
     ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
     ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
     Ĥm = @views estim.Ĥ[estim.i_ym, :]
-    return prepare_estimate_kf!(estim, y0m, d0, Ĥm)
+    return correct_estimate_kf!(estim, y0m, d0, Ĥm)
 end
 
 
@@ -915,17 +918,17 @@ automatically computes the Jacobians:
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs.
 """
 function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
-    model = estim.model
-    nx̂, nu, ny = estim.nx̂, model.nu, model.ny
-    x̂0 = estim.x̂0
+    model, x̂0 = estim.model, estim.x̂0
+    nx̂, nu = estim.nx̂, model.nu
     # concatenate x̂0next and û0 vectors to allows û0 vector with dual numbers for AD:
+    # TODO: remove this allocation using estim.buffer
     x̂0nextû = Vector{NT}(undef, nx̂ + nu)
     f̂AD! = (x̂0nextû, x̂0) -> @views f̂!(
         x̂0nextû[1:nx̂], x̂0nextû[nx̂+1:end], estim, model, x̂0, u0, d0
     )
     ForwardDiff.jacobian!(estim.F̂_û, f̂AD!, x̂0nextû, x̂0)  
     if !estim.direct
-        ŷ0 = Vector{NT}(undef, ny)
+        ŷ0 = estim.buffer.ŷ
         ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
         ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
     end
@@ -961,12 +964,9 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0=nothing)
 end
 
 
-function prepare_estimate_kf!(
-    estim::StateEstimator{NT}, y0m, d0, Ĉm, Â=estim.Â
-) where NT<:Real
+function correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm, Â=estim.Â)
     R̂, M̂, K̂ = estim.R̂, estim.M̂, estim.K̂
     x̂0, P̂ = estim.x̂0, estim.P̂
-    ŷ0 =  Vector{NT}(undef, estim.model.ny)
     mul!(M̂, P̂.data, Ĉm') # the ".data" weirdly removes a type instability in mul!
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂, :L)))
     if estim.direct
@@ -974,11 +974,12 @@ function prepare_estimate_kf!(
     else
         mul!(K̂, Â, M̂)
     end
+    ŷ0 = estim.buffer.ŷ
     ĥ!(ŷ0, estim, estim.model, x̂0, d0)
     ŷ0m = @views ŷ0[estim.i_ym]
     v̂  = ŷ0m
     v̂ .= y0m .- ŷ0m
-    x̂0corr = x̂0
+    x̂0corr = estim.x̂0
     mul!(x̂0corr, K̂, v̂, 1, 1)
     return nothing
 end
@@ -995,14 +996,14 @@ substitutes the augmented model matrices with its Jacobians (`Â = F̂` and `C�
 The implementation uses in-place operations and explicit factorization to reduce
 allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations.
 """
-function update_estimate_kf!(estim::StateEstimator{NT}, y0m, d0, u0, Ĉm, Â) where NT<:Real
+function update_estimate_kf!(estim::StateEstimator, y0m, d0, u0, Ĉm, Â)
     if !estim.direct
-        prepare_estimate_kf!(estim, y0m, d0, Ĉm, Â) # compute x̂0corr
+        correct_estimate_kf!(estim, y0m, d0, Ĉm, Â)
     end
     x̂0corr = estim.x̂0
     P̂, Q̂, M̂ = estim.P̂, estim.Q̂, estim.M̂
     nx̂, nu = estim.nx̂, estim.model.nu
-    x̂0next, û0 = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu)
+    x̂0next, û0 = estim.buffer.x̂, estim.buffer.û
     f̂!(x̂0next, û0, estim, estim.model, x̂0corr, u0, d0)
     P̂next = Hermitian(Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂, :L)
     x̂0next  .+= estim.f̂op .- estim.x̂op

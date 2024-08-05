@@ -218,10 +218,12 @@ function initstate!(model::SimModel, u, d=model.buffer.empty)
     return x
 end
 
-"""
+@doc raw"""
     updatestate!(model::SimModel, u, d=[]) -> x
 
 Update `model.x0` states with current inputs `u` and measured disturbances `d`.
+
+The method computes and returns the model state for the next time step ``\mathbf{x}(k+1)``.
 
 # Examples
 ```jldoctest

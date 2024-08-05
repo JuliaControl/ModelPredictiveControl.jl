@@ -238,7 +238,7 @@ end
 
 Save the current measured output `y0m` and disturbance `d0` for the stochastic predictions.
 """
-function prepare_estimate!(estim::InternalModel, y0m, d0)
+function correct_estimate!(estim::InternalModel, y0m, d0)
     estim.y0m .= y0m
     estim.d0  .= d0
     return nothing
@@ -259,21 +259,23 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(estim::InternalModel{NT, SM}, y0m, d0, u0) where {NT<:Real, SM}
+function update_estimate!(estim::InternalModel, y0m, d0, u0)
     model = estim.model
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # -------------- deterministic model ---------------------
-    ŷ0d, x̂dnext = Vector{NT}(undef, model.ny), Vector{NT}(undef, model.nx)
+    ŷ0d, ŷ0m, x̂dnext = estim.buffer.ŷ, estim.buffer.ym, estim.buffer.x̂
     h!(ŷ0d, model, x̂d, d0)
+    ŷ0m .= @views ŷ0d[estim.i_ym]
     f!(x̂dnext, model, x̂d, u0, d0) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
-    x̂snext = Vector{NT}(undef, estim.nxs)
-    ŷs = zeros(NT, model.ny)
-    ŷs[estim.i_ym] = y0m - ŷ0d[estim.i_ym]   # ŷs=0 for unmeasured outputs
-    mul!(x̂snext, estim.Âs, x̂s)
+    ŷs  = estim.buffer.ŷ
+    ŷs .= 0     # ŷs=0 for unmeasured outputs
+    ŷs[estim.i_ym] .= y0m .- ŷ0m  
+    x̂snext = estim.Âs*x̂s # TODO: remove this allocation with a new buffer?
     mul!(x̂snext, estim.B̂s, ŷs, 1, 1)
     x̂s .= x̂snext
+    # --------------- operating points ---------------------
     x̂0next    = x̂dnext
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
@@ -301,12 +303,15 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
     # also updates estim.x̂0 (they are the same object):
+    # TODO: use estim.buffer.x̂ to reduce the allocation:
     x̂d .= (I - model.A)\(model.Bu*u0 + model.Bd*d0 + model.fop - model.xop)
-    ŷd0 = Vector{NT}(undef, model.ny)
+    ŷd0, ŷ0m = estim.buffer.ŷ, estim.buffer.ym
     h!(ŷd0, model, x̂d, d0)
-    ŷs = zeros(NT, model.ny)
-    ŷs[estim.i_ym] = y0m - ŷd0[estim.i_ym]  # ŷs=0 for unmeasured outputs
-    x̂s .= (I-estim.Âs)\estim.B̂s*ŷs
+    ŷ0m .= @views ŷd0[estim.i_ym]
+    ŷs  = estim.buffer.ŷ
+    ŷs .= 0     # ŷs=0 for unmeasured outputs
+    ŷs[estim.i_ym] .= y0m - ŷ0m
+    x̂s .= (I-estim.Âs)\estim.B̂s*ŷs # TODO: remove this allocation with a new buffer?
     return nothing
 end
 
@@ -321,8 +326,8 @@ estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that
 store the current measured outputs and disturbances inside `estim` object, it should be thus
 called before `evalŷ`.
 """
-function evalŷ(estim::InternalModel{NT}, _ ) where NT<:Real
-    ŷ = Vector{NT}(undef, estim.model.ny)
+function evalŷ(estim::InternalModel, _ )
+    ŷ = estim.buffer.ŷ
     h!(ŷ, estim.model, estim.x̂d, estim.d0) 
     ŷ .+= estim.model.yop
     ŷ[estim.i_ym] = @views estim.y0m .+ estim.model.yop[estim.i_ym] 

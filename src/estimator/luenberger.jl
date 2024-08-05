@@ -111,10 +111,10 @@ end
 """
     prepare_estimate_obsv!(estim::Luenberger, y0m, d0, _ )
 
-Same than [`prepare_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
+Same than [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
-function prepare_estimate!(estim::Luenberger, y0m, d0)
-    return prepare_estimate_obsv!(estim, y0m, d0)
+function correct_estimate!(estim::Luenberger, y0m, d0)
+    return correct_estimate_obsv!(estim, y0m, d0)
 end
 
 
