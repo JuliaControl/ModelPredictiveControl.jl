@@ -119,7 +119,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     U0 = mpc.S̃*mpc.ΔŨ + mpc.T_lastu0
     J  = obj_nonlinprog!(U0, Ȳ, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
     oldF = copy(mpc.F)
-    predictstoch!(mpc, mpc.estim, mpc.d0 + model.dop, mpc.ŷ[mpc.estim.i_ym]) 
+    predictstoch!(mpc, mpc.estim) 
     Ŷs .= mpc.F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
     mpc.F .= oldF  # restore old F value
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
@@ -495,8 +495,6 @@ end
 
 "By default, no need to modify the objective function."
 set_objective_linear_coef!(::PredictiveController, _ ) = nothing
-
-
 
 """
     preparestate!(mpc::PredictiveController, ym, d=[])

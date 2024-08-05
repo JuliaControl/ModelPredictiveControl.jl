@@ -637,6 +637,40 @@ function init_ukf(::SimModel{NT}, nx̂, α, β, κ) where {NT<:Real}
     return nσ, γ, m̂, Ŝ
 end
 
+function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
+    x̂0, P̂, R̂, K̂, M̂ = estim.x̂0, estim.P̂, estim.R̂, estim.K̂, estim.M̂
+    nx̂ = estim.nx̂
+    γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
+    X̂0, Ŷ0m = estim.X̂0, estim.Ŷ0m
+    sqrtP̂ = estim.sqrtP̂
+    ŷ0 = estim.buffer.ŷ
+    P̂_chol  = sqrtP̂.data
+    P̂_chol .= P̂
+    cholesky!(Hermitian(P̂_chol, :L)) # also modifies sqrtP̂
+    γ_sqrtP̂ = lmul!(γ, sqrtP̂) 
+    X̂0 .= x̂0
+    X̂0[:, 2:nx̂+1]   .+= γ_sqrtP̂
+    X̂0[:, nx̂+2:end] .-= γ_sqrtP̂
+    for j in axes(Ŷ0m, 2)
+        @views ĥ!(ŷ0, estim, estim.model, X̂0[:, j], d0)
+        @views Ŷ0m[:, j] .= ŷ0[estim.i_ym]
+    end
+    ŷ0m = @views ŷ0[estim.i_ym]
+    mul!(ŷ0m, Ŷ0m, m̂)
+    X̄, Ȳm = X̂0, Ŷ0m
+    X̄  .= X̂0  .- x̂0
+    Ȳm .= Ŷ0m .- ŷ0m
+    M̂.data .= Ȳm * Ŝ * Ȳm' .+ R̂
+    mul!(K̂, X̄, lmul!(Ŝ, Ȳm'))
+    rdiv!(K̂, cholesky(M̂))
+    v̂ = ŷ0m
+    v̂ .= y0m .- ŷ0m
+    x̂0corr, P̂corr = estim.x̂0, estim.P̂
+    mul!(x̂0corr, K̂, v̂, 1, 1)
+    P̂corr .= Hermitian(P̂ .- K̂ * M̂ * K̂', :L)
+    return nothing
+end
+
 @doc raw"""
     update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     
@@ -677,60 +711,30 @@ noise, respectively.
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, <https://doi.org/10.1002/0470045345.ch14>, 
      ISBN9780470045343.
 """
-function update_estimate!(estim::UnscentedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
-    x̂0, P̂, Q̂, R̂, K̂, M̂ = estim.x̂0, estim.P̂, estim.Q̂, estim.R̂, estim.K̂, estim.M̂
-    nym, nx̂ = estim.nym, estim.nx̂
+function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
+    if !estim.direct
+        correct_estimate!(estim, y0m, d0)
+    end
+    x̂0corr, X̂0corr, P̂corr, sqrtP̂corr = estim.x̂0, estim.X̂0, estim.P̂, estim.sqrtP̂
+    Q̂, nx̂ = estim.Q̂, estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
-    X̂0, Ŷ0m = estim.X̂0, estim.Ŷ0m
-    sqrtP̂ = estim.sqrtP̂
-    # --- initialize matrices ---
-    x̂0next = Vector{NT}(undef, nx̂)
-    û0  = Vector{NT}(undef, estim.model.nu)
-    ŷ0m = Vector{NT}(undef, nym)
-    ŷ0  = Vector{NT}(undef, estim.model.ny)
-    # --- correction step ---
-    P̂_chol  = sqrtP̂.data
-    P̂_chol .= P̂
-    cholesky!(Hermitian(P̂_chol, :L)) # also modifies sqrtP̂
-    γ_sqrtP̂ = lmul!(γ, sqrtP̂) 
-    X̂0 .= x̂0
-    X̂0[:, 2:nx̂+1]   .+= γ_sqrtP̂
-    X̂0[:, nx̂+2:end] .-= γ_sqrtP̂
-    for j in axes(Ŷ0m, 2)
-        @views ĥ!(ŷ0, estim, estim.model, X̂0[:, j], d0)
-        @views Ŷ0m[:, j] .= ŷ0[estim.i_ym]
-    end
-    mul!(ŷ0m, Ŷ0m, m̂)
-    X̄, Ȳm = X̂0, Ŷ0m
-    X̄  .= X̂0  .- x̂0
-    Ȳm .= Ŷ0m .- ŷ0m
-    M̂.data .= Ȳm * Ŝ * Ȳm' .+ R̂
-    mul!(K̂, X̄, lmul!(Ŝ, Ȳm'))
-    rdiv!(K̂, cholesky(M̂))
-    v̂ = ŷ0m
-    v̂ .= y0m .- ŷ0m
-    x̂0cor  = x̂0next
-    x̂0cor .= x̂0
-    mul!(x̂0cor, K̂, v̂, 1, 1)
-    P̂cor = Hermitian(P̂ .- K̂ * M̂ * K̂', :L)
-    # --- prediction step ---
-    X̂0cor, sqrtP̂cor = X̂0, sqrtP̂
-    P̂cor_chol  = sqrtP̂cor.data
-    P̂cor_chol .= P̂cor
+    x̂0next, û0 = estim.buffer.x̂, estim.buffer.û
+    P̂cor_chol  = sqrtP̂corr.data
+    P̂cor_chol .= P̂corr
     cholesky!(Hermitian(P̂cor_chol, :L)) # also modifies sqrtP̂cor
-    γ_sqrtP̂cor = lmul!(γ, sqrtP̂cor)
-    X̂0cor .= x̂0cor
-    X̂0cor[:, 2:nx̂+1]   .+= γ_sqrtP̂cor
-    X̂0cor[:, nx̂+2:end] .-= γ_sqrtP̂cor
-    X̂0next = X̂0cor
+    γ_sqrtP̂corr = lmul!(γ, sqrtP̂corr)
+    X̂0corr .= x̂0corr
+    X̂0corr[:, 2:nx̂+1]   .+= γ_sqrtP̂corr
+    X̂0corr[:, nx̂+2:end] .-= γ_sqrtP̂corr
+    X̂0next = X̂0corr
     for j in axes(X̂0next, 2)
-        @views x̂0cor .= X̂0cor[:, j]
-        @views f̂!(X̂0next[:, j], û0, estim, estim.model, x̂0cor, u0, d0)
+        @views x̂0corr .= X̂0corr[:, j]
+        @views f̂!(X̂0next[:, j], û0, estim, estim.model, x̂0corr, u0, d0)
     end
-    x̂0next .= mul!(x̂0, X̂0next, m̂)
+    x̂0next .= mul!(x̂0corr, X̂0next, m̂)
     X̄next  = X̂0next
     X̄next .= X̂0next .- x̂0next
-    P̂next  = P̂cor
+    P̂next  = P̂corr
     P̂next.data .= X̄next * Ŝ * X̄next' .+ Q̂
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next

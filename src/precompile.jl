@@ -71,7 +71,7 @@ nlmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10, 10], y
 y = nlmodel()
 nmpc_im = setconstraint!(NonLinMPC(InternalModel(nlmodel), Hp=10, Cwt=Inf), ymin=[45, -Inf])
 initstate!(nmpc_im, nlmodel.uop, y)
-u = nmpc_im([55, 30], ym=y)
+u = nmpc_im([55, 30])
 sim!(nmpc_im, 3, [55, 30])
 
 nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=1e3), ymin=[45, -Inf])
