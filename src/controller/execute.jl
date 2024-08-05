@@ -3,7 +3,7 @@
 
 Init the states of `mpc.estim` [`StateEstimator`](@ref) and warm start `mpc.ΔŨ` at zero.
 """
-function initstate!(mpc::PredictiveController, u, ym, d=mpc.estim.model.buffer.empty)
+function initstate!(mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty)
     mpc.ΔŨ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
@@ -51,7 +51,7 @@ julia> ry = [5]; u = moveinput!(mpc, ry); round.(u, digits=3)
 function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = mpc.estim.model.buffer.empty;
+    d ::Vector = mpc.estim.buffer.empty;
     Dhat ::Vector = repeat(d,  mpc.Hp),
     Rhaty::Vector = repeat(ry, mpc.Hp),
     Rhatu::Vector = mpc.Uop,
@@ -509,7 +509,7 @@ set_objective_linear_coef!(::PredictiveController, _ ) = nothing
 
 Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
-function updatestate!(mpc::PredictiveController, u, ym, d=mpc.estim.model.buffer.empty)
+function updatestate!(mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty)
     return updatestate!(mpc.estim, u, ym, d)
 end
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))

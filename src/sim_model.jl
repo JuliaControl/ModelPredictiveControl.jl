@@ -241,8 +241,8 @@ function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: 
     f!(xnext0, model, model.x0, u0, d0)
     xnext0  .+= model.fop .- model.xop
     model.x0 .= xnext0
-    xnext  = model.buffer.x
-    xnext .= xnext0 .+ model.xop
+    xnext   = xnext0
+    xnext .+= model.xop
     return xnext
 end
 
@@ -268,8 +268,8 @@ function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
     d0 .= d .- model.dop
     y0 = model.buffer.y
     h!(y0, model, model.x0, d0)
-    y  = model.buffer.y
-    y .= y0 .+ model.yop
+    y   = y0
+    y .+= model.yop
     return y
 end
 

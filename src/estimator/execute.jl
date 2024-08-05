@@ -113,7 +113,7 @@ julia> evaloutput(estim) ≈ y
 true
 ```
 """
-function initstate!(estim::StateEstimator, u, ym, d=estim.model.buffer.empty)
+function initstate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     # --- validate arguments ---
     validate_args(estim, u, ym, d)
     # --- init state estimate ----
@@ -179,18 +179,18 @@ julia> ŷ = evaloutput(kf)
  20.0
 ```
 """
-function evaloutput(estim::StateEstimator{NT}, d=estim.model.buffer.empty) where NT <: Real
+function evaloutput(estim::StateEstimator{NT}, d=estim.buffer.empty) where NT <: Real
     validate_args(estim.model, d)
-    ŷ0, d0 = estim.model.buffer.y, estim.model.buffer.d
+    ŷ0, d0 = estim.buffer.ŷ, estim.buffer.d
     d0 .= d .- estim.model.dop
     ĥ!(ŷ0, estim, estim.model, estim.x̂0, d0)
-    ŷ  = estim.model.buffer.y
-    ŷ .= ŷ0 .+ estim.model.yop
+    ŷ   = ŷ0
+    ŷ .+= estim.model.yop
     return ŷ
 end
 
 "Functor allowing callable `StateEstimator` object as an alias for `evaloutput`."
-(estim::StateEstimator)(d=estim.model.buffer.empty) = evaloutput(estim, d)
+(estim::StateEstimator)(d=estim.buffer.empty) = evaloutput(estim, d)
 
 @doc raw"""
     updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂
@@ -210,10 +210,10 @@ julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_y
  0.0
 ```
 """
-function updatestate!(estim::StateEstimator, u, ym, d=estim.model.buffer.empty)
+function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     validate_args(estim, u, ym, d)
     u0, ym0, d0 = remove_op!(estim, u, ym, d)
-    x̂0next = update_estimate!(estim, u0, ym0, d0)
+    x̂0next  = update_estimate!(estim, u0, ym0, d0)
     x̂next   = x̂0next
     x̂next .+= estim.x̂op
     return x̂next

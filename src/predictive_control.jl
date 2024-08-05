@@ -42,7 +42,7 @@ end
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(
     ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = mpc.estim.model.buffer.empty;
+    d ::Vector = mpc.estim.buffer.empty;
     kwargs...
 )
     return moveinput!(mpc, ry, d; kwargs...)
