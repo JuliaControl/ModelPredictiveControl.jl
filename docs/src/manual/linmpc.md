@@ -116,10 +116,11 @@ function test_mpc(mpc, model)
         i == 101 && (ry = [54, 30])
         i == 151 && (ul = -20)
         y = model() # simulated measurements
+        preparestate!(mpc, y) # prepare mpc state estimate for current iteration
         u = mpc(ry) # or equivalently : u = moveinput!(mpc, ry)
         u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
-        updatestate!(mpc, u, y) # update mpc state estimate
-        updatestate!(model, u + [0; ul]) # update simulator with the load disturbance
+        updatestate!(mpc, u, y) # update mpc state estimate for next iteration
+        updatestate!(model, u + [0; ul]) # update simulator with load disturbance
     end
     return u_data, y_data, ry_data
 end
@@ -131,10 +132,10 @@ nothing # hide
 The [`LinMPC`](@ref) objects are also callable as an alternative syntax for
 [`moveinput!`](@ref). It is worth mentioning that additional information like the optimal
 output predictions ``\mathbf{Ŷ}`` can be retrieved by calling [`getinfo`](@ref) after
-solving the problem. Also, calling [`updatestate!`](@ref) on the `mpc` object updates its
-internal state for the *NEXT* control period (this is by design, see
-[Functions: State Estimators](@ref) for justifications). That is why the call is done at the
-end of the `for` loop. The same logic applies for `model`.
+solving the problem. Also, calling [`preparestate!`](@ref) on the `mpc` object prepares the
+estimates for the current control period, and [`updatestate!`](@ref) updates them for the
+next one (the same logic applies for `model`). This is why [`preparestate!`](@ref) is called
+before the controller, and [`updatestate!`](@ref), after.
 
 Lastly, we plot the closed-loop test with the `Plots` package:
 
@@ -264,6 +265,7 @@ function test_mpc_d(mpc_d, model)
         i == 151 && (ul = -20)
         d = ul .+ dop   # simulated measured disturbance
         y = model()     # simulated measurements
+        preparestate!(mpc_d, y, d) # prepare estimate with the measured disturbance d
         u = mpc_d(ry, d) # also feed the measured disturbance d to the controller
         u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
         updatestate!(mpc_d, u, y, d)    # update estimate with the measured disturbance d

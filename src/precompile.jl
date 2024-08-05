@@ -8,7 +8,7 @@ y = model()
 
 mpc_im = setconstraint!(LinMPC(InternalModel(model)), ymin=[45, -Inf])
 initstate!(mpc_im, model.uop, y)
-u = mpc_im([55, 30], ym=y)
+u = mpc_im([55, 30])
 sim!(mpc_im, 3)
 
 mpc_kf = setconstraint!(LinMPC(KalmanFilter(model)), ymin=[45, -Inf])

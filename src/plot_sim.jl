@@ -287,7 +287,7 @@ function sim_closedloop!(
         y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
         ym = y[estim.i_ym]
         preparestate!(est_mpc, ym, d)
-        u  = sim_getu!(est_mpc, u_ry, d, ru, ym)
+        u  = sim_getu!(est_mpc, u_ry, d, ru)
         ud = u + u_step + u_noise.*randn(plant.nu)
         Y_data[:, i]        .= y
         Ŷ_data[:, i]        .= evalŷ(estim, d)
@@ -312,11 +312,11 @@ function sim_closedloop!(
 end
 
 "Compute new `u` for predictive controller simulation."
-function sim_getu!(mpc::PredictiveController, ry, d, ru, ym)
-    return moveinput!(mpc, ry, d; R̂u=repeat(ru, mpc.Hp), ym)
+function sim_getu!(mpc::PredictiveController, ry, d, ru)
+    return moveinput!(mpc, ry, d; R̂u=repeat(ru, mpc.Hp))
 end
 "Keep manipulated input `u` unchanged for state estimator simulation."
-sim_getu!(::StateEstimator, u, _ , _ , _ ) = u
+sim_getu!(::StateEstimator, u, _ , _ ) = u
 
 
 # dummy plot methods to document recipes (both in ?-mode and web documentation)
