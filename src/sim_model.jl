@@ -234,10 +234,9 @@ julia> x = updatestate!(model, [1])
 """
 function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: Real
     validate_args(model::SimModel, d, u)
-    u0, d0 = model.buffer.u, model.buffer.d
+    u0, d0, xnext0 = model.buffer.u, model.buffer.d, model.buffer.x
     u0 .= u .- model.uop
     d0 .= d .- model.dop
-    xnext0 = model.buffer.x
     f!(xnext0, model, model.x0, u0, d0)
     xnext0  .+= model.fop .- model.xop
     model.x0 .= xnext0
@@ -264,9 +263,8 @@ julia> y = evaloutput(model)
 """
 function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
     validate_args(model, d)
-    d0  = model.buffer.d
+    d0, y0  = model.buffer.d, model.buffer.y
     d0 .= d .- model.dop
-    y0 = model.buffer.y
     h!(y0, model, model.x0, d0)
     y   = y0
     y .+= model.yop
