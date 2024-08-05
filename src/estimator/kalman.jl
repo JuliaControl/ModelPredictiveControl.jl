@@ -26,6 +26,7 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     function SteadyKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, Q̂, R̂
     ) where {NT<:Real, SM<:LinModel}
+        nu, ny, nd = model.nu, model.ny, model.nd
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
@@ -34,7 +35,7 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         validate_kfcov(nym, nx̂, Q̂, R̂)
         K̂ = try
             Q̂_kalman = Matrix(Q̂) # Matrix() required for Julia 1.6
-            R̂_kalman = zeros(NT, model.ny, model.ny)
+            R̂_kalman = zeros(NT, ny, ny)
             R̂_kalman[i_ym, i_ym] = R̂
             ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂_kalman, R̂_kalman)[:, i_ym] 
         catch my_error
@@ -46,10 +47,10 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
                 rethrow()
             end
         end
-        lastu0 = zeros(NT, model.nu)
+        lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
-        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0, 
@@ -241,19 +242,20 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     function KalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂
     ) where {NT<:Real, SM<:LinModel}
+        nu, ny, nd = model.nu, model.ny, model.nd
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
-        lastu0 = zeros(NT, model.nu)
+        lastu0 = zeros(NT, nu)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
         P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
-        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0, P̂, 
@@ -412,6 +414,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     function UnscentedKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ
     ) where {NT<:Real, SM<:SimModel{NT}}
+        nu, ny, nd = model.nu, model.ny, model.nd
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
@@ -419,7 +422,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         nσ, γ, m̂, Ŝ = init_ukf(model, nx̂, α, β, κ)
-        lastu0 = zeros(NT, model.nu)
+        lastu0 = zeros(NT, nu)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
@@ -428,7 +431,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
         X̂0, Ŷ0m = zeros(NT, nx̂, nσ), zeros(NT, nym, nσ)
         sqrtP̂ = LowerTriangular(zeros(NT, nx̂, nx̂))
-        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model,
             lastu0, x̂op, f̂op, x̂0, P̂, 
@@ -711,21 +714,22 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     function ExtendedKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂
     ) where {NT<:Real, SM<:SimModel}
+        nu, ny, nd = model.nu, model.ny, model.nd
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
-        lastu0 = zeros(NT, model.nu)
+        lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         P̂_0 = Hermitian(P̂_0, :L)
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)
         P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
-        F̂_û, Ĥ = zeros(NT, nx̂+model.nu, nx̂), zeros(NT, model.ny, nx̂)
-        buffer = StateEstimatorBuffer{NT}(nx̂, nym)
+        F̂_û, Ĥ = zeros(NT, nx̂+nu, nx̂), zeros(NT, ny, nx̂)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model,
             lastu0, x̂op, f̂op, x̂0, P̂, 
