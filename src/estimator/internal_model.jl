@@ -234,9 +234,9 @@ function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
 end
 
 """
-    prepare_estimate!(estim::InternalModel, y0m, d0)
+    correct_estimate!(estim::InternalModel, y0m, d0)
 
-Save the current measured output `y0m` and disturbance `d0` for the stochastic predictions.
+Save current meas. output `y0m` and disturbance `d0` inside `estim` for stoch. predictions.
 """
 function correct_estimate!(estim::InternalModel, y0m, d0)
     estim.y0m .= y0m

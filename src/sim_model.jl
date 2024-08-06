@@ -247,12 +247,13 @@ function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: 
     return xnext
 end
 
-"""
+@doc raw"""
     evaloutput(model::SimModel, d=[]) -> y
 
 Evaluate `SimModel` outputs `y` from `model.x0` states and measured disturbances `d`.
 
-Calling a [`SimModel`](@ref) object calls this `evaloutput` method.
+It returns `model` output at the current time step ``\mathbf{y}(k)``. Calling a 
+[`SimModel`](@ref) object calls this `evaloutput` method.
 
 # Examples
 ```jldoctest

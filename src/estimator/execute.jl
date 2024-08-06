@@ -169,7 +169,8 @@ init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
 
 Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂0` states and disturbances `d`.
 
-Calling a [`StateEstimator`](@ref) object calls this `evaloutput` method.
+It returns `estim` output at the current time step ``\mathbf{ŷ}(k)``. Calling a
+[`StateEstimator`](@ref) object calls this `evaloutput` method.
 
 # Examples
 ```jldoctest
@@ -196,14 +197,14 @@ end
 @doc raw"""
     preparestate!(estim::StateEstimator, ym, d=estim.model.dop) -> x̂
 
-Prepare `estim.x̂0` estimate with measured outputs `ym` and dist. `d` for current time step.
+Prepare `estim.x̂0` estimate with meas. outputs `ym` and dist. `d` for the current time step.
 
 This function should be called at the beginning of each discrete time step. Its behavior
-depends if `estim` is a [`StateEstimator`] in the current/filter (1) or delayed/predictor (2) 
-form:
+depends if `estim` is a [`StateEstimator`](@ref) in the current/filter (1.) or 
+delayed/predictor (2.) form:
 
 1. If `estim.direct` is `true`, it removes the operating points with [`remove_op!`](@ref),
-   calls [`correct_estimate!`](@ref) and returns the corrected state estimate 
+   calls [`correct_estimate!`](@ref), and returns the corrected state estimate 
    ``\mathbf{x̂}_k(k)``.
 2. Else, it does nothing and returns the current best estimate ``\mathbf{x̂}_{k-1}(k)``.
 
@@ -220,6 +221,7 @@ julia> estim2 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, d
 julia> round.(preparestate!(estim2, [1]), digits=3)
 1-element Vector{Float64}:
  0.01
+```
 """
 function preparestate!(estim::StateEstimator, ym, d=estim.model.dop)
     if estim.direct
@@ -240,8 +242,8 @@ Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and 
 This function should be called at the end of each discrete time step. It removes the 
 operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and returns the
 state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
-should be called prior to this one to correct the estimate when applicable (`estim.direct ==
-true`). 
+should be called prior to this one to correct the estimate when applicable (if
+`estim.direct == true`). 
 
 # Examples
 ```jldoctest

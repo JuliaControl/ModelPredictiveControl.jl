@@ -16,6 +16,11 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
     return nothing
 end
 
+"""
+    correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
+
+Do the same but for [`MovingHorizonEstimator`](@ref) objects.
+"""
 function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
     return nothing
 end

@@ -188,9 +188,9 @@ function setmodel_estimator!(::SteadyKalmanFilter, args...)
 end
 
 @doc raw"""
-    prepare_estimate!(estim::SteadyKalmanFilter, y0m, d0)
+    correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
 
-Prepare `estim.x̂0` with measured outputs `y0m` and disturbances `d0` for current time step.
+Correct `estim.x̂0` with measured outputs `y0m` and disturbances `d0` for current time step.
 """
 function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
     return correct_estimate_obsv!(estim, y0m, d0)
@@ -385,7 +385,7 @@ end
 """
     correct_estimate!(estim::KalmanFilter, y0m, d0)
 
-
+Do the same but for the time varying [`KalmanFilter`](@ref).
 """
 function correct_estimate!(estim::KalmanFilter, y0m, d0)
     Ĉm = @views estim.Ĉ[estim.i_ym, :]
@@ -637,6 +637,11 @@ function init_ukf(::SimModel{NT}, nx̂, α, β, κ) where {NT<:Real}
     return nσ, γ, m̂, Ŝ
 end
 
+"""
+    correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
+
+Do the same but for the [`UnscentedKalmanFilter`](@ref).
+"""
 function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
     x̂0, P̂, R̂, K̂, M̂ = estim.x̂0, estim.P̂, estim.R̂, estim.K̂, estim.M̂
     nx̂ = estim.nx̂
@@ -881,6 +886,11 @@ function ExtendedKalmanFilter(
     return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 
+"""
+    correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
+
+Do the same but for the [`ExtendedKalmanFilter`](@ref).
+"""
 function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
     model, x̂0 = estim.model, estim.x̂0
     ŷ0 = estim.buffer.ŷ
