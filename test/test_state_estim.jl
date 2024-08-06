@@ -389,11 +389,14 @@ end
 @testset "InternalModel estimator methods" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]) , uop=[10,50], yop=[50,30])
     internalmodel1 = InternalModel(linmodel1)
+    preparestate!(internalmodel1, [50, 30] .+ 1)
     @test updatestate!(internalmodel1, [10, 50], [50, 30] .+ 1) ≈ zeros(2)
+    preparestate!(internalmodel1, [50, 30] .+ 1)
     @test updatestate!(internalmodel1, [10, 50], [50, 30] .+ 1, Float64[]) ≈ zeros(2)
     @test internalmodel1.x̂d ≈ internalmodel1.x̂0 ≈ zeros(2)
     @test internalmodel1.x̂s ≈ ones(2)
-    @test ModelPredictiveControl.evalŷ(internalmodel1, [51,31], Float64[]) ≈ [51,31]
+    preparestate!(internalmodel1, [51, 31])
+    @test ModelPredictiveControl.evalŷ(internalmodel1, Float64[]) ≈ [51,31]
     @test initstate!(internalmodel1, [10, 50], [50, 30]) ≈ zeros(2)
     linmodel2 = LinModel(append(tf(3, [5, 1]), tf(2, [10, 1])), 1.0)
     stoch_ym = append(tf([2.5, 1],[1.2, 1, 0]),tf([1.5, 1], [1.3, 1, 0]))
@@ -791,15 +794,17 @@ end
     setstate!(mhe1, [1,2,3,4,5,6])
     @test mhe1.x̂0 ≈ [1,2,3,4,5,6]
     for i in 1:100
+        preparestate!(mhe1, [50, 30], [5])
         updatestate!(mhe1, [11, 52], [50, 30], [5])
     end
     @test mhe1([5]) ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(mhe1, [51, 32], [5])
         updatestate!(mhe1, [10, 50], [51, 32], [5])
     end
     @test mhe1([5]) ≈ [51, 32] atol=1e-3
     
-    mhe2 = MovingHorizonEstimator(linmodel1, He=2, nint_u=[1, 1], nint_ym=[0, 0])
+    mhe2 = MovingHorizonEstimator(linmodel1, He=2, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
     @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
@@ -808,10 +813,12 @@ end
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
     for i in 1:100
+        preparestate!(mhe2, [50, 30], [5])
         updatestate!(mhe2, [11, 52], [50, 30], [5])
     end
     @test mhe2([5]) ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(mhe2, [51, 32], [5])
         updatestate!(mhe2, [10, 50], [51, 32], [5])
     end
     @test mhe2([5]) ≈ [51, 32] atol=1e-3

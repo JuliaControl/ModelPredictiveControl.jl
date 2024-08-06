@@ -16,6 +16,10 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
     return nothing
 end
 
+function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
+    return nothing
+end
+
 @doc raw"""
     update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0)
     
