@@ -508,7 +508,7 @@ end
     u = moveinput!(nmpc)
     @test u ≈ [1] atol=5e-2
     # ensure that the current estimated output is updated for correct JE values:
-    @test nmpc.ŷ ≈ ModelPredictiveControl.evalŷ(nmpc.estim, nothing, Float64[])
+    @test nmpc.ŷ ≈ ModelPredictiveControl.evalŷ(nmpc.estim, Float64[])
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
     f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
