@@ -365,7 +365,7 @@ function update_cov!(estim::MovingHorizonEstimator)
     u0arr, y0marr, d0arr = @views estim.U0[1:nu], estim.Y0m[1:nym], estim.D0[1:nd]
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
-    update_estimate!(estim.covestim, u0arr, y0marr, d0arr)
+    update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
     estim.P̂arr_old    .= estim.covestim.P̂
     estim.invP̄        .= inv(estim.P̂arr_old)
     return nothing
