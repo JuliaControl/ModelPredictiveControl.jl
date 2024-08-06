@@ -977,7 +977,14 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0=nothing)
     end
 end
 
+"""
+    correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm, Â=estim.Â)
 
+Correct time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
+
+Allows code reuse for [`KalmanFilter`](@ref), [`ExtendedKalmanFilterKalmanFilter`](@ref).
+See [`update_estimate_kf!`](@ref) for more information.
+"""
 function correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm, Â=estim.Â)
     R̂, M̂, K̂ = estim.R̂, estim.M̂, estim.K̂
     x̂0, P̂ = estim.x̂0, estim.P̂
@@ -993,11 +1000,12 @@ function correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm, Â=estim.A�
     ŷ0m = @views ŷ0[estim.i_ym]
     v̂  = ŷ0m
     v̂ .= y0m .- ŷ0m
-    x̂0corr = estim.x̂0
+    x̂0corr, P̂corr = estim.x̂0, estim.P̂
     mul!(x̂0corr, K̂, v̂, 1, 1)
+    # TODO: use buffer.P̂ to reduce allocations
+    P̂corr .= Hermitian((I - K̂ * Ĉm) * P̂, :L)
     return nothing
 end
-
 
 """
     update_estimate_kf!(estim::StateEstimator, y0m, d0, u0, Ĉm, Â)
@@ -1014,12 +1022,13 @@ function update_estimate_kf!(estim::StateEstimator, y0m, d0, u0, Ĉm, Â)
     if !estim.direct
         correct_estimate_kf!(estim, y0m, d0, Ĉm, Â)
     end
-    x̂0corr = estim.x̂0
-    P̂, Q̂, M̂ = estim.P̂, estim.Q̂, estim.M̂
+    x̂0corr, P̂corr = estim.x̂0, estim.P̂
+    Q̂, M̂ = estim.Q̂, estim.M̂
     nx̂, nu = estim.nx̂, estim.model.nu
     x̂0next, û0 = estim.buffer.x̂, estim.buffer.û
     f̂!(x̂0next, û0, estim, estim.model, x̂0corr, u0, d0)
-    P̂next = Hermitian(Â * (P̂ .- M̂ * Ĉm * P̂) * Â' .+ Q̂, :L)
+    # TODO: use buffer.P̂ to reduce allocations
+    P̂next = Hermitian(Â * P̂corr * Â' .+ Q̂, :L)
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
     estim.P̂  .= P̂next

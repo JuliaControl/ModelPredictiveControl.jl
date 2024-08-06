@@ -751,7 +751,7 @@ end
     I_6 = Matrix{Float64}(I, 6, 6)
     I_2 = Matrix{Float64}(I, 2, 2)
     optim = Model(Ipopt.Optimizer)
-    mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, 1e5 ,optim)
+    mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, 1e5; optim)
     @test mhe9.P̂_0 ≈ I(6)
     @test mhe9.Q̂ ≈ I(6)
     @test mhe9.R̂ ≈ I(2)
@@ -759,7 +759,7 @@ end
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, [1, 1], I_6, I_6, I_2)
     mhe10 = MovingHorizonEstimator(
-        nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf, optim, covestim
+        nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf; optim, covestim
     )
     @test solver_name(mhe10.optim) == "Ipopt"
 
@@ -1017,14 +1017,16 @@ end
 
 @testset "MovingHorizonEstimator v.s. Kalman filters" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
-    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0)
-    kf  = KalmanFilter(linmodel1, nint_ym=0)
+    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=false)
+    kf  = KalmanFilter(linmodel1, nint_ym=0, direct=false)
     X̂0_mhe = zeros(4, 6)
     X̂0_kf  = zeros(4, 6)
     for i in 1:6
         X̂0_mhe[:,i] = mhe.x̂0
         X̂0_kf[:,i]  = kf.x̂0
+        preparestate!(mhe, [50, 31], [25])
         updatestate!(mhe, [11, 50], [50, 31], [25])
+        preparestate!(kf,  [50, 31], [25])
         updatestate!(kf,  [11, 50], [50, 31], [25])
     end
     @test X̂0_mhe ≈ X̂0_kf atol=1e-3
@@ -1032,8 +1034,8 @@ end
     h = (x,d)   -> linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
-    mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0)
-    ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0)
+    mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=false)
+    ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=false)
     X̂0_mhe = zeros(4, 6)
     X̂0_ukf = zeros(4, 6)
     for i in 1:6

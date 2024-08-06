@@ -312,7 +312,7 @@ function MovingHorizonEstimator(
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
     return MovingHorizonEstimator(
-        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim; direct
+        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt; direct, optim
     )
 end
 
@@ -320,20 +320,26 @@ default_optim_mhe(::LinModel) = JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges
 default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
 
 @doc raw"""
-    MovingHorizonEstimator(model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim[, covestim])
+    MovingHorizonEstimator(
+        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
+        optim=default_optim_mhe(model), 
+        direct=true,
+        covestim=default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    )
 
 Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
-The final argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) 
+The keyword argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) 
 object for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. The
 supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and 
 [`ExtendedKalmanFilter`](@ref).
 """
 function MovingHorizonEstimator(
-    model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim::JM, 
-    covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂);
-    direct = true
+    model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
+    optim::JM = default_optim_mhe(model),
+    direct = true,
+    covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     return MovingHorizonEstimator{NT, SM, JM, CE}(
@@ -341,11 +347,11 @@ function MovingHorizonEstimator(
     )
 end
 
-function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
-    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
+function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
-function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
-    return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
+function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 
 @doc raw"""

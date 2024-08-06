@@ -22,6 +22,7 @@ struct StateEstimatorBuffer{NT<:Real}
     u ::Vector{NT}
     û ::Vector{NT}
     x̂ ::Vector{NT}
+    P̂ ::Matrix{NT}
     ym::Vector{NT}
     ŷ ::Vector{NT}
     d ::Vector{NT}
@@ -41,11 +42,12 @@ function StateEstimatorBuffer{NT}(
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)
     x̂  = Vector{NT}(undef, nx̂)
+    P̂  = Matrix{NT}(undef, nx̂, nx̂)
     ym = Vector{NT}(undef, nym)
     ŷ  = Vector{NT}(undef, ny)
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
-    return StateEstimatorBuffer{NT}(u, û, x̂, ym, ŷ, d, empty)
+    return StateEstimatorBuffer{NT}(u, û, x̂, P̂, ym, ŷ, d, empty)
 end
 
 const IntVectorOrInt = Union{Int, Vector{Int}}
