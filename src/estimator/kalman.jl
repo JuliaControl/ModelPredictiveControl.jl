@@ -1003,7 +1003,7 @@ function correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm, Â=estim.A�
     x̂0corr, P̂corr = estim.x̂0, estim.P̂
     mul!(x̂0corr, K̂, v̂, 1, 1)
     # TODO: use buffer.P̂ to reduce allocations
-    P̂corr .= Hermitian((I - K̂ * Ĉm) * P̂, :L)
+    P̂corr .= Hermitian((I - M̂*Ĉm) * P̂, :L)
     return nothing
 end
 
