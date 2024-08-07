@@ -230,7 +230,7 @@ function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
 end
 
 @doc raw"""
-    updatestate!(model::SimModel, u, d=[]) -> x
+    updatestate!(model::SimModel, u, d=[]) -> xnext
 
 Update `model.x0` states with current inputs `u` and measured disturbances `d`.
 

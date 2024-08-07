@@ -497,7 +497,7 @@ end
 set_objective_linear_coef!(::PredictiveController, _ ) = nothing
 
 """
-    preparestate!(mpc::PredictiveController, ym, d=[])
+    preparestate!(mpc::PredictiveController, ym, d=[]) -> x̂
 
 Call [`preparestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
@@ -506,7 +506,7 @@ function preparestate!(mpc::PredictiveController, ym, d=mpc.estim.buffer.empty)
 end
 
 """
-    updatestate!(mpc::PredictiveController, u, ym, d=[]) -> x̂
+    updatestate!(mpc::PredictiveController, u, ym, d=[]) -> x̂next
 
 Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """

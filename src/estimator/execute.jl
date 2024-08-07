@@ -210,17 +210,17 @@ delayed/predictor (2.) form:
 
 # Examples
 ```jldoctest
-julia> estim1 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=false);
-
-julia> preparestate!(estim1, [1])
-1-element Vector{Float64}:
- 0.0
-
 julia> estim2 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=true);
 
-julia> round.(preparestate!(estim2, [1]), digits=3)
+julia> x̂ = round.(preparestate!(estim2, [1]), digits=3)
 1-element Vector{Float64}:
  0.01
+
+julia> estim1 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=false);
+
+julia> x̂ = preparestate!(estim1, [1])
+1-element Vector{Float64}:
+ 0.0
 ```
 """
 function preparestate!(estim::StateEstimator, ym, d=estim.model.dop)
@@ -235,7 +235,7 @@ function preparestate!(estim::StateEstimator, ym, d=estim.model.dop)
 end
 
 @doc raw"""
-    updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂
+    updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂next
 
 Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
 
@@ -247,11 +247,11 @@ should be called prior to this one to correct the estimate when applicable (if
 
 # Examples
 ```jldoctest
-julia> kf = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
+julia> kf = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0))); u = [1]; ym = [0];
 
-julia> preparestate!(kf, [0]);
+julia> preparestate!(kf, ym);
 
-julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_ym argument)
+julia> x̂ = updatestate!(kf, u, ym) # x̂[2] is the integrator state (nint_ym argument)
 2-element Vector{Float64}:
  0.5
  0.0
