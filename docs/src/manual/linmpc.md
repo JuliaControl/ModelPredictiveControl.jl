@@ -62,10 +62,10 @@ plant simulator to test the design. Its sampling time is 2 s thus the control pe
 ## Linear Model Predictive Controller
 
 A linear model predictive controller (MPC) will control both the water level ``y_L`` and
-temperature ``y_T`` in the tank. The tank level should also never fall below 45:
+temperature ``y_T`` in the tank. The tank level should also never fall below 48:
 
 ```math
-y_L ≥ 45
+y_L ≥ 48
 ```
 
 We design our [`LinMPC`](@ref) controllers by including the linear level constraint with
@@ -73,7 +73,7 @@ We design our [`LinMPC`](@ref) controllers by including the linear level constra
 
 ```@example 1
 mpc = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
-mpc = setconstraint!(mpc, ymin=[45, -Inf])
+mpc = setconstraint!(mpc, ymin=[48, -Inf])
 ```
 
 in which `Hp` and `Hc` keyword arguments are respectively the predictive and control
@@ -144,7 +144,7 @@ using Plots
 function plot_data(t_data, u_data, y_data, ry_data)
     p1 = plot(t_data, y_data[1,:], label="meas.", ylabel="level")
     plot!(p1, t_data, ry_data[1,:], label="setpoint", linestyle=:dash, linetype=:steppost)
-    plot!(p1, t_data, fill(45,size(t_data)), label="min", linestyle=:dot, linewidth=1.5)
+    plot!(p1, t_data, fill(48,size(t_data)), label="min", linestyle=:dot, linewidth=1.5)
     p2 = plot(t_data, y_data[2,:], label="meas.", legend=:topleft, ylabel="temp.")
     plot!(p2, t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
     p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost, ylabel="flow rate")
@@ -163,11 +163,11 @@ real-life control problems. Constructing a [`LinMPC`](@ref) with input integrato
 
 ```@example 1
 mpc2 = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], nint_u=[1, 1])
-mpc2 = setconstraint!(mpc2, ymin=[45, -Inf])
+mpc2 = setconstraint!(mpc2, ymin=[48, -Inf])
 ```
 
-does accelerate the rejection of the load disturbance and eliminates the level constraint
-violation:
+does accelerate the rejection of the load disturbance and almost eliminates the level
+constraint violation:
 
 ```@example 1
 setstate!(model, zeros(model.nx))
@@ -247,7 +247,7 @@ A [`LinMPC`](@ref) controller is constructed on this model:
 
 ```@example 1
 mpc_d = LinMPC(model_d, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
-mpc_d = setconstraint!(mpc_d, ymin=[45, -Inf])
+mpc_d = setconstraint!(mpc_d, ymin=[48, -Inf])
 ```
 
 A new test function that feeds the measured disturbance ``\mathbf{d}`` to the controller is

@@ -219,6 +219,17 @@ function initstate!(model::SimModel, u, d=model.buffer.empty)
 end
 
 @doc raw"""
+    preparestate!(model::SimModel, _ , _ ) -> x
+
+Do nothing for [`SimModel`](@ref) and return the current model state ``\mathbf{x}(k)``. 
+"""
+function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
+    x  = model.buffer.x
+    x .= model.x0 .+ model.xop
+    return x 
+end
+
+@doc raw"""
     updatestate!(model::SimModel, u, d=[]) -> x
 
 Update `model.x0` states with current inputs `u` and measured disturbances `d`.

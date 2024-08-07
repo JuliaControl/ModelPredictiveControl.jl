@@ -990,6 +990,7 @@ function correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm)
     x̂0, P̂ = estim.x̂0, estim.P̂
     mul!(M̂, P̂.data, Ĉm') # the ".data" weirdly removes a type instability in mul!
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂, :L)))
+    # TODO: use M̂ matrix for something else e.g. M̂ = Ĉm * P̂ * Ĉm' .+ R̂ (would be Hermitian)
     K̂ .= M̂
     ŷ0 = estim.buffer.ŷ
     ĥ!(ŷ0, estim, estim.model, x̂0, d0)
@@ -1019,8 +1020,7 @@ function update_estimate_kf!(estim::StateEstimator, y0m, d0, u0, Ĉm, Â)
         correct_estimate_kf!(estim, y0m, d0, Ĉm)
     end
     x̂0corr, P̂corr = estim.x̂0, estim.P̂
-    Q̂, M̂ = estim.Q̂, estim.M̂
-    nx̂, nu = estim.nx̂, estim.model.nu
+    Q̂ = estim.Q̂
     x̂0next, û0 = estim.buffer.x̂, estim.buffer.û
     f̂!(x̂0next, û0, estim, estim.model, x̂0corr, u0, d0)
     # TODO: use buffer.P̂ to reduce allocations
