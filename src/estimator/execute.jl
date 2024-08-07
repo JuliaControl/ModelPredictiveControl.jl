@@ -107,6 +107,8 @@ julia> u = [1]; y = [3 - 0.1]; x̂ = round.(initstate!(estim, u, y), digits=3)
   0.0
  -0.1
 
+julia> preparestate!(estim, y); 
+
 julia> x̂ ≈ updatestate!(estim, u, y)
 true
 

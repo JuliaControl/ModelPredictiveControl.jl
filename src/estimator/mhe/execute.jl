@@ -126,7 +126,9 @@ dictionary `info` with the following fields:
 
 # Examples
 ```jldoctest
-julia> estim = MovingHorizonEstimator(LinModel(ss(1.0, 1.0, 1.0, 0, 1)), He=1, nint_ym=0);
+julia> model = LinModel(ss(1.0, 1.0, 1.0, 0, 5.0));
+
+julia> estim = MovingHorizonEstimator(model, He=1, nint_ym=0, direct=false);
 
 julia> updatestate!(estim, [0], [1]);
 
