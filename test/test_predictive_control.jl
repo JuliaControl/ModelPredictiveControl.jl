@@ -127,8 +127,10 @@ end
     setstate!(mpc1, [1,2,3,4])
     @test mpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(mpc1, [0,0,0,0])
+    preparestate!(mpc1, mpc1.estim())
     updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
+    preparestate!(mpc1, mpc1.estim())
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -246,6 +248,7 @@ end
     setstate!(model, [1,1])
     for i=1:20
         y = model()
+        preparestate!(mpc, y)
         u = moveinput!(mpc, [0, 0])
         X_mpc[:,i] = model.x0
         updatestate!(mpc, u, y)
@@ -398,8 +401,10 @@ end
     setstate!(mpc1, [1,2,3,4])
     @test mpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(mpc1, [0,0,0,0])
+    preparestate!(mpc1, mpc1.estim())
     updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
+    preparestate!(mpc1, mpc1.estim())
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -596,6 +601,7 @@ end
     setstate!(nmpc1, [1,2,3,4])
     @test nmpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(nmpc1, [0,0,0,0])
+    preparestate!(nmpc1, nmpc1.estim())
     updatestate!(nmpc1, nmpc1.estim.model.uop, nmpc1.estim())
     @test nmpc1.estim.x̂0 ≈ [0,0,0,0] atol=1e-6
 end
