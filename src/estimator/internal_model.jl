@@ -25,6 +25,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     Âs::Matrix{NT}
     B̂s::Matrix{NT}
     direct::Bool
+    corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function InternalModel{NT, SM}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
@@ -43,6 +44,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         x̂s = zeros(NT, nxs)
         y0m, d0 = zeros(NT, nym), zeros(NT, model.nd)
         direct = true # InternalModel always uses direct transmission from ym
+        corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
@@ -52,7 +54,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d,
             Âs, B̂s,
-            direct,
+            direct, corrected,
             buffer
         )
     end

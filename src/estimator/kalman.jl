@@ -23,6 +23,7 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     R̂::Hermitian{NT, Matrix{NT}}
     K̂::Matrix{NT}
     direct::Bool
+    corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function SteadyKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, Q̂, R̂; direct=true
@@ -51,6 +52,7 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
+        corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
@@ -60,7 +62,7 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             Â, B̂u, Ĉ, B̂d, D̂d,
             Q̂, R̂,
             K̂,
-            direct,
+            direct, corrected,
             buffer
         )
     end
@@ -271,6 +273,7 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     K̂::Matrix{NT}
     M̂::Matrix{NT}
     direct::Bool
+    corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function KalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true
@@ -288,6 +291,7 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         P̂_0 = Hermitian(P̂_0, :L)
         P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
+        corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
@@ -297,7 +301,7 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂_0, Q̂, R̂,
             K̂, M̂,
-            direct,
+            direct, corrected,
             buffer
         )
     end
@@ -459,6 +463,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     m̂::Vector{NT}
     Ŝ::Diagonal{NT, Vector{NT}}
     direct::Bool
+    corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function UnscentedKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ; direct=true
@@ -480,6 +485,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
         X̂0, Ŷ0m = zeros(NT, nx̂, nσ), zeros(NT, nym, nσ)
         sqrtP̂ = LowerTriangular(zeros(NT, nx̂, nx̂))
+        corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model,
@@ -490,7 +496,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             P̂_0, Q̂, R̂,
             K̂, M̂, X̂0, Ŷ0m, sqrtP̂,
             nσ, γ, m̂, Ŝ,
-            direct,
+            direct, corrected,
             buffer
         )
     end
@@ -777,6 +783,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     F̂_û::Matrix{NT}
     Ĥ  ::Matrix{NT}
     direct::Bool
+    corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function ExtendedKalmanFilter{NT, SM}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true
@@ -796,6 +803,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
         F̂_û, Ĥ = zeros(NT, nx̂+nu, nx̂), zeros(NT, ny, nx̂)
+        corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model,
@@ -806,7 +814,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             P̂_0, Q̂, R̂,
             K̂, M̂,
             F̂_û, Ĥ,
-            direct,
+            direct, corrected,
             buffer
         )
     end
@@ -1007,7 +1015,7 @@ end
 """
     update_estimate_kf!(estim::StateEstimator, y0m, d0, u0, Ĉm, Â)
 
-Update time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
+Update time-varying/extended Kalman Filter estimates with augmented `Ĉm` and `Â` matrices.
 
 Allows code reuse for [`KalmanFilter`](@ref), [`ExtendedKalmanFilterKalmanFilter`](@ref).
 They update the state `x̂` and covariance `P̂` with the same equations. The extended filter
