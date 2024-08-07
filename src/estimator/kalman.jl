@@ -290,7 +290,8 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
         P̂ = copy(P̂_0)
-        K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
+        K̂ = zeros(NT, nx̂, nym)
+        M̂ = Hermitian(zeros(NT, nym, nym), :L)
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
@@ -411,6 +412,9 @@ It implements the time-varying Kalman Filter in its predictor (observer) form :
     \mathbf{ŷ^m}(k)     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k)                  \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k)
                            + \mathbf{K̂}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
+
+
+
     \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k)
                            - \mathbf{M̂}(k)\mathbf{Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}' + \mathbf{Q̂}
 \end{aligned}
@@ -801,7 +805,8 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         Q̂ = Hermitian(Q̂, :L)
         R̂ = Hermitian(R̂, :L)
         P̂ = copy(P̂_0)
-        K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
+        K̂ = zeros(NT, nx̂, nym)
+        M̂ = Hermitian(zeros(NT, nym, nym), :L)
         F̂_û, Ĥ = zeros(NT, nx̂+nu, nx̂), zeros(NT, ny, nx̂)
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
@@ -996,10 +1001,13 @@ See [`update_estimate_kf!`](@ref) for more information.
 function correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm)
     R̂, M̂, K̂ = estim.R̂, estim.M̂, estim.K̂
     x̂0, P̂ = estim.x̂0, estim.P̂
-    mul!(M̂, P̂.data, Ĉm') # the ".data" weirdly removes a type instability in mul!
-    rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂, :L)))
-    # TODO: use M̂ matrix for something else e.g. M̂ = Ĉm * P̂ * Ĉm' .+ R̂ (would be Hermitian)
-    K̂ .= M̂
+    P̂_Ĉmᵀ = K̂
+    mul!(P̂_Ĉmᵀ, P̂.data, Ĉm') # the ".data" weirdly removes a type instability in mul!
+    mul!(M̂, Ĉm, P̂_Ĉmᵀ)
+    M̂ .+= R̂
+    K̂ = P̂_Ĉmᵀ
+    M̂_chol = cholesky!(Hermitian(M̂)) # also modifies M̂
+    rdiv!(K̂, M̂_chol)
     ŷ0 = estim.buffer.ŷ
     ĥ!(ŷ0, estim, estim.model, x̂0, d0)
     ŷ0m = @views ŷ0[estim.i_ym]
@@ -1007,8 +1015,11 @@ function correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm)
     v̂ .= y0m .- ŷ0m
     x̂0corr, P̂corr = estim.x̂0, estim.P̂
     mul!(x̂0corr, K̂, v̂, 1, 1)
-    # TODO: use buffer.P̂ to reduce allocations
-    P̂corr .= Hermitian((I - M̂*Ĉm) * P̂, :L)
+    I_minus_K̂_Ĉm = estim.buffer.P̂
+    mul!(I_minus_K̂_Ĉm, K̂, Ĉm)
+    lmul!(-1, I_minus_K̂_Ĉm)
+    I_minus_K̂_Ĉm[diagind(I_minus_K̂_Ĉm)] .+= 1 # compute I - K̂*Ĉm
+    P̂corr .= Hermitian(I_minus_K̂_Ĉm * P̂) # TODO: remove this allocation
     return nothing
 end
 
