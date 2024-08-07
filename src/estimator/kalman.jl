@@ -978,23 +978,19 @@ function validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0=nothing)
 end
 
 """
-    correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm, Â=estim.Â)
+    correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm)
 
-Correct time-varying/extended Kalman Filter estimates with augmented `Â` and `Ĉm` matrices.
+Correct time-varying/extended Kalman Filter estimates with augmented `Ĉm` matrices.
 
 Allows code reuse for [`KalmanFilter`](@ref), [`ExtendedKalmanFilterKalmanFilter`](@ref).
 See [`update_estimate_kf!`](@ref) for more information.
 """
-function correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm, Â=estim.Â)
+function correct_estimate_kf!(estim::StateEstimator, y0m, d0, Ĉm)
     R̂, M̂, K̂ = estim.R̂, estim.M̂, estim.K̂
     x̂0, P̂ = estim.x̂0, estim.P̂
     mul!(M̂, P̂.data, Ĉm') # the ".data" weirdly removes a type instability in mul!
     rdiv!(M̂, cholesky!(Hermitian(Ĉm * P̂ * Ĉm' .+ R̂, :L)))
-    if estim.direct
-        K̂ .= M̂
-    else
-        mul!(K̂, Â, M̂)
-    end
+    K̂ .= M̂
     ŷ0 = estim.buffer.ŷ
     ĥ!(ŷ0, estim, estim.model, x̂0, d0)
     ŷ0m = @views ŷ0[estim.i_ym]
@@ -1020,7 +1016,7 @@ allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations.
 """
 function update_estimate_kf!(estim::StateEstimator, y0m, d0, u0, Ĉm, Â)
     if !estim.direct
-        correct_estimate_kf!(estim, y0m, d0, Ĉm, Â)
+        correct_estimate_kf!(estim, y0m, d0, Ĉm)
     end
     x̂0corr, P̂corr = estim.x̂0, estim.P̂
     Q̂, M̂ = estim.Q̂, estim.M̂
