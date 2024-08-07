@@ -287,8 +287,8 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, nu)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
-        P̂_0  = Hermitian(NT.(P̂_0), :L)
-        Q̂, R̂ = Hermitian(NT.(Q̂), :L),  Hermitian(NT.(R̂), :L)
+        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
+        P̂_0 = Hermitian(P̂_0, :L)
         P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
         corrected = [false]
@@ -478,8 +478,8 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         nσ, γ, m̂, Ŝ = init_ukf(model, nx̂, α, β, κ)
         lastu0 = zeros(NT, nu)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
-        P̂_0  = Hermitian(NT.(P̂_0), :L)
-        Q̂, R̂ = Hermitian(NT.(Q̂), :L),  Hermitian(NT.(R̂), :L)
+        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
+        P̂_0 = Hermitian(P̂_0, :L)
         P̂ = copy(P̂_0)
         K̂ = zeros(NT, nx̂, nym)
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
@@ -797,8 +797,9 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
-        P̂_0  = Hermitian(NT.(P̂_0), :L)
-        Q̂, R̂ = Hermitian(NT.(Q̂), :L),  Hermitian(NT.(R̂), :L)
+        P̂_0 = Hermitian(P̂_0, :L)
+        Q̂ = Hermitian(Q̂, :L)
+        R̂ = Hermitian(R̂, :L)
         P̂ = copy(P̂_0)
         K̂, M̂ = zeros(NT, nx̂, nym), zeros(NT, nx̂, nym)
         F̂_û, Ĥ = zeros(NT, nx̂+nu, nx̂), zeros(NT, ny, nx̂)

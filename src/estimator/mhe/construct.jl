@@ -120,8 +120,8 @@ struct MovingHorizonEstimator{
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
-        P̂_0  = Hermitian(NT.(P̂_0), :L)
-        Q̂, R̂ = Hermitian(NT.(Q̂), :L),  Hermitian(NT.(R̂), :L)
+        P̂_0 = Hermitian(P̂_0, :L)
+        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         invP̄ = Hermitian(inv(P̂_0), :L)
         invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
