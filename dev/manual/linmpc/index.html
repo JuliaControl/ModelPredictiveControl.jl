@@ -18,8 +18,8 @@ model = setop!(LinModel(G, Ts), uop=[20, 20], yop=[50, 30])</code></pre><pre cla
  2 manipulated inputs u
  2 states x
  2 outputs y
- 0 measured disturbances d</code></pre><p>The <code>model</code> object will be used for two purposes : to construct our controller, and as a plant simulator to test the design. Its sampling time is 2 s thus the control period will be 2 s as well.</p><h2 id="Linear-Model-Predictive-Controller"><a class="docs-heading-anchor" href="#Linear-Model-Predictive-Controller">Linear Model Predictive Controller</a><a id="Linear-Model-Predictive-Controller-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-Model-Predictive-Controller" title="Permalink"></a></h2><p>A linear model predictive controller (MPC) will control both the water level <span>$y_L$</span> and temperature <span>$y_T$</span> in the tank. The tank level should also never fall below 45:</p><p class="math-container">\[y_L ≥ 45\]</p><p>We design our <a href="../../public/predictive_control/#LinMPC"><code>LinMPC</code></a> controllers by including the linear level constraint with <a href="../../public/generic_func/#ModelPredictiveControl.setconstraint!"><code>setconstraint!</code></a> (<code>±Inf</code> values should be used when there is no bound):</p><pre><code class="language-julia hljs">mpc = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
-mpc = setconstraint!(mpc, ymin=[45, -Inf])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LinMPC controller with a sample time Ts = 2.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
+ 0 measured disturbances d</code></pre><p>The <code>model</code> object will be used for two purposes : to construct our controller, and as a plant simulator to test the design. Its sampling time is 2 s thus the control period will be 2 s as well.</p><h2 id="Linear-Model-Predictive-Controller"><a class="docs-heading-anchor" href="#Linear-Model-Predictive-Controller">Linear Model Predictive Controller</a><a id="Linear-Model-Predictive-Controller-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-Model-Predictive-Controller" title="Permalink"></a></h2><p>A linear model predictive controller (MPC) will control both the water level <span>$y_L$</span> and temperature <span>$y_T$</span> in the tank. The tank level should also never fall below 48:</p><p class="math-container">\[y_L ≥ 48\]</p><p>We design our <a href="../../public/predictive_control/#LinMPC"><code>LinMPC</code></a> controllers by including the linear level constraint with <a href="../../public/generic_func/#ModelPredictiveControl.setconstraint!"><code>setconstraint!</code></a> (<code>±Inf</code> values should be used when there is no bound):</p><pre><code class="language-julia hljs">mpc = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
+mpc = setconstraint!(mpc, ymin=[48, -Inf])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LinMPC controller with a sample time Ts = 2.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
  10 prediction steps Hp
   2 control steps Hc
   1 slack variable ϵ (control constraints)
@@ -37,19 +37,20 @@ initstate!(mpc, u, y)</code></pre><p>We can then close the loop and test <code>m
         i == 101 &amp;&amp; (ry = [54, 30])
         i == 151 &amp;&amp; (ul = -20)
         y = model() # simulated measurements
+        preparestate!(mpc, y) # prepare mpc state estimate for current iteration
         u = mpc(ry) # or equivalently : u = moveinput!(mpc, ry)
         u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
-        updatestate!(mpc, u, y) # update mpc state estimate
-        updatestate!(model, u + [0; ul]) # update simulator with the load disturbance
+        updatestate!(mpc, u, y) # update mpc state estimate for next iteration
+        updatestate!(model, u + [0; ul]) # update simulator with load disturbance
     end
     return u_data, y_data, ry_data
 end
 u_data, y_data, ry_data = test_mpc(mpc, model)
-t_data = Ts*(0:(size(y_data,2)-1))</code></pre><p>The <a href="../../public/predictive_control/#LinMPC"><code>LinMPC</code></a> objects are also callable as an alternative syntax for <a href="../../public/predictive_control/#ModelPredictiveControl.moveinput!"><code>moveinput!</code></a>. It is worth mentioning that additional information like the optimal output predictions <span>$\mathbf{Ŷ}$</span> can be retrieved by calling <a href="../../public/generic_func/#ModelPredictiveControl.getinfo"><code>getinfo</code></a> after solving the problem. Also, calling <a href="../../public/generic_func/#ModelPredictiveControl.updatestate!"><code>updatestate!</code></a> on the <code>mpc</code> object updates its internal state for the <em>NEXT</em> control period (this is by design, see <a href="../../public/state_estim/#Functions:-State-Estimators">Functions: State Estimators</a> for justifications). That is why the call is done at the end of the <code>for</code> loop. The same logic applies for <code>model</code>.</p><p>Lastly, we plot the closed-loop test with the <code>Plots</code> package:</p><pre><code class="language-julia hljs">using Plots
+t_data = Ts*(0:(size(y_data,2)-1))</code></pre><p>The <a href="../../public/predictive_control/#LinMPC"><code>LinMPC</code></a> objects are also callable as an alternative syntax for <a href="../../public/predictive_control/#ModelPredictiveControl.moveinput!"><code>moveinput!</code></a>. It is worth mentioning that additional information like the optimal output predictions <span>$\mathbf{Ŷ}$</span> can be retrieved by calling <a href="../../public/generic_func/#ModelPredictiveControl.getinfo"><code>getinfo</code></a> after solving the problem. Also, calling <a href="../../public/generic_func/#ModelPredictiveControl.preparestate!"><code>preparestate!</code></a> on the <code>mpc</code> object prepares the estimates for the current control period, and <a href="../../public/generic_func/#ModelPredictiveControl.updatestate!"><code>updatestate!</code></a> updates them for the next one (the same logic applies for <code>model</code>). This is why <a href="../../public/generic_func/#ModelPredictiveControl.preparestate!"><code>preparestate!</code></a> is called before the controller, and <a href="../../public/generic_func/#ModelPredictiveControl.updatestate!"><code>updatestate!</code></a>, after.</p><p>Lastly, we plot the closed-loop test with the <code>Plots</code> package:</p><pre><code class="language-julia hljs">using Plots
 function plot_data(t_data, u_data, y_data, ry_data)
     p1 = plot(t_data, y_data[1,:], label=&quot;meas.&quot;, ylabel=&quot;level&quot;)
     plot!(p1, t_data, ry_data[1,:], label=&quot;setpoint&quot;, linestyle=:dash, linetype=:steppost)
-    plot!(p1, t_data, fill(45,size(t_data)), label=&quot;min&quot;, linestyle=:dot, linewidth=1.5)
+    plot!(p1, t_data, fill(48,size(t_data)), label=&quot;min&quot;, linestyle=:dot, linewidth=1.5)
     p2 = plot(t_data, y_data[2,:], label=&quot;meas.&quot;, legend=:topleft, ylabel=&quot;temp.&quot;)
     plot!(p2, t_data, ry_data[2,:],label=&quot;setpoint&quot;, linestyle=:dash, linetype=:steppost)
     p3 = plot(t_data,u_data[1,:],label=&quot;cold&quot;, linetype=:steppost, ylabel=&quot;flow rate&quot;)
@@ -57,7 +58,7 @@ function plot_data(t_data, u_data, y_data, ry_data)
     return plot(p1, p2, p3, layout=(3,1))
 end
 plot_data(t_data, u_data, y_data, ry_data)</code></pre><p><img src="../plot1_LinMPC.svg" alt="plot1_LinMPC"/></p><p>Compared to the default setting, adding the integrating states at the model inputs may improve the closed-loop performance. Load disturbances are indeed very common in many real-life control problems. Constructing a <a href="../../public/predictive_control/#LinMPC"><code>LinMPC</code></a> with input integrators:</p><pre><code class="language-julia hljs">mpc2 = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], nint_u=[1, 1])
-mpc2 = setconstraint!(mpc2, ymin=[45, -Inf])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LinMPC controller with a sample time Ts = 2.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
+mpc2 = setconstraint!(mpc2, ymin=[48, -Inf])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LinMPC controller with a sample time Ts = 2.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
  10 prediction steps Hp
   2 control steps Hc
   1 slack variable ϵ (control constraints)
@@ -65,7 +66,7 @@ mpc2 = setconstraint!(mpc2, ymin=[45, -Inf])</code></pre><pre class="documenter-
   4 estimated states x̂
   2 measured outputs ym (0 integrating states)
   0 unmeasured outputs yu
-  0 measured disturbances d</code></pre><p>does accelerate the rejection of the load disturbance and eliminates the level constraint violation:</p><pre><code class="language-julia hljs">setstate!(model, zeros(model.nx))
+  0 measured disturbances d</code></pre><p>does accelerate the rejection of the load disturbance and almost eliminates the level constraint violation:</p><pre><code class="language-julia hljs">setstate!(model, zeros(model.nx))
 u, y = model.uop, model()
 initstate!(mpc2, u, y)
 u_data, y_data, ry_data = test_mpc(mpc2, model)
@@ -82,11 +83,11 @@ mpc_mhe = setconstraint!(mpc_mhe, ymin=[45, -Inf])</code></pre><pre class="docum
   4 estimated states x̂
   2 measured outputs ym (0 integrating states)
   0 unmeasured outputs yu
-  0 measured disturbances d</code></pre><p>The rejection is slightly improved:</p><pre><code class="language-julia hljs">setstate!(model, zeros(model.nx))
+  0 measured disturbances d</code></pre><p>The rejection is not improved here:</p><pre><code class="language-julia hljs">setstate!(model, zeros(model.nx))
 u, y, d = model.uop, model(), mpc_mhe.estim.model.dop
 initstate!(mpc_mhe, u, y, d)
 u_data, y_data, ry_data = test_mpc(mpc_mhe, model)
-plot_data(t_data, u_data, y_data, ry_data)</code></pre><p><img src="../plot3_LinMPC.svg" alt="plot3_LinMPC"/></p><h2 id="Adding-Feedforward-Compensation"><a class="docs-heading-anchor" href="#Adding-Feedforward-Compensation">Adding Feedforward Compensation</a><a id="Adding-Feedforward-Compensation-1"></a><a class="docs-heading-anchor-permalink" href="#Adding-Feedforward-Compensation" title="Permalink"></a></h2><p>Suppose that the load disturbance <span>$u_l$</span> of the last section is in fact caused by a separate hot water pipe that discharges into the tank. Adding a new sensor to measure this flow rate allows us to incorporate feedforward compensation in the controller. The new plant model is:</p><p class="math-container">\[\begin{bmatrix}
+plot_data(t_data, u_data, y_data, ry_data)</code></pre><p><img src="../plot3_LinMPC.svg" alt="plot3_LinMPC"/></p><p>This is because the more performant <code>direct=true</code> version of the <a href="../../public/state_estim/#MovingHorizonEstimator"><code>MovingHorizonEstimator</code></a> is not not implemented yet. The rejection will be improved with the <code>direct=true</code> version (coming soon).</p><h2 id="Adding-Feedforward-Compensation"><a class="docs-heading-anchor" href="#Adding-Feedforward-Compensation">Adding Feedforward Compensation</a><a id="Adding-Feedforward-Compensation-1"></a><a class="docs-heading-anchor-permalink" href="#Adding-Feedforward-Compensation" title="Permalink"></a></h2><p>Suppose that the load disturbance <span>$u_l$</span> of the last section is in fact caused by a separate hot water pipe that discharges into the tank. Adding a new sensor to measure this flow rate allows us to incorporate feedforward compensation in the controller. The new plant model is:</p><p class="math-container">\[\begin{bmatrix}
     y_L(s) \\ y_T(s)
 \end{bmatrix} = 
 \begin{bmatrix}
@@ -100,7 +101,7 @@ plot_data(t_data, u_data, y_data, ry_data)</code></pre><p><img src="../plot3_Lin
  4 states x
  2 outputs y
  1 measured disturbances d</code></pre><p>A <a href="../../public/predictive_control/#LinMPC"><code>LinMPC</code></a> controller is constructed on this model:</p><pre><code class="language-julia hljs">mpc_d = LinMPC(model_d, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
-mpc_d = setconstraint!(mpc_d, ymin=[45, -Inf])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LinMPC controller with a sample time Ts = 2.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
+mpc_d = setconstraint!(mpc_d, ymin=[48, -Inf])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LinMPC controller with a sample time Ts = 2.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
  10 prediction steps Hp
   2 control steps Hc
   1 slack variable ϵ (control constraints)
@@ -119,6 +120,7 @@ mpc_d = setconstraint!(mpc_d, ymin=[45, -Inf])</code></pre><pre class="documente
         i == 151 &amp;&amp; (ul = -20)
         d = ul .+ dop   # simulated measured disturbance
         y = model()     # simulated measurements
+        preparestate!(mpc_d, y, d) # prepare estimate with the measured disturbance d
         u = mpc_d(ry, d) # also feed the measured disturbance d to the controller
         u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
         updatestate!(mpc_d, u, y, d)    # update estimate with the measured disturbance d
@@ -129,4 +131,4 @@ end</code></pre><p>The new feedforward compensation is able to almost perfectly 
 u, y, d = model.uop, model(), mpc_d.estim.model.dop
 initstate!(mpc_d, u, y, d)
 u_data, y_data, ry_data = test_mpc_d(mpc_d, model)
-plot_data(t_data, u_data, y_data, ry_data)</code></pre><p><img src="../plot4_LinMPC.svg" alt="plot4_LinMPC"/></p><p>Note that measured disturbances are assumed constant in the future by default but custom <span>$\mathbf{D̂}$</span> predictions are possible. The same applies for the setpoint predictions <span>$\mathbf{R̂_y}$</span>.</p><section class="footnotes is-size-7"><ul><li class="footnote" id="footnote-1"><a class="tag is-link" href="#citeref-1">1</a>As an alternative to state observer, we could have use an <a href="../../public/state_estim/#InternalModel"><code>InternalModel</code></a> structure with <code>mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])</code>. It was tested on the example of this page and it gave similar results.</li></ul></section></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../installation/">« Installation</a><a class="docs-footer-nextpage" href="../nonlinmpc/">Nonlinear Design »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.5.0 on <span class="colophon-date" title="Monday 5 August 2024 16:26">Monday 5 August 2024</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+plot_data(t_data, u_data, y_data, ry_data)</code></pre><p><img src="../plot4_LinMPC.svg" alt="plot4_LinMPC"/></p><p>Note that measured disturbances are assumed constant in the future by default but custom <span>$\mathbf{D̂}$</span> predictions are possible. The same applies for the setpoint predictions <span>$\mathbf{R̂_y}$</span>.</p><section class="footnotes is-size-7"><ul><li class="footnote" id="footnote-1"><a class="tag is-link" href="#citeref-1">1</a>As an alternative to state observer, we could have use an <a href="../../public/state_estim/#InternalModel"><code>InternalModel</code></a> structure with <code>mpc = LinMPC(InternalModel(model), Hp=15, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])</code>. It was tested on the example of this page and it gave similar results.</li></ul></section></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../installation/">« Installation</a><a class="docs-footer-nextpage" href="../nonlinmpc/">Nonlinear Design »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.5.0 on <span class="colophon-date" title="Thursday 8 August 2024 22:31">Thursday 8 August 2024</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
