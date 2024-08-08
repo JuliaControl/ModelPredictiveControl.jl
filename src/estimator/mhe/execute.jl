@@ -16,8 +16,17 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
     return nothing
 end
 
+"""
+    correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
+
+Do the same but for [`MovingHorizonEstimator`](@ref) objects.
+"""
+function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
+    return nothing
+end
+
 @doc raw"""
-    update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0) -> x̂0next
+    update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0)
     
 Update [`MovingHorizonEstimator`](@ref) state `estim.x̂0`.
 
@@ -28,7 +37,7 @@ augmented model from ``j = N_k-1`` to ``0`` inclusively. Afterward, if ``k ≥ H
 arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is estimated
 using `estim.covestim` object.
 """
-function update_estimate!(estim::MovingHorizonEstimator{NT}, u0, y0m, d0) where NT<:Real
+function update_estimate!(estim::MovingHorizonEstimator{NT}, y0m, d0, u0) where NT<:Real
     model, optim, x̂0 = estim.model, estim.optim, estim.x̂0
     add_data_windows!(estim::MovingHorizonEstimator, u0, d0, y0m)
     initpred!(estim, model)
@@ -84,7 +93,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, u0, y0m, d0) where 
     Nk == estim.He && update_cov!(estim::MovingHorizonEstimator)
     x̂0next    = X̂0[end-nx̂+1:end] 
     estim.x̂0 .= x̂0next
-    return x̂0next
+    return nothing
 end
 
 
@@ -117,7 +126,9 @@ dictionary `info` with the following fields:
 
 # Examples
 ```jldoctest
-julia> estim = MovingHorizonEstimator(LinModel(ss(1.0, 1.0, 1.0, 0, 1)), He=1, nint_ym=0);
+julia> model = LinModel(ss(1.0, 1.0, 1.0, 0, 5.0));
+
+julia> estim = MovingHorizonEstimator(model, He=1, nint_ym=0, direct=false);
 
 julia> updatestate!(estim, [0], [1]);
 
@@ -361,7 +372,7 @@ function update_cov!(estim::MovingHorizonEstimator)
     u0arr, y0marr, d0arr = @views estim.U0[1:nu], estim.Y0m[1:nym], estim.D0[1:nd]
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
-    update_estimate!(estim.covestim, u0arr, y0marr, d0arr)
+    update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
     estim.P̂arr_old    .= estim.covestim.P̂
     estim.invP̄        .= inv(estim.P̂arr_old)
     return nothing
@@ -545,7 +556,7 @@ function setmodel_estimator!(
     for i in 1:He
         # convert x̂0 to x̂ with the old operating point:
         estim.X̂0[(1+nx̂*(i-1)):(nx̂*i)]    .+= x̂op_old 
-        # convert ym0 to ym with the old operating point:
+        # convert y0m to ym with the old operating point:
         estim.Y0m[(1+nym*(i-1)):(nym*i)] .+= @views yop_old[estim.i_ym]
         # convert u0 to u with the old operating point:
         estim.U0[(1+nu*(i-1)):(nu*i)]    .+= uop_old

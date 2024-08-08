@@ -52,6 +52,12 @@ ModelPredictiveControl.remove_op!
 ModelPredictiveControl.init_estimate!
 ```
 
+## Correct Estimate
+
+```@docs
+ModelPredictiveControl.correct_estimate!
+```
+
 ## Update Estimate
 
 !!! info

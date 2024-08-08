@@ -1,19 +1,20 @@
 """
-    remove_op!(estim::StateEstimator, u, ym, d) -> u0, ym0, d0
+    remove_op!(estim::StateEstimator, ym, d, u=nothing) -> y0m, d0, u0
 
-Remove operating points on inputs `u`, measured outputs `ym` and disturbances `d`.
+Remove operating pts on measured outputs `ym`, disturbances `d` and inputs `u` (if provided).
 
-Also store current inputs without operating points `u0` in `estim.lastu0`. This field is 
-used for [`PredictiveController`](@ref) computations.
+If `u` is provided, also store current inputs without operating points `u0` in 
+`estim.lastu0`. This field is used for [`PredictiveController`](@ref) computations.
 """
-function remove_op!(estim::StateEstimator, u, ym, d)
-    u0, d0 = estim.buffer.u, estim.buffer.d
-    y0m = estim.buffer.ym
-    u0  .= u  .- estim.model.uop
+function remove_op!(estim::StateEstimator, ym, d, u=nothing)
+    y0m, u0, d0 = estim.buffer.ym, estim.buffer.u, estim.buffer.d
     y0m .= @views ym .- estim.model.yop[estim.i_ym]
     d0  .= d  .- estim.model.dop
-    estim.lastu0 .= u0
-    return u0, y0m, d0 
+    if !isnothing(u)
+        u0 .= u .- estim.model.uop
+        estim.lastu0 .= u0
+    end
+    return y0m, d0, u0
 end
 
 @doc raw"""
@@ -106,6 +107,8 @@ julia> u = [1]; y = [3 - 0.1]; x̂ = round.(initstate!(estim, u, y), digits=3)
   0.0
  -0.1
 
+julia> preparestate!(estim, y); 
+
 julia> x̂ ≈ updatestate!(estim, u, y)
 true
 
@@ -115,12 +118,12 @@ true
 """
 function initstate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     # --- validate arguments ---
-    validate_args(estim, u, ym, d)
+    validate_args(estim, ym, d, u)
     # --- init state estimate ----
-    u0, ym0, d0 = remove_op!(estim, u, ym, d)
-    init_estimate!(estim, estim.model, u0, ym0, d0)
+    y0m, d0, u0 = remove_op!(estim, ym, d, u)
+    init_estimate!(estim, estim.model, y0m, d0, u0)
     # --- init covariance error estimate, if applicable ---
-    init_estimate_cov!(estim, u0, ym0, d0)
+    init_estimate_cov!(estim, y0m, d0, u0)
     x̂ = estim.x̂0 + estim.x̂op
     return x̂
 end
@@ -129,11 +132,11 @@ end
 init_estimate_cov!(::StateEstimator, _ , _ , _ ) = nothing
 
 @doc raw"""
-    init_estimate!(estim::StateEstimator, model::LinModel, u0, ym0, d0)
+    init_estimate!(estim::StateEstimator, model::LinModel, y0m, d0, u0)
 
 Init `estim.x̂0` estimate with the steady-state solution if `model` is a [`LinModel`](@ref).
 
-Using `u0`, `ym0` and `d0` arguments (deviation values, see [`setop!`](@ref)), the
+Using `u0`, `y0m` and `d0` arguments (deviation values, see [`setop!`](@ref)), the
 steadystate problem combined to the equality constraint ``\mathbf{ŷ_0^m} = \mathbf{y_0^m}``
 engenders the following system to solve:
 ```math
@@ -149,11 +152,11 @@ engenders the following system to solve:
 in which ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of `estim.Ĉ, estim.D̂d`  that correspond to 
 measured outputs ``\mathbf{y^m}``.
 """
-function init_estimate!(estim::StateEstimator, ::LinModel, u0, ym0, d0)
+function init_estimate!(estim::StateEstimator, ::LinModel, y0m, d0, u0)
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     Ĉm, D̂dm = @views Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
     # TODO: use estim.buffer.x̂ to reduce allocations
-    estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; ym0 - D̂dm*d0]
+    estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; y0m - D̂dm*d0]
     return nothing
 end
 """
@@ -168,7 +171,8 @@ init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
 
 Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂0` states and disturbances `d`.
 
-Calling a [`StateEstimator`](@ref) object calls this `evaloutput` method.
+It returns `estim` output at the current time step ``\mathbf{ŷ}(k)``. Calling a
+[`StateEstimator`](@ref) object calls this `evaloutput` method.
 
 # Examples
 ```jldoctest
@@ -193,39 +197,89 @@ end
 (estim::StateEstimator)(d=estim.buffer.empty) = evaloutput(estim, d)
 
 @doc raw"""
-    updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂
+    preparestate!(estim::StateEstimator, ym, d=estim.model.dop) -> x̂
 
-Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
+Prepare `estim.x̂0` estimate with meas. outputs `ym` and dist. `d` for the current time step.
 
-The method removes the operating points with [`remove_op!`](@ref) and call 
-[`update_estimate!`](@ref).
+This function should be called at the beginning of each discrete time step. Its behavior
+depends if `estim` is a [`StateEstimator`](@ref) in the current/filter (1.) or 
+delayed/predictor (2.) form:
+
+1. If `estim.direct` is `true`, it removes the operating points with [`remove_op!`](@ref),
+   calls [`correct_estimate!`](@ref), and returns the corrected state estimate 
+   ``\mathbf{x̂}_k(k)``.
+2. Else, it does nothing and returns the current best estimate ``\mathbf{x̂}_{k-1}(k)``.
 
 # Examples
 ```jldoctest
-julia> kf = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)));
+julia> estim2 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=true);
 
-julia> x̂ = updatestate!(kf, [1], [0]) # x̂[2] is the integrator state (nint_ym argument)
+julia> x̂ = round.(preparestate!(estim2, [1]), digits=3)
+1-element Vector{Float64}:
+ 0.01
+
+julia> estim1 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=false);
+
+julia> x̂ = preparestate!(estim1, [1])
+1-element Vector{Float64}:
+ 0.0
+```
+"""
+function preparestate!(estim::StateEstimator, ym, d=estim.model.dop)
+    if estim.direct
+        validate_args(estim, ym, d)
+        y0m, d0 = remove_op!(estim, ym, d)
+        correct_estimate!(estim, y0m, d0)
+        estim.corrected[] = true
+    end
+    x̂  = estim.buffer.x̂
+    x̂ .= estim.x̂0 .+ estim.x̂op
+    return x̂
+end
+
+@doc raw"""
+    updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂next
+
+Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
+
+This function should be called at the end of each discrete time step. It removes the 
+operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and returns the
+state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
+should be called prior to this one to correct the estimate when applicable (if
+`estim.direct == true`). 
+
+# Examples
+```jldoctest
+julia> kf = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0))); u = [1]; ym = [0];
+
+julia> preparestate!(kf, ym);
+
+julia> x̂ = updatestate!(kf, u, ym) # x̂[2] is the integrator state (nint_ym argument)
 2-element Vector{Float64}:
  0.5
  0.0
 ```
 """
 function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
-    validate_args(estim, u, ym, d)
-    u0, ym0, d0 = remove_op!(estim, u, ym, d)
-    x̂0next  = update_estimate!(estim, u0, ym0, d0)
-    x̂next   = x̂0next
-    x̂next .+= estim.x̂op
+    if estim.direct && !estim.corrected[]
+        error("preparestate! must be called before updatestate! with direct=true option")
+    end
+    validate_args(estim, ym, d, u)
+    y0m, d0, u0 = remove_op!(estim, ym, d, u)
+    update_estimate!(estim, y0m, d0, u0)
+    estim.corrected[] = false
+    x̂next  = estim.buffer.x̂
+    x̂next .= estim.x̂0 .+ estim.x̂op
     return x̂next
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
 """
-    validate_args(estim::StateEstimator, u, ym, d)
+    validate_args(estim::StateEstimator, ym, d, u=nothing)
 
-Check `u`, `ym` and `d` sizes against `estim` dimensions.
+Check `ym`, `d` and `u` sizes against `estim` dimensions.
 """
-function validate_args(estim::StateEstimator, u, ym, d)
+function validate_args(estim::StateEstimator, ym, d, u=nothing)
     validate_args(estim.model, d, u)
     nym = estim.nym
     size(ym) ≠ (nym,) && throw(DimensionMismatch("ym size $(size(ym)) ≠ meas. output size ($nym,)"))
@@ -243,7 +297,7 @@ function setstate!(estim::StateEstimator, x̂)
 end
 
 @doc raw"""
-    setmodel!(estim::StateEstimator, model=estim.model, <keyword arguments>) -> estim
+    setmodel!(estim::StateEstimator, model=estim.model; <keyword arguments>) -> estim
 
 Set `model` and covariance matrices of `estim` [`StateEstimator`](@ref).
 

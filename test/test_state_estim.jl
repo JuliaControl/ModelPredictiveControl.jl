@@ -67,38 +67,45 @@ end
 @testset "SteadyKalmanFilter estimator methods" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     skalmanfilter1 = SteadyKalmanFilter(linmodel1, nint_ym=[1, 1])
+    preparestate!(skalmanfilter1, [50, 30])
     @test updatestate!(skalmanfilter1, [10, 50], [50, 30]) ≈ zeros(4)
+    preparestate!(skalmanfilter1, [50, 30])
     @test updatestate!(skalmanfilter1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
     @test skalmanfilter1.x̂0 ≈ zeros(4)
     @test evaloutput(skalmanfilter1) ≈ skalmanfilter1() ≈ [50, 30]
     @test evaloutput(skalmanfilter1, Float64[]) ≈ skalmanfilter1(Float64[]) ≈ [50, 30]
     @test initstate!(skalmanfilter1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     linmodel2 = LinModel(append(tf(1, [1, 0]), tf(2, [10, 1])), 1.0)
-    skalmanfilter2 = SteadyKalmanFilter(linmodel2, nint_u=[1, 1])
+    skalmanfilter2 = SteadyKalmanFilter(linmodel2, nint_u=[1, 1], direct=false)
     x = initstate!(skalmanfilter2, [10, 3], [0.5, 6+0.1])
     @test evaloutput(skalmanfilter2) ≈ [0.5, 6+0.1]
     @test updatestate!(skalmanfilter2, [10, 3], [0.5, 6+0.1]) ≈ x
     setstate!(skalmanfilter1, [1,2,3,4])
     @test skalmanfilter1.x̂0 ≈ [1,2,3,4]
     for i in 1:100
+        preparestate!(skalmanfilter1, [50, 30])
         updatestate!(skalmanfilter1, [11, 52], [50, 30])
     end
     @test skalmanfilter1() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(skalmanfilter1, [51, 32])
         updatestate!(skalmanfilter1, [10, 50], [51, 32])
     end
     @test skalmanfilter1() ≈ [51, 32] atol=1e-3
-    skalmanfilter2 = SteadyKalmanFilter(linmodel1, nint_u=[1, 1])
+    skalmanfilter2 = SteadyKalmanFilter(linmodel1, nint_u=[1, 1], direct=false)
     for i in 1:100
+        preparestate!(skalmanfilter2, [50, 30])
         updatestate!(skalmanfilter2, [11, 52], [50, 30])
     end
     @test skalmanfilter2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(skalmanfilter2, [51, 32])
         updatestate!(skalmanfilter2, [10, 50], [51, 32])
     end
     @test skalmanfilter2() ≈ [51, 32] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     skalmanfilter3 = SteadyKalmanFilter(linmodel3)
+    preparestate!(skalmanfilter3, [0])
     x̂ = updatestate!(skalmanfilter3, [0], [0])
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
@@ -166,7 +173,9 @@ end
 @testset "KalmanFilter estimator methods" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     kalmanfilter1 = KalmanFilter(linmodel1)
+    preparestate!(kalmanfilter1, [50, 30])
     @test updatestate!(kalmanfilter1, [10, 50], [50, 30]) ≈ zeros(4)
+    preparestate!(kalmanfilter1, [50, 30])
     @test updatestate!(kalmanfilter1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
     @test kalmanfilter1.x̂0 ≈ zeros(4)
     @test evaloutput(kalmanfilter1) ≈ kalmanfilter1() ≈ [50, 30]
@@ -175,24 +184,29 @@ end
     setstate!(kalmanfilter1, [1,2,3,4])
     @test kalmanfilter1.x̂0 ≈ [1,2,3,4]
     for i in 1:1000
+        preparestate!(kalmanfilter1, [50, 30])
         updatestate!(kalmanfilter1, [11, 52], [50, 30])
     end
     @test kalmanfilter1() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(kalmanfilter1, [51, 32])
         updatestate!(kalmanfilter1, [10, 50], [51, 32])
     end
     @test kalmanfilter1() ≈ [51, 32] atol=1e-3
-    kalmanfilter2 = KalmanFilter(linmodel1, nint_u=[1, 1])
+    kalmanfilter2 = KalmanFilter(linmodel1, nint_u=[1, 1], direct=false)
     for i in 1:100
+        preparestate!(kalmanfilter2, [50, 30])
         updatestate!(kalmanfilter2, [11, 52], [50, 30])
     end
     @test kalmanfilter2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(kalmanfilter2, [51, 32])
         updatestate!(kalmanfilter2, [10, 50], [51, 32])
     end
     @test kalmanfilter2() ≈ [51, 32] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     kalmanfilter3 = KalmanFilter(linmodel3)
+    preparestate!(kalmanfilter3, [0])
     x̂ = updatestate!(kalmanfilter3, [0], [0])
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
@@ -205,6 +219,7 @@ end
     kalmanfilter = KalmanFilter(linmodel, nint_ym=0)
     @test kalmanfilter.Â ≈ [0.5]
     @test evaloutput(kalmanfilter) ≈ [50.0]
+    preparestate!(kalmanfilter, [50.0])
     x̂ = updatestate!(kalmanfilter, [2.0], [50.0])
     @test x̂ ≈ [3.0]
     newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
@@ -213,6 +228,7 @@ end
     @test kalmanfilter.Â ≈ [0.2]
     @test evaloutput(kalmanfilter) ≈ [55.0]
     @test kalmanfilter.lastu0 ≈ [2.0 - 3.0]
+    preparestate!(kalmanfilter, [55.0])
     x̂ = updatestate!(kalmanfilter, [3.0], [55.0])
     @test x̂ ≈ [3.0]
     newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
@@ -265,34 +281,41 @@ end
     
 @testset "Luenberger estimator methods" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    ukf1 = Luenberger(linmodel1, nint_ym=[1, 1])
-    @test updatestate!(ukf1, [10, 50], [50, 30]) ≈ zeros(4)
-    @test updatestate!(ukf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
-    @test ukf1.x̂0 ≈ zeros(4)
-    @test evaloutput(ukf1) ≈ ukf1() ≈ [50, 30]
-    @test evaloutput(ukf1, Float64[]) ≈ ukf1(Float64[]) ≈ [50, 30]
-    @test initstate!(ukf1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
-    setstate!(ukf1, [1,2,3,4])
-    @test ukf1.x̂0 ≈ [1,2,3,4]
+    lo1 = Luenberger(linmodel1, nint_ym=[1, 1])
+    preparestate!(lo1, [50, 30])
+    @test updatestate!(lo1, [10, 50], [50, 30]) ≈ zeros(4)
+    preparestate!(lo1, [50, 30])
+    @test updatestate!(lo1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
+    @test lo1.x̂0 ≈ zeros(4)
+    @test evaloutput(lo1) ≈ lo1() ≈ [50, 30]
+    @test evaloutput(lo1, Float64[]) ≈ lo1(Float64[]) ≈ [50, 30]
+    @test initstate!(lo1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    setstate!(lo1, [1,2,3,4])
+    @test lo1.x̂0 ≈ [1,2,3,4]
     for i in 1:100
-        updatestate!(ukf1, [11, 52], [50, 30])
+        preparestate!(lo1, [50, 30])
+        updatestate!(lo1, [11, 52], [50, 30])
     end
-    @test ukf1() ≈ [50, 30] atol=1e-3
+    @test lo1() ≈ [50, 30] atol=1e-3
     for i in 1:100
-        updatestate!(ukf1, [10, 50], [51, 32])
+        preparestate!(lo1, [51, 32])
+        updatestate!(lo1, [10, 50], [51, 32])
     end
-    @test ukf1() ≈ [51, 32] atol=1e-3
-    lo2 = Luenberger(linmodel1, nint_u=[1, 1])
+    @test lo1() ≈ [51, 32] atol=1e-3
+    lo2 = Luenberger(linmodel1, nint_u=[1, 1], direct=false)
     for i in 1:100
+        preparestate!(lo2, [50, 30])
         updatestate!(lo2, [11, 52], [50, 30])
     end
     @test lo2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(lo2, [51, 32])
         updatestate!(lo2, [10, 50], [51, 32])
     end
     @test lo2() ≈ [51, 32] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     lo3 = Luenberger(linmodel3)
+    preparestate!(lo3, [0])
     x̂ = updatestate!(lo3, [0], [0])
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
@@ -377,11 +400,14 @@ end
 @testset "InternalModel estimator methods" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]) , uop=[10,50], yop=[50,30])
     internalmodel1 = InternalModel(linmodel1)
+    preparestate!(internalmodel1, [50, 30] .+ 1)
     @test updatestate!(internalmodel1, [10, 50], [50, 30] .+ 1) ≈ zeros(2)
+    preparestate!(internalmodel1, [50, 30] .+ 1)
     @test updatestate!(internalmodel1, [10, 50], [50, 30] .+ 1, Float64[]) ≈ zeros(2)
     @test internalmodel1.x̂d ≈ internalmodel1.x̂0 ≈ zeros(2)
     @test internalmodel1.x̂s ≈ ones(2)
-    @test ModelPredictiveControl.evalŷ(internalmodel1, [51,31], Float64[]) ≈ [51,31]
+    preparestate!(internalmodel1, [51, 31])
+    @test ModelPredictiveControl.evalŷ(internalmodel1, Float64[]) ≈ [51,31]
     @test initstate!(internalmodel1, [10, 50], [50, 30]) ≈ zeros(2)
     linmodel2 = LinModel(append(tf(3, [5, 1]), tf(2, [10, 1])), 1.0)
     stoch_ym = append(tf([2.5, 1],[1.2, 1, 0]),tf([1.5, 1], [1.3, 1, 0]))
@@ -396,6 +422,7 @@ end
 
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     internalmodel3 = InternalModel(linmodel3)
+    preparestate!(internalmodel3, [0])
     x̂ = updatestate!(internalmodel3, [0], [0])
     @test x̂ ≈ [0]
     @test isa(x̂, Vector{Float32})
@@ -407,6 +434,7 @@ end
     internalmodel = InternalModel(linmodel)
     @test internalmodel.Â ≈ [0.5]
     @test evaloutput(internalmodel) ≈ [50.0]
+    preparestate!(internalmodel, [50.0])
     x̂ = updatestate!(internalmodel, [2.0], [50.0])
     @test x̂ ≈ [3.0]
     newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
@@ -415,6 +443,7 @@ end
     @test internalmodel.Â ≈ [0.2]
     @test evaloutput(internalmodel) ≈ [55.0]
     @test internalmodel.lastu0 ≈ [2.0 - 3.0]
+    preparestate!(internalmodel, [55.0])
     x̂ = updatestate!(internalmodel, [3.0], [55.0])
     @test x̂ ≈ [3.0]
     newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
@@ -485,7 +514,9 @@ end
     h(x,_)   = linmodel1.C*x
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     ukf1 = UnscentedKalmanFilter(nonlinmodel)
+    preparestate!(ukf1, [50, 30])
     @test updatestate!(ukf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
+    preparestate!(ukf1, [50, 30])
     @test updatestate!(ukf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
     @test ukf1.x̂0 ≈ zeros(4) atol=1e-9
     @test evaloutput(ukf1) ≈ ukf1() ≈ [50, 30]
@@ -494,24 +525,29 @@ end
     setstate!(ukf1, [1,2,3,4])
     @test ukf1.x̂0 ≈ [1,2,3,4]
     for i in 1:100
+        preparestate!(ukf1, [50, 30])
         updatestate!(ukf1, [11, 52], [50, 30])
     end
     @test ukf1() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(ukf1, [51, 32])
         updatestate!(ukf1, [10, 50], [51, 32])
     end
     @test ukf1() ≈ [51, 32] atol=1e-3
-    ukf2 = UnscentedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
+    ukf2 = UnscentedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     for i in 1:100
+        preparestate!(ukf2, [50, 30])
         updatestate!(ukf2, [11, 52], [50, 30])
     end
     @test ukf2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(ukf2, [51, 32])
         updatestate!(ukf2, [10, 50], [51, 32])
     end
     @test ukf2() ≈ [51, 32] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     ukf3 = UnscentedKalmanFilter(linmodel3)
+    preparestate!(ukf3, [0])
     x̂ = updatestate!(ukf3, [0], [0])
     @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
@@ -523,6 +559,7 @@ end
     ukf1 = UnscentedKalmanFilter(linmodel, nint_ym=0)
     @test ukf1.Â ≈ [0.5]
     @test evaloutput(ukf1) ≈ [50.0]
+    preparestate!(ukf1, [50.0])
     x̂ = updatestate!(ukf1, [2.0], [50.0])
     @test x̂ ≈ [3.0]
     newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
@@ -531,6 +568,7 @@ end
     @test ukf1.Â ≈ [0.2]
     @test evaloutput(ukf1) ≈ [55.0]
     @test ukf1.lastu0 ≈ [2.0 - 3.0]
+    preparestate!(ukf1, [55.0])
     x̂ = updatestate!(ukf1, [3.0], [55.0])
     @test x̂ ≈ [3.0]
     newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
@@ -608,7 +646,9 @@ end
     h(x,_)   = linmodel1.C*x
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     ekf1 = ExtendedKalmanFilter(nonlinmodel)
+    preparestate!(ekf1, [50, 30])
     @test updatestate!(ekf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
+    preparestate!(ekf1, [50, 30])
     @test updatestate!(ekf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
     @test ekf1.x̂0 ≈ zeros(4) atol=1e-9
     @test evaloutput(ekf1) ≈ ekf1() ≈ [50, 30]
@@ -617,24 +657,29 @@ end
     setstate!(ekf1, [1,2,3,4])
     @test ekf1.x̂0 ≈ [1,2,3,4]
     for i in 1:100
+        preparestate!(ekf1, [50, 30])
         updatestate!(ekf1, [11, 52], [50, 30])
     end
     @test ekf1() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(ekf1, [51, 32])
         updatestate!(ekf1, [10, 50], [51, 32])
     end
     @test ekf1() ≈ [51, 32] atol=1e-3
-    ekf2 = ExtendedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
+    ekf2 = ExtendedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     for i in 1:100
+        preparestate!(ekf2, [50, 30])
         updatestate!(ekf2, [11, 52], [50, 30])
     end
     @test ekf2() ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(ekf2, [51, 32])
         updatestate!(ekf2, [10, 50], [51, 32])
     end
     @test ekf2() ≈ [51, 32] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     ekf3 = ExtendedKalmanFilter(linmodel3)
+    preparestate!(ekf3, [0])
     x̂ = updatestate!(ekf3, [0], [0])
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
@@ -646,6 +691,7 @@ end
     ekf1 = ExtendedKalmanFilter(linmodel, nint_ym=0)
     @test ekf1.Â ≈ [0.5]
     @test evaloutput(ekf1) ≈ [50.0]
+    preparestate!(ekf1, [50.0])
     x̂ = updatestate!(ekf1, [2.0], [50.0])
     @test x̂ ≈ [3.0]
     newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
@@ -654,6 +700,7 @@ end
     @test ekf1.Â ≈ [0.2]
     @test evaloutput(ekf1) ≈ [55.0]
     @test ekf1.lastu0 ≈ [2.0 - 3.0]
+    preparestate!(ekf1, [55.0])
     x̂ = updatestate!(ekf1, [3.0], [55.0])
     @test x̂ ≈ [3.0]
     newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
@@ -728,7 +775,7 @@ end
     I_6 = Matrix{Float64}(I, 6, 6)
     I_2 = Matrix{Float64}(I, 2, 2)
     optim = Model(Ipopt.Optimizer)
-    mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, 1e5 ,optim)
+    mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, 1e5; optim)
     @test mhe9.P̂_0 ≈ I(6)
     @test mhe9.Q̂ ≈ I(6)
     @test mhe9.R̂ ≈ I(2)
@@ -736,7 +783,7 @@ end
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, [1, 1], I_6, I_6, I_2)
     mhe10 = MovingHorizonEstimator(
-        nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf, optim, covestim
+        nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf; optim, covestim
     )
     @test solver_name(mhe10.optim) == "Ipopt"
 
@@ -759,6 +806,7 @@ end
     h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing), uop=[10,50], yop=[50,30], dop=[5])
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
+    preparestate!(mhe1, [50, 30], [5])
     x̂ = updatestate!(mhe1, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
     @test mhe1.x̂0 ≈ zeros(6) atol=1e-9
@@ -771,15 +819,17 @@ end
     setstate!(mhe1, [1,2,3,4,5,6])
     @test mhe1.x̂0 ≈ [1,2,3,4,5,6]
     for i in 1:100
+        preparestate!(mhe1, [50, 30], [5])
         updatestate!(mhe1, [11, 52], [50, 30], [5])
     end
     @test mhe1([5]) ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(mhe1, [51, 32], [5])
         updatestate!(mhe1, [10, 50], [51, 32], [5])
     end
     @test mhe1([5]) ≈ [51, 32] atol=1e-3
     
-    mhe2 = MovingHorizonEstimator(linmodel1, He=2, nint_u=[1, 1], nint_ym=[0, 0])
+    mhe2 = MovingHorizonEstimator(linmodel1, He=2, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
     @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
@@ -788,15 +838,18 @@ end
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
     for i in 1:100
+        preparestate!(mhe2, [50, 30], [5])
         updatestate!(mhe2, [11, 52], [50, 30], [5])
     end
     @test mhe2([5]) ≈ [50, 30] atol=1e-3
     for i in 1:100
+        preparestate!(mhe2, [51, 32], [5])
         updatestate!(mhe2, [10, 50], [51, 32], [5])
     end
     @test mhe2([5]) ≈ [51, 32] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mhe3 = MovingHorizonEstimator(linmodel3, He=1)
+    preparestate!(mhe3, [0])
     x̂ = updatestate!(mhe3, [0], [0])
     @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
@@ -812,7 +865,8 @@ end
     R̂ = diagm([1, 1].^2)
     optim = Model(Ipopt.Optimizer)
     covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, 0, Q̂, Q̂, R̂)
-    mhe5 = MovingHorizonEstimator(nonlinmodel, 1, 1:2, 0, 0, Q̂, Q̂, R̂, Inf, optim, covestim)
+    mhe5 = MovingHorizonEstimator(nonlinmodel, 1, 1:2, 0, 0, Q̂, Q̂, R̂, Inf; optim, covestim)
+    preparestate!(mhe5, [50, 30], [5])
     x̂ = updatestate!(mhe5, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(4) atol=1e-9
     @test mhe5.x̂0 ≈ zeros(4) atol=1e-9
@@ -879,6 +933,7 @@ end
     @test_throws ArgumentError setconstraint!(mhe2, c_v̂min=[-1])
     @test_throws ArgumentError setconstraint!(mhe2, c_v̂max=[+1])
 
+    preparestate!(mhe1, [50, 30])
     updatestate!(mhe1, [10, 50], [50, 30])
     @test_throws ErrorException setconstraint!(mhe1, x̂min=[-Inf,-Inf])
     @test_throws ErrorException setconstraint!(mhe1, x̂max=[+Inf,+Inf])
@@ -911,10 +966,12 @@ end
     setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
 
     setconstraint!(mhe, x̂min=[1,1], x̂max=[100,100])
+    preparestate!(mhe, [50, 30])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
     @test x̂ ≈ [1, 1] atol=5e-2
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[-1,-1])
+    preparestate!(mhe, [50, 30])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
     @test x̂ ≈ [-1, -1] atol=5e-2
 
@@ -923,10 +980,12 @@ end
     setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
 
     setconstraint!(mhe, ŵmin=[1,1], ŵmax=[100,100])
+    preparestate!(mhe, [50, 30])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
     @test mhe.Ŵ ≈ [1,1] atol=5e-2
 
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[-1,-1])
+    preparestate!(mhe, [50, 30])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
     @test mhe.Ŵ ≈ [-1,-1] atol=5e-2
 
@@ -935,11 +994,13 @@ end
     setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
 
     setconstraint!(mhe, v̂min=[1,1], v̂max=[100,100])
+    preparestate!(mhe, [50, 30])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
     info = getinfo(mhe)
     @test info[:V̂] ≈ [1,1] atol=5e-2
 
     setconstraint!(mhe, v̂min=[-100,-100], v̂max=[-1,-1])
+    preparestate!(mhe, [50, 30])
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
     info = getinfo(mhe)
     @test info[:V̂] ≈ [-1,-1] atol=5e-2
@@ -954,10 +1015,12 @@ end
     setconstraint!(mhe2, v̂min=[-100,-100], v̂max=[100,100])
 
     setconstraint!(mhe2, x̂min=[1,1], x̂max=[100,100])
+    preparestate!(mhe2, [50, 30])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     @test x̂ ≈ [1, 1] atol=5e-2
 
     setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[-1,-1])
+    preparestate!(mhe2, [50, 30])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     @test x̂ ≈ [-1, -1] atol=5e-2
 
@@ -966,10 +1029,12 @@ end
     setconstraint!(mhe2, v̂min=[-100,-100], v̂max=[100,100])
 
     setconstraint!(mhe2, ŵmin=[1,1], ŵmax=[100,100])
+    preparestate!(mhe2, [50, 30])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     @test mhe2.Ŵ ≈ [1,1] atol=5e-2
 
     setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[-1,-1])
+    preparestate!(mhe2, [50, 30])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     @test mhe2.Ŵ ≈ [-1,-1] atol=5e-2
 
@@ -978,11 +1043,13 @@ end
     setconstraint!(mhe2, v̂min=[-100,-100], v̂max=[100,100])
 
     setconstraint!(mhe2, v̂min=[1,1], v̂max=[100,100])
+    preparestate!(mhe2, [50, 30])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     info = getinfo(mhe2)
     @test info[:V̂] ≈ [1,1] atol=5e-2
 
     setconstraint!(mhe2, v̂min=[-100,-100], v̂max=[-1,-1])
+    preparestate!(mhe2, [50, 30])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     info = getinfo(mhe2)
     @test info[:V̂] ≈ [-1,-1] atol=5e-2
@@ -990,14 +1057,16 @@ end
 
 @testset "MovingHorizonEstimator v.s. Kalman filters" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
-    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0)
-    kf  = KalmanFilter(linmodel1, nint_ym=0)
+    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=false)
+    kf  = KalmanFilter(linmodel1, nint_ym=0, direct=false)
     X̂0_mhe = zeros(4, 6)
     X̂0_kf  = zeros(4, 6)
     for i in 1:6
         X̂0_mhe[:,i] = mhe.x̂0
         X̂0_kf[:,i]  = kf.x̂0
+        preparestate!(mhe, [50, 31], [25])
         updatestate!(mhe, [11, 50], [50, 31], [25])
+        preparestate!(kf,  [50, 31], [25])
         updatestate!(kf,  [11, 50], [50, 31], [25])
     end
     @test X̂0_mhe ≈ X̂0_kf atol=1e-3
@@ -1005,14 +1074,16 @@ end
     h = (x,d)   -> linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
-    mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0)
-    ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0)
+    mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=false)
+    ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=false)
     X̂0_mhe = zeros(4, 6)
     X̂0_ukf = zeros(4, 6)
     for i in 1:6
         X̂0_mhe[:,i] = mhe.x̂0
         X̂0_ukf[:,i] = ukf.x̂0
+        preparestate!(mhe, [50, 31], [25])
         updatestate!(mhe, [11, 50], [50, 31], [25])
+        preparestate!(ukf, [50, 31], [25])
         updatestate!(ukf, [11, 50], [50, 31], [25])
     end
     @test X̂0_mhe ≈ X̂0_ukf atol=1e-3
@@ -1025,6 +1096,7 @@ end
     setconstraint!(mhe, x̂min=[-1000], x̂max=[1000])
     @test mhe.Â ≈ [0.5]
     @test evaloutput(mhe) ≈ [50.0]
+    preparestate!(mhe, [50.0])
     x̂ = updatestate!(mhe, [2.0], [50.0])
     @test x̂ ≈ [3.0]
     newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
@@ -1035,6 +1107,7 @@ end
     @test mhe.lastu0 ≈ [2.0 - 3.0]
     @test mhe.U0 ≈ [2.0 - 3.0]
     @test mhe.Y0m ≈ [50.0 - 55.0]
+    preparestate!(mhe, [55.0])
     x̂ = updatestate!(mhe, [3.0], [55.0])
     @test x̂ ≈ [3.0]
     newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])

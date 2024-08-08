@@ -20,9 +20,11 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     B̂d  ::Matrix{NT}
     D̂d  ::Matrix{NT}
     K̂::Matrix{NT}
+    direct::Bool
+    corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function Luenberger{NT, SM}(
-        model, i_ym, nint_u, nint_ym, poles
+        model, i_ym, nint_u, nint_ym, poles; direct=true
     ) where {NT<:Real, SM<:LinModel}
         nu, ny, nd = model.nu, model.ny, model.nd
         nym, nyu = validate_ym(model, i_ym)
@@ -32,12 +34,13 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         K̂ = try
-            ControlSystemsBase.place(Â, Ĉ, poles, :o)[:, i_ym]
+            ControlSystemsBase.place(Â, Ĉ, poles, :o; direct)[:, i_ym]
         catch
             error("Cannot compute the Luenberger gain K̂ with specified poles.")
         end
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
+        corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
@@ -46,6 +49,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             K̂,
+            direct, corrected,
             buffer
         )
     end
@@ -57,7 +61,8 @@ end
         i_ym = 1:model.ny, 
         nint_u  = 0,
         nint_ym = default_nint(model, i_ym),
-        poles = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
+        poles = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5,
+        direct = true
     )
 
 Construct a Luenberger observer with the [`LinModel`](@ref) `model`.
@@ -66,8 +71,10 @@ Construct a Luenberger observer with the [`LinModel`](@ref) `model`.
 unmeasured ``\mathbf{y^u}``. `model` matrices are augmented with the stochastic model, which
 is specified by the numbers of integrator `nint_u` and `nint_ym` (see [`SteadyKalmanFilter`](@ref)
 Extended Help). The argument `poles` is a vector of `model.nx + sum(nint_u) + sum(nint_ym)`
-elements specifying the observer poles/eigenvalues (near ``z=0.5`` by default). The method
-computes the observer gain `K̂` with [`place`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.place).
+elements specifying the observer poles/eigenvalues (near ``z=0.5`` by default). The observer
+is constructed with a direct transmission from ``\mathbf{y^m}`` if `direct=true` (a.k.a. 
+current observers, in opposition to the delayed/prediction form). The method computes the
+observer gain `K̂` with [`place`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.place).
 
 # Examples
 ```jldoctest
@@ -87,9 +94,10 @@ function Luenberger(
     i_ym::IntRangeOrVector  = 1:model.ny,
     nint_u ::IntVectorOrInt = 0,
     nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
-    poles = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5
+    poles = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5,
+    direct = true
 ) where{NT<:Real, SM<:LinModel{NT}}
-    return Luenberger{NT, SM}(model, i_ym, nint_u, nint_ym, poles)
+    return Luenberger{NT, SM}(model, i_ym, nint_u, nint_ym, poles; direct)
 end
 
 "Validate the quantity and stability of the Luenberger `poles`."
@@ -103,27 +111,25 @@ end
 
 
 """
-    update_estimate!(estim::Luenberger, u0, y0m, d0) -> x̂0next
+    prepare_estimate_obsv!(estim::Luenberger, y0m, d0, _ )
+
+Identical to [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
+"""
+function correct_estimate!(estim::Luenberger, y0m, d0)
+    return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+end
+
+
+"""
+    update_estimate!(estim::Luenberger, y0m, d0, u0)
 
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
-function update_estimate!(estim::Luenberger, u0, y0m, d0)
-    Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
-    x̂0, K̂ = estim.x̂0, estim.K̂
-    Ĉm, D̂dm = @views estim.Ĉ[estim.i_ym, :], estim.D̂d[estim.i_ym, :]
-    ŷ0m, x̂0next = similar(y0m), similar(x̂0)
-    # in-place operations to reduce allocations:
-    mul!(ŷ0m, Ĉm, x̂0) 
-    mul!(ŷ0m, D̂dm, d0, 1, 1)
-    v̂  = ŷ0m
-    v̂ .= y0m .- ŷ0m
-    mul!(x̂0next, Â, x̂0)
-    mul!(x̂0next, B̂u, u0, 1, 1)
-    mul!(x̂0next, B̂d, d0, 1, 1)
-    mul!(x̂0next, K̂, v̂, 1, 1)
-    x̂0next  .+= estim.f̂op .- estim.x̂op
-    estim.x̂0 .= x̂0next
-    return x̂0next
+function update_estimate!(estim::Luenberger, y0m, d0, u0)
+    if !estim.direct
+        correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+    end
+    return predict_estimate_obsv!(estim, y0m, d0, u0)
 end
 
 "Throw an error if `setmodel!` is called on `Luenberger` observer."

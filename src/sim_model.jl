@@ -218,10 +218,23 @@ function initstate!(model::SimModel, u, d=model.buffer.empty)
     return x
 end
 
+@doc raw"""
+    preparestate!(model::SimModel, _ , _ ) -> x
+
+Do nothing for [`SimModel`](@ref) and return the current model state ``\mathbf{x}(k)``. 
 """
-    updatestate!(model::SimModel, u, d=[]) -> x
+function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
+    x  = model.buffer.x
+    x .= model.x0 .+ model.xop
+    return x 
+end
+
+@doc raw"""
+    updatestate!(model::SimModel, u, d=[]) -> xnext
 
 Update `model.x0` states with current inputs `u` and measured disturbances `d`.
+
+The method computes and returns the model state for the next time step ``\mathbf{x}(k+1)``.
 
 # Examples
 ```jldoctest
@@ -245,12 +258,13 @@ function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: 
     return xnext
 end
 
-"""
+@doc raw"""
     evaloutput(model::SimModel, d=[]) -> y
 
 Evaluate `SimModel` outputs `y` from `model.x0` states and measured disturbances `d`.
 
-Calling a [`SimModel`](@ref) object calls this `evaloutput` method.
+It returns `model` output at the current time step ``\mathbf{y}(k)``. Calling a 
+[`SimModel`](@ref) object calls this `evaloutput` method.
 
 # Examples
 ```jldoctest

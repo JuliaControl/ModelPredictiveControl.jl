@@ -8,7 +8,8 @@ y = model()
 
 mpc_im = setconstraint!(LinMPC(InternalModel(model)), ymin=[45, -Inf])
 initstate!(mpc_im, model.uop, y)
-u = mpc_im([55, 30], ym=y)
+preparestate!(mpc_im, [55, 30])
+u = mpc_im([55, 30])
 sim!(mpc_im, 3)
 
 mpc_kf = setconstraint!(LinMPC(KalmanFilter(model)), ymin=[45, -Inf])
@@ -71,7 +72,8 @@ nlmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10, 10], y
 y = nlmodel()
 nmpc_im = setconstraint!(NonLinMPC(InternalModel(nlmodel), Hp=10, Cwt=Inf), ymin=[45, -Inf])
 initstate!(nmpc_im, nlmodel.uop, y)
-u = nmpc_im([55, 30], ym=y)
+preparestate!(nmpc_im, [55, 30])
+u = nmpc_im([55, 30])
 sim!(nmpc_im, 3, [55, 30])
 
 nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=1e3), ymin=[45, -Inf])

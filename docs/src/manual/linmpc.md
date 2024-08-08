@@ -62,10 +62,10 @@ plant simulator to test the design. Its sampling time is 2 s thus the control pe
 ## Linear Model Predictive Controller
 
 A linear model predictive controller (MPC) will control both the water level ``y_L`` and
-temperature ``y_T`` in the tank. The tank level should also never fall below 45:
+temperature ``y_T`` in the tank. The tank level should also never fall below 48:
 
 ```math
-y_L ≥ 45
+y_L ≥ 48
 ```
 
 We design our [`LinMPC`](@ref) controllers by including the linear level constraint with
@@ -73,7 +73,7 @@ We design our [`LinMPC`](@ref) controllers by including the linear level constra
 
 ```@example 1
 mpc = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
-mpc = setconstraint!(mpc, ymin=[45, -Inf])
+mpc = setconstraint!(mpc, ymin=[48, -Inf])
 ```
 
 in which `Hp` and `Hc` keyword arguments are respectively the predictive and control
@@ -116,10 +116,11 @@ function test_mpc(mpc, model)
         i == 101 && (ry = [54, 30])
         i == 151 && (ul = -20)
         y = model() # simulated measurements
+        preparestate!(mpc, y) # prepare mpc state estimate for current iteration
         u = mpc(ry) # or equivalently : u = moveinput!(mpc, ry)
         u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
-        updatestate!(mpc, u, y) # update mpc state estimate
-        updatestate!(model, u + [0; ul]) # update simulator with the load disturbance
+        updatestate!(mpc, u, y) # update mpc state estimate for next iteration
+        updatestate!(model, u + [0; ul]) # update simulator with load disturbance
     end
     return u_data, y_data, ry_data
 end
@@ -131,10 +132,10 @@ nothing # hide
 The [`LinMPC`](@ref) objects are also callable as an alternative syntax for
 [`moveinput!`](@ref). It is worth mentioning that additional information like the optimal
 output predictions ``\mathbf{Ŷ}`` can be retrieved by calling [`getinfo`](@ref) after
-solving the problem. Also, calling [`updatestate!`](@ref) on the `mpc` object updates its
-internal state for the *NEXT* control period (this is by design, see
-[Functions: State Estimators](@ref) for justifications). That is why the call is done at the
-end of the `for` loop. The same logic applies for `model`.
+solving the problem. Also, calling [`preparestate!`](@ref) on the `mpc` object prepares the
+estimates for the current control period, and [`updatestate!`](@ref) updates them for the
+next one (the same logic applies for `model`). This is why [`preparestate!`](@ref) is called
+before the controller, and [`updatestate!`](@ref), after.
 
 Lastly, we plot the closed-loop test with the `Plots` package:
 
@@ -143,7 +144,7 @@ using Plots
 function plot_data(t_data, u_data, y_data, ry_data)
     p1 = plot(t_data, y_data[1,:], label="meas.", ylabel="level")
     plot!(p1, t_data, ry_data[1,:], label="setpoint", linestyle=:dash, linetype=:steppost)
-    plot!(p1, t_data, fill(45,size(t_data)), label="min", linestyle=:dot, linewidth=1.5)
+    plot!(p1, t_data, fill(48,size(t_data)), label="min", linestyle=:dot, linewidth=1.5)
     p2 = plot(t_data, y_data[2,:], label="meas.", legend=:topleft, ylabel="temp.")
     plot!(p2, t_data, ry_data[2,:],label="setpoint", linestyle=:dash, linetype=:steppost)
     p3 = plot(t_data,u_data[1,:],label="cold", linetype=:steppost, ylabel="flow rate")
@@ -162,11 +163,11 @@ real-life control problems. Constructing a [`LinMPC`](@ref) with input integrato
 
 ```@example 1
 mpc2 = LinMPC(model, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1], nint_u=[1, 1])
-mpc2 = setconstraint!(mpc2, ymin=[45, -Inf])
+mpc2 = setconstraint!(mpc2, ymin=[48, -Inf])
 ```
 
-does accelerate the rejection of the load disturbance and eliminates the level constraint
-violation:
+does accelerate the rejection of the load disturbance and almost eliminates the level
+constraint violation:
 
 ```@example 1
 setstate!(model, zeros(model.nx))
@@ -202,7 +203,7 @@ mpc_mhe = LinMPC(estim, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
 mpc_mhe = setconstraint!(mpc_mhe, ymin=[45, -Inf])
 ```
 
-The rejection is slightly improved:
+The rejection is not improved here:
 
 ```@example 1
 setstate!(model, zeros(model.nx))
@@ -214,6 +215,10 @@ savefig("plot3_LinMPC.svg"); nothing # hide
 ```
 
 ![plot3_LinMPC](plot3_LinMPC.svg)
+
+This is because the more performant `direct=true` version of the [`MovingHorizonEstimator`](@ref)
+is not not implemented yet. The rejection will be improved with the `direct=true` version
+(coming soon).
 
 ## Adding Feedforward Compensation
 
@@ -246,7 +251,7 @@ A [`LinMPC`](@ref) controller is constructed on this model:
 
 ```@example 1
 mpc_d = LinMPC(model_d, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
-mpc_d = setconstraint!(mpc_d, ymin=[45, -Inf])
+mpc_d = setconstraint!(mpc_d, ymin=[48, -Inf])
 ```
 
 A new test function that feeds the measured disturbance ``\mathbf{d}`` to the controller is
@@ -264,6 +269,7 @@ function test_mpc_d(mpc_d, model)
         i == 151 && (ul = -20)
         d = ul .+ dop   # simulated measured disturbance
         y = model()     # simulated measurements
+        preparestate!(mpc_d, y, d) # prepare estimate with the measured disturbance d
         u = mpc_d(ry, d) # also feed the measured disturbance d to the controller
         u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
         updatestate!(mpc_d, u, y, d)    # update estimate with the measured disturbance d

@@ -89,11 +89,11 @@ method.
 An [`UnscentedKalmanFilter`](@ref) estimates the plant state :
 
 ```@example 1
-α=0.01; σQ=[0.1, 0.5]; σR=[0.5]; nint_u=[1]; σQint_u=[0.1]
+α=0.01; σQ=[0.1, 1.0]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
 estim = UnscentedKalmanFilter(model; α, σQ, σR, nint_u, σQint_u)
 ```
 
-The vectors `σQ` and σR `σR` are the standard deviations of the process and sensor noises,
+The vectors `σQ` and `σR` are the standard deviations of the process and sensor noises,
 respectively. The value for the velocity ``ω`` is higher here (`σQ` second value) since
 ``\dot{ω}(t)`` equation includes an uncertain parameter: the friction coefficient ``K``.
 Also, the argument `nint_u` explicitly adds one integrating state at the model input, the
@@ -237,7 +237,8 @@ savefig("plot6_NonLinMPC.svg"); nothing # hide
 
 ![plot6_NonLinMPC](plot6_NonLinMPC.svg)
 
-the new controller is able to recuperate more energy from the pendulum (i.e. negative work):
+the new controller is able to recuperate a little more energy from the pendulum (i.e.
+negative work):
 
 ```@example 1
 Dict(:W_nmpc => calcW(res_yd), :W_empc => calcW(res2_yd))
@@ -262,12 +263,13 @@ linmodel = linearize(model, x=[π, 0], u=[0])
 A [`SteadyKalmanFilter`](@ref) and a [`LinMPC`](@ref) are designed from `linmodel`:
 
 ```@example 1
+
 skf = SteadyKalmanFilter(linmodel; σQ, σR, nint_u, σQint_u)
 mpc = LinMPC(skf; Hp, Hc, Mwt, Nwt, Cwt=Inf)
 mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 ```
 
-The linear controller has difficulties to reject the 10° step disturbance:
+The linear controller satisfactorily rejects the 10° step disturbance:
 
 ```@example 1
 res_lin = sim!(mpc, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
@@ -278,9 +280,10 @@ savefig("plot7_NonLinMPC.svg"); nothing # hide
 ![plot7_NonLinMPC](plot7_NonLinMPC.svg)
 
 Solving the optimization problem of `mpc` with [`DAQP`](https://darnstrom.github.io/daqp/)
-optimizer instead of the default `OSQP` solver can help here. It is indeed documented that
-`DAQP` can perform better on small/medium dense matrices and unstable poles[^1], which is
-obviously the case here (absolute value of unstable poles are greater than one):
+optimizer instead of the default `OSQP` solver can improve the performance here. It is
+indeed documented that `DAQP` can perform better on small/medium dense matrices and unstable
+poles[^1], which is obviously the case here (absolute value of unstable poles are greater
+than one):
 
 [^1]: Arnström, D., Bemporad, A., and Axehill, D. (2022). A dual active-set solver for
     embedded quadratic programming using recursive LDLᵀ updates. IEEE Trans. Autom. Contr.,
@@ -305,7 +308,7 @@ mpc2 = LinMPC(skf; Hp, Hc, Mwt, Nwt, Cwt=Inf, optim=daqp)
 mpc2 = setconstraint!(mpc2; umin, umax)
 ```
 
-does improve the rejection of the step disturbance:
+does slightly improve the rejection of the step disturbance:
 
 ```@example 1
 res_lin2 = sim!(mpc2, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
@@ -359,12 +362,13 @@ function sim_adapt!(mpc, nonlinmodel, N, ry, plant, x_0, x̂_0, y_step=[0])
     x̂ = x̂_0
     for i = 1:N
         y = plant() + y_step
+        x̂ = preparestate!(mpc, y)
         u = moveinput!(mpc, ry)
         linmodel = linearize(nonlinmodel; u, x=x̂[1:2])
         setmodel!(mpc, linmodel)
         U_data[:,i], Y_data[:,i], Ry_data[:,i] = u, y, ry
-        x̂ = updatestate!(mpc, u, y) # update mpc state estimate
-        updatestate!(plant, u)      # update plant simulator
+        updatestate!(mpc, u, y) # update mpc state estimate
+        updatestate!(plant, u)  # update plant simulator
     end
     res = SimResult(mpc, U_data, Y_data; Ry_data)
     return res

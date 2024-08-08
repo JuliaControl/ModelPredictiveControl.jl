@@ -87,7 +87,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_im, r; ym)
+        preparestate!(mpc_im, ym)
+        u = moveinput!(mpc_im, r)
         updatestate!(mpc_im, u, ym)
         updatestate!(linmodel, u)
     end
@@ -98,7 +99,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_nint_u, r; ym)
+        preparestate!(mpc_nint_u, ym)
+        u = moveinput!(mpc_nint_u, r)
         updatestate!(mpc_nint_u, u, ym)
         updatestate!(linmodel, u)
     end
@@ -109,7 +111,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_nint_ym, r; ym)
+        preparestate!(mpc_nint_ym, ym)
+        u = moveinput!(mpc_nint_ym, r)
         updatestate!(mpc_nint_ym, u, ym)
         updatestate!(linmodel, u)
     end
@@ -124,8 +127,10 @@ end
     setstate!(mpc1, [1,2,3,4])
     @test mpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(mpc1, [0,0,0,0])
+    preparestate!(mpc1, mpc1.estim())
     updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
+    preparestate!(mpc1, mpc1.estim())
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -243,6 +248,7 @@ end
     setstate!(model, [1,1])
     for i=1:20
         y = model()
+        preparestate!(mpc, y)
         u = moveinput!(mpc, [0, 0])
         X_mpc[:,i] = model.x0
         updatestate!(mpc, u, y)
@@ -355,7 +361,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_im, r; ym)
+        preparestate!(mpc_im, ym)
+        u = moveinput!(mpc_im, r)
         updatestate!(mpc_im, u, ym)
         updatestate!(linmodel, u)
     end
@@ -366,7 +373,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_nint_u, r; ym)
+        preparestate!(mpc_nint_u, ym)
+        u = moveinput!(mpc_nint_u, r)
         updatestate!(mpc_nint_u, u, ym)
         updatestate!(linmodel, u)
     end
@@ -377,7 +385,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(mpc_nint_ym, r; ym)
+        preparestate!(mpc_nint_ym, ym)
+        u = moveinput!(mpc_nint_ym, r)
         updatestate!(mpc_nint_ym, u, ym)
         updatestate!(linmodel, u)
     end
@@ -392,8 +401,10 @@ end
     setstate!(mpc1, [1,2,3,4])
     @test mpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(mpc1, [0,0,0,0])
+    preparestate!(mpc1, mpc1.estim())
     updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
+    preparestate!(mpc1, mpc1.estim())
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -502,7 +513,7 @@ end
     u = moveinput!(nmpc)
     @test u ≈ [1] atol=5e-2
     # ensure that the current estimated output is updated for correct JE values:
-    @test nmpc.ŷ ≈ ModelPredictiveControl.evalŷ(nmpc.estim, nothing, Float64[])
+    @test nmpc.ŷ ≈ ModelPredictiveControl.evalŷ(nmpc.estim, Float64[])
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
     f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
@@ -547,7 +558,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(nmpc_im, r; ym)
+        preparestate!(nmpc_im, ym)
+        u = moveinput!(nmpc_im, r)
         updatestate!(nmpc_im, u, ym)
         updatestate!(linmodel, u)
     end
@@ -558,7 +570,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(nmpc_nint_u, r; ym)
+        preparestate!(nmpc_nint_u, ym)
+        u = moveinput!(nmpc_nint_u, r)
         updatestate!(nmpc_nint_u, u, ym)
         updatestate!(linmodel, u)
     end
@@ -569,7 +582,8 @@ end
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
         ym = linmodel() - outdist
-        u = moveinput!(nmpc_nint_ym, r; ym)
+        preparestate!(nmpc_nint_ym, ym)
+        u = moveinput!(nmpc_nint_ym, r)
         updatestate!(nmpc_nint_ym, u, ym)
         updatestate!(linmodel, u)
     end
@@ -587,6 +601,7 @@ end
     setstate!(nmpc1, [1,2,3,4])
     @test nmpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(nmpc1, [0,0,0,0])
+    preparestate!(nmpc1, nmpc1.estim())
     updatestate!(nmpc1, nmpc1.estim.model.uop, nmpc1.estim())
     @test nmpc1.estim.x̂0 ≈ [0,0,0,0] atol=1e-6
 end

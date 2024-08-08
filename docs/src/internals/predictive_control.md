@@ -26,7 +26,7 @@ ModelPredictiveControl.init_matconstraint_mpc
 ## Update Quadratic Optimization
 
 ```@docs
-ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any, ::Any)
+ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any)
 ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel)
 ```
 

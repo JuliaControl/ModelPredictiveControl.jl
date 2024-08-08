@@ -20,7 +20,11 @@ abstract type StateEstimator{NT<:Real} end
 
 struct StateEstimatorBuffer{NT<:Real}
     u ::Vector{NT}
+    û ::Vector{NT}
     x̂ ::Vector{NT}
+    P̂ ::Matrix{NT}
+    Q̂ ::Matrix{NT}
+    R̂ ::Matrix{NT}
     ym::Vector{NT}
     ŷ ::Vector{NT}
     d ::Vector{NT}
@@ -38,12 +42,16 @@ function StateEstimatorBuffer{NT}(
     nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int
 ) where NT <: Real
     u  = Vector{NT}(undef, nu)
+    û  = Vector{NT}(undef, nu)
     x̂  = Vector{NT}(undef, nx̂)
+    P̂  = Matrix{NT}(undef, nx̂, nx̂)
+    Q̂  = Matrix{NT}(undef, nx̂, nx̂)
+    R̂  = Matrix{NT}(undef, nym, nym)
     ym = Vector{NT}(undef, nym)
     ŷ  = Vector{NT}(undef, ny)
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
-    return StateEstimatorBuffer{NT}(u, x̂, ym, ŷ, d, empty)
+    return StateEstimatorBuffer{NT}(u, û, x̂, P̂, Q̂, R̂, ym, ŷ, d, empty)
 end
 
 const IntVectorOrInt = Union{Int, Vector{Int}}
@@ -76,11 +84,9 @@ include("estimator/mhe.jl")
 include("estimator/internal_model.jl")
 
 """
-    evalŷ(estim::StateEstimator, _ , d) -> ŷ
+    evalŷ(estim::StateEstimator, d) -> ŷ
 
 Evaluate [`StateEstimator`](@ref) output `ŷ` from measured disturbance `d` and `estim.x̂0`.
-
-Second argument is ignored, except for [`InternalModel`](@ref).
 """
-evalŷ(estim::StateEstimator, _ , d) = evaloutput(estim, d)
+evalŷ(estim::StateEstimator, d) = evaloutput(estim, d)
     
