@@ -116,7 +116,7 @@ end
 Identical to [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function correct_estimate!(estim::Luenberger, y0m, d0)
-    return correct_estimate_obsv!(estim, y0m, d0)
+    return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
 end
 
 
@@ -126,7 +126,10 @@ end
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function update_estimate!(estim::Luenberger, y0m, d0, u0)
-    return update_estimate_obsv!(estim, y0m, d0, u0)
+    if !estim.direct
+        correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+    end
+    return predict_estimate_obsv!(estim, y0m, d0, u0)
 end
 
 "Throw an error if `setmodel!` is called on `Luenberger` observer."

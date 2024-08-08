@@ -193,14 +193,46 @@ end
     correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
 
 Correct `estim.x̂0` with measured outputs `y0m` and disturbances `d0` for current time step.
+
+It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)``. See the docstring of
+[`update_estimate!(::SteadyKalmanFilter, ::Any, ::Any)`](@ref) for the equations.
 """
 function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
-    return correct_estimate_obsv!(estim, y0m, d0)
+    return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+end
+
+@doc raw"""
+    update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
+
+Update `estim.x̂0` estimate with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
+
+If `estim.direct == false`, the [`SteadyKalmanFilter`](@ref) first corrects the state
+estimate with the precomputed Kalman gain ``\mathbf{K̂}``. Afterward, it predicts the next
+state with the augmented process model. The correction step is skipped if `direct == true`
+since it is already done by the user through the [`preparestate!`](@ref) function (that
+calls [`correct_estimate!`](@ref)). The correction and prediction step equations are
+provided below.
+
+# Correction Step
+```math
+\mathbf{x̂}_k(k) = \mathbf{x̂}_{k-1}(k) + \mathbf{K̂}[\mathbf{y^m}(k) - \mathbf{Ĉ^m x̂}_{k-1}(k)
+                                                                   - \mathbf{D̂_d^m d}(k)    ]
+```
+
+# Prediction Step
+```math
+\mathbf{x̂}_{k}(k+1) = \mathbf{Â x̂}_{k}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
+```
+"""
+function update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
+    if !estim.direct
+        correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+    end
+    return predict_estimate_obsv!(estim::StateEstimator, y0m, d0, u0)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function correct_estimate_obsv!(estim::StateEstimator, y0m, d0)
-    K̂ = estim.K̂
+function correct_estimate_obsv!(estim::StateEstimator, y0m, d0, K̂)
     Ĉm, D̂dm = @views estim.Ĉ[estim.i_ym, :], estim.D̂d[estim.i_ym, :]
     ŷ0m = @views estim.buffer.ŷ[estim.i_ym]
     # in-place operations to reduce allocations:
@@ -213,26 +245,8 @@ function correct_estimate_obsv!(estim::StateEstimator, y0m, d0)
     return nothing
 end
 
-@doc raw"""
-    update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
-
-Update `estim.x̂0` estimate with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
-
-The [`SteadyKalmanFilter`](@ref) updates it with the precomputed Kalman gain ``\mathbf{K̂}``:
-```math
-\mathbf{x̂}_{k}(k+1) = \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
-               + \mathbf{K̂}[\mathbf{y^m}(k) - \mathbf{Ĉ^m x̂}_{k-1}(k) - \mathbf{D̂_d^m d}(k)]
-```
-"""
-function update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
-    return update_estimate_obsv!(estim::StateEstimator, y0m, d0, u0)
-end
-
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function update_estimate_obsv!(estim::StateEstimator, y0m, d0, u0)
-    if !estim.direct
-        correct_estimate_obsv!(estim, y0m, d0)
-    end
+function predict_estimate_obsv!(estim::StateEstimator, y0m, d0, u0)
     x̂0corr = estim.x̂0
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     x̂0next = estim.buffer.x̂
@@ -385,10 +399,13 @@ function KalmanFilter(
     return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 
-"""
+@doc raw"""
     correct_estimate!(estim::KalmanFilter, y0m, d0)
 
-Do the same but for the time varying [`KalmanFilter`](@ref).
+Correct `estim.x̂0` and `estim.P̂` using the time-varying [`KalmanFilter`](@ref).
+
+It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)`` estimation covariance 
+``\mathbf{P̂}_{k}(k)``.
 """
 function correct_estimate!(estim::KalmanFilter, y0m, d0)
     Ĉm = @views estim.Ĉ[estim.i_ym, :]
@@ -401,32 +418,40 @@ end
 
 Update [`KalmanFilter`](@ref) state `estim.x̂0` and estimation error covariance `estim.P̂`.
 
-It implements the time-varying Kalman Filter in its predictor (observer) form :
+It implements the classical time-varying Kalman Filter based on the process model described
+in [`SteadyKalmanFilter`](@ref). If `estim.direct == false`, it first corrects the estimate
+before predicting the next state. The correction step is skipped if `estim.direct == true`
+since it's already done by the user. The correction and prediction step equations are
+provided below, see [^2] for details.
+
+# Correction Step
 ```math
 \begin{aligned}
-    \mathbf{M̂}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^m}'
-                           [\mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m}' + \mathbf{R̂}]^{-1}       \\
-    \mathbf{K̂}(k)       &= \mathbf{Â M̂}(k)                                                \\
-    \mathbf{ŷ^m}(k)     &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k)                  \\
-    \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k-1}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k)
-                           + \mathbf{K̂}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
-
-
-
-    \mathbf{P̂}_{k}(k+1) &= \mathbf{Â}[\mathbf{P̂}_{k-1}(k)
-                           - \mathbf{M̂}(k)\mathbf{Ĉ^m P̂}_{k-1}(k)]\mathbf{Â}' + \mathbf{Q̂}
+    \mathbf{Ŝ}(k)     &= \mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m}' + \mathbf{R̂}                        \\
+    \mathbf{K̂}(k)     &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^m}'\mathbf{Ŝ^{-1}}(k)                       \\
+    \mathbf{ŷ^m}(k)   &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k)                            \\
+    \mathbf{x̂}_{k}(k) &= \mathbf{x̂}_{k-1}(k) + \mathbf{K̂}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]   \\
+    \mathbf{P̂}_{k}(k) &= [\mathbf{I - K̂}(k)\mathbf{Ĉ^m}]\mathbf{P̂}_{k-1}(k)
 \end{aligned}
 ```
-based on the process model described in [`SteadyKalmanFilter`](@ref). The notation 
-``\mathbf{x̂}_{k-1}(k)`` refers to the state for the current time ``k`` estimated at the last 
-control period ``k-1``. See [^2] for details.
 
-[^2]: Boyd S., "Lecture 8 : The Kalman Filter" (Winter 2008-09) [course slides], *EE363: 
-     Linear Dynamical Systems*, <https://web.stanford.edu/class/ee363/lectures/kf.pdf>.
+# Prediction Step
+```math
+\begin{aligned}
+    \mathbf{x̂}_{k}(k+1) &= \mathbf{Â x̂}_{k}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k)      \\
+    \mathbf{P̂}_{k}(k+1) &= \mathbf{Â P̂}_{k}(k)\mathbf{Â}' + \mathbf{Q̂}
+\end{aligned}
+```
+
+[^2]: "Kalman Filter", *Wikipedia: The Free Encyclopedia*, 
+     <https://en.wikipedia.org/wiki/Kalman_filter>, Accessed 2024-08-08.
 """
 function update_estimate!(estim::KalmanFilter, y0m, d0, u0)
     Ĉm = @views estim.Ĉ[estim.i_ym, :]
-    return update_estimate_kf!(estim, y0m, d0, u0, Ĉm, estim.Â)
+    if !estim.direct
+        correct_estimate_kf!(estim, y0m, d0, Ĉm)
+    end
+    return predict_estimate_kf!(estim, y0m, d0, u0, Ĉm, estim.Â)
 end
 
 
@@ -916,48 +941,60 @@ end
 Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂0` and covariance `estim.P̂`.
 
 The equations are similar to [`update_estimate!(::KalmanFilter)`](@ref) but with the 
-substitutions ``\mathbf{Â = F̂}(k)`` and ``\mathbf{Ĉ^m = Ĥ^m}(k)``:
+substitutions ``\mathbf{Â = F̂}(k)`` and ``\mathbf{Ĉ^m = Ĥ^m}(k)``, the Jacobians of the
+augmented process model:
 ```math
 \begin{aligned}
-    \mathbf{M̂}(k)       &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}'(k)
-                           [\mathbf{Ĥ^m}(k)\mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}'(k) + \mathbf{R̂}]^{-1}    \\
-    \mathbf{K̂}(k)       &= \mathbf{F̂}(k) \mathbf{M̂}(k)                                    \\
-    \mathbf{ŷ^m}(k)     &= \mathbf{ĥ^m}\Big( \mathbf{x̂}_{k-1}(k), \mathbf{d}(k) \Big)     \\
-    \mathbf{x̂}_{k}(k+1) &= \mathbf{f̂}\Big( \mathbf{x̂}_{k-1}(k), \mathbf{u}(k), \mathbf{d}(k) \Big)
-                           + \mathbf{K̂}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]             \\
-    \mathbf{P̂}_{k}(k+1) &= \mathbf{F̂}(k)[\mathbf{P̂}_{k-1}(k)
-                           - \mathbf{M̂}(k)\mathbf{Ĥ^m}(k)\mathbf{P̂}_{k-1}(k)]\mathbf{F̂}'(k) 
-                           + \mathbf{Q̂}
+    \mathbf{Ĥ}(k) &= \left. \frac{∂\mathbf{ĥ}(\mathbf{x̂}, \mathbf{d})}{∂\mathbf{x̂}}             \right|_{\mathbf{x̂ = x̂}_{k-1}(k),\, \mathbf{d = d}(k)}   \\
+    \mathbf{F̂}(k) &= \left. \frac{∂\mathbf{f̂}(\mathbf{x̂}, \mathbf{u}, \mathbf{d})}{∂\mathbf{x̂}} \right|_{\mathbf{x̂ = x̂}_{k}(k),  \, \mathbf{u = u}(k),\, \mathbf{d = d}(k)}
 \end{aligned}
 ```
-[`ForwardDiff.jacobian`](https://juliadiff.org/ForwardDiff.jl/stable/user/api/#ForwardDiff.jacobian)
-automatically computes the Jacobians:
+The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs. The
+function [`ForwardDiff.jacobian`](https://juliadiff.org/ForwardDiff.jl/stable/user/api/#ForwardDiff.jacobian)
+automatically computes them. The correction and prediction step equations are provided below.
+
+# Correction Step
 ```math
 \begin{aligned}
-    \mathbf{F̂}(k) &= \left. \frac{∂\mathbf{f̂}(\mathbf{x̂}, \mathbf{u}, \mathbf{d})}{∂\mathbf{x̂}} \right|_{\mathbf{x̂ = x̂}_{k-1}(k),\, \mathbf{u = u}(k),\, \mathbf{d = d}(k)}  \\
-    \mathbf{Ĥ}(k) &= \left. \frac{∂\mathbf{ĥ}(\mathbf{x̂}, \mathbf{d})}{∂\mathbf{x̂}}             \right|_{\mathbf{x̂ = x̂}_{k-1}(k),\, \mathbf{d = d}(k)}
+    \mathbf{Ŝ}(k)     &= \mathbf{Ĥ^m}(k)\mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}'(k) + \mathbf{R̂}             \\
+    \mathbf{K̂}(k)     &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĥ^m}'(k)\mathbf{Ŝ^{-1}}(k)                       \\
+    \mathbf{ŷ^m}(k)   &= \mathbf{ĥ^m}\Big( \mathbf{x̂}_{k-1}(k), \mathbf{d}(k) \Big)                  \\
+    \mathbf{x̂}_{k}(k) &= \mathbf{x̂}_{k-1}(k) + \mathbf{K̂}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]      \\
+    \mathbf{P̂}_{k}(k) &= [\mathbf{I - K̂}(k)\mathbf{Ĥ^m}(k)]\mathbf{P̂}_{k-1}(k)
 \end{aligned}
 ```
-The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs.
+
+# Prediction Step
+```math
+\begin{aligned}
+    \mathbf{x̂}_{k}(k+1) &= \mathbf{f̂}\Big( \mathbf{x̂}_{k}(k), \mathbf{u}(k), \mathbf{d}(k) \Big)   \\
+    \mathbf{P̂}_{k}(k+1) &= \mathbf{F̂}(k)\mathbf{P̂}_{k}(k)\mathbf{F̂}'(k) + \mathbf{Q̂}
+\end{aligned}
+```
 """
 function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
     model, x̂0 = estim.model, estim.x̂0
     nx̂, nu = estim.nx̂, model.nu
-    # concatenate x̂0next and û0 vectors to allows û0 vector with dual numbers for AD:
-    # TODO: remove this allocation using estim.buffer
-    x̂0nextû = Vector{NT}(undef, nx̂ + nu)
-    f̂AD! = (x̂0nextû, x̂0) -> @views f̂!(
-        x̂0nextû[1:nx̂], x̂0nextû[nx̂+1:end], estim, model, x̂0, u0, d0
-    )
-    ForwardDiff.jacobian!(estim.F̂_û, f̂AD!, x̂0nextû, x̂0)  
+    Ĥ = estim.Ĥ
     if !estim.direct
         ŷ0 = estim.buffer.ŷ
         ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
-        ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
+        ForwardDiff.jacobian!(Ĥ, ĥAD!, ŷ0, x̂0)
+        Ĥm = @views Ĥ[estim.i_ym, :]
+        correct_estimate_kf!(estim, y0m, d0, Ĥm)
+    else
+        Ĥm = @views Ĥ[estim.i_ym, :]
     end
+    x̂0corr = estim.x̂0
+    # concatenate x̂0next and û0 vectors to allows û0 vector with dual numbers for AD:
+    # TODO: remove this allocation using estim.buffer
+    x̂0nextû = Vector{NT}(undef, nx̂ + nu)
+    f̂AD! = (x̂0nextû, x̂0corr) -> @views f̂!(
+        x̂0nextû[1:nx̂], x̂0nextû[nx̂+1:end], estim, model, x̂0corr, u0, d0
+    )
+    ForwardDiff.jacobian!(estim.F̂_û, f̂AD!, x̂0nextû, x̂0corr)
     F̂  = @views estim.F̂_û[1:estim.nx̂, :]
-    Ĥm = @views estim.Ĥ[estim.i_ym, :]
-    return update_estimate_kf!(estim, y0m, d0, u0, Ĥm, F̂)
+    return predict_estimate_kf!(estim, y0m, d0, u0, Ĥm, F̂)
 end
 
 "Set `estim.P̂` to `estim.P̂_0` for the time-varying Kalman Filters."
@@ -1024,20 +1061,15 @@ function correct_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, 
 end
 
 """
-    update_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, y0m, d0, u0, Ĉm, Â)
+    predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, y0m, d0, u0, Ĉm, Â)
 
-Update time-varying/extended Kalman Filter estimates with augmented `Ĉm` and `Â` matrices.
+Predict time-varying/extended Kalman Filter estimates with augmented `Ĉm` and `Â` matrices.
 
 Allows code reuse for [`KalmanFilter`](@ref), [`ExtendedKalmanFilterKalmanFilter`](@ref).
-They update the state `x̂` and covariance `P̂` with the same equations. The extended filter
-substitutes the augmented model matrices with its Jacobians (`Â = F̂` and `Ĉm = Ĥm`).
-The implementation uses in-place operations and explicit factorization to reduce
-allocations. See e.g. [`KalmanFilter`](@ref) docstring for the equations.
+They predict the state `x̂` and covariance `P̂` with the same equations. See 
+[`update_estimate`](@ref) methods for the equations.
 """
-function update_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, y0m, d0, u0, Ĉm, Â)
-    if !estim.direct
-        correct_estimate_kf!(estim, y0m, d0, Ĉm)
-    end
+function predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, y0m, d0, u0, Ĉm, Â)
     x̂0corr, P̂corr = estim.x̂0, estim.P̂
     Q̂ = estim.Q̂
     x̂0next, û0 = estim.buffer.x̂, estim.buffer.û
