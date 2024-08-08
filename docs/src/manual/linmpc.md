@@ -203,7 +203,7 @@ mpc_mhe = LinMPC(estim, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
 mpc_mhe = setconstraint!(mpc_mhe, ymin=[45, -Inf])
 ```
 
-The rejection is slightly improved:
+The rejection is not improved here:
 
 ```@example 1
 setstate!(model, zeros(model.nx))
@@ -215,6 +215,10 @@ savefig("plot3_LinMPC.svg"); nothing # hide
 ```
 
 ![plot3_LinMPC](plot3_LinMPC.svg)
+
+This is because the more performant `direct=true` version of the [`MovingHorizonEstimator`](@ref)
+is not not implemented yet. The rejection will be improved with the `direct=true` version
+(coming soon).
 
 ## Adding Feedforward Compensation
 
