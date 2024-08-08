@@ -240,14 +240,9 @@ end
 Init `mpc.F` vector with ``\mathbf{F = Ŷ_s}`` when `estim` is an [`InternalModel`](@ref).
 """
 function predictstoch!(mpc::PredictiveController{NT}, estim::InternalModel) where {NT<:Real}
-    F, ny = mpc.F, estim.model.ny
-    ŷ0d = similar(estim.model.yop)
-    h!(ŷ0d, estim.model, estim.x̂d, estim.d0)
-    ŷs = zeros(NT, ny)
-    ŷs[estim.i_ym] .= @views estim.y0m .- ŷ0d[estim.i_ym]  # ŷs=0 for unmeasured outputs
-    Ŷs = F
+    Ŷs = mpc.F
     mul!(Ŷs, mpc.Ks, estim.x̂s)
-    mul!(Ŷs, mpc.Ps, ŷs, 1, 1)
+    mul!(Ŷs, mpc.Ps, estim.ŷs, 1, 1)
     return nothing
 end
 "Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."

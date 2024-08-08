@@ -6,8 +6,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     x̂0 ::Vector{NT}
     x̂d::Vector{NT}
     x̂s::Vector{NT}
-    y0m::Vector{NT}
-    d0 ::Vector{NT}
+    ŷs::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
@@ -42,14 +41,13 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         # x̂0 and x̂d are same object (updating x̂d will update x̂0):
         x̂d = x̂0 = zeros(NT, model.nx) 
         x̂s = zeros(NT, nxs)
-        y0m, d0 = zeros(NT, nym), zeros(NT, model.nd)
+        ŷs = zeros(NT, ny)
         direct = true # InternalModel always uses direct transmission from ym
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
-            lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, 
-            y0m, d0,
+            lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, ŷs,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d,
@@ -238,16 +236,20 @@ end
 """
     correct_estimate!(estim::InternalModel, y0m, d0)
 
-Save current meas. output `y0m` and disturbance `d0` inside `estim` for stoch. predictions.
+Compute the current stochastic output estimation `ŷs` for [`InternalModel`](@ref).
 """
 function correct_estimate!(estim::InternalModel, y0m, d0)
-    estim.y0m .= y0m
-    estim.d0  .= d0
+    ŷ0d = estim.buffer.ŷ
+    h!(ŷ0d, estim.model, estim.x̂d, d0)
+    ŷs = estim.ŷs
+    ŷs[estim.i_ym] .= @views y0m .- ŷ0d[estim.i_ym]
+    # ŷs=0 for unmeasured outputs :
+    map(i -> ŷs[i] = (i in estim.i_ym) ? ŷs[i] : 0, eachindex(ŷs)) 
     return nothing
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, y0m, d0, u0)
+    update_estimate!(estim::InternalModel, _ , d0, u0)
 
 Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -261,19 +263,14 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(estim::InternalModel, y0m, d0, u0)
+function update_estimate!(estim::InternalModel, _ , d0, u0)
     model = estim.model
-    x̂d, x̂s = estim.x̂d, estim.x̂s
+    x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
-    ŷ0d, x̂dnext = estim.buffer.ŷ, estim.buffer.x̂
-    h!(ŷ0d, model, x̂d, d0)
+    x̂dnext = estim.buffer.x̂
     f!(x̂dnext, model, x̂d, u0, d0) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
-    ŷs = ŷ0d
-    ŷs[estim.i_ym] .= @views y0m .- ŷ0d[estim.i_ym]
-    # ŷs=0 for unmeasured outputs :
-    map(i -> ŷs[i] = (i in estim.i_ym) ? ŷs[i] : 0, eachindex(ŷs))  
     x̂snext = similar(x̂s) # TODO: remove this allocation with a new buffer?
     mul!(x̂snext, estim.Âs, x̂s)
     mul!(x̂snext, estim.B̂s, ŷs, 1, 1)
@@ -319,21 +316,23 @@ function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) 
 end
 
 @doc raw"""
-    evalŷ(estim::InternalModel, _ ) -> ŷ
+    evalŷ(estim::InternalModel, d) -> ŷ
 
 Get [`InternalModel`](@ref) estimated output `ŷ`.
 
-[`InternalModel`](@ref) estimator needs current measured outputs ``\mathbf{y^m}(k)`` to 
-estimate its outputs ``\mathbf{ŷ}(k)``, since the strategy imposes that 
-``\mathbf{ŷ^m}(k) = \mathbf{y^m}(k)`` is always true. The method [`preparestate!`](@ref)
-store the current measured outputs and disturbances inside `estim` object, it should be thus
-called before `evalŷ`.
+[`InternalModel`](@ref) estimator needs current stochastic output ``\mathbf{ŷ_s}(k)`` to 
+estimate its outputs ``\mathbf{ŷ}(k)``. The method [`preparestate!`](@ref) store this value
+inside `estim` object, it should be thus called before `evalŷ`.
 """
-function evalŷ(estim::InternalModel, _ )
-    ŷ = estim.buffer.ŷ
-    h!(ŷ, estim.model, estim.x̂d, estim.d0) 
-    ŷ .+= estim.model.yop
-    ŷ[estim.i_ym] = @views estim.y0m .+ estim.model.yop[estim.i_ym] 
+function evalŷ(estim::InternalModel, d)
+    if !estim.corrected[]
+        error("InternalModel: preparestate! must be called before evalŷ")
+    end
+    ŷ0d, d0 = estim.buffer.ŷ, estim.buffer.d
+    d0 .= d .- estim.model.dop
+    h!(ŷ0d, estim.model, estim.x̂d, d0) 
+    ŷ = ŷ0d
+    ŷ .+= estim.model.yop .+ estim.ŷs
     return ŷ
 end
 
