@@ -44,7 +44,7 @@ The predictive controllers support both soft and hard constraints, defined by:
     \mathbf{u_{min}  - c_{u_{min}}}  ϵ ≤&&\       \mathbf{u}(k+j) &≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad  j = 0, 1 ,..., H_p - 1 \\
     \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ ≤&&\      \mathbf{Δu}(k+j) &≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad  j = 0, 1 ,..., H_c - 1 \\
     \mathbf{y_{min}  - c_{y_{min}}}  ϵ ≤&&\       \mathbf{ŷ}(k+j) &≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad  j = 1, 2 ,..., H_p     \\
-    \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ ≤&&\ \mathbf{x̂}_{k-1}(k+j) &≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad  j = H_p
+    \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ ≤&&\ \mathbf{x̂}_{i}(k+j) &≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad  j = H_p
 \end{alignat*}
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
@@ -94,8 +94,10 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
     Terminal constraints provide closed-loop stability guarantees on the nominal plant model.
     They can render an unfeasible problem however. In practice, a sufficiently large
     prediction horizon ``H_p`` without terminal constraints is typically enough for 
-    stability. Note that terminal constraints are applied on the augmented state vector 
-    ``\mathbf{x̂}`` (see [`SteadyKalmanFilter`](@ref) for details on augmentation).
+    stability. If `mpc.estim.direct==true`, the state is estimated at ``i = k`` (the current
+    time step), otherwise at ``i = k - 1``. Note that terminal constraints are applied on the
+    augmented state vector ``\mathbf{x̂}`` (see [`SteadyKalmanFilter`](@ref) for details on
+    augmentation).
 
     For variable constraints, the bounds can be modified after calling [`moveinput!`](@ref),
     that is, at runtime, but not the softness parameters ``\mathbf{c}``. It is not possible
@@ -433,16 +435,16 @@ The model predictions are evaluated from the deviation vectors (see [`setop!`](@
                  &= \mathbf{E ΔU} + \mathbf{F}
 \end{aligned}
 ```
-in which ``\mathbf{x̂_0}(k) = \mathbf{x̂}_{k-1}(k) - \mathbf{x̂_{op}}`` and
-``\mathbf{x̂}_{k-1}(k)`` is the state estimated at the last control period. The predicted
-outputs ``\mathbf{Ŷ_0}`` and measured disturbances ``\mathbf{D̂_0}`` respectively include
-``\mathbf{ŷ_0}(k+j)`` and ``\mathbf{d̂_0}(k+j)`` values with ``j=1`` to ``H_p``, and input
-increments ``\mathbf{ΔU}``, ``\mathbf{Δu}(k+j)`` from ``j=0`` to ``H_c-1``. The vector
-``\mathbf{B}`` contains the contribution for non-zero state ``\mathbf{x̂_{op}}`` and state
-update ``\mathbf{f̂_{op}}`` operating points (for linearization at non-equilibrium point, see
-[`linearize`](@ref)). The stochastic predictions ``\mathbf{Ŷ_s=0}`` if `estim` is not a
-[`InternalModel`](@ref), see [`init_stochpred`](@ref). The method also computes similar
-matrices for the predicted terminal states at ``k+H_p``:
+in which ``\mathbf{x̂_0}(k) = \mathbf{x̂}_{i}(k) - \mathbf{x̂_{op}}``, with ``i = k`` if 
+`estim.direct==true`, otherwise ``i = k - 1``. The predicted outputs ``\mathbf{Ŷ_0}`` and
+measured disturbances ``\mathbf{D̂_0}`` respectively include ``\mathbf{ŷ_0}(k+j)`` and 
+``\mathbf{d̂_0}(k+j)`` values with ``j=1`` to ``H_p``, and input increments ``\mathbf{ΔU}``,
+``\mathbf{Δu}(k+j)`` from ``j=0`` to ``H_c-1``. The vector ``\mathbf{B}`` contains the
+contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}``
+operating points (for linearization at non-equilibrium point, see [`linearize`](@ref)). The
+stochastic predictions ``\mathbf{Ŷ_s=0}`` if `estim` is not a [`InternalModel`](@ref), see
+[`init_stochpred`](@ref). The method also computes similar matrices for the predicted
+terminal states at ``k+H_p``:
 ```math
 \begin{aligned}
     \mathbf{x̂_0}(k+H_p) &= \mathbf{e_x̂ ΔU} + \mathbf{g_x̂ d_0}(k)   + \mathbf{j_x̂ D̂_0} 

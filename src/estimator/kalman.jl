@@ -698,6 +698,7 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
     X̄, Ȳm = X̂0, Ŷ0m
     X̄  .= X̂0  .- x̂0
     Ȳm .= Ŷ0m .- ŷ0m
+    # TODO: use estim.buffer.R̂ here to reduce allocations
     M̂.data .= Ȳm * Ŝ * Ȳm' .+ R̂
     mul!(K̂, X̄, lmul!(Ŝ, Ȳm'))
     rdiv!(K̂, cholesky(M̂))
@@ -705,6 +706,7 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
     v̂ .= y0m .- ŷ0m
     x̂0corr, P̂corr = estim.x̂0, estim.P̂
     mul!(x̂0corr, K̂, v̂, 1, 1)
+    # TODO: use estim.buffer.P̂ and estim.buffer.Q̂ here to reduce allocations
     P̂corr .= Hermitian(P̂ .- K̂ * M̂ * K̂', :L)
     return nothing
 end
@@ -714,14 +716,16 @@ end
     
 Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂0` and covariance estimate `estim.P̂`.
 
-It implements the unscented Kalman Filter in its predictor (observer) form, based on the 
-generalized unscented transform[^3]. See [`init_ukf`](@ref) for the definition of the 
-constants ``\mathbf{m̂, Ŝ}`` and ``γ``. 
+It implements the unscented Kalman Filter based on the generalized unscented transform[^3].
+See [`init_ukf`](@ref) for the definition of the constants ``\mathbf{m̂, Ŝ}`` and ``γ``. The
+superscript in e.g. ``\mathbf{X̂}_{k-1}^j(k)`` refers the vector at the ``j``th column of 
+``\mathbf{X̂}_{k-1}(k)``. The symbol ``\mathbf{0}`` is a vector with zeros. The number of
+sigma points is ``n_σ = 2 n_\mathbf{x̂} + 1``. The matrices ``\sqrt{\mathbf{P̂}_{k-1}(k)}``
+and ``\sqrt{\mathbf{P̂}_{k}(k)}`` are the the lower triangular factors of [`cholesky`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.cholesky)
+results. The correction and prediction step equations are provided below. The correction
+step is skipped if `estim.direct == true` since it's already done by the user.
 
-Denoting ``\mathbf{x̂}_{k-1}(k)`` as the state for the current time ``k`` estimated at the 
-last period ``k-1``, ``\mathbf{0}``, a null vector, ``n_σ = 2 n_\mathbf{x̂} + 1``, the number
-of sigma points, and ``\mathbf{X̂}_{k-1}^j(k)``, the vector at the ``j``th column of 
-``\mathbf{X̂}_{k-1}(k)``, the estimator updates the states with:
+# Correction Step
 ```math
 \begin{aligned}
     \mathbf{X̂}_{k-1}(k) &= \bigg[\begin{matrix} \mathbf{x̂}_{k-1}(k) & \mathbf{x̂}_{k-1}(k) & \cdots & \mathbf{x̂}_{k-1}(k)  \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & γ \sqrt{\mathbf{P̂}_{k-1}(k)} & -γ \sqrt{\mathbf{P̂}_{k-1}(k)} \end{matrix}\bigg] \\
@@ -733,17 +737,19 @@ of sigma points, and ``\mathbf{X̂}_{k-1}^j(k)``, the vector at the ``j``th colu
     \mathbf{K̂}(k)       &= \mathbf{X̄}_{k-1}(k) \mathbf{Ŝ} \mathbf{Ȳ^m}'(k) \mathbf{M̂^{-1}}(k) \\
     \mathbf{x̂}_k(k)     &= \mathbf{x̂}_{k-1}(k) + \mathbf{K̂}(k) \big[ \mathbf{y^m}(k) - \mathbf{ŷ^m}(k) \big] \\
     \mathbf{P̂}_k(k)     &= \mathbf{P̂}_{k-1}(k) - \mathbf{K̂}(k) \mathbf{M̂}(k) \mathbf{K̂}'(k) \\
+\end{aligned} 
+```
+
+# Prediction Step
+```math
+\begin{aligned}
     \mathbf{X̂}_k(k)     &= \bigg[\begin{matrix} \mathbf{x̂}_{k}(k) & \mathbf{x̂}_{k}(k) & \cdots & \mathbf{x̂}_{k}(k) \end{matrix}\bigg] + \bigg[\begin{matrix} \mathbf{0} & \gamma \sqrt{\mathbf{P̂}_{k}(k)} & - \gamma \sqrt{\mathbf{P̂}_{k}(k)} \end{matrix}\bigg] \\
     \mathbf{X̂}_{k}(k+1) &= \bigg[\begin{matrix} \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{1}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{2}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) & \cdots & \mathbf{f̂}\Big( \mathbf{X̂}_{k}^{n_σ}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \end{matrix}\bigg] \\
     \mathbf{x̂}_{k}(k+1) &= \mathbf{X̂}_{k}(k+1)\mathbf{m̂} \\
     \mathbf{X̄}_k(k+1)   &= \begin{bmatrix} \mathbf{X̂}_{k}^{1}(k+1) - \mathbf{x̂}_{k}(k+1) & \mathbf{X̂}_{k}^{2}(k+1) - \mathbf{x̂}_{k}(k+1) & \cdots &\, \mathbf{X̂}_{k}^{n_σ}(k+1) - \mathbf{x̂}_{k}(k+1) \end{bmatrix} \\
     \mathbf{P̂}_k(k+1)   &= \mathbf{X̄}_k(k+1) \mathbf{Ŝ} \mathbf{X̄}_k'(k+1) + \mathbf{Q̂}
-\end{aligned} 
+\end{aligned}
 ```
-by using the lower triangular factor of [`cholesky`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.cholesky)
-to compute ``\sqrt{\mathbf{P̂}_{k-1}(k)}`` and ``\sqrt{\mathbf{P̂}_{k}(k)}``.  The matrices 
-``\mathbf{P̂, Q̂, R̂}`` are the covariance of the estimation error, process noise and sensor 
-noise, respectively.
 
 [^3]: Simon, D. 2006, "Chapter 14: The unscented Kalman filter" in "Optimal State Estimation: 
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, <https://doi.org/10.1002/0470045345.ch14>, 
@@ -773,6 +779,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     X̄next  = X̂0next
     X̄next .= X̂0next .- x̂0next
     P̂next  = P̂corr
+    # TODO: use estim.buffer.P̂ and estim.buffer.Q̂ here to reduce allocations
     P̂next.data .= X̄next * Ŝ * X̄next' .+ Q̂
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
@@ -941,7 +948,7 @@ end
 Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂0` and covariance `estim.P̂`.
 
 The equations are similar to [`update_estimate!(::KalmanFilter)`](@ref) but with the 
-substitutions ``\mathbf{Â = F̂}(k)`` and ``\mathbf{Ĉ^m = Ĥ^m}(k)``, the Jacobians of the
+substitutions ``\mathbf{Ĉ^m = Ĥ^m}(k)`` and ``\mathbf{Â = F̂}(k)``, the Jacobians of the
 augmented process model:
 ```math
 \begin{aligned}
@@ -952,6 +959,7 @@ augmented process model:
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs. The
 function [`ForwardDiff.jacobian`](https://juliadiff.org/ForwardDiff.jl/stable/user/api/#ForwardDiff.jacobian)
 automatically computes them. The correction and prediction step equations are provided below.
+The correction step is skipped if `estim.direct == true` since it's already done by the user.
 
 # Correction Step
 ```math
