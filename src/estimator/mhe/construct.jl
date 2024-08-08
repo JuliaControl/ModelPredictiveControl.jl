@@ -107,8 +107,11 @@ struct MovingHorizonEstimator{
     buffer::StateEstimatorBuffer{NT}
     function MovingHorizonEstimator{NT, SM, JM, CE}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim::JM, covestim::CE;
-        direct=true
+        direct=false
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
+        if direct
+            throw(ArgumentError("MovingHorizonEstimator: direct=true is not implemented yet"))
+        end
         nu, ny, nd = model.nu, model.ny, model.nd
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
@@ -213,6 +216,10 @@ for details on the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` co
     `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
 
 # Arguments
+!!! warning
+    The keyword argument `direct` defaults to `false` for the `MovingHorizonEstimator`, 
+    since `direct=true` is not implemented yet.
+
 - `model::SimModel` : (deterministic) model for the estimations.
 - `He=nothing` : estimation horizon ``H_e``, must be specified.
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
@@ -299,7 +306,7 @@ function MovingHorizonEstimator(
     sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
     Cwt::Real = Inf,
     optim::JM = default_optim_mhe(model),
-    direct = true,
+    direct = false,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
     σR         = sigmaR,
@@ -340,7 +347,7 @@ supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
     optim::JM = default_optim_mhe(model),
-    direct = true,
+    direct = false,
     covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
