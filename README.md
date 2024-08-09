@@ -127,8 +127,8 @@ for more detailed examples.
   - [x] measured outputs
 - [x] bumpless manual to automatic transfer for control with a proper initial estimate
 - [ ] estimators in two possible forms:
-  - [x] predictor (or delayed) form to reduce computational load
   - [x] filter (or current) form to improve accuracy and robustness
+  - [x] predictor (or delayed) form to reduce computational load
 - [x] moving horizon estimator in two formulations:
   - [x] linear plant models (quadratic optimization)
   - [x] nonlinear plant models (nonlinear optimization)
