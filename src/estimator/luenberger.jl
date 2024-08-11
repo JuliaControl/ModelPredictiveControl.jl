@@ -111,7 +111,7 @@ end
 
 
 """
-    prepare_estimate_obsv!(estim::Luenberger, y0m, d0, _ )
+    correct_estimate!(estim::Luenberger, y0m, d0, _ )
 
 Identical to [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
