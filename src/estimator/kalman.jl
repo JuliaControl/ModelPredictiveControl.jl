@@ -682,6 +682,7 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
     X̂0, Ŷ0m = estim.X̂0, estim.Ŷ0m
     sqrtP̂ = estim.sqrtP̂
     ŷ0 = estim.buffer.ŷ
+    # in-place operations to reduce allocations:
     P̂_chol  = sqrtP̂.data
     P̂_chol .= P̂
     cholesky!(Hermitian(P̂_chol, :L)) # also modifies sqrtP̂
@@ -700,7 +701,7 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
     Ȳm .= Ŷ0m .- ŷ0m
     # TODO: use estim.buffer.R̂ here to reduce allocations
     M̂.data .= Ȳm * Ŝ * Ȳm' .+ R̂
-    mul!(K̂, X̄, lmul!(Ŝ, Ȳm'))
+    mul!(K̂, X̄, lmul!(Ŝ, Ȳm')) # also modifiers Ȳm' (not used after so it's okay)
     rdiv!(K̂, cholesky(M̂))
     v̂ = ŷ0m
     v̂ .= y0m .- ŷ0m
@@ -764,6 +765,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     x̂0next, û0 = estim.buffer.x̂, estim.buffer.û
     P̂cor_chol  = sqrtP̂corr.data
+    # in-place operations to reduce allocations:
     P̂cor_chol .= P̂corr
     cholesky!(Hermitian(P̂cor_chol, :L)) # also modifies sqrtP̂cor
     γ_sqrtP̂corr = lmul!(γ, sqrtP̂corr)
