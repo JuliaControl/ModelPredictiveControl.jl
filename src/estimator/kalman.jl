@@ -427,8 +427,8 @@ provided below, see [^2] for details.
 # Correction Step
 ```math
 \begin{aligned}
-    \mathbf{Ŝ}(k)     &= \mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m}' + \mathbf{R̂}                        \\
-    \mathbf{K̂}(k)     &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^m}'\mathbf{Ŝ^{-1}}(k)                       \\
+    \mathbf{M̂}(k)     &= \mathbf{Ĉ^m P̂}_{k-1}(k)\mathbf{Ĉ^m}' + \mathbf{R̂}                        \\
+    \mathbf{K̂}(k)     &= \mathbf{P̂}_{k-1}(k)\mathbf{Ĉ^m}'\mathbf{M̂^{-1}}(k)                       \\
     \mathbf{ŷ^m}(k)   &= \mathbf{Ĉ^m x̂}_{k-1}(k) + \mathbf{D̂_d^m d}(k)                            \\
     \mathbf{x̂}_{k}(k) &= \mathbf{x̂}_{k-1}(k) + \mathbf{K̂}(k)[\mathbf{y^m}(k) - \mathbf{ŷ^m}(k)]   \\
     \mathbf{P̂}_{k}(k) &= [\mathbf{I - K̂}(k)\mathbf{Ĉ^m}]\mathbf{P̂}_{k-1}(k)
@@ -1045,11 +1045,11 @@ function correct_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, 
     # in-place operations to reduce allocations:
     P̂_Ĉmᵀ = K̂
     mul!(P̂_Ĉmᵀ, P̂.data, Ĉm') # the ".data" weirdly removes a type instability in mul!
-    Ŝ = estim.buffer.R̂
-    mul!(Ŝ, Ĉm, P̂_Ĉmᵀ)
-    Ŝ .+= R̂
+    M̂ = estim.buffer.R̂
+    mul!(M̂, Ĉm, P̂_Ĉmᵀ)
+    M̂ .+= R̂
     K̂ = P̂_Ĉmᵀ
-    M̂_chol = cholesky!(Hermitian(Ŝ)) # also modifies Ŝ
+    M̂_chol = cholesky!(Hermitian(M̂)) # also modifies M̂
     rdiv!(K̂, M̂_chol)
     ŷ0 = estim.buffer.ŷ
     ĥ!(ŷ0, estim, estim.model, x̂0, d0)
