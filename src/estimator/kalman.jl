@@ -689,8 +689,8 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
     γ_sqrtP̂ = lmul!(γ, sqrtP̂)
     X̂0, Ŷ0m = estim.X̂0, estim.Ŷ0m
     X̂0 .= x̂0
-    X̂0[:, 2:nx̂+1]   .+= γ_sqrtP̂
-    X̂0[:, nx̂+2:end] .-= γ_sqrtP̂
+    X̂0[:, 2:nx̂+1]   .= @views X̂0[:, 2:nx̂+1]   .+ γ_sqrtP̂
+    X̂0[:, nx̂+2:end] .= @views X̂0[:, nx̂+2:end] .- γ_sqrtP̂
     ŷ0 = estim.buffer.ŷ
     for j in axes(Ŷ0m, 2)
         @views ĥ!(ŷ0, estim, estim.model, X̂0[:, j], d0)
@@ -784,8 +784,8 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     sqrtP̂corr   = P̂corr_chol.L
     γ_sqrtP̂corr = lmul!(γ, sqrtP̂corr)
     X̂0corr .= x̂0corr
-    X̂0corr[:, 2:nx̂+1]   .+= γ_sqrtP̂corr
-    X̂0corr[:, nx̂+2:end] .-= γ_sqrtP̂corr
+    X̂0corr[:, 2:nx̂+1]   .= @views X̂0corr[:, 2:nx̂+1]   .+ γ_sqrtP̂corr
+    X̂0corr[:, nx̂+2:end] .= @views X̂0corr[:, nx̂+2:end] .- γ_sqrtP̂corr
     X̂0next = X̂0corr
     for j in axes(X̂0next, 2)
         @views x̂0corr .= X̂0corr[:, j]
