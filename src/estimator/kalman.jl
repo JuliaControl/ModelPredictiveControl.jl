@@ -483,8 +483,9 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     K̂::Matrix{NT}
     M̂::Hermitian{NT, Matrix{NT}}
     X̂0::Matrix{NT}
+    X̄0::Matrix{NT}
     Ŷ0m::Matrix{NT}
-    sqrtP̂::LowerTriangular{NT, Matrix{NT}}
+    Ȳ0m::Matrix{NT}
     nσ::Int 
     γ::NT
     m̂::Vector{NT}
@@ -510,8 +511,8 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         P̂ = copy(P̂_0)
         K̂ = zeros(NT, nx̂, nym)
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
-        X̂0, Ŷ0m = zeros(NT, nx̂, nσ), zeros(NT, nym, nσ)
-        sqrtP̂ = LowerTriangular(zeros(NT, nx̂, nx̂))
+        X̂0,  X̄0  = zeros(NT, nx̂, nσ),  zeros(NT, nx̂, nσ)
+        Ŷ0m, Ȳ0m = zeros(NT, nym, nσ), zeros(NT, nym, nσ)
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
@@ -521,7 +522,8 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d,
             P̂_0, Q̂, R̂,
-            K̂, M̂, X̂0, Ŷ0m, sqrtP̂,
+            K̂, 
+            M̂, X̂0, X̄0, Ŷ0m, Ȳ0m,
             nσ, γ, m̂, Ŝ,
             direct, corrected,
             buffer
@@ -676,39 +678,51 @@ end
 Do the same but for the [`UnscentedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
-    x̂0, P̂, R̂, K̂, M̂ = estim.x̂0, estim.P̂, estim.R̂, estim.K̂, estim.M̂
+    x̂0, P̂, R̂, K̂ = estim.x̂0, estim.P̂, estim.R̂, estim.K̂
     nx̂ = estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
-    X̂0, Ŷ0m = estim.X̂0, estim.Ŷ0m
-    sqrtP̂ = estim.sqrtP̂
-    ŷ0 = estim.buffer.ŷ
     # in-place operations to reduce allocations:
-    P̂_chol  = sqrtP̂.data
-    P̂_chol .= P̂
-    cholesky!(Hermitian(P̂_chol, :L)) # also modifies sqrtP̂
-    γ_sqrtP̂ = lmul!(γ, sqrtP̂) 
+    sqrtP̂   = LowerTriangular(estim.buffer.P̂)
+    P̂_temp  = Hermitian(estim.buffer.Q̂, :L)
+    P̂_temp .= P̂
+    P̂_chol = cholesky!(P̂_temp) # also modifies P̂_temp
+    sqrtP̂ .= P̂_chol.L
+    γ_sqrtP̂ = lmul!(γ, sqrtP̂)
+    X̂0, Ŷ0m = estim.X̂0, estim.Ŷ0m
     X̂0 .= x̂0
     X̂0[:, 2:nx̂+1]   .+= γ_sqrtP̂
     X̂0[:, nx̂+2:end] .-= γ_sqrtP̂
+    ŷ0 = estim.buffer.ŷ
     for j in axes(Ŷ0m, 2)
         @views ĥ!(ŷ0, estim, estim.model, X̂0[:, j], d0)
         @views Ŷ0m[:, j] .= ŷ0[estim.i_ym]
     end
     ŷ0m = @views ŷ0[estim.i_ym]
     mul!(ŷ0m, Ŷ0m, m̂)
-    X̄, Ȳm = X̂0, Ŷ0m
-    X̄  .= X̂0  .- x̂0
-    Ȳm .= Ŷ0m .- ŷ0m
-    # TODO: use estim.buffer.R̂ here to reduce allocations
-    M̂.data .= Ȳm * Ŝ * Ȳm' .+ R̂
-    mul!(K̂, X̄, lmul!(Ŝ, Ȳm')) # also modifiers Ȳm' (not used after so it's okay)
-    rdiv!(K̂, cholesky(M̂))
-    v̂ = ŷ0m
+    X̄0, Ȳ0m = estim.X̄0, estim.Ȳ0m
+    X̄0  .= X̂0  .- x̂0
+    Ȳ0m .= Ŷ0m .- ŷ0m
+    Ŝ_Ŷ0mᵀ = estim.Ŷ0m'
+    mul!(Ŝ_Ŷ0mᵀ, Ŝ, Ȳ0m')
+    M̂ = estim.buffer.R̂
+    mul!(M̂, Ȳ0m, Ŝ_Ŷ0mᵀ)
+    M̂ .+= R̂
+    M̂ = Hermitian(M̂, :L)
+    estim.M̂ .= M̂
+    mul!(K̂, X̄0, Ŝ_Ŷ0mᵀ)
+    rdiv!(K̂, cholesky!(M̂)) # also modifies M̂ (estim.M̂ contains unmodified M̂, see line below)
+    M̂ = estim.M̂
+    v̂  = ŷ0m
     v̂ .= y0m .- ŷ0m
     x̂0corr, P̂corr = estim.x̂0, estim.P̂
     mul!(x̂0corr, K̂, v̂, 1, 1)
-    # TODO: use estim.buffer.P̂ and estim.buffer.Q̂ here to reduce allocations
-    P̂corr .= Hermitian(P̂ .- K̂ * M̂ * K̂', :L)
+    K̂_M̂   = estim.buffer.K̂
+    mul!(K̂_M̂, K̂, M̂)
+    K̂_M̂_K̂ᵀ = estim.buffer.Q̂
+    mul!(K̂_M̂_K̂ᵀ, K̂_M̂, K̂')
+    P̂corr  = estim.buffer.P̂
+    P̂corr .= P̂ .- Hermitian(K̂_M̂_K̂ᵀ, :L)
+    estim.P̂ .= Hermitian(P̂corr, :L)
     return nothing
 end
 
@@ -760,14 +774,16 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     if !estim.direct
         correct_estimate!(estim, y0m, d0)
     end
-    x̂0corr, X̂0corr, P̂corr, sqrtP̂corr = estim.x̂0, estim.X̂0, estim.P̂, estim.sqrtP̂
+    x̂0corr, X̂0corr, P̂corr = estim.x̂0, estim.X̂0, estim.P̂
     Q̂, nx̂ = estim.Q̂, estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     x̂0next, û0 = estim.buffer.x̂, estim.buffer.û
-    P̂cor_chol  = sqrtP̂corr.data
     # in-place operations to reduce allocations:
-    P̂cor_chol .= P̂corr
-    cholesky!(Hermitian(P̂cor_chol, :L)) # also modifies sqrtP̂cor
+    sqrtP̂corr   = LowerTriangular(estim.buffer.P̂)
+    P̂corr_temp  = Hermitian(estim.buffer.Q̂, :L)
+    P̂corr_temp .= P̂corr
+    P̂corr_chol = cholesky!(P̂corr_temp) # also modifies P̂corr_temp
+    sqrtP̂corr .= P̂corr_chol.L
     γ_sqrtP̂corr = lmul!(γ, sqrtP̂corr)
     X̂0corr .= x̂0corr
     X̂0corr[:, 2:nx̂+1]   .+= γ_sqrtP̂corr
@@ -778,11 +794,14 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
         @views f̂!(X̂0next[:, j], û0, estim, estim.model, x̂0corr, u0, d0)
     end
     x̂0next .= mul!(x̂0corr, X̂0next, m̂)
-    X̄next  = X̂0next
-    X̄next .= X̂0next .- x̂0next
+    X̄0next  = X̂0next
+    X̄0next .= X̂0next .- x̂0next
     P̂next  = P̂corr
-    # TODO: use estim.buffer.P̂ and estim.buffer.Q̂ here to reduce allocations
-    P̂next.data .= X̄next * Ŝ * X̄next' .+ Q̂
+    Ŝ_X̄0nextᵀ = estim.X̂0'
+    mul!(Ŝ_X̄0nextᵀ, Ŝ, X̄0next')
+    P̂next = estim.buffer.P̂
+    mul!(P̂next, X̄0next, Ŝ_X̄0nextᵀ) 
+    P̂next   .+= Q̂
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
     estim.P̂  .= P̂next
@@ -1051,7 +1070,7 @@ function correct_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, 
     mul!(M̂, Ĉm, P̂_Ĉmᵀ)
     M̂ .+= R̂
     K̂ = P̂_Ĉmᵀ
-    M̂_chol = cholesky!(Hermitian(M̂)) # also modifies M̂
+    M̂_chol = cholesky!(Hermitian(M̂, :L)) # also modifies M̂
     rdiv!(K̂, M̂_chol)
     ŷ0 = estim.buffer.ŷ
     ĥ!(ŷ0, estim, estim.model, x̂0, d0)
