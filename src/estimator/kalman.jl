@@ -865,7 +865,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         R̂ = Hermitian(R̂, :L)
         P̂ = copy(P̂_0)
         K̂ = zeros(NT, nx̂, nym)
-        F̂_û, F̂ = zeros(NT, nx̂, nx̂+nu), zeros(NT, nx̂, nx̂)
+        F̂_û, F̂ = zeros(NT, nx̂+nu, nx̂), zeros(NT, nx̂, nx̂)
         Ĥ,  Ĥm = zeros(NT, ny, nx̂),    zeros(NT, nym, nx̂)
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
