@@ -228,8 +228,8 @@ function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
     estim.Ĉ  .= Ĉ
     estim.B̂d .= B̂d
     estim.D̂d .= D̂d
-    estim.Ĉm .= @views Ĉ[estim.i_ym,:]
-    estim.D̂m .= @views D̂d[estim.i_ym,:]
+    estim.Ĉm  .= @views Ĉ[estim.i_ym,:]
+    estim.D̂dm .= @views D̂d[estim.i_ym,:]
     # --- update state estimate and its operating points ---
     estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
     estim.x̂op .= x̂op
