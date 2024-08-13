@@ -682,11 +682,10 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
     nx̂ = estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     # in-place operations to reduce allocations:
-    sqrtP̂   = LowerTriangular(estim.buffer.P̂)
-    P̂_temp  = Hermitian(estim.buffer.Q̂, :L)
+    P̂_temp  = Hermitian(estim.buffer.P̂, :L)
     P̂_temp .= P̂
-    P̂_chol = cholesky!(P̂_temp) # also modifies P̂_temp
-    sqrtP̂ .= P̂_chol.L
+    P̂_chol  = cholesky!(P̂_temp) # also modifies P̂_temp
+    sqrtP̂   = P̂_chol.L
     γ_sqrtP̂ = lmul!(γ, sqrtP̂)
     X̂0, Ŷ0m = estim.X̂0, estim.Ŷ0m
     X̂0 .= x̂0
@@ -779,11 +778,10 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     x̂0next, û0 = estim.buffer.x̂, estim.buffer.û
     # in-place operations to reduce allocations:
-    sqrtP̂corr   = LowerTriangular(estim.buffer.P̂)
-    P̂corr_temp  = Hermitian(estim.buffer.Q̂, :L)
+    P̂corr_temp  = Hermitian(estim.buffer.P̂, :L)
     P̂corr_temp .= P̂corr
-    P̂corr_chol = cholesky!(P̂corr_temp) # also modifies P̂corr_temp
-    sqrtP̂corr .= P̂corr_chol.L
+    P̂corr_chol  = cholesky!(P̂corr_temp) # also modifies P̂corr_temp
+    sqrtP̂corr   = P̂corr_chol.L
     γ_sqrtP̂corr = lmul!(γ, sqrtP̂corr)
     X̂0corr .= x̂0corr
     X̂0corr[:, 2:nx̂+1]   .+= γ_sqrtP̂corr
@@ -794,9 +792,8 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
         @views f̂!(X̂0next[:, j], û0, estim, estim.model, x̂0corr, u0, d0)
     end
     x̂0next .= mul!(x̂0corr, X̂0next, m̂)
-    X̄0next  = X̂0next
+    X̄0next  = estim.X̄0
     X̄0next .= X̂0next .- x̂0next
-    P̂next  = P̂corr
     Ŝ_X̄0nextᵀ = estim.X̂0'
     mul!(Ŝ_X̄0nextᵀ, Ŝ, X̄0next')
     P̂next = estim.buffer.P̂
@@ -804,7 +801,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     P̂next   .+= Q̂
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
-    estim.P̂  .= P̂next
+    estim.P̂  .= Hermitian(P̂next, :L)
     return nothing
 end
 
