@@ -153,8 +153,8 @@ in which ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of `estim.Ĉ, estim.D̂d`  th
 measured outputs ``\mathbf{y^m}``.
 """
 function init_estimate!(estim::StateEstimator, ::LinModel, y0m, d0, u0)
-    Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
-    Ĉm, D̂dm = @views Ĉ[estim.i_ym, :], D̂d[estim.i_ym, :] # measured outputs ym only
+    Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
+    Ĉm, D̂dm = estim.Ĉm, estim.D̂dm
     # TODO: use estim.buffer.x̂ to reduce allocations
     estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; y0m - D̂dm*d0]
     return nothing
@@ -390,6 +390,8 @@ function setmodel_estimator!(estim::StateEstimator, model, _ , _ , _ , Q̂, R̂)
     estim.Ĉ  .= Ĉ
     estim.B̂d .= B̂d
     estim.D̂d .= D̂d
+    estim.Ĉm  .= @views Ĉ[estim.i_ym, :]
+    estim.D̂dm .= @views D̂d[estim.i_ym, :]
     # --- update state estimate and its operating points ---
     estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
     estim.x̂op .= x̂op

@@ -146,13 +146,13 @@ end
 Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref).
 """
 function augment_model(model::SimModel{NT}, As, args... ; verify_obsv=false) where NT<:Real
-    nu, nx, nd = model.nu, model.nx, model.nd
+    nu, nx, nd, ny = model.nu, model.nx, model.nd, model.ny
     nxs = size(As, 1)
     Â   = zeros(NT, 0, nx+nxs)
     B̂u  = zeros(NT, 0, nu)
-    Ĉ   = zeros(NT, 0, nx+nxs)
+    Ĉ   = zeros(NT, ny, 0)
     B̂d  = zeros(NT, 0, nd)
-    D̂d  = zeros(NT, 0, nd)
+    D̂d  = zeros(NT, ny, 0)
     x̂op, f̂op = [model.xop; zeros(nxs)], [model.fop; zeros(nxs)]
     return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end

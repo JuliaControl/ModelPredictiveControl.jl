@@ -94,10 +94,10 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
     Terminal constraints provide closed-loop stability guarantees on the nominal plant model.
     They can render an unfeasible problem however. In practice, a sufficiently large
     prediction horizon ``H_p`` without terminal constraints is typically enough for 
-    stability. If `mpc.estim.direct==true`, the state is estimated at ``i = k`` (the current
-    time step), otherwise at ``i = k - 1``. Note that terminal constraints are applied on the
-    augmented state vector ``\mathbf{x̂}`` (see [`SteadyKalmanFilter`](@ref) for details on
-    augmentation).
+    stability. If `mpc.estim.direct==true`, the estimator computes the states at ``i = k`` 
+    (the current time step), otherwise at ``i = k - 1``. Note that terminal constraints are
+    applied on the augmented state vector ``\mathbf{x̂}`` (see [`SteadyKalmanFilter`](@ref)
+    for details on augmentation).
 
     For variable constraints, the bounds can be modified after calling [`moveinput!`](@ref),
     that is, at runtime, but not the softness parameters ``\mathbf{c}``. It is not possible

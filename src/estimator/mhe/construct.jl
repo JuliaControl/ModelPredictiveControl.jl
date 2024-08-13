@@ -76,6 +76,8 @@ struct MovingHorizonEstimator{
     Ĉ   ::Matrix{NT}
     B̂d  ::Matrix{NT}
     D̂d  ::Matrix{NT}
+    Ĉm  ::Matrix{NT}
+    D̂dm ::Matrix{NT}
     Ẽ ::Matrix{NT}
     F ::Vector{NT}
     G ::Matrix{NT}
@@ -120,6 +122,7 @@ struct MovingHorizonEstimator{
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
@@ -129,7 +132,7 @@ struct MovingHorizonEstimator{
         invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
         E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
-            model, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
+            model, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
         )
         # dummy values (updated just before optimization):
         F, fx̄, Fx̂ = zeros(NT, nym*He), zeros(NT, nx̂), zeros(NT, nx̂*He)
@@ -155,7 +158,7 @@ struct MovingHorizonEstimator{
             He, nϵ,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
-            Â, B̂u, Ĉ, B̂d, D̂d,
+            Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             Ẽ, F, G, J, B, ẽx̄, fx̄,
             H̃, q̃, p,
             P̂_0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He, Cwt,
@@ -891,7 +894,7 @@ end
 
 @doc raw"""
     init_predmat_mhe(
-        model::LinModel, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
+        model::LinModel, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
     ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 
 Construct the MHE prediction matrices for [`LinModel`](@ref) `model`.
@@ -989,11 +992,10 @@ calculated with:
     All these matrices are truncated when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
-    model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
+    model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
     nym, nx̂ = length(i_ym), size(Â, 2)
-    Ĉm, D̂dm = Ĉ[i_ym,:], D̂d[i_ym,:] # measured outputs ym only
     nŵ = nx̂
     # --- pre-compute matrix powers ---
     # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,He+1] = A^He
