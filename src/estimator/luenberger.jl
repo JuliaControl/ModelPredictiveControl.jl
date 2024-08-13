@@ -19,6 +19,8 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     Ĉ   ::Matrix{NT}
     B̂d  ::Matrix{NT}
     D̂d  ::Matrix{NT}
+    Ĉm  ::Matrix{NT}
+    D̂dm ::Matrix{NT}
     K̂::Matrix{NT}
     direct::Bool
     corrected::Vector{Bool}
@@ -33,6 +35,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         K̂ = try
             ControlSystemsBase.place(Â, Ĉ, poles, :o; direct)[:, i_ym]
         catch
@@ -47,7 +50,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             lastu0, x̂op, f̂op, x̂0,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
-            Â, B̂u, Ĉ, B̂d, D̂d,
+            Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             K̂,
             direct, corrected,
             buffer

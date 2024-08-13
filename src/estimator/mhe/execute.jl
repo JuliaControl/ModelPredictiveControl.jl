@@ -496,6 +496,8 @@ function setmodel_estimator!(
     estim.Ĉ  .= Ĉ
     estim.B̂d .= B̂d
     estim.D̂d .= D̂d
+    estim.Ĉm  .= @views Ĉ[estim.i_ym, :]
+    estim.D̂dm .= @views D̂d[estim.i_ym, :]
     # --- update state estimate and its operating points ---
     x̂op_old = copy(estim.x̂op)
     estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
@@ -504,7 +506,9 @@ function setmodel_estimator!(
     estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     # --- predictions matrices ---
     E, G, J, B, _ , Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
-        model, He, estim.i_ym, Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
+        model, He, estim.i_ym, 
+        estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, 
+        estim.x̂op, estim.f̂op
     )
     A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nϵ, con.C_x̂min, con.C_x̂max, Ex̂)   
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(model, nϵ, con.C_v̂min, con.C_v̂max, E) 

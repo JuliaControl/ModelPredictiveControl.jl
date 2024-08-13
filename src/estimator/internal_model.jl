@@ -16,11 +16,13 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     Bs::Matrix{NT}
     Cs::Matrix{NT}
     Ds::Matrix{NT}
-    Â ::Matrix{NT}
-    B̂u::Matrix{NT}
-    Ĉ ::Matrix{NT}
-    B̂d::Matrix{NT}
-    D̂d::Matrix{NT}
+    Â   ::Matrix{NT}
+    B̂u  ::Matrix{NT}
+    Ĉ   ::Matrix{NT}
+    B̂d  ::Matrix{NT}
+    D̂d  ::Matrix{NT}
+    Ĉm  ::Matrix{NT}
+    D̂dm ::Matrix{NT}
     Âs::Matrix{NT}
     B̂s::Matrix{NT}
     direct::Bool
@@ -36,6 +38,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         nxs = size(As,1)
         nx̂ = model.nx
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)
+        Ĉm, D̂dm = Ĉ[i_ym,:], D̂d[i_ym,:]
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
         lastu0 = zeros(NT, nu)
         # x̂0 and x̂d are same object (updating x̂d will update x̂0):
@@ -50,7 +53,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, ŷs,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
-            Â, B̂u, Ĉ, B̂d, D̂d,
+            Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             Âs, B̂s,
             direct, corrected,
             buffer
@@ -156,8 +159,8 @@ function matrices_internalmodel(model::LinModel)
 end
 "Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref)."
 function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
-    nu, nx, nd = model.nu, model.nx, model.nd
-    Â, B̂u, Ĉ, B̂d, D̂d = zeros(NT,0,nx), zeros(NT,0,nu), zeros(NT,0,nx), zeros(NT,0,nd), zeros(NT,0,nd)
+    nu, nx, nd, ny = model.nu, model.nx, model.nd, model.ny
+    Â, B̂u, Ĉ, B̂d, D̂d = zeros(NT,0,nx), zeros(NT,0,nu), zeros(NT,ny,0), zeros(NT,0,nd), zeros(NT,ny,0)
     x̂op, f̂op = copy(model.xop), copy(model.fop)
     return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
@@ -225,6 +228,8 @@ function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
     estim.Ĉ  .= Ĉ
     estim.B̂d .= B̂d
     estim.D̂d .= D̂d
+    estim.Ĉm .= @views Ĉ[estim.i_ym,:]
+    estim.D̂m .= @views D̂d[estim.i_ym,:]
     # --- update state estimate and its operating points ---
     estim.x̂0 .+= estim.x̂op # convert x̂0 to x̂ with the old operating point
     estim.x̂op .= x̂op
