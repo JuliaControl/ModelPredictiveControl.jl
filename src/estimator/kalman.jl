@@ -841,7 +841,9 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     R̂::Hermitian{NT, Matrix{NT}}
     K̂::Matrix{NT}
     F̂_û::Matrix{NT}
+    F̂  ::Matrix{NT}
     Ĥ  ::Matrix{NT}
+    Ĥm ::Matrix{NT}
     direct::Bool
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
@@ -863,7 +865,8 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         R̂ = Hermitian(R̂, :L)
         P̂ = copy(P̂_0)
         K̂ = zeros(NT, nx̂, nym)
-        F̂_û, Ĥ = zeros(NT, nx̂+nu, nx̂), zeros(NT, ny, nx̂)
+        F̂_û, F̂ = zeros(NT, nx̂, nx̂+nu), zeros(NT, nx̂, nx̂)
+        Ĥ,  Ĥm = zeros(NT, ny, nx̂),    zeros(NT, nym, nx̂)
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
@@ -874,7 +877,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             P̂_0, Q̂, R̂,
             K̂,
-            F̂_û, Ĥ,
+            F̂_û, F̂, Ĥ, Ĥm,
             direct, corrected,
             buffer
         )
@@ -965,8 +968,8 @@ function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
     ŷ0 = estim.buffer.ŷ
     ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
     ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
-    Ĥm = @views estim.Ĥ[estim.i_ym, :]
-    return correct_estimate_kf!(estim, y0m, d0, Ĥm)
+    estim.Ĥm .= @views estim.Ĥ[estim.i_ym, :]
+    return correct_estimate_kf!(estim, y0m, d0, estim.Ĥm)
 end
 
 
@@ -1011,13 +1014,12 @@ The correction step is skipped if `estim.direct == true` since it's already done
 function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
     model, x̂0 = estim.model, estim.x̂0
     nx̂, nu = estim.nx̂, model.nu
-    Ĥ = estim.Ĥ
     if !estim.direct
         ŷ0 = estim.buffer.ŷ
         ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
-        ForwardDiff.jacobian!(Ĥ, ĥAD!, ŷ0, x̂0)
-        Ĥm = @views Ĥ[estim.i_ym, :]
-        correct_estimate_kf!(estim, y0m, d0, Ĥm)
+        ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
+        estim.Ĥm .= @views estim.Ĥ[estim.i_ym, :]
+        correct_estimate_kf!(estim, y0m, d0, estim.Ĥm)
     end
     x̂0corr = estim.x̂0
     # concatenate x̂0next and û0 vectors to allows û0 vector with dual numbers for AD:
@@ -1027,8 +1029,8 @@ function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT
         x̂0nextû[1:nx̂], x̂0nextû[nx̂+1:end], estim, model, x̂0corr, u0, d0
     )
     ForwardDiff.jacobian!(estim.F̂_û, f̂AD!, x̂0nextû, x̂0corr)
-    F̂  = @views estim.F̂_û[1:estim.nx̂, :]
-    return predict_estimate_kf!(estim, u0, d0, F̂)
+    estim.F̂ .= @views estim.F̂_û[1:estim.nx̂, :]
+    return predict_estimate_kf!(estim, u0, d0, estim.F̂)
 end
 
 "Set `estim.P̂` to `estim.P̂_0` for the time-varying Kalman Filters."
