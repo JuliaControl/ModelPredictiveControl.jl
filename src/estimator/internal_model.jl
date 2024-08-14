@@ -7,6 +7,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     x̂d::Vector{NT}
     x̂s::Vector{NT}
     ŷs::Vector{NT}
+    x̂snext::Vector{NT}
     i_ym::Vector{Int}
     nx̂::Int
     nym::Int
@@ -43,14 +44,14 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         lastu0 = zeros(NT, nu)
         # x̂0 and x̂d are same object (updating x̂d will update x̂0):
         x̂d = x̂0 = zeros(NT, model.nx) 
-        x̂s = zeros(NT, nxs)
+        x̂s, x̂snext = zeros(NT, nxs), zeros(NT, nxs)
         ŷs = zeros(NT, ny)
         direct = true # InternalModel always uses direct transmission from ym
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         return new{NT, SM}(
             model, 
-            lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, ŷs,
+            lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, ŷs, x̂snext,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
@@ -247,9 +248,14 @@ function correct_estimate!(estim::InternalModel, y0m, d0)
     ŷ0d = estim.buffer.ŷ
     h!(ŷ0d, estim.model, estim.x̂d, d0)
     ŷs = estim.ŷs
-    ŷs[estim.i_ym] .= @views y0m .- ŷ0d[estim.i_ym]
-    # ŷs=0 for unmeasured outputs :
-    map(i -> ŷs[i] = (i in estim.i_ym) ? ŷs[i] : 0, eachindex(ŷs)) 
+    for j in eachindex(ŷs) # broadcasting was allocating unexpectedly, so we use a loop
+        if j in estim.i_ym
+            i = estim.i_ym[j]
+            ŷs[j] = y0m[i] - ŷ0d[j]
+        else
+            ŷs[j] = 0
+        end
+    end
     return nothing
 end
 
@@ -276,7 +282,7 @@ function update_estimate!(estim::InternalModel, _ , d0, u0)
     f!(x̂dnext, model, x̂d, u0, d0) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
-    x̂snext = similar(x̂s) # TODO: remove this allocation with a new buffer?
+    x̂snext = estim.x̂snext
     mul!(x̂snext, estim.Âs, x̂s)
     mul!(x̂snext, estim.B̂s, ŷs, 1, 1)
     estim.x̂s .= x̂snext
