@@ -109,11 +109,8 @@ struct MovingHorizonEstimator{
     buffer::StateEstimatorBuffer{NT}
     function MovingHorizonEstimator{NT, SM, JM, CE}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim::JM, covestim::CE;
-        direct=false
+        direct=true
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
-        if direct
-            throw(ArgumentError("MovingHorizonEstimator: direct=true is not implemented yet"))
-        end
         nu, ny, nd = model.nu, model.ny, model.nd
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
@@ -183,7 +180,7 @@ distribution is not approximated like the [`UnscentedKalmanFilter`](@ref). The c
 costs are drastically higher, however, since it minimizes the following objective function
 at each discrete time ``k``:
 ```math
-\min_{\mathbf{x̂}_k(k-N_k+1), \mathbf{Ŵ}, ϵ}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
+\min_{\mathbf{x̂}_k(k-N_k+K), \mathbf{Ŵ}, ϵ}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
                                             + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
                                             + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
                                             + C ϵ^2
@@ -191,8 +188,8 @@ at each discrete time ``k``:
 in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
 ```math
 \begin{aligned}
-    \mathbf{x̄} &= \mathbf{x̂}_{k-N_k}(k-N_k+1) - \mathbf{x̂}_k(k-N_k+1) \\
-    \mathbf{P̄} &= \mathbf{P̂}_{k-N_k}(k-N_k+1)
+    \mathbf{x̄} &= \mathbf{x̂}_{k-N_k}(k-N_k+K) - \mathbf{x̂}_k(k-N_k+K) \\
+    \mathbf{P̄} &= \mathbf{P̂}_{k-N_k}(k-N_k+K)
 \end{aligned}
 ```
 and the covariances are repeated ``N_k`` times:
@@ -209,20 +206,20 @@ N_k =                     \begin{cases}
     H_e     &  k ≥ H_e    \end{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
-``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
+``\mathbf{ŵ}(k-j+K)`` and sensor noise ``\mathbf{v̂}(k-j+K)`` from ``j=N_k`` to ``1``. The 
 Extended Help defines the two vectors, the slack variable ``ϵ``, and the estimation of the
-covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. See [`UnscentedKalmanFilter`](@ref)
-for details on the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances.
+covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+K)``. If the keyword argument `direct==true`
+(default value), the constant ``K=0`` in all the equations above and the MHE is in the
+current form. Else, the constant ``K=1`` leading to the predictor form.
+
+See [`UnscentedKalmanFilter`](@ref) for details on the augmented process model and 
+``\mathbf{R̂}, \mathbf{Q̂}`` covariances.
 
 !!! warning
     See the Extended Help if you get an error like:    
     `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
 
 # Arguments
-!!! warning
-    The keyword argument `direct` defaults to `false` for the `MovingHorizonEstimator`, 
-    since `direct=true` is not implemented yet.
-
 - `model::SimModel` : (deterministic) model for the estimations.
 - `He=nothing` : estimation horizon ``H_e``, must be specified.
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
@@ -253,10 +250,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     ```math
     \mathbf{Ŵ} = 
     \begin{bmatrix}
-        \mathbf{ŵ}(k-N_k+1)     \\
-        \mathbf{ŵ}(k-N_k+2)     \\
+        \mathbf{ŵ}(k-N_k+K+0)   \\
+        \mathbf{ŵ}(k-N_k+K+1)   \\
         \vdots                  \\
-        \mathbf{ŵ}(k)
+        \mathbf{ŵ}(k+K-1)
     \end{bmatrix} , \quad
     \mathbf{V̂} =
     \begin{bmatrix}
@@ -273,13 +270,20 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
         \mathbf{x̂}_k(k-j+1) &= \mathbf{f̂}\Big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\Big) + \mathbf{ŵ}(k-j)
     \end{aligned}
     ```
+    The constant integer ``K`` equals to `!direct`. In other words, ``\mathbf{Ŵ}`` and 
+    ``\mathbf{V̂}`` are shifted by one time step with `direct=true`. The non-default predictor
+    form with `direct=false` is particularly useful for the MHE since it moves its expensive
+    computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
+    optimization by default, but it can be postponed to [`updatestate!`](@ref) with
+    `direct=false`.
+    
     The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
     problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
     state and sensor noise). 
     
     The optimization and the estimation of the covariance at arrival 
-    ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` depend on `model`:
+    ``\mathbf{P̂}_{k-N_k}(k-N_k+K)`` depend on `model`:
 
     - If `model` is a [`LinModel`](@ref), the optimization is treated as a quadratic program
       with a time-varying Hessian, which is generally cheaper than nonlinear programming. By
@@ -309,7 +313,7 @@ function MovingHorizonEstimator(
     sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
     Cwt::Real = Inf,
     optim::JM = default_optim_mhe(model),
-    direct = false,
+    direct = true,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
     σR         = sigmaR,
@@ -350,7 +354,7 @@ supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
     optim::JM = default_optim_mhe(model),
-    direct = false,
+    direct = true,
     covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
@@ -375,8 +379,8 @@ It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}
 noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
-    \mathbf{x̂_{min} - c_{x̂_{min}}} ϵ ≤&&\   \mathbf{x̂}_k(k-j+1) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 0    \\
-    \mathbf{ŵ_{min} - c_{ŵ_{min}}} ϵ ≤&&\     \mathbf{ŵ}(k-j+1) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1    \\
+    \mathbf{x̂_{min} - c_{x̂_{min}}} ϵ ≤&&\   \mathbf{x̂}_k(k-j+K) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 0    \\
+    \mathbf{ŵ_{min} - c_{ŵ_{min}}} ϵ ≤&&\     \mathbf{ŵ}(k-j+K) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1    \\
     \mathbf{v̂_{min} - c_{v̂_{min}}} ϵ ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max} + c_{v̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1
 \end{alignat*}
 ```
@@ -385,8 +389,8 @@ is no bound. The constraint softness parameters ``\mathbf{c}``, also called equa
 for relaxation, are non-negative values that specify the softness of the associated bound.
 Use `0.0` values for hard constraints (default for all of them). Notice that constraining
 the estimated sensor noises is equivalent to bounding the innovation term, since 
-``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See Extended Help for details on 
-model augmentation and time-varying constraints.
+``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See Extended Help for details on
+the constant ``K``, on model augmentation and on time-varying constraints.
 
 # Arguments
 !!! info
@@ -422,9 +426,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, 
 
 # Extended Help
 !!! details "Extended Help"
-    Note that the state ``\mathbf{x̂}`` and process noise ``\mathbf{ŵ}`` constraints are 
-    applied on the augmented model, detailed in [`SteadyKalmanFilter`](@ref) Extended Help. 
-    For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
+    The constant ``K=0`` if `estim.direct==true` (current form), else ``K=1`` (predictor
+    form). Note that the state ``\mathbf{x̂}`` and process noise ``\mathbf{ŵ}`` constraints
+    are applied on the augmented model, detailed in [`SteadyKalmanFilter`](@ref) Extended
+    Help. For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
     that is, at runtime, except for `±Inf` bounds. Time-varying constraints over the
     estimation horizon ``H_e`` are also possible, mathematically defined as:
     ```math 

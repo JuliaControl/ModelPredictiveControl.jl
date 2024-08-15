@@ -116,7 +116,7 @@ unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 - `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
     disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
-   estimator, in opposition to the delayed/prediction form).
+   estimator, in opposition to the delayed/predictor form).
 
 # Examples
 ```jldoctest
