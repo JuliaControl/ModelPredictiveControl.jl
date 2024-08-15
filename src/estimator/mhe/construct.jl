@@ -206,7 +206,7 @@ N_k =                     \begin{cases}
     H_e     &  k ≥ H_e    \end{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
-``\mathbf{ŵ}(k-j+K)`` and sensor noise ``\mathbf{v̂}(k-j+K)`` from ``j=N_k`` to ``1``. The 
+``\mathbf{ŵ}(k-j+K)`` and sensor noise ``\mathbf{v̂}(k-j+1)`` from ``j=N_k`` to ``1``. The 
 Extended Help defines the two vectors, the slack variable ``ϵ``, and the estimation of the
 covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+K)``. If the keyword argument `direct==true`
 (default value), the constant ``K=0`` in all the equations above and the MHE is in the
