@@ -17,7 +17,7 @@ Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and retur
 results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm discards
 the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...`` Note that
 the method mutates `mpc` internal data but it does not modifies `mpc.estim` states. Call
-[`preparestate!(mpc, ym, d)`](@ref) before `moveinput!`, and [`updatestate!(mpc, u, ym, d)`](@ref),
+[`preparestate!(mpc, ym, d)`](@ref) before `moveinput!`, and [`updatestate!(mpc, u, ym, d)`](@ref)
 after, to update `mpc` state estimates.
 
 Calling a [`PredictiveController`](@ref) object calls this method.
