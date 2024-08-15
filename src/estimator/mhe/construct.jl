@@ -905,8 +905,8 @@ end
 Construct the MHE prediction matrices for [`LinModel`](@ref) `model`.
 
 We first introduce the deviation vector of the estimated state at arrival 
-``\mathbf{x̂_0}(k-N_k+1) = \mathbf{x̂}_k(k-N_k+1) - \mathbf{x̂_{op}}`` (see [`setop!`](@ref)),
-and the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂_0}(k-N_k+1)
+``\mathbf{x̂_0}(k-N_k+K) = \mathbf{x̂}_k(k-N_k+K) - \mathbf{x̂_{op}}`` (see [`setop!`](@ref)),
+and the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂_0}(k-N_k+K)
 \\ \mathbf{Ŵ} \end{smallmatrix}]`` with the decision variables. The estimated sensor noises
 from time ``k-N_k+1`` to ``k`` are computed by:
 ```math
@@ -915,6 +915,7 @@ from time ``k-N_k+1`` to ``k`` are computed by:
                                         &= \mathbf{E Z + F}
 \end{aligned}
 ```
+#TODO: I'M THERE, CONTINUE AFTER
 in which ``\mathbf{U_0, D_0, Y_0^m}`` respectively include the deviation values of the
 manipulated inputs ``\mathbf{u_0}(k-j)``, meas. disturbances ``\mathbf{d_0}(k-j)`` and meas.
 outputs ``\mathbf{y_0^m}(k-j)`` from ``j=N_k-1`` to ``0``. The vector ``\mathbf{B}`` 
