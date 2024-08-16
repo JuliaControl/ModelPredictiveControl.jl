@@ -285,6 +285,46 @@ function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
     return y
 end
 
+@doc raw"""
+    savetime!(model::SimModel) -> t
+
+Set `model.t` to the current time to `time()` and return it.
+
+"""
+function savetime!(model::SimModel)
+    model.t[] = time()
+end
+
+@doc raw"""
+    sleep(model::SimModel)
+
+Sleep for `model.Ts` s minus the time elapsed since the last call to [`savetime!`](@ref).
+
+Can be used to implement simple soft real-time simulations, see example.
+
+# Examples
+```jldoctest
+julia> model = LinModel(tf(2, [1, 1]), 100e-3);
+
+julia> function sim_realtime!(model)
+           T = zeros(3);
+           for i=1:3
+               T[i] = savetime!(model)
+               y = evaloutput(model)
+               updatestate!(model, [1])
+               periodsleep(model)
+           end
+           return T
+       end
+
+julia> diff(sim_realtime!(model))
+"""
+function periodsleep(model::SimModel)
+    computing_time = time() - model.t[]
+    sleep(max(0, model.Ts - computing_time))
+    return nothing
+end
+
 """
     validate_args(model::SimModel, d, u=nothing)
 

@@ -6,6 +6,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     Dd  ::Matrix{NT}
     x0::Vector{NT}
     Ts::NT
+    t::Vector{NT}
     nu::Int
     nx::Int
     ny::Int
@@ -44,12 +45,13 @@ struct LinModel{NT<:Real} <: SimModel{NT}
         yname = ["\$y_{$i}\$" for i in 1:ny]
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
-        x0  = zeros(NT, nx)
+        x0 = zeros(NT, nx)
+        t  = zeros(NT, 1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         return new{NT}(
             A, Bu, C, Bd, Dd, 
             x0, 
-            Ts, 
+            Ts, t,
             nu, nx, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
