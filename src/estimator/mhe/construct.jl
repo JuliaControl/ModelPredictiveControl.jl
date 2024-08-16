@@ -915,20 +915,21 @@ from time ``k-N_k+1`` to ``k`` are computed by:
                                         &= \mathbf{E Z + F}
 \end{aligned}
 ```
-#TODO: I'M THERE, CONTINUE AFTER
-in which ``\mathbf{U_0, D_0, Y_0^m}`` respectively include the deviation values of the
-manipulated inputs ``\mathbf{u_0}(k-j)``, meas. disturbances ``\mathbf{d_0}(k-j)`` and meas.
-outputs ``\mathbf{y_0^m}(k-j)`` from ``j=N_k-1`` to ``0``. The vector ``\mathbf{B}`` 
-includes the contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update 
-``\mathbf{f̂_{op}}`` operating points (for linearization, see [`linearize`](@ref)). The
-method also returns matrices for the estimation error at arrival:
+in which ``\mathbf{U_0}`` and ``\mathbf{Y_0^m}`` respectively include the deviation values of
+the manipulated inputs ``\mathbf{u_0}(k-j+K)`` and measured outputs ``\mathbf{y_0^m}(k-j+1)`` 
+from ``j=N_k` to ``1``. The vector ``\mathbf{D_0}`` includes one additional measured
+disturbance when ``K=0``, that is the deviation vectors ``\mathbf{d_0}(k-j+1)`` from 
+``j=N_k-1-K`` to ``1``. The constant ``\mathbf{B}`` includes the contribution for non-zero
+state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}`` operating points (for
+linearization, see [`linearize`](@ref)). The method also returns matrices for the estimation
+error at arrival:
 ```math
-    \mathbf{x̄} = \mathbf{x̂_0^†}(k-N_k+1) - \mathbf{x̂_0}(k-N_k+1) = \mathbf{e_x̄ Z + f_x̄}
+    \mathbf{x̄} = \mathbf{x̂_0^†}(k-N_k+K) - \mathbf{x̂_0}(k-N_k+K) = \mathbf{e_x̄ Z + f_x̄}
 ```
-in which ``\mathbf{x̂_0^†}(k-N_k+1) = \mathbf{x̂}_{k-N_k}(k-N_k+1) - \mathbf{x̂_{op}}`` is the
-deviation vector of the state at arrival estimated at time ``k-N_k``. Lastly, the estimated
-states ``\mathbf{x̂_0}(k-j)`` from ``j=N_k-2`` to ``-1``, also in deviation form, are 
-calculated with:
+in which ``\mathbf{x̂_0^†}(k-N_k+K) = \mathbf{x̂}_{k-N_k}(k-N_k+K) - \mathbf{x̂_{op}}`` is the
+deviation vector of the state at arrival (estimated at time ``k-N_k``). Lastly, the
+estimated states ``\mathbf{x̂_0}(k-j+K)`` from ``j=N_k`` to ``0``, also in deviation form,
+are calculated with:
 ```math
 \begin{aligned}
     \mathbf{X̂_0}  &= \mathbf{E_x̂ Z + G_x̂ U_0 + J_x̂ D_0} \\
