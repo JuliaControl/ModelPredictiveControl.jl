@@ -286,42 +286,48 @@ function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
 end
 
 @doc raw"""
-    savetime!(model::SimModel) -> t
+    savetime!(model::SimModel, disable_gc=false) -> t
 
-Set `model.t` to the current time to `time()` and return it.
+Set `model.t` to `time()`  and return the value.
 
+Also disable the garbage collector if `disable_gc` is `true`.
 """
-function savetime!(model::SimModel)
+function savetime!(model::SimModel, disable_gc=false)
     model.t[] = time()
+    disable_gc && GC.enable(false)
+    return model.t[]
 end
 
 @doc raw"""
-    sleep(model::SimModel)
+    periodsleep(model::SimModel, reactivate_gc=false) -> nothing
 
 Sleep for `model.Ts` s minus the time elapsed since the last call to [`savetime!`](@ref).
 
-Can be used to implement simple soft real-time simulations, see example.
+Also reactivate the garbage collector if `reactivate_gc` is `true`. Can be used to implement
+simple soft real-time simulations, see example below.
 
 # Examples
 ```jldoctest
-julia> model = LinModel(tf(2, [1, 1]), 100e-3);
+julia> model = LinModel(tf(2, [1, 1]), 0.1);
 
 julia> function sim_realtime!(model)
-           T = zeros(3);
-           for i=1:3
-               T[i] = savetime!(model)
+           times = zeros(4);
+           for i=1:4
+               times[i] = savetime!(model)
                y = evaloutput(model)
                updatestate!(model, [1])
                periodsleep(model)
            end
-           return T
+           return times
        end
 
-julia> diff(sim_realtime!(model))
+julia> round.(diff(sim_realtime!(model)), digits=3)
 """
-function periodsleep(model::SimModel)
+function periodsleep(model::SimModel, reactivate_gc=false)
+    reactivate_gc && GC.enable(true)
     computing_time = time() - model.t[]
-    sleep(max(0, model.Ts - computing_time))
+    sleep_time = model.Ts - computing_time #- 0.001
+    sleep_time > 0 && Libc.systemsleep(sleep_time) #sleep(sleep_time) 
     return nothing
 end
 
