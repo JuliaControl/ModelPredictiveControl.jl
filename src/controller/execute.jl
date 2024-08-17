@@ -511,6 +511,20 @@ end
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
 """
+    savetime!(mpc::PredictiveController) -> t
+
+Call `savetime!(mpc.estim.model)` and return the time `t`.
+"""
+savetime!(mpc::PredictiveController) = savetime!(mpc.estim.model)
+
+"""
+    periodsleep(mpc::PredictiveController) -> nothing
+
+Call `periodsleep(mpc.estim.model)`.
+"""
+periodsleep(mpc::PredictiveController) = periodsleep(mpc.estim.model)
+
+"""
     setstate!(mpc::PredictiveController, x̂) -> mpc
 
 Set `mpc.estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`.

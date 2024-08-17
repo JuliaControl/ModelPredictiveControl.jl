@@ -285,49 +285,59 @@ function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
     return y
 end
 
-@doc raw"""
-    savetime!(model::SimModel, disable_gc=false) -> t
+"""
+    savetime!(model::SimModel) -> t
 
 Set `model.t` to `time()`  and return the value.
 
-Also disable the garbage collector if `disable_gc` is `true`.
+Used in conjunction with [`periodsleep`](@ref) for simple soft real-time simulations. Call
+this function before any other in the simulation loop.
 """
-function savetime!(model::SimModel, disable_gc=false)
+function savetime!(model::SimModel)
     model.t[] = time()
-    disable_gc && GC.enable(false)
     return model.t[]
 end
 
-@doc raw"""
-    periodsleep(model::SimModel, reactivate_gc=false) -> nothing
+"""
+    periodsleep(model::SimModel, busywait=false) -> nothing
 
 Sleep for `model.Ts` s minus the time elapsed since the last call to [`savetime!`](@ref).
 
-Also reactivate the garbage collector if `reactivate_gc` is `true`. Can be used to implement
-simple soft real-time simulations, see example below.
+It calls `sleep` of Julia if `busywait == false`. Else, a simple `while` loop serves as 
+busy-waiting. As a rule-of-thumb, busy-waiting should be used if `model.Ts < 0.1` s, since
+the accuracy of `sleep` is around 1 ms. Can be used to implement simple soft real-time
+simulations, see the example below.
 
 # Examples
 ```jldoctest
-julia> model = LinModel(tf(2, [1, 1]), 0.1);
+julia> model = LinModel(tf(2, [0.3, 1]), 0.01);
 
 julia> function sim_realtime!(model)
-           times = zeros(4);
-           for i=1:4
-               times[i] = savetime!(model)
-               y = evaloutput(model)
+           t_0 = time()
+           for i=1:3
+               t = savetime!(model)      # first function called
+               println(round(t - t_0, digits=3))
                updatestate!(model, [1])
-               periodsleep(model)
+               periodsleep(model, true)  # last function called
            end
-           return times
        end
 
-julia> round.(diff(sim_realtime!(model)), digits=3)
+julia> sim_realtime!(model)
+0.0
+0.01
+0.02
+```
 """
-function periodsleep(model::SimModel, reactivate_gc=false)
-    reactivate_gc && GC.enable(true)
-    computing_time = time() - model.t[]
-    sleep_time = model.Ts - computing_time #- 0.001
-    sleep_time > 0 && Libc.systemsleep(sleep_time) #sleep(sleep_time) 
+function periodsleep(model::SimModel, busywait=false)
+    if !busywait
+        model.Ts < 0.1 && @warn "busy-waiting is recommended for Ts < 0.1 s"
+        computing_time = time() - model.t[]
+        sleep_time = model.Ts - computing_time
+        sleep_time > 0 && sleep(sleep_time)
+    else
+        while time() - model.t[] < model.Ts
+        end
+    end
     return nothing
 end
 

@@ -274,6 +274,22 @@ function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
+
+"""
+    savetime!(estim::StateEstimator) -> t
+
+Call `savetime!(estim.model)` and return the time `t`.
+"""
+savetime!(estim::StateEstimator) = savetime!(estim.model)
+
+"""
+    periodsleep(estim::StateEstimator) -> nothing
+
+Call `periodsleep(estim.model)`.
+"""
+periodsleep(estim::StateEstimator) = periodsleep(estim.model)
+
+
 """
     validate_args(estim::StateEstimator, ym, d, u=nothing)
 

@@ -54,3 +54,17 @@ setmodel!
 ```@docs
 getinfo
 ```
+
+## Soft Real-Time Utilities
+
+### Save current time t
+
+```@docs
+savetime!
+```
+
+### Period Sleep
+
+```@docs
+periodsleep
+```
