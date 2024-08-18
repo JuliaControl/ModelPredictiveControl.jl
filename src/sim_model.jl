@@ -320,7 +320,7 @@ julia> function sim_realtime!(model)
                updatestate!(model, [1])
                periodsleep(model, true)  # last function called
            end
-       end
+       end;
 
 julia> sim_realtime!(model)
 0.0
