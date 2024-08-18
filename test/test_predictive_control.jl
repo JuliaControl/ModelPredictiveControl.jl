@@ -302,6 +302,19 @@ end
     @test mpc.L_Hp ≈ diagm(1.1:1000.1)
 end
 
+@testset "LinMPC real-time simulations" begin
+    linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
+    mpc1 = LinMPC(linmodel1)
+    times1 = zeros(5)
+    for i=1:5
+        times1[i] = savetime!(mpc1)
+        preparestate!(mpc1, [1])
+        updatestate!(mpc1, [1], [1])
+        periodsleep(mpc1)
+    end
+    @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
+end
+
 @testset "ExplicitMPC construction" begin
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = ExplicitMPC(model, Hp=15)

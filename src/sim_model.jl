@@ -303,10 +303,10 @@ end
 
 Sleep for `model.Ts` s minus the time elapsed since the last call to [`savetime!`](@ref).
 
-It calls `sleep` of Julia if `busywait == false`. Else, a simple `while` loop serves as 
-busy-waiting. As a rule-of-thumb, busy-waiting should be used if `model.Ts < 0.1` s, since
-the accuracy of `sleep` is around 1 ms. Can be used to implement simple soft real-time
-simulations, see the example below.
+It calls [`sleep`](https://docs.julialang.org/en/v1/base/parallel/#Base.sleep) if `busywait`
+is `false`. Else, a simple `while` loop implements busy-waiting. As a rule-of-thumb,
+busy-waiting should be used if `model.Ts < 0.1` s, since the accuracy of `sleep` is around 1
+ms. Can be used to implement simple soft real-time simulations, see the example below.
 
 # Examples
 ```jldoctest

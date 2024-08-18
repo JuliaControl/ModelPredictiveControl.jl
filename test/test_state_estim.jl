@@ -118,6 +118,19 @@ end
     skalmanfilter = SteadyKalmanFilter(linmodel, nint_ym=0)
     @test_throws ErrorException setmodel!(skalmanfilter, linmodel)
 end
+
+@testset "SteadyKalmanFilter real-time simulations" begin
+    linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
+    skalmanfilter1 = SteadyKalmanFilter(linmodel1)
+    times1 = zeros(5)
+    for i=1:5
+        times1[i] = savetime!(skalmanfilter1)
+        preparestate!(skalmanfilter1, [1])
+        updatestate!(skalmanfilter1, [1], [1])
+        periodsleep(skalmanfilter1)
+    end
+    @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
+end
     
 @testset "KalmanFilter construction" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])

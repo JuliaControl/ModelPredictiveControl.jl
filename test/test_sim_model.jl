@@ -111,6 +111,25 @@ end
     @test_throws DimensionMismatch evaloutput(linmodel1, zeros(1))
 end
 
+@testset "LinModel real time simulations" begin
+    linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
+    times1 = zeros(5)
+    for i=1:5
+        times1[i] = savetime!(linmodel1)
+        updatestate!(linmodel1, [1])
+        periodsleep(linmodel1)
+    end
+    @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
+    linmodel2 = LinModel(tf(2, [0.1, 1]), 0.001)
+    times2 = zeros(5)
+    for i=1:5
+        times2[i] = savetime!(linmodel2)
+        updatestate!(linmodel2, [1])
+        periodsleep(linmodel2, true)
+    end
+    @test all(isapprox.(diff(times2[2:end]), 0.001, atol=0.0001))
+end
+
 @testset "NonLinModel construction" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
@@ -274,4 +293,33 @@ end
         updatestate!(linmodel3, u, d)
     end
     @test all(isapprox.(Ynl, Yl, atol=1e-6))
+end
+
+@testset "NonLinModel real time simulations" begin
+    linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
+    nonlinmodel1 = NonLinModel(
+        (x,u,_)->linmodel1.A*x + linmodel1.Bu*u,
+        (x,_)->linmodel1.C*x,
+        linmodel1.Ts, 1, 1, 1, 0, solver=nothing
+    )
+    times1 = zeros(5)
+    for i=1:5
+        times1[i] = savetime!(nonlinmodel1)
+        updatestate!(nonlinmodel1, [1])
+        periodsleep(nonlinmodel1)
+    end
+    @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
+    linmodel2 = LinModel(tf(2, [0.1, 1]), 0.001)
+    nonlinmodel2 = NonLinModel(
+        (x,u,_)->linmodel2.A*x + linmodel2.Bu*u,
+        (x,_)->linmodel2.C*x,
+        linmodel2.Ts, 1, 1, 1, 0, solver=nothing
+    )
+    times2 = zeros(5)
+    for i=1:5
+        times2[i] = savetime!(nonlinmodel2)
+        updatestate!(nonlinmodel2, [1])
+        periodsleep(nonlinmodel2, true)
+    end
+    @test all(isapprox.(diff(times2[2:end]), 0.001, atol=0.0001))
 end
