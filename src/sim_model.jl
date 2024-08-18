@@ -324,8 +324,8 @@ julia> function sim_realtime!(model)
 
 julia> sim_realtime!(model)
 0.0
-0.01
-0.02
+0.1
+0.2
 ```
 """
 function periodsleep(model::SimModel, busywait=false)
