@@ -310,7 +310,7 @@ ms. Can be used to implement simple soft real-time simulations, see the example 
 
 # Examples
 ```jldoctest
-julia> model = LinModel(tf(2, [0.3, 1]), 0.01);
+julia> model = LinModel(tf(2, [0.3, 1]), 0.1);
 
 julia> function sim_realtime!(model)
            t_0 = time()
