@@ -110,7 +110,9 @@ for more detailed examples.
   - [x] quickly compare multiple optimizers
   - [x] nonlinear solvers relying on automatic differentiation (exact derivative)
 - [x] additional information about the optimum to ease troubleshooting
-- [x] implementation that carefully limits allocations for real-time applications
+- [x] real-time control loop features:
+  - [x] implementations that carefully limits the allocations
+  - [x] simple soft real-time utilities
 
 ### State Estimation Features
 
