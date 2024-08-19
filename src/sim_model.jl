@@ -310,7 +310,7 @@ ms. Can be used to implement simple soft real-time simulations, see the example 
 
 !!! warning
     The allocations in Julia are garbage-collected (GC) automatically. This can affect the 
-    timings. In such cases, you can temporarily stop the GC with `GC.enable(false)`, and
+    timing. In such cases, you can temporarily stop the GC with `GC.enable(false)`, and
     restart it at a convenient time e.g.: just before calling `periodsleep`.
 
 # Examples
