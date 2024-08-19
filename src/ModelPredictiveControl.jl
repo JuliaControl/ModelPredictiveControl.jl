@@ -26,6 +26,7 @@ export SimModel, LinModel, NonLinModel
 export DiffSolver, RungeKutta
 export setop!, setname!
 export setstate!, setmodel!, preparestate!, updatestate!, evaloutput, linearize, linearize!
+export savetime!, periodsleep
 export StateEstimator, InternalModel, Luenberger
 export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
 export MovingHorizonEstimator

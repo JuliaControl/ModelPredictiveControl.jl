@@ -286,6 +286,67 @@ function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
 end
 
 """
+    savetime!(model::SimModel) -> t
+
+Set `model.t` to `time()`  and return the value.
+
+Used in conjunction with [`periodsleep`](@ref) for simple soft real-time simulations. Call
+this function before any other in the simulation loop.
+"""
+function savetime!(model::SimModel)
+    model.t[] = time()
+    return model.t[]
+end
+
+"""
+    periodsleep(model::SimModel, busywait=false) -> nothing
+
+Sleep for `model.Ts` s minus the time elapsed since the last call to [`savetime!`](@ref).
+
+It calls [`sleep`](https://docs.julialang.org/en/v1/base/parallel/#Base.sleep) if `busywait`
+is `false`. Else, a simple `while` loop implements busy-waiting. As a rule-of-thumb,
+busy-waiting should be used if `model.Ts < 0.1` s, since the accuracy of `sleep` is around 1
+ms. Can be used to implement simple soft real-time simulations, see the example below.
+
+!!! warning
+    The allocations in Julia are garbage-collected (GC) automatically. This can affect the 
+    timings. In such cases, you can temporarily stop the GC with `GC.enable(false)`, and
+    restart it at a convenient time e.g.: just before calling `periodsleep`.
+
+# Examples
+```jldoctest
+julia> model = LinModel(tf(2, [0.3, 1]), 0.1);
+
+julia> function sim_realtime!(model)
+           t_0 = time()
+           for i=1:3
+               t = savetime!(model)      # first function called
+               println(round(t - t_0, digits=3))
+               updatestate!(model, [1])
+               periodsleep(model, true)  # last function called
+           end
+       end;
+
+julia> sim_realtime!(model)
+0.0
+0.1
+0.2
+```
+"""
+function periodsleep(model::SimModel, busywait=false)
+    if !busywait
+        model.Ts < 0.1 && @warn "busy-waiting is recommended for Ts < 0.1 s"
+        computing_time = time() - model.t[]
+        sleep_time = model.Ts - computing_time
+        sleep_time > 0 && sleep(sleep_time)
+    else
+        while time() - model.t[] < model.Ts
+        end
+    end
+    return nothing
+end
+
+"""
     validate_args(model::SimModel, d, u=nothing)
 
 Check `d` and `u` (if provided) sizes against `model` dimensions.
