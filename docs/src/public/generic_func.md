@@ -57,9 +57,9 @@ setmodel!
 getinfo
 ```
 
-## Simulate/Control in Real-Time
+## Real-Time Simulate and Control
 
-!!!danger "Disclaimer"
+!!! danger "Disclaimer"
     These utilities are for soft real-time applications. They are not suitable for hard
     real-time environnement like safety-critical processes.
 
