@@ -308,6 +308,11 @@ is `false`. Else, a simple `while` loop implements busy-waiting. As a rule-of-th
 busy-waiting should be used if `model.Ts < 0.1` s, since the accuracy of `sleep` is around 1
 ms. Can be used to implement simple soft real-time simulations, see the example below.
 
+!!!warning
+    The allocations in Julia are garbage-collected (GC) automatically. This can affect the 
+    timings. In such cases, you can temporarily stop the GC with `GC.enable(false)`, and
+    restart it at a convenient time e.g.: just before calling `periodsleep`.
+
 # Examples
 ```jldoctest
 julia> model = LinModel(tf(2, [0.3, 1]), 0.1);
