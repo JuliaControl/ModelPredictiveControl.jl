@@ -19,25 +19,27 @@ setconstraint!
 evaloutput
 ```
 
-## Prepare State x
+## Change State x
+
+### Prepare State x
 
 ```@docs
 preparestate!
 ```
 
-## Update State x
+### Update State x
 
 ```@docs
 updatestate!
 ```
 
-## Init State x
+### Init State x
 
 ```@docs
 initstate!
 ```
 
-## Set State x
+### Set State x
 
 ```@docs
 setstate!
@@ -55,7 +57,11 @@ setmodel!
 getinfo
 ```
 
-## Soft Real-Time Utilities
+## Simulate/Control in Real-Time
+
+!!!danger "Disclaimer"
+    These utilities are for soft real-time applications. They are not suitable for hard
+    real-time environnement like safety-critical processes.
 
 ### Save current time t
 
