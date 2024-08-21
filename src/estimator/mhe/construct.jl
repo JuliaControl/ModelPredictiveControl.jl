@@ -907,8 +907,9 @@ Construct the MHE prediction matrices for [`LinModel`](@ref) `model`.
 We first introduce the deviation vector of the estimated state at arrival 
 ``\mathbf{x̂_0}(k-N_k+K) = \mathbf{x̂}_k(k-N_k+K) - \mathbf{x̂_{op}}`` (see [`setop!`](@ref)),
 and the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂_0}(k-N_k+K)
-\\ \mathbf{Ŵ} \end{smallmatrix}]`` with the decision variables. The estimated sensor noises
-from time ``k-N_k+1`` to ``k`` are computed by:
+\\ \mathbf{Ŵ} \end{smallmatrix}]`` with the decision variables. Setting the constant ``K=0``
+produces an estimator in the current form, while the predictor form is obtained with
+``K=1``. The estimated sensor noises from time ``k-N_k+1`` to ``k`` are computed by:
 ```math
 \begin{aligned}
     \mathbf{V̂} = \mathbf{Y_0^m - Ŷ_0^m} &= \mathbf{E Z + G U_0 + J D_0 + Y_0^m + B}     \\
@@ -917,22 +918,23 @@ from time ``k-N_k+1`` to ``k`` are computed by:
 ```
 in which ``\mathbf{U_0}`` and ``\mathbf{Y_0^m}`` respectively include the deviation values of
 the manipulated inputs ``\mathbf{u_0}(k-j+K)`` and measured outputs ``\mathbf{y_0^m}(k-j+1)`` 
-from ``j=N_k` to ``1``. The vector ``\mathbf{D_0}`` includes one additional measured
-disturbance when ``K=0``, that is the deviation vectors ``\mathbf{d_0}(k-j+1)`` from 
-``j=N_k-1-K`` to ``1``. The constant ``\mathbf{B}`` includes the contribution for non-zero
+from ``j=N_k`` to ``1``. The vector ``\mathbf{D_0}`` includes one additional measured
+disturbance when ``K=0``, that is, the deviation vectors ``\mathbf{d_0}(k-j+1)`` from 
+``j=N_k+1-K`` to ``1``. The constant ``\mathbf{B}`` is the contribution for non-zero
 state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}`` operating points (for
-linearization, see [`linearize`](@ref)). The method also returns matrices for the estimation
-error at arrival:
+linearization, see [`augment_model`](@ref) and [`linearize`](@ref)). The method also returns
+the matrices for the estimation error at arrival:
 ```math
     \mathbf{x̄} = \mathbf{x̂_0^†}(k-N_k+K) - \mathbf{x̂_0}(k-N_k+K) = \mathbf{e_x̄ Z + f_x̄}
 ```
-in which ``\mathbf{x̂_0^†}(k-N_k+K) = \mathbf{x̂}_{k-N_k}(k-N_k+K) - \mathbf{x̂_{op}}`` is the
-deviation vector of the state at arrival (estimated at time ``k-N_k``). Lastly, the
-estimated states ``\mathbf{x̂_0}(k-j+K)`` from ``j=N_k`` to ``0``, also in deviation form,
-are calculated with:
+in which ``\mathbf{e_x̄} = [\begin{smallmatrix} -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{smallmatrix}]``,
+and ``\mathbf{f_x̄} = \mathbf{x̂_0^†}(k-N_k+K)``. The latter is the deviation vector of the
+state at arrival ``\mathbf{x̂}_{k-N_k}(k-N_k+K) - \mathbf{x̂_{op}}`` (estimated at ``k-N_k``).
+Lastly, the estimated states ``\mathbf{x̂_0}(k-j+K)`` from ``j=N_k-1`` to ``0``, also in
+deviation form, are calculated with:
 ```math
 \begin{aligned}
-    \mathbf{X̂_0}  &= \mathbf{E_x̂ Z + G_x̂ U_0 + J_x̂ D_0} \\
+    \mathbf{X̂_0}  &= \mathbf{E_x̂ Z + G_x̂ U_0 + J_x̂ D_0 + B_x̂} \\
                   &= \mathbf{E_x̂ Z + F_x̂}
 \end{aligned}
 ```
@@ -941,7 +943,32 @@ are calculated with:
 !!! details "Extended Help"
     Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ^m, B̂_d, D̂_d^m}``, and the function 
     ``\mathbf{S}(j) = ∑_{i=0}^j \mathbf{Â}^i``, the prediction matrices for the sensor
-    noises are computed by (notice the minus signs after the equalities):
+    noises depend on the constant ``K``. For ``K=0``, the matrices are computed by:
+    ```math
+    \begin{aligned}
+    \mathbf{E} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{Â}^{0}                    & \cdots & \mathbf{0}                               \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{2}                  & \mathbf{Ĉ^m}\mathbf{Â}^{1}                    & \cdots & \mathbf{0}                               \\ 
+        \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e}                & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Ĉ^m}\mathbf{Â}^{0}               \end{bmatrix} \\
+    \mathbf{G} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}      & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{1}\mathbf{B̂_u}      & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                               \\ 
+        \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
+    \mathbf{J} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂_d^m}                                & \cdots & \mathbf{0}                               \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{1}\mathbf{B̂_d}      & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                               \\ 
+        \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{D̂_d^m}                           \end{bmatrix} \\
+    \mathbf{B} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m S}(0)                    \\
+        \mathbf{Ĉ^m S}(1)                    \\
+        \vdots                               \\
+        \mathbf{Ĉ^m S}(H_e-1) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
+    \end{aligned}
+    ```
+    and, for ``K=1``, the matrices are given by:
     ```math
     \begin{aligned}
     \mathbf{E} &= - \begin{bmatrix}
@@ -966,12 +993,9 @@ are calculated with:
         \mathbf{Ĉ^m S}(H_e-2) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
-    for the estimation error at arrival:
+    The matrices for the estimated states does not depend on ``K``:
     ```math
-    \mathbf{e_x̄} = \begin{bmatrix}
-        -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{bmatrix}
-    ```
-    and, for the estimated states:
+    and for the estimated states:
     ```math
     \begin{aligned}
     \mathbf{E_x̂} &= \begin{bmatrix}

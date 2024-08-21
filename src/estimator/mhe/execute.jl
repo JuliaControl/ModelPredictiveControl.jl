@@ -199,7 +199,7 @@ end
 function add_data_windows!(estim::MovingHorizonEstimator, u0, d0, y0m)
     model = estim.model
     nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
-    x̂0, ŵ = estim.x̂0, zeros(nŵ) # ŵ(k) = 0 for warm-starting
+    x̂0, ŵ = estim.x̂0, 0 # ŵ(k) = 0 for warm-starting
     estim.Nk .+= 1
     Nk = estim.Nk[]
     if Nk > estim.He
