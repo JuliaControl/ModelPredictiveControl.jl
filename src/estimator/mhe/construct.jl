@@ -929,7 +929,7 @@ the matrices for the estimation error at arrival:
 ```
 in which ``\mathbf{e_x̄} = [\begin{smallmatrix} -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{smallmatrix}]``,
 and ``\mathbf{f_x̄} = \mathbf{x̂_0^†}(k-N_k+K)``. The latter is the deviation vector of the
-state at arrival estimated at ``k-N_k`` i.e. ``\mathbf{x̂_0^†}(k-N_k+K) = 
+state at arrival estimated at time ``k-N_k``, i.e. ``\mathbf{x̂_0^†}(k-N_k+K) = 
 \mathbf{x̂}_{k-N_k}(k-N_k+K) - \mathbf{x̂_{op}}``. Lastly, the estimated states 
 ``\mathbf{x̂_0}(k-j+K)`` from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
 ```math
