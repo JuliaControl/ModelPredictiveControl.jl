@@ -929,9 +929,9 @@ the matrices for the estimation error at arrival:
 ```
 in which ``\mathbf{e_x̄} = [\begin{smallmatrix} -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{smallmatrix}]``,
 and ``\mathbf{f_x̄} = \mathbf{x̂_0^†}(k-N_k+K)``. The latter is the deviation vector of the
-state at arrival ``\mathbf{x̂}_{k-N_k}(k-N_k+K) - \mathbf{x̂_{op}}`` (estimated at ``k-N_k``).
-Lastly, the estimated states ``\mathbf{x̂_0}(k-j+K)`` from ``j=N_k-1`` to ``0``, also in
-deviation form, are calculated with:
+state at arrival estimated at ``k-N_k`` i.e. ``\mathbf{x̂_0^†}(k-N_k+K) = 
+\mathbf{x̂}_{k-N_k}(k-N_k+K) - \mathbf{x̂_{op}}``. Lastly, the estimated states 
+``\mathbf{x̂_0}(k-j+K)`` from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
 ```math
 \begin{aligned}
     \mathbf{X̂_0}  &= \mathbf{E_x̂ Z + G_x̂ U_0 + J_x̂ D_0 + B_x̂} \\
@@ -968,7 +968,7 @@ deviation form, are calculated with:
         \mathbf{Ĉ^m S}(H_e-1) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
-    and, for ``K=1``, the matrices are given by:
+    or, for ``K=1``, the matrices are given by:
     ```math
     \begin{aligned}
     \mathbf{E} &= - \begin{bmatrix}
@@ -993,9 +993,7 @@ deviation form, are calculated with:
         \mathbf{Ĉ^m S}(H_e-2) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
-    The matrices for the estimated states does not depend on ``K``:
-    ```math
-    and for the estimated states:
+    The matrices for the estimated states does not depend on the constant ``K``:
     ```math
     \begin{aligned}
     \mathbf{E_x̂} &= \begin{bmatrix}
