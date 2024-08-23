@@ -280,7 +280,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
     `direct=false`. The current form with ``p=0`` has the particular aspect that the arrival
-    covariance switch from an *a priori* estimate ``\mathbf{P̂}_{k-1}{k}`` to *a posteriori* 
+    covariance switch from an *a priori* estimate ``\mathbf{P̂}_{k-1}(k)`` to *a posteriori* 
     ``\mathbf{P̂}_k(k)`` when ``k=H_e``.
     
     A particular aspect of the current form with ``p=0`` is that the covariance 
