@@ -279,7 +279,11 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     with ``p=1`` is particularly useful for the MHE since it moves its expensive
     computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
-    `direct=false`.
+    `direct=false`. The current form with ``p=0`` has the particular aspect that the arrival
+    covariance switch from an *a priori* estimate ``\mathbf{P̂}_{k-1}{k}`` to *a posteriori* 
+    ``\mathbf{P̂}_k(k)`` when ``k=H_e``.
+    
+    A particular aspect of the current form with ``p=0`` is that the covariance 
     
     The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
@@ -297,7 +301,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
       functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
       for common mistakes when writing these functions. An [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
-        
+
     Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
     `10/Cwt` (if not already set), to scale the small values of ``ϵ``. Use the second
     constructor to specify the covariance estimation method.
@@ -1022,7 +1026,7 @@ from ``j=M_k-1`` to ``0``, also in deviation form, are computed with:
         \mathbf{S}(H_e-1) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
-    All these matrices are truncated when ``N_k < H_e`` (at the beginning).
+    All these matrices are truncated when ``k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
     model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
