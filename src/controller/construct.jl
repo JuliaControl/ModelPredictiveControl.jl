@@ -529,7 +529,7 @@ function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where 
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Âpow_csum  = cumsum(Âpow, dims=3)
     # helper function to improve code clarity and be similar to eqs. in docstring:
-    getpower(array3D, power) = array3D[:,:, power+1]
+    getpower(array3D, power) = @views array3D[:,:, power+1]
     # --- state estimates x̂ ---
     kx̂ = getpower(Âpow, Hp)
     K  = Matrix{NT}(undef, Hp*ny, nx̂)
