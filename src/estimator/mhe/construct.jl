@@ -283,8 +283,6 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     covariance switch from an *a priori* estimate ``\mathbf{P̂}_{k-1}(k)`` to *a posteriori* 
     ``\mathbf{P̂}_k(k)`` when ``k=H_e``.
     
-    A particular aspect of the current form with ``p=0`` is that the covariance 
-    
     The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
     problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
