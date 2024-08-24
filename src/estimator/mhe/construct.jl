@@ -280,9 +280,12 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
     `direct=false`. The current form with ``p=0`` has the particular aspect that the arrival
-    covariance switch from an *a priori* estimate ``\mathbf{P̂}_{k-1}(k)`` to *a posteriori* 
-    ``\mathbf{P̂}_k(k)`` when ``k=H_e``.
-    
+    covariance switch from an *a priori* estimate ``\mathbf{P̂}_{k-1}(k)`` to *a
+    posteriori*[^2] ``\mathbf{P̂}_k(k)`` when ``k=H_e``.
+
+    [^2]: M. Hovd (2012), "A Note On The Smoothing Formulation Of Moving Horizon Estimation",
+          *Facta Universitatis*, Vol. 11 №2.
+
     The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
     problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
