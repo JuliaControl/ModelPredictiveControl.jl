@@ -281,7 +281,8 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
     `direct=false`. The current form with ``p=0`` has the particular aspect that the arrival
     covariance switch from an *a priori* estimate ``\mathbf{P̂}_{k-1}(k)`` to *a
-    posteriori*[^2] ``\mathbf{P̂}_k(k)`` when ``k=H_e``.
+    posteriori*[^2] ``\mathbf{P̂}_k(k)`` when ``k=H_e`` (to match the nature of the arrival
+    estimate at this point in time).
 
     [^2]: M. Hovd (2012), "A Note On The Smoothing Formulation Of Moving Horizon Estimation",
           *Facta Universitatis*, Vol. 11 №2.
@@ -936,7 +937,7 @@ The method also returns the matrices for the estimation error at arrival:
 ```math
     \mathbf{x̄} = \mathbf{x̂_0^†}(k-M_k+p) - \mathbf{x̂_0}(k-M_k+p) = \mathbf{e_x̄ Z + f_x̄}
 ```
-in which ``\mathbf{e_x̄} = [\begin{smallmatrix} -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{smallmatrix}]``,
+in which ``\mathbf{e_x̄} = -[\begin{smallmatrix} \mathbf{I} & \mathbf{0} & ⋯ & \mathbf{0} \end{smallmatrix}]``,
 and ``\mathbf{f_x̄} = \mathbf{x̂_0^†}(k-M_k+p)``. The latter is the deviation vector of the
 state at arrival, estimated at time ``k-N_k``, i.e. ``\mathbf{x̂_0^†}(k-M_k+p) = 
 \mathbf{x̂}_{k-N_k}(k-M_k+p) - \mathbf{x̂_{op}}``. Lastly, the estimates ``\mathbf{x̂_0}(k-j+p)``
@@ -947,87 +948,87 @@ from ``j=M_k-1`` to ``0``, also in deviation form, are computed with:
                   &= \mathbf{E_x̂ Z + F_x̂}
 \end{aligned}
 ```
+The Extended Help provides details on the matrices ``\mathbf{E, G, J, B, Ex̂, Gx̂, Jx̂, Bx̂}``.
 
 # Extended Help
 !!! details "Extended Help"
     Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ^m, B̂_d, D̂_d^m}``, and the function 
     ``\mathbf{S}(j) = ∑_{i=0}^j \mathbf{Â}^i``, the prediction matrices for the sensor
-    noises depend on the constant ``p``. For ``p=0``, the matrices are computed by:
+    noises are computed using (notice the minus signs after the equalities):
     ```math
     \begin{aligned}
-    \mathbf{E} &= - \begin{bmatrix}
+    \mathbf{E^†} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m}\mathbf{Â}^{0}                  & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\
         \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{Â}^{0}                    & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{2}                  & \mathbf{Ĉ^m}\mathbf{Â}^{1}                    & \cdots & \mathbf{0}                               \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}              & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}                & \cdots & \mathbf{0}                               \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e}                & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Ĉ^m}\mathbf{Â}^{0}               \end{bmatrix} \\
-    \mathbf{G} &= - \begin{bmatrix}
+    \mathbf{G^†} &= - \begin{bmatrix}
+        \mathbf{0}                                  & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}      & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{1}\mathbf{B̂_u}      & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                               \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_u}    & \cdots & \mathbf{0}                               \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
-    \mathbf{J} &= - \begin{bmatrix}
+    \mathbf{J^†} &= - \begin{bmatrix}
+        \mathbf{D̂_d^m}                              & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂_d^m}                                & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{1}\mathbf{B̂_d}      & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                               \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{0}                               \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{D̂_d^m}                           \end{bmatrix} \\
-    \mathbf{B} &= - \begin{bmatrix}
+    \mathbf{B^†} &= - \begin{bmatrix}
+        \mathbf{0}                           \\
         \mathbf{Ĉ^m S}(0)                    \\
         \mathbf{Ĉ^m S}(1)                    \\
         \vdots                               \\
+        \mathbf{Ĉ^m S}(H_e-2)                \\
         \mathbf{Ĉ^m S}(H_e-1) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
-    or, for ``p=1``, the matrices are given by:
+    Now, because the current form switch from an *a priori* to an *a posteriori* arrival
+    estimation covariance ``\mathbf{P̂}`` when ``k=H_e``, the first lines of those matrices
+    are omitted if ``p=0`` and ``k ≥ H_e``. Introducing `ck` that equals 1 when these two
+    conditions are met or, mathematically, ``c_k = (1-p)(M_k-N_k+1)``, the matrices are 
+    truncated as follows:
+
+    - ``\mathbf{E}``: `E = E†[(nym*ck + 1):(nym*ck + nym*Nk), 1:(nx̂ + nx̂*Mk)]`
+    - ``\mathbf{G}``: `G = G†[(nym*ck + 1):(nym*ck + nym*Nk), 1:(nu*Mk)]`
+    - ``\mathbf{J}``: `J = J†[(nym*ck + 1):(nym*ck + nym*Nk), 1:(nd*(Mk+1-p))]`
+    - ``\mathbf{B}``: `B = B†[(nym*ck + 1):(nym*ck + nym*Nk)]`
+
+    The matrices for the estimated states are computed using:
     ```math
     \begin{aligned}
-    \mathbf{E} &= - \begin{bmatrix}
-        \mathbf{Ĉ^m}\mathbf{Â}^{0}                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-        \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{Â}^{0}                    & \cdots & \mathbf{0}   \\ 
-        \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}              & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}                & \cdots & \mathbf{0}   \end{bmatrix} \\
-    \mathbf{G} &= - \begin{bmatrix}
-        \mathbf{0}                                  & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}      & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-        \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_u}    & \cdots & \mathbf{0}   \end{bmatrix} \\
-    \mathbf{J} &= - \begin{bmatrix}
-        \mathbf{D̂_d^m}                              & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂_d^m}                                & \cdots & \mathbf{0}   \\ 
-        \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{D̂_d^m} \end{bmatrix} \\
-    \mathbf{B} &= - \begin{bmatrix}
-        \mathbf{0}                           \\  
-        \mathbf{Ĉ^m S}(0)                    \\
-        \vdots                               \\
-        \mathbf{Ĉ^m S}(H_e-2) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
-    \end{aligned}
-    ```
-    The matrices for the estimated states does not depend on the constant ``p``:
-    ```math
-    \begin{aligned}
-    \mathbf{E_x̂} &= \begin{bmatrix}
+    \mathbf{E_x̂^†} &= \begin{bmatrix}
         \mathbf{Â}^{1}                      & \mathbf{I}                        & \cdots & \mathbf{0}                   \\
         \mathbf{Â}^{2}                      & \mathbf{Â}^{1}                    & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e}                    & \mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Â}^{1}               \end{bmatrix} \\
-    \mathbf{G_x̂} &= \begin{bmatrix}
+    \mathbf{G_x̂^†} &= \begin{bmatrix}
         \mathbf{Â}^{0}\mathbf{B̂_u}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
         \mathbf{Â}^{1}\mathbf{B̂_u}          & \mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e-1}\mathbf{B̂_u}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
-    \mathbf{J_x̂} &= \begin{bmatrix}
+    \mathbf{J_x̂^†} &= \begin{bmatrix}
         \mathbf{Â}^{0}\mathbf{B̂_d}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
         \mathbf{Â}^{1}\mathbf{B̂_d}          & \mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix} \\
-    \mathbf{B_x̂} &= \begin{bmatrix}
+    \mathbf{B_x̂^†} &= \begin{bmatrix}
         \mathbf{S}(0)                    \\
         \mathbf{S}(1)                    \\
         \vdots                           \\
         \mathbf{S}(H_e-1) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
-    All these matrices are truncated when ``k < H_e`` (at the beginning).
+    and truncated as follows:
+
+    - ``\mathbf{E_x̂}``: `Ex̂ = Ex̂†[1:nx̂*Mk, 1:(nx̂ + nx̂*Mk)]`
+    - ``\mathbf{G_x̂}``: `Gx̂ = Gx̂†[1:nx̂*Mk, 1:(nu*Mk)]`
+    - ``\mathbf{J_x̂}``: `Jx̂ = Jx̂†[1:nx̂*Mk, 1:(nd*(Mk+1-p))]`
+    - ``\mathbf{B_x̂}``: `Bx̂ = Bx̂†[1:nx̂*Mk]`
 """
 function init_predmat_mhe(
     model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
