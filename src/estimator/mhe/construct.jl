@@ -214,7 +214,7 @@ noises ``\mathbf{ŵ}(k-j+p)`` from ``j=M_k`` to ``1`` and sensor noises ``\math
 from ``j=N_k`` to ``1``. The Extended Help defines the two vectors, the slack variable
 ``ϵ``, and the estimation of the covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-M_k+p)``. If
 the keyword argument `direct=true` (default value), the constant ``p=0`` in the equations
-above, and the MHE is in the current form. Else ``p=1``, leading to the prediction form.
+above, and the MHE is in the current/filter form, else ``p=1`` for the prediction form.
 
 See [`UnscentedKalmanFilter`](@ref) for details on the augmented process model and 
 ``\mathbf{R̂}, \mathbf{Q̂}`` covariances.
@@ -910,7 +910,7 @@ end
 @doc raw"""
     init_predmat_mhe(
         model::LinModel, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
-    ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
+    ) -> Ee, Ge, Je, Be, ex̄e, Ex̂e, Gx̂e, Jx̂e, Bx̂e
 
 Construct the [`MovingHorizonEstimator`](@ref) prediction matrices for [`LinModel`](@ref) `model`.
 
@@ -948,7 +948,7 @@ from ``j=M_k-1`` to ``0``, also in deviation form, are computed with:
                   &= \mathbf{E_x̂ Z + F_x̂}
 \end{aligned}
 ```
-The Extended Help provides details on the matrices ``\mathbf{E, G, J, B, Ex̂, Gx̂, Jx̂, Bx̂}``.
+The Extended Help provides details on the matrices ``\mathbf{E, G, J, B, E_x̂, G_x̂, J_x̂, B_x̂}``.
 
 # Extended Help
 !!! details "Extended Help"
@@ -957,28 +957,28 @@ The Extended Help provides details on the matrices ``\mathbf{E, G, J, B, Ex̂, G
     noises are computed using (notice the minus signs after the equalities):
     ```math
     \begin{aligned}
-    \mathbf{E^†} &= - \begin{bmatrix}
+    \mathbf{E^e} &= - \begin{bmatrix}
         \mathbf{Ĉ^m}\mathbf{Â}^{0}                  & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\
         \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{Â}^{0}                    & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{2}                  & \mathbf{Ĉ^m}\mathbf{Â}^{1}                    & \cdots & \mathbf{0}                               \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}              & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}                & \cdots & \mathbf{0}                               \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e}                & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Ĉ^m}\mathbf{Â}^{0}               \end{bmatrix} \\
-    \mathbf{G^†} &= - \begin{bmatrix}
+    \mathbf{G^e} &= - \begin{bmatrix}
         \mathbf{0}                                  & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}      & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{1}\mathbf{B̂_u}      & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                               \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_u}    & \cdots & \mathbf{0}                               \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
-    \mathbf{J^†} &= - \begin{bmatrix}
+    \mathbf{J^e} &= - \begin{bmatrix}
         \mathbf{D̂_d^m}                              & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂_d^m}                                & \cdots & \mathbf{0}                               \\ 
         \mathbf{Ĉ^m}\mathbf{Â}^{1}\mathbf{B̂_d}      & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                               \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{0}                               \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{D̂_d^m}                           \end{bmatrix} \\
-    \mathbf{B^†} &= - \begin{bmatrix}
+    \mathbf{B^e} &= - \begin{bmatrix}
         \mathbf{0}                           \\
         \mathbf{Ĉ^m S}(0)                    \\
         \mathbf{Ĉ^m S}(1)                    \\
@@ -988,35 +988,35 @@ The Extended Help provides details on the matrices ``\mathbf{E, G, J, B, Ex̂, G
     \end{aligned}
     ```
     Now, because the current form switch from an *a priori* to an *a posteriori* arrival
-    estimation covariance ``\mathbf{P̂}`` when ``k=H_e``, the first lines of those matrices
+    estimation covariance ``\mathbf{P̂}`` when ``k = H_e``, the first lines of those matrices
     are omitted if ``p=0`` and ``k ≥ H_e``. Introducing `ck` that equals 1 when these two
     conditions are met or, mathematically, ``c_k = (1-p)(M_k-N_k+1)``, the matrices are 
     truncated as follows:
 
-    - ``\mathbf{E}``: `E = E†[(nym*ck + 1):(nym*ck + nym*Nk), 1:(nx̂ + nx̂*Mk)]`
-    - ``\mathbf{G}``: `G = G†[(nym*ck + 1):(nym*ck + nym*Nk), 1:(nu*Mk)]`
-    - ``\mathbf{J}``: `J = J†[(nym*ck + 1):(nym*ck + nym*Nk), 1:(nd*(Mk+1-p))]`
-    - ``\mathbf{B}``: `B = B†[(nym*ck + 1):(nym*ck + nym*Nk)]`
+    - ``\mathbf{E}`` with `E = Ee[(nym*ck + 1):(nym*ck + nym*Nk), 1:(nx̂ + nx̂*Mk)]`
+    - ``\mathbf{G}`` with `G = Ge[(nym*ck + 1):(nym*ck + nym*Nk), 1:(nu*Mk)]`
+    - ``\mathbf{J}`` with `J = Je[(nym*ck + 1):(nym*ck + nym*Nk), 1:(nd*(Mk+1-p))]`
+    - ``\mathbf{B}`` with `B = Be[(nym*ck + 1):(nym*ck + nym*Nk)]`
 
     The matrices for the estimated states are computed using:
     ```math
     \begin{aligned}
-    \mathbf{E_x̂^†} &= \begin{bmatrix}
+    \mathbf{E_x̂^e} &= \begin{bmatrix}
         \mathbf{Â}^{1}                      & \mathbf{I}                        & \cdots & \mathbf{0}                   \\
         \mathbf{Â}^{2}                      & \mathbf{Â}^{1}                    & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e}                    & \mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Â}^{1}               \end{bmatrix} \\
-    \mathbf{G_x̂^†} &= \begin{bmatrix}
+    \mathbf{G_x̂^e} &= \begin{bmatrix}
         \mathbf{Â}^{0}\mathbf{B̂_u}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
         \mathbf{Â}^{1}\mathbf{B̂_u}          & \mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e-1}\mathbf{B̂_u}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
-    \mathbf{J_x̂^†} &= \begin{bmatrix}
+    \mathbf{J_x̂^e} &= \begin{bmatrix}
         \mathbf{Â}^{0}\mathbf{B̂_d}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
         \mathbf{Â}^{1}\mathbf{B̂_d}          & \mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix} \\
-    \mathbf{B_x̂^†} &= \begin{bmatrix}
+    \mathbf{B_x̂^e} &= \begin{bmatrix}
         \mathbf{S}(0)                    \\
         \mathbf{S}(1)                    \\
         \vdots                           \\
@@ -1025,10 +1025,10 @@ The Extended Help provides details on the matrices ``\mathbf{E, G, J, B, Ex̂, G
     ```
     and truncated as follows:
 
-    - ``\mathbf{E_x̂}``: `Ex̂ = Ex̂†[1:nx̂*Mk, 1:(nx̂ + nx̂*Mk)]`
-    - ``\mathbf{G_x̂}``: `Gx̂ = Gx̂†[1:nx̂*Mk, 1:(nu*Mk)]`
-    - ``\mathbf{J_x̂}``: `Jx̂ = Jx̂†[1:nx̂*Mk, 1:(nd*(Mk+1-p))]`
-    - ``\mathbf{B_x̂}``: `Bx̂ = Bx̂†[1:nx̂*Mk]`
+    - ``\mathbf{E_x̂}`` with `Ex̂ = Ex̂e[1:(nx̂*Mk), 1:(nx̂ + nx̂*Mk)]`
+    - ``\mathbf{G_x̂}`` with `Gx̂ = Gx̂e[1:(nx̂*Mk), 1:(nu*Mk)]`
+    - ``\mathbf{J_x̂}`` with `Jx̂ = Jx̂e[1:(nx̂*Mk), 1:(nd*(Mk+1-p))]`
+    - ``\mathbf{B_x̂}`` with `Bx̂ = Bx̂e[1:(nx̂*Mk)]`
 """
 function init_predmat_mhe(
     model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
@@ -1043,28 +1043,16 @@ function init_predmat_mhe(
     for j=2:He+1
         Âpow[:,:,j] = @views Âpow[:,:,j-1]*Â
     end
-    # helper function to improve code clarity and be similar to eqs. in docstring:
-    getpower(array3D, power) = @views array3D[:,:, power+1]
-
-    # TODO: WIP, rendu ici:
     nĈm_Âpow = Array{NT}(undef, nym, nx̂, He+1)
     nĈm_Âpow[:,:,1] = Ĉm
     for j=2:He+1
-        nĈm_Âpow[:,:,j] = Ĉm*Âpow[:,:,j]
+        nĈm_Âpow[:,:,j] = @views Ĉm*Âpow[:,:,j]
     end
-
+    # helper function to improve code clarity and be similar to eqs. in docstring:
+    getpower(array3D, power) = @views array3D[:,:, power+1]
     # --- decision variables Z ---
 
-
-
-
-
-
-    # TODO: ça marche pas, nĈm_Âpow n'incluera pas Ĉm*Â^0 quand K=0, à changer:
-    i_first = (p == 0) ? 1 : 0
-    i_last  = (p == 0) ? He : He-1
-    nĈm_Âpow = reduce(vcat, -Ĉm*getpower(Âpow, i) for i=i_first:i_last)
-    E = zeros(NT, nym*He, nx̂ + nŵ*He)
+    E† = zeros(NT, nym*He, nx̂ + nŵ*He)
     E[:, 1:nx̂] = nĈm_Âpow
     for j=1:He-1
         iRow = (1 + j*nym):(nym*He)
@@ -1136,16 +1124,16 @@ function init_predmat_mhe(
 ) where {NT<:Real}
     nym, nx̂ = length(i_ym), size(Â, 2)
     nŵ = nx̂
-    E  = zeros(NT, 0, nx̂ + nŵ*He)
-    ex̄ = [-I zeros(NT, nx̂, nŵ*He)]
-    Ex̂ = zeros(NT, 0, nx̂ + nŵ*He)
-    G  = zeros(NT, 0, model.nu*He)
-    Gx̂ = zeros(NT, 0, model.nu*He)
-    J  = zeros(NT, 0, model.nd*He)
-    Jx̂ = zeros(NT, 0, model.nd*He)
-    B  = zeros(NT, nym*He)
-    Bx̂ = zeros(NT, nx̂*He)
-    return E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
+    Ee  = zeros(NT, 0, nx̂ + nŵ*He)
+    ex̄e = [-I zeros(NT, nx̂, nŵ*He)]
+    Ex̂e = zeros(NT, 0, nx̂ + nŵ*He)
+    Ge  = zeros(NT, 0, model.nu*He)
+    Gx̂e = zeros(NT, 0, model.nu*He)
+    Je  = zeros(NT, 0, model.nd*He)
+    Jx̂e = zeros(NT, 0, model.nd*He)
+    Be  = zeros(NT, nym*He)
+    Bx̂e = zeros(NT, nx̂*He)
+    return Ee, Ge, Je, Be, ex̄e, Ex̂e, Gx̂e, Jx̂e, Bx̂e
 end
 
 """
