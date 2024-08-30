@@ -143,7 +143,8 @@ struct MovingHorizonEstimator{
         Z̃ = zeros(NT, nZ̃)
         X̂op = repeat(x̂op, He)
         X̂0, Y0m = zeros(NT, nx̂*He), zeros(NT, nym*He)
-        U0, D0  = zeros(NT, nu*He), zeros(NT, nd*He) 
+        nD0 = direct ? nd*(He+1) : nd*He
+        U0, D0  = zeros(NT, nu*He), zeros(NT, nD0) 
         Ŵ = zeros(NT, nx̂*He)
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(P̂_0)
@@ -1000,24 +1001,27 @@ from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
         \mathbf{Ĉ^m S}(H_e-2) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
-    The matrices for the estimated states does not depend on the constant ``p``:
+    The matrices for the estimated states are computed by:
     ```math
     \begin{aligned}
     \mathbf{E_x̂} &= \begin{bmatrix}
         \mathbf{Â}^{1}                      & \mathbf{A}^{0}                    & \cdots & \mathbf{0}                   \\
         \mathbf{Â}^{2}                      & \mathbf{Â}^{1}                    & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
-        \mathbf{Â}^{H_e}                    & \mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Â}^{1}               \end{bmatrix} \\
+        \mathbf{Â}^{H_e}                    & \mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Â}^{0}               \end{bmatrix} \\
     \mathbf{G_x̂} &= \begin{bmatrix}
         \mathbf{Â}^{0}\mathbf{B̂_u}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
         \mathbf{Â}^{1}\mathbf{B̂_u}          & \mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e-1}\mathbf{B̂_u}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
-    \mathbf{J_x̂} &= \begin{bmatrix}
+    \mathbf{J_x̂^†} &= \begin{bmatrix}
         \mathbf{Â}^{0}\mathbf{B̂_d}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
         \mathbf{Â}^{1}\mathbf{B̂_d}          & \mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
-        \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix} \\
+        \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix} \ , \quad
+    \mathbf{J_x̂} = \begin{cases}
+        [\begin{smallmatrix} \mathbf{J_x̂^†} & \mathbf{0} \end{smallmatrix}]     & p=0                                   \\
+                             \mathbf{J_x̂^†}                                     & p=1                                   \end{cases}   \\
     \mathbf{B_x̂} &= \begin{bmatrix}
         \mathbf{S}(0)                    \\
         \mathbf{S}(1)                    \\
@@ -1060,45 +1064,55 @@ function init_predmat_mhe(
         E[iRow, iCol] = @views nĈm_Âpow[1:length(iRow) ,:]
         i += 1
     end
-    iszero(p) && (E[:, 1:nx̂] = @views nĈm_Âpow[nym+1:end, :])
-    display(E)
-    # TODO: je suis rendu ici vérifier si E est correct et continuer!
-
+    iszero(p) && @views (E[:, 1:nx̂] = @views nĈm_Âpow[nym+1:end, :])
     ex̄ = [-I zeros(NT, nx̂, nŵ*He)]
     Âpow_vec = reduce(vcat, getpower(Âpow3D, i) for i=0:He)
     Ex̂ = zeros(NT, nx̂*He, nx̂ + nŵ*He)
-    Ex̂[:, 1:nx̂] = Âpow_vec[nx̂+1:end, :]
-    for j=0:He-1
-        iRow = (1 + j*nx̂):(nx̂*He)
-        iCol = (1:nŵ) .+ j*nŵ .+ nx̂
-        Ex̂[iRow, iCol] = Âpow_vec[1:length(iRow) ,:]
+    i=0
+    for j=1:He
+        iRow = (1 + i*nx̂):(nx̂*He)
+        iCol = (1:nŵ) .+ j*nŵ
+        Ex̂[iRow, iCol] = @views Âpow_vec[1:length(iRow) ,:]
+        i+=1
     end
+    Ex̂[:, 1:nx̂] = @views Âpow_vec[nx̂+1:end, :] 
     # --- manipulated inputs U ---
-    i_first = 
-    nĈm_Âpow_B̂u = @views reduce(vcat, nĈm_Âpow[(1+(i*nym)):((i+1)*nym),:]*B̂u for i=0:He-1)
+    nĈm_Âpow_B̂u = reduce(vcat, getpower(nĈm_Âpow3D, i)*B̂u for i=0:He-1)
+    nĈm_Âpow_B̂u = [zeros(nym, nu) ; nĈm_Âpow_B̂u]
     G = zeros(NT, nym*He, nu*He)
-    for j=1:He-1
-        iRow = (1 + j*nym):(nym*He)
-        iCol = (1:nu) .+ (j-1)*nu
-        G[iRow, iCol] = nĈm_Âpow_B̂u[1:length(iRow) ,:]
+    i=0
+    col_begin = iszero(p) ? 1    : 0
+    col_end   = iszero(p) ? He-1 : He-2
+    for j=col_begin:col_end
+        iRow = (1 + i*nym):(nym*He)
+        iCol = (1:nu) .+ j*nu
+        G[iRow, iCol] = @views nĈm_Âpow_B̂u[1:length(iRow) ,:]
+        i+=1
     end
-    Âpow_B̂u = reduce(vcat, getpower(Âpow3D, i)*B̂u for i=0:He)
+    G[:, 1:nu] = @views nĈm_Âpow_B̂u[nym+1:end, :]
+    Âpow_B̂u = reduce(vcat, getpower(Âpow3D, i)*B̂u for i=0:He-1)
     Gx̂ = zeros(NT, nx̂*He, nu*He)
     for j=0:He-1
         iRow = (1 + j*nx̂):(nx̂*He)
         iCol = (1:nu) .+ j*nu
-        Gx̂[iRow, iCol] = Âpow_B̂u[1:length(iRow) ,:]
+        Gx̂[iRow, iCol] = @views Âpow_B̂u[1:length(iRow) ,:]
     end
     # --- measured disturbances D ---
-    nĈm_Âpow_B̂d = @views reduce(vcat, nĈm_Âpow[(1+(i*nym)):((i+1)*nym),:]*B̂d for i=0:He-1)
-    J = repeatdiag(-D̂dm, He)
-    for j=1:He-1
-        iRow = (1 + j*nym):(nym*He)
-        iCol = (1:nd) .+ (j-1)*nd
+    nĈm_Âpow_B̂d = reduce(vcat, getpower(nĈm_Âpow3D, i)*B̂d for i=0:He-1)
+    nĈm_Âpow_B̂d = [D̂dm; nĈm_Âpow_B̂d]
+    J = zeros(NT, nym*He, nd*(He+1-p))
+    col_begin = iszero(p) ? 1    : 0
+    col_end   = iszero(p) ? He+1 : He
+    i=0
+    for j=col_begin:col_end-1
+        iRow = (1 + i*nym):(nym*He)
+        iCol = (1:nd) .+ j*nd
         J[iRow, iCol] = nĈm_Âpow_B̂d[1:length(iRow) ,:]
+        i+=1
     end
-    Âpow_B̂d = reduce(vcat, getpower(Âpow3D, i)*B̂d for i=0:He)
-    Jx̂ = zeros(NT, nx̂*He, nd*He)
+    iszero(p) && @views (J[:, 1:nd] = nĈm_Âpow_B̂d[nym+1:end, :])
+    Âpow_B̂d = reduce(vcat, getpower(Âpow3D, i)*B̂d for i=0:He-1)
+    Jx̂ = zeros(NT, nx̂*He, nd*(He+1-p))
     for j=0:He-1
         iRow = (1 + j*nx̂):(nx̂*He)
         iCol = (1:nd) .+ j*nd
@@ -1109,9 +1123,13 @@ function init_predmat_mhe(
     Âpow_csum  = cumsum(Âpow3D, dims=3)
     f̂_op_n_x̂op = (f̂op - x̂op)
     coef_B  = zeros(NT, nym*He, nx̂)
-    for j=1:He-1
-        iRow = (1:nym) .+ nym*j
-        coef_B[iRow,:] = -Ĉm*getpower(Âpow_csum, j-1)
+    row_begin = iszero(p) ? 0    : 1
+    row_end   = iszero(p) ? He-1 : He-2
+    j=0
+    for i=row_begin:row_end
+        iRow = (1:nym) .+ nym*i
+        coef_B[iRow,:] = -Ĉm*getpower(Âpow_csum, j)
+        j+=1
     end
     B = coef_B*f̂_op_n_x̂op
     coef_Bx̂ = Matrix{NT}(undef, nx̂*He, nx̂)
@@ -1125,7 +1143,7 @@ end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref), except for `ex̄`."
 function init_predmat_mhe(
-    model::SimModel{NT}, He, i_ym, Â, _ , _ , _ , _ , _ , _ , _
+    model::SimModel{NT}, He, i_ym, Â, _ , _ , _ , _ , _ , _ , p
 ) where {NT<:Real}
     nym, nx̂ = length(i_ym), size(Â, 2)
     nŵ = nx̂
@@ -1134,7 +1152,7 @@ function init_predmat_mhe(
     Ex̂ = zeros(NT, 0, nx̂ + nŵ*He)
     G  = zeros(NT, 0, model.nu*He)
     Gx̂ = zeros(NT, 0, model.nu*He)
-    J  = zeros(NT, 0, model.nd*He)
+    J  = zeros(NT, 0, model.nd*(He+1-p))
     Jx̂ = zeros(NT, 0, model.nd*He)
     B  = zeros(NT, nym*He)
     Bx̂ = zeros(NT, nx̂*He)

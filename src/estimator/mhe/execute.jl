@@ -1,5 +1,5 @@
 "Reset the data windows and time-varying variables for the moving horizon estimator."
-function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ ) 
+function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0) 
     estim.invP̄      .= inv(estim.P̂_0)
     estim.P̂arr_old  .= estim.P̂_0
     estim.x̂0arr_old .= 0
@@ -13,6 +13,11 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , _ , _ )
     estim.H̃         .= 0
     estim.q̃         .= 0
     estim.p         .= 0
+    if estim.direct
+        # add u0(-1) and d0(-1) to the data windows:
+        estim.U0[1:estim.model.nu] .= u0
+        estim.D0[1:estim.model.nd] .= d0
+    end
     return nothing
 end
 
@@ -22,6 +27,11 @@ end
 Do the same but for [`MovingHorizonEstimator`](@ref) objects.
 """
 function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
+    if estim.direct
+        add_data_windows!(estim, y0m, d0)
+        estim.Nk[] == estim.He && correct_cov!(estim)
+        optim_objective!(estim)
+    end
     return nothing
 end
 
@@ -38,8 +48,17 @@ arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is
 using `estim.covestim` object.
 """
 function update_estimate!(estim::MovingHorizonEstimator{NT}, y0m, d0, u0) where NT<:Real
+    add_data_windows!(estim, y0m, d0)
+    add_data_windowU!(estim, u0)
+    if !estim.direct
+        optim_objective!(mhe)
+    end
+    estim.Nk[] == estim.He && update_cov!(estim)
+    return nothing
+end
+
+function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim, x̂0 = estim.model, estim.optim, estim.x̂0
-    add_data_windows!(estim::MovingHorizonEstimator, u0, d0, y0m)
     initpred!(estim, model)
     linconstraint!(estim, model)
     nu, ny = model.nu, model.ny
@@ -90,12 +109,10 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, y0m, d0, u0) where 
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
     V̂, X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
-    Nk == estim.He && update_cov!(estim::MovingHorizonEstimator)
     x̂0next    = X̂0[end-nx̂+1:end] 
     estim.x̂0 .= x̂0next
     return nothing
 end
-
 
 @doc raw"""
     getinfo(estim::MovingHorizonEstimator) -> info
@@ -196,9 +213,9 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
 end
 
 "Add data to the observation windows of the moving horizon estimator."
-function add_data_windows!(estim::MovingHorizonEstimator, u0, d0, y0m)
+function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0)
     model = estim.model
-    nx̂, nym, nu, nd, nŵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.nx̂
+    nx̂, nym, nd, nŵ = estim.nx̂, estim.nym, model.nd, estim.nx̂
     x̂0, ŵ = estim.x̂0, 0 # ŵ(k) = 0 for warm-starting
     estim.Nk .+= 1
     Nk = estim.Nk[]
@@ -207,8 +224,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, u0, d0, y0m)
         estim.X̂0[end-nx̂+1:end]   .= x̂0
         estim.Y0m[1:end-nym]     .= @views estim.Y0m[nym+1:end]
         estim.Y0m[end-nym+1:end] .= y0m
-        estim.U0[1:end-nu]       .= @views estim.U0[nu+1:end]
-        estim.U0[end-nu+1:end]   .= u0
         estim.D0[1:end-nd]       .= @views estim.D0[nd+1:end]
         estim.D0[end-nd+1:end]   .= d0
         estim.Ŵ[1:end-nŵ]        .= @views estim.Ŵ[nŵ+1:end]
@@ -217,13 +232,26 @@ function add_data_windows!(estim::MovingHorizonEstimator, u0, d0, y0m)
     else
         estim.X̂0[(1 + nx̂*(Nk-1)):(nx̂*Nk)]    .= x̂0
         estim.Y0m[(1 + nym*(Nk-1)):(nym*Nk)] .= y0m
-        estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]    .= u0
         estim.D0[(1 + nd*(Nk-1)):(nd*Nk)]    .= d0
         estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]     .= ŵ
     end
     estim.x̂0arr_old .= @views estim.X̂0[1:nx̂]
     return nothing
 end
+
+function add_data_windowU!(estim::MovingHorizonEstimator, u0)
+    model = estim.model
+    nu = model.nu
+    estim.Nk .+= 1
+    Nk = estim.Nk[]
+    if Nk > estim.He
+        estim.U0[1:end-nu]       .= @views estim.U0[nu+1:end]
+        estim.U0[end-nu+1:end]   .= u0
+    else
+        estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]    .= u0
+    end
+end
+    
 
 @doc raw"""
     initpred!(estim::MovingHorizonEstimator, model::LinModel) -> nothing
@@ -364,6 +392,18 @@ function trunc_bounds(estim::MovingHorizonEstimator{NT}, Bmin, Bmax, n) where NT
         Bmax_t = Bmax
     end
     return Bmin_t, Bmax_t
+end
+
+"Correct the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
+function correct_cov!(estim::MovingHorizonEstimator)
+    nym, nd = estim.nym, estim.model.nd
+    y0marr, d0arr = @views estim.Y0m[1:nym], estim.D0[1:nd]
+    estim.covestim.x̂0 .= estim.x̂0arr_old
+    estim.covestim.P̂  .= estim.P̂arr_old
+    correct_estimate!(estim.covestim, y0marr, d0arr)
+    estim.P̂arr_old .= estim.covestim.P̂
+    estim.invP̄     .= inv(estim.P̂arr_old)
+    return nothing
 end
 
 "Update the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
