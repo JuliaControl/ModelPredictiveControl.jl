@@ -181,38 +181,35 @@ distribution is not approximated like the [`UnscentedKalmanFilter`](@ref). The c
 costs are drastically higher, however, since it minimizes the following objective function
 at each discrete time ``k``:
 ```math
-\min_{\mathbf{x̂}_k(k-M_k+p), \mathbf{Ŵ}, ϵ}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
-                                            + \mathbf{Ŵ}' \mathbf{Q̂}_{M_k}^{-1} \mathbf{Ŵ}  
+\min_{\mathbf{x̂}_k(k-N_k+p), \mathbf{Ŵ}, ϵ}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
+                                            + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
                                             + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
                                             + C ϵ^2
 ```
 in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
 ```math
 \begin{aligned}
-    \mathbf{x̄} &= \mathbf{x̂}_{k-N_k}(k-M_k+p) - \mathbf{x̂}_k(k-M_k+p) \\
-    \mathbf{P̄} &= \mathbf{P̂}_{k-N_k}(k-M_k+p)
+    \mathbf{x̄} &= \mathbf{x̂}_{k-N_k}(k-N_k+p) - \mathbf{x̂}_k(k-N_k+p) \\
+    \mathbf{P̄} &= \mathbf{P̂}_{k-N_k}(k-N_k+p)
 \end{aligned}
 ```
-and the covariances are repeated ``M_k`` or ``N_k`` times:
+and the covariances are repeated``N_k`` times:
 ```math
 \begin{aligned}
-    \mathbf{Q̂}_{M_k} &= \text{diag}\mathbf{(Q̂,Q̂,...,Q̂)}  \\
+    \mathbf{Q̂}_{N_k} &= \text{diag}\mathbf{(Q̂,Q̂,...,Q̂)}  \\
     \mathbf{R̂}_{N_k} &= \text{diag}\mathbf{(R̂,R̂,...,R̂)} 
 \end{aligned}
 ```
-The estimation horizon ``H_e`` limits the number of process and sensor noises: 
+The estimation horizon ``H_e`` limits the window length:
 ```math
-M_k =                     \begin{cases} 
-    k + p   &  k < H_e    \\
-    H_e     &  k ≥ H_e    \end{cases}       \quad \text{and} \quad
 N_k =                     \begin{cases}
     k + 1   &  k < H_e    \\
     H_e     &  k ≥ H_e    \end{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` respectively encompass the estimated process
-noises ``\mathbf{ŵ}(k-j+p)`` from ``j=M_k`` to ``1`` and sensor noises ``\mathbf{v̂}(k-j+1)``
+noises ``\mathbf{ŵ}(k-j+p)`` from ``j=N_k`` to ``1`` and sensor noises ``\mathbf{v̂}(k-j+1)``
 from ``j=N_k`` to ``1``. The Extended Help defines the two vectors, the slack variable
-``ϵ``, and the estimation of the covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-M_k+p)``. If
+``ϵ``, and the estimation of the covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If
 the keyword argument `direct=true` (default value), the constant ``p=0`` in the equations
 above, and the MHE is in the current form. Else ``p=1``, leading to the prediction form.
 
@@ -254,8 +251,8 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     ```math
     \mathbf{Ŵ} = 
     \begin{bmatrix}
-        \mathbf{ŵ}(k-M_k+p+0)     \\
-        \mathbf{ŵ}(k-M_k+p+1)     \\
+        \mathbf{ŵ}(k-N_k+p+0)     \\
+        \mathbf{ŵ}(k-N_k+p+1)     \\
         \vdots                  \\
         \mathbf{ŵ}(k+p-1)
     \end{bmatrix} , \quad
@@ -274,14 +271,15 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
         \mathbf{x̂}_k(k-j+1) &= \mathbf{f̂}\Big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\Big) + \mathbf{ŵ}(k-j)
     \end{aligned}
     ```
-    The constant ``p`` equals to `!direct`. In other words, ``\mathbf{Ŵ}`` does not include
-    the current estimated process noise if `direct==true`. The non-default prediction form
+    The constant ``p`` equals to `!direct`. In other words, ``\mathbf{Ŵ}`` and ``\mathbf{V̂}``
+    are shifted by one time step if `direct==true`. The non-default prediction form
     with ``p=1`` is particularly useful for the MHE since it moves its expensive
     computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
-    `direct=false`. The current form with ``p=0`` has the particular aspect that the arrival
-    covariance switch from an *a priori* estimate ``\mathbf{P̂}_{k-1}(k)`` to *a
-    posteriori*[^2] ``\mathbf{P̂}_k(k)`` when ``k=H_e``.
+    `direct=false`. Note that contrarily to all the other estimators, the MHE in its current
+    form with ``p=0`` interprets the initial state estimate and covariance as 
+    ``\mathbf{x̂}_{-1}(-1)`` and ``\mathbf{P̂}_{-1}(-1)``, that is, an *a posteriori*
+    estimate[^2] for the last time step. 
 
     [^2]: M. Hovd (2012), "A Note On The Smoothing Formulation Of Moving Horizon Estimation",
           *Facta Universitatis*, Vol. 11 №2.
@@ -292,7 +290,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     state and sensor noise). 
     
     The optimization and the estimation of the covariance at arrival 
-    ``\mathbf{P̂}_{k-N_k}(k-M_k+p)`` depend on `model`:
+    ``\mathbf{P̂}_{k-N_k}(k-N_k+p)`` depend on `model`:
 
     - If `model` is a [`LinModel`](@ref), the optimization is treated as a quadratic program
       with a time-varying Hessian, which is generally cheaper than nonlinear programming. By
@@ -914,8 +912,8 @@ end
 Construct the [`MovingHorizonEstimator`](@ref) prediction matrices for [`LinModel`](@ref) `model`.
 
 We first introduce the deviation vector of the estimated state at arrival 
-``\mathbf{x̂_0}(k-M_k+p) = \mathbf{x̂}_k(k-M_k+p) - \mathbf{x̂_{op}}`` (see [`setop!`](@ref)),
-and the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂_0}(k-M_k+p)
+``\mathbf{x̂_0}(k-N_k+p) = \mathbf{x̂}_k(k-N_k+p) - \mathbf{x̂_{op}}`` (see [`setop!`](@ref)),
+and the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂_0}(k-N_k+p)
 \\ \mathbf{Ŵ} \end{smallmatrix}]`` with the decision variables. Setting the constant ``p=0``
 produces an estimator in the current form, while the prediction form is obtained with
 ``p=1``. The estimated sensor noises from time ``k-N_k+1`` to ``k`` are computed by:
@@ -926,21 +924,21 @@ produces an estimator in the current form, while the prediction form is obtained
 \end{aligned}
 ```
 in which ``\mathbf{U_0}`` and ``\mathbf{Y_0^m}`` respectively include the deviation values of
-the manipulated inputs ``\mathbf{u_0}(k-j+p)`` from ``j=M_k`` to ``1`` and measured outputs
+the manipulated inputs ``\mathbf{u_0}(k-j+p)`` from ``j=N_k`` to ``1`` and measured outputs
 ``\mathbf{y_0^m}(k-j+1)`` from ``j=N_k`` to ``1``. The vector ``\mathbf{D_0}`` comprises one 
 additional measured disturbance if ``p=0``, that is, it includes the deviation vectors
-``\mathbf{d_0}(k-j+1)`` from ``j=M_k+1-p`` to ``1``. The constant ``\mathbf{B}`` is the
+``\mathbf{d_0}(k-j+1)`` from ``j=N_k+1-p`` to ``1``. The constant ``\mathbf{B}`` is the
 contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}``
 operating points (for linearization, see [`augment_model`](@ref) and [`linearize`](@ref)).
 The method also returns the matrices for the estimation error at arrival:
 ```math
-    \mathbf{x̄} = \mathbf{x̂_0^†}(k-M_k+p) - \mathbf{x̂_0}(k-M_k+p) = \mathbf{e_x̄ Z + f_x̄}
+    \mathbf{x̄} = \mathbf{x̂_0^†}(k-N_k+p) - \mathbf{x̂_0}(k-N_k+p) = \mathbf{e_x̄ Z + f_x̄}
 ```
 in which ``\mathbf{e_x̄} = [\begin{smallmatrix} -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{smallmatrix}]``,
-and ``\mathbf{f_x̄} = \mathbf{x̂_0^†}(k-M_k+p)``. The latter is the deviation vector of the
-state at arrival, estimated at time ``k-N_k``, i.e. ``\mathbf{x̂_0^†}(k-M_k+p) = 
-\mathbf{x̂}_{k-N_k}(k-M_k+p) - \mathbf{x̂_{op}}``. Lastly, the estimates ``\mathbf{x̂_0}(k-j+p)``
-from ``j=M_k-1`` to ``0``, also in deviation form, are computed with:
+and ``\mathbf{f_x̄} = \mathbf{x̂_0^†}(k-N_k+p)``. The latter is the deviation vector of the
+state at arrival, estimated at time ``k-N_k``, i.e. ``\mathbf{x̂_0^†}(k-N_k+p) = 
+\mathbf{x̂}_{k-N_k}(k-N_k+p) - \mathbf{x̂_{op}}``. Lastly, the estimates ``\mathbf{x̂_0}(k-j+p)``
+from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
 ```math
 \begin{aligned}
     \mathbf{X̂_0}  &= \mathbf{E_x̂ Z + G_x̂ U_0 + J_x̂ D_0 + B_x̂} \\
@@ -950,9 +948,9 @@ from ``j=M_k-1`` to ``0``, also in deviation form, are computed with:
 
 # Extended Help
 !!! details "Extended Help"
-    Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ^m, B̂_d, D̂_d^m}``, and the function 
-    ``\mathbf{S}(j) = ∑_{i=0}^j \mathbf{Â}^i``, the prediction matrices for the sensor
-    noises depend on the constant ``p``. For ``p=0``, the matrices are computed by:
+    Using the augmented process model matrices ``\mathbf{Â, B̂_u, Ĉ^m, B̂_d, D̂_d^m}``, and the
+    function ``\mathbf{S}(j) = ∑_{i=0}^j \mathbf{Â}^i``, the prediction matrices for the
+    sensor noises depend on the constant ``p``. For ``p=0``, the matrices are computed by:
     ```math
     \begin{aligned}
     \mathbf{E} &= - \begin{bmatrix}
@@ -1006,7 +1004,7 @@ from ``j=M_k-1`` to ``0``, also in deviation form, are computed with:
     ```math
     \begin{aligned}
     \mathbf{E_x̂} &= \begin{bmatrix}
-        \mathbf{Â}^{1}                      & \mathbf{I}                        & \cdots & \mathbf{0}                   \\
+        \mathbf{Â}^{1}                      & \mathbf{A}^{0}                    & \cdots & \mathbf{0}                   \\
         \mathbf{Â}^{2}                      & \mathbf{Â}^{1}                    & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e}                    & \mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Â}^{1}               \end{bmatrix} \\
@@ -1036,42 +1034,38 @@ function init_predmat_mhe(
     nym, nx̂ = length(i_ym), size(Â, 2)
     nŵ = nx̂
     # --- pre-compute matrix powers ---
-    # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,He+1] = A^He
-    Âpow = Array{NT}(undef, nx̂, nx̂, He+1)
-    Âpow[:,:,1] = I(nx̂)
+    # Apow3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,He+1] = A^He
+    Âpow3D = Array{NT}(undef, nx̂, nx̂, He+1)
+    Âpow3D[:,:,1] = I(nx̂)
     for j=2:He+1
-        Âpow[:,:,j] = @views Âpow[:,:,j-1]*Â
+        Âpow3D[:,:,j] = @views Âpow3D[:,:,j-1]*Â
+    end
+    # nĈm_Âpow3D array : similar indices as Apow3D
+    nĈm_Âpow3D = Array{NT}(undef, nym, nx̂, He+1)
+    nĈm_Âpow3D[:,:,1] = -Ĉm
+    for j=2:He+1
+        nĈm_Âpow3D[:,:,j] = @views -Ĉm*Âpow3D[:,:,j]
     end
     # helper function to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
-
-    # TODO: WIP, rendu ici:
-    nĈm_Âpow = Array{NT}(undef, nym, nx̂, He+1)
-    nĈm_Âpow[:,:,1] = Ĉm
-    for j=2:He+1
-        nĈm_Âpow[:,:,j] = Ĉm*Âpow[:,:,j]
-    end
-
     # --- decision variables Z ---
-
-
-
-
-
-
-    # TODO: ça marche pas, nĈm_Âpow n'incluera pas Ĉm*Â^0 quand K=0, à changer:
-    i_first = (p == 0) ? 1 : 0
-    i_last  = (p == 0) ? He : He-1
-    nĈm_Âpow = reduce(vcat, -Ĉm*getpower(Âpow, i) for i=i_first:i_last)
+    nĈm_Âpow = reduce(vcat, getpower(nĈm_Âpow3D, i) for i=0:He)
     E = zeros(NT, nym*He, nx̂ + nŵ*He)
-    E[:, 1:nx̂] = nĈm_Âpow
-    for j=1:He-1
-        iRow = (1 + j*nym):(nym*He)
-        iCol = (1:nŵ) .+ (j-1)*nŵ .+ nx̂
-        E[iRow, iCol] = nĈm_Âpow[1:length(iRow) ,:]
+    col_begin = iszero(p) ? 1    : 0
+    col_end   = iszero(p) ? He : He-1
+    i = 0
+    for j=col_begin:col_end
+        iRow = (1 + i*nym):(nym*He)
+        iCol = (1:nŵ) .+ j*nŵ
+        E[iRow, iCol] = @views nĈm_Âpow[1:length(iRow) ,:]
+        i += 1
     end
+    iszero(p) && (E[:, 1:nx̂] = @views nĈm_Âpow[nym+1:end, :])
+    display(E)
+    # TODO: je suis rendu ici vérifier si E est correct et continuer!
+
     ex̄ = [-I zeros(NT, nx̂, nŵ*He)]
-    Âpow_vec = reduce(vcat, getpower(Âpow, i) for i=0:He)
+    Âpow_vec = reduce(vcat, getpower(Âpow3D, i) for i=0:He)
     Ex̂ = zeros(NT, nx̂*He, nx̂ + nŵ*He)
     Ex̂[:, 1:nx̂] = Âpow_vec[nx̂+1:end, :]
     for j=0:He-1
@@ -1088,7 +1082,7 @@ function init_predmat_mhe(
         iCol = (1:nu) .+ (j-1)*nu
         G[iRow, iCol] = nĈm_Âpow_B̂u[1:length(iRow) ,:]
     end
-    Âpow_B̂u = reduce(vcat, getpower(Âpow, i)*B̂u for i=0:He)
+    Âpow_B̂u = reduce(vcat, getpower(Âpow3D, i)*B̂u for i=0:He)
     Gx̂ = zeros(NT, nx̂*He, nu*He)
     for j=0:He-1
         iRow = (1 + j*nx̂):(nx̂*He)
@@ -1103,7 +1097,7 @@ function init_predmat_mhe(
         iCol = (1:nd) .+ (j-1)*nd
         J[iRow, iCol] = nĈm_Âpow_B̂d[1:length(iRow) ,:]
     end
-    Âpow_B̂d = reduce(vcat, getpower(Âpow, i)*B̂d for i=0:He)
+    Âpow_B̂d = reduce(vcat, getpower(Âpow3D, i)*B̂d for i=0:He)
     Jx̂ = zeros(NT, nx̂*He, nd*He)
     for j=0:He-1
         iRow = (1 + j*nx̂):(nx̂*He)
@@ -1112,7 +1106,7 @@ function init_predmat_mhe(
     end
     # --- state x̂op and state update f̂op operating points ---
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
-    Âpow_csum  = cumsum(Âpow, dims=3)
+    Âpow_csum  = cumsum(Âpow3D, dims=3)
     f̂_op_n_x̂op = (f̂op - x̂op)
     coef_B  = zeros(NT, nym*He, nx̂)
     for j=1:He-1
