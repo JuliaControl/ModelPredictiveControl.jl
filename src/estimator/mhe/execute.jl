@@ -54,7 +54,7 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, y0m, d0, u0) where 
     else
         add_data_windows!(estim, y0m, d0)
         add_data_windowU!(estim, u0)
-        optim_objective!(mhe)
+        optim_objective!(estim)
     end
     estim.Nk[] == estim.He && update_cov!(estim)
     return nothing
