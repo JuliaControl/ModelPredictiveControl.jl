@@ -773,11 +773,11 @@ end
 
     mhe7 = MovingHorizonEstimator(nonlinmodel, He=10)
     @test mhe7.He == 10
-    @test length(mhe7.X̂0)  == 10*6
-    @test length(mhe7.Y0m) == 10*2
-    @test length(mhe7.U0)  == 10*2
-    @test length(mhe7.D0)  == 10*1
-    @test length(mhe7.Ŵ)  == 10*6
+    @test length(mhe7.X̂0)  == mhe7.He*6
+    @test length(mhe7.Y0m) == mhe7.He*2
+    @test length(mhe7.U0)  == mhe7.He*2
+    @test length(mhe7.D0)  == (mhe7.He+mhe7.direct)*1
+    @test length(mhe7.Ŵ)   == mhe7.He*6
 
     mhe8 = MovingHorizonEstimator(nonlinmodel, He=5, nint_u=[1, 1], nint_ym=[0, 0])
     @test mhe8.nxs == 2
