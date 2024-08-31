@@ -1,8 +1,5 @@
 "Reset the data windows and time-varying variables for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0) 
-    estim.invP̄      .= inv(estim.P̂_0)
-    estim.P̂arr_old  .= estim.P̂_0
-    estim.x̂0arr_old .= 0
     estim.Z̃         .= 0
     estim.X̂0        .= 0
     estim.Y0m       .= 0
@@ -18,6 +15,10 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
         estim.U0[1:estim.model.nu] .= u0
         estim.D0[1:estim.model.nd] .= d0
     end
+    # estim.P̂_0 is in fact P̂(-1|-1) is estim.direct==false, else P̂(-1|0)
+    estim.invP̄      .= inv(estim.P̂_0)
+    estim.P̂arr_old  .= estim.P̂_0
+    estim.x̂0arr_old .= 0
     return nothing
 end
 
@@ -48,15 +49,40 @@ arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is
 using `estim.covestim` object.
 """
 function update_estimate!(estim::MovingHorizonEstimator{NT}, y0m, d0, u0) where NT<:Real
-    add_data_windows!(estim, y0m, d0)
-    add_data_windowU!(estim, u0)
-    if !estim.direct
+    if estim.direct
+        add_data_windowU!(estim, u0)
+    else
+        add_data_windows!(estim, y0m, d0)
+        add_data_windowU!(estim, u0)
         optim_objective!(mhe)
     end
     estim.Nk[] == estim.He && update_cov!(estim)
     return nothing
 end
 
+@doc raw"""
+    optim_objective!(estim::MovingHorizonEstimator) -> Z̃
+
+Optimize objective of `estim` [`MovingHorizonEstimator`](@ref) and return the solution `Z̃`.
+
+If supported by `estim.optim`, it warm-starts the solver at:
+```math
+\mathbf{Z̃} = 
+\begin{bmatrix}
+    ϵ_{k-1}                         \\
+    \mathbf{x̂}_{k-1}(k-N_k+p)       \\ 
+    \mathbf{ŵ}_{k-1}(k-N_k+p+0)     \\ 
+    \mathbf{ŵ}_{k-1}(k-N_k+p+1)     \\ 
+    \vdots                          \\
+    \mathbf{ŵ}_{k-1}(k-p-1)         \\
+    \mathbf{0}                      \\
+\end{bmatrix}
+```
+where ``\mathbf{ŵ}_{k-1}(k-j)`` is the input increment for time ``k-j`` computed at the 
+last time step ``k-1``. It then calls `JuMP.optimize!(estim.optim)` and extract the
+solution. A failed optimization prints an `@error` log in the REPL and returns the 
+warm-start value.
+"""
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim, x̂0 = estim.model, estim.optim, estim.x̂0
     initpred!(estim, model)
@@ -111,7 +137,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     V̂, X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
     x̂0next    = X̂0[end-nx̂+1:end] 
     estim.x̂0 .= x̂0next
-    return nothing
+    return estim.Z̃
 end
 
 @doc raw"""
@@ -119,8 +145,9 @@ end
 
 Get additional info on `estim` [`MovingHorizonEstimator`](@ref) optimum for troubleshooting.
 
-The function should be called after calling [`updatestate!`](@ref). It returns the
-dictionary `info` with the following fields:
+If `estim.direct == false`, the function should be called after calling [`updatestate!`](@ref). 
+Otherwise, call it after [`preparestate!`](@ref). It returns the dictionary `info` with the
+following fields:
 
 !!! info
     Fields with *`emphasis`* are non-Unicode alternatives.
@@ -212,11 +239,11 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     return info
 end
 
-"Add data to the observation windows of the moving horizon estimator."
+"Add data to the observation windows of the moving horizon estimator and clamp `estim.Nk`."
 function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0)
     model = estim.model
     nx̂, nym, nd, nŵ = estim.nx̂, estim.nym, model.nd, estim.nx̂
-    x̂0, ŵ = estim.x̂0, 0 # ŵ(k) = 0 for warm-starting
+    x̂0, ŵ = estim.x̂0, 0 # ŵ(k+p-1) = 0 for warm-starting
     estim.Nk .+= 1
     Nk = estim.Nk[]
     if Nk > estim.He
@@ -239,10 +266,9 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0)
     return nothing
 end
 
+"Add input data `u0` to its window for the moving horizon estimator."
 function add_data_windowU!(estim::MovingHorizonEstimator, u0)
-    model = estim.model
-    nu = model.nu
-    estim.Nk .+= 1
+    nu = estim.model.nu
     Nk = estim.Nk[]
     if Nk > estim.He
         estim.U0[1:end-nu]       .= @views estim.U0[nu+1:end]
@@ -252,7 +278,6 @@ function add_data_windowU!(estim::MovingHorizonEstimator, u0)
     end
 end
     
-
 @doc raw"""
     initpred!(estim::MovingHorizonEstimator, model::LinModel) -> nothing
 
