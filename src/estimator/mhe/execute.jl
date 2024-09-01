@@ -30,7 +30,9 @@ Do the same but for [`MovingHorizonEstimator`](@ref) objects.
 function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
     if estim.direct
         add_data_windows!(estim, y0m, d0)
-        estim.Nk[] == estim.He && correct_cov!(estim)
+        initpred!(estim, estim.model)
+        linconstraint!(estim, estim.model)
+        correct_cov!(estim)
         optim_objective!(estim)
     end
     return nothing
@@ -54,9 +56,11 @@ function update_estimate!(estim::MovingHorizonEstimator{NT}, y0m, d0, u0) where 
     else
         add_data_windows!(estim, y0m, d0)
         add_data_windowU!(estim, u0)
+        initpred!(estim, estim.model)
+        linconstraint!(estim, estim.model)
         optim_objective!(estim)
     end
-    estim.Nk[] == estim.He && update_cov!(estim)
+    update_cov!(estim)
     return nothing
 end
 
@@ -85,8 +89,6 @@ warm-start value.
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim, x̂0 = estim.model, estim.optim, estim.x̂0
-    initpred!(estim, model)
-    linconstraint!(estim, model)
     nu, ny = model.nu, model.ny
     nx̂, nym, nŵ, nϵ, Nk = estim.nx̂, estim.nym, estim.nx̂, estim.nϵ, estim.Nk[]
     nx̃ = nϵ + nx̂
@@ -421,25 +423,29 @@ end
 
 "Correct the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
 function correct_cov!(estim::MovingHorizonEstimator)
-    nym, nd = estim.nym, estim.model.nd
-    y0marr, d0arr = @views estim.Y0m[1:nym], estim.D0[1:nd]
-    estim.covestim.x̂0 .= estim.x̂0arr_old
-    estim.covestim.P̂  .= estim.P̂arr_old
-    correct_estimate!(estim.covestim, y0marr, d0arr)
-    estim.P̂arr_old .= estim.covestim.P̂
-    estim.invP̄     .= inv(estim.P̂arr_old)
+    if estim.Nk[] == estim.He
+        nym, nd = estim.nym, estim.model.nd
+        y0marr, d0arr = @views estim.Y0m[1:nym], estim.D0[1:nd]
+        estim.covestim.x̂0 .= estim.x̂0arr_old
+        estim.covestim.P̂  .= estim.P̂arr_old
+        correct_estimate!(estim.covestim, y0marr, d0arr)
+        estim.P̂arr_old .= estim.covestim.P̂
+        estim.invP̄     .= inv(estim.P̂arr_old)
+    end
     return nothing
 end
 
 "Update the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
 function update_cov!(estim::MovingHorizonEstimator)
-    nu, nd, nym = estim.model.nu, estim.model.nd, estim.nym
-    u0arr, y0marr, d0arr = @views estim.U0[1:nu], estim.Y0m[1:nym], estim.D0[1:nd]
-    estim.covestim.x̂0 .= estim.x̂0arr_old
-    estim.covestim.P̂  .= estim.P̂arr_old
-    update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
-    estim.P̂arr_old    .= estim.covestim.P̂
-    estim.invP̄        .= inv(estim.P̂arr_old)
+    if estim.Nk[] == estim.He
+        nu, nd, nym = estim.model.nu, estim.model.nd, estim.nym
+        u0arr, y0marr, d0arr = @views estim.U0[1:nu], estim.Y0m[1:nym], estim.D0[1:nd]
+        estim.covestim.x̂0 .= estim.x̂0arr_old
+        estim.covestim.P̂  .= estim.P̂arr_old
+        update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
+        estim.P̂arr_old    .= estim.covestim.P̂
+        estim.invP̄        .= inv(estim.P̂arr_old)
+    end
     return nothing
 end
 
