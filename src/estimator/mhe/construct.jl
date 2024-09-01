@@ -1099,7 +1099,7 @@ function init_predmat_mhe(
     end
     # --- measured disturbances D ---
     nĈm_Âpow_B̂d = reduce(vcat, getpower(nĈm_Âpow3D, i)*B̂d for i=0:He-1)
-    nĈm_Âpow_B̂d = [D̂dm; nĈm_Âpow_B̂d]
+    nĈm_Âpow_B̂d = [-D̂dm; nĈm_Âpow_B̂d]
     J = zeros(NT, nym*He, nd*(He+1-p))
     col_begin = iszero(p) ? 1    : 0
     col_end   = iszero(p) ? He+1 : He
