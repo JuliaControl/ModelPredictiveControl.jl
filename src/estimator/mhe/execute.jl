@@ -271,9 +271,8 @@ end
 # TODO: aussi ajouter ŵ et x̂ ici. puisqu'ils sont aussi décalés si direct == true
 "Add input data `u0` to its window for the moving horizon estimator."
 function add_data_windowU!(estim::MovingHorizonEstimator, u0)
-    nu = estim.model.nu
-    Nk = estim.Nk[]
-    if Nk > estim.He
+    nu, Nk = estim.model.nu, estim.Nk[]
+    if Nk == estim.He
         estim.U0[1:end-nu]       .= @views estim.U0[nu+1:end]
         estim.U0[end-nu+1:end]   .= u0
     else
