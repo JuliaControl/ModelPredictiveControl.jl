@@ -1089,7 +1089,7 @@ function init_predmat_mhe(
         G[iRow, iCol] = @views nĈm_Âpow_B̂u[1:length(iRow) ,:]
         i+=1
     end
-    G[:, 1:nu] = @views nĈm_Âpow_B̂u[nym+1:end, :]
+    iszero(p) && @views (G[:, 1:nu] = nĈm_Âpow_B̂u[nym+1:end, :])
     Âpow_B̂u = reduce(vcat, getpower(Âpow3D, i)*B̂u for i=0:He-1)
     Gx̂ = zeros(NT, nx̂*He, nu*He)
     for j=0:He-1
