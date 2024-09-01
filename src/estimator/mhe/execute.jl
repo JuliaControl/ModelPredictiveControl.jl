@@ -268,6 +268,7 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0)
     return nothing
 end
 
+# TODO: aussi ajouter ŵ et x̂ ici. puisqu'ils sont aussi décalés si direct == true
 "Add input data `u0` to its window for the moving horizon estimator."
 function add_data_windowU!(estim::MovingHorizonEstimator, u0)
     nu = estim.model.nu
