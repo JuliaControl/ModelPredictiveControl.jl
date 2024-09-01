@@ -138,7 +138,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
     V̂, X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
-    x̂0next    = X̂0[end-nx̂+1:end] 
+    x̂0next    = @views X̂0[end-nx̂+1:end] 
     estim.x̂0 .= x̂0next
     return estim.Z̃
 end
