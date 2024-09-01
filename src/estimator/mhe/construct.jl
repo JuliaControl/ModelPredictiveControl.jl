@@ -104,6 +104,7 @@ struct MovingHorizonEstimator{
     x̂0arr_old::Vector{NT}
     P̂arr_old ::Hermitian{NT, Matrix{NT}}
     Nk::Vector{Int}
+    moving::Vector{Bool}
     direct::Bool
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
@@ -149,6 +150,7 @@ struct MovingHorizonEstimator{
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(P̂_0)
         Nk = [0]
+        moving = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         corrected = [false]
         estim = new{NT, SM, JM, CE}(
@@ -162,7 +164,7 @@ struct MovingHorizonEstimator{
             H̃, q̃, p,
             P̂_0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He, Cwt,
             X̂op, X̂0, Y0m, U0, D0, Ŵ, 
-            x̂0arr_old, P̂arr_old, Nk,
+            x̂0arr_old, P̂arr_old, Nk, moving,
             direct, corrected,
             buffer
         )

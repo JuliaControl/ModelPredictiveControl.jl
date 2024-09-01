@@ -7,6 +7,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     estim.D0        .= 0
     estim.Ŵ         .= 0
     estim.Nk        .= 0
+    estim.moving    .= 0
     estim.H̃         .= 0
     estim.q̃         .= 0
     estim.p         .= 0
@@ -246,9 +247,15 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0)
     model = estim.model
     nx̂, nym, nd, nŵ = estim.nx̂, estim.nym, model.nd, estim.nx̂
     x̂0, ŵ = estim.x̂0, 0 # ŵ(k+p-1) = 0 for warm-starting
-    estim.Nk .+= 1
-    Nk = estim.Nk[]
-    if Nk > estim.He
+    Nk, moving = estim.Nk[], estim.moving[]
+    if Nk < estim.He
+        estim.Nk .+= 1
+        Nk = estim.Nk[]
+    else
+        estim.moving .= true
+        moving = estim.moving[]
+    end
+    if moving
         estim.X̂0[1:end-nx̂]       .= @views estim.X̂0[nx̂+1:end]
         estim.X̂0[end-nx̂+1:end]   .= x̂0
         estim.Y0m[1:end-nym]     .= @views estim.Y0m[nym+1:end]
@@ -257,7 +264,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0)
         estim.D0[end-nd+1:end]   .= d0
         estim.Ŵ[1:end-nŵ]        .= @views estim.Ŵ[nŵ+1:end]
         estim.Ŵ[end-nŵ+1:end]    .= ŵ
-        estim.Nk .= estim.He
     else
         estim.X̂0[(1 + nx̂*(Nk-1)):(nx̂*Nk)]    .= x̂0
         estim.Y0m[(1 + nym*(Nk-1)):(nym*Nk)] .= y0m
@@ -271,8 +277,8 @@ end
 # TODO: aussi ajouter ŵ et x̂ ici. puisqu'ils sont aussi décalés si direct == true
 "Add input data `u0` to its window for the moving horizon estimator."
 function add_data_windowU!(estim::MovingHorizonEstimator, u0)
-    nu, Nk = estim.model.nu, estim.Nk[]
-    if Nk == estim.He
+    nu, Nk, moving = estim.model.nu, estim.Nk[], estim.moving[]
+    if moving
         estim.U0[1:end-nu]       .= @views estim.U0[nu+1:end]
         estim.U0[end-nu+1:end]   .= u0
     else
