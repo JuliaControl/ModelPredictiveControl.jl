@@ -1105,7 +1105,7 @@ end
 @testset "MovingHorizonEstimator set model" begin
     linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
     linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
-    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0)
+    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, direct=false)
     setconstraint!(mhe, x̂min=[-1000], x̂max=[1000])
     @test mhe.Â ≈ [0.5]
     @test evaloutput(mhe) ≈ [50.0]
