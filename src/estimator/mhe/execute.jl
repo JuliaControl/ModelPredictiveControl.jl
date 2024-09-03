@@ -182,8 +182,10 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     if ismoving
         estim.Y0m[1:end-nym]     .= @views estim.Y0m[nym+1:end]
         estim.Y0m[end-nym+1:end] .= y0m
-        estim.D0[1:end-nd]       .= @views estim.D0[nd+1:end]
-        estim.D0[end-nd+1:end]   .= d0
+        if nd ≠ 0
+            estim.D0[1:end-nd]       .= @views estim.D0[nd+1:end]
+            estim.D0[end-nd+1:end]   .= d0
+        end
         estim.U0[1:end-nu]       .= @views estim.U0[nu+1:end]
         estim.U0[end-nu+1:end]   .= u0
         estim.X̂0[1:end-nx̂]       .= @views estim.X̂0[nx̂+1:end]
@@ -193,7 +195,10 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.Nk .= estim.He
     else
         estim.Y0m[(1 + nym*(Nk-1)):(nym*Nk)]  .= y0m
-        estim.D0[(1 + nd*(Nk-p)):(nd*Nk+1-p)] .= d0   # D0 include 1 addition. meas. if direct
+        if nd ≠ 0
+            # D0 include 1 additional measured disturbance if direct==true (p==0):
+            estim.D0[(1 + nd*(Nk-p)):(nd*Nk+1-p)] .= d0 
+        end  
         estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]     .= u0
         estim.X̂0[(1 + nx̂*(Nk-1)):(nx̂*Nk)]     .= x̂0
         estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]      .= ŵ
