@@ -50,7 +50,7 @@ augmented model from ``j = N_k-1`` to ``0`` inclusively. Afterward, if ``k ≥ H
 arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is estimated
 using `estim.covestim` object.
 """
-function update_estimate!(estim::MovingHorizonEstimator{NT}, y0m, d0, u0) where NT<:Real
+function update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0)
     if !estim.direct
         add_data_windows!(estim, y0m, d0, u0)
         initpred!(estim, estim.model)
@@ -66,8 +66,8 @@ end
 
 Get additional info on `estim` [`MovingHorizonEstimator`](@ref) optimum for troubleshooting.
 
-If `estim.direct == false`, the function should be called after calling [`updatestate!`](@ref). 
-Otherwise, call it after [`preparestate!`](@ref). It returns the dictionary `info` with the
+If `estim.direct==true`, the function should be called after calling [`preparestate!`](@ref)
+Otherwise, call it after [`updatestate!`](@ref). It returns the dictionary `info` with the
 following fields:
 
 !!! info

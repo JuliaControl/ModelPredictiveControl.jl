@@ -246,7 +246,9 @@ This function should be called at the end of each discrete time step. It removes
 operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and returns the
 state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
 should be called prior to this one to correct the estimate when applicable (if
-`estim.direct == true`). 
+`estim.direct == true`). Note that the [`MovingHorizonEstimator`](@ref) with the default
+`direct=true` option is not able to estimate ``\mathbf{x̂}_k(k+1)``, the returned value
+is therefore the current corrected state ``\mathbf{x̂}_k(k)``.
 
 # Examples
 ```jldoctest

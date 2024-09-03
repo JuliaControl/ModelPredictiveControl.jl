@@ -203,7 +203,7 @@ mpc_mhe = LinMPC(estim, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
 mpc_mhe = setconstraint!(mpc_mhe, ymin=[45, -Inf])
 ```
 
-The rejection is improved here:
+The rejection is indeed improved:
 
 ```@example 1
 setstate!(model, zeros(model.nx))
