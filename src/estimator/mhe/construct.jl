@@ -1029,7 +1029,7 @@ from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
         \mathbf{S}(H_e-1) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
-    All these matrices are truncated when ``k < H_e`` (at the beginning).
+    All these matrices are truncated when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
     model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
