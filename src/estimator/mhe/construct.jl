@@ -277,10 +277,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     with ``p=1`` is particularly useful for the MHE since it moves its expensive
     computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
-    `direct=false`. Note that contrarily to all the other estimators, the MHE in its current
-    form with ``p=0`` interprets the initial state estimate and covariance as 
+    `direct=false`. Note that contrarily to all the other estimators in the module, the MHE
+    in its current form with ``p=0`` interprets the initial state estimate and covariance as 
     ``\mathbf{x̂}_{-1}(-1)`` and ``\mathbf{P̂}_{-1}(-1)``, that is, an *a posteriori*
-    estimate[^2] for the last time step. 
+    estimate[^2] from the last time step. 
 
     [^2]: M. Hovd (2012), "A Note On The Smoothing Formulation Of Moving Horizon Estimation",
           *Facta Universitatis*, Vol. 11 №2.
