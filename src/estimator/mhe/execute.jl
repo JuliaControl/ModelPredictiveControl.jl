@@ -44,11 +44,12 @@ end
 Update [`MovingHorizonEstimator`](@ref) state `estim.x̂0`.
 
 The optimization problem of [`MovingHorizonEstimator`](@ref) documentation is solved at
-each discrete time ``k``. Once solved, the next estimate ``\mathbf{x̂}_k(k+1)`` is computed
-by inserting the optimal values of ``\mathbf{x̂}_k(k-N_k+1)`` and ``\mathbf{Ŵ}`` in the
-augmented model from ``j = N_k-1`` to ``0`` inclusively. Afterward, if ``k ≥ H_e``, the
-arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k+1}(k-N_k+2)`` is estimated
-using `estim.covestim` object.
+each discrete time ``k``. The prediction matrices are provided at [`init_predmat_mhe`](@ref)
+documentation. Once solved, the optimal estimate ``\mathbf{x̂}_k(k+p)`` is computed by 
+inserting the optimal values of ``\mathbf{x̂}_k(k-N_k+p)`` and ``\mathbf{Ŵ}`` in the
+augmented model from ``j = N_k-1`` to ``0`` inclusively. Afterward, if ``N_k = H_e``, the
+arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated using 
+`estim.covestim` object.
 """
 function update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0)
     if !estim.direct
