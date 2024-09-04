@@ -1168,8 +1168,6 @@ end
     end
     @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
     @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3
-    display(plot(X̂_ukf'))
-    display(plot(X̂_mhe')) 
     mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=true)
     ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
     ekf = ExtendedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
@@ -1189,9 +1187,7 @@ end
         updatestate!(ekf, [11, 50], y, [25])
     end
     @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
-    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3
-    display(plot(X̂_ukf'))
-    display(plot(X̂_mhe'))    
+    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3 
 end
 
 @testset "MovingHorizonEstimator set model" begin
