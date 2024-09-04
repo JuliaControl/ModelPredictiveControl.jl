@@ -1118,62 +1118,80 @@ end
     linmodel1 = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
     mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=false)
     kf  = KalmanFilter(linmodel1, nint_ym=0, direct=false)
-    X̂0_mhe = zeros(4, 6)
-    X̂0_kf  = zeros(4, 6)
+    X̂_mhe = zeros(4, 6)
+    X̂_kf  = zeros(4, 6)
     for i in 1:6
-        preparestate!(mhe, [50, 31], [25])
-        preparestate!(kf,  [50, 31], [25])
-        X̂0_mhe[:,i] = mhe.x̂0
-        X̂0_kf[:,i]  = kf.x̂0
-        updatestate!(mhe, [11, 50], [50, 31], [25])
-        updatestate!(kf,  [11, 50], [50, 31], [25])
+        y = [50,31] + randn(2)
+        x̂_mhe = preparestate!(mhe, y, [25])
+        x̂_kf  = preparestate!(kf,  y, [25])
+        X̂_mhe[:,i] = x̂_mhe
+        X̂_kf[:,i]  = x̂_kf
+        updatestate!(mhe, [11, 50], y, [25])
+        updatestate!(kf,  [11, 50], y, [25])
     end
-    @test X̂0_mhe ≈ X̂0_kf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_kf atol=1e-3 rtol=1e-3
     mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=true)
     kf  = KalmanFilter(linmodel1, nint_ym=0, direct=true)
-    #preparestate!(mhe, [50, 30], [20])
-    #updatestate!(mhe, [10, 50], [50, 30], [20])
-    X̂0_mhe = zeros(4, 6)
-    X̂0_kf  = zeros(4, 6)
+    X̂_mhe = zeros(4, 6)
+    X̂_kf  = zeros(4, 6)
     for i in 1:6
-        preparestate!(mhe, [50, 31], [25])
-        preparestate!(kf,  [50, 31], [25])
-        X̂0_mhe[:,i] = mhe.x̂0
-        X̂0_kf[:,i]  = kf.x̂0
-        updatestate!(mhe, [11, 50], [50, 31], [25])
-        updatestate!(kf,  [11, 50], [50, 31], [25])
+        y = [50,31] + randn(2)
+        x̂_mhe = preparestate!(mhe, y, [25])
+        x̂_kf  = preparestate!(kf,  y, [25])
+        X̂_mhe[:,i] = x̂_mhe
+        X̂_kf[:,i]  = x̂_kf
+        updatestate!(mhe, [11, 50], y, [25])
+        updatestate!(kf,  [11, 50], y, [25])
     end
-    @test X̂0_mhe ≈ X̂0_kf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_kf atol=1e-3 rtol=1e-3
     f = (x,u,d) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h = (x,d)   -> linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
     mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=false)
     ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=false)
-    X̂0_mhe = zeros(4, 6)
-    X̂0_ukf = zeros(4, 6)
+    ekf = ExtendedKalmanFilter(nonlinmodel, nint_ym=0, direct=false)
+    X̂_mhe = zeros(4, 6)
+    X̂_ukf = zeros(4, 6)
+    X̂_ekf = zeros(4, 6)
     for i in 1:6
-        preparestate!(mhe, [50, 31], [25])
-        preparestate!(ukf, [50, 31], [25])
-        X̂0_mhe[:,i] = mhe.x̂0
-        X̂0_ukf[:,i] = ukf.x̂0
-        updatestate!(mhe, [11, 50], [50, 31], [25])
-        updatestate!(ukf, [11, 50], [50, 31], [25])
+        y = [50,31] + randn(2)
+        x̂_mhe = preparestate!(mhe, y, [25])
+        x̂_ukf = preparestate!(ukf,  y, [25])
+        x̂_ekf = preparestate!(ekf,  y, [25])
+        X̂_mhe[:,i] = x̂_mhe
+        X̂_ukf[:,i] = x̂_ukf
+        X̂_ekf[:,i] = x̂_ekf
+        updatestate!(mhe, [11, 50], y, [25])
+        updatestate!(ukf, [11, 50], y, [25])
+        updatestate!(ekf, [11, 50], y, [25])
     end
-    @test X̂0_mhe ≈ X̂0_ukf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3
+    display(plot(X̂_ukf'))
+    display(plot(X̂_mhe')) 
     mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=true)
     ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
-    X̂0_mhe = zeros(4, 6)
-    X̂0_ukf = zeros(4, 6)
+    ekf = ExtendedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
+    X̂_mhe = zeros(4, 6)
+    X̂_ukf = zeros(4, 6)
+    X̂_ekf = zeros(4, 6)
     for i in 1:6
-        preparestate!(mhe, [50, 31], [25])
-        preparestate!(ukf, [50, 31], [25])
-        X̂0_mhe[:,i] = mhe.x̂0
-        X̂0_ukf[:,i] = ukf.x̂0
-        updatestate!(mhe, [11, 50], [50, 31], [25])
-        updatestate!(ukf, [11, 50], [50, 31], [25])
+        y = [50,31] + randn(2)
+        x̂_mhe = preparestate!(mhe, y, [25])
+        x̂_ukf = preparestate!(ukf,  y, [25])
+        x̂_ekf = preparestate!(ekf,  y, [25])
+        X̂_mhe[:,i] = x̂_mhe
+        X̂_ukf[:,i]  = x̂_ukf
+        X̂_ekf[:,i]  = x̂_ekf
+        updatestate!(mhe, [11, 50], y, [25])
+        updatestate!(ukf, [11, 50], y, [25])
+        updatestate!(ekf, [11, 50], y, [25])
     end
-    @test X̂0_mhe ≈ X̂0_ukf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3
+    display(plot(X̂_ukf'))
+    display(plot(X̂_mhe'))    
 end
 
 @testset "MovingHorizonEstimator set model" begin
