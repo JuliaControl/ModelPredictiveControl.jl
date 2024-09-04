@@ -1114,6 +1114,50 @@ end
     @test info[:V̂] ≈ [-1,-1] atol=5e-2
 end
 
+@testset "MovingHorizonEstimator set model" begin
+    linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
+    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
+    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, direct=false)
+    setconstraint!(mhe, x̂min=[-1000], x̂max=[1000])
+    @test mhe.Â ≈ [0.5]
+    @test evaloutput(mhe) ≈ [50.0]
+    preparestate!(mhe, [50.0])
+    x̂ = updatestate!(mhe, [2.0], [50.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[3.0], fop=[3.0])
+    setmodel!(mhe, newlinmodel)
+    @test mhe.Â ≈ [0.2]
+    @test evaloutput(mhe) ≈ [55.0]
+    @test mhe.lastu0 ≈ [2.0 - 3.0]
+    @test mhe.U0 ≈ [2.0 - 3.0]
+    @test mhe.Y0m ≈ [50.0 - 55.0]
+    preparestate!(mhe, [55.0])
+    x̂ = updatestate!(mhe, [3.0], [55.0])
+    @test x̂ ≈ [3.0]
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
+    setmodel!(mhe, newlinmodel)
+    @test mhe.x̂0   ≈ [3.0 - 8.0]
+    @test mhe.Z̃[1] ≈ 3.0 - 8.0
+    @test mhe.X̂0   ≈ [3.0 - 8.0]
+    @test mhe.x̂0arr_old ≈ [3.0 - 8.0]
+    @test mhe.con.X̂0min ≈ [-1000 - 8.0]
+    @test mhe.con.X̂0max ≈ [+1000 - 8.0]
+    @test mhe.con.x̃0min ≈ [-1000 - 8.0]
+    @test mhe.con.x̃0max ≈ [+1000 - 8.0]
+    setmodel!(mhe, Q̂=[1e-3], R̂=[1e-6])
+    @test mhe.Q̂ ≈ [1e-3]
+    @test mhe.R̂ ≈ [1e-6]
+    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h(x,d)   = linmodel.C*x + linmodel.Du*d
+    nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
+    mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
+    setmodel!(mhe2, Q̂=[1e-3], R̂=[1e-6])
+    @test mhe2.Q̂ ≈ [1e-3]
+    @test mhe2.R̂ ≈ [1e-6]
+    @test_throws ErrorException setmodel!(mhe2, deepcopy(nonlinmodel))
+end
+
 @testset "MovingHorizonEstimator v.s. Kalman filters" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
     mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=false)
@@ -1190,46 +1234,51 @@ end
     @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3 
 end
 
-@testset "MovingHorizonEstimator set model" begin
-    linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
-    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
-    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, direct=false)
-    setconstraint!(mhe, x̂min=[-1000], x̂max=[1000])
-    @test mhe.Â ≈ [0.5]
-    @test evaloutput(mhe) ≈ [50.0]
-    preparestate!(mhe, [50.0])
-    x̂ = updatestate!(mhe, [2.0], [50.0])
-    @test x̂ ≈ [3.0]
-    newlinmodel = LinModel(ss(0.2, 0.3, 1.0, 0, 10.0))
-    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[3.0], fop=[3.0])
-    setmodel!(mhe, newlinmodel)
-    @test mhe.Â ≈ [0.2]
-    @test evaloutput(mhe) ≈ [55.0]
-    @test mhe.lastu0 ≈ [2.0 - 3.0]
-    @test mhe.U0 ≈ [2.0 - 3.0]
-    @test mhe.Y0m ≈ [50.0 - 55.0]
-    preparestate!(mhe, [55.0])
-    x̂ = updatestate!(mhe, [3.0], [55.0])
-    @test x̂ ≈ [3.0]
-    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
-    setmodel!(mhe, newlinmodel)
-    @test mhe.x̂0   ≈ [3.0 - 8.0]
-    @test mhe.Z̃[1] ≈ 3.0 - 8.0
-    @test mhe.X̂0   ≈ [3.0 - 8.0]
-    @test mhe.x̂0arr_old ≈ [3.0 - 8.0]
-    @test mhe.con.X̂0min ≈ [-1000 - 8.0]
-    @test mhe.con.X̂0max ≈ [+1000 - 8.0]
-    @test mhe.con.x̃0min ≈ [-1000 - 8.0]
-    @test mhe.con.x̃0max ≈ [+1000 - 8.0]
-    setmodel!(mhe, Q̂=[1e-3], R̂=[1e-6])
-    @test mhe.Q̂ ≈ [1e-3]
-    @test mhe.R̂ ≈ [1e-6]
-    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
-    h(x,d)   = linmodel.C*x + linmodel.Du*d
-    nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
-    mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
-    setmodel!(mhe2, Q̂=[1e-3], R̂=[1e-6])
-    @test mhe2.Q̂ ≈ [1e-3]
-    @test mhe2.R̂ ≈ [1e-6]
-    @test_throws ErrorException setmodel!(mhe2, deepcopy(nonlinmodel))
+@testset "MovingHorizonEstimator LinModel v.s. NonLinModel" begin
+    linmodel = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
+    f = (x,u,d) -> linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h = (x,d)   -> linmodel.C*x + linmodel.Dd*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
+    nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
+    optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes"))
+    mhe_lin = MovingHorizonEstimator(linmodel, He=5, nint_ym=0, direct=true, optim=optim)
+    mhe_lin = setconstraint!(
+        mhe_lin, x̂min=[-100, -100, -100, -100], ŵmin=[10,10,10,10]
+    )
+    mhe_nonlin = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=true)
+    mhe_nonlin = setconstraint!(
+        mhe_nonlin, x̂min=[-100, -100, -100, -100], ŵmin=[10,10,10,10]
+    )
+    X̂_lin = zeros(4, 6)
+    X̂_nonlin = zeros(4, 6)
+    for i in 1:6
+        y = [50,31] + randn(2)
+        x̂_lin = preparestate!(mhe_lin, y, [25])
+        x̂_nonlin = preparestate!(mhe_nonlin, y, [25])
+        X̂_lin[:,i] = x̂_lin
+        X̂_nonlin[:,i] = x̂_nonlin
+        updatestate!(mhe_lin, [11, 50], y, [25])
+        updatestate!(mhe_nonlin, [11, 50], y, [25])
+    end
+    @test X̂_lin ≈ X̂_nonlin atol=1e-3 rtol=1e-3
+    mhe2_lin = MovingHorizonEstimator(linmodel, He=5, nint_ym=0, direct=false, optim=optim)
+    mhe2_lin = setconstraint!(
+        mhe2_lin, x̂min=[-100, -100, -100, -100], ŵmin=[10,10,10,10]
+    )
+    mhe2_nonlin = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=false)
+    mhe2_nonlin = setconstraint!(
+        mhe2_nonlin, x̂min=[-100, -100, -100, -100], ŵmin=[10,10,10,10]
+    )
+    X̂_lin = zeros(4, 6)
+    X̂_nonlin = zeros(4, 6)
+    for i in 1:6
+        y = [50,31] + randn(2)
+        x̂_lin = preparestate!(mhe2_lin, y, [25])
+        x̂_nonlin = preparestate!(mhe2_nonlin, y, [25])
+        X̂_lin[:,i] = x̂_lin
+        X̂_nonlin[:,i] = x̂_nonlin
+        updatestate!(mhe2_lin, [11, 50], y, [25])
+        updatestate!(mhe2_nonlin, [11, 50], y, [25])
+    end
+    @test X̂_lin ≈ X̂_nonlin atol=1e-3 rtol=1e-3
 end
