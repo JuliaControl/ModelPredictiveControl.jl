@@ -302,11 +302,12 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
     `direct=false`.
 
-    The Extended Help of [`SteadyKalmanFilter`](@ref) details the augmentation with `nint_ym` 
-    and `nint_u` arguments. The default augmentation scheme is identical, that is `nint_u=0`
-    and `nint_ym` computed by [`default_nint`](@ref). Note that the constructor does not
-    validate the observability of the resulting augmented [`NonLinModel`](@ref). In such
-    cases, it is the user's responsibility to ensure that it is still observable.
+    The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
+    and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation
+    scheme is identical, that is `nint_u=0` and `nint_ym` computed by [`default_nint`](@ref).
+    Note that the constructor does not validate the observability of the resulting augmented
+    [`NonLinModel`](@ref). In such cases, it is the user's responsibility to ensure that it
+    is still observable.
 
     The estimation covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)`` gives an uncertainty
     on the state estimate at the beginning of the window ``k-N_k+p``, that is, in the past.
@@ -341,8 +342,8 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
     state ``\mathbf{x̂}`` and sensor noise ``\mathbf{v̂}``). Note that if `Cwt≠Inf`, the
     attribute `nlp_scaling_max_gradient` of `Ipopt` is set to  `10/Cwt` (if not already set), 
-    to scale the small values of ``ϵ``. Use the second constructor to specify the covariance
-    estimation method.
+    to scale the small values of ``ϵ``. Use the second constructor to specify the arrival
+    covariance estimation method.
 """
 function MovingHorizonEstimator(
     model::SM;
@@ -391,9 +392,10 @@ default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_brid
 
 Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
-This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
-The keyword argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) 
-object for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. The
+This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂_i}, \mathbf{Q̂, R̂}``,
+where ``\mathbf{P̂_i}`` is the initial estimation covariance, provided by `P̂_0` argument. The
+keyword argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) object
+for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. The
 supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and 
 [`ExtendedKalmanFilter`](@ref).
 """

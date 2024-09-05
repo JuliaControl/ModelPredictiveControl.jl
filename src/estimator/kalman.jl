@@ -92,11 +92,12 @@ The arguments are in standard deviations σ, i.e. same units than outputs and st
 matrices ``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the stochastic
 model, which is specified by the numbers of integrator `nint_u` and `nint_ym` (see Extended
 Help). Likewise, the covariance matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, 
-Q_{int_u}, Q_{int_{ym}})}`` and ``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are
-the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and 
-unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``). The Kalman filter will estimate the current
-state with the newest measurements ``\mathbf{x̂}_k(k)`` if `direct == true`, else it will
-predict the state of the next time step ``\mathbf{x̂}_k(k+1)``.
+Q_{int_u}, Q_{int_{ym}})}`` and ``\mathbf{R̂ = R}``. The Extended Help provide some guidelines
+on the covariance tuning. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of 
+``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and unmeasured
+ones, for ``\mathbf{Ĉ^u, D̂_d^u}``). The Kalman filter will estimate the current state with 
+the newest measurements ``\mathbf{x̂}_k(k)`` if `direct` is `true`, else it will predict the
+state of the next time step ``\mathbf{x̂}_k(k+1)``.
 
 # Arguments
 !!! info
@@ -135,6 +136,11 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 
 # Extended Help
 !!! details "Extended Help"
+    The `σR` argument is generally fixed at the estimated standard deviations of the sensor
+    noises. The `σQ`, `σQint_u` and `σQint_ym` arguments can be used to tune the filter
+    response. Increasing them make the filter more responsive to disturbances but more
+    sensitive to measurement noise.
+
     The model augmentation with `nint_u` vector adds integrators at model manipulated inputs,
     and `nint_ym`, at measured outputs. They create the integral action when the estimator
     is used in a controller as state feedback. By default, the method [`default_nint`](@ref)
@@ -628,11 +634,12 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
 
 # Extended Help
 !!! details "Extended Help"
-    The Extended Help of [`SteadyKalmanFilter`](@ref) details the augmentation with `nint_ym` 
-    and `nint_u` arguments. The default augmentation scheme is identical, that is `nint_u=0`
-    and `nint_ym` computed by [`default_nint`](@ref). Note that the constructor does not
-    validate the observability of the resulting augmented [`NonLinModel`](@ref). In such
-    cases, it is the user's responsibility to ensure that it is still observable.
+    The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
+    and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation
+    scheme is identical, that is `nint_u=0` and `nint_ym` computed by [`default_nint`](@ref).
+    Note that the constructor does not validate the observability of the resulting augmented
+    [`NonLinModel`](@ref). In such cases, it is the user's responsibility to ensure that it
+    is still observable.
 """
 function UnscentedKalmanFilter(
     model::SM;

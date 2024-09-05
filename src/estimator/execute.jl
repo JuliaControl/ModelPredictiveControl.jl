@@ -203,7 +203,7 @@ Prepare `estim.x̂0` estimate with meas. outputs `ym` and dist. `d` for the curr
 
 This function should be called at the beginning of each discrete time step. Its behavior
 depends if `estim` is a [`StateEstimator`](@ref) in the current/filter (1.) or 
-delayed/predictor (2.) form:
+delayed/predictor (2.) formulation:
 
 1. If `estim.direct` is `true`, it removes the operating points with [`remove_op!`](@ref),
    calls [`correct_estimate!`](@ref), and returns the corrected state estimate 
