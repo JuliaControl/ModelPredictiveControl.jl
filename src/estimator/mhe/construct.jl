@@ -318,10 +318,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     ``\mathbf{x̂_i}`` can be manually specified with [`setstate!`](@ref), or automatically 
     with [`initstate!`](@ref) for [`LinModel`](@ref). Note the MHE with ``p=0`` is slightly
     inconsistent with all the other estimators here. It interprets the initial values as
-    ``\mathbf{x̂}_{-1}(-1) = \mathbf{x̂_i}`` and  ``\mathbf{P̂}_{-1}(-1) = \mathbf{P̂_i}``, that 
+    ``\mathbf{x̂_i} = \mathbf{x̂}_{-1}(-1)`` and  ``\mathbf{P̂_i} = \mathbf{P̂}_{-1}(-1)``, that 
     is, an *a posteriori* estimate[^2] from the last time step. The MHE with ``p=1`` is
-    consistent, interpreting them as  ``\mathbf{x̂}_{-1}(0) = \mathbf{x̂_i}`` and
-    ``\mathbf{P̂}_{-1}(0) = \mathbf{P̂_i}``.
+    consistent, interpreting them as  ``\mathbf{x̂_i} = \mathbf{x̂}_{-1}(0)`` and
+    ``\mathbf{P̂_i} = \mathbf{P̂}_{-1}(0)``.
 
     [^2]: M. Hovd (2012), "A Note On The Smoothing Formulation Of Moving Horizon Estimation",
           *Facta Universitatis*, Vol. 11 №2.
