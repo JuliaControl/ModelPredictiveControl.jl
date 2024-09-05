@@ -96,7 +96,7 @@ Q_{int_u}, Q_{int_{ym}})}`` and ``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ
 the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and 
 unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``). The Kalman filter will estimate the current
 state with the newest measurements ``\mathbf{x̂}_k(k)`` if `direct == true`, else it will
-predict the the state of the next time step ``\mathbf{x̂}_k(k+1)``.
+predict the state of the next time step ``\mathbf{x̂}_k(k+1)``.
 
 # Arguments
 !!! info

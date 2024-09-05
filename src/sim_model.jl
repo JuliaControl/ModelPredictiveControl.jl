@@ -189,7 +189,8 @@ detailstr(model::SimModel) = ""
 
 Init `model.x0` with manipulated inputs `u` and measured disturbances `d` steady-state.
 
-It removes the operating points on `u` and `d` and calls [`steadystate!`](@ref):
+The method tries to initialize the model state ``\mathbf{x}`` at steady-state. It removes
+the operating points on `u` and `d` and calls [`steadystate!`](@ref):
 
 - If `model` is a [`LinModel`](@ref), the method computes the steady-state of current
   inputs `u` and measured disturbances `d`.

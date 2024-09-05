@@ -86,7 +86,7 @@ end
 
 Init `estim.x̂0` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
-The method tries to find a good steady-state for the initial estimate ``\mathbf{x̂}(0)``. It
+The method tries to find a good steady-state for the initial estimate ``\mathbf{x̂}``. It
 removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!`](@ref):
 
 - If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
