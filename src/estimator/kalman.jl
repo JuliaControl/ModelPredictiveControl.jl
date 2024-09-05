@@ -94,7 +94,9 @@ model, which is specified by the numbers of integrator `nint_u` and `nint_ym` (s
 Help). Likewise, the covariance matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, 
 Q_{int_u}, Q_{int_{ym}})}`` and ``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are
 the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and 
-unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
+unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``). The Kalman filter will estimate the current
+state with the newest measurements ``\mathbf{x̂}_k(k)`` if `direct == true`, else it will
+predict the the state of the next time step ``\mathbf{x̂}_k(k+1)``.
 
 # Arguments
 !!! info
@@ -331,10 +333,12 @@ end
 
 Construct a time-varying Kalman Filter with the [`LinModel`](@ref) `model`.
 
-The process model is identical to [`SteadyKalmanFilter`](@ref). The matrix ``\mathbf{P̂}_k``
-is the estimation error covariance of `model` states augmented with the stochastic ones
-(specified by `nint_u` and `nint_ym`). Three keyword arguments modify its initial value with
-``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``.
+The process model is identical to [`SteadyKalmanFilter`](@ref). The matrix ``\mathbf{P̂}`` is
+the estimation error covariance of `model` states augmented with the stochastic ones
+(specified by `nint_u` and `nint_ym`). Three keyword arguments specify its initial value with
+``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), 
+\mathbf{P_{int_{ym}}}(0) \}``. The initial state estimate ``\mathbf{x̂}_{-1}(0)`` can be
+manually specified with [`setstate!`](@ref), or automatically with [`initstate!`](@ref).
 
 # Arguments
 !!! info
@@ -572,7 +576,11 @@ See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)``
 state-space functions augmented with the stochastic model of the unmeasured disturbances,
 which is specified by the numbers of integrator `nint_u` and `nint_ym` (see Extended Help).
 The ``\mathbf{ĥ^m}`` function represents the measured outputs of ``\mathbf{ĥ}`` function
-(and unmeasured ones, for ``\mathbf{ĥ^u}``).
+(and unmeasured ones, for ``\mathbf{ĥ^u}``). The matrix ``\mathbf{P̂}`` is the estimation
+error covariance of `model` state augmented with the stochastic ones. Three keyword
+arguments specify its initial value with ``\mathbf{P̂}_{-1}(0) = 
+\mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``. The 
+initial state estimate ``\mathbf{x̂}_{-1}(0)`` can be manually specified with [`setstate!`](@ref).
 
 # Arguments
 !!! info
