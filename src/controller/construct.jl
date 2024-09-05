@@ -453,8 +453,9 @@ terminal states at ``k+H_p``:
                         &= \mathbf{e_x̂ ΔU} + \mathbf{f_x̂}
 \end{aligned}
 ```
-The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are recalculated at each control period
-``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
+The matrices ``\mathbf{E, G, J, K, V, B, e_x̂, g_x̂, j_x̂, k_x̂, v_x̂, b_x̂}`` are defined in the
+Extended Help section. The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are  recalculated at
+each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
 
 # Extended Help
 !!! details "Extended Help"

@@ -946,6 +946,9 @@ from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
                   &= \mathbf{E_x̂ Z + F_x̂}
 \end{aligned}
 ```
+The matrices ``\mathbf{E, G, J, B, E_x̂, G_x̂, J_x̂, B_x̂}`` are defined in the Extended Help 
+section. The vectors ``\mathbf{F, F_x̂, f_x̄}`` are recalculated at each discrete time step, 
+see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstraint!(::MovingHorizonEstimator, ::LinModel)`](@ref).
 
 # Extended Help
 !!! details "Extended Help"
