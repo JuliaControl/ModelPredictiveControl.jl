@@ -4,6 +4,7 @@ using ModelPredictiveControl
 using ControlSystemsBase
 using Documenter
 using LinearAlgebra
+using Random: randn
 using JuMP, OSQP, Ipopt, DAQP, ForwardDiff
 using Plots
 using Test

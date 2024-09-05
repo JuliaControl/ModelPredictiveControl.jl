@@ -33,5 +33,5 @@ ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel)
 ## Solve Optimization Problem
 
 ```@docs
-ModelPredictiveControl.optim_objective!
+ModelPredictiveControl.optim_objective!(::PredictiveController)
 ```

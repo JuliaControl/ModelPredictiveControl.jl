@@ -189,7 +189,8 @@ detailstr(model::SimModel) = ""
 
 Init `model.x0` with manipulated inputs `u` and measured disturbances `d` steady-state.
 
-It removes the operating points on `u` and `d` and calls [`steadystate!`](@ref):
+The method tries to initialize the model state ``\mathbf{x}`` at steady-state. It removes
+the operating points on `u` and `d` and calls [`steadystate!`](@ref):
 
 - If `model` is a [`LinModel`](@ref), the method computes the steady-state of current
   inputs `u` and measured disturbances `d`.
@@ -310,7 +311,7 @@ ms. Can be used to implement simple soft real-time simulations, see the example 
 
 !!! warning
     The allocations in Julia are garbage-collected (GC) automatically. This can affect the 
-    timings. In such cases, you can temporarily stop the GC with `GC.enable(false)`, and
+    timing. In such cases, you can temporarily stop the GC with `GC.enable(false)`, and
     restart it at a convenient time e.g.: just before calling `periodsleep`.
 
 # Examples

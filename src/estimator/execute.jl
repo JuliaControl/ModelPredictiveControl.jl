@@ -86,7 +86,7 @@ end
 
 Init `estim.x̂0` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
-The method tries to find a good steady-state for the initial estimate ``\mathbf{x̂}(0)``. It
+The method tries to find a good steady-state for the initial estimate ``\mathbf{x̂}``. It
 removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!`](@ref):
 
 - If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
@@ -203,7 +203,7 @@ Prepare `estim.x̂0` estimate with meas. outputs `ym` and dist. `d` for the curr
 
 This function should be called at the beginning of each discrete time step. Its behavior
 depends if `estim` is a [`StateEstimator`](@ref) in the current/filter (1.) or 
-delayed/predictor (2.) form:
+delayed/predictor (2.) formulation:
 
 1. If `estim.direct` is `true`, it removes the operating points with [`remove_op!`](@ref),
    calls [`correct_estimate!`](@ref), and returns the corrected state estimate 
@@ -246,7 +246,9 @@ This function should be called at the end of each discrete time step. It removes
 operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and returns the
 state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
 should be called prior to this one to correct the estimate when applicable (if
-`estim.direct == true`). 
+`estim.direct == true`). Note that the [`MovingHorizonEstimator`](@ref) with the default
+`direct=true` option is not able to estimate ``\mathbf{x̂}_k(k+1)``, the returned value
+is therefore the current corrected state ``\mathbf{x̂}_k(k)``.
 
 # Examples
 ```jldoctest

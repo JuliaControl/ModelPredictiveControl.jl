@@ -109,11 +109,8 @@ struct MovingHorizonEstimator{
     buffer::StateEstimatorBuffer{NT}
     function MovingHorizonEstimator{NT, SM, JM, CE}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim::JM, covestim::CE;
-        direct=false
+        direct=true
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
-        if direct
-            throw(ArgumentError("MovingHorizonEstimator: direct=true is not implemented yet"))
-        end
         nu, ny, nd = model.nu, model.ny, model.nd
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
@@ -131,8 +128,9 @@ struct MovingHorizonEstimator{
         invP̄ = Hermitian(inv(P̂_0), :L)
         invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
+        p = direct ? 0 : 1
         E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
-            model, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
+            model, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
         )
         # dummy values (updated just before optimization):
         F, fx̄, Fx̂ = zeros(NT, nym*He), zeros(NT, nx̂), zeros(NT, nx̂*He)
@@ -145,7 +143,8 @@ struct MovingHorizonEstimator{
         Z̃ = zeros(NT, nZ̃)
         X̂op = repeat(x̂op, He)
         X̂0, Y0m = zeros(NT, nx̂*He), zeros(NT, nym*He)
-        U0, D0  = zeros(NT, nu*He), zeros(NT, nd*He) 
+        nD0 = direct ? nd*(He+1) : nd*He
+        U0, D0  = zeros(NT, nu*He), zeros(NT, nD0) 
         Ŵ = zeros(NT, nx̂*He)
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(P̂_0)
@@ -183,7 +182,7 @@ distribution is not approximated like the [`UnscentedKalmanFilter`](@ref). The c
 costs are drastically higher, however, since it minimizes the following objective function
 at each discrete time ``k``:
 ```math
-\min_{\mathbf{x̂}_k(k-N_k+1), \mathbf{Ŵ}, ϵ}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
+\min_{\mathbf{x̂}_k(k-N_k+p), \mathbf{Ŵ}, ϵ}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
                                             + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
                                             + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
                                             + C ϵ^2
@@ -191,8 +190,8 @@ at each discrete time ``k``:
 in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
 ```math
 \begin{aligned}
-    \mathbf{x̄} &= \mathbf{x̂}_{k-N_k}(k-N_k+1) - \mathbf{x̂}_k(k-N_k+1) \\
-    \mathbf{P̄} &= \mathbf{P̂}_{k-N_k}(k-N_k+1)
+    \mathbf{x̄} &= \mathbf{x̂}_{k-N_k}(k-N_k+p) - \mathbf{x̂}_k(k-N_k+p) \\
+    \mathbf{P̄} &= \mathbf{P̂}_{k-N_k}(k-N_k+p)
 \end{aligned}
 ```
 and the covariances are repeated ``N_k`` times:
@@ -202,35 +201,58 @@ and the covariances are repeated ``N_k`` times:
     \mathbf{R̂}_{N_k} &= \text{diag}\mathbf{(R̂,R̂,...,R̂)} 
 \end{aligned}
 ```
-The estimation horizon ``H_e`` limits the window length: 
+The estimation horizon ``H_e`` limits the window length:
 ```math
-N_k =                     \begin{cases} 
+N_k =                     \begin{cases}
     k + 1   &  k < H_e    \\
     H_e     &  k ≥ H_e    \end{cases}
 ```
-The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` encompass the estimated process noise
-``\mathbf{ŵ}(k-j)`` and sensor noise ``\mathbf{v̂}(k-j)`` from ``j=N_k-1`` to ``0``. The 
-Extended Help defines the two vectors, the slack variable ``ϵ``, and the estimation of the
-covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. See [`UnscentedKalmanFilter`](@ref)
-for details on the augmented process model and ``\mathbf{R̂}, \mathbf{Q̂}`` covariances.
+The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` respectively encompass the estimated process
+noises ``\mathbf{ŵ}(k-j+p)`` from ``j=N_k`` to ``1`` and sensor noises ``\mathbf{v̂}(k-j+1)``
+from ``j=N_k`` to ``1``. The Extended Help defines the two vectors, the slack variable
+``ϵ``, and the estimation of the covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If
+the keyword argument `direct=true` (default value), the constant ``p=0`` in the equations
+above, and the MHE is in the current form. Else ``p=1``, leading to the prediction form.
+
+See [`UnscentedKalmanFilter`](@ref) for details on the augmented process model and 
+``\mathbf{R̂}, \mathbf{Q̂}`` covariances.
 
 !!! warning
     See the Extended Help if you get an error like:    
     `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
 
 # Arguments
-!!! warning
-    The keyword argument `direct` defaults to `false` for the `MovingHorizonEstimator`, 
-    since `direct=true` is not implemented yet.
+!!! info
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `model::SimModel` : (deterministic) model for the estimations.
 - `He=nothing` : estimation horizon ``H_e``, must be specified.
+- `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
+    are unmeasured ``\mathbf{y^u}``.
+- `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
+    covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
+- `σQ=fill(1/model.nx,model.nx)` or *`sigmaQ`* : main diagonal of the process noise
+    covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
+- `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
+    ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
+- `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
+    the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
+- `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
+    disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
+- `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
+- `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+- `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
+    disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
+- `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
+    disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
 - `optim=default_optim_mhe(model)` : a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    with a quadratic/nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
-- `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
-- `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
+- `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
+   estimator, in opposition to the delayed/predictor form).
 
 # Examples
 ```jldoctest
@@ -253,10 +275,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     ```math
     \mathbf{Ŵ} = 
     \begin{bmatrix}
-        \mathbf{ŵ}(k-N_k+1)     \\
-        \mathbf{ŵ}(k-N_k+2)     \\
+        \mathbf{ŵ}(k-N_k+p+0)     \\
+        \mathbf{ŵ}(k-N_k+p+1)     \\
         \vdots                  \\
-        \mathbf{ŵ}(k)
+        \mathbf{ŵ}(k+p-1)
     \end{bmatrix} , \quad
     \mathbf{V̂} =
     \begin{bmatrix}
@@ -273,13 +295,38 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
         \mathbf{x̂}_k(k-j+1) &= \mathbf{f̂}\Big(\mathbf{x̂}_k(k-j), \mathbf{u}(k-j), \mathbf{d}(k-j)\Big) + \mathbf{ŵ}(k-j)
     \end{aligned}
     ```
-    The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
-    It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
-    problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
-    state and sensor noise). 
-    
-    The optimization and the estimation of the covariance at arrival 
-    ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` depend on `model`:
+    The constant ``p`` equals to `!direct`. In other words, ``\mathbf{Ŵ}`` and ``\mathbf{V̂}``
+    are shifted by one time step if `direct==true`. The non-default prediction form
+    with ``p=1`` is particularly useful for the MHE since it moves its expensive
+    computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
+    optimization by default, but it can be postponed to [`updatestate!`](@ref) with
+    `direct=false`.
+
+    The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
+    and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation
+    scheme is identical, that is `nint_u=0` and `nint_ym` computed by [`default_nint`](@ref).
+    Note that the constructor does not validate the observability of the resulting augmented
+    [`NonLinModel`](@ref). In such cases, it is the user's responsibility to ensure that it
+    is still observable.
+
+    The estimation covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)`` gives an uncertainty
+    on the state estimate at the beginning of the window ``k-N_k+p``, that is, in the past.
+    It is not the same as the current estimate covariance ``\mathbf{P̂}_k(k)``, a value not
+    computed by the MHE (contrarily to e.g. the [`KalmanFilter`](@ref)). Three keyword
+    arguments specify its initial value with ``\mathbf{P̂_i} =  \mathrm{diag}\{ \mathbf{P}(0),
+    \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``. The initial state estimate
+    ``\mathbf{x̂_i}`` can be manually specified with [`setstate!`](@ref), or automatically 
+    with [`initstate!`](@ref) for [`LinModel`](@ref). Note the MHE with ``p=0`` is slightly
+    inconsistent with all the other estimators here. It interprets the initial values as
+    ``\mathbf{x̂_i} = \mathbf{x̂}_{-1}(-1)`` and  ``\mathbf{P̂_i} = \mathbf{P̂}_{-1}(-1)``, that 
+    is, an *a posteriori* estimate[^2] from the last time step. The MHE with ``p=1`` is
+    consistent, interpreting them as  ``\mathbf{x̂_i} = \mathbf{x̂}_{-1}(0)`` and
+    ``\mathbf{P̂_i} = \mathbf{P̂}_{-1}(0)``.
+
+    [^2]: M. Hovd (2012), "A Note On The Smoothing Formulation Of Moving Horizon Estimation",
+          *Facta Universitatis*, Vol. 11 №2.
+
+    The optimization and the update of the arrival covariance depend on `model`:
 
     - If `model` is a [`LinModel`](@ref), the optimization is treated as a quadratic program
       with a time-varying Hessian, which is generally cheaper than nonlinear programming. By
@@ -289,10 +336,14 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
       functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
       for common mistakes when writing these functions. An [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
-        
-    Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
-    `10/Cwt` (if not already set), to scale the small values of ``ϵ``. Use the second
-    constructor to specify the covariance estimation method.
+    
+    The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
+    It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
+    problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
+    state ``\mathbf{x̂}`` and sensor noise ``\mathbf{v̂}``). Note that if `Cwt≠Inf`, the
+    attribute `nlp_scaling_max_gradient` of `Ipopt` is set to  `10/Cwt` (if not already set), 
+    to scale the small values of ``ϵ``. Use the second constructor to specify the arrival
+    covariance estimation method.
 """
 function MovingHorizonEstimator(
     model::SM;
@@ -309,7 +360,7 @@ function MovingHorizonEstimator(
     sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
     Cwt::Real = Inf,
     optim::JM = default_optim_mhe(model),
-    direct = false,
+    direct = true,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
     σR         = sigmaR,
@@ -341,16 +392,17 @@ default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_brid
 
 Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
-This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
-The keyword argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) 
-object for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. The
+This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂_i}, \mathbf{Q̂, R̂}``,
+where ``\mathbf{P̂_i}`` is the initial estimation covariance, provided by `P̂_0` argument. The
+keyword argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) object
+for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+1)``. The
 supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and 
 [`ExtendedKalmanFilter`](@ref).
 """
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
     optim::JM = default_optim_mhe(model),
-    direct = false,
+    direct = true,
     covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
@@ -375,8 +427,8 @@ It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}
 noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
-    \mathbf{x̂_{min} - c_{x̂_{min}}} ϵ ≤&&\   \mathbf{x̂}_k(k-j+1) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 0    \\
-    \mathbf{ŵ_{min} - c_{ŵ_{min}}} ϵ ≤&&\     \mathbf{ŵ}(k-j+1) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1    \\
+    \mathbf{x̂_{min} - c_{x̂_{min}}} ϵ ≤&&\   \mathbf{x̂}_k(k-j+p) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 0    \\
+    \mathbf{ŵ_{min} - c_{ŵ_{min}}} ϵ ≤&&\     \mathbf{ŵ}(k-j+p) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1    \\
     \mathbf{v̂_{min} - c_{v̂_{min}}} ϵ ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max} + c_{v̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1
 \end{alignat*}
 ```
@@ -385,8 +437,8 @@ is no bound. The constraint softness parameters ``\mathbf{c}``, also called equa
 for relaxation, are non-negative values that specify the softness of the associated bound.
 Use `0.0` values for hard constraints (default for all of them). Notice that constraining
 the estimated sensor noises is equivalent to bounding the innovation term, since 
-``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See Extended Help for details on 
-model augmentation and time-varying constraints.
+``\mathbf{v̂}(k) = \mathbf{y^m}(k) - \mathbf{ŷ^m}(k)``. See Extended Help for details on
+the constant ``p``, on model augmentation and on time-varying constraints.
 
 # Arguments
 !!! info
@@ -422,9 +474,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, 
 
 # Extended Help
 !!! details "Extended Help"
-    Note that the state ``\mathbf{x̂}`` and process noise ``\mathbf{ŵ}`` constraints are 
-    applied on the augmented model, detailed in [`SteadyKalmanFilter`](@ref) Extended Help. 
-    For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
+    The constant ``p=0`` if `estim.direct==true` (current form), else ``p=1`` (prediction
+    form). Note that the state ``\mathbf{x̂}`` and process noise ``\mathbf{ŵ}`` constraints
+    are applied on the augmented model, detailed in [`SteadyKalmanFilter`](@ref) Extended
+    Help. For variable constraints, the bounds can be modified after calling [`updatestate!`](@ref),
     that is, at runtime, except for `±Inf` bounds. Time-varying constraints over the
     estimation horizon ``H_e`` are also possible, mathematically defined as:
     ```math 
@@ -894,47 +947,79 @@ end
 
 @doc raw"""
     init_predmat_mhe(
-        model::LinModel, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
+        model::LinModel, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
     ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 
-Construct the MHE prediction matrices for [`LinModel`](@ref) `model`.
+Construct the [`MovingHorizonEstimator`](@ref) prediction matrices for [`LinModel`](@ref) `model`.
 
 We first introduce the deviation vector of the estimated state at arrival 
-``\mathbf{x̂_0}(k-N_k+1) = \mathbf{x̂}_k(k-N_k+1) - \mathbf{x̂_{op}}`` (see [`setop!`](@ref)),
-and the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂_0}(k-N_k+1)
-\\ \mathbf{Ŵ} \end{smallmatrix}]`` with the decision variables. The estimated sensor noises
-from time ``k-N_k+1`` to ``k`` are computed by:
+``\mathbf{x̂_0}(k-N_k+p) = \mathbf{x̂}_k(k-N_k+p) - \mathbf{x̂_{op}}`` (see [`setop!`](@ref)),
+and the vector ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{x̂_0}(k-N_k+p)
+\\ \mathbf{Ŵ} \end{smallmatrix}]`` with the decision variables. Setting the constant ``p=0``
+produces an estimator in the current form, while the prediction form is obtained with
+``p=1``. The estimated sensor noises from time ``k-N_k+1`` to ``k`` are computed by:
 ```math
 \begin{aligned}
     \mathbf{V̂} = \mathbf{Y_0^m - Ŷ_0^m} &= \mathbf{E Z + G U_0 + J D_0 + Y_0^m + B}     \\
                                         &= \mathbf{E Z + F}
 \end{aligned}
 ```
-in which ``\mathbf{U_0, D_0, Y_0^m}`` respectively include the deviation values of the
-manipulated inputs ``\mathbf{u_0}(k-j)``, meas. disturbances ``\mathbf{d_0}(k-j)`` and meas.
-outputs ``\mathbf{y_0^m}(k-j)`` from ``j=N_k-1`` to ``0``. The vector ``\mathbf{B}`` 
-includes the contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update 
-``\mathbf{f̂_{op}}`` operating points (for linearization, see [`linearize`](@ref)). The
-method also returns matrices for the estimation error at arrival:
+in which ``\mathbf{U_0}`` and ``\mathbf{Y_0^m}`` respectively include the deviation values of
+the manipulated inputs ``\mathbf{u_0}(k-j+p)`` from ``j=N_k`` to ``1`` and measured outputs
+``\mathbf{y_0^m}(k-j+1)`` from ``j=N_k`` to ``1``. The vector ``\mathbf{D_0}`` comprises one 
+additional measured disturbance if ``p=0``, that is, it includes the deviation vectors
+``\mathbf{d_0}(k-j+1)`` from ``j=N_k+1-p`` to ``1``. The constant ``\mathbf{B}`` is the
+contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}``
+operating points (for linearization, see [`augment_model`](@ref) and [`linearize`](@ref)).
+The method also returns the matrices for the estimation error at arrival:
 ```math
-    \mathbf{x̄} = \mathbf{x̂_0^†}(k-N_k+1) - \mathbf{x̂_0}(k-N_k+1) = \mathbf{e_x̄ Z + f_x̄}
+    \mathbf{x̄} = \mathbf{x̂_0^†}(k-N_k+p) - \mathbf{x̂_0}(k-N_k+p) = \mathbf{e_x̄ Z + f_x̄}
 ```
-in which ``\mathbf{x̂_0^†}(k-N_k+1) = \mathbf{x̂}_{k-N_k}(k-N_k+1) - \mathbf{x̂_{op}}`` is the
-deviation vector of the state at arrival estimated at time ``k-N_k``. Lastly, the estimated
-states ``\mathbf{x̂_0}(k-j)`` from ``j=N_k-2`` to ``-1``, also in deviation form, are 
-calculated with:
+in which ``\mathbf{e_x̄} = [\begin{smallmatrix} -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{smallmatrix}]``,
+and ``\mathbf{f_x̄} = \mathbf{x̂_0^†}(k-N_k+p)``. The latter is the deviation vector of the
+state at arrival, estimated at time ``k-N_k``, i.e. ``\mathbf{x̂_0^†}(k-N_k+p) = 
+\mathbf{x̂}_{k-N_k}(k-N_k+p) - \mathbf{x̂_{op}}``. Lastly, the estimates ``\mathbf{x̂_0}(k-j+p)``
+from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
 ```math
 \begin{aligned}
-    \mathbf{X̂_0}  &= \mathbf{E_x̂ Z + G_x̂ U_0 + J_x̂ D_0} \\
+    \mathbf{X̂_0}  &= \mathbf{E_x̂ Z + G_x̂ U_0 + J_x̂ D_0 + B_x̂} \\
                   &= \mathbf{E_x̂ Z + F_x̂}
 \end{aligned}
 ```
+The matrices ``\mathbf{E, G, J, B, E_x̂, G_x̂, J_x̂, B_x̂}`` are defined in the Extended Help 
+section. The vectors ``\mathbf{F, F_x̂, f_x̄}`` are recalculated at each discrete time step, 
+see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstraint!(::MovingHorizonEstimator, ::LinModel)`](@ref).
 
 # Extended Help
 !!! details "Extended Help"
-    Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}``, and the function 
-    ``\mathbf{S}(j) = ∑_{i=0}^j \mathbf{Â}^i``, the prediction matrices for the sensor
-    noises are computed by (notice the minus signs after the equalities):
+    Using the augmented process model matrices ``\mathbf{Â, B̂_u, Ĉ^m, B̂_d, D̂_d^m}``, and the
+    function ``\mathbf{S}(j) = ∑_{i=0}^j \mathbf{Â}^i``, the prediction matrices for the
+    sensor noises depend on the constant ``p``. For ``p=0``, the matrices are computed by:
+    ```math
+    \begin{aligned}
+    \mathbf{E} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m}\mathbf{Â}^{1}                  & \mathbf{Ĉ^m}\mathbf{Â}^{0}                    & \cdots & \mathbf{0}                               \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{2}                  & \mathbf{Ĉ^m}\mathbf{Â}^{1}                    & \cdots & \mathbf{0}                               \\ 
+        \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e}                & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Ĉ^m}\mathbf{Â}^{0}               \end{bmatrix} \\
+    \mathbf{G} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}      & \mathbf{0}                                    & \cdots & \mathbf{0}                               \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{1}\mathbf{B̂_u}      & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                               \\ 
+        \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
+    \mathbf{J} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂_d^m}                                & \cdots & \mathbf{0}                               \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{1}\mathbf{B̂_d}      & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                               \\ 
+        \vdots                                      & \vdots                                        & \ddots & \vdots                                   \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-1}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{D̂_d^m}                           \end{bmatrix} \\
+    \mathbf{B} &= - \begin{bmatrix}
+        \mathbf{Ĉ^m S}(0)                    \\
+        \mathbf{Ĉ^m S}(1)                    \\
+        \vdots                               \\
+        \mathbf{Ĉ^m S}(H_e-1) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
+    \end{aligned}
+    ```
+    or, for ``p=1``, the matrices are given by:
     ```math
     \begin{aligned}
     \mathbf{E} &= - \begin{bmatrix}
@@ -948,10 +1033,10 @@ calculated with:
         \vdots                                      & \vdots                                        & \ddots & \vdots       \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_u}    & \cdots & \mathbf{0}   \end{bmatrix} \\
     \mathbf{J} &= - \begin{bmatrix}
-        \mathbf{D̂^m}                                & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂^m}                                  & \cdots & \mathbf{0}   \\ 
+        \mathbf{D̂_d^m}                              & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
+        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂_d^m}                                & \cdots & \mathbf{0}   \\ 
         \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{D̂^m} \end{bmatrix} \\
+        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{D̂_d^m} \end{bmatrix} \\
     \mathbf{B} &= - \begin{bmatrix}
         \mathbf{0}                           \\  
         \mathbf{Ĉ^m S}(0)                    \\
@@ -959,29 +1044,27 @@ calculated with:
         \mathbf{Ĉ^m S}(H_e-2) \end{bmatrix}  \mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
-    for the estimation error at arrival:
-    ```math
-    \mathbf{e_x̄} = \begin{bmatrix}
-        -\mathbf{I} & \mathbf{0} & \cdots & \mathbf{0} \end{bmatrix}
-    ```
-    and, for the estimated states:
+    The matrices for the estimated states are computed by:
     ```math
     \begin{aligned}
     \mathbf{E_x̂} &= \begin{bmatrix}
-        \mathbf{Â}^{1}                      & \mathbf{I}                        & \cdots & \mathbf{0}                   \\
+        \mathbf{Â}^{1}                      & \mathbf{A}^{0}                    & \cdots & \mathbf{0}                   \\
         \mathbf{Â}^{2}                      & \mathbf{Â}^{1}                    & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
-        \mathbf{Â}^{H_e}                    & \mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Â}^{1}               \end{bmatrix} \\
+        \mathbf{Â}^{H_e}                    & \mathbf{Â}^{H_e-1}                & \cdots & \mathbf{Â}^{0}               \end{bmatrix} \\
     \mathbf{G_x̂} &= \begin{bmatrix}
         \mathbf{Â}^{0}\mathbf{B̂_u}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
         \mathbf{Â}^{1}\mathbf{B̂_u}          & \mathbf{Â}^{0}\mathbf{B̂_u}        & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e-1}\mathbf{B̂_u}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_u}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_u}   \end{bmatrix} \\
-    \mathbf{J_x̂} &= \begin{bmatrix}
+    \mathbf{J_x̂^†} &= \begin{bmatrix}
         \mathbf{Â}^{0}\mathbf{B̂_d}          & \mathbf{0}                        & \cdots & \mathbf{0}                   \\ 
         \mathbf{Â}^{1}\mathbf{B̂_d}          & \mathbf{Â}^{0}\mathbf{B̂_d}        & \cdots & \mathbf{0}                   \\ 
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
-        \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix} \\
+        \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix} \ , \quad
+    \mathbf{J_x̂} = \begin{cases}
+        [\begin{smallmatrix} \mathbf{J_x̂^†} & \mathbf{0} \end{smallmatrix}]     & p=0                                   \\
+                             \mathbf{J_x̂^†}                                     & p=1                                   \end{cases}   \\
     \mathbf{B_x̂} &= \begin{bmatrix}
         \mathbf{S}(0)                    \\
         \mathbf{S}(1)                    \\
@@ -992,76 +1075,104 @@ calculated with:
     All these matrices are truncated when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
-    model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
+    model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
     nym, nx̂ = length(i_ym), size(Â, 2)
     nŵ = nx̂
     # --- pre-compute matrix powers ---
-    # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,He+1] = A^He
-    Âpow = Array{NT}(undef, nx̂, nx̂, He+1)
-    Âpow[:,:,1] = I(nx̂)
+    # Apow3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,He+1] = A^He
+    Âpow3D = Array{NT}(undef, nx̂, nx̂, He+1)
+    Âpow3D[:,:,1] = I(nx̂)
     for j=2:He+1
-        Âpow[:,:,j] = @views Âpow[:,:,j-1]*Â
+        Âpow3D[:,:,j] = @views Âpow3D[:,:,j-1]*Â
     end
-    # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
-    Âpow_csum  = cumsum(Âpow, dims=3)
+    # nĈm_Âpow3D array : similar indices as Apow3D
+    nĈm_Âpow3D = Array{NT}(undef, nym, nx̂, He+1)
+    nĈm_Âpow3D[:,:,1] = -Ĉm
+    for j=2:He+1
+        nĈm_Âpow3D[:,:,j] = @views -Ĉm*Âpow3D[:,:,j]
+    end
     # helper function to improve code clarity and be similar to eqs. in docstring:
-    getpower(array3D, power) = array3D[:,:, power+1]
+    getpower(array3D, power) = @views array3D[:,:, power+1]
     # --- decision variables Z ---
-    nĈm_Âpow = reduce(vcat, -Ĉm*getpower(Âpow, i) for i=0:He-1)
+    nĈm_Âpow = reduce(vcat, getpower(nĈm_Âpow3D, i) for i=0:He)
     E = zeros(NT, nym*He, nx̂ + nŵ*He)
-    E[:, 1:nx̂] = nĈm_Âpow
-    for j=1:He-1
-        iRow = (1 + j*nym):(nym*He)
-        iCol = (1:nŵ) .+ (j-1)*nŵ .+ nx̂
-        E[iRow, iCol] = nĈm_Âpow[1:length(iRow) ,:]
+    col_begin = iszero(p) ? 1    : 0
+    col_end   = iszero(p) ? He : He-1
+    i = 0
+    for j=col_begin:col_end
+        iRow = (1 + i*nym):(nym*He)
+        iCol = (1:nŵ) .+ j*nŵ
+        E[iRow, iCol] = @views nĈm_Âpow[1:length(iRow) ,:]
+        i += 1
     end
+    iszero(p) && @views (E[:, 1:nx̂] = @views nĈm_Âpow[nym+1:end, :])
     ex̄ = [-I zeros(NT, nx̂, nŵ*He)]
-    Âpow_vec = reduce(vcat, getpower(Âpow, i) for i=0:He)
+    Âpow_vec = reduce(vcat, getpower(Âpow3D, i) for i=0:He)
     Ex̂ = zeros(NT, nx̂*He, nx̂ + nŵ*He)
-    Ex̂[:, 1:nx̂] = Âpow_vec[nx̂+1:end, :]
-    for j=0:He-1
-        iRow = (1 + j*nx̂):(nx̂*He)
-        iCol = (1:nŵ) .+ j*nŵ .+ nx̂
-        Ex̂[iRow, iCol] = Âpow_vec[1:length(iRow) ,:]
+    i=0
+    for j=1:He
+        iRow = (1 + i*nx̂):(nx̂*He)
+        iCol = (1:nŵ) .+ j*nŵ
+        Ex̂[iRow, iCol] = @views Âpow_vec[1:length(iRow) ,:]
+        i+=1
     end
+    Ex̂[:, 1:nx̂] = @views Âpow_vec[nx̂+1:end, :] 
     # --- manipulated inputs U ---
-    nĈm_Âpow_B̂u = @views reduce(vcat, nĈm_Âpow[(1+(i*nym)):((i+1)*nym),:]*B̂u for i=0:He-1)
+    nĈm_Âpow_B̂u = reduce(vcat, getpower(nĈm_Âpow3D, i)*B̂u for i=0:He-1)
+    nĈm_Âpow_B̂u = [zeros(nym, nu) ; nĈm_Âpow_B̂u]
     G = zeros(NT, nym*He, nu*He)
-    for j=1:He-1
-        iRow = (1 + j*nym):(nym*He)
-        iCol = (1:nu) .+ (j-1)*nu
-        G[iRow, iCol] = nĈm_Âpow_B̂u[1:length(iRow) ,:]
+    i=0
+    col_begin = iszero(p) ? 1    : 0
+    col_end   = iszero(p) ? He-1 : He-2
+    for j=col_begin:col_end
+        iRow = (1 + i*nym):(nym*He)
+        iCol = (1:nu) .+ j*nu
+        G[iRow, iCol] = @views nĈm_Âpow_B̂u[1:length(iRow) ,:]
+        i+=1
     end
-    Âpow_B̂u = reduce(vcat, getpower(Âpow, i)*B̂u for i=0:He)
+    iszero(p) && @views (G[:, 1:nu] = nĈm_Âpow_B̂u[nym+1:end, :])
+    Âpow_B̂u = reduce(vcat, getpower(Âpow3D, i)*B̂u for i=0:He-1)
     Gx̂ = zeros(NT, nx̂*He, nu*He)
     for j=0:He-1
         iRow = (1 + j*nx̂):(nx̂*He)
         iCol = (1:nu) .+ j*nu
-        Gx̂[iRow, iCol] = Âpow_B̂u[1:length(iRow) ,:]
+        Gx̂[iRow, iCol] = @views Âpow_B̂u[1:length(iRow) ,:]
     end
     # --- measured disturbances D ---
-    nĈm_Âpow_B̂d = @views reduce(vcat, nĈm_Âpow[(1+(i*nym)):((i+1)*nym),:]*B̂d for i=0:He-1)
-    J = repeatdiag(-D̂dm, He)
-    for j=1:He-1
-        iRow = (1 + j*nym):(nym*He)
-        iCol = (1:nd) .+ (j-1)*nd
+    nĈm_Âpow_B̂d = reduce(vcat, getpower(nĈm_Âpow3D, i)*B̂d for i=0:He-1)
+    nĈm_Âpow_B̂d = [-D̂dm; nĈm_Âpow_B̂d]
+    J = zeros(NT, nym*He, nd*(He+1-p))
+    col_begin = iszero(p) ? 1    : 0
+    col_end   = iszero(p) ? He+1 : He
+    i=0
+    for j=col_begin:col_end-1
+        iRow = (1 + i*nym):(nym*He)
+        iCol = (1:nd) .+ j*nd
         J[iRow, iCol] = nĈm_Âpow_B̂d[1:length(iRow) ,:]
+        i+=1
     end
-    Âpow_B̂d = reduce(vcat, getpower(Âpow, i)*B̂d for i=0:He)
-    Jx̂ = zeros(NT, nx̂*He, nd*He)
+    iszero(p) && @views (J[:, 1:nd] = nĈm_Âpow_B̂d[nym+1:end, :])
+    Âpow_B̂d = reduce(vcat, getpower(Âpow3D, i)*B̂d for i=0:He-1)
+    Jx̂ = zeros(NT, nx̂*He, nd*(He+1-p))
     for j=0:He-1
         iRow = (1 + j*nx̂):(nx̂*He)
         iCol = (1:nd) .+ j*nd
         Jx̂[iRow, iCol] = Âpow_B̂d[1:length(iRow) ,:]
     end
     # --- state x̂op and state update f̂op operating points ---
+    # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
+    Âpow_csum  = cumsum(Âpow3D, dims=3)
     f̂_op_n_x̂op = (f̂op - x̂op)
     coef_B  = zeros(NT, nym*He, nx̂)
-    for j=1:He-1
-        iRow = (1:nym) .+ nym*j
-        coef_B[iRow,:] = -Ĉm*getpower(Âpow_csum, j-1)
+    row_begin = iszero(p) ? 0    : 1
+    row_end   = iszero(p) ? He-1 : He-2
+    j=0
+    for i=row_begin:row_end
+        iRow = (1:nym) .+ nym*i
+        coef_B[iRow,:] = -Ĉm*getpower(Âpow_csum, j)
+        j+=1
     end
     B = coef_B*f̂_op_n_x̂op
     coef_Bx̂ = Matrix{NT}(undef, nx̂*He, nx̂)
@@ -1075,7 +1186,7 @@ end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref), except for `ex̄`."
 function init_predmat_mhe(
-    model::SimModel{NT}, He, i_ym, Â, _ , _ , _ , _ , _ , _
+    model::SimModel{NT}, He, i_ym, Â, _ , _ , _ , _ , _ , _ , p
 ) where {NT<:Real}
     nym, nx̂ = length(i_ym), size(Â, 2)
     nŵ = nx̂
@@ -1084,7 +1195,7 @@ function init_predmat_mhe(
     Ex̂ = zeros(NT, 0, nx̂ + nŵ*He)
     G  = zeros(NT, 0, model.nu*He)
     Gx̂ = zeros(NT, 0, model.nu*He)
-    J  = zeros(NT, 0, model.nd*He)
+    J  = zeros(NT, 0, model.nd*(He+1-p))
     Jx̂ = zeros(NT, 0, model.nd*He)
     B  = zeros(NT, nym*He)
     Bx̂ = zeros(NT, nx̂*He)

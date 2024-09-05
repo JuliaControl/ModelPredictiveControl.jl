@@ -92,9 +92,12 @@ The arguments are in standard deviations σ, i.e. same units than outputs and st
 matrices ``\mathbf{Â, B̂_u, B̂_d, Ĉ, D̂_d}`` are `model` matrices augmented with the stochastic
 model, which is specified by the numbers of integrator `nint_u` and `nint_ym` (see Extended
 Help). Likewise, the covariance matrices are augmented with ``\mathbf{Q̂ = \text{diag}(Q, 
-Q_{int_u}, Q_{int_{ym}})}`` and ``\mathbf{R̂ = R}``. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are
-the rows of ``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and 
-unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
+Q_{int_u}, Q_{int_{ym}})}`` and ``\mathbf{R̂ = R}``. The Extended Help provide some guidelines
+on the covariance tuning. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows of 
+``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and unmeasured
+ones, for ``\mathbf{Ĉ^u, D̂_d^u}``). The Kalman filter will estimate the current state with 
+the newest measurements ``\mathbf{x̂}_k(k)`` if `direct` is `true`, else it will predict the
+state of the next time step ``\mathbf{x̂}_k(k+1)``.
 
 # Arguments
 !!! info
@@ -116,7 +119,7 @@ unmeasured ones, for ``\mathbf{Ĉ^u, D̂_d^u}``).
 - `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
     disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
-   estimator, in opposition to the delayed/prediction form).
+   estimator, in opposition to the delayed/predictor form).
 
 # Examples
 ```jldoctest
@@ -133,6 +136,11 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 
 # Extended Help
 !!! details "Extended Help"
+    The `σR` argument is generally fixed at the estimated standard deviations of the sensor
+    noises. The `σQ`, `σQint_u` and `σQint_ym` arguments can be used to tune the filter
+    response. Increasing them make the filter more responsive to disturbances but more
+    sensitive to measurement noise.
+
     The model augmentation with `nint_u` vector adds integrators at model manipulated inputs,
     and `nint_ym`, at measured outputs. They create the integral action when the estimator
     is used in a controller as state feedback. By default, the method [`default_nint`](@ref)
@@ -249,7 +257,7 @@ function correct_estimate_obsv!(estim::StateEstimator, y0m, d0, K̂)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function predict_estimate_obsv!(estim::StateEstimator, y0m, d0, u0)
+function predict_estimate_obsv!(estim::StateEstimator, _ , d0, u0)
     x̂0corr = estim.x̂0
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     x̂0next = estim.buffer.x̂
@@ -331,24 +339,40 @@ end
 
 Construct a time-varying Kalman Filter with the [`LinModel`](@ref) `model`.
 
-The process model is identical to [`SteadyKalmanFilter`](@ref). The matrix 
-``\mathbf{P̂}_k(k+1)`` is the estimation error covariance of `model` states augmented with
-the stochastic ones (specified by `nint_u` and `nint_ym`). Three keyword arguments modify
-its initial value with ``\mathbf{P̂}_{-1}(0) = 
-    \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``.
+The process model is identical to [`SteadyKalmanFilter`](@ref). The matrix ``\mathbf{P̂}`` is
+the estimation error covariance of `model` states augmented with the stochastic ones
+(specified by `nint_u` and `nint_ym`). Three keyword arguments specify its initial value with
+``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), 
+\mathbf{P_{int_{ym}}}(0) \}``. The initial state estimate ``\mathbf{x̂}_{-1}(0)`` can be
+manually specified with [`setstate!`](@ref), or automatically with [`initstate!`](@ref).
 
 # Arguments
 !!! info
     Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `model::LinModel` : (deterministic) model for the estimations.
+- `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
+    are unmeasured ``\mathbf{y^u}``.
 - `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
     covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
+- `σQ=fill(1/model.nx,model.nx)` or *`sigmaQ`* : main diagonal of the process noise
+    covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
+- `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
+    ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
+- `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
+    the manipulated inputs (vector), use `nint_u=0` for no integrator.
+- `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
+    disturbances at the measured outputs, use `nint_ym=0` for no integrator.
+- `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
 - `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured
     disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+- `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
+    disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
-- `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
+- `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
+   estimator, in opposition to the delayed/predictor form).
 
 # Examples
 ```jldoctest
@@ -558,18 +582,42 @@ See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)``
 state-space functions augmented with the stochastic model of the unmeasured disturbances,
 which is specified by the numbers of integrator `nint_u` and `nint_ym` (see Extended Help).
 The ``\mathbf{ĥ^m}`` function represents the measured outputs of ``\mathbf{ĥ}`` function
-(and unmeasured ones, for ``\mathbf{ĥ^u}``).
+(and unmeasured ones, for ``\mathbf{ĥ^u}``). The matrix ``\mathbf{P̂}`` is the estimation
+error covariance of `model` state augmented with the stochastic ones. Three keyword
+arguments specify its initial value with ``\mathbf{P̂}_{-1}(0) = 
+\mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``. The 
+initial state estimate ``\mathbf{x̂}_{-1}(0)`` can be manually specified with [`setstate!`](@ref).
 
 # Arguments
 !!! info
     Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
 - `model::SimModel` : (deterministic) model for the estimations.
+- `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
+    are unmeasured ``\mathbf{y^u}``.
+- `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
+    covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
+- `σQ=fill(1/model.nx,model.nx)` or *`sigmaQ`* : main diagonal of the process noise
+    covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
+- `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
+    ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
+- `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
+    the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
+- `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
+    disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
+- `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
+- `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+- `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
+    disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
+- `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
+    disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
+- `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
+   estimator, in opposition to the delayed/predictor form).
 - `α=1e-3` or *`alpha`* : alpha parameter, spread of the state distribution ``(0 < α ≤ 1)``.
 - `β=2` or *`beta`* : beta parameter, skewness and kurtosis of the states distribution ``(β ≥ 0)``.
 - `κ=0` or *`kappa`* : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
-- `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
-- `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
 
 # Examples
 ```jldoctest
@@ -586,11 +634,12 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
 
 # Extended Help
 !!! details "Extended Help"
-    The Extended Help of [`SteadyKalmanFilter`](@ref) details the augmentation with `nint_ym` 
-    and `nint_u` arguments. The default augmentation scheme is identical, that is `nint_u=0`
-    and `nint_ym` computed by [`default_nint`](@ref). Note that the constructor does not
-    validate the observability of the resulting augmented [`NonLinModel`](@ref). In such
-    cases, it is the user's responsibility to ensure that it is still observable.
+    The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
+    and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation
+    scheme is identical, that is `nint_u=0` and `nint_ym` computed by [`default_nint`](@ref).
+    Note that the constructor does not validate the observability of the resulting augmented
+    [`NonLinModel`](@ref). In such cases, it is the user's responsibility to ensure that it
+    is still observable.
 """
 function UnscentedKalmanFilter(
     model::SM;
@@ -889,19 +938,15 @@ end
 
 Construct an extended Kalman Filter with the [`SimModel`](@ref) `model`.
 
-Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model is 
-identical to [`UnscentedKalmanFilter`](@ref). The Jacobians of the augmented model 
+Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model and the
+keyword arguments are identical to [`UnscentedKalmanFilter`](@ref), except for `α`, `β` and 
+`κ` which do not apply to the extended Kalman Filter. The Jacobians of the augmented model 
 ``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl)
 automatic differentiation.
 
 !!! warning
     See the Extended Help of [`linearize`](@ref) function if you get an error like:    
     `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
-
-# Arguments
-- `model::SimModel` : (deterministic) model for the estimations.
-- `<keyword arguments>` of [`SteadyKalmanFilter`](@ref) constructor.
-- `<keyword arguments>` of [`KalmanFilter`](@ref) constructor.
 
 # Examples
 ```jldoctest

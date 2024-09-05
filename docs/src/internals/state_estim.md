@@ -34,6 +34,12 @@ ModelPredictiveControl.initpred!(::MovingHorizonEstimator, ::LinModel)
 ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel)
 ```
 
+## Solve Optimization Problem
+
+```@docs
+ModelPredictiveControl.optim_objective!(::MovingHorizonEstimator)
+```
+
 ## Evaluate Estimated Output
 
 ```@docs

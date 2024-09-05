@@ -459,8 +459,8 @@ end
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     nmpc0 = NonLinMPC(linmodel1, Hp=15)
     @test isa(nmpc0.estim, SteadyKalmanFilter)
-    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
+    f = (x,u,d) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h = (x,d)   -> linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
@@ -528,8 +528,8 @@ end
     # ensure that the current estimated output is updated for correct JE values:
     @test nmpc.ŷ ≈ ModelPredictiveControl.evalŷ(nmpc.estim, Float64[])
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
-    f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
-    h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
+    f = (x,u,d) -> linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
+    h = (x,d)   -> linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
     d = [0.1]
@@ -606,8 +606,8 @@ end
 
 @testset "NonLinMPC other methods" begin
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    f(x,u,_) = linmodel.A*x + linmodel.Bu*u
-    h(x,_)   = linmodel.C*x
+    f = (x,u,_) -> linmodel.A*x + linmodel.Bu*u
+    h = (x,_)   -> linmodel.C*x
     nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing) 
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test initstate!(nmpc1, [10, 50], [20, 25]) ≈ zeros(4)
@@ -628,8 +628,8 @@ end
     setconstraint!(nmpc_lin, c_ymin=[1.0,1.1], c_ymax=[1.2,1.3])
     @test all((-nmpc_lin.con.A_Ymin[:, end], -nmpc_lin.con.A_Ymax[:, end]) .≈ ([1.0,1.1], [1.2,1.3]))
 
-    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
+    f = (x,u,d) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h = (x,d)   -> linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc = NonLinMPC(nonlinmodel, Hp=1, Hc=1)
 
@@ -690,8 +690,8 @@ end
     info = getinfo(nmpc_lin)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
 
-    f(x,u,_) = linmodel.A*x + linmodel.Bu*u
-    h(x,_)   = linmodel.C*x
+    f = (x,u,_) -> linmodel.A*x + linmodel.Bu*u
+    h = (x,_)   -> linmodel.C*x
     nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing)
     nmpc = NonLinMPC(nonlinmodel, Hp=50, Hc=5)
 
@@ -764,8 +764,8 @@ end
     @test mpc.M_Hp ≈ diagm(1:1000)
     @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
     @test mpc.L_Hp ≈ diagm(1.1:1000.1)
-    f(x,u,d) = estim.model.A*x + estim.model.Bu*u + estim.model.Bd*d
-    h(x,d)   = estim.model.C*x + estim.model.Du*d
+    f = (x,u,d) -> estim.model.A*x + estim.model.Bu*u + estim.model.Bd*d
+    h = (x,d)   -> estim.model.C*x + estim.model.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
     nmpc = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=1e4, Hp=1000, Hc=10)
     setmodel!(nmpc, Mwt=[100], Nwt=[200], Lwt=[300])
@@ -779,3 +779,41 @@ end
     @test_throws ErrorException setmodel!(nmpc, deepcopy(nonlinmodel))
 end
 
+@testset "LinMPC v.s. NonLinMPC" begin
+    linmodel = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
+    f = (x,u,d) -> linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h = (x,d)   -> linmodel.C*x + linmodel.Dd*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
+    nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
+    optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "sb"=>"yes"))
+    linmpc = LinMPC(KalmanFilter(linmodel), Hp=15, optim=optim)
+    linmpc = setconstraint!(linmpc, ymax=[55,35], Δumax=[5, 5])
+    nonlinmpc1 = NonLinMPC(UnscentedKalmanFilter(nonlinmodel), Hp=15)
+    nonlinmpc1 = setconstraint!(nonlinmpc1, ymax=[55,35], Δumax=[5, 5])
+    nonlinmpc2 = NonLinMPC(KalmanFilter(linmodel), Hp=15)
+    nonlinmpc2 = setconstraint!(nonlinmpc2, ymax=[55,35], Δumax=[5, 5])
+    U_linmpc = zeros(2, 30)
+    U_nonlinmpc1 = zeros(2, 30)
+    U_nonlinmpc2 = zeros(2, 30)
+    for i=1:30
+        r = [55, 35]
+        d = i > 15 ? [0] : [20]
+        y = linmodel(d) + randn(2)
+        preparestate!(linmpc, y, d)
+        preparestate!(nonlinmpc1, y, d)
+        preparestate!(nonlinmpc2, y, d)
+        u1 = moveinput!(linmpc, r, d)
+        u2 = moveinput!(nonlinmpc1, r, d)
+        u3 = moveinput!(nonlinmpc2, r, d)
+        U_linmpc[:, i] = u1
+        U_nonlinmpc1[:, i] = u2 
+        U_nonlinmpc2[:, i] = u3
+        updatestate!(linmpc, u1, y, d)
+        updatestate!(nonlinmpc1, u2, y, d)
+        updatestate!(nonlinmpc2, u3, y, d)
+        updatestate!(linmodel, u1, d)
+    end
+    @test U_linmpc ≈ U_nonlinmpc1 rtol=1e-3 atol=1e-3
+    @test U_linmpc ≈ U_nonlinmpc2 rtol=1e-3 atol=1e-3
+    @test U_nonlinmpc1 ≈ U_nonlinmpc2 rtol=1e-3 atol=1e-3
+end
