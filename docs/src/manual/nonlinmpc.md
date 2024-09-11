@@ -359,7 +359,6 @@ function sim_adapt!(mpc, nonlinmodel, N, ry, plant, x_0, x̂_0, y_step=[0])
     setstate!(plant, x_0)
     initstate!(mpc, [0], plant())
     setstate!(mpc, x̂_0)
-    x̂ = x̂_0
     for i = 1:N
         y = plant() + y_step
         x̂ = preparestate!(mpc, y)
