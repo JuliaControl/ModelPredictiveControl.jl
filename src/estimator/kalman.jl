@@ -316,7 +316,7 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
-        P̂ = copy(P̂_0)
+        P̂   = Hermitian(copy(P̂_0.data), :L) # copy on P̂_0.data necessary for Julia Nightly
         K̂ = zeros(NT, nx̂, nym)
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
@@ -539,7 +539,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
-        P̂ = copy(P̂_0)
+        P̂   = Hermitian(copy(P̂_0.data), :L) # copy on P̂_0.data necessary for Julia Nightly
         K̂ = zeros(NT, nx̂, nym)
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
         X̂0,  X̄0  = zeros(NT, nx̂, nσ),  zeros(NT, nx̂, nσ)
@@ -910,10 +910,9 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
+        Q̂, R̂ = Hermitian(Q̂, :L), Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
-        Q̂ = Hermitian(Q̂, :L)
-        R̂ = Hermitian(R̂, :L)
-        P̂ = copy(P̂_0)
+        P̂   = Hermitian(copy(P̂_0.data), :L) # copy on P̂_0.data necessary for Julia Nightly
         K̂ = zeros(NT, nx̂, nym)
         F̂_û, F̂ = zeros(NT, nx̂+nu, nx̂), zeros(NT, nx̂, nx̂)
         Ĥ,  Ĥm = zeros(NT, ny, nx̂),    zeros(NT, nym, nx̂)
