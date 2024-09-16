@@ -118,7 +118,8 @@ function linearize!(
     d0 .= d .- nonlinmodel.dop
     x0 .= x .- nonlinmodel.xop
     # --- compute the Jacobians at linearization points ---
-    A, Bu, Bd, C, Dd = linmodel.A, linmodel.Bu, linmodel.Bd, linmodel.C, linmodel.Dd
+    A::Matrix{NT}, Bu::Matrix{NT}, Bd::Matrix{NT}  = linmodel.A, linmodel.Bu, linmodel.Bd
+    C::Matrix{NT}, Dd::Matrix{NT} = linmodel.C, linmodel.Dd
     xnext0::Vector{NT}, y0::Vector{NT} = linmodel.buffer.x, linmodel.buffer.y
     myf_x0! = (xnext0, x0) -> f!(xnext0, nonlinmodel, x0, u0, d0)
     myf_u0! = (xnext0, u0) -> f!(xnext0, nonlinmodel, x0, u0, d0)
