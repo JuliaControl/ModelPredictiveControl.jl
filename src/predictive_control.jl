@@ -9,7 +9,7 @@ Functor allowing callable `PredictiveController` object as an alias for [`movein
 
 # Examples
 ```jldoctest
-julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
+julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1, direct=false);
 
 julia> u = mpc([5]); round.(u, digits=3)
 1-element Vector{Float64}:

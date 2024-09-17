@@ -9,7 +9,7 @@ Functor allowing callable `StateEstimator` object as an alias for [`evaloutput`]
 
 # Examples
 ```jldoctest
-julia> kf = KalmanFilter(setop!(LinModel(tf(3, [10, 1]), 2), yop=[20]));
+julia> kf = KalmanFilter(setop!(LinModel(tf(3, [10, 1]), 2), yop=[20]), direct=false);
 
 julia> ŷ = kf() 
 1-element Vector{Float64}:
@@ -84,11 +84,3 @@ include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
 include("estimator/mhe.jl")
 include("estimator/internal_model.jl")
-
-"""
-    evalŷ(estim::StateEstimator, d) -> ŷ
-
-Evaluate [`StateEstimator`](@ref) output `ŷ` from measured disturbance `d` and `estim.x̂0`.
-"""
-evalŷ(estim::StateEstimator, d) = evaloutput(estim, d)
-    

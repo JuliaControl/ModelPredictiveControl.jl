@@ -42,7 +42,9 @@ See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
 ```jldoctest
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
 
-julia> ry = [5]; u = moveinput!(mpc, ry); round.(u, digits=3)
+julia> preparestate!(mpc, [0]); ry = [5];
+
+julia> u = moveinput!(mpc, ry); round.(u, digits=3)
 1-element Vector{Float64}:
  1.0
 ```
@@ -58,6 +60,9 @@ function moveinput!(
     R̂y = Rhaty,
     R̂u = Rhatu
 )
+    if mpc.estim.direct && !mpc.estim.corrected[]
+        @warn "preparestate! should be called before moveinput! with current estimators"
+    end
     validate_args(mpc, ry, d, D̂, R̂y, R̂u)
     initpred!(mpc, mpc.estim.model, d, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model)
@@ -102,7 +107,7 @@ available for [`NonLinMPC`](@ref).
 ```jldoctest
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1, Hc=1);
 
-julia> u = moveinput!(mpc, [10]);
+julia> preparestate!(mpc, [0]); u = moveinput!(mpc, [10]);
 
 julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 1-element Vector{Float64}:
@@ -184,7 +189,7 @@ They are computed with these equations using in-place operations:
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u)
     mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
     ŷ, F, q̃, r = mpc.ŷ, mpc.F, mpc.q̃, mpc.r
-    ŷ .= evalŷ(mpc.estim, d)
+    ŷ .= evaloutput(mpc.estim, d)
     predictstoch!(mpc, mpc.estim) # init mpc.F with Ŷs for InternalModel
     F .+= mpc.B
     mul!(F, mpc.K, mpc.estim.x̂0, 1, 1) 
@@ -220,7 +225,7 @@ Init `ŷ, F, d0, D̂0, D̂E, R̂y0, R̂u0` vectors when model is not a [`LinMod
 """
 function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
     mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
-    mpc.ŷ .= evalŷ(mpc.estim, d)
+    mpc.ŷ .= evaloutput(mpc.estim, d)
     predictstoch!(mpc, mpc.estim) # init mpc.F with Ŷs for InternalModel
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop

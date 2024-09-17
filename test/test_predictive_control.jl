@@ -54,6 +54,7 @@ end
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3), yop=[10])
     mpc1 = LinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
     r = [15]
+    preparestate!(mpc1, [10])
     u = moveinput!(mpc1, r)
     @test u ≈ [1] atol=1e-2
     u = mpc1(r)
@@ -62,13 +63,16 @@ end
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ r[1] atol=1e-2
     mpc2 = LinMPC(linmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
+    preparestate!(mpc2, [10])
     u = moveinput!(mpc2, r)
     @test u ≈ [1] atol=1e-2
     mpc3 = LinMPC(linmodel, Mwt=[0], Nwt=[0], Lwt=[1])
+    preparestate!(mpc3, [10])
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc4  = LinMPC(model2)
+    preparestate!(mpc4, [0])
     moveinput!(mpc4, [0]) ≈ [0.0]
 
     @test_throws DimensionMismatch moveinput!(mpc1, [0,0,0])
@@ -127,10 +131,10 @@ end
     setstate!(mpc1, [1,2,3,4])
     @test mpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(mpc1, [0,0,0,0])
-    preparestate!(mpc1, mpc1.estim())
-    updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
+    preparestate!(mpc1, [50, 30])
+    updatestate!(mpc1, mpc1.estim.model.uop, [50, 30])
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
-    preparestate!(mpc1, mpc1.estim())
+    preparestate!(mpc1, [50, 30])
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -187,6 +191,7 @@ end
     @test_throws ArgumentError setconstraint!(mpc, c_ymin=[0,0,0])
     @test_throws ArgumentError setconstraint!(mpc, c_ymax=[0,0,0])
 
+    preparestate!(mpc, mpc.estim.model.yop, mpc.estim.model.dop)
     moveinput!(mpc, [0, 0], [0])
     @test_throws ErrorException setconstraint!(mpc, c_umin=[1, 1], c_umax=[1, 1])
     @test_throws ErrorException setconstraint!(mpc, umin=[-Inf,-Inf], umax=[+Inf,+Inf])
@@ -208,6 +213,7 @@ end
     setconstraint!(mpc, umin=[-3], umax=[3])
     setconstraint!(mpc, Δumin=[-1.5], Δumax=[1.5])
     setconstraint!(mpc, ymin=[-100], ymax=[100])
+    preparestate!(mpc, [0])
     moveinput!(mpc, [-10])
     info = getinfo(mpc)
     @test info[:ΔU][begin] ≈ -1.5 atol=1e-1
@@ -276,6 +282,7 @@ end
     @test mpc.con.Y0min ≈ fill(-54.0 -10, 1000)
     @test mpc.con.Y0max ≈ fill(56.0  -10, 1000)
     r = [15]
+    preparestate!(mpc, [10])
     u = moveinput!(mpc, r)
     @test u ≈ [2] atol=1e-2
     setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))
@@ -346,6 +353,7 @@ end
 @testset "ExplicitMPC moves and getinfo" begin
     mpc1 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
     r = [5]
+    preparestate!(mpc1, [0])
     u = moveinput!(mpc1, r)
     @test u ≈ [1] atol=1e-2
     u = mpc1(r)
@@ -354,13 +362,16 @@ end
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ r[1] atol=1e-2
     mpc2 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
+    preparestate!(mpc2, [0])
     u = moveinput!(mpc2, [5])
     @test u ≈ [1] atol=1e-2
     mpc3 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1])
+    preparestate!(mpc3, [0])
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc4  = ExplicitMPC(model2)
+    preparestate!(mpc4, [0])
     moveinput!(mpc4, [0]) ≈ [0.0]
 end
 
@@ -414,10 +425,10 @@ end
     setstate!(mpc1, [1,2,3,4])
     @test mpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(mpc1, [0,0,0,0])
-    preparestate!(mpc1, mpc1.estim())
-    updatestate!(mpc1, mpc1.estim.model.uop, mpc1.estim())
+    preparestate!(mpc1, [50, 30])
+    updatestate!(mpc1, mpc1.estim.model.uop, [50, 30])
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
-    preparestate!(mpc1, mpc1.estim())
+    preparestate!(mpc1, [50, 30])
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -433,6 +444,7 @@ end
     @test mpc.Yop ≈ fill(10.0, 1000)
     @test mpc.Uop ≈ fill(1.0, 1000)
     r = [15]
+    preparestate!(mpc, [10])
     u = moveinput!(mpc, r)
     @test u ≈ [2] atol=1e-2
     setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))
@@ -512,6 +524,7 @@ end
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
     r = [15]
+    preparestate!(nmpc_lin, [10])
     u = moveinput!(nmpc_lin, r)
     @test u ≈ [1] atol=5e-2
     u = nmpc_lin(r)
@@ -523,16 +536,18 @@ end
     R̂y = fill(r[1], Hp)
     JE = (_ , ŶE, _ ) -> sum((ŶE[2:end] - R̂y).^2)
     nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
+    preparestate!(nmpc, [10])
     u = moveinput!(nmpc)
     @test u ≈ [1] atol=5e-2
     # ensure that the current estimated output is updated for correct JE values:
-    @test nmpc.ŷ ≈ ModelPredictiveControl.evalŷ(nmpc.estim, Float64[])
+    @test nmpc.ŷ ≈ evaloutput(nmpc.estim, Float64[])
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
     f = (x,u,d) -> linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h = (x,d)   -> linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
     d = [0.1]
+    preparestate!(nmpc2, [0], [0])
     u = moveinput!(nmpc2, 7d, d)
     @test u ≈ [0] atol=5e-2
     u = nmpc2(7d, d)
@@ -541,9 +556,11 @@ end
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 7d[1] atol=5e-2
     nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
+    preparestate!(nmpc3, [0], [0])
     u = moveinput!(nmpc3, 7d, d)
     @test u ≈ [0] atol=5e-2
     nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[0], Nwt=[0], Lwt=[1])
+    preparestate!(nmpc4, [0], [0])
     u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
     nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Hp=15, Cwt=Inf), ymin=[1])
@@ -554,11 +571,13 @@ end
     @test ForwardDiff.gradient(vec->g_Y0min_end(vec...), [20.0, 10.0]) ≈ [-5, -5] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
+    preparestate!(nmpc6, [0])
     @test moveinput!(nmpc6, [0]) ≈ [0.0]
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
     nonlinmodel2.h!(y, Float32[0,0], Float32[0])
+    preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0]
 end
 
@@ -608,14 +627,16 @@ end
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     f = (x,u,_) -> linmodel.A*x + linmodel.Bu*u
     h = (x,_)   -> linmodel.C*x
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing) 
+    nonlinmodel = setop!(
+        NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30]
+    )
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test initstate!(nmpc1, [10, 50], [20, 25]) ≈ zeros(4)
     setstate!(nmpc1, [1,2,3,4])
     @test nmpc1.estim.x̂0 ≈ [1,2,3,4]
     setstate!(nmpc1, [0,0,0,0])
-    preparestate!(nmpc1, nmpc1.estim())
-    updatestate!(nmpc1, nmpc1.estim.model.uop, nmpc1.estim())
+    preparestate!(nmpc1, [50, 30])
+    updatestate!(nmpc1, nmpc1.estim.model.uop, [50, 30])
     @test nmpc1.estim.x̂0 ≈ [0,0,0,0] atol=1e-6
 end
 
@@ -662,6 +683,7 @@ end
     setconstraint!(nmpc_lin, umin=[-3], umax=[3])
     setconstraint!(nmpc_lin, Δumin=[-1.5], Δumax=[1.5])
     setconstraint!(nmpc_lin, ymin=[-100], ymax=[100])
+    preparestate!(nmpc_lin, [0])
     moveinput!(nmpc_lin, [-20])
     info = getinfo(nmpc_lin)
     @test info[:ΔU][begin] ≈ -1.5 atol=1e-2
@@ -699,6 +721,7 @@ end
     setconstraint!(nmpc, umin=[-3], umax=[3])
     setconstraint!(nmpc, Δumin=[-1.5], Δumax=[1.5])
     setconstraint!(nmpc, ymin=[-100], ymax=[100])
+    preparestate!(nmpc, [0])
     moveinput!(nmpc, [-20])
     info = getinfo(nmpc)
     @test info[:ΔU][begin] ≈ -1.5 atol=1e-2
@@ -740,6 +763,7 @@ end
     @test mpc.con.Y0min ≈ fill(-54.0 -10, 1000)
     @test mpc.con.Y0max ≈ fill(56.0  -10, 1000)
     r = [15]
+    preparestate!(mpc, [10])
     u = moveinput!(mpc, r)
     @test u ≈ [2] atol=1e-2
     setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))

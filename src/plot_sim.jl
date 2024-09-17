@@ -290,7 +290,7 @@ function sim_closedloop!(
         u  = sim_getu!(est_mpc, u_ry, d, ru)
         ud = u + u_step + u_noise.*randn(plant.nu)
         Y_data[:, i]        .= y
-        Ŷ_data[:, i]        .= evalŷ(estim, d)
+        Ŷ_data[:, i]        .= evaloutput(estim, d)
         U_Ry_data[:, i]     .= u_ry
         U_data[:, i]        .= u
         Ud_data[:, i]       .= ud
