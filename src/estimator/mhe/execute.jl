@@ -9,7 +9,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , d0, u0)
     estim.Nk        .= 0
     estim.H̃         .= 0
     estim.q̃         .= 0
-    estim.p         .= 0
+    estim.r         .= 0
     if estim.direct
         # add u0(-1) and d0(-1) to the data windows:
         estim.U0[1:estim.model.nu] .= u0
@@ -211,15 +211,15 @@ end
 @doc raw"""
     initpred!(estim::MovingHorizonEstimator, model::LinModel) -> nothing
 
-Init quadratic optimization matrices `F, fx̄, H̃, q̃, p` for [`MovingHorizonEstimator`](@ref).
+Init quadratic optimization matrices `F, fx̄, H̃, q̃, r` for [`MovingHorizonEstimator`](@ref).
 
 See [`init_predmat_mhe`](@ref) for the definition of the vectors ``\mathbf{F, f_x̄}``. It
 also inits `estim.optim` objective function, expressed as the quadratic general form:
 ```math
-    J = \min_{\mathbf{Z̃}} \frac{1}{2}\mathbf{Z̃' H̃ Z̃} + \mathbf{q̃' Z̃} + p 
+    J = \min_{\mathbf{Z̃}} \frac{1}{2}\mathbf{Z̃' H̃ Z̃} + \mathbf{q̃' Z̃} + r 
 ```
 in which ``\mathbf{Z̃} = [\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``. Note that
-``p`` is useless at optimization but required to evaluate the objective minima ``J``. The 
+``r`` is useless at optimization but required to evaluate the objective minima ``J``. The 
 Hessian ``\mathbf{H̃}`` matrix of the quadratic general form is not constant here because
 of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
 ```math
@@ -232,7 +232,7 @@ of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
     \mathbf{Ñ}_{N_k} &= \mathrm{diag}(C,  \mathbf{0},  \mathbf{Q̂}_{N_k}^{-1})               \\
     \mathbf{H̃}       &= 2(\mathbf{Ẽ_Z̃}' \mathbf{M}_{N_k} \mathbf{Ẽ_Z̃} + \mathbf{Ñ}_{N_k})   \\
     \mathbf{q̃}       &= 2(\mathbf{M}_{N_k} \mathbf{Ẽ_Z̃})' \mathbf{F_Z̃}                      \\
-            p        &= \mathbf{F_Z̃}' \mathbf{M}_{N_k} \mathbf{F_Z̃}
+            r        &= \mathbf{F_Z̃}' \mathbf{M}_{N_k} \mathbf{F_Z̃}
 \end{aligned}
 ```
 """
@@ -257,7 +257,7 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     M_Nk_ẼZ̃ = M_Nk*ẼZ̃
     @views mul!(estim.q̃[1:nZ̃], M_Nk_ẼZ̃', FZ̃)
     @views lmul!(2, estim.q̃[1:nZ̃])
-    estim.p .= dot(FZ̃, M_Nk, FZ̃)
+    estim.r .= dot(FZ̃, M_Nk, FZ̃)
     estim.H̃.data[1:nZ̃, 1:nZ̃] .= Ñ_Nk
     @views mul!(estim.H̃.data[1:nZ̃, 1:nZ̃], ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
     @views lmul!(2, estim.H̃.data[1:nZ̃, 1:nZ̃])
@@ -460,7 +460,7 @@ It can be called on a [`MovingHorizonEstimator`](@ref) object to evaluate the ob
 function at specific `Z̃` and `V̂` values.
 """
 function obj_nonlinprog!( _ , estim::MovingHorizonEstimator, ::LinModel, _ , Z̃)
-    return obj_quadprog(Z̃, estim.H̃, estim.q̃) + estim.p[]
+    return obj_quadprog(Z̃, estim.H̃, estim.q̃) + estim.r[]
 end
 
 """

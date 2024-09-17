@@ -164,7 +164,7 @@ end
 @doc raw"""
     initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u) -> nothing
 
-Init linear model prediction matrices `F, q̃, p` and current estimated output `ŷ`.
+Init linear model prediction matrices `F, q̃, r` and current estimated output `ŷ`.
 
 See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 They are computed with these equations using in-place operations:
@@ -176,14 +176,14 @@ They are computed with these equations using in-place operations:
     \mathbf{C_u}     &= \mathbf{T} \mathbf{u_0}(k-1) - (\mathbf{R̂_u - U_{op}})          \\
     \mathbf{q̃}       &= 2[(\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} 
                             + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}]              \\
-    p                &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
+    r                &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
                             + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
 \end{aligned}
 ```
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u)
     mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
-    ŷ, F, q̃, p = mpc.ŷ, mpc.F, mpc.q̃, mpc.p
+    ŷ, F, q̃, r = mpc.ŷ, mpc.F, mpc.q̃, mpc.r
     ŷ .= evalŷ(mpc.estim, d)
     predictstoch!(mpc, mpc.estim) # init mpc.F with Ŷs for InternalModel
     F .+= mpc.B
@@ -201,13 +201,13 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     Cy = F .- mpc.R̂y0
     M_Hp_Ẽ = mpc.M_Hp*mpc.Ẽ
     mul!(q̃, M_Hp_Ẽ', Cy)
-    p .= dot(Cy, mpc.M_Hp, Cy)
+    r .= dot(Cy, mpc.M_Hp, Cy)
     if ~mpc.noR̂u
         mpc.R̂u0 .= R̂u .- mpc.Uop
         Cu = mpc.T_lastu0 .- mpc.R̂u0
         L_Hp_S̃ = mpc.L_Hp*mpc.S̃
         mul!(q̃, L_Hp_S̃', Cu, 1, 1)
-        p .+= dot(Cu, mpc.L_Hp, Cu)
+        r .+= dot(Cu, mpc.L_Hp, Cu)
     end
     lmul!(2, q̃)
     return nothing
@@ -367,9 +367,9 @@ at specific input increments `ΔŨ` and predictions `Ŷ0` values. It mutates t
 function obj_nonlinprog!(
     U0, Ȳ, _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ::AbstractVector{NT}
 ) where NT <: Real
-    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
+    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.r[]
     if !iszero(mpc.E)
-        ny, Hp, ŷ, D̂E = model.ny, mpc.Hp, mpc.ŷ, mpc.D̂E
+        ŷ, D̂E = mpc.ŷ, mpc.D̂E
         U = U0
         U  .+= mpc.Uop
         uend = @views U[(end-model.nu+1):end]

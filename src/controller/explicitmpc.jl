@@ -24,7 +24,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     B::Vector{NT}
     H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
-    p::Vector{NT}
+    r::Vector{NT}
     H̃_chol::Cholesky{NT, Matrix{NT}}
     Ks::Matrix{NT}
     Ps::Matrix{NT}
@@ -57,7 +57,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
         H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         # dummy vals (updated just before optimization):
-        q̃, p = zeros(NT, size(H̃, 1)), zeros(NT, 1)
+        q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         H̃_chol = cholesky(H̃)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
@@ -73,7 +73,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
             R̂u0, R̂y0, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
-            H̃, q̃, p,
+            H̃, q̃, r,
             H̃_chol,
             Ks, Ps,
             d0, D̂0, D̂E,

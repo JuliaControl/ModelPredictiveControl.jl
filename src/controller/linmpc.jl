@@ -34,7 +34,7 @@ struct LinMPC{
     B::Vector{NT}
     H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
-    p::Vector{NT}
+    r::Vector{NT}
     Ks::Matrix{NT}
     Ps::Matrix{NT}
     d0::Vector{NT}
@@ -67,7 +67,7 @@ struct LinMPC{
         )
         H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         # dummy vals (updated just before optimization):
-        q̃, p = zeros(NT, size(H̃, 1)), zeros(NT, 1)
+        q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
@@ -82,7 +82,7 @@ struct LinMPC{
             R̂u0, R̂y0, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B, 
-            H̃, q̃, p,
+            H̃, q̃, r,
             Ks, Ps,
             d0, D̂0, D̂E,
             Uop, Yop, Dop,
