@@ -87,7 +87,7 @@ struct MovingHorizonEstimator{
     fx̄::Vector{NT}
     H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
-    p::Vector{NT}
+    r::Vector{NT}
     P̂_0::Hermitian{NT, Matrix{NT}}
     Q̂::Hermitian{NT, Matrix{NT}}
     R̂::Hermitian{NT, Matrix{NT}}
@@ -128,9 +128,9 @@ struct MovingHorizonEstimator{
         invP̄ = Hermitian(inv(P̂_0), :L)
         invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
         invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
-        p = direct ? 0 : 1
+        r = direct ? 0 : 1
         E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
-            model, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
+            model, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, r
         )
         # dummy values (updated just before optimization):
         F, fx̄, Fx̂ = zeros(NT, nym*He), zeros(NT, nx̂), zeros(NT, nx̂*He)
@@ -139,7 +139,7 @@ struct MovingHorizonEstimator{
         )
         nZ̃ = size(Ẽ, 2)
         # dummy values, updated before optimization:
-        H̃, q̃, p = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
+        H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
         X̂op = repeat(x̂op, He)
         X̂0, Y0m = zeros(NT, nx̂*He), zeros(NT, nym*He)
@@ -159,7 +159,7 @@ struct MovingHorizonEstimator{
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             Ẽ, F, G, J, B, ẽx̄, fx̄,
-            H̃, q̃, p,
+            H̃, q̃, r,
             P̂_0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He, Cwt,
             X̂op, X̂0, Y0m, U0, D0, Ŵ, 
             x̂0arr_old, P̂arr_old, Nk,

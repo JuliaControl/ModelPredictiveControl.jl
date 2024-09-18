@@ -42,7 +42,9 @@ See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
 ```jldoctest
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1);
 
-julia> ry = [5]; u = moveinput!(mpc, ry); round.(u, digits=3)
+julia> preparestate!(mpc, [0]); ry = [5];
+
+julia> u = moveinput!(mpc, ry); round.(u, digits=3)
 1-element Vector{Float64}:
  1.0
 ```
@@ -50,24 +52,23 @@ julia> ry = [5]; u = moveinput!(mpc, ry); round.(u, digits=3)
 function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = mpc.estim.buffer.empty;
-    Dhat ::Vector = repeat(d,  mpc.Hp),
-    Rhaty::Vector = repeat(ry, mpc.Hp),
+    d ::Vector = mpc.buffer.empty;
+    Dhat ::Vector = repeat!(mpc.buffer.D̂,  d,  mpc.Hp),
+    Rhaty::Vector = repeat!(mpc.buffer.R̂y, ry, mpc.Hp),
     Rhatu::Vector = mpc.Uop,
     D̂  = Dhat,
     R̂y = Rhaty,
     R̂u = Rhatu
 )
+    if mpc.estim.direct && !mpc.estim.corrected[]
+        @warn "preparestate! should be called before moveinput! with current estimators"
+    end
     validate_args(mpc, ry, d, D̂, R̂y, R̂u)
     initpred!(mpc, mpc.estim.model, d, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model)
     ΔŨ = optim_objective!(mpc)
-    Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
-    u = mpc.estim.lastu0 + mpc.estim.model.uop + Δu
-    return u
+    return getinput(mpc, ΔŨ)
 end
-
-
 
 @doc raw"""
     getinfo(mpc::PredictiveController) -> info
@@ -102,7 +103,7 @@ available for [`NonLinMPC`](@ref).
 ```jldoctest
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1, Hc=1);
 
-julia> u = moveinput!(mpc, [10]);
+julia> preparestate!(mpc, [0]); u = moveinput!(mpc, [10]);
 
 julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 1-element Vector{Float64}:
@@ -164,7 +165,7 @@ end
 @doc raw"""
     initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u) -> nothing
 
-Init linear model prediction matrices `F, q̃, p` and current estimated output `ŷ`.
+Init linear model prediction matrices `F, q̃, r` and current estimated output `ŷ`.
 
 See [`init_predmat`](@ref) and [`init_quadprog`](@ref) for the definition of the matrices.
 They are computed with these equations using in-place operations:
@@ -176,15 +177,15 @@ They are computed with these equations using in-place operations:
     \mathbf{C_u}     &= \mathbf{T} \mathbf{u_0}(k-1) - (\mathbf{R̂_u - U_{op}})          \\
     \mathbf{q̃}       &= 2[(\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} 
                             + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}]              \\
-    p                &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
+    r                &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
                             + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
 \end{aligned}
 ```
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u)
     mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
-    ŷ, F, q̃, p = mpc.ŷ, mpc.F, mpc.q̃, mpc.p
-    ŷ .= evalŷ(mpc.estim, d)
+    ŷ, F, q̃, r = mpc.ŷ, mpc.F, mpc.q̃, mpc.r
+    ŷ .= evaloutput(mpc.estim, d)
     predictstoch!(mpc, mpc.estim) # init mpc.F with Ŷs for InternalModel
     F .+= mpc.B
     mul!(F, mpc.K, mpc.estim.x̂0, 1, 1) 
@@ -201,13 +202,13 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     Cy = F .- mpc.R̂y0
     M_Hp_Ẽ = mpc.M_Hp*mpc.Ẽ
     mul!(q̃, M_Hp_Ẽ', Cy)
-    p .= dot(Cy, mpc.M_Hp, Cy)
+    r .= dot(Cy, mpc.M_Hp, Cy)
     if ~mpc.noR̂u
         mpc.R̂u0 .= R̂u .- mpc.Uop
         Cu = mpc.T_lastu0 .- mpc.R̂u0
         L_Hp_S̃ = mpc.L_Hp*mpc.S̃
         mul!(q̃, L_Hp_S̃', Cu, 1, 1)
-        p .+= dot(Cu, mpc.L_Hp, Cu)
+        r .+= dot(Cu, mpc.L_Hp, Cu)
     end
     lmul!(2, q̃)
     return nothing
@@ -220,7 +221,7 @@ Init `ŷ, F, d0, D̂0, D̂E, R̂y0, R̂u0` vectors when model is not a [`LinMod
 """
 function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
     mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
-    mpc.ŷ .= evalŷ(mpc.estim, d)
+    mpc.ŷ .= evaloutput(mpc.estim, d)
     predictstoch!(mpc, mpc.estim) # init mpc.F with Ŷs for InternalModel
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
@@ -367,9 +368,9 @@ at specific input increments `ΔŨ` and predictions `Ŷ0` values. It mutates t
 function obj_nonlinprog!(
     U0, Ȳ, _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ::AbstractVector{NT}
 ) where NT <: Real
-    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.p[]
+    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.r[]
     if !iszero(mpc.E)
-        ny, Hp, ŷ, D̂E = model.ny, mpc.Hp, mpc.ŷ, mpc.D̂E
+        ŷ, D̂E = mpc.ŷ, mpc.D̂E
         U = U0
         U  .+= mpc.Uop
         uend = @views U[(end-model.nu+1):end]
@@ -499,6 +500,24 @@ Call [`preparestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
 function preparestate!(mpc::PredictiveController, ym, d=mpc.estim.buffer.empty)
     return preparestate!(mpc.estim, ym, d)
+end
+
+@doc raw"""
+    getinput(mpc::PredictiveController, ΔŨ) -> u
+
+Get current manipulated input `u` from a [`PredictiveController`](@ref) solution `ΔŨ`.
+
+The first manipulated input ``\mathbf{u}(k)`` is extracted from the input increments vector
+``\mathbf{ΔŨ}`` and applied on the plant (from the receding horizon principle).
+"""
+function getinput(mpc, ΔŨ)
+    Δu  = mpc.buffer.u
+    for i in 1:mpc.estim.model.nu
+        Δu[i] = ΔŨ[i]
+    end
+    u   = Δu
+    u .+= mpc.estim.lastu0 .+ mpc.estim.model.uop
+    return u
 end
 
 """

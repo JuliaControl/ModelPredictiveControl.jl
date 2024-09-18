@@ -326,23 +326,16 @@ function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) 
     return nothing
 end
 
-@doc raw"""
-    evalŷ(estim::InternalModel, d) -> ŷ
-
-Get [`InternalModel`](@ref) estimated output `ŷ`.
-
-[`InternalModel`](@ref) estimator needs current stochastic output ``\mathbf{ŷ_s}(k)`` to 
-estimate its outputs ``\mathbf{ŷ}(k)``. The method [`preparestate!`](@ref) store this value
-inside `estim` object, it should be thus called before `evalŷ`.
-"""
-function evalŷ(estim::InternalModel, d)
+# Compute estimated output with current stochastic estimate `estim.ŷs` for `InternalModel`
+function evaloutput(estim::InternalModel, d)
     if !estim.corrected[]
-        error("InternalModel: preparestate! must be called before evalŷ")
+        @warn "preparestate! should be called before evaloutput with InternalModel"
     end
+    validate_args(estim.model, d)
     ŷ0d, d0 = estim.buffer.ŷ, estim.buffer.d
     d0 .= d .- estim.model.dop
-    h!(ŷ0d, estim.model, estim.x̂d, d0) 
-    ŷ = ŷ0d
+    ĥ!(ŷ0d, estim, estim.model, estim.x̂0, d0)
+    ŷ   = ŷ0d
     ŷ .+= estim.model.yop .+ estim.ŷs
     return ŷ
 end

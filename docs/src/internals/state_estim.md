@@ -40,12 +40,6 @@ ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel)
 ModelPredictiveControl.optim_objective!(::MovingHorizonEstimator)
 ```
 
-## Evaluate Estimated Output
-
-```@docs
-ModelPredictiveControl.evalŷ
-```
-
 ## Remove Operating Points
 
 ```@docs

@@ -87,7 +87,8 @@ end
 Init `estim.x̂0` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
 The method tries to find a good steady-state for the initial estimate ``\mathbf{x̂}``. It
-removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!`](@ref):
+stores `u - estim.model.uop` at `estim.lastu0` and removes the operating points with 
+[`remove_op!`](@ref), and call [`init_estimate!`](@ref):
 
 - If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
   using `u` and `d` arguments, and uses the `ym` argument to enforce that 
@@ -99,15 +100,13 @@ If applicable, it also sets the error covariance `estim.P̂` to `estim.P̂_0`.
 
 # Examples
 ```jldoctest
-julia> estim = SteadyKalmanFilter(LinModel(tf(3, [10, 1]), 0.5), nint_ym=[2]);
+julia> estim = SteadyKalmanFilter(LinModel(tf(3, [10, 1]), 0.5), nint_ym=[2], direct=false);
 
 julia> u = [1]; y = [3 - 0.1]; x̂ = round.(initstate!(estim, u, y), digits=3)
 3-element Vector{Float64}:
   5.0
   0.0
  -0.1
-
-julia> preparestate!(estim, y); 
 
 julia> x̂ ≈ updatestate!(estim, u, y)
 true
@@ -171,12 +170,15 @@ init_estimate!(::StateEstimator, ::SimModel, _ , _ , _ ) = nothing
 
 Evaluate `StateEstimator` outputs `ŷ` from `estim.x̂0` states and disturbances `d`.
 
-It returns `estim` output at the current time step ``\mathbf{ŷ}(k)``. Calling a
-[`StateEstimator`](@ref) object calls this `evaloutput` method.
+It returns `estim` output at the current time step ``\mathbf{ŷ}(k)``. If `estim.direct` is
+`true`, the method [`preparestate!`](@ref) should be called beforehand to correct the state
+estimate. 
+
+Calling a [`StateEstimator`](@ref) object calls this `evaloutput` method.
 
 # Examples
 ```jldoctest
-julia> kf = SteadyKalmanFilter(setop!(LinModel(tf(2, [10, 1]), 5), yop=[20]));
+julia> kf = SteadyKalmanFilter(setop!(LinModel(tf(2, [10, 1]), 5), yop=[20]), direct=false);
 
 julia> ŷ = evaloutput(kf)
 1-element Vector{Float64}:
@@ -184,6 +186,9 @@ julia> ŷ = evaloutput(kf)
 ```
 """
 function evaloutput(estim::StateEstimator{NT}, d=estim.buffer.empty) where NT <: Real
+    if estim.direct && !estim.corrected[]
+        @warn "preparestate! should be called before evaloutput with current estimators"
+    end
     validate_args(estim.model, d)
     ŷ0, d0 = estim.buffer.ŷ, estim.buffer.d
     d0 .= d .- estim.model.dop

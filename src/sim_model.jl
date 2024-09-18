@@ -29,7 +29,7 @@ struct SimModelBuffer{NT<:Real}
 end
 
 @doc raw"""
-    SimModelBuffer(nu::Int, nx::Int, ny::Int, nd::Int) -> SimModelBuffer{NT}
+    SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int)
 
 Create a buffer for `SimModel` objects for inputs, states, outputs, and disturbances.
 

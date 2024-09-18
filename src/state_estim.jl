@@ -9,7 +9,7 @@ Functor allowing callable `StateEstimator` object as an alias for [`evaloutput`]
 
 # Examples
 ```jldoctest
-julia> kf = KalmanFilter(setop!(LinModel(tf(3, [10, 1]), 2), yop=[20]));
+julia> kf = KalmanFilter(setop!(LinModel(tf(3, [10, 1]), 2), yop=[20]), direct=false);
 
 julia> ŷ = kf() 
 1-element Vector{Float64}:
@@ -33,11 +33,11 @@ struct StateEstimatorBuffer{NT<:Real}
 end
 
 @doc raw"""
-    StateEstimatorBuffer(nx̂::Int, nym::Int) -> StateEstimatorBuffer{NT}
+    StateEstimatorBuffer{NT}(nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int)
 
 Create a buffer for `StateEstimator` objects for estimated states and measured outputs.
 
-The buffer is used to store intermediate results during simulation without allocating.
+The buffer is used to store intermediate results during estimation without allocating.
 """
 function StateEstimatorBuffer{NT}(
     nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int
@@ -84,11 +84,3 @@ include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
 include("estimator/mhe.jl")
 include("estimator/internal_model.jl")
-
-"""
-    evalŷ(estim::StateEstimator, d) -> ŷ
-
-Evaluate [`StateEstimator`](@ref) output `ŷ` from measured disturbance `d` and `estim.x̂0`.
-"""
-evalŷ(estim::StateEstimator, d) = evaloutput(estim, d)
-    

@@ -603,15 +603,15 @@ Init the quadratic programming Hessian `H̃` for MPC.
 
 The matrix appear in the quadratic general form:
 ```math
-    J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'H̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + p 
+    J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'H̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + r 
 ```
 The Hessian matrix is constant if the model and weights are linear and time invariant (LTI): 
 ```math
     \mathbf{H̃} = 2 (  \mathbf{Ẽ}'\mathbf{M}_{H_p}\mathbf{Ẽ} + \mathbf{Ñ}_{H_c} 
                     + \mathbf{S̃}'\mathbf{L}_{H_p}\mathbf{S̃} )
 ```
-The vector ``\mathbf{q̃}`` and scalar ``p`` need recalculation each control period ``k``, see
-[`initpred!`](@ref). ``p`` does not impact the minima position. It is thus useless at
+The vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
+[`initpred!`](@ref). ``r`` does not impact the minima position. It is thus useless at
 optimization but required to evaluate the minimal ``J`` value.
 """
 function init_quadprog(::LinModel, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
