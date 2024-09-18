@@ -33,11 +33,11 @@ struct StateEstimatorBuffer{NT<:Real}
 end
 
 @doc raw"""
-    StateEstimatorBuffer(nx̂::Int, nym::Int) -> StateEstimatorBuffer{NT}
+    StateEstimatorBuffer{NT}(nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int)
 
 Create a buffer for `StateEstimator` objects for estimated states and measured outputs.
 
-The buffer is used to store intermediate results during simulation without allocating.
+The buffer is used to store intermediate results during estimation without allocating.
 """
 function StateEstimatorBuffer{NT}(
     nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int

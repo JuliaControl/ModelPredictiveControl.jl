@@ -34,4 +34,5 @@ ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel)
 
 ```@docs
 ModelPredictiveControl.optim_objective!(::PredictiveController)
+ModelPredictiveControl.getinput
 ```

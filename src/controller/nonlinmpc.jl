@@ -45,6 +45,7 @@ struct NonLinMPC{
     Uop::Vector{NT}
     Yop::Vector{NT}
     Dop::Vector{NT}
+    buffer::PredictiveControllerBuffer{NT}
     function NonLinMPC{NT, SE, JM, JEFunc}(
         estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEFunc, optim::JM
     ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel, JEFunc<:Function}
@@ -75,6 +76,7 @@ struct NonLinMPC{
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
+        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp)
         mpc = new{NT, SE, JM, JEFunc}(
             estim, optim, con,
             ΔŨ, ŷ,
@@ -87,6 +89,7 @@ struct NonLinMPC{
             Ks, Ps,
             d0, D̂0, D̂E,
             Uop, Yop, Dop,
+            buffer
         )
         init_optimization!(mpc, model, optim)
         return mpc

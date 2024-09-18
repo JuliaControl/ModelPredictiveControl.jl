@@ -52,9 +52,9 @@ julia> u = moveinput!(mpc, ry); round.(u, digits=3)
 function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = mpc.estim.buffer.empty;
-    Dhat ::Vector = repeat(d,  mpc.Hp),
-    Rhaty::Vector = repeat(ry, mpc.Hp),
+    d ::Vector = mpc.buffer.empty;
+    Dhat ::Vector = repeat!(mpc.buffer.D̂,  d,  mpc.Hp),
+    Rhaty::Vector = repeat!(mpc.buffer.R̂y, ry, mpc.Hp),
     Rhatu::Vector = mpc.Uop,
     D̂  = Dhat,
     R̂y = Rhaty,
@@ -67,12 +67,8 @@ function moveinput!(
     initpred!(mpc, mpc.estim.model, d, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model)
     ΔŨ = optim_objective!(mpc)
-    Δu = ΔŨ[1:mpc.estim.model.nu] # receding horizon principle: only Δu(k) is used (1st one)
-    u = mpc.estim.lastu0 + mpc.estim.model.uop + Δu
-    return u
+    return getinput(mpc, ΔŨ)
 end
-
-
 
 @doc raw"""
     getinfo(mpc::PredictiveController) -> info
@@ -504,6 +500,24 @@ Call [`preparestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
 function preparestate!(mpc::PredictiveController, ym, d=mpc.estim.buffer.empty)
     return preparestate!(mpc.estim, ym, d)
+end
+
+@doc raw"""
+    getinput(mpc::PredictiveController, ΔŨ) -> u
+
+Get current manipulated input `u` from a [`PredictiveController`](@ref) solution `ΔŨ`.
+
+The first manipulated input ``\mathbf{u}(k)`` is extracted from the input increments vector
+``\mathbf{ΔŨ}`` and applied on the plant (from the receding horizon principle).
+"""
+function getinput(mpc, ΔŨ)
+    Δu  = mpc.buffer.u
+    for i in 1:mpc.estim.model.nu
+        Δu[i] = ΔŨ[i]
+    end
+    u   = Δu
+    u .+= mpc.estim.lastu0 .+ mpc.estim.model.uop
+    return u
 end
 
 """

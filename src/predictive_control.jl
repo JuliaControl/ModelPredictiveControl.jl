@@ -19,6 +19,28 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController{NT<:Real} end
 
+struct PredictiveControllerBuffer{NT<:Real}
+    u ::Vector{NT}
+    R̂y::Vector{NT}
+    D̂ ::Vector{NT}
+    empty::Vector{NT}
+end
+
+@doc raw"""
+    PredictiveControllerBuffer{NT}(nu::Int, ny::Int, nd::Int)
+
+Create a buffer for `PredictiveController` objects.
+
+The buffer is used to store intermediate results during computation without allocating.
+"""
+function PredictiveControllerBuffer{NT}(nu::Int, ny::Int, nd::Int, Hp::Int) where NT <: Real
+    u  = Vector{NT}(undef, nu)
+    R̂y = Vector{NT}(undef, ny*Hp)
+    D̂  = Vector{NT}(undef, nd*Hp)
+    empty = Vector{NT}(undef, 0)
+    return PredictiveControllerBuffer{NT}(u, R̂y, D̂, empty)
+end
+
 include("controller/construct.jl")
 include("controller/execute.jl")
 include("controller/explicitmpc.jl")
