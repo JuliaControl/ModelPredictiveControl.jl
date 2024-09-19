@@ -67,7 +67,7 @@ end
 
 Get additional info on `estim` [`MovingHorizonEstimator`](@ref) optimum for troubleshooting.
 
-If `estim.direct==true`, the function should be called after calling [`preparestate!`](@ref)
+If `estim.direct==true`, the function should be called after calling [`preparestate!`](@ref).
 Otherwise, call it after [`updatestate!`](@ref). It returns the dictionary `info` with the
 following fields:
 

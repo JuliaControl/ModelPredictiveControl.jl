@@ -89,7 +89,7 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:Ŷs` or *`:Yhats`* : predicted stochastic output over ``H_p`` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``
 - `:R̂y` or *`:Rhaty`* : predicted output setpoint over ``H_p``, ``\mathbf{R̂_y}``
 - `:R̂u` or *`:Rhatu`* : predicted manipulated input setpoint over ``H_p``, ``\mathbf{R̂_u}``
-- `:x̂end` or *`:xhatend`* : optimal terminal states, ``\mathbf{x̂}_{k-1}(k+H_p)``
+- `:x̂end` or *`:xhatend`* : optimal terminal states, ``\mathbf{x̂}_i(k+H_p)``
 - `:J`   : objective value optimum, ``J``
 - `:U`   : optimal manipulated inputs over ``H_p``, ``\mathbf{U}``
 - `:u`   : current optimal manipulated input, ``\mathbf{u}(k)``
