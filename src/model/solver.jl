@@ -16,6 +16,9 @@ struct RungeKutta <: DiffSolver
         if order ≠ 4
             throw(ArgumentError("only 4th order Runge-Kutta is supported."))
         end
+        if order < 1
+            throw(ArgumentError("order must be greater than 0"))
+        end
         if supersample < 1
             throw(ArgumentError("supersample must be greater than 0"))
         end
@@ -31,15 +34,7 @@ Create a Runge-Kutta solver with optional super-sampling.
 Only the 4th order Runge-Kutta is supported for now. The keyword argument `supersample`
 provides the number of internal steps (default to 1 step).
 """
-function RungeKutta(order::Int=4; supersample::Int=1)
-    if order < 1
-        throw(ArgumentError("order must be greater than 0"))
-    end
-    if supersample < 1
-        throw(ArgumentError("supersample must be greater than 0"))
-    end
-    return RungeKutta(order, supersample)
-end
+RungeKutta(order::Int=4; supersample::Int=1) = RungeKutta(order, supersample)
 
 "Get the `f!` and `h!` functions for Runge-Kutta solver."
 function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ , nx, _ , _ )

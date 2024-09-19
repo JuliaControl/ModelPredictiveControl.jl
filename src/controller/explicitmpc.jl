@@ -167,7 +167,7 @@ function ExplicitMPC(
     return ExplicitMPC{NT, SE}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp)
 end
 
-setconstraint!(::ExplicitMPC,kwargs...) = error("ExplicitMPC does not support constraints.")
+setconstraint!(::ExplicitMPC; kwargs...) = error("ExplicitMPC does not support constraints.")
 
 function Base.show(io::IO, mpc::ExplicitMPC)
     Hp, Hc = mpc.Hp, mpc.Hc

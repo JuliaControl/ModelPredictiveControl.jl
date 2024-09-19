@@ -141,19 +141,19 @@ LinModel with a sample time Ts = 2.0 s and:
 """
 function setname!(model::SimModel; u=nothing, y=nothing, d=nothing, x=nothing)
     if !isnothing(u)
-        size(u) == (model.nu,) || error("u size must be $((model.nu,))")
+        size(u) == (model.nu,) || throw(DimensionMismatch("u size must be $((model.nu,))"))
         model.uname .= u
     end
     if !isnothing(y)
-        size(y) == (model.ny,) || error("y size must be $((model.ny,))")
+        size(y) == (model.ny,) || throw(DimensionMismatch("y size must be $((model.ny,))"))
         model.yname .= y
     end
     if !isnothing(d)
-        size(d) == (model.nd,) || error("d size must be $((model.nd,))")
+        size(d) == (model.nd,) || throw(DimensionMismatch("d size must be $((model.nd,))"))
         model.dname .= d
     end
     if !isnothing(x)
-        size(x) == (model.nx,) || error("x size must be $((model.nx,))")
+        size(x) == (model.nx,) || throw(DimensionMismatch("x size must be $((model.nx,))"))
         model.xname .= x
     end
     return model

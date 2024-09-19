@@ -134,7 +134,8 @@ end
     preparestate!(mpc1, [50, 30])
     updatestate!(mpc1, mpc1.estim.model.uop, [50, 30])
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
-    preparestate!(mpc1, [50, 30])
+    # do not call preparestate! before moveinput! for the warning:
+    moveinput!(mpc1, [10, 50])
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -348,6 +349,8 @@ end
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc13  = ExplicitMPC(model2)
     @test isa(mpc13, ExplicitMPC{Float32})
+
+    @test_throws ArgumentError LinMPC(model, Hp=0)
 end
 
 @testset "ExplicitMPC moves and getinfo" begin

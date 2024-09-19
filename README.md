@@ -24,7 +24,7 @@ using Pkg; Pkg.add("ModelPredictiveControl")
 To construct model predictive controllers (MPCs), we must first specify a plant model that
 is typically extracted from input-output data using [system identification](https://github.com/baggepinnen/ControlSystemIdentification.jl).
 The model here is linear with one input, two outputs and a large time delay in the first
-channel:
+channel (a transfer matrix, with $s$ as the Laplace variable):
 
 ```math
 \mathbf{G}(s) = \frac{\mathbf{y}(s)}{\mathbf{u}(s)} = 

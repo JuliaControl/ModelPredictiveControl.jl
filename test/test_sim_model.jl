@@ -79,6 +79,17 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
     linmodel12 = LinModel{Float32}(Gss.A, Gss.B, Gss.C, zeros(2, 0), zeros(2, 0), Ts)
     @test isa(linmodel12, LinModel{Float32})
 
+    linmodel13 = LinModel(sys,Ts,i_d=[3])
+    linmodel13 = setname!(linmodel13, 
+        u=["u_c", "u_h"], 
+        y=["y_L", "y_T"], 
+        d=["u_l"],
+        x=["X_1", "X_2", "X_3", "X_4"]
+    )
+    @test all(linmodel13.uname .== ["u_c", "u_h"])
+    @test all(linmodel13.yname .== ["y_L", "y_T"])
+    @test all(linmodel13.dname .== ["u_l"])
+    @test all(linmodel13.xname .== ["X_1", "X_2", "X_3", "X_4"])
 
     @test_throws ErrorException LinModel(sys)
     @test_throws ErrorException LinModel(sys,-Ts)
@@ -101,7 +112,8 @@ end
     @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30]
     x = initstate!(linmodel1, [10, 60])
     @test evaloutput(linmodel1) ≈ [50 + 19.0, 30 + 7.4]
-    @test updatestate!(linmodel1, [10, 60]) ≈ x
+    @test preparestate!(linmodel1, [10, 60]) ≈ x
+    @test updatestate!(linmodel1,  [10, 60]) ≈ x
     linmodel2 = LinModel(append(tf(1, [1, 0]), tf(2, [10, 1])), 1.0)
     x = initstate!(linmodel2, [10, 3])
     @test evaloutput(linmodel2) ≈ [0, 6]
@@ -188,12 +200,17 @@ end
     Dd = reshape([0], 1, 1)
     f3(x, u, d) = A*x + Bu*u+ Bd*d
     h3(x, d) = C*x + Dd*d
-    nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=RungeKutta())
+    solver=RungeKutta()
+    @test string(solver) == 
+        "4th order Runge-Kutta differential equation solver with 1 supersamples."
+    nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver)
     xnext, y = similar(nonlinmodel5.x0), similar(nonlinmodel5.yop)
     nonlinmodel5.f!(xnext, [0; 0], [0], [0])
     @test xnext ≈ zeros(2)
     nonlinmodel5.h!(y, [0; 0], [0])
     @test y ≈ zeros(1)
+
+
 
     function f2!(ẋ, x, u , d)
         mul!(ẋ, A, x)
