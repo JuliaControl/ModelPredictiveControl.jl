@@ -187,10 +187,11 @@ detailstr(model::SimModel) = ""
 @doc raw"""
     initstate!(model::SimModel, u, d=[]) -> x
 
-Init `model.x0` with manipulated inputs `u` and measured disturbances `d` steady-state.
+Init `model.x0` with manipulated inputs `u` and meas. dist. `d` steady-state and reset time.
 
-The method tries to initialize the model state ``\mathbf{x}`` at steady-state. It removes
-the operating points on `u` and `d` and calls [`steadystate!`](@ref):
+The method resets the discrete time step `model.k` at `0` and tries to initialize the model
+state ``\mathbf{x}`` at steady-state. It removes the operating points on `u` and `d` and 
+calls [`steadystate!`](@ref):
 
 - If `model` is a [`LinModel`](@ref), the method computes the steady-state of current
   inputs `u` and measured disturbances `d`.
@@ -210,6 +211,7 @@ true
 """
 function initstate!(model::SimModel, u, d=model.buffer.empty)
     validate_args(model::SimModel, d, u)
+    model.k[] = 0
     u0, d0 = model.buffer.u, model.buffer.d
     u0 .= u .- model.uop
     d0 .= d .- model.dop
@@ -233,9 +235,10 @@ end
 @doc raw"""
     updatestate!(model::SimModel, u, d=[]) -> xnext
 
-Update `model.x0` states with current inputs `u` and measured disturbances `d`.
+Update `model.x0` states with current inputs `u` and meas. dist. `d` and increment `model.k`.
 
 The method computes and returns the model state for the next time step ``\mathbf{x}(k+1)``.
+It also increment the discrete time step `model.k` by `1`.
 
 # Examples
 ```jldoctest
@@ -248,10 +251,11 @@ julia> x = updatestate!(model, [1])
 """
 function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: Real
     validate_args(model::SimModel, d, u)
+    model.k[] += 1
     u0, d0, xnext0 = model.buffer.u, model.buffer.d, model.buffer.x
     u0 .= u .- model.uop
     d0 .= d .- model.dop
-    f!(xnext0, model, model.x0, u0, d0)
+    f!(xnext0, model, model.x0, u0, d0, model.p, model.k[])
     xnext0  .+= model.fop .- model.xop
     model.x0 .= xnext0
     xnext   = xnext0
@@ -280,7 +284,7 @@ function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
     validate_args(model, d)
     d0, y0  = model.buffer.d, model.buffer.y
     d0 .= d .- model.dop
-    h!(y0, model, model.x0, d0)
+    h!(y0, model, model.x0, d0, model.p, model.k[])
     y   = y0
     y .+= model.yop
     return y

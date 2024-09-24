@@ -1,8 +1,12 @@
-struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimModel{NT}
+struct NonLinModel{
+    NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver
+} <: SimModel{NT}
     x0::Vector{NT}
     f!::F
     h!::H
+    p::P
     solver::DS
+    k::Vector{Int}
     Ts::NT
     t::Vector{NT}
     nu::Int
@@ -19,10 +23,11 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
     dname::Vector{String}
     xname::Vector{String}
     buffer::SimModelBuffer{NT}
-    function NonLinModel{NT, F, H, DS}(
-        f!::F, h!::H, solver::DS, Ts, nu, nx, ny, nd
-    ) where {NT<:Real, F<:Function, H<:Function, DS<:DiffSolver}
+    function NonLinModel{NT, F, H, P, DS}(
+        f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS
+    ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver}
         Ts > 0 || error("Sampling time Ts must be positive")
+        k = [0]
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
@@ -35,11 +40,12 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, F, H, DS}(
+        return new{NT, F, H, P, DS}(
             x0, 
-            f!, h!, 
+            f!, h!,
+            p,
             solver, 
-            Ts, t,
+            k, Ts, t,
             nu, nx, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
@@ -49,8 +55,8 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
 end
 
 @doc raw"""
-    NonLinModel{NT}(f::Function,  h::Function,  Ts, nu, nx, ny, nd=0; solver=RungeKutta(4))
-    NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0; solver=RungeKutta(4))
+    NonLinModel{NT}(f::Function,  h::Function,  Ts, nu, nx, ny, nd=0; p=[], solver=RungeKutta(4))
+    NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0; p=[], solver=RungeKutta(4))
 
 Construct a nonlinear model from state-space functions `f`/`f!` and `h`/`h!`.
 
@@ -59,23 +65,27 @@ continuous dynamics. Use `solver=nothing` for the discrete case (see Extended He
 functions are defined as:
 ```math
 \begin{aligned}
-    \mathbf{ẋ}(t) &= \mathbf{f}\Big( \mathbf{x}(t), \mathbf{u}(t), \mathbf{d}(t) \Big) \\
-    \mathbf{y}(t) &= \mathbf{h}\Big( \mathbf{x}(t), \mathbf{d}(t) \Big)
+    \mathbf{ẋ}(t) &= \mathbf{f}\Big( \mathbf{x}(t), \mathbf{u}(t), \mathbf{d}(t), \mathbf{p}(t), t \Big) \\
+    \mathbf{y}(t) &= \mathbf{h}\Big( \mathbf{x}(t), \mathbf{d}(t), \mathbf{p}(t), t \Big)
 \end{aligned}
 ```
-They can be implemented in two possible ways:
+where ``\mathbf{x}``, ``\mathbf{y}, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
+respectively the state, output, manipulated input, measured disturbance and parameter vectors,
+and ``t`` the time in second. The functions can be implemented in two possible ways:
 
-1. **Non-mutating functions** (out-of-place): define them as `f(x, u, d) -> ẋ` and
-   `h(x, d) -> y`. This syntax is simple and intuitive but it allocates more memory.
-2. **Mutating functions** (in-place): define them as `f!(ẋ, x, u, d) -> nothing` and
-   `h!(y, x, d) -> nothing`. This syntax reduces the allocations and potentially the 
+1. **Non-mutating functions** (out-of-place): define them as `f(x, u, d, p, t) -> ẋ` and
+   `h(x, d, p, t) -> y`. This syntax is simple and intuitive but it allocates more memory.
+2. **Mutating functions** (in-place): define them as `f!(ẋ, x, u, d, p, t) -> nothing` and
+   `h!(y, x, d, p, t) -> nothing`. This syntax reduces the allocations and potentially the 
    computational burden as well.
 
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
-manipulated inputs, states, outputs and measured disturbances. 
+manipulated inputs, states, outputs and measured disturbances. The keyword argument `p`
+is the parameters of the model passed to the two functions. It can be of any Julia object 
+but use a mutable type if you want to change them later e.g.: a vector.
 
 !!! tip
-    Replace the `d` argument with `_` if `nd = 0` (see Examples below).
+    Replace the `d`, `p` or `t`  argument with `_` if not needed (see Examples below).
     
 A 4th order [`RungeKutta`](@ref) solver discretizes the differential equations by default. 
 The rest of the documentation assumes discrete dynamics since all models end up in this 
@@ -118,39 +128,44 @@ NonLinModel with a sample time Ts = 2.0 s, empty solver and:
     State-space functions are similar for discrete dynamics:
     ```math
     \begin{aligned}
-        \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \\
-        \mathbf{y}(k)   &= \mathbf{h}\Big( \mathbf{x}(k), \mathbf{d}(k) \Big)
+        \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k), \mathbf{p}(k), k \Big) \\
+        \mathbf{y}(k)   &= \mathbf{h}\Big( \mathbf{x}(k), \mathbf{d}(k), \mathbf{p}(k), k \Big)
     \end{aligned}
     ```
     with two possible implementations as well:
 
-    1. **Non-mutating functions**: define them as `f(x, u, d) -> xnext` and `h(x, d) -> y`.
-    2. **Mutating functions**: define them as `f!(xnext, x, u, d) -> nothing` and
-       `h!(y, x, d) -> nothing`.
+    1. **Non-mutating functions**: define them as `f(x, u, d, p, k) -> xnext` and 
+       `h(x, d, p, k) -> y`.
+    2. **Mutating functions**: define them as `f!(xnext, x, u, d, p, k) -> nothing` and
+       `h!(y, x, d, p, k) -> nothing`.
 """
 function NonLinModel{NT}(
-    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0; 
-    solver=RungeKutta(4)
+    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
+    p=NT[], solver=RungeKutta(4)
 ) where {NT<:Real}
     isnothing(solver) && (solver=EmptySolver())
     ismutating_f = validate_f(NT, f)
     ismutating_h = validate_h(NT, h)
-    f! = ismutating_f ? f : (xnext, x, u, d) -> xnext .= f(x, u, d)
-    h! = ismutating_h ? h : (y, x, d) -> y .= h(x, d)
+    f! = ismutating_f ? f : f!(xnext, x, u, d, p, k) = (xnext .= f(x, u, d, p, k); nothing)
+    h! = ismutating_h ? h : h!(y, x, d, p, k) = (y .= h(x, d, p, k); nothing)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
-    F, H, DS = get_types(f!, h!, solver)
-    return NonLinModel{NT, F, H, DS}(f!, h!, solver, Ts, nu, nx, ny, nd)
+    F, H, P, DS = get_types(f!, h!, p, solver)
+    return NonLinModel{NT, F, H, P, DS}(f!, h!, Ts, nu, nx, ny, nd, p, solver)
 end
 
 function NonLinModel(
-    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0; 
-    solver=RungeKutta(4)
+    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
+    p=Float64[], solver=RungeKutta(4)
 )
-    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; solver)
+    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; p, solver)
 end
 
 "Get the types of `f!`, `h!` and `solver` to construct a `NonLinModel`."
-get_types(::F, ::H, ::DS) where {F<:Function, H<:Function, DS<:DiffSolver} = F, H, DS
+function get_types(
+    ::F, ::H, ::P, ::DS
+) where {F<:Function, H<:Function, P<:Any, DS<:DiffSolver} 
+    return F, H, P, DS
+end
 
 """
     validate_f(NT, f) -> ismutating
@@ -158,12 +173,13 @@ get_types(::F, ::H, ::DS) where {F<:Function, H<:Function, DS<:DiffSolver} = F, 
 Validate `f` function argument signature and return `true` if it is mutating.
 """
 function validate_f(NT, f)
-    ismutating = hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}})
-    if !(ismutating || hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}}))
+    ismutating = hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any, NT})
+    if !(ismutating || hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}))
         error(
             "the state function has no method with type signature "*
-            "f(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}) or mutating form "*
-            "f!(xnext::Vector{$(NT)}, x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)})"
+            "f(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any, t::$(NT)) or "*
+            "mutating form f!(xnext::Vector{$(NT)}, x::Vector{$(NT)}, u::Vector{$(NT)}, "*
+                                                   "d::Vector{$(NT)}, p::Any, t::$(NT))"
         )
     end
     return ismutating
@@ -175,12 +191,12 @@ end
 Validate `h` function argument signature and return `true` if it is mutating.
 """
 function validate_h(NT, h)
-    ismutating = hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Vector{NT}})
-    if !(ismutating || hasmethod(h, Tuple{Vector{NT}, Vector{NT}}))
+    ismutating = hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any, NT})
+    if !(ismutating || hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Any, NT}))
         error(
             "the output function has no method with type signature "*
-            "h(x::Vector{$(NT)}, d::Vector{$(NT)}) or mutating form "*
-            "h!(y::Vector{$(NT)}, x::Vector{$(NT)}, d::Vector{$(NT)})"
+            "h(x::Vector{$(NT)}, d::Vector{$(NT)}, p::Any, t::$(NT)) or mutating form "*
+            "h!(y::Vector{$(NT)}, x::Vector{$(NT)}, d::Vector{$(NT)}, p::Any, t::$(NT))"
         )
     end
     return ismutating
@@ -189,11 +205,11 @@ end
 "Do nothing if `model` is a [`NonLinModel`](@ref)."
 steadystate!(::SimModel, _ , _ ) = nothing
 
-"Call `f!(xnext0, x0, u0, d0)` with `model.f!` method for [`NonLinModel`](@ref)."
-f!(xnext0, model::NonLinModel, x0, u0, d0) = model.f!(xnext0, x0, u0, d0)
+"Call `f!(xnext0, x0, u0, d0, p, k)` with `model.f!` method for [`NonLinModel`](@ref)."
+f!(xnext0, model::NonLinModel, x0, u0, d0, p, k) = model.f!(xnext0, x0, u0, d0, p, k)
 
-"Call `h!(y0, x0, d0)` with `model.h` method for [`NonLinModel`](@ref)."
-h!(y0, model::NonLinModel, x0, d0) = model.h!(y0, x0, d0)
+"Call `h!(y0, x0, d0, p, k)` with `model.h` method for [`NonLinModel`](@ref)."
+h!(y0, model::NonLinModel, x0, d0, p, k) = model.h!(y0, x0, d0, p, k)
 
 detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name) solver"
-detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:EmptySolver}) = ", empty solver"
+detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:Any, <:EmptySolver}) = ", empty solver"
