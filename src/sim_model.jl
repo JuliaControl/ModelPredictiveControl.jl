@@ -234,7 +234,7 @@ end
 @doc raw"""
     updatestate!(model::SimModel, u, d=[]) -> xnext
 
-Update `model.x0` states with current inputs `u` and meas. dist. `d` and increment `model.k`.
+Update `model.x0` states with current inputs `u` and meas. dist. `d` for the next time step.
 
 The method computes and returns the model state for the next time step ``\mathbf{x}(k+1)``.
 It also increment the discrete time step `model.k` by `1`.
