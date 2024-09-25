@@ -32,7 +32,8 @@ function returns the next state of the augmented model, defined as:
 ```
 where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂next0` argument. The method mutates `x̂next0` and
 `û0` in place, the latter stores the input vector of the augmented model 
-``\mathbf{u_0 + ŷ_{s_u}}``.
+``\mathbf{u_0 + ŷ_{s_u}}``. The model parameter vector `model.p` is not included in the 
+function signature for conciseness.
 """
 function f̂!(x̂next0, û0, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]

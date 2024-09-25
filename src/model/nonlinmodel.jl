@@ -67,10 +67,10 @@ functions are defined as:
     \mathbf{y}(t) &= \mathbf{h}\Big( \mathbf{x}(t), \mathbf{d}(t), \mathbf{p} \Big)
 \end{aligned}
 ```
-where ``\mathbf{x}``, ``\mathbf{y}, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
-respectively the state, output, manipulated input, measured disturbance and parameter vectors,
-and ``t`` the time in second. If the dynamics is a function of time, simply add a measured
-disturbance defined as ``d(t)=t``. The functions can be implemented in two possible ways:
+where ``\mathbf{x}``, ``\mathbf{y}``, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
+respectively the state, output, manipulated input, measured disturbance and parameter
+vectors. If the dynamics is a function of time, simply add a measured disturbance defined as
+``d(t) = t``. The functions can be implemented in two possible ways:
 
 1. **Non-mutating functions** (out-of-place): define them as `f(x, u, d, p) -> ẋ` and
    `h(x, d, p) -> y`. This syntax is simple and intuitive but it allocates more memory.
@@ -99,11 +99,11 @@ See also [`LinModel`](@ref).
 
 # Examples
 ```jldoctest
-julia> f!(ẋ, x, u, _ , _ ) = (ẋ .= -0.2x .+ u; nothing);
+julia> f!(ẋ, x, u, _ , p) = (ẋ .= p*x .+ u; nothing);
 
 julia> h!(y, x, _ , _ ) = (y .= 0.1x; nothing);
 
-julia> model1 = NonLinModel(f!, h!, 5.0, 1, 1, 1)               # continuous dynamics
+julia> model1 = NonLinModel(f!, h!, 5.0, 1, 1, 1, p=-0.2)       # continuous dynamics
 NonLinModel with a sample time Ts = 5.0 s, RungeKutta solver and:
  1 manipulated inputs u
  1 states x
@@ -127,8 +127,8 @@ NonLinModel with a sample time Ts = 2.0 s, empty solver and:
     State-space functions are similar for discrete dynamics:
     ```math
     \begin{aligned}
-        \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k), \mathbf{p}(k) \Big) \\
-        \mathbf{y}(k)   &= \mathbf{h}\Big( \mathbf{x}(k), \mathbf{d}(k), \mathbf{p}(k) \Big)
+        \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k), \mathbf{p} \Big) \\
+        \mathbf{y}(k)   &= \mathbf{h}\Big( \mathbf{x}(k), \mathbf{d}(k), \mathbf{p} \Big)
     \end{aligned}
     ```
     with two possible implementations as well:

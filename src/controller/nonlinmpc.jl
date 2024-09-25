@@ -126,7 +126,8 @@ the manipulated inputs, the predicted outputs and measured disturbances from ``k
 ```
 since ``H_c ≤ H_p`` implies that ``\mathbf{Δu}(k+H_p) = \mathbf{0}`` or ``\mathbf{u}(k+H_p)=
 \mathbf{u}(k+H_p-1)``. The vector ``\mathbf{D̂}`` includes the predicted measured disturbance
-over ``H_p``. The argument ``\mathbf{p}`` is a custom parameter object of any type.
+over ``H_p``. The argument ``\mathbf{p}`` is a custom parameter object of any type but use a
+mutable one if you want to modify it later e.g.: a vector.
 
 !!! tip
     Replace any of the 4 arguments with `_` if not needed (see `JE` default value below).
