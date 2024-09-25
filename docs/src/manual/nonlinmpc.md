@@ -40,34 +40,34 @@ The plant model is nonlinear:
 
 in which ``g`` is the gravitational acceleration in m/s², ``L``, the pendulum length in m,
 ``K``, the friction coefficient at the pivot point in kg/s, and ``m``, the mass attached at
-the end of the pendulum in kg. The [`NonLinModel`](@ref) constructor assumes by default
-that the state function `f` is continuous in time, that is, an ordinary differential
-equation system (like here):
+the end of the pendulum in kg, all bundled in the parameter vector ``\mathbf{p} =
+[\begin{smallmatrix} g & L & K & m \end{smallmatrix}]'``. The [`NonLinModel`](@ref)
+constructor assumes by default that the state function `f` is continuous in time, that is,
+an ordinary differential equation system (like here):
 
 ```@example 1
 using ModelPredictiveControl
-function pendulum(par, x, u)
-    g, L, K, m = par        # [m/s²], [m], [kg/s], [kg]
+function f(x, u, _ , p)
+    g, L, K, m = p          # [m/s²], [m], [kg/s], [kg]
     θ, ω = x[1], x[2]       # [rad], [rad/s]
     τ  = u[1]               # [Nm]
     dθ = ω
     dω = -g/L*sin(θ) - K/m*ω + τ/m/L^2
     return [dθ, dω]
 end
-# declared constants, to avoid type-instability in the f function, for speed:
-const par = (9.8, 0.4, 1.2, 0.3)
-f(x, u, _ ) = pendulum(par, x, u)
-h(x, _ )    = [180/π*x[1]]  # [°]
+h(x, _ , _ ) = [180/π*x[1]] # [°]
+p_model = [9.8, 0.4, 1.2, 0.3]
 nu, nx, ny, Ts = 1, 2, 1, 0.1
 vu, vx, vy = ["\$τ\$ (Nm)"], ["\$θ\$ (rad)", "\$ω\$ (rad/s)"], ["\$θ\$ (°)"]
-model = setname!(NonLinModel(f, h, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
+model = setname!(NonLinModel(f, h, Ts, nu, nx, ny; p=p_model); u=vu, x=vx, y=vy)
 ```
 
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
 characters like ``θ`` can be typed in the Julia REPL or VS Code by typing `\theta` and
-pressing the `<TAB>` key. The tuple `par` is constant here to improve the [performance](https://docs.julialang.org/en/v1/manual/performance-tips/#Avoid-untyped-global-variables).
-A 4th order [`RungeKutta`](@ref) method solves the differential equations by default. It is
-good practice to first simulate `model` using [`sim!`](@ref) as a quick sanity check:
+pressing the `<TAB>` key. Note that the model parameter `p` can be any 
+ A 4th order [`RungeKutta`](@ref) method solves the differential
+equations by default. It is good practice to first simulate `model` using [`sim!`](@ref) as
+a quick sanity check:
 
 ```@example 1
 using Plots
@@ -101,9 +101,9 @@ motor torque ``τ``, with an associated standard deviation `σQint_u` of 0.1 N m
 estimator tuning is tested on a plant with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
-const par_plant = (par[1], par[2], 1.25*par[3], par[4])
-f_plant(x, u, _ ) = pendulum(par_plant, x, u)
-plant = setname!(NonLinModel(f_plant, h, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
+p_plant = copy(p_model)
+p_plant[3] = 1.25*p_model[3]
+plant = setname!(NonLinModel(f, h, Ts, nu, nx, ny; p=p_plant); u=vu, x=vx, y=vy)
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
 plot(res, plotu=false, plotxwithx̂=true)
 savefig("plot2_NonLinMPC.svg"); nothing # hide
@@ -182,10 +182,10 @@ angle ``θ`` is measured here). As the arguments of [`NonLinMPC`](@ref) economic
 Kalman Filter similar to the previous one (``\mathbf{y^m} = θ`` and ``\mathbf{y^u} = ω``):
 
 ```@example 1
-h2(x, _ ) = [180/π*x[1], x[2]]
+h2(x, _ , _ ) = [180/π*x[1], x[2]]
 nu, nx, ny = 1, 2, 2
-model2 = setname!(NonLinModel(f      , h2, Ts, nu, nx, ny), u=vu, x=vx, y=[vy; vx[2]])
-plant2 = setname!(NonLinModel(f_plant, h2, Ts, nu, nx, ny), u=vu, x=vx, y=[vy; vx[2]])
+model2 = setname!(NonLinModel(f, h2, Ts, nu, nx, ny; p=p_model), u=vu, x=vx, y=[vy; vx[2]])
+plant2 = setname!(NonLinModel(f, h2, Ts, nu, nx, ny; p=p_plant), u=vu, x=vx, y=[vy; vx[2]])
 estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
 ```
 

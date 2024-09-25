@@ -74,8 +74,8 @@ exmpc.estim()
 u = exmpc([55, 30])
 sim!(exmpc, 3, [55, 30])
 
-f(x,u,_) = model.A*x + model.Bu*u
-h(x,_) = model.C*x
+f(x,u,_,_) = model.A*x + model.Bu*u
+h(x,_,_) = model.C*x
 
 nlmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10, 10], yop=[50, 30])
 y = nlmodel()

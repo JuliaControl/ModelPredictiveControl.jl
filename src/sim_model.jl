@@ -11,7 +11,7 @@ Functor allowing callable `SimModel` object as an alias for [`evaloutput`](@ref)
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->-x + u, (x,_)->x .+ 20, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->-x + u, (x,_,_)->x .+ 20, 4, 1, 1, 1, solver=nothing);
 
 julia> y = model()
 1-element Vector{Float64}:

@@ -159,7 +159,7 @@ This method uses the default state estimator :
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:
@@ -236,7 +236,7 @@ Use custom state estimator `estim` to construct `NonLinMPC`.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> estim = UnscentedKalmanFilter(model, σQint_ym=[0.05]);
 

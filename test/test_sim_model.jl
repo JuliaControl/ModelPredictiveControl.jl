@@ -144,8 +144,8 @@ end
 
 @testset "NonLinModel construction" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f1(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
-    h1(x,_)   = linmodel1.C*x
+    f1(x,u,_,_) = linmodel1.A*x + linmodel1.Bu*u
+    h1(x,_,_)   = linmodel1.C*x
     nonlinmodel1 = NonLinModel(f1,h1,Ts,2,2,2,solver=nothing)
     @test nonlinmodel1.nx == 2
     @test nonlinmodel1.nu == 2
@@ -158,8 +158,8 @@ end
     @test y ≈ zeros(2,)
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
-    f2(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
-    h2(x,d)   = linmodel2.C*x + linmodel2.Dd*d
+    f2(x,u,d,_) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
+    h2(x,d,_)   = linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1,solver=nothing)
 
     @test nonlinmodel2.nx == 4
@@ -175,13 +175,13 @@ end
     nonlinmodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1,solver=nothing)
     @test isa(nonlinmodel3, NonLinModel{Float32})
 
-    function f1!(xnext, x, u, d)
+    function f1!(xnext, x, u, d,_)
         mul!(xnext, linmodel2.A,  x)
         mul!(xnext, linmodel2.Bu, u, 1, 1)
         mul!(xnext, linmodel2.Bd, d, 1, 1)
         return nothing
     end 
-    function h1!(y, x, d)
+    function h1!(y, x, d,_)
         mul!(y, linmodel2.C,  x)
         mul!(y, linmodel2.Dd, d, 1, 1)
         return nothing
@@ -198,8 +198,8 @@ end
     Bd = reshape([0; 0.5], 2, 1)
     C  = [0.4 0]
     Dd = reshape([0], 1, 1)
-    f3(x, u, d) = A*x + Bu*u+ Bd*d
-    h3(x, d) = C*x + Dd*d
+    f3(x, u, d, _) = A*x + Bu*u+ Bd*d
+    h3(x, d, _) = C*x + Dd*d
     solver=RungeKutta()
     @test string(solver) == 
         "4th order Runge-Kutta differential equation solver with 1 supersamples."
@@ -210,15 +210,13 @@ end
     nonlinmodel5.h!(y, [0; 0], [0], nonlinmodel5.p)
     @test y ≈ zeros(1)
 
-
-
-    function f2!(ẋ, x, u , d)
+    function f2!(ẋ, x, u , d, _)
         mul!(ẋ, A, x)
         mul!(ẋ, Bu, u, 1, 1)
         mul!(ẋ, Bd, d, 1, 1)
         return nothing
     end
-    function h2!(y, x, d)
+    function h2!(y, x, d, _)
         mul!(y, C, x)
         mul!(y, Dd, d, 1, 1)
         return nothing
@@ -232,16 +230,22 @@ end
     
     @test_throws ErrorException NonLinModel(
         (x,u)->linmodel1.A*x + linmodel1.Bu*u,
-        (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
+        (x,_,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
     @test_throws ErrorException NonLinModel(
         (x,u,_)->linmodel1.A*x + linmodel1.Bu*u,
+        (x,_,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
+    @test_throws ErrorException NonLinModel(
+        (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
         (x)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
+    @test_throws ErrorException NonLinModel(
+        (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
+        (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
 end
 
 @testset "NonLinModel sim methods" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f1(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
-    h1(x,_)   = linmodel1.C*x
+    f1(x,u,_,_) = linmodel1.A*x + linmodel1.Bu*u
+    h1(x,_,_)   = linmodel1.C*x
     nonlinmodel = NonLinModel(f1,h1,Ts,2,2,2,solver=nothing)
 
     @test updatestate!(nonlinmodel, zeros(2,)) ≈ zeros(2) 
@@ -259,8 +263,8 @@ end
 
 @testset "NonLinModel linearization" begin
     Ts = 1.0
-    f1(x,u,d) = x.^5 + u.^4 + d.^3
-    h1(x,d)   = x.^2 + d
+    f1(x,u,d,_) = x.^5 + u.^4 + d.^3
+    h1(x,d,_)   = x.^2 + d
     nonlinmodel1 = NonLinModel(f1,h1,Ts,1,1,1,1,solver=nothing)
     x, u, d = [2.0], [3.0], [4.0]
     linmodel1 = linearize(nonlinmodel1; x, u, d)
@@ -276,8 +280,8 @@ end
     @test linmodel1.C  ≈ linmodel2.C
     @test linmodel1.Dd ≈ linmodel2.Dd 
 
-    f1!(ẋ, x, u, d) = (ẋ .= x.^5 + u.^4 + d.^3; nothing)
-    h1!(y, x, d) = (y .= x.^2 + d; nothing)
+    f1!(ẋ, x, u, d, _) = (ẋ .= x.^5 + u.^4 + d.^3; nothing)
+    h1!(y, x, d, _) = (y .= x.^2 + d; nothing)
     nonlinmodel3 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=RungeKutta())
     linmodel3 = linearize(nonlinmodel3; x, u, d)
     u0, d0 = u - nonlinmodel3.uop, d - nonlinmodel3.dop
@@ -315,8 +319,8 @@ end
 @testset "NonLinModel real time simulations" begin
     linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
     nonlinmodel1 = NonLinModel(
-        (x,u,_)->linmodel1.A*x + linmodel1.Bu*u,
-        (x,_)->linmodel1.C*x,
+        (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
+        (x,_,_)->linmodel1.C*x,
         linmodel1.Ts, 1, 1, 1, 0, solver=nothing
     )
     times1 = zeros(5)
@@ -328,8 +332,8 @@ end
     @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
     linmodel2 = LinModel(tf(2, [0.1, 1]), 0.001)
     nonlinmodel2 = NonLinModel(
-        (x,u,_)->linmodel2.A*x + linmodel2.Bu*u,
-        (x,_)->linmodel2.C*x,
+        (x,u,_,_)->linmodel2.A*x + linmodel2.Bu*u,
+        (x,_,_)->linmodel2.C*x,
         linmodel2.Ts, 1, 1, 1, 0, solver=nothing
     )
     times2 = zeros(5)

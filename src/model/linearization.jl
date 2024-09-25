@@ -21,7 +21,7 @@ necessarily an equilibrium, details in Extended Help). The Jacobians of ``\mathb
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->x.^3 + u, (x,_)->x, 0.1, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->x.^3 + u, (x,_,_)->x, 0.1, 1, 1, 1, solver=nothing);
 
 julia> linmodel = linearize(model, x=[10.0], u=[0.0]); 
 
@@ -96,7 +96,7 @@ The keyword arguments are identical to [`linearize`](@ref).
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->x.^3 + u, (x,_)->x, 0.1, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->x.^3 + u, (x,_,_)->x, 0.1, 1, 1, 1, solver=nothing);
 
 julia> linmodel = linearize(model, x=[10.0], u=[0.0]); linmodel.A
 1×1 Matrix{Float64}:

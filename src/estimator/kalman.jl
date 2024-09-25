@@ -623,7 +623,7 @@ initial state estimate ``\mathbf{x̂}_{-1}(0)`` can be manually specified with [
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.1x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σPint_ym_0=[1, 1])
 UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
@@ -951,7 +951,7 @@ automatic differentiation.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.2x+u, (x,_)->-3x, 5.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.2x+u, (x,_,_)->-3x, 5.0, 1, 1, 1, solver=nothing);
 
 julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP_0=[0.1], σPint_ym_0=[0.1])
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
