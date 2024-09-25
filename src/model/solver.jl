@@ -45,7 +45,7 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ 
     k2_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     k3_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     k4_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
-    f! = function inner_solver_f!(xnext, x, u, d, p, k)
+    f! = function inner_solver_f!(xnext, x, u, d, p)
         CT = promote_type(eltype(x), eltype(u), eltype(d))
         # dummy variable for get_tmp, necessary for PreallocationTools + Julia 1.6 :
         var::CT = 0
@@ -55,23 +55,22 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ 
         k3   = get_tmp(k3_cache, var)
         k4   = get_tmp(k4_cache, var)
         @. xcur = x
-        for k_inner=0:solver.supersample-1
+        for i=1:solver.supersample
             xterm = xnext # TODO: move this out of the loop, just above (to test) ?
-            t = k*Ts + k_inner*Ts_inner
             @. xterm = xcur
-            fc!(k1, xterm, u, d, p, t)
+            fc!(k1, xterm, u, d, p)
             @. xterm = xcur + k1 * Ts_inner/2
-            fc!(k2, xterm, u, d, p, t)
+            fc!(k2, xterm, u, d, p)
             @. xterm = xcur + k2 * Ts_inner/2
-            fc!(k3, xterm, u, d, p, t)
+            fc!(k3, xterm, u, d, p)
             @. xterm = xcur + k3 * Ts_inner
-            fc!(k4, xterm, u, d, p, t)
+            fc!(k4, xterm, u, d, p)
             @. xcur = xcur + (k1 + 2k2 + 2k3 + k4)*Ts_inner/6
         end
         @. xnext = xcur
         return nothing
     end
-    h!(y, x, d, p, k) = (hc!(y, x, d, p, k*Ts); nothing)
+    h! = hc!
     return f!, h!
 end
 

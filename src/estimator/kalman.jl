@@ -582,9 +582,10 @@ See [`SteadyKalmanFilter`](@ref) for details on ``\mathbf{v}(k), \mathbf{w}(k)``
 \text{diag}(Q, Q_{int_u}, Q_{int_{ym}})}`` and ``\mathbf{R̂ = R}``. The functions
 ``\mathbf{f̂, ĥ}`` are `model` state-space functions augmented with the stochastic model of
 the unmeasured disturbances, which is specified by the numbers of integrator `nint_u` and
-`nint_ym` (see Extended Help). The ``\mathbf{ĥ^m}`` function represents the measured outputs
-of ``\mathbf{ĥ}`` function (and unmeasured ones, for ``\mathbf{ĥ^u}``). The matrix 
-``\mathbf{P̂}`` is the estimation error covariance of `model` state augmented with the 
+`nint_ym` (see Extended Help). Model parameters ``\mathbf{p}`` are not an argument of
+``\mathbf{f̂, ĥ}`` functions for conciseness. The ``\mathbf{ĥ^m}`` function represents the
+measured outputs of ``\mathbf{ĥ}`` function (and unmeasured ones, for ``\mathbf{ĥ^u}``). The
+matrix ``\mathbf{P̂}`` is the estimation error covariance of `model` state augmented with the 
 stochastic ones. Three keyword arguments specify its initial value with ``\mathbf{P̂}_{-1}(0) = 
 \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``. The 
 initial state estimate ``\mathbf{x̂}_{-1}(0)`` can be manually specified with [`setstate!`](@ref).

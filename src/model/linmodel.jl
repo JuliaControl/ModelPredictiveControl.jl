@@ -5,7 +5,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     Bd  ::Matrix{NT}
     Dd  ::Matrix{NT}
     x0::Vector{NT}
-    k::Vector{Int}
+    p ::Nothing
     Ts::NT
     t::Vector{NT}
     nu::Int
@@ -36,8 +36,8 @@ struct LinModel{NT<:Real} <: SimModel{NT}
         size(C)  == (ny,nx) || error("C size must be $((ny,nx))")
         size(Bd) == (nx,nd) || error("Bd size must be $((nx,nd))")
         size(Dd) == (ny,nd) || error("Dd size must be $((ny,nd))")
+        p = nothing # the parameter field p is not used for LinModel
         Ts > 0 || error("Sampling time Ts must be positive")
-        k = [0]
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
         dop = zeros(NT, nd)
@@ -52,8 +52,9 @@ struct LinModel{NT<:Real} <: SimModel{NT}
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         return new{NT}(
             A, Bu, C, Bd, Dd, 
-            x0, 
-            k, Ts, t,
+            x0,
+            p,
+            Ts, t,
             nu, nx, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
@@ -256,11 +257,11 @@ function steadystate!(model::LinModel, u0, d0)
 end
 
 """
-    f!(xnext0, model::LinModel, x0, u0, d0, _ , _ ) -> nothing
+    f!(xnext0, model::LinModel, x0, u0, d0, p) -> nothing
 
 Evaluate `xnext0 = A*x0 + Bu*u0 + Bd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function f!(xnext0, model::LinModel, x0, u0, d0, _ , _ )
+function f!(xnext0, model::LinModel, x0, u0, d0, _ )
     mul!(xnext0, model.A,  x0)
     mul!(xnext0, model.Bu, u0, 1, 1)
     mul!(xnext0, model.Bd, d0, 1, 1)
@@ -269,11 +270,11 @@ end
 
 
 """
-    h!(y0, model::LinModel, x0, d0, _ , _ ) -> nothing
+    h!(y0, model::LinModel, x0, d0, p) -> nothing
 
 Evaluate `y0 = C*x0 + Dd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function h!(y0, model::LinModel, x0, d0, _ , _ )
+function h!(y0, model::LinModel, x0, d0, _ )
     mul!(y0, model.C,  x0)
     mul!(y0, model.Dd, d0, 1, 1)
     return nothing

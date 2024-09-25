@@ -121,22 +121,22 @@ function linearize!(
     A::Matrix{NT}, Bu::Matrix{NT}, Bd::Matrix{NT}  = linmodel.A, linmodel.Bu, linmodel.Bd
     C::Matrix{NT}, Dd::Matrix{NT} = linmodel.C, linmodel.Dd
     xnext0::Vector{NT}, y0::Vector{NT} = linmodel.buffer.x, linmodel.buffer.y
-    myf_x0!(xnext0, x0) = f!(xnext0, nonlinmodel, x0, u0, d0)
-    myf_u0!(xnext0, u0) = f!(xnext0, nonlinmodel, x0, u0, d0)
-    myf_d0!(xnext0, d0) = f!(xnext0, nonlinmodel, x0, u0, d0)
-    myh_x0!(y0, x0) = h!(y0, nonlinmodel, x0, d0)
-    myh_d0!(y0, d0) = h!(y0, nonlinmodel, x0, d0)
+    myf_x0!(xnext0, x0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
+    myf_u0!(xnext0, u0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
+    myf_d0!(xnext0, d0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
+    myh_x0!(y0, x0) = h!(y0, nonlinmodel, x0, d0, model.p)
+    myh_d0!(y0, d0) = h!(y0, nonlinmodel, x0, d0, model.p)
     ForwardDiff.jacobian!(A,  myf_x0!, xnext0, x0)
     ForwardDiff.jacobian!(Bu, myf_u0!, xnext0, u0)
     ForwardDiff.jacobian!(Bd, myf_d0!, xnext0, d0)
     ForwardDiff.jacobian!(C,  myh_x0!, y0, x0)
     ForwardDiff.jacobian!(Dd, myh_d0!, y0, d0)
     # --- compute the nonlinear model output at operating points ---
-    h!(y0, nonlinmodel, x0, d0)
+    h!(y0, nonlinmodel, x0, d0, model.p)
     y  = y0
     y .= y0 .+ nonlinmodel.yop
     # --- compute the nonlinear model next state at operating points ---
-    f!(xnext0, nonlinmodel, x0, u0, d0)
+    f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
     xnext  = xnext0
     xnext .= xnext0 .+ nonlinmodel.fop .- nonlinmodel.xop
     # --- modify the linear model operating points ---

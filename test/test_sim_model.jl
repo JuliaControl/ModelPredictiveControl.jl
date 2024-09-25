@@ -152,9 +152,9 @@ end
     @test nonlinmodel1.nd == 0
     @test nonlinmodel1.ny == 2
     xnext, y = similar(nonlinmodel1.x0), similar(nonlinmodel1.yop)
-    nonlinmodel1.f!(xnext,[0,0],[0,0],[1])
+    nonlinmodel1.f!(xnext,[0,0],[0,0],[1],nonlinmodel1.p)
     @test xnext ≈ zeros(2,)
-    nonlinmodel1.h!(y,[0,0],[1])
+    nonlinmodel1.h!(y,[0,0],[1],nonlinmodel1.p)
     @test y ≈ zeros(2,)
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
@@ -167,9 +167,9 @@ end
     @test nonlinmodel2.nd == 1
     @test nonlinmodel2.ny == 2
     xnext, y = similar(nonlinmodel2.x0), similar(nonlinmodel2.yop)
-    nonlinmodel2.f!(xnext,[0,0,0,0],[0,0],[0])
+    nonlinmodel2.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel2.p)
     @test xnext ≈ zeros(4,)
-    nonlinmodel2.h!(y,[0,0,0,0],[0])
+    nonlinmodel2.h!(y,[0,0,0,0],[0],nonlinmodel2.p)
     @test y ≈ zeros(2,)
 
     nonlinmodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1,solver=nothing)
@@ -188,9 +188,9 @@ end
     end
     nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1, solver=nothing)
     xnext, y = similar(nonlinmodel4.x0), similar(nonlinmodel4.yop)
-    nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0])
+    nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel4.p)
     @test xnext ≈ zeros(4)
-    nonlinmodel4.h!(y,[0,0,0,0],[0])
+    nonlinmodel4.h!(y,[0,0,0,0],[0],nonlinmodel4.p)
     @test y ≈ zeros(2)
 
     A  = [0 0.5; -0.2 -0.1]
@@ -205,9 +205,9 @@ end
         "4th order Runge-Kutta differential equation solver with 1 supersamples."
     nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver)
     xnext, y = similar(nonlinmodel5.x0), similar(nonlinmodel5.yop)
-    nonlinmodel5.f!(xnext, [0; 0], [0], [0])
+    nonlinmodel5.f!(xnext, [0; 0], [0], [0], nonlinmodel5.p)
     @test xnext ≈ zeros(2)
-    nonlinmodel5.h!(y, [0; 0], [0])
+    nonlinmodel5.h!(y, [0; 0], [0], nonlinmodel5.p)
     @test y ≈ zeros(1)
 
 
@@ -225,9 +225,9 @@ end
     end
     nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta())
     xnext, y = similar(nonlinmodel6.x0), similar(nonlinmodel6.yop)
-    nonlinmodel6.f!(xnext, [0; 0], [0], [0])
+    nonlinmodel6.f!(xnext, [0; 0], [0], [0], nonlinmodel6.p)
     @test xnext ≈ zeros(2)
-    nonlinmodel6.h!(y, [0; 0], [0])
+    nonlinmodel6.h!(y, [0; 0], [0], nonlinmodel6.p)
     @test y ≈ zeros(1)
     
     @test_throws ErrorException NonLinModel(
@@ -282,11 +282,11 @@ end
     linmodel3 = linearize(nonlinmodel3; x, u, d)
     u0, d0 = u - nonlinmodel3.uop, d - nonlinmodel3.dop
     xnext, y = similar(nonlinmodel3.x0), similar(nonlinmodel3.yop)
-    A  = ForwardDiff.jacobian((xnext, x)  -> nonlinmodel3.f!(xnext, x, u0, d0), xnext, x)
-    Bu = ForwardDiff.jacobian((xnext, u0) -> nonlinmodel3.f!(xnext, x, u0, d0), xnext, u0)
-    Bd = ForwardDiff.jacobian((xnext, d0) -> nonlinmodel3.f!(xnext, x, u0, d0), xnext, d0)
-    C  = ForwardDiff.jacobian((y, x)  -> nonlinmodel3.h!(y, x, d0), y, x)
-    Dd = ForwardDiff.jacobian((y, d0) -> nonlinmodel3.h!(y, x, d0), y, d0)
+    A  = ForwardDiff.jacobian((xnext, x)  -> nonlinmodel3.f!(xnext, x, u0, d0, nonlinmodel3.p), xnext, x)
+    Bu = ForwardDiff.jacobian((xnext, u0) -> nonlinmodel3.f!(xnext, x, u0, d0, nonlinmodel3.p), xnext, u0)
+    Bd = ForwardDiff.jacobian((xnext, d0) -> nonlinmodel3.f!(xnext, x, u0, d0, nonlinmodel3.p), xnext, d0)
+    C  = ForwardDiff.jacobian((y, x)  -> nonlinmodel3.h!(y, x, d0, nonlinmodel3.p), y, x)
+    Dd = ForwardDiff.jacobian((y, d0) -> nonlinmodel3.h!(y, x, d0, nonlinmodel3.p), y, d0)
     @test linmodel3.A  ≈ A
     @test linmodel3.Bu ≈ Bu
     @test linmodel3.Bd ≈ Bd
