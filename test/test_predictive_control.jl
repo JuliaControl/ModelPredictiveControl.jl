@@ -491,9 +491,9 @@ end
     @test nmpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
     nmpc6 = NonLinMPC(nonlinmodel, Hp=15, Lwt=[0,1])
     @test nmpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(UE,ŶE,D̂E) -> UE.*ŶE.*D̂E)
+    nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(UE,ŶE,D̂E,p) -> p*UE.*ŶE.*D̂E, p=2)
     @test nmpc7.E == 1e-3
-    @test nmpc7.JE([1,2],[3,4],[4,6]) == [12, 48]
+    @test nmpc7.JE([1,2],[3,4],[4,6],2) == 2*[1,2].*[3.4].*[4,6]
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     nmpc8 = NonLinMPC(nonlinmodel, Hp=15, optim=optim)
     @test solver_name(nmpc8.optim) == "Ipopt"

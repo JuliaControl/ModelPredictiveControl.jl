@@ -194,11 +194,11 @@ output vector of `plant` argument corresponds to the model output vector in `mpc
 We can now define the ``J_E`` function and the `empc` controller:
 
 ```@example 1
-function JE(UE, ŶE, _ )
+function JE(UE, ŶE, _ , Ts)
     τ, ω = UE[1:end-1], ŶE[2:2:end-1]
     return Ts*sum(τ.*ω)
 end
-empc = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=[0.5, 0], Cwt=Inf, Ewt=3.5e3, JE=JE)
+empc = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=[0.5, 0], Cwt=Inf, Ewt=3.5e3, JE=JE, p=Ts)
 empc = setconstraint!(empc; umin, umax)
 ```
 

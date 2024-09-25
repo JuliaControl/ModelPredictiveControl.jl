@@ -369,19 +369,7 @@ function obj_nonlinprog!(
     U0, Ȳ, _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ::AbstractVector{NT}
 ) where NT <: Real
     J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.r[]
-    if !iszero(mpc.E)
-        ŷ, D̂E = mpc.ŷ, mpc.D̂E
-        U = U0
-        U  .+= mpc.Uop
-        uend = @views U[(end-model.nu+1):end]
-        Ŷ  = Ȳ
-        Ŷ .= Ŷ0 .+ mpc.Yop
-        UE = [U; uend]
-        ŶE = [ŷ; Ŷ]
-        E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E)
-    else
-        E_JE = 0.0
-    end
+    E_JE = obj_econ!(U0, Ȳ, mpc, model, Ŷ0, ΔŨ)
     return J + E_JE
 end
 
@@ -413,21 +401,12 @@ function obj_nonlinprog!(
         JR̂u = 0.0
     end
     # --- economic term ---
-    if !iszero(mpc.E)
-        ny, Hp, ŷ, D̂E = model.ny, mpc.Hp, mpc.ŷ, mpc.D̂E
-        U = U0
-        U  .+= mpc.Uop
-        uend = @views U[(end-model.nu+1):end]
-        Ŷ  = Ȳ
-        Ŷ .= Ŷ0 .+ mpc.Yop
-        UE = [U; uend]
-        ŶE = [ŷ; Ŷ]
-        E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E)
-    else
-        E_JE = 0.0
-    end
+    E_JE = obj_econ!(U0, Ȳ, mpc, model, Ŷ0, ΔŨ)
     return JR̂y + JΔŨ + JR̂u + E_JE
 end
+
+"By default, the economic term is zero."
+obj_econ!( _ , _ , ::PredictiveController, ::SimModel, _ , _ ) = 0.0
 
 @doc raw"""
     optim_objective!(mpc::PredictiveController) -> ΔŨ

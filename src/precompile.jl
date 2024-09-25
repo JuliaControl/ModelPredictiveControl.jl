@@ -74,10 +74,13 @@ exmpc.estim()
 u = exmpc([55, 30])
 sim!(exmpc, 3, [55, 30])
 
-f(x,u,_,_) = model.A*x + model.Bu*u
-h(x,_,_) = model.C*x
+f(x,u,_,model) = model.A*x + model.Bu*u
+h(x,_,model) = model.C*x
 
-nlmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10, 10], yop=[50, 30])
+nlmodel = setop!(
+    NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing, p=model), 
+    uop=[10, 10], yop=[50, 30]
+)
 y = nlmodel()
 nmpc_im = setconstraint!(NonLinMPC(InternalModel(nlmodel), Hp=10, Cwt=Inf), ymin=[45, -Inf])
 initstate!(nmpc_im, nlmodel.uop, y)
@@ -86,7 +89,9 @@ nmpc_im.estim()
 u = nmpc_im([55, 30])
 sim!(nmpc_im, 3, [55, 30])
 
-nmpc_ukf = setconstraint!(NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=1e3), ymin=[45, -Inf])
+nmpc_ukf = setconstraint!(
+    NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=1e3), ymin=[45, -Inf]
+)
 initstate!(nmpc_ukf, nlmodel.uop, y)
 preparestate!(nmpc_ukf, [55, 30])
 u = nmpc_ukf([55, 30])
@@ -98,19 +103,24 @@ preparestate!(nmpc_ekf, [55, 30])
 u = nmpc_ekf([55, 30])
 sim!(nmpc_ekf, 3, [55, 30])
 
-nmpc_mhe = setconstraint!(NonLinMPC(MovingHorizonEstimator(nlmodel, He=2), Hp=10, Cwt=Inf), ymin=[45, -Inf])
+nmpc_mhe = setconstraint!(
+    NonLinMPC(MovingHorizonEstimator(nlmodel, He=2), Hp=10, Cwt=Inf), ymin=[45, -Inf]
+)
 setconstraint!(nmpc_mhe.estim, x̂min=[-50,-50,-50,-50], x̂max=[50,50,50,50])
 initstate!(nmpc_mhe, nlmodel.uop, y)
 preparestate!(nmpc_mhe, [55, 30])
 u = nmpc_mhe([55, 30])
 sim!(nmpc_mhe, 3, [55, 30])
 
-function JE( _ , ŶE, _ )
-    Ŷ  = ŶE[3:end]
-    Eŷ = repeat([55; 30], 10) - Ŷ
-    return dot(Eŷ, I, Eŷ)
+function JE( _ , ŶE, _ , R̂y)
+    Ŷ = ŶE[3:end]
+    Ȳ = R̂y - Ŷ
+    return dot(Ȳ, Ȳ)
 end
-empc = setconstraint!(NonLinMPC(nlmodel, Mwt=[0, 0], Hp=10, Cwt=Inf, Ewt=1, JE=JE), ymin=[45, -Inf])
+R̂y = repeat([55; 30], 10)
+empc = setconstraint!(
+    NonLinMPC(nlmodel, Mwt=[0, 0], Hp=10, Cwt=Inf, Ewt=1, JE=JE, p=R̂y), ymin=[45, -Inf]
+)
 preparestate!(empc, [55, 30])
 u = empc()
 sim!(empc, 3)
