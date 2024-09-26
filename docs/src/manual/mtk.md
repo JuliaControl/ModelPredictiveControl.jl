@@ -9,16 +9,18 @@ using Logging; errlogger = ConsoleLogger(stderr, Error);
 old_logger = global_logger(); global_logger(errlogger);
 ```
 
-## Pendulum Example
+## Pendulum Model
 
 This example integrates the simple pendulum model of the [last section](@ref man_nonlin) in the
-[ModelingToolkit.jl](https://docs.sciml.ai/ModelingToolkit/stable/) (MTK) framework and
-extracts appropriate `f!` and `h!` functions to construct a [`NonLinModel`](@ref).
+[`ModelingToolkit.jl`](https://docs.sciml.ai/ModelingToolkit/stable/) (MTK) framework and
+extracts appropriate `f!` and `h!` functions to construct a [`NonLinModel`](@ref). An
+[`NonLinMPC`](@ref) is designed from this model and simulated to reproduce the results of
+the last section.
 
 !!! danger "Disclaimer"
     This simple example is not an official interface to `ModelingToolkit.jl`. It is provided
-    as a basic starting point template to combine both packages. There is no guarantee that
-    it will work for all corner cases.
+    as a basic starting template to combine both packages. There is no guarantee that it
+    will work for all corner cases.
 
 We first construct and instantiate the pendulum model:
 
@@ -93,6 +95,8 @@ f_plant, h_plant, _, _ = generate_f_h(mtk_model, inputs, outputs)
 plant = setname!(NonLinModel(f_plant, h_plant, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
 ```
 
+## Controller Design
+
 We can than reproduce the Kalman filter and the controller design of the [last section](@ref man_nonlin):
 
 ```@example 1
@@ -126,6 +130,8 @@ savefig("plot2_MTK.svg"); nothing # hide
 ```
 
 ![plot2_MTK](plot2_MTK.svg)
+
+## Acknowledgement
 
 Authored by `1-Bart-1` and `baggepinnen`, thanks for the contribution.
 
