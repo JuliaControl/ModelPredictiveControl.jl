@@ -29,6 +29,7 @@ Pages = [
     "manual/installation.md",
     "manual/linmpc.md",
     "manual/nonlinmpc.md",
+    "manual/mtk.md"
 ]
 ```
 
