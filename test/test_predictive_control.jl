@@ -493,7 +493,7 @@ end
     @test nmpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
     nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(UE,ŶE,D̂E,p) -> p*UE.*ŶE.*D̂E, p=2)
     @test nmpc7.E == 1e-3
-    @test nmpc7.JE([1,2],[3,4],[4,6],2) == 2*[1,2].*[3.4].*[4,6]
+    @test nmpc7.JE([1,2],[3,4],[4,6],2) == 2*[1,2].*[3,4].*[4,6]
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     nmpc8 = NonLinMPC(nonlinmodel, Hp=15, optim=optim)
     @test solver_name(nmpc8.optim) == "Ipopt"
@@ -537,8 +537,8 @@ end
     @test info[:Ŷ][end] ≈ r[1] atol=5e-2
     Hp = 1000
     R̂y = fill(r[1], Hp)
-    JE = (_ , ŶE, _ ) -> sum((ŶE[2:end] - R̂y).^2)
-    nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
+    JE = (_ , ŶE, _ , R̂y) -> sum((ŶE[2:end] - R̂y).^2)
+    nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, p=R̂y, Hp=Hp, Hc=1)
     preparestate!(nmpc, [10])
     u = moveinput!(nmpc)
     @test u ≈ [1] atol=5e-2
