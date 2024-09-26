@@ -54,6 +54,7 @@ struct NonLinMPC{
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
+        validate_JE(NT, JE)
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # convert `Diagonal` to normal `Matrix` if required:
         M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
@@ -282,6 +283,21 @@ function NonLinMPC(
     return NonLinMPC{NT, SE, JM, JEFunc, P}(
         estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, p, optim
     )
+end
+
+"""
+    validate_JE(NT, JE) -> nothing
+
+Validate `JE` function argument signature 
+"""
+function validate_JE(NT, JE)
+    if !hasmethod(JE, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any})
+        error(
+            "the economic function has no method with type signature "*
+            "JE(UE::Vector{$(NT)}, ŶE::Vector{$(NT)}, D̂E::Vector{$(NT)}, p::Any)"
+        )
+    end
+    return nothing
 end
 
 """

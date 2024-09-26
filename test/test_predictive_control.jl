@@ -521,6 +521,7 @@ end
 
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
     @test_throws ArgumentError NonLinMPC(nonlinmodel)
+    @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, JE=(_,_,_)->0.0)
 end
 
 @testset "NonLinMPC moves and getinfo" begin
