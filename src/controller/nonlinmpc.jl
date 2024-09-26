@@ -205,7 +205,7 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE::Function = (_,_,_,_) -> 0.0,
+    JE::Function = (args...) -> 0.0,
     p = model.p,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
@@ -226,7 +226,7 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE::Function = (_,_,_,_) -> 0.0,
+    JE::Function = (args...) -> 0.0,
     p = model.p,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
@@ -271,7 +271,7 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE::JEFunc = (_,_,_,_) -> 0.0,
+    JE::JEFunc = (args...) -> 0.0,
     p::P = estim.model.p,
     optim::JM = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel, JEFunc<:Function, P<:Any}
@@ -288,7 +288,7 @@ end
 """
     validate_JE(NT, JE) -> nothing
 
-Validate `JE` function argument signature 
+Validate `JE` function argument signature.
 """
 function validate_JE(NT, JE)
     if !hasmethod(JE, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any})
