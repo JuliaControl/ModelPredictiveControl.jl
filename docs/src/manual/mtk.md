@@ -11,14 +11,14 @@ old_logger = global_logger(); global_logger(errlogger);
 
 ## Pendulum Example
 
-This example integrates the simple pendulum model of the [last section](@man_nonlin) in the
+This example integrates the simple pendulum model of the [last section](@ref man_nonlin) in the
 [ModelingToolkit.jl](https://docs.sciml.ai/ModelingToolkit/stable/) (MTK) framework and
 extracts appropriate `f!` and `h!` functions to construct a [`NonLinModel`](@ref).
 
 !!! danger "Disclaimer"
     This simple example is not an official interface to `ModelingToolkit.jl`. It is provided
-    as a basic template to combine both packages. There is no guarantee that it will work
-    for all corner cases.
+    as a basic starting point template to combine both packages. There is no guarantee that
+    it will work for all corner cases.
 
 We first construct and instantiate the pendulum model:
 
@@ -93,7 +93,7 @@ f_plant, h_plant, _, _ = generate_f_h(mtk_model, inputs, outputs)
 plant = setname!(NonLinModel(f_plant, h_plant, Ts, nu, nx, ny); u=vu, x=vx, y=vy)
 ```
 
-We can than reproduce the Kalman filter and the controller design of the [last section](@man_nonlin):
+We can than reproduce the Kalman filter and the controller design of the [last section](@ref man_nonlin):
 
 ```@example 1
 α=0.01; σQ=[0.1, 1.0]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
@@ -104,11 +104,14 @@ umin, umax = [-1.5], [+1.5]
 nmpc = setconstraint!(nmpc; umin, umax)
 ```
 
-The angular setpoint response is identical:
+The 180° setpoint response is identical:
 
 ```@example 1
+using Plots
+N = 35
+using JuMP; unset_time_limit_sec(nmpc.optim) # hide
 res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
-display(plot(res_ry))
+plot(res_ry)
 savefig("plot1_MTK.svg"); nothing # hide
 ```
 
@@ -118,11 +121,13 @@ and also the output disturbance rejection:
 
 ```@example 1
 res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
-display(plot(res_yd))
+plot(res_yd)
 savefig("plot2_MTK.svg"); nothing # hide
 ```
 
 ![plot2_MTK](plot2_MTK.svg)
+
+Authored by `1-Bart-1` and `baggepinnen`, thanks for the contribution.
 
 ```@setup 1
 global_logger(old_logger);
