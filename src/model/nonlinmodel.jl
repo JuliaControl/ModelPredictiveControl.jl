@@ -69,8 +69,8 @@ functions are defined as:
 ```
 where ``\mathbf{x}``, ``\mathbf{y}``, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
 respectively the state, output, manipulated input, measured disturbance and parameter
-vectors. If the dynamics is a function of time, simply add a measured disturbance defined as
-``d(t) = t``. The functions can be implemented in two possible ways:
+vectors. If the dynamics is a function of the time, simply add a measured disturbance
+defined as ``d(t) = t``. The functions can be implemented in two possible ways:
 
 1. **Non-mutating functions** (out-of-place): define them as `f(x, u, d, p) -> ẋ` and
    `h(x, d, p) -> y`. This syntax is simple and intuitive but it allocates more memory.

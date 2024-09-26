@@ -144,9 +144,9 @@ end
 
 @testset "NonLinModel construction" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f1(x,u,_,_) = linmodel1.A*x + linmodel1.Bu*u
-    h1(x,_,_)   = linmodel1.C*x
-    nonlinmodel1 = NonLinModel(f1,h1,Ts,2,2,2,solver=nothing)
+    f1(x,u,_,model) = model.A*x + model.Bu*u
+    h1(x,_,model)   = model.C*x
+    nonlinmodel1 = NonLinModel(f1,h1,Ts,2,2,2,solver=nothing,p=linmodel1)
     @test nonlinmodel1.nx == 2
     @test nonlinmodel1.nu == 2
     @test nonlinmodel1.nd == 0
@@ -244,9 +244,9 @@ end
 
 @testset "NonLinModel sim methods" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f1(x,u,_,_) = linmodel1.A*x + linmodel1.Bu*u
-    h1(x,_,_)   = linmodel1.C*x
-    nonlinmodel = NonLinModel(f1,h1,Ts,2,2,2,solver=nothing)
+    f1(x,u,_,model) = model.A*x + model.Bu*u
+    h1(x,_,model)   = model.C*x
+    nonlinmodel = NonLinModel(f1,h1,Ts,2,2,2,p=linmodel1,solver=nothing)
 
     @test updatestate!(nonlinmodel, zeros(2,)) ≈ zeros(2) 
     @test updatestate!(nonlinmodel, zeros(2,), Float64[]) ≈ zeros(2)
