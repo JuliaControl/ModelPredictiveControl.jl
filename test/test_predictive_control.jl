@@ -134,7 +134,8 @@ end
     preparestate!(mpc1, [50, 30])
     updatestate!(mpc1, mpc1.estim.model.uop, [50, 30])
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
-    preparestate!(mpc1, [50, 30])
+    # do not call preparestate! before moveinput! for the warning:
+    moveinput!(mpc1, [10, 50])
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
@@ -348,6 +349,8 @@ end
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc13  = ExplicitMPC(model2)
     @test isa(mpc13, ExplicitMPC{Float32})
+
+    @test_throws ArgumentError LinMPC(model, Hp=0)
 end
 
 @testset "ExplicitMPC moves and getinfo" begin
@@ -471,9 +474,9 @@ end
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     nmpc0 = NonLinMPC(linmodel1, Hp=15)
     @test isa(nmpc0.estim, SteadyKalmanFilter)
-    f = (x,u,d) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h = (x,d)   -> linmodel1.C*x + linmodel1.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, p=linmodel1, solver=nothing)
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
     @test size(nmpc1.R̂y0, 1) == 15*nmpc1.estim.model.ny
@@ -488,9 +491,9 @@ end
     @test nmpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
     nmpc6 = NonLinMPC(nonlinmodel, Hp=15, Lwt=[0,1])
     @test nmpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(UE,ŶE,D̂E) -> UE.*ŶE.*D̂E)
+    nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(UE,ŶE,D̂E,p) -> p*UE.*ŶE.*D̂E, p=2)
     @test nmpc7.E == 1e-3
-    @test nmpc7.JE([1,2],[3,4],[4,6]) == [12, 48]
+    @test nmpc7.JE([1,2],[3,4],[4,6],2) == 2*[1,2].*[3,4].*[4,6]
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     nmpc8 = NonLinMPC(nonlinmodel, Hp=15, optim=optim)
     @test solver_name(nmpc8.optim) == "Ipopt"
@@ -518,6 +521,7 @@ end
 
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
     @test_throws ArgumentError NonLinMPC(nonlinmodel)
+    @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, JE=(_,_,_)->0.0)
 end
 
 @testset "NonLinMPC moves and getinfo" begin
@@ -534,16 +538,16 @@ end
     @test info[:Ŷ][end] ≈ r[1] atol=5e-2
     Hp = 1000
     R̂y = fill(r[1], Hp)
-    JE = (_ , ŶE, _ ) -> sum((ŶE[2:end] - R̂y).^2)
-    nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, Hp=Hp, Hc=1)
+    JE = (_ , ŶE, _ , R̂y) -> sum((ŶE[2:end] - R̂y).^2)
+    nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, p=R̂y, Hp=Hp, Hc=1)
     preparestate!(nmpc, [10])
     u = moveinput!(nmpc)
     @test u ≈ [1] atol=5e-2
     # ensure that the current estimated output is updated for correct JE values:
     @test nmpc.ŷ ≈ evaloutput(nmpc.estim, Float64[])
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
-    f = (x,u,d) -> linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
-    h = (x,d)   -> linmodel2.C*x + linmodel2.Dd*d
+    f = (x,u,d,_) -> linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
+    h = (x,d,_)   -> linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
     d = [0.1]
@@ -576,7 +580,7 @@ end
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
-    nonlinmodel2.h!(y, Float32[0,0], Float32[0])
+    nonlinmodel2.h!(y, Float32[0,0], Float32[0], Float32[])
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0]
 end
@@ -625,8 +629,8 @@ end
 
 @testset "NonLinMPC other methods" begin
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    f = (x,u,_) -> linmodel.A*x + linmodel.Bu*u
-    h = (x,_)   -> linmodel.C*x
+    f = (x,u,_,_) -> linmodel.A*x + linmodel.Bu*u
+    h = (x,_,_)   -> linmodel.C*x
     nonlinmodel = setop!(
         NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30]
     )
@@ -649,8 +653,8 @@ end
     setconstraint!(nmpc_lin, c_ymin=[1.0,1.1], c_ymax=[1.2,1.3])
     @test all((-nmpc_lin.con.A_Ymin[:, end], -nmpc_lin.con.A_Ymax[:, end]) .≈ ([1.0,1.1], [1.2,1.3]))
 
-    f = (x,u,d) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h = (x,d)   -> linmodel1.C*x + linmodel1.Dd*d
+    f = (x,u,d,_) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h = (x,d,_)   -> linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc = NonLinMPC(nonlinmodel, Hp=1, Hc=1)
 
@@ -712,8 +716,8 @@ end
     info = getinfo(nmpc_lin)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
 
-    f = (x,u,_) -> linmodel.A*x + linmodel.Bu*u
-    h = (x,_)   -> linmodel.C*x
+    f = (x,u,_,_) -> linmodel.A*x + linmodel.Bu*u
+    h = (x,_,_)   -> linmodel.C*x
     nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing)
     nmpc = NonLinMPC(nonlinmodel, Hp=50, Hc=5)
 
@@ -788,8 +792,8 @@ end
     @test mpc.M_Hp ≈ diagm(1:1000)
     @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
     @test mpc.L_Hp ≈ diagm(1.1:1000.1)
-    f = (x,u,d) -> estim.model.A*x + estim.model.Bu*u + estim.model.Bd*d
-    h = (x,d)   -> estim.model.C*x + estim.model.Du*d
+    f = (x,u,d,_) -> estim.model.A*x + estim.model.Bu*u + estim.model.Bd*d
+    h = (x,d,_)   -> estim.model.C*x + estim.model.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
     nmpc = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=1e4, Hp=1000, Hc=10)
     setmodel!(nmpc, Mwt=[100], Nwt=[200], Lwt=[300])
@@ -805,8 +809,8 @@ end
 
 @testset "LinMPC v.s. NonLinMPC" begin
     linmodel = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
-    f = (x,u,d) -> linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
-    h = (x,d)   -> linmodel.C*x + linmodel.Dd*d
+    f = (x,u,d,_) -> linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h = (x,d,_)   -> linmodel.C*x + linmodel.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "sb"=>"yes"))

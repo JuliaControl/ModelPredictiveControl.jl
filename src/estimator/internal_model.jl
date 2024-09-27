@@ -171,16 +171,16 @@ end
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls `model.f!(x̂next0, x̂0, u0 ,d0)` since this estimator does not augment the states.
+It calls `model.f!(x̂next0, x̂0, u0 ,d0, model.p)` since this estimator does not augment the states.
 """
-f̂!(x̂next0, _, ::InternalModel, model::NonLinModel, x̂0, u0, d0) = model.f!(x̂next0, x̂0, u0, d0)
+f̂!(x̂next0, _, ::InternalModel, model::NonLinModel, x̂0, u0, d0) = model.f!(x̂next0, x̂0, u0, d0, model.p)
 
 @doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
 
 Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.h!`.
 """
-ĥ!(x̂next0, ::InternalModel, model::NonLinModel, x̂0, d0) = model.h!(x̂next0, x̂0, d0)
+ĥ!(x̂next0, ::InternalModel, model::NonLinModel, x̂0, d0) = model.h!(x̂next0, x̂0, d0, model.p)
 
 
 @doc raw"""
@@ -246,7 +246,7 @@ Compute the current stochastic output estimation `ŷs` for [`InternalModel`](@r
 """
 function correct_estimate!(estim::InternalModel, y0m, d0)
     ŷ0d = estim.buffer.ŷ
-    h!(ŷ0d, estim.model, estim.x̂d, d0)
+    h!(ŷ0d, estim.model, estim.x̂d, d0, estim.model.p)
     ŷs = estim.ŷs
     for j in eachindex(ŷs) # broadcasting was allocating unexpectedly, so we use a loop
         if j in estim.i_ym
@@ -279,7 +279,7 @@ function update_estimate!(estim::InternalModel, _ , d0, u0)
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
     x̂dnext = estim.buffer.x̂
-    f!(x̂dnext, model, x̂d, u0, d0) 
+    f!(x̂dnext, model, x̂d, u0, d0, model.p) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = estim.x̂snext
@@ -317,7 +317,7 @@ function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) 
     # TODO: use estim.buffer.x̂ to reduce the allocation:
     x̂d .= (I - model.A)\(model.Bu*u0 + model.Bd*d0 + model.fop - model.xop)
     ŷ0d = estim.buffer.ŷ
-    h!(ŷ0d, model, x̂d, d0)
+    h!(ŷ0d, model, x̂d, d0, model.p)
     ŷs = ŷ0d
     ŷs[estim.i_ym] .= @views y0m .- ŷ0d[estim.i_ym]
     # ŷs=0 for unmeasured outputs :

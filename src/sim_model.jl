@@ -11,7 +11,7 @@ Functor allowing callable `SimModel` object as an alias for [`evaloutput`](@ref)
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->-x + u, (x,_)->x .+ 20, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->-x + u, (x,_,_)->x .+ 20, 4, 1, 1, 1, solver=nothing);
 
 julia> y = model()
 1-element Vector{Float64}:
@@ -141,19 +141,19 @@ LinModel with a sample time Ts = 2.0 s and:
 """
 function setname!(model::SimModel; u=nothing, y=nothing, d=nothing, x=nothing)
     if !isnothing(u)
-        size(u) == (model.nu,) || error("u size must be $((model.nu,))")
+        size(u) == (model.nu,) || throw(DimensionMismatch("u size must be $((model.nu,))"))
         model.uname .= u
     end
     if !isnothing(y)
-        size(y) == (model.ny,) || error("y size must be $((model.ny,))")
+        size(y) == (model.ny,) || throw(DimensionMismatch("y size must be $((model.ny,))"))
         model.yname .= y
     end
     if !isnothing(d)
-        size(d) == (model.nd,) || error("d size must be $((model.nd,))")
+        size(d) == (model.nd,) || throw(DimensionMismatch("d size must be $((model.nd,))"))
         model.dname .= d
     end
     if !isnothing(x)
-        size(x) == (model.nx,) || error("x size must be $((model.nx,))")
+        size(x) == (model.nx,) || throw(DimensionMismatch("x size must be $((model.nx,))"))
         model.xname .= x
     end
     return model
@@ -187,10 +187,11 @@ detailstr(model::SimModel) = ""
 @doc raw"""
     initstate!(model::SimModel, u, d=[]) -> x
 
-Init `model.x0` with manipulated inputs `u` and measured disturbances `d` steady-state.
+Init `model.x0` with manipulated inputs `u` and meas. dist. `d` steady-state and reset time.
 
-The method tries to initialize the model state ``\mathbf{x}`` at steady-state. It removes
-the operating points on `u` and `d` and calls [`steadystate!`](@ref):
+The method resets the discrete time step `model.k` at `0` and tries to initialize the model
+state ``\mathbf{x}`` at steady-state. It removes the operating points on `u` and `d` and 
+calls [`steadystate!`](@ref):
 
 - If `model` is a [`LinModel`](@ref), the method computes the steady-state of current
   inputs `u` and measured disturbances `d`.
@@ -233,9 +234,10 @@ end
 @doc raw"""
     updatestate!(model::SimModel, u, d=[]) -> xnext
 
-Update `model.x0` states with current inputs `u` and measured disturbances `d`.
+Update `model.x0` states with current inputs `u` and meas. dist. `d` for the next time step.
 
 The method computes and returns the model state for the next time step ``\mathbf{x}(k+1)``.
+It also increment the discrete time step `model.k` by `1`.
 
 # Examples
 ```jldoctest
@@ -251,7 +253,7 @@ function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: 
     u0, d0, xnext0 = model.buffer.u, model.buffer.d, model.buffer.x
     u0 .= u .- model.uop
     d0 .= d .- model.dop
-    f!(xnext0, model, model.x0, u0, d0)
+    f!(xnext0, model, model.x0, u0, d0, model.p)
     xnext0  .+= model.fop .- model.xop
     model.x0 .= xnext0
     xnext   = xnext0
@@ -280,7 +282,7 @@ function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
     validate_args(model, d)
     d0, y0  = model.buffer.d, model.buffer.y
     d0 .= d .- model.dop
-    h!(y0, model, model.x0, d0)
+    h!(y0, model, model.x0, d0, model.p)
     y   = y0
     y .+= model.yop
     return y

@@ -4,7 +4,8 @@ struct NonLinMPC{
     NT<:Real, 
     SE<:StateEstimator, 
     JM<:JuMP.GenericModel, 
-    JEfunc<:Function
+    JEfunc<:Function,
+    P<:Any
 } <: PredictiveController{NT}
     estim::SE
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
@@ -21,6 +22,7 @@ struct NonLinMPC{
     L_Hp::Hermitian{NT, Matrix{NT}}
     E::NT
     JE::JEfunc
+    p::P
     R̂u0::Vector{NT}
     R̂y0::Vector{NT}
     noR̂u::Bool
@@ -46,12 +48,13 @@ struct NonLinMPC{
     Yop::Vector{NT}
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
-    function NonLinMPC{NT, SE, JM, JEFunc}(
-        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEFunc, optim::JM
-    ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel, JEFunc<:Function}
+    function NonLinMPC{NT, SE, JM, JEFunc, P}(
+        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEFunc, p::P, optim::JM
+    ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel, JEFunc<:Function, P<:Any}
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
+        validate_JE(NT, JE)
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # convert `Diagonal` to normal `Matrix` if required:
         M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
@@ -77,11 +80,11 @@ struct NonLinMPC{
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
         buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp)
-        mpc = new{NT, SE, JM, JEFunc}(
+        mpc = new{NT, SE, JM, JEFunc, P}(
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
-            M_Hp, Ñ_Hc, L_Hp, Ewt, JE, 
+            M_Hp, Ñ_Hc, L_Hp, Ewt, JE, p,
             R̂u0, R̂y0, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
@@ -109,12 +112,12 @@ controller minimizes the following objective function at each discrete time ``k`
                        + \mathbf{(ΔU)}'      \mathbf{N}_{H_c} \mathbf{(ΔU)}        \\&
                        + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
                        + C ϵ^2  
-                       + E J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E)
+                       + E J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, \mathbf{p})
 \end{aligned}
 ```
 See [`LinMPC`](@ref) for the variable definitions. The custom economic function ``J_E`` can
 penalizes solutions with high economic costs. Setting all the weights to 0 except ``E`` 
-creates a pure economic model predictive controller (EMPC). The arguments of ``J_E`` are 
+creates a pure economic model predictive controller (EMPC). The arguments of ``J_E`` include
 the manipulated inputs, the predicted outputs and measured disturbances from ``k`` to 
 ``k+H_p`` inclusively:
 ```math
@@ -124,10 +127,11 @@ the manipulated inputs, the predicted outputs and measured disturbances from ``k
 ```
 since ``H_c ≤ H_p`` implies that ``\mathbf{Δu}(k+H_p) = \mathbf{0}`` or ``\mathbf{u}(k+H_p)=
 \mathbf{u}(k+H_p-1)``. The vector ``\mathbf{D̂}`` includes the predicted measured disturbance
-over ``H_p``.
+over ``H_p``. The argument ``\mathbf{p}`` is a custom parameter object of any type but use a
+mutable one if you want to modify it later e.g.: a vector.
 
 !!! tip
-    Replace any of the 3 arguments with `_` if not needed (see `JE` default value below).
+    Replace any of the 4 arguments with `_` if not needed (see `JE` default value below).
 
 This method uses the default state estimator :
 
@@ -150,7 +154,8 @@ This method uses the default state estimator :
 - `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
-- `JE=(_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E)``.
+- `JE=(_,_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, \mathbf{p})``.
+- `p=model.p` : ``J_E`` function parameter ``\mathbf{p}`` (any type).
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
@@ -159,7 +164,7 @@ This method uses the default state estimator :
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:
@@ -200,12 +205,13 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE::Function = (_,_,_) -> 0.0,
+    JE::Function = (args...) -> 0.0,
+    p = model.p,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = UnscentedKalmanFilter(model; kwargs...)
-    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, M_Hp, N_Hc, L_Hp, optim)
+    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, p, M_Hp, N_Hc, L_Hp, optim)
 end
 
 function NonLinMPC(
@@ -220,12 +226,13 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE::Function = (_,_,_) -> 0.0,
+    JE::Function = (args...) -> 0.0,
+    p = model.p,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
-    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, M_Hp, N_Hc, L_Hp, optim)
+    NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, p, M_Hp, N_Hc, L_Hp, optim)
 end
 
 
@@ -236,7 +243,7 @@ Use custom state estimator `estim` to construct `NonLinMPC`.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_)->0.5x+u, (x,_)->2x, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> estim = UnscentedKalmanFilter(model, σQint_ym=[0.05]);
 
@@ -264,15 +271,33 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE::JEFunc = (_,_,_) -> 0.0,
+    JE::JEFunc = (args...) -> 0.0,
+    p::P = estim.model.p,
     optim::JM = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
-) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel, JEFunc<:Function}
+) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel, JEFunc<:Function, P<:Any}
     nk = estimate_delays(estim.model)
     if Hp ≤ nk
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
-    return NonLinMPC{NT, SE, JM, JEFunc}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, optim)
+    return NonLinMPC{NT, SE, JM, JEFunc, P}(
+        estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, p, optim
+    )
+end
+
+"""
+    validate_JE(NT, JE) -> nothing
+
+Validate `JE` function argument signature.
+"""
+function validate_JE(NT, JE)
+    if !hasmethod(JE, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any})
+        error(
+            "the economic function has no method with type signature "*
+            "JE(UE::Vector{$(NT)}, ŶE::Vector{$(NT)}, D̂E::Vector{$(NT)}, p::Any)"
+        )
+    end
+    return nothing
 end
 
 """
@@ -285,7 +310,7 @@ function addinfo!(info, mpc::NonLinMPC)
     UE = [U; U[(end - mpc.estim.model.nu + 1):end]]
     ŶE = [ŷ; Ŷ]
     D̂E = [d; D̂]
-    info[:JE]  = mpc.JE(UE, ŶE, D̂E)
+    info[:JE]  = mpc.JE(UE, ŶE, D̂E, mpc.p)
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
     return info
 end
@@ -458,3 +483,21 @@ end
 
 "No nonlinear constraints if `model` is a [`LinModel`](@ref), return `g` unchanged."
 con_nonlinprog!(g, ::NonLinMPC, ::LinModel, _ , _ , _ ) = g
+
+"Evaluate the economic term of the objective function for [`NonLinMPC`](@ref)."
+function obj_econ!(U0, Ȳ, mpc::NonLinMPC, model::SimModel, Ŷ0, ΔŨ)
+    if !iszero(mpc.E)
+        ny, Hp, ŷ, D̂E = model.ny, mpc.Hp, mpc.ŷ, mpc.D̂E
+        U   = U0
+        U .+= mpc.Uop
+        uend = @views U[(end-model.nu+1):end]
+        Ŷ  = Ȳ
+        Ŷ .= Ŷ0 .+ mpc.Yop
+        UE = [U; uend]
+        ŶE = [ŷ; Ŷ]
+        E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E, mpc.p)
+    else
+        E_JE = 0.0
+    end
+    return E_JE
+end

@@ -367,8 +367,8 @@ end
     @test internalmodel2.nxs == 1
     @test internalmodel2.nx̂ == 4
 
-    f(x,u,d) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
-    h(x,d)   = linmodel2.C*x + linmodel2.Dd*d
+    f(x,u,d,_) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
+    h(x,d,_)   = linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 2, solver=nothing)
     internalmodel3 = InternalModel(nonlinmodel)
     @test internalmodel3.nym == 2
@@ -485,8 +485,8 @@ end
  
 @testset "UnscentedKalmanFilter construction" begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
-    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h(x,d)   = linmodel1.C*x + linmodel1.Du*d
+    f(x,u,d,_) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h(x,d,_)   = linmodel1.C*x + linmodel1.Du*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
 
     ukf1 = UnscentedKalmanFilter(linmodel1)
@@ -542,8 +542,8 @@ end
 
 @testset "UnscentedKalmanFilter estimator methods" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
-    h(x,_)   = linmodel1.C*x
+    f(x,u,_,_) = linmodel1.A*x + linmodel1.Bu*u
+    h(x,_,_)   = linmodel1.C*x
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     ukf1 = UnscentedKalmanFilter(nonlinmodel)
     preparestate!(ukf1, [50, 30])
@@ -614,8 +614,8 @@ end
     setmodel!(ukf1, Q̂=[1e-3], R̂=[1e-6])
     @test ukf1.Q̂ ≈ [1e-3]
     @test ukf1.R̂ ≈ [1e-6]
-    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
-    h(x,d)   = linmodel.C*x + linmodel.Du*d
+    f(x,u,d,_) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h(x,d,_)   = linmodel.C*x + linmodel.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
     ukf2 = UnscentedKalmanFilter(nonlinmodel, nint_ym=0)
     setmodel!(ukf2, Q̂=[1e-3], R̂=[1e-6])
@@ -626,8 +626,8 @@ end
 
 @testset "ExtendedKalmanFilter construction" begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
-    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h(x,d)   = linmodel1.C*x + linmodel1.Du*d
+    f(x,u,d,_) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h(x,d,_)   = linmodel1.C*x + linmodel1.Du*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
 
     ekf1 = ExtendedKalmanFilter(linmodel1)
@@ -679,8 +679,8 @@ end
 
 @testset "ExtendedKalmanFilter estimator methods" begin
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
-    h(x,_)   = linmodel1.C*x
+    f(x,u,_,_) = linmodel1.A*x + linmodel1.Bu*u
+    h(x,_,_)   = linmodel1.C*x
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     ekf1 = ExtendedKalmanFilter(nonlinmodel)
     preparestate!(ekf1, [50, 30])
@@ -751,8 +751,8 @@ end
     setmodel!(ekf1, Q̂=[1e-3], R̂=[1e-6])
     @test ekf1.Q̂ ≈ [1e-3]
     @test ekf1.R̂ ≈ [1e-6]
-    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
-    h(x,d)   = linmodel.C*x + linmodel.Du*d
+    f(x,u,d,_) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h(x,d,_)   = linmodel.C*x + linmodel.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
     ekf2 = ExtendedKalmanFilter(nonlinmodel, nint_ym=0)
     setmodel!(ekf2, Q̂=[1e-3], R̂=[1e-6])
@@ -763,8 +763,8 @@ end
 
 @testset "MovingHorizonEstimator construction" begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
-    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h(x,d)   = linmodel1.C*x + linmodel1.Du*d
+    f(x,u,d,_) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h(x,d,_)   = linmodel1.C*x + linmodel1.Du*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
 
     mhe1 = MovingHorizonEstimator(linmodel1, He=5)
@@ -844,8 +844,8 @@ end
 
 @testset "MovingHorizonEstimator estimation and getinfo" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2], i_d=[3]), uop=[10,50], yop=[50,30], dop=[5])
-    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h(x,d)   = linmodel1.C*x + linmodel1.Dd*d
+    f(x,u,d,_) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h(x,d,_)   = linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing), uop=[10,50], yop=[50,30], dop=[5])
     
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
@@ -1005,8 +1005,8 @@ end
     setconstraint!(mhe2, C_v̂min=0.05(31:38), C_v̂max=0.06(31:38))
     @test all((-mhe2.con.A_V̂min[:, end], -mhe2.con.A_V̂max[:, end]) .≈ (0.05(31:38), 0.06(31:38)))
 
-    f(x,u,d) = linmodel1.A*x + linmodel1.Bu*u
-    h(x,d)   = linmodel1.C*x 
+    f(x,u,d,_) = linmodel1.A*x + linmodel1.Bu*u
+    h(x,d,_)   = linmodel1.C*x 
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
 
     mhe3 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3)
@@ -1100,8 +1100,8 @@ end
     info = getinfo(mhe)
     @test info[:V̂] ≈ [-1,-1] atol=5e-2
 
-    f(x,u,_) = linmodel1.A*x + linmodel1.Bu*u
-    h(x,_)   = linmodel1.C*x
+    f(x,u,_,_) = linmodel1.A*x + linmodel1.Bu*u
+    h(x,_,_)   = linmodel1.C*x
     nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing), uop=[10,50], yop=[50,30])
     mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
 
@@ -1184,8 +1184,8 @@ end
     setmodel!(mhe, Q̂=[1e-3], R̂=[1e-6])
     @test mhe.Q̂ ≈ [1e-3]
     @test mhe.R̂ ≈ [1e-6]
-    f(x,u,d) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
-    h(x,d)   = linmodel.C*x + linmodel.Du*d
+    f(x,u,d,_) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h(x,d,_)   = linmodel.C*x + linmodel.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
     mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
     setmodel!(mhe2, Q̂=[1e-3], R̂=[1e-6])
@@ -1224,8 +1224,8 @@ end
         updatestate!(kf,  [11, 50], y, [25])
     end
     @test X̂_mhe ≈ X̂_kf atol=1e-3 rtol=1e-3
-    f = (x,u,d) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h = (x,d)   -> linmodel1.C*x + linmodel1.Dd*d
+    f = (x,u,d,_) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
+    h = (x,d,_)   -> linmodel1.C*x + linmodel1.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
     mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=false)
@@ -1272,8 +1272,8 @@ end
 
 @testset "MovingHorizonEstimator LinModel v.s. NonLinModel" begin
     linmodel = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
-    f = (x,u,d) -> linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
-    h = (x,d)   -> linmodel.C*x + linmodel.Dd*d
+    f = (x,u,d,_) -> linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h = (x,d,_)   -> linmodel.C*x + linmodel.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "sb" => "yes"))

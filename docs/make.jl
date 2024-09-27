@@ -27,6 +27,7 @@ makedocs(
             "Examples" => [
                 "Linear Design" => "manual/linmpc.md",
                 "Nonlinear Design" => "manual/nonlinmpc.md",
+                "ModelingToolkit" =>  "manual/mtk.md",
             ],
         ],
         "Functions" => [

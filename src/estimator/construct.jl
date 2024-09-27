@@ -11,12 +11,12 @@ manipulated input and measured outputs. The function returns the state-space mat
 ```math
 \begin{aligned}
 \mathbf{x_{s}}(k+1)     &= \mathbf{A_s x_s}(k) + \mathbf{B_s e}(k) \\
-\mathbf{y_{s_{u}}}(k)   &= \mathbf{C_{s_{u}}  x_s}(k) \\
-\mathbf{y_{s_{ym}}}(k)  &= \mathbf{C_{s_{ym}} x_s}(k) 
+\mathbf{y_{s_{u}}}(k)   &= \mathbf{C_{s_{u}} x_s}(k) \\
+\mathbf{y_{s_{y}}}(k)   &= \mathbf{C_{s_{y}} x_s}(k) 
 \end{aligned}
 ```
 where ``\mathbf{e}(k)`` is an unknown zero mean white noise and ``\mathbf{A_s} = 
-\mathrm{diag}(\mathbf{A_{s_{u}}, A_{s_{ym}}})``. The estimations does not use ``\mathbf{B_s}``,
+\mathrm{diag}(\mathbf{A_{s_{u}}, A_{s_{y}}})``. The estimations does not use ``\mathbf{B_s}``,
 it is thus ignored. The function [`init_integrators`](@ref) builds the state-space matrices.
 """
 function init_estimstoch(
@@ -119,7 +119,30 @@ returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```
 An error is thrown if the augmented model is not observable and `verify_obsv == true`. The
 augmented operating points `x̂op` and `f̂op` are simply ``\mathbf{x_{op}}`` and
-``\mathbf{f_{op}}`` vectors appended with zeros (see [`setop!`](@ref)).
+``\mathbf{f_{op}}`` vectors appended with zeros (see [`setop!`](@ref)). See Extended Help
+for a detailed definition of the augmented matrices.
+
+# Extended Help
+!!! details "Extended Help"
+    Using the `As`, `Cs_u` and `Cs_y` matrices of the stochastic model provided in argument
+    and the `model.A`, `model.Bu`, `model.Bd`, `model.C`, `model.Dd` matrices, the 
+    state-space matrices of the augmented model are defined as follows:
+    ```math
+    \begin{aligned}
+    \mathbf{Â}   &=                                    \begin{bmatrix} 
+        \mathbf{A} & \mathbf{B_u C_{s_u}}              \\ 
+        \mathbf{0} & \mathbf{A_s}                      \end{bmatrix} \\
+    \mathbf{B̂_u} &=                                    \begin{bmatrix}
+        \mathbf{B_u}                                   \\
+        \mathbf{0}                                     \end{bmatrix} \\
+    \mathbf{Ĉ}   &=                                    \begin{bmatrix}
+        \mathbf{C} & \mathbf{C_{s_y}}                  \end{bmatrix} \\
+    \mathbf{B̂_d} &=                                    \begin{bmatrix} 
+        \mathbf{B_d}                                   \\
+        \mathbf{0}                                     \end{bmatrix} \\
+    \mathbf{D̂_d} &= \mathbf{D_d}
+    \end{aligned}
+    ```
 """
 function augment_model(model::LinModel{NT}, As, Cs_u, Cs_y; verify_obsv=true) where NT<:Real
     nu, nx, nd = model.nu, model.nx, model.nd

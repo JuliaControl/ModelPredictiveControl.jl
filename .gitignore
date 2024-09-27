@@ -5,3 +5,4 @@ LocalPreferences.toml
 .vscode/
 *.cov
 docs/Manifest.toml
+lcov.info

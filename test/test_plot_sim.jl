@@ -110,6 +110,18 @@ end
     @test all(p5[end-4][2][:y] .≈ +101)
     @test all(p5[end-3][2][:y] .≈ +102)
     @test all(p5[end-2][2][:y] .≈ +103)
+    p6 = plot(res, plotxwithx̂=true, plotx̂min=true, plotx̂max=false)
+    @test p6[1][1][:x] ≈ res.T_data
+    @test all(p6[end-5][3][:y] .≈ -100)
+    @test all(p6[end-4][3][:y] .≈ -101)
+    @test all(p6[end-3][3][:y] .≈ -102)
+    @test all(p6[end-2][3][:y] .≈ -103)
+    p7 = plot(res, plotxwithx̂=true, plotx̂min=false, plotx̂max=true)
+    @test p7[1][1][:x] ≈ res.T_data
+    @test all(p7[end-5][3][:y] .≈ +100)
+    @test all(p7[end-4][3][:y] .≈ +101)
+    @test all(p7[end-3][3][:y] .≈ +102)
+    @test all(p7[end-2][3][:y] .≈ +103)
 end
 
 @testset "PredictiveController quick simulation" begin
@@ -147,7 +159,10 @@ end
 end
 
 @testset "PredictiveController Plots" begin
-    mpc = LinMPC(LinModel(sys, Ts, i_d=[3]), Lwt=[0.01, 0.01])
+    estim = MovingHorizonEstimator(LinModel(sys, Ts, i_d=[3]), He=5)
+    estim = setconstraint!(estim, x̂min=[-100,-101,-102,-103,-104,-105])
+    estim = setconstraint!(estim, x̂max=[+100,+101,+102,+103,+104,+105])
+    mpc = LinMPC(estim, Lwt=[0.01, 0.01])
     mpc = setconstraint!(mpc, umin=[-50, -51], umax=[52, 53], ymin=[-54,-55], ymax=[56,57])
     res = sim!(mpc, 15)
     p1 = plot(res, plotŷ=true)
@@ -198,4 +213,36 @@ end
     @test p8[1][1][:x] ≈ res.T_data
     @test all(p8[end-4][3][:y] .≈ 56.0)
     @test all(p8[end-3][3][:y] .≈ 57.0)
+    p9 = plot(res, plotx̂=true, plotx̂min=true, plotx̂max=false)
+    @test p9[1][1][:x] ≈ res.T_data
+    @test all(p9[end-5][2][:y] .≈ -100.0)
+    @test all(p9[end-4][2][:y] .≈ -101.0)
+    @test all(p9[end-3][2][:y] .≈ -102.0)
+    @test all(p9[end-2][2][:y] .≈ -103.0)
+    @test all(p9[end-1][2][:y] .≈ -104.0)
+    @test all(p9[end-0][2][:y] .≈ -105.0)
+    p10 = plot(res, plotx̂=true, plotx̂min=false, plotx̂max=true)
+    @test p10[1][1][:x] ≈ res.T_data
+    @test all(p10[end-5][2][:y] .≈ +100.0)
+    @test all(p10[end-4][2][:y] .≈ +101.0)
+    @test all(p10[end-3][2][:y] .≈ +102.0)
+    @test all(p10[end-2][2][:y] .≈ +103.0)
+    @test all(p10[end-1][2][:y] .≈ +104.0)
+    @test all(p10[end-0][2][:y] .≈ +105.0)
+    p11 = plot(res, plotxwithx̂=true, plotx̂min=true, plotx̂max=false)
+    @test p11[1][1][:x] ≈ res.T_data
+    @test all(p11[end-5][3][:y] .≈ -100.0)
+    @test all(p11[end-4][3][:y] .≈ -101.0)
+    @test all(p11[end-3][3][:y] .≈ -102.0)
+    @test all(p11[end-2][3][:y] .≈ -103.0)
+    @test all(p11[end-1][2][:y] .≈ -104.0)
+    @test all(p11[end-0][2][:y] .≈ -105.0)
+    p12 = plot(res, plotxwithx̂=true, plotx̂min=false, plotx̂max=true)
+    @test p12[1][1][:x] ≈ res.T_data
+    @test all(p12[end-5][3][:y] .≈ +100.0)
+    @test all(p12[end-4][3][:y] .≈ +101.0)
+    @test all(p12[end-3][3][:y] .≈ +102.0)
+    @test all(p12[end-2][3][:y] .≈ +103.0)
+    @test all(p12[end-1][2][:y] .≈ +104.0)
+    @test all(p12[end-0][2][:y] .≈ +105.0)
 end

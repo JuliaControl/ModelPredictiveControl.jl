@@ -118,7 +118,7 @@ internal states.
 
 # Examples
 ```jldoctest
-julia> plant = NonLinModel((x,u,d)->0.1x+u+d, (x,_)->2x, 10.0, 1, 1, 1, 1, solver=nothing);
+julia> plant = NonLinModel((x,u,d,_)->0.1x+u+d, (x,_,_)->2x, 5, 1, 1, 1, 1, solver=nothing);
 
 julia> res = sim!(plant, 15, [0], [0], x_0=[1])
 Simulation results of NonLinModel with 15 time steps.

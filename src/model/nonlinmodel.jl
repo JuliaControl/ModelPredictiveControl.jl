@@ -1,7 +1,10 @@
-struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimModel{NT}
+struct NonLinModel{
+    NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver
+} <: SimModel{NT}
     x0::Vector{NT}
     f!::F
     h!::H
+    p::P
     solver::DS
     Ts::NT
     t::Vector{NT}
@@ -19,9 +22,9 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
     dname::Vector{String}
     xname::Vector{String}
     buffer::SimModelBuffer{NT}
-    function NonLinModel{NT, F, H, DS}(
-        f!::F, h!::H, solver::DS, Ts, nu, nx, ny, nd
-    ) where {NT<:Real, F<:Function, H<:Function, DS<:DiffSolver}
+    function NonLinModel{NT, F, H, P, DS}(
+        f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS
+    ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver}
         Ts > 0 || error("Sampling time Ts must be positive")
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
@@ -35,9 +38,10 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, F, H, DS}(
+        return new{NT, F, H, P, DS}(
             x0, 
-            f!, h!, 
+            f!, h!,
+            p,
             solver, 
             Ts, t,
             nu, nx, ny, nd, 
@@ -49,8 +53,8 @@ struct NonLinModel{NT<:Real, F<:Function, H<:Function, DS<:DiffSolver} <: SimMod
 end
 
 @doc raw"""
-    NonLinModel{NT}(f::Function,  h::Function,  Ts, nu, nx, ny, nd=0; solver=RungeKutta(4))
-    NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0; solver=RungeKutta(4))
+    NonLinModel{NT}(f::Function,  h::Function,  Ts, nu, nx, ny, nd=0; p=[], solver=RungeKutta(4))
+    NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0; p=[], solver=RungeKutta(4))
 
 Construct a nonlinear model from state-space functions `f`/`f!` and `h`/`h!`.
 
@@ -59,23 +63,28 @@ continuous dynamics. Use `solver=nothing` for the discrete case (see Extended He
 functions are defined as:
 ```math
 \begin{aligned}
-    \mathbf{ẋ}(t) &= \mathbf{f}\Big( \mathbf{x}(t), \mathbf{u}(t), \mathbf{d}(t) \Big) \\
-    \mathbf{y}(t) &= \mathbf{h}\Big( \mathbf{x}(t), \mathbf{d}(t) \Big)
+    \mathbf{ẋ}(t) &= \mathbf{f}\Big( \mathbf{x}(t), \mathbf{u}(t), \mathbf{d}(t), \mathbf{p} \Big) \\
+    \mathbf{y}(t) &= \mathbf{h}\Big( \mathbf{x}(t), \mathbf{d}(t), \mathbf{p} \Big)
 \end{aligned}
 ```
-They can be implemented in two possible ways:
+where ``\mathbf{x}``, ``\mathbf{y}``, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
+respectively the state, output, manipulated input, measured disturbance and parameter
+vectors. If the dynamics is a function of the time, simply add a measured disturbance
+defined as ``d(t) = t``. The functions can be implemented in two possible ways:
 
-1. **Non-mutating functions** (out-of-place): define them as `f(x, u, d) -> ẋ` and
-   `h(x, d) -> y`. This syntax is simple and intuitive but it allocates more memory.
-2. **Mutating functions** (in-place): define them as `f!(ẋ, x, u, d) -> nothing` and
-   `h!(y, x, d) -> nothing`. This syntax reduces the allocations and potentially the 
+1. **Non-mutating functions** (out-of-place): define them as `f(x, u, d, p) -> ẋ` and
+   `h(x, d, p) -> y`. This syntax is simple and intuitive but it allocates more memory.
+2. **Mutating functions** (in-place): define them as `f!(ẋ, x, u, d, p) -> nothing` and
+   `h!(y, x, d, p) -> nothing`. This syntax reduces the allocations and potentially the 
    computational burden as well.
 
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
-manipulated inputs, states, outputs and measured disturbances. 
+manipulated inputs, states, outputs and measured disturbances. The keyword argument `p`
+is the parameters of the model passed to the two functions. It can be of any Julia object 
+but use a mutable type if you want to change them later e.g.: a vector.
 
 !!! tip
-    Replace the `d` argument with `_` if `nd = 0` (see Examples below).
+    Replace the `d` or `p` argument with `_` in your functions if not needed (see Examples below).
     
 A 4th order [`RungeKutta`](@ref) solver discretizes the differential equations by default. 
 The rest of the documentation assumes discrete dynamics since all models end up in this 
@@ -90,20 +99,20 @@ See also [`LinModel`](@ref).
 
 # Examples
 ```jldoctest
-julia> f!(ẋ, x, u, _ ) = (ẋ .= -0.2x .+ u; nothing);
+julia> f!(ẋ, x, u, _ , p) = (ẋ .= p*x .+ u; nothing);
 
-julia> h!(y, x, _ ) = (y .= 0.1x; nothing);
+julia> h!(y, x, _ , _ ) = (y .= 0.1x; nothing);
 
-julia> model1 = NonLinModel(f!, h!, 5.0, 1, 1, 1)               # continuous dynamics
+julia> model1 = NonLinModel(f!, h!, 5.0, 1, 1, 1, p=-0.2)       # continuous dynamics
 NonLinModel with a sample time Ts = 5.0 s, RungeKutta solver and:
  1 manipulated inputs u
  1 states x
  1 outputs y
  0 measured disturbances d
 
-julia> f(x, u, _ ) = 0.1x + u;
+julia> f(x, u, _ , _ ) = 0.1x + u;
 
-julia> h(x, _ ) = 2x;
+julia> h(x, _ , _ ) = 2x;
 
 julia> model2 = NonLinModel(f, h, 2.0, 1, 1, 1, solver=nothing) # discrete dynamics
 NonLinModel with a sample time Ts = 2.0 s, empty solver and:
@@ -118,39 +127,44 @@ NonLinModel with a sample time Ts = 2.0 s, empty solver and:
     State-space functions are similar for discrete dynamics:
     ```math
     \begin{aligned}
-        \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \\
-        \mathbf{y}(k)   &= \mathbf{h}\Big( \mathbf{x}(k), \mathbf{d}(k) \Big)
+        \mathbf{x}(k+1) &= \mathbf{f}\Big( \mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k), \mathbf{p} \Big) \\
+        \mathbf{y}(k)   &= \mathbf{h}\Big( \mathbf{x}(k), \mathbf{d}(k), \mathbf{p} \Big)
     \end{aligned}
     ```
     with two possible implementations as well:
 
-    1. **Non-mutating functions**: define them as `f(x, u, d) -> xnext` and `h(x, d) -> y`.
-    2. **Mutating functions**: define them as `f!(xnext, x, u, d) -> nothing` and
-       `h!(y, x, d) -> nothing`.
+    1. **Non-mutating functions**: define them as `f(x, u, d, p) -> xnext` and 
+       `h(x, d, p) -> y`.
+    2. **Mutating functions**: define them as `f!(xnext, x, u, d, p) -> nothing` and
+       `h!(y, x, d, p) -> nothing`.
 """
 function NonLinModel{NT}(
-    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0; 
-    solver=RungeKutta(4)
+    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
+    p=NT[], solver=RungeKutta(4)
 ) where {NT<:Real}
     isnothing(solver) && (solver=EmptySolver())
     ismutating_f = validate_f(NT, f)
     ismutating_h = validate_h(NT, h)
-    f! = ismutating_f ? f : (xnext, x, u, d) -> xnext .= f(x, u, d)
-    h! = ismutating_h ? h : (y, x, d) -> y .= h(x, d)
+    f! = ismutating_f ? f : f!(xnext, x, u, d, p) = (xnext .= f(x, u, d, p); nothing)
+    h! = ismutating_h ? h : h!(y, x, d, p) = (y .= h(x, d, p); nothing)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
-    F, H, DS = get_types(f!, h!, solver)
-    return NonLinModel{NT, F, H, DS}(f!, h!, solver, Ts, nu, nx, ny, nd)
+    F, H, P, DS = get_types(f!, h!, p, solver)
+    return NonLinModel{NT, F, H, P, DS}(f!, h!, Ts, nu, nx, ny, nd, p, solver)
 end
 
 function NonLinModel(
-    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0; 
-    solver=RungeKutta(4)
+    f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
+    p=Float64[], solver=RungeKutta(4)
 )
-    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; solver)
+    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; p, solver)
 end
 
 "Get the types of `f!`, `h!` and `solver` to construct a `NonLinModel`."
-get_types(::F, ::H, ::DS) where {F<:Function, H<:Function, DS<:DiffSolver} = F, H, DS
+function get_types(
+    ::F, ::H, ::P, ::DS
+) where {F<:Function, H<:Function, P<:Any, DS<:DiffSolver} 
+    return F, H, P, DS
+end
 
 """
     validate_f(NT, f) -> ismutating
@@ -158,12 +172,13 @@ get_types(::F, ::H, ::DS) where {F<:Function, H<:Function, DS<:DiffSolver} = F, 
 Validate `f` function argument signature and return `true` if it is mutating.
 """
 function validate_f(NT, f)
-    ismutating = hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}})
-    if !(ismutating || hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}}))
+    ismutating = hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any})
+    if !(ismutating || hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any}))
         error(
             "the state function has no method with type signature "*
-            "f(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}) or mutating form "*
-            "f!(xnext::Vector{$(NT)}, x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)})"
+            "f(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any) or "*
+            "mutating form f!(xnext::Vector{$(NT)}, x::Vector{$(NT)}, u::Vector{$(NT)}, "*
+                                                   "d::Vector{$(NT)}, p::Any)"
         )
     end
     return ismutating
@@ -175,12 +190,12 @@ end
 Validate `h` function argument signature and return `true` if it is mutating.
 """
 function validate_h(NT, h)
-    ismutating = hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Vector{NT}})
-    if !(ismutating || hasmethod(h, Tuple{Vector{NT}, Vector{NT}}))
+    ismutating = hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any})
+    if !(ismutating || hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Any}))
         error(
             "the output function has no method with type signature "*
-            "h(x::Vector{$(NT)}, d::Vector{$(NT)}) or mutating form "*
-            "h!(y::Vector{$(NT)}, x::Vector{$(NT)}, d::Vector{$(NT)})"
+            "h(x::Vector{$(NT)}, d::Vector{$(NT)}, p::Any) or mutating form "*
+            "h!(y::Vector{$(NT)}, x::Vector{$(NT)}, d::Vector{$(NT)}, p::Any)"
         )
     end
     return ismutating
@@ -189,11 +204,11 @@ end
 "Do nothing if `model` is a [`NonLinModel`](@ref)."
 steadystate!(::SimModel, _ , _ ) = nothing
 
-"Call `f!(xnext0, x0, u0, d0)` with `model.f!` method for [`NonLinModel`](@ref)."
-f!(xnext0, model::NonLinModel, x0, u0, d0) = model.f!(xnext0, x0, u0, d0)
+"Call `model.f!(xnext0, x0, u0, d0, p)` for [`NonLinModel`](@ref)."
+f!(xnext0, model::NonLinModel, x0, u0, d0, p) = model.f!(xnext0, x0, u0, d0, p)
 
-"Call `h!(y0, x0, d0)` with `model.h` method for [`NonLinModel`](@ref)."
-h!(y0, model::NonLinModel, x0, d0) = model.h!(y0, x0, d0)
+"Call `model.h!(y0, x0, d0, p)` for [`NonLinModel`](@ref)."
+h!(y0, model::NonLinModel, x0, d0, p) = model.h!(y0, x0, d0, p)
 
 detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name) solver"
-detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:EmptySolver}) = ", empty solver"
+detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:Any, <:EmptySolver}) = ", empty solver"
