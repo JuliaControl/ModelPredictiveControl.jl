@@ -64,10 +64,10 @@ model = setname!(NonLinModel(f, h, Ts, nu, nx, ny; p=p_model); u=vu, x=vx, y=vy)
 
 The output function ``\mathbf{h}`` converts the ``θ`` angle to degrees. Note that special
 characters like ``θ`` can be typed in the Julia REPL or VS Code by typing `\theta` and
-pressing the `<TAB>` key. Note that the parameter `p` can be of any type but use a mutable
-type like a vector of you want to modify it later. A 4th order [`RungeKutta`](@ref) method
-solves the differential equations by default. It is good practice to first simulate `model`
-using [`sim!`](@ref) as a quick sanity check:
+pressing the `<TAB>` key. The parameter `p` can be of any type but use a mutable type like a
+vector of you want to modify it later. A 4th order [`RungeKutta`](@ref) method solves the
+differential equations by default. It is good practice to first simulate `model` using
+[`sim!`](@ref) as a quick sanity check:
 
 ```@example 1
 using Plots
