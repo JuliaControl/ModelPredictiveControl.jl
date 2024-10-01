@@ -150,7 +150,8 @@ function LinModel(
     sysu = sminreal(sys[:,i_u]) # remove states associated to measured disturbances d
     sysd = sminreal(sys[:,i_d]) # remove states associated to manipulates inputs u
     if !iszero(sysu.D)
-        error("State matrix D must be 0 for columns associated to manipulated inputs u")
+        error("LinModel only supports strictly proper systems (state matrix D must be 0 "*
+              "for columns associated to manipulated inputs u)")
     end
     if iscontinuous(sys)
         isnothing(Ts) && error("Sample time Ts must be specified if sys is continuous")

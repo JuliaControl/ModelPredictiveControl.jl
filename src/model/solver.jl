@@ -54,9 +54,9 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ 
         k2   = get_tmp(k2_cache, var)
         k3   = get_tmp(k3_cache, var)
         k4   = get_tmp(k4_cache, var)
+        xterm = xnext
         @. xcur = x
         for i=1:solver.supersample
-            xterm = xnext # TODO: move this out of the loop, just above (to test) ?
             @. xterm = xcur
             fc!(k1, xterm, u, d, p)
             @. xterm = xcur + k1 * Ts_inner/2
