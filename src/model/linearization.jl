@@ -35,15 +35,15 @@ julia> linmodel.A
     With the nonlinear state-space model:
     ```math
     \begin{aligned}
-        \mathbf{x}(k+1) &= \mathbf{f}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k)\Big)  \\
-        \mathbf{y}(k)   &= \mathbf{h}\Big(\mathbf{x}(k), \mathbf{d}(k)\Big)
+        \mathbf{x}(k+1) &= \mathbf{f}\Big(\mathbf{x}(k), \mathbf{u}(k), \mathbf{d}(k), \mathbf{p}\Big)  \\
+        \mathbf{y}(k)   &= \mathbf{h}\Big(\mathbf{x}(k), \mathbf{d}(k), \mathbf{p}\Big)
     \end{aligned}
     ```
     its linearization at the operating point ``\mathbf{x_{op}, u_{op}, d_{op}}`` is:
     ```math
     \begin{aligned}
         \mathbf{x_0}(k+1) &≈ \mathbf{A x_0}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k)  
-                            + \mathbf{f(x_{op}, u_{op}, d_{op})} - \mathbf{x_{op}}         \\
+                            + \mathbf{f(x_{op}, u_{op}, d_{op}, p)} - \mathbf{x_{op}}         \\
         \mathbf{y_0}(k)   &≈ \mathbf{C x_0}(k) + \mathbf{D_d d_0}(k) 
     \end{aligned}
     ```
@@ -51,18 +51,18 @@ julia> linmodel.A
     documentation, and the Jacobian matrices:
     ```math
     \begin{aligned}
-        \mathbf{A}   &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{x}} \right|_{\mathbf{x=x_{op},\, u=u_{op},\, d=d_{op}}} \\
-        \mathbf{B_u} &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{u}} \right|_{\mathbf{x=x_{op},\, u=u_{op},\, d=d_{op}}} \\
-        \mathbf{B_d} &= \left. \frac{∂\mathbf{f(x, u, d)}}{∂\mathbf{d}} \right|_{\mathbf{x=x_{op},\, u=u_{op},\, d=d_{op}}} \\
-        \mathbf{C}   &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{x}}    \right|_{\mathbf{x=x_{op},\, d=d_{op}}}             \\
-        \mathbf{D_d} &= \left. \frac{∂\mathbf{h(x, d)}}{∂\mathbf{d}}    \right|_{\mathbf{x=x_{op},\, d=d_{op}}}
+        \mathbf{A}   &= \left. \frac{∂\mathbf{f(x, u, d, p)}}{∂\mathbf{x}} \right|_{\mathbf{x=x_{op},\, u=u_{op},\, d=d_{op}}} \\
+        \mathbf{B_u} &= \left. \frac{∂\mathbf{f(x, u, d, p)}}{∂\mathbf{u}} \right|_{\mathbf{x=x_{op},\, u=u_{op},\, d=d_{op}}} \\
+        \mathbf{B_d} &= \left. \frac{∂\mathbf{f(x, u, d, p)}}{∂\mathbf{d}} \right|_{\mathbf{x=x_{op},\, u=u_{op},\, d=d_{op}}} \\
+        \mathbf{C}   &= \left. \frac{∂\mathbf{h(x, d, p)}}{∂\mathbf{x}}    \right|_{\mathbf{x=x_{op},\, d=d_{op}}}             \\
+        \mathbf{D_d} &= \left. \frac{∂\mathbf{h(x, d, p)}}{∂\mathbf{d}}    \right|_{\mathbf{x=x_{op},\, d=d_{op}}}
     \end{aligned}
     ```
     Following [`setop!`](@ref) notation, we find:
     ```math
     \begin{aligned}
-        \mathbf{f_{op}} &= \mathbf{f(x_{op}, u_{op}, d_{op})} \\
-        \mathbf{y_{op}} &= \mathbf{h(x_{op}, d_{op})}
+        \mathbf{f_{op}} &= \mathbf{f(x_{op}, u_{op}, d_{op}, p)} \\
+        \mathbf{y_{op}} &= \mathbf{h(x_{op}, d_{op}, p)}
     \end{aligned}
     ```
     Notice that ``\mathbf{f_{op} - x_{op} = 0}`` if the point is an equilibrium. The 
