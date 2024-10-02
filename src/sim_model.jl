@@ -189,9 +189,8 @@ detailstr(model::SimModel) = ""
 
 Init `model.x0` with manipulated inputs `u` and meas. dist. `d` steady-state and reset time.
 
-The method resets the discrete time step `model.k` at `0` and tries to initialize the model
-state ``\mathbf{x}`` at steady-state. It removes the operating points on `u` and `d` and 
-calls [`steadystate!`](@ref):
+The method tries to initialize the model state ``\mathbf{x}`` at steady-state. It removes
+the operating points on `u` and `d` and calls [`steadystate!`](@ref):
 
 - If `model` is a [`LinModel`](@ref), the method computes the steady-state of current
   inputs `u` and measured disturbances `d`.
@@ -237,7 +236,6 @@ end
 Update `model.x0` states with current inputs `u` and meas. dist. `d` for the next time step.
 
 The method computes and returns the model state for the next time step ``\mathbf{x}(k+1)``.
-It also increment the discrete time step `model.k` by `1`.
 
 # Examples
 ```jldoctest
