@@ -115,11 +115,14 @@ controller minimizes the following objective function at each discrete time ``k`
                        + E J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, \mathbf{p})
 \end{aligned}
 ```
-See [`LinMPC`](@ref) for the variable definitions. The custom economic function ``J_E`` can
-penalizes solutions with high economic costs. Setting all the weights to 0 except ``E`` 
-creates a pure economic model predictive controller (EMPC). The arguments of ``J_E`` include
-the manipulated inputs, the predicted outputs and measured disturbances from ``k`` to 
-``k+H_p`` inclusively:
+subject to [`setconstraint!`](@ref) bounds, and the custom economic inequality constraints:
+```math
+\mathbf{g}_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, \mathbf{p}, ε) ≤ \mathbf{0}
+````
+The economic function ``J_E`` can penalizes solutions with high economic costs. Setting all
+the weights to 0 except ``E``  creates a pure economic model predictive controller (EMPC).
+The arguments of ``J_E`` include the manipulated inputs, the predicted outputs and measured
+disturbances from ``k`` to ``k+H_p`` inclusively:
 ```math
     \mathbf{U}_E = \begin{bmatrix} \mathbf{U}      \\ \mathbf{u}(k+H_p-1)   \end{bmatrix}  , \quad
     \mathbf{Ŷ}_E = \begin{bmatrix} \mathbf{ŷ}(k)   \\ \mathbf{Ŷ}            \end{bmatrix}  , \quad
@@ -133,7 +136,8 @@ mutable one if you want to modify it later e.g.: a vector.
 !!! tip
     Replace any of the 4 arguments with `_` if not needed (see `JE` default value below).
 
-This method uses the default state estimator :
+See [`LinMPC`](@ref) for the definition of the other variables. This method uses the default
+state estimator :
 
 - if `model` is a [`LinModel`](@ref), a [`SteadyKalmanFilter`](@ref) with default arguments;
 - else, an [`UnscentedKalmanFilter`](@ref) with default arguments. 
@@ -154,7 +158,10 @@ This method uses the default state estimator :
 - `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
-- `JE=(_,_,_,_)->0.0` : economic function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, \mathbf{p})``.
+- `JE=(_,_,_,_)->0.0` : economic (or custom) cost function
+   ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, \mathbf{p})``.
+- `gE=(_,_,_,_,_)->[]` : economic (or custom) constraint function
+   ``\mathbf{g}_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, \mathbf{p}, ε)``.
 - `p=model.p` : ``J_E`` function parameter ``\mathbf{p}`` (any type).
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
