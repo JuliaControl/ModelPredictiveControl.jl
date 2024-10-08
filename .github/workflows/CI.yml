@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 'release'
+          - '1'
           - 'lts'
           - 'nightly'
         os:
