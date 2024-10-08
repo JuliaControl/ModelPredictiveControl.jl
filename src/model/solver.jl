@@ -47,13 +47,11 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ 
     k4_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     f! = function inner_solver_f!(xnext, x, u, d, p)
         CT = promote_type(eltype(x), eltype(u), eltype(d))
-        # dummy variable for get_tmp, necessary for PreallocationTools + Julia 1.6 :
-        var::CT = 0
-        xcur = get_tmp(xcur_cache, var)
-        k1   = get_tmp(k1_cache, var)
-        k2   = get_tmp(k2_cache, var)
-        k3   = get_tmp(k3_cache, var)
-        k4   = get_tmp(k4_cache, var)
+        xcur = get_tmp(xcur_cache, CT)
+        k1   = get_tmp(k1_cache, CT)
+        k2   = get_tmp(k2_cache, CT)
+        k3   = get_tmp(k3_cache, CT)
+        k4   = get_tmp(k4_cache, CT)
         xterm = xnext
         @. xcur = x
         for i=1:solver.supersample

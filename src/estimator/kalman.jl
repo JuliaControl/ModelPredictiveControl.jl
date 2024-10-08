@@ -38,11 +38,15 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         validate_kfcov(nym, nx̂, Q̂, R̂)
+        if ny == nym
+            R̂_y = R̂
+        else
+            R̂_y = zeros(NT, ny, ny)
+            R̂_y[i_ym, i_ym] = R̂
+            R̂_y = Hermitian(R̂_y, :L)
+        end
         K̂ = try
-            Q̂_kalman = Matrix(Q̂) # Matrix() required for Julia 1.6
-            R̂_kalman = zeros(NT, ny, ny)
-            R̂_kalman[i_ym, i_ym] = R̂
-            ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂_kalman, R̂_kalman; direct)[:, i_ym] 
+            ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂_y; direct)[:, i_ym]
         catch my_error
             if isa(my_error, ErrorException)
                 error("Cannot compute the optimal Kalman gain K̂ for the "* 
