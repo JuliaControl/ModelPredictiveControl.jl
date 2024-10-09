@@ -156,7 +156,9 @@ function augment_model(model::LinModel{NT}, As, Cs_u, Cs_y; verify_obsv=true) wh
     if verify_obsv && !ControlSystemsBase.observability(Â, Ĉ)[:isobservable]
         error("The augmented model is unobservable. You may try to use 0 integrator on "*
               "model integrating outputs with nint_ym parameter. Adding integrators at both "*
-              "inputs (nint_u) and outputs (nint_ym) can also violate observability.")
+              "inputs (nint_u) and outputs (nint_ym) can also violate observability. If the "*
+              "model is still unobservable without any integrators, you may need to call "*
+              "sminreal or minreal on your system.")
     end
     x̂op, f̂op = [model.xop; zeros(nxs)], [model.fop; zeros(nxs)]
     return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
