@@ -22,6 +22,9 @@ the last section.
     as a basic starting template to combine both packages. There is no guarantee that it
     will work for all corner cases.
 
+!!! compat
+    The example only work with `ModelingToolkit.jl` v9.41 releases.
+
 We first construct and instantiate the pendulum model:
 
 ```@example 1
@@ -76,14 +79,18 @@ function generate_f_h(model, inputs, outputs)
         end
         return nothing
     end
-    h_ = ModelingToolkit.build_explicit_observed_function(io_sys, outputs; inputs)
+    return_inplace = true
+    (_, h_ip) = ModelingToolkit.build_explicit_observed_function(
+        io_sys, outputs; inputs, return_inplace
+    )
+    println(h_ip)
     u_nothing = fill(nothing, nu)
     function h!(y, x, _ , p)
-        y .= try
+        try
             # MTK.jl supports a `u` argument in `h_` function but not this package. We set
             # `u` as a vector of nothing and `h_` function will presumably throw an
             # MethodError it this argument is used inside the function
-            h_(x, u_nothing, p, nothing)
+            h_ip(y, x, u_nothing, p, nothing)
         catch err
             if err isa MethodError
                 error("NonLinModel only support strictly proper systems (no manipulated "*
