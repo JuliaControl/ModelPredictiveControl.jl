@@ -22,6 +22,9 @@ the last section.
     as a basic starting template to combine both packages. There is no guarantee that it
     will work for all corner cases.
 
+!!! compat
+    The example only work with `ModelingToolkit.jl` v9.41 releases.
+
 We first construct and instantiate the pendulum model:
 
 ```@example 1
