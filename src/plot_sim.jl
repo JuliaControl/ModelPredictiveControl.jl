@@ -320,9 +320,9 @@ sim_getu!(::StateEstimator, u, _ , _ ) = u
 
 
 # dummy plot methods to document recipes (both in ?-mode and web documentation)
-plot(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
-plot(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
-plot(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
+RecipesBase.plot(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
+RecipesBase.plot(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
+RecipesBase.plot(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
 
 @doc raw"""
     plot(res::SimResult{<:Real, <:SimModel}; <keyword arguments>)
@@ -348,7 +348,7 @@ julia> using Plots; plot(res, plotu=false)
 ```
 ![plot_model](../assets/plot_model.svg)
 """
-plot(::Nothing, ::SimResult{<:Real, <:SimModel})
+RecipesBase.plot(::Nothing, ::SimResult{<:Real, <:SimModel})
 
 function get_indices(arg::IntRangeOrVector, n)
     if length(unique(arg)) ≠ length(arg) || maximum(arg) > n
