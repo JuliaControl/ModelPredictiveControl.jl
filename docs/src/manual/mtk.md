@@ -22,6 +22,9 @@ the last section.
     as a basic starting template to combine both packages. There is no guarantee that it
     will work for all corner cases.
 
+!!! compat
+    The example relies on features and bugfixes of `ModelingToolkit.jl` v9.50.
+
 We first construct and instantiate the pendulum model:
 
 ```@example 1
@@ -104,9 +107,6 @@ Ts = 0.1
 vu, vy = ["\$τ\$ (Nm)"], ["\$θ\$ (°)"]
 nothing # hide
 ```
-
-!!! compat
-    The example relies on features and bugfixes of `ModelingToolkit.jl` v9.50.
 
 A [`NonLinModel`](@ref) can now be constructed:
 
