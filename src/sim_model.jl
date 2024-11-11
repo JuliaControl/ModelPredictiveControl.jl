@@ -187,7 +187,7 @@ detailstr(model::SimModel) = ""
 @doc raw"""
     initstate!(model::SimModel, u, d=[]) -> x
 
-Init `model.x0` with manipulated inputs `u` and meas. dist. `d` steady-state and reset time.
+Init `model.x0` with manipulated inputs `u` and meas. dist. `d` steady-state.
 
 The method tries to initialize the model state ``\mathbf{x}`` at steady-state. It removes
 the operating points on `u` and `d` and calls [`steadystate!`](@ref):
@@ -316,7 +316,7 @@ ms. Can be used to implement simple soft real-time simulations, see the example 
 
 # Examples
 ```jldoctest
-julia> model = LinModel(tf(2, [0.3, 1]), 0.1);
+julia> model = LinModel(tf(2, [0.3, 1]), 0.25);
 
 julia> function sim_realtime!(model)
            t_0 = time()
@@ -330,8 +330,8 @@ julia> function sim_realtime!(model)
 
 julia> sim_realtime!(model)
 0.0
-0.1
-0.2
+0.25
+0.5
 ```
 """
 function periodsleep(model::SimModel, busywait=false)
