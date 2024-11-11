@@ -187,7 +187,7 @@ detailstr(model::SimModel) = ""
 @doc raw"""
     initstate!(model::SimModel, u, d=[]) -> x
 
-Init `model.x0` with manipulated inputs `u` and meas. dist. `d` steady-state and reset time.
+Init `model.x0` with manipulated inputs `u` and meas. dist. `d` steady-state.
 
 The method tries to initialize the model state ``\mathbf{x}`` at steady-state. It removes
 the operating points on `u` and `d` and calls [`steadystate!`](@ref):
