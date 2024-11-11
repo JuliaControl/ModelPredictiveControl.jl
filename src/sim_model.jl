@@ -316,7 +316,7 @@ ms. Can be used to implement simple soft real-time simulations, see the example 
 
 # Examples
 ```jldoctest
-julia> model = LinModel(tf(2, [0.3, 1]), 0.1);
+julia> model = LinModel(tf(2, [0.3, 1]), 0.25);
 
 julia> function sim_realtime!(model)
            t_0 = time()
@@ -330,8 +330,8 @@ julia> function sim_realtime!(model)
 
 julia> sim_realtime!(model)
 0.0
-0.1
-0.2
+0.25
+0.5
 ```
 """
 function periodsleep(model::SimModel, busywait=false)
