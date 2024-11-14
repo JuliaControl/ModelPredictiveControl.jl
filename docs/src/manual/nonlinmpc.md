@@ -402,9 +402,8 @@ savefig("plot11_NonLinMPC.svg"); nothing # hide
 
 ![plot11_NonLinMPC](plot11_NonLinMPC.svg)
 
-The computations of the successive linearization MPC are about 125 times faster than the
-nonlinear MPC (0.00012 s per time steps versus 0.015 s per time steps, on average), an
-impressive gain for similar closed-loop performances!
+The computations of the successive linearization MPC are about 75 times faster than the
+nonlinear MPC on average, an impressive gain for similar closed-loop performances!
 
 ```@setup 1
 global_logger(old_logger);
