@@ -24,5 +24,6 @@ DocMeta.setdocmeta!(
 )
 doctest(ModelPredictiveControl, testset="DocTest")
 
-
 end;
+
+nothing
