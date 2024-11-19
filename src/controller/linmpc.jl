@@ -109,7 +109,8 @@ The controller minimizes the following objective function at each discrete time 
                       + C ϵ^2
 \end{aligned}
 ```
-in which the weight matrices are repeated ``H_p`` or ``H_c`` times by default:
+subject to [`setconstraint!`](@ref) bounds, and in which the weight matrices are repeated 
+``H_p`` or ``H_c`` times by default:
 ```math
 \begin{aligned}
     \mathbf{M}_{H_p} &= \text{diag}\mathbf{(M,M,...,M)}     \\
