@@ -994,7 +994,8 @@ see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstrain
 !!! details "Extended Help"
     Using the augmented process model matrices ``\mathbf{Â, B̂_u, Ĉ^m, B̂_d, D̂_d^m}``, and the
     function ``\mathbf{S}(j) = ∑_{i=0}^j \mathbf{Â}^i``, the prediction matrices for the
-    sensor noises depend on the constant ``p``. For ``p=0``, the matrices are computed by:
+    sensor noises depend on the constant ``p``. For ``p=0``, the matrices are computed by
+    (notice the minus signs after the equalities):
     ```math
     \begin{aligned}
     \mathbf{E} &= - \begin{bmatrix}
