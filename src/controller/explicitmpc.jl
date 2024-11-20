@@ -30,7 +30,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     Ps::Matrix{NT}
     d0::Vector{NT}
     D̂0::Vector{NT}
-    D̂E::Vector{NT}
+    D̂e::Vector{NT}
     Uop::Vector{NT}
     Yop::Vector{NT}
     Dop::Vector{NT}
@@ -62,7 +62,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         H̃_chol = cholesky(H̃)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
-        d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
+        d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
@@ -78,7 +78,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
             H̃, q̃, r,
             H̃_chol,
             Ks, Ps,
-            d0, D̂0, D̂E,
+            d0, D̂0, D̂e,
             Uop, Yop, Dop,
             buffer
         )

@@ -112,8 +112,8 @@ preparestate!(nmpc_mhe, [55, 30])
 u = nmpc_mhe([55, 30])
 sim!(nmpc_mhe, 3, [55, 30])
 
-function JE( _ , ŶE, _ , R̂y)
-    Ŷ = ŶE[3:end]
+function JE( _ , Ŷe, _ , R̂y)
+    Ŷ = Ŷe[3:end]
     Ȳ = R̂y - Ŷ
     return dot(Ȳ, Ȳ)
 end

@@ -179,13 +179,6 @@ function get_mutating_functions(NT, f, h)
     return f!, h!
 end
 
-"Get the types of `f!`, `h!` and `solver` to construct a `NonLinModel`."
-function get_types(
-    ::F, ::H, ::P, ::DS
-) where {F<:Function, H<:Function, P<:Any, DS<:DiffSolver} 
-    return F, H, P, DS
-end
-
 """
     validate_f(NT, f) -> ismutating
 
@@ -194,7 +187,7 @@ Validate `f` function argument signature and return `true` if it is mutating.
 function validate_f(NT, f)
     ismutating = hasmethod(
         f, 
-        #       ẋ/xnext,    x,          u,          d,          p    
+        #       ẋ or xnext, x,          u,          d,          p    
         Tuple{  Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any}
     )
     #                                     x,          u,          d,          p
@@ -229,6 +222,13 @@ function validate_h(NT, h)
         )
     end
     return ismutating
+end
+
+"Get the types of `f!`, `h!` and `solver` to construct a `NonLinModel`."
+function get_types(
+    ::F, ::H, ::P, ::DS
+) where {F<:Function, H<:Function, P<:Any, DS<:DiffSolver} 
+    return F, H, P, DS
 end
 
 "Do nothing if `model` is a [`NonLinModel`](@ref)."

@@ -31,12 +31,12 @@ See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
 - `mpc::PredictiveController` : solve optimization problem of `mpc`.
 - `ry=mpc.estim.model.yop` : current output setpoints ``\mathbf{r_y}(k)``.
 - `d=[]` : current measured disturbances ``\mathbf{d}(k)``.
-- `D̂=repeat(d, mpc.Hp)` or *`Dhat`* : predicted measured disturbances ``\mathbf{D̂}``, constant
-   in the future by default or ``\mathbf{d̂}(k+j)=\mathbf{d}(k)`` for ``j=1`` to ``H_p``.
-- `R̂y=repeat(ry, mpc.Hp)` or *`Rhaty`* : predicted output setpoints ``\mathbf{R̂_y}``, constant
-   in the future by default or ``\mathbf{r̂_y}(k+j)=\mathbf{r_y}(k)`` for ``j=1`` to ``H_p``.
-- `R̂u=mpc.Uop` or *`Rhatu`* : predicted manipulated input setpoints, constant in the future 
-   by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for ``j=0`` to ``H_p-1``. 
+- `D̂=repeat(d, mpc.Hp)` or *`Dhat`* : predicted measured disturbances ``\mathbf{D̂}`` (constant
+   in the future by default, or ``\mathbf{d̂}(k+j)=\mathbf{d}(k)`` for ``j=1`` to ``H_p``).
+- `R̂y=repeat(ry, mpc.Hp)` or *`Rhaty`* : predicted output setpoints ``\mathbf{R̂_y}`` (constant
+   in the future by default, or ``\mathbf{r̂_y}(k+j)=\mathbf{r_y}(k)`` for ``j=1`` to ``H_p``).
+- `R̂u=mpc.Uop` or *`Rhatu`* : predicted manipulated input setpoints ``\mathbf{R̂_u}`` (constant
+   in the future by default, or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for ``j=0`` to ``H_p-1``). 
 
 # Examples
 ```jldoctest
@@ -193,8 +193,8 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
         mpc.D̂0 .= D̂ .- mpc.Dop
-        mpc.D̂E[1:model.nd]     .= d
-        mpc.D̂E[model.nd+1:end] .= D̂
+        mpc.D̂e[1:model.nd]     .= d
+        mpc.D̂e[model.nd+1:end] .= D̂
         mul!(F, mpc.G, mpc.d0, 1, 1)
         mul!(F, mpc.J, mpc.D̂0, 1, 1)
     end
@@ -217,7 +217,7 @@ end
 @doc raw"""
     initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
 
-Init `ŷ, F, d0, D̂0, D̂E, R̂y0, R̂u0` vectors when model is not a [`LinModel`](@ref).
+Init `ŷ, F, d0, D̂0, D̂e, R̂y0, R̂u0` vectors when model is not a [`LinModel`](@ref).
 """
 function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
     mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
@@ -226,8 +226,8 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
         mpc.D̂0 .= D̂ .- mpc.Dop
-        mpc.D̂E[1:model.nd]     .= d
-        mpc.D̂E[model.nd+1:end] .= D̂
+        mpc.D̂e[1:model.nd]     .= d
+        mpc.D̂e[model.nd+1:end] .= D̂
     end
     mpc.R̂y0 .= (R̂y .- mpc.Yop)
     if ~mpc.noR̂u

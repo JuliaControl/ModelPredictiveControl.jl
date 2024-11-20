@@ -39,7 +39,7 @@ struct LinMPC{
     Ps::Matrix{NT}
     d0::Vector{NT}
     D̂0::Vector{NT}
-    D̂E::Vector{NT}
+    D̂e::Vector{NT}
     Uop::Vector{NT}
     Yop::Vector{NT}
     Dop::Vector{NT}
@@ -71,7 +71,7 @@ struct LinMPC{
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
-        d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
+        d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
@@ -86,7 +86,7 @@ struct LinMPC{
             Ẽ, F, G, J, K, V, B, 
             H̃, q̃, r,
             Ks, Ps,
-            d0, D̂0, D̂E,
+            d0, D̂0, D̂e,
             Uop, Yop, Dop,
             buffer
         )

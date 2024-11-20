@@ -43,7 +43,7 @@ struct NonLinMPC{
     Ps::Matrix{NT}
     d0::Vector{NT}
     D̂0::Vector{NT}
-    D̂E::Vector{NT}
+    D̂e::Vector{NT}
     Uop::Vector{NT}
     Yop::Vector{NT}
     Dop::Vector{NT}
@@ -76,7 +76,7 @@ struct NonLinMPC{
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
-        d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
+        d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
@@ -91,7 +91,7 @@ struct NonLinMPC{
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
             Ks, Ps,
-            d0, D̂0, D̂E,
+            d0, D̂0, D̂e,
             Uop, Yop, Dop,
             buffer
         )
@@ -165,8 +165,8 @@ state estimator :
 - `JE=(_,_,_,_)->0.0` : economic or custom cost function ``J_E(\mathbf{U_e}, \mathbf{Ŷ_e},
    \mathbf{D̂_e}, \mathbf{p})``.
 - `gc=(_,_,_,_,_,_)->nothing` or `gc!` : custom inequality constraint function 
-   ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ)`` (mutating or 
-   not, details in Extended Help).
+   ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ)``, mutating or 
+   not (details in Extended Help).
 - `nc=0` : number of custom inequality constraints.
 - `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
@@ -346,20 +346,6 @@ function validate_JE(NT, JE)
     return nothing
 end
 
-"Get mutating custom constraint function `gc!` from the provided function in argument."
-function get_mutating_gc(NT, gc)
-    ismutating_gc = validate_gc(NT, gc)
-    gc! = if ismutating_gc
-        gc
-    else
-        function gc!(LHS, Ue, Ŷe, D̂e, p, ϵ)
-            LHS .= gc(Ue, Ŷe, D̂e, p, ϵ)
-            return nothing
-        end
-    end
-    return gc!
-end
-
 """
     validate_gc(NT, gc) -> ismutating
 
@@ -371,17 +357,42 @@ function validate_gc(NT, gc)
         #     LHS,        Ue,         Ŷe,         D̂e,         p,   ϵ
         Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}
     )
-    println(ismutating)
     #                                      Ue,         Ŷe,         D̂e,         p,   ϵ
     if !(ismutating || hasmethod(gc, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}))
         error(
             "the custom constraint function has no method with type signature "*
-            "gc(UE::Vector{$(NT)}, ŶE::Vector{$(NT)}, D̂E::Vector{$(NT)}, p::Any, ϵ::$(NT)) "*
+            "gc(Ue::Vector{$(NT)}, Ŷe::Vector{$(NT)}, D̂e::Vector{$(NT)}, p::Any, ϵ::$(NT)) "*
             "or mutating form gc!(LHS::Vector{$(NT)}, Ue::Vector{$(NT)}, Ŷe::Vector{$(NT)}, "*
             "D̂e::Vector{$(NT)}, p::Any, ϵ::$(NT))"
         )
     end
     return ismutating
+end
+
+"Get mutating custom constraint function `gc!` from the provided function in argument."
+function get_mutating_gc(NT, gc)
+    ismutating_gc = validate_gc(NT, gc)
+    gc! = if ismutating_gc
+        gc
+    else
+        println("YO!")
+        function gc!(LHS, Ue, Ŷe, D̂e, p, ϵ)
+            LHS .= gc(Ue, Ŷe, D̂e, p, ϵ)
+            return nothing
+        end
+    end
+    return gc!
+end
+
+function test_custom_functions(JE, gc!, uop; Uop, dop, Dop, ΔŨ, p)
+    Ue = [Uop; uop]
+    D̂e = [dop; Dop]
+    Ŷ0, x̂0next =
+    Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
+
+
+    JE = JE(Uop, Uop, Dop, p)
+
 end
 
 """
@@ -391,10 +402,10 @@ For [`NonLinMPC`](@ref), add `:sol` and the optimal economic cost `:JE`.
 """
 function addinfo!(info, mpc::NonLinMPC)
     U, Ŷ, D̂, ŷ, d = info[:U], info[:Ŷ], info[:D̂], info[:ŷ], info[:d]
-    UE = [U; U[(end - mpc.estim.model.nu + 1):end]]
-    ŶE = [ŷ; Ŷ]
-    D̂E = [d; D̂]
-    info[:JE]  = mpc.JE(UE, ŶE, D̂E, mpc.p)
+    Ue = [U; U[(end - mpc.estim.model.nu + 1):end]]
+    Ŷe = [ŷ; Ŷ]
+    D̂e = [d; D̂]
+    info[:JE]  = mpc.JE(Ue, Ŷe, D̂e, mpc.p)
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
     return info
 end
@@ -571,15 +582,15 @@ con_nonlinprog!(g, ::NonLinMPC, ::LinModel, _ , _ , _ ) = g
 "Evaluate the economic term of the objective function for [`NonLinMPC`](@ref)."
 function obj_econ!(U0, Ȳ, mpc::NonLinMPC, model::SimModel, Ŷ0, ΔŨ)
     if !iszero(mpc.E)
-        ny, Hp, ŷ, D̂E = model.ny, mpc.Hp, mpc.ŷ, mpc.D̂E
+        ny, Hp, ŷ, D̂e = model.ny, mpc.Hp, mpc.ŷ, mpc.D̂e
         U   = U0
         U .+= mpc.Uop
         uend = @views U[(end-model.nu+1):end]
         Ŷ  = Ȳ
         Ŷ .= Ŷ0 .+ mpc.Yop
-        UE = [U; uend]
-        ŶE = [ŷ; Ŷ]
-        E_JE = mpc.E*mpc.JE(UE, ŶE, D̂E, mpc.p)
+        Ue = [U; uend]
+        Ŷe = [ŷ; Ŷ]
+        E_JE = mpc.E*mpc.JE(Ue, Ŷe, D̂e, mpc.p)
     else
         E_JE = 0.0
     end
