@@ -1,5 +1,5 @@
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
-struct ControllerConstraint{NT<:Real, GEfunc<:Function}
+struct ControllerConstraint{NT<:Real, GCfunc<:Function}
     ẽx̂      ::Matrix{NT}
     fx̂      ::Vector{NT}
     gx̂      ::Matrix{NT}
@@ -31,8 +31,8 @@ struct ControllerConstraint{NT<:Real, GEfunc<:Function}
     c_x̂min  ::Vector{NT}
     c_x̂max  ::Vector{NT}
     i_g     ::BitVector
-    gE      ::GEfunc
-    nE      ::Int
+    gc!     ::GCfunc
+    nc      ::Int
 end
 
 @doc raw"""
@@ -628,7 +628,8 @@ end
 
 """
     init_defaultcon_mpc(
-        estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, gE=()->nothing, nE=0
+        estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, 
+        gc!=(_,_,_,_,_,_)->nothing, nc=0
     ) -> con, S̃, Ñ_Hc, Ẽ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
@@ -637,8 +638,9 @@ Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision ve
 """
 function init_defaultcon_mpc(
     estim::StateEstimator{NT}, 
-    Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, gE::GEfunc=()->nothing, nE=0
-) where {NT<:Real, GEfunc<:Function}
+    Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+    gc!::GCfunc=(_,_,_,_,_,_)->nothing, nc=0
+) where {NT<:Real, GCfunc<:Function}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
     nϵ = isinf(C) ? 0 : 1
@@ -670,12 +672,12 @@ function init_defaultcon_mpc(
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min
     )
     b = zeros(NT, size(A, 1)) # dummy b vector (updated just before optimization)
-    con = ControllerConstraint{NT, GEfunc}(
+    con = ControllerConstraint{NT, GCfunc}(
         ẽx̂      , fx̂    , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
         U0min   , U0max , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max,
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
         A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_g,
-        gE      , nE
+        gc!     , nc
     )
     return con, nϵ, S̃, Ñ_Hc, Ẽ
 end

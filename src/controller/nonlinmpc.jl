@@ -49,12 +49,13 @@ struct NonLinMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function NonLinMPC{NT, SE, JM, JEfunc, P}(
-        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gE, nE, p::P, optim::JM
+        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc, nc, p::P, optim::JM
     ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel, JEfunc<:Function, P<:Any}
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         validate_JE(NT, JE)
+        gc! = get_mutating_gc(NT, gc)
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # convert `Diagonal` to normal `Matrix` if required:
         M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
@@ -68,7 +69,7 @@ struct NonLinMPC{
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
         con, nϵ, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
-            estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, gE, nE
+            estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, gc!, nc
         )
         H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
         # dummy vals (updated just before optimization):
@@ -112,30 +113,32 @@ controller minimizes the following objective function at each discrete time ``k`
                        + \mathbf{(ΔU)}'      \mathbf{N}_{H_c} \mathbf{(ΔU)}        \\&
                        + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
                        + C ϵ^2  
-                       + E J_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, \mathbf{p})
+                       + E J_E(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p})
 \end{aligned}
 ```
-subject to [`setconstraint!`](@ref) bounds, and the economic inequality constraints:
+subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraints:
 ```math
-\mathbf{g}_E(\mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, ϵ, \mathbf{p}) ≤ \mathbf{0}
+\mathbf{g_c}\Big(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ(k)\Big) ≤ \mathbf{0}
 ```
 The economic function ``J_E`` can penalizes solutions with high economic costs. Setting all
-the weights to 0 except ``E``  creates a pure economic model predictive controller (EMPC).
-The arguments of ``J_E`` and ``\mathbf{g}_E`` include the manipulated inputs, the predicted
-outputs and measured disturbances from ``k`` to ``k+H_p`` inclusively:
+the weights to 0 except ``E``  creates a pure economic model predictive controller (EMPC). 
+As a matter of fact, ``J_E`` can be any nonlinear function to customize the objective, even
+if there is no economic interpretation to it. The arguments of ``J_E`` and ``\mathbf{g_c}``
+include the manipulated inputs, predicted outputs and measured disturbances, extended from
+``k`` to ``k + H_p`` (inclusively):
 ```math
-    \mathbf{U}_E = \begin{bmatrix} \mathbf{U}      \\ \mathbf{u}(k+H_p-1)   \end{bmatrix}  , \quad
-    \mathbf{Ŷ}_E = \begin{bmatrix} \mathbf{ŷ}(k)   \\ \mathbf{Ŷ}            \end{bmatrix}  , \quad
-    \mathbf{D̂}_E = \begin{bmatrix} \mathbf{d}(k)   \\ \mathbf{D̂}            \end{bmatrix}
+    \mathbf{U_e} = \begin{bmatrix} \mathbf{U}      \\ \mathbf{u}(k+H_p-1)   \end{bmatrix}  , \quad
+    \mathbf{Ŷ_e} = \begin{bmatrix} \mathbf{ŷ}(k)   \\ \mathbf{Ŷ}            \end{bmatrix}  , \quad
+    \mathbf{D̂_e} = \begin{bmatrix} \mathbf{d}(k)   \\ \mathbf{D̂}            \end{bmatrix}
 ```
 since ``H_c ≤ H_p`` implies that ``\mathbf{Δu}(k+H_p) = \mathbf{0}`` or ``\mathbf{u}(k+H_p)=
-\mathbf{u}(k+H_p-1)``. The vector ``\mathbf{D̂}`` includes the predicted measured disturbance
-over ``H_p``. The argument ``\mathbf{p}`` is a custom parameter object of any type but use a
-mutable one if you want to modify it later e.g.: a vector.
+\mathbf{u}(k+H_p-1)``. The vector ``\mathbf{D̂}`` comprises the measured disturbance
+predictions over ``H_p``. The argument ``\mathbf{p}`` is a custom parameter object of any
+type, but use a mutable one if you want to modify it later e.g.: a vector.
 
 !!! tip
-    Replace any of the arguments of ``J_E`` and ``\mathbf{g}_E`` functions with `_` if not
-    needed (details in Extended Help).
+    Replace any of the arguments of ``J_E`` and ``\mathbf{g_c}`` functions with `_` if not
+    needed (see e.g. the default value of `JE` below).
 
 See [`LinMPC`](@ref) for the definition of the other variables. This method uses the default
 state estimator :
@@ -159,12 +162,13 @@ state estimator :
 - `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
-- `JE=(_,_,_,_)->0.0` : economic (or custom) cost function ``J_E(\mathbf{U}_E, \mathbf{Ŷ}_E,
-   \mathbf{D̂}_E, \mathbf{p})`` (details in Extended Help).
-- `gE=(_,_,_,_,_,_)->nothing` : economic (or custom) constraint function ``\mathbf{g}_E(
-   \mathbf{U}_E, \mathbf{Ŷ}_E, \mathbf{D̂}_E, ϵ, \mathbf{p})`` (details in Extended Help).
-- `nE=0` : number of economic constraints.
-- `p=model.p` : ``J_E`` and ``\mathbf{g}_E`` functions parameter ``\mathbf{p}`` (any type).
+- `JE=(_,_,_,_)->0.0` : economic or custom cost function ``J_E(\mathbf{U_e}, \mathbf{Ŷ_e},
+   \mathbf{D̂_e}, \mathbf{p})``.
+- `gc=(_,_,_,_,_,_)->nothing` or `gc!` : custom inequality constraint function 
+   ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ)`` (mutating or 
+   not, details in Extended Help).
+- `nc=0` : number of custom inequality constraints.
+- `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
@@ -193,22 +197,24 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
     algebra instead of a `for` loop. This feature can accelerate the optimization, especially
     for the constraint handling, and is not available in any other package, to my knowledge.
 
-    The J
-
-1. **Non-mutating functions** (out-of-place): define them as `f(x, u, d, p) -> ẋ` and
-   `h(x, d, p) -> y`. This syntax is simple and intuitive but it allocates more memory.
-2. **Mutating functions** (in-place): define them as `f!(ẋ, x, u, d, p) -> nothing` and
-   `h!(y, x, d, p) -> nothing`. This syntax reduces the allocations and potentially the 
-   computational burden as well.
-
-
     The optimization relies on [`JuMP`](https://github.com/jump-dev/JuMP.jl) automatic 
     differentiation (AD) to compute the objective and constraint derivatives. Optimizers 
     generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
     state-space functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
     for common mistakes when writing these functions.
 
-    Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
+    If `LHS` represents the result of the left-hand side in the inequality 
+    ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``, 
+    the function `gc` can be implemented in two ways:
+    
+    1. **Non-mutating function** (out-of-place): define it as `gc(Ue, Ŷe, D̂e, p, ϵ) -> LHS`.
+    This syntax is simple and intuitive but it allocates more memory.
+    2. **Mutating function** (in-place): define it as `gc!(LHS, Ue, Ŷe, D̂e, p, ϵ) -> nothing`.
+    This syntax reduces the allocations and potentially the computational burden as well.
+
+    The keyword argument `nc` is the number of elements in the `LHS` vector, and `gc!`, an
+    alias for the `gc` argument (both accepts non-mutating and mutating functions). Note
+    that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
     `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
 """
 function NonLinMPC(
@@ -224,8 +230,9 @@ function NonLinMPC(
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE::Function = (_,_,_,_) -> 0.0,
-    gE::Function = (_,_,_,_,_,_) -> nothing,
-    nE = 0,
+    gc!::Function = (_,_,_,_,_,_) -> nothing,
+    gc ::Function = gc!,
+    nc::Int = 0,
     p = model.p,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
@@ -233,7 +240,7 @@ function NonLinMPC(
     estim = UnscentedKalmanFilter(model; kwargs...)
     return NonLinMPC(
         estim; 
-        Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gE, nE, p, M_Hp, N_Hc, L_Hp, optim
+        Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, optim
     )
 end
 
@@ -249,9 +256,10 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE::Function = (_,_,_,_) -> 0.0,
-    gE::Function = (_,_,_,_,_,_) -> nothing,
-    nE = 0,
+    JE ::Function = (_,_,_,_) -> 0.0,
+    gc!::Function = (_,_,_,_,_,_) -> nothing,
+    gc ::Function = gc!,
+    nc::Int = 0,
     p = model.p,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
@@ -259,7 +267,7 @@ function NonLinMPC(
     estim = SteadyKalmanFilter(model; kwargs...)
     return NonLinMPC(
         estim; 
-        Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gE, nE, p, M_Hp, N_Hc, L_Hp, optim
+        Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, optim
     )
 end
 
@@ -299,17 +307,17 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE::JEfunc = (_,_,_,_) -> 0.0,
-    gE::GEfunc = (_,_,_,_,_,_) -> nothing,
-    nE = 0,
+    JE ::JEfunc = (_,_,_,_) -> 0.0,
+    gc!::Function = (_,_,_,_,_,_) -> nothing,
+    gc ::Function = gc!,
+    nc = 0,
     p::P = estim.model.p,
     optim::JM = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
 ) where {
     NT<:Real, 
     SE<:StateEstimator{NT}, 
     JM<:JuMP.GenericModel, 
-    JEfunc<:Function, 
-    GEfunc<:Function,
+    JEfunc<:Function,
     P<:Any
 }
     nk = estimate_delays(estim.model)
@@ -318,7 +326,7 @@ function NonLinMPC(
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
     return NonLinMPC{NT, SE, JM, JEfunc, P}(
-        estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, gE, nE, p, optim
+        estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, gc, nc, p, optim
     )
 end
 
@@ -328,13 +336,52 @@ end
 Validate `JE` function argument signature.
 """
 function validate_JE(NT, JE)
+    #                       Ue,         Ŷe,         D̂e,         p
     if !hasmethod(JE, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any})
         error(
-            "the economic function has no method with type signature "*
-            "JE(UE::Vector{$(NT)}, ŶE::Vector{$(NT)}, D̂E::Vector{$(NT)}, p::Any)"
+            "the economic cost function has no method with type signature "*
+            "JE(Ue::Vector{$(NT)}, Ŷe::Vector{$(NT)}, D̂e::Vector{$(NT)}, p::Any)"
         )
     end
     return nothing
+end
+
+"Get mutating custom constraint function `gc!` from the provided function in argument."
+function get_mutating_gc(NT, gc)
+    ismutating_gc = validate_gc(NT, gc)
+    gc! = if ismutating_gc
+        gc
+    else
+        function gc!(LHS, Ue, Ŷe, D̂e, p, ϵ)
+            LHS .= gc(Ue, Ŷe, D̂e, p, ϵ)
+            return nothing
+        end
+    end
+    return gc!
+end
+
+"""
+    validate_gc(NT, gc) -> ismutating
+
+Validate `gc` function argument signature and return `true` if it is mutating.
+"""
+function validate_gc(NT, gc)
+    ismutating = hasmethod(
+        gc, 
+        #     LHS,        Ue,         Ŷe,         D̂e,         p,   ϵ
+        Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}
+    )
+    println(ismutating)
+    #                                      Ue,         Ŷe,         D̂e,         p,   ϵ
+    if !(ismutating || hasmethod(gc, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}))
+        error(
+            "the custom constraint function has no method with type signature "*
+            "gc(UE::Vector{$(NT)}, ŶE::Vector{$(NT)}, D̂E::Vector{$(NT)}, p::Any, ϵ::$(NT)) "*
+            "or mutating form gc!(LHS::Vector{$(NT)}, Ue::Vector{$(NT)}, Ŷe::Vector{$(NT)}, "*
+            "D̂e::Vector{$(NT)}, p::Any, ϵ::$(NT))"
+        )
+    end
+    return ismutating
 end
 
 """

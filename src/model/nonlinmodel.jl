@@ -143,10 +143,7 @@ function NonLinModel{NT}(
     p=NT[], solver=RungeKutta(4)
 ) where {NT<:Real}
     isnothing(solver) && (solver=EmptySolver())
-    ismutating_f = validate_f(NT, f)
-    ismutating_h = validate_h(NT, h)
-    f! = ismutating_f ? f : f!(xnext, x, u, d, p) = (xnext .= f(x, u, d, p); nothing)
-    h! = ismutating_h ? h : h!(y, x, d, p) = (y .= h(x, d, p); nothing)
+    f!, h! = get_mutating_functions(NT, f, h)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
     F, H, P, DS = get_types(f!, h!, p, solver)
     return NonLinModel{NT, F, H, P, DS}(f!, h!, Ts, nu, nx, ny, nd, p, solver)
@@ -157,6 +154,29 @@ function NonLinModel(
     p=Float64[], solver=RungeKutta(4)
 )
     return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; p, solver)
+end
+
+"Get the mutating functions `f!` and `h!` from the provided functions in argument."
+function get_mutating_functions(NT, f, h)
+    ismutating_f = validate_f(NT, f)
+    f! = if ismutating_f
+        f
+    else
+        function f!(xnext, x, u, d, p)
+            xnext .= f(x, u, d, p)
+            return nothing
+        end
+    end
+    ismutating_h = validate_h(NT, h)
+    h! = if ismutating_h
+        h
+    else
+        function h!(y, x, d, p)
+            y .= h(x, d, p)
+            return nothing
+        end
+    end
+    return f!, h!
 end
 
 "Get the types of `f!`, `h!` and `solver` to construct a `NonLinModel`."
@@ -172,7 +192,12 @@ end
 Validate `f` function argument signature and return `true` if it is mutating.
 """
 function validate_f(NT, f)
-    ismutating = hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any})
+    ismutating = hasmethod(
+        f, 
+        #       ẋ/xnext,    x,          u,          d,          p    
+        Tuple{  Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any}
+    )
+    #                                     x,          u,          d,          p
     if !(ismutating || hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any}))
         error(
             "the state function has no method with type signature "*
@@ -190,7 +215,12 @@ end
 Validate `h` function argument signature and return `true` if it is mutating.
 """
 function validate_h(NT, h)
-    ismutating = hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any})
+    ismutating = hasmethod(
+        h, 
+        #     y,          x,          d,          p
+        Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any}
+    )
+    #                                     x,          d,          p
     if !(ismutating || hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Any}))
         error(
             "the output function has no method with type signature "*
