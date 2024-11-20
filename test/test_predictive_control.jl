@@ -479,7 +479,7 @@ end
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, p=linmodel1, solver=nothing)
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
-    @test size(nmpc1.R̂y0, 1) == 15*nmpc1.estim.model.ny
+    @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
     nmpc2 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=Inf)
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
     nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e6)

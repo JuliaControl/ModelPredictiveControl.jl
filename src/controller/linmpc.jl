@@ -19,8 +19,8 @@ struct LinMPC{
     Ñ_Hc::Hermitian{NT, Matrix{NT}}
     L_Hp::Hermitian{NT, Matrix{NT}}
     E::NT
-    R̂u0::Vector{NT}
-    R̂y0::Vector{NT}
+    R̂u::Vector{NT}
+    R̂y::Vector{NT}
     noR̂u::Bool
     S̃::Matrix{NT} 
     T::Matrix{NT}
@@ -57,7 +57,7 @@ struct LinMPC{
         N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
         L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
-        R̂y0, R̂u0, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        R̂y, R̂u, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
@@ -81,7 +81,7 @@ struct LinMPC{
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
             M_Hp, Ñ_Hc, L_Hp, Ewt, 
-            R̂u0, R̂y0, noR̂u,
+            R̂u, R̂y, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B, 
             H̃, q̃, r,

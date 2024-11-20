@@ -23,8 +23,8 @@ struct NonLinMPC{
     E::NT
     JE::JEfunc
     p::P
-    R̂u0::Vector{NT}
-    R̂y0::Vector{NT}
+    R̂u::Vector{NT}
+    R̂y::Vector{NT}
     noR̂u::Bool
     S̃::Matrix{NT}
     T::Matrix{NT}
@@ -62,7 +62,7 @@ struct NonLinMPC{
         N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
         L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
-        R̂y0, R̂u0, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        R̂y, R̂u, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
@@ -86,7 +86,7 @@ struct NonLinMPC{
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
             M_Hp, Ñ_Hc, L_Hp, Ewt, JE, p,
-            R̂u0, R̂y0, noR̂u,
+            R̂u, R̂y, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
@@ -375,7 +375,6 @@ function get_mutating_gc(NT, gc)
     gc! = if ismutating_gc
         gc
     else
-        println("YO!")
         function gc!(LHS, Ue, Ŷe, D̂e, p, ϵ)
             LHS .= gc(Ue, Ŷe, D̂e, p, ϵ)
             return nothing
@@ -385,14 +384,13 @@ function get_mutating_gc(NT, gc)
 end
 
 function test_custom_functions(JE, gc!, uop; Uop, dop, Dop, ΔŨ, p)
+    # TODO: contunue here (important to guide the users, sim! can be used on NonLinModel
+    # but there is no similar function for the custom functions of NonLinMPC)
     Ue = [Uop; uop]
     D̂e = [dop; Dop]
     Ŷ0, x̂0next =
     Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
-
-
     JE = JE(Uop, Uop, Dop, p)
-
 end
 
 """
@@ -475,31 +473,33 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     model = mpc.estim.model
     nu, ny, nx̂, Hp = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp
     ng, nΔŨ, nU, nŶ = length(mpc.con.i_g), length(mpc.ΔŨ), Hp*nu, Hp*ny
+    nUe, nŶe = nU + nu, nŶ + ny
     Nc = nΔŨ + 3
     ΔŨ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nΔŨ), Nc)
-    Ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶ), Nc)
-    U0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU), Nc)
-    g_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, ng), Nc)
-    x̂0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nx̂), Nc)
-    x̂0next_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂), Nc)
-    u0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu), Nc)
-    û0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu), Nc)
-    Ȳ_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, nŶ), Nc)
-    Ū_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, nU), Nc)
+    Ŷe_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶe), Nc)
+    Ue_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nUe), Nc)
+    Ȳ_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, nŶ),  Nc)
+    Ū_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, nU),  Nc)
+    x̂0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nx̂),  Nc)
+    x̂0next_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nx̂),  Nc)
+    u0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu),  Nc)
+    û0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu),  Nc)
+    g_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, ng),  Nc)
     function Jfunc(ΔŨtup::T...) where T<:Real
         ΔŨ1 = ΔŨtup[begin]
         ΔŨ, g = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(g_cache, ΔŨ1) 
         for i in eachindex(ΔŨtup)
             ΔŨ[i] = ΔŨtup[i] # ΔŨ .= ΔŨtup seems to produce a type instability
-        end 
-        Ŷ0 = get_tmp(Ŷ0_cache, ΔŨ1)
+        end
+        Ŷe, Ue = get_tmp(Ŷe_cache, ΔŨ1), get_tmp(Ue_cache, ΔŨ1)
+        Ȳ,  Ū  = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
         x̂0, x̂0next = get_tmp(x̂0_cache, ΔŨ1), get_tmp(x̂0next_cache, ΔŨ1)
-        u0, û0 = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
-        Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
+        u0, û0     = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
+        Ŷ0, x̂0end = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
+        Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
         g = get_tmp(g_cache, ΔŨ1)
         g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, ΔŨ)
-        U0, Ȳ, Ū = get_tmp(U0_cache, ΔŨ1), get_tmp(Ȳ_cache, ΔŨ1), get_tmp(Ū_cache, ΔŨ1)
-        return obj_nonlinprog!(U0, Ȳ, Ū, mpc, model, Ŷ0, ΔŨ)::T
+        return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷe, Ue, ΔŨ)::T
     end
     function gfunc_i(i, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
         ΔŨ1 = ΔŨtup[begin]
@@ -508,16 +508,40 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             for i in eachindex(ΔŨtup)
                 ΔŨ[i] = ΔŨtup[i] # ΔŨ .= ΔŨtup seems to produce a type instability
             end
-            Ŷ0 = get_tmp(Ŷ0_cache, ΔŨ1)
+            Ŷe, Ue = get_tmp(Ŷe_cache, ΔŨ1), get_tmp(Ue_cache, ΔŨ1)
+            Ȳ,  Ū  = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
             x̂0, x̂0next = get_tmp(x̂0_cache, ΔŨ1), get_tmp(x̂0next_cache, ΔŨ1)
-            u0, û0 = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
-            Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
+            u0, û0     = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
+            Ŷ0, x̂0end = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
+            Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
+            g = get_tmp(g_cache, ΔŨ1)
             g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, ΔŨ)
         end
         return g[i]::T
     end
     gfunc = [(ΔŨ...) -> gfunc_i(i, ΔŨ) for i in 1:ng]
     return Jfunc, gfunc
+end
+
+"""
+    extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ) -> Ŷe, Ue
+
+Compute the extended predictions `Ŷe` and `Ue` for the nonlinear optimization.
+
+The function mutates `Ŷe`, `Ue` and `Ū` in arguments, without assuming any initial values.
+"""
+function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
+    ny, nu = model.ny, model.nu
+    # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
+    Ŷe[1:ny]     .= mpc.ŷ
+    Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
+    # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
+    U0 = Ū
+    U0 .= mul!(U0, mpc.S̃, ΔŨ) .+ mpc.T_lastu0
+    Ue[1:end-nu] .= U0 .+ mpc.Uop
+    # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
+    Ue[end-nu+1:end] .= @views Ue[end-2nu+1:end-nu]
+    return Ŷe, Ue
 end
 
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
@@ -579,20 +603,8 @@ end
 "No nonlinear constraints if `model` is a [`LinModel`](@ref), return `g` unchanged."
 con_nonlinprog!(g, ::NonLinMPC, ::LinModel, _ , _ , _ ) = g
 
-"Evaluate the economic term of the objective function for [`NonLinMPC`](@ref)."
-function obj_econ!(U0, Ȳ, mpc::NonLinMPC, model::SimModel, Ŷ0, ΔŨ)
-    if !iszero(mpc.E)
-        ny, Hp, ŷ, D̂e = model.ny, mpc.Hp, mpc.ŷ, mpc.D̂e
-        U   = U0
-        U .+= mpc.Uop
-        uend = @views U[(end-model.nu+1):end]
-        Ŷ  = Ȳ
-        Ŷ .= Ŷ0 .+ mpc.Yop
-        Ue = [U; uend]
-        Ŷe = [ŷ; Ŷ]
-        E_JE = mpc.E*mpc.JE(Ue, Ŷe, D̂e, mpc.p)
-    else
-        E_JE = 0.0
-    end
+"Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
+function obj_econ!(Ue, Ŷe, mpc::NonLinMPC, model::SimModel)
+    E_JE = iszero(mpc.E) ? 0.0 : mpc.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
     return E_JE
 end
