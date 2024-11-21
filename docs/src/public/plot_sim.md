@@ -28,5 +28,5 @@ The `plot` methods are based on [`Plots.jl`](https://github.com/JuliaPlots/Plots
 To install it run `using Pkg; Pkg.add("Plots")` in the Julia REPL.
 
 ```@docs
-ModelPredictiveControl.plot
+ModelPredictiveControl.plot_recipe
 ```
