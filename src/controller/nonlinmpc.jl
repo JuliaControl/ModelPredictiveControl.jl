@@ -438,6 +438,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     @operator(optim, J, nΔŨ, Jfunc)
     @objective(optim, Min, J(ΔŨvar...))
     init_nonlincon!(mpc, model, gfunc)
+    set_nonlincon!(mpc, model, mpc.optim) #TODO: check if this is really necessary !!
     return nothing
 end
 
@@ -507,6 +508,18 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     return Jfunc, gfunc
 end
 
+function init_nonlincon!(mpc::NonLinMPC, ::LinModel, gfunc::Vector{<:Function}) 
+    optim, con = mpc.optim, mpc.con
+    nΔŨ = length(mpc.ΔŨ)
+    if length(con.i_g) ≠ 0
+        i_base = 0
+        for i in 1:con.nc
+            name = Symbol("g_c_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+        end
+    end
+    return nothing
+end
 
 function init_nonlincon!(mpc::NonLinMPC, ::NonLinModel, gfunc::Vector{<:Function}) 
     optim, con = mpc.optim, mpc.con
@@ -533,19 +546,6 @@ function init_nonlincon!(mpc::NonLinMPC, ::NonLinModel, gfunc::Vector{<:Function
             optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
         end
         i_base = 2Hp*ny + 2nx̂
-        for i in 1:con.nc
-            name = Symbol("g_c_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
-        end
-    end
-    return nothing
-end
-
-function init_nonlincon!(mpc::NonLinMPC, ::LinModel, gfunc::Vector{<:Function}) 
-    optim, con = mpc.optim, mpc.con
-    nΔŨ = length(mpc.ΔŨ)
-    if length(con.i_g) ≠ 0
-        i_base = 0
         for i in 1:con.nc
             name = Symbol("g_c_$i")
             optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
