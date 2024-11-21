@@ -362,6 +362,27 @@ function predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, mod
 end
 
 """
+    extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ) -> Ŷe, Ue
+
+Compute the extended predictions `Ŷe` and `Ue` for the nonlinear optimization.
+
+The function mutates `Ŷe`, `Ue` and `Ū` in arguments, without assuming any initial values.
+"""
+function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
+    ny, nu = model.ny, model.nu
+    # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
+    Ŷe[1:ny]     .= mpc.ŷ
+    Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
+    # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
+    U0 = Ū
+    U0 .= mul!(U0, mpc.S̃, ΔŨ) .+ mpc.T_lastu0
+    Ue[1:end-nu] .= U0 .+ mpc.Uop
+    # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
+    Ue[end-nu+1:end] .= @views Ue[end-2nu+1:end-nu]
+    return Ŷe, Ue
+end
+
+"""
     obj_nonlinprog!( _ , _ , mpc::PredictiveController, model::LinModel, Ŷe, Ue, ΔŨ)
 
 Nonlinear programming objective function when `model` is a [`LinModel`](@ref).

@@ -652,7 +652,7 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        setnonlincon!(estim, model, optim)
+        set_nonlincon!(estim, model, optim)
     else
         i_b, i_g = init_matconstraint_mhe(model, 
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
@@ -714,10 +714,10 @@ function init_matconstraint_mhe(::SimModel{NT},
 end
 
 "By default, no nonlinear constraints in the MHE, thus return nothing."
-setnonlincon!(::MovingHorizonEstimator, ::SimModel, ::JuMP.GenericModel) = nothing
+set_nonlincon!(::MovingHorizonEstimator, ::SimModel, ::JuMP.GenericModel) = nothing
 
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
-function setnonlincon!(
+function set_nonlincon!(
     estim::MovingHorizonEstimator, ::NonLinModel, optim::JuMP.GenericModel{JNT}
 ) where JNT<:Real
     optim, con = estim.optim, estim.con

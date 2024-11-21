@@ -437,33 +437,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     Jfunc, gfunc = get_optim_functions(mpc, mpc.optim)
     @operator(optim, J, nΔŨ, Jfunc)
     @objective(optim, Min, J(ΔŨvar...))
-    ny, nx̂, Hp = model.ny, mpc.estim.nx̂, mpc.Hp
-    if length(con.i_g) ≠ 0
-        for i in eachindex(con.Y0min)
-            name = Symbol("g_Y0min_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i]; name)
-        end
-        i_end_Ymin = 1Hp*ny
-        for i in eachindex(con.Y0max)
-            name = Symbol("g_Y0max_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_Ymin+i]; name)
-        end
-        i_end_Ymax = 2Hp*ny
-        for i in eachindex(con.x̂0min)
-            name = Symbol("g_x̂0min_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_Ymax+i]; name)
-        end
-        i_end_x̂min = 2Hp*ny + nx̂
-        for i in eachindex(con.x̂0max)
-            name = Symbol("g_x̂0max_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_x̂min+i]; name)
-        end
-        i_end_x̂max = 2Hp*ny + 2nx̂
-        for i in 1:con.nc
-            name = Symbol("g_c_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_end_x̂max+i]; name)
-        end
-    end
+    init_nonlincon!(mpc, model, gfunc)
     return nothing
 end
 
@@ -506,7 +480,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         Ŷe, Ue     = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
         ϵ = (nϵ == 1) ? ΔŨ[end] : zero(JNT) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
         mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
-        g = con_nonlinprog!(g, mpc, model, x̂0end, gc, Ŷ0, ΔŨ, ϵ)
+        g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷe, Ue, ΔŨ)::T
     end
     function gfunc_i(i, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
@@ -525,7 +499,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             Ŷe, Ue     = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
             ϵ = (nϵ == 1) ? ΔŨ[end] : zero(JNT) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
             mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
-            g = con_nonlinprog!(g, mpc, model, x̂0end, gc, Ŷ0, ΔŨ, ϵ)
+            g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         end
         return g[i]::T
     end
@@ -533,30 +507,79 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     return Jfunc, gfunc
 end
 
-"""
-    extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ) -> Ŷe, Ue
 
-Compute the extended predictions `Ŷe` and `Ue` for the nonlinear optimization.
-
-The function mutates `Ŷe`, `Ue` and `Ū` in arguments, without assuming any initial values.
-"""
-function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
-    ny, nu = model.ny, model.nu
-    # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
-    Ŷe[1:ny]     .= mpc.ŷ
-    Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
-    # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
-    U0 = Ū
-    U0 .= mul!(U0, mpc.S̃, ΔŨ) .+ mpc.T_lastu0
-    Ue[1:end-nu] .= U0 .+ mpc.Uop
-    # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
-    Ue[end-nu+1:end] .= @views Ue[end-2nu+1:end-nu]
-    return Ŷe, Ue
+function init_nonlincon!(mpc::NonLinMPC, ::NonLinModel, gfunc::Vector{<:Function}) 
+    optim, con = mpc.optim, mpc.con
+    ny, nx̂, Hp, nΔŨ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.ΔŨ)
+    if length(con.i_g) ≠ 0
+        i_base = 0
+        for i in eachindex(con.Y0min)
+            name = Symbol("g_Y0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+        end
+        i_base = 1Hp*ny
+        for i in eachindex(con.Y0max)
+            name = Symbol("g_Y0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+        end
+        i_base = 2Hp*ny
+        for i in eachindex(con.x̂0min)
+            name = Symbol("g_x̂0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+        end
+        i_base = 2Hp*ny + nx̂
+        for i in eachindex(con.x̂0max)
+            name = Symbol("g_x̂0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+        end
+        i_base = 2Hp*ny + 2nx̂
+        for i in 1:con.nc
+            name = Symbol("g_c_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+        end
+    end
+    return nothing
 end
 
-"Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
-function setnonlincon!(
-    mpc::NonLinMPC, ::NonLinModel, optim::JuMP.GenericModel{JNT}
+function init_nonlincon!(mpc::NonLinMPC, ::LinModel, gfunc::Vector{<:Function}) 
+    optim, con = mpc.optim, mpc.con
+    nΔŨ = length(mpc.ΔŨ)
+    if length(con.i_g) ≠ 0
+        i_base = 0
+        for i in 1:con.nc
+            name = Symbol("g_c_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+        end
+    end
+    return nothing
+end
+
+"""
+    set_nonlincon!(mpc::NonLinMPC, ::LinModel, optim)
+
+Set the custom nonlinear inequality constraints for `LinModel`.
+"""
+function set_nonlincon!(
+    mpc::NonLinMPC, ::LinModel, optim::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    ΔŨvar = optim[:ΔŨvar]
+    con = mpc.con
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    for i in 1:con.nc
+        gfunc_i = optim[Symbol("g_c_$i")]
+        @constraint(optim, gfunc_i(ΔŨvar...) <= 0)
+    end
+    return nothing
+end
+
+"""
+    set_nonlincon!(mpc::NonLinMPC, ::NonLinModel, optim)
+
+Also set output prediction `Ŷ` and terminal state `x̂end` constraints when not a `LinModel`.
+"""
+function set_nonlincon!(
+    mpc::NonLinMPC, ::SimModel, optim::JuMP.GenericModel{JNT}
 ) where JNT<:Real
     ΔŨvar = optim[:ΔŨvar]
     con = mpc.con
@@ -585,21 +608,30 @@ function setnonlincon!(
     return nothing
 end
 
-# TODO: MODIF THE FOLLOWING METHOD!
-function setnonlincon!(
-    mpc::NonLinMPC, ::LinModel, optim::JuMP.GenericModel{JNT}
-) where JNT<:Real
-    return nothing
+"""
+    con_nonlinprog!(g, mpc::NonLinMPC, model::LinModel, _ , _ , gc, ϵ)
+
+Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
+
+The method mutates the `g` vectors in argument and returns it. Only the custom constraints
+are include in the `g` vector.
+"""
+function con_nonlinprog!(g, mpc::NonLinMPC, ::LinModel, _ , _ , gc, ϵ)
+    for i in eachindex(g)
+        g[i] = gc[i]
+    end
+    return g
 end
 
 """
-    con_nonlinprog!(g, mpc::NonLinMPC, model::SimModel, x̂end, gc, Ŷ0, ΔŨ, ϵ) -> g
+    con_nonlinprog!(g, mpc::NonLinMPC, model::SimModel, x̂0end, Ŷ0, gc, ϵ) -> g
 
 Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
 
-The method mutates the `g` and `gc` vectors in argument.
+The method mutates the `g` vectors in argument and returns it. The output prediction, 
+the terminal state and the custom constraints are include in the `g` vector.
 """
-function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, gc, Ŷ0, ΔŨ, ϵ)
+function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, Ŷ0, gc, ϵ)
     nx̂, nŶ = length(x̂0end), length(Ŷ0)
     for i in eachindex(g)
         mpc.con.i_g[i] || continue
@@ -622,10 +654,6 @@ function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, gc, Ŷ0, ΔŨ
     end
     return g
 end
-
-#TODO: MODIF THE FOLLOWING METHOD!
-"No nonlinear constraints if `model` is a [`LinModel`](@ref), return `g` unchanged."
-con_nonlinprog!(g, ::NonLinMPC, ::LinModel, _ , _ , _ , _ , _ ) = g
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
 function obj_econ!(Ue, Ŷe, mpc::NonLinMPC, model::SimModel)

@@ -291,7 +291,7 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
-        setnonlincon!(mpc, model, optim)
+        set_nonlincon!(mpc, model, optim)
     else
         i_b, i_g = init_matconstraint_mpc(
             model, nc,
@@ -363,7 +363,7 @@ function init_matconstraint_mpc(
 end
 
 "By default, there is no nonlinear constraint, thus do nothing."
-setnonlincon!(::PredictiveController, ::SimModel, ::JuMP.GenericModel) = nothing
+set_nonlincon!(::PredictiveController, ::SimModel, ::JuMP.GenericModel) = nothing
 
 """
     default_Hp(model::LinModel)
