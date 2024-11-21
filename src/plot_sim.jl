@@ -318,11 +318,13 @@ end
 "Keep manipulated input `u` unchanged for state estimator simulation."
 sim_getu!(::StateEstimator, u, _ , _ ) = u
 
-
-# dummy plot methods to document recipes (both in ?-mode and web documentation)
-RecipesBase.plot(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
-RecipesBase.plot(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
-RecipesBase.plot(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
+function get_indices(arg::IntRangeOrVector, n)
+    if length(unique(arg)) ≠ length(arg) || maximum(arg) > n
+        error("Plot keyword argument arguments should contains valid and unique indices")
+    end
+    return arg
+end
+get_indices(arg::Bool, n) = arg ? (1:n) : Int64[]
 
 @doc raw"""
     plot(res::SimResult{<:Real, <:SimModel}; <keyword arguments>)
@@ -348,15 +350,7 @@ julia> using Plots; plot(res, plotu=false)
 ```
 ![plot_model](../assets/plot_model.svg)
 """
-RecipesBase.plot(::Nothing, ::SimResult{<:Real, <:SimModel})
-
-function get_indices(arg::IntRangeOrVector, n)
-    if length(unique(arg)) ≠ length(arg) || maximum(arg) > n
-        error("Plot keyword argument arguments should contains valid and unique indices")
-    end
-    return arg
-end
-get_indices(arg::Bool, n) = arg ? (1:n) : Int64[]
+plot_recipe(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
 
 @recipe function plot_recipe(
     res::SimResult{<:Real, <:SimModel};
@@ -468,7 +462,7 @@ Plot the simulation results of a [`StateEstimator`](@ref).
    if applicable
 - `plotx̂max=true` or *`plotxhatmax`* : plot estimated state upper bounds ``\mathbf{x̂_{max}}``
    if applicable
-- `<keyword arguments>` of [`plot(::SimResult{<:Real, <:SimModel})`](@ref)
+- `<keyword arguments>` of [`plot(::SimResult{<:Real, <:SimModel})`](@ref plot_recipe)
 
 # Examples
 ```julia-repl
@@ -478,7 +472,7 @@ julia> using Plots; plot(res, plotu=false, plotŷ=true, plotxwithx̂=true)
 ```
 ![plot_estimator](../assets/plot_estimator.svg)
 """
-plot(::Nothing, ::SimResult{<:Real, <:StateEstimator})
+plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
 
 @recipe function plot_recipe(
     res::SimResult{<:Real, <:StateEstimator};
@@ -726,8 +720,8 @@ Plot the simulation results of a [`PredictiveController`](@ref).
 - `plotru=true` : plot manipulated input setpoints ``\mathbf{r_u}`` if applicable
 - `plotumin=true` : plot manipulated input lower bounds ``\mathbf{u_{min}}`` if applicable
 - `plotumax=true` : plot manipulated input upper bounds ``\mathbf{u_{max}}`` if applicable
-- `<keyword arguments>` of [`plot(::SimResult{<:Real, <:SimModel})`](@ref)
-- `<keyword arguments>` of [`plot(::SimResult{<:Real, <:StateEstimator})`](@ref)
+- `<keyword arguments>` of [`plot(::SimResult{<:Real, <:SimModel})`](@ref plot_recipe)
+- `<keyword arguments>` of [`plot(::SimResult{<:Real, <:StateEstimator})`](@ref plot_recipe)
 
 # Examples
 ```julia-repl
@@ -739,7 +733,7 @@ julia> using Plots; plot(res, plotŷ=true, plotry=true, plotumax=true, plotx̂=
 ```
 ![plot_controller](../assets/plot_controller.svg)
 """
-plot(::Nothing, ::SimResult{<:Real, <:PredictiveController})
+plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
 
 @recipe function plot_recipe(
     res::SimResult{<:Real, <:PredictiveController};
