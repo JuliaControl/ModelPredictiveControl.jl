@@ -38,7 +38,7 @@ end
 @doc raw"""
     setconstraint!(mpc::PredictiveController; <keyword arguments>) -> mpc
 
-Set the constraint parameters of the [`PredictiveController`](@ref) `mpc`.
+Set the bound constraint parameters of the [`PredictiveController`](@ref) `mpc`.
 
 The predictive controllers support both soft and hard constraints, defined by:
 ```math 
@@ -329,7 +329,7 @@ function init_matconstraint_mpc(::LinModel{NT},
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
     i_g = BitVector()
     if isempty(args)
-        A = zeros(NT, length(i_b), 0)
+        A = nothing
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max = args
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
@@ -344,7 +344,7 @@ function init_matconstraint_mpc(::SimModel{NT},
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min; i_x̂max]
     if isempty(args)
-        A = zeros(NT, length(i_b), 0)
+        A = nothing
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ = args
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]

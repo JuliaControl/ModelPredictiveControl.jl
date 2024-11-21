@@ -421,7 +421,7 @@ end
 @doc raw"""
     setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
 
-Set the constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
+Set the bound constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
    
 It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``, process 
 noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
