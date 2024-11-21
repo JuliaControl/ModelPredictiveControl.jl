@@ -491,14 +491,14 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         for i in eachindex(ΔŨtup)
             ΔŨ[i] = ΔŨtup[i] # ΔŨ .= ΔŨtup seems to produce a type instability
         end
-        Ŷe, Ue = get_tmp(Ŷe_cache, ΔŨ1), get_tmp(Ue_cache, ΔŨ1)
-        Ȳ,  Ū  = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
+        Ŷe, Ue     = get_tmp(Ŷe_cache, ΔŨ1), get_tmp(Ue_cache, ΔŨ1)
+        Ȳ,  Ū      = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
         x̂0, x̂0next = get_tmp(x̂0_cache, ΔŨ1), get_tmp(x̂0next_cache, ΔŨ1)
         u0, û0     = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
-        Ŷ0, x̂0end = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
-        Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
-        g = get_tmp(g_cache, ΔŨ1)
-        g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, ΔŨ)
+        g          = get_tmp(g_cache, ΔŨ1)
+        Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
+        Ŷe, Ue     = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
+        g          = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, ΔŨ)
         return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷe, Ue, ΔŨ)::T
     end
     function gfunc_i(i, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
@@ -508,14 +508,14 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             for i in eachindex(ΔŨtup)
                 ΔŨ[i] = ΔŨtup[i] # ΔŨ .= ΔŨtup seems to produce a type instability
             end
-            Ŷe, Ue = get_tmp(Ŷe_cache, ΔŨ1), get_tmp(Ue_cache, ΔŨ1)
-            Ȳ,  Ū  = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
+            Ŷe, Ue     = get_tmp(Ŷe_cache, ΔŨ1), get_tmp(Ue_cache, ΔŨ1)
+            Ȳ,  Ū      = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
             x̂0, x̂0next = get_tmp(x̂0_cache, ΔŨ1), get_tmp(x̂0next_cache, ΔŨ1)
             u0, û0     = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
-            Ŷ0, x̂0end = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
-            Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
-            g = get_tmp(g_cache, ΔŨ1)
-            g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, ΔŨ)
+            g          = get_tmp(g_cache, ΔŨ1)
+            Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
+            Ŷe, Ue     = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
+            g          = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, ΔŨ)
         end
         return g[i]::T
     end
