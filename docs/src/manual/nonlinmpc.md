@@ -81,7 +81,7 @@ savefig("plot1_NonLinMPC.svg"); nothing # hide
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
 
 The [`setname!`](@ref) function allows customized Y-axis labels. The available plotting
-options are detailed in the documentation of the corresponding [`plot`](@ref ModelPredictiveControl.plot)
+options are detailed in the documentation of the corresponding [`plot`](@ref ModelPredictiveControl.plot_recipe)
 method.
 
 ## Nonlinear Model Predictive Controller
