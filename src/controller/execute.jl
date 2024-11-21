@@ -111,15 +111,21 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 ```
 """
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
-    model = mpc.estim.model
+    model    = mpc.estim.model
+    nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu 
     info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
     Ŷ0, u0, û0  = similar(mpc.Yop), similar(model.uop), similar(model.uop)
     Ŷs          = similar(mpc.Yop)
     x̂0, x̂0next  = similar(mpc.estim.x̂0), similar(mpc.estim.x̂0)
     Ȳ, Ū        = similar(mpc.Yop), similar(mpc.Uop)
+    Ŷe, Ue      = Vector{NT}(undef, nŶe), Vector{NT}(undef, nUe)
     Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
-    U0 = mpc.S̃*mpc.ΔŨ + mpc.T_lastu0
-    J  = obj_nonlinprog!(U0, Ȳ, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
+    Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
+    J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷe, Ue, mpc.ΔŨ)
+    U  = Ū
+    U .= @views Ue[1:end-model.nu]
+    Ŷ  = Ȳ
+    Ŷ .= @views Ŷe[model.ny+1:end]
     oldF = copy(mpc.F)
     predictstoch!(mpc, mpc.estim) 
     Ŷs .= mpc.F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
@@ -127,7 +133,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
     info[:ϵ]    = mpc.nϵ == 1 ? mpc.ΔŨ[end] : NaN
     info[:J]    = J
-    info[:U]    = U0 + mpc.Uop
+    info[:U]    = U
     info[:u]    = info[:U][1:model.nu]
     info[:d]    = mpc.d0 + model.dop
     info[:D̂]    = mpc.D̂0 + mpc.Dop
@@ -385,14 +391,14 @@ function obj_nonlinprog!(
 ) where NT<:Real
     nu, ny = model.nu, model.ny
     # --- output setpoint tracking term ---
-    Ȳ  .= Ŷe[ny+1:end]
+    Ȳ  .= @views Ŷe[ny+1:end]
     Ȳ  .= mpc.R̂y .- Ȳ
     JR̂y = dot(Ȳ, mpc.M_Hp, Ȳ)
     # --- move suppression and slack variable term ---
     JΔŨ = dot(ΔŨ, mpc.Ñ_Hc, ΔŨ)
     # --- input setpoint tracking term ---
     if !mpc.noR̂u
-        Ū  .= Ue[1:end-nu]
+        Ū  .= @views Ue[1:end-nu]
         Ū  .= mpc.R̂u .- Ū
         JR̂u = dot(Ū, mpc.L_Hp, Ū)
     else
