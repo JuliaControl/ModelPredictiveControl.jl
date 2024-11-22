@@ -479,7 +479,7 @@ end
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, p=linmodel1, solver=nothing)
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
-    @test size(nmpc1.R̂y0, 1) == 15*nmpc1.estim.model.ny
+    @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
     nmpc2 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=Inf)
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
     nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e6)
@@ -491,7 +491,7 @@ end
     @test nmpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
     nmpc6 = NonLinMPC(nonlinmodel, Hp=15, Lwt=[0,1])
     @test nmpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(UE,ŶE,D̂E,p) -> p*UE.*ŶE.*D̂E, p=2)
+    nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(Ue,Ŷe,D̂e,p) -> p*Ue.*Ŷe.*D̂e, p=2)
     @test nmpc7.E == 1e-3
     @test nmpc7.JE([1,2],[3,4],[4,6],2) == 2*[1,2].*[3,4].*[4,6]
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
@@ -538,7 +538,7 @@ end
     @test info[:Ŷ][end] ≈ r[1] atol=5e-2
     Hp = 1000
     R̂y = fill(r[1], Hp)
-    JE = (_ , ŶE, _ , R̂y) -> sum((ŶE[2:end] - R̂y).^2)
+    JE = (_ , Ŷe, _ , R̂y) -> sum((Ŷe[2:end] - R̂y).^2)
     nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, p=R̂y, Hp=Hp, Hc=1)
     preparestate!(nmpc, [10])
     u = moveinput!(nmpc)

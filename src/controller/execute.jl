@@ -111,15 +111,21 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 ```
 """
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
-    model = mpc.estim.model
+    model    = mpc.estim.model
+    nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu 
     info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
     Ŷ0, u0, û0  = similar(mpc.Yop), similar(model.uop), similar(model.uop)
     Ŷs          = similar(mpc.Yop)
     x̂0, x̂0next  = similar(mpc.estim.x̂0), similar(mpc.estim.x̂0)
     Ȳ, Ū        = similar(mpc.Yop), similar(mpc.Uop)
+    Ŷe, Ue      = Vector{NT}(undef, nŶe), Vector{NT}(undef, nUe)
     Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
-    U0 = mpc.S̃*mpc.ΔŨ + mpc.T_lastu0
-    J  = obj_nonlinprog!(U0, Ȳ, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
+    Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
+    J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷe, Ue, mpc.ΔŨ)
+    U  = Ū
+    U .= @views Ue[1:end-model.nu]
+    Ŷ  = Ȳ
+    Ŷ .= @views Ŷe[model.ny+1:end]
     oldF = copy(mpc.F)
     predictstoch!(mpc, mpc.estim) 
     Ŷs .= mpc.F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
@@ -127,7 +133,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
     info[:ϵ]    = mpc.nϵ == 1 ? mpc.ΔŨ[end] : NaN
     info[:J]    = J
-    info[:U]    = U0 + mpc.Uop
+    info[:U]    = U
     info[:u]    = info[:U][1:model.nu]
     info[:d]    = mpc.d0 + model.dop
     info[:D̂]    = mpc.D̂0 + mpc.Dop
@@ -135,8 +141,8 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info[:Ŷ]    = Ŷ0 + mpc.Yop
     info[:x̂end] = x̂0end + mpc.estim.x̂op
     info[:Ŷs]   = Ŷs
-    info[:R̂y]   = mpc.R̂y0 + mpc.Yop
-    info[:R̂u]   = mpc.R̂u0 + mpc.Uop
+    info[:R̂y]   = mpc.R̂y
+    info[:R̂u]   = mpc.R̂u
     # --- non-Unicode fields ---
     info[:DeltaU] = info[:ΔU]
     info[:epsilon] = info[:ϵ]
@@ -193,19 +199,19 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
         mpc.D̂0 .= D̂ .- mpc.Dop
-        mpc.D̂E[1:model.nd]     .= d
-        mpc.D̂E[model.nd+1:end] .= D̂
+        mpc.D̂e[1:model.nd]     .= d
+        mpc.D̂e[model.nd+1:end] .= D̂
         mul!(F, mpc.G, mpc.d0, 1, 1)
         mul!(F, mpc.J, mpc.D̂0, 1, 1)
     end
-    mpc.R̂y0 .= R̂y .- mpc.Yop
-    Cy = F .- mpc.R̂y0
+    mpc.R̂y .= R̂y
+    Cy = F .- (R̂y .- mpc.Yop)
     M_Hp_Ẽ = mpc.M_Hp*mpc.Ẽ
     mul!(q̃, M_Hp_Ẽ', Cy)
     r .= dot(Cy, mpc.M_Hp, Cy)
     if ~mpc.noR̂u
-        mpc.R̂u0 .= R̂u .- mpc.Uop
-        Cu = mpc.T_lastu0 .- mpc.R̂u0
+        mpc.R̂u .= R̂u
+        Cu = mpc.T_lastu0 .- (R̂u .- mpc.Uop) 
         L_Hp_S̃ = mpc.L_Hp*mpc.S̃
         mul!(q̃, L_Hp_S̃', Cu, 1, 1)
         r .+= dot(Cu, mpc.L_Hp, Cu)
@@ -217,7 +223,7 @@ end
 @doc raw"""
     initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
 
-Init `ŷ, F, d0, D̂0, D̂E, R̂y0, R̂u0` vectors when model is not a [`LinModel`](@ref).
+Init `ŷ, F, d0, D̂0, D̂e, R̂y, R̂u` vectors when model is not a [`LinModel`](@ref).
 """
 function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
     mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
@@ -226,12 +232,12 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
         mpc.D̂0 .= D̂ .- mpc.Dop
-        mpc.D̂E[1:model.nd]     .= d
-        mpc.D̂E[model.nd+1:end] .= D̂
+        mpc.D̂e[1:model.nd]     .= d
+        mpc.D̂e[model.nd+1:end] .= D̂
     end
-    mpc.R̂y0 .= (R̂y .- mpc.Yop)
+    mpc.R̂y .= R̂y
     if ~mpc.noR̂u
-        mpc.R̂u0 .= (R̂u .- mpc.Uop)
+        mpc.R̂u .= R̂u 
     end
     return nothing
 end
@@ -356,57 +362,76 @@ function predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, mod
 end
 
 """
-    obj_nonlinprog!(U0 , Ȳ, _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ)
+    extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ) -> Ŷe, Ue
 
-Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
+Compute the extended predictions `Ŷe` and `Ue` for the nonlinear optimization.
 
-The function is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
-also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
-at specific input increments `ΔŨ` and predictions `Ŷ0` values. It mutates the `U0` and
-`Ȳ` arguments.
+The function mutates `Ŷe`, `Ue` and `Ū` in arguments, without assuming any initial values.
 """
-function obj_nonlinprog!(
-    U0, Ȳ, _ , mpc::PredictiveController, model::LinModel, Ŷ0, ΔŨ::AbstractVector{NT}
-) where NT <: Real
-    J = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.r[]
-    E_JE = obj_econ!(U0, Ȳ, mpc, model, Ŷ0, ΔŨ)
-    return J + E_JE
+function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
+    ny, nu = model.ny, model.nu
+    # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
+    Ŷe[1:ny]     .= mpc.ŷ
+    Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
+    # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
+    U0 = Ū
+    U0 .= mul!(U0, mpc.S̃, ΔŨ) .+ mpc.T_lastu0
+    Ue[1:end-nu] .= U0 .+ mpc.Uop
+    # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
+    Ue[end-nu+1:end] .= @views Ue[end-2nu+1:end-nu]
+    return Ŷe, Ue
 end
 
 """
-    obj_nonlinprog!(U0, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ0, ΔŨ)
+    obj_nonlinprog!( _ , _ , mpc::PredictiveController, model::LinModel, Ŷe, Ue, ΔŨ)
 
-Nonlinear programming objective function when `model` is not a [`LinModel`](@ref). The
-function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
-`U0`, `Ȳ` and `Ū` arguments (input over `Hp`, and output and input setpoint tracking error, 
-respectively).
+Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
+
+The method is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
+also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
+at specific `Ue`, `Ŷe` and `ΔŨ`, values. It does not mutate any argument.
 """
 function obj_nonlinprog!(
-    U0, Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷ0, ΔŨ::AbstractVector{NT}
+    _, _, mpc::PredictiveController, model::LinModel, Ŷe, Ue, ΔŨ::AbstractVector{NT}
+) where NT <: Real
+    JQP  = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.r[]
+    E_JE = obj_econ!(Ue, Ŷe, mpc, model)
+    return JQP + E_JE
+end
+
+"""
+    obj_nonlinprog!(Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷe, Ue, ΔŨ)
+
+Nonlinear programming objective method when `model` is not a [`LinModel`](@ref). The
+function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
+`Ȳ` and `Ū` arguments, without assuming any initial values (it recuperates the values in
+`Ŷe` and `Ue` arguments).
+"""
+function obj_nonlinprog!(
+    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷe, Ue, ΔŨ::AbstractVector{NT}
 ) where NT<:Real
+    nu, ny = model.nu, model.ny
     # --- output setpoint tracking term ---
-    Ȳ  .= mpc.R̂y0 .- Ŷ0
+    Ȳ  .= @views Ŷe[ny+1:end]
+    Ȳ  .= mpc.R̂y .- Ȳ
     JR̂y = dot(Ȳ, mpc.M_Hp, Ȳ)
     # --- move suppression and slack variable term ---
     JΔŨ = dot(ΔŨ, mpc.Ñ_Hc, ΔŨ)
-    # --- input over prediction horizon ---
-    if !mpc.noR̂u || !iszero(mpc.E)
-        U0 .= mul!(U0, mpc.S̃, ΔŨ) .+ mpc.T_lastu0
-    end
     # --- input setpoint tracking term ---
     if !mpc.noR̂u
-        Ū  .= mpc.R̂u0 .- U0
+        Ū  .= @views Ue[1:end-nu]
+        Ū  .= mpc.R̂u .- Ū
         JR̂u = dot(Ū, mpc.L_Hp, Ū)
     else
         JR̂u = 0.0
     end
     # --- economic term ---
-    E_JE = obj_econ!(U0, Ȳ, mpc, model, Ŷ0, ΔŨ)
+    E_JE = obj_econ!(Ue, Ŷe, mpc, model)
     return JR̂y + JΔŨ + JR̂u + E_JE
 end
 
 "By default, the economic term is zero."
-obj_econ!( _ , _ , ::PredictiveController, ::SimModel, _ , _ ) = 0.0
+obj_econ!( _ , _ , ::PredictiveController, ::SimModel) = 0.0
 
 @doc raw"""
     optim_objective!(mpc::PredictiveController) -> ΔŨ

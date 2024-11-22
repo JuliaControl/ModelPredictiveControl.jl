@@ -84,7 +84,7 @@ for more detailed examples.
   - [x] move suppression
   - [x] input setpoint tracking
   - [x] terminal costs
-  - [x] economic costs (economic model predictive control)
+  - [x] custom economic costs (economic model predictive control)
 - [x] adaptive linear model predictive controller
   - [x] manual model modification
   - [x] automatic successive linearization of a nonlinear model
@@ -95,7 +95,7 @@ for more detailed examples.
   - [x] manipulated inputs
   - [x] manipulated inputs increments
   - [x] terminal states to ensure nominal stability
-- [ ] custom manipulated input constraints that are a function of the predictions
+- [x] custom economic inequality constraints (soft or hard)
 - [x] supported feedback strategy:
   - [x] state estimator (see State Estimation features)
   - [x] internal model structure with a custom stochastic model

@@ -421,7 +421,7 @@ end
 @doc raw"""
     setconstraint!(estim::MovingHorizonEstimator; <keyword arguments>) -> estim
 
-Set the constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
+Set the bound constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
    
 It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``, process 
 noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
@@ -652,7 +652,7 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        setnonlincon!(estim, model, optim)
+        set_nonlincon!(estim, model, optim)
     else
         i_b, i_g = init_matconstraint_mhe(model, 
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
@@ -714,10 +714,10 @@ function init_matconstraint_mhe(::SimModel{NT},
 end
 
 "By default, no nonlinear constraints in the MHE, thus return nothing."
-setnonlincon!(::MovingHorizonEstimator, ::SimModel, ::JuMP.GenericModel) = nothing
+set_nonlincon!(::MovingHorizonEstimator, ::SimModel, ::JuMP.GenericModel) = nothing
 
 "Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
-function setnonlincon!(
+function set_nonlincon!(
     estim::MovingHorizonEstimator, ::NonLinModel, optim::JuMP.GenericModel{JNT}
 ) where JNT<:Real
     optim, con = estim.optim, estim.con
@@ -994,7 +994,8 @@ see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstrain
 !!! details "Extended Help"
     Using the augmented process model matrices ``\mathbf{Â, B̂_u, Ĉ^m, B̂_d, D̂_d^m}``, and the
     function ``\mathbf{S}(j) = ∑_{i=0}^j \mathbf{Â}^i``, the prediction matrices for the
-    sensor noises depend on the constant ``p``. For ``p=0``, the matrices are computed by:
+    sensor noises depend on the constant ``p``. For ``p=0``, the matrices are computed by
+    (notice the minus signs after the equalities):
     ```math
     \begin{aligned}
     \mathbf{E} &= - \begin{bmatrix}

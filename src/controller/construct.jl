@@ -1,5 +1,5 @@
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
-struct ControllerConstraint{NT<:Real}
+struct ControllerConstraint{NT<:Real, GCfunc<:Function}
     ẽx̂      ::Matrix{NT}
     fx̂      ::Vector{NT}
     gx̂      ::Matrix{NT}
@@ -31,12 +31,14 @@ struct ControllerConstraint{NT<:Real}
     c_x̂min  ::Vector{NT}
     c_x̂max  ::Vector{NT}
     i_g     ::BitVector
+    gc!     ::GCfunc
+    nc      ::Int
 end
 
 @doc raw"""
     setconstraint!(mpc::PredictiveController; <keyword arguments>) -> mpc
 
-Set the constraint parameters of the [`PredictiveController`](@ref) `mpc`.
+Set the bound constraint parameters of the [`PredictiveController`](@ref) `mpc`.
 
 The predictive controllers support both soft and hard constraints, defined by:
 ```math 
@@ -146,7 +148,8 @@ function setconstraint!(
     C_Δumin = C_Deltaumin, C_Δumax = C_Deltaumax,
 )
     model, con, optim = mpc.estim.model, mpc.con, mpc.optim
-    nu, ny, nx̂, Hp, Hc, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.nϵ
+    nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
+    nϵ, nc = mpc.nϵ, con.nc
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
     if isnothing(Umin) && !isnothing(umin)
         size(umin) == (nu,) || throw(ArgumentError("umin size must be $((nu,))"))
@@ -275,7 +278,8 @@ function setconstraint!(
     i_Ymin,  i_Ymax  = .!isinf.(con.Y0min), .!isinf.(con.Y0max)
     i_x̂min,  i_x̂max  = .!isinf.(con.x̂0min), .!isinf.(con.x̂0max)
     if notSolvedYet
-        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(model,
+        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(
+            model, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
@@ -287,9 +291,10 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
-        setnonlincon!(mpc, model, optim)
+        set_nonlincon!(mpc, model, optim)
     else
-        i_b, i_g = init_matconstraint_mpc(model, 
+        i_b, i_g = init_matconstraint_mpc(
+            model, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max
         )
@@ -302,8 +307,10 @@ end
 
 
 @doc raw"""
-    init_matconstraint_mpc(model::LinModel,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
+    init_matconstraint_mpc(
+        model::LinModel, nc::Int,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+        args...
     ) -> i_b, i_g, A
 
 Init `i_b`, `i_g` and `A` matrices for the linear and nonlinear inequality constraints.
@@ -315,19 +322,22 @@ The linear and nonlinear inequality constraints are respectively defined as:
     \mathbf{g(ΔŨ)} &≤ \mathbf{0}
 \end{aligned}
 ```
-`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. 
-`i_g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if `model` is a 
-[`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if `args` is
-provided. In such a case, `args`  needs to contain all the inequality constraint matrices: 
+The argument `nc` is the number of custom nonlinear constraints in ``\mathbf{g_c}``. `i_b` 
+is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. `i_g` is a
+similar vector but for the indices of ``\mathbf{g}``. The method also returns the 
+``\mathbf{A}`` matrix if `args` is provided. In such a case, `args`  needs to contain all
+the inequality constraint matrices: 
 `A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max`.
 """
-function init_matconstraint_mpc(::LinModel{NT}, 
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
+function init_matconstraint_mpc(
+    ::LinModel{NT}, nc::Int,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    args...
 ) where {NT<:Real}
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
-    i_g = BitVector()
+    i_g = trues(nc)
     if isempty(args)
-        A = zeros(NT, length(i_b), 0)
+        A = nothing
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max = args
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
@@ -336,13 +346,15 @@ function init_matconstraint_mpc(::LinModel{NT},
 end
 
 "Init `i_b, A` without outputs and terminal constraints if `model` is not a [`LinModel`](@ref)."
-function init_matconstraint_mpc(::SimModel{NT},
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, args...
+function init_matconstraint_mpc(
+    ::SimModel{NT}, nc::Int,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    args...
 ) where {NT<:Real}
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    i_g = [i_Ymin; i_Ymax; i_x̂min; i_x̂max]
+    i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
     if isempty(args)
-        A = zeros(NT, length(i_b), 0)
+        A = nothing
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ = args
         A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
@@ -351,7 +363,7 @@ function init_matconstraint_mpc(::SimModel{NT},
 end
 
 "By default, there is no nonlinear constraint, thus do nothing."
-setnonlincon!(::PredictiveController, ::SimModel, ::JuMP.GenericModel) = nothing
+set_nonlincon!(::PredictiveController, ::SimModel, ::JuMP.GenericModel) = nothing
 
 """
     default_Hp(model::LinModel)
@@ -625,7 +637,10 @@ function init_quadprog(::SimModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:
 end
 
 """
-    init_defaultcon_mpc(estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂) -> con, S̃, Ñ_Hc, Ẽ
+    init_defaultcon_mpc(
+        estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, 
+        gc!=(_,_,_,_,_,_)->nothing, nc=0
+    ) -> con, S̃, Ñ_Hc, Ẽ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
@@ -633,8 +648,9 @@ Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision ve
 """
 function init_defaultcon_mpc(
     estim::StateEstimator{NT}, 
-    Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
-) where {NT<:Real}
+    Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+    gc!::GCfunc=(_,_,_,_,_,_)->nothing, nc=0
+) where {NT<:Real, GCfunc<:Function}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
     nϵ = isinf(C) ? 0 : 1
@@ -661,16 +677,17 @@ function init_defaultcon_mpc(
     i_Ymin,  i_Ymax  = .!isinf.(Y0min),  .!isinf.(Y0max)
     i_x̂min,  i_x̂max  = .!isinf.(x̂0min),  .!isinf.(x̂0max)
     i_b, i_g, A = init_matconstraint_mpc(
-        model, 
+        model, nc,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min
     )
     b = zeros(NT, size(A, 1)) # dummy b vector (updated just before optimization)
-    con = ControllerConstraint{NT}(
+    con = ControllerConstraint{NT, GCfunc}(
         ẽx̂      , fx̂    , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
         U0min   , U0max , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max,
         A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
-        A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_g
+        A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_g,
+        gc!     , nc
     )
     return con, nϵ, S̃, Ñ_Hc, Ẽ
 end

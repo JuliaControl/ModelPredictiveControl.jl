@@ -9,8 +9,8 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     Ñ_Hc::Hermitian{NT, Matrix{NT}}
     L_Hp::Hermitian{NT, Matrix{NT}}
     E::NT
-    R̂u0::Vector{NT}
-    R̂y0::Vector{NT}
+    R̂u::Vector{NT}
+    R̂y::Vector{NT}
     noR̂u::Bool
     S̃::Matrix{NT} 
     T::Matrix{NT}
@@ -30,7 +30,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     Ps::Matrix{NT}
     d0::Vector{NT}
     D̂0::Vector{NT}
-    D̂E::Vector{NT}
+    D̂e::Vector{NT}
     Uop::Vector{NT}
     Yop::Vector{NT}
     Dop::Vector{NT}
@@ -49,7 +49,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
         L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
-        R̂y0, R̂u0, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        R̂y, R̂u, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc)
@@ -62,7 +62,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         H̃_chol = cholesky(H̃)
         Ks, Ps = init_stochpred(estim, Hp)
         # dummy vals (updated just before optimization):
-        d0, D̂0, D̂E = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
+        d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
@@ -72,13 +72,13 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
             M_Hp, Ñ_Hc, L_Hp, Ewt,  
-            R̂u0, R̂y0, noR̂u,
+            R̂u, R̂y, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
             H̃_chol,
             Ks, Ps,
-            d0, D̂0, D̂E,
+            d0, D̂0, D̂e,
             Uop, Yop, Dop,
             buffer
         )
