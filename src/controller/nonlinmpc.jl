@@ -438,7 +438,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     @operator(optim, J, nΔŨ, Jfunc)
     @objective(optim, Min, J(ΔŨvar...))
     init_nonlincon!(mpc, model, gfunc)
-    set_nonlincon!(mpc, model, mpc.optim) #TODO: check if this is really necessary !!
+    set_nonlincon!(mpc, model, mpc.optim)
     return nothing
 end
 
