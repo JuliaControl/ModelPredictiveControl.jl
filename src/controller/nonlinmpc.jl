@@ -208,9 +208,9 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
     the function `gc` can be implemented in two ways:
     
     1. **Non-mutating function** (out-of-place): define it as `gc(Ue, Ŷe, D̂e, p, ϵ) -> LHS`.
-    This syntax is simple and intuitive but it allocates more memory.
+       This syntax is simple and intuitive but it allocates more memory.
     2. **Mutating function** (in-place): define it as `gc!(LHS, Ue, Ŷe, D̂e, p, ϵ) -> nothing`.
-    This syntax reduces the allocations and potentially the computational burden as well.
+       This syntax reduces the allocations and potentially the computational burden as well.
 
     The keyword argument `nc` is the number of elements in the `LHS` vector, and `gc!`, an
     alias for the `gc` argument (both accepts non-mutating and mutating functions). Note
