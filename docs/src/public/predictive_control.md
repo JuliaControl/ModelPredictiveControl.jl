@@ -12,8 +12,9 @@ assumes by default that the current model mismatch estimation is constant in the
 (same approach as dynamic matrix control, DMC).
 
 !!! info
-    The nomenclature uses capital letters for time series (and matrices) and hats for the
-    predictions (and estimations, for state estimators).
+    The nomenclature uses boldfaces for vectors or matrices, capital boldface letters for
+    vectors representing time series (and also for matrices), and hats for the predictions
+    (and also for the observer estimations).
 
 To be precise, at the ``k``th control period, the vectors that encompass the future measured
 disturbances ``\mathbf{d̂}``, model outputs ``\mathbf{ŷ}`` and setpoints ``\mathbf{r̂_y}``
@@ -31,7 +32,9 @@ over the prediction horizon ``H_p`` are defined as:
     \end{bmatrix}
 ```
 
-The vectors for the manipulated input ``\mathbf{u}`` are shifted by one time step:
+in which ``\mathbf{D̂}``, ``\mathbf{Ŷ}`` and  ``\mathbf{R̂_y}`` are vectors of `nd*Hp`, `ny*Hp`
+and `ny*Hp` elements, respectively. The vectors for the manipulated input ``\mathbf{u}``
+are shifted by one time step:
 
 ```math
     \mathbf{U} = \begin{bmatrix}
@@ -42,10 +45,10 @@ The vectors for the manipulated input ``\mathbf{u}`` are shifted by one time ste
     \end{bmatrix}
 ```
 
-Defining the manipulated input increment as ``\mathbf{Δu}(k+j) =
-\mathbf{u}(k+j) - \mathbf{u}(k+j-1)``, the control horizon ``H_c`` enforces that
-``\mathbf{Δu}(k+j) = \mathbf{0}`` for ``j ≥ H_c``. For this reason, the vector that collects
-them is truncated up to ``k+H_c-1``:
+in which ``\mathbf{U}`` and ``\mathbf{R̂_u}`` are both vectors of `nu*Hp` elements. Defining
+the manipulated input increment as ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)``,
+the control horizon ``H_c`` enforces that ``\mathbf{Δu}(k+j) = \mathbf{0}`` for ``j ≥ H_c``.
+For this reason, the vector that collects them is truncated up to ``k+H_c-1``:
 
 ```math
     \mathbf{ΔU} =
@@ -53,6 +56,8 @@ them is truncated up to ``k+H_c-1``:
         \mathbf{Δu}(k+0) \\ \mathbf{Δu}(k+1) \\ \vdots  \\ \mathbf{Δu}(k+H_c-1)
     \end{bmatrix}
 ```
+
+in which ``\mathbf{ΔU}`` is a vector of `nu*Hc` elements.
 
 ## PredictiveController
 

@@ -28,8 +28,10 @@ solving the MPC problem with [`moveinput!`](@ref), for when the estimations are 
 [^1]: also denoted ``\mathbf{x̂}_{k|k}`` [elsewhere](https://en.wikipedia.org/wiki/Kalman_filter).
 
 !!! info
-    All the estimators support measured ``\mathbf{y^m}`` and unmeasured ``\mathbf{y^u}``
-    model outputs, where ``\mathbf{y}`` refers to all of them.
+    The nomenclature in this page introduces the estimated state ``\mathbf{x̂}`` and output
+    ``\mathbf{ŷ}`` vectors of respectively `nx̂` and `ny` elements. Also, all the estimators
+    support measured ``\mathbf{y^m}`` (`nym` elements) and unmeasured ``\mathbf{y^u}``
+    (`nyu` elements) model output, where ``\mathbf{y}`` refers to all of them.
 
 ## StateEstimator
 

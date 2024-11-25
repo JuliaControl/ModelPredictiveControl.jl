@@ -11,6 +11,12 @@ simulators by calling [`evaloutput`](@ref) and [`updatestate!`](@ref) methods on
 the states ``\mathbf{x}`` are stored inside [`SimModel`](@ref) instances. Use [`setstate!`](@ref)
 method to manually modify them.
 
+!!! info
+    The nomenclature in this page introduces the model manipulated input ``\mathbf{u}``,
+    measured disturbances ``\mathbf{d}``, state ``\mathbf{x}`` and output ``\mathbf{y}``,
+    four vectors of `nu`, `nd`, `nx` and `ny` elements, respectively. The ``\mathbf{z}``
+    vector combines the elements of ``\mathbf{u}`` and ``\mathbf{d}``.
+
 ## SimModel
 
 ```@docs
