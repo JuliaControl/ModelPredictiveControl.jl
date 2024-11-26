@@ -125,7 +125,7 @@ the weights to 0 except ``E``  creates a pure economic model predictive controll
 As a matter of fact, ``J_E`` can be any nonlinear function to customize the objective, even
 if there is no economic interpretation to it. The arguments of ``J_E`` and ``\mathbf{g_c}``
 include the manipulated inputs, predicted outputs and measured disturbances, extended from
-``k`` to ``k + H_p`` (inclusively):
+``k`` to ``k + H_p`` (inclusively, see Extended Help for more details):
 ```math
     \mathbf{U_e} = \begin{bmatrix} \mathbf{U}      \\ \mathbf{u}(k+H_p-1)   \end{bmatrix}  , \quad
     \mathbf{Ŷ_e} = \begin{bmatrix} \mathbf{ŷ}(k)   \\ \mathbf{Ŷ}            \end{bmatrix}  , \quad
@@ -197,15 +197,11 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
     algebra instead of a `for` loop. This feature can accelerate the optimization, especially
     for the constraint handling, and is not available in any other package, to my knowledge.
 
-    The optimization relies on [`JuMP`](https://github.com/jump-dev/JuMP.jl) automatic 
-    differentiation (AD) to compute the objective and constraint derivatives. Optimizers 
-    generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
-    state-space functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
-    for common mistakes when writing these functions.
-
-    If `LHS` represents the result of the left-hand side in the inequality 
-    ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``, 
-    the function `gc` can be implemented in two ways:
+    The economic cost ``J_E`` and custom constraint ``\mathbf{g_c}`` functions receive the
+    extended vectors ``\mathbf{U_e}`` (`nu*(Hp+1)` elements), ``\mathbf{Ŷ_e}`` (`ny*(Hp+1)`
+    elements) and  ``\mathbf{D̂_e}`` (`nd*(Hp+1)` elements) as arguments. If `LHS` represents
+    the left-hand side result in the inequality ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e},
+    \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``, `gc` can be implemented in two ways:
     
     1. **Non-mutating function** (out-of-place): define it as `gc(Ue, Ŷe, D̂e, p, ϵ) -> LHS`.
        This syntax is simple and intuitive but it allocates more memory.
@@ -213,8 +209,15 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
        This syntax reduces the allocations and potentially the computational burden as well.
 
     The keyword argument `nc` is the number of elements in the `LHS` vector, and `gc!`, an
-    alias for the `gc` argument (both accepts non-mutating and mutating functions). Note
-    that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
+    alias for the `gc` argument (both accepts non-mutating and mutating functions). 
+    
+    The optimization relies on [`JuMP`](https://github.com/jump-dev/JuMP.jl) automatic 
+    differentiation (AD) to compute the objective and constraint derivatives. Optimizers 
+    generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
+    state-space functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+    for common mistakes when writing these functions.
+
+    Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
     `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
 """
 function NonLinMPC(
