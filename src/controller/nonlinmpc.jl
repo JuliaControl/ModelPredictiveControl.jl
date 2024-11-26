@@ -131,17 +131,16 @@ include the manipulated inputs, predicted outputs and measured disturbances, ext
     \mathbf{Ŷ_e} = \begin{bmatrix} \mathbf{ŷ}(k)   \\ \mathbf{Ŷ}            \end{bmatrix}  , \quad
     \mathbf{D̂_e} = \begin{bmatrix} \mathbf{d}(k)   \\ \mathbf{D̂}            \end{bmatrix}
 ```
-since ``H_c ≤ H_p`` implies that ``\mathbf{Δu}(k+H_p) = \mathbf{0}`` or ``\mathbf{u}(k+H_p)=
-\mathbf{u}(k+H_p-1)``. The vector ``\mathbf{D̂}`` comprises the measured disturbance
-predictions over ``H_p``. The argument ``\mathbf{p}`` is a custom parameter object of any
-type, but use a mutable one if you want to modify it later e.g.: a vector.
+The vector ``\mathbf{D̂}`` comprises the measured disturbance predictions over ``H_p``. The
+argument ``\mathbf{p}`` is a custom parameter object of any type, but use a mutable one if
+you want to modify it later e.g.: a vector.
 
 !!! tip
     Replace any of the arguments of ``J_E`` and ``\mathbf{g_c}`` functions with `_` if not
     needed (see e.g. the default value of `JE` below).
 
-See [`LinMPC`](@ref) for the definition of the other variables. This method uses the default
-state estimator :
+See [`LinMPC`](@ref) Extended Help for the definition of the other variables. This method
+uses the default state estimator :
 
 - if `model` is a [`LinModel`](@ref), a [`SteadyKalmanFilter`](@ref) with default arguments;
 - else, an [`UnscentedKalmanFilter`](@ref) with default arguments. 
@@ -199,10 +198,12 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 
     The economic cost ``J_E`` and custom constraint ``\mathbf{g_c}`` functions receive the
     extended vectors ``\mathbf{U_e}`` (`nu*Hp+nu` elements), ``\mathbf{Ŷ_e}`` (`ny+ny*Hp`
-    elements) and  ``\mathbf{D̂_e}`` (`nd+nd*Hp` elements) as arguments. If `LHS` represents
-    the result of the left-hand side in the inequality ``\mathbf{g_c}(\mathbf{U_e},
-    \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``, the function `gc` can be
-    implemented in two possible ways:
+    elements) and  ``\mathbf{D̂_e}`` (`nd+nd*Hp` elements) as arguments. The last two time
+    steps in ``\mathbf{U_e}`` are forced to be equal, that is ``\mathbf{u}(k+H_p) =
+    \mathbf{u}(k+H_p-1)``, since ``H_c ≤ H_p`` implies that ``\mathbf{Δu}(k+H_p) =
+    \mathbf{0}``. If `LHS` represents the result of the left-hand side in the inequality 
+    ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``, 
+    the function `gc` can be implemented in two possible ways:
     
     1. **Non-mutating function** (out-of-place): define it as `gc(Ue, Ŷe, D̂e, p, ϵ) -> LHS`.
        This syntax is simple and intuitive but it allocates more memory.
