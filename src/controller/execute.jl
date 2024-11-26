@@ -120,8 +120,8 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ȳ, Ū        = similar(mpc.Yop), similar(mpc.Uop)
     Ŷe, Ue      = Vector{NT}(undef, nŶe), Vector{NT}(undef, nUe)
     Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
-    Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
-    J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷe, Ue, mpc.ΔŨ)
+    Ue, Ŷe    = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
+    J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, mpc.ΔŨ)
     U  = Ū
     U .= @views Ue[1:end-model.nu]
     Ŷ  = Ȳ
@@ -362,28 +362,28 @@ function predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, mod
 end
 
 """
-    extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ) -> Ŷe, Ue
+    extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ) -> Ŷe, Ue
 
-Compute the extended predictions `Ŷe` and `Ue` for the nonlinear optimization.
+Compute the extended vectors `Ue` and `Ŷe` and  for the nonlinear optimization.
 
-The function mutates `Ŷe`, `Ue` and `Ū` in arguments, without assuming any initial values.
+The function mutates `Ue`, `Ŷe` and `Ū` in arguments, without assuming any initial values.
 """
-function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
+function extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
     ny, nu = model.ny, model.nu
-    # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
-    Ŷe[1:ny]     .= mpc.ŷ
-    Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
     # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
     U0 = Ū
     U0 .= mul!(U0, mpc.S̃, ΔŨ) .+ mpc.T_lastu0
     Ue[1:end-nu] .= U0 .+ mpc.Uop
     # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
     Ue[end-nu+1:end] .= @views Ue[end-2nu+1:end-nu]
-    return Ŷe, Ue
+    # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
+    Ŷe[1:ny]     .= mpc.ŷ
+    Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
+    return Ue, Ŷe
 end
 
 """
-    obj_nonlinprog!( _ , _ , mpc::PredictiveController, model::LinModel, Ŷe, Ue, ΔŨ)
+    obj_nonlinprog!( _ , _ , mpc::PredictiveController, model::LinModel, Ue, Ŷe, ΔŨ)
 
 Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
 
@@ -392,15 +392,15 @@ also be called on any [`PredictiveController`](@ref)s to evaluate the objective 
 at specific `Ue`, `Ŷe` and `ΔŨ`, values. It does not mutate any argument.
 """
 function obj_nonlinprog!(
-    _, _, mpc::PredictiveController, model::LinModel, Ŷe, Ue, ΔŨ::AbstractVector{NT}
+    _, _, mpc::PredictiveController, model::LinModel, Ue, Ŷe, ΔŨ::AbstractVector{NT}
 ) where NT <: Real
     JQP  = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.r[]
-    E_JE = obj_econ!(Ue, Ŷe, mpc, model)
+    E_JE = obj_econ(mpc, model, Ue, Ŷe)
     return JQP + E_JE
 end
 
 """
-    obj_nonlinprog!(Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷe, Ue, ΔŨ)
+    obj_nonlinprog!(Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ)
 
 Nonlinear programming objective method when `model` is not a [`LinModel`](@ref). The
 function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
@@ -408,7 +408,7 @@ function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method
 `Ŷe` and `Ue` arguments).
 """
 function obj_nonlinprog!(
-    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ŷe, Ue, ΔŨ::AbstractVector{NT}
+    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ::AbstractVector{NT}
 ) where NT<:Real
     nu, ny = model.nu, model.ny
     # --- output setpoint tracking term ---
@@ -426,12 +426,12 @@ function obj_nonlinprog!(
         JR̂u = 0.0
     end
     # --- economic term ---
-    E_JE = obj_econ!(Ue, Ŷe, mpc, model)
+    E_JE = obj_econ(mpc, model, Ue, Ŷe)
     return JR̂y + JΔŨ + JR̂u + E_JE
 end
 
 "By default, the economic term is zero."
-obj_econ!( _ , _ , ::PredictiveController, ::SimModel) = 0.0
+obj_econ(::PredictiveController, ::SimModel, _ , _ ) = 0.0
 
 @doc raw"""
     optim_objective!(mpc::PredictiveController) -> ΔŨ

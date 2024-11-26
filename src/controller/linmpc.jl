@@ -175,6 +175,7 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
     | ``H_p``              | prediction horizon (integer)                             | `()`             |
     | ``H_c``              | control horizon (integer)                                | `()`             |
     | ``\mathbf{ΔU}``      | manipulated input increments over ``H_c``                | `(nu*Hc,)`       |
+    | ``\mathbf{D̂}``       | predicted measured disturbances over ``H_p``             | `(nd*Hp,)`       |
     | ``\mathbf{Ŷ}``       | predicted outputs over ``H_p``                           | `(ny*Hp,)`       |
     | ``\mathbf{U}``       | manipulated inputs over ``H_p``                          | `(nu*Hp,)`       |
     | ``\mathbf{R̂_y}``     | predicted output setpoints over ``H_p``                  | `(ny*Hp,)`       |
