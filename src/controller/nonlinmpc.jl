@@ -118,7 +118,7 @@ controller minimizes the following objective function at each discrete time ``k`
 ```
 subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraints:
 ```math
-\mathbf{g_c}\Big(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ(k)\Big) ≤ \mathbf{0}
+\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}
 ```
 The economic function ``J_E`` can penalizes solutions with high economic costs. Setting all
 the weights to 0 except ``E``  creates a pure economic model predictive controller (EMPC). 
@@ -198,18 +198,19 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
     for the constraint handling, and is not available in any other package, to my knowledge.
 
     The economic cost ``J_E`` and custom constraint ``\mathbf{g_c}`` functions receive the
-    extended vectors ``\mathbf{U_e}`` (`nu*(Hp+1)` elements), ``\mathbf{Ŷ_e}`` (`ny*(Hp+1)`
-    elements) and  ``\mathbf{D̂_e}`` (`nd*(Hp+1)` elements) as arguments. If `LHS` represents
-    the left-hand side result in the inequality ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e},
-    \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``, `gc` can be implemented in two ways:
+    extended vectors ``\mathbf{U_e}`` (`nu*Hp+nu` elements), ``\mathbf{Ŷ_e}`` (`ny+ny*Hp`
+    elements) and  ``\mathbf{D̂_e}`` (`nd+nd*Hp` elements) as arguments. If `LHS` represents
+    the result of the left-hand side in the inequality ``\mathbf{g_c}(\mathbf{U_e},
+    \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``, the function `gc` can be
+    implemented in two possible ways:
     
     1. **Non-mutating function** (out-of-place): define it as `gc(Ue, Ŷe, D̂e, p, ϵ) -> LHS`.
        This syntax is simple and intuitive but it allocates more memory.
     2. **Mutating function** (in-place): define it as `gc!(LHS, Ue, Ŷe, D̂e, p, ϵ) -> nothing`.
        This syntax reduces the allocations and potentially the computational burden as well.
 
-    The keyword argument `nc` is the number of elements in the `LHS` vector, and `gc!`, an
-    alias for the `gc` argument (both accepts non-mutating and mutating functions). 
+    The keyword argument `nc` is the number of elements in `LHS`, and `gc!`, an alias for
+    the `gc` argument (both `gc` and `gc!` accepts non-mutating and mutating functions). 
     
     The optimization relies on [`JuMP`](https://github.com/jump-dev/JuMP.jl) automatic 
     differentiation (AD) to compute the objective and constraint derivatives. Optimizers 
@@ -391,6 +392,17 @@ function test_custom_functions(JE, gc!, uop; Uop, dop, Dop, ΔŨ, p)
     # but there is no similar function for the custom functions of NonLinMPC)
     Ue = [Uop; uop]
     D̂e = [dop; Dop]
+
+    Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
+    Ŷe, Ue     = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
+    ϵ = (nϵ == 1) ? ΔŨ[end] : zero(JNT) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
+    mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
+    g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
+    J = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷe, Ue, ΔŨ)
+
+
+
+
     Ŷ0, x̂0next =
     Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
     JE = JE(Uop, Uop, Dop, p)
