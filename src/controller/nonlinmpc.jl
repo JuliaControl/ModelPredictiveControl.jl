@@ -406,13 +406,14 @@ should ease troubleshooting of simple bugs e.g.: the user forgets to set the `nc
 function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
     uop, dop, yop = model.uop, model.dop, model.yop
     Ue, Ŷe, D̂e = [Uop; uop], [yop; Yop], [dop; Dop]
-    try 
-        JE(Ue, Ŷe, D̂e, p)
+    try
+        val::NT = JE(Ue, Ŷe, D̂e, p)
     catch err
         @warn(
             """
             Calling the JE function with Ue, Ŷe, D̂e arguments fixed at uop=$uop, 
-            yop=$yop, dop=$dop failed with the following stacktrace.
+            yop=$yop, dop=$dop failed with the following stacktrace. Did you forget
+            to set the keyword argument p?
             """, 
             exception=(err, catch_backtrace())
         )
@@ -425,7 +426,7 @@ function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, 
             """
             Calling the gc function with Ue, Ŷe, D̂e, ϵ arguments fixed at uop=$uop,
             yop=$yop, dop=$dop, ϵ=0 failed with the following stacktrace. Did you 
-            forget to set the keyword argument nc?
+            forget to set the keyword argument p or nc?
             """, 
             exception=(err, catch_backtrace())
         )
