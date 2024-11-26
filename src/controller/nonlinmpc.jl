@@ -394,6 +394,15 @@ function get_mutating_gc(NT, gc)
     return gc!
 end
 
+"""
+    test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
+
+Test the custom functions `JE` and `gc!` at the operating point `Uop`, `Yop`, `Dop`.
+
+This function is called at the end of `NonLinMPC` construction. It warns the user if the
+custom cost `JE` and constraint `gc!` functions crash at `model` operating points. This
+should ease troubleshooting of simple bugs e.g.: the user forgets to set the `nc` argument.
+"""
 function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
     uop, dop, yop = model.uop, model.dop, model.yop
     Ue, Ŷe, D̂e = [Uop; uop], [yop; Yop], [dop; Dop]
