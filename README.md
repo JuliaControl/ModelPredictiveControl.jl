@@ -70,71 +70,66 @@ for more detailed examples.
 
 ## Features
 
-### Legend
-
-- [x] implemented feature  
-- [ ] planned feature
-
 ### Model Predictive Control Features
 
-- [x] linear and nonlinear plant models exploiting multiple dispatch
-- [x] model linearization based on automatic differentiation (exact Jacobians)
-- [x] supported objective function terms:
-  - [x] output setpoint tracking
-  - [x] move suppression
-  - [x] input setpoint tracking
-  - [x] terminal costs
-  - [x] custom economic costs (economic model predictive control)
-- [x] adaptive linear model predictive controller
-  - [x] manual model modification
-  - [x] automatic successive linearization of a nonlinear model
-  - [x] objective function weights and covariance matrices modification
-- [x] explicit predictive controller for problems without constraint
-- [x] online-tunable soft and hard constraints on:
-  - [x] output predictions
-  - [x] manipulated inputs
-  - [x] manipulated inputs increments
-  - [x] terminal states to ensure nominal stability
-- [x] custom economic inequality constraints (soft or hard)
-- [x] supported feedback strategy:
-  - [x] state estimator (see State Estimation features)
-  - [x] internal model structure with a custom stochastic model
-- [x] automatic model augmentation with integrating states for offset-free tracking
-- [x] support for unmeasured model outputs
-- [x] feedforward action with measured disturbances that supports direct transmission
-- [x] custom predictions for:
-  - [x] output setpoints
-  - [x] measured disturbances
-- [x] easy integration with `Plots.jl`
-- [x] optimization based on `JuMP.jl`:
-  - [x] quickly compare multiple optimizers
-  - [x] nonlinear solvers relying on automatic differentiation (exact derivative)
-- [x] additional information about the optimum to ease troubleshooting
-- [x] real-time control loop features:
-  - [x] implementations that carefully limits the allocations
-  - [x] simple soft real-time utilities
+- linear and nonlinear plant models exploiting multiple dispatch
+- model linearization based on automatic differentiation (exact Jacobians)
+- supported objective function terms:
+  - output setpoint tracking
+  - move suppression
+  - input setpoint tracking
+  - terminal costs
+  - custom economic costs (economic model predictive control)
+- adaptive linear model predictive controller
+  - manual model modification
+  - automatic successive linearization of a nonlinear model
+  - objective function weights and covariance matrices modification
+- explicit predictive controller for problems without constraint
+- online-tunable soft and hard constraints on:
+  - output predictions
+  - manipulated inputs
+  - manipulated inputs increments
+  - terminal states to ensure nominal stability
+- custom nonlinear inequality constraints (soft or hard)
+- supported feedback strategy:
+  - state estimator (see State Estimation features)
+  - internal model structure with a custom stochastic model
+- automatic model augmentation with integrating states for offset-free tracking
+- support for unmeasured model outputs
+- feedforward action with measured disturbances that supports direct transmission
+- custom predictions for:
+  - output setpoints
+  - measured disturbances
+- easy integration with `Plots.jl`
+- optimization based on `JuMP.jl`:
+  - quickly compare multiple optimizers
+  - nonlinear solvers relying on automatic differentiation (exact derivative)
+- additional information about the optimum to ease troubleshooting
+- real-time control loop features:
+  - implementations that carefully limits the allocations
+  - simple soft real-time utilities
 
 ### State Estimation Features
 
-- [x] supported state estimators/observers:
-  - [x] steady-state Kalman filter
-  - [x] Kalman filter
-  - [x] Luenberger observer
-  - [x] internal model structure
-  - [x] extended Kalman filter
-  - [x] unscented Kalman filter
-  - [x] moving horizon estimator
-- [x] easily estimate unmeasured disturbances by adding one or more integrators at the:
-  - [x] manipulated inputs
-  - [x] measured outputs
-- [x] bumpless manual to automatic transfer for control with a proper initial estimate
-- [x] estimators in two possible forms:
-  - [x] filter (or current) form to improve accuracy and robustness
-  - [x] predictor (or delayed) form to reduce computational load
-- [x] moving horizon estimator in two formulations:
-  - [x] linear plant models (quadratic optimization)
-  - [x] nonlinear plant models (nonlinear optimization)
-- [x] moving horizon estimator online-tunable soft and hard constraints on:
-  - [x] state estimates
-  - [x] process noise estimates
-  - [x] sensor noise estimates
+- supported state estimators/observers:
+  - steady-state Kalman filter
+  - Kalman filter
+  - Luenberger observer
+  - internal model structure
+  - extended Kalman filter
+  - unscented Kalman filter
+  - moving horizon estimator
+- easily estimate unmeasured disturbances by adding one or more integrators at the:
+  - manipulated inputs
+  - measured outputs
+- bumpless manual to automatic transfer for control with a proper initial estimate
+- estimators in two possible forms:
+  - filter (or current) form to improve accuracy and robustness
+  - predictor (or delayed) form to reduce computational load
+- moving horizon estimator in two formulations:
+  - linear plant models (quadratic optimization)
+  - nonlinear plant models (nonlinear optimization)
+- moving horizon estimator online-tunable soft and hard constraints on:
+  - state estimates
+  - process noise estimates
+  - sensor noise estimates

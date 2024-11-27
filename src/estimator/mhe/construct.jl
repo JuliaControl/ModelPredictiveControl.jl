@@ -1298,7 +1298,7 @@ function get_optim_functions(
     estim::MovingHorizonEstimator, ::JuMP.GenericModel{JNT}
 ) where {JNT <: Real}
     model, con = estim.model, estim.con
-    nx̂, nym, nŷ, nu, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.He
+    nx̂, nym, nŷ, nu, nϵ, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, estim.He
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
     Nc = nZ̃ + 3
     Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nZ̃), Nc)
@@ -1317,8 +1317,8 @@ function get_optim_functions(
         V̂,  X̂0 = get_tmp(V̂_cache, Z̃1),  get_tmp(X̂0_cache, Z̃1)
         û0, ŷ0 = get_tmp(û0_cache, Z̃1), get_tmp(ŷ0_cache, Z̃1)
         V̂,  X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
-        g = get_tmp(g_cache, Z̃1)
-        g = con_nonlinprog!(g, estim, model, X̂0, V̂, Z̃)
+        ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
+        g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
         x̄ = get_tmp(x̄_cache, Z̃1)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
@@ -1332,7 +1332,8 @@ function get_optim_functions(
                 Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
             end
             V̂, X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
-            g = con_nonlinprog!(g, estim, model, X̂0, V̂, Z̃)
+            ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
+            g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
         end
         return g[i]
     end

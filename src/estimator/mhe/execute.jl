@@ -541,14 +541,13 @@ function predict!(V̂, X̂0, û0, ŷ0, estim::MovingHorizonEstimator, model::S
 end
 
 """
-    con_nonlinprog!(g, estim::MovingHorizonEstimator, model::SimModel, X̂0, V̂, Z̃)
+    con_nonlinprog!(g, estim::MovingHorizonEstimator, model::SimModel, X̂0, V̂, ϵ)
 
 Nonlinear constrains for [`MovingHorizonEstimator`](@ref).
 """
-function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂0, V̂, Z̃)
+function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂0, V̂, ϵ)
     nX̂con, nX̂ = length(estim.con.X̂0min), estim.nx̂ *estim.Nk[]
     nV̂con, nV̂ = length(estim.con.V̂min),  estim.nym*estim.Nk[]
-    ϵ = estim.nϵ ≠ 0 ? Z̃[begin] : 0 # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
     for i in eachindex(g)
         estim.con.i_g[i] || continue
         if i ≤ nX̂con

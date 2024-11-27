@@ -78,6 +78,7 @@ struct NonLinMPC{
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
+        test_custom_functions(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
         buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp)
@@ -118,30 +119,28 @@ controller minimizes the following objective function at each discrete time ``k`
 ```
 subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraints:
 ```math
-\mathbf{g_c}\Big(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ(k)\Big) ≤ \mathbf{0}
+\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}
 ```
 The economic function ``J_E`` can penalizes solutions with high economic costs. Setting all
 the weights to 0 except ``E``  creates a pure economic model predictive controller (EMPC). 
 As a matter of fact, ``J_E`` can be any nonlinear function to customize the objective, even
 if there is no economic interpretation to it. The arguments of ``J_E`` and ``\mathbf{g_c}``
 include the manipulated inputs, predicted outputs and measured disturbances, extended from
-``k`` to ``k + H_p`` (inclusively):
+``k`` to ``k + H_p`` (inclusively, see Extended Help for more details):
 ```math
     \mathbf{U_e} = \begin{bmatrix} \mathbf{U}      \\ \mathbf{u}(k+H_p-1)   \end{bmatrix}  , \quad
     \mathbf{Ŷ_e} = \begin{bmatrix} \mathbf{ŷ}(k)   \\ \mathbf{Ŷ}            \end{bmatrix}  , \quad
     \mathbf{D̂_e} = \begin{bmatrix} \mathbf{d}(k)   \\ \mathbf{D̂}            \end{bmatrix}
 ```
-since ``H_c ≤ H_p`` implies that ``\mathbf{Δu}(k+H_p) = \mathbf{0}`` or ``\mathbf{u}(k+H_p)=
-\mathbf{u}(k+H_p-1)``. The vector ``\mathbf{D̂}`` comprises the measured disturbance
-predictions over ``H_p``. The argument ``\mathbf{p}`` is a custom parameter object of any
-type, but use a mutable one if you want to modify it later e.g.: a vector.
+The argument ``\mathbf{p}`` is a custom parameter object of any type, but use a mutable one
+if you want to modify it later e.g.: a vector. See [`LinMPC`](@ref) Extended Help for the
+definition of the other variables.
 
 !!! tip
     Replace any of the arguments of ``J_E`` and ``\mathbf{g_c}`` functions with `_` if not
     needed (see e.g. the default value of `JE` below).
 
-See [`LinMPC`](@ref) for the definition of the other variables. This method uses the default
-state estimator :
+This method uses the default state estimator:
 
 - if `model` is a [`LinModel`](@ref), a [`SteadyKalmanFilter`](@ref) with default arguments;
 - else, an [`UnscentedKalmanFilter`](@ref) with default arguments. 
@@ -197,24 +196,36 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
     algebra instead of a `for` loop. This feature can accelerate the optimization, especially
     for the constraint handling, and is not available in any other package, to my knowledge.
 
+    The economic cost ``J_E`` and custom constraint ``\mathbf{g_c}`` functions receive the
+    extended vectors ``\mathbf{U_e}`` (`nu*Hp+nu` elements), ``\mathbf{Ŷ_e}`` (`ny+ny*Hp`
+    elements) and  ``\mathbf{D̂_e}`` (`nd+nd*Hp` elements) as arguments. They all include the
+    values from ``k`` to ``k + H_p`` (inclusively). The custom constraint also receives the
+    slack ``ϵ`` (scalar), which is always zero if `Cwt=Inf`.
+    
+    More precisely, the last two time steps in ``\mathbf{U_e}`` are forced to be equal, i.e.
+    ``\mathbf{u}(k+H_p) = \mathbf{u}(k+H_p-1)``, since ``H_c ≤ H_p`` implies that
+    ``\mathbf{Δu}(k+H_p) = \mathbf{0}``. The vectors ``\mathbf{ŷ}(k)`` and ``\mathbf{d}(k)``
+    are the current state estimator output and measured disturbance, respectively, and 
+    ``\mathbf{Ŷ}`` and ``\mathbf{D̂}``, their respective predictions from ``k+1`` to ``k+H_p``. 
+    If `LHS` represents the result of the left-hand side in the inequality 
+    ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``,
+    the function `gc` can be implemented in two possible ways:
+    
+    1. **Non-mutating function** (out-of-place): define it as `gc(Ue, Ŷe, D̂e, p, ϵ) -> LHS`.
+       This syntax is simple and intuitive but it allocates more memory.
+    2. **Mutating function** (in-place): define it as `gc!(LHS, Ue, Ŷe, D̂e, p, ϵ) -> nothing`.
+       This syntax reduces the allocations and potentially the computational burden as well.
+
+    The keyword argument `nc` is the number of elements in `LHS`, and `gc!`, an alias for
+    the `gc` argument (both `gc` and `gc!` accepts non-mutating and mutating functions). 
+    
     The optimization relies on [`JuMP`](https://github.com/jump-dev/JuMP.jl) automatic 
     differentiation (AD) to compute the objective and constraint derivatives. Optimizers 
     generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
     state-space functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
     for common mistakes when writing these functions.
 
-    If `LHS` represents the result of the left-hand side in the inequality 
-    ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``, 
-    the function `gc` can be implemented in two ways:
-    
-    1. **Non-mutating function** (out-of-place): define it as `gc(Ue, Ŷe, D̂e, p, ϵ) -> LHS`.
-    This syntax is simple and intuitive but it allocates more memory.
-    2. **Mutating function** (in-place): define it as `gc!(LHS, Ue, Ŷe, D̂e, p, ϵ) -> nothing`.
-    This syntax reduces the allocations and potentially the computational burden as well.
-
-    The keyword argument `nc` is the number of elements in the `LHS` vector, and `gc!`, an
-    alias for the `gc` argument (both accepts non-mutating and mutating functions). Note
-    that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
+    Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
     `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
 """
 function NonLinMPC(
@@ -383,14 +394,44 @@ function get_mutating_gc(NT, gc)
     return gc!
 end
 
-function test_custom_functions(JE, gc!, uop; Uop, dop, Dop, ΔŨ, p)
-    # TODO: contunue here (important to guide the user, sim! can be used on NonLinModel,
-    # but there is no similar function for the custom functions of NonLinMPC)
-    Ue = [Uop; uop]
-    D̂e = [dop; Dop]
-    Ŷ0, x̂0next =
-    Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
-    JE = JE(Uop, Uop, Dop, p)
+"""
+    test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
+
+Test the custom functions `JE` and `gc!` at the operating point `Uop`, `Yop`, `Dop`.
+
+This function is called at the end of `NonLinMPC` construction. It warns the user if the
+custom cost `JE` and constraint `gc!` functions crash at `model` operating points. This
+should ease troubleshooting of simple bugs e.g.: the user forgets to set the `nc` argument.
+"""
+function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
+    uop, dop, yop = model.uop, model.dop, model.yop
+    Ue, Ŷe, D̂e = [Uop; uop], [yop; Yop], [dop; Dop]
+    try
+        val::NT = JE(Ue, Ŷe, D̂e, p)
+    catch err
+        @warn(
+            """
+            Calling the JE function with Ue, Ŷe, D̂e arguments fixed at uop=$uop, 
+            yop=$yop, dop=$dop failed with the following stacktrace. Did you forget
+            to set the keyword argument p?
+            """, 
+            exception=(err, catch_backtrace())
+        )
+    end
+    ϵ, gc = 0, Vector{NT}(undef, nc) 
+    try
+        gc!(gc, Ue, Ŷe, D̂e, p, ϵ)
+    catch err
+        @warn(
+            """
+            Calling the gc function with Ue, Ŷe, D̂e, ϵ arguments fixed at uop=$uop,
+            yop=$yop, dop=$dop, ϵ=0 failed with the following stacktrace. Did you 
+            forget to set the keyword argument p or nc?
+            """, 
+            exception=(err, catch_backtrace())
+        )
+    end
+    return nothing
 end
 
 """
@@ -438,7 +479,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     @operator(optim, J, nΔŨ, Jfunc)
     @objective(optim, Min, J(ΔŨvar...))
     init_nonlincon!(mpc, model, gfunc)
-    set_nonlincon!(mpc, model, mpc.optim) #TODO: check if this is really necessary !!
+    set_nonlincon!(mpc, model, mpc.optim)
     return nothing
 end
 
@@ -476,13 +517,13 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         Ȳ,  Ū      = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
         x̂0, x̂0next = get_tmp(x̂0_cache, ΔŨ1), get_tmp(x̂0next_cache, ΔŨ1)
         u0, û0     = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
-        g,  gc     = get_tmp(g_cache, ΔŨ1),  get_tmp(gc_cache, ΔŨ1)
+        gc         = get_tmp(gc_cache, ΔŨ1)
         Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
-        Ŷe, Ue     = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
-        ϵ = (nϵ == 1) ? ΔŨ[end] : zero(JNT) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
+        Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
+        ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
         mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
         g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
-        return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ŷe, Ue, ΔŨ)::T
+        return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ)::T
     end
     function gfunc_i(i, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
         ΔŨ1 = ΔŨtup[begin]
@@ -495,10 +536,10 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             Ȳ,  Ū      = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
             x̂0, x̂0next = get_tmp(x̂0_cache, ΔŨ1), get_tmp(x̂0next_cache, ΔŨ1)
             u0, û0     = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
-            g,  gc     = get_tmp(g_cache, ΔŨ1),  get_tmp(gc_cache, ΔŨ1)
+            gc         = get_tmp(gc_cache, ΔŨ1)
             Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
-            Ŷe, Ue     = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
-            ϵ = (nϵ == 1) ? ΔŨ[end] : zero(JNT) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
+            Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
+            ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
             mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
             g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         end
@@ -656,7 +697,7 @@ function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, Ŷ0, gc, ϵ)
 end
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
-function obj_econ!(Ue, Ŷe, mpc::NonLinMPC, model::SimModel)
+function obj_econ(mpc::NonLinMPC, model::SimModel, Ue, Ŷe)
     E_JE = iszero(mpc.E) ? 0.0 : mpc.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
     return E_JE
 end
