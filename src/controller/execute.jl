@@ -371,11 +371,10 @@ The function mutates `Ue`, `Ŷe` and `Ū` in arguments, without assuming any i
 function extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
     ny, nu = model.ny, model.nu
     # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
-    U0 = Ū
-    U0 .= mul!(U0, mpc.S̃, ΔŨ) .+ mpc.T_lastu0
-    Ue[1:end-nu] .= U0 .+ mpc.Uop
+    U  = Ū
+    U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu0 .+ mpc.Uop
     # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
-    Ue[end-nu+1:end] .= @views Ue[end-2nu+1:end-nu]
+    Ue[end-nu+1:end] .= @views U[end-nu+1:end]
     # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
     Ŷe[1:ny]     .= mpc.ŷ
     Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
