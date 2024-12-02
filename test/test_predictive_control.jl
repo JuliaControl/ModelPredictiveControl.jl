@@ -11,13 +11,13 @@ sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
     @test size(mpc2.Ẽ,2) == 4*mpc2.estim.model.nu
     mpc3 = LinMPC(model, Hc=4, Cwt=1e6)
     @test size(mpc3.Ẽ,2) == 4*mpc3.estim.model.nu + 1
-    @test mpc3.Ñ_Hc[end] ≈ 1e6
+    @test mpc3.weights.Ñ_Hc[end] ≈ 1e6
     mpc4 = LinMPC(model, Mwt=[1,2], Hp=15)
-    @test mpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
+    @test mpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     mpc5 = LinMPC(model, Nwt=[3,4], Cwt=1e3, Hc=5)
-    @test mpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
+    @test mpc5.weights.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
     mpc6 = LinMPC(model, Lwt=[0,1], Hp=15)
-    @test mpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
+    @test mpc6.weights.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
     mpc7 = @test_logs(
         (:warn, "Solving time limit is not supported by the optimizer."), 
         LinMPC(model, optim=JuMP.Model(DAQP.Optimizer))
@@ -30,11 +30,11 @@ sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
     @test mpc9.estim.nint_u  == [1, 1]
     @test mpc9.estim.nint_ym == [0, 0]
     mpc10 = LinMPC(model, M_Hp=Diagonal(collect(1.01:0.01:1.2)))
-    @test mpc10.M_Hp ≈ Diagonal(collect(1.01:0.01:1.2))
+    @test mpc10.weights.M_Hp ≈ Diagonal(collect(1.01:0.01:1.2))
     mpc11 = LinMPC(model, N_Hc=Diagonal([0.1,0.11,0.12,0.13]), Cwt=Inf)
-    @test mpc11.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
+    @test mpc11.weights.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
     mcp12 = LinMPC(model, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
-    @test mcp12.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
+    @test mcp12.weights.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc13  = LinMPC(model2)
     @test isa(mpc13, LinMPC{Float32})
@@ -326,13 +326,13 @@ end
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
     setmodel!(mpc, Mwt=[100], Nwt=[200], Lwt=[300])
-    @test mpc.M_Hp ≈ diagm(fill(100, 1000))
-    @test mpc.Ñ_Hc ≈ diagm([200, 1e4])
-    @test mpc.L_Hp ≈ diagm(fill(300, 1000))
+    @test mpc.weights.M_Hp ≈ diagm(fill(100, 1000))
+    @test mpc.weights.Ñ_Hc ≈ diagm([200, 1e4])
+    @test mpc.weights.L_Hp ≈ diagm(fill(300, 1000))
     setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
-    @test mpc.M_Hp ≈ diagm(1:1000)
-    @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
-    @test mpc.L_Hp ≈ diagm(1.1:1000.1)
+    @test mpc.weights.M_Hp ≈ diagm(1:1000)
+    @test mpc.weights.Ñ_Hc ≈ diagm([0.1;1e6])
+    @test mpc.weights.L_Hp ≈ diagm(1.1:1000.1)
 end
 
 @testset "LinMPC real-time simulations" begin
@@ -354,11 +354,11 @@ end
     @test isa(mpc1.estim, SteadyKalmanFilter)
     @test size(mpc1.Ẽ,1) == 15*mpc1.estim.model.ny
     mpc4 = ExplicitMPC(model, Mwt=[1,2], Hp=15)
-    @test mpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
+    @test mpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     mpc5 = ExplicitMPC(model, Nwt=[3,4], Hc=5)
-    @test mpc5.Ñ_Hc ≈ Diagonal(diagm(repeat(Float64[3, 4], 5)))
+    @test mpc5.weights.Ñ_Hc ≈ Diagonal(diagm(repeat(Float64[3, 4], 5)))
     mpc6 = ExplicitMPC(model, Lwt=[0,1], Hp=15)
-    @test mpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
+    @test mpc6.weights.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
     kf = KalmanFilter(model)
     mpc8 = ExplicitMPC(kf)
     @test isa(mpc8.estim, KalmanFilter)
@@ -366,11 +366,11 @@ end
     @test mpc9.estim.nint_u  == [1, 1]
     @test mpc9.estim.nint_ym == [0, 0]
     mpc10 = ExplicitMPC(model, M_Hp=Diagonal(collect(1.01:0.01:1.2)))
-    @test mpc10.M_Hp ≈ Diagonal(collect(1.01:0.01:1.2))
+    @test mpc10.weights.M_Hp ≈ Diagonal(collect(1.01:0.01:1.2))
     mpc11 = ExplicitMPC(model, N_Hc=Diagonal([0.1,0.11,0.12,0.13]))
-    @test mpc11.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
+    @test mpc11.weights.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
     mcp12 = ExplicitMPC(model, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
-    @test mcp12.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
+    @test mcp12.weights.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc13  = ExplicitMPC(model2)
     @test isa(mpc13, ExplicitMPC{Float32})
@@ -486,13 +486,13 @@ end
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
     setmodel!(mpc, Mwt=[100], Nwt=[200], Lwt=[300])
-    @test mpc.M_Hp ≈ diagm(fill(100, 1000))
-    @test mpc.Ñ_Hc ≈ diagm([200])
-    @test mpc.L_Hp ≈ diagm(fill(300, 1000))
+    @test mpc.weights.M_Hp ≈ diagm(fill(100, 1000))
+    @test mpc.weights.Ñ_Hc ≈ diagm([200])
+    @test mpc.weights.L_Hp ≈ diagm(fill(300, 1000))
     setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=[0.1], L_Hp=diagm(1.1:1000.1))
-    @test mpc.M_Hp ≈ diagm(1:1000)
-    @test mpc.Ñ_Hc ≈ [0.1]
-    @test mpc.L_Hp ≈ diagm(1.1:1000.1)
+    @test mpc.weights.M_Hp ≈ diagm(1:1000)
+    @test mpc.weights.Ñ_Hc ≈ [0.1]
+    @test mpc.weights.L_Hp ≈ diagm(1.1:1000.1)
 end
 
 @testset "NonLinMPC construction" begin
@@ -509,15 +509,15 @@ end
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
     nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e6)
     @test size(nmpc3.Ẽ, 2) == 4*nonlinmodel.nu + 1
-    @test nmpc3.Ñ_Hc[end] == 1e6
+    @test nmpc3.weights.Ñ_Hc[end] == 1e6
     nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[1,2])
-    @test nmpc4.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
+    @test nmpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     nmpc5 = NonLinMPC(nonlinmodel, Hp=15 ,Nwt=[3,4], Cwt=1e3, Hc=5)
-    @test nmpc5.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
+    @test nmpc5.weights.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
     nmpc6 = NonLinMPC(nonlinmodel, Hp=15, Lwt=[0,1])
-    @test nmpc6.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
+    @test nmpc6.weights.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
     nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(Ue,Ŷe,D̂e,p) -> p*dot(Ue,Ŷe)+sum(D̂e), p=10)
-    @test nmpc7.E == 1e-3
+    @test nmpc7.weights.E == 1e-3
     @test nmpc7.JE([1,2],[3,4],[4,6],10) == 10*dot([1,2],[3,4])+sum([4,6])
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     nmpc8 = NonLinMPC(nonlinmodel, Hp=15, optim=optim)
@@ -533,11 +533,11 @@ end
     @test nmpc11.estim.nint_u  == [1, 1]
     @test nmpc11.estim.nint_ym == [0, 0]
     nmpc12 = NonLinMPC(nonlinmodel, Hp=10, M_Hp=Diagonal(collect(1.01:0.01:1.2)))
-    @test nmpc12.M_Hp ≈ Diagonal(collect(1.01:0.01:1.2))
+    @test nmpc12.weights.M_Hp ≈ Diagonal(collect(1.01:0.01:1.2))
     nmpc13 = NonLinMPC(nonlinmodel, Hp=10, N_Hc=Diagonal([0.1,0.11,0.12,0.13]), Cwt=Inf)
-    @test nmpc13.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
+    @test nmpc13.weights.Ñ_Hc ≈ Diagonal([0.1,0.11,0.12,0.13])
     nmcp14 = NonLinMPC(nonlinmodel, Hp=10, L_Hp=Diagonal(collect(0.001:0.001:0.02)))
-    @test nmcp14.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
+    @test nmcp14.weights.L_Hp ≈ Diagonal(collect(0.001:0.001:0.02))
     nmpc15 = NonLinMPC(nonlinmodel, Hp=10, gc=(Ue,Ŷe,D̂e,p,ϵ)-> [p*dot(Ue,Ŷe)+sum(D̂e)+ϵ], nc=1, p=10)
     LHS = zeros(1)
     nmpc15.con.gc!(LHS,[1,2],[3,4],[4,6],10,0.1) 
@@ -869,25 +869,25 @@ end
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
     setmodel!(mpc, Mwt=[100], Nwt=[200], Lwt=[300])
-    @test mpc.M_Hp ≈ diagm(fill(100, 1000))
-    @test mpc.Ñ_Hc ≈ diagm([200, 1e4])
-    @test mpc.L_Hp ≈ diagm(fill(300, 1000))
+    @test mpc.weights.M_Hp ≈ diagm(fill(100, 1000))
+    @test mpc.weights.Ñ_Hc ≈ diagm([200, 1e4])
+    @test mpc.weights.L_Hp ≈ diagm(fill(300, 1000))
     setmodel!(mpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([0.1;1e6]), L_Hp=diagm(1.1:1000.1))
-    @test mpc.M_Hp ≈ diagm(1:1000)
-    @test mpc.Ñ_Hc ≈ diagm([0.1;1e6])
-    @test mpc.L_Hp ≈ diagm(1.1:1000.1)
+    @test mpc.weights.M_Hp ≈ diagm(1:1000)
+    @test mpc.weights.Ñ_Hc ≈ diagm([0.1;1e6])
+    @test mpc.weights.L_Hp ≈ diagm(1.1:1000.1)
     f = (x,u,d,_) -> estim.model.A*x + estim.model.Bu*u + estim.model.Bd*d
     h = (x,d,_)   -> estim.model.C*x + estim.model.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1)
     nmpc = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=1e4, Hp=1000, Hc=10)
     setmodel!(nmpc, Mwt=[100], Nwt=[200], Lwt=[300])
-    @test nmpc.M_Hp ≈ diagm(fill(100, 1000))
-    @test nmpc.Ñ_Hc ≈ diagm([fill(200, 10); 1e4])
-    @test nmpc.L_Hp ≈ diagm(fill(300, 1000))
+    @test nmpc.weights.M_Hp ≈ diagm(fill(100, 1000))
+    @test nmpc.weights.Ñ_Hc ≈ diagm([fill(200, 10); 1e4])
+    @test nmpc.weights.L_Hp ≈ diagm(fill(300, 1000))
     setmodel!(nmpc, M_Hp=diagm(1:1000), Ñ_Hc=diagm([fill(0.1, 10);1e6]), L_Hp=diagm(1.1:1000.1))
-    @test nmpc.M_Hp ≈ diagm(1:1000)
-    @test nmpc.Ñ_Hc ≈ diagm([fill(0.1, 10);1e6])
-    @test nmpc.L_Hp ≈ diagm(1.1:1000.1)
+    @test nmpc.weights.M_Hp ≈ diagm(1:1000)
+    @test nmpc.weights.Ñ_Hc ≈ diagm([fill(0.1, 10);1e6])
+    @test nmpc.weights.L_Hp ≈ diagm(1.1:1000.1)
     @test_throws ErrorException setmodel!(nmpc, deepcopy(nonlinmodel))
 end
 

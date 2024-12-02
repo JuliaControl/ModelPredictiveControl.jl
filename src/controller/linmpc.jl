@@ -15,10 +15,7 @@ struct LinMPC{
     Hp::Int
     Hc::Int
     nϵ::Int
-    M_Hp::Hermitian{NT, Matrix{NT}}
-    Ñ_Hc::Hermitian{NT, Matrix{NT}}
-    L_Hp::Hermitian{NT, Matrix{NT}}
-    E::NT
+    weights::ControllerWeights{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
     noR̂u::Bool
@@ -50,12 +47,7 @@ struct LinMPC{
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
-        Ewt = 0   # economic costs not supported for LinMPC
-        validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-        # convert `Diagonal` to normal `Matrix` if required:
-        M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
-        N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
-        L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
+        weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
@@ -63,10 +55,10 @@ struct LinMPC{
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-        con, nϵ, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
-            estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
+        con, nϵ, S̃, Ẽ = init_defaultcon_mpc(
+            estim, Hp, Hc, Cwt, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
         )
-        H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        H̃ = init_quadprog(model, weights, Ẽ, S̃)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
@@ -80,7 +72,7 @@ struct LinMPC{
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
-            M_Hp, Ñ_Hc, L_Hp, Ewt, 
+            weights,
             R̂u, R̂y, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B, 
