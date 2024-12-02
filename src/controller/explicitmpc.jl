@@ -5,10 +5,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     Hp::Int
     Hc::Int
     nϵ::Int
-    M_Hp::Hermitian{NT, Matrix{NT}}
-    Ñ_Hc::Hermitian{NT, Matrix{NT}}
-    L_Hp::Hermitian{NT, Matrix{NT}}
-    E::NT
+    weights::ControllerWeights{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
     noR̂u::Bool
@@ -42,8 +39,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         nϵ = 0    # no slack variable ϵ for ExplicitMPC
-        Ewt = 0   # economic costs not supported for ExplicitMPC
-        validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp)
+        weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp)
         # convert `Diagonal` to normal `Matrix` if required:
         M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
         N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
@@ -56,7 +52,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         # dummy val (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
         S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
-        H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        H̃ = init_quadprog(model, weights ,Ẽ, S̃)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         H̃_chol = cholesky(H̃)
@@ -71,7 +67,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
             estim,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
-            M_Hp, Ñ_Hc, L_Hp, Ewt,  
+            weights,
             R̂u, R̂y, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
@@ -211,7 +207,7 @@ addinfo!(info, mpc::ExplicitMPC) = info
 
 
 "Update the prediction matrices and Cholesky factorization."
-function setmodel_controller!(mpc::ExplicitMPC, _ , M_Hp, Ñ_Hc, L_Hp)
+function setmodel_controller!(mpc::ExplicitMPC, _ )
     estim, model = mpc.estim, mpc.estim.model
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
@@ -224,7 +220,7 @@ function setmodel_controller!(mpc::ExplicitMPC, _ , M_Hp, Ñ_Hc, L_Hp)
     mpc.V .= V
     mpc.B .= B
     # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.Ẽ, mpc.S̃, mpc.M_Hp, mpc.Ñ_Hc, mpc.L_Hp)
+    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.S̃)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc)
     # --- operating points ---

@@ -838,7 +838,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
                 t, res.Ŷ_data[i_y, :]
             end
         end
-        M_Hp_i = mpc.M_Hp[i_y, i_y]
+        M_Hp_i = mpc.weights.M_Hp[i_y, i_y]
         if i_y in indices_ry && !iszero(M_Hp_i)
             @series begin
                 i == ny && (xguide --> "Time (s)")
@@ -894,7 +894,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
             legend     --> false
             t, res.U_data[i_u, :]
         end
-        L_Hp_i = mpc.L_Hp[i_u, i_u]
+        L_Hp_i = mpc.weights.L_Hp[i_u, i_u]
         if i_u in indices_ru && !iszero(L_Hp_i)
             @series begin
                 i == nu && (xguide --> "Time (s)")
