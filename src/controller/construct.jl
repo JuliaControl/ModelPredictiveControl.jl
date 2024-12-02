@@ -1,3 +1,31 @@
+"Include all the objective function weights of [`PredictiveController`](@ref)"
+struct ControllerWeights{NT<:Real}
+    M_Hp::Hermitian{NT, Matrix{NT}}
+    Ñ_Hc::Hermitian{NT, Matrix{NT}}
+    L_Hp::Hermitian{NT, Matrix{NT}}
+    E   ::NT
+    function ControllerWeights{NT}(
+        model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
+    ) where NT<:Real
+        validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
+        # convert `Diagonal` to normal `Matrix` if required:
+        M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
+        N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
+        L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
+        nΔU = size(N_Hc, 1)
+        C = Cwt
+        if !isinf(Cwt)  
+            # ΔŨ = [ΔU; ϵ] (ϵ is the slack variable)
+            Ñ_Hc = Hermitian([N_Hc zeros(NT, nΔU, 1); zeros(NT, 1, nΔU) C], :L)
+        else
+            # ΔŨ = ΔU (only hard constraints)
+            Ñ_Hc = N_Hc
+        end   
+        E = Ewt         
+        return new{NT}(M_Hp, Ñ_Hc, L_Hp, E)
+    end
+end
+
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint{NT<:Real, GCfunc<:Function}
     ẽx̂      ::Matrix{NT}
@@ -609,7 +637,7 @@ function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where 
 end
 
 @doc raw"""
-    init_quadprog(model::LinModel, Ẽ, S, M_Hp, N_Hc, L_Hp) -> H̃
+    init_quadprog(model::LinModel, weights::ControllerWeights, Ẽ, S) -> H̃
 
 Init the quadratic programming Hessian `H̃` for MPC.
 
@@ -626,29 +654,30 @@ The vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control per
 [`initpred!`](@ref). ``r`` does not impact the minima position. It is thus useless at
 optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+function init_quadprog(::LinModel, weights::ControllerWeights, Ẽ, S̃)
+    M_Hp, Ñ_Hc, L_Hp = weights.M_Hp, weights.Ñ_Hc, weights.L_Hp
     H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃), :L)
     return H̃
 end
-"Return empty matrices if `model` is not a [`LinModel`](@ref)."
-function init_quadprog(::SimModel{NT}, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp) where {NT<:Real}
+"Return empty matrix if `model` is not a [`LinModel`](@ref)."
+function init_quadprog(::SimModel{NT}, weights::ControllerWeights, _, _) where {NT<:Real}
     H̃ = Hermitian(zeros(NT, 0, 0), :L)
     return H̃
 end
 
 """
     init_defaultcon_mpc(
-        estim, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, 
+        estim, C, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, 
         gc!=(_,_,_,_,_,_)->nothing, nc=0
-    ) -> con, S̃, Ñ_Hc, Ẽ
+    ) -> con, S̃, Ẽ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
-Also return `S̃`, `Ñ_Hc` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
+Also return `S̃` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
 """
 function init_defaultcon_mpc(
     estim::StateEstimator{NT}, 
-    Hp, Hc, C, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+    Hp, Hc, C, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
     gc!::GCfunc=(_,_,_,_,_,_)->nothing, nc=0
 ) where {NT<:Real, GCfunc<:Function}
     model = estim.model
@@ -667,9 +696,7 @@ function init_defaultcon_mpc(
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
     A_Umin,  A_Umax, S̃  = relaxU(model, nϵ, C_umin, C_umax, S)
-    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc = relaxΔU(
-        model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc
-    )
+    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax = relaxΔU(model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax)
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(model, nϵ, C_ymin, C_ymax, E)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(model, nϵ, c_x̂min, c_x̂max, ex̂)
     i_Umin,  i_Umax  = .!isinf.(U0min),  .!isinf.(U0max)
@@ -689,7 +716,7 @@ function init_defaultcon_mpc(
         A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc
     )
-    return con, nϵ, S̃, Ñ_Hc, Ẽ
+    return con, nϵ, S̃, Ẽ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -742,17 +769,14 @@ function relaxU(::SimModel{NT}, nϵ, C_umin, C_umax, S) where NT<:Real
 end
 
 @doc raw"""
-    relaxΔU(
-        model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc
-    ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
+    relaxΔU(model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax
 
 Augment input increments constraints with slack variable ϵ for softening.
 
 Denoting the input increments augmented with the slack variable 
 ``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
-augmented input increment weights ``\mathbf{Ñ}_{H_c}`` (that incorporate ``C``). It also  
-returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{max}}`` and the 
-``\mathbf{A}`` matrices for the inequality constraints:
+augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{max}}`` and the ``\mathbf{A}``
+matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{ΔŨ_{min}}} \\ 
@@ -764,21 +788,19 @@ returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{
 \end{bmatrix}
 ```
 """
-function relaxΔU(::SimModel{NT}, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax, N_Hc) where NT<:Real
-    nΔU = size(N_Hc, 1)
+function relaxΔU(::SimModel{NT}, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax) where NT<:Real
+    nΔU = length(ΔUmin)
     if nϵ == 1 # ΔŨ = [ΔU; ϵ]
         # 0 ≤ ϵ ≤ ∞  
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]]
-        A_ϵ = [zeros(NT, 1, length(ΔUmin)) NT[1.0]]
+        A_ϵ = [zeros(NT, 1, nΔU) NT[1.0]]
         A_ΔŨmin, A_ΔŨmax = -[I  C_Δumin; A_ϵ], [I -C_Δumax; A_ϵ]
-        Ñ_Hc = Hermitian([N_Hc zeros(NT, nΔU, 1);zeros(NT, 1, nΔU) C], :L)
     else # ΔŨ = ΔU (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
         I_Hc = Matrix{NT}(I, nΔU, nΔU)
         A_ΔŨmin, A_ΔŨmax = -I_Hc,  I_Hc
-        Ñ_Hc = N_Hc
     end
-    return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, Ñ_Hc
+    return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax
 end
 
 @doc raw"""

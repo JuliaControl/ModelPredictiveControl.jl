@@ -17,10 +17,7 @@ struct NonLinMPC{
     Hp::Int
     Hc::Int
     nϵ::Int
-    M_Hp::Hermitian{NT, Matrix{NT}}
-    Ñ_Hc::Hermitian{NT, Matrix{NT}}
-    L_Hp::Hermitian{NT, Matrix{NT}}
-    E::NT
+    weights::ControllerWeights{NT}
     JE::JEfunc
     p::P
     R̂u::Vector{NT}
@@ -56,11 +53,7 @@ struct NonLinMPC{
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         validate_JE(NT, JE)
         gc! = get_mutating_gc(NT, gc)
-        validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-        # convert `Diagonal` to normal `Matrix` if required:
-        M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
-        N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
-        L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
+        weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         noR̂u = iszero(L_Hp)
@@ -68,10 +61,10 @@ struct NonLinMPC{
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-        con, nϵ, S̃, Ñ_Hc, Ẽ = init_defaultcon_mpc(
-            estim, Hp, Hc, Cwt, S, N_Hc, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, gc!, nc
+        con, nϵ, S̃, Ẽ = init_defaultcon_mpc(
+            estim, Hp, Hc, Cwt, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, gc!, nc
         )
-        H̃ = init_quadprog(model, Ẽ, S̃, M_Hp, Ñ_Hc, L_Hp)
+        H̃ = init_quadprog(model, weights, Ẽ, S̃)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
@@ -86,7 +79,8 @@ struct NonLinMPC{
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
-            M_Hp, Ñ_Hc, L_Hp, Ewt, JE, p,
+            weights,
+            JE, p,
             R̂u, R̂y, noR̂u,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
@@ -467,7 +461,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- nonlinear optimization init ---
     if mpc.nϵ == 1 && JuMP.solver_name(optim) == "Ipopt"
-        C = mpc.Ñ_Hc[end]
+        C = mpc.weights.Ñ_Hc[end]
         try
             JuMP.get_attribute(optim, "nlp_scaling_max_gradient")
         catch
@@ -698,6 +692,6 @@ end
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
 function obj_econ(mpc::NonLinMPC, model::SimModel, Ue, Ŷe)
-    E_JE = iszero(mpc.E) ? 0.0 : mpc.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
+    E_JE = iszero(mpc.weights.E) ? 0.0 : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
     return E_JE
 end

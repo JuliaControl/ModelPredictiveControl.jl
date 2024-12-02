@@ -206,15 +206,15 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     end
     mpc.R̂y .= R̂y
     Cy = F .- (R̂y .- mpc.Yop)
-    M_Hp_Ẽ = mpc.M_Hp*mpc.Ẽ
+    M_Hp_Ẽ = mpc.weights.M_Hp*mpc.Ẽ
     mul!(q̃, M_Hp_Ẽ', Cy)
-    r .= dot(Cy, mpc.M_Hp, Cy)
+    r .= dot(Cy, mpc.weights.M_Hp, Cy)
     if ~mpc.noR̂u
         mpc.R̂u .= R̂u
         Cu = mpc.T_lastu0 .- (R̂u .- mpc.Uop) 
-        L_Hp_S̃ = mpc.L_Hp*mpc.S̃
+        L_Hp_S̃ = mpc.weights.L_Hp*mpc.S̃
         mul!(q̃, L_Hp_S̃', Cu, 1, 1)
-        r .+= dot(Cu, mpc.L_Hp, Cu)
+        r .+= dot(Cu, mpc.weights.L_Hp, Cu)
     end
     lmul!(2, q̃)
     return nothing
@@ -414,14 +414,14 @@ function obj_nonlinprog!(
     # --- output setpoint tracking term ---
     Ȳ  .= @views Ŷe[ny+1:end]
     Ȳ  .= mpc.R̂y .- Ȳ
-    JR̂y = dot(Ȳ, mpc.M_Hp, Ȳ)
+    JR̂y = dot(Ȳ, mpc.weights.M_Hp, Ȳ)
     # --- move suppression and slack variable term ---
-    JΔŨ = dot(ΔŨ, mpc.Ñ_Hc, ΔŨ)
+    JΔŨ = dot(ΔŨ, mpc.weights.Ñ_Hc, ΔŨ)
     # --- input setpoint tracking term ---
     if !mpc.noR̂u
         Ū  .= @views Ue[1:end-nu]
         Ū  .= mpc.R̂u .- Ū
-        JR̂u = dot(Ū, mpc.L_Hp, Ū)
+        JR̂u = dot(Ū, mpc.weights.L_Hp, Ū)
     else
         JR̂u = 0.0
     end
@@ -589,12 +589,12 @@ prediction horizon ``H_p``.
 ```jldoctest
 julia> mpc = LinMPC(KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σR=[√25]), Hp=1, Hc=1);
 
-julia> mpc.estim.model.A[1], mpc.estim.R̂[1], mpc.M_Hp[1], mpc.Ñ_Hc[1]
+julia> mpc.estim.model.A[1], mpc.estim.R̂[1], mpc.weights.M_Hp[1], mpc.weights.Ñ_Hc[1]
 (0.1, 25.0, 1.0, 0.1)
 
 julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0)); R̂=[9], M_Hp=[10], Nwt=[0.666]);
 
-julia> mpc.estim.model.A[1], mpc.estim.R̂[1], mpc.M_Hp[1], mpc.Ñ_Hc[1]
+julia> mpc.estim.model.A[1], mpc.estim.R̂[1], mpc.weights.M_Hp[1], mpc.weights.Ñ_Hc[1]
 (0.42, 9.0, 10.0, 0.666)
 ```
 """
@@ -617,44 +617,44 @@ function setmodel!(
         size(Mwt) == (ny,) || throw(ArgumentError("Mwt should be a vector of length $ny"))
         any(x -> x < 0, Mwt) && throw(ArgumentError("Mwt values should be nonnegative"))
         for i=1:ny*Hp
-            mpc.M_Hp[i, i] = Mwt[(i-1) % ny + 1]
+            mpc.weights.M_Hp[i, i] = Mwt[(i-1) % ny + 1]
         end
     elseif !isnothing(M_Hp)
         M_Hp = to_hermitian(M_Hp)
         nŶ = ny*Hp
         size(M_Hp) == (nŶ, nŶ) || throw(ArgumentError("M_Hp size should be ($nŶ, $nŶ)"))
-        mpc.M_Hp .= M_Hp
+        mpc.weights.M_Hp .= M_Hp
     end
     if isnothing(Ñ_Hc) && !isnothing(Nwt)
         size(Nwt) == (nu,) || throw(ArgumentError("Nwt should be a vector of length $nu"))
         any(x -> x < 0, Nwt) && throw(ArgumentError("Nwt values should be nonnegative"))
         for i=1:nu*Hc
-            mpc.Ñ_Hc[i, i] = Nwt[(i-1) % nu + 1]
+            mpc.weights.Ñ_Hc[i, i] = Nwt[(i-1) % nu + 1]
         end
     elseif !isnothing(Ñ_Hc)
         Ñ_Hc = to_hermitian(Ñ_Hc)
         nΔŨ = nu*Hc+nϵ
         size(Ñ_Hc) == (nΔŨ, nΔŨ) || throw(ArgumentError("Ñ_Hc size should be ($nΔŨ, $nΔŨ)"))
-        mpc.Ñ_Hc .= Ñ_Hc
+        mpc.weights.Ñ_Hc .= Ñ_Hc
     end
     if isnothing(L_Hp) && !isnothing(Lwt)
         size(Lwt) == (nu,) || throw(ArgumentError("Lwt should be a vector of length $nu"))
         any(x -> x < 0, Lwt) && throw(ArgumentError("Lwt values should be nonnegative"))
         for i=1:nu*Hp
-            mpc.L_Hp[i, i] = Lwt[(i-1) % nu + 1]
+            mpc.weights.L_Hp[i, i] = Lwt[(i-1) % nu + 1]
         end
     elseif !isnothing(L_Hp)
         L_Hp = to_hermitian(L_Hp)
         nU = nu*Hp
         size(L_Hp) == (nU, nU) || throw(ArgumentError("L_Hp size should be ($nU, $nU)"))
-        mpc.L_Hp .= L_Hp
+        mpc.weights.L_Hp .= L_Hp
     end
-    setmodel_controller!(mpc, x̂op_old, M_Hp, Ñ_Hc, L_Hp)
+    setmodel_controller!(mpc, x̂op_old)
     return mpc
 end
 
 "Update the prediction matrices, linear constraints and JuMP optimization."
-function setmodel_controller!(mpc::PredictiveController, x̂op_old, M_Hp, Ñ_Hc, L_Hp)
+function setmodel_controller!(mpc::PredictiveController, x̂op_old)
     estim, model = mpc.estim, mpc.estim.model
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     optim, con = mpc.optim, mpc.con
@@ -715,7 +715,7 @@ function setmodel_controller!(mpc::PredictiveController, x̂op_old, M_Hp, Ñ_Hc
     JuMP.unregister(optim, :linconstraint)
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.Ẽ, mpc.S̃, mpc.M_Hp, mpc.Ñ_Hc, mpc.L_Hp)
+    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.S̃)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc, ΔŨvar)
     return nothing
