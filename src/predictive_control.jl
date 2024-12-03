@@ -23,6 +23,8 @@ struct PredictiveControllerBuffer{NT<:Real}
     u ::Vector{NT}
     R̂y::Vector{NT}
     D̂ ::Vector{NT}
+    Cy::Vector{NT}
+    Cu::Vector{NT}
     empty::Vector{NT}
 end
 
@@ -37,8 +39,10 @@ function PredictiveControllerBuffer{NT}(nu::Int, ny::Int, nd::Int, Hp::Int) wher
     u  = Vector{NT}(undef, nu)
     R̂y = Vector{NT}(undef, ny*Hp)
     D̂  = Vector{NT}(undef, nd*Hp)
+    Cy = Vector{NT}(undef, ny*Hp)
+    Cu = Vector{NT}(undef, nu*Hp)
     empty = Vector{NT}(undef, 0)
-    return PredictiveControllerBuffer{NT}(u, R̂y, D̂, empty)
+    return PredictiveControllerBuffer{NT}(u, R̂y, D̂, Cy, Cu, empty)
 end
 
 include("controller/construct.jl")

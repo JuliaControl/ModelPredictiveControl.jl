@@ -191,6 +191,7 @@ They are computed with these equations using in-place operations:
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u)
     mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
     ŷ, F, q̃, r = mpc.ŷ, mpc.F, mpc.q̃, mpc.r
+    Cy, Cu = mpc.buffer.Cy, mpc.buffer.Cu
     ŷ .= evaloutput(mpc.estim, d)
     predictstoch!(mpc, mpc.estim) # init mpc.F with Ŷs for InternalModel
     F .+= mpc.B
@@ -206,18 +207,18 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     end
     # --- output setpoint tracking term ---
     mpc.R̂y .= R̂y
-    Cy = F .- (R̂y .- mpc.Yop)
+    Cy .= F .- (R̂y .- mpc.Yop)
     M_Hp_Ẽ = mpc.weights.M_Hp*mpc.Ẽ
-    mul!(q̃, M_Hp_Ẽ', Cy)
+    mul!(q̃, M_Hp_Ẽ', Cy)                # q̃ = M_Hp*Ẽ'*Cy
     r .= dot(Cy, mpc.weights.M_Hp, Cy)
     # --- input setpoint tracking term ---
     mpc.R̂u .= R̂u
-    Cu = mpc.T_lastu0 .- (R̂u .- mpc.Uop) 
+    Cu .= mpc.T_lastu0 .- (R̂u .- mpc.Uop) 
     L_Hp_S̃ = mpc.weights.L_Hp*mpc.S̃
-    mul!(q̃, L_Hp_S̃', Cu, 1, 1)
+    mul!(q̃, L_Hp_S̃', Cu, 1, 1)         # q̃ = q̃ + L_Hp*S̃'*Cu
     r .+= dot(Cu, mpc.weights.L_Hp, Cu)
     # --- finalize ---
-    lmul!(2, q̃)
+    lmul!(2, q̃)                        # q̃ = 2*q̃
     return nothing
 end
 
