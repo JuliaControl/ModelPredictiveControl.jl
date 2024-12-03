@@ -373,12 +373,13 @@ function extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
     # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
     U  = Ū
     U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu0 .+ mpc.Uop
+    Ue[1:end-nu] .= U
     # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
     Ue[end-nu+1:end] .= @views U[end-nu+1:end]
     # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
     Ŷe[1:ny]     .= mpc.ŷ
     Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
-    return Ue, Ŷe
+    return Ue, Ŷe 
 end
 
 """
