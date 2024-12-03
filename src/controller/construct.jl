@@ -27,7 +27,7 @@ struct ControllerWeights{NT<:Real}
 end
 
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
-struct ControllerConstraint{NT<:Real, GCfunc<:Function}
+struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     ẽx̂      ::Matrix{NT}
     fx̂      ::Vector{NT}
     gx̂      ::Matrix{NT}
@@ -668,7 +668,7 @@ end
 """
     init_defaultcon_mpc(
         estim, C, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, 
-        gc!=(_,_,_,_,_,_)->nothing, nc=0
+        gc!=nothing, nc=0
     ) -> con, S̃, Ẽ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
@@ -676,10 +676,9 @@ Init `ControllerConstraint` struct with default parameters based on estimator `e
 Also return `S̃` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
 """
 function init_defaultcon_mpc(
-    estim::StateEstimator{NT}, 
-    Hp, Hc, C, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-    gc!::GCfunc=(_,_,_,_,_,_)->nothing, nc=0
-) where {NT<:Real, GCfunc<:Function}
+    estim::StateEstimator{NT}, Hp, Hc, C, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+    gc!::GCfunc=nothing, nc=0
+) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
     nϵ = isinf(C) ? 0 : 1

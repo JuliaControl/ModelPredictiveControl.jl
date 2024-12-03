@@ -9,7 +9,7 @@ struct LinMPC{
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
     optim::JM
-    con::ControllerConstraint{NT}
+    con::ControllerConstraint{NT, Nothing}
     ΔŨ::Vector{NT}
     ŷ ::Vector{NT}
     Hp::Int
