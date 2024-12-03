@@ -2,16 +2,17 @@ const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"s
 
 struct NonLinMPC{
     NT<:Real, 
-    SE<:StateEstimator, 
+    SE<:StateEstimator,
     JM<:JuMP.GenericModel, 
     JEfunc<:Function,
+    GCfunc<:Function,
     P<:Any
 } <: PredictiveController{NT}
     estim::SE
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
     optim::JM
-    con::ControllerConstraint{NT}
+    con::ControllerConstraint{NT, GCfunc}
     ΔŨ::Vector{NT}
     ŷ ::Vector{NT}
     Hp::Int
@@ -22,7 +23,6 @@ struct NonLinMPC{
     p::P
     R̂u::Vector{NT}
     R̂y::Vector{NT}
-    noR̂u::Bool
     S̃::Matrix{NT}
     T::Matrix{NT}
     T_lastu0::Vector{NT}
@@ -45,18 +45,23 @@ struct NonLinMPC{
     Yop::Vector{NT}
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
-    function NonLinMPC{NT, SE, JM, JEfunc, P}(
-        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc, nc, p::P, optim::JM
-    ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel, JEfunc<:Function, P<:Any}
+    function NonLinMPC{NT, SE, JM, JEfunc, GCfunc, P}(
+        estim::SE, 
+        Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc!::GCfunc, nc, p::P, optim::JM
+    ) where {
+            NT<:Real, 
+            SE<:StateEstimator, 
+            JM<:JuMP.GenericModel, 
+            JEfunc<:Function, 
+            GCfunc<:Function, 
+            P<:Any
+        }
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
-        validate_JE(NT, JE)
-        gc! = get_mutating_gc(NT, gc)
         weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
         # dummy vals (updated just before optimization):
@@ -74,14 +79,14 @@ struct NonLinMPC{
         test_custom_functions(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
-        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp)
-        mpc = new{NT, SE, JM, JEfunc, P}(
+        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
+        mpc = new{NT, SE, JM, JEfunc, GCfunc, P}(
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
             weights,
             JE, p,
-            R̂u, R̂y, noR̂u,
+            R̂u, R̂y,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
@@ -234,7 +239,7 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE::Function = (_,_,_,_) -> 0.0,
+    JE ::Function = (_,_,_,_) -> 0.0,
     gc!::Function = (_,_,_,_,_,_) -> nothing,
     gc ::Function = gc!,
     nc::Int = 0,
@@ -312,7 +317,7 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE ::JEfunc = (_,_,_,_) -> 0.0,
+    JE ::JEfunc   = (_,_,_,_) -> 0.0,
     gc!::Function = (_,_,_,_,_,_) -> nothing,
     gc ::Function = gc!,
     nc = 0,
@@ -330,8 +335,11 @@ function NonLinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
-    return NonLinMPC{NT, SE, JM, JEfunc, P}(
-        estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, gc, nc, p, optim
+    validate_JE(NT, JE)
+    gc! = get_mutating_gc(NT, gc)
+    GCfunc = get_type_mutating_gc(gc!)
+    return NonLinMPC{NT, SE, JM, JEfunc, GCfunc, P}(
+        estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, gc!, nc, p, optim
     )
 end
 
@@ -387,6 +395,9 @@ function get_mutating_gc(NT, gc)
     end
     return gc!
 end
+
+"Get the type of the mutating version of the custom constrain function `gc!`."
+get_type_mutating_gc(::GCfunc) where {GCfunc<:Function} = GCfunc
 
 """
     test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
@@ -514,7 +525,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         gc         = get_tmp(gc_cache, ΔŨ1)
         Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
         Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
-        ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
+        ϵ = (nϵ ≠ 0) ? ΔŨ[end] : 0 # ϵ = 0 if nϵ == 0 (meaning no relaxation)
         mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
         g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ)::T
@@ -533,7 +544,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             gc         = get_tmp(gc_cache, ΔŨ1)
             Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
             Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
-            ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
+            ϵ = (nϵ ≠ 0) ? ΔŨ[end] : 0 # ϵ = 0 if nϵ == 0 (meaning no relaxation)
             mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
             g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         end

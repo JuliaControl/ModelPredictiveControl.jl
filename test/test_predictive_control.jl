@@ -714,10 +714,10 @@ end
 end
 
 @testset "NonLinMPC constraint violation" begin
-    gc( _ , Ŷe, _ , p , ϵ) = p[]*(Ŷe .- 3.14 .- ϵ)
+    gc(Ue, Ŷe, _ ,p , ϵ) = [p[1]*(Ue .- 4.2 .- ϵ); p[2]*(Ŷe .- 3.14 .- ϵ)]
 
     linmodel = LinModel(tf([2], [10000, 1]), 3000.0)
-    nmpc_lin = NonLinMPC(linmodel, Hp=50, Hc=5, gc=gc, nc=50+1, p=[0])
+    nmpc_lin = NonLinMPC(linmodel, Hp=50, Hc=5, gc=gc, nc=2*(50+1), p=[0; 0])
 
     setconstraint!(nmpc_lin, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
     setconstraint!(nmpc_lin, umin=[-3], umax=[3])
@@ -766,11 +766,18 @@ end
     info = getinfo(nmpc_lin)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
 
-    nmpc_lin.p[] = 1
     setconstraint!(nmpc_lin, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
     setconstraint!(nmpc_lin, umin=[-10], umax=[10])
     setconstraint!(nmpc_lin, Δumin=[-15], Δumax=[15])
     setconstraint!(nmpc_lin, ymin=[-100], ymax=[100])
+
+    nmpc_lin.p .= [1; 0]
+    moveinput!(nmpc_lin, [20])
+    info = getinfo(nmpc_lin)
+    @test info[:U][end]   ≈ 4.2 atol=1e-1
+    @test info[:U][begin] ≈ 4.2 atol=1e-1
+
+    nmpc_lin.p .= [0; 1]
     moveinput!(nmpc_lin, [20])
     info = getinfo(nmpc_lin)
     @test info[:Ŷ][end]   ≈ 3.14 atol=1e-1
@@ -779,7 +786,7 @@ end
     f = (x,u,_,_) -> linmodel.A*x + linmodel.Bu*u
     h = (x,_,_)   -> linmodel.C*x
     nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing)
-    nmpc = NonLinMPC(nonlinmodel, Hp=50, Hc=5, gc=gc, nc=50+1, p=[0])
+    nmpc = NonLinMPC(nonlinmodel, Hp=50, Hc=5, gc=gc, nc=2*(50+1), p=[0; 0])
 
     setconstraint!(nmpc, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
     setconstraint!(nmpc, umin=[-3], umax=[3])
@@ -828,11 +835,18 @@ end
     info = getinfo(nmpc)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
 
-    nmpc.p[] = 1
     setconstraint!(nmpc, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
     setconstraint!(nmpc, umin=[-10], umax=[10])
     setconstraint!(nmpc, Δumin=[-15], Δumax=[15])
     setconstraint!(nmpc, ymin=[-100], ymax=[100])
+
+    nmpc.p .= [1; 0]
+    moveinput!(nmpc, [20])
+    info = getinfo(nmpc)
+    @test info[:U][end]   ≈ 4.2 atol=1e-1
+    @test info[:U][begin] ≈ 4.2 atol=1e-1
+
+    nmpc.p .= [0; 1]
     moveinput!(nmpc, [20])
     info = getinfo(nmpc)
     @test info[:Ŷ][end]   ≈ 3.14 atol=1e-1
@@ -840,7 +854,7 @@ end
 end
 
 @testset "NonLinMPC set model" begin
-    estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
+    estim = KalmanFilter(setop!(LinModel(tf(5, [200, 1]), 300), yop=[10], uop=[1]))
     mpc = NonLinMPC(estim, Nwt=[0], Cwt=1e4, Hp=1000, Hc=1)
     mpc = setconstraint!(mpc, umin=[-24], umax=[26])
     mpc = setconstraint!(mpc, ymin=[-54], ymax=[56])
@@ -854,7 +868,7 @@ end
     preparestate!(mpc, [10])
     u = moveinput!(mpc, r)
     @test u ≈ [2] atol=1e-2
-    setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))
+    setmodel!(mpc, setop!(LinModel(tf(5, [200, 1]), 300), yop=[20], uop=[11]))
     @test mpc.Yop ≈ fill(20.0, 1000)
     @test mpc.Uop ≈ fill(11.0, 1000)
     @test mpc.con.U0min ≈ fill(-24.0 - 1  + 1  - 11,  1000)
@@ -864,7 +878,7 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [15] atol=1e-2
-    setmodel!(mpc, setop!(LinModel(tf(10, [2, 1]), 3), yop=[20], uop=[11]))
+    setmodel!(mpc, setop!(LinModel(tf(10, [200, 1]), 300), yop=[20], uop=[11]))
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2

@@ -8,7 +8,6 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     weights::ControllerWeights{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
-    noR̂u::Bool
     S̃::Matrix{NT} 
     T::Matrix{NT}
     T_lastu0::Vector{NT}
@@ -46,7 +45,6 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc)
         # dummy val (updated just before optimization):
@@ -62,13 +60,13 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
-        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp)
+        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
         mpc = new{NT, SE}(
             estim,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
             weights,
-            R̂u, R̂y, noR̂u,
+            R̂u, R̂y,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
