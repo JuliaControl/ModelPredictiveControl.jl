@@ -854,7 +854,7 @@ end
 end
 
 @testset "NonLinMPC set model" begin
-    estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
+    estim = KalmanFilter(setop!(LinModel(tf(5, [200, 1]), 300), yop=[10], uop=[1]))
     mpc = NonLinMPC(estim, Nwt=[0], Cwt=1e4, Hp=1000, Hc=1)
     mpc = setconstraint!(mpc, umin=[-24], umax=[26])
     mpc = setconstraint!(mpc, ymin=[-54], ymax=[56])
@@ -868,7 +868,7 @@ end
     preparestate!(mpc, [10])
     u = moveinput!(mpc, r)
     @test u ≈ [2] atol=1e-2
-    setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))
+    setmodel!(mpc, setop!(LinModel(tf(5, [200, 1]), 300), yop=[20], uop=[11]))
     @test mpc.Yop ≈ fill(20.0, 1000)
     @test mpc.Uop ≈ fill(11.0, 1000)
     @test mpc.con.U0min ≈ fill(-24.0 - 1  + 1  - 11,  1000)
@@ -878,7 +878,7 @@ end
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [15] atol=1e-2
-    setmodel!(mpc, setop!(LinModel(tf(10, [2, 1]), 3), yop=[20], uop=[11]))
+    setmodel!(mpc, setop!(LinModel(tf(10, [200, 1]), 300), yop=[20], uop=[11]))
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [13] atol=1e-2
