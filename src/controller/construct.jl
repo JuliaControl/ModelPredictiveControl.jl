@@ -4,6 +4,10 @@ struct ControllerWeights{NT<:Real}
     Ñ_Hc::Hermitian{NT, Matrix{NT}}
     L_Hp::Hermitian{NT, Matrix{NT}}
     E   ::NT
+    iszero_M_Hp::Vector{Bool}
+    iszero_Ñ_Hc::Vector{Bool}
+    iszero_L_Hp::Vector{Bool}
+    iszero_E::Bool
     function ControllerWeights{NT}(
         model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
     ) where NT<:Real
@@ -21,8 +25,12 @@ struct ControllerWeights{NT<:Real}
             # ΔŨ = ΔU (only hard constraints)
             Ñ_Hc = N_Hc
         end   
-        E = Ewt         
-        return new{NT}(M_Hp, Ñ_Hc, L_Hp, E)
+        E = Ewt
+        iszero_M_Hp = [iszero(M_Hp)]
+        iszero_Ñ_Hc = [iszero(Ñ_Hc)]
+        iszero_L_Hp = [iszero(L_Hp)]
+        iszero_E = iszero(E)
+        return new{NT}(M_Hp, Ñ_Hc, L_Hp, E, iszero_M_Hp, iszero_Ñ_Hc, iszero_L_Hp, iszero_E)
     end
 end
 

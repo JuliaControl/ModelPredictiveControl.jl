@@ -525,7 +525,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         gc         = get_tmp(gc_cache, ΔŨ1)
         Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
         Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
-        ϵ = (nϵ ≠ 0) ? ΔŨ[end] : 0 # ϵ = 0 if nϵ == 0 (meaning no relaxation)
+        ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
         mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
         g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ)::T
@@ -544,7 +544,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             gc         = get_tmp(gc_cache, ΔŨ1)
             Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
             Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
-            ϵ = (nϵ ≠ 0) ? ΔŨ[end] : 0 # ϵ = 0 if nϵ == 0 (meaning no relaxation)
+            ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
             mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
             g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         end
@@ -702,7 +702,9 @@ function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, Ŷ0, gc, ϵ)
 end
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
-function obj_econ(mpc::NonLinMPC, model::SimModel, Ue, Ŷe)
-    E_JE = iszero(mpc.weights.E) ? 0.0 : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
+function obj_econ(
+    mpc::NonLinMPC, model::SimModel, Ue, Ŷe::AbstractVector{NT}
+) where NT<:Real
+    E_JE = mpc.weights.iszero_E ? zero(NT) : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
     return E_JE
 end
