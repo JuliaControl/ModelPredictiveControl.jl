@@ -23,7 +23,6 @@ struct NonLinMPC{
     p::P
     R̂u::Vector{NT}
     R̂y::Vector{NT}
-    noR̂u::Bool
     S̃::Matrix{NT}
     T::Matrix{NT}
     T_lastu0::Vector{NT}
@@ -63,7 +62,6 @@ struct NonLinMPC{
         weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        noR̂u = iszero(L_Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
         # dummy vals (updated just before optimization):
@@ -88,7 +86,7 @@ struct NonLinMPC{
             Hp, Hc, nϵ,
             weights,
             JE, p,
-            R̂u, R̂y, noR̂u,
+            R̂u, R̂y,
             S̃, T, T_lastu0,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,

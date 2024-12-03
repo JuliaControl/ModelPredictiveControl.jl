@@ -204,18 +204,19 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
         mul!(F, mpc.G, mpc.d0, 1, 1)
         mul!(F, mpc.J, mpc.D̂0, 1, 1)
     end
+    # --- output setpoint tracking term ---
     mpc.R̂y .= R̂y
     Cy = F .- (R̂y .- mpc.Yop)
     M_Hp_Ẽ = mpc.weights.M_Hp*mpc.Ẽ
     mul!(q̃, M_Hp_Ẽ', Cy)
     r .= dot(Cy, mpc.weights.M_Hp, Cy)
-    if ~mpc.noR̂u
-        mpc.R̂u .= R̂u
-        Cu = mpc.T_lastu0 .- (R̂u .- mpc.Uop) 
-        L_Hp_S̃ = mpc.weights.L_Hp*mpc.S̃
-        mul!(q̃, L_Hp_S̃', Cu, 1, 1)
-        r .+= dot(Cu, mpc.weights.L_Hp, Cu)
-    end
+    # --- input setpoint tracking term ---
+    mpc.R̂u .= R̂u
+    Cu = mpc.T_lastu0 .- (R̂u .- mpc.Uop) 
+    L_Hp_S̃ = mpc.weights.L_Hp*mpc.S̃
+    mul!(q̃, L_Hp_S̃', Cu, 1, 1)
+    r .+= dot(Cu, mpc.weights.L_Hp, Cu)
+    # --- finalize ---
     lmul!(2, q̃)
     return nothing
 end
@@ -236,9 +237,7 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂
         mpc.D̂e[model.nd+1:end] .= D̂
     end
     mpc.R̂y .= R̂y
-    if ~mpc.noR̂u
-        mpc.R̂u .= R̂u 
-    end
+    mpc.R̂u .= R̂u
     return nothing
 end
 
@@ -418,13 +417,9 @@ function obj_nonlinprog!(
     # --- move suppression and slack variable term ---
     JΔŨ = dot(ΔŨ, mpc.weights.Ñ_Hc, ΔŨ)
     # --- input setpoint tracking term ---
-    if !mpc.noR̂u
-        Ū  .= @views Ue[1:end-nu]
-        Ū  .= mpc.R̂u .- Ū
-        JR̂u = dot(Ū, mpc.weights.L_Hp, Ū)
-    else
-        JR̂u = 0.0
-    end
+    Ū  .= @views Ue[1:end-nu]
+    Ū  .= mpc.R̂u .- Ū
+    JR̂u = dot(Ū, mpc.weights.L_Hp, Ū)
     # --- economic term ---
     E_JE = obj_econ(mpc, model, Ue, Ŷe)
     return JR̂y + JΔŨ + JR̂u + E_JE
