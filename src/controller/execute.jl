@@ -635,11 +635,13 @@ function setmodel!(
         for i=1:ny*Hp
             mpc.weights.M_Hp[i, i] = Mwt[(i-1) % ny + 1]
         end
+        mpc.weights.iszero_M_Hp[] = iszero(mpc.weights.M_Hp)
     elseif !isnothing(M_Hp)
         M_Hp = to_hermitian(M_Hp)
         nŶ = ny*Hp
         size(M_Hp) == (nŶ, nŶ) || throw(ArgumentError("M_Hp size should be ($nŶ, $nŶ)"))
         mpc.weights.M_Hp .= M_Hp
+        mpc.weights.iszero_M_Hp[] = iszero(mpc.weights.M_Hp)
     end
     if isnothing(Ñ_Hc) && !isnothing(Nwt)
         size(Nwt) == (nu,) || throw(ArgumentError("Nwt should be a vector of length $nu"))
@@ -647,11 +649,13 @@ function setmodel!(
         for i=1:nu*Hc
             mpc.weights.Ñ_Hc[i, i] = Nwt[(i-1) % nu + 1]
         end
+        mpc.weights.iszero_Ñ_Hc[] = iszero(mpc.weights.Ñ_Hc)
     elseif !isnothing(Ñ_Hc)
         Ñ_Hc = to_hermitian(Ñ_Hc)
         nΔŨ = nu*Hc+nϵ
         size(Ñ_Hc) == (nΔŨ, nΔŨ) || throw(ArgumentError("Ñ_Hc size should be ($nΔŨ, $nΔŨ)"))
         mpc.weights.Ñ_Hc .= Ñ_Hc
+        mpc.weights.iszero_Ñ_Hc[] = iszero(mpc.weights.Ñ_Hc)
     end
     if isnothing(L_Hp) && !isnothing(Lwt)
         size(Lwt) == (nu,) || throw(ArgumentError("Lwt should be a vector of length $nu"))
@@ -659,11 +663,13 @@ function setmodel!(
         for i=1:nu*Hp
             mpc.weights.L_Hp[i, i] = Lwt[(i-1) % nu + 1]
         end
+        mpc.weights.iszero_L_Hp[] = iszero(mpc.weights.L_Hp)
     elseif !isnothing(L_Hp)
         L_Hp = to_hermitian(L_Hp)
         nU = nu*Hp
         size(L_Hp) == (nU, nU) || throw(ArgumentError("L_Hp size should be ($nU, $nU)"))
         mpc.weights.L_Hp .= L_Hp
+        mpc.weights.iszero_L_Hp[] = iszero(mpc.weights.L_Hp)
     end
     setmodel_controller!(mpc, x̂op_old)
     return mpc
