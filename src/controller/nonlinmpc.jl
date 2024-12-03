@@ -702,7 +702,9 @@ function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, Ŷ0, gc, ϵ)
 end
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
-function obj_econ(mpc::NonLinMPC, model::SimModel, Ue, Ŷe)
-    E_JE = iszero(mpc.weights.E) ? 0.0 : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
+function obj_econ(
+    mpc::NonLinMPC, model::SimModel, Ue, Ŷe::AbstractVector{NT}
+) where NT<:Real
+    E_JE = mpc.weights.iszero_E ? zero(NT) : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
     return E_JE
 end
