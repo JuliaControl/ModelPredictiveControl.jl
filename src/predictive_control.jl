@@ -25,6 +25,8 @@ struct PredictiveControllerBuffer{NT<:Real}
     D̂ ::Vector{NT}
     Cy::Vector{NT}
     Cu::Vector{NT}
+    Ẽ ::Matrix{NT}
+    S̃ ::Matrix{NT}
     empty::Vector{NT}
 end
 
@@ -35,14 +37,18 @@ Create a buffer for `PredictiveController` objects.
 
 The buffer is used to store intermediate results during computation without allocating.
 """
-function PredictiveControllerBuffer{NT}(nu::Int, ny::Int, nd::Int, Hp::Int) where NT <: Real
+function PredictiveControllerBuffer{NT}(
+    nu::Int, ny::Int, nd::Int, Hp::Int, Hc::Int, nϵ::Int
+) where NT <: Real
     u  = Vector{NT}(undef, nu)
     R̂y = Vector{NT}(undef, ny*Hp)
     D̂  = Vector{NT}(undef, nd*Hp)
     Cy = Vector{NT}(undef, ny*Hp)
     Cu = Vector{NT}(undef, nu*Hp)
+    Ẽ  = Matrix{NT}(undef, ny*Hp, nu*Hc + nϵ)
+    S̃  = Matrix{NT}(undef, nu*Hp, nu*Hc + nϵ)
     empty = Vector{NT}(undef, 0)
-    return PredictiveControllerBuffer{NT}(u, R̂y, D̂, Cy, Cu, empty)
+    return PredictiveControllerBuffer{NT}(u, R̂y, D̂, Cy, Cu, Ẽ, S̃, empty)
 end
 
 include("controller/construct.jl")

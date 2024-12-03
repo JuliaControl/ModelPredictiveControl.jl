@@ -65,7 +65,7 @@ struct LinMPC{
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
-        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp)
+        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
         mpc = new{NT, SE, JM}(
             estim, optim, con,
             ΔŨ, ŷ,

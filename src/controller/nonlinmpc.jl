@@ -79,7 +79,7 @@ struct NonLinMPC{
         test_custom_functions(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
-        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp)
+        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
         mpc = new{NT, SE, JM, JEfunc, GCfunc, P}(
             estim, optim, con,
             ΔŨ, ŷ,
