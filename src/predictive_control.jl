@@ -23,8 +23,8 @@ struct PredictiveControllerBuffer{NT<:Real}
     u ::Vector{NT}
     R̂y::Vector{NT}
     D̂ ::Vector{NT}
-    Cy::Vector{NT}
-    Cu::Vector{NT}
+    Ŷ ::Vector{NT}
+    U ::Vector{NT}
     Ẽ ::Matrix{NT}
     S̃ ::Matrix{NT}
     empty::Vector{NT}
@@ -43,12 +43,12 @@ function PredictiveControllerBuffer{NT}(
     u  = Vector{NT}(undef, nu)
     R̂y = Vector{NT}(undef, ny*Hp)
     D̂  = Vector{NT}(undef, nd*Hp)
-    Cy = Vector{NT}(undef, ny*Hp)
-    Cu = Vector{NT}(undef, nu*Hp)
+    Ŷ  = Vector{NT}(undef, ny*Hp)
+    U  = Vector{NT}(undef, nu*Hp)
     Ẽ  = Matrix{NT}(undef, ny*Hp, nu*Hc + nϵ)
     S̃  = Matrix{NT}(undef, nu*Hp, nu*Hc + nϵ)
     empty = Vector{NT}(undef, 0)
-    return PredictiveControllerBuffer{NT}(u, R̂y, D̂, Cy, Cu, Ẽ, S̃, empty)
+    return PredictiveControllerBuffer{NT}(u, R̂y, D̂, Ŷ, U, Ẽ, S̃, empty)
 end
 
 include("controller/construct.jl")

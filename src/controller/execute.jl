@@ -191,8 +191,7 @@ They are computed with these equations using in-place operations:
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u)
     mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
     ŷ, F, q̃, r = mpc.ŷ, mpc.F, mpc.q̃, mpc.r
-    Cy, Cu = mpc.buffer.Cy, mpc.buffer.Cu
-    M_Hp_Ẽ, L_Hp_S̃ = mpc.buffer.Ẽ, mpc.buffer.S̃
+    Cy, Cu, M_Hp_Ẽ, L_Hp_S̃ = mpc.buffer.Ŷ, mpc.buffer.U, mpc.buffer.Ẽ, mpc.buffer.S̃
     ŷ .= evaloutput(mpc.estim, d)
     predictstoch!(mpc, mpc.estim)           # init F with Ŷs for InternalModel
     F .+= mpc.B                             # F = F + B
