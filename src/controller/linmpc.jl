@@ -20,7 +20,7 @@ struct LinMPC{
     R̂y::Vector{NT}
     S̃::Matrix{NT} 
     T::Matrix{NT}
-    T_lastu0::Vector{NT}
+    T_lastu::Vector{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
@@ -48,7 +48,7 @@ struct LinMPC{
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
         # dummy vals (updated just before optimization):
-        R̂y, R̂u, T_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         S, T = init_ΔUtoU(model, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
         # dummy vals (updated just before optimization):
@@ -72,7 +72,7 @@ struct LinMPC{
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
-            S̃, T, T_lastu0,
+            S̃, T, T_lastu,
             Ẽ, F, G, J, K, V, B, 
             H̃, q̃, r,
             Ks, Ps,

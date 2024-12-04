@@ -179,8 +179,8 @@ They are computed with these equations using in-place operations:
 \begin{aligned}
     \mathbf{F}       &= \mathbf{G d_0}(k) + \mathbf{J D̂_0} + \mathbf{K x̂_0}(k) 
                             + \mathbf{V u_0}(k-1) + \mathbf{B} + \mathbf{Ŷ_s}           \\
-    \mathbf{C_y}     &= \mathbf{F}                   - (\mathbf{R̂_y - Y_{op}})          \\
-    \mathbf{C_u}     &= \mathbf{T} \mathbf{u_0}(k-1) - (\mathbf{R̂_u - U_{op}})          \\
+    \mathbf{C_y}     &= \mathbf{F} + \mathbf{Y_{op}} - \mathbf{R̂_y}                     \\
+    \mathbf{C_u}     &= \mathbf{T}\mathbf{u}(k-1)    - \mathbf{R̂_u}                     \\
     \mathbf{q̃}       &= 2[(\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} 
                             + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}]              \\
     r                &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
@@ -189,7 +189,9 @@ They are computed with these equations using in-place operations:
 ```
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u)
-    mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
+    lastu  = mpc.buffer.u
+    lastu .= mpc.estim.lastu0 .+ model.uop
+    mul!(mpc.T_lastu, mpc.T, lastu)
     ŷ, F, q̃, r = mpc.ŷ, mpc.F, mpc.q̃, mpc.r
     Cy, Cu, M_Hp_Ẽ, L_Hp_S̃ = mpc.buffer.Ŷ, mpc.buffer.U, mpc.buffer.Ẽ, mpc.buffer.S̃
     ŷ .= evaloutput(mpc.estim, d)
@@ -210,7 +212,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     # --- output setpoint tracking term ---
     mpc.R̂y .= R̂y
     if !mpc.weights.iszero_M_Hp[]
-        Cy .= F .- (R̂y .- mpc.Yop)
+        Cy .= F .+ mpc.Yop .- R̂y
         mul!(M_Hp_Ẽ, mpc.weights.M_Hp, mpc.Ẽ)
         mul!(q̃, M_Hp_Ẽ', Cy, 1, 1)              # q̃ = q̃ + M_Hp*Ẽ'*Cy
         r .+= dot(Cy, mpc.weights.M_Hp, Cy)     # r = r + Cy'*M_Hp*Cy
@@ -218,7 +220,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     # --- input setpoint tracking term ---
     mpc.R̂u .= R̂u
     if !mpc.weights.iszero_L_Hp[]
-        Cu .= mpc.T_lastu0 .- (R̂u .- mpc.Uop) 
+        Cu .= mpc.T_lastu .- R̂u 
         mul!(L_Hp_S̃, mpc.weights.L_Hp, mpc.S̃)
         mul!(q̃, L_Hp_S̃', Cu, 1, 1)              # q̃ = q̃ + L_Hp*S̃'*Cu
         r .+= dot(Cu, mpc.weights.L_Hp, Cu)     # r = r + Cu'*L_Hp*Cu
@@ -234,7 +236,9 @@ end
 Init `ŷ, F, d0, D̂0, D̂e, R̂y, R̂u` vectors when model is not a [`LinModel`](@ref).
 """
 function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
-    mul!(mpc.T_lastu0, mpc.T, mpc.estim.lastu0)
+    lastu  = mpc.buffer.u
+    lastu .= mpc.estim.lastu0 .+ model.uop
+    mul!(mpc.T_lastu, mpc.T, lastu)
     mpc.ŷ .= evaloutput(mpc.estim, d)
     predictstoch!(mpc, mpc.estim)               # init F with Ŷs for InternalModel
     if model.nd ≠ 0
@@ -281,9 +285,9 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
         mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
     end
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.T_lastu0
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + (mpc.T_lastu - mpc.Uop)
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.T_lastu0
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - (mpc.T_lastu - mpc.Uop)
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
@@ -307,9 +311,9 @@ end
 function linconstraint!(mpc::PredictiveController, ::SimModel)
     nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.T_lastu0
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + (mpc.T_lastu - mpc.Uop)
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.T_lastu0
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - (mpc.T_lastu - mpc.Uop)
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
@@ -378,7 +382,7 @@ function extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
     ny, nu = model.ny, model.nu
     # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
     U  = Ū
-    U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu0 .+ mpc.Uop
+    U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu
     Ue[1:end-nu] .= U
     # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
     Ue[end-nu+1:end] .= @views U[end-nu+1:end]
