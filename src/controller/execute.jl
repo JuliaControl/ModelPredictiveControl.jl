@@ -313,7 +313,7 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
     n = 0
     mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.T_lastu
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.T_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max + mpc.Uop - mpc.T_lastu
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
