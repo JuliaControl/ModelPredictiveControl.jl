@@ -285,9 +285,9 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
         mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
     end
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + (mpc.T_lastu - mpc.Uop)
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.T_lastu
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - (mpc.T_lastu - mpc.Uop)
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max + mpc.Uop - mpc.T_lastu
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
@@ -311,9 +311,9 @@ end
 function linconstraint!(mpc::PredictiveController, ::SimModel)
     nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + (mpc.T_lastu - mpc.Uop)
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.T_lastu
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - (mpc.T_lastu - mpc.Uop)
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.T_lastu
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
