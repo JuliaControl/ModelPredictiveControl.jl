@@ -459,29 +459,30 @@ are calculated by:
 The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help section.
 
 # Extended Help
-The ``\mathbf{U}`` vector and the two conversion matrices are defined as:
-```math
-\mathbf{U} = \begin{bmatrix}
-    \mathbf{u}(k + 0)                                           \\
-    \mathbf{u}(k + 1)                                           \\
-    \vdots                                                      \\
-    \mathbf{u}(k + H_c - 1)                                     \\
-    \vdots                                                      \\
-    \mathbf{u}(k + H_p - 1)                                     \end{bmatrix} , \quad
-\mathbf{S} = \begin{bmatrix}
-    \mathbf{I}  & \mathbf{0}    & \cdots    & \mathbf{0}        \\
-    \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{0}        \\
-    \vdots      & \vdots        & \ddots    & \vdots            \\
-    \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \\
-    \vdots      & \vdots        & \ddots    & \vdots            \\
-    \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \end{bmatrix} , \quad
-\mathbf{T} = \begin{bmatrix}
-    \mathbf{I}                                                  \\
-    \mathbf{I}                                                  \\
-    \vdots                                                      \\
-    \mathbf{I}                                                  \\
-    \vdots                                                      \\
-    \mathbf{I}                                                  \end{bmatrix}
+!!! details "Extended Help"
+    The ``\mathbf{U}`` vector and the two conversion matrices are defined as:
+    ```math
+    \mathbf{U} = \begin{bmatrix}
+        \mathbf{u}(k + 0)                                           \\
+        \mathbf{u}(k + 1)                                           \\
+        \vdots                                                      \\
+        \mathbf{u}(k + H_c - 1)                                     \\
+        \vdots                                                      \\
+        \mathbf{u}(k + H_p - 1)                                     \end{bmatrix} , \quad
+    \mathbf{S} = \begin{bmatrix}
+        \mathbf{I}  & \mathbf{0}    & \cdots    & \mathbf{0}        \\
+        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{0}        \\
+        \vdots      & \vdots        & \ddots    & \vdots            \\
+        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \\
+        \vdots      & \vdots        & \ddots    & \vdots            \\
+        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \end{bmatrix} , \quad
+    \mathbf{T} = \begin{bmatrix}
+        \mathbf{I}                                                  \\
+        \mathbf{I}                                                  \\
+        \vdots                                                      \\
+        \mathbf{I}                                                  \\
+        \vdots                                                      \\
+        \mathbf{I}                                                  \end{bmatrix}
 ```
 """
 function init_ΔUtoU(model::SimModel{NT}, Hp, Hc) where {NT<:Real}
