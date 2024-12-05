@@ -265,8 +265,8 @@ constructor expects a function in this form:
 ```
 
 in which ``ϵ`` is the slack variable (scalar), an necessary feature to ensure feasibility
-when there the nonlinear inequality constraints are active. There is also an additional
-`LHS` argument ("left-hand side" of the inequality above) for the in-place version:
+when the nonlinear inequality constraints are active. There is also an additional `LHS`
+argument ("left-hand side" of the inequality above) for the in-place version:
 
 ```@example 1
 function gc!(LHS, Ue, Ŷe, _, p, ϵ)
