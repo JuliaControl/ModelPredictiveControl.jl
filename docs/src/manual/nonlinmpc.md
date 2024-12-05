@@ -4,11 +4,6 @@
 Pages = ["nonlinmpc.md"]
 ```
 
-```@setup man_nonlin
-using Logging; 
-with_logger(ConsoleLogger(stderr, Error)) do
-```
-
 ## Nonlinear Model
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum
@@ -301,7 +296,10 @@ nmpc2 # hide
 In addition to the 180° setpoint response:
 
 ```@example man_nonlin
+using Logging # hide
+res3_ry = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res3_ry = sim!(nmpc2, N, [180; 0]; plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0]);
+end # hide
 nothing # hide
 ```
 
@@ -481,7 +479,3 @@ savefig("plot13_NonLinMPC.svg"); nothing # hide
 
 The computations of the successive linearization MPC are about 75 times faster than the
 nonlinear MPC on average, an impressive gain for similar closed-loop performances!
-
-```@setup man_nonlin
-end
-```
