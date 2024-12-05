@@ -281,6 +281,7 @@ function gc!(LHS, Ue, Ŷe, _, p, ϵ)
     end
     return nothing
 end
+nothing;
 ```
 
 Here we implemented the custom nonlinear constraint function in the mutating form to reduce
@@ -294,12 +295,14 @@ Cwt, Pmax, nc = 1e5, 3, Hp+1
 p_nmpc2 = [Pmax, Hp]
 nmpc2 = NonLinMPC(estim2; Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=p_nmpc2)
 using JuMP; unset_time_limit_sec(nmpc2.optim) # hide
+nmpc2 # hide
 ```
 
 In addition to the 180° setpoint response:
 
 ```@example 1
 res3_ry = sim!(nmpc2, N, [180; 0]; plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
+nothing # hide
 ```
 
 a plot for the power ``P(t)`` is included below:
