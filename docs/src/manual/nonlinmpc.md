@@ -281,7 +281,7 @@ function gc!(LHS, Ue, Ŷe, _, p, ϵ)
     end
     return nothing
 end
-nothing;
+nothing # hide
 ```
 
 Here we implemented the custom nonlinear constraint function in the mutating form to reduce
