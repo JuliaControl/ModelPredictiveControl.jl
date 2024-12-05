@@ -221,52 +221,58 @@ end
     model = LinModel(tf([2], [10, 1]), 3.0)
     mpc = LinMPC(model, Hp=50, Hc=5)
 
-    setconstraint!(mpc, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
-    setconstraint!(mpc, umin=[-3], umax=[3])
-    setconstraint!(mpc, Δumin=[-1.5], Δumax=[1.5])
+    setconstraint!(mpc, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
+    setconstraint!(mpc, umin=[-10], umax=[10])
+    setconstraint!(mpc, Δumin=[-15], Δumax=[15])
     setconstraint!(mpc, ymin=[-100], ymax=[100])
     preparestate!(mpc, [0])
-    moveinput!(mpc, [-10])
-    info = getinfo(mpc)
-    @test info[:ΔU][begin] ≈ -1.5 atol=1e-1
-    @test info[:U][end] ≈ -3 atol=1e-1
-    moveinput!(mpc, [10])
-    info = getinfo(mpc)
-    @test info[:ΔU][begin] ≈ 1.5 atol=1e-1
-    @test info[:U][end] ≈ 3 atol=1e-1
 
+    setconstraint!(mpc, umin=[-3], umax=[4])
+    moveinput!(mpc, [-100])
+    info = getinfo(mpc)
+    @test all(isapprox.(info[:U], -3; atol=1e-1))
+    moveinput!(mpc, [100])
+    info = getinfo(mpc)
+    @test all(isapprox.(info[:U], 4; atol=1e-1))
     setconstraint!(mpc, umin=[-10], umax=[10])
-    setconstraint!(mpc, Δumin=[-15], Δumax=[15])
-    setconstraint!(mpc, ymin=[-0.5], ymax=[0.5])
-    moveinput!(mpc, [-10])
-    info = getinfo(mpc)
-    @test info[:Ŷ][end] ≈ -0.5 atol=1e-1
-    moveinput!(mpc, [10])
-    info = getinfo(mpc)
-    @test info[:Ŷ][end] ≈ 0.5 atol=1e-1
 
-    setconstraint!(mpc, umin=[-10], umax=[10])
+    setconstraint!(mpc, Δumin=[-1.5], Δumax=[1.25])
+    moveinput!(mpc, [-100])
+    info = getinfo(mpc)
+    @test all(isapprox.(info[:ΔU], -1.5; atol=1e-1))
+    moveinput!(mpc, [100])
+    info = getinfo(mpc)
+    @test all(isapprox.(info[:ΔU], 1.25; atol=1e-1))
     setconstraint!(mpc, Δumin=[-15], Δumax=[15])
-    setconstraint!(mpc, Ymin=[-0.5; fill(-100, 49)], Ymax=[0.5; fill(+100, 49)])
+
+    setconstraint!(mpc, ymin=[-0.5], ymax=[0.9])
+    moveinput!(mpc, [-100])
+    info = getinfo(mpc)
+    @test all(isapprox.(info[:Ŷ], -0.5; atol=1e-1))
+    moveinput!(mpc, [100])
+    info = getinfo(mpc)
+    @test all(isapprox.(info[:Ŷ], 0.9; atol=1e-1))
+    setconstraint!(mpc, ymin=[-100], ymax=[100])
+
+    setconstraint!(mpc, Ymin=[-0.5; fill(-100, 49)], Ymax=[0.9; fill(+100, 49)])
     moveinput!(mpc, [-10])
     info = getinfo(mpc)
-    @test info[:Ŷ][end]   ≈ -10  atol=1e-1
     @test info[:Ŷ][begin] ≈ -0.5 atol=1e-1
+    @test info[:Ŷ][end]   ≈ -10  atol=1e-1
     moveinput!(mpc, [10])
     info = getinfo(mpc)
+    @test info[:Ŷ][begin] ≈ 0.9 atol=1e-1
     @test info[:Ŷ][end]   ≈ 10  atol=1e-1
-    @test info[:Ŷ][begin] ≈ 0.5 atol=1e-1
+    setconstraint!(mpc, ymin=[-100], ymax=[100])
 
-    setconstraint!(mpc, umin=[-1e3], umax=[+1e3])
-    setconstraint!(mpc, Δumin=[-1e3], Δumax=[+1e3])
-    setconstraint!(mpc, ymin=[-1e3], ymax=[+1e3])
     setconstraint!(mpc, x̂min=[-1e-6,-Inf], x̂max=[+1e-6,+Inf])
-    moveinput!(mpc, [-10])
+    moveinput!(mpc, [-100])
     info = getinfo(mpc)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
-    moveinput!(mpc, [10])
+    moveinput!(mpc, [100])
     info = getinfo(mpc)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
+    setconstraint!(mpc, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
 end
 
 @testset "LinMPC terminal cost" begin
@@ -719,33 +725,40 @@ end
     linmodel = LinModel(tf([2], [10000, 1]), 3000.0)
     nmpc_lin = NonLinMPC(linmodel, Hp=50, Hc=5, gc=gc, nc=2*(50+1), p=[0; 0])
 
-    setconstraint!(nmpc_lin, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
-    setconstraint!(nmpc_lin, umin=[-3], umax=[3])
-    setconstraint!(nmpc_lin, Δumin=[-1.5], Δumax=[1.5])
+    setconstraint!(nmpc_lin, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
+    setconstraint!(nmpc_lin, umin=[-10], umax=[10])
+    setconstraint!(nmpc_lin, Δumin=[-15], Δumax=[15])
     setconstraint!(nmpc_lin, ymin=[-100], ymax=[100])
     preparestate!(nmpc_lin, [0])
-    moveinput!(nmpc_lin, [-20])
-    info = getinfo(nmpc_lin)
-    @test info[:ΔU][begin] ≈ -1.5 atol=1e-1
-    @test info[:U][end] ≈ -3 atol=1e-1
-    moveinput!(nmpc_lin, [20])
-    info = getinfo(nmpc_lin)
-    @test info[:ΔU][begin] ≈ 1.5 atol=1e-1
-    @test info[:U][end] ≈ 3 atol=1e-1
 
+    setconstraint!(nmpc_lin, umin=[-3], umax=[4])
+    moveinput!(nmpc_lin, [-100])
+    info = getinfo(nmpc_lin)
+    @test all(isapprox.(info[:U], -3; atol=1e-1))
+    moveinput!(nmpc_lin, [100])
+    info = getinfo(nmpc_lin)
+    @test all(isapprox.(info[:U], 4; atol=1e-1))
     setconstraint!(nmpc_lin, umin=[-10], umax=[10])
-    setconstraint!(nmpc_lin, Δumin=[-15], Δumax=[15])
-    setconstraint!(nmpc_lin, ymin=[-0.5], ymax=[0.5])
-    moveinput!(nmpc_lin, [-20])
-    info = getinfo(nmpc_lin)
-    @test info[:Ŷ][end] ≈ -0.5 atol=1e-1
-    moveinput!(nmpc_lin, [20])
-    info = getinfo(nmpc_lin)
-    @test info[:Ŷ][end] ≈ 0.5 atol=1e-1
 
-    setconstraint!(nmpc_lin, umin=[-10], umax=[10])
+    setconstraint!(nmpc_lin, Δumin=[-1.5], Δumax=[1.25])
+    moveinput!(nmpc_lin, [-100])
+    info = getinfo(nmpc_lin)
+    @test all(isapprox.(info[:ΔU], -1.5; atol=1e-1))
+    moveinput!(nmpc_lin, [100])
+    info = getinfo(nmpc_lin)
+    @test all(isapprox.(info[:ΔU], 1.25; atol=1e-1))
     setconstraint!(nmpc_lin, Δumin=[-15], Δumax=[15])
-    setconstraint!(nmpc_lin, Ymin=[-0.5; fill(-100, 49)], Ymax=[0.5; fill(+100, 49)])
+
+    setconstraint!(nmpc_lin, ymin=[-0.5], ymax=[0.9])
+    moveinput!(nmpc_lin, [-100])
+    info = getinfo(nmpc_lin)
+    @test all(isapprox.(info[:Ŷ], -0.5; atol=1e-1))
+    moveinput!(nmpc_lin, [100])
+    info = getinfo(nmpc_lin)
+    @test all(isapprox.(info[:Ŷ], 0.9; atol=1e-1))
+    setconstraint!(nmpc_lin, ymin=[-100], ymax=[100])
+
+    setconstraint!(nmpc_lin, Ymin=[-0.5; fill(-100, 49)], Ymax=[0.9; fill(+100, 49)])
     moveinput!(nmpc_lin, [-10])
     info = getinfo(nmpc_lin)
     @test info[:Ŷ][end]   ≈ -10  atol=1e-1
@@ -753,68 +766,68 @@ end
     moveinput!(nmpc_lin, [10])
     info = getinfo(nmpc_lin)
     @test info[:Ŷ][end]   ≈ 10  atol=1e-1
-    @test info[:Ŷ][begin] ≈ 0.5 atol=1e-1
-
-    setconstraint!(nmpc_lin, umin=[-1e3], umax=[+1e3])
-    setconstraint!(nmpc_lin, Δumin=[-1e3], Δumax=[+1e3])
-    setconstraint!(nmpc_lin, ymin=[-1e3], ymax=[+1e3])
-    setconstraint!(nmpc_lin, x̂min=[-1e-6,-Inf], x̂max=[+1e-6,+Inf])
-    moveinput!(nmpc_lin, [-10])
-    info = getinfo(nmpc_lin)
-    @test info[:x̂end][1] ≈ 0 atol=1e-1
-    moveinput!(nmpc_lin, [10])
-    info = getinfo(nmpc_lin)
-    @test info[:x̂end][1] ≈ 0 atol=1e-1
-
-    setconstraint!(nmpc_lin, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
-    setconstraint!(nmpc_lin, umin=[-10], umax=[10])
-    setconstraint!(nmpc_lin, Δumin=[-15], Δumax=[15])
+    @test info[:Ŷ][begin] ≈ 0.9 atol=1e-1
     setconstraint!(nmpc_lin, ymin=[-100], ymax=[100])
 
-    nmpc_lin.p .= [1; 0]
-    moveinput!(nmpc_lin, [20])
+    setconstraint!(nmpc_lin, x̂min=[-1e-6,-Inf], x̂max=[+1e-6,+Inf])
+    moveinput!(nmpc_lin, [-100])
     info = getinfo(nmpc_lin)
-    @test info[:U][end]   ≈ 4.2 atol=1e-1
-    @test info[:U][begin] ≈ 4.2 atol=1e-1
+    @test info[:x̂end][1] ≈ 0 atol=1e-1
+    moveinput!(nmpc_lin, [100])
+    info = getinfo(nmpc_lin)
+    @test info[:x̂end][1] ≈ 0 atol=1e-1
+    setconstraint!(nmpc_lin, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
+
+    nmpc_lin.p .= [1; 0]
+    moveinput!(nmpc_lin, [100])
+    info = getinfo(nmpc_lin)
+    @test all(isapprox.(info[:U], 4.2; atol=1e-1))
 
     nmpc_lin.p .= [0; 1]
-    moveinput!(nmpc_lin, [20])
+    moveinput!(nmpc_lin, [100])
     info = getinfo(nmpc_lin)
-    @test info[:Ŷ][end]   ≈ 3.14 atol=1e-1
-    @test info[:Ŷ][begin] ≈ 3.14 atol=1e-1
+    @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
 
-    f = (x,u,_,_) -> linmodel.A*x + linmodel.Bu*u
-    h = (x,_,_)   -> linmodel.C*x
-    nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing)
+
+    f = (x,u,_,p) -> p.A*x + p.Bu*u
+    h = (x,_,p)   -> p.C*x
+    nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing, p=linmodel)
     nmpc = NonLinMPC(nonlinmodel, Hp=50, Hc=5, gc=gc, nc=2*(50+1), p=[0; 0])
 
-    setconstraint!(nmpc, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
-    setconstraint!(nmpc, umin=[-3], umax=[3])
-    setconstraint!(nmpc, Δumin=[-1.5], Δumax=[1.5])
+    setconstraint!(nmpc, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
+    setconstraint!(nmpc, umin=[-10], umax=[10])
+    setconstraint!(nmpc, Δumin=[-15], Δumax=[15])
     setconstraint!(nmpc, ymin=[-100], ymax=[100])
     preparestate!(nmpc, [0])
-    moveinput!(nmpc, [-20])
-    info = getinfo(nmpc)
-    @test info[:ΔU][begin] ≈ -1.5 atol=1e-1
-    @test info[:U][end] ≈ -3 atol=1e-1
-    moveinput!(nmpc, [20])
-    info = getinfo(nmpc)
-    @test info[:ΔU][begin] ≈ 1.5 atol=1e-1
-    @test info[:U][end] ≈ 3 atol=1e-1
     
-    setconstraint!(nmpc, umin=[-10], umax=[10])
-    setconstraint!(nmpc, Δumin=[-15], Δumax=[15])
-    setconstraint!(nmpc, ymin=[-0.5], ymax=[0.5])
-    moveinput!(nmpc, [-20])
+    setconstraint!(nmpc, umin=[-3], umax=[4])
+    moveinput!(nmpc, [-100])
     info = getinfo(nmpc)
-    @test info[:Ŷ][end] ≈ -0.5 atol=1e-1
-    moveinput!(nmpc, [20])
+    @test all(isapprox.(info[:U], -3; atol=1e-1))
+    moveinput!(nmpc, [100])
     info = getinfo(nmpc)
-    @test info[:Ŷ][end] ≈ 0.5 atol=1e-1
-    
+    @test all(isapprox.(info[:U], 4; atol=1e-1))
     setconstraint!(nmpc, umin=[-10], umax=[10])
+
+    setconstraint!(nmpc, Δumin=[-1.5], Δumax=[1.25])
+    moveinput!(nmpc, [-100])
+    info = getinfo(nmpc)
+    @test all(isapprox.(info[:ΔU], -1.5; atol=1e-1))
+    moveinput!(nmpc, [100])
+    info = getinfo(nmpc)
+    @test all(isapprox.(info[:ΔU], 1.25; atol=1e-1))
     setconstraint!(nmpc, Δumin=[-15], Δumax=[15])
-    setconstraint!(nmpc, Ymin=[-0.5; fill(-100, 49)], Ymax=[0.5; fill(+100, 49)])
+
+    setconstraint!(nmpc, ymin=[-0.5], ymax=[0.9])
+    moveinput!(nmpc, [-100])
+    info = getinfo(nmpc)
+    @test all(isapprox.(info[:Ŷ], -0.5; atol=1e-1))
+    moveinput!(nmpc, [100])
+    info = getinfo(nmpc)
+    @test all(isapprox.(info[:Ŷ], 0.9; atol=1e-1))
+    setconstraint!(nmpc, ymin=[-100], ymax=[100])
+
+    setconstraint!(nmpc, Ymin=[-0.5; fill(-100, 49)], Ymax=[0.9; fill(+100, 49)])
     moveinput!(nmpc, [-10])
     info = getinfo(nmpc)
     @test info[:Ŷ][end]   ≈ -10  atol=1e-1
@@ -822,11 +835,9 @@ end
     moveinput!(nmpc, [10])
     info = getinfo(nmpc)
     @test info[:Ŷ][end]   ≈ 10  atol=1e-1
-    @test info[:Ŷ][begin] ≈ 0.5 atol=1e-1
+    @test info[:Ŷ][begin] ≈ 0.9 atol=1e-1
+    setconstraint!(nmpc, ymin=[-100], ymax=[100])
     
-    setconstraint!(nmpc, umin=[-1e3], umax=[+1e3])
-    setconstraint!(nmpc, Δumin=[-1e3], Δumax=[+1e3])
-    setconstraint!(nmpc, ymin=[-1e3], ymax=[+1e3])
     setconstraint!(nmpc, x̂min=[-1e-6,-Inf], x̂max=[+1e-6,+Inf])
     moveinput!(nmpc, [-10])
     info = getinfo(nmpc)
@@ -834,23 +845,18 @@ end
     moveinput!(nmpc, [10])
     info = getinfo(nmpc)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
-
-    setconstraint!(nmpc, x̂min=[-1e3,-Inf], x̂max=[1e3,+Inf])
-    setconstraint!(nmpc, umin=[-10], umax=[10])
-    setconstraint!(nmpc, Δumin=[-15], Δumax=[15])
-    setconstraint!(nmpc, ymin=[-100], ymax=[100])
+    setconstraint!(nmpc, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
 
     nmpc.p .= [1; 0]
-    moveinput!(nmpc, [20])
+    moveinput!(nmpc, [100])
     info = getinfo(nmpc)
-    @test info[:U][end]   ≈ 4.2 atol=1e-1
-    @test info[:U][begin] ≈ 4.2 atol=1e-1
+    @test all(isapprox.(info[:U], 4.2; atol=1e-1))
 
     nmpc.p .= [0; 1]
-    moveinput!(nmpc, [20])
+    moveinput!(nmpc, [100])
     info = getinfo(nmpc)
-    @test info[:Ŷ][end]   ≈ 3.14 atol=1e-1
-    @test info[:Ŷ][begin] ≈ 3.14 atol=1e-1
+    @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
+
 end
 
 @testset "NonLinMPC set model" begin

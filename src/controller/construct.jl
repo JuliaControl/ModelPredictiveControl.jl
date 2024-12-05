@@ -454,7 +454,35 @@ Init manipulated input increments to inputs conversion matrices.
 The conversion from the input increments ``\mathbf{ΔU}`` to manipulated inputs over ``H_p`` 
 are calculated by:
 ```math
-\mathbf{U} = \mathbf{S} \mathbf{ΔU} + \mathbf{T} \mathbf{u}(k-1) \\
+\mathbf{U} = \mathbf{S} \mathbf{ΔU} + \mathbf{T} \mathbf{u}(k-1)
+```
+The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    The ``\mathbf{U}`` vector and the two conversion matrices are defined as:
+    ```math
+    \mathbf{U} = \begin{bmatrix}
+        \mathbf{u}(k + 0)                                           \\
+        \mathbf{u}(k + 1)                                           \\
+        \vdots                                                      \\
+        \mathbf{u}(k + H_c - 1)                                     \\
+        \vdots                                                      \\
+        \mathbf{u}(k + H_p - 1)                                     \end{bmatrix} , \quad
+    \mathbf{S} = \begin{bmatrix}
+        \mathbf{I}  & \mathbf{0}    & \cdots    & \mathbf{0}        \\
+        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{0}        \\
+        \vdots      & \vdots        & \ddots    & \vdots            \\
+        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \\
+        \vdots      & \vdots        & \ddots    & \vdots            \\
+        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \end{bmatrix} , \quad
+    \mathbf{T} = \begin{bmatrix}
+        \mathbf{I}                                                  \\
+        \mathbf{I}                                                  \\
+        \vdots                                                      \\
+        \mathbf{I}                                                  \\
+        \vdots                                                      \\
+        \mathbf{I}                                                  \end{bmatrix}
 ```
 """
 function init_ΔUtoU(model::SimModel{NT}, Hp, Hc) where {NT<:Real}
@@ -753,12 +781,12 @@ constraints:
     \mathbf{A_{U_{max}}} 
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \mathbf{(U_{min} - U_{op}) + T} \mathbf{u_0}(k-1) \\
-    + \mathbf{(U_{max} - U_{op}) - T} \mathbf{u_0}(k-1)
+    - \mathbf{(U_{min}) + T} \mathbf{u}(k-1) \\
+    + \mathbf{(U_{max}) - T} \mathbf{u}(k-1)
 \end{bmatrix}
 ```
-in which ``\mathbf{U_{min}, U_{max}}`` and ``\mathbf{U_{op}}`` vectors respectively contains
-``\mathbf{u_{min}, u_{max}}`` and ``\mathbf{u_{op}}`` repeated ``H_p`` times.
+in which ``\mathbf{U_{min}}`` and ``\mathbf{U_{max}}`` vectors respectively contains
+``\mathbf{u_{min}}`` and ``\mathbf{u_{max}}`` repeated ``H_p`` times.
 """
 function relaxU(::SimModel{NT}, nϵ, C_umin, C_umax, S) where NT<:Real
     if nϵ == 1 # ΔŨ = [ΔU; ϵ]
