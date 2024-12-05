@@ -781,8 +781,8 @@ constraints:
     \mathbf{A_{U_{max}}} 
 \end{bmatrix} \mathbf{ΔŨ} ≤
 \begin{bmatrix}
-    - \mathbf{(U_{min}) + T} \mathbf{u}(k-1) \\
-    + \mathbf{(U_{max}) - T} \mathbf{u}(k-1)
+    - \mathbf{U_{min} + T} \mathbf{u}(k-1) \\
+    + \mathbf{U_{max} - T} \mathbf{u}(k-1)
 \end{bmatrix}
 ```
 in which ``\mathbf{U_{min}}`` and ``\mathbf{U_{max}}`` vectors respectively contains
