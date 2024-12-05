@@ -248,6 +248,79 @@ Dict(:W_nmpc => calcW(res_yd), :W_empc => calcW(res2_yd))
 Of course, this gain is only exploitable if the motor electronic includes some kind of
 regenerative circuitry.
 
+## Custom Nonlinear Constraints
+
+Instead of limits on the torque, suppose that the motor can deliver a maximum of 3 watt:
+
+```math
+P(t) = τ(t) ω(t) ≤ P_\mathrm{max}
+```
+
+with ``P_\mathrm{max} = 3`` W. This inequality represents nonlinear constraints that can
+be implemented as the custom ``\mathbf{g_c}`` function of [`NonLinMPC`](@ref). The
+constructor expect a function in this form:
+
+```math
+\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}
+```
+
+in which ``ϵ`` is the slack variable (scalar) to ensure feasibility. There is also an
+additional `LHS` argument for the in-place version:
+
+```@example 1
+function gc!(LHS, Ue, Ŷe, _, p, ϵ)
+    Pmax, Hp = p
+    i_τ, i_ω = 1, 2
+    for i in eachindex(LHS)
+        τ, ω = Ue[i_τ], Ŷe[i_ω]
+        P = τ*ω 
+        LHS[i] = P - Pmax - ϵ
+        i_τ += 1
+        i_ω += 2
+    end
+    return nothing
+end
+```
+
+Here we implemented the custom nonlinear constraint function in the mutating form to reduce
+the computational burden (see [`NonLinMPC`](@ref) Extended Help for details). Note that
+similar mutating forms are also possible for the `f` and `h` functions of [`NonLinModel`](@ref).
+We construct the controller by enabling relaxation with the `Cwt` argument, and also by
+specifying the number of custom inequality constraints `nc`:
+
+```@example 1
+Cwt, Pmax, nc = 1e5, 3, Hp + 1,
+p_nmpc2 = [Pmax, Hp]
+nmpc2 = NonLinMPC(estim2; Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=p_nmpc2)
+using JuMP; unset_time_limit_sec(nmpc2.optim) # hide
+```
+
+We include the simulation of a 180° setpoint:
+
+```@example 1
+res3_ry = sim!(nmpc2, N, [180; 0]; plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
+```
+
+with a additional plot for the power ``P(t)``:
+
+```@example 1
+function plotWithPower(res, Pmax)
+    t, τ, ω = res.T_data, res.U_data[1, :], res.X_data[2, :]
+    P, Pmax = τ.*ω, fill(Pmax, size(t))
+    plt1 = plot(res, ploty=[1])
+    plt2 = plot(t, P, label=raw"$P$", ylabel=raw"$P$ (W)", xlabel="Time (s)", legend=:right)
+    plot!(plt2, t, Pmax, label=raw"$P_\mathrm{max}$", linestyle=:dot, linewidth=1.5)
+    return plot(plt1, plt2, layout=(2,1))
+end
+plotWithPower(res3_ry, Pmax)
+savefig("plot7_NonLinMPC.svg"); nothing # hide
+```
+
+![plot7_NonLinMPC](plot6_NonLinMPC.svg)
+
+The small constraint violation is caused here by the modeling error in the friction
+coefficient ``K``.
+
 ## Model Linearization
 
 Nonlinear MPC is more computationally expensive than [`LinMPC`](@ref). Solving the problem
@@ -275,10 +348,10 @@ The linear controller satisfactorily rejects the 10° step disturbance:
 ```@example 1
 res_lin = sim!(mpc, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin)
-savefig("plot7_NonLinMPC.svg"); nothing # hide
+savefig("plot9_NonLinMPC.svg"); nothing # hide
 ```
 
-![plot7_NonLinMPC](plot7_NonLinMPC.svg)
+![plot9_NonLinMPC](plot9_NonLinMPC.svg)
 
 Solving the optimization problem of `mpc` with [`DAQP`](https://darnstrom.github.io/daqp/)
 optimizer instead of the default `OSQP` solver can improve the performance here. It is
@@ -314,10 +387,10 @@ does slightly improve the rejection of the step disturbance:
 ```@example 1
 res_lin2 = sim!(mpc2, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin2)
-savefig("plot8_NonLinMPC.svg"); nothing # hide
+savefig("plot10_NonLinMPC.svg"); nothing # hide
 ```
 
-![plot8_NonLinMPC](plot8_NonLinMPC.svg)
+![plot10_NonLinMPC](plot10_NonLinMPC.svg)
 
 The closed-loop performance is still lower than the nonlinear controller, as expected, but
 computations are about 210 times faster (0.000071 s versus 0.015 s per time steps, on
@@ -331,7 +404,7 @@ plot(res_lin3)
 savefig("plot9_NonLinMPC.svg"); nothing # hide
 ```
 
-![plot9_NonLinMPC](plot9_NonLinMPC.svg)
+![plot11_NonLinMPC](plot11_NonLinMPC.svg)
 
 Multiple linearized model and controller objects are required for large deviations from this
 operating point. This is known as gain scheduling. Another approach is adapting the model of
@@ -386,10 +459,10 @@ operating point. The [`SimResult`](@ref) object is for plotting purposes only. T
 x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180]
 res_slin = sim_adapt!(mpc3, model, N, ry, plant, x_0, x̂_0)
 plot(res_slin)
-savefig("plot10_NonLinMPC.svg"); nothing # hide
+savefig("plot12_NonLinMPC.svg"); nothing # hide
 ```
 
-![plot10_NonLinMPC](plot10_NonLinMPC.svg)
+![plot12_NonLinMPC](plot12_NonLinMPC.svg)
 
 and the 10° step disturbance:
 
@@ -397,10 +470,10 @@ and the 10° step disturbance:
 x_0 = [π, 0]; x̂_0 = [π, 0, 0]; y_step = [10]
 res_slin = sim_adapt!(mpc3, model, N, ry, plant, x_0, x̂_0, y_step)
 plot(res_slin)
-savefig("plot11_NonLinMPC.svg"); nothing # hide
+savefig("plot13_NonLinMPC.svg"); nothing # hide
 ```
 
-![plot11_NonLinMPC](plot11_NonLinMPC.svg)
+![plot13_NonLinMPC](plot13_NonLinMPC.svg)
 
 The computations of the successive linearization MPC are about 75 times faster than the
 nonlinear MPC on average, an impressive gain for similar closed-loop performances!
