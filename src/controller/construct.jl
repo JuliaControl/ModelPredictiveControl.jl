@@ -483,7 +483,7 @@ The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help 
         \mathbf{I}                                                  \\
         \vdots                                                      \\
         \mathbf{I}                                                  \end{bmatrix}
-```
+    ```
 """
 function init_ΔUtoU(model::SimModel{NT}, Hp, Hc) where {NT<:Real}
     # S and T are `Matrix{NT}` since conversion is faster than `Matrix{Bool}` or `BitMatrix`
