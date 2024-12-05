@@ -256,16 +256,17 @@ Instead of limits on the torque, suppose that the motor can deliver a maximum of
 P(t) = τ(t) ω(t) ≤ P_\mathrm{max}
 ```
 
-with ``P_\mathrm{max} = 3`` W. This inequality represents nonlinear constraints that can
-be implemented as the custom ``\mathbf{g_c}`` function of [`NonLinMPC`](@ref). The
-constructor expect a function in this form:
+with ``P_\mathrm{max} = 3`` W. This inequality describes nonlinear constraints that can
+be implemented using the custom ``\mathbf{g_c}`` function of [`NonLinMPC`](@ref). The
+constructor expects a function in this form:
 
 ```math
 \mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}
 ```
 
-in which ``ϵ`` is the slack variable (scalar) to ensure feasibility. There is also an
-additional `LHS` argument for the in-place version:
+in which ``ϵ`` is the slack variable (scalar), an necessary feature to ensure feasibility
+when there the nonlinear inequality constraints are active. There is also an additional
+`LHS` argument ("left-hand side" of the inequality above) for the in-place version:
 
 ```@example 1
 function gc!(LHS, Ue, Ŷe, _, p, ϵ)
@@ -295,13 +296,13 @@ nmpc2 = NonLinMPC(estim2; Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=p_nmpc2
 using JuMP; unset_time_limit_sec(nmpc2.optim) # hide
 ```
 
-We include the simulation of a 180° setpoint:
+In addition to the 180° setpoint response:
 
 ```@example 1
 res3_ry = sim!(nmpc2, N, [180; 0]; plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
 ```
 
-with a additional plot for the power ``P(t)``:
+a plot for the power ``P(t)`` is included below:
 
 ```@example 1
 function plotWithPower(res, Pmax)
@@ -316,9 +317,9 @@ plotWithPower(res3_ry, Pmax)
 savefig("plot7_NonLinMPC.svg"); nothing # hide
 ```
 
-![plot7_NonLinMPC](plot6_NonLinMPC.svg)
+![plot7_NonLinMPC](plot7_NonLinMPC.svg)
 
-The small constraint violation is caused here by the modeling error on the friction
+The slight constraint violation is caused here by the modeling error on the friction
 coefficient ``K``.
 
 ## Model Linearization
