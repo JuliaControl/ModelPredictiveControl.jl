@@ -289,7 +289,7 @@ We construct the controller by enabling relaxation with the `Cwt` argument, and 
 specifying the number of custom inequality constraints `nc`:
 
 ```@example 1
-Cwt, Pmax, nc = 1e5, 3, Hp + 1,
+Cwt, Pmax, nc = 1e5, 3, Hp+1
 p_nmpc2 = [Pmax, Hp]
 nmpc2 = NonLinMPC(estim2; Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=p_nmpc2)
 using JuMP; unset_time_limit_sec(nmpc2.optim) # hide
@@ -318,7 +318,7 @@ savefig("plot7_NonLinMPC.svg"); nothing # hide
 
 ![plot7_NonLinMPC](plot6_NonLinMPC.svg)
 
-The small constraint violation is caused here by the modeling error in the friction
+The small constraint violation is caused here by the modeling error on the friction
 coefficient ``K``.
 
 ## Model Linearization
@@ -401,7 +401,7 @@ poor in the first quadrant:
 ```@example 1
 res_lin3 = sim!(mpc2, N, [180.0]; plant, x_0=[0, 0])
 plot(res_lin3)
-savefig("plot9_NonLinMPC.svg"); nothing # hide
+savefig("plot11_NonLinMPC.svg"); nothing # hide
 ```
 
 ![plot11_NonLinMPC](plot11_NonLinMPC.svg)
