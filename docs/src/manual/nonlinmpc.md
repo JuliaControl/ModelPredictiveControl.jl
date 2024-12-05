@@ -248,7 +248,7 @@ Dict(:W_nmpc => calcW(res_yd), :W_empc => calcW(res2_yd))
 Of course, this gain is only exploitable if the motor electronic includes some kind of
 regenerative circuitry.
 
-## Custom Nonlinear Constraints
+## Custom Nonlinear Inequality Constraints
 
 Instead of limits on the torque, suppose that the motor can deliver a maximum of 3 watt:
 
