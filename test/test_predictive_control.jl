@@ -601,7 +601,7 @@ end
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
     d = [0.1]
-    preparestate!(nmpc2, [0], [0])
+    preparestate!(nmpc2, [0], d)
     u = moveinput!(nmpc2, 7d, d)
     @test u ≈ [0] atol=5e-2
     u = nmpc2(7d, d)

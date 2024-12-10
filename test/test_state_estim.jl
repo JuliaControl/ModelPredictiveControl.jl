@@ -119,7 +119,10 @@ end
     linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
     linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
     skalmanfilter = SteadyKalmanFilter(linmodel, nint_ym=0)
-    @test_throws ErrorException setmodel!(skalmanfilter, linmodel)
+    @test_nowarn setmodel!(skalmanfilter, linmodel)
+    @test_throws ErrorException setmodel!(skalmanfilter, deepcopy(linmodel))
+    @test_throws ErrorException setmodel!(skalmanfilter, linmodel, Q̂=[0.01])
+    @test_throws ErrorException setmodel!(skalmanfilter, linmodel, R̂=[0.01])
 end
 
 @testset "SteadyKalmanFilter real-time simulations" begin
@@ -349,7 +352,8 @@ end
     linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
     linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
     lo = Luenberger(linmodel, nint_ym=0)
-    @test_throws ErrorException setmodel!(lo, linmodel)
+    @test_nowarn setmodel!(lo, linmodel)
+    @test_throws ErrorException setmodel!(lo, deepcopy(linmodel))
 end
 
 @testset "InternalModel construction" begin
