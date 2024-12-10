@@ -135,5 +135,10 @@ function update_estimate!(estim::Luenberger, y0m, d0, u0)
     return predict_estimate_obsv!(estim, y0m, d0, u0)
 end
 
-"Throw an error if `setmodel!` is called on `Luenberger` observer."
-setmodel_estimator!(::Luenberger, args...) = error("Luenberger does not support setmodel!")
+"Throw an error if `setmodel!` is called on `Luenberger` observer w/o the default values."
+function setmodel!(estim::Luenberger, model, args...)
+    if estim.model !== model
+        error("Luenberger does not support setmodel!")
+    end
+    return nothing
+end
