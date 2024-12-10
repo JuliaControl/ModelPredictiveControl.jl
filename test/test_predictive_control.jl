@@ -566,25 +566,35 @@ end
 
 @testset "NonLinMPC moves and getinfo" begin
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
-    nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
-    r = [15]
+    Hp = 1000
+    nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=Hp, Hc=1)
+    ry, ru = [15], [4]
     preparestate!(nmpc_lin, [10])
-    u = moveinput!(nmpc_lin, r)
+    u = moveinput!(nmpc_lin, ry)
     @test u ≈ [1] atol=5e-2
-    u = nmpc_lin(r)
+    u = nmpc_lin(ry)
     @test u ≈ [1] atol=5e-2
     info = getinfo(nmpc_lin)
     @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ r[1] atol=5e-2
-    Hp = 1000
-    R̂y = fill(r[1], Hp)
-    JE = (_ , Ŷe, _ , R̂y) -> sum((Ŷe[2:end] - R̂y).^2)
-    nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, p=R̂y, Hp=Hp, Hc=1)
+    @test info[:Ŷ][end] ≈ ry[1] atol=5e-2
+    setmodel!(nmpc_lin; Mwt=[0], Lwt=[1])
+    u = moveinput!(nmpc_lin; R̂u=fill(ru[1], Hp))
+    @test u ≈ [4] atol=5e-2
+    function JE(Ue, Ŷe, _ , p)
+        Wy, R̂y, Wu, R̂u = p
+        return Wy*sum((R̂y-Ŷe[2:end]).^2) + Wu*sum((R̂u-Ue[1:end-1]).^2)
+    end
+    R̂y, R̂u = fill(ry[1], Hp), fill(ru[1], Hp)
+    p = [1, R̂y, 0, R̂u]
+    nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, p=p, Hp=Hp, Hc=1)
     preparestate!(nmpc, [10])
     u = moveinput!(nmpc)
     @test u ≈ [1] atol=5e-2
     # ensure that the current estimated output is updated for correct JE values:
     @test nmpc.ŷ ≈ evaloutput(nmpc.estim, Float64[])
+    nmpc.p .= [0, R̂y, 1, R̂u]
+    u = moveinput!(nmpc)
+    @test u ≈ [4] atol=5e-2
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
     f = (x,u,d,_) -> linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h = (x,d,_)   -> linmodel2.C*x + linmodel2.Dd*d
@@ -613,7 +623,7 @@ end
     @test g_Y0min_end(20.0, 10.0) ≤ 0.0 
     # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
     @test ForwardDiff.gradient(vec->g_Y0min_end(vec...), [20.0, 10.0]) ≈ [-5, -5] atol=1e-3
-    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     preparestate!(nmpc6, [0])
     @test moveinput!(nmpc6, [0]) ≈ [0.0]
