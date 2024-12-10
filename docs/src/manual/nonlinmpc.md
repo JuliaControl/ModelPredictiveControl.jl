@@ -265,7 +265,7 @@ argument ("left-hand side" of the inequality above) for the in-place version:
 
 ```@example man_nonlin
 function gc!(LHS, Ue, Ŷe, _, p, ϵ)
-    Pmax, Hp = p
+    Pmax = p
     i_τ, i_ω = 1, 2
     for i in eachindex(LHS)
         τ, ω = Ue[i_τ], Ŷe[i_ω]
@@ -287,8 +287,7 @@ specifying the number of custom inequality constraints `nc`:
 
 ```@example man_nonlin
 Cwt, Pmax, nc = 1e5, 3, Hp+1
-p_nmpc2 = [Pmax, Hp]
-nmpc2 = NonLinMPC(estim2; Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=p_nmpc2)
+nmpc2 = NonLinMPC(estim2; Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=Pmax)
 using JuMP; unset_time_limit_sec(nmpc2.optim) # hide
 nmpc2 # hide
 ```
