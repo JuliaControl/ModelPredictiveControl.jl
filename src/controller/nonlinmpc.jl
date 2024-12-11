@@ -423,7 +423,7 @@ function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, 
             exception=(err, catch_backtrace())
         )
     end
-    ϵ, gc = 0, Vector{NT}(undef, nc) 
+    ϵ, gc = zero(NT), Vector{NT}(undef, nc) 
     try
         gc!(gc, Ue, Ŷe, D̂e, p, ϵ)
     catch err
@@ -444,12 +444,16 @@ end
 
 For [`NonLinMPC`](@ref), add `:sol` and the optimal economic cost `:JE`.
 """
-function addinfo!(info, mpc::NonLinMPC)
-    U, Ŷ, D̂, ŷ, d = info[:U], info[:Ŷ], info[:D̂], info[:ŷ], info[:d]
+function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
+    U, Ŷ, D̂, ŷ, d, ϵ = info[:U], info[:Ŷ], info[:D̂], info[:ŷ], info[:d], info[:ϵ]
     Ue = [U; U[(end - mpc.estim.model.nu + 1):end]]
     Ŷe = [ŷ; Ŷ]
-    D̂e = [d; D̂]
-    info[:JE]  = mpc.JE(Ue, Ŷe, D̂e, mpc.p)
+    D̂e = [d; D̂] 
+    JE = mpc.JE(Ue, Ŷe, D̂e, mpc.p)
+    LHS = Vector{NT}(undef, mpc.con.nc)
+    mpc.con.gc!(LHS, Ue, Ŷe, D̂e, mpc.p, ϵ)
+    info[:JE]  = JE 
+    info[:gc] = LHS
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
     return info
 end

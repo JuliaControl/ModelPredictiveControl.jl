@@ -96,8 +96,8 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:d`   : current measured disturbance, ``\mathbf{d}(k)``
 
 For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
-solution summary that can be printed. Lastly, the optimal economic cost `:JE` is also
-available for [`NonLinMPC`](@ref).
+solution summary that can be printed. Lastly, the economical cost `:JE` and the custom
+nonlinear constraints `:gc` values at the optimum are also available for [`NonLinMPC`](@ref).
 
 # Examples
 ```jldoctest
@@ -131,14 +131,14 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷs .= mpc.F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
     mpc.F .= oldF  # restore old F value
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
-    info[:ϵ]    = mpc.nϵ == 1 ? mpc.ΔŨ[end] : NaN
+    info[:ϵ]    = mpc.nϵ == 1 ? mpc.ΔŨ[end] : zero(NT)
     info[:J]    = J
     info[:U]    = U
     info[:u]    = info[:U][1:model.nu]
     info[:d]    = mpc.d0 + model.dop
     info[:D̂]    = mpc.D̂0 + mpc.Dop
     info[:ŷ]    = mpc.ŷ
-    info[:Ŷ]    = Ŷ0 + mpc.Yop
+    info[:Ŷ]    = Ŷ
     info[:x̂end] = x̂0end + mpc.estim.x̂op
     info[:Ŷs]   = Ŷs
     info[:R̂y]   = mpc.R̂y

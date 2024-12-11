@@ -199,9 +199,12 @@ function SteadyKalmanFilter(
     return SteadyKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
 end
 
-"Throw an error if `setmodel!` is called on a SteadyKalmanFilter"
-function setmodel_estimator!(::SteadyKalmanFilter, args...)
-    error("SteadyKalmanFilter does not support setmodel! (use KalmanFilter instead)")
+"Throw an error if `setmodel!` is called on a SteadyKalmanFilter w/o the default values."
+function setmodel_estimator!(estim::SteadyKalmanFilter, model, _ , _ , _ , Q̂, R̂)
+    if estim.model !== model || !isnothing(Q̂) || !isnothing(R̂)
+        error("SteadyKalmanFilter does not support setmodel! (use KalmanFilter instead)")
+    end
+    return nothing
 end
 
 @doc raw"""
