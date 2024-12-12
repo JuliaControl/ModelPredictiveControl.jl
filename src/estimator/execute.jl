@@ -203,7 +203,7 @@ end
 (estim::StateEstimator)(d=estim.buffer.empty) = evaloutput(estim, d)
 
 @doc raw"""
-    preparestate!(estim::StateEstimator, ym, d=estim.model.dop) -> x̂
+    preparestate!(estim::StateEstimator, ym, d=[]) -> x̂
 
 Prepare `estim.x̂0` estimate with meas. outputs `ym` and dist. `d` for the current time step.
 
@@ -231,7 +231,7 @@ julia> x̂ = preparestate!(estim1, [1])
  0.0
 ```
 """
-function preparestate!(estim::StateEstimator, ym, d=estim.model.dop)
+function preparestate!(estim::StateEstimator, ym, d=estim.buffer.empty)
     if estim.direct
         validate_args(estim, ym, d)
         y0m, d0 = remove_op!(estim, ym, d)
