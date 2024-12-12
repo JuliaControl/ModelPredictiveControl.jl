@@ -80,8 +80,8 @@ defined as ``d(t) = t``. The functions can be implemented in two possible ways:
 
 `Ts` is the sampling time in second. `nu`, `nx`, `ny` and `nd` are the respective number of 
 manipulated inputs, states, outputs and measured disturbances. The keyword argument `p`
-is the parameters of the model passed to the two functions. It can be of any Julia object 
-but use a mutable type if you want to change them later e.g.: a vector.
+is the parameters of the model passed to the two functions. It can be any Julia objects but
+use a mutable type if you want to change them later e.g.: a vector.
 
 !!! tip
     Replace the `d` or `p` argument with `_` in your functions if not needed (see Examples below).
