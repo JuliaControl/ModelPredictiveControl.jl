@@ -530,8 +530,8 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
         Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
         ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
-        mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
-        g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
+        gc = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
+        g  = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ)::T
     end
     function gfunc_i(i, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
@@ -549,8 +549,8 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
             Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
             ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
-            mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
-            g = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
+            gc = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
+            g  = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         end
         return g[i]::T
     end
@@ -659,7 +659,7 @@ function set_nonlincon!(
 end
 
 """
-    con_nonlinprog!(g, mpc::NonLinMPC, model::LinModel, _ , _ , gc, ϵ)
+    con_nonlinprog!(g, mpc::NonLinMPC, model::LinModel, _ , _ , gc, ϵ) -> g
 
 Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
 
@@ -703,6 +703,17 @@ function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, Ŷ0, gc, ϵ)
         end
     end
     return g
+end
+
+
+@doc raw"""
+    con_custom!(gc, mpc::NonLinMPC, Ue, Ŷe, ϵ) -> gc
+
+Evaluate the custom inequality constraint `gc` in-place and return it.
+"""
+function con_custom!(gc, mpc::NonLinMPC, Ue, Ŷe, ϵ)
+    mpc.con.nc ≠ 0 && mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
+    return gc
 end
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
