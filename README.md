@@ -97,9 +97,10 @@ for more detailed examples.
 - automatic model augmentation with integrating states for offset-free tracking
 - support for unmeasured model outputs
 - feedforward action with measured disturbances that supports direct transmission
-- custom predictions for:
+- custom predictions for (or preview):
   - output setpoints
   - measured disturbances
+  - input setpoints
 - easy integration with `Plots.jl`
 - optimization based on `JuMP.jl`:
   - quickly compare multiple optimizers

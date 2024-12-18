@@ -18,7 +18,8 @@ results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorit
 the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...`` Note that
 the method mutates `mpc` internal data but it does not modifies `mpc.estim` states. Call
 [`preparestate!(mpc, ym, d)`](@ref) before `moveinput!`, and [`updatestate!(mpc, u, ym, d)`](@ref)
-after, to update `mpc` state estimates.
+after, to update `mpc` state estimates. Setpoint and measured disturbance previews can
+be implemented with the `R̂y`, `R̂u` and `D̂` keyword arguments. 
 
 Calling a [`PredictiveController`](@ref) object calls this method.
 
