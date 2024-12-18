@@ -21,6 +21,7 @@ abstract type PredictiveController{NT<:Real} end
 
 struct PredictiveControllerBuffer{NT<:Real}
     u ::Vector{NT}
+    ΔŨ::Vector{NT}
     D̂ ::Vector{NT}
     Ŷ ::Vector{NT}
     U ::Vector{NT}
@@ -39,14 +40,16 @@ The buffer is used to store intermediate results during computation without allo
 function PredictiveControllerBuffer{NT}(
     nu::Int, ny::Int, nd::Int, Hp::Int, Hc::Int, nϵ::Int
 ) where NT <: Real
+    nΔŨ = nu*Hc + nϵ
     u  = Vector{NT}(undef, nu)
+    ΔŨ = Vector{NT}(undef, nΔŨ)
     D̂  = Vector{NT}(undef, nd*Hp)
     Ŷ  = Vector{NT}(undef, ny*Hp)
     U  = Vector{NT}(undef, nu*Hp)
-    Ẽ  = Matrix{NT}(undef, ny*Hp, nu*Hc + nϵ)
-    S̃  = Matrix{NT}(undef, nu*Hp, nu*Hc + nϵ)
+    Ẽ  = Matrix{NT}(undef, ny*Hp, nΔŨ)
+    S̃  = Matrix{NT}(undef, nu*Hp, nΔŨ)
     empty = Vector{NT}(undef, 0)
-    return PredictiveControllerBuffer{NT}(u, D̂, Ŷ, U, Ẽ, S̃, empty)
+    return PredictiveControllerBuffer{NT}(u, ΔŨ, D̂, Ŷ, U, Ẽ, S̃, empty)
 end
 
 include("controller/construct.jl")

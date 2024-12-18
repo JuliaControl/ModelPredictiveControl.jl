@@ -35,8 +35,8 @@ See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
    in the future by default or ``\mathbf{d̂}(k+j)=\mathbf{d}(k)`` for ``j=1`` to ``H_p``.
 - `R̂y=repeat(ry, mpc.Hp)` or *`Rhaty`* : predicted output setpoints ``\mathbf{R̂_y}``, constant
    in the future by default or ``\mathbf{r̂_y}(k+j)=\mathbf{r_y}(k)`` for ``j=1`` to ``H_p``.
-- `R̂u=mpc.Uop` or *`Rhatu`* : predicted manipulated input setpoints, constant in the future 
-   by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for ``j=0`` to ``H_p-1``. 
+- `R̂u=mpc.Uop` or *`Rhatu`* : predicted manipulated input setpoints ``\mathbf{R̂_u}``, constant
+   in the future by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for ``j=0`` to ``H_p-1``. 
 
 # Examples
 ```jldoctest
@@ -127,9 +127,9 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷ  = Ȳ
     Ŷ .= @views Ŷe[model.ny+1:end]
     oldF = copy(mpc.F)
-    predictstoch!(mpc, mpc.estim) 
-    Ŷs .= mpc.F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
-    mpc.F .= oldF  # restore old F value
+    F    = predictstoch!(mpc, mpc.estim) 
+    Ŷs  .= F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
+    F   .= oldF  # restore old F value
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
     info[:ϵ]    = mpc.nϵ == 1 ? mpc.ΔŨ[end] : zero(NT)
     info[:J]    = J
@@ -479,12 +479,14 @@ solution. A failed optimization prints an `@error` log in the REPL and returns t
 warm-start value.
 """
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
-    optim = mpc.optim
-    model = mpc.estim.model
+    model, optim = mpc.estim.model, mpc.optim
+    nu, Hc = model.nu, mpc.Hc
     ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}; ϵ_{k-1}]
-    ϵ0  = (mpc.nϵ == 1) ? mpc.ΔŨ[end] : empty(mpc.ΔŨ)
-    ΔŨ0 = [mpc.ΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(NT, model.nu); ϵ0]
+    ΔŨ0 = mpc.buffer.ΔŨ
+    ΔŨ0[1:(Hc*nu-nu)] .= @views mpc.ΔŨ[nu+1:Hc*nu]
+    ΔŨ0[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    mpc.nϵ == 1 && (ΔŨ0[end] = mpc.ΔŨ[end])
     JuMP.set_start_value.(ΔŨvar, ΔŨ0)
     set_objective_linear_coef!(mpc, ΔŨvar)
     try
