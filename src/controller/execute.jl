@@ -53,8 +53,8 @@ function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
     d ::Vector = mpc.buffer.empty;
-    Dhat ::Vector = repeat!(mpc.buffer.D̂,  d,  mpc.Hp),
-    Rhaty::Vector = repeat!(mpc.buffer.R̂y, ry, mpc.Hp),
+    Dhat ::Vector = repeat!(mpc.buffer.D̂, d,  mpc.Hp),
+    Rhaty::Vector = repeat!(mpc.buffer.Ŷ, ry, mpc.Hp),
     Rhatu::Vector = mpc.Uop,
     D̂  = Dhat,
     R̂y = Rhaty,
@@ -323,7 +323,7 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
     if any(mpc.con.i_b) 
         lincon = mpc.optim[:linconstraint]
-        JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
+        @views JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
     end
     return nothing
 end
