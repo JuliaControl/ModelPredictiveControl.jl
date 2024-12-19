@@ -1,5 +1,5 @@
 struct NonLinModel{
-    NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver
+    NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver, SMB<:SimModelBuffer
 } <: SimModel{NT}
     x0::Vector{NT}
     f!::F
@@ -21,10 +21,10 @@ struct NonLinModel{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
-    buffer::SimModelBuffer{NT}
+    buffer::SMB
     function NonLinModel{NT, F, H, P, DS}(
-        f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS
-    ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver}
+        f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS, buffer::SMB
+    ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver, SMB<:SimModelBuffer}
         Ts > 0 || error("Sampling time Ts must be positive")
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
@@ -37,8 +37,7 @@ struct NonLinModel{
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
-        buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, F, H, P, DS}(
+        return new{NT, F, H, P, DS, SMB}(
             x0, 
             f!, h!,
             p,
@@ -146,7 +145,9 @@ function NonLinModel{NT}(
     f!, h! = get_mutating_functions(NT, f, h)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
     F, H, P, DS = get_types(f!, h!, p, solver)
-    return NonLinModel{NT, F, H, P, DS}(f!, h!, Ts, nu, nx, ny, nd, p, solver)
+    jacobian = JacobianBuffer{NT}(f!, h!, nu, nx, ny, nd)
+    buffer = SimModelBuffer{NT}(nu, nx, ny, nd, jacobian)
+    return NonLinModel{NT, F, H, P, DS}(f!, h!, Ts, nu, nx, ny, nd, p, solver, buffer)
 end
 
 function NonLinModel(

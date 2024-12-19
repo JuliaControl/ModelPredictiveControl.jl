@@ -20,12 +20,73 @@ julia> y = model()
 """
 abstract type SimModel{NT<:Real} end
 
-struct SimModelBuffer{NT<:Real}
+struct JacobianBuffer{
+    NT<:Real, 
+    FX<:Function,
+    FU<:Function,
+    FD<:Function,
+    HX<:Function,
+    HU<:Function,
+    CFX<:ForwardDiff.JacobianConfig,
+    CFU<:ForwardDiff.JacobianConfig,
+    CFD<:ForwardDiff.JacobianConfig,
+    CHU<:ForwardDiff.JacobianConfig,
+    CHX<:ForwardDiff.JacobianConfig
+}
+    xnext::Vector{NT}
+    x::Vector{NT}
+    y::Vector{NT}
+    u::Vector{NT}
+    d::Vector{NT}
+    f_x!::FX
+    f_u!::FU
+    f_d!::FD
+    h_x!::HX
+    h_d!::HU
+    f_x_cfg::CFX
+    f_u_cfg::CFU
+    f_d_cfg::CFD
+    h_x_cfg::CHX
+    h_d_cfg::CHU
+end
+
+"""
+    JacobianBuffer(NT::DataType, f!::Function, h!::Function, nx, nu, ny, nd)
+
+Buffer object for calling `ForwardDiff.jacobian!` on `SimModel` without any allocation.
+"""
+function JacobianBuffer{NT}(
+    f!::Function, h!::Function, nx::Int, nu::Int, ny::Int, nd::Int
+) where NT <: Real 
+    xnext = Vector{NT}(undef, nx)
+    x = Vector{NT}(undef, nx)
+    y = Vector{NT}(undef, ny)
+    u = Vector{NT}(undef, nu)
+    d = Vector{NT}(undef, nd)
+    f_x!(y, x) = f!(y, x, u, d)
+    f_u!(y, u) = f!(y, x, u, d)
+    f_d!(y, d) = f!(y, x, u, d)
+    h_x!(y, x) = h!(y, x, d)
+    h_d!(y, d) = h!(y, x, d)
+    f_x_cfg = ForwardDiff.JacobianConfig(f_x!, xnext, x)
+    f_u_cfg = ForwardDiff.JacobianConfig(f_u!, xnext, u)
+    f_d_cfg = ForwardDiff.JacobianConfig(f_d!, xnext, d)
+    h_x_cfg = ForwardDiff.JacobianConfig(h_x!, y, x)
+    h_d_cfg = ForwardDiff.JacobianConfig(h_d!, y, d)
+    return JacobianBuffer(
+        xnext,      x,          y,          u,          d,
+        f_x!,       f_u!,       f_d!,       h_x!,       h_d!, 
+        f_x_cfg,    f_u_cfg,    f_d_cfg,    h_x_cfg,    h_d_cfg
+    )
+end
+
+struct SimModelBuffer{NT<:Real, JB<:Union{JacobianBuffer, Nothing}}
     u::Vector{NT}
     x::Vector{NT}
     y::Vector{NT}
     d::Vector{NT}
     empty::Vector{NT}
+    jacobian::JB
 end
 
 @doc raw"""
@@ -35,13 +96,15 @@ Create a buffer for `SimModel` objects for inputs, states, outputs, and disturba
 
 The buffer is used to store intermediate results during simulation without allocating.
 """
-function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int) where NT <: Real
+function SimModelBuffer{NT}(
+    nu::Int, nx::Int, ny::Int, nd::Int, jacobian::JB=nothing
+) where {NT <: Real, JB <: Union{JacobianBuffer, Nothing}}
     u = Vector{NT}(undef, nu)
     x = Vector{NT}(undef, nx)
     y = Vector{NT}(undef, ny)
     d = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
-    return SimModelBuffer{NT}(u, x, y, d, empty)
+    return SimModelBuffer{NT, JB}(u, x, y, d, empty, jacobian)
 end
 
 
