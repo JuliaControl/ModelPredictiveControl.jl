@@ -18,7 +18,8 @@ results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorit
 the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...`` Note that
 the method mutates `mpc` internal data but it does not modifies `mpc.estim` states. Call
 [`preparestate!(mpc, ym, d)`](@ref) before `moveinput!`, and [`updatestate!(mpc, u, ym, d)`](@ref)
-after, to update `mpc` state estimates.
+after, to update `mpc` state estimates. Setpoint and measured disturbance previews can
+be implemented with the `R̂y`, `R̂u` and `D̂` keyword arguments. 
 
 Calling a [`PredictiveController`](@ref) object calls this method.
 
@@ -35,8 +36,8 @@ See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
    in the future by default or ``\mathbf{d̂}(k+j)=\mathbf{d}(k)`` for ``j=1`` to ``H_p``.
 - `R̂y=repeat(ry, mpc.Hp)` or *`Rhaty`* : predicted output setpoints ``\mathbf{R̂_y}``, constant
    in the future by default or ``\mathbf{r̂_y}(k+j)=\mathbf{r_y}(k)`` for ``j=1`` to ``H_p``.
-- `R̂u=mpc.Uop` or *`Rhatu`* : predicted manipulated input setpoints, constant in the future 
-   by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for ``j=0`` to ``H_p-1``. 
+- `R̂u=mpc.Uop` or *`Rhatu`* : predicted manipulated input setpoints ``\mathbf{R̂_u}``, constant
+   in the future by default or ``\mathbf{r̂_u}(k+j)=\mathbf{u_{op}}`` for ``j=0`` to ``H_p-1``. 
 
 # Examples
 ```jldoctest
@@ -53,8 +54,8 @@ function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
     d ::Vector = mpc.buffer.empty;
-    Dhat ::Vector = repeat!(mpc.buffer.D̂,  d,  mpc.Hp),
-    Rhaty::Vector = repeat!(mpc.buffer.R̂y, ry, mpc.Hp),
+    Dhat ::Vector = repeat!(mpc.buffer.D̂, d,  mpc.Hp),
+    Rhaty::Vector = repeat!(mpc.buffer.Ŷ, ry, mpc.Hp),
     Rhatu::Vector = mpc.Uop,
     D̂  = Dhat,
     R̂y = Rhaty,
@@ -127,9 +128,9 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷ  = Ȳ
     Ŷ .= @views Ŷe[model.ny+1:end]
     oldF = copy(mpc.F)
-    predictstoch!(mpc, mpc.estim) 
-    Ŷs .= mpc.F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
-    mpc.F .= oldF  # restore old F value
+    F    = predictstoch!(mpc, mpc.estim) 
+    Ŷs  .= F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
+    F   .= oldF  # restore old F value
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
     info[:ϵ]    = mpc.nϵ == 1 ? mpc.ΔŨ[end] : zero(NT)
     info[:J]    = J
@@ -189,28 +190,19 @@ They are computed with these equations using in-place operations:
 ```
 """
 function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u)
-    lastu  = mpc.buffer.u
-    lastu .= mpc.estim.lastu0 .+ model.uop
-    mul!(mpc.T_lastu, mpc.T, lastu)
-    ŷ, F, q̃, r = mpc.ŷ, mpc.F, mpc.q̃, mpc.r
-    Cy, Cu, M_Hp_Ẽ, L_Hp_S̃ = mpc.buffer.Ŷ, mpc.buffer.U, mpc.buffer.Ẽ, mpc.buffer.S̃
-    ŷ .= evaloutput(mpc.estim, d)
-    predictstoch!(mpc, mpc.estim)               # init F with Ŷs for InternalModel
+    F   = initpred_common!(mpc, model, d, D̂, R̂y, R̂u)
     F .+= mpc.B                                 # F = F + B
     mul!(F, mpc.K, mpc.estim.x̂0, 1, 1)          # F = F + K*x̂0
     mul!(F, mpc.V, mpc.estim.lastu0, 1, 1)      # F = F + V*lastu0
     if model.nd ≠ 0
-        mpc.d0 .= d .- model.dop
-        mpc.D̂0 .= D̂ .- mpc.Dop
-        mpc.D̂e[1:model.nd]     .= d
-        mpc.D̂e[model.nd+1:end] .= D̂
         mul!(F, mpc.G, mpc.d0, 1, 1)            # F = F + G*d0
         mul!(F, mpc.J, mpc.D̂0, 1, 1)            # F = F + J*D̂0
     end
+    Cy, Cu, M_Hp_Ẽ, L_Hp_S̃ = mpc.buffer.Ŷ, mpc.buffer.U, mpc.buffer.Ẽ, mpc.buffer.S̃
+    q̃, r = mpc.q̃, mpc.r
     q̃ .= 0
     r .= 0
     # --- output setpoint tracking term ---
-    mpc.R̂y .= R̂y
     if !mpc.weights.iszero_M_Hp[]
         Cy .= F .+ mpc.Yop .- R̂y
         mul!(M_Hp_Ẽ, mpc.weights.M_Hp, mpc.Ẽ)
@@ -218,7 +210,6 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
         r .+= dot(Cy, mpc.weights.M_Hp, Cy)     # r = r + Cy'*M_Hp*Cy
     end
     # --- input setpoint tracking term ---
-    mpc.R̂u .= R̂u
     if !mpc.weights.iszero_L_Hp[]
         Cu .= mpc.T_lastu .- R̂u 
         mul!(L_Hp_S̃, mpc.weights.L_Hp, mpc.S̃)
@@ -236,11 +227,23 @@ end
 Init `ŷ, F, d0, D̂0, D̂e, R̂y, R̂u` vectors when model is not a [`LinModel`](@ref).
 """
 function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
+    F = initpred_common!(mpc, model, d, D̂, R̂y, R̂u)
+    return nothing
+end
+
+"""
+    initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u) -> F
+
+Common computations of `initpred!` for all types of [`SimModel`](@ref).
+
+Will init `mpc.F` with 0 values, or with the stochastic predictions `Ŷs` if `mpc.estim` is
+an [`InternalModel`](@ref). The function returns `mpc.F`.
+"""
+function initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
     lastu  = mpc.buffer.u
     lastu .= mpc.estim.lastu0 .+ model.uop
     mul!(mpc.T_lastu, mpc.T, lastu)
     mpc.ŷ .= evaloutput(mpc.estim, d)
-    predictstoch!(mpc, mpc.estim)               # init F with Ŷs for InternalModel
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
         mpc.D̂0 .= D̂ .- mpc.Dop
@@ -249,22 +252,23 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂
     end
     mpc.R̂y .= R̂y
     mpc.R̂u .= R̂u
-    return nothing
+    F = predictstoch!(mpc, mpc.estim)  # init mpc.F with Ŷs for InternalModel
+    return F
 end
 
 @doc raw"""
-    predictstoch!(mpc::PredictiveController, estim::InternalModel)
+    predictstoch!(mpc::PredictiveController, estim::InternalModel) -> F
 
 Init `mpc.F` vector with ``\mathbf{F = Ŷ_s}`` when `estim` is an [`InternalModel`](@ref).
 """
-function predictstoch!(mpc::PredictiveController{NT}, estim::InternalModel) where {NT<:Real}
+function predictstoch!(mpc::PredictiveController, estim::InternalModel)
     Ŷs = mpc.F
     mul!(Ŷs, mpc.Ks, estim.x̂s)
     mul!(Ŷs, mpc.Ps, estim.ŷs, 1, 1)
-    return nothing
+    return mpc.F
 end
 "Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."
-predictstoch!(mpc::PredictiveController, ::StateEstimator) = (mpc.F .= 0; nothing)
+predictstoch!(mpc::PredictiveController, ::StateEstimator) = (mpc.F .= 0)
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)
@@ -320,7 +324,7 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
     if any(mpc.con.i_b) 
         lincon = mpc.optim[:linconstraint]
-        JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
+        @views JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
     end
     return nothing
 end
@@ -476,12 +480,14 @@ solution. A failed optimization prints an `@error` log in the REPL and returns t
 warm-start value.
 """
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
-    optim = mpc.optim
-    model = mpc.estim.model
+    model, optim = mpc.estim.model, mpc.optim
+    nu, Hc = model.nu, mpc.Hc
     ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
     # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}; ϵ_{k-1}]
-    ϵ0  = (mpc.nϵ == 1) ? mpc.ΔŨ[end] : empty(mpc.ΔŨ)
-    ΔŨ0 = [mpc.ΔŨ[(model.nu+1):(mpc.Hc*model.nu)]; zeros(NT, model.nu); ϵ0]
+    ΔŨ0 = mpc.buffer.ΔŨ
+    ΔŨ0[1:(Hc*nu-nu)] .= @views mpc.ΔŨ[nu+1:Hc*nu]
+    ΔŨ0[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    mpc.nϵ == 1 && (ΔŨ0[end] = mpc.ΔŨ[end])
     JuMP.set_start_value.(ΔŨvar, ΔŨ0)
     set_objective_linear_coef!(mpc, ΔŨvar)
     try
