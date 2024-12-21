@@ -40,7 +40,7 @@ struct LinMPC{
     Yop::Vector{NT}
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
-    function LinMPC{NT, SE, JM}(
+    function LinMPC{NT}(
         estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim::JM
     ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel}
         model = estim.model
@@ -237,7 +237,7 @@ function LinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
-    return LinMPC{NT, SE, JM}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim)
+    return LinMPC{NT}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim)
 end
 
 """

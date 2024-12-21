@@ -29,7 +29,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     direct::Bool
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
-    function InternalModel{NT, SM}(
+    function InternalModel{NT}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
     ) where {NT<:Real, SM<:SimModel}
         nu, ny, nd = model.nu, model.ny, model.nd
@@ -117,7 +117,7 @@ function InternalModel(
             stoch_ym   = c2d(stoch_ym_c, model.Ts, :tustin)
         end
     end
-    return InternalModel{NT, SM}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
+    return InternalModel{NT}(model, i_ym, stoch_ym.A, stoch_ym.B, stoch_ym.C, stoch_ym.D)
 end
 
 "Validate if deterministic `model` and stochastic model `Csm, Dsm` for `InternalModel`s."

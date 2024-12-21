@@ -4,9 +4,9 @@ struct NonLinMPC{
     NT<:Real, 
     SE<:StateEstimator,
     JM<:JuMP.GenericModel, 
+    P<:Any,
     JEfunc<:Function,
-    GCfunc<:Function,
-    P<:Any
+    GCfunc<:Function
 } <: PredictiveController{NT}
     estim::SE
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
@@ -45,16 +45,16 @@ struct NonLinMPC{
     Yop::Vector{NT}
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
-    function NonLinMPC{NT, SE, JM, P}(
+    function NonLinMPC{NT}(
         estim::SE, 
         Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc!::GCfunc, nc, p::P, optim::JM
     ) where {
             NT<:Real, 
             SE<:StateEstimator, 
-            JM<:JuMP.GenericModel, 
+            JM<:JuMP.GenericModel,
+            P<:Any,
             JEfunc<:Function, 
             GCfunc<:Function, 
-            P<:Any
         }
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
@@ -80,7 +80,7 @@ struct NonLinMPC{
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
         buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
-        mpc = new{NT, SE, JM, JEfunc, GCfunc, P}(
+        mpc = new{NT, SE, JM, P, JEfunc, GCfunc}(
             estim, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
@@ -317,7 +317,7 @@ function NonLinMPC(
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE ::JEfunc   = (_,_,_,_) -> 0.0,
+    JE ::Function = (_,_,_,_) -> 0.0,
     gc!::Function = (_,_,_,_,_,_) -> nothing,
     gc ::Function = gc!,
     nc = 0,
@@ -327,7 +327,6 @@ function NonLinMPC(
     NT<:Real, 
     SE<:StateEstimator{NT}, 
     JM<:JuMP.GenericModel, 
-    JEfunc<:Function,
     P<:Any
 }
     nk = estimate_delays(estim.model)
@@ -337,7 +336,7 @@ function NonLinMPC(
     end
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
-    return NonLinMPC{NT, SE, JM, P}(
+    return NonLinMPC{NT}(
         estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, gc!, nc, p, optim
     )
 end

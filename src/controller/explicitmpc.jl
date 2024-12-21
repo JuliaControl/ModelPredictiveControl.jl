@@ -31,7 +31,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     Yop::Vector{NT}
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
-    function ExplicitMPC{NT, SE}(
+    function ExplicitMPC{NT}(
         estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp
     ) where {NT<:Real, SE<:StateEstimator}
         model = estim.model
@@ -158,7 +158,7 @@ function ExplicitMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
-    return ExplicitMPC{NT, SE}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp)
+    return ExplicitMPC{NT}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp)
 end
 
 setconstraint!(::ExplicitMPC; kwargs...) = error("ExplicitMPC does not support constraints.")

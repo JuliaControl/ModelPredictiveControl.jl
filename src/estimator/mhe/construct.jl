@@ -107,7 +107,7 @@ struct MovingHorizonEstimator{
     direct::Bool
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
-    function MovingHorizonEstimator{NT, SM, JM, CE}(
+    function MovingHorizonEstimator{NT}(
         model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim::JM, covestim::CE;
         direct=true
     ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
@@ -406,7 +406,7 @@ function MovingHorizonEstimator(
     covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
-    return MovingHorizonEstimator{NT, SM, JM, CE}(
+    return MovingHorizonEstimator{NT}(
         model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂, Cwt, optim, covestim; direct
     )
 end
