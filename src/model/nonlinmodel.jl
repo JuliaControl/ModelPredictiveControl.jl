@@ -22,7 +22,7 @@ struct NonLinModel{
     dname::Vector{String}
     xname::Vector{String}
     buffer::SMB
-    function NonLinModel{NT, F, H, P, DS}(
+    function NonLinModel{NT}(
         f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS, buffer::SMB
     ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver, SMB<:SimModelBuffer}
         Ts > 0 || error("Sampling time Ts must be positive")
@@ -144,10 +144,9 @@ function NonLinModel{NT}(
     isnothing(solver) && (solver=EmptySolver())
     f!, h! = get_mutating_functions(NT, f, h)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
-    F, H, P, DS = get_types(f!, h!, p, solver)
     jacobian = JacobianBuffer{NT}(f!, h!, nu, nx, ny, nd)
     buffer = SimModelBuffer{NT}(nu, nx, ny, nd, jacobian)
-    return NonLinModel{NT, F, H, P, DS}(f!, h!, Ts, nu, nx, ny, nd, p, solver, buffer)
+    return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver, buffer)
 end
 
 function NonLinModel(
@@ -223,13 +222,6 @@ function validate_h(NT, h)
         )
     end
     return ismutating
-end
-
-"Get the types of `f!`, `h!` and `solver` to construct a `NonLinModel`."
-function get_types(
-    ::F, ::H, ::P, ::DS
-) where {F<:Function, H<:Function, P<:Any, DS<:DiffSolver} 
-    return F, H, P, DS
 end
 
 "Do nothing if `model` is a [`NonLinModel`](@ref)."

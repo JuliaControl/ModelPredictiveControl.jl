@@ -45,7 +45,7 @@ struct NonLinMPC{
     Yop::Vector{NT}
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
-    function NonLinMPC{NT, SE, JM, JEfunc, GCfunc, P}(
+    function NonLinMPC{NT, SE, JM, P}(
         estim::SE, 
         Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc!::GCfunc, nc, p::P, optim::JM
     ) where {
@@ -337,8 +337,7 @@ function NonLinMPC(
     end
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
-    GCfunc = get_type_mutating_gc(gc!)
-    return NonLinMPC{NT, SE, JM, JEfunc, GCfunc, P}(
+    return NonLinMPC{NT, SE, JM, P}(
         estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, gc!, nc, p, optim
     )
 end
@@ -395,9 +394,6 @@ function get_mutating_gc(NT, gc)
     end
     return gc!
 end
-
-"Get the type of the mutating version of the custom constrain function `gc!`."
-get_type_mutating_gc(::GCfunc) where {GCfunc<:Function} = GCfunc
 
 """
     test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
