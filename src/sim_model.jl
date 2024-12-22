@@ -34,9 +34,9 @@ struct JacobianBuffer{
     CHX<:ForwardDiff.JacobianConfig
 }
     xnext::Vector{NT}
+    u::Vector{NT}
     x::Vector{NT}
     y::Vector{NT}
-    u::Vector{NT}
     d::Vector{NT}
     f_x!::FX
     f_u!::FU
@@ -48,33 +48,34 @@ struct JacobianBuffer{
     f_d_cfg::CFD
     h_x_cfg::CHX
     h_d_cfg::CHU
+    
 end
 
 """
-    JacobianBuffer(NT::DataType, f!::Function, h!::Function, nx, nu, ny, nd)
+    JacobianBuffer(NT::DataType, f!::Function, h!::Function, nu, nx, ny, nd)
 
 Buffer object for calling `ForwardDiff.jacobian!` on `SimModel` without any allocation.
 """
 function JacobianBuffer{NT}(
-    f!::Function, h!::Function, nx::Int, nu::Int, ny::Int, nd::Int
+    f!::Function, h!::Function, nu::Int, nx::Int, ny::Int, nd::Int, p
 ) where NT <: Real 
     xnext = Vector{NT}(undef, nx)
+    u = Vector{NT}(undef, nu)
     x = Vector{NT}(undef, nx)
     y = Vector{NT}(undef, ny)
-    u = Vector{NT}(undef, nu)
     d = Vector{NT}(undef, nd)
-    f_x!(y, x) = f!(y, x, u, d)
-    f_u!(y, u) = f!(y, x, u, d)
-    f_d!(y, d) = f!(y, x, u, d)
-    h_x!(y, x) = h!(y, x, d)
-    h_d!(y, d) = h!(y, x, d)
+    f_x!(xnext, x) = f!(xnext, x, u, d, p)
+    f_u!(xnext, u) = f!(xnext, x, u, d, p)
+    f_d!(xnext, d) = f!(xnext, x, u, d, p)
+    h_x!(y, x) = h!(y, x, d, p)
+    h_d!(y, d) = h!(y, x, d, p)
     f_x_cfg = ForwardDiff.JacobianConfig(f_x!, xnext, x)
     f_u_cfg = ForwardDiff.JacobianConfig(f_u!, xnext, u)
     f_d_cfg = ForwardDiff.JacobianConfig(f_d!, xnext, d)
     h_x_cfg = ForwardDiff.JacobianConfig(h_x!, y, x)
     h_d_cfg = ForwardDiff.JacobianConfig(h_d!, y, d)
     return JacobianBuffer(
-        xnext,      x,          y,          u,          d,
+        xnext,      u,          x,          y,           d,
         f_x!,       f_u!,       f_d!,       h_x!,       h_d!, 
         f_x_cfg,    f_u_cfg,    f_d_cfg,    h_x_cfg,    h_d_cfg
     )

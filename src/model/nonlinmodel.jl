@@ -144,7 +144,7 @@ function NonLinModel{NT}(
     isnothing(solver) && (solver=EmptySolver())
     f!, h! = get_mutating_functions(NT, f, h)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
-    jacobian = JacobianBuffer{NT}(f!, h!, nu, nx, ny, nd)
+    jacobian = JacobianBuffer{NT}(f!, h!, nu, nx, ny, nd, p)
     buffer = SimModelBuffer{NT}(nu, nx, ny, nd, jacobian)
     return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver, buffer)
 end
