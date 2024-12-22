@@ -27,7 +27,7 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     direct::Bool
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
-    function SteadyKalmanFilter{NT, SM}(
+    function SteadyKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, Q̂, R̂; direct=true
     ) where {NT<:Real, SM<:LinModel}
         nu, ny, nd = model.nu, model.ny, model.nd
@@ -182,7 +182,7 @@ function SteadyKalmanFilter(
     # estimated covariances matrices (variance = σ²) :
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    return SteadyKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
+    return SteadyKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
 end
 
 @doc raw"""
@@ -196,7 +196,7 @@ function SteadyKalmanFilter(
     model::SM, i_ym, nint_u, nint_ym, Q̂, R̂; direct=true
 ) where {NT<:Real, SM<:LinModel{NT}}
     Q̂, R̂ = to_mat(Q̂), to_mat(R̂)
-    return SteadyKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
+    return SteadyKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
 end
 
 "Throw an error if `setmodel!` is called on a SteadyKalmanFilter w/o the default values."
@@ -308,7 +308,7 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     direct::Bool
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
-    function KalmanFilter{NT, SM}(
+    function KalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true
     ) where {NT<:Real, SM<:LinModel}
         nu, ny, nd = model.nu, model.ny, model.nd
@@ -419,7 +419,7 @@ function KalmanFilter(
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂; direct)
+    return KalmanFilter{NT}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂; direct)
 end
 
 @doc raw"""
@@ -433,7 +433,7 @@ function KalmanFilter(
     model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true
 ) where {NT<:Real, SM<:LinModel{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
-    return KalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    return KalmanFilter{NT}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 
 @doc raw"""
@@ -530,7 +530,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     direct::Bool
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
-    function UnscentedKalmanFilter{NT, SM}(
+    function UnscentedKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ; direct=true
     ) where {NT<:Real, SM<:SimModel{NT}}
         nu, ny, nd = model.nu, model.ny, model.nd
@@ -681,7 +681,7 @@ function UnscentedKalmanFilter(
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    return UnscentedKalmanFilter{NT, SM}(
+    return UnscentedKalmanFilter{NT}(
         model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ; direct
     )
 end
@@ -699,7 +699,7 @@ function UnscentedKalmanFilter(
     model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α=1e-3, β=2, κ=0; direct=true
 ) where {NT<:Real, SM<:SimModel{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
-    return UnscentedKalmanFilter{NT, SM}(
+    return UnscentedKalmanFilter{NT}(
         model, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂, α, β, κ; direct
     )
 end
@@ -905,7 +905,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     direct::Bool
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
-    function ExtendedKalmanFilter{NT, SM}(
+    function ExtendedKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true
     ) where {NT<:Real, SM<:SimModel}
         nu, ny, nd = model.nu, model.ny, model.nd
@@ -994,7 +994,7 @@ function ExtendedKalmanFilter(
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    return ExtendedKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 
 @doc raw"""
@@ -1008,7 +1008,7 @@ function ExtendedKalmanFilter(
     model::SM, i_ym, nint_u, nint_ym,P̂_0, Q̂, R̂; direct=true
 ) where {NT<:Real, SM<:SimModel{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
-    return ExtendedKalmanFilter{NT, SM}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    return ExtendedKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 
 """

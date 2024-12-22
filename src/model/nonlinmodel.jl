@@ -1,5 +1,5 @@
 struct NonLinModel{
-    NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver
+    NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver, SMB<:SimModelBuffer
 } <: SimModel{NT}
     x0::Vector{NT}
     f!::F
@@ -21,10 +21,10 @@ struct NonLinModel{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
-    buffer::SimModelBuffer{NT}
-    function NonLinModel{NT, F, H, P, DS}(
-        f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS
-    ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver}
+    buffer::SMB
+    function NonLinModel{NT}(
+        f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS, buffer::SMB
+    ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver, SMB<:SimModelBuffer}
         Ts > 0 || error("Sampling time Ts must be positive")
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
@@ -37,8 +37,7 @@ struct NonLinModel{
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
-        buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, F, H, P, DS}(
+        return new{NT, F, H, P, DS, SMB}(
             x0, 
             f!, h!,
             p,
@@ -145,8 +144,9 @@ function NonLinModel{NT}(
     isnothing(solver) && (solver=EmptySolver())
     f!, h! = get_mutating_functions(NT, f, h)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
-    F, H, P, DS = get_types(f!, h!, p, solver)
-    return NonLinModel{NT, F, H, P, DS}(f!, h!, Ts, nu, nx, ny, nd, p, solver)
+    jacobian = JacobianBuffer{NT}(f!, h!, nu, nx, ny, nd, p)
+    buffer = SimModelBuffer{NT}(nu, nx, ny, nd, jacobian)
+    return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver, buffer)
 end
 
 function NonLinModel(
@@ -222,13 +222,6 @@ function validate_h(NT, h)
         )
     end
     return ismutating
-end
-
-"Get the types of `f!`, `h!` and `solver` to construct a `NonLinModel`."
-function get_types(
-    ::F, ::H, ::P, ::DS
-) where {F<:Function, H<:Function, P<:Any, DS<:DiffSolver} 
-    return F, H, P, DS
 end
 
 "Do nothing if `model` is a [`NonLinModel`](@ref)."

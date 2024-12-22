@@ -1,3 +1,31 @@
+
+function jacobianA!(A, jb::JacobianBuffer, model::SimModel, x, u, d)
+    jb.x .= x; jb.u .= u; jb.d .= d
+    return ForwardDiff.jacobian!(A, jb.f_x!, jb.xnext, jb.x, jb.f_x_cfg)
+end
+jacobianA!( _ , _ , model::LinModel, _ , _ , _ ) = model.A
+function jacobianBu!(Bu, jb::JacobianBuffer, model::SimModel, x, u, d)
+    jb.x .= x; jb.u .= u; jb.d .= d
+    return ForwardDiff.jacobian!(Bu, jb.f_u!, jb.xnext, jb.u, jb.f_u_cfg)
+end
+jacobianBu!( _ , _ , model::LinModel, _ , _ , _ ) = model.Bu
+function jacobianBd!(Bd, jb::JacobianBuffer, model::SimModel, x, u, d)
+    jb.x .= x; jb.u .= u; jb.d .= d
+    return ForwardDiff.jacobian!(Bd, jb.f_d!, jb.xnext, jb.d, jb.f_d_cfg)
+end
+jacobianBd!( _ , _ , model::LinModel, _ , _ , _ ) = model.Bd
+function jacobianC!(C, jb::JacobianBuffer, model::SimModel, x, d)
+    jb.x .= x; jb.d .= d
+    return ForwardDiff.jacobian!(C, jb.h_x!, jb.y, jb.x, jb.h_x_cfg)
+end
+jacobianC!( _ , _ , model::LinModel, _ , _ ) = model.C
+function jacobianDd!(Dd, jb::JacobianBuffer, model::SimModel, x, d)
+    jb.x .= x; jb.d .= d
+    return ForwardDiff.jacobian!(Dd, jb.h_d!, jb.y, jb.d, jb.h_d_cfg)
+end
+jacobianDd!( _ , _ , model::LinModel, _ , _ ) = model.Dd
+
+
 """
     LinModel(model::NonLinModel; x=model.x0+model.xop, u=model.uop, d=model.dop)
 
@@ -118,19 +146,25 @@ function linearize!(
     d0 .= d .- nonlinmodel.dop
     x0 .= x .- nonlinmodel.xop
     # --- compute the Jacobians at linearization points ---
-    A::Matrix{NT}, Bu::Matrix{NT}, Bd::Matrix{NT}  = linmodel.A, linmodel.Bu, linmodel.Bd
-    C::Matrix{NT}, Dd::Matrix{NT} = linmodel.C, linmodel.Dd
+    #A::Matrix{NT}, Bu::Matrix{NT}, Bd::Matrix{NT}  = linmodel.A, linmodel.Bu, linmodel.Bd
+    #C::Matrix{NT}, Dd::Matrix{NT} = linmodel.C, linmodel.Dd
     xnext0::Vector{NT}, y0::Vector{NT} = linmodel.buffer.x, linmodel.buffer.y
-    myf_x0!(xnext0, x0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
-    myf_u0!(xnext0, u0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
-    myf_d0!(xnext0, d0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
-    myh_x0!(y0, x0) = h!(y0, nonlinmodel, x0, d0, model.p)
-    myh_d0!(y0, d0) = h!(y0, nonlinmodel, x0, d0, model.p)
-    ForwardDiff.jacobian!(A,  myf_x0!, xnext0, x0)
-    ForwardDiff.jacobian!(Bu, myf_u0!, xnext0, u0)
-    ForwardDiff.jacobian!(Bd, myf_d0!, xnext0, d0)
-    ForwardDiff.jacobian!(C,  myh_x0!, y0, x0)
-    ForwardDiff.jacobian!(Dd, myh_d0!, y0, d0)
+    #myf_x0!(xnext0, x0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
+    #myf_u0!(xnext0, u0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
+    #myf_d0!(xnext0, d0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
+    #myh_x0!(y0, x0) = h!(y0, nonlinmodel, x0, d0, model.p)
+    #myh_d0!(y0, d0) = h!(y0, nonlinmodel, x0, d0, model.p)
+    #ForwardDiff.jacobian!(A,  myf_x0!, xnext0, x0)
+    #ForwardDiff.jacobian!(Bu, myf_u0!, xnext0, u0)
+    #ForwardDiff.jacobian!(Bd, myf_d0!, xnext0, d0)
+    #ForwardDiff.jacobian!(C,  myh_x0!, y0, x0)
+    #ForwardDiff.jacobian!(Dd, myh_d0!, y0, d0)
+    jb = nonlinmodel.buffer.jacobian
+    jacobianA!(linmodel.A,   jb, nonlinmodel, x0, u0, d0)
+    jacobianBu!(linmodel.Bu, jb, nonlinmodel, x0, u0, d0)
+    jacobianBd!(linmodel.Bd, jb, nonlinmodel, x0, u0, d0)
+    jacobianC!(linmodel.C,   jb, nonlinmodel, x0, d0)
+    jacobianDd!(linmodel.Dd, jb, nonlinmodel, x0, d0)
     # --- compute the nonlinear model output at operating points ---
     h!(y0, nonlinmodel, x0, d0, model.p)
     y  = y0
