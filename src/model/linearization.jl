@@ -136,29 +136,16 @@ julia> linearize!(linmodel, model, x=[20.0], u=[0.0]); linmodel.A
 ```
 """
 function linearize!(
-    linmodel::LinModel{NT}, model::SM; x=model.x0+model.xop, u=model.uop, d=model.dop
-) where {NT<:Real, SM<:SimModel{NT}}
+    linmodel::LinModel, model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop
+)
     nonlinmodel = model
     buffer = nonlinmodel.buffer
     # --- remove the operating points of the nonlinear model (typically zeros) ---
-    x0::Vector{NT}, u0::Vector{NT}, d0::Vector{NT} = buffer.x, buffer.u, buffer.d
+    x0, u0, d0 = buffer.x, buffer.u, buffer.d
     u0 .= u .- nonlinmodel.uop
     d0 .= d .- nonlinmodel.dop
     x0 .= x .- nonlinmodel.xop
     # --- compute the Jacobians at linearization points ---
-    #A::Matrix{NT}, Bu::Matrix{NT}, Bd::Matrix{NT}  = linmodel.A, linmodel.Bu, linmodel.Bd
-    #C::Matrix{NT}, Dd::Matrix{NT} = linmodel.C, linmodel.Dd
-    xnext0::Vector{NT}, y0::Vector{NT} = linmodel.buffer.x, linmodel.buffer.y
-    #myf_x0!(xnext0, x0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
-    #myf_u0!(xnext0, u0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
-    #myf_d0!(xnext0, d0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
-    #myh_x0!(y0, x0) = h!(y0, nonlinmodel, x0, d0, model.p)
-    #myh_d0!(y0, d0) = h!(y0, nonlinmodel, x0, d0, model.p)
-    #ForwardDiff.jacobian!(A,  myf_x0!, xnext0, x0)
-    #ForwardDiff.jacobian!(Bu, myf_u0!, xnext0, u0)
-    #ForwardDiff.jacobian!(Bd, myf_d0!, xnext0, d0)
-    #ForwardDiff.jacobian!(C,  myh_x0!, y0, x0)
-    #ForwardDiff.jacobian!(Dd, myh_d0!, y0, d0)
     jb = nonlinmodel.buffer.jacobian
     jacobianA!(linmodel.A,   jb, nonlinmodel, x0, u0, d0)
     jacobianBu!(linmodel.Bu, jb, nonlinmodel, x0, u0, d0)
@@ -166,6 +153,7 @@ function linearize!(
     jacobianC!(linmodel.C,   jb, nonlinmodel, x0, d0)
     jacobianDd!(linmodel.Dd, jb, nonlinmodel, x0, d0)
     # --- compute the nonlinear model output at operating points ---
+    xnext0, y0 = linmodel.buffer.x, linmodel.buffer.y
     h!(y0, nonlinmodel, x0, d0, model.p)
     y  = y0
     y .= y0 .+ nonlinmodel.yop
