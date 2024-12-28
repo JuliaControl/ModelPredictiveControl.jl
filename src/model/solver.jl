@@ -32,7 +32,8 @@ end
 Create a Runge-Kutta solver with optional super-sampling.
 
 Only the 4th order Runge-Kutta is supported for now. The keyword argument `supersample`
-provides the number of internal steps (default to 1 step).
+provides the number of internal steps (default to 1 step). This solver is allocation-free if
+the `f!` and `h!` functions do not allocate.
 """
 RungeKutta(order::Int=4; supersample::Int=1) = RungeKutta(order, supersample)
 

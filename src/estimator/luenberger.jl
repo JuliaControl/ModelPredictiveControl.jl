@@ -78,6 +78,7 @@ elements specifying the observer poles/eigenvalues (near ``z=0.5`` by default). 
 is constructed with a direct transmission from ``\mathbf{y^m}`` if `direct=true` (a.k.a. 
 current observers, in opposition to the delayed/prediction form). The method computes the
 observer gain `K̂` with [`place`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.place).
+This estimator is allocation-free.
 
 # Examples
 ```jldoctest

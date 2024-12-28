@@ -215,7 +215,8 @@ the keyword argument `direct=true` (default value), the constant ``p=0`` in the 
 above, and the MHE is in the current form. Else ``p=1``, leading to the prediction form.
 
 See [`UnscentedKalmanFilter`](@ref) for details on the augmented process model and 
-``\mathbf{R̂}, \mathbf{Q̂}`` covariances.
+``\mathbf{R̂}, \mathbf{Q̂}`` covariances. This estimator allocates a fair amount of memory 
+at each time step.
 
 !!! warning
     See the Extended Help if you get an error like:    

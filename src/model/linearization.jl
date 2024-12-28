@@ -120,7 +120,8 @@ end
 
 Linearize `model` and store the result in `linmodel` (in-place).
 
-The keyword arguments are identical to [`linearize`](@ref).
+The keyword arguments are identical to [`linearize`](@ref). The code is allocation-free if
+`model` simulations does not allocate.
 
 # Examples
 ```jldoctest
