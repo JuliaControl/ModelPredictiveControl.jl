@@ -233,5 +233,5 @@ f!(xnext0, model::NonLinModel, x0, u0, d0, p) = model.f!(xnext0, x0, u0, d0, p)
 "Call `model.h!(y0, x0, d0, p)` for [`NonLinModel`](@ref)."
 h!(y0, model::NonLinModel, x0, d0, p) = model.h!(y0, x0, d0, p)
 
-detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name) solver"
+detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name)($(model.solver.order)) solver"
 detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:Any, <:EmptySolver}) = ", empty solver"

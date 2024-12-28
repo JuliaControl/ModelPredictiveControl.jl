@@ -31,9 +31,9 @@ end
 
 Create an explicit Runge-Kutta solver with optional super-sampling.
 
-Only the 1st and 4th order Runge-Kutta is supported. The keyword argument
-`supersample` provides the number of internal steps (default to 1 step). This solver is
-allocation-free if the `f!` and `h!` functions do not allocate.
+The argument `order` specifies the order of the Runge-Kutta solver, which must be 1 or 4.
+The keyword argument `supersample` provides the number of internal steps (default to 1 step).
+This solver is allocation-free if the `f!` and `h!` functions do not allocate.
 """
 RungeKutta(order::Int=4; supersample::Int=1) = RungeKutta(order, supersample)
 
@@ -94,7 +94,7 @@ end
 
 Create a Forward Euler solver with optional super-sampling.
 
-This is an alias for `RungeKutta(1; supersample)`.
+This is an alias for `RungeKutta(1; supersample)`, see [`RungeKutta`](@ref).
 """
 const ForwardEuler(;supersample=1) = RungeKutta(1; supersample)
 
