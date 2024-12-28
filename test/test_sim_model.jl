@@ -200,7 +200,7 @@ end
     Dd = reshape([0], 1, 1)
     f3(x, u, d, _) = A*x + Bu*u+ Bd*d
     h3(x, d, _) = C*x + Dd*d
-    solver=RungeKutta()
+    solver=RungeKutta(4)
     @test string(solver) == 
         "4th order Runge-Kutta differential equation solver with 1 supersamples."
     nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver)
@@ -227,6 +227,13 @@ end
     @test xnext ≈ zeros(2)
     nonlinmodel6.h!(y, [0; 0], [0], nonlinmodel6.p)
     @test y ≈ zeros(1)
+    nonlinemodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler())
+    xnext, y = similar(nonlinemodel7.x0), similar(nonlinemodel7.yop)
+    nonlinemodel7.f!(xnext, [0; 0], [0], [0], nonlinemodel7.p)
+    @test xnext ≈ zeros(2)
+    nonlinemodel7.h!(y, [0; 0], [0], nonlinemodel7.p)
+    @test y ≈ zeros(1)
+
     
     @test_throws ErrorException NonLinModel(
         (x,u)->linmodel1.A*x + linmodel1.Bu*u,
