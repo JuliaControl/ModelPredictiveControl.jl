@@ -103,7 +103,7 @@ julia> f!(ẋ, x, u, _ , p) = (ẋ .= p*x .+ u; nothing);
 julia> h!(y, x, _ , _ ) = (y .= 0.1x; nothing);
 
 julia> model1 = NonLinModel(f!, h!, 5.0, 1, 1, 1, p=-0.2)       # continuous dynamics
-NonLinModel with a sample time Ts = 5.0 s, RungeKutta solver and:
+NonLinModel with a sample time Ts = 5.0 s, RungeKutta(4) solver and:
  1 manipulated inputs u
  1 states x
  1 outputs y
