@@ -23,7 +23,7 @@ import PreallocationTools: DiffCache, get_tmp
 import OSQP, Ipopt
 
 export SimModel, LinModel, NonLinModel
-export DiffSolver, RungeKutta
+export DiffSolver, RungeKutta, ForwardEuler
 export setop!, setname!
 export setstate!, setmodel!, preparestate!, updatestate!, evaloutput, linearize, linearize!
 export savetime!, periodsleep

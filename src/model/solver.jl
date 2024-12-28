@@ -37,7 +37,7 @@ allocation-free if the `f!` and `h!` functions do not allocate.
 """
 RungeKutta(order::Int=4; supersample::Int=1) = RungeKutta(order, supersample)
 
-"Get the `f!` and `h!` functions for Runge-Kutta solver."
+"Get the `f!` and `h!` functions for the explicit Runge-Kutta solvers."
 function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ , nx, _ , _ )
     order = solver.order
     Ts_inner = Ts/solver.supersample
@@ -47,7 +47,21 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ 
     k2_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     k3_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     k4_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
-    if order==4
+    if order==1
+        f! = function euler_solver!(xnext, x, u, d, p)
+            CT = promote_type(eltype(x), eltype(u), eltype(d))
+            xcur = get_tmp(xcur_cache, CT)
+            k1   = get_tmp(k1_cache, CT)
+            xterm = xnext
+            @. xcur = x
+            for i=1:solver.supersample
+                fc!(k1, xcur, u, d, p)
+                @. xcur = xcur + k1 * Ts_inner
+            end
+            @. xnext = xcur
+            return nothing
+        end
+    elseif order==4
         f! = function rk4_solver!(xnext, x, u, d, p)
             CT = promote_type(eltype(x), eltype(u), eltype(d))
             xcur = get_tmp(xcur_cache, CT)
@@ -74,6 +88,15 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ 
     h! = hc!
     return f!, h!
 end
+
+"""
+    ForwardEuler(; supersample=1)
+
+Create a Forward Euler solver with optional super-sampling.
+
+This is an alias for `RungeKutta(1; supersample)`.
+"""
+const ForwardEuler(;supersample=1) = RungeKutta(1; supersample)
 
 function Base.show(io::IO, solver::RungeKutta)
     N, n = solver.order, solver.supersample

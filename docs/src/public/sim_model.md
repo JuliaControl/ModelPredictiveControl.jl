@@ -66,4 +66,5 @@ ModelPredictiveControl.DiffSolver
 
 ```@docs
 RungeKutta
+ForwardEuler
 ```
