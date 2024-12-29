@@ -144,6 +144,8 @@ This method uses the default state estimator:
 - if `model` is a [`LinModel`](@ref), a [`SteadyKalmanFilter`](@ref) with default arguments;
 - else, an [`UnscentedKalmanFilter`](@ref) with default arguments. 
 
+This controller allocates memory at each time step for the optimization.
+
 !!! warning
     See Extended Help if you get an error like:    
     `MethodError: no method matching Float64(::ForwardDiff.Dual)`.

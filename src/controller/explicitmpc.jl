@@ -100,7 +100,7 @@ suitable for applications that require small sample times. The keyword arguments
 identical to [`LinMPC`](@ref), except for `Cwt` and `optim` which are not supported. 
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
-arguments.
+arguments. This controller is allocation-free.
 
 # Examples
 ```jldoctest

@@ -101,7 +101,7 @@ on the covariance tuning. The matrices ``\mathbf{Ĉ^m, D̂_d^m}`` are the rows 
 ``\mathbf{Ĉ, D̂_d}`` that correspond to measured outputs ``\mathbf{y^m}`` (and unmeasured
 ones, for ``\mathbf{Ĉ^u, D̂_d^u}``). The Kalman filter will estimate the current state with 
 the newest measurements ``\mathbf{x̂}_k(k)`` if `direct` is `true`, else it will predict the
-state of the next time step ``\mathbf{x̂}_k(k+1)``.
+state of the next time step ``\mathbf{x̂}_k(k+1)``. This estimator is allocation-free.
 
 # Arguments
 !!! info
@@ -352,6 +352,7 @@ the estimation error covariance of `model` states augmented with the stochastic 
 ``\mathbf{P̂}_{-1}(0) = \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), 
 \mathbf{P_{int_{ym}}}(0) \}``. The initial state estimate ``\mathbf{x̂}_{-1}(0)`` can be
 manually specified with [`setstate!`](@ref), or automatically with [`initstate!`](@ref).
+This estimator is allocation-free.
 
 # Arguments
 !!! info
@@ -596,6 +597,7 @@ matrix ``\mathbf{P̂}`` is the estimation error covariance of `model` state augm
 stochastic ones. Three keyword arguments specify its initial value with ``\mathbf{P̂}_{-1}(0) = 
 \mathrm{diag}\{ \mathbf{P}(0), \mathbf{P_{int_{u}}}(0), \mathbf{P_{int_{ym}}}(0) \}``. The 
 initial state estimate ``\mathbf{x̂}_{-1}(0)`` can be manually specified with [`setstate!`](@ref).
+This estimator is allocation-free if `model` simulations do not allocate.
 
 # Arguments
 !!! info
@@ -950,7 +952,7 @@ Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process mod
 keyword arguments are identical to [`UnscentedKalmanFilter`](@ref), except for `α`, `β` and 
 `κ` which do not apply to the extended Kalman Filter. The Jacobians of the augmented model 
 ``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl)
-automatic differentiation.
+automatic differentiation. This estimator allocates memory for the Jacobians.
 
 !!! warning
     See the Extended Help of [`linearize`](@ref) function if you get an error like:    

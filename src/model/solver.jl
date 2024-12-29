@@ -13,8 +13,8 @@ struct RungeKutta <: DiffSolver
     order::Int
     supersample::Int
     function RungeKutta(order::Int, supersample::Int)
-        if order ≠ 4
-            throw(ArgumentError("only 4th order Runge-Kutta is supported."))
+        if order ≠ 4 && order ≠ 1
+            throw(ArgumentError("only 1st and 4th order Runge-Kutta is supported."))
         end
         if order < 1
             throw(ArgumentError("order must be greater than 0"))
@@ -29,15 +29,17 @@ end
 """
     RungeKutta(order=4; supersample=1)
 
-Create a Runge-Kutta solver with optional super-sampling.
+Create an explicit Runge-Kutta solver with optional super-sampling.
 
-Only the 4th order Runge-Kutta is supported for now. The keyword argument `supersample`
-provides the number of internal steps (default to 1 step).
+The argument `order` specifies the order of the Runge-Kutta solver, which must be 1 or 4.
+The keyword argument `supersample` provides the number of internal steps (default to 1 step).
+This solver is allocation-free if the `f!` and `h!` functions do not allocate.
 """
 RungeKutta(order::Int=4; supersample::Int=1) = RungeKutta(order, supersample)
 
-"Get the `f!` and `h!` functions for Runge-Kutta solver."
+"Get the `f!` and `h!` functions for the explicit Runge-Kutta solvers."
 function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ , nx, _ , _ )
+    order = solver.order
     Ts_inner = Ts/solver.supersample
     Nc = nx + 2
     xcur_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx), Nc)
@@ -45,32 +47,56 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ 
     k2_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     k3_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
     k4_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
-    f! = function inner_solver_f!(xnext, x, u, d, p)
-        CT = promote_type(eltype(x), eltype(u), eltype(d))
-        xcur = get_tmp(xcur_cache, CT)
-        k1   = get_tmp(k1_cache, CT)
-        k2   = get_tmp(k2_cache, CT)
-        k3   = get_tmp(k3_cache, CT)
-        k4   = get_tmp(k4_cache, CT)
-        xterm = xnext
-        @. xcur = x
-        for i=1:solver.supersample
-            @. xterm = xcur
-            fc!(k1, xterm, u, d, p)
-            @. xterm = xcur + k1 * Ts_inner/2
-            fc!(k2, xterm, u, d, p)
-            @. xterm = xcur + k2 * Ts_inner/2
-            fc!(k3, xterm, u, d, p)
-            @. xterm = xcur + k3 * Ts_inner
-            fc!(k4, xterm, u, d, p)
-            @. xcur = xcur + (k1 + 2k2 + 2k3 + k4)*Ts_inner/6
+    if order==1
+        f! = function euler_solver!(xnext, x, u, d, p)
+            CT = promote_type(eltype(x), eltype(u), eltype(d))
+            xcur = get_tmp(xcur_cache, CT)
+            k1   = get_tmp(k1_cache, CT)
+            xterm = xnext
+            @. xcur = x
+            for i=1:solver.supersample
+                fc!(k1, xcur, u, d, p)
+                @. xcur = xcur + k1 * Ts_inner
+            end
+            @. xnext = xcur
+            return nothing
         end
-        @. xnext = xcur
-        return nothing
+    elseif order==4
+        f! = function rk4_solver!(xnext, x, u, d, p)
+            CT = promote_type(eltype(x), eltype(u), eltype(d))
+            xcur = get_tmp(xcur_cache, CT)
+            k1   = get_tmp(k1_cache, CT)
+            k2   = get_tmp(k2_cache, CT)
+            k3   = get_tmp(k3_cache, CT)
+            k4   = get_tmp(k4_cache, CT)
+            xterm = xnext
+            @. xcur = x
+            for i=1:solver.supersample
+                fc!(k1, xcur, u, d, p)
+                @. xterm = xcur + k1 * Ts_inner/2
+                fc!(k2, xterm, u, d, p)
+                @. xterm = xcur + k2 * Ts_inner/2
+                fc!(k3, xterm, u, d, p)
+                @. xterm = xcur + k3 * Ts_inner
+                fc!(k4, xterm, u, d, p)
+                @. xcur = xcur + (k1 + 2k2 + 2k3 + k4)*Ts_inner/6
+            end
+            @. xnext = xcur
+            return nothing
+        end
     end
     h! = hc!
     return f!, h!
 end
+
+"""
+    ForwardEuler(; supersample=1)
+
+Create a Forward Euler solver with optional super-sampling.
+
+This is an alias for `RungeKutta(1; supersample)`, see [`RungeKutta`](@ref).
+"""
+const ForwardEuler(;supersample=1) = RungeKutta(1; supersample)
 
 function Base.show(io::IO, solver::RungeKutta)
     N, n = solver.order, solver.supersample

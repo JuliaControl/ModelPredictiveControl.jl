@@ -117,7 +117,7 @@ from ``j=0`` to ``H_p-1``. The slack variable ``ϵ`` relaxes the constraints, as
 in [`setconstraint!`](@ref) documentation. See Extended Help for a detailed nomenclature. 
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
-arguments.
+arguments. This controller allocates memory at each time step for the optimization.
 
 # Arguments
 - `model::LinModel` : model used for controller predictions and state estimations.

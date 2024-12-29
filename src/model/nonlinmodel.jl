@@ -103,7 +103,7 @@ julia> f!(ẋ, x, u, _ , p) = (ẋ .= p*x .+ u; nothing);
 julia> h!(y, x, _ , _ ) = (y .= 0.1x; nothing);
 
 julia> model1 = NonLinModel(f!, h!, 5.0, 1, 1, 1, p=-0.2)       # continuous dynamics
-NonLinModel with a sample time Ts = 5.0 s, RungeKutta solver and:
+NonLinModel with a sample time Ts = 5.0 s, RungeKutta(4) solver and:
  1 manipulated inputs u
  1 states x
  1 outputs y
@@ -233,5 +233,5 @@ f!(xnext0, model::NonLinModel, x0, u0, d0, p) = model.f!(xnext0, x0, u0, d0, p)
 "Call `model.h!(y0, x0, d0, p)` for [`NonLinModel`](@ref)."
 h!(y0, model::NonLinModel, x0, d0, p) = model.h!(y0, x0, d0, p)
 
-detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name) solver"
+detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name)($(model.solver.order)) solver"
 detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:Any, <:EmptySolver}) = ", empty solver"
