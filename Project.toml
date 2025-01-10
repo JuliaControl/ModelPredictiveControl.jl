@@ -28,7 +28,7 @@ PrecompileTools = "1"
 ProgressLogging = "0.1"
 Random = "1.6"
 RecipesBase = "1"
-julia = "1.6"
+julia = "1.10"
 
 [extras]
 DAQP = "c47d62df-3981-49c8-9651-128b1cd08617"
