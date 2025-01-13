@@ -513,28 +513,9 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     û0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nu),  Ncache)
     g_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, ng),  Ncache)
     gc_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nc),  Ncache)
-    function Jfunc(ΔŨtup::T...) where T<:Real
-        ΔŨ1 = ΔŨtup[begin]
-        ΔŨ, g = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(g_cache, ΔŨ1) 
-        for i in eachindex(ΔŨtup)
-            ΔŨ[i] = ΔŨtup[i] # ΔŨ .= ΔŨtup seems to produce a type instability
-        end
-        Ŷe, Ue     = get_tmp(Ŷe_cache, ΔŨ1), get_tmp(Ue_cache, ΔŨ1)
-        Ȳ,  Ū      = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
-        x̂0, x̂0next = get_tmp(x̂0_cache, ΔŨ1), get_tmp(x̂0next_cache, ΔŨ1)
-        u0, û0     = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
-        gc         = get_tmp(gc_cache, ΔŨ1)
-        Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
-        Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
-        ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
-        gc = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
-        g  = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
-        return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ)::T
-    end
-    function gfunc_i(i, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
-        ΔŨ1 = ΔŨtup[begin]
-        ΔŨ, g = get_tmp(ΔŨ_cache, ΔŨ1), get_tmp(g_cache, ΔŨ1)     
+    function update_simulations!(ΔŨ, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
         if any(new !== old for (new, old) in zip(ΔŨtup, ΔŨ)) # new ΔŨtup, update predictions:
+            ΔŨ1 = ΔŨtup[begin]
             for i in eachindex(ΔŨtup)
                 ΔŨ[i] = ΔŨtup[i] # ΔŨ .= ΔŨtup seems to produce a type instability
             end
@@ -542,13 +523,28 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             Ȳ,  Ū      = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
             x̂0, x̂0next = get_tmp(x̂0_cache, ΔŨ1), get_tmp(x̂0next_cache, ΔŨ1)
             u0, û0     = get_tmp(u0_cache, ΔŨ1), get_tmp(û0_cache, ΔŨ1)
-            gc         = get_tmp(gc_cache, ΔŨ1)
+            gc, g      = get_tmp(gc_cache, ΔŨ1), get_tmp(g_cache, ΔŨ1)
             Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, ΔŨ)
             Ue, Ŷe     = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
             ϵ = (nϵ ≠ 0) ? ΔŨ[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
             gc = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
             g  = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
         end
+        return nothing
+    end
+    function Jfunc(ΔŨtup::T...) where T<:Real
+        ΔŨ1 = ΔŨtup[begin]
+        ΔŨ = get_tmp(ΔŨ_cache, ΔŨ1)
+        update_simulations!(ΔŨ, ΔŨtup)
+        Ȳ,  Ū  = get_tmp(Ȳ_cache, ΔŨ1),  get_tmp(Ū_cache, ΔŨ1)
+        Ŷe, Ue = get_tmp(Ŷe_cache, ΔŨ1), get_tmp(Ue_cache, ΔŨ1)
+        return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ)::T
+    end
+    function gfunc_i(i, ΔŨtup::NTuple{N, T}) where {N, T<:Real}
+        ΔŨ1 = ΔŨtup[begin]
+        ΔŨ = get_tmp(ΔŨ_cache, ΔŨ1)
+        update_simulations!(ΔŨ, ΔŨtup)
+        g = get_tmp(g_cache, ΔŨ1)
         return g[i]::T
     end
     gfunc = [(ΔŨ...) -> gfunc_i(i, ΔŨ) for i in 1:ng]
