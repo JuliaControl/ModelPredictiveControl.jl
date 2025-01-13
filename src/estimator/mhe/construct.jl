@@ -1309,33 +1309,33 @@ function get_optim_functions(
     x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂), Nc)
     û0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu), Nc)
     ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ), Nc)
+    function update_simulations!(Z̃, Z̃tup::NTuple{N, T}) where {N, T <:Real}
+        if any(new !== old for (new, old) in zip(Z̃tup, Z̃)) # new Z̃tup, update predictions:
+            Z̃1 = Z̃tup[begin]
+            for i in eachindex(Z̃tup)
+                Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
+            end
+            V̂,  X̂0 = get_tmp(V̂_cache, Z̃1),  get_tmp(X̂0_cache, Z̃1)
+            û0, ŷ0 = get_tmp(û0_cache, Z̃1), get_tmp(ŷ0_cache, Z̃1)
+            g      = get_tmp(g_cache, Z̃1)
+            V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
+            ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
+            g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
+        end
+        return nothing
+    end
     function Jfunc(Z̃tup::T...)::T where {T <: Real}
         Z̃1 = Z̃tup[begin]
-        Z̃, g = get_tmp(Z̃_cache, Z̃1), get_tmp(g_cache, Z̃1)
-        for i in eachindex(Z̃tup)
-            Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
-        end
-        V̂,  X̂0 = get_tmp(V̂_cache, Z̃1),  get_tmp(X̂0_cache, Z̃1)
-        û0, ŷ0 = get_tmp(û0_cache, Z̃1), get_tmp(ŷ0_cache, Z̃1)
-        V̂,  X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
-        ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
-        g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
-        x̄ = get_tmp(x̄_cache, Z̃1)
+        Z̃ = get_tmp(Z̃_cache, Z̃1)
+        update_simulations!(Z̃, Z̃tup)
+        x̄, V̂ = get_tmp(x̄_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
     function gfunc_i(i, Z̃tup::NTuple{N, T})::T where {N, T <:Real}
         Z̃1 = Z̃tup[begin]
-        Z̃, g = get_tmp(Z̃_cache, Z̃1), get_tmp(g_cache, Z̃1)
-        if any(new !== old for (new, old) in zip(Z̃tup, Z̃)) # new Z̃tup, update predictions:
-            V̂,  X̂0 = get_tmp(V̂_cache, Z̃1),  get_tmp(X̂0_cache, Z̃1)
-            û0, ŷ0 = get_tmp(û0_cache, Z̃1), get_tmp(ŷ0_cache, Z̃1)
-            for i in eachindex(Z̃tup)
-                Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
-            end
-            V̂, X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
-            ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
-            g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
-        end
+        Z̃ = get_tmp(Z̃_cache, Z̃1)
+        update_simulations!(Z̃, Z̃tup)
+        g = get_tmp(g_cache, Z̃1)
         return g[i]
     end
     gfunc = [(Z̃...) -> gfunc_i(i, Z̃) for i in 1:ng]
