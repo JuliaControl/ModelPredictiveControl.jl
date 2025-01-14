@@ -403,8 +403,6 @@ function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
         Ue[1:end-nu] .= U
         # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
         Ue[end-nu+1:end] .= @views U[end-nu+1:end]
-    else
-        print("yo")
     end
     return Ŷe, Ue 
 end
