@@ -124,7 +124,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
     J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, mpc.ΔŨ)
     U, Ŷ = Ū, Ȳ
-    U   .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu 
+    U   .= mul!(U, mpc.S̃, mpc.ΔŨ) .+ mpc.T_lastu 
     Ŷ   .= Ŷ0 .+ mpc.Yop
     oldF = copy(mpc.F)
     F    = predictstoch!(mpc, mpc.estim) 
@@ -390,14 +390,14 @@ special cases in which `Ŷe`, `Ue` and `Ū` are not mutated:
 """
 function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
     ny, nu = model.ny, model.nu
-    nocustomfcts = (mpc.weights.iszero_E && mpc.con.nc==0)
+    nocustomfonctions = (mpc.weights.iszero_E && iszero_nc(mpc))
     # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
-    if !(mpc.weights.iszero_M_Hp[] && nocustomfcts)
+    if !(mpc.weights.iszero_M_Hp[] && mpc.nocustomfcts)
         Ŷe[1:ny] .= mpc.ŷ
         Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
     end
     # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
-    if !(mpc.weights.iszero_L_Hp[] && nocustomfcts)
+    if !(mpc.weights.iszero_L_Hp[] && mpc.nocustomfcts)
         U  = Ū
         U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu
         Ue[1:end-nu] .= U
@@ -406,6 +406,9 @@ function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
     end
     return Ŷe, Ue 
 end
+
+"Verify if the custom nonlinear constraint has zero elements."
+iszero_nc(mpc::PredictiveController) = (mpc.con.nc == 0)
 
 """
     obj_nonlinprog!( _ , _ , mpc::PredictiveController, model::LinModel, Ue, Ŷe, ΔŨ)
