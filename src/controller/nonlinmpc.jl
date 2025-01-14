@@ -554,7 +554,6 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             return gfunc_i(i, ΔŨtup)
         end
     end
-    #gfunc = [(ΔŨ::Vararg{T, N}) -> gfunc_i(i, ΔŨ) where {N, T<:Real} for i in 1:ng]  
     return Jfunc, gfuncs
 end
 
