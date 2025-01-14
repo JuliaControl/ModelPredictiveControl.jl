@@ -121,12 +121,11 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ȳ, Ū        = similar(mpc.Yop), similar(mpc.Uop)
     Ŷe, Ue      = Vector{NT}(undef, nŶe), Vector{NT}(undef, nUe)
     Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
-    Ue, Ŷe    = extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
+    Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
     J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, mpc.ΔŨ)
-    U  = Ū
-    U .= @views Ue[1:end-model.nu]
-    Ŷ  = Ȳ
-    Ŷ .= @views Ŷe[model.ny+1:end]
+    U, Ŷ = Ū, Ȳ
+    U   .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu 
+    Ŷ   .= Ŷ0 .+ mpc.Yop
     oldF = copy(mpc.F)
     F    = predictstoch!(mpc, mpc.estim) 
     Ŷs  .= F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
@@ -376,24 +375,38 @@ function predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, mod
 end
 
 """
-    extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ) -> Ŷe, Ue
+    extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ) -> Ŷe, Ue
 
-Compute the extended vectors `Ue` and `Ŷe` and  for the nonlinear optimization.
+Compute the extended vectors `Ŷe` and `Ue` for the nonlinear optimization.
 
-The function mutates `Ue`, `Ŷe` and `Ū` in arguments, without assuming any initial values.
+The function mutates `Ŷe`, `Ue` and `Ū` in arguments, without assuming any initial values
+for them. Using `nocustomfcts = mpc.weights.iszero_E && mpc.con.nc == 0`, there is two 
+special cases in which `Ŷe`, `Ue` and `Ū` are not mutated:
+    
+- If `mpc.weights.iszero_M_Hp[] && nocustomfcts`, the `Ŷe` vector is not computed to reduce
+  the burden in the optimization problem.
+- If `mpc.weights.iszero_L_Hc[] && nocustomfcts`, the `Ue` vector is not computed for the
+  same reason as above.
 """
-function extended_predictions!(Ue, Ŷe, Ū, mpc, model, Ŷ0, ΔŨ)
+function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
     ny, nu = model.ny, model.nu
-    # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
-    U  = Ū
-    U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu
-    Ue[1:end-nu] .= U
-    # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
-    Ue[end-nu+1:end] .= @views U[end-nu+1:end]
+    nocustomfcts = (mpc.weights.iszero_E && mpc.con.nc==0)
     # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
-    Ŷe[1:ny]     .= mpc.ŷ
-    Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
-    return Ue, Ŷe 
+    if !(mpc.weights.iszero_M_Hp[] && nocustomfcts)
+        Ŷe[1:ny] .= mpc.ŷ
+        Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
+    end
+    # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
+    if !(mpc.weights.iszero_L_Hp[] && nocustomfcts)
+        U  = Ū
+        U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu
+        Ue[1:end-nu] .= U
+        # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
+        Ue[end-nu+1:end] .= @views U[end-nu+1:end]
+    else
+        print("yo")
+    end
+    return Ŷe, Ue 
 end
 
 """
