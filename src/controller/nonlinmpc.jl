@@ -490,9 +490,10 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
 end
 
 """
-    get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel) -> Jfunc, gfunc
+    get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel) -> Jfunc, gfuncs
 
-Get the objective `Jfunc` and constraints `gfunc` functions for [`NonLinMPC`](@ref).
+Get the objective `Jfunc` function and constraint `gfuncs` function vector for 
+[`NonLinMPC`](@ref).
 
 Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
 """

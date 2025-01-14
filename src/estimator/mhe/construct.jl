@@ -1289,9 +1289,10 @@ end
 
 
 """
-    get_optim_functions(estim::MovingHorizonEstimator, ::JuMP.GenericModel) -> Jfunc, gfunc
+    get_optim_functions(estim::MovingHorizonEstimator, ::JuMP.GenericModel) -> Jfunc, gfuncs
 
-Get the objective `Jfunc` and constraints `gfunc` functions for [`MovingHorizonEstimator`](@ref).
+Get the objective `Jfunc` function and constraint `gfuncs` function vector for 
+[`MovingHorizonEstimator`](@ref).
 
 Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
 """
