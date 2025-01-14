@@ -390,9 +390,9 @@ special cases in which `Ŷe`, `Ue` and `Ū` are not mutated:
 """
 function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
     ny, nu = model.ny, model.nu
-    nocustomfonctions = (mpc.weights.iszero_E && iszero_nc(mpc))
+    nocustomfcts = (mpc.weights.iszero_E && iszero_nc(mpc))
     # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
-    if !(mpc.weights.iszero_M_Hp[] && mpc.nocustomfcts)
+    if !(mpc.weights.iszero_M_Hp[] && nocustomfcts)
         Ŷe[1:ny] .= mpc.ŷ
         Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
     end
