@@ -397,7 +397,7 @@ function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
         Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
     end
     # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
-    if !(mpc.weights.iszero_L_Hp[] && mpc.nocustomfcts)
+    if !(mpc.weights.iszero_L_Hp[] && nocustomfcts)
         U  = Ū
         U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu
         Ue[1:end-nu] .= U
