@@ -1251,7 +1251,7 @@ function init_optimization!(
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, gfunc = get_optim_functions(estim, optim)
+    Jfunc, gfuncs = get_optim_functions(estim, optim)
     @operator(optim, J, nZ̃, Jfunc)
     @objective(optim, Min, J(Z̃var...))
     nV̂, nX̂ = estim.He*estim.nym, estim.He*estim.nx̂
@@ -1259,28 +1259,28 @@ function init_optimization!(
         for i in eachindex(con.X̂0min)
             name = Symbol("g_X̂0min_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfunc[i]; name
+                optim, nZ̃, gfuncs[i]; name
             )
         end
         i_end_X̂min = nX̂
         for i in eachindex(con.X̂0max)
             name = Symbol("g_X̂0max_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfunc[i_end_X̂min + i]; name
+                optim, nZ̃, gfuncs[i_end_X̂min + i]; name
             )
         end
         i_end_X̂max = 2*nX̂
         for i in eachindex(con.V̂min)
             name = Symbol("g_V̂min_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfunc[i_end_X̂max + i]; name
+                optim, nZ̃, gfuncs[i_end_X̂max + i]; name
             )
         end
         i_end_V̂min = 2*nX̂ + nV̂
         for i in eachindex(con.V̂max)
             name = Symbol("g_V̂max_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfunc[i_end_V̂min + i]; name
+                optim, nZ̃, gfuncs[i_end_V̂min + i]; name
             )
         end
     end
@@ -1324,7 +1324,7 @@ function get_optim_functions(
         end
         return nothing
     end
-    function Jfunc(Z̃tup::T...)::T where {T <: Real}
+    function Jfunc(Z̃tup::Vararg{T, N}) where {N, T<:Real}
         Z̃1 = Z̃tup[begin]
         Z̃ = get_tmp(Z̃_cache, Z̃1)
         update_simulations!(Z̃, Z̃tup)
@@ -1338,6 +1338,12 @@ function get_optim_functions(
         g = get_tmp(g_cache, Z̃1)
         return g[i]
     end
-    gfunc = [(Z̃...) -> gfunc_i(i, Z̃) for i in 1:ng]
-    return Jfunc, gfunc
+    gfuncs = Vector{Function}(undef, ng)
+    for i in 1:ng
+        # this is another syntax for anonymous function, allowing parameters T and N:
+        gfuncs[i] = function (ΔŨtup::Vararg{T, N}) where {N, T<:Real}
+            return gfunc_i(i, ΔŨtup)
+        end
+    end
+    return Jfunc, gfuncs
 end

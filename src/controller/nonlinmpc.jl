@@ -481,10 +481,10 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, gfunc = get_optim_functions(mpc, mpc.optim)
+    Jfunc, gfuncs = get_optim_functions(mpc, mpc.optim)
     @operator(optim, J, nΔŨ, Jfunc)
     @objective(optim, Min, J(ΔŨvar...))
-    init_nonlincon!(mpc, model, gfunc)
+    init_nonlincon!(mpc, model, gfuncs)
     set_nonlincon!(mpc, model, mpc.optim)
     return nothing
 end
@@ -532,7 +532,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         end
         return nothing
     end
-    function Jfunc(ΔŨtup::T...) where T<:Real
+    function Jfunc(ΔŨtup::Vararg{T, N}) where {N, T<:Real}
         ΔŨ1 = ΔŨtup[begin]
         ΔŨ = get_tmp(ΔŨ_cache, ΔŨ1)
         update_simulations!(ΔŨ, ΔŨtup)
@@ -547,51 +547,58 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         g = get_tmp(g_cache, ΔŨ1)
         return g[i]::T
     end
-    gfunc = [(ΔŨ...) -> gfunc_i(i, ΔŨ) for i in 1:ng]
-    return Jfunc, gfunc
+    gfuncs = Vector{Function}(undef, ng)
+    for i in 1:ng
+        # this is another syntax for anonymous function, allowing parameters T and N:
+        gfuncs[i] = function (ΔŨtup::Vararg{T, N}) where {N, T<:Real}
+            return gfunc_i(i, ΔŨtup)
+        end
+    end
+    #gfunc = [(ΔŨ::Vararg{T, N}) -> gfunc_i(i, ΔŨ) where {N, T<:Real} for i in 1:ng]  
+    return Jfunc, gfuncs
 end
 
-function init_nonlincon!(mpc::NonLinMPC, ::LinModel, gfunc::Vector{<:Function}) 
+function init_nonlincon!(mpc::NonLinMPC, ::LinModel, gfuncs::Vector{<:Function}) 
     optim, con = mpc.optim, mpc.con
     nΔŨ = length(mpc.ΔŨ)
     if length(con.i_g) ≠ 0
         i_base = 0
         for i in 1:con.nc
             name = Symbol("g_c_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfuncs[i_base+i]; name)
         end
     end
     return nothing
 end
 
-function init_nonlincon!(mpc::NonLinMPC, ::NonLinModel, gfunc::Vector{<:Function}) 
+function init_nonlincon!(mpc::NonLinMPC, ::NonLinModel, gfuncs::Vector{<:Function}) 
     optim, con = mpc.optim, mpc.con
     ny, nx̂, Hp, nΔŨ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.ΔŨ)
     if length(con.i_g) ≠ 0
         i_base = 0
         for i in eachindex(con.Y0min)
             name = Symbol("g_Y0min_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfuncs[i_base+i]; name)
         end
         i_base = 1Hp*ny
         for i in eachindex(con.Y0max)
             name = Symbol("g_Y0max_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfuncs[i_base+i]; name)
         end
         i_base = 2Hp*ny
         for i in eachindex(con.x̂0min)
             name = Symbol("g_x̂0min_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfuncs[i_base+i]; name)
         end
         i_base = 2Hp*ny + nx̂
         for i in eachindex(con.x̂0max)
             name = Symbol("g_x̂0max_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfuncs[i_base+i]; name)
         end
         i_base = 2Hp*ny + 2nx̂
         for i in 1:con.nc
             name = Symbol("g_c_$i")
-            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfunc[i_base+i]; name)
+            optim[name] = JuMP.add_nonlinear_operator(optim, nΔŨ, gfuncs[i_base+i]; name)
         end
     end
     return nothing
