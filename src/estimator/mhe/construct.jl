@@ -1251,7 +1251,7 @@ function init_optimization!(
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, gfunc = get_optim_functions(estim, optim)
+    Jfunc, gfuncs = get_optim_functions(estim, optim)
     @operator(optim, J, nZ̃, Jfunc)
     @objective(optim, Min, J(Z̃var...))
     nV̂, nX̂ = estim.He*estim.nym, estim.He*estim.nx̂
@@ -1259,28 +1259,28 @@ function init_optimization!(
         for i in eachindex(con.X̂0min)
             name = Symbol("g_X̂0min_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfunc[i]; name
+                optim, nZ̃, gfuncs[i]; name
             )
         end
         i_end_X̂min = nX̂
         for i in eachindex(con.X̂0max)
             name = Symbol("g_X̂0max_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfunc[i_end_X̂min + i]; name
+                optim, nZ̃, gfuncs[i_end_X̂min + i]; name
             )
         end
         i_end_X̂max = 2*nX̂
         for i in eachindex(con.V̂min)
             name = Symbol("g_V̂min_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfunc[i_end_X̂max + i]; name
+                optim, nZ̃, gfuncs[i_end_X̂max + i]; name
             )
         end
         i_end_V̂min = 2*nX̂ + nV̂
         for i in eachindex(con.V̂max)
             name = Symbol("g_V̂max_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfunc[i_end_V̂min + i]; name
+                optim, nZ̃, gfuncs[i_end_V̂min + i]; name
             )
         end
     end
@@ -1289,9 +1289,10 @@ end
 
 
 """
-    get_optim_functions(estim::MovingHorizonEstimator, ::JuMP.GenericModel) -> Jfunc, gfunc
+    get_optim_functions(estim::MovingHorizonEstimator, ::JuMP.GenericModel) -> Jfunc, gfuncs
 
-Get the objective `Jfunc` and constraints `gfunc` functions for [`MovingHorizonEstimator`](@ref).
+Get the objective `Jfunc` function and constraint `gfuncs` function vector for 
+[`MovingHorizonEstimator`](@ref).
 
 Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
 """
@@ -1309,35 +1310,41 @@ function get_optim_functions(
     x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂), Nc)
     û0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu), Nc)
     ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ), Nc)
-    function Jfunc(Z̃tup::T...)::T where {T <: Real}
-        Z̃1 = Z̃tup[begin]
-        Z̃, g = get_tmp(Z̃_cache, Z̃1), get_tmp(g_cache, Z̃1)
-        for i in eachindex(Z̃tup)
-            Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
+    function update_simulations!(Z̃, Z̃tup::NTuple{N, T}) where {N, T <:Real}
+        if any(new !== old for (new, old) in zip(Z̃tup, Z̃)) # new Z̃tup, update predictions:
+            Z̃1 = Z̃tup[begin]
+            for i in eachindex(Z̃tup)
+                Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
+            end
+            V̂,  X̂0 = get_tmp(V̂_cache, Z̃1),  get_tmp(X̂0_cache, Z̃1)
+            û0, ŷ0 = get_tmp(û0_cache, Z̃1), get_tmp(ŷ0_cache, Z̃1)
+            g      = get_tmp(g_cache, Z̃1)
+            V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
+            ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
+            g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
         end
-        V̂,  X̂0 = get_tmp(V̂_cache, Z̃1),  get_tmp(X̂0_cache, Z̃1)
-        û0, ŷ0 = get_tmp(û0_cache, Z̃1), get_tmp(ŷ0_cache, Z̃1)
-        V̂,  X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
-        ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
-        g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
-        x̄ = get_tmp(x̄_cache, Z̃1)
+        return nothing
+    end
+    function Jfunc(Z̃tup::Vararg{T, N}) where {N, T<:Real}
+        Z̃1 = Z̃tup[begin]
+        Z̃ = get_tmp(Z̃_cache, Z̃1)
+        update_simulations!(Z̃, Z̃tup)
+        x̄, V̂ = get_tmp(x̄_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
     function gfunc_i(i, Z̃tup::NTuple{N, T})::T where {N, T <:Real}
         Z̃1 = Z̃tup[begin]
-        Z̃, g = get_tmp(Z̃_cache, Z̃1), get_tmp(g_cache, Z̃1)
-        if any(new !== old for (new, old) in zip(Z̃tup, Z̃)) # new Z̃tup, update predictions:
-            V̂,  X̂0 = get_tmp(V̂_cache, Z̃1),  get_tmp(X̂0_cache, Z̃1)
-            û0, ŷ0 = get_tmp(û0_cache, Z̃1), get_tmp(ŷ0_cache, Z̃1)
-            for i in eachindex(Z̃tup)
-                Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
-            end
-            V̂, X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
-            ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
-            g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
-        end
+        Z̃ = get_tmp(Z̃_cache, Z̃1)
+        update_simulations!(Z̃, Z̃tup)
+        g = get_tmp(g_cache, Z̃1)
         return g[i]
     end
-    gfunc = [(Z̃...) -> gfunc_i(i, Z̃) for i in 1:ng]
-    return Jfunc, gfunc
+    gfuncs = Vector{Function}(undef, ng)
+    for i in 1:ng
+        # this is another syntax for anonymous function, allowing parameters T and N:
+        gfuncs[i] = function (ΔŨtup::Vararg{T, N}) where {N, T<:Real}
+            return gfunc_i(i, ΔŨtup)
+        end
+    end
+    return Jfunc, gfuncs
 end

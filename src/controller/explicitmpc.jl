@@ -195,6 +195,8 @@ function predict!(Ŷ, x̂, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, ΔŨ)
     return Ŷ, x̂
 end
 
+"`ExplicitMPC` does not support custom nonlinear constraint, return `true`."
+iszero_nc(mpc::ExplicitMPC) = true
 
 """
     addinfo!(info, mpc::ExplicitMPC) -> info
