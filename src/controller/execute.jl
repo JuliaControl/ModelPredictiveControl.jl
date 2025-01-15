@@ -385,7 +385,7 @@ special cases in which `Ŷe`, `Ue` and `Ū` are not mutated:
     
 - If `mpc.weights.iszero_M_Hp[] && nocustomfcts`, the `Ŷe` vector is not computed to reduce
   the burden in the optimization problem.
-- If `mpc.weights.iszero_L_Hc[] && nocustomfcts`, the `Ue` vector is not computed for the
+- If `mpc.weights.iszero_L_Hp[] && nocustomfcts`, the `Ue` vector is not computed for the
   same reason as above.
 """
 function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
