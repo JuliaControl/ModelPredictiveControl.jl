@@ -320,8 +320,8 @@ savefig("plot7_NonLinMPC.svg"); nothing # hide
 
 ![plot7_NonLinMPC](plot7_NonLinMPC.svg)
 
-The slight constraint violation is caused here by the modeling error on the friction
-coefficient ``K``.
+The controller is able to find a solution that does not violate the torque and power
+constraints.
 
 ## Model Linearization
 
