@@ -245,7 +245,7 @@ regenerative circuitry.
 
 ## Custom Nonlinear Inequality Constraints
 
-Instead of limits on the torque, suppose that the motor can deliver a maximum of 3 watt:
+In addition to the torque limits, suppose that the motor can deliver a maximum of 3 watt:
 
 ```math
 P(t) = τ(t) ω(t) ≤ P_\mathrm{max}
@@ -288,6 +288,7 @@ specifying the number of custom inequality constraints `nc`:
 ```@example man_nonlin
 Cwt, Pmax, nc = 1e5, 3, Hp+1
 nmpc2 = NonLinMPC(estim2; Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=Pmax)
+nmpc2 = setconstraint!(nmpc2; umin, umax)
 using JuMP; unset_time_limit_sec(nmpc2.optim) # hide
 nmpc2 # hide
 ```
@@ -319,8 +320,8 @@ savefig("plot7_NonLinMPC.svg"); nothing # hide
 
 ![plot7_NonLinMPC](plot7_NonLinMPC.svg)
 
-The slight constraint violation is caused here by the modeling error on the friction
-coefficient ``K``.
+The controller is able to find a solution that does not violate the torque and power
+constraints.
 
 ## Model Linearization
 
