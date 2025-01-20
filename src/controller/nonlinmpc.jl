@@ -169,6 +169,8 @@ This controller allocates memory at each time step for the optimization.
    not (details in Extended Help).
 - `nc=0` : number of custom inequality constraints.
 - `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
+- `transcription=:singleshooting` : transcription method for the nonlinear optimization 
+    problem, can be `:singleshooting`, `:multipleshoting` or `:directcollocation`.
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
