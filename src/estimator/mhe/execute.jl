@@ -435,19 +435,15 @@ function correct_cov!(estim::MovingHorizonEstimator)
     estim.covestim.P̂  .= estim.P̂arr_old
     try
         correct_estimate!(estim.covestim, y0marr, d0arr)
+        estim.P̂arr_old .= estim.covestim.P̂
+        invert_cov!(estim, estim.covestim.P̂)
     catch err
         if err isa PosDefException
-            @warn("Arrival covariance not positive definite: using nearest symmetric one")
-            estim.covestim.P̂ .= estim.P̂arr_old .+ estim.P̂arr_old'
-            lmul!(0.5, estim.covestim.P̂)
-            correct_estimate!(estim.covestim, y0marr, d0arr)
+            @warn("Arrival covariance is not positive definite: keeping the old one")
         else
             rethrow(err)
         end
     end
-    P̄ = estim.covestim.P̂
-    invert_cov!(estim, P̄)
-    estim.P̂arr_old .= P̄
     return nothing
 end
 
@@ -458,20 +454,16 @@ function update_cov!(estim::MovingHorizonEstimator)
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
     try
-        update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
+        correct_estimate!(estim.covestim, y0marr, d0arr)
+        estim.P̂arr_old .= estim.covestim.P̂
+        invert_cov!(estim, estim.covestim.P̂)
     catch err
         if err isa PosDefException
-            @warn("Arrival covariance not positive definite: using nearest symmetric one")
-            estim.covestim.P̂ .= estim.P̂arr_old .+ estim.P̂arr_old'
-            lmul!(0.5, estim.covestim.P̂)
-            update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
+            @warn("Arrival covariance is not positive definite: keeping the old one")
         else
             rethrow(err)
         end
     end
-    P̄ = estim.covestim.P̂
-    invert_cov!(estim, P̄)
-    estim.P̂arr_old .= P̄
     return nothing
 end
 
@@ -481,8 +473,7 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
         estim.invP̄ .= inv(P̄)
     catch err
         if err isa SingularException
-            @warn("Arrival covariance is singular: adding small regularization term")
-            estim.invP̄ .= inv(P̄ + eps()*I)
+            @warn("Arrival covariance is not invertible: keeping the old one")
         else
             rethrow(err)
         end
