@@ -481,8 +481,8 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
         estim.invP̄ .= inv(P̄)
     catch err
         if err isa SingularException
-            @warn("Arrival covariance not invertible: using pseudo-inverse")
-            estim.invP̄ .= pinv(P̄)
+            @warn("Arrival covariance is singular: adding small regularization term")
+            estim.invP̄ .= inv(P̄ + eps()*I)
         else
             rethrow(err)
         end
