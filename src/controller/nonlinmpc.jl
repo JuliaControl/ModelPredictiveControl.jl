@@ -109,7 +109,7 @@ Both [`NonLinModel`](@ref) and [`LinModel`](@ref) are supported (see Extended He
 controller minimizes the following objective function at each discrete time ``k``:
 ```math
 \begin{aligned}
-\min_{\mathbf{ΔU}, ϵ}\ & \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)}   
+\min_{\mathbf{Z}, ϵ}\ & \mathbf{(R̂_y - Ŷ)}' \mathbf{M}_{H_p} \mathbf{(R̂_y - Ŷ)}   
                        + \mathbf{(ΔU)}'      \mathbf{N}_{H_c} \mathbf{(ΔU)}        \\&
                        + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
                        + C ϵ^2  
@@ -120,6 +120,12 @@ subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraint
 ```math
 \mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}
 ```
+and the slack ``ϵ`` and the ``\mathbf{Z}`` vector as the decision variables:
+
+- ``\mathbf{Z} = \mathbf{ΔŨ}`` if the transcription method is `:singleshooting`
+- ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{ΔŨ}' & \mathbf{X̂}' \end{smallmatrix}]'`` if the transcription method is `:multipleshoting`
+- ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{ΔŨ}' & \mathbf{X̂}' & \mathbf{Ĉ}' \end{smallmatrix}]'`` if the transcription method is `:directcollocation`
+
 The economic function ``J_E`` can penalizes solutions with high economic costs. Setting all
 the weights to 0 except ``E``  creates a pure economic model predictive controller (EMPC). 
 As a matter of fact, ``J_E`` can be any nonlinear function to customize the objective, even
