@@ -486,6 +486,7 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
         else
             rethrow(err)
         end
+    end
     return nothing
 end
 
