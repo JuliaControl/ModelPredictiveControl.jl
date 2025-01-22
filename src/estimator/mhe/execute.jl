@@ -16,7 +16,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , d0, u0)
         estim.D0[1:estim.model.nd] .= d0
     end
     # estim.P̂_0 is in fact P̂(-1|-1) is estim.direct==false, else P̂(-1|0)
-    estim.invP̄      .= inv(estim.P̂_0)
+    invert_cov!(estim, estim.P̂_0)
     estim.P̂arr_old  .= estim.P̂_0
     estim.x̂0arr_old .= 0
     return nothing
@@ -433,9 +433,21 @@ function correct_cov!(estim::MovingHorizonEstimator)
     y0marr, d0arr = @views estim.Y0m[1:nym], estim.D0[1:nd]
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
-    correct_estimate!(estim.covestim, y0marr, d0arr)
-    estim.P̂arr_old .= estim.covestim.P̂
-    estim.invP̄     .= inv(estim.P̂arr_old)
+    try
+        correct_estimate!(estim.covestim, y0marr, d0arr)
+    catch err
+        if err isa PosDefException
+            @warn("Arrival covariance not positive definite: using nearest symmetric one")
+            estim.covestim.P̂ .= estim.P̂arr_old .+ estim.P̂arr_old'
+            lmul!(0.5, estim.covestim.P̂)
+            correct_estimate!(estim.covestim, y0marr, d0arr)
+        else
+            rethrow(err)
+        end
+    end
+    P̄ = estim.covestim.P̂
+    invert_cov!(estim, P̄)
+    estim.P̂arr_old .= P̄
     return nothing
 end
 
@@ -445,9 +457,35 @@ function update_cov!(estim::MovingHorizonEstimator)
     u0arr, y0marr, d0arr = @views estim.U0[1:nu], estim.Y0m[1:nym], estim.D0[1:nd]
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
-    update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
-    estim.P̂arr_old    .= estim.covestim.P̂
-    estim.invP̄        .= inv(estim.P̂arr_old)
+    try
+        update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
+    catch err
+        if err isa PosDefException
+            @warn("Arrival covariance not positive definite: using nearest symmetric one")
+            estim.covestim.P̂ .= estim.P̂arr_old .+ estim.P̂arr_old'
+            lmul!(0.5, estim.covestim.P̂)
+            update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
+        else
+            rethrow(err)
+        end
+    end
+    P̄ = estim.covestim.P̂
+    invert_cov!(estim, P̄)
+    estim.P̂arr_old .= P̄
+    return nothing
+end
+
+"Invert the covariance estimate at arrival `P̄`."
+function invert_cov!(estim::MovingHorizonEstimator, P̄)
+    try
+        estim.invP̄ .= inv(P̄)
+    catch err
+        if err isa SingularException
+            @warn("Arrival covariance not invertible: using pseudo-inverse")
+            estim.invP̄ .= pinv(P̄)
+        else
+            rethrow(err)
+        end
     return nothing
 end
 
