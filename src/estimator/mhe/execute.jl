@@ -475,7 +475,7 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
         if err isa SingularException || err isa LAPACKException
             @warn("Arrival covariance is not invertible: keeping the old one")
         else
-            rethrow(err)
+            rethrow()
         end
     end
     return nothing
