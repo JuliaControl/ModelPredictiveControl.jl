@@ -406,13 +406,22 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     if !issolved(optim)
         status = JuMP.termination_status(optim)
         if iserror(optim)
-            @error("MHE terminated without solution: estimation in open-loop", 
-                   status)
+            @error(
+                "MHE terminated without solution: estimation in open-loop "*
+                "(more info in debug log)",
+                status
+            )
         else
-            @warn("MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
-                  "solution anyway", status)
+            @warn(
+                "MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping solution "*
+                "anyway (more info in debug log)", 
+                status
+            )
         end
-        @debug("The function getinfo returns: ", getinfo(estim))
+        @debug(
+            "calling getinfo (use logger with show_limited=false if values are truncated)", 
+            getinfo(estim)
+        )
     end
     if iserror(optim)
         estim.Z̃ .= Z̃_0
