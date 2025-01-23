@@ -1000,7 +1000,7 @@ end
     @test mhe.invP̄ ≈ invP̄_copy
     @test_logs(
         (:warn, "Arrival covariance is not invertible: keeping the old one"), 
-        ModelPredictiveControl.invert_cov!(mhe, zeros(mhe.nx̂, mhe.nx̂))
+        ModelPredictiveControl.invert_cov!(mhe, Hermitian(zeros(mhe.nx̂, mhe.nx̂),:L))
     )
 end
 
