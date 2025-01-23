@@ -479,9 +479,9 @@ end
 "Invert the covariance estimate at arrival `P̄`."
 function invert_cov!(estim::MovingHorizonEstimator, P̄)
     try
-        estim.invP̄ .= inv(P̄)
+        estim.invP̄ .= inv_cholesky!(estim.buffer.P̂, P̄)
     catch err
-        if err isa SingularException || err isa LAPACKException
+        if err isa PosDefException
             @warn("Arrival covariance is not invertible: keeping the old one")
         else
             rethrow()

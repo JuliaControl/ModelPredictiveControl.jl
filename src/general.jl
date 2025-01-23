@@ -60,3 +60,17 @@ to_hermitian(A::AbstractVector) = Hermitian(reshape(A, 1, 1), :L)
 to_hermitian(A::AbstractMatrix) = Hermitian(A, :L)
 to_hermitian(A::Hermitian) = A
 to_hermitian(A) = A
+
+"""
+Compute the inverse of a the Hermitian positive definite matrix `A` using `cholesky`.
+
+Builtin `inv` function uses LU factorization which is not the best choice for Hermitian
+positive definite matrices. The function will mutate `buffer` to reduce memory allocations.
+"""
+function inv_cholesky!(buffer::Matrix, A::Hermitian)
+    Achol  = Hermitian(buffer, :L)
+    Achol .= A
+    chol_obj = cholesky!(Achol)
+    invA = Hermitian(inv(chol_obj), :L)
+    return invA
+end
