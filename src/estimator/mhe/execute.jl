@@ -108,8 +108,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     nu, ny, nd = model.nu, model.ny, model.nd
     nx̂, nym, nŵ, nϵ = estim.nx̂, estim.nym, estim.nx̂, estim.nϵ
     nx̃ = nϵ + nx̂
-    MyTypes = Union{JuMP._SolutionSummary, Hermitian{NT, Matrix{NT}}, Vector{NT}, NT}
-    info = Dict{Symbol, MyTypes}()
+    info = Dict{Symbol, Any}()
     V̂,  X̂0 = similar(estim.Y0m[1:nym*Nk]), similar(estim.X̂0[1:nx̂*Nk])
     û0, ŷ0 = similar(model.uop), similar(model.yop)
     V̂,  X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
@@ -370,7 +369,8 @@ If supported by `estim.optim`, it warm-starts the solver at:
 where ``\mathbf{ŵ}_{k-1}(k-j)`` is the input increment for time ``k-j`` computed at the 
 last time step ``k-1``. It then calls `JuMP.optimize!(estim.optim)` and extract the
 solution. A failed optimization prints an `@error` log in the REPL and returns the 
-warm-start value.
+warm-start value. A failed optimization also prints [`getinfo`](@ref) results in
+the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim = estim.model, estim.optim
@@ -406,13 +406,22 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     if !issolved(optim)
         status = JuMP.termination_status(optim)
         if iserror(optim)
-            @error("MHE terminated without solution: estimation in open-loop", 
-                   status)
+            @error(
+                "MHE terminated without solution: estimation in open-loop "*
+                "(more info in debug log)",
+                status
+            )
         else
-            @warn("MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
-                  "solution anyway", status)
+            @warn(
+                "MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping solution "*
+                "anyway (more info in debug log)", 
+                status
+            )
         end
-        @debug JuMP.solution_summary(optim, verbose=true)
+        @debug(
+            "calling getinfo (use logger with show_limited=false if values are truncated)", 
+            getinfo(estim)
+        )
     end
     if iserror(optim)
         estim.Z̃ .= Z̃_0
