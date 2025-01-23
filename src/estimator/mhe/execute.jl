@@ -108,8 +108,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     nu, ny, nd = model.nu, model.ny, model.nd
     nx̂, nym, nŵ, nϵ = estim.nx̂, estim.nym, estim.nx̂, estim.nϵ
     nx̃ = nϵ + nx̂
-    MyTypes = Union{JuMP._SolutionSummary, Hermitian{NT, Matrix{NT}}, Vector{NT}, NT}
-    info = Dict{Symbol, MyTypes}()
+    info = Dict{Symbol, Any}()
     V̂,  X̂0 = similar(estim.Y0m[1:nym*Nk]), similar(estim.X̂0[1:nx̂*Nk])
     û0, ŷ0 = similar(model.uop), similar(model.yop)
     V̂,  X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)

@@ -114,7 +114,7 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     model    = mpc.estim.model
     nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu 
-    info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
+    info = Dict{Symbol, Any}()
     Ŷ0, u0, û0  = similar(mpc.Yop), similar(model.uop), similar(model.uop)
     Ŷs          = similar(mpc.Yop)
     x̂0, x̂0next  = similar(mpc.estim.x̂0), similar(mpc.estim.x̂0)
