@@ -436,7 +436,7 @@ function correct_cov!(estim::MovingHorizonEstimator)
     try
         correct_estimate!(estim.covestim, y0marr, d0arr)
         estim.P̂arr_old .= estim.covestim.P̂
-        invert_cov!(estim, estim.covestim.P̂)
+        invert_cov!(estim, estim.P̂arr_old)
     catch err
         if err isa PosDefException
             @warn("Arrival covariance is not positive definite: keeping the old one")
@@ -454,9 +454,9 @@ function update_cov!(estim::MovingHorizonEstimator)
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
     try
-        correct_estimate!(estim.covestim, y0marr, d0arr)
+        update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
         estim.P̂arr_old .= estim.covestim.P̂
-        invert_cov!(estim, estim.covestim.P̂)
+        invert_cov!(estim, estim.P̂arr_old)
     catch err
         if err isa PosDefException
             @warn("Arrival covariance is not positive definite: keeping the old one")
