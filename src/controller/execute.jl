@@ -525,7 +525,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
             @warn("MPC termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
                   "solution anyway", status)
         end
-        @debug getinfo(mpc)
+        @debug("The function getinfo returns: ", getinfo(mpc))
     end
     if iserror(optim)
         mpc.ΔŨ .= ΔŨ0

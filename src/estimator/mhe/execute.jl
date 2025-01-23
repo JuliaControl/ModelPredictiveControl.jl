@@ -412,7 +412,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
             @warn("MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
                   "solution anyway", status)
         end
-        @debug getinfo(estim)
+        @debug("The function getinfo returns: ", getinfo(estim))
     end
     if iserror(optim)
         estim.Z̃ .= Z̃_0
