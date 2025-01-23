@@ -975,6 +975,35 @@ end
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
 end
 
+@testset "MovingHorizonEstimator fallbacks for arrival covariance estimation" begin
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2], i_d=[3]), uop=[10,50], yop=[50,30], dop=[5])
+    f(x,u,d,_) = linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
+    h(x,d,_)   = linmodel.C*x + linmodel.Dd*d
+    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing), uop=[10,50], yop=[50,30], dop=[5])
+    mhe = MovingHorizonEstimator(nonlinmodel, nint_ym=0, He=1)
+    preparestate!(mhe, [50, 30], [5])
+    updatestate!(mhe, [10, 50], [50, 30], [5])
+    mhe.P̂arr_old[1, 1] = -1e-3 # negative eigenvalue to trigger fallback
+    P̂arr_old_copy = deepcopy(mhe.P̂arr_old)
+    invP̄_copy = deepcopy(mhe.invP̄)
+    @test_logs(
+        (:warn, "Arrival covariance is not positive definite: keeping the old one"), 
+        preparestate!(mhe, [50, 30], [5])
+    )
+    @test mhe.P̂arr_old ≈ P̂arr_old_copy
+    @test mhe.invP̄ ≈ invP̄_copy
+    @test_logs(
+        (:warn, "Arrival covariance is not positive definite: keeping the old one"), 
+        updatestate!(mhe, [10, 50], [50, 30], [5])
+    )
+    @test mhe.P̂arr_old ≈ P̂arr_old_copy
+    @test mhe.invP̄ ≈ invP̄_copy
+    @test_logs(
+        (:warn, "Arrival covariance is not invertible: keeping the old one"), 
+        ModelPredictiveControl.invert_cov!(mhe, Hermitian(zeros(mhe.nx̂, mhe.nx̂),:L))
+    )
+end
+
 @testset "MovingHorizonEstimator set constraints" begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     mhe1 = MovingHorizonEstimator(linmodel1, He=1, nint_ym=0, Cwt=1e3)
