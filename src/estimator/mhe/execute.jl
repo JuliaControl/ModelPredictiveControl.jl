@@ -441,7 +441,7 @@ function correct_cov!(estim::MovingHorizonEstimator)
         if err isa PosDefException
             @warn("Arrival covariance is not positive definite: keeping the old one")
         else
-            rethrow(err)
+            rethrow()
         end
     end
     return nothing
@@ -461,7 +461,7 @@ function update_cov!(estim::MovingHorizonEstimator)
         if err isa PosDefException
             @warn("Arrival covariance is not positive definite: keeping the old one")
         else
-            rethrow(err)
+            rethrow()
         end
     end
     return nothing
@@ -472,7 +472,7 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
     try
         estim.invP̄ .= inv(P̄)
     catch err
-        if err isa SingularException
+        if err isa SingularException || err isa LAPACKException
             @warn("Arrival covariance is not invertible: keeping the old one")
         else
             rethrow(err)
