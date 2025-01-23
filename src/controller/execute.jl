@@ -533,7 +533,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
         end
         @debug(
             "calling getinfo (use logger with show_limited=false if values are truncated)", 
-            getinfo(estim)
+            getinfo(mpc)
         )
     end
     if iserror(optim)
