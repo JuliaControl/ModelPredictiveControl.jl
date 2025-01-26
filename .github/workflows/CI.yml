@@ -42,4 +42,4 @@ jobs:
           fail_ci_if_error: false
       - name: Set JULIA_DEBUG environment variable
         if: ${{ runner.debug == '1' }}
-        run: echo "JULIA_DEBUG=all" >> $GITHUB_ENV
+        run: export JULIA_DEBUG="all"
