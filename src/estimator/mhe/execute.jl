@@ -418,10 +418,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
                 status
             )
         end
-        @debug(
-            "calling getinfo (use logger with show_limited=false if values are truncated)", 
-            getinfo(estim)
-        )
+        @debug info2debugstr(getinfo(estim))
     end
     if iserror(optim)
         estim.Z̃ .= Z̃_0

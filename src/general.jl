@@ -25,6 +25,15 @@ function iserror(optim::JuMP.GenericModel)
     return any(errstatus->isequal(status, errstatus), ERROR_STATUSES)
 end
 
+"Convert getinfo dictionary to a debug string (without any truncation)."
+function info2debugstr(info)
+    mystr = "Content of getinfo dictionary:\n"
+    for (key, value) in info
+        mystr *= "  :$key => $value\n"
+    end
+    return mystr
+end
+
 "Evaluate the quadratic programming objective function `0.5x'*H*x + q'*x` at `x`."
 obj_quadprog(x, H, q) = 0.5*dot(x, H, x) + q'*x  # dot(x, H, x) is faster than x'*H*x
 
