@@ -531,10 +531,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
                 status
             )
         end
-        @debug(
-            "calling getinfo (use logger with show_limited=false if values are truncated)", 
-            getinfo(mpc)
-        )
+        @debug info2debugstr(getinfo(mpc))
     end
     if iserror(optim)
         mpc.ΔŨ .= ΔŨ0
