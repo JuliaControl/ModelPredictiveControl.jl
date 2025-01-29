@@ -29,7 +29,13 @@ end
 function info2debugstr(info)
     mystr = "Content of getinfo dictionary:\n"
     for (key, value) in info
+        (key == :sol) && continue
         mystr *= "  :$key => $value\n"
+    end
+    if haskey(info, :sol)
+        split_sol = split(string(info[:sol]), "\n")
+        solstr = join((lpad(line, length(line) + 2) for line in split_sol), "\n", "")
+        mystr *= "  :sol => \n"*solstr
     end
     return mystr
 end
