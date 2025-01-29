@@ -973,6 +973,7 @@ end
     info = getinfo(mhe5)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+    @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
 @testset "MovingHorizonEstimator fallbacks for arrival covariance estimation" begin

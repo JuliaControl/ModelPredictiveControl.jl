@@ -82,6 +82,7 @@ end
     mpc4  = LinMPC(model2)
     preparestate!(mpc4, [0])
     moveinput!(mpc4, [0]) ≈ [0.0]
+    @test_nowarn ModelPredictiveControl.info2debugstr(info)
 
     @test_throws DimensionMismatch moveinput!(mpc1, [0,0,0])
     @test_throws DimensionMismatch moveinput!(mpc1, [0], [0,0])
@@ -407,6 +408,7 @@ end
     mpc4  = ExplicitMPC(model2)
     preparestate!(mpc4, [0])
     moveinput!(mpc4, [0]) ≈ [0.0]
+    @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
 
@@ -633,6 +635,7 @@ end
     nonlinmodel2.h!(y, Float32[0,0], Float32[0], Float32[])
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0]
+    @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
 @testset "NonLinMPC step disturbance rejection" begin
