@@ -515,10 +515,10 @@ Construct the prediction matrices for [`LinModel`](@ref) `model`.
 The model predictions are evaluated from the deviation vectors (see [`setop!`](@ref)) and:
 ```math
 \begin{aligned}
-    \mathbf{Ŷ_0} &= \mathbf{E ΔU} + \mathbf{G d_0}(k) + \mathbf{J D̂_0} 
-                                  + \mathbf{K x̂_0}(k) + \mathbf{V u_0}(k-1) 
-                                  + \mathbf{B}        + \mathbf{Ŷ_s}                      \\
-                 &= \mathbf{E ΔU} + \mathbf{F}
+    \mathbf{Ŷ_0} &= \mathbf{E Z} + \mathbf{G d_0}(k) + \mathbf{J D̂_0} 
+                                 + \mathbf{K x̂_0}(k) + \mathbf{V u_0}(k-1) 
+                                 + \mathbf{B}        + \mathbf{Ŷ_s}                      \\
+                 &= \mathbf{E Z} + \mathbf{F}
 \end{aligned}
 ```
 in which ``\mathbf{x̂_0}(k) = \mathbf{x̂}_i(k) - \mathbf{x̂_{op}}``, with ``i = k`` if 
@@ -533,10 +533,10 @@ stochastic predictions ``\mathbf{Ŷ_s=0}`` if `estim` is not a [`InternalModel`
 terminal states at ``k+H_p``:
 ```math
 \begin{aligned}
-    \mathbf{x̂_0}(k+H_p) &= \mathbf{e_x̂ ΔU} + \mathbf{g_x̂ d_0}(k)   + \mathbf{j_x̂ D̂_0} 
+    \mathbf{x̂_0}(k+H_p) &= \mathbf{e_x̂ Z}  + \mathbf{g_x̂ d_0}(k)   + \mathbf{j_x̂ D̂_0} 
                                            + \mathbf{k_x̂ x̂_0}(k) + \mathbf{v_x̂ u_0}(k-1)
                                            + \mathbf{b_x̂}                                 \\
-                        &= \mathbf{e_x̂ ΔU} + \mathbf{f_x̂}
+                        &= \mathbf{e_x̂ Z}  + \mathbf{f_x̂}
 \end{aligned}
 ```
 The matrices ``\mathbf{E, G, J, K, V, B, e_x̂, g_x̂, j_x̂, k_x̂, v_x̂, b_x̂}`` are defined in the
