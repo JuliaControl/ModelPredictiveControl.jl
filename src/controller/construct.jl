@@ -447,20 +447,20 @@ end
 
 
 @doc raw"""
-    init_ΔUtoU(model, Hp, Hc) -> S, T
+    init_ZtoU(estim, Hp, Hc, transcription) -> S, T
 
-Init manipulated input increments to inputs conversion matrices.
+Init decision variables to inputs over ``H_p`` conversion matrices.
 
 The conversion from the input increments ``\mathbf{ΔU}`` to manipulated inputs over ``H_p`` 
 are calculated by:
 ```math
-\mathbf{U} = \mathbf{S} \mathbf{ΔU} + \mathbf{T} \mathbf{u}(k-1)
+\mathbf{U} = \mathbf{S} \mathbf{Z} + \mathbf{T} \mathbf{u}(k-1)
 ```
 The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help section.
 
 # Extended Help
 !!! details "Extended Help"
-    The ``\mathbf{U}`` vector and the two conversion matrices are defined as:
+    The ``\mathbf{U}`` vector and the conversion matrices are defined as:
     ```math
     \mathbf{U} = \begin{bmatrix}
         \mathbf{u}(k + 0)                                           \\
@@ -469,7 +469,7 @@ The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help 
         \mathbf{u}(k + H_c - 1)                                     \\
         \vdots                                                      \\
         \mathbf{u}(k + H_p - 1)                                     \end{bmatrix} , \quad
-    \mathbf{S} = \begin{bmatrix}
+    \mathbf{S^†} = \begin{bmatrix}
         \mathbf{I}  & \mathbf{0}    & \cdots    & \mathbf{0}        \\
         \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{0}        \\
         \vdots      & \vdots        & \ddots    & \vdots            \\
@@ -484,12 +484,24 @@ The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help 
         \vdots                                                      \\
         \mathbf{I}                                                  \end{bmatrix}
     ```
+    and, depending on the transcription method, we have:
+    - ``\mathbf{S} = \mathbf{S^†}`` if `transcription == :singleshooting`
+    - ``\mathbf{S} = [\begin{smallmatrix}\mathbf{S^†} \mathbf{0} \end{smallmatrix}]`` if 
+      `transcription == :multipleshooting` 
 """
-function init_ΔUtoU(model::SimModel{NT}, Hp, Hc) where {NT<:Real}
+function init_ZtoU(estim::StateEstimator{NT}, Hp, Hc, transcription) where {NT<:Real}
+    model = estim.model
     # S and T are `Matrix{NT}` since conversion is faster than `Matrix{Bool}` or `BitMatrix`
     I_nu = Matrix{NT}(I, model.nu, model.nu)
     S_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
-    S = [S_Hc; repeat(I_nu, Hp - Hc, Hc)]
+    if transcription == :singleshooting
+        O = zeros(NT, model.nu*Hp, 0)
+    elseif transcription == :multipleshooting
+        O = zeros(NT, model.nu*Hp, estim.nx̂*Hp)
+    else
+        throw(ArgumentError("transcription method not recognized"))
+    end
+    S = hcat([S_Hc; repeat(I_nu, Hp - Hc, Hc)], O)
     T = repeat(I_nu, Hp)
     return S, T
 end
