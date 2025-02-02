@@ -123,11 +123,6 @@ struct MovingHorizonEstimator{
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
-        P̂_0 = Hermitian(P̂_0, :L)
-        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
-        invP̄ = Hermitian(inv(P̂_0), :L)
-        invQ̂_He = Hermitian(repeatdiag(inv(Q̂), He), :L)
-        invR̂_He = Hermitian(repeatdiag(inv(R̂), He), :L)
         r = direct ? 0 : 1
         E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
             model, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, r
@@ -146,10 +141,18 @@ struct MovingHorizonEstimator{
         nD0 = direct ? nd*(He+1) : nd*He
         U0, D0  = zeros(NT, nu*He), zeros(NT, nD0) 
         Ŵ = zeros(NT, nx̂*He)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
+        P̂_0 = Hermitian(P̂_0, :L)
+        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
+        P̂_0 = Hermitian(P̂_0, :L)
+        invP̄ = inv_cholesky!(buffer.P̂, P̂_0)
+        invQ̂ = inv_cholesky!(buffer.Q̂, Q̂)
+        invR̂ = inv_cholesky!(buffer.R̂, R̂)
+        invQ̂_He = Hermitian(repeatdiag(invQ̂, He), :L)
+        invR̂_He = Hermitian(repeatdiag(invR̂, He), :L)
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(P̂_0)
         Nk = [0]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
         corrected = [false]
         estim = new{NT, SM, JM, CE}(
             model, optim, con, covestim,  

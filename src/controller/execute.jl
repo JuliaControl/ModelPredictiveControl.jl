@@ -114,7 +114,7 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     model    = mpc.estim.model
     nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu 
-    info = Dict{Symbol, Union{JuMP._SolutionSummary, Vector{NT}, NT}}()
+    info = Dict{Symbol, Any}()
     Ŷ0, u0, û0  = similar(mpc.Yop), similar(model.uop), similar(model.uop)
     Ŷs          = similar(mpc.Yop)
     x̂0, x̂0next  = similar(mpc.estim.x̂0), similar(mpc.estim.x̂0)
@@ -491,7 +491,8 @@ If supported by `mpc.optim`, it warm-starts the solver at:
 where ``\mathbf{Δu}_{k-1}(k+j)`` is the input increment for time ``k+j`` computed at the 
 last control period ``k-1``. It then calls `JuMP.optimize!(mpc.optim)` and extract the
 solution. A failed optimization prints an `@error` log in the REPL and returns the 
-warm-start value.
+warm-start value. A failed optimization also prints [`getinfo`](@ref) results in
+the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
 """
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model, optim = mpc.estim.model, mpc.optim
@@ -518,13 +519,19 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     if !issolved(optim)
         status = JuMP.termination_status(optim)
         if iserror(optim)
-            @error("MPC terminated without solution: returning last solution shifted", 
-                   status)
+            @error(
+                "MPC terminated without solution: estimation in open-loop "*
+                "(more info in debug log)",
+                status
+            )
         else
-            @warn("MPC termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
-                  "solution anyway", status)
+            @warn(
+                "MPC termination status not OPTIMAL or LOCALLY_SOLVED: keeping solution "*
+                "anyway (more info in debug log)", 
+                status
+            )
         end
-        @debug JuMP.solution_summary(optim, verbose=true)
+        @debug info2debugstr(getinfo(mpc))
     end
     if iserror(optim)
         mpc.ΔŨ .= ΔŨ0

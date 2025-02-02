@@ -27,6 +27,9 @@ jobs:
         arch:
           - x64
     steps:
+      - name: Set JULIA_DEBUG environment variable
+        if: ${{ runner.debug == '1' }}
+        run: echo "JULIA_DEBUG=ModelPredictiveControl" >> $GITHUB_ENV
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
         with:

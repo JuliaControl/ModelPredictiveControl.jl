@@ -16,7 +16,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , d0, u0)
         estim.D0[1:estim.model.nd] .= d0
     end
     # estim.P̂_0 is in fact P̂(-1|-1) is estim.direct==false, else P̂(-1|0)
-    estim.invP̄      .= inv(estim.P̂_0)
+    invert_cov!(estim, estim.P̂_0)
     estim.P̂arr_old  .= estim.P̂_0
     estim.x̂0arr_old .= 0
     return nothing
@@ -108,8 +108,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     nu, ny, nd = model.nu, model.ny, model.nd
     nx̂, nym, nŵ, nϵ = estim.nx̂, estim.nym, estim.nx̂, estim.nϵ
     nx̃ = nϵ + nx̂
-    MyTypes = Union{JuMP._SolutionSummary, Hermitian{NT, Matrix{NT}}, Vector{NT}, NT}
-    info = Dict{Symbol, MyTypes}()
+    info = Dict{Symbol, Any}()
     V̂,  X̂0 = similar(estim.Y0m[1:nym*Nk]), similar(estim.X̂0[1:nx̂*Nk])
     û0, ŷ0 = similar(model.uop), similar(model.yop)
     V̂,  X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
@@ -370,7 +369,8 @@ If supported by `estim.optim`, it warm-starts the solver at:
 where ``\mathbf{ŵ}_{k-1}(k-j)`` is the input increment for time ``k-j`` computed at the 
 last time step ``k-1``. It then calls `JuMP.optimize!(estim.optim)` and extract the
 solution. A failed optimization prints an `@error` log in the REPL and returns the 
-warm-start value.
+warm-start value. A failed optimization also prints [`getinfo`](@ref) results in
+the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim = estim.model, estim.optim
@@ -406,13 +406,19 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     if !issolved(optim)
         status = JuMP.termination_status(optim)
         if iserror(optim)
-            @error("MHE terminated without solution: estimation in open-loop", 
-                   status)
+            @error(
+                "MHE terminated without solution: estimation in open-loop "*
+                "(more info in debug log)",
+                status
+            )
         else
-            @warn("MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping "*
-                  "solution anyway", status)
+            @warn(
+                "MHE termination status not OPTIMAL or LOCALLY_SOLVED: keeping solution "*
+                "anyway (more info in debug log)", 
+                status
+            )
         end
-        @debug JuMP.solution_summary(optim, verbose=true)
+        @debug info2debugstr(getinfo(estim))
     end
     if iserror(optim)
         estim.Z̃ .= Z̃_0
@@ -433,9 +439,17 @@ function correct_cov!(estim::MovingHorizonEstimator)
     y0marr, d0arr = @views estim.Y0m[1:nym], estim.D0[1:nd]
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
-    correct_estimate!(estim.covestim, y0marr, d0arr)
-    estim.P̂arr_old .= estim.covestim.P̂
-    estim.invP̄     .= inv(estim.P̂arr_old)
+    try
+        correct_estimate!(estim.covestim, y0marr, d0arr)
+        estim.P̂arr_old .= estim.covestim.P̂
+        invert_cov!(estim, estim.P̂arr_old)
+    catch err
+        if err isa PosDefException
+            @warn("Arrival covariance is not positive definite: keeping the old one")
+        else
+            rethrow()
+        end
+    end
     return nothing
 end
 
@@ -445,9 +459,31 @@ function update_cov!(estim::MovingHorizonEstimator)
     u0arr, y0marr, d0arr = @views estim.U0[1:nu], estim.Y0m[1:nym], estim.D0[1:nd]
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
-    update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
-    estim.P̂arr_old    .= estim.covestim.P̂
-    estim.invP̄        .= inv(estim.P̂arr_old)
+    try
+        update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
+        estim.P̂arr_old .= estim.covestim.P̂
+        invert_cov!(estim, estim.P̂arr_old)
+    catch err
+        if err isa PosDefException
+            @warn("Arrival covariance is not positive definite: keeping the old one")
+        else
+            rethrow()
+        end
+    end
+    return nothing
+end
+
+"Invert the covariance estimate at arrival `P̄`."
+function invert_cov!(estim::MovingHorizonEstimator, P̄)
+    try
+        estim.invP̄ .= inv_cholesky!(estim.buffer.P̂, P̄)
+    catch err
+        if err isa PosDefException
+            @warn("Arrival covariance is not invertible: keeping the old one")
+        else
+            rethrow()
+        end
+    end
     return nothing
 end
 

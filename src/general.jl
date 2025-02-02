@@ -25,6 +25,21 @@ function iserror(optim::JuMP.GenericModel)
     return any(errstatus->isequal(status, errstatus), ERROR_STATUSES)
 end
 
+"Convert getinfo dictionary to a debug string (without any truncation)."
+function info2debugstr(info)
+    mystr = "Content of getinfo dictionary:\n"
+    for (key, value) in info
+        (key == :sol) && continue
+        mystr *= "  :$key => $value\n"
+    end
+    if haskey(info, :sol)
+        split_sol = split(string(info[:sol]), "\n")
+        solstr = join((lpad(line, length(line) + 2) for line in split_sol), "\n", "")
+        mystr *= "  :sol => \n"*solstr
+    end
+    return mystr
+end
+
 "Evaluate the quadratic programming objective function `0.5x'*H*x + q'*x` at `x`."
 obj_quadprog(x, H, q) = 0.5*dot(x, H, x) + q'*x  # dot(x, H, x) is faster than x'*H*x
 
@@ -60,3 +75,17 @@ to_hermitian(A::AbstractVector) = Hermitian(reshape(A, 1, 1), :L)
 to_hermitian(A::AbstractMatrix) = Hermitian(A, :L)
 to_hermitian(A::Hermitian) = A
 to_hermitian(A) = A
+
+"""
+Compute the inverse of a the Hermitian positive definite matrix `A` using `cholesky`.
+
+Builtin `inv` function uses LU factorization which is not the best choice for Hermitian
+positive definite matrices. The function will mutate `buffer` to reduce memory allocations.
+"""
+function inv_cholesky!(buffer::Matrix, A::Hermitian)
+    Achol  = Hermitian(buffer, :L)
+    Achol .= A
+    chol_obj = cholesky!(Achol)
+    invA = Hermitian(inv(chol_obj), :L)
+    return invA
+end
