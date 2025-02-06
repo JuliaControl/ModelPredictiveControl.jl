@@ -1,4 +1,5 @@
 const DEFAULT_LINMPC_OPTIMIZER = OSQP.MathOptInterfaceOSQP.Optimizer
+const DEFAULT_LINMPC_TRANSCRIPTION = :singleshooting
 
 struct LinMPC{
     NT<:Real, 
@@ -8,6 +9,7 @@ struct LinMPC{
     estim::SE
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
+    transcription::Symbol
     optim::JM
     con::ControllerConstraint{NT, Nothing}
     ΔŨ::Vector{NT}
@@ -41,7 +43,8 @@ struct LinMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function LinMPC{NT}(
-        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim::JM
+        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, 
+        transcription, optim::JM
     ) where {NT<:Real, SE<:StateEstimator, JM<:JuMP.GenericModel}
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
@@ -49,8 +52,10 @@ struct LinMPC{
         weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        S, T = init_ΔUtoU(model, Hp, Hc)
-        E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
+        S, T = init_ZtoU(estim, Hp, Hc, transcription)
+        E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
+            estim, model, Hp, Hc, transcription
+        )
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
         con, nϵ, S̃, Ẽ = init_defaultcon_mpc(
@@ -67,7 +72,7 @@ struct LinMPC{
         ΔŨ = zeros(NT, nΔŨ)
         buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
         mpc = new{NT, SE, JM}(
-            estim, optim, con,
+            estim, transcription, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
             weights,
@@ -130,6 +135,8 @@ arguments. This controller allocates memory at each time step for the optimizati
 - `N_Hc=diagm(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
 - `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
+- `transcription=:singleshooting` : transcription method for the nonlinear optimization 
+    problem, can be `:singleshooting` or `:multipleshoting`.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
   (default to [`OSQP`](https://osqp.org/docs/parsers/jump.html) optimizer).
@@ -187,11 +194,12 @@ function LinMPC(
     N_Hc = diagm(repeat(Nwt, Hc)),
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt = DEFAULT_CWT,
+    transcription = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
-    return LinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, optim)
+    return LinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, transcription, optim)
 end
 
 
@@ -229,6 +237,7 @@ function LinMPC(
     N_Hc = diagm(repeat(Nwt, Hc)),
     L_Hp = diagm(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
+    transcription = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
     isa(estim.model, LinModel) || error("estim.model type must be a LinModel") 
@@ -237,7 +246,7 @@ function LinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
-    return LinMPC{NT}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, optim)
+    return LinMPC{NT}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, transcription, optim)
 end
 
 """

@@ -508,7 +508,9 @@ end
 
 
 @doc raw"""
-    init_predmat(estim, model::LinModel, Hp, Hc) -> E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
+    init_predmat(
+        estim, model::LinModel, Hp, Hc, transcription
+    ) -> E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
 
 Construct the prediction matrices for [`LinModel`](@ref) `model`.
 
@@ -603,7 +605,9 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     \end{aligned}
     ```
 """
-function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where {NT<:Real}
+function init_predmat(
+    estim::StateEstimator{NT}, model::LinModel, Hp, Hc, transcription
+) where {NT<:Real}
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
     # --- pre-compute matrix powers ---
@@ -670,7 +674,9 @@ function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where 
 end
 
 "Return empty matrices if `model` is not a [`LinModel`](@ref)"
-function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where {NT<:Real}
+function init_predmat(
+    estim::StateEstimator{NT}, model::SimModel, Hp, Hc, transcription
+) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     E  = zeros(NT, 0, nu*Hc)
     G  = zeros(NT, 0, nd)
@@ -680,6 +686,59 @@ function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where 
     B  = zeros(NT, 0)
     ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V, B
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
+end
+
+
+@doc raw"""
+    init_defectmat(estim::StateEstimator, model::LinModel, Hp, Hc, transcription)
+
+Init the matrices for computing the defects over the predicted states. 
+
+The defects are calculated with an equation similar to the prediction matrices (see 
+[`init_predmat`](@ref)):
+```math
+\begin{aligned*}
+    \mathbf{Ŝ} &= \mathbf{E_ŝ Z} + \mathbf{G_ŝ d_0}(k)  + \mathbf{J_ŝ D̂_0} 
+                                 + \mathbf{K_ŝ x̂_0}(k) + \mathbf{V_ŝ u_0}(k-1) 
+                                 + \mathbf{B_ŝ}
+               &= \mathbf{E_ŝ Z} + \mathbf{F_ŝ}
+               
+\end{aligned*}
+```   
+They are forced to be ``\mathbf{Ŝ = 0}`` using the equality constraints of the optimizer.
+The matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in the Extended Help
+section.
+
+# Extended Help
+!!! details "Extended Help"
+    The matrices are computed by:
+    ```math
+    \begin{aligned}
+    \mathbf{E_ŝ} &= \begin{bmatrix}
+        \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0} & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}    \\
+        \mathbf{0}   & \mathbf{B̂_u} & \cdots & \mathbf{0} &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}    \\
+        \vdots       & \vdots       & \ddots & \vdots     &  \vdots     &  \vdots     & \ddots & \vdots         \\
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_u}  \mathbf{0} &  \mathbf{0} & \cdots & -\mathbf{I}    \end{bmatrix} \\
+    \mathbf{G_ŝ} &= \begin{bmatrix}
+        \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                      \end{bmatrix} \\
+    \mathbf{J_ŝ} &= \begin{bmatrix}
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                        \\
+        \mathbf{B̂_d} & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                        \\
+        \vdots       & \vdots       & \ddots & \vdots       & \vdots                                            \\
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_d} & \mathbf{0}                                        \end{bmatrix} \\
+    \mathbf{K_ŝ} &= \begin{bmatrix}
+        \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                        \end{bmatrix} \\
+    \mathbf{V_ŝ} &= \begin{bmatrix}
+        \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \mathbf{B̂_u}                                            \end{bmatrix} \\
+    \mathbf{B_ŝ} &= \begin{bmatrix}
+        \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}              \end{bmatrix}
+    \end{aligned}
+    ```
+"""
+function init_defectmat(
+    estim::StateEstimator{NT}, model::LinModel, Hp, Hc, transcription
+) where {NT<:Real}
+
 end
 
 @doc raw"""

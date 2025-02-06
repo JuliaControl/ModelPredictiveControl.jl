@@ -1,4 +1,5 @@
 const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
+const DEFAULT_NONLINMPC_TRANSCRIPTION = :singleshooting
 
 struct NonLinMPC{
     NT<:Real, 
@@ -65,7 +66,9 @@ struct NonLinMPC{
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         S, T = init_ZtoU(estim, Hp, Hc, transcription)
-        E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
+        E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
+            estim, model, Hp, Hc, transcription
+        )
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
         con, nϵ, S̃, Ẽ = init_defaultcon_mpc(
@@ -255,7 +258,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc::Int = 0,
     p = model.p,
-    transcription = :singleshooting,
+    transcription = DEFAULT_NONLINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
@@ -284,7 +287,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc::Int = 0,
     p = model.p,
-    transcription = :singleshooting,
+    transcription = DEFAULT_NONLINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
@@ -337,7 +340,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc = 0,
     p::P = estim.model.p,
-    transcription = :singleshooting,
+    transcription = DEFAULT_NONLINMPC_TRANSCRIPTION,
     optim::JM = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
 ) where {
     NT<:Real, 

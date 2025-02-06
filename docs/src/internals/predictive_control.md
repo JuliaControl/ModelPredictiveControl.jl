@@ -14,6 +14,7 @@ The prediction methodology of this module is mainly based on Maciejowski textboo
 ```@docs
 ModelPredictiveControl.init_ΔUtoU
 ModelPredictiveControl.init_predmat
+ModelPredictiveControl.init_defectmat
 ModelPredictiveControl.relaxU
 ModelPredictiveControl.relaxΔU
 ModelPredictiveControl.relaxŶ
