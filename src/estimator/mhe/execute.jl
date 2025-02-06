@@ -77,7 +77,7 @@ following fields:
 - `:Ŵ` or *`:What`* : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``
 - `:ϵ` or *`:epsilon`* : optimal slack variable, ``ϵ``
 - `:X̂` or *`:Xhat`* : optimal estimated states over ``N_k+1``, ``\mathbf{X̂}``
-- `:x̂` or *`:xhat`* : optimal estimated state for the next time step, ``\mathbf{x̂}_k(k+1)``
+- `:x̂` or *`:xhat`* : optimal estimated state, ``\mathbf{x̂}_k(k+p)``
 - `:V̂` or *`:Vhat`* : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``
 - `:P̄` or *`:Pbar`* : estimation error covariance at arrival, ``\mathbf{P̄}``
 - `:x̄` or *`:xbar`* : optimal estimation error at arrival, ``\mathbf{x̄}``
