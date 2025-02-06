@@ -12,7 +12,7 @@ The prediction methodology of this module is mainly based on Maciejowski textboo
 ## Controller Construction
 
 ```@docs
-ModelPredictiveControl.init_ΔUtoU
+ModelPredictiveControl.init_ZtoU
 ModelPredictiveControl.init_predmat
 ModelPredictiveControl.init_defectmat
 ModelPredictiveControl.relaxU

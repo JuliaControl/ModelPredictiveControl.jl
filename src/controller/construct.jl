@@ -844,7 +844,7 @@ Augment manipulated inputs constraints with slack variable ϵ for softening.
 Denoting the input increments augmented with the slack variable
 ``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
 augmented conversion matrix ``\mathbf{S̃}``, similar to the one described at
-[`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the inequality
+[`init_ZtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the inequality
 constraints:
 ```math
 \begin{bmatrix} 
