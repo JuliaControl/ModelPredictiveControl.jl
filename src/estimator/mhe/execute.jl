@@ -445,7 +445,7 @@ function correct_cov!(estim::MovingHorizonEstimator)
         invert_cov!(estim, estim.P̂arr_old)
     catch err
         if err isa PosDefException
-            @warn("Arrival covariance is not positive definite: keeping the old one")
+            @error("Arrival covariance P̄ is not positive definite: keeping the old one")
         else
             rethrow()
         end
@@ -465,7 +465,7 @@ function update_cov!(estim::MovingHorizonEstimator)
         invert_cov!(estim, estim.P̂arr_old)
     catch err
         if err isa PosDefException
-            @warn("Arrival covariance is not positive definite: keeping the old one")
+            @error("Arrival covariance P̄ is not positive definite: keeping the old one")
         else
             rethrow()
         end
@@ -479,7 +479,7 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
         estim.invP̄ .= inv_cholesky!(estim.buffer.P̂, P̄)
     catch err
         if err isa PosDefException
-            @warn("Arrival covariance is not invertible: keeping the old one")
+            @error("Arrival covariance P̄ is not invertible: keeping the old one")
         else
             rethrow()
         end
