@@ -14,6 +14,9 @@ jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
+    permissions: # needed for julia-actions/cache delete old caches that it has created
+      actions: write
+      contents: read
     continue-on-error: ${{ matrix.version == 'nightly' }}
     strategy:
       fail-fast: false
@@ -28,10 +31,10 @@ jobs:
         arch:
           - x64
     steps:
-      - name: Set JULIA_DEBUG environment variable
+      - name: Set JULIA_DEBUG environment variable if applicable
         if: ${{ runner.debug == '1' }}
         run: echo "JULIA_DEBUG=ModelPredictiveControl" >> $GITHUB_ENV
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
