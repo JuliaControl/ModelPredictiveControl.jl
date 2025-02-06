@@ -1003,6 +1003,21 @@ end
         (:error, "Arrival covariance P̄ is not invertible: keeping the old one"), 
         ModelPredictiveControl.invert_cov!(mhe, Hermitian(zeros(mhe.nx̂, mhe.nx̂),:L))
     )
+    mhe.P̂arr_old[1, 1] = Inf # Inf to trigger fallback
+    P̂arr_old_copy = deepcopy(mhe.P̂arr_old)
+    invP̄_copy = deepcopy(mhe.invP̄)
+    @test_logs(
+        (:error, "Arrival covariance P̄ is not finite: keeping the old one"), 
+        preparestate!(mhe, [50, 30], [5])
+    )
+    @test mhe.P̂arr_old ≈ P̂arr_old_copy
+    @test mhe.invP̄ ≈ invP̄_copy
+    @test_logs(
+        (:error, "Arrival covariance P̄ is not finite: keeping the old one"), 
+        updatestate!(mhe, [10, 50], [50, 30], [5])   
+    )
+    @test mhe.P̂arr_old ≈ P̂arr_old_copy
+    @test mhe.invP̄ ≈ invP̄_copy
 end
 
 @testset "MovingHorizonEstimator set constraints" begin

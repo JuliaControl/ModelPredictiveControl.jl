@@ -441,11 +441,14 @@ function correct_cov!(estim::MovingHorizonEstimator)
     estim.covestim.P̂  .= estim.P̂arr_old
     try
         correct_estimate!(estim.covestim, y0marr, d0arr)
+        all(isfinite, estim.covestim.P̂) || error("Arrival covariance P̄ is not finite")
         estim.P̂arr_old .= estim.covestim.P̂
         invert_cov!(estim, estim.P̂arr_old)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not positive definite: keeping the old one")
+        elseif err isa ErrorException
+            @error("Arrival covariance P̄ is not finite: keeping the old one")
         else
             rethrow()
         end
@@ -461,11 +464,14 @@ function update_cov!(estim::MovingHorizonEstimator)
     estim.covestim.P̂  .= estim.P̂arr_old
     try
         update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
+        all(isfinite, estim.covestim.P̂) || error("Arrival covariance P̄ is not finite")
         estim.P̂arr_old .= estim.covestim.P̂
         invert_cov!(estim, estim.P̂arr_old)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not positive definite: keeping the old one")
+        elseif err isa ErrorException
+            @error("Arrival covariance P̄ is not finite: keeping the old one")
         else
             rethrow()
         end
