@@ -19,9 +19,10 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1'
-          - '1.10'
-          - 'nightly'
+          - 'lts' # long-term support release
+          - '1'   # latest stable 1.x release
+          - 'pre' # latest stable prerelease
+          # - 'nightly' # commented since noisy + 'pre' allows testing upcoming versions
         os:
           - ubuntu-latest
         arch:
@@ -31,11 +32,11 @@ jobs:
         if: ${{ runner.debug == '1' }}
         run: echo "JULIA_DEBUG=ModelPredictiveControl" >> $GITHUB_ENV
       - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v1
+      - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: julia-actions/julia-processcoverage@v1
