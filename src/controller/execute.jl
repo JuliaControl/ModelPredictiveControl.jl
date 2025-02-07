@@ -710,9 +710,11 @@ end
 function setmodel_controller!(mpc::PredictiveController, x̂op_old)
     estim, model = mpc.estim, mpc.estim.model
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
-    optim, con = mpc.optim, mpc.con
+    transcription, optim, con = mpc.transcription, mpc.optim, mpc.con
     # --- predictions matrices ---
-    E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(estim, model, Hp, Hc)
+    E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
+        estim, model, Hp, Hc, transcription
+    )
     A_Ymin, A_Ymax, Ẽ = relaxŶ(model, mpc.nϵ, con.C_ymin, con.C_ymax, E)
     A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, mpc.nϵ, con.c_x̂min, con.c_x̂max, ex̂)
     mpc.Ẽ .= Ẽ
