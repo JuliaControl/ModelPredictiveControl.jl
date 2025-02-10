@@ -694,20 +694,18 @@ end
 
 Init the matrices for computing the defects over the predicted states. 
 
-The defects are calculated with an equation similar to the prediction matrices (see 
-[`init_predmat`](@ref)):
+An equation similar to the prediction matrices (see 
+[`init_predmat`](@ref)) computes the defects over the predicted states:
 ```math
-\begin{aligned*}
+\begin{aligned}
     \mathbf{Ŝ} &= \mathbf{E_ŝ Z} + \mathbf{G_ŝ d_0}(k)  + \mathbf{J_ŝ D̂_0} 
-                                 + \mathbf{K_ŝ x̂_0}(k) + \mathbf{V_ŝ u_0}(k-1) 
-                                 + \mathbf{B_ŝ}
+                                 + \mathbf{K_ŝ x̂_0}(k)  + \mathbf{V_ŝ u_0}(k-1) 
+                                 + \mathbf{B_ŝ}                                         \\
                &= \mathbf{E_ŝ Z} + \mathbf{F_ŝ}
-               
-\end{aligned*}
+\end{aligned}
 ```   
-They are forced to be ``\mathbf{Ŝ = 0}`` using the equality constraints of the optimizer.
-The matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in the Extended Help
-section.
+They are forced to be ``\mathbf{Ŝ = 0}`` using the optimization equality constraints. The
+matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in the Extended Help section.
 
 # Extended Help
 !!! details "Extended Help"
@@ -715,10 +713,10 @@ section.
     ```math
     \begin{aligned}
     \mathbf{E_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0} & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}    \\
-        \mathbf{0}   & \mathbf{B̂_u} & \cdots & \mathbf{0} &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}    \\
-        \vdots       & \vdots       & \ddots & \vdots     &  \vdots     &  \vdots     & \ddots & \vdots         \\
-        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_u}  \mathbf{0} &  \mathbf{0} & \cdots & -\mathbf{I}    \end{bmatrix} \\
+        \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0}   & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}    \\
+        \mathbf{0}   & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}    \\
+        \vdots       & \vdots       & \ddots & \vdots       &  \vdots     &  \vdots     & \ddots & \vdots         \\
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_u} &  \mathbf{0} &  \mathbf{0} & \cdots & -\mathbf{I}    \end{bmatrix} \\
     \mathbf{G_ŝ} &= \begin{bmatrix}
         \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                      \end{bmatrix} \\
     \mathbf{J_ŝ} &= \begin{bmatrix}
@@ -729,7 +727,7 @@ section.
     \mathbf{K_ŝ} &= \begin{bmatrix}
         \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                        \end{bmatrix} \\
     \mathbf{V_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \mathbf{B̂_u}                                            \end{bmatrix} \\
+        \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \vdots \\ \mathbf{B̂_u}                                                  \end{bmatrix} \\
     \mathbf{B_ŝ} &= \begin{bmatrix}
         \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}              \end{bmatrix}
     \end{aligned}
