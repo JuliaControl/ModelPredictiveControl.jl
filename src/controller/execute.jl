@@ -167,7 +167,6 @@ function addinfo!(info, mpc::PredictiveController)
     return info
 end
 
-
 @doc raw"""
     initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u) -> nothing
 
@@ -235,8 +234,8 @@ end
 
 Common computations of `initpred!` for all types of [`SimModel`](@ref).
 
-Will init `mpc.F` with 0 values, or with the stochastic predictions `Ŷs` if `mpc.estim` is
-an [`InternalModel`](@ref). The function returns `mpc.F`.
+Will also init `mpc.F` with 0 values, or with the stochastic predictions `Ŷs` if `mpc.estim`
+is an [`InternalModel`](@ref). The function returns `mpc.F`.
 """
 function initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
     lastu  = mpc.buffer.u
@@ -713,7 +712,7 @@ function setmodel_controller!(mpc::PredictiveController, x̂op_old)
     transcription, optim, con = mpc.transcription, mpc.optim, mpc.con
     # --- predictions matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
-        estim, model, Hp, Hc, transcription
+        model, estim, transcription, Hp, Hc
     )
     A_Ymin, A_Ymax, Ẽ = relaxŶ(model, mpc.nϵ, con.C_ymin, con.C_ymax, E)
     A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, mpc.nϵ, con.c_x̂min, con.c_x̂max, ex̂)

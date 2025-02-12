@@ -1,16 +1,17 @@
 const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
-const DEFAULT_NONLINMPC_TRANSCRIPTION = :singleshooting
+const DEFAULT_NONLINMPC_TRANSCRIPTION = SingleShooting()
 
 struct NonLinMPC{
     NT<:Real, 
     SE<:StateEstimator,
+    TM<:TranscriptionMethod,
     JM<:JuMP.GenericModel, 
     P<:Any,
     JEfunc<:Function,
     GCfunc<:Function
 } <: PredictiveController{NT}
     estim::SE
-    transcription::Symbol
+    transcription::TM
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
     optim::JM
@@ -50,10 +51,11 @@ struct NonLinMPC{
     function NonLinMPC{NT}(
         estim::SE, 
         Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc!::GCfunc, nc, p::P, 
-        transcription, optim::JM
+        transcription::TM, optim::JM
     ) where {
             NT<:Real, 
             SE<:StateEstimator, 
+            TM<:TranscriptionMethod,
             JM<:JuMP.GenericModel,
             P<:Any,
             JEfunc<:Function, 
@@ -65,9 +67,9 @@ struct NonLinMPC{
         weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        S, T = init_ZtoU(estim, Hp, Hc, transcription)
+        S, T = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
-            estim, model, Hp, Hc, transcription
+            model, estim, transcription, Hp, Hc
         )
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
@@ -85,7 +87,7 @@ struct NonLinMPC{
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
         buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
-        mpc = new{NT, SE, JM, P, JEfunc, GCfunc}(
+        mpc = new{NT, SE, TM, JM, P, JEfunc, GCfunc}(
             estim, transcription, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
@@ -125,17 +127,14 @@ subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraint
 ```math
 \mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}
 ```
-and the slack ``ϵ`` and the ``\mathbf{Z}`` vector as the decision variables:
-
-- ``\mathbf{Z} = \mathbf{ΔU}`` if the transcription method is `:singleshooting`
-- ``\mathbf{Z} = [\begin{smallmatrix} \mathbf{ΔU}' & \mathbf{X̂}' \end{smallmatrix}]'`` if the transcription method is `:multipleshoting`
-
-The economic function ``J_E`` can penalizes solutions with high economic costs. Setting all
-the weights to 0 except ``E``  creates a pure economic model predictive controller (EMPC). 
-As a matter of fact, ``J_E`` can be any nonlinear function to customize the objective, even
-if there is no economic interpretation to it. The arguments of ``J_E`` and ``\mathbf{g_c}``
-include the manipulated inputs, predicted outputs and measured disturbances, extended from
-``k`` to ``k + H_p`` (inclusively, see Extended Help for more details):
+with the decision variables ``\mathbf{Z}`` and slack ``ϵ``. By default, a [`SingleShooting`](@ref)
+transcription method is used, hence ``\mathbf{Z=ΔU}``. The economic function ``J_E`` can
+penalizes solutions with high economic costs. Setting all the weights to 0 except ``E``
+creates a pure economic model predictive controller (EMPC). As a matter of fact, ``J_E`` can
+be any nonlinear function as a custom objective, even if there is no economic interpretation
+to it. The arguments of ``J_E`` and ``\mathbf{g_c}`` include the manipulated inputs,
+predicted outputs and measured disturbances, extended from ``k`` to ``k+H_p`` (inclusively,
+see Extended Help for more details):
 ```math
     \mathbf{U_e} = \begin{bmatrix} \mathbf{U}      \\ \mathbf{u}(k+H_p-1)   \end{bmatrix}  , \quad
     \mathbf{Ŷ_e} = \begin{bmatrix} \mathbf{ŷ}(k)   \\ \mathbf{Ŷ}            \end{bmatrix}  , \quad
@@ -179,8 +178,7 @@ This controller allocates memory at each time step for the optimization.
    not (details in Extended Help).
 - `nc=0` : number of custom inequality constraints.
 - `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
-- `transcription=:singleshooting` : transcription method for the nonlinear optimization 
-    problem, can be `:singleshooting` or `:multipleshoting`.
+- `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
@@ -258,7 +256,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc::Int = 0,
     p = model.p,
-    transcription = DEFAULT_NONLINMPC_TRANSCRIPTION,
+    transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
@@ -287,7 +285,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc::Int = 0,
     p = model.p,
-    transcription = DEFAULT_NONLINMPC_TRANSCRIPTION,
+    transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
@@ -339,14 +337,12 @@ function NonLinMPC(
     gc!::Function = (_,_,_,_,_,_) -> nothing,
     gc ::Function = gc!,
     nc = 0,
-    p::P = estim.model.p,
-    transcription = DEFAULT_NONLINMPC_TRANSCRIPTION,
-    optim::JM = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
+    p = estim.model.p,
+    transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
 ) where {
     NT<:Real, 
-    SE<:StateEstimator{NT}, 
-    JM<:JuMP.GenericModel, 
-    P<:Any
+    SE<:StateEstimator{NT}
 }
     nk = estimate_delays(estim.model)
     if Hp ≤ nk

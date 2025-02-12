@@ -36,6 +36,7 @@ end
 
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
+    # matrices for the terminal constraints:
     ẽx̂      ::Matrix{NT}
     fx̂      ::Vector{NT}
     gx̂      ::Matrix{NT}
@@ -43,6 +44,15 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     kx̂      ::Matrix{NT}
     vx̂      ::Matrix{NT}
     bx̂      ::Vector{NT}
+    # matrices for the zero defect constraints (N/A for single shooting transcriptions):
+    Ẽŝ      ::Matrix{NT}
+    Fŝ      ::Vector{NT}
+    Gŝ      ::Matrix{NT}
+    Jŝ      ::Matrix{NT}
+    Kŝ      ::Matrix{NT}
+    Vŝ      ::Matrix{NT}
+    Bŝ      ::Vector{NT}
+    # bounds over the prediction horizon (deviation vectors from operating points):
     U0min   ::Vector{NT}
     U0max   ::Vector{NT}
     ΔŨmin   ::Vector{NT}
@@ -51,6 +61,7 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     Y0max   ::Vector{NT}
     x̂0min   ::Vector{NT}
     x̂0max   ::Vector{NT}
+    # A matrices for the linear inequality constraints:
     A_Umin  ::Matrix{NT}
     A_Umax  ::Matrix{NT}
     A_ΔŨmin ::Matrix{NT}
@@ -60,13 +71,18 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     A_x̂min  ::Matrix{NT}
     A_x̂max  ::Matrix{NT}
     A       ::Matrix{NT}
+    # b vector for the linear inequality constraints:
     b       ::Vector{NT}
+    # indices of finite numbers in the b vector (linear inequality constraints):
     i_b     ::BitVector
+    # constraint softness parameter vectors for the nonlinear inequality constraints:
     C_ymin  ::Vector{NT}
     C_ymax  ::Vector{NT}
     c_x̂min  ::Vector{NT}
     c_x̂max  ::Vector{NT}
+    # indices of finite numbers in the g vector (nonlinear inequality constraints):
     i_g     ::BitVector
+    # custom nonlinear inequality constraints:
     gc!     ::GCfunc
     nc      ::Int
 end

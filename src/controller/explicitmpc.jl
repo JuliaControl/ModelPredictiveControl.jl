@@ -1,5 +1,6 @@
 struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     estim::SE
+    transcription::SingleShooting
     ΔŨ::Vector{NT}
     ŷ ::Vector{NT}
     Hp::Int
@@ -45,9 +46,9 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        transcription = :singleshooting
-        S, T = init_ZtoU(estim, Hp, Hc, transcription)
-        E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc, transcription)
+        transcription = SingleShooting() # explicit MPC only supports SingleShooting
+        S, T = init_ZtoU(estim, transcription, Hp, Hc)
+        E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
         # dummy val (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
         S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
@@ -64,6 +65,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
         mpc = new{NT, SE}(
             estim,
+            transcription,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
             weights,
@@ -212,7 +214,7 @@ function setmodel_controller!(mpc::ExplicitMPC, _ )
     estim, model = mpc.estim, mpc.estim.model
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
-    E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc)
+    E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
     Ẽ = E  # no slack variable ϵ for ExplicitMPC
     mpc.Ẽ .= Ẽ
     mpc.G .= G
