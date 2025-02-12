@@ -52,6 +52,7 @@ function PredictiveControllerBuffer{NT}(
     return PredictiveControllerBuffer{NT}(u, ΔŨ, D̂, Ŷ, U, Ẽ, S̃, empty)
 end
 
+include("controller/transcription.jl")
 include("controller/construct.jl")
 include("controller/execute.jl")
 include("controller/explicitmpc.jl")
