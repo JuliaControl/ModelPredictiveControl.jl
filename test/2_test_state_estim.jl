@@ -133,9 +133,8 @@ end
         times1[i] = savetime!(skalmanfilter1)
         preparestate!(skalmanfilter1, [1])
         updatestate!(skalmanfilter1, [1], [1])
-        periodsleep(skalmanfilter1)
+        periodsleep(skalmanfilter1, true)
     end
-    println(diff(times1))
     @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.01))
 end
     
@@ -864,7 +863,7 @@ end
 end
 
 @testitem "MovingHorizonEstimator estimation and getinfo" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt, ForwardDiff
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2], i_d=[3]), uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d,_) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h(x,d,_)   = linmodel1.C*x + linmodel1.Dd*d

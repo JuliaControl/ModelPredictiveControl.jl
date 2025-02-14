@@ -356,7 +356,7 @@ end
         times1[i] = savetime!(mpc1)
         preparestate!(mpc1, [1])
         updatestate!(mpc1, [1], [1])
-        periodsleep(mpc1)
+        periodsleep(mpc1, true)
     end
     @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
 end
@@ -580,7 +580,7 @@ end
 end
 
 @testitem "NonLinMPC moves and getinfo" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     Hp = 1000
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=Hp, Hc=1)

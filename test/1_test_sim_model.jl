@@ -120,22 +120,22 @@ end
 
 @testitem "LinModel real time simulations" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
+    linmodel1 = LinModel(tf(2, [10, 1]), 0.25)
     times1 = zeros(5)
     for i=1:5
         times1[i] = savetime!(linmodel1)
         updatestate!(linmodel1, [1])
         periodsleep(linmodel1)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
-    linmodel2 = LinModel(tf(2, [0.1, 1]), 0.001)
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.01))
+    linmodel2 = LinModel(tf(2, [0.1, 1]), 0.25)
     times2 = zeros(5)
     for i=1:5
         times2[i] = savetime!(linmodel2)
         updatestate!(linmodel2, [1])
         periodsleep(linmodel2, true)
     end
-    @test all(isapprox.(diff(times2[2:end]), 0.001, atol=0.0001))
+    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.0001))
 end
 
 @testitem "NonLinModel construction" setup=[SetupMPCtests] begin
