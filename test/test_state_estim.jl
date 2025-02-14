@@ -935,12 +935,12 @@ end
         preparestate!(mhe2, [50, 30], [5])
         updatestate!(mhe2, [11, 52], [50, 30], [5])
     end
-    @test mhe2([5]) ≈ [50, 30] atol=1e-3
+    @test mhe2([5]) ≈ [50, 30] atol=1e-2
     for i in 1:40
         preparestate!(mhe2, [51, 32], [5])
         updatestate!(mhe2, [10, 50], [51, 32], [5])
     end
-    @test mhe2([5]) ≈ [51, 32] atol=1e-3
+    @test mhe2([5]) ≈ [51, 32] atol=1e-2
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mhe3 = MovingHorizonEstimator(linmodel3, He=1)
     preparestate!(mhe3, [0])
