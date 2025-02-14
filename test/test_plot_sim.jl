@@ -1,4 +1,5 @@
 @testitem "SimModel quick simulation" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(sys, Ts, i_d=[3])
     res = sim!(model, 15)
     display(res)
@@ -18,6 +19,7 @@
 end
 
 @testitem "SimModel Plots" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, Plots
     model = LinModel(sys, Ts, i_d=[3])
     res = sim!(model, 15, [1, 3], [-10])
     p = plot(res, plotx=true)
@@ -42,6 +44,7 @@ end
 end
 
 @testitem "StateEstimator quick simulation" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     estim = SteadyKalmanFilter(LinModel(sys, Ts, i_d=[3]))
     res = sim!(estim, 15)
     @test isa(res.obj, SteadyKalmanFilter)
@@ -64,6 +67,7 @@ end
 end
 
 @testitem "StateEstimator Plots" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, Plots
     estim = MovingHorizonEstimator(LinModel(sys, Ts, i_d=[3]), He=5)
     estim = setconstraint!(estim, x̂min=[-100,-101,-102,-103,-Inf,-Inf])
     estim = setconstraint!(estim, x̂max=[+100,+101,+102,+103,+Inf,+Inf])
@@ -121,6 +125,7 @@ end
 end
 
 @testitem "PredictiveController quick simulation" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     mpc1 = LinMPC(LinModel(sys, Ts, i_d=[3]))
     res = sim!(mpc1, 15)
     @test isa(res.obj, LinMPC)
@@ -155,6 +160,7 @@ end
 end
 
 @testitem "PredictiveController Plots" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, Plots
     estim = MovingHorizonEstimator(LinModel(sys, Ts, i_d=[3]), He=5)
     estim = setconstraint!(estim, x̂min=[-100,-101,-102,-103,-104,-105])
     estim = setconstraint!(estim, x̂max=[+100,+101,+102,+103,+104,+105])

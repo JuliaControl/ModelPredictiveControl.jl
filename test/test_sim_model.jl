@@ -1,4 +1,5 @@
 @testitem "LinModel construction" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys, Ts, i_u=1:2)
     @test linmodel1.nx == 2
     @test linmodel1.nu == 2
@@ -97,6 +98,7 @@
 end
 
 @testitem "LinModel sim methods" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase
     linmodel1 = setop!(LinModel(Gss), uop=[10,50], yop=[50,30])
     @test updatestate!(linmodel1, [10, 50]) ≈ zeros(2)
     @test updatestate!(linmodel1, [10, 50], Float64[]) ≈ zeros(2)
@@ -117,6 +119,7 @@ end
 end
 
 @testitem "LinModel real time simulations" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
     times1 = zeros(5)
     for i=1:5
@@ -136,6 +139,7 @@ end
 end
 
 @testitem "NonLinModel construction" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1(x,u,_,model) = model.A*x + model.Bu*u
     h1(x,_,model)   = model.C*x
@@ -243,6 +247,7 @@ end
 end
 
 @testitem "NonLinModel sim methods" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1(x,u,_,model) = model.A*x + model.Bu*u
     h1(x,_,model)   = model.C*x
@@ -262,6 +267,7 @@ end
 end
 
 @testitem "NonLinModel linearization" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     Ts = 1.0
     f1(x,u,d,_) = x.^5 + u.^4 + d.^3
     h1(x,d,_)   = x.^2 + d
@@ -317,6 +323,7 @@ end
 end
 
 @testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
     nonlinmodel1 = NonLinModel(
         (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
