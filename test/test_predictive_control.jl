@@ -1,8 +1,4 @@
-Ts = 400.0
-sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
-        tf(-0.74,[800.0,1])   tf(0.74,[800.0,1])    tf(-0.74,[800.0,1])   ]
-
-@testset "LinMPC construction" begin
+@testitem "LinMPC construction" setup=[SetupMPCtests] begin
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = LinMPC(model, Hp=15)
     @test isa(mpc1.estim, SteadyKalmanFilter)
@@ -58,7 +54,7 @@ sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
     @test_throws ArgumentError LinMPC(model, Cwt=-1)
 end
 
-@testset "LinMPC moves and getinfo" begin
+@testitem "LinMPC moves and getinfo" setup=[SetupMPCtests] begin
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3), yop=[10])
     mpc1 = LinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
     r = [15]
@@ -91,7 +87,7 @@ end
     @test_throws DimensionMismatch moveinput!(mpc3; R̂u = fill(0, mpc1.Hp+1))
 end
 
-@testset "LinMPC step disturbance rejection" begin
+@testitem "LinMPC step disturbance rejection" setup=[SetupMPCtests] begin
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
     r = [15]
     outdist = [5]
@@ -99,9 +95,9 @@ end
     linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = linmodel() - outdist
+        global ym = linmodel() - outdist
         preparestate!(mpc_im, ym)
-        u = moveinput!(mpc_im, r)
+        global u = moveinput!(mpc_im, r)
         updatestate!(mpc_im, u, ym)
         updatestate!(linmodel, u)
     end
@@ -111,9 +107,9 @@ end
     linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = linmodel() - outdist
+        global ym = linmodel() - outdist
         preparestate!(mpc_nint_u, ym)
-        u = moveinput!(mpc_nint_u, r)
+        global u = moveinput!(mpc_nint_u, r)
         updatestate!(mpc_nint_u, u, ym)
         updatestate!(linmodel, u)
     end
@@ -123,9 +119,9 @@ end
     linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = linmodel() - outdist
+        global ym = linmodel() - outdist
         preparestate!(mpc_nint_ym, ym)
-        u = moveinput!(mpc_nint_ym, r)
+        global u = moveinput!(mpc_nint_ym, r)
         updatestate!(mpc_nint_ym, u, ym)
         updatestate!(linmodel, u)
     end
@@ -133,7 +129,7 @@ end
     @test ym ≈ r   atol=1e-2 
 end
 
-@testset "LinMPC other methods" begin
+@testitem "LinMPC other methods" setup=[SetupMPCtests] begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     mpc1 = LinMPC(linmodel1)
     @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
@@ -151,7 +147,7 @@ end
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
-@testset "LinMPC set constraints" begin
+@testitem "LinMPC set constraints" setup=[SetupMPCtests] begin
     model = LinModel(sys, Ts, i_d=[3])
     mpc = LinMPC(model, Hp=1, Hc=1)
 
@@ -218,7 +214,7 @@ end
     @test_throws ArgumentError setconstraint!(mpc3, c_ymax=[1, 1])
 end
 
-@testset "LinMPC constraint violation" begin
+@testitem "LinMPC constraint violation" setup=[SetupMPCtests] begin
     model = LinModel(tf([2], [10, 1]), 3.0)
     mpc = LinMPC(model, Hp=50, Hc=5)
 
@@ -276,7 +272,7 @@ end
     setconstraint!(mpc, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
 end
 
-@testset "LinMPC terminal cost" begin
+@testitem "LinMPC terminal cost" setup=[SetupMPCtests] begin
     model = LinModel(ss([0.5 -0.4;0.6 0.5], [1 0;0 1], [1 0; 0 1], 0, 1))
     K = lqr(Discrete, model.A, model.Bu, I, 0.5I)
     M_end = ControlSystemsBase.are(Discrete, model.A, model.Bu, I, 0.5I)
@@ -296,14 +292,14 @@ end
     X_lqr = zeros(2,20)
     x=[1,1]
     for i=1:20
-        u = -K*x
+        global u = -K*x
         X_lqr[:,i] = x
-        x = model.A*x + model.Bu*u
+        global x = model.A*x + model.Bu*u
     end
     @test all(isapprox.(X_mpc, X_lqr, atol=1e-5))
 end
 
-@testset "LinMPC set model" begin
+@testitem "LinMPC set model" setup=[SetupMPCtests] begin
     estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
     mpc = LinMPC(estim, Nwt=[0], Cwt=1e4, Hp=1000, Hc=1)
     mpc = setconstraint!(mpc, umin=[-24], umax=[26])
@@ -342,7 +338,7 @@ end
     @test mpc.weights.L_Hp ≈ diagm(1.1:1000.1)
 end
 
-@testset "LinMPC real-time simulations" begin
+@testitem "LinMPC real-time simulations" setup=[SetupMPCtests] begin
     linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
     mpc1 = LinMPC(linmodel1)
     times1 = zeros(5)
@@ -355,7 +351,7 @@ end
     @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
 end
 
-@testset "ExplicitMPC construction" begin
+@testitem "ExplicitMPC construction" setup=[SetupMPCtests] begin
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = ExplicitMPC(model, Hp=15)
     @test isa(mpc1.estim, SteadyKalmanFilter)
@@ -385,7 +381,7 @@ end
     @test_throws ArgumentError LinMPC(model, Hp=0)
 end
 
-@testset "ExplicitMPC moves and getinfo" begin
+@testitem "ExplicitMPC moves and getinfo" setup=[SetupMPCtests] begin
     mpc1 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
     r = [5]
     preparestate!(mpc1, [0])
@@ -412,7 +408,7 @@ end
 end
 
 
-@testset "ExplicitMPC step disturbance rejection" begin
+@testitem "ExplicitMPC step disturbance rejection" setup=[SetupMPCtests] begin
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
     r = [15]
     outdist = [5]
@@ -420,9 +416,9 @@ end
     linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = linmodel() - outdist
+        global ym = linmodel() - outdist
         preparestate!(mpc_im, ym)
-        u = moveinput!(mpc_im, r)
+        global u = moveinput!(mpc_im, r)
         updatestate!(mpc_im, u, ym)
         updatestate!(linmodel, u)
     end
@@ -432,9 +428,9 @@ end
     linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = linmodel() - outdist
+        global ym = linmodel() - outdist
         preparestate!(mpc_nint_u, ym)
-        u = moveinput!(mpc_nint_u, r)
+        global u = moveinput!(mpc_nint_u, r)
         updatestate!(mpc_nint_u, u, ym)
         updatestate!(linmodel, u)
     end
@@ -444,9 +440,9 @@ end
     linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = linmodel() - outdist
+        global ym = linmodel() - outdist
         preparestate!(mpc_nint_ym, ym)
-        u = moveinput!(mpc_nint_ym, r)
+        global u = moveinput!(mpc_nint_ym, r)
         updatestate!(mpc_nint_ym, u, ym)
         updatestate!(linmodel, u)
     end
@@ -454,7 +450,7 @@ end
     @test ym ≈ r   atol=1e-2 
 end
 
-@testset "ExplicitMPC other methods" begin
+@testitem "ExplicitMPC other methods" setup=[SetupMPCtests] begin
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     mpc1 = ExplicitMPC(linmodel1)
     @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
@@ -468,13 +464,13 @@ end
     @test_throws ArgumentError updatestate!(mpc1, [0,0])
 end
 
-@testset "ExplicitMPC constraints" begin
+@testitem "ExplicitMPC constraints" setup=[SetupMPCtests] begin
     model = LinModel(sys, Ts, i_d=[3])
     mpc = ExplicitMPC(model, Hp=1, Hc=1)
     @test_throws ErrorException setconstraint!(mpc, umin=[0.0, 0.0])
 end
 
-@testset "ExplicitMPC set model" begin
+@testitem "ExplicitMPC set model" setup=[SetupMPCtests] begin
     estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
     mpc = ExplicitMPC(estim, Nwt=[0], Hp=1000, Hc=1)
     @test mpc.Yop ≈ fill(10.0, 1000)
@@ -503,7 +499,7 @@ end
     @test mpc.weights.L_Hp ≈ diagm(1.1:1000.1)
 end
 
-@testset "NonLinMPC construction" begin
+@testitem "NonLinMPC construction" setup=[SetupMPCtests] begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     nmpc0 = NonLinMPC(linmodel1, Hp=15)
     @test isa(nmpc0.estim, SteadyKalmanFilter)
@@ -566,7 +562,7 @@ end
     @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
 end
 
-@testset "NonLinMPC moves and getinfo" begin
+@testitem "NonLinMPC moves and getinfo" setup=[SetupMPCtests] begin
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     Hp = 1000
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=Hp, Hc=1)
@@ -638,7 +634,7 @@ end
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
-@testset "NonLinMPC step disturbance rejection" begin
+@testitem "NonLinMPC step disturbance rejection" setup=[SetupMPCtests] begin
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     r = [15]
     outdist = [5]
@@ -646,9 +642,9 @@ end
     linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = linmodel() - outdist
+        global ym = linmodel() - outdist
         preparestate!(nmpc_im, ym)
-        u = moveinput!(nmpc_im, r)
+        global u = moveinput!(nmpc_im, r)
         updatestate!(nmpc_im, u, ym)
         updatestate!(linmodel, u)
     end
@@ -658,9 +654,9 @@ end
     linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = linmodel() - outdist
+        global ym = linmodel() - outdist
         preparestate!(nmpc_nint_u, ym)
-        u = moveinput!(nmpc_nint_u, r)
+        global u = moveinput!(nmpc_nint_u, r)
         updatestate!(nmpc_nint_u, u, ym)
         updatestate!(linmodel, u)
     end
@@ -670,9 +666,9 @@ end
     linmodel.x0 .= 0
     ym, u = linmodel() - outdist, [0.0]
     for i=1:25
-        ym = linmodel() - outdist
+        global ym = linmodel() - outdist
         preparestate!(nmpc_nint_ym, ym)
-        u = moveinput!(nmpc_nint_ym, r)
+        global u = moveinput!(nmpc_nint_ym, r)
         updatestate!(nmpc_nint_ym, u, ym)
         updatestate!(linmodel, u)
     end
@@ -680,7 +676,7 @@ end
     @test ym ≈ r   atol=1e-2
 end
 
-@testset "NonLinMPC other methods" begin
+@testitem "NonLinMPC other methods" setup=[SetupMPCtests] begin
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     f = (x,u,_,_) -> linmodel.A*x + linmodel.Bu*u
     h = (x,_,_)   -> linmodel.C*x
@@ -697,7 +693,7 @@ end
     @test nmpc1.estim.x̂0 ≈ [0,0,0,0] atol=1e-6
 end
 
-@testset "NonLinMPC set constraints" begin
+@testitem "NonLinMPC set constraints" setup=[SetupMPCtests] begin
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     nmpc_lin = NonLinMPC(linmodel1, Hp=1, Hc=1)
 
@@ -732,7 +728,7 @@ end
 
 end
 
-@testset "NonLinMPC constraint violation" begin
+@testitem "NonLinMPC constraint violation" setup=[SetupMPCtests] begin
     gc(Ue, Ŷe, _ ,p , ϵ) = [p[1]*(Ue[1:end-1] .- 4.2 .- ϵ); p[2]*(Ŷe[2:end] .- 3.14 .- ϵ)]
     Hp=50
 
@@ -876,7 +872,7 @@ end
 
 end
 
-@testset "NonLinMPC set model" begin
+@testitem "NonLinMPC set model" setup=[SetupMPCtests] begin
     estim = KalmanFilter(setop!(LinModel(tf(5, [200, 1]), 300), yop=[10], uop=[1]))
     mpc = NonLinMPC(estim, Nwt=[0], Cwt=1e4, Hp=1000, Hc=1)
     mpc = setconstraint!(mpc, umin=[-24], umax=[26])
@@ -928,7 +924,7 @@ end
     @test_throws ErrorException setmodel!(nmpc, deepcopy(nonlinmodel))
 end
 
-@testset "LinMPC v.s. NonLinMPC" begin
+@testitem "LinMPC v.s. NonLinMPC" setup=[SetupMPCtests] begin
     linmodel = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
     f = (x,u,d,_) -> linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
     h = (x,d,_)   -> linmodel.C*x + linmodel.Dd*d

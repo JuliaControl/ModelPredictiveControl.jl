@@ -1,8 +1,4 @@
-Ts = 400.0
-sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
-        tf(-0.74,[800.0,1])   tf(0.74,[800.0,1])    tf(-0.74,[800.0,1])   ]
-
-@testset "SimModel quick simulation" begin
+@testitem "SimModel quick simulation" setup=[SetupMPCtests] begin
     model = LinModel(sys, Ts, i_d=[3])
     res = sim!(model, 15)
     display(res)
@@ -21,7 +17,7 @@ sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
     @test_throws ArgumentError SimResult(model, [res.U_data model.uop], res.Y_data, res.D_data)
 end
 
-@testset "SimModel Plots" begin
+@testitem "SimModel Plots" setup=[SetupMPCtests] begin
     model = LinModel(sys, Ts, i_d=[3])
     res = sim!(model, 15, [1, 3], [-10])
     p = plot(res, plotx=true)
@@ -45,7 +41,7 @@ end
     @test p[3][1][:y] ≈ res.X_data[4, :]
 end
 
-@testset "StateEstimator quick simulation" begin
+@testitem "StateEstimator quick simulation" setup=[SetupMPCtests] begin
     estim = SteadyKalmanFilter(LinModel(sys, Ts, i_d=[3]))
     res = sim!(estim, 15)
     @test isa(res.obj, SteadyKalmanFilter)
@@ -67,7 +63,7 @@ end
     @test res_man.X̂_data ≈ res.X̂_data
 end
 
-@testset "StateEstimator Plots" begin
+@testitem "StateEstimator Plots" setup=[SetupMPCtests] begin
     estim = MovingHorizonEstimator(LinModel(sys, Ts, i_d=[3]), He=5)
     estim = setconstraint!(estim, x̂min=[-100,-101,-102,-103,-Inf,-Inf])
     estim = setconstraint!(estim, x̂max=[+100,+101,+102,+103,+Inf,+Inf])
@@ -124,7 +120,7 @@ end
     @test all(p7[end-2][3][:y] .≈ +103)
 end
 
-@testset "PredictiveController quick simulation" begin
+@testitem "PredictiveController quick simulation" setup=[SetupMPCtests] begin
     mpc1 = LinMPC(LinModel(sys, Ts, i_d=[3]))
     res = sim!(mpc1, 15)
     @test isa(res.obj, LinMPC)
@@ -158,7 +154,7 @@ end
     @test res_man.Ry_data ≈ res.Ry_data
 end
 
-@testset "PredictiveController Plots" begin
+@testitem "PredictiveController Plots" setup=[SetupMPCtests] begin
     estim = MovingHorizonEstimator(LinModel(sys, Ts, i_d=[3]), He=5)
     estim = setconstraint!(estim, x̂min=[-100,-101,-102,-103,-104,-105])
     estim = setconstraint!(estim, x̂max=[+100,+101,+102,+103,+104,+105])
