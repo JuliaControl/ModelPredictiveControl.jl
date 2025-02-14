@@ -7,9 +7,26 @@ using LinearAlgebra
 using Random: randn
 using JuMP, OSQP, Ipopt, DAQP, ForwardDiff
 using Plots
-using Test
+using Test, TestItemRunner
 
-@testset "ModelPredictiveControl.jl" begin
+@run_package_tests 
+
+#@testitem "ModelPredictiveControl.jl" begin
+
+@testsnippet SetupMPCtests begin
+    using ControlSystemsBase, LinearAlgebra
+    using Random: randn
+    using JuMP, OSQP, Ipopt, DAQP, ForwardDiff
+    using Plots
+    Ts = 400.0
+    sys = [ tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1])   tf(1.90,[1800.0,1]);
+            tf(-0.74,[800.0,1])   tf(0.74,[800.0,1])    tf(-0.74,[800.0,1])   ] 
+    sys_ss = minreal(ss(sys))
+    Gss = c2d(sys_ss[:,1:2], Ts, :zoh)
+    Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
+end
+
+
 include("test_sim_model.jl")
 include("test_state_estim.jl")
 include("test_predictive_control.jl")
@@ -29,6 +46,6 @@ DocMeta.setdocmeta!(
 doctest(ModelPredictiveControl, testset="DocTest")
 ENV["JULIA_DEBUG"] = old_debug_level
 
-end;
+#end;
 
 nothing
