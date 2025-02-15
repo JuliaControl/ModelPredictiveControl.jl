@@ -585,11 +585,11 @@ Call `savetime!(mpc.estim.model)` and return the time `t`.
 savetime!(mpc::PredictiveController) = savetime!(mpc.estim.model)
 
 """
-    periodsleep(mpc::PredictiveController) -> nothing
+    periodsleep(mpc::PredictiveController, busywait=false) -> nothing
 
 Call `periodsleep(mpc.estim.model)`.
 """
-periodsleep(mpc::PredictiveController) = periodsleep(mpc.estim.model)
+periodsleep(mpc::PredictiveController, busywait=false) = periodsleep(mpc.estim.model, busywait)
 
 """
     setstate!(mpc::PredictiveController, x̂) -> mpc

@@ -1,4 +1,5 @@
 @testitem "LinMPC construction" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, DAQP
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = LinMPC(model, Hp=15)
     @test isa(mpc1.estim, SteadyKalmanFilter)
@@ -55,6 +56,8 @@
 end
 
 @testitem "LinMPC moves and getinfo" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3), yop=[10])
     mpc1 = LinMPC(linmodel, Nwt=[0], Hp=1000, Hc=1)
     r = [15]
@@ -88,6 +91,7 @@ end
 end
 
 @testitem "LinMPC step disturbance rejection" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
     r = [15]
     outdist = [5]
@@ -130,6 +134,7 @@ end
 end
 
 @testitem "LinMPC other methods" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     mpc1 = LinMPC(linmodel1)
     @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
@@ -148,6 +153,7 @@ end
 end
 
 @testitem "LinMPC set constraints" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(sys, Ts, i_d=[3])
     mpc = LinMPC(model, Hp=1, Hc=1)
 
@@ -215,6 +221,7 @@ end
 end
 
 @testitem "LinMPC constraint violation" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(tf([2], [10, 1]), 3.0)
     mpc = LinMPC(model, Hp=50, Hc=5)
 
@@ -273,6 +280,7 @@ end
 end
 
 @testitem "LinMPC terminal cost" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(ss([0.5 -0.4;0.6 0.5], [1 0;0 1], [1 0; 0 1], 0, 1))
     K = lqr(Discrete, model.A, model.Bu, I, 0.5I)
     M_end = ControlSystemsBase.are(Discrete, model.A, model.Bu, I, 0.5I)
@@ -300,6 +308,7 @@ end
 end
 
 @testitem "LinMPC set model" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
     mpc = LinMPC(estim, Nwt=[0], Cwt=1e4, Hp=1000, Hc=1)
     mpc = setconstraint!(mpc, umin=[-24], umax=[26])
@@ -339,6 +348,7 @@ end
 end
 
 @testitem "LinMPC real-time simulations" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
     mpc1 = LinMPC(linmodel1)
     times1 = zeros(5)
@@ -346,12 +356,13 @@ end
         times1[i] = savetime!(mpc1)
         preparestate!(mpc1, [1])
         updatestate!(mpc1, [1], [1])
-        periodsleep(mpc1)
+        periodsleep(mpc1, true)
     end
     @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
 end
 
 @testitem "ExplicitMPC construction" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = ExplicitMPC(model, Hp=15)
     @test isa(mpc1.estim, SteadyKalmanFilter)
@@ -382,6 +393,7 @@ end
 end
 
 @testitem "ExplicitMPC moves and getinfo" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     mpc1 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
     r = [5]
     preparestate!(mpc1, [0])
@@ -409,6 +421,7 @@ end
 
 
 @testitem "ExplicitMPC step disturbance rejection" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
     r = [15]
     outdist = [5]
@@ -451,6 +464,7 @@ end
 end
 
 @testitem "ExplicitMPC other methods" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     mpc1 = ExplicitMPC(linmodel1)
     @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
@@ -465,12 +479,14 @@ end
 end
 
 @testitem "ExplicitMPC constraints" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(sys, Ts, i_d=[3])
     mpc = ExplicitMPC(model, Hp=1, Hc=1)
     @test_throws ErrorException setconstraint!(mpc, umin=[0.0, 0.0])
 end
 
 @testitem "ExplicitMPC set model" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     estim = KalmanFilter(setop!(LinModel(tf(5, [2, 1]), 3), yop=[10], uop=[1]))
     mpc = ExplicitMPC(estim, Nwt=[0], Hp=1000, Hc=1)
     @test mpc.Yop ≈ fill(10.0, 1000)
@@ -500,6 +516,7 @@ end
 end
 
 @testitem "NonLinMPC construction" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     nmpc0 = NonLinMPC(linmodel1, Hp=15)
     @test isa(nmpc0.estim, SteadyKalmanFilter)
@@ -563,6 +580,7 @@ end
 end
 
 @testitem "NonLinMPC moves and getinfo" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     Hp = 1000
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=Hp, Hc=1)
@@ -635,6 +653,7 @@ end
 end
 
 @testitem "NonLinMPC step disturbance rejection" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     r = [15]
     outdist = [5]
@@ -677,6 +696,7 @@ end
 end
 
 @testitem "NonLinMPC other methods" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     f = (x,u,_,_) -> linmodel.A*x + linmodel.Bu*u
     h = (x,_,_)   -> linmodel.C*x
@@ -694,6 +714,7 @@ end
 end
 
 @testitem "NonLinMPC set constraints" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     nmpc_lin = NonLinMPC(linmodel1, Hp=1, Hc=1)
 
@@ -729,6 +750,7 @@ end
 end
 
 @testitem "NonLinMPC constraint violation" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     gc(Ue, Ŷe, _ ,p , ϵ) = [p[1]*(Ue[1:end-1] .- 4.2 .- ϵ); p[2]*(Ŷe[2:end] .- 3.14 .- ϵ)]
     Hp=50
 
@@ -737,7 +759,7 @@ end
 
     setconstraint!(nmpc_lin, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
     setconstraint!(nmpc_lin, umin=[-10], umax=[10])
-    setconstraint!(nmpc_lin, Δumin=[-15], Δumax=[15])
+    setconstraint!(nmpc_lin, Δumin=[-1e6], Δumax=[1e6])
     setconstraint!(nmpc_lin, ymin=[-100], ymax=[100])
     preparestate!(nmpc_lin, [0])
 
@@ -805,8 +827,8 @@ end
     nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing, p=linmodel)
     nmpc = NonLinMPC(nonlinmodel, Hp=50, Hc=5, gc=gc, nc=2Hp, p=[0; 0])
 
-    setconstraint!(nmpc, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
-    setconstraint!(nmpc, umin=[-10], umax=[10])
+    setconstraint!(nmpc, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
+    setconstraint!(nmpc, umin=[-1e6], umax=[+1e6])
     setconstraint!(nmpc, Δumin=[-15], Δumax=[15])
     setconstraint!(nmpc, ymin=[-100], ymax=[100])
     preparestate!(nmpc, [0])
@@ -818,7 +840,7 @@ end
     moveinput!(nmpc, [100])
     info = getinfo(nmpc)
     @test all(isapprox.(info[:U], 4; atol=1e-1))
-    setconstraint!(nmpc, umin=[-10], umax=[10])
+    setconstraint!(nmpc, umin=[-1e6], umax=[+1e6])
 
     setconstraint!(nmpc, Δumin=[-1.5], Δumax=[1.25])
     moveinput!(nmpc, [-100])
@@ -827,7 +849,7 @@ end
     moveinput!(nmpc, [100])
     info = getinfo(nmpc)
     @test all(isapprox.(info[:ΔU], 1.25; atol=1e-1))
-    setconstraint!(nmpc, Δumin=[-15], Δumax=[15])
+    setconstraint!(nmpc, Δumin=[-1e6], Δumax=[+1e6])
 
     setconstraint!(nmpc, ymin=[-0.5], ymax=[0.9])
     moveinput!(nmpc, [-100])
@@ -839,13 +861,13 @@ end
     setconstraint!(nmpc, ymin=[-100], ymax=[100])
 
     setconstraint!(nmpc, Ymin=[-0.5; fill(-100, Hp-1)], Ymax=[0.9; fill(+100, Hp-1)])
-    moveinput!(nmpc, [-10])
+    moveinput!(nmpc, [-200])
     info = getinfo(nmpc)
-    @test info[:Ŷ][end]   ≈ -10  atol=1e-1
+    @test info[:Ŷ][end]   ≈ -100  atol=1e-1
     @test info[:Ŷ][begin] ≈ -0.5 atol=1e-1
-    moveinput!(nmpc, [10])
+    moveinput!(nmpc, [200])
     info = getinfo(nmpc)
-    @test info[:Ŷ][end]   ≈ 10  atol=1e-1
+    @test info[:Ŷ][end]   ≈ 100  atol=1e-1
     @test info[:Ŷ][begin] ≈ 0.9 atol=1e-1
     setconstraint!(nmpc, ymin=[-100], ymax=[100])
     
@@ -873,6 +895,7 @@ end
 end
 
 @testitem "NonLinMPC set model" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     estim = KalmanFilter(setop!(LinModel(tf(5, [200, 1]), 300), yop=[10], uop=[1]))
     mpc = NonLinMPC(estim, Nwt=[0], Cwt=1e4, Hp=1000, Hc=1)
     mpc = setconstraint!(mpc, umin=[-24], umax=[26])
@@ -925,6 +948,7 @@ end
 end
 
 @testitem "LinMPC v.s. NonLinMPC" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt
     linmodel = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
     f = (x,u,d,_) -> linmodel.A*x + linmodel.Bu*u + linmodel.Bd*d
     h = (x,d,_)   -> linmodel.C*x + linmodel.Dd*d

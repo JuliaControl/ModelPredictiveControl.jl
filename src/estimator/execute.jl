@@ -291,11 +291,11 @@ Call `savetime!(estim.model)` and return the time `t`.
 savetime!(estim::StateEstimator) = savetime!(estim.model)
 
 """
-    periodsleep(estim::StateEstimator) -> nothing
+    periodsleep(estim::StateEstimator, busywait=false) -> nothing
 
 Call `periodsleep(estim.model)`.
 """
-periodsleep(estim::StateEstimator) = periodsleep(estim.model)
+periodsleep(estim::StateEstimator, busywait=false) = periodsleep(estim.model, busywait)
 
 
 """
