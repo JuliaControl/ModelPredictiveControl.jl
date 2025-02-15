@@ -7,13 +7,15 @@ using LinearAlgebra
 using Random: randn
 using JuMP, OSQP, Ipopt, DAQP, ForwardDiff
 using Plots
-using Test
+using Test, TestItemRunner
 
-@testset "ModelPredictiveControl.jl" begin
-include("test_sim_model.jl")
-include("test_state_estim.jl")
-include("test_predictive_control.jl")
-include("test_plot_sim.jl")
+@run_package_tests 
+
+include("0_test_module.jl")
+include("1_test_sim_model.jl")
+include("2_test_state_estim.jl")
+include("3_test_predictive_control.jl")
+include("4_test_plot_sim.jl")
 
 old_debug_level = get(ENV, "JULIA_DEBUG", "")
 DocMeta.setdocmeta!(
@@ -28,7 +30,5 @@ DocMeta.setdocmeta!(
 )
 doctest(ModelPredictiveControl, testset="DocTest")
 ENV["JULIA_DEBUG"] = old_debug_level
-
-end;
 
 nothing

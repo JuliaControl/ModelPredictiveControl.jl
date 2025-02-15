@@ -126,10 +126,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     U, Ŷ = Ū, Ȳ
     U   .= mul!(U, mpc.S̃, mpc.ΔŨ) .+ mpc.T_lastu 
     Ŷ   .= Ŷ0 .+ mpc.Yop
-    oldF = copy(mpc.F)
-    F    = predictstoch!(mpc, mpc.estim) 
-    Ŷs  .= F # predictstoch! init mpc.F with Ŷs value if estim is an InternalModel
-    F   .= oldF  # restore old F value
+    predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
     info[:ϵ]    = mpc.nϵ == 1 ? mpc.ΔŨ[end] : zero(NT)
     info[:J]    = J
@@ -230,7 +227,7 @@ function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂
 end
 
 """
-    initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u) -> F
+    initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u) -> mpc.F
 
 Common computations of `initpred!` for all types of [`SimModel`](@ref).
 
@@ -250,23 +247,22 @@ function initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R�
     end
     mpc.R̂y .= R̂y
     mpc.R̂u .= R̂u
-    F = predictstoch!(mpc, mpc.estim)  # init mpc.F with Ŷs for InternalModel
-    return F
+    predictstoch!(mpc.F, mpc, mpc.estim)
+    return mpc.F
 end
 
 @doc raw"""
-    predictstoch!(mpc::PredictiveController, estim::InternalModel) -> F
+    predictstoch!(Ŷs, mpc::PredictiveController, estim::InternalModel) -> nothing
 
-Init `mpc.F` vector with ``\mathbf{F = Ŷ_s}`` when `estim` is an [`InternalModel`](@ref).
+Fill `Ŷs` in-place with stochastic predictions if `estim` is an [`InternalModel`](@ref).
 """
-function predictstoch!(mpc::PredictiveController, estim::InternalModel)
-    Ŷs = mpc.F
+function predictstoch!(Ŷs, mpc::PredictiveController, estim::InternalModel)
     mul!(Ŷs, mpc.Ks, estim.x̂s)
     mul!(Ŷs, mpc.Ps, estim.ŷs, 1, 1)
-    return mpc.F
+    return nothing
 end
-"Separate stochastic predictions are not needed if `estim` is not [`InternalModel`](@ref)."
-predictstoch!(mpc::PredictiveController, ::StateEstimator) = (mpc.F .= 0)
+"Fill `Ŷs` vector with 0 values when `estim` is not an [`InternalModel`](@ref)."
+predictstoch!(Ŷs, mpc::PredictiveController, ::StateEstimator) = (Ŷs .= 0; nothing)
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)
@@ -588,11 +584,11 @@ Call `savetime!(mpc.estim.model)` and return the time `t`.
 savetime!(mpc::PredictiveController) = savetime!(mpc.estim.model)
 
 """
-    periodsleep(mpc::PredictiveController) -> nothing
+    periodsleep(mpc::PredictiveController, busywait=false) -> nothing
 
 Call `periodsleep(mpc.estim.model)`.
 """
-periodsleep(mpc::PredictiveController) = periodsleep(mpc.estim.model)
+periodsleep(mpc::PredictiveController, busywait=false) = periodsleep(mpc.estim.model, busywait)
 
 """
     setstate!(mpc::PredictiveController, x̂) -> mpc

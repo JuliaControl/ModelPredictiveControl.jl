@@ -1,11 +1,5 @@
-Ts = 4.0
-sys = [ tf(1.90,[18.0,1])   tf(1.90,[18.0,1])   tf(1.90,[18.0,1]);
-        tf(-0.74,[8.0,1])   tf(0.74,[8.0,1])    tf(-0.74,[8.0,1])   ] 
-sys_ss = minreal(ss(sys))
-Gss = c2d(sys_ss[:,1:2], Ts, :zoh)
-Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
-
-@testset "LinModel construction" begin
+@testitem "LinModel construction" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys, Ts, i_u=1:2)
     @test linmodel1.nx == 2
     @test linmodel1.nu == 2
@@ -29,7 +23,7 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
     @test linmodel2.dop ≈ zeros(0,1)
 
     linmodel3 = LinModel(Gss, 0.5Ts)
-    @test linmodel3.Ts == 2.0
+    @test linmodel3.Ts == 200.0
     @test linmodel3.A ≈ Gss2.A
     @test linmodel3.C ≈ Gss2.C
 
@@ -55,7 +49,7 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
     @test linmodel5.yop ≈ [50,30]
     @test linmodel5.dop ≈ [20]
 
-    linmodel6 = LinModel([delay(4) delay(4)]*sys,Ts,i_d=[3])
+    linmodel6 = LinModel([delay(Ts) delay(Ts)]*sys,Ts,i_d=[3])
     @test linmodel6.nx == 3
     @test sum(eigvals(linmodel6.A) .≈ 0) == 1
 
@@ -103,7 +97,8 @@ Gss2 = c2d(sys_ss[:,1:2], 0.5Ts, :zoh)
     @test_throws ErrorException LinModel(sys_ss,Ts)
 end
 
-@testset "LinModel sim methods" begin
+@testitem "LinModel sim methods" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase
     linmodel1 = setop!(LinModel(Gss), uop=[10,50], yop=[50,30])
     @test updatestate!(linmodel1, [10, 50]) ≈ zeros(2)
     @test updatestate!(linmodel1, [10, 50], Float64[]) ≈ zeros(2)
@@ -123,26 +118,28 @@ end
     @test_throws DimensionMismatch evaloutput(linmodel1, zeros(1))
 end
 
-@testset "LinModel real time simulations" begin
-    linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
+@testitem "LinModel real time simulations" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    linmodel1 = LinModel(tf(2, [10, 1]), 0.25)
     times1 = zeros(5)
     for i=1:5
         times1[i] = savetime!(linmodel1)
         updatestate!(linmodel1, [1])
         periodsleep(linmodel1)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
-    linmodel2 = LinModel(tf(2, [0.1, 1]), 0.001)
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.01))
+    linmodel2 = LinModel(tf(2, [0.1, 1]), 0.25)
     times2 = zeros(5)
     for i=1:5
         times2[i] = savetime!(linmodel2)
         updatestate!(linmodel2, [1])
         periodsleep(linmodel2, true)
     end
-    @test all(isapprox.(diff(times2[2:end]), 0.001, atol=0.0001))
+    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.0001))
 end
 
-@testset "NonLinModel construction" begin
+@testitem "NonLinModel construction" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1(x,u,_,model) = model.A*x + model.Bu*u
     h1(x,_,model)   = model.C*x
@@ -249,7 +246,8 @@ end
         (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
 end
 
-@testset "NonLinModel sim methods" begin
+@testitem "NonLinModel sim methods" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1(x,u,_,model) = model.A*x + model.Bu*u
     h1(x,_,model)   = model.C*x
@@ -268,7 +266,8 @@ end
     @test_throws DimensionMismatch evaloutput(nonlinmodel, zeros(1))
 end
 
-@testset "NonLinModel linearization" begin
+@testitem "NonLinModel linearization" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     Ts = 1.0
     f1(x,u,d,_) = x.^5 + u.^4 + d.^3
     h1(x,d,_)   = x.^2 + d
@@ -313,17 +312,18 @@ end
     linmodel3 = linearize(nonlinmodel3; x, u, d)
     for i=1:N
         ynl = nonlinmodel3(d)
-        yl  = linmodel3(d)
+        global yl  = linmodel3(d)
         Ynl[i] = ynl[1]
         Yl[i]  = yl[1]
-        linmodel3 = linearize(nonlinmodel3; u, d)
+        global linmodel3 = linearize(nonlinmodel3; u, d)
         updatestate!(nonlinmodel3, u, d)
         updatestate!(linmodel3, u, d)
     end
     @test all(isapprox.(Ynl, Yl, atol=1e-6))
 end
 
-@testset "NonLinModel real time simulations" begin
+@testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
     nonlinmodel1 = NonLinModel(
         (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
