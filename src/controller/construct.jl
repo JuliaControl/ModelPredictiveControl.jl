@@ -75,6 +75,11 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     b       ::Vector{NT}
     # indices of finite numbers in the b vector (linear inequality constraints):
     i_b     ::BitVector
+    # A matrices for the linear equality constraints:
+    A_ŝ     ::Matrix{NT}
+    Aeq     ::Matrix{NT}
+    # b vector for the linear equality constraints:
+    beq     ::Vector{NT}
     # constraint softness parameter vectors for the nonlinear inequality constraints:
     C_ymin  ::Vector{NT}
     C_ymax  ::Vector{NT}
@@ -492,17 +497,25 @@ end
 
 """
     init_defaultcon_mpc(
-        estim, C, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, 
+        estim::StateEstimator,
+        Hp, Hc, C, 
+        S, E, 
+        ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+        Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
         gc!=nothing, nc=0
-    ) -> con, S̃, Ẽ
+    ) -> con, S̃, Ẽ, Ẽŝ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
-Also return `S̃` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
+Also return `S̃`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `ΔŨ`.
 """
 function init_defaultcon_mpc(
-    estim::StateEstimator{NT}, Hp, Hc, C, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-    gc!::GCfunc=nothing, nc=0
+    estim::StateEstimator{NT}, 
+    Hp, Hc, C, 
+    S, E, 
+    ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+    Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+    gc!::GCfunc = nothing, nc = 0
 ) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
@@ -523,10 +536,11 @@ function init_defaultcon_mpc(
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax = relaxΔU(model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax)
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(model, nϵ, C_ymin, C_ymax, E)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(model, nϵ, c_x̂min, c_x̂max, ex̂)
-    i_Umin,  i_Umax  = .!isinf.(U0min),  .!isinf.(U0max)
+    A_ŝ, Ẽŝ = augmentdefect(model, nϵ, Eŝ)
+    i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
-    i_Ymin,  i_Ymax  = .!isinf.(Y0min),  .!isinf.(Y0max)
-    i_x̂min,  i_x̂max  = .!isinf.(x̂0min),  .!isinf.(x̂0max)
+    i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
+    i_x̂min,  i_x̂max  = .!isinf.(x̂0min), .!isinf.(x̂0max)
     i_b, i_g, A = init_matconstraint_mpc(
         model, nc,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
@@ -534,13 +548,17 @@ function init_defaultcon_mpc(
     )
     b = zeros(NT, size(A, 1)) # dummy b vector (updated just before optimization)
     con = ControllerConstraint{NT, GCfunc}(
-        ẽx̂      , fx̂    , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
-        U0min   , U0max , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max,
-        A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
-        A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_g,
+        ẽx̂      , fx̂     , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
+        Ẽŝ      , Fŝ     , Gŝ     , Jŝ       , Kŝ     , Vŝ     , Bŝ     ,
+        U0min   , U0max  , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max,
+        A_Umin  , A_Umax , A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
+        A       , b      , i_b    , 
+        A_ŝ     ,
+        Aeq     , beq    ,
+        C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc
     )
-    return con, nϵ, S̃, Ẽ
+    return con, nϵ, S̃, Ẽ, Ẽŝ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -554,7 +572,7 @@ function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
     return Umin, Umax, ΔUmin, ΔUmax, Ymin, Ymax
 end
 
-
+#TODO: change all the next docstringgs with Z̃ instead of ΔŨ !!!!!
 
 @doc raw"""
     relaxU(model, nϵ, C_umin, C_umax, S) -> A_Umin, A_Umax, S̃
@@ -709,6 +727,29 @@ function relaxterminal(::SimModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<
     A_x̂min, A_x̂max = -ẽx̂,  ẽx̂
     return A_x̂min, A_x̂max, ẽx̂
 end
+
+"""
+    augmentdefect(::LinModel{NT}, nϵ, Eŝ) where NT<:Real
+
+Augment defect equality constraints with slack variable ϵ if `nϵ == 1`.
+"""
+function augmentdefect(::LinModel{NT}, nϵ, Eŝ) where NT<:Real
+    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
+        Ẽŝ = [Eŝ zeros(NT, size(Eŝ, 1), 1)]
+    else # ΔŨ = ΔU (only hard constraints)
+        Ẽŝ = Eŝ
+    end
+    A_ŝ = Ẽŝ
+    return A_ŝ, Ẽŝ
+end
+
+"Return empty matrices if model is not a [`LinModel`](@ref)"
+function augmentdefect(::SimModel{NT}, nϵ, Eŝ) where NT<:Real
+    Ẽŝ = [Eŝ zeros(NT, 0, nϵ)]
+    A_ŝ = Ẽŝ
+    return A_ŝ, Ẽŝ
+end
+
 
 @doc raw"""
     init_stochpred(estim::InternalModel, Hp) -> Ks, Ps
