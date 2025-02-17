@@ -141,7 +141,7 @@ end
 init_ZtoU_Smat( _ , transcription::SingleShooting, _ , _ , Sdagger) = Sdagger
 
 function init_ZtoU_Smat(estim, transcription::MultipleShooting, Hp, _ , Sdagger)
-    return [Sdagger; zeros(eltype(Sdagger), estim.model.nu*Hp, estim.nx̂*Hp)]
+    return [Sdagger zeros(eltype(Sdagger), estim.model.nu*Hp, estim.nx̂*Hp)]
 end
 
 @doc raw"""
@@ -326,8 +326,10 @@ function init_predmat(
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
     # --- state estimates x̂ ---
     K = zeros(NT, Hp*ny, nx̂)
+    kx̂ = zeros(NT, nx̂, nx̂)
     # --- manipulated inputs u ---
     V = zeros(NT, Hp*ny, nu)
+    vx̂ = zeros(NT, nx̂, nu)
     # --- decision variables Z ---
     E  = [zeros(NT, Hp*ny, Hc*nu) repeatdiag(Ĉ, Hp)]
     ex̂ = [zeros(NT, nx̂, Hc*nu + (Hp-1)*nx̂) I]
@@ -338,7 +340,7 @@ function init_predmat(
     jx̂ = zeros(NT, nx̂, Hp*nd)
     # --- state x̂op and state update f̂op operating points ---
     B  = zeros(NT, Hp*ny, 1)
-    bx̂ = zeros(NT, nx̂, 1)
+    bx̂ = zeros(NT, nx̂)
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
@@ -377,7 +379,7 @@ function init_predmat(
     V  = zeros(NT, 0, nu)
     B  = zeros(NT, 0)
     ex̂ = [zeros(NT, nx̂, Hc*nu + (Hp-1)*nx̂) I]
-    gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V
+    gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V, B
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
@@ -423,23 +425,23 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
     ```math
     \begin{aligned}
     \mathbf{E_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0}   & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}    \\
-        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}    \\
-        \vdots       & \vdots       & \ddots & \vdots       &  \vdots     &  \vdots     & \ddots & \vdots         \\
-        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{B̂_u} &  \mathbf{0} &  \mathbf{0} & \cdots & -\mathbf{I}    \end{bmatrix} \\
+        \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0}   & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}      \\
+        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}      \\
+        \vdots       & \vdots       & \ddots & \vdots       &  \vdots     &  \vdots     & \ddots & \vdots           \\
+        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{B̂_u} &  \mathbf{0} &  \mathbf{0} & \cdots & -\mathbf{I}      \end{bmatrix} \\
     \mathbf{G_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                      \end{bmatrix} \\
+        \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                          \end{bmatrix} \\
     \mathbf{J_ŝ} &= \begin{bmatrix}
-        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                        \\
-        \mathbf{B̂_d} & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                        \\
-        \vdots       & \vdots       & \ddots & \vdots       & \vdots                                            \\
-        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_d} & \mathbf{0}                                        \end{bmatrix} \\
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                            \\
+        \mathbf{B̂_d} & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                            \\
+        \vdots       & \vdots       & \ddots & \vdots       & \vdots                                                \\
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_d} & \mathbf{0}                                            \end{bmatrix} \\
     \mathbf{K_ŝ} &= \begin{bmatrix}
-        \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                        \end{bmatrix} \\
+        \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                            \end{bmatrix} \\
     \mathbf{V_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \vdots \\ \mathbf{B̂_u}                                                  \end{bmatrix} \\
+        \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \vdots \\ \mathbf{B̂_u}                                                      \end{bmatrix} \\
     \mathbf{B_ŝ} &= \begin{bmatrix}
-        \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}              \end{bmatrix}
+        \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}                  \end{bmatrix}
     \end{aligned}
     ```
 """
@@ -453,13 +455,18 @@ function init_defectmat(
     # --- manipulated inputs u ---
     Vŝ = repeat(B̂u, Hp)
     # --- decision variables Z ---
-    nI_nu = Matrix{NT}(-I, nu, nu)
-    Eŝ = [LowerTriangular(repeat(B̂u, Hc, Hc)) repeatdiag(nI_nu, Hp)]
+    nI_nx̂ = Matrix{NT}(-I, nx̂, nx̂)
+    Eŝ = [zeros(nx̂*Hp, nu*Hc) repeatdiag(nI_nx̂, Hp)]
+    for j=1:Hc, i=j:Hp
+        iRow = (1:nx̂) .+ nx̂*(i-1)
+        iCol = (1:nu) .+ nu*(j-1)
+        Eŝ[iRow, iCol] = B̂u
+    end
     # --- measured disturbances d ---
     Gŝ = [B̂d; zeros(NT, (Hp-1)*nx̂, nd)]
-    Jŝ = [zeros(NT, nx̂, Hp*nd); repeatdiag(B̂d, Hp-1) zeros(NT, (Hp-1)*nd, nd)]
+    Jŝ = [zeros(nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
     # --- state x̂op and state update f̂op operating points ---
-    B̂s = repeat(estim.f̂op - estim.x̂op, Hp)
+    Bŝ = repeat(estim.f̂op - estim.x̂op, Hp)
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 end
 
