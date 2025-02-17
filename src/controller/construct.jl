@@ -499,7 +499,7 @@ end
     init_defaultcon_mpc(
         estim::StateEstimator,
         Hp, Hc, C, 
-        S, E, 
+        P, S, E, 
         ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
         Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
         gc!=nothing, nc=0
@@ -507,12 +507,12 @@ end
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
-Also return `S̃`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `ΔŨ`.
+Also return `P̃`, `S̃`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `Z̃`.
 """
 function init_defaultcon_mpc(
     estim::StateEstimator{NT}, 
     Hp, Hc, C, 
-    S, E, 
+    P, S, E, 
     ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
     Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
     gc!::GCfunc = nothing, nc = 0
@@ -533,7 +533,7 @@ function init_defaultcon_mpc(
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
     A_Umin,  A_Umax, S̃  = relaxU(model, nϵ, C_umin, C_umax, S)
-    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax = relaxΔU(model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax)
+    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃ = relaxΔU(model, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P)
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(model, nϵ, C_ymin, C_ymax, E)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(model, nϵ, c_x̂min, c_x̂max, ex̂)
     A_ŝ, Ẽŝ = augmentdefect(model, nϵ, Eŝ)
@@ -558,7 +558,7 @@ function init_defaultcon_mpc(
         C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc
     )
-    return con, nϵ, S̃, Ẽ, Ẽŝ
+    return con, nϵ, P̃, S̃, Ẽ, Ẽŝ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -579,8 +579,8 @@ end
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
-Denoting the input increments augmented with the slack variable
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
+Denoting the decision variables augmented with the slack variable
+``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the
 augmented conversion matrix ``\mathbf{S̃}``, similar to the one described at
 [`init_ZtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the inequality
 constraints:
@@ -588,22 +588,22 @@ constraints:
 \begin{bmatrix} 
     \mathbf{A_{U_{min}}} \\ 
     \mathbf{A_{U_{max}}} 
-\end{bmatrix} \mathbf{ΔŨ} ≤
+\end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
-    - \mathbf{U_{min} + T} \mathbf{u}(k-1) \\
-    + \mathbf{U_{max} - T} \mathbf{u}(k-1)
+    - \mathbf{U_{min} + T u}(k-1) \\
+    + \mathbf{U_{max} - T u}(k-1)
 \end{bmatrix}
 ```
 in which ``\mathbf{U_{min}}`` and ``\mathbf{U_{max}}`` vectors respectively contains
 ``\mathbf{u_{min}}`` and ``\mathbf{u_{max}}`` repeated ``H_p`` times.
 """
 function relaxU(::SimModel{NT}, nϵ, C_umin, C_umax, S) where NT<:Real
-    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
-        # ϵ impacts ΔU → U conversion for constraint calculations:
+    if nϵ == 1 # Z̃ = [Z; ϵ]
+        # ϵ impacts Z → U conversion for constraint calculations:
         A_Umin, A_Umax = -[S  C_umin], [S -C_umax] 
-        # ϵ has no impact on ΔU → U conversion for prediction calculations:
+        # ϵ has no impact on Z → U conversion for prediction calculations:
         S̃ = [S zeros(NT, size(S, 1))]
-    else # ΔŨ = ΔU (only hard constraints)
+    else # Z̃ = Z (only hard constraints)
         A_Umin, A_Umax = -S,  S
         S̃ = S
     end
@@ -611,38 +611,44 @@ function relaxU(::SimModel{NT}, nϵ, C_umin, C_umax, S) where NT<:Real
 end
 
 @doc raw"""
-    relaxΔU(model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax
+    relaxΔU(
+        model, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P
+    ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃
 
 Augment input increments constraints with slack variable ϵ for softening.
 
-Denoting the input increments augmented with the slack variable 
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
-augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{max}}`` and the ``\mathbf{A}``
-matrices for the inequality constraints:
+Denoting the decision variables augmented with the slack variable 
+``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the
+augmented conversion matrix ``\mathbf{P̃}``, similar to the one described at
+[`init_ZtoΔU`](@ref). It also returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and
+``\mathbf{ΔŨ_{max}}`` and the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{ΔŨ_{min}}} \\ 
     \mathbf{A_{ΔŨ_{max}}}
-\end{bmatrix} \mathbf{ΔŨ} ≤
+\end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
     - \mathbf{ΔŨ_{min}} \\
     + \mathbf{ΔŨ_{max}}
 \end{bmatrix}
 ```
 """
-function relaxΔU(::SimModel{NT}, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax) where NT<:Real
+function relaxΔU(::SimModel{NT}, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P) where NT<:Real
     nΔU = length(ΔUmin)
-    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
-        # 0 ≤ ϵ ≤ ∞  
+    nZ = size(P, 2)
+    if nϵ == 1 # Z̃ = [Z; ϵ]
+        # 0 ≤ ϵ ≤ ∞
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]]
         A_ϵ = [zeros(NT, 1, nΔU) NT[1.0]]
         A_ΔŨmin, A_ΔŨmax = -[I  C_Δumin; A_ϵ], [I -C_Δumax; A_ϵ]
-    else # ΔŨ = ΔU (only hard constraints)
+        P̃ = [P zeros(NT, size(P, 1), 1)]
+    else # Z̃ = Z (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
         I_Hc = Matrix{NT}(I, nΔU, nΔU)
         A_ΔŨmin, A_ΔŨmax = -I_Hc,  I_Hc
+        P̃ = P
     end
-    return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax
+    return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃
 end
 
 @doc raw"""

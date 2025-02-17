@@ -47,11 +47,12 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         transcription = SingleShooting() # explicit MPC only supports SingleShooting
+        P = init_ZtoΔU(estim, transcription, Hp, Hc)
         S, T = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
         # dummy val (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-        S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
+        P̃, S̃, Ñ_Hc, Ẽ = P, S, N_Hc, E # no slack variable ϵ for ExplicitMPC
         H̃ = init_quadprog(model, weights ,Ẽ, S̃)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
@@ -70,7 +71,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
-            S̃, T, T_lastu,
+            P̃, S̃, T, T_lastu,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
             H̃_chol,

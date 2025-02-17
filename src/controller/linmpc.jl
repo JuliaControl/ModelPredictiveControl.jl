@@ -53,14 +53,15 @@ struct LinMPC{
         weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        P = init_ZtoΔU(estim, transcription, Hp, Hc)
         S, T = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
             model, estim, transcription, Hp, Hc
         )
         # dummy vals (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-        con, nϵ, S̃, Ẽ = init_defaultcon_mpc(
-            estim, Hp, Hc, Cwt, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
+        con, nϵ, P̃, S̃, Ẽ, Ẽŝ = init_defaultcon_mpc(
+            estim, Hp, Hc, Cwt, P, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
         )
         H̃ = init_quadprog(model, weights, Ẽ, S̃)
         # dummy vals (updated just before optimization):
@@ -78,7 +79,7 @@ struct LinMPC{
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
-            S̃, T, T_lastu,
+            P̃, S̃, T, T_lastu,
             Ẽ, F, G, J, K, V, B, 
             H̃, q̃, r,
             Ks, Ps,

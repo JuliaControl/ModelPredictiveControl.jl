@@ -18,9 +18,8 @@ The decision variable in the optimization problem is (excluding the slack ``ϵ``
     \vdots                          \\ 
     \mathbf{Δu}(k+H_c-1)            \end{bmatrix}
 ```
-
 This method generally more efficient for small control horizon ``H_c``, stable or mildly
-nonlinear plant model.
+nonlinear plant model/constraints.
 """
 struct SingleShooting <: TranscriptionMethod end
 
@@ -42,11 +41,46 @@ operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
     \vdots                                      \\ 
     \mathbf{x̂}(k+H_p)   - \mathbf{x̂_{op}}       \end{bmatrix}
 ```
-
 This method is generally more efficient for large control horizon ``H_c``, unstable or
-highly nonlinear plant models.
+highly nonlinear plant models/constraints.
 """
 struct MultipleShooting <: TranscriptionMethod end
+
+
+@doc raw"""
+    init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> P
+
+Init decision variables to input increments over ``H_c`` conversion matrix `P`.
+
+The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{ΔU}``, the input
+increments over ``H_c``, is computed by:
+```math
+\mathbf{ΔU} = \mathbf{P} \mathbf{Z}
+```
+in which ``\mathbf{P} is defined in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    Following the decision variable definition of the [`TranscriptionMethod`](@ref), the
+    conversion matrix ``\mathbf{P}``, we have:
+    - ``\mathbf{P} = \mathbf{I}`` if `transcription isa SingleShooting`
+    - ``\mathbf{P} = [\begin{smallmatrix}\mathbf{I} \mathbf{0} \end{smallmatrix}]`` if 
+      `transcription isa MultipleShooting`
+"""
+function init_ZtoU end
+
+function init_ZtoΔU(
+    estim::StateEstimator{NT}, transcription::SingleShooting, _ , Hc
+) where {NT<:Real}
+    return Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
+end
+
+function init_ZtoΔU(
+    estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
+) where {NT<:Real}
+    I_nu_Hc = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
+    return [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
+end
 
 @doc raw"""
     init_ZtoU(estim, transcription, Hp, Hc) -> S, T
