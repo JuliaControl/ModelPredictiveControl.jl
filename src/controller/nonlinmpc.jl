@@ -6,7 +6,7 @@ struct NonLinMPC{
     SE<:StateEstimator,
     TM<:TranscriptionMethod,
     JM<:JuMP.GenericModel, 
-    P<:Any,
+    PT<:Any,
     JEfunc<:Function,
     GCfunc<:Function
 } <: PredictiveController{NT}
@@ -23,9 +23,10 @@ struct NonLinMPC{
     nϵ::Int
     weights::ControllerWeights{NT}
     JE::JEfunc
-    p::P
+    p::PT
     R̂u::Vector{NT}
     R̂y::Vector{NT}
+    P̃::Matrix{NT}
     S̃::Matrix{NT}
     T::Matrix{NT}
     T_lastu::Vector{NT}
@@ -50,14 +51,14 @@ struct NonLinMPC{
     buffer::PredictiveControllerBuffer{NT}
     function NonLinMPC{NT}(
         estim::SE, 
-        Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc!::GCfunc, nc, p::P, 
+        Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc!::GCfunc, nc, p::PT, 
         transcription::TM, optim::JM
     ) where {
             NT<:Real, 
             SE<:StateEstimator, 
             TM<:TranscriptionMethod,
             JM<:JuMP.GenericModel,
-            P<:Any,
+            PT<:Any,
             JEfunc<:Function, 
             GCfunc<:Function, 
         }
@@ -72,10 +73,14 @@ struct NonLinMPC{
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
             model, estim, transcription, Hp, Hc
         )
+        Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc)
         # dummy vals (updated just before optimization):
-        F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
+        F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
         con, nϵ, P̃, S̃, Ẽ, Ẽŝ = init_defaultcon_mpc(
-            estim, Hp, Hc, Cwt, P, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
+            estim, Hp, Hc, Cwt, P, S, E, 
+            ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+            Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+            gc!, nc
         )
         H̃ = init_quadprog(model, weights, Ẽ, S̃)
         # dummy vals (updated just before optimization):
@@ -88,7 +93,7 @@ struct NonLinMPC{
         nΔŨ = size(Ẽ, 2)
         ΔŨ = zeros(NT, nΔŨ)
         buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
-        mpc = new{NT, SE, TM, JM, P, JEfunc, GCfunc}(
+        mpc = new{NT, SE, TM, JM, PT, JEfunc, GCfunc}(
             estim, transcription, optim, con,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,

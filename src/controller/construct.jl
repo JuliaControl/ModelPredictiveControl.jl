@@ -340,7 +340,8 @@ function setconstraint!(
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
-            con.A_Ymin, con.A_Ymax, con.A_x̂min, con.A_x̂max
+            con.A_Ymin, con.A_Ymax, con.A_x̂min, con.A_x̂max,
+            con.A_ŝ
         )
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
@@ -368,23 +369,25 @@ end
         model::LinModel, nc::Int,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
         args...
-    ) -> i_b, i_g, A
+    ) -> i_b, i_g, A, Aeq
 
-Init `i_b`, `i_g` and `A` matrices for the linear and nonlinear inequality constraints.
+Init `i_b`, `i_g`, `A` and `Aeq` matrices for the linear and nonlinear constraints.
 
-The linear and nonlinear inequality constraints are respectively defined as:
+The linear and nonlinear constraints are respectively defined as:
 ```math
 \begin{aligned} 
-    \mathbf{A ΔŨ } &≤ \mathbf{b} \\ 
-    \mathbf{g(ΔŨ)} &≤ \mathbf{0}
+    \mathbf{A Z̃ }       &≤ \mathbf{b}           \\ 
+    \mathbf{A_{eq} Z̃}   &= \mathbf{b_{eq}}      \\
+    \mathbf{g(Z̃)}       &≤ \mathbf{0}           \\
+    \mathbf{g_{eq}(Z̃)}  &= \mathbf{0}           \\
 \end{aligned}
 ```
-The argument `nc` is the number of custom nonlinear constraints in ``\mathbf{g_c}``. `i_b` 
-is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. `i_g` is a
-similar vector but for the indices of ``\mathbf{g}``. The method also returns the 
-``\mathbf{A}`` matrix if `args` is provided. In such a case, `args`  needs to contain all
-the inequality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max`.
+The argument `nc` is the number of custom nonlinear inequality constraints in
+``\mathbf{g_c}``. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
+finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
+also returns the ``\mathbf{A, A_{eq}}`` matrices if `args` is provided. In such a case,
+`args`  needs to contain all the inequality and equality constraint matrices: 
+`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ`.
 """
 function init_matconstraint_mpc(
     ::LinModel{NT}, nc::Int,
@@ -394,12 +397,13 @@ function init_matconstraint_mpc(
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
     i_g = trues(nc)
     if isempty(args)
-        A = nothing
+        A, Aeq = nothing, nothing
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max = args
-        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
     end
-    return i_b, i_g, A
+    return i_b, i_g, A, Aeq
 end
 
 "Init `i_b, A` without outputs and terminal constraints if `model` is not a [`LinModel`](@ref)."
@@ -411,12 +415,13 @@ function init_matconstraint_mpc(
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
     if isempty(args)
-        A = nothing
+        A, Aeq = nothing, nothing
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ = args
-        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
     end
-    return i_b, i_g, A
+    return i_b, i_g, A, Aeq
 end
 
 "By default, there is no nonlinear constraint, thus do nothing."
@@ -541,12 +546,14 @@ function init_defaultcon_mpc(
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
     i_x̂min,  i_x̂max  = .!isinf.(x̂0min), .!isinf.(x̂0max)
-    i_b, i_g, A = init_matconstraint_mpc(
+    i_b, i_g, A, Aeq = init_matconstraint_mpc(
         model, nc,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min,
+        A_ŝ
     )
-    b = zeros(NT, size(A, 1)) # dummy b vector (updated just before optimization)
+    # dummy b and beq vectors (updated just before optimization)
+    b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
     con = ControllerConstraint{NT, GCfunc}(
         ẽx̂      , fx̂     , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
         Ẽŝ      , Fŝ     , Gŝ     , Jŝ       , Kŝ     , Vŝ     , Bŝ     ,
@@ -620,8 +627,10 @@ Augment input increments constraints with slack variable ϵ for softening.
 Denoting the decision variables augmented with the slack variable 
 ``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the
 augmented conversion matrix ``\mathbf{P̃}``, similar to the one described at
-[`init_ZtoΔU`](@ref). It also returns the augmented constraints ``\mathbf{ΔŨ_{min}}`` and
-``\mathbf{ΔŨ_{max}}`` and the ``\mathbf{A}`` matrices for the inequality constraints:
+[`init_ZtoΔU`](@ref). Knowing that ``0 ≤ ϵ ≤ ∞``, it also returns the augmented bounds 
+``\mathbf{ΔŨ_{min}} = [\begin{smallmatrix} \mathbf{ΔU_{min}} \\ 0 \end{smallmatrix}]`` and
+``\mathbf{ΔŨ_{max}} = [\begin{smallmatrix} \mathbf{ΔU_{min}} \\ ∞ \end{smallmatrix}]``,
+and the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{ΔŨ_{min}}} \\ 
@@ -632,20 +641,21 @@ augmented conversion matrix ``\mathbf{P̃}``, similar to the one described at
     + \mathbf{ΔŨ_{max}}
 \end{bmatrix}
 ```
+Note that strictly speaking, the lower bound on the slack variable ϵ is a decision variable
+bound, which is more specific than a linear inequality constraint. However, it is more
+convenient to treat it as a linear inequality constraint since the optimizer `OSQP.jl` does
+not support pure bounds on the decision variables.
 """
 function relaxΔU(::SimModel{NT}, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P) where NT<:Real
-    nΔU = length(ΔUmin)
     nZ = size(P, 2)
     if nϵ == 1 # Z̃ = [Z; ϵ]
-        # 0 ≤ ϵ ≤ ∞
-        ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]]
-        A_ϵ = [zeros(NT, 1, nΔU) NT[1.0]]
-        A_ΔŨmin, A_ΔŨmax = -[I  C_Δumin; A_ϵ], [I -C_Δumax; A_ϵ]
+        ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]] # 0 ≤ ϵ ≤ ∞
+        A_ϵ = [zeros(NT, 1, nZ) NT[1.0]]
+        A_ΔŨmin, A_ΔŨmax = -[P  C_Δumin; A_ϵ], [P -C_Δumax; A_ϵ]
         P̃ = [P zeros(NT, size(P, 1), 1)]
     else # Z̃ = Z (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
-        I_Hc = Matrix{NT}(I, nΔU, nΔU)
-        A_ΔŨmin, A_ΔŨmax = -I_Hc,  I_Hc
+        A_ΔŨmin, A_ΔŨmax = -P,  P
         P̃ = P
     end
     return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃
@@ -656,15 +666,15 @@ end
 
 Augment linear output prediction constraints with slack variable ϵ for softening.
 
-Denoting the input increments augmented with the slack variable 
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
+Denoting the decision variables augmented with the slack variable 
+``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the 
 ``\mathbf{Ẽ}`` matrix that appears in the linear model prediction equation 
-``\mathbf{Ŷ_0 = Ẽ ΔŨ + F}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
+``\mathbf{Ŷ_0 = Ẽ Z̃ + F}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{Y_{min}}} \\ 
     \mathbf{A_{Y_{max}}}
-\end{bmatrix} \mathbf{ΔŨ} ≤
+\end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
     - \mathbf{(Y_{min} - Y_{op}) + F} \\
     + \mathbf{(Y_{max} - Y_{op}) - F} 
@@ -674,12 +684,12 @@ in which ``\mathbf{Y_{min}, Y_{max}}`` and ``\mathbf{Y_{op}}`` vectors respectiv
 ``\mathbf{y_{min}, y_{max}}`` and ``\mathbf{y_{op}}`` repeated ``H_p`` times.
 """
 function relaxŶ(::LinModel{NT}, nϵ, C_ymin, C_ymax, E) where NT<:Real
-    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
+    if nϵ == 1 # Z̃ = [Z; ϵ]
         # ϵ impacts predicted output constraint calculations:
         A_Ymin, A_Ymax = -[E  C_ymin], [E -C_ymax] 
         # ϵ has no impact on output predictions:
         Ẽ = [E zeros(NT, size(E, 1), 1)] 
-    else # ΔŨ = ΔU (only hard constraints)
+    else # Z̃ = Z (only hard constraints)
         Ẽ = E
         A_Ymin, A_Ymax = -E,  E
     end
@@ -698,16 +708,16 @@ end
 
 Augment terminal state constraints with slack variable ϵ for softening.
 
-Denoting the input increments augmented with the slack variable 
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
+Denoting the decision variables augmented with the slack variable 
+``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the 
 ``\mathbf{ẽ_{x̂}}`` matrix that appears in the terminal state equation 
-``\mathbf{x̂_0}(k + H_p) = \mathbf{ẽ_x̂ ΔŨ + f_x̂}``, and the ``\mathbf{A}`` matrices for 
+``\mathbf{x̂_0}(k + H_p) = \mathbf{ẽ_x̂ Z̃ + f_x̂}``, and the ``\mathbf{A}`` matrices for 
 the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{x̂_{min}}} \\ 
     \mathbf{A_{x̂_{max}}}
-\end{bmatrix} \mathbf{ΔŨ} ≤
+\end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
     - \mathbf{(x̂_{min} - x̂_{op}) + f_x̂} \\
     + \mathbf{(x̂_{max} - x̂_{op}) - f_x̂}
@@ -715,12 +725,12 @@ the inequality constraints:
 ```
 """
 function relaxterminal(::LinModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
-    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
+    if nϵ == 1 # Z̃ = [Z; ϵ]
         # ϵ impacts terminal state constraint calculations:
         A_x̂min, A_x̂max = -[ex̂ c_x̂min], [ex̂ -c_x̂max]
         # ϵ has no impact on terminal state predictions:
         ẽx̂ = [ex̂ zeros(NT, size(ex̂, 1), 1)] 
-    else # ΔŨ = ΔU (only hard constraints)
+    else # Z̃ = Z (only hard constraints)
         ẽx̂ = ex̂
         A_x̂min, A_x̂max = -ex̂,  ex̂
     end
@@ -734,15 +744,21 @@ function relaxterminal(::SimModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<
     return A_x̂min, A_x̂max, ẽx̂
 end
 
-"""
+@doc raw"""
     augmentdefect(::LinModel{NT}, nϵ, Eŝ) where NT<:Real
 
 Augment defect equality constraints with slack variable ϵ if `nϵ == 1`.
+
+It returns the ``\mathbf{Ẽŝ}`` matrix that appears in the defect equation 
+``\mathbf{Ŝ = Ẽ_ŝ Z̃ + F_ŝ}`` and the ``\mathbf{A}`` matrix for the equality constraints:
+```math
+\mathbf{A_ŝ Z̃} = - \mathbf{F_ŝ}
+```
 """
 function augmentdefect(::LinModel{NT}, nϵ, Eŝ) where NT<:Real
-    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
+    if nϵ == 1 # Z̃ = [Z; ϵ]
         Ẽŝ = [Eŝ zeros(NT, size(Eŝ, 1), 1)]
-    else # ΔŨ = ΔU (only hard constraints)
+    else # Z̃ = Z (only hard constraints)
         Ẽŝ = Eŝ
     end
     A_ŝ = Ẽŝ

@@ -8,9 +8,9 @@ struct LinMPC{
     JM<:JuMP.GenericModel
 } <: PredictiveController{NT}
     estim::SE
+    transcription::TM
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
-    transcription::TM
     optim::JM
     con::ControllerConstraint{NT, Nothing}
     ΔŨ::Vector{NT}
@@ -21,6 +21,7 @@ struct LinMPC{
     weights::ControllerWeights{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
+    P̃::Matrix{NT}
     S̃::Matrix{NT} 
     T::Matrix{NT}
     T_lastu::Vector{NT}
@@ -58,10 +59,13 @@ struct LinMPC{
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
             model, estim, transcription, Hp, Hc
         )
+        Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc)
         # dummy vals (updated just before optimization):
-        F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
+        F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
         con, nϵ, P̃, S̃, Ẽ, Ẽŝ = init_defaultcon_mpc(
-            estim, Hp, Hc, Cwt, P, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂
+            estim, Hp, Hc, Cwt, P, S, E, 
+            ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+            Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
         )
         H̃ = init_quadprog(model, weights, Ẽ, S̃)
         # dummy vals (updated just before optimization):

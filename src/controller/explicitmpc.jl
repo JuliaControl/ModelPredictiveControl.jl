@@ -9,6 +9,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     weights::ControllerWeights{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
+    P̃::Matrix{NT}
     S̃::Matrix{NT} 
     T::Matrix{NT}
     T_lastu::Vector{NT}

@@ -382,12 +382,12 @@ function init_predmat(
 end
 
 """
-    init_defectmat(model::LinModel, estim, transcription::SingleShooting, Hp, Hc)
+    init_defectmat(model::SimModel, estim, transcription::SingleShooting, Hp, Hc)
 
 Return empty matrices if `transcription` is a [`SingleShooting`](@ref) (N/A).
 """
 function init_defectmat(
-    model, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
+    model::SimModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     Eŝ = zeros(NT, 0, nu*Hc)
