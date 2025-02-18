@@ -21,7 +21,7 @@ struct LinModel{NT<:Real} <: SimModel{NT}
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
-    buffer::SimModelBuffer{NT, Nothing}
+    buffer::SimModelBuffer{NT}
     function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
         A, Bu = to_mat(A, 1, 1), to_mat(Bu, 1, 1)
         nu, nx = size(Bu, 2), size(A, 2)
