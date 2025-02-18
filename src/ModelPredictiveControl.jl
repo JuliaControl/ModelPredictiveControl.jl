@@ -32,6 +32,7 @@ export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFi
 export MovingHorizonEstimator
 export default_nint, initstate!
 export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
+export SingleShooting, MultipleShooting
 export SimResult, getinfo, sim!
 
 include("general.jl")

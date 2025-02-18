@@ -88,3 +88,23 @@ NonLinMPC
 ```@docs
 moveinput!
 ```
+
+## Transcription Methods
+
+### Transcription Method
+
+```@docs
+ModelPredictiveControl.TranscriptionMethod
+```
+
+### SingleShooting
+
+```@docs
+SingleShooting
+```
+
+### MultipleShooting
+
+```@docs
+MultipleShooting
+```

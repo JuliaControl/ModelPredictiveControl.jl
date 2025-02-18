@@ -1,10 +1,10 @@
 struct NonLinModel{
-    NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver
+    NT<:Real, F<:Function, H<:Function, PT<:Any, DS<:DiffSolver
 } <: SimModel{NT}
     x0::Vector{NT}
     f!::F
     h!::H
-    p::P
+    p::PT
     solver::DS
     Ts::NT
     t::Vector{NT}
@@ -23,8 +23,8 @@ struct NonLinModel{
     xname::Vector{String}
     buffer::SimModelBuffer{NT}
     function NonLinModel{NT}(
-        f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS
-    ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver}
+        f!::F, h!::H, Ts, nu, nx, ny, nd, p::PT, solver::DS
+    ) where {NT<:Real, F<:Function, H<:Function, PT<:Any, DS<:DiffSolver}
         Ts > 0 || error("Sampling time Ts must be positive")
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
@@ -38,7 +38,7 @@ struct NonLinModel{
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, F, H, P, DS}(
+        return new{NT, F, H, PT, DS}(
             x0, 
             f!, h!,
             p,

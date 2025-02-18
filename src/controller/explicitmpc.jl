@@ -1,5 +1,6 @@
 struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     estim::SE
+    transcription::SingleShooting
     ΔŨ::Vector{NT}
     ŷ ::Vector{NT}
     Hp::Int
@@ -8,6 +9,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     weights::ControllerWeights{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
+    P̃::Matrix{NT}
     S̃::Matrix{NT} 
     T::Matrix{NT}
     T_lastu::Vector{NT}
@@ -45,11 +47,13 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        S, T = init_ΔUtoU(model, Hp, Hc)
-        E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc)
+        transcription = SingleShooting() # explicit MPC only supports SingleShooting
+        P = init_ZtoΔU(estim, transcription, Hp, Hc)
+        S, T = init_ZtoU(estim, transcription, Hp, Hc)
+        E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
         # dummy val (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-        S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
+        P̃, S̃, Ñ_Hc, Ẽ = P, S, N_Hc, E # no slack variable ϵ for ExplicitMPC
         H̃ = init_quadprog(model, weights ,Ẽ, S̃)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
@@ -63,11 +67,12 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
         mpc = new{NT, SE}(
             estim,
+            transcription,
             ΔŨ, ŷ,
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
-            S̃, T, T_lastu,
+            P̃, S̃, T, T_lastu,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
             H̃_chol,
@@ -211,7 +216,7 @@ function setmodel_controller!(mpc::ExplicitMPC, _ )
     estim, model = mpc.estim, mpc.estim.model
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
-    E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc)
+    E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
     Ẽ = E  # no slack variable ϵ for ExplicitMPC
     mpc.Ẽ .= Ẽ
     mpc.G .= G
