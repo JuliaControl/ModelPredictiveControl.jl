@@ -1,28 +1,35 @@
-struct LinModel{NT<:Real} <: SimModel{NT}
-    A   ::Matrix{NT}
-    Bu  ::Matrix{NT}
-    C   ::Matrix{NT}
-    Bd  ::Matrix{NT}
-    Dd  ::Matrix{NT}
-    x0::Vector{NT}
+struct LinModel{NT<:Real, AT<:AbstractArray} <: SimModel{NT}
+    A   ::AT{NT, 2}
+    Bu  ::AT{NT, 2}
+    C   ::AT{NT, 2}
+    Bd  ::AT{NT, 2}
+    Dd  ::AT{NT, 2}
+    x0::AT{NT, 1}
     p ::Nothing
     Ts::NT
-    t::Vector{NT}
+    t::AT{NT, 1}
     nu::Int
     nx::Int
     ny::Int
     nd::Int
-    uop::Vector{NT}
-    yop::Vector{NT}
-    dop::Vector{NT}
-    xop::Vector{NT}
-    fop::Vector{NT}
-    uname::Vector{String}
-    yname::Vector{String}
-    dname::Vector{String}
-    xname::Vector{String}
+    uop::AT{NT, 1}
+    yop::AT{NT, 1}
+    dop::AT{NT, 1}
+    xop::AT{NT, 1}
+    fop::AT{NT, 1}
+    uname::AT{String, 1}
+    yname::AT{String, 1}
+    dname::AT{String, 1}
+    xname::AT{String, 1}
     buffer::SimModelBuffer{NT}
-    function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
+    function LinModel{NT, AT}(
+        A, 
+        Bu,
+        C,
+        Bd,
+        Dd,
+        Ts
+    ) where {NT<:Real, AT<:AbstractArray}
         A, Bu = to_mat(A, 1, 1), to_mat(Bu, 1, 1)
         nu, nx = size(Bu, 2), size(A, 2)
         (C == I) && (C = Matrix{NT}(I, nx, nx))
@@ -49,8 +56,8 @@ struct LinModel{NT<:Real} <: SimModel{NT}
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
-        buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT}(
+        buffer = SimModelBuffer{NT, AT}(nu, nx, ny, nd)
+        return new{NT, AT}(
             A, Bu, C, Bd, Dd, 
             x0,
             p,
@@ -180,7 +187,7 @@ function LinModel(
     Bd  = sys_dis.B[:,nu+1:end]
     C   = sys_dis.C
     Dd  = sys_dis.D[:,nu+1:end]
-    return LinModel{NT}(A, Bu, C, Bd, Dd, Ts)
+    return LinModel{NT, Array}(A, Bu, C, Bd, Dd, Ts)
 end
 
 
@@ -234,7 +241,7 @@ called). Care must be taken to ensure that the model is controllable and observa
 optional parameter `NT` explicitly set the number type of vectors (default to `Float64`).
 """
 LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where NT<:Real
-LinModel(A, Bu, C, Bd, Dd, Ts) = LinModel{Float64}(A, Bu, C, Bd, Dd, Ts)
+LinModel(A, Bu, C, Bd, Dd, Ts) = LinModel{Float64, Array}(A, Bu, C, Bd, Dd, Ts)
 
 @doc raw"""
     steadystate!(model::LinModel, u0, d0)

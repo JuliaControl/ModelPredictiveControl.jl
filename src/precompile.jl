@@ -1,4 +1,4 @@
-sys = [ 
+#=sys = [ 
     tf(1.90, [1800, 1]) tf(1.90, [1800, 1]);
     tf(-0.74,[800, 1])  tf(0.74, [800, 1]) 
 ]
@@ -123,4 +123,4 @@ empc = setconstraint!(
 )
 preparestate!(empc, [55, 30])
 u = empc()
-sim!(empc, 3)
+sim!(empc, 3)=#
