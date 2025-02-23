@@ -492,6 +492,9 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+    Aeq = con.A
+    beq = con.b
+    @constraint(optim, lineqconstraint, Aeq*ΔŨvar .== beq)
     # --- nonlinear optimization init ---
     if mpc.nϵ == 1 && JuMP.solver_name(optim) == "Ipopt"
         C = mpc.weights.Ñ_Hc[end]

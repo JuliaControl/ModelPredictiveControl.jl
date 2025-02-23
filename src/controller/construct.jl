@@ -495,7 +495,7 @@ function init_quadprog(::LinModel, weights::ControllerWeights, Ẽ, P̃, S̃)
     return H̃
 end
 "Return empty matrix if `model` is not a [`LinModel`](@ref)."
-function init_quadprog(::SimModel{NT}, weights::ControllerWeights, _, _) where {NT<:Real}
+function init_quadprog(::SimModel{NT}, weights::ControllerWeights, _, _, _) where {NT<:Real}
     H̃ = Hermitian(zeros(NT, 0, 0), :L)
     return H̃
 end

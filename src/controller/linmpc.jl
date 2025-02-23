@@ -274,6 +274,9 @@ function init_optimization!(mpc::LinMPC, model::LinModel, optim)
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+    Aeq = con.A
+    beq = con.b
+    @constraint(optim, lineqconstraint, Aeq*ΔŨvar .== beq)
     set_objective_hessian!(mpc, ΔŨvar)
     return nothing
 end
