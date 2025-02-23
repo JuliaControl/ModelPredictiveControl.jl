@@ -46,6 +46,13 @@ highly nonlinear plant models/constraints.
 """
 struct MultipleShooting <: TranscriptionMethod end
 
+"Get the number of elements in the optimization decision vector `Z̃`."
+function get_nZ̃(estim::StateEstimator, transcription::SingleShooting, Hp, Hc, nϵ)
+    return estim.model.nu*Hc + nϵ
+end
+function get_nZ̃(estim::StateEstimator, transcription::MultipleShooting, Hp, Hc, nϵ)
+    return estim.model.nu*Hc + estim.nx̂*Hp + nϵ
+end
 
 @doc raw"""
     init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> P
@@ -352,7 +359,7 @@ function init_predmat(
     ex̂ = [zeros(NT, nx̂, Hc*nu + (Hp-1)*nx̂) I]
     # --- measured disturbances d ---
     G  = zeros(NT, Hp*ny, nd)
-    gx̂ = zeros(NT, nx̂, Hp*nd)
+    gx̂ = zeros(NT, nx̂, nd)
     J  = repeatdiag(D̂d, Hp)
     jx̂ = zeros(NT, nx̂, Hp*nd)
     # --- state x̂op and state update f̂op operating points ---
@@ -499,4 +506,74 @@ function init_defectmat(
     Vŝ = zeros(NT, 0, nu)
     Bŝ = zeros(NT, 0)
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+end
+
+@doc raw"""
+    set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var) -> Z̃0
+
+Set and return the warm start value of `Z̃var` for [`SingleShooting`](@ref) transcription.
+
+If supported by `mpc.optim`, it warm-starts the solver at:
+```math
+\mathbf{ΔŨ} = 
+\begin{bmatrix}
+    \mathbf{Δu}_{k-1}(k+0)      \\ 
+    \mathbf{Δu}_{k-1}(k+1)      \\ 
+    \vdots                      \\
+    \mathbf{Δu}_{k-1}(k+H_c-2)  \\
+    \mathbf{0}                  \\
+    ϵ_{k-1}
+\end{bmatrix}
+```
+where ``\mathbf{Δu}_{k-1}(k+j)`` is the input increment for time ``k+j`` computed at the 
+last control period ``k-1``, and ``ϵ_{k-1}``, the slack variable of the last control period.
+"""
+function set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var)
+    nu, Hc, Z̃0 = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
+    # --- input increments ΔU ---
+    Z̃0[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
+    Z̃0[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    # --- slack variable ϵ ---
+    mpc.nϵ == 1 && (Z̃0[end] = mpc.Z̃[end])
+    JuMP.set_start_value.(Z̃var, Z̃0)
+    return Z̃0
+end
+
+@doc raw"""
+    set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var) -> Z̃0
+
+Set and return the warm start value of `Z̃var` for [`MultipleShooting`](@ref) transcription.
+
+It warm-starts the solver at:
+```math
+\mathbf{ΔŨ} =
+\begin{bmatrix}
+    \mathbf{Δu}_{k-1}(k+0)      \\ 
+    \mathbf{Δu}_{k-1}(k+1)      \\ 
+    \vdots                      \\
+    \mathbf{Δu}_{k-1}(k+H_c-1)  \\
+    \mathbf{0}                  \\
+    \mathbf{x̂_0}_{k-1}(k+1)     \\
+    \mathbf{x̂_0}_{k-1}(k+2)     \\
+    \vdots                      \\
+    \mathbf{x̂_0}_{k-1}(k+H_p-1) \\
+    \mathbf{x̂_0}_{k-1}(k+H_p-1) \\
+    ϵ_{k-1}
+\end{bmatrix}
+```
+where ``\mathbf{x̂_0}_{k-1}(k+j)`` is the predicted state for time ``k+j`` computed at the
+last control period ``k-1``, expressed as a deviation from the operating point ``x̂_{op}``.
+"""
+function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var)
+    nu, nx̂, Hp, Hc, Z̃0 = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
+    # --- input increments ΔU ---
+    Z̃0[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
+    Z̃0[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    # --- predicted states X̂0 ---
+    Z̃0[(Hc*nu+1):(Hc*nu+Hp*nx̂-nx̂)]       .= @views mpc.Z̃[(Hc*nu+nx̂+1):(Hc*nu+Hp*nx̂)]
+    Z̃0[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)] .= @views mpc.Z̃[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)]
+    # --- slack variable ϵ ---
+    mpc.nϵ == 1 && (Z̃0[end] = mpc.Z̃[end])
+    JuMP.set_start_value.(Z̃var, Z̃0)
+    return Z̃0
 end

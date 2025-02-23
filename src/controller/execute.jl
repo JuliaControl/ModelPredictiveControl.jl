@@ -1,10 +1,10 @@
 @doc raw"""
     initstate!(mpc::PredictiveController, u, ym, d=[]) -> x̂
 
-Init the states of `mpc.estim` [`StateEstimator`](@ref) and warm start `mpc.ΔŨ` at zero.
+Init the states of `mpc.estim` [`StateEstimator`](@ref) and warm start `mpc.Z̃` at zero.
 """
 function initstate!(mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty)
-    mpc.ΔŨ .= 0
+    mpc.Z̃ .= 0
     return initstate!(mpc.estim, u, ym, d)
 end
 
@@ -67,8 +67,9 @@ function moveinput!(
     validate_args(mpc, ry, d, D̂, R̂y, R̂u)
     initpred!(mpc, mpc.estim.model, d, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model)
-    ΔŨ = optim_objective!(mpc)
-    return getinput(mpc, ΔŨ)
+    linconstrainteq!(mpc, mpc.transcription)
+    Z̃ = optim_objective!(mpc)
+    return getinput(mpc, Z̃)
 end
 
 @doc raw"""
@@ -323,6 +324,22 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
     return nothing
 end
 
+linconstrainteq!(mpc::PredictiveController, transcription::SingleShooting) = nothing
+function linconstrainteq!(mpc::PredictiveController, transcription::MultipleShooting)
+    nx̂, Fŝ = mpc.estim.nx̂, mpc.con.Fŝ
+    Fŝ .= mpc.con.Bŝ
+    mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0, 1, 1)
+    mul!(Fŝ, mpc.con.Vŝ, mpc.estim.lastu0, 1, 1)
+    if mpc.estim.model.nd ≠ 0
+        mul!(Fŝ, mpc.con.Gŝ, mpc.d0, 1, 1)
+        mul!(Fŝ, mpc.con.Jŝ, mpc.D̂0, 1, 1)
+    end
+    mpc.con.beq .= @. -Fŝ
+    linconeq = mpc.optim[:linconstrainteq]
+    JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    return nothing
+end
+
 @doc raw"""
     predict!(Ŷ0, x̂0, _, _, _, mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ0, x̂0end
 
@@ -467,39 +484,21 @@ function obj_econ(::PredictiveController, ::SimModel, _ , ::AbstractVector{NT}) 
 end
 
 @doc raw"""
-    optim_objective!(mpc::PredictiveController) -> ΔŨ
+    optim_objective!(mpc::PredictiveController) -> Z̃
 
-Optimize the objective function of `mpc` [`PredictiveController`](@ref) and return the solution `ΔŨ`.
+Optimize the objective function of `mpc` [`PredictiveController`](@ref) and return the solution `Z̃`.
 
-If supported by `mpc.optim`, it warm-starts the solver at:
-```math
-\mathbf{ΔŨ} = 
-\begin{bmatrix}
-    \mathbf{Δu}_{k-1}(k+0)      \\ 
-    \mathbf{Δu}_{k-1}(k+1)      \\ 
-    \vdots                      \\
-    \mathbf{Δu}_{k-1}(k+H_c-2)  \\
-    \mathbf{0}                  \\
-    ϵ_{k-1}
-\end{bmatrix}
-```
-where ``\mathbf{Δu}_{k-1}(k+j)`` is the input increment for time ``k+j`` computed at the 
-last control period ``k-1``. It then calls `JuMP.optimize!(mpc.optim)` and extract the
-solution. A failed optimization prints an `@error` log in the REPL and returns the 
-warm-start value. A failed optimization also prints [`getinfo`](@ref) results in
-the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
+If first warm-starts the solver with [`set_warm_start!`](@ref). It then calls 
+`JuMP.optimize!(mpc.optim)` and extract the solution. A failed optimization prints an 
+`@error` log in the REPL and returns the warm-start value. A failed optimization also prints
+[`getinfo`](@ref) results in the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
 """
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model, optim = mpc.estim.model, mpc.optim
-    nu, Hc = model.nu, mpc.Hc
-    ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
-    # initial ΔŨ (warm-start): [Δu_{k-1}(k); Δu_{k-1}(k+1); ... ; 0_{nu × 1}; ϵ_{k-1}]
-    ΔŨ0 = mpc.buffer.ΔŨ
-    ΔŨ0[1:(Hc*nu-nu)] .= @views mpc.ΔŨ[nu+1:Hc*nu]
-    ΔŨ0[(Hc*nu-nu+1):(Hc*nu)] .= 0
-    mpc.nϵ == 1 && (ΔŨ0[end] = mpc.ΔŨ[end])
-    JuMP.set_start_value.(ΔŨvar, ΔŨ0)
-    set_objective_linear_coef!(mpc, ΔŨvar)
+    nu, Hc = model.nu, mpc.Hc 
+    Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
+    Z̃0 = set_warmstart!(mpc, mpc.transcription, Z̃var)
+    set_objective_linear_coef!(mpc, Z̃var)
     try
         JuMP.optimize!(optim)
     catch err
@@ -529,11 +528,11 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
         @debug info2debugstr(getinfo(mpc))
     end
     if iserror(optim)
-        mpc.ΔŨ .= ΔŨ0
+        mpc.Z̃ .= Z̃0
     else
-        mpc.ΔŨ .= JuMP.value.(ΔŨvar)
+        mpc.Z̃ .= JuMP.value.(Z̃var)
     end
-    return mpc.ΔŨ
+    return mpc.Z̃
 end
 
 "By default, no need to modify the objective function."
@@ -549,17 +548,17 @@ function preparestate!(mpc::PredictiveController, ym, d=mpc.estim.buffer.empty)
 end
 
 @doc raw"""
-    getinput(mpc::PredictiveController, ΔŨ) -> u
+    getinput(mpc::PredictiveController, Z̃) -> u
 
-Get current manipulated input `u` from a [`PredictiveController`](@ref) solution `ΔŨ`.
+Get current manipulated input `u` from a [`PredictiveController`](@ref) solution `Z̃`.
 
-The first manipulated input ``\mathbf{u}(k)`` is extracted from the input increments vector
-``\mathbf{ΔŨ}`` and applied on the plant (from the receding horizon principle).
+The first manipulated input ``\mathbf{u}(k)`` is extracted from the decision vector
+``\mathbf{Z̃}`` and applied on the plant (from the receding horizon principle).
 """
-function getinput(mpc, ΔŨ)
+function getinput(mpc, Z̃)
     Δu  = mpc.buffer.u
     for i in 1:mpc.estim.model.nu
-        Δu[i] = ΔŨ[i]
+        Δu[i] = Z̃[i]
     end
     u   = Δu
     u .+= mpc.estim.lastu0 .+ mpc.estim.model.uop

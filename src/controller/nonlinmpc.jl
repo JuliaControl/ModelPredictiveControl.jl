@@ -16,8 +16,8 @@ struct NonLinMPC{
     # different since solvers that support non-Float64 are scarce.
     optim::JM
     con::ControllerConstraint{NT, GCfunc}
-    ΔŨ::Vector{NT}
-    ŷ ::Vector{NT}
+    Z̃::Vector{NT}
+    ŷ::Vector{NT}
     Hp::Int
     Hc::Int
     nϵ::Int
@@ -91,12 +91,12 @@ struct NonLinMPC{
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         test_custom_functions(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
-        nΔŨ = size(Ẽ, 2)
-        ΔŨ = zeros(NT, nΔŨ)
-        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
+        nZ̃ = get_nZ̃(estim, transcription, Hp, Hc, nϵ)
+        Z̃ = zeros(NT, nZ̃)
+        buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE, TM, JM, PT, JEfunc, GCfunc}(
             estim, transcription, optim, con,
-            ΔŨ, ŷ,
+            Z̃, ŷ,
             Hp, Hc, nϵ,
             weights,
             JE, p,
@@ -484,17 +484,17 @@ Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     # --- variables and linear constraints ---
     con = mpc.con
-    nΔŨ = length(mpc.ΔŨ)
+    nZ̃ = length(mpc.Z̃)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(mpc.optim, mpc.estim.model.Ts)
-    @variable(optim, ΔŨvar[1:nΔŨ])
+    @variable(optim, Z̃var[1:nZ̃])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
-    @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+    @constraint(optim, linconstraint, A*Z̃var .≤ b)
     Aeq = con.A
     beq = con.b
-    @constraint(optim, lineqconstraint, Aeq*ΔŨvar .== beq)
+    @constraint(optim, lineqconstraint, Aeq*Z̃var .== beq)
     # --- nonlinear optimization init ---
     if mpc.nϵ == 1 && JuMP.solver_name(optim) == "Ipopt"
         C = mpc.weights.Ñ_Hc[end]
@@ -506,8 +506,8 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
         end
     end
     Jfunc, gfuncs = get_optim_functions(mpc, mpc.optim)
-    @operator(optim, J, nΔŨ, Jfunc)
-    @objective(optim, Min, J(ΔŨvar...))
+    @operator(optim, J, nZ̃, Jfunc)
+    @objective(optim, Min, J(Z̃var...))
     init_nonlincon!(mpc, model, gfuncs)
     set_nonlincon!(mpc, model, mpc.optim)
     return nothing

@@ -13,8 +13,8 @@ struct LinMPC{
     # different since solvers that support non-Float64 are scarce.
     optim::JM
     con::ControllerConstraint{NT, Nothing}
-    ΔŨ::Vector{NT}
-    ŷ ::Vector{NT}
+    Z̃::Vector{NT}
+    ŷ::Vector{NT}
     Hp::Int
     Hc::Int
     nϵ::Int
@@ -75,12 +75,12 @@ struct LinMPC{
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
-        nΔŨ = size(Ẽ, 2)
-        ΔŨ = zeros(NT, nΔŨ)
-        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
+        nZ̃ = get_nZ̃(estim, transcription, Hp, Hc, nϵ)
+        Z̃ = zeros(NT, nZ̃)
+        buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE, TM, JM}(
             estim, transcription, optim, con,
-            ΔŨ, ŷ,
+            Z̃, ŷ,
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
@@ -266,29 +266,29 @@ Init the quadratic optimization for [`LinMPC`](@ref) controllers.
 function init_optimization!(mpc::LinMPC, model::LinModel, optim)
     # --- variables and linear constraints ---
     con = mpc.con
-    nΔŨ = length(mpc.ΔŨ)
+    nZ̃ = length(mpc.Z̃)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(mpc.optim, model.Ts)
-    @variable(optim, ΔŨvar[1:nΔŨ])
+    @variable(optim, Z̃var[1:nZ̃])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
-    @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
-    Aeq = con.A
-    beq = con.b
-    @constraint(optim, lineqconstraint, Aeq*ΔŨvar .== beq)
-    set_objective_hessian!(mpc, ΔŨvar)
+    @constraint(optim, linconstraint, A*Z̃var .≤ b)
+    Aeq = con.Aeq
+    beq = con.beq
+    @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
+    set_objective_hessian!(mpc, Z̃var)
     return nothing
 end
 
 "For [`LinMPC`](@ref), set the QP linear coefficient `q̃` just before optimization."
-function set_objective_linear_coef!(mpc::LinMPC, ΔŨvar)
-    JuMP.set_objective_coefficient(mpc.optim, ΔŨvar, mpc.q̃)
+function set_objective_linear_coef!(mpc::LinMPC, Z̃var)
+    JuMP.set_objective_coefficient(mpc.optim, Z̃var, mpc.q̃)
     return nothing
 end
 
 "Update the quadratic objective function for [`LinMPC`](@ref) controllers."
-function set_objective_hessian!(mpc::LinMPC, ΔŨvar)
-    @objective(mpc.optim, Min, obj_quadprog(ΔŨvar, mpc.H̃, mpc.q̃))
+function set_objective_hessian!(mpc::LinMPC, Z̃var)
+    @objective(mpc.optim, Min, obj_quadprog(Z̃var, mpc.H̃, mpc.q̃))
     return nothing
 end

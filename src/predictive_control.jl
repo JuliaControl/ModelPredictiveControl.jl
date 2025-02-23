@@ -19,39 +19,6 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController{NT<:Real} end
 
-struct PredictiveControllerBuffer{NT<:Real}
-    u ::Vector{NT}
-    ΔŨ::Vector{NT}
-    D̂ ::Vector{NT}
-    Ŷ ::Vector{NT}
-    U ::Vector{NT}
-    Ẽ ::Matrix{NT}
-    S̃ ::Matrix{NT}
-    empty::Vector{NT}
-end
-
-@doc raw"""
-    PredictiveControllerBuffer{NT}(nu::Int, ny::Int, nd::Int)
-
-Create a buffer for `PredictiveController` objects.
-
-The buffer is used to store intermediate results during computation without allocating.
-"""
-function PredictiveControllerBuffer{NT}(
-    nu::Int, ny::Int, nd::Int, Hp::Int, Hc::Int, nϵ::Int
-) where NT <: Real
-    nΔŨ = nu*Hc + nϵ
-    u  = Vector{NT}(undef, nu)
-    ΔŨ = Vector{NT}(undef, nΔŨ)
-    D̂  = Vector{NT}(undef, nd*Hp)
-    Ŷ  = Vector{NT}(undef, ny*Hp)
-    U  = Vector{NT}(undef, nu*Hp)
-    Ẽ  = Matrix{NT}(undef, ny*Hp, nΔŨ)
-    S̃  = Matrix{NT}(undef, nu*Hp, nΔŨ)
-    empty = Vector{NT}(undef, 0)
-    return PredictiveControllerBuffer{NT}(u, ΔŨ, D̂, Ŷ, U, Ẽ, S̃, empty)
-end
-
 include("controller/transcription.jl")
 include("controller/construct.jl")
 include("controller/execute.jl")

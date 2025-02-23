@@ -170,18 +170,6 @@ function setstate!(model::SimModel, x)
     return model
 end
 
-function Base.show(io::IO, model::SimModel)
-    nu, nd = model.nu, model.nd
-    nx, ny = model.nx, model.ny
-    n = maximum(ndigits.((nu, nx, ny, nd))) + 1
-    println(io, "$(typeof(model).name.name) with a sample time Ts = $(model.Ts) s"*
-                "$(detailstr(model)) and:")
-    println(io, "$(lpad(nu, n)) manipulated inputs u")
-    println(io, "$(lpad(nx, n)) states x")
-    println(io, "$(lpad(ny, n)) outputs y")
-    print(io,   "$(lpad(nd, n)) measured disturbances d")
-end
-
 detailstr(model::SimModel) = ""
 
 @doc raw"""
@@ -365,11 +353,22 @@ to_mat(A::AbstractVector, _ ...) = reshape(A, length(A), 1)
 to_mat(A::AbstractMatrix, _ ...) = A
 to_mat(A::Real, dims...) = fill(A, dims)
 
-
-"Functor allowing callable `SimModel` object as an alias for `evaloutput`."
-(model::SimModel)(d=model.buffer.empty) = evaloutput(model::SimModel, d)
-
 include("model/linmodel.jl")
 include("model/solver.jl")
 include("model/nonlinmodel.jl")
 include("model/linearization.jl")
+
+function Base.show(io::IO, model::SimModel)
+    nu, nd = model.nu, model.nd
+    nx, ny = model.nx, model.ny
+    n = maximum(ndigits.((nu, nx, ny, nd))) + 1
+    println(io, "$(typeof(model).name.name) with a sample time Ts = $(model.Ts) s"*
+                "$(detailstr(model)) and:")
+    println(io, "$(lpad(nu, n)) manipulated inputs u")
+    println(io, "$(lpad(nx, n)) states x")
+    println(io, "$(lpad(ny, n)) outputs y")
+    print(io,   "$(lpad(nd, n)) measured disturbances d")
+end
+
+"Functor allowing callable `SimModel` object as an alias for `evaloutput`."
+(model::SimModel)(d=model.buffer.empty) = evaloutput(model::SimModel, d)

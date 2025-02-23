@@ -36,5 +36,6 @@ ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel)
 
 ```@docs
 ModelPredictiveControl.optim_objective!(::PredictiveController)
+ModelPredictiveControl.set_warmstart!
 ModelPredictiveControl.getinput
 ```

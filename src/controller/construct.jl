@@ -1,3 +1,37 @@
+struct PredictiveControllerBuffer{NT<:Real}
+    u::Vector{NT}
+    Z̃::Vector{NT}
+    D̂::Vector{NT}
+    Ŷ::Vector{NT}
+    U::Vector{NT}
+    Ẽ::Matrix{NT}
+    S̃::Matrix{NT}
+    empty::Vector{NT}
+end
+
+@doc raw"""
+    PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
+
+Create a buffer for `PredictiveController` objects.
+
+The buffer is used to store intermediate results during computation without allocating.
+"""
+function PredictiveControllerBuffer(
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp::Int, Hc::Int, nϵ::Int
+) where NT <: Real
+    nu, ny, nd, nx̂ = estim.model.nu, estim.model.ny, estim.model.nd, estim.nx̂
+    nZ̃ = get_nZ̃(estim, transcription, Hp, Hc, nϵ)
+    u = Vector{NT}(undef, nu)
+    Z̃ = Vector{NT}(undef, nZ̃)
+    D̂ = Vector{NT}(undef, nd*Hp)
+    Ŷ = Vector{NT}(undef, ny*Hp)
+    U = Vector{NT}(undef, nu*Hp)
+    Ẽ = Matrix{NT}(undef, ny*Hp, nZ̃)
+    S̃ = Matrix{NT}(undef, nu*Hp, nZ̃)
+    empty = Vector{NT}(undef, 0)
+    return PredictiveControllerBuffer{NT}(u, Z̃, D̂, Ŷ, U, Ẽ, S̃, empty)
+end
+
 "Include all the objective function weights of [`PredictiveController`](@ref)"
 struct ControllerWeights{NT<:Real}
     M_Hp::Hermitian{NT, Matrix{NT}}

@@ -1,8 +1,8 @@
 struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     estim::SE
     transcription::SingleShooting
-    ΔŨ::Vector{NT}
-    ŷ ::Vector{NT}
+    Z̃::Vector{NT}
+    ŷ::Vector{NT}
     Hp::Int
     Hc::Int
     nϵ::Int
@@ -62,13 +62,13 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
-        nΔŨ = size(Ẽ, 2)
-        ΔŨ = zeros(NT, nΔŨ)
-        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
+        nZ̃ = get_nZ̃(estim, transcription, Hp, Hc, nϵ)
+        Z̃ = zeros(NT, nZ̃)
+        buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE}(
             estim,
             transcription,
-            ΔŨ, ŷ,
+            Z̃, ŷ,
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
