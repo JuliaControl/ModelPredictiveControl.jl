@@ -472,7 +472,7 @@ function validate_args(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
 end
 
 @doc raw"""
-    init_quadprog(model::LinModel, weights::ControllerWeights, Ẽ, S) -> H̃
+    init_quadprog(model::LinModel, weights::ControllerWeights, Ẽ, P̃, S̃) -> H̃
 
 Init the quadratic programming Hessian `H̃` for MPC.
 
@@ -489,9 +489,9 @@ The vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control per
 [`initpred!`](@ref). ``r`` does not impact the minima position. It is thus useless at
 optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel, weights::ControllerWeights, Ẽ, S̃)
+function init_quadprog(::LinModel, weights::ControllerWeights, Ẽ, P̃, S̃)
     M_Hp, Ñ_Hc, L_Hp = weights.M_Hp, weights.Ñ_Hc, weights.L_Hp
-    H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃), :L)
+    H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + P̃'*Ñ_Hc*P̃ + S̃'*L_Hp*S̃), :L)
     return H̃
 end
 "Return empty matrix if `model` is not a [`LinModel`](@ref)."
@@ -502,7 +502,7 @@ end
 
 """
     init_defaultcon_mpc(
-        estim::StateEstimator,
+        estim::StateEstimator, transcription::TranscriptionMethod,
         Hp, Hc, C, 
         P, S, E, 
         ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
@@ -515,7 +515,7 @@ Init `ControllerConstraint` struct with default parameters based on estimator `e
 Also return `P̃`, `S̃`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `Z̃`.
 """
 function init_defaultcon_mpc(
-    estim::StateEstimator{NT}, 
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod,
     Hp, Hc, C, 
     P, S, E, 
     ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
@@ -538,7 +538,9 @@ function init_defaultcon_mpc(
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
     A_Umin,  A_Umax, S̃  = relaxU(model, nϵ, C_umin, C_umax, S)
-    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃ = relaxΔU(model, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P)
+    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃ = relaxΔU(
+        model, transcription, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P
+    )
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(model, nϵ, C_ymin, C_ymax, E)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(model, nϵ, c_x̂min, c_x̂max, ex̂)
     A_ŝ, Ẽŝ = augmentdefect(model, nϵ, Eŝ)
@@ -619,7 +621,7 @@ end
 
 @doc raw"""
     relaxΔU(
-        model, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P
+        model, transcription, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P
     ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃
 
 Augment input increments constraints with slack variable ϵ for softening.
@@ -627,7 +629,9 @@ Augment input increments constraints with slack variable ϵ for softening.
 Denoting the decision variables augmented with the slack variable 
 ``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the
 augmented conversion matrix ``\mathbf{P̃}``, similar to the one described at
-[`init_ZtoΔU`](@ref). Knowing that ``0 ≤ ϵ ≤ ∞``, it also returns the augmented bounds 
+[`init_ZtoΔU`](@ref), but extracting the input increments augmented with the slack variable
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}] = \mathbf{P̃ Z̃}``.
+Also, knowing that ``0 ≤ ϵ ≤ ∞``, it also returns the augmented bounds 
 ``\mathbf{ΔŨ_{min}} = [\begin{smallmatrix} \mathbf{ΔU_{min}} \\ 0 \end{smallmatrix}]`` and
 ``\mathbf{ΔŨ_{max}} = [\begin{smallmatrix} \mathbf{ΔU_{min}} \\ ∞ \end{smallmatrix}]``,
 and the ``\mathbf{A}`` matrices for the inequality constraints:
@@ -646,13 +650,16 @@ bound, which is more specific than a linear inequality constraint. However, it i
 convenient to treat it as a linear inequality constraint since the optimizer `OSQP.jl` does
 not support pure bounds on the decision variables.
 """
-function relaxΔU(::SimModel{NT}, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P) where NT<:Real
+function relaxΔU(
+    ::SimModel{NT}, transcription::TranscriptionMethod, 
+    nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P
+) where NT<:Real
     nZ = size(P, 2)
     if nϵ == 1 # Z̃ = [Z; ϵ]
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]] # 0 ≤ ϵ ≤ ∞
         A_ϵ = [zeros(NT, 1, nZ) NT[1.0]]
         A_ΔŨmin, A_ΔŨmax = -[P  C_Δumin; A_ϵ], [P -C_Δumax; A_ϵ]
-        P̃ = [P zeros(NT, size(P, 1), 1)]
+        P̃ = [P zeros(NT, size(P, 1), 1); zeros(NT, 1, size(P, 2)) NT[1.0]]
     else # Z̃ = Z (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
         A_ΔŨmin, A_ΔŨmax = -P,  P

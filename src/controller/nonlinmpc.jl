@@ -77,12 +77,13 @@ struct NonLinMPC{
         # dummy vals (updated just before optimization):
         F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
         con, nϵ, P̃, S̃, Ẽ, Ẽŝ = init_defaultcon_mpc(
-            estim, Hp, Hc, Cwt, P, S, E, 
+            estim, transcription,
+            Hp, Hc, Cwt, P, S, E, 
             ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
             Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
             gc!, nc
         )
-        H̃ = init_quadprog(model, weights, Ẽ, S̃)
+        H̃ = init_quadprog(model, weights, Ẽ, P̃, S̃)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)

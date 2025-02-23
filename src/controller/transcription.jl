@@ -67,20 +67,37 @@ in which ``\mathbf{P} is defined in the Extended Help section.
     - ``\mathbf{P} = [\begin{smallmatrix}\mathbf{I} \mathbf{0} \end{smallmatrix}]`` if 
       `transcription isa MultipleShooting`
 """
-function init_ZtoU end
+function init_ZtoΔU end
 
 function init_ZtoΔU(
     estim::StateEstimator{NT}, transcription::SingleShooting, _ , Hc
 ) where {NT<:Real}
-    return Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
+    P = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
+    return P
 end
 
 function init_ZtoΔU(
     estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
     I_nu_Hc = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
-    return [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
+    P = [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
+    return P
 end
+
+#=
+function init_Z̃toΔŨ(
+    estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
+) where {NT<:Real}
+    return Matrix{NT}(I, model.nu*Hc, model.nu*Hc)
+end
+
+function init_Z̃toΔŨ(
+    estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
+) where {NT<:Real}
+    I_nu_Hc = Matrix{NT}(I, model.nu*Hc, model.nu*Hc)
+    return [I_nu_Hc zeros(NT, model.nu*Hc, model.nx̂*Hp)]
+end
+=#
 
 @doc raw"""
     init_ZtoU(estim, transcription, Hp, Hc) -> S, T
@@ -133,14 +150,14 @@ function init_ZtoU(
     I_nu = Matrix{NT}(I, model.nu, model.nu)
     S_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
     Sdagger = [S_Hc; repeat(I_nu, Hp - Hc, Hc)]
-    S = init_ZtoU_Smat(estim, transcription, Hp, Hc, Sdagger)
+    S = init_Smat(estim, transcription, Hp, Hc, Sdagger)
     T = repeat(I_nu, Hp)
     return S, T
 end
 
-init_ZtoU_Smat( _ , transcription::SingleShooting, _ , _ , Sdagger) = Sdagger
+init_Smat( _ , transcription::SingleShooting, _ , _ , Sdagger) = Sdagger
 
-function init_ZtoU_Smat(estim, transcription::MultipleShooting, Hp, _ , Sdagger)
+function init_Smat(estim, transcription::MultipleShooting, Hp, _ , Sdagger)
     return [Sdagger zeros(eltype(Sdagger), estim.model.nu*Hp, estim.nx̂*Hp)]
 end
 
@@ -339,7 +356,7 @@ function init_predmat(
     J  = repeatdiag(D̂d, Hp)
     jx̂ = zeros(NT, nx̂, Hp*nd)
     # --- state x̂op and state update f̂op operating points ---
-    B  = zeros(NT, Hp*ny, 1)
+    B  = zeros(NT, Hp*ny)
     bx̂ = zeros(NT, nx̂)
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end

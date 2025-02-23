@@ -54,7 +54,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         # dummy val (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
         P̃, S̃, Ñ_Hc, Ẽ = P, S, N_Hc, E # no slack variable ϵ for ExplicitMPC
-        H̃ = init_quadprog(model, weights ,Ẽ, S̃)
+        H̃ = init_quadprog(model, weights, Ẽ, P̃, S̃)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         H̃_chol = cholesky(H̃)

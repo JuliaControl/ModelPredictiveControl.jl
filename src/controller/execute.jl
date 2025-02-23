@@ -177,10 +177,10 @@ They are computed with these equations using in-place operations:
                             + \mathbf{V u_0}(k-1) + \mathbf{B} + \mathbf{Ŷ_s}           \\
     \mathbf{C_y}     &= \mathbf{F} + \mathbf{Y_{op}} - \mathbf{R̂_y}                     \\
     \mathbf{C_u}     &= \mathbf{T}\mathbf{u}(k-1)    - \mathbf{R̂_u}                     \\
-    \mathbf{q̃}       &= 2[(\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} 
-                            + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}]              \\
-    r                &= \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
-                            + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
+    \mathbf{q̃}       &= 2[    (\mathbf{M}_{H_p} \mathbf{Ẽ})' \mathbf{C_y} 
+                            + (\mathbf{L}_{H_p} \mathbf{S̃})' \mathbf{C_u}   ]           \\
+    r                &=     \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
+                          + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
 \end{aligned}
 ```
 """
@@ -765,7 +765,7 @@ function setmodel_controller!(mpc::PredictiveController, x̂op_old)
     JuMP.unregister(optim, :linconstraint)
     @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
     # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.S̃)
+    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ. mpc.P̃, mpc.S̃)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc, ΔŨvar)
     return nothing
