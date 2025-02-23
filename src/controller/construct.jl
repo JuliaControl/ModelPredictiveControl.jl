@@ -379,10 +379,10 @@ function setconstraint!(
         )
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
-        ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
+        Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
-        @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+        @constraint(optim, linconstraint, A*Z̃var .≤ b)
         set_nonlincon!(mpc, model, optim)
     else
         i_b, i_g = init_matconstraint_mpc(

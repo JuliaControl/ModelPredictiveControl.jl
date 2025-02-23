@@ -67,7 +67,7 @@ function moveinput!(
     validate_args(mpc, ry, d, D̂, R̂y, R̂u)
     initpred!(mpc, mpc.estim.model, d, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model)
-    linconstrainteq!(mpc, mpc.transcription)
+    linconstrainteq!(mpc, mpc.estim.model, mpc.transcription)
     Z̃ = optim_objective!(mpc)
     return getinput(mpc, Z̃)
 end
@@ -268,10 +268,11 @@ predictstoch!(Ŷs, mpc::PredictiveController, ::StateEstimator) = (Ŷs .= 0; n
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)
 
-Set `b` vector for the linear model inequality constraints (``\mathbf{A ΔŨ ≤ b}``).
+Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``).
 
-Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d}(k) + \mathbf{j_x̂ D̂} + \mathbf{k_x̂ x̂_0}(k) + \mathbf{v_x̂ u}(k-1) + \mathbf{b_x̂}``
-vector for the terminal constraints, see [`init_predmat`](@ref).
+Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d_0}(k) + \mathbf{j_x̂ D̂_0} + \mathbf{k_x̂ x̂_0}(k) + 
+\mathbf{v_x̂ u_0}(k-1) + \mathbf{b_x̂}`` vector for the terminal constraints, see
+[`init_predmat`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel)
     nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
@@ -321,22 +322,6 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
         lincon = mpc.optim[:linconstraint]
         @views JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
     end
-    return nothing
-end
-
-linconstrainteq!(mpc::PredictiveController, transcription::SingleShooting) = nothing
-function linconstrainteq!(mpc::PredictiveController, transcription::MultipleShooting)
-    nx̂, Fŝ = mpc.estim.nx̂, mpc.con.Fŝ
-    Fŝ .= mpc.con.Bŝ
-    mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0, 1, 1)
-    mul!(Fŝ, mpc.con.Vŝ, mpc.estim.lastu0, 1, 1)
-    if mpc.estim.model.nd ≠ 0
-        mul!(Fŝ, mpc.con.Gŝ, mpc.d0, 1, 1)
-        mul!(Fŝ, mpc.con.Jŝ, mpc.D̂0, 1, 1)
-    end
-    mpc.con.beq .= @. -Fŝ
-    linconeq = mpc.optim[:linconstrainteq]
-    JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
 

@@ -184,18 +184,18 @@ end
 linconstraint!(::ExplicitMPC, ::LinModel) = nothing
 
 @doc raw"""
-    optim_objective!(mpc::ExplicitMPC) -> ΔŨ
+    optim_objective!(mpc::ExplicitMPC) -> Z̃
 
 Analytically solve the optimization problem for [`ExplicitMPC`](@ref).
 
-The solution is ``\mathbf{ΔŨ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref).
+The solution is ``\mathbf{Z̃ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref).
 """
-optim_objective!(mpc::ExplicitMPC) = lmul!(-1, ldiv!(mpc.ΔŨ, mpc.H̃_chol, mpc.q̃))
+optim_objective!(mpc::ExplicitMPC) = lmul!(-1, ldiv!(mpc.Z̃, mpc.H̃_chol, mpc.q̃))
 
 "Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
-function predict!(Ŷ, x̂, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, ΔŨ)
+function predict!(Ŷ, x̂, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, Z̃)
     # in-place operations to reduce allocations :
-    Ŷ .= mul!(Ŷ, mpc.Ẽ, ΔŨ) .+ mpc.F
+    Ŷ .= mul!(Ŷ, mpc.Ẽ, Z̃) .+ mpc.F
     x̂ .= NaN
     return Ŷ, x̂
 end

@@ -509,6 +509,33 @@ function init_defectmat(
 end
 
 @doc raw"""
+    linconstrainteq!(
+        mpc::PredictiveController, model::LinModel, transcription::MultipleShooting
+    )
+
+Set `beq` vector for the linear model equality constraints (``\mathbf{Aeq Z̃ = beq}``).
+
+Also init ``\mathbf{F_ŝ} = \mathbf{G_ŝ d_0}(k) + \mathbf{J_ŝ D̂_0} + \mathbf{K_ŝ x̂_0}(k) + 
+\mathbf{V_ŝ u_0}(k-1) + \mathbf{B_ŝ}``, see [`init_defectmat`](@ref).
+"""
+function linconstrainteq!(mpc::PredictiveController, model::LinModel, ::MultipleShooting)
+    Fŝ  = mpc.con.Fŝ
+    Fŝ .= mpc.con.Bŝ
+    mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0, 1, 1)
+    mul!(Fŝ, mpc.con.Vŝ, mpc.estim.lastu0, 1, 1)
+    if model.nd ≠ 0
+        mul!(Fŝ, mpc.con.Gŝ, mpc.d0, 1, 1)
+        mul!(Fŝ, mpc.con.Jŝ, mpc.D̂0, 1, 1)
+    end
+    mpc.con.beq .= @. -Fŝ
+    linconeq = mpc.optim[:linconstrainteq]
+    JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    return nothing
+end
+linconstrainteq!(::PredictiveController, ::SimModel, ::SingleShooting) = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::MultipleShooting) = nothing
+
+@doc raw"""
     set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var) -> Z̃0
 
 Set and return the warm start value of `Z̃var` for [`SingleShooting`](@ref) transcription.
