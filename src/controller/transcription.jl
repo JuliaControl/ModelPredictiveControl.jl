@@ -492,7 +492,6 @@ function init_defectmat(
         iCol = (1:nx̂) .+ nx̂*(j-1) .+ nu*Hc
         Eŝ[iRow, iCol] = Â
     end
-    display(Eŝ)
     # --- current measured disturbances d0 and predictions D̂0 ---
     Gŝ = [B̂d; zeros(NT, (Hp-1)*nx̂, nd)]
     Jŝ = [zeros(nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
