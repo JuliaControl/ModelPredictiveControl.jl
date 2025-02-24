@@ -283,14 +283,14 @@ function init_predmat(
     Âpow_csum  = cumsum(Âpow, dims=3)
     # helper function to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
-    # --- state estimates x̂ ---
+    # --- current state estimates x̂0 ---
     kx̂ = getpower(Âpow, Hp)
     K  = Matrix{NT}(undef, Hp*ny, nx̂)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
         K[iRow,:] = Ĉ*getpower(Âpow, j)
     end    
-    # --- manipulated inputs u ---
+    # --- previous manipulated inputs lastu0 ---
     vx̂ = getpower(Âpow_csum, Hp-1)*B̂u
     V  = Matrix{NT}(undef, Hp*ny, nu)
     for j=1:Hp
@@ -306,7 +306,7 @@ function init_predmat(
         E[iRow, iCol] = V[iRow .- ny*(j-1),:]
         ex̂[:  , iCol] = getpower(Âpow_csum, Hp-j)*B̂u
     end
-    # --- measured disturbances d ---
+    # --- current measured disturbances d0 and predictions D̂0 ---
     gx̂ = getpower(Âpow, Hp-1)*B̂d
     G  = Matrix{NT}(undef, Hp*ny, nd)
     jx̂ = Matrix{NT}(undef, nx̂, Hp*nd)
@@ -348,16 +348,16 @@ function init_predmat(
 ) where {NT<:Real}
     Ĉ, D̂d = estim.Ĉ, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
-    # --- state estimates x̂ ---
+    # --- current state estimates x̂0 ---
     K = zeros(NT, Hp*ny, nx̂)
     kx̂ = zeros(NT, nx̂, nx̂)
-    # --- manipulated inputs u ---
+    # --- previous manipulated inputs lastu0 ---
     V = zeros(NT, Hp*ny, nu)
     vx̂ = zeros(NT, nx̂, nu)
     # --- decision variables Z ---
     E  = [zeros(NT, Hp*ny, Hc*nu) repeatdiag(Ĉ, Hp)]
     ex̂ = [zeros(NT, nx̂, Hc*nu + (Hp-1)*nx̂) I]
-    # --- measured disturbances d ---
+    # --- current measured disturbances d0 and predictions D̂0 ---
     G  = zeros(NT, Hp*ny, nd)
     gx̂ = zeros(NT, nx̂, nd)
     J  = repeatdiag(D̂d, Hp)
@@ -451,6 +451,7 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
     \mathbf{E_ŝ} &= \begin{bmatrix}
         \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0}   & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}      \\
         \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}      \\
+        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{0} &  \mathbf{Â} & \cdots &  \mathbf{0}      \\
         \vdots       & \vdots       & \ddots & \vdots       &  \vdots     &  \vdots     & \ddots & \vdots           \\
         \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{B̂_u} &  \mathbf{0} &  \mathbf{0} & \cdots & -\mathbf{I}      \end{bmatrix} \\
     \mathbf{G_ŝ} &= \begin{bmatrix}
@@ -474,9 +475,9 @@ function init_defectmat(
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
-    # --- state estimates x̂ ---
+    # --- current state estimates x̂0 ---
     Kŝ = [Â; zeros(NT, nx̂*(Hp-1), nx̂)]
-    # --- manipulated inputs u ---
+    # --- previous manipulated inputs lastu0 ---
     Vŝ = repeat(B̂u, Hp)
     # --- decision variables Z ---
     nI_nx̂ = Matrix{NT}(-I, nx̂, nx̂)
@@ -486,7 +487,13 @@ function init_defectmat(
         iCol = (1:nu) .+ nu*(j-1)
         Eŝ[iRow, iCol] = B̂u
     end
-    # --- measured disturbances d ---
+    for j=1:Hp-1
+        iRow = (1:nx̂) .+ nx̂*j
+        iCol = (1:nx̂) .+ nx̂*(j-1) .+ nu*Hc
+        Eŝ[iRow, iCol] = Â
+    end
+    display(Eŝ)
+    # --- current measured disturbances d0 and predictions D̂0 ---
     Gŝ = [B̂d; zeros(NT, (Hp-1)*nx̂, nd)]
     Jŝ = [zeros(nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
     # --- state x̂op and state update f̂op operating points ---

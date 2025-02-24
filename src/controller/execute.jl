@@ -473,7 +473,7 @@ end
 
 Optimize the objective function of `mpc` [`PredictiveController`](@ref) and return the solution `Z̃`.
 
-If first warm-starts the solver with [`set_warm_start!`](@ref). It then calls 
+If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls 
 `JuMP.optimize!(mpc.optim)` and extract the solution. A failed optimization prints an 
 `@error` log in the REPL and returns the warm-start value. A failed optimization also prints
 [`getinfo`](@ref) results in the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
@@ -741,17 +741,22 @@ function setmodel_controller!(mpc::PredictiveController, x̂op_old)
         con.A_x̂min  
         con.A_x̂max
     ]
+    Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
-    ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
     # deletion is required for sparse solvers like OSQP, when the sparsity pattern changes
     JuMP.delete(optim, optim[:linconstraint])
     JuMP.unregister(optim, :linconstraint)
-    @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+    @constraint(optim, linconstraint, A*Z̃var .≤ b)
+    Aeq = con.Aeq
+    beq = con.beq
+    JuMP.delete(optim, optim[:linconstrainteq])
+    JuMP.unregister(optim, :linconstrainteq)
+    @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     # --- quadratic programming Hessian matrix ---
     H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ. mpc.P̃, mpc.S̃)
     mpc.H̃ .= H̃
-    set_objective_hessian!(mpc, ΔŨvar)
+    set_objective_hessian!(mpc, Z̃var)
     return nothing
 end
 
