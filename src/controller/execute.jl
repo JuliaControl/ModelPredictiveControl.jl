@@ -121,15 +121,15 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     x̂0, x̂0next  = similar(mpc.estim.x̂0), similar(mpc.estim.x̂0)
     Ȳ, Ū        = similar(mpc.Yop), similar(mpc.Uop)
     Ŷe, Ue      = Vector{NT}(undef, nŶe), Vector{NT}(undef, nUe)
-    Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.ΔŨ)
-    Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, mpc.ΔŨ)
-    J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, mpc.ΔŨ)
+    Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.Z̃)
+    Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, mpc.Z̃)
+    J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, mpc.Z̃)
     U, Ŷ = Ū, Ȳ
-    U   .= mul!(U, mpc.S̃, mpc.ΔŨ) .+ mpc.T_lastu 
+    U   .= mul!(U, mpc.S̃, mpc.Z̃) .+ mpc.T_lastu 
     Ŷ   .= Ŷ0 .+ mpc.Yop
     predictstoch!(Ŷs, mpc, mpc.estim)
-    info[:ΔU]   = mpc.ΔŨ[1:mpc.Hc*model.nu]
-    info[:ϵ]    = mpc.nϵ == 1 ? mpc.ΔŨ[end] : zero(NT)
+    info[:ΔU]   = mpc.Z̃[1:mpc.Hc*model.nu]
+    info[:ϵ]    = mpc.nϵ == 1 ? mpc.Z̃[end] : zero(NT)
     info[:J]    = J
     info[:U]    = U
     info[:u]    = info[:U][1:model.nu]
@@ -325,69 +325,31 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
     return nothing
 end
 
-@doc raw"""
-    predict!(Ŷ0, x̂0, _, _, _, mpc::PredictiveController, model::LinModel, ΔŨ) -> Ŷ0, x̂0end
-
-Compute the predictions `Ŷ0` and terminal states `x̂0end` if model is a [`LinModel`](@ref).
-
-The method mutates `Ŷ0` and `x̂0` vector arguments. The `x̂end` vector is used for
-the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``.
 """
-function predict!(Ŷ0, x̂0, _ , _ , _ , mpc::PredictiveController, ::LinModel, ΔŨ)
-    # in-place operations to reduce allocations :
-    Ŷ0 .= mul!(Ŷ0, mpc.Ẽ, ΔŨ) .+ mpc.F
-    x̂0 .= mul!(x̂0, mpc.con.ẽx̂, ΔŨ) .+ mpc.con.fx̂
-    x̂0end = x̂0
-    return Ŷ0, x̂0end
-end
+    nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc::PredictiveController, Ŷ0, Z̃) -> ΔŨ, Ŷe, Ue
 
-@doc raw"""
-    predict!(
-        Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, model::SimModel, ΔŨ
-    ) -> Ŷ0, x̂end
+Compute the `ΔŨ`, `Ŷe` and `Ue` vectors for nonlinear programming using `Ŷ0` and `Z̃`.
 
-Compute both vectors if `model` is not a [`LinModel`](@ref). 
-    
-The method mutates `Ŷ0`, `x̂0`, `x̂0next`, `u0` and `û0` arguments.
-"""
-function predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc::PredictiveController, model::SimModel, ΔŨ)
-    nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
-    x̂0 .= mpc.estim.x̂0
-    u0 .= mpc.estim.lastu0
-    d0  = @views mpc.d0[1:end]
-    for j=1:Hp
-        if j ≤ Hc
-            u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
-        end
-        f̂!(x̂0next, û0, mpc.estim, model, x̂0, u0, d0)
-        x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
-        x̂0 .= x̂0next
-        d0 = @views mpc.D̂0[(1 + nd*(j-1)):(nd*j)]
-        ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
-        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
-    end
-    Ŷ0 .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
-    x̂end = x̂0
-    return Ŷ0, x̂end
-end
+See [`NonLinMPC`](@ref) for the definition of the vectors. The function mutates `ΔŨ`, `Ŷe`,
+`Ue` and `Ū` in arguments, without assuming any initial values for them. Using 
+`nocustomfcts = mpc.weights.iszero_E && mpc.con.nc == 0`, there are three special cases in
+which ΔŨ, `Ŷe`, `Ue` and `Ū` are not mutated:
 
-"""
-    extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ) -> Ŷe, Ue
-
-Compute the extended vectors `Ŷe` and `Ue` for the nonlinear optimization.
-
-The function mutates `Ŷe`, `Ue` and `Ū` in arguments, without assuming any initial values
-for them. Using `nocustomfcts = mpc.weights.iszero_E && mpc.con.nc == 0`, there is two 
-special cases in which `Ŷe`, `Ue` and `Ū` are not mutated:
-    
-- If `mpc.weights.iszero_M_Hp[] && nocustomfcts`, the `Ŷe` vector is not computed to reduce
-  the burden in the optimization problem.
+- If `mpc.weights.iszero_Ñ_Hc[]`, the `ΔŨ` vector is not computed to reduce the burden in 
+  the optimization problem.
+- If `mpc.weights.iszero_M_Hp[] && nocustomfcts`, the `Ŷe` vector is not computed for the
+  same reason as above.
 - If `mpc.weights.iszero_L_Hp[] && nocustomfcts`, the `Ue` vector is not computed for the
   same reason as above.
 """
-function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
+function nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc::PredictiveController, Ŷ0, Z̃)
+    model = mpc.estim.model
     ny, nu = model.ny, model.nu
     nocustomfcts = (mpc.weights.iszero_E && iszero_nc(mpc))
+    # --- augmented input increments ΔŨ = [ΔU; ϵ] ---
+    if !(mpc.weights.iszero_Ñ_Hc[])
+        ΔŨ .= mul!(ΔŨ, mpc.P̃, Z̃)
+    end
     # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
     if !(mpc.weights.iszero_M_Hp[] && nocustomfcts)
         Ŷe[1:ny] .= mpc.ŷ
@@ -396,36 +358,36 @@ function extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, ΔŨ)
     # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
     if !(mpc.weights.iszero_L_Hp[] && nocustomfcts)
         U  = Ū
-        U .= mul!(U, mpc.S̃, ΔŨ) .+ mpc.T_lastu
+        U .= mul!(U, mpc.S̃, Z̃) .+ mpc.T_lastu
         Ue[1:end-nu] .= U
         # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
         Ue[end-nu+1:end] .= @views U[end-nu+1:end]
     end
-    return Ŷe, Ue 
+    return ΔŨ, Ŷe, Ue 
 end
 
 "Verify if the custom nonlinear constraint has zero elements."
 iszero_nc(mpc::PredictiveController) = (mpc.con.nc == 0)
 
 """
-    obj_nonlinprog!( _ , _ , mpc::PredictiveController, model::LinModel, Ue, Ŷe, ΔŨ)
+    obj_nonlinprog!( _ , _ , mpc::PredictiveController, model::LinModel, Ue, Ŷe, _ , Z̃)
 
 Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
 
 The method is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
 also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
-at specific `Ue`, `Ŷe` and `ΔŨ`, values. It does not mutate any argument.
+at specific `Ue`, `Ŷe` and `Z̃`, values. It does not mutate any argument.
 """
 function obj_nonlinprog!(
-    _, _, mpc::PredictiveController, model::LinModel, Ue, Ŷe, ΔŨ::AbstractVector{NT}
+    _, _, mpc::PredictiveController, model::LinModel, Ue, Ŷe, _ , Z̃::AbstractVector{NT}
 ) where NT <: Real
-    JQP  = obj_quadprog(ΔŨ, mpc.H̃, mpc.q̃) + mpc.r[]
+    JQP  = obj_quadprog(Z̃, mpc.H̃, mpc.q̃) + mpc.r[]
     E_JE = obj_econ(mpc, model, Ue, Ŷe)
     return JQP + E_JE
 end
 
 """
-    obj_nonlinprog!(Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ)
+    obj_nonlinprog!(Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ, Z̃)
 
 Nonlinear programming objective method when `model` is not a [`LinModel`](@ref). The
 function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
@@ -433,7 +395,7 @@ function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method
 `Ŷe` and `Ue` arguments).
 """
 function obj_nonlinprog!(
-    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ::AbstractVector{NT}
+    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ, Z̃::AbstractVector{NT}
 ) where NT<:Real
     nu, ny = model.nu, model.ny
     # --- output setpoint tracking term ---
@@ -694,8 +656,8 @@ function setmodel_controller!(mpc::PredictiveController, x̂op_old)
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
         model, estim, transcription, Hp, Hc
     )
-    A_Ymin, A_Ymax, Ẽ = relaxŶ(model, mpc.nϵ, con.C_ymin, con.C_ymax, E)
-    A_x̂min, A_x̂max, ẽx̂ = relaxterminal(model, mpc.nϵ, con.c_x̂min, con.c_x̂max, ex̂)
+    A_Ymin, A_Ymax, Ẽ = relaxŶ(E, con.C_ymin, con.C_ymax, mpc.nϵ)
+    A_x̂min, A_x̂max, ẽx̂ = relaxterminal(ex̂, con.c_x̂min, con.c_x̂max, mpc.nϵ)
     mpc.Ẽ .= Ẽ
     mpc.G .= G
     mpc.J .= J

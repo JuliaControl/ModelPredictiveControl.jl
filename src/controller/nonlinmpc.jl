@@ -91,7 +91,7 @@ struct NonLinMPC{
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         test_custom_functions(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
-        nZ̃ = get_nZ̃(estim, transcription, Hp, Hc, nϵ)
+        nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE, TM, JM, PT, JEfunc, GCfunc}(
@@ -483,7 +483,7 @@ Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
 function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     # --- variables and linear constraints ---
-    con = mpc.con
+    con, transcription = mpc.con, mpc.transcription
     nZ̃ = length(mpc.Z̃)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
@@ -492,9 +492,9 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
-    Aeq = con.A
-    beq = con.b
-    @constraint(optim, lineqconstraint, Aeq*Z̃var .== beq)
+    Aeq = con.Aeq
+    beq = con.beq
+    @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     # --- nonlinear optimization init ---
     if mpc.nϵ == 1 && JuMP.solver_name(optim) == "Ipopt"
         C = mpc.weights.Ñ_Hc[end]
@@ -505,11 +505,11 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, gfuncs = get_optim_functions(mpc, mpc.optim)
+    Jfunc, gfuncs = get_optim_functions(mpc, optim)
     @operator(optim, J, nZ̃, Jfunc)
     @objective(optim, Min, J(Z̃var...))
-    init_nonlincon!(mpc, model, gfuncs)
-    set_nonlincon!(mpc, model, mpc.optim)
+    init_nonlincon!(mpc, model, transcription, gfuncs)
+    set_nonlincon!(mpc, model, optim)
     return nothing
 end
 
@@ -522,12 +522,13 @@ Get the objective `Jfunc` function and constraint `gfuncs` function vector for
 Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
 """
 function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
-    model = mpc.estim.model
-    nu, ny, nx̂, nϵ, Hp = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, mpc.Hp
+    model, transcription = mpc.estim.model, mpc.transcription
+    nu, ny, nx̂, nϵ, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, mpc.Hp, mpc.Hc
     ng, nc, nZ̃, nU, nŶ = length(mpc.con.i_g), mpc.con.nc, length(mpc.Z̃), Hp*nu, Hp*ny
-    nUe, nŶe = nU + nu, nŶ + ny
+    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny
     Ncache = nZ̃ + 3 
     Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, nZ̃),  Ncache)
+    ΔŨ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nΔŨ), Ncache)
     Ŷe_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶe), Ncache)
     Ue_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nUe), Ncache)
     Ȳ_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, nŶ),  Ncache)
@@ -544,13 +545,14 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             for i in eachindex(Z̃tup)
                 Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
             end
+            ΔŨ         = get_tmp(ΔŨ_cache, Z̃1)
             Ŷe, Ue     = get_tmp(Ŷe_cache, Z̃1), get_tmp(Ue_cache, Z̃1)
-            Ȳ,  Ū      = get_tmp(Ȳ_cache, Z̃1),  get_tmp(Ū_cache, Z̃1)
+            Ȳ,  Ū      = get_tmp(Ȳ_cache,  Z̃1), get_tmp(Ū_cache, Z̃1)
             x̂0, x̂0next = get_tmp(x̂0_cache, Z̃1), get_tmp(x̂0next_cache, Z̃1)
             u0, û0     = get_tmp(u0_cache, Z̃1), get_tmp(û0_cache, Z̃1)
             gc, g      = get_tmp(gc_cache, Z̃1), get_tmp(g_cache, Z̃1)
-            Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, Z̃)
-            Ŷe, Ue     = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, Z̃)
+            Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, transcription, Z̃)
+            ΔŨ, Ŷe, Ue = nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc, Ŷ0, Z̃)
             ϵ = (nϵ ≠ 0) ? Z̃[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
             gc = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
             g  = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
@@ -563,7 +565,8 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         update_simulations!(Z̃, Z̃tup)
         Ȳ,  Ū  = get_tmp(Ȳ_cache, Z̃1),  get_tmp(Ū_cache, Z̃1)
         Ŷe, Ue = get_tmp(Ŷe_cache, Z̃1), get_tmp(Ue_cache, Z̃1)
-        return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, Z̃)::T
+        ΔŨ = get_tmp(ΔŨ_cache, Z̃1)
+        return obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ, Z̃)::T
     end
     function gfunc_i(i, Z̃tup::NTuple{N, T}) where {N, T<:Real}
         Z̃1 = Z̃tup[begin]
@@ -582,7 +585,9 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     return Jfunc, gfuncs
 end
 
-function init_nonlincon!(mpc::NonLinMPC, ::LinModel, gfuncs::Vector{<:Function}) 
+function init_nonlincon!(
+    mpc::NonLinMPC, ::LinModel, ::TranscriptionMethod, gfuncs::Vector{<:Function}
+) 
     optim, con = mpc.optim, mpc.con
     nZ̃ = length(mpc.Z̃)
     if length(con.i_g) ≠ 0
@@ -595,7 +600,34 @@ function init_nonlincon!(mpc::NonLinMPC, ::LinModel, gfuncs::Vector{<:Function})
     return nothing
 end
 
-function init_nonlincon!(mpc::NonLinMPC, ::NonLinModel, gfuncs::Vector{<:Function}) 
+function init_nonlincon!(
+    mpc::NonLinMPC, ::NonLinModel, ::MultipleShooting, gfuncs::Vector{<:Function}
+) 
+    optim, con = mpc.optim, mpc.con
+    ny, nx̂, Hp, nZ̃ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.Z̃)
+    if length(con.i_g) ≠ 0
+        i_base = 0
+        for i in eachindex(con.Y0min)
+            name = Symbol("g_Y0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nZ̃, gfuncs[i_base+i]; name)
+        end
+        i_base = 1Hp*ny
+        for i in eachindex(con.Y0max)
+            name = Symbol("g_Y0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nZ̃, gfuncs[i_base+i]; name)
+        end
+        i_base = 2Hp*ny
+        for i in 1:con.nc
+            name = Symbol("g_c_$i")
+            optim[name] = JuMP.add_nonlinear_operator(optim, nZ̃, gfuncs[i_base+i]; name)
+        end
+    end
+    return nothing
+end
+
+function init_nonlincon!(
+    mpc::NonLinMPC, ::NonLinModel, ::SingleShooting, gfuncs::Vector{<:Function}
+) 
     optim, con = mpc.optim, mpc.con
     ny, nx̂, Hp, nZ̃ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.Z̃)
     if length(con.i_g) ≠ 0

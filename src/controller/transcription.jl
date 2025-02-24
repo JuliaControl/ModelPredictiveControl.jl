@@ -42,16 +42,17 @@ operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
     \mathbf{x̂}(k+H_p)   - \mathbf{x̂_{op}}       \end{bmatrix}
 ```
 This method is generally more efficient for large control horizon ``H_c``, unstable or
-highly nonlinear plant models/constraints.
+highly nonlinear plant models/constraints. Sparse optimizers like `OSQP.jl` or `Ipopt.jl`
+are recommended for large-scale problems.
 """
 struct MultipleShooting <: TranscriptionMethod end
 
-"Get the number of elements in the optimization decision vector `Z̃`."
-function get_nZ̃(estim::StateEstimator, transcription::SingleShooting, Hp, Hc, nϵ)
-    return estim.model.nu*Hc + nϵ
+"Get the number of elements in the optimization decision vector `Z`."
+function get_nZ(estim::StateEstimator, transcription::SingleShooting, Hp, Hc)
+    return estim.model.nu*Hc
 end
-function get_nZ̃(estim::StateEstimator, transcription::MultipleShooting, Hp, Hc, nϵ)
-    return estim.model.nu*Hc + estim.nx̂*Hp + nϵ
+function get_nZ(estim::StateEstimator, transcription::MultipleShooting, Hp, Hc)
+    return estim.model.nu*Hc + estim.nx̂*Hp
 end
 
 @doc raw"""
@@ -297,9 +298,10 @@ function init_predmat(
         iRow = (1:ny) .+ ny*(j-1)
         V[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)*B̂u
     end
-    ex̂ = Matrix{NT}(undef, nx̂, Hc*nu)
     # --- decision variables Z ---
-    E  = zeros(NT, Hp*ny, Hc*nu) 
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    ex̂ = Matrix{NT}(undef, nx̂, nZ)
+    E  = zeros(NT, Hp*ny, nZ) 
     for j=1:Hc # truncated with control horizon
         iRow = (ny*(j-1)+1):(ny*Hp)
         iCol = (1:nu) .+ nu*(j-1)
@@ -377,7 +379,8 @@ function init_predmat(
     model::SimModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
-    E  = zeros(NT, 0, nu*Hc)
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    E  = zeros(NT, 0, nZ)
     G  = zeros(NT, 0, nd)
     J  = zeros(NT, 0, nd*Hp)
     K  = zeros(NT, 0, nx̂)
@@ -396,14 +399,15 @@ function init_predmat(
     model::SimModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
-    E  = zeros(NT, 0, nu*Hc)
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    E  = zeros(NT, 0, nZ)
     G  = zeros(NT, 0, nd)
     J  = zeros(NT, 0, nd*Hp)
     K  = zeros(NT, 0, nx̂)
     V  = zeros(NT, 0, nu)
     B  = zeros(NT, 0)
     ex̂ = [zeros(NT, nx̂, Hc*nu + (Hp-1)*nx̂) I]
-    gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V, B
+    gx̂, jx̂, kx̂, vx̂, bx̂ = G, J, K, V, B
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
@@ -416,7 +420,8 @@ function init_defectmat(
     model::SimModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
-    Eŝ = zeros(NT, 0, nu*Hc)
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    Eŝ = zeros(NT, 0, nZ)
     Gŝ = zeros(NT, 0, nd)
     Jŝ = zeros(NT, 0, nd*Hp)
     Kŝ = zeros(NT, 0, nx̂)
@@ -505,7 +510,8 @@ function init_defectmat(
     model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
-    Eŝ = zeros(NT, 0, nu*Hc)
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    Eŝ = zeros(NT, 0, nZ)
     Gŝ = zeros(NT, 0, nd)
     Jŝ = zeros(NT, 0, nd*Hp)
     Kŝ = zeros(NT, 0, nx̂)
@@ -609,4 +615,97 @@ function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooti
     mpc.nϵ == 1 && (Z̃0[end] = mpc.Z̃[end])
     JuMP.set_start_value.(Z̃var, Z̃0)
     return Z̃0
+end
+
+@doc raw"""
+    predict!(
+        Ŷ0, x̂0, _, _, _, 
+        mpc::PredictiveController, model::LinModel, transcription::TranscriptionMethod, 
+        Z̃
+    ) -> Ŷ0, x̂0end
+
+Compute the predictions `Ŷ0` and terminal states `x̂0end` if model is a [`LinModel`](@ref).
+
+The method mutates `Ŷ0` and `x̂0` vector arguments. The `x̂end` vector is used for
+the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``. The computations are
+identical for any [`TranscriptionMethod`](@ref).
+"""
+function predict!(
+    Ŷ0, x̂0, _ , _ , _ , 
+    mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, 
+    Z̃
+)
+    # in-place operations to reduce allocations :
+    Ŷ0 .= mul!(Ŷ0, mpc.Ẽ, Z̃) .+ mpc.F
+    x̂0 .= mul!(x̂0, mpc.con.ẽx̂, Z̃) .+ mpc.con.fx̂
+    x̂0end = x̂0
+    return Ŷ0, x̂0end
+end
+
+@doc raw"""
+    predict!(
+        Ŷ0, x̂0, x̂0next, u0, û0, 
+        mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
+        Z̃
+    ) -> Ŷ0, x̂0end
+
+Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
+    
+The method mutates `Ŷ0`, `x̂0`, `x̂0next`, `u0` and `û0` arguments.
+"""
+function predict!(
+    Ŷ0, x̂0, x̂0next, u0, û0, 
+    mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
+    Z̃
+)
+    nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
+    ΔŨ  = Z̃ # only true for SingleShooting transcription method
+    D̂0  = mpc.D̂0
+    x̂0 .= mpc.estim.x̂0
+    u0 .= mpc.estim.lastu0
+    d0  = @views mpc.d0[1:end]
+    for j=1:Hp
+        if j ≤ Hc
+            u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
+        end
+        f̂!(x̂0next, û0, mpc.estim, model, x̂0, u0, d0)
+        x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
+        x̂0 .= x̂0next
+        d0  = @views D̂0[(1 + nd*(j-1)):(nd*j)]
+        ŷ0  = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
+        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
+    end
+    Ŷ0 .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
+    x̂0end = x̂0
+    return Ŷ0, x̂0end
+end
+
+@doc raw"""
+    predict!(
+        Ŷ0, x̂0, _ , _ , _ , 
+        mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting,
+        Z̃
+    ) -> Ŷ0, x̂0end
+
+Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`MultipleShooting`](@ref).
+    
+The method mutates `Ŷ0` and `x̂0` arguments.
+"""
+function predict!(
+    Ŷ0, x̂0, x̂0next, u0, û0,
+    mpc::PredictiveController, model::NonLinModel, ::MultipleShooting,
+    Z̃
+)
+    nu, ny, nd, nx̂, Hp, Hc = model.nu, model.ny, model.nd, mpc.estim.nx̂, mpc.Hp, mpc.Hc
+    X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
+    D̂0 = mpc.D̂0
+    for j=1:Hp
+        x̂0 .= @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        d0  = @views D̂0[(1 + nd*(j-1)):(nd*j)]
+        ŷ0  = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
+        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
+    end
+    Ŷ0 .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
+    x̂0end = x̂0
+    return Ŷ0, x̂0end
 end

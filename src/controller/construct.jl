@@ -20,7 +20,7 @@ function PredictiveControllerBuffer(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp::Int, Hc::Int, nϵ::Int
 ) where NT <: Real
     nu, ny, nd, nx̂ = estim.model.nu, estim.model.ny, estim.model.nd, estim.nx̂
-    nZ̃ = get_nZ̃(estim, transcription, Hp, Hc, nϵ)
+    nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
     u = Vector{NT}(undef, nu)
     Z̃ = Vector{NT}(undef, nZ̃)
     D̂ = Vector{NT}(undef, nd*Hp)
@@ -238,7 +238,8 @@ function setconstraint!(
     ΔUmin   = DeltaUmin,   ΔUmax = DeltaUmax,
     C_Δumin = C_Deltaumin, C_Δumax = C_Deltaumax,
 )
-    model, con, optim = mpc.estim.model, mpc.con, mpc.optim
+    model, con =  mpc.estim.model, mpc.con
+    transcription, optim = mpc.transcription, mpc.optim
     nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     nϵ, nc = mpc.nϵ, con.nc
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
@@ -370,7 +371,7 @@ function setconstraint!(
     i_x̂min,  i_x̂max  = .!isinf.(con.x̂0min), .!isinf.(con.x̂0max)
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(
-            model, nc,
+            model, transcription, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
@@ -386,7 +387,7 @@ function setconstraint!(
         set_nonlincon!(mpc, model, optim)
     else
         i_b, i_g = init_matconstraint_mpc(
-            model, nc,
+            model, transcription, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max
         )
@@ -400,7 +401,7 @@ end
 
 @doc raw"""
     init_matconstraint_mpc(
-        model::LinModel, nc::Int,
+        model::LinModel, transcription::TranscriptionMethod, nc::Int,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
         args...
     ) -> i_b, i_g, A, Aeq
@@ -424,12 +425,10 @@ also returns the ``\mathbf{A, A_{eq}}`` matrices if `args` is provided. In such 
 `A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ`.
 """
 function init_matconstraint_mpc(
-    ::LinModel{NT}, nc::Int,
+    ::LinModel{NT}, ::TranscriptionMethod, nc::Int,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
     args...
 ) where {NT<:Real}
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
-    i_g = trues(nc)
     if isempty(args)
         A, Aeq = nothing, nothing
     else
@@ -437,17 +436,17 @@ function init_matconstraint_mpc(
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
         Aeq = A_ŝ
     end
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
+    i_g = trues(nc)
     return i_b, i_g, A, Aeq
 end
 
-"Init `i_b, A` without outputs and terminal constraints if `model` is not a [`LinModel`](@ref)."
+"Init `i_b` without output constraints if [`NonLinModel`](@ref) & [`MultipleShooting`](@ref)."
 function init_matconstraint_mpc(
-    ::SimModel{NT}, nc::Int,
+    ::NonLinModel{NT}, ::MultipleShooting, nc::Int,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
     args...
 ) where {NT<:Real}
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
     if isempty(args)
         A, Aeq = nothing, nothing
     else
@@ -455,8 +454,29 @@ function init_matconstraint_mpc(
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
         Aeq = A_ŝ
     end
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_x̂min; i_x̂max]
+    i_g = [i_Ymin; i_Ymax; trues(nc)]
     return i_b, i_g, A, Aeq
 end
+
+"Init `i_b` without output & terminal constraints if [`NonLinModel`](@ref) & [`SingleShooting`](@ref)."
+function init_matconstraint_mpc(
+    ::NonLinModel{NT}, ::SingleShooting, nc::Int,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    args...
+) where {NT<:Real}
+    if isempty(args)
+        A, Aeq = nothing, nothing
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
+    end
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
+    i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
+    return i_b, i_g, A, Aeq
+end
+
 
 "By default, there is no nonlinear constraint, thus do nothing."
 set_nonlincon!(::PredictiveController, ::SimModel, ::JuMP.GenericModel) = nothing
@@ -512,11 +532,12 @@ Init the quadratic programming Hessian `H̃` for MPC.
 
 The matrix appear in the quadratic general form:
 ```math
-    J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'H̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + r 
+    J = \min_{\mathbf{Z̃}} \frac{1}{2}\mathbf{Z̃' H̃ Z̃} + \mathbf{q̃' Z̃} + r 
 ```
 The Hessian matrix is constant if the model and weights are linear and time invariant (LTI): 
 ```math
-    \mathbf{H̃} = 2 (  \mathbf{Ẽ}'\mathbf{M}_{H_p}\mathbf{Ẽ} + \mathbf{Ñ}_{H_c} 
+    \mathbf{H̃} = 2 (  \mathbf{Ẽ}'\mathbf{M}_{H_p}\mathbf{Ẽ} 
+                    + \mathbf{P̃}'\mathbf{Ñ}_{H_c}\mathbf{P̃} 
                     + \mathbf{S̃}'\mathbf{L}_{H_p}\mathbf{S̃} )
 ```
 The vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
@@ -571,19 +592,17 @@ function init_defaultcon_mpc(
         repeat_constraints(Hp, Hc, u0min, u0max, Δumin, Δumax, y0min, y0max)
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
-    A_Umin,  A_Umax, S̃  = relaxU(model, nϵ, C_umin, C_umax, S)
-    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃ = relaxΔU(
-        model, transcription, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P
-    )
-    A_Ymin,  A_Ymax, Ẽ  = relaxŶ(model, nϵ, C_ymin, C_ymax, E)
-    A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(model, nϵ, c_x̂min, c_x̂max, ex̂)
-    A_ŝ, Ẽŝ = augmentdefect(model, nϵ, Eŝ)
+    A_Umin,  A_Umax, S̃  = relaxU(S, C_umin, C_umax, nϵ)
+    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃ = relaxΔU(P, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ)
+    A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
+    A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
+    A_ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
     i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
     i_x̂min,  i_x̂max  = .!isinf.(x̂0min), .!isinf.(x̂0max)
     i_b, i_g, A, Aeq = init_matconstraint_mpc(
-        model, nc,
+        model, transcription, nc,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min,
         A_ŝ
@@ -615,10 +634,8 @@ function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
     return Umin, Umax, ΔUmin, ΔUmax, Ymin, Ymax
 end
 
-#TODO: change all the next docstringgs with Z̃ instead of ΔŨ !!!!!
-
 @doc raw"""
-    relaxU(model, nϵ, C_umin, C_umax, S) -> A_Umin, A_Umax, S̃
+    relaxU(S, C_umin, C_umax, nϵ) -> A_Umin, A_Umax, S̃
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
@@ -640,7 +657,7 @@ constraints:
 in which ``\mathbf{U_{min}}`` and ``\mathbf{U_{max}}`` vectors respectively contains
 ``\mathbf{u_{min}}`` and ``\mathbf{u_{max}}`` repeated ``H_p`` times.
 """
-function relaxU(::SimModel{NT}, nϵ, C_umin, C_umax, S) where NT<:Real
+function relaxU(S::Matrix{NT}, C_umin, C_umax, nϵ) where NT<:Real
     if nϵ == 1 # Z̃ = [Z; ϵ]
         # ϵ impacts Z → U conversion for constraint calculations:
         A_Umin, A_Umax = -[S  C_umin], [S -C_umax] 
@@ -654,9 +671,7 @@ function relaxU(::SimModel{NT}, nϵ, C_umin, C_umax, S) where NT<:Real
 end
 
 @doc raw"""
-    relaxΔU(
-        model, transcription, nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P
-    ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃
+    relaxΔU(P, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃
 
 Augment input increments constraints with slack variable ϵ for softening.
 
@@ -684,10 +699,7 @@ bound, which is more specific than a linear inequality constraint. However, it i
 convenient to treat it as a linear inequality constraint since the optimizer `OSQP.jl` does
 not support pure bounds on the decision variables.
 """
-function relaxΔU(
-    ::SimModel{NT}, transcription::TranscriptionMethod, 
-    nϵ, C_Δumin, C_Δumax, ΔUmin, ΔUmax, P
-) where NT<:Real
+function relaxΔU(P::Matrix{NT}, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) where NT<:Real
     nZ = size(P, 2)
     if nϵ == 1 # Z̃ = [Z; ϵ]
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]] # 0 ≤ ϵ ≤ ∞
@@ -703,7 +715,7 @@ function relaxΔU(
 end
 
 @doc raw"""
-    relaxŶ(::LinModel, nϵ, C_ymin, C_ymax, E) -> A_Ymin, A_Ymax, Ẽ
+    relaxŶ(E, C_ymin, C_ymax, nϵ) -> A_Ymin, A_Ymax, Ẽ
 
 Augment linear output prediction constraints with slack variable ϵ for softening.
 
@@ -724,8 +736,12 @@ Denoting the decision variables augmented with the slack variable
 in which ``\mathbf{Y_{min}, Y_{max}}`` and ``\mathbf{Y_{op}}`` vectors respectively contains
 ``\mathbf{y_{min}, y_{max}}`` and ``\mathbf{y_{op}}`` repeated ``H_p`` times.
 """
-function relaxŶ(::LinModel{NT}, nϵ, C_ymin, C_ymax, E) where NT<:Real
+function relaxŶ(E::Matrix{NT}, C_ymin, C_ymax, nϵ) where NT<:Real
     if nϵ == 1 # Z̃ = [Z; ϵ]
+        if iszero(size(E, 1))
+            # model is not a LinModel, thus Ŷ constraints are not linear:
+            C_ymin = C_ymax = zeros(NT, 0, 1)
+        end
         # ϵ impacts predicted output constraint calculations:
         A_Ymin, A_Ymax = -[E  C_ymin], [E -C_ymax] 
         # ϵ has no impact on output predictions:
@@ -737,15 +753,8 @@ function relaxŶ(::LinModel{NT}, nϵ, C_ymin, C_ymax, E) where NT<:Real
     return A_Ymin, A_Ymax, Ẽ
 end
 
-"Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxŶ(::SimModel{NT}, nϵ, C_ymin, C_ymax, E) where NT<:Real
-    Ẽ = [E zeros(NT, 0, nϵ)]
-    A_Ymin, A_Ymax = -Ẽ,  Ẽ 
-    return A_Ymin, A_Ymax, Ẽ
-end
-
 @doc raw"""
-    relaxterminal(::LinModel, nϵ, c_x̂min, c_x̂max, ex̂) -> A_x̂min, A_x̂max, ẽx̂
+    relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ) -> A_x̂min, A_x̂max, ẽx̂
 
 Augment terminal state constraints with slack variable ϵ for softening.
 
@@ -765,8 +774,13 @@ the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxterminal(::LinModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
+function relaxterminal(ex̂::Matrix{NT}, c_x̂min, c_x̂max, nϵ) where {NT<:Real}
     if nϵ == 1 # Z̃ = [Z; ϵ]
+        if iszero(size(ex̂, 1))
+            # model is not a LinModel and transcription is a SingleShooting, thus terminal
+            # state constraints are not linear:
+            c_x̂min = c_x̂max = zeros(NT, 0, 1)
+        end
         # ϵ impacts terminal state constraint calculations:
         A_x̂min, A_x̂max = -[ex̂ c_x̂min], [ex̂ -c_x̂max]
         # ϵ has no impact on terminal state predictions:
@@ -778,15 +792,8 @@ function relaxterminal(::LinModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<
     return A_x̂min, A_x̂max, ẽx̂
 end
 
-"Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxterminal(::SimModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
-    ẽx̂ = [ex̂ zeros(NT, 0, nϵ)]
-    A_x̂min, A_x̂max = -ẽx̂,  ẽx̂
-    return A_x̂min, A_x̂max, ẽx̂
-end
-
 @doc raw"""
-    augmentdefect(::LinModel{NT}, nϵ, Eŝ) where NT<:Real
+    augmentdefect(Eŝ, nϵ) -> A_ŝ, Ẽŝ
 
 Augment defect equality constraints with slack variable ϵ if `nϵ == 1`.
 
@@ -796,7 +803,7 @@ It returns the ``\mathbf{Ẽŝ}`` matrix that appears in the defect equation
 \mathbf{A_ŝ Z̃} = - \mathbf{F_ŝ}
 ```
 """
-function augmentdefect(::LinModel{NT}, nϵ, Eŝ) where NT<:Real
+function augmentdefect(Eŝ::Matrix{NT}, nϵ) where NT<:Real
     if nϵ == 1 # Z̃ = [Z; ϵ]
         Ẽŝ = [Eŝ zeros(NT, size(Eŝ, 1), 1)]
     else # Z̃ = Z (only hard constraints)
@@ -805,14 +812,6 @@ function augmentdefect(::LinModel{NT}, nϵ, Eŝ) where NT<:Real
     A_ŝ = Ẽŝ
     return A_ŝ, Ẽŝ
 end
-
-"Return empty matrices if model is not a [`LinModel`](@ref)"
-function augmentdefect(::SimModel{NT}, nϵ, Eŝ) where NT<:Real
-    Ẽŝ = [Eŝ zeros(NT, 0, nϵ)]
-    A_ŝ = Ẽŝ
-    return A_ŝ, Ẽŝ
-end
-
 
 @doc raw"""
     init_stochpred(estim::InternalModel, Hp) -> Ks, Ps
