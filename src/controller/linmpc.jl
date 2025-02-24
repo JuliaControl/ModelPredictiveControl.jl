@@ -121,10 +121,10 @@ subject to [`setconstraint!`](@ref) bounds, and in which the weight matrices are
 \end{aligned}
 ```
 Time-varying and non-diagonal weights are also supported. Modify the last block in 
-``\mathbf{M}_{H_p}`` to specify a terminal weight. The content of the decision variable
-vector ``\mathbf{Z}`` depends on the chosen [`TranscriptionMethod`](@ref) (default to
-[`SingleShooting`](@ref)). The ``\mathbf{ΔU}`` includes the input increments 
-``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to
+``\mathbf{M}_{H_p}`` to specify a terminal weight. The content of the decision vector
+``\mathbf{Z}`` depends on the chosen [`TranscriptionMethod`](@ref) (default to
+[`SingleShooting`](@ref), hence ``\mathbf{Z = ΔU}``). The ``\mathbf{ΔU}`` includes the input
+increments ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to
 ``H_c-1``, the ``\mathbf{Ŷ}`` vector, the output predictions ``\mathbf{ŷ}(k+j)`` from
 ``j=1`` to ``H_p``, and the ``\mathbf{U}`` vector, the manipulated inputs ``\mathbf{u}(k+j)``
 from ``j=0`` to ``H_p-1``. The slack variable ``ϵ`` relaxes the constraints, as described

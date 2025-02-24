@@ -113,22 +113,25 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 ```
 """
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
-    model    = mpc.estim.model
+    model, transcription = mpc.estim.model, mpc.transcription
+    nΔŨ      = mpc.Hc*model.nu + mpc.nϵ
     nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu 
+    Z̃ = mpc.Z̃
     info = Dict{Symbol, Any}()
     Ŷ0, u0, û0  = similar(mpc.Yop), similar(model.uop), similar(model.uop)
     Ŷs          = similar(mpc.Yop)
     x̂0, x̂0next  = similar(mpc.estim.x̂0), similar(mpc.estim.x̂0)
     Ȳ, Ū        = similar(mpc.Yop), similar(mpc.Uop)
+    ΔŨ          = Vector{NT}(undef, nΔŨ)
     Ŷe, Ue      = Vector{NT}(undef, nŶe), Vector{NT}(undef, nUe)
-    Ŷ0, x̂0end = predict!(Ŷ0, x̂0, x̂0next, u0, û0, mpc, model, mpc.Z̃)
-    Ŷe, Ue    = extended_predictions!(Ŷe, Ue, Ū, mpc, model, Ŷ0, mpc.Z̃)
-    J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, mpc.Z̃)
+    Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, transcription, Z̃)
+    ΔŨ, Ŷe, Ue = nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc, Ŷ0, Z̃)
+    J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ, Z̃)
     U, Ŷ = Ū, Ȳ
     U   .= mul!(U, mpc.S̃, mpc.Z̃) .+ mpc.T_lastu 
     Ŷ   .= Ŷ0 .+ mpc.Yop
     predictstoch!(Ŷs, mpc, mpc.estim)
-    info[:ΔU]   = mpc.Z̃[1:mpc.Hc*model.nu]
+    info[:ΔU]   = Z̃[1:mpc.Hc*model.nu]
     info[:ϵ]    = mpc.nϵ == 1 ? mpc.Z̃[end] : zero(NT)
     info[:J]    = J
     info[:U]    = U
@@ -395,7 +398,7 @@ function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method
 `Ŷe` and `Ue` arguments).
 """
 function obj_nonlinprog!(
-    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ, Z̃::AbstractVector{NT}
+    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ, ::AbstractVector{NT}
 ) where NT<:Real
     nu, ny = model.nu, model.ny
     # --- output setpoint tracking term ---
@@ -716,7 +719,7 @@ function setmodel_controller!(mpc::PredictiveController, x̂op_old)
     JuMP.unregister(optim, :linconstrainteq)
     @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ. mpc.P̃, mpc.S̃)
+    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.P̃, mpc.S̃)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc, Z̃var)
     return nothing

@@ -89,9 +89,9 @@ NonLinMPC
 moveinput!
 ```
 
-## Transcription Methods
+## Direct Transcription Methods
 
-### Transcription Method
+### TranscriptionMethod
 
 ```@docs
 ModelPredictiveControl.TranscriptionMethod

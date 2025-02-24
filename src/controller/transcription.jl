@@ -18,7 +18,7 @@ The decision variable in the optimization problem is (excluding the slack ``ϵ``
     \vdots                          \\ 
     \mathbf{Δu}(k+H_c-1)            \end{bmatrix}
 ```
-This method generally more efficient for small control horizon ``H_c``, stable or mildly
+This method is generally more efficient for small control horizon ``H_c``, stable or mildly
 nonlinear plant model/constraints.
 """
 struct SingleShooting <: TranscriptionMethod end
@@ -35,15 +35,17 @@ The decision variable is (excluding ``ϵ``):
 thus it also includes the predicted states, expressed as deviation vectors from the
 operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
 ```math
-\mathbf{X̂_0} =                                  \begin{bmatrix} 
-    \mathbf{x̂}(k+1)     - \mathbf{x̂_{op}}       \\ 
-    \mathbf{x̂}(k+2)     - \mathbf{x̂_{op}}       \\ 
+\mathbf{X̂_0} = \mathbf{X̂ - X̂_{op}}              \begin{bmatrix} 
+    \mathbf{x̂}_i(k+1)     - \mathbf{x̂_{op}}     \\ 
+    \mathbf{x̂}_i(k+2)     - \mathbf{x̂_{op}}     \\ 
     \vdots                                      \\ 
-    \mathbf{x̂}(k+H_p)   - \mathbf{x̂_{op}}       \end{bmatrix}
+    \mathbf{x̂}_i(k+H_p)   - \mathbf{x̂_{op}}     \end{bmatrix}
 ```
-This method is generally more efficient for large control horizon ``H_c``, unstable or
-highly nonlinear plant models/constraints. Sparse optimizers like `OSQP.jl` or `Ipopt.jl`
-are recommended for large-scale problems.
+where ``\mathbf{x̂}_i(k+j)`` is the state prediction for time ``k+j``, estimated by the
+observer at time ``i=k`` or ``i=k-1`` depending on the `direct` flag. This transcription
+method is generally more efficient for large control horizon ``H_c``, unstable or highly
+nonlinear plant models/constraints. Sparse optimizers like `OSQP.jl` or `Ipopt.jl` are
+recommended for large-scale problems.
 """
 struct MultipleShooting <: TranscriptionMethod end
 
@@ -65,15 +67,15 @@ increments over ``H_c``, is computed by:
 ```math
 \mathbf{ΔU} = \mathbf{P} \mathbf{Z}
 ```
-in which ``\mathbf{P} is defined in the Extended Help section.
+in which ``\mathbf{P}`` is defined in the Extended Help section.
 
 # Extended Help
 !!! details "Extended Help"
     Following the decision variable definition of the [`TranscriptionMethod`](@ref), the
     conversion matrix ``\mathbf{P}``, we have:
-    - ``\mathbf{P} = \mathbf{I}`` if `transcription isa SingleShooting`
-    - ``\mathbf{P} = [\begin{smallmatrix}\mathbf{I} \mathbf{0} \end{smallmatrix}]`` if 
-      `transcription isa MultipleShooting`
+    - ``\mathbf{P} = \mathbf{I}`` if `transcription` is a [`SingleShooting`](@ref)
+    - ``\mathbf{P} = [\begin{smallmatrix}\mathbf{I} & \mathbf{0} \end{smallmatrix}]`` if 
+      `transcription` is a [`MultipleShooting`](@ref)
 """
 function init_ZtoΔU end
 
@@ -91,21 +93,6 @@ function init_ZtoΔU(
     P = [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
     return P
 end
-
-#=
-function init_Z̃toΔŨ(
-    estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
-) where {NT<:Real}
-    return Matrix{NT}(I, model.nu*Hc, model.nu*Hc)
-end
-
-function init_Z̃toΔŨ(
-    estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
-) where {NT<:Real}
-    I_nu_Hc = Matrix{NT}(I, model.nu*Hc, model.nu*Hc)
-    return [I_nu_Hc zeros(NT, model.nu*Hc, model.nx̂*Hp)]
-end
-=#
 
 @doc raw"""
     init_ZtoU(estim, transcription, Hp, Hc) -> S, T
@@ -146,9 +133,9 @@ The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help 
         \mathbf{I}                                                  \end{bmatrix}
     ```
     and, depending on the transcription method, we have:
-    - ``\mathbf{S} = \mathbf{S^†}`` if `transcription isa SingleShooting`
-    - ``\mathbf{S} = [\begin{smallmatrix}\mathbf{S^†} \mathbf{0} \end{smallmatrix}]`` if 
-      `transcription isa MultipleShooting`
+    - ``\mathbf{S} = \mathbf{S^†}`` if `transcription` is a [`SingleShooting`](@ref)
+    - ``\mathbf{S} = [\begin{smallmatrix}\mathbf{S^†} & \mathbf{0} \end{smallmatrix}]`` if 
+      `transcription` is a [`MultipleShooting`](@ref)
 """
 function init_ZtoU(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
@@ -343,7 +330,15 @@ end
         model::LinModel, estim, transcription::MultipleShooting, Hp, Hc
     ) -> E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
     
-    Construct the prediction matrices for [`LinModel`](@ref) and [`MultipleShooting`](@ref).
+Construct the prediction matrices for [`LinModel`](@ref) and [`MultipleShooting`](@ref).
+
+They are defined in the Extended Help section.
+
+# TODO: fill the next section
+
+# Extended Help
+!!! details "Extended Help"
+    The matrices are computed by:
 """
 function init_predmat(
     model::LinModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
@@ -390,10 +385,12 @@ function init_predmat(
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
-"""
+@doc raw"""
     init_predmat(model::SimModel, estim, transcription::MultipleShooting, Hp, Hc)
 
 Return empty matrices except `ex̂` for [`SimModel`](@ref) and [`MultipleShooting`](@ref).
+
+The matrix is ``\mathbf{ex̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``.
 """
 function init_predmat(
     model::SimModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
@@ -456,7 +453,6 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
     \mathbf{E_ŝ} &= \begin{bmatrix}
         \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0}   & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}      \\
         \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}      \\
-        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{0} &  \mathbf{Â} & \cdots &  \mathbf{0}      \\
         \vdots       & \vdots       & \ddots & \vdots       &  \vdots     &  \vdots     & \ddots & \vdots           \\
         \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{B̂_u} &  \mathbf{0} &  \mathbf{0} & \cdots & -\mathbf{I}      \end{bmatrix} \\
     \mathbf{G_ŝ} &= \begin{bmatrix}
@@ -556,16 +552,16 @@ If supported by `mpc.optim`, it warm-starts the solver at:
 ```math
 \mathbf{ΔŨ} = 
 \begin{bmatrix}
-    \mathbf{Δu}_{k-1}(k+0)      \\ 
-    \mathbf{Δu}_{k-1}(k+1)      \\ 
+    \mathbf{Δu}(k+0|k-1)        \\ 
+    \mathbf{Δu}(k+1|k-1)        \\ 
     \vdots                      \\
-    \mathbf{Δu}_{k-1}(k+H_c-2)  \\
+    \mathbf{Δu}(k+H_c-2|k-1)    \\
     \mathbf{0}                  \\
-    ϵ_{k-1}
+    ϵ(k-1)
 \end{bmatrix}
 ```
-where ``\mathbf{Δu}_{k-1}(k+j)`` is the input increment for time ``k+j`` computed at the 
-last control period ``k-1``, and ``ϵ_{k-1}``, the slack variable of the last control period.
+where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
+last control period ``k-1``, and ``ϵ(k-1)``, the slack variable of the last control period.
 """
 function set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var)
     nu, Hc, Z̃0 = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
@@ -587,20 +583,20 @@ It warm-starts the solver at:
 ```math
 \mathbf{ΔŨ} =
 \begin{bmatrix}
-    \mathbf{Δu}_{k-1}(k+0)      \\ 
-    \mathbf{Δu}_{k-1}(k+1)      \\ 
+    \mathbf{Δu}(k+0|k-1)        \\ 
+    \mathbf{Δu}(k+1|k-1)        \\ 
     \vdots                      \\
-    \mathbf{Δu}_{k-1}(k+H_c-1)  \\
+    \mathbf{Δu}(k+H_c-2|k-1)    \\
     \mathbf{0}                  \\
-    \mathbf{x̂_0}_{k-1}(k+1)     \\
-    \mathbf{x̂_0}_{k-1}(k+2)     \\
+    \mathbf{x̂_0}(k+1|k-1)       \\
+    \mathbf{x̂_0}(k+2|k-1)       \\
     \vdots                      \\
-    \mathbf{x̂_0}_{k-1}(k+H_p-1) \\
-    \mathbf{x̂_0}_{k-1}(k+H_p-1) \\
-    ϵ_{k-1}
+    \mathbf{x̂_0}(k+H_p-1|k-1)   \\
+    \mathbf{x̂_0}(k+H_p-1|k-1)   \\
+    ϵ(k-1)
 \end{bmatrix}
 ```
-where ``\mathbf{x̂_0}_{k-1}(k+j)`` is the predicted state for time ``k+j`` computed at the
+where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
 last control period ``k-1``, expressed as a deviation from the operating point ``x̂_{op}``.
 """
 function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var)
