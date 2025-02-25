@@ -286,6 +286,9 @@ end
     @test linmodel1.C  ≈ linmodel2.C
     @test linmodel1.Dd ≈ linmodel2.Dd 
 
+    display(nonlinmodel1.linbuffer)
+    display(nonlinmodel1.linbuffer.buffer_f_at_u_d)
+
     f1!(ẋ, x, u, d, _) = (ẋ .= x.^5 + u.^4 + d.^3; nothing)
     h1!(y, x, d, _) = (y .= x.^2 + d; nothing)
     nonlinmodel3 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=RungeKutta())
