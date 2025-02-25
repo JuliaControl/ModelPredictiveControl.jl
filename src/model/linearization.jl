@@ -1,9 +1,71 @@
-"""
-    LinModel(model::NonLinModel; x=model.x0+model.xop, u=model.uop, d=model.dop)
+"A linearization buffer for the [`linearize`](@ref) function."
+struct LinearizationBuffer{
+    NT <:Real,
+    JB_FUD <:JacobianBuffer,
+    JB_FXD <:JacobianBuffer,
+    JB_FXU <:JacobianBuffer,
+    JB_HD  <:JacobianBuffer,
+    JB_HX  <:JacobianBuffer
+}
+    x::Vector{NT}
+    u::Vector{NT}
+    d::Vector{NT}
+    buffer_f_at_u_d::JB_FUD
+    buffer_f_at_x_d::JB_FXD
+    buffer_f_at_x_u::JB_FXU
+    buffer_h_at_d  ::JB_HD
+    buffer_h_at_x  ::JB_HX
+    function LinearizationBuffer(
+        x::Vector{NT}, 
+        u::Vector{NT}, 
+        d::Vector{NT},
+        buffer_f_at_u_d::JB_FUD, 
+        buffer_f_at_x_d::JB_FXD, 
+        buffer_f_at_x_u::JB_FXU, 
+        buffer_h_at_d::JB_HD, 
+        buffer_h_at_x::JB_HX
+    ) where {NT<:Real, JB_FUD, JB_FXD, JB_FXU, JB_HD, JB_HX}
+        return new{NT, JB_FUD, JB_FXD, JB_FXU, JB_HD, JB_HX}(
+            x, u, d, 
+            buffer_f_at_u_d, 
+            buffer_f_at_x_d, 
+            buffer_f_at_x_u, 
+            buffer_h_at_d, 
+            buffer_h_at_x
+        )
+    end
+    
+end
 
-Call [`linearize(model; x, u, d)`](@ref) and return the resulting linear model.
-"""
-LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
+Base.show(io::IO, buffer::LinearizationBuffer) = print(io, "LinearizationBuffer object")
+
+function LinearizationBuffer(NT, f!, h!, nu, nx, ny, nd, p)
+    x, u, d, f_at_u_d!, f_at_x_d!, f_at_x_u!, h_at_d!, h_at_x! = get_linearize_funcs(
+        NT, f!, h!, nu, nx, ny, nd, p
+    )
+    xnext, y = Vector{NT}(undef, nx), Vector{NT}(undef, ny) # TODO: to replace ?
+    return LinearizationBuffer(
+        x, u, d, 
+        JacobianBuffer(f_at_u_d!, xnext, x),
+        JacobianBuffer(f_at_x_d!, xnext, u),
+        JacobianBuffer(f_at_x_u!, xnext, d),
+        JacobianBuffer(h_at_d!, y, x),
+        JacobianBuffer(h_at_x!, y, d)
+    )
+end
+
+"Get the linearization functions for [`NonLinModel`](@ref) `f!` and `h!` functions."
+function get_linearize_funcs(NT, f!, h!, nu, nx, ny, nd, p)
+    x = Vector{NT}(undef, nx)
+    u = Vector{NT}(undef, nu)
+    d = Vector{NT}(undef, nd)
+    f_at_u_d!(xnext, x) = f!(xnext, x, u, d, p)
+    f_at_x_d!(xnext, u) = f!(xnext, x, u, d, p)
+    f_at_x_u!(xnext, d) = f!(xnext, x, u, d, p)
+    h_at_d!(y, x)       = h!(y, x, d, p)
+    h_at_x!(y, d)       = h!(y, x, d, p)
+    return x, u, d, f_at_u_d!, f_at_x_d!, f_at_x_u!, h_at_d!, h_at_x!
+end
 
 @doc raw"""
     linearize(model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop) -> linmodel
@@ -92,8 +154,8 @@ end
 
 Linearize `model` and store the result in `linmodel` (in-place).
 
-The keyword arguments are identical to [`linearize`](@ref). The code allocates a small
-amount of memory to compute the Jacobians.
+The keyword arguments are identical to [`linearize`](@ref). The code is allocation-free if
+`model` simulations does not allocate.
 
 # Examples
 ```jldoctest
@@ -112,26 +174,22 @@ function linearize!(
     linmodel::LinModel{NT}, model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop
 ) where NT<:Real
     nonlinmodel = model
-    buffer = nonlinmodel.buffer
+    buffer, linbuffer = nonlinmodel.buffer, nonlinmodel.linbuffer
     # --- remove the operating points of the nonlinear model (typically zeros) ---
     x0, u0, d0 = buffer.x, buffer.u, buffer.d
     u0 .= u .- nonlinmodel.uop
     d0 .= d .- nonlinmodel.dop
     x0 .= x .- nonlinmodel.xop
     # --- compute the Jacobians at linearization points ---
-    A::Matrix{NT}, Bu::Matrix{NT}, Bd::Matrix{NT}  = linmodel.A, linmodel.Bu, linmodel.Bd
-    C::Matrix{NT}, Dd::Matrix{NT} = linmodel.C, linmodel.Dd
     xnext0::Vector{NT}, y0::Vector{NT} = linmodel.buffer.x, linmodel.buffer.y
-    myf_x0!(xnext0, x0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
-    myf_u0!(xnext0, u0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
-    myf_d0!(xnext0, d0) = f!(xnext0, nonlinmodel, x0, u0, d0, model.p)
-    myh_x0!(y0, x0) = h!(y0, nonlinmodel, x0, d0, model.p)
-    myh_d0!(y0, d0) = h!(y0, nonlinmodel, x0, d0, model.p)
-    ForwardDiff.jacobian!(A,  myf_x0!, xnext0, x0)
-    ForwardDiff.jacobian!(Bu, myf_u0!, xnext0, u0)
-    ForwardDiff.jacobian!(Bd, myf_d0!, xnext0, d0)
-    ForwardDiff.jacobian!(C,  myh_x0!, y0, x0)
-    ForwardDiff.jacobian!(Dd, myh_d0!, y0, d0)
+    linbuffer.x .= x0
+    linbuffer.u .= u0
+    linbuffer.d .= d0
+    jacobian!(linmodel.A,  linbuffer.buffer_f_at_u_d, xnext0, x0)
+    jacobian!(linmodel.Bu, linbuffer.buffer_f_at_x_d, xnext0, u0)
+    jacobian!(linmodel.Bd, linbuffer.buffer_f_at_x_u, xnext0, d0)
+    jacobian!(linmodel.C,  linbuffer.buffer_h_at_d, y0, x0)
+    jacobian!(linmodel.Dd, linbuffer.buffer_h_at_x, y0, d0)
     # --- compute the nonlinear model output at operating points ---
     xnext0, y0 = linmodel.buffer.x, linmodel.buffer.y
     h!(y0, nonlinmodel, x0, d0, model.p)

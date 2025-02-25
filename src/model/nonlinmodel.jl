@@ -1,5 +1,5 @@
 struct NonLinModel{
-    NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver
+    NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver, LB<:LinearizationBuffer
 } <: SimModel{NT}
     x0::Vector{NT}
     f!::F
@@ -21,10 +21,11 @@ struct NonLinModel{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    linbuffer::LB
     buffer::SimModelBuffer{NT}
     function NonLinModel{NT}(
-        f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS
-    ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver}
+        f!::F, h!::H, Ts, nu, nx, ny, nd, p::P, solver::DS, linbuffer::LB
+    ) where {NT<:Real, F<:Function, H<:Function, P<:Any, DS<:DiffSolver, LB<:LinearizationBuffer}
         Ts > 0 || error("Sampling time Ts must be positive")
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
@@ -38,7 +39,7 @@ struct NonLinModel{
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, F, H, P, DS}(
+        return new{NT, F, H, P, DS, LB}(
             x0, 
             f!, h!,
             p,
@@ -47,6 +48,7 @@ struct NonLinModel{
             nu, nx, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
+            linbuffer,
             buffer
         )
     end
@@ -145,7 +147,8 @@ function NonLinModel{NT}(
     isnothing(solver) && (solver=EmptySolver())
     f!, h! = get_mutating_functions(NT, f, h)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
-    return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver)
+    linbuffer = LinearizationBuffer(NT, f!, h!, nu, nx, ny, nd, p)
+    return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver, linbuffer)
 end
 
 function NonLinModel(
@@ -225,6 +228,13 @@ end
 
 "Do nothing if `model` is a [`NonLinModel`](@ref)."
 steadystate!(::SimModel, _ , _ ) = nothing
+
+"""
+    LinModel(model::NonLinModel; x=model.x0+model.xop, u=model.uop, d=model.dop)
+
+Call [`linearize(model; x, u, d)`](@ref) and return the resulting linear model.
+"""
+LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 "Call `model.f!(xnext0, x0, u0, d0, p)` for [`NonLinModel`](@ref)."
 f!(xnext0, model::NonLinModel, x0, u0, d0, p) = model.f!(xnext0, x0, u0, d0, p)

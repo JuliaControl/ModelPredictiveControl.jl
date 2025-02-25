@@ -2,7 +2,8 @@
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(sys, Ts, i_d=[3])
     res = sim!(model, 15)
-    display(res)
+
+    @test repr(res) == "Simulation results of LinModel with 15 time steps."
     @test isa(res.obj, LinModel)
     @test length(res.T_data) == 15
     @test res.U_data[:, 1] ≈ model.uop .+ 1
