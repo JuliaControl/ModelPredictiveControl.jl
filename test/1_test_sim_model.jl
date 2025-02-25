@@ -285,9 +285,8 @@ end
     @test linmodel1.Bd ≈ linmodel2.Bd
     @test linmodel1.C  ≈ linmodel2.C
     @test linmodel1.Dd ≈ linmodel2.Dd 
-
-    display(nonlinmodel1.linbuffer)
-    display(nonlinmodel1.linbuffer.buffer_f_at_u_d)
+    @test repr(nonlinmodel1.linbuffer) == "LinearizationBuffer object"
+    @test repr(nonlinmodel1.linbuffer.buffer_f_at_u_d) == "DifferentiationBuffer with a JacobianConfig"
 
     f1!(ẋ, x, u, d, _) = (ẋ .= x.^5 + u.^4 + d.^3; nothing)
     h1!(y, x, d, _) = (y .= x.^2 + d; nothing)
