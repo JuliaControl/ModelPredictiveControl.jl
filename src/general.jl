@@ -6,6 +6,29 @@ const DEFAULT_LWT = 0.0
 const DEFAULT_CWT = 1e5
 const DEFAULT_EWT = 0.0
 
+"Abstract type for all differentiation buffers."
+abstract type DifferentiationBuffer end
+
+"Struct with both function and configuration for ForwardDiff differentiation."
+struct JacobianBuffer{FT<:Function, CT<:ForwardDiff.JacobianConfig} <: DifferentiationBuffer
+    f!::FT
+    config::CT
+end
+
+function Base.show(io::IO, buffer::DifferentiationBuffer) 
+    return print(io, "DifferentiationBuffer with a $(typeof(buffer.config).name.name)")
+end
+
+"Create a JacobianBuffer with function `f!`, output `y` and input `x`."
+JacobianBuffer(f!, y, x) = JacobianBuffer(f!, ForwardDiff.JacobianConfig(f!, y, x))
+
+"Compute in-place and return the Jacobian matrix of `buffer.f!` at `x`."
+function jacobian!(
+    A, buffer::JacobianBuffer, y, x
+)
+    return ForwardDiff.jacobian!(A, buffer.f!, y, x, buffer.config)
+end
+
 "Termination status that means 'no solution available'."
 const ERROR_STATUSES = (
     JuMP.INFEASIBLE, JuMP.DUAL_INFEASIBLE, JuMP.LOCALLY_INFEASIBLE, 
