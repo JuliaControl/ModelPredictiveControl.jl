@@ -35,17 +35,17 @@ The decision variable is (excluding ``ϵ``):
 thus it also includes the predicted states, expressed as deviation vectors from the
 operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
 ```math
-\mathbf{X̂_0} = \mathbf{X̂ - X̂_{op}}              \begin{bmatrix} 
+\mathbf{X̂_0} = \mathbf{X̂ - X̂_{op}} =            \begin{bmatrix} 
     \mathbf{x̂}_i(k+1)     - \mathbf{x̂_{op}}     \\ 
     \mathbf{x̂}_i(k+2)     - \mathbf{x̂_{op}}     \\ 
     \vdots                                      \\ 
     \mathbf{x̂}_i(k+H_p)   - \mathbf{x̂_{op}}     \end{bmatrix}
 ```
 where ``\mathbf{x̂}_i(k+j)`` is the state prediction for time ``k+j``, estimated by the
-observer at time ``i=k`` or ``i=k-1`` depending on the `direct` flag. This transcription
+observer at time ``i=k`` or ``i=k-1`` depending on its `direct` flag. This transcription
 method is generally more efficient for large control horizon ``H_c``, unstable or highly
-nonlinear plant models/constraints. Sparse optimizers like `OSQP.jl` or `Ipopt.jl` are
-recommended for large-scale problems.
+nonlinear plant models/constraints. Sparse optimizers like `OSQP` or `Ipopt` are recommended
+for large-scale problems.
 """
 struct MultipleShooting <: TranscriptionMethod end
 
@@ -365,32 +365,12 @@ function init_predmat(
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
-"""
-    init_predmat(model::SimModel, estim, transcription::SingleShooting, Hp, Hc) 
-
-Return empty matrices for [`SimModel`](@ref) and [`SingleShooting`](@ref) (N/A).
-"""
-function init_predmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
-) where {NT<:Real}
-    nu, nx̂, nd = model.nu, estim.nx̂, model.nd
-    nZ = get_nZ(estim, transcription, Hp, Hc)
-    E  = zeros(NT, 0, nZ)
-    G  = zeros(NT, 0, nd)
-    J  = zeros(NT, 0, nd*Hp)
-    K  = zeros(NT, 0, nx̂)
-    V  = zeros(NT, 0, nu)
-    B  = zeros(NT, 0)
-    ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V, B
-    return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
-end
-
 @doc raw"""
     init_predmat(model::SimModel, estim, transcription::MultipleShooting, Hp, Hc)
 
 Return empty matrices except `ex̂` for [`SimModel`](@ref) and [`MultipleShooting`](@ref).
 
-The matrix is ``\mathbf{ex̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``.
+The matrix is ``\mathbf{e_x̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``.
 """
 function init_predmat(
     model::SimModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
@@ -409,22 +389,23 @@ function init_predmat(
 end
 
 """
-    init_defectmat(model::SimModel, estim, transcription::SingleShooting, Hp, Hc)
+    init_predmat(model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc) 
 
-Return empty matrices if `transcription` is a [`SingleShooting`](@ref) (N/A).
+Return empty matrices for all other cases.
 """
-function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
+function init_predmat(
+    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
 ) where {NT<:Real}
-    nx̂, nu, nd = estim.nx̂, model.nu, model.nd
+    nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
-    Eŝ = zeros(NT, 0, nZ)
-    Gŝ = zeros(NT, 0, nd)
-    Jŝ = zeros(NT, 0, nd*Hp)
-    Kŝ = zeros(NT, 0, nx̂)
-    Vŝ = zeros(NT, 0, nu)
-    Bŝ = zeros(NT, 0)
-    return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    E  = zeros(NT, 0, nZ)
+    G  = zeros(NT, 0, nd)
+    J  = zeros(NT, 0, nd*Hp)
+    K  = zeros(NT, 0, nx̂)
+    V  = zeros(NT, 0, nu)
+    B  = zeros(NT, 0)
+    ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V, B
+    return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
 @doc raw"""
@@ -501,7 +482,11 @@ function init_defectmat(
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 end
 
-"Return empty matrices if `model` is not a [`LinModel`](@ref) (N/A)."
+"""
+    init_defectmat(model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc)
+
+Return empty matrices for all other cases (N/A).
+"""
 function init_defectmat(
     model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
 ) where {NT<:Real}

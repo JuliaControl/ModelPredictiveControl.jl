@@ -193,7 +193,7 @@ The solution is ``\mathbf{Z̃ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref).
 optim_objective!(mpc::ExplicitMPC) = lmul!(-1, ldiv!(mpc.Z̃, mpc.H̃_chol, mpc.q̃))
 
 "Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
-function predict!(Ŷ, x̂, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, Z̃)
+function predict!(Ŷ, x̂, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, ::TranscriptionMethod, Z̃)
     # in-place operations to reduce allocations :
     Ŷ .= mul!(Ŷ, mpc.Ẽ, Z̃) .+ mpc.F
     x̂ .= NaN
@@ -213,7 +213,7 @@ addinfo!(info, mpc::ExplicitMPC) = info
 
 "Update the prediction matrices and Cholesky factorization."
 function setmodel_controller!(mpc::ExplicitMPC, _ )
-    estim, model = mpc.estim, mpc.estim.model
+    model, estim, transcription = mpc.estim.model, mpc.estim, mpc.transcription
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
     E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
@@ -225,7 +225,7 @@ function setmodel_controller!(mpc::ExplicitMPC, _ )
     mpc.V .= V
     mpc.B .= B
     # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.S̃)
+    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.P̃, mpc.S̃)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc)
     # --- operating points ---

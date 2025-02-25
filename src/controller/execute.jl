@@ -652,9 +652,9 @@ end
 
 "Update the prediction matrices, linear constraints and JuMP optimization."
 function setmodel_controller!(mpc::PredictiveController, x̂op_old)
-    estim, model = mpc.estim, mpc.estim.model
+    model, estim, transcription = mpc.estim.model, mpc.estim, mpc.transcription
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
-    transcription, optim, con = mpc.transcription, mpc.optim, mpc.con
+    optim, con = mpc.optim, mpc.con
     # --- predictions matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
         model, estim, transcription, Hp, Hc
