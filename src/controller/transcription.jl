@@ -664,7 +664,7 @@ function predict!(
         ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
-    x0end   = x0next
+    x̂0end   = x̂0next
     return Ŷ0, x̂0end
 end
 
