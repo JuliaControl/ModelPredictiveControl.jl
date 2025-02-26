@@ -585,6 +585,13 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     return Jfunc, gfuncs
 end
 
+"""
+    init_nonlincon!(mpc::NonLinMPC, model::LinModel, ::TranscriptionMethod, gfuncs)
+
+Init nonlinear constraints for [`LinModel`](@ref).
+
+The only nonlinear constraints are the custom inequality constraints `gc`.
+"""
 function init_nonlincon!(
     mpc::NonLinMPC, ::LinModel, ::TranscriptionMethod, gfuncs::Vector{<:Function}
 ) 
@@ -600,6 +607,14 @@ function init_nonlincon!(
     return nothing
 end
 
+"""
+    init_nonlincon!(mpc::NonLinMPC, model::NonLinModel, ::MultipleShooting, gfuncs)
+    
+Init nonlinear constraints for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
+
+The nonlinear constraints are the output prediction `Ŷ` bounds, the custom inequality
+constraints `gc` and the zero defect `Ŝ` equality constraints. 
+"""
 function init_nonlincon!(
     mpc::NonLinMPC, ::NonLinModel, ::MultipleShooting, gfuncs::Vector{<:Function}
 ) 
@@ -625,6 +640,14 @@ function init_nonlincon!(
     return nothing
 end
 
+"""
+    init_nonlincon!(mpc::NonLinMPC, model::NonLinModel, ::SingleShooting, gfuncs)
+
+Init nonlinear constraints for [`NonLinModel`](@ref) and [`SingleShooting`](@ref).
+
+The nonlinear constraints are the custom inequality constraints `gc`, the output
+prediction `Ŷ` bounds and the terminal state `x̂end` bounds.
+"""
 function init_nonlincon!(
     mpc::NonLinMPC, ::NonLinModel, ::SingleShooting, gfuncs::Vector{<:Function}
 ) 

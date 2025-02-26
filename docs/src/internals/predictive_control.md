@@ -23,6 +23,7 @@ ModelPredictiveControl.relaxterminal
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
 ModelPredictiveControl.init_matconstraint_mpc
+ModelPredictiveControl.init_nonlincon!
 ```
 
 ## Update Quadratic Optimization
@@ -30,6 +31,7 @@ ModelPredictiveControl.init_matconstraint_mpc
 ```@docs
 ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any)
 ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel)
+ModelPredictiveControl.linconstrainteq!
 ```
 
 ## Solve Optimization Problem

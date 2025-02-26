@@ -334,11 +334,17 @@ Construct the prediction matrices for [`LinModel`](@ref) and [`MultipleShooting`
 
 They are defined in the Extended Help section.
 
-# TODO: fill the next section
-
 # Extended Help
 !!! details "Extended Help"
-    The matrices are computed by:
+    They are all appropriately sized zero matrices ``\mathbf{0}``, except for:
+    ```math
+    \begin{aligned}
+    \mathbf{E}   &= [\begin{smallmatrix}\mathbf{0} & \mathbf{E^†} \end{smallmatrix}]    \\
+    \mathbf{E^†} &= \text{diag}\mathbf{(Ĉ,Ĉ,...,Ĉ)}                                     \\
+    \mathbf{J}   &= \text{diag}\mathbf{(D̂_d,D̂_d,...,D̂_d)}                               \\
+    \mathbf{ex̂}  &= [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]   
+    \end{aligned}
+    ```
 """
 function init_predmat(
     model::LinModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
@@ -432,10 +438,10 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
     ```math
     \begin{aligned}
     \mathbf{E_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0}   & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}      \\
-        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}      \\
-        \vdots       & \vdots       & \ddots & \vdots       &  \vdots     &  \vdots     & \ddots & \vdots           \\
-        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{B̂_u} &  \mathbf{0} &  \mathbf{0} & \cdots & -\mathbf{I}      \end{bmatrix} \\
+        \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0}   & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}  &  \mathbf{0}      \\
+        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}  &  \mathbf{0}      \\
+        \vdots       & \vdots       & \ddots & \vdots       &  \vdots     &  \vdots     & \ddots &  \vdots      &  \vdots          \\
+        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{B̂_u} &  \mathbf{0} &  \mathbf{0} & \cdots &  \mathbf{Â}  & -\mathbf{I}      \end{bmatrix} \\
     \mathbf{G_ŝ} &= \begin{bmatrix}
         \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                          \end{bmatrix} \\
     \mathbf{J_ŝ} &= \begin{bmatrix}
@@ -582,7 +588,8 @@ It warm-starts the solver at:
 \end{bmatrix}
 ```
 where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
-last control period ``k-1``, expressed as a deviation from the operating point ``x̂_{op}``.
+last control period ``k-1``, expressed as a deviation from the operating point 
+``\mathbf{x̂_{op}}``.
 """
 function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var)
     nu, nx̂, Hp, Hc, Z̃0 = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
