@@ -58,53 +58,53 @@ function get_nZ(estim::StateEstimator, transcription::MultipleShooting, Hp, Hc)
 end
 
 @doc raw"""
-    init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> P
+    init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔU
 
-Init decision variables to input increments over ``H_c`` conversion matrix `P`.
+Init decision variables to input increments over ``H_c`` conversion matrix `PΔU`.
 
 The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{ΔU}``, the input
 increments over ``H_c``, is computed by:
 ```math
-\mathbf{ΔU} = \mathbf{P} \mathbf{Z}
+\mathbf{ΔU} = \mathbf{P_{ΔU}} \mathbf{Z}
 ```
-in which ``\mathbf{P}`` is defined in the Extended Help section.
+in which ``\mathbf{P_{ΔU}}`` is defined in the Extended Help section.
 
 # Extended Help
 !!! details "Extended Help"
     Following the decision variable definition of the [`TranscriptionMethod`](@ref), the
-    conversion matrix ``\mathbf{P}``, we have:
-    - ``\mathbf{P} = \mathbf{I}`` if `transcription` is a [`SingleShooting`](@ref)
-    - ``\mathbf{P} = [\begin{smallmatrix}\mathbf{I} & \mathbf{0} \end{smallmatrix}]`` if 
-      `transcription` is a [`MultipleShooting`](@ref)
+    conversion matrix ``\mathbf{P_{ΔU}}``, we have:
+    - ``\mathbf{P_{ΔU}} = \mathbf{I}`` if `transcription` is a [`SingleShooting`](@ref)
+    - ``\mathbf{P_{ΔU}} = [\begin{smallmatrix}\mathbf{I} & \mathbf{0} \end{smallmatrix}]``
+      if `transcription` is a [`MultipleShooting`](@ref)
 """
 function init_ZtoΔU end
 
 function init_ZtoΔU(
     estim::StateEstimator{NT}, transcription::SingleShooting, _ , Hc
 ) where {NT<:Real}
-    P = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
-    return P
+    PΔU = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
+    return PΔU
 end
 
 function init_ZtoΔU(
     estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
     I_nu_Hc = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
-    P = [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
-    return P
+    PΔU = [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
+    return PΔU
 end
 
 @doc raw"""
-    init_ZtoU(estim, transcription, Hp, Hc) -> S, T
+    init_ZtoU(estim, transcription, Hp, Hc) -> PU, TU
 
 Init decision variables to inputs over ``H_p`` conversion matrices.
 
 The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{U}``, the manipulated
 inputs over ``H_p``, is computed by:
 ```math
-\mathbf{U} = \mathbf{S} \mathbf{Z} + \mathbf{T} \mathbf{u}(k-1)
+\mathbf{U} = \mathbf{P_U} \mathbf{Z} + \mathbf{T_U} \mathbf{u}(k-1)
 ```
-The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help section.
+The ``\mathbf{P_U}`` and ``\mathbf{T_U}`` matrices are defined in the Extended Help section.
 
 # Extended Help
 !!! details "Extended Help"
@@ -117,14 +117,14 @@ The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help 
         \mathbf{u}(k + H_c - 1)                                     \\
         \vdots                                                      \\
         \mathbf{u}(k + H_p - 1)                                     \end{bmatrix} , \quad
-    \mathbf{S^†} = \begin{bmatrix}
+    \mathbf{P_U^†} = \begin{bmatrix}
         \mathbf{I}  & \mathbf{0}    & \cdots    & \mathbf{0}        \\
         \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{0}        \\
         \vdots      & \vdots        & \ddots    & \vdots            \\
         \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \\
         \vdots      & \vdots        & \ddots    & \vdots            \\
         \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \end{bmatrix} , \quad
-    \mathbf{T} = \begin{bmatrix}
+    \mathbf{T_U} = \begin{bmatrix}
         \mathbf{I}                                                  \\
         \mathbf{I}                                                  \\
         \vdots                                                      \\
@@ -133,27 +133,26 @@ The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help 
         \mathbf{I}                                                  \end{bmatrix}
     ```
     and, depending on the transcription method, we have:
-    - ``\mathbf{S} = \mathbf{S^†}`` if `transcription` is a [`SingleShooting`](@ref)
-    - ``\mathbf{S} = [\begin{smallmatrix}\mathbf{S^†} & \mathbf{0} \end{smallmatrix}]`` if 
-      `transcription` is a [`MultipleShooting`](@ref)
+    - ``\mathbf{P_U} = \mathbf{P_U^†}`` if `transcription` is a [`SingleShooting`](@ref)
+    - ``\mathbf{P_U} = [\begin{smallmatrix}\mathbf{P_U^†} & \mathbf{0} \end{smallmatrix}]``
+      if `transcription` is a [`MultipleShooting`](@ref)
 """
 function init_ZtoU(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
 ) where {NT<:Real}
     model = estim.model
-    # S and T are `Matrix{NT}` since conversion is faster than `Matrix{Bool}` or `BitMatrix`
+    # PU and TU are `Matrix{NT}`, conversion is faster than `Matrix{Bool}` or `BitMatrix`
     I_nu = Matrix{NT}(I, model.nu, model.nu)
-    S_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
-    Sdagger = [S_Hc; repeat(I_nu, Hp - Hc, Hc)]
-    S = init_Smat(estim, transcription, Hp, Hc, Sdagger)
-    T = repeat(I_nu, Hp)
-    return S, T
+    PU_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
+    PUdagger = [PU_Hc; repeat(I_nu, Hp - Hc, Hc)]
+    PU = init_PUmat(estim, transcription, Hp, Hc, PUdagger)
+    TU = repeat(I_nu, Hp)
+    return PU, TU
 end
 
-init_Smat( _ , transcription::SingleShooting, _ , _ , Sdagger) = Sdagger
-
-function init_Smat(estim, transcription::MultipleShooting, Hp, _ , Sdagger)
-    return [Sdagger zeros(eltype(Sdagger), estim.model.nu*Hp, estim.nx̂*Hp)]
+init_PUmat( _ , transcription::SingleShooting, _ , _ , PUdagger) = PUdagger
+function init_PUmat(estim, transcription::MultipleShooting, Hp, _ , PUdagger)
+    return [PUdagger zeros(eltype(PUdagger), estim.model.nu*Hp, estim.nx̂*Hp)]
 end
 
 @doc raw"""
@@ -512,7 +511,7 @@ end
         mpc::PredictiveController, model::LinModel, transcription::MultipleShooting
     )
 
-Set `beq` vector for the linear model equality constraints (``\mathbf{Aeq Z̃ = beq}``).
+Set `beq` vector for the linear model equality constraints (``\mathbf{A_{eq} Z̃ = b_{eq}}``).
 
 Also init ``\mathbf{F_ŝ} = \mathbf{G_ŝ d_0}(k) + \mathbf{J_ŝ D̂_0} + \mathbf{K_ŝ x̂_0}(k) + 
 \mathbf{V_ŝ u_0}(k-1) + \mathbf{B_ŝ}``, see [`init_defectmat`](@ref).

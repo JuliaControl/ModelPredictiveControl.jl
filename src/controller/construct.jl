@@ -1,11 +1,11 @@
 struct PredictiveControllerBuffer{NT<:Real}
-    u::Vector{NT}
-    Z̃::Vector{NT}
-    D̂::Vector{NT}
-    Ŷ::Vector{NT}
-    U::Vector{NT}
-    Ẽ::Matrix{NT}
-    S̃::Matrix{NT}
+    u ::Vector{NT}
+    Z̃ ::Vector{NT}
+    D̂ ::Vector{NT}
+    Ŷ ::Vector{NT}
+    U ::Vector{NT}
+    Ẽ ::Matrix{NT}
+    P̃U::Matrix{NT}
     empty::Vector{NT}
 end
 
@@ -21,15 +21,15 @@ function PredictiveControllerBuffer(
 ) where NT <: Real
     nu, ny, nd, nx̂ = estim.model.nu, estim.model.ny, estim.model.nd, estim.nx̂
     nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
-    u = Vector{NT}(undef, nu)
-    Z̃ = Vector{NT}(undef, nZ̃)
-    D̂ = Vector{NT}(undef, nd*Hp)
-    Ŷ = Vector{NT}(undef, ny*Hp)
-    U = Vector{NT}(undef, nu*Hp)
-    Ẽ = Matrix{NT}(undef, ny*Hp, nZ̃)
-    S̃ = Matrix{NT}(undef, nu*Hp, nZ̃)
+    u  = Vector{NT}(undef, nu)
+    Z̃  = Vector{NT}(undef, nZ̃)
+    D̂  = Vector{NT}(undef, nd*Hp)
+    Ŷ  = Vector{NT}(undef, ny*Hp)
+    U  = Vector{NT}(undef, nu*Hp)
+    Ẽ  = Matrix{NT}(undef, ny*Hp, nZ̃)
+    P̃U = Matrix{NT}(undef, nu*Hp, nZ̃)
     empty = Vector{NT}(undef, 0)
-    return PredictiveControllerBuffer{NT}(u, Z̃, D̂, Ŷ, U, Ẽ, S̃, empty)
+    return PredictiveControllerBuffer{NT}(u, Z̃, D̂, Ŷ, U, Ẽ, P̃U, empty)
 end
 
 "Include all the objective function weights of [`PredictiveController`](@ref)"
@@ -526,7 +526,7 @@ function validate_args(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
 end
 
 @doc raw"""
-    init_quadprog(model::LinModel, weights::ControllerWeights, Ẽ, P̃, S̃) -> H̃
+    init_quadprog(model::LinModel, weights::ControllerWeights, Ẽ, P̃ΔU, P̃U) -> H̃
 
 Init the quadratic programming Hessian `H̃` for MPC.
 
@@ -536,17 +536,17 @@ The matrix appear in the quadratic general form:
 ```
 The Hessian matrix is constant if the model and weights are linear and time invariant (LTI): 
 ```math
-    \mathbf{H̃} = 2 (  \mathbf{Ẽ}'\mathbf{M}_{H_p}\mathbf{Ẽ} 
-                    + \mathbf{P̃}'\mathbf{Ñ}_{H_c}\mathbf{P̃} 
-                    + \mathbf{S̃}'\mathbf{L}_{H_p}\mathbf{S̃} )
+    \mathbf{H̃} = 2 (   \mathbf{Ẽ}'      \mathbf{M}_{H_p} \mathbf{Ẽ} 
+                     + \mathbf{P̃_{ΔU}}' \mathbf{Ñ}_{H_c} \mathbf{P̃_{ΔU}} 
+                     + \mathbf{P̃_{U}}'  \mathbf{L}_{H_p} \mathbf{P̃_{U}}     )
 ```
 The vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
 [`initpred!`](@ref). ``r`` does not impact the minima position. It is thus useless at
 optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel, weights::ControllerWeights, Ẽ, P̃, S̃)
+function init_quadprog(::LinModel, weights::ControllerWeights, Ẽ, P̃ΔU, P̃U)
     M_Hp, Ñ_Hc, L_Hp = weights.M_Hp, weights.Ñ_Hc, weights.L_Hp
-    H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + P̃'*Ñ_Hc*P̃ + S̃'*L_Hp*S̃), :L)
+    H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + P̃ΔU'*Ñ_Hc*P̃ΔU + P̃U'*L_Hp*P̃U), :L)
     return H̃
 end
 "Return empty matrix if `model` is not a [`LinModel`](@ref)."
@@ -559,20 +559,20 @@ end
     init_defaultcon_mpc(
         estim::StateEstimator, transcription::TranscriptionMethod,
         Hp, Hc, C, 
-        P, S, E, 
+        PΔU, PU, E, 
         ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
         Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
         gc!=nothing, nc=0
-    ) -> con, S̃, Ẽ, Ẽŝ
+    ) -> con, nϵ, P̃ΔU, P̃U, Ẽ, Ẽŝ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
-Also return `P̃`, `S̃`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `Z̃`.
+Also return `P̃ΔU`, `P̃U`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `Z̃`.
 """
 function init_defaultcon_mpc(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod,
-    Hp, Hc, C, 
-    P, S, E, 
+    Hp,  Hc, C, 
+    PΔU, PU, E, 
     ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
     Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
     gc!::GCfunc = nothing, nc = 0
@@ -592,8 +592,8 @@ function init_defaultcon_mpc(
         repeat_constraints(Hp, Hc, u0min, u0max, Δumin, Δumax, y0min, y0max)
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
-    A_Umin,  A_Umax, S̃  = relaxU(S, C_umin, C_umax, nϵ)
-    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃ = relaxΔU(P, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ)
+    A_Umin,  A_Umax, P̃U  = relaxU(PU, C_umin, C_umax, nϵ)
+    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃ΔU = relaxΔU(PΔU, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ)
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
     A_ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
@@ -620,7 +620,7 @@ function init_defaultcon_mpc(
         C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc
     )
-    return con, nϵ, P̃, S̃, Ẽ, Ẽŝ
+    return con, nϵ, P̃ΔU, P̃U, Ẽ, Ẽŝ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -635,13 +635,13 @@ function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
 end
 
 @doc raw"""
-    relaxU(S, C_umin, C_umax, nϵ) -> A_Umin, A_Umax, S̃
+    relaxU(PU, C_umin, C_umax, nϵ) -> A_Umin, A_Umax, P̃U
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
 Denoting the decision variables augmented with the slack variable
 ``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the
-augmented conversion matrix ``\mathbf{S̃}``, similar to the one described at
+augmented conversion matrix ``\mathbf{P̃U}``, similar to the one described at
 [`init_ZtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the inequality
 constraints:
 ```math
@@ -650,36 +650,36 @@ constraints:
     \mathbf{A_{U_{max}}} 
 \end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
-    - \mathbf{U_{min} + T u}(k-1) \\
-    + \mathbf{U_{max} - T u}(k-1)
+    - \mathbf{U_{min} + T_U u}(k-1) \\
+    + \mathbf{U_{max} - T_U u}(k-1)
 \end{bmatrix}
 ```
 in which ``\mathbf{U_{min}}`` and ``\mathbf{U_{max}}`` vectors respectively contains
 ``\mathbf{u_{min}}`` and ``\mathbf{u_{max}}`` repeated ``H_p`` times.
 """
-function relaxU(S::Matrix{NT}, C_umin, C_umax, nϵ) where NT<:Real
+function relaxU(PU::Matrix{NT}, C_umin, C_umax, nϵ) where NT<:Real
     if nϵ == 1 # Z̃ = [Z; ϵ]
         # ϵ impacts Z → U conversion for constraint calculations:
-        A_Umin, A_Umax = -[S  C_umin], [S -C_umax] 
+        A_Umin, A_Umax = -[PU  C_umin], [PU -C_umax] 
         # ϵ has no impact on Z → U conversion for prediction calculations:
-        S̃ = [S zeros(NT, size(S, 1))]
+        P̃U = [PU zeros(NT, size(PU, 1))]
     else # Z̃ = Z (only hard constraints)
-        A_Umin, A_Umax = -S,  S
-        S̃ = S
+        A_Umin, A_Umax = -PU,  PU
+        P̃U = PU
     end
-    return A_Umin, A_Umax, S̃
+    return A_Umin, A_Umax, P̃U
 end
 
 @doc raw"""
-    relaxΔU(P, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃
+    relaxΔU(PΔU, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃ΔU
 
 Augment input increments constraints with slack variable ϵ for softening.
 
 Denoting the decision variables augmented with the slack variable 
 ``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the
-augmented conversion matrix ``\mathbf{P̃}``, similar to the one described at
+augmented conversion matrix ``\mathbf{P̃_{ΔU}}``, similar to the one described at
 [`init_ZtoΔU`](@ref), but extracting the input increments augmented with the slack variable
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}] = \mathbf{P̃ Z̃}``.
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}] = \mathbf{P̃_{ΔU} Z̃}``.
 Also, knowing that ``0 ≤ ϵ ≤ ∞``, it also returns the augmented bounds 
 ``\mathbf{ΔŨ_{min}} = [\begin{smallmatrix} \mathbf{ΔU_{min}} \\ 0 \end{smallmatrix}]`` and
 ``\mathbf{ΔŨ_{max}} = [\begin{smallmatrix} \mathbf{ΔU_{min}} \\ ∞ \end{smallmatrix}]``,
@@ -695,23 +695,23 @@ and the ``\mathbf{A}`` matrices for the inequality constraints:
 \end{bmatrix}
 ```
 Note that strictly speaking, the lower bound on the slack variable ϵ is a decision variable
-bound, which is more specific than a linear inequality constraint. However, it is more
+bound, which is more precise than a linear inequality constraint. However, it is more
 convenient to treat it as a linear inequality constraint since the optimizer `OSQP.jl` does
 not support pure bounds on the decision variables.
 """
-function relaxΔU(P::Matrix{NT}, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) where NT<:Real
-    nZ = size(P, 2)
+function relaxΔU(PΔU::Matrix{NT}, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) where NT<:Real
+    nZ = size(PΔU, 2)
     if nϵ == 1 # Z̃ = [Z; ϵ]
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]] # 0 ≤ ϵ ≤ ∞
         A_ϵ = [zeros(NT, 1, nZ) NT[1.0]]
-        A_ΔŨmin, A_ΔŨmax = -[P  C_Δumin; A_ϵ], [P -C_Δumax; A_ϵ]
-        P̃ = [P zeros(NT, size(P, 1), 1); zeros(NT, 1, size(P, 2)) NT[1.0]]
+        A_ΔŨmin, A_ΔŨmax = -[PΔU  C_Δumin; A_ϵ], [PΔU -C_Δumax; A_ϵ]
+        P̃ΔU = [PΔU zeros(NT, size(PΔU, 1), 1); zeros(NT, 1, size(PΔU, 2)) NT[1.0]]
     else # Z̃ = Z (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
-        A_ΔŨmin, A_ΔŨmax = -P,  P
-        P̃ = P
+        A_ΔŨmin, A_ΔŨmax = -PΔU,  PΔU
+        P̃ΔU = PΔU
     end
-    return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃
+    return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃ΔU
 end
 
 @doc raw"""
