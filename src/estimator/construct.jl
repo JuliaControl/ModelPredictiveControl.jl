@@ -154,9 +154,9 @@ returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 \end{aligned}
 ```
 An error is thrown if the augmented model is not observable and `verify_obsv == true`. The
-augmented operating points `x̂op` and `f̂op` are simply ``\mathbf{x_{op}}`` and
-``\mathbf{f_{op}}`` vectors appended with zeros (see [`setop!`](@ref)). See Extended Help
-for a detailed definition of the augmented matrices.
+augmented operating points ``\mathbf{x̂_{op}}`` and ``\mathbf{f̂_{op}}`` are simply 
+``\mathbf{x_{op}}`` and ``\mathbf{f_{op}}`` vectors appended with zeros (see [`setop!`](@ref)). 
+See Extended Help for a detailed definition of the augmented matrices and vectors.
 
 # Extended Help
 !!! details "Extended Help"
@@ -177,6 +177,13 @@ for a detailed definition of the augmented matrices.
         \mathbf{B_d}                                   \\
         \mathbf{0}                                     \end{bmatrix} \\
     \mathbf{D̂_d} &= \mathbf{D_d}
+    \end{aligned}
+    ```
+    and the operating points of the augmented model are:
+    ```math
+    \begin{aligned}
+        \mathbf{x̂_{op}} &= \begin{bmatrix} \mathbf{x_{op}} \\ \mathbf{0} \end{bmatrix} \\
+        \mathbf{f̂_{op}} &= \begin{bmatrix} \mathbf{f_{op}} \\ \mathbf{0} \end{bmatrix}
     \end{aligned}
     ```
 """

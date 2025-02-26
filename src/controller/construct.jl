@@ -536,9 +536,9 @@ The matrix appear in the quadratic general form:
 ```
 The Hessian matrix is constant if the model and weights are linear and time invariant (LTI): 
 ```math
-    \mathbf{H̃} = 2 (   \mathbf{Ẽ}'      \mathbf{M}_{H_p} \mathbf{Ẽ} 
-                     + \mathbf{P̃_{Δu}}' \mathbf{Ñ}_{H_c} \mathbf{P̃_{Δu}} 
-                     + \mathbf{P̃_{u}}'  \mathbf{L}_{H_p} \mathbf{P̃_{u}}     )
+    \mathbf{H̃} = 2 (   \mathbf{Ẽ'}      \mathbf{M}_{H_p} \mathbf{Ẽ} 
+                     + \mathbf{P̃_{Δu}'} \mathbf{Ñ}_{H_c} \mathbf{P̃_{Δu}} 
+                     + \mathbf{P̃_{u}'}  \mathbf{L}_{H_p} \mathbf{P̃_{u}}     )
 ```
 The vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
 [`initpred!`](@ref). ``r`` does not impact the minima position. It is thus useless at
@@ -641,7 +641,7 @@ Augment manipulated inputs constraints with slack variable ϵ for softening.
 
 Denoting the decision variables augmented with the slack variable
 ``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the
-augmented conversion matrix ``\mathbf{P̃u}``, similar to the one described at
+augmented conversion matrix ``\mathbf{P̃_u}``, similar to the one described at
 [`init_ZtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the inequality
 constraints:
 ```math

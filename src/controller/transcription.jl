@@ -44,8 +44,9 @@ operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
 where ``\mathbf{x̂}_i(k+j)`` is the state prediction for time ``k+j``, estimated by the
 observer at time ``i=k`` or ``i=k-1`` depending on its `direct` flag. This transcription
 method is generally more efficient for large control horizon ``H_c``, unstable or highly
-nonlinear plant models/constraints. Sparse optimizers like `OSQP` or `Ipopt` are recommended
-for large-scale problems.
+nonlinear plant models/constraints. 
+
+Sparse optimizers like `OSQP` or `Ipopt` are recommended for this method.
 """
 struct MultipleShooting <: TranscriptionMethod end
 

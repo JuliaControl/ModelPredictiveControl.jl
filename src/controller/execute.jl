@@ -183,8 +183,8 @@ They are computed with these equations using in-place operations:
     \mathbf{C_u}     &= \mathbf{T}\mathbf{u}(k-1)    - \mathbf{R̂_u}                     \\
     \mathbf{q̃}       &= 2[    (\mathbf{M}_{H_p} \mathbf{Ẽ})'   \mathbf{C_y} 
                             + (\mathbf{L}_{H_p} \mathbf{P̃_U})' \mathbf{C_u}   ]         \\
-    r                &=     \mathbf{C_y}' \mathbf{M}_{H_p} \mathbf{C_y} 
-                          + \mathbf{C_u}' \mathbf{L}_{H_p} \mathbf{C_u}
+    r                &=     \mathbf{C_y'}  \mathbf{M}_{H_p} \mathbf{C_y} 
+                          + \mathbf{C_u'} \mathbf{L}_{H_p} \mathbf{C_u}
 \end{aligned}
 ```
 """
