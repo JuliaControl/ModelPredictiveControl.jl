@@ -128,7 +128,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     ΔŨ, Ŷe, Ue = nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc, Ŷ0, Z̃)
     J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ, Z̃)
     U, Ŷ = Ū, Ȳ
-    U   .= mul!(U, mpc.P̃U, mpc.Z̃) .+ mpc.TU_lastu 
+    U   .= mul!(U, mpc.P̃u, mpc.Z̃) .+ mpc.Tu_lastu 
     Ŷ   .= Ŷ0 .+ mpc.Yop
     predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]   = Z̃[1:mpc.Hc*model.nu]
@@ -197,7 +197,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
         mul!(F, mpc.G, mpc.d0, 1, 1)            # F = F + G*d0
         mul!(F, mpc.J, mpc.D̂0, 1, 1)            # F = F + J*D̂0
     end
-    Cy, Cu, M_Hp_Ẽ, L_Hp_P̃U = mpc.buffer.Ŷ, mpc.buffer.U, mpc.buffer.Ẽ, mpc.buffer.P̃U
+    Cy, Cu, M_Hp_Ẽ, L_Hp_P̃U = mpc.buffer.Ŷ, mpc.buffer.U, mpc.buffer.Ẽ, mpc.buffer.P̃u
     q̃, r = mpc.q̃, mpc.r
     q̃ .= 0
     r .= 0
@@ -210,9 +210,9 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     end
     # --- input setpoint tracking term ---
     if !mpc.weights.iszero_L_Hp[]
-        Cu .= mpc.TU_lastu .- R̂u 
-        mul!(L_Hp_P̃U, mpc.weights.L_Hp, mpc.P̃U)
-        mul!(q̃, L_Hp_P̃U', Cu, 1, 1)             # q̃ = q̃ + L_Hp*P̃U'*Cu
+        Cu .= mpc.Tu_lastu .- R̂u 
+        mul!(L_Hp_P̃U, mpc.weights.L_Hp, mpc.P̃u)
+        mul!(q̃, L_Hp_P̃U', Cu, 1, 1)             # q̃ = q̃ + L_Hp*P̃u'*Cu
         r .+= dot(Cu, mpc.weights.L_Hp, Cu)     # r = r + Cu'*L_Hp*Cu
     end
     # --- finalize ---
@@ -241,7 +241,7 @@ is an [`InternalModel`](@ref). The function returns `mpc.F`.
 function initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
     lastu  = mpc.buffer.u
     lastu .= mpc.estim.lastu0 .+ model.uop
-    mul!(mpc.TU_lastu, mpc.TU, lastu)
+    mul!(mpc.Tu_lastu, mpc.Tu, lastu)
     mpc.ŷ .= evaloutput(mpc.estim, d)
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
@@ -288,9 +288,9 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
         mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
     end
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.TU_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.Tu_lastu
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max + mpc.Uop - mpc.TU_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max + mpc.Uop - mpc.Tu_lastu
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
@@ -314,9 +314,9 @@ end
 function linconstraint!(mpc::PredictiveController, ::SimModel)
     nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.TU_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.Tu_lastu
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max + mpc.Uop - mpc.TU_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max + mpc.Uop - mpc.Tu_lastu
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
@@ -351,7 +351,7 @@ function nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc::PredictiveController, Y�
     nocustomfcts = (mpc.weights.iszero_E && iszero_nc(mpc))
     # --- augmented input increments ΔŨ = [ΔU; ϵ] ---
     if !(mpc.weights.iszero_Ñ_Hc[])
-        ΔŨ .= mul!(ΔŨ, mpc.P̃ΔU, Z̃)
+        ΔŨ .= mul!(ΔŨ, mpc.P̃Δu, Z̃)
     end
     # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
     if !(mpc.weights.iszero_M_Hp[] && nocustomfcts)
@@ -361,7 +361,7 @@ function nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc::PredictiveController, Y�
     # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
     if !(mpc.weights.iszero_L_Hp[] && nocustomfcts)
         U  = Ū
-        U .= mul!(U, mpc.P̃U, Z̃) .+ mpc.TU_lastu
+        U .= mul!(U, mpc.P̃u, Z̃) .+ mpc.Tu_lastu
         Ue[1:end-nu] .= U
         # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
         Ue[end-nu+1:end] .= @views U[end-nu+1:end]
@@ -719,7 +719,7 @@ function setmodel_controller!(mpc::PredictiveController, x̂op_old)
     JuMP.unregister(optim, :linconstrainteq)
     @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.P̃ΔU, mpc.P̃U)
+    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc, Z̃var)
     return nothing

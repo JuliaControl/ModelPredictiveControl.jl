@@ -26,10 +26,10 @@ struct NonLinMPC{
     p::PT
     R̂u::Vector{NT}
     R̂y::Vector{NT}
-    P̃ΔU::Matrix{NT}
-    P̃U ::Matrix{NT}
-    TU ::Matrix{NT}
-    TU_lastu::Vector{NT}
+    P̃Δu::Matrix{NT}
+    P̃u ::Matrix{NT}
+    Tu ::Matrix{NT}
+    Tu_lastu::Vector{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
@@ -67,23 +67,23 @@ struct NonLinMPC{
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # dummy vals (updated just before optimization):
-        R̂y, R̂u, TU_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        PΔU = init_ZtoΔU(estim, transcription, Hp, Hc)
-        PU, TU = init_ZtoU(estim, transcription, Hp, Hc)
+        R̂y, R̂u, Tu_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
+        Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
             model, estim, transcription, Hp, Hc
         )
         Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc)
         # dummy vals (updated just before optimization):
         F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
-        con, nϵ, P̃ΔU, P̃U, Ẽ, Ẽŝ = init_defaultcon_mpc(
+        con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ = init_defaultcon_mpc(
             estim, transcription,
-            Hp, Hc, Cwt, PΔU, PU, E, 
+            Hp, Hc, Cwt, PΔu, Pu, E, 
             ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
             Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
             gc!, nc
         )
-        H̃ = init_quadprog(model, weights, Ẽ, P̃ΔU, P̃U)
+        H̃ = init_quadprog(model, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
@@ -101,7 +101,7 @@ struct NonLinMPC{
             weights,
             JE, p,
             R̂u, R̂y,
-            P̃ΔU, P̃U, TU, TU_lastu,
+            P̃Δu, P̃u, Tu, Tu_lastu,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
             Ks, Ps,
