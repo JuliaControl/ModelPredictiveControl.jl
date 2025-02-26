@@ -193,11 +193,14 @@ The solution is ``\mathbf{Z̃ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref).
 optim_objective!(mpc::ExplicitMPC) = lmul!(-1, ldiv!(mpc.Z̃, mpc.H̃_chol, mpc.q̃))
 
 "Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
-function predict!(Ŷ, x̂, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, ::TranscriptionMethod, Z̃)
+function predict!(
+    Ŷ0, x̂0next, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, ::TranscriptionMethod, Z̃
+)
     # in-place operations to reduce allocations :
-    Ŷ .= mul!(Ŷ, mpc.Ẽ, Z̃) .+ mpc.F
-    x̂ .= NaN
-    return Ŷ, x̂
+    Ŷ0    .= mul!(Ŷ0, mpc.Ẽ, Z̃) .+ mpc.F
+    x̂0end  = x̂0next
+    x̂0end .= NaN 
+    return Ŷ0, x̂0end
 end
 
 "`ExplicitMPC` does not support custom nonlinear constraint, return `true`."

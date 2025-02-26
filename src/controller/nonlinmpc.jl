@@ -551,7 +551,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             x̂0, x̂0next = get_tmp(x̂0_cache, Z̃1), get_tmp(x̂0next_cache, Z̃1)
             u0, û0     = get_tmp(u0_cache, Z̃1), get_tmp(û0_cache, Z̃1)
             gc, g      = get_tmp(gc_cache, Z̃1), get_tmp(g_cache, Z̃1)
-            Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, transcription, Z̃)
+            Ŷ0, x̂0end  = predict!(Ȳ, x̂0next, x̂0, u0, û0, mpc, model, transcription, Z̃)
             ΔŨ, Ŷe, Ue = nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc, Ŷ0, Z̃)
             ϵ = (nϵ ≠ 0) ? Z̃[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
             gc = con_custom!(gc, mpc, Ue, Ŷe, ϵ)

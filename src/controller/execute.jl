@@ -124,12 +124,13 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ȳ, Ū        = similar(mpc.Yop), similar(mpc.Uop)
     ΔŨ          = Vector{NT}(undef, nΔŨ)
     Ŷe, Ue      = Vector{NT}(undef, nŶe), Vector{NT}(undef, nUe)
-    Ŷ0, x̂0end  = predict!(Ȳ, x̂0, x̂0next, u0, û0, mpc, model, transcription, Z̃)
-    ΔŨ, Ŷe, Ue = nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc, Ŷ0, Z̃)
-    J         = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ, Z̃)
+    # careful, 1st arg is Ȳ in NonLinMPC to save memory, but Ŷ0 in this func for clarity:
+    Ŷ0, x̂0end   = predict!(Ŷ0, x̂0next, x̂0, u0, û0, mpc, model, transcription, Z̃)
+    ΔŨ, Ŷe, Ue  = nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc, Ŷ0, Z̃)
+    J           = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ, Z̃)
     U, Ŷ = Ū, Ȳ
-    U   .= mul!(U, mpc.P̃u, mpc.Z̃) .+ mpc.Tu_lastu 
-    Ŷ   .= Ŷ0 .+ mpc.Yop
+    U .= mul!(U, mpc.P̃u, Z̃) .+ mpc.Tu_lastu 
+    Ŷ .= Ŷ0 .+ mpc.Yop
     predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]   = Z̃[1:mpc.Hc*model.nu]
     info[:ϵ]    = mpc.nϵ == 1 ? mpc.Z̃[end] : zero(NT)
