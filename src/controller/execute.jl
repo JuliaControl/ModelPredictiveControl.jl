@@ -180,11 +180,11 @@ They are computed with these equations using in-place operations:
     \mathbf{F}       &= \mathbf{G d_0}(k) + \mathbf{J D̂_0} + \mathbf{K x̂_0}(k) 
                             + \mathbf{V u_0}(k-1) + \mathbf{B} + \mathbf{Ŷ_s}           \\
     \mathbf{C_y}     &= \mathbf{F} + \mathbf{Y_{op}} - \mathbf{R̂_y}                     \\
-    \mathbf{C_u}     &= \mathbf{T}\mathbf{u}(k-1)    - \mathbf{R̂_u}                     \\
+    \mathbf{C_u}     &= \mathbf{T_u}\mathbf{u}(k-1)  - \mathbf{R̂_u}                     \\
     \mathbf{q̃}       &= 2[    (\mathbf{M}_{H_p} \mathbf{Ẽ})'   \mathbf{C_y} 
                             + (\mathbf{L}_{H_p} \mathbf{P̃_U})' \mathbf{C_u}   ]         \\
     r                &=     \mathbf{C_y'}  \mathbf{M}_{H_p} \mathbf{C_y} 
-                          + \mathbf{C_u'} \mathbf{L}_{H_p} \mathbf{C_u}
+                          + \mathbf{C_u'}  \mathbf{L}_{H_p} \mathbf{C_u}
 \end{aligned}
 ```
 """

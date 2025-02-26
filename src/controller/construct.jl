@@ -540,7 +540,9 @@ The Hessian matrix is constant if the model and weights are linear and time inva
                      + \mathbf{P̃_{Δu}'} \mathbf{Ñ}_{H_c} \mathbf{P̃_{Δu}} 
                      + \mathbf{P̃_{u}'}  \mathbf{L}_{H_p} \mathbf{P̃_{u}}     )
 ```
-The vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
+in which ``\mathbf{Ẽ}``, ``\mathbf{P̃_{Δu}}`` and ``\mathbf{P̃_{u}}`` matrices are defined
+at [`relaxŶ`](@ref), [`relaxΔU`](@ref) and [`relaxU`](@ref) documentation, respectively. The
+vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
 [`initpred!`](@ref). ``r`` does not impact the minima position. It is thus useless at
 optimization but required to evaluate the minimal ``J`` value.
 """
