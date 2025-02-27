@@ -219,7 +219,8 @@ above, and the MHE is in the current form. Else ``p=1``, leading to the predicti
 
 See [`UnscentedKalmanFilter`](@ref) for details on the augmented process model and 
 ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. This estimator allocates a fair amount of memory 
-at each time step.
+at each time step for the optimization, which is hard-coded as a single shooting
+transcription for now.
 
 !!! warning
     See the Extended Help if you get an error like:    
