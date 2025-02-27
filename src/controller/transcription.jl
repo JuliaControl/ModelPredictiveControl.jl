@@ -687,6 +687,7 @@ function predict!(
     nu, ny, nd, nx̂, Hp, Hc = model.nu, model.ny, model.nd, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
     D̂0 = mpc.D̂0
+    local x̂0
     for j=1:Hp
         x̂0 = @views X̂0[(1 +  nx̂*(j-1)):(nx̂*j)]
         d0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
@@ -698,3 +699,4 @@ function predict!(
     x̂0end  .= x̂0
     return Ŷ0, x̂0end
 end
+
