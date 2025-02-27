@@ -12,7 +12,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     P̃Δu::Matrix{NT}
     P̃u ::Matrix{NT} 
     Tu ::Matrix{NT}
-    Tu_lastu::Vector{NT}
+    Tu_lastu0::Vector{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
@@ -46,7 +46,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
         L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
-        R̂y, R̂u, Tu_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         transcription = SingleShooting() # explicit MPC only supports SingleShooting
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
@@ -72,7 +72,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
-            P̃Δu, P̃u, Tu, Tu_lastu,
+            P̃Δu, P̃u, Tu, Tu_lastu0,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
             H̃_chol,

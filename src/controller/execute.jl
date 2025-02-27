@@ -129,7 +129,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     ΔŨ, Ŷe, Ue  = nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc, Ŷ0, Z̃)
     J           = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ, Z̃)
     U, Ŷ = Ū, Ȳ
-    U .= mul!(U, mpc.P̃u, Z̃) .+ mpc.Tu_lastu 
+    U .= getU0!(U0, mpc, Z̃) .+ mpc.Uop
     Ŷ .= Ŷ0 .+ mpc.Yop
     predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]   = Z̃[1:mpc.Hc*model.nu]
@@ -211,7 +211,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     end
     # --- input setpoint tracking term ---
     if !mpc.weights.iszero_L_Hp[]
-        Cu .= mpc.Tu_lastu .- R̂u 
+        Cu .= mpc.Tu_lastu0 .+ mpc.Uop .- R̂u 
         mul!(L_Hp_P̃U, mpc.weights.L_Hp, mpc.P̃u)
         mul!(q̃, L_Hp_P̃U', Cu, 1, 1)             # q̃ = q̃ + L_Hp*P̃u'*Cu
         r .+= dot(Cu, mpc.weights.L_Hp, Cu)     # r = r + Cu'*L_Hp*Cu
@@ -240,9 +240,7 @@ Will also init `mpc.F` with 0 values, or with the stochastic predictions `Ŷs` 
 is an [`InternalModel`](@ref). The function returns `mpc.F`.
 """
 function initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
-    lastu  = mpc.buffer.u
-    lastu .= mpc.estim.lastu0 .+ model.uop
-    mul!(mpc.Tu_lastu, mpc.Tu, lastu)
+    mul!(mpc.Tu_lastu0, mpc.Tu, mpc.estim.lastu0)
     mpc.ŷ .= evaloutput(mpc.estim, d)
     if model.nd ≠ 0
         mpc.d0 .= d .- model.dop
@@ -289,9 +287,9 @@ function linconstraint!(mpc::PredictiveController, model::LinModel)
         mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
     end
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.Tu_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max + mpc.Uop - mpc.Tu_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
@@ -315,9 +313,9 @@ end
 function linconstraint!(mpc::PredictiveController, ::SimModel)
     nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
     n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min - mpc.Uop + mpc.Tu_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
     n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max + mpc.Uop - mpc.Tu_lastu
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
     n += nU
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ

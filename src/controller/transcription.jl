@@ -607,11 +607,7 @@ end
 
 getΔŨ!(ΔŨ, mpc::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃) # since mpc.P̃Δu = I
 getΔŨ!(ΔŨ, mpc::PredictiveController, ::TranscriptionMethod, Z̃) = mul!(ΔŨ, mpc.P̃Δu, Z̃)
-function getU0!(U0, mpc::PredictiveController, Z̃)
-     #TODO: modify Tu_lastu to Tu_lastu0 to save some computations
-    U0 .= mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_lastu .- mpc.Uop
-    return U0
-end
+getU0!(U0, mpc::PredictiveController, Z̃) = (mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_lastu0)
 
 @doc raw"""
     predict!(
