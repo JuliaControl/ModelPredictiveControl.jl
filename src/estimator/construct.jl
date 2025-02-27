@@ -1,4 +1,40 @@
+struct StateEstimatorBuffer{NT<:Real}
+    u ::Vector{NT}
+    û ::Vector{NT}
+    x̂ ::Vector{NT}
+    P̂ ::Matrix{NT}
+    Q̂ ::Matrix{NT}
+    R̂ ::Matrix{NT}
+    K̂ ::Matrix{NT}
+    ym::Vector{NT}
+    ŷ ::Vector{NT}
+    d ::Vector{NT}
+    empty::Vector{NT}
+end
 
+@doc raw"""
+    StateEstimatorBuffer{NT}(nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int)
+
+Create a buffer for `StateEstimator` objects for estimated states and measured outputs.
+
+The buffer is used to store intermediate results during estimation without allocating.
+"""
+function StateEstimatorBuffer{NT}(
+    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int
+) where NT <: Real
+    u  = Vector{NT}(undef, nu)
+    û  = Vector{NT}(undef, nu)
+    x̂  = Vector{NT}(undef, nx̂)
+    P̂  = Matrix{NT}(undef, nx̂, nx̂)
+    Q̂  = Matrix{NT}(undef, nx̂, nx̂)
+    R̂  = Matrix{NT}(undef, nym, nym)
+    K̂  = Matrix{NT}(undef, nx̂, nym)
+    ym = Vector{NT}(undef, nym)
+    ŷ  = Vector{NT}(undef, ny)
+    d  = Vector{NT}(undef, nd)
+    empty = Vector{NT}(undef, 0)
+    return StateEstimatorBuffer{NT}(u, û, x̂, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty)
+end
 
 @doc raw"""
     init_estimstoch(model, i_ym, nint_u, nint_ym) -> As, Cs_u, Cs_y, nxs, nint_u, nint_ym
@@ -118,9 +154,9 @@ returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 \end{aligned}
 ```
 An error is thrown if the augmented model is not observable and `verify_obsv == true`. The
-augmented operating points `x̂op` and `f̂op` are simply ``\mathbf{x_{op}}`` and
-``\mathbf{f_{op}}`` vectors appended with zeros (see [`setop!`](@ref)). See Extended Help
-for a detailed definition of the augmented matrices.
+augmented operating points ``\mathbf{x̂_{op}}`` and ``\mathbf{f̂_{op}}`` are simply 
+``\mathbf{x_{op}}`` and ``\mathbf{f_{op}}`` vectors appended with zeros (see [`setop!`](@ref)). 
+See Extended Help for a detailed definition of the augmented matrices and vectors.
 
 # Extended Help
 !!! details "Extended Help"
@@ -141,6 +177,13 @@ for a detailed definition of the augmented matrices.
         \mathbf{B_d}                                   \\
         \mathbf{0}                                     \end{bmatrix} \\
     \mathbf{D̂_d} &= \mathbf{D_d}
+    \end{aligned}
+    ```
+    and the operating points of the augmented model are:
+    ```math
+    \begin{aligned}
+        \mathbf{x̂_{op}} &= \begin{bmatrix} \mathbf{x_{op}} \\ \mathbf{0} \end{bmatrix} \\
+        \mathbf{f̂_{op}} &= \begin{bmatrix} \mathbf{f_{op}} \\ \mathbf{0} \end{bmatrix}
     \end{aligned}
     ```
 """

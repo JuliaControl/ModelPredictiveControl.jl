@@ -616,6 +616,7 @@ end
     h = (x,d,_)   -> linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
+    # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
     d = [0.1]
     preparestate!(nmpc2, [0], d)
     u = moveinput!(nmpc2, 7d, d)
