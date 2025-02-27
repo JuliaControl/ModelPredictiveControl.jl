@@ -330,44 +330,36 @@ function linconstraint!(mpc::PredictiveController, ::SimModel)
 end
 
 """
-    nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc::PredictiveController, Ŷ0, Z̃) -> ΔŨ, Ŷe, Ue
+    extended_vectors!(Ue, Ŷe, mpc::PredictiveController, U0, Ŷ0) -> Ue, Ŷe
 
-Compute the `ΔŨ`, `Ŷe` and `Ue` vectors for nonlinear programming using `Ŷ0` and `Z̃`.
+Compute the extended `Ue` and `Ŷe` vectors for nonlinear programming using `U0` and `Ŷ0`.
 
-See [`NonLinMPC`](@ref) for the definition of the vectors. The function mutates `ΔŨ`, `Ŷe`,
-`Ue` and `Ū` in arguments, without assuming any initial values for them. Using 
+See [`NonLinMPC`](@ref) for the definition of the vectors. The function mutates `Ue` and
+and `Ŷe` in arguments, without assuming any initial values for them. Using 
 `nocustomfcts = mpc.weights.iszero_E && mpc.con.nc == 0`, there are three special cases in
-which ΔŨ, `Ŷe`, `Ue` and `Ū` are not mutated:
+which `Ue` and `Ŷe` are not mutated:
 
-- If `mpc.weights.iszero_Ñ_Hc[]`, the `ΔŨ` vector is not computed to reduce the burden in 
-  the optimization problem.
 - If `mpc.weights.iszero_M_Hp[] && nocustomfcts`, the `Ŷe` vector is not computed for the
   same reason as above.
 - If `mpc.weights.iszero_L_Hp[] && nocustomfcts`, the `Ue` vector is not computed for the
   same reason as above.
 """
-function nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc::PredictiveController, Ŷ0, Z̃)
+function extended_vectors!(Ue, Ŷe, mpc::PredictiveController, U0, Ŷ0)
     model = mpc.estim.model
     ny, nu = model.ny, model.nu
     nocustomfcts = (mpc.weights.iszero_E && iszero_nc(mpc))
-    # --- augmented input increments ΔŨ = [ΔU; ϵ] ---
-    if !(mpc.weights.iszero_Ñ_Hc[])
-        ΔŨ .= mul!(ΔŨ, mpc.P̃Δu, Z̃)
+    # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
+    if !(mpc.weights.iszero_L_Hp[] && nocustomfcts)
+        Ue[1:end-nu] .= U0 .+ mpc.Uop
+        # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
+        Ue[end-nu+1:end] .= @views U[end-nu+1:end]
     end
     # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
     if !(mpc.weights.iszero_M_Hp[] && nocustomfcts)
         Ŷe[1:ny] .= mpc.ŷ
         Ŷe[ny+1:end] .= Ŷ0 .+ mpc.Yop
     end
-    # --- extended manipulated inputs Ue = [U; u(k+Hp-1)] ---
-    if !(mpc.weights.iszero_L_Hp[] && nocustomfcts)
-        U  = Ū
-        U .= mul!(U, mpc.P̃u, Z̃) .+ mpc.Tu_lastu
-        Ue[1:end-nu] .= U
-        # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
-        Ue[end-nu+1:end] .= @views U[end-nu+1:end]
-    end
-    return ΔŨ, Ŷe, Ue 
+    return Ue, Ŷe 
 end
 
 "Verify if the custom nonlinear constraint has zero elements."
@@ -391,7 +383,7 @@ function obj_nonlinprog!(
 end
 
 """
-    obj_nonlinprog!(Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ, Z̃)
+    obj_nonlinprog!(Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ)
 
 Nonlinear programming objective method when `model` is not a [`LinModel`](@ref). The
 function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
@@ -399,7 +391,7 @@ function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method
 `Ŷe` and `Ue` arguments).
 """
 function obj_nonlinprog!(
-    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ, ::AbstractVector{NT}
+    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ::AbstractVector{NT}
 ) where NT<:Real
     nu, ny = model.nu, model.ny
     # --- output setpoint tracking term ---
@@ -407,7 +399,7 @@ function obj_nonlinprog!(
         JR̂y = zero(NT)
     else
         Ȳ  .= @views Ŷe[ny+1:end]
-        Ȳ  .= mpc.R̂y .- Ȳ
+        Ȳ  .= Ȳ .- mpc.R̂y  
         JR̂y = dot(Ȳ, mpc.weights.M_Hp, Ȳ)
     end
     # --- move suppression and slack variable term ---
@@ -421,7 +413,7 @@ function obj_nonlinprog!(
         JR̂u = zero(NT)
     else
         Ū  .= @views Ue[1:end-nu]
-        Ū  .= mpc.R̂u .- Ū
+        Ū  .= Ū .- mpc.R̂u
         JR̂u = dot(Ū, mpc.weights.L_Hp, Ū)
     end
     # --- economic term ---

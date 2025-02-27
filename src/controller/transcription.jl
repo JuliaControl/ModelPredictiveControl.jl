@@ -605,84 +605,89 @@ function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooti
     return Z̃0
 end
 
+getΔŨ!(ΔŨ, mpc::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃) # since mpc.P̃Δu = I
+getΔŨ!(ΔŨ, mpc::PredictiveController, ::TranscriptionMethod, Z̃) = mul!(ΔŨ, mpc.P̃Δu, Z̃)
+function getU0!(U0, mpc::PredictiveController, Z̃)
+     #TODO: modify Tu_lastu to Tu_lastu0 to save some computations
+    U0 .= mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_lastu .- mpc.Uop
+    return U0
+end
+
 @doc raw"""
     predict!(
-        Ŷ0, x̂0next, _, _, _, 
+        Ŷ0, x̂0end, _ , _ ,
         mpc::PredictiveController, model::LinModel, transcription::TranscriptionMethod, 
-        Z̃
+        _ , Z̃
     ) -> Ŷ0, x̂0end
 
-Compute the predictions `Ŷ0` and terminal states `x̂0end` if model is a [`LinModel`](@ref).
+Compute the predictions `Ŷ0`, terminal states `x̂0end` if model is a [`LinModel`](@ref).
 
-The method mutates `Ŷ0` and `x̂0next` vector arguments. The `x̂end` vector is used for
+The method mutates `Ŷ0` and `x̂0end` vector arguments. The `x̂end` vector is used for
 the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``. The computations are
-identical for any [`TranscriptionMethod`](@ref).
+identical for any [`TranscriptionMethod`](@ref) if the model is linear.
 """
 function predict!(
-    Ŷ0, x̂0next, _ , _ , _ , 
+    Ŷ0, x̂0end, _ , _ , 
     mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, 
-    Z̃
+    _ , Z̃
 )
     # in-place operations to reduce allocations :
     Ŷ0    .= mul!(Ŷ0, mpc.Ẽ, Z̃) .+ mpc.F
-    x̂0end  = x̂0next
     x̂0end .= mul!(x̂0end, mpc.con.ẽx̂, Z̃) .+ mpc.con.fx̂
     return Ŷ0, x̂0end
 end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0next, x̂0, u0, û0, 
+        Ŷ0, x̂0end, X̂0, Û0, 
         mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
-        Z̃
+        U0, _
     ) -> Ŷ0, x̂0end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
-The method mutates `Ŷ0`, `x̂0`, `x̂0next`, `u0` and `û0` arguments.
+The method mutates `Ŷ0`, `x̂0end`, `X̂0` and `Û0` arguments.
 """
 function predict!(
-    Ŷ0, x̂0next, x̂0, u0, û0, 
+    Ŷ0, x̂0end, X̂0, Û0,
     mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
-    Z̃
+    U0, _
 )
-    nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
-    ΔŨ  = Z̃ # only true for SingleShooting transcription method
-    D̂0  = mpc.D̂0
-    x̂0 .= mpc.estim.x̂0
-    u0 .= mpc.estim.lastu0
-    d0  = @views mpc.d0[1:end]
+    nu, nx̂, ny, nd, Hp, Hc = model.nu, mpc.estim.nx̂, model.ny, model.nd, mpc.Hp, mpc.Hc
+    D̂0 = mpc.D̂0
+    x̂0 = @views mpc.estim.x̂0[1:nx̂]
+    d0 = @views mpc.d0[1:nd]
     for j=1:Hp
-        if j ≤ Hc
-            u0 .+= @views ΔŨ[(1 + nu*(j-1)):(nu*j)]
-        end
+        u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
+        û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, mpc.estim, model, x̂0, u0, d0)
         x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
-        x̂0 .= x̂0next
-        d0  = @views D̂0[(1 + nd*(j-1)):(nd*j)]
-        ŷ0  = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
+        x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
+        ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
         ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
-    x̂0end   = x̂0next
+    x̂0end  .= x̂0
     return Ŷ0, x̂0end
 end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0next, _ , _ , _ , 
+        Ŷ0, x̂0end, _ , _ , 
         mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting,
-        Z̃
+        U0, Z̃
     ) -> Ŷ0, x̂0end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`MultipleShooting`](@ref).
     
-The method mutates `Ŷ0` and `x̂0next` arguments.
+The method mutates `Ŷ0` and `x̂0end` arguments.
 """
 function predict!(
-    Ŷ0, x̂0next, _, _, _,
+    Ŷ0, x̂0end, _, _,
     mpc::PredictiveController, model::NonLinModel, ::MultipleShooting,
-    Z̃
+    U0, Z̃
 )
     nu, ny, nd, nx̂, Hp, Hc = model.nu, model.ny, model.nd, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
@@ -695,7 +700,6 @@ function predict!(
         ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
-    x̂0end   = x̂0next
     x̂0end  .= x̂0
     return Ŷ0, x̂0end
 end

@@ -114,6 +114,8 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     Aeq     ::Matrix{NT}
     # b vector for the linear equality constraints:
     beq     ::Vector{NT}
+    # nonlinear equality constraints:
+    neq     ::Int
     # constraint softness parameter vectors for the nonlinear inequality constraints:
     C_ymin  ::Vector{NT}
     C_ymax  ::Vector{NT}
@@ -404,9 +406,9 @@ end
         model::LinModel, transcription::TranscriptionMethod, nc::Int,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
         args...
-    ) -> i_b, i_g, A, Aeq
+    ) -> i_b, i_g, A, Aeq, neq
 
-Init `i_b`, `i_g`, `A` and `Aeq` matrices for the linear and nonlinear constraints.
+Init `i_b`, `i_g`, `neq`, and `A` and `Aeq` matrices for the all the MPC constraints.
 
 The linear and nonlinear constraints are respectively defined as:
 ```math
@@ -420,9 +422,10 @@ The linear and nonlinear constraints are respectively defined as:
 The argument `nc` is the number of custom nonlinear inequality constraints in
 ``\mathbf{g_c}``. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
 finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
-also returns the ``\mathbf{A, A_{eq}}`` matrices if `args` is provided. In such a case,
-`args`  needs to contain all the inequality and equality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ`.
+also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a 
+case, `args`  needs to contain all the inequality and equality constraint matrices: 
+`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ`. The integer `neq`
+is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
     ::LinModel{NT}, ::TranscriptionMethod, nc::Int,
@@ -430,15 +433,16 @@ function init_matconstraint_mpc(
     args...
 ) where {NT<:Real}
     if isempty(args)
-        A, Aeq = nothing, nothing
+        A, Aeq, neq = nothing, nothing, nothing
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
         Aeq = A_ŝ
+        neq = 0
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
     i_g = trues(nc)
-    return i_b, i_g, A, Aeq
+    return i_b, i_g, A, Aeq, neq
 end
 
 "Init `i_b` without output constraints if [`NonLinModel`](@ref) & [`MultipleShooting`](@ref)."
@@ -448,15 +452,17 @@ function init_matconstraint_mpc(
     args...
 ) where {NT<:Real}
     if isempty(args)
-        A, Aeq = nothing, nothing
+        A, Aeq, neq = nothing, nothing, nothing
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
         Aeq = A_ŝ
+        nΔŨ, nZ̃ = size(A_ΔŨmin)
+        neq = nZ̃ - nΔŨ
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_x̂min; i_x̂max]
     i_g = [i_Ymin; i_Ymax; trues(nc)]
-    return i_b, i_g, A, Aeq
+    return i_b, i_g, A, Aeq, neq
 end
 
 "Init `i_b` without output & terminal constraints if [`NonLinModel`](@ref) & [`SingleShooting`](@ref)."
@@ -466,15 +472,16 @@ function init_matconstraint_mpc(
     args...
 ) where {NT<:Real}
     if isempty(args)
-        A, Aeq = nothing, nothing
+        A, Aeq, neq = nothing, nothing, nothing
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
         Aeq = A_ŝ
+        neq = 0
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
-    return i_b, i_g, A, Aeq
+    return i_b, i_g, A, Aeq, neq
 end
 
 
@@ -603,7 +610,7 @@ function init_defaultcon_mpc(
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
     i_x̂min,  i_x̂max  = .!isinf.(x̂0min), .!isinf.(x̂0max)
-    i_b, i_g, A, Aeq = init_matconstraint_mpc(
+    i_b, i_g, A, Aeq, neq = init_matconstraint_mpc(
         model, transcription, nc,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min,
@@ -619,6 +626,7 @@ function init_defaultcon_mpc(
         A       , b      , i_b    , 
         A_ŝ     ,
         Aeq     , beq    ,
+        neq     ,
         C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc
     )
