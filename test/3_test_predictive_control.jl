@@ -602,7 +602,7 @@ end
 @testitem "NonLinMPC moves and getinfo" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
-    Hp = 1000
+    Hp = 100
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=Hp, Hc=1)
     ry, ru = [15], [4]
     preparestate!(nmpc_lin, [10])
@@ -635,7 +635,7 @@ end
     f = (x,u,d,_) -> linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
     h = (x,d,_)   -> linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
-    nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
+    nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1)
     # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
     d = [0.1]
     preparestate!(nmpc2, [0], d)
@@ -646,7 +646,7 @@ end
     info = getinfo(nmpc2)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 7d[1] atol=5e-2
-    nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
+    nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=100, Hc=1)
     preparestate!(nmpc3, [0], [0])
     u = moveinput!(nmpc3, 7d, d)
     @test u ≈ [0] atol=5e-2
@@ -670,6 +670,20 @@ end
     nonlinmodel2.h!(y, Float32[0,0], Float32[0], Float32[])
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0]
+    nmpc8 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
+    preparestate!(nmpc8, [0], [0])
+    u = moveinput!(nmpc8, [10], [0])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc8)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
+    preparestate!(nmpc9, [0])
+    u = moveinput!(nmpc9, [15])
+    @test u ≈ [3] atol=5e-2
+    info = getinfo(nmpc9)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 15 atol=5e-2
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
