@@ -36,6 +36,10 @@
     mpc13  = LinMPC(model2)
     @test isa(mpc13, LinMPC{Float32})
     @test isa(mpc13.optim, JuMP.GenericModel{Float64}) # OSQP does not support Float32
+    mpc14  = LinMPC(model2, transcription=MultipleShooting())
+    @test mpc14.transcription == MultipleShooting()
+    @test length(mpc14.Z̃) == model2.nu*mpc14.Hc + mpc14.estim.nx̂*mpc14.Hp + mpc14.nϵ
+    @test size(mpc14.con.Aeq, 1) == mpc14.estim.nx̂*mpc14.Hp
 
     @test_logs(
         (:warn, 
@@ -616,6 +620,7 @@ end
     h = (x,d,_)   -> linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=1000, Hc=1)
+    # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
     d = [0.1]
     preparestate!(nmpc2, [0], d)
     u = moveinput!(nmpc2, 7d, d)

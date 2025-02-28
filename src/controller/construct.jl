@@ -1,3 +1,37 @@
+struct PredictiveControllerBuffer{NT<:Real}
+    u ::Vector{NT}
+    Z̃ ::Vector{NT}
+    D̂ ::Vector{NT}
+    Ŷ ::Vector{NT}
+    U ::Vector{NT}
+    Ẽ ::Matrix{NT}
+    P̃u::Matrix{NT}
+    empty::Vector{NT}
+end
+
+@doc raw"""
+    PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
+
+Create a buffer for `PredictiveController` objects.
+
+The buffer is used to store intermediate results during computation without allocating.
+"""
+function PredictiveControllerBuffer(
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp::Int, Hc::Int, nϵ::Int
+) where NT <: Real
+    nu, ny, nd, nx̂ = estim.model.nu, estim.model.ny, estim.model.nd, estim.nx̂
+    nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
+    u  = Vector{NT}(undef, nu)
+    Z̃  = Vector{NT}(undef, nZ̃)
+    D̂  = Vector{NT}(undef, nd*Hp)
+    Ŷ  = Vector{NT}(undef, ny*Hp)
+    U  = Vector{NT}(undef, nu*Hp)
+    Ẽ  = Matrix{NT}(undef, ny*Hp, nZ̃)
+    P̃u = Matrix{NT}(undef, nu*Hp, nZ̃)
+    empty = Vector{NT}(undef, 0)
+    return PredictiveControllerBuffer{NT}(u, Z̃, D̂, Ŷ, U, Ẽ, P̃u, empty)
+end
+
 "Include all the objective function weights of [`PredictiveController`](@ref)"
 struct ControllerWeights{NT<:Real}
     M_Hp::Hermitian{NT, Matrix{NT}}
@@ -36,6 +70,7 @@ end
 
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
 struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
+    # matrices for the terminal constraints:
     ẽx̂      ::Matrix{NT}
     fx̂      ::Vector{NT}
     gx̂      ::Matrix{NT}
@@ -43,6 +78,15 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     kx̂      ::Matrix{NT}
     vx̂      ::Matrix{NT}
     bx̂      ::Vector{NT}
+    # matrices for the zero defect constraints (N/A for single shooting transcriptions):
+    Ẽŝ      ::Matrix{NT}
+    Fŝ      ::Vector{NT}
+    Gŝ      ::Matrix{NT}
+    Jŝ      ::Matrix{NT}
+    Kŝ      ::Matrix{NT}
+    Vŝ      ::Matrix{NT}
+    Bŝ      ::Vector{NT}
+    # bounds over the prediction horizon (deviation vectors from operating points):
     U0min   ::Vector{NT}
     U0max   ::Vector{NT}
     ΔŨmin   ::Vector{NT}
@@ -51,6 +95,7 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     Y0max   ::Vector{NT}
     x̂0min   ::Vector{NT}
     x̂0max   ::Vector{NT}
+    # A matrices for the linear inequality constraints:
     A_Umin  ::Matrix{NT}
     A_Umax  ::Matrix{NT}
     A_ΔŨmin ::Matrix{NT}
@@ -60,13 +105,25 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     A_x̂min  ::Matrix{NT}
     A_x̂max  ::Matrix{NT}
     A       ::Matrix{NT}
+    # b vector for the linear inequality constraints:
     b       ::Vector{NT}
+    # indices of finite numbers in the b vector (linear inequality constraints):
     i_b     ::BitVector
+    # A matrices for the linear equality constraints:
+    A_ŝ     ::Matrix{NT}
+    Aeq     ::Matrix{NT}
+    # b vector for the linear equality constraints:
+    beq     ::Vector{NT}
+    # nonlinear equality constraints:
+    neq     ::Int
+    # constraint softness parameter vectors for the nonlinear inequality constraints:
     C_ymin  ::Vector{NT}
     C_ymax  ::Vector{NT}
     c_x̂min  ::Vector{NT}
     c_x̂max  ::Vector{NT}
+    # indices of finite numbers in the g vector (nonlinear inequality constraints):
     i_g     ::BitVector
+    # custom nonlinear inequality constraints:
     gc!     ::GCfunc
     nc      ::Int
 end
@@ -183,7 +240,8 @@ function setconstraint!(
     ΔUmin   = DeltaUmin,   ΔUmax = DeltaUmax,
     C_Δumin = C_Deltaumin, C_Δumax = C_Deltaumax,
 )
-    model, con, optim = mpc.estim.model, mpc.con, mpc.optim
+    model, con =  mpc.estim.model, mpc.con
+    transcription, optim = mpc.transcription, mpc.optim
     nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     nϵ, nc = mpc.nϵ, con.nc
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
@@ -315,22 +373,23 @@ function setconstraint!(
     i_x̂min,  i_x̂max  = .!isinf.(con.x̂0min), .!isinf.(con.x̂0max)
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(
-            model, nc,
+            model, transcription, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
-            con.A_Ymin, con.A_Ymax, con.A_x̂min, con.A_x̂max
+            con.A_Ymin, con.A_Ymax, con.A_x̂min, con.A_x̂max,
+            con.A_ŝ
         )
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
-        ΔŨvar::Vector{JuMP.VariableRef} = optim[:ΔŨvar]
+        Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
-        @constraint(optim, linconstraint, A*ΔŨvar .≤ b)
+        @constraint(optim, linconstraint, A*Z̃var .≤ b)
         set_nonlincon!(mpc, model, optim)
     else
         i_b, i_g = init_matconstraint_mpc(
-            model, nc,
+            model, transcription, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max
         )
@@ -344,59 +403,87 @@ end
 
 @doc raw"""
     init_matconstraint_mpc(
-        model::LinModel, nc::Int,
+        model::LinModel, transcription::TranscriptionMethod, nc::Int,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
         args...
-    ) -> i_b, i_g, A
+    ) -> i_b, i_g, A, Aeq, neq
 
-Init `i_b`, `i_g` and `A` matrices for the linear and nonlinear inequality constraints.
+Init `i_b`, `i_g`, `neq`, and `A` and `Aeq` matrices for the all the MPC constraints.
 
-The linear and nonlinear inequality constraints are respectively defined as:
+The linear and nonlinear constraints are respectively defined as:
 ```math
 \begin{aligned} 
-    \mathbf{A ΔŨ } &≤ \mathbf{b} \\ 
-    \mathbf{g(ΔŨ)} &≤ \mathbf{0}
+    \mathbf{A Z̃ }       &≤ \mathbf{b}           \\ 
+    \mathbf{A_{eq} Z̃}   &= \mathbf{b_{eq}}      \\
+    \mathbf{g(Z̃)}       &≤ \mathbf{0}           \\
+    \mathbf{g_{eq}(Z̃)}  &= \mathbf{0}           \\
 \end{aligned}
 ```
-The argument `nc` is the number of custom nonlinear constraints in ``\mathbf{g_c}``. `i_b` 
-is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. `i_g` is a
-similar vector but for the indices of ``\mathbf{g}``. The method also returns the 
-``\mathbf{A}`` matrix if `args` is provided. In such a case, `args`  needs to contain all
-the inequality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max`.
+The argument `nc` is the number of custom nonlinear inequality constraints in
+``\mathbf{g_c}``. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
+finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
+also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a 
+case, `args`  needs to contain all the inequality and equality constraint matrices: 
+`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ`. The integer `neq`
+is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
-    ::LinModel{NT}, nc::Int,
+    ::LinModel{NT}, ::TranscriptionMethod, nc::Int,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
     args...
 ) where {NT<:Real}
+    if isempty(args)
+        A, Aeq, neq = nothing, nothing, nothing
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
+        neq = 0
+    end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
     i_g = trues(nc)
-    if isempty(args)
-        A = nothing
-    else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max = args
-        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
-    end
-    return i_b, i_g, A
+    return i_b, i_g, A, Aeq, neq
 end
 
-"Init `i_b, A` without outputs and terminal constraints if `model` is not a [`LinModel`](@ref)."
+"Init `i_b` without output constraints if [`NonLinModel`](@ref) & [`MultipleShooting`](@ref)."
 function init_matconstraint_mpc(
-    ::SimModel{NT}, nc::Int,
+    ::NonLinModel{NT}, ::MultipleShooting, nc::Int,
     i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
     args...
 ) where {NT<:Real}
+    if isempty(args)
+        A, Aeq, neq = nothing, nothing, nothing
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
+        nΔŨ, nZ̃ = size(A_ΔŨmin)
+        neq = nZ̃ - nΔŨ
+    end
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_x̂min; i_x̂max]
+    i_g = [i_Ymin; i_Ymax; trues(nc)]
+    return i_b, i_g, A, Aeq, neq
+end
+
+"Init `i_b` without output & terminal constraints if [`NonLinModel`](@ref) & [`SingleShooting`](@ref)."
+function init_matconstraint_mpc(
+    ::NonLinModel{NT}, ::SingleShooting, nc::Int,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    args...
+) where {NT<:Real}
+    if isempty(args)
+        A, Aeq, neq = nothing, nothing, nothing
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
+        neq = 0
+    end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
-    if isempty(args)
-        A = nothing
-    else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ = args
-        A = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
-    end
-    return i_b, i_g, A
+    return i_b, i_g, A, Aeq, neq
 end
+
 
 "By default, there is no nonlinear constraint, thus do nothing."
 set_nonlincon!(::PredictiveController, ::SimModel, ::JuMP.GenericModel) = nothing
@@ -445,273 +532,59 @@ function validate_args(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
     size(R̂u) ≠ (nu*Hp,) && throw(DimensionMismatch("R̂u size $(size(R̂u)) ≠ manip. input size × Hp ($(nu*Hp),)"))
 end
 
-
 @doc raw"""
-    init_ΔUtoU(model, Hp, Hc) -> S, T
-
-Init manipulated input increments to inputs conversion matrices.
-
-The conversion from the input increments ``\mathbf{ΔU}`` to manipulated inputs over ``H_p`` 
-are calculated by:
-```math
-\mathbf{U} = \mathbf{S} \mathbf{ΔU} + \mathbf{T} \mathbf{u}(k-1)
-```
-The ``\mathbf{S}`` and ``\mathbf{T}`` matrices are defined in the Extended Help section.
-
-# Extended Help
-!!! details "Extended Help"
-    The ``\mathbf{U}`` vector and the two conversion matrices are defined as:
-    ```math
-    \mathbf{U} = \begin{bmatrix}
-        \mathbf{u}(k + 0)                                           \\
-        \mathbf{u}(k + 1)                                           \\
-        \vdots                                                      \\
-        \mathbf{u}(k + H_c - 1)                                     \\
-        \vdots                                                      \\
-        \mathbf{u}(k + H_p - 1)                                     \end{bmatrix} , \quad
-    \mathbf{S} = \begin{bmatrix}
-        \mathbf{I}  & \mathbf{0}    & \cdots    & \mathbf{0}        \\
-        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{0}        \\
-        \vdots      & \vdots        & \ddots    & \vdots            \\
-        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \\
-        \vdots      & \vdots        & \ddots    & \vdots            \\
-        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \end{bmatrix} , \quad
-    \mathbf{T} = \begin{bmatrix}
-        \mathbf{I}                                                  \\
-        \mathbf{I}                                                  \\
-        \vdots                                                      \\
-        \mathbf{I}                                                  \\
-        \vdots                                                      \\
-        \mathbf{I}                                                  \end{bmatrix}
-    ```
-"""
-function init_ΔUtoU(model::SimModel{NT}, Hp, Hc) where {NT<:Real}
-    # S and T are `Matrix{NT}` since conversion is faster than `Matrix{Bool}` or `BitMatrix`
-    I_nu = Matrix{NT}(I, model.nu, model.nu)
-    S_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
-    S = [S_Hc; repeat(I_nu, Hp - Hc, Hc)]
-    T = repeat(I_nu, Hp)
-    return S, T
-end
-
-
-@doc raw"""
-    init_predmat(estim, model::LinModel, Hp, Hc) -> E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
-
-Construct the prediction matrices for [`LinModel`](@ref) `model`.
-
-The model predictions are evaluated from the deviation vectors (see [`setop!`](@ref)) and:
-```math
-\begin{aligned}
-    \mathbf{Ŷ_0} &= \mathbf{E ΔU} + \mathbf{G d_0}(k) + \mathbf{J D̂_0} 
-                                  + \mathbf{K x̂_0}(k) + \mathbf{V u_0}(k-1) 
-                                  + \mathbf{B}        + \mathbf{Ŷ_s}                      \\
-                 &= \mathbf{E ΔU} + \mathbf{F}
-\end{aligned}
-```
-in which ``\mathbf{x̂_0}(k) = \mathbf{x̂}_i(k) - \mathbf{x̂_{op}}``, with ``i = k`` if 
-`estim.direct==true`, otherwise ``i = k - 1``. The predicted outputs ``\mathbf{Ŷ_0}`` and
-measured disturbances ``\mathbf{D̂_0}`` respectively include ``\mathbf{ŷ_0}(k+j)`` and 
-``\mathbf{d̂_0}(k+j)`` values with ``j=1`` to ``H_p``, and input increments ``\mathbf{ΔU}``,
-``\mathbf{Δu}(k+j)`` from ``j=0`` to ``H_c-1``. The vector ``\mathbf{B}`` contains the
-contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}``
-operating points (for linearization at non-equilibrium point, see [`linearize`](@ref)). The
-stochastic predictions ``\mathbf{Ŷ_s=0}`` if `estim` is not a [`InternalModel`](@ref), see
-[`init_stochpred`](@ref). The method also computes similar matrices for the predicted
-terminal states at ``k+H_p``:
-```math
-\begin{aligned}
-    \mathbf{x̂_0}(k+H_p) &= \mathbf{e_x̂ ΔU} + \mathbf{g_x̂ d_0}(k)   + \mathbf{j_x̂ D̂_0} 
-                                           + \mathbf{k_x̂ x̂_0}(k) + \mathbf{v_x̂ u_0}(k-1)
-                                           + \mathbf{b_x̂}                                 \\
-                        &= \mathbf{e_x̂ ΔU} + \mathbf{f_x̂}
-\end{aligned}
-```
-The matrices ``\mathbf{E, G, J, K, V, B, e_x̂, g_x̂, j_x̂, k_x̂, v_x̂, b_x̂}`` are defined in the
-Extended Help section. The ``\mathbf{F}`` and ``\mathbf{f_x̂}`` vectors are  recalculated at
-each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
-
-# Extended Help
-!!! details "Extended Help"
-    Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` (see 
-    [`augment_model`](@ref)), and the function ``\mathbf{W}(j) = ∑_{i=0}^j \mathbf{Â}^i``,
-    the prediction matrices are computed by :
-    ```math
-    \begin{aligned}
-    \mathbf{E} &= \begin{bmatrix}
-        \mathbf{Ĉ W}(0)\mathbf{B̂_u}     & \mathbf{0}                      & \cdots & \mathbf{0}                                        \\
-        \mathbf{Ĉ W}(1)\mathbf{B̂_u}     & \mathbf{Ĉ W}(0)\mathbf{B̂_u}     & \cdots & \mathbf{0}                                        \\
-        \vdots                          & \vdots                          & \ddots & \vdots                                            \\
-        \mathbf{Ĉ W}(H_p-1)\mathbf{B̂_u} & \mathbf{Ĉ W}(H_p-2)\mathbf{B̂_u} & \cdots & \mathbf{Ĉ W}(H_p-H_c+1)\mathbf{B̂_u} \end{bmatrix} \\
-    \mathbf{G} &= \begin{bmatrix}
-        \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
-        \mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
-        \vdots                                    \\
-        \mathbf{Ĉ}\mathbf{Â}^{H_p-1} \mathbf{B̂_d} \end{bmatrix} \\
-    \mathbf{J} &= \begin{bmatrix}
-        \mathbf{D̂_d}                              & \mathbf{0}                                & \cdots & \mathbf{0}   \\ 
-        \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     & \mathbf{D̂_d}                              & \cdots & \mathbf{0}   \\ 
-        \vdots                                    & \vdots                                    & \ddots & \vdots       \\
-        \mathbf{Ĉ}\mathbf{Â}^{H_p-2} \mathbf{B̂_d} & \mathbf{Ĉ}\mathbf{Â}^{H_p-3} \mathbf{B̂_d} & \cdots & \mathbf{D̂_d} \end{bmatrix} \\
-    \mathbf{K} &= \begin{bmatrix}
-        \mathbf{Ĉ}\mathbf{Â}^{1}        \\
-        \mathbf{Ĉ}\mathbf{Â}^{2}        \\
-        \vdots                          \\
-        \mathbf{Ĉ}\mathbf{Â}^{H_p}      \end{bmatrix} \\
-    \mathbf{V} &= \begin{bmatrix}
-        \mathbf{Ĉ W}(0)\mathbf{B̂_u}     \\
-        \mathbf{Ĉ W}(1)\mathbf{B̂_u}     \\
-        \vdots                          \\
-        \mathbf{Ĉ W}(H_p-1)\mathbf{B̂_u} \end{bmatrix} \\
-    \mathbf{B} &= \begin{bmatrix}
-        \mathbf{Ĉ W}(0)                 \\
-        \mathbf{Ĉ W}(1)                 \\
-        \vdots                          \\
-        \mathbf{Ĉ W}(H_p-1)             \end{bmatrix}   \mathbf{\big(f̂_{op} - x̂_{op}\big)} 
-    \end{aligned}
-    ```
-    For the terminal constraints, the matrices are computed with:
-    ```math
-    \begin{aligned}
-    \mathbf{e_x̂} &= \begin{bmatrix} 
-                        \mathbf{W}(H_p-1)\mathbf{B̂_u} & 
-                        \mathbf{W}(H_p-2)\mathbf{B̂_u} & 
-                        \cdots & 
-                        \mathbf{W}(H_p-H_c+1)\mathbf{B̂_u} \end{bmatrix} \\
-    \mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
-    \mathbf{j_x̂} &= \begin{bmatrix} 
-                        \mathbf{Â}^{H_p-2} \mathbf{B̂_d} & 
-                        \mathbf{Â}^{H_p-3} \mathbf{B̂_d} & 
-                        \cdots & 
-                        \mathbf{0} 
-                    \end{bmatrix} \\
-    \mathbf{k_x̂} &= \mathbf{Â}^{H_p} \\
-    \mathbf{v_x̂} &= \mathbf{W}(H_p-1)\mathbf{B̂_u} \\
-    \mathbf{b_x̂} &= \mathbf{W}(H_p-1)    \mathbf{\big(f̂_{op} - x̂_{op}\big)}
-    \end{aligned}
-    ```
-"""
-function init_predmat(estim::StateEstimator{NT}, model::LinModel, Hp, Hc) where {NT<:Real}
-    Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
-    nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
-    # --- pre-compute matrix powers ---
-    # Apow 3D array : Apow[:,:,1] = A^0, Apow[:,:,2] = A^1, ... , Apow[:,:,Hp+1] = A^Hp
-    Âpow = Array{NT}(undef, nx̂, nx̂, Hp+1)
-    Âpow[:,:,1] = I(nx̂)
-    for j=2:Hp+1
-        Âpow[:,:,j] = @views Âpow[:,:,j-1]*Â
-    end
-    # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
-    Âpow_csum  = cumsum(Âpow, dims=3)
-    # helper function to improve code clarity and be similar to eqs. in docstring:
-    getpower(array3D, power) = @views array3D[:,:, power+1]
-    # --- state estimates x̂ ---
-    kx̂ = getpower(Âpow, Hp)
-    K  = Matrix{NT}(undef, Hp*ny, nx̂)
-    for j=1:Hp
-        iRow = (1:ny) .+ ny*(j-1)
-        K[iRow,:] = Ĉ*getpower(Âpow, j)
-    end    
-    # --- manipulated inputs u ---
-    vx̂ = getpower(Âpow_csum, Hp-1)*B̂u
-    V  = Matrix{NT}(undef, Hp*ny, nu)
-    for j=1:Hp
-        iRow = (1:ny) .+ ny*(j-1)
-        V[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)*B̂u
-    end
-    ex̂ = Matrix{NT}(undef, nx̂, Hc*nu)
-    E  = zeros(NT, Hp*ny, Hc*nu) 
-    for j=1:Hc # truncated with control horizon
-        iRow = (ny*(j-1)+1):(ny*Hp)
-        iCol = (1:nu) .+ nu*(j-1)
-        E[iRow, iCol] = V[iRow .- ny*(j-1),:]
-        ex̂[:  , iCol] = getpower(Âpow_csum, Hp-j)*B̂u
-    end
-    # --- measured disturbances d ---
-    gx̂ = getpower(Âpow, Hp-1)*B̂d
-    G  = Matrix{NT}(undef, Hp*ny, nd)
-    jx̂ = Matrix{NT}(undef, nx̂, Hp*nd)
-    J  = repeatdiag(D̂d, Hp)
-    if nd ≠ 0
-        for j=1:Hp
-            iRow = (1:ny) .+ ny*(j-1)
-            G[iRow,:] = Ĉ*getpower(Âpow, j-1)*B̂d
-        end
-        for j=1:Hp
-            iRow = (ny*j+1):(ny*Hp)
-            iCol = (1:nd) .+ nd*(j-1)
-            J[iRow, iCol] = G[iRow .- ny*j,:]
-            jx̂[:  , iCol] = j < Hp ? getpower(Âpow, Hp-j-1)*B̂d : zeros(NT, nx̂, nd)
-        end
-    end
-    # --- state x̂op and state update f̂op operating points ---
-    coef_bx̂ = getpower(Âpow_csum, Hp-1)
-    coef_B  = Matrix{NT}(undef, ny*Hp, nx̂)
-    for j=1:Hp
-        iRow = (1:ny) .+ ny*(j-1)
-        coef_B[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)
-    end
-    f̂op_n_x̂op = estim.f̂op - estim.x̂op
-    bx̂ = coef_bx̂ * f̂op_n_x̂op
-    B  = coef_B  * f̂op_n_x̂op
-    return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
-end
-
-"Return empty matrices if `model` is not a [`LinModel`](@ref)"
-function init_predmat(estim::StateEstimator{NT}, model::SimModel, Hp, Hc) where {NT<:Real}
-    nu, nx̂, nd = model.nu, estim.nx̂, model.nd
-    E  = zeros(NT, 0, nu*Hc)
-    G  = zeros(NT, 0, nd)
-    J  = zeros(NT, 0, nd*Hp)
-    K  = zeros(NT, 0, nx̂)
-    V  = zeros(NT, 0, nu)
-    B  = zeros(NT, 0)
-    ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V, B
-    return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
-end
-
-@doc raw"""
-    init_quadprog(model::LinModel, weights::ControllerWeights, Ẽ, S) -> H̃
+    init_quadprog(model::LinModel, weights::ControllerWeights, Ẽ, P̃Δu, P̃u) -> H̃
 
 Init the quadratic programming Hessian `H̃` for MPC.
 
 The matrix appear in the quadratic general form:
 ```math
-    J = \min_{\mathbf{ΔŨ}} \frac{1}{2}\mathbf{(ΔŨ)'H̃(ΔŨ)} + \mathbf{q̃'(ΔŨ)} + r 
+    J = \min_{\mathbf{Z̃}} \frac{1}{2}\mathbf{Z̃' H̃ Z̃} + \mathbf{q̃' Z̃} + r 
 ```
 The Hessian matrix is constant if the model and weights are linear and time invariant (LTI): 
 ```math
-    \mathbf{H̃} = 2 (  \mathbf{Ẽ}'\mathbf{M}_{H_p}\mathbf{Ẽ} + \mathbf{Ñ}_{H_c} 
-                    + \mathbf{S̃}'\mathbf{L}_{H_p}\mathbf{S̃} )
+    \mathbf{H̃} = 2 (   \mathbf{Ẽ'}      \mathbf{M}_{H_p} \mathbf{Ẽ} 
+                     + \mathbf{P̃_{Δu}'} \mathbf{Ñ}_{H_c} \mathbf{P̃_{Δu}} 
+                     + \mathbf{P̃_{u}'}  \mathbf{L}_{H_p} \mathbf{P̃_{u}}     )
 ```
-The vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
+in which ``\mathbf{Ẽ}``, ``\mathbf{P̃_{Δu}}`` and ``\mathbf{P̃_{u}}`` matrices are defined
+at [`relaxŶ`](@ref), [`relaxΔU`](@ref) and [`relaxU`](@ref) documentation, respectively. The
+vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
 [`initpred!`](@ref). ``r`` does not impact the minima position. It is thus useless at
 optimization but required to evaluate the minimal ``J`` value.
 """
-function init_quadprog(::LinModel, weights::ControllerWeights, Ẽ, S̃)
+function init_quadprog(::LinModel, weights::ControllerWeights, Ẽ, P̃Δu, P̃u)
     M_Hp, Ñ_Hc, L_Hp = weights.M_Hp, weights.Ñ_Hc, weights.L_Hp
-    H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + Ñ_Hc + S̃'*L_Hp*S̃), :L)
+    H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + P̃Δu'*Ñ_Hc*P̃Δu + P̃u'*L_Hp*P̃u), :L)
     return H̃
 end
 "Return empty matrix if `model` is not a [`LinModel`](@ref)."
-function init_quadprog(::SimModel{NT}, weights::ControllerWeights, _, _) where {NT<:Real}
+function init_quadprog(::SimModel{NT}, weights::ControllerWeights, _, _, _) where {NT<:Real}
     H̃ = Hermitian(zeros(NT, 0, 0), :L)
     return H̃
 end
 
 """
     init_defaultcon_mpc(
-        estim, C, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, 
+        estim::StateEstimator, transcription::TranscriptionMethod,
+        Hp, Hc, C, 
+        PΔu, Pu, E, 
+        ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+        Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
         gc!=nothing, nc=0
-    ) -> con, S̃, Ẽ
+    ) -> con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
-Also return `S̃` and `Ẽ` matrices for the the augmented decision vector `ΔŨ`.
+Also return `P̃Δu`, `P̃u`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `Z̃`.
 """
 function init_defaultcon_mpc(
-    estim::StateEstimator{NT}, Hp, Hc, C, S, E, ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-    gc!::GCfunc=nothing, nc=0
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod,
+    Hp,  Hc, C, 
+    PΔu, Pu, E, 
+    ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+    Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+    gc!::GCfunc = nothing, nc = 0
 ) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
@@ -728,28 +601,36 @@ function init_defaultcon_mpc(
         repeat_constraints(Hp, Hc, u0min, u0max, Δumin, Δumax, y0min, y0max)
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
         repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
-    A_Umin,  A_Umax, S̃  = relaxU(model, nϵ, C_umin, C_umax, S)
-    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax = relaxΔU(model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax)
-    A_Ymin,  A_Ymax, Ẽ  = relaxŶ(model, nϵ, C_ymin, C_ymax, E)
-    A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(model, nϵ, c_x̂min, c_x̂max, ex̂)
-    i_Umin,  i_Umax  = .!isinf.(U0min),  .!isinf.(U0max)
+    A_Umin,  A_Umax, P̃u  = relaxU(Pu, C_umin, C_umax, nϵ)
+    A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃Δu = relaxΔU(PΔu, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ)
+    A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
+    A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
+    A_ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
+    i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
-    i_Ymin,  i_Ymax  = .!isinf.(Y0min),  .!isinf.(Y0max)
-    i_x̂min,  i_x̂max  = .!isinf.(x̂0min),  .!isinf.(x̂0max)
-    i_b, i_g, A = init_matconstraint_mpc(
-        model, nc,
+    i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
+    i_x̂min,  i_x̂max  = .!isinf.(x̂0min), .!isinf.(x̂0max)
+    i_b, i_g, A, Aeq, neq = init_matconstraint_mpc(
+        model, transcription, nc,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min,
+        A_ŝ
     )
-    b = zeros(NT, size(A, 1)) # dummy b vector (updated just before optimization)
+    # dummy b and beq vectors (updated just before optimization)
+    b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
     con = ControllerConstraint{NT, GCfunc}(
-        ẽx̂      , fx̂    , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
-        U0min   , U0max , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max,
-        A_Umin  , A_Umax, A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
-        A       , b     , i_b    , C_ymin   , C_ymax , c_x̂min , c_x̂max , i_g,
+        ẽx̂      , fx̂     , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
+        Ẽŝ      , Fŝ     , Gŝ     , Jŝ       , Kŝ     , Vŝ     , Bŝ     ,
+        U0min   , U0max  , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max,
+        A_Umin  , A_Umax , A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
+        A       , b      , i_b    , 
+        A_ŝ     ,
+        Aeq     , beq    ,
+        neq     ,
+        C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc
     )
-    return con, nϵ, S̃, Ẽ
+    return con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
@@ -763,93 +644,100 @@ function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
     return Umin, Umax, ΔUmin, ΔUmax, Ymin, Ymax
 end
 
-
-
 @doc raw"""
-    relaxU(model, nϵ, C_umin, C_umax, S) -> A_Umin, A_Umax, S̃
+    relaxU(Pu, C_umin, C_umax, nϵ) -> A_Umin, A_Umax, P̃u
 
 Augment manipulated inputs constraints with slack variable ϵ for softening.
 
-Denoting the input increments augmented with the slack variable
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
-augmented conversion matrix ``\mathbf{S̃}``, similar to the one described at
-[`init_ΔUtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the inequality
+Denoting the decision variables augmented with the slack variable
+``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the
+augmented conversion matrix ``\mathbf{P̃_u}``, similar to the one described at
+[`init_ZtoU`](@ref). It also returns the ``\mathbf{A}`` matrices for the inequality
 constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{U_{min}}} \\ 
     \mathbf{A_{U_{max}}} 
-\end{bmatrix} \mathbf{ΔŨ} ≤
+\end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
-    - \mathbf{U_{min} + T} \mathbf{u}(k-1) \\
-    + \mathbf{U_{max} - T} \mathbf{u}(k-1)
+    - \mathbf{U_{min} + T_u u}(k-1) \\
+    + \mathbf{U_{max} - T_u u}(k-1)
 \end{bmatrix}
 ```
 in which ``\mathbf{U_{min}}`` and ``\mathbf{U_{max}}`` vectors respectively contains
 ``\mathbf{u_{min}}`` and ``\mathbf{u_{max}}`` repeated ``H_p`` times.
 """
-function relaxU(::SimModel{NT}, nϵ, C_umin, C_umax, S) where NT<:Real
-    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
-        # ϵ impacts ΔU → U conversion for constraint calculations:
-        A_Umin, A_Umax = -[S  C_umin], [S -C_umax] 
-        # ϵ has no impact on ΔU → U conversion for prediction calculations:
-        S̃ = [S zeros(NT, size(S, 1))]
-    else # ΔŨ = ΔU (only hard constraints)
-        A_Umin, A_Umax = -S,  S
-        S̃ = S
+function relaxU(Pu::Matrix{NT}, C_umin, C_umax, nϵ) where NT<:Real
+    if nϵ == 1 # Z̃ = [Z; ϵ]
+        # ϵ impacts Z → U conversion for constraint calculations:
+        A_Umin, A_Umax = -[Pu  C_umin], [Pu -C_umax] 
+        # ϵ has no impact on Z → U conversion for prediction calculations:
+        P̃u = [Pu zeros(NT, size(Pu, 1))]
+    else # Z̃ = Z (only hard constraints)
+        A_Umin, A_Umax = -Pu,  Pu
+        P̃u = Pu
     end
-    return A_Umin, A_Umax, S̃
+    return A_Umin, A_Umax, P̃u
 end
 
 @doc raw"""
-    relaxΔU(model, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax
+    relaxΔU(PΔu, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) -> A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃Δu
 
 Augment input increments constraints with slack variable ϵ for softening.
 
-Denoting the input increments augmented with the slack variable 
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the
-augmented constraints ``\mathbf{ΔŨ_{min}}`` and ``\mathbf{ΔŨ_{max}}`` and the ``\mathbf{A}``
-matrices for the inequality constraints:
+Denoting the decision variables augmented with the slack variable 
+``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the
+augmented conversion matrix ``\mathbf{P̃_{Δu}}``, similar to the one described at
+[`init_ZtoΔU`](@ref), but extracting the input increments augmented with the slack variable
+``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}] = \mathbf{P̃_{Δu} Z̃}``.
+Also, knowing that ``0 ≤ ϵ ≤ ∞``, it also returns the augmented bounds 
+``\mathbf{ΔŨ_{min}} = [\begin{smallmatrix} \mathbf{ΔU_{min}} \\ 0 \end{smallmatrix}]`` and
+``\mathbf{ΔŨ_{max}} = [\begin{smallmatrix} \mathbf{ΔU_{min}} \\ ∞ \end{smallmatrix}]``,
+and the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{ΔŨ_{min}}} \\ 
     \mathbf{A_{ΔŨ_{max}}}
-\end{bmatrix} \mathbf{ΔŨ} ≤
+\end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
     - \mathbf{ΔŨ_{min}} \\
     + \mathbf{ΔŨ_{max}}
 \end{bmatrix}
 ```
+Note that strictly speaking, the lower bound on the slack variable ϵ is a decision variable
+bound, which is more precise than a linear inequality constraint. However, it is more
+convenient to treat it as a linear inequality constraint since the optimizer `OSQP.jl` does
+not support pure bounds on the decision variables.
 """
-function relaxΔU(::SimModel{NT}, nϵ, C, C_Δumin, C_Δumax, ΔUmin, ΔUmax) where NT<:Real
-    nΔU = length(ΔUmin)
-    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
-        # 0 ≤ ϵ ≤ ∞  
-        ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]]
-        A_ϵ = [zeros(NT, 1, nΔU) NT[1.0]]
-        A_ΔŨmin, A_ΔŨmax = -[I  C_Δumin; A_ϵ], [I -C_Δumax; A_ϵ]
-    else # ΔŨ = ΔU (only hard constraints)
+function relaxΔU(PΔu::Matrix{NT}, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) where NT<:Real
+    nZ = size(PΔu, 2)
+    if nϵ == 1 # Z̃ = [Z; ϵ]
+        ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]] # 0 ≤ ϵ ≤ ∞
+        A_ϵ = [zeros(NT, 1, nZ) NT[1.0]]
+        A_ΔŨmin, A_ΔŨmax = -[PΔu  C_Δumin; A_ϵ], [PΔu -C_Δumax; A_ϵ]
+        P̃Δu = [PΔu zeros(NT, size(PΔu, 1), 1); zeros(NT, 1, size(PΔu, 2)) NT[1.0]]
+    else # Z̃ = Z (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
-        I_Hc = Matrix{NT}(I, nΔU, nΔU)
-        A_ΔŨmin, A_ΔŨmax = -I_Hc,  I_Hc
+        A_ΔŨmin, A_ΔŨmax = -PΔu,  PΔu
+        P̃Δu = PΔu
     end
-    return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax
+    return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃Δu
 end
 
 @doc raw"""
-    relaxŶ(::LinModel, nϵ, C_ymin, C_ymax, E) -> A_Ymin, A_Ymax, Ẽ
+    relaxŶ(E, C_ymin, C_ymax, nϵ) -> A_Ymin, A_Ymax, Ẽ
 
 Augment linear output prediction constraints with slack variable ϵ for softening.
 
-Denoting the input increments augmented with the slack variable 
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
+Denoting the decision variables augmented with the slack variable 
+``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the 
 ``\mathbf{Ẽ}`` matrix that appears in the linear model prediction equation 
-``\mathbf{Ŷ_0 = Ẽ ΔŨ + F}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
+``\mathbf{Ŷ_0 = Ẽ Z̃ + F}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{Y_{min}}} \\ 
     \mathbf{A_{Y_{max}}}
-\end{bmatrix} \mathbf{ΔŨ} ≤
+\end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
     - \mathbf{(Y_{min} - Y_{op}) + F} \\
     + \mathbf{(Y_{max} - Y_{op}) - F} 
@@ -858,65 +746,81 @@ Denoting the input increments augmented with the slack variable
 in which ``\mathbf{Y_{min}, Y_{max}}`` and ``\mathbf{Y_{op}}`` vectors respectively contains
 ``\mathbf{y_{min}, y_{max}}`` and ``\mathbf{y_{op}}`` repeated ``H_p`` times.
 """
-function relaxŶ(::LinModel{NT}, nϵ, C_ymin, C_ymax, E) where NT<:Real
-    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
+function relaxŶ(E::Matrix{NT}, C_ymin, C_ymax, nϵ) where NT<:Real
+    if nϵ == 1 # Z̃ = [Z; ϵ]
+        if iszero(size(E, 1))
+            # model is not a LinModel, thus Ŷ constraints are not linear:
+            C_ymin = C_ymax = zeros(NT, 0, 1)
+        end
         # ϵ impacts predicted output constraint calculations:
         A_Ymin, A_Ymax = -[E  C_ymin], [E -C_ymax] 
         # ϵ has no impact on output predictions:
         Ẽ = [E zeros(NT, size(E, 1), 1)] 
-    else # ΔŨ = ΔU (only hard constraints)
+    else # Z̃ = Z (only hard constraints)
         Ẽ = E
         A_Ymin, A_Ymax = -E,  E
     end
     return A_Ymin, A_Ymax, Ẽ
 end
 
-"Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxŶ(::SimModel{NT}, nϵ, C_ymin, C_ymax, E) where NT<:Real
-    Ẽ = [E zeros(NT, 0, nϵ)]
-    A_Ymin, A_Ymax = -Ẽ,  Ẽ 
-    return A_Ymin, A_Ymax, Ẽ
-end
-
 @doc raw"""
-    relaxterminal(::LinModel, nϵ, c_x̂min, c_x̂max, ex̂) -> A_x̂min, A_x̂max, ẽx̂
+    relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ) -> A_x̂min, A_x̂max, ẽx̂
 
 Augment terminal state constraints with slack variable ϵ for softening.
 
-Denoting the input increments augmented with the slack variable 
-``\mathbf{ΔŨ} = [\begin{smallmatrix} \mathbf{ΔU} \\ ϵ \end{smallmatrix}]``, it returns the 
+Denoting the decision variables augmented with the slack variable 
+``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, it returns the 
 ``\mathbf{ẽ_{x̂}}`` matrix that appears in the terminal state equation 
-``\mathbf{x̂_0}(k + H_p) = \mathbf{ẽ_x̂ ΔŨ + f_x̂}``, and the ``\mathbf{A}`` matrices for 
+``\mathbf{x̂_0}(k + H_p) = \mathbf{ẽ_x̂ Z̃ + f_x̂}``, and the ``\mathbf{A}`` matrices for 
 the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{x̂_{min}}} \\ 
     \mathbf{A_{x̂_{max}}}
-\end{bmatrix} \mathbf{ΔŨ} ≤
+\end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
     - \mathbf{(x̂_{min} - x̂_{op}) + f_x̂} \\
     + \mathbf{(x̂_{max} - x̂_{op}) - f_x̂}
 \end{bmatrix}
 ```
 """
-function relaxterminal(::LinModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
-    if nϵ == 1 # ΔŨ = [ΔU; ϵ]
+function relaxterminal(ex̂::Matrix{NT}, c_x̂min, c_x̂max, nϵ) where {NT<:Real}
+    if nϵ == 1 # Z̃ = [Z; ϵ]
+        if iszero(size(ex̂, 1))
+            # model is not a LinModel and transcription is a SingleShooting, thus terminal
+            # state constraints are not linear:
+            c_x̂min = c_x̂max = zeros(NT, 0, 1)
+        end
         # ϵ impacts terminal state constraint calculations:
         A_x̂min, A_x̂max = -[ex̂ c_x̂min], [ex̂ -c_x̂max]
         # ϵ has no impact on terminal state predictions:
         ẽx̂ = [ex̂ zeros(NT, size(ex̂, 1), 1)] 
-    else # ΔŨ = ΔU (only hard constraints)
+    else # Z̃ = Z (only hard constraints)
         ẽx̂ = ex̂
         A_x̂min, A_x̂max = -ex̂,  ex̂
     end
     return A_x̂min, A_x̂max, ẽx̂
 end
 
-"Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxterminal(::SimModel{NT}, nϵ, c_x̂min, c_x̂max, ex̂) where {NT<:Real}
-    ẽx̂ = [ex̂ zeros(NT, 0, nϵ)]
-    A_x̂min, A_x̂max = -ẽx̂,  ẽx̂
-    return A_x̂min, A_x̂max, ẽx̂
+@doc raw"""
+    augmentdefect(Eŝ, nϵ) -> A_ŝ, Ẽŝ
+
+Augment defect equality constraints with slack variable ϵ if `nϵ == 1`.
+
+It returns the ``\mathbf{Ẽŝ}`` matrix that appears in the defect equation 
+``\mathbf{Ŝ = Ẽ_ŝ Z̃ + F_ŝ}`` and the ``\mathbf{A}`` matrix for the equality constraints:
+```math
+\mathbf{A_ŝ Z̃} = - \mathbf{F_ŝ}
+```
+"""
+function augmentdefect(Eŝ::Matrix{NT}, nϵ) where NT<:Real
+    if nϵ == 1 # Z̃ = [Z; ϵ]
+        Ẽŝ = [Eŝ zeros(NT, size(Eŝ, 1), 1)]
+    else # Z̃ = Z (only hard constraints)
+        Ẽŝ = Eŝ
+    end
+    A_ŝ = Ẽŝ
+    return A_ŝ, Ẽŝ
 end
 
 @doc raw"""

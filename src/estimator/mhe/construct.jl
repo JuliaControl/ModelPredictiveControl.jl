@@ -219,7 +219,8 @@ above, and the MHE is in the current form. Else ``p=1``, leading to the predicti
 
 See [`UnscentedKalmanFilter`](@ref) for details on the augmented process model and 
 ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. This estimator allocates a fair amount of memory 
-at each time step.
+at each time step for the optimization, which is hard-coded as a single shooting
+transcription for now.
 
 !!! warning
     See the Extended Help if you get an error like:    
@@ -1306,13 +1307,14 @@ function get_optim_functions(
     nx̂, nym, nŷ, nu, nϵ, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, estim.He
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
     Nc = nZ̃ + 3
-    Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nZ̃), Nc)
-    V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nV̂), Nc)
-    g_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, ng), Nc)
-    X̂0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂), Nc)
-    x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂), Nc)
-    û0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu), Nc)
-    ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ), Nc)
+    myNaN = convert(JNT, NaN) # fill Z̃ with NaNs to force update_simulations! at 1st call:
+    Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(fill(myNaN, nZ̃), Nc)
+    V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nV̂),  Nc)
+    g_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, ng),  Nc)
+    X̂0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂),  Nc)
+    x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂),  Nc)
+    û0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu),  Nc)
+    ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ),  Nc)
     function update_simulations!(Z̃, Z̃tup::NTuple{N, T}) where {N, T <:Real}
         if any(new !== old for (new, old) in zip(Z̃tup, Z̃)) # new Z̃tup, update predictions:
             Z̃1 = Z̃tup[begin]

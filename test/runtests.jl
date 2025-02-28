@@ -1,15 +1,10 @@
 # spell-checker: disable
 
 using ModelPredictiveControl
-using ControlSystemsBase
 using Documenter
-using LinearAlgebra
-using Random: randn
-using JuMP, OSQP, Ipopt, DAQP, ForwardDiff
-using Plots
 using Test, TestItemRunner
 
-@run_package_tests 
+@run_package_tests(verbose=true)
 
 include("0_test_module.jl")
 include("1_test_sim_model.jl")

@@ -1,16 +1,18 @@
 struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     estim::SE
-    ΔŨ::Vector{NT}
-    ŷ ::Vector{NT}
+    transcription::SingleShooting
+    Z̃::Vector{NT}
+    ŷ::Vector{NT}
     Hp::Int
     Hc::Int
     nϵ::Int
     weights::ControllerWeights{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
-    S̃::Matrix{NT} 
-    T::Matrix{NT}
-    T_lastu::Vector{NT}
+    P̃Δu::Matrix{NT}
+    P̃u ::Matrix{NT} 
+    Tu ::Matrix{NT}
+    Tu_lastu0::Vector{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}
     G::Matrix{NT}
@@ -44,13 +46,15 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
         L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
-        R̂y, R̂u, T_lastu = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        S, T = init_ΔUtoU(model, Hp, Hc)
-        E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc)
+        R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        transcription = SingleShooting() # explicit MPC only supports SingleShooting
+        PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
+        Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
+        E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
         # dummy val (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-        S̃, Ñ_Hc, Ẽ  = S, N_Hc, E # no slack variable ϵ for ExplicitMPC
-        H̃ = init_quadprog(model, weights ,Ẽ, S̃)
+        P̃Δu, P̃u, Ñ_Hc, Ẽ = PΔu, Pu, N_Hc, E # no slack variable ϵ for ExplicitMPC
+        H̃ = init_quadprog(model, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         H̃_chol = cholesky(H̃)
@@ -58,16 +62,17 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
-        nΔŨ = size(Ẽ, 2)
-        ΔŨ = zeros(NT, nΔŨ)
-        buffer = PredictiveControllerBuffer{NT}(nu, ny, nd, Hp, Hc, nϵ)
+        nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
+        Z̃ = zeros(NT, nZ̃)
+        buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE}(
             estim,
-            ΔŨ, ŷ,
+            transcription,
+            Z̃, ŷ,
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
-            S̃, T, T_lastu,
+            P̃Δu, P̃u, Tu, Tu_lastu0,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
             H̃_chol,
@@ -97,7 +102,8 @@ The controller minimizes the following objective function at each discrete time 
 See [`LinMPC`](@ref) for the variable definitions. This controller does not support
 constraints but the computational costs are extremely low (array division), therefore 
 suitable for applications that require small sample times. The keyword arguments are
-identical to [`LinMPC`](@ref), except for `Cwt` and `optim` which are not supported. 
+identical to [`LinMPC`](@ref), except for `Cwt` and `optim` which are not supported. This
+controller uses a [`SingleShooting`](@ref) transcription method.
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
 arguments. This controller is allocation-free.
@@ -179,20 +185,22 @@ end
 linconstraint!(::ExplicitMPC, ::LinModel) = nothing
 
 @doc raw"""
-    optim_objective!(mpc::ExplicitMPC) -> ΔŨ
+    optim_objective!(mpc::ExplicitMPC) -> Z̃
 
 Analytically solve the optimization problem for [`ExplicitMPC`](@ref).
 
-The solution is ``\mathbf{ΔŨ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref).
+The solution is ``\mathbf{Z̃ = - H̃^{-1} q̃}``, see [`init_quadprog`](@ref).
 """
-optim_objective!(mpc::ExplicitMPC) = lmul!(-1, ldiv!(mpc.ΔŨ, mpc.H̃_chol, mpc.q̃))
+optim_objective!(mpc::ExplicitMPC) = lmul!(-1, ldiv!(mpc.Z̃, mpc.H̃_chol, mpc.q̃))
 
 "Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
-function predict!(Ŷ, x̂, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, ΔŨ)
+function predict!(
+    Ŷ0, x̂0end, _ , _ , mpc::ExplicitMPC, ::LinModel, ::TranscriptionMethod, _ , Z̃
+)
     # in-place operations to reduce allocations :
-    Ŷ .= mul!(Ŷ, mpc.Ẽ, ΔŨ) .+ mpc.F
-    x̂ .= NaN
-    return Ŷ, x̂
+    Ŷ0    .= mul!(Ŷ0, mpc.Ẽ, Z̃) .+ mpc.F
+    x̂0end .= NaN 
+    return Ŷ0, x̂0end
 end
 
 "`ExplicitMPC` does not support custom nonlinear constraint, return `true`."
@@ -208,10 +216,10 @@ addinfo!(info, mpc::ExplicitMPC) = info
 
 "Update the prediction matrices and Cholesky factorization."
 function setmodel_controller!(mpc::ExplicitMPC, _ )
-    estim, model = mpc.estim, mpc.estim.model
+    model, estim, transcription = mpc.estim.model, mpc.estim, mpc.transcription
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
-    E, G, J, K, V, B = init_predmat(estim, model, Hp, Hc)
+    E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
     Ẽ = E  # no slack variable ϵ for ExplicitMPC
     mpc.Ẽ .= Ẽ
     mpc.G .= G
@@ -220,7 +228,7 @@ function setmodel_controller!(mpc::ExplicitMPC, _ )
     mpc.V .= V
     mpc.B .= B
     # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.S̃)
+    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc)
     # --- operating points ---
