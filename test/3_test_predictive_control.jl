@@ -82,10 +82,13 @@ end
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
-    mpc4  = LinMPC(model2)
+    mpc4 = LinMPC(model2)
     preparestate!(mpc4, [0])
     moveinput!(mpc4, [0]) ≈ [0.0]
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
+    mpc5 = LinMPC(linmodel, Hp=100, Hc=10, transcription=MultipleShooting())
+    preparestate!(mpc5, [0])
+    moveinput!(mpc5, [1]) ≈ [0.2]
 
     @test_throws DimensionMismatch moveinput!(mpc1, [0,0,0])
     @test_throws DimensionMismatch moveinput!(mpc1, [0], [0,0])
