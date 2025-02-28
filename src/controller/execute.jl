@@ -352,7 +352,7 @@ function extended_vectors!(Ue, Ŷe, mpc::PredictiveController, U0, Ŷ0)
     if !(mpc.weights.iszero_L_Hp[] && nocustomfcts)
         Ue[1:end-nu] .= U0 .+ mpc.Uop
         # u(k + Hp) = u(k + Hp - 1) since Δu(k+Hp) = 0 (because Hc ≤ Hp):
-        Ue[end-nu+1:end] .= @views U[end-nu+1:end]
+        Ue[end-nu+1:end] .= @views Ue[end-2*nu+1:end-nu]
     end
     # --- extended output predictions Ŷe = [ŷ(k); Ŷ] ---
     if !(mpc.weights.iszero_M_Hp[] && nocustomfcts)
