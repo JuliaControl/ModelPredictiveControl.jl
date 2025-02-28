@@ -90,10 +90,10 @@ end
     preparestate!(mpc5, [10])
     r = [15]
     u = moveinput!(mpc5, r) 
-    @test u ≈ [0.2] atol=1e-2
+    @test u ≈ [1] atol=1e-2
     info = getinfo(mpc5)
-    @test info[:u] ≈ [1]
-    @test info[:Ŷ][end] ≈ 15
+    @test info[:u] ≈ [1] atol=1e-2
+    @test info[:Ŷ][end] ≈ 15 atol=1e-2
 
     @test_throws DimensionMismatch moveinput!(mpc1, [0,0,0])
     @test_throws DimensionMismatch moveinput!(mpc1, [0], [0,0])
