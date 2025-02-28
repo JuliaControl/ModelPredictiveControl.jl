@@ -115,22 +115,24 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     model, transcription = mpc.estim.model, mpc.transcription
     nΔŨ      = mpc.Hc*model.nu + mpc.nϵ
-    nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu 
+    nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu
+    nX̂0, nÛ0 = mpc.estim.nx̂*mpc.Hp, model.nu*mpc.Hp 
     Z̃ = mpc.Z̃
     info = Dict{Symbol, Any}()
-    Ŷ0, u0, û0  = similar(mpc.Yop), similar(model.uop), similar(model.uop)
-    Ŷs          = similar(mpc.Yop)
-    x̂0, x̂0next  = similar(mpc.estim.x̂0), similar(mpc.estim.x̂0)
-    Ȳ, Ū        = similar(mpc.Yop), similar(mpc.Uop)
-    ΔŨ          = Vector{NT}(undef, nΔŨ)
-    Ŷe, Ue      = Vector{NT}(undef, nŶe), Vector{NT}(undef, nUe)
-    # careful, 1st arg is Ȳ in NonLinMPC to save memory, but Ŷ0 in this func for clarity:
-    Ŷ0, x̂0end   = predict!(Ŷ0, x̂0next, x̂0, u0, û0, mpc, model, transcription, Z̃)
-    ΔŨ, Ŷe, Ue  = nonlinprog_vectors!(ΔŨ, Ŷe, Ue, Ū, mpc, Ŷ0, Z̃)
-    J           = obj_nonlinprog!(Ȳ, Ū, mpc, model, Ue, Ŷe, ΔŨ, Z̃)
-    U, Ŷ = Ū, Ȳ
-    U .= getU0!(U0, mpc, Z̃) .+ mpc.Uop
+    ΔŨ = Vector{NT}(undef, nΔŨ)
+    x̂0end = similar(mpc.estim.x̂0)
+    Ue, Ŷe = Vector{NT}(undef, nUe), Vector{NT}(undef, nŶe)
+    U0, Ŷ0 = similar(mpc.Uop), similar(mpc.Yop)
+    X̂0, Û0 = Vector{NT}(undef, nX̂0), Vector{NT}(undef, nÛ0)
+    U,  Ŷ  = similar(mpc.Uop), similar(mpc.Yop)
+    Ŷs = similar(mpc.Yop)
+    U0 = getU0!(U0, mpc, Z̃)
+    ΔŨ = getΔŨ!(ΔŨ, mpc, mpc.transcription, Z̃)
+    Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, mpc, model, transcription, U0, Z̃)
+    Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
+    U .= U0 .+ mpc.Uop
     Ŷ .= Ŷ0 .+ mpc.Yop
+    J = obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]   = Z̃[1:mpc.Hc*model.nu]
     info[:ϵ]    = mpc.nϵ == 1 ? mpc.Z̃[end] : zero(NT)
