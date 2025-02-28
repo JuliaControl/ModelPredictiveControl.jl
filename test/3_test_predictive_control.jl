@@ -86,12 +86,14 @@ end
     preparestate!(mpc4, [0])
     moveinput!(mpc4, [0]) ≈ [0.0]
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
-    mpc5 = LinMPC(linmodel, Hp=1000, Hc=10, transcription=MultipleShooting())
-    preparestate!(mpc5, [0])
-    u = moveinput!(mpc5, [1]) 
-    @test u ≈ [0.2]
-    # info = getinfo(mpc5)
-    # info[:u] ≈ [0.2]
+    mpc5 = LinMPC(linmodel, Hp=1000, Hc=1, transcription=MultipleShooting())
+    preparestate!(mpc5, [10])
+    r = [15]
+    u = moveinput!(mpc5, r) 
+    @test u ≈ [0.2] atol=1e-2
+    info = getinfo(mpc5)
+    @test info[:u] ≈ [1]
+    @test info[:Ŷ][end] ≈ 15
 
     @test_throws DimensionMismatch moveinput!(mpc1, [0,0,0])
     @test_throws DimensionMismatch moveinput!(mpc1, [0], [0,0])
