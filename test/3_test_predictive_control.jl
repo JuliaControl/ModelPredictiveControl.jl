@@ -36,6 +36,10 @@
     mpc13  = LinMPC(model2)
     @test isa(mpc13, LinMPC{Float32})
     @test isa(mpc13.optim, JuMP.GenericModel{Float64}) # OSQP does not support Float32
+    mpc14  = LinMPC(model2, transcription=MultipleShooting())
+    @test mpc14.transcription == MultipleShooting()
+    @test length(mpc14.Z̃) == model2.nu*mpc14.Hc + mpc14.estim.nx̂*mpc14.Hp + mpc14.nϵ
+    @test size(mpc14.con.Aeq, 1) == mpc14.estim.nx̂*mpc14.Hp
 
     @test_logs(
         (:warn, 
