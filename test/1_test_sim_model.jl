@@ -155,9 +155,9 @@ end
     @test y ≈ zeros(2,)
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
-    f2(x,u,d,_) = linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
-    h2(x,d,_)   = linmodel2.C*x + linmodel2.Dd*d
-    nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1,solver=nothing)
+    f2(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h2(x,d,model)   = model.C*x + model.Dd*d
+    nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1,solver=nothing,p=linmodel2)
 
     @test nonlinmodel2.nx == 4
     @test nonlinmodel2.nu == 2
@@ -172,18 +172,18 @@ end
     nonlinmodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1,solver=nothing)
     @test isa(nonlinmodel3, NonLinModel{Float32})
 
-    function f1!(xnext, x, u, d,_)
-        mul!(xnext, linmodel2.A,  x)
-        mul!(xnext, linmodel2.Bu, u, 1, 1)
-        mul!(xnext, linmodel2.Bd, d, 1, 1)
+    function f1!(xnext, x, u, d, model)
+        mul!(xnext, model.A,  x)
+        mul!(xnext, model.Bu, u, 1, 1)
+        mul!(xnext, model.Bd, d, 1, 1)
         return nothing
     end 
-    function h1!(y, x, d,_)
-        mul!(y, linmodel2.C,  x)
-        mul!(y, linmodel2.Dd, d, 1, 1)
+    function h1!(y, x, d, model)
+        mul!(y, model.C,  x)
+        mul!(y, model.Dd, d, 1, 1)
         return nothing
     end
-    nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1, solver=nothing)
+    nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel2)
     xnext, y = similar(nonlinmodel4.x0), similar(nonlinmodel4.yop)
     nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel4.p)
     @test xnext ≈ zeros(4)
@@ -195,36 +195,37 @@ end
     Bd = reshape([0; 0.5], 2, 1)
     C  = [0.4 0]
     Dd = reshape([0], 1, 1)
-    f3(x, u, d, _) = A*x + Bu*u+ Bd*d
-    h3(x, d, _) = C*x + Dd*d
+    p=(; A, Bu, Bd, C, Dd)
+    f3(x, u, d, p) = p.A*x + p.Bu*u+ p.Bd*d
+    h3(x, d, p) = p.C*x + p.Dd*d
     solver=RungeKutta(4)
     @test string(solver) == 
         "4th order Runge-Kutta differential equation solver with 1 supersamples."
-    nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver)
+    nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver, p=p)
     xnext, y = similar(nonlinmodel5.x0), similar(nonlinmodel5.yop)
     nonlinmodel5.f!(xnext, [0; 0], [0], [0], nonlinmodel5.p)
     @test xnext ≈ zeros(2)
     nonlinmodel5.h!(y, [0; 0], [0], nonlinmodel5.p)
     @test y ≈ zeros(1)
 
-    function f2!(ẋ, x, u , d, _)
-        mul!(ẋ, A, x)
-        mul!(ẋ, Bu, u, 1, 1)
-        mul!(ẋ, Bd, d, 1, 1)
+    function f2!(ẋ, x, u , d, p)
+        mul!(ẋ, p.A, x)
+        mul!(ẋ, p.Bu, u, 1, 1)
+        mul!(ẋ, p.Bd, d, 1, 1)
         return nothing
     end
-    function h2!(y, x, d, _)
-        mul!(y, C, x)
-        mul!(y, Dd, d, 1, 1)
+    function h2!(y, x, d, p)
+        mul!(y, p.C, x)
+        mul!(y, p.Dd, d, 1, 1)
         return nothing
     end
-    nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta())
+    nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta(), p=p)
     xnext, y = similar(nonlinmodel6.x0), similar(nonlinmodel6.yop)
     nonlinmodel6.f!(xnext, [0; 0], [0], [0], nonlinmodel6.p)
     @test xnext ≈ zeros(2)
     nonlinmodel6.h!(y, [0; 0], [0], nonlinmodel6.p)
     @test y ≈ zeros(1)
-    nonlinemodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler())
+    nonlinemodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler(), p=p)
     xnext, y = similar(nonlinemodel7.x0), similar(nonlinemodel7.yop)
     nonlinemodel7.f!(xnext, [0; 0], [0], [0], nonlinemodel7.p)
     @test xnext ≈ zeros(2)
@@ -269,8 +270,8 @@ end
 @testitem "NonLinModel linearization" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     Ts = 1.0
-    f1(x,u,d,_) = x.^5 + u.^4 + d.^3
-    h1(x,d,_)   = x.^2 + d
+    f1(x,u,d,_) = x.^5 .+ u.^4 .+ d.^3
+    h1(x,d,_)   = x.^2 .+ d
     nonlinmodel1 = NonLinModel(f1,h1,Ts,1,1,1,1,solver=nothing)
     x, u, d = [2.0], [3.0], [4.0]
     linmodel1 = linearize(nonlinmodel1; x, u, d)
@@ -288,8 +289,8 @@ end
     @test repr(nonlinmodel1.linbuffer) == "LinearizationBuffer object"
     @test repr(nonlinmodel1.linbuffer.buffer_f_at_u_d) == "DifferentiationBuffer with a JacobianConfig"
 
-    f1!(ẋ, x, u, d, _) = (ẋ .= x.^5 + u.^4 + d.^3; nothing)
-    h1!(y, x, d, _) = (y .= x.^2 + d; nothing)
+    f1!(ẋ, x, u, d, _) = (ẋ .= x.^5 .+ u.^4 .+ d.^3; nothing)
+    h1!(y, x, d, _) = (y .= x.^2 .+ d; nothing)
     nonlinmodel3 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=RungeKutta())
     linmodel3 = linearize(nonlinmodel3; x, u, d)
     u0, d0 = u - nonlinmodel3.uop, d - nonlinmodel3.dop
@@ -306,20 +307,23 @@ end
     @test linmodel3.Dd ≈ Dd
 
     # test `linearize` at a non-equilibrium point:
-    N = 5
-    x, u, d = [0.2], [0.0], [0.0]
-    Ynl = zeros(N)
-    Yl  = zeros(N)
-    setstate!(nonlinmodel3, x)
-    linmodel3 = linearize(nonlinmodel3; x, u, d)
-    for i=1:N
-        ynl = nonlinmodel3(d)
-        global yl  = linmodel3(d)
-        Ynl[i] = ynl[1]
-        Yl[i]  = yl[1]
-        global linmodel3 = linearize(nonlinmodel3; u, d)
-        updatestate!(nonlinmodel3, u, d)
-        updatestate!(linmodel3, u, d)
+    Ynl, Yl = let nonlinmodel3=nonlinmodel3
+        N = 5
+        Ynl = zeros(N)
+        Yl = zeros(N)
+        x, u, d = [0.2], [0.0], [0.0]
+        setstate!(nonlinmodel3, x)
+        linmodel3 = linearize(nonlinmodel3; x, u, d)
+        for i=1:N
+            ynl = nonlinmodel3(d)
+            yl  = linmodel3(d)
+            Ynl[i] = ynl[1]
+            Yl[i]  = yl[1]
+            linmodel3 = linearize(nonlinmodel3; u, d)
+            updatestate!(nonlinmodel3, u, d)
+            updatestate!(linmodel3, u, d)
+        end
+        Ynl, Yl
     end
     @test all(isapprox.(Ynl, Yl, atol=1e-6))
 end

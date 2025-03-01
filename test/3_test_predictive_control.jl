@@ -113,39 +113,48 @@ end
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
     r = [15]
     outdist = [5]
-    mpc_im = LinMPC(InternalModel(linmodel))
-    linmodel.x0 .= 0
-    ym, u = linmodel() - outdist, [0.0]
-    for i=1:25
-        global ym = linmodel() - outdist
-        preparestate!(mpc_im, ym)
-        global u = moveinput!(mpc_im, r)
-        updatestate!(mpc_im, u, ym)
-        updatestate!(linmodel, u)
+    u, ym = let linmodel=linmodel, r=r, outdist=outdist
+        mpc_im = LinMPC(InternalModel(linmodel))
+        linmodel.x0 .= 0
+        ym, u = linmodel() - outdist, [0.0]
+        for i=1:25
+            ym = linmodel() - outdist
+            preparestate!(mpc_im, ym)
+            u = moveinput!(mpc_im, r)
+            updatestate!(mpc_im, u, ym)
+            updatestate!(linmodel, u)
+        end
+        u, ym
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
-    mpc_nint_u = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    linmodel.x0 .= 0
-    ym, u = linmodel() - outdist, [0.0]
-    for i=1:25
-        global ym = linmodel() - outdist
-        preparestate!(mpc_nint_u, ym)
-        global u = moveinput!(mpc_nint_u, r)
-        updatestate!(mpc_nint_u, u, ym)
-        updatestate!(linmodel, u)
+    u, ym = let linmodel=linmodel, r=r, outdist=outdist
+        mpc_nint_u = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
+        linmodel.x0 .= 0
+        ym, u = linmodel() - outdist, [0.0]
+        for i=1:25
+            ym = linmodel() - outdist
+            preparestate!(mpc_nint_u, ym)
+            u = moveinput!(mpc_nint_u, r)
+            updatestate!(mpc_nint_u, u, ym)
+            updatestate!(linmodel, u)
+        end
+        u, ym
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
-    mpc_nint_ym = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    linmodel.x0 .= 0
-    ym, u = linmodel() - outdist, [0.0]
-    for i=1:25
-        global ym = linmodel() - outdist
-        preparestate!(mpc_nint_ym, ym)
-        global u = moveinput!(mpc_nint_ym, r)
-        updatestate!(mpc_nint_ym, u, ym)
-        updatestate!(linmodel, u)
+    u,ym = let linmodel=linmodel, r=r, outdist=outdist
+        mpc_nint_ym = LinMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
+        linmodel.x0 .= 0
+        ym, u = linmodel() - outdist, [0.0]
+        for i=1:25
+            ym = linmodel() - outdist
+            preparestate!(mpc_nint_ym, ym)
+            u = moveinput!(mpc_nint_ym, r)
+            updatestate!(mpc_nint_ym, u, ym)
+            updatestate!(linmodel, u)
+        end
+        u, ym
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
@@ -300,27 +309,30 @@ end
 @testitem "LinMPC terminal cost" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(ss([0.5 -0.4;0.6 0.5], [1 0;0 1], [1 0; 0 1], 0, 1))
-    K = lqr(Discrete, model.A, model.Bu, I, 0.5I)
-    M_end = ControlSystemsBase.are(Discrete, model.A, model.Bu, I, 0.5I)
-    M_Hp = [I(4) zeros(4,2); zeros(2,4) M_end]
-    mpc = LinMPC(model; Hp=3, Hc=3, M_Hp, Nwt=[0; 0], Lwt=[0.5, 0.5], nint_ym=0)
-    X_mpc = zeros(2,20)
-    setstate!(mpc,[1,1])
-    setstate!(model, [1,1])
-    for i=1:20
-        y = model()
-        preparestate!(mpc, y)
-        u = moveinput!(mpc, [0, 0])
-        X_mpc[:,i] = model.x0
-        updatestate!(mpc, u, y)
-        updatestate!(model, u)
-    end
-    X_lqr = zeros(2,20)
-    x=[1,1]
-    for i=1:20
-        global u = -K*x
-        X_lqr[:,i] = x
-        global x = model.A*x + model.Bu*u
+    X_mpc, X_lqr = let model=model
+        K = lqr(Discrete, model.A, model.Bu, I, 0.5I)
+        M_end = ControlSystemsBase.are(Discrete, model.A, model.Bu, I, 0.5I)
+        M_Hp = [I(4) zeros(4,2); zeros(2,4) M_end]
+        mpc = LinMPC(model; Hp=3, Hc=3, M_Hp, Nwt=[0; 0], Lwt=[0.5, 0.5], nint_ym=0)
+        X_mpc = zeros(2,20)
+        setstate!(mpc,[1,1])
+        setstate!(model, [1,1])
+        for i=1:20
+            y = model()
+            preparestate!(mpc, y)
+            u = moveinput!(mpc, [0, 0])
+            X_mpc[:,i] = model.x0
+            updatestate!(mpc, u, y)
+            updatestate!(model, u)
+        end
+        X_lqr = zeros(2,20)
+        x=[1,1]
+        for i=1:20
+            u = -K*x
+            X_lqr[:,i] = x
+            x = model.A*x + model.Bu*u
+        end
+        X_mpc, X_lqr
     end
     @test all(isapprox.(X_mpc, X_lqr, atol=1e-5))
 end
@@ -443,39 +455,48 @@ end
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
     r = [15]
     outdist = [5]
-    mpc_im = ExplicitMPC(InternalModel(linmodel))
-    linmodel.x0 .= 0
-    ym, u = linmodel() - outdist, [0.0]
-    for i=1:25
-        global ym = linmodel() - outdist
-        preparestate!(mpc_im, ym)
-        global u = moveinput!(mpc_im, r)
-        updatestate!(mpc_im, u, ym)
-        updatestate!(linmodel, u)
+    u, ym = let linmodel=linmodel, r=r, outdist=outdist
+        mpc_im = ExplicitMPC(InternalModel(linmodel))
+        linmodel.x0 .= 0
+        ym, u = linmodel() - outdist, [0.0]
+        for i=1:25
+            ym = linmodel() - outdist
+            preparestate!(mpc_im, ym)
+            u = moveinput!(mpc_im, r)
+            updatestate!(mpc_im, u, ym)
+            updatestate!(linmodel, u)
+        end
+        u, ym
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
-    mpc_nint_u = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
-    linmodel.x0 .= 0
-    ym, u = linmodel() - outdist, [0.0]
-    for i=1:25
-        global ym = linmodel() - outdist
-        preparestate!(mpc_nint_u, ym)
-        global u = moveinput!(mpc_nint_u, r)
-        updatestate!(mpc_nint_u, u, ym)
-        updatestate!(linmodel, u)
+    u, ym = let linmodel=linmodel, r=r, outdist=outdist
+        mpc_nint_u = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_u=[1]))
+        linmodel.x0 .= 0
+        ym, u = linmodel() - outdist, [0.0]
+        for i=1:25
+            ym = linmodel() - outdist
+            preparestate!(mpc_nint_u, ym)
+            u = moveinput!(mpc_nint_u, r)
+            updatestate!(mpc_nint_u, u, ym)
+            updatestate!(linmodel, u)
+        end
+        u, ym
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
-    mpc_nint_ym = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
-    linmodel.x0 .= 0
-    ym, u = linmodel() - outdist, [0.0]
-    for i=1:25
-        global ym = linmodel() - outdist
-        preparestate!(mpc_nint_ym, ym)
-        global u = moveinput!(mpc_nint_ym, r)
-        updatestate!(mpc_nint_ym, u, ym)
-        updatestate!(linmodel, u)
+    u, ym = let linmodel=linmodel, r=r, outdist=outdist
+        mpc_nint_ym = ExplicitMPC(SteadyKalmanFilter(LinModel(tf(5, [2, 1]), 3), nint_ym=[1]))
+        linmodel.x0 .= 0
+        ym, u = linmodel() - outdist, [0.0]
+        for i=1:25
+            ym = linmodel() - outdist
+            preparestate!(mpc_nint_ym, ym)
+            u = moveinput!(mpc_nint_ym, r)
+            updatestate!(mpc_nint_ym, u, ym)
+            updatestate!(linmodel, u)
+        end
+        u, ym
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
@@ -698,39 +719,48 @@ end
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     r = [15]
     outdist = [5]
-    nmpc_im = NonLinMPC(InternalModel(linmodel))
-    linmodel.x0 .= 0
-    ym, u = linmodel() - outdist, [0.0]
-    for i=1:25
-        global ym = linmodel() - outdist
-        preparestate!(nmpc_im, ym)
-        global u = moveinput!(nmpc_im, r)
-        updatestate!(nmpc_im, u, ym)
-        updatestate!(linmodel, u)
+    u, ym = let linmodel=linmodel, r=r, outdist=outdist
+        nmpc_im = NonLinMPC(InternalModel(linmodel))
+        linmodel.x0 .= 0
+        ym, u = linmodel() - outdist, [0.0]
+        for i=1:25
+            ym = linmodel() - outdist
+            preparestate!(nmpc_im, ym)
+            u = moveinput!(nmpc_im, r)
+            updatestate!(nmpc_im, u, ym)
+            updatestate!(linmodel, u)
+        end
+        u, ym
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
-    nmpc_nint_u = NonLinMPC(SteadyKalmanFilter(linmodel, nint_u=[1]))
-    linmodel.x0 .= 0
-    ym, u = linmodel() - outdist, [0.0]
-    for i=1:25
-        global ym = linmodel() - outdist
-        preparestate!(nmpc_nint_u, ym)
-        global u = moveinput!(nmpc_nint_u, r)
-        updatestate!(nmpc_nint_u, u, ym)
-        updatestate!(linmodel, u)
+    u, ym = let linmodel=linmodel, r=r, outdist=outdist
+        nmpc_nint_u = NonLinMPC(SteadyKalmanFilter(linmodel, nint_u=[1]))
+        linmodel.x0 .= 0
+        ym, u = linmodel() - outdist, [0.0]
+        for i=1:25
+            ym = linmodel() - outdist
+            preparestate!(nmpc_nint_u, ym)
+            u = moveinput!(nmpc_nint_u, r)
+            updatestate!(nmpc_nint_u, u, ym)
+            updatestate!(linmodel, u)
+        end
+        u, ym
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2 
-    nmpc_nint_ym = NonLinMPC(SteadyKalmanFilter(linmodel, nint_ym=[1]))
-    linmodel.x0 .= 0
-    ym, u = linmodel() - outdist, [0.0]
-    for i=1:25
-        global ym = linmodel() - outdist
-        preparestate!(nmpc_nint_ym, ym)
-        global u = moveinput!(nmpc_nint_ym, r)
-        updatestate!(nmpc_nint_ym, u, ym)
-        updatestate!(linmodel, u)
+    u, ym = let linmodel=linmodel, r=r, outdist=outdist
+        nmpc_nint_ym = NonLinMPC(SteadyKalmanFilter(linmodel, nint_ym=[1]))
+        linmodel.x0 .= 0
+        ym, u = linmodel() - outdist, [0.0]
+        for i=1:25
+            ym = linmodel() - outdist
+            preparestate!(nmpc_nint_ym, ym)
+            u = moveinput!(nmpc_nint_ym, r)
+            updatestate!(nmpc_nint_ym, u, ym)
+            updatestate!(linmodel, u)
+        end
+        u, ym
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
