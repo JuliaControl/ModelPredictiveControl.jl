@@ -105,6 +105,9 @@ for more detailed examples.
 - optimization based on `JuMP.jl`:
   - quickly compare multiple optimizers
   - nonlinear solvers relying on automatic differentiation (exact derivative)
+- supported transcription methods of the optimization problem:
+  - direct single shooting
+  - direct multiple shooting
 - additional information about the optimum to ease troubleshooting
 - real-time control loop features:
   - implementations that carefully limits the allocations
