@@ -94,7 +94,13 @@ end
     info = getinfo(mpc5)
     @test info[:u] ≈ [1] atol=1e-2
     @test info[:Ŷ][end] ≈ 15 atol=1e-2
-
+    linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
+    mpc6 = LinMPC(linmodel2, Nwt=[0], Hp=1000, Hc=1)
+    preparestate!(mpc6, [0], [0])
+    # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
+    d = [0.1]
+    u = moveinput!(mpc6, 7d, d)
+    @test u ≈ [0] atol=1e-2
     @test_throws DimensionMismatch moveinput!(mpc1, [0,0,0])
     @test_throws DimensionMismatch moveinput!(mpc1, [0], [0,0])
     @test_throws DimensionMismatch moveinput!(mpc1; D̂  = fill(0, mpc1.Hp+1))
@@ -636,9 +642,9 @@ end
     h = (x,d,_)   -> linmodel2.C*x + linmodel2.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1)
+    preparestate!(nmpc2, [0], [0])
     # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
     d = [0.1]
-    preparestate!(nmpc2, [0], d)
     u = moveinput!(nmpc2, 7d, d)
     @test u ≈ [0] atol=5e-2
     u = nmpc2(7d, d)
