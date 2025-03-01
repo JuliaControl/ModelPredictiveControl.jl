@@ -18,7 +18,7 @@ The decision variable in the optimization problem is (excluding the slack ``ϵ``
     \vdots                          \\ 
     \mathbf{Δu}(k+H_c-1)            \end{bmatrix}
 ```
-This method is generally more efficient for small control horizon ``H_c``, stable or mildly
+This method is generally more efficient for small control horizon ``H_c``, stable and mildly
 nonlinear plant model/constraints.
 """
 struct SingleShooting <: TranscriptionMethod end
@@ -42,9 +42,10 @@ operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
     \mathbf{x̂}_i(k+H_p)   - \mathbf{x̂_{op}}     \end{bmatrix}
 ```
 where ``\mathbf{x̂}_i(k+j)`` is the state prediction for time ``k+j``, estimated by the
-observer at time ``i=k`` or ``i=k-1`` depending on its `direct` flag. This transcription
-method is generally more efficient for large control horizon ``H_c``, unstable or highly
-nonlinear plant models/constraints. 
+observer at time ``i=k`` or ``i=k-1`` depending on its `direct` flag. Note that 
+``\mathbf{X̂_0 = X̂}`` if the operating points is zero, which is typically the case in 
+practice for [`NonLinModel`](@ref). This transcription method is generally more efficient
+for large control horizon ``H_c``, unstable or highly nonlinear plant models/constraints. 
 
 Sparse optimizers like `OSQP` or `Ipopt` are recommended for this method.
 """
@@ -182,7 +183,7 @@ contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf
 operating points (for linearization at non-equilibrium point, see [`linearize`](@ref)). The
 stochastic predictions ``\mathbf{Ŷ_s=0}`` if `estim` is not a [`InternalModel`](@ref), see
 [`init_stochpred`](@ref). The method also computes similar matrices for the predicted
-terminal states at ``k+H_p``:
+terminal state at ``k+H_p``:
 ```math
 \begin{aligned}
     \mathbf{x̂_0}(k+H_p) &= \mathbf{e_x̂ Z}  + \mathbf{g_x̂ d_0}(k)   + \mathbf{j_x̂ D̂_0} 
