@@ -678,12 +678,12 @@ end
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
     nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
-    preparestate!(nmpc9, [0])
-    u = moveinput!(nmpc9, [15])
-    @test u ≈ [3] atol=5e-2
+    preparestate!(nmpc9, [10])
+    u = moveinput!(nmpc9, [20])
+    @test u ≈ [2] atol=5e-2
     info = getinfo(nmpc9)
     @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 15 atol=5e-2
+    @test info[:Ŷ][end] ≈ 20 atol=5e-2
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
