@@ -18,7 +18,7 @@ The decision variable in the optimization problem is (excluding the slack ``ϵ``
     \vdots                          \\ 
     \mathbf{Δu}(k+H_c-1)            \end{bmatrix}
 ```
-This method is generally more efficient for small control horizon ``H_c``, stable or mildly
+This method is generally more efficient for small control horizon ``H_c``, stable and mildly
 nonlinear plant model/constraints.
 """
 struct SingleShooting <: TranscriptionMethod end
@@ -182,7 +182,7 @@ contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf
 operating points (for linearization at non-equilibrium point, see [`linearize`](@ref)). The
 stochastic predictions ``\mathbf{Ŷ_s=0}`` if `estim` is not a [`InternalModel`](@ref), see
 [`init_stochpred`](@ref). The method also computes similar matrices for the predicted
-terminal states at ``k+H_p``:
+terminal state at ``k+H_p``:
 ```math
 \begin{aligned}
     \mathbf{x̂_0}(k+H_p) &= \mathbf{e_x̂ Z}  + \mathbf{g_x̂ d_0}(k)   + \mathbf{j_x̂ D̂_0} 
