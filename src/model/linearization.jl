@@ -174,22 +174,15 @@ function linearize!(
     linmodel::LinModel{NT}, model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop
 ) where NT<:Real
     nonlinmodel = model
-    buffer, linbuffer = nonlinmodel.buffer, nonlinmodel.linbuffer
+    buffer = nonlinmodel.buffer
     # --- remove the operating points of the nonlinear model (typically zeros) ---
     x0, u0, d0 = buffer.x, buffer.u, buffer.d
+    x0 .= x .- nonlinmodel.xop
     u0 .= u .- nonlinmodel.uop
     d0 .= d .- nonlinmodel.dop
-    x0 .= x .- nonlinmodel.xop
     # --- compute the Jacobians at linearization points ---
     xnext0::Vector{NT}, y0::Vector{NT} = linmodel.buffer.x, linmodel.buffer.y
-    linbuffer.x .= x0
-    linbuffer.u .= u0
-    linbuffer.d .= d0
-    jacobian!(linmodel.A,  linbuffer.buffer_f_at_u_d, xnext0, x0)
-    jacobian!(linmodel.Bu, linbuffer.buffer_f_at_x_d, xnext0, u0)
-    jacobian!(linmodel.Bd, linbuffer.buffer_f_at_x_u, xnext0, d0)
-    jacobian!(linmodel.C,  linbuffer.buffer_h_at_d, y0, x0)
-    jacobian!(linmodel.Dd, linbuffer.buffer_h_at_x, y0, d0)
+    get_jacobians!(linmodel, xnext0, y0, nonlinmodel, x0, u0, d0)
     # --- compute the nonlinear model output at operating points ---
     xnext0, y0 = linmodel.buffer.x, linmodel.buffer.y
     h!(y0, nonlinmodel, x0, d0, model.p)
@@ -208,4 +201,28 @@ function linearize!(
     # --- reset the state of the linear model ---
     linmodel.x0 .= 0 # state deviation vector is always x0=0 after a linearization
     return linmodel
+end
+
+"Compute the 5 Jacobians of `model` at the linearization point and write them in `linmodel`."
+function get_jacobians!(linmodel::LinModel, xnext0, y0, model::SimModel, x0, u0, d0)
+    linbuffer = model.linbuffer # a LinearizationBuffer object
+    linbuffer.x .= x0
+    linbuffer.u .= u0
+    linbuffer.d .= d0
+    jacobian!(linmodel.A,  linbuffer.buffer_f_at_u_d, xnext0, x0)
+    jacobian!(linmodel.Bu, linbuffer.buffer_f_at_x_d, xnext0, u0)
+    jacobian!(linmodel.Bd, linbuffer.buffer_f_at_x_u, xnext0, d0)
+    jacobian!(linmodel.C,  linbuffer.buffer_h_at_d, y0, x0)
+    jacobian!(linmodel.Dd, linbuffer.buffer_h_at_x, y0, d0)
+    return nothing
+end
+
+"Copy the state-space matrices of `model` to `linmodel` if `model` is already linear."
+function get_jacobians!(linmodel::LinModel, _ , _ , model::LinModel, _ , _ , _)
+    linmodel.A  .= model.A
+    linmodel.Bu .= model.Bu
+    linmodel.C  .= model.C
+    linmodel.Bd .= model.Bd
+    linmodel.Dd .= model.Dd
+    return nothing
 end

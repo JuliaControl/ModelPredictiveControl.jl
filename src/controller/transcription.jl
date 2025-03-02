@@ -343,7 +343,7 @@ They are defined in the Extended Help section.
     \mathbf{E}   &= [\begin{smallmatrix}\mathbf{0} & \mathbf{E^†} \end{smallmatrix}]    \\
     \mathbf{E^†} &= \text{diag}\mathbf{(Ĉ,Ĉ,...,Ĉ)}                                     \\
     \mathbf{J}   &= \text{diag}\mathbf{(D̂_d,D̂_d,...,D̂_d)}                               \\
-    \mathbf{ex̂}  &= [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]   
+    \mathbf{e_x̂} &= [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]   
     \end{aligned}
     ```
 """
