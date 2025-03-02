@@ -457,7 +457,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
         status = JuMP.termination_status(optim)
         if iserror(optim)
             @error(
-                "MPC terminated without solution: estimation in open-loop "*
+                "MPC terminated without solution: returning last solution shifted "*
                 "(more info in debug log)",
                 status
             )
