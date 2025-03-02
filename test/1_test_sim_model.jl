@@ -118,6 +118,17 @@ end
     @test_throws DimensionMismatch evaloutput(linmodel1, zeros(1))
 end
 
+@testitem "LinModel linearization" setup=[SetupMPCtests] begin
+    using .SetupMPCtests
+    linmodel1 = LinModel(sys, Ts, i_d=[3])
+    linmodel2 = linearize(linmodel1, x=[1,2,3,4], u=[5,6], d=[7])
+    @test linmodel2.A ≈ linmodel1.A
+    @test linmodel2.Bu ≈ linmodel1.Bu
+    @test linmodel2.Bd ≈ linmodel1.Bd
+    @test linmodel2.C ≈ linmodel1.C
+    @test linmodel2.Dd ≈ linmodel1.Dd
+end
+
 @testitem "LinModel real time simulations" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(tf(2, [10, 1]), 0.25)
