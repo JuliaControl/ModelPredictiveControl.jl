@@ -822,42 +822,6 @@ function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, Ŷ0, gc, ϵ)
     return g
 end
 
-"""
-    con_nonlinprogeq!(
-        geq, X̂0, Û0, mpc::NonLinMPC, model::NonLinModel, ::MultipleShooting, U0, Z̃
-    )
-
-Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
-
-The method mutates the `geq`, `X̂0` and `Û0` vectors in argument.
-"""
-function con_nonlinprogeq!(
-    geq, X̂0, Û0, mpc::NonLinMPC, model::NonLinModel, ::MultipleShooting, U0, Z̃
-)
-    nx̂, nu, nd, Hp, Hc = mpc.estim.nx̂, model.nu, model.nd, mpc.Hp, mpc.Hc
-    nΔU, nX̂ = nu*Hc, nx̂*Hp
-    D̂0 = mpc.D̂0
-    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    x̂0 = @views mpc.estim.x̂0[1:nx̂]
-    d0 = @views mpc.d0[1:nd]
-    #TODO: allow parallel for loop or threads? 
-    for j=1:Hp
-        u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
-        û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, mpc.estim, model, x̂0, u0, d0)
-        x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
-        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]       
-        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        ŝnext   .= x̂0next .- x̂0next_Z̃
-        x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
-        d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
-    end
-    return geq
-end
-con_nonlinprogeq!(geq,_,_, ::NonLinMPC, ::NonLinModel, ::SingleShooting,      _,_) = geq
-con_nonlinprogeq!(geq,_,_, ::NonLinMPC, ::LinModel,    ::TranscriptionMethod, _,_) = geq
-
 @doc raw"""
     con_custom!(gc, mpc::NonLinMPC, Ue, Ŷe, ϵ) -> gc
 
