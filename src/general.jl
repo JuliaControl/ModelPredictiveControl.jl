@@ -9,14 +9,28 @@ const DEFAULT_EWT = 0.0
 "Abstract type for all differentiation buffers."
 abstract type DifferentiationBuffer end
 
-"Struct with both function and configuration for ForwardDiff differentiation."
-struct JacobianBuffer{FT<:Function, CT<:ForwardDiff.JacobianConfig} <: DifferentiationBuffer
+function Base.show(io::IO, buffer::DifferentiationBuffer) 
+    return print(io, "DifferentiationBuffer with a $(typeof(buffer.config).name.name)")
+end
+
+"Struct with both function and configuration for ForwardDiff gradient."
+struct GradientBuffer{FT<:Function, CT<:ForwardDiff.GradientConfig} <: DifferentiationBuffer
     f!::FT
     config::CT
 end
 
-function Base.show(io::IO, buffer::DifferentiationBuffer) 
-    return print(io, "DifferentiationBuffer with a $(typeof(buffer.config).name.name)")
+GradientBuffer(f!, x) = GradientBuffer(f!, ForwardDiff.GradientConfig(f!, x))
+
+function gradient!(
+    g, buffer::GradientBuffer, x
+)
+    return ForwardDiff.gradient!(g, buffer.f!, x, buffer.config)
+end
+
+"Struct with both function and configuration for ForwardDiff Jacobian."
+struct JacobianBuffer{FT<:Function, CT<:ForwardDiff.JacobianConfig} <: DifferentiationBuffer
+    f!::FT
+    config::CT
 end
 
 "Create a JacobianBuffer with function `f!`, output `y` and input `x`."
