@@ -667,7 +667,7 @@ function init_nonlincon!(
     Z̃var = optim[:Z̃var]
     for i in 1:con.neq
         name = Symbol("geq_$i")
-        geqfunc_i = JuMP.add_nonlinear_operator(optim, nZ̃, geqfuncs[i]; name)
+        geqfunc_i = optim[name] = JuMP.add_nonlinear_operator(optim, nZ̃, geqfuncs[i]; name)
         # set with @constrains here instead of set_nonlincon!, since the number of nonlinear 
         # equality constraints is known and constant (±Inf are impossible):
         @constraint(optim, geqfunc_i(Z̃var...) == 0)
