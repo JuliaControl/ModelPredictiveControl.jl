@@ -15,16 +15,16 @@ end
 
 "Struct with both function and configuration for ForwardDiff gradient."
 struct GradientBuffer{FT<:Function, CT<:ForwardDiff.GradientConfig} <: DifferentiationBuffer
-    f!::FT
+    f::FT
     config::CT
 end
 
-GradientBuffer(f!, x) = GradientBuffer(f!, ForwardDiff.GradientConfig(f!, x))
+GradientBuffer(f, x) = GradientBuffer(f, ForwardDiff.GradientConfig(f, x))
 
 function gradient!(
     g, buffer::GradientBuffer, x
 )
-    return ForwardDiff.gradient!(g, buffer.f!, x, buffer.config)
+    return ForwardDiff.gradient!(g, buffer.f, x, buffer.config)
 end
 
 "Struct with both function and configuration for ForwardDiff Jacobian."

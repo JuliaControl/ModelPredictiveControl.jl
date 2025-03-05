@@ -505,8 +505,8 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, gfuncs, geqfuncs = get_optim_functions(mpc, optim)
-    @operator(optim, J, nZ̃, Jfunc)
+    Jfunc, ∇Jfunc!, gfuncs, geqfuncs, ∇geqfuncs! = get_optim_functions(mpc, optim)
+    @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
     @objective(optim, Min, J(Z̃var...))
     init_nonlincon!(mpc, model, transcription, gfuncs, geqfuncs)
     set_nonlincon!(mpc, model, optim)
@@ -514,10 +514,10 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
 end
 
 """
-    get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel) -> Jfunc, gfuncs, geqfuncs
+    get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel) -> Jfunc, ∇Jfunc!, gfuncs, geqfuncs
 
-Get the objective `Jfunc` function, and constraint `gfuncs` and `geqfuncs` function vectors
-for [`NonLinMPC`](@ref).
+Get the objective `Jfunc` function and `∇Jfunc!` to compute its gradient, and constraint 
+`gfuncs` and `geqfuncs` function vectors for [`NonLinMPC`](@ref).
 
 Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
 """
@@ -541,22 +541,25 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     gc_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nc),  Ncache)
     g_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, ng),  Ncache)
     geq_cache::DiffCache{Vector{JNT}, Vector{JNT}}    = DiffCache(zeros(JNT, neq), Ncache)
-    function update_simulations!(Z̃, Z̃tup::NTuple{N, T}) where {N, T<:Real}
-        if any(new !== old for (new, old) in zip(Z̃tup, Z̃)) # new Z̃tup, update predictions:
-            Z̃1 = Z̃tup[begin]
-            for i in eachindex(Z̃tup)
-                Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
+    function update_simulations!(
+        Z̃arg::Union{NTuple{N, T}, AbstractVector{T}}, Z̃cache
+    ) where {N, T<:Real}
+        if any(cache !== arg for (cache, arg) in zip(Z̃cache, Z̃arg)) # new Z̃, update:
+            for i in eachindex(Z̃cache)
+                # Z̃cache .= Z̃arg is type unstable with Z̃arg::NTuple{N, FowardDiff.Dual}
+                Z̃cache[i] = Z̃arg[i]
             end
+            Z̃ = Z̃cache
             ϵ = (nϵ ≠ 0) ? Z̃[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
-            ΔŨ     = get_tmp(ΔŨ_cache, Z̃1)
-            x̂0end  = get_tmp(x̂0end_cache, Z̃1)
-            Ue, Ŷe = get_tmp(Ue_cache, Z̃1), get_tmp(Ŷe_cache, Z̃1)
-            U0, Ŷ0 = get_tmp(U0_cache, Z̃1), get_tmp(Ŷ0_cache, Z̃1)
-            X̂0, Û0 = get_tmp(X̂0_cache, Z̃1), get_tmp(Û0_cache, Z̃1) 
-            gc, g  = get_tmp(gc_cache, Z̃1), get_tmp(g_cache, Z̃1)
-            geq    = get_tmp(geq_cache, Z̃1)
+            ΔŨ     = get_tmp(ΔŨ_cache, T)
+            x̂0end  = get_tmp(x̂0end_cache, T)
+            Ue, Ŷe = get_tmp(Ue_cache, T), get_tmp(Ŷe_cache, T)
+            U0, Ŷ0 = get_tmp(U0_cache, T), get_tmp(Ŷ0_cache, T)
+            X̂0, Û0 = get_tmp(X̂0_cache, T), get_tmp(Û0_cache, T) 
+            gc, g  = get_tmp(gc_cache, T), get_tmp(g_cache, T)
+            geq    = get_tmp(geq_cache, T)
             U0 = getU0!(U0, mpc, Z̃)
-            ΔŨ = getΔŨ!(ΔŨ, mpc, mpc.transcription, Z̃)
+            ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
             Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, mpc, model, transcription, U0, Z̃)
             Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
             gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
@@ -565,43 +568,94 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         end
         return nothing
     end
-    function Jfunc(Z̃tup::Vararg{T, N}) where {N, T<:Real}
-        Z̃1 = Z̃tup[begin]
-        Z̃ = get_tmp(Z̃_cache, Z̃1)
-        update_simulations!(Z̃, Z̃tup)
-        ΔŨ = get_tmp(ΔŨ_cache, Z̃1)
-        Ue, Ŷe = get_tmp(Ue_cache, Z̃1), get_tmp(Ŷe_cache, Z̃1)
-        U0, Ŷ0 = get_tmp(U0_cache, Z̃1), get_tmp(Ŷ0_cache, Z̃1)
-        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
+    # force specialization using Vararg, see https://docs.julialang.org/en/v1/manual/performance-tips/#Be-aware-of-when-Julia-avoids-specializing
+    function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real} 
+        return Jfunc(Z̃arg, get_tmp(Z̃_cache, T))::T
     end
-    function gfunc_i(i, Z̃tup::NTuple{N, T}) where {N, T<:Real}
-        Z̃1 = Z̃tup[begin]
-        Z̃ = get_tmp(Z̃_cache, Z̃1)
-        update_simulations!(Z̃, Z̃tup)
-        g = get_tmp(g_cache, Z̃1)
+    # method with the additional cache argument:
+    function Jfunc(Z̃arg::Union{NTuple{N, T}, AbstractVector{T}}, Z̃cache) where {N, T<:Real}
+        update_simulations!(Z̃arg, Z̃cache)
+        ΔŨ = get_tmp(ΔŨ_cache, T)
+        Ue, Ŷe = get_tmp(Ue_cache, T), get_tmp(Ŷe_cache, T)
+        U0, Ŷ0 = get_tmp(U0_cache, T), get_tmp(Ŷ0_cache, T)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+    end
+    Jfunc_vec(Z̃vec) = Jfunc(Z̃vec, get_tmp(Z̃_cache, Z̃vec[1]))    
+    Z̃vec = Vector{JNT}(undef, nZ̃)
+    ∇Jbuffer = GradientBuffer(Jfunc_vec, Z̃vec) 
+    function ∇Jfunc!(∇J, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+        Z̃vec .= Z̃arg
+        gradient!(∇J, ∇Jbuffer, Z̃vec)
+        return nothing
+    end
+
+
+    function gfunceq_i(i, Z̃arg::NTuple{N, T}) where {N, T<:Real}
+        update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
+        geq = get_tmp(geq_cache, T)
+        return geq[i]::T
+    end
+    geqfuncs = Vector{Function}(undef, neq)
+    for i in 1:neq
+        geqfuncs[i] = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            return gfunceq_i(i, Z̃arg)
+        end
+    end
+
+
+    ∇geqfuncs! = nothing
+    #=
+    function geqfunc!(geq, Z̃)
+        update_simulations!(Z̃, get_tmp(Z̃_cache, T))
+        geq = get_tmp(geq_cache, T)
+        return 
+    end
+    =#
+
+    #=
+
+
+
+    ∇geq = Matrix{JNT}(undef, neq, nZ̃) # Jacobian of geq
+    function ∇geqfunc_vec!(∇geq, Z̃vec)
+        update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
+        return nothing
+    end
+
+
+
+
+
+    function ∇geqfuncs_i!(∇geq_i, i, Z̃arg::NTuple{N, T}) where {N, T<:Real}
+        Z̃arg_vec .= Z̃arg
+        ForwardDiff
+        
+
+    end
+
+    ∇geqfuncs! = Vector{Function}(undef, neq)
+    for i in 1:neq
+        ∇eqfuncs![i] = function (∇geq, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            return ∇geqfuncs_i!(∇geq, i, Z̃arg)
+        end
+    end
+=#
+
+
+    # TODO:re-déplacer en haut:
+    function gfunc_i(i, Z̃arg::NTuple{N, T}) where {N, T<:Real}
+        update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
+        g = get_tmp(g_cache, T)
         return g[i]::T
     end
     gfuncs = Vector{Function}(undef, ng)
     for i in 1:ng
         # this is another syntax for anonymous function, allowing parameters T and N:
-        gfuncs[i] = function (Z̃tup::Vararg{T, N}) where {N, T<:Real}
-            return gfunc_i(i, Z̃tup)
+        gfuncs[i] = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            return gfunc_i(i, Z̃arg)
         end
     end
-    function gfunceq_i(i, Z̃tup::NTuple{N, T}) where {N, T<:Real}
-        Z̃1 = Z̃tup[begin]
-        Z̃ = get_tmp(Z̃_cache, Z̃1)
-        update_simulations!(Z̃, Z̃tup)
-        geq = get_tmp(geq_cache, Z̃1)
-        return geq[i]::T
-    end
-    geqfuncs = Vector{Function}(undef, neq)
-    for i in 1:neq
-        geqfuncs[i] = function (Z̃tup::Vararg{T, N}) where {N, T<:Real}
-            return gfunceq_i(i, Z̃tup)
-        end
-    end
-    return Jfunc, gfuncs, geqfuncs
+    return Jfunc, ∇Jfunc!, gfuncs, geqfuncs, ∇geqfuncs!
 end
 
 """
