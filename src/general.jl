@@ -19,11 +19,11 @@ struct GradientBuffer{FT<:Function, CT<:ForwardDiff.GradientConfig} <: Different
     config::CT
 end
 
+"Create a GradientBuffer with function `f` and input `x`."
 GradientBuffer(f, x) = GradientBuffer(f, ForwardDiff.GradientConfig(f, x))
 
-function gradient!(
-    g, buffer::GradientBuffer, x
-)
+"Compute in-place and return the gradient of `buffer.f` at `x`."
+function gradient!(g, buffer::GradientBuffer, x)
     return ForwardDiff.gradient!(g, buffer.f, x, buffer.config)
 end
 
@@ -33,13 +33,11 @@ struct JacobianBuffer{FT<:Function, CT<:ForwardDiff.JacobianConfig} <: Different
     config::CT
 end
 
-"Create a JacobianBuffer with function `f!`, output `y` and input `x`."
+"Create a JacobianBuffer with in-place function `f!`, output `y` and input `x`."
 JacobianBuffer(f!, y, x) = JacobianBuffer(f!, ForwardDiff.JacobianConfig(f!, y, x))
 
 "Compute in-place and return the Jacobian matrix of `buffer.f!` at `x`."
-function jacobian!(
-    A, buffer::JacobianBuffer, y, x
-)
+function jacobian!(A, buffer::JacobianBuffer, y, x)
     return ForwardDiff.jacobian!(A, buffer.f!, y, x, buffer.config)
 end
 
