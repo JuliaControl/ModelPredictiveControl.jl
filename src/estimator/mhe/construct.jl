@@ -1256,35 +1256,36 @@ function init_optimization!(
         end
     end
     Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs! = get_optim_functions(estim, optim)
-    @operator(optim, J, nZ̃, Jfunc)
+    @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
     @objective(optim, Min, J(Z̃var...))
     nV̂, nX̂ = estim.He*estim.nym, estim.He*estim.nx̂
     if length(con.i_g) ≠ 0
+        i_base = 0
         for i in eachindex(con.X̂0min)
             name = Symbol("g_X̂0min_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i]; name
+                optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
             )
         end
-        i_end_X̂min = nX̂
+        i_base = nX̂
         for i in eachindex(con.X̂0max)
             name = Symbol("g_X̂0max_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_end_X̂min + i]; name
+                optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
             )
         end
-        i_end_X̂max = 2*nX̂
+        i_base = 2*nX̂
         for i in eachindex(con.V̂min)
             name = Symbol("g_V̂min_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_end_X̂max + i]; name
+                optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
             )
         end
-        i_end_V̂min = 2*nX̂ + nV̂
+        i_base = 2*nX̂ + nV̂
         for i in eachindex(con.V̂max)
             name = Symbol("g_V̂max_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_end_V̂min + i]; name
+                optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
             )
         end
     end
