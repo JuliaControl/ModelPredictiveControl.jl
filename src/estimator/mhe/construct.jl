@@ -1343,9 +1343,9 @@ function get_optim_functions(
             end
             Z̃ = Z̃cache
             ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
-            V̂,  X̂0 = get_tmp(V̂_cache, Z̃1),  get_tmp(X̂0_cache, Z̃1)
-            û0, ŷ0 = get_tmp(û0_cache, Z̃1), get_tmp(ŷ0_cache, Z̃1)
-            g      = get_tmp(g_cache, Z̃1)
+            V̂,  X̂0 = get_tmp(V̂_cache, T),  get_tmp(X̂0_cache, T)
+            û0, ŷ0 = get_tmp(û0_cache, T), get_tmp(ŷ0_cache, T)
+            g      = get_tmp(g_cache, T)
             V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
             g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
         end
@@ -1353,12 +1353,14 @@ function get_optim_functions(
     end
     # --------------------- objective functions -------------------------------------------
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
-        update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
+        Z̃ = get_tmp(Z̃_cache, T)
+        update_simulations!(Z̃arg, Z̃)
         x̄, V̂ = get_tmp(x̄_cache, T), get_tmp(V̂_cache, T)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
     function Jfunc_vec(Z̃arg::AbstractVector{T}) where T<:Real
-        update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
+        Z̃ = get_tmp(Z̃_cache, T)
+        update_simulations!(Z̃arg, Z̃)
         x̄, V̂ = get_tmp(x̄_cache, T), get_tmp(V̂_cache, T)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
