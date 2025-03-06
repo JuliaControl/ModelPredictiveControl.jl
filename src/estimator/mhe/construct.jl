@@ -1315,6 +1315,7 @@ function get_optim_functions(
     x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂),  Nc)
     û0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu),  Nc)
     ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ),  Nc)
+    # --------------------- update simulation function ------------------------------------
     function update_simulations!(Z̃, Z̃tup::NTuple{N, T}) where {N, T <:Real}
         if any(new !== old for (new, old) in zip(Z̃tup, Z̃)) # new Z̃tup, update predictions:
             Z̃1 = Z̃tup[begin]

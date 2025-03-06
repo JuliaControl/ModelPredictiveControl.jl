@@ -91,6 +91,9 @@ function limit_solve_time(optim::GenericModel, Ts)
     end
 end
 
+"Verify that x and y elements are different using `!==`."
+isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
+
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)
 
