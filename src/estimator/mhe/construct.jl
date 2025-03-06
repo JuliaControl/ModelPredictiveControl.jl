@@ -1255,7 +1255,7 @@ function init_optimization!(
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, gfuncs = get_optim_functions(estim, optim)
+    Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs! = get_optim_functions(estim, optim)
     @operator(optim, J, nZ̃, Jfunc)
     @objective(optim, Min, J(Z̃var...))
     nV̂, nX̂ = estim.He*estim.nym, estim.He*estim.nx̂
@@ -1293,10 +1293,26 @@ end
 
 
 """
-    get_optim_functions(estim::MovingHorizonEstimator, ::JuMP.GenericModel) -> Jfunc, gfuncs
+    get_optim_functions(
+        estim::MovingHorizonEstimator, optim::JuMP.GenericModel
+    ) -> Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!
 
-Get the objective `Jfunc` function and constraint `gfuncs` function vector for 
-[`MovingHorizonEstimator`](@ref).
+Return the functions for the nonlinear optimization of [`MovingHorizonEstimator`](@ref).
+
+Return the nonlinear objective `Jfunc` function, and `∇Jfunc!`, to compute its gradient. 
+Also return vectors with the nonlinear inequality constraint functions `gfuncs`, and 
+`∇gfuncs!`, for the associated gradients. 
+
+This method is really indicated and I'm not proud of it. That's because of 3 elements:
+
+- These functions are used inside the nonlinear optimization, so they must be type-stable
+  and as efficient as possible.
+- The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
+  of `Vararg{T,N}` (see the [performance tip](https://docs.julialang.org/en/v1/manual/performance-tips/#Be-aware-of-when-Julia-avoids-specializing))
+  and memoization to avoid redundant computations. This is already complex, but it's even
+  worse knowing that most automatic differentiation tools do not support splatting.
+- The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
+  and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
 
 Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
 """
@@ -1306,51 +1322,100 @@ function get_optim_functions(
     model, con = estim.model, estim.con
     nx̂, nym, nŷ, nu, nϵ, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, estim.He
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
-    Nc = nZ̃ + 3
+    Ncache = nZ̃ + 3
     myNaN = convert(JNT, NaN) # fill Z̃ with NaNs to force update_simulations! at 1st call:
-    Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(fill(myNaN, nZ̃), Nc)
-    V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nV̂),  Nc)
-    g_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, ng),  Nc)
-    X̂0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂),  Nc)
-    x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂),  Nc)
-    û0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu),  Nc)
-    ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ),  Nc)
+    # ---------------------- differentiation cache ---------------------------------------
+    Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(fill(myNaN, nZ̃), Ncache)
+    V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nV̂),  Ncache)
+    g_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, ng),  Ncache)
+    X̂0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂),  Ncache)
+    x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂),  Ncache)
+    û0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu),  Ncache)
+    ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ),  Ncache)
     # --------------------- update simulation function ------------------------------------
-    function update_simulations!(Z̃, Z̃tup::NTuple{N, T}) where {N, T <:Real}
-        if any(new !== old for (new, old) in zip(Z̃tup, Z̃)) # new Z̃tup, update predictions:
-            Z̃1 = Z̃tup[begin]
-            for i in eachindex(Z̃tup)
-                Z̃[i] = Z̃tup[i] # Z̃ .= Z̃tup seems to produce a type instability
+    function update_simulations!(
+        Z̃arg::Union{NTuple{N, T}, AbstractVector{T}}, Z̃cache
+    ) where {N, T <:Real}
+        if isdifferent(Z̃cache, Z̃arg)
+            for i in eachindex(Z̃cache)
+                # Z̃cache .= Z̃arg is type unstable with Z̃arg::NTuple{N, FowardDiff.Dual}
+                Z̃cache[i] = Z̃arg[i]
             end
+            Z̃ = Z̃cache
+            ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
             V̂,  X̂0 = get_tmp(V̂_cache, Z̃1),  get_tmp(X̂0_cache, Z̃1)
             û0, ŷ0 = get_tmp(û0_cache, Z̃1), get_tmp(ŷ0_cache, Z̃1)
             g      = get_tmp(g_cache, Z̃1)
             V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
-            ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
             g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
         end
         return nothing
     end
-    function Jfunc(Z̃tup::Vararg{T, N}) where {N, T<:Real}
-        Z̃1 = Z̃tup[begin]
-        Z̃ = get_tmp(Z̃_cache, Z̃1)
-        update_simulations!(Z̃, Z̃tup)
-        x̄, V̂ = get_tmp(x̄_cache, Z̃1), get_tmp(V̂_cache, Z̃1)
+    # --------------------- objective functions -------------------------------------------
+    function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
+        update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
+        x̄, V̂ = get_tmp(x̄_cache, T), get_tmp(V̂_cache, T)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
-    function gfunc_i(i, Z̃tup::NTuple{N, T})::T where {N, T <:Real}
-        Z̃1 = Z̃tup[begin]
-        Z̃ = get_tmp(Z̃_cache, Z̃1)
-        update_simulations!(Z̃, Z̃tup)
-        g = get_tmp(g_cache, Z̃1)
-        return g[i]
+    function Jfunc_vec(Z̃arg::AbstractVector{T}) where T<:Real
+        update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
+        x̄, V̂ = get_tmp(x̄_cache, T), get_tmp(V̂_cache, T)
+        return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
-    gfuncs = Vector{Function}(undef, ng)
-    for i in 1:ng
-        # this is another syntax for anonymous function, allowing parameters T and N:
-        gfuncs[i] = function (ΔŨtup::Vararg{T, N}) where {N, T<:Real}
-            return gfunc_i(i, ΔŨtup)
+    Z̃_∇J      = fill(myNaN, nZ̃) 
+    ∇J        = Vector{JNT}(undef, nZ̃)       # gradient of objective J
+    ∇J_buffer = GradientBuffer(Jfunc_vec, Z̃_∇J)
+    ∇Jfunc! = if nZ̃ == 1
+        function (Z̃arg::T) where T<:Real 
+            Z̃_∇J .= Z̃arg
+            gradient!(∇J, ∇J_buffer, Z̃_∇J)
+            return ∇J[begin]    # univariate syntax, see JuMP.@operator doc
+        end
+    else
+        function (∇J::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            Z̃_∇J .= Z̃arg
+            gradient!(∇J, ∇J_buffer, Z̃_∇J)
+            return ∇J           # multivariate syntax, see JuMP.@operator doc
         end
     end
-    return Jfunc, gfuncs
+    # --------------------- inequality constraint functions -------------------------------
+    gfuncs = Vector{Function}(undef, ng)
+    for i in eachindex(gfuncs)
+        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
+            g = get_tmp(g_cache, T)
+            return g[i]::T
+        end
+        gfuncs[i] = func_i
+    end
+    function gfunc_vec!(g, Z̃vec::AbstractVector{T}) where T<:Real
+        update_simulations!(Z̃vec, get_tmp(Z̃_cache, T))
+        g .= get_tmp(g_cache, T)
+        return g
+    end
+    Z̃_∇g      = fill(myNaN, nZ̃)
+    g_vec     = Vector{JNT}(undef, ng)
+    ∇g        = Matrix{JNT}(undef, ng, nZ̃)   # Jacobian of inequality constraints g
+    ∇g_buffer = JacobianBuffer(gfunc_vec!, g_vec, Z̃_∇g)
+    ∇gfuncs!  = Vector{Function}(undef, ng)
+    for i in eachindex(∇gfuncs!)
+        ∇gfuncs![i] = if nZ̃ == 1
+            function (Z̃arg::T) where T<:Real
+                if isdifferent(Z̃arg, Z̃_∇g)
+                    Z̃_∇g .= Z̃arg
+                    jacobian!(∇g, ∇g_buffer, g_vec, Z̃_∇g)
+                end
+                return ∇g[i, begin]            # univariate syntax, see JuMP.@operator doc
+            end
+        else
+            function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+                if isdifferent(Z̃arg, Z̃_∇g)
+                    Z̃_∇g .= Z̃arg
+                    jacobian!(∇g, ∇g_buffer, g_vec, Z̃_∇g)
+                end
+                return ∇g_i .= @views ∇g[i, :] # multivariate syntax, see JuMP.@operator doc
+            end
+        end
+    end
+    return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!
 end

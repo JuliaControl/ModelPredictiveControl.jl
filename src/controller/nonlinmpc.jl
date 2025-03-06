@@ -515,7 +515,7 @@ end
 
 """
     get_optim_functions(
-        mpc::NonLinMPC, ::JuMP.GenericModel
+        mpc::NonLinMPC, optim::JuMP.GenericModel
     ) -> Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
 
 Return the functions for the nonlinear optimization of `mpc` [`NonLinMPC`](@ref) controller.
@@ -563,7 +563,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     function update_simulations!(
         Z̃arg::Union{NTuple{N, T}, AbstractVector{T}}, Z̃cache
     ) where {N, T<:Real}
-        if isdifferent(Z̃cache, Z̃arg) # new Z̃, update:
+        if isdifferent(Z̃cache, Z̃arg)
             for i in eachindex(Z̃cache)
                 # Z̃cache .= Z̃arg is type unstable with Z̃arg::NTuple{N, FowardDiff.Dual}
                 Z̃cache[i] = Z̃arg[i]
@@ -600,7 +600,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         ΔŨ = get_tmp(ΔŨ_cache, T)
         Ue, Ŷe = get_tmp(Ue_cache, T), get_tmp(Ŷe_cache, T)
         U0, Ŷ0 = get_tmp(U0_cache, T), get_tmp(Ŷ0_cache, T)
-        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
     end
     Z̃_∇J      = fill(myNaN, nZ̃) 
     ∇J        = Vector{JNT}(undef, nZ̃)       # gradient of objective J
