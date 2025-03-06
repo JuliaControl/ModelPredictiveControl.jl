@@ -531,8 +531,8 @@ This method is really indicated and I'm not proud of it. That's because of 3 ele
   and as efficient as possible.
 - The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
   of `Vararg{T,N}` (see the [performance tip](https://docs.julialang.org/en/v1/manual/performance-tips/#Be-aware-of-when-Julia-avoids-specializing))
-  and memoization to avoid redundant computations. This is already complex,
-  but it's even worse knowing that AD tools for gradients do not support splatting.
+  and memoization to avoid redundant computations. This is already complex, but it's even
+  worse knowing that most automatic differentiation tools do not support splatting.
 - The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
   and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
 
@@ -546,6 +546,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny
     Ncache = nZ̃ + 3 
     myNaN = convert(JNT, NaN) # fill Z̃ with NaNs to force update_simulations! at 1st call:
+    # ---------------------- differentiation cache ---------------------------------------
     Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(fill(myNaN, nZ̃), Ncache)
     ΔŨ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nΔŨ), Ncache)
     x̂0end_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂),  Ncache)
@@ -586,14 +587,14 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         end
         return nothing
     end
-    # --------------------- cache for the AD functions  -----------------------------------
+    # --------------------- normal cache for the AD functions  ----------------------------
     Z̃arg_vec = Vector{JNT}(undef, nZ̃)
-    ∇J       = Vector{JNT}(undef, nZ̃)       # gradient of J
+    ∇J       = Vector{JNT}(undef, nZ̃)       # gradient of objective J
     g_vec    = Vector{JNT}(undef, ng)
-    ∇g       = Matrix{JNT}(undef, ng, nZ̃)   # Jacobian of g
+    ∇g       = Matrix{JNT}(undef, ng, nZ̃)   # Jacobian of inequality constraints g
     geq_vec  = Vector{JNT}(undef, neq)
-    ∇geq     = Matrix{JNT}(undef, neq, nZ̃)  # Jacobian of geq
-    # --------------------- objective function --------------------------------------------
+    ∇geq     = Matrix{JNT}(undef, neq, nZ̃)  # Jacobian of equality constraints geq
+    # --------------------- objective functions -------------------------------------------
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
         ΔŨ = get_tmp(ΔŨ_cache, T)
@@ -674,7 +675,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     ∇geqfuncs! = Vector{Function}(undef, neq)
     for i in eachindex(∇geqfuncs!)
         # only multivariate syntax, univariate is impossible since nonlinear equality
-        # constraints imply MultipleShooting thus input AND state in Z̃:
+        # constraints imply MultipleShooting, thus input increment ΔU and state X̂0 in Z̃:
         ∇geqfuncs![i] = 
             function (∇geq_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
                 Z̃arg_vec .= Z̃arg
