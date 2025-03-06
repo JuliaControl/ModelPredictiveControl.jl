@@ -514,10 +514,27 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
 end
 
 """
-    get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel) -> Jfunc, ∇Jfunc!, gfuncs, geqfuncs
+    get_optim_functions(
+        mpc::NonLinMPC, ::JuMP.GenericModel
+    ) -> Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
 
-Get the objective `Jfunc` function and `∇Jfunc!` to compute its gradient, and constraint 
-`gfuncs` and `geqfuncs` function vectors for [`NonLinMPC`](@ref).
+Return the functions for the nonlinear optimization of `mpc` [`NonLinMPC`](@ref) controller.
+
+Return the nonlinear objective `Jfunc` function, and `∇Jfunc!`, to compute its gradient. 
+Also return vectors with the nonlinear inequality constraint functions `gfuncs`, and 
+`∇gfuncs!`, for the associated gradients. Lastly, also return vectors with the nonlinear 
+equality constraint functions `geqfuncs` and gradients `∇geqfuncs!`.
+
+This method is really indicated and I'm not proud of it. That's because of 3 elements:
+
+- These functions are used inside the nonlinear optimization, so they must be type-stable
+  and as efficient as possible.
+- The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
+  of `Vararg{T,N}` (see the [performance tip](https://docs.julialang.org/en/v1/manual/performance-tips/#Be-aware-of-when-Julia-avoids-specializing))
+  and memoization to avoid redundant computations. This is already complex,
+  but it's even worse knowing that AD tools for gradients do not support splatting.
+- The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
+  and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
 
 Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
 """
@@ -577,7 +594,6 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     geq_vec  = Vector{JNT}(undef, neq)
     ∇geq     = Matrix{JNT}(undef, neq, nZ̃)  # Jacobian of geq
     # --------------------- objective function --------------------------------------------
-    # force specialization with Vararg, see https://docs.julialang.org/en/v1/manual/performance-tips/#Be-aware-of-when-Julia-avoids-specializing
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
         ΔŨ = get_tmp(ΔŨ_cache, T)
@@ -609,7 +625,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     # --------------------- inequality constraint functions -------------------------------
     gfuncs = Vector{Function}(undef, ng)
     for i in eachindex(gfuncs)
-        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real} # see comment above
+        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
             g = get_tmp(g_cache, T)
             return g[i]::T
@@ -642,7 +658,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     # --------------------- equality constraint functions ---------------------------------
     geqfuncs = Vector{Function}(undef, neq)
     for i in eachindex(geqfuncs)
-        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real} # see comment above
+        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
             geq = get_tmp(geq_cache, T)
             return geq[i]::T
@@ -657,20 +673,15 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     ∇geq_buffer = JacobianBuffer(geqfunc_vec!, geq_vec, Z̃arg_vec)
     ∇geqfuncs! = Vector{Function}(undef, neq)
     for i in eachindex(∇geqfuncs!)
-        ∇geqfuncs![i] = if nZ̃ == 1
-            function (Z̃arg::T) where T<:Real
-                Z̃arg_vec .= Z̃arg
-                jacobian!(∇geq, ∇geq_buffer, geq_vec, Z̃arg_vec)
-                return ∇geq[i, begin]   # univariate syntax, see JuMP.@operator doc
-            end
-        else
+        # only multivariate syntax, univariate is impossible since nonlinear equality
+        # constraints imply MultipleShooting thus input AND state in Z̃:
+        ∇geqfuncs![i] = 
             function (∇geq_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
                 Z̃arg_vec .= Z̃arg
                 jacobian!(∇geq, ∇geq_buffer, geq_vec, Z̃arg_vec)
                 ∇geq_i .= @views ∇geq[i, :]
-                return ∇geq_i           # multivariate syntax, see JuMP.@operator doc
+                return ∇geq_i
             end
-        end
     end
     return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
 end
