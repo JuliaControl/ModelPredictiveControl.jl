@@ -508,6 +508,148 @@ function init_defectmat(
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 end
 
+"""
+    init_nonlincon!(
+        mpc::PredictiveController, model::LinModel, transcription::TranscriptionMethod, 
+        gfuncs  , ∇gfuncs!,   
+        geqfuncs, ∇geqfuncs!
+    )
+
+Init nonlinear constraints for [`LinModel`](@ref) for all [`TranscriptionMethod`](@ref).
+
+The only nonlinear constraints are the custom inequality constraints `gc`.
+"""
+function init_nonlincon!(
+        mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, gfuncs, ∇gfuncs!, _ , _    
+    ) 
+    optim, con = mpc.optim, mpc.con
+    nZ̃ = length(mpc.Z̃)
+    if length(con.i_g) ≠ 0
+        i_base = 0
+        for i in 1:con.nc
+            name = Symbol("g_c_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i]; name
+            )
+        end
+    end
+    return nothing
+end
+
+"""
+    init_nonlincon!(
+        mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
+        gfuncs,   ∇gfuncs!,
+        geqfuncs, ∇geqfuncs!
+    )
+    
+Init nonlinear constraints for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
+
+The nonlinear constraints are the output prediction `Ŷ` bounds, the custom inequality
+constraints `gc` and all the nonlinear equality constraints `geq`.
+"""
+function init_nonlincon!(
+    mpc::PredictiveController, ::NonLinModel, ::MultipleShooting, 
+    gfuncs,     ∇gfuncs!,
+    geqfuncs,   ∇geqfuncs!
+) 
+    optim, con = mpc.optim, mpc.con
+    ny, nx̂, Hp, nZ̃ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.Z̃)
+    # --- nonlinear inequality constraints ---
+    if length(con.i_g) ≠ 0
+        i_base = 0
+        for i in eachindex(con.Y0min)
+            name = Symbol("g_Y0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 1Hp*ny
+        for i in eachindex(con.Y0max)
+            name = Symbol("g_Y0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 2Hp*ny
+        for i in 1:con.nc
+            name = Symbol("g_c_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+    end
+    # --- nonlinear equality constraints ---
+    Z̃var = optim[:Z̃var]
+    for i in eachindex(geqfuncs)
+        name = Symbol("geq_$i")
+        geqfunc_i = optim[name] = JuMP.add_nonlinear_operator(
+            optim, nZ̃, geqfuncs[i], ∇geqfuncs![i]; name
+        )
+        # set with @constrains here instead of set_nonlincon!, since the number of nonlinear 
+        # equality constraints is known and constant (±Inf are impossible):
+        @constraint(optim, geqfunc_i(Z̃var...) == 0)
+    end
+    return nothing
+end
+
+"""
+    init_nonlincon!(
+        mpc::PredictiveController, model::NonLinModel, ::SingleShooting, 
+        gfuncs,   ∇gfuncs!,
+        geqfuncs, ∇geqfuncs!
+    )
+
+Init nonlinear constraints for [`NonLinModel`](@ref) and [`SingleShooting`](@ref).
+
+The nonlinear constraints are the custom inequality constraints `gc`, the output
+prediction `Ŷ` bounds and the terminal state `x̂end` bounds.
+"""
+function init_nonlincon!(
+    mpc::PredictiveController, ::NonLinModel, ::SingleShooting, gfuncs, ∇gfuncs!, _ , _
+)
+    optim, con = mpc.optim, mpc.con
+    ny, nx̂, Hp, nZ̃ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.Z̃)
+    if length(con.i_g) ≠ 0
+        i_base = 0
+        for i in eachindex(con.Y0min)
+            name = Symbol("g_Y0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 1Hp*ny
+        for i in eachindex(con.Y0max)
+            name = Symbol("g_Y0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 2Hp*ny
+        for i in eachindex(con.x̂0min)
+            name = Symbol("g_x̂0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 2Hp*ny + nx̂
+        for i in eachindex(con.x̂0max)
+            name = Symbol("g_x̂0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 2Hp*ny + 2nx̂
+        for i in 1:con.nc
+            name = Symbol("g_c_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+    end
+    return nothing
+end
+
 @doc raw"""
     linconstrainteq!(
         mpc::PredictiveController, model::LinModel, transcription::MultipleShooting

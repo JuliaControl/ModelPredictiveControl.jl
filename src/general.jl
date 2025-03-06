@@ -9,23 +9,35 @@ const DEFAULT_EWT = 0.0
 "Abstract type for all differentiation buffers."
 abstract type DifferentiationBuffer end
 
-"Struct with both function and configuration for ForwardDiff differentiation."
+function Base.show(io::IO, buffer::DifferentiationBuffer) 
+    return print(io, "DifferentiationBuffer with a $(typeof(buffer.config).name.name)")
+end
+
+"Struct with both function and configuration for ForwardDiff gradient."
+struct GradientBuffer{FT<:Function, CT<:ForwardDiff.GradientConfig} <: DifferentiationBuffer
+    f::FT
+    config::CT
+end
+
+"Create a GradientBuffer with function `f` and input `x`."
+GradientBuffer(f, x) = GradientBuffer(f, ForwardDiff.GradientConfig(f, x))
+
+"Compute in-place and return the gradient of `buffer.f` at `x`."
+function gradient!(g, buffer::GradientBuffer, x)
+    return ForwardDiff.gradient!(g, buffer.f, x, buffer.config)
+end
+
+"Struct with both function and configuration for ForwardDiff Jacobian."
 struct JacobianBuffer{FT<:Function, CT<:ForwardDiff.JacobianConfig} <: DifferentiationBuffer
     f!::FT
     config::CT
 end
 
-function Base.show(io::IO, buffer::DifferentiationBuffer) 
-    return print(io, "DifferentiationBuffer with a $(typeof(buffer.config).name.name)")
-end
-
-"Create a JacobianBuffer with function `f!`, output `y` and input `x`."
+"Create a JacobianBuffer with in-place function `f!`, output `y` and input `x`."
 JacobianBuffer(f!, y, x) = JacobianBuffer(f!, ForwardDiff.JacobianConfig(f!, y, x))
 
 "Compute in-place and return the Jacobian matrix of `buffer.f!` at `x`."
-function jacobian!(
-    A, buffer::JacobianBuffer, y, x
-)
+function jacobian!(A, buffer::JacobianBuffer, y, x)
     return ForwardDiff.jacobian!(A, buffer.f!, y, x, buffer.config)
 end
 
@@ -78,6 +90,9 @@ function limit_solve_time(optim::GenericModel, Ts)
         end
     end
 end
+
+"Verify that x and y elements are different using `!==`."
+isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
 
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)

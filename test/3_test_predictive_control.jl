@@ -602,10 +602,12 @@ end
     LHS = zeros(1)
     nmpc15.con.gc!(LHS,[1,2],[3,4],[4,6],10,0.1) 
     @test LHS ≈ [10*dot([1,2],[3,4])+sum([4,6])+0.1]
-    nmpc16 = NonLinMPC(nonlinmodel, Hp=10, transcription=MultipleShooting())
+    gc! = (LHS,_,_,_,_,_)-> (LHS .= 0.0) # useless, only for coverage
+    nmpc16 = NonLinMPC(nonlinmodel, Hp=10, transcription=MultipleShooting(), nc=10, gc=gc!)
     @test nmpc16.transcription == MultipleShooting()
     @test length(nmpc16.Z̃) == nonlinmodel.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
     @test nmpc16.con.neq == nmpc16.estim.nx̂*nmpc16.Hp
+    @test nmpc16.con.nc == 10
     nmpc17 = NonLinMPC(linmodel1, Hp=10, transcription=MultipleShooting())
     @test nmpc17.transcription == MultipleShooting()
     @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
