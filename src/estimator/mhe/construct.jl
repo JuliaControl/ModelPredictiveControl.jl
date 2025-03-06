@@ -718,36 +718,6 @@ function init_matconstraint_mhe(::SimModel{NT},
     return i_b, i_g, A
 end
 
-"By default, no nonlinear constraints in the MHE, thus return nothing."
-set_nonlincon!(::MovingHorizonEstimator, ::SimModel, ::JuMP.GenericModel) = nothing
-
-"Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
-function set_nonlincon!(
-    estim::MovingHorizonEstimator, ::NonLinModel, optim::JuMP.GenericModel{JNT}
-) where JNT<:Real
-    optim, con = estim.optim, estim.con
-    Z̃var = optim[:Z̃var]
-    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
-    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
-    for i in findall(.!isinf.(con.X̂0min))
-        gfunc_i = optim[Symbol("g_X̂0min_$(i)")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in findall(.!isinf.(con.X̂0max))
-        gfunc_i = optim[Symbol("g_X̂0max_$(i)")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in findall(.!isinf.(con.V̂min))
-        gfunc_i = optim[Symbol("g_V̂min_$(i)")]
-        JuMP.@constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in findall(.!isinf.(con.V̂max))
-        gfunc_i = optim[Symbol("g_V̂max_$(i)")]
-        JuMP.@constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    return nothing
-end
-
 """
     init_defaultcon_mhe(
         model::SimModel, He, C, nx̂, nym, E, ex̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂
@@ -1289,6 +1259,7 @@ function init_optimization!(
             )
         end
     end
+    set_nonlincon!(estim, model, optim)
     return nothing
 end
 
@@ -1421,4 +1392,34 @@ function get_optim_functions(
         end
     end
     return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!
+end
+
+"By default, no nonlinear constraints in the MHE, thus return nothing."
+set_nonlincon!(::MovingHorizonEstimator, ::SimModel, ::JuMP.GenericModel) = nothing
+
+"Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
+function set_nonlincon!(
+    estim::MovingHorizonEstimator, ::NonLinModel, optim::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    optim, con = estim.optim, estim.con
+    Z̃var = optim[:Z̃var]
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    for i in findall(.!isinf.(con.X̂0min))
+        gfunc_i = optim[Symbol("g_X̂0min_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.X̂0max))
+        gfunc_i = optim[Symbol("g_X̂0max_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.V̂min))
+        gfunc_i = optim[Symbol("g_V̂min_$(i)")]
+        JuMP.@constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.V̂max))
+        gfunc_i = optim[Symbol("g_V̂max_$(i)")]
+        JuMP.@constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    return nothing
 end
