@@ -525,7 +525,7 @@ Also return vectors with the nonlinear inequality constraint functions `gfuncs`,
 `∇gfuncs!`, for the associated gradients. Lastly, also return vectors with the nonlinear 
 equality constraint functions `geqfuncs` and gradients `∇geqfuncs!`.
 
-This method is really indicated and I'm not proud of it. That's because of 3 elements:
+This method is really intricate and I'm not proud of it. That's because of 3 elements:
 
 - These functions are used inside the nonlinear optimization, so they must be type-stable
   and as efficient as possible.
