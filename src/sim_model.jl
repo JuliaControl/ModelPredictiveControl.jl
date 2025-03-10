@@ -218,10 +218,13 @@ function preparestate!(model::SimModel)
     return x 
 end
 
-@deprecate function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
-    x  = model.buffer.x
-    x .= model.x0 .+ model.xop
-    return x 
+function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
+    Base.depwarn(
+        "The method preparestate!(model::SimModel, u, d=[]) is deprecated. Use "*
+        " preparestate!(model::SimModel) instead.",
+        :preparestate!,
+    )
+    return preparestate!(model)
 end
 
 @doc raw"""

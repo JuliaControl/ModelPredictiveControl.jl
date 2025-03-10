@@ -65,6 +65,9 @@ end
     @test res_man.D_data ≈ res.D_data
     @test res_man.X_data ≈ res.X_data
     @test res_man.X̂_data ≈ res.X̂_data
+
+    res2 = sim!(estim, 15, x_noise=[0.1, 0.2, 0.3, 0.4])
+    @test !(res2.X_data ≈ res.X_data)
 end
 
 @testitem "StateEstimator Plots" setup=[SetupMPCtests] begin
