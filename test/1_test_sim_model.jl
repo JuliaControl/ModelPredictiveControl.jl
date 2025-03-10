@@ -107,7 +107,8 @@ end
     @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30]
     x = initstate!(linmodel1, [10, 60])
     @test evaloutput(linmodel1) ≈ [50 + 19.0, 30 + 7.4]
-    @test preparestate!(linmodel1, [10, 60]) ≈ x
+    @test preparestate!(linmodel1) ≈ x           # new method
+    @test preparestate!(linmodel1, [10, 60]) ≈ x # deprecated method
     @test updatestate!(linmodel1,  [10, 60]) ≈ x
     linmodel2 = LinModel(append(tf(1, [1, 0]), tf(2, [10, 1])), 1.0)
     x = initstate!(linmodel2, [10, 3])

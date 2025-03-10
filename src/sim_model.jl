@@ -208,11 +208,17 @@ function initstate!(model::SimModel, u, d=model.buffer.empty)
 end
 
 @doc raw"""
-    preparestate!(model::SimModel, _ , _ ) -> x
+    preparestate!(model::SimModel) -> x
 
 Do nothing for [`SimModel`](@ref) and return the current model state ``\mathbf{x}(k)``. 
 """
-function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
+function preparestate!(model::SimModel)
+    x  = model.buffer.x
+    x .= model.x0 .+ model.xop
+    return x 
+end
+
+@deprecate function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
     x  = model.buffer.x
     x .= model.x0 .+ model.xop
     return x 
