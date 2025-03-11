@@ -208,14 +208,23 @@ function initstate!(model::SimModel, u, d=model.buffer.empty)
 end
 
 @doc raw"""
-    preparestate!(model::SimModel, _ , _ ) -> x
+    preparestate!(model::SimModel) -> x
 
 Do nothing for [`SimModel`](@ref) and return the current model state ``\mathbf{x}(k)``. 
 """
-function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
+function preparestate!(model::SimModel)
     x  = model.buffer.x
     x .= model.x0 .+ model.xop
     return x 
+end
+
+function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
+    Base.depwarn(
+        "The method preparestate!(model::SimModel, u, d=[]) is deprecated. Use "*
+        " preparestate!(model::SimModel) instead.",
+        :preparestate!,
+    )
+    return preparestate!(model)
 end
 
 @doc raw"""

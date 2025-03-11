@@ -286,7 +286,8 @@ function sim_closedloop!(
         d = lastd + d_step + d_noise.*randn(plant.nd)
         y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
         ym = y[estim.i_ym]
-        preparestate!(est_mpc, ym, d)
+        x  = preparestate!(plant)
+        x̂  = preparestate!(est_mpc, ym, d)
         u  = sim_getu!(est_mpc, u_ry, d, ru)
         ud = u + u_step + u_noise.*randn(plant.nu)
         Y_data[:, i]        .= y
@@ -296,10 +297,10 @@ function sim_closedloop!(
         Ud_data[:, i]       .= ud
         Ru_data[:, i]       .= ru
         D_data[:, i]        .= d
-        X_data[:, i]        .= plant.x0 .+ plant.xop
-        X̂_data[:, i]        .= estim.x̂0 .+ estim.x̂op
-        x = updatestate!(plant, ud, d); 
-        x[:] += x_noise.*randn(plant.nx)
+        X_data[:, i]        .= x
+        X̂_data[:, i]        .= x̂
+        updatestate!(plant, ud, d); 
+        plant.x0 .+= x_noise.*randn(plant.nx)
         updatestate!(est_mpc, u, ym, d)
     end
     res = SimResult(
