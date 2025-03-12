@@ -373,8 +373,8 @@ function MovingHorizonEstimator(
     sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
     Cwt::Real = Inf,
     optim::JM = default_optim_mhe(model),
-    gradient::AbstractADType = DEFAULT_NONLINMJE_GRADIENT,
-    jacobian::AbstractADType = DEFAULT_NONLINMJE_JACOBIAN,
+    gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
+    jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
     direct = true,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
@@ -419,8 +419,8 @@ supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
     optim::JM = default_optim_mhe(model),
-    gradient::AbstractADType = DEFAULT_NONLINMJE_GRADIENT,
-    jacobian::AbstractADType = DEFAULT_NONLINMJE_JACOBIAN,
+    gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
+    jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
     direct = true,
     covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
