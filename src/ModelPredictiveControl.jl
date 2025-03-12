@@ -6,7 +6,17 @@ using Random: randn
 
 using RecipesBase
 using ProgressLogging
-using ForwardDiff
+
+
+
+using DifferentiationInterface: ADTypes.AbstractADType, AutoForwardDiff, AutoSparse
+using DifferentiationInterface: gradient!, jacobian!, prepare_gradient, prepare_jacobian
+
+import ForwardDiff
+
+
+
+
 
 import ControlSystemsBase
 import ControlSystemsBase: ss, tf, delay

@@ -13,20 +13,6 @@ function Base.show(io::IO, buffer::DifferentiationBuffer)
     return print(io, "DifferentiationBuffer with a $(typeof(buffer.config).name.name)")
 end
 
-"Struct with both function and configuration for ForwardDiff gradient."
-struct GradientBuffer{FT<:Function, CT<:ForwardDiff.GradientConfig} <: DifferentiationBuffer
-    f::FT
-    config::CT
-end
-
-"Create a GradientBuffer with function `f` and input `x`."
-GradientBuffer(f, x) = GradientBuffer(f, ForwardDiff.GradientConfig(f, x))
-
-"Compute in-place and return the gradient of `buffer.f` at `x`."
-function gradient!(g, buffer::GradientBuffer, x)
-    return ForwardDiff.gradient!(g, buffer.f, x, buffer.config)
-end
-
 "Struct with both function and configuration for ForwardDiff Jacobian."
 struct JacobianBuffer{FT<:Function, CT<:ForwardDiff.JacobianConfig} <: DifferentiationBuffer
     f!::FT
@@ -37,7 +23,7 @@ end
 JacobianBuffer(f!, y, x) = JacobianBuffer(f!, ForwardDiff.JacobianConfig(f!, y, x))
 
 "Compute in-place and return the Jacobian matrix of `buffer.f!` at `x`."
-function jacobian!(A, buffer::JacobianBuffer, y, x)
+function get_jacobian!(A, buffer::JacobianBuffer, y, x)
     return ForwardDiff.jacobian!(A, buffer.f!, y, x, buffer.config)
 end
 
