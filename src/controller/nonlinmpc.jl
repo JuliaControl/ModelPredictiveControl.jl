@@ -1,5 +1,12 @@
-const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
 const DEFAULT_NONLINMPC_TRANSCRIPTION = SingleShooting()
+const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
+const DEFAULT_NONLINMPC_GRADIENT  = AutoForwardDiff()
+const DEFAULT_NONLINMPC_JACDENSE  = AutoForwardDiff()
+const DEFAULT_NONLINMPC_JACSPARSE = AutoSparse(
+    AutoForwardDiff();
+    sparsity_detector=TracerSparsityDetector(),
+    coloring_algorithm=GreedyColoringAlgorithm(),
+)
 
 struct NonLinMPC{
     NT<:Real, 
@@ -52,7 +59,7 @@ struct NonLinMPC{
     function NonLinMPC{NT}(
         estim::SE, 
         Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc!::GCfunc, nc, p::PT, 
-        transcription::TM, optim::JM
+        transcription::TM, optim::JM, gradient, jacobian
     ) where {
             NT<:Real, 
             SE<:StateEstimator, 
@@ -109,7 +116,7 @@ struct NonLinMPC{
             Uop, Yop, Dop,
             buffer
         )
-        init_optimization!(mpc, model, optim)
+        init_optimization!(mpc, model, optim, gradient, jacobian)
         return mpc
     end
 end
@@ -189,6 +196,10 @@ This controller allocates memory at each time step for the optimization.
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
    (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
+- `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
+   function, see [`DifferentiationInterface`](https://juliadiff.org/DifferentiationInterface.jl/DifferentiationInterface/stable/explanation/backends/#List).
+- `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
+   of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
@@ -265,13 +276,15 @@ function NonLinMPC(
     p = model.p,
     transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
+    gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
+    jacobian::AbstractADType = default_jacobian(transcription),
     kwargs...
 )
     estim = UnscentedKalmanFilter(model; kwargs...)
     return NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
-        transcription, optim
+        transcription, optim, gradient, jacobian
     )
 end
 
@@ -294,13 +307,15 @@ function NonLinMPC(
     p = model.p,
     transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
+    gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
+    jacobian::AbstractADType = default_jacobian(transcription),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
     return NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
-        transcription, optim
+        transcription, optim, gradient, jacobian
     )
 end
 
@@ -347,6 +362,8 @@ function NonLinMPC(
     p = estim.model.p,
     transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
+    gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
+    jacobian::AbstractADType = default_jacobian(transcription),
 ) where {
     NT<:Real, 
     SE<:StateEstimator{NT}
@@ -360,9 +377,12 @@ function NonLinMPC(
     gc! = get_mutating_gc(NT, gc)
     return NonLinMPC{NT}(
         estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, gc!, nc, p, 
-        transcription, optim
+        transcription, optim, gradient, jacobian
     )
 end
+
+default_jacobian(::SingleShooting)      = DEFAULT_NONLINMPC_JACDENSE
+default_jacobian(::TranscriptionMethod) = DEFAULT_NONLINMPC_JACSPARSE
 
 """
     validate_JE(NT, JE) -> nothing
@@ -477,11 +497,23 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
 end
 
 """
-    init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
+    init_optimization!(
+        mpc::NonLinMPC, 
+        model::SimModel, 
+        optim::JuMP.GenericModel, 
+        gradient::AbstractADType,
+        Jacobian::AbstractADType
+    ) -> nothing
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
+function init_optimization!(
+        mpc::NonLinMPC,
+        model::SimModel,
+        optim::JuMP.GenericModel, 
+        gradient::AbstractADType,
+        jacobian::AbstractADType
+    )
     # --- variables and linear constraints ---
     con, transcription = mpc.con, mpc.transcription
     nZ̃ = length(mpc.Z̃)
@@ -505,7 +537,9 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs! = get_optim_functions(mpc, optim)
+    Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs! = get_optim_functions(
+        mpc, optim, gradient, jacobian
+    )
     @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
     @objective(optim, Min, J(Z̃var...))
     init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
@@ -515,7 +549,10 @@ end
 
 """
     get_optim_functions(
-        mpc::NonLinMPC, optim::JuMP.GenericModel
+        mpc::NonLinMPC, 
+        optim::JuMP.GenericModel, 
+        grad_backend::AbstractADType,
+        jac_backend ::AbstractADType
     ) -> Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
 
 Return the functions for the nonlinear optimization of `mpc` [`NonLinMPC`](@ref) controller.
@@ -538,45 +575,21 @@ This method is really intricate and I'm not proud of it. That's because of 3 ele
 
 Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
 """
-function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
+function get_optim_functions(
+    mpc::NonLinMPC, 
+    optim::JuMP.GenericModel{JNT}, 
+    grad_backend::AbstractADType,
+    jac_backend ::AbstractADType
+) where JNT<:Real
     model, transcription = mpc.estim.model, mpc.transcription
-    nu, ny, nx̂, nϵ, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, mpc.Hp, mpc.Hc
-    ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
-    nZ̃, nU, nŶ, nX̂ = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂
-    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny
-    Ncache = nZ̃ + 3 
-    myNaN = convert(JNT, NaN) # fill Z̃ with NaNs to force update_simulations! at 1st call:
-    # ---------------------- differentiation cache ---------------------------------------
-    Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(fill(myNaN, nZ̃), Ncache)
-    ΔŨ_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nΔŨ), Ncache)
-    x̂0end_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂),  Ncache)
-    Ŷe_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶe), Ncache)
-    Ue_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nUe), Ncache)
-    Ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nŶ),  Ncache)
-    U0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU),  Ncache)
-    Û0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nU),  Ncache)
-    X̂0_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nX̂),  Ncache)
-    gc_cache::DiffCache{Vector{JNT}, Vector{JNT}}     = DiffCache(zeros(JNT, nc),  Ncache)
-    g_cache::DiffCache{Vector{JNT}, Vector{JNT}}      = DiffCache(zeros(JNT, ng),  Ncache)
-    geq_cache::DiffCache{Vector{JNT}, Vector{JNT}}    = DiffCache(zeros(JNT, neq), Ncache)
     # --------------------- update simulation function ------------------------------------
-    function update_simulations!(
-        Z̃arg::Union{NTuple{N, T}, AbstractVector{T}}, Z̃cache
-    ) where {N, T<:Real}
-        if isdifferent(Z̃cache, Z̃arg)
-            for i in eachindex(Z̃cache)
+    function update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        if isdifferent(Z̃arg, Z̃)
+            for i in eachindex(Z̃)
                 # Z̃cache .= Z̃arg is type unstable with Z̃arg::NTuple{N, FowardDiff.Dual}
-                Z̃cache[i] = Z̃arg[i]
+                Z̃[i] = Z̃arg[i]
             end
-            Z̃ = Z̃cache
             ϵ = (nϵ ≠ 0) ? Z̃[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
-            ΔŨ     = get_tmp(ΔŨ_cache, T)
-            x̂0end  = get_tmp(x̂0end_cache, T)
-            Ue, Ŷe = get_tmp(Ue_cache, T), get_tmp(Ŷe_cache, T)
-            U0, Ŷ0 = get_tmp(U0_cache, T), get_tmp(Ŷ0_cache, T)
-            X̂0, Û0 = get_tmp(X̂0_cache, T), get_tmp(Û0_cache, T) 
-            gc, g  = get_tmp(gc_cache, T), get_tmp(g_cache, T)
-            geq    = get_tmp(geq_cache, T)
             U0 = getU0!(U0, mpc, Z̃)
             ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
             Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, mpc, model, transcription, U0, Z̃)
@@ -587,63 +600,133 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         end
         return nothing
     end
-    # --------------------- objective functions -------------------------------------------
+    # ---------------------- JNT vectors cache --------------------------------------------
+    nu, ny, nx̂, nϵ, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, mpc.Hp, mpc.Hc
+    ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
+    nZ̃, nU, nŶ, nX̂ = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂
+    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+    myNaN = convert(JNT, NaN)
+    Z̃      = fill(myNaN, nZ̃)
+    ΔŨ     = zeros(JNT, nΔŨ)
+    x̂0end  = zeros(JNT, nx̂)
+    Ue, Ŷe = zeros(JNT, nUe), zeros(JNT, nŶe)
+    U0, Ŷ0 = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Û0, X̂0 = zeros(JNT, nU),  zeros(JNT, nX̂)
+    gc, g  = zeros(JNT, nc),  zeros(JNT, ng)
+    geq    = zeros(JNT, neq)
+
+    # WIP: still receive INVALID_MODEL once and a while, needs to investigate.
+
+
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
-        update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
-        ΔŨ = get_tmp(ΔŨ_cache, T)
-        Ue, Ŷe = get_tmp(Ue_cache, T), get_tmp(Ŷe_cache, T)
-        U0, Ŷ0 = get_tmp(U0_cache, T), get_tmp(Ŷ0_cache, T)
+        update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
     end
-    function Jfunc_vec(Z̃arg::AbstractVector{T}) where T<:Real 
-        update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
-        ΔŨ = get_tmp(ΔŨ_cache, T)
-        Ue, Ŷe = get_tmp(Ue_cache, T), get_tmp(Ŷe_cache, T)
-        U0, Ŷ0 = get_tmp(U0_cache, T), get_tmp(Ŷ0_cache, T)
-        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
+    function Jfunc_vec!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
-    Z̃_∇J      = fill(myNaN, nZ̃) 
-    ∇J        = Vector{JNT}(undef, nZ̃)       # gradient of objective J
-    ∇J_buffer = GradientBuffer(Jfunc_vec, Z̃_∇J)
+
+
+
+    gfuncs = Vector{Function}(undef, ng)
+    for i in eachindex(gfuncs)
+        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+            return g[i]::T
+        end
+        gfuncs[i] = func_i
+    end
+    function gfunc_vec!(g, Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, geq)
+        update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        return g
+    end
+
+
+
+
+
+
+
+
+    Z̃_∇J      = fill(myNaN, nZ̃)
+    ΔŨ_∇J     = zeros(JNT, nΔŨ)
+    x̂0end_∇J  = zeros(JNT, nx̂)
+    Ue_∇J, Ŷe_∇J = zeros(JNT, nUe), zeros(JNT, nŶe)
+    U0_∇J, Ŷ0_∇J = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Û0_∇J, X̂0_∇J = zeros(JNT, nU),  zeros(JNT, nX̂)
+    gc_∇J, g_∇J  = zeros(JNT, nc),  zeros(JNT, ng)
+    geq_∇J    = zeros(JNT, neq)
+
+
+
+
+
+
+
+    Z̃_∇J    = fill(myNaN, nZ̃) 
+    ∇J      = Vector{JNT}(undef, nZ̃)       # gradient of objective J
+    ∇J_context = (
+        Cache(Z̃_∇J),  Cache(ΔŨ_∇J), Cache(x̂0end_∇J), 
+        Cache(Ue_∇J), Cache(Ŷe_∇J), 
+        Cache(U0_∇J), Cache(Ŷ0_∇J), 
+        Cache(Û0_∇J), Cache(X̂0_∇J), 
+        Cache(gc_∇J), Cache(g_∇J), Cache(geq_∇J)
+    )
+    ∇J_prep = prepare_gradient(Jfunc_vec!, grad_backend, Z̃_∇J, ∇J_context...)
     ∇Jfunc! = if nZ̃ == 1
-        function (Z̃arg::T) where T<:Real 
+        function (Z̃arg)
             Z̃_∇J .= Z̃arg
-            gradient!(∇J, ∇J_buffer, Z̃_∇J)
+            gradient!(Jfunc_vec!, ∇J, ∇J_prep, grad_backend, Z̃_∇J, ∇J_context...)
             return ∇J[begin]    # univariate syntax, see JuMP.@operator doc
         end
     else
         function (∇J::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
             Z̃_∇J .= Z̃arg
-            gradient!(∇J, ∇J_buffer, Z̃_∇J)
+            gradient!(Jfunc_vec!, ∇J, ∇J_prep, grad_backend, Z̃_∇J, ∇J_context...)
             return ∇J           # multivariate syntax, see JuMP.@operator doc
         end
     end
-    # --------------------- inequality constraint functions -------------------------------
-    gfuncs = Vector{Function}(undef, ng)
-    for i in eachindex(gfuncs)
-        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
-            g = get_tmp(g_cache, T)
-            return g[i]::T
-        end
-        gfuncs[i] = func_i
-    end
-    function gfunc_vec!(g, Z̃vec::AbstractVector{T}) where T<:Real
-        update_simulations!(Z̃vec, get_tmp(Z̃_cache, T))
-        g .= get_tmp(g_cache, T)
-        return g
-    end
+
+
+
+
+
+
+
     Z̃_∇g      = fill(myNaN, nZ̃)
-    g_vec     = Vector{JNT}(undef, ng)
-    ∇g        = Matrix{JNT}(undef, ng, nZ̃)   # Jacobian of inequality constraints g
-    ∇g_buffer = JacobianBuffer(gfunc_vec!, g_vec, Z̃_∇g)
-    ∇gfuncs!  = Vector{Function}(undef, ng)
+    ΔŨ_∇g     = zeros(JNT, nΔŨ)
+    x̂0end_∇g  = zeros(JNT, nx̂)
+    Ue_∇g, Ŷe_∇g = zeros(JNT, nUe), zeros(JNT, nŶe)
+    U0_∇g, Ŷ0_∇g = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Û0_∇g, X̂0_∇g = zeros(JNT, nU),  zeros(JNT, nX̂)
+    gc_∇g, g_∇g  = zeros(JNT, nc),  zeros(JNT, ng)
+    geq_∇g    = zeros(JNT, neq)
+
+
+
+
+
+    Z̃_∇g     = fill(myNaN, nZ̃)
+    g_vec    = Vector{JNT}(undef, ng)
+    ∇g       = Matrix{JNT}(undef, ng, nZ̃)   # Jacobian of inequality constraints g
+    ∇g_context = (
+        Cache(Z̃_∇g),  Cache(ΔŨ_∇g), Cache(x̂0end_∇g), 
+        Cache(Ue_∇g), Cache(Ŷe_∇g), 
+        Cache(U0_∇g), Cache(Ŷ0_∇g), 
+        Cache(Û0_∇g), Cache(X̂0_∇g), 
+        Cache(gc_∇g), Cache(geq_∇g)
+    )
+    ∇g_prep  = prepare_jacobian(gfunc_vec!, g_vec, jac_backend, Z̃_∇g, ∇g_context...)
+    ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)
         ∇gfuncs![i] = if nZ̃ == 1
             function (Z̃arg::T) where T<:Real
                 if isdifferent(Z̃arg, Z̃_∇g)
                     Z̃_∇g .= Z̃arg
-                    jacobian!(∇g, ∇g_buffer, g_vec, Z̃_∇g)
+                    jacobian!(
+                        gfunc_vec!, g_vec, ∇g, ∇g_prep, jac_backend, Z̃_∇g, ∇g_context...
+                    )
                 end
                 return ∇g[i, begin]            # univariate syntax, see JuMP.@operator doc
             end
@@ -651,7 +734,9 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
                 if isdifferent(Z̃arg, Z̃_∇g)
                     Z̃_∇g .= Z̃arg
-                    jacobian!(∇g, ∇g_buffer, g_vec, Z̃_∇g)
+                    jacobian!(
+                        gfunc_vec!, g_vec, ∇g, ∇g_prep, jac_backend, Z̃_∇g, ∇g_context...
+                    )
                 end
                 return ∇g_i .= @views ∇g[i, :] # multivariate syntax, see JuMP.@operator doc
             end
@@ -659,6 +744,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     end
     # --------------------- equality constraint functions ---------------------------------
     geqfuncs = Vector{Function}(undef, neq)
+    #=
     for i in eachindex(geqfuncs)
         func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
@@ -672,11 +758,13 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         geq .= get_tmp(geq_cache, T)
         return geq
     end
-    Z̃_∇geq      = fill(myNaN, nZ̃)               # NaN to force update at 1st call
-    geq_vec     = Vector{JNT}(undef, neq)
-    ∇geq        = Matrix{JNT}(undef, neq, nZ̃)   # Jacobian of equality constraints geq
-    ∇geq_buffer = JacobianBuffer(geqfunc_vec!, geq_vec, Z̃_∇geq)
-    ∇geqfuncs!  = Vector{Function}(undef, neq)
+    Z̃_∇geq     = fill(myNaN, nZ̃)
+    geq_vec    = Vector{JNT}(undef, neq)
+    ∇geq       = Matrix{JNT}(undef, neq, nZ̃)   # Jacobian of equality constraints geq
+    ∇geq_prep  = prepare_jacobian(geqfunc_vec!, geq_vec, jac_backend, Z̃_∇geq)
+    =#
+    ∇geqfuncs! = Vector{Function}(undef, neq)
+    #=
     for i in eachindex(∇geqfuncs!)
         # only multivariate syntax, univariate is impossible since nonlinear equality
         # constraints imply MultipleShooting, thus input increment ΔU and state X̂0 in Z̃:
@@ -684,11 +772,12 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             function (∇geq_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
                 if isdifferent(Z̃arg, Z̃_∇geq)
                     Z̃_∇geq .= Z̃arg
-                    jacobian!(∇geq, ∇geq_buffer, geq_vec, Z̃_∇geq)
+                    jacobian!(geqfunc_vec!, geq_vec, ∇geq, ∇geq_prep, jac_backend, Z̃_∇geq)
                 end
                 return ∇geq_i .= @views ∇geq[i, :]
             end
     end
+    =#
     return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
 end
 

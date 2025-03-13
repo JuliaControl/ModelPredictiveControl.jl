@@ -209,11 +209,11 @@ function get_jacobians!(linmodel::LinModel, xnext0, y0, model::SimModel, x0, u0,
     linbuffer.x .= x0
     linbuffer.u .= u0
     linbuffer.d .= d0
-    jacobian!(linmodel.A,  linbuffer.buffer_f_at_u_d, xnext0, x0)
-    jacobian!(linmodel.Bu, linbuffer.buffer_f_at_x_d, xnext0, u0)
-    jacobian!(linmodel.Bd, linbuffer.buffer_f_at_x_u, xnext0, d0)
-    jacobian!(linmodel.C,  linbuffer.buffer_h_at_d, y0, x0)
-    jacobian!(linmodel.Dd, linbuffer.buffer_h_at_x, y0, d0)
+    get_jacobian!(linmodel.A,  linbuffer.buffer_f_at_u_d, xnext0, x0)
+    get_jacobian!(linmodel.Bu, linbuffer.buffer_f_at_x_d, xnext0, u0)
+    get_jacobian!(linmodel.Bd, linbuffer.buffer_f_at_x_u, xnext0, d0)
+    get_jacobian!(linmodel.C,  linbuffer.buffer_h_at_d, y0, x0)
+    get_jacobian!(linmodel.Dd, linbuffer.buffer_h_at_x, y0, d0)
     return nothing
 end
 

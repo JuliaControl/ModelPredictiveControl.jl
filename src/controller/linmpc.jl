@@ -259,11 +259,11 @@ function LinMPC(
 end
 
 """
-    init_optimization!(mpc::LinMPC, model::LinModel, optim)
+    init_optimization!(mpc::LinMPC, model::LinModel, optim::JuMP.GenericModel) -> nothing
 
 Init the quadratic optimization for [`LinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::LinMPC, model::LinModel, optim)
+function init_optimization!(mpc::LinMPC, model::LinModel, optim::JuMP.GenericModel)
     # --- variables and linear constraints ---
     con = mpc.con
     nZ̃ = length(mpc.Z̃)
