@@ -1,6 +1,12 @@
 const DEFAULT_NONLINMPC_TRANSCRIPTION = SingleShooting()
 const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
-const DEFAULT_NONLINMPC_GRADIENT = AutoForwardDiff()
+const DEFAULT_NONLINMPC_GRADIENT  = AutoForwardDiff()
+const DEFAULT_NONLINMPC_JACDENSE  = AutoForwardDiff()
+const DEFAULT_NONLINMPC_JACSPARSE = AutoSparse(
+    AutoForwardDiff();
+    sparsity_detector=TracerSparsityDetector(),
+    coloring_algorithm=GreedyColoringAlgorithm(),
+)
 
 struct NonLinMPC{
     NT<:Real, 
@@ -375,8 +381,8 @@ function NonLinMPC(
     )
 end
 
-default_jacobian(::SingleShooting) = AutoForwardDiff()
-default_jacobian(::TranscriptionMethod) = AutoForwardDiff()
+default_jacobian(::SingleShooting)      = DEFAULT_NONLINMPC_JACDENSE
+default_jacobian(::TranscriptionMethod) = DEFAULT_NONLINMPC_JACSPARSE
 
 """
     validate_JE(NT, JE) -> nothing

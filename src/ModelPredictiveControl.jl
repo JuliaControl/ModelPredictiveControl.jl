@@ -7,16 +7,12 @@ using Random: randn
 using RecipesBase
 using ProgressLogging
 
-
-
 using DifferentiationInterface: ADTypes.AbstractADType, AutoForwardDiff, AutoSparse
 using DifferentiationInterface: gradient!, jacobian!, prepare_gradient, prepare_jacobian
+using SparseConnectivityTracer: TracerSparsityDetector
+using SparseMatrixColorings: GreedyColoringAlgorithm
 
-import ForwardDiff
-
-
-
-
+import ForwardDiff #TODO: delete this after `linearize!` and `ExtendedKalmanFilter` are updated
 
 import ControlSystemsBase
 import ControlSystemsBase: ss, tf, delay

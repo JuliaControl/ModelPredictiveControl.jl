@@ -1196,12 +1196,18 @@ function init_predmat_mhe(
 end
 
 """
-    init_optimization!(estim::MovingHorizonEstimator, model::SimModel, optim, _ , _ )
+    init_optimization!(
+        estim::MovingHorizonEstimator, model::SimModel, optim::JuMP.GenericModel, _ , _ 
+    )
 
 Init the quadratic optimization of [`MovingHorizonEstimator`](@ref).
 """
 function init_optimization!(
-    estim::MovingHorizonEstimator, ::LinModel, optim::JuMP.GenericModel, _ , _
+    estim::MovingHorizonEstimator, 
+    ::LinModel, 
+    optim::JuMP.GenericModel, 
+    ::AbstractADType, 
+    ::AbstractADType
 )
     nZ̃ = length(estim.Z̃)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
