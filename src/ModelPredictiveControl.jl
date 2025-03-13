@@ -9,6 +9,7 @@ using ProgressLogging
 
 using DifferentiationInterface: ADTypes.AbstractADType, AutoForwardDiff, AutoSparse
 using DifferentiationInterface: gradient!, jacobian!, prepare_gradient, prepare_jacobian
+using DifferentiationInterface: Constant, Cache
 using SparseConnectivityTracer: TracerSparsityDetector
 using SparseMatrixColorings: GreedyColoringAlgorithm
 
