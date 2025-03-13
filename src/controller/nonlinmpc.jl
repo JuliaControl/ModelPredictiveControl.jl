@@ -605,7 +605,7 @@ function get_optim_functions(
     function update_simulations!(
         Z̃arg::Union{NTuple{N, T}, AbstractVector{T}}, Z̃cache
     ) where {N, T<:Real}
-        if isdifferent(Z̃cache, Z̃arg)
+        #if isdifferent(Z̃cache, Z̃arg) # TODO: commented out for debugging
             for i in eachindex(Z̃cache)
                 # Z̃cache .= Z̃arg is type unstable with Z̃arg::NTuple{N, FowardDiff.Dual}
                 Z̃cache[i] = Z̃arg[i]
@@ -626,7 +626,7 @@ function get_optim_functions(
             gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
             g   = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
             geq = con_nonlinprogeq!(geq, X̂0, Û0, mpc, model, transcription, U0, Z̃)
-        end
+        #end
         return nothing
     end
     # --------------------- objective functions -------------------------------------------
