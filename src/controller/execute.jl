@@ -135,7 +135,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     J = obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]   = Z̃[1:mpc.Hc*model.nu]
-    info[:ϵ]    = mpc.nϵ == 1 ? mpc.Z̃[end] : zero(NT)
+    info[:ϵ]    = getϵ(mpc, Z̃)
     info[:J]    = J
     info[:U]    = U
     info[:u]    = info[:U][1:model.nu]
@@ -159,6 +159,15 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info[:Rhatu] = info[:R̂u]
     info = addinfo!(info, mpc)
     return info
+end
+
+"""
+    getϵ(mpc::PredictiveController, Z̃) -> ϵ
+
+Get the slack `ϵ` from the decision vector `Z̃` if present, otherwise return 0.
+"""
+function getϵ(mpc::PredictiveController, Z̃::AbstractVector{NT}) where NT<:Real
+    return mpc.nϵ ≠ 0 ? Z̃[end] : zero(NT)
 end
 
 """

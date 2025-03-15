@@ -382,7 +382,7 @@ function NonLinMPC(
 end
 
 default_jacobian(::SingleShooting)      = DEFAULT_NONLINMPC_JACDENSE
-default_jacobian(::TranscriptionMethod) = DEFAULT_NONLINMPC_JACSPARSE
+default_jacobian(::TranscriptionMethod) = DEFAULT_NONLINMPC_JACDENSE #TODO: DEFAULT_NONLINMPC_JACSPARSE
 
 """
     validate_JE(NT, JE) -> nothing
@@ -589,11 +589,11 @@ function get_optim_functions(
                 # Z̃cache .= Z̃arg is type unstable with Z̃arg::NTuple{N, FowardDiff.Dual}
                 Z̃[i] = Z̃arg[i]
             end
-            ϵ = (nϵ ≠ 0) ? Z̃[end] : zero(T) # ϵ = 0 if nϵ == 0 (meaning no relaxation)
             U0 = getU0!(U0, mpc, Z̃)
             ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
             Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, mpc, model, transcription, U0, Z̃)
             Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
+            ϵ = getϵ(mpc, Z̃)
             gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
             g   = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
             geq = con_nonlinprogeq!(geq, X̂0, Û0, mpc, model, transcription, U0, Z̃)
@@ -615,9 +615,8 @@ function get_optim_functions(
     gc, g  = zeros(JNT, nc),  zeros(JNT, ng)
     geq    = zeros(JNT, neq)
 
-    # WIP: still receive INVALID_MODEL once and a while, needs to investigate.
 
-
+    # ---------------------- objective function ------------------------------------------
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
@@ -627,51 +626,14 @@ function get_optim_functions(
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
 
-
-
-    gfuncs = Vector{Function}(undef, ng)
-    for i in eachindex(gfuncs)
-        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
-            return g[i]::T
-        end
-        gfuncs[i] = func_i
-    end
-    function gfunc_vec!(g, Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, geq)
-        update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
-        return g
-    end
-
-
-
-
-
-
-
-
-    Z̃_∇J      = fill(myNaN, nZ̃)
-    ΔŨ_∇J     = zeros(JNT, nΔŨ)
-    x̂0end_∇J  = zeros(JNT, nx̂)
-    Ue_∇J, Ŷe_∇J = zeros(JNT, nUe), zeros(JNT, nŶe)
-    U0_∇J, Ŷ0_∇J = zeros(JNT, nU),  zeros(JNT, nŶ)
-    Û0_∇J, X̂0_∇J = zeros(JNT, nU),  zeros(JNT, nX̂)
-    gc_∇J, g_∇J  = zeros(JNT, nc),  zeros(JNT, ng)
-    geq_∇J    = zeros(JNT, neq)
-
-
-
-
-
-
-
     Z̃_∇J    = fill(myNaN, nZ̃) 
     ∇J      = Vector{JNT}(undef, nZ̃)       # gradient of objective J
     ∇J_context = (
-        Cache(Z̃_∇J),  Cache(ΔŨ_∇J), Cache(x̂0end_∇J), 
-        Cache(Ue_∇J), Cache(Ŷe_∇J), 
-        Cache(U0_∇J), Cache(Ŷ0_∇J), 
-        Cache(Û0_∇J), Cache(X̂0_∇J), 
-        Cache(gc_∇J), Cache(g_∇J), Cache(geq_∇J)
+        Cache(Z̃),  Cache(ΔŨ), Cache(x̂0end), 
+        Cache(Ue), Cache(Ŷe), 
+        Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(X̂0), 
+        Cache(gc), Cache(g), Cache(geq)
     )
     ∇J_prep = prepare_gradient(Jfunc_vec!, grad_backend, Z̃_∇J, ∇J_context...)
     ∇Jfunc! = if nZ̃ == 1
@@ -689,44 +651,38 @@ function get_optim_functions(
     end
 
 
-
-
-
-
+    # --------------------- inequality constraint functions -------------------------------
+    gfuncs = Vector{Function}(undef, ng)
+    for i in eachindex(gfuncs)
+        gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+            return g[i]::T
+        end
+        gfuncs[i] = gfunc_i
+    end
+    function gfunc!(g, Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, geq)
+        update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        return g
+    end
 
     Z̃_∇g      = fill(myNaN, nZ̃)
-    ΔŨ_∇g     = zeros(JNT, nΔŨ)
-    x̂0end_∇g  = zeros(JNT, nx̂)
-    Ue_∇g, Ŷe_∇g = zeros(JNT, nUe), zeros(JNT, nŶe)
-    U0_∇g, Ŷ0_∇g = zeros(JNT, nU),  zeros(JNT, nŶ)
-    Û0_∇g, X̂0_∇g = zeros(JNT, nU),  zeros(JNT, nX̂)
-    gc_∇g, g_∇g  = zeros(JNT, nc),  zeros(JNT, ng)
-    geq_∇g    = zeros(JNT, neq)
-
-
-
-
-
-    Z̃_∇g     = fill(myNaN, nZ̃)
     g_vec    = Vector{JNT}(undef, ng)
     ∇g       = Matrix{JNT}(undef, ng, nZ̃)   # Jacobian of inequality constraints g
     ∇g_context = (
-        Cache(Z̃_∇g),  Cache(ΔŨ_∇g), Cache(x̂0end_∇g), 
-        Cache(Ue_∇g), Cache(Ŷe_∇g), 
-        Cache(U0_∇g), Cache(Ŷ0_∇g), 
-        Cache(Û0_∇g), Cache(X̂0_∇g), 
-        Cache(gc_∇g), Cache(geq_∇g)
+        Cache(Z̃),  Cache(ΔŨ), Cache(x̂0end), 
+        Cache(Ue), Cache(Ŷe), 
+        Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(X̂0), 
+        Cache(gc), Cache(geq)
     )
-    ∇g_prep  = prepare_jacobian(gfunc_vec!, g_vec, jac_backend, Z̃_∇g, ∇g_context...)
+    ∇g_prep  = prepare_jacobian(gfunc!, g_vec, jac_backend, Z̃_∇g, ∇g_context...)
     ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)
-        ∇gfuncs![i] = if nZ̃ == 1
+        ∇gfuncs_i! = if nZ̃ == 1
             function (Z̃arg::T) where T<:Real
                 if isdifferent(Z̃arg, Z̃_∇g)
                     Z̃_∇g .= Z̃arg
-                    jacobian!(
-                        gfunc_vec!, g_vec, ∇g, ∇g_prep, jac_backend, Z̃_∇g, ∇g_context...
-                    )
+                    jacobian!(gfunc!, g_vec, ∇g, ∇g_prep, jac_backend, Z̃_∇g, ∇g_context...)
                 end
                 return ∇g[i, begin]            # univariate syntax, see JuMP.@operator doc
             end
@@ -734,50 +690,52 @@ function get_optim_functions(
             function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
                 if isdifferent(Z̃arg, Z̃_∇g)
                     Z̃_∇g .= Z̃arg
-                    jacobian!(
-                        gfunc_vec!, g_vec, ∇g, ∇g_prep, jac_backend, Z̃_∇g, ∇g_context...
-                    )
+                    jacobian!(gfunc!, g_vec, ∇g, ∇g_prep, jac_backend, Z̃_∇g, ∇g_context...)
                 end
                 return ∇g_i .= @views ∇g[i, :] # multivariate syntax, see JuMP.@operator doc
             end
         end
+        ∇gfuncs![i] = ∇gfuncs_i!
     end
     # --------------------- equality constraint functions ---------------------------------
     geqfuncs = Vector{Function}(undef, neq)
-    #=
     for i in eachindex(geqfuncs)
-        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
-            geq = get_tmp(geq_cache, T)
+        geqfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
             return geq[i]::T
         end
-        geqfuncs[i] = func_i          
+        geqfuncs[i] = geqfunc_i          
     end
-    function geqfunc_vec!(geq, Z̃vec::AbstractVector{T}) where T<:Real
-        update_simulations!(Z̃vec, get_tmp(Z̃_cache, T))
-        geq .= get_tmp(geq_cache, T)
+    function geqfunc!(geq, Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g) 
+        update_simulations!(Z̃arg, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
         return geq
     end
+
     Z̃_∇geq     = fill(myNaN, nZ̃)
     geq_vec    = Vector{JNT}(undef, neq)
     ∇geq       = Matrix{JNT}(undef, neq, nZ̃)   # Jacobian of equality constraints geq
-    ∇geq_prep  = prepare_jacobian(geqfunc_vec!, geq_vec, jac_backend, Z̃_∇geq)
-    =#
+    ∇geq_context = (
+        Cache(Z̃), Cache(ΔŨ), Cache(x̂0end),
+        Cache(Ue), Cache(Ŷe),
+        Cache(U0), Cache(Ŷ0),
+        Cache(Û0), Cache(X̂0),
+        Cache(gc), Cache(g)
+    )
+    ∇geq_prep  = prepare_jacobian(geqfunc!, geq_vec, jac_backend, Z̃_∇geq, ∇geq_context...)
     ∇geqfuncs! = Vector{Function}(undef, neq)
-    #=
     for i in eachindex(∇geqfuncs!)
         # only multivariate syntax, univariate is impossible since nonlinear equality
         # constraints imply MultipleShooting, thus input increment ΔU and state X̂0 in Z̃:
-        ∇geqfuncs![i] = 
+        ∇geqfuncs_i! = 
             function (∇geq_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
                 if isdifferent(Z̃arg, Z̃_∇geq)
                     Z̃_∇geq .= Z̃arg
-                    jacobian!(geqfunc_vec!, geq_vec, ∇geq, ∇geq_prep, jac_backend, Z̃_∇geq)
+                    jacobian!(geqfunc!, geq_vec, ∇geq, ∇geq_prep, jac_backend, Z̃_∇geq, ∇geq_context...)
                 end
                 return ∇geq_i .= @views ∇geq[i, :]
             end
+        ∇geqfuncs![i] = ∇geqfuncs_i!
     end
-    =#
     return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
 end
 
