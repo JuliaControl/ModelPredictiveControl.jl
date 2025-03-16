@@ -776,10 +776,10 @@ end
 """
     set_nonlincon!(mpc::PredictiveController, ::NonLinModel, ::MultipleShooting, optim)
 
-Also set output prediction `Ŷ` constraints for `NonLinModel` and `MultipleShooting`.
+Also set output prediction `Ŷ` constraints for `NonLinModel` and non-`SingleShooting`.
 """
 function set_nonlincon!(
-    mpc::PredictiveController, ::SimModel, ::MultipleShooting, ::JuMP.GenericModel{JNT}
+    mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, ::JuMP.GenericModel{JNT}
 ) where JNT<:Real
     optim = mpc.optim
     Z̃var = optim[:Z̃var]
