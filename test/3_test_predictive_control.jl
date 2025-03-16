@@ -1000,7 +1000,7 @@ end
     moveinput!(nmpc, [100])
     info = getinfo(nmpc)
     @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
-    @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))=#
+    @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
     
     nmpc_ms = NonLinMPC(
         nonlinmodel; Hp, Hc=5, transcription=MultipleShooting(), gc, nc=2Hp, p=[0; 0]
