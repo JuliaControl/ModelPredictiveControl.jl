@@ -891,9 +891,9 @@ function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::Transcr
     n += nΔŨ
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
     n += nΔŨ
-    mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂0min + fx̂
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂0min
     n += nx̂
-    mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂0max - fx̂
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂0max
     if any(mpc.con.i_b) 
         lincon = mpc.optim[:linconstraint]
         JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
