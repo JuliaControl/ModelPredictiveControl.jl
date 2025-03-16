@@ -613,8 +613,10 @@ Init nonlinear constraints for [`LinModel`](@ref) for all [`TranscriptionMethod`
 The only nonlinear constraints are the custom inequality constraints `gc`.
 """
 function init_nonlincon!(
-        mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, gfuncs, ∇gfuncs!, _ , _    
-    ) 
+    mpc::PredictiveController, ::LinModel, ::TranscriptionMethod,
+    gfuncs, ∇gfuncs!, 
+    _ , _    
+) 
     optim, con = mpc.optim, mpc.con
     nZ̃ = length(mpc.Z̃)
     if length(con.i_g) ≠ 0
@@ -746,7 +748,7 @@ end
 
 "By default, there is no nonlinear constraint, thus do nothing."
 function set_nonlincon!(
-    ::PredictiveController, ::SimModel, ::JuMP.GenericModel, ::TranscriptionMethod
+    ::PredictiveController, ::SimModel, ::TranscriptionMethod, ::JuMP.GenericModel, 
     )
     return nothing
 end

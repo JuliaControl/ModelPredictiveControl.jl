@@ -386,7 +386,7 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        set_nonlincon!(mpc, model, optim, transcription)
+        set_nonlincon!(mpc, model, transcription, optim)
     else
         i_b, i_g = init_matconstraint_mpc(
             model, transcription, nc,

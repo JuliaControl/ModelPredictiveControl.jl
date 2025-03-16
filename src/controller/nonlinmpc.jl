@@ -509,7 +509,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
     @objective(optim, Min, J(Z̃var...))
     init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
-    set_nonlincon!(mpc, model, optim, transcription)
+    set_nonlincon!(mpc, model, transcription, optim)
     return nothing
 end
 
