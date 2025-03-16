@@ -595,7 +595,7 @@ function get_optim_functions(
             Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
             ϵ = getϵ(mpc, Z̃)
             gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
-            g   = con_nonlinprog!(g, mpc, model, x̂0end, Ŷ0, gc, ϵ)
+            g   = con_nonlinprog!(g, mpc, model, transcription, x̂0end, Ŷ0, gc, ϵ)
             geq = con_nonlinprogeq!(geq, X̂0, Û0, mpc, model, transcription, U0, Z̃)
         end
         return nothing
@@ -737,53 +737,6 @@ function get_optim_functions(
         ∇geqfuncs![i] = ∇geqfuncs_i!
     end
     return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
-end
-
-"""
-    con_nonlinprog!(g, mpc::NonLinMPC, model::LinModel, _ , _ , gc, ϵ) -> g
-
-Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is a [`LinModel`](@ref).
-
-The method mutates the `g` vectors in argument and returns it. Only the custom constraints
-are include in the `g` vector.
-"""
-function con_nonlinprog!(g, mpc::NonLinMPC, ::LinModel, _ , _ , gc, ϵ)
-    for i in eachindex(g)
-        g[i] = gc[i]
-    end
-    return g
-end
-
-"""
-    con_nonlinprog!(g, mpc::NonLinMPC, model::SimModel, x̂0end, Ŷ0, gc, ϵ) -> g
-
-Nonlinear constrains for [`NonLinMPC`](@ref) when `model` is not a [`LinModel`](@ref).
-
-The method mutates the `g` vectors in argument and returns it. The output prediction, 
-the terminal state and the custom constraints are include in the `g` vector.
-"""
-function con_nonlinprog!(g, mpc::NonLinMPC, ::SimModel, x̂0end, Ŷ0, gc, ϵ)
-    nx̂, nŶ = length(x̂0end), length(Ŷ0)
-    for i in eachindex(g)
-        mpc.con.i_g[i] || continue
-        if i ≤ nŶ
-            j = i
-            g[i] = (mpc.con.Y0min[j] - Ŷ0[j])     - ϵ*mpc.con.C_ymin[j]
-        elseif i ≤ 2nŶ
-            j = i - nŶ
-            g[i] = (Ŷ0[j] - mpc.con.Y0max[j])     - ϵ*mpc.con.C_ymax[j]
-        elseif i ≤ 2nŶ + nx̂
-            j = i - 2nŶ
-            g[i] = (mpc.con.x̂0min[j] - x̂0end[j])  - ϵ*mpc.con.c_x̂min[j]
-        elseif i ≤ 2nŶ + 2nx̂
-            j = i - 2nŶ - nx̂
-            g[i] = (x̂0end[j] - mpc.con.x̂0max[j])  - ϵ*mpc.con.c_x̂max[j]
-        else
-            j = i - 2nŶ - 2nx̂
-            g[i] = gc[j]
-        end
-    end
-    return g
 end
 
 @doc raw"""
