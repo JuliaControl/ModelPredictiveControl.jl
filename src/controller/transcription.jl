@@ -572,6 +572,20 @@ function init_nonlincon!(
             )
         end
         i_base = 2Hp*ny
+        for i in eachindex(con.x̂0min)
+            name = Symbol("g_x̂0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 2Hp*ny + nx̂
+        for i in eachindex(con.x̂0max)
+            name = Symbol("g_x̂0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 2Hp*ny + 2nx̂
         for i in 1:con.nc
             name = Symbol("g_c_$i")
             optim[name] = JuMP.add_nonlinear_operator(
