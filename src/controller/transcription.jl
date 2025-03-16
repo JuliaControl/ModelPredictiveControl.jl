@@ -659,13 +659,14 @@ function set_nonlincon!(
 end
 
 """
-    set_nonlincon!(mpc::NonLinMPC, ::LinModel, ::TranscriptionMethod, optim)
+    set_nonlincon!(mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, optim)
 
 Set the custom nonlinear inequality constraints for `LinModel`.
 """
 function set_nonlincon!(
-    mpc::NonLinMPC, ::LinModel, ::TranscriptionMethod, optim::JuMP.GenericModel{JNT}
+    mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, ::JuMP.GenericModel{JNT}
 ) where JNT<:Real
+    optim = mpc.optim
     Z̃var = optim[:Z̃var]
     con = mpc.con
     nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
@@ -678,13 +679,14 @@ function set_nonlincon!(
 end
 
 """
-    set_nonlincon!(mpc::NonLinMPC, ::NonLinModel, ::MultipleShooting, optim)
+    set_nonlincon!(mpc::PredictiveController, ::NonLinModel, ::MultipleShooting, optim)
 
 Also set output prediction `Ŷ` constraints for `NonLinModel` and `MultipleShooting`.
 """
 function set_nonlincon!(
-    mpc::NonLinMPC, ::SimModel, ::MultipleShooting, optim::JuMP.GenericModel{JNT}
+    mpc::PredictiveController, ::SimModel, ::MultipleShooting, ::JuMP.GenericModel{JNT}
 ) where JNT<:Real
+    optim = mpc.optim
     Z̃var = optim[:Z̃var]
     con = mpc.con
     nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
@@ -705,13 +707,14 @@ function set_nonlincon!(
 end
 
 """
-    set_nonlincon!(mpc::NonLinMPC, ::NonLinModel, ::SingleShooting, optim)
+    set_nonlincon!(mpc::PredictiveController, ::NonLinModel, ::SingleShooting, optim)
 
 Also set output prediction `Ŷ` and terminal state `x̂end` constraint for `SingleShooting`.
 """
 function set_nonlincon!(
-    mpc::NonLinMPC, ::NonLinModel, ::SingleShooting, optim::JuMP.GenericModel{JNT}
+    mpc::PredictiveController, ::NonLinModel, ::SingleShooting, ::JuMP.GenericModel{JNT}
 ) where JNT<:Real
+    optim = mpc.optim
     Z̃var = optim[:Z̃var]
     con = mpc.con
     nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
