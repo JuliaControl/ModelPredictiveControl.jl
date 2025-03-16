@@ -386,7 +386,7 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        set_nonlincon!(mpc, model, optim)
+        set_nonlincon!(mpc, model, transcription, optim)
     else
         i_b, i_g = init_matconstraint_mpc(
             model, transcription, nc,
@@ -399,94 +399,6 @@ function setconstraint!(
     end
     return mpc
 end
-
-
-@doc raw"""
-    init_matconstraint_mpc(
-        model::LinModel, transcription::TranscriptionMethod, nc::Int,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
-        args...
-    ) -> i_b, i_g, A, Aeq, neq
-
-Init `i_b`, `i_g`, `neq`, and `A` and `Aeq` matrices for the all the MPC constraints.
-
-The linear and nonlinear constraints are respectively defined as:
-```math
-\begin{aligned} 
-    \mathbf{A Z̃ }       &≤ \mathbf{b}           \\ 
-    \mathbf{A_{eq} Z̃}   &= \mathbf{b_{eq}}      \\
-    \mathbf{g(Z̃)}       &≤ \mathbf{0}           \\
-    \mathbf{g_{eq}(Z̃)}  &= \mathbf{0}           \\
-\end{aligned}
-```
-The argument `nc` is the number of custom nonlinear inequality constraints in
-``\mathbf{g_c}``. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
-finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
-also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a 
-case, `args`  needs to contain all the inequality and equality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ`. The integer `neq`
-is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
-"""
-function init_matconstraint_mpc(
-    ::LinModel{NT}, ::TranscriptionMethod, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
-    args...
-) where {NT<:Real}
-    if isempty(args)
-        A, Aeq, neq = nothing, nothing, nothing
-    else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
-        Aeq = A_ŝ
-        neq = 0
-    end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
-    i_g = trues(nc)
-    return i_b, i_g, A, Aeq, neq
-end
-
-"Init `i_b` without output constraints if [`NonLinModel`](@ref) & [`MultipleShooting`](@ref)."
-function init_matconstraint_mpc(
-    ::NonLinModel{NT}, ::MultipleShooting, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
-    args...
-) where {NT<:Real}
-    if isempty(args)
-        A, Aeq, neq = nothing, nothing, nothing
-    else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
-        Aeq = A_ŝ
-        nΔŨ, nZ̃ = size(A_ΔŨmin)
-        neq = nZ̃ - nΔŨ
-    end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_x̂min; i_x̂max]
-    i_g = [i_Ymin; i_Ymax; trues(nc)]
-    return i_b, i_g, A, Aeq, neq
-end
-
-"Init `i_b` without output & terminal constraints if [`NonLinModel`](@ref) & [`SingleShooting`](@ref)."
-function init_matconstraint_mpc(
-    ::NonLinModel{NT}, ::SingleShooting, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
-    args...
-) where {NT<:Real}
-    if isempty(args)
-        A, Aeq, neq = nothing, nothing, nothing
-    else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
-        Aeq = A_ŝ
-        neq = 0
-    end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
-    i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
-    return i_b, i_g, A, Aeq, neq
-end
-
-
-"By default, there is no nonlinear constraint, thus do nothing."
-set_nonlincon!(::PredictiveController, ::SimModel, ::JuMP.GenericModel) = nothing
 
 """
     default_Hp(model::LinModel)

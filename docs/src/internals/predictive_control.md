@@ -30,7 +30,7 @@ ModelPredictiveControl.init_nonlincon!
 
 ```@docs
 ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any)
-ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel)
+ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel, ::TranscriptionMethod)
 ModelPredictiveControl.linconstrainteq!
 ```
 
