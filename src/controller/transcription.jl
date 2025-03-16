@@ -881,13 +881,7 @@ end
 function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod)
     nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
     nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
-    fx̂ .= mpc.con.bx̂
-    mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂0, 1, 1)
-    mul!(fx̂, mpc.con.vx̂, mpc.estim.lastu0, 1, 1)
-    if model.nd ≠ 0
-        mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
-        mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
-    end
+    # here, updating fx̂ is not necessary since fx̂ = 0
     n = 0
     mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
     n += nU
