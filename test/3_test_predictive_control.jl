@@ -865,8 +865,8 @@ end
     Hp=50
 
     linmodel = LinModel(tf([2], [10000, 1]), 3000.0)
-    nmpc_lin = NonLinMPC(linmodel; Hp, Hc=5, gc=gc, nc=2Hp, p=[0; 0])
-   
+    nmpc_lin = NonLinMPC(linmodel; Hp, Hc=5, gc, nc=2Hp, p=[0; 0])
+ 
     setconstraint!(nmpc_lin, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
     setconstraint!(nmpc_lin, umin=[-10], umax=[10])
     setconstraint!(nmpc_lin, Δumin=[-1e6], Δumax=[1e6])
@@ -935,7 +935,7 @@ end
     f = (x,u,_,p) -> p.A*x + p.Bu*u
     h = (x,_,p)   -> p.C*x
     nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing, p=linmodel)
-    nmpc = NonLinMPC(nonlinmodel; Hp, Hc=5, gc=gc, nc=2Hp, p=[0; 0])
+    nmpc = NonLinMPC(nonlinmodel; Hp, Hc=5, gc, nc=2Hp, p=[0; 0])
 
     setconstraint!(nmpc, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
     setconstraint!(nmpc, umin=[-1e6], umax=[+1e6])
@@ -1000,9 +1000,11 @@ end
     moveinput!(nmpc, [100])
     info = getinfo(nmpc)
     @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
-    @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
+    @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))=#
     
-    nmpc_ms = NonLinMPC(nonlinmodel; Hp, Hc=5, transcription=MultipleShooting())
+    nmpc_ms = NonLinMPC(
+        nonlinmodel; Hp, Hc=5, transcription=MultipleShooting(), gc, nc=2Hp, p=[0; 0]
+    )
 
     preparestate!(nmpc_ms, [0])
 
@@ -1013,6 +1015,19 @@ end
     moveinput!(nmpc_ms, [10])
     info = getinfo(nmpc_ms)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
+    setconstraint!(nmpc_ms, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
+
+    nmpc_ms.p .= [1; 0]
+    moveinput!(nmpc_ms, [100])
+    info = getinfo(nmpc_ms)
+    @test all(isapprox.(info[:U], 4.2; atol=1e-1))
+    @test all(isapprox.(info[:gc][1:Hp], 0.0; atol=1e-1))
+
+    nmpc_ms.p .= [0; 1]
+    moveinput!(nmpc_ms, [100])
+    info = getinfo(nmpc_ms)
+    @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
+    @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
 
 end
 

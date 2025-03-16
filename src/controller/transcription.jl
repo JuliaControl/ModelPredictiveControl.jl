@@ -1158,7 +1158,7 @@ function con_nonlinprog!(
             j = i - nŶ
             g[i] = (Ŷ0[j] - mpc.con.Y0max[j])     - ϵ*mpc.con.C_ymax[j]
         else
-            j = i - 2nŶ - 2nx̂
+            j = i - 2nŶ
             g[i] = gc[j]
         end
     end
