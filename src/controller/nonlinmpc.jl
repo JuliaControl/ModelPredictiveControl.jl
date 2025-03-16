@@ -509,7 +509,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim)
     @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
     @objective(optim, Min, J(Z̃var...))
     init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
-    set_nonlincon!(mpc, model, optim)
+    set_nonlincon!(mpc, model, optim, transcription)
     return nothing
 end
 
@@ -690,60 +690,6 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             end
     end
     return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
-end
-
-"""
-    set_nonlincon!(mpc::NonLinMPC, ::LinModel, optim)
-
-Set the custom nonlinear inequality constraints for `LinModel`.
-"""
-function set_nonlincon!(
-    mpc::NonLinMPC, ::LinModel, optim::JuMP.GenericModel{JNT}
-) where JNT<:Real
-    Z̃var = optim[:Z̃var]
-    con = mpc.con
-    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
-    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
-    for i in 1:con.nc
-        gfunc_i = optim[Symbol("g_c_$i")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    return nothing
-end
-
-"""
-    set_nonlincon!(mpc::NonLinMPC, ::NonLinModel, optim)
-
-Also set output prediction `Ŷ` and terminal state `x̂end` constraints when not a `LinModel`.
-"""
-function set_nonlincon!(
-    mpc::NonLinMPC, ::SimModel, optim::JuMP.GenericModel{JNT}
-) where JNT<:Real
-    Z̃var = optim[:Z̃var]
-    con = mpc.con
-    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
-    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
-    for i in findall(.!isinf.(con.Y0min))
-        gfunc_i = optim[Symbol("g_Y0min_$(i)")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in findall(.!isinf.(con.Y0max))
-        gfunc_i = optim[Symbol("g_Y0max_$(i)")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in findall(.!isinf.(con.x̂0min))
-        gfunc_i = optim[Symbol("g_x̂0min_$(i)")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in findall(.!isinf.(con.x̂0max))
-        gfunc_i = optim[Symbol("g_x̂0max_$(i)")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in 1:con.nc
-        gfunc_i = optim[Symbol("g_c_$i")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    return nothing
 end
 
 """

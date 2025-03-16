@@ -650,6 +650,95 @@ function init_nonlincon!(
     return nothing
 end
 
+
+"By default, there is no nonlinear constraint, thus do nothing."
+function set_nonlincon!(
+    ::PredictiveController, ::SimModel, ::JuMP.GenericModel, ::TranscriptionMethod
+    )
+    return nothing
+end
+
+"""
+    set_nonlincon!(mpc::NonLinMPC, ::LinModel, ::TranscriptionMethod, optim)
+
+Set the custom nonlinear inequality constraints for `LinModel`.
+"""
+function set_nonlincon!(
+    mpc::NonLinMPC, ::LinModel, ::TranscriptionMethod, optim::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    Z̃var = optim[:Z̃var]
+    con = mpc.con
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    for i in 1:con.nc
+        gfunc_i = optim[Symbol("g_c_$i")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    return nothing
+end
+
+"""
+    set_nonlincon!(mpc::NonLinMPC, ::NonLinModel, ::MultipleShooting, optim)
+
+Also set output prediction `Ŷ` constraints for `NonLinModel` and `MultipleShooting`.
+"""
+function set_nonlincon!(
+    mpc::NonLinMPC, ::SimModel, ::MultipleShooting, optim::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    Z̃var = optim[:Z̃var]
+    con = mpc.con
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    for i in findall(.!isinf.(con.Y0min))
+        gfunc_i = optim[Symbol("g_Y0min_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.Y0max))
+        gfunc_i = optim[Symbol("g_Y0max_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in 1:con.nc
+        gfunc_i = optim[Symbol("g_c_$i")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    return nothing
+end
+
+"""
+    set_nonlincon!(mpc::NonLinMPC, ::NonLinModel, ::SingleShooting, optim)
+
+Also set output prediction `Ŷ` and terminal state `x̂end` constraint for `SingleShooting`.
+"""
+function set_nonlincon!(
+    mpc::NonLinMPC, ::NonLinModel, ::SingleShooting, optim::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    Z̃var = optim[:Z̃var]
+    con = mpc.con
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    for i in findall(.!isinf.(con.Y0min))
+        gfunc_i = optim[Symbol("g_Y0min_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.Y0max))
+        gfunc_i = optim[Symbol("g_Y0max_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.x̂0min))
+        gfunc_i = optim[Symbol("g_x̂0min_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.x̂0max))
+        gfunc_i = optim[Symbol("g_x̂0max_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in 1:con.nc
+        gfunc_i = optim[Symbol("g_c_$i")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    return nothing
+end
+
 @doc raw"""
     linconstrainteq!(
         mpc::PredictiveController, model::LinModel, transcription::MultipleShooting
