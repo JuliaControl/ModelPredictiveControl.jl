@@ -375,9 +375,15 @@ end
 @doc raw"""
     init_predmat(model::SimModel, estim, transcription::MultipleShooting, Hp, Hc)
 
-Return empty matrices except `ex̂` for [`SimModel`](@ref) and [`MultipleShooting`](@ref).
+Return the terminal state matrices for [`SimModel`](@ref) and [`MultipleShooting`](@ref).
 
-The matrix is ``\mathbf{e_x̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``.
+The output prediction matrices are all empty matrices. The terminal state matrices are
+given in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    The terminal state matrices all appropriately sized zero matrices ``\mathbf{0}``, except
+    for ``\mathbf{e_x̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``
 """
 function init_predmat(
     model::SimModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
@@ -391,7 +397,11 @@ function init_predmat(
     V  = zeros(NT, 0, nu)
     B  = zeros(NT, 0)
     ex̂ = [zeros(NT, nx̂, Hc*nu + (Hp-1)*nx̂) I]
-    gx̂, jx̂, kx̂, vx̂, bx̂ = G, J, K, V, B
+    gx̂ = zeros(NT, nx̂, nd)
+    jx̂ = zeros(NT, nx̂, nd*Hp)
+    kx̂ = zeros(NT, nx̂, nx̂)
+    vx̂ = zeros(NT, nx̂, nu)
+    bx̂ = zeros(NT, nx̂)
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
@@ -508,6 +518,89 @@ function init_defectmat(
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 end
 
+@doc raw"""
+    init_matconstraint_mpc(
+        model::LinModel, transcription::TranscriptionMethod, nc::Int,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+        args...
+    ) -> i_b, i_g, A, Aeq, neq
+
+Init `i_b`, `i_g`, `neq`, and `A` and `Aeq` matrices for the all the MPC constraints.
+
+The linear and nonlinear constraints are respectively defined as:
+```math
+\begin{aligned} 
+    \mathbf{A Z̃ }       &≤ \mathbf{b}           \\ 
+    \mathbf{A_{eq} Z̃}   &= \mathbf{b_{eq}}      \\
+    \mathbf{g(Z̃)}       &≤ \mathbf{0}           \\
+    \mathbf{g_{eq}(Z̃)}  &= \mathbf{0}           \\
+\end{aligned}
+```
+The argument `nc` is the number of custom nonlinear inequality constraints in
+``\mathbf{g_c}``. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
+finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
+also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a 
+case, `args`  needs to contain all the inequality and equality constraint matrices: 
+`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ`. The integer `neq`
+is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
+"""
+function init_matconstraint_mpc(
+    ::LinModel{NT}, ::TranscriptionMethod, nc::Int,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    args...
+) where {NT<:Real}
+    if isempty(args)
+        A, Aeq, neq = nothing, nothing, nothing
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
+        neq = 0
+    end
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
+    i_g = trues(nc)
+    return i_b, i_g, A, Aeq, neq
+end
+
+"Init `i_b` without output constraints if `NonLinModel` and not `SingleShooting`."
+function init_matconstraint_mpc(
+    ::NonLinModel{NT}, ::TranscriptionMethod, nc::Int,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    args...
+) where {NT<:Real}
+    if isempty(args)
+        A, Aeq, neq = nothing, nothing, nothing
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
+        nΔŨ, nZ̃ = size(A_ΔŨmin)
+        neq = nZ̃ - nΔŨ
+    end
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_x̂min; i_x̂max]
+    i_g = [i_Ymin; i_Ymax; trues(nc)]
+    return i_b, i_g, A, Aeq, neq
+end
+
+"Init `i_b` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
+function init_matconstraint_mpc(
+    ::NonLinModel{NT}, ::SingleShooting, nc::Int,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    args...
+) where {NT<:Real}
+    if isempty(args)
+        A, Aeq, neq = nothing, nothing, nothing
+    else
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
+        neq = 0
+    end
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
+    i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
+    return i_b, i_g, A, Aeq, neq
+end
+
 """
     init_nonlincon!(
         mpc::PredictiveController, model::LinModel, transcription::TranscriptionMethod, 
@@ -520,8 +613,10 @@ Init nonlinear constraints for [`LinModel`](@ref) for all [`TranscriptionMethod`
 The only nonlinear constraints are the custom inequality constraints `gc`.
 """
 function init_nonlincon!(
-        mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, gfuncs, ∇gfuncs!, _ , _    
-    ) 
+    mpc::PredictiveController, ::LinModel, ::TranscriptionMethod,
+    gfuncs, ∇gfuncs!, 
+    _ , _    
+) 
     optim, con = mpc.optim, mpc.con
     nZ̃ = length(mpc.Z̃)
     if length(con.i_g) ≠ 0
@@ -649,6 +744,184 @@ function init_nonlincon!(
     end
     return nothing
 end
+
+
+"By default, there is no nonlinear constraint, thus do nothing."
+function set_nonlincon!(
+    ::PredictiveController, ::SimModel, ::TranscriptionMethod, ::JuMP.GenericModel, 
+    )
+    return nothing
+end
+
+"""
+    set_nonlincon!(mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, optim)
+
+Set the custom nonlinear inequality constraints for `LinModel`.
+"""
+function set_nonlincon!(
+    mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, ::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    optim = mpc.optim
+    Z̃var = optim[:Z̃var]
+    con = mpc.con
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    for i in 1:con.nc
+        gfunc_i = optim[Symbol("g_c_$i")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    return nothing
+end
+
+"""
+    set_nonlincon!(mpc::PredictiveController, ::NonLinModel, ::MultipleShooting, optim)
+
+Also set output prediction `Ŷ` constraints for `NonLinModel` and non-`SingleShooting`.
+"""
+function set_nonlincon!(
+    mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, ::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    optim = mpc.optim
+    Z̃var = optim[:Z̃var]
+    con = mpc.con
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    for i in findall(.!isinf.(con.Y0min))
+        gfunc_i = optim[Symbol("g_Y0min_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.Y0max))
+        gfunc_i = optim[Symbol("g_Y0max_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in 1:con.nc
+        gfunc_i = optim[Symbol("g_c_$i")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    return nothing
+end
+
+"""
+    set_nonlincon!(mpc::PredictiveController, ::NonLinModel, ::SingleShooting, optim)
+
+Also set output prediction `Ŷ` and terminal state `x̂end` constraint for `SingleShooting`.
+"""
+function set_nonlincon!(
+    mpc::PredictiveController, ::NonLinModel, ::SingleShooting, ::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    optim = mpc.optim
+    Z̃var = optim[:Z̃var]
+    con = mpc.con
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    for i in findall(.!isinf.(con.Y0min))
+        gfunc_i = optim[Symbol("g_Y0min_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.Y0max))
+        gfunc_i = optim[Symbol("g_Y0max_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.x̂0min))
+        gfunc_i = optim[Symbol("g_x̂0min_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in findall(.!isinf.(con.x̂0max))
+        gfunc_i = optim[Symbol("g_x̂0max_$(i)")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    for i in 1:con.nc
+        gfunc_i = optim[Symbol("g_c_$i")]
+        @constraint(optim, gfunc_i(Z̃var...) <= 0)
+    end
+    return nothing
+end
+
+@doc raw"""
+    linconstraint!(mpc::PredictiveController, model::LinModel)
+
+Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``).
+
+Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d_0}(k) + \mathbf{j_x̂ D̂_0} + \mathbf{k_x̂ x̂_0}(k) + 
+\mathbf{v_x̂ u_0}(k-1) + \mathbf{b_x̂}`` vector for the terminal constraints, see
+[`init_predmat`](@ref).
+"""
+function linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
+    nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
+    nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
+    fx̂ .= mpc.con.bx̂
+    mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂0, 1, 1)
+    mul!(fx̂, mpc.con.vx̂, mpc.estim.lastu0, 1, 1)
+    if model.nd ≠ 0
+        mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
+        mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
+    end
+    n = 0
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
+    n += nU
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
+    n += nU
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
+    n += nΔŨ
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
+    n += nΔŨ
+    mpc.con.b[(n+1):(n+nY)]  .= @. -mpc.con.Y0min + mpc.F
+    n += nY
+    mpc.con.b[(n+1):(n+nY)]  .= @. +mpc.con.Y0max - mpc.F
+    n += nY
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂0min + fx̂
+    n += nx̂
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂0max - fx̂
+    if any(mpc.con.i_b) 
+        lincon = mpc.optim[:linconstraint]
+        JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
+    end
+    return nothing
+end
+
+"Set `b` excluding predicted output constraints for `NonLinModel` and not `SingleShooting`."
+function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod)
+    nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
+    nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
+    # here, updating fx̂ is not necessary since fx̂ = 0
+    n = 0
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
+    n += nU
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
+    n += nU
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
+    n += nΔŨ
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
+    n += nΔŨ
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂0min
+    n += nx̂
+    mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂0max
+    if any(mpc.con.i_b) 
+        lincon = mpc.optim[:linconstraint]
+        JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
+    end
+end
+
+"Also exclude terminal constraints for `NonLinModel` and `SingleShooting`."
+function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::SingleShooting)
+    nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
+    n = 0
+    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
+    n += nU
+    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
+    n += nU
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
+    n += nΔŨ
+    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
+    if any(mpc.con.i_b) 
+        lincon = mpc.optim[:linconstraint]
+        @views JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
+    end
+    return nothing
+end
+
+
+
 
 @doc raw"""
     linconstrainteq!(
