@@ -66,7 +66,7 @@ function moveinput!(
     end
     validate_args(mpc, ry, d, D̂, R̂y, R̂u)
     initpred!(mpc, mpc.estim.model, d, D̂, R̂y, R̂u)
-    linconstraint!(mpc, mpc.estim.model)
+    linconstraint!(mpc, mpc.estim.model, mpc.transcription)
     linconstrainteq!(mpc, mpc.estim.model, mpc.transcription)
     Z̃ = optim_objective!(mpc)
     return getinput(mpc, Z̃)
@@ -268,66 +268,6 @@ function predictstoch!(Ŷs, mpc::PredictiveController, estim::InternalModel)
 end
 "Fill `Ŷs` vector with 0 values when `estim` is not an [`InternalModel`](@ref)."
 predictstoch!(Ŷs, mpc::PredictiveController, ::StateEstimator) = (Ŷs .= 0; nothing)
-
-@doc raw"""
-    linconstraint!(mpc::PredictiveController, model::LinModel)
-
-Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``).
-
-Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d_0}(k) + \mathbf{j_x̂ D̂_0} + \mathbf{k_x̂ x̂_0}(k) + 
-\mathbf{v_x̂ u_0}(k-1) + \mathbf{b_x̂}`` vector for the terminal constraints, see
-[`init_predmat`](@ref).
-"""
-function linconstraint!(mpc::PredictiveController, model::LinModel)
-    nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
-    nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
-    fx̂ .= mpc.con.bx̂
-    mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂0, 1, 1)
-    mul!(fx̂, mpc.con.vx̂, mpc.estim.lastu0, 1, 1)
-    if model.nd ≠ 0
-        mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
-        mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
-    end
-    n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
-    n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
-    n += nU
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
-    n += nΔŨ
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
-    n += nΔŨ
-    mpc.con.b[(n+1):(n+nY)]  .= @. -mpc.con.Y0min + mpc.F
-    n += nY
-    mpc.con.b[(n+1):(n+nY)]  .= @. +mpc.con.Y0max - mpc.F
-    n += nY
-    mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂0min + fx̂
-    n += nx̂
-    mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂0max - fx̂
-    if any(mpc.con.i_b) 
-        lincon = mpc.optim[:linconstraint]
-        JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
-    end
-    return nothing
-end
-
-"Set `b` excluding predicted output constraints when `model` is not a [`LinModel`](@ref)."
-function linconstraint!(mpc::PredictiveController, ::SimModel)
-    nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
-    n = 0
-    mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
-    n += nU
-    mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
-    n += nU
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
-    n += nΔŨ
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
-    if any(mpc.con.i_b) 
-        lincon = mpc.optim[:linconstraint]
-        @views JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
-    end
-    return nothing
-end
 
 """
     extended_vectors!(Ue, Ŷe, mpc::PredictiveController, U0, Ŷ0) -> Ue, Ŷe
