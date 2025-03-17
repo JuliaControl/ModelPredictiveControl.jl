@@ -1001,12 +1001,23 @@ end
     info = getinfo(nmpc)
     @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
     @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
-    
+
     nmpc_ms = NonLinMPC(
         nonlinmodel; Hp, Hc=5, transcription=MultipleShooting(), gc, nc=2Hp, p=[0; 0]
     )
 
+    setconstraint!(nmpc_ms, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
+    setconstraint!(nmpc_ms, ymin=[-100], ymax=[100])
     preparestate!(nmpc_ms, [0])
+
+    setconstraint!(nmpc_ms, ymin=[-0.5], ymax=[0.9])
+    moveinput!(nmpc_ms, [-100])
+    info = getinfo(nmpc_ms)
+    @test all(isapprox.(info[:Ŷ], -0.5; atol=1e-1))
+    moveinput!(nmpc_ms, [100])
+    info = getinfo(nmpc_ms)
+    @test all(isapprox.(info[:Ŷ], 0.9; atol=1e-1))
+    setconstraint!(nmpc_ms, ymin=[-100], ymax=[100])
 
     setconstraint!(nmpc_ms, x̂min=[-1e-6,-Inf], x̂max=[+1e-6,+Inf])
     moveinput!(nmpc_ms, [-10])
