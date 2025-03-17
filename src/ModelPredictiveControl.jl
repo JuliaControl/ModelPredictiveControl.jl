@@ -11,7 +11,7 @@ using DifferentiationInterface: ADTypes.AbstractADType, AutoForwardDiff, AutoSpa
 using DifferentiationInterface: gradient!, jacobian!, prepare_gradient, prepare_jacobian
 using DifferentiationInterface: Constant, Cache
 using SparseConnectivityTracer: TracerSparsityDetector
-using SparseMatrixColorings: GreedyColoringAlgorithm
+using SparseMatrixColorings: GreedyColoringAlgorithm, sparsity_pattern
 
 import ForwardDiff #TODO: delete this after `linearize!` and `ExtendedKalmanFilter` are updated
 

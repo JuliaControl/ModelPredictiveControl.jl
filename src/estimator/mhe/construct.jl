@@ -1362,7 +1362,6 @@ function get_optim_functions(
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
     Z̃_∇J    = fill(myNaN, nZ̃) 
-    ∇J      = Vector{JNT}(undef, nZ̃)       # gradient of objective J
     ∇J_context = (
         Cache(V̂),  Cache(X̂0),
         Cache(û0), Cache(ŷ0),
@@ -1370,6 +1369,7 @@ function get_optim_functions(
         Cache(x̄),
     )
     ∇J_prep = prepare_gradient(Jfunc!, grad_backend, Z̃_∇J, ∇J_context...)
+    ∇J = Vector{JNT}(undef, nZ̃)
     ∇Jfunc! = if nZ̃ == 1
         function (Z̃arg) 
             Z̃_∇J .= Z̃arg
@@ -1399,7 +1399,6 @@ function get_optim_functions(
         return update_simulations!(Z̃, V̂, X̂0, û0, ŷ0, g)
     end
     Z̃_∇g     = fill(myNaN, nZ̃)
-    ∇g       = Matrix{JNT}(undef, ng, nZ̃)   # Jacobian of inequality constraints g
     ∇g_context = (
         Cache(V̂),  Cache(X̂0),
         Cache(û0), Cache(ŷ0),
@@ -1409,6 +1408,7 @@ function get_optim_functions(
     estim.con.i_g .= true
     ∇g_prep  = prepare_jacobian(gfunc!, g, jac_backend, Z̃_∇g, ∇g_context...)
     estim.con.i_g .= i_g_old
+    ∇g = init_diffmat(JNT, jac_backend, ∇g_prep, nZ̃, ng)
     ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)
         ∇gfuncs![i] = if nZ̃ == 1

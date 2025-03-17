@@ -27,6 +27,10 @@ function get_jacobian!(A, buffer::JacobianBuffer, y, x)
     return ForwardDiff.jacobian!(A, buffer.f!, y, x, buffer.config)
 end
 
+"Init a differentiation result matrix as dense or sparse matrix, as required by `backend`."
+init_diffmat(T, backend::AbstractADType, _  , nx , ny) = Matrix{T}(undef, ny, nx)
+init_diffmat(T, backend::AutoSparse    ,prep , _ , _ ) = similar(sparsity_pattern(prep), T)
+
 "Termination status that means 'no solution available'."
 const ERROR_STATUSES = (
     JuMP.INFEASIBLE, JuMP.DUAL_INFEASIBLE, JuMP.LOCALLY_INFEASIBLE, 

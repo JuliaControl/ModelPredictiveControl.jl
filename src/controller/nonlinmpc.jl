@@ -590,7 +590,6 @@ function get_optim_functions(
     jac_backend ::AbstractADType
 ) where JNT<:Real
     model, transcription = mpc.estim.model, mpc.transcription
-    #TODO: initialize jacobian as sparsed if it's the case?
     #TODO: fix type of all cache to ::Vector{JNT} (verify performance difference with and w/o)
     #TODO: mêmes choses pour le MHE
     # --------------------- update simulation function ------------------------------------
@@ -631,14 +630,14 @@ function get_optim_functions(
         update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
-    Z̃_∇J    = fill(myNaN, nZ̃) 
-    ∇J      = zeros(JNT, nZ̃)       # gradient of objective J
+    Z̃_∇J = fill(myNaN, nZ̃) 
     ∇J_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(X̂0), 
         Cache(gc), Cache(g), Cache(geq)
     )
     ∇J_prep = prepare_gradient(Jfunc!, grad_backend, Z̃_∇J, ∇J_context...)
+    ∇J = Vector{JNT}(undef, nZ̃)
     ∇Jfunc! = if nZ̃ == 1
         function (Z̃arg)
             Z̃_∇J .= Z̃arg
@@ -668,7 +667,6 @@ function get_optim_functions(
         return update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
     end
     Z̃_∇g = fill(myNaN, nZ̃)
-    ∇g   = zeros(JNT, ng, nZ̃)   # Jacobian of inequality constraints g
     ∇g_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(X̂0), 
@@ -679,6 +677,7 @@ function get_optim_functions(
     mpc.con.i_g .= true
     ∇g_prep  = prepare_jacobian(gfunc!, g, jac_backend, Z̃_∇g, ∇g_context...)
     mpc.con.i_g .= i_g_old
+    ∇g = init_diffmat(JNT, jac_backend, ∇g_prep, nZ̃, ng)
     ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)
         ∇gfuncs_i! = if nZ̃ == 1
@@ -716,13 +715,13 @@ function get_optim_functions(
         return update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
     end
     Z̃_∇geq = fill(myNaN, nZ̃)
-    ∇geq   = zeros(JNT, neq, nZ̃)  # Jacobian of equality constraints geq
     ∇geq_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
         Cache(Û0), Cache(X̂0),
         Cache(gc), Cache(g)
     )
     ∇geq_prep  = prepare_jacobian(geqfunc!, geq, jac_backend, Z̃_∇geq, ∇geq_context...)
+    ∇geq = init_diffmat(JNT, jac_backend, ∇geq_prep, nZ̃, neq)
     ∇geqfuncs! = Vector{Function}(undef, neq)
     for i in eachindex(∇geqfuncs!)
         # only multivariate syntax, univariate is impossible since nonlinear equality
