@@ -1,6 +1,6 @@
 module ModelPredictiveControl
 
-using PrecompileTools
+using PrecompileTools # TODO: remove this dep if possible (with Cache of DI.jl)
 using LinearAlgebra
 using Random: randn
 

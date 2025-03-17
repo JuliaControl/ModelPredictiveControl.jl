@@ -80,8 +80,7 @@ end
 
 Construct a steady-state Kalman Filter with the [`LinModel`](@ref) `model`.
 
-The steady-state (or [asymptotic](https://en.wikipedia.org/wiki/Kalman_filter#Asymptotic_form))
-Kalman filter is based on the process model :
+The steady-state (or [asymptotic][1]) Kalman filter is based on the process model :
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &= 
@@ -125,6 +124,8 @@ state of the next time step ``\mathbf{x̂}_k(k+1)``. This estimator is allocatio
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
 
+[1]: https://en.wikipedia.org/wiki/Kalman_filter#Asymptotic_form
+
 # Examples
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
@@ -160,9 +161,11 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
     !!! tip
         Increasing `σQint_u` and `σQint_ym` values increases the integral action "gain".
 
-    The constructor pre-compute the steady-state Kalman gain `K̂` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
+    The constructor pre-compute the steady-state Kalman gain `K̂` with the [`kalman`][2]
     function. It can sometimes fail, for example when `model` matrices are ill-conditioned.
     In such a case, you can try the alternative time-varying [`KalmanFilter`](@ref).
+
+    [2]: https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}}
 """
 function SteadyKalmanFilter(
     model::SM;

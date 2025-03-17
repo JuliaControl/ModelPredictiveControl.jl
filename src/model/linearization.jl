@@ -131,8 +131,10 @@ julia> linmodel.A
     equations are similar if the nonlinear model has nonzero operating points.
 
     Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and
-    `h` functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+    `h` functions must be compatible with this feature though. See `JuMP` [documentation][3]
     for common mistakes when writing these functions.
+
+    [3]: https://jump.dev/JuMP.jl/stable/manual/nonlinear/#Common-mistakes-when-writing-a-user-defined-operator
 """
 function linearize(model::SimModel{NT}; kwargs...) where NT<:Real
     nu, nx, ny, nd = model.nu, model.nx, model.ny, model.nd

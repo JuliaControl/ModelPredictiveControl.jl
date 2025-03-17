@@ -112,12 +112,12 @@ LinModel with a sample time Ts = 0.1 s and:
         \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D z}(k)
     \end{aligned}
     ```
-    Continuous dynamics are internally discretized using [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
-    and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Lastly, if 
-    `sys` is discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by
-    using the aforementioned discretization methods.
+    Continuous dynamics are internally discretized using [`c2d`][1] and `:zoh` for
+    manipulated inputs, and `:tustin`, for measured disturbances. Lastly, if `sys` is
+    discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by using the
+    aforementioned discretization methods.
 
-    Note that the constructor transforms the system to its minimal realization using [`minreal`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.minreal)
+    Note that the constructor transforms the system to its minimal realization using [`minreal`][2]
     for controllability/observability. As a consequence, the final state-space
     representation may be different from the one provided in `sys`. It is also converted 
     into a more practical form (``\mathbf{D_u=0}`` because of the zero-order hold):
@@ -129,6 +129,9 @@ LinModel with a sample time Ts = 0.1 s and:
     ```
     Use the syntax [`LinModel{NT}(A, Bu, C, Bd, Dd, Ts)`](@ref) to force a specific
     state-space representation.
+
+    [1]: https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d
+    [2]: https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.minreal
 """
 function LinModel(
     sys::StateSpace{E, NT},
