@@ -951,8 +951,8 @@ Construct an extended Kalman Filter with the [`SimModel`](@ref) `model`.
 Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model and the
 keyword arguments are identical to [`UnscentedKalmanFilter`](@ref), except for `α`, `β` and 
 `κ` which do not apply to the extended Kalman Filter. The Jacobians of the augmented model 
-``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl)
-automatic differentiation. This estimator allocates memory for the Jacobians.
+``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff`](@extref ForwardDiff) automatic
+differentiation. This estimator allocates memory for the Jacobians.
 
 !!! warning
     See the Extended Help of [`linearize`](@ref) function if you get an error like:    
@@ -1043,9 +1043,9 @@ augmented process model:
 \end{aligned}
 ```
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs. The
-function [`ForwardDiff.jacobian`](https://juliadiff.org/ForwardDiff.jl/stable/user/api/#ForwardDiff.jacobian)
-automatically computes them. The correction and prediction step equations are provided below.
-The correction step is skipped if `estim.direct == true` since it's already done by the user.
+Jacobians are computed with [`ForwardDiff`](@extref ForwardDiff). The correction and 
+prediction step equations are provided below. The correction step is skipped if 
+`estim.direct == true` since it's already done by the user.
 
 # Correction Step
 ```math

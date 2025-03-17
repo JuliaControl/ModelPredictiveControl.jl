@@ -75,7 +75,7 @@ Linearize `model` at the operating points `x`, `u`, `d` and return the [`LinMode
 The arguments `x`, `u` and `d` are the linearization points for the state ``\mathbf{x}``,
 manipulated input ``\mathbf{u}`` and measured disturbance ``\mathbf{d}``, respectively (not
 necessarily an equilibrium, details in Extended Help). The Jacobians of ``\mathbf{f}`` and 
-``\mathbf{h}`` functions are automatically computed with [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl).
+``\mathbf{h}`` functions are automatically computed with [`ForwardDiff`](@extref ForwardDiff).
 
 !!! warning
     See Extended Help if you get an error like:    
@@ -131,7 +131,7 @@ julia> linmodel.A
     equations are similar if the nonlinear model has nonzero operating points.
 
     Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and
-    `h` functions must be compatible with this feature though. See [`JuMP` documentation][@extref JuMP Common-mistakes-when-writing-a-user-defined-operator]
+    `h` functions must be compatible with this feature though. See [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
     for common mistakes when writing these functions.
 """
 function linearize(model::SimModel{NT}; kwargs...) where NT<:Real

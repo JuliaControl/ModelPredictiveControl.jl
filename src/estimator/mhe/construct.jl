@@ -261,7 +261,7 @@ transcription for now.
    nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
 - `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
-   function if `model` is not a [`LinModel`](@ref), see [`DifferentiationInterface`][@extref DifferentiationInterface List].
+   function if `model` is not a [`LinModel`](@ref), see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
 - `jacobian=AutoForwardDiff()` : an `AbstractADType` backend for the Jacobian of the
    constraints if `model` is not a [`LinModel`](@ref), see `gradient` above for the options.
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current

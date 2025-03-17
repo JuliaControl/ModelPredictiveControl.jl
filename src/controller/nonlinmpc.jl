@@ -196,7 +196,7 @@ This controller allocates memory at each time step for the optimization.
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
 - `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
-   function, see [`DifferentiationInterface`](@extref DifferentiationInterface List).
+   function, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
@@ -247,16 +247,16 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
     The keyword argument `nc` is the number of elements in `LHS`, and `gc!`, an alias for
     the `gc` argument (both `gc` and `gc!` accepts non-mutating and mutating functions). 
     
-    By default, the optimization relies on dense [`ForwardDiff`](https://github.com/JuliaDiff/ForwardDiff.jl)
+    By default, the optimization relies on dense [`ForwardDiff`](@extref ForwardDiff)
     automatic differentiation (AD) to compute the objective and constraint derivatives. One
     exception: if `transcription` is not a [`SingleShooting`](@ref), the `jacobian` argument
-    defaults to this [sparse backend](@extref DifferentiationInterface Sparsity):
+    defaults to this [sparse backend](@extref DifferentiationInterface AutoSparse-object):
     ```julia
-        AutoSparse(
-            AutoForwardDiff(); 
-            sparsity_detector  = TracerSparsityDetector(), 
-            coloring_algorithm = GreedyColoringAlgorithm()
-        )
+    AutoSparse(
+        AutoForwardDiff(); 
+        sparsity_detector  = TracerSparsityDetector(), 
+        coloring_algorithm = GreedyColoringAlgorithm()
+    )
     ```
     Optimizers generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
     state-space functions must be compatible with this feature. See [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
