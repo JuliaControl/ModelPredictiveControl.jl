@@ -194,16 +194,13 @@ This controller allocates memory at each time step for the optimization.
 - `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
 - `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
-   controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
-   (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
+   controller, provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
 - `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
-   function, see [`DifferentiationInterface`][1].
+   function, see [`DifferentiationInterface`](@extref DifferentiationInterface List).
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
-
-[1]: https://juliadiff.org/DifferentiationInterface.jl/DifferentiationInterface/stable/explanation/backends/#List
 
 # Examples
 ```jldoctest
@@ -253,7 +250,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
     By default, the optimization relies on dense [`ForwardDiff`](https://github.com/JuliaDiff/ForwardDiff.jl)
     automatic differentiation (AD) to compute the objective and constraint derivatives. One
     exception: if `transcription` is not a [`SingleShooting`](@ref), the `jacobian` argument
-    defaults to this [sparse backend][2]:
+    defaults to this [sparse backend](@extref DifferentiationInterface Sparsity):
     ```julia
         AutoSparse(
             AutoForwardDiff(); 
@@ -262,14 +259,11 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
         )
     ```
     Optimizers generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
-    state-space functions must be compatible with this feature. See `JuMP` [documentation][3]
+    state-space functions must be compatible with this feature. See [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
     for common mistakes when writing these functions.
 
     Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
     `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
-
-    [2]: https://juliadiff.org/DifferentiationInterface.jl/DifferentiationInterface/stable/explanation/advanced/#Sparsity
-    [3]: https://jump.dev/JuMP.jl/stable/manual/nonlinear/#Common-mistakes-when-writing-a-user-defined-operator
 """
 function NonLinMPC(
     model::SimModel;
@@ -581,16 +575,13 @@ This method is really intricate and I'm not proud of it. That's because of 3 ele
 - These functions are used inside the nonlinear optimization, so they must be type-stable
   and as efficient as possible.
 - The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
-  of `Vararg{T,N}` (see the [performance tip][1]) and memoization to avoid redundant
-  computations. This is already complex, but it's even worse knowing that most automatic
-  differentiation tools do not support splatting.
+  of `Vararg{T,N}` (see the [performance tip][@extref Julia Be-aware-of-when-Julia-avoids-specializing]
+  ) and memoization to avoid redundant computations. This is already complex, but it's even
+  worse knowing that most automatic differentiation tools do not support splatting.
 - The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
   and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
 
-Inspired from: [User-defined operators with vector outputs][2]
-
-[1]: https://docs.julialang.org/en/v1/manual/performance-tips/#Be-aware-of-when-Julia-avoids-specializing
-[2]: https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs
+Inspired from: [User-defined operators with vector outputs](@extref JuMP User-defined-operators-with-vector-outputs)
 """
 function get_optim_functions(
     mpc::NonLinMPC, 

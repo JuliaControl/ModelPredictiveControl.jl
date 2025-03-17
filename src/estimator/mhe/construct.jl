@@ -257,17 +257,15 @@ transcription for now.
 - `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
-- `optim=default_optim_mhe(model)` : a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
-   with a quadratic/nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
+- `optim=default_optim_mhe(model)` : a [`JuMP.Model`](@extref) object with a quadratic or
+   nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
 - `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
-   function if `model` is not a [`LinModel`](@ref), see [`DifferentiationInterface`][1].
+   function if `model` is not a [`LinModel`](@ref), see [`DifferentiationInterface`][@extref DifferentiationInterface List].
 - `jacobian=AutoForwardDiff()` : an `AbstractADType` backend for the Jacobian of the
    constraints if `model` is not a [`LinModel`](@ref), see `gradient` above for the options.
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
-
-[1]: https://juliadiff.org/DifferentiationInterface.jl/DifferentiationInterface/stable/explanation/backends/#List
 
 # Examples
 ```jldoctest
@@ -348,11 +346,9 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
       default, a [`KalmanFilter`](@ref) estimates the arrival covariance (customizable).
     - Else, a nonlinear program with automatic differentiation (AD) solves the optimization.
       Optimizers generally benefit from exact derivatives like AD. However, the `f` and `h` 
-      functions must be compatible with this feature. See the `JuMP` [documentation][3]
+      functions must be compatible with this feature. See the [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
       for common mistakes when writing these functions. An [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
-
-    [3]: https://jump.dev/JuMP.jl/stable/manual/nonlinear/#Common-mistakes-when-writing-a-user-defined-operator
     
     The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for

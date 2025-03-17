@@ -3,8 +3,15 @@ ENV["PLOTS_TEST"] = "true"
 ENV["GKSwstype"] = "nul"
 push!(LOAD_PATH,"../src/")
 
-using Documenter
+using Documenter, DocumenterInterLinks
 using ModelPredictiveControl
+
+links = InterLinks(
+    "Julia" => "https://docs.julialang.org/en/v1/objects.inv",
+    "ControlSystemsBase" => "https://juliacontrol.github.io/ControlSystems.jl/stable/objects.inv",
+    "JuMP" => "https://jump.dev/JuMP.jl/stable/objects.inv",
+    "DifferentiationInterface" => "https://juliadiff.org/DifferentiationInterface.jl/DifferentiationInterface/stable/objects.inv",
+)
 
 DocMeta.setdocmeta!(
     ModelPredictiveControl, 
@@ -16,6 +23,7 @@ makedocs(
     sitename    = "ModelPredictiveControl.jl",
     #format = Documenter.LaTeX(platform = "none"),
     doctest     = true,
+    plugins     = [links],
     format      = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
         edit_link = "main"
