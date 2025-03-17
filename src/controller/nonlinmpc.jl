@@ -590,6 +590,9 @@ function get_optim_functions(
     jac_backend ::AbstractADType
 ) where JNT<:Real
     model, transcription = mpc.estim.model, mpc.transcription
+    #TODO: initialize jacobian as sparsed if it's the case?
+    #TODO: fix type of all cache to ::Vector{JNT} (verify performance difference with and w/o)
+    #TODO: mêmes choses pour le MHE
     # --------------------- update simulation function ------------------------------------
     function update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
         U0 = getU0!(U0, mpc, Z̃)

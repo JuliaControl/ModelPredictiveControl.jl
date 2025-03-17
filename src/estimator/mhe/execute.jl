@@ -161,6 +161,15 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
 end
 
 """
+    getϵ(estim::MovingHorizonEstimator, Z̃) -> ϵ
+
+Get the slack `ϵ` from the decision vector `Z̃` if present, otherwise return 0.
+"""
+function getϵ(estim::MovingHorizonEstimator, Z̃::AbstractVector{NT}) where NT<:Real
+    return estim.nϵ ≠ 0 ? Z̃[begin] : zero(NT)
+end
+
+"""
     add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.lastu0) -> ismoving
 
 Add data to the observation windows of the moving horizon estimator and clamp `estim.Nk`.
