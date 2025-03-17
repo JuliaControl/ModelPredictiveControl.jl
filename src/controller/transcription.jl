@@ -1116,6 +1116,90 @@ function predict!(
     return Ŷ0, x̂0end
 end
 
+"""
+    con_nonlinprog!(
+        g, mpc::PredictiveController, model::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
+    ) -> g
+
+Nonlinear constrains when `model` is a [`LinModel`](@ref).
+
+The method mutates the `g` vectors in argument and returns it. Only the custom constraints
+are include in the `g` vector.
+"""
+function con_nonlinprog!(
+    g, mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
+)
+    for i in eachindex(g)
+        g[i] = gc[i]
+    end
+    return g
+end
+
+"""
+    con_nonlinprog!(
+        g, mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod, x̂0end, Ŷ0, gc, ϵ
+    ) -> g
+
+Nonlinear constrains when `model` is a [`NonLinModel`](@ref) with non-[`SingleShooting`](@ref).
+
+The method mutates the `g` vectors in argument and returns it. The output prediction and the
+custom constraints are include in the `g` vector.
+"""
+function con_nonlinprog!(
+    g, mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, x̂0end, Ŷ0, gc, ϵ
+)
+    nx̂, nŶ = length(x̂0end), length(Ŷ0)
+    for i in eachindex(g)
+        mpc.con.i_g[i] || continue
+        if i ≤ nŶ
+            j = i
+            g[i] = (mpc.con.Y0min[j] - Ŷ0[j])     - ϵ*mpc.con.C_ymin[j]
+        elseif i ≤ 2nŶ
+            j = i - nŶ
+            g[i] = (Ŷ0[j] - mpc.con.Y0max[j])     - ϵ*mpc.con.C_ymax[j]
+        else
+            j = i - 2nŶ
+            g[i] = gc[j]
+        end
+    end
+    return g
+end
+
+"""
+    con_nonlinprog!(
+        g, mpc::PredictiveController, model::NonLinModel, ::SingleShooting, x̂0end, Ŷ0, gc, ϵ
+    ) -> g
+
+Nonlinear constrains when `model` is [`NonLinModel`](@ref) with [`SingleShooting`](@ref).
+
+The method mutates the `g` vectors in argument and returns it. The output prediction, 
+the terminal state and the custom constraints are include in the `g` vector.
+"""
+function con_nonlinprog!(
+    g, mpc::PredictiveController, ::NonLinModel, ::SingleShooting, x̂0end, Ŷ0, gc, ϵ
+)
+    nx̂, nŶ = length(x̂0end), length(Ŷ0)
+    for i in eachindex(g)
+        mpc.con.i_g[i] || continue
+        if i ≤ nŶ
+            j = i
+            g[i] = (mpc.con.Y0min[j] - Ŷ0[j])     - ϵ*mpc.con.C_ymin[j]
+        elseif i ≤ 2nŶ
+            j = i - nŶ
+            g[i] = (Ŷ0[j] - mpc.con.Y0max[j])     - ϵ*mpc.con.C_ymax[j]
+        elseif i ≤ 2nŶ + nx̂
+            j = i - 2nŶ
+            g[i] = (mpc.con.x̂0min[j] - x̂0end[j])  - ϵ*mpc.con.c_x̂min[j]
+        elseif i ≤ 2nŶ + 2nx̂
+            j = i - 2nŶ - nx̂
+            g[i] = (x̂0end[j] - mpc.con.x̂0max[j])  - ϵ*mpc.con.c_x̂max[j]
+        else
+            j = i - 2nŶ - 2nx̂
+            g[i] = gc[j]
+        end
+    end
+    return g
+end
 
 """
     con_nonlinprogeq!(
