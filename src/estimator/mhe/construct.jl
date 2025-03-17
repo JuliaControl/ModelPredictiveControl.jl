@@ -1406,8 +1406,10 @@ function get_optim_functions(
     # temporarily enable all the inequality constraints for sparsity pattern detection:
     i_g_old = copy(estim.con.i_g)
     estim.con.i_g .= true
+    estim.Nk      .= estim.He
     ∇g_prep  = prepare_jacobian(gfunc!, g, jac_backend, Z̃_∇g, ∇g_context...)
     estim.con.i_g .= i_g_old
+    estim.Nk      .= 0
     ∇g = init_diffmat(JNT, jac_backend, ∇g_prep, nZ̃, ng)
     ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)
