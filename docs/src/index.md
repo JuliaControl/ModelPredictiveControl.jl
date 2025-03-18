@@ -12,8 +12,9 @@ The objective is to provide a simple, clear and modular framework to quickly des
 predictive controllers (MPCs) in Julia, while preserving the flexibility for advanced
 real-time optimization. Modern MPCs based on closed-loop state estimators are the main focus
 of the package, but classical approaches that rely on internal models are also possible. The
-`JuMP.jl` interface allows the user to test different solvers easily if the performance of
-the default settings is not satisfactory.
+`JuMP` amd `DifferentiationInterface` dependencies allows the user to test different
+optimizers and automatic differentiation (AD) backends easily if the performance of the
+default settings is not satisfactory.
 
 The documentation is divided in two parts:
 
