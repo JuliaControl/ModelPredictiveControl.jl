@@ -510,7 +510,9 @@ Objective function of [`MovingHorizonEstimator`](@ref) when `model` is a [`LinMo
 It can be called on a [`MovingHorizonEstimator`](@ref) object to evaluate the objective 
 function at specific `Z̃` and `V̂` values.
 """
-function obj_nonlinprog!( _ , estim::MovingHorizonEstimator, ::LinModel, _ , Z̃)
+function obj_nonlinprog!(
+    _ , estim::MovingHorizonEstimator, ::LinModel, _ , Z̃::AbstractVector{NT}
+) where NT<:Real
     return obj_quadprog(Z̃, estim.H̃, estim.q̃) + estim.r[]
 end
 
@@ -532,11 +534,6 @@ function obj_nonlinprog!(
     x̂0arr, Ŵ, V̂ = @views Z̃[nx̃-nx̂+1:nx̃], Z̃[nx̃+1:nx̃+nŴ], V̂[1:nYm]
     x̄ .= estim.x̂0arr_old .- x̂0arr
     Jϵ = nϵ ≠ 0 ? estim.C*Z̃[begin]^2 : zero(NT)
-    #println(x̂0arr)
-    #println(invP̄)
-    #println(dot(x̄, invP̄, x̄))
-    #println(dot(Ŵ, invQ̂_Nk, Ŵ))
-    #println(dot(V̂, invR̂_Nk, V̂))
     return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jϵ
 end
 
