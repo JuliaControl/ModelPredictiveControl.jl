@@ -522,14 +522,21 @@ Objective function of the MHE when `model` is not a [`LinModel`](@ref).
 The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
 `x̄` vector arguments.
 """
-function obj_nonlinprog!(x̄, estim::MovingHorizonEstimator, ::SimModel, V̂, Z̃) 
+function obj_nonlinprog!(
+    x̄, estim::MovingHorizonEstimator, ::SimModel, V̂, Z̃::AbstractVector{NT}
+) where NT<:Real
     nϵ, Nk = estim.nϵ, estim.Nk[] 
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
     nx̃ = nϵ + nx̂
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
     x̂0arr, Ŵ, V̂ = @views Z̃[nx̃-nx̂+1:nx̃], Z̃[nx̃+1:nx̃+nŴ], V̂[1:nYm]
     x̄ .= estim.x̂0arr_old .- x̂0arr
-    Jϵ = nϵ ≠ 0 ? estim.C*Z̃[begin]^2 : 0
+    Jϵ = nϵ ≠ 0 ? estim.C*Z̃[begin]^2 : zero(NT)
+    #println(x̂0arr)
+    #println(invP̄)
+    #println(dot(x̄, invP̄, x̄))
+    #println(dot(Ŵ, invQ̂_Nk, Ŵ))
+    #println(dot(V̂, invR̂_Nk, V̂))
     return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jϵ
 end
 

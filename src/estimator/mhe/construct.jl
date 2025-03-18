@@ -1356,7 +1356,10 @@ function get_optim_functions(
         Cache(g),
         Cache(x̄),
     )
+    # temporarily "fill" the estimation window for the preperation of the gradient: 
+    estim.Nk[] = He
     ∇J_prep = prepare_gradient(Jfunc!, estim.gradient, Z̃_∇J, ∇J_context...; strict)
+    estim.Nk[] = 0
     ∇J = Vector{JNT}(undef, nZ̃)
     ∇Jfunc! = function (∇J::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
         # only the multivariate syntax of JuMP.@operator, univariate is impossible for MHE

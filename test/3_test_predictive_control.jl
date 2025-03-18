@@ -614,10 +614,12 @@ end
     @test nmpc17.transcription == MultipleShooting()
     @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
     @test size(nmpc17.con.Aeq, 1) == nmpc17.estim.nx̂*nmpc17.Hp
-    @test_nowarn nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
+    nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
         gradient=AutoFiniteDiff(), 
         jacobian=AutoFiniteDiff()
     )
+    @test nmpc18.gradient == AutoFiniteDiff()
+    @test nmpc18.jacobian == AutoFiniteDiff()
 
     nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc15  = NonLinMPC(nonlinmodel2, Hp=15)
@@ -724,6 +726,19 @@ end
     info = getinfo(nmpc9)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 20 atol=5e-2
+    nmpc10 = setconstraint!(NonLinMPC(
+        nonlinmodel, Nwt=[0], Hp=100, Hc=1, 
+        gradient=AutoFiniteDiff(),
+        jacobian=AutoFiniteDiff()), 
+        ymax=[100], ymin=[-100]
+    )
+    preparestate!(nmpc10, [0], [0])
+    u = moveinput!(nmpc10, [10], [0])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc10)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 10 atol=5e-2
+
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 

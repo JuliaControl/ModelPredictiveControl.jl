@@ -781,11 +781,13 @@ end
 end
 
 @testitem "MovingHorizonEstimator construction" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using JuMP, Ipopt, DifferentiationInterface
+    import FiniteDiff
     linmodel1 = LinModel(sys,Ts,i_d=[3])
-    f(x,u,d,_) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h(x,d,_)   = linmodel1.C*x + linmodel1.Du*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing)
+    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h(x,d,model)   = model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel1)
 
     mhe1 = MovingHorizonEstimator(linmodel1, He=5)
     @test mhe1.nym == 2
@@ -856,6 +858,12 @@ end
     linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mhe13 = MovingHorizonEstimator(linmodel2, He=5)
     @test isa(mhe13, MovingHorizonEstimator{Float32})
+
+    mhe14 = MovingHorizonEstimator(
+        nonlinmodel, He=5, gradient=AutoFiniteDiff(), jacobian=AutoFiniteDiff()
+    )
+    @test mhe14.gradient == AutoFiniteDiff()
+    @test mhe14.jacobian == AutoFiniteDiff()
 
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel1, He=0)
