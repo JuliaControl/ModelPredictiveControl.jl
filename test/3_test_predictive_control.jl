@@ -696,7 +696,7 @@ end
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     preparestate!(nmpc6, [0])
     @test moveinput!(nmpc6, [0]) ≈ [0.0]
-    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
+    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
     nonlinmodel2.h!(y, Float32[0,0], Float32[0], nonlinmodel2.p)
