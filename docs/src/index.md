@@ -13,8 +13,8 @@ predictive controllers (MPCs) in Julia, while preserving the flexibility for adv
 real-time optimization. Modern MPCs based on closed-loop state estimators are the main focus
 of the package, but classical approaches that rely on internal models are also possible. The
 `JuMP` amd `DifferentiationInterface` dependencies allows the user to test different
-optimizers and automatic differentiation (AD) backends easily if the performance of the
-default settings is not satisfactory.
+optimizers and automatic differentiation (AD) backends easily if the performances of the
+default settings are not satisfactory.
 
 The documentation is divided in two parts:
 
