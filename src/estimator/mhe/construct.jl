@@ -357,10 +357,12 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     - If `model` is a [`LinModel`](@ref), the optimization is treated as a quadratic program
       with a time-varying Hessian, which is generally cheaper than nonlinear programming. By
       default, a [`KalmanFilter`](@ref) estimates the arrival covariance (customizable).
-    - Else, a nonlinear program with automatic differentiation (AD) solves the optimization.
-      Optimizers generally benefit from exact derivatives like AD. However, the `f` and `h` 
-      functions must be compatible with this feature. See the [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
-      for common mistakes when writing these functions. An [`UnscentedKalmanFilter`](@ref)
+    - Else, a nonlinear program with dense [`ForwardDiff`](@extref ForwardDiff) automatic
+      differentiation (AD) compute the objective and constraint derivatives by default 
+      (customizable). Optimizers generally benefit from exact derivatives like AD. However, 
+      the `f` and `h` functions must be compatible with this feature. See the 
+      [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
+      for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
     
     The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
