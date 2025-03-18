@@ -608,6 +608,7 @@ function get_optim_functions(
     ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
     nZ̃, nU, nŶ, nX̂ = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+    strict = Val(true)
     myNaN  = convert(JNT, NaN)  # NaN to force update_simulations! at first call:
     Z̃ ::Vector{JNT}                  = fill(myNaN, nZ̃)
     ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
@@ -636,7 +637,7 @@ function get_optim_functions(
         Cache(Û0), Cache(X̂0), 
         Cache(gc), Cache(g), Cache(geq),
     )
-    ∇J_prep = prepare_gradient(Jfunc!, grad_backend, Z̃_∇J, ∇J_context...)
+    ∇J_prep = prepare_gradient(Jfunc!, grad_backend, Z̃_∇J, ∇J_context...; strict)
     ∇J = Vector{JNT}(undef, nZ̃)
     ∇Jfunc! = if nZ̃ == 1
         function (Z̃arg)
@@ -675,7 +676,7 @@ function get_optim_functions(
     )
     # temporarily enable all the inequality constraints for sparsity detection:
     mpc.con.i_g[1:end-nc] .= true
-    ∇g_prep  = prepare_jacobian(gfunc!, g, jac_backend, Z̃_∇g, ∇g_context...)
+    ∇g_prep  = prepare_jacobian(gfunc!, g, jac_backend, Z̃_∇g, ∇g_context...; strict)
     mpc.con.i_g[1:end-nc] .= false
     ∇g = init_diffmat(JNT, jac_backend, ∇g_prep, nZ̃, ng)
     ∇gfuncs! = Vector{Function}(undef, ng)
@@ -721,7 +722,7 @@ function get_optim_functions(
         Cache(Û0), Cache(X̂0),
         Cache(gc), Cache(g)
     )
-    ∇geq_prep  = prepare_jacobian(geqfunc!, geq, jac_backend, Z̃_∇geq, ∇geq_context...)
+    ∇geq_prep = prepare_jacobian(geqfunc!, geq, jac_backend, Z̃_∇geq, ∇geq_context...; strict)
     ∇geq = init_diffmat(JNT, jac_backend, ∇geq_prep, nZ̃, neq)
     ∇geqfuncs! = Vector{Function}(undef, neq)
     for i in eachindex(∇geqfuncs!)

@@ -1345,6 +1345,7 @@ function get_optim_functions(
     nx̂, nym, nŷ, nu, nϵ, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, estim.He
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
     myNaN = convert(JNT, NaN) # NaN to force update_simulations! at first call
+    strict = Val(true)
     Z̃::Vector{JNT}                   = fill(myNaN, nZ̃) 
     V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
     û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
@@ -1370,7 +1371,7 @@ function get_optim_functions(
         Cache(g),
         Cache(x̄),
     )
-    ∇J_prep = prepare_gradient(Jfunc!, grad_backend, Z̃_∇J, ∇J_context...)
+    ∇J_prep = prepare_gradient(Jfunc!, grad_backend, Z̃_∇J, ∇J_context...; strict)
     ∇J = Vector{JNT}(undef, nZ̃)
     ∇Jfunc! = if nZ̃ == 1
         function (Z̃arg) 
@@ -1409,7 +1410,7 @@ function get_optim_functions(
     # temporarily enable all the inequality constraints for sparsity detection:
     estim.con.i_g .= true  
     estim.Nk[] = He
-    ∇g_prep  = prepare_jacobian(gfunc!, g, jac_backend, Z̃_∇g, ∇g_context...)
+    ∇g_prep  = prepare_jacobian(gfunc!, g, jac_backend, Z̃_∇g, ∇g_context...; strict)
     estim.con.i_g .= false
     estim.Nk[] = 0
     ∇g = init_diffmat(JNT, jac_backend, ∇g_prep, nZ̃, ng)
