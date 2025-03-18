@@ -41,10 +41,11 @@ julia = "1.10"
 [extras]
 DAQP = "c47d62df-3981-49c8-9651-128b1cd08617"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 
 [targets]
-test = ["Test", "TestItems", "TestItemRunner", "Documenter", "Plots", "DAQP"]
+test = ["Test", "TestItems", "TestItemRunner", "Documenter", "Plots", "DAQP", "FiniteDiff"]

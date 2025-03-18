@@ -555,7 +555,9 @@ end
 end
 
 @testitem "NonLinMPC construction" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using JuMP, Ipopt, DifferentiationInterface
+    import FiniteDiff
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     nmpc0 = NonLinMPC(linmodel1, Hp=15)
     @test isa(nmpc0.estim, SteadyKalmanFilter)
@@ -612,6 +614,10 @@ end
     @test nmpc17.transcription == MultipleShooting()
     @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
     @test size(nmpc17.con.Aeq, 1) == nmpc17.estim.nx̂*nmpc17.Hp
+    @test_nowarn nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
+        gradient=AutoFiniteDiff(), 
+        jacobian=AutoFiniteDiff()
+    )
 
     nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc15  = NonLinMPC(nonlinmodel2, Hp=15)
@@ -629,7 +635,9 @@ end
 end
 
 @testitem "NonLinMPC moves and getinfo" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     Hp = 100
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=Hp, Hc=1)
