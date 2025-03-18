@@ -864,10 +864,12 @@ end
 
 @testitem "MovingHorizonEstimator estimation and getinfo" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt, ForwardDiff
-    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2], i_d=[3]), uop=[10,50], yop=[50,30], dop=[5])
-    f(x,u,d,_) = linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
-    h(x,d,_)   = linmodel1.C*x + linmodel1.Dd*d
-    nonlinmodel = setop!(NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing), uop=[10,50], yop=[50,30], dop=[5])
+    linmodel1 = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
+    linmodel1 = setop!(linmodel1, uop=[10,50], yop=[50,30], dop=[5])
+    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h(x,d,model)   = model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel1)
+    nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
     
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
     preparestate!(mhe1, [50, 30], [5])
@@ -968,6 +970,10 @@ end
     x̂ = updatestate!(mhe3, [0], [0])
     @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
+    mhe4 = setconstraint!(MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0), v̂max=[50,50])
+    g_V̂max_end = mhe4.optim[:g_V̂max_2].func
+    # execute update_predictions! branch in `gfunc_i` for coverage:
+    @test_nowarn g_V̂max_end(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) ≤ 0.0 
 
     Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
     R̂ = diagm([1, 1].^2)
