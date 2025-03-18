@@ -1365,19 +1365,14 @@ function get_optim_functions(
     )
     ∇J_prep = prepare_gradient(Jfunc!, grad_backend, Z̃_∇J, ∇J_context...; strict)
     ∇J = Vector{JNT}(undef, nZ̃)
-    ∇Jfunc! = if nZ̃ == 1
-        function (Z̃arg) 
-            Z̃_∇J .= Z̃arg
-            gradient!(Jfunc!, ∇J, ∇J_prep, grad_backend, Z̃_∇J, ∇J_context...)
-            return ∇J[begin]    # univariate syntax, see JuMP.@operator doc
-        end
-    else
-        function (∇J::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            Z̃_∇J .= Z̃arg
-            gradient!(Jfunc!, ∇J, ∇J_prep, grad_backend, Z̃_∇J, ∇J_context...)
-            return ∇J           # multivariate syntax, see JuMP.@operator doc
-        end
+    ∇Jfunc! = function (∇J::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+        # only the multivariate syntax of JuMP.@operator, univariate is impossible for MHE
+        # since Z̃ comprises the arrival state estimate AND the estimated process noise
+        Z̃_∇J .= Z̃arg
+        gradient!(Jfunc!, ∇J, ∇J_prep, grad_backend, Z̃_∇J, ∇J_context...)
+        return ∇J
     end
+    
     # --------------------- inequality constraint functions -------------------------------
     gfuncs = Vector{Function}(undef, ng)
     for i in eachindex(gfuncs)
@@ -1408,22 +1403,13 @@ function get_optim_functions(
     ∇g = init_diffmat(JNT, jac_backend, ∇g_prep, nZ̃, ng)
     ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)
-        ∇gfuncs![i] = if nZ̃ == 1
-            function (Z̃arg::T) where T<:Real
-                if isdifferent(Z̃arg, Z̃_∇g)
-                    Z̃_∇g .= Z̃arg
-                    jacobian!(gfunc!, g, ∇g, ∇g_prep, jac_backend, Z̃_∇g. ∇g_context...)
-                end
-                return ∇g[i, begin]            # univariate syntax, see JuMP.@operator doc
+        ∇gfuncs![i] = function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            # only the multivariate syntax of JuMP.@operator, see above for the explanation
+            if isdifferent(Z̃arg, Z̃_∇g)
+                Z̃_∇g .= Z̃arg
+                jacobian!(gfunc!, g, ∇g, ∇g_prep, jac_backend, Z̃_∇g, ∇g_context...)
             end
-        else
-            function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-                if isdifferent(Z̃arg, Z̃_∇g)
-                    Z̃_∇g .= Z̃arg
-                    jacobian!(gfunc!, g, ∇g, ∇g_prep, jac_backend, Z̃_∇g, ∇g_context...)
-                end
-                return ∇g_i .= @views ∇g[i, :] # multivariate syntax, see JuMP.@operator doc
-            end
+            return ∇g_i .= @views ∇g[i, :]
         end
     end
     return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!
