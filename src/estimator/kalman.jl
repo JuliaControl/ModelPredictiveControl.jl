@@ -802,7 +802,7 @@ See [`init_ukf`](@ref) for the definition of the constants ``\mathbf{m̂, Ŝ}``
 superscript in e.g. ``\mathbf{X̂}_{k-1}^j(k)`` refers the vector at the ``j``th column of 
 ``\mathbf{X̂}_{k-1}(k)``. The symbol ``\mathbf{0}`` is a vector with zeros. The number of
 sigma points is ``n_σ = 2 n_\mathbf{x̂} + 1``. The matrices ``\sqrt{\mathbf{P̂}_{k-1}(k)}``
-and ``\sqrt{\mathbf{P̂}_{k}(k)}`` are the the lower triangular factors of [`cholesky`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.cholesky)
+and ``\sqrt{\mathbf{P̂}_{k}(k)}`` are the the lower triangular factors of [`cholesky`](@extref Julia LinearAlgebra.cholesky)
 results. The correction and prediction step equations are provided below. The correction
 step is skipped if `estim.direct == true` since it's already done by the user.
 

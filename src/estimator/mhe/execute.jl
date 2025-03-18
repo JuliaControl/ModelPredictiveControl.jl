@@ -379,7 +379,7 @@ where ``\mathbf{ŵ}_{k-1}(k-j)`` is the input increment for time ``k-j`` comput
 last time step ``k-1``. It then calls `JuMP.optimize!(estim.optim)` and extract the
 solution. A failed optimization prints an `@error` log in the REPL and returns the 
 warm-start value. A failed optimization also prints [`getinfo`](@ref) results in
-the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
+the debug log [if activated](@extref Julia Example:-Enable-debug-level-messages).
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim = estim.model, estim.optim

@@ -11,8 +11,8 @@ old_logger = global_logger(); global_logger(errlogger);
 
 ## Pendulum Model
 
-This example integrates the simple pendulum model of the [last section](@ref man_nonlin) in the
-[`ModelingToolkit.jl`](https://docs.sciml.ai/ModelingToolkit/stable/) (MTK) framework and
+This example integrates the simple pendulum model of the [last section](@ref man_nonlin) in
+[`ModelingToolkit`](https://docs.sciml.ai/ModelingToolkit/stable/) (MTK) framework and
 extracts appropriate `f!` and `h!` functions to construct a [`NonLinModel`](@ref). An
 [`NonLinMPC`](@ref) is designed from this model and simulated to reproduce the results of
 the last section.

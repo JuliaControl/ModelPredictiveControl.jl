@@ -1318,13 +1318,13 @@ This method is really intricate and I'm not proud of it. That's because of 3 ele
 - These functions are used inside the nonlinear optimization, so they must be type-stable
   and as efficient as possible.
 - The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
-  of `Vararg{T,N}` (see the [performance tip](https://docs.julialang.org/en/v1/manual/performance-tips/#Be-aware-of-when-Julia-avoids-specializing))
+  of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
   and memoization to avoid redundant computations. This is already complex, but it's even
   worse knowing that most automatic differentiation tools do not support splatting.
 - The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
   and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
 
-Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
+Inspired from: [User-defined operators with vector outputs](@extref JuMP User-defined-operators-with-vector-outputs)
 """
 function get_optim_functions(
     estim::MovingHorizonEstimator, 
