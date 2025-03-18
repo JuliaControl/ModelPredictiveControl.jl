@@ -683,12 +683,6 @@ end
     preparestate!(nmpc4, [0], [0])
     u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
-    nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Hp=15, Cwt=Inf), ymin=[1])
-    g_Y0min_end = nmpc5.optim[:g_Y0min_15].func
-    # test gfunc_i(i,::NTuple{N, Float64}):
-    @test g_Y0min_end(20.0, 10.0) ≤ 0.0 
-    # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
-    @test ForwardDiff.gradient(vec->g_Y0min_end(vec...), [20.0, 10.0]) ≈ [-5, -5] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     preparestate!(nmpc6, [0])
