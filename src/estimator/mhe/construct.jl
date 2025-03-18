@@ -1332,37 +1332,39 @@ function get_optim_functions(
     grad_backend::AbstractADType,
     jac_backend::AbstractADType
 ) where {JNT <: Real}
-    model, con = estim.model, estim.con
-    # --------------------- update simulation function ------------------------------------
-    function update_simulations!(Z̃, V̂, X̂0, û0, ŷ0, g)
+    # -------- update simulation function (all args after `estim` are mutated) ------------
+    function update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
+        model = estim.model
         V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
         ϵ = getϵ(estim, Z̃)
         g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
         return nothing
     end
     # ---------- common cache for Jfunc, gfuncs called with floats ------------------------
+    model, con = estim.model, estim.con
     nx̂, nym, nŷ, nu, nϵ, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, estim.He
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
-    myNaN = convert(JNT, NaN)
-    Z̃ = fill(myNaN, nZ̃) # NaN to force update_simulations! at first call
-    V̂, X̂0  = zeros(JNT, nV̂), zeros(JNT, nX̂)
-    û0, ŷ0 = zeros(JNT, nu), zeros(JNT, nŷ)
-    g      = zeros(JNT, ng)
-    x̄      = zeros(JNT, nx̂)
+    myNaN = convert(JNT, NaN) # NaN to force update_simulations! at first call
+    Z̃::Vector{JNT}                   = fill(myNaN, nZ̃) 
+    V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
+    û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
+    g::Vector{JNT}                   = zeros(JNT, ng)
+    x̄::Vector{JNT}                   = zeros(JNT, nx̂)
     # --------------------- objective functions -------------------------------------------
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         if isdifferent(Z̃arg, Z̃)
             Z̃ .= Z̃arg
-            update_simulations!(Z̃, V̂, X̂0, û0, ŷ0, g)
+            update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
         end
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
-    function Jfunc!(Z̃, V̂, X̂0, û0, ŷ0, g, x̄)
-        update_simulations!(Z̃, V̂, X̂0, û0, ŷ0, g)
+    function Jfunc!(Z̃, estim, V̂, X̂0, û0, ŷ0, g, x̄)
+        update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
     Z̃_∇J    = fill(myNaN, nZ̃) 
     ∇J_context = (
+        Constant(estim),
         Cache(V̂),  Cache(X̂0),
         Cache(û0), Cache(ŷ0),
         Cache(g),
@@ -1389,27 +1391,27 @@ function get_optim_functions(
         gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             if isdifferent(Z̃arg, Z̃)
                 Z̃ .= Z̃arg
-                update_simulations!(Z̃, V̂, X̂0, û0, ŷ0, g)
+                update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
             end
             return g[i]::T
         end
         gfuncs[i] = gfunc_i
     end
-    function gfunc!(g, Z̃, V̂, X̂0, û0, ŷ0)
-        return update_simulations!(Z̃, V̂, X̂0, û0, ŷ0, g)
+    function gfunc!(g, Z̃, estim, V̂, X̂0, û0, ŷ0)
+        return update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
     end
     Z̃_∇g     = fill(myNaN, nZ̃)
     ∇g_context = (
+        Constant(estim),
         Cache(V̂),  Cache(X̂0),
         Cache(û0), Cache(ŷ0),
     )
-    # temporarily enable all the inequality constraints for sparsity pattern detection:
-    i_g_old = copy(estim.con.i_g)
-    estim.con.i_g .= true
-    estim.Nk      .= estim.He
+    # temporarily enable all the inequality constraints for sparsity detection:
+    estim.con.i_g .= true  
+    estim.Nk[] = He
     ∇g_prep  = prepare_jacobian(gfunc!, g, jac_backend, Z̃_∇g, ∇g_context...)
-    estim.con.i_g .= i_g_old
-    estim.Nk      .= 0
+    estim.con.i_g .= false
+    estim.Nk[] = 0
     ∇g = init_diffmat(JNT, jac_backend, ∇g_prep, nZ̃, ng)
     ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)

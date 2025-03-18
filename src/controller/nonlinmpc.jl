@@ -589,11 +589,9 @@ function get_optim_functions(
     grad_backend::AbstractADType,
     jac_backend ::AbstractADType
 ) where JNT<:Real
-    model, transcription = mpc.estim.model, mpc.transcription
-    #TODO: fix type of all cache to ::Vector{JNT} (verify performance difference with and w/o)
-    #TODO: mêmes choses pour le MHE
-    # --------------------- update simulation function ------------------------------------
-    function update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+    # ------ update simulation function (all args after `mpc` are mutated) ----------------
+    function update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        model, transcription = mpc.estim.model, mpc.transcription
         U0 = getU0!(U0, mpc, Z̃)
         ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
         Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, mpc, model, transcription, U0, Z̃)
@@ -605,36 +603,38 @@ function get_optim_functions(
         return nothing
     end
     # ----- common cache for Jfunc, gfuncs, geqfuncs called with floats -------------------
+    model = mpc.estim.model
     nu, ny, nx̂, nϵ, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, mpc.Hp, mpc.Hc
     ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
     nZ̃, nU, nŶ, nX̂ = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
-    myNaN  = convert(JNT, NaN)
-    Z̃      = fill(myNaN, nZ̃) # NaN to force update_simulations! at first call
-    ΔŨ     = zeros(JNT, nΔŨ)
-    x̂0end  = zeros(JNT, nx̂)
-    Ue, Ŷe = zeros(JNT, nUe), zeros(JNT, nŶe)
-    U0, Ŷ0 = zeros(JNT, nU),  zeros(JNT, nŶ)
-    Û0, X̂0 = zeros(JNT, nU),  zeros(JNT, nX̂)
-    gc, g  = zeros(JNT, nc),  zeros(JNT, ng)
-    geq    = zeros(JNT, neq)
-    # ---------------------- objective function ------------------------------------------
+    myNaN  = convert(JNT, NaN)  # NaN to force update_simulations! at first call:
+    Z̃ ::Vector{JNT}                  = fill(myNaN, nZ̃)
+    ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
+    x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
+    Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
+    U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
+    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
+    geq::Vector{JNT}                 = zeros(JNT, neq)
+    # ---------------------- objective function ------------------------------------------- 
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         if isdifferent(Z̃arg, Z̃)
             Z̃ .= Z̃arg
-            update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+            update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
         end
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
     end
-    function Jfunc!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
-        update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+    function Jfunc!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
     Z̃_∇J = fill(myNaN, nZ̃) 
     ∇J_context = (
+        Constant(mpc),
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(X̂0), 
-        Cache(gc), Cache(g), Cache(geq)
+        Cache(gc), Cache(g), Cache(geq),
     )
     ∇J_prep = prepare_gradient(Jfunc!, grad_backend, Z̃_∇J, ∇J_context...)
     ∇J = Vector{JNT}(undef, nZ̃)
@@ -657,26 +657,26 @@ function get_optim_functions(
         gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             if isdifferent(Z̃arg, Z̃)
                 Z̃ .= Z̃arg
-                update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+                update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
             end
             return g[i]::T
         end
         gfuncs[i] = gfunc_i
     end
-    function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, geq)
-        return update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+    function gfunc!(g, Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, geq)
+        return update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
     end
     Z̃_∇g = fill(myNaN, nZ̃)
     ∇g_context = (
+        Constant(mpc),
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(X̂0), 
-        Cache(gc), Cache(geq)
+        Cache(gc), Cache(geq),
     )
-    # temporarily enable all the inequality constraints for sparsity pattern detection:
-    i_g_old = copy(mpc.con.i_g)
-    mpc.con.i_g .= true
+    # temporarily enable all the inequality constraints for sparsity detection:
+    mpc.con.i_g[1:end-nc] .= true
     ∇g_prep  = prepare_jacobian(gfunc!, g, jac_backend, Z̃_∇g, ∇g_context...)
-    mpc.con.i_g .= i_g_old
+    mpc.con.i_g[1:end-nc] .= false
     ∇g = init_diffmat(JNT, jac_backend, ∇g_prep, nZ̃, ng)
     ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)
@@ -705,17 +705,18 @@ function get_optim_functions(
         geqfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             if isdifferent(Z̃arg, Z̃)
                 Z̃ .= Z̃arg
-                update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+                update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
             end
             return geq[i]::T
         end
         geqfuncs[i] = geqfunc_i          
     end
-    function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g) 
-        return update_simulations!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+    function geqfunc!(geq, Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g) 
+        return update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
     end
     Z̃_∇geq = fill(myNaN, nZ̃)
     ∇geq_context = (
+        Constant(mpc),
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
         Cache(Û0), Cache(X̂0),
         Cache(gc), Cache(g)
