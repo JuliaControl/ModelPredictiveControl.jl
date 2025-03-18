@@ -591,6 +591,22 @@ function predict!(V̂, X̂0, û0, ŷ0, estim::MovingHorizonEstimator, model::S
     return V̂, X̂0
 end
 
+
+"""
+    update_predictions!(V̂, X̂0, û0, ŷ0, g, estim::MovingHorizonEstimator, Z̃)
+
+Update in-place the vectors for the predictions of `estim` estimator at decision vector `Z̃`.
+
+The method mutates all the arguments before `estim` argument.
+"""
+function update_prediction!(V̂, X̂0, û0, ŷ0, g, estim::MovingHorizonEstimator, Z̃)
+    model = estim.model
+    V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
+    ϵ = getϵ(estim, Z̃)
+    g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
+    return nothing
+end
+
 """
     con_nonlinprog!(g, estim::MovingHorizonEstimator, model::SimModel, X̂0, V̂, ϵ)
 

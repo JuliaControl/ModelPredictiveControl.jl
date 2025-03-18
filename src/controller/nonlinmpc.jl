@@ -589,19 +589,6 @@ function get_optim_functions(
     grad_backend::AbstractADType,
     jac_backend ::AbstractADType
 ) where JNT<:Real
-    # ------ update simulation function (all args after `mpc` are mutated) ----------------
-    function update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
-        model, transcription = mpc.estim.model, mpc.transcription
-        U0 = getU0!(U0, mpc, Z̃)
-        ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
-        Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, mpc, model, transcription, U0, Z̃)
-        Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
-        ϵ = getϵ(mpc, Z̃)
-        gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
-        g   = con_nonlinprog!(g, mpc, model, transcription, x̂0end, Ŷ0, gc, ϵ)
-        geq = con_nonlinprogeq!(geq, X̂0, Û0, mpc, model, transcription, U0, Z̃)
-        return nothing
-    end
     # ----- common cache for Jfunc, gfuncs, geqfuncs called with floats -------------------
     model = mpc.estim.model
     nu, ny, nx̂, nϵ, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, mpc.Hp, mpc.Hc
@@ -622,12 +609,12 @@ function get_optim_functions(
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         if isdifferent(Z̃arg, Z̃)
             Z̃ .= Z̃arg
-            update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
         end
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
     end
     function Jfunc!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
-        update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
     Z̃_∇J = fill(myNaN, nZ̃) 
@@ -658,14 +645,14 @@ function get_optim_functions(
         gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             if isdifferent(Z̃arg, Z̃)
                 Z̃ .= Z̃arg
-                update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+                update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
             end
             return g[i]::T
         end
         gfuncs[i] = gfunc_i
     end
     function gfunc!(g, Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, geq)
-        return update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        return update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
     end
     Z̃_∇g = fill(myNaN, nZ̃)
     ∇g_context = (
@@ -706,14 +693,14 @@ function get_optim_functions(
         geqfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             if isdifferent(Z̃arg, Z̃)
                 Z̃ .= Z̃arg
-                update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+                update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
             end
             return geq[i]::T
         end
         geqfuncs[i] = geqfunc_i          
     end
     function geqfunc!(geq, Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g) 
-        return update_simulations!(Z̃, mpc, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
+        return update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
     end
     Z̃_∇geq = fill(myNaN, nZ̃)
     ∇geq_context = (
@@ -741,6 +728,31 @@ function get_optim_functions(
         ∇geqfuncs![i] = ∇geqfuncs_i!
     end
     return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
+end
+
+"""
+    update_predictions!(
+        ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, 
+        mpc::PredictiveController, Z̃
+    ) -> nothing
+
+Update in-place all vectors for the predictions of `mpc` controller at decision vector `Z̃`. 
+
+The method mutates all the arguments before the `mpc` argument.
+"""
+function update_predictions!(
+    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc::PredictiveController, Z̃
+)
+    model, transcription = mpc.estim.model, mpc.transcription
+    U0 = getU0!(U0, mpc, Z̃)
+    ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
+    Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, mpc, model, transcription, U0, Z̃)
+    Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
+    ϵ = getϵ(mpc, Z̃)
+    gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
+    g   = con_nonlinprog!(g, mpc, model, transcription, x̂0end, Ŷ0, gc, ϵ)
+    geq = con_nonlinprogeq!(geq, X̂0, Û0, mpc, model, transcription, U0, Z̃)
+    return nothing
 end
 
 @doc raw"""

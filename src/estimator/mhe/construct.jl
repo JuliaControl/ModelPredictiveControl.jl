@@ -1332,14 +1332,6 @@ function get_optim_functions(
     grad_backend::AbstractADType,
     jac_backend::AbstractADType
 ) where {JNT <: Real}
-    # -------- update simulation function (all args after `estim` are mutated) ------------
-    function update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
-        model = estim.model
-        V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
-        ϵ = getϵ(estim, Z̃)
-        g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
-        return nothing
-    end
     # ---------- common cache for Jfunc, gfuncs called with floats ------------------------
     model, con = estim.model, estim.con
     nx̂, nym, nŷ, nu, nϵ, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, estim.He
@@ -1355,12 +1347,12 @@ function get_optim_functions(
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         if isdifferent(Z̃arg, Z̃)
             Z̃ .= Z̃arg
-            update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
+            update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
         end
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
     function Jfunc!(Z̃, estim, V̂, X̂0, û0, ŷ0, g, x̄)
-        update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
+        update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
     Z̃_∇J    = fill(myNaN, nZ̃) 
@@ -1392,14 +1384,14 @@ function get_optim_functions(
         gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             if isdifferent(Z̃arg, Z̃)
                 Z̃ .= Z̃arg
-                update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
+                update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
             end
             return g[i]::T
         end
         gfuncs[i] = gfunc_i
     end
     function gfunc!(g, Z̃, estim, V̂, X̂0, û0, ŷ0)
-        return update_simulations!(Z̃, estim, V̂, X̂0, û0, ŷ0, g)
+        return update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
     end
     Z̃_∇g     = fill(myNaN, nZ̃)
     ∇g_context = (

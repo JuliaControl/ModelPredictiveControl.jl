@@ -123,16 +123,16 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     x̂0end = similar(mpc.estim.x̂0)
     Ue, Ŷe = Vector{NT}(undef, nUe), Vector{NT}(undef, nŶe)
     U0, Ŷ0 = similar(mpc.Uop), similar(mpc.Yop)
-    X̂0, Û0 = Vector{NT}(undef, nX̂0), Vector{NT}(undef, nÛ0)
+    Û0, X̂0 = Vector{NT}(undef, nÛ0), Vector{NT}(undef, nX̂0)
     U,  Ŷ  = similar(mpc.Uop), similar(mpc.Yop)
-    Ŷs = similar(mpc.Yop)
     U0 = getU0!(U0, mpc, Z̃)
-    ΔŨ = getΔŨ!(ΔŨ, mpc, mpc.transcription, Z̃)
+    ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
     Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, mpc, model, transcription, U0, Z̃)
     Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
     U .= U0 .+ mpc.Uop
     Ŷ .= Ŷ0 .+ mpc.Yop
     J = obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+    Ŷs = similar(mpc.Yop)
     predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]   = Z̃[1:mpc.Hc*model.nu]
     info[:ϵ]    = getϵ(mpc, Z̃)
@@ -369,6 +369,9 @@ function obj_nonlinprog!(
     E_JE = obj_econ(mpc, model, Ue, Ŷe)
     return JR̂y + JΔŨ + JR̂u + E_JE
 end
+
+"No custom nonlinear constraints `gc` by default, return `gc` unchanged." 
+con_custom!(gc, ::PredictiveController, _ , _, _ ) = gc
 
 "By default, the economic term is zero."
 function obj_econ(::PredictiveController, ::SimModel, _ , ::AbstractVector{NT}) where NT
