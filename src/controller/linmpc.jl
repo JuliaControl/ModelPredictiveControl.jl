@@ -135,7 +135,7 @@ arguments. This controller allocates memory at each time step for the optimizati
 
 # Arguments
 - `model::LinModel` : model used for controller predictions and state estimations.
-- `Hp=10+nk`: prediction horizon ``H_p``, `nk` is the number of delays in `model`.
+- `Hp=10+nk` : prediction horizon ``H_p``, `nk` is the number of delays in `model`.
 - `Hc=2` : control horizon ``H_c``.
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
