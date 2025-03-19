@@ -51,8 +51,9 @@ Linearize `model` at the operating points `x`, `u`, `d` and return the [`LinMode
 
 The arguments `x`, `u` and `d` are the linearization points for the state ``\mathbf{x}``,
 manipulated input ``\mathbf{u}`` and measured disturbance ``\mathbf{d}``, respectively (not
-necessarily an equilibrium, details in Extended Help). The Jacobians of ``\mathbf{f}`` and 
-``\mathbf{h}`` functions are automatically computed with [`ForwardDiff`](@extref ForwardDiff).
+necessarily an equilibrium, details in Extended Help). By default, [`ForwardDiff`](@extref ForwardDiff)
+automatically computes the Jacobians of ``\mathbf{f}`` and ``\mathbf{h}`` functions. Modify
+the `jacobian` keyword argument at the construction of `model` to swap the backend.
 
 !!! warning
     See Extended Help if you get an error like:    
