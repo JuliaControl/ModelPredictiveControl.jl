@@ -1,5 +1,11 @@
 struct NonLinModel{
-    NT<:Real, F<:Function, H<:Function, PT<:Any, DS<:DiffSolver, LF<:Function
+    NT<:Real, 
+    F<:Function, 
+    H<:Function, 
+    PT<:Any, 
+    DS<:DiffSolver, 
+    JB<:AbstractADType,
+    LF<:Function
 } <: SimModel{NT}
     x0::Vector{NT}
     f!::F
@@ -21,11 +27,20 @@ struct NonLinModel{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    jacobian::JB
     linfunc!::LF
     buffer::SimModelBuffer{NT}
     function NonLinModel{NT}(
-        f!::F, h!::H, Ts, nu, nx, ny, nd, p::PT, solver::DS, linfunc!::LF
-    ) where {NT<:Real, F<:Function, H<:Function, PT<:Any, DS<:DiffSolver, LF<:Function}
+        f!::F, h!::H, Ts, nu, nx, ny, nd, p::PT, solver::DS, jacobian::JB, linfunc!::LF
+    ) where {
+            NT<:Real, 
+            F<:Function, 
+            H<:Function, 
+            PT<:Any, 
+            DS<:DiffSolver, 
+            JB<:AbstractADType,
+            LF<:Function
+        }
         Ts > 0 || error("Sampling time Ts must be positive")
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
@@ -39,7 +54,7 @@ struct NonLinModel{
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, F, H, PT, DS, LF}(
+        return new{NT, F, H, PT, DS, JB, LF}(
             x0, 
             f!, h!,
             p,
@@ -48,7 +63,7 @@ struct NonLinModel{
             nu, nx, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
-            linfunc!,
+            jacobian, linfunc!,
             buffer
         )
     end
@@ -143,20 +158,20 @@ NonLinModel with a sample time Ts = 2.0 s, empty solver and:
 """
 function NonLinModel{NT}(
     f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
-    p=NT[], solver=RungeKutta(4)
+    p=NT[], solver=RungeKutta(4), jacobian=AutoForwardDiff()
 ) where {NT<:Real}
     isnothing(solver) && (solver=EmptySolver())
     f!, h! = get_mutating_functions(NT, f, h)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
-    linfunc! = get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p)
-    return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver, linfunc!)
+    linfunc! = get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p, jacobian)
+    return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver, jacobian, linfunc!)
 end
 
 function NonLinModel(
     f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
-    p=Float64[], solver=RungeKutta(4)
+    p=Float64[], solver=RungeKutta(4), jacobian=AutoForwardDiff()
 )
-    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; p, solver)
+    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; p, solver, jacobian)
 end
 
 "Get the mutating functions `f!` and `h!` from the provided functions in argument."

@@ -1,22 +1,22 @@
 """
-    get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p) -> linfunc!
+    get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p, backend) -> linfunc!
 
 Return the `linfunc!` function that computes the Jacobians of `f!` and `h!` functions.
 
 The function has the following signature: 
 ```
-    linfunc!(xnext, y, A, Bu, C, Bd, Dd, x, u, d, cst_x, cst_u, cst_d) -> nothing
+    linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d) -> nothing
 ```
-and it should modifies in-place all the arguments before `x`. The `cst_x`, `cst_u`, `cst_d` 
-and are `DifferentiationInterface.Constant` objects with the linearization points.
+and it should modifies in-place all the arguments before `backend`. The `backend` argument
+is an `AbstractADType` backend from `DifferentiationInterface`. The `cst_x`, `cst_u` and 
+`cst_d` are `DifferentiationInterface.Constant` objects with the linearization points.
 """
-function get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p)
+function get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p, backend)
     f_x!(xnext, x, u, d) = f!(xnext, x, u, d, p)
     f_u!(xnext, u, x, d) = f!(xnext, x, u, d, p)
     f_d!(xnext, d, x, u) = f!(xnext, x, u, d, p)
     h_x!(y, x, d) = h!(y, x, d, p)
     h_d!(y, d, x) = h!(y, x, d, p)
-    backend = AutoForwardDiff()
     strict  = Val(true)
     xnext = zeros(NT, nx)
     y = zeros(NT, ny)
@@ -31,7 +31,7 @@ function get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p)
     Bd_prep = prepare_jacobian(f_d!, xnext, backend, d, cst_x, cst_u; strict)
     C_prep  = prepare_jacobian(h_x!, y,     backend, x, cst_d       ; strict)
     Dd_prep = prepare_jacobian(h_d!, y,     backend, d, cst_x       ; strict)
-    function linfunc!(xnext, y, A, Bu, C, Bd, Dd, x, u, d, cst_x, cst_u, cst_d)
+    function linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d)
         # all the arguments before `x` are mutated in this function
         jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cst_u, cst_d)
         jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cst_x, cst_d)
@@ -183,10 +183,11 @@ end
 function linearize_core!(linmodel::LinModel, model::SimModel, x0, u0, d0)
     xnext0, y0 = linmodel.buffer.x, linmodel.buffer.y
     A, Bu, C, Bd, Dd = linmodel.A, linmodel.Bu, linmodel.C, linmodel.Bd, linmodel.Dd
-    cx = Constant(x0)
-    cu = Constant(u0)
-    cd = Constant(d0)
-    model.linfunc!(xnext0, y0, A, Bu, C, Bd, Dd, x0, u0, d0, cx, cu, cd)
+    cst_x = Constant(x0)
+    cst_u = Constant(u0)
+    cst_d = Constant(d0)
+    backend = model.jacobian
+    model.linfunc!(xnext0, y0, A, Bu, C, Bd, Dd, backend, x0, u0, d0, cst_x, cst_u, cst_d)
     return nothing
 end
 
