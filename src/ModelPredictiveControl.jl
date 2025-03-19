@@ -1,6 +1,6 @@
 module ModelPredictiveControl
 
-using PrecompileTools # TODO: remove this dep if possible (with Cache of DI.jl)
+using PrecompileTools 
 using LinearAlgebra
 using Random: randn
 
@@ -13,7 +13,7 @@ using DifferentiationInterface: Constant, Cache
 using SparseConnectivityTracer: TracerSparsityDetector
 using SparseMatrixColorings: GreedyColoringAlgorithm, sparsity_pattern
 
-import ForwardDiff #TODO: delete this after `linearize!` and `ExtendedKalmanFilter` are updated
+import ForwardDiff
 
 import ControlSystemsBase
 import ControlSystemsBase: ss, tf, delay
@@ -25,7 +25,7 @@ import JuMP
 import JuMP: MOIU, MOI, GenericModel, Model, optimizer_with_attributes, register
 import JuMP: @variable, @operator, @constraint, @objective
 
-import PreallocationTools: DiffCache, get_tmp
+import PreallocationTools: DiffCache, get_tmp # TODO: remove this dep if possible (with Cache of DI.jl)
 
 import OSQP, Ipopt
 
