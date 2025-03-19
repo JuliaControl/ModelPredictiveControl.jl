@@ -1,5 +1,5 @@
 struct NonLinModel{
-    NT<:Real, F<:Function, H<:Function, PT<:Any, DS<:DiffSolver, LB<:LinearizationBuffer
+    NT<:Real, F<:Function, H<:Function, PT<:Any, DS<:DiffSolver, LF<:Function
 } <: SimModel{NT}
     x0::Vector{NT}
     f!::F
@@ -21,11 +21,11 @@ struct NonLinModel{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
-    linbuffer::LB
+    linfunc!::LF
     buffer::SimModelBuffer{NT}
     function NonLinModel{NT}(
-        f!::F, h!::H, Ts, nu, nx, ny, nd, p::PT, solver::DS, linbuffer::LB
-    ) where {NT<:Real, F<:Function, H<:Function, PT<:Any, DS<:DiffSolver, LB<:LinearizationBuffer}
+        f!::F, h!::H, Ts, nu, nx, ny, nd, p::PT, solver::DS, linfunc!::LF
+    ) where {NT<:Real, F<:Function, H<:Function, PT<:Any, DS<:DiffSolver, LF<:Function}
         Ts > 0 || error("Sampling time Ts must be positive")
         uop = zeros(NT, nu)
         yop = zeros(NT, ny)
@@ -39,7 +39,7 @@ struct NonLinModel{
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, F, H, PT, DS, LB}(
+        return new{NT, F, H, PT, DS, LF}(
             x0, 
             f!, h!,
             p,
@@ -48,7 +48,7 @@ struct NonLinModel{
             nu, nx, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
-            linbuffer,
+            linfunc!,
             buffer
         )
     end
@@ -148,8 +148,8 @@ function NonLinModel{NT}(
     isnothing(solver) && (solver=EmptySolver())
     f!, h! = get_mutating_functions(NT, f, h)
     f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
-    linbuffer = LinearizationBuffer(NT, f!, h!, nu, nx, ny, nd, p)
-    return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver, linbuffer)
+    linfunc! = get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p)
+    return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver, linfunc!)
 end
 
 function NonLinModel(

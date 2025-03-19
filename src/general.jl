@@ -6,31 +6,6 @@ const DEFAULT_LWT = 0.0
 const DEFAULT_CWT = 1e5
 const DEFAULT_EWT = 0.0
 
-"Abstract type for all differentiation buffers."
-abstract type DifferentiationBuffer end
-
-function Base.show(io::IO, buffer::DifferentiationBuffer) 
-    return print(io, "DifferentiationBuffer with a $(typeof(buffer.config).name.name)")
-end
-
-"Struct with both function and configuration for ForwardDiff Jacobian."
-struct JacobianBuffer{FT<:Function, CT<:ForwardDiff.JacobianConfig} <: DifferentiationBuffer
-    f!::FT
-    config::CT
-end
-
-"Create a JacobianBuffer with in-place function `f!`, output `y` and input `x`."
-JacobianBuffer(f!, y, x) = JacobianBuffer(f!, ForwardDiff.JacobianConfig(f!, y, x))
-
-"Compute in-place and return the Jacobian matrix of `buffer.f!` at `x`."
-function get_jacobian!(A, buffer::JacobianBuffer, y, x)
-    return ForwardDiff.jacobian!(A, buffer.f!, y, x, buffer.config)
-end
-
-"Init a differentiation result matrix as dense or sparse matrix, as required by `backend`."
-init_diffmat(T, backend::AbstractADType, _  , nx , ny) = Matrix{T}(undef, ny, nx)
-init_diffmat(T, backend::AutoSparse    ,prep , _ , _ ) = similar(sparsity_pattern(prep), T)
-
 "Termination status that means 'no solution available'."
 const ERROR_STATUSES = (
     JuMP.INFEASIBLE, JuMP.DUAL_INFEASIBLE, JuMP.LOCALLY_INFEASIBLE, 
@@ -80,6 +55,10 @@ function limit_solve_time(optim::GenericModel, Ts)
         end
     end
 end
+
+"Init a differentiation result matrix as dense or sparse matrix, as required by `backend`."
+init_diffmat(T, backend::AbstractADType, _  , nx , ny) = Matrix{T}(undef, ny, nx)
+init_diffmat(T, backend::AutoSparse    ,prep , _ , _ ) = similar(sparsity_pattern(prep), T)
 
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))

@@ -1,71 +1,48 @@
-"A linearization buffer for the [`linearize`](@ref) function."
-struct LinearizationBuffer{
-    NT <:Real,
-    JB_FUD <:JacobianBuffer,
-    JB_FXD <:JacobianBuffer,
-    JB_FXU <:JacobianBuffer,
-    JB_HD  <:JacobianBuffer,
-    JB_HX  <:JacobianBuffer
-}
-    x::Vector{NT}
-    u::Vector{NT}
-    d::Vector{NT}
-    buffer_f_at_u_d::JB_FUD
-    buffer_f_at_x_d::JB_FXD
-    buffer_f_at_x_u::JB_FXU
-    buffer_h_at_d  ::JB_HD
-    buffer_h_at_x  ::JB_HX
-    function LinearizationBuffer(
-        x::Vector{NT}, 
-        u::Vector{NT}, 
-        d::Vector{NT},
-        buffer_f_at_u_d::JB_FUD, 
-        buffer_f_at_x_d::JB_FXD, 
-        buffer_f_at_x_u::JB_FXU, 
-        buffer_h_at_d::JB_HD, 
-        buffer_h_at_x::JB_HX
-    ) where {NT<:Real, JB_FUD, JB_FXD, JB_FXU, JB_HD, JB_HX}
-        return new{NT, JB_FUD, JB_FXD, JB_FXU, JB_HD, JB_HX}(
-            x, u, d, 
-            buffer_f_at_u_d, 
-            buffer_f_at_x_d, 
-            buffer_f_at_x_u, 
-            buffer_h_at_d, 
-            buffer_h_at_x
-        )
+"""
+    get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p) -> linfunc!
+
+Return the `linfunc!` function that computes the Jacobians of `f!` and `h!` functions.
+
+The function has the following signature: 
+```
+    linfunc!(xnext, y, A, Bu, C, Bd, Dd, x, u, d, cst_x, cst_u, cst_d) -> nothing
+```
+and it should modifies in-place all the arguments before `x`. The `cst_x`, `cst_u`, `cst_d` 
+and are `DifferentiationInterface.Constant` objects with the linearization points.
+"""
+function get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p)
+    f_x!(xnext, x, u, d) = f!(xnext, x, u, d, p)
+    f_u!(xnext, u, x, d) = f!(xnext, x, u, d, p)
+    f_d!(xnext, d, x, u) = f!(xnext, x, u, d, p)
+    h_x!(y, x, d) = h!(y, x, d, p)
+    h_d!(y, d, x) = h!(y, x, d, p)
+    backend = AutoForwardDiff()
+    strict  = Val(true)
+    xnext = zeros(NT, nx)
+    y = zeros(NT, ny)
+    x = zeros(NT, nx)
+    u = zeros(NT, nu)
+    d = zeros(NT, nd)
+    cst_x = Constant(x)
+    cst_u = Constant(u)
+    cst_d = Constant(d)
+    A_prep  = prepare_jacobian(f_x!, xnext, backend, x, cst_u, cst_d; strict)
+    Bu_prep = prepare_jacobian(f_u!, xnext, backend, u, cst_x, cst_d; strict)
+    Bd_prep = prepare_jacobian(f_d!, xnext, backend, d, cst_x, cst_u; strict)
+    C_prep  = prepare_jacobian(h_x!, y,     backend, x, cst_d    ; strict)
+    Dd_prep = prepare_jacobian(h_d!, y,     backend, d, cst_x    ; strict)
+    function linfunc!(xnext, y, A, Bu, C, Bd, Dd, x, u, d, cst_x, cst_u, cst_d)
+        # all the arguments before `x` are mutated in this function
+        jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cst_u, cst_d)
+        jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cst_x, cst_d)
+        jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cst_x, cst_u)
+        jacobian!(h_x!, y,     C,  C_prep,  backend, x, cst_d)
+        jacobian!(h_d!, y,     Dd, Dd_prep, backend, d, cst_x)
+        return nothing
     end
-    
+    return linfunc!
 end
 
-Base.show(io::IO, buffer::LinearizationBuffer) = print(io, "LinearizationBuffer object")
-
-function LinearizationBuffer(NT, f!, h!, nu, nx, ny, nd, p)
-    x, u, d, f_at_u_d!, f_at_x_d!, f_at_x_u!, h_at_d!, h_at_x! = get_linearize_funcs(
-        NT, f!, h!, nu, nx, ny, nd, p
-    )
-    xnext, y = Vector{NT}(undef, nx), Vector{NT}(undef, ny) # TODO: to replace ?
-    return LinearizationBuffer(
-        x, u, d, 
-        JacobianBuffer(f_at_u_d!, xnext, x),
-        JacobianBuffer(f_at_x_d!, xnext, u),
-        JacobianBuffer(f_at_x_u!, xnext, d),
-        JacobianBuffer(h_at_d!, y, x),
-        JacobianBuffer(h_at_x!, y, d)
-    )
-end
-
-"Get the linearization functions for [`NonLinModel`](@ref) `f!` and `h!` functions."
-function get_linearize_funcs(NT, f!, h!, nu, nx, ny, nd, p)
-    x = Vector{NT}(undef, nx)
-    u = Vector{NT}(undef, nu)
-    d = Vector{NT}(undef, nd)
-    f_at_u_d!(xnext, x) = f!(xnext, x, u, d, p)
-    f_at_x_d!(xnext, u) = f!(xnext, x, u, d, p)
-    f_at_x_u!(xnext, d) = f!(xnext, x, u, d, p)
-    h_at_d!(y, x)       = h!(y, x, d, p)
-    h_at_x!(y, d)       = h!(y, x, d, p)
-    return x, u, d, f_at_u_d!, f_at_x_d!, f_at_x_u!, h_at_d!, h_at_x!
-end
 
 @doc raw"""
     linearize(model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop) -> linmodel
@@ -181,8 +158,7 @@ function linearize!(
     u0 .= u .- nonlinmodel.uop
     d0 .= d .- nonlinmodel.dop
     # --- compute the Jacobians at linearization points ---
-    xnext0::Vector{NT}, y0::Vector{NT} = linmodel.buffer.x, linmodel.buffer.y
-    get_jacobians!(linmodel, xnext0, y0, nonlinmodel, x0, u0, d0)
+    linearize_core!(linmodel, nonlinmodel, x0, u0, d0)
     # --- compute the nonlinear model output at operating points ---
     xnext0, y0 = linmodel.buffer.x, linmodel.buffer.y
     h!(y0, nonlinmodel, x0, d0, model.p)
@@ -203,22 +179,19 @@ function linearize!(
     return linmodel
 end
 
-"Compute the 5 Jacobians of `model` at the linearization point and write them in `linmodel`."
-function get_jacobians!(linmodel::LinModel, xnext0, y0, model::SimModel, x0, u0, d0)
-    linbuffer = model.linbuffer # a LinearizationBuffer object
-    linbuffer.x .= x0
-    linbuffer.u .= u0
-    linbuffer.d .= d0
-    get_jacobian!(linmodel.A,  linbuffer.buffer_f_at_u_d, xnext0, x0)
-    get_jacobian!(linmodel.Bu, linbuffer.buffer_f_at_x_d, xnext0, u0)
-    get_jacobian!(linmodel.Bd, linbuffer.buffer_f_at_x_u, xnext0, d0)
-    get_jacobian!(linmodel.C,  linbuffer.buffer_h_at_d, y0, x0)
-    get_jacobian!(linmodel.Dd, linbuffer.buffer_h_at_x, y0, d0)
+"Call `linfunc!` function to compute the Jacobians of `model` at the linearization point."
+function linearize_core!(linmodel::LinModel, model::SimModel, x0, u0, d0)
+    xnext0, y0 = linmodel.buffer.x, linmodel.buffer.y
+    A, Bu, C, Bd, Dd = linmodel.A, linmodel.Bu, linmodel.C, linmodel.Bd, linmodel.Dd
+    cx = Constant(x0)
+    cu = Constant(u0)
+    cd = Constant(d0)
+    model.linfunc!(xnext0, y0, A, Bu, C, Bd, Dd, x0, u0, d0, cx, cu, cd)
     return nothing
 end
 
 "Copy the state-space matrices of `model` to `linmodel` if `model` is already linear."
-function get_jacobians!(linmodel::LinModel, _ , _ , model::LinModel, _ , _ , _)
+function linearize_core!(linmodel::LinModel, model::LinModel, _ , _ , _ )
     linmodel.A  .= model.A
     linmodel.Bu .= model.Bu
     linmodel.C  .= model.C
