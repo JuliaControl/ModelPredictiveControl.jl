@@ -1346,13 +1346,12 @@ function get_optim_functions(
         end
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
-    function Jfunc!(Z̃, estim, V̂, X̂0, û0, ŷ0, g, x̄)
+    function Jfunc!(Z̃, V̂, X̂0, û0, ŷ0, g, x̄)
         update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
     Z̃_∇J    = fill(myNaN, nZ̃) 
     ∇J_context = (
-        Constant(estim),
         Cache(V̂),  Cache(X̂0),
         Cache(û0), Cache(ŷ0),
         Cache(g),
@@ -1383,12 +1382,11 @@ function get_optim_functions(
         end
         gfuncs[i] = gfunc_i
     end
-    function gfunc!(g, Z̃, estim, V̂, X̂0, û0, ŷ0)
+    function gfunc!(g, Z̃, V̂, X̂0, û0, ŷ0)
         return update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
     end
     Z̃_∇g     = fill(myNaN, nZ̃)
     ∇g_context = (
-        Constant(estim),
         Cache(V̂),  Cache(X̂0),
         Cache(û0), Cache(ŷ0),
     )
