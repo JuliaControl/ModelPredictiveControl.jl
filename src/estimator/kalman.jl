@@ -872,7 +872,12 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     return nothing
 end
 
-struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
+struct ExtendedKalmanFilter{
+        NT<:Real, 
+        SM<:SimModel, 
+        JB<:AbstractADType, 
+        LF<:Function
+} <: StateEstimator{NT}
     model::SM
     lastu0::Vector{NT}
     x̂op ::Vector{NT}
@@ -906,10 +911,12 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     Ĥm ::Matrix{NT}
     direct::Bool
     corrected::Vector{Bool}
+    jacobian::JB
+    linfunc!::LF
     buffer::StateEstimatorBuffer{NT}
     function ExtendedKalmanFilter{NT}(
-        model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true
-    ) where {NT<:Real, SM<:SimModel}
+        model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian::JB, linfunc!::LF, direct=true
+    ) where {NT<:Real, SM<:SimModel, JB<:AbstractADType, LF<:Function}
         nu, ny, nd = model.nu, model.ny, model.nd
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -937,6 +944,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             P̂_0, Q̂, R̂,
             K̂,
             F̂_û, F̂, Ĥ, Ĥm,
+            jacobian, linfunc!,
             direct, corrected,
             buffer
         )
@@ -983,6 +991,7 @@ function ExtendedKalmanFilter(
     sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
     sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
+    jacobian = AutoForwardDiff(),
     direct = true,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
@@ -996,21 +1005,67 @@ function ExtendedKalmanFilter(
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    return ExtendedKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    linfunc! = get_ekf_linfunc(model, i_ym, nint_u, nint_ym, jacobian)
+    return ExtendedKalmanFilter{NT}(
+        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian, linfunc!, direct
+    )
 end
 
 @doc raw"""
-    ExtendedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true)
+    ExtendedKalmanFilter(
+        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian=AutoForwardDiff(), direct=true
+    )
 
 Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function ExtendedKalmanFilter(
-    model::SM, i_ym, nint_u, nint_ym,P̂_0, Q̂, R̂; direct=true
+    model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian=AutoForwardDiff(), direct=true
 ) where {NT<:Real, SM<:SimModel{NT}}
-    P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
-    return ExtendedKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)    
+    linfunc! = get_ekf_linfunc(model, i_ym, nint_u, nint_ym, jacobian)
+    return ExtendedKalmanFilter{NT}(
+        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian, direct, linfunc!
+    )
+end
+
+function get_ekf_linfunc(model, i_ym, nint_u, nint_ym, jacobian)
+    As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
+    function f̂_ekf!(x̂0next, x̂0, model, As, Cs_u, u0, d0, û0)
+        return f̂!(x̂next0, û0, model, As, Cs_u, x̂0, u0, d0)
+    end
+    function ĥ_ekf!(ŷ0, x̂0, model, Cs_y, d0)
+        return ĥ!(ŷ0, model, Cs_y, x̂0, d0)
+    end
+    strict  = Val(true)
+    #TODO: continue here:
+    xnext = zeros(NT, nx)
+    y = zeros(NT, ny)
+    x = zeros(NT, nx)
+    u = zeros(NT, nu)
+    d = zeros(NT, nd)
+    cst_x = Constant(x)
+    cst_u = Constant(u)
+    cst_d = Constant(d)
+    A_prep  = prepare_jacobian(f_x!, xnext, backend, x, cst_u, cst_d; strict)
+    Bu_prep = prepare_jacobian(f_u!, xnext, backend, u, cst_x, cst_d; strict)
+    Bd_prep = prepare_jacobian(f_d!, xnext, backend, d, cst_x, cst_u; strict)
+    C_prep  = prepare_jacobian(h_x!, y,     backend, x, cst_d       ; strict)
+    Dd_prep = prepare_jacobian(h_d!, y,     backend, d, cst_x       ; strict)
+    function linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d)
+        # all the arguments before `x` are mutated in this function
+        jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cst_u, cst_d)
+        jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cst_x, cst_d)
+        jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cst_x, cst_u)
+        jacobian!(h_x!, y,     C,  C_prep,  backend, x, cst_d)
+        jacobian!(h_d!, y,     Dd, Dd_prep, backend, d, cst_x)
+        return nothing
+    end
+    return linfunc!
+
+
+
 end
 
 """
@@ -1021,9 +1076,14 @@ Do the same but for the [`ExtendedKalmanFilter`](@ref).
 function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
     model, x̂0 = estim.model, estim.x̂0
     ŷ0 = estim.buffer.ŷ
+
+
     ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
     ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
+
+    
     estim.Ĥm .= @views estim.Ĥ[estim.i_ym, :]
+
     return correct_estimate_kf!(estim, y0m, d0, estim.Ĥm)
 end
 
