@@ -8,7 +8,7 @@ The function has the following signature:
     linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d) -> nothing
 ```
 and it should modifies in-place all the arguments before `backend`. The `backend` argument
-is an `AbstractADType` backend from `DifferentiationInterface`. The `cst_x`, `cst_u` and 
+is an `AbstractADType` object from `DifferentiationInterface`. The `cst_x`, `cst_u` and 
 `cst_d` are `DifferentiationInterface.Constant` objects with the linearization points.
 """
 function get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p, backend)
@@ -32,7 +32,7 @@ function get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p, backend)
     C_prep  = prepare_jacobian(h_x!, y,     backend, x, cst_d       ; strict)
     Dd_prep = prepare_jacobian(h_d!, y,     backend, d, cst_x       ; strict)
     function linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d)
-        # all the arguments before `x` are mutated in this function
+        # all the arguments before `backend` are mutated in this function
         jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cst_u, cst_d)
         jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cst_x, cst_d)
         jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cst_x, cst_u)

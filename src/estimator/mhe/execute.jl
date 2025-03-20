@@ -445,7 +445,10 @@ end
 "Correct the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
 function correct_cov!(estim::MovingHorizonEstimator)
     nym, nd = estim.nym, estim.model.nd
-    y0marr, d0arr = @views estim.Y0m[1:nym], estim.D0[1:nd]
+    buffer = estim.covestim.buffer
+    y0marr, d0arr = buffer.ym, buffer.d
+    y0marr .= @views estim.Y0m[1:nym]
+    d0arr  .= @views estim.D0[1:nd]
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
     try
@@ -468,7 +471,11 @@ end
 "Update the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
 function update_cov!(estim::MovingHorizonEstimator)
     nu, nd, nym = estim.model.nu, estim.model.nd, estim.nym
-    u0arr, y0marr, d0arr = @views estim.U0[1:nu], estim.Y0m[1:nym], estim.D0[1:nd]
+    buffer = estim.covestim.buffer
+    u0arr, y0marr, d0arr = buffer.u, buffer.ym, buffer.d
+    u0arr  .= @views estim.U0[1:nu]
+    y0marr .= @views estim.Y0m[1:nym]
+    d0arr  .= @views estim.D0[1:nd]
     estim.covestim.x̂0 .= estim.x̂0arr_old
     estim.covestim.P̂  .= estim.P̂arr_old
     try

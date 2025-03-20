@@ -6,7 +6,7 @@ package for Julia.
 The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl/ControlSystems.jl)
 for the linear systems, [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the
 optimization and [`DifferentiationInterface.jl`](https://github.com/JuliaDiff/DifferentiationInterface.jl)
-for the differentiation.
+for the derivatives.
 
 The objective is to provide a simple, clear and modular framework to quickly design model
 predictive controllers (MPCs) in Julia, while preserving the flexibility for advanced

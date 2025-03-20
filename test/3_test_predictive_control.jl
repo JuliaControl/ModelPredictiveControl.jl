@@ -698,7 +698,6 @@ end
     nmpc5 = setconstraint!(nmpc5, ymin=[1])
     # execute update_predictions! branch in `gfunc_i` for coverage:
     g_Y0min_end = nmpc5.optim[:g_Y0min_1].func
-    println(nmpc5.Z̃)
     @test_nowarn g_Y0min_end(10.0, 9.0, 8.0, 7.0)
     # execute update_predictions! branch in `geqfunc_i` for coverage:
     geq_end = nmpc5.optim[:geq_2].func

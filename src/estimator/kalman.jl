@@ -624,11 +624,11 @@ This estimator is allocation-free if `model` simulations do not allocate.
     disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
-- `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
-   estimator, in opposition to the delayed/predictor form).
 - `α=1e-3` or *`alpha`* : alpha parameter, spread of the state distribution ``(0 < α ≤ 1)``.
 - `β=2` or *`beta`* : beta parameter, skewness and kurtosis of the states distribution ``(β ≥ 0)``.
 - `κ=0` or *`kappa`* : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
+- `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
+   estimator, in opposition to the delayed/predictor form).
 
 # Examples
 ```jldoctest
@@ -872,7 +872,12 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     return nothing
 end
 
-struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
+struct ExtendedKalmanFilter{
+        NT<:Real, 
+        SM<:SimModel, 
+        JB<:AbstractADType, 
+        LF<:Function
+} <: StateEstimator{NT}
     model::SM
     lastu0::Vector{NT}
     x̂op ::Vector{NT}
@@ -904,12 +909,14 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     F̂  ::Matrix{NT}
     Ĥ  ::Matrix{NT}
     Ĥm ::Matrix{NT}
+    jacobian::JB
+    linfunc!::LF
     direct::Bool
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function ExtendedKalmanFilter{NT}(
-        model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true
-    ) where {NT<:Real, SM<:SimModel}
+        model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian::JB, linfunc!::LF, direct=true
+    ) where {NT<:Real, SM<:SimModel, JB<:AbstractADType, LF<:Function}
         nu, ny, nd = model.nu, model.ny, model.nd
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -928,7 +935,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         Ĥ,  Ĥm = zeros(NT, ny, nx̂),    zeros(NT, nym, nx̂)
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
-        return new{NT, SM}(
+        return new{NT, SM, JB, LF}(
             model,
             lastu0, x̂op, f̂op, x̂0, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
@@ -937,6 +944,7 @@ struct ExtendedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             P̂_0, Q̂, R̂,
             K̂,
             F̂_û, F̂, Ĥ, Ĥm,
+            jacobian, linfunc!,
             direct, corrected,
             buffer
         )
@@ -948,15 +956,43 @@ end
 
 Construct an extended Kalman Filter with the [`SimModel`](@ref) `model`.
 
-Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model and the
-keyword arguments are identical to [`UnscentedKalmanFilter`](@ref), except for `α`, `β` and 
-`κ` which do not apply to the extended Kalman Filter. The Jacobians of the augmented model 
-``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff`](@extref ForwardDiff) automatic
-differentiation. This estimator allocates memory for the Jacobians.
-
+Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model is
+identical to [`UnscentedKalmanFilter`](@ref). By default, the Jacobians of the augmented
+model ``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff`](@extref ForwardDiff) automatic
+differentiation. This estimator is allocation-free if `model` simulations do not allocate.
 !!! warning
     See the Extended Help of [`linearize`](@ref) function if you get an error like:    
     `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
+
+# Arguments
+!!! info
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
+
+- `model::SimModel` : (deterministic) model for the estimations.
+- `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
+    are unmeasured ``\mathbf{y^u}``.
+- `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
+    covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
+- `σQ=fill(1/model.nx,model.nx)` or *`sigmaQ`* : main diagonal of the process noise
+    covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
+- `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
+    ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
+- `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
+    the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
+- `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
+    disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
+- `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
+- `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+- `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
+    disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
+- `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
+    disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
+- `jacobian=AutoForwardDiff()`: an `AbstractADType` backend for the Jacobians of the augmented
+    model, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
+- `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
+   estimator, in opposition to the delayed/predictor form).
 
 # Examples
 ```jldoctest
@@ -983,6 +1019,7 @@ function ExtendedKalmanFilter(
     sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
     sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
+    jacobian = AutoForwardDiff(),
     direct = true,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
@@ -996,21 +1033,68 @@ function ExtendedKalmanFilter(
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    return ExtendedKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    linfunc! = get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
+    return ExtendedKalmanFilter{NT}(
+        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian, linfunc!, direct
+    )
 end
 
 @doc raw"""
-    ExtendedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true)
+    ExtendedKalmanFilter(
+        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian=AutoForwardDiff(), direct=true
+    )
 
 Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function ExtendedKalmanFilter(
-    model::SM, i_ym, nint_u, nint_ym,P̂_0, Q̂, R̂; direct=true
+    model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian=AutoForwardDiff(), direct=true
 ) where {NT<:Real, SM<:SimModel{NT}}
-    P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
-    return ExtendedKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)    
+    linfunc! = get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
+    return ExtendedKalmanFilter{NT}(
+        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian, direct, linfunc!
+    )
+end
+
+"""
+    get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian) -> linfunc!
+
+Return the `linfunc!` function that computes the Jacobians of the augmented model.
+
+The function has the two following methods:
+```
+linfunc!(x̂0next   , ::Nothing, F̂        , ::Nothing, backend, x̂0, cst_u0, cst_d0) -> nothing
+linfunc!(::Nothing, ŷ0       , ::Nothing, Ĥ        , backend, x̂0, _     , cst_d0) -> nothing
+```
+To respectively compute only `F̂` or `Ĥ` Jacobian. The methods mutate all the arguments
+before `backend` argument. The `backend` argument is an `AbstractADType` object from 
+`DifferentiationInterface`. The `cst_u0` and `cst_d0` are `DifferentiationInterface.Constant`
+objects with the linearization points.
+"""
+function get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
+    As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
+    f̂_ekf!(x̂0next, x̂0, û0, u0, d0) = f̂!(x̂0next, û0, model, As, Cs_u, x̂0, u0, d0)
+    ĥ_ekf!(ŷ0, x̂0, d0) = ĥ!(ŷ0, model, Cs_y, x̂0, d0)
+    strict  = Val(true)
+    nu, ny, nd = model.nu, model.ny, model.nd
+    nx̂ = model.nx + size(As, 1)
+    x̂0next = zeros(NT, nx̂)
+    ŷ0 = zeros(NT, ny)
+    x̂0 = zeros(NT, nx̂)
+    tmp_û0 = Cache(zeros(NT,    nu))
+    cst_u0 = Constant(zeros(NT, nu))
+    cst_d0 = Constant(zeros(NT, nd))
+    F̂_prep = prepare_jacobian(f̂_ekf!, x̂0next, jacobian, x̂0, tmp_û0, cst_u0, cst_d0; strict)
+    Ĥ_prep = prepare_jacobian(ĥ_ekf!, ŷ0,     jacobian, x̂0, cst_d0; strict)
+    function linfunc!(x̂0next, ŷ0::Nothing, F̂, Ĥ::Nothing, backend, x̂0, cst_u0, cst_d0)
+        return jacobian!(f̂_ekf!, x̂0next, F̂, F̂_prep, backend, x̂0, tmp_û0, cst_u0, cst_d0)
+    end
+    function linfunc!(x̂0next::Nothing, ŷ0, F̂::Nothing, Ĥ, backend, x̂0, _     , cst_d0)
+        return jacobian!(ĥ_ekf!, ŷ0, Ĥ, Ĥ_prep, backend, x̂0, cst_d0)
+    end
+    return linfunc!
 end
 
 """
@@ -1020,9 +1104,9 @@ Do the same but for the [`ExtendedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
     model, x̂0 = estim.model, estim.x̂0
-    ŷ0 = estim.buffer.ŷ
-    ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
-    ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
+    cst_d0 = Constant(d0)
+    ŷ0, Ĥ = estim.buffer.ŷ, estim.Ĥ
+    estim.linfunc!(nothing, ŷ0, nothing, Ĥ, estim.jacobian, x̂0, nothing, cst_d0)
     estim.Ĥm .= @views estim.Ĥ[estim.i_ym, :]
     return correct_estimate_kf!(estim, y0m, d0, estim.Ĥm)
 end
@@ -1043,8 +1127,8 @@ augmented process model:
 \end{aligned}
 ```
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs. The
-Jacobians are computed with [`ForwardDiff`](@extref ForwardDiff). The correction and 
-prediction step equations are provided below. The correction step is skipped if 
+Jacobians are computed with [`ForwardDiff`](@extref ForwardDiff) bu default. The correction
+and prediction step equations are provided below. The correction step is skipped if 
 `estim.direct == true` since it's already done by the user.
 
 # Correction Step
@@ -1069,22 +1153,16 @@ prediction step equations are provided below. The correction step is skipped if
 function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
     model, x̂0 = estim.model, estim.x̂0
     nx̂, nu = estim.nx̂, model.nu
+    cst_u0, cst_d0 = Constant(u0), Constant(d0)
     if !estim.direct
-        ŷ0 = estim.buffer.ŷ
-        ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
-        ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
+        ŷ0, Ĥ = estim.buffer.ŷ, estim.Ĥ
+        estim.linfunc!(nothing, ŷ0, nothing, Ĥ, estim.jacobian, x̂0, nothing, cst_d0)
         estim.Ĥm .= @views estim.Ĥ[estim.i_ym, :]
         correct_estimate_kf!(estim, y0m, d0, estim.Ĥm)
     end
     x̂0corr = estim.x̂0
-    # concatenate x̂0next and û0 vectors to allows û0 vector with dual numbers for AD:
-    # TODO: remove this allocation using estim.buffer
-    x̂0nextû = Vector{NT}(undef, nx̂ + nu)
-    f̂AD! = (x̂0nextû, x̂0corr) -> @views f̂!(
-        x̂0nextû[1:nx̂], x̂0nextû[nx̂+1:end], estim, model, x̂0corr, u0, d0
-    )
-    ForwardDiff.jacobian!(estim.F̂_û, f̂AD!, x̂0nextû, x̂0corr)
-    estim.F̂ .= @views estim.F̂_û[1:estim.nx̂, :]
+    x̂0next, F̂ = estim.buffer.x̂, estim.F̂
+    estim.linfunc!(x̂0next, nothing, F̂, nothing, estim.jacobian, x̂0corr, cst_u0, cst_d0)
     return predict_estimate_kf!(estim, u0, d0, estim.F̂)
 end
 

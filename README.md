@@ -11,7 +11,7 @@ package for Julia.
 The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl/ControlSystems.jl)
 for the linear systems, [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the
 optimization and [`DifferentiationInterface.jl`](https://github.com/JuliaDiff/DifferentiationInterface.jl)
-for the differentiation.
+for the derivatives.
 
 ## Installation
 

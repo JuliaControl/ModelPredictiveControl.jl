@@ -36,14 +36,7 @@ where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂next0` argument. The method mutat
 function signature for conciseness.
 """
 function f̂!(x̂next0, û0, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
-    # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    @views x̂d_next, x̂s_next = x̂next0[1:model.nx], x̂next0[model.nx+1:end]
-    mul!(û0, estim.Cs_u, x̂s)
-    û0 .+= u0
-    f!(x̂d_next, model, x̂d, û0, d0, model.p)
-    mul!(x̂s_next, estim.As, x̂s)
-    return nothing
+    return f̂!(x̂next0, û0, model, estim.As, estim.Cs_u, x̂0, u0, d0)
 end
 
 """
@@ -58,18 +51,31 @@ function f̂!(x̂next0, _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
     return nothing
 end
 
+"""
+    f̂!(x̂next0, û0, model::SimModel, As, Cs_u, x̂0, u0, d0)
+
+Same than [`f̂!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
+"""
+function f̂!(x̂next0, û0, model::SimModel, As, Cs_u, x̂0, u0, d0)
+    # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
+    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    @views x̂d_next, x̂s_next = x̂next0[1:model.nx], x̂next0[model.nx+1:end]
+    mul!(û0, Cs_u, x̂s)
+    û0 .+= u0
+    f!(x̂d_next, model, x̂d, û0, d0, model.p)
+    mul!(x̂s_next, As, x̂s)
+    return nothing
+end
+
 @doc raw"""
     ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, d0) -> nothing
 
 Mutating output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂!`](@ref).
 """
 function ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, d0)
-    # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    h!(ŷ0, model, x̂d, d0, model.p)
-    mul!(ŷ0, estim.Cs_y, x̂s, 1, 1)
-    return nothing
+    return ĥ!(ŷ0, model, estim.Cs_y, x̂0, d0)
 end
+
 """
     ĥ!(ŷ0, estim::StateEstimator, model::LinModel, x̂0, d0) -> nothing
 
@@ -78,6 +84,19 @@ Use the augmented model matrices if `model` is a [`LinModel`](@ref).
 function ĥ!(ŷ0, estim::StateEstimator, ::LinModel, x̂0, d0)
     mul!(ŷ0, estim.Ĉ,  x̂0)
     mul!(ŷ0, estim.D̂d, d0, 1, 1)
+    return nothing
+end
+
+"""
+    ĥ!(ŷ0, model::SimModel, Cs_y, x̂0, d0)
+
+Same than [`ĥ!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
+"""
+function ĥ!(ŷ0, model::SimModel, Cs_y, x̂0, d0)
+    # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
+    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    h!(ŷ0, model, x̂d, d0, model.p)
+    mul!(ŷ0, Cs_y, x̂s, 1, 1)
     return nothing
 end
 
