@@ -75,7 +75,7 @@ Linearize `model` at the operating points `x`, `u`, `d` and return the [`LinMode
 The arguments `x`, `u` and `d` are the linearization points for the state ``\mathbf{x}``,
 manipulated input ``\mathbf{u}`` and measured disturbance ``\mathbf{d}``, respectively (not
 necessarily an equilibrium, details in Extended Help). The Jacobians of ``\mathbf{f}`` and 
-``\mathbf{h}`` functions are automatically computed with [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl).
+``\mathbf{h}`` functions are automatically computed with [`ForwardDiff`](@extref ForwardDiff).
 
 !!! warning
     See Extended Help if you get an error like:    
@@ -131,7 +131,7 @@ julia> linmodel.A
     equations are similar if the nonlinear model has nonzero operating points.
 
     Automatic differentiation (AD) allows exact Jacobians. The [`NonLinModel`](@ref) `f` and
-    `h` functions must be compatible with this feature though. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
+    `h` functions must be compatible with this feature though. See [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
     for common mistakes when writing these functions.
 """
 function linearize(model::SimModel{NT}; kwargs...) where NT<:Real
@@ -209,11 +209,11 @@ function get_jacobians!(linmodel::LinModel, xnext0, y0, model::SimModel, x0, u0,
     linbuffer.x .= x0
     linbuffer.u .= u0
     linbuffer.d .= d0
-    jacobian!(linmodel.A,  linbuffer.buffer_f_at_u_d, xnext0, x0)
-    jacobian!(linmodel.Bu, linbuffer.buffer_f_at_x_d, xnext0, u0)
-    jacobian!(linmodel.Bd, linbuffer.buffer_f_at_x_u, xnext0, d0)
-    jacobian!(linmodel.C,  linbuffer.buffer_h_at_d, y0, x0)
-    jacobian!(linmodel.Dd, linbuffer.buffer_h_at_x, y0, d0)
+    get_jacobian!(linmodel.A,  linbuffer.buffer_f_at_u_d, xnext0, x0)
+    get_jacobian!(linmodel.Bu, linbuffer.buffer_f_at_x_d, xnext0, u0)
+    get_jacobian!(linmodel.Bd, linbuffer.buffer_f_at_x_u, xnext0, d0)
+    get_jacobian!(linmodel.C,  linbuffer.buffer_h_at_d, y0, x0)
+    get_jacobian!(linmodel.Dd, linbuffer.buffer_h_at_x, y0, d0)
     return nothing
 end
 

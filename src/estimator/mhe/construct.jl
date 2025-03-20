@@ -1,5 +1,7 @@
 const DEFAULT_LINMHE_OPTIMIZER    = OSQP.MathOptInterfaceOSQP.Optimizer
 const DEFAULT_NONLINMHE_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
+const DEFAULT_NONLINMHE_GRADIENT  = AutoForwardDiff()
+const DEFAULT_NONLINMHE_JACOBIAN  = AutoForwardDiff()
 
 @doc raw"""
 Include all the data for the constraints of [`MovingHorizonEstimator`](@ref).
@@ -46,6 +48,8 @@ struct MovingHorizonEstimator{
     NT<:Real, 
     SM<:SimModel,
     JM<:JuMP.GenericModel,
+    GB<:AbstractADType,
+    JB<:AbstractADType,
     CE<:StateEstimator,
 } <: StateEstimator{NT}
     model::SM
@@ -53,6 +57,8 @@ struct MovingHorizonEstimator{
     # different since solvers that support non-Float64 are scarce.
     optim::JM
     con::EstimatorConstraint{NT}
+    gradient::GB
+    jacobian::JB
     covestim::CE
     Z̃::Vector{NT}
     lastu0::Vector{NT}
@@ -108,9 +114,18 @@ struct MovingHorizonEstimator{
     corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function MovingHorizonEstimator{NT}(
-        model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, optim::JM, covestim::CE;
+        model::SM, 
+        He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, 
+        optim::JM, gradient::GB, jacobian::JB, covestim::CE;
         direct=true
-    ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
+    ) where {
+            NT<:Real, 
+            SM<:SimModel{NT}, 
+            JM<:JuMP.GenericModel, 
+            GB<:AbstractADType,
+            JB<:AbstractADType,
+            CE<:StateEstimator{NT}
+        }
         nu, ny, nd = model.nu, model.ny, model.nd
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
@@ -154,8 +169,10 @@ struct MovingHorizonEstimator{
         P̂arr_old = copy(P̂_0)
         Nk = [0]
         corrected = [false]
-        estim = new{NT, SM, JM, CE}(
-            model, optim, con, covestim,  
+        estim = new{NT, SM, JM, GB, JB, CE}(
+            model, optim, con, 
+            gradient, jacobian,
+            covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
             He, nϵ,
             i_ym, nx̂, nym, nyu, nxs, 
@@ -253,9 +270,13 @@ transcription for now.
 - `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
-- `optim=default_optim_mhe(model)` : a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
-   with a quadratic/nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
+- `optim=default_optim_mhe(model)` : a [`JuMP.Model`](@extref) object with a quadratic or
+   nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
+- `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
+   function when `model` is not a [`LinModel`](@ref), see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
+- `jacobian=AutoForwardDiff()` : an `AbstractADType` backend for the Jacobian of the
+   constraints when `model` is not a [`LinModel`](@ref), see `gradient` above for the options.
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
 
@@ -336,10 +357,12 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
     - If `model` is a [`LinModel`](@ref), the optimization is treated as a quadratic program
       with a time-varying Hessian, which is generally cheaper than nonlinear programming. By
       default, a [`KalmanFilter`](@ref) estimates the arrival covariance (customizable).
-    - Else, a nonlinear program with automatic differentiation (AD) solves the optimization.
-      Optimizers generally benefit from exact derivatives like AD. However, the `f` and `h` 
-      functions must be compatible with this feature. See [Automatic differentiation](https://jump.dev/JuMP.jl/stable/manual/nlp/#Automatic-differentiation)
-      for common mistakes when writing these functions. An [`UnscentedKalmanFilter`](@ref)
+    - Else, a nonlinear program with dense [`ForwardDiff`](@extref ForwardDiff) automatic
+      differentiation (AD) compute the objective and constraint derivatives by default 
+      (customizable). Optimizers generally benefit from exact derivatives like AD. However, 
+      the `f` and `h` functions must be compatible with this feature. See the 
+      [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
+      for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
     
     The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
@@ -365,6 +388,8 @@ function MovingHorizonEstimator(
     sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
     Cwt::Real = Inf,
     optim::JM = default_optim_mhe(model),
+    gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
+    jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
     direct = true,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
@@ -380,7 +405,7 @@ function MovingHorizonEstimator(
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
     return MovingHorizonEstimator(
-        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt; direct, optim
+        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt; direct, optim, gradient, jacobian
     )
 end
 
@@ -391,6 +416,8 @@ default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_brid
     MovingHorizonEstimator(
         model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
         optim=default_optim_mhe(model), 
+        gradient=AutoForwardDiff(),
+        jacobian=AutoForwardDiff(),
         direct=true,
         covestim=default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     )
@@ -407,12 +434,17 @@ supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
     optim::JM = default_optim_mhe(model),
+    gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
+    jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
     direct = true,
     covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     return MovingHorizonEstimator{NT}(
-        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂, Cwt, optim, covestim; direct
+        model, 
+        He, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂, Cwt, 
+        optim, gradient, jacobian, covestim; 
+        direct
     )
 end
 
@@ -1179,17 +1211,19 @@ function init_predmat_mhe(
 end
 
 """
-    init_optimization!(estim::MovingHorizonEstimator, model::SimModel, optim)
+    init_optimization!(
+        estim::MovingHorizonEstimator, model::LinModel, optim::JuMP.GenericModel
+    )
 
 Init the quadratic optimization of [`MovingHorizonEstimator`](@ref).
 """
 function init_optimization!(
-    estim::MovingHorizonEstimator, ::LinModel, optim::JuMP.GenericModel
+    estim::MovingHorizonEstimator, model::LinModel, optim::JuMP.GenericModel,
 )
     nZ̃ = length(estim.Z̃)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
-    limit_solve_time(estim.optim, estim.model.Ts)
+    limit_solve_time(optim, model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
     A = estim.con.A[estim.con.i_b, :]
     b = estim.con.b[estim.con.i_b]
@@ -1199,19 +1233,21 @@ function init_optimization!(
 end
 
 """
-    init_optimization!(estim::MovingHorizonEstimator, model::SimModel, optim)
+    init_optimization!(
+        estim::MovingHorizonEstimator, model::SimModel, optim::JuMP.GenericModel,
+    ) -> nothing
 
 Init the nonlinear optimization of [`MovingHorizonEstimator`](@ref).
 """
 function init_optimization!(
-    estim::MovingHorizonEstimator, model::SimModel, optim::JuMP.GenericModel{JNT},
+    estim::MovingHorizonEstimator, model::SimModel, optim::JuMP.GenericModel{JNT}
 ) where JNT<:Real
     C, con = estim.C, estim.con
     nZ̃ = length(estim.Z̃)
     # --- variables and linear constraints ---
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
-    limit_solve_time(estim.optim, estim.model.Ts)
+    limit_solve_time(optim, model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
     A = estim.con.A[con.i_b, :]
     b = estim.con.b[con.i_b]
@@ -1266,7 +1302,7 @@ end
 
 """
     get_optim_functions(
-        estim::MovingHorizonEstimator, optim::JuMP.GenericModel
+        estim::MovingHorizonEstimator, optim::JuMP.GenericModel,
     ) -> Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!
 
 Return the functions for the nonlinear optimization of [`MovingHorizonEstimator`](@ref).
@@ -1280,115 +1316,96 @@ This method is really intricate and I'm not proud of it. That's because of 3 ele
 - These functions are used inside the nonlinear optimization, so they must be type-stable
   and as efficient as possible.
 - The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
-  of `Vararg{T,N}` (see the [performance tip](https://docs.julialang.org/en/v1/manual/performance-tips/#Be-aware-of-when-Julia-avoids-specializing))
+  of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
   and memoization to avoid redundant computations. This is already complex, but it's even
   worse knowing that most automatic differentiation tools do not support splatting.
 - The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
   and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
 
-Inspired from: [User-defined operators with vector outputs](https://jump.dev/JuMP.jl/stable/tutorials/nonlinear/tips_and_tricks/#User-defined-operators-with-vector-outputs)
+Inspired from: [User-defined operators with vector outputs](@extref JuMP User-defined-operators-with-vector-outputs)
 """
 function get_optim_functions(
-    estim::MovingHorizonEstimator, ::JuMP.GenericModel{JNT}
+    estim::MovingHorizonEstimator, ::JuMP.GenericModel{JNT},
 ) where {JNT <: Real}
+    # ---------- common cache for Jfunc, gfuncs called with floats ------------------------
     model, con = estim.model, estim.con
     nx̂, nym, nŷ, nu, nϵ, He = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, estim.He
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
-    Ncache = nZ̃ + 3
-    myNaN = convert(JNT, NaN) # fill Z̃ with NaNs to force update_simulations! at 1st call:
-    # ---------------------- differentiation cache ---------------------------------------
-    Z̃_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(fill(myNaN, nZ̃), Ncache)
-    V̂_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nV̂),  Ncache)
-    g_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, ng),  Ncache)
-    X̂0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nX̂),  Ncache)
-    x̄_cache::DiffCache{Vector{JNT}, Vector{JNT}}  = DiffCache(zeros(JNT, nx̂),  Ncache)
-    û0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nu),  Ncache)
-    ŷ0_cache::DiffCache{Vector{JNT}, Vector{JNT}} = DiffCache(zeros(JNT, nŷ),  Ncache)
-    # --------------------- update simulation function ------------------------------------
-    function update_simulations!(
-        Z̃arg::Union{NTuple{N, T}, AbstractVector{T}}, Z̃cache
-    ) where {N, T <:Real}
-        if isdifferent(Z̃cache, Z̃arg)
-            for i in eachindex(Z̃cache)
-                # Z̃cache .= Z̃arg is type unstable with Z̃arg::NTuple{N, FowardDiff.Dual}
-                Z̃cache[i] = Z̃arg[i]
-            end
-            Z̃ = Z̃cache
-            ϵ = (nϵ ≠ 0) ? Z̃[begin] : zero(T) # ϵ = 0 if Cwt=Inf (meaning: no relaxation)
-            V̂,  X̂0 = get_tmp(V̂_cache, T),  get_tmp(X̂0_cache, T)
-            û0, ŷ0 = get_tmp(û0_cache, T), get_tmp(ŷ0_cache, T)
-            g      = get_tmp(g_cache, T)
-            V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
-            g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
-        end
-        return nothing
-    end
+    myNaN = convert(JNT, NaN) # NaN to force update_simulations! at first call
+    strict = Val(true)
+    Z̃::Vector{JNT}                   = fill(myNaN, nZ̃) 
+    V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
+    û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
+    g::Vector{JNT}                   = zeros(JNT, ng)
+    x̄::Vector{JNT}                   = zeros(JNT, nx̂)
     # --------------------- objective functions -------------------------------------------
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
-        Z̃ = get_tmp(Z̃_cache, T)
-        update_simulations!(Z̃arg, Z̃)
-        x̄, V̂ = get_tmp(x̄_cache, T), get_tmp(V̂_cache, T)
+        if isdifferent(Z̃arg, Z̃)
+            Z̃ .= Z̃arg
+            update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
+        end
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
-    function Jfunc_vec(Z̃arg::AbstractVector{T}) where T<:Real
-        Z̃ = get_tmp(Z̃_cache, T)
-        update_simulations!(Z̃arg, Z̃)
-        x̄, V̂ = get_tmp(x̄_cache, T), get_tmp(V̂_cache, T)
-        return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
+    function Jfunc!(Z̃, V̂, X̂0, û0, ŷ0, g, x̄)
+        update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
+        return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
-    Z̃_∇J      = fill(myNaN, nZ̃) 
-    ∇J        = Vector{JNT}(undef, nZ̃)       # gradient of objective J
-    ∇J_buffer = GradientBuffer(Jfunc_vec, Z̃_∇J)
-    ∇Jfunc! = if nZ̃ == 1
-        function (Z̃arg::T) where T<:Real 
-            Z̃_∇J .= Z̃arg
-            gradient!(∇J, ∇J_buffer, Z̃_∇J)
-            return ∇J[begin]    # univariate syntax, see JuMP.@operator doc
-        end
-    else
-        function (∇J::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            Z̃_∇J .= Z̃arg
-            gradient!(∇J, ∇J_buffer, Z̃_∇J)
-            return ∇J           # multivariate syntax, see JuMP.@operator doc
-        end
+    Z̃_∇J    = fill(myNaN, nZ̃) 
+    ∇J_context = (
+        Cache(V̂),  Cache(X̂0),
+        Cache(û0), Cache(ŷ0),
+        Cache(g),
+        Cache(x̄),
+    )
+    # temporarily "fill" the estimation window for the preperation of the gradient: 
+    estim.Nk[] = He
+    ∇J_prep = prepare_gradient(Jfunc!, estim.gradient, Z̃_∇J, ∇J_context...; strict)
+    estim.Nk[] = 0
+    ∇J = Vector{JNT}(undef, nZ̃)
+    ∇Jfunc! = function (∇J::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+        # only the multivariate syntax of JuMP.@operator, univariate is impossible for MHE
+        # since Z̃ comprises the arrival state estimate AND the estimated process noise
+        Z̃_∇J .= Z̃arg
+        gradient!(Jfunc!, ∇J, ∇J_prep, estim.gradient, Z̃_∇J, ∇J_context...)
+        return ∇J
     end
+    
     # --------------------- inequality constraint functions -------------------------------
     gfuncs = Vector{Function}(undef, ng)
     for i in eachindex(gfuncs)
-        func_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            update_simulations!(Z̃arg, get_tmp(Z̃_cache, T))
-            g = get_tmp(g_cache, T)
+        gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            if isdifferent(Z̃arg, Z̃)
+                Z̃ .= Z̃arg
+                update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
+            end
             return g[i]::T
         end
-        gfuncs[i] = func_i
+        gfuncs[i] = gfunc_i
     end
-    function gfunc_vec!(g, Z̃vec::AbstractVector{T}) where T<:Real
-        update_simulations!(Z̃vec, get_tmp(Z̃_cache, T))
-        g .= get_tmp(g_cache, T)
-        return g
+    function gfunc!(g, Z̃, V̂, X̂0, û0, ŷ0)
+        return update_prediction!(V̂, X̂0, û0, ŷ0, g, estim, Z̃)
     end
-    Z̃_∇g      = fill(myNaN, nZ̃)
-    g_vec     = Vector{JNT}(undef, ng)
-    ∇g        = Matrix{JNT}(undef, ng, nZ̃)   # Jacobian of inequality constraints g
-    ∇g_buffer = JacobianBuffer(gfunc_vec!, g_vec, Z̃_∇g)
-    ∇gfuncs!  = Vector{Function}(undef, ng)
+    Z̃_∇g     = fill(myNaN, nZ̃)
+    ∇g_context = (
+        Cache(V̂),  Cache(X̂0),
+        Cache(û0), Cache(ŷ0),
+    )
+    # temporarily enable all the inequality constraints for sparsity detection:
+    estim.con.i_g .= true  
+    estim.Nk[] = He
+    ∇g_prep  = prepare_jacobian(gfunc!, g, estim.jacobian, Z̃_∇g, ∇g_context...; strict)
+    estim.con.i_g .= false
+    estim.Nk[] = 0
+    ∇g = init_diffmat(JNT, estim.jacobian, ∇g_prep, nZ̃, ng)
+    ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)
-        ∇gfuncs![i] = if nZ̃ == 1
-            function (Z̃arg::T) where T<:Real
-                if isdifferent(Z̃arg, Z̃_∇g)
-                    Z̃_∇g .= Z̃arg
-                    jacobian!(∇g, ∇g_buffer, g_vec, Z̃_∇g)
-                end
-                return ∇g[i, begin]            # univariate syntax, see JuMP.@operator doc
+        ∇gfuncs![i] = function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            # only the multivariate syntax of JuMP.@operator, see above for the explanation
+            if isdifferent(Z̃arg, Z̃_∇g)
+                Z̃_∇g .= Z̃arg
+                jacobian!(gfunc!, g, ∇g, ∇g_prep, estim.jacobian, Z̃_∇g, ∇g_context...)
             end
-        else
-            function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-                if isdifferent(Z̃arg, Z̃_∇g)
-                    Z̃_∇g .= Z̃arg
-                    jacobian!(∇g, ∇g_buffer, g_vec, Z̃_∇g)
-                end
-                return ∇g_i .= @views ∇g[i, :] # multivariate syntax, see JuMP.@operator doc
-            end
+            return ∇g_i .= @views ∇g[i, :]
         end
     end
     return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!

@@ -146,8 +146,8 @@ arguments. This controller allocates memory at each time step for the optimizati
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
-  the predictive controller, provided as a [`JuMP.Model`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.Model)
-  (default to [`OSQP`](https://osqp.org/docs/parsers/jump.html) optimizer).
+  the predictive controller, provided as a [`JuMP.Model`](@extref) object (default to 
+  [`OSQP`](https://osqp.org/docs/parsers/jump.html) optimizer).
 - additional keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
@@ -259,11 +259,11 @@ function LinMPC(
 end
 
 """
-    init_optimization!(mpc::LinMPC, model::LinModel, optim)
+    init_optimization!(mpc::LinMPC, model::LinModel, optim::JuMP.GenericModel) -> nothing
 
 Init the quadratic optimization for [`LinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::LinMPC, model::LinModel, optim)
+function init_optimization!(mpc::LinMPC, model::LinModel, optim::JuMP.GenericModel)
     # --- variables and linear constraints ---
     con = mpc.con
     nZ̃ = length(mpc.Z̃)

@@ -84,7 +84,7 @@ resamples discrete ones if `Ts ≠ sys.Ts`, computes a new realization if not mi
 separates the ``\mathbf{z}`` terms in two parts (details in Extended Help). The rest of the
 documentation assumes discrete dynamics since all systems end up in this form.
 
-See also [`ss`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.ss)
+See also [`ss`](@extref ControlSystemsBase.ss)
 
 # Examples
 ```jldoctest
@@ -112,12 +112,12 @@ LinModel with a sample time Ts = 0.1 s and:
         \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D z}(k)
     \end{aligned}
     ```
-    Continuous dynamics are internally discretized using [`c2d`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.c2d)
-    and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Lastly, if 
+    Continuous dynamics are internally discretized using [`c2d`](@extref ControlSystemsBase.c2d)
+    and `:zoh` for manipulated inputs, and `:tustin`, for measured disturbances. Lastly, if
     `sys` is discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by
     using the aforementioned discretization methods.
 
-    Note that the constructor transforms the system to its minimal realization using [`minreal`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.minreal)
+    Note that the constructor transforms the system to its minimal realization using [`minreal`](@extref ControlSystemsBase.minreal)
     for controllability/observability. As a consequence, the final state-space
     representation may be different from the one provided in `sys`. It is also converted 
     into a more practical form (``\mathbf{D_u=0}`` because of the zero-order hold):
@@ -192,7 +192,7 @@ Convert to minimal realization state-space when `sys` is a transfer function.
 `sys` is equal to ``\frac{\mathbf{y}(s)}{\mathbf{z}(s)}`` for continuous-time, and 
 ``\frac{\mathbf{y}(z)}{\mathbf{z}(z)}``, for discrete-time.
 
-See also [`tf`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/constructors/#ControlSystemsBase.tf)
+See also [`tf`](@extref ControlSystemsBase.tf)
 
 # Examples
 ```jldoctest

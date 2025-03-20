@@ -95,7 +95,8 @@ form. The optional parameter `NT` explicitly set the number type of vectors (def
 
 !!! warning
     The two functions must be in pure Julia to use the model in [`NonLinMPC`](@ref),
-    [`ExtendedKalmanFilter`](@ref), [`MovingHorizonEstimator`](@ref) and [`linearize`](@ref).
+    [`ExtendedKalmanFilter`](@ref), [`MovingHorizonEstimator`](@ref) and [`linearize`](@ref),
+    except if a finite difference backend is used (e.g. [`AutoFiniteDiff`](@extref DifferentiationInterface List).
 
 See also [`LinModel`](@ref).
 

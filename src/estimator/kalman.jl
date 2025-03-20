@@ -81,7 +81,7 @@ end
 Construct a steady-state Kalman Filter with the [`LinModel`](@ref) `model`.
 
 The steady-state (or [asymptotic](https://en.wikipedia.org/wiki/Kalman_filter#Asymptotic_form))
-Kalman filter is based on the process model :
+Kalman filter is based on the process model:
 ```math
 \begin{aligned}
     \mathbf{x}(k+1) &= 
@@ -160,7 +160,7 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
     !!! tip
         Increasing `σQint_u` and `σQint_ym` values increases the integral action "gain".
 
-    The constructor pre-compute the steady-state Kalman gain `K̂` with the [`kalman`](https://juliacontrol.github.io/ControlSystems.jl/stable/lib/synthesis/#ControlSystemsBase.kalman-Tuple{Any,%20Any,%20Any,%20Any,%20Any,%20Vararg{Any}})
+    The constructor pre-compute the steady-state Kalman gain `K̂` with the [`kalman`](@extref ControlSystemsBase.kalman)
     function. It can sometimes fail, for example when `model` matrices are ill-conditioned.
     In such a case, you can try the alternative time-varying [`KalmanFilter`](@ref).
 """
@@ -802,7 +802,7 @@ See [`init_ukf`](@ref) for the definition of the constants ``\mathbf{m̂, Ŝ}``
 superscript in e.g. ``\mathbf{X̂}_{k-1}^j(k)`` refers the vector at the ``j``th column of 
 ``\mathbf{X̂}_{k-1}(k)``. The symbol ``\mathbf{0}`` is a vector with zeros. The number of
 sigma points is ``n_σ = 2 n_\mathbf{x̂} + 1``. The matrices ``\sqrt{\mathbf{P̂}_{k-1}(k)}``
-and ``\sqrt{\mathbf{P̂}_{k}(k)}`` are the the lower triangular factors of [`cholesky`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.cholesky)
+and ``\sqrt{\mathbf{P̂}_{k}(k)}`` are the the lower triangular factors of [`cholesky`](@extref Julia LinearAlgebra.cholesky)
 results. The correction and prediction step equations are provided below. The correction
 step is skipped if `estim.direct == true` since it's already done by the user.
 
@@ -951,8 +951,8 @@ Construct an extended Kalman Filter with the [`SimModel`](@ref) `model`.
 Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model and the
 keyword arguments are identical to [`UnscentedKalmanFilter`](@ref), except for `α`, `β` and 
 `κ` which do not apply to the extended Kalman Filter. The Jacobians of the augmented model 
-``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff.jl`](https://github.com/JuliaDiff/ForwardDiff.jl)
-automatic differentiation. This estimator allocates memory for the Jacobians.
+``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff`](@extref ForwardDiff) automatic
+differentiation. This estimator allocates memory for the Jacobians.
 
 !!! warning
     See the Extended Help of [`linearize`](@ref) function if you get an error like:    
@@ -1043,9 +1043,9 @@ augmented process model:
 \end{aligned}
 ```
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs. The
-function [`ForwardDiff.jacobian`](https://juliadiff.org/ForwardDiff.jl/stable/user/api/#ForwardDiff.jacobian)
-automatically computes them. The correction and prediction step equations are provided below.
-The correction step is skipped if `estim.direct == true` since it's already done by the user.
+Jacobians are computed with [`ForwardDiff`](@extref ForwardDiff). The correction and 
+prediction step equations are provided below. The correction step is skipped if 
+`estim.direct == true` since it's already done by the user.
 
 # Correction Step
 ```math

@@ -4,14 +4,17 @@ An open source [model predictive control](https://en.wikipedia.org/wiki/Model_pr
 package for Julia.
 
 The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl/ControlSystems.jl)
-for the linear systems and [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the solving.
+for the linear systems, [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the
+optimization and [`DifferentiationInterface.jl`](https://github.com/JuliaDiff/DifferentiationInterface.jl)
+for the differentiation.
 
 The objective is to provide a simple, clear and modular framework to quickly design model
 predictive controllers (MPCs) in Julia, while preserving the flexibility for advanced
 real-time optimization. Modern MPCs based on closed-loop state estimators are the main focus
 of the package, but classical approaches that rely on internal models are also possible. The
-`JuMP.jl` interface allows the user to test different solvers easily if the performance of
-the default settings is not satisfactory.
+`JuMP` and `DifferentiationInterface` dependencies allows the user to test different
+optimizers and automatic differentiation (AD) backends easily if the performances of the
+default settings are not satisfactory.
 
 The documentation is divided in two parts:
 

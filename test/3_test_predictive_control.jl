@@ -555,7 +555,9 @@ end
 end
 
 @testitem "NonLinMPC construction" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using JuMP, Ipopt, DifferentiationInterface
+    import FiniteDiff
     linmodel1 = LinModel(sys,Ts,i_d=[3])
     nmpc0 = NonLinMPC(linmodel1, Hp=15)
     @test isa(nmpc0.estim, SteadyKalmanFilter)
@@ -612,6 +614,12 @@ end
     @test nmpc17.transcription == MultipleShooting()
     @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
     @test size(nmpc17.con.Aeq, 1) == nmpc17.estim.nx̂*nmpc17.Hp
+    nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
+        gradient=AutoFiniteDiff(), 
+        jacobian=AutoFiniteDiff()
+    )
+    @test nmpc18.gradient == AutoFiniteDiff()
+    @test nmpc18.jacobian == AutoFiniteDiff()
 
     nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc15  = NonLinMPC(nonlinmodel2, Hp=15)
@@ -629,7 +637,9 @@ end
 end
 
 @testitem "NonLinMPC moves and getinfo" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
     Hp = 100
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=Hp, Hc=1)
@@ -661,9 +671,9 @@ end
     u = moveinput!(nmpc)
     @test u ≈ [4] atol=5e-2
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
-    f = (x,u,d,_) -> linmodel2.A*x + linmodel2.Bu*u + linmodel2.Bd*d
-    h = (x,d,_)   -> linmodel2.C*x + linmodel2.Dd*d
-    nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1)
     preparestate!(nmpc2, [0], [0])
     # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
@@ -683,20 +693,23 @@ end
     preparestate!(nmpc4, [0], [0])
     u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
-    nmpc5 = setconstraint!(NonLinMPC(nonlinmodel, Hp=15, Cwt=Inf), ymin=[1])
-    g_Y0min_end = nmpc5.optim[:g_Y0min_15].func
-    # test gfunc_i(i,::NTuple{N, Float64}):
-    @test g_Y0min_end(20.0, 10.0) ≤ 0.0 
-    # test gfunc_i(i,::NTuple{N, ForwardDiff.Dual}) : 
-    @test ForwardDiff.gradient(vec->g_Y0min_end(vec...), [20.0, 10.0]) ≈ [-5, -5] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
+    nmpc5 = NonLinMPC(nonlinmodel, Hp=1, Hc=1, Cwt=Inf, transcription=MultipleShooting())
+    nmpc5 = setconstraint!(nmpc5, ymin=[1])
+    # execute update_predictions! branch in `gfunc_i` for coverage:
+    g_Y0min_end = nmpc5.optim[:g_Y0min_1].func
+    println(nmpc5.Z̃)
+    @test_nowarn g_Y0min_end(10.0, 9.0, 8.0, 7.0)
+    # execute update_predictions! branch in `geqfunc_i` for coverage:
+    geq_end = nmpc5.optim[:geq_2].func
+    @test_nowarn geq_end(5.0, 4.0, 3.0, 2.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     preparestate!(nmpc6, [0])
     @test moveinput!(nmpc6, [0]) ≈ [0.0]
-    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing)
+    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
-    nonlinmodel2.h!(y, Float32[0,0], Float32[0], Float32[])
+    nonlinmodel2.h!(y, Float32[0,0], Float32[0], nonlinmodel2.p)
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0]
     nmpc8 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
@@ -713,6 +726,19 @@ end
     info = getinfo(nmpc9)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 20 atol=5e-2
+    nmpc10 = setconstraint!(NonLinMPC(
+        nonlinmodel, Nwt=[0], Hp=100, Hc=1, 
+        gradient=AutoFiniteDiff(),
+        jacobian=AutoFiniteDiff()), 
+        ymax=[100], ymin=[-100]
+    )
+    preparestate!(nmpc10, [0], [0])
+    u = moveinput!(nmpc10, [10], [0])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc10)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 10 atol=5e-2
+
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 

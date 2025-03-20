@@ -9,7 +9,9 @@ An open source [model predictive control](https://en.wikipedia.org/wiki/Model_pr
 package for Julia.
 
 The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl/ControlSystems.jl)
-for the linear systems and [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the solving.
+for the linear systems, [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the
+optimization and [`DifferentiationInterface.jl`](https://github.com/JuliaDiff/DifferentiationInterface.jl)
+for the differentiation.
 
 ## Installation
 
@@ -102,9 +104,13 @@ for more detailed examples.
   - measured disturbances
   - input setpoints
 - easy integration with `Plots.jl`
-- optimization based on `JuMP.jl`:
-  - quickly compare multiple optimizers
-  - nonlinear solvers relying on automatic differentiation (exact derivative)
+- optimization based on `JuMP.jl` to quickly compare multiple optimizers:
+  - many quadratic solvers for linear control
+  - many nonlinear solvers for nonlinear control (local or global)
+- derivatives based on `DifferentiationInterface.jl` to compare different approaches:
+  - automatic differentiation (exact solution)
+  - symbolic differentiation (exact solution)
+  - finite difference (approximate solution)
 - supported transcription methods of the optimization problem:
   - direct single shooting
   - direct multiple shooting

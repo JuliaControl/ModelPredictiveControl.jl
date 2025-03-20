@@ -161,6 +161,15 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
 end
 
 """
+    getϵ(estim::MovingHorizonEstimator, Z̃) -> ϵ
+
+Get the slack `ϵ` from the decision vector `Z̃` if present, otherwise return 0.
+"""
+function getϵ(estim::MovingHorizonEstimator, Z̃::AbstractVector{NT}) where NT<:Real
+    return estim.nϵ ≠ 0 ? Z̃[begin] : zero(NT)
+end
+
+"""
     add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.lastu0) -> ismoving
 
 Add data to the observation windows of the moving horizon estimator and clamp `estim.Nk`.
@@ -370,7 +379,7 @@ where ``\mathbf{ŵ}_{k-1}(k-j)`` is the input increment for time ``k-j`` comput
 last time step ``k-1``. It then calls `JuMP.optimize!(estim.optim)` and extract the
 solution. A failed optimization prints an `@error` log in the REPL and returns the 
 warm-start value. A failed optimization also prints [`getinfo`](@ref) results in
-the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
+the debug log [if activated](@extref Julia Example:-Enable-debug-level-messages).
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim = estim.model, estim.optim
@@ -501,7 +510,9 @@ Objective function of [`MovingHorizonEstimator`](@ref) when `model` is a [`LinMo
 It can be called on a [`MovingHorizonEstimator`](@ref) object to evaluate the objective 
 function at specific `Z̃` and `V̂` values.
 """
-function obj_nonlinprog!( _ , estim::MovingHorizonEstimator, ::LinModel, _ , Z̃)
+function obj_nonlinprog!(
+    _ , estim::MovingHorizonEstimator, ::LinModel, _ , Z̃::AbstractVector{NT}
+) where NT<:Real
     return obj_quadprog(Z̃, estim.H̃, estim.q̃) + estim.r[]
 end
 
@@ -513,14 +524,16 @@ Objective function of the MHE when `model` is not a [`LinModel`](@ref).
 The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
 `x̄` vector arguments.
 """
-function obj_nonlinprog!(x̄, estim::MovingHorizonEstimator, ::SimModel, V̂, Z̃) 
+function obj_nonlinprog!(
+    x̄, estim::MovingHorizonEstimator, ::SimModel, V̂, Z̃::AbstractVector{NT}
+) where NT<:Real
     nϵ, Nk = estim.nϵ, estim.Nk[] 
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
     nx̃ = nϵ + nx̂
     invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
     x̂0arr, Ŵ, V̂ = @views Z̃[nx̃-nx̂+1:nx̃], Z̃[nx̃+1:nx̃+nŴ], V̂[1:nYm]
     x̄ .= estim.x̂0arr_old .- x̂0arr
-    Jϵ = nϵ ≠ 0 ? estim.C*Z̃[begin]^2 : 0
+    Jϵ = nϵ ≠ 0 ? estim.C*Z̃[begin]^2 : zero(NT)
     return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jϵ
 end
 
@@ -580,6 +593,22 @@ function predict!(V̂, X̂0, û0, ŷ0, estim::MovingHorizonEstimator, model::S
         end
     end
     return V̂, X̂0
+end
+
+
+"""
+    update_predictions!(V̂, X̂0, û0, ŷ0, g, estim::MovingHorizonEstimator, Z̃)
+
+Update in-place the vectors for the predictions of `estim` estimator at decision vector `Z̃`.
+
+The method mutates all the arguments before `estim` argument.
+"""
+function update_prediction!(V̂, X̂0, û0, ŷ0, g, estim::MovingHorizonEstimator, Z̃)
+    model = estim.model
+    V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
+    ϵ = getϵ(estim, Z̃)
+    g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
+    return nothing
 end
 
 """

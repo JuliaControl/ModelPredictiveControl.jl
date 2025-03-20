@@ -624,7 +624,7 @@ function init_nonlincon!(
         for i in 1:con.nc
             name = Symbol("g_c_$i")
             optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_base+i]; name
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
             )
         end
     end
