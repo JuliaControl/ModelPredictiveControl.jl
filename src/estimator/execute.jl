@@ -36,7 +36,7 @@ where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂next0` argument. The method mutat
 function signature for conciseness.
 """
 function f̂!(x̂next0, û0, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
-    return f!(x̂next0, û0, model, estim.As, estim.Cs_u, x̂0, u0, d0)
+    return f̂!(x̂next0, û0, model, estim.As, estim.Cs_u, x̂0, u0, d0)
 end
 
 """

@@ -909,10 +909,10 @@ struct ExtendedKalmanFilter{
     F̂  ::Matrix{NT}
     Ĥ  ::Matrix{NT}
     Ĥm ::Matrix{NT}
-    direct::Bool
-    corrected::Vector{Bool}
     jacobian::JB
     linfunc!::LF
+    direct::Bool
+    corrected::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function ExtendedKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian::JB, linfunc!::LF, direct=true
@@ -935,7 +935,7 @@ struct ExtendedKalmanFilter{
         Ĥ,  Ĥm = zeros(NT, ny, nx̂),    zeros(NT, nym, nx̂)
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
-        return new{NT, SM}(
+        return new{NT, SM, JB, LF}(
             model,
             lastu0, x̂op, f̂op, x̂0, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
@@ -1005,7 +1005,7 @@ function ExtendedKalmanFilter(
     P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
     Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
     R̂  = Hermitian(diagm(NT[σR;].^2), :L)
-    linfunc! = get_ekf_linfunc(model, i_ym, nint_u, nint_ym, jacobian)
+    linfunc! = get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
     return ExtendedKalmanFilter{NT}(
         model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian, linfunc!, direct
     )
@@ -1024,48 +1024,52 @@ function ExtendedKalmanFilter(
     model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian=AutoForwardDiff(), direct=true
 ) where {NT<:Real, SM<:SimModel{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)    
-    linfunc! = get_ekf_linfunc(model, i_ym, nint_u, nint_ym, jacobian)
+    linfunc! = get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
     return ExtendedKalmanFilter{NT}(
         model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian, direct, linfunc!
     )
 end
 
-function get_ekf_linfunc(model, i_ym, nint_u, nint_ym, jacobian)
+"""
+    get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian) -> linfunc!
+
+Return the `linfunc!` function that computes the Jacobians of the augmented model.
+
+The function has the following signature:
+```
+    linfunc!(x̂0next, ŷ0, F̂, Ĥ, backend, x̂0, cst_u0, cst_d0) -> nothing
+```
+#TODO: continue here
+"""
+function get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
     As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
-    function f̂_ekf!(x̂0next, x̂0, model, As, Cs_u, u0, d0, û0)
-        return f̂!(x̂next0, û0, model, As, Cs_u, x̂0, u0, d0)
-    end
-    function ĥ_ekf!(ŷ0, x̂0, model, Cs_y, d0)
-        return ĥ!(ŷ0, model, Cs_y, x̂0, d0)
-    end
+    f̂_ekf!(x̂0next, x̂0, û0, u0, d0) = f̂!(x̂0next, û0, model, As, Cs_u, x̂0, u0, d0)
+    ĥ_ekf!(ŷ0, x̂0, d0) = ĥ!(ŷ0, model, Cs_y, x̂0, d0)
     strict  = Val(true)
-    #TODO: continue here:
-    xnext = zeros(NT, nx)
-    y = zeros(NT, ny)
-    x = zeros(NT, nx)
-    u = zeros(NT, nu)
-    d = zeros(NT, nd)
-    cst_x = Constant(x)
-    cst_u = Constant(u)
-    cst_d = Constant(d)
-    A_prep  = prepare_jacobian(f_x!, xnext, backend, x, cst_u, cst_d; strict)
-    Bu_prep = prepare_jacobian(f_u!, xnext, backend, u, cst_x, cst_d; strict)
-    Bd_prep = prepare_jacobian(f_d!, xnext, backend, d, cst_x, cst_u; strict)
-    C_prep  = prepare_jacobian(h_x!, y,     backend, x, cst_d       ; strict)
-    Dd_prep = prepare_jacobian(h_d!, y,     backend, d, cst_x       ; strict)
-    function linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d)
-        # all the arguments before `x` are mutated in this function
-        jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cst_u, cst_d)
-        jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cst_x, cst_d)
-        jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cst_x, cst_u)
-        jacobian!(h_x!, y,     C,  C_prep,  backend, x, cst_d)
-        jacobian!(h_d!, y,     Dd, Dd_prep, backend, d, cst_x)
+    nu, ny, nd = model.nu, model.ny, model.nd
+    nx̂ = model.nx + size(As, 1)
+    x̂0next = zeros(NT, nx̂)
+    ŷ0 = zeros(NT, ny)
+    x̂0 = zeros(NT, nx̂)
+    tmp_û0 = Cache(zeros(NT,    nu))
+    cst_u0 = Constant(zeros(NT, nu))
+    cst_d0 = Constant(zeros(NT, nd))
+    F̂_prep = prepare_jacobian(f̂_ekf!, x̂0next, jacobian, x̂0, tmp_û0, cst_u0, cst_d0; strict)
+    Ĥ_prep = prepare_jacobian(ĥ_ekf!, ŷ0,     jacobian, x̂0, cst_d0; strict)
+    # main method to compute both Jacobians, it mutates all args before `backend`:
+    function linfunc!(x̂0next, ŷ0, F̂, Ĥ, backend, x̂0, cst_u0, cst_d0)
+        jacobian!(f̂_ekf!, x̂0next, F̂, F̂_prep, backend, x̂0, tmp_û0, cst_u0, cst_d0)
+        jacobian!(ĥ_ekf!, ŷ0, Ĥ, Ĥ_prep, backend, x̂0, cst_d0)
         return nothing
     end
+    # two additional methods to only compute one of the two Jacobians at a time:
+    function linfunc!(x̂0next, ŷ0::Nothing, F̂, Ĥ::Nothing, backend, x̂0, cst_u0, cst_d0)
+        return jacobian!(f̂_ekf!, x̂0next, F̂, F̂_prep, backend, x̂0, tmp_û0, cst_u0, cst_d0)
+    end
+    function linfunc!(x̂0next::Nothing, ŷ0, F̂::Nothing, Ĥ, backend, x̂0, _     , cst_d0)
+        return jacobian!(ĥ_ekf!, ŷ0, Ĥ, Ĥ_prep, backend, x̂0, cst_d0)
+    end
     return linfunc!
-
-
-
 end
 
 """
@@ -1075,15 +1079,10 @@ Do the same but for the [`ExtendedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
     model, x̂0 = estim.model, estim.x̂0
-    ŷ0 = estim.buffer.ŷ
-
-
-    ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
-    ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
-
-    
+    cst_d0 = Constant(d0)
+    ŷ0, Ĥ = estim.buffer.ŷ, estim.Ĥ
+    estim.linfunc!(nothing, ŷ0, nothing, Ĥ, estim.jacobian, x̂0, nothing, cst_d0)
     estim.Ĥm .= @views estim.Ĥ[estim.i_ym, :]
-
     return correct_estimate_kf!(estim, y0m, d0, estim.Ĥm)
 end
 
@@ -1129,22 +1128,16 @@ prediction step equations are provided below. The correction step is skipped if
 function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
     model, x̂0 = estim.model, estim.x̂0
     nx̂, nu = estim.nx̂, model.nu
+    cst_u0, cst_d0 = Constant(u0), Constant(d0)
     if !estim.direct
-        ŷ0 = estim.buffer.ŷ
-        ĥAD! = (ŷ0, x̂0) -> ĥ!(ŷ0, estim, model, x̂0, d0)
-        ForwardDiff.jacobian!(estim.Ĥ, ĥAD!, ŷ0, x̂0)
+        ŷ0, Ĥ = estim.buffer.ŷ, estim.Ĥ
+        estim.linfunc!(nothing, ŷ0, nothing, Ĥ, estim.jacobian, x̂0, nothing, cst_d0)
         estim.Ĥm .= @views estim.Ĥ[estim.i_ym, :]
         correct_estimate_kf!(estim, y0m, d0, estim.Ĥm)
     end
     x̂0corr = estim.x̂0
-    # concatenate x̂0next and û0 vectors to allows û0 vector with dual numbers for AD:
-    # TODO: remove this allocation using estim.buffer
-    x̂0nextû = Vector{NT}(undef, nx̂ + nu)
-    f̂AD! = (x̂0nextû, x̂0corr) -> @views f̂!(
-        x̂0nextû[1:nx̂], x̂0nextû[nx̂+1:end], estim, model, x̂0corr, u0, d0
-    )
-    ForwardDiff.jacobian!(estim.F̂_û, f̂AD!, x̂0nextû, x̂0corr)
-    estim.F̂ .= @views estim.F̂_û[1:estim.nx̂, :]
+    x̂0next, F̂ = estim.buffer.x̂, estim.F̂
+    estim.linfunc!(x̂0next, nothing, F̂, nothing, estim.jacobian, x̂0corr, cst_u0, cst_d0)
     return predict_estimate_kf!(estim, u0, d0, estim.F̂)
 end
 
