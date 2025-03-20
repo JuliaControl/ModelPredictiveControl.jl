@@ -624,11 +624,11 @@ This estimator is allocation-free if `model` simulations do not allocate.
     disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
-- `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
-   estimator, in opposition to the delayed/predictor form).
 - `α=1e-3` or *`alpha`* : alpha parameter, spread of the state distribution ``(0 < α ≤ 1)``.
 - `β=2` or *`beta`* : beta parameter, skewness and kurtosis of the states distribution ``(β ≥ 0)``.
 - `κ=0` or *`kappa`* : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
+- `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
+   estimator, in opposition to the delayed/predictor form).
 
 # Examples
 ```jldoctest
@@ -960,11 +960,40 @@ Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process mod
 keyword arguments are identical to [`UnscentedKalmanFilter`](@ref), except for `α`, `β` and 
 `κ` which do not apply to the extended Kalman Filter. The Jacobians of the augmented model 
 ``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff`](@extref ForwardDiff) automatic
-differentiation. This estimator allocates memory for the Jacobians.
-
+differentiation. This estimator is allocation-free if `model` simulations do not allocate.
 !!! warning
     See the Extended Help of [`linearize`](@ref) function if you get an error like:    
     `MethodError: no method matching (::var"##")(::Vector{ForwardDiff.Dual})`.
+
+# Arguments
+!!! info
+    Keyword arguments with *`emphasis`* are non-Unicode alternatives.
+
+- `model::SimModel` : (deterministic) model for the estimations.
+- `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
+    are unmeasured ``\mathbf{y^u}``.
+- `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
+    covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
+- `σQ=fill(1/model.nx,model.nx)` or *`sigmaQ`* : main diagonal of the process noise
+    covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
+- `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
+    ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
+- `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
+    the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
+- `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
+    disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
+- `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
+- `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured
+    disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+- `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
+    disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
+- `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
+    disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
+- `jacobian=AutoForwardDiff()`: an `AbstractADType` backend for the Jacobians of the augmented
+    model, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
+- `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
+   estimator, in opposition to the delayed/predictor form).
 
 # Examples
 ```jldoctest
@@ -1035,11 +1064,15 @@ end
 
 Return the `linfunc!` function that computes the Jacobians of the augmented model.
 
-The function has the following signature:
+The function has the two following methods:
 ```
-    linfunc!(x̂0next, ŷ0, F̂, Ĥ, backend, x̂0, cst_u0, cst_d0) -> nothing
+linfunc!(x̂0next   , ::Nothing, F̂        , ::Nothing, backend, x̂0, cst_u0, cst_d0) -> nothing
+linfunc!(::Nothing, ŷ0       , ::Nothing, Ĥ        , backend, x̂0, _     , cst_d0) -> nothing
 ```
-#TODO: continue here
+To respectively compute only `F̂` or `Ĥ` Jacobian. The methods mutate all the arguments
+before `backend` argument. The `backend` argument is an `AbstractADType` object from 
+`DifferentiationInterface`. The `cst_u0` and `cst_d0` are `DifferentiationInterface.Constant`
+objects with the linearization points.
 """
 function get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
     As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -1056,13 +1089,6 @@ function get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
     cst_d0 = Constant(zeros(NT, nd))
     F̂_prep = prepare_jacobian(f̂_ekf!, x̂0next, jacobian, x̂0, tmp_û0, cst_u0, cst_d0; strict)
     Ĥ_prep = prepare_jacobian(ĥ_ekf!, ŷ0,     jacobian, x̂0, cst_d0; strict)
-    # main method to compute both Jacobians, it mutates all args before `backend`:
-    function linfunc!(x̂0next, ŷ0, F̂, Ĥ, backend, x̂0, cst_u0, cst_d0)
-        jacobian!(f̂_ekf!, x̂0next, F̂, F̂_prep, backend, x̂0, tmp_û0, cst_u0, cst_d0)
-        jacobian!(ĥ_ekf!, ŷ0, Ĥ, Ĥ_prep, backend, x̂0, cst_d0)
-        return nothing
-    end
-    # two additional methods to only compute one of the two Jacobians at a time:
     function linfunc!(x̂0next, ŷ0::Nothing, F̂, Ĥ::Nothing, backend, x̂0, cst_u0, cst_d0)
         return jacobian!(f̂_ekf!, x̂0next, F̂, F̂_prep, backend, x̂0, tmp_û0, cst_u0, cst_d0)
     end
@@ -1102,8 +1128,8 @@ augmented process model:
 \end{aligned}
 ```
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs. The
-Jacobians are computed with [`ForwardDiff`](@extref ForwardDiff). The correction and 
-prediction step equations are provided below. The correction step is skipped if 
+Jacobians are computed with [`ForwardDiff`](@extref ForwardDiff) bu default. The correction
+and prediction step equations are provided below. The correction step is skipped if 
 `estim.direct == true` since it's already done by the user.
 
 # Correction Step

@@ -8,7 +8,7 @@ The function has the following signature:
     linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d) -> nothing
 ```
 and it should modifies in-place all the arguments before `backend`. The `backend` argument
-is an `AbstractADType` backend from `DifferentiationInterface`. The `cst_x`, `cst_u` and 
+is an `AbstractADType` object from `DifferentiationInterface`. The `cst_x`, `cst_u` and 
 `cst_d` are `DifferentiationInterface.Constant` objects with the linearization points.
 """
 function get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p, backend)
