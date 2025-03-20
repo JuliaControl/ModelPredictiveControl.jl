@@ -152,6 +152,8 @@ end
 
 @testitem "NonLinModel construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1(x,u,_,model) = model.A*x + model.Bu*u
     h1(x,_,model)   = model.C*x
@@ -243,8 +245,9 @@ end
     @test xnext ≈ zeros(2)
     nonlinemodel7.h!(y, [0; 0], [0], nonlinemodel7.p)
     @test y ≈ zeros(1)
+    nonlinemodel8 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, p=p, jacobian=AutoFiniteDiff())
+    @test nonlinemodel8.jacobian == AutoFiniteDiff()
 
-    
     @test_throws ErrorException NonLinModel(
         (x,u)->linmodel1.A*x + linmodel1.Bu*u,
         (x,_,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
@@ -280,7 +283,9 @@ end
 end
 
 @testitem "NonLinModel linearization" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import ForwardDiff, FiniteDiff
     Ts = 1.0
     f1(x,u,d,_) = x.^5 .+ u.^4 .+ d.^3
     h1(x,d,_)   = x.^2 .+ d
@@ -292,14 +297,20 @@ end
     @test linmodel1.Bd ≈ 3*d.^2
     @test linmodel1.C  ≈ 2*x.^1
     @test linmodel1.Dd ≈ 1*d.^0
-    linmodel2 = LinModel(nonlinmodel1; x, u, d)
-    @test linmodel1.A  ≈ linmodel2.A
-    @test linmodel1.Bu ≈ linmodel2.Bu
-    @test linmodel1.Bd ≈ linmodel2.Bd
-    @test linmodel1.C  ≈ linmodel2.C
-    @test linmodel1.Dd ≈ linmodel2.Dd 
-    @test repr(nonlinmodel1.linbuffer) == "LinearizationBuffer object"
-    @test repr(nonlinmodel1.linbuffer.buffer_f_at_u_d) == "DifferentiationBuffer with a JacobianConfig"
+    linmodel1b = LinModel(nonlinmodel1; x, u, d)
+    @test linmodel1.A  ≈ linmodel1b.A
+    @test linmodel1.Bu ≈ linmodel1b.Bu
+    @test linmodel1.Bd ≈ linmodel1b.Bd
+    @test linmodel1.C  ≈ linmodel1b.C
+    @test linmodel1.Dd ≈ linmodel1b.Dd
+
+    nonlinmodel2 = NonLinModel(f1,h1,Ts,1,1,1,1,solver=nothing, jacobian=AutoFiniteDiff()) 
+    linmodel2 = linearize(nonlinmodel2; x, u, d)
+    @test linmodel2.A  ≈ 5*x.^4 atol=1e-3
+    @test linmodel2.Bu ≈ 4*u.^3 atol=1e-3
+    @test linmodel2.Bd ≈ 3*d.^2 atol=1e-3
+    @test linmodel2.C  ≈ 2*x.^1 atol=1e-3
+    @test linmodel2.Dd ≈ 1*d.^0 atol=1e-3
 
     f1!(ẋ, x, u, d, _) = (ẋ .= x.^5 .+ u.^4 .+ d.^3; nothing)
     h1!(y, x, d, _) = (y .= x.^2 .+ d; nothing)
