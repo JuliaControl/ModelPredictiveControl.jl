@@ -956,10 +956,9 @@ end
 
 Construct an extended Kalman Filter with the [`SimModel`](@ref) `model`.
 
-Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model and the
-keyword arguments are identical to [`UnscentedKalmanFilter`](@ref), except for `α`, `β` and 
-`κ` which do not apply to the extended Kalman Filter. The Jacobians of the augmented model 
-``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff`](@extref ForwardDiff) automatic
+Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model is
+identical to [`UnscentedKalmanFilter`](@ref). By default, the Jacobians of the augmented
+model ``\mathbf{f̂, ĥ}`` are computed with [`ForwardDiff`](@extref ForwardDiff) automatic
 differentiation. This estimator is allocation-free if `model` simulations do not allocate.
 !!! warning
     See the Extended Help of [`linearize`](@ref) function if you get an error like:    
