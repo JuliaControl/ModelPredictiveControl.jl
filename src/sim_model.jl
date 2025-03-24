@@ -25,23 +25,26 @@ struct SimModelBuffer{NT<:Real}
     x::Vector{NT}
     y::Vector{NT}
     d::Vector{NT}
+    K::Matrix{NT}
     empty::Vector{NT}
 end
 
 @doc raw"""
-    SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, linearization=nothing)
+    SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ns::Int=0)
 
 Create a buffer for `SimModel` objects for inputs, states, outputs, and disturbances.
 
-The buffer is used to store intermediate results during simulation without allocating.
+The buffer is used to store intermediate results during simulation without allocating. The
+argument `ns` is the number of stage of the [`DiffSolver`](@ref), when applicable.
 """
-function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ) where {NT<:Real}
+function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ns::Int=0) where {NT<:Real}
     u = Vector{NT}(undef, nu)
     x = Vector{NT}(undef, nx)
     y = Vector{NT}(undef, ny)
     d = Vector{NT}(undef, nd)
+    K = Matrix{NT}(undef, nx, ns)
     empty = Vector{NT}(undef, 0)
-    return SimModelBuffer{NT}(u, x, y, d, empty)
+    return SimModelBuffer{NT}(u, x, y, d, K, empty)
 end
 
 

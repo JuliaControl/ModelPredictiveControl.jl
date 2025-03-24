@@ -2,14 +2,22 @@
 abstract type DiffSolver end
 
 "Empty solver for nonlinear discrete-time models."
-struct EmptySolver <: DiffSolver end
-get_solver_functions(::DataType, ::EmptySolver, f!, h!, _ ... ) = f!, h!
+struct EmptySolver <: DiffSolver
+    ns::Int
+    EmptySolver() = new(0)
+end
+
+function get_solver_functions(NT::DataType, ::EmptySolver, f!, h!, _ ... )
+    f_solver!(xnext, _ , x, u, d, p) = f!(xnext, x, u, d, p)
+    return f!, h!
+end
 
 function Base.show(io::IO, solver::EmptySolver)
     print(io, "Empty differential equation solver.")
 end
 
 struct RungeKutta <: DiffSolver
+    ns::Int
     order::Int
     supersample::Int
     function RungeKutta(order::Int, supersample::Int)
@@ -22,7 +30,8 @@ struct RungeKutta <: DiffSolver
         if supersample < 1
             throw(ArgumentError("supersample must be greater than 0"))
         end
-        return new(order, supersample)
+        ns = order # only true for order ≤ 4
+        return new(ns, order, supersample)
     end
 end
 
@@ -54,18 +63,18 @@ end
 "Get the f! function for the 4th order explicit Runge-Kutta solver."
 function get_rk4_function(NT, solver, fc!, Ts, nx, Nc)
     Ts_inner = Ts/solver.supersample
-    xcur_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx), Nc)
-    k1_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
-    k2_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
-    k3_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
-    k4_cache::DiffCache{Vector{NT}, Vector{NT}}   = DiffCache(zeros(NT, nx), Nc)
+    xcur = zeros(NT, nx)
+    k1  = zeros(NT, nx)
+    k2 = zeros(NT, nx)
+    k3 = zeros(NT, nx)
+    k4 = zeros(NT, nx)
     f! = function rk4_solver!(xnext, x, u, d, p)
         CT = promote_type(eltype(x), eltype(u), eltype(d))
-        xcur = get_tmp(xcur_cache, CT)
+        #=xcur = get_tmp(xcur_cache, CT)
         k1   = get_tmp(k1_cache, CT)
         k2   = get_tmp(k2_cache, CT)
         k3   = get_tmp(k3_cache, CT)
-        k4   = get_tmp(k4_cache, CT)
+        k4   = get_tmp(k4_cache, CT)=#
         xterm = xnext
         @. xcur = x
         for i=1:solver.supersample
