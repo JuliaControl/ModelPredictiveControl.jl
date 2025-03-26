@@ -3,13 +3,28 @@ abstract type DiffSolver end
 
 "Empty solver for nonlinear discrete-time models."
 struct EmptySolver <: DiffSolver
-    ns::Int
+    ns::Int             # number of stages
     EmptySolver() = new(0)
 end
 
-function get_solver_functions(NT::DataType, ::EmptySolver, f!, h!, _ ... )
-    f_solver!(xnext, _ , x, u, d, p) = f!(xnext, x, u, d, p)
-    return f!, h!
+"""
+    get_solver_functions(NT::DataType, solver::EmptySolver, f!, h!, Ts, nu, nx, ny, nd)
+
+Get `solver_f!` and `solver_h!` functions for the `EmptySolver` (discrete models).
+
+The functions should have the following signature:
+```
+    solver_f!(xnext, K, x, u, d, p) -> nothing
+    solver_h!(y, x, d, p) -> nothing
+```
+in which `xnext`, `K` and `y` arguments should be mutated in-place. The `K` argument is 
+a vector of `nx*(solver.ns+1)` elements to store the solver intermediary stage values,
+and also the current state value when `supersample ≠ 1`.
+"""
+function get_solver_functions(::DataType, ::EmptySolver, f!, h!, _ , _ , _ , _ )
+    solver_f!(xnext, _ , x, u, d, p) = f!(xnext, x, u, d, p)
+    solver_h! = h!
+    return solver_f!, solver_h!
 end
 
 function Base.show(io::IO, solver::EmptySolver)
@@ -17,9 +32,9 @@ function Base.show(io::IO, solver::EmptySolver)
 end
 
 struct RungeKutta <: DiffSolver
-    ns::Int
-    order::Int
-    supersample::Int
+    ns::Int             # number of stages
+    order::Int          # order of the method
+    supersample::Int    # number of internal steps
     function RungeKutta(order::Int, supersample::Int)
         if order ≠ 4 && order ≠ 1
             throw(ArgumentError("only 1st and 4th order Runge-Kutta is supported."))
@@ -30,7 +45,7 @@ struct RungeKutta <: DiffSolver
         if supersample < 1
             throw(ArgumentError("supersample must be greater than 0"))
         end
-        ns = order # only true for order ≤ 4
+        ns = order # only true for order ≤ 4 with RungeKutta
         return new(ns, order, supersample)
     end
 end
@@ -46,59 +61,50 @@ This solver is allocation-free if the `f!` and `h!` functions do not allocate.
 """
 RungeKutta(order::Int=4; supersample::Int=1) = RungeKutta(order, supersample)
 
-"Get the `f!` and `h!` functions for the explicit Runge-Kutta solvers."
-function get_solver_functions(NT::DataType, solver::RungeKutta, fc!, hc!, Ts, _ , nx, _ , _ )
+"Get `solve_f!` and `solver_h!` functions for the explicit Runge-Kutta solvers."
+function get_solver_functions(NT::DataType, solver::RungeKutta, f!, h!, Ts, _ , nx, _ , _ )
     Nc = nx + 2
-    f! = if solver.order==4
-        get_rk4_function(NT, solver, fc!, Ts, nx, Nc)
+    solver_f! = if solver.order==4
+        get_rk4_function(NT, solver, f!, Ts, nx, Nc)
     elseif solver.order==1
-        get_euler_function(NT, solver, fc!, Ts, nx, Nc)
+        get_euler_function(NT, solver, f!, Ts, nx, Nc)
     else
         throw(ArgumentError("only 1st and 4th order Runge-Kutta is supported."))
     end
-    h! = hc!
-    return f!, h!
+    solver_h! = h!
+    return solver_f!, solver_h!
 end
 
 "Get the f! function for the 4th order explicit Runge-Kutta solver."
-function get_rk4_function(NT, solver, fc!, Ts, nx, Nc)
+function get_rk4_function(NT, solver, f!, Ts, nx, Nc)
     Ts_inner = Ts/solver.supersample
-    xcur = zeros(NT, nx)
-    k1  = zeros(NT, nx)
-    k2 = zeros(NT, nx)
-    k3 = zeros(NT, nx)
-    k4 = zeros(NT, nx)
-    f! = function rk4_solver!(xnext, x, u, d, p)
-        CT = promote_type(eltype(x), eltype(u), eltype(d))
-        #=xcur = get_tmp(xcur_cache, CT)
-        k1   = get_tmp(k1_cache, CT)
-        k2   = get_tmp(k2_cache, CT)
-        k3   = get_tmp(k3_cache, CT)
-        k4   = get_tmp(k4_cache, CT)=#
-        xterm = xnext
-        @. xcur = x
+    function rk4_solver_f!(xnext, K, x, u, d, p)
+        xcurr = @views K[1:nx]
+        k1 = @views K[(1nx + 1):(2nx)]
+        k2 = @views K[(2nx + 1):(3nx)]
+        k3 = @views K[(3nx + 1):(4nx)]
+        k4 = @views K[(4nx + 1):(5nx)]   
+        @. xcurr = x
         for i=1:solver.supersample
-            fc!(k1, xcur, u, d, p)
-            @. xterm = xcur + k1 * Ts_inner/2
-            fc!(k2, xterm, u, d, p)
-            @. xterm = xcur + k2 * Ts_inner/2
-            fc!(k3, xterm, u, d, p)
-            @. xterm = xcur + k3 * Ts_inner
-            fc!(k4, xterm, u, d, p)
-            @. xcur = xcur + (k1 + 2k2 + 2k3 + k4)*Ts_inner/6
+            f!(k1, xcurr, u, d, p)
+            @. xnext = xcurr + k1 * Ts_inner/2
+            f!(k2, xnext, u, d, p)
+            @. xnext = xcurr + k2 * Ts_inner/2
+            f!(k3, xnext, u, d, p)
+            @. xnext = xcurr + k3 * Ts_inner
+            f!(k4, xnext, u, d, p)
+            @. xcurr = xcurr + (k1 + 2k2 + 2k3 + k4)*Ts_inner/6
         end
-        @. xnext = xcur
+        @. xnext = xcurr
         return nothing
     end
-    return f!
+    return rk4_solver_f!
 end
 
 "Get the f! function for the explicit Euler solver."
 function get_euler_function(NT, solver, fc!, Ts, nx, Nc)
     Ts_inner = Ts/solver.supersample
-    xcur_cache::DiffCache{Vector{NT}, Vector{NT}} = DiffCache(zeros(NT, nx), Nc)
-    k_cache::DiffCache{Vector{NT}, Vector{NT}}    = DiffCache(zeros(NT, nx), Nc)
-    f! = function euler_solver!(xnext, x, u, d, p)
+    function euler_solver_f!(xnext, x, u, d, p)
         CT = promote_type(eltype(x), eltype(u), eltype(d))
         xcur = get_tmp(xcur_cache, CT)
         k    = get_tmp(k_cache, CT)
@@ -111,7 +117,7 @@ function get_euler_function(NT, solver, fc!, Ts, nx, Nc)
         @. xnext = xcur
         return nothing
     end
-    return f!
+    return euler_solver_f!
 end
 
 """

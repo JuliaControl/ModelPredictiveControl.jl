@@ -25,7 +25,7 @@ struct SimModelBuffer{NT<:Real}
     x::Vector{NT}
     y::Vector{NT}
     d::Vector{NT}
-    K::Matrix{NT}
+    K::Vector{NT}
     empty::Vector{NT}
 end
 
@@ -42,7 +42,7 @@ function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ns::Int=0) where
     x = Vector{NT}(undef, nx)
     y = Vector{NT}(undef, ny)
     d = Vector{NT}(undef, nd)
-    K = Matrix{NT}(undef, nx, ns)
+    K = Vector{NT}(undef, nx*(ns+1)) # the "+1" is necessary because of super-sampling
     empty = Vector{NT}(undef, 0)
     return SimModelBuffer{NT}(u, x, y, d, K, empty)
 end

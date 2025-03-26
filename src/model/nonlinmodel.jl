@@ -53,7 +53,7 @@ struct NonLinModel{
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
-        buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
+        buffer = SimModelBuffer{NT}(nu, nx, ny, nd, solver.ns)
         return new{NT, F, H, PT, DS, JB, LF}(
             x0, 
             f!, h!,
@@ -263,7 +263,7 @@ Call [`linearize(model; x, u, d)`](@ref) and return the resulting linear model.
 LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 "Call `model.f!(xnext0, x0, u0, d0, p)` for [`NonLinModel`](@ref)."
-f!(xnext0, model::NonLinModel, x0, u0, d0, p) = model.f!(xnext0, x0, u0, d0, p)
+f!(xnext0, model::NonLinModel, x0, u0, d0, p) = model.f!(xnext0, model.buffer.K, x0, u0, d0, p)
 
 "Call `model.h!(y0, x0, d0, p)` for [`NonLinModel`](@ref)."
 h!(y0, model::NonLinModel, x0, d0, p) = model.h!(y0, x0, d0, p)
