@@ -168,20 +168,25 @@ function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂next0, _ , estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    f̂!(x̂0next, _ , x̂0i, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls `model.f!(x̂next0, x̂0, u0 ,d0, model.p)` since this estimator does not augment the states.
+It calls `model.solver_f!(x̂0next, x̂0i, x̂0, u0 ,d0, model.p)` directly since this estimator
+does not augment the states.
 """
-f̂!(x̂next0, _, ::InternalModel, model::NonLinModel, x̂0, u0, d0) = model.f!(x̂next0, x̂0, u0, d0, model.p)
+function f̂!(x̂0next, _ , x̂0i, ::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    return model.solver_f!(x̂0next, x̂0i, x̂0, u0, d0, model.p)
+end
 
 @doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
 
-Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.h!`.
+Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.solver_h!`.
 """
-ĥ!(x̂next0, ::InternalModel, model::NonLinModel, x̂0, d0) = model.h!(x̂next0, x̂0, d0, model.p)
+function ĥ!(ŷ0, ::InternalModel, model::NonLinModel, x̂0, d0)
+    return model.solver_h!(ŷ0, x̂0, d0, model.p)
+end
 
 
 @doc raw"""

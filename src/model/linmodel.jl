@@ -258,20 +258,20 @@ function steadystate!(model::LinModel, u0, d0)
 end
 
 """
-    f!(xnext0, model::LinModel, x0, u0, d0, p) -> nothing
+    f!(x0next, _ , model::LinModel, x0, u0, d0, _ ) -> nothing
 
-Evaluate `xnext0 = A*x0 + Bu*u0 + Bd*d0` in-place when `model` is a [`LinModel`](@ref).
+Evaluate `x0next = A*x0 + Bu*u0 + Bd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function f!(xnext0, model::LinModel, x0, u0, d0, _ )
-    mul!(xnext0, model.A,  x0)
-    mul!(xnext0, model.Bu, u0, 1, 1)
-    mul!(xnext0, model.Bd, d0, 1, 1)
+function f!(x0next, _ , model::LinModel, x0, u0, d0, _ )
+    mul!(x0next, model.A,  x0)
+    mul!(x0next, model.Bu, u0, 1, 1)
+    mul!(x0next, model.Bd, d0, 1, 1)
     return nothing
 end
 
 
 """
-    h!(y0, model::LinModel, x0, d0, p) -> nothing
+    h!(y0, model::LinModel, x0, d0, _ ) -> nothing
 
 Evaluate `y0 = C*x0 + Dd*d0` in-place when `model` is a [`LinModel`](@ref).
 """

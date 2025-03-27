@@ -3,8 +3,8 @@ abstract type DiffSolver end
 
 "Empty solver for nonlinear discrete-time models."
 struct EmptySolver <: DiffSolver
-    ns::Int             # number of stages
-    EmptySolver() = new(0)
+    ni::Int             # number of intermediate stages
+    EmptySolver() = new(-1)
 end
 
 """
@@ -14,12 +14,12 @@ Get `solver_f!` and `solver_h!` functions for the `EmptySolver` (discrete models
 
 The functions should have the following signature:
 ```
-    solver_f!(xnext, K, x, u, d, p) -> nothing
+    solver_f!(xnext, xi, x, u, d, p) -> nothing
     solver_h!(y, x, d, p) -> nothing
 ```
-in which `xnext`, `K` and `y` arguments should be mutated in-place. The `K` argument is 
-a vector of `nx*(solver.ns+1)` elements to store the solver intermediary stage values,
-and also the current state value when `supersample ≠ 1`.
+in which `xnext`, `xi` and `y` arguments are mutated in-place. The `xi` argument is 
+a vector of `nx*(solver.ni+1)` elements to store the solver intermediate stage values (and 
+also the current state value for when `supersample ≠ 1`).
 """
 function get_solver_functions(::DataType, ::EmptySolver, f!, h!, _ , _ , _ , _ )
     solver_f!(xnext, _ , x, u, d, p) = f!(xnext, x, u, d, p)
@@ -32,7 +32,7 @@ function Base.show(io::IO, solver::EmptySolver)
 end
 
 struct RungeKutta <: DiffSolver
-    ns::Int             # number of stages
+    ni::Int             # number of intermediate stages
     order::Int          # order of the method
     supersample::Int    # number of internal steps
     function RungeKutta(order::Int, supersample::Int)
@@ -45,8 +45,8 @@ struct RungeKutta <: DiffSolver
         if supersample < 1
             throw(ArgumentError("supersample must be greater than 0"))
         end
-        ns = order # only true for order ≤ 4 with RungeKutta
-        return new(ns, order, supersample)
+        ni = order # only true for order ≤ 4 with RungeKutta
+        return new(ni, order, supersample)
     end
 end
 
@@ -63,11 +63,10 @@ RungeKutta(order::Int=4; supersample::Int=1) = RungeKutta(order, supersample)
 
 "Get `solve_f!` and `solver_h!` functions for the explicit Runge-Kutta solvers."
 function get_solver_functions(NT::DataType, solver::RungeKutta, f!, h!, Ts, _ , nx, _ , _ )
-    Nc = nx + 2
-    solver_f! = if solver.order==4
-        get_rk4_function(NT, solver, f!, Ts, nx, Nc)
-    elseif solver.order==1
-        get_euler_function(NT, solver, f!, Ts, nx, Nc)
+    solver_f! = if solver.order == 4
+        get_rk4_function(NT, solver, f!, Ts, nx)
+    elseif solver.order == 1
+        get_euler_function(NT, solver, f!, Ts, nx)
     else
         throw(ArgumentError("only 1st and 4th order Runge-Kutta is supported."))
     end
@@ -76,14 +75,14 @@ function get_solver_functions(NT::DataType, solver::RungeKutta, f!, h!, Ts, _ , 
 end
 
 "Get the f! function for the 4th order explicit Runge-Kutta solver."
-function get_rk4_function(NT, solver, f!, Ts, nx, Nc)
+function get_rk4_function(NT, solver, f!, Ts, nx)
     Ts_inner = Ts/solver.supersample
-    function rk4_solver_f!(xnext, K, x, u, d, p)
-        xcurr = @views K[1:nx]
-        k1 = @views K[(1nx + 1):(2nx)]
-        k2 = @views K[(2nx + 1):(3nx)]
-        k3 = @views K[(3nx + 1):(4nx)]
-        k4 = @views K[(4nx + 1):(5nx)]   
+    function rk4_solver_f!(xnext, xi, x, u, d, p)
+        xcurr = @views xi[1:nx]
+        k1 = @views xi[(1nx + 1):(2nx)]
+        k2 = @views xi[(2nx + 1):(3nx)]
+        k3 = @views xi[(3nx + 1):(4nx)]
+        k4 = @views xi[(4nx + 1):(5nx)]   
         @. xcurr = x
         for i=1:solver.supersample
             f!(k1, xcurr, u, d, p)
@@ -104,17 +103,15 @@ end
 "Get the f! function for the explicit Euler solver."
 function get_euler_function(NT, solver, fc!, Ts, nx, Nc)
     Ts_inner = Ts/solver.supersample
-    function euler_solver_f!(xnext, x, u, d, p)
-        CT = promote_type(eltype(x), eltype(u), eltype(d))
-        xcur = get_tmp(xcur_cache, CT)
-        k    = get_tmp(k_cache, CT)
-        xterm = xnext
-        @. xcur = x
+    function euler_solver_f!(xnext, xi, x, u, d, p)
+        xcurr = @views xi[1:nx]
+        k1 = @views xi[(1nx + 1):(2nx)]
+        @. xcurr = x
         for i=1:solver.supersample
-            fc!(k, xcur, u, d, p)
-            @. xcur = xcur + k * Ts_inner
+            fc!(k1, xcurr, u, d, p)
+            @. xcurr = xcurr + k1 * Ts_inner
         end
-        @. xnext = xcur
+        @. xnext = xcurr
         return nothing
     end
     return euler_solver_f!
