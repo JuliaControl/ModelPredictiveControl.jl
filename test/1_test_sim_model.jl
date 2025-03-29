@@ -162,10 +162,10 @@ end
     @test nonlinmodel1.nu == 2
     @test nonlinmodel1.nd == 0
     @test nonlinmodel1.ny == 2
-    xnext, y = similar(nonlinmodel1.x0), similar(nonlinmodel1.yop)
-    nonlinmodel1.f!(xnext,[0,0],[0,0],[1],nonlinmodel1.p)
+    xnext, k, y = nonlinmodel1.buffer.x, nonlinmodel1.buffer.k, nonlinmodel1.buffer.y
+    nonlinmodel1.solver_f!(xnext, k, [0,0],[0,0],[1],nonlinmodel1.p)
     @test xnext ≈ zeros(2,)
-    nonlinmodel1.h!(y,[0,0],[1],nonlinmodel1.p)
+    nonlinmodel1.solver_h!(y,[0,0],[1],nonlinmodel1.p)
     @test y ≈ zeros(2,)
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
@@ -177,10 +177,10 @@ end
     @test nonlinmodel2.nu == 2
     @test nonlinmodel2.nd == 1
     @test nonlinmodel2.ny == 2
-    xnext, y = similar(nonlinmodel2.x0), similar(nonlinmodel2.yop)
-    nonlinmodel2.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel2.p)
+    xnext, k, y = nonlinmodel2.buffer.x, nonlinmodel2.buffer.k, nonlinmodel2.buffer.y
+    nonlinmodel2.solver_f!(xnext, k,[0,0,0,0],[0,0],[0],nonlinmodel2.p)
     @test xnext ≈ zeros(4,)
-    nonlinmodel2.h!(y,[0,0,0,0],[0],nonlinmodel2.p)
+    nonlinmodel2.solver_h!(y,[0,0,0,0],[0],nonlinmodel2.p)
     @test y ≈ zeros(2,)
 
     nonlinmodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1,solver=nothing)
@@ -198,10 +198,10 @@ end
         return nothing
     end
     nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel2)
-    xnext, y = similar(nonlinmodel4.x0), similar(nonlinmodel4.yop)
-    nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel4.p)
+    xnext, k, y = nonlinmodel4.buffer.x, nonlinmodel4.buffer.k, nonlinmodel4.buffer.y
+    nonlinmodel4.solver_f!(xnext,k,[0,0,0,0],[0,0],[0],nonlinmodel4.p)
     @test xnext ≈ zeros(4)
-    nonlinmodel4.h!(y,[0,0,0,0],[0],nonlinmodel4.p)
+    nonlinmodel4.solver_h!(y,[0,0,0,0],[0],nonlinmodel4.p)
     @test y ≈ zeros(2)
 
     A  = [0 0.5; -0.2 -0.1]
@@ -216,10 +216,10 @@ end
     @test string(solver) == 
         "4th order Runge-Kutta differential equation solver with 1 supersamples."
     nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver, p=p)
-    xnext, y = similar(nonlinmodel5.x0), similar(nonlinmodel5.yop)
-    nonlinmodel5.f!(xnext, [0; 0], [0], [0], nonlinmodel5.p)
+    xnext, k, y = nonlinmodel5.buffer.x, nonlinmodel5.buffer.k, nonlinmodel5.buffer.y
+    nonlinmodel5.solver_f!(xnext,k, [0; 0], [0], [0], nonlinmodel5.p)
     @test xnext ≈ zeros(2)
-    nonlinmodel5.h!(y, [0; 0], [0], nonlinmodel5.p)
+    nonlinmodel5.solver_h!(y, [0; 0], [0], nonlinmodel5.p)
     @test y ≈ zeros(1)
 
     function f2!(ẋ, x, u , d, p)
@@ -234,19 +234,19 @@ end
         return nothing
     end
     nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta(), p=p)
-    xnext, y = similar(nonlinmodel6.x0), similar(nonlinmodel6.yop)
-    nonlinmodel6.f!(xnext, [0; 0], [0], [0], nonlinmodel6.p)
+    xnext, k, y = nonlinmodel6.buffer.x, nonlinmodel6.buffer.k, nonlinmodel6.buffer.y
+    nonlinmodel6.solver_f!(xnext,k, [0; 0], [0], [0], nonlinmodel6.p)
     @test xnext ≈ zeros(2)
-    nonlinmodel6.h!(y, [0; 0], [0], nonlinmodel6.p)
+    nonlinmodel6.solver_h!(y, [0; 0], [0], nonlinmodel6.p)
     @test y ≈ zeros(1)
-    nonlinemodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler(), p=p)
-    xnext, y = similar(nonlinemodel7.x0), similar(nonlinemodel7.yop)
-    nonlinemodel7.f!(xnext, [0; 0], [0], [0], nonlinemodel7.p)
+    nonlinmodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler(), p=p)
+    xnext, k, y = nonlinmodel7.buffer.x, nonlinmodel7.buffer.k, nonlinmodel7.buffer.y
+    nonlinmodel7.solver_f!(xnext, k, [0; 0], [0], [0], nonlinmodel7.p)
     @test xnext ≈ zeros(2)
-    nonlinemodel7.h!(y, [0; 0], [0], nonlinemodel7.p)
+    nonlinmodel7.solver_h!(y, [0; 0], [0], nonlinmodel7.p)
     @test y ≈ zeros(1)
-    nonlinemodel8 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, p=p, jacobian=AutoFiniteDiff())
-    @test nonlinemodel8.jacobian == AutoFiniteDiff()
+    nonlinmodel8 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, p=p, jacobian=AutoFiniteDiff())
+    @test nonlinmodel8.jacobian == AutoFiniteDiff()
 
     @test_throws ErrorException NonLinModel(
         (x,u)->linmodel1.A*x + linmodel1.Bu*u,
@@ -316,19 +316,25 @@ end
     h1!(y, x, d, _) = (y .= x.^2 .+ d; nothing)
     nonlinmodel3 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=RungeKutta())
     linmodel3 = linearize(nonlinmodel3; x, u, d)
-    u0, d0 = u - nonlinmodel3.uop, d - nonlinmodel3.dop
-    xnext, y = similar(nonlinmodel3.x0), similar(nonlinmodel3.yop)
-    A  = ForwardDiff.jacobian((xnext, x)  -> nonlinmodel3.f!(xnext, x, u0, d0, nonlinmodel3.p), xnext, x)
-    Bu = ForwardDiff.jacobian((xnext, u0) -> nonlinmodel3.f!(xnext, x, u0, d0, nonlinmodel3.p), xnext, u0)
-    Bd = ForwardDiff.jacobian((xnext, d0) -> nonlinmodel3.f!(xnext, x, u0, d0, nonlinmodel3.p), xnext, d0)
-    C  = ForwardDiff.jacobian((y, x)  -> nonlinmodel3.h!(y, x, d0, nonlinmodel3.p), y, x)
-    Dd = ForwardDiff.jacobian((y, d0) -> nonlinmodel3.h!(y, x, d0, nonlinmodel3.p), y, d0)
+    x0, u0, d0 = x - nonlinmodel3.xop, u - nonlinmodel3.uop, d - nonlinmodel3.dop
+    xnext, k, y = nonlinmodel3.buffer.x, nonlinmodel3.buffer.k, nonlinmodel3.buffer.y
+    backend = AutoForwardDiff()
+    f_A(xnext, x0, k)  = nonlinmodel3.solver_f!(xnext, k, x0, u0, d0, nonlinmodel3.p)
+    f_Bu(xnext, u0, k) = nonlinmodel3.solver_f!(xnext, k, x0, u0, d0, nonlinmodel3.p)
+    f_Bd(xnext, d0, k) = nonlinmodel3.solver_f!(xnext, k, x0, u0, d0, nonlinmodel3.p)
+    h_C(y, x0)  = nonlinmodel3.solver_h!(y, x0, d0, nonlinmodel3.p)
+    h_Dd(y, d0) = nonlinmodel3.solver_h!(y, x0, d0, nonlinmodel3.p)
+    A  = jacobian(f_A,  xnext, backend, x0, Cache(k))
+    Bu = jacobian(f_Bu, xnext, backend, u0, Cache(k))
+    Bd = jacobian(f_Bd, xnext, backend, d0, Cache(k))
+    C  = jacobian(h_C,  y, backend, x0)
+    Dd = jacobian(h_Dd, y, backend, d0)
     @test linmodel3.A  ≈ A
     @test linmodel3.Bu ≈ Bu
     @test linmodel3.Bd ≈ Bd
     @test linmodel3.C  ≈ C
     @test linmodel3.Dd ≈ Dd
-
+    
     # test `linearize` at a non-equilibrium point:
     Ynl, Yl = let nonlinmodel3=nonlinmodel3
         N = 5

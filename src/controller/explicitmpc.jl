@@ -195,7 +195,7 @@ optim_objective!(mpc::ExplicitMPC) = lmul!(-1, ldiv!(mpc.Z̃, mpc.H̃_chol, mpc.
 
 "Compute the predictions but not the terminal states if `mpc` is an [`ExplicitMPC`](@ref)."
 function predict!(
-    Ŷ0, x̂0end, _ , _ , mpc::ExplicitMPC, ::LinModel, ::TranscriptionMethod, _ , Z̃
+    Ŷ0, x̂0end, _ , _ , _ , mpc::ExplicitMPC, ::LinModel, ::TranscriptionMethod, _ , Z̃
 )
     # in-place operations to reduce allocations :
     Ŷ0    .= mul!(Ŷ0, mpc.Ẽ, Z̃) .+ mpc.F

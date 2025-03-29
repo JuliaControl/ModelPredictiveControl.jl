@@ -25,23 +25,27 @@ struct SimModelBuffer{NT<:Real}
     x::Vector{NT}
     y::Vector{NT}
     d::Vector{NT}
+    k::Vector{NT}
     empty::Vector{NT}
 end
 
 @doc raw"""
-    SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, linearization=nothing)
+    SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0)
 
 Create a buffer for `SimModel` objects for inputs, states, outputs, and disturbances.
 
-The buffer is used to store intermediate results during simulation without allocating.
+The buffer is used to store temporary results during simulation without allocating. The
+argument `ni` is the number of intermediate stage of the [`DiffSolver`](@ref), when 
+applicable.
 """
-function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ) where {NT<:Real}
+function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0) where {NT<:Real}
     u = Vector{NT}(undef, nu)
     x = Vector{NT}(undef, nx)
     y = Vector{NT}(undef, ny)
     d = Vector{NT}(undef, nd)
+    k = Vector{NT}(undef, nx*(ni+1)) # the "+1" is necessary because of super-sampling
     empty = Vector{NT}(undef, 0)
-    return SimModelBuffer{NT}(u, x, y, d, empty)
+    return SimModelBuffer{NT}(u, x, y, d, k, empty)
 end
 
 
@@ -245,13 +249,13 @@ julia> x = updatestate!(model, [1])
 """
 function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: Real
     validate_args(model::SimModel, d, u)
-    u0, d0, xnext0 = model.buffer.u, model.buffer.d, model.buffer.x
+    u0, d0, x0next, k0 = model.buffer.u, model.buffer.d, model.buffer.x, model.buffer.k
     u0 .= u .- model.uop
     d0 .= d .- model.dop
-    f!(xnext0, model, model.x0, u0, d0, model.p)
-    xnext0  .+= model.fop .- model.xop
-    model.x0 .= xnext0
-    xnext   = xnext0
+    f!(x0next, k0, model, model.x0, u0, d0, model.p)
+    x0next  .+= model.fop .- model.xop
+    model.x0 .= x0next
+    xnext   = x0next
     xnext .+= model.xop
     return xnext
 end

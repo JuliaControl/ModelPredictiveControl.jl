@@ -25,8 +25,6 @@ import JuMP
 import JuMP: MOIU, MOI, GenericModel, Model, optimizer_with_attributes, register
 import JuMP: @variable, @operator, @constraint, @objective
 
-import PreallocationTools: DiffCache, get_tmp # TODO: remove this dep if possible (with Cache of DI.jl)
-
 import OSQP, Ipopt
 
 export SimModel, LinModel, NonLinModel
