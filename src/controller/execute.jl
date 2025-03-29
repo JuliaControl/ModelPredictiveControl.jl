@@ -114,14 +114,14 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 """
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     model, buffer, transcription = mpc.estim.model, mpc.buffer, mpc.transcription
-    nΔŨ, nXi = mpc.Hc*model.nu + mpc.nϵ, mpc.Hp*model.nxi
+    nΔŨ, nK = mpc.Hc*model.nu + mpc.nϵ, mpc.Hp*model.nk
     nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu
     nX̂0, nÛ0 = mpc.estim.nx̂*mpc.Hp, model.nu*mpc.Hp 
     Z̃ = mpc.Z̃
     info = Dict{Symbol, Any}()
     ΔŨ     = Vector{NT}(undef, nΔŨ)
     x̂0end  = similar(mpc.estim.x̂0)
-    X0i    = Vector{NT}(undef, nXi) 
+    K0     = Vector{NT}(undef, nK) 
     Ue, Ŷe = Vector{NT}(undef, nUe), Vector{NT}(undef, nŶe)
     U0, Ŷ0 = similar(mpc.Uop), similar(mpc.Yop)
     Û0, X̂0 = Vector{NT}(undef, nÛ0), Vector{NT}(undef, nX̂0)
@@ -129,7 +129,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     D̂      = buffer.D̂
     U0 = getU0!(U0, mpc, Z̃)
     ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
-    Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, X0i, mpc, model, transcription, U0, Z̃)
+    Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, K0, mpc, model, transcription, U0, Z̃)
     Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
     U .= U0 .+ mpc.Uop
     Ŷ .= Ŷ0 .+ mpc.Yop

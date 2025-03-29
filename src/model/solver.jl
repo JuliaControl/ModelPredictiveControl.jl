@@ -14,10 +14,10 @@ Get `solver_f!` and `solver_h!` functions for the `EmptySolver` (discrete models
 
 The functions should have the following signature:
 ```
-    solver_f!(xnext, xi, x, u, d, p) -> nothing
+    solver_f!(xnext, k, x, u, d, p) -> nothing
     solver_h!(y, x, d, p) -> nothing
 ```
-in which `xnext`, `xi` and `y` arguments are mutated in-place. The `xi` argument is 
+in which `xnext`, `k` and `y` arguments are mutated in-place. The `k` argument is 
 a vector of `nx*(solver.ni+1)` elements to store the solver intermediate stage values (and 
 also the current state value for when `supersample ≠ 1`).
 """
@@ -77,12 +77,12 @@ end
 "Get the f! function for the 4th order explicit Runge-Kutta solver."
 function get_rk4_function(NT, solver, f!, Ts, nx)
     Ts_inner = Ts/solver.supersample
-    function rk4_solver_f!(xnext, xi, x, u, d, p)
-        xcurr = @views xi[1:nx]
-        k1 = @views xi[(1nx + 1):(2nx)]
-        k2 = @views xi[(2nx + 1):(3nx)]
-        k3 = @views xi[(3nx + 1):(4nx)]
-        k4 = @views xi[(4nx + 1):(5nx)]   
+    function rk4_solver_f!(xnext, k, x, u, d, p)
+        xcurr = @views k[1:nx]
+        k1 = @views k[(1nx + 1):(2nx)]
+        k2 = @views k[(2nx + 1):(3nx)]
+        k3 = @views k[(3nx + 1):(4nx)]
+        k4 = @views k[(4nx + 1):(5nx)]   
         @. xcurr = x
         for i=1:solver.supersample
             f!(k1, xcurr, u, d, p)
@@ -103,9 +103,9 @@ end
 "Get the f! function for the explicit Euler solver."
 function get_euler_function(NT, solver, fc!, Ts, nx)
     Ts_inner = Ts/solver.supersample
-    function euler_solver_f!(xnext, xi, x, u, d, p)
-        xcurr = @views xi[1:nx]
-        k1 = @views xi[(1nx + 1):(2nx)]
+    function euler_solver_f!(xnext, k, x, u, d, p)
+        xcurr = @views k[1:nx]
+        k1 = @views k[(1nx + 1):(2nx)]
         @. xcurr = x
         for i=1:solver.supersample
             fc!(k1, xcurr, u, d, p)

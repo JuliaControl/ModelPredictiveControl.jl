@@ -25,7 +25,7 @@ struct SimModelBuffer{NT<:Real}
     x::Vector{NT}
     y::Vector{NT}
     d::Vector{NT}
-    xi::Vector{NT}
+    k::Vector{NT}
     empty::Vector{NT}
 end
 
@@ -43,9 +43,9 @@ function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0) where
     x = Vector{NT}(undef, nx)
     y = Vector{NT}(undef, ny)
     d = Vector{NT}(undef, nd)
-    xi = Vector{NT}(undef, nx*(ni+1)) # the "+1" is necessary because of super-sampling
+    k = Vector{NT}(undef, nx*(ni+1)) # the "+1" is necessary because of super-sampling
     empty = Vector{NT}(undef, 0)
-    return SimModelBuffer{NT}(u, x, y, d, xi, empty)
+    return SimModelBuffer{NT}(u, x, y, d, k, empty)
 end
 
 
@@ -249,10 +249,10 @@ julia> x = updatestate!(model, [1])
 """
 function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: Real
     validate_args(model::SimModel, d, u)
-    u0, d0, x0next, x0i = model.buffer.u, model.buffer.d, model.buffer.x, model.buffer.xi
+    u0, d0, x0next, k0 = model.buffer.u, model.buffer.d, model.buffer.x, model.buffer.k
     u0 .= u .- model.uop
     d0 .= d .- model.dop
-    f!(x0next, x0i, model, model.x0, u0, d0, model.p)
+    f!(x0next, k0, model, model.x0, u0, d0, model.p)
     x0next  .+= model.fop .- model.xop
     model.x0 .= x0next
     xnext   = x0next

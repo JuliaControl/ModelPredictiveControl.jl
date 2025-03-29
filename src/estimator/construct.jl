@@ -1,7 +1,7 @@
 struct StateEstimatorBuffer{NT<:Real}
     u ::Vector{NT}
     û ::Vector{NT}
-    xi::Vector{NT}
+    k::Vector{NT}
     x̂ ::Vector{NT}
     P̂ ::Matrix{NT}
     Q̂ ::Matrix{NT}
@@ -14,18 +14,18 @@ struct StateEstimatorBuffer{NT<:Real}
 end
 
 @doc raw"""
-    StateEstimatorBuffer{NT}(nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nxi::Int=0)
+    StateEstimatorBuffer{NT}(nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0)
 
 Create a buffer for `StateEstimator` objects for estimated states and measured outputs.
 
 The buffer is used to store intermediate results during estimation without allocating.
 """
 function StateEstimatorBuffer{NT}(
-    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nxi::Int=0
+    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0
 ) where NT <: Real
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)
-    xi = Vector{NT}(undef, nxi)
+    k  = Vector{NT}(undef, nk)
     x̂  = Vector{NT}(undef, nx̂)
     P̂  = Matrix{NT}(undef, nx̂, nx̂)
     Q̂  = Matrix{NT}(undef, nx̂, nx̂)
@@ -35,7 +35,7 @@ function StateEstimatorBuffer{NT}(
     ŷ  = Vector{NT}(undef, ny)
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
-    return StateEstimatorBuffer{NT}(u, û, xi, x̂, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty)
+    return StateEstimatorBuffer{NT}(u, û, k, x̂, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty)
 end
 
 @doc raw"""

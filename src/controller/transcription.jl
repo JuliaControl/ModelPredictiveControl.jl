@@ -1052,31 +1052,31 @@ end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, X̂0, Û0, X0i,
+        Ŷ0, x̂0end, X̂0, Û0, K0,
         mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
         U0, _
     ) -> Ŷ0, x̂0end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
-The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `X0i` arguments.
+The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments.
 """
 function predict!(
-    Ŷ0, x̂0end, X̂0, Û0, X0i,
+    Ŷ0, x̂0end, X̂0, Û0, K0,
     mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
     U0, _
 )
-    nu, nx̂, ny, nd, nxi = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nxi
+    nu, nx̂, ny, nd, nk = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk
     Hp, Hc = mpc.Hp, mpc.Hc
     D̂0 = mpc.D̂0
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
     d0 = @views mpc.d0[1:nd]
     for j=1:Hp
-        u0     = @views  U0[(1 +  nu*(j-1)):(nu*j)]
-        û0     = @views  Û0[(1 +  nu*(j-1)):(nu*j)]
-        x0i    = @views X0i[(1 + nxi*(j-1)):(nxi*j)]
-        x̂0next = @views  X̂0[(1 +  nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, x0i, mpc.estim, model, x̂0, u0, d0)
+        u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
+        û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
+        x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
         x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
@@ -1206,19 +1206,19 @@ end
 
 """
     con_nonlinprogeq!(
-        geq, X̂0, Û0, X0i
+        geq, X̂0, Û0, K0
         mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
     )
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `X0i` vectors in argument.
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument.
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, X0i, 
+    geq, X̂0, Û0, K0, 
     mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
 )
-    nu, nx̂, ny, nd, nxi = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nxi
+    nu, nx̂, ny, nd, nk = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     D̂0 = mpc.D̂0
@@ -1230,8 +1230,8 @@ function con_nonlinprogeq!(
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        x0i    = @views X0i[(1 + nxi*(j-1)):(nxi*j)]
-        f̂!(x̂0next, û0, x0i, mpc.estim, model, x̂0, u0, d0)
+        k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
         x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]       
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]

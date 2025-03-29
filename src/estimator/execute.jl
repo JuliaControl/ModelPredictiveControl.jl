@@ -18,7 +18,7 @@ function remove_op!(estim::StateEstimator, ym, d, u=nothing)
 end
 
 @doc raw"""
-    f̂!(x̂0next, û0, x0i, estim::StateEstimator, model::SimModel, x̂0, u0, d0) -> nothing
+    f̂!(x̂0next, û0, k0, estim::StateEstimator, model::SimModel, x̂0, u0, d0) -> nothing
 
 Mutating state function ``\mathbf{f̂}`` of the augmented model.
 
@@ -31,13 +31,13 @@ function returns the next state of the augmented model, defined as:
 \end{aligned}
 ```
 where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂0next` argument. The method mutates `x̂0next`, 
-`û0` and `x0i` in place. The argument `û0` is the input vector of the augmented model, 
-computed by ``\mathbf{û_0 = u_0 + ŷ_{s_u}}``. The argument `x0i` is used to store the
+`û0` and `k0` in place. The argument `û0` is the input vector of the augmented model, 
+computed by ``\mathbf{û_0 = u_0 + ŷ_{s_u}}``. The argument `k0` is used to store the
 intermediate stage values of `model.solver` (when applicable). The model parameter vector
 `model.p` is not included in the function signature for conciseness.
 """
-function f̂!(x̂0next, û0, x0i, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
-    return f̂!(x̂0next, û0, x0i, model, estim.As, estim.Cs_u, x̂0, u0, d0)
+function f̂!(x̂0next, û0, k0, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
+    return f̂!(x̂0next, û0, k0, model, estim.As, estim.Cs_u, x̂0, u0, d0)
 end
 
 """
@@ -53,17 +53,17 @@ function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
 end
 
 """
-    f̂!(x̂0next, û0, x0i, model::SimModel, As, Cs_u, x̂0, u0, d0)
+    f̂!(x̂0next, û0, k0, model::SimModel, As, Cs_u, x̂0, u0, d0)
 
 Same than [`f̂!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
 """
-function f̂!(x̂0next, û0, x0i, model::SimModel, As, Cs_u, x̂0, u0, d0)
+function f̂!(x̂0next, û0, k0, model::SimModel, As, Cs_u, x̂0, u0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
     @views x̂d_next, x̂s_next = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
     mul!(û0, Cs_u, x̂s) # ŷs_u = Cs_u * x̂s
     û0 .+= u0
-    f!(x̂d_next, x0i, model, x̂d, û0, d0, model.p)
+    f!(x̂d_next, k0, model, x̂d, û0, d0, model.p)
     mul!(x̂s_next, As, x̂s)
     return nothing
 end

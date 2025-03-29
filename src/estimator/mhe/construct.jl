@@ -126,7 +126,7 @@ struct MovingHorizonEstimator{
             JB<:AbstractADType,
             CE<:StateEstimator{NT}
         }
-        nu, ny, nd, nxi = model.nu, model.ny, model.nd, model.nxi
+        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
@@ -156,7 +156,7 @@ struct MovingHorizonEstimator{
         nD0 = direct ? nd*(He+1) : nd*He
         U0, D0  = zeros(NT, nu*He), zeros(NT, nD0) 
         Ŵ = zeros(NT, nx̂*He)
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nxi)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         P̂_0 = Hermitian(P̂_0, :L)
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
@@ -1329,14 +1329,14 @@ function get_optim_functions(
 ) where {JNT <: Real}
     # ---------- common cache for Jfunc, gfuncs called with floats ------------------------
     model, con = estim.model, estim.con
-    nx̂, nym, nŷ, nu, nϵ, nxi = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, model.nxi
+    nx̂, nym, nŷ, nu, nϵ, nk = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, model.nk
     He = estim.He
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
     myNaN = convert(JNT, NaN) # NaN to force update_simulations! at first call
     strict = Val(true)
     Z̃::Vector{JNT}                   = fill(myNaN, nZ̃) 
     V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
-    x0i::Vector{JNT}                 = zeros(JNT, nxi)
+    k0::Vector{JNT}                 = zeros(JNT, nk)
     û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
     g::Vector{JNT}                   = zeros(JNT, ng)
     x̄::Vector{JNT}                   = zeros(JNT, nx̂)
@@ -1344,17 +1344,17 @@ function get_optim_functions(
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         if isdifferent(Z̃arg, Z̃)
             Z̃ .= Z̃arg
-            update_prediction!(V̂, X̂0, û0, x0i, ŷ0, g, estim, Z̃)
+            update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
         end
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)::T
     end
-    function Jfunc!(Z̃, V̂, X̂0, û0, x0i, ŷ0, g, x̄)
-        update_prediction!(V̂, X̂0, û0, x0i, ŷ0, g, estim, Z̃)
+    function Jfunc!(Z̃, V̂, X̂0, û0, k0, ŷ0, g, x̄)
+        update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
     Z̃_∇J    = fill(myNaN, nZ̃) 
     ∇J_context = (
-        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(x0i), Cache(ŷ0),
+        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0),
         Cache(g),
         Cache(x̄),
     )
@@ -1377,18 +1377,18 @@ function get_optim_functions(
         gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             if isdifferent(Z̃arg, Z̃)
                 Z̃ .= Z̃arg
-                update_prediction!(V̂, X̂0, û0, x0i, ŷ0, g, estim, Z̃)
+                update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
             end
             return g[i]::T
         end
         gfuncs[i] = gfunc_i
     end
-    function gfunc!(g, Z̃, V̂, X̂0, û0, x0i, ŷ0)
-        return update_prediction!(V̂, X̂0, û0, x0i, ŷ0, g, estim, Z̃)
+    function gfunc!(g, Z̃, V̂, X̂0, û0, k0, ŷ0)
+        return update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
     end
     Z̃_∇g     = fill(myNaN, nZ̃)
     ∇g_context = (
-        Cache(V̂), Cache(X̂0), Cache(û0), Cache(x0i), Cache(ŷ0),
+        Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0),
     )
     # temporarily enable all the inequality constraints for sparsity detection:
     estim.con.i_g .= true  

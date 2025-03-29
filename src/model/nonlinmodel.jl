@@ -18,7 +18,7 @@ struct NonLinModel{
     nx::Int
     ny::Int
     nd::Int
-    nxi::Int
+    nk::Int
     uop::Vector{NT}
     yop::Vector{NT}
     dop::Vector{NT}
@@ -56,7 +56,7 @@ struct NonLinModel{
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
         ni = solver.ni
-        nxi = nx*(ni+1)
+        nk = nx*(ni+1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd, ni)
         return new{NT, F, H, PT, DS, JB, LF}(
             x0, 
@@ -64,7 +64,7 @@ struct NonLinModel{
             p,
             solver, 
             Ts, t,
-            nu, nx, ny, nd, nxi, 
+            nu, nx, ny, nd, nk, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
             jacobian, linfunc!,
@@ -271,14 +271,14 @@ Call [`linearize(model; x, u, d)`](@ref) and return the resulting linear model.
 LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 """
-    f!(x0next, x0i, model::NonLinModel, x0, u0, d0, p)
+    f!(x0next, k0, model::NonLinModel, x0, u0, d0, p)
 
-Call `model.solver_f!(x0next, x0i, x0, u0, d0, p)` for [`NonLinModel`](@ref).
+Call `model.solver_f!(x0next, k0, x0, u0, d0, p)` for [`NonLinModel`](@ref).
 
-The method mutate `x0next` and `x0i` arguments in-place. The latter is used to store the
+The method mutate `x0next` and `k0` arguments in-place. The latter is used to store the
 intermediate stage values of `model.solver` [`DiffSolver`](@ref).
 """
-f!(x0next, x0i, model::NonLinModel, x0, u0, d0, p) = model.solver_f!(x0next, x0i, x0, u0, d0, p)
+f!(x0next, k0, model::NonLinModel, x0, u0, d0, p) = model.solver_f!(x0next, k0, x0, u0, d0, p)
 
 """
     h!(y0, model::NonLinModel, x0, d0, p)

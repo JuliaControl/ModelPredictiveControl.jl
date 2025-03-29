@@ -14,9 +14,9 @@ is an `AbstractADType` object from `DifferentiationInterface`. The `cst_x`, `cst
 `cst_d` are `DifferentiationInterface.Constant` objects with the linearization points.
 """
 function get_linearization_func(NT, solver_f!, solver_h!, nu, nx, ny, nd, p, solver, backend)
-    f_x!(xnext, x, xi, u, d) = solver_f!(xnext, xi, x, u, d, p)
-    f_u!(xnext, u, xi, x, d) = solver_f!(xnext, xi, x, u, d, p)
-    f_d!(xnext, d, xi, x, u) = solver_f!(xnext, xi, x, u, d, p)
+    f_x!(xnext, x, k, u, d) = solver_f!(xnext, k, x, u, d, p)
+    f_u!(xnext, u, k, x, d) = solver_f!(xnext, k, x, u, d, p)
+    f_d!(xnext, d, k, x, u) = solver_f!(xnext, k, x, u, d, p)
     h_x!(y, x, d) = solver_h!(y, x, d, p)
     h_d!(y, d, x) = solver_h!(y, x, d, p)
     strict  = Val(true)
@@ -25,21 +25,21 @@ function get_linearization_func(NT, solver_f!, solver_h!, nu, nx, ny, nd, p, sol
     x = zeros(NT, nx)
     u = zeros(NT, nu)
     d = zeros(NT, nd)
-    xi = zeros(NT, nx*(solver.ni+1))
-    cache_xi = Cache(xi)
+    k = zeros(NT, nx*(solver.ni+1))
+    cache_k = Cache(k)
     cst_x = Constant(x)
     cst_u = Constant(u)
     cst_d = Constant(d)
-    A_prep  = prepare_jacobian(f_x!, xnext, backend, x, cache_xi, cst_u, cst_d; strict)
-    Bu_prep = prepare_jacobian(f_u!, xnext, backend, u, cache_xi, cst_x, cst_d; strict)
-    Bd_prep = prepare_jacobian(f_d!, xnext, backend, d, cache_xi, cst_x, cst_u; strict)
+    A_prep  = prepare_jacobian(f_x!, xnext, backend, x, cache_k, cst_u, cst_d; strict)
+    Bu_prep = prepare_jacobian(f_u!, xnext, backend, u, cache_k, cst_x, cst_d; strict)
+    Bd_prep = prepare_jacobian(f_d!, xnext, backend, d, cache_k, cst_x, cst_u; strict)
     C_prep  = prepare_jacobian(h_x!, y,     backend, x, cst_d                ; strict)
     Dd_prep = prepare_jacobian(h_d!, y,     backend, d, cst_x                ; strict)
     function linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d)
         # all the arguments before `backend` are mutated in this function
-        jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cache_xi, cst_u, cst_d)
-        jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cache_xi, cst_x, cst_d)
-        jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cache_xi, cst_x, cst_u)
+        jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cache_k, cst_u, cst_d)
+        jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cache_k, cst_x, cst_d)
+        jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cache_k, cst_x, cst_u)
         jacobian!(h_x!, y,     C,  C_prep,  backend, x, cst_d)
         jacobian!(h_d!, y,     Dd, Dd_prep, backend, d, cst_x)
         return nothing
@@ -158,7 +158,7 @@ function linearize!(
     nonlinmodel = model
     buffer = nonlinmodel.buffer
     # --- remove the operating points of the nonlinear model (typically zeros) ---
-    x0, u0, d0, x0i = buffer.x, buffer.u, buffer.d, buffer.xi
+    x0, u0, d0, k0 = buffer.x, buffer.u, buffer.d, buffer.k
     x0 .= x .- nonlinmodel.xop
     u0 .= u .- nonlinmodel.uop
     d0 .= d .- nonlinmodel.dop
@@ -170,7 +170,7 @@ function linearize!(
     y  = y0
     y .= y0 .+ nonlinmodel.yop
     # --- compute the nonlinear model next state at operating points ---
-    f!(x0next, x0i, nonlinmodel, x0, u0, d0, model.p)
+    f!(x0next, k0, nonlinmodel, x0, u0, d0, model.p)
     xnext  = x0next
     xnext .= x0next .+ nonlinmodel.fop .- nonlinmodel.xop
     # --- modify the linear model operating points ---

@@ -32,7 +32,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     function InternalModel{NT}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
     ) where {NT<:Real, SM<:SimModel}
-        nu, ny, nd, nxi = model.nu, model.ny, model.nd, model.nxi
+        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
         nym, nyu = validate_ym(model, i_ym)
         validate_internalmodel(model, nym, Csm, Dsm)
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
@@ -48,7 +48,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         ŷs = zeros(NT, ny)
         direct = true # InternalModel always uses direct transmission from ym
         corrected = [false]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nxi)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, ŷs, x̂snext,
@@ -284,8 +284,8 @@ function update_estimate!(estim::InternalModel, _ , d0, u0)
     model = estim.model
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
-    x̂dnext, x0i = estim.buffer.x̂, estim.buffer.xi
-    f!(x̂dnext, x0i, model, x̂d, u0, d0, model.p) 
+    x̂dnext, k0 = estim.buffer.x̂, estim.buffer.k
+    f!(x̂dnext, k0, model, x̂d, u0, d0, model.p) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = estim.x̂snext
