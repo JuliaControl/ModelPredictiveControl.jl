@@ -28,7 +28,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     function Luenberger{NT, SM}(
         model, i_ym, nint_u, nint_ym, poles; direct=true
     ) where {NT<:Real, SM<:LinModel}
-        nu, ny, nd = model.nu, model.ny, model.nd
+        nu, ny, nd, nxi = model.nu, model.ny, model.nd, model.nxi
         nym, nyu = validate_ym(model, i_ym)
         validate_luenberger(model, nint_u, nint_ym, poles)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -44,7 +44,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         corrected = [false]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nxi)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0,

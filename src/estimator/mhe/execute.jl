@@ -104,14 +104,14 @@ julia> round.(getinfo(estim)[:Ŷ], digits=3)
 ```
 """
 function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
-    model, Nk = estim.model, estim.Nk[]
+    model, buffer, Nk = estim.model, estim.buffer, estim.Nk[]
     nu, ny, nd = model.nu, model.ny, model.nd
     nx̂, nym, nŵ, nϵ = estim.nx̂, estim.nym, estim.nx̂, estim.nϵ
     nx̃ = nϵ + nx̂
     info = Dict{Symbol, Any}()
     V̂,  X̂0 = similar(estim.Y0m[1:nym*Nk]), similar(estim.X̂0[1:nx̂*Nk])
-    û0, ŷ0 = similar(model.uop), similar(model.yop)
-    V̂,  X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
+    û0, x0i, ŷ0 = buffer.û, buffer.xi, buffer.ŷ
+    V̂,  X̂0 = predict!(V̂, X̂0, û0, x0i, ŷ0, estim, model, estim.Z̃)
     x̂0arr  = @views estim.Z̃[nx̃-nx̂+1:nx̃]
     x̄ = estim.x̂0arr_old - x̂0arr
     X̂0 = [x̂0arr; X̂0]
@@ -382,19 +382,17 @@ warm-start value. A failed optimization also prints [`getinfo`](@ref) results in
 the debug log [if activated](@extref Julia Example:-Enable-debug-level-messages).
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
-    model, optim = estim.model, estim.optim
-    nu, ny = model.nu, model.ny
+    model, optim, buffer = estim.model, estim.optim, estim.buffer
+    nu, ny, nxi = model.nu, model.ny, model.nxi
     nx̂, nym, nŵ, nϵ, Nk = estim.nx̂, estim.nym, estim.nx̂, estim.nϵ, estim.Nk[]
     nx̃ = nϵ + nx̂
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    V̂  = Vector{NT}(undef, nym*Nk)
-    X̂0 = Vector{NT}(undef, nx̂*Nk)
-    û0 = Vector{NT}(undef, nu)
-    ŷ0 = Vector{NT}(undef, ny)
-    x̄  = Vector{NT}(undef, nx̂)
+    V̂   = Vector{NT}(undef, nym*Nk)
+    X̂0  = Vector{NT}(undef, nx̂*Nk)
+    û0, ŷ0, x̄, x0i = buffer.û, buffer.ŷ, buffer.x̂, buffer.xi
     ϵ_0 = estim.nϵ ≠ 0 ? estim.Z̃[begin] : empty(estim.Z̃)
     Z̃_0 = [ϵ_0; estim.x̂0arr_old; estim.Ŵ]
-    V̂, X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃_0)
+    V̂, X̂0 = predict!(V̂, X̂0, û0, x0i, ŷ0, estim, model, Z̃_0)
     J_0 = obj_nonlinprog!(x̄, estim, model, V̂, Z̃_0)
     # initial Z̃0 with Ŵ=0 if objective or constraint function not finite :
     isfinite(J_0) || (Z̃_0 = [ϵ_0; estim.x̂0arr_old; zeros(NT, nŵ*estim.He)])
@@ -436,7 +434,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     end
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
-    V̂, X̂0 = predict!(V̂, X̂0, û0, ŷ0, estim, model, estim.Z̃)
+    V̂, X̂0 = predict!(V̂, X̂0, û0, x0i, ŷ0, estim, model, estim.Z̃)
     x̂0next    = @views X̂0[end-nx̂+1:end] 
     estim.x̂0 .= x̂0next
     return estim.Z̃
@@ -545,7 +543,7 @@ function obj_nonlinprog!(
 end
 
 """
-    predict!(V̂, X̂0, û0, ŷ0, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂0
+    predict!(V̂, X̂0, û0, x0i, ŷ0, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂0
 
 Compute the `V̂` vector and `X̂0` vectors for the `MovingHorizonEstimator` and `LinModel`.
 
@@ -553,7 +551,7 @@ The function mutates `V̂`, `X̂0`, `û0` and `ŷ0` vector arguments. The vect
 estimated sensor noises from ``k-N_k+1`` to ``k``. The `X̂0` vector is estimated states from 
 ``k-N_k+2`` to ``k+1``.
 """
-function predict!(V̂, X̂0, _ , _ , estim::MovingHorizonEstimator, ::LinModel, Z̃) 
+function predict!(V̂, X̂0, _ , _ , _ , estim::MovingHorizonEstimator, ::LinModel, Z̃) 
     nϵ, Nk = estim.nϵ, estim.Nk[]
     nX̂, nŴ, nYm = estim.nx̂*Nk, estim.nx̂*Nk, estim.nym*Nk
     nZ̃ = nϵ + estim.nx̂ + nŴ
@@ -563,7 +561,7 @@ function predict!(V̂, X̂0, _ , _ , estim::MovingHorizonEstimator, ::LinModel, 
 end
 
 "Compute the two vectors when `model` is not a `LinModel`."
-function predict!(V̂, X̂0, û0, ŷ0, estim::MovingHorizonEstimator, model::SimModel, Z̃)
+function predict!(V̂, X̂0, û0, x0i, ŷ0, estim::MovingHorizonEstimator, model::SimModel, Z̃)
     nϵ, Nk = estim.nϵ, estim.Nk[]
     nu, nd, nx̂, nŵ, nym = model.nu, model.nd, estim.nx̂, estim.nx̂, estim.nym
     nx̃ = nϵ + nx̂
@@ -575,7 +573,7 @@ function predict!(V̂, X̂0, û0, ŷ0, estim::MovingHorizonEstimator, model::S
             u0  = @views estim.U0[ (1 + nu  * (j-1)):(nu*j)]
             ŵ   = @views Z̃[(1 + nx̃ + nŵ*(j-1)):(nx̃ + nŵ*j)]
             x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
-            f̂!(x̂0next, û0, estim, model, x̂0, u0, d0)
+            f̂!(x̂0next, û0, x0i, estim, model, x̂0, u0, d0)
             x̂0next .+= ŵ .+ estim.f̂op .- estim.x̂op
             y0nextm = @views estim.Y0m[(1 + nym * (j-1)):(nym*j)]
             d0next  = @views estim.D0[(1 + nd*j):(nd*(j+1))]
@@ -594,7 +592,7 @@ function predict!(V̂, X̂0, û0, ŷ0, estim::MovingHorizonEstimator, model::S
             ŷ0m = @views ŷ0[estim.i_ym]
             V̂[(1 + nym*(j-1)):(nym*j)] .= y0m .- ŷ0m
             x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
-            f̂!(x̂0next, û0, estim, model, x̂0, u0, d0)
+            f̂!(x̂0next, û0, x0i, estim, model, x̂0, u0, d0)
             x̂0next .+= ŵ .+ estim.f̂op .- estim.x̂op
             x̂0 = x̂0next
         end
@@ -604,15 +602,15 @@ end
 
 
 """
-    update_predictions!(V̂, X̂0, û0, ŷ0, g, estim::MovingHorizonEstimator, Z̃)
+    update_predictions!(V̂, X̂0, û0, x0i, ŷ0, g, estim::MovingHorizonEstimator, Z̃)
 
 Update in-place the vectors for the predictions of `estim` estimator at decision vector `Z̃`.
 
 The method mutates all the arguments before `estim` argument.
 """
-function update_prediction!(V̂, X̂0, û0, ŷ0, g, estim::MovingHorizonEstimator, Z̃)
+function update_prediction!(V̂, X̂0, û0, x0i, ŷ0, g, estim::MovingHorizonEstimator, Z̃)
     model = estim.model
-    V̂, X̂0  = predict!(V̂, X̂0, û0, ŷ0, estim, model, Z̃)
+    V̂, X̂0  = predict!(V̂, X̂0, û0, x0i, ŷ0, estim, model, Z̃)
     ϵ = getϵ(estim, Z̃)
     g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
     return nothing

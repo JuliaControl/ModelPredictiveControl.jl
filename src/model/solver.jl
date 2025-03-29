@@ -21,7 +21,7 @@ in which `xnext`, `xi` and `y` arguments are mutated in-place. The `xi` argument
 a vector of `nx*(solver.ni+1)` elements to store the solver intermediate stage values (and 
 also the current state value for when `supersample ≠ 1`).
 """
-function get_solver_functions(::DataType, ::EmptySolver, f!, h!, _ , _ , _ , _ )
+function get_solver_functions(::DataType, ::EmptySolver, f!, h!, _ , _ , _ , _ , _ )
     solver_f!(xnext, _ , x, u, d, p) = f!(xnext, x, u, d, p)
     solver_h! = h!
     return solver_f!, solver_h!
@@ -101,7 +101,7 @@ function get_rk4_function(NT, solver, f!, Ts, nx)
 end
 
 "Get the f! function for the explicit Euler solver."
-function get_euler_function(NT, solver, fc!, Ts, nx, Nc)
+function get_euler_function(NT, solver, fc!, Ts, nx)
     Ts_inner = Ts/solver.supersample
     function euler_solver_f!(xnext, xi, x, u, d, p)
         xcurr = @views xi[1:nx]

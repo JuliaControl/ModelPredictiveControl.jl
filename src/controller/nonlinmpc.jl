@@ -578,15 +578,17 @@ Inspired from: [User-defined operators with vector outputs](@extref JuMP User-de
 function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
     # ----- common cache for Jfunc, gfuncs, geqfuncs called with floats -------------------
     model = mpc.estim.model
-    nu, ny, nx̂, nϵ, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, mpc.Hp, mpc.Hc
+    nu, ny, nx̂, nϵ, nxi = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, model.nxi
+    Hp, Hc = mpc.Hp, mpc.Hc
     ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
-    nZ̃, nU, nŶ, nX̂ = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂
+    nZ̃, nU, nŶ, nX̂, nXi = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nxi
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
     strict = Val(true)
     myNaN  = convert(JNT, NaN)  # NaN to force update_simulations! at first call:
     Z̃ ::Vector{JNT}                  = fill(myNaN, nZ̃)
     ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
     x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
+    X0i::Vector{JNT}                 = zeros(JNT, nXi)
     Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
     U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
     Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
@@ -596,18 +598,18 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         if isdifferent(Z̃arg, Z̃)
             Z̃ .= Z̃arg
-            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g, geq, mpc, Z̃)
         end
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
     end
-    function Jfunc!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
+    function Jfunc!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
     Z̃_∇J = fill(myNaN, nZ̃) 
     ∇J_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-        Cache(Û0), Cache(X̂0), 
+        Cache(Û0), Cache(X0i), Cache(X̂0), 
         Cache(gc), Cache(g), Cache(geq),
     )
     ∇J_prep = prepare_gradient(Jfunc!, mpc.gradient, Z̃_∇J, ∇J_context...; strict)
@@ -631,19 +633,23 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             if isdifferent(Z̃arg, Z̃)
                 Z̃ .= Z̃arg
-                update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
+                update_predictions!(
+                    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g, geq, mpc, Z̃
+                )
             end
             return g[i]::T
         end
         gfuncs[i] = gfunc_i
     end
-    function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, geq)
-        return update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
+    function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, geq)
+        return update_predictions!(
+            ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g, geq, mpc, Z̃
+        )
     end
     Z̃_∇g = fill(myNaN, nZ̃)
     ∇g_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-        Cache(Û0), Cache(X̂0), 
+        Cache(Û0), Cache(X0i),   Cache(X̂0), 
         Cache(gc), Cache(geq),
     )
     # temporarily enable all the inequality constraints for sparsity detection:
@@ -678,19 +684,23 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         geqfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             if isdifferent(Z̃arg, Z̃)
                 Z̃ .= Z̃arg
-                update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
+                update_predictions!(
+                    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g, geq, mpc, Z̃
+                )
             end
             return geq[i]::T
         end
         geqfuncs[i] = geqfunc_i          
     end
-    function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g) 
-        return update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc, Z̃)
+    function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g) 
+        return update_predictions!(
+            ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g, geq, mpc, Z̃
+        )
     end
     Z̃_∇geq = fill(myNaN, nZ̃)
     ∇geq_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
-        Cache(Û0), Cache(X̂0),
+        Cache(Û0), Cache(X0i),   Cache(X̂0),
         Cache(gc), Cache(g)
     )
     ∇geq_prep = prepare_jacobian(geqfunc!, geq, mpc.jacobian, Z̃_∇geq, ∇geq_context...; strict)
@@ -716,7 +726,7 @@ end
 
 """
     update_predictions!(
-        ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, 
+        ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g, geq, 
         mpc::PredictiveController, Z̃
     ) -> nothing
 
@@ -725,17 +735,17 @@ Update in-place all vectors for the predictions of `mpc` controller at decision 
 The method mutates all the arguments before the `mpc` argument.
 """
 function update_predictions!(
-    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X̂0, gc, g, geq, mpc::PredictiveController, Z̃
+    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, X0i, X̂0, gc, g, geq, mpc::PredictiveController, Z̃
 )
     model, transcription = mpc.estim.model, mpc.transcription
     U0 = getU0!(U0, mpc, Z̃)
     ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
-    Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, mpc, model, transcription, U0, Z̃)
+    Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, X0i, mpc, model, transcription, U0, Z̃)
     Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
     ϵ = getϵ(mpc, Z̃)
     gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
     g   = con_nonlinprog!(g, mpc, model, transcription, x̂0end, Ŷ0, gc, ϵ)
-    geq = con_nonlinprogeq!(geq, X̂0, Û0, mpc, model, transcription, U0, Z̃)
+    geq = con_nonlinprogeq!(geq, X̂0, Û0, X0i, mpc, model, transcription, U0, Z̃)
     return nothing
 end
 
