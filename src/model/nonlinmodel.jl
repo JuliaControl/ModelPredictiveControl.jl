@@ -8,8 +8,8 @@ struct NonLinModel{
     LF<:Function
 } <: SimModel{NT}
     x0::Vector{NT}
-    f!::F
-    h!::H
+    solver_f!::F
+    solver_h!::H
     p::PT
     solver::DS
     Ts::NT
@@ -18,6 +18,7 @@ struct NonLinModel{
     nx::Int
     ny::Int
     nd::Int
+    nk::Int
     uop::Vector{NT}
     yop::Vector{NT}
     dop::Vector{NT}
@@ -31,7 +32,8 @@ struct NonLinModel{
     linfunc!::LF
     buffer::SimModelBuffer{NT}
     function NonLinModel{NT}(
-        f!::F, h!::H, Ts, nu, nx, ny, nd, p::PT, solver::DS, jacobian::JB, linfunc!::LF
+        solver_f!::F, solver_h!::H, Ts, nu, nx, ny, nd, 
+        p::PT, solver::DS, jacobian::JB, linfunc!::LF
     ) where {
             NT<:Real, 
             F<:Function, 
@@ -53,14 +55,16 @@ struct NonLinModel{
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
-        buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
+        ni = solver.ni
+        nk = nx*(ni+1)
+        buffer = SimModelBuffer{NT}(nu, nx, ny, nd, ni)
         return new{NT, F, H, PT, DS, JB, LF}(
             x0, 
-            f!, h!,
+            solver_f!, solver_h!,
             p,
             solver, 
             Ts, t,
-            nu, nx, ny, nd, 
+            nu, nx, ny, nd, nk, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
             jacobian, linfunc!,
@@ -172,9 +176,13 @@ function NonLinModel{NT}(
 ) where {NT<:Real}
     isnothing(solver) && (solver=EmptySolver())
     f!, h! = get_mutating_functions(NT, f, h)
-    f!, h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
-    linfunc! = get_linearization_func(NT, f!, h!, nu, nx, ny, nd, p, jacobian)
-    return NonLinModel{NT}(f!, h!, Ts, nu, nx, ny, nd, p, solver, jacobian, linfunc!)
+    solver_f!, solver_h! = get_solver_functions(NT, solver, f!, h!, Ts, nu, nx, ny, nd)
+    linfunc! = get_linearization_func(
+        NT, solver_f!, solver_h!, nu, nx, ny, nd, p, solver, jacobian
+    )
+    return NonLinModel{NT}(
+        solver_f!, solver_h!, Ts, nu, nx, ny, nd, p, solver, jacobian, linfunc!
+    )
 end
 
 function NonLinModel(
@@ -262,11 +270,22 @@ Call [`linearize(model; x, u, d)`](@ref) and return the resulting linear model.
 """
 LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
-"Call `model.f!(xnext0, x0, u0, d0, p)` for [`NonLinModel`](@ref)."
-f!(xnext0, model::NonLinModel, x0, u0, d0, p) = model.f!(xnext0, x0, u0, d0, p)
+"""
+    f!(x0next, k0, model::NonLinModel, x0, u0, d0, p)
 
-"Call `model.h!(y0, x0, d0, p)` for [`NonLinModel`](@ref)."
-h!(y0, model::NonLinModel, x0, d0, p) = model.h!(y0, x0, d0, p)
+Call `model.solver_f!(x0next, k0, x0, u0, d0, p)` for [`NonLinModel`](@ref).
+
+The method mutate `x0next` and `k0` arguments in-place. The latter is used to store the
+intermediate stage values of `model.solver` [`DiffSolver`](@ref).
+"""
+f!(x0next, k0, model::NonLinModel, x0, u0, d0, p) = model.solver_f!(x0next, k0, x0, u0, d0, p)
+
+"""
+    h!(y0, model::NonLinModel, x0, d0, p)
+
+Call `model.solver_h!(y0, x0, d0, p)` for [`NonLinModel`](@ref).
+"""
+h!(y0, model::NonLinModel, x0, d0, p) = model.solver_h!(y0, x0, d0, p)
 
 detailstr(model::NonLinModel) = ", $(typeof(model.solver).name.name)($(model.solver.order)) solver"
 detailstr(::NonLinModel{<:Real, <:Function, <:Function, <:Any, <:EmptySolver}) = ", empty solver"

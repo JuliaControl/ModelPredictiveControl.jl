@@ -32,7 +32,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     function InternalModel{NT}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
     ) where {NT<:Real, SM<:SimModel}
-        nu, ny, nd = model.nu, model.ny, model.nd
+        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
         nym, nyu = validate_ym(model, i_ym)
         validate_internalmodel(model, nym, Csm, Dsm)
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
@@ -48,7 +48,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         ŷs = zeros(NT, ny)
         direct = true # InternalModel always uses direct transmission from ym
         corrected = [false]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model, 
             lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, ŷs, x̂snext,
@@ -168,20 +168,25 @@ function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂next0, _ , estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    f̂!(x̂0next, _ , x̂0i, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls `model.f!(x̂next0, x̂0, u0 ,d0, model.p)` since this estimator does not augment the states.
+It calls `model.solver_f!(x̂0next, x̂0i, x̂0, u0 ,d0, model.p)` directly since this estimator
+does not augment the states.
 """
-f̂!(x̂next0, _, ::InternalModel, model::NonLinModel, x̂0, u0, d0) = model.f!(x̂next0, x̂0, u0, d0, model.p)
+function f̂!(x̂0next, _ , x̂0i, ::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    return model.solver_f!(x̂0next, x̂0i, x̂0, u0, d0, model.p)
+end
 
 @doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
 
-Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.h!`.
+Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.solver_h!`.
 """
-ĥ!(x̂next0, ::InternalModel, model::NonLinModel, x̂0, d0) = model.h!(x̂next0, x̂0, d0, model.p)
+function ĥ!(ŷ0, ::InternalModel, model::NonLinModel, x̂0, d0)
+    return model.solver_h!(ŷ0, x̂0, d0, model.p)
+end
 
 
 @doc raw"""
@@ -279,8 +284,8 @@ function update_estimate!(estim::InternalModel, _ , d0, u0)
     model = estim.model
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
-    x̂dnext = estim.buffer.x̂
-    f!(x̂dnext, model, x̂d, u0, d0, model.p) 
+    x̂dnext, k0 = estim.buffer.x̂, estim.buffer.k
+    f!(x̂dnext, k0, model, x̂d, u0, d0, model.p) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = estim.x̂snext

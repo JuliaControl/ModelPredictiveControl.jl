@@ -1028,7 +1028,7 @@ getU0!(U0, mpc::PredictiveController, Z̃) = (mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, _ , _ ,
+        Ŷ0, x̂0end, _ , _ , _ ,
         mpc::PredictiveController, model::LinModel, transcription::TranscriptionMethod, 
         _ , Z̃
     ) -> Ŷ0, x̂0end
@@ -1040,7 +1040,7 @@ the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``. The computati
 identical for any [`TranscriptionMethod`](@ref) if the model is linear.
 """
 function predict!(
-    Ŷ0, x̂0end, _ , _ , 
+    Ŷ0, x̂0end, _, _, _,
     mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, 
     _ , Z̃
 )
@@ -1052,29 +1052,31 @@ end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, X̂0, Û0, 
+        Ŷ0, x̂0end, X̂0, Û0, K0,
         mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
         U0, _
     ) -> Ŷ0, x̂0end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
-The method mutates `Ŷ0`, `x̂0end`, `X̂0` and `Û0` arguments.
+The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments.
 """
 function predict!(
-    Ŷ0, x̂0end, X̂0, Û0,
+    Ŷ0, x̂0end, X̂0, Û0, K0,
     mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
     U0, _
 )
-    nu, nx̂, ny, nd, Hp, Hc = model.nu, mpc.estim.nx̂, model.ny, model.nd, mpc.Hp, mpc.Hc
+    nu, nx̂, ny, nd, nk = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk
+    Hp, Hc = mpc.Hp, mpc.Hc
     D̂0 = mpc.D̂0
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
     d0 = @views mpc.d0[1:nd]
     for j=1:Hp
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, mpc.estim, model, x̂0, u0, d0)
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
         x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
@@ -1088,7 +1090,7 @@ end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, _ , _ , 
+        Ŷ0, x̂0end, _ , _ , _ , 
         mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting,
         U0, Z̃
     ) -> Ŷ0, x̂0end
@@ -1098,7 +1100,7 @@ Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`MultipleShooting
 The method mutates `Ŷ0` and `x̂0end` arguments.
 """
 function predict!(
-    Ŷ0, x̂0end, _, _,
+    Ŷ0, x̂0end, _, _, _,
     mpc::PredictiveController, model::NonLinModel, ::MultipleShooting,
     U0, Z̃
 )
@@ -1204,17 +1206,20 @@ end
 
 """
     con_nonlinprogeq!(
-        geq, X̂0, Û0, mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
+        geq, X̂0, Û0, K0
+        mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
     )
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0` and `Û0` vectors in argument.
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument.
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
+    geq, X̂0, Û0, K0, 
+    mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
 )
-    nx̂, nu, nd, Hp, Hc = mpc.estim.nx̂, model.nu, model.nd, mpc.Hp, mpc.Hc
+    nu, nx̂, ny, nd, nk = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk
+    Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
@@ -1225,7 +1230,8 @@ function con_nonlinprogeq!(
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, mpc.estim, model, x̂0, u0, d0)
+        k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
         x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]       
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
@@ -1235,5 +1241,5 @@ function con_nonlinprogeq!(
     end
     return geq
 end
-con_nonlinprogeq!(geq,_,_,::PredictiveController,::NonLinModel,::SingleShooting,  _,_) = geq
-con_nonlinprogeq!(geq,_,_,::PredictiveController,::LinModel,::TranscriptionMethod,_,_) = geq
+con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::NonLinModel,::SingleShooting,  _,_)=geq
+con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::LinModel,::TranscriptionMethod,_,_)=geq
