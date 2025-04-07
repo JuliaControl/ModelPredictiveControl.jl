@@ -153,7 +153,8 @@ julia> linearize!(linmodel, model, x=[20.0], u=[0.0]); linmodel.A
 ```
 """
 function linearize!(
-    linmodel::LinModel{NT}, model::SimModel; x=model.x0+model.xop, u=model.uop, d=model.dop
+    linmodel::LinModel{NT}, model::SimModel; 
+    x=(model.buffer.x.=model.x0.+model.xop), u=model.uop, d=model.dop
 ) where NT<:Real
     nonlinmodel = model
     buffer = nonlinmodel.buffer

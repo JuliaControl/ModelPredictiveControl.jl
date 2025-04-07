@@ -100,11 +100,14 @@ end
 @testitem "LinModel sim methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase
     linmodel1 = setop!(LinModel(Gss), uop=[10,50], yop=[50,30])
-    @test updatestate!(linmodel1, [10, 50]) ≈ zeros(2)
-    @test updatestate!(linmodel1, [10, 50], Float64[]) ≈ zeros(2)
+    u, d = [10, 50], Float64[]
+    @test updatestate!(linmodel1, u) ≈ zeros(2)
+    @test updatestate!(linmodel1, u, d) ≈ zeros(2)
+    @test @allocations(updatestate!(linmodel1, u)) == 0
     @test linmodel1.x0 ≈ zeros(2)
     @test evaloutput(linmodel1) ≈ linmodel1() ≈ [50,30]
     @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30]
+    @test @allocations(evaloutput(linmodel1)) == 0
     x = initstate!(linmodel1, [10, 60])
     @test evaloutput(linmodel1) ≈ [50 + 19.0, 30 + 7.4]
     @test preparestate!(linmodel1) ≈ x           # new method
@@ -265,15 +268,21 @@ end
 @testitem "NonLinModel sim methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f1(x,u,_,model) = model.A*x + model.Bu*u
-    h1(x,_,model)   = model.C*x
+    function f1(xnext, x, u, _ , model)
+        mul!(xnext, model.A, x)
+        mul!(xnext, model.Bu, u, 1, 1)
+    end
+    h1(y, x , _ , model) = mul!(y, model.C, x)
     nonlinmodel = NonLinModel(f1,h1,Ts,2,2,2,p=linmodel1,solver=nothing)
 
-    @test updatestate!(nonlinmodel, zeros(2,)) ≈ zeros(2) 
-    @test updatestate!(nonlinmodel, zeros(2,), Float64[]) ≈ zeros(2)
+    u, d = zeros(2), Float64[]
+    @test updatestate!(nonlinmodel, u) ≈ zeros(2) 
+    @test updatestate!(nonlinmodel, u, d) ≈ zeros(2)
+    @test @allocations(updatestate!(nonlinmodel, u)) == 0
     @test nonlinmodel.x0 ≈ zeros(2)
     @test evaloutput(nonlinmodel) ≈ nonlinmodel() ≈ zeros(2)
-    @test evaloutput(nonlinmodel, Float64[]) ≈ nonlinmodel(Float64[]) ≈ zeros(2)
+    @test evaloutput(nonlinmodel, d) ≈ nonlinmodel(Float64[]) ≈ zeros(2)
+    @test @allocations(evaloutput(nonlinmodel)) == 0
 
     x = initstate!(nonlinmodel, [0, 10]) # do nothing for NonLinModel
     @test evaloutput(nonlinmodel) ≈ [0, 0]
@@ -302,7 +311,7 @@ end
     @test linmodel1.Bu ≈ linmodel1b.Bu
     @test linmodel1.Bd ≈ linmodel1b.Bd
     @test linmodel1.C  ≈ linmodel1b.C
-    @test linmodel1.Dd ≈ linmodel1b.Dd
+    @test linmodel1.Dd ≈ linmodel1b.Dd  
 
     nonlinmodel2 = NonLinModel(f1,h1,Ts,1,1,1,1,solver=nothing, jacobian=AutoFiniteDiff()) 
     linmodel2 = linearize(nonlinmodel2; x, u, d)
@@ -334,7 +343,7 @@ end
     @test linmodel3.Bd ≈ Bd
     @test linmodel3.C  ≈ C
     @test linmodel3.Dd ≈ Dd
-    
+
     # test `linearize` at a non-equilibrium point:
     Ynl, Yl = let nonlinmodel3=nonlinmodel3
         N = 5
@@ -355,6 +364,17 @@ end
         Ynl, Yl
     end
     @test all(isapprox.(Ynl, Yl, atol=1e-6))
+
+    function f2!(xnext, x, u, d, _)
+        xnext .= x.*u .+ x.*d
+    end
+    function h2!(y, x, d, _)
+        y .= x.*d
+    end
+    nonlinmodel4 = NonLinModel(f2!, h2!, Ts, 1, 1, 1, 1, solver=nothing)
+    linmodel4 = linearize(nonlinmodel4; x, u, d)
+    linearize!(linmodel4, nonlinmodel4)
+    #@test @allocations(linearize!(linmodel4, nonlinmodel4)) == 0
 end
 
 @testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin
