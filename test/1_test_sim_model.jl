@@ -355,6 +355,11 @@ end
         Ynl, Yl
     end
     @test all(isapprox.(Ynl, Yl, atol=1e-6))
+
+    f2!(xnext, x, u, _, _) = (xnext .= x .+ u)
+    h2!(y, x, _, _) = (y .= x)
+    nonlinmodel4 = NonLinModel(f2!,h2!,Ts,1,1,1,0,solver=nothing,jacobian=AutoFiniteDiff())
+    @test_nowarn linearize(nonlinmodel4, x=[1], u=[2])
 end
 
 @testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin

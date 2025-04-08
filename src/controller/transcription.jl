@@ -302,7 +302,7 @@ function init_predmat(
     G  = Matrix{NT}(undef, Hp*ny, nd)
     jx̂ = Matrix{NT}(undef, nx̂, Hp*nd)
     J  = repeatdiag(D̂d, Hp)
-    if nd ≠ 0
+    if nd > 0
         for j=1:Hp
             iRow = (1:ny) .+ ny*(j-1)
             G[iRow,:] = Ĉ*getpower(Âpow, j-1)*B̂d
@@ -853,7 +853,7 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
     fx̂ .= mpc.con.bx̂
     mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂0, 1, 1)
     mul!(fx̂, mpc.con.vx̂, mpc.estim.lastu0, 1, 1)
-    if model.nd ≠ 0
+    if model.nd > 0
         mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
         mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
     end
@@ -939,7 +939,7 @@ function linconstrainteq!(mpc::PredictiveController, model::LinModel, ::Multiple
     Fŝ .= mpc.con.Bŝ
     mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0, 1, 1)
     mul!(Fŝ, mpc.con.Vŝ, mpc.estim.lastu0, 1, 1)
-    if model.nd ≠ 0
+    if model.nd > 0
         mul!(Fŝ, mpc.con.Gŝ, mpc.d0, 1, 1)
         mul!(Fŝ, mpc.con.Jŝ, mpc.D̂0, 1, 1)
     end

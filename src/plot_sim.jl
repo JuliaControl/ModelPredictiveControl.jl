@@ -379,10 +379,10 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
     nx = length(indices_x)
 
     layout_mat = Matrix{Tuple{Int64, Int64}}(undef, 1, 0)
-    ny ≠ 0 && (layout_mat = [layout_mat (ny, 1)])
-    nu ≠ 0 && (layout_mat = [layout_mat (nu, 1)])
-    nd ≠ 0 && (layout_mat = [layout_mat (nd, 1)])
-    nx ≠ 0 && (layout_mat = [layout_mat (nx, 1)])
+    ny > 0 && (layout_mat = [layout_mat (ny, 1)])
+    nu > 0 && (layout_mat = [layout_mat (nu, 1)])
+    nd > 0 && (layout_mat = [layout_mat (nd, 1)])
+    nx > 0 && (layout_mat = [layout_mat (nx, 1)])
     layout := layout_mat
 
     # --- outputs y ---
