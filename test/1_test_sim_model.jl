@@ -365,13 +365,18 @@ end
     end
     @test all(isapprox.(Ynl, Yl, atol=1e-6))
 
-    function f2!(xnext, x, u, d, _)
+    f2!(xnext, x, u, _, _) = (xnext .= x .+ u)
+    h2!(y, x, _, _) = (y .= x)
+    nonlinmodel4 = NonLinModel(f2!,h2!,Ts,1,1,1,0,solver=nothing,jacobian=AutoFiniteDiff())
+    @test_nowarn linearize(nonlinmodel4, x=[1], u=[2])
+
+    function f3!(xnext, x, u, d, _)
         xnext .= x.*u .+ x.*d
     end
-    function h2!(y, x, d, _)
+    function h3!(y, x, d, _)
         y .= x.*d
     end
-    nonlinmodel4 = NonLinModel(f2!, h2!, Ts, 1, 1, 1, 1, solver=nothing)
+    nonlinmodel4 = NonLinModel(f3!, h3!, Ts, 1, 1, 1, 1, solver=nothing)
     linmodel4 = linearize(nonlinmodel4; x, u, d)
     linearize!(linmodel4, nonlinmodel4)
     #@test @allocations(linearize!(linmodel4, nonlinmodel4)) == 0

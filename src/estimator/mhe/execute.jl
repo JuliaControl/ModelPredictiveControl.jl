@@ -191,7 +191,7 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     if ismoving
         estim.Y0m[1:end-nym]     .= @views estim.Y0m[nym+1:end]
         estim.Y0m[end-nym+1:end] .= y0m
-        if nd ≠ 0
+        if nd > 0
             estim.D0[1:end-nd]       .= @views estim.D0[nd+1:end]
             estim.D0[end-nd+1:end]   .= d0
         end
@@ -204,7 +204,7 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.Nk .= estim.He
     else
         estim.Y0m[(1 + nym*(Nk-1)):(nym*Nk)]  .= y0m
-        if nd ≠ 0
+        if nd > 0
             # D0 include 1 additional measured disturbance if direct==true (p==0):
             estim.D0[(1 + nd*(Nk-p)):(nd*Nk+1-p)] .= d0 
         end  
@@ -252,7 +252,7 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     # --- update F and fx̄ vectors for MHE predictions ---
     F .= estim.Y0m .+ estim.B
     mul!(F, estim.G, estim.U0, 1, 1)
-    if model.nd ≠ 0
+    if model.nd > 0
         mul!(F, estim.J, estim.D0, 1, 1)
     end
     estim.fx̄ .= estim.x̂0arr_old
@@ -290,7 +290,7 @@ function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
     Fx̂  = estim.con.Fx̂
     Fx̂ .= estim.con.Bx̂
     mul!(Fx̂, estim.con.Gx̂, estim.U0, 1, 1)
-    if model.nd ≠ 0
+    if model.nd > 0
         mul!(Fx̂, estim.con.Jx̂, estim.D0, 1, 1)
     end
     X̂0min, X̂0max = trunc_bounds(estim, estim.con.X̂0min, estim.con.X̂0max, estim.nx̂)

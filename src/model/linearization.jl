@@ -39,9 +39,11 @@ function get_linearization_func(NT, solver_f!, solver_h!, nu, nx, ny, nd, p, sol
         # all the arguments before `backend` are mutated in this function
         jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cache_k, cst_u, cst_d)
         jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cache_k, cst_x, cst_d)
-        jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cache_k, cst_x, cst_u)
         jacobian!(h_x!, y,     C,  C_prep,  backend, x, cst_d)
-        jacobian!(h_d!, y,     Dd, Dd_prep, backend, d, cst_x)
+        if nd > 0
+            jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cache_k, cst_x, cst_u)
+            jacobian!(h_d!, y,     Dd, Dd_prep, backend, d, cst_x)
+        end
         return nothing
     end
     return linfunc!
