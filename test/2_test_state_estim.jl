@@ -65,11 +65,14 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     skalmanfilter1 = SteadyKalmanFilter(linmodel1, nint_ym=[1, 1])
-    preparestate!(skalmanfilter1, [50, 30])
-    @test updatestate!(skalmanfilter1, [10, 50], [50, 30]) ≈ zeros(4)
-    preparestate!(skalmanfilter1, [50, 30])
-    @test updatestate!(skalmanfilter1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
+    u, y, d = [10, 50], [50, 30], Float64[]
+    preparestate!(skalmanfilter1, y)
+    @test updatestate!(skalmanfilter1, u, y) ≈ zeros(4)
+    preparestate!(skalmanfilter1, y)
+    @test updatestate!(skalmanfilter1, u, y, d) ≈ zeros(4)
     @test skalmanfilter1.x̂0 ≈ zeros(4)
+    @test @allocations(preparestate!(skalmanfilter1, y)) == 0
+    @test @allocations(updatestate!(skalmanfilter1, u, y)) == 0
     preparestate!(skalmanfilter1, [50, 30])
     @test evaloutput(skalmanfilter1) ≈ skalmanfilter1() ≈ [50, 30]
     @test evaloutput(skalmanfilter1, Float64[]) ≈ skalmanfilter1(Float64[]) ≈ [50, 30]
@@ -194,11 +197,14 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     kalmanfilter1 = KalmanFilter(linmodel1)
-    preparestate!(kalmanfilter1, [50, 30])
-    @test updatestate!(kalmanfilter1, [10, 50], [50, 30]) ≈ zeros(4)
-    preparestate!(kalmanfilter1, [50, 30])
-    @test updatestate!(kalmanfilter1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
+    u, y, d = [10, 50], [50, 30], Float64[]
+    preparestate!(kalmanfilter1, y)
+    @test updatestate!(kalmanfilter1, u, y) ≈ zeros(4)
+    preparestate!(kalmanfilter1, y)
+    @test updatestate!(kalmanfilter1, u, y, d) ≈ zeros(4)
     @test kalmanfilter1.x̂0 ≈ zeros(4)
+    @test @allocations(preparestate!(kalmanfilter1, y)) == 0
+    @test @allocations(updatestate!(kalmanfilter1, u, y)) == 0
     preparestate!(kalmanfilter1, [50, 30])
     @test evaloutput(kalmanfilter1) ≈ kalmanfilter1() ≈ [50, 30]
     @test evaloutput(kalmanfilter1, Float64[]) ≈ kalmanfilter1(Float64[]) ≈ [50, 30]
@@ -311,11 +317,14 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     lo1 = Luenberger(linmodel1, nint_ym=[1, 1])
-    preparestate!(lo1, [50, 30])
-    @test updatestate!(lo1, [10, 50], [50, 30]) ≈ zeros(4)
-    preparestate!(lo1, [50, 30])
-    @test updatestate!(lo1, [10, 50], [50, 30], Float64[]) ≈ zeros(4)
+    u, y, d = [10, 50], [50, 30], Float64[]
+    preparestate!(lo1, y)
+    @test updatestate!(lo1, u, y) ≈ zeros(4)
+    preparestate!(lo1, y)
+    @test updatestate!(lo1, u, y, d) ≈ zeros(4)
     @test lo1.x̂0 ≈ zeros(4)
+    @test @allocations(preparestate!(lo1, y)) == 0
+    @test @allocations(updatestate!(lo1, u, y)) == 0
     preparestate!(lo1, [50, 30])
     @test evaloutput(lo1) ≈ lo1() ≈ [50, 30]
     @test evaloutput(lo1, Float64[]) ≈ lo1(Float64[]) ≈ [50, 30]
@@ -436,12 +445,15 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]) , uop=[10,50], yop=[50,30])
     internalmodel1 = InternalModel(linmodel1)
-    preparestate!(internalmodel1, [50, 30] .+ 1)
-    @test updatestate!(internalmodel1, [10, 50], [50, 30] .+ 1) ≈ zeros(2)
-    preparestate!(internalmodel1, [50, 30] .+ 1)
-    @test updatestate!(internalmodel1, [10, 50], [50, 30] .+ 1, Float64[]) ≈ zeros(2)
+    u, y, d = [10, 50], [50, 30] .+ 1, Float64[]
+    preparestate!(internalmodel1, y)
+    @test updatestate!(internalmodel1, u, y) ≈ zeros(2)
+    preparestate!(internalmodel1, y)
+    @test updatestate!(internalmodel1, u, y, d) ≈ zeros(2)
     @test internalmodel1.x̂d ≈ internalmodel1.x̂0 ≈ zeros(2)
     @test internalmodel1.x̂s ≈ ones(2)
+    @test @allocations(preparestate!(internalmodel1, y)) == 0
+    @test @allocations(updatestate!(internalmodel1, u, y)) == 0
     preparestate!(internalmodel1, [51, 31])
     @test evaloutput(internalmodel1, Float64[]) ≈ [51,31]
     @test initstate!(internalmodel1, [10, 50], [50, 30]) ≈ zeros(2)
@@ -557,16 +569,26 @@ end
 @testitem "UnscentedKalmanFilter estimator methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f(x,u,_,model) = model.A*x + model.Bu*u
-    h(x,_,model)   = model.C*x
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing, p=linmodel1)
+    function f!(xnext, x,u,_,model)
+        mul!(xnext, model.A, x)
+        mul!(xnext, model.Bu, u, 1, 1)
+        return nothing
+    end
+    function h!(y, x,_,model)
+        mul!(y, model.C, x)
+        return nothing
+    end
+    nonlinmodel = NonLinModel(f!, h!, Ts, 2, 2, 2, solver=nothing, p=linmodel1)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30])
     ukf1 = UnscentedKalmanFilter(nonlinmodel)
-    preparestate!(ukf1, [50, 30])
-    @test updatestate!(ukf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
-    preparestate!(ukf1, [50, 30])
-    @test updatestate!(ukf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
+    u, y, d = [10, 50], [50, 30], Float64[]
+    preparestate!(ukf1, y)
+    @test updatestate!(ukf1, u, y) ≈ zeros(4) atol=1e-9
+    preparestate!(ukf1, y)
+    @test updatestate!(ukf1, u, y, d) ≈ zeros(4) atol=1e-9
     @test ukf1.x̂0 ≈ zeros(4) atol=1e-9
+    @test @allocations(preparestate!(ukf1, y)) == 0
+    @test @allocations(updatestate!(ukf1, u, y)) == 0
     preparestate!(ukf1, [50, 30])
     @test evaloutput(ukf1) ≈ ukf1() ≈ [50, 30]
     @test evaloutput(ukf1, Float64[]) ≈ ukf1(Float64[]) ≈ [50, 30]
@@ -705,16 +727,26 @@ end
     using DifferentiationInterface
     import FiniteDiff
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f(x,u,_,model) = model.A*x + model.Bu*u
-    h(x,_,model)   = model.C*x
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing, p=linmodel1)
+    function f!(xnext, x,u,_,model)
+        mul!(xnext, model.A, x)
+        mul!(xnext, model.Bu, u, 1, 1)
+        return nothing
+    end
+    function h!(y, x,_,model)
+        mul!(y, model.C, x)
+        return nothing
+    end
+    nonlinmodel = NonLinModel(f!, h!, Ts, 2, 2, 2, solver=nothing, p=linmodel1)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30])
     ekf1 = ExtendedKalmanFilter(nonlinmodel)
-    preparestate!(ekf1, [50, 30])
-    @test updatestate!(ekf1, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
-    preparestate!(ekf1, [50, 30])
-    @test updatestate!(ekf1, [10, 50], [50, 30], Float64[]) ≈ zeros(4) atol=1e-9
+    u, y, d = [10, 50], [50, 30], Float64[]
+    preparestate!(ekf1, y)
+    @test updatestate!(ekf1, u, y) ≈ zeros(4) atol=1e-9
+    preparestate!(ekf1, y)
+    @test updatestate!(ekf1, u, y, d) ≈ zeros(4) atol=1e-9
     @test ekf1.x̂0 ≈ zeros(4) atol=1e-9
+    @test @allocations(preparestate!(ekf1, y)) == 0
+    @test @allocations(updatestate!(ekf1, u, y)) == 0
     preparestate!(ekf1, [50, 30])
     @test evaloutput(ekf1) ≈ ekf1() ≈ [50, 30]
     @test evaloutput(ekf1, Float64[]) ≈ ekf1(Float64[]) ≈ [50, 30]
