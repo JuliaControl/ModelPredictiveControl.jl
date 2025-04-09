@@ -378,8 +378,10 @@ end
     end
     nonlinmodel4 = NonLinModel(f3!, h3!, Ts, 1, 1, 1, 1, solver=nothing)
     linmodel4 = linearize(nonlinmodel4; x, u, d)
-    linearize!(linmodel4, nonlinmodel4)
-    #@test @allocations(linearize!(linmodel4, nonlinmodel4)) == 0
+    # see this bug : https://github.com/JuliaLang/julia/issues/51112
+    linearize2!(linmodel, model) = (linearize!(linmodel, model); nothing)
+    linearize2!(linmodel4, nonlinmodel4)
+    @test @allocations(linearize2!(linmodel4, nonlinmodel4)) == 0
 end
 
 @testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin
