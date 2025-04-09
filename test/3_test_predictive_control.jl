@@ -425,12 +425,13 @@ end
 @testitem "ExplicitMPC moves and getinfo" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     mpc1 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
-    r = [5]
-    preparestate!(mpc1, [0])
+    r, y = [5], [0]
+    preparestate!(mpc1, y)
     u = moveinput!(mpc1, r)
     @test u ≈ [1] atol=1e-2
     u = mpc1(r)
     @test u ≈ [1] atol=1e-2
+    @test_skip @allocations(moveinput!(mpc1, r)) == 0
     info = getinfo(mpc1)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ r[1] atol=1e-2

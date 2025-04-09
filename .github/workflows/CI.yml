@@ -17,7 +17,7 @@ jobs:
     permissions: # needed for julia-actions/cache delete old caches that it has created
       actions: write
       contents: read
-    continue-on-error: ${{ matrix.version == 'nightly' }}
+    continue-on-error: ${{ matrix.version == 'nightly' || matrix.version == 'pre' }}
     strategy:
       fail-fast: false
       matrix:

@@ -100,11 +100,14 @@ end
 @testitem "LinModel sim methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase
     linmodel1 = setop!(LinModel(Gss), uop=[10,50], yop=[50,30])
-    @test updatestate!(linmodel1, [10, 50]) ≈ zeros(2)
-    @test updatestate!(linmodel1, [10, 50], Float64[]) ≈ zeros(2)
+    u, d = [10, 50], Float64[]
+    @test updatestate!(linmodel1, u) ≈ zeros(2)
+    @test updatestate!(linmodel1, u, d) ≈ zeros(2)
+    @test_skip @allocations(updatestate!(linmodel1, u)) == 0
     @test linmodel1.x0 ≈ zeros(2)
     @test evaloutput(linmodel1) ≈ linmodel1() ≈ [50,30]
     @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30]
+    @test_skip @allocations(evaloutput(linmodel1)) == 0
     x = initstate!(linmodel1, [10, 60])
     @test evaloutput(linmodel1) ≈ [50 + 19.0, 30 + 7.4]
     @test preparestate!(linmodel1) ≈ x           # new method
@@ -155,9 +158,9 @@ end
     using DifferentiationInterface
     import FiniteDiff
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f1(x,u,_,model) = model.A*x + model.Bu*u
-    h1(x,_,model)   = model.C*x
-    nonlinmodel1 = NonLinModel(f1,h1,Ts,2,2,2,solver=nothing,p=linmodel1)
+    f1!(x,u,_,model) = model.A*x + model.Bu*u
+    h1!(x,_,model)   = model.C*x
+    nonlinmodel1 = NonLinModel(f1!,h1!,Ts,2,2,2,solver=nothing,p=linmodel1)
     @test nonlinmodel1.nx == 2
     @test nonlinmodel1.nu == 2
     @test nonlinmodel1.nd == 0
@@ -265,15 +268,21 @@ end
 @testitem "NonLinModel sim methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    f1(x,u,_,model) = model.A*x + model.Bu*u
-    h1(x,_,model)   = model.C*x
-    nonlinmodel = NonLinModel(f1,h1,Ts,2,2,2,p=linmodel1,solver=nothing)
+    function f1!(xnext, x, u, _ , model)
+        mul!(xnext, model.A, x)
+        mul!(xnext, model.Bu, u, 1, 1)
+    end
+    h1!(y, x , _ , model) = mul!(y, model.C, x)
+    nonlinmodel = NonLinModel(f1!,h1!,Ts,2,2,2,p=linmodel1,solver=nothing)
 
-    @test updatestate!(nonlinmodel, zeros(2,)) ≈ zeros(2) 
-    @test updatestate!(nonlinmodel, zeros(2,), Float64[]) ≈ zeros(2)
+    u, d = zeros(2), Float64[]
+    @test updatestate!(nonlinmodel, u) ≈ zeros(2) 
+    @test updatestate!(nonlinmodel, u, d) ≈ zeros(2)
+    @test_skip @allocations(updatestate!(nonlinmodel, u)) == 0
     @test nonlinmodel.x0 ≈ zeros(2)
     @test evaloutput(nonlinmodel) ≈ nonlinmodel() ≈ zeros(2)
-    @test evaloutput(nonlinmodel, Float64[]) ≈ nonlinmodel(Float64[]) ≈ zeros(2)
+    @test evaloutput(nonlinmodel, d) ≈ nonlinmodel(Float64[]) ≈ zeros(2)
+    @test_skip @allocations(evaloutput(nonlinmodel)) == 0
 
     x = initstate!(nonlinmodel, [0, 10]) # do nothing for NonLinModel
     @test evaloutput(nonlinmodel) ≈ [0, 0]
@@ -287,9 +296,9 @@ end
     using DifferentiationInterface
     import ForwardDiff, FiniteDiff
     Ts = 1.0
-    f1(x,u,d,_) = x.^5 .+ u.^4 .+ d.^3
-    h1(x,d,_)   = x.^2 .+ d
-    nonlinmodel1 = NonLinModel(f1,h1,Ts,1,1,1,1,solver=nothing)
+    f1!(x,u,d,_) = x.^5 .+ u.^4 .+ d.^3
+    h1!(x,d,_)   = x.^2 .+ d
+    nonlinmodel1 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=nothing)
     x, u, d = [2.0], [3.0], [4.0]
     linmodel1 = linearize(nonlinmodel1; x, u, d)
     @test linmodel1.A  ≈ 5*x.^4
@@ -302,9 +311,9 @@ end
     @test linmodel1.Bu ≈ linmodel1b.Bu
     @test linmodel1.Bd ≈ linmodel1b.Bd
     @test linmodel1.C  ≈ linmodel1b.C
-    @test linmodel1.Dd ≈ linmodel1b.Dd
+    @test linmodel1.Dd ≈ linmodel1b.Dd  
 
-    nonlinmodel2 = NonLinModel(f1,h1,Ts,1,1,1,1,solver=nothing, jacobian=AutoFiniteDiff()) 
+    nonlinmodel2 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=nothing, jacobian=AutoFiniteDiff()) 
     linmodel2 = linearize(nonlinmodel2; x, u, d)
     @test linmodel2.A  ≈ 5*x.^4 atol=1e-3
     @test linmodel2.Bu ≈ 4*u.^3 atol=1e-3
@@ -334,7 +343,7 @@ end
     @test linmodel3.Bd ≈ Bd
     @test linmodel3.C  ≈ C
     @test linmodel3.Dd ≈ Dd
-    
+
     # test `linearize` at a non-equilibrium point:
     Ynl, Yl = let nonlinmodel3=nonlinmodel3
         N = 5
@@ -348,7 +357,7 @@ end
             yl  = linmodel3(d)
             Ynl[i] = ynl[1]
             Yl[i]  = yl[1]
-            linmodel3 = linearize(nonlinmodel3; u, d)
+            linearize!(linmodel3, nonlinmodel3; u, d)
             updatestate!(nonlinmodel3, u, d)
             updatestate!(linmodel3, u, d)
         end
@@ -356,10 +365,24 @@ end
     end
     @test all(isapprox.(Ynl, Yl, atol=1e-6))
 
+    # test nd==0 also works with AutoFiniteDiff (does not support empty matrices):
     f2!(xnext, x, u, _, _) = (xnext .= x .+ u)
     h2!(y, x, _, _) = (y .= x)
     nonlinmodel4 = NonLinModel(f2!,h2!,Ts,1,1,1,0,solver=nothing,jacobian=AutoFiniteDiff())
     @test_nowarn linearize(nonlinmodel4, x=[1], u=[2])
+
+    function f3!(xnext, x, u, d, _)
+        xnext .= x.*u .+ x.*d
+    end
+    function h3!(y, x, d, _)
+        y .= x.*d
+    end
+    nonlinmodel4 = NonLinModel(f3!, h3!, Ts, 1, 1, 1, 1, solver=nothing)
+    linmodel4 = linearize(nonlinmodel4; x, u, d)
+    # return nothing (see this issue : https://github.com/JuliaLang/julia/issues/51112):
+    linearize2!(linmodel, model) = (linearize!(linmodel, model); nothing)
+    linearize2!(linmodel4, nonlinmodel4)
+    @test_skip @allocations(linearize2!(linmodel4, nonlinmodel4)) == 0
 end
 
 @testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin
