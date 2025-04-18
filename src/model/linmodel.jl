@@ -174,8 +174,9 @@ function LinModel(
             sysd_dis = sysd
         end     
     end
-    # minreal to merge common poles if possible and ensure controllability/observability:
-    sys_dis = minreal([sysu_dis sysd_dis]) # same realization if already minimal
+    # minreal to merge common poles if possible and ensure controllability/observability
+    # balance=false option to keep the same realization if already minimal
+    sys_dis = minreal([sysu_dis sysd_dis], balance=false)
     nu  = length(i_u)
     A   = sys_dis.A
     Bu  = sys_dis.B[:,1:nu]
