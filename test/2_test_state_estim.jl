@@ -115,6 +115,7 @@ end
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
     @test_throws ArgumentError updatestate!(skalmanfilter1, [10, 50])
+    @test_throws ErrorException setstate!(skalmanfilter1, [1,2,3,4], diagm(.1:.1:.4))
 end 
 
 @testitem "SteadyKalmanFilter set model" setup=[SetupMPCtests] begin
@@ -211,8 +212,9 @@ end
     @test evaloutput(kalmanfilter1, d) ≈ kalmanfilter1(d) ≈ [50, 30]
     @test_skip @allocations(evaloutput(kalmanfilter1, d)) == 0
     @test initstate!(kalmanfilter1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
-    setstate!(kalmanfilter1, [1,2,3,4])
+    setstate!(kalmanfilter1, [1,2,3,4], diagm(.1:.1:.4))
     @test kalmanfilter1.x̂0 ≈ [1,2,3,4]
+    @test kalmanfilter1.P̂  ≈ diagm(.1:.1:.4)
     for i in 1:40
         preparestate!(kalmanfilter1, [50, 30])
         updatestate!(kalmanfilter1, [11, 52], [50, 30])
@@ -363,6 +365,7 @@ end
     x̂ = updatestate!(lo3, [0], [0])
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
+    @test_throws ErrorException setstate!(lo1, [1,2,3,4], diagm(.1:.1:.4))
 end
 
 @testitem "Luenberger set model" setup=[SetupMPCtests] begin
@@ -484,6 +487,7 @@ end
     x̂ = updatestate!(internalmodel3, [0], [0])
     @test x̂ ≈ [0]
     @test isa(x̂, Vector{Float32})
+    @test_throws ErrorException setstate!(internalmodel1, [1,2,3,4], diagm(.1:.1:.4))
 end
 
 @testitem "InternalModel set model" setup=[SetupMPCtests] begin
@@ -598,8 +602,9 @@ end
     @test evaloutput(ukf1, d) ≈ ukf1(d) ≈ [50, 30]
     @test_skip @allocations(evaloutput(ukf1, d)) == 0
     @test initstate!(ukf1, [10, 50], [50, 30+1]) ≈ zeros(4) atol=1e-9
-    setstate!(ukf1, [1,2,3,4])
+    setstate!(ukf1, [1,2,3,4], diagm(.1:.1:.4))
     @test ukf1.x̂0 ≈ [1,2,3,4]
+    @test ukf1.P̂ ≈ diagm(.1:.1:.4)
     for i in 1:40
         preparestate!(ukf1, [50, 30])
         updatestate!(ukf1, [11, 52], [50, 30])
@@ -757,8 +762,9 @@ end
     @test evaloutput(ekf1, d) ≈ ekf1(d) ≈ [50, 30]
     @test_skip @allocations(evaloutput(ekf1, d)) == 0
     @test initstate!(ekf1, [10, 50], [50, 30+1]) ≈ zeros(4);
-    setstate!(ekf1, [1,2,3,4])
+    setstate!(ekf1, [1,2,3,4], diagm(.1:.1:.4))
     @test ekf1.x̂0 ≈ [1,2,3,4]
+    @test ekf1.P̂ ≈ diagm(.1:.1:.4)
     for i in 1:40
         preparestate!(ekf1, [50, 30])
         updatestate!(ekf1, [11, 52], [50, 30])
@@ -1055,6 +1061,7 @@ end
     x̂ = preparestate!(mhe6, [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
+    @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
 end
 
 @testitem "MovingHorizonEstimator fallbacks for arrival covariance estimation" setup=[SetupMPCtests] begin
