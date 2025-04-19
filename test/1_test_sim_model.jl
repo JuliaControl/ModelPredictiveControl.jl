@@ -37,9 +37,9 @@
     @test linmodel5.nu == 2
     @test linmodel5.nd == 1
     @test linmodel5.ny == 2
-    sysu_ss = sminreal(c2d(minreal(ss(sys))[:,1:2], Ts, :zoh))
-    sysd_ss = sminreal(c2d(minreal(ss(sys))[:,3],   Ts, :tustin))
-    sys_ss = [sysu_ss sysd_ss]
+    sysu_ss = c2d(sminreal(ss(sys)[:,1:2]), Ts, :zoh)
+    sysd_ss = c2d(sminreal(ss(sys)[:,3]),   Ts, :tustin)
+    sys_ss = minreal([sysu_ss sysd_ss])
     @test linmodel5.A   ≈ sys_ss.A
     @test linmodel5.Bu  ≈ sys_ss.B[:,1:2]
     @test linmodel5.Bd  ≈ sys_ss.B[:,3]
@@ -51,14 +51,19 @@
 
     linmodel6 = LinModel([delay(Ts) delay(Ts)]*sys,Ts,i_d=[3])
     @test linmodel6.nx == 3
-    @test sum(eigvals(linmodel6.A) .≈ 0) == 1
+    @test sum(isapprox.(eigvals(linmodel6.A), 0, atol=1e-15)) == 1
 
-    linmodel7 = LinModel(
-        ss(diagm( .1: .1: .3), I(3), diagm( .4: .1: .6), 0, 1.0), 
-        i_u=[1, 2],
-        i_d=[3])
-    @test linmodel7.A ≈ diagm( .1: .1: .3)
-    @test linmodel7.C ≈ diagm( .4: .1: .6)
+    A = diagm( .1: .1: .3)
+    Bu = [I(2); zeros(1,2)]
+    C = diagm( .4: .1: .6)
+    Bd = [zeros(2,1); I(1)]
+    Dd = 0;
+    linmodel7 = LinModel(A, Bu, C, Bd, Dd, 1.0)
+    @test linmodel7.A ≈ A
+    @test linmodel7.Bu ≈ Bu
+    @test linmodel7.Bd ≈ Bd
+    @test linmodel7.C ≈ C
+    @test linmodel7.Dd ≈ zeros(3,1)
 
     linmodel8 = LinModel(Gss.A, Gss.B, Gss.C, zeros(Float32, 2, 0), zeros(Float32, 2, 0), Ts)
     @test isa(linmodel8, LinModel{Float64})

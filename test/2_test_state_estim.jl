@@ -1334,8 +1334,8 @@ end
 @testitem "MovingHorizonEstimator v.s. Kalman filters" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
-    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=false)
     kf  = KalmanFilter(linmodel1, nint_ym=0, direct=false)
+    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=false)
     X̂_mhe = zeros(4, 6)
     X̂_kf  = zeros(4, 6)
     for i in 1:6
@@ -1347,13 +1347,17 @@ end
         updatestate!(mhe, [11, 50], y, [25])
         updatestate!(kf,  [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_kf atol=1e-3 rtol=1e-3
-    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=true)
+    @test X̂_mhe ≈ X̂_kf atol=1e-6 rtol=1e-6
     kf  = KalmanFilter(linmodel1, nint_ym=0, direct=true)
+    # recuperate P̂(-1|-1) exact value using the Kalman filter:
+    preparestate!(kf, [50, 30], [20])
+    σP̂ = sqrt.(diag(kf.P̂))
+    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=true, σP_0=σP̂)
+    updatestate!(kf, [10, 50], [50, 30], [20])
     X̂_mhe = zeros(4, 6)
     X̂_kf  = zeros(4, 6)
     for i in 1:6
-        y = [50,31] + randn(2)
+        y = [50,31] #+ randn(2)
         x̂_mhe = preparestate!(mhe, y, [25])
         x̂_kf  = preparestate!(kf,  y, [25])
         X̂_mhe[:,i] = x̂_mhe
@@ -1361,14 +1365,15 @@ end
         updatestate!(mhe, [11, 50], y, [25])
         updatestate!(kf,  [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_kf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_kf atol=1e-6 rtol=1e-6
+
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, p=linmodel1, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
-    mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=false)
     ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=false)
     ekf = ExtendedKalmanFilter(nonlinmodel, nint_ym=0, direct=false)
+    mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=false)
     X̂_mhe = zeros(4, 6)
     X̂_ukf = zeros(4, 6)
     X̂_ekf = zeros(4, 6)
@@ -1384,11 +1389,18 @@ end
         updatestate!(ukf, [11, 50], y, [25])
         updatestate!(ekf, [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
-    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3
-    mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=true)
+    @test X̂_mhe ≈ X̂_ukf atol=1e-6 rtol=1e-6
+    @test X̂_mhe ≈ X̂_ekf atol=1e-6 rtol=1e-6
+    
     ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
     ekf = ExtendedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
+    # recuperate P̂(-1|-1) exact value using the Unscented Kalman filter:
+    preparestate!(ukf, [50, 30], [20])
+    preparestate!(ekf, [50, 30], [20])
+    σP̂ = sqrt.(diag(ukf.P̂))
+    mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=true, σP_0=σP̂)
+    updatestate!(ukf, [10, 50], [50, 30], [20])
+    updatestate!(ekf, [10, 50], [50, 30], [20])
     X̂_mhe = zeros(4, 6)
     X̂_ukf = zeros(4, 6)
     X̂_ekf = zeros(4, 6)
@@ -1404,8 +1416,8 @@ end
         updatestate!(ukf, [11, 50], y, [25])
         updatestate!(ekf, [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
-    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3 
+    @test X̂_mhe ≈ X̂_ukf atol=1e-6 rtol=1e-6
+    @test X̂_mhe ≈ X̂_ekf atol=1e-6 rtol=1e-6 
 end
 
 @testitem "MovingHorizonEstimator LinModel v.s. NonLinModel" setup=[SetupMPCtests] begin

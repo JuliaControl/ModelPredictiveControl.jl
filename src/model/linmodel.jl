@@ -82,9 +82,9 @@ with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{z
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
 in any order. `i_u` provides the indices of ``\mathbf{z}`` that are manipulated, and `i_d`, 
 the measured disturbances. The constructor automatically discretizes continuous systems,
-resamples discrete ones if `Ts ≠ sys.Ts`, computes a new realization if not minimal, and 
-separates the ``\mathbf{z}`` terms in two parts (details in Extended Help). The rest of the
-documentation assumes discrete dynamics since all systems end up in this form.
+resamples discrete ones if `Ts ≠ sys.Ts`, computes a new balancing and minimal state-space
+realization, and separates the ``\mathbf{z}`` terms in two parts (details in Extended Help). 
+The rest of the documentation assumes discrete models since all systems end up in this form.
 
 See also [`ss`](@extref ControlSystemsBase.ss)
 
@@ -119,10 +119,11 @@ LinModel with a sample time Ts = 0.1 s and:
     `sys` is discrete and the provided argument `Ts ≠ sys.Ts`, the system is resampled by
     using the aforementioned discretization methods.
 
-    Note that the constructor transforms the system to its minimal realization using [`minreal`](@extref ControlSystemsBase.minreal)
-    for controllability/observability. As a consequence, the final state-space
-    representation may be different from the one provided in `sys`. It is also converted 
-    into a more practical form (``\mathbf{D_u=0}`` because of the zero-order hold):
+    Note that the constructor transforms the system to its minimal and balancing realization
+    using [`minreal`](@extref ControlSystemsBase.minreal) for controllability/observability.
+    As a consequence, the final state-space representation will be presumably different from
+    the one provided in `sys`. It is also converted into a more practical form
+    (``\mathbf{D_u=0}`` because of the zero-order hold):
     ```math
     \begin{aligned}
         \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u}(k) + \mathbf{B_d d}(k) \\
@@ -152,8 +153,8 @@ function LinModel(
     sysu = sminreal(sys[:,i_u]) # remove states associated to measured disturbances d
     sysd = sminreal(sys[:,i_d]) # remove states associated to manipulates inputs u
     if !iszero(sysu.D)
-        error("LinModel only supports strictly proper systems (state matrix D must be 0 "*
-              "for columns associated to manipulated inputs u)")
+        error("LinModel only supports strictly proper systems (state-space matrix D must "*
+              "be 0 for columns associated to manipulated inputs u)")
     end
     if iscontinuous(sys)
         isnothing(Ts) && error("Sample time Ts must be specified if sys is continuous")
@@ -175,7 +176,7 @@ function LinModel(
         end     
     end
     # minreal to merge common poles if possible and ensure controllability/observability:
-    sys_dis = minreal([sysu_dis sysd_dis]) # same realization if already minimal
+    sys_dis = minreal([sysu_dis sysd_dis])
     nu  = length(i_u)
     A   = sys_dis.A
     Bu  = sys_dis.B[:,1:nu]
@@ -207,7 +208,7 @@ LinModel with a sample time Ts = 0.5 s and:
 ```
 """
 function LinModel(sys::TransferFunction, Ts::Union{Real,Nothing} = nothing; kwargs...) 
-    sys_min = minreal(ss(sys)) # remove useless states with pole-zero cancellation
+    sys_min = ss(sys) # minreal is automatically called during conversion
     return LinModel(sys_min, Ts; kwargs...)
 end
 
@@ -220,7 +221,7 @@ Discretize with zero-order hold when `sys` is a continuous system with delays.
 The delays must be multiples of the sample time `Ts`.
 """
 function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
-    sys_dis = minreal(c2d(sys, Ts, :zoh)) # c2d only supports :zoh for DelayLtiSystem
+    sys_dis = c2d(sys, Ts, :zoh) # c2d only supports :zoh for DelayLtiSystem
     return LinModel(sys_dis, Ts; kwargs...)
 end
 
