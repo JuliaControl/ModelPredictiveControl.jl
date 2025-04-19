@@ -488,12 +488,11 @@ Call `periodsleep(mpc.estim.model)`.
 periodsleep(mpc::PredictiveController, busywait=false) = periodsleep(mpc.estim.model, busywait)
 
 """
-    setstate!(mpc::PredictiveController, x̂) -> mpc
+    setstate!(mpc::PredictiveController, x̂, P̂=nothing) -> mpc
 
-Set `mpc.estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`.
+Call [`setstate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
-setstate!(mpc::PredictiveController, x̂) = (setstate!(mpc.estim, x̂); return mpc)
-
+setstate!(mpc::PredictiveController, x̂, P̂=nothing) = (setstate!(mpc.estim, x̂, P̂); return mpc)
 
 @doc raw"""
     setmodel!(mpc::PredictiveController, model=mpc.estim.model; <keyword arguments>) -> mpc

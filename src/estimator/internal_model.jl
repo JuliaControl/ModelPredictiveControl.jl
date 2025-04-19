@@ -226,6 +226,12 @@ function init_internalmodel(As, Bs, Cs, Ds)
     return Âs, B̂s
 end
 
+"Throw an error if P̂ != nothing."
+function setstate_cov!(estim::InternalModel, P̂)
+    P̂ == nothing || error("InternalModel does not compute an estimation covariance matrix P̂.")
+    return nothing
+end
+
 "Update similar values for [`InternalModel`](@ref) estimator."
 function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
     Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)

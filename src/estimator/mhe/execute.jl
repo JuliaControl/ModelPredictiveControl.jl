@@ -650,6 +650,12 @@ end
 "No nonlinear constraints if `model` is a [`LinModel`](@ref), return `g` unchanged."
 con_nonlinprog!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , _ ) = g
 
+"Throw an error if P̂ != nothing."
+function setstate_cov!(estim::MovingHorizonEstimator, P̂)
+    P̂ == nothing || error("MovingHorizonEstimator does not compute an estimation covariance matrix P̂.")
+    return nothing
+end
+
 "Update the augmented model, prediction matrices, constrains and data windows for MHE."
 function setmodel_estimator!(
     estim::MovingHorizonEstimator, model, uop_old, yop_old, dop_old, Q̂, R̂

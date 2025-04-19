@@ -330,14 +330,26 @@ function validate_args(estim::StateEstimator, ym, d, u=nothing)
 end
 
 """
-    setstate!(estim::StateEstimator, x̂) -> estim
+    setstate!(estim::StateEstimator, x̂, P̂=nothing) -> estim
 
-Set `estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`. 
+Set `estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`, and `estim.P̂` to `P̂` if applicable. 
+
+The covariance error estimate `P̂` can be set only if `estim` computes it.
 """
-function setstate!(estim::StateEstimator, x̂)
+function setstate!(estim::StateEstimator, x̂, P̂=nothing)
     size(x̂) == (estim.nx̂,) || error("x̂ size must be $((estim.nx̂,))")
     estim.x̂0 .= x̂ .- estim.x̂op
+    setstate_cov!(estim, P̂)
     return estim
+end
+
+"Set the covariance error estimate `estim.P̂` to `P̂`."
+function setstate_cov!(estim::StateEstimator, P̂)
+    if !isnothing(P̂)
+        size(P̂) == (estim.nx̂, estim.nx̂) || error("P̂ size must be $((estim.nx̂, estim.nx̂))")
+        estim.P̂ .= to_hermitian(P̂)
+    end
+    return nothing
 end
 
 @doc raw"""
