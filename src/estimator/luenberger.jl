@@ -136,6 +136,12 @@ function update_estimate!(estim::Luenberger, y0m, d0, u0)
     return predict_estimate_obsv!(estim, y0m, d0, u0)
 end
 
+"Throw an error if P̂ != nothing."
+function setstate_cov!(estim::Luenberger, P̂)
+    P̂ == nothing || error("Luenberger does not compute an estimation covariance matrix P̂.")
+    return nothing
+end
+
 "Throw an error if `setmodel!` is called on `Luenberger` observer w/o the default values."
 function setmodel_estimator!(estim::Luenberger, model, args...)
     if estim.model !== model

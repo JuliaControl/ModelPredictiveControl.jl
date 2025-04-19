@@ -163,11 +163,12 @@ end
 @testitem "LinMPC other methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    mpc1 = LinMPC(linmodel1)
+    mpc1 = LinMPC(KalmanFilter(linmodel1))
     @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
-    setstate!(mpc1, [1,2,3,4])
+    setstate!(mpc1, [1,2,3,4], diagm(.1:.1:.4))
     @test mpc1.estim.x̂0 ≈ [1,2,3,4]
-    setstate!(mpc1, [0,0,0,0])
+    @test mpc1.estim.P̂  ≈ diagm(.1:.1:.4)
+    setstate!(mpc1, [0,0,0,0], mpc1.estim.P̂_0)
     preparestate!(mpc1, [50, 30])
     updatestate!(mpc1, mpc1.estim.model.uop, [50, 30])
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
