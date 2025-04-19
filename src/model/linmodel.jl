@@ -153,8 +153,8 @@ function LinModel(
     sysu = sminreal(sys[:,i_u]) # remove states associated to measured disturbances d
     sysd = sminreal(sys[:,i_d]) # remove states associated to manipulates inputs u
     if !iszero(sysu.D)
-        error("LinModel only supports strictly proper systems (state matrix D must be 0 "*
-              "for columns associated to manipulated inputs u)")
+        error("LinModel only supports strictly proper systems (state-space matrix D must "*
+              "be 0 for columns associated to manipulated inputs u)")
     end
     if iscontinuous(sys)
         isnothing(Ts) && error("Sample time Ts must be specified if sys is continuous")
@@ -176,7 +176,7 @@ function LinModel(
         end     
     end
     # minreal to merge common poles if possible and ensure controllability/observability:
-    sys_dis = minreal([sysu_dis sysd_dis]) # same realization if already minimal
+    sys_dis = minreal([sysu_dis sysd_dis])
     nu  = length(i_u)
     A   = sys_dis.A
     Bu  = sys_dis.B[:,1:nu]
