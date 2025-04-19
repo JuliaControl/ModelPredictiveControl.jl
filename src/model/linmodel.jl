@@ -221,7 +221,7 @@ Discretize with zero-order hold when `sys` is a continuous system with delays.
 The delays must be multiples of the sample time `Ts`.
 """
 function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
-    sys_dis = minreal(c2d(sys, Ts, :zoh)) # c2d only supports :zoh for DelayLtiSystem
+    sys_dis = c2d(sys, Ts, :zoh) # c2d only supports :zoh for DelayLtiSystem
     return LinModel(sys_dis, Ts; kwargs...)
 end
 
