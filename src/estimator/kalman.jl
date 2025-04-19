@@ -1210,7 +1210,7 @@ function correct_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, 
     x̂0, P̂ = estim.x̂0, estim.P̂
     # in-place operations to reduce allocations:
     P̂_Ĉmᵀ = K̂
-    mul!(P̂_Ĉmᵀ, P̂.data, Ĉm') # the ".data" weirdly removes a type instability in mul!
+    mul!(P̂_Ĉmᵀ, P̂, Ĉm')
     M̂ = estim.buffer.R̂
     mul!(M̂, Ĉm, P̂_Ĉmᵀ)
     M̂ .+= R̂
@@ -1252,7 +1252,7 @@ function predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, 
     # in-place operations to reduce allocations:
     f̂!(x̂0next, û0, k0, estim, estim.model, x̂0corr, u0, d0)
     P̂corr_Âᵀ = estim.buffer.P̂
-    mul!(P̂corr_Âᵀ, P̂corr.data, Â') # the ".data" weirdly removes a type instability in mul!
+    mul!(P̂corr_Âᵀ, P̂corr, Â')
     Â_P̂corr_Âᵀ = estim.buffer.Q̂
     mul!(Â_P̂corr_Âᵀ, Â, P̂corr_Âᵀ)
     P̂next  = estim.buffer.P̂
