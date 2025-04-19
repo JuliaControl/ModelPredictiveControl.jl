@@ -125,7 +125,7 @@ julia> estim = SteadyKalmanFilter(LinModel(tf(3, [10, 1]), 0.5), nint_ym=[2], di
 
 julia> u = [1]; y = [3 - 0.1]; x̂ = round.(initstate!(estim, u, y), digits=3)
 3-element Vector{Float64}:
-  5.0
+ 10.0
   0.0
  -0.1
 
