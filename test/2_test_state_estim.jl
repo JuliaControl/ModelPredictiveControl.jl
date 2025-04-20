@@ -1364,7 +1364,7 @@ end
     X̂_mhe = zeros(4, 6)
     X̂_kf  = zeros(4, 6)
     for i in 1:6
-        y = [50,31] #+ randn(2)
+        y = [50,31] + randn(2)
         x̂_mhe = preparestate!(mhe, y, [25])
         x̂_kf  = preparestate!(kf,  y, [25])
         X̂_mhe[:,i] = x̂_mhe
