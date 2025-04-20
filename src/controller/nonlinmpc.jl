@@ -639,6 +639,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             return ∇J           # multivariate syntax, see JuMP.@operator doc
         end
     end
+    ∇²Jfunc! = nothing
     # --------------------- inequality constraint functions -------------------------------
     gfuncs = Vector{Function}(undef, ng)
     for i in eachindex(gfuncs)
@@ -733,7 +734,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             end
         ∇geqfuncs![i] = ∇geqfuncs_i!
     end
-    return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
+    return Jfunc, ∇Jfunc!, ∇²Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
 end
 
 """
