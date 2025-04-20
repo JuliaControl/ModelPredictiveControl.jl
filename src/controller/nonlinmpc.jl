@@ -14,7 +14,8 @@ struct NonLinMPC{
     TM<:TranscriptionMethod,
     JM<:JuMP.GenericModel,
     GB<:AbstractADType,
-    JB<:AbstractADType, 
+    JB<:AbstractADType,
+    HB<:Union{Nothing, AbstractADType},
     PT<:Any,
     JEfunc<:Function,
     GCfunc<:Function
@@ -27,6 +28,7 @@ struct NonLinMPC{
     con::ControllerConstraint{NT, GCfunc}
     gradient::GB
     jacobian::JB
+    hessian::HB
     Z̃::Vector{NT}
     ŷ::Vector{NT}
     Hp::Int
@@ -63,7 +65,7 @@ struct NonLinMPC{
     function NonLinMPC{NT}(
         estim::SE, 
         Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc!::GCfunc, nc, p::PT, 
-        transcription::TM, optim::JM, gradient::GB, jacobian::JB
+        transcription::TM, optim::JM, gradient::GB, jacobian::JB, hessian::HB
     ) where {
             NT<:Real, 
             SE<:StateEstimator, 
@@ -71,6 +73,7 @@ struct NonLinMPC{
             JM<:JuMP.GenericModel,
             GB<:AbstractADType,
             JB<:AbstractADType,
+            HB<:Union{Nothing, AbstractADType},
             PT<:Any,
             JEfunc<:Function, 
             GCfunc<:Function, 
@@ -107,9 +110,9 @@ struct NonLinMPC{
         nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
-        mpc = new{NT, SE, TM, JM, GB, JB, PT, JEfunc, GCfunc}(
+        mpc = new{NT, SE, TM, JM, GB, JB, HB, PT, JEfunc, GCfunc}(
             estim, transcription, optim, con,
-            gradient, jacobian,
+            gradient, jacobian, hessian,
             Z̃, ŷ,
             Hp, Hc, nϵ,
             weights,
@@ -206,6 +209,8 @@ This controller allocates memory at each time step for the optimization.
    function, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
+- `hessian=nothing` : an `AbstractADType` backend for the Hessian of the objective function,
+   see `gradient` above for the options, use `nothing` for the LBFGS approximation of `optim`.
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
@@ -265,8 +270,11 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
         coloring_algorithm = GreedyColoringAlgorithm()
     )
     ```
-    Optimizers generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
-    state-space functions must be compatible with this feature. See [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
+    Also, the `hessian` argument defaults to `nothing` meaning the built-in second-order
+    approximation of `solver`. Otherwise, a sparse backend like above is recommended to test
+    different `hessian` methods. Optimizers generally benefit from exact derivatives like AD.
+    However, the [`NonLinModel`](@ref) state-space functions must be compatible with this
+    feature. See [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
     for common mistakes when writing these functions.
 
     Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
@@ -293,13 +301,14 @@ function NonLinMPC(
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
+    hessian::Union{Nothing, AbstractADType} = nothing,
     kwargs...
 )
     estim = UnscentedKalmanFilter(model; kwargs...)
     return NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
-        transcription, optim, gradient, jacobian
+        transcription, optim, gradient, jacobian, hessian
     )
 end
 
@@ -324,13 +333,14 @@ function NonLinMPC(
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
+    hessian::Union{Nothing, AbstractADType} = nothing,
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
     return NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
-        transcription, optim, gradient, jacobian
+        transcription, optim, gradient, jacobian, hessian
     )
 end
 
@@ -379,6 +389,7 @@ function NonLinMPC(
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
+    hessian::Union{Nothing, AbstractADType} = nothing,
 ) where {
     NT<:Real, 
     SE<:StateEstimator{NT}
@@ -392,7 +403,7 @@ function NonLinMPC(
     gc! = get_mutating_gc(NT, gc)
     return NonLinMPC{NT}(
         estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, gc!, nc, p, 
-        transcription, optim, gradient, jacobian
+        transcription, optim, gradient, jacobian, hessian
     )
 end
 
@@ -540,7 +551,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.Generic
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs! = get_optim_functions(
+    Jfunc, ∇Jfunc!, ∇²Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs! = get_optim_functions(
         mpc, optim
     )
     @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
@@ -553,14 +564,15 @@ end
 """
     get_optim_functions(
         mpc::NonLinMPC, optim::JuMP.GenericModel
-    ) -> Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
+    ) -> Jfunc, ∇Jfunc!, ∇J²Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
 
 Return the functions for the nonlinear optimization of `mpc` [`NonLinMPC`](@ref) controller.
 
-Return the nonlinear objective `Jfunc` function, and `∇Jfunc!`, to compute its gradient. 
-Also return vectors with the nonlinear inequality constraint functions `gfuncs`, and 
-`∇gfuncs!`, for the associated gradients. Lastly, also return vectors with the nonlinear 
-equality constraint functions `geqfuncs` and gradients `∇geqfuncs!`.
+Return the nonlinear objective `Jfunc` function, and `∇Jfunc!` and `∇²Jfunc!`, to compute 
+its gradient and hessian, respectively. Also return vectors with the nonlinear inequality
+constraint functions `gfuncs`, and  `∇gfuncs!`, for the associated gradients. Lastly, also
+return vectors with the nonlinear equality constraint functions `geqfuncs` and gradients
+`∇geqfuncs!`.
 
 This method is really intricate and I'm not proud of it. That's because of 3 elements:
 
