@@ -554,6 +554,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.Generic
     Jfunc, ∇Jfunc!, ∇²Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs! = get_optim_functions(
         mpc, optim
     )
+    ∇²Jfunc! = ()
     @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
     @objective(optim, Min, J(Z̃var...))
     init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
@@ -607,38 +608,57 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                 = zeros(JNT, neq)
     # ---------------------- objective function ------------------------------------------- 
-    function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
-        if isdifferent(Z̃arg, Z̃)
-            Z̃ .= Z̃arg
-            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-        end
-        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
-    end
+       
     function Jfunc!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
-    Z̃_∇J = fill(myNaN, nZ̃) 
+
+    
+    #Z̃_∇J = fill(myNaN, nZ̃) 
     ∇J_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K0), Cache(X̂0), 
         Cache(gc), Cache(g), Cache(geq),
     )
-    ∇J_prep = prepare_gradient(Jfunc!, mpc.gradient, Z̃_∇J, ∇J_context...; strict)
+    ∇J_prep = prepare_gradient(Jfunc!, mpc.gradient, Z̃, ∇J_context...; strict)
+    
     ∇J = Vector{JNT}(undef, nZ̃)
+    J_vec = zeros(JNT, 1)
+
+
+    
+    function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
+        #if isdifferent(Z̃arg, Z̃)
+            Z̃ .= Z̃arg
+            J, _ = value_and_gradient!(Jfunc!, ∇J, ∇J_prep, mpc.gradient, Z̃, ∇J_context...)
+            J_vec .= J
+        #end
+        return J_vec[]
+    end
+
+
     ∇Jfunc! = if nZ̃ == 1
         function (Z̃arg)
-            Z̃_∇J .= Z̃arg
-            gradient!(Jfunc!, ∇J, ∇J_prep, mpc.gradient, Z̃_∇J, ∇J_context...)
+            if isdifferent(Z̃arg, Z̃)
+                Z̃ .= Z̃arg
+                J, _ = value_and_gradient!(Jfunc!, ∇J, ∇J_prep, mpc.gradient, Z̃, ∇J_context...)
+                J_vec .= J
+            end
             return ∇J[begin]    # univariate syntax, see JuMP.@operator doc
         end
     else
-        function (∇J::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            Z̃_∇J .= Z̃arg
-            gradient!(Jfunc!, ∇J, ∇J_prep, mpc.gradient, Z̃_∇J, ∇J_context...)
-            return ∇J           # multivariate syntax, see JuMP.@operator doc
+        function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            #if isdifferent(Z̃arg, Z̃)
+                Z̃ .= Z̃arg
+                J, _ = value_and_gradient!(Jfunc!, ∇J, ∇J_prep, mpc.gradient, Z̃, ∇J_context...)
+                J_vec .= J
+            #end
+            return ∇Jarg .= ∇J  # multivariate syntax, see JuMP.@operator doc
         end
     end
+
+
     ∇²Jfunc! = nothing
     # --------------------- inequality constraint functions -------------------------------
     gfuncs = Vector{Function}(undef, ng)
