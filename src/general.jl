@@ -51,7 +51,7 @@ function limit_solve_time(optim::GenericModel, Ts)
         if isa(err, MOI.UnsupportedAttribute{MOI.TimeLimitSec})
             @warn "Solving time limit is not supported by the optimizer."
         else
-            rethrow(err)
+            rethrow()
         end
     end
 end

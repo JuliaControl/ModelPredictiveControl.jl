@@ -405,7 +405,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
             MOIU.reset_optimizer(optim)
             JuMP.optimize!(optim)
         else
-            rethrow(err)
+            rethrow()
         end
     end
     if !issolved(optim)
