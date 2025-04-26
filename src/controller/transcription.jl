@@ -952,13 +952,13 @@ linconstrainteq!(::PredictiveController, ::SimModel, ::SingleShooting) = nothing
 linconstrainteq!(::PredictiveController, ::SimModel, ::MultipleShooting) = nothing
 
 @doc raw"""
-    set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var) -> Z̃0
+    set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var) -> Z̃s
 
 Set and return the warm start value of `Z̃var` for [`SingleShooting`](@ref) transcription.
 
 If supported by `mpc.optim`, it warm-starts the solver at:
 ```math
-\mathbf{ΔŨ} = 
+\mathbf{Z̃_s} = 
 \begin{bmatrix}
     \mathbf{Δu}(k+0|k-1)        \\ 
     \mathbf{Δu}(k+1|k-1)        \\ 
@@ -983,13 +983,13 @@ function set_warmstart!(mpc::PredictiveController, transcription::SingleShooting
 end
 
 @doc raw"""
-    set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var) -> Z̃0
+    set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var) -> Z̃s
 
 Set and return the warm start value of `Z̃var` for [`MultipleShooting`](@ref) transcription.
 
 It warm-starts the solver at:
 ```math
-\mathbf{ΔŨ} =
+\mathbf{Z̃_s} =
 \begin{bmatrix}
     \mathbf{Δu}(k+0|k-1)        \\ 
     \mathbf{Δu}(k+1|k-1)        \\ 
