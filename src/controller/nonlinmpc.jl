@@ -566,7 +566,7 @@ This method is really intricate and I'm not proud of it. That's because of 3 ele
 
 - These functions are used inside the nonlinear optimization, so they must be type-stable
   and as efficient as possible. All the function outputs and derivatives are cached and
-  updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!)`.
+  updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
 - The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
   of `Vararg{T,N}` (see the [performance tip][@extref Julia Be-aware-of-when-Julia-avoids-specializing]
   ) and memoization to avoid redundant computations. This is already complex, but it's even
@@ -577,7 +577,7 @@ This method is really intricate and I'm not proud of it. That's because of 3 ele
 Inspired from: [User-defined operators with vector outputs](@extref JuMP User-defined-operators-with-vector-outputs)
 """
 function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
-    # ----- common cache for Jfunc, gfuncs, geqfuncs called with floats -------------------
+    # ----------- common cache for Jfunc, gfuncs and geqfuncs  ----------------------------
     model = mpc.estim.model
     grad, jac = mpc.gradient, mpc.jacobian
     nu, ny, nx̂, nϵ, nk = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, model.nk
