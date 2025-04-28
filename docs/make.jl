@@ -17,7 +17,7 @@ links = InterLinks(
 DocMeta.setdocmeta!(
     ModelPredictiveControl, 
     :DocTestSetup, 
-    :(using ModelPredictiveControl, ControlSystemsBase, JuMP); 
+    :(using ModelPredictiveControl, ControlSystemsBase); 
     recursive=true
 )
 makedocs(
