@@ -565,7 +565,8 @@ equality constraint functions `geqfuncs` and gradients `∇geqfuncs!`.
 This method is really intricate and I'm not proud of it. That's because of 3 elements:
 
 - These functions are used inside the nonlinear optimization, so they must be type-stable
-  and as efficient as possible.
+  and as efficient as possible. All the function outputs and derivatives are cached and
+  updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
 - The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
   of `Vararg{T,N}` (see the [performance tip][@extref Julia Be-aware-of-when-Julia-avoids-specializing]
   ) and memoization to avoid redundant computations. This is already complex, but it's even
@@ -576,16 +577,17 @@ This method is really intricate and I'm not proud of it. That's because of 3 ele
 Inspired from: [User-defined operators with vector outputs](@extref JuMP User-defined-operators-with-vector-outputs)
 """
 function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
-    # ----- common cache for Jfunc, gfuncs, geqfuncs called with floats -------------------
+    # ----------- common cache for Jfunc, gfuncs and geqfuncs  ----------------------------
     model = mpc.estim.model
+    grad, jac = mpc.gradient, mpc.jacobian
     nu, ny, nx̂, nϵ, nk = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, model.nk
     Hp, Hc = mpc.Hp, mpc.Hc
     ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
     nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
     strict = Val(true)
-    myNaN  = convert(JNT, NaN)  # NaN to force update_simulations! at first call:
-    Z̃ ::Vector{JNT}                  = fill(myNaN, nZ̃)
+    myNaN  = convert(JNT, NaN)
+    J::Vector{JNT}                   = zeros(JNT, 1)
     ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
     x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
     K0::Vector{JNT}                  = zeros(JNT, nK)
@@ -595,128 +597,118 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                 = zeros(JNT, neq)
     # ---------------------- objective function ------------------------------------------- 
-    function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
-        if isdifferent(Z̃arg, Z̃)
-            Z̃ .= Z̃arg
-            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-        end
-        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)::T
-    end
     function Jfunc!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
-    Z̃_∇J = fill(myNaN, nZ̃) 
+    Z̃_∇J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇J_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K0), Cache(X̂0), 
         Cache(gc), Cache(g), Cache(geq),
     )
-    ∇J_prep = prepare_gradient(Jfunc!, mpc.gradient, Z̃_∇J, ∇J_context...; strict)
+    ∇J_prep = prepare_gradient(Jfunc!, grad, Z̃_∇J, ∇J_context...; strict)
     ∇J = Vector{JNT}(undef, nZ̃)
-    ∇Jfunc! = if nZ̃ == 1
-        function (Z̃arg)
-            Z̃_∇J .= Z̃arg
-            gradient!(Jfunc!, ∇J, ∇J_prep, mpc.gradient, Z̃_∇J, ∇J_context...)
-            return ∇J[begin]    # univariate syntax, see JuMP.@operator doc
+    function update_objective!(J, ∇J, Z̃, Z̃arg)
+        if isdifferent(Z̃arg, Z̃)
+            Z̃ .= Z̃arg
+            J[], _ = value_and_gradient!(Jfunc!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
         end
-    else
-        function (∇J::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            Z̃_∇J .= Z̃arg
-            gradient!(Jfunc!, ∇J, ∇J_prep, mpc.gradient, Z̃_∇J, ∇J_context...)
-            return ∇J           # multivariate syntax, see JuMP.@operator doc
+    end    
+    function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
+        update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        return J[]::T
+    end
+    ∇Jfunc! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
+        function (Z̃arg)
+            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+            return ∇J[begin]
+        end
+    else                        # multivariate syntax (see JuMP.@operator doc):
+        function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+            return ∇Jarg .= ∇J
         end
     end
     # --------------------- inequality constraint functions -------------------------------
-    gfuncs = Vector{Function}(undef, ng)
-    for i in eachindex(gfuncs)
-        gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            if isdifferent(Z̃arg, Z̃)
-                Z̃ .= Z̃arg
-                update_predictions!(
-                    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃
-                )
-            end
-            return g[i]::T
-        end
-        gfuncs[i] = gfunc_i
-    end
     function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
-        return update_predictions!(
-            ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃
-        )
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return g
     end
-    Z̃_∇g = fill(myNaN, nZ̃)
+    Z̃_∇g = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇g_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-        Cache(Û0), Cache(K0),   Cache(X̂0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
         Cache(gc), Cache(geq),
     )
     # temporarily enable all the inequality constraints for sparsity detection:
     mpc.con.i_g[1:end-nc] .= true
-    ∇g_prep  = prepare_jacobian(gfunc!, g, mpc.jacobian, Z̃_∇g, ∇g_context...; strict)
+    ∇g_prep  = prepare_jacobian(gfunc!, g, jac, Z̃_∇g, ∇g_context...; strict)
     mpc.con.i_g[1:end-nc] .= false
-    ∇g = init_diffmat(JNT, mpc.jacobian, ∇g_prep, nZ̃, ng)
+    ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
+    function update_con!(g, ∇g, Z̃, Z̃arg)
+        if isdifferent(Z̃arg, Z̃)
+            Z̃ .= Z̃arg
+            value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃, ∇g_context...)
+        end
+    end
+    gfuncs = Vector{Function}(undef, ng)
+    for i in eachindex(gfuncs)
+        gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            update_con!(g, ∇g, Z̃_∇g, Z̃arg)
+            return g[i]::T
+        end
+        gfuncs[i] = gfunc_i
+    end
     ∇gfuncs! = Vector{Function}(undef, ng)
     for i in eachindex(∇gfuncs!)
-        ∇gfuncs_i! = if nZ̃ == 1
+        ∇gfuncs_i! = if nZ̃ == 1     # univariate syntax (see JuMP.@operator doc):
             function (Z̃arg::T) where T<:Real
-                if isdifferent(Z̃arg, Z̃_∇g)
-                    Z̃_∇g .= Z̃arg
-                    jacobian!(gfunc!, g, ∇g, ∇g_prep, mpc.jacobian, Z̃_∇g, ∇g_context...)
-                end
-                return ∇g[i, begin]            # univariate syntax, see JuMP.@operator doc
+                update_con!(g, ∇g, Z̃_∇g, Z̃arg)
+                return ∇g[i, begin]
             end
-        else
+        else                        # multivariate syntax (see JuMP.@operator doc):
             function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-                if isdifferent(Z̃arg, Z̃_∇g)
-                    Z̃_∇g .= Z̃arg
-                    jacobian!(gfunc!, g, ∇g, ∇g_prep, mpc.jacobian, Z̃_∇g, ∇g_context...)
-                end
-                return ∇g_i .= @views ∇g[i, :] # multivariate syntax, see JuMP.@operator doc
+                update_con!(g, ∇g, Z̃_∇g, Z̃arg)
+                return ∇g_i .= @views ∇g[i, :] 
             end
         end
         ∇gfuncs![i] = ∇gfuncs_i!
     end
     # --------------------- equality constraint functions ---------------------------------
-    geqfuncs = Vector{Function}(undef, neq)
-    for i in eachindex(geqfuncs)
-        geqfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            if isdifferent(Z̃arg, Z̃)
-                Z̃ .= Z̃arg
-                update_predictions!(
-                    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃
-                )
-            end
-            return geq[i]::T
-        end
-        geqfuncs[i] = geqfunc_i          
-    end
     function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
-        return update_predictions!(
-            ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃
-        )
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return geq
     end
-    Z̃_∇geq = fill(myNaN, nZ̃)
+    Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update_predictions! at first call
     ∇geq_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
         Cache(Û0), Cache(K0),   Cache(X̂0),
         Cache(gc), Cache(g)
     )
-    ∇geq_prep = prepare_jacobian(geqfunc!, geq, mpc.jacobian, Z̃_∇geq, ∇geq_context...; strict)
-    ∇geq = init_diffmat(JNT, mpc.jacobian, ∇geq_prep, nZ̃, neq)
+    ∇geq_prep = prepare_jacobian(geqfunc!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)
+    ∇geq = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
+    function update_con_eq!(geq, ∇geq, Z̃, Z̃arg)
+        if isdifferent(Z̃arg, Z̃)
+            Z̃ .= Z̃arg
+            value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃, ∇geq_context...)
+        end
+    end
+    geqfuncs = Vector{Function}(undef, neq)
+    for i in eachindex(geqfuncs)
+        geqfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃arg)
+            return geq[i]::T
+        end
+        geqfuncs[i] = geqfunc_i          
+    end
     ∇geqfuncs! = Vector{Function}(undef, neq)
     for i in eachindex(∇geqfuncs!)
         # only multivariate syntax, univariate is impossible since nonlinear equality
         # constraints imply MultipleShooting, thus input increment ΔU and state X̂0 in Z̃:
         ∇geqfuncs_i! = 
             function (∇geq_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-                if isdifferent(Z̃arg, Z̃_∇geq)
-                    Z̃_∇geq .= Z̃arg
-                    jacobian!(
-                        geqfunc!, geq, ∇geq, ∇geq_prep, mpc.jacobian, Z̃_∇geq, ∇geq_context...
-                    )
-                end
+                update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃arg)
                 return ∇geq_i .= @views ∇geq[i, :]
             end
         ∇geqfuncs![i] = ∇geqfuncs_i!
