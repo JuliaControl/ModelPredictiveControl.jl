@@ -25,6 +25,7 @@ ModelPredictiveControl.relaxX̂
 ModelPredictiveControl.relaxŴ
 ModelPredictiveControl.relaxV̂
 ModelPredictiveControl.init_matconstraint_mhe
+ModelPredictiveControl.get_optim_functions(::MovingHorizonEstimator, ::JuMP.GenericModel)
 ```
 
 ## Update Quadratic Optimization
