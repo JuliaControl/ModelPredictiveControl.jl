@@ -798,8 +798,8 @@ function update_diff_objective!(
         J[], _ = value_gradient_and_hessian!(
             Jfunc!, ∇J, ∇²J, prep_∇²J, hess, Z̃_J, context_J...
         )
-        @warn "Here's the current Hessian:"
-        println(∇²J)
+        @warn "Uncomment the following line to print the current Hessian"
+        # println(∇²J)
     end
     return nothing
 end 
