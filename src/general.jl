@@ -56,9 +56,28 @@ function limit_solve_time(optim::GenericModel, Ts)
     end
 end
 
+"Verify that provided 1st and 2nd order differentiation backends are possible and efficient."
+validate_backends(firstOrder::AbstractADType, secondOrder::Nothing) = nothing
+validate_backends(firstOrder::Nothing, secondOrder::AbstractADType) = nothing
+function validate_backends(firstOrder::AbstractADType, secondOrder::AbstractADType) 
+    @warn(
+        """
+        Two AbstractADType backends were provided for the 1st and 2nd order differentiations,
+        meaning that 1st order derivatives will be computed twice. Use gradient=nothing to
+        retrieve the result from the hessian backend, which is more efficient.
+        """
+    )
+    return nothing 
+end
+function validate_backends(firstOrder::Nothing, secondOrder::Nothing)
+    throw(ArgumentError("1st and 2nd order differentiation backends cannot be both nothing."))
+end
+
+
 "Init a differentiation result matrix as dense or sparse matrix, as required by `backend`."
 init_diffmat(T, backend::AbstractADType, _  , nx , ny) = Matrix{T}(undef, ny, nx)
 init_diffmat(T, backend::AutoSparse    ,prep , _ , _ ) = similar(sparsity_pattern(prep), T)
+init_diffmat(T, backend::Nothing       , _  , nx , ny) = Matrix{T}(undef, ny, nx)
 
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))

@@ -8,8 +8,10 @@ using RecipesBase
 using ProgressLogging
 
 using DifferentiationInterface: ADTypes.AbstractADType, AutoForwardDiff, AutoSparse
-using DifferentiationInterface: gradient!, jacobian!, prepare_gradient, prepare_jacobian
+using DifferentiationInterface: prepare_gradient, prepare_jacobian, prepare_hessian
+using DifferentiationInterface: gradient!, jacobian!, hessian!
 using DifferentiationInterface: value_and_gradient!, value_and_jacobian!
+using DifferentiationInterface: value_gradient_and_hessian!
 using DifferentiationInterface: Constant, Cache
 using SparseConnectivityTracer: TracerSparsityDetector
 using SparseMatrixColorings: GreedyColoringAlgorithm, sparsity_pattern

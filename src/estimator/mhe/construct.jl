@@ -250,33 +250,37 @@ transcription for now.
 - `model::SimModel` : (deterministic) model for the estimations.
 - `He=nothing` : estimation horizon ``H_e``, must be specified.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
-    are unmeasured ``\mathbf{y^u}``.
+   are unmeasured ``\mathbf{y^u}``.
 - `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
-    covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
+   covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
 - `σQ=fill(1/model.nx,model.nx)` or *`sigmaQ`* : main diagonal of the process noise
-    covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
+   covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
 - `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
-    ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
+   ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
 - `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
-    the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
+   the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
 - `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
-    disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
+   disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
 - `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
-    disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
+   disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
 - `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured
-    disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+   disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
 - `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
-    disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
+   disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
-    disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
+   disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
 - `optim=default_optim_mhe(model)` : a [`JuMP.Model`](@extref) object with a quadratic or
    nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
-- `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
-   function when `model` is not a [`LinModel`](@ref), see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
+- `hessian=nothing` : an `AbstractADType` backend for the Hessian of the objective function 
+   when `model` is not a [`LinModel`](@ref) (see [`DifferentiationInterface` doc](@extref DifferentiationInterface List)),
+   or `nothing` for the LBFGS approximation provided by `optim` (details in Extended Help).
+- `gradient=isnothing(hessian) ? AutoForwardDiff() : nothing` : an `AbstractADType` backend
+   for the gradient of the objective function when `model` is not a [`LinModel`](@ref) (see
+   `hessian` for the options), or `nothing` to retrieve lower-order derivatives from `hessian`. 
 - `jacobian=AutoForwardDiff()` : an `AbstractADType` backend for the Jacobian of the
-   constraints when `model` is not a [`LinModel`](@ref), see `gradient` above for the options.
+   constraints when `model` is not a [`LinModel`](@ref) (see `hessian` for the options).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
 
@@ -359,7 +363,9 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
       default, a [`KalmanFilter`](@ref) estimates the arrival covariance (customizable).
     - Else, a nonlinear program with dense [`ForwardDiff`](@extref ForwardDiff) automatic
       differentiation (AD) compute the objective and constraint derivatives by default 
-      (customizable). Optimizers generally benefit from exact derivatives like AD. However, 
+      (customizable). The `hessian` argument defaults the LBFGS approximation of `optim`,
+      but see [`NonLinMPC`](@ref) extended help for a sparse backend that would be otherwise
+      recommended. Optimizers generally benefit from exact derivatives like AD. However, 
       the `f` and `h` functions must be compatible with this feature. See the 
       [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
       for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
