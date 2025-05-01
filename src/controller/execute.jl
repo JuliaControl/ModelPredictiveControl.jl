@@ -370,7 +370,12 @@ function obj_nonlinprog!(
     end
     # --- economic term ---
     E_JE = obj_econ(mpc, model, Ue, Ŷe)
-    return JR̂y + JΔŨ + JR̂u + E_JE
+    return (
+        JR̂y +
+        JΔŨ +
+        JR̂u +
+        E_JE
+    )
 end
 
 "No custom nonlinear constraints `gc` by default, return `gc` unchanged." 

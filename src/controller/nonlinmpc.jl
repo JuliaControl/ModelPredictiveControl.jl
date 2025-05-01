@@ -18,7 +18,8 @@ struct NonLinMPC{
     JB<:AbstractADType,
     PT<:Any,
     JEfunc<:Function,
-    GCfunc<:Function
+    GCfunc<:Function,
+    M<:AbstractMatrix{NT}
 } <: PredictiveController{NT}
     estim::SE
     transcription::TM
@@ -39,8 +40,8 @@ struct NonLinMPC{
     p::PT
     R̂u::Vector{NT}
     R̂y::Vector{NT}
-    P̃Δu::Matrix{NT}
-    P̃u ::Matrix{NT}
+    P̃Δu::M
+    P̃u ::M
     Tu ::Matrix{NT}
     Tu_lastu0::Vector{NT}
     Ẽ::Matrix{NT}
@@ -110,7 +111,7 @@ struct NonLinMPC{
         nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
-        mpc = new{NT, SE, TM, JM, GB, HB, JB, PT, JEfunc, GCfunc}(
+        mpc = new{NT, SE, TM, JM, GB, HB, JB, PT, JEfunc, GCfunc, typeof(P̃u)}(
             estim, transcription, optim, con,
             gradient, hessian, jacobian,
             Z̃, ŷ,
@@ -289,9 +290,9 @@ function NonLinMPC(
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE ::Function = (_,_,_,_) -> 0.0,
@@ -321,9 +322,9 @@ function NonLinMPC(
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE ::Function = (_,_,_,_) -> 0.0,
@@ -377,9 +378,9 @@ function NonLinMPC(
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE ::Function = (_,_,_,_) -> 0.0,
