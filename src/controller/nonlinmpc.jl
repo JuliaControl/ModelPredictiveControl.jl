@@ -554,13 +554,11 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.Generic
         end
     end
     validate_backends(mpc.gradient, mpc.hessian)
-    Jfunc, ∇Jfunc!, ∇²Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs! = get_optim_functions(
-        mpc, optim
-    )
-    Jargs = isnothing(∇²Jfunc!) ? (Jfunc, ∇Jfunc!) : (Jfunc, ∇Jfunc!, ∇²Jfunc!)  
-    @operator(optim, J, nZ̃, Jargs...)
+    J_args, g_vec_args, geq_vec_args = get_optim_functions(mpc, optim)
+    #display(J_args)
+    @operator(optim, J, nZ̃, J_args...)
     @objective(optim, Min, J(Z̃var...))
-    init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
+    init_nonlincon!(mpc, model, transcription, g_vec_args, geq_vec_args)
     set_nonlincon!(mpc, model, transcription, optim)
     return nothing
 end
@@ -568,15 +566,15 @@ end
 """
     get_optim_functions(
         mpc::NonLinMPC, optim::JuMP.GenericModel
-    ) -> Jfunc, ∇Jfunc!, ∇J²Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
+    ) -> J_args, g_vec_args, geq_vec_args
 
 Return the functions for the nonlinear optimization of `mpc` [`NonLinMPC`](@ref) controller.
-
-Return the nonlinear objective `Jfunc` function, and `∇Jfunc!` and `∇²Jfunc!`, to compute 
-its gradient and hessian, respectively. Also return vectors with the nonlinear inequality
-constraint functions `gfuncs`, and  `∇gfuncs!`, for the associated gradients. Lastly, also
-return vectors with the nonlinear equality constraint functions `geqfuncs` and gradients
-`∇geqfuncs!`.
+    
+Return the tuple `J_args` containing the functions to compute the objective function
+value and its derivatives. Also return the tuple `g_vec_args` containing 2 vectors of
+functions to compute the nonlinear inequality values and associated gradients. Lastly, also
+return `geq_vec_args` containing 2 vectors of functions to compute the nonlinear equality
+values and associated gradients.
 
 This method is really intricate and I'm not proud of it. That's because of 3 elements:
 
@@ -630,7 +628,6 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     end
     if !isnothing(hess)
         prep_∇²J = prepare_hessian(Jfunc!, hess, Z̃_J, context_J...; strict)
-        @warn "Here's the objective Hessian sparsity pattern:"
         display(sparsity_pattern(prep_∇²J))
     else
         prep_∇²J = nothing
@@ -638,27 +635,46 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     ∇J  = Vector{JNT}(undef, nZ̃)
     ∇²J = init_diffmat(JNT, hess, prep_∇²J, nZ̃, nZ̃)
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
-        update_diff_objective!(
+        update_memoized_diff!(
             Z̃_J, J, ∇J, ∇²J, prep_∇J, prep_∇²J, context_J, grad, hess, Jfunc!, Z̃arg
         )
         return J[]::T
     end
-    ∇Jfunc! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
+    ∇Jfunc! = if nZ̃ == 1            # univariate syntax (see JuMP.@operator doc):
         function (Z̃arg)
-            update_diff_objective!(
+            update_memoized_diff!(
                 Z̃_J, J, ∇J, ∇²J, prep_∇J, prep_∇²J, context_J, grad, hess, Jfunc!, Z̃arg
             )
             return ∇J[begin]
         end
-    else                        # multivariate syntax (see JuMP.@operator doc):
+    else                             # multivariate syntax (see JuMP.@operator doc):
         function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            update_diff_objective!(
+            update_memoized_diff!(
                 Z̃_J, J, ∇J, ∇²J, prep_∇J, prep_∇²J, context_J, grad, hess, Jfunc!, Z̃arg
             )
             return ∇Jarg .= ∇J
         end
     end
-    ∇²Jfunc! = nothing
+    ∇²Jfunc! = if nZ̃ == 1           # univariate syntax (see JuMP.@operator doc):
+        function (Z̃arg)
+            update_memoized_diff!(
+                Z̃_J, J, ∇J, ∇²J, prep_∇J, prep_∇²J, context_J, grad, hess, Jfunc!, Z̃arg
+            )
+            return ∇²J[begin, begin]
+        end
+    else                             # multivariate syntax (see JuMP.@operator doc):
+        function (∇²Jarg::AbstractMatrix{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            print("d")
+            update_memoized_diff!(
+                Z̃_J, J, ∇J, ∇²J, prep_∇J, prep_∇²J, context_J, grad, hess, Jfunc!, Z̃arg
+            )
+            for i in 1:N, j in 1:i
+                ∇²Jarg[i, j] = ∇²J[i, j]
+            end
+            return ∇²Jarg
+        end
+    end
+    J_args = isnothing(hess) ? (Jfunc, ∇Jfunc!) : (Jfunc, ∇Jfunc!, ∇²Jfunc!)
     # --------------------- inequality constraint functions -------------------------------
     function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
@@ -672,19 +688,13 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     )
     # temporarily enable all the inequality constraints for sparsity detection:
     mpc.con.i_g[1:end-nc] .= true
-    ∇g_prep  = prepare_jacobian(gfunc!, g, jac, Z̃_g, context_g...; strict)
+    prep_∇g  = prepare_jacobian(gfunc!, g, jac, Z̃_g, context_g...; strict)
     mpc.con.i_g[1:end-nc] .= false
-    ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
-    function update_con!(g, ∇g, Z̃, Z̃arg)
-        if isdifferent(Z̃arg, Z̃)
-            Z̃ .= Z̃arg
-            value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃, context_g...)
-        end
-    end
+    ∇g  = init_diffmat(JNT, jac, prep_∇g, nZ̃, ng)
     gfuncs = Vector{Function}(undef, ng)
     for i in eachindex(gfuncs)
         gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            update_con!(g, ∇g, Z̃_g, Z̃arg)
+            update_memoized_diff!(Z̃_g, g, ∇g, prep_∇g, context_g, jac, gfunc!, Z̃arg)
             return g[i]::T
         end
         gfuncs[i] = gfunc_i
@@ -693,17 +703,18 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     for i in eachindex(∇gfuncs!)
         ∇gfuncs_i! = if nZ̃ == 1     # univariate syntax (see JuMP.@operator doc):
             function (Z̃arg::T) where T<:Real
-                update_con!(g, ∇g, Z̃_g, Z̃arg)
+                update_memoized_diff!(Z̃_g, g, ∇g, prep_∇g, context_g, jac, gfunc!, Z̃arg)
                 return ∇g[i, begin]
             end
-        else                        # multivariate syntax (see JuMP.@operator doc):
+        else                         # multivariate syntax (see JuMP.@operator doc):
             function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-                update_con!(g, ∇g, Z̃_g, Z̃arg)
+                update_memoized_diff!(Z̃_g, g, ∇g, prep_∇g, context_g, jac, gfunc!, Z̃arg)
                 return ∇g_i .= @views ∇g[i, :] 
             end
         end
         ∇gfuncs![i] = ∇gfuncs_i!
     end
+    g_vec_args = (gfuncs, ∇gfuncs!)
     # --------------------- equality constraint functions ---------------------------------
     function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
@@ -715,18 +726,14 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         Cache(Û0), Cache(K0),   Cache(X̂0),
         Cache(gc), Cache(g)
     )
-    ∇geq_prep = prepare_jacobian(geqfunc!, geq, jac, Z̃_geq, context_geq...; strict)
-    ∇geq = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
-    function update_con_eq!(geq, ∇geq, Z̃, Z̃arg)
-        if isdifferent(Z̃arg, Z̃)
-            Z̃ .= Z̃arg
-            value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃, context_geq...)
-        end
-    end
+    prep_∇geq = prepare_jacobian(geqfunc!, geq, jac, Z̃_geq, context_geq...; strict)
+    ∇geq = init_diffmat(JNT, jac, prep_∇geq, nZ̃, neq)
     geqfuncs = Vector{Function}(undef, neq)
     for i in eachindex(geqfuncs)
         geqfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            update_con_eq!(geq, ∇geq, Z̃_geq, Z̃arg)
+            update_memoized_diff!(
+                Z̃_geq, geq, ∇geq, prep_∇geq, context_geq, jac, geqfunc!, Z̃arg
+            )
             return geq[i]::T
         end
         geqfuncs[i] = geqfunc_i          
@@ -737,12 +744,15 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         # constraints imply MultipleShooting, thus input increment ΔU and state X̂0 in Z̃:
         ∇geqfuncs_i! = 
             function (∇geq_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-                update_con_eq!(geq, ∇geq, Z̃_geq, Z̃arg)
+                update_memoized_diff!(
+                    Z̃_geq, geq, ∇geq, prep_∇geq, context_geq, jac, geqfunc!, Z̃arg
+                )
                 return ∇geq_i .= @views ∇geq[i, :]
             end
         ∇geqfuncs![i] = ∇geqfuncs_i!
     end
-    return Jfunc, ∇Jfunc!, ∇²Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
+    geq_vec_args = (geqfuncs, ∇geqfuncs!)
+    return J_args, g_vec_args, geq_vec_args
 end
 
 """
@@ -767,52 +777,6 @@ function update_predictions!(
     gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
     g   = con_nonlinprog!(g, mpc, model, transcription, x̂0end, Ŷ0, gc, ϵ)
     geq = con_nonlinprogeq!(geq, X̂0, Û0, K0, mpc, model, transcription, U0, Z̃)
-    return nothing
-end
-
-"""
-    update_diff_objective!(
-        Z̃_J, J, ∇J, ∇²J, prep_∇J, prep_∇²J , context_J,
-        grad::AbstractADType, hess::Nothing, Jfunc!, Z̃arg
-    )
-
-TBW
-"""
-function update_diff_objective!(
-    Z̃_J, J, ∇J, ∇²J, prep_∇J, _ , context_J,
-    grad::AbstractADType, hess::Nothing, Jfunc!::F, Z̃arg
-) where F <: Function
-    if isdifferent(Z̃arg, Z̃_J)
-        Z̃_J .= Z̃arg
-        J[], _ = value_and_gradient!(Jfunc!, ∇J, prep_∇J, grad, Z̃_J, context...)
-    end
-    return nothing
-end
-
-function update_diff_objective!(
-    Z̃_J, J, ∇J, ∇²J, _ , prep_∇²J, context_J,
-    grad::Nothing, hess::AbstractADType, Jfunc!::F, Z̃arg
-) where F <: Function
-    if isdifferent(Z̃arg, Z̃_J)
-        Z̃_J .= Z̃arg
-        J[], _ = value_gradient_and_hessian!(
-            Jfunc!, ∇J, ∇²J, prep_∇²J, hess, Z̃_J, context_J...
-        )
-        @warn "Uncomment the following line to print the current Hessian"
-        # println(∇²J)
-    end
-    return nothing
-end 
-
-function update_diff_objective!(
-    Z̃_J, J, ∇J, ∇²J, prep_∇J, prep_∇²J, context_J,
-    grad::AbstractADType, hess::AbstractADType, Jfunc!::F, Z̃arg
-) where F<: Function
-    if isdifferent(Z̃arg, Z̃_J)
-        Z̃_J .= Z̃arg # inefficient, as warned by validate_backends(), but still possible:
-        hessian!(Jfunc!, ∇²J, prep_∇²J, hess, Z̃_J, context_J...)
-        J[], _ = value_and_gradient!(Jfunc!, ∇J, prep_∇J, grad, Z̃_J, context_J...)
-    end
     return nothing
 end
 

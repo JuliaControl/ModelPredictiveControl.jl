@@ -604,21 +604,18 @@ end
 
 """
     init_nonlincon!(
-        mpc::PredictiveController, model::LinModel, transcription::TranscriptionMethod, 
-        gfuncs  , ∇gfuncs!,   
-        geqfuncs, ∇geqfuncs!
-    )
+        mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, g_vec_args, geq_vec_args
+    ) -> nothing
 
 Init nonlinear constraints for [`LinModel`](@ref) for all [`TranscriptionMethod`](@ref).
 
 The only nonlinear constraints are the custom inequality constraints `gc`.
 """
 function init_nonlincon!(
-    mpc::PredictiveController, ::LinModel, ::TranscriptionMethod,
-    gfuncs, ∇gfuncs!, 
-    _ , _    
+    mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, g_vec_args, _   
 ) 
     optim, con = mpc.optim, mpc.con
+    gfuncs, ∇gfuncs! = g_vec_args
     nZ̃ = length(mpc.Z̃)
     if length(con.i_g) ≠ 0
         i_base = 0
@@ -634,10 +631,8 @@ end
 
 """
     init_nonlincon!(
-        mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
-        gfuncs,   ∇gfuncs!,
-        geqfuncs, ∇geqfuncs!
-    )
+        mpc::PredictiveController, ::NonLinModel, ::MultipleShooting, g_vec_args, geq_vec_args
+    ) -> nothing
     
 Init nonlinear constraints for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
@@ -645,11 +640,11 @@ The nonlinear constraints are the output prediction `Ŷ` bounds, the custom ine
 constraints `gc` and all the nonlinear equality constraints `geq`.
 """
 function init_nonlincon!(
-    mpc::PredictiveController, ::NonLinModel, ::MultipleShooting, 
-    gfuncs,     ∇gfuncs!,
-    geqfuncs,   ∇geqfuncs!
+    mpc::PredictiveController, ::NonLinModel, ::MultipleShooting, g_vec_args, geq_vec_args
 ) 
     optim, con = mpc.optim, mpc.con
+    gfuncs  , ∇gfuncs!   = g_vec_args
+    geqfuncs, ∇geqfuncs! = geq_vec_args
     ny, nx̂, Hp, nZ̃ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.Z̃)
     # --- nonlinear inequality constraints ---
     if length(con.i_g) ≠ 0
@@ -691,10 +686,8 @@ end
 
 """
     init_nonlincon!(
-        mpc::PredictiveController, model::NonLinModel, ::SingleShooting, 
-        gfuncs,   ∇gfuncs!,
-        geqfuncs, ∇geqfuncs!
-    )
+        mpc::PredictiveController, ::NonLinModel, ::SingleShooting, g_vec_args, geq_vec_args
+    ) -> nothing
 
 Init nonlinear constraints for [`NonLinModel`](@ref) and [`SingleShooting`](@ref).
 
@@ -702,9 +695,10 @@ The nonlinear constraints are the custom inequality constraints `gc`, the output
 prediction `Ŷ` bounds and the terminal state `x̂end` bounds.
 """
 function init_nonlincon!(
-    mpc::PredictiveController, ::NonLinModel, ::SingleShooting, gfuncs, ∇gfuncs!, _ , _
+    mpc::PredictiveController, ::NonLinModel, ::SingleShooting, g_vec_args, _
 )
     optim, con = mpc.optim, mpc.con
+    gfuncs, ∇gfuncs! = g_vec_args
     ny, nx̂, Hp, nZ̃ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.Z̃)
     if length(con.i_g) ≠ 0
         i_base = 0

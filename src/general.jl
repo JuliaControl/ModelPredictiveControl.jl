@@ -63,8 +63,8 @@ function validate_backends(firstOrder::AbstractADType, secondOrder::AbstractADTy
     @warn(
         """
         Two AbstractADType backends were provided for the 1st and 2nd order differentiations,
-        meaning that 1st order derivatives will be computed twice. Use gradient=nothing to
-        retrieve the result from the hessian backend, which is more efficient.
+        meaning that 1st order derivatives will be computed twice. Use nothing for the 1st
+        order backend to retrieve results from the hessian backend, which is more efficient.
         """
     )
     return nothing 
@@ -73,11 +73,75 @@ function validate_backends(firstOrder::Nothing, secondOrder::Nothing)
     throw(ArgumentError("1st and 2nd order differentiation backends cannot be both nothing."))
 end
 
-
 "Init a differentiation result matrix as dense or sparse matrix, as required by `backend`."
 init_diffmat(T, backend::AbstractADType, _  , nx , ny) = Matrix{T}(undef, ny, nx)
 init_diffmat(T, backend::AutoSparse    ,prep , _ , _ ) = similar(sparsity_pattern(prep), T)
 init_diffmat(T, backend::Nothing       , _  , nx , ny) = Matrix{T}(undef, ny, nx)
+
+"""
+    update_memoized_diff!(
+        x, y, ∇f, ∇²f, prep_∇f, prep_∇²f, context,
+        gradient::AbstractADType, hessian::Nothing, f!, xarg
+    ) -> nothing
+
+Update `f!` value `y` and and its gradient `∇f` in-place if `x ≠ xarg`.
+
+The method mutates all the arguments before `gradient`. This function is used for the
+memoization of the `f!` function derivatives, to avoid redundant computations with the
+splatting syntax of `JuMP.@operator`.
+"""
+function update_memoized_diff!(
+    x, y, ∇f, _ , prep_∇f, _ , context,
+    gradient::AbstractADType, hessian::Nothing, f!::F, xarg
+) where F <: Function
+    if isdifferent(xarg, x)
+        x .= xarg # more efficient than individual f! and gradient! calls:
+        y[], _ = value_and_gradient!(f!, ∇f, prep_∇f, gradient, x, context...)
+    end
+    return nothing
+end
+
+"Also update the Hessian `∇²f` if `hessian isa AbstractADType` and `isnothing(gradient)`."
+function update_memoized_diff!(
+    x, y, ∇f, ∇²f, _ , prep_∇²f, context,
+    gradient::Nothing, hessian::AbstractADType, f!::F, xarg
+) where F <: Function
+    if isdifferent(xarg, x)
+        x .= xarg # more efficient than individual f!, gradient! and hessian! calls:
+        y[], _ = value_gradient_and_hessian!(f!, ∇f, ∇²f, prep_∇²f, hessian, x, context...)
+    end
+    return nothing
+end 
+
+"Update `∇f` and `∇²f` individually if both backends are `AbstractADType`."
+function update_memoized_diff!(
+    x, y, ∇f, ∇²f, prep_∇f, prep_∇²f, context,
+    gradient::AbstractADType, hessian::AbstractADType, f!::F, xarg
+) where F <: Function
+    if isdifferent(xarg, x)
+        x .= xarg # inefficient, as warned by validate_backends(), but still possible:
+        hessian!(f!, ∇²f, prep_∇²f, hessian, x, context...)
+        y[], _ = value_and_gradient!(f!, ∇f, prep_∇f, gradient, x, context...)
+    end
+    return nothing
+end
+
+"""
+    update_memoized_diff!(x, y, ∇f, prep_∇f, context, jacobian::AbstractADType, f!, xarg) 
+
+Update `f!` value `y` (vector) and and its jacobian `∇f` in-place if `x ≠ xarg`.
+
+This method mutates all the arguments before `jacobian`.
+"""
+function update_memoized_diff!(
+    x, y, ∇f, prep_∇f, context, jacobian::AbstractADType, f!::F, xarg
+) where F <: Function
+    if isdifferent(xarg, x)
+        x .= xarg # more efficient than individual f! and jacobian! calls:
+        value_and_jacobian!(f!, y, ∇f, prep_∇f, jacobian, x, context...)
+    end
+    return nothing
+end
 
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
