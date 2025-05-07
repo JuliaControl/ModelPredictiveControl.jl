@@ -395,7 +395,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model, optim = mpc.estim.model, mpc.optim
     nu, Hc = model.nu, mpc.Hc 
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    Z̃0 = set_warmstart!(mpc, mpc.transcription, Z̃var)
+    Z̃s = set_warmstart!(mpc, mpc.transcription, Z̃var)
     set_objective_linear_coef!(mpc, Z̃var)
     try
         JuMP.optimize!(optim)
@@ -405,7 +405,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
             MOIU.reset_optimizer(optim)
             JuMP.optimize!(optim)
         else
-            rethrow(err)
+            rethrow()
         end
     end
     if !issolved(optim)
@@ -426,7 +426,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
         @debug info2debugstr(getinfo(mpc))
     end
     if iserror(optim)
-        mpc.Z̃ .= Z̃0
+        mpc.Z̃ .= Z̃s
     else
         mpc.Z̃ .= JuMP.value.(Z̃var)
     end
@@ -488,7 +488,7 @@ Call `periodsleep(mpc.estim.model)`.
 periodsleep(mpc::PredictiveController, busywait=false) = periodsleep(mpc.estim.model, busywait)
 
 """
-    setstate!(mpc::PredictiveController, x̂, P̂=nothing) -> mpc
+    setstate!(mpc::PredictiveController, x̂[, P̂]) -> mpc
 
 Call [`setstate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """

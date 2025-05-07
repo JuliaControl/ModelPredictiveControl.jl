@@ -364,7 +364,7 @@ Optimize objective of `estim` [`MovingHorizonEstimator`](@ref) and return the so
 
 If supported by `estim.optim`, it warm-starts the solver at:
 ```math
-\mathbf{Z̃} = 
+\mathbf{Z̃_s} = 
 \begin{bmatrix}
     ϵ_{k-1}                         \\
     \mathbf{x̂}_{k-1}(k-N_k+p)       \\ 
@@ -391,12 +391,12 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     X̂0  = Vector{NT}(undef, nx̂*Nk)
     û0, ŷ0, x̄, k0 = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
     ϵ_0 = estim.nϵ ≠ 0 ? estim.Z̃[begin] : empty(estim.Z̃)
-    Z̃_0 = [ϵ_0; estim.x̂0arr_old; estim.Ŵ]
-    V̂, X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, Z̃_0)
-    J_0 = obj_nonlinprog!(x̄, estim, model, V̂, Z̃_0)
-    # initial Z̃0 with Ŵ=0 if objective or constraint function not finite :
-    isfinite(J_0) || (Z̃_0 = [ϵ_0; estim.x̂0arr_old; zeros(NT, nŵ*estim.He)])
-    JuMP.set_start_value.(Z̃var, Z̃_0)
+    Z̃s = [ϵ_0; estim.x̂0arr_old; estim.Ŵ]
+    V̂, X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, Z̃s)
+    J_0 = obj_nonlinprog!(x̄, estim, model, V̂, Z̃s)
+    # warm-start Z̃s with Ŵ=0 if objective or constraint function not finite :
+    isfinite(J_0) || (Z̃s = [ϵ_0; estim.x̂0arr_old; zeros(NT, nŵ*estim.He)])
+    JuMP.set_start_value.(Z̃var, Z̃s)
     # ------- solve optimization problem --------------
     try
         JuMP.optimize!(optim)
@@ -428,7 +428,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
         @debug info2debugstr(getinfo(estim))
     end
     if iserror(optim)
-        estim.Z̃ .= Z̃_0
+        estim.Z̃ .= Z̃s
     else
         estim.Z̃ .= JuMP.value.(Z̃var)
     end

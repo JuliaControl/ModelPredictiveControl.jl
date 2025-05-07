@@ -972,14 +972,14 @@ where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed
 last control period ``k-1``, and ``ϵ(k-1)``, the slack variable of the last control period.
 """
 function set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var)
-    nu, Hc, Z̃0 = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
+    nu, Hc, Z̃s = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
     # --- input increments ΔU ---
-    Z̃0[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
-    Z̃0[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
+    Z̃s[(Hc*nu-nu+1):(Hc*nu)] .= 0
     # --- slack variable ϵ ---
-    mpc.nϵ == 1 && (Z̃0[end] = mpc.Z̃[end])
-    JuMP.set_start_value.(Z̃var, Z̃0)
-    return Z̃0
+    mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
+    JuMP.set_start_value.(Z̃var, Z̃s)
+    return Z̃s
 end
 
 @doc raw"""
@@ -1009,17 +1009,17 @@ last control period ``k-1``, expressed as a deviation from the operating point
 ``\mathbf{x̂_{op}}``.
 """
 function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var)
-    nu, nx̂, Hp, Hc, Z̃0 = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
+    nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
     # --- input increments ΔU ---
-    Z̃0[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
-    Z̃0[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
+    Z̃s[(Hc*nu-nu+1):(Hc*nu)] .= 0
     # --- predicted states X̂0 ---
-    Z̃0[(Hc*nu+1):(Hc*nu+Hp*nx̂-nx̂)]       .= @views mpc.Z̃[(Hc*nu+nx̂+1):(Hc*nu+Hp*nx̂)]
-    Z̃0[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)] .= @views mpc.Z̃[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)]
+    Z̃s[(Hc*nu+1):(Hc*nu+Hp*nx̂-nx̂)]       .= @views mpc.Z̃[(Hc*nu+nx̂+1):(Hc*nu+Hp*nx̂)]
+    Z̃s[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)] .= @views mpc.Z̃[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)]
     # --- slack variable ϵ ---
-    mpc.nϵ == 1 && (Z̃0[end] = mpc.Z̃[end])
-    JuMP.set_start_value.(Z̃var, Z̃0)
-    return Z̃0
+    mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
+    JuMP.set_start_value.(Z̃var, Z̃s)
+    return Z̃s
 end
 
 getΔŨ!(ΔŨ, mpc::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃) # since mpc.P̃Δu = I

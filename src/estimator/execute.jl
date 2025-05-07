@@ -330,7 +330,7 @@ function validate_args(estim::StateEstimator, ym, d, u=nothing)
 end
 
 """
-    setstate!(estim::StateEstimator, x̂, P̂=nothing) -> estim
+    setstate!(estim::StateEstimator, x̂[, P̂]) -> estim
 
 Set `estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`, and `estim.P̂` to `P̂` if applicable. 
 
