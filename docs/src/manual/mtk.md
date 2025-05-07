@@ -23,7 +23,8 @@ the last section.
     will work for all corner cases.
 
 !!! compat
-    The example relies on features and bugfixes of `ModelingToolkit.jl` v9.50.
+    The example works on `ModelingToolkit.jl` v9.50 to 9.76 (corresponding to the following
+    `[compat]` entry: `ModelingToolkit = "9.50 - 9.76"`).
 
 We first construct and instantiate the pendulum model:
 
