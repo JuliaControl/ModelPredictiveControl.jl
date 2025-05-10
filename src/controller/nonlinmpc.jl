@@ -32,6 +32,7 @@ struct NonLinMPC{
     Hp::Int
     Hc::Int
     nϵ::Int
+    nb::Vector{Int}
     weights::ControllerWeights{NT}
     JE::JEfunc
     p::PT
@@ -81,6 +82,7 @@ struct NonLinMPC{
         weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        nb = ones(Hc)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
@@ -111,7 +113,7 @@ struct NonLinMPC{
             estim, transcription, optim, con,
             gradient, jacobian,
             Z̃, ŷ,
-            Hp, Hc, nϵ,
+            Hp, Hc, nϵ, nb,
             weights,
             JE, p,
             R̂u, R̂y,

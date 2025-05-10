@@ -18,6 +18,7 @@ struct LinMPC{
     Hp::Int
     Hc::Int
     nϵ::Int
+    nb::Vector{Int}
     weights::ControllerWeights{NT}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
@@ -54,6 +55,7 @@ struct LinMPC{
         weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        nb = ones(Hc)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
@@ -81,7 +83,7 @@ struct LinMPC{
         mpc = new{NT, SE, TM, JM}(
             estim, transcription, optim, con,
             Z̃, ŷ,
-            Hp, Hc, nϵ,
+            Hp, Hc, nϵ, nb,
             weights,
             R̂u, R̂y,
             P̃Δu, P̃u, Tu, Tu_lastu0,

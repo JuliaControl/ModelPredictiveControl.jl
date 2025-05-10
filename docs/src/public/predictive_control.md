@@ -48,7 +48,8 @@ are shifted by one time step:
 in which ``\mathbf{U}`` and ``\mathbf{R̂_u}`` are both vectors of `nu*Hp` elements. Defining
 the manipulated input increment as ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)``,
 the control horizon ``H_c`` enforces that ``\mathbf{Δu}(k+j) = \mathbf{0}`` for ``j ≥ H_c``.
-For this reason, the vector that collects them is truncated up to ``k+H_c-1``:
+For this reason, the vector that collects them is truncated up to ``k+H_c-1`` (without
+custom move blocking):
 
 ```math
     \mathbf{ΔU} =
