@@ -3,7 +3,6 @@ module ModelPredictiveControl
 using PrecompileTools 
 using LinearAlgebra
 using Random: randn
-using SparseArrays
 
 using RecipesBase
 using ProgressLogging
@@ -48,7 +47,6 @@ include("state_estim.jl")
 include("predictive_control.jl")
 include("plot_sim.jl")
 
-#=
 @setup_workload begin
     # Putting some things in `@setup_workload` instead of `@compile_workload` can reduce the
     # size of the precompile file and potentially make loading faster.
@@ -58,6 +56,5 @@ include("plot_sim.jl")
         include("precompile.jl")
     end
 end
-=#
 
 end

@@ -1,11 +1,11 @@
-struct PredictiveControllerBuffer{NT<:Real,M<:AbstractMatrix{NT}}
+struct PredictiveControllerBuffer{NT<:Real}
     u ::Vector{NT}
     Z̃ ::Vector{NT}
     D̂ ::Vector{NT}
     Ŷ ::Vector{NT}
     U ::Vector{NT}
     Ẽ ::Matrix{NT}
-    P̃u::M
+    P̃u::Matrix{NT}
     empty::Vector{NT}
 end
 
@@ -29,19 +29,14 @@ function PredictiveControllerBuffer(
     Ẽ  = Matrix{NT}(undef, ny*Hp, nZ̃)
     P̃u = Matrix{NT}(undef, nu*Hp, nZ̃)
     empty = Vector{NT}(undef, 0)
-    return PredictiveControllerBuffer{NT,typeof(P̃u)}(u, Z̃, D̂, Ŷ, U, Ẽ, P̃u, empty)
+    return PredictiveControllerBuffer{NT}(u, Z̃, D̂, Ŷ, U, Ẽ, P̃u, empty)
 end
 
 "Include all the objective function weights of [`PredictiveController`](@ref)"
-struct ControllerWeights{
-    NT<:Real,
-    H1<:Hermitian{NT, <:AbstractMatrix{NT}},
-    H2<:Hermitian{NT, <:AbstractMatrix{NT}},
-    H3<:Hermitian{NT, <:AbstractMatrix{NT}},
-}
-    M_Hp::H1
-    Ñ_Hc::H2
-    L_Hp::H3
+struct ControllerWeights{NT<:Real}
+    M_Hp::Hermitian{NT, Matrix{NT}}
+    Ñ_Hc::Hermitian{NT, Matrix{NT}}
+    L_Hp::Hermitian{NT, Matrix{NT}}
     E   ::NT
     iszero_M_Hp::Vector{Bool}
     iszero_Ñ_Hc::Vector{Bool}
@@ -51,15 +46,15 @@ struct ControllerWeights{
         model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
     ) where NT<:Real
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-        M_Hp = Hermitian(convert.(NT, M_Hp), :L) 
-        N_Hc = Hermitian(convert.(NT, N_Hc), :L)
-        L_Hp = Hermitian(convert.(NT, L_Hp), :L)
+        # convert `Diagonal` to normal `Matrix` if required:
+        M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
+        N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
+        L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         nΔU = size(N_Hc, 1)
         C = Cwt
         if !isinf(Cwt)  
             # ΔŨ = [ΔU; ϵ] (ϵ is the slack variable)
-            # Ñ_Hc = Hermitian([N_Hc zeros(NT, nΔU, 1); zeros(NT, 1, nΔU) C], :L)
-            Ñ_Hc = Hermitian(blockdiag(sparse(N_Hc), sparse(Diagonal([C]))), :L)
+            Ñ_Hc = Hermitian([N_Hc zeros(NT, nΔU, 1); zeros(NT, 1, nΔU) C], :L)
         else
             # ΔŨ = ΔU (only hard constraints)
             Ñ_Hc = N_Hc
@@ -69,7 +64,7 @@ struct ControllerWeights{
         iszero_Ñ_Hc = [iszero(Ñ_Hc)]
         iszero_L_Hp = [iszero(L_Hp)]
         iszero_E = iszero(E)
-        return new{NT,typeof(M_Hp),typeof(Ñ_Hc),typeof(L_Hp)}(M_Hp, Ñ_Hc, L_Hp, E, iszero_M_Hp, iszero_Ñ_Hc, iszero_L_Hp, iszero_E)
+        return new{NT}(M_Hp, Ñ_Hc, L_Hp, E, iszero_M_Hp, iszero_Ñ_Hc, iszero_L_Hp, iszero_E)
     end
 end
 
@@ -589,10 +584,10 @@ function relaxU(Pu::Matrix{NT}, C_umin, C_umax, nϵ) where NT<:Real
         # ϵ impacts Z → U conversion for constraint calculations:
         A_Umin, A_Umax = -[Pu  C_umin], [Pu -C_umax] 
         # ϵ has no impact on Z → U conversion for prediction calculations:
-        P̃u = sparse_hcat(sparse(Pu), spzeros(NT, size(Pu, 1)))
+        P̃u = [Pu zeros(NT, size(Pu, 1))]
     else # Z̃ = Z (only hard constraints)
         A_Umin, A_Umax = -Pu,  Pu
-        P̃u = sparse(Pu)
+        P̃u = Pu
     end
     return A_Umin, A_Umax, P̃u
 end
@@ -626,17 +621,17 @@ bound, which is more precise than a linear inequality constraint. However, it is
 convenient to treat it as a linear inequality constraint since the optimizer `OSQP.jl` does
 not support pure bounds on the decision variables.
 """
-function relaxΔU(PΔu::AbstractMatrix{NT}, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) where NT<:Real
+function relaxΔU(PΔu::Matrix{NT}, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) where NT<:Real
     nZ = size(PΔu, 2)
     if nϵ == 1 # Z̃ = [Z; ϵ]
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]] # 0 ≤ ϵ ≤ ∞
         A_ϵ = [zeros(NT, 1, nZ) NT[1.0]]
         A_ΔŨmin, A_ΔŨmax = -[PΔu  C_Δumin; A_ϵ], [PΔu -C_Δumax; A_ϵ]
-        P̃Δu = blockdiag(sparse(PΔu), spdiagm([one(NT)]))
+        P̃Δu = [PΔu zeros(NT, size(PΔu, 1), 1); zeros(NT, 1, size(PΔu, 2)) NT[1.0]]
     else # Z̃ = Z (only hard constraints)
         ΔŨmin, ΔŨmax = ΔUmin, ΔUmax
         A_ΔŨmin, A_ΔŨmax = -PΔu,  PΔu
-        P̃Δu = sparse(PΔu)
+        P̃Δu = PΔu
     end
     return A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃Δu
 end

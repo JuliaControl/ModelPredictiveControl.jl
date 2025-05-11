@@ -85,15 +85,15 @@ function init_ZtoΔU end
 function init_ZtoΔU(
     estim::StateEstimator{NT}, transcription::SingleShooting, _ , Hc
 ) where {NT<:Real}
-    PΔu = Diagonal(fill(one(NT), estim.model.nu*Hc))
+    PΔu = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
     return PΔu
 end
 
 function init_ZtoΔU(
     estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
-    I_nu_Hc = Diagonal(fill(one(NT), estim.model.nu*Hc))
-    PΔu = sparse_hcat(I_nu_Hc , spzeros(NT, estim.model.nu*Hc, estim.nx̂*Hp))
+    I_nu_Hc = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
+    PΔu = [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
     return PΔu
 end
 
@@ -145,8 +145,7 @@ function init_ZtoU(
 ) where {NT<:Real}
     model = estim.model
     # Pu and Tu are `Matrix{NT}`, conversion is faster than `Matrix{Bool}` or `BitMatrix`
-    I_nu = Diagonal(fill(one(NT), model.nu))
-    # TODO: make PU and friends sparse
+    I_nu = Matrix{NT}(I, model.nu, model.nu)
     PU_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
     PUdagger = [PU_Hc; repeat(I_nu, Hp - Hc, Hc)]
     Pu = init_PUmat(estim, transcription, Hp, Hc, PUdagger)
