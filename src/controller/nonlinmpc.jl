@@ -306,8 +306,8 @@ function NonLinMPC(
     )
 end
 
-default_estimator(model::SimModel; kwargs...) = UnscentedKalmanFilter(model, kwargs...)
-default_estimator(model::LinModel; kwargs...) = SteadyKalmanFilter(model, kwargs...)
+default_estimator(model::SimModel; kwargs...) = UnscentedKalmanFilter(model; kwargs...)
+default_estimator(model::LinModel; kwargs...) = SteadyKalmanFilter(model; kwargs...)
 
 """
     NonLinMPC(estim::StateEstimator; <keyword arguments>)
