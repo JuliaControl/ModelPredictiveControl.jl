@@ -212,7 +212,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
         mul!(F, mpc.G, mpc.d0, 1, 1)            # F = F + G*d0
         mul!(F, mpc.J, mpc.D̂0, 1, 1)            # F = F + J*D̂0
     end
-    Cy, Cu, M_Hp_Ẽ, L_Hp_P̃U = mpc.buffer.Ŷ, mpc.buffer.U, mpc.buffer.Ẽ, mpc.buffer.P̃u
+    Cy, Cu, M_Hp_Ẽ, L_Hp_P̃u = mpc.buffer.Ŷ, mpc.buffer.U, mpc.buffer.Ẽ, mpc.buffer.P̃u
     q̃, r = mpc.q̃, mpc.r
     q̃ .= 0
     r .= 0
@@ -226,8 +226,8 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     # --- input setpoint tracking term ---
     if !mpc.weights.iszero_L_Hp[]
         Cu .= mpc.Tu_lastu0 .+ mpc.Uop .- R̂u 
-        mul!(L_Hp_P̃U, mpc.weights.L_Hp, mpc.P̃u)
-        mul!(q̃, L_Hp_P̃U', Cu, 1, 1)             # q̃ = q̃ + L_Hp*P̃u'*Cu
+        mul!(L_Hp_P̃u, mpc.weights.L_Hp, mpc.P̃u)
+        mul!(q̃, L_Hp_P̃u', Cu, 1, 1)             # q̃ = q̃ + L_Hp*P̃u'*Cu
         r .+= dot(Cu, mpc.weights.L_Hp, Cu)     # r = r + Cu'*L_Hp*Cu
     end
     # --- finalize ---

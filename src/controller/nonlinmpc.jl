@@ -9,8 +9,9 @@ const DEFAULT_NONLINMPC_JACSPARSE = AutoSparse(
 )
 
 struct NonLinMPC{
-    NT<:Real, 
+    NT<:Real,
     SE<:StateEstimator,
+    CW<:ControllerWeights,
     TM<:TranscriptionMethod,
     JM<:JuMP.GenericModel,
     GB<:AbstractADType,
@@ -32,7 +33,7 @@ struct NonLinMPC{
     Hp::Int
     Hc::Int
     nϵ::Int
-    weights::ControllerWeights{NT}
+    weights::CW
     JE::JEfunc
     p::PT
     R̂u::Vector{NT}
@@ -61,12 +62,14 @@ struct NonLinMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function NonLinMPC{NT}(
-        estim::SE, 
-        Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE::JEfunc, gc!::GCfunc, nc, p::PT, 
-        transcription::TM, optim::JM, gradient::GB, jacobian::JB
+        estim::SE, Hp, Hc, weights::CW,
+        JE::JEfunc, gc!::GCfunc, nc, p::PT, 
+        transcription::TM, optim::JM, 
+        gradient::GB, jacobian::JB
     ) where {
             NT<:Real, 
-            SE<:StateEstimator, 
+            SE<:StateEstimator,
+            CW<:ControllerWeights,
             TM<:TranscriptionMethod,
             JM<:JuMP.GenericModel,
             GB<:AbstractADType,
@@ -78,7 +81,6 @@ struct NonLinMPC{
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
-        weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
@@ -90,8 +92,9 @@ struct NonLinMPC{
         # dummy vals (updated just before optimization):
         F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
         con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ = init_defaultcon_mpc(
-            estim, transcription,
-            Hp, Hc, Cwt, PΔu, Pu, E, 
+            estim, weights, transcription,
+            Hp, Hc, 
+            PΔu, Pu, E, 
             ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
             Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
             gc!, nc
@@ -107,7 +110,7 @@ struct NonLinMPC{
         nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
-        mpc = new{NT, SE, TM, JM, GB, JB, PT, JEfunc, GCfunc}(
+        mpc = new{NT, SE, CW, TM, JM, GB, JB, PT, JEfunc, GCfunc}(
             estim, transcription, optim, con,
             gradient, jacobian,
             Z̃, ŷ,
@@ -187,9 +190,9 @@ This controller allocates memory at each time step for the optimization.
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
-- `M_Hp=diagm(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
-- `N_Hc=diagm(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
-- `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
+- `M_Hp=Diagonal(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
+- `N_Hc=Diagonal(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
+- `L_Hp=Diagonal(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
 - `JE=(_,_,_,_)->0.0` : economic or custom cost function ``J_E(\mathbf{U_e}, \mathbf{Ŷ_e},
@@ -279,9 +282,9 @@ function NonLinMPC(
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE ::Function = (_,_,_,_) -> 0.0,
@@ -295,7 +298,7 @@ function NonLinMPC(
     jacobian::AbstractADType = default_jacobian(transcription),
     kwargs...
 )
-    estim = UnscentedKalmanFilter(model; kwargs...)
+    estim = default_estimator(model; kwargs...)
     return NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
@@ -303,37 +306,8 @@ function NonLinMPC(
     )
 end
 
-function NonLinMPC(
-    model::LinModel;
-    Hp::Int = default_Hp(model),
-    Hc::Int = DEFAULT_HC,
-    Mwt  = fill(DEFAULT_MWT, model.ny),
-    Nwt  = fill(DEFAULT_NWT, model.nu),
-    Lwt  = fill(DEFAULT_LWT, model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
-    Cwt  = DEFAULT_CWT,
-    Ewt  = DEFAULT_EWT,
-    JE ::Function = (_,_,_,_) -> 0.0,
-    gc!::Function = (_,_,_,_,_,_) -> nothing,
-    gc ::Function = gc!,
-    nc::Int = 0,
-    p = model.p,
-    transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
-    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
-    gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
-    jacobian::AbstractADType = default_jacobian(transcription),
-    kwargs...
-)
-    estim = SteadyKalmanFilter(model; kwargs...)
-    return NonLinMPC(
-        estim; 
-        Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
-        transcription, optim, gradient, jacobian
-    )
-end
-
+default_estimator(model::SimModel; kwargs...) = UnscentedKalmanFilter(model; kwargs...)
+default_estimator(model::LinModel; kwargs...) = SteadyKalmanFilter(model; kwargs...)
 
 """
     NonLinMPC(estim::StateEstimator; <keyword arguments>)
@@ -365,9 +339,9 @@ function NonLinMPC(
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE ::Function = (_,_,_,_) -> 0.0,
@@ -390,9 +364,9 @@ function NonLinMPC(
     end
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
+    weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     return NonLinMPC{NT}(
-        estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt, JE, gc!, nc, p, 
-        transcription, optim, gradient, jacobian
+        estim, Hp, Hc, weights, JE, gc!, nc, p, transcription, optim, gradient, jacobian
     )
 end
 

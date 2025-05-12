@@ -33,39 +33,62 @@ function PredictiveControllerBuffer(
 end
 
 "Include all the objective function weights of [`PredictiveController`](@ref)"
-struct ControllerWeights{NT<:Real}
-    M_Hp::Hermitian{NT, Matrix{NT}}
-    Ñ_Hc::Hermitian{NT, Matrix{NT}}
-    L_Hp::Hermitian{NT, Matrix{NT}}
+struct ControllerWeights{
+    NT<:Real,
+    # parameters to support both dense and Diagonal matrices (with specialization):
+    MW<:AbstractMatrix{NT}, 
+    NW<:AbstractMatrix{NT},  
+    LW<:AbstractMatrix{NT}, 
+}
+    M_Hp::Hermitian{NT, MW}
+    Ñ_Hc::Hermitian{NT, NW}
+    L_Hp::Hermitian{NT, LW}
     E   ::NT
     iszero_M_Hp::Vector{Bool}
     iszero_Ñ_Hc::Vector{Bool}
     iszero_L_Hp::Vector{Bool}
     iszero_E::Bool
+    isinf_C ::Bool
     function ControllerWeights{NT}(
-        model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
-    ) where NT<:Real
+        model, Hp, Hc, M_Hp::MW, N_Hc::NW, L_Hp::LW, Cwt=Inf, Ewt=0
+    ) where {
+        NT<:Real, 
+        MW<:AbstractMatrix{NT}, 
+        NW<:AbstractMatrix{NT}, 
+        LW<:AbstractMatrix{NT}
+    }
         validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-        # convert `Diagonal` to normal `Matrix` if required:
-        M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
-        N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
-        L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         nΔU = size(N_Hc, 1)
         C = Cwt
-        if !isinf(Cwt)  
+        isinf_C = isinf(C)
+        if !isinf_C  
             # ΔŨ = [ΔU; ϵ] (ϵ is the slack variable)
-            Ñ_Hc = Hermitian([N_Hc zeros(NT, nΔU, 1); zeros(NT, 1, nΔU) C], :L)
+            Ñ_Hc = [N_Hc zeros(NT, nΔU, 1); zeros(NT, 1, nΔU) C]
+            isdiag(N_Hc) && (Ñ_Hc = Diagonal(Ñ_Hc)) # NW(Ñ_Hc) does not work on Julia 1.10
         else
             # ΔŨ = ΔU (only hard constraints)
             Ñ_Hc = N_Hc
-        end   
+        end
+        M_Hp = Hermitian(M_Hp, :L)
+        Ñ_Hc = Hermitian(Ñ_Hc, :L)
+        L_Hp = Hermitian(L_Hp, :L)
         E = Ewt
         iszero_M_Hp = [iszero(M_Hp)]
         iszero_Ñ_Hc = [iszero(Ñ_Hc)]
         iszero_L_Hp = [iszero(L_Hp)]
         iszero_E = iszero(E)
-        return new{NT}(M_Hp, Ñ_Hc, L_Hp, E, iszero_M_Hp, iszero_Ñ_Hc, iszero_L_Hp, iszero_E)
+        return new{NT, MW, NW, LW}(
+            M_Hp, Ñ_Hc, L_Hp, E, 
+            iszero_M_Hp, iszero_Ñ_Hc, iszero_L_Hp, iszero_E, isinf_C
+        )
     end
+end
+
+"Outer constructor to convert weight matrix number type to `NT` if necessary."
+function ControllerWeights{NT}(
+        model, Hp, Hc, M_Hp::MW, N_Hc::NW, L_Hp::LW, Cwt=Inf, Ewt=0
+    ) where {NT<:Real, MW<:AbstractMatrix, NW<:AbstractMatrix, LW<:AbstractMatrix}
+    return ControllerWeights{NT}(model, Hp, Hc, NT.(M_Hp), NT.(N_Hc), NT.(L_Hp), Cwt, Ewt)
 end
 
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
@@ -478,8 +501,10 @@ end
 
 """
     init_defaultcon_mpc(
-        estim::StateEstimator, transcription::TranscriptionMethod,
-        Hp, Hc, C, 
+        estim::StateEstimator, 
+        weights::ControllerWeights
+        transcription::TranscriptionMethod,
+        Hp, Hc, 
         PΔu, Pu, E, 
         ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
         Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
@@ -491,8 +516,10 @@ Init `ControllerConstraint` struct with default parameters based on estimator `e
 Also return `P̃Δu`, `P̃u`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `Z̃`.
 """
 function init_defaultcon_mpc(
-    estim::StateEstimator{NT}, transcription::TranscriptionMethod,
-    Hp,  Hc, C, 
+    estim::StateEstimator{NT}, 
+    weights::ControllerWeights,
+    transcription::TranscriptionMethod,
+    Hp,  Hc, 
     PΔu, Pu, E, 
     ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
     Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
@@ -500,7 +527,7 @@ function init_defaultcon_mpc(
 ) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
-    nϵ = isinf(C) ? 0 : 1
+    nϵ = weights.isinf_C ? 0 : 1
     u0min,      u0max   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     Δumin,      Δumax   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     y0min,      y0max   = fill(convert(NT,-Inf), ny), fill(convert(NT,+Inf), ny)
