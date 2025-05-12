@@ -1,4 +1,8 @@
-struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
+struct ExplicitMPC{
+    NT<:Real, 
+    SE<:StateEstimator, 
+    CW<:ControllerWeights
+} <: PredictiveController{NT}
     estim::SE
     transcription::SingleShooting
     Z̃::Vector{NT}
@@ -6,7 +10,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     Hp::Int
     Hc::Int
     nϵ::Int
-    weights::ControllerWeights{NT}
+    weights::CW
     R̂u::Vector{NT}
     R̂y::Vector{NT}
     P̃Δu::Matrix{NT}
@@ -34,17 +38,12 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function ExplicitMPC{NT}(
-        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp
-    ) where {NT<:Real, SE<:StateEstimator}
+        estim::SE, Hp, Hc, weights::CW
+    ) where {NT<:Real, SE<:StateEstimator, CW<:ControllerWeights}
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         nϵ = 0    # no slack variable ϵ for ExplicitMPC
-        weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp)
-        # convert `Diagonal` to normal `Matrix` if required:
-        M_Hp = Hermitian(convert(Matrix{NT}, M_Hp), :L) 
-        N_Hc = Hermitian(convert(Matrix{NT}, N_Hc), :L)
-        L_Hp = Hermitian(convert(Matrix{NT}, L_Hp), :L)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         transcription = SingleShooting() # explicit MPC only supports SingleShooting
@@ -53,7 +52,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
         # dummy val (updated just before optimization):
         F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
-        P̃Δu, P̃u, Ñ_Hc, Ẽ = PΔu, Pu, N_Hc, E # no slack variable ϵ for ExplicitMPC
+        P̃Δu, P̃u, Ẽ = PΔu, Pu, E # no slack variable ϵ for ExplicitMPC
         H̃ = init_quadprog(model, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
@@ -65,7 +64,7 @@ struct ExplicitMPC{NT<:Real, SE<:StateEstimator} <: PredictiveController{NT}
         nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
-        mpc = new{NT, SE}(
+        mpc = new{NT, SE, CW}(
             estim,
             transcription,
             Z̃, ŷ,
@@ -131,9 +130,9 @@ function ExplicitMPC(
     Mwt = fill(DEFAULT_MWT, model.ny),
     Nwt = fill(DEFAULT_NWT, model.nu),
     Lwt = fill(DEFAULT_LWT, model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     kwargs...
 ) 
     estim = SteadyKalmanFilter(model; kwargs...)
@@ -154,9 +153,9 @@ function ExplicitMPC(
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
 ) where {NT<:Real, SE<:StateEstimator{NT}}
     isa(estim.model, LinModel) || error("estim.model type must be a LinModel") 
     nk = estimate_delays(estim.model)
@@ -164,7 +163,8 @@ function ExplicitMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
-    return ExplicitMPC{NT}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp)
+    weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp)
+    return ExplicitMPC{NT}(estim, Hp, Hc, weights)
 end
 
 setconstraint!(::ExplicitMPC; kwargs...) = error("ExplicitMPC does not support constraints.")

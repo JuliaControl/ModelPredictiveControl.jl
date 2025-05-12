@@ -420,7 +420,13 @@ end
     mpc13  = ExplicitMPC(model2)
     @test isa(mpc13, ExplicitMPC{Float32})
 
-    @test_throws ArgumentError LinMPC(model, Hp=0)
+    @test_logs(
+        (:warn, 
+        "prediction horizon Hp (0) ≤ estimated number of delays in model (0), the "*
+        "closed-loop system may be unstable or zero-gain (unresponsive)"), 
+        @test_throws ArgumentError ExplicitMPC(model, Hp=0)
+    )
+
 end
 
 @testitem "ExplicitMPC moves and getinfo" setup=[SetupMPCtests] begin
