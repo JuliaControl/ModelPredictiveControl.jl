@@ -64,7 +64,7 @@ struct ControllerWeights{
         if !isinf_C  
             # ΔŨ = [ΔU; ϵ] (ϵ is the slack variable)
             Ñ_Hc = [N_Hc zeros(NT, nΔU, 1); zeros(NT, 1, nΔU) C]
-            Ñ_Hc = NW(Ñ_Hc) # preserve special type e.g. Diagonal
+            isdiag(N_Hc) && (Ñ_Hc = Diagonal(Ñ_Hc)) # NW(Ñ_Hc) does not work on Julia 1.10
         else
             # ΔŨ = ΔU (only hard constraints)
             Ñ_Hc = N_Hc
