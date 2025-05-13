@@ -22,7 +22,7 @@ SparseMatrixColorings = "0a514795-09f3-496d-8182-132a7b665d35"
 [compat]
 ControlSystemsBase = "1.9"
 DAQP = "0.6"
-DifferentiationInterface = "0.6.45"
+DifferentiationInterface = "0.6.45, 0.7"
 Documenter = "1"
 FiniteDiff = "2"
 ForwardDiff = "0.10, 1"
