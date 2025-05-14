@@ -4,6 +4,7 @@ const DEFAULT_LINMPC_TRANSCRIPTION = SingleShooting()
 struct LinMPC{
     NT<:Real, 
     SE<:StateEstimator, 
+    CW<:ControllerWeights,
     TM<:TranscriptionMethod,
     JM<:JuMP.GenericModel
 } <: PredictiveController{NT}
@@ -19,7 +20,7 @@ struct LinMPC{
     Hc::Int
     nϵ::Int
     nb::Vector{Int}
-    weights::ControllerWeights{NT}
+    weights::CW
     R̂u::Vector{NT}
     R̂y::Vector{NT}
     P̃Δu::Matrix{NT}
@@ -46,13 +47,18 @@ struct LinMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function LinMPC{NT}(
-        estim::SE, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, 
+        estim::SE, Hp, Hc, weights::CW, 
         transcription::TM, optim::JM
-    ) where {NT<:Real, SE<:StateEstimator, TM<:TranscriptionMethod, JM<:JuMP.GenericModel}
+    ) where {
+            NT<:Real, 
+            SE<:StateEstimator, 
+            CW<:ControllerWeights,
+            TM<:TranscriptionMethod, 
+            JM<:JuMP.GenericModel
+        }
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
-        weights = ControllerWeights{NT}(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         nb = ones(Hc)
@@ -65,8 +71,9 @@ struct LinMPC{
         # dummy vals (updated just before optimization):
         F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
         con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ = init_defaultcon_mpc(
-            estim, transcription,
-            Hp, Hc, Cwt, PΔu, Pu, E, 
+            estim, weights, transcription,
+            Hp, Hc, 
+            PΔu, Pu, E, 
             ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
             Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
         )
@@ -80,7 +87,7 @@ struct LinMPC{
         nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
-        mpc = new{NT, SE, TM, JM}(
+        mpc = new{NT, SE, CW, TM, JM}(
             estim, transcription, optim, con,
             Z̃, ŷ,
             Hp, Hc, nϵ, nb,
@@ -142,9 +149,9 @@ arguments. This controller allocates memory at each time step for the optimizati
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
-- `M_Hp=diagm(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
-- `N_Hc=diagm(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
-- `L_Hp=diagm(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
+- `M_Hp=Diagonal(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
+- `N_Hc=Diagonal(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
+- `L_Hp=Diagonal(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
@@ -201,9 +208,9 @@ function LinMPC(
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt = DEFAULT_CWT,
     transcription::TranscriptionMethod = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
@@ -244,9 +251,9 @@ function LinMPC(
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
-    M_Hp = diagm(repeat(Mwt, Hp)),
-    N_Hc = diagm(repeat(Nwt, Hc)),
-    L_Hp = diagm(repeat(Lwt, Hp)),
+    M_Hp = Diagonal(repeat(Mwt, Hp)),
+    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     transcription::TranscriptionMethod = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
@@ -257,7 +264,8 @@ function LinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
-    return LinMPC{NT}(estim, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, transcription, optim)
+    weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
+    return LinMPC{NT}(estim, Hp, Hc, weights, transcription, optim)
 end
 
 """

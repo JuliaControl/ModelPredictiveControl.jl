@@ -1044,8 +1044,14 @@ function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooti
     return Z̃s
 end
 
-getΔŨ!(ΔŨ, mpc::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃) # since mpc.P̃Δu = I
-getΔŨ!(ΔŨ, mpc::PredictiveController, ::TranscriptionMethod, Z̃) = mul!(ΔŨ, mpc.P̃Δu, Z̃)
+getΔŨ!(ΔŨ, mpc::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃)
+function getΔŨ!(ΔŨ, mpc::PredictiveController, ::TranscriptionMethod, Z̃)
+    # avoid explicit matrix multiplication with mpc.P̃Δu for performance:
+    nΔU = mpc.Hc*mpc.estim.model.nu
+    ΔŨ[1:nΔU] .= @views Z̃[1:nΔU]
+    mpc.nϵ == 1 && (ΔŨ[end] = Z̃[end])
+    return ΔŨ
+end
 getU0!(U0, mpc::PredictiveController, Z̃) = (mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_lastu0)
 
 @doc raw"""
