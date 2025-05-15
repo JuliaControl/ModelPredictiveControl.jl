@@ -10,7 +10,8 @@ abstract type TranscriptionMethod end
 
 Construct a direct single shooting [`TranscriptionMethod`](@ref).
 
-The decision variable in the optimization problem is (excluding the slack ``ϵ``):
+The decision variable in the optimization problem is (excluding the slack ``ϵ`` and without
+any custom move blocking):
 ```math
 \mathbf{Z} = \mathbf{ΔU} =          \begin{bmatrix} 
     \mathbf{Δu}(k+0)                \\ 
@@ -66,7 +67,7 @@ end
 Init decision variables to input increments over ``H_c`` conversion matrix `PΔu`.
 
 Introducing the move blocking vector that specifies the length of each step in the 
-``\mathbf{ΔU}`` vector to customize the pattern (strictly positive integers):
+``\mathbf{ΔU}`` vector, to customize the pattern (strictly positive integers):
 
 ```math
 \mathbf{n_b} = \begin{bmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{bmatrix}'

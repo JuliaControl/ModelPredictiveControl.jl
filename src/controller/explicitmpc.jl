@@ -39,7 +39,7 @@ struct ExplicitMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function ExplicitMPC{NT}(
-        estim::SE, Hp, Hc, weights::CW
+        estim::SE, Hp, Hc, nb, weights::CW
     ) where {NT<:Real, SE<:StateEstimator, CW<:ControllerWeights}
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
@@ -48,7 +48,6 @@ struct ExplicitMPC{
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         transcription = SingleShooting() # explicit MPC only supports SingleShooting
-        nb = ones(Hc)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
@@ -128,7 +127,7 @@ ExplicitMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimat
 function ExplicitMPC(
     model::LinModel; 
     Hp::Int = default_Hp(model),
-    Hc::Int = DEFAULT_HC,
+    Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt = fill(DEFAULT_MWT, model.ny),
     Nwt = fill(DEFAULT_NWT, model.nu),
     Lwt = fill(DEFAULT_LWT, model.nu),
@@ -151,7 +150,7 @@ Use custom state estimator `estim` to construct `ExplicitMPC`.
 function ExplicitMPC(
     estim::SE;
     Hp::Int = default_Hp(estim.model),
-    Hc::Int = DEFAULT_HC,
+    Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
@@ -165,8 +164,9 @@ function ExplicitMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
+    nb, Hc = move_blocking(Hc)
     weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp)
-    return ExplicitMPC{NT}(estim, Hp, Hc, weights)
+    return ExplicitMPC{NT}(estim, Hp, Hc, nb, weights)
 end
 
 setconstraint!(::ExplicitMPC; kwargs...) = error("ExplicitMPC does not support constraints.")

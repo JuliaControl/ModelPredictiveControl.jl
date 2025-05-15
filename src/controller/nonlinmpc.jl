@@ -63,7 +63,7 @@ struct NonLinMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function NonLinMPC{NT}(
-        estim::SE, Hp, Hc, weights::CW,
+        estim::SE, Hp, Hc, nb, weights::CW,
         JE::JEfunc, gc!::GCfunc, nc, p::PT, 
         transcription::TM, optim::JM, 
         gradient::GB, jacobian::JB
@@ -84,7 +84,6 @@ struct NonLinMPC{
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
-        nb = ones(Hc)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
@@ -280,7 +279,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 function NonLinMPC(
     model::SimModel;
     Hp::Int = default_Hp(model),
-    Hc::Int = DEFAULT_HC,
+    Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
@@ -337,7 +336,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 function NonLinMPC(
     estim::SE;
     Hp::Int = default_Hp(estim.model),
-    Hc::Int = DEFAULT_HC,
+    Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
@@ -364,11 +363,12 @@ function NonLinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
+    nb, Hc = move_blocking(Hc)
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
     weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     return NonLinMPC{NT}(
-        estim, Hp, Hc, weights, JE, gc!, nc, p, transcription, optim, gradient, jacobian
+        estim, Hp, Hc, nb, weights, JE, gc!, nc, p, transcription, optim, gradient, jacobian
     )
 end
 
