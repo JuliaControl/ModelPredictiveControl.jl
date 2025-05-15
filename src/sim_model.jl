@@ -1,5 +1,3 @@
-const IntRangeOrVector = Union{UnitRange{Int}, Vector{Int}}
-
 @doc raw"""
 Abstract supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
 

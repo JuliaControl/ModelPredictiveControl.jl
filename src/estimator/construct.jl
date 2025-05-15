@@ -116,7 +116,7 @@ function init_integrators(nint::IntVectorOrInt, ny, varname::String)
         nint = fill(0, ny)
     end
     if length(nint) ≠ ny
-        error("nint_$(varname) size ($(length(nint))) ≠ n$(varname) ($ny)")
+        error("nint_$(varname) length ($(length(nint))) ≠ n$(varname) ($ny)")
     end
     any(nint .< 0) && error("nint_$(varname) values should be ≥ 0")
     nx = sum(nint)

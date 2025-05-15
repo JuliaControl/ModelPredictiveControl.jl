@@ -104,7 +104,7 @@ InternalModel estimator with a sample time Ts = 0.5 s, LinModel and:
 """
 function InternalModel(
     model::SM;
-    i_ym::IntRangeOrVector = 1:model.ny,
+    i_ym::AbstractVector{Int} = 1:model.ny,
     stoch_ym::LTISystem = (In = I(length(i_ym)); ss(In, In, In, In, model.Ts))
 ) where {NT<:Real, SM<:SimModel{NT}}
     stoch_ym = minreal(ss(stoch_ym))

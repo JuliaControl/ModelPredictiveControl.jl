@@ -136,8 +136,8 @@ LinModel with a sample time Ts = 0.1 s and:
 function LinModel(
     sys::StateSpace{E, NT},
     Ts::Union{Real,Nothing} = nothing;
-    i_u::IntRangeOrVector = 1:size(sys,2),
-    i_d::IntRangeOrVector = Int[]
+    i_u::AbstractVector{Int} = 1:size(sys,2),
+    i_d::AbstractVector{Int} = Int[]
 ) where {E, NT<:Real}
     if !isempty(i_d)
         # common indexes in i_u and i_d are interpreted as measured disturbances d :

@@ -376,7 +376,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
 function MovingHorizonEstimator(
     model::SM;
     He::Union{Int, Nothing} = nothing,
-    i_ym::IntRangeOrVector = 1:model.ny,
+    i_ym::AbstractVector{Int} = 1:model.ny,
     sigmaP_0 = fill(1/model.nx, model.nx),
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),

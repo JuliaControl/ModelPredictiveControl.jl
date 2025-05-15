@@ -453,6 +453,12 @@ end
 "Return `0` when model is not a [`LinModel`](@ref)."
 estimate_delays(::SimModel) = 0
 
+
+"Get move blocking vector `nb` and actual `Hc` value from provided `Hc_arg` argument" 
+move_blocking(Hc_arg::AbstractVector{Int}) = (Hc_arg, length(nb))
+move_blocking(Hc_arg::Int) = (fill(1, length(Hc_arg)), Hc_arg)
+
+
 """
     validate_args(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
 
