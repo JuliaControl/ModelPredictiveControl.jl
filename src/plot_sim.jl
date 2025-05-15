@@ -319,7 +319,7 @@ end
 "Keep manipulated input `u` unchanged for state estimator simulation."
 sim_getu!(::StateEstimator, u, _ , _ ) = u
 
-function get_indices(arg::IntRangeOrVector, n)
+function get_indices(arg::AbstractVector{Int}, n)
     if length(unique(arg)) ≠ length(arg) || maximum(arg) > n
         error("Plot keyword argument arguments should contains valid and unique indices")
     end

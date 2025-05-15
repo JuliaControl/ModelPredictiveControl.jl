@@ -166,7 +166,7 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 """
 function SteadyKalmanFilter(
     model::SM;
-    i_ym::IntRangeOrVector = 1:model.ny,
+    i_ym::AbstractVector{Int} = 1:model.ny,
     sigmaQ = fill(1/model.nx, model.nx),
     sigmaR = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
@@ -397,7 +397,7 @@ KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
 """
 function KalmanFilter(
     model::SM;
-    i_ym::IntRangeOrVector = 1:model.ny,
+    i_ym::AbstractVector{Int} = 1:model.ny,
     sigmaP_0 = fill(1/model.nx, model.nx),
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
@@ -654,7 +654,7 @@ UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
 """
 function UnscentedKalmanFilter(
     model::SM;
-    i_ym::IntRangeOrVector = 1:model.ny,
+    i_ym::AbstractVector{Int} = 1:model.ny,
     sigmaP_0 = fill(1/model.nx, model.nx),
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
@@ -1009,7 +1009,7 @@ ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
 """
 function ExtendedKalmanFilter(
     model::SM;
-    i_ym::IntRangeOrVector = 1:model.ny,
+    i_ym::AbstractVector{Int} = 1:model.ny,
     sigmaP_0 = fill(1/model.nx, model.nx),
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
