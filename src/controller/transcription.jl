@@ -954,7 +954,7 @@ linconstrainteq!(::PredictiveController, ::SimModel, ::MultipleShooting) = nothi
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var) -> Z̃s
 
-Set and return the warm start value of `Z̃var` for [`SingleShooting`](@ref) transcription.
+Set and return the warm-start value of `Z̃var` for [`SingleShooting`](@ref) transcription.
 
 If supported by `mpc.optim`, it warm-starts the solver at:
 ```math
@@ -985,7 +985,7 @@ end
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var) -> Z̃s
 
-Set and return the warm start value of `Z̃var` for [`MultipleShooting`](@ref) transcription.
+Set and return the warm-start value of `Z̃var` for [`MultipleShooting`](@ref) transcription.
 
 It warm-starts the solver at:
 ```math
