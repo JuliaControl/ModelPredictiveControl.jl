@@ -459,7 +459,7 @@ function set_warmstart_mhe!(V̂, X̂0, estim::MovingHorizonEstimator{NT}, Z̃var
     V̂, X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, Z̃s)
     Js = obj_nonlinprog!(x̄, estim, model, V̂, Z̃s)
     if !isfinite(Js)
-        Z̃s[nx̃+nx̂+1:end] = 0
+        Z̃s[nx̃+1:end] = 0
     end
     # --- unused variable in Z̃ (applied only when Nk ≠ He) ---
     # We force the update of the NLP gradient and jacobian by warm-starting the unused 
