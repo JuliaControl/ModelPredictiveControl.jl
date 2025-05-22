@@ -1356,15 +1356,14 @@ function get_optim_functions(
     ∇J_prep = prepare_gradient(Jfunc!, grad, Z̃_∇J, ∇J_context...; strict)
     estim.Nk[] = 0
     ∇J = Vector{JNT}(undef, nZ̃)
-    function update_objective!(J, ∇J, Z̃, Z̃arg)
-        if isdifferent(Z̃arg, Z̃)
-            Z̃ .= Z̃arg
+    function update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        if isdifferent(Z̃arg, Z̃_∇J)
+            Z̃_∇J .= Z̃arg
             J[], _ = value_and_gradient!(Jfunc!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
         end
     end
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
-        @show J
         return J[]::T
     end
     ∇Jfunc! = function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
@@ -1388,10 +1387,10 @@ function get_optim_functions(
     estim.con.i_g .= false
     estim.Nk[] = 0
     ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
-    function update_con!(g, ∇g, Z̃, Z̃arg)
-        if isdifferent(Z̃arg, Z̃)
-            Z̃ .= Z̃arg
-            value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃, ∇g_context...)
+    function update_con!(g, ∇g, Z̃_∇g, Z̃arg)
+        if isdifferent(Z̃arg, Z̃_∇g)
+            Z̃_∇g .= Z̃arg
+            value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃_∇g, ∇g_context...)
         end
     end
     gfuncs = Vector{Function}(undef, ng)
