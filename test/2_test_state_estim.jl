@@ -1064,6 +1064,29 @@ end
     @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
 end
 
+@testitem "MovingHorizonEstimator estimation with unfilled window" setup=[SetupMPCtests] begin
+    f(x,u,_,_) = 0.5x + u
+    h(x,_,_) = x
+    model = NonLinModel(f, h, 10.0, 1, 1, 1, solver=nothing)
+    mhe1 = MovingHorizonEstimator(model, nint_u=[1], He=3, direct=true) 
+    for i = 1:40
+        y = model()
+        x̂ = preparestate!(mhe1, y)
+        updatestate!(mhe1, [0.0], y)
+        updatestate!(model, [0.1])
+    end
+    @test mhe1() ≈ model() atol = 1e-9
+    model = NonLinModel(f, h, 10.0, 1, 1, 1, solver=nothing)
+    mhe2 = MovingHorizonEstimator(model, nint_u=[1], He=3, direct=false) 
+    for i = 1:40
+        y = model()
+        x̂ = preparestate!(mhe2, y)
+        updatestate!(mhe2, [0.0], y)
+        updatestate!(model, [0.1])
+    end
+    @test mhe2() ≈ model() atol = 1e-9
+end
+
 @testitem "MovingHorizonEstimator fallbacks for arrival covariance estimation" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2], i_d=[3]), uop=[10,50], yop=[50,30], dop=[5])
