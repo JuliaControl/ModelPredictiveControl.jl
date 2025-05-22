@@ -398,6 +398,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     isfinite(J_0) || (Z̃s = [ϵ_0; estim.x̂0arr_old; zeros(NT, nŵ*estim.He)])
     JuMP.set_start_value.(Z̃var, Z̃s)
     # ------- solve optimization problem --------------
+    println("optimizing!")
     try
         JuMP.optimize!(optim)
     catch err
@@ -434,9 +435,11 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     end
     # --------- update estimate -----------------------
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
+    println("solved, needs to call predict! one more time.")
     V̂, X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, estim.Z̃)
     x̂0next    = @views X̂0[end-nx̂+1:end] 
     estim.x̂0 .= x̂0next
+    @show estim.Ŵ[1:nŵ*Nk]
     return estim.Z̃
 end
 
@@ -596,6 +599,10 @@ function predict!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, mode
             x̂0next .+= ŵ .+ estim.f̂op .- estim.x̂op
             x̂0 = x̂0next
         end
+    end
+    if eltype(X̂0) == Float64
+        @show X̂0
+        @show V̂
     end
     return V̂, X̂0
 end

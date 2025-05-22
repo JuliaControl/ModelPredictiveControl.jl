@@ -1364,6 +1364,7 @@ function get_optim_functions(
     end
     function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        @show J
         return J[]::T
     end
     ∇Jfunc! = function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
