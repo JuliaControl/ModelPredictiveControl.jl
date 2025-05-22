@@ -39,6 +39,7 @@ ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel)
 
 ```@docs
 ModelPredictiveControl.optim_objective!(::MovingHorizonEstimator)
+ModelPredictiveControl.set_warmstart_mhe!
 ```
 
 ## Remove Operating Points

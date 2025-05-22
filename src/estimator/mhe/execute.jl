@@ -362,43 +362,20 @@ end
 
 Optimize objective of `estim` [`MovingHorizonEstimator`](@ref) and return the solution `Z̃`.
 
-If supported by `estim.optim`, it warm-starts the solver at:
-```math
-\mathbf{Z̃_s} = 
-\begin{bmatrix}
-    ϵ_{k-1}                         \\
-    \mathbf{x̂}_{k-1}(k-N_k+p)       \\ 
-    \mathbf{ŵ}_{k-1}(k-N_k+p+0)     \\ 
-    \mathbf{ŵ}_{k-1}(k-N_k+p+1)     \\ 
-    \vdots                          \\
-    \mathbf{ŵ}_{k-1}(k-p-2)         \\
-    \mathbf{0}                      \\
-\end{bmatrix}
-```
-where ``\mathbf{ŵ}_{k-1}(k-j)`` is the input increment for time ``k-j`` computed at the 
-last time step ``k-1``. It then calls `JuMP.optimize!(estim.optim)` and extract the
-solution. A failed optimization prints an `@error` log in the REPL and returns the 
-warm-start value. A failed optimization also prints [`getinfo`](@ref) results in
-the debug log [if activated](@extref Julia Example:-Enable-debug-level-messages).
+If first warm-starts the solver with [`set_warmstart_mhe!`](@ref). It then calls 
+`JuMP.optimize!(estim.optim)` and extract the solution. A failed optimization prints an 
+`@error` log in the REPL and returns the warm-start value. A failed optimization also prints
+[`getinfo`](@ref) results in the debug log [if activated](@extref Julia Example:-Enable-debug-level-messages).
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim, buffer = estim.model, estim.optim, estim.buffer
-    nu, ny, nk = model.nu, model.ny, model.nk
-    nx̂, nym, nŵ, nϵ, Nk = estim.nx̂, estim.nym, estim.nx̂, estim.nϵ, estim.Nk[]
+    nym, nx̂, nŵ, nϵ, Nk = estim.nym, estim.nx̂, estim.nx̂, estim.nϵ, estim.Nk[]
     nx̃ = nϵ + nx̂
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    V̂   = Vector{NT}(undef, nym*Nk)
-    X̂0  = Vector{NT}(undef, nx̂*Nk)
-    û0, ŷ0, x̄, k0 = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
-    ϵ_0 = estim.nϵ ≠ 0 ? estim.Z̃[begin] : empty(estim.Z̃)
-    Z̃s = [ϵ_0; estim.x̂0arr_old; estim.Ŵ]
-    V̂, X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, Z̃s)
-    J_0 = obj_nonlinprog!(x̄, estim, model, V̂, Z̃s)
-    # warm-start Z̃s with Ŵ=0 if objective or constraint function not finite :
-    isfinite(J_0) || (Z̃s = [ϵ_0; estim.x̂0arr_old; zeros(NT, nŵ*estim.He)])
-    JuMP.set_start_value.(Z̃var, Z̃s)
+    V̂   = Vector{NT}(undef, nym*Nk)     # TODO: remove this allocation
+    X̂0  = Vector{NT}(undef, nx̂*Nk)      # TODO: remove this allocation
+    Z̃s = set_warmstart_mhe!(V̂, X̂0, estim, Z̃var)
     # ------- solve optimization problem --------------
-    println("optimizing!")
     try
         JuMP.optimize!(optim)
     catch err
@@ -434,13 +411,62 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
         estim.Z̃ .= JuMP.value.(Z̃var)
     end
     # --------- update estimate -----------------------
+    û0, ŷ0, k0 = buffer.û, buffer.ŷ, buffer.k
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
-    println("solved, needs to call predict! one more time.")
     V̂, X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, estim.Z̃)
     x̂0next    = @views X̂0[end-nx̂+1:end] 
     estim.x̂0 .= x̂0next
-    @show estim.Ŵ[1:nŵ*Nk]
     return estim.Z̃
+end
+
+@doc raw"""
+    set_warmstart_mhe!(V̂, X̂0, estim::MovingHorizonEstimator, Z̃var) -> Z̃s
+
+Set and return the warm-start value of `Z̃var` for [`MovingHorizonEstimator`](@ref).
+
+If supported by `estim.optim`, it warm-starts the solver at:
+```math
+\mathbf{Z̃_s} = 
+\begin{bmatrix}
+    ϵ_{k-1}                         \\
+    \mathbf{x̂}_{k-1}(k-N_k+p)       \\ 
+    \mathbf{ŵ}_{k-1}(k-N_k+p+0)     \\ 
+    \mathbf{ŵ}_{k-1}(k-N_k+p+1)     \\ 
+    \vdots                          \\
+    \mathbf{ŵ}_{k-1}(k-p-2)         \\
+    \mathbf{0}                      \\
+\end{bmatrix}
+```
+where ``ϵ(k-1)``, ``\mathbf{x̂}_{k-1}(k-N_k+p)`` and ``\mathbf{ŵ}_{k-1}(k-j)`` are
+respectively the slack variable, the arrival state estimate and the process noise estimates
+computed at the last time step ``k-1``. If the objective function is not finite at this
+point, all the process noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. The
+method mutates all the arguments.
+"""
+function set_warmstart_mhe!(V̂, X̂0, estim::MovingHorizonEstimator{NT}, Z̃var) where NT<:Real
+    model, buffer = estim.model, estim.buffer
+    nϵ, nx̂, nŵ, nZ̃, Nk = estim.nϵ, estim.nx̂, estim.nx̂, length(estim.Z̃), estim.Nk[]
+    nx̃ = nϵ + nx̂
+    Z̃s  = Vector{NT}(undef, nZ̃)  # TODO: remove this allocation
+    û0, ŷ0, x̄, k0 = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
+    # --- slack variable ϵ ---
+    estim.nϵ == 1 && (Z̃s[begin] = estim.Z̃[begin])
+    # --- arrival state estimate x̂0arr ---
+    Z̃s[nϵ+1:nx̃] = estim.x̂0arr_old
+    # --- process noise estimates Ŵ ---
+    Z̃s[nx̃+1:end] = estim.Ŵ
+    # verify definiteness of objective function:
+    V̂, X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, Z̃s)
+    Js = obj_nonlinprog!(x̄, estim, model, V̂, Z̃s)
+    if !isfinite(Js)
+        Z̃s[nx̃+nx̂+1:end] = 0
+    end
+    # --- unused variable in Z̃ (applied only when Nk ≠ He) ---
+    # We force the update of the NLP gradient and jacobian by warm-starting the unused 
+    # variable in Z̃ at 1. Since estim.Ŵ is initialized with 0s, at least 1 variable in Z̃s
+    # will be inevitably different at the following time step.
+    Z̃s[nx̃+Nk*nŵ+1:end] .= 1
+    JuMP.set_start_value.(Z̃var, Z̃s)
 end
 
 "Correct the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
@@ -599,10 +625,6 @@ function predict!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, mode
             x̂0next .+= ŵ .+ estim.f̂op .- estim.x̂op
             x̂0 = x̂0next
         end
-    end
-    if eltype(X̂0) == Float64
-        @show X̂0
-        @show V̂
     end
     return V̂, X̂0
 end
