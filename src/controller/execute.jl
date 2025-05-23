@@ -556,6 +556,7 @@ function setmodel!(
         Ñ_Hc      = Ntilde_Hc,
         kwargs...
     )
+    uop_old = copy(mpc.estim.model.uop)
     x̂op_old = copy(mpc.estim.x̂op)
     nu, ny, Hp, Hc, nϵ = model.nu, model.ny, mpc.Hp, mpc.Hc, mpc.nϵ
     setmodel!(mpc.estim, model; kwargs...)
@@ -601,12 +602,12 @@ function setmodel!(
         mpc.weights.L_Hp .= L_Hp
         mpc.weights.iszero_L_Hp[] = iszero(mpc.weights.L_Hp)
     end
-    setmodel_controller!(mpc, x̂op_old)
+    setmodel_controller!(mpc, uop_old, x̂op_old)
     return mpc
 end
 
 "Update the prediction matrices, linear constraints and JuMP optimization."
-function setmodel_controller!(mpc::PredictiveController, x̂op_old)
+function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     model, estim, transcription = mpc.estim.model, mpc.estim, mpc.transcription
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     optim, con = mpc.optim, mpc.con
@@ -636,6 +637,7 @@ function setmodel_controller!(mpc::PredictiveController, x̂op_old)
     con.x̂0min .+= x̂op_old # convert x̂0 to x̂ with the old operating point
     con.x̂0max .+= x̂op_old # convert x̂0 to x̂ with the old operating point
     # --- operating points ---
+    mpc.lastu0 .+= uop_old .- model.uop
     for i in 0:Hp-1
         mpc.Uop[(1+nu*i):(nu+nu*i)] .= model.uop
         mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop

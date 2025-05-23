@@ -43,13 +43,15 @@ end
     
 Update [`MovingHorizonEstimator`](@ref) state `estim.x̂0`.
 
-The optimization problem of [`MovingHorizonEstimator`](@ref) documentation is solved at
-each discrete time ``k``. The prediction matrices are provided at [`init_predmat_mhe`](@ref)
-documentation. Once solved, the optimal estimate ``\mathbf{x̂}_k(k+p)`` is computed by 
-inserting the optimal values of ``\mathbf{x̂}_k(k-N_k+p)`` and ``\mathbf{Ŵ}`` in the
-augmented model from ``j = N_k-1`` to ``0`` inclusively. Afterward, if ``N_k = H_e``, the
-arrival covariance for the next time step ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated using 
-`estim.covestim` object.
+The optimization problem of [`MovingHorizonEstimator`](@ref) documentation is solved if
+`estim.direct` is `false` (otherwise solved in [`correct_estimate!`](@ref)). The prediction
+matrices are provided at [`init_predmat_mhe`](@ref) documentation. Once solved, the optimal
+estimate ``\mathbf{x̂}_k(k+p)`` is computed by inserting the optimal values of 
+``\mathbf{x̂}_k(k-N_k+p)`` and ``\mathbf{Ŵ}`` in the augmented model from ``j = N_k-1`` to
+``0`` inclusively. Afterward, if ``N_k = H_e``, the arrival covariance for the next time
+step ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated using `estim.covestim` object. It
+also stores `u0` at `estim.lastu0`, so it can be added to the data window at the next time
+step in [`correct_estimate!`](@ref).
 """
 function update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0)
     if !estim.direct
@@ -59,6 +61,7 @@ function update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0)
         optim_objective!(estim)
     end
     (estim.Nk[] == estim.He) && update_cov!(estim)
+    estim.lastu0 .= u0
     return nothing
 end
 
@@ -779,8 +782,10 @@ function setmodel_estimator!(
         # convert d to d0 with the new operating point:
         estim.D0[(1+nd*(i-1)):(nd*i)]    .-= model.dop
     end
+    estim.lastu0        .+= uop_old
     estim.Z̃[nϵ+1:nϵ+nx̂] .+= x̂op_old
     estim.x̂0arr_old     .+= x̂op_old
+    estim.lastu0        .-= model.uop
     estim.Z̃[nϵ+1:nϵ+nx̂] .-= x̂op
     estim.x̂0arr_old     .-= x̂op
     # --- covariance matrices ---

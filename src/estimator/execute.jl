@@ -403,7 +403,6 @@ function setmodel!(
     yop_old = copy(estim.model.yop)
     dop_old = copy(estim.model.dop)
     setmodel_linmodel!(estim.model, model)
-    estim.lastu0 .+= uop_old .- model.uop
     setmodel_estimator!(estim, model, uop_old, yop_old, dop_old, Q̂, R̂)
     return estim
 end
