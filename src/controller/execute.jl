@@ -2,9 +2,13 @@
     initstate!(mpc::PredictiveController, u, ym, d=[]) -> x̂
 
 Init the states of `mpc.estim` [`StateEstimator`](@ref) and warm start `mpc.Z̃` at zero.
+
+It also stores `u - mpc.estim.model.uop` at `mpc.lastu0` for converting the input increments
+``\mathbf{ΔU}`` to inputs ``\mathbf{U}``.
 """
 function initstate!(mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty)
     mpc.Z̃ .= 0
+    mpc.lastu0 .= u .- mpc.estim.model.uop
     return initstate!(mpc.estim, u, ym, d)
 end
 
@@ -16,10 +20,11 @@ Compute the optimal manipulated input value `u` for the current control period.
 Solve the optimization problem of `mpc` [`PredictiveController`](@ref) and return the
 results ``\mathbf{u}(k)``. Following the receding horizon principle, the algorithm discards
 the optimal future manipulated inputs ``\mathbf{u}(k+1), \mathbf{u}(k+2), ...`` Note that
-the method mutates `mpc` internal data but it does not modifies `mpc.estim` states. Call
-[`preparestate!(mpc, ym, d)`](@ref) before `moveinput!`, and [`updatestate!(mpc, u, ym, d)`](@ref)
-after, to update `mpc` state estimates. Setpoint and measured disturbance previews can
-be implemented with the `R̂y`, `R̂u` and `D̂` keyword arguments. 
+the method mutates `mpc` internal data (it stores `u - mpc.estim.model.uop` at `mpc.lastu0`
+for instance) but it does not modifies `mpc.estim` states. Call [`preparestate!(mpc, ym, d)`](@ref)
+before `moveinput!`, and [`updatestate!(mpc, u, ym, d)`](@ref) after, to update `mpc` state
+estimates. Setpoint and measured disturbance previews can be implemented with the `R̂y`, `R̂u`
+and `D̂` keyword arguments. 
 
 Calling a [`PredictiveController`](@ref) object calls this method.
 
@@ -69,7 +74,7 @@ function moveinput!(
     linconstraint!(mpc, mpc.estim.model, mpc.transcription)
     linconstrainteq!(mpc, mpc.estim.model, mpc.transcription)
     Z̃ = optim_objective!(mpc)
-    return getinput(mpc, Z̃)
+    return getinput!(mpc, Z̃)
 end
 
 @doc raw"""
@@ -207,7 +212,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     F   = initpred_common!(mpc, model, d, D̂, R̂y, R̂u)
     F .+= mpc.B                                 # F = F + B
     mul!(F, mpc.K, mpc.estim.x̂0, 1, 1)          # F = F + K*x̂0
-    mul!(F, mpc.V, mpc.estim.lastu0, 1, 1)      # F = F + V*lastu0
+    mul!(F, mpc.V, mpc.lastu0, 1, 1)      # F = F + V*lastu0
     if model.nd > 0
         mul!(F, mpc.G, mpc.d0, 1, 1)            # F = F + G*d0
         mul!(F, mpc.J, mpc.D̂0, 1, 1)            # F = F + J*D̂0
@@ -254,7 +259,7 @@ Will also init `mpc.F` with 0 values, or with the stochastic predictions `Ŷs` 
 is an [`InternalModel`](@ref). The function returns `mpc.F`.
 """
 function initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
-    mul!(mpc.Tu_lastu0, mpc.Tu, mpc.estim.lastu0)
+    mul!(mpc.Tu_lastu0, mpc.Tu, mpc.lastu0)
     mpc.ŷ .= evaloutput(mpc.estim, d)
     if model.nd > 0
         mpc.d0 .= d .- model.dop
@@ -446,20 +451,23 @@ function preparestate!(mpc::PredictiveController, ym, d=mpc.estim.buffer.empty)
 end
 
 @doc raw"""
-    getinput(mpc::PredictiveController, Z̃) -> u
+    getinput!(mpc::PredictiveController, Z̃) -> u
 
-Get current manipulated input `u` from a [`PredictiveController`](@ref) solution `Z̃`.
+Get current manipulated input `u` from the solution `Z̃`, store it and return it.
 
 The first manipulated input ``\mathbf{u}(k)`` is extracted from the decision vector
-``\mathbf{Z̃}`` and applied on the plant (from the receding horizon principle).
+``\mathbf{Z̃}`` and applied on the plant (from the receding horizon principle). It also
+stores `u - mpc.estim.model.uop` at `mpc.lastu0`.
 """
-function getinput(mpc, Z̃)
+function getinput!(mpc, Z̃)
+    model = mpc.estim.model
     Δu  = mpc.buffer.u
-    for i in 1:mpc.estim.model.nu
+    for i in 1:model.nu
         Δu[i] = Z̃[i]
     end
     u   = Δu
-    u .+= mpc.estim.lastu0 .+ mpc.estim.model.uop
+    u .+= mpc.lastu0 .+ model.uop
+    mpc.lastu0 .=  u .- model.uop
     return u
 end
 

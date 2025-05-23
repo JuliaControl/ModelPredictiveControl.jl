@@ -2,9 +2,6 @@
     remove_op!(estim::StateEstimator, ym, d, u=nothing) -> y0m, d0, u0
 
 Remove operating pts on measured outputs `ym`, disturbances `d` and inputs `u` (if provided).
-
-If `u` is provided, also store current inputs without operating points `u0` in 
-`estim.lastu0`. This field is used for [`PredictiveController`](@ref) computations.
 """
 function remove_op!(estim::StateEstimator, ym, d, u=nothing)
     y0m, u0, d0 = estim.buffer.ym, estim.buffer.u, estim.buffer.d
@@ -12,7 +9,6 @@ function remove_op!(estim::StateEstimator, ym, d, u=nothing)
     d0  .= d  .- estim.model.dop
     if !isnothing(u)
         u0 .= u .- estim.model.uop
-        estim.lastu0 .= u0
     end
     return y0m, d0, u0
 end
@@ -108,8 +104,7 @@ end
 Init `estim.x̂0` states from current inputs `u`, measured outputs `ym` and disturbances `d`.
 
 The method tries to find a good steady-state for the initial estimate ``\mathbf{x̂}``. It
-stores `u - estim.model.uop` at `estim.lastu0` and removes the operating points with 
-[`remove_op!`](@ref), and call [`init_estimate!`](@ref):
+removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!`](@ref):
 
 - If `estim.model` is a [`LinModel`](@ref), it finds the steady-state of the augmented model
   using `u` and `d` arguments, and uses the `ym` argument to enforce that 

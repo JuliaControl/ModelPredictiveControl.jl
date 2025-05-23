@@ -13,6 +13,7 @@ struct ExplicitMPC{
     weights::CW
     R̂u::Vector{NT}
     R̂y::Vector{NT}
+    lastu0::Vector{NT}
     P̃Δu::Matrix{NT}
     P̃u ::Matrix{NT} 
     Tu ::Matrix{NT}
@@ -46,6 +47,7 @@ struct ExplicitMPC{
         nϵ = 0    # no slack variable ϵ for ExplicitMPC
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        lastu0 = zeros(NT, nu)
         transcription = SingleShooting() # explicit MPC only supports SingleShooting
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
@@ -71,6 +73,7 @@ struct ExplicitMPC{
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
+            lastu0,
             P̃Δu, P̃u, Tu, Tu_lastu0,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,

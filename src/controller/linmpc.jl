@@ -22,6 +22,7 @@ struct LinMPC{
     weights::CW
     R̂u::Vector{NT}
     R̂y::Vector{NT}
+    lastu0::Vector{NT}
     P̃Δu::Matrix{NT}
     P̃u ::Matrix{NT} 
     Tu ::Matrix{NT}
@@ -60,6 +61,7 @@ struct LinMPC{
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        lastu0 = zeros(NT, ny)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
@@ -91,6 +93,7 @@ struct LinMPC{
             Hp, Hc, nϵ,
             weights,
             R̂u, R̂y,
+            lastu0,
             P̃Δu, P̃u, Tu, Tu_lastu0,
             Ẽ, F, G, J, K, V, B, 
             H̃, q̃, r,
