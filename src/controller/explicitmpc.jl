@@ -53,7 +53,7 @@ struct ExplicitMPC{
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
         # dummy val (updated just before optimization):
-        F, fx̂  = zeros(NT, ny*Hp), zeros(NT, nx̂)
+        F = zeros(NT, ny*Hp)
         P̃Δu, P̃u, Ẽ = PΔu, Pu, E # no slack variable ϵ for ExplicitMPC
         H̃ = init_quadprog(model, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
@@ -218,7 +218,7 @@ addinfo!(info, mpc::ExplicitMPC) = info
 
 
 "Update the prediction matrices and Cholesky factorization."
-function setmodel_controller!(mpc::ExplicitMPC, _ )
+function setmodel_controller!(mpc::ExplicitMPC, uop_old, _ )
     model, estim, transcription = mpc.estim.model, mpc.estim, mpc.transcription
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
@@ -235,6 +235,7 @@ function setmodel_controller!(mpc::ExplicitMPC, _ )
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc)
     # --- operating points ---
+    mpc.lastu0 .+= uop_old .- model.uop
     for i in 0:Hp-1
         mpc.Uop[(1+nu*i):(nu+nu*i)] .= model.uop
         mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop

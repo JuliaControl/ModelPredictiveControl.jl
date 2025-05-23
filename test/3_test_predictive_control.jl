@@ -361,6 +361,7 @@ end
     preparestate!(mpc, [10])
     u = moveinput!(mpc, r)
     @test u ≈ [2] atol=1e-2
+    @test mpc.lastu0 ≈ [2] - [1] atol=1e-2
     setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))
     @test mpc.Yop ≈ fill(20.0, 1000)
     @test mpc.Uop ≈ fill(11.0, 1000)
@@ -368,6 +369,7 @@ end
     @test mpc.con.U0max ≈ fill(26.0  - 1  + 1  - 11,  1000)
     @test mpc.con.Y0min ≈ fill(-54.0 - 10 + 10 - 20, 1000)
     @test mpc.con.Y0max ≈ fill(56.0  - 10 + 10 - 20, 1000)
+    @test mpc.lastu0 ≈ [2] - [11] atol=1e-2
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [15] atol=1e-2
@@ -556,9 +558,11 @@ end
     preparestate!(mpc, [10])
     u = moveinput!(mpc, r)
     @test u ≈ [2] atol=1e-2
+    @test mpc.lastu0 ≈ [2] - [1] atol=1e-2
     setmodel!(mpc, setop!(LinModel(tf(5, [2, 1]), 3), yop=[20], uop=[11]))
     @test mpc.Yop ≈ fill(20.0, 1000)
     @test mpc.Uop ≈ fill(11.0, 1000)
+    @test mpc.lastu0 ≈ [2] - [11] atol=1e-2
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [15] atol=1e-2
@@ -1112,6 +1116,7 @@ end
     preparestate!(mpc, [10])
     u = moveinput!(mpc, r)
     @test u ≈ [2] atol=1e-2
+    @test mpc.lastu0 ≈ [2] - [1] atol=1e-2
     setmodel!(mpc, setop!(LinModel(tf(5, [200, 1]), 300), yop=[20], uop=[11]))
     @test mpc.Yop ≈ fill(20.0, 1000)
     @test mpc.Uop ≈ fill(11.0, 1000)
@@ -1119,6 +1124,7 @@ end
     @test mpc.con.U0max ≈ fill(26.0  - 1  + 1  - 11,  1000)
     @test mpc.con.Y0min ≈ fill(-54.0 - 10 + 10 - 20, 1000)
     @test mpc.con.Y0max ≈ fill(56.0  - 10 + 10 - 20, 1000)
+    @test mpc.lastu0 ≈ [2] - [11] atol=1e-2
     r = [40]
     u = moveinput!(mpc, r)
     @test u ≈ [15] atol=1e-2

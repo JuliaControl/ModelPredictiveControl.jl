@@ -264,7 +264,6 @@ end
     @test kalmanfilter.Â ≈ [0.2]
     preparestate!(kalmanfilter, [55.0])
     @test evaloutput(kalmanfilter) ≈ [55.0]
-    @test kalmanfilter.lastu0 ≈ [2.0 - 3.0]
     preparestate!(kalmanfilter, [55.0])
     x̂ = updatestate!(kalmanfilter, [3.0], [55.0])
     @test x̂ ≈ [3.0]
@@ -507,7 +506,6 @@ end
     @test internalmodel.Â ≈ [0.2]
     preparestate!(internalmodel, [55.0])
     @test evaloutput(internalmodel) ≈ [55.0]
-    @test internalmodel.lastu0 ≈ [2.0 - 3.0]
     preparestate!(internalmodel, [55.0])
     x̂ = updatestate!(internalmodel, [3.0], [55.0])
     @test x̂ ≈ [3.0]
@@ -653,7 +651,6 @@ end
     @test ukf1.Â ≈ [0.2]
     preparestate!(ukf1, [55.0])
     @test evaloutput(ukf1) ≈ [55.0]
-    @test ukf1.lastu0 ≈ [2.0 - 3.0]
     preparestate!(ukf1, [55.0])
     x̂ = updatestate!(ukf1, [3.0], [55.0])
     @test x̂ ≈ [3.0]
@@ -818,7 +815,6 @@ end
     @test ekf1.Â ≈ [0.2]
     preparestate!(ekf1, [55.0])
     @test evaloutput(ekf1) ≈ [55.0]
-    @test ekf1.lastu0 ≈ [2.0 - 3.0]
     preparestate!(ekf1, [55.0])
     x̂ = updatestate!(ekf1, [3.0], [55.0])
     @test x̂ ≈ [3.0]
