@@ -1,6 +1,5 @@
 struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     model::SM
-    lastu0::Vector{NT}
     x̂op::Vector{NT}
     f̂op::Vector{NT}
     x̂0 ::Vector{NT}
@@ -41,13 +40,12 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         catch
             error("Cannot compute the Luenberger gain K̂ with specified poles.")
         end
-        lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model, 
-            lastu0, x̂op, f̂op, x̂0,
+            x̂op, f̂op, x̂0,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,

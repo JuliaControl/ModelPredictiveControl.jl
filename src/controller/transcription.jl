@@ -852,7 +852,7 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
     nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
     fx̂ .= mpc.con.bx̂
     mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂0, 1, 1)
-    mul!(fx̂, mpc.con.vx̂, mpc.estim.lastu0, 1, 1)
+    mul!(fx̂, mpc.con.vx̂, mpc.lastu0, 1, 1)
     if model.nd > 0
         mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
         mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
@@ -938,7 +938,7 @@ function linconstrainteq!(mpc::PredictiveController, model::LinModel, ::Multiple
     Fŝ  = mpc.con.Fŝ
     Fŝ .= mpc.con.Bŝ
     mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0, 1, 1)
-    mul!(Fŝ, mpc.con.Vŝ, mpc.estim.lastu0, 1, 1)
+    mul!(Fŝ, mpc.con.Vŝ, mpc.lastu0, 1, 1)
     if model.nd > 0
         mul!(Fŝ, mpc.con.Gŝ, mpc.d0, 1, 1)
         mul!(Fŝ, mpc.con.Jŝ, mpc.D̂0, 1, 1)
