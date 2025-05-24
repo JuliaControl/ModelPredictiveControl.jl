@@ -15,6 +15,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , d0, u0)
         estim.U0[1:estim.model.nu] .= u0
         estim.D0[1:estim.model.nd] .= d0
     end
+    estim.lastu0 .= u0
     # estim.P̂_0 is in fact P̂(-1|-1) is estim.direct==false, else P̂(-1|0)
     invert_cov!(estim, estim.P̂_0)
     estim.P̂arr_old  .= estim.P̂_0
