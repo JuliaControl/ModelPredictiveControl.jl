@@ -978,9 +978,9 @@ differentiation. This estimator is allocation-free if `model` simulations do not
 - `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
     ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
 - `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
-    the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
+    the manipulated inputs (vector), use `nint_u=0` for no integrator.
 - `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
-    disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
+    disturbances at the measured outputs, use `nint_ym=0` for no integrator.
 - `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
     disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
 - `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured

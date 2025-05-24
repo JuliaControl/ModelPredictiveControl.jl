@@ -157,7 +157,7 @@ function ExplicitMPC(
     N_Hc = Diagonal(repeat(Nwt, Hc)),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
 ) where {NT<:Real, SE<:StateEstimator{NT}}
-    isa(estim.model, LinModel) || error("estim.model type must be a LinModel") 
+    isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 
     nk = estimate_delays(estim.model)
     if Hp ≤ nk
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*

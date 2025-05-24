@@ -256,7 +256,7 @@ function LinMPC(
     transcription::TranscriptionMethod = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
-    isa(estim.model, LinModel) || error("estim.model type must be a LinModel") 
+    isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 
     nk = estimate_delays(estim.model)
     if Hp ≤ nk
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
