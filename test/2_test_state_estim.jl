@@ -944,7 +944,8 @@ end
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
 
-    @test initstate!(mhe1, [10, 50], [50, 30+1], [5]) ≈ zeros(6) atol=1e-9
+    @test initstate!(mhe1, [11, 52], [50, 30], [5]) ≈ zeros(6) atol=1e-9
+    @test mhe1.lastu0 ≈ [1, 2]
     setstate!(mhe1, [1,2,3,4,5,6])
     @test mhe1.x̂0 ≈ [1,2,3,4,5,6]
     for i in 1:40
@@ -970,7 +971,8 @@ end
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
 
-    @test initstate!(mhe1, [10, 50], [50, 30+1], [5]) ≈ zeros(6) atol=1e-9
+    @test initstate!(mhe1, [11, 52], [50, 30], [5]) ≈ zeros(6) atol=1e-9
+    @test mhe1.lastu0 ≈ [1, 2]
     setstate!(mhe1, [1,2,3,4,5,6])
     @test mhe1.x̂0 ≈ [1,2,3,4,5,6]
     for i in 1:40
