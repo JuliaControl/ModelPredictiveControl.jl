@@ -212,7 +212,7 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
     F   = initpred_common!(mpc, model, d, D̂, R̂y, R̂u)
     F .+= mpc.B                                 # F = F + B
     mul!(F, mpc.K, mpc.estim.x̂0, 1, 1)          # F = F + K*x̂0
-    mul!(F, mpc.V, mpc.lastu0, 1, 1)      # F = F + V*lastu0
+    mul!(F, mpc.V, mpc.lastu0, 1, 1)            # F = F + V*lastu0
     if model.nd > 0
         mul!(F, mpc.G, mpc.d0, 1, 1)            # F = F + G*d0
         mul!(F, mpc.J, mpc.D̂0, 1, 1)            # F = F + J*D̂0
