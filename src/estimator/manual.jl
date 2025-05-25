@@ -125,7 +125,7 @@ ManualEstimator estimator with a sample time Ts = 0.5 s, LinModel and:
     A custom stochastic model for the unmeasured disturbances (other than integrated white 
     noise) can be specified by constructing a [`SimModel`](@ref) object with the augmented
     state-space matrices/functions directly, and by setting `nint_u=0` and `nint_ym=0`. See
-    [`Disturbance-gallery`](@ext_ref LowLevelParticleFilters) for examples of other
+    [`Disturbance-gallery`](@extref LowLevelParticleFilters) for examples of other
     disturbance models.
 """
 function ManualEstimator(
