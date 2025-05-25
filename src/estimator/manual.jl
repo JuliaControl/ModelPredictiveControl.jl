@@ -119,10 +119,10 @@ ManualEstimator estimator with a sample time Ts = 0.5 s, LinModel and:
                return collect([y_data ŷ_data]')
            end;
 
-    julia> YandŶ = man_sim()
+    julia> YandŶ = round.(man_sim(), digits=6)
     2×5 Matrix{Float64}:
-      0.0          0.239713  0.227556  0.157837  0.0986288
-     -1.41242e-19  0.238713  0.226556  0.156837  0.0976288
+      0.0  0.239713  0.227556  0.157837  0.098629
+     -0.0  0.238713  0.226556  0.156837  0.097629
     ```
 
     A second use case is to allow the user to manually provide the state estimate computed
