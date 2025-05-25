@@ -56,6 +56,11 @@ mpc_mhe.estim()
 u = mpc_mhe([55, 30])
 sim!(mpc_mhe, 2, [55, 30])
 
+mpc_man = setconstraint!(LinMPC(ManualEstimator(model)), ymin=[45, -Inf])
+initstate!(mpc_man, model.uop, model())
+setstate!(mpc_man, ones(4))
+u = mpc_man([55, 30])
+
 nmpc_skf = setconstraint!(NonLinMPC(SteadyKalmanFilter(model), Cwt=Inf), ymin=[45, -Inf])
 initstate!(nmpc_skf, model.uop, model())
 preparestate!(nmpc_skf, [55, 30])

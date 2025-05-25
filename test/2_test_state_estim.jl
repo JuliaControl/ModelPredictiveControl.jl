@@ -1,29 +1,29 @@
 @testitem "SteadyKalmanFilter construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    skalmanfilter1 = SteadyKalmanFilter(linmodel1)
-    @test skalmanfilter1.nym == 2
-    @test skalmanfilter1.nyu == 0
-    @test skalmanfilter1.nxs == 2
-    @test skalmanfilter1.nx̂ == 4
-    @test skalmanfilter1.nint_ym == [1, 1]
+    linmodel = LinModel(sys,Ts,i_u=[1,2])
+    manual1 = SteadyKalmanFilter(linmodel)
+    @test manual1.nym == 2
+    @test manual1.nyu == 0
+    @test manual1.nxs == 2
+    @test manual1.nx̂ == 4
+    @test manual1.nint_ym == [1, 1]
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
-    skalmanfilter2 = SteadyKalmanFilter(linmodel2, i_ym=[2])
-    @test skalmanfilter2.nym == 1
-    @test skalmanfilter2.nyu == 1
-    @test skalmanfilter2.nxs == 1
-    @test skalmanfilter2.nx̂ == 5
-    @test skalmanfilter2.nint_ym == [1]
+    manual2 = SteadyKalmanFilter(linmodel2, i_ym=[2])
+    @test manual2.nym == 1
+    @test manual2.nyu == 1
+    @test manual2.nxs == 1
+    @test manual2.nx̂ == 5
+    @test manual2.nint_ym == [1]
 
-    skalmanfilter3 = SteadyKalmanFilter(linmodel1, nint_ym=0)
-    @test skalmanfilter3.nxs == 0
-    @test skalmanfilter3.nx̂ == 2
-    @test skalmanfilter3.nint_ym == [0, 0]
+    manual3 = SteadyKalmanFilter(linmodel, nint_ym=0)
+    @test manual3.nxs == 0
+    @test manual3.nx̂ == 2
+    @test manual3.nint_ym == [0, 0]
 
-    skalmanfilter4 = SteadyKalmanFilter(linmodel1, nint_ym=[2,2])
-    @test skalmanfilter4.nxs == 4
-    @test skalmanfilter4.nx̂ == 6
+    manual4 = SteadyKalmanFilter(linmodel, nint_ym=[2,2])
+    @test manual4.nxs == 4
+    @test manual4.nx̂ == 6
 
     skalmanfilter5 = SteadyKalmanFilter(linmodel2, σQ=[1,2,3,4], σQint_ym=[5, 6],  σR=[7, 8])
     @test skalmanfilter5.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
@@ -35,87 +35,87 @@
     @test skalmanfilter6.nx̂ == 5
     @test skalmanfilter6.nint_ym == [0, 1, 1]
 
-    skalmanfilter7 = SteadyKalmanFilter(linmodel1, nint_u=[1,1])
-    @test skalmanfilter7.nxs == 2
-    @test skalmanfilter7.nx̂  == 4
-    @test skalmanfilter7.nint_u  == [1, 1]
-    @test skalmanfilter7.nint_ym == [0, 0]
+    manual5 = SteadyKalmanFilter(linmodel, nint_u=[1,1])
+    @test manual5.nxs == 2
+    @test manual5.nx̂  == 4
+    @test manual5.nint_u  == [1, 1]
+    @test manual5.nint_ym == [0, 0]
 
     linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
-    skalmanfilter8 = SteadyKalmanFilter(linmodel2)
-    @test isa(skalmanfilter8, SteadyKalmanFilter{Float32})
+    manual6 = SteadyKalmanFilter(linmodel2)
+    @test isa(manual6, SteadyKalmanFilter{Float32})
 
-    skalmanfilter9 = SteadyKalmanFilter(linmodel1, 1:2, 0, [1, 1], I(4), I(2))
+    skalmanfilter9 = SteadyKalmanFilter(linmodel, 1:2, 0, [1, 1], I(4), I(2))
     @test skalmanfilter9.Q̂ ≈ I(4)
     @test skalmanfilter9.R̂ ≈ I(2)
 
-    @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=[1,1,1])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=[-1,0])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σQ=[1])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_ym=0, σR=[1,1,1])
+    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=[1,1,1])
+    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=[-1,0])
+    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=0, σQ=[1])
+    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=0, σR=[1,1,1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel3, nint_ym=[1, 0, 0])
     model_unobs = LinModel([1 0;0 1.5], [1; 0], [1 0], zeros(2,0), zeros(1,0), 1.0)
     @test_throws ErrorException SteadyKalmanFilter(model_unobs, nint_ym=[1])
     @test_throws ErrorException SteadyKalmanFilter(LinModel(tf(1,[10, 1]), 1.0), 1:1, 0, 0, [-1], [1])
     @test_throws ErrorException SteadyKalmanFilter(LinModel(tf(1, [1,0]), 1), nint_ym=[1])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel1, nint_u=[1,1], nint_ym=[1,1])
+    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_u=[1,1], nint_ym=[1,1])
 end
 
 @testitem "SteadyKalmanFilter estimator methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    skalmanfilter1 = SteadyKalmanFilter(linmodel1, nint_ym=[1, 1])
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    manual1 = SteadyKalmanFilter(linmodel, nint_ym=[1, 1])
     u, y, d = [10, 50], [50, 30], Float64[]
-    preparestate!(skalmanfilter1, y)
-    @test updatestate!(skalmanfilter1, u, y) ≈ zeros(4)
-    preparestate!(skalmanfilter1, y)
-    @test updatestate!(skalmanfilter1, u, y, d) ≈ zeros(4)
-    @test skalmanfilter1.x̂0 ≈ zeros(4)
-    @test_skip @allocations(preparestate!(skalmanfilter1, y)) == 0
-    @test_skip @allocations(updatestate!(skalmanfilter1, u, y)) == 0
-    preparestate!(skalmanfilter1, y)
-    @test evaloutput(skalmanfilter1) ≈ skalmanfilter1() ≈ [50, 30]
-    @test evaloutput(skalmanfilter1, d) ≈ skalmanfilter1(d) ≈ [50, 30]
-    @test_skip @allocations(evaloutput(skalmanfilter1, d)) == 0
-    @test initstate!(skalmanfilter1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    preparestate!(manual1, y)
+    @test updatestate!(manual1, u, y) ≈ zeros(4)
+    preparestate!(manual1, y)
+    @test updatestate!(manual1, u, y, d) ≈ zeros(4)
+    @test manual1.x̂0 ≈ zeros(4)
+    @test_skip @allocations(preparestate!(manual1, y)) == 0
+    @test_skip @allocations(updatestate!(manual1, u, y)) == 0
+    preparestate!(manual1, y)
+    @test evaloutput(manual1) ≈ manual1() ≈ [50, 30]
+    @test evaloutput(manual1, d) ≈ manual1(d) ≈ [50, 30]
+    @test_skip @allocations(evaloutput(manual1, d)) == 0
+    @test initstate!(manual1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     linmodel2 = LinModel(append(tf(1, [1, 0]), tf(2, [10, 1])), 1.0)
-    skalmanfilter2 = SteadyKalmanFilter(linmodel2, nint_u=[1, 1], direct=false)
-    x = initstate!(skalmanfilter2, [10, 3], [0.5, 6+0.1])
-    @test evaloutput(skalmanfilter2) ≈ [0.5, 6+0.1]
-    @test updatestate!(skalmanfilter2, [10, 3], [0.5, 6+0.1]) ≈ x
-    setstate!(skalmanfilter1, [1,2,3,4])
-    @test skalmanfilter1.x̂0 ≈ [1,2,3,4]
+    manual2 = SteadyKalmanFilter(linmodel2, nint_u=[1, 1], direct=false)
+    x = initstate!(manual2, [10, 3], [0.5, 6+0.1])
+    @test evaloutput(manual2) ≈ [0.5, 6+0.1]
+    @test updatestate!(manual2, [10, 3], [0.5, 6+0.1]) ≈ x
+    setstate!(manual1, [1,2,3,4])
+    @test manual1.x̂0 ≈ [1,2,3,4]
     for i in 1:40
-        preparestate!(skalmanfilter1, [50, 30])
-        updatestate!(skalmanfilter1, [11, 52], [50, 30])
+        preparestate!(manual1, [50, 30])
+        updatestate!(manual1, [11, 52], [50, 30])
     end
-    preparestate!(skalmanfilter1, [50, 30])
-    @test skalmanfilter1() ≈ [50, 30] atol=1e-3
+    preparestate!(manual1, [50, 30])
+    @test manual1() ≈ [50, 30] atol=1e-3
     for i in 1:40
-        preparestate!(skalmanfilter1, [51, 32])
-        updatestate!(skalmanfilter1, [10, 50], [51, 32])
+        preparestate!(manual1, [51, 32])
+        updatestate!(manual1, [10, 50], [51, 32])
     end
-    preparestate!(skalmanfilter1, [51, 32])
-    @test skalmanfilter1() ≈ [51, 32] atol=1e-3
-    skalmanfilter2 = SteadyKalmanFilter(linmodel1, nint_u=[1, 1], direct=false)
+    preparestate!(manual1, [51, 32])
+    @test manual1() ≈ [51, 32] atol=1e-3
+    manual2 = SteadyKalmanFilter(linmodel, nint_u=[1, 1], direct=false)
     for i in 1:40
-        preparestate!(skalmanfilter2, [50, 30])
-        updatestate!(skalmanfilter2, [11, 52], [50, 30])
+        preparestate!(manual2, [50, 30])
+        updatestate!(manual2, [11, 52], [50, 30])
     end
-    @test skalmanfilter2() ≈ [50, 30] atol=1e-3
+    @test manual2() ≈ [50, 30] atol=1e-3
     for i in 1:40
-        preparestate!(skalmanfilter2, [51, 32])
-        updatestate!(skalmanfilter2, [10, 50], [51, 32])
+        preparestate!(manual2, [51, 32])
+        updatestate!(manual2, [10, 50], [51, 32])
     end
-    @test skalmanfilter2() ≈ [51, 32] atol=1e-3
+    @test manual2() ≈ [51, 32] atol=1e-3
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
-    skalmanfilter3 = SteadyKalmanFilter(linmodel3)
-    preparestate!(skalmanfilter3, [0])
-    x̂ = updatestate!(skalmanfilter3, [0], [0])
+    manual3 = SteadyKalmanFilter(linmodel3)
+    preparestate!(manual3, [0])
+    x̂ = updatestate!(manual3, [0], [0])
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
-    @test_throws ArgumentError updatestate!(skalmanfilter1, [10, 50])
-    @test_throws ErrorException setstate!(skalmanfilter1, [1,2,3,4], diagm(.1:.1:.4))
+    @test_throws ArgumentError updatestate!(manual1, [10, 50])
+    @test_throws ErrorException setstate!(manual1, [1,2,3,4], diagm(.1:.1:.4))
 end 
 
 @testitem "SteadyKalmanFilter set model" setup=[SetupMPCtests] begin
@@ -131,22 +131,22 @@ end
 
 @testitem "SteadyKalmanFilter real-time simulations" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(tf(2, [10, 1]), 0.25)
-    skalmanfilter1 = SteadyKalmanFilter(linmodel1)
+    linmodel = LinModel(tf(2, [10, 1]), 0.25)
+    manual1 = SteadyKalmanFilter(linmodel)
     times1 = zeros(5)
     for i=1:5
-        times1[i] = savetime!(skalmanfilter1)
-        preparestate!(skalmanfilter1, [1])
-        updatestate!(skalmanfilter1, [1], [1])
-        periodsleep(skalmanfilter1, true)
+        times1[i] = savetime!(manual1)
+        preparestate!(manual1, [1])
+        updatestate!(manual1, [1], [1])
+        periodsleep(manual1, true)
     end
     @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.01))
 end
     
 @testitem "KalmanFilter construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    kalmanfilter1 = KalmanFilter(linmodel1)
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    kalmanfilter1 = KalmanFilter(linmodel)
     @test kalmanfilter1.nym == 2
     @test kalmanfilter1.nyu == 0
     @test kalmanfilter1.nxs == 2
@@ -160,11 +160,11 @@ end
     @test kalmanfilter2.nxs == 1
     @test kalmanfilter2.nx̂ == 5
 
-    kalmanfilter3 = KalmanFilter(linmodel1, nint_ym=0)
+    kalmanfilter3 = KalmanFilter(linmodel, nint_ym=0)
     @test kalmanfilter3.nxs == 0
     @test kalmanfilter3.nx̂ == 2
 
-    kalmanfilter4 = KalmanFilter(linmodel1, nint_ym=[2,2])
+    kalmanfilter4 = KalmanFilter(linmodel, nint_ym=[2,2])
     @test kalmanfilter4.nxs == 4
     @test kalmanfilter4.nx̂ == 6
 
@@ -177,13 +177,13 @@ end
     @test kalmanfilter6.P̂  ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test kalmanfilter6.P̂_0 !== kalmanfilter6.P̂
 
-    kalmanfilter7 = KalmanFilter(linmodel1, nint_u=[1,1])
+    kalmanfilter7 = KalmanFilter(linmodel, nint_u=[1,1])
     @test kalmanfilter7.nxs == 2
     @test kalmanfilter7.nx̂  == 4
     @test kalmanfilter7.nint_u  == [1, 1]
     @test kalmanfilter7.nint_ym == [0, 0]
 
-    kalmanfilter8 = KalmanFilter(linmodel1, 1:2, 0, [1, 1], I(4), I(4), I(2))
+    kalmanfilter8 = KalmanFilter(linmodel, 1:2, 0, [1, 1], I(4), I(4), I(2))
     @test kalmanfilter8.P̂_0 ≈ I(4)
     @test kalmanfilter8.Q̂ ≈ I(4)
     @test kalmanfilter8.R̂ ≈ I(2)
@@ -192,13 +192,13 @@ end
     kalmanfilter8 = KalmanFilter(linmodel2)
     @test isa(kalmanfilter8, KalmanFilter{Float32})
 
-    @test_throws ErrorException KalmanFilter(linmodel1, nint_ym=0, σP_0=[1])
+    @test_throws ErrorException KalmanFilter(linmodel, nint_ym=0, σP_0=[1])
 end
 
 @testitem "KalmanFilter estimator methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    kalmanfilter1 = KalmanFilter(linmodel1)
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    kalmanfilter1 = KalmanFilter(linmodel)
     u, y, d = [10, 50], [50, 30], Float64[]
     preparestate!(kalmanfilter1, y)
     @test updatestate!(kalmanfilter1, u, y) ≈ zeros(4)
@@ -227,7 +227,7 @@ end
     end
     preparestate!(kalmanfilter1, [51, 32])
     @test kalmanfilter1() ≈ [51, 32] atol=1e-3
-    kalmanfilter2 = KalmanFilter(linmodel1, nint_u=[1, 1], direct=false)
+    kalmanfilter2 = KalmanFilter(linmodel, nint_u=[1, 1], direct=false)
     for i in 1:40
         preparestate!(kalmanfilter2, [50, 30])
         updatestate!(kalmanfilter2, [11, 52], [50, 30])
@@ -277,8 +277,8 @@ end
 
 @testitem "Luenberger construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    lo1 = Luenberger(linmodel1)
+    linmodel = LinModel(sys,Ts,i_u=[1,2])
+    lo1 = Luenberger(linmodel)
     @test lo1.nym == 2
     @test lo1.nyu == 0
     @test lo1.nxs == 2
@@ -291,15 +291,15 @@ end
     @test lo2.nxs == 1
     @test lo2.nx̂ == 5
 
-    lo3 = Luenberger(linmodel1, nint_ym=0)
+    lo3 = Luenberger(linmodel, nint_ym=0)
     @test lo3.nxs == 0
     @test lo3.nx̂ == 2
 
-    lo4 = Luenberger(linmodel1, nint_ym=[2,2])
+    lo4 = Luenberger(linmodel, nint_ym=[2,2])
     @test lo4.nxs == 4
     @test lo4.nx̂ == 6
 
-    lo5 = Luenberger(linmodel1, nint_u=[1,1])
+    lo5 = Luenberger(linmodel, nint_u=[1,1])
     @test lo5.nxs == 2
     @test lo5.nx̂  == 4
     @test lo5.nint_u  == [1, 1]
@@ -309,17 +309,17 @@ end
     lo6 = Luenberger(linmodel2)
     @test isa(lo6, Luenberger{Float32})
 
-    @test_throws ErrorException Luenberger(linmodel1, nint_ym=[1,1,1])
-    @test_throws ErrorException Luenberger(linmodel1, nint_ym=[-1,0])
-    @test_throws ErrorException Luenberger(linmodel1, poles=[0.5])
-    @test_throws ErrorException Luenberger(linmodel1, poles=fill(1.5, lo1.nx̂))
+    @test_throws ErrorException Luenberger(linmodel, nint_ym=[1,1,1])
+    @test_throws ErrorException Luenberger(linmodel, nint_ym=[-1,0])
+    @test_throws ErrorException Luenberger(linmodel, poles=[0.5])
+    @test_throws ErrorException Luenberger(linmodel, poles=fill(1.5, lo1.nx̂))
     @test_throws ErrorException Luenberger(LinModel(tf(1,[1, 0]),0.1), poles=[0.5,0.6])
 end
     
 @testitem "Luenberger estimator methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    lo1 = Luenberger(linmodel1, nint_ym=[1, 1])
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    lo1 = Luenberger(linmodel, nint_ym=[1, 1])
     u, y, d = [10, 50], [50, 30], Float64[]
     preparestate!(lo1, y)
     @test updatestate!(lo1, u, y) ≈ zeros(4)
@@ -347,7 +347,7 @@ end
     end
     preparestate!(lo1, [51, 32])
     @test lo1() ≈ [51, 32] atol=1e-3
-    lo2 = Luenberger(linmodel1, nint_u=[1, 1], direct=false)
+    lo2 = Luenberger(linmodel, nint_u=[1, 1], direct=false)
     for i in 1:40
         preparestate!(lo2, [50, 30])
         updatestate!(lo2, [11, 52], [50, 30])
@@ -378,8 +378,8 @@ end
 
 @testitem "InternalModel construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
-    internalmodel1 = InternalModel(linmodel1)
+    linmodel = LinModel(sys,Ts,i_u=[1,2])
+    internalmodel1 = InternalModel(linmodel)
     @test internalmodel1.nym == 2
     @test internalmodel1.nyu == 0
     @test internalmodel1.nxs == 2
@@ -440,16 +440,16 @@ end
 
     unstablemodel = LinModel(ss(diagm([0.5, -0.5, 1.5]), ones(3,1), I, 0, 1))
     @test_throws ErrorException InternalModel(unstablemodel)
-    @test_throws ErrorException InternalModel(linmodel1, i_ym=[1,4])
-    @test_throws ErrorException InternalModel(linmodel1, i_ym=[2,2])
-    @test_throws ErrorException InternalModel(linmodel1, stoch_ym=ss(1,1,1,1,Ts))
-    @test_throws ErrorException InternalModel(linmodel1, stoch_ym=ss(1,1,1,0,Ts).*I(2))
+    @test_throws ErrorException InternalModel(linmodel, i_ym=[1,4])
+    @test_throws ErrorException InternalModel(linmodel, i_ym=[2,2])
+    @test_throws ErrorException InternalModel(linmodel, stoch_ym=ss(1,1,1,1,Ts))
+    @test_throws ErrorException InternalModel(linmodel, stoch_ym=ss(1,1,1,0,Ts).*I(2))
 end    
     
 @testitem "InternalModel estimator methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]) , uop=[10,50], yop=[50,30])
-    internalmodel1 = InternalModel(linmodel1)
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]) , uop=[10,50], yop=[50,30])
+    internalmodel1 = InternalModel(linmodel)
     u, y, d = [10, 50], [50, 30] .+ 1, Float64[]
     preparestate!(internalmodel1, y)
     @test updatestate!(internalmodel1, u, y) ≈ zeros(2)
@@ -516,12 +516,12 @@ end
  
 @testitem "UnscentedKalmanFilter construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(sys,Ts,i_d=[3])
+    linmodel = LinModel(sys,Ts,i_d=[3])
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Du*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
 
-    ukf1 = UnscentedKalmanFilter(linmodel1)
+    ukf1 = UnscentedKalmanFilter(linmodel)
     @test ukf1.nym == 2
     @test ukf1.nyu == 0
     @test ukf1.nxs == 2
@@ -574,7 +574,7 @@ end
 
 @testitem "UnscentedKalmanFilter estimator methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
+    linmodel = LinModel(sys,Ts,i_u=[1,2])
     function f!(xnext, x,u,_,model)
         mul!(xnext, model.A, x)
         mul!(xnext, model.Bu, u, 1, 1)
@@ -584,7 +584,7 @@ end
         mul!(y, model.C, x)
         return nothing
     end
-    nonlinmodel = NonLinModel(f!, h!, Ts, 2, 2, 2, solver=nothing, p=linmodel1)
+    nonlinmodel = NonLinModel(f!, h!, Ts, 2, 2, 2, solver=nothing, p=linmodel)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30])
     ukf1 = UnscentedKalmanFilter(nonlinmodel)
     u, y, d = [10, 50], [50, 30], Float64[]
@@ -615,7 +615,7 @@ end
     end
     preparestate!(ukf1, [51, 32])
     @test ukf1() ≈ [51, 32] atol=1e-3
-    ukf2 = UnscentedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
+    ukf2 = UnscentedKalmanFilter(linmodel, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     for i in 1:40
         preparestate!(ukf2, [50, 30])
         updatestate!(ukf2, [11, 52], [50, 30])
@@ -674,12 +674,12 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
-    linmodel1 = LinModel(sys,Ts,i_d=[3])
+    linmodel = LinModel(sys,Ts,i_d=[3])
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Du*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
 
-    ekf1 = ExtendedKalmanFilter(linmodel1)
+    ekf1 = ExtendedKalmanFilter(linmodel)
     @test ekf1.nym == 2
     @test ekf1.nyu == 0
     @test ekf1.nxs == 2
@@ -733,7 +733,7 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
-    linmodel1 = LinModel(sys,Ts,i_u=[1,2])
+    linmodel = LinModel(sys,Ts,i_u=[1,2])
     function f!(xnext, x,u,_,model)
         mul!(xnext, model.A, x)
         mul!(xnext, model.Bu, u, 1, 1)
@@ -743,7 +743,7 @@ end
         mul!(y, model.C, x)
         return nothing
     end
-    nonlinmodel = NonLinModel(f!, h!, Ts, 2, 2, 2, solver=nothing, p=linmodel1)
+    nonlinmodel = NonLinModel(f!, h!, Ts, 2, 2, 2, solver=nothing, p=linmodel)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30])
     ekf1 = ExtendedKalmanFilter(nonlinmodel)
     u, y, d = [10, 50], [50, 30], Float64[]
@@ -774,7 +774,7 @@ end
     end
     preparestate!(ekf1, [51, 32])
     @test ekf1() ≈ [51, 32] atol=1e-3
-    ekf2 = ExtendedKalmanFilter(linmodel1, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
+    ekf2 = ExtendedKalmanFilter(linmodel, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     for i in 1:40
         preparestate!(ekf2, [50, 30])
         updatestate!(ekf2, [11, 52], [50, 30])
@@ -838,12 +838,12 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using JuMP, Ipopt, DifferentiationInterface
     import FiniteDiff
-    linmodel1 = LinModel(sys,Ts,i_d=[3])
+    linmodel = LinModel(sys,Ts,i_d=[3])
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
 
-    mhe1 = MovingHorizonEstimator(linmodel1, He=5)
+    mhe1 = MovingHorizonEstimator(linmodel, He=5)
     @test mhe1.nym == 2
     @test mhe1.nyu == 0
     @test mhe1.nxs == 2
@@ -919,18 +919,18 @@ end
     @test mhe14.gradient == AutoFiniteDiff()
     @test mhe14.jacobian == AutoFiniteDiff()
 
-    @test_throws ArgumentError MovingHorizonEstimator(linmodel1)
-    @test_throws ArgumentError MovingHorizonEstimator(linmodel1, He=0)
-    @test_throws ArgumentError MovingHorizonEstimator(linmodel1, Cwt=-1)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
 end
 
 @testitem "MovingHorizonEstimator estimation and getinfo" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt, ForwardDiff
-    linmodel1 = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
-    linmodel1 = setop!(linmodel1, uop=[10,50], yop=[50,30], dop=[5])
+    linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
+    linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel1)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
     
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
@@ -986,7 +986,7 @@ end
     end
     @test mhe1([5]) ≈ [51, 32] atol=1e-3
 
-    mhe2 = MovingHorizonEstimator(linmodel1, He=2)
+    mhe2 = MovingHorizonEstimator(linmodel, He=2)
     preparestate!(mhe2, [50, 30], [5])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
@@ -1009,7 +1009,7 @@ end
     preparestate!(mhe2, [51, 32], [5])
     @test mhe2([5]) ≈ [51, 32] atol=1e-3
 
-    mhe2 = MovingHorizonEstimator(linmodel1, He=2, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
+    mhe2 = MovingHorizonEstimator(linmodel, He=2, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     preparestate!(mhe2, [50, 30], [5])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
@@ -1133,8 +1133,8 @@ end
 
 @testitem "MovingHorizonEstimator set constraints" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    mhe1 = MovingHorizonEstimator(linmodel1, He=1, nint_ym=0, Cwt=1e3)
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    mhe1 = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe1, x̂min=[-51,-52], x̂max=[53,54])
     @test all((mhe1.con.X̂0min, mhe1.con.X̂0max) .≈ ([-51,-52], [53,54]))
     @test all((mhe1.con.x̃0min[2:end], mhe1.con.x̃0max[2:end]) .≈ ([-51,-52], [53,54]))
@@ -1150,7 +1150,7 @@ end
     setconstraint!(mhe1, c_v̂min=[0.09,0.10], c_v̂max=[0.11,0.12])
     @test all((-mhe1.con.A_V̂min[:, end], -mhe1.con.A_V̂max[:, end]) .≈ ([0.09, 0.10], [0.11,0.12]))
 
-    mhe2 = MovingHorizonEstimator(linmodel1, He=4, nint_ym=0, Cwt=1e3)
+    mhe2 = MovingHorizonEstimator(linmodel, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe2, X̂min=-1(1:10), X̂max=1(1:10))
     @test all((mhe2.con.X̂0min, mhe2.con.X̂0max) .≈ (-1(3:10), 1(3:10)))
     @test all((mhe2.con.x̃0min[2:end], mhe2.con.x̃0max[2:end]) .≈ (-1(1:2),  1(1:2)))
@@ -1168,7 +1168,7 @@ end
 
     f(x,u,d,model) = model.A*x + model.Bu*u
     h(x,d,model)   = model.C*x 
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, p=linmodel1, solver=nothing)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, p=linmodel, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30])
 
     mhe3 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3)
@@ -1216,8 +1216,8 @@ end
 
 @testitem "MovingHorizonEstimator constraint violation" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    mhe = MovingHorizonEstimator(linmodel1, He=1, nint_ym=0)
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
+    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0)
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
@@ -1265,7 +1265,7 @@ end
 
     f(x,u,_,model) = model.A*x + model.Bu*u
     h(x,_,model)   = model.C*x
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, p=linmodel1, solver=nothing)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, p=linmodel, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30])
     mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
 
@@ -1361,9 +1361,9 @@ end
 
 @testitem "MovingHorizonEstimator v.s. Kalman filters" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
-    kf  = KalmanFilter(linmodel1, nint_ym=0, direct=false)
-    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=false)
+    linmodel = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
+    kf  = KalmanFilter(linmodel, nint_ym=0, direct=false)
+    mhe = MovingHorizonEstimator(linmodel, He=3, nint_ym=0, direct=false)
     X̂_mhe = zeros(4, 6)
     X̂_kf  = zeros(4, 6)
     for i in 1:6
@@ -1376,11 +1376,11 @@ end
         updatestate!(kf,  [11, 50], y, [25])
     end
     @test X̂_mhe ≈ X̂_kf atol=1e-6 rtol=1e-6
-    kf  = KalmanFilter(linmodel1, nint_ym=0, direct=true)
+    kf  = KalmanFilter(linmodel, nint_ym=0, direct=true)
     # recuperate P̂(-1|-1) exact value using the Kalman filter:
     preparestate!(kf, [50, 30], [20])
     σP̂ = sqrt.(diag(kf.P̂))
-    mhe = MovingHorizonEstimator(linmodel1, He=3, nint_ym=0, direct=true, σP_0=σP̂)
+    mhe = MovingHorizonEstimator(linmodel, He=3, nint_ym=0, direct=true, σP_0=σP̂)
     updatestate!(kf, [10, 50], [50, 30], [20])
     X̂_mhe = zeros(4, 6)
     X̂_kf  = zeros(4, 6)
@@ -1397,7 +1397,7 @@ end
 
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, p=linmodel1, solver=nothing)
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, p=linmodel, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[20])
     ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=false)
     ekf = ExtendedKalmanFilter(nonlinmodel, nint_ym=0, direct=false)
@@ -1496,4 +1496,78 @@ end
         updatestate!(mhe2_nonlin, [11, 50], y, [25])
     end
     @test X̂_lin ≈ X̂_nonlin atol=1e-3 rtol=1e-3
+end
+
+@testitem "ManualEstimator construction" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    linmodel = LinModel(sys,Ts,i_u=[1,2])
+    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h(x,d,model)   = model.C*x + model.Du*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
+
+    manual1 = ManualEstimator(linmodel)
+    @test manual1.nym == 2
+    @test manual1.nyu == 0
+    @test manual1.nxs == 2
+    @test manual1.nx̂ == 4
+    @test manual1.nint_ym == [1, 1]
+
+    linmodel2 = LinModel(sys,Ts,i_d=[3])
+    manual2 = ManualEstimator(linmodel2, i_ym=[2])
+    @test manual2.nym == 1
+    @test manual2.nyu == 1
+    @test manual2.nxs == 1
+    @test manual2.nx̂ == 5
+    @test manual2.nint_ym == [1]
+
+    manual3 = ManualEstimator(linmodel, nint_ym=0)
+    @test manual3.nxs == 0
+    @test manual3.nx̂ == 2
+    @test manual3.nint_ym == [0, 0]
+
+    manual4 = ManualEstimator(linmodel, nint_ym=[2,2])
+    @test manual4.nxs == 4
+    @test manual4.nx̂ == 6
+
+    manual5 = ManualEstimator(linmodel, nint_u=[1,1])
+    @test manual5.nxs == 2
+    @test manual5.nx̂  == 4
+    @test manual5.nint_u  == [1, 1]
+    @test manual5.nint_ym == [0, 0]
+
+    linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    manual6 = ManualEstimator(linmodel2)
+    @test isa(manual6, ManualEstimator{Float32})
+
+    manual7 = ManualEstimator(nonlinmodel)
+    @test manual7.nym == 2
+    @test manual7.nyu == 0
+    @test manual7.nxs == 2
+    @test manual7.nx̂ == 6
+end
+
+@testitem "ManualEstimator estimator methods" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    linmodel = LinModel(sys,Ts,i_u=[1,2])
+    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h(x,d,model)   = model.C*x + model.Du*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, 0, solver=nothing, p=linmodel)
+
+    manual1 = ManualEstimator(linmodel)
+    u, y, d = [11, 52], [50, 30], Float64[]
+    preparestate!(manual1, y, d)
+    @test manual1.x̂0 ≈ zeros(4)
+    updatestate!(manual1, u, y, d)
+    @test manual1.x̂0 ≈ zeros(4)
+    setstate!(manual1, [1, 2, 3, 4])
+    @test manual1.x̂0 ≈ [1, 2, 3, 4]
+
+    manual2 = ManualEstimator(nonlinmodel)
+    u, y, d = [11, 52], [50, 30], Float64[]
+    preparestate!(manual2, y, d)
+    @test manual2.x̂0 ≈ zeros(4)
+    updatestate!(manual2, u, y, d)
+    @test manual2.x̂0 ≈ zeros(4)
+    setstate!(manual2, [1, 2, 3, 4])
+    @test manual2.x̂0 ≈ [1, 2, 3, 4]
 end
