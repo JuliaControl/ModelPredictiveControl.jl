@@ -228,7 +228,8 @@ end
 
 Use custom state estimator `estim` to construct `LinMPC`.
 
-`estim.model` must be a [`LinModel`](@ref). Else, a [`NonLinMPC`](@ref) is required. 
+`estim.model` must be a [`LinModel`](@ref). Else, a [`NonLinMPC`](@ref) is required. See
+[`ManualEstimator`](@ref) for linear controllers with nonlinear state estimation.
 
 # Examples
 ```jldoctest
