@@ -26,6 +26,7 @@ include("estimator/kalman.jl")
 include("estimator/luenberger.jl")
 include("estimator/mhe.jl")
 include("estimator/internal_model.jl")
+include("estimator/manual.jl")
 
 function Base.show(io::IO, estim::StateEstimator)
     nu, nd = estim.model.nu, estim.model.nd

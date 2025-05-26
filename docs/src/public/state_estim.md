@@ -81,6 +81,12 @@ MovingHorizonEstimator
 InternalModel
 ```
 
+## ManualEstimator
+
+```@docs
+ManualEstimator
+```
+
 ## Default Model Augmentation
 
 ```@docs

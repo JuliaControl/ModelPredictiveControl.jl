@@ -1,3 +1,6 @@
+const MSG_LINMODEL_ERR = "estim.model type must be a LinModel, see ManualEstimator docstring "*
+                         "to use a nonlinear state estimator with a linear controller"
+
 struct PredictiveControllerBuffer{NT<:Real}
     u ::Vector{NT}
     Z̃ ::Vector{NT}

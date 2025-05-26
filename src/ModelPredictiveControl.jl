@@ -36,6 +36,7 @@ export savetime!, periodsleep
 export StateEstimator, InternalModel, Luenberger
 export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter
 export MovingHorizonEstimator
+export ManualEstimator
 export default_nint, initstate!
 export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
 export TranscriptionMethod, SingleShooting, MultipleShooting

@@ -1,6 +1,5 @@
 struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     model::SM
-    lastu0::Vector{NT}
     x̂op ::Vector{NT}
     f̂op ::Vector{NT}
     x̂0  ::Vector{NT}
@@ -56,14 +55,13 @@ struct SteadyKalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
                 rethrow()
             end
         end
-        lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model, 
-            lastu0, x̂op, f̂op, x̂0, 
+            x̂op, f̂op, x̂0, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
@@ -279,7 +277,6 @@ end
 
 struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     model::SM
-    lastu0::Vector{NT}
     x̂op::Vector{NT}
     f̂op::Vector{NT}
     x̂0 ::Vector{NT}
@@ -319,7 +316,6 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
-        lastu0 = zeros(NT, nu)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
@@ -329,7 +325,7 @@ struct KalmanFilter{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model, 
-            lastu0, x̂op, f̂op, x̂0, P̂, 
+            x̂op, f̂op, x̂0, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
@@ -493,7 +489,6 @@ end
 
 struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     model::SM
-    lastu0::Vector{NT}
     x̂op ::Vector{NT}
     f̂op ::Vector{NT}
     x̂0  ::Vector{NT}
@@ -543,7 +538,6 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         nσ, γ, m̂, Ŝ = init_ukf(model, nx̂, α, β, κ)
-        lastu0 = zeros(NT, nu)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
@@ -556,7 +550,7 @@ struct UnscentedKalmanFilter{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model,
-            lastu0, x̂op, f̂op, x̂0, P̂, 
+            x̂op, f̂op, x̂0, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
@@ -879,7 +873,6 @@ struct ExtendedKalmanFilter{
         LF<:Function
 } <: StateEstimator{NT}
     model::SM
-    lastu0::Vector{NT}
     x̂op ::Vector{NT}
     f̂op ::Vector{NT}
     x̂0  ::Vector{NT}
@@ -925,7 +918,6 @@ struct ExtendedKalmanFilter{
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
-        lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         Q̂, R̂ = Hermitian(Q̂, :L), Hermitian(R̂, :L)
         P̂_0 = Hermitian(P̂_0, :L)
@@ -937,7 +929,7 @@ struct ExtendedKalmanFilter{
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM, JB, LF}(
             model,
-            lastu0, x̂op, f̂op, x̂0, P̂, 
+            x̂op, f̂op, x̂0, P̂, 
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
@@ -978,9 +970,9 @@ differentiation. This estimator is allocation-free if `model` simulations do not
 - `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
     ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
 - `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
-    the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
+    the manipulated inputs (vector), use `nint_u=0` for no integrator.
 - `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
-    disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
+    disturbances at the measured outputs, use `nint_ym=0` for no integrator.
 - `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
     disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
 - `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured

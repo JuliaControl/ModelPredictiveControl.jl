@@ -129,6 +129,7 @@ for more detailed examples.
   - extended Kalman filter
   - unscented Kalman filter
   - moving horizon estimator
+- disable built-in observer to manually provide your own state estimate
 - easily estimate unmeasured disturbances by adding one or more integrators at the:
   - manipulated inputs
   - measured outputs

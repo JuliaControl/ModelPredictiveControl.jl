@@ -90,7 +90,7 @@ functions are defined as:
 ```
 where ``\mathbf{x}``, ``\mathbf{y}``, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
 respectively the state, output, manipulated input, measured disturbance and parameter
-vectors. As a mather of fact, the parameter argument `p` can be any Julia objects but use a
+vectors. As a matter of fact, the parameter argument `p` can be any Julia objects but use a
 mutable type if you want to change them later e.g.: a vector. If the dynamics is a function
 of the time, simply add a measured disturbance defined as ``d(t) = t``. The functions can be
 implemented in two possible ways:

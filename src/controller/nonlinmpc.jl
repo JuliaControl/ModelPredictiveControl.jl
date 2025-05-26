@@ -39,6 +39,7 @@ struct NonLinMPC{
     p::PT
     R̂u::Vector{NT}
     R̂y::Vector{NT}
+    lastu0::Vector{NT}
     P̃Δu::Matrix{NT}
     P̃u ::Matrix{NT}
     Tu ::Matrix{NT}
@@ -84,6 +85,7 @@ struct NonLinMPC{
         ŷ = copy(model.yop) # dummy vals (updated just before optimization)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
+        lastu0 = zeros(NT, nu)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
@@ -119,6 +121,7 @@ struct NonLinMPC{
             weights,
             JE, p,
             R̂u, R̂y,
+            lastu0,
             P̃Δu, P̃u, Tu, Tu_lastu0,
             Ẽ, F, G, J, K, V, B,
             H̃, q̃, r,
@@ -585,9 +588,9 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     )
     ∇J_prep = prepare_gradient(Jfunc!, grad, Z̃_∇J, ∇J_context...; strict)
     ∇J = Vector{JNT}(undef, nZ̃)
-    function update_objective!(J, ∇J, Z̃, Z̃arg)
-        if isdifferent(Z̃arg, Z̃)
-            Z̃ .= Z̃arg
+    function update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        if isdifferent(Z̃arg, Z̃_∇J)
+            Z̃_∇J .= Z̃arg
             J[], _ = value_and_gradient!(Jfunc!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
         end
     end    
@@ -622,10 +625,10 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     ∇g_prep  = prepare_jacobian(gfunc!, g, jac, Z̃_∇g, ∇g_context...; strict)
     mpc.con.i_g[1:end-nc] .= false
     ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
-    function update_con!(g, ∇g, Z̃, Z̃arg)
-        if isdifferent(Z̃arg, Z̃)
-            Z̃ .= Z̃arg
-            value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃, ∇g_context...)
+    function update_con!(g, ∇g, Z̃_∇g, Z̃arg)
+        if isdifferent(Z̃arg, Z̃_∇g)
+            Z̃_∇g .= Z̃arg
+            value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃_∇g, ∇g_context...)
         end
     end
     gfuncs = Vector{Function}(undef, ng)
@@ -664,10 +667,10 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     )
     ∇geq_prep = prepare_jacobian(geqfunc!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)
     ∇geq = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
-    function update_con_eq!(geq, ∇geq, Z̃, Z̃arg)
-        if isdifferent(Z̃arg, Z̃)
-            Z̃ .= Z̃arg
-            value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃, ∇geq_context...)
+    function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃arg)
+        if isdifferent(Z̃arg, Z̃_∇geq)
+            Z̃_∇geq .= Z̃arg
+            value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_context...)
         end
     end
     geqfuncs = Vector{Function}(undef, neq)

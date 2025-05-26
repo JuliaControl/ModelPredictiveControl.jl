@@ -1,6 +1,5 @@
 struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     model::SM
-    lastu0::Vector{NT}
     x̂op::Vector{NT}
     f̂op::Vector{NT}
     x̂0 ::Vector{NT}
@@ -41,7 +40,6 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = matrices_internalmodel(model)
         Ĉm, D̂dm = Ĉ[i_ym,:], D̂d[i_ym,:]
         Âs, B̂s = init_internalmodel(As, Bs, Cs, Ds)
-        lastu0 = zeros(NT, nu)
         # x̂0 and x̂d are same object (updating x̂d will update x̂0):
         x̂d = x̂0 = zeros(NT, model.nx) 
         x̂s, x̂snext = zeros(NT, nxs), zeros(NT, nxs)
@@ -51,7 +49,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model, 
-            lastu0, x̂op, f̂op, x̂0, x̂d, x̂s, ŷs, x̂snext,
+            x̂op, f̂op, x̂0, x̂d, x̂s, ŷs, x̂snext,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
@@ -168,15 +166,15 @@ function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂0next, _ , x̂0i, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    f̂!(x̂0next, _ , k0, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls `model.solver_f!(x̂0next, x̂0i, x̂0, u0 ,d0, model.p)` directly since this estimator
+It calls `model.solver_f!(x̂0next, k0, x̂0, u0 ,d0, model.p)` directly since this estimator
 does not augment the states.
 """
-function f̂!(x̂0next, _ , x̂0i, ::InternalModel, model::NonLinModel, x̂0, u0, d0)
-    return model.solver_f!(x̂0next, x̂0i, x̂0, u0, d0, model.p)
+function f̂!(x̂0next, _ , k0, ::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    return model.solver_f!(x̂0next, k0, x̂0, u0, d0, model.p)
 end
 
 @doc raw"""
