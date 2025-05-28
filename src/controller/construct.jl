@@ -458,7 +458,7 @@ estimate_delays(::SimModel) = 0
 
 
 """
-    move_blocking(Hp::Int, Hc::AbstractVector{Int}) -> nb, Hc
+    move_blocking(Hp::Int, Hc::AbstractVector{Int}) -> nb
 
 Get move blocking vector `nb` and actual control horizon from `Hp` and `Hc` arguments.
 
@@ -483,12 +483,11 @@ function move_blocking(Hp_arg::Int, Hc_arg::AbstractVector{Int})
             nb[end] = Hp - @views sum(nb[begin:end-1])
         end
     end
-    Hc = length(nb)
-    return nb, Hc
+    return nb
 end
 
 """
-    move_blocking(Hp::Int, Hc::Int) -> nb, Hc
+    move_blocking(Hp::Int, Hc::Int) -> nb
 
 Construct a move blocking vector `nb` that match the provided `Hp` and `Hc` horizons.
 
@@ -498,8 +497,11 @@ function move_blocking(Hp_arg::Int, Hc_arg::Int)
     Hp, Hc = Hp_arg, Hc_arg
     nb = fill(1, Hc)
     nb[end] = Hp - Hc + 1
-    return nb, Hc
+    return nb
 end
+
+"Get the actual control Horizon `Hc` (integer) from the move blocking vector `nb`."
+get_Hc(nb::AbstractVector{Int}) = length(nb)
 
 
 """

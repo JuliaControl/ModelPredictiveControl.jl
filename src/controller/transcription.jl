@@ -134,29 +134,32 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
 
 # Extended Help
 !!! details "Extended Help"
+    With ``n_j``, the ``j``th element of the ``\mathbf{n_b}`` vector introduced in [`init_ZtoΔU`](@ref)
+    documentation, we introduce the ``\mathbf{Q}(j)`` matrix of size `(nu*nj, nu)`:
+    ```math
+    \mathbf{Q}(j) =         \begin{bmatrix}
+        \mathbf{I}          \\
+        \mathbf{I}          \\
+        \vdots              \\
+        \mathbf{I}          \end{bmatrix}            
+    ```
     The ``\mathbf{U}`` vector and the conversion matrices are defined as:
     ```math
     \mathbf{U} = \begin{bmatrix}
-        \mathbf{u}(k + 0)                                           \\
-        \mathbf{u}(k + 1)                                           \\
-        \vdots                                                      \\
-        \mathbf{u}(k + H_c - 1)                                     \\
-        \vdots                                                      \\
-        \mathbf{u}(k + H_p - 1)                                     \end{bmatrix} , \quad
+        \mathbf{u}(k + 0)                                                                   \\
+        \mathbf{u}(k + 1)                                                                   \\
+        \vdots                                                                              \\
+        \mathbf{u}(k + H_p - 1)                                                             \end{bmatrix} , \quad
     \mathbf{P_u^†} = \begin{bmatrix}
-        \mathbf{I}  & \mathbf{0}    & \cdots    & \mathbf{0}        \\
-        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{0}        \\
-        \vdots      & \vdots        & \ddots    & \vdots            \\
-        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \\
-        \vdots      & \vdots        & \ddots    & \vdots            \\
-        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \end{bmatrix} , \quad
+        \mathbf{Q}(n_1)         & \mathbf{0}            & \cdots    & \mathbf{0}            \\
+        \mathbf{Q}(n_2)         & \mathbf{Q}(n_2)       & \cdots    & \mathbf{0}            \\
+        \vdots                  & \vdots                & \ddots    & \vdots                \\
+        \mathbf{Q}(n_{H_c})     & \mathbf{Q}(n_{H_c})   & \cdots    & \mathbf{Q}(n_{H_c})   \end{bmatrix} , \quad
     \mathbf{T_u} = \begin{bmatrix}
-        \mathbf{I}                                                  \\
-        \mathbf{I}                                                  \\
-        \vdots                                                      \\
-        \mathbf{I}                                                  \\
-        \vdots                                                      \\
-        \mathbf{I}                                                  \end{bmatrix}
+        \mathbf{I}                                                                          \\
+        \mathbf{I}                                                                          \\
+        \vdots                                                                              \\
+        \mathbf{I}                                                                          \end{bmatrix}
     ```
     and, depending on the transcription method, we have:
     - ``\mathbf{P_u} = \mathbf{P_u^†}`` if `transcription` is a [`SingleShooting`](@ref)
@@ -166,19 +169,26 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
 function init_ZtoU(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, nb
 ) where {NT<:Real}
-    model = estim.model
+    nu = estim.model.nu
     # Pu and Tu are `Matrix{NT}`, conversion is faster than `Matrix{Bool}` or `BitMatrix`
-    I_nu = Matrix{NT}(I, model.nu, model.nu)
-    PU_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
-    PUdagger = [PU_Hc; repeat(I_nu, Hp - Hc, Hc)]
-    Pu = init_PUmat(estim, transcription, Hp, Hc, PUdagger)
+    I_nu = Matrix{NT}(I, nu, nu)
+    PuDagger = Matrix{NT}(undef, nu*Hp, nu*Hc)
+    for j=1:Hc
+        nj = nb[j]
+        Qj = repeat(I_nu, nj, 1)
+        iRows = (1:nu*nj) .+ @views nu*sum(nb[1:j-1])
+        PuDagger[iRows, :] = [repeat(Qj, 1, j) zeros(nu*nj, nu*(Hc-j))]
+    end
+    Pu = init_PUmat(estim, transcription, Hp, Hc, PuDagger)
     Tu = repeat(I_nu, Hp)
     return Pu, Tu
 end
 
-init_PUmat( _ , ::SingleShooting, _ , _ , PUdagger) = PUdagger
-function init_PUmat(estim, ::MultipleShooting, Hp, _ , PUdagger)
-    return [PUdagger zeros(eltype(PUdagger), estim.model.nu*Hp, estim.nx̂*Hp)]
+
+
+init_PUmat( _ , ::SingleShooting, _ , _ , PuDagger) = PuDagger
+function init_PUmat(estim, ::MultipleShooting, Hp, _ , PuDagger)
+    return [PuDagger zeros(eltype(PuDagger), estim.model.nu*Hp, estim.nx̂*Hp)]
 end
 
 @doc raw"""
