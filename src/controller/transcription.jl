@@ -176,7 +176,7 @@ function init_ZtoU(
     return Pu, Tu
 end
 
-init_PUmat( _ , transcription::SingleShooting, _ , _ , PUdagger) = PUdagger
+init_PUmat( _ , ::SingleShooting, _ , _ , PUdagger) = PUdagger
 function init_PUmat(estim, ::MultipleShooting, Hp, _ , PUdagger)
     return [PUdagger zeros(eltype(PUdagger), estim.model.nu*Hp, estim.nx̂*Hp)]
 end

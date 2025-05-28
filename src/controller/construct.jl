@@ -465,7 +465,7 @@ Get move blocking vector `nb` and actual control horizon from `Hp` and `Hc` argu
 The argument `Hc` is in fact the move blocking vector `nb` provided by the user. The `nb`
 vector is modified in these two cases:
 
-- If `sum(nb) < Hp`, a new element is added to `nb` with the value `Hp - sum(nb)`.
+- If `sum(nb) < Hp`, a new element is pushed to `nb` with the value `Hp - sum(nb)`.
 - If `sum(nb) > Hp`, the intervals are truncated until the sum is `Hp`. For example, if
   `Hp = 10` and `nb = [1, 2, 3, 6, 7]`, then `nb` is truncated to `[1, 2, 3, 4]`.
 """ 
