@@ -66,29 +66,8 @@ end
 
 Init decision variables to input increments over ``H_c`` conversion matrix `PΔu`.
 
-Introducing the move blocking vector that specifies the length of each step in the 
-``\mathbf{ΔU}`` vector, to customize the pattern (strictly positive integers):
-
-```math
-\mathbf{n_b} = \begin{bmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{bmatrix}'
-```
-
-The vector with all the manipulated input increments over the control horizon is defined
-as:
-
-```math
-\mathbf{ΔU} = \begin{bmatrix}
-    \mathbf{Δu}(k + 0)                                  \\[0.1em]
-    \mathbf{Δu}(k + ∑_{i=1}^1 n_i)                      \\[0.1em]
-    \mathbf{Δu}(k + ∑_{i=1}^2 n_i)                      \\[0.1em]
-    \vdots                                              \\[0.1em]
-    \mathbf{Δu}(k + ∑_{i=1}^{H_c-1} n_i)   
-\end{bmatrix}
-```
-
-This vector is extracted from from the decision variables ``\mathbf{Z}`` using the following
-formula:
-
+The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{ΔU}``, the input
+increments over ``H_c``, is computed by:
 ```math
 \mathbf{ΔU} = \mathbf{P_{Δu}} \mathbf{Z}
 ```
@@ -134,7 +113,7 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
 
 # Extended Help
 !!! details "Extended Help"
-    With ``n_j``, the ``j``th element of the ``\mathbf{n_b}`` vector definedc in [`init_ZtoΔU`](@ref)
+    With ``n_j``, the ``j``th element of the ``\mathbf{n_b}`` vector defined in [`move_blocking`](@ref)
     documentation, we introduce the ``\mathbf{Q}(j)`` matrix of size `(nu*nj, nu)`:
     ```math
     \mathbf{Q}(j) =         \begin{bmatrix}

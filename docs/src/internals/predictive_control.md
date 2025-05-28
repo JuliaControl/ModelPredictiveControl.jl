@@ -12,6 +12,7 @@ The prediction methodology of this module is mainly based on Maciejowski textboo
 ## Controller Construction
 
 ```@docs
+ModelPredictiveControl.move_blocking
 ModelPredictiveControl.init_ZtoΔU   
 ModelPredictiveControl.init_ZtoU
 ModelPredictiveControl.init_predmat

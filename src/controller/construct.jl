@@ -457,14 +457,28 @@ end
 estimate_delays(::SimModel) = 0
 
 
-"""
+@doc raw"""
     move_blocking(Hp::Int, Hc::AbstractVector{Int}) -> nb
 
-Get move blocking vector `nb` and actual control horizon from `Hp` and `Hc` arguments.
+Get the move blocking vector `nb` from the `Hc` argument, and modify it to match `Hp`.
 
-The argument `Hc` is in fact the move blocking vector `nb` provided by the user. The `nb`
-vector is modified in these two cases:
-
+The argument `Hc` is interpreted as the move blocking vector `nb`. It specifies the length
+of each step (or "block") in the ``\mathbf{ΔU}`` vector, to customize the pattern (strictly
+positive integers):
+```math
+    \mathbf{n_b} = \begin{bmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{bmatrix}'
+```
+The vector with all the manipulated input increments is then defined as:
+```math
+\mathbf{ΔU} = \begin{bmatrix}
+    \mathbf{Δu}(k + 0)                                  \\[0.1em]
+    \mathbf{Δu}(k + ∑_{i=1}^1 n_i)                      \\[0.1em]
+    \mathbf{Δu}(k + ∑_{i=1}^2 n_i)                      \\[0.1em]
+    \vdots                                              \\[0.1em]
+    \mathbf{Δu}(k + ∑_{i=1}^{H_c-1} n_i)   
+\end{bmatrix}
+```
+The provided `nb` vector is modified in these two cases:
 - If `sum(nb) < Hp`, a new element is pushed to `nb` with the value `Hp - sum(nb)`.
 - If `sum(nb) > Hp`, the intervals are truncated until the sum is `Hp`. For example, if
   `Hp = 10` and `nb = [1, 2, 3, 6, 7]`, then `nb` is truncated to `[1, 2, 3, 4]`.
@@ -472,11 +486,11 @@ vector is modified in these two cases:
 function move_blocking(Hp_arg::Int, Hc_arg::AbstractVector{Int})
     Hp = Hp_arg
     nb = Hc_arg
+    all(>(0), nb) || throw(ArgumentError("Move blocking vector must be strictly positive integers."))
     if sum(nb) < Hp
         newblock = [Hp - sum(nb)]
         nb = [nb; newblock]
     elseif sum(nb) > Hp
-        #For example, if Hp = 10 and nb = [1, 2, 3, 6, 7], than nb is truncated to [1, 2, 3, 4]
         nb = nb[begin:findfirst(≥(Hp), cumsum(nb))]
         if sum(nb) > Hp
             # if the last block is too large, it is truncated to fit Hp:
@@ -489,7 +503,7 @@ end
 """
     move_blocking(Hp::Int, Hc::Int) -> nb
 
-Construct a move blocking vector `nb` that match the provided `Hp` and `Hc` horizons.
+Construct a move blocking vector `nb` that match the provided `Hp` and `Hc` integers.
 
 The vector is filled with `1`s, except for the last element which is `Hp - Hc + 1`.
 """
