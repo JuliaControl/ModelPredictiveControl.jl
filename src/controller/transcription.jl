@@ -54,10 +54,10 @@ for this transcription method.
 struct MultipleShooting <: TranscriptionMethod end
 
 "Get the number of elements in the optimization decision vector `Z`."
-function get_nZ(estim::StateEstimator, transcription::SingleShooting, Hp, Hc)
+function get_nZ(estim::StateEstimator, ::SingleShooting, Hp, Hc)
     return estim.model.nu*Hc
 end
-function get_nZ(estim::StateEstimator, transcription::MultipleShooting, Hp, Hc)
+function get_nZ(estim::StateEstimator, ::MultipleShooting, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
 
@@ -106,14 +106,14 @@ in which ``\mathbf{P_{Δu}}`` is defined in the Extended Help section.
 function init_ZtoΔU end
 
 function init_ZtoΔU(
-    estim::StateEstimator{NT}, transcription::SingleShooting, _ , Hc
+    estim::StateEstimator{NT}, ::SingleShooting, _ , Hc
 ) where {NT<:Real}
     PΔu = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
     return PΔu
 end
 
 function init_ZtoΔU(
-    estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
+    estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
     I_nu_Hc = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
     PΔu = [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
@@ -177,7 +177,7 @@ function init_ZtoU(
 end
 
 init_PUmat( _ , transcription::SingleShooting, _ , _ , PUdagger) = PUdagger
-function init_PUmat(estim, transcription::MultipleShooting, Hp, _ , PUdagger)
+function init_PUmat(estim, ::MultipleShooting, Hp, _ , PUdagger)
     return [PUdagger zeros(eltype(PUdagger), estim.model.nu*Hp, estim.nx̂*Hp)]
 end
 
@@ -372,7 +372,7 @@ They are defined in the Extended Help section.
     ```
 """
 function init_predmat(
-    model::LinModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
     Ĉ, D̂d = estim.Ĉ, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
@@ -494,7 +494,7 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
     ```
 """
 function init_defectmat(
-    model::LinModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
@@ -904,7 +904,7 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
 end
 
 "Set `b` excluding predicted output constraints for `NonLinModel` and not `SingleShooting`."
-function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod)
+function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod)
     nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
     nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
     # here, updating fx̂ is not necessary since fx̂ = 0
@@ -994,7 +994,7 @@ If supported by `mpc.optim`, it warm-starts the solver at:
 where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
 last control period ``k-1``, and ``ϵ(k-1)``, the slack variable of the last control period.
 """
-function set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var)
+function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
     nu, Hc, Z̃s = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
     # --- input increments ΔU ---
     Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
@@ -1031,7 +1031,7 @@ where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` comput
 last control period ``k-1``, expressed as a deviation from the operating point 
 ``\mathbf{x̂_{op}}``.
 """
-function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var)
+function set_warmstart!(mpc::PredictiveController, ::MultipleShooting, Z̃var)
     nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
     # --- input increments ΔU ---
     Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
@@ -1045,7 +1045,7 @@ function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooti
     return Z̃s
 end
 
-getΔŨ!(ΔŨ, mpc::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃)
+getΔŨ!(ΔŨ, ::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃)
 function getΔŨ!(ΔŨ, mpc::PredictiveController, ::TranscriptionMethod, Z̃)
     # avoid explicit matrix multiplication with mpc.P̃Δu for performance:
     nΔU = mpc.Hc*mpc.estim.model.nu
@@ -1159,7 +1159,7 @@ The method mutates the `g` vectors in argument and returns it. Only the custom c
 are include in the `g` vector.
 """
 function con_nonlinprog!(
-    g, mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
+    g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
 )
     for i in eachindex(g)
         g[i] = gc[i]
