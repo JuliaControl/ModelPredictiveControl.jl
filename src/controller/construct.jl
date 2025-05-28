@@ -490,18 +490,14 @@ end
 """
     move_blocking(Hp::Int, Hc::Int) -> nb, Hc
 
-Construct a move blocking vector `nb` to fit the provides `Hp` and `Hc` horizons.
+Construct a move blocking vector `nb` that match the provided `Hp` and `Hc` horizons.
 
-The vector is filled with `1`s for the first `Hc` blocks. If `Hc < Hp`, the last block in 
-`nb` is set to `Hp - Hc` to ensure the total sum is `Hp`.
+The vector is filled with `1`s, except for the last element which is `Hp - Hc + 1`.
 """
 function move_blocking(Hp_arg::Int, Hc_arg::Int)
     Hp, Hc = Hp_arg, Hc_arg
-    nb = fill(1, Hc_arg)
-    if Hc < Hp
-        newblock = Hp - Hc
-        nb = [nb; newblock]
-    end
+    nb = fill(1, Hc)
+    nb[end] = Hp - Hc + 1
     return nb, Hc
 end
 
