@@ -457,9 +457,53 @@ end
 estimate_delays(::SimModel) = 0
 
 
-"Get move blocking vector `nb` and actual `Hc` value from provided `Hc_arg` argument" 
-move_blocking(Hc_arg::AbstractVector{Int}) = (Hc_arg, length(nb))
-move_blocking(Hc_arg::Int) = (fill(1, length(Hc_arg)), Hc_arg)
+"""
+    move_blocking(Hp::Int, Hc::AbstractVector{Int}) -> nb, Hc
+
+Get move blocking vector `nb` and actual control horizon from `Hp` and `Hc` arguments.
+
+The argument `Hc` is in fact the move blocking vector `nb` provided by the user. The `nb`
+vector is modified in these two cases:
+
+- If `sum(nb) < Hp`, a new element is added to `nb` with the value `Hp - sum(nb)`.
+- If `sum(nb) > Hp`, the intervals are truncated until the sum is `Hp`. For example, if
+  `Hp = 10` and `nb = [1, 2, 3, 6, 7]`, then `nb` is truncated to `[1, 2, 3, 4]`.
+""" 
+function move_blocking(Hp_arg::Int, Hc_arg::AbstractVector{Int})
+    Hp = Hp_arg
+    nb = Hc_arg
+    if sum(nb) < Hp
+        newblock = [Hp - sum(nb)]
+        nb = [nb; newblock]
+    elseif sum(nb) > Hp
+        #For example, if Hp = 10 and nb = [1, 2, 3, 6, 7], than nb is truncated to [1, 2, 3, 4]
+        nb = nb[begin:findfirst(≥(Hp), cumsum(nb))]
+        if sum(nb) > Hp
+            # if the last block is too large, it is truncated to fit Hp:
+            nb[end] = Hp - @views sum(nb[begin:end-1])
+        end
+    end
+    Hc = length(nb)
+    return nb, Hc
+end
+
+"""
+    move_blocking(Hp::Int, Hc::Int) -> nb, Hc
+
+Construct a move blocking vector `nb` to fit the provides `Hp` and `Hc` horizons.
+
+The vector is filled with `1`s for the first `Hc` blocks. If `Hc < Hp`, the last block in 
+`nb` is set to `Hp - Hc` to ensure the total sum is `Hp`.
+"""
+function move_blocking(Hp_arg::Int, Hc_arg::Int)
+    Hp, Hc = Hp_arg, Hc_arg
+    nb = fill(1, Hc_arg)
+    if Hc < Hp
+        newblock = Hp - Hc
+        nb = [nb; newblock]
+    end
+    return nb, Hc
+end
 
 
 """

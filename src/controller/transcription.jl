@@ -121,7 +121,7 @@ function init_ZtoΔU(
 end
 
 @doc raw"""
-    init_ZtoU(estim, transcription, Hp, Hc) -> Pu, Tu
+    init_ZtoU(estim, transcription, Hp, Hc, nb) -> Pu, Tu
 
 Init decision variables to inputs over ``H_p`` conversion matrices.
 
@@ -164,7 +164,7 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
       if `transcription` is a [`MultipleShooting`](@ref)
 """
 function init_ZtoU(
-    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, nb
 ) where {NT<:Real}
     model = estim.model
     # Pu and Tu are `Matrix{NT}`, conversion is faster than `Matrix{Bool}` or `BitMatrix`

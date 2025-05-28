@@ -51,7 +51,7 @@ struct ExplicitMPC{
         lastu0 = zeros(NT, nu)
         transcription = SingleShooting() # explicit MPC only supports SingleShooting
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
-        Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
+        Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
         E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
         # dummy val (updated just before optimization):
         F = zeros(NT, ny*Hp)
@@ -167,7 +167,7 @@ function ExplicitMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
-    nb, Hc = move_blocking(Hc)
+    nb, Hc = move_blocking(Hp, Hc)
     weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp)
     return ExplicitMPC{NT}(estim, Hp, Hc, nb, weights)
 end
