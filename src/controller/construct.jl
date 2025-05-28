@@ -496,7 +496,9 @@ The vector is filled with `1`s, except for the last element which is `Hp - Hc + 
 function move_blocking(Hp_arg::Int, Hc_arg::Int)
     Hp, Hc = Hp_arg, Hc_arg
     nb = fill(1, Hc)
-    nb[end] = Hp - Hc + 1
+    if Hc > 1 # if Hc < 1, it will crash later with a clear error message
+        nb[end] = Hp - Hc + 1
+    end
     return nb
 end
 

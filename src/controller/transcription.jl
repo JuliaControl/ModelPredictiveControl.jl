@@ -134,7 +134,7 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
 
 # Extended Help
 !!! details "Extended Help"
-    With ``n_j``, the ``j``th element of the ``\mathbf{n_b}`` vector introduced in [`init_ZtoΔU`](@ref)
+    With ``n_j``, the ``j``th element of the ``\mathbf{n_b}`` vector definedc in [`init_ZtoΔU`](@ref)
     documentation, we introduce the ``\mathbf{Q}(j)`` matrix of size `(nu*nj, nu)`:
     ```math
     \mathbf{Q}(j) =         \begin{bmatrix}
