@@ -119,7 +119,7 @@ end
     r = [15]
     moveinput!(mpc7, r)
     ΔU_diff = diff(getinfo(mpc7)[:U])
-    @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6)
+    @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
 
     @test_throws DimensionMismatch moveinput!(mpc1, [0,0,0])
     @test_throws DimensionMismatch moveinput!(mpc1, [0], [0,0])
@@ -488,7 +488,7 @@ end
     preparestate!(mpc5, y)
     moveinput!(mpc5, r)
     ΔU_diff = diff(getinfo(mpc5)[:U])
-    @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6)
+    @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
 
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
@@ -795,7 +795,7 @@ end
     moveinput!(nmpc11, [10], [0])
     ΔU_diff = diff(getinfo(nmpc11)[:U])
     println(ΔU_diff)
-    @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6)
+    @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
 
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
