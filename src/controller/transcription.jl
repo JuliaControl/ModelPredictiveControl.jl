@@ -113,10 +113,10 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
 
 # Extended Help
 !!! details "Extended Help"
-    With ``n_j``, the ``j``th element of the ``\mathbf{n_b}`` vector defined in [`move_blocking`](@ref)
-    documentation, we introduce the ``\mathbf{Q}(j)`` matrix of size `(nu*nj, nu)`:
+    With ``n_i``, the ``i``th element of the ``\mathbf{n_b}`` vector defined in [`move_blocking`](@ref)
+    documentation, we introduce the ``\mathbf{Q}(i)`` matrix of size `(nu*ni, nu)`:
     ```math
-    \mathbf{Q}(j) =         \begin{bmatrix}
+    \mathbf{Q}(i) =         \begin{bmatrix}
         \mathbf{I}          \\
         \mathbf{I}          \\
         \vdots              \\
@@ -152,11 +152,11 @@ function init_ZtoU(
     # Pu and Tu are `Matrix{NT}`, conversion is faster than `Matrix{Bool}` or `BitMatrix`
     I_nu = Matrix{NT}(I, nu, nu)
     PuDagger = Matrix{NT}(undef, nu*Hp, nu*Hc)
-    for j=1:Hc
-        nj = nb[j]
-        Qj = repeat(I_nu, nj, 1)
-        iRows = (1:nu*nj) .+ @views nu*sum(nb[1:j-1])
-        PuDagger[iRows, :] = [repeat(Qj, 1, j) zeros(nu*nj, nu*(Hc-j))]
+    for i=1:Hc
+        ni = nb[i]
+        Qi = repeat(I_nu, ni, 1)
+        iRows = (1:nu*ni) .+ @views nu*sum(nb[1:i-1])
+        PuDagger[iRows, :] = [repeat(Qi, 1, i) zeros(nu*ni, nu*(Hc-i))]
     end
     Pu = init_PUmat(estim, transcription, Hp, Hc, PuDagger)
     Tu = repeat(I_nu, Hp)
