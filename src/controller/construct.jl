@@ -462,13 +462,15 @@ estimate_delays(::SimModel) = 0
 
 Get the move blocking vector `nb` from the `Hc` argument, and modify it to match `Hp`.
 
-The argument `Hc` is interpreted as the move blocking vector `nb`. It specifies the length
-of each step (or "block") in the ``\mathbf{ΔU}`` vector, to customize the pattern (strictly
-positive integers):
+This feature is also known as manipulated variable blocking. The argument `Hc` is
+interpreted as the move blocking vector `nb`. It specifies the length of each step (or
+"block") in the ``\mathbf{ΔU}`` vector, to customize the pattern (in time steps, thus
+strictly positive integers):
 ```math
     \mathbf{n_b} = \begin{bmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{bmatrix}'
 ```
-The vector with all the manipulated input increments is then defined as:
+The vector that includes all the manipulated input increments ``\mathbf{Δu}`` is then
+defined as:
 ```math
 \mathbf{ΔU} = \begin{bmatrix}
     \mathbf{Δu}(k + 0)                                  \\[0.1em]
@@ -478,9 +480,9 @@ The vector with all the manipulated input increments is then defined as:
     \mathbf{Δu}(k + ∑_{i=1}^{H_c-1} n_i)   
 \end{bmatrix}
 ```
-The provided `nb` vector is modified in these two cases:
+The provided `nb` vector is modified to ensure `sum(nb) == Hp`:
 - If `sum(nb) < Hp`, a new element is pushed to `nb` with the value `Hp - sum(nb)`.
-- If `sum(nb) > Hp`, the intervals are truncated until the sum is `Hp`. For example, if
+- If `sum(nb) > Hp`, the intervals are truncated until `sum(nb) == Hp`. For example, if
   `Hp = 10` and `nb = [1, 2, 3, 6, 7]`, then `nb` is truncated to `[1, 2, 3, 4]`.
 """ 
 function move_blocking(Hp_arg::Int, Hc_arg::AbstractVector{Int})
