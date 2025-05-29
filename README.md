@@ -82,6 +82,7 @@ for more detailed examples.
   - input setpoint tracking
   - terminal costs
   - custom economic costs (economic model predictive control)
+- control horizon distinct from prediction horizon and custom move blocking
 - adaptive linear model predictive controller
   - manual model modification
   - automatic successive linearization of a nonlinear model

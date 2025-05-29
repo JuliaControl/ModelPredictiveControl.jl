@@ -93,7 +93,7 @@ Luenberger estimator with a sample time Ts = 0.5 s, LinModel and:
 """
 function Luenberger(
     model::SM;
-    i_ym::IntRangeOrVector  = 1:model.ny,
+    i_ym::AbstractVector{Int}  = 1:model.ny,
     nint_u ::IntVectorOrInt = 0,
     nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     poles = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5,

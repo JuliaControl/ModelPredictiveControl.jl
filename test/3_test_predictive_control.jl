@@ -47,6 +47,12 @@
     @test mpc14.transcription == MultipleShooting()
     @test length(mpc14.Z̃) == model2.nu*mpc14.Hc + mpc14.estim.nx̂*mpc14.Hp + mpc14.nϵ
     @test size(mpc14.con.Aeq, 1) == mpc14.estim.nx̂*mpc14.Hp
+    mpc15 = LinMPC(model, Hc=[1,2,3], Hp=10, Cwt=Inf)
+    @test mpc15.Hc == 4 # the constructor will push an element to nb
+    @test size(mpc15.P̃u) == (10*mpc1.estim.model.nu, 4*mpc1.estim.model.nu)
+    mpc16 = LinMPC(model, Hc=[1,2,3,6,6,6], Hp=10, Cwt=Inf)
+    @test mpc16.Hc == 4 # the last 2 elements of Hc are ignored
+    @test size(mpc16.P̃u) == (10*mpc1.estim.model.nu, 4*mpc1.estim.model.nu)
 
     @test_logs(
         (:warn, 
@@ -108,6 +114,13 @@ end
     d = [0.1]
     u = moveinput!(mpc6, 7d, d)
     @test u ≈ [0] atol=1e-2
+    mpc7 = LinMPC(linmodel, Hp=10, Hc=[1, 2, 3, 4], Nwt=[10])
+    preparestate!(mpc7, [10])
+    r = [15]
+    moveinput!(mpc7, r)
+    ΔU_diff = diff(getinfo(mpc7)[:U])
+    @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
+
     @test_throws DimensionMismatch moveinput!(mpc1, [0,0,0])
     @test_throws DimensionMismatch moveinput!(mpc1, [0], [0,0])
     @test_throws DimensionMismatch moveinput!(mpc1; D̂  = fill(0, mpc1.Hp+1))
@@ -447,7 +460,8 @@ end
 
 @testitem "ExplicitMPC moves and getinfo" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    mpc1 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
+    model = LinModel(tf(5, [2, 1]), 3)
+    mpc1 = ExplicitMPC(model, Nwt=[0], Hp=1000, Hc=1)
     r, y = [5], [0]
     preparestate!(mpc1, y)
     u = moveinput!(mpc1, r)
@@ -458,18 +472,24 @@ end
     info = getinfo(mpc1)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ r[1] atol=1e-2
-    mpc2 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1000, Hc=1)
-    preparestate!(mpc2, [0])
+    mpc2 = ExplicitMPC(model, Nwt=[0], Hp=1000, Hc=1)
+    preparestate!(mpc2, y)
     u = moveinput!(mpc2, [5])
     @test u ≈ [1] atol=1e-2
-    mpc3 = ExplicitMPC(LinModel(tf(5, [2, 1]), 3), Mwt=[0], Nwt=[0], Lwt=[1])
-    preparestate!(mpc3, [0])
+    mpc3 = ExplicitMPC(model, Mwt=[0], Nwt=[0], Lwt=[1])
+    preparestate!(mpc3, y)
     u = moveinput!(mpc3, [0], R̂u=fill(12, mpc3.Hp))
     @test u ≈ [12] atol=1e-2
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc4  = ExplicitMPC(model2)
-    preparestate!(mpc4, [0])
+    preparestate!(mpc4, y)
     moveinput!(mpc4, [0]) ≈ [0.0]
+    mpc5 = ExplicitMPC(model, Hp=10, Hc=[1, 2, 3, 4], Nwt=[10])
+    preparestate!(mpc5, y)
+    moveinput!(mpc5, r)
+    ΔU_diff = diff(getinfo(mpc5)[:U])
+    @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
+
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
@@ -770,6 +790,12 @@ end
     info = getinfo(nmpc10)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    nmpc11 = NonLinMPC(nonlinmodel, Hp=10, Hc=[1, 2, 3, 4], Nwt=[10])
+    preparestate!(nmpc11, y, [0])
+    moveinput!(nmpc11, [10], [0])
+    ΔU_diff = diff(getinfo(nmpc11)[:U])
+    println(ΔU_diff)
+    @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
 
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end

@@ -33,6 +33,7 @@ struct NonLinMPC{
     Hp::Int
     Hc::Int
     nϵ::Int
+    nb::Vector{Int}
     weights::CW
     JE::JEfunc
     p::PT
@@ -63,7 +64,7 @@ struct NonLinMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function NonLinMPC{NT}(
-        estim::SE, Hp, Hc, weights::CW,
+        estim::SE, Hp, Hc, nb, weights::CW,
         JE::JEfunc, gc!::GCfunc, nc, p::PT, 
         transcription::TM, optim::JM, 
         gradient::GB, jacobian::JB
@@ -86,7 +87,7 @@ struct NonLinMPC{
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         lastu0 = zeros(NT, nu)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
-        Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
+        Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
             model, estim, transcription, Hp, Hc
         )
@@ -116,7 +117,7 @@ struct NonLinMPC{
             estim, transcription, optim, con,
             gradient, jacobian,
             Z̃, ŷ,
-            Hp, Hc, nϵ,
+            Hp, Hc, nϵ, nb,
             weights,
             JE, p,
             R̂u, R̂y,
@@ -188,8 +189,10 @@ This controller allocates memory at each time step for the optimization.
 
 # Arguments
 - `model::SimModel` : model used for controller predictions and state estimations.
-- `Hp=nothing`: prediction horizon ``H_p``, must be specified for [`NonLinModel`](@ref).
-- `Hc=2` : control horizon ``H_c``.
+- `Hp::Int=10+nk` : prediction horizon ``H_p``, `nk` is the number of delays if `model` is a
+   [`LinModel`](@ref) (must be specified otherwise).
+- `Hc::Union{Int, Vector{Int}}=2` : control horizon ``H_c``, custom move blocking pattern is 
+   specified with a vector of integers (see [`move_blocking`](@ref) for details).
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
@@ -281,12 +284,12 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 function NonLinMPC(
     model::SimModel;
     Hp::Int = default_Hp(model),
-    Hc::Int = DEFAULT_HC,
+    Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
     M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
@@ -338,12 +341,12 @@ NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedK
 function NonLinMPC(
     estim::SE;
     Hp::Int = default_Hp(estim.model),
-    Hc::Int = DEFAULT_HC,
+    Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
     M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
@@ -365,11 +368,13 @@ function NonLinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
+    nb = move_blocking(Hp, Hc)
+    Hc = get_Hc(nb)
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
     weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     return NonLinMPC{NT}(
-        estim, Hp, Hc, weights, JE, gc!, nc, p, transcription, optim, gradient, jacobian
+        estim, Hp, Hc, nb, weights, JE, gc!, nc, p, transcription, optim, gradient, jacobian
     )
 end
 

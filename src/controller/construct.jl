@@ -456,6 +456,72 @@ end
 "Return `0` when model is not a [`LinModel`](@ref)."
 estimate_delays(::SimModel) = 0
 
+
+@doc raw"""
+    move_blocking(Hp::Int, Hc::AbstractVector{Int}) -> nb
+
+Get the move blocking vector `nb` from the `Hc` argument, and modify it to match `Hp`.
+
+This feature is also known as manipulated variable blocking. The argument `Hc` is
+interpreted as the move blocking vector `nb`. It specifies the length of each step (or
+"block") in the ``\mathbf{ΔU}`` vector, to customize the pattern (in time steps, thus
+strictly positive integers):
+```math
+    \mathbf{n_b} = \begin{bmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{bmatrix}'
+```
+The vector that includes all the manipulated input increments ``\mathbf{Δu}`` is then
+defined as:
+```math
+\mathbf{ΔU} = \begin{bmatrix}
+    \mathbf{Δu}(k + 0)                                  \\[0.1em]
+    \mathbf{Δu}(k + ∑_{i=1}^1 n_i)                      \\[0.1em]
+    \mathbf{Δu}(k + ∑_{i=1}^2 n_i)                      \\[0.1em]
+    \vdots                                              \\[0.1em]
+    \mathbf{Δu}(k + ∑_{i=1}^{H_c-1} n_i)   
+\end{bmatrix}
+```
+The provided `nb` vector is modified to ensure `sum(nb) == Hp`:
+- If `sum(nb) < Hp`, a new element is pushed to `nb` with the value `Hp - sum(nb)`.
+- If `sum(nb) > Hp`, the intervals are truncated until `sum(nb) == Hp`. For example, if
+  `Hp = 10` and `nb = [1, 2, 3, 6, 7]`, then `nb` is truncated to `[1, 2, 3, 4]`.
+""" 
+function move_blocking(Hp_arg::Int, Hc_arg::AbstractVector{Int})
+    Hp = Hp_arg
+    nb = Hc_arg
+    all(>(0), nb) || throw(ArgumentError("Move blocking vector must be strictly positive integers."))
+    if sum(nb) < Hp
+        newblock = [Hp - sum(nb)]
+        nb = [nb; newblock]
+    elseif sum(nb) > Hp
+        nb = nb[begin:findfirst(≥(Hp), cumsum(nb))]
+        if sum(nb) > Hp
+            # if the last block is too large, it is truncated to fit Hp:
+            nb[end] = Hp - @views sum(nb[begin:end-1])
+        end
+    end
+    return nb
+end
+
+"""
+    move_blocking(Hp::Int, Hc::Int) -> nb
+
+Construct a move blocking vector `nb` that match the provided `Hp` and `Hc` integers.
+
+The vector is filled with `1`s, except for the last element which is `Hp - Hc + 1`.
+"""
+function move_blocking(Hp_arg::Int, Hc_arg::Int)
+    Hp, Hc = Hp_arg, Hc_arg
+    nb = fill(1, Hc)
+    if Hc > 0 # if Hc < 1, it will crash later with a clear error message
+        nb[end] = Hp - Hc + 1
+    end
+    return nb
+end
+
+"Get the actual control Horizon `Hc` (integer) from the move blocking vector `nb`."
+get_Hc(nb::AbstractVector{Int}) = length(nb)
+
+
 """
     validate_args(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
 

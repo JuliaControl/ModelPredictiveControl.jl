@@ -19,6 +19,7 @@ struct LinMPC{
     Hp::Int
     Hc::Int
     nϵ::Int
+    nb::Vector{Int}
     weights::CW
     R̂u::Vector{NT}
     R̂y::Vector{NT}
@@ -47,7 +48,7 @@ struct LinMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function LinMPC{NT}(
-        estim::SE, Hp, Hc, weights::CW, 
+        estim::SE, Hp, Hc, nb, weights::CW, 
         transcription::TM, optim::JM
     ) where {
             NT<:Real, 
@@ -63,7 +64,7 @@ struct LinMPC{
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         lastu0 = zeros(NT, nu)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
-        Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc)
+        Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
             model, estim, transcription, Hp, Hc
         )
@@ -90,7 +91,7 @@ struct LinMPC{
         mpc = new{NT, SE, CW, TM, JM}(
             estim, transcription, optim, con,
             Z̃, ŷ,
-            Hp, Hc, nϵ,
+            Hp, Hc, nϵ, nb,
             weights,
             R̂u, R̂y,
             lastu0,
@@ -145,8 +146,9 @@ arguments. This controller allocates memory at each time step for the optimizati
 
 # Arguments
 - `model::LinModel` : model used for controller predictions and state estimations.
-- `Hp=10+nk` : prediction horizon ``H_p``, `nk` is the number of delays in `model`.
-- `Hc=2` : control horizon ``H_c``.
+- `Hp::Int=10+nk` : prediction horizon ``H_p``, `nk` is the number of delays in `model`.
+- `Hc::Union{Int, Vector{Int}}=2` : control horizon ``H_c``, custom move blocking pattern is 
+   specified with a vector of integers (see [`move_blocking`](@ref) for details).
 - `Mwt=fill(1.0,model.ny)` : main diagonal of ``\mathbf{M}`` weight matrix (vector).
 - `Nwt=fill(0.1,model.nu)` : main diagonal of ``\mathbf{N}`` weight matrix (vector).
 - `Lwt=fill(0.0,model.nu)` : main diagonal of ``\mathbf{L}`` weight matrix (vector).
@@ -205,12 +207,12 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFil
 function LinMPC(
     model::LinModel;
     Hp::Int = default_Hp(model),
-    Hc::Int = DEFAULT_HC,
+    Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, model.ny),
     Nwt  = fill(DEFAULT_NWT, model.nu),
     Lwt  = fill(DEFAULT_LWT, model.nu),
     M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt = DEFAULT_CWT,
     transcription::TranscriptionMethod = DEFAULT_LINMPC_TRANSCRIPTION,
@@ -227,7 +229,8 @@ end
 
 Use custom state estimator `estim` to construct `LinMPC`.
 
-`estim.model` must be a [`LinModel`](@ref). Else, a [`NonLinMPC`](@ref) is required. 
+`estim.model` must be a [`LinModel`](@ref). Else, a [`NonLinMPC`](@ref) is required. See
+[`ManualEstimator`](@ref) for linear controllers with nonlinear state estimation.
 
 # Examples
 ```jldoctest
@@ -248,12 +251,12 @@ LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, KalmanFilter es
 function LinMPC(
     estim::SE;
     Hp::Int = default_Hp(estim.model),
-    Hc::Int = DEFAULT_HC,
+    Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, estim.model.ny),
     Nwt  = fill(DEFAULT_NWT, estim.model.nu),
     Lwt  = fill(DEFAULT_LWT, estim.model.nu),
     M_Hp = Diagonal(repeat(Mwt, Hp)),
-    N_Hc = Diagonal(repeat(Nwt, Hc)),
+    N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
     transcription::TranscriptionMethod = DEFAULT_LINMPC_TRANSCRIPTION,
@@ -265,8 +268,10 @@ function LinMPC(
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
+    nb = move_blocking(Hp, Hc)
+    Hc = get_Hc(nb)
     weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-    return LinMPC{NT}(estim, Hp, Hc, weights, transcription, optim)
+    return LinMPC{NT}(estim, Hp, Hc, nb, weights, transcription, optim)
 end
 
 """

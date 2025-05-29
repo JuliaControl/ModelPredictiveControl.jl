@@ -10,7 +10,8 @@ abstract type TranscriptionMethod end
 
 Construct a direct single shooting [`TranscriptionMethod`](@ref).
 
-The decision variable in the optimization problem is (excluding the slack ``ϵ``):
+The decision variable in the optimization problem is (excluding the slack ``ϵ`` and without
+any custom move blocking):
 ```math
 \mathbf{Z} = \mathbf{ΔU} =          \begin{bmatrix} 
     \mathbf{Δu}(k+0)                \\ 
@@ -53,10 +54,10 @@ for this transcription method.
 struct MultipleShooting <: TranscriptionMethod end
 
 "Get the number of elements in the optimization decision vector `Z`."
-function get_nZ(estim::StateEstimator, transcription::SingleShooting, Hp, Hc)
+function get_nZ(estim::StateEstimator, ::SingleShooting, Hp, Hc)
     return estim.model.nu*Hc
 end
-function get_nZ(estim::StateEstimator, transcription::MultipleShooting, Hp, Hc)
+function get_nZ(estim::StateEstimator, ::MultipleShooting, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
 
@@ -70,6 +71,7 @@ increments over ``H_c``, is computed by:
 ```math
 \mathbf{ΔU} = \mathbf{P_{Δu}} \mathbf{Z}
 ```
+
 in which ``\mathbf{P_{Δu}}`` is defined in the Extended Help section.
 
 # Extended Help
@@ -83,14 +85,14 @@ in which ``\mathbf{P_{Δu}}`` is defined in the Extended Help section.
 function init_ZtoΔU end
 
 function init_ZtoΔU(
-    estim::StateEstimator{NT}, transcription::SingleShooting, _ , Hc
+    estim::StateEstimator{NT}, ::SingleShooting, _ , Hc
 ) where {NT<:Real}
     PΔu = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
     return PΔu
 end
 
 function init_ZtoΔU(
-    estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
+    estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
     I_nu_Hc = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
     PΔu = [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
@@ -98,7 +100,7 @@ function init_ZtoΔU(
 end
 
 @doc raw"""
-    init_ZtoU(estim, transcription, Hp, Hc) -> Pu, Tu
+    init_ZtoU(estim, transcription, Hp, Hc, nb) -> Pu, Tu
 
 Init decision variables to inputs over ``H_p`` conversion matrices.
 
@@ -111,29 +113,32 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
 
 # Extended Help
 !!! details "Extended Help"
+    With ``n_i``, the ``i``th element of the ``\mathbf{n_b}`` vector defined in [`move_blocking`](@ref)
+    documentation, we introduce the ``\mathbf{Q}(i)`` matrix of size `(nu*ni, nu)`:
+    ```math
+    \mathbf{Q}(i) =         \begin{bmatrix}
+        \mathbf{I}          \\
+        \mathbf{I}          \\
+        \vdots              \\
+        \mathbf{I}          \end{bmatrix}            
+    ```
     The ``\mathbf{U}`` vector and the conversion matrices are defined as:
     ```math
     \mathbf{U} = \begin{bmatrix}
-        \mathbf{u}(k + 0)                                           \\
-        \mathbf{u}(k + 1)                                           \\
-        \vdots                                                      \\
-        \mathbf{u}(k + H_c - 1)                                     \\
-        \vdots                                                      \\
-        \mathbf{u}(k + H_p - 1)                                     \end{bmatrix} , \quad
+        \mathbf{u}(k + 0)                                                                   \\
+        \mathbf{u}(k + 1)                                                                   \\
+        \vdots                                                                              \\
+        \mathbf{u}(k + H_p - 1)                                                             \end{bmatrix} , \quad
     \mathbf{P_u^†} = \begin{bmatrix}
-        \mathbf{I}  & \mathbf{0}    & \cdots    & \mathbf{0}        \\
-        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{0}        \\
-        \vdots      & \vdots        & \ddots    & \vdots            \\
-        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \\
-        \vdots      & \vdots        & \ddots    & \vdots            \\
-        \mathbf{I}  & \mathbf{I}    & \cdots    & \mathbf{I}        \end{bmatrix} , \quad
+        \mathbf{Q}(n_1)         & \mathbf{0}            & \cdots    & \mathbf{0}            \\
+        \mathbf{Q}(n_2)         & \mathbf{Q}(n_2)       & \cdots    & \mathbf{0}            \\
+        \vdots                  & \vdots                & \ddots    & \vdots                \\
+        \mathbf{Q}(n_{H_c})     & \mathbf{Q}(n_{H_c})   & \cdots    & \mathbf{Q}(n_{H_c})   \end{bmatrix} , \quad
     \mathbf{T_u} = \begin{bmatrix}
-        \mathbf{I}                                                  \\
-        \mathbf{I}                                                  \\
-        \vdots                                                      \\
-        \mathbf{I}                                                  \\
-        \vdots                                                      \\
-        \mathbf{I}                                                  \end{bmatrix}
+        \mathbf{I}                                                                          \\
+        \mathbf{I}                                                                          \\
+        \vdots                                                                              \\
+        \mathbf{I}                                                                          \end{bmatrix}
     ```
     and, depending on the transcription method, we have:
     - ``\mathbf{P_u} = \mathbf{P_u^†}`` if `transcription` is a [`SingleShooting`](@ref)
@@ -141,21 +146,28 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
       if `transcription` is a [`MultipleShooting`](@ref)
 """
 function init_ZtoU(
-    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, nb
 ) where {NT<:Real}
-    model = estim.model
+    nu = estim.model.nu
     # Pu and Tu are `Matrix{NT}`, conversion is faster than `Matrix{Bool}` or `BitMatrix`
-    I_nu = Matrix{NT}(I, model.nu, model.nu)
-    PU_Hc = LowerTriangular(repeat(I_nu, Hc, Hc))
-    PUdagger = [PU_Hc; repeat(I_nu, Hp - Hc, Hc)]
-    Pu = init_PUmat(estim, transcription, Hp, Hc, PUdagger)
+    I_nu = Matrix{NT}(I, nu, nu)
+    PuDagger = Matrix{NT}(undef, nu*Hp, nu*Hc)
+    for i=1:Hc
+        ni = nb[i]
+        Qi = repeat(I_nu, ni, 1)
+        iRows = (1:nu*ni) .+ @views nu*sum(nb[1:i-1])
+        PuDagger[iRows, :] = [repeat(Qi, 1, i) zeros(nu*ni, nu*(Hc-i))]
+    end
+    Pu = init_PUmat(estim, transcription, Hp, Hc, PuDagger)
     Tu = repeat(I_nu, Hp)
     return Pu, Tu
 end
 
-init_PUmat( _ , transcription::SingleShooting, _ , _ , PUdagger) = PUdagger
-function init_PUmat(estim, transcription::MultipleShooting, Hp, _ , PUdagger)
-    return [PUdagger zeros(eltype(PUdagger), estim.model.nu*Hp, estim.nx̂*Hp)]
+
+
+init_PUmat( _ , ::SingleShooting, _ , _ , PuDagger) = PuDagger
+function init_PUmat(estim, ::MultipleShooting, Hp, _ , PuDagger)
+    return [PuDagger zeros(eltype(PuDagger), estim.model.nu*Hp, estim.nx̂*Hp)]
 end
 
 @doc raw"""
@@ -349,7 +361,7 @@ They are defined in the Extended Help section.
     ```
 """
 function init_predmat(
-    model::LinModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
     Ĉ, D̂d = estim.Ĉ, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
@@ -471,7 +483,7 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
     ```
 """
 function init_defectmat(
-    model::LinModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
@@ -881,7 +893,7 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
 end
 
 "Set `b` excluding predicted output constraints for `NonLinModel` and not `SingleShooting`."
-function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod)
+function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod)
     nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
     nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
     # here, updating fx̂ is not necessary since fx̂ = 0
@@ -971,7 +983,7 @@ If supported by `mpc.optim`, it warm-starts the solver at:
 where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
 last control period ``k-1``, and ``ϵ(k-1)``, the slack variable of the last control period.
 """
-function set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var)
+function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
     nu, Hc, Z̃s = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
     # --- input increments ΔU ---
     Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
@@ -1008,7 +1020,7 @@ where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` comput
 last control period ``k-1``, expressed as a deviation from the operating point 
 ``\mathbf{x̂_{op}}``.
 """
-function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var)
+function set_warmstart!(mpc::PredictiveController, ::MultipleShooting, Z̃var)
     nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
     # --- input increments ΔU ---
     Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
@@ -1022,7 +1034,7 @@ function set_warmstart!(mpc::PredictiveController, transcription::MultipleShooti
     return Z̃s
 end
 
-getΔŨ!(ΔŨ, mpc::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃)
+getΔŨ!(ΔŨ, ::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃)
 function getΔŨ!(ΔŨ, mpc::PredictiveController, ::TranscriptionMethod, Z̃)
     # avoid explicit matrix multiplication with mpc.P̃Δu for performance:
     nΔU = mpc.Hc*mpc.estim.model.nu
@@ -1136,7 +1148,7 @@ The method mutates the `g` vectors in argument and returns it. Only the custom c
 are include in the `g` vector.
 """
 function con_nonlinprog!(
-    g, mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
+    g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
 )
     for i in eachindex(g)
         g[i] = gc[i]
