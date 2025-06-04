@@ -70,7 +70,7 @@ unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions
 ``\mathbf{ŷ_d}``, and `stoch_ym`, the stochastic predictions of the measured outputs 
 ``\mathbf{ŷ_s^m}`` (the unmeasured ones being ``\mathbf{ŷ_s^u=0}``). The predicted outputs
 sum both values : ``\mathbf{ŷ = ŷ_d + ŷ_s}``. See the Extended Help for more details. This
-estimator is allocation-free is `model` simulations do not allocate.
+estimator is allocation-free if `model` simulations do not allocate.
 
 !!! warning
     `InternalModel` estimator does not work if `model` is integrating or unstable. The 

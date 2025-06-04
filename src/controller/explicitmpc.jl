@@ -105,8 +105,8 @@ The controller minimizes the following objective function at each discrete time 
 See [`LinMPC`](@ref) for the variable definitions. This controller does not support
 constraints but the computational costs are extremely low (array division), therefore 
 suitable for applications that require small sample times. The keyword arguments are
-identical to [`LinMPC`](@ref), except for `Cwt` and `optim` which are not supported. This
-controller uses a [`SingleShooting`](@ref) transcription method.
+identical to [`LinMPC`](@ref), except for `Cwt`, `transcription` and `optim`, which are not
+supported. This controller uses a [`SingleShooting`](@ref) transcription method.
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
 arguments. This controller is allocation-free.
