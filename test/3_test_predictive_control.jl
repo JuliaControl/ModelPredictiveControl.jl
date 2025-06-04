@@ -180,6 +180,34 @@ end
     @test ym ≈ r   atol=1e-2 
 end
 
+@testitem "LinMPC and ManualEstimator v.s. default" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    linmodel = setop!(LinModel(tf(5, [2, 1]), 3.0), yop=[10])
+    r = [15]
+    outdist = [5]
+    U_man, U_def = let linmodel=linmodel, r=r, outdist=outdist
+        mpc_man = LinMPC(ManualEstimator(linmodel))
+        skf = SteadyKalmanFilter(linmodel)
+        mpc_def = LinMPC(linmodel)
+        linmodel.x0 .= 0
+        U_man, U_def = zeros(1, 25), zeros(1, 25)
+        for i=1:25
+            ym = linmodel() - outdist
+            x̂ = preparestate!(skf, ym)
+            setstate!(mpc_man, x̂)
+            preparestate!(mpc_def, ym)
+            u_man = moveinput!(mpc_man, r)
+            u_def = moveinput!(mpc_def, r)
+            U_man[:, i], U_def[:, i] = u_man, u_def
+            updatestate!(skf, u_man, ym)
+            updatestate!(mpc_def, u_def, ym)
+            updatestate!(linmodel, u_man)
+        end
+        U_man, U_def
+    end
+    @test U_man ≈ U_def atol=1e-9
+end
+
 @testitem "LinMPC other methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
@@ -850,6 +878,37 @@ end
     end
     @test u  ≈ [2] atol=1e-2
     @test ym ≈ r   atol=1e-2
+end
+
+@testitem "NonLinMPC and ManualEstimator v.s. default" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    linmodel = LinModel(tf(5, [2, 1]), 3.0)
+    f(x,u,_,p) = p.A*x + p.Bu*u
+    h(x,_,p)   = p.C*x
+    model = setop!(NonLinModel(f, h, 3.0, 1, 1, 1; solver=nothing, p=linmodel), yop=[10])
+    r = [15]
+    outdist = [5]
+    U_man, U_def = let model=model, r=r, outdist=outdist
+        nmpc_man = NonLinMPC(ManualEstimator(model), Hp=10)
+        ukf = UnscentedKalmanFilter(model)
+        nmpc_def = NonLinMPC(model, Hp=10)
+        model.x0 .= 0
+        U_man, U_def = zeros(1, 25), zeros(1, 25)
+        for i=1:25
+            ym = model() - outdist
+            x̂ = preparestate!(ukf, ym)
+            setstate!(nmpc_man, x̂)
+            preparestate!(nmpc_def, ym)
+            u_man = moveinput!(nmpc_man, r)
+            u_def = moveinput!(nmpc_def, r)
+            U_man[:, i], U_def[:, i] = u_man, u_def
+            updatestate!(ukf, u_man, ym)
+            updatestate!(nmpc_def, u_def, ym)
+            updatestate!(model, u_man)
+        end
+        U_man, U_def
+    end
+    @test U_man ≈ U_def atol=1e-9
 end
 
 @testitem "NonLinMPC other methods" setup=[SetupMPCtests] begin
