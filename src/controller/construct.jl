@@ -458,7 +458,7 @@ estimate_delays(::SimModel) = 0
 
 
 @doc raw"""
-    move_blocking(Hp::Int, Hc::AbstractVector{Int}) -> nb
+    move_blocking(Hp::Int, Hc::Vector{Int}) -> nb
 
 Get the move blocking vector `nb` from the `Hc` argument, and modify it to match `Hp`.
 

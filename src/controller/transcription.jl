@@ -114,9 +114,9 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
 # Extended Help
 !!! details "Extended Help"
     With ``n_i``, the ``i``th element of the ``\mathbf{n_b}`` vector defined in [`move_blocking`](@ref)
-    documentation, we introduce the ``\mathbf{Q}(i)`` matrix of size `(nu*ni, nu)`:
+    documentation, we introduce the ``\mathbf{Q}(n_i)`` matrix of size `(nu*ni, nu)`:
     ```math
-    \mathbf{Q}(i) =         \begin{bmatrix}
+    \mathbf{Q}(n_i) =       \begin{bmatrix}
         \mathbf{I}          \\
         \mathbf{I}          \\
         \vdots              \\
@@ -153,10 +153,10 @@ function init_ZtoU(
     I_nu = Matrix{NT}(I, nu, nu)
     PuDagger = Matrix{NT}(undef, nu*Hp, nu*Hc)
     for i=1:Hc
-        ni = nb[i]
-        Qi = repeat(I_nu, ni, 1)
+        ni    = nb[i]
+        Q_ni  = repeat(I_nu, ni, 1)
         iRows = (1:nu*ni) .+ @views nu*sum(nb[1:i-1])
-        PuDagger[iRows, :] = [repeat(Qi, 1, i) zeros(nu*ni, nu*(Hc-i))]
+        PuDagger[iRows, :] = [repeat(Q_ni, 1, i) zeros(nu*ni, nu*(Hc-i))]
     end
     Pu = init_PUmat(estim, transcription, Hp, Hc, PuDagger)
     Tu = repeat(I_nu, Hp)
