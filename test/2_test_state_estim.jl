@@ -71,12 +71,12 @@ end
     preparestate!(manual1, y)
     @test updatestate!(manual1, u, y, d) ≈ zeros(4)
     @test manual1.x̂0 ≈ zeros(4)
-    @test_skip @allocations(preparestate!(manual1, y)) == 0
-    @test_skip @allocations(updatestate!(manual1, u, y)) == 0
+    @test @allocations(preparestate!(manual1, y)) == 0
+    @test @allocations(updatestate!(manual1, u, y)) == 0
     preparestate!(manual1, y)
     @test evaloutput(manual1) ≈ manual1() ≈ [50, 30]
     @test evaloutput(manual1, d) ≈ manual1(d) ≈ [50, 30]
-    @test_skip @allocations(evaloutput(manual1, d)) == 0
+    @test @allocations(evaloutput(manual1, d)) == 0
     @test initstate!(manual1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     linmodel2 = LinModel(append(tf(1, [1, 0]), tf(2, [10, 1])), 1.0)
     manual2 = SteadyKalmanFilter(linmodel2, nint_u=[1, 1], direct=false)
@@ -205,12 +205,12 @@ end
     preparestate!(kalmanfilter1, y)
     @test updatestate!(kalmanfilter1, u, y, d) ≈ zeros(4)
     @test kalmanfilter1.x̂0 ≈ zeros(4)
-    @test_skip @allocations(preparestate!(kalmanfilter1, y)) == 0
-    @test_skip @allocations(updatestate!(kalmanfilter1, u, y)) == 0
+    @test @allocations(preparestate!(kalmanfilter1, y)) == 0
+    @test @allocations(updatestate!(kalmanfilter1, u, y)) == 0
     preparestate!(kalmanfilter1, y)
     @test evaloutput(kalmanfilter1) ≈ kalmanfilter1() ≈ [50, 30]
     @test evaloutput(kalmanfilter1, d) ≈ kalmanfilter1(d) ≈ [50, 30]
-    @test_skip @allocations(evaloutput(kalmanfilter1, d)) == 0
+    @test @allocations(evaloutput(kalmanfilter1, d)) == 0
     @test initstate!(kalmanfilter1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     setstate!(kalmanfilter1, [1,2,3,4], diagm(.1:.1:.4))
     @test kalmanfilter1.x̂0 ≈ [1,2,3,4]
@@ -326,12 +326,12 @@ end
     preparestate!(lo1, y)
     @test updatestate!(lo1, u, y, d) ≈ zeros(4)
     @test lo1.x̂0 ≈ zeros(4)
-    @test_skip @allocations(preparestate!(lo1, y)) == 0
-    @test_skip @allocations(updatestate!(lo1, u, y)) == 0
+    @test @allocations(preparestate!(lo1, y)) == 0
+    @test @allocations(updatestate!(lo1, u, y)) == 0
     preparestate!(lo1, y)
     @test evaloutput(lo1) ≈ lo1() ≈ [50, 30]
     @test evaloutput(lo1, d) ≈ lo1(d) ≈ [50, 30]
-    @test_skip @allocations(evaloutput(lo1, d)) == 0
+    @test @allocations(evaloutput(lo1, d)) == 0
     @test initstate!(lo1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     setstate!(lo1, [1,2,3,4])
     @test lo1.x̂0 ≈ [1,2,3,4]
@@ -457,11 +457,11 @@ end
     @test updatestate!(internalmodel1, u, y, d) ≈ zeros(2)
     @test internalmodel1.x̂d ≈ internalmodel1.x̂0 ≈ zeros(2)
     @test internalmodel1.x̂s ≈ ones(2)
-    @test_skip @allocations(preparestate!(internalmodel1, y)) == 0
-    @test_skip @allocations(updatestate!(internalmodel1, u, y)) == 0
+    @test @allocations(preparestate!(internalmodel1, y)) == 0
+    @test @allocations(updatestate!(internalmodel1, u, y)) == 0
     preparestate!(internalmodel1, y)
     @test evaloutput(internalmodel1, d) ≈ [51,31]
-    @test_skip @allocations(evaloutput(internalmodel1, d)) == 0
+    @test @allocations(evaloutput(internalmodel1, d)) == 0
     @test initstate!(internalmodel1, [10, 50], [50, 30]) ≈ zeros(2)
     @test internalmodel1.x̂s ≈ zeros(2)
     setstate!(internalmodel1, [1,2])
@@ -593,12 +593,12 @@ end
     preparestate!(ukf1, y)
     @test updatestate!(ukf1, u, y, d) ≈ zeros(4) atol=1e-9
     @test ukf1.x̂0 ≈ zeros(4) atol=1e-9
-    @test_skip @allocations(preparestate!(ukf1, y)) == 0
-    @test_skip @allocations(updatestate!(ukf1, u, y)) == 0
+    @test @allocations(preparestate!(ukf1, y)) == 0
+    @test @allocations(updatestate!(ukf1, u, y)) == 0
     preparestate!(ukf1, y)
     @test evaloutput(ukf1) ≈ ukf1() ≈ [50, 30]
     @test evaloutput(ukf1, d) ≈ ukf1(d) ≈ [50, 30]
-    @test_skip @allocations(evaloutput(ukf1, d)) == 0
+    @test @allocations(evaloutput(ukf1, d)) == 0
     @test initstate!(ukf1, [10, 50], [50, 30+1]) ≈ zeros(4) atol=1e-9
     setstate!(ukf1, [1,2,3,4], diagm(.1:.1:.4))
     @test ukf1.x̂0 ≈ [1,2,3,4]
@@ -752,12 +752,12 @@ end
     preparestate!(ekf1, y)
     @test updatestate!(ekf1, u, y, d) ≈ zeros(4) atol=1e-9
     @test ekf1.x̂0 ≈ zeros(4) atol=1e-9
-    @test_skip @allocations(preparestate!(ekf1, y)) == 0
-    @test_skip @allocations(updatestate!(ekf1, u, y)) == 0
+    @test @allocations(preparestate!(ekf1, y)) == 0
+    @test @allocations(updatestate!(ekf1, u, y)) == 0
     preparestate!(ekf1, y)
     @test evaloutput(ekf1) ≈ ekf1() ≈ [50, 30]
     @test evaloutput(ekf1, d) ≈ ekf1(d) ≈ [50, 30]
-    @test_skip @allocations(evaloutput(ekf1, d)) == 0
+    @test @allocations(evaloutput(ekf1, d)) == 0
     @test initstate!(ekf1, [10, 50], [50, 30+1]) ≈ zeros(4);
     setstate!(ekf1, [1,2,3,4], diagm(.1:.1:.4))
     @test ekf1.x̂0 ≈ [1,2,3,4]
