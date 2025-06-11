@@ -492,7 +492,7 @@ function init_defectmat(
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     # --- current state estimates x̂0 ---
-    Kŝ = [Â; spzeros(NT, nx̂*(Hp-1), nx̂)]
+    Kŝ = [Â; zeros(NT, nx̂*(Hp-1), nx̂)]
     # --- previous manipulated inputs lastu0 ---
     Vŝ = repeat(B̂u, Hp)
     # --- decision variables Z ---
@@ -508,10 +508,9 @@ function init_defectmat(
         iCol = (1:nx̂) .+ nx̂*(j-1) .+ nu*Hc
         Eŝ[iRow, iCol] = Â
     end
-    Eŝ = sparse(Eŝ)
     # --- current measured disturbances d0 and predictions D̂0 ---
-    Gŝ = [B̂d; spzeros(NT, (Hp-1)*nx̂, nd)]
-    Jŝ = [spzeros(nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) spzeros(NT, nx̂*(Hp-1), nd)]
+    Gŝ = [B̂d; zeros(NT, (Hp-1)*nx̂, nd)]
+    Jŝ = [zeros(nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
     # --- state x̂op and state update f̂op operating points ---
     Bŝ = repeat(estim.f̂op - estim.x̂op, Hp)
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
@@ -527,10 +526,10 @@ function init_defectmat(
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
-    Eŝ = spzeros(NT, 0, nZ)
-    Gŝ = spzeros(NT, 0, nd)
-    Jŝ = spzeros(NT, 0, nd*Hp)
-    Kŝ = spzeros(NT, 0, nx̂)
+    Eŝ = zeros(NT, 0, nZ)
+    Gŝ = zeros(NT, 0, nd)
+    Jŝ = zeros(NT, 0, nd*Hp)
+    Kŝ = zeros(NT, 0, nx̂)
     Vŝ = zeros(NT, 0, nu)
     Bŝ = zeros(NT, 0)
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
