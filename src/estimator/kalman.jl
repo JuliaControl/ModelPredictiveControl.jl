@@ -158,6 +158,12 @@ SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
     !!! tip
         Increasing `σQint_u` and `σQint_ym` values increases the integral action "gain".
 
+    Custom stochastic model for the unmeasured disturbances (different than integrated white
+    gaussian noise) can be specified by constructing a [`LinModel`](@ref) object with the
+    augmented state-space matrices directly, and by setting `nint_u=0` and `nint_ym=0`. See
+    [Disturbance-gallery](@extref LowLevelParticleFilters) for examples of other
+    disturbance models.
+    
     The constructor pre-compute the steady-state Kalman gain `K̂` with the [`kalman`](@extref ControlSystemsBase.kalman)
     function. It can sometimes fail, for example when `model` matrices are ill-conditioned.
     In such a case, you can try the alternative time-varying [`KalmanFilter`](@ref).

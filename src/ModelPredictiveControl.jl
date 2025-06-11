@@ -1,7 +1,7 @@
 module ModelPredictiveControl
 
 using PrecompileTools 
-using LinearAlgebra
+using LinearAlgebra, SparseArrays
 using Random: randn
 
 using RecipesBase

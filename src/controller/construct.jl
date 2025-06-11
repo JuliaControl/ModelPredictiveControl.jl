@@ -122,10 +122,10 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     x̂0min   ::Vector{NT}
     x̂0max   ::Vector{NT}
     # A matrices for the linear inequality constraints:
-    A_Umin  ::Matrix{NT}
-    A_Umax  ::Matrix{NT}
-    A_ΔŨmin ::Matrix{NT}
-    A_ΔŨmax ::Matrix{NT}
+    A_Umin  ::SparseMatrixCSC{NT, Int}
+    A_Umax  ::SparseMatrixCSC{NT, Int}
+    A_ΔŨmin ::SparseMatrixCSC{NT, Int}
+    A_ΔŨmax ::SparseMatrixCSC{NT, Int}
     A_Ymin  ::Matrix{NT}
     A_Ymax  ::Matrix{NT}
     A_x̂min  ::Matrix{NT}
@@ -675,7 +675,7 @@ constraints:
 in which ``\mathbf{U_{min}}`` and ``\mathbf{U_{max}}`` vectors respectively contains
 ``\mathbf{u_{min}}`` and ``\mathbf{u_{max}}`` repeated ``H_p`` times.
 """
-function relaxU(Pu::Matrix{NT}, C_umin, C_umax, nϵ) where NT<:Real
+function relaxU(Pu::AbstractMatrix{NT}, C_umin, C_umax, nϵ) where NT<:Real
     if nϵ == 1 # Z̃ = [Z; ϵ]
         # ϵ impacts Z → U conversion for constraint calculations:
         A_Umin, A_Umax = -[Pu  C_umin], [Pu -C_umax] 
@@ -717,7 +717,7 @@ bound, which is more precise than a linear inequality constraint. However, it is
 convenient to treat it as a linear inequality constraint since the optimizer `OSQP.jl` does
 not support pure bounds on the decision variables.
 """
-function relaxΔU(PΔu::Matrix{NT}, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) where NT<:Real
+function relaxΔU(PΔu::AbstractMatrix{NT}, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ) where NT<:Real
     nZ = size(PΔu, 2)
     if nϵ == 1 # Z̃ = [Z; ϵ]
         ΔŨmin, ΔŨmax = [ΔUmin; NT[0.0]], [ΔUmax; NT[Inf]] # 0 ≤ ϵ ≤ ∞
@@ -754,7 +754,7 @@ Denoting the decision variables augmented with the slack variable
 in which ``\mathbf{Y_{min}, Y_{max}}`` and ``\mathbf{Y_{op}}`` vectors respectively contains
 ``\mathbf{y_{min}, y_{max}}`` and ``\mathbf{y_{op}}`` repeated ``H_p`` times.
 """
-function relaxŶ(E::Matrix{NT}, C_ymin, C_ymax, nϵ) where NT<:Real
+function relaxŶ(E::AbstractMatrix{NT}, C_ymin, C_ymax, nϵ) where NT<:Real
     if nϵ == 1 # Z̃ = [Z; ϵ]
         if iszero(size(E, 1))
             # model is not a LinModel, thus Ŷ constraints are not linear:
@@ -792,7 +792,7 @@ the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxterminal(ex̂::Matrix{NT}, c_x̂min, c_x̂max, nϵ) where {NT<:Real}
+function relaxterminal(ex̂::AbstractMatrix{NT}, c_x̂min, c_x̂max, nϵ) where {NT<:Real}
     if nϵ == 1 # Z̃ = [Z; ϵ]
         if iszero(size(ex̂, 1))
             # model is not a LinModel and transcription is a SingleShooting, thus terminal
@@ -821,7 +821,7 @@ It returns the ``\mathbf{Ẽŝ}`` matrix that appears in the defect equation
 \mathbf{A_ŝ Z̃} = - \mathbf{F_ŝ}
 ```
 """
-function augmentdefect(Eŝ::Matrix{NT}, nϵ) where NT<:Real
+function augmentdefect(Eŝ::AbstractMatrix{NT}, nϵ) where NT<:Real
     if nϵ == 1 # Z̃ = [Z; ϵ]
         Ẽŝ = [Eŝ zeros(NT, size(Eŝ, 1), 1)]
     else # Z̃ = Z (only hard constraints)
