@@ -105,11 +105,11 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     vx̂      ::Matrix{NT}
     bx̂      ::Vector{NT}
     # matrices for the zero defect constraints (N/A for single shooting transcriptions):
-    Ẽŝ      ::Matrix{NT}
+    Ẽŝ      ::SparseMatrixCSC{NT}
     Fŝ      ::Vector{NT}
-    Gŝ      ::Matrix{NT}
-    Jŝ      ::Matrix{NT}
-    Kŝ      ::Matrix{NT}
+    Gŝ      ::SparseMatrixCSC{NT}
+    Jŝ      ::SparseMatrixCSC{NT}
+    Kŝ      ::SparseMatrixCSC{NT}
     Vŝ      ::Matrix{NT}
     Bŝ      ::Vector{NT}
     # bounds over the prediction horizon (deviation vectors from operating points):
