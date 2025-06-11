@@ -24,9 +24,9 @@ struct LinMPC{
     R̂u::Vector{NT}
     R̂y::Vector{NT}
     lastu0::Vector{NT}
-    P̃Δu::Matrix{NT}
-    P̃u ::Matrix{NT} 
-    Tu ::Matrix{NT}
+    P̃Δu::SparseMatrixCSC{NT, Int}
+    P̃u ::SparseMatrixCSC{NT, Int}
+    Tu ::SparseMatrixCSC{NT, Int}
     Tu_lastu0::Vector{NT}
     Ẽ::Matrix{NT}
     F::Vector{NT}

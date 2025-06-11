@@ -81,21 +81,22 @@ in which ``\mathbf{P_{Δu}}`` is defined in the Extended Help section.
     - ``\mathbf{P_{Δu}} = \mathbf{I}`` if `transcription` is a [`SingleShooting`](@ref)
     - ``\mathbf{P_{Δu}} = [\begin{smallmatrix}\mathbf{I} & \mathbf{0} \end{smallmatrix}]``
       if `transcription` is a [`MultipleShooting`](@ref)
+    The matrix is store as as `SparseMatrixCSC` to support both cases efficiently.
 """
 function init_ZtoΔU end
 
 function init_ZtoΔU(
     estim::StateEstimator{NT}, ::SingleShooting, _ , Hc
 ) where {NT<:Real}
-    PΔu = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
+    PΔu = sparse(Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc))
     return PΔu
 end
 
 function init_ZtoΔU(
     estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
 ) where {NT<:Real}
-    I_nu_Hc = Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc)
-    PΔu = [I_nu_Hc zeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
+    I_nu_Hc = sparse(Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc))
+    PΔu = [I_nu_Hc spzeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
     return PΔu
 end
 
@@ -144,30 +145,33 @@ The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended H
     - ``\mathbf{P_u} = \mathbf{P_u^†}`` if `transcription` is a [`SingleShooting`](@ref)
     - ``\mathbf{P_u} = [\begin{smallmatrix}\mathbf{P_u^†} & \mathbf{0} \end{smallmatrix}]``
       if `transcription` is a [`MultipleShooting`](@ref)
+    The conversion matrices are stored as `SparseMatrixCSC` since it was benchmarked that it
+    is generally more performant than normal dense matrices, even for small `nu`, `Hp` and 
+    `Hc` values. Using `Bool` element type and `BitMatrix` is also slower.
 """
 function init_ZtoU(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, nb
 ) where {NT<:Real}
     nu = estim.model.nu
-    # Pu and Tu are `Matrix{NT}`, conversion is faster than `Matrix{Bool}` or `BitMatrix`
-    I_nu = Matrix{NT}(I, nu, nu)
+    I_nu = sparse(Matrix{NT}(I, nu, nu))
     PuDagger = Matrix{NT}(undef, nu*Hp, nu*Hc)
     for i=1:Hc
         ni    = nb[i]
         Q_ni  = repeat(I_nu, ni, 1)
         iRows = (1:nu*ni) .+ @views nu*sum(nb[1:i-1])
-        PuDagger[iRows, :] = [repeat(Q_ni, 1, i) zeros(nu*ni, nu*(Hc-i))]
+        PuDagger[iRows, :] = [repeat(Q_ni, 1, i) spzeros(nu*ni, nu*(Hc-i))]
     end
+    PuDagger = sparse(PuDagger)
     Pu = init_PUmat(estim, transcription, Hp, Hc, PuDagger)
     Tu = repeat(I_nu, Hp)
     return Pu, Tu
 end
 
-
-
 init_PUmat( _ , ::SingleShooting, _ , _ , PuDagger) = PuDagger
-function init_PUmat(estim, ::MultipleShooting, Hp, _ , PuDagger)
-    return [PuDagger zeros(eltype(PuDagger), estim.model.nu*Hp, estim.nx̂*Hp)]
+function init_PUmat(
+    estim, ::MultipleShooting, Hp, _ , PuDagger::AbstractMatrix{NT}
+) where NT<:Real
+    return [PuDagger spzeros(NT, estim.model.nu*Hp, estim.nx̂*Hp)]
 end
 
 @doc raw"""
