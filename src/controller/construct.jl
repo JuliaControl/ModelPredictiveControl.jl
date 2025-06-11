@@ -122,10 +122,10 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     x̂0min   ::Vector{NT}
     x̂0max   ::Vector{NT}
     # A matrices for the linear inequality constraints:
-    A_Umin  ::Matrix{NT}
-    A_Umax  ::Matrix{NT}
-    A_ΔŨmin ::Matrix{NT}
-    A_ΔŨmax ::Matrix{NT}
+    A_Umin  ::SparseMatrixCSC{NT, Int}
+    A_Umax  ::SparseMatrixCSC{NT, Int}
+    A_ΔŨmin ::SparseMatrixCSC{NT, Int}
+    A_ΔŨmax ::SparseMatrixCSC{NT, Int}
     A_Ymin  ::Matrix{NT}
     A_Ymax  ::Matrix{NT}
     A_x̂min  ::Matrix{NT}
