@@ -159,10 +159,16 @@ struct MovingHorizonEstimator{
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         P̂_0 = Hermitian(P̂_0, :L)
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
-        P̂_0 = Hermitian(P̂_0, :L)
-        invP̄ = inv_cholesky!(buffer.P̂, P̂_0)
-        invQ̂ = inv_cholesky!(buffer.Q̂, Q̂)
-        invR̂ = inv_cholesky!(buffer.R̂, R̂)
+
+        invP̄ = Hermitian(buffer.P̂, :L)
+        invP̄ .= P̂_0
+        inv!(invP̄)
+        invQ̂ = Hermitian(buffer.Q̂, :L)
+        invQ̂ .= Q̂
+        inv!(invQ̂)
+        invR̂ = Hermitian(buffer.R̂, :L)
+        invR̂ .= R̂
+        inv!(invR̂)
         invQ̂_He = Hermitian(repeatdiag(invQ̂, He), :L)
         invR̂_He = Hermitian(repeatdiag(invR̂, He), :L)
         x̂0arr_old = zeros(NT, nx̂)

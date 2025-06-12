@@ -84,15 +84,30 @@ to_hermitian(A::Hermitian) = A
 to_hermitian(A) = A
 
 """
-Compute the inverse of a the Hermitian positive definite matrix `A` using `cholesky`.
+Compute the inverse of a the Hermitian positive definite matrix `A` in-place and return it.
 
-Builtin `inv` function uses LU factorization which is not the best choice for Hermitian
-positive definite matrices. The function will mutate `buffer` to reduce memory allocations.
+There is 3 methods for this function:
+- If `A` is a `Hermitian{<Real, Matrix{<:Real}}`, it uses `LAPACK.potrf!` and 
+  `LAPACK.potri!` functions to compute the Cholesky factor and then the inverse. This is
+  allocation-free. See <https://tinyurl.com/4pwdwbcj> for the source.
+- If `A` is a `Hermitian{<Real, Diagonal{<:Real, Vector{<:Real}}}`, it computes the 
+  inverse of the diagonal elements in-place (allocation-free).
+- Else if `A` is a `Hermitian{<:Real, <:AbstractMatrix}`, it computes the Cholesky factor
+  with `cholesky!` and then the inverse with `inv`, which allocates memory.
 """
-function inv_cholesky!(buffer::Matrix, A::Hermitian)
-    Achol  = Hermitian(buffer, :L)
-    Achol .= A
-    chol_obj = cholesky!(Achol)
-    invA = Hermitian(inv(chol_obj), :L)
-    return invA
+function inv!(A::Hermitian{NT, Matrix{NT}}) where {NT<:Real}
+    _, info = LAPACK.potrf!(A.uplo, A.data)
+    (info == 0) || throw(PosDefException(info))
+    LAPACK.potri!(A.uplo, A.data)
+    return A
+end
+function inv!(A::Hermitian{NT, Diagonal{NT, Vector{NT}}}) where {NT<:Real}
+    A.data.diag .= 1 ./ A.data.diag
+    return A
+end
+function inv!(A::Hermitian{<:Real, <:AbstractMatrix})
+    Achol = cholesky!(A)
+    invA = inv(Achol)
+    A .= Hermitian(invA, :L)
+    return A
 end
