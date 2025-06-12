@@ -169,7 +169,7 @@ function ExplicitMPC(
     end
     nb = move_blocking(Hp, Hc)
     Hc = get_Hc(nb)
-    weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp)
+    weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp)
     return ExplicitMPC{NT}(estim, Hp, Hc, nb, weights)
 end
 

@@ -88,9 +88,9 @@ struct ControllerWeights{
 end
 
 "Outer constructor to convert weight matrix number type to `NT` if necessary."
-function ControllerWeights{NT}(
-        model, Hp, Hc, M_Hp::MW, N_Hc::NW, L_Hp::LW, Cwt=Inf, Ewt=0
-    ) where {NT<:Real, MW<:AbstractMatrix, NW<:AbstractMatrix, LW<:AbstractMatrix}
+function ControllerWeights(
+        model::SimModel{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
+    ) where {NT<:Real}
     return ControllerWeights{NT}(model, Hp, Hc, NT.(M_Hp), NT.(N_Hc), NT.(L_Hp), Cwt, Ewt)
 end
 
