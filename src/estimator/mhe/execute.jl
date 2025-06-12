@@ -528,8 +528,10 @@ end
 
 "Invert the covariance estimate at arrival `P̄`."
 function invert_cov!(estim::MovingHorizonEstimator, P̄)
+    invP̄  = Hermitian(estim.buffer.P̂, :L)
+    invP̄ .= P̄
     try
-        estim.invP̄ .= inv_cholesky!(estim.buffer.P̂, P̄)
+        inv!(invP̄)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not invertible: keeping the old one")
@@ -759,7 +761,7 @@ function setmodel_estimator!(
         con.A_V̂max
     ]
     A = con.A[con.i_b, :]
-    b = con.b[con.i_b]
+    b = zeros(count(con.i_b)) # dummy value, updated before optimization (avoid ±Inf)
     Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
     JuMP.delete(estim.optim, estim.optim[:linconstraint])
     JuMP.unregister(estim.optim, :linconstraint)
@@ -792,11 +794,17 @@ function setmodel_estimator!(
     # --- covariance matrices ---
     if !isnothing(Q̂)
         estim.Q̂ .= to_hermitian(Q̂)
-        estim.invQ̂_He .= repeatdiag(inv(estim.Q̂), He)
+        invQ̂  = Hermitian(estim.buffer.Q̂, :L)
+        invQ̂ .= estim.Q̂
+        inv!(invQ̂)
+        estim.invQ̂_He .= Hermitian(repeatdiag(invQ̂, He), :L)
     end
     if !isnothing(R̂) 
         estim.R̂ .= to_hermitian(R̂)
-        estim.invR̂_He .= repeatdiag(inv(estim.R̂), He)
+        invR̂  = Hermitian(estim.buffer.R̂, :L)
+        invR̂ .= estim.R̂
+        inv!(invR̂)
+        estim.invR̂_He .= Hermitian(repeatdiag(invR̂, He), :L)
     end
     return nothing
 end

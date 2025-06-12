@@ -1318,7 +1318,8 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = LinModel(ss(0.5, 0.3, 1.0, 0, 10.0))
     linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
-    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, direct=false)
+    He = 5
+    mhe = MovingHorizonEstimator(linmodel; He, nint_ym=0, direct=false)
     setconstraint!(mhe, x̂min=[-1000], x̂max=[1000])
     @test mhe.Â ≈ [0.5]
     @test evaloutput(mhe) ≈ [50.0]
@@ -1331,19 +1332,18 @@ end
     @test mhe.Â ≈ [0.2]
     @test evaloutput(mhe) ≈ [55.0]
     @test mhe.lastu0 ≈ [2.0 - 3.0]
-    @test mhe.U0 ≈ [2.0 - 3.0]
-    @test mhe.Y0m ≈ [50.0 - 55.0]
-    preparestate!(mhe, [55.0])
-    x̂ = updatestate!(mhe, [3.0], [55.0])
+    @test mhe.U0 ≈ repeat([2.0 - 3.0], He)
+    @test mhe.Y0m ≈ repeat([50.0 - 55.0], He)
+    x̂ = preparestate!(mhe, [55.0])
     @test x̂ ≈ [3.0]
     newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
     setmodel!(mhe, newlinmodel)
     @test mhe.x̂0   ≈ [3.0 - 8.0]
     @test mhe.Z̃[1] ≈ 3.0 - 8.0
-    @test mhe.X̂0   ≈ [3.0 - 8.0]
+    @test mhe.X̂0   ≈ repeat([3.0 - 8.0], He)
     @test mhe.x̂0arr_old ≈ [3.0 - 8.0]
-    @test mhe.con.X̂0min ≈ [-1000 - 8.0]
-    @test mhe.con.X̂0max ≈ [+1000 - 8.0]
+    @test mhe.con.X̂0min ≈ repeat([-1000 - 8.0], He)
+    @test mhe.con.X̂0max ≈ repeat([+1000 - 8.0], He)
     @test mhe.con.x̃0min ≈ [-1000 - 8.0]
     @test mhe.con.x̃0max ≈ [+1000 - 8.0]
     setmodel!(mhe, Q̂=[1e-3], R̂=[1e-6])
@@ -1352,7 +1352,7 @@ end
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1, p=linmodel, solver=nothing)
-    mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
+    mhe2 = MovingHorizonEstimator(nonlinmodel; He, nint_ym=0)
     setmodel!(mhe2, Q̂=[1e-3], R̂=[1e-6])
     @test mhe2.Q̂ ≈ [1e-3]
     @test mhe2.R̂ ≈ [1e-6]
