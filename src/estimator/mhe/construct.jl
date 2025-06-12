@@ -159,7 +159,6 @@ struct MovingHorizonEstimator{
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         P̂_0 = Hermitian(P̂_0, :L)
         Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
-
         invP̄ = Hermitian(buffer.P̂, :L)
         invP̄ .= P̂_0
         inv!(invP̄)
@@ -690,7 +689,7 @@ function setconstraint!(
             con.A_Ŵmin, con.A_Ŵmax, con.A_V̂min, con.A_V̂max
         )
         A = con.A[con.i_b, :]
-        b = con.b[con.i_b]
+        b = zeros(count(con.i_b)) # dummy value, updated before optimization (avoid ±Inf)
         Z̃var = optim[:Z̃var]
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)

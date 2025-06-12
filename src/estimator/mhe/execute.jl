@@ -761,7 +761,7 @@ function setmodel_estimator!(
         con.A_V̂max
     ]
     A = con.A[con.i_b, :]
-    b = con.b[con.i_b]
+    b = zeros(count(con.i_b)) # dummy value, updated before optimization (avoid ±Inf)
     Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
     JuMP.delete(estim.optim, estim.optim[:linconstraint])
     JuMP.unregister(estim.optim, :linconstraint)
