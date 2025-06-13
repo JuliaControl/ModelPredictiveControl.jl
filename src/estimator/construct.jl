@@ -70,8 +70,6 @@ struct KalmanCovariances{
         inv!(invR̂)
         invQ̂_He = repeatdiag(invQ̂, He)
         invR̂_He = repeatdiag(invR̂, He)
-        isdiag(invQ̂_He) && (invQ̂_He = Diagonal(invQ̂_He)) # Q̂C(invQ̂_He) does not work on Julia 1.10
-        isdiag(invR̂_He) && (invR̂_He = Diagonal(invR̂_He)) # R̂C(invR̂_He) does not work on Julia 1.10
         invQ̂_He = Hermitian(invQ̂_He, :L)
         invR̂_He = Hermitian(invR̂_He, :L)
         return new{NT, Q̂C, R̂C}(P̂_0, P̂, Q̂, R̂, invP̄, invQ̂_He, invR̂_He)

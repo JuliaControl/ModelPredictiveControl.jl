@@ -1174,7 +1174,7 @@ end
 function init_estimate_cov!(
     estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}, _ , _ , _
 ) 
-    estim.P̂ .= estim.P̂_0
+    estim.cov.P̂ .= estim.cov.P̂_0
     return nothing
 end
 
@@ -1187,8 +1187,8 @@ Allows code reuse for [`KalmanFilter`](@ref), [`ExtendedKalmanFilterKalmanFilter
 See [`update_estimate_kf!`](@ref) for more information.
 """
 function correct_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, y0m, d0, Ĉm)
-    R̂, K̂ = estim.R̂, estim.K̂
-    x̂0, P̂ = estim.x̂0, estim.P̂
+    R̂, K̂ = estim.cov.R̂, estim.K̂
+    x̂0, P̂ = estim.x̂0, estim.cov.P̂
     # in-place operations to reduce allocations:
     P̂_Ĉmᵀ = K̂
     mul!(P̂_Ĉmᵀ, P̂, Ĉm')
@@ -1213,7 +1213,7 @@ function correct_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, 
     end
     P̂corr = estim.buffer.P̂
     mul!(P̂corr, I_minus_K̂_Ĉm, P̂)
-    estim.P̂ .= Hermitian(P̂corr, :L)
+    estim.cov.P̂ .= Hermitian(P̂corr, :L)
     return nothing
 end
 
@@ -1227,8 +1227,8 @@ They predict the state `x̂` and covariance `P̂` with the same equations. See
 [`update_estimate`](@ref) methods for the equations.
 """
 function predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, u0, d0, Â)
-    x̂0corr, P̂corr = estim.x̂0, estim.P̂
-    Q̂ = estim.Q̂
+    x̂0corr, P̂corr = estim.x̂0, estim.cov.P̂
+    Q̂ = estim.cov.Q̂
     x̂0next, û0, k0 = estim.buffer.x̂, estim.buffer.û, estim.buffer.k
     # in-place operations to reduce allocations:
     f̂!(x̂0next, û0, k0, estim, estim.model, x̂0corr, u0, d0)
@@ -1240,6 +1240,6 @@ function predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, 
     P̂next .= Â_P̂corr_Âᵀ .+ Q̂
     x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
-    estim.P̂  .= Hermitian(P̂next, :L)
+    estim.cov.P̂  .= Hermitian(P̂next, :L)
     return nothing
 end
