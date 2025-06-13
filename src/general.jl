@@ -65,6 +65,9 @@ isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
 
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)
+function repeatdiag(A::Hermitian{NT, Diagonal{NT, Vector{NT}}}, n::Int) where {NT<:Real}
+    return Hermitian(repeatdiag(A.data, n), :L) # to return hermitian of a `Diagonal`
+end
 
 "In-place version of `repeat` but for vectors only."
 function repeat!(Y::Vector, a::Vector, n::Int)
