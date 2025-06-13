@@ -872,9 +872,9 @@ end
     @test mhe5.nx̂ == 8
 
     mhe6 = MovingHorizonEstimator(nonlinmodel, He=5, σP_0=[1,2,3,4], σPint_ym_0=[5,6])
-    @test mhe6.P̂_0       ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    @test mhe6.cov.P̂_0       ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test mhe6.P̂arr_old ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
-    @test mhe6.P̂_0 !== mhe6.P̂arr_old
+    @test mhe6.cov.P̂_0 !== mhe6.P̂arr_old
 
     mhe7 = MovingHorizonEstimator(nonlinmodel, He=10)
     @test mhe7.He == 10
@@ -894,9 +894,9 @@ end
     I_2 = Matrix{Float64}(I, 2, 2)
     optim = Model(Ipopt.Optimizer)
     mhe9 = MovingHorizonEstimator(nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, 1e5; optim)
-    @test mhe9.P̂_0 ≈ I(6)
-    @test mhe9.Q̂ ≈ I(6)
-    @test mhe9.R̂ ≈ I(2)
+    @test mhe9.cov.P̂_0 ≈ I(6)
+    @test mhe9.cov.Q̂ ≈ I(6)
+    @test mhe9.cov.R̂ ≈ I(2)
 
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, [1, 1], I_6, I_6, I_2)
@@ -1103,13 +1103,13 @@ end
         preparestate!(mhe, [50, 30], [5])
     )
     @test mhe.P̂arr_old ≈ P̂arr_old_copy
-    @test mhe.invP̄ ≈ invP̄_copy
+    @test mhe.cov.invP̄ ≈ invP̄_copy
     @test_logs(
         (:error, "Arrival covariance P̄ is not positive definite: keeping the old one"), 
         updatestate!(mhe, [10, 50], [50, 30], [5])
     )
     @test mhe.P̂arr_old ≈ P̂arr_old_copy
-    @test mhe.invP̄ ≈ invP̄_copy
+    @test mhe.cov.invP̄ ≈ invP̄_copy
     @test_logs(
         (:error, "Arrival covariance P̄ is not invertible: keeping the old one"), 
         ModelPredictiveControl.invert_cov!(mhe, Hermitian(zeros(mhe.nx̂, mhe.nx̂),:L))
@@ -1122,7 +1122,7 @@ end
         preparestate!(mhe, [50, 30], [5])
     )
     @test mhe.P̂arr_old ≈ P̂arr_old_copy
-    @test mhe.invP̄ ≈ invP̄_copy
+    @test mhe.cov.invP̄ ≈ invP̄_copy
     @test_logs(
         (:error, "Arrival covariance P̄ is not finite: keeping the old one"), 
         updatestate!(mhe, [10, 50], [50, 30], [5])   
@@ -1347,8 +1347,8 @@ end
     @test mhe.con.x̃0min ≈ [-1000 - 8.0]
     @test mhe.con.x̃0max ≈ [+1000 - 8.0]
     setmodel!(mhe, Q̂=[1e-3], R̂=[1e-6])
-    @test mhe.Q̂ ≈ [1e-3]
-    @test mhe.R̂ ≈ [1e-6]
+    @test mhe.cov.Q̂ ≈ [1e-3]
+    @test mhe.cov.R̂ ≈ [1e-6]
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1, p=linmodel, solver=nothing)
