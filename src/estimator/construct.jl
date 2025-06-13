@@ -53,7 +53,7 @@ struct KalmanCovariances{
     invQ̂_He::Hermitian{NT, Q̂C}
     invR̂_He::Hermitian{NT, R̂C}
     function KalmanCovariances{NT}(
-        model, i_ym, nint_u, nint_ym, Q̂::Q̂C, R̂::R̂C, P̂_0=nothing, He=1
+        Q̂::Q̂C, R̂::R̂C, P̂_0, He
     ) where {NT<:Real, Q̂C<:AbstractMatrix{NT}, R̂C<:AbstractMatrix{NT}}
         if isnothing(P̂_0)
             P̂_0 = zeros(NT, 0, 0)
@@ -104,7 +104,9 @@ function KalmanCovariances(
         model::SimModel{NT}, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing, He=1
     ) where {NT<:Real}
     validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
-    return KalmanCovariances{NT}(model, i_ym, nint_u, nint_ym, NT.(Q̂), NT.(R̂), NT.(P̂_0), He)
+    Q̂, R̂ = NT.(Q̂), NT.(R̂)
+    !isnothing(P̂_0) && (P̂_0 .= NT.(P̂_0))
+    return KalmanCovariances{NT}(Q̂, R̂, P̂_0, He)
 end
 
 """

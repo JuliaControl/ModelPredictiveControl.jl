@@ -822,7 +822,6 @@ end
     preparestate!(nmpc11, y, [0])
     moveinput!(nmpc11, [10], [0])
     ΔU_diff = diff(getinfo(nmpc11)[:U])
-    println(ΔU_diff)
     @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
 
     @test_nowarn ModelPredictiveControl.info2debugstr(info)

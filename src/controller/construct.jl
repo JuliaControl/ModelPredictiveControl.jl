@@ -91,7 +91,8 @@ function ControllerWeights(
         model::SimModel{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
     ) where {NT<:Real}
     validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-    return ControllerWeights{NT}(NT.(M_Hp), NT.(N_Hc), NT.(L_Hp), Cwt, Ewt)
+    M_Hp, N_Hc, L_Hp = NT.(M_Hp), NT.(N_Hc), NT.(L_Hp)
+    return ControllerWeights{NT}(M_Hp, N_Hc, L_Hp, Cwt, Ewt)
 end
 
 "Validate predictive controller weight and horizon specified values."
