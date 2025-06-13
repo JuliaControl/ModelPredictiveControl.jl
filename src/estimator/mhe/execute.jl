@@ -16,7 +16,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , d0, u0)
         estim.D0[1:estim.model.nd] .= d0
     end
     estim.lastu0 .= u0
-    # estim.P̂_0 is in fact P̂(-1|-1) is estim.direct==false, else P̂(-1|0)
+    # estim.cov.P̂_0 is in fact P̂(-1|-1) is estim.direct==false, else P̂(-1|0)
     invert_cov!(estim, estim.cov.P̂_0)
     estim.P̂arr_old  .= estim.cov.P̂_0
     estim.x̂0arr_old .= 0
@@ -793,16 +793,16 @@ function setmodel_estimator!(
     estim.x̂0arr_old     .-= x̂op
     # --- covariance matrices ---
     if !isnothing(Q̂)
-        estim.Q̂ .= to_hermitian(Q̂)
+        estim.cov.Q̂ .= to_hermitian(Q̂)
         invQ̂  = Hermitian(estim.buffer.Q̂, :L)
-        invQ̂ .= estim.Q̂
+        invQ̂ .= estim.cov.Q̂
         inv!(invQ̂)
         estim.invQ̂_He .= Hermitian(repeatdiag(invQ̂, He), :L)
     end
     if !isnothing(R̂) 
-        estim.R̂ .= to_hermitian(R̂)
+        estim.cov.R̂ .= to_hermitian(R̂)
         invR̂  = Hermitian(estim.buffer.R̂, :L)
-        invR̂ .= estim.R̂
+        invR̂ .= estim.cov.R̂
         inv!(invR̂)
         estim.invR̂_He .= Hermitian(repeatdiag(invR̂, He), :L)
     end

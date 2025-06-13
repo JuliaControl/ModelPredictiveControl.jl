@@ -443,7 +443,7 @@ end
 @doc raw"""
     correct_estimate!(estim::KalmanFilter, y0m, d0)
 
-Correct `estim.x̂0` and `estim.P̂` using the time-varying [`KalmanFilter`](@ref).
+Correct `estim.x̂0` and `estim.cov.P̂` using the time-varying [`KalmanFilter`](@ref).
 
 It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)`` estimation covariance 
 ``\mathbf{P̂}_{k}(k)``.
@@ -456,7 +456,7 @@ end
 @doc raw"""
     update_estimate!(estim::KalmanFilter, y0m, d0, u0)
 
-Update [`KalmanFilter`](@ref) state `estim.x̂0` and estimation error covariance `estim.P̂`.
+Update [`KalmanFilter`](@ref) state `estim.x̂0` and estimation error covariance `estim.cov.P̂`.
 
 It implements the classical time-varying Kalman Filter based on the process model described
 in [`SteadyKalmanFilter`](@ref). If `estim.direct == false`, it first corrects the estimate
@@ -790,7 +790,7 @@ end
 @doc raw"""
     update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     
-Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂0` and covariance estimate `estim.P̂`.
+Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂0` and covariance estimate `estim.cov.P̂`.
 
 It implements the unscented Kalman Filter based on the generalized unscented transform[^3].
 See [`init_ukf`](@ref) for the definition of the constants ``\mathbf{m̂, Ŝ}`` and ``γ``. The
@@ -1107,7 +1107,7 @@ end
 @doc raw"""
     update_estimate!(estim::ExtendedKalmanFilter, y0m, d0, u0)
 
-Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂0` and covariance `estim.P̂`.
+Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂0` and covariance `estim.cov.P̂`.
 
 The equations are similar to [`update_estimate!(::KalmanFilter)`](@ref) but with the 
 substitutions ``\mathbf{Ĉ^m = Ĥ^m}(k)`` and ``\mathbf{Â = F̂}(k)``, the Jacobians of the
@@ -1158,7 +1158,7 @@ function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT
     return predict_estimate_kf!(estim, u0, d0, estim.F̂)
 end
 
-"Set `estim.P̂` to `estim.P̂_0` for the time-varying Kalman Filters."
+"Set `estim.cov.P̂` to `estim.cov.P̂_0` for the time-varying Kalman Filters."
 function init_estimate_cov!(
     estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}, _ , _ , _
 ) 

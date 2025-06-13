@@ -215,8 +215,8 @@ end
     @test initstate!(mpc1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     setstate!(mpc1, [1,2,3,4], diagm(.1:.1:.4))
     @test mpc1.estim.x̂0 ≈ [1,2,3,4]
-    @test mpc1.estim.P̂  ≈ diagm(.1:.1:.4)
-    setstate!(mpc1, [0,0,0,0], mpc1.estim.P̂_0)
+    @test mpc1.estim.cov.P̂  ≈ diagm(.1:.1:.4)
+    setstate!(mpc1, [0,0,0,0], mpc1.estim.cov.P̂_0)
     preparestate!(mpc1, [50, 30])
     updatestate!(mpc1, mpc1.estim.model.uop, [50, 30])
     @test mpc1.estim.x̂0 ≈ [0,0,0,0]
