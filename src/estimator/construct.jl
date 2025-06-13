@@ -105,12 +105,7 @@ function KalmanCovariances(
     ) where {NT<:Real}
     validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
     Q̂, R̂ = NT.(Q̂), NT.(R̂)
-    if !isnothing(P̂_0) 
-        P̂_0 .= NT.(P̂_0)
-    end
-    println(Q̂)
-    println(R̂)
-    println(P̂_0)
+    !isnothing(P̂_0) && (P̂_0 = NT.(P̂_0))
     return KalmanCovariances{NT}(Q̂, R̂, P̂_0, He)
 end
 

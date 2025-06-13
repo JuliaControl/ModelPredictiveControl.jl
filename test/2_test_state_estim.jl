@@ -1128,7 +1128,7 @@ end
         updatestate!(mhe, [10, 50], [50, 30], [5])   
     )
     @test mhe.P̂arr_old ≈ P̂arr_old_copy
-    @test mhe.invP̄ ≈ invP̄_copy
+    @test mhe.cov.invP̄ ≈ invP̄_copy
 end
 
 @testitem "MovingHorizonEstimator set constraints" setup=[SetupMPCtests] begin
@@ -1354,8 +1354,8 @@ end
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1, p=linmodel, solver=nothing)
     mhe2 = MovingHorizonEstimator(nonlinmodel; He, nint_ym=0)
     setmodel!(mhe2, Q̂=[1e-3], R̂=[1e-6])
-    @test mhe2.Q̂ ≈ [1e-3]
-    @test mhe2.R̂ ≈ [1e-6]
+    @test mhe2.cov.Q̂ ≈ [1e-3]
+    @test mhe2.cov.R̂ ≈ [1e-6]
     @test_throws ErrorException setmodel!(mhe2, deepcopy(nonlinmodel))
 end
 
