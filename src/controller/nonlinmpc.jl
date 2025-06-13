@@ -372,7 +372,7 @@ function NonLinMPC(
     Hc = get_Hc(nb)
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
-    weights = ControllerWeights{NT}(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
+    weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     return NonLinMPC{NT}(
         estim, Hp, Hc, nb, weights, JE, gc!, nc, p, transcription, optim, gradient, jacobian
     )
