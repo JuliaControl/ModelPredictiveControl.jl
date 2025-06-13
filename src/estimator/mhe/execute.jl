@@ -797,14 +797,14 @@ function setmodel_estimator!(
         invQ̂  = Hermitian(estim.buffer.Q̂, :L)
         invQ̂ .= estim.cov.Q̂
         inv!(invQ̂)
-        estim.invQ̂_He .= Hermitian(repeatdiag(invQ̂, He), :L)
+        estim.cov.invQ̂_He .= Hermitian(repeatdiag(invQ̂, He), :L)
     end
     if !isnothing(R̂) 
         estim.cov.R̂ .= to_hermitian(R̂)
         invR̂  = Hermitian(estim.buffer.R̂, :L)
         invR̂ .= estim.cov.R̂
         inv!(invR̂)
-        estim.invR̂_He .= Hermitian(repeatdiag(invR̂, He), :L)
+        estim.cov.invR̂_He .= Hermitian(repeatdiag(invR̂, He), :L)
     end
     return nothing
 end

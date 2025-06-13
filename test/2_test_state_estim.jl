@@ -864,8 +864,8 @@ end
     @test mhe3.nx̂ == 5
 
     mhe4 = MovingHorizonEstimator(nonlinmodel, He=5, σQ=[1,2,3,4], σQint_ym=[5, 6], σR=[7, 8])
-    @test mhe4.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
-    @test mhe4.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
+    @test mhe4.cov.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
+    @test mhe4.cov.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
     
     mhe5 = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=[2,2])
     @test mhe5.nxs == 4
@@ -1116,7 +1116,7 @@ end
     )
     mhe.P̂arr_old[1, 1] = Inf # Inf to trigger fallback
     P̂arr_old_copy = deepcopy(mhe.P̂arr_old)
-    invP̄_copy = deepcopy(mhe.invP̄)
+    invP̄_copy = deepcopy(mhe.cov.invP̄)
     @test_logs(
         (:error, "Arrival covariance P̄ is not finite: keeping the old one"), 
         preparestate!(mhe, [50, 30], [5])
@@ -1425,7 +1425,7 @@ end
     # recuperate P̂(-1|-1) exact value using the Unscented Kalman filter:
     preparestate!(ukf, [50, 30], [20])
     preparestate!(ekf, [50, 30], [20])
-    σP̂ = sqrt.(diag(ukf.P̂))
+    σP̂ = sqrt.(diag(ukf.cov.P̂))
     mhe = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=0, direct=true, σP_0=σP̂)
     updatestate!(ukf, [10, 50], [50, 30], [20])
     updatestate!(ekf, [10, 50], [50, 30], [20])
