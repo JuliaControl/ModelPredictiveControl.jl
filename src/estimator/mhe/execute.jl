@@ -686,8 +686,8 @@ end
 con_nonlinprog!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , _ ) = g
 
 "Throw an error if P̂ != nothing."
-function setstate_cov!(estim::MovingHorizonEstimator, P̂)
-    P̂ == nothing || error("MovingHorizonEstimator does not compute an estimation covariance matrix P̂.")
+function setstate_cov!(::MovingHorizonEstimator, P̂)
+    isnothing(P̂) || error("MovingHorizonEstimator does not compute an estimation covariance matrix P̂.")
     return nothing
 end
 

@@ -214,6 +214,12 @@ function setmodel_estimator!(estim::SteadyKalmanFilter, model, _ , _ , _ , Q̂, 
     return nothing
 end
 
+"Throw an error if P̂ != nothing."
+function setstate_cov!(::SteadyKalmanFilter, P̂)
+    isnothing(P̂) || error("SteadyKalmanFilter does not compute an estimation covariance matrix P̂.")
+    return nothing
+end
+
 @doc raw"""
     correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
 

@@ -225,8 +225,8 @@ function init_internalmodel(As, Bs, Cs, Ds)
 end
 
 "Throw an error if P̂ != nothing."
-function setstate_cov!(estim::InternalModel, P̂)
-    P̂ == nothing || error("InternalModel does not compute an estimation covariance matrix P̂.")
+function setstate_cov!(::InternalModel, P̂)
+    isnothing(P̂) || error("InternalModel does not compute an estimation covariance matrix P̂.")
     return nothing
 end
 

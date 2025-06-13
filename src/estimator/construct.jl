@@ -64,9 +64,33 @@ struct KalmanCovariances{
         R̂   = Hermitian(R̂, :L)
         # the following variables are only for the moving horizon estimator:
         invP̄, invQ̂, invR̂ = copy(P̂_0), copy(Q̂), copy(R̂)
-        inv!(invP̄)
-        inv!(invQ̂)
-        inv!(invR̂)
+        try
+            inv!(invP̄)
+        catch err
+            if err isa PosDefException
+                error("P̂_0 is not positive definite")
+            else
+                rethrow()
+            end
+        end
+        try
+            inv!(invQ̂)
+        catch err
+            if err isa PosDefException
+                error("Q̂ is not positive definite")
+            else
+                rethrow()
+            end
+        end
+        try
+            inv!(invR̂)
+        catch err
+            if err isa PosDefException
+                error("R̂ is not positive definite")
+            else
+                rethrow()
+            end
+        end
         invQ̂_He = repeatdiag(invQ̂, He)
         invR̂_He = repeatdiag(invR̂, He)
         invQ̂_He = Hermitian(invQ̂_He, :L)
@@ -80,7 +104,7 @@ function KalmanCovariances(
         model::SimModel{NT}, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing, He=1
     ) where {NT<:Real}
     validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
-    return KalmanCovariances{NT}(model, i_ym, nint_u, nint_ym, NT.(Q̂), NT.(R̂), P̂_0, He)
+    return KalmanCovariances{NT}(model, i_ym, nint_u, nint_ym, NT.(Q̂), NT.(R̂), NT.(P̂_0), He)
 end
 
 """

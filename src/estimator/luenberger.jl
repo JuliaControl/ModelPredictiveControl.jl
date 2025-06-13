@@ -135,8 +135,8 @@ function update_estimate!(estim::Luenberger, y0m, d0, u0)
 end
 
 "Throw an error if P̂ != nothing."
-function setstate_cov!(estim::Luenberger, P̂)
-    P̂ == nothing || error("Luenberger does not compute an estimation covariance matrix P̂.")
+function setstate_cov!(::Luenberger, P̂)
+    isnothing(P̂) || error("Luenberger does not compute an estimation covariance matrix P̂.")
     return nothing
 end
 
