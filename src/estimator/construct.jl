@@ -55,7 +55,6 @@ struct KalmanCovariances{
     function KalmanCovariances{NT}(
         model, i_ym, nint_u, nint_ym, Q̂::Q̂C, R̂::R̂C, P̂_0=nothing, He=1
     ) where {NT<:Real, Q̂C<:AbstractMatrix{NT}, R̂C<:AbstractMatrix{NT}}
-        validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
         if isnothing(P̂_0)
             P̂_0 = zeros(NT, 0, 0)
         end
@@ -76,10 +75,11 @@ struct KalmanCovariances{
     end
 end
 
-"Outer constructor to convert covariance matrix number type to `NT` if necessary."
+"Outer constructor to validate and convert covariance matrices if necessary."
 function KalmanCovariances(
         model::SimModel{NT}, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing, He=1
     ) where {NT<:Real}
+    validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
     return KalmanCovariances{NT}(model, i_ym, nint_u, nint_ym, NT.(Q̂), NT.(R̂), P̂_0, He)
 end
 

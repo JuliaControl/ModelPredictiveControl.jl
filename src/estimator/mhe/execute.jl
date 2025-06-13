@@ -17,8 +17,8 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , d0, u0)
     end
     estim.lastu0 .= u0
     # estim.P̂_0 is in fact P̂(-1|-1) is estim.direct==false, else P̂(-1|0)
-    invert_cov!(estim, estim.P̂_0)
-    estim.P̂arr_old  .= estim.P̂_0
+    invert_cov!(estim, estim.cov.P̂_0)
+    estim.P̂arr_old  .= estim.cov.P̂_0
     estim.x̂0arr_old .= 0
     return nothing
 end
@@ -249,6 +249,7 @@ of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
 ```
 """
 function initpred!(estim::MovingHorizonEstimator, model::LinModel)
+    invP̄, invQ̂_He, invR̂_He = estim.cov.invP̄, estim.cov.invQ̂_He, estim.cov.invR̂_He
     F, C, optim = estim.F, estim.C, estim.optim
     nx̂, nŵ, nym, nϵ, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nϵ, estim.Nk[]
     nYm, nŴ = nym*Nk, nŵ*Nk
@@ -263,8 +264,8 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
     ẼZ̃ = @views [estim.ẽx̄[:, 1:nZ̃]; estim.Ẽ[1:nYm, 1:nZ̃]]
     FZ̃ = @views [estim.fx̄; estim.F[1:nYm]]
-    invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
-    M_Nk = [estim.invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
+    invQ̂_Nk, invR̂_Nk = @views invQ̂_He[1:nŴ, 1:nŴ], invR̂_He[1:nYm, 1:nYm]
+    M_Nk = [invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
     Ñ_Nk = [fill(C, nϵ, nϵ) zeros(nϵ, nx̂+nŴ); zeros(nx̂, nϵ+nx̂+nŴ); zeros(nŴ, nϵ+nx̂) invQ̂_Nk]
     M_Nk_ẼZ̃ = M_Nk*ẼZ̃
     @views mul!(estim.q̃[1:nZ̃], M_Nk_ẼZ̃', FZ̃)
@@ -480,12 +481,12 @@ function correct_cov!(estim::MovingHorizonEstimator)
     y0marr, d0arr = buffer.ym, buffer.d
     y0marr .= @views estim.Y0m[1:nym]
     d0arr  .= @views estim.D0[1:nd]
-    estim.covestim.x̂0 .= estim.x̂0arr_old
-    estim.covestim.P̂  .= estim.P̂arr_old
+    estim.covestim.x̂0     .= estim.x̂0arr_old
+    estim.covestim.cov.P̂  .= estim.P̂arr_old
     try
         correct_estimate!(estim.covestim, y0marr, d0arr)
-        all(isfinite, estim.covestim.P̂) || error("Arrival covariance P̄ is not finite")
-        estim.P̂arr_old .= estim.covestim.P̂
+        all(isfinite, estim.covestim.cov.P̂) || error("Arrival covariance P̄ is not finite")
+        estim.P̂arr_old .= estim.covestim.cov.P̂
         invert_cov!(estim, estim.P̂arr_old)
     catch err
         if err isa PosDefException
@@ -507,12 +508,12 @@ function update_cov!(estim::MovingHorizonEstimator)
     u0arr  .= @views estim.U0[1:nu]
     y0marr .= @views estim.Y0m[1:nym]
     d0arr  .= @views estim.D0[1:nd]
-    estim.covestim.x̂0 .= estim.x̂0arr_old
-    estim.covestim.P̂  .= estim.P̂arr_old
+    estim.covestim.x̂0     .= estim.x̂0arr_old
+    estim.covestim.cov.P̂  .= estim.P̂arr_old
     try
         update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
-        all(isfinite, estim.covestim.P̂) || error("Arrival covariance P̄ is not finite")
-        estim.P̂arr_old .= estim.covestim.P̂
+        all(isfinite, estim.covestim.cov.P̂) || error("Arrival covariance P̄ is not finite")
+        estim.P̂arr_old .= estim.covestim.cov.P̂
         invert_cov!(estim, estim.P̂arr_old)
     catch err
         if err isa PosDefException
@@ -528,10 +529,9 @@ end
 
 "Invert the covariance estimate at arrival `P̄`."
 function invert_cov!(estim::MovingHorizonEstimator, P̄)
-    invP̄  = Hermitian(estim.buffer.P̂, :L)
-    invP̄ .= P̄
+    estim.cov.invP̄ .= P̄
     try
-        inv!(invP̄)
+        inv!(estim.cov.invP̄)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not invertible: keeping the old one")
@@ -568,9 +568,9 @@ function obj_nonlinprog!(
     x̄, estim::MovingHorizonEstimator, ::SimModel, V̂, Z̃::AbstractVector{NT}
 ) where NT<:Real
     nϵ, Nk = estim.nϵ, estim.Nk[] 
-    nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.invP̄
+    nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.cov.invP̄
     nx̃ = nϵ + nx̂
-    invQ̂_Nk, invR̂_Nk = @views estim.invQ̂_He[1:nŴ, 1:nŴ], estim.invR̂_He[1:nYm, 1:nYm]
+    invQ̂_Nk, invR̂_Nk = @views estim.cov.invQ̂_He[1:nŴ, 1:nŴ], estim.cov.invR̂_He[1:nYm, 1:nYm]
     x̂0arr, Ŵ, V̂ = @views Z̃[nx̃-nx̂+1:nx̃], Z̃[nx̃+1:nx̃+nŴ], V̂[1:nYm]
     x̄ .= estim.x̂0arr_old .- x̂0arr
     Jϵ = nϵ ≠ 0 ? estim.C*Z̃[begin]^2 : zero(NT)

@@ -47,12 +47,14 @@ end
 struct MovingHorizonEstimator{
     NT<:Real, 
     SM<:SimModel,
+    KC<:KalmanCovariances,
     JM<:JuMP.GenericModel,
     GB<:AbstractADType,
     JB<:AbstractADType,
     CE<:StateEstimator,
 } <: StateEstimator{NT}
     model::SM
+    cov  ::KC
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
     optim::JM
@@ -94,12 +96,6 @@ struct MovingHorizonEstimator{
     H̃::Hermitian{NT, Matrix{NT}}
     q̃::Vector{NT}
     r::Vector{NT}
-    P̂_0::Hermitian{NT, Matrix{NT}}
-    Q̂::Hermitian{NT, Matrix{NT}}
-    R̂::Hermitian{NT, Matrix{NT}}
-    invP̄::Hermitian{NT, Matrix{NT}}
-    invQ̂_He::Hermitian{NT, Matrix{NT}}
-    invR̂_He::Hermitian{NT, Matrix{NT}}
     C::NT
     X̂op::Vector{NT}
     X̂0 ::Vector{NT}
@@ -115,12 +111,13 @@ struct MovingHorizonEstimator{
     buffer::StateEstimatorBuffer{NT}
     function MovingHorizonEstimator{NT}(
         model::SM, 
-        He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt, 
+        He, i_ym, nint_u, nint_ym, cov::KC, Cwt, 
         optim::JM, gradient::GB, jacobian::JB, covestim::CE;
         direct=true
     ) where {
             NT<:Real, 
             SM<:SimModel{NT}, 
+            KC<:KalmanCovariances,
             JM<:JuMP.GenericModel, 
             GB<:AbstractADType,
             JB<:AbstractADType,
@@ -135,7 +132,6 @@ struct MovingHorizonEstimator{
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
-        validate_kfcov(nym, nx̂, Q̂, R̂, P̂_0)
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         r = direct ? 0 : 1
@@ -157,25 +153,14 @@ struct MovingHorizonEstimator{
         U0, D0  = zeros(NT, nu*He), zeros(NT, nD0) 
         Ŵ = zeros(NT, nx̂*He)
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
-        P̂_0 = Hermitian(P̂_0, :L)
-        Q̂, R̂ = Hermitian(Q̂, :L),  Hermitian(R̂, :L)
-        invP̄ = Hermitian(buffer.P̂, :L)
-        invP̄ .= P̂_0
-        inv!(invP̄)
-        invQ̂ = Hermitian(buffer.Q̂, :L)
-        invQ̂ .= Q̂
-        inv!(invQ̂)
-        invR̂ = Hermitian(buffer.R̂, :L)
-        invR̂ .= R̂
-        inv!(invR̂)
-        invQ̂_He = Hermitian(repeatdiag(invQ̂, He), :L)
-        invR̂_He = Hermitian(repeatdiag(invR̂, He), :L)
         x̂0arr_old = zeros(NT, nx̂)
-        P̂arr_old = copy(P̂_0)
+        P̂arr_old = copy(cov.P̂_0)
         Nk = [0]
         corrected = [false]
-        estim = new{NT, SM, JM, GB, JB, CE}(
-            model, optim, con, 
+        estim = new{NT, SM, KC, JM, GB, JB, CE}(
+            model,
+            cov,
+            optim, con, 
             gradient, jacobian,
             covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
@@ -185,7 +170,7 @@ struct MovingHorizonEstimator{
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             Ẽ, F, G, J, B, ẽx̄, fx̄,
             H̃, q̃, r,
-            P̂_0, Q̂, R̂, invP̄, invQ̂_He, invR̂_He, Cwt,
+            Cwt,
             X̂op, X̂0, Y0m, U0, D0, Ŵ, 
             x̂0arr_old, P̂arr_old, Nk,
             direct, corrected,
@@ -405,9 +390,9 @@ function MovingHorizonEstimator(
     σQint_ym   = sigmaQint_ym,
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     # estimated covariances matrices (variance = σ²) :
-    P̂_0 = Hermitian(diagm(NT[σP_0; σPint_u_0; σPint_ym_0].^2), :L)
-    Q̂  = Hermitian(diagm(NT[σQ;  σQint_u;  σQint_ym ].^2), :L)
-    R̂  = Hermitian(diagm(NT[σR;].^2), :L)
+    P̂_0 = Diagonal([σP_0; σPint_u_0; σPint_ym_0].^2)
+    Q̂   = Diagonal([σQ;  σQint_u;  σQint_ym ].^2)
+    R̂   = Diagonal([σR;].^2)
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
     return MovingHorizonEstimator(
         model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt; direct, optim, gradient, jacobian
@@ -445,9 +430,10 @@ function MovingHorizonEstimator(
     covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
+    cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0, He)
     return MovingHorizonEstimator{NT}(
         model, 
-        He, i_ym, nint_u, nint_ym, P̂_0, Q̂ , R̂, Cwt, 
+        He, i_ym, nint_u, nint_ym, cov, Cwt, 
         optim, gradient, jacobian, covestim; 
         direct
     )
