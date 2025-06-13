@@ -375,12 +375,12 @@ augmented model is not verified (see Extended Help for more info).
 ```jldoctest
 julia> kf = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σQ=[√4.0], σQint_ym=[√0.25]);
 
-julia> kf.model.A[], kf.Q̂[1, 1], kf.Q̂[2, 2] 
+julia> kf.model.A[], kf.cov.Q̂[1, 1], kf.cov.Q̂[2, 2] 
 (0.1, 4.0, 0.25)
 
 julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0)), Q̂=[1 0;0 0.5]);
 
-julia> kf.model.A[], kf.Q̂[1, 1], kf.Q̂[2, 2] 
+julia> kf.model.A[], kf.cov.Q̂[1, 1], kf.cov.Q̂[2, 2] 
 (0.42, 1.0, 0.5)
 ```
 
