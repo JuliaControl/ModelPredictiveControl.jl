@@ -29,14 +29,14 @@
     mpc9 = LinMPC(model, nint_u=[1, 1], nint_ym=[0, 0])
     @test mpc9.estim.nint_u  == [1, 1]
     @test mpc9.estim.nint_ym == [0, 0]
-    mpc10 = LinMPC(model, M_Hp=diagm(collect(1.01:0.01:1.2)))
-    @test mpc10.weights.M_Hp ≈ diagm(collect(1.01:0.01:1.2))
+    mpc10 = LinMPC(model, M_Hp=Hermitian(diagm(1.01:0.01:1.2), :L))
+    @test mpc10.weights.M_Hp ≈ diagm(1.01:0.01:1.2)
     @test mpc10.weights.M_Hp isa Hermitian{Float64, Matrix{Float64}}
-    mpc11 = LinMPC(model, N_Hc=diagm([0.1,0.11,0.12,0.13]), Cwt=Inf)
+    mpc11 = LinMPC(model, N_Hc=Hermitian(diagm([0.1,0.11,0.12,0.13]), :L), Cwt=Inf)
     @test mpc11.weights.Ñ_Hc ≈ diagm([0.1,0.11,0.12,0.13])
     @test mpc11.weights.Ñ_Hc isa Hermitian{Float64, Matrix{Float64}}
-    mcp12 = LinMPC(model, L_Hp=diagm(collect(0.001:0.001:0.02)))
-    @test mcp12.weights.L_Hp ≈ diagm(collect(0.001:0.001:0.02))
+    mcp12 = LinMPC(model, L_Hp=Hermitian(diagm(0.001:0.001:0.02), :L))
+    @test mcp12.weights.L_Hp ≈ diagm(0.001:0.001:0.02)
     @test mcp12.weights.L_Hp isa Hermitian{Float64, Matrix{Float64}}
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc13  = LinMPC(model2)
@@ -463,14 +463,14 @@ end
     mpc9 = ExplicitMPC(model, nint_u=[1, 1], nint_ym=[0, 0])
     @test mpc9.estim.nint_u  == [1, 1]
     @test mpc9.estim.nint_ym == [0, 0]
-    mpc10 = ExplicitMPC(model, M_Hp=diagm(collect(1.01:0.01:1.2)))
-    @test mpc10.weights.M_Hp ≈ diagm(collect(1.01:0.01:1.2))
+    mpc10 = ExplicitMPC(model, M_Hp=Hermitian(diagm(1.01:0.01:1.2), :L))
+    @test mpc10.weights.M_Hp ≈ diagm(1.01:0.01:1.2)
     @test mpc10.weights.M_Hp isa Hermitian{Float64, Matrix{Float64}}
-    mpc11 = ExplicitMPC(model, N_Hc=diagm([0.1,0.11,0.12,0.13]))
+    mpc11 = ExplicitMPC(model, N_Hc=Hermitian(diagm([0.1,0.11,0.12,0.13]), :L))
     @test mpc11.weights.Ñ_Hc ≈ diagm([0.1,0.11,0.12,0.13])
     @test mpc11.weights.Ñ_Hc isa Hermitian{Float64, Matrix{Float64}}
-    mcp12 = ExplicitMPC(model, L_Hp=diagm(collect(0.001:0.001:0.02)))
-    @test mcp12.weights.L_Hp ≈ diagm(collect(0.001:0.001:0.02))
+    mcp12 = ExplicitMPC(model, L_Hp=Hermitian(diagm(0.001:0.001:0.02), :L))
+    @test mcp12.weights.L_Hp ≈ diagm(0.001:0.001:0.02)
     @test mcp12.weights.L_Hp isa Hermitian{Float64, Matrix{Float64}}
     model2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mpc13  = ExplicitMPC(model2)
@@ -671,14 +671,14 @@ end
     nmpc11 = NonLinMPC(nonlinmodel, Hp=15, nint_u=[1, 1], nint_ym=[0, 0])
     @test nmpc11.estim.nint_u  == [1, 1]
     @test nmpc11.estim.nint_ym == [0, 0]
-    nmpc12 = NonLinMPC(nonlinmodel, Hp=10, M_Hp=diagm(collect(1.01:0.01:1.2)))
-    @test nmpc12.weights.M_Hp ≈ diagm(collect(1.01:0.01:1.2))
+    nmpc12 = NonLinMPC(nonlinmodel, Hp=10, M_Hp=Hermitian(diagm(1.01:0.01:1.2), :L))
+    @test nmpc12.weights.M_Hp ≈ diagm(1.01:0.01:1.2)
     @test nmpc12.weights.M_Hp isa Hermitian{Float64, Matrix{Float64}}
-    nmpc13 = NonLinMPC(nonlinmodel, Hp=10, N_Hc=diagm([0.1,0.11,0.12,0.13]), Cwt=Inf)
+    nmpc13 = NonLinMPC(nonlinmodel, Hp=10, N_Hc=Hermitian(diagm([0.1,0.11,0.12,0.13]), :L), Cwt=Inf)
     @test nmpc13.weights.Ñ_Hc ≈ diagm([0.1,0.11,0.12,0.13])
     @test nmpc13.weights.Ñ_Hc isa Hermitian{Float64, Matrix{Float64}}
-    nmcp14 = NonLinMPC(nonlinmodel, Hp=10, L_Hp=diagm(collect(0.001:0.001:0.02)))
-    @test nmcp14.weights.L_Hp ≈ diagm(collect(0.001:0.001:0.02))
+    nmcp14 = NonLinMPC(nonlinmodel, Hp=10, L_Hp=Hermitian(diagm(0.001:0.001:0.02), :L))
+    @test nmcp14.weights.L_Hp ≈ diagm(0.001:0.001:0.02)
     @test nmcp14.weights.L_Hp isa Hermitian{Float64, Matrix{Float64}}
     nmpc15 = NonLinMPC(nonlinmodel, Hp=10, gc=(Ue,Ŷe,D̂e,p,ϵ)-> [p*dot(Ue,Ŷe)+sum(D̂e)+ϵ], nc=1, p=10)
     LHS = zeros(1)

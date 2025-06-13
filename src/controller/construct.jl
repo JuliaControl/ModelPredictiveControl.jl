@@ -53,14 +53,13 @@ struct ControllerWeights{
     iszero_E::Bool
     isinf_C ::Bool
     function ControllerWeights{NT}(
-        model, Hp, Hc, M_Hp::MW, N_Hc::NW, L_Hp::LW, Cwt=Inf, Ewt=0
+        M_Hp::MW, N_Hc::NW, L_Hp::LW, Cwt, Ewt
     ) where {
         NT<:Real, 
         MW<:AbstractMatrix{NT}, 
         NW<:AbstractMatrix{NT}, 
         LW<:AbstractMatrix{NT}
     }
-        validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
         nΔU = size(N_Hc, 1)
         C = Cwt
         isinf_C = isinf(C)
@@ -87,11 +86,12 @@ struct ControllerWeights{
     end
 end
 
-"Outer constructor to convert weight matrix number type to `NT` if necessary."
-function ControllerWeights{NT}(
-        model, Hp, Hc, M_Hp::MW, N_Hc::NW, L_Hp::LW, Cwt=Inf, Ewt=0
-    ) where {NT<:Real, MW<:AbstractMatrix, NW<:AbstractMatrix, LW<:AbstractMatrix}
-    return ControllerWeights{NT}(model, Hp, Hc, NT.(M_Hp), NT.(N_Hc), NT.(L_Hp), Cwt, Ewt)
+"Outer constructor to validate and convert weight matrices if necessary."
+function ControllerWeights(
+        model::SimModel{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
+    ) where {NT<:Real}
+    validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
+    return ControllerWeights{NT}(NT.(M_Hp), NT.(N_Hc), NT.(L_Hp), Cwt, Ewt)
 end
 
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
