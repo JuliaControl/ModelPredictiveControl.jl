@@ -147,4 +147,10 @@ end
 
 Do nothing for [`ManualEstimator`](@ref).
 """
-update_estimate!(estim::ManualEstimator, y0m, d0, u0) = nothing
+update_estimate!(::ManualEstimator, y0m, d0, u0) = nothing
+
+"Throw an error if P̂ != nothing."
+function setstate_cov!(::ManualEstimator, P̂)
+    isnothing(P̂) || error("ManualEstimator does not compute an estimation covariance matrix P̂.")
+    return nothing
+end

@@ -91,7 +91,29 @@ function ControllerWeights(
         model::SimModel{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
     ) where {NT<:Real}
     validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-    return ControllerWeights{NT}(NT.(M_Hp), NT.(N_Hc), NT.(L_Hp), Cwt, Ewt)
+    M_Hp, N_Hc, L_Hp = NT.(M_Hp), NT.(N_Hc), NT.(L_Hp)
+    return ControllerWeights{NT}(M_Hp, N_Hc, L_Hp, Cwt, Ewt)
+end
+
+"Validate predictive controller weight and horizon specified values."
+function validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, C=Inf, E=nothing)
+    nu, ny = model.nu, model.ny
+    nM, nN, nL = ny*Hp, nu*Hc, nu*Hp
+    Hp < 1  && throw(ArgumentError("Prediction horizon Hp should be ≥ 1"))
+    Hc < 1  && throw(ArgumentError("Control horizon Hc should be ≥ 1"))
+    Hc > Hp && throw(ArgumentError("Control horizon Hc should be ≤ prediction horizon Hp"))
+    size(M_Hp) ≠ (nM,nM) && throw(ArgumentError("M_Hp size $(size(M_Hp)) ≠ (ny*Hp, ny*Hp) ($nM,$nM)"))
+    size(N_Hc) ≠ (nN,nN) && throw(ArgumentError("N_Hc size $(size(N_Hc)) ≠ (nu*Hc, nu*Hc) ($nN,$nN)"))
+    size(L_Hp) ≠ (nL,nL) && throw(ArgumentError("L_Hp size $(size(L_Hp)) ≠ (nu*Hp, nu*Hp) ($nL,$nL)"))
+    (isdiag(M_Hp) && any(diag(M_Hp) .< 0)) && throw(ArgumentError("Mwt values should be nonnegative"))
+    (isdiag(N_Hc) && any(diag(N_Hc) .< 0)) && throw(ArgumentError("Nwt values should be nonnegative"))
+    (isdiag(L_Hp) && any(diag(L_Hp) .< 0)) && throw(ArgumentError("Lwt values should be nonnegative"))
+    !ishermitian(M_Hp) && throw(ArgumentError("M_Hp should be hermitian"))
+    !ishermitian(N_Hc) && throw(ArgumentError("N_Hc should be hermitian"))
+    !ishermitian(L_Hp) && throw(ArgumentError("L_Hp should be hermitian"))
+    size(C) ≠ ()    && throw(ArgumentError("Cwt should be a real scalar"))
+    C < 0           && throw(ArgumentError("Cwt weight should be ≥ 0"))
+    !isnothing(E) && size(E) ≠ () && throw(ArgumentError("Ewt should be a real scalar"))
 end
 
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
@@ -867,25 +889,4 @@ end
 "Return empty matrices if `estim` is not a [`InternalModel`](@ref)."
 function init_stochpred(estim::StateEstimator{NT}, _ ) where NT<:Real
     return zeros(NT, 0, estim.nxs), zeros(NT, 0, estim.model.ny)
-end
-
-"Validate predictive controller weight and horizon specified values."
-function validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, C=Inf, E=nothing)
-    nu, ny = model.nu, model.ny
-    nM, nN, nL = ny*Hp, nu*Hc, nu*Hp
-    Hp < 1  && throw(ArgumentError("Prediction horizon Hp should be ≥ 1"))
-    Hc < 1  && throw(ArgumentError("Control horizon Hc should be ≥ 1"))
-    Hc > Hp && throw(ArgumentError("Control horizon Hc should be ≤ prediction horizon Hp"))
-    size(M_Hp) ≠ (nM,nM) && throw(ArgumentError("M_Hp size $(size(M_Hp)) ≠ (ny*Hp, ny*Hp) ($nM,$nM)"))
-    size(N_Hc) ≠ (nN,nN) && throw(ArgumentError("N_Hc size $(size(N_Hc)) ≠ (nu*Hc, nu*Hc) ($nN,$nN)"))
-    size(L_Hp) ≠ (nL,nL) && throw(ArgumentError("L_Hp size $(size(L_Hp)) ≠ (nu*Hp, nu*Hp) ($nL,$nL)"))
-    (isdiag(M_Hp) && any(diag(M_Hp) .< 0)) && throw(ArgumentError("Mwt values should be nonnegative"))
-    (isdiag(N_Hc) && any(diag(N_Hc) .< 0)) && throw(ArgumentError("Nwt values should be nonnegative"))
-    (isdiag(L_Hp) && any(diag(L_Hp) .< 0)) && throw(ArgumentError("Lwt values should be nonnegative"))
-    !ishermitian(M_Hp) && throw(ArgumentError("M_Hp should be hermitian"))
-    !ishermitian(N_Hc) && throw(ArgumentError("N_Hc should be hermitian"))
-    !ishermitian(L_Hp) && throw(ArgumentError("L_Hp should be hermitian"))
-    size(C) ≠ ()    && throw(ArgumentError("Cwt should be a real scalar"))
-    C < 0           && throw(ArgumentError("Cwt weight should be ≥ 0"))
-    !isnothing(E) && size(E) ≠ () && throw(ArgumentError("Ewt should be a real scalar"))
 end

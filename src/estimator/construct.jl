@@ -38,6 +38,97 @@ function StateEstimatorBuffer{NT}(
     return StateEstimatorBuffer{NT}(u, û, k, x̂, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty)
 end
 
+"Include all the covariance matrices for the Kalman filters and moving horizon estimator."
+struct KalmanCovariances{
+    NT<:Real,
+    # parameters to support both dense and Diagonal matrices (with specialization):
+    Q̂C<:AbstractMatrix{NT},
+    R̂C<:AbstractMatrix{NT},
+}
+    P̂_0::Hermitian{NT, Matrix{NT}}
+    P̂::Hermitian{NT, Matrix{NT}}
+    Q̂::Hermitian{NT, Q̂C}
+    R̂::Hermitian{NT, R̂C}
+    invP̄::Hermitian{NT, Matrix{NT}}
+    invQ̂_He::Hermitian{NT, Q̂C}
+    invR̂_He::Hermitian{NT, R̂C}
+    function KalmanCovariances{NT}(
+        Q̂::Q̂C, R̂::R̂C, P̂_0, He
+    ) where {NT<:Real, Q̂C<:AbstractMatrix{NT}, R̂C<:AbstractMatrix{NT}}
+        if isnothing(P̂_0)
+            P̂_0 = zeros(NT, 0, 0)
+        end
+        P̂_0 = Hermitian(P̂_0, :L)
+        P̂   = copy(P̂_0)
+        Q̂   = Hermitian(Q̂, :L)
+        R̂   = Hermitian(R̂, :L)
+        # the following variables are only for the moving horizon estimator:
+        invP̄, invQ̂, invR̂ = copy(P̂_0), copy(Q̂), copy(R̂)
+        try
+            inv!(invP̄)
+        catch err
+            if err isa PosDefException
+                error("P̂_0 is not positive definite")
+            else
+                rethrow()
+            end
+        end
+        try
+            inv!(invQ̂)
+        catch err
+            if err isa PosDefException
+                error("Q̂ is not positive definite")
+            else
+                rethrow()
+            end
+        end
+        try
+            inv!(invR̂)
+        catch err
+            if err isa PosDefException
+                error("R̂ is not positive definite")
+            else
+                rethrow()
+            end
+        end
+        invQ̂_He = repeatdiag(invQ̂, He)
+        invR̂_He = repeatdiag(invR̂, He)
+        invQ̂_He = Hermitian(invQ̂_He, :L)
+        invR̂_He = Hermitian(invR̂_He, :L)
+        return new{NT, Q̂C, R̂C}(P̂_0, P̂, Q̂, R̂, invP̄, invQ̂_He, invR̂_He)
+    end
+end
+
+"Outer constructor to validate and convert covariance matrices if necessary."
+function KalmanCovariances(
+        model::SimModel{NT}, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing, He=1
+    ) where {NT<:Real}
+    validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
+    Q̂, R̂ = NT.(Q̂), NT.(R̂)
+    !isnothing(P̂_0) && (P̂_0 = NT.(P̂_0))
+    return KalmanCovariances{NT}(Q̂, R̂, P̂_0, He)
+end
+
+"""
+    validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing)
+
+Validate sizes and Hermitianity of process `Q̂`` and sensor `R̂` noises covariance matrices.
+
+Also validate initial estimate covariance `P̂_0`, if provided.
+"""
+function validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing)
+    nym = length(i_ym)
+    nx̂  = model.nx + sum(nint_u) + sum(nint_ym)
+    size(Q̂)  ≠ (nx̂, nx̂)     && error("Q̂ size $(size(Q̂)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
+    !ishermitian(Q̂)         && error("Q̂ is not Hermitian")
+    size(R̂)  ≠ (nym, nym)   && error("R̂ size $(size(R̂)) ≠ nym, nym $((nym, nym))")
+    !ishermitian(R̂)         && error("R̂ is not Hermitian")
+    if ~isnothing(P̂_0)
+        size(P̂_0) ≠ (nx̂, nx̂) && error("P̂_0 size $(size(P̂_0)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
+        !ishermitian(P̂_0)    && error("P̂_0 is not Hermitian")
+    end
+end
+
 @doc raw"""
     init_estimstoch(model, i_ym, nint_u, nint_ym) -> As, Cs_u, Cs_y, nxs, nint_u, nint_ym
 

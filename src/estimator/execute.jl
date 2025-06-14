@@ -112,7 +112,7 @@ removes the operating points with [`remove_op!`](@ref) and call [`init_estimate!
   bumpless manual to automatic transfer. See [`init_estimate!`](@ref) for details.
 - Else, `estim.x̂0` is left unchanged. Use [`setstate!`](@ref) to manually modify it.
 
-If applicable, it also sets the error covariance `estim.P̂` to `estim.P̂_0`.
+If applicable, it also sets the error covariance `estim.cov.P̂` to `estim.cov.P̂_0`.
 
 # Examples
 ```jldoctest
@@ -327,7 +327,7 @@ end
 """
     setstate!(estim::StateEstimator, x̂[, P̂]) -> estim
 
-Set `estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`, and `estim.P̂` to `P̂` if applicable. 
+Set `estim.x̂0` to `x̂ - estim.x̂op` from the argument `x̂`, and `estim.cov.P̂` to `P̂` if applicable. 
 
 The covariance error estimate `P̂` can be set only if `estim` is a [`StateEstimator`](@ref)
 that computes it.
@@ -339,11 +339,11 @@ function setstate!(estim::StateEstimator, x̂, P̂=nothing)
     return estim
 end
 
-"Set the covariance error estimate `estim.P̂` to `P̂`."
+"Set the covariance error estimate `estim.cov.P̂` to `P̂`."
 function setstate_cov!(estim::StateEstimator, P̂)
     if !isnothing(P̂)
         size(P̂) == (estim.nx̂, estim.nx̂) || error("P̂ size must be $((estim.nx̂, estim.nx̂))")
-        estim.P̂ .= to_hermitian(P̂)
+        estim.cov.P̂ .= to_hermitian(P̂)
     end
     return nothing
 end
@@ -375,12 +375,12 @@ augmented model is not verified (see Extended Help for more info).
 ```jldoctest
 julia> kf = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σQ=[√4.0], σQint_ym=[√0.25]);
 
-julia> kf.model.A[], kf.Q̂[1, 1], kf.Q̂[2, 2] 
+julia> kf.model.A[], kf.cov.Q̂[1, 1], kf.cov.Q̂[2, 2] 
 (0.1, 4.0, 0.25)
 
 julia> setmodel!(kf, LinModel(ss(0.42, 0.5, 1, 0, 4.0)), Q̂=[1 0;0 0.5]);
 
-julia> kf.model.A[], kf.Q̂[1, 1], kf.Q̂[2, 2] 
+julia> kf.model.A[], kf.cov.Q̂[1, 1], kf.cov.Q̂[2, 2] 
 (0.42, 1.0, 0.5)
 ```
 
@@ -449,7 +449,7 @@ function setmodel_estimator!(estim::StateEstimator, model, _ , _ , _ , Q̂, R̂)
     estim.f̂op .= f̂op
     estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     # --- update covariance matrices ---
-    !isnothing(Q̂) && (estim.Q̂ .= to_hermitian(Q̂))
-    !isnothing(R̂) && (estim.R̂ .= to_hermitian(R̂))
+    !isnothing(Q̂) && (estim.cov.Q̂ .= to_hermitian(Q̂))
+    !isnothing(R̂) && (estim.cov.R̂ .= to_hermitian(R̂))
     return nothing
 end
