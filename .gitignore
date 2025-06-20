@@ -6,3 +6,4 @@ LocalPreferences.toml
 *.cov
 docs/Manifest.toml
 lcov.info
+benchmark/Manifest.toml
