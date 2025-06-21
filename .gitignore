@@ -7,3 +7,5 @@ LocalPreferences.toml
 docs/Manifest.toml
 lcov.info
 benchmark/Manifest.toml
+/.benchmarkci
+/benchmark/*.json
