@@ -106,10 +106,10 @@ See [`LinMPC`](@ref) for the variable definitions. This controller does not supp
 constraints but the computational costs are extremely low (array division), therefore 
 suitable for applications that require small sample times. The keyword arguments are
 identical to [`LinMPC`](@ref), except for `Cwt`, `transcription` and `optim`, which are not
-supported. This controller uses a [`SingleShooting`](@ref) transcription method.
+supported. It uses a [`SingleShooting`](@ref) transcription method and is allocation-free.
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
-arguments. This controller is allocation-free.
+arguments. 
 
 # Examples
 ```jldoctest
