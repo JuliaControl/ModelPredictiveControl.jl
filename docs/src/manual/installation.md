@@ -15,7 +15,7 @@ with this package in the current working directory, write this in the REPL:
 using Pkg; Pkg.generate("MPCproject"); Pkg.activate("."); Pkg.add("ModelPredictiveControl")
 ```
 
-Note that that the construction of linear models typically requires `ss` or `tf` functions,
+Note that the construction of linear models typically requires `ss` or `tf` functions,
 it is thus advised to load the package with:
 
 ```julia
