@@ -108,11 +108,9 @@ end
     u, d = [10, 50], Float64[]
     @test updatestate!(linmodel1, u) ≈ zeros(2)
     @test updatestate!(linmodel1, u, d) ≈ zeros(2)
-    @test_skip @allocations(updatestate!(linmodel1, u)) == 0
     @test linmodel1.x0 ≈ zeros(2)
     @test evaloutput(linmodel1) ≈ linmodel1() ≈ [50,30]
     @test evaloutput(linmodel1, Float64[]) ≈ linmodel1(Float64[]) ≈ [50,30]
-    @test_skip @allocations(evaloutput(linmodel1)) == 0
     x = initstate!(linmodel1, [10, 60])
     @test evaloutput(linmodel1) ≈ [50 + 19.0, 30 + 7.4]
     @test preparestate!(linmodel1) ≈ x           # new method
@@ -283,11 +281,9 @@ end
     u, d = zeros(2), Float64[]
     @test updatestate!(nonlinmodel, u) ≈ zeros(2) 
     @test updatestate!(nonlinmodel, u, d) ≈ zeros(2)
-    @test_skip @allocations(updatestate!(nonlinmodel, u)) == 0
     @test nonlinmodel.x0 ≈ zeros(2)
     @test evaloutput(nonlinmodel) ≈ nonlinmodel() ≈ zeros(2)
     @test evaloutput(nonlinmodel, d) ≈ nonlinmodel(Float64[]) ≈ zeros(2)
-    @test_skip @allocations(evaloutput(nonlinmodel)) == 0
 
     x = initstate!(nonlinmodel, [0, 10]) # do nothing for NonLinModel
     @test evaloutput(nonlinmodel) ≈ [0, 0]
@@ -375,19 +371,6 @@ end
     h2!(y, x, _, _) = (y .= x)
     nonlinmodel4 = NonLinModel(f2!,h2!,Ts,1,1,1,0,solver=nothing,jacobian=AutoFiniteDiff())
     @test_nowarn linearize(nonlinmodel4, x=[1], u=[2])
-
-    function f3!(xnext, x, u, d, _)
-        xnext .= x.*u .+ x.*d
-    end
-    function h3!(y, x, d, _)
-        y .= x.*d
-    end
-    nonlinmodel4 = NonLinModel(f3!, h3!, Ts, 1, 1, 1, 1, solver=nothing)
-    linmodel4 = linearize(nonlinmodel4; x, u, d)
-    # return nothing (see this issue : https://github.com/JuliaLang/julia/issues/51112):
-    linearize2!(linmodel, model) = (linearize!(linmodel, model); nothing)
-    linearize2!(linmodel4, nonlinmodel4)
-    @test_skip @allocations(linearize2!(linmodel4, nonlinmodel4)) == 0
 end
 
 @testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin

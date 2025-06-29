@@ -24,7 +24,7 @@ const SUITE = BenchmarkGroup()
 
 ## ================== SimModel benchmarks =========================================
 SUITE["SimModel"]["allocation"] = BenchmarkGroup(["allocation"])
-SUITE["SimModel"]["allocation"]["LinModel_updatestate"] = @benchmarkable(
+SUITE["SimModel"]["allocation"]["LinModel_updatestate!"] = @benchmarkable(
     updatestate!($linmodel, $u, $d),
     samples=1
 )
@@ -32,7 +32,7 @@ SUITE["SimModel"]["allocation"]["LinModel_evaloutput"] = @benchmarkable(
     evaloutput($linmodel, $d),
     samples=1
 )
-SUITE["SimModel"]["allocation"]["NonLinModel_updatestate"] = @benchmarkable(
+SUITE["SimModel"]["allocation"]["NonLinModel_updatestate!"] = @benchmarkable(
     updatestate!($nonlinmodel, $u, $d),
     samples=1
 )
@@ -41,22 +41,9 @@ SUITE["SimModel"]["allocation"]["NonLinModel_evaloutput"] = @benchmarkable(
     samples=1
 )
 
+SUITE["SimModel"]["allocation"]["linearize!"] = @benchmarkable(
+    linearize!($linmodel, $nonlinmodel),
+    samples=1
+)
+
 ## ================== StateEstimator benchmarks ================================
-
-
-
-#=
-SUITE["utf8"] = BenchmarkGroup(["string", "unicode"])
-teststr = String(join(rand(MersenneTwister(1), 'a':'d', 10^4)))
-SUITE["utf8"]["replace"] = @benchmarkable replace($teststr, "a" => "b")
-SUITE["utf8"]["join"] = @benchmarkable join($teststr, $teststr)
-SUITE["utf8"]["plots"] = BenchmarkGroup()
-
-SUITE["trigonometry"] = BenchmarkGroup(["math", "triangles"])
-SUITE["trigonometry"]["circular"] = BenchmarkGroup()
-for f in (sin, cos, tan)
-    for x in (0.0, pi)
-        SUITE["trigonometry"]["circular"][string(f), x] = @benchmarkable ($f)($x)
-    end
-end
-=#
