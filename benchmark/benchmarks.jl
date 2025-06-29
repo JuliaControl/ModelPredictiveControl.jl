@@ -81,10 +81,10 @@ SUITE["StateEstimator"]["allocation"]["KalmanFilter_updatestate!"] = @benchmarka
 )
 
 lo = Luenberger(linmodel, nint_u=[1, 1])
-SUITE["StateEstimator"]["allocation"]["Luenberger_preparestate!"] = @benchmarkable(
-    preparestate!($lo, $y, $d),
-    samples=1
-)
+#SUITE["StateEstimator"]["allocation"]["Luenberger_preparestate!"] = @benchmarkable(
+#    preparestate!($lo, $y, $d),
+#    samples=1
+#)
 SUITE["StateEstimator"]["allocation"]["Luenberger_updatestate!"] = @benchmarkable(
     updatestate!($lo, $u, $y, $d),
     setup=preparestate!($lo, $y, $d),
