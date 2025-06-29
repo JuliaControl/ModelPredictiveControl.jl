@@ -71,12 +71,9 @@ end
     preparestate!(kalmanfilter1, y)
     @test updatestate!(kalmanfilter1, u, y, d) ≈ zeros(4)
     @test kalmanfilter1.x̂0 ≈ zeros(4)
-    @test_skip @allocations(preparestate!(kalmanfilter1, y)) == 0
-    @test_skip @allocations(updatestate!(kalmanfilter1, u, y)) == 0
     preparestate!(kalmanfilter1, y)
     @test evaloutput(kalmanfilter1) ≈ kalmanfilter1() ≈ [50, 30]
     @test evaloutput(kalmanfilter1, d) ≈ kalmanfilter1(d) ≈ [50, 30]
-    @test_skip @allocations(evaloutput(kalmanfilter1, d)) == 0
     @test initstate!(kalmanfilter1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
     linmodel2 = LinModel(append(tf(1, [1, 0]), tf(2, [10, 1])), 1.0)
     kalmanfilter2 = SteadyKalmanFilter(linmodel2, nint_u=[1, 1], direct=false)

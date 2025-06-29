@@ -55,8 +55,13 @@ SUITE["StateEstimator"]["allocation"]["SteadyKalmanFilter_preparestate!"] = @ben
     preparestate!($skf, $y, $d),
     samples=1
 )
-SUITE["StateEstimator"]["allocation"]["SteadyKalmanFilter_update!"] = @benchmarkable(
+SUITE["StateEstimator"]["allocation"]["SteadyKalmanFilter_updatestate!"] = @benchmarkable(
     updatestate!($skf, $u, $y, $d),
+    setup=preparestate!($skf, $y, $d),
+    samples=1
+)
+SUITE["StateEstimator"]["allocation"]["SteadyKalmanFilter_evaloutput"] = @benchmarkable(
+    evaloutput($skf, $d),
     setup=preparestate!($skf, $y, $d),
     samples=1
 )
