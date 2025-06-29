@@ -128,3 +128,14 @@ SUITE["StateEstimator"]["allocation"]["ExtendedKalmanFilter_updatestate!"] = @be
     setup=preparestate!($ekf, $y, $d),
     samples=1
 )
+
+## ==================================================================================
+## ================== PredictiveController benchmarks ===============================
+## ==================================================================================
+empc = ExplicitMPC(linmodel)
+SUITE["PredictiveController"]["allocation"] = BenchmarkGroup(["allocation"])
+SUITE["PredictiveController"]["allocation"]["ExplicitMPC_moveinput!"] = @benchmarkable(
+    moveinput!($empc, $d),
+    setup=preparestate!($empc, $y, $d),
+    samples=1
+)
