@@ -112,6 +112,11 @@ SUITE["StateEstimator"]["allocation"]["UnscentedKalmanFilter_updatestate!"] = @b
     setup=preparestate!($ukf, $y, $d),
     samples=1
 )
+SUITE["StateEstimator"]["allocation"]["UnscentedKalmanFilter_evaloutput"] = @benchmarkable(
+    evaloutput($ukf, $d),
+    setup=preparestate!($ukf, $y, $d),
+    samples=1
+)
 
 ekf = ExtendedKalmanFilter(linmodel, nint_u=[1, 1], direct=false)
 SUITE["StateEstimator"]["allocation"]["ExtendedKalmanFilter_preparestate!"] = @benchmarkable(
