@@ -53,7 +53,6 @@ SUITE["SimModel"]["allocation"]["NonLinModel_linearize!"] = @benchmarkable(
 ## ================== StateEstimator benchmarks =====================================
 ## ==================================================================================
 skf = SteadyKalmanFilter(linmodel)
-
 SUITE["StateEstimator"]["allocation"] = BenchmarkGroup(["allocation"])
 SUITE["StateEstimator"]["allocation"]["SteadyKalmanFilter_preparestate!"] = @benchmarkable(
     preparestate!($skf, $y, $d),
@@ -71,7 +70,6 @@ SUITE["StateEstimator"]["allocation"]["SteadyKalmanFilter_evaloutput"] = @benchm
 )
 
 kf = KalmanFilter(linmodel, nint_u=[1, 1], direct=false)
-
 SUITE["StateEstimator"]["allocation"]["KalmanFilter_preparestate!"] = @benchmarkable(
     preparestate!($kf, $y, $d),
     samples=1
@@ -81,8 +79,47 @@ SUITE["StateEstimator"]["allocation"]["KalmanFilter_updatestate!"] = @benchmarka
     setup=preparestate!($kf, $y, $d),
     samples=1
 )
-SUITE["StateEstimator"]["allocation"]["KalmanFilter_evaloutput"] = @benchmarkable(
-    evaloutput($kf, $d),
-    setup=preparestate!($kf, $y, $d),
+
+lo = Luenberger(linmodel, nint_u=[1, 1])
+SUITE["StateEstimator"]["allocation"]["Luenberger_preparestate!"] = @benchmarkable(
+    preparestate!($lo, $y, $d),
+    samples=1
+)
+SUITE["StateEstimator"]["allocation"]["Luenberger_updatestate!"] = @benchmarkable(
+    updatestate!($lo, $u, $y, $d),
+    setup=preparestate!($lo, $y, $d),
+    samples=1
+)
+
+im = InternalModel(nonlinmodel)
+SUITE["StateEstimator"]["allocation"]["InternalModel_preparestate!"] = @benchmarkable(
+    preparestate!($im, $y, $d),
+    samples=1
+)
+SUITE["StateEstimator"]["allocation"]["InternalModel_updatestate!"] = @benchmarkable(
+    updatestate!($im, $u, $y, $d),
+    setup=preparestate!($im, $y, $d),
+    samples=1
+)
+
+ukf = UnscentedKalmanFilter(nonlinmodel)
+SUITE["StateEstimator"]["allocation"]["UnscentedKalmanFilter_preparestate!"] = @benchmarkable(
+    preparestate!($ukf, $y, $d),
+    samples=1
+)
+SUITE["StateEstimator"]["allocation"]["UnscentedKalmanFilter_updatestate!"] = @benchmarkable(
+    updatestate!($ukf, $u, $y,  $d),
+    setup=preparestate!($ukf, $y, $d),
+    samples=1
+)
+
+ekf = ExtendedKalmanFilter(linmodel, nint_u=[1, 1], direct=false)
+SUITE["StateEstimator"]["allocation"]["ExtendedKalmanFilter_preparestate!"] = @benchmarkable(
+    preparestate!($ekf, $y, $d),
+    samples=1
+)
+SUITE["StateEstimator"]["allocation"]["ExtendedKalmanFilter_updatestate!"] = @benchmarkable(
+    updatestate!($ekf, $u, $y, $d),
+    setup=preparestate!($ekf, $y, $d),
     samples=1
 )
