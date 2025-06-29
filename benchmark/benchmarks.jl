@@ -41,7 +41,7 @@ SUITE["SimModel"]["allocation"]["NonLinModel_evaloutput"] = @benchmarkable(
     samples=1
 )
 
-SUITE["SimModel"]["allocation"]["linearize!"] = @benchmarkable(
+SUITE["SimModel"]["allocation"]["NonLinModel_linearize!"] = @benchmarkable(
     linearize!($linmodel, $nonlinmodel),
     samples=1
 )
