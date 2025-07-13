@@ -9,3 +9,4 @@ lcov.info
 benchmark/Manifest.toml
 /.benchmarkci
 /benchmark/*.json
+results_ModelPredictiveControl*

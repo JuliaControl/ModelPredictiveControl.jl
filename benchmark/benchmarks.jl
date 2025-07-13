@@ -26,25 +26,25 @@ nonlinmodel = NonLinModel(f!, h!, Ts, 2, 4, 2, 1, p=linmodel, solver=nothing)
 nonlinmodel = setop!(nonlinmodel, uop=[10, 50], yop=[50, 30], dop=[5])
 u, d, y = [10, 50], [5], [50, 30]
 
-SUITE["SimModel"]["allocation"] = BenchmarkGroup(["allocation"])
-SUITE["SimModel"]["allocation"]["LinModel_updatestate!"] = @benchmarkable(
+SUITE["allocation"]["SimModel"] = BenchmarkGroup(["allocation"])
+SUITE["allocation"]["SimModel"]["LinModel_updatestate!"] = @benchmarkable(
     updatestate!($linmodel, $u, $d),
     samples=1
 )
-SUITE["SimModel"]["allocation"]["LinModel_evaloutput"] = @benchmarkable(
+SUITE["allocation"]["SimModel"]["LinModel_evaloutput"] = @benchmarkable(
     evaloutput($linmodel, $d),
     samples=1
 )
-SUITE["SimModel"]["allocation"]["NonLinModel_updatestate!"] = @benchmarkable(
+SUITE["allocation"]["SimModel"]["NonLinModel_updatestate!"] = @benchmarkable(
     updatestate!($nonlinmodel, $u, $d),
     samples=1
 )
-SUITE["SimModel"]["allocation"]["NonLinModel_evaloutput"] = @benchmarkable(
+SUITE["allocation"]["SimModel"]["NonLinModel_evaloutput"] = @benchmarkable(
     evaloutput($nonlinmodel, $d),
     samples=1
 )
 
-SUITE["SimModel"]["allocation"]["NonLinModel_linearize!"] = @benchmarkable(
+SUITE["allocation"]["SimModel"]["NonLinModel_linearize!"] = @benchmarkable(
     linearize!($linmodel, $nonlinmodel),
     samples=1
 )
@@ -53,77 +53,77 @@ SUITE["SimModel"]["allocation"]["NonLinModel_linearize!"] = @benchmarkable(
 ## ================== StateEstimator benchmarks =====================================
 ## ==================================================================================
 skf = SteadyKalmanFilter(linmodel)
-SUITE["StateEstimator"]["allocation"] = BenchmarkGroup(["allocation"])
-SUITE["StateEstimator"]["allocation"]["SteadyKalmanFilter_preparestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"] = BenchmarkGroup(["allocation"])
+SUITE["allocation"]["StateEstimator"]["SteadyKalmanFilter_preparestate!"] = @benchmarkable(
     preparestate!($skf, $y, $d),
     samples=1
 )
-SUITE["StateEstimator"]["allocation"]["SteadyKalmanFilter_updatestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["SteadyKalmanFilter_updatestate!"] = @benchmarkable(
     updatestate!($skf, $u, $y, $d),
     setup=preparestate!($skf, $y, $d),
     samples=1
 )
-SUITE["StateEstimator"]["allocation"]["SteadyKalmanFilter_evaloutput"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["SteadyKalmanFilter_evaloutput"] = @benchmarkable(
     evaloutput($skf, $d),
     setup=preparestate!($skf, $y, $d),
     samples=1
 )
 
 kf = KalmanFilter(linmodel, nint_u=[1, 1], direct=false)
-SUITE["StateEstimator"]["allocation"]["KalmanFilter_preparestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["KalmanFilter_preparestate!"] = @benchmarkable(
     preparestate!($kf, $y, $d),
     samples=1
 )
-SUITE["StateEstimator"]["allocation"]["KalmanFilter_updatestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["KalmanFilter_updatestate!"] = @benchmarkable(
     updatestate!($kf, $u, $y, $d),
     setup=preparestate!($kf, $y, $d),
     samples=1
 )
 
 lo = Luenberger(linmodel, nint_u=[1, 1])
-#SUITE["StateEstimator"]["allocation"]["Luenberger_preparestate!"] = @benchmarkable(
-#    preparestate!($lo, $y, $d),
-#    samples=1
-#)
-SUITE["StateEstimator"]["allocation"]["Luenberger_updatestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["Luenberger_preparestate!"] = @benchmarkable(
+    preparestate!($lo, $y, $d),
+    samples=1
+)
+SUITE["allocation"]["StateEstimator"]["Luenberger_updatestate!"] = @benchmarkable(
     updatestate!($lo, $u, $y, $d),
     setup=preparestate!($lo, $y, $d),
     samples=1
 )
 
 im = InternalModel(nonlinmodel)
-SUITE["StateEstimator"]["allocation"]["InternalModel_preparestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["InternalModel_preparestate!"] = @benchmarkable(
     preparestate!($im, $y, $d),
     samples=1
 )
-SUITE["StateEstimator"]["allocation"]["InternalModel_updatestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["InternalModel_updatestate!"] = @benchmarkable(
     updatestate!($im, $u, $y, $d),
     setup=preparestate!($im, $y, $d),
     samples=1
 )
 
 ukf = UnscentedKalmanFilter(nonlinmodel)
-SUITE["StateEstimator"]["allocation"]["UnscentedKalmanFilter_preparestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["UnscentedKalmanFilter_preparestate!"] = @benchmarkable(
     preparestate!($ukf, $y, $d),
     samples=1
 )
-SUITE["StateEstimator"]["allocation"]["UnscentedKalmanFilter_updatestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["UnscentedKalmanFilter_updatestate!"] = @benchmarkable(
     updatestate!($ukf, $u, $y,  $d),
     setup=preparestate!($ukf, $y, $d),
     samples=1
 )
-SUITE["StateEstimator"]["allocation"]["UnscentedKalmanFilter_evaloutput"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["UnscentedKalmanFilter_evaloutput"] = @benchmarkable(
     evaloutput($ukf, $d),
     setup=preparestate!($ukf, $y, $d),
     samples=1
 )
 
 ekf = ExtendedKalmanFilter(linmodel, nint_u=[1, 1], direct=false)
-SUITE["StateEstimator"]["allocation"]["ExtendedKalmanFilter_preparestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["ExtendedKalmanFilter_preparestate!"] = @benchmarkable(
     preparestate!($ekf, $y, $d),
     samples=1
 )
-SUITE["StateEstimator"]["allocation"]["ExtendedKalmanFilter_updatestate!"] = @benchmarkable(
+SUITE["allocation"]["StateEstimator"]["ExtendedKalmanFilter_updatestate!"] = @benchmarkable(
     updatestate!($ekf, $u, $y, $d),
     setup=preparestate!($ekf, $y, $d),
     samples=1
@@ -133,8 +133,8 @@ SUITE["StateEstimator"]["allocation"]["ExtendedKalmanFilter_updatestate!"] = @be
 ## ================== PredictiveController benchmarks ===============================
 ## ==================================================================================
 empc = ExplicitMPC(linmodel, Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1])
-SUITE["PredictiveController"]["allocation"] = BenchmarkGroup(["allocation"])
-SUITE["PredictiveController"]["allocation"]["ExplicitMPC_moveinput!"] = @benchmarkable(
+SUITE["allocation"]["PredictiveController"] = BenchmarkGroup(["allocation"])
+SUITE["allocation"]["PredictiveController"]["ExplicitMPC_moveinput!"] = @benchmarkable(
     moveinput!($empc, $y, $d),
     setup=preparestate!($empc, $y, $d),
     samples=1
