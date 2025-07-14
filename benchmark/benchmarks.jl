@@ -178,22 +178,24 @@ end
 
 ## ----------------- Runtime benchmarks ---------------------------------------------
 optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
-
 transcription = SingleShooting()
 mpc_osqp_ss = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_osqp_ss.optim)
 
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
 transcription = MultipleShooting()
 mpc_osqp_ms = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_osqp_ms.optim)
 
 optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
-
 transcription = SingleShooting()
 mpc_daqp_ss = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 
+optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
 transcription = MultipleShooting()
 mpc_daqp_ms = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
+# needed to solve Hessians with eigenvalues at zero, like in MultipleShooting transcription:
+JuMP.set_attribute(mpc_daqp_ms.optim, "eps_prox", 1e-6) 
 
 samples, evals = 500, 1
 SUITE["runtime"]["PredictiveController"]["CSTR"]["LinMPC"]["OSQP"]["SingleShooting"] = 
