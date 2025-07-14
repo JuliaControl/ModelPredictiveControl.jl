@@ -6,18 +6,18 @@
 samples, evals = 1, 1
 
 skf = SteadyKalmanFilter(linmodel)
-SUITE["allocation"]["StateEstimator"]["SteadyKalmanFilter"]["preparestate!"] = 
+ALLOC["StateEstimator"]["SteadyKalmanFilter"]["preparestate!"] = 
     @benchmarkable(
         preparestate!($skf, $y, $d),
         samples=samples, evals=evals
     )
-SUITE["allocation"]["StateEstimator"]["SteadyKalmanFilter"]["updatestate!"] = 
+ALLOC["StateEstimator"]["SteadyKalmanFilter"]["updatestate!"] = 
     @benchmarkable(
         updatestate!($skf, $u, $y, $d), 
         setup=preparestate!($skf, $y, $d),
         samples=samples, evals=evals
     )
-SUITE["allocation"]["StateEstimator"]["SteadyKalmanFilter"]["evaloutput"] = 
+ALLOC["StateEstimator"]["SteadyKalmanFilter"]["evaloutput"] = 
     @benchmarkable(
         evaloutput($skf, $d),
         setup=preparestate!($skf, $y, $d),
@@ -25,12 +25,12 @@ SUITE["allocation"]["StateEstimator"]["SteadyKalmanFilter"]["evaloutput"] =
     )
 
 kf = KalmanFilter(linmodel, nint_u=[1, 1], direct=false)
-SUITE["allocation"]["StateEstimator"]["KalmanFilter"]["preparestate!"] = 
+ALLOC["StateEstimator"]["KalmanFilter"]["preparestate!"] = 
     @benchmarkable(
         preparestate!($kf, $y, $d),
         samples=samples, evals=evals
     )
-SUITE["allocation"]["StateEstimator"]["KalmanFilter"]["updatestate!"] = 
+ALLOC["StateEstimator"]["KalmanFilter"]["updatestate!"] = 
     @benchmarkable(
         updatestate!($kf, $u, $y, $d),
         setup=preparestate!($kf, $y, $d),
@@ -38,12 +38,12 @@ SUITE["allocation"]["StateEstimator"]["KalmanFilter"]["updatestate!"] =
     )
 
 lo = Luenberger(linmodel, nint_u=[1, 1])
-SUITE["allocation"]["StateEstimator"]["Luenberger"]["preparestate!"] = 
+ALLOC["StateEstimator"]["Luenberger"]["preparestate!"] = 
     @benchmarkable(
         preparestate!($lo, $y, $d),
         samples=samples, evals=evals
     )
-SUITE["allocation"]["StateEstimator"]["Luenberger"]["updatestate!"] = 
+ALLOC["StateEstimator"]["Luenberger"]["updatestate!"] = 
     @benchmarkable(
         updatestate!($lo, $u, $y, $d),
         setup=preparestate!($lo, $y, $d),
@@ -51,12 +51,12 @@ SUITE["allocation"]["StateEstimator"]["Luenberger"]["updatestate!"] =
     )
 
 im = InternalModel(nonlinmodel)
-SUITE["allocation"]["StateEstimator"]["InternalModel"]["preparestate!"] = 
+ALLOC["StateEstimator"]["InternalModel"]["preparestate!"] = 
     @benchmarkable(
         preparestate!($im, $y, $d),
         samples=samples, evals=evals
     )
-SUITE["allocation"]["StateEstimator"]["InternalModel"]["updatestate!"] = 
+ALLOC["StateEstimator"]["InternalModel"]["updatestate!"] = 
     @benchmarkable(
         updatestate!($im, $u, $y, $d),
         setup=preparestate!($im, $y, $d),
@@ -64,18 +64,18 @@ SUITE["allocation"]["StateEstimator"]["InternalModel"]["updatestate!"] =
     )
 
 ukf = UnscentedKalmanFilter(nonlinmodel)
-SUITE["allocation"]["StateEstimator"]["UnscentedKalmanFilter"]["preparestate!"] = 
+ALLOC["StateEstimator"]["UnscentedKalmanFilter"]["preparestate!"] = 
     @benchmarkable(
         preparestate!($ukf, $y, $d),
         samples=samples, evals=evals
     )
-SUITE["allocation"]["StateEstimator"]["UnscentedKalmanFilter"]["updatestate!"] = 
+ALLOC["StateEstimator"]["UnscentedKalmanFilter"]["updatestate!"] = 
     @benchmarkable(
         updatestate!($ukf, $u, $y,  $d),
         setup=preparestate!($ukf, $y, $d),
         samples=samples, evals=evals
     )
-SUITE["allocation"]["StateEstimator"]["UnscentedKalmanFilter"]["evaloutput"] = 
+ALLOC["StateEstimator"]["UnscentedKalmanFilter"]["evaloutput"] = 
     @benchmarkable(
         evaloutput($ukf, $d),
         setup=preparestate!($ukf, $y, $d),
@@ -83,12 +83,12 @@ SUITE["allocation"]["StateEstimator"]["UnscentedKalmanFilter"]["evaloutput"] =
     )
 
 ekf = ExtendedKalmanFilter(linmodel, nint_u=[1, 1], direct=false)
-SUITE["allocation"]["StateEstimator"]["ExtendedKalmanFilter"]["preparestate!"] = 
+ALLOC["StateEstimator"]["ExtendedKalmanFilter"]["preparestate!"] = 
     @benchmarkable(
         preparestate!($ekf, $y, $d),
         samples=samples, evals=evals
     )
-SUITE["allocation"]["StateEstimator"]["ExtendedKalmanFilter"]["updatestate!"] = 
+ALLOC["StateEstimator"]["ExtendedKalmanFilter"]["updatestate!"] = 
     @benchmarkable(
         updatestate!($ekf, $u, $y, $d),
         setup=preparestate!($ekf, $y, $d),
