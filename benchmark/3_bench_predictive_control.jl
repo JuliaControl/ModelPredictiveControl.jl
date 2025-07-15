@@ -1,4 +1,21 @@
-## ----------------- Runtime benchmarks : CSTR ----------------------------------------
+# ---------------------- Unit tests (no allocation) ---------------------------------------
+const UNIT_MPC = SUITE["unit tests"]["PredictiveController"]
+
+empc = ExplicitMPC(linmodel, Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1])
+
+samples, evals = 10000, 1
+UNIT_MPC["ExplicitMPC"]["moveinput!"] = 
+    @benchmarkable(
+        moveinput!($empc, $y, $d),
+        setup=preparestate!($empc, $y, $d),
+        samples=samples, evals=evals
+    )
+
+
+## ---------------------- Case studies ----------------------------------------------------
+const CASE_MPC = SUITE["case studies"]["PredictiveController"]
+
+## ----------------- Runtime benchmarks : CSTR without feedforward ------------------------
 G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
       tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
 uop, yop = [20, 20], [50, 30]
@@ -52,30 +69,107 @@ mpc_ipopt_ms = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -In
 JuMP.unset_time_limit_sec(mpc_ipopt_ms.optim) 
 
 samples, evals = 500, 1
-RUNTIME["PredictiveController"]["CSTR"]["LinMPC"]["OSQP"]["SingleShooting"] = 
+CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["OSQP"]["SingleShooting"] = 
     @benchmarkable(test_mpc($mpc_osqp_ss, $model); 
-    samples=samples, evals=evals
-)
-RUNTIME["PredictiveController"]["CSTR"]["LinMPC"]["OSQP"]["MultipleShooting"] = 
+        samples=samples, evals=evals
+    )
+CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["OSQP"]["MultipleShooting"] = 
     @benchmarkable(test_mpc($mpc_osqp_ms, $model); 
-    samples=samples, evals=evals
-)
-RUNTIME["PredictiveController"]["CSTR"]["LinMPC"]["DAQP"]["SingleShooting"] =
+        samples=samples, evals=evals
+    )
+CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["DAQP"]["SingleShooting"] =
     @benchmarkable(test_mpc($mpc_daqp_ss, $model); 
-    samples=samples, evals=evals
-)
-RUNTIME["PredictiveController"]["CSTR"]["LinMPC"]["DAQP"]["MultipleShooting"] =
+        samples=samples, evals=evals
+    )
+CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["DAQP"]["MultipleShooting"] =
     @benchmarkable(test_mpc($mpc_daqp_ms, $model); 
-    samples=samples, evals=evals
-)
-RUNTIME["PredictiveController"]["CSTR"]["LinMPC"]["Ipopt"]["SingleShooting"] =
+        samples=samples, evals=evals
+    )
+CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["Ipopt"]["SingleShooting"] =
     @benchmarkable(test_mpc($mpc_ipopt_ss, $model); 
     samples=samples, evals=evals
 )
-RUNTIME["PredictiveController"]["CSTR"]["LinMPC"]["Ipopt"]["MultipleShooting"] =
+CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(test_mpc($mpc_ipopt_ms, $model); 
-    samples=samples, evals=evals
-)
+        samples=samples, evals=evals
+    )
+
+## ----------------- Runtime benchmarks : CSTR with feedforward -------------------------
+model_d = LinModel([G G[1:2, 2]], 2.0; i_d=[3])
+model_d = setop!(model_d; uop, yop, dop=[20])
+function test_mpc_d(mpc_d, plant)
+    plant.x0 .= 0; y = plant(); d = [20]
+    initstate!(mpc_d, plant.uop, y, d)
+    N = 75; ry = [50, 30]; ul = 0
+    U, Y, Ry = zeros(2, N), zeros(2, N), zeros(2, N)
+    for i = 1:N
+        i == 26 && (ry = [48, 35])
+        i == 51 && (ul = -10)
+        y, d = plant(), [20+ul]
+        preparestate!(mpc_d, y, d)
+        u = mpc_d(ry, d)
+        U[:,i], Y[:,i], Ry[:,i] = u, y, ry
+        updatestate!(mpc_d, u, y, d)
+        updatestate!(plant, u+[0,ul])
+    end
+    return U, Y, Ry
+end
+
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+transcription = SingleShooting()
+mpc_d_osqp_ss = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
+JuMP.unset_time_limit_sec(mpc_d_osqp_ss.optim)
+
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+transcription = MultipleShooting()
+mpc_d_osqp_ms = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
+JuMP.unset_time_limit_sec(mpc_d_osqp_ms.optim)
+
+optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
+transcription = SingleShooting()
+mpc_d_daqp_ss = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
+
+optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
+transcription = MultipleShooting()
+mpc_d_daqp_ms = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
+# needed to solve Hessians with eigenvalues at zero, like with MultipleShooting:
+JuMP.set_attribute(mpc_d_daqp_ms.optim, "eps_prox", 1e-6)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = SingleShooting()
+mpc_d_ipopt_ss = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
+JuMP.unset_time_limit_sec(mpc_d_ipopt_ss.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = MultipleShooting()
+mpc_d_ipopt_ms = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
+JuMP.unset_time_limit_sec(mpc_d_ipopt_ms.optim)
+
+samples, evals = 500, 1
+CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["OSQP"]["SingleShooting"] = 
+    @benchmarkable(test_mpc_d($mpc_d_osqp_ss, $model); 
+        samples=samples, evals=evals
+    )
+CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["OSQP"]["MultipleShooting"] =
+    @benchmarkable(test_mpc_d($mpc_d_osqp_ms, $model); 
+        samples=samples, evals=evals
+    )
+CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["DAQP"]["SingleShooting"] =
+    @benchmarkable(test_mpc_d($mpc_d_daqp_ss, $model); 
+        samples=samples, evals=evals
+    )
+CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["DAQP"]["MultipleShooting"] =
+    @benchmarkable(test_mpc_d($mpc_d_daqp_ms, $model); 
+        samples=samples, evals=evals
+    )
+CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["SingleShooting"] =
+    @benchmarkable(test_mpc_d($mpc_d_ipopt_ss, $model); 
+        samples=samples, evals=evals
+    )
+CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["MultipleShooting"] =
+    @benchmarkable(test_mpc_d($mpc_d_ipopt_ms, $model); 
+        samples=samples, evals=evals
+    )
 
 # ----------------- Runtime benchmarks : Pendulum ---------------------------------------
 function f!(ẋ, x, u, _ , p)
@@ -131,35 +225,25 @@ MadNLP_QNopt = MadNLP.QuasiNewtonOptions(; max_history=42)
 JuMP.set_attribute(nmpc_madnlp_ms.optim, "quasi_newton_options", MadNLP_QNopt)
 
 samples, evals, seconds = 50, 1, 15*60
-RUNTIME["PredictiveController"]["Pendulum"]["NonLinMPC"]["Ipopt"]["SingleShooting"] = 
+CASE_MPC["Pendulum"]["NonLinMPC"]["Tracking"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
         sim!($nmpc_ipopt_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
-RUNTIME["PredictiveController"]["Pendulum"]["NonLinMPC"]["Ipopt"]["MultipleShooting"] =
+CASE_MPC["Pendulum"]["NonLinMPC"]["Tracking"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($nmpc_ipopt_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
-RUNTIME["PredictiveController"]["Pendulum"]["NonLinMPC"]["MadNLP"]["SingleShooting"] = 
+CASE_MPC["Pendulum"]["NonLinMPC"]["Tracking"]["MadNLP"]["SingleShooting"] = 
     @benchmarkable(
         sim!($nmpc_madnlp_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
 # TODO: way too slow, samples=1 (just an informative single point), might change this later.
-RUNTIME["PredictiveController"]["Pendulum"]["NonLinMPC"]["MadNLP"]["MultipleShooting"] =
+CASE_MPC["Pendulum"]["NonLinMPC"]["Tracking"]["MadNLP"]["MultipleShooting"] =
     @benchmarkable(
         sim!($nmpc_madnlp_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=1, evals=evals, seconds=seconds 
     )
 
-# ---------------------- Allocation benchmarks ------------------------------------------
-empc = ExplicitMPC(linmodel, Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1])
-
-samples, evals = 1, 1
-ALLOC["PredictiveController"]["ExplicitMPC"]["moveinput!"] = 
-    @benchmarkable(
-        moveinput!($empc, $y, $d),
-        setup=preparestate!($empc, $y, $d),
-        samples=samples, evals=evals
-    )
