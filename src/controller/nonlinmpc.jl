@@ -550,8 +550,8 @@ This method is really intricate and I'm not proud of it. That's because of 3 ele
   and as efficient as possible. All the function outputs and derivatives are cached and
   updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
 - The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
-  of `Vararg{T,N}` (see the (performance tip)[@extref Julia Be-aware-of-when-Julia-avoids-specializing]
-  ) and memoization to avoid redundant computations. This is already complex, but it's even
+  of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
+  and memoization to avoid redundant computations. This is already complex, but it's even
   worse knowing that most automatic differentiation tools do not support splatting.
 - The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
   and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
