@@ -13,7 +13,7 @@ UNIT_MPC["ExplicitMPC"]["moveinput!"] =
 ## ---------------------- Case studies ----------------------------------------------------
 const CASE_MPC = SUITE["case studies"]["PredictiveController"]
 
-## ----------------- Runtime benchmarks : CSTR without feedforward ------------------------
+## ----------------- Case study: CSTR without feedforward ------------------------
 G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
       tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
 uop, yop = [20, 20], [50, 30]
@@ -92,7 +92,7 @@ CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["Ipopt"]["MultipleShooting"] =
         samples=samples, evals=evals
     )
 
-## ----------------- Runtime benchmarks : CSTR with feedforward -------------------------
+## ----------------- Case study: CSTR with feedforward -------------------------
 model_d = LinModel([G G[1:2, 2]], 2.0; i_d=[3])
 model_d = setop!(model_d; uop, yop, dop=[20])
 function test_mpc_d(mpc_d, plant)
@@ -169,7 +169,7 @@ CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["MultipleShooting"] =
         samples=samples, evals=evals
     )
 
-# ----------------- Runtime benchmarks : Pendulum ---------------------------------------
+# ----------------- Case study: Pendulum noneconomic -----------------------------
 function f!(ẋ, x, u, _ , p)
     g, L, K, m = p       # [m/s²], [m], [kg/s], [kg]
     θ, ω = x[1], x[2]    # [rad], [rad/s]
@@ -223,25 +223,122 @@ MadNLP_QNopt = MadNLP.QuasiNewtonOptions(; max_history=42)
 JuMP.set_attribute(nmpc_madnlp_ms.optim, "quasi_newton_options", MadNLP_QNopt)
 
 samples, evals, seconds = 50, 1, 15*60
-CASE_MPC["Pendulum"]["NonLinMPC"]["Tracking"]["Ipopt"]["SingleShooting"] = 
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
         sim!($nmpc_ipopt_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
-CASE_MPC["Pendulum"]["NonLinMPC"]["Tracking"]["Ipopt"]["MultipleShooting"] =
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($nmpc_ipopt_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
-CASE_MPC["Pendulum"]["NonLinMPC"]["Tracking"]["MadNLP"]["SingleShooting"] = 
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting"] = 
     @benchmarkable(
         sim!($nmpc_madnlp_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
 # TODO: way too slow, samples=1 (just an informative single point), might change this later.
-CASE_MPC["Pendulum"]["NonLinMPC"]["Tracking"]["MadNLP"]["MultipleShooting"] =
+# CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["MultipleShooting"] =
+#     @benchmarkable(
+#         sim!($nmpc_madnlp_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+#         samples=1, evals=evals, seconds=seconds 
+#     )
+
+# ----------------- Case study: Pendulum economic --------------------------------
+h2!(y, x, _ , _ ) = (y[1] = 180/π*x[1]; y[2]=x[2])
+nu, nx, ny = 1, 2, 2
+model2 = NonLinModel(f!, h2!, Ts, nu, nx, ny; p)
+plant2 = NonLinModel(f!, h2!, Ts, nu, nx, ny; p=p_plant)
+estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
+function JE(UE, ŶE, _ , p)
+    Ts = p
+    τ, ω = @views UE[1:end-1], ŶE[2:2:end-1]
+    return Ts*dot(τ, ω)
+end
+p = Ts; Mwt2 = [Mwt; 0.0]; Ewt = 3.5e3
+x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180; 0]
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = SingleShooting()
+empc_ipopt_ss = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
+empc_ipopt_ss = setconstraint!(empc_ipopt_ss; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_ss.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = MultipleShooting()
+empc_ipopt_ms = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
+empc_ipopt_ms = setconstraint!(empc_ipopt_ms; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_ms.optim)
+
+optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
+transcription = SingleShooting()
+empc_madnlp_ss = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
+empc_madnlp_ss = setconstraint!(empc_madnlp_ss; umin, umax)
+JuMP.unset_time_limit_sec(empc_madnlp_ss.optim)
+
+# TODO: test EMPC with MadNLP and MultipleShooting, see comment above.
+
+samples, evals, seconds = 50, 1, 15*60
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
-        sim!($nmpc_madnlp_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
-        samples=1, evals=evals, seconds=seconds 
+        sim!($empc_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["MultipleShooting"] =
+    @benchmarkable(
+        sim!($empc_ipopt_ms, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["MadNLP"]["SingleShooting"] = 
+    @benchmarkable(
+        sim!($empc_madnlp_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
     )
 
+# -------------- Case study: Pendulum custom constraints --------------------------
+function gc!(LHS, Ue, Ŷe, _, p, ϵ)
+    Pmax = p
+    i_τ, i_ω = 1, 2
+    for i in eachindex(LHS)
+        τ, ω = Ue[i_τ], Ŷe[i_ω]
+        P = τ*ω
+        LHS[i] = P - Pmax - ϵ
+        i_τ += 1
+        i_ω += 2
+    end
+    return nothing
+end
+Cwt, Pmax, nc = 1e5, 3, Hp+1
+x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180; 0]
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = SingleShooting()
+nmpc2_ipopt_ss = NonLinMPC(estim2; 
+    Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=Pmax, optim, transcription
+)
+nmpc2_ipopt_ss = setconstraint!(nmpc2_ipopt_ss; umin, umax)
+JuMP.unset_time_limit_sec(nmpc2_ipopt_ss.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = MultipleShooting()
+nmpc2_ipopt_ms = NonLinMPC(estim2; 
+    Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=Pmax, optim, transcription
+)
+nmpc2_ipopt_ms = setconstraint!(nmpc2_ipopt_ms; umin, umax)
+JuMP.unset_time_limit_sec(nmpc2_ipopt_ms.optim)
+
+# TODO: test custom constraints with MadNLP and SingleShooting, see comment above.
+# TODO: test custom constraints with MadNLP and MultipleShooting, see comment above.
+
+samples, evals, seconds = 50, 1, 15*60
+CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["SingleShooting"] = 
+    @benchmarkable(
+        sim!($nmpc2_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["MultipleShooting"] =
+    @benchmarkable(
+        sim!($nmpc2_ipopt_ms, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
