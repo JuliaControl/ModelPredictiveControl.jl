@@ -1,4 +1,4 @@
-## ----------------- Unit tests (no allocation) -------------------------------------
+## ----------------- Unit tests  ----------------------------------------------------------
 const UNIT_MODEL = SUITE["unit tests"]["SimModel"]
 
 UNIT_MODEL["LinModel"]["updatestate!"] = 
@@ -22,5 +22,5 @@ UNIT_MODEL["NonLinModel"]["linearize!"] =
         linearize!($linmodel, $nonlinmodel); 
     )
 
-## ----------------- Case studies ---------------------------------------------------
+## ----------------- Case studies ---------------------------------------------------------
 # TODO: Add case study benchmarks for SimModel
