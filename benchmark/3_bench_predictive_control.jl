@@ -84,6 +84,8 @@ G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
       tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
 uop, yop = [20, 20], [50, 30]
 model = setop!(LinModel(G, 2.0); uop, yop)
+plant = setop!(LinModel(G, 2.0); uop, yop)
+plant.A[diagind(plant.A)] .-= 0.1 # plant-model mismatch
 function test_mpc(mpc, plant)
     plant.x0 .= 0; y = plant() 
     initstate!(mpc, plant.uop, y)
@@ -135,23 +137,23 @@ JuMP.unset_time_limit_sec(mpc_ipopt_ms.optim)
 
 samples, evals = 500, 1
 CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["OSQP"]["SingleShooting"] = 
-    @benchmarkable(test_mpc($mpc_osqp_ss, $model); 
+    @benchmarkable(test_mpc($mpc_osqp_ss, $plant); 
         samples=samples, evals=evals
     )
 CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["OSQP"]["MultipleShooting"] = 
-    @benchmarkable(test_mpc($mpc_osqp_ms, $model); 
+    @benchmarkable(test_mpc($mpc_osqp_ms, $plant); 
         samples=samples, evals=evals
     )
 CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["DAQP"]["SingleShooting"] =
-    @benchmarkable(test_mpc($mpc_daqp_ss, $model); 
+    @benchmarkable(test_mpc($mpc_daqp_ss, $plant); 
         samples=samples, evals=evals
     )
 CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["Ipopt"]["SingleShooting"] =
-    @benchmarkable(test_mpc($mpc_ipopt_ss, $model); 
+    @benchmarkable(test_mpc($mpc_ipopt_ss, $plant); 
     samples=samples, evals=evals
 )
 CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["Ipopt"]["MultipleShooting"] =
-    @benchmarkable(test_mpc($mpc_ipopt_ms, $model); 
+    @benchmarkable(test_mpc($mpc_ipopt_ms, $plant); 
         samples=samples, evals=evals
     )
 
@@ -209,23 +211,23 @@ JuMP.unset_time_limit_sec(mpc_d_ipopt_ms.optim)
 
 samples, evals = 500, 1
 CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["OSQP"]["SingleShooting"] = 
-    @benchmarkable(test_mpc_d($mpc_d_osqp_ss, $model); 
+    @benchmarkable(test_mpc_d($mpc_d_osqp_ss, $plant); 
         samples=samples, evals=evals
     )
 CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["OSQP"]["MultipleShooting"] =
-    @benchmarkable(test_mpc_d($mpc_d_osqp_ms, $model); 
+    @benchmarkable(test_mpc_d($mpc_d_osqp_ms, $plant); 
         samples=samples, evals=evals
     )
 CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["DAQP"]["SingleShooting"] =
-    @benchmarkable(test_mpc_d($mpc_d_daqp_ss, $model); 
+    @benchmarkable(test_mpc_d($mpc_d_daqp_ss, $plant); 
         samples=samples, evals=evals
     )
 CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["SingleShooting"] =
-    @benchmarkable(test_mpc_d($mpc_d_ipopt_ss, $model); 
+    @benchmarkable(test_mpc_d($mpc_d_ipopt_ss, $plant); 
         samples=samples, evals=evals
     )
 CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["MultipleShooting"] =
-    @benchmarkable(test_mpc_d($mpc_d_ipopt_ms, $model); 
+    @benchmarkable(test_mpc_d($mpc_d_ipopt_ms, $plant); 
         samples=samples, evals=evals
     )
 
