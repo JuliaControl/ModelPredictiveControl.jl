@@ -7,6 +7,7 @@ const SUITE = BenchmarkGroup(["ModelPredictiveControl"])
 SUITE["unit tests"]   = BenchmarkGroup(["allocation-free", "allocations", "single call"])
 SUITE["case studies"] = BenchmarkGroup(["performance", "speed" ,"integration"])
 
+
 include("0_bench_setup.jl")
 include("1_bench_sim_model.jl")
 include("2_bench_state_estim.jl")
