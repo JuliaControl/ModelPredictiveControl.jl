@@ -117,11 +117,18 @@ nmpc_madnlp_ss = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 nmpc_madnlp_ss = setconstraint!(nmpc_madnlp_ss; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_madnlp_ss.optim) 
 
-optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
+optim = JuMP.Model(MadNLP.Optimizer)
 transcription = MultipleShooting()
 nmpc_madnlp_ms = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 nmpc_madnlp_ms = setconstraint!(nmpc_madnlp_ms; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_madnlp_ms.optim)
+# TODO: does not work well with MadNLP and MultipleShooting, figure out why. 
+# Current theory: MadNLP LBFGS approximation is less robust than Ipopt version.
+# Re-test when exact Hessians will be supported in ModelPredictiveControl.jl.
+# The following attributes kinda work with the MadNLP LBFGS approximation but super slow:
+JuMP.set_attribute(nmpc_madnlp_ms.optim, "hessian_approximation", MadNLP.CompactLBFGS)
+MadNLP_QNopt = MadNLP.QuasiNewtonOptions(; max_history=42)
+JuMP.set_attribute(nmpc_madnlp_ms.optim, "quasi_newton_options", MadNLP_QNopt)
 
 samples, evals, seconds = 50, 1, 15*60
 RUNTIME["PredictiveController"]["Pendulum"]["NonLinMPC"]["Ipopt"]["SingleShooting"] = 
@@ -139,12 +146,12 @@ RUNTIME["PredictiveController"]["Pendulum"]["NonLinMPC"]["MadNLP"]["SingleShooti
         sim!($nmpc_madnlp_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
-# TODO: does not work with MadNLP and MultipleShooting, figure out why
-# RUNTIME["PredictiveController"]["Pendulum"]["NonLinMPC"]["MadNLP"]["MultipleShooting"] =
-#     @benchmarkable(
-#         sim!($nmpc_madnlp_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
-#         samples=samples, evals=evals, seconds=seconds
-#     )
+# TODO: way too slow, samples=1 (just an informative single point), might change this later.
+RUNTIME["PredictiveController"]["Pendulum"]["NonLinMPC"]["MadNLP"]["MultipleShooting"] =
+    @benchmarkable(
+        sim!($nmpc_madnlp_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=1, evals=evals, seconds=seconds 
+    )
 
 # ---------------------- Allocation benchmarks ------------------------------------------
 empc = ExplicitMPC(linmodel, Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1])
