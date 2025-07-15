@@ -3,12 +3,10 @@ const UNIT_MPC = SUITE["unit tests"]["PredictiveController"]
 
 empc = ExplicitMPC(linmodel, Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1])
 
-samples, evals = 10000, 1
 UNIT_MPC["ExplicitMPC"]["moveinput!"] = 
     @benchmarkable(
         moveinput!($empc, $y, $d),
         setup=preparestate!($empc, $y, $d),
-        samples=samples, evals=evals
     )
 
 
