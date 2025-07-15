@@ -231,6 +231,7 @@ CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["MultipleShooting"] =
         samples=samples, evals=evals
     )
 
+
 # ----------------- Case study: Pendulum noneconomic -----------------------------
 function f!(ẋ, x, u, _ , p)
     g, L, K, m = p       # [m/s²], [m], [kg/s], [kg]

@@ -23,4 +23,5 @@ UNIT_MODEL["NonLinModel"]["linearize!"] =
     )
 
 ## ----------------- Case studies ---------------------------------------------------------
+const CASE_MODEL = SUITE["case studies"]["SimModel"]
 # TODO: Add case study benchmarks for SimModel

@@ -142,13 +142,144 @@ UNIT_ESTIM["ExtendedKalmanFilter"]["evaloutput"]["NonLinModel"] =
         setup=preparestate!($ekf_nonlin, $y, $d),
     )
 
-mhe_lin_direct = MovingHorizonEstimator(linmodel, He=10, direct=true)
-mhe_lin_nondirect = MovingHorizonEstimator(linmodel, He=10, direct=false)
-mhe_nonlin_direct = MovingHorizonEstimator(nonlinmodel, He=10, direct=true)
-mhe_nonlin_nondirect = MovingHorizonEstimator(nonlinmodel, He=10, direct=false)
+mhe_lin_curr    = MovingHorizonEstimator(linmodel, He=10, direct=true)
+mhe_lin_pred    = MovingHorizonEstimator(linmodel, He=10, direct=false)
+mhe_nonlin_curr = MovingHorizonEstimator(nonlinmodel, He=10, direct=true)
+mhe_nonlin_pred = MovingHorizonEstimator(nonlinmodel, He=10, direct=false)
 
+samples, evals, seconds = 5000, 1, 60
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Current form"] =
+    @benchmarkable(
+        preparestate!($mhe_lin_curr, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Current form"] = 
+    @benchmarkable(
+        updatestate!($mhe_lin_curr, $u, $y, $d),
+        setup=preparestate!($mhe_lin_curr, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Prediction form"] =
+    @benchmarkable(
+        preparestate!($mhe_lin_pred, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Prediction form"] =
+    @benchmarkable(
+        updatestate!($mhe_lin_pred, $u, $y, $d),
+        setup=preparestate!($mhe_lin_pred, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["NonLinModel"]["Current form"] =
+    @benchmarkable(
+        preparestate!($mhe_nonlin_curr, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["NonLinModel"]["Current form"] = 
+    @benchmarkable(
+        updatestate!($mhe_nonlin_curr, $u, $y, $d),
+        setup=preparestate!($mhe_nonlin_curr, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["NonLinModel"]["Prediction form"] =
+    @benchmarkable(
+        preparestate!($mhe_nonlin_pred, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["NonLinModel"]["Prediction form"] =
+    @benchmarkable(
+        updatestate!($mhe_nonlin_pred, $u, $y, $d),
+        setup=preparestate!($mhe_nonlin_pred, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    ) 
 
 ## ----------------- Case studies ---------------------------------------------------
-# TODO: Add case study benchmarks for StateEstimator
+const CASE_ESTIM = SUITE["case studies"]["StateEstimator"]
 
+## ----------------- Case study: CSTR -----------------------------------------------------
+G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
+      tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
+uop, yop = [20, 20], [50, 30]
+model = setop!(LinModel(G, 2.0); uop, yop)
+plant = setop!(LinModel(G, 2.0); uop, yop)
+plant.A[diagind(plant.A)] .-= 0.1 # plant-model mismatch
+function test_mhe(mhe, plant)
+    plant.x0 .= 0; y = plant() 
+    initstate!(mhe, plant.uop, y)
+    N = 75; u = [20, 20]; ul = 0
+    U, Y, Ŷ = zeros(2, N), zeros(2, N), zeros(2, N)
+    for i = 1:N
+        i == 26 && (u = [15, 25])
+        i == 51 && (ul = -10)
+        y = plant() 
+        preparestate!(mhe, y) 
+        ŷ = evaloutput(mhe)
+        U[:,i], Y[:,i], Ŷ[:,i] = u, y, ŷ
+        updatestate!(mhe, u, y) 
+        updatestate!(plant, u+[0,ul])
+    end
+    return U, Y, Ŷ
+end
+He = 10; nint_u = [1, 1]; σQint_u = [1, 2]
 
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+direct = true
+mhe_cstr_osqp_curr = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
+mhe_cstr_osqp_curr = setconstraint!(mhe_cstr_osqp_curr, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+JuMP.unset_time_limit_sec(mhe_cstr_osqp_curr.optim)
+
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+direct = false
+mhe_cstr_osqp_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
+mhe_cstr_osqp_pred = setconstraint!(mhe_cstr_osqp_pred, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+JuMP.unset_time_limit_sec(mhe_cstr_osqp_pred.optim)
+
+optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
+direct = true
+mhe_cstr_daqp_curr = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
+mhe_cstr_daqp_curr = setconstraint!(mhe_cstr_daqp_curr, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+JuMP.set_attribute(mhe_cstr_daqp_curr.optim, "eps_prox", 1e-6) # needed to support hessians H≥0
+
+optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
+direct = false
+mhe_cstr_daqp_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
+mhe_cstr_daqp_pred = setconstraint!(mhe_cstr_daqp_pred, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+JuMP.set_attribute(mhe_cstr_daqp_pred.optim, "eps_prox", 1e-6) # needed to support hessians H≥0
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+direct = true
+mhe_cstr_ipopt_curr = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
+mhe_cstr_ipopt_curr = setconstraint!(mhe_cstr_ipopt_curr, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+JuMP.unset_time_limit_sec(mhe_cstr_ipopt_curr.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+direct = false
+mhe_cstr_ipopt_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
+mhe_cstr_ipopt_pred = setconstraint!(mhe_cstr_ipopt_pred, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+JuMP.unset_time_limit_sec(mhe_cstr_ipopt_pred.optim)
+
+samples, evals = 500, 1
+CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Current form"] =
+    @benchmarkable(test_mhe($mhe_cstr_osqp_curr, $plant); 
+        samples=samples, evals=evals
+    )
+CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Prediction form"] =
+    @benchmarkable(test_mhe($mhe_cstr_osqp_pred, $plant);
+        samples=samples, evals=evals
+    )
+CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["DAQP"]["Current form"] =
+    @benchmarkable(test_mhe($mhe_cstr_daqp_curr, $plant); 
+        samples=samples, evals=evals
+    )
+CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["DAQP"]["Prediction form"] =
+    @benchmarkable(test_mhe($mhe_cstr_daqp_pred, $plant);
+        samples=samples, evals=evals
+    )
+CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
+    @benchmarkable(test_mhe($mhe_cstr_ipopt_curr, $plant); 
+        samples=samples, evals=evals
+    )
+CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["Ipopt"]["Prediction form"] =
+    @benchmarkable(test_mhe($mhe_cstr_ipopt_pred, $plant);
+        samples=samples, evals=evals
+    )
