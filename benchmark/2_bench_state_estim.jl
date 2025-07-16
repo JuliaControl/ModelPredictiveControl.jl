@@ -1,5 +1,7 @@
-## ----------------- Unit tests -----------------------------------------------------------
-const UNIT_ESTIM = SUITE["unit tests"]["StateEstimator"]
+## ----------------------------------------------------------------------------------------
+## ----------------- UNIT TESTS -----------------------------------------------------------
+## ----------------------------------------------------------------------------------------
+const UNIT_ESTIM = SUITE["UNIT TESTS"]["StateEstimator"]
 
 skf = SteadyKalmanFilter(linmodel)
 UNIT_ESTIM["SteadyKalmanFilter"]["preparestate!"] = 
@@ -193,18 +195,17 @@ UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["NonLinModel"]["Prediction 
         samples=samples, evals=evals, seconds=seconds,
     ) 
 
-## ----------------- Case studies ---------------------------------------------------
-const CASE_ESTIM = SUITE["case studies"]["StateEstimator"]
+## ----------------------------------------------------------------------------------------
+## ----------------- CASE STUDIES ---------------------------------------------------------
+## ----------------------------------------------------------------------------------------
+const CASE_ESTIM = SUITE["CASE STUDIES"]["StateEstimator"]
 
 ## ----------------- Case study: CSTR -----------------------------------------------------
-G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
-      tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
-uop, yop = [20, 20], [50, 30]
-model = setop!(LinModel(G, 2.0); uop, yop)
-plant = setop!(LinModel(G, 2.0); uop, yop)
+model = CSTR_model
+plant = deepcopy(model)
 plant.A[diagind(plant.A)] .-= 0.1 # plant-model mismatch
 function test_mhe(mhe, plant)
-    plant.x0 .= 0; y = plant() 
+    plant.x0 .= 0.1; y = plant() 
     initstate!(mhe, plant.uop, y)
     N = 75; u = [20, 20]; ul = 0
     U, Y, Ŷ = zeros(2, N), zeros(2, N), zeros(2, N)
@@ -220,45 +221,46 @@ function test_mhe(mhe, plant)
     end
     return U, Y, Ŷ
 end
-He = 10; nint_u = [1, 1]; σQint_u = [1, 2]
+He = 4; nint_u = [1, 1]; σQint_u = [1, 2]
+v̂min, v̂max = [-1, -0.5], [+1, +0.5]
 
 optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
 direct = true
 mhe_cstr_osqp_curr = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
-mhe_cstr_osqp_curr = setconstraint!(mhe_cstr_osqp_curr, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+mhe_cstr_osqp_curr = setconstraint!(mhe_cstr_osqp_curr; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_cstr_osqp_curr.optim)
 
 optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
 direct = false
 mhe_cstr_osqp_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
-mhe_cstr_osqp_pred = setconstraint!(mhe_cstr_osqp_pred, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+mhe_cstr_osqp_pred = setconstraint!(mhe_cstr_osqp_pred; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_cstr_osqp_pred.optim)
 
 optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
 direct = true
 mhe_cstr_daqp_curr = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
-mhe_cstr_daqp_curr = setconstraint!(mhe_cstr_daqp_curr, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+mhe_cstr_daqp_curr = setconstraint!(mhe_cstr_daqp_curr; v̂min, v̂max)
 JuMP.set_attribute(mhe_cstr_daqp_curr.optim, "eps_prox", 1e-6) # needed to support hessians H≥0
 
 optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
 direct = false
 mhe_cstr_daqp_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
-mhe_cstr_daqp_pred = setconstraint!(mhe_cstr_daqp_pred, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+mhe_cstr_daqp_pred = setconstraint!(mhe_cstr_daqp_pred; v̂min, v̂max)
 JuMP.set_attribute(mhe_cstr_daqp_pred.optim, "eps_prox", 1e-6) # needed to support hessians H≥0
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 direct = true
 mhe_cstr_ipopt_curr = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
-mhe_cstr_ipopt_curr = setconstraint!(mhe_cstr_ipopt_curr, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+mhe_cstr_ipopt_curr = setconstraint!(mhe_cstr_ipopt_curr; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_cstr_ipopt_curr.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 direct = false
 mhe_cstr_ipopt_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
-mhe_cstr_ipopt_pred = setconstraint!(mhe_cstr_ipopt_pred, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
+mhe_cstr_ipopt_pred = setconstraint!(mhe_cstr_ipopt_pred; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_cstr_ipopt_pred.optim)
 
-samples, evals = 500, 1
+samples, evals = 5000, 1
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Current form"] =
     @benchmarkable(test_mhe($mhe_cstr_osqp_curr, $plant); 
         samples=samples, evals=evals
@@ -282,4 +284,68 @@ CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["Ipopt"]["Prediction form"] =
     @benchmarkable(test_mhe($mhe_cstr_ipopt_pred, $plant);
         samples=samples, evals=evals
+    )
+
+## ---------------------- Case study: pendulum -------------------------------------------
+model, p = pendulum_model, pendulum_p
+plant = deepcopy(model)
+plant.p[3] = 1.25*p[3]  # plant-model mismatch
+σQ = [0.1, 1.0]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
+He = 3; v̂min, v̂max = [-5.0], [+5.0]
+N = 35; 
+
+x_0 = [0.1, 0.1]; x̂_0 = [0, 0, 0]; u = [0.5]
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+direct = true
+mhe_pendulum_ipopt_curr = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct
+)
+mhe_pendulum_ipopt_curr = setconstraint!(mhe_pendulum_ipopt_curr; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_curr.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+direct = false
+mhe_pendulum_ipopt_pred = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct
+)
+mhe_pendulum_ipopt_pred = setconstraint!(mhe_pendulum_ipopt_pred; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_pred.optim)
+
+optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
+direct = true
+mhe_pendulum_madnlp_curr = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct
+)
+mhe_pendulum_madnlp_curr = setconstraint!(mhe_pendulum_madnlp_curr; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_madnlp_curr.optim)
+
+optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
+direct = false
+mhe_pendulum_madnlp_pred = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct
+)
+mhe_pendulum_madnlp_pred = setconstraint!(mhe_pendulum_madnlp_pred; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_madnlp_pred.optim)
+
+samples, evals, seconds = 10, 1, 15*60
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
+    @benchmarkable(
+        sim!($mhe_pendulum_ipopt_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Prediction form"] =
+    @benchmarkable(
+        sim!($mhe_pendulum_ipopt_pred, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["MadNLP"]["Current form"] =
+    @benchmarkable(
+        sim!($mhe_pendulum_madnlp_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["MadNLP"]["Prediction form"] =
+    @benchmarkable(
+        sim!($mhe_pendulum_madnlp_pred, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
     )
