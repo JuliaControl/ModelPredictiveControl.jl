@@ -328,7 +328,7 @@ mhe_pendulum_madnlp_pred = MovingHorizonEstimator(
 mhe_pendulum_madnlp_pred = setconstraint!(mhe_pendulum_madnlp_pred; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_pendulum_madnlp_pred.optim)
 
-samples, evals, seconds = 100, 1, 15*60
+samples, evals, seconds = 50, 1, 15*60
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
     @benchmarkable(
         sim!($mhe_pendulum_ipopt_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
