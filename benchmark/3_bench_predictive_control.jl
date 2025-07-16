@@ -1,5 +1,7 @@
-# ---------------------- Unit tests -------------------------------------------------------
-const UNIT_MPC = SUITE["unit tests"]["PredictiveController"]
+# -----------------------------------------------------------------------------------------
+# ---------------------- UNIT TESTS -------------------------------------------------------
+# -----------------------------------------------------------------------------------------
+const UNIT_MPC = SUITE["UNIT TESTS"]["PredictiveController"]
 
 linmpc_ss = LinMPC(
     linmodel, transcription=SingleShooting(), 
@@ -10,7 +12,7 @@ linmpc_ms = LinMPC(
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10
 )
 
-samples, evals, seconds = 500, 1, 60
+samples, evals, seconds = 5000, 1, 60
 UNIT_MPC["LinMPC"]["moveinput!"]["SingleShooting"] = 
     @benchmarkable(
         moveinput!($linmpc_ss, $y, $d),
@@ -49,7 +51,7 @@ nmpc_nonlin_ms = NonLinMPC(
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10    
 )
 
-samples, evals, seconds = 500, 1, 60
+samples, evals, seconds = 5000, 1, 60
 UNIT_MPC["NonLinMPC"]["moveinput!"]["LinModel"]["SingleShooting"] =
     @benchmarkable(
         moveinput!($nmpc_lin_ss, $y, $d),
@@ -75,9 +77,10 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["MultipleShooting"] =
         samples=samples, evals=evals, seconds=seconds
     )
 
-
-## ---------------------- Case studies ----------------------------------------------------
-const CASE_MPC = SUITE["case studies"]["PredictiveController"]
+## ----------------------------------------------------------------------------------------
+## ---------------------- CASE STUDIES ----------------------------------------------------
+## ----------------------------------------------------------------------------------------
+const CASE_MPC = SUITE["CASE STUDIES"]["PredictiveController"]
 
 ## ----------------- Case study: CSTR without feedforward ------------------------
 G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
@@ -135,7 +138,7 @@ transcription = MultipleShooting()
 mpc_ipopt_ms = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_ipopt_ms.optim) 
 
-samples, evals = 500, 1
+samples, evals = 5000, 1
 CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["OSQP"]["SingleShooting"] = 
     @benchmarkable(test_mpc($mpc_osqp_ss, $plant); 
         samples=samples, evals=evals
@@ -209,7 +212,7 @@ transcription = MultipleShooting()
 mpc_d_ipopt_ms = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_d_ipopt_ms.optim)
 
-samples, evals = 500, 1
+samples, evals = 5000, 1
 CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["OSQP"]["SingleShooting"] = 
     @benchmarkable(test_mpc_d($mpc_d_osqp_ss, $plant); 
         samples=samples, evals=evals
@@ -285,7 +288,7 @@ JuMP.unset_time_limit_sec(nmpc_madnlp_ss.optim)
 # MadNLP_QNopt = MadNLP.QuasiNewtonOptions(; max_history=42)
 # JuMP.set_attribute(nmpc_madnlp_ms.optim, "quasi_newton_options", MadNLP_QNopt)
 
-samples, evals, seconds = 50, 1, 15*60
+samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
         sim!($nmpc_ipopt_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
@@ -336,7 +339,7 @@ JuMP.unset_time_limit_sec(empc_madnlp_ss.optim)
 
 # TODO: test EMPC with MadNLP and MultipleShooting, see comment above.
 
-samples, evals, seconds = 50, 1, 15*60
+samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
         sim!($empc_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
@@ -388,7 +391,7 @@ JuMP.unset_time_limit_sec(nmpc2_ipopt_ms.optim)
 # TODO: test custom constraints with MadNLP and SingleShooting, see comment above.
 # TODO: test custom constraints with MadNLP and MultipleShooting, see comment above.
 
-samples, evals, seconds = 50, 1, 15*60
+samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
         sim!($nmpc2_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
@@ -458,7 +461,7 @@ mpc3_ipopt_ms = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 mpc3_ipopt_ms = setconstraint!(mpc3_ipopt_ms; umin, umax)
 JuMP.unset_time_limit_sec(mpc3_ipopt_ms.optim)
 
-samples, evals = 500, 1
+samples, evals = 5000, 1
 CASE_MPC["Pendulum"]["LinMPC"]["Successive linearization"]["OSQP"]["SingleShooting"] = 
     @benchmarkable(
         sim2!($mpc3_osqp_ss, $model, $N, $ry, $plant, $x_0, $x̂_0, $y_step),

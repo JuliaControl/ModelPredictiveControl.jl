@@ -1,5 +1,7 @@
-## ----------------- Unit tests -----------------------------------------------------------
-const UNIT_ESTIM = SUITE["unit tests"]["StateEstimator"]
+## ----------------------------------------------------------------------------------------
+## ----------------- UNIT TESTS -----------------------------------------------------------
+## ----------------------------------------------------------------------------------------
+const UNIT_ESTIM = SUITE["UNIT TESTS"]["StateEstimator"]
 
 skf = SteadyKalmanFilter(linmodel)
 UNIT_ESTIM["SteadyKalmanFilter"]["preparestate!"] = 
@@ -193,8 +195,10 @@ UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["NonLinModel"]["Prediction 
         samples=samples, evals=evals, seconds=seconds,
     ) 
 
-## ----------------- Case studies ---------------------------------------------------
-const CASE_ESTIM = SUITE["case studies"]["StateEstimator"]
+## ----------------------------------------------------------------------------------------
+## ----------------- CASE STUDIES ---------------------------------------------------------
+## ----------------------------------------------------------------------------------------
+const CASE_ESTIM = SUITE["CASE STUDIES"]["StateEstimator"]
 
 ## ----------------- Case study: CSTR -----------------------------------------------------
 G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
@@ -258,7 +262,7 @@ mhe_cstr_ipopt_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim,
 mhe_cstr_ipopt_pred = setconstraint!(mhe_cstr_ipopt_pred, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
 JuMP.unset_time_limit_sec(mhe_cstr_ipopt_pred.optim)
 
-samples, evals = 500, 1
+samples, evals = 5000, 1
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Current form"] =
     @benchmarkable(test_mhe($mhe_cstr_osqp_curr, $plant); 
         samples=samples, evals=evals
