@@ -79,11 +79,18 @@ exmpc.estim()
 u = exmpc([55, 30])
 sim!(exmpc, 2, [55, 30])
 
-f(x,u,_,model) = model.A*x + model.Bu*u
-h(x,_,model) = model.C*x
+function f!(xnext, x, u, _, model)
+    mul!(xnext, model.A , x)
+    mul!(xnext, model.Bu, u, 1, 1)
+    return nothing
+end
+function h!(y, x, _, model)
+    mul!(y, model.C, x)
+    return nothing
+end
 
 nlmodel = setop!(
-    NonLinModel(f, h, Ts, 2, 2, 2, solver=nothing, p=model), 
+    NonLinModel(f!, h!, Ts, 2, 2, 2, solver=nothing, p=model), 
     uop=[10, 10], yop=[50, 30]
 )
 y = nlmodel()
@@ -118,7 +125,7 @@ u = nmpc_mhe([55, 30])
 sim!(nmpc_mhe, 2, [55, 30])
 
 function JE( _ , Ŷe, _ , R̂y)
-    Ŷ = Ŷe[3:end]
+    Ŷ = @views Ŷe[3:end]
     Ȳ = R̂y - Ŷ
     return dot(Ȳ, Ȳ)
 end
