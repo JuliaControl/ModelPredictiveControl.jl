@@ -205,7 +205,7 @@ model = CSTR_model
 plant = deepcopy(model)
 plant.A[diagind(plant.A)] .-= 0.1 # plant-model mismatch
 function test_mhe(mhe, plant)
-    plant.x0 .= 0; y = plant() 
+    plant.x0 .= 0.1; y = plant() 
     initstate!(mhe, plant.uop, y)
     N = 75; u = [20, 20]; ul = 0
     U, Y, Ŷ = zeros(2, N), zeros(2, N), zeros(2, N)
@@ -221,7 +221,7 @@ function test_mhe(mhe, plant)
     end
     return U, Y, Ŷ
 end
-He = 10; nint_u = [1, 1]; σQint_u = [1, 2]
+He = 4; nint_u = [1, 1]; σQint_u = [1, 2]
 v̂min, v̂max = [-1, -0.5], [+1, +0.5]
 
 optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
