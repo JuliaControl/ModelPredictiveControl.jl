@@ -1035,6 +1035,16 @@ end
     info = getinfo(mhe5)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+
+    # coverage of the branch with error termination status (with an infeasible problem):
+    mhe_infeas = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
+    mhe_infeas = setconstraint!(mhe_infeas, v̂min=[1, 1], v̂max=[-1, -1]) 
+    @test_logs(
+        (:error, "MHE terminated without solution: estimation in open-loop "*
+                 "(more info in debug log)"), 
+        preparestate!(mhe_infeas, [0, 0], [0])
+    )
+
     # for coverage of NLP functions, the univariate syntax of JuMP.@operator
     mhe6 = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
     setconstraint!(mhe6, v̂min=[-51,-52], v̂max=[53,54])

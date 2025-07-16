@@ -472,6 +472,7 @@ function set_warmstart_mhe!(V̂, X̂0, estim::MovingHorizonEstimator{NT}, Z̃var
     # will be inevitably different at the following time step.
     Z̃s[nx̃+Nk*nŵ+1:end] .= 1
     JuMP.set_start_value.(Z̃var, Z̃s)
+    return Z̃s
 end
 
 "Correct the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
