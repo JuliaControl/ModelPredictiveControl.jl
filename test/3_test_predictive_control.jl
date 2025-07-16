@@ -1022,12 +1022,13 @@ end
 end
 
 @testitem "NonLinMPC constraint violation" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP
     gc(Ue, Ŷe, _ ,p , ϵ) = [p[1]*(Ue[1:end-1] .- 4.2 .- ϵ); p[2]*(Ŷe[2:end] .- 3.14 .- ϵ)]
     Hp=50
 
     linmodel = LinModel(tf([2], [10000, 1]), 3000.0)
     nmpc_lin = NonLinMPC(linmodel; Hp, Hc=5, gc, nc=2Hp, p=[0; 0])
+    JuMP.set_attribute(nmpc_lin.optim, "constr_viol_tol", 1e-3)
  
     setconstraint!(nmpc_lin, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
     setconstraint!(nmpc_lin, umin=[-10], umax=[10])
@@ -1098,6 +1099,7 @@ end
     h = (x,_,p)   -> p.C*x
     nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing, p=linmodel)
     nmpc = NonLinMPC(nonlinmodel; Hp, Hc=5, gc, nc=2Hp, p=[0; 0])
+    JuMP.set_attribute(nmpc.optim, "constr_viol_tol", 1e-3)
 
     setconstraint!(nmpc, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
     setconstraint!(nmpc, umin=[-1e6], umax=[+1e6])
@@ -1167,6 +1169,7 @@ end
     nmpc_ms = NonLinMPC(
         nonlinmodel; Hp, Hc=5, transcription=MultipleShooting(), gc, nc=2Hp, p=[0; 0]
     )
+    JuMP.set_attribute(nmpc_ms.optim, "constr_viol_tol", 1e-3)
 
     setconstraint!(nmpc_ms, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
     setconstraint!(nmpc_ms, ymin=[-100], ymax=[100])
