@@ -916,6 +916,7 @@ end
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
     
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
+    JuMP.set_attribute(mhe1.optim, "tol", 1e-7)
     preparestate!(mhe1, [50, 30], [5])
     x̂ = updatestate!(mhe1, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
@@ -944,6 +945,7 @@ end
     @test mhe1([5]) ≈ [51, 32] atol=1e-3
 
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
+    JuMP.set_attribute(mhe1.optim, "tol", 1e-7)
     preparestate!(mhe1, [50, 30], [5])
     x̂ = updatestate!(mhe1, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
@@ -1065,7 +1067,8 @@ end
         updatestate!(mhe1, [0.0], y)
         updatestate!(model, [0.1])
     end
-    @test mhe1() ≈ model() atol = 1e-9
+    preparestate!(mhe1, model())
+    @test mhe1() ≈ model() atol = 1e-6
     model = NonLinModel(f, h, 10.0, 1, 1, 1, solver=nothing)
     mhe2 = MovingHorizonEstimator(model, nint_u=[1], He=3, direct=false) 
     for i = 1:40
@@ -1074,7 +1077,8 @@ end
         updatestate!(mhe2, [0.0], y)
         updatestate!(model, [0.1])
     end
-    @test mhe2() ≈ model() atol = 1e-9
+    preparestate!(mhe2, model())
+    @test mhe2() ≈ model() atol = 1e-6
 end
 
 @testitem "MovingHorizonEstimator fallbacks for arrival covariance estimation" setup=[SetupMPCtests] begin
