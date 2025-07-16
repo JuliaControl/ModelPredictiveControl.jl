@@ -82,12 +82,9 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["MultipleShooting"] =
 ## ----------------------------------------------------------------------------------------
 const CASE_MPC = SUITE["CASE STUDIES"]["PredictiveController"]
 
-## ----------------- Case study: CSTR without feedforward ------------------------
-G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
-      tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
-uop, yop = [20, 20], [50, 30]
-model = setop!(LinModel(G, 2.0); uop, yop)
-plant = setop!(LinModel(G, 2.0); uop, yop)
+## ----------------- Case study: CSTR without feedforward ---------------------------------
+model = CSTR_model
+plant = deepcopy(model)
 plant.A[diagind(plant.A)] .-= 0.1 # plant-model mismatch
 function test_mpc(mpc, plant)
     plant.x0 .= 0; y = plant() 
@@ -161,8 +158,7 @@ CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["Ipopt"]["MultipleShooting"] =
     )
 
 ## ----------------- Case study: CSTR with feedforward -------------------------
-model_d = LinModel([G G[1:2, 2]], 2.0; i_d=[3])
-model_d = setop!(model_d; uop, yop, dop=[20])
+model_d = CSTR_model_d
 function test_mpc_d(mpc_d, plant)
     plant.x0 .= 0; y = plant(); d = [20]
     initstate!(mpc_d, plant.uop, y, d)
@@ -236,21 +232,11 @@ CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["MultipleShooting"] =
 
 
 # ----------------- Case study: Pendulum noneconomic -----------------------------
-function f!(ẋ, x, u, _ , p)
-    g, L, K, m = p       # [m/s²], [m], [kg/s], [kg]
-    θ, ω = x[1], x[2]    # [rad], [rad/s]
-    τ = u[1]             # [Nm]
-    ẋ[1] = ω
-    ẋ[2] = -g/L*sin(θ) - K/m*ω + τ/m/L^2
-end
-h!(y, x, _ , _ ) = (y[1] = 180/π*x[1])   # [°]
-p = [9.8, 0.4, 1.2, 0.3]
-nu = 1; nx = 2; ny = 1; Ts = 0.1
-model = NonLinModel(f!, h!, Ts, nu, nx, ny; p)
+model, p = pendulum_model, pendulum_p
 σQ = [0.1, 1.0]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
 estim = UnscentedKalmanFilter(model; σQ, σR, nint_u, σQint_u)
-p_plant = copy(p); p_plant[3] = 1.25*p[3]
-plant = NonLinModel(f!, h!, Ts, nu, nx, ny; p=p_plant)
+plant = deepcopy(model)
+plant.p[3] = 1.25*p[3]  # plant-model mismatch
 N = 35; u = [0.5]; 
 
 Hp, Hc, Mwt, Nwt, Cwt = 20, 2, [0.5], [2.5], Inf
@@ -306,10 +292,9 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting"] =
     )
 
 # ----------------- Case study: Pendulum economic --------------------------------
-h2!(y, x, _ , _ ) = (y[1] = 180/π*x[1]; y[2]=x[2])
-nu, nx, ny = 1, 2, 2
-model2 = NonLinModel(f!, h2!, Ts, nu, nx, ny; p)
-plant2 = NonLinModel(f!, h2!, Ts, nu, nx, ny; p=p_plant)
+model2, p = pendulum_model2, pendulum_p2
+plant2 = deepcopy(model2)
+plant2.p[3] = 1.25*p[3]  # plant-model mismatch
 estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
 function JE(UE, ŶE, _ , p)
     Ts = p
