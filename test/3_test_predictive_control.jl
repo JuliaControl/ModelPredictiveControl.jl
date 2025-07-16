@@ -19,7 +19,7 @@
     @test mpc6.weights.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
     @test mpc6.weights.L_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
     mpc7 = @test_logs(
-        (:warn, "Solving time limit is not supported by the optimizer."), 
+        (:warn, "Solving time limit is not supported by the DAQP optimizer."), 
         LinMPC(model, optim=JuMP.Model(DAQP.Optimizer))
     )
     @test solver_name(mpc7.optim) == "DAQP"
