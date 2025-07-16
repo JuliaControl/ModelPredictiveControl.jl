@@ -121,6 +121,16 @@ end
     ΔU_diff = diff(getinfo(mpc7)[:U])
     @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
 
+    # coverage of the branch with error termination status (with an infeasible problem):
+    mpc_infeas = LinMPC(linmodel2, Hp=1, Hc=1, Cwt=Inf)
+    mpc_infeas = setconstraint!(mpc_infeas, umin=[+1], umax=[-1])
+    preparestate!(mpc_infeas, [0], [0])
+    @test_logs(
+        (:error, "MPC terminated without solution: returning last solution shifted "*
+                 "(more info in debug log)"), 
+        moveinput!(mpc_infeas, [0], [0])
+    )
+
     @test_throws DimensionMismatch moveinput!(mpc1, [0,0,0])
     @test_throws DimensionMismatch moveinput!(mpc1, [0], [0,0])
     @test_throws DimensionMismatch moveinput!(mpc1; D̂  = fill(0, mpc1.Hp+1))
@@ -822,6 +832,17 @@ end
     moveinput!(nmpc11, [10], [0])
     ΔU_diff = diff(getinfo(nmpc11)[:U])
     @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
+
+    # coverage of the branch with error termination status (with an infeasible problem):
+    nmpc_infeas = NonLinMPC(nonlinmodel, Hp=1, Hc=1, Cwt=Inf)
+    nmpc_infeas = setconstraint!(nmpc_infeas, umin=[+1], umax=[-1])
+    preparestate!(nmpc_infeas, [0], [0])
+    @test_logs(
+        (:error, "MPC terminated without solution: returning last solution shifted "*
+                 "(more info in debug log)"), 
+        moveinput!(nmpc_infeas, [0], [0])
+    )
+
 
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
