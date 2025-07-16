@@ -49,7 +49,8 @@ function limit_solve_time(optim::GenericModel, Ts)
         JuMP.set_time_limit_sec(optim, Ts)
     catch err
         if isa(err, MOI.UnsupportedAttribute{MOI.TimeLimitSec})
-            @warn "Solving time limit is not supported by the optimizer."
+            @warn "Solving time limit is not supported by the $(JuMP.solver_name(optim)) "*
+                  "optimizer."
         else
             rethrow()
         end
