@@ -303,6 +303,7 @@ mhe_pendulum_ipopt_curr = MovingHorizonEstimator(
 )
 mhe_pendulum_ipopt_curr = setconstraint!(mhe_pendulum_ipopt_curr; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_curr.optim)
+JuMP.set_attribute(mhe_pendulum_ipopt_curr.optim, "tol", 1e-7)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 direct = false
@@ -311,6 +312,7 @@ mhe_pendulum_ipopt_pred = MovingHorizonEstimator(
 )
 mhe_pendulum_ipopt_pred = setconstraint!(mhe_pendulum_ipopt_pred; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_pred.optim)
+JuMP.set_attribute(mhe_pendulum_ipopt_pred.optim, "tol", 1e-7)
 
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 direct = true
@@ -319,6 +321,7 @@ mhe_pendulum_madnlp_curr = MovingHorizonEstimator(
 )
 mhe_pendulum_madnlp_curr = setconstraint!(mhe_pendulum_madnlp_curr; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_pendulum_madnlp_curr.optim)
+JuMP.set_attribute(mhe_pendulum_madnlp_curr.optim, "tol", 1e-7)
 
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 direct = false
@@ -327,6 +330,7 @@ mhe_pendulum_madnlp_pred = MovingHorizonEstimator(
 )
 mhe_pendulum_madnlp_pred = setconstraint!(mhe_pendulum_madnlp_pred; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_pendulum_madnlp_pred.optim)
+JuMP.set_attribute(mhe_pendulum_madnlp_pred.optim, "tol", 1e-7)
 
 samples, evals, seconds = 10, 1, 15*60
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
