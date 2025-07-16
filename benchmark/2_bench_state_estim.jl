@@ -291,10 +291,10 @@ model, p = pendulum_model, pendulum_p
 plant = deepcopy(model)
 plant.p[3] = 1.25*p[3]  # plant-model mismatch
 σQ = [0.1, 1.0]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
-He = 20; v̂min, v̂max = [-5.0], [+5.0]
+He = 3; v̂min, v̂max = [-5.0], [+5.0]
 N = 35; 
 
-x_0 = [0, 0]; x̂_0 = [0, 0, 0]; u = [0.5]
+x_0 = [0.1, 0.1]; x̂_0 = [0, 0, 0]; u = [0.5]
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 direct = true
