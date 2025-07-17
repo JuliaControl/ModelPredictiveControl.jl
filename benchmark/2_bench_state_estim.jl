@@ -149,7 +149,7 @@ mhe_lin_pred    = MovingHorizonEstimator(linmodel, He=10, direct=false)
 mhe_nonlin_curr = MovingHorizonEstimator(nonlinmodel, He=10, direct=true)
 mhe_nonlin_pred = MovingHorizonEstimator(nonlinmodel, He=10, direct=false)
 
-samples, evals, seconds = 5000, 1, 60
+samples, evals, seconds = 10000, 1, 60
 UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Current form"] =
     @benchmarkable(
         preparestate!($mhe_lin_curr, $y, $d),
@@ -260,7 +260,7 @@ mhe_cstr_ipopt_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim,
 mhe_cstr_ipopt_pred = setconstraint!(mhe_cstr_ipopt_pred; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_cstr_ipopt_pred.optim)
 
-samples, evals = 5000, 1
+samples, evals = 10000, 1
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Current form"] =
     @benchmarkable(test_mhe($mhe_cstr_osqp_curr, $plant); 
         samples=samples, evals=evals
@@ -332,7 +332,7 @@ mhe_pendulum_madnlp_pred = setconstraint!(mhe_pendulum_madnlp_pred; v̂min, v̂m
 JuMP.unset_time_limit_sec(mhe_pendulum_madnlp_pred.optim)
 JuMP.set_attribute(mhe_pendulum_madnlp_pred.optim, "tol", 1e-7)
 
-samples, evals, seconds = 10, 1, 15*60
+samples, evals, seconds = 25, 1, 15*60
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
     @benchmarkable(
         sim!($mhe_pendulum_ipopt_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
