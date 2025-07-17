@@ -12,7 +12,7 @@ linmpc_ms = LinMPC(
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10
 )
 
-samples, evals, seconds = 5000, 1, 60
+samples, evals, seconds = 10000, 1, 60
 UNIT_MPC["LinMPC"]["moveinput!"]["SingleShooting"] = 
     @benchmarkable(
         moveinput!($linmpc_ss, $y, $d),
@@ -51,7 +51,7 @@ nmpc_nonlin_ms = NonLinMPC(
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10    
 )
 
-samples, evals, seconds = 5000, 1, 60
+samples, evals, seconds = 10000, 1, 60
 UNIT_MPC["NonLinMPC"]["moveinput!"]["LinModel"]["SingleShooting"] =
     @benchmarkable(
         moveinput!($nmpc_lin_ss, $y, $d),
@@ -446,7 +446,7 @@ mpc3_ipopt_ms = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 mpc3_ipopt_ms = setconstraint!(mpc3_ipopt_ms; umin, umax)
 JuMP.unset_time_limit_sec(mpc3_ipopt_ms.optim)
 
-samples, evals = 5000, 1
+samples, evals = 10000, 1
 CASE_MPC["Pendulum"]["LinMPC"]["Successive linearization"]["OSQP"]["SingleShooting"] = 
     @benchmarkable(
         sim2!($mpc3_osqp_ss, $model, $N, $ry, $plant, $x_0, $x̂_0, $y_step),
