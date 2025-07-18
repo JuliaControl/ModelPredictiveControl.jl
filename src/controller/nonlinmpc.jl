@@ -498,7 +498,9 @@ end
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel)
+function init_optimization!(
+    mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel{JNT}
+)  where JNT<:Real
     # --- variables and linear constraints ---
     con, transcription = mpc.con, mpc.transcription
     nZ̃ = length(mpc.Z̃)
@@ -527,8 +529,68 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.Generic
     )
     @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
     @objective(optim, Min, J(Z̃var...))
-    init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
-    set_nonlincon!(mpc, model, transcription, optim)
+    if JuMP.solver_name(optim) ≠ "Ipopt"
+        init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
+        set_nonlincon!(mpc, model, transcription, optim)
+    else
+        # Test new experimental  feature:
+
+
+        J::Vector{JNT}                   = zeros(JNT, 1)
+        ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
+        x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
+        K0::Vector{JNT}                  = zeros(JNT, nK)
+        Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
+        U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
+        Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
+        gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
+        geq::Vector{JNT}                 = zeros(JNT, neq)
+
+        geq_min = zeros(JNT, mpc.con.neq)
+        geq_max = zeros(JNT, mpc.con.neq)
+
+
+        function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+            return nothing
+        end
+        Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update_predictions! at first call
+        ∇geq_context = (
+            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
+            Cache(Û0), Cache(K0),   Cache(X̂0),
+            Cache(gc), Cache(g)
+        )
+        ∇geq_prep = prepare_jacobian(geqfunc!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)
+        ∇geq = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
+
+        function geqfunc_set!(geq, Z̃)
+            return geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
+        end
+        function ∇geqfunc_set!(∇geq, Z̃)
+            value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃, ∇geq_context...)
+            return nothing
+        end
+
+        #=
+        # Langragian of the optimization problem:
+        function Lfunc!(Z̃, μ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+            J = obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+            L = J + dot(μ, geq)
+            return L
+        end
+        =#
+ 
+        
+        set = Ipopt._VectorNonlinearOracle(;
+            mpc.con.neq,
+            geq_min,
+            geq_max,
+            geqfunc_set!,
+            jacobian_structure,
+            ∇geqfunc_set!
+        )
+    end 
     return nothing
 end
 
