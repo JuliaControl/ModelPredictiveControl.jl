@@ -535,8 +535,16 @@ function init_optimization!(
     else
         # Test new experimental  feature:
 
+        model = mpc.estim.model
+        grad, jac = mpc.gradient, mpc.jacobian
+        nu, ny, nx̂, nϵ, nk = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, model.nk
+        Hp, Hc = mpc.Hp, mpc.Hc
+        ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
+        nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
+        nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+        strict = Val(true)
+        myNaN  = convert(JNT, NaN)
 
-        J::Vector{JNT}                   = zeros(JNT, 1)
         ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
         x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
         K0::Vector{JNT}                  = zeros(JNT, nK)
@@ -566,10 +574,14 @@ function init_optimization!(
         function geqfunc_set!(geq, Z̃)
             return geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
         end
-        function ∇geqfunc_set!(∇geq, Z̃)
+        function ∇geqfunc_set!(∇geq_vec, Z̃)
             value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃, ∇geq_context...)
+            ∇geq_vec .= nonzeros(∇geq)
             return nothing
         end
+
+        I_∇geq, J_∇geq = SparseArrays.findnz(∇geq)
+        ∇geq_structure = collect(zip(I_∇geq, J_∇geq))
 
         #=
         # Langragian of the optimization problem:
@@ -583,13 +595,14 @@ function init_optimization!(
  
         
         set = Ipopt._VectorNonlinearOracle(;
-            mpc.con.neq,
-            geq_min,
-            geq_max,
-            geqfunc_set!,
-            jacobian_structure,
-            ∇geqfunc_set!
+            dimension = nZ̃,
+            l = geq_min,
+            u = geq_max,
+            eval_f = geqfunc_set!,
+            jacobian_structure = ∇geq_structure,
+            eval_jacobian = ∇geqfunc_set!
         )
+        @constraint(optim, Z̃var in set)
     end 
     return nothing
 end

@@ -58,8 +58,8 @@ function limit_solve_time(optim::GenericModel, Ts)
 end
 
 "Init a differentiation result matrix as dense or sparse matrix, as required by `backend`."
-init_diffmat(T, backend::AbstractADType, _  , nx , ny) = Matrix{T}(undef, ny, nx)
-init_diffmat(T, backend::AutoSparse    ,prep , _ , _ ) = similar(sparsity_pattern(prep), T)
+init_diffmat(T, ::AbstractADType, _  , nx , ny) = Matrix{T}(undef, ny, nx)
+init_diffmat(T, ::AutoSparse    ,prep , _ , _ ) = similar(sparsity_pattern(prep), T)
 
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
