@@ -536,7 +536,7 @@ function init_optimization!(
         # Test new experimental  feature:
 
         model = mpc.estim.model
-        grad, jac = mpc.gradient, mpc.jacobian
+        jac = mpc.jacobian
         nu, ny, nx̂, nϵ, nk = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, model.nk
         Hp, Hc = mpc.Hp, mpc.Hc
         ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
@@ -544,6 +544,7 @@ function init_optimization!(
         nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
         strict = Val(true)
         myNaN  = convert(JNT, NaN)
+        myInf  = convert(JNT, Inf)
 
         ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
         x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
@@ -554,9 +555,47 @@ function init_optimization!(
         gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
         geq::Vector{JNT}                 = zeros(JNT, neq)
 
-        geq_min = zeros(JNT, mpc.con.neq)
-        geq_max = zeros(JNT, mpc.con.neq)
+        function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+            return nothing
+        end
+        Z̃_∇g = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+        ∇g_context = (
+            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+            Cache(Û0), Cache(K0), Cache(X̂0), 
+            Cache(gc), Cache(geq),
+        )
+        # temporarily enable all the inequality constraints for sparsity detection:
+        mpc.con.i_g[1:end-nc] .= true
+        ∇g_prep  = prepare_jacobian(gfunc!, g, jac, Z̃_∇g, ∇g_context...; strict)
+        mpc.con.i_g[1:end-nc] .= false
+        ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
 
+
+        function gfunc_set!(g, Z̃)
+            return gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
+        end
+        function ∇gfunc_set!(∇g_vec, Z̃)
+            value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃, ∇g_context...)
+            ∇g_vec .= nonzeros(∇g)
+            return nothing
+        end
+
+        g_min = fill(-myInf, ng)
+        g_max = zeros(JNT, ng)
+
+        I_∇g, J_∇g = SparseArrays.findnz(∇g)
+        ∇g_structure = collect(zip(I_∇g, J_∇g))
+
+        g_set = Ipopt._VectorNonlinearOracle(;
+            dimension = nZ̃,
+            l = g_min,
+            u = g_max,
+            eval_f = gfunc_set!,
+            jacobian_structure = ∇g_structure,
+            eval_jacobian = ∇gfunc_set!
+        )
+        @constraint(optim, Z̃var in g_set)
 
         function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
@@ -580,6 +619,10 @@ function init_optimization!(
             return nothing
         end
 
+
+        geq_min = zeros(JNT, mpc.con.neq)
+        geq_max = zeros(JNT, mpc.con.neq)
+
         I_∇geq, J_∇geq = SparseArrays.findnz(∇geq)
         ∇geq_structure = collect(zip(I_∇geq, J_∇geq))
 
@@ -594,7 +637,7 @@ function init_optimization!(
         =#
  
         
-        set = Ipopt._VectorNonlinearOracle(;
+        geq_set = Ipopt._VectorNonlinearOracle(;
             dimension = nZ̃,
             l = geq_min,
             u = geq_max,
@@ -602,7 +645,8 @@ function init_optimization!(
             jacobian_structure = ∇geq_structure,
             eval_jacobian = ∇geqfunc_set!
         )
-        @constraint(optim, Z̃var in set)
+        @constraint(optim, Z̃var in geq_set)
+
     end 
     return nothing
 end
