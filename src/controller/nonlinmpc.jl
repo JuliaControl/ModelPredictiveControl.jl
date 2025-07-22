@@ -555,6 +555,9 @@ function init_optimization!(
         gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
         geq::Vector{JNT}                 = zeros(JNT, neq)
 
+
+        
+        
         function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
             return nothing
@@ -572,17 +575,23 @@ function init_optimization!(
         ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
 
 
-        function gfunc_set!(g, Z̃)
-            return gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
+        function update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_∇g)
+                Z̃_∇g .= Z̃_arg
+                value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃_∇g, ∇g_context...)
+            end
         end
-        function ∇gfunc_set!(∇g_vec, Z̃)
-            value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃, ∇g_context...)
-            ∇g_vec .= nonzeros(∇g)
-            return nothing
+        function gfunc_set!(g_arg, Z̃_arg)
+            update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
+            return g_arg .= g
+        end
+        function ∇gfunc_set!(∇g_arg, Z̃_arg)
+            update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
+            return ∇g_arg .= nonzeros(∇g)
         end
 
         g_min = fill(-myInf, ng)
-        g_max = zeros(JNT, ng)
+        g_max = fill(+myInf, ng)
 
         I_∇g, J_∇g = SparseArrays.findnz(∇g)
         ∇g_structure = collect(zip(I_∇g, J_∇g))
@@ -597,6 +606,10 @@ function init_optimization!(
         )
         @constraint(optim, Z̃var in g_set)
 
+
+
+
+
         function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
             return nothing
@@ -610,15 +623,21 @@ function init_optimization!(
         ∇geq_prep = prepare_jacobian(geqfunc!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)
         ∇geq = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
 
-        function geqfunc_set!(geq, Z̃)
-            return geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
-        end
-        function ∇geqfunc_set!(∇geq_vec, Z̃)
-            value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃, ∇geq_context...)
-            ∇geq_vec .= nonzeros(∇geq)
-            return nothing
-        end
 
+        function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_∇geq)
+                Z̃_∇geq .= Z̃_arg
+                value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_context...)
+            end
+        end
+        function geqfunc_set!(geq_arg, Z̃_arg)
+            update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+            return geq_arg .= geq
+        end
+        function ∇geqfunc_set!(∇geq_arg, Z̃_arg)
+            update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+            return ∇geq_arg .= nonzeros(∇geq)
+        end
 
         geq_min = zeros(JNT, mpc.con.neq)
         geq_max = zeros(JNT, mpc.con.neq)
