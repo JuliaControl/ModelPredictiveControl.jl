@@ -538,9 +538,7 @@ function init_optimization!(
     return nothing
 end
 
-set_nonlincon!(::PredictiveController, ::JuMP.GenericModel) = nothing
-set_nonlincon!(::LinMPC, ::JuMP.GenericModel) = nothing
-set_nonlincon!(::ExplicitMPC, ::JuMP.GenericModel) = nothing
+set_nonlincon_exp(::PredictiveController, ::JuMP.GenericModel) = nothing
 # TODO: cleanup this function, this is super dirty
 function set_nonlincon_exp(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
     # ========= Test new experimental  feature ========================================
