@@ -557,7 +557,8 @@ function init_optimization!(
 
 
         
-        
+        # TODO: transfer all the following in set_nonlincon!, including a copy-paste
+        # of all the vectors above.
         function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
             return nothing
@@ -584,20 +585,19 @@ function init_optimization!(
         end
         function gfunc_set!(g_arg, Z̃_arg)
             update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-            g_arg .= g
+            g_arg .= @views g[mpc.con.i_g]
             return nothing
         end
         function ∇gfunc_set!(∇g_arg, Z̃_arg)
             update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-            diffmat2vec!(∇g_arg, ∇g)
+            diffmat2vec!(∇g_arg, @views ∇g[mpc.con.i_g, :])
             return nothing
         end
 
-        g_min = fill(-myInf, ng)
-        g_max = fill(+myInf, ng)
-        g_max[end-nc+1:end] .= 0 # custom constraints, if any, are always upper bounded
+        g_min = fill(-myInf, sum(mpc.con.i_g))
+        g_max = zeros(JNT, sum(mpc.con.i_g))
 
-        ∇g_structure = init_diffstructure(∇g)
+        ∇g_structure = init_diffstructure(∇g[mpc.con.i_g, :])
 
         g_set = Ipopt._VectorNonlinearOracle(;
             dimension = nZ̃,
@@ -609,6 +609,8 @@ function init_optimization!(
         )
         @constraint(optim, Z̃var in g_set)
 
+
+        
         function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
             return nothing
