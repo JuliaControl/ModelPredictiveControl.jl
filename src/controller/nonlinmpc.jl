@@ -533,143 +533,155 @@ function init_optimization!(
         init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
         set_nonlincon!(mpc, model, transcription, optim)
     else
-        # ========= Test new experimental  feature ========================================
-
-        model = mpc.estim.model
-        jac = mpc.jacobian
-        nu, ny, nx̂, nϵ, nk = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, model.nk
-        Hp, Hc = mpc.Hp, mpc.Hc
-        ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
-        nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
-        nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
-        strict = Val(true)
-        myNaN  = convert(JNT, NaN)
-        myInf  = convert(JNT, Inf)
-
-        ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
-        x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
-        K0::Vector{JNT}                  = zeros(JNT, nK)
-        Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
-        U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
-        Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
-        gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
-        geq::Vector{JNT}                 = zeros(JNT, neq)
-
-
-        
-        # TODO: transfer all the following in set_nonlincon!, including a copy-paste
-        # of all the vectors above.
-        function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
-            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-            return nothing
-        end
-        Z̃_∇g = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
-        ∇g_context = (
-            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-            Cache(Û0), Cache(K0), Cache(X̂0), 
-            Cache(gc), Cache(geq),
-        )
-        # temporarily enable all the inequality constraints for sparsity detection:
-        mpc.con.i_g[1:end-nc] .= true
-        ∇g_prep  = prepare_jacobian(gfunc!, g, jac, Z̃_∇g, ∇g_context...; strict)
-        mpc.con.i_g[1:end-nc] .= false
-        ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
-
-
-        function update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_∇g)
-                Z̃_∇g .= Z̃_arg
-                value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃_∇g, ∇g_context...)
-            end
-            return nothing
-        end
-        function gfunc_set!(g_arg, Z̃_arg)
-            update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-            g_arg .= @views g[mpc.con.i_g]
-            return nothing
-        end
-        function ∇gfunc_set!(∇g_arg, Z̃_arg)
-            update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-            diffmat2vec!(∇g_arg, @views ∇g[mpc.con.i_g, :])
-            return nothing
-        end
-
-        g_min = fill(-myInf, sum(mpc.con.i_g))
-        g_max = zeros(JNT, sum(mpc.con.i_g))
-
-        ∇g_structure = init_diffstructure(∇g[mpc.con.i_g, :])
-
-        g_set = Ipopt._VectorNonlinearOracle(;
-            dimension = nZ̃,
-            l = g_min,
-            u = g_max,
-            eval_f = gfunc_set!,
-            jacobian_structure = ∇g_structure,
-            eval_jacobian = ∇gfunc_set!
-        )
-        @constraint(optim, Z̃var in g_set)
-
-
-        
-        function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
-            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-            return nothing
-        end
-        Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update_predictions! at first call
-        ∇geq_context = (
-            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
-            Cache(Û0), Cache(K0),   Cache(X̂0),
-            Cache(gc), Cache(g)
-        )
-        ∇geq_prep = prepare_jacobian(geqfunc!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)
-        ∇geq = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
-
-
-        function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_∇geq)
-                Z̃_∇geq .= Z̃_arg
-                value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_context...)
-            end
-            return nothing
-        end
-        function geqfunc_set!(geq_arg, Z̃_arg)
-            update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-            geq_arg .= geq
-            return nothing
-        end
-        function ∇geqfunc_set!(∇geq_arg, Z̃_arg)
-            update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-            diffmat2vec!(∇geq_arg, ∇geq)
-            return nothing
-        end
-
-        geq_min = zeros(JNT, mpc.con.neq)
-        geq_max = zeros(JNT, mpc.con.neq)
-
-        ∇geq_structure = init_diffstructure(∇geq)
-
-        #=
-        # Langragian of the optimization problem:
-        function Lfunc!(Z̃, μ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
-            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-            J = obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
-            L = J + dot(μ, geq)
-            return L
-        end
-        =#
- 
-        
-        geq_set = Ipopt._VectorNonlinearOracle(;
-            dimension = nZ̃,
-            l = geq_min,
-            u = geq_max,
-            eval_f = geqfunc_set!,
-            jacobian_structure = ∇geq_structure,
-            eval_jacobian = ∇geqfunc_set!
-        )
-        @constraint(optim, Z̃var in geq_set)
-
+        set_nonlincon_exp(mpc, optim)
     end 
+    return nothing
+end
+
+# TODO: cleanup this function, this is super dirty
+function set_nonlincon_exp(mpc::PredictiveController, optim::JuMP.GenericModel{JNT}) where JNT<:Real
+    # ========= Test new experimental  feature ========================================
+
+    nonlin_constraints = JuMP.all_constraints(optim, JuMP.Vector{JuMP.VariableRef}, Ipopt._VectorNonlinearOracle)
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+
+
+    Z̃var = optim[:Z̃var]
+
+    model = mpc.estim.model
+    jac = mpc.jacobian
+    nu, ny, nx̂, nϵ, nk = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, model.nk
+    Hp, Hc = mpc.Hp, mpc.Hc
+    ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
+    nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
+    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+    strict = Val(true)
+    myNaN  = convert(JNT, NaN)
+    myInf  = convert(JNT, Inf)
+
+
+    ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
+    x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
+    K0::Vector{JNT}                  = zeros(JNT, nK)
+    Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
+    U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
+    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
+    geq::Vector{JNT}                 = zeros(JNT, neq)
+
+
+    
+    # TODO: transfer all the following in set_nonlincon!, including a copy-paste
+    # of all the vectors above.
+    function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return nothing
+    end
+    Z̃_∇g = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    ∇g_context = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(gc), Cache(geq),
+    )
+    # temporarily enable all the inequality constraints for sparsity detection:
+    mpc.con.i_g[1:end-nc] .= true
+    ∇g_prep  = prepare_jacobian(gfunc!, g, jac, Z̃_∇g, ∇g_context...; strict)
+    mpc.con.i_g[1:end-nc] .= false
+    ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
+
+
+    function update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇g)
+            Z̃_∇g .= Z̃_arg
+            value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃_∇g, ∇g_context...)
+        end
+        return nothing
+    end
+    function gfunc_set!(g_arg, Z̃_arg)
+        update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
+        g_arg .= @views g[mpc.con.i_g]
+        return nothing
+    end
+    function ∇gfunc_set!(∇g_arg, Z̃_arg)
+        update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
+        diffmat2vec!(∇g_arg, @views ∇g[mpc.con.i_g, :])
+        return nothing
+    end
+
+    g_min = fill(-myInf, sum(mpc.con.i_g))
+    g_max = zeros(JNT, sum(mpc.con.i_g))
+
+    ∇g_structure = init_diffstructure(∇g[mpc.con.i_g, :])
+
+    g_set = Ipopt._VectorNonlinearOracle(;
+        dimension = nZ̃,
+        l = g_min,
+        u = g_max,
+        eval_f = gfunc_set!,
+        jacobian_structure = ∇g_structure,
+        eval_jacobian = ∇gfunc_set!
+    )
+    @constraint(optim, Z̃var in g_set)
+
+
+    
+    function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return nothing
+    end
+    Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update_predictions! at first call
+    ∇geq_context = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
+        Cache(Û0), Cache(K0),   Cache(X̂0),
+        Cache(gc), Cache(g)
+    )
+    ∇geq_prep = prepare_jacobian(geqfunc!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)
+    ∇geq = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
+
+
+    function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇geq)
+            Z̃_∇geq .= Z̃_arg
+            value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_context...)
+        end
+        return nothing
+    end
+    function geqfunc_set!(geq_arg, Z̃_arg)
+        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        geq_arg .= geq
+        return nothing
+    end
+    function ∇geqfunc_set!(∇geq_arg, Z̃_arg)
+        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        diffmat2vec!(∇geq_arg, ∇geq)
+        return nothing
+    end
+
+    geq_min = zeros(JNT, mpc.con.neq)
+    geq_max = zeros(JNT, mpc.con.neq)
+
+    ∇geq_structure = init_diffstructure(∇geq)
+
+    #=
+    # Langragian of the optimization problem:
+    function Lfunc!(Z̃, μ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        J = obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+        L = J + dot(μ, geq)
+        return L
+    end
+    =#
+
+    
+    geq_set = Ipopt._VectorNonlinearOracle(;
+        dimension = nZ̃,
+        l = geq_min,
+        u = geq_max,
+        eval_f = geqfunc_set!,
+        jacobian_structure = ∇geq_structure,
+        eval_jacobian = ∇geqfunc_set!
+    )
+    @constraint(optim, Z̃var in geq_set)
     return nothing
 end
 

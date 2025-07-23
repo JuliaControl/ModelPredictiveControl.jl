@@ -437,6 +437,8 @@ function setconstraint!(
         # TODO: change this !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if JuMP.solver_name(optim) ≠ "Ipopt"
             set_nonlincon!(mpc, model, transcription, optim)
+        else
+            set_nonlincon_exp(mpc, optim)
         end
     else
         i_b, i_g = init_matconstraint_mpc(
