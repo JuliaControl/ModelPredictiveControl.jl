@@ -595,6 +595,7 @@ function init_optimization!(
 
         g_min = fill(-myInf, ng)
         g_max = fill(+myInf, ng)
+        g_max[end-nc+1:end] .= 0 # custom constraints, if any, are always upper bounded
 
         ∇g_structure = init_diffstructure(∇g)
 
