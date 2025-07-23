@@ -533,7 +533,7 @@ function init_optimization!(
         init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
         set_nonlincon!(mpc, model, transcription, optim)
     else
-        # Test new experimental  feature:
+        # ========= Test new experimental  feature ========================================
 
         model = mpc.estim.model
         jac = mpc.jacobian
@@ -580,21 +580,23 @@ function init_optimization!(
                 Z̃_∇g .= Z̃_arg
                 value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃_∇g, ∇g_context...)
             end
+            return nothing
         end
         function gfunc_set!(g_arg, Z̃_arg)
             update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-            return g_arg .= g
+            g_arg .= g
+            return nothing
         end
         function ∇gfunc_set!(∇g_arg, Z̃_arg)
             update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-            return ∇g_arg .= nonzeros(∇g)
+            diffmat2vec!(∇g_arg, ∇g)
+            return nothing
         end
 
         g_min = fill(-myInf, ng)
         g_max = fill(+myInf, ng)
 
-        I_∇g, J_∇g = SparseArrays.findnz(∇g)
-        ∇g_structure = collect(zip(I_∇g, J_∇g))
+        ∇g_structure = init_diffstructure(∇g)
 
         g_set = Ipopt._VectorNonlinearOracle(;
             dimension = nZ̃,
@@ -605,10 +607,6 @@ function init_optimization!(
             eval_jacobian = ∇gfunc_set!
         )
         @constraint(optim, Z̃var in g_set)
-
-
-
-
 
         function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
@@ -629,21 +627,23 @@ function init_optimization!(
                 Z̃_∇geq .= Z̃_arg
                 value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_context...)
             end
+            return nothing
         end
         function geqfunc_set!(geq_arg, Z̃_arg)
             update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-            return geq_arg .= geq
+            geq_arg .= geq
+            return nothing
         end
         function ∇geqfunc_set!(∇geq_arg, Z̃_arg)
             update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-            return ∇geq_arg .= nonzeros(∇geq)
+            diffmat2vec!(∇geq_arg, ∇geq)
+            return nothing
         end
 
         geq_min = zeros(JNT, mpc.con.neq)
         geq_max = zeros(JNT, mpc.con.neq)
 
-        I_∇geq, J_∇geq = SparseArrays.findnz(∇geq)
-        ∇geq_structure = collect(zip(I_∇geq, J_∇geq))
+        ∇geq_structure = init_diffstructure(∇geq)
 
         #=
         # Langragian of the optimization problem:

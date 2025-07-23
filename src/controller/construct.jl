@@ -434,7 +434,7 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        # TODO: change this
+        # TODO: change this !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         if JuMP.solver_name(optim) ≠ "Ipopt"
             set_nonlincon!(mpc, model, transcription, optim)
         end
