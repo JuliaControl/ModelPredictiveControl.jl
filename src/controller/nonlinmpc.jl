@@ -538,8 +538,9 @@ function init_optimization!(
     return nothing
 end
 
+set_nonlincon!(::PredictiveController, _ ) = nothing
 # TODO: cleanup this function, this is super dirty
-function set_nonlincon_exp(mpc::PredictiveController, optim::JuMP.GenericModel{JNT}) where JNT<:Real
+function set_nonlincon_exp(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
     # ========= Test new experimental  feature ========================================
 
     nonlin_constraints = JuMP.all_constraints(optim, JuMP.Vector{JuMP.VariableRef}, Ipopt._VectorNonlinearOracle)
