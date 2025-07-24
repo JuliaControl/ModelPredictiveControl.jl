@@ -603,9 +603,11 @@ function set_nonlincon_exp(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where 
         g_arg .= @views g[mpc.con.i_g]
         return nothing
     end
+    ∇g_i_g = ∇g[mpc.con.i_g, :]
     function ∇gfunc_set!(∇g_arg, Z̃_arg)
         update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-        diffmat2vec!(∇g_arg, @views ∇g[mpc.con.i_g, :])
+        ∇g_i_g .= @views ∇g[mpc.con.i_g, :]
+        diffmat2vec!(∇g_arg, ∇g_i_g)
         return nothing
     end
 
