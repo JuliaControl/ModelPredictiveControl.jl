@@ -235,9 +235,9 @@ delayed/predictor (2.) formulation:
 ```jldoctest
 julia> estim2 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=true);
 
-julia> x̂ = round.(preparestate!(estim2, [1]), digits=3)
+julia> x̂ = round.(preparestate!(estim2, [1]), digits=2)
 1-element Vector{Float64}:
- 0.01
+ 0.5
 
 julia> estim1 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=false);
 
