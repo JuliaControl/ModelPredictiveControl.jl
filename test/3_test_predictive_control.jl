@@ -798,7 +798,7 @@ end
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
-    nonlinmodel2.solver_h!(y, Float32[0,0], Float32[0], nonlinmodel2.p)
+    ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0], nonlinmodel2.p)
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0] atol=5e-2
     nmpc8 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())

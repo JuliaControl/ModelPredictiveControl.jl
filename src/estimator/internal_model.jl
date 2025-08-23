@@ -170,20 +170,19 @@ end
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
-It calls `model.solver_f!(x̂0next, k0, x̂0, u0 ,d0, model.p)` directly since this estimator
-does not augment the states.
+It calls [`f!`](@ref) directly since this estimator does not augment the states.
 """
 function f̂!(x̂0next, _ , k0, ::InternalModel, model::NonLinModel, x̂0, u0, d0)
-    return model.solver_f!(x̂0next, k0, x̂0, u0, d0, model.p)
+    return f!(x̂0next, k0, model, x̂0, u0, d0, model.p)
 end
 
 @doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
 
-Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls `model.solver_h!`.
+Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h!`](@ref).
 """
 function ĥ!(ŷ0, ::InternalModel, model::NonLinModel, x̂0, d0)
-    return model.solver_h!(ŷ0, x̂0, d0, model.p)
+    return h!(ŷ0, model, x̂0, d0, model.p)
 end
 
 
