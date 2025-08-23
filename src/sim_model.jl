@@ -365,7 +365,6 @@ to_mat(A::AbstractMatrix, _ ...) = A
 to_mat(A::Real, dims...) = fill(A, dims)
 
 include("model/linmodel.jl")
-include("model/solver.jl")
 include("model/linearization.jl")
 include("model/nonlinmodel.jl")
 

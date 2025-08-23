@@ -1,9 +1,9 @@
 """
     get_linearization_func(
-        NT, solver_f!, solver_h!, nu, nx, ny, nd, ns, p, solver, backend
+        NT, f!, h!, Ts, nu, nx, ny, nd, ns, p, solver, backend
     ) -> linfunc!
 
-Return `linfunc!` function that computes Jacobians of `solver_f!` and `solver_h!` functions.
+Return `linfunc!` function that computes Jacobians of `f!` and `h!` functions.
 
 The function has the following signature: 
 ```
@@ -13,12 +13,14 @@ and it should modifies in-place all the arguments before `backend`. The `backend
 is an `AbstractADType` object from `DifferentiationInterface`. The `cst_x`, `cst_u` and 
 `cst_d` are `DifferentiationInterface.Constant` objects with the linearization points.
 """
-function get_linearization_func(NT, solver_f!, solver_h!, nu, nx, ny, nd, p, solver, backend)
-    f_x!(xnext, x, k, u, d) = solver_f!(xnext, k, x, u, d, p)
-    f_u!(xnext, u, k, x, d) = solver_f!(xnext, k, x, u, d, p)
-    f_d!(xnext, d, k, x, u) = solver_f!(xnext, k, x, u, d, p)
-    h_x!(y, x, d) = solver_h!(y, x, d, p)
-    h_d!(y, d, x) = solver_h!(y, x, d, p)
+function get_linearization_func(
+    NT, f!::F, h!::H, Ts, nu, nx, ny, nd, p, solver, backend
+) where {F<:Function, H<:Function}
+    f_x!(xnext, x, k, u, d) = solver_f!(xnext, k, f!, Ts, solver, x, u, d, p)
+    f_u!(xnext, u, k, x, d) = solver_f!(xnext, k, f!, Ts, solver, x, u, d, p)
+    f_d!(xnext, d, k, x, u) = solver_f!(xnext, k, f!, Ts, solver, x, u, d, p)
+    h_x!(y, x, d) = h!(y, x, d, p)
+    h_d!(y, d, x) = h!(y, x, d, p)
     strict  = Val(true)
     xnext = zeros(NT, nx)
     y = zeros(NT, ny)
