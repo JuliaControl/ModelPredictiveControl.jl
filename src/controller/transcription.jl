@@ -61,6 +61,42 @@ function get_nZ(estim::StateEstimator, ::MultipleShooting, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
 
+
+@doc raw"""
+    TrapezoidalMethod()
+
+An implicit trapezoidal transcription method (not yet implemented).
+
+This is presumably the simplest collocation method. It can handle moderately stiff systems
+and is A-stable. However, it may not be as efficient as more advanced methods for highly
+stiff systems. The decision variables are the same as for [`MultipleShooting`](@ref), hence
+a similar algorithm complexity.
+
+# Extended Help
+
+!!! details "Extended Help"
+    The trapezoidal method estimates the defects with:
+    by:
+    ```math
+    \mathbf{Ŝ}(k) = \mathbf{Ẽ_ŝ Z̃} + \mathbf{K_ŝ x̂_0}(k) + 0.5\frac{T_s}\big(\mathbf{F̂}(k+1) + \mathbf{F̂}(k)\big)
+    ```
+    where ``T_s`` is the sampling period, ``\mathbf{Ẽ}`` the matrix defined at 
+    [`init_defectmat`](@ref), and ``\mathbf{F̂}(k+j)`` the stacked vector of system
+
+    where ``\mathbf{f̂}(k+j) = \mathbf{f̂}\big(\mathbf{x̂}(k+j), \mathbf{u}(k+j), \mathbf{d}(k+j)\big)``.
+    This leads to the following defect constraints for ``j=0`` to ``H_p-1``:
+    ```math
+    \mathbf{ŝ}(k+j) = \mathbf{x̂}(k+j+1) - \mathbf{x̂}(k+j) - \frac{T_s}{2} \big( \mathbf{f̂}(k+j) + \mathbf{f̂}(k+j+1) \big) = 0
+    ```
+    which are added as equality constraints in the optimization problem. The initial state
+    ``\mathbf{x̂}(k)`` is given by the state estimator, and the future states
+    ``\mathbf{x̂}(k+j+1)`` are decision variables in the optimization problem. The method
+    requires evaluating the system dynamics at both the current and next time steps, which
+    can increase computational complexity compared to explicit methods like single shooting.
+"""
+struct TrapezoidalMethod <: TranscriptionMethod end
+
+
 @doc raw"""
     init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
 

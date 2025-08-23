@@ -109,3 +109,9 @@ SingleShooting
 ```@docs
 MultipleShooting
 ```
+
+### TrapezoidalMethod
+
+```@docs
+TrapezoidalMethod
+```
