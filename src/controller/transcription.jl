@@ -1173,7 +1173,7 @@ custom constraints are include in the `g` vector.
 function con_nonlinprog!(
     g, mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, x̂0end, Ŷ0, gc, ϵ
 )
-    nx̂, nŶ = length(x̂0end), length(Ŷ0)
+    nŶ = length(Ŷ0)
     for i in eachindex(g)
         mpc.con.i_g[i] || continue
         if i ≤ nŶ
