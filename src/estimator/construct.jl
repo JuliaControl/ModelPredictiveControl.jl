@@ -236,8 +236,8 @@ end
 
 Augment [`LinModel`](@ref) state-space matrices with stochastic ones `As`, `Cs_u`, `Cs_y`.
 
-If ``\mathbf{x_0}`` are `model.x0` states, and ``\mathbf{x_s}``, the states defined at
-[`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
+If ``\mathbf{x_0}`` is `model.x0` state, and ``\mathbf{x_s}``, the states defined at
+[`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂_0} = 
 [ \begin{smallmatrix} \mathbf{x_0} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
 returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
@@ -253,9 +253,9 @@ See Extended Help for a detailed definition of the augmented matrices and vector
 
 # Extended Help
 !!! details "Extended Help"
-    Using the `As`, `Cs_u` and `Cs_y` matrices of the stochastic model provided in argument
-    and the `model.A`, `model.Bu`, `model.Bd`, `model.C`, `model.Dd` matrices, the 
-    state-space matrices of the augmented model are defined as follows:
+    Using the `As`, `Cs_u` and `Cs_y` matrices of the stochastic model constructed in
+    [`init_estimstoch`](@ref)), and `model.A`, `model.Bu`, `model.Bd`, `model.C`, `model.Dd`
+    matrices, the state-space matrices of the augmented model are defined as follows:
     ```math
     \begin{aligned}
     \mathbf{Â}   &=                                    \begin{bmatrix} 
