@@ -4,13 +4,6 @@
 Pages = ["state_estim.md"]
 ```
 
-## Augmented Model
-
-```@docs
-ModelPredictiveControl.f̂!
-ModelPredictiveControl.ĥ!
-```
-
 ## Estimator Construction
 
 ```@docs
@@ -26,6 +19,13 @@ ModelPredictiveControl.relaxŴ
 ModelPredictiveControl.relaxV̂
 ModelPredictiveControl.init_matconstraint_mhe
 ModelPredictiveControl.get_optim_functions(::MovingHorizonEstimator, ::ModelPredictiveControl.GenericModel)
+```
+
+## Augmented Model
+
+```@docs
+ModelPredictiveControl.f̂!
+ModelPredictiveControl.ĥ!
 ```
 
 ## Update Quadratic Optimization
