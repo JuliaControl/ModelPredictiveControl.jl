@@ -1124,8 +1124,7 @@ function predict!(
     mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
     U0, _
 )
-    nu, nx̂, ny, nd, nk = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk
-    Hp, Hc = mpc.Hp, mpc.Hc
+    nu, nx̂, ny, nd, nk, Hp = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk, mpc.Hp
     D̂0 = mpc.D̂0
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
     d0 = @views mpc.d0[1:nd]
@@ -1209,7 +1208,7 @@ custom constraints are include in the `g` vector.
 function con_nonlinprog!(
     g, mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, x̂0end, Ŷ0, gc, ϵ
 )
-    nx̂, nŶ = length(x̂0end), length(Ŷ0)
+    nŶ = length(Ŷ0)
     for i in eachindex(g)
         mpc.con.i_g[i] || continue
         if i ≤ nŶ
@@ -1276,7 +1275,7 @@ function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
     mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
 )
-    nu, nx̂, ny, nd, nk = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk
+    nu, nx̂, nd, nk = model.nu, mpc.estim.nx̂, model.nd, model.nk
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     D̂0 = mpc.D̂0
