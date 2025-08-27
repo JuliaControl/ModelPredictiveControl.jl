@@ -1125,7 +1125,7 @@ augmented process model:
 \end{aligned}
 ```
 The matrix ``\mathbf{Ĥ^m}`` is the rows of ``\mathbf{Ĥ}`` that are measured outputs. The
-Jacobians are computed with [`ForwardDiff`](@extref ForwardDiff) bu default. The correction
+Jacobians are computed with [`ForwardDiff`](@extref ForwardDiff) by default. The correction
 and prediction step equations are provided below. The correction step is skipped if 
 `estim.direct == true` since it's already done by the user.
 

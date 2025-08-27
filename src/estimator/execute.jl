@@ -18,8 +18,8 @@ end
 
 Mutating state function ``\mathbf{f̂}`` of the augmented model.
 
-By introducing an augmented state vector ``\mathbf{x̂_0}`` like in [`augment_model`](@ref), the
-function returns the next state of the augmented model, defined as:
+By introducing an augmented state vector ``\mathbf{x̂_0}`` like in [`augment_model`](@ref), 
+the function returns the next state of the augmented model, defined as:
 ```math
 \begin{aligned}
     \mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) \\
@@ -27,10 +27,35 @@ function returns the next state of the augmented model, defined as:
 \end{aligned}
 ```
 where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂0next` argument. The method mutates `x̂0next`, 
-`û0` and `k0` in place. The argument `û0` is the input vector of the augmented model, 
-computed by ``\mathbf{û_0 = u_0 + ŷ_{s_u}}``. The argument `k0` is used to store the
-intermediate stage values of `model.solver` (when applicable). The model parameter vector
-`model.p` is not included in the function signature for conciseness.
+`û0` and `k0` in place. The argument `û0` stores the disturbed input of the augmented model
+``\mathbf{û_0}``, and `k0`, the intermediate stage values of `model.solver`, when applicable.
+The model parameter `model.p` is not included in the function signature for conciseness. See
+Extended Help for details on ``\mathbf{û_0, f̂}`` and ``\mathbf{ĥ}`` implementations.
+
+# Extended Help
+!!! details "Extended Help"
+    Knowing that the augmented state vector is defined as
+    ``\mathbf{x̂_0} = [ \begin{smallmatrix} \mathbf{x_0} \\ \mathbf{x_s} \end{smallmatrix} ]``,
+    the augmented model functions are:
+    ```math
+    \begin{aligned}
+    \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big)  &=               \begin{bmatrix}
+        \mathbf{f}\Big(\mathbf{x_0}(k), \mathbf{û_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big)   \\
+        \mathbf{A_s} \mathbf{x_s}(k)                                                        \end{bmatrix} \\
+    \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k)\Big)                   &=
+        \mathbf{h}\Big(\mathbf{x_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big) + \mathbf{y_{s_y}}(k)
+    \end{aligned}
+    ```
+    in which:
+    ```math
+    \begin{aligned}
+    \mathbf{û_0}(k)     &= \mathbf{u_0}(k) + \mathbf{y_{s_u}}(k)                            \\
+    \mathbf{y_{s_u}}(k) &= \mathbf{C_{s_u} x_s}(k)                                          \\
+    \mathbf{y_{s_y}}(k) &= \mathbf{C_{s_y} x_s}(k)
+    \end{aligned}
+    ```
+    The ``\mathbf{f}`` and ``\mathbf{h}`` functions above are in fact the [`f!`](@ref) and 
+    [`h!`](@ref) methods, respectively.
 """
 function f̂!(x̂0next, û0, k0, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
     return f̂!(x̂0next, û0, k0, model, estim.As, estim.Cs_u, x̂0, u0, d0)
