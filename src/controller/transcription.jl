@@ -63,7 +63,7 @@ end
 
 
 @doc raw"""
-    TrapezoidalMethod()
+    TrapezoidalCollocation()
 
 An implicit trapezoidal transcription method (not yet implemented).
 
@@ -1284,19 +1284,71 @@ function con_nonlinprogeq!(
     d0 = @views mpc.d0[1:nd]
     #TODO: allow parallel for loop or threads? 
     for j=1:Hp
-        u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
-        û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
+        u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
+        û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
+        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        d0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
+        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
+        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
         x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
-        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]       
-        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        ŝnext   .= x̂0next .- x̂0next_Z̃
+        ŝnext .= x̂0next .- x̂0next_Z̃
         x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
-        d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
+        d0 = d0next
     end
     return geq
 end
+
+
+function con_nonlinprogeq!(
+    geq, X̂0, Û0, K0, 
+    mpc::PredictiveController, model::NonLinModel, ::TrapezoidalCollocation, U0, Z̃
+)
+    nu, nx̂, nd, nx = model.nu, mpc.estim.nx̂, model.nd, model.nx
+    Hp, Hc = mpc.Hp, mpc.Hc
+    nΔU, nX̂ = nu*Hc, nx̂*Hp
+
+    Ts, p = model.Ts, model.p
+    As = mpc.estim.As
+    # K0 stores the state derivatives at each collocation point for all intervals
+    nk = model.nk # TODO: initialize K0 to the adequate size for a given collocation method 
+    D̂0 = mpc.D̂0
+    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    x̂0 = @views mpc.estim.x̂0[1:nx̂]
+    d0 = @views mpc.d0[1:nd]
+    #TODO: allow parallel for loop or threads? 
+    for j=1:Hp
+        u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
+        û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
+        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        d0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
+        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
+        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
+        xd, xs              = @views x̂0[1:nx], x̂0[nx+1:end]
+        xdnext_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
+        sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
+
+        mul!(û0, Cs_u, xs)      # ys_u = Cs_u*xs
+        û0 .+= u0               # û0 = u0 + ys_u
+
+        ẋd, ẋdnext = @views k0[1:nx], k0[nx+1:2*nx]
+        # TODO: decide what to do with model.xop and model.fop
+        model.f!(ẋd, xd, û0, d0, p)
+        model.f!(ẋdnext, xdnext_Z̃, û0, d0next, p) # with ZOH on manipulated inputs u
+
+        xsnext = @views x̂0next[nx+1:end]
+        mul!(xsnext, As, xs)
+   
+        sdnext .= @. xd - xdnext_Z̃ + (Ts/2)*(ẋd + ẋdnext)
+        ssnext .= @. xsnext - xsnext_Z̃
+        
+        x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
+        d0 = d0next
+    end
+    return geq
+end
+
 con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::NonLinModel,::SingleShooting,  _,_)=geq
 con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::LinModel,::TranscriptionMethod,_,_)=geq
