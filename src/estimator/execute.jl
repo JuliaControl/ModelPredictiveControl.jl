@@ -39,23 +39,22 @@ Extended Help for details on ``\mathbf{û_0, f̂}`` and ``\mathbf{ĥ}`` implem
     the augmented model functions are:
     ```math
     \begin{aligned}
-    \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) &= \begin{bmatrix}
-        \mathbf{f}\Big(\mathbf{x_0}(k), \mathbf{û_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big) \\
-        \mathbf{A_s} \mathbf{x_s}(k)
-    \end{bmatrix}
-    \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k)\Big) &=
-    \begin{aligned}
-        \mathbf{h}\Big(\mathbf{x_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big) + \mathbf{y_{s_y}}(k) \\
-        \mathbf{h}\Big(\mathbf{x_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big) + \mathbf{C_{s_y} x_s}(k)
-    \end{aligned}
-    and the disturbed input is:
-    ```math
-    \begin{aligned}
-    \mathbf{û_0}(k) &= \mathbf{u_0}(k) + \mathbf{y_{s_u}(k)} 
-                    &= \mathbf{u_0}(k) + \mathbf{C_{s_u} x_s}(k)
+    \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big)  &=               \begin{bmatrix}
+        \mathbf{f}\Big(\mathbf{x_0}(k), \mathbf{û_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big)   \\
+        \mathbf{A_s} \mathbf{x_s}(k)                                                        \end{bmatrix} \\
+    \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k)\Big)                   &=
+        \mathbf{h}\Big(\mathbf{x_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big) + \mathbf{y_{s_y}}(k)
     \end{aligned}
     ```
-    The ``\mathbf{f}`` and ``\mathbf{h}`` functions above are in fact [`f!`](@ref) and 
+    in which:
+    ```math
+    \begin{aligned}
+    \mathbf{û_0}(k)     &= \mathbf{u_0}(k) + \mathbf{y_{s_u}(k)}                            \\
+    \mathbf{y_{s_u}}(k) &= \mathbf{C_{s_u} x_s}(k)                                          \\
+    \mathbf{y_{s_y}}(k) &= \mathbf{C_{s_y} x_s}(k)
+    \end{aligned}
+    ```
+    The ``\mathbf{f}`` and ``\mathbf{h}`` functions above are in fact the [`f!`](@ref) and 
     [`h!`](@ref) methods, respectively.
 """
 function f̂!(x̂0next, û0, k0, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
