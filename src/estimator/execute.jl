@@ -49,7 +49,7 @@ Extended Help for details on ``\mathbf{û_0, f̂}`` and ``\mathbf{ĥ}`` implem
     in which:
     ```math
     \begin{aligned}
-    \mathbf{û_0}(k)     &= \mathbf{u_0}(k) + \mathbf{y_{s_u}(k)}                            \\
+    \mathbf{û_0}(k)     &= \mathbf{u_0}(k) + \mathbf{y_{s_u}}(k)                            \\
     \mathbf{y_{s_u}}(k) &= \mathbf{C_{s_u} x_s}(k)                                          \\
     \mathbf{y_{s_y}}(k) &= \mathbf{C_{s_y} x_s}(k)
     \end{aligned}
