@@ -56,32 +56,25 @@ for this transcription method.
 """
 struct MultipleShooting <: ShootingMethod end
 
-"Get the number of elements in the optimization decision vector `Z`."
-function get_nZ(estim::StateEstimator, ::SingleShooting, Hp, Hc)
-    return estim.model.nu*Hc
-end
-function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
-    return estim.model.nu*Hc + estim.nx̂*Hp
-end
-
-
 @doc raw"""
     TrapezoidalCollocation()
 
-An implicit trapezoidal transcription method (not yet implemented).
+Construct an implicit trapezoidal [`TranscriptionMethod`](@ref).
 
-This is presumably the simplest collocation method. It can handle moderately stiff systems
-and is A-stable. However, it may not be as efficient as more advanced methods for highly
-stiff systems. The decision variables are the same as for [`MultipleShooting`](@ref), hence
-a similar algorithm complexity.
+This is the simplest collocation method. It is only supported for continuous-time
+[`NonLinModel`](@ref)s. It can handle moderately stiff systems and is A-stable. The decision
+variables are the same as for [`MultipleShooting`](@ref), hence similar computational costs. 
+However, it may not be as efficient as more advanced collocation methods for highly stiff
+systems. It currently assumes piecewise constant manipulated inputs (or zero-order hold) 
+between the samples, but linear interpolation will be added in the future. See Extended Help
+for more details on the collocation/defect constraints.
 
 # Extended Help
 
 !!! details "Extended Help"
-    The trapezoidal method estimates the defects with:
-    by:
+    The implicit trapezoidal collocation estimates the defects with:
     ```math
-    \mathbf{Ŝ}(k) = \mathbf{Ẽ_ŝ Z̃} + \mathbf{K_ŝ x̂_0}(k) + 0.5\frac{T_s}\big(\mathbf{F̂}(k+1) + \mathbf{F̂}(k)\big)
+    \mathbf{s_d}(k) = \mathbf{x_0} \frac{T_s}{2}\big(\mathbf{F̂}(k+1) + \mathbf{F̂}(k)\big)
     ```
     where ``T_s`` is the sampling period, ``\mathbf{Ẽ}`` the matrix defined at 
     [`init_defectmat`](@ref), and ``\mathbf{F̂}(k+j)`` the stacked vector of system
@@ -99,7 +92,6 @@ a similar algorithm complexity.
 """
 struct TrapezoidalCollocation <: CollocationMethod end
 
-
 function validate_transcription(::LinModel, ::CollocationMethod)
     throw(ArgumentError("Collocation methods are not supported for LinModel."))
     return nothing
@@ -109,6 +101,14 @@ function validate_transcription(::NonLinModel{<:Real, <:EmptySolver}, ::Collocat
     return nothing
 end
 validate_transcription(::SimModel, ::TranscriptionMethod) = nothing
+
+"Get the number of elements in the optimization decision vector `Z`."
+function get_nZ(estim::StateEstimator, ::SingleShooting, Hp, Hc)
+    return estim.model.nu*Hc
+end
+function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
+    return estim.model.nu*Hc + estim.nx̂*Hp
+end
 
 @doc raw"""
     init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
@@ -1015,11 +1015,10 @@ function linconstrainteq!(mpc::PredictiveController, model::LinModel, ::Multiple
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
-linconstrainteq!(::PredictiveController, ::SimModel, ::SingleShooting) = nothing
-linconstrainteq!(::PredictiveController, ::SimModel, ::MultipleShooting) = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::TranscriptionMethod) = nothing
 
 @doc raw"""
-    set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var) -> Z̃s
+    set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
 
 Set and return the warm-start value of `Z̃var` for [`SingleShooting`](@ref) transcription.
 
@@ -1050,9 +1049,9 @@ function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
 end
 
 @doc raw"""
-    set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var) -> Z̃s
+    set_warmstart!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var) -> Z̃s
 
-Set and return the warm-start value of `Z̃var` for [`MultipleShooting`](@ref) transcription.
+Set and return the warm-start value of `Z̃var` for other [`TranscriptionMethod`](@ref).
 
 It warm-starts the solver at:
 ```math
@@ -1075,7 +1074,7 @@ where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` comput
 last control period ``k-1``, expressed as a deviation from the operating point 
 ``\mathbf{x̂_{op}}``.
 """
-function set_warmstart!(mpc::PredictiveController, ::MultipleShooting, Z̃var)
+function set_warmstart!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var)
     nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
     # --- input increments ΔU ---
     Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
@@ -1307,6 +1306,7 @@ function con_nonlinprogeq!(
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
+        # handle operating points (but should be zeros for NonLinModel):
         x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
         ŝnext .= x̂0next .- x̂0next_Z̃
         x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
@@ -1315,7 +1315,30 @@ function con_nonlinprogeq!(
     return geq
 end
 
+@docs raw"""
+    con_nonlinprogeq!(
+        geq, X̂0, Û0, K0
+        mpc::PredictiveController, model::NonLinModel, ::TrapezoidalCollocation, U0, Z̃
+    )
 
+Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
+
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The deterministic
+and stochastic states are handled separately since collocation methods require 
+continuous-time state-space models, and the stochastic model of the unmeasured disturbances
+is discrete-time. Also note that operating points in `model` are typically zeros for 
+[`NonLinModel`](@ref), but they are handled rigorously here if it's not the case. It should
+be noted that linearization of continuous-time dynamics at non-equilibrium points leads to:
+```math
+    \mathbf{ẋ_0}(t)   ≈ \mathbf{A x_0}(t) + \mathbf{B_u u_0}(t) + \mathbf{B_d d_0}(t)
+```
+as opposed to, for discrete-time models:
+```math
+    \mathbf{x_0}(k+1) ≈ \mathbf{A x_0}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) 
+                         + \mathbf{f_{op} - \mathbf{x_{op}}
+```
+hence no need to add `model.fop` and subtract `model.xop` in the collocation equations.
+"""
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
     mpc::PredictiveController, model::NonLinModel, ::TrapezoidalCollocation, U0, Z̃
@@ -1344,26 +1367,19 @@ function con_nonlinprogeq!(
         xd, xs              = @views x̂0[1:nx], x̂0[nx+1:end]
         xdnext_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
         sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
-
         mul!(û0, Cs_u, xs)      # ys_u = Cs_u*xs
         û0 .+= u0               # û0 = u0 + ys_u
-
-        ẋd, ẋdnext = @views k0[1:nx], k0[nx+1:2*nx]
-        # TODO: decide what to do with model.xop and model.fop
-        model.f!(ẋd, xd, û0, d0, p)
-        model.f!(ẋdnext, xdnext_Z̃, û0, d0next, p) # with ZOH on manipulated inputs u
-
+        ẋ0, ẋ0next = @views k0[1:nx], k0[nx+1:2*nx]
+        # no need to handle model.fop and model.xop, see docstring:
+        model.f!(ẋ0, xd, û0, d0, p)
+        model.f!(ẋ0next, xdnext_Z̃, û0, d0next, p) # assuming ZOH on manipulated inputs u
         xsnext = @views x̂0next[nx+1:end]
         mul!(xsnext, As, xs)
-   
-        sdnext .= @. xd - xdnext_Z̃ + (Ts/2)*(ẋd + ẋdnext)
+        sdnext .= @. xd - xdnext_Z̃ + (Ts/2)*(ẋ0 + ẋ0next)
         ssnext .= @. xsnext - xsnext_Z̃
-        
         x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
         d0 = d0next
     end
     return geq
 end
-
-con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::NonLinModel,::SingleShooting,  _,_)=geq
-con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::LinModel,::TranscriptionMethod,_,_)=geq
+con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::SimModel,::TranscriptionMethod,_,_)=geq
