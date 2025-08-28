@@ -39,7 +39,7 @@ export MovingHorizonEstimator
 export ManualEstimator
 export default_nint, initstate!
 export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
-export TranscriptionMethod, SingleShooting, MultipleShooting, TrapezoidalMethod
+export TranscriptionMethod, SingleShooting, MultipleShooting, TrapezoidalCollocation
 export SimResult, getinfo, sim!
 
 include("general.jl")

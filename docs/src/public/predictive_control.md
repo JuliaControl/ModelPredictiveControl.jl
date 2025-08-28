@@ -110,8 +110,8 @@ SingleShooting
 MultipleShooting
 ```
 
-### TrapezoidalMethod
+### TrapezoidalCollocation
 
 ```@docs
-TrapezoidalMethod
+TrapezoidalCollocation
 ```
