@@ -600,11 +600,11 @@ end
         ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
         Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
         gc!=nothing, nc=0
-    ) -> con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ
+    ) -> con, nϵ, P̃Δu, P̃u, Ẽ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
-Also return `P̃Δu`, `P̃u`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `Z̃`.
+Also return `P̃Δu`, `P̃u` and `Ẽ` matrices for the the augmented decision vector `Z̃`.
 """
 function init_defaultcon_mpc(
     estim::StateEstimator{NT}, 
@@ -660,7 +660,7 @@ function init_defaultcon_mpc(
         C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc
     )
-    return con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ
+    return con, nϵ, P̃Δu, P̃u, Ẽ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
