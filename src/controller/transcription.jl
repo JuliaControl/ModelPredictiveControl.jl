@@ -78,12 +78,18 @@ equality constraint function and by using the implicit trapezoidal rule. It can 
 moderately stiff systems and is A-stable. However, it may not be as efficient as more
 advanced collocation methods for highly stiff systems. Note that the stochastic model of the
 unmeasured disturbances is strictly discrete-time, it is thus transcribed separately using 
-[`MultipleShooting`](@ref).
+[`MultipleShooting`](@ref). Also note that the state  
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
 transcription method.
 """
-struct TrapezoidalCollocation <: CollocationMethod end
+struct TrapezoidalCollocation <: CollocationMethod
+    nc::Int
+    function TrapezoidalCollocation() 
+        nc = 2 # 2 collocation points per interval for trapezoidal rule
+        return new(nc)
+    end
+end
 
 function validate_transcription(::LinModel, ::CollocationMethod)
     throw(ArgumentError("Collocation methods are not supported for LinModel."))
@@ -102,6 +108,10 @@ end
 function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
+
+"Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
+get_nk(model::SimModel, ::ShootingMethod) = model.nk
+get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.nc
 
 @doc raw"""
     init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
@@ -1271,7 +1281,8 @@ end
 """
     con_nonlinprogeq!(
         geq, X̂0, Û0, K0
-        mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
+        mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
+        U0, Z̃
     )
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
@@ -1311,7 +1322,8 @@ end
 @doc raw"""
     con_nonlinprogeq!(
         geq, X̂0, Û0, K0
-        mpc::PredictiveController, model::NonLinModel, ::TrapezoidalCollocation, U0, Z̃
+        mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
+        U0, Z̃
     )
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
@@ -1334,16 +1346,15 @@ hence no need to add `model.fop` and subtract `model.xop` in the collocation equ
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
-    mpc::PredictiveController, model::NonLinModel, ::TrapezoidalCollocation, U0, Z̃
+    mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
+    U0, Z̃
 )
     nu, nx̂, nd, nx = model.nu, mpc.estim.nx̂, model.nd, model.nx
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
-
     Ts, p = model.Ts, model.p
     As, Cs_u = mpc.estim.As, mpc.estim.Cs_u
-    # K0 stores the state derivatives at each collocation point for all intervals
-    nk = model.nk # TODO: initialize K0 to the adequate size for a given collocation method 
+    nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     x̂0 = @views mpc.estim.x̂0[1:nx̂]

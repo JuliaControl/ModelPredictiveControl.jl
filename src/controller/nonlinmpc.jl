@@ -562,8 +562,10 @@ Inspired from: [User-defined operators with vector outputs](@extref JuMP User-de
 function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
     # ----------- common cache for Jfunc, gfuncs and geqfuncs  ----------------------------
     model = mpc.estim.model
+    transcription = mpc.transcription
     grad, jac = mpc.gradient, mpc.jacobian
-    nu, ny, nx̂, nϵ, nk = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, model.nk
+    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
+    nk = get_nk(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
     nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
