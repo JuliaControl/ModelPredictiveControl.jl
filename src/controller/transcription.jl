@@ -22,8 +22,11 @@ any custom move blocking):
     \vdots                          \\ 
     \mathbf{Δu}(k+H_c-1)            \end{bmatrix}
 ```
-This method is generally more efficient for small control horizon ``H_c``, stable and mildly
-nonlinear plant model/constraints.
+This method computes the predictions by calling the augmented discrete-time model
+recursively over the prediction horizon ``H_p`` in the objective function, or by updating
+the linear coefficients of the quadratic optimization for [`LinModel`](@ref). It is 
+generally  more efficient for small control horizon ``H_c``, stable and mildly nonlinear
+plant model/constraints.
 """
 struct SingleShooting <: ShootingMethod end
 
@@ -48,7 +51,11 @@ operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
 where ``\mathbf{x̂}_i(k+j)`` is the state prediction for time ``k+j``, estimated by the
 observer at time ``i=k`` or ``i=k-1`` depending on its `direct` flag. Note that 
 ``\mathbf{X̂_0 = X̂}`` if the operating point is zero, which is typically the case in practice
-for [`NonLinModel`](@ref). This transcription method is generally more efficient for large
+for [`NonLinModel`](@ref). 
+    
+This transcription computes the predictions by calling the augmented discrete-time model
+in the equality constraint function recursively over ``H_p``, or by updating the linear
+equality constraint vector for [`LinModel`](@ref). It is generally more efficient for large
 control horizon ``H_c``, unstable or highly nonlinear plant models/constraints. 
 
 Sparse optimizers like `OSQP` or `Ipopt` and sparse Jacobian computations are recommended
@@ -61,34 +68,20 @@ struct MultipleShooting <: ShootingMethod end
 
 Construct an implicit trapezoidal [`TranscriptionMethod`](@ref).
 
-This is the simplest collocation method. It is only supported for continuous-time
-[`NonLinModel`](@ref)s. It can handle moderately stiff systems and is A-stable. The decision
-variables are the same as for [`MultipleShooting`](@ref), hence similar computational costs. 
-However, it may not be as efficient as more advanced collocation methods for highly stiff
-systems. It currently assumes piecewise constant manipulated inputs (or zero-order hold) 
-between the samples, but linear interpolation will be added in the future. See Extended Help
-for more details on the collocation/defect constraints.
+This is the simplest collocation method. It supports continuous-time [`NonLinModel`](@ref)s
+only. The decision variables are the same as for [`MultipleShooting`](@ref), hence similar
+computational costs. It currently assumes piecewise constant manipulated inputs (or zero-
+order hold) between the samples, but linear interpolation will be added soon.
 
-# Extended Help
+This transcription computes the predictions by calling the continuous-time model in the
+equality constraint function and by using the implicit trapezoidal rule. It can handle
+moderately stiff systems and is A-stable. However, it may not be as efficient as more
+advanced collocation methods for highly stiff systems. Note that the stochastic model of the
+unmeasured disturbances is strictly discrete-time, it is thus transcribed separately using 
+[`MultipleShooting`](@ref).
 
-!!! details "Extended Help"
-    The implicit trapezoidal collocation estimates the defects with:
-    ```math
-    \mathbf{s_d}(k) = \mathbf{x_0} \frac{T_s}{2}\big(\mathbf{F̂}(k+1) + \mathbf{F̂}(k)\big)
-    ```
-    where ``T_s`` is the sampling period, ``\mathbf{Ẽ}`` the matrix defined at 
-    [`init_defectmat`](@ref), and ``\mathbf{F̂}(k+j)`` the stacked vector of system
-
-    where ``\mathbf{f̂}(k+j) = \mathbf{f̂}\big(\mathbf{x̂}(k+j), \mathbf{u}(k+j), \mathbf{d}(k+j)\big)``.
-    This leads to the following defect constraints for ``j=0`` to ``H_p-1``:
-    ```math
-    \mathbf{ŝ}(k+j) = \mathbf{x̂}(k+j+1) - \mathbf{x̂}(k+j) - \frac{T_s}{2} \big( \mathbf{f̂}(k+j) + \mathbf{f̂}(k+j+1) \big) = 0
-    ```
-    which are added as equality constraints in the optimization problem. The initial state
-    ``\mathbf{x̂}(k)`` is given by the state estimator, and the future states
-    ``\mathbf{x̂}(k+j+1)`` are decision variables in the optimization problem. The method
-    requires evaluating the system dynamics at both the current and next time steps, which
-    can increase computational complexity compared to explicit methods like single shooting.
+Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
+transcription method.
 """
 struct TrapezoidalCollocation <: CollocationMethod end
 
