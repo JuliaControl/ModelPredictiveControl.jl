@@ -94,7 +94,7 @@ a similar algorithm complexity.
     requires evaluating the system dynamics at both the current and next time steps, which
     can increase computational complexity compared to explicit methods like single shooting.
 """
-struct TrapezoidalMethod <: TranscriptionMethod end
+struct TrapezoidalCollocation <: TranscriptionMethod end
 
 
 @doc raw"""
