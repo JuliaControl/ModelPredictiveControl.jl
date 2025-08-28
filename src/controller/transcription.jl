@@ -76,14 +76,20 @@ order hold) between the samples, but linear interpolation will be added soon.
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
 moderately stiff systems and is A-stable. However, it may not be as efficient as more
-advanced collocation methods for highly stiff systems. Note that the stochastic model of the
-unmeasured disturbances is strictly discrete-time, it is thus transcribed separately using 
-[`MultipleShooting`](@ref). Also note that the built-in [`StateEstimator`](@ref) will still
-use the `solver` provided at the construction of the [`NonLinModel`](@ref) to estimate the
-plant states, not the trapezoidal rule (see `supersample` option for stiff systems). 
+advanced collocation methods for highly stiff systems. Note that the built-in [`StateEstimator`](@ref)
+will still use the `solver` provided at the construction of the [`NonLinModel`](@ref) to
+estimate the plant states, not the trapezoidal rule (see `supersample` option of 
+[`RungeKutta`](@ref) for stiff systems). See Extended Help for more details.
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
 transcription method.
+
+# Extended Help
+!!! details "Extended Help"
+    Note that the stochastic model of the unmeasured disturbances is strictly discrete-time,
+    as described in [`ModelPredictiveControl.init_estimstoch`](@ref). Collocation methods
+    require continuous-time dynamics. Because of this, the stochastic states are transcribed
+    separately using a [`MultipleShooting`](@ref) method.
 """
 struct TrapezoidalCollocation <: CollocationMethod
     nc::Int
