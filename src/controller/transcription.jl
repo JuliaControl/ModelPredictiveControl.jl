@@ -1315,7 +1315,7 @@ function con_nonlinprogeq!(
     return geq
 end
 
-@docs raw"""
+@doc raw"""
     con_nonlinprogeq!(
         geq, X̂0, Û0, K0
         mpc::PredictiveController, model::NonLinModel, ::TrapezoidalCollocation, U0, Z̃
