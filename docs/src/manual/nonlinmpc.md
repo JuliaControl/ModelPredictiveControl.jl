@@ -119,8 +119,10 @@ umin, umax = [-1.5], [+1.5]
 nmpc = setconstraint!(nmpc; umin, umax)
 ```
 
-The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. We test `mpc`
-performance on `plant` by imposing an angular setpoint of 180° (inverted position):
+The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. By default,
+[`NonLinMPC`](@ref) controllers use [`Ipopt`](https://coin-or.github.io/Ipopt/) and a direct
+[`SingleShooting`](@ref) transcription method to solve the optimal control problem. We test
+`mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted position):
 
 ```@example man_nonlin
 using JuMP; unset_time_limit_sec(nmpc.optim) # hide

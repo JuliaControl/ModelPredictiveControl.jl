@@ -33,6 +33,7 @@ function Base.show(io::IO, mpc::PredictiveController)
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
     println(io, "$(typeof(mpc).name.name) controller with a sample time Ts = "*
                 "$(mpc.estim.model.Ts) s, $(JuMP.solver_name(mpc.optim)) optimizer, "*
+                "$(typeof(mpc.transcription).name.name) transcription, "*
                 "$(typeof(mpc.estim).name.name) estimator and:")
     println(io, "$(lpad(Hp, n)) prediction steps Hp")
     println(io, "$(lpad(Hc, n)) control steps Hc")
