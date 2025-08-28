@@ -78,8 +78,9 @@ mpc = setconstraint!(mpc, ymin=[48, -Inf])
 
 in which `Hp` and `Hc` keyword arguments are respectively the predictive and control
 horizons, and `Mwt` and `Nwt`, the output setpoint tracking and move suppression weights. By
-default, [`LinMPC`](@ref) controllers use [`OSQP`](https://osqp.org/) to solve the problem,
-soft constraints on output predictions ``\mathbf{ŷ}`` to ensure feasibility, and a
+default, [`LinMPC`](@ref) controllers use [`OSQP`](https://osqp.org/) and a direct
+[`SingleShooting`](@ref) transcription method to solve the optimal control problem, soft
+constraints on output predictions ``\mathbf{ŷ}`` to ensure feasibility, and a
 [`SteadyKalmanFilter`](@ref) to estimate the plant states[^1]. An attentive reader will also
 notice that the Kalman filter estimates two additional states compared to the plant model.
 These are the integrating states for the unmeasured plant disturbances, and they are

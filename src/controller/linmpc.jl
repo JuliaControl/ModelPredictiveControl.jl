@@ -168,7 +168,7 @@ arguments. This controller allocates memory at each time step for the optimizati
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
 
 julia> mpc = LinMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
+LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SingleShooting transcription, SteadyKalmanFilter estimator and:
  30 prediction steps Hp
   1 control steps Hc
   1 slack variable ϵ (control constraints)
@@ -238,7 +238,7 @@ Use custom state estimator `estim` to construct `LinMPC`.
 julia> estim = KalmanFilter(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4), i_ym=[2]);
 
 julia> mpc = LinMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, KalmanFilter estimator and:
+LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SingleShooting transcription, KalmanFilter estimator and:
  30 prediction steps Hp
   1 control steps Hc
   1 slack variable ϵ (control constraints)
