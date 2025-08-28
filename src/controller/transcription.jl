@@ -78,7 +78,9 @@ equality constraint function and by using the implicit trapezoidal rule. It can 
 moderately stiff systems and is A-stable. However, it may not be as efficient as more
 advanced collocation methods for highly stiff systems. Note that the stochastic model of the
 unmeasured disturbances is strictly discrete-time, it is thus transcribed separately using 
-[`MultipleShooting`](@ref). Also note that the state  
+[`MultipleShooting`](@ref). Also note that the built-in [`StateEstimator`](@ref) will still
+use the `solver` provided at the construction of the [`NonLinModel`](@ref) to estimate the
+plant states, not the trapezoidal rule (see `supersample` option for stiff systems). 
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
 transcription method.
