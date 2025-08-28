@@ -100,6 +100,16 @@ a similar algorithm complexity.
 struct TrapezoidalCollocation <: CollocationMethod end
 
 
+function validate_transcription(::LinModel, ::CollocationMethod)
+    throw(ArgumentError("Collocation methods are not supported for LinModel."))
+    return nothing
+end
+function validate_transcription(::NonLinModel{<:Real, <:EmptySolver}, ::CollocationMethod)
+    throw(ArgumentError("Collocation methods require continuous-time NonLinModel."))
+    return nothing
+end
+validate_transcription(::SimModel, ::TranscriptionMethod) = nothing
+
 @doc raw"""
     init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
 
@@ -206,7 +216,9 @@ function init_ZtoU(
     return Pu, Tu
 end
 
-init_PUmat( _ , ::SingleShooting, _ , _ , PuDagger) = PuDagger
+function init_PUmat(_,::SingleShooting,_,_,PuDagger::AbstractMatrix{NT}) where NT<:Real
+    return PuDagger
+end
 function init_PUmat(
     estim, ::TranscriptionMethod, Hp, _ , PuDagger::AbstractMatrix{NT}
 ) where NT<:Real
