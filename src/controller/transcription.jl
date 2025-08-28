@@ -1335,7 +1335,7 @@ be noted that linearization of continuous-time dynamics at non-equilibrium point
 as opposed to, for discrete-time models:
 ```math
     \mathbf{x_0}(k+1) ≈ \mathbf{A x_0}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) 
-                         + \mathbf{f_{op} - \mathbf{x_{op}}
+                         + \mathbf{f_{op}} - \mathbf{x_{op}}
 ```
 hence no need to add `model.fop` and subtract `model.xop` in the collocation equations.
 """
