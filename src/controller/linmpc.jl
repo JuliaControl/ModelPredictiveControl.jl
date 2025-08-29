@@ -5,7 +5,7 @@ struct LinMPC{
     NT<:Real, 
     SE<:StateEstimator, 
     CW<:ControllerWeights,
-    TM<:TranscriptionMethod,
+    TM<:ShootingMethod,
     JM<:JuMP.GenericModel
 } <: PredictiveController{NT}
     estim::SE
@@ -54,7 +54,7 @@ struct LinMPC{
             NT<:Real, 
             SE<:StateEstimator, 
             CW<:ControllerWeights,
-            TM<:TranscriptionMethod, 
+            TM<:ShootingMethod, 
             JM<:JuMP.GenericModel
         }
         model = estim.model
@@ -63,6 +63,7 @@ struct LinMPC{
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         lastu0 = zeros(NT, nu)
+        validate_transcription(model, transcription)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
@@ -71,7 +72,7 @@ struct LinMPC{
         Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc)
         # dummy vals (updated just before optimization):
         F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
-        con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ = init_defaultcon_mpc(
+        con, nϵ, P̃Δu, P̃u, Ẽ = init_defaultcon_mpc(
             estim, weights, transcription,
             Hp, Hc, 
             PΔu, Pu, E, 
@@ -156,7 +157,7 @@ arguments. This controller allocates memory at each time step for the optimizati
 - `N_Hc=Diagonal(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
 - `L_Hp=Diagonal(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
-- `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
+- `transcription=SingleShooting()` : [`SingleShooting`](@ref) or [`MultipleShooting`](@ref).
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](@extref) object (default to 
   [`OSQP`](https://osqp.org/docs/parsers/jump.html) optimizer).
@@ -215,7 +216,7 @@ function LinMPC(
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt = DEFAULT_CWT,
-    transcription::TranscriptionMethod = DEFAULT_LINMPC_TRANSCRIPTION,
+    transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
@@ -259,7 +260,7 @@ function LinMPC(
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
-    transcription::TranscriptionMethod = DEFAULT_LINMPC_TRANSCRIPTION,
+    transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
     isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 

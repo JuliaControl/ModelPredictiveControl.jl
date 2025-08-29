@@ -50,6 +50,7 @@ struct ExplicitMPC{
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         lastu0 = zeros(NT, nu)
         transcription = SingleShooting() # explicit MPC only supports SingleShooting
+        validate_transcription(model, transcription)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
         E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
