@@ -83,7 +83,7 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["MultipleShooting"] =
 UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["TrapezoidalCollocation"] =
     @benchmarkable(
         moveinput!($nmpc_nonlin_tc, $y_c, $d_c),
-        setup=preparestate!($nmpc_nonlin_ms, $y_c, $d_c),
+        setup=preparestate!($nmpc_nonlin_tc, $y_c, $d_c),
         samples=samples, evals=evals, seconds=seconds
     )
 
@@ -239,7 +239,6 @@ CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(test_mpc_d($mpc_d_ipopt_ms, $plant); 
         samples=samples, evals=evals
     )
-
 
 # ----------------- Case study: Pendulum noneconomic -----------------------------
 model, p = pendulum_model, pendulum_p

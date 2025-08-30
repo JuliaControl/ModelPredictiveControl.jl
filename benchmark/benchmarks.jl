@@ -8,6 +8,6 @@ SUITE["UNIT TESTS"]   = BenchmarkGroup(["allocation-free", "allocations", "singl
 SUITE["CASE STUDIES"] = BenchmarkGroup(["performance", "speed" ,"integration"])
 
 include("0_bench_setup.jl")
-#include("1_bench_sim_model.jl")
-#include("2_bench_state_estim.jl")
+include("1_bench_sim_model.jl")
+include("2_bench_state_estim.jl")
 include("3_bench_predictive_control.jl")
