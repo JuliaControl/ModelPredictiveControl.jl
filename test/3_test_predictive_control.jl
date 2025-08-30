@@ -799,17 +799,13 @@ end
     # execute update_predictions! branch in `geqfunc_i` for coverage:
     geq_end = nmpc5.optim[:geq_2].func
     @test_nowarn geq_end(5.0, 4.0, 3.0, 2.0)
-
     f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
     h! = (y,x,_,_) -> y .= x 
-    nonlinmodel_c = NonLinModel(f!, h!, 100, 1, 1, 1)
+    nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
     nmpc5 = NonLinMPC(nonlinmodel_c, Nwt=[0], Hp=100, Hc=1, transcription=TrapezoidalCollocation())
     preparestate!(nmpc5, [0.0])
     u = moveinput!(nmpc5, [1/0.001])
-    #@test u ≈ [1.0] atol=5e-2
-    println(u)
-    using Plots; plot(sim!(nmpc5, 100, [1/0.001])) |> display
-
+    @test u ≈ [1.0] atol=5e-2
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     preparestate!(nmpc6, [0])
     @test moveinput!(nmpc6, [0]) ≈ [0.0] atol=5e-2
