@@ -16,6 +16,11 @@ linmodel = setop!(LinModel(sys, Ts, i_d=[3]), uop=[10, 50], yop=[50, 30], dop=[5
 nonlinmodel = NonLinModel(f_lin!, h_lin!, Ts, 2, 4, 2, 1, p=linmodel, solver=nothing)
 nonlinmodel = setop!(nonlinmodel, uop=[10, 50], yop=[50, 30], dop=[5])
 u, d, y = [10, 50], [5], [50, 30]
+nonlinmodel_c = NonLinModel(
+    (ẋ,x,u,d,_) -> ẋ .= -0.001x .+ u .+ d , 
+    (y,x,d,_) -> y .= x .+ 0.001d, 500, 1, 1, 1, 1
+)
+u_c, d_c, y_c = [1], [0], [0]
 
 G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);
       tf(-0.74,[8, 1])  tf(0.74, [8, 1]) ]
