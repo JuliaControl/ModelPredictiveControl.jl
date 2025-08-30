@@ -699,6 +699,12 @@ end
     @test length(nmpc16.Z̃) == nonlinmodel.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
     @test nmpc16.con.neq == nmpc16.estim.nx̂*nmpc16.Hp
     @test nmpc16.con.nc == 10
+    nonlinmodel_c = NonLinModel((ẋ,x,u,_,_)->ẋ .= -0.1x .+ u, (y,x,_,_)->y.=x, 1, 1, 1, 1)
+    nmpc16 = NonLinMPC(nonlinmodel_c, Hp=10, transcription=TrapezoidalCollocation(), nc=10, gc=gc!)
+    @test nmpc16.transcription == TrapezoidalCollocation()
+    @test length(nmpc16.Z̃) == nonlinmodel_c.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
+    @test nmpc16.con.neq == nmpc16.estim.nx̂*nmpc16.Hp
+    @test nmpc16.con.nc == 10
     nmpc17 = NonLinMPC(linmodel1, Hp=10, transcription=MultipleShooting())
     @test nmpc17.transcription == MultipleShooting()
     @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
@@ -721,6 +727,7 @@ end
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, JE  = (_,_,_)->0.0)
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation())
 
     @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, JE=(Ue,_,_,_)->Ue)
     @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
@@ -792,6 +799,13 @@ end
     # execute update_predictions! branch in `geqfunc_i` for coverage:
     geq_end = nmpc5.optim[:geq_2].func
     @test_nowarn geq_end(5.0, 4.0, 3.0, 2.0)
+    f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
+    h! = (y,x,_,_) -> y .= x 
+    nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
+    nmpc5 = NonLinMPC(nonlinmodel_c, Nwt=[0], Hp=100, Hc=1, transcription=TrapezoidalCollocation())
+    preparestate!(nmpc5, [0.0])
+    u = moveinput!(nmpc5, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     preparestate!(nmpc6, [0])
     @test moveinput!(nmpc6, [0]) ≈ [0.0] atol=5e-2
