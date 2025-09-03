@@ -115,6 +115,7 @@ for more detailed examples.
 - supported transcription methods of the optimization problem:
   - direct single shooting
   - direct multiple shooting
+  - trapezoidal collocation
 - additional information about the optimum to ease troubleshooting
 - real-time control loop features:
   - implementations that carefully limits the allocations
