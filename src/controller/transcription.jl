@@ -1149,7 +1149,7 @@ end
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
 The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments. The augmented model of
-[`f̂!`](@ref) and [`ĥ!`](@ref) is called recursively in a `for` loop.
+[`f̂!`](@ref) and [`ĥ!`](@ref) is called recursively in a `for` loop:
 """
 function predict!(
     Ŷ0, x̂0end, X̂0, Û0, K0,
@@ -1302,12 +1302,14 @@ end
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The defects are
-updated with:
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The nonlinear 
+equality constraints `geq` only includes the state defects, computed with:
 ```math
 \mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) 
-                    + \text{TODO}
+                    - \mathbf{x̂_0^†}(k+1)
 ```
+in which ``\mathbf{x̂_0^†}`` is the augmented state extracted from the decision variables 
+`Z̃`, and ``\mathbf{f̂}``, the augmented state function defined in [`f̂!`](@ref).
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
@@ -1346,21 +1348,33 @@ end
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The deterministic
-and stochastic states are handled separately since collocation methods require 
-continuous-time state-space models, and the stochastic model of the unmeasured disturbances
-is discrete-time. Also note that operating points in `model` are typically zeros for 
-[`NonLinModel`](@ref), but they are handled rigorously here if it's not the case. It should
-be noted that linearization of continuous-time dynamics at non-equilibrium points leads to:
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. 
+
+The nonlinear equality constraints `geq` only includes the state defects. The deterministic
+and stochastic states are handled separately since collocation methods require continuous-
+time state-space models, and the stochastic model of the unmeasured disturbances
+is discrete-time. The deterministic and stochastic defects are respectively computed with:
 ```math
-    \mathbf{ẋ_0}(t)   ≈ \mathbf{A x_0}(t) + \mathbf{B_u u_0}(t) + \mathbf{B_d d_0}(t)
+\begin{aligned}
+\mathbf{s_d}(k+1) &= \mathbf{x_0}(k) - \mathbf{x_0^†}(k+1) 
+                      + 0.5 T_s (\mathbf{k}_1 + \mathbf{k}_2) \\
+\mathbf{s_s}(k+1) &= \mathbf{A_s x_s}(k) - \mathbf{x_s^†}(k+1)
+\end{aligned}
 ```
-as opposed to, for discrete-time models:
+in which ``\mathbf{x_0^†}`` and ``\mathbf{x_s^†}`` are the deterministic and stochastic
+states extracted from the decision variables `Z̃`. The ``\mathbf{k}`` coefficients are 
+evaluated from the continuous-time function `model.f!` and:
 ```math
-    \mathbf{x_0}(k+1) ≈ \mathbf{A x_0}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) 
-                         + \mathbf{f_{op}} - \mathbf{x_{op}}
+\begin{aligned}
+\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),     \mathbf{û_0}(k), \mathbf{d_0}(k)  \Big) \\
+\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0^†}(k+1), \mathbf{û_0}(k), \mathbf{d_0}(k+1)\Big) 
+\end{aligned}
 ```
-hence no need to add `model.fop` and subtract `model.xop` in the collocation equations.
+and the input of the augmented model is:
+```math
+\mathbf{û_0}(k) = \mathbf{u_0}(k) + \mathbf{C_{s_u} x_s}(k)
+``` 
+the ``\mathbf{A_s, C_{s_u}}`` matrices are defined in [`init_estimstoch`](@ref) doc.
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
@@ -1391,13 +1405,12 @@ function con_nonlinprogeq!(
         sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
         mul!(û0, Cs_u, xs)      # ys_u = Cs_u*xs
         û0 .+= u0               # û0 = u0 + ys_u
-        ẋ0, ẋ0next = @views k0[1:nx], k0[nx+1:2*nx]
-        # no need to handle model.fop and model.xop, see docstring:
-        model.f!(ẋ0, xd, û0, d0, p)
-        model.f!(ẋ0next, xdnext_Z̃, û0, d0next, p) # assuming ZOH on manipulated inputs u
+        k1, k2 = @views k0[1:nx], k0[nx+1:2*nx]
+        model.f!(k1, xd, û0, d0, p)
+        model.f!(k2, xdnext_Z̃, û0, d0next, p) # assuming ZOH on manipulated inputs u
         xsnext = @views x̂0next[nx+1:end]
         mul!(xsnext, As, xs)
-        sdnext .= @. xd - xdnext_Z̃ + (Ts/2)*(ẋ0 + ẋ0next)
+        sdnext .= @. xd - xdnext_Z̃ + (Ts/2)*(k1 + k2)
         ssnext .= @. xsnext - xsnext_Z̃
         x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
         d0 = d0next
@@ -1405,5 +1418,5 @@ function con_nonlinprogeq!(
     return geq
 end
 
-"No equality constraints for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
+"No eq. constraints for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
 con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::SimModel,::TranscriptionMethod,_,_)=geq

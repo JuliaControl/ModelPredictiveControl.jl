@@ -65,10 +65,23 @@ function f̂!(x̂0next, û0, k0, estim::StateEstimator, model::SimModel, x̂0, 
     return f̂!(x̂0next, û0, k0, model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0)
 end
 
-"""
+@doc raw"""
     f̂!(x̂0next, _ , _ , estim::StateEstimator, model::LinModel, x̂0, u0, d0) -> nothing
 
 Use the augmented model matrices and operating points if `model` is a [`LinModel`](@ref).
+
+# Extended Help
+!!! details "Extended Help"
+
+    This method computes:
+    ```math
+    \begin{aligned}
+    \mathbf{x̂_0}(k+1) &= \mathbf{Â x̂_0}(k) + \mathbf{B̂_u u_0}(k) + \mathbf{B̂_d d_0}(k)
+                         + \mathbf{f̂_{op}} - \mathbf{x̂_{op}}                                \\
+    \mathbf{ŷ_0}(k)   &= \mathbf{Ĉ x̂_0}(k) + \mathbf{D̂_d d_0}(k)
+    \end{aligned}
+    ```
+    with the augmented matrices constructed by [`augment_model`](@ref).
 """
 function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
     mul!(x̂0next, estim.Â,  x̂0)
