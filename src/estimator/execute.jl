@@ -22,7 +22,7 @@ By introducing an augmented state vector ``\mathbf{x̂_0}`` like in [`augment_mo
 the function returns the next state of the augmented model, as deviation vectors:
 ```math
 \begin{aligned}
-    \mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big)
+    \mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) \\
     \mathbf{ŷ_0}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k)\Big) 
 \end{aligned}
 ```
