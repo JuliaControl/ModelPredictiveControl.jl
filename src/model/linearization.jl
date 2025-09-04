@@ -157,9 +157,9 @@ julia> linearize!(linmodel, model, x=[20.0], u=[0.0]); linmodel.A
 ```
 """
 function linearize!(
-    linmodel::LinModel{NT}, model::SimModel; 
+    linmodel::LinModel, model::SimModel; 
     x=(model.buffer.x.=model.x0.+model.xop), u=model.uop, d=model.dop
-) where NT<:Real
+)
     nonlinmodel = model
     buffer = nonlinmodel.buffer
     # --- remove the operating points of the nonlinear model (typically zeros) ---
@@ -172,16 +172,19 @@ function linearize!(
     # --- compute the nonlinear model output at operating points ---
     x0next, y0 = linmodel.buffer.x, linmodel.buffer.y
     h!(y0, nonlinmodel, x0, d0, model.p)
-    y  = y0
-    y .= y0 .+ nonlinmodel.yop
+    y0 .+= nonlinmodel.yop
+    y = y0
     # --- compute the nonlinear model next state at operating points ---
     f!(x0next, k0, nonlinmodel, x0, u0, d0, model.p)
-    xnext  = x0next
-    xnext .= x0next .+ nonlinmodel.fop .- nonlinmodel.xop
+    x0next .+= nonlinmodel.fop 
+    xnext = x0next  # xnext = f(x0,u0,d0) + fop - xop + xop = f(x0,u0,d0) + fop
+    # --- recompute x since it was modified in buffer.x ---
+    x0 .+= nonlinmodel.xop
+    x = x0
     # --- modify the linear model operating points ---
     linmodel.uop .= u
-    linmodel.yop .= y
     linmodel.dop .= d
+    linmodel.yop .= y
     linmodel.xop .= x
     linmodel.fop .= xnext
     # --- reset the state of the linear model ---
@@ -190,14 +193,14 @@ function linearize!(
 end
 
 "Call `linfunc!` function to compute the Jacobians of `model` at the linearization point."
-function linearize_core!(linmodel::LinModel, model::SimModel, x0, u0, d0)
-    x0next, y0 = linmodel.buffer.x, linmodel.buffer.y
+function linearize_core!(linmodel::LinModel, model::SimModel, x, u, d)
+    xnext, y = linmodel.buffer.x, linmodel.buffer.y
     A, Bu, C, Bd, Dd = linmodel.A, linmodel.Bu, linmodel.C, linmodel.Bd, linmodel.Dd
-    cst_x = Constant(x0)
-    cst_u = Constant(u0)
-    cst_d = Constant(d0)
+    cst_x = Constant(x)
+    cst_u = Constant(u)
+    cst_d = Constant(d)
     backend = model.jacobian
-    model.linfunc!(x0next, y0, A, Bu, C, Bd, Dd, backend, x0, u0, d0, cst_x, cst_u, cst_d)
+    model.linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d)
     return nothing
 end
 

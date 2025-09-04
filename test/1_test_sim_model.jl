@@ -371,6 +371,22 @@ end
     h2!(y0, x0, _, _) = (y0 .= x0)
     nonlinmodel4 = NonLinModel(f2!,h2!,Ts,1,1,1,0,solver=nothing,jacobian=AutoFiniteDiff())
     @test_nowarn linearize(nonlinmodel4, x=[1], u=[2])
+
+    # test linearization with nonzero operating points in the NonLinModel object:
+    linmodel_op = LinModel(tf(2, [10, 1]),1)
+    linmodel_op = setop!(linmodel_op, uop=[10], yop=[20], xop=[-2], fop=[5])
+    f3!(xnext, x, u, _, p) = (xnext .= p.A*x .+ p.Bu*u)
+    h3!(y, x, _, p) = (y .= p.C*x)
+    nonlinmodel_op = NonLinModel(f3!, h3!, 1.0, 1, 1, 1, p=linmodel_op, solver=nothing)
+    nonlinmodel_op = setop!(linmodel_op, uop=[10], yop=[20], xop=[-2], fop=[5])
+    linmodel_op_2 = linearize(nonlinmodel_op)
+    @test linmodel_op.A   ≈ linmodel_op_2.A
+    @test linmodel_op.Bu  ≈ linmodel_op_2.Bu
+    @test linmodel_op.C   ≈ linmodel_op_2.C
+    @test linmodel_op.uop ≈ linmodel_op_2.uop
+    @test linmodel_op.yop ≈ linmodel_op_2.yop
+    @test linmodel_op.xop ≈ linmodel_op_2.xop
+    @test linmodel_op.fop ≈ linmodel_op_2.fop
 end
 
 @testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin
