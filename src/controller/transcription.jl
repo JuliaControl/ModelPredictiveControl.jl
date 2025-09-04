@@ -75,8 +75,7 @@ order hold) between the samples, but linear interpolation will be added soon.
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
-moderately stiff systems and is A-stable. However, it may not be as efficient as more
-advanced collocation methods for highly stiff systems. Note that the built-in [`StateEstimator`](@ref)
+moderately stiff systems and is A-stable. Note that the built-in [`StateEstimator`](@ref)
 will still use the `solver` provided at the construction of the [`NonLinModel`](@ref) to
 estimate the plant states, not the trapezoidal rule (see `supersample` option of 
 [`RungeKutta`](@ref) for stiff systems). See Extended Help for more details.
@@ -89,7 +88,8 @@ transcription method.
     Note that the stochastic model of the unmeasured disturbances is strictly discrete-time,
     as described in [`ModelPredictiveControl.init_estimstoch`](@ref). Collocation methods
     require continuous-time dynamics. Because of this, the stochastic states are transcribed
-    separately using a [`MultipleShooting`](@ref) method.
+    separately using a [`MultipleShooting`](@ref) method. See [`con_nonlinprogeq!`](@ref)
+    for more details.
 """
 struct TrapezoidalCollocation <: CollocationMethod
     nc::Int
@@ -1149,7 +1149,13 @@ end
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
 The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments. The augmented model of
-[`f̂!`](@ref) and [`ĥ!`](@ref) is called recursively in a `for` loop:
+[`f̂!`](@ref) and [`ĥ!`](@ref) functions is called recursively in a `for` loop:
+```math
+\begin{aligned}
+\mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k) \Big) \\
+\mathbf{ŷ_0}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k) \Big)
+\end{aligned}
+```
 """
 function predict!(
     Ŷ0, x̂0end, X̂0, Û0, K0,
@@ -1185,8 +1191,12 @@ end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
     
-The method mutates `Ŷ0` and `x̂0end` arguments. The states `X̂0` are extracted from the 
-decisions variables `Z̃` and the augmented output function [`ĥ!`](@ref) is applied on them.
+The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
+is called multiple times in a `for` loop:
+```math
+\mathbf{ŷ_0}(k) = \mathbf{ĥ}\Big(\mathbf{x̂_0^†}(k+j), \mathbf{d_0}(k) \Big)
+```
+in which ``\mathbf{x̂_0^†}`` is the augmented state extracted from the decision variable `Z̃`.
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
@@ -1303,7 +1313,7 @@ end
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
 The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The nonlinear 
-equality constraints `geq` only includes the state defects, computed with:
+equality constraints `geq` only includes the augmented state defects, computed with:
 ```math
 \mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) 
                     - \mathbf{x̂_0^†}(k+1)
