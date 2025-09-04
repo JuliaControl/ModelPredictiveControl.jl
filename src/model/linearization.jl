@@ -160,8 +160,8 @@ function linearize!(
     linmodel::LinModel{NT}, model::SimModel; 
     x=(model.buffer.x.=model.x0.+model.xop), u=model.uop, d=model.dop
 ) where NT<:Real
-    # using linmodel.buffer since default arguments already use model.buffer:
-    nonlinmodel, buffer = model, linmodel.buffer
+    nonlinmodel = model
+    buffer = nonlinmodel.buffer
     # --- compute the Jacobians at linearization points ---
     linearize_core!(linmodel, nonlinmodel, x, u, d) # no deviation vectors in model.linfunc!
     # --- remove the operating points of the nonlinear model (typically zeros) ---
@@ -172,16 +172,19 @@ function linearize!(
     # --- compute the nonlinear model output at operating points ---
     x0next, y0 = linmodel.buffer.x, linmodel.buffer.y
     h!(y0, nonlinmodel, x0, d0, model.p)
-    y  = y0
-    y .= y0 .+ nonlinmodel.yop
+    y0 .+= nonlinmodel.yop
+    y = y0
     # --- compute the nonlinear model next state at operating points ---
     f!(x0next, k0, nonlinmodel, x0, u0, d0, model.p)
-    xnext  = x0next
-    xnext .= x0next .+ nonlinmodel.xop
+    x0next .+= nonlinmodel.fop 
+    xnext = x0next  # xnext = f(x0,u0,d0) + fop - xop + xop = f(x0,u0,d0) + fop
+    # --- recompute x since it was modified in buffer.x ---
+    x0 .+= nonlinmodel.xop
+    x = x0
     # --- modify the linear model operating points ---
     linmodel.uop .= u
-    linmodel.yop .= y
     linmodel.dop .= d
+    linmodel.yop .= y
     linmodel.xop .= x
     linmodel.fop .= xnext
     # --- reset the state of the linear model ---
