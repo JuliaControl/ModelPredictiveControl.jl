@@ -1119,8 +1119,14 @@ getU0!(U0, mpc::PredictiveController, Z̃) = (mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_
 Compute the predictions `Ŷ0`, terminal states `x̂0end` if model is a [`LinModel`](@ref).
 
 The method mutates `Ŷ0` and `x̂0end` vector arguments. The `x̂end` vector is used for
-the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``. The computations are
-identical for any [`TranscriptionMethod`](@ref) if the model is linear.
+the terminal constraints applied on ``\mathbf{x̂_0}(k+H_p)``. The computations are
+identical for any [`TranscriptionMethod`](@ref) if the model is linear:
+```math
+\begin{aligned}
+\mathbf{Ŷ_0}        &= \mathbf{Ẽ Z̃}   + \mathbf{F} \\
+\mathbf{x̂_0}(k+H_p) &= \mathbf{ẽ_x̂ Z̃} + \mathbf{f_x̂}
+\end{aligned}
+```
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
@@ -1142,7 +1148,8 @@ end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
-The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments.
+The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments. The augmented model of
+[`f̂!`](@ref) and [`ĥ!`](@ref) is called recursively in a `for` loop.
 """
 function predict!(
     Ŷ0, x̂0end, X̂0, Û0, K0,
@@ -1174,17 +1181,18 @@ end
     predict!(
         Ŷ0, x̂0end, _ , _ , _ , 
         mpc::PredictiveController, model::NonLinModel, transcription::TranscriptionMethod,
-        U0, Z̃
+        _ , Z̃
     ) -> Ŷ0, x̂0end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
     
-The method mutates `Ŷ0` and `x̂0end` arguments.
+The method mutates `Ŷ0` and `x̂0end` arguments. The states `X̂0` are extracted from the 
+decisions variables `Z̃` and the augmented output function [`ĥ!`](@ref) is applied on them.
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
     mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod,
-    U0, Z̃
+    _ , Z̃
 )
     nu, ny, nd, nx̂, Hp, Hc = model.nu, model.ny, model.nd, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
@@ -1209,7 +1217,7 @@ end
 Nonlinear constrains when `model` is a [`LinModel`](@ref).
 
 The method mutates the `g` vectors in argument and returns it. Only the custom constraints
-are include in the `g` vector.
+`gc` are include in the `g` vector.
 """
 function con_nonlinprog!(
     g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
@@ -1286,7 +1294,7 @@ function con_nonlinprog!(
     return g
 end
 
-"""
+@doc raw"""
     con_nonlinprogeq!(
         geq, X̂0, Û0, K0
         mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
@@ -1295,7 +1303,12 @@ end
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument.
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The defects are
+updated with:
+```math
+\mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) 
+                    + \text{TODO}
+```
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
@@ -1394,4 +1407,6 @@ function con_nonlinprogeq!(
     end
     return geq
 end
+
+"No equality constraints for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
 con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::SimModel,::TranscriptionMethod,_,_)=geq
