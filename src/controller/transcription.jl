@@ -1166,7 +1166,6 @@ function predict!(
         k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
-        x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
@@ -1331,8 +1330,6 @@ function con_nonlinprogeq!(
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
-        # handle operating points (but should be zeros for NonLinModel):
-        x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
         ŝnext .= x̂0next .- x̂0next_Z̃
         x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
         d0 = d0next

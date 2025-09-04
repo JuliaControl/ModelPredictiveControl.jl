@@ -867,7 +867,6 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     P̂next = estim.buffer.P̂
     mul!(P̂next, X̄0next, Ŝ_X̄0nextᵀ) 
     P̂next   .+= Q̂
-    x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
     estim.cov.P̂  .= Hermitian(P̂next, :L)
     return nothing
@@ -1068,11 +1067,17 @@ objects with the linearization points.
 """
 function get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
     As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
-    f̂_ekf!(x̂0next, x̂0, û0, k0, u0, d0) = f̂!(x̂0next, û0, k0, model, As, Cs_u, x̂0, u0, d0)
-    ĥ_ekf!(ŷ0, x̂0, d0) = ĥ!(ŷ0, model, Cs_y, x̂0, d0)
+    nxs = size(As, 1)
+    x̂op, f̂op = [model.xop; zeros(nxs)], [model.fop; zeros(nxs)]
+    f̂_ekf!(x̂0next, x̂0, û0, k0, u0, d0) = f̂!(
+        x̂0next, û0, k0, model, As, Cs_u, f̂op, x̂op, x̂0, u0, d0
+    )
+    ĥ_ekf!(ŷ0, x̂0, d0) = ĥ!(
+        ŷ0, model, Cs_y, x̂0, d0
+    )
     strict  = Val(true)
     nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
-    nx̂ = model.nx + size(As, 1)
+    nx̂ = model.nx + nxs
     x̂0next = zeros(NT, nx̂)
     ŷ0 = zeros(NT, ny)
     x̂0 = zeros(NT, nx̂)
