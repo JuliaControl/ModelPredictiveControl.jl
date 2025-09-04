@@ -867,7 +867,6 @@ function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
     P̂next = estim.buffer.P̂
     mul!(P̂next, X̄0next, Ŝ_X̄0nextᵀ) 
     P̂next   .+= Q̂
-    x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
     estim.cov.P̂  .= Hermitian(P̂next, :L)
     return nothing

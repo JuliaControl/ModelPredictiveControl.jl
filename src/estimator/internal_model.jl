@@ -172,8 +172,10 @@ State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@
 
 It calls [`f!`](@ref) directly since this estimator does not augment the states.
 """
-function f̂!(x̂0next, _ , k0, ::InternalModel, model::NonLinModel, x̂0, u0, d0)
-    return f!(x̂0next, k0, model, x̂0, u0, d0, model.p)
+function f̂!(x̂0next, _ , k0, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    f!(x̂0next, k0, model, x̂0, u0, d0, model.p)
+    x̂0next .+= estim.f̂op .- estim.x̂op
+    return x̂0next
 end
 
 @doc raw"""
