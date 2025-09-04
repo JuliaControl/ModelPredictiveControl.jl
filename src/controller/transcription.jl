@@ -75,8 +75,7 @@ order hold) between the samples, but linear interpolation will be added soon.
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
-moderately stiff systems and is A-stable. However, it may not be as efficient as more
-advanced collocation methods for highly stiff systems. Note that the built-in [`StateEstimator`](@ref)
+moderately stiff systems and is A-stable. Note that the built-in [`StateEstimator`](@ref)
 will still use the `solver` provided at the construction of the [`NonLinModel`](@ref) to
 estimate the plant states, not the trapezoidal rule (see `supersample` option of 
 [`RungeKutta`](@ref) for stiff systems). See Extended Help for more details.
@@ -89,7 +88,8 @@ transcription method.
     Note that the stochastic model of the unmeasured disturbances is strictly discrete-time,
     as described in [`ModelPredictiveControl.init_estimstoch`](@ref). Collocation methods
     require continuous-time dynamics. Because of this, the stochastic states are transcribed
-    separately using a [`MultipleShooting`](@ref) method.
+    separately using a [`MultipleShooting`](@ref) method. See [`con_nonlinprogeq!`](@ref)
+    for more details.
 """
 struct TrapezoidalCollocation <: CollocationMethod
     nc::Int
@@ -1119,8 +1119,14 @@ getU0!(U0, mpc::PredictiveController, Z̃) = (mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_
 Compute the predictions `Ŷ0`, terminal states `x̂0end` if model is a [`LinModel`](@ref).
 
 The method mutates `Ŷ0` and `x̂0end` vector arguments. The `x̂end` vector is used for
-the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``. The computations are
-identical for any [`TranscriptionMethod`](@ref) if the model is linear.
+the terminal constraints applied on ``\mathbf{x̂_0}(k+H_p)``. The computations are
+identical for any [`TranscriptionMethod`](@ref) if the model is linear:
+```math
+\begin{aligned}
+\mathbf{Ŷ_0}        &= \mathbf{Ẽ Z̃}   + \mathbf{F} \\
+\mathbf{x̂_0}(k+H_p) &= \mathbf{ẽ_x̂ Z̃} + \mathbf{f_x̂}
+\end{aligned}
+```
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
@@ -1142,7 +1148,14 @@ end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
-The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments.
+The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments. The augmented model of
+[`f̂!`](@ref) and [`ĥ!`](@ref) functions is called recursively in a `for` loop:
+```math
+\begin{aligned}
+\mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k) \Big) \\
+\mathbf{ŷ_0}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k) \Big)
+\end{aligned}
+```
 """
 function predict!(
     Ŷ0, x̂0end, X̂0, Û0, K0,
@@ -1173,17 +1186,22 @@ end
     predict!(
         Ŷ0, x̂0end, _ , _ , _ , 
         mpc::PredictiveController, model::NonLinModel, transcription::TranscriptionMethod,
-        U0, Z̃
+        _ , Z̃
     ) -> Ŷ0, x̂0end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
     
-The method mutates `Ŷ0` and `x̂0end` arguments.
+The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
+is called multiple times in a `for` loop:
+```math
+\mathbf{ŷ_0}(k) = \mathbf{ĥ}\Big(\mathbf{x̂_0^†}(k+j), \mathbf{d_0}(k) \Big)
+```
+in which ``\mathbf{x̂_0^†}`` is the augmented state extracted from the decision variable `Z̃`.
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
     mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod,
-    U0, Z̃
+    _ , Z̃
 )
     nu, ny, nd, nx̂, Hp, Hc = model.nu, model.ny, model.nd, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
@@ -1208,7 +1226,7 @@ end
 Nonlinear constrains when `model` is a [`LinModel`](@ref).
 
 The method mutates the `g` vectors in argument and returns it. Only the custom constraints
-are include in the `g` vector.
+`gc` are include in the `g` vector.
 """
 function con_nonlinprog!(
     g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
@@ -1285,7 +1303,7 @@ function con_nonlinprog!(
     return g
 end
 
-"""
+@doc raw"""
     con_nonlinprogeq!(
         geq, X̂0, Û0, K0
         mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
@@ -1294,7 +1312,14 @@ end
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument.
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The nonlinear 
+equality constraints `geq` only includes the augmented state defects, computed with:
+```math
+\mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) 
+                    - \mathbf{x̂_0^†}(k+1)
+```
+in which ``\mathbf{x̂_0^†}`` is the augmented state extracted from the decision variables 
+`Z̃`, and ``\mathbf{f̂}``, the augmented state function defined in [`f̂!`](@ref).
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
@@ -1333,21 +1358,33 @@ end
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The deterministic
-and stochastic states are handled separately since collocation methods require 
-continuous-time state-space models, and the stochastic model of the unmeasured disturbances
-is discrete-time. Also note that operating points in `model` are typically zeros for 
-[`NonLinModel`](@ref), but they are handled rigorously here if it's not the case. It should
-be noted that linearization of continuous-time dynamics at non-equilibrium points leads to:
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. 
+
+The nonlinear equality constraints `geq` only includes the state defects. The deterministic
+and stochastic states are handled separately since collocation methods require continuous-
+time state-space models, and the stochastic model of the unmeasured disturbances
+is discrete-time. The deterministic and stochastic defects are respectively computed with:
 ```math
-    \mathbf{ẋ_0}(t)   ≈ \mathbf{A x_0}(t) + \mathbf{B_u u_0}(t) + \mathbf{B_d d_0}(t)
+\begin{aligned}
+\mathbf{s_d}(k+1) &= \mathbf{x_0}(k) - \mathbf{x_0^†}(k+1) 
+                      + 0.5 T_s (\mathbf{k}_1 + \mathbf{k}_2) \\
+\mathbf{s_s}(k+1) &= \mathbf{A_s x_s}(k) - \mathbf{x_s^†}(k+1)
+\end{aligned}
 ```
-as opposed to, for discrete-time models:
+in which ``\mathbf{x_0^†}`` and ``\mathbf{x_s^†}`` are the deterministic and stochastic
+states extracted from the decision variables `Z̃`. The ``\mathbf{k}`` coefficients are 
+evaluated from the continuous-time function `model.f!` and:
 ```math
-    \mathbf{x_0}(k+1) ≈ \mathbf{A x_0}(k) + \mathbf{B_u u_0}(k) + \mathbf{B_d d_0}(k) 
-                         + \mathbf{f_{op}} - \mathbf{x_{op}}
+\begin{aligned}
+\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),     \mathbf{û_0}(k), \mathbf{d_0}(k)  \Big) \\
+\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0^†}(k+1), \mathbf{û_0}(k), \mathbf{d_0}(k+1)\Big) 
+\end{aligned}
 ```
-hence no need to add `model.fop` and subtract `model.xop` in the collocation equations.
+and the input of the augmented model is:
+```math
+\mathbf{û_0}(k) = \mathbf{u_0}(k) + \mathbf{C_{s_u} x_s}(k)
+``` 
+the ``\mathbf{A_s, C_{s_u}}`` matrices are defined in [`init_estimstoch`](@ref) doc.
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
@@ -1378,17 +1415,18 @@ function con_nonlinprogeq!(
         sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
         mul!(û0, Cs_u, xs)      # ys_u = Cs_u*xs
         û0 .+= u0               # û0 = u0 + ys_u
-        ẋ0, ẋ0next = @views k0[1:nx], k0[nx+1:2*nx]
-        # no need to handle model.fop and model.xop, see docstring:
-        model.f!(ẋ0, xd, û0, d0, p)
-        model.f!(ẋ0next, xdnext_Z̃, û0, d0next, p) # assuming ZOH on manipulated inputs u
+        k1, k2 = @views k0[1:nx], k0[nx+1:2*nx]
+        model.f!(k1, xd, û0, d0, p)
+        model.f!(k2, xdnext_Z̃, û0, d0next, p) # assuming ZOH on manipulated inputs u
         xsnext = @views x̂0next[nx+1:end]
         mul!(xsnext, As, xs)
-        sdnext .= @. xd - xdnext_Z̃ + (Ts/2)*(ẋ0 + ẋ0next)
+        sdnext .= @. xd - xdnext_Z̃ + (Ts/2)*(k1 + k2)
         ssnext .= @. xsnext - xsnext_Z̃
         x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
         d0 = d0next
     end
     return geq
 end
+
+"No eq. constraints for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
 con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::SimModel,::TranscriptionMethod,_,_)=geq

@@ -356,11 +356,14 @@ end
 """
     default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
 
-One integrator on each measured output by default if `model` is not a  [`LinModel`](@ref).
+One integrator on each measured output by default for other cases e.g. [`NonLinModel`](@ref).
 
-Theres is no verification the augmented model remains observable. If the integrator quantity
-per manipulated input `nint_u ≠ 0`, the method returns zero integrator on each measured
-output.
+If the integrator quantity per manipulated input `nint_u ≠ 0`, the method returns zero 
+integrator on each measured output.
+
+!!! warning
+    Theres is no verification the augmented model remains observable. The resulting 
+    [`StateEstimator`](@ref) object should be assessed separately with e.g.: [`sim!`](@ref). 
 """
 function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
     validate_ym(model, i_ym)
