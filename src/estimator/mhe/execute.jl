@@ -610,7 +610,7 @@ function predict!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, mode
             ŵ   = @views Z̃[(1 + nx̃ + nŵ*(j-1)):(nx̃ + nŵ*j)]
             x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
             f̂!(x̂0next, û0, k0, estim, model, x̂0, u0, d0)
-            x̂0next .+= ŵ .+ estim.f̂op .- estim.x̂op
+            x̂0next .+= ŵ
             y0nextm = @views estim.Y0m[(1 + nym * (j-1)):(nym*j)]
             d0next  = @views estim.D0[(1 + nd*j):(nd*(j+1))]
             ĥ!(ŷ0next, estim, model, x̂0next, d0next)
@@ -629,7 +629,7 @@ function predict!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, mode
             V̂[(1 + nym*(j-1)):(nym*j)] .= y0m .- ŷ0m
             x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
             f̂!(x̂0next, û0, k0, estim, model, x̂0, u0, d0)
-            x̂0next .+= ŵ .+ estim.f̂op .- estim.x̂op
+            x̂0next .+= ŵ
             x̂0 = x̂0next
         end
     end
