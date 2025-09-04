@@ -157,18 +157,18 @@ julia> linearize!(linmodel, model, x=[20.0], u=[0.0]); linmodel.A
 ```
 """
 function linearize!(
-    linmodel::LinModel{NT}, model::SimModel; 
+    linmodel::LinModel, model::SimModel; 
     x=(model.buffer.x.=model.x0.+model.xop), u=model.uop, d=model.dop
-) where NT<:Real
+)
     nonlinmodel = model
     buffer = nonlinmodel.buffer
-    # --- compute the Jacobians at linearization points ---
-    linearize_core!(linmodel, nonlinmodel, x, u, d) # no deviation vectors in model.linfunc!
     # --- remove the operating points of the nonlinear model (typically zeros) ---
     x0, u0, d0, k0 = buffer.x, buffer.u, buffer.d, buffer.k
     x0 .= x .- nonlinmodel.xop
     u0 .= u .- nonlinmodel.uop
     d0 .= d .- nonlinmodel.dop
+    # --- compute the Jacobians at linearization points ---
+    linearize_core!(linmodel, nonlinmodel, x0, u0, d0)
     # --- compute the nonlinear model output at operating points ---
     x0next, y0 = linmodel.buffer.x, linmodel.buffer.y
     h!(y0, nonlinmodel, x0, d0, model.p)
