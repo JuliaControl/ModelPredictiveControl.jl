@@ -1237,7 +1237,6 @@ function predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, 
     mul!(Â_P̂corr_Âᵀ, Â, P̂corr_Âᵀ)
     P̂next  = estim.buffer.P̂
     P̂next .= Â_P̂corr_Âᵀ .+ Q̂
-    x̂0next  .+= estim.f̂op .- estim.x̂op
     estim.x̂0 .= x̂0next
     estim.cov.P̂  .= Hermitian(P̂next, :L)
     return nothing
