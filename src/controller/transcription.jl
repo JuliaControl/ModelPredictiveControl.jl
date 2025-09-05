@@ -64,14 +64,14 @@ for this transcription method.
 struct MultipleShooting <: ShootingMethod end
 
 @doc raw"""
-    TrapezoidalCollocation()
+    TrapezoidalCollocation(nh::Int=0)
 
-Construct an implicit trapezoidal [`TranscriptionMethod`](@ref).
+Construct an implicit trapezoidal [`TranscriptionMethod`](@ref) with `nh`th order hold.
 
 This is the simplest collocation method. It supports continuous-time [`NonLinModel`](@ref)s
 only. The decision variables are the same as for [`MultipleShooting`](@ref), hence similar
-computational costs. It currently assumes piecewise constant manipulated inputs (or zero-
-order hold) between the samples, but linear interpolation will be added soon.
+computational costs. The `nh` argument is `0` or `1`, for piecewise constant or linear
+manipulated inputs ``\mathbf{u}`` (`1` is slightly less computationally expensive).
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
@@ -92,10 +92,14 @@ transcription method.
     for more details.
 """
 struct TrapezoidalCollocation <: CollocationMethod
+    nh::Int
     nc::Int
-    function TrapezoidalCollocation() 
+    function TrapezoidalCollocation(nh::Int=0)
+        if !(nh == 0 || nh == 1)
+            throw(ArgumentError("nh argument must be 0 or 1 for TrapezoidalCollocation."))
+        end
         nc = 2 # 2 collocation points per interval for trapezoidal rule
-        return new(nc)
+        return new(nh, nc)
     end
 end
 
@@ -1403,8 +1407,6 @@ function con_nonlinprogeq!(
     d0 = @views mpc.d0[1:nd]
     #TODO: allow parallel for loop or threads? 
     for j=1:Hp
-        u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
-        û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
         k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
         d0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
@@ -1413,11 +1415,23 @@ function con_nonlinprogeq!(
         xd, xs              = @views x̂0[1:nx], x̂0[nx+1:end]
         xdnext_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
         sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
-        mul!(û0, Cs_u, xs)      # ys_u = Cs_u*xs
-        û0 .+= u0               # û0 = u0 + ys_u
         k1, k2 = @views k0[1:nx], k0[nx+1:2*nx]
-        model.f!(k1, xd, û0, d0, p)
-        model.f!(k2, xdnext_Z̃, û0, d0next, p) # assuming ZOH on manipulated inputs u
+        if iszero(transcription.nh) # piecewise constant manipulated inputs u:
+            u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
+            û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
+            mul!(û0, Cs_u, xs)                 # ys_u(k) = Cs_u*xs(k)
+            û0 .+= u0                          #   û0(k) = u0(k) + ys_u(k)
+            model.f!(k1, xd, û0, d0, p)
+            model.f!(k2, xdnext_Z̃, û0, d0next, p)
+        else # piecewise linear manipulated inputs u:
+            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
+            û0next = @views U0[(1 + nu*j):(nu*(j+1))]
+            mul!(û0next, Cs_u, xsnext_Z̃)      # ys_u(k+1) = Cs_u*xs(k+1)
+            û0next .+= u0next                 #   û0(k+1) = u0(k+1) + ys_u(k+1)
+            model.f!(k2, xdnext_Z̃, û0next, d0next, p)
+            k1 .= lastk2
+            lastk2 = k2
+        end 
         xsnext = @views x̂0next[nx+1:end]
         mul!(xsnext, As, xs)
         sdnext .= @. xd - xdnext_Z̃ + (Ts/2)*(k1 + k2)
