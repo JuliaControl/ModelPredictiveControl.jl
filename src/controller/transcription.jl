@@ -1194,9 +1194,9 @@ Compute vectors if `model` is a [`NonLinModel`](@ref) and other [`TranscriptionM
 The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
 is called multiple times in a `for` loop:
 ```math
-\mathbf{ŷ_0}(k) = \mathbf{ĥ}\Big(\mathbf{x̂_0^†}(k+j), \mathbf{d_0}(k) \Big)
+\mathbf{ŷ_0}(k) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k) \Big)
 ```
-in which ``\mathbf{x̂_0^†}`` is the augmented state extracted from the decision variable `Z̃`.
+in which ``\mathbf{x̂_0}`` is the augmented state extracted from the decision variable `Z̃`.
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
@@ -1316,10 +1316,10 @@ The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The n
 equality constraints `geq` only includes the augmented state defects, computed with:
 ```math
 \mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) 
-                    - \mathbf{x̂_0^†}(k+1)
+                    - \mathbf{x̂_0}(k+1)
 ```
-in which ``\mathbf{x̂_0^†}`` is the augmented state extracted from the decision variables 
-`Z̃`, and ``\mathbf{f̂}``, the augmented state function defined in [`f̂!`](@ref).
+in which the augmented state ``\mathbf{x̂_0}`` are extracted from the decision variables 
+`Z̃`, and ``\mathbf{f̂}`` is the augmented state function defined in [`f̂!`](@ref).
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
@@ -1366,18 +1366,18 @@ time state-space models, and the stochastic model of the unmeasured disturbances
 is discrete-time. The deterministic and stochastic defects are respectively computed with:
 ```math
 \begin{aligned}
-\mathbf{s_d}(k+1) &= \mathbf{x_0}(k) - \mathbf{x_0^†}(k+1) 
+\mathbf{s_d}(k+1) &= \mathbf{x_0}(k) - \mathbf{x_0}(k+1) 
                       + 0.5 T_s (\mathbf{k}_1 + \mathbf{k}_2) \\
-\mathbf{s_s}(k+1) &= \mathbf{A_s x_s}(k) - \mathbf{x_s^†}(k+1)
+\mathbf{s_s}(k+1) &= \mathbf{A_s x_s}(k) - \mathbf{x_s}(k+1)
 \end{aligned}
 ```
-in which ``\mathbf{x_0^†}`` and ``\mathbf{x_s^†}`` are the deterministic and stochastic
-states extracted from the decision variables `Z̃`. The ``\mathbf{k}`` coefficients are 
+in which ``\mathbf{x_0}`` and ``\mathbf{x_s}`` are the deterministic and stochastic states 
+extracted from the decision variables `Z̃`. The ``\mathbf{k}`` coefficients are 
 evaluated from the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
-\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),     \mathbf{û_0}(k), \mathbf{d_0}(k)  \Big) \\
-\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0^†}(k+1), \mathbf{û_0}(k), \mathbf{d_0}(k+1)\Big) 
+\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),   \mathbf{û_0}(k), \mathbf{d_0}(k)  \Big) \\
+\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0}(k+1), \mathbf{û_0}(k), \mathbf{d_0}(k+1)\Big) 
 \end{aligned}
 ```
 and the input of the augmented model is:
