@@ -1057,8 +1057,8 @@ Return the `linfunc!` function that computes the Jacobians of the augmented mode
 
 The function has the two following methods:
 ```
-linfunc!(x̂0next   , ::Nothing, F̂        , ::Nothing, backend, x̂0, cst_u0, cst_d0) -> nothing
-linfunc!(::Nothing, ŷ0       , ::Nothing, Ĥ        , backend, x̂0, _     , cst_d0) -> nothing
+linfunc!(x̂0next   , ::Nothing, F̂        , ::Nothing, backend, x̂0, cst_u0    , cst_d0) -> nothing
+linfunc!(::Nothing, ŷ0       , ::Nothing, Ĥ        , backend, x̂0, ::Nothing , cst_d0) -> nothing
 ```
 To respectively compute only `F̂` or `Ĥ` Jacobian. The methods mutate all the arguments
 before `backend` argument. The `backend` argument is an `AbstractADType` object from 
@@ -1067,8 +1067,9 @@ objects with the linearization points.
 """
 function get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
     As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
-    nxs = size(As, 1)
-    x̂op, f̂op = [model.xop; zeros(nxs)], [model.fop; zeros(nxs)]
+    nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+    nx̂ = model.nx + size(As, 1)
+    x̂op = f̂op = zeros(nx̂) # not important for Jacobians
     f̂_ekf!(x̂0next, x̂0, û0, k0, u0, d0) = f̂!(
         x̂0next, û0, k0, model, As, Cs_u, f̂op, x̂op, x̂0, u0, d0
     )
@@ -1076,25 +1077,23 @@ function get_ekf_linfunc(NT, model, i_ym, nint_u, nint_ym, jacobian)
         ŷ0, model, Cs_y, x̂0, d0
     )
     strict  = Val(true)
-    nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
-    nx̂ = model.nx + nxs
     x̂0next = zeros(NT, nx̂)
     ŷ0 = zeros(NT, ny)
     x̂0 = zeros(NT, nx̂)
-    tmp_û0  = Cache(zeros(NT, nu))
-    tmp_x0i = Cache(zeros(NT, nk))
+    tmp_û0 = Cache(zeros(NT, nu))
+    tmp_k0 = Cache(zeros(NT, nk))
     cst_u0 = Constant(zeros(NT, nu))
     cst_d0 = Constant(zeros(NT, nd))
     F̂_prep = prepare_jacobian(
-        f̂_ekf!, x̂0next, jacobian, x̂0, tmp_û0, tmp_x0i, cst_u0, cst_d0; strict
+        f̂_ekf!, x̂0next, jacobian, x̂0, tmp_û0, tmp_k0, cst_u0, cst_d0; strict
     )
     Ĥ_prep = prepare_jacobian(ĥ_ekf!, ŷ0,     jacobian, x̂0, cst_d0; strict)
-    function linfunc!(x̂0next, ŷ0::Nothing, F̂, Ĥ::Nothing, backend, x̂0, cst_u0, cst_d0)
+    function linfunc!(x̂0next, ::Nothing, F̂, ::Nothing, backend, x̂0, cst_u0, cst_d0)
         return jacobian!(
-            f̂_ekf!, x̂0next, F̂, F̂_prep, backend, x̂0, tmp_û0, tmp_x0i, cst_u0, cst_d0
+            f̂_ekf!, x̂0next, F̂, F̂_prep, backend, x̂0, tmp_û0, tmp_k0, cst_u0, cst_d0
         )
     end
-    function linfunc!(x̂0next::Nothing, ŷ0, F̂::Nothing, Ĥ, backend, x̂0, _     , cst_d0)
+    function linfunc!(::Nothing, ŷ0, ::Nothing, Ĥ, backend, x̂0, ::Nothing , cst_d0)
         return jacobian!(ĥ_ekf!, ŷ0, Ĥ, Ĥ_prep, backend, x̂0, cst_d0)
     end
     return linfunc!
@@ -1106,12 +1105,12 @@ end
 Do the same but for the [`ExtendedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
-    model, x̂0 = estim.model, estim.x̂0
+    x̂0 = estim.x̂0
     cst_d0 = Constant(d0)
-    ŷ0, Ĥ = estim.buffer.ŷ, estim.Ĥ
+    ŷ0, Ĥ, Ĥm = estim.buffer.ŷ, estim.Ĥ, estim.Ĥm
     estim.linfunc!(nothing, ŷ0, nothing, Ĥ, estim.jacobian, x̂0, nothing, cst_d0)
-    estim.Ĥm .= @views estim.Ĥ[estim.i_ym, :]
-    return correct_estimate_kf!(estim, y0m, d0, estim.Ĥm)
+    Ĥm .= @views Ĥ[estim.i_ym, :]
+    return correct_estimate_kf!(estim, y0m, d0, Ĥm)
 end
 
 
@@ -1154,19 +1153,14 @@ and prediction step equations are provided below. The correction step is skipped
 ```
 """
 function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
-    model, x̂0 = estim.model, estim.x̂0
-    nx̂, nu = estim.nx̂, model.nu
-    cst_u0, cst_d0 = Constant(u0), Constant(d0)
     if !estim.direct
-        ŷ0, Ĥ = estim.buffer.ŷ, estim.Ĥ
-        estim.linfunc!(nothing, ŷ0, nothing, Ĥ, estim.jacobian, x̂0, nothing, cst_d0)
-        estim.Ĥm .= @views estim.Ĥ[estim.i_ym, :]
-        correct_estimate_kf!(estim, y0m, d0, estim.Ĥm)
+        correct_estimate!(estim, y0m, d0)
     end
+    cst_u0, cst_d0 = Constant(u0), Constant(d0)
     x̂0corr = estim.x̂0
     x̂0next, F̂ = estim.buffer.x̂, estim.F̂
     estim.linfunc!(x̂0next, nothing, F̂, nothing, estim.jacobian, x̂0corr, cst_u0, cst_d0)
-    return predict_estimate_kf!(estim, u0, d0, estim.F̂)
+    return predict_estimate_kf!(estim, u0, d0, F̂)
 end
 
 "Set `estim.cov.P̂` to `estim.cov.P̂_0` for the time-varying Kalman Filters."
