@@ -1405,6 +1405,14 @@ function con_nonlinprogeq!(
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
     d0 = @views mpc.d0[1:nd]
+    if !iszero(transcription.nh)
+        k1, u0, û0 = @views K0[1:nx], U0[1:nu], Û0[1:nu]
+        xd, xs     = @views x̂0[1:nx], x̂0[nx+1:end]
+        mul!(û0, Cs_u, xs)                 
+        û0 .+= u0                          
+        model.f!(k1, xd, û0, d0, p)
+        lastk2 = k1
+    end
     #TODO: allow parallel for loop or threads? 
     for j=1:Hp
         k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
@@ -1424,12 +1432,17 @@ function con_nonlinprogeq!(
             model.f!(k1, xd, û0, d0, p)
             model.f!(k2, xdnext_Z̃, û0, d0next, p)
         else # piecewise linear manipulated inputs u:
-            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
-            û0next = @views U0[(1 + nu*j):(nu*(j+1))]
+            if j < Hp 
+                u0next = @views U0[(1 + nu*j):(nu*(j+1))]
+                û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
+            else # u(k+Hp) = u(k+Hp-1) since Hc ≤ Hp implies that Δu(k+Hp)=0
+                u0next = @views U0[(1 + nu*(j-1)):(nu*j)]
+                û0next = @views Û0[(1 + nu*(j-1)):(nu*j)]
+            end
             mul!(û0next, Cs_u, xsnext_Z̃)      # ys_u(k+1) = Cs_u*xs(k+1)
             û0next .+= u0next                 #   û0(k+1) = u0(k+1) + ys_u(k+1)
-            model.f!(k2, xdnext_Z̃, û0next, d0next, p)
             k1 .= lastk2
+            model.f!(k2, xdnext_Z̃, û0next, d0next, p)
             lastk2 = k2
         end 
         xsnext = @views x̂0next[nx+1:end]
