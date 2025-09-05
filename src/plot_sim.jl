@@ -101,7 +101,7 @@ get_nx̂(mpc::PredictiveController) = mpc.estim.nx̂
 
 function Base.show(io::IO, res::SimResult) 
     N = length(res.T_data)
-    print(io, "Simulation results of $(typeof(res.obj).name.name) with $N time steps.")
+    print(io, "Simulation results of $(nameof(typeof(res.obj))) with $N time steps.")
 end
 
 
@@ -137,7 +137,7 @@ function sim!(
     D_data  = Matrix{NT}(undef, plant.nd, N)
     X_data  = Matrix{NT}(undef, plant.nx, N)
     setstate!(plant, x_0)
-    @progress name="$(typeof(plant).name.name) simulation" for i=1:N
+    @progress name="$(nameof(typeof(plant))) simulation" for i=1:N
         y = evaloutput(plant, d) 
         Y_data[:, i] .= y
         U_data[:, i] .= u
@@ -282,7 +282,7 @@ function sim_closedloop!(
     lastd, lasty = d, evaloutput(plant, d)
     initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
     isnothing(x̂_0) || setstate!(est_mpc, x̂_0)
-    @progress name="$(typeof(est_mpc).name.name) simulation" for i=1:N
+    @progress name="$(nameof(typeof(est_mpc))) simulation" for i=1:N
         d = lastd + d_step + d_noise.*randn(plant.nd)
         y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
         ym = y[estim.i_ym]
