@@ -372,7 +372,7 @@ function Base.show(io::IO, model::SimModel)
     nu, nd = model.nu, model.nd
     nx, ny = model.nx, model.ny
     n = maximum(ndigits.((nu, nx, ny, nd))) + 1
-    println(io, "$(typeof(model).name.name) with a sample time Ts = $(model.Ts) s"*
+    println(io, "$(nameof(typeof(model))) with a sample time Ts = $(model.Ts) s"*
                 "$(detailstr(model)) and:")
     println(io, "$(lpad(nu, n)) manipulated inputs u")
     println(io, "$(lpad(nx, n)) states x")

@@ -32,8 +32,8 @@ function Base.show(io::IO, estim::StateEstimator)
     nu, nd = estim.model.nu, estim.model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     n = maximum(ndigits.((nu, nx̂, nym, nyu, nd))) + 1
-    println(io, "$(typeof(estim).name.name) estimator with a sample time "*
-                "Ts = $(estim.model.Ts) s, $(typeof(estim.model).name.name) and:")
+    println(io, "$(nameof(typeof(estim))) estimator with a sample time "*
+                "Ts = $(estim.model.Ts) s, $(nameof(typeof(estim.model))) and:")
     print_estim_dim(io, estim, n)
 end
 

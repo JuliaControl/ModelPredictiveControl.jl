@@ -181,9 +181,9 @@ function Base.show(io::IO, mpc::ExplicitMPC)
     nu, nd = mpc.estim.model.nu, mpc.estim.model.nd
     nx̂, nym, nyu = mpc.estim.nx̂, mpc.estim.nym, mpc.estim.nyu
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
-    println(io, "$(typeof(mpc).name.name) controller with a sample time Ts = "*
+    println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = "*
                 "$(mpc.estim.model.Ts) s, "*
-                "$(typeof(mpc.estim).name.name) estimator and:")
+                "$(nameof(typeof(mpc.estim))) estimator and:")
     println(io, "$(lpad(Hp, n)) prediction steps Hp")
     println(io, "$(lpad(Hc, n)) control steps Hc")
     print_estim_dim(io, mpc.estim, n)
