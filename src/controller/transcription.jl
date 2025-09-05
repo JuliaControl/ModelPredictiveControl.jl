@@ -71,7 +71,9 @@ Construct an implicit trapezoidal [`TranscriptionMethod`](@ref) with `nh`th orde
 This is the simplest collocation method. It supports continuous-time [`NonLinModel`](@ref)s
 only. The decision variables are the same as for [`MultipleShooting`](@ref), hence similar
 computational costs. The `nh` argument is `0` or `1`, for piecewise constant or linear
-manipulated inputs ``\mathbf{u}`` (`1` is slightly less computationally expensive).
+manipulated inputs ``\mathbf{u}`` (`nh=1` is slightly less expensive). Note that the various
+[`DiffSolver`](@ref) assume zero-order hold, so `nh=1` will induce a mismatch if the plant
+is simulated using these solvers.
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
