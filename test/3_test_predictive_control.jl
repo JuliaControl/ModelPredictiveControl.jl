@@ -728,6 +728,7 @@ end
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
     @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation())
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation(2))
 
     @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, JE=(Ue,_,_,_)->Ue)
     @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
@@ -805,6 +806,10 @@ end
     nmpc5 = NonLinMPC(nonlinmodel_c, Nwt=[0], Hp=100, Hc=1, transcription=TrapezoidalCollocation())
     preparestate!(nmpc5, [0.0])
     u = moveinput!(nmpc5, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
+    nmpc5_1 = NonLinMPC(nonlinmodel_c, Nwt=[0], Hp=100, Hc=1, transcription=TrapezoidalCollocation(1))
+    preparestate!(nmpc5_1, [0.0])
+    u = moveinput!(nmpc5_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     preparestate!(nmpc6, [0])
