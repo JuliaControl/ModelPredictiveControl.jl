@@ -25,10 +25,10 @@ print_backends(::IO, ::MovingHorizonEstimator, ::LinModel) = nothing
 function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n)
     nu, nd = estim.model.nu, estim.model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
-    He, nϵ = estim.He, estim.nϵ
+    He, nε = estim.He, estim.nε
     niu, niym = sum(estim.nint_u), sum(estim.nint_ym)
     println(io, "  ├$(lpad(He, n)) estimation steps He")
-    println(io, "  ├$(lpad(nϵ, n)) slack variable ϵ (estimation constraints)")
+    println(io, "  ├$(lpad(nε, n)) slack variable ε (estimation constraints)")
     println(io, "  ├$(lpad(nu, n)) manipulated inputs u ($niu integrating states)")
     println(io, "  ├$(lpad(nx̂, n)) estimated states x̂")
     println(io, "  ├$(lpad(nym, n)) measured outputs ym ($niym integrating states)")
