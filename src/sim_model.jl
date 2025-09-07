@@ -174,8 +174,6 @@ function setstate!(model::SimModel, x)
     return model
 end
 
-detailstr(model::SimModel) = ""
-
 @doc raw"""
     initstate!(model::SimModel, u, d=[]) -> x
 
@@ -374,15 +372,17 @@ function Base.show(io::IO, model::SimModel)
     nu, nd = model.nu, model.nd
     nx, ny = model.nx, model.ny
     n = maximum(ndigits.((nu, nx, ny, nd))) + 1
-    details = detailstr(model) 
     println(io, "$(nameof(typeof(model))) with a sample time Ts = $(model.Ts) s:")
-    !isempty(details) && println(io, "├ $details")
+    print_details(io, model)
     println(io, "└ dimensions:")
     println(io, "  ├$(lpad(nu, n)) manipulated inputs u")
     println(io, "  ├$(lpad(nx, n)) states x")
     println(io, "  ├$(lpad(ny, n)) outputs y")
     print(io,   "  └$(lpad(nd, n)) measured disturbances d")
 end
+
+"Print additional details of `model` if any (no details by default)."
+print_details(::IO, ::SimModel) = nothing
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=model.buffer.empty) = evaloutput(model::SimModel, d)

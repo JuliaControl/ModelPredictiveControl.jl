@@ -311,8 +311,11 @@ h!(y0, model::NonLinModel, x0, d0, p) = model.h!(y0, x0, d0, p)
 
 include("solver.jl")
 
-function detailstr(model::NonLinModel{<:Real, <:RungeKutta{N}}) where N
-    return "solver: $(nameof(typeof(model.solver)))($N)"
+function print_details(io::IO, model::NonLinModel{<:Real, <:RungeKutta{N}}) where N
+    println(io, "├ solver: $(nameof(typeof(model.solver)))($N)")
+    println(io, "├ linearization: $(backend_str(model.jacobian))")
 end
-detailstr(::NonLinModel{<:Real, <:EmptySolver}) = "solver: empty"
-detailstr(::NonLinModel) = ""
+function print_details(io::IO, model::NonLinModel) 
+    println(io, "├ solver: $(nameof(typeof(model.solver)))")
+    println(io, "├ linearization: $(backend_str(model.jacobian))")
+end

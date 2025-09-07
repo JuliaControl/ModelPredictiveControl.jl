@@ -9,9 +9,17 @@ function Base.show(io::IO, estim::MovingHorizonEstimator)
     println(io, "$(nameof(typeof(estim))) estimator with a sample time Ts = $(model.Ts) s:")
     println(io, "├ model: $(nameof(typeof(model)))")
     println(io, "├ optimizer: $(JuMP.solver_name(estim.optim)) ")
+    print_backends(io, estim, model)
     println(io, "└ dimensions:")
     print_estim_dim(io, estim, n)
 end
+
+function print_backends(io::IO, estim::MovingHorizonEstimator, ::SimModel)
+    println(io, "├ gradient: $(backend_str(estim.gradient))")
+    println(io, "├ jacobian: $(backend_str(estim.jacobian))")
+end
+print_backends(::IO, ::MovingHorizonEstimator, ::LinModel) = nothing
+
 
 "Print the overall dimensions of the MHE `estim` with left padding `n`."
 function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n)

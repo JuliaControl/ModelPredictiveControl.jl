@@ -37,12 +37,16 @@ function Base.show(io::IO, mpc::PredictiveController)
     println(io, "├ model: $(nameof(typeof(model)))")
     println(io, "├ optimizer: $(JuMP.solver_name(mpc.optim)) ")
     println(io, "├ transcription: $(nameof(typeof(mpc.transcription)))")
+    print_backends(io, mpc)
     println(io, "└ dimensions:")
     println(io, "  ├$(lpad(Hp, n)) prediction steps Hp")
     println(io, "  ├$(lpad(Hc, n)) control steps Hc")
     println(io, "  ├$(lpad(nϵ, n)) slack variable ϵ (control constraints)")
     print_estim_dim(io, mpc.estim, n)
 end
+
+"No differentiation backends to print for a `PredictiveController` by default."
+print_backends(::IO, ::PredictiveController) = nothing
 
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(

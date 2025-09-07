@@ -748,8 +748,14 @@ end
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
 function obj_econ(
-    mpc::NonLinMPC, model::SimModel, Ue, Ŷe::AbstractVector{NT}
+    mpc::NonLinMPC, ::SimModel, Ue, Ŷe::AbstractVector{NT}
 ) where NT<:Real
     E_JE = mpc.weights.iszero_E ? zero(NT) : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
     return E_JE
+end
+
+"Print the differentiation backends of a [`NonLinMPC`](@ref) controller."
+function print_backends(io::IO, mpc::NonLinMPC)
+    println(io, "├ gradient: $(backend_str(mpc.gradient))")
+    println(io, "├ jacobian: $(backend_str(mpc.jacobian))")
 end
