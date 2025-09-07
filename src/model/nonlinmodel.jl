@@ -154,7 +154,7 @@ julia> h!(y, x, _ , _ ) = (y .= 0.1x; nothing);
 julia> model1 = NonLinModel(f!, h!, 5.0, 1, 1, 1, p=-0.2)       # continuous dynamics
 NonLinModel with a sample time Ts = 5.0 s:
 ├ solver: RungeKutta(4)
-├ linearization: AutoForwardDiff
+├ jacobian: AutoForwardDiff
 └ dimensions:
   ├ 1 manipulated inputs u
   ├ 1 states x
@@ -168,7 +168,7 @@ julia> h(x, _ , _ ) = 2x;
 julia> model2 = NonLinModel(f, h, 2.0, 1, 1, 1, solver=nothing) # discrete dynamics
 NonLinModel with a sample time Ts = 2.0 s:
 ├ solver: EmptySolver
-├ linearization: AutoForwardDiff
+├ jacobian: AutoForwardDiff
 └ dimensions:
   ├ 1 manipulated inputs u
   ├ 1 states x

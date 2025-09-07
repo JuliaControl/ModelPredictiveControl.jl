@@ -1010,6 +1010,7 @@ julia> model = NonLinModel((x,u,_,_)->0.2x+u, (x,_,_)->-3x, 5.0, 1, 1, 1, solver
 julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP_0=[0.1], σPint_ym_0=[0.1])
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s:
 ├ model: NonLinModel
+├ jacobian: AutoForwardDiff
 └ dimensions:
   ├ 1 manipulated inputs u (0 integrating states)
   ├ 2 estimated states x̂
