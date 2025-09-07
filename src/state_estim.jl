@@ -35,9 +35,13 @@ function Base.show(io::IO, estim::StateEstimator)
     n = maximum(ndigits.((nu, nx̂, nym, nyu, nd))) + 1
     println(io, "$(nameof(typeof(estim))) estimator with a sample time Ts = $(model.Ts) s:")
     println(io, "├ model: $(nameof(typeof(estim.model)))")
+    print_details(io, estim)
     println(io, "└ dimensions:")
     print_estim_dim(io, estim, n)
 end
+
+"Print additional details of `estim` if any (no details by default)."
+print_details(::IO, ::StateEstimator) = nothing
 
 "Print the overall dimensions of the state estimator `estim` with left padding `n`."
 function print_estim_dim(io::IO, estim::StateEstimator, n)

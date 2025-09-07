@@ -1177,6 +1177,10 @@ function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT
     return predict_estimate_kf!(estim, u0, d0, F̂)
 end
 
+function print_details(io::IO, estim::ExtendedKalmanFilter)
+    println(io, "├ jacobian: $(backend_str(estim.jacobian))")
+end
+
 "Set `estim.cov.P̂` to `estim.cov.P̂_0` for the time-varying Kalman Filters."
 function init_estimate_cov!(
     estim::Union{KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter}, _ , _ , _

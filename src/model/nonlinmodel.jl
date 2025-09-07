@@ -315,9 +315,9 @@ include("solver.jl")
 
 function print_details(io::IO, model::NonLinModel{<:Real, <:RungeKutta{N}}) where N
     println(io, "├ solver: $(nameof(typeof(model.solver)))($N)")
-    println(io, "├ linearization: $(backend_str(model.jacobian))")
+    println(io, "├ jacobian: $(backend_str(model.jacobian))")
 end
 function print_details(io::IO, model::NonLinModel) 
     println(io, "├ solver: $(nameof(typeof(model.solver)))")
-    println(io, "├ linearization: $(backend_str(model.jacobian))")
+    println(io, "├ jacobian: $(backend_str(model.jacobian))")
 end

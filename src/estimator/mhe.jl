@@ -1,25 +1,19 @@
 include("mhe/construct.jl")
 include("mhe/execute.jl")
 
-function Base.show(io::IO, estim::MovingHorizonEstimator)
-    model = estim.model
-    nu, nd = model.nu, model.nd
-    nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
-    n = maximum(ndigits.((nu, nx̂, nym, nyu, nd))) + 1
-    println(io, "$(nameof(typeof(estim))) estimator with a sample time Ts = $(model.Ts) s:")
-    println(io, "├ model: $(nameof(typeof(model)))")
+"Print optimizer and other information for `MovingHorizonEstimator`."
+function print_details(io::IO, estim::MovingHorizonEstimator)
     println(io, "├ optimizer: $(JuMP.solver_name(estim.optim)) ")
-    print_backends(io, estim, model)
-    println(io, "└ dimensions:")
-    print_estim_dim(io, estim, n)
+    print_backends(io, estim, estim.model)
 end
 
+"Print the differentiation backends for `SimModel`."
 function print_backends(io::IO, estim::MovingHorizonEstimator, ::SimModel)
     println(io, "├ gradient: $(backend_str(estim.gradient))")
     println(io, "├ jacobian: $(backend_str(estim.jacobian))")
 end
+"No differentiation backends to print for `LinModel`."
 print_backends(::IO, ::MovingHorizonEstimator, ::LinModel) = nothing
-
 
 "Print the overall dimensions of the MHE `estim` with left padding `n`."
 function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n)
