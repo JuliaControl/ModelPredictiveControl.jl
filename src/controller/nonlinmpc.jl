@@ -223,16 +223,23 @@ This controller allocates memory at each time step for the optimization.
 ```jldoctest
 julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
-julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
-NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, SingleShooting transcription, UnscentedKalmanFilter estimator and:
- 20 prediction steps Hp
-  1 control steps Hc
-  1 slack variable ϵ (control constraints)
-  1 manipulated inputs u (0 integrating states)
-  2 estimated states x̂
-  1 measured outputs ym (1 integrating states)
-  0 unmeasured outputs yu
-  0 measured disturbances d
+julia> mpc = NonLinMPC(model, Hp=20, Hc=10, transcription=MultipleShooting())
+NonLinMPC controller with a sample time Ts = 10.0 s:
+├ estimator: UnscentedKalmanFilter
+├ model: NonLinModel
+├ optimizer: Ipopt 
+├ transcription: MultipleShooting
+├ gradient: AutoForwardDiff
+├ jacobian: AutoSparse (AutoForwardDiff, TracerSparsityDetector, GreedyColoringAlgorithm)
+└ dimensions:
+  ├ 20 prediction steps Hp
+  ├ 10 control steps Hc
+  ├  1 slack variable ϵ (control constraints)
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  2 estimated states x̂
+  ├  1 measured outputs ym (1 integrating states)
+  ├  0 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 
 # Extended Help
@@ -327,16 +334,23 @@ julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver
 
 julia> estim = UnscentedKalmanFilter(model, σQint_ym=[0.05]);
 
-julia> mpc = NonLinMPC(estim, Hp=20, Hc=1, Cwt=1e6)
-NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, SingleShooting transcription, UnscentedKalmanFilter estimator and:
- 20 prediction steps Hp
-  1 control steps Hc
-  1 slack variable ϵ (control constraints)
-  1 manipulated inputs u (0 integrating states)
-  2 estimated states x̂
-  1 measured outputs ym (1 integrating states)
-  0 unmeasured outputs yu
-  0 measured disturbances d
+julia> mpc = NonLinMPC(estim, Hp=20, Cwt=1e6)
+NonLinMPC controller with a sample time Ts = 10.0 s:
+├ estimator: UnscentedKalmanFilter
+├ model: NonLinModel
+├ optimizer: Ipopt
+├ transcription: SingleShooting
+├ gradient: AutoForwardDiff
+├ jacobian: AutoForwardDiff
+└ dimensions:
+  ├ 20 prediction steps Hp
+  ├  2 control steps Hc
+  ├  1 slack variable ϵ (control constraints)
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  2 estimated states x̂
+  ├  1 measured outputs ym (1 integrating states)
+  ├  0 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 """
 function NonLinMPC(
@@ -738,8 +752,14 @@ end
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
 function obj_econ(
-    mpc::NonLinMPC, model::SimModel, Ue, Ŷe::AbstractVector{NT}
+    mpc::NonLinMPC, ::SimModel, Ue, Ŷe::AbstractVector{NT}
 ) where NT<:Real
     E_JE = mpc.weights.iszero_E ? zero(NT) : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
     return E_JE
+end
+
+"Print the differentiation backends of a [`NonLinMPC`](@ref) controller."
+function print_backends(io::IO, mpc::NonLinMPC)
+    println(io, "├ gradient: $(backend_str(mpc.gradient))")
+    println(io, "├ jacobian: $(backend_str(mpc.jacobian))")
 end

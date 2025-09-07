@@ -130,12 +130,14 @@ state of the next time step ``\mathbf{x̂}_k(k+1)``. This estimator is allocatio
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
 julia> estim = SteadyKalmanFilter(model, i_ym=[2], σR=[1], σQint_ym=[0.01])
-SteadyKalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
- 1 manipulated inputs u (0 integrating states)
- 3 estimated states x̂
- 1 measured outputs ym (1 integrating states)
- 1 unmeasured outputs yu
- 0 measured disturbances d
+SteadyKalmanFilter estimator with a sample time Ts = 0.5 s:
+├ model: LinModel
+└ dimensions:
+  ├ 1 manipulated inputs u (0 integrating states)
+  ├ 3 estimated states x̂
+  ├ 1 measured outputs ym (1 integrating states)
+  ├ 1 unmeasured outputs yu
+  └ 0 measured disturbances d
 ```
 
 # Extended Help
@@ -395,12 +397,14 @@ This estimator is allocation-free.
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
 julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP_0=[100, 100], σQint_ym=[0.01])
-KalmanFilter estimator with a sample time Ts = 0.5 s, LinModel and:
- 1 manipulated inputs u (0 integrating states)
- 3 estimated states x̂
- 1 measured outputs ym (1 integrating states)
- 1 unmeasured outputs yu
- 0 measured disturbances d
+KalmanFilter estimator with a sample time Ts = 0.5 s:
+├ model: LinModel
+└ dimensions:
+  ├ 1 manipulated inputs u (0 integrating states)
+  ├ 3 estimated states x̂
+  ├ 1 measured outputs ym (1 integrating states)
+  ├ 1 unmeasured outputs yu
+  └ 0 measured disturbances d
 ```
 """
 function KalmanFilter(
@@ -639,12 +643,14 @@ This estimator is allocation-free if `model` simulations do not allocate.
 julia> model = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σPint_ym_0=[1, 1])
-UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s, NonLinModel and:
- 1 manipulated inputs u (0 integrating states)
- 3 estimated states x̂
- 1 measured outputs ym (2 integrating states)
- 0 unmeasured outputs yu
- 0 measured disturbances d
+UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s:
+├ model: NonLinModel
+└ dimensions:
+  ├ 1 manipulated inputs u (0 integrating states)
+  ├ 3 estimated states x̂
+  ├ 1 measured outputs ym (2 integrating states)
+  ├ 0 unmeasured outputs yu
+  └ 0 measured disturbances d
 ```
 
 # Extended Help
@@ -1002,12 +1008,15 @@ differentiation. This estimator is allocation-free if `model` simulations do not
 julia> model = NonLinModel((x,u,_,_)->0.2x+u, (x,_,_)->-3x, 5.0, 1, 1, 1, solver=nothing);
 
 julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP_0=[0.1], σPint_ym_0=[0.1])
-ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s, NonLinModel and:
- 1 manipulated inputs u (0 integrating states)
- 2 estimated states x̂
- 1 measured outputs ym (1 integrating states)
- 0 unmeasured outputs yu
- 0 measured disturbances d
+ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s:
+├ model: NonLinModel
+├ jacobian: AutoForwardDiff
+└ dimensions:
+  ├ 1 manipulated inputs u (0 integrating states)
+  ├ 2 estimated states x̂
+  ├ 1 measured outputs ym (1 integrating states)
+  ├ 0 unmeasured outputs yu
+  └ 0 measured disturbances d
 ```
 """
 function ExtendedKalmanFilter(
@@ -1167,6 +1176,10 @@ function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT
     x̂0next, F̂ = estim.buffer.x̂, estim.F̂
     estim.linfuncF̂!(F̂, x̂0next, estim.jacobian, x̂0corr, cst_u0, cst_d0)
     return predict_estimate_kf!(estim, u0, d0, F̂)
+end
+
+function print_details(io::IO, estim::ExtendedKalmanFilter)
+    println(io, "├ jacobian: $(backend_str(estim.jacobian))")
 end
 
 "Set `estim.cov.P̂` to `estim.cov.P̂_0` for the time-varying Kalman Filters."

@@ -27,19 +27,26 @@ include("controller/linmpc.jl")
 include("controller/nonlinmpc.jl")
 
 function Base.show(io::IO, mpc::PredictiveController)
+    estim, model = mpc.estim, mpc.estim.model
     Hp, Hc, nϵ = mpc.Hp, mpc.Hc, mpc.nϵ
-    nu, nd = mpc.estim.model.nu, mpc.estim.model.nd
-    nx̂, nym, nyu = mpc.estim.nx̂, mpc.estim.nym, mpc.estim.nyu
+    nu, nd = model.nu, model.nd
+    nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
-    println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = "*
-                "$(mpc.estim.model.Ts) s, $(JuMP.solver_name(mpc.optim)) optimizer, "*
-                "$(nameof(typeof(mpc.transcription))) transcription, "*
-                "$(nameof(typeof(mpc.estim))) estimator and:")
-    println(io, "$(lpad(Hp, n)) prediction steps Hp")
-    println(io, "$(lpad(Hc, n)) control steps Hc")
-    println(io, "$(lpad(nϵ, n)) slack variable ϵ (control constraints)")
+    println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = $(model.Ts) s:")
+    println(io, "├ estimator: $(nameof(typeof(mpc.estim)))")
+    println(io, "├ model: $(nameof(typeof(model)))")
+    println(io, "├ optimizer: $(JuMP.solver_name(mpc.optim)) ")
+    println(io, "├ transcription: $(nameof(typeof(mpc.transcription)))")
+    print_backends(io, mpc)
+    println(io, "└ dimensions:")
+    println(io, "  ├$(lpad(Hp, n)) prediction steps Hp")
+    println(io, "  ├$(lpad(Hc, n)) control steps Hc")
+    println(io, "  ├$(lpad(nϵ, n)) slack variable ϵ (control constraints)")
     print_estim_dim(io, mpc.estim, n)
 end
+
+"No differentiation backends to print for a `PredictiveController` by default."
+print_backends(::IO, ::PredictiveController) = nothing
 
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(

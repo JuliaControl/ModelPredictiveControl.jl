@@ -61,6 +61,14 @@ end
 init_diffmat(T, backend::AbstractADType, _  , nx , ny) = Matrix{T}(undef, ny, nx)
 init_diffmat(T, backend::AutoSparse    ,prep , _ , _ ) = similar(sparsity_pattern(prep), T)
 
+backend_str(backend::AbstractADType) = string(nameof(typeof(backend)))
+function backend_str(backend::AutoSparse)
+    str =   "AutoSparse ($(nameof(typeof(backend.dense_ad))),"*
+            " $(nameof(typeof(backend.sparsity_detector))),"*
+            " $(nameof(typeof(backend.coloring_algorithm))))"
+    return str
+end
+
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
 

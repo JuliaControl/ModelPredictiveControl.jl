@@ -85,11 +85,12 @@ The state `xop` and the additional `fop` operating points are frequently zero e.
 # Examples
 ```jldoctest
 julia> model = setop!(LinModel(tf(3, [10, 1]), 2.0), uop=[50], yop=[20])
-LinModel with a sample time Ts = 2.0 s and:
- 1 manipulated inputs u
- 1 states x
- 1 outputs y
- 0 measured disturbances d
+LinModel with a sample time Ts = 2.0 s:
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 1 states x
+  ├ 1 outputs y
+  └ 0 measured disturbances d
 
 julia> y = model()
 1-element Vector{Float64}:
@@ -134,11 +135,12 @@ used in the plotting functions.
 # Examples
 ```jldoctest
 julia> model = setname!(LinModel(tf(3, [10, 1]), 2.0), u=["\$A\$ (%)"], y=["\$T\$ (∘C)"])
-LinModel with a sample time Ts = 2.0 s and:
- 1 manipulated inputs u
- 1 states x
- 1 outputs y
- 0 measured disturbances d
+LinModel with a sample time Ts = 2.0 s:
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 1 states x
+  ├ 1 outputs y
+  └ 0 measured disturbances d
 ```
 """
 function setname!(model::SimModel; u=nothing, y=nothing, d=nothing, x=nothing)
@@ -171,8 +173,6 @@ function setstate!(model::SimModel, x)
     model.x0 .= x .- model.xop
     return model
 end
-
-detailstr(model::SimModel) = ""
 
 @doc raw"""
     initstate!(model::SimModel, u, d=[]) -> x
@@ -372,13 +372,17 @@ function Base.show(io::IO, model::SimModel)
     nu, nd = model.nu, model.nd
     nx, ny = model.nx, model.ny
     n = maximum(ndigits.((nu, nx, ny, nd))) + 1
-    println(io, "$(nameof(typeof(model))) with a sample time Ts = $(model.Ts) s"*
-                "$(detailstr(model)) and:")
-    println(io, "$(lpad(nu, n)) manipulated inputs u")
-    println(io, "$(lpad(nx, n)) states x")
-    println(io, "$(lpad(ny, n)) outputs y")
-    print(io,   "$(lpad(nd, n)) measured disturbances d")
+    println(io, "$(nameof(typeof(model))) with a sample time Ts = $(model.Ts) s:")
+    print_details(io, model)
+    println(io, "└ dimensions:")
+    println(io, "  ├$(lpad(nu, n)) manipulated inputs u")
+    println(io, "  ├$(lpad(nx, n)) states x")
+    println(io, "  ├$(lpad(ny, n)) outputs y")
+    print(io,   "  └$(lpad(nd, n)) measured disturbances d")
 end
+
+"Print additional details of `model` if any (no details by default)."
+print_details(::IO, ::SimModel) = nothing
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=model.buffer.empty) = evaloutput(model::SimModel, d)

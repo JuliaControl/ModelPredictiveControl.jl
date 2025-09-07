@@ -117,14 +117,15 @@ arguments.
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
 
 julia> mpc = ExplicitMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-ExplicitMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimator and:
- 30 prediction steps Hp
-  1 control steps Hc
-  1 manipulated inputs u (0 integrating states)
-  4 estimated states x̂
-  2 measured outputs ym (2 integrating states)
-  0 unmeasured outputs yu
-  0 measured disturbances d
+ExplicitMPC controller with a sample time Ts = 4.0 s:
+├ estimator: SteadyKalmanFilter
+├ model: LinModel
+└ dimensions:
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  4 estimated states x̂
+  ├  2 measured outputs ym (2 integrating states)
+  ├  0 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 
 """
@@ -177,15 +178,15 @@ end
 setconstraint!(::ExplicitMPC; kwargs...) = error("ExplicitMPC does not support constraints.")
 
 function Base.show(io::IO, mpc::ExplicitMPC)
-    Hp, Hc = mpc.Hp, mpc.Hc
-    nu, nd = mpc.estim.model.nu, mpc.estim.model.nd
-    nx̂, nym, nyu = mpc.estim.nx̂, mpc.estim.nym, mpc.estim.nyu
+    estim, model = mpc.estim, mpc.estim.model
+    Hp, Hc, nϵ = mpc.Hp, mpc.Hc, mpc.nϵ
+    nu, nd = model.nu, model.nd
+    nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
-    println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = "*
-                "$(mpc.estim.model.Ts) s, "*
-                "$(nameof(typeof(mpc.estim))) estimator and:")
-    println(io, "$(lpad(Hp, n)) prediction steps Hp")
-    println(io, "$(lpad(Hc, n)) control steps Hc")
+    println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = $(model.Ts) s:")
+    println(io, "├ estimator: $(nameof(typeof(mpc.estim)))")
+    println(io, "├ model: $(nameof(typeof(model)))")
+    println(io, "└ dimensions:")
     print_estim_dim(io, mpc.estim, n)
 end
 
