@@ -223,17 +223,17 @@ This controller allocates memory at each time step for the optimization.
 ```jldoctest
 julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
-julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
+julia> mpc = NonLinMPC(model, Hp=20, Hc=10, transcription=MultipleShooting())
 NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ estimator: UnscentedKalmanFilter
 ├ model: NonLinModel
-├ optimizer: Ipopt
-├ transcription: SingleShooting
+├ optimizer: Ipopt 
+├ transcription: MultipleShooting
 ├ gradient: AutoForwardDiff
-├ jacobian: AutoForwardDiff
+├ jacobian: AutoSparse (AutoForwardDiff, TracerSparsityDetector, GreedyColoringAlgorithm)
 └ dimensions:
   ├ 20 prediction steps Hp
-  ├  1 control steps Hc
+  ├ 10 control steps Hc
   ├  1 slack variable ϵ (control constraints)
   ├  1 manipulated inputs u (0 integrating states)
   ├  2 estimated states x̂
@@ -334,7 +334,7 @@ julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver
 
 julia> estim = UnscentedKalmanFilter(model, σQint_ym=[0.05]);
 
-julia> mpc = NonLinMPC(estim, Hp=20, Hc=1, Cwt=1e6)
+julia> mpc = NonLinMPC(estim, Hp=20, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ estimator: UnscentedKalmanFilter
 ├ model: NonLinModel
@@ -344,7 +344,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ jacobian: AutoForwardDiff
 └ dimensions:
   ├ 20 prediction steps Hp
-  ├  1 control steps Hc
+  ├  2 control steps Hc
   ├  1 slack variable ϵ (control constraints)
   ├  1 manipulated inputs u (0 integrating states)
   ├  2 estimated states x̂
