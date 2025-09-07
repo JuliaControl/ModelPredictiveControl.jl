@@ -85,11 +85,12 @@ The state `xop` and the additional `fop` operating points are frequently zero e.
 # Examples
 ```jldoctest
 julia> model = setop!(LinModel(tf(3, [10, 1]), 2.0), uop=[50], yop=[20])
-LinModel with a sample time Ts = 2.0 s and:
- 1 manipulated inputs u
- 1 states x
- 1 outputs y
- 0 measured disturbances d
+LinModel with a sample time Ts = 2.0 s:
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 1 states x
+  ├ 1 outputs y
+  └ 0 measured disturbances d
 
 julia> y = model()
 1-element Vector{Float64}:
@@ -134,11 +135,12 @@ used in the plotting functions.
 # Examples
 ```jldoctest
 julia> model = setname!(LinModel(tf(3, [10, 1]), 2.0), u=["\$A\$ (%)"], y=["\$T\$ (∘C)"])
-LinModel with a sample time Ts = 2.0 s and:
- 1 manipulated inputs u
- 1 states x
- 1 outputs y
- 0 measured disturbances d
+LinModel with a sample time Ts = 2.0 s:
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 1 states x
+  ├ 1 outputs y
+  └ 0 measured disturbances d
 ```
 """
 function setname!(model::SimModel; u=nothing, y=nothing, d=nothing, x=nothing)

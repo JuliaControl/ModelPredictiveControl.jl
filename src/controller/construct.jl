@@ -221,15 +221,20 @@ constraints are all soft by default. See Extended Help for time-varying constrai
 julia> mpc = LinMPC(setop!(LinModel(tf(3, [30, 1]), 4), uop=[50], yop=[25]));
 
 julia> mpc = setconstraint!(mpc, umin=[0], umax=[100], Δumin=[-10], Δumax=[+10])
-LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SingleShooting transcription, SteadyKalmanFilter estimator and:
- 10 prediction steps Hp
-  2 control steps Hc
-  1 slack variable ϵ (control constraints)
-  1 manipulated inputs u (0 integrating states)
-  2 estimated states x̂
-  1 measured outputs ym (1 integrating states)
-  0 unmeasured outputs yu
-  0 measured disturbances d
+LinMPC controller with a sample time Ts = 4.0 s:
+├ estimator: SteadyKalmanFilter
+├ model: LinModel
+├ optimizer: OSQP
+├ transcription: SingleShooting
+└ dimensions:
+  ├ 10 prediction steps Hp
+  ├  2 control steps Hc
+  ├  1 slack variable ϵ (control constraints)
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  2 estimated states x̂
+  ├  1 measured outputs ym (1 integrating states)
+  ├  0 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 
 # Extended Help

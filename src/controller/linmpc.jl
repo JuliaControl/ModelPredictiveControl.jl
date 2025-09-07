@@ -168,15 +168,20 @@ arguments. This controller allocates memory at each time step for the optimizati
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
 
 julia> mpc = LinMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SingleShooting transcription, SteadyKalmanFilter estimator and:
- 30 prediction steps Hp
-  1 control steps Hc
-  1 slack variable ϵ (control constraints)
-  1 manipulated inputs u (0 integrating states)
-  4 estimated states x̂
-  2 measured outputs ym (2 integrating states)
-  0 unmeasured outputs yu
-  0 measured disturbances d
+LinMPC controller with a sample time Ts = 4.0 s:
+├ estimator: SteadyKalmanFilter
+├ model: LinModel
+├ optimizer: OSQP
+├ transcription: SingleShooting
+└ dimensions:
+  ├ 30 prediction steps Hp
+  ├  1 control steps Hc
+  ├  1 slack variable ϵ (control constraints)
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  4 estimated states x̂
+  ├  2 measured outputs ym (2 integrating states)
+  ├  0 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 
 # Extended Help
@@ -238,15 +243,20 @@ Use custom state estimator `estim` to construct `LinMPC`.
 julia> estim = KalmanFilter(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4), i_ym=[2]);
 
 julia> mpc = LinMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SingleShooting transcription, KalmanFilter estimator and:
- 30 prediction steps Hp
-  1 control steps Hc
-  1 slack variable ϵ (control constraints)
-  1 manipulated inputs u (0 integrating states)
-  3 estimated states x̂
-  1 measured outputs ym (1 integrating states)
-  1 unmeasured outputs yu
-  0 measured disturbances d
+LinMPC controller with a sample time Ts = 4.0 s:
+├ estimator: KalmanFilter
+├ model: LinModel
+├ optimizer: OSQP
+├ transcription: SingleShooting
+└ dimensions:
+  ├ 30 prediction steps Hp
+  ├  1 control steps Hc
+  ├  1 slack variable ϵ (control constraints)
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  3 estimated states x̂
+  ├  1 measured outputs ym (1 integrating states)
+  ├  1 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 """
 function LinMPC(

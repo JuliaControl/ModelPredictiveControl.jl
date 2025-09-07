@@ -91,18 +91,20 @@ See also [`ss`](@extref ControlSystemsBase.ss)
 # Examples
 ```jldoctest
 julia> model1 = LinModel(ss(-0.1, 1.0, 1.0, 0), 2.0) # continuous-time StateSpace
-LinModel with a sample time Ts = 2.0 s and:
- 1 manipulated inputs u
- 1 states x
- 1 outputs y
- 0 measured disturbances d
+LinModel with a sample time Ts = 2.0 s:
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 1 states x
+  ├ 1 outputs y
+  └ 0 measured disturbances d
 
 julia> model2 = LinModel(ss(0.4, 0.2, 0.3, 0, 0.1)) # discrete-time StateSpace
-LinModel with a sample time Ts = 0.1 s and:
- 1 manipulated inputs u
- 1 states x
- 1 outputs y
- 0 measured disturbances d
+LinModel with a sample time Ts = 0.1 s:
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 1 states x
+  ├ 1 outputs y
+  └ 0 measured disturbances d
 ```
 
 # Extended Help
@@ -200,11 +202,12 @@ See also [`tf`](@extref ControlSystemsBase.tf)
 # Examples
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]) tf(-2, [5, 1])], 0.5, i_d=[2])
-LinModel with a sample time Ts = 0.5 s and:
- 1 manipulated inputs u
- 2 states x
- 1 outputs y
- 1 measured disturbances d
+LinModel with a sample time Ts = 0.5 s:
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 2 states x
+  ├ 1 outputs y
+  └ 1 measured disturbances d
 ```
 """
 function LinModel(sys::TransferFunction, Ts::Union{Real,Nothing} = nothing; kwargs...) 

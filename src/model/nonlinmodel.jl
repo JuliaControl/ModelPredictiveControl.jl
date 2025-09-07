@@ -152,22 +152,26 @@ julia> f!(ẋ, x, u, _ , p) = (ẋ .= p*x .+ u; nothing);
 julia> h!(y, x, _ , _ ) = (y .= 0.1x; nothing);
 
 julia> model1 = NonLinModel(f!, h!, 5.0, 1, 1, 1, p=-0.2)       # continuous dynamics
-NonLinModel with a sample time Ts = 5.0 s, RungeKutta(4) solver and:
- 1 manipulated inputs u
- 1 states x
- 1 outputs y
- 0 measured disturbances d
+NonLinModel with a sample time Ts = 5.0 s:
+├ solver: RungeKutta(4)
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 1 states x
+  ├ 1 outputs y
+  └ 0 measured disturbances d
 
 julia> f(x, u, _ , _ ) = 0.1x + u;
 
 julia> h(x, _ , _ ) = 2x;
 
 julia> model2 = NonLinModel(f, h, 2.0, 1, 1, 1, solver=nothing) # discrete dynamics
-NonLinModel with a sample time Ts = 2.0 s, empty solver and:
- 1 manipulated inputs u
- 1 states x
- 1 outputs y
- 0 measured disturbances d
+NonLinModel with a sample time Ts = 2.0 s:
+├ solver: empty
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 1 states x
+  ├ 1 outputs y
+  └ 0 measured disturbances d
 ```
 
 # Extended Help

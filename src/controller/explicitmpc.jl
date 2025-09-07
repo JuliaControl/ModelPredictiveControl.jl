@@ -117,14 +117,15 @@ arguments.
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4);
 
 julia> mpc = ExplicitMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
-ExplicitMPC controller with a sample time Ts = 4.0 s, SteadyKalmanFilter estimator and:
- 30 prediction steps Hp
-  1 control steps Hc
-  1 manipulated inputs u (0 integrating states)
-  4 estimated states x̂
-  2 measured outputs ym (2 integrating states)
-  0 unmeasured outputs yu
-  0 measured disturbances d
+ExplicitMPC controller with a sample time Ts = 4.0 s:
+├ estimator: SteadyKalmanFilter
+├ model: LinModel
+└ dimensions:
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  4 estimated states x̂
+  ├  2 measured outputs ym (2 integrating states)
+  ├  0 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 
 """

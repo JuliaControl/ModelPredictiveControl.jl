@@ -77,12 +77,14 @@ examples.
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
 julia> estim = ManualEstimator(model, nint_ym=0) # disable augmentation with integrators
-ManualEstimator estimator with a sample time Ts = 0.5 s, LinModel and:
- 1 manipulated inputs u (0 integrating states)
- 2 estimated states x̂
- 2 measured outputs ym (0 integrating states)
- 0 unmeasured outputs yu
- 0 measured disturbances d
+ManualEstimator estimator with a sample time Ts = 0.5 s:
+├ model: LinModel
+└ dimensions:
+  ├ 1 manipulated inputs u (0 integrating states)
+  ├ 2 estimated states x̂
+  ├ 2 measured outputs ym (0 integrating states)
+  ├ 0 unmeasured outputs yu
+  └ 0 measured disturbances d
 ```
 
 # Extended Help
