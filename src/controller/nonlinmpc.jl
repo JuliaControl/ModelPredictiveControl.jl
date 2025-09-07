@@ -229,6 +229,8 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ model: NonLinModel
 ├ optimizer: Ipopt
 ├ transcription: SingleShooting
+├ gradient: AutoForwardDiff
+├ jacobian: AutoForwardDiff
 └ dimensions:
   ├ 20 prediction steps Hp
   ├  1 control steps Hc
@@ -338,6 +340,8 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ model: NonLinModel
 ├ optimizer: Ipopt
 ├ transcription: SingleShooting
+├ gradient: AutoForwardDiff
+├ jacobian: AutoForwardDiff
 └ dimensions:
   ├ 20 prediction steps Hp
   ├  1 control steps Hc

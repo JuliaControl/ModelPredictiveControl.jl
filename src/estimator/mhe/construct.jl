@@ -278,6 +278,8 @@ julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP_0=[0.01])
 MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
 ├ model: NonLinModel
 ├ optimizer: Ipopt
+├ gradient: AutoForwardDiff
+├ jacobian: AutoForwardDiff
 └ dimensions:
   ├ 5 estimation steps He
   ├ 0 slack variable ϵ (estimation constraints)
