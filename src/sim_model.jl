@@ -372,12 +372,14 @@ function Base.show(io::IO, model::SimModel)
     nu, nd = model.nu, model.nd
     nx, ny = model.nx, model.ny
     n = maximum(ndigits.((nu, nx, ny, nd))) + 1
-    println(io, "$(nameof(typeof(model))) with a sample time Ts = $(model.Ts) s"*
-                "$(detailstr(model)) and:")
-    println(io, "$(lpad(nu, n)) manipulated inputs u")
-    println(io, "$(lpad(nx, n)) states x")
-    println(io, "$(lpad(ny, n)) outputs y")
-    print(io,   "$(lpad(nd, n)) measured disturbances d")
+    details = detailstr(model) 
+    println(io, "$(nameof(typeof(model))) with a sample time Ts = $(model.Ts) s:")
+    !isempty(details) && println(io, "├ $details")
+    println(io, "└ dimensions:")
+    println(io, "  ├$(lpad(nu, n)) manipulated inputs u")
+    println(io, "  ├$(lpad(nx, n)) states x")
+    println(io, "  ├$(lpad(ny, n)) outputs y")
+    print(io,   "  └$(lpad(nd, n)) measured disturbances d")
 end
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."

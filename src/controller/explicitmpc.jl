@@ -177,15 +177,15 @@ end
 setconstraint!(::ExplicitMPC; kwargs...) = error("ExplicitMPC does not support constraints.")
 
 function Base.show(io::IO, mpc::ExplicitMPC)
-    Hp, Hc = mpc.Hp, mpc.Hc
-    nu, nd = mpc.estim.model.nu, mpc.estim.model.nd
-    nx̂, nym, nyu = mpc.estim.nx̂, mpc.estim.nym, mpc.estim.nyu
+    estim, model = mpc.estim, mpc.estim.model
+    Hp, Hc, nϵ = mpc.Hp, mpc.Hc, mpc.nϵ
+    nu, nd = model.nu, model.nd
+    nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
-    println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = "*
-                "$(mpc.estim.model.Ts) s, "*
-                "$(nameof(typeof(mpc.estim))) estimator and:")
-    println(io, "$(lpad(Hp, n)) prediction steps Hp")
-    println(io, "$(lpad(Hc, n)) control steps Hc")
+    println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = $(model.Ts) s:")
+    println(io, "├ estimator: $(nameof(typeof(mpc.estim)))")
+    println(io, "├ model: $(nameof(typeof(model)))")
+    println(io, "└ dimensions:")
     print_estim_dim(io, mpc.estim, n)
 end
 

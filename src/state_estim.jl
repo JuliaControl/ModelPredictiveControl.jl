@@ -29,11 +29,13 @@ include("estimator/internal_model.jl")
 include("estimator/manual.jl")
 
 function Base.show(io::IO, estim::StateEstimator)
-    nu, nd = estim.model.nu, estim.model.nd
+    model = estim.model
+    nu, nd = model.nu, model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     n = maximum(ndigits.((nu, nx̂, nym, nyu, nd))) + 1
-    println(io, "$(nameof(typeof(estim))) estimator with a sample time "*
-                "Ts = $(estim.model.Ts) s, $(nameof(typeof(estim.model))) and:")
+    println(io, "$(nameof(typeof(estim))) estimator with a sample time Ts = $(model.Ts) s:")
+    println(io, "├ model: $(nameof(typeof(estim.model)))")
+    println(io, "└ dimensions:")
     print_estim_dim(io, estim, n)
 end
 
@@ -41,9 +43,10 @@ end
 function print_estim_dim(io::IO, estim::StateEstimator, n)
     nu, nd = estim.model.nu, estim.model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
-    println(io, "$(lpad(nu, n)) manipulated inputs u ($(sum(estim.nint_u)) integrating states)")
-    println(io, "$(lpad(nx̂, n)) estimated states x̂")
-    println(io, "$(lpad(nym, n)) measured outputs ym ($(sum(estim.nint_ym)) integrating states)")
-    println(io, "$(lpad(nyu, n)) unmeasured outputs yu")
-    print(io,   "$(lpad(nd, n)) measured disturbances d")
+    niu, niym = sum(estim.nint_u), sum(estim.nint_ym)
+    println(io, "  ├$(lpad(nu, n)) manipulated inputs u ($niu integrating states)")
+    println(io, "  ├$(lpad(nx̂, n)) estimated states x̂")
+    println(io, "  ├$(lpad(nym, n)) measured outputs ym ($niym integrating states)")
+    println(io, "  ├$(lpad(nyu, n)) unmeasured outputs yu")
+    print(io,   "  └$(lpad(nd, n)) measured disturbances d")
 end
