@@ -611,7 +611,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     model, estim, transcription = mpc.estim.model, mpc.estim, mpc.transcription
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     optim, con = mpc.optim, mpc.con
-    # --- predictions matrices ---
+    # --- prediction matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
         model, estim, transcription, Hp, Hc
     )
@@ -623,6 +623,15 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     mpc.K .= K
     mpc.V .= V
     mpc.B .= B
+    # --- defect matrices ---
+    Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc)
+    A_ŝ, Ẽŝ = augmentdefect(Eŝ, mpc.nϵ)
+    con.Ẽŝ .= Ẽŝ
+    con.Gŝ .= Gŝ
+    con.Jŝ .= Jŝ
+    con.Kŝ .= Kŝ
+    con.Vŝ .= Vŝ
+    con.Bŝ .= Bŝ
     # --- linear inequality constraints ---
     con.ẽx̂ .= ẽx̂ 
     con.gx̂ .= gx̂
@@ -630,25 +639,6 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.kx̂ .= kx̂
     con.vx̂ .= vx̂
     con.bx̂ .= bx̂
-    con.U0min .+= mpc.Uop # convert U0 to U with the old operating point
-    con.U0max .+= mpc.Uop # convert U0 to U with the old operating point
-    con.Y0min .+= mpc.Yop # convert Y0 to Y with the old operating point
-    con.Y0max .+= mpc.Yop # convert Y0 to Y with the old operating point
-    con.x̂0min .+= x̂op_old # convert x̂0 to x̂ with the old operating point
-    con.x̂0max .+= x̂op_old # convert x̂0 to x̂ with the old operating point
-    # --- operating points ---
-    mpc.lastu0 .+= uop_old .- model.uop
-    for i in 0:Hp-1
-        mpc.Uop[(1+nu*i):(nu+nu*i)] .= model.uop
-        mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop
-        mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
-    end
-    con.U0min .-= mpc.Uop # convert U to U0 with the new operating point
-    con.U0max .-= mpc.Uop # convert U to U0 with the new operating point
-    con.Y0min .-= mpc.Yop # convert Y to Y0 with the new operating point
-    con.Y0max .-= mpc.Yop # convert Y to Y0 with the new operating point
-    con.x̂0min .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
-    con.x̂0max .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     con.A_Ymin .= A_Ymin
     con.A_Ymax .= A_Ymax
     con.A_x̂min .= A_x̂min
@@ -663,6 +653,32 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
         con.A_x̂min  
         con.A_x̂max
     ]
+    # --- linear equality constraints ---
+    con.A_ŝ .= A_ŝ
+    con.Aeq .= A_ŝ
+    # --- operating points ---
+    con.U0min .+= mpc.Uop # convert U0 to U with the old operating point
+    con.U0max .+= mpc.Uop # convert U0 to U with the old operating point
+    con.Y0min .+= mpc.Yop # convert Y0 to Y with the old operating point
+    con.Y0max .+= mpc.Yop # convert Y0 to Y with the old operating point
+    con.x̂0min .+= x̂op_old # convert x̂0 to x̂ with the old operating point
+    con.x̂0max .+= x̂op_old # convert x̂0 to x̂ with the old operating point
+    mpc.lastu0 .+= uop_old .- model.uop
+    for i in 0:Hp-1
+        mpc.Uop[(1+nu*i):(nu+nu*i)] .= model.uop
+        mpc.Yop[(1+ny*i):(ny+ny*i)] .= model.yop
+        mpc.Dop[(1+nd*i):(nd+nd*i)] .= model.dop
+    end
+    con.U0min .-= mpc.Uop # convert U to U0 with the new operating point
+    con.U0max .-= mpc.Uop # convert U to U0 with the new operating point
+    con.Y0min .-= mpc.Yop # convert Y to Y0 with the new operating point
+    con.Y0max .-= mpc.Yop # convert Y to Y0 with the new operating point
+    con.x̂0min .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    con.x̂0max .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    # --- quadratic programming Hessian matrix ---
+    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u)
+    mpc.H̃ .= H̃
+    # --- JuMP optimization ---
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
@@ -670,14 +686,9 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     JuMP.delete(optim, optim[:linconstraint])
     JuMP.unregister(optim, :linconstraint)
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
-    Aeq = con.Aeq
-    beq = con.beq
     JuMP.delete(optim, optim[:linconstrainteq])
     JuMP.unregister(optim, :linconstrainteq)
-    @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
-    # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u)
-    mpc.H̃ .= H̃
+    @constraint(optim, linconstrainteq, con.Aeq*Z̃var .== con.beq)
     set_objective_hessian!(mpc, Z̃var)
     return nothing
 end
