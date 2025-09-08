@@ -436,6 +436,17 @@ end
     @test mpc.weights.M_Hp ≈ diagm(1:1000)
     @test mpc.weights.Ñ_Hc ≈ diagm([0.1;1e6])
     @test mpc.weights.L_Hp ≈ diagm(1.1:1000.1)
+
+    estim2 = KalmanFilter(LinModel(tf(5, [2, 1]), 3))
+    mpc_ms = LinMPC(estim2, Nwt=[0], Hp=1000, Hc=1, transcription=MultipleShooting())
+    r = [15]
+    preparestate!(mpc_ms, [0])
+    u = moveinput!(mpc_ms, r)
+    @test u ≈ [3] atol=1e-2
+    setmodel!(mpc_ms, LinModel(tf(10, [2, 1]), 3))
+    r = [40]
+    u = moveinput!(mpc_ms, r)
+    @test u ≈ [4] atol=1e-2
 end
 
 @testitem "LinMPC real-time simulations" setup=[SetupMPCtests] begin
