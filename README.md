@@ -4,6 +4,7 @@
 [![codecov](https://codecov.io/gh/JuliaControl/ModelPredictiveControl.jl/branch/main/graph/badge.svg?token=K4V0L113M4)](https://codecov.io/gh/JuliaControl/ModelPredictiveControl.jl)
 [![doc-stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaControl.github.io/ModelPredictiveControl.jl/stable)
 [![doc-dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaControl.github.io/ModelPredictiveControl.jl/dev)
+[![arXiv](https://img.shields.io/badge/arXiv-2411.09764-b31b1b.svg)](https://arxiv.org/abs/2411.09764)
 
 An open source [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_control)
 package for Julia.
