@@ -904,6 +904,14 @@ end
     @test_throws ArgumentError MovingHorizonEstimator(linmodel)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
+    @test_throws ErrorException MovingHorizonEstimator(
+        nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf; optim, 
+        covestim = InternalModel(nonlinmodel)
+    )
+    @test_throws ArgumentError MovingHorizonEstimator(
+        nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf; optim, 
+        covestim = UnscentedKalmanFilter(nonlinmodel, nint_ym=[2,2])
+    )
 end
 
 @testitem "MovingHorizonEstimator estimation and getinfo" setup=[SetupMPCtests] begin
