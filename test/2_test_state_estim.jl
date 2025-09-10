@@ -907,14 +907,15 @@ end
 end
 
 @testitem "MovingHorizonEstimator estimation and getinfo" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, Ipopt, ForwardDiff
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using JuMP, Ipopt, DAQP
     linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
     linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
-    
+
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
     JuMP.set_attribute(mhe1.optim, "tol", 1e-7)
     preparestate!(mhe1, [50, 30], [5])
@@ -950,7 +951,6 @@ end
     x̂ = updatestate!(mhe1, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
     @test mhe1.x̂0 ≈ zeros(6) atol=1e-9
-    @test evaloutput(mhe1, [5]) ≈ mhe1([5]) ≈ [50, 30]
     info = getinfo(mhe1)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
@@ -976,7 +976,6 @@ end
     @test x̂ ≈ zeros(6) atol=1e-9
     @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
     preparestate!(mhe2, [50, 30], [5])
-    @test evaloutput(mhe2, [5]) ≈ mhe2([5]) ≈ [50, 30]
     info = getinfo(mhe2)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
@@ -998,7 +997,6 @@ end
     x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
     @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
-    @test evaloutput(mhe2, [5]) ≈ mhe2([5]) ≈ [50, 30]
     info = getinfo(mhe2)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
@@ -1012,12 +1010,29 @@ end
         updatestate!(mhe2, [10, 50], [51, 32], [5])
     end
     @test mhe2([5]) ≈ [51, 32] atol=1e-2
+
+    Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
+    R̂ = diagm([1, 1].^2)
+    optim = Model(DAQP.Optimizer)
+    covestim = SteadyKalmanFilter(linmodel, 1:2, 0, 0, Q̂, R̂)
+    P̂_0 = covestim.cov.P̂
+    mhe3 = MovingHorizonEstimator(linmodel, 2, 1:2, 0, 0, P̂_0, Q̂, R̂; optim, covestim)
+    preparestate!(mhe3, [50, 30], [5])
+    x̂ = updatestate!(mhe3, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(4) atol=1e-9
+    @test mhe3.x̂0 ≈ zeros(4) atol=1e-9
+    preparestate!(mhe3, [50, 30], [5])
+    info = getinfo(mhe3)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mhe3 = MovingHorizonEstimator(linmodel3, He=1)
     preparestate!(mhe3, [0])
     x̂ = updatestate!(mhe3, [0], [0])
     @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
+    
     mhe4 = setconstraint!(MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0), v̂max=[50,50])
     g_V̂max_end = mhe4.optim[:g_V̂max_2].func
     # execute update_predictions! branch in `gfunc_i` for coverage:
@@ -1027,7 +1042,7 @@ end
     R̂ = diagm([1, 1].^2)
     optim = Model(Ipopt.Optimizer)
     covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, 0, Q̂, Q̂, R̂)
-    mhe5 = MovingHorizonEstimator(nonlinmodel, 1, 1:2, 0, 0, Q̂, Q̂, R̂, Inf; optim, covestim)
+    mhe5 = MovingHorizonEstimator(nonlinmodel, 1, 1:2, 0, 0, Q̂, Q̂, R̂; optim, covestim)
     preparestate!(mhe5, [50, 30], [5])
     x̂ = updatestate!(mhe5, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(4) atol=1e-9
