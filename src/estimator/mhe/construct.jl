@@ -423,8 +423,10 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂_i}, \mathbf{Q�
 where ``\mathbf{P̂_i}`` is the initial estimation covariance, provided by `P̂_0` argument. The
 keyword argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) object
 for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. The
-supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and 
-[`ExtendedKalmanFilter`](@ref).
+supported types are [`SteadyKalmanFilter`](@ref), [`KalmanFilter`](@ref), 
+[`UnscentedKalmanFilter`](@ref) and [`ExtendedKalmanFilter`](@ref). A constant arrival
+covariance is supported with [`SteadyKalmanFilter`](@ref), and by setting the `P̂` argument 
+of [`setstate!`](@ref) at the desired value.
 """
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
