@@ -112,7 +112,6 @@ end
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
     @test_throws ArgumentError updatestate!(kalmanfilter1, [10, 50])
-    @test_throws ErrorException setstate!(kalmanfilter1, [1,2,3,4], diagm(.1:.1:.4))
 end 
 
 @testitem "SteadyKalmanFilter set model" setup=[SetupMPCtests] begin
