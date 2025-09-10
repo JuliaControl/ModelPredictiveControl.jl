@@ -280,6 +280,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
 ├ optimizer: Ipopt
 ├ gradient: AutoForwardDiff
 ├ jacobian: AutoForwardDiff
+├ arrival covariance: UnscentedKalmanFilter
 └ dimensions:
   ├ 5 estimation steps He
   ├ 0 slack variable ε (estimation constraints)
@@ -514,6 +515,7 @@ julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
 MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
 ├ model: LinModel
 ├ optimizer: OSQP
+├ arrival covariance: KalmanFilter
 └ dimensions:
   ├ 3 estimation steps He
   ├ 0 slack variable ε (estimation constraints)
