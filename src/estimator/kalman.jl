@@ -1,8 +1,11 @@
+"Abstract supertype of all Kalman-type state estimators."
+abstract type KalmanEstimator{NT<:Real} <: StateEstimator{NT} end
+
 struct SteadyKalmanFilter{
     NT<:Real, 
     SM<:LinModel, 
     KC<:KalmanCovariances
-} <: StateEstimator{NT}
+} <: KalmanEstimator{NT}
     model::SM
     cov  ::KC
     x̂op ::Vector{NT}
@@ -47,8 +50,8 @@ struct SteadyKalmanFilter{
             R̂_y[i_ym, i_ym] = R̂
             R̂_y = Hermitian(R̂_y, :L)
         end
-        K̂ = try
-            ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂_y; direct)[:, i_ym]
+        K̂_y, P̂ = try
+            ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂_y; direct, extra=Val(true))
         catch my_error
             if isa(my_error, ErrorException)
                 error("Cannot compute the optimal Kalman gain K̂ for the "* 
@@ -58,6 +61,8 @@ struct SteadyKalmanFilter{
                 rethrow()
             end
         end
+        K̂ = (ny == nym) ? K̂_y : K̂_y[:, i_ym]
+        cov.P̂ .= Hermitian(P̂, :L)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
@@ -296,7 +301,7 @@ struct KalmanFilter{
     NT<:Real, 
     SM<:LinModel,
     KC<:KalmanCovariances
-} <: StateEstimator{NT}
+} <: KalmanEstimator{NT}
     model::SM
     cov  ::KC
     x̂op::Vector{NT}
@@ -508,7 +513,7 @@ struct UnscentedKalmanFilter{
     NT<:Real, 
     SM<:SimModel,
     KC<:KalmanCovariances
-} <: StateEstimator{NT}
+} <: KalmanEstimator{NT}
     model::SM
     cov  ::KC
     x̂op ::Vector{NT}
@@ -885,7 +890,7 @@ struct ExtendedKalmanFilter{
         JB<:AbstractADType, 
         FF<:Function,
         HF<:Function
-} <: StateEstimator{NT}
+} <: KalmanEstimator{NT}
     model::SM
     cov  ::KC
     x̂op ::Vector{NT}

@@ -59,9 +59,9 @@ struct KalmanCovariances{
             P̂_0 = zeros(NT, 0, 0)
         end
         P̂_0 = Hermitian(P̂_0, :L)
-        P̂   = copy(P̂_0)
         Q̂   = Hermitian(Q̂, :L)
         R̂   = Hermitian(R̂, :L)
+        P̂   = copy(Q̂)
         # the following variables are only for the moving horizon estimator:
         invP̄, invQ̂, invR̂ = copy(P̂_0), copy(Q̂), copy(R̂)
         try

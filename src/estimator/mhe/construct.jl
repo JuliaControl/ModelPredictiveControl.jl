@@ -51,7 +51,7 @@ struct MovingHorizonEstimator{
     JM<:JuMP.GenericModel,
     GB<:AbstractADType,
     JB<:AbstractADType,
-    CE<:StateEstimator,
+    CE<:KalmanEstimator,
 } <: StateEstimator{NT}
     model::SM
     cov  ::KC
@@ -121,7 +121,7 @@ struct MovingHorizonEstimator{
             JM<:JuMP.GenericModel, 
             GB<:AbstractADType,
             JB<:AbstractADType,
-            CE<:StateEstimator{NT}
+            CE<:KalmanEstimator{NT}
         }
         nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
@@ -436,6 +436,7 @@ function MovingHorizonEstimator(
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0, He)
+    validate_covestim(cov, covestim)
     return MovingHorizonEstimator{NT}(
         model, 
         He, i_ym, nint_u, nint_ym, cov, Cwt, 
@@ -444,11 +445,24 @@ function MovingHorizonEstimator(
     )
 end
 
+
 function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+end
+
+"Validate covestim type and dimensions."
+function validate_covestim(cov::KalmanCovariances, covestim::KalmanEstimator)
+    if size(cov.P̂) != size(covestim.cov.P̂)
+        throw(ArgumentError("estimation covariance covestim.cov.P̂ size does not match the MHE"))
+    end
+    return nothing
+end
+function validate_covestim(::KalmanCovariances, ::StateEstimator)
+    error(  "covestim argument must be a SteadyKalmanFilter, KalmanFilter, "*
+            "ExtendedKalmanFilter or UnscentedKalmanFilter")
 end
 
 @doc raw"""
