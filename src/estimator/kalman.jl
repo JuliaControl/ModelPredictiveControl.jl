@@ -219,8 +219,8 @@ function init_skf(model, i_ym, Â, Ĉ, Q̂, R̂; direct=true)
     catch my_error
         if isa(my_error, ErrorException)
             error("Cannot compute the optimal Kalman gain K̂ for the "* 
-                    "SteadyKalmanFilter. You may try to remove integrators with "*
-                    "nint_u/nint_ym parameter or use the time-varying KalmanFilter.")
+                  "SteadyKalmanFilter. You may try to remove integrators with "*
+                  "nint_u/nint_ym parameter or use the time-varying KalmanFilter.")
         else
             rethrow()
         end
