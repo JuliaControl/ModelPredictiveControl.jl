@@ -200,22 +200,15 @@ end
 
 Initialize the steady-state Kalman gain `K̂` and estimation error covariance `P̂`.
 """
-function init_skf(model::LinModel{NT}, i_ym, Â, Ĉ, Q̂, R̂; direct=true) where {NT<:Real}
-    ny, nym = model.ny, length(i_ym)
+function init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct=true)
+    ny, nym = size(Ĉ, 1), length(i_ym)
     if ny != nym
-        R̂_y = zeros(NT, ny, ny)
+        R̂_y = zeros(eltype(R̂), ny, ny)
         R̂_y[i_ym, i_ym] = R̂
-        R̂_y = Hermitian(R̂_y, :L)
-        R̂ = R̂_y
+        R̂ = Hermitian(R̂_y, :L)
     end
     K̂, P̂ = try 
-        if pkgversion(ControlSystemsBase) ≥ v"1.18.2"
-            ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂; direct, extra=Val(true))
-        else
-            K̂ = ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂; direct)
-            P̂ = ControlSystemsBase.are(Discrete, Â', Ĉ', Q̂, R̂)
-            K̂, P̂
-        end
+        ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂; direct, extra=Val(true))
     catch my_error
         if isa(my_error, ErrorException)
             error("Cannot compute the optimal Kalman gain K̂ for the "* 
@@ -225,7 +218,7 @@ function init_skf(model::LinModel{NT}, i_ym, Â, Ĉ, Q̂, R̂; direct=true) wh
             rethrow()
         end
     end
-    if ny != nym
+    if ny != nym 
         K̂ = K̂[:, i_ym]
     end
     P̂ = Hermitian(P̂, :L)
@@ -572,7 +565,7 @@ struct UnscentedKalmanFilter{
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
-        nσ, γ, m̂, Ŝ = init_ukf(model, nx̂, α, β, κ)
+        nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         K̂ = zeros(NT, nx̂, nym)
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
@@ -733,7 +726,7 @@ end
 
 
 @doc raw"""
-    init_ukf(model, nx̂, α, β, κ) -> nσ, γ, m̂, Ŝ
+    init_ukf(nx̂, α, β, κ) -> nσ, γ, m̂, Ŝ
 
 Compute the [`UnscentedKalmanFilter`](@ref) constants from ``α, β`` and ``κ``.
 
@@ -753,14 +746,15 @@ covariance are respectively:
 ```
 See [`update_estimate!(::UnscentedKalmanFilter)`](@ref) for other details.
 """
-function init_ukf(::SimModel{NT}, nx̂, α, β, κ) where {NT<:Real}
-    nσ = 2nx̂ + 1                                  # number of sigma points
-    γ = α * √(nx̂ + κ)                             # constant factor of standard deviation √P
+function init_ukf(nx̂, α, β, κ)
+    α, β, κ = promote(α, β, κ)
+    nσ =2nx̂ + 1                                 # number of sigma points
+    γ = α * √(nx̂ + κ)                           # constant factor of standard deviation √P
     m̂_0 = 1 - nx̂ / γ^2
     Ŝ_0 = m̂_0 + 1 - α^2 + β
     w = 1 / 2 / γ^2
-    m̂ = NT[m̂_0; fill(w, 2 * nx̂)]                  # weights for the mean
-    Ŝ = Diagonal(NT[Ŝ_0; fill(w, 2 * nx̂)])        # weights for the covariance
+    m̂ = [m̂_0; fill(w, 2 * nx̂)]                  # weights for the mean
+    Ŝ = Diagonal([Ŝ_0; fill(w, 2 * nx̂)])        # weights for the covariance
     return nσ, γ, m̂, Ŝ
 end
 
