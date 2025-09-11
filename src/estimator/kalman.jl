@@ -1,8 +1,11 @@
+"Abstract supertype of all Kalman-type state estimators."
+abstract type KalmanEstimator{NT<:Real} <: StateEstimator{NT} end
+
 struct SteadyKalmanFilter{
     NT<:Real, 
     SM<:LinModel, 
     KC<:KalmanCovariances
-} <: StateEstimator{NT}
+} <: KalmanEstimator{NT}
     model::SM
     cov  ::KC
     x̂op ::Vector{NT}
@@ -40,24 +43,8 @@ struct SteadyKalmanFilter{
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         R̂, Q̂ = cov.R̂, cov.Q̂
-        if ny == nym
-            R̂_y = R̂
-        else
-            R̂_y = zeros(NT, ny, ny)
-            R̂_y[i_ym, i_ym] = R̂
-            R̂_y = Hermitian(R̂_y, :L)
-        end
-        K̂ = try
-            ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂_y; direct)[:, i_ym]
-        catch my_error
-            if isa(my_error, ErrorException)
-                error("Cannot compute the optimal Kalman gain K̂ for the "* 
-                      "SteadyKalmanFilter. You may try to remove integrators with "*
-                      "nint_u/nint_ym parameter or use the time-varying KalmanFilter.")
-            else
-                rethrow()
-            end
-        end
+        K̂, P̂ = init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct)
+        cov.P̂ .= P̂
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
@@ -208,17 +195,41 @@ function SteadyKalmanFilter(
     return SteadyKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, cov; direct)
 end
 
+"""
+    init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct=true) -> K̂, P̂
+
+Initialize the steady-state Kalman gain `K̂` and estimation error covariance `P̂`.
+"""
+function init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct=true)
+    ny, nym = size(Ĉ, 1), length(i_ym)
+    if ny != nym
+        R̂_y = zeros(eltype(R̂), ny, ny)
+        R̂_y[i_ym, i_ym] = R̂
+        R̂ = Hermitian(R̂_y, :L)
+    end
+    K̂, P̂ = try 
+        ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂; direct, extra=Val(true))
+    catch my_error
+        if isa(my_error, ErrorException)
+            error("Cannot compute the optimal Kalman gain K̂ for the "* 
+                  "SteadyKalmanFilter. You may try to remove integrators with "*
+                  "nint_u/nint_ym parameter or use the time-varying KalmanFilter.")
+        else
+            rethrow()
+        end
+    end
+    if ny != nym 
+        K̂ = K̂[:, i_ym]
+    end
+    P̂ = Hermitian(P̂, :L)
+    return K̂, P̂
+end
+
 "Throw an error if `setmodel!` is called on a SteadyKalmanFilter w/o the default values."
 function setmodel_estimator!(estim::SteadyKalmanFilter, model, _ , _ , _ , Q̂, R̂)
     if estim.model !== model || !isnothing(Q̂) || !isnothing(R̂)
         error("SteadyKalmanFilter does not support setmodel! (use KalmanFilter instead)")
     end
-    return nothing
-end
-
-"Throw an error if P̂ != nothing."
-function setstate_cov!(::SteadyKalmanFilter, P̂)
-    isnothing(P̂) || error("SteadyKalmanFilter does not compute an estimation covariance matrix P̂.")
     return nothing
 end
 
@@ -296,7 +307,7 @@ struct KalmanFilter{
     NT<:Real, 
     SM<:LinModel,
     KC<:KalmanCovariances
-} <: StateEstimator{NT}
+} <: KalmanEstimator{NT}
     model::SM
     cov  ::KC
     x̂op::Vector{NT}
@@ -508,7 +519,7 @@ struct UnscentedKalmanFilter{
     NT<:Real, 
     SM<:SimModel,
     KC<:KalmanCovariances
-} <: StateEstimator{NT}
+} <: KalmanEstimator{NT}
     model::SM
     cov  ::KC
     x̂op ::Vector{NT}
@@ -554,7 +565,7 @@ struct UnscentedKalmanFilter{
         nx̂  = model.nx + nxs
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
-        nσ, γ, m̂, Ŝ = init_ukf(model, nx̂, α, β, κ)
+        nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         K̂ = zeros(NT, nx̂, nym)
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
@@ -715,7 +726,7 @@ end
 
 
 @doc raw"""
-    init_ukf(model, nx̂, α, β, κ) -> nσ, γ, m̂, Ŝ
+    init_ukf(nx̂, α, β, κ) -> nσ, γ, m̂, Ŝ
 
 Compute the [`UnscentedKalmanFilter`](@ref) constants from ``α, β`` and ``κ``.
 
@@ -735,14 +746,15 @@ covariance are respectively:
 ```
 See [`update_estimate!(::UnscentedKalmanFilter)`](@ref) for other details.
 """
-function init_ukf(::SimModel{NT}, nx̂, α, β, κ) where {NT<:Real}
-    nσ = 2nx̂ + 1                                  # number of sigma points
-    γ = α * √(nx̂ + κ)                             # constant factor of standard deviation √P
+function init_ukf(nx̂, α, β, κ)
+    α, β, κ = promote(α, β, κ)
+    nσ =2nx̂ + 1                                 # number of sigma points
+    γ = α * √(nx̂ + κ)                           # constant factor of standard deviation √P
     m̂_0 = 1 - nx̂ / γ^2
     Ŝ_0 = m̂_0 + 1 - α^2 + β
     w = 1 / 2 / γ^2
-    m̂ = NT[m̂_0; fill(w, 2 * nx̂)]                  # weights for the mean
-    Ŝ = Diagonal(NT[Ŝ_0; fill(w, 2 * nx̂)])        # weights for the covariance
+    m̂ = [m̂_0; fill(w, 2 * nx̂)]                  # weights for the mean
+    Ŝ = Diagonal([Ŝ_0; fill(w, 2 * nx̂)])        # weights for the covariance
     return nσ, γ, m̂, Ŝ
 end
 
@@ -885,7 +897,7 @@ struct ExtendedKalmanFilter{
         JB<:AbstractADType, 
         FF<:Function,
         HF<:Function
-} <: StateEstimator{NT}
+} <: KalmanEstimator{NT}
     model::SM
     cov  ::KC
     x̂op ::Vector{NT}

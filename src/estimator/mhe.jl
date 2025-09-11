@@ -5,6 +5,7 @@ include("mhe/execute.jl")
 function print_details(io::IO, estim::MovingHorizonEstimator)
     println(io, "├ optimizer: $(JuMP.solver_name(estim.optim)) ")
     print_backends(io, estim, estim.model)
+    println(io, "├ arrival covariance: $(nameof(typeof(estim.covestim))) ")
 end
 
 "Print the differentiation backends for `SimModel`."

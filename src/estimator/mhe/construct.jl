@@ -51,7 +51,7 @@ struct MovingHorizonEstimator{
     JM<:JuMP.GenericModel,
     GB<:AbstractADType,
     JB<:AbstractADType,
-    CE<:StateEstimator,
+    CE<:KalmanEstimator,
 } <: StateEstimator{NT}
     model::SM
     cov  ::KC
@@ -121,7 +121,7 @@ struct MovingHorizonEstimator{
             JM<:JuMP.GenericModel, 
             GB<:AbstractADType,
             JB<:AbstractADType,
-            CE<:StateEstimator{NT}
+            CE<:KalmanEstimator{NT}
         }
         nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
@@ -280,6 +280,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
 ├ optimizer: Ipopt
 ├ gradient: AutoForwardDiff
 ├ jacobian: AutoForwardDiff
+├ arrival covariance: UnscentedKalmanFilter
 └ dimensions:
   ├ 5 estimation steps He
   ├ 0 slack variable ε (estimation constraints)
@@ -423,8 +424,10 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂_i}, \mathbf{Q�
 where ``\mathbf{P̂_i}`` is the initial estimation covariance, provided by `P̂_0` argument. The
 keyword argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) object
 for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. The
-supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and 
-[`ExtendedKalmanFilter`](@ref).
+supported types are [`SteadyKalmanFilter`](@ref), [`KalmanFilter`](@ref), 
+[`UnscentedKalmanFilter`](@ref) and [`ExtendedKalmanFilter`](@ref). A constant arrival
+covariance is supported with [`SteadyKalmanFilter`](@ref), and by setting the `P̂` argument 
+of [`setstate!`](@ref) at the desired value.
 """
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
@@ -436,6 +439,7 @@ function MovingHorizonEstimator(
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0, He)
+    validate_covestim(cov, covestim)
     return MovingHorizonEstimator{NT}(
         model, 
         He, i_ym, nint_u, nint_ym, cov, Cwt, 
@@ -444,11 +448,24 @@ function MovingHorizonEstimator(
     )
 end
 
+
 function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+end
+
+"Validate covestim type and dimensions."
+function validate_covestim(cov::KalmanCovariances, covestim::KalmanEstimator)
+    if size(cov.P̂) != size(covestim.cov.P̂)
+        throw(ArgumentError("estimation covariance covestim.cov.P̂ size does not match the MHE"))
+    end
+    return nothing
+end
+function validate_covestim(::KalmanCovariances, ::StateEstimator)
+    error(  "covestim argument must be a SteadyKalmanFilter, KalmanFilter, "*
+            "ExtendedKalmanFilter or UnscentedKalmanFilter")
 end
 
 @doc raw"""
@@ -498,6 +515,7 @@ julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
 MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
 ├ model: LinModel
 ├ optimizer: OSQP
+├ arrival covariance: KalmanFilter
 └ dimensions:
   ├ 3 estimation steps He
   ├ 0 slack variable ε (estimation constraints)
