@@ -43,7 +43,7 @@ struct SteadyKalmanFilter{
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         R̂, Q̂ = cov.R̂, cov.Q̂
-        K̂, P̂ = init_skf(model, i_ym, Â, Ĉ, Q̂, R̂; direct)
+        K̂, P̂ = init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct)
         cov.P̂ .= P̂
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         corrected = [false]
@@ -196,7 +196,7 @@ function SteadyKalmanFilter(
 end
 
 """
-    init_skf(model::LinModel, i_ym, Â, Ĉ, Q̂, R̂; direct=true) -> K̂, P̂
+    init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct=true) -> K̂, P̂
 
 Initialize the steady-state Kalman gain `K̂` and estimation error covariance `P̂`.
 """
