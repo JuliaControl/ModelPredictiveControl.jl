@@ -43,26 +43,8 @@ struct SteadyKalmanFilter{
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         R̂, Q̂ = cov.R̂, cov.Q̂
-        if ny == nym
-            R̂_y = R̂
-        else
-            R̂_y = zeros(NT, ny, ny)
-            R̂_y[i_ym, i_ym] = R̂
-            R̂_y = Hermitian(R̂_y, :L)
-        end
-        K̂_y, P̂ = try
-            ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂_y; direct, extra=Val(true))
-        catch my_error
-            if isa(my_error, ErrorException)
-                error("Cannot compute the optimal Kalman gain K̂ for the "* 
-                      "SteadyKalmanFilter. You may try to remove integrators with "*
-                      "nint_u/nint_ym parameter or use the time-varying KalmanFilter.")
-            else
-                rethrow()
-            end
-        end
-        K̂ = (ny == nym) ? K̂_y : K̂_y[:, i_ym]
-        cov.P̂ .= Hermitian(P̂, :L)
+        K̂, P̂ = init_skf(model, i_ym, Â, Ĉ, Q̂, R̂; direct)
+        cov.P̂ .= P̂
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
@@ -211,6 +193,43 @@ function SteadyKalmanFilter(
     Q̂, R̂ = to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂)
     return SteadyKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, cov; direct)
+end
+
+"""
+    init_skf(model, i_ym, Â, Ĉ, Q̂, R̂; direct=true) -> K̂, P̂
+
+Initialize the steady-state Kalman gain `K̂` and estimation error covariance `P̂`.
+"""
+function init_skf(model, i_ym, Â, Ĉ, Q̂, R̂; direct=true)
+    ny, nym = model.ny, length(i_ym)
+    if ny != nym
+        R̂_y = zeros(NT, ny, ny)
+        R̂_y[i_ym, i_ym] = R̂
+        R̂_y = Hermitian(R̂_y, :L)
+        R̂ = R̂_y
+    end
+    K̂, P̂ = try 
+        if pkgversion(ControlSystemsBase) ≥ v"1.18.2"
+            ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂; direct, extra=Val(true))
+        else
+            K̂ = ControlSystemsBase.kalman(Discrete, Â, Ĉ, Q̂, R̂; direct)
+            P̂ = ControlSystemsBase.are(Discrete, Â', Ĉ', Q̂, R̂)
+            K̂, P̂
+        end
+    catch my_error
+        if isa(my_error, ErrorException)
+            error("Cannot compute the optimal Kalman gain K̂ for the "* 
+                    "SteadyKalmanFilter. You may try to remove integrators with "*
+                    "nint_u/nint_ym parameter or use the time-varying KalmanFilter.")
+        else
+            rethrow()
+        end
+    end
+    if ny != nym
+        K̂ = K̂[:, i_ym]
+    end
+    P̂ = Hermitian(P̂, :L)
+    return K̂, P̂
 end
 
 "Throw an error if `setmodel!` is called on a SteadyKalmanFilter w/o the default values."
