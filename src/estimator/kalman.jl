@@ -196,11 +196,11 @@ function SteadyKalmanFilter(
 end
 
 """
-    init_skf(model, i_ym, Â, Ĉ, Q̂, R̂; direct=true) -> K̂, P̂
+    init_skf(model::LinModel, i_ym, Â, Ĉ, Q̂, R̂; direct=true) -> K̂, P̂
 
 Initialize the steady-state Kalman gain `K̂` and estimation error covariance `P̂`.
 """
-function init_skf(model, i_ym, Â, Ĉ, Q̂, R̂; direct=true)
+function init_skf(model::LinModel{NT}, i_ym, Â, Ĉ, Q̂, R̂; direct=true) where {NT<:Real}
     ny, nym = model.ny, length(i_ym)
     if ny != nym
         R̂_y = zeros(NT, ny, ny)
