@@ -58,15 +58,14 @@ We than convert the MTK model to an [input-output system](https://docs.sciml.ai/
 
 ```@example 1
 function generate_f_h(model, inputs, outputs)
-    (_, f_ip), dvs, psym, io_sys = ModelingToolkit.generate_control_function(
+    (_, f_ip), x_sym, p_sym, io_sys = ModelingToolkit.generate_control_function(
         model, inputs, split=false; outputs
     )
     if any(ModelingToolkit.is_alg_equation, equations(io_sys)) 
         error("Systems with algebraic equations are not supported")
     end
-    nu, nx, ny = length(inputs), length(dvs), length(outputs)
-    vx = string.(dvs)
-    p = varmap_to_vars(defaults(io_sys), psym)
+    nu, nx, ny = length(inputs), length(x_sym), length(outputs)
+    vx = string.(x_sym)
     function f!(ẋ, x, u, _ , p)
         try
             f_ip(ẋ, x, u, p, nothing)
@@ -100,10 +99,11 @@ function generate_f_h(model, inputs, outputs)
         end
         return nothing
     end
-    return f!, h!, p, nu, nx, ny, vx
+    p = varmap_to_vars(defaults(io_sys), p_sym)
+    return f!, h!, p, vx, nu, nx, ny
 end
 inputs, outputs = [mtk_model.τ], [mtk_model.y]
-f!, h!, p, nu, nx, ny, vx = generate_f_h(mtk_model, inputs, outputs)
+f!, h!, p, vx, nu, nx, ny = generate_f_h(mtk_model, inputs, outputs)
 Ts = 0.1
 vu, vy = ["\$τ\$ (Nm)"], ["\$θ\$ (°)"]
 nothing # hide
@@ -118,9 +118,11 @@ model = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)
 We also instantiate a plant model with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
-mtk_model.K = defaults(mtk_model)[mtk_model.K] * 1.25
-f_plant, h_plant, p = generate_f_h(mtk_model, inputs, outputs)
-plant = setname!(NonLinModel(f_plant, h_plant, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)
+@named mtk_model_plant = Pendulum(K=1.2*1.25)
+mtk_model_plant = complete(mtk_model_plant)
+f2!, h2!, p2, vx2 = generate_f_h(mtk_model_plant, inputs, outputs)
+plant = NonLinModel(f2!, h2!, Ts, nu, nx, ny; p=p2)
+plant = setname!(plant, u=vu, x=vx2, y=vy)
 ```
 
 ## Controller Design
