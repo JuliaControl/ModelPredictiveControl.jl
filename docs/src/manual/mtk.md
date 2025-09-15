@@ -154,7 +154,7 @@ savefig("plot1_MTK.svg"); nothing # hide
 and also the output disturbance rejection:
 
 ```@example 1
-res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
+res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, π], 0x̂_0=[0, π, 0], y_step=[10])
 plot(res_yd)
 savefig("plot2_MTK.svg"); nothing # hide
 ```
