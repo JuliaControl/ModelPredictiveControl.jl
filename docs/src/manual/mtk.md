@@ -22,10 +22,6 @@ the last section.
     as a basic starting template to combine both packages. There is no guarantee that it
     will work for all corner cases.
 
-!!! compat
-    The example works on `ModelingToolkit.jl` v9.50 to 9.76 (corresponding to the following
-    `[compat]` entry: `ModelingToolkit = "9.50 - 9.76"`).
-
 We first construct and instantiate the pendulum model:
 
 ```@example 1
@@ -65,7 +61,6 @@ function generate_f_h(model, inputs, outputs)
         error("Systems with algebraic equations are not supported")
     end
     nu, nx, ny = length(inputs), length(x_sym), length(outputs)
-    vx = string.(x_sym)
     function f!(ẋ, x, u, _ , p)
         try
             f_ip(ẋ, x, u, p, nothing)
@@ -100,37 +95,42 @@ function generate_f_h(model, inputs, outputs)
         return nothing
     end
     p = varmap_to_vars(defaults(io_sys), p_sym)
-    return f!, h!, p, vx, nu, nx, ny
+    return f!, h!, p, x_sym, nu, nx, ny
 end
 inputs, outputs = [mtk_model.τ], [mtk_model.y]
-f!, h!, p, vx, nu, nx, ny = generate_f_h(mtk_model, inputs, outputs)
-Ts = 0.1
-vu, vy = ["\$τ\$ (Nm)"], ["\$θ\$ (°)"]
-nothing # hide
+f!, h!, p, x_sym, nu, nx, ny = generate_f_h(mtk_model, inputs, outputs)
+x_sym
 ```
 
-A [`NonLinModel`](@ref) can now be constructed:
+Since MTK is an acausal modeling framework, we do not have the control on the state
+realization chosen by the package. The content of `x_sym` above shows it settled for the
+state vector ``\mathbf{x}(t) = [\begin{smallmatrix}ω(t) && θ(t)\end{smallmatrix}]'``,
+that is, the states of the [last section](@ref man_nonlin) in the reverse order. We can now
+construct a [`NonLinModel`](@ref) with this specific state realization:
 
 ```@example 1
+vu, vx, vy = ["\$τ\$ (Nm)"], ["\$ω\$ (rad/s)", "\$θ\$ (rad)"], ["\$θ\$ (°)"]
+Ts = 0.1
 model = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)
 ```
 
 We also instantiate a plant model with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
-@named mtk_model_plant = Pendulum(K=1.2*1.25)
-mtk_model_plant = complete(mtk_model_plant)
-f2!, h2!, p2, vx2 = generate_f_h(mtk_model_plant, inputs, outputs)
-plant = NonLinModel(f2!, h2!, Ts, nu, nx, ny; p=p2)
-plant = setname!(plant, u=vu, x=vx2, y=vy)
+@named mtk_plant = Pendulum(K=1.25*defaults(mtk_model)[mtk_model.K])
+mtk_plant = complete(mtk_plant)
+inputs, outputs = [mtk_plant.τ], [mtk_plant.y]
+f2!, h2!, p2 = generate_f_h(mtk_plant, inputs, outputs)
+plant = setname!(NonLinModel(f2!, h2!, Ts, nu, nx, ny; p=p2), u=vu, x=vx, y=vy)
 ```
 
 ## Controller Design
 
-We can than reproduce the Kalman filter and the controller design of the [last section](@ref man_nonlin):
+We can than reproduce the Kalman filter and the controller design of the [last section](@ref man_nonlin)
+by reversing the order of `σQ` vector, because of the different state realization:
 
 ```@example 1
-α=0.01; σQ=[0.1, 1.0]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
+α=0.01; σQ=[1.0, 0.1]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
 estim = UnscentedKalmanFilter(model; α, σQ, σR, nint_u, σQint_u)
 Hp, Hc, Mwt, Nwt = 20, 2, [0.5], [2.5]
 nmpc = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt=Inf)
