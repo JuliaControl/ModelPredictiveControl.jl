@@ -22,10 +22,6 @@ the last section.
     as a basic starting template to combine both packages. There is no guarantee that it
     will work for all corner cases.
 
-!!! compat
-    The example works on `ModelingToolkit.jl` v9.50 to 9.76 (corresponding to the following
-    `[compat]` entry: `ModelingToolkit = "9.50 - 9.76"`).
-
 We first construct and instantiate the pendulum model:
 
 ```@example 1
@@ -58,15 +54,13 @@ We than convert the MTK model to an [input-output system](https://docs.sciml.ai/
 
 ```@example 1
 function generate_f_h(model, inputs, outputs)
-    (_, f_ip), dvs, psym, io_sys = ModelingToolkit.generate_control_function(
+    (_, f_ip), x_sym, p_sym, io_sys = ModelingToolkit.generate_control_function(
         model, inputs, split=false; outputs
     )
     if any(ModelingToolkit.is_alg_equation, equations(io_sys)) 
         error("Systems with algebraic equations are not supported")
     end
-    nu, nx, ny = length(inputs), length(dvs), length(outputs)
-    vx = string.(dvs)
-    p = varmap_to_vars(defaults(io_sys), psym)
+    nu, nx, ny = length(inputs), length(x_sym), length(outputs)
     function f!(ẋ, x, u, _ , p)
         try
             f_ip(ẋ, x, u, p, nothing)
@@ -100,35 +94,43 @@ function generate_f_h(model, inputs, outputs)
         end
         return nothing
     end
-    return f!, h!, p, nu, nx, ny, vx
+    p = varmap_to_vars(defaults(io_sys), p_sym)
+    return f!, h!, p, x_sym, nu, nx, ny
 end
 inputs, outputs = [mtk_model.τ], [mtk_model.y]
-f!, h!, p, nu, nx, ny, vx = generate_f_h(mtk_model, inputs, outputs)
-Ts = 0.1
-vu, vy = ["\$τ\$ (Nm)"], ["\$θ\$ (°)"]
-nothing # hide
+f!, h!, p, x_sym, nu, nx, ny = generate_f_h(mtk_model, inputs, outputs)
+x_sym
 ```
 
-A [`NonLinModel`](@ref) can now be constructed:
+Since MTK is an acausal modeling framework, we do not have the control on the state
+realization chosen by the package. The content of `x_sym` above shows it settled for the
+state vector ``\mathbf{x}(t) = [\begin{smallmatrix}ω(t) && θ(t)\end{smallmatrix}]'``,
+that is, the states of the [last section](@ref man_nonlin) in the reverse order. We can now
+construct a [`NonLinModel`](@ref) with this specific state realization:
 
 ```@example 1
+vu, vx, vy = ["\$τ\$ (Nm)"], ["\$ω\$ (rad/s)", "\$θ\$ (rad)"], ["\$θ\$ (°)"]
+Ts = 0.1
 model = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)
 ```
 
 We also instantiate a plant model with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
-mtk_model.K = defaults(mtk_model)[mtk_model.K] * 1.25
-f_plant, h_plant, p = generate_f_h(mtk_model, inputs, outputs)
-plant = setname!(NonLinModel(f_plant, h_plant, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)
+@named mtk_plant = Pendulum(K=1.25*defaults(mtk_model)[mtk_model.K])
+mtk_plant = complete(mtk_plant)
+inputs, outputs = [mtk_plant.τ], [mtk_plant.y]
+f2!, h2!, p2 = generate_f_h(mtk_plant, inputs, outputs)
+plant = setname!(NonLinModel(f2!, h2!, Ts, nu, nx, ny; p=p2), u=vu, x=vx, y=vy)
 ```
 
 ## Controller Design
 
-We can than reproduce the Kalman filter and the controller design of the [last section](@ref man_nonlin):
+We can than reproduce the Kalman filter and the controller design of the [last section](@ref man_nonlin)
+by reversing the order of `σQ` vector, because of the different state realization:
 
 ```@example 1
-α=0.01; σQ=[0.1, 1.0]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
+α=0.01; σQ=[1.0, 0.1]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
 estim = UnscentedKalmanFilter(model; α, σQ, σR, nint_u, σQint_u)
 Hp, Hc, Mwt, Nwt = 20, 2, [0.5], [2.5]
 nmpc = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt=Inf)
@@ -152,7 +154,7 @@ savefig("plot1_MTK.svg"); nothing # hide
 and also the output disturbance rejection:
 
 ```@example 1
-res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
+res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, π], x̂_0=[0, π, 0], y_step=[10])
 plot(res_yd)
 savefig("plot2_MTK.svg"); nothing # hide
 ```
