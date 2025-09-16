@@ -404,7 +404,7 @@ explicilty handle sparsity like the default `OSQP`:
 mpc_ms = LinMPC(skf; Hp, Hc, Mwt, Nwt, Cwt=Inf, transcription=MultipleShooting())
 mpc_ms = setconstraint!(mpc_ms, umin=[-1.5], umax=[+1.5])
 ```
-
+s
 Superimposing the previous disturbance rejection to the newer one gives almost identical
 results:
 
