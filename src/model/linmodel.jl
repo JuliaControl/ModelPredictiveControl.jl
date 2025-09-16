@@ -74,16 +74,16 @@ The system `sys` can be continuous or discrete-time (`Ts` can be omitted for the
 For continuous dynamics, its state-space equations are (discrete case in Extended Help):
 ```math
 \begin{aligned}
-    \mathbf{ẋ}(t) &= \mathbf{A x}(t) + \mathbf{B z}(t) \\
-    \mathbf{y}(t) &= \mathbf{C x}(t) + \mathbf{D z}(t)
+    \mathbf{ẋ}(t) &= \mathbf{A x}(t) + \mathbf{B s}(t) \\
+    \mathbf{y}(t) &= \mathbf{C x}(t) + \mathbf{D s}(t)
 \end{aligned}
 ```
-with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{z}`` vector 
+with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{s}`` vector 
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
-in any order. `i_u` provides the indices of ``\mathbf{z}`` that are manipulated, and `i_d`, 
+in any order. `i_u` provides the indices of ``\mathbf{s}`` that are manipulated, and `i_d`, 
 the measured disturbances. The constructor automatically discretizes continuous systems,
 resamples discrete ones if `Ts ≠ sys.Ts`, computes a new balancing and minimal state-space
-realization, and separates the ``\mathbf{z}`` terms in two parts (details in Extended Help). 
+realization, and separates the ``\mathbf{s}`` terms in two parts (details in Extended Help). 
 The rest of the documentation assumes discrete models since all systems end up in this form.
 
 See also [`ss`](@extref ControlSystemsBase.ss)
@@ -112,8 +112,8 @@ LinModel with a sample time Ts = 0.1 s:
     The state-space equations are similar if `sys` is discrete-time:
     ```math
     \begin{aligned}
-        \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B z}(k) \\
-        \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D z}(k)
+        \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B s}(k) \\
+        \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D s}(k)
     \end{aligned}
     ```
     Continuous dynamics are internally discretized using [`c2d`](@extref ControlSystemsBase.c2d)
@@ -124,8 +124,7 @@ LinModel with a sample time Ts = 0.1 s:
     Note that the constructor transforms the system to its minimal and balancing realization
     using [`minreal`](@extref ControlSystemsBase.minreal) for controllability/observability.
     As a consequence, the final state-space representation will be presumably different from
-    the one provided in `sys`. It is also converted into a more practical form
-    (``\mathbf{D_u=0}`` because of the zero-order hold):
+    the one provided in `sys`. It is also converted into a more practical form:
     ```math
     \begin{aligned}
         \mathbf{x}(k+1) &=  \mathbf{A x}(k) + \mathbf{B_u u}(k) + \mathbf{B_d d}(k) \\
@@ -133,7 +132,13 @@ LinModel with a sample time Ts = 0.1 s:
     \end{aligned}
     ```
     Use the syntax [`LinModel{NT}(A, Bu, C, Bd, Dd, Ts)`](@ref) to force a specific
-    state-space representation.
+    state-space representation. 
+    
+    It is assumed that ``\mathbf{D_u=0}`` (or `sys` is strictly proper) since otherwise the
+    resulting discrete controller is acausal by definition. Indeed, all discrete controllers
+    (1) sample an output ``\mathbf{y}(k)`` from the plant, (2) computes an action 
+    ``\mathbf{u}(k)`` and (3) apply the action on the plant. There is a causality paradox
+    if ``\mathbf{u}(k)`` impacts ``\mathbf{y}(k)`` even before computing it.
 """
 function LinModel(
     sys::StateSpace{E, NT},
@@ -194,8 +199,8 @@ end
 
 Convert to minimal realization state-space when `sys` is a transfer function.
 
-`sys` is equal to ``\frac{\mathbf{y}(s)}{\mathbf{z}(s)}`` for continuous-time, and 
-``\frac{\mathbf{y}(z)}{\mathbf{z}(z)}``, for discrete-time.
+`sys` is equal to ``\frac{\mathbf{y}(s)}{\mathbf{s}(s)}`` for continuous-time, and 
+``\frac{\mathbf{y}(z)}{\mathbf{s}(z)}``, for discrete-time.
 
 See also [`tf`](@extref ControlSystemsBase.tf)
 

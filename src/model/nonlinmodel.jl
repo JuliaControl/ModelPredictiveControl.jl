@@ -107,9 +107,10 @@ functions are defined as:
 where ``\mathbf{x}``, ``\mathbf{y}``, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
 respectively the state, output, manipulated input, measured disturbance and parameter
 vectors. As a matter of fact, the parameter argument `p` can be any Julia objects but use a
-mutable type if you want to change them later e.g.: a vector. If the dynamics is a function
-of the time, simply add a measured disturbance defined as ``d(t) = t``. The functions can be
-implemented in two possible ways:
+mutable type if you want to change them later e.g.: a vector. 
+    
+See Extended Help if the dynamics are a function of  ``t`` or ``\mathbf{u}`` appears in 
+``\mathbf{h}``. The functions can be implemented in two possible ways:
 
 1. **Non-mutating functions** (out-of-place): define them as `f(x, u, d, p) -> ẋ` and
    `h(x, d, p) -> y`. This syntax is simple and intuitive but it allocates more memory.
@@ -191,6 +192,10 @@ NonLinModel with a sample time Ts = 2.0 s:
        `h(x, d, p) -> y`.
     2. **Mutating functions**: define them as `f!(xnext, x, u, d, p) -> nothing` and
        `h!(y, x, d, p) -> nothing`.
+
+    If the dynamics are a function of the time, simply add a measured disturbance defined as
+    ``d(t) = t``. This package does not support the ``\mathbf{u}`` argument in ``\mathbf{h}``
+    function, see the Extended Help of [`LinModel`](@ref) for the justification.
 """
 function NonLinModel{NT}(
     f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
