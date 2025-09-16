@@ -405,7 +405,8 @@ mpc_ms = LinMPC(skf; Hp, Hc, Mwt, Nwt, Cwt=Inf, transcription=MultipleShooting()
 mpc_ms = setconstraint!(mpc_ms, umin=[-1.5], umax=[+1.5])
 ```
 
-Superimposing the previous disturbance rejection plot shows almost identical results:
+Superimposing the previous disturbance rejection to the newer one gives almost identical
+results:
 
 ```@example man_nonlin
 res_ms = sim!(mpc_ms, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
