@@ -2,6 +2,7 @@ name: Benchmark
 on:
   pull_request_target:
     branches: [ main ]
+    types: [labeled, opened, synchronize, reopened]
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
@@ -12,6 +13,7 @@ permissions:
 jobs:
   bench:
     runs-on: ubuntu-latest
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'benchmark') }}
     steps:
       - uses: MilesCranmer/AirspeedVelocity.jl@action-v1
         with:
