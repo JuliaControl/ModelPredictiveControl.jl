@@ -31,7 +31,7 @@ plant model/constraints.
 struct SingleShooting <: ShootingMethod end
 
 @doc raw"""
-    MultipleShooting()
+    MultipleShooting(threads=false)
 
 Construct a direct multiple shooting [`TranscriptionMethod`](@ref).
 
@@ -61,7 +61,11 @@ control horizon ``H_c``, unstable or highly nonlinear plant models/constraints.
 Sparse optimizers like `OSQP` or `Ipopt` and sparse Jacobian computations are recommended
 for this transcription method.
 """
-struct MultipleShooting <: ShootingMethod end
+struct MultipleShooting{T} <: ShootingMethod 
+    function MultipleShooting(thread::Bool=false)
+        return new{thread}()
+    end
+end
 
 @doc raw"""
     TrapezoidalCollocation(h::Int=0)
@@ -1212,7 +1216,6 @@ function predict!(
     nu, ny, nd, nx̂, Hp, Hc = model.nu, model.ny, model.nd, mpc.estim.nx̂, mpc.Hp, mpc.Hc
     X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
     D̂0 = mpc.D̂0
-    local x̂0
     for j=1:Hp
         x̂0 = @views X̂0[(1 +  nx̂*(j-1)):(nx̂*j)]
         d̂0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
@@ -1220,7 +1223,7 @@ function predict!(
         ĥ!(ŷ0, mpc.estim, model, x̂0, d̂0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
-    x̂0end  .= x̂0
+    x̂0end  .= @views X̂0[(1+nx̂*(Hp-1)):(nx̂*Hp)]
     return Ŷ0, x̂0end
 end
 
@@ -1329,15 +1332,14 @@ in which the augmented state ``\mathbf{x̂_0}`` are extracted from the decision 
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
-    mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
-)
+    mpc::PredictiveController, model::NonLinModel, ::MultipleShooting{T}, U0, Z̃
+) where T
     nu, nx̂, nd, nk = model.nu, mpc.estim.nx̂, model.nd, model.nk
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     D̂0 = mpc.D̂0
-    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)] 
     Threads.@threads for j=1:Hp
-    #for j=1:Hp
         if j < 2
             x̂0 = @views mpc.estim.x̂0[1:nx̂]
             d̂0 = @views mpc.d0[1:nd]
