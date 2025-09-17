@@ -1336,21 +1336,23 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    x̂0 = @views mpc.estim.x̂0[1:nx̂]
-    d0 = @views mpc.d0[1:nd]
-    #TODO: allow parallel for loop or threads? 
-    for j=1:Hp
+    Threads.@threads for j=1:Hp
+    #for j=1:Hp
+        if j < 2
+            x̂0 = @views mpc.estim.x̂0[1:nx̂]
+            d̂0 = @views mpc.d0[1:nd]
+        else
+            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
+            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+        end
         u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
         k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
-        d0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
         ŝnext .= x̂0next .- x̂0next_Z̃
-        x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
-        d0 = d0next
     end
     return geq
 end
