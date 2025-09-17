@@ -1177,11 +1177,11 @@ function predict!(
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
         k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         d̂0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
-        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
+        ĥ!(ŷ0, mpc.estim, model, x̂0, d̂0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
     x̂0end  .= x̂0
@@ -1217,7 +1217,7 @@ function predict!(
         x̂0 = @views X̂0[(1 +  nx̂*(j-1)):(nx̂*j)]
         d̂0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 +  ny*(j-1)):(ny*j)]
-        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
+        ĥ!(ŷ0, mpc.estim, model, x̂0, d̂0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
     x̂0end  .= x̂0
