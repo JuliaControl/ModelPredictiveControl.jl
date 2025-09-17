@@ -1171,7 +1171,7 @@ function predict!(
     nu, nx̂, ny, nd, nk, Hp = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk, mpc.Hp
     D̂0 = mpc.D̂0
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
-    d0 = @views mpc.d0[1:nd]
+    d̂0 = @views mpc.d0[1:nd]
     for j=1:Hp
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
@@ -1179,7 +1179,7 @@ function predict!(
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
+        d̂0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
         ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
     end
@@ -1215,7 +1215,7 @@ function predict!(
     local x̂0
     for j=1:Hp
         x̂0 = @views X̂0[(1 +  nx̂*(j-1)):(nx̂*j)]
-        d0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
+        d̂0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 +  ny*(j-1)):(ny*j)]
         ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
     end
@@ -1406,7 +1406,7 @@ function con_nonlinprogeq!(
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
-    d0 = @views mpc.d0[1:nd]
+    d̂0 = @views mpc.d0[1:nd]
     if !iszero(h)
         k1, u0, û0 = @views K0[1:nx], U0[1:nu], Û0[1:nu]
         x0, xs     = @views x̂0[1:nx], x̂0[nx+1:end]
@@ -1450,7 +1450,7 @@ function con_nonlinprogeq!(
         end
         sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k1 + k2)
         x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
-        d0 = d0next
+        d̂0 = d0next
     end
     if !iszero(h)
         # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp)=0
