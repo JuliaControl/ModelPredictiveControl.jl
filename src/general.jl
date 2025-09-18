@@ -123,3 +123,14 @@ function inv!(A::Hermitian{<:Real, <:AbstractMatrix})
     A .= Hermitian(invA, :L)
     return A
 end
+
+"Add `Threads.@threads` to a `for` loop if `flag==true`, else leave the loop as is."
+macro threadsif(flag, expr)
+    quote
+        if $(flag)
+            Threads.@threads $expr
+        else
+            $expr
+        end
+    end |> esc
+end
