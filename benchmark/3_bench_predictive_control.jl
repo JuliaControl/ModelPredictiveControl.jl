@@ -265,10 +265,22 @@ nmpc_ipopt_ms = setconstraint!(nmpc_ipopt_ms; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_ipopt_ms.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = MultipleShooting(f_threads=true)
+nmpc_ipopt_mst = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
+nmpc_ipopt_mst = setconstraint!(nmpc_ipopt_mst; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_ipopt_mst.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 transcription = TrapezoidalCollocation()
 nmpc_ipopt_tc = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 nmpc_ipopt_tc = setconstraint!(nmpc_ipopt_tc; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_ipopt_tc.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = TrapezoidalCollocation(f_threads=true)
+nmpc_ipopt_tct = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
+nmpc_ipopt_tct = setconstraint!(nmpc_ipopt_tct; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_ipopt_tct.optim)
 
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 transcription = SingleShooting()
@@ -301,9 +313,19 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["MultipleShooting"] =
         sim!($nmpc_ipopt_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["MultipleShooting (threaded)"] =
+    @benchmarkable(
+        sim!($nmpc_ipopt_mst, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation"] =
     @benchmarkable(
         sim!($nmpc_ipopt_tc, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation (threaded)"] =
+    @benchmarkable(
+        sim!($nmpc_ipopt_tct, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting"] = 

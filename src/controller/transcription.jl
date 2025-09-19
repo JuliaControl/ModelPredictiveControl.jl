@@ -31,7 +31,7 @@ plant model/constraints.
 struct SingleShooting <: ShootingMethod end
 
 @doc raw"""
-    MultipleShooting()
+    MultipleShooting(; f_threads=false, h_threads=false)
 
 Construct a direct multiple shooting [`TranscriptionMethod`](@ref).
 
@@ -56,24 +56,33 @@ for [`NonLinModel`](@ref).
 This transcription computes the predictions by calling the augmented discrete-time model
 in the equality constraint function recursively over ``H_p``, or by updating the linear
 equality constraint vector for [`LinModel`](@ref). It is generally more efficient for large
-control horizon ``H_c``, unstable or highly nonlinear plant models/constraints. 
+control horizon ``H_c``, unstable or highly nonlinear models/constraints. Multithreading
+with `threads_f` or `threads_h` keyword arguments can be advantageous if ``\mathbf{f}`` or 
+``\mathbf{h}`` in the [`NonLinModel`](@ref) is expensive to evaluate, respectively.
 
 Sparse optimizers like `OSQP` or `Ipopt` and sparse Jacobian computations are recommended
 for this transcription method.
 """
-struct MultipleShooting <: ShootingMethod end
+struct MultipleShooting <: ShootingMethod 
+    f_threads::Bool
+    h_threads::Bool
+    function MultipleShooting(; f_threads=false, h_threads=false)
+        return new(f_threads, h_threads)
+    end
+end
 
 @doc raw"""
-    TrapezoidalCollocation(h::Int=0)
+    TrapezoidalCollocation(h::Int=0; f_threads=false, h_threads=false)
 
 Construct an implicit trapezoidal [`TranscriptionMethod`](@ref) with `h`th order hold.
 
 This is the simplest collocation method. It supports continuous-time [`NonLinModel`](@ref)s
 only. The decision variables are the same as for [`MultipleShooting`](@ref), hence similar
-computational costs. The `h` argument is `0` or `1`, for piecewise constant or linear
-manipulated inputs ``\mathbf{u}`` (`h=1` is slightly less expensive). Note that the various
-[`DiffSolver`](@ref) here assume zero-order hold, so `h=1` will induce a plant-model 
-mismatch if the plant is simulated with these solvers.
+computational costs. See the same docstring for descriptions of `f_threads` and `h_threads`
+keywords. The `h` argument is `0` or `1`, for piecewise constant or linear manipulated 
+inputs ``\mathbf{u}`` (`h=1` is slightly less expensive). Note that the various [`DiffSolver`](@ref) 
+here assume zero-order hold, so `h=1` will induce a plant-model  mismatch if the plant is
+simulated with these solvers. 
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
@@ -96,12 +105,14 @@ transcription method.
 struct TrapezoidalCollocation <: CollocationMethod
     h::Int
     nc::Int
-    function TrapezoidalCollocation(h::Int=0)
+    f_threads::Bool
+    h_threads::Bool
+    function TrapezoidalCollocation(h::Int=0; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
             throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
         end
         nc = 2 # 2 collocation points per interval for trapezoidal rule
-        return new(h, nc)
+        return new(h, nc, f_threads, h_threads)
     end
 end
 
@@ -1171,17 +1182,17 @@ function predict!(
     nu, nx̂, ny, nd, nk, Hp = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk, mpc.Hp
     D̂0 = mpc.D̂0
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
-    d0 = @views mpc.d0[1:nd]
+    d̂0 = @views mpc.d0[1:nd]
     for j=1:Hp
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
         k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
+        d̂0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
-        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
+        ĥ!(ŷ0, mpc.estim, model, x̂0, d̂0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
     x̂0end  .= x̂0
@@ -1206,21 +1217,21 @@ in which ``\mathbf{x̂_0}`` is the augmented state extracted from the decision v
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
-    mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod,
+    mpc::PredictiveController, model::NonLinModel, transcription::TranscriptionMethod,
     _ , Z̃
 )
     nu, ny, nd, nx̂, Hp, Hc = model.nu, model.ny, model.nd, mpc.estim.nx̂, mpc.Hp, mpc.Hc
+    h_threads = transcription.h_threads
     X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
     D̂0 = mpc.D̂0
-    local x̂0
-    for j=1:Hp
+    @threadsif h_threads for j=1:Hp
         x̂0 = @views X̂0[(1 +  nx̂*(j-1)):(nx̂*j)]
-        d0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
+        d̂0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 +  ny*(j-1)):(ny*j)]
-        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
+        ĥ!(ŷ0, mpc.estim, model, x̂0, d̂0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
-    x̂0end  .= x̂0
+    x̂0end  .= @views X̂0[(1+nx̂*(Hp-1)):(nx̂*Hp)]
     return Ŷ0, x̂0end
 end
 
@@ -1329,28 +1340,30 @@ in which the augmented state ``\mathbf{x̂_0}`` are extracted from the decision 
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
-    mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
+    mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, U0, Z̃
 )
     nu, nx̂, nd, nk = model.nu, mpc.estim.nx̂, model.nd, model.nk
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
+    f_threads = transcription.f_threads
     D̂0 = mpc.D̂0
-    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    x̂0 = @views mpc.estim.x̂0[1:nx̂]
-    d0 = @views mpc.d0[1:nd]
-    #TODO: allow parallel for loop or threads? 
-    for j=1:Hp
+    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)] 
+    @threadsif f_threads for j=1:Hp
+        if j < 2
+            x̂0 = @views mpc.estim.x̂0[1:nx̂]
+            d̂0 = @views mpc.d0[1:nd]
+        else
+            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
+            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+        end
         u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
         k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
-        d0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
         ŝnext .= x̂0next .- x̂0next_Z̃
-        x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
-        d0 = d0next
     end
     return geq
 end
@@ -1400,25 +1413,23 @@ function con_nonlinprogeq!(
     nu, nx̂, nd, nx, h = model.nu, mpc.estim.nx̂, model.nd, model.nx, transcription.h
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
+    f_threads = transcription.f_threads
     Ts, p = model.Ts, model.p
     As, Cs_u = mpc.estim.As, mpc.estim.Cs_u
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    x̂0 = @views mpc.estim.x̂0[1:nx̂]
-    d0 = @views mpc.d0[1:nd]
-    if !iszero(h)
-        k1, u0, û0 = @views K0[1:nx], U0[1:nu], Û0[1:nu]
-        x0, xs     = @views x̂0[1:nx], x̂0[nx+1:end]
-        mul!(û0, Cs_u, xs)                 
-        û0 .+= u0                          
-        model.f!(k1, x0, û0, d0, p)
-        lastk2 = k1
-    end
     #TODO: allow parallel for loop or threads? 
-    for j=1:Hp
+    @threadsif f_threads for j=1:Hp
+        if j < 2
+            x̂0 = @views mpc.estim.x̂0[1:nx̂]
+            d̂0 = @views mpc.d0[1:nd]
+        else
+            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
+            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+        end
         k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
-        d0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
+        d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
@@ -1431,39 +1442,28 @@ function con_nonlinprogeq!(
         mul!(xsnext, As, xs)
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- deterministic defects --------------------------------------
-        if iszero(h) # piecewise constant manipulated inputs u:
-            u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
-            û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-            mul!(û0, Cs_u, xs)                 # ys_u(k) = Cs_u*xs(k)
-            û0 .+= u0                          #   û0(k) = u0(k) + ys_u(k)
-            model.f!(k1, x0, û0, d0, p)
-            model.f!(k2, x0next_Z̃, û0, d0next, p)
-        else # piecewise linear manipulated inputs u:
-            k1 .= lastk2
-            j == Hp && break # special case, treated after the loop
+        u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
+        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        mul!(û0, Cs_u, xs)                 # ys_u(k) = Cs_u*xs(k)
+        û0 .+= u0                          #   û0(k) = u0(k) + ys_u(k)
+        if f_threads || h < 1 || j < 2
+            # we need to recompute k1 with multi-threading, even with h==1, since the 
+            # last iteration (j-1) may not be executed (iterations are re-orderable)
+            model.f!(k1, x0, û0, d̂0, p)
+        else
+            k1 .= @views K0[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+        end
+        if h < 1 || j ≥ Hp
+            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
+            û0next = û0
+        else
             u0next = @views U0[(1 + nu*j):(nu*(j+1))]
             û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
             mul!(û0next, Cs_u, xsnext_Z̃)      # ys_u(k+1) = Cs_u*xs(k+1)
             û0next .+= u0next                 #   û0(k+1) = u0(k+1) + ys_u(k+1)
-            model.f!(k2, x0next_Z̃, û0next, d0next, p)
-            lastk2 = k2
         end
+        model.f!(k2, x0next_Z̃, û0next, d̂0next, p)
         sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k1 + k2)
-        x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
-        d0 = d0next
-    end
-    if !iszero(h)
-        # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp)=0
-        x̂0, x̂0next_Z̃   = @views X̂0_Z̃[end-2nx̂+1:end-nx̂], X̂0_Z̃[end-nx̂+1:end]
-        k1, k2         = @views K0[end-2nx+1:end-nx], K0[end-nx+1:end] # k1 already filled
-        d0next         = @views D̂0[end-nd+1:end]
-        û0next, u0next = @views Û0[end-nu+1:end], U0[end-nu+1:end] # correspond to u(k+Hp-1)
-        x0, x0next_Z̃, xsnext_Z̃ = @views x̂0[1:nx], x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
-        sdnext = @views geq[end-nx̂+1:end-nx̂+nx] # ssnext already filled
-        mul!(û0next, Cs_u, xsnext_Z̃)                 
-        û0next .+= u0next                          
-        model.f!(k2, x0next_Z̃, û0next, d0next, p)
-        sdnext .= @. x0 - x0next_Z̃ + (Ts/2)*(k1 + k2)
     end
     return geq
 end
