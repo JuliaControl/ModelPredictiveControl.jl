@@ -841,7 +841,7 @@ end
     info = getinfo(nmpc8)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
-    transcription = MultipleShooting(f_threads=true, h_treads=true)
+    transcription = MultipleShooting(f_threads=true, h_threads=true)
     nmpc8t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc8t, [0], [0])
     u = moveinput!(nmpc8t, [10], [0])
