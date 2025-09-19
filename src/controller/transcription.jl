@@ -57,7 +57,7 @@ This transcription computes the predictions by calling the augmented discrete-ti
 in the equality constraint function recursively over ``H_p``, or by updating the linear
 equality constraint vector for [`LinModel`](@ref). It is generally more efficient for large
 control horizon ``H_c``, unstable or highly nonlinear models/constraints. Multithreading
-with `threads_f` or `threads_h` keyword arguments can be advantageous if ``\mathbf{f}`` or 
+with `f_threads` or `h_threads` keyword arguments can be advantageous if ``\mathbf{f}`` or 
 ``\mathbf{h}`` in the [`NonLinModel`](@ref) is expensive to evaluate, respectively.
 
 Sparse optimizers like `OSQP` or `Ipopt` and sparse Jacobian computations are recommended
