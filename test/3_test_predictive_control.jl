@@ -814,11 +814,13 @@ end
     f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
     h! = (y,x,_,_) -> y .= x 
     nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
-    nmpc5 = NonLinMPC(nonlinmodel_c, Nwt=[0], Hp=100, Hc=1, transcription=TrapezoidalCollocation())
+    transcription = TrapezoidalCollocation(0, f_threads=true, h_threads=true)
+    nmpc5 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc5, [0.0])
     u = moveinput!(nmpc5, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
-    nmpc5_1 = NonLinMPC(nonlinmodel_c, Nwt=[0], Hp=100, Hc=1, transcription=TrapezoidalCollocation(1))
+    transcription = TrapezoidalCollocation(1)
+    nmpc5_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc5_1, [0.0])
     u = moveinput!(nmpc5_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
@@ -831,11 +833,20 @@ end
     ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0], nonlinmodel2.p)
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0] atol=5e-2
-    nmpc8 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
+    transcription = MultipleShooting()
+    nmpc8 = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc8, [0], [0])
     u = moveinput!(nmpc8, [10], [0])
     @test u ≈ [2] atol=5e-2
     info = getinfo(nmpc8)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    transcription = MultipleShooting(f_threads=true, h_treads=true)
+    nmpc8t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc8t, [0], [0])
+    u = moveinput!(nmpc8t, [10], [0])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc8t)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
     nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
