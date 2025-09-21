@@ -1169,8 +1169,8 @@ The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments. The aug
 [`f̂!`](@ref) and [`ĥ!`](@ref) functions is called recursively in a `for` loop:
 ```math
 \begin{aligned}
-\mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k) \Big) \\
-\mathbf{ŷ_0}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k) \Big)
+\mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d̂_0}(k) \Big) \\
+\mathbf{ŷ_0}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d̂_0}(k) \Big)
 \end{aligned}
 ```
 """
@@ -1211,7 +1211,7 @@ Compute vectors if `model` is a [`NonLinModel`](@ref) and other [`TranscriptionM
 The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
 is called multiple times in a `for` loop:
 ```math
-\mathbf{ŷ_0}(k) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k) \Big)
+\mathbf{ŷ_0}(k) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d̂_0}(k) \Big)
 ```
 in which ``\mathbf{x̂_0}`` is the augmented state extracted from the decision variable `Z̃`.
 """
@@ -1332,7 +1332,7 @@ Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`]
 The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The nonlinear 
 equality constraints `geq` only includes the augmented state defects, computed with:
 ```math
-\mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) 
+\mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d̂_0}(k)\Big) 
                     - \mathbf{x̂_0}(k+1)
 ```
 in which the augmented state ``\mathbf{x̂_0}`` are extracted from the decision variables 
@@ -1395,8 +1395,8 @@ extracted from the decision variables `Z̃`. The ``\mathbf{k}`` coefficients are
 evaluated from the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
-\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),   \mathbf{û_0}(k),   \mathbf{d_0}(k)  \Big) \\
-\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0}(k+1), \mathbf{û_0}(k+h), \mathbf{d_0}(k+1)\Big) 
+\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),   \mathbf{û_0}(k),   \mathbf{d̂_0}(k)  \Big) \\
+\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0}(k+1), \mathbf{û_0}(k+h), \mathbf{d̂_0}(k+1)\Big) 
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input is:
@@ -1419,7 +1419,6 @@ function con_nonlinprogeq!(
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    #TODO: allow parallel for loop or threads? 
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0 = @views mpc.estim.x̂0[1:nx̂]
