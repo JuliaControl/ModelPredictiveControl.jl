@@ -134,3 +134,14 @@ macro threadsif(flag, expr)
         end
     end |> esc
 end
+
+"Add `ProgressLogging.@progress` with the name `name`  to a `for` loop if `flag==true`"
+macro progressif(flag, name, expr)
+    quote
+        if $(flag)
+            ProgressLogging.@progress $name $expr
+        else
+            $expr
+        end
+    end |> esc
+end
