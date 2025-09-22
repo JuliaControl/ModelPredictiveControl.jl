@@ -106,7 +106,9 @@ end
 
 
 @doc raw"""
-    sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x_0=plant.xop, progress=true) -> res
+    sim!(
+        plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x_0=plant.xop, progress=true
+    ) -> res
 
 Open-loop simulation of `plant` for `N` time steps, default to unit bump test on all inputs.
 
