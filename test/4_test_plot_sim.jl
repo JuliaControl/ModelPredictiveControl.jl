@@ -10,6 +10,8 @@
     @test res.D_data[:, 1] ≈ model.dop
     @test res.X_data[:, 1] ≈ zeros(model.nx)
 
+    @test_nowarn sim!(model, 15, progress=false)
+
     res_man = SimResult(model, res.U_data, res.Y_data, res.D_data; X_data=res.X_data)
     @test res_man.U_data ≈ res.U_data
     @test res_man.Y_data ≈ res.Y_data
@@ -55,6 +57,8 @@ end
     @test res.D_data[:, 1]  ≈ estim.model.dop
     @test res.X_data[:, 1]  ≈ zeros(estim.model.nx)
     @test res.X̂_data[:, 1]  ≈ zeros(estim.nx̂)
+
+    @test_nowarn sim!(estim, 15, progress=false)
 
     res_man = SimResult(
         estim, res.U_data, res.Y_data, res.D_data; 
@@ -139,6 +143,8 @@ end
     @test res.D_data[:, 1]  ≈ mpc1.estim.model.dop
     @test res.X_data[:, 1]  ≈ zeros(mpc1.estim.model.nx)
     @test res.X̂_data[:, 1]  ≈ zeros(mpc1.estim.nx̂)
+
+    @test_nowarn sim!(mpc1, 15, progress=false)
 
     mpc2 = ExplicitMPC(LinModel(sys, Ts, i_d=[3]))
     res = sim!(mpc2, 15)
