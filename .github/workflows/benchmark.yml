@@ -3,9 +3,6 @@ on:
   pull_request_target:
     branches: [ main ]
     types: [labeled, opened, synchronize, reopened]
-concurrency:
-  group: benchmark-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 permissions:
   pull-requests: write    # needed to post comments
 jobs:
