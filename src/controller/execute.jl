@@ -609,6 +609,7 @@ end
 "Update the prediction matrices, linear constraints and JuMP optimization."
 function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     model, estim, transcription = mpc.estim.model, mpc.estim, mpc.transcription
+    weights = mpc.weights
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     optim, con = mpc.optim, mpc.con
     # --- prediction matrices ---
@@ -676,7 +677,8 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.x̂0min .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     con.x̂0max .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u)
+    # do not verify the condition number of the Hessian here:
+    H̃ = init_quadprog(model, transcription, weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u; warn_cond=Inf)
     mpc.H̃ .= H̃
     # --- JuMP optimization ---
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]

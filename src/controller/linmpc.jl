@@ -79,7 +79,7 @@ struct LinMPC{
             ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
             Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
         )
-        H̃ = init_quadprog(model, weights, Ẽ, P̃Δu, P̃u)
+        H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)

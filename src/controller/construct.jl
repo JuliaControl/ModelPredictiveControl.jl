@@ -564,7 +564,10 @@ function validate_args(mpc::PredictiveController, ry, d, D̂, R̂y, R̂u)
 end
 
 @doc raw"""
-    init_quadprog(model::LinModel, weights::ControllerWeights, Ẽ, P̃Δu, P̃u) -> H̃
+    init_quadprog(
+        model::LinModel, transcriptions::TranscriptionMethod, weights::ControllerWeights, 
+        Ẽ, P̃Δu, P̃u; warn_cond=1e6
+    ) -> H̃
 
 Init the quadratic programming Hessian `H̃` for MPC.
 
@@ -582,18 +585,42 @@ in which ``\mathbf{Ẽ}``, ``\mathbf{P̃_{Δu}}`` and ``\mathbf{P̃_{u}}`` matri
 at [`relaxŶ`](@ref), [`relaxΔU`](@ref) and [`relaxU`](@ref) documentation, respectively. The
 vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
 [`initpred!`](@ref). ``r`` does not impact the minima position. It is thus useless at
-optimization but required to evaluate the minimal ``J`` value.
+optimization but required to evaluate the minimal ``J`` value. A `@warn` will be displayed
+if the condition number `cond(H̃) ≥ warn_cond` and `transcription` is a `SingleShooting` 
+(`warn_cond=Inf` for no warning).
 """
-function init_quadprog(::LinModel, weights::ControllerWeights, Ẽ, P̃Δu, P̃u)
+function init_quadprog(
+    ::LinModel, transcription::TranscriptionMethod, weights::ControllerWeights, 
+    Ẽ, P̃Δu, P̃u; warn_cond=1e6
+)
     M_Hp, Ñ_Hc, L_Hp = weights.M_Hp, weights.Ñ_Hc, weights.L_Hp
     H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + P̃Δu'*Ñ_Hc*P̃Δu + P̃u'*L_Hp*P̃u), :L)
+    verify_cond(transcription, H̃, warn_cond)
     return H̃
 end
 "Return empty matrix if `model` is not a [`LinModel`](@ref)."
-function init_quadprog(::SimModel{NT}, weights::ControllerWeights, _, _, _) where {NT<:Real}
+function init_quadprog(
+    ::SimModel{NT}, ::TranscriptionMethod, ::ControllerWeights, args...; kwargs...
+) where {NT<:Real}
     H̃ = Hermitian(zeros(NT, 0, 0), :L)
     return H̃
 end
+
+"Check the condition number of `H̃` and display a `@warn` if `cond(H̃) > warn_cond`."
+function verify_cond(::SingleShooting, H̃, warn_cond)
+    if !isinf(warn_cond)
+        cond_H̃ = cond(H̃)
+        cond_H̃ > warn_cond && @warn(
+            "The Hessian condition number cond_H̃ > $warn_cond. The optimization "*
+            "problem may be ill-conditioned.\n Consider changing the tunings, using "*
+            "MultipleShooting, or using an optimizer more robust to this like DAQP.",
+            cond_H̃,
+        )
+    end
+    return nothing
+end
+"No check if `transcription` is not a `SingleShooting`."
+verify_cond(::TranscriptionMethod,_,_) = nothing
 
 """
     init_defaultcon_mpc(
