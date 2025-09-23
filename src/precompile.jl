@@ -20,7 +20,8 @@ mpc_kf.estim()
 u = mpc_kf([55, 30])
 sim!(mpc_kf, 2, [55, 30])
 
-mpc_lo = setconstraint!(LinMPC(Luenberger(model)), ymin=[45, -Inf])
+transcription = MultipleShooting()
+mpc_lo = setconstraint!(LinMPC(Luenberger(model); transcription), ymin=[45, -Inf])
 initstate!(mpc_lo, model.uop, model())
 preparestate!(mpc_lo, [55, 30])
 mpc_lo.estim()
@@ -79,18 +80,21 @@ exmpc.estim()
 u = exmpc([55, 30])
 sim!(exmpc, 2, [55, 30])
 
-function f!(xnext, x, u, _, model)
-    mul!(xnext, model.A , x)
-    mul!(xnext, model.Bu, u, 1, 1)
+function f!(xnext, x, u, _ , p)
+    A, B, _ = p
+    mul!(xnext, A , x)
+    mul!(xnext, B, u, 1, 1)
     return nothing
 end
-function h!(y, x, _, model)
-    mul!(y, model.C, x)
+function h!(y, x, _ , p)
+    _, _, C = p
+    mul!(y, C, x)
     return nothing
 end
 
+sys2 = minreal(ss(sys))
 nlmodel = setop!(
-    NonLinModel(f!, h!, Ts, 2, 2, 2, solver=nothing, p=model), 
+    NonLinModel(f!, h!, Ts, 2, 2, 2, solver=RungeKutta(4), p=(sys2.A, sys2.B, sys2.C)), 
     uop=[10, 10], yop=[50, 30]
 )
 y = nlmodel()
@@ -101,8 +105,9 @@ nmpc_im.estim()
 u = nmpc_im([55, 30])
 sim!(nmpc_im, 2, [55, 30])
 
-nmpc_ukf = setconstraint!(
-    NonLinMPC(UnscentedKalmanFilter(nlmodel), Hp=10, Cwt=1e3), ymin=[45, -Inf]
+transcription = MultipleShooting(f_threads=true)
+nmpc_ukf = setconstraint!(NonLinMPC(
+    UnscentedKalmanFilter(nlmodel); Hp=10, transcription, Cwt=1e3), ymin=[45, -Inf]
 )
 initstate!(nmpc_ukf, nlmodel.uop, y)
 preparestate!(nmpc_ukf, [55, 30])
@@ -115,8 +120,9 @@ preparestate!(nmpc_ekf, [55, 30])
 u = nmpc_ekf([55, 30])
 sim!(nmpc_ekf, 2, [55, 30])
 
-nmpc_mhe = setconstraint!(
-    NonLinMPC(MovingHorizonEstimator(nlmodel, He=2), Hp=10, Cwt=Inf), ymin=[45, -Inf]
+transcription = TrapezoidalCollocation()
+nmpc_mhe = setconstraint!(NonLinMPC(
+    MovingHorizonEstimator(nlmodel, He=2); transcription, Hp=10, Cwt=Inf), ymin=[45, -Inf]
 )
 setconstraint!(nmpc_mhe.estim, x̂min=[-50,-50,-50,-50], x̂max=[50,50,50,50])
 initstate!(nmpc_mhe, nlmodel.uop, y)
