@@ -221,15 +221,20 @@ constraints are all soft by default. See Extended Help for time-varying constrai
 julia> mpc = LinMPC(setop!(LinModel(tf(3, [30, 1]), 4), uop=[50], yop=[25]));
 
 julia> mpc = setconstraint!(mpc, umin=[0], umax=[100], Δumin=[-10], Δumax=[+10])
-LinMPC controller with a sample time Ts = 4.0 s, OSQP optimizer, SteadyKalmanFilter estimator and:
- 10 prediction steps Hp
-  2 control steps Hc
-  1 slack variable ϵ (control constraints)
-  1 manipulated inputs u (0 integrating states)
-  2 estimated states x̂
-  1 measured outputs ym (1 integrating states)
-  0 unmeasured outputs yu
-  0 measured disturbances d
+LinMPC controller with a sample time Ts = 4.0 s:
+├ estimator: SteadyKalmanFilter
+├ model: LinModel
+├ optimizer: OSQP
+├ transcription: SingleShooting
+└ dimensions:
+  ├ 10 prediction steps Hp
+  ├  2 control steps Hc
+  ├  1 slack variable ϵ (control constraints)
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  2 estimated states x̂
+  ├  1 measured outputs ym (1 integrating states)
+  ├  0 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 
 # Extended Help
@@ -605,11 +610,11 @@ end
         ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
         Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
         gc!=nothing, nc=0
-    ) -> con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ
+    ) -> con, nϵ, P̃Δu, P̃u, Ẽ
 
 Init `ControllerConstraint` struct with default parameters based on estimator `estim`.
 
-Also return `P̃Δu`, `P̃u`, `Ẽ` and `Ẽŝ` matrices for the the augmented decision vector `Z̃`.
+Also return `P̃Δu`, `P̃u` and `Ẽ` matrices for the the augmented decision vector `Z̃`.
 """
 function init_defaultcon_mpc(
     estim::StateEstimator{NT}, 
@@ -665,7 +670,7 @@ function init_defaultcon_mpc(
         C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc
     )
-    return con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ
+    return con, nϵ, P̃Δu, P̃u, Ẽ
 end
 
 "Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."

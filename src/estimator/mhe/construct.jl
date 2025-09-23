@@ -10,7 +10,7 @@ The bounds on the estimated state at arrival ``\mathbf{x̂}_k(k-N_k+1)`` is sepa
 the other state constraints ``\mathbf{x̂}_k(k-N_k+2), \mathbf{x̂}_k(k-N_k+3), ...`` since
 the former is always a linear inequality constraint (it's a decision variable). The fields
 `x̃min` and `x̃max` refer to the bounds at the arrival (augmented with the slack variable
-ϵ), and `X̂min` and `X̂max`, the others.
+ε), and `X̂min` and `X̂max`, the others.
 """
 struct EstimatorConstraint{NT<:Real}
     Ẽx̂      ::Matrix{NT}
@@ -51,7 +51,7 @@ struct MovingHorizonEstimator{
     JM<:JuMP.GenericModel,
     GB<:AbstractADType,
     JB<:AbstractADType,
-    CE<:StateEstimator,
+    CE<:KalmanEstimator,
 } <: StateEstimator{NT}
     model::SM
     cov  ::KC
@@ -68,7 +68,7 @@ struct MovingHorizonEstimator{
     f̂op::Vector{NT}
     x̂0 ::Vector{NT}
     He::Int
-    nϵ::Int
+    nε::Int
     i_ym::Vector{Int}
     nx̂ ::Int
     nym::Int
@@ -121,7 +121,7 @@ struct MovingHorizonEstimator{
             JM<:JuMP.GenericModel, 
             GB<:AbstractADType,
             JB<:AbstractADType,
-            CE<:StateEstimator{NT}
+            CE<:KalmanEstimator{NT}
         }
         nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
@@ -140,7 +140,7 @@ struct MovingHorizonEstimator{
         )
         # dummy values (updated just before optimization):
         F, fx̄, Fx̂ = zeros(NT, nym*He), zeros(NT, nx̂), zeros(NT, nx̂*He)
-        con, nϵ, Ẽ, ẽx̄ = init_defaultcon_mhe(
+        con, nε, Ẽ, ẽx̄ = init_defaultcon_mhe(
             model, He, Cwt, nx̂, nym, E, ex̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂
         )
         nZ̃ = size(Ẽ, 2)
@@ -164,7 +164,7 @@ struct MovingHorizonEstimator{
             gradient, jacobian,
             covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
-            He, nϵ,
+            He, nε,
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
@@ -192,10 +192,10 @@ distribution is not approximated like the [`UnscentedKalmanFilter`](@ref). The c
 costs are drastically higher, however, since it minimizes the following objective function
 at each discrete time ``k``:
 ```math
-\min_{\mathbf{x̂}_k(k-N_k+p), \mathbf{Ŵ}, ϵ}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
+\min_{\mathbf{x̂}_k(k-N_k+p), \mathbf{Ŵ}, ε}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
                                             + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
                                             + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
-                                            + C ϵ^2
+                                            + C ε^2
 ```
 in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
 ```math
@@ -220,7 +220,7 @@ N_k =                     \begin{cases}
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` respectively encompass the estimated process
 noises ``\mathbf{ŵ}(k-j+p)`` from ``j=N_k`` to ``1`` and sensor noises ``\mathbf{v̂}(k-j+1)``
 from ``j=N_k`` to ``1``. The Extended Help defines the two vectors, the slack variable
-``ϵ``, and the estimation of the covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If
+``ε``, and the estimation of the covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If
 the keyword argument `direct=true` (default value), the constant ``p=0`` in the equations
 above, and the MHE is in the current form. Else ``p=1``, leading to the prediction form.
 
@@ -275,14 +275,20 @@ transcription for now.
 julia> model = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
 julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP_0=[0.01])
-MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer, NonLinModel and:
- 5 estimation steps He
- 0 slack variable ϵ (estimation constraints)
- 1 manipulated inputs u (0 integrating states)
- 2 estimated states x̂
- 1 measured outputs ym (1 integrating states)
- 0 unmeasured outputs yu
- 0 measured disturbances d
+MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
+├ model: NonLinModel
+├ optimizer: Ipopt
+├ gradient: AutoForwardDiff
+├ jacobian: AutoForwardDiff
+├ arrival covariance: UnscentedKalmanFilter
+└ dimensions:
+  ├ 5 estimation steps He
+  ├ 0 slack variable ε (estimation constraints)
+  ├ 1 manipulated inputs u (0 integrating states)
+  ├ 2 estimated states x̂
+  ├ 1 measured outputs ym (1 integrating states)
+  ├ 0 unmeasured outputs yu
+  └ 0 measured disturbances d
 ```
 
 # Extended Help
@@ -355,12 +361,12 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s, Ipopt optimizer
       for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
     
-    The slack variable ``ϵ`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
+    The slack variable ``ε`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
     problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
     state ``\mathbf{x̂}`` and sensor noise ``\mathbf{v̂}``). Note that if `Cwt≠Inf`, the
     attribute `nlp_scaling_max_gradient` of `Ipopt` is set to  `10/Cwt` (if not already set), 
-    to scale the small values of ``ϵ``. Use the second constructor to specify the arrival
+    to scale the small values of ``ε``. Use the second constructor to specify the arrival
     covariance estimation method.
 """
 function MovingHorizonEstimator(
@@ -418,8 +424,10 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂_i}, \mathbf{Q�
 where ``\mathbf{P̂_i}`` is the initial estimation covariance, provided by `P̂_0` argument. The
 keyword argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) object
 for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. The
-supported types are [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref) and 
-[`ExtendedKalmanFilter`](@ref).
+supported types are [`SteadyKalmanFilter`](@ref), [`KalmanFilter`](@ref), 
+[`UnscentedKalmanFilter`](@ref) and [`ExtendedKalmanFilter`](@ref). A constant arrival
+covariance is supported with [`SteadyKalmanFilter`](@ref), and by setting the `P̂` argument 
+of [`setstate!`](@ref) at the desired value.
 """
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
@@ -431,6 +439,7 @@ function MovingHorizonEstimator(
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0, He)
+    validate_covestim(cov, covestim)
     return MovingHorizonEstimator{NT}(
         model, 
         He, i_ym, nint_u, nint_ym, cov, Cwt, 
@@ -439,11 +448,24 @@ function MovingHorizonEstimator(
     )
 end
 
+
 function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 end
 function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+end
+
+"Validate covestim type and dimensions."
+function validate_covestim(cov::KalmanCovariances, covestim::KalmanEstimator)
+    if size(cov.P̂) != size(covestim.cov.P̂)
+        throw(ArgumentError("estimation covariance covestim.cov.P̂ size does not match the MHE"))
+    end
+    return nothing
+end
+function validate_covestim(::KalmanCovariances, ::StateEstimator)
+    error(  "covestim argument must be a SteadyKalmanFilter, KalmanFilter, "*
+            "ExtendedKalmanFilter or UnscentedKalmanFilter")
 end
 
 @doc raw"""
@@ -455,12 +477,12 @@ It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}
 noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
-    \mathbf{x̂_{min} - c_{x̂_{min}}} ϵ ≤&&\   \mathbf{x̂}_k(k-j+p) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 0    \\
-    \mathbf{ŵ_{min} - c_{ŵ_{min}}} ϵ ≤&&\     \mathbf{ŵ}(k-j+p) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1    \\
-    \mathbf{v̂_{min} - c_{v̂_{min}}} ϵ ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max} + c_{v̂_{max}}} ϵ &&\qquad  j = N_k, N_k - 1, ... , 1
+    \mathbf{x̂_{min} - c_{x̂_{min}}} ε ≤&&\   \mathbf{x̂}_k(k-j+p) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ε &&\qquad  j = N_k, N_k - 1, ... , 0    \\
+    \mathbf{ŵ_{min} - c_{ŵ_{min}}} ε ≤&&\     \mathbf{ŵ}(k-j+p) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ε &&\qquad  j = N_k, N_k - 1, ... , 1    \\
+    \mathbf{v̂_{min} - c_{v̂_{min}}} ε ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max} + c_{v̂_{max}}} ε &&\qquad  j = N_k, N_k - 1, ... , 1
 \end{alignat*}
 ```
-and also ``ϵ ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there
+and also ``ε ≥ 0``. All the constraint parameters are vector. Use `±Inf` values when there
 is no bound. The constraint softness parameters ``\mathbf{c}``, also called equal concern
 for relaxation, are non-negative values that specify the softness of the associated bound.
 Use `0.0` values for hard constraints (default for all of them). Notice that constraining
@@ -490,14 +512,18 @@ the constant ``p``, on model augmentation and on time-varying constraints.
 julia> estim = MovingHorizonEstimator(LinModel(ss(0.5,1,1,0,1)), He=3);
 
 julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
-MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, LinModel and:
- 3 estimation steps He
- 0 slack variable ϵ (estimation constraints)
- 1 manipulated inputs u (0 integrating states)
- 2 estimated states x̂
- 1 measured outputs ym (1 integrating states)
- 0 unmeasured outputs yu
- 0 measured disturbances d
+MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
+├ model: LinModel
+├ optimizer: OSQP
+├ arrival covariance: KalmanFilter
+└ dimensions:
+  ├ 3 estimation steps He
+  ├ 0 slack variable ε (estimation constraints)
+  ├ 1 manipulated inputs u (0 integrating states)
+  ├ 2 estimated states x̂
+  ├ 1 measured outputs ym (1 integrating states)
+  ├ 0 unmeasured outputs yu
+  └ 0 measured disturbances d
 ```
 
 # Extended Help
@@ -510,9 +536,9 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s, OSQP optimizer, 
     estimation horizon ``H_e`` are also possible, mathematically defined as:
     ```math 
     \begin{alignat*}{3}
-        \mathbf{X̂_{min} - C_{x̂_{min}}} ϵ ≤&&\ \mathbf{X̂} &≤ \mathbf{X̂_{max} + C_{x̂_{max}}} ϵ \\
-        \mathbf{Ŵ_{min} - C_{ŵ_{min}}} ϵ ≤&&\ \mathbf{Ŵ} &≤ \mathbf{Ŵ_{max} + C_{ŵ_{max}}} ϵ \\
-        \mathbf{V̂_{min} - C_{v̂_{min}}} ϵ ≤&&\ \mathbf{V̂} &≤ \mathbf{V̂_{max} + C_{v̂_{max}}} ϵ
+        \mathbf{X̂_{min} - C_{x̂_{min}}} ε ≤&&\ \mathbf{X̂} &≤ \mathbf{X̂_{max} + C_{x̂_{max}}} ε \\
+        \mathbf{Ŵ_{min} - C_{ŵ_{min}}} ε ≤&&\ \mathbf{Ŵ} &≤ \mathbf{Ŵ_{max} + C_{ŵ_{max}}} ε \\
+        \mathbf{V̂_{min} - C_{v̂_{min}}} ε ≤&&\ \mathbf{V̂} &≤ \mathbf{V̂_{max} + C_{v̂_{max}}} ε
     \end{alignat*}
     ```
     For this, use the same keyword arguments as above but with a first capital letter:
@@ -554,7 +580,7 @@ function setconstraint!(
     C = estim.C
     if isnothing(X̂min) && !isnothing(x̂min)
         size(x̂min) == (nx̂,) || throw(ArgumentError("x̂min size must be $((nx̂,))"))
-        con.x̃0min[end-nx̂+1:end] .= x̂min .- estim.x̂op # if C is finite : x̃ = [ϵ; x̂]
+        con.x̃0min[end-nx̂+1:end] .= x̂min .- estim.x̂op # if C is finite : x̃ = [ε; x̂]
         for i in 1:nx̂*He
             con.X̂0min[i] = x̂min[(i-1) % nx̂ + 1] - estim.X̂op[i]
         end
@@ -565,7 +591,7 @@ function setconstraint!(
     end
     if isnothing(X̂max) && !isnothing(x̂max)
         size(x̂max) == (nx̂,) || throw(ArgumentError("x̂max size must be $((nx̂,))"))
-        con.x̃0max[end-nx̂+1:end] .= x̂max .- estim.x̂op # if C is finite : x̃ = [ϵ; x̂]
+        con.x̃0max[end-nx̂+1:end] .= x̂max .- estim.x̂op # if C is finite : x̃ = [ε; x̂]
         for i in 1:nx̂*He
             con.X̂0max[i] = x̂max[(i-1) % nx̂ + 1] - estim.X̂op[i]
         end
@@ -628,7 +654,7 @@ function setconstraint!(
         if !isnothing(C_x̂min)
             size(C_x̂min) == (nX̂con,) || throw(ArgumentError("C_x̂min size must be $((nX̂con,))"))
             any(C_x̂min .< 0) && error("C_x̂min weights should be non-negative")
-            # if C is finite : x̃ = [ϵ; x̂] 
+            # if C is finite : x̃ = [ε; x̂] 
             con.A_x̃min[end-nx̂+1:end, end] .= @views -C_x̂min[1:nx̂] 
             con.C_x̂min .= @views C_x̂min[nx̂+1:end]
             size(con.A_X̂min, 1) ≠ 0 && (con.A_X̂min[:, end] = -con.C_x̂min) # for LinModel
@@ -636,7 +662,7 @@ function setconstraint!(
         if !isnothing(C_x̂max)
             size(C_x̂max) == (nX̂con,) || throw(ArgumentError("C_x̂max size must be $((nX̂con,))"))
             any(C_x̂max .< 0) && error("C_x̂max weights should be non-negative")
-            # if C is finite : x̃ = [ϵ; x̂] :
+            # if C is finite : x̃ = [ε; x̂] :
             con.A_x̃max[end-nx̂+1:end, end] .= @views -C_x̂max[1:nx̂]
             con.C_x̂max .= @views C_x̂max[nx̂+1:end]
             size(con.A_X̂max, 1) ≠ 0 && (con.A_X̂max[:, end] = -con.C_x̂max) # for LinModel
@@ -755,7 +781,7 @@ function init_defaultcon_mhe(
 ) where {NT<:Real}
     nŵ = nx̂
     nZ̃, nX̂, nŴ, nYm = nx̂+nŵ*He, nx̂*He, nŵ*He, nym*He
-    nϵ = isinf(C) ? 0 : 1
+    nε = isinf(C) ? 0 : 1
     x̂min, x̂max = fill(convert(NT,-Inf), nx̂),  fill(convert(NT,+Inf), nx̂)
     X̂min, X̂max = fill(convert(NT,-Inf), nX̂),  fill(convert(NT,+Inf), nX̂)
     Ŵmin, Ŵmax = fill(convert(NT,-Inf), nŴ),  fill(convert(NT,+Inf), nŴ)
@@ -764,10 +790,10 @@ function init_defaultcon_mhe(
     C_x̂min, C_x̂max = fill(0.0, nX̂),  fill(0.0, nX̂)
     C_ŵmin, C_ŵmax = fill(0.0, nŴ),  fill(0.0, nŴ)
     C_v̂min, C_v̂max = fill(0.0, nYm), fill(0.0, nYm)
-    A_x̃min, A_x̃max, x̃min, x̃max, ẽx̄ = relaxarrival(model, nϵ, c_x̂min, c_x̂max, x̂min, x̂max, ex̄)
-    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nϵ, C_x̂min, C_x̂max, Ex̂)
-    A_Ŵmin, A_Ŵmax = relaxŴ(model, nϵ, C_ŵmin, C_ŵmax, nx̂)
-    A_V̂min, A_V̂max, Ẽ = relaxV̂(model, nϵ, C_v̂min, C_v̂max, E)
+    A_x̃min, A_x̃max, x̃min, x̃max, ẽx̄ = relaxarrival(model, nε, c_x̂min, c_x̂max, x̂min, x̂max, ex̄)
+    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nε, C_x̂min, C_x̂max, Ex̂)
+    A_Ŵmin, A_Ŵmax = relaxŴ(model, nε, C_ŵmin, C_ŵmax, nx̂)
+    A_V̂min, A_V̂max, Ẽ = relaxV̂(model, nε, C_v̂min, C_v̂max, E)
     i_x̃min, i_x̃max = .!isinf.(x̃min), .!isinf.(x̃max)
     i_X̂min, i_X̂max = .!isinf.(X̂min), .!isinf.(X̂max)
     i_Ŵmin, i_Ŵmax = .!isinf.(Ŵmin), .!isinf.(Ŵmax)
@@ -785,18 +811,18 @@ function init_defaultcon_mhe(
         C_x̂min, C_x̂max, C_v̂min, C_v̂max,
         i_b, i_g
     )
-    return con, nϵ, Ẽ, ẽx̄
+    return con, nε, Ẽ, ẽx̄
 end
 
 @doc raw"""
     relaxarrival(
-        model::SimModel, nϵ, c_x̂min, c_x̂max, x̂min, x̂max, ex̄
+        model::SimModel, nε, c_x̂min, c_x̂max, x̂min, x̂max, ex̄
     ) -> A_x̃min, A_x̃max, x̃min, x̃max, ẽx̄
 
-Augment arrival state constraints with slack variable ϵ for softening the MHE.
+Augment arrival state constraints with slack variable ε for softening the MHE.
 
 Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z̃} = 
-[\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{ẽ_x̄}``
+[\begin{smallmatrix} ε \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{ẽ_x̄}``
 matrix that appears in the estimation error at arrival equation ``\mathbf{x̄} =
 \mathbf{ẽ_x̄ Z̃ + f_x̄}``. It also returns the augmented constraints ``\mathbf{x̃_{min}}`` and
 ``\mathbf{x̃_{max}}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
@@ -815,14 +841,14 @@ in which
 ``\mathbf{x̃_{max}} = [\begin{smallmatrix} ∞ \\ \mathbf{x̂_{max}} \end{smallmatrix}]`` and
 ``\mathbf{x̃_{op}}  = [\begin{smallmatrix} 0 \\ \mathbf{x̂_{op}}  \end{smallmatrix}]``
 """
-function relaxarrival(::SimModel{NT}, nϵ, c_x̂min, c_x̂max, x̂min, x̂max, ex̄) where {NT<:Real}
+function relaxarrival(::SimModel{NT}, nε, c_x̂min, c_x̂max, x̂min, x̂max, ex̄) where {NT<:Real}
     ex̂ = -ex̄
-    if nϵ ≠ 0 # Z̃ = [ϵ; Z]
+    if nε ≠ 0 # Z̃ = [ε; Z]
         x̃min, x̃max = [NT[0.0]; x̂min], [NT[Inf]; x̂max]
-        A_ϵ = [NT[1.0] zeros(NT, 1, size(ex̂, 2))]
-        # ϵ impacts arrival state constraint calculations:
-        A_x̃min, A_x̃max = -[A_ϵ; c_x̂min ex̂], [A_ϵ; -c_x̂max ex̂]
-        # ϵ has no impact on estimation error at arrival:
+        A_ε = [NT[1.0] zeros(NT, 1, size(ex̂, 2))]
+        # ε impacts arrival state constraint calculations:
+        A_x̃min, A_x̃max = -[A_ε; c_x̂min ex̂], [A_ε; -c_x̂max ex̂]
+        # ε has no impact on estimation error at arrival:
         ẽx̄ = [zeros(NT, size(ex̄, 1), 1) ex̄] 
     else # Z̃ = Z (only hard constraints)
         x̃min, x̃max = x̂min, x̂max
@@ -833,12 +859,12 @@ function relaxarrival(::SimModel{NT}, nϵ, c_x̂min, c_x̂max, x̂min, x̂max, e
 end
 
 @doc raw"""
-    relaxX̂(model::SimModel, nϵ, C_x̂min, C_x̂max, Ex̂) -> A_X̂min, A_X̂max, Ẽx̂
+    relaxX̂(model::SimModel, nε, C_x̂min, C_x̂max, Ex̂) -> A_X̂min, A_X̂max, Ẽx̂
 
-Augment estimated state constraints with slack variable ϵ for softening the MHE.
+Augment estimated state constraints with slack variable ε for softening the MHE.
 
 Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z̃} = 
-[\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{Ẽ_x̂}``
+[\begin{smallmatrix} ε \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{Ẽ_x̂}``
 matrix that appears in estimated states equation ``\mathbf{X̂} = \mathbf{Ẽ_x̂ Z̃ + F_x̂}``. It
 also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
@@ -854,11 +880,11 @@ also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 in which ``\mathbf{X̂_{min}, X̂_{max}}`` and ``\mathbf{X̂_{op}}`` vectors respectively contains
 ``\mathbf{x̂_{min}, x̂_{max}}`` and ``\mathbf{x̂_{op}}`` repeated ``H_e`` times.
 """
-function relaxX̂(::LinModel{NT}, nϵ, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
-    if nϵ ≠ 0 # Z̃ = [ϵ; Z]
-        # ϵ impacts estimated process noise constraint calculations:
+function relaxX̂(::LinModel{NT}, nε, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
+    if nε ≠ 0 # Z̃ = [ε; Z]
+        # ε impacts estimated process noise constraint calculations:
         A_X̂min, A_X̂max = -[C_x̂min Ex̂], [-C_x̂max Ex̂]
-        # ϵ has no impact on estimated process noises:
+        # ε has no impact on estimated process noises:
         Ẽx̂ = [zeros(NT, size(Ex̂, 1), 1) Ex̂] 
     else # Z̃ = Z (only hard constraints)
         Ẽx̂ = Ex̂
@@ -868,19 +894,19 @@ function relaxX̂(::LinModel{NT}, nϵ, C_x̂min, C_x̂max, Ex̂) where {NT<:Real
 end
 
 "Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxX̂(::SimModel{NT}, nϵ, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
-    Ẽx̂ = [zeros(NT, 0, nϵ) Ex̂]
+function relaxX̂(::SimModel{NT}, nε, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
+    Ẽx̂ = [zeros(NT, 0, nε) Ex̂]
     A_X̂min, A_X̂max = -Ẽx̂,  Ẽx̂
     return A_X̂min, A_X̂max, Ẽx̂
 end
 
 @doc raw"""
-    relaxŴ(model::SimModel, nϵ, C_ŵmin, C_ŵmax, nx̂) -> A_Ŵmin, A_Ŵmax
+    relaxŴ(model::SimModel, nε, C_ŵmin, C_ŵmax, nx̂) -> A_Ŵmin, A_Ŵmax
 
-Augment estimated process noise constraints with slack variable ϵ for softening the MHE.
+Augment estimated process noise constraints with slack variable ε for softening the MHE.
 
 Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z̃} = 
-[\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{A}`` 
+[\begin{smallmatrix} ε \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{A}`` 
 matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
@@ -893,9 +919,9 @@ matrices for the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxŴ(::SimModel{NT}, nϵ, C_ŵmin, C_ŵmax, nx̂) where {NT<:Real}
+function relaxŴ(::SimModel{NT}, nε, C_ŵmin, C_ŵmax, nx̂) where {NT<:Real}
     A = [zeros(NT, length(C_ŵmin), nx̂) I]
-    if nϵ ≠ 0 # Z̃ = [ϵ; Z]
+    if nε ≠ 0 # Z̃ = [ε; Z]
         A_Ŵmin, A_Ŵmax = -[C_ŵmin A], [-C_ŵmax A]
     else # Z̃ = Z (only hard constraints)
         A_Ŵmin, A_Ŵmax = -A, A
@@ -904,12 +930,12 @@ function relaxŴ(::SimModel{NT}, nϵ, C_ŵmin, C_ŵmax, nx̂) where {NT<:Real
 end
 
 @doc raw"""
-    relaxV̂(model::SimModel, nϵ, C_v̂min, C_v̂max, E) -> A_V̂min, A_V̂max, Ẽ
+    relaxV̂(model::SimModel, nε, C_v̂min, C_v̂max, E) -> A_V̂min, A_V̂max, Ẽ
 
-Augment estimated sensor noise constraints with slack variable ϵ for softening the MHE.
+Augment estimated sensor noise constraints with slack variable ε for softening the MHE.
 
 Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z̃} = 
-[\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{Ẽ}``
+[\begin{smallmatrix} ε \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{Ẽ}``
 matrix that appears in estimated sensor noise equation ``\mathbf{V̂} = \mathbf{Ẽ Z̃ + F}``. It
 also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
@@ -923,11 +949,11 @@ also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxV̂(::LinModel{NT}, nϵ, C_v̂min, C_v̂max, E) where {NT<:Real}
-    if nϵ ≠ 0 # Z̃ = [ϵ; Z]
-        # ϵ impacts estimated sensor noise constraint calculations:
+function relaxV̂(::LinModel{NT}, nε, C_v̂min, C_v̂max, E) where {NT<:Real}
+    if nε ≠ 0 # Z̃ = [ε; Z]
+        # ε impacts estimated sensor noise constraint calculations:
         A_V̂min, A_V̂max = -[C_v̂min E], [-C_v̂max E]
-        # ϵ has no impact on estimated sensor noises:
+        # ε has no impact on estimated sensor noises:
         Ẽ = [zeros(NT, size(E, 1), 1) E] 
     else # Z̃ = Z (only hard constraints)
         Ẽ = E
@@ -937,8 +963,8 @@ function relaxV̂(::LinModel{NT}, nϵ, C_v̂min, C_v̂max, E) where {NT<:Real}
 end
 
 "Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxV̂(::SimModel{NT}, nϵ, C_v̂min, C_v̂max, E) where {NT<:Real}
-    Ẽ = [zeros(NT, 0, nϵ) E]
+function relaxV̂(::SimModel{NT}, nε, C_v̂min, C_v̂max, E) where {NT<:Real}
+    Ẽ = [zeros(NT, 0, nε) E]
     A_V̂min, A_V̂max = -Ẽ, Ẽ
     return A_V̂min, A_V̂max, Ẽ
 end
@@ -1320,7 +1346,7 @@ function get_optim_functions(
     # ----------- common cache for Jfunc and gfuncs  --------------------------------------
     model, con = estim.model, estim.con
     grad, jac = estim.gradient, estim.jacobian
-    nx̂, nym, nŷ, nu, nϵ, nk = estim.nx̂, estim.nym, model.ny, model.nu, estim.nϵ, model.nk
+    nx̂, nym, nŷ, nu, nε, nk = estim.nx̂, estim.nym, model.ny, model.nu, estim.nε, model.nk
     He = estim.He
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
     strict = Val(true)

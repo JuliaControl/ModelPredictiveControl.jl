@@ -18,8 +18,8 @@ end
 
 Mutating state function ``\mathbf{f̂}`` of the augmented model.
 
-By introducing an augmented state vector ``\mathbf{x̂_0}`` like in [`augment_model`](@ref), the
-function returns the next state of the augmented model, defined as:
+By introducing an augmented state vector ``\mathbf{x̂_0}`` like in [`augment_model`](@ref), 
+the function returns the next state of the augmented model, as deviation vectors:
 ```math
 \begin{aligned}
     \mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big) \\
@@ -27,40 +27,84 @@ function returns the next state of the augmented model, defined as:
 \end{aligned}
 ```
 where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂0next` argument. The method mutates `x̂0next`, 
-`û0` and `k0` in place. The argument `û0` is the input vector of the augmented model, 
-computed by ``\mathbf{û_0 = u_0 + ŷ_{s_u}}``. The argument `k0` is used to store the
-intermediate stage values of `model.solver` (when applicable). The model parameter vector
-`model.p` is not included in the function signature for conciseness.
+`û0` and `k0` in place. The argument `û0` stores the disturbed input of the augmented model
+``\mathbf{û_0}``, and `k0`, the intermediate stage values of `model.solver`, when applicable.
+The model parameter `model.p` is not included in the function signature for conciseness. 
+The operating points are handled inside ``\mathbf{f̂}``. See Extended Help for details on 
+``\mathbf{û_0, f̂}`` and ``\mathbf{ĥ}`` implementations.
+
+# Extended Help
+!!! details "Extended Help"
+    Knowing that the augmented state vector is defined as
+    ``\mathbf{x̂_0} = [ \begin{smallmatrix} \mathbf{x_0} \\ \mathbf{x_s} \end{smallmatrix} ]``,
+    the augmented model functions are:
+    ```math
+    \begin{aligned}
+    \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d_0}(k)\Big)  &=               \begin{bmatrix}
+        \mathbf{f}\Big(\mathbf{x_0}(k), \mathbf{û_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big)   \\
+        \mathbf{A_s} \mathbf{x_s}(k)                                                        \end{bmatrix} 
+        + \mathbf{f̂_{op}} - \mathbf{x̂_{op}}                                                 \\
+    \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d_0}(k)\Big)                   &=
+        \mathbf{h}\Big(\mathbf{x_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big) + \mathbf{y_{s_y}}(k)
+    \end{aligned}
+    ```
+    in which:
+    ```math
+    \begin{aligned}
+    \mathbf{û_0}(k)     &= \mathbf{u_0}(k) + \mathbf{y_{s_u}}(k)                            \\
+    \mathbf{y_{s_u}}(k) &= \mathbf{C_{s_u} x_s}(k)                                          \\
+    \mathbf{y_{s_y}}(k) &= \mathbf{C_{s_y} x_s}(k)
+    \end{aligned}
+    ```
+    The ``\mathbf{f}`` and ``\mathbf{h}`` functions above are in fact the [`f!`](@ref) and 
+    [`h!`](@ref) methods, respectively. The operating points ``\mathbf{x̂_{op}, f̂_{op}}``
+    are computed by [`augment_model`](@ref) (almost always zeros in practice for 
+    [`NonLinModel`](@ref)).
 """
 function f̂!(x̂0next, û0, k0, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
-    return f̂!(x̂0next, û0, k0, model, estim.As, estim.Cs_u, x̂0, u0, d0)
+    return f̂!(x̂0next, û0, k0, model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0)
 end
 
-"""
+@doc raw"""
     f̂!(x̂0next, _ , _ , estim::StateEstimator, model::LinModel, x̂0, u0, d0) -> nothing
 
-Use the augmented model matrices if `model` is a [`LinModel`](@ref).
+Use the augmented model matrices and operating points if `model` is a [`LinModel`](@ref).
+
+# Extended Help
+!!! details "Extended Help"
+
+    This method computes:
+    ```math
+    \begin{aligned}
+    \mathbf{x̂_0}(k+1) &= \mathbf{Â x̂_0}(k) + \mathbf{B̂_u u_0}(k) + \mathbf{B̂_d d_0}(k)
+                         + \mathbf{f̂_{op}} - \mathbf{x̂_{op}}                                \\
+    \mathbf{ŷ_0}(k)   &= \mathbf{Ĉ x̂_0}(k) + \mathbf{D̂_d d_0}(k)
+    \end{aligned}
+    ```
+    with the augmented matrices constructed by [`augment_model`](@ref).
 """
 function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
     mul!(x̂0next, estim.Â,  x̂0)
     mul!(x̂0next, estim.B̂u, u0, 1, 1)
     mul!(x̂0next, estim.B̂d, d0, 1, 1)
+    x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
 
 """
-    f̂!(x̂0next, û0, k0, model::SimModel, As, Cs_u, x̂0, u0, d0)
+    f̂!(x̂0next, û0, k0, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
 
 Same than [`f̂!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
 """
-function f̂!(x̂0next, û0, k0, model::SimModel, As, Cs_u, x̂0, u0, d0)
+function f̂!(x̂0next, û0, k0, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    @views x̂d_next, x̂s_next = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
-    mul!(û0, Cs_u, x̂s) # ŷs_u = Cs_u * x̂s
-    û0 .+= u0
-    f!(x̂d_next, k0, model, x̂d, û0, d0, model.p)
-    mul!(x̂s_next, As, x̂s)
+    @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    @views xdnext, xsnext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
+    mul!(û0, Cs_u, xs)      # ys_u = Cs_u*xs
+    û0 .+= u0               # û0 = u0 + ys_u  
+    f!(xdnext, k0, model, xd, û0, d0, model.p)
+    mul!(xsnext, As, xs)
+    x̂0next .+= f̂op .- x̂op
     return nothing
 end
 
@@ -91,9 +135,9 @@ Same than [`ĥ!`](@ref) for [`SimModel`](@ref) but without the `estim` argument
 """
 function ĥ!(ŷ0, model::SimModel, Cs_y, x̂0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    h!(ŷ0, model, x̂d, d0, model.p)
-    mul!(ŷ0, Cs_y, x̂s, 1, 1) # ŷ0 = ŷ0 + Cs_y*x̂s
+    @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    h!(ŷ0, model, xd, d0, model.p)  # y0 = h(xd, d0)
+    mul!(ŷ0, Cs_y, xs, 1, 1)        # ŷ0 = y0 + Cs_y*xs
     return nothing
 end
 
@@ -235,9 +279,9 @@ delayed/predictor (2.) formulation:
 ```jldoctest
 julia> estim2 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=true);
 
-julia> x̂ = round.(preparestate!(estim2, [1]), digits=3)
+julia> x̂ = round.(preparestate!(estim2, [1]), digits=2)
 1-element Vector{Float64}:
- 0.01
+ 0.5
 
 julia> estim1 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=false);
 

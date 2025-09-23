@@ -109,3 +109,9 @@ SingleShooting
 ```@docs
 MultipleShooting
 ```
+
+### TrapezoidalCollocation
+
+```@docs
+TrapezoidalCollocation
+```

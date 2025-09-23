@@ -101,18 +101,21 @@ get_nx̂(mpc::PredictiveController) = mpc.estim.nx̂
 
 function Base.show(io::IO, res::SimResult) 
     N = length(res.T_data)
-    print(io, "Simulation results of $(typeof(res.obj).name.name) with $N time steps.")
+    print(io, "Simulation results of $(nameof(typeof(res.obj))) with $N time steps.")
 end
 
 
 @doc raw"""
-    sim!(plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x_0=plant.xop) -> res
+    sim!(
+        plant::SimModel, N::Int, u=plant.uop.+1, d=plant.dop; x_0=plant.xop, progress=true
+    ) -> res
 
 Open-loop simulation of `plant` for `N` time steps, default to unit bump test on all inputs.
 
 The manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}`` are held
 constant at `u` and `d` values, respectively. The plant initial state ``\mathbf{x}(0)`` is
-specified by `x_0` keyword arguments. The function returns [`SimResult`](@ref) instances 
+specified by `x_0` keyword arguments. If `progress` is `true`, VS Code will display a
+progress percentage of the simulation. The function returns [`SimResult`](@ref) instances
 that can be visualized by calling `plot` on them. Note that the method mutates `plant`
 internal states.
 
@@ -129,7 +132,8 @@ function sim!(
     N::Int,
     u::Vector = plant.uop.+1,
     d::Vector = plant.dop;
-    x_0 = plant.xop
+    x_0 = plant.xop,
+    progress = true
 ) where {NT<:Real}
     T_data  = collect(plant.Ts*(0:(N-1)))
     Y_data  = Matrix{NT}(undef, plant.ny, N)
@@ -137,7 +141,7 @@ function sim!(
     D_data  = Matrix{NT}(undef, plant.nd, N)
     X_data  = Matrix{NT}(undef, plant.nx, N)
     setstate!(plant, x_0)
-    @progress name="$(typeof(plant).name.name) simulation" for i=1:N
+    @progressif progress name="$(nameof(typeof(plant))) simulation" for i=1:N
         y = evaloutput(plant, d) 
         Y_data[:, i] .= y
         U_data[:, i] .= u
@@ -187,6 +191,7 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 - `x̂_0 = nothing` or *`xhat_0`* : initial estimate ``\mathbf{x̂}(0)``, [`initstate!`](@ref)
    is used if `nothing`
 - `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
+- `progress = true` : display a progress percentage in VS Code if `true`
 
 # Examples
 ```jldoctest
@@ -263,6 +268,7 @@ function sim_closedloop!(
     x_0    = plant.xop,
     xhat_0 = nothing,
     lastu  = plant.uop,
+    progress = true,
     x̂_0 = xhat_0
 ) where {NT<:Real}
     model = estim.model
@@ -282,7 +288,7 @@ function sim_closedloop!(
     lastd, lasty = d, evaloutput(plant, d)
     initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
     isnothing(x̂_0) || setstate!(est_mpc, x̂_0)
-    @progress name="$(typeof(est_mpc).name.name) simulation" for i=1:N
+    @progressif progress name="$(nameof(typeof(est_mpc))) simulation" for i=1:N
         d = lastd + d_step + d_noise.*randn(plant.nd)
         y = evaloutput(plant, d) + y_step + y_noise.*randn(plant.ny)
         ym = y[estim.i_ym]

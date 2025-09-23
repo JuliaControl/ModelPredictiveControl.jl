@@ -50,6 +50,10 @@ nmpc_nonlin_ms = NonLinMPC(
     nonlinmodel, transcription=MultipleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10    
 )
+nmpc_nonlin_tc = NonLinMPC(
+    nonlinmodel_c, transcription=TrapezoidalCollocation(),
+    Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
+)
 
 samples, evals, seconds = 10000, 1, 60
 UNIT_MPC["NonLinMPC"]["moveinput!"]["LinModel"]["SingleShooting"] =
@@ -74,6 +78,12 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["MultipleShooting"] =
     @benchmarkable(
         moveinput!($nmpc_nonlin_ms, $y, $d),
         setup=preparestate!($nmpc_nonlin_ms, $y, $d),
+        samples=samples, evals=evals, seconds=seconds
+    )
+UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["TrapezoidalCollocation"] =
+    @benchmarkable(
+        moveinput!($nmpc_nonlin_tc, $y_c, $d_c),
+        setup=preparestate!($nmpc_nonlin_tc, $y_c, $d_c),
         samples=samples, evals=evals, seconds=seconds
     )
 
@@ -230,7 +240,6 @@ CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["MultipleShooting"] =
         samples=samples, evals=evals
     )
 
-
 # ----------------- Case study: Pendulum noneconomic -----------------------------
 model, p = pendulum_model, pendulum_p
 σQ = [0.1, 1.0]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
@@ -255,13 +264,32 @@ nmpc_ipopt_ms = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 nmpc_ipopt_ms = setconstraint!(nmpc_ipopt_ms; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_ipopt_ms.optim)
 
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = MultipleShooting(f_threads=true)
+nmpc_ipopt_mst = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
+nmpc_ipopt_mst = setconstraint!(nmpc_ipopt_mst; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_ipopt_mst.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = TrapezoidalCollocation()
+nmpc_ipopt_tc = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
+nmpc_ipopt_tc = setconstraint!(nmpc_ipopt_tc; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_ipopt_tc.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = TrapezoidalCollocation(f_threads=true)
+nmpc_ipopt_tct = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
+nmpc_ipopt_tct = setconstraint!(nmpc_ipopt_tct; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_ipopt_tct.optim)
+
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 transcription = SingleShooting()
 nmpc_madnlp_ss = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 nmpc_madnlp_ss = setconstraint!(nmpc_madnlp_ss; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_madnlp_ss.optim) 
 
-# TODO: does not work well with MadNLP and MultipleShooting, figure out why. Current theory: 
+# TODO: does not work well with MadNLP and MultipleShooting or TrapezoidalCollocation, 
+# figure out why. Current theory: 
 # MadNLP LBFGS approximation is less robust than Ipopt version. Re-test when exact Hessians
 # will be supported in ModelPredictiveControl.jl. The following attributes kinda work with 
 # the MadNLP LBFGS approximation but super slow (~1000 times slower than Ipopt):
@@ -283,6 +311,21 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["SingleShooting"] =
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($nmpc_ipopt_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["MultipleShooting (threaded)"] =
+    @benchmarkable(
+        sim!($nmpc_ipopt_mst, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation"] =
+    @benchmarkable(
+        sim!($nmpc_ipopt_tc, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation (threaded)"] =
+    @benchmarkable(
+        sim!($nmpc_ipopt_tct, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting"] = 
@@ -316,13 +359,19 @@ empc_ipopt_ms = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, tr
 empc_ipopt_ms = setconstraint!(empc_ipopt_ms; umin, umax)
 JuMP.unset_time_limit_sec(empc_ipopt_ms.optim)
 
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = TrapezoidalCollocation()
+empc_ipopt_tc = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
+empc_ipopt_tc = setconstraint!(empc_ipopt_tc; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_tc.optim)
+
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 transcription = SingleShooting()
 empc_madnlp_ss = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
 empc_madnlp_ss = setconstraint!(empc_madnlp_ss; umin, umax)
 JuMP.unset_time_limit_sec(empc_madnlp_ss.optim)
 
-# TODO: test EMPC with MadNLP and MultipleShooting, see comment above.
+# TODO: test EMPC with MadNLP and MultipleShooting and TrapezoidalCollocation, see comment above.
 
 samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting"] = 
@@ -333,6 +382,11 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting"] =
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($empc_ipopt_ms, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["TrapezoidalCollocation"] =
+    @benchmarkable(
+        sim!($empc_ipopt_tc, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["MadNLP"]["SingleShooting"] = 
@@ -373,8 +427,17 @@ nmpc2_ipopt_ms = NonLinMPC(estim2;
 nmpc2_ipopt_ms = setconstraint!(nmpc2_ipopt_ms; umin, umax)
 JuMP.unset_time_limit_sec(nmpc2_ipopt_ms.optim)
 
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = TrapezoidalCollocation()
+nmpc2_ipopt_tc = NonLinMPC(estim2; 
+    Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=Pmax, optim, transcription
+)
+nmpc2_ipopt_tc = setconstraint!(nmpc2_ipopt_tc; umin, umax)
+JuMP.unset_time_limit_sec(nmpc2_ipopt_tc.optim)
+
 # TODO: test custom constraints with MadNLP and SingleShooting, see comment above.
 # TODO: test custom constraints with MadNLP and MultipleShooting, see comment above.
+# TODO: test custom constraints with MadNLP and TrapezoidalCollocation, see comment above.
 
 samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["SingleShooting"] = 
@@ -385,6 +448,11 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["SingleShooting
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($nmpc2_ipopt_ms, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["TrapezoidalCollocation"] =
+    @benchmarkable(
+        sim!($nmpc2_ipopt_tc, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0),
         samples=samples, evals=evals, seconds=seconds
     )
 

@@ -1,9 +1,9 @@
 """
     get_linearization_func(
-        NT, solver_f!, solver_h!, nu, nx, ny, nd, ns, p, solver, backend
+        NT, f!, h!, Ts, nu, nx, ny, nd, ns, p, solver, backend
     ) -> linfunc!
 
-Return `linfunc!` function that computes Jacobians of `solver_f!` and `solver_h!` functions.
+Return `linfunc!` function that computes Jacobians of `f!` and `h!` functions.
 
 The function has the following signature: 
 ```
@@ -13,12 +13,14 @@ and it should modifies in-place all the arguments before `backend`. The `backend
 is an `AbstractADType` object from `DifferentiationInterface`. The `cst_x`, `cst_u` and 
 `cst_d` are `DifferentiationInterface.Constant` objects with the linearization points.
 """
-function get_linearization_func(NT, solver_f!, solver_h!, nu, nx, ny, nd, p, solver, backend)
-    f_x!(xnext, x, k, u, d) = solver_f!(xnext, k, x, u, d, p)
-    f_u!(xnext, u, k, x, d) = solver_f!(xnext, k, x, u, d, p)
-    f_d!(xnext, d, k, x, u) = solver_f!(xnext, k, x, u, d, p)
-    h_x!(y, x, d) = solver_h!(y, x, d, p)
-    h_d!(y, d, x) = solver_h!(y, x, d, p)
+function get_linearization_func(
+    NT, f!::F, h!::H, Ts, nu, nx, ny, nd, p, solver, backend
+) where {F<:Function, H<:Function}
+    f_x!(xnext, x, k, u, d) = solver_f!(xnext, k, f!, Ts, solver, x, u, d, p)
+    f_u!(xnext, u, k, x, d) = solver_f!(xnext, k, f!, Ts, solver, x, u, d, p)
+    f_d!(xnext, d, k, x, u) = solver_f!(xnext, k, f!, Ts, solver, x, u, d, p)
+    h_x!(y, x, d) = h!(y, x, d, p)
+    h_d!(y, d, x) = h!(y, x, d, p)
     strict  = Val(true)
     xnext = zeros(NT, nx)
     y = zeros(NT, ny)
@@ -155,9 +157,9 @@ julia> linearize!(linmodel, model, x=[20.0], u=[0.0]); linmodel.A
 ```
 """
 function linearize!(
-    linmodel::LinModel{NT}, model::SimModel; 
+    linmodel::LinModel, model::SimModel; 
     x=(model.buffer.x.=model.x0.+model.xop), u=model.uop, d=model.dop
-) where NT<:Real
+)
     nonlinmodel = model
     buffer = nonlinmodel.buffer
     # --- remove the operating points of the nonlinear model (typically zeros) ---
@@ -170,16 +172,19 @@ function linearize!(
     # --- compute the nonlinear model output at operating points ---
     x0next, y0 = linmodel.buffer.x, linmodel.buffer.y
     h!(y0, nonlinmodel, x0, d0, model.p)
-    y  = y0
-    y .= y0 .+ nonlinmodel.yop
+    y0 .+= nonlinmodel.yop
+    y = y0
     # --- compute the nonlinear model next state at operating points ---
     f!(x0next, k0, nonlinmodel, x0, u0, d0, model.p)
-    xnext  = x0next
-    xnext .= x0next .+ nonlinmodel.fop .- nonlinmodel.xop
+    x0next .+= nonlinmodel.fop 
+    xnext = x0next  # xnext = f(x0,u0,d0) + fop - xop + xop = f(x0,u0,d0) + fop
+    # --- recompute x since it was modified in buffer.x ---
+    x0 .+= nonlinmodel.xop
+    x = x0
     # --- modify the linear model operating points ---
     linmodel.uop .= u
-    linmodel.yop .= y
     linmodel.dop .= d
+    linmodel.yop .= y
     linmodel.xop .= x
     linmodel.fop .= xnext
     # --- reset the state of the linear model ---
@@ -188,14 +193,14 @@ function linearize!(
 end
 
 "Call `linfunc!` function to compute the Jacobians of `model` at the linearization point."
-function linearize_core!(linmodel::LinModel, model::SimModel, x0, u0, d0)
-    x0next, y0 = linmodel.buffer.x, linmodel.buffer.y
+function linearize_core!(linmodel::LinModel, model::SimModel, x, u, d)
+    xnext, y = linmodel.buffer.x, linmodel.buffer.y
     A, Bu, C, Bd, Dd = linmodel.A, linmodel.Bu, linmodel.C, linmodel.Bd, linmodel.Dd
-    cst_x = Constant(x0)
-    cst_u = Constant(u0)
-    cst_d = Constant(d0)
+    cst_x = Constant(x)
+    cst_u = Constant(u)
+    cst_d = Constant(d)
     backend = model.jacobian
-    model.linfunc!(x0next, y0, A, Bu, C, Bd, Dd, backend, x0, u0, d0, cst_x, cst_u, cst_d)
+    model.linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d)
     return nothing
 end
 

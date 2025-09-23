@@ -5,7 +5,6 @@ using LinearAlgebra, SparseArrays
 using Random: randn
 
 using RecipesBase
-using ProgressLogging
 
 using DifferentiationInterface: ADTypes.AbstractADType, AutoForwardDiff, AutoSparse
 using DifferentiationInterface: gradient!, jacobian!, prepare_gradient, prepare_jacobian
@@ -13,6 +12,8 @@ using DifferentiationInterface: value_and_gradient!, value_and_jacobian!
 using DifferentiationInterface: Constant, Cache
 using SparseConnectivityTracer: TracerSparsityDetector
 using SparseMatrixColorings: GreedyColoringAlgorithm, sparsity_pattern
+
+import ProgressLogging
 
 import ForwardDiff
 
@@ -39,7 +40,7 @@ export MovingHorizonEstimator
 export ManualEstimator
 export default_nint, initstate!
 export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
-export TranscriptionMethod, SingleShooting, MultipleShooting
+export TranscriptionMethod, SingleShooting, MultipleShooting, TrapezoidalCollocation
 export SimResult, getinfo, sim!
 
 include("general.jl")

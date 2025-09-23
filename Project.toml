@@ -1,7 +1,7 @@
 name = "ModelPredictiveControl"
 uuid = "61f9bdb8-6ae4-484a-811f-bbf86720c31c"
 authors = ["Francis Gagnon"]
-version = "1.8.2"
+version = "1.11.0"
 
 [deps]
 ControlSystemsBase = "aaaaaaaa-a6ca-5380-bf3e-84a91bcd477e"
@@ -21,7 +21,7 @@ SparseConnectivityTracer = "9f842d2f-2579-4b1d-911e-f412cf18a3f5"
 SparseMatrixColorings = "0a514795-09f3-496d-8182-132a7b665d35"
 
 [compat]
-ControlSystemsBase = "1.9"
+ControlSystemsBase = "1.18.2"
 DAQP = "0.6, 0.7.1"
 DifferentiationInterface = "0.6.45, 0.7"
 Documenter = "1"

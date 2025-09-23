@@ -75,6 +75,14 @@ init_diffstructure(A::AbstractMatrix)= Tuple.(CartesianIndices(A))[:]
 diffmat2vec!(v::AbstractVector, A::AbstractSparseMatrix)    = v   .= nonzeros(A)
 diffmat2vec!(v::AbstractVector, A::AbstractMatrix)          = v[:] = A
 
+backend_str(backend::AbstractADType) = string(nameof(typeof(backend)))
+function backend_str(backend::AutoSparse)
+    str =   "AutoSparse ($(nameof(typeof(backend.dense_ad))),"*
+            " $(nameof(typeof(backend.sparsity_detector))),"*
+            " $(nameof(typeof(backend.coloring_algorithm))))"
+    return str
+end
+
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
 
@@ -128,4 +136,26 @@ function inv!(A::Hermitian{<:Real, <:AbstractMatrix})
     invA = inv(Achol)
     A .= Hermitian(invA, :L)
     return A
+end
+
+"Add `Threads.@threads` to a `for` loop if `flag==true`, else leave the loop as is."
+macro threadsif(flag, expr)
+    quote
+        if $(flag)
+            Threads.@threads $expr
+        else
+            $expr
+        end
+    end |> esc
+end
+
+"Add `ProgressLogging.@progress` with the name `name`  to a `for` loop if `flag==true`"
+macro progressif(flag, name, expr)
+    quote
+        if $(flag)
+            ProgressLogging.@progress $name $expr
+        else
+            $expr
+        end
+    end |> esc
 end

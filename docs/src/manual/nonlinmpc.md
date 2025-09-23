@@ -119,8 +119,10 @@ umin, umax = [-1.5], [+1.5]
 nmpc = setconstraint!(nmpc; umin, umax)
 ```
 
-The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. We test `mpc`
-performance on `plant` by imposing an angular setpoint of 180° (inverted position):
+The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. By default,
+[`NonLinMPC`](@ref) controllers use [`Ipopt`](https://coin-or.github.io/Ipopt/) and a direct
+[`SingleShooting`](@ref) transcription method to solve the optimal control problem. We test
+`mpc` performance on `plant` by imposing an angular setpoint of 180° (inverted position):
 
 ```@example man_nonlin
 using JuMP; unset_time_limit_sec(nmpc.optim) # hide
@@ -394,7 +396,27 @@ savefig("plot10_NonLinMPC.svg"); nothing # hide
 
 ![plot10_NonLinMPC](plot10_NonLinMPC.svg)
 
-The closed-loop performance is still lower than the nonlinear controller, as expected, but
+Additionally, similar results are obtained by using a sparse [`MultipleShooting`](@ref)
+transcription, which is known to be more robust for unstable systems, with a solver that can
+explicilty handle sparsity like the default `OSQP`:
+
+```@example man_nonlin
+mpc_ms = LinMPC(skf; Hp, Hc, Mwt, Nwt, Cwt=Inf, transcription=MultipleShooting())
+mpc_ms = setconstraint!(mpc_ms, umin=[-1.5], umax=[+1.5])
+```
+
+Superimposing the previous disturbance rejection to the newer one gives almost identical
+results:
+
+```@example man_nonlin
+res_ms = sim!(mpc_ms, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
+plot!(res_ms)
+savefig("plot10b_NonLinMPC.svg"); nothing # hide
+```
+
+![plot10b_NonLinMPC](plot10b_NonLinMPC.svg)
+
+The closed-loop performances are still lower than the nonlinear controller, as expected, but
 computations are about 210 times faster (0.000071 s versus 0.015 s per time steps, on
 average). However, remember that `linmodel` is only valid for angular positions near 180°.
 For example, the 180° setpoint response from 0° is unsatisfactory since the predictions are

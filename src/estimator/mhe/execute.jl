@@ -79,7 +79,7 @@ following fields:
     Fields with *`emphasis`* are non-Unicode alternatives.
 
 - `:Ŵ` or *`:What`* : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``
-- `:ϵ` or *`:epsilon`* : optimal slack variable, ``ϵ``
+- `:ε` or *`:epsilon`* : optimal slack variable, ``ε``
 - `:X̂` or *`:Xhat`* : optimal estimated states over ``N_k+1``, ``\mathbf{X̂}``
 - `:x̂` or *`:xhat`* : optimal estimated state, ``\mathbf{x̂}_k(k+p)``
 - `:V̂` or *`:Vhat`* : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``
@@ -110,12 +110,12 @@ julia> round.(getinfo(estim)[:Ŷ], digits=3)
 function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, buffer, Nk = estim.model, estim.buffer, estim.Nk[]
     nu, ny, nd = model.nu, model.ny, model.nd
-    nx̂, nym, nŵ, nϵ = estim.nx̂, estim.nym, estim.nx̂, estim.nϵ
-    nx̃ = nϵ + nx̂
+    nx̂, nym, nŵ, nε = estim.nx̂, estim.nym, estim.nx̂, estim.nε
+    nx̃ = nε + nx̂
     info = Dict{Symbol, Any}()
     V̂,  X̂0 = similar(estim.Y0m[1:nym*Nk]), similar(estim.X̂0[1:nx̂*Nk])
     û0, k0, ŷ0 = buffer.û, buffer.k, buffer.ŷ
-    V̂,  X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, estim.Z̃)
+    V̂,  X̂0 = predict_mhe!(V̂, X̂0, û0, k0, ŷ0, estim, model, estim.Z̃)
     x̂0arr  = @views estim.Z̃[nx̃-nx̂+1:nx̃]
     x̄ = estim.x̂0arr_old - x̂0arr
     X̂0 = [x̂0arr; X̂0]
@@ -137,7 +137,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     end
     info[:Ŵ] = estim.Ŵ[1:Nk*nŵ]
     info[:x̂arr] = x̂0arr + estim.x̂op
-    info[:ϵ]  = nϵ ≠ 0 ? estim.Z̃[begin] : zero(NT)
+    info[:ε]  = nε ≠ 0 ? estim.Z̃[begin] : zero(NT)
     info[:J]  = obj_nonlinprog!(x̄, estim, estim.model, V̂, estim.Z̃)
     info[:X̂]  = X̂0       .+ @views [estim.x̂op; estim.X̂op[1:nx̂*Nk]]
     info[:x̂]  = estim.x̂0 .+ estim.x̂op
@@ -153,7 +153,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     # --- non-Unicode fields ---
     info[:What] = info[:Ŵ]
     info[:xhatarr] = info[:x̂arr]
-    info[:epsilon] = info[:ϵ]
+    info[:epsilon] = info[:ε]
     info[:Xhat] = info[:X̂]
     info[:xhat] = info[:x̂]
     info[:Vhat] = info[:V̂]
@@ -161,16 +161,18 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:xbar] = info[:x̄]
     info[:Yhat] = info[:Ŷ]
     info[:Yhatm] = info[:Ŷm]
+    # --- deprecated fields ---
+    info[:ϵ] = info[:ε]
     return info
 end
 
 """
-    getϵ(estim::MovingHorizonEstimator, Z̃) -> ϵ
+    getε(estim::MovingHorizonEstimator, Z̃) -> ε
 
-Get the slack `ϵ` from the decision vector `Z̃` if present, otherwise return 0.
+Get the slack `ε` from the decision vector `Z̃` if present, otherwise return 0.
 """
-function getϵ(estim::MovingHorizonEstimator, Z̃::AbstractVector{NT}) where NT<:Real
-    return estim.nϵ ≠ 0 ? Z̃[begin] : zero(NT)
+function getε(estim::MovingHorizonEstimator, Z̃::AbstractVector{NT}) where NT<:Real
+    return estim.nε ≠ 0 ? Z̃[begin] : zero(NT)
 end
 
 """
@@ -230,7 +232,7 @@ also inits `estim.optim` objective function, expressed as the quadratic general 
 ```math
     J = \min_{\mathbf{Z̃}} \frac{1}{2}\mathbf{Z̃' H̃ Z̃} + \mathbf{q̃' Z̃} + r 
 ```
-in which ``\mathbf{Z̃} = [\begin{smallmatrix} ϵ \\ \mathbf{Z} \end{smallmatrix}]``. Note that
+in which ``\mathbf{Z̃} = [\begin{smallmatrix} ε \\ \mathbf{Z} \end{smallmatrix}]``. Note that
 ``r`` is useless at optimization but required to evaluate the objective minima ``J``. The 
 Hessian ``\mathbf{H̃}`` matrix of the quadratic general form is not constant here because
 of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
@@ -251,9 +253,9 @@ of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
 function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     invP̄, invQ̂_He, invR̂_He = estim.cov.invP̄, estim.cov.invQ̂_He, estim.cov.invR̂_He
     F, C, optim = estim.F, estim.C, estim.optim
-    nx̂, nŵ, nym, nϵ, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nϵ, estim.Nk[]
+    nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
     nYm, nŴ = nym*Nk, nŵ*Nk
-    nZ̃ = nϵ + nx̂ + nŴ
+    nZ̃ = nε + nx̂ + nŴ
     # --- update F and fx̄ vectors for MHE predictions ---
     F .= estim.Y0m .+ estim.B
     mul!(F, estim.G, estim.U0, 1, 1)
@@ -266,7 +268,7 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     FZ̃ = @views [estim.fx̄; estim.F[1:nYm]]
     invQ̂_Nk, invR̂_Nk = @views invQ̂_He[1:nŴ, 1:nŴ], invR̂_He[1:nYm, 1:nYm]
     M_Nk = [invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
-    Ñ_Nk = [fill(C, nϵ, nϵ) zeros(nϵ, nx̂+nŴ); zeros(nx̂, nϵ+nx̂+nŴ); zeros(nŴ, nϵ+nx̂) invQ̂_Nk]
+    Ñ_Nk = [fill(C, nε, nε) zeros(nε, nx̂+nŴ); zeros(nx̂, nε+nx̂+nŴ); zeros(nŴ, nε+nx̂) invQ̂_Nk]
     M_Nk_ẼZ̃ = M_Nk*ẼZ̃
     @views mul!(estim.q̃[1:nZ̃], M_Nk_ẼZ̃', FZ̃)
     @views lmul!(2, estim.q̃[1:nZ̃])
@@ -374,8 +376,8 @@ If first warm-starts the solver with [`set_warmstart_mhe!`](@ref). It then calls
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim, buffer = estim.model, estim.optim, estim.buffer
-    nym, nx̂, nŵ, nϵ, Nk = estim.nym, estim.nx̂, estim.nx̂, estim.nϵ, estim.Nk[]
-    nx̃ = nϵ + nx̂
+    nym, nx̂, nŵ, nε, Nk = estim.nym, estim.nx̂, estim.nx̂, estim.nε, estim.Nk[]
+    nx̃ = nε + nx̂
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     V̂   = Vector{NT}(undef, nym*Nk)     # TODO: remove this allocation
     X̂0  = Vector{NT}(undef, nx̂*Nk)      # TODO: remove this allocation
@@ -418,7 +420,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     # --------- update estimate -----------------------
     û0, ŷ0, k0 = buffer.û, buffer.ŷ, buffer.k
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
-    V̂, X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, estim.Z̃)
+    V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k0, ŷ0, estim, model, estim.Z̃)
     x̂0next    = @views X̂0[end-nx̂+1:end] 
     estim.x̂0 .= x̂0next
     return estim.Z̃
@@ -433,7 +435,7 @@ If supported by `estim.optim`, it warm-starts the solver at:
 ```math
 \mathbf{Z̃_s} = 
 \begin{bmatrix}
-    ϵ_{k-1}                         \\
+    ε_{k-1}                         \\
     \mathbf{x̂}_{k-1}(k-N_k+p)       \\ 
     \mathbf{ŵ}_{k-1}(k-N_k+p+0)     \\ 
     \mathbf{ŵ}_{k-1}(k-N_k+p+1)     \\ 
@@ -442,7 +444,7 @@ If supported by `estim.optim`, it warm-starts the solver at:
     \mathbf{0}                      \\
 \end{bmatrix}
 ```
-where ``ϵ(k-1)``, ``\mathbf{x̂}_{k-1}(k-N_k+p)`` and ``\mathbf{ŵ}_{k-1}(k-j)`` are
+where ``ε(k-1)``, ``\mathbf{x̂}_{k-1}(k-N_k+p)`` and ``\mathbf{ŵ}_{k-1}(k-j)`` are
 respectively the slack variable, the arrival state estimate and the process noise estimates
 computed at the last time step ``k-1``. If the objective function is not finite at this
 point, all the process noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. The
@@ -450,18 +452,18 @@ method mutates all the arguments.
 """
 function set_warmstart_mhe!(V̂, X̂0, estim::MovingHorizonEstimator{NT}, Z̃var) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nϵ, nx̂, nŵ, nZ̃, Nk = estim.nϵ, estim.nx̂, estim.nx̂, length(estim.Z̃), estim.Nk[]
-    nx̃ = nϵ + nx̂
+    nε, nx̂, nŵ, nZ̃, Nk = estim.nε, estim.nx̂, estim.nx̂, length(estim.Z̃), estim.Nk[]
+    nx̃ = nε + nx̂
     Z̃s  = Vector{NT}(undef, nZ̃)  # TODO: remove this allocation
     û0, ŷ0, x̄, k0 = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
-    # --- slack variable ϵ ---
-    estim.nϵ == 1 && (Z̃s[begin] = estim.Z̃[begin])
+    # --- slack variable ε ---
+    estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
     # --- arrival state estimate x̂0arr ---
-    Z̃s[nϵ+1:nx̃] = estim.x̂0arr_old
+    Z̃s[nε+1:nx̃] = estim.x̂0arr_old
     # --- process noise estimates Ŵ ---
     Z̃s[nx̃+1:end] = estim.Ŵ
     # verify definiteness of objective function:
-    V̂, X̂0 = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, Z̃s)
+    V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k0, ŷ0, estim, model, Z̃s)
     Js = obj_nonlinprog!(x̄, estim, model, V̂, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+1:end] = 0
@@ -568,39 +570,53 @@ The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This me
 function obj_nonlinprog!(
     x̄, estim::MovingHorizonEstimator, ::SimModel, V̂, Z̃::AbstractVector{NT}
 ) where NT<:Real
-    nϵ, Nk = estim.nϵ, estim.Nk[] 
+    nε, Nk = estim.nε, estim.Nk[] 
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.cov.invP̄
-    nx̃ = nϵ + nx̂
+    nx̃ = nε + nx̂
     invQ̂_Nk, invR̂_Nk = @views estim.cov.invQ̂_He[1:nŴ, 1:nŴ], estim.cov.invR̂_He[1:nYm, 1:nYm]
     x̂0arr, Ŵ, V̂ = @views Z̃[nx̃-nx̂+1:nx̃], Z̃[nx̃+1:nx̃+nŴ], V̂[1:nYm]
     x̄ .= estim.x̂0arr_old .- x̂0arr
-    Jϵ = nϵ ≠ 0 ? estim.C*Z̃[begin]^2 : zero(NT)
-    return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jϵ
+    Jε = nε ≠ 0 ? estim.C*Z̃[begin]^2 : zero(NT)
+    return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jε
 end
 
-"""
-    predict!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂0
+@doc raw"""
+    predict_mhe!(V̂, X̂0, _, _, _, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂0
 
 Compute the `V̂` vector and `X̂0` vectors for the `MovingHorizonEstimator` and `LinModel`.
 
-The function mutates `V̂`, `X̂0`, `û0` and `ŷ0` vector arguments. The vector `V̂` is the
-estimated sensor noises from ``k-N_k+1`` to ``k``. The `X̂0` vector is estimated states from 
-``k-N_k+2`` to ``k+1``.
+The function mutates `V̂` and `X̂0` vector arguments. The vector `V̂` is the estimated sensor
+noises from ``k-N_k+1`` to ``k``. The `X̂0` vector is estimated states from ``k-N_k+2`` to 
+``k+1``. The computations are (by truncating the matrices when `N_k < H_e`):
+```math
+\begin{aligned}
+\mathbf{V̂}   &= \mathbf{Ẽ Z̃}   + \mathbf{F}     \\
+\mathbf{X̂_0} &= \mathbf{Ẽ_x̂ Z̃} + \mathbf{F_x̂}
+\end{aligned}
+```
 """
-function predict!(V̂, X̂0, _ , _ , _ , estim::MovingHorizonEstimator, ::LinModel, Z̃) 
-    nϵ, Nk = estim.nϵ, estim.Nk[]
+function predict_mhe!(V̂, X̂0, _ , _ , _ , estim::MovingHorizonEstimator, ::LinModel, Z̃) 
+    nε, Nk = estim.nε, estim.Nk[]
     nX̂, nŴ, nYm = estim.nx̂*Nk, estim.nx̂*Nk, estim.nym*Nk
-    nZ̃ = nϵ + estim.nx̂ + nŴ
+    nZ̃ = nε + estim.nx̂ + nŴ
     V̂[1:nYm] .= @views estim.Ẽ[1:nYm, 1:nZ̃]*Z̃[1:nZ̃]     + estim.F[1:nYm]
     X̂0[1:nX̂] .= @views estim.con.Ẽx̂[1:nX̂, 1:nZ̃]*Z̃[1:nZ̃] + estim.con.Fx̂[1:nX̂]
     return V̂, X̂0
 end
 
-"Compute the two vectors when `model` is not a `LinModel`."
-function predict!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, model::SimModel, Z̃)
-    nϵ, Nk = estim.nϵ, estim.Nk[]
+@doc raw"""
+    predict_mhe!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, model::SimModel, Z̃) -> V̂, X̂0
+
+Compute the vectors when `model` is *not* a [`LinModel`](@ref).
+
+The function mutates `V̂`, `X̂0`, `û0` and `ŷ0` vector arguments. The augmented model of
+[`f̂!`](@ref) and [`ĥ!`](@ref) is called recursively in a `for` loop from ``j=1`` to ``N_k``,
+and by adding the estimated process noise ``\mathbf{ŵ}``.
+"""
+function predict_mhe!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, model::SimModel, Z̃)
+    nε, Nk = estim.nε, estim.Nk[]
     nu, nd, nx̂, nŵ, nym = model.nu, model.nd, estim.nx̂, estim.nx̂, estim.nym
-    nx̃ = nϵ + nx̂
+    nx̃ = nε + nx̂
     x̂0 = @views Z̃[nx̃-nx̂+1:nx̃]
     if estim.direct
         ŷ0next = ŷ0
@@ -610,7 +626,7 @@ function predict!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, mode
             ŵ   = @views Z̃[(1 + nx̃ + nŵ*(j-1)):(nx̃ + nŵ*j)]
             x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
             f̂!(x̂0next, û0, k0, estim, model, x̂0, u0, d0)
-            x̂0next .+= ŵ .+ estim.f̂op .- estim.x̂op
+            x̂0next .+= ŵ
             y0nextm = @views estim.Y0m[(1 + nym * (j-1)):(nym*j)]
             d0next  = @views estim.D0[(1 + nd*j):(nd*(j+1))]
             ĥ!(ŷ0next, estim, model, x̂0next, d0next)
@@ -629,7 +645,7 @@ function predict!(V̂, X̂0, û0, k0, ŷ0, estim::MovingHorizonEstimator, mode
             V̂[(1 + nym*(j-1)):(nym*j)] .= y0m .- ŷ0m
             x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
             f̂!(x̂0next, û0, k0, estim, model, x̂0, u0, d0)
-            x̂0next .+= ŵ .+ estim.f̂op .- estim.x̂op
+            x̂0next .+= ŵ
             x̂0 = x̂0next
         end
     end
@@ -646,18 +662,18 @@ The method mutates all the arguments before `estim` argument.
 """
 function update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim::MovingHorizonEstimator, Z̃)
     model = estim.model
-    V̂, X̂0  = predict!(V̂, X̂0, û0, k0, ŷ0, estim, model, Z̃)
-    ϵ = getϵ(estim, Z̃)
-    g = con_nonlinprog!(g, estim, model, X̂0, V̂, ϵ)
+    V̂, X̂0  = predict_mhe!(V̂, X̂0, û0, k0, ŷ0, estim, model, Z̃)
+    ε = getε(estim, Z̃)
+    g = con_nonlinprog_mhe!(g, estim, model, X̂0, V̂, ε)
     return nothing
 end
 
 """
-    con_nonlinprog!(g, estim::MovingHorizonEstimator, model::SimModel, X̂0, V̂, ϵ)
+    con_nonlinprog_mhe!(g, estim::MovingHorizonEstimator, model::SimModel, X̂0, V̂, ε) -> g
 
-Nonlinear constrains for [`MovingHorizonEstimator`](@ref).
+Compute nonlinear constrains `g` in-place for [`MovingHorizonEstimator`](@ref).
 """
-function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂0, V̂, ϵ)
+function con_nonlinprog_mhe!(g, estim::MovingHorizonEstimator, ::SimModel, X̂0, V̂, ε)
     nX̂con, nX̂ = length(estim.con.X̂0min), estim.nx̂ *estim.Nk[]
     nV̂con, nV̂ = length(estim.con.V̂min),  estim.nym*estim.Nk[]
     for i in eachindex(g)
@@ -665,26 +681,26 @@ function con_nonlinprog!(g, estim::MovingHorizonEstimator, ::SimModel, X̂0, V̂
         if i ≤ nX̂con
             j = i
             jcon = nX̂con-nX̂+j
-            g[i] = j > nX̂ ? 0 : estim.con.X̂0min[jcon] - X̂0[j] - ϵ*estim.con.C_x̂min[jcon]
+            g[i] = j > nX̂ ? 0 : estim.con.X̂0min[jcon] - X̂0[j] - ε*estim.con.C_x̂min[jcon]
         elseif i ≤ 2nX̂con
             j = i - nX̂con
             jcon = nX̂con-nX̂+j
-            g[i] = j > nX̂ ? 0 : X̂0[j] - estim.con.X̂0max[jcon] - ϵ*estim.con.C_x̂max[jcon]
+            g[i] = j > nX̂ ? 0 : X̂0[j] - estim.con.X̂0max[jcon] - ε*estim.con.C_x̂max[jcon]
         elseif i ≤ 2nX̂con + nV̂con
             j = i - 2nX̂con
             jcon = nV̂con-nV̂+j
-            g[i] = j > nV̂ ? 0 : estim.con.V̂min[jcon] - V̂[j] - ϵ*estim.con.C_v̂min[jcon]
+            g[i] = j > nV̂ ? 0 : estim.con.V̂min[jcon] - V̂[j] - ε*estim.con.C_v̂min[jcon]
         else
             j = i - 2nX̂con - nV̂con
             jcon = nV̂con-nV̂+j
-            g[i] = j > nV̂ ? 0 : V̂[j] - estim.con.V̂max[jcon] - ϵ*estim.con.C_v̂max[jcon]
+            g[i] = j > nV̂ ? 0 : V̂[j] - estim.con.V̂max[jcon] - ε*estim.con.C_v̂max[jcon]
         end
     end
     return g
 end
 
 "No nonlinear constraints if `model` is a [`LinModel`](@ref), return `g` unchanged."
-con_nonlinprog!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , _ ) = g
+con_nonlinprog_mhe!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , _ ) = g
 
 "Throw an error if P̂ != nothing."
 function setstate_cov!(::MovingHorizonEstimator, P̂)
@@ -697,7 +713,7 @@ function setmodel_estimator!(
     estim::MovingHorizonEstimator, model, uop_old, yop_old, dop_old, Q̂, R̂
 )
     con = estim.con
-    nx̂, nym, nu, nd, He, nϵ = estim.nx̂, estim.nym, model.nu, model.nd, estim.He, estim.nϵ
+    nx̂, nym, nu, nd, He, nε = estim.nx̂, estim.nym, model.nu, model.nd, estim.He, estim.nε
     As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
     Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
     # --- update augmented state-space matrices ---
@@ -721,8 +737,8 @@ function setmodel_estimator!(
         estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, 
         estim.x̂op, estim.f̂op, p
     )
-    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nϵ, con.C_x̂min, con.C_x̂max, Ex̂)   
-    A_V̂min, A_V̂max, Ẽ  = relaxV̂(model, nϵ, con.C_v̂min, con.C_v̂max, E) 
+    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nε, con.C_x̂min, con.C_x̂max, Ex̂)   
+    A_V̂min, A_V̂max, Ẽ  = relaxV̂(model, nε, con.C_v̂min, con.C_v̂max, E) 
     estim.Ẽ .= Ẽ
     estim.G .= G
     estim.J .= J
@@ -787,10 +803,10 @@ function setmodel_estimator!(
         estim.D0[(1+nd*(i-1)):(nd*i)]    .-= model.dop
     end
     estim.lastu0        .+= uop_old
-    estim.Z̃[nϵ+1:nϵ+nx̂] .+= x̂op_old
+    estim.Z̃[nε+1:nε+nx̂] .+= x̂op_old
     estim.x̂0arr_old     .+= x̂op_old
     estim.lastu0        .-= model.uop
-    estim.Z̃[nϵ+1:nϵ+nx̂] .-= x̂op
+    estim.Z̃[nε+1:nε+nx̂] .-= x̂op
     estim.x̂0arr_old     .-= x̂op
     # --- covariance matrices ---
     if !isnothing(Q̂)

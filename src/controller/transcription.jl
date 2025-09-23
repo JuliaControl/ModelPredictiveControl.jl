@@ -1,9 +1,12 @@
 """
 Abstract supertype of all transcription methods of [`PredictiveController`](@ref).
 
-The module currently supports [`SingleShooting`](@ref) and [`MultipleShooting`](@ref).
+The module currently supports [`SingleShooting`](@ref), [`MultipleShooting`](@ref) and
+[`TrapezoidalCollocation`](@ref) transcription methods.
 """
 abstract type TranscriptionMethod end
+abstract type ShootingMethod    <: TranscriptionMethod end
+abstract type CollocationMethod <: TranscriptionMethod end
 
 @doc raw"""
     SingleShooting()
@@ -19,13 +22,16 @@ any custom move blocking):
     \vdots                          \\ 
     \mathbf{Δu}(k+H_c-1)            \end{bmatrix}
 ```
-This method is generally more efficient for small control horizon ``H_c``, stable and mildly
-nonlinear plant model/constraints.
+This method computes the predictions by calling the augmented discrete-time model
+recursively over the prediction horizon ``H_p`` in the objective function, or by updating
+the linear coefficients of the quadratic optimization for [`LinModel`](@ref). It is 
+generally  more efficient for small control horizon ``H_c``, stable and mildly nonlinear
+plant model/constraints.
 """
-struct SingleShooting <: TranscriptionMethod end
+struct SingleShooting <: ShootingMethod end
 
 @doc raw"""
-    MultipleShooting()
+    MultipleShooting(; f_threads=false, h_threads=false)
 
 Construct a direct multiple shooting [`TranscriptionMethod`](@ref).
 
@@ -45,21 +51,92 @@ operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
 where ``\mathbf{x̂}_i(k+j)`` is the state prediction for time ``k+j``, estimated by the
 observer at time ``i=k`` or ``i=k-1`` depending on its `direct` flag. Note that 
 ``\mathbf{X̂_0 = X̂}`` if the operating point is zero, which is typically the case in practice
-for [`NonLinModel`](@ref). This transcription method is generally more efficient for large
-control horizon ``H_c``, unstable or highly nonlinear plant models/constraints. 
+for [`NonLinModel`](@ref). 
+    
+This transcription computes the predictions by calling the augmented discrete-time model
+in the equality constraint function recursively over ``H_p``, or by updating the linear
+equality constraint vector for [`LinModel`](@ref). It is generally more efficient for large
+control horizon ``H_c``, unstable or highly nonlinear models/constraints. Multithreading
+with `f_threads` or `h_threads` keyword arguments can be advantageous if ``\mathbf{f}`` or 
+``\mathbf{h}`` in the [`NonLinModel`](@ref) is expensive to evaluate, respectively.
 
 Sparse optimizers like `OSQP` or `Ipopt` and sparse Jacobian computations are recommended
 for this transcription method.
 """
-struct MultipleShooting <: TranscriptionMethod end
+struct MultipleShooting <: ShootingMethod 
+    f_threads::Bool
+    h_threads::Bool
+    function MultipleShooting(; f_threads=false, h_threads=false)
+        return new(f_threads, h_threads)
+    end
+end
+
+@doc raw"""
+    TrapezoidalCollocation(h::Int=0; f_threads=false, h_threads=false)
+
+Construct an implicit trapezoidal [`TranscriptionMethod`](@ref) with `h`th order hold.
+
+This is the simplest collocation method. It supports continuous-time [`NonLinModel`](@ref)s
+only. The decision variables are the same as for [`MultipleShooting`](@ref), hence similar
+computational costs. See the same docstring for descriptions of `f_threads` and `h_threads`
+keywords. The `h` argument is `0` or `1`, for piecewise constant or linear manipulated 
+inputs ``\mathbf{u}`` (`h=1` is slightly less expensive). Note that the various [`DiffSolver`](@ref) 
+here assume zero-order hold, so `h=1` will induce a plant-model  mismatch if the plant is
+simulated with these solvers. 
+
+This transcription computes the predictions by calling the continuous-time model in the
+equality constraint function and by using the implicit trapezoidal rule. It can handle
+moderately stiff systems and is A-stable. Note that the built-in [`StateEstimator`](@ref)
+will still use the `solver` provided at the construction of the [`NonLinModel`](@ref) to
+estimate the plant states, not the trapezoidal rule (see `supersample` option of 
+[`RungeKutta`](@ref) for stiff systems). See Extended Help for more details.
+
+Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
+transcription method.
+
+# Extended Help
+!!! details "Extended Help"
+    Note that the stochastic model of the unmeasured disturbances is strictly discrete-time,
+    as described in [`ModelPredictiveControl.init_estimstoch`](@ref). Collocation methods
+    require continuous-time dynamics. Because of this, the stochastic states are transcribed
+    separately using a [`MultipleShooting`](@ref) method. See [`con_nonlinprogeq!`](@ref)
+    for more details.
+"""
+struct TrapezoidalCollocation <: CollocationMethod
+    h::Int
+    nc::Int
+    f_threads::Bool
+    h_threads::Bool
+    function TrapezoidalCollocation(h::Int=0; f_threads=false, h_threads=false)
+        if !(h == 0 || h == 1)
+            throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
+        end
+        nc = 2 # 2 collocation points per interval for trapezoidal rule
+        return new(h, nc, f_threads, h_threads)
+    end
+end
+
+function validate_transcription(::LinModel, ::CollocationMethod)
+    throw(ArgumentError("Collocation methods are not supported for LinModel."))
+    return nothing
+end
+function validate_transcription(::NonLinModel{<:Real, <:EmptySolver}, ::CollocationMethod)
+    throw(ArgumentError("Collocation methods require continuous-time NonLinModel."))
+    return nothing
+end
+validate_transcription(::SimModel, ::TranscriptionMethod) = nothing
 
 "Get the number of elements in the optimization decision vector `Z`."
 function get_nZ(estim::StateEstimator, ::SingleShooting, Hp, Hc)
     return estim.model.nu*Hc
 end
-function get_nZ(estim::StateEstimator, ::MultipleShooting, Hp, Hc)
+function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
+
+"Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
+get_nk(model::SimModel, ::ShootingMethod) = model.nk
+get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.nc
 
 @doc raw"""
     init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
@@ -93,7 +170,7 @@ function init_ZtoΔU(
 end
 
 function init_ZtoΔU(
-    estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
+    estim::StateEstimator{NT}, ::TranscriptionMethod, Hp, Hc
 ) where {NT<:Real}
     I_nu_Hc = sparse(Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc))
     PΔu = [I_nu_Hc spzeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
@@ -167,9 +244,11 @@ function init_ZtoU(
     return Pu, Tu
 end
 
-init_PUmat( _ , ::SingleShooting, _ , _ , PuDagger) = PuDagger
+function init_PUmat(_,::SingleShooting,_,_,PuDagger::AbstractMatrix{NT}) where NT<:Real
+    return PuDagger
+end
 function init_PUmat(
-    estim, ::MultipleShooting, Hp, _ , PuDagger::AbstractMatrix{NT}
+    estim, ::TranscriptionMethod, Hp, _ , PuDagger::AbstractMatrix{NT}
 ) where NT<:Real
     return [PuDagger spzeros(NT, estim.model.nu*Hp, estim.nx̂*Hp)]
 end
@@ -389,10 +468,30 @@ function init_predmat(
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
-@doc raw"""
-    init_predmat(model::SimModel, estim, transcription::MultipleShooting, Hp, Hc)
+"""
+    init_predmat(model::NonLinModel, estim, transcription::SingleShooting, Hp, Hc) 
 
-Return the terminal state matrices for [`SimModel`](@ref) and [`MultipleShooting`](@ref).
+Return empty matrices for [`SingleShooting`](@ref) of [`NonLinModel`](@ref)
+"""
+function init_predmat(
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
+) where {NT<:Real}
+    nu, nx̂, nd = model.nu, estim.nx̂, model.nd
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    E  = zeros(NT, 0, nZ)
+    G  = zeros(NT, 0, nd)
+    J  = zeros(NT, 0, nd*Hp)
+    K  = zeros(NT, 0, nx̂)
+    V  = zeros(NT, 0, nu)
+    B  = zeros(NT, 0)
+    ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V, B
+    return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
+end
+
+@doc raw"""
+    init_predmat(model::NonLinModel, estim, transcription::TranscriptionMethod, Hp, Hc)
+
+Return the terminal state matrices for [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
 
 The output prediction matrices are all empty matrices. The terminal state matrices are
 given in the Extended Help section.
@@ -403,7 +502,7 @@ given in the Extended Help section.
     for ``\mathbf{e_x̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``
 """
 function init_predmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::MultipleShooting, Hp, Hc
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -419,26 +518,6 @@ function init_predmat(
     kx̂ = zeros(NT, nx̂, nx̂)
     vx̂ = zeros(NT, nx̂, nu)
     bx̂ = zeros(NT, nx̂)
-    return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
-end
-
-"""
-    init_predmat(model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc) 
-
-Return empty matrices for all other cases.
-"""
-function init_predmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
-) where {NT<:Real}
-    nu, nx̂, nd = model.nu, estim.nx̂, model.nd
-    nZ = get_nZ(estim, transcription, Hp, Hc)
-    E  = zeros(NT, 0, nZ)
-    G  = zeros(NT, 0, nd)
-    J  = zeros(NT, 0, nd*Hp)
-    K  = zeros(NT, 0, nx̂)
-    V  = zeros(NT, 0, nu)
-    B  = zeros(NT, 0)
-    ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = E, G, J, K, V, B
     return E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 end
 
@@ -579,26 +658,6 @@ function init_matconstraint_mpc(
     return i_b, i_g, A, Aeq, neq
 end
 
-"Init `i_b` without output constraints if `NonLinModel` and not `SingleShooting`."
-function init_matconstraint_mpc(
-    ::NonLinModel{NT}, ::TranscriptionMethod, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
-    args...
-) where {NT<:Real}
-    if isempty(args)
-        A, Aeq, neq = nothing, nothing, nothing
-    else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
-        Aeq = A_ŝ
-        nΔŨ, nZ̃ = size(A_ΔŨmin)
-        neq = nZ̃ - nΔŨ
-    end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_x̂min; i_x̂max]
-    i_g = [i_Ymin; i_Ymax; trues(nc)]
-    return i_b, i_g, A, Aeq, neq
-end
-
 "Init `i_b` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
 function init_matconstraint_mpc(
     ::NonLinModel{NT}, ::SingleShooting, nc::Int,
@@ -608,13 +667,33 @@ function init_matconstraint_mpc(
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ , A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
         Aeq = A_ŝ
         neq = 0
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
+    return i_b, i_g, A, Aeq, neq
+end
+
+"Init `i_b` without output constraints if `NonLinModel` and other `TranscriptionMethod`."
+function init_matconstraint_mpc(
+    ::NonLinModel{NT}, ::TranscriptionMethod, nc::Int,
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    args...
+) where {NT<:Real}
+    if isempty(args)
+        A, Aeq, neq = nothing, nothing, nothing
+    else    
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_x̂min; A_x̂max]
+        Aeq = A_ŝ
+        nΔŨ, nZ̃ = size(A_ΔŨmin)
+        neq = nZ̃ - nΔŨ
+    end
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_x̂min; i_x̂max]
+    i_g = [i_Ymin; i_Ymax; trues(nc)]
     return i_b, i_g, A, Aeq, neq
 end
 
@@ -644,63 +723,6 @@ function init_nonlincon!(
                 optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
             )
         end
-    end
-    return nothing
-end
-
-"""
-    init_nonlincon!(
-        mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
-        gfuncs,   ∇gfuncs!,
-        geqfuncs, ∇geqfuncs!
-    )
-    
-Init nonlinear constraints for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
-
-The nonlinear constraints are the output prediction `Ŷ` bounds, the custom inequality
-constraints `gc` and all the nonlinear equality constraints `geq`.
-"""
-function init_nonlincon!(
-    mpc::PredictiveController, ::NonLinModel, ::MultipleShooting, 
-    gfuncs,     ∇gfuncs!,
-    geqfuncs,   ∇geqfuncs!
-) 
-    optim, con = mpc.optim, mpc.con
-    ny, nx̂, Hp, nZ̃ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.Z̃)
-    # --- nonlinear inequality constraints ---
-    if length(con.i_g) ≠ 0
-        i_base = 0
-        for i in eachindex(con.Y0min)
-            name = Symbol("g_Y0min_$i")
-            optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
-            )
-        end
-        i_base = 1Hp*ny
-        for i in eachindex(con.Y0max)
-            name = Symbol("g_Y0max_$i")
-            optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
-            )
-        end
-        i_base = 2Hp*ny
-        for i in 1:con.nc
-            name = Symbol("g_c_$i")
-            optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
-            )
-        end
-    end
-    # --- nonlinear equality constraints ---
-    Z̃var = optim[:Z̃var]
-    for i in eachindex(geqfuncs)
-        name = Symbol("geq_$i")
-        geqfunc_i = optim[name] = JuMP.add_nonlinear_operator(
-            optim, nZ̃, geqfuncs[i], ∇geqfuncs![i]; name
-        )
-        # set with @constrains here instead of set_nonlincon!, since the number of nonlinear 
-        # equality constraints is known and constant (±Inf are impossible):
-        @constraint(optim, geqfunc_i(Z̃var...) == 0)
     end
     return nothing
 end
@@ -758,6 +780,63 @@ function init_nonlincon!(
                 optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
             )
         end
+    end
+    return nothing
+end
+
+"""
+    init_nonlincon!(
+        mpc::PredictiveController, model::NonLinModel, transcription::TranscriptionMethod, 
+        gfuncs,   ∇gfuncs!,
+        geqfuncs, ∇geqfuncs!
+    )
+    
+Init nonlinear constraints for [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
+
+The nonlinear constraints are the output prediction `Ŷ` bounds, the custom inequality
+constraints `gc` and all the nonlinear equality constraints `geq`.
+"""
+function init_nonlincon!(
+    mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, 
+    gfuncs,     ∇gfuncs!,
+    geqfuncs,   ∇geqfuncs!
+)
+    optim, con = mpc.optim, mpc.con
+    ny, nx̂, Hp, nZ̃ = mpc.estim.model.ny, mpc.estim.nx̂, mpc.Hp, length(mpc.Z̃)
+    # --- nonlinear inequality constraints ---
+    if length(con.i_g) ≠ 0
+        i_base = 0
+        for i in eachindex(con.Y0min)
+            name = Symbol("g_Y0min_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 1Hp*ny
+        for i in eachindex(con.Y0max)
+            name = Symbol("g_Y0max_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+        i_base = 2Hp*ny
+        for i in 1:con.nc
+            name = Symbol("g_c_$i")
+            optim[name] = JuMP.add_nonlinear_operator(
+                optim, nZ̃, gfuncs[i_base+i], ∇gfuncs![i_base+i]; name
+            )
+        end
+    end
+    # --- nonlinear equality constraints ---
+    Z̃var = optim[:Z̃var]
+    for i in eachindex(geqfuncs)
+        name = Symbol("geq_$i")
+        geqfunc_i = optim[name] = JuMP.add_nonlinear_operator(
+            optim, nZ̃, geqfuncs[i], ∇geqfuncs![i]; name
+        )
+        # set with @constrains here instead of set_nonlincon!, since the number of nonlinear 
+        # equality constraints is known and constant (±Inf are impossible):
+        @constraint(optim, geqfunc_i(Z̃var...) == 0)
     end
     return nothing
 end
@@ -964,11 +1043,10 @@ function linconstrainteq!(mpc::PredictiveController, model::LinModel, ::Multiple
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
-linconstrainteq!(::PredictiveController, ::SimModel, ::SingleShooting) = nothing
-linconstrainteq!(::PredictiveController, ::SimModel, ::MultipleShooting) = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::TranscriptionMethod) = nothing
 
 @doc raw"""
-    set_warmstart!(mpc::PredictiveController, transcription::SingleShooting, Z̃var) -> Z̃s
+    set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
 
 Set and return the warm-start value of `Z̃var` for [`SingleShooting`](@ref) transcription.
 
@@ -999,9 +1077,9 @@ function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
 end
 
 @doc raw"""
-    set_warmstart!(mpc::PredictiveController, transcription::MultipleShooting, Z̃var) -> Z̃s
+    set_warmstart!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var) -> Z̃s
 
-Set and return the warm-start value of `Z̃var` for [`MultipleShooting`](@ref) transcription.
+Set and return the warm-start value of `Z̃var` for other [`TranscriptionMethod`](@ref).
 
 It warm-starts the solver at:
 ```math
@@ -1024,7 +1102,7 @@ where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` comput
 last control period ``k-1``, expressed as a deviation from the operating point 
 ``\mathbf{x̂_{op}}``.
 """
-function set_warmstart!(mpc::PredictiveController, ::MultipleShooting, Z̃var)
+function set_warmstart!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var)
     nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
     # --- input increments ΔU ---
     Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
@@ -1058,8 +1136,14 @@ getU0!(U0, mpc::PredictiveController, Z̃) = (mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_
 Compute the predictions `Ŷ0`, terminal states `x̂0end` if model is a [`LinModel`](@ref).
 
 The method mutates `Ŷ0` and `x̂0end` vector arguments. The `x̂end` vector is used for
-the terminal constraints applied on ``\mathbf{x̂}_{k-1}(k+H_p)``. The computations are
-identical for any [`TranscriptionMethod`](@ref) if the model is linear.
+the terminal constraints applied on ``\mathbf{x̂_0}(k+H_p)``. The computations are
+identical for any [`TranscriptionMethod`](@ref) if the model is linear:
+```math
+\begin{aligned}
+\mathbf{Ŷ_0}        &= \mathbf{Ẽ Z̃}   + \mathbf{F} \\
+\mathbf{x̂_0}(k+H_p) &= \mathbf{ẽ_x̂ Z̃} + \mathbf{f_x̂}
+\end{aligned}
+```
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
@@ -1081,29 +1165,34 @@ end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
-The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments.
+The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments. The augmented model of
+[`f̂!`](@ref) and [`ĥ!`](@ref) functions is called recursively in a `for` loop:
+```math
+\begin{aligned}
+\mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d̂_0}(k) \Big) \\
+\mathbf{ŷ_0}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d̂_0}(k) \Big)
+\end{aligned}
+```
 """
 function predict!(
     Ŷ0, x̂0end, X̂0, Û0, K0,
     mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
     U0, _
 )
-    nu, nx̂, ny, nd, nk = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk
-    Hp, Hc = mpc.Hp, mpc.Hc
+    nu, nx̂, ny, nd, nk, Hp = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk, mpc.Hp
     D̂0 = mpc.D̂0
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
-    d0 = @views mpc.d0[1:nd]
+    d̂0 = @views mpc.d0[1:nd]
     for j=1:Hp
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
         k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
-        x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
+        d̂0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
-        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
+        ĥ!(ŷ0, mpc.estim, model, x̂0, d̂0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
     x̂0end  .= x̂0
@@ -1113,31 +1202,36 @@ end
 @doc raw"""
     predict!(
         Ŷ0, x̂0end, _ , _ , _ , 
-        mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting,
-        U0, Z̃
+        mpc::PredictiveController, model::NonLinModel, transcription::TranscriptionMethod,
+        _ , Z̃
     ) -> Ŷ0, x̂0end
 
-Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`MultipleShooting`](@ref).
+Compute vectors if `model` is a [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
     
-The method mutates `Ŷ0` and `x̂0end` arguments.
+The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
+is called multiple times in a `for` loop:
+```math
+\mathbf{ŷ_0}(k) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d̂_0}(k) \Big)
+```
+in which ``\mathbf{x̂_0}`` is the augmented state extracted from the decision variable `Z̃`.
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
-    mpc::PredictiveController, model::NonLinModel, ::MultipleShooting,
-    U0, Z̃
+    mpc::PredictiveController, model::NonLinModel, transcription::TranscriptionMethod,
+    _ , Z̃
 )
     nu, ny, nd, nx̂, Hp, Hc = model.nu, model.ny, model.nd, mpc.estim.nx̂, mpc.Hp, mpc.Hc
+    h_threads = transcription.h_threads
     X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
     D̂0 = mpc.D̂0
-    local x̂0
-    for j=1:Hp
+    @threadsif h_threads for j=1:Hp
         x̂0 = @views X̂0[(1 +  nx̂*(j-1)):(nx̂*j)]
-        d0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
+        d̂0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 +  ny*(j-1)):(ny*j)]
-        ĥ!(ŷ0, mpc.estim, model, x̂0, d0)
+        ĥ!(ŷ0, mpc.estim, model, x̂0, d̂0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
-    x̂0end  .= x̂0
+    x̂0end  .= @views X̂0[(1+nx̂*(Hp-1)):(nx̂*Hp)]
     return Ŷ0, x̂0end
 end
 
@@ -1149,7 +1243,7 @@ end
 Nonlinear constrains when `model` is a [`LinModel`](@ref).
 
 The method mutates the `g` vectors in argument and returns it. Only the custom constraints
-are include in the `g` vector.
+`gc` are include in the `g` vector.
 """
 function con_nonlinprog!(
     g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
@@ -1226,42 +1320,152 @@ function con_nonlinprog!(
     return g
 end
 
-"""
+@doc raw"""
     con_nonlinprogeq!(
         geq, X̂0, Û0, K0
-        mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
+        mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
+        U0, Z̃
     )
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument.
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The nonlinear 
+equality constraints `geq` only includes the augmented state defects, computed with:
+```math
+\mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d̂_0}(k)\Big) 
+                    - \mathbf{x̂_0}(k+1)
+```
+in which the augmented state ``\mathbf{x̂_0}`` are extracted from the decision variables 
+`Z̃`, and ``\mathbf{f̂}`` is the augmented state function defined in [`f̂!`](@ref).
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
-    mpc::PredictiveController, model::NonLinModel, ::MultipleShooting, U0, Z̃
+    mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, U0, Z̃
 )
-    nu, nx̂, ny, nd, nk = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk
+    nu, nx̂, nd, nk = model.nu, mpc.estim.nx̂, model.nd, model.nk
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
+    f_threads = transcription.f_threads
     D̂0 = mpc.D̂0
-    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    x̂0 = @views mpc.estim.x̂0[1:nx̂]
-    d0 = @views mpc.d0[1:nd]
-    #TODO: allow parallel for loop or threads? 
-    for j=1:Hp
-        u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
-        û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d0)
-        x̂0next .+= mpc.estim.f̂op .- mpc.estim.x̂op
-        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]       
+    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)] 
+    @threadsif f_threads for j=1:Hp
+        if j < 2
+            x̂0 = @views mpc.estim.x̂0[1:nx̂]
+            d̂0 = @views mpc.d0[1:nd]
+        else
+            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
+            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+        end
+        u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
+        û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
+        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        ŝnext   .= x̂0next .- x̂0next_Z̃
-        x̂0 = x̂0next_Z̃ # using states in Z̃ for next iteration (allow parallel for)
-        d0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
+        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
+        ŝnext .= x̂0next .- x̂0next_Z̃
     end
     return geq
 end
-con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::NonLinModel,::SingleShooting,  _,_)=geq
-con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::LinModel,::TranscriptionMethod,_,_)=geq
+
+@doc raw"""
+    con_nonlinprogeq!(
+        geq, X̂0, Û0, K0
+        mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
+        U0, Z̃
+    )
+
+Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
+
+The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. 
+
+The nonlinear equality constraints `geq` only includes the state defects. The deterministic
+and stochastic states are handled separately since collocation methods require continuous-
+time state-space models, and the stochastic model of the unmeasured disturbances
+is discrete-time. The deterministic and stochastic defects are respectively computed with:
+```math
+\begin{aligned}
+\mathbf{s_d}(k+1) &= \mathbf{x_0}(k) - \mathbf{x_0}(k+1) 
+                      + 0.5 T_s (\mathbf{k}_1 + \mathbf{k}_2) \\
+\mathbf{s_s}(k+1) &= \mathbf{A_s x_s}(k) - \mathbf{x_s}(k+1)
+\end{aligned}
+```
+in which ``\mathbf{x_0}`` and ``\mathbf{x_s}`` are the deterministic and stochastic states 
+extracted from the decision variables `Z̃`. The ``\mathbf{k}`` coefficients are 
+evaluated from the continuous-time function `model.f!` and:
+```math
+\begin{aligned}
+\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),   \mathbf{û_0}(k),   \mathbf{d̂_0}(k)  \Big) \\
+\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0}(k+1), \mathbf{û_0}(k+h), \mathbf{d̂_0}(k+1)\Big) 
+\end{aligned}
+```
+in which ``h`` is the hold order `transcription.h` and the disturbed input is:
+```math
+\mathbf{û_0}(k) = \mathbf{u_0}(k) + \mathbf{C_{s_u} x_s}(k)
+``` 
+the ``\mathbf{A_s, C_{s_u}}`` matrices are defined in [`init_estimstoch`](@ref) doc.
+"""
+function con_nonlinprogeq!(
+    geq, X̂0, Û0, K0, 
+    mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
+    U0, Z̃
+)
+    nu, nx̂, nd, nx, h = model.nu, mpc.estim.nx̂, model.nd, model.nx, transcription.h
+    Hp, Hc = mpc.Hp, mpc.Hc
+    nΔU, nX̂ = nu*Hc, nx̂*Hp
+    f_threads = transcription.f_threads
+    Ts, p = model.Ts, model.p
+    As, Cs_u = mpc.estim.As, mpc.estim.Cs_u
+    nk = get_nk(model, transcription)
+    D̂0 = mpc.D̂0
+    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    @threadsif f_threads for j=1:Hp
+        if j < 2
+            x̂0 = @views mpc.estim.x̂0[1:nx̂]
+            d̂0 = @views mpc.d0[1:nd]
+        else
+            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
+            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+        end
+        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
+        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
+        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
+        x0, xs              = @views x̂0[1:nx], x̂0[nx+1:end]
+        x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
+        sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
+        k1, k2              = @views k0[1:nx], k0[nx+1:2*nx]
+        # ----------------- stochastic defects -----------------------------------------
+        xsnext = @views x̂0next[nx+1:end]
+        mul!(xsnext, As, xs)
+        ssnext .= @. xsnext - xsnext_Z̃
+        # ----------------- deterministic defects --------------------------------------
+        u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
+        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        mul!(û0, Cs_u, xs)                 # ys_u(k) = Cs_u*xs(k)
+        û0 .+= u0                          #   û0(k) = u0(k) + ys_u(k)
+        if f_threads || h < 1 || j < 2
+            # we need to recompute k1 with multi-threading, even with h==1, since the 
+            # last iteration (j-1) may not be executed (iterations are re-orderable)
+            model.f!(k1, x0, û0, d̂0, p)
+        else
+            k1 .= @views K0[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+        end
+        if h < 1 || j ≥ Hp
+            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
+            û0next = û0
+        else
+            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
+            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
+            mul!(û0next, Cs_u, xsnext_Z̃)      # ys_u(k+1) = Cs_u*xs(k+1)
+            û0next .+= u0next                 #   û0(k+1) = u0(k+1) + ys_u(k+1)
+        end
+        model.f!(k2, x0next_Z̃, û0next, d̂0next, p)
+        sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k1 + k2)
+    end
+    return geq
+end
+
+"No eq. constraints for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
+con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::SimModel,::TranscriptionMethod,_,_)=geq

@@ -56,10 +56,13 @@ struct KalmanCovariances{
         Q̂::Q̂C, R̂::R̂C, P̂_0, He
     ) where {NT<:Real, Q̂C<:AbstractMatrix{NT}, R̂C<:AbstractMatrix{NT}}
         if isnothing(P̂_0)
-            P̂_0 = zeros(NT, 0, 0)
+            P̂_0 = zeros(NT, 0, 0)    # does not apply to steady-state Kalman filter
+            P̂   = zeros(NT, size(Q̂)) # will hold the steady-state error covariance
+        else
+            P̂   = copy(P̂_0)
         end
         P̂_0 = Hermitian(P̂_0, :L)
-        P̂   = copy(P̂_0)
+        P̂   = Hermitian(P̂, :L)
         Q̂   = Hermitian(Q̂, :L)
         R̂   = Hermitian(R̂, :L)
         # the following variables are only for the moving horizon estimator:
@@ -236,8 +239,8 @@ end
 
 Augment [`LinModel`](@ref) state-space matrices with stochastic ones `As`, `Cs_u`, `Cs_y`.
 
-If ``\mathbf{x_0}`` are `model.x0` states, and ``\mathbf{x_s}``, the states defined at
-[`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂} = 
+If ``\mathbf{x_0}`` is `model.x0` state, and ``\mathbf{x_s}``, the states defined at
+[`init_estimstoch`](@ref), we define an augmented state vector ``\mathbf{x̂_0} = 
 [ \begin{smallmatrix} \mathbf{x_0} \\ \mathbf{x_s} \end{smallmatrix} ]``. The method
 returns the augmented matrices `Â`, `B̂u`, `Ĉ`, `B̂d` and `D̂d`:
 ```math
@@ -253,9 +256,9 @@ See Extended Help for a detailed definition of the augmented matrices and vector
 
 # Extended Help
 !!! details "Extended Help"
-    Using the `As`, `Cs_u` and `Cs_y` matrices of the stochastic model provided in argument
-    and the `model.A`, `model.Bu`, `model.Bd`, `model.C`, `model.Dd` matrices, the 
-    state-space matrices of the augmented model are defined as follows:
+    Using the `As`, `Cs_u` and `Cs_y` matrices of the stochastic model constructed in
+    [`init_estimstoch`](@ref)), and `model.A`, `model.Bu`, `model.Bd`, `model.C`, `model.Dd`
+    matrices, the state-space matrices of the augmented model are defined as follows:
     ```math
     \begin{aligned}
     \mathbf{Â}   &=                                    \begin{bmatrix} 
@@ -356,11 +359,14 @@ end
 """
     default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
 
-One integrator on each measured output by default if `model` is not a  [`LinModel`](@ref).
+One integrator on each measured output by default for other cases e.g. [`NonLinModel`](@ref).
 
-Theres is no verification the augmented model remains observable. If the integrator quantity
-per manipulated input `nint_u ≠ 0`, the method returns zero integrator on each measured
-output.
+If the integrator quantity per manipulated input `nint_u ≠ 0`, the method returns zero 
+integrator on each measured output.
+
+!!! warning
+    Theres is no verification the augmented model remains observable. The resulting 
+    [`StateEstimator`](@ref) object should be assessed separately with e.g.: [`sim!`](@ref). 
 """
 function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
     validate_ym(model, i_ym)

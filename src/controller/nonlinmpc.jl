@@ -86,6 +86,7 @@ struct NonLinMPC{
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         lastu0 = zeros(NT, nu)
+        validate_transcription(model, transcription)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
@@ -94,7 +95,7 @@ struct NonLinMPC{
         Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc)
         # dummy vals (updated just before optimization):
         F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
-        con, nϵ, P̃Δu, P̃u, Ẽ, Ẽŝ = init_defaultcon_mpc(
+        con, nϵ, P̃Δu, P̃u, Ẽ = init_defaultcon_mpc(
             estim, weights, transcription,
             Hp, Hc, 
             PΔu, Pu, E, 
@@ -222,16 +223,23 @@ This controller allocates memory at each time step for the optimization.
 ```jldoctest
 julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
 
-julia> mpc = NonLinMPC(model, Hp=20, Hc=1, Cwt=1e6)
-NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:
- 20 prediction steps Hp
-  1 control steps Hc
-  1 slack variable ϵ (control constraints)
-  1 manipulated inputs u (0 integrating states)
-  2 estimated states x̂
-  1 measured outputs ym (1 integrating states)
-  0 unmeasured outputs yu
-  0 measured disturbances d
+julia> mpc = NonLinMPC(model, Hp=20, Hc=10, transcription=MultipleShooting())
+NonLinMPC controller with a sample time Ts = 10.0 s:
+├ estimator: UnscentedKalmanFilter
+├ model: NonLinModel
+├ optimizer: Ipopt 
+├ transcription: MultipleShooting
+├ gradient: AutoForwardDiff
+├ jacobian: AutoSparse (AutoForwardDiff, TracerSparsityDetector, GreedyColoringAlgorithm)
+└ dimensions:
+  ├ 20 prediction steps Hp
+  ├ 10 control steps Hc
+  ├  1 slack variable ϵ (control constraints)
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  2 estimated states x̂
+  ├  1 measured outputs ym (1 integrating states)
+  ├  0 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 
 # Extended Help
@@ -326,16 +334,23 @@ julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver
 
 julia> estim = UnscentedKalmanFilter(model, σQint_ym=[0.05]);
 
-julia> mpc = NonLinMPC(estim, Hp=20, Hc=1, Cwt=1e6)
-NonLinMPC controller with a sample time Ts = 10.0 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:
- 20 prediction steps Hp
-  1 control steps Hc
-  1 slack variable ϵ (control constraints)
-  1 manipulated inputs u (0 integrating states)
-  2 estimated states x̂
-  1 measured outputs ym (1 integrating states)
-  0 unmeasured outputs yu
-  0 measured disturbances d
+julia> mpc = NonLinMPC(estim, Hp=20, Cwt=1e6)
+NonLinMPC controller with a sample time Ts = 10.0 s:
+├ estimator: UnscentedKalmanFilter
+├ model: NonLinModel
+├ optimizer: Ipopt
+├ transcription: SingleShooting
+├ gradient: AutoForwardDiff
+├ jacobian: AutoForwardDiff
+└ dimensions:
+  ├ 20 prediction steps Hp
+  ├  2 control steps Hc
+  ├  1 slack variable ϵ (control constraints)
+  ├  1 manipulated inputs u (0 integrating states)
+  ├  2 estimated states x̂
+  ├  1 measured outputs ym (1 integrating states)
+  ├  0 unmeasured outputs yu
+  └  0 measured disturbances d
 ```
 """
 function NonLinMPC(
@@ -717,8 +732,10 @@ Inspired from: [User-defined operators with vector outputs](@extref JuMP User-de
 function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
     # ----------- common cache for Jfunc, gfuncs and geqfuncs  ----------------------------
     model = mpc.estim.model
+    transcription = mpc.transcription
     grad, jac = mpc.gradient, mpc.jacobian
-    nu, ny, nx̂, nϵ, nk = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ, model.nk
+    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
+    nk = get_nk(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
     nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
@@ -891,8 +908,14 @@ end
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
 function obj_econ(
-    mpc::NonLinMPC, model::SimModel, Ue, Ŷe::AbstractVector{NT}
+    mpc::NonLinMPC, ::SimModel, Ue, Ŷe::AbstractVector{NT}
 ) where NT<:Real
     E_JE = mpc.weights.iszero_E ? zero(NT) : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
     return E_JE
+end
+
+"Print the differentiation backends of a [`NonLinMPC`](@ref) controller."
+function print_backends(io::IO, mpc::NonLinMPC)
+    println(io, "├ gradient: $(backend_str(mpc.gradient))")
+    println(io, "├ jacobian: $(backend_str(mpc.jacobian))")
 end

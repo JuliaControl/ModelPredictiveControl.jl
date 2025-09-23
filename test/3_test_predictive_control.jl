@@ -436,6 +436,17 @@ end
     @test mpc.weights.M_Hp ≈ diagm(1:1000)
     @test mpc.weights.Ñ_Hc ≈ diagm([0.1;1e6])
     @test mpc.weights.L_Hp ≈ diagm(1.1:1000.1)
+
+    estim2 = KalmanFilter(LinModel(tf(5, [2, 1]), 3))
+    mpc_ms = LinMPC(estim2, Nwt=[0], Hp=1000, Hc=1, transcription=MultipleShooting())
+    r = [15]
+    preparestate!(mpc_ms, [0])
+    u = moveinput!(mpc_ms, r)
+    @test u ≈ [3] atol=1e-2
+    setmodel!(mpc_ms, LinModel(tf(10, [2, 1]), 3))
+    r = [40]
+    u = moveinput!(mpc_ms, r)
+    @test u ≈ [4] atol=1e-2
 end
 
 @testitem "LinMPC real-time simulations" setup=[SetupMPCtests] begin
@@ -699,6 +710,12 @@ end
     @test length(nmpc16.Z̃) == nonlinmodel.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
     @test nmpc16.con.neq == nmpc16.estim.nx̂*nmpc16.Hp
     @test nmpc16.con.nc == 10
+    nonlinmodel_c = NonLinModel((ẋ,x,u,_,_)->ẋ .= -0.1x .+ u, (y,x,_,_)->y.=x, 1, 1, 1, 1)
+    nmpc16 = NonLinMPC(nonlinmodel_c, Hp=10, transcription=TrapezoidalCollocation(), nc=10, gc=gc!)
+    @test nmpc16.transcription == TrapezoidalCollocation()
+    @test length(nmpc16.Z̃) == nonlinmodel_c.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
+    @test nmpc16.con.neq == nmpc16.estim.nx̂*nmpc16.Hp
+    @test nmpc16.con.nc == 10
     nmpc17 = NonLinMPC(linmodel1, Hp=10, transcription=MultipleShooting())
     @test nmpc17.transcription == MultipleShooting()
     @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
@@ -721,6 +738,8 @@ end
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, JE  = (_,_,_)->0.0)
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation())
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation(2))
 
     @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, JE=(Ue,_,_,_)->Ue)
     @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
@@ -792,20 +811,42 @@ end
     # execute update_predictions! branch in `geqfunc_i` for coverage:
     geq_end = nmpc5.optim[:geq_2].func
     @test_nowarn geq_end(5.0, 4.0, 3.0, 2.0)
+    f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
+    h! = (y,x,_,_) -> y .= x 
+    nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
+    transcription = TrapezoidalCollocation(0, f_threads=true, h_threads=true)
+    nmpc5 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc5, [0.0])
+    u = moveinput!(nmpc5, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
+    transcription = TrapezoidalCollocation(1)
+    nmpc5_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc5_1, [0.0])
+    u = moveinput!(nmpc5_1, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     preparestate!(nmpc6, [0])
     @test moveinput!(nmpc6, [0]) ≈ [0.0] atol=5e-2
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
-    nonlinmodel2.solver_h!(y, Float32[0,0], Float32[0], nonlinmodel2.p)
+    ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0], nonlinmodel2.p)
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0] atol=5e-2
-    nmpc8 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
+    transcription = MultipleShooting()
+    nmpc8 = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc8, [0], [0])
     u = moveinput!(nmpc8, [10], [0])
     @test u ≈ [2] atol=5e-2
     info = getinfo(nmpc8)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    transcription = MultipleShooting(f_threads=true, h_threads=true)
+    nmpc8t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc8t, [0], [0])
+    u = moveinput!(nmpc8t, [10], [0])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc8t)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
     nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
