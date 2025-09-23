@@ -57,7 +57,7 @@ struct ExplicitMPC{
         # dummy val (updated just before optimization):
         F = zeros(NT, ny*Hp)
         P̃Δu, P̃u, Ẽ = PΔu, Pu, E # no slack variable ϵ for ExplicitMPC
-        H̃ = init_quadprog(model, weights, Ẽ, P̃Δu, P̃u)
+        H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         H̃_chol = cholesky(H̃)
@@ -225,6 +225,7 @@ addinfo!(info, mpc::ExplicitMPC) = info
 "Update the prediction matrices and Cholesky factorization."
 function setmodel_controller!(mpc::ExplicitMPC, uop_old, _ )
     model, estim, transcription = mpc.estim.model, mpc.estim, mpc.transcription
+    weights = mpc.weights
     nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
     # --- predictions matrices ---
     E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
@@ -236,7 +237,8 @@ function setmodel_controller!(mpc::ExplicitMPC, uop_old, _ )
     mpc.V .= V
     mpc.B .= B
     # --- quadratic programming Hessian matrix ---
-    H̃ = init_quadprog(model, mpc.weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u)
+    # do not verify the condition number of the Hessian here:
+    H̃ = init_quadprog(model, transcription, weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u, warn_cond=Inf)
     mpc.H̃ .= H̃
     set_objective_hessian!(mpc)
     # --- operating points ---
