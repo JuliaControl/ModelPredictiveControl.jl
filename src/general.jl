@@ -58,8 +58,22 @@ function limit_solve_time(optim::GenericModel, Ts)
 end
 
 "Init a differentiation result matrix as dense or sparse matrix, as required by `backend`."
-init_diffmat(T, backend::AbstractADType, _  , nx , ny) = Matrix{T}(undef, ny, nx)
-init_diffmat(T, backend::AutoSparse    ,prep , _ , _ ) = similar(sparsity_pattern(prep), T)
+init_diffmat(T, ::AbstractADType, _ , nx, ny) = zeros(T, ny, nx)
+function init_diffmat(T, ::AutoSparse, prep , _ , _ )
+    A = similar(sparsity_pattern(prep), T)
+    return A .= 0
+end
+
+"Init the sparsity structure of matrix `A` as required by `JuMP.jl`."
+function init_diffstructure(A::AbstractSparseMatrix)
+    I, J = findnz(A)
+    return collect(zip(I, J))
+end
+init_diffstructure(A::AbstractMatrix)= Tuple.(CartesianIndices(A))[:]
+
+"Store the differentiation matrix `A` in the vector `v` as required by `JuMP.jl.`" 
+diffmat2vec!(v::AbstractVector, A::AbstractSparseMatrix)    = v   .= nonzeros(A)
+diffmat2vec!(v::AbstractVector, A::AbstractMatrix)          = v[:] = A
 
 backend_str(backend::AbstractADType) = string(nameof(typeof(backend)))
 function backend_str(backend::AutoSparse)
