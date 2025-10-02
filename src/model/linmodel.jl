@@ -135,10 +135,15 @@ LinModel with a sample time Ts = 0.1 s:
     state-space representation. 
     
     It is assumed that ``\mathbf{D_u=0}`` (or `sys` is strictly proper) since otherwise the
-    resulting discrete controller is acausal by definition. Indeed, all discrete controllers
-    (1) sample an output ``\mathbf{y}(k)`` from the plant, (2) computes an action 
-    ``\mathbf{u}(k)`` and (3) apply the action on the plant. There is a causality paradox
-    if ``\mathbf{u}(k)`` impacts ``\mathbf{y}(k)`` even before computing it.
+    resulting discrete controller would be acausal in its implementation (≠ mathematical
+    causality). Indeed, at each sampling instant `k`, the predictive controller will:
+    
+    1. sample an output ``\mathbf{y}(k)`` from the plant
+    2. computes an action ``\mathbf{u}(k)`` and 
+    3. apply the action on the plant. 
+    
+    There is a causality paradox if ``\mathbf{u}(k)`` impacts ``\mathbf{y}(k)`` even before
+    computing it.
 """
 function LinModel(
     sys::StateSpace{E, NT},
