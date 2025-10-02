@@ -586,7 +586,7 @@ at [`relaxŶ`](@ref), [`relaxΔU`](@ref) and [`relaxU`](@ref) documentation, re
 vector ``\mathbf{q̃}`` and scalar ``r`` need recalculation each control period ``k``, see
 [`initpred!`](@ref). ``r`` does not impact the minima position. It is thus useless at
 optimization but required to evaluate the minimal ``J`` value. A `@warn` will be displayed
-if the condition number `cond(H̃) ≥ warn_cond` and `transcription` is a `SingleShooting` 
+if the condition number `cond(H̃) > warn_cond` and `transcription` is a `SingleShooting` 
 (`warn_cond=Inf` for no warning).
 """
 function init_quadprog(

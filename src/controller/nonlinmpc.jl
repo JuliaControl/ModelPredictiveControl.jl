@@ -103,7 +103,8 @@ struct NonLinMPC{
             Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
             gc!, nc
         )
-        H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u)
+        warn_cond = iszero(weights.E) ? 1e6 : Inf # condition number warning only if Ewt==0
+        H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u; warn_cond)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
