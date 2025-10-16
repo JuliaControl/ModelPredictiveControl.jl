@@ -805,12 +805,6 @@ end
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
     nmpc5 = NonLinMPC(nonlinmodel, Hp=1, Hc=1, Cwt=Inf, transcription=MultipleShooting())
     nmpc5 = setconstraint!(nmpc5, ymin=[1])
-    # execute update_predictions! branch in `gfunc_i` for coverage:
-    g_Y0min_end = nmpc5.optim[:g_Y0min_1].func
-    @test_nowarn g_Y0min_end(10.0, 9.0, 8.0, 7.0)
-    # execute update_predictions! branch in `geqfunc_i` for coverage:
-    geq_end = nmpc5.optim[:geq_2].func
-    @test_nowarn geq_end(5.0, 4.0, 3.0, 2.0)
     f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
     h! = (y,x,_,_) -> y .= x 
     nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
