@@ -1016,9 +1016,6 @@ function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::SingleShooti
     return nothing
 end
 
-
-
-
 @doc raw"""
     linconstrainteq!(
         mpc::PredictiveController, model::LinModel, transcription::MultipleShooting
