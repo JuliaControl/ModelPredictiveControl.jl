@@ -83,6 +83,28 @@ function backend_str(backend::AutoSparse)
     return str
 end
 
+"Assign rows of of `g` to `gi` at the positions where `i` is true (without allocations)."
+function assign!(Ai::AbstractMatrix, A::AbstractMatrix, i::BitVector)
+    k = 1
+    @inbounds for j in axes(A, 1)
+        if i[j]
+            Ai[k, :] = @views A[j, :]
+            k += 1
+        end
+    end
+    return Ai
+end
+function assign!(ai::AbstractVector, a::AbstractVector, i::BitVector)
+    k = 1
+    @inbounds for j in eachindex(a)
+        if i[j]
+            ai[k] = a[j]
+            k += 1
+        end
+    end
+    return ai
+end
+
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
 
