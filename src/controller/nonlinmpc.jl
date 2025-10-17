@@ -737,7 +737,7 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
     nk = get_nk(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
-    ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
+    ng, ng_i_g, nc, neq = length(mpc.con.i_g), sum(mpc.con.i_g), mpc.con.nc, mpc.con.neq
     nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
     strict = Val(true)
@@ -762,11 +762,9 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
         Cache(Û0), Cache(K0), Cache(X̂0), 
         Cache(gc), Cache(geq),
     )
-    ## temporarily enable all the inequality constraints for sparsity detection:
-    # mpc.con.i_g[1:end-nc] .= true
     ∇g_prep  = prepare_jacobian(g!, g, jac, Z̃_∇g, ∇g_context...; strict)
-    # mpc.con.i_g[1:end-nc] .= false
     ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
+    ∇g_i_g = ∇g[mpc.con.i_g, :]
     function update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
         if isdifferent(Z̃_arg, Z̃_∇g)
             Z̃_∇g .= Z̃_arg
@@ -776,19 +774,18 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
     end
     function gfunc_oracle!(g_arg, Z̃_arg)
         update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-        g_arg .= @views g[mpc.con.i_g]
+        assign!(g_arg, g, mpc.con.i_g)
         return nothing
     end
-    ∇g_i_g = ∇g[mpc.con.i_g, :]
     function ∇gfunc_oracle!(∇g_arg, Z̃_arg)
         update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
-        ∇g_i_g .= @views ∇g[mpc.con.i_g, :]
+        assign!(∇g_i_g, ∇g, mpc.con.i_g)
         diffmat2vec!(∇g_arg, ∇g_i_g)
         return nothing
     end
-    g_min = fill(-myInf, sum(mpc.con.i_g))
-    g_max = zeros(JNT, sum(mpc.con.i_g))
-    ∇g_structure = init_diffstructure(∇g[mpc.con.i_g, :])
+    g_min = fill(-myInf, ng_i_g)
+    g_max = zeros(JNT, ng_i_g)
+    ∇g_structure = init_diffstructure(∇g_i_g)
     g_oracle = Ipopt._VectorNonlinearOracle(;
         dimension = nZ̃,
         l = g_min,
