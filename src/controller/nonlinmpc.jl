@@ -514,7 +514,9 @@ end
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel)
+function init_optimization!(
+    mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel{JNT}
+)  where JNT<:Real
     # --- variables and linear constraints ---
     con, transcription = mpc.con, mpc.transcription
     nZ̃ = length(mpc.Z̃)
@@ -538,27 +540,37 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.Generic
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs! = get_optim_functions(
-        mpc, optim
-    )
-    @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
-    @objective(optim, Min, J(Z̃var...))
-    init_nonlincon!(mpc, model, transcription, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!)
-    set_nonlincon!(mpc, model, transcription, optim)
+    if JuMP.solver_name(optim) ≠ "Ipopt"
+        # everything with the splatting syntax:
+        J_func, ∇J_func!, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs! = get_optim_functions(
+            mpc, optim
+        )
+    else
+        # constraints with vector nonlinear oracle, objective function with splatting:
+        g_oracle, geq_oracle, J_func, ∇J_func! = get_nonlinops(mpc, optim)
+    end
+    @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
+    @objective(optim, Min, J_op(Z̃var...))
+    if JuMP.solver_name(optim) ≠ "Ipopt"
+        init_nonlincon!(mpc, model, transcription, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs!)
+        set_nonlincon!(mpc, model, transcription, optim)
+    else
+        set_nonlincon_exp!(mpc, transcription, g_oracle, geq_oracle)
+    end 
     return nothing
 end
 
 """
     get_optim_functions(
         mpc::NonLinMPC, optim::JuMP.GenericModel
-    ) -> Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
+    ) -> J_func, ∇J_func!, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs!
 
 Return the functions for the nonlinear optimization of `mpc` [`NonLinMPC`](@ref) controller.
 
-Return the nonlinear objective `Jfunc` function, and `∇Jfunc!`, to compute its gradient. 
-Also return vectors with the nonlinear inequality constraint functions `gfuncs`, and 
-`∇gfuncs!`, for the associated gradients. Lastly, also return vectors with the nonlinear 
-equality constraint functions `geqfuncs` and gradients `∇geqfuncs!`.
+Return the nonlinear objective `J_func` function, and `∇J_func!`, to compute its gradient. 
+Also return vectors with the nonlinear inequality constraint functions `g_funcs`, and 
+`∇g_funcs!`, for the associated gradients. Lastly, also return vectors with the nonlinear 
+equality constraint functions `geq_funcs` and gradients `∇geq_funcs!`.
 
 This method is really intricate and I'm not proud of it. That's because of 3 elements:
 
@@ -615,11 +627,11 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             J[], _ = value_and_gradient!(Jfunc!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
         end
     end    
-    function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
+    function J_func(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
         return J[]::T
     end
-    ∇Jfunc! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
+    ∇J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
         function (Z̃arg)
             update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
             return ∇J[begin]
@@ -652,16 +664,16 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃_∇g, ∇g_context...)
         end
     end
-    gfuncs = Vector{Function}(undef, ng)
-    for i in eachindex(gfuncs)
+    g_funcs = Vector{Function}(undef, ng)
+    for i in eachindex(g_funcs)
         gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             update_con!(g, ∇g, Z̃_∇g, Z̃arg)
             return g[i]::T
         end
-        gfuncs[i] = gfunc_i
+        g_funcs[i] = gfunc_i
     end
-    ∇gfuncs! = Vector{Function}(undef, ng)
-    for i in eachindex(∇gfuncs!)
+    ∇g_funcs! = Vector{Function}(undef, ng)
+    for i in eachindex(∇g_funcs!)
         ∇gfuncs_i! = if nZ̃ == 1     # univariate syntax (see JuMP.@operator doc):
             function (Z̃arg::T) where T<:Real
                 update_con!(g, ∇g, Z̃_∇g, Z̃arg)
@@ -673,7 +685,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
                 return ∇g_i .= @views ∇g[i, :] 
             end
         end
-        ∇gfuncs![i] = ∇gfuncs_i!
+        ∇g_funcs![i] = ∇gfuncs_i!
     end
     # --------------------- equality constraint functions ---------------------------------
     function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
@@ -694,16 +706,16 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
             value_and_jacobian!(geqfunc!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_context...)
         end
     end
-    geqfuncs = Vector{Function}(undef, neq)
-    for i in eachindex(geqfuncs)
+    geq_funcs = Vector{Function}(undef, neq)
+    for i in eachindex(geq_funcs)
         geqfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃arg)
             return geq[i]::T
         end
-        geqfuncs[i] = geqfunc_i          
+        geq_funcs[i] = geqfunc_i          
     end
-    ∇geqfuncs! = Vector{Function}(undef, neq)
-    for i in eachindex(∇geqfuncs!)
+    ∇geq_funcs! = Vector{Function}(undef, neq)
+    for i in eachindex(∇geq_funcs!)
         # only multivariate syntax, univariate is impossible since nonlinear equality
         # constraints imply MultipleShooting, thus input increment ΔU and state X̂0 in Z̃:
         ∇geqfuncs_i! = 
@@ -711,10 +723,157 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
                 update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃arg)
                 return ∇geq_i .= @views ∇geq[i, :]
             end
-        ∇geqfuncs![i] = ∇geqfuncs_i!
+        ∇geq_funcs![i] = ∇geqfuncs_i!
     end
-    return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!, geqfuncs, ∇geqfuncs!
+    return J_func, ∇J_func!, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs!
 end
+
+# TODO: move docstring of method above here an re-work it
+function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
+    # ----------- common cache for all functions  ----------------------------------------
+    model = mpc.estim.model
+    transcription = mpc.transcription
+    grad, jac = mpc.gradient, mpc.jacobian
+    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
+    nk = get_nk(model, transcription)
+    Hp, Hc = mpc.Hp, mpc.Hc
+    ng, nc, neq = length(mpc.con.i_g), mpc.con.nc, mpc.con.neq
+    nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
+    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+    strict = Val(true)
+    myNaN, myInf                     = convert(JNT, NaN), convert(JNT, Inf)
+    J::Vector{JNT}                   = zeros(JNT, 1)
+    ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
+    x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
+    K0::Vector{JNT}                  = zeros(JNT, nK)
+    Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
+    U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
+    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
+    geq::Vector{JNT}                 = zeros(JNT, neq)
+    # -------------- inequality constraint: nonlinear oracle -----------------------------
+    function g!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return nothing
+    end
+    Z̃_∇g = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    ∇g_context = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(gc), Cache(geq),
+    )
+    ## temporarily enable all the inequality constraints for sparsity detection:
+    # mpc.con.i_g[1:end-nc] .= true
+    ∇g_prep  = prepare_jacobian(g!, g, jac, Z̃_∇g, ∇g_context...; strict)
+    # mpc.con.i_g[1:end-nc] .= false
+    ∇g = init_diffmat(JNT, jac, ∇g_prep, nZ̃, ng)
+    function update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇g)
+            Z̃_∇g .= Z̃_arg
+            value_and_jacobian!(g!, g, ∇g, ∇g_prep, jac, Z̃_∇g, ∇g_context...)
+        end
+        return nothing
+    end
+    function gfunc_oracle!(g_arg, Z̃_arg)
+        update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
+        g_arg .= @views g[mpc.con.i_g]
+        return nothing
+    end
+    ∇g_i_g = ∇g[mpc.con.i_g, :]
+    function ∇gfunc_oracle!(∇g_arg, Z̃_arg)
+        update_con!(g, ∇g, Z̃_∇g, Z̃_arg)
+        ∇g_i_g .= @views ∇g[mpc.con.i_g, :]
+        diffmat2vec!(∇g_arg, ∇g_i_g)
+        return nothing
+    end
+    g_min = fill(-myInf, sum(mpc.con.i_g))
+    g_max = zeros(JNT, sum(mpc.con.i_g))
+    ∇g_structure = init_diffstructure(∇g[mpc.con.i_g, :])
+    g_oracle = Ipopt._VectorNonlinearOracle(;
+        dimension = nZ̃,
+        l = g_min,
+        u = g_max,
+        eval_f = gfunc_oracle!,
+        jacobian_structure = ∇g_structure,
+        eval_jacobian = ∇gfunc_oracle!
+    )
+    # ------------- equality constraints : nonlinear oracle ------------------------------
+    function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return nothing
+    end
+    Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update_predictions! at first call
+    ∇geq_context = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
+        Cache(Û0), Cache(K0),   Cache(X̂0),
+        Cache(gc), Cache(g)
+    )
+    ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)
+    ∇geq = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
+    function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇geq)
+            Z̃_∇geq .= Z̃_arg
+            value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_context...)
+        end
+        return nothing
+    end
+    function geq_oracle!(geq_arg, Z̃_arg)
+        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        geq_arg .= geq
+        return nothing
+    end
+    function ∇geq_oracle!(∇geq_arg, Z̃_arg)
+        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        diffmat2vec!(∇geq_arg, ∇geq)
+        return nothing
+    end
+    geq_min = geq_max = zeros(JNT, neq)
+    ∇geq_structure = init_diffstructure(∇geq)
+    geq_oracle = Ipopt._VectorNonlinearOracle(;
+        dimension = nZ̃,
+        l = geq_min,
+        u = geq_max,
+        eval_f = geq_oracle!,
+        jacobian_structure = ∇geq_structure,
+        eval_jacobian = ∇geq_oracle!
+    )
+    # ------------- objective function: splatting syntax ---------------------------------
+    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+    end
+    Z̃_∇J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    ∇J_context = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(gc), Cache(g), Cache(geq),
+    )
+    ∇J_prep = prepare_gradient(J!, grad, Z̃_∇J, ∇J_context...; strict)
+    ∇J = Vector{JNT}(undef, nZ̃)
+    function update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        if isdifferent(Z̃arg, Z̃_∇J)
+            Z̃_∇J .= Z̃arg
+            J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
+        end
+    end    
+    function J_func(Z̃arg::Vararg{T, N}) where {N, T<:Real}
+        update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        return J[]::T
+    end
+    ∇J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
+        function (Z̃arg)
+            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+            return ∇J[]
+        end
+    else                        # multivariate syntax (see JuMP.@operator doc):
+        function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+            return ∇Jarg .= ∇J
+        end
+    end
+    return g_oracle, geq_oracle, J_func, ∇J_func!
+end
+
 
 """
     update_predictions!(
@@ -738,6 +897,20 @@ function update_predictions!(
     gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
     g   = con_nonlinprog!(g, mpc, model, transcription, x̂0end, Ŷ0, gc, ϵ)
     geq = con_nonlinprogeq!(geq, X̂0, Û0, K0, mpc, model, transcription, U0, Z̃)
+    return nothing
+end
+
+function set_nonlincon_exp!(
+    mpc::NonLinMPC, ::TranscriptionMethod, g_oracle, geq_oracle
+)
+    optim = mpc.optim
+    Z̃var = optim[:Z̃var]
+    nonlin_constraints = JuMP.all_constraints(
+        optim, JuMP.Vector{JuMP.VariableRef}, Ipopt._VectorNonlinearOracle
+    )
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    @constraint(optim, Z̃var in g_oracle)
+    mpc.con.neq > 0 && @constraint(optim, Z̃var in geq_oracle)
     return nothing
 end
 
