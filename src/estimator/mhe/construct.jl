@@ -1299,28 +1299,28 @@ function init_optimization!(
             for i in eachindex(con.X̂0min)
                 name = Symbol("g_X̂0min_$i")
                 optim[name] = JuMP.add_nonlinear_operator(
-                    optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
+                    optim, nZ̃, g_funcs[i_base + i], ∇g_funcs![i_base + i]; name
                 )
             end
             i_base = nX̂
             for i in eachindex(con.X̂0max)
                 name = Symbol("g_X̂0max_$i")
                 optim[name] = JuMP.add_nonlinear_operator(
-                    optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
+                    optim, nZ̃, g_funcs[i_base + i], ∇g_funcs![i_base + i]; name
                 )
             end
             i_base = 2*nX̂
             for i in eachindex(con.V̂min)
                 name = Symbol("g_V̂min_$i")
                 optim[name] = JuMP.add_nonlinear_operator(
-                    optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
+                    optim, nZ̃, g_funcs[i_base + i], ∇g_funcs![i_base + i]; name
                 )
             end
             i_base = 2*nX̂ + nV̂
             for i in eachindex(con.V̂max)
                 name = Symbol("g_V̂max_$i")
                 optim[name] = JuMP.add_nonlinear_operator(
-                    optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
+                    optim, nZ̃, g_funcs[i_base + i], ∇g_funcs![i_base + i]; name
                 )
             end
         end
