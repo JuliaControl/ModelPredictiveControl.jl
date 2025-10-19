@@ -766,7 +766,7 @@ function get_nonlinops(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
         Cache(gc), Cache(geq), Cache(g)
     )
     ∇gi_prep = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_context...; strict)
-    ∇gi      = init_diffmat(JNT, jac, ∇gi_prep, nZ̃, ng)
+    ∇gi      = init_diffmat(JNT, jac, ∇gi_prep, nZ̃, ngi)
     function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
         if isdifferent(Z̃_arg, Z̃_∇gi)
             Z̃_∇gi .= Z̃_arg
