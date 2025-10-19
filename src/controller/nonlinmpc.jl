@@ -549,13 +549,13 @@ function init_optimization!(
         # constraints with vector nonlinear oracle, objective function with splatting:
         g_oracle, geq_oracle, J_func, ∇J_func! = get_nonlinops(mpc, optim)
     end
-    @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
-    @objective(optim, Min, J_op(Z̃var...))
+    @operator(optim, J, nZ̃, J_func, ∇J_func!)
+    @objective(optim, Min, J(Z̃var...))
     if JuMP.solver_name(optim) ≠ "Ipopt"
         init_nonlincon!(mpc, model, transcription, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs!)
         set_nonlincon!(mpc, model, transcription, optim)
     else
-        set_nonlincon_exp!(mpc, transcription, g_oracle, geq_oracle)
+        set_nonlincon_exp!(mpc, g_oracle, geq_oracle)
     end 
     return nothing
 end
@@ -894,8 +894,13 @@ function update_predictions!(
     return nothing
 end
 
+"""
+    set_nonlincon_exp!(mpc::NonLinMPC, g_oracle, geq_oracle)
+
+Set the nonlinear inequality and equality constraints for `NonLinMPC`, if any.
+"""
 function set_nonlincon_exp!(
-    mpc::NonLinMPC, ::TranscriptionMethod, g_oracle, geq_oracle
+    mpc::NonLinMPC, g_oracle, geq_oracle
 )
     optim = mpc.optim
     Z̃var = optim[:Z̃var]

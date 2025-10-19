@@ -706,7 +706,12 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        set_nonlincon!(estim, model, optim)
+        if JuMP.solver_name(optim) ≠ "Ipopt"
+            set_nonlincon!(estim, model, optim)
+        else
+            g_oracle = get_nonlinops(estim, optim)
+            set_nonlincon_exp!(estim, model, g_oracle)
+        end
     else
         i_b, i_g = init_matconstraint_mhe(model, 
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
@@ -1278,41 +1283,51 @@ function init_optimization!(
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs! = get_optim_functions(estim, optim)
-    @operator(optim, J, nZ̃, Jfunc, ∇Jfunc!)
+    if JuMP.solver_name(optim) ≠ "Ipopt"
+        # everything with the splatting syntax:
+        J_func, ∇J_func!, g_funcs, ∇g_funcs! = get_optim_functions(estim, optim)
+    else
+        # constraints with vector nonlinear oracle, objective function with splatting:
+        g_oracle, J_func, ∇J_func! = get_nonlinops(estim, optim)
+    end
+    @operator(optim, J, nZ̃, J_func, ∇J_func!)
     @objective(optim, Min, J(Z̃var...))
     nV̂, nX̂ = estim.He*estim.nym, estim.He*estim.nx̂
-    if length(con.i_g) ≠ 0
-        i_base = 0
-        for i in eachindex(con.X̂0min)
-            name = Symbol("g_X̂0min_$i")
-            optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
-            )
+    if JuMP.solver_name(optim) ≠ "Ipopt"
+        if length(con.i_g) ≠ 0
+            i_base = 0
+            for i in eachindex(con.X̂0min)
+                name = Symbol("g_X̂0min_$i")
+                optim[name] = JuMP.add_nonlinear_operator(
+                    optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
+                )
+            end
+            i_base = nX̂
+            for i in eachindex(con.X̂0max)
+                name = Symbol("g_X̂0max_$i")
+                optim[name] = JuMP.add_nonlinear_operator(
+                    optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
+                )
+            end
+            i_base = 2*nX̂
+            for i in eachindex(con.V̂min)
+                name = Symbol("g_V̂min_$i")
+                optim[name] = JuMP.add_nonlinear_operator(
+                    optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
+                )
+            end
+            i_base = 2*nX̂ + nV̂
+            for i in eachindex(con.V̂max)
+                name = Symbol("g_V̂max_$i")
+                optim[name] = JuMP.add_nonlinear_operator(
+                    optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
+                )
+            end
         end
-        i_base = nX̂
-        for i in eachindex(con.X̂0max)
-            name = Symbol("g_X̂0max_$i")
-            optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
-            )
-        end
-        i_base = 2*nX̂
-        for i in eachindex(con.V̂min)
-            name = Symbol("g_V̂min_$i")
-            optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
-            )
-        end
-        i_base = 2*nX̂ + nV̂
-        for i in eachindex(con.V̂max)
-            name = Symbol("g_V̂max_$i")
-            optim[name] = JuMP.add_nonlinear_operator(
-                optim, nZ̃, gfuncs[i_base + i], ∇gfuncs![i_base + i]; name
-            )
-        end
+        set_nonlincon!(estim, model, optim)
+    else
+        set_nonlincon_exp!(estim, model, g_oracle)
     end
-    set_nonlincon!(estim, model, optim)
     return nothing
 end
 
@@ -1379,11 +1394,11 @@ function get_optim_functions(
             J[], _ = value_and_gradient!(Jfunc!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
         end
     end
-    function Jfunc(Z̃arg::Vararg{T, N}) where {N, T<:Real}
+    function J_func(Z̃arg::Vararg{T, N}) where {N, T<:Real}
         update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
         return J[]::T
     end
-    ∇Jfunc! = function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+    ∇J_func! = function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
         # only the multivariate syntax of JuMP.@operator, univariate is impossible for MHE
         # since Z̃ comprises the arrival state estimate AND the estimated process noise
         update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
@@ -1410,23 +1425,124 @@ function get_optim_functions(
             value_and_jacobian!(gfunc!, g, ∇g, ∇g_prep, jac, Z̃_∇g, ∇g_context...)
         end
     end
-    gfuncs = Vector{Function}(undef, ng)
-    for i in eachindex(gfuncs)
+    g_funcs = Vector{Function}(undef, ng)
+    for i in eachindex(g_funcs)
         gfunc_i = function (Z̃arg::Vararg{T, N}) where {N, T<:Real}
             update_con!(g, ∇g, Z̃_∇g, Z̃arg)
             return g[i]::T
         end
-        gfuncs[i] = gfunc_i
+        g_funcs[i] = gfunc_i
     end
-    ∇gfuncs! = Vector{Function}(undef, ng)
-    for i in eachindex(∇gfuncs!)
-        ∇gfuncs![i] = function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+    ∇g_funcs! = Vector{Function}(undef, ng)
+    for i in eachindex(∇g_funcs!)
+        ∇g_funcs![i] = function (∇g_i, Z̃arg::Vararg{T, N}) where {N, T<:Real}
             # only the multivariate syntax of JuMP.@operator, see above for the explanation
             update_con!(g, ∇g, Z̃_∇g, Z̃arg)
             return ∇g_i .= @views ∇g[i, :]
         end
     end
-    return Jfunc, ∇Jfunc!, gfuncs, ∇gfuncs!
+    return J_func, ∇J_func!, g_funcs, ∇g_funcs!
+end
+
+# TODO: move docstring of method above here an re-work it
+function get_nonlinops(
+    estim::MovingHorizonEstimator, ::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    # ----------- common cache for Jfunc and gfuncs  --------------------------------------
+    model, con = estim.model, estim.con
+    grad, jac = estim.gradient, estim.jacobian
+    nx̂, nym, nŷ, nu, nε, nk = estim.nx̂, estim.nym, model.ny, model.nu, estim.nε, model.nk
+    He = estim.He
+    i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
+    ng, ngi = length(con.i_g), sum(con.i_g)
+    nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
+    strict = Val(true)
+    myNaN, myInf                     = convert(JNT, NaN), convert(JNT, Inf)
+    J::Vector{JNT}                   = zeros(JNT, 1)
+    V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
+    k0::Vector{JNT}                  = zeros(JNT, nk)
+    û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
+    g::Vector{JNT}, gi::Vector{JNT}  = zeros(JNT, ng), zeros(JNT, ngi)
+    x̄::Vector{JNT}                   = zeros(JNT, nx̂)
+    # -------------- inequality constraint: nonlinear oracle -----------------------------
+    function gi!(gi, Z̃, V̂, X̂0, û0, k0, ŷ0, g)
+        update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
+        gi .= @views g[i_g]
+        return nothing
+    end
+    Z̃_∇gi = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    ∇gi_context = (
+        Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g)
+    )
+    # temporarily "fill" the estimation window for the preparation of the gradient: 
+    estim.Nk[] = He
+    ∇gi_prep = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_context...; strict)
+    estim.Nk[] = 0
+    ∇gi = init_diffmat(JNT, jac, ∇gi_prep, nZ̃, ngi)
+    function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇gi)
+            Z̃_∇gi .= Z̃_arg
+            value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_context...)
+        end
+        return nothing
+    end
+    function gi_func!(gi_vec, Z̃_arg)
+        update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
+        return gi_vec .= gi
+    end
+    function ∇gi_func!(∇gi_vec, Z̃_arg)
+        update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
+        return diffmat2vec!(∇gi_vec, ∇gi)
+    end
+    gi_min = fill(-myInf, ngi)
+    gi_max = zeros(JNT,   ngi)
+    ∇gi_structure = init_diffstructure(∇gi)
+    g_oracle = Ipopt._VectorNonlinearOracle(;
+        dimension = nZ̃,
+        l = gi_min,
+        u = gi_max,
+        eval_f = gi_func!,
+        jacobian_structure = ∇gi_structure,
+        eval_jacobian = ∇gi_func!
+    )
+    # ------------- objective function: splatting syntax ---------------------------------
+    function J!(Z̃, V̂, X̂0, û0, k0, ŷ0, g, x̄)
+        update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
+        return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
+    end
+    Z̃_∇J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    ∇J_context = (
+        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0),
+        Cache(g),
+        Cache(x̄),
+    )
+    # temporarily "fill" the estimation window for the preparation of the gradient: 
+    estim.Nk[] = He
+    ∇J_prep = prepare_gradient(J!, grad, Z̃_∇J, ∇J_context...; strict)
+    estim.Nk[] = 0
+    ∇J = Vector{JNT}(undef, nZ̃)
+    function update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        if isdifferent(Z̃arg, Z̃_∇J)
+            Z̃_∇J .= Z̃arg
+            J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
+        end
+    end    
+    function J_func(Z̃arg::Vararg{T, N}) where {N, T<:Real}
+        update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        return J[]::T
+    end
+    ∇J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
+        function (Z̃arg)
+            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+            return ∇J[]
+        end
+    else                        # multivariate syntax (see JuMP.@operator doc):
+        function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+            return ∇Jarg .= ∇J
+        end
+    end
+    g_oracle, J_func, ∇J_func!
 end
 
 "By default, no nonlinear constraints in the MHE, thus return nothing."
@@ -1456,5 +1572,24 @@ function set_nonlincon!(
         gfunc_i = optim[Symbol("g_V̂max_$(i)")]
         JuMP.@constraint(optim, gfunc_i(Z̃var...) <= 0)
     end
+    return nothing
+end
+
+"By default, there is no nonlinear constraint, thus do nothing."
+set_nonlincon_exp!(::MovingHorizonEstimator, ::SimModel, _ ) = nothing
+
+"""
+    set_nonlincon_exp!(estim::MovingHorizonEstimator, ::NonLinModel, g_oracle)
+
+Set the nonlinear inequality constraints for `NonLinModel`, if any.
+"""
+function set_nonlincon_exp!(estim::MovingHorizonEstimator, ::NonLinModel, g_oracle)
+    optim = estim.optim
+    Z̃var = optim[:Z̃var]
+    nonlin_constraints = JuMP.all_constraints(
+        optim, JuMP.Vector{JuMP.VariableRef}, Ipopt._VectorNonlinearOracle
+    )
+    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    any(estim.con.i_g) && @constraint(optim, Z̃var in g_oracle)
     return nothing
 end
