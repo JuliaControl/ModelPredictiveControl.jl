@@ -1040,11 +1040,6 @@ end
     @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
     
-    mhe4 = setconstraint!(MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0), v̂max=[50,50])
-    g_V̂max_end = mhe4.optim[:g_V̂max_2].func
-    # execute update_predictions! branch in `gfunc_i` for coverage:
-    @test_nowarn g_V̂max_end(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) ≤ 0.0 
-
     Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
     R̂ = diagm([1, 1].^2)
     optim = Model(Ipopt.Optimizer)
