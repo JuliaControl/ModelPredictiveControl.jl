@@ -440,7 +440,7 @@ function setconstraint!(
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
         if JuMP.solver_name(optim) ≠ "Ipopt"
-            set_nonlincon!(mpc, model, optim)
+            set_nonlincon!(mpc, model, transcription, optim)
         else
             g_oracle, geq_oracle = get_nonlinops(mpc, optim)
             set_nonlincon_exp!(mpc, g_oracle, geq_oracle)
