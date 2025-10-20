@@ -774,13 +774,13 @@ function get_nonlinops(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
         end
         return nothing
     end
-    function gi_func!(gi_vec, Z̃_arg)
+    function gi_func!(gi_arg, Z̃_arg)
         update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        return gi_vec .= gi
+        return gi_arg .= gi
     end
-    function ∇gi_func!(∇gi_vec, Z̃_arg)
+    function ∇gi_func!(∇gi_arg, Z̃_arg)
         update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        return diffmat2vec!(∇gi_vec, ∇gi)
+        return diffmat2vec!(∇gi_arg, ∇gi)
     end
     gi_min = fill(-myInf, ngi)
     gi_max = zeros(JNT,   ngi)
@@ -813,13 +813,13 @@ function get_nonlinops(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
         end
         return nothing
     end
-    function geq_func!(geq_vec, Z̃_arg)
+    function geq_func!(geq_arg, Z̃_arg)
         update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-        return geq_vec .= geq
+        return geq_arg .= geq
     end
-    function ∇geq_func!(∇geq_vec, Z̃_arg)
+    function ∇geq_func!(∇geq_arg, Z̃_arg)
         update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-        return diffmat2vec!(∇geq_vec, ∇geq)
+        return diffmat2vec!(∇geq_arg, ∇geq)
     end
     geq_min = geq_max = zeros(JNT, neq)
     ∇geq_structure = init_diffstructure(∇geq)
@@ -844,25 +844,25 @@ function get_nonlinops(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
     )
     ∇J_prep = prepare_gradient(J!, grad, Z̃_∇J, ∇J_context...; strict)
     ∇J = Vector{JNT}(undef, nZ̃)
-    function update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
-        if isdifferent(Z̃arg, Z̃_∇J)
-            Z̃_∇J .= Z̃arg
+    function update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇J)
+            Z̃_∇J .= Z̃_arg
             J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
         end
     end    
-    function J_func(Z̃arg::Vararg{T, N}) where {N, T<:Real}
-        update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+    function J_func(Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+        update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
         return J[]::T
     end
     ∇J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
-        function (Z̃arg)
-            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        function (Z̃_arg)
+            update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
             return ∇J[]
         end
     else                        # multivariate syntax (see JuMP.@operator doc):
-        function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
-            return ∇Jarg .= ∇J
+        function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
+            return ∇J_arg .= ∇J
         end
     end
     return g_oracle, geq_oracle, J_func, ∇J_func!

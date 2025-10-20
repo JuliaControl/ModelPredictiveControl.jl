@@ -709,7 +709,7 @@ function setconstraint!(
         if JuMP.solver_name(optim) ≠ "Ipopt"
             set_nonlincon!(estim, model, optim)
         else
-            g_oracle = get_nonlinops(estim, optim)
+            g_oracle, = get_nonlinops(estim, optim)
             set_nonlincon_exp!(estim, model, g_oracle)
         end
     else
@@ -1521,25 +1521,25 @@ function get_nonlinops(
     ∇J_prep = prepare_gradient(J!, grad, Z̃_∇J, ∇J_context...; strict)
     estim.Nk[] = 0
     ∇J = Vector{JNT}(undef, nZ̃)
-    function update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
-        if isdifferent(Z̃arg, Z̃_∇J)
-            Z̃_∇J .= Z̃arg
+    function update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇J)
+            Z̃_∇J .= Z̃_arg
             J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
         end
     end    
-    function J_func(Z̃arg::Vararg{T, N}) where {N, T<:Real}
-        update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+    function J_func(Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+        update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
         return J[]::T
     end
     ∇J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
-        function (Z̃arg)
-            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
+        function (Z̃_arg)
+            update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
             return ∇J[]
         end
     else                        # multivariate syntax (see JuMP.@operator doc):
-        function (∇Jarg::AbstractVector{T}, Z̃arg::Vararg{T, N}) where {N, T<:Real}
-            update_objective!(J, ∇J, Z̃_∇J, Z̃arg)
-            return ∇Jarg .= ∇J
+        function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
+            return ∇J_arg .= ∇J
         end
     end
     g_oracle, J_func, ∇J_func!
