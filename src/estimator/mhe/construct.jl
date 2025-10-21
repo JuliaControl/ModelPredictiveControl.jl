@@ -706,12 +706,8 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        if JuMP.solver_name(optim) ≠ "Ipopt"
-            set_nonlincon!(estim, model, optim)
-        else
-            g_oracle, = get_nonlinops(estim, optim)
-            set_nonlincon_exp!(estim, model, g_oracle)
-        end
+        g_oracle, = get_nonlinops(estim, optim)
+        set_nonlincon!(estim, model, optim, g_oracle)
     else
         i_b, i_g = init_matconstraint_mhe(model, 
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
@@ -1283,51 +1279,11 @@ function init_optimization!(
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    if JuMP.solver_name(optim) ≠ "Ipopt"
-        # everything with the splatting syntax:
-        J_func, ∇J_func!, g_funcs, ∇g_funcs! = get_optim_functions(estim, optim)
-    else
-        # constraints with vector nonlinear oracle, objective function with splatting:
-        g_oracle, J_func, ∇J_func! = get_nonlinops(estim, optim)
-    end
+    # constraints with vector nonlinear oracle, objective function with splatting:
+    g_oracle, J_func, ∇J_func! = get_nonlinops(estim, optim)
     @operator(optim, J, nZ̃, J_func, ∇J_func!)
     @objective(optim, Min, J(Z̃var...))
-    nV̂, nX̂ = estim.He*estim.nym, estim.He*estim.nx̂
-    if JuMP.solver_name(optim) ≠ "Ipopt"
-        if length(con.i_g) ≠ 0
-            i_base = 0
-            for i in eachindex(con.X̂0min)
-                name = Symbol("g_X̂0min_$i")
-                optim[name] = JuMP.add_nonlinear_operator(
-                    optim, nZ̃, g_funcs[i_base + i], ∇g_funcs![i_base + i]; name
-                )
-            end
-            i_base = nX̂
-            for i in eachindex(con.X̂0max)
-                name = Symbol("g_X̂0max_$i")
-                optim[name] = JuMP.add_nonlinear_operator(
-                    optim, nZ̃, g_funcs[i_base + i], ∇g_funcs![i_base + i]; name
-                )
-            end
-            i_base = 2*nX̂
-            for i in eachindex(con.V̂min)
-                name = Symbol("g_V̂min_$i")
-                optim[name] = JuMP.add_nonlinear_operator(
-                    optim, nZ̃, g_funcs[i_base + i], ∇g_funcs![i_base + i]; name
-                )
-            end
-            i_base = 2*nX̂ + nV̂
-            for i in eachindex(con.V̂max)
-                name = Symbol("g_V̂max_$i")
-                optim[name] = JuMP.add_nonlinear_operator(
-                    optim, nZ̃, g_funcs[i_base + i], ∇g_funcs![i_base + i]; name
-                )
-            end
-        end
-        set_nonlincon!(estim, model, optim)
-    else
-        set_nonlincon_exp!(estim, model, g_oracle)
-    end
+    set_nonlincon!(estim, model, optim, g_oracle)
     return nothing
 end
 
@@ -1339,21 +1295,18 @@ end
 
 Return the functions for the nonlinear optimization of [`MovingHorizonEstimator`](@ref).
 
-Return the nonlinear objective `Jfunc` function, and `∇Jfunc!`, to compute its gradient. 
-Also return vectors with the nonlinear inequality constraint functions `gfuncs`, and 
-`∇gfuncs!`, for the associated gradients. 
-
-This method is really intricate and I'm not proud of it. That's because of 3 elements:
+Return `g_oracle`, the [`VectorNonlinearOracle`](@extref MOI MathOptInterface.VectorNonlinearOracle)
+for the ineqaulity constraints. Note that `g_oracle` only includes the non-`Inf`
+inequality constraints, thus it must be re-constructed if they change. Also return `J_op`, 
+the [`NonlinearOperator`](@extref JuMP NonlinearOperator) for the objective function, based
+on the splatting syntax. This method is really intricate and that's because of 2 elements:
 
 - These functions are used inside the nonlinear optimization, so they must be type-stable
   and as efficient as possible. All the function outputs and derivatives are cached and
   updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
-- The `JuMP` NLP syntax forces splatting for the decision variable, which implies use
-  of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
+- The splatting syntax for objective functions implies the use of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
   and memoization to avoid redundant computations. This is already complex, but it's even
-  worse knowing that most automatic differentiation tools do not support splatting.
-
-Inspired from: [User-defined operators with vector outputs](@extref JuMP User-defined-operators-with-vector-outputs)
+  worse knowing that the automatic differentiation tools do not support splatting.
 """
 function get_optim_functions(
     estim::MovingHorizonEstimator, ::JuMP.GenericModel{JNT},
@@ -1444,7 +1397,26 @@ function get_optim_functions(
     return J_func, ∇J_func!, g_funcs, ∇g_funcs!
 end
 
-# TODO: move docstring of method above here an re-work it
+"""
+    get_nonlinops(estim::MovingHorizonEstimator, optim) -> g_oracle, J_op
+
+Return the operators for the nonlinear optimization of [`MovingHorizonEstimator`](@ref).
+
+Return `g_oracle`, the inequality [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle),
+. Note that `g_oracle` only includes the non-`Inf` inequality constraints, thus
+it must be re-constructed if they change. Also return `J_op`, the [`NonlinearOperator`](@extref JuMP NonlinearOperator)
+for the objective function, based on the splatting syntax. This method is really intricate
+and that's because of 3 elements:
+
+- These functions are used inside the nonlinear optimization, so they must be type-stable
+  and as efficient as possible. All the function outputs and derivatives are cached and
+  updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
+- The splatting syntax for objective functions implies the use of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
+  and memoization to avoid redundant computations. This is already complex, but it's even
+  worse knowing that the automatic differentiation tools do not support splatting.
+- The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
+  and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
+"""
 function get_nonlinops(
     estim::MovingHorizonEstimator, ::JuMP.GenericModel{JNT}
 ) where JNT<:Real
@@ -1497,7 +1469,7 @@ function get_nonlinops(
     gi_min = fill(-myInf, ngi)
     gi_max = zeros(JNT,   ngi)
     ∇gi_structure = init_diffstructure(∇gi)
-    g_oracle = Ipopt._VectorNonlinearOracle(;
+    g_oracle = MOI.VectorNonlinearOracle(;
         dimension = nZ̃,
         l = gi_min,
         u = gi_max,
@@ -1545,51 +1517,23 @@ function get_nonlinops(
     g_oracle, J_func, ∇J_func!
 end
 
-"By default, no nonlinear constraints in the MHE, thus return nothing."
-set_nonlincon!(::MovingHorizonEstimator, ::SimModel, ::JuMP.GenericModel) = nothing
-
-"Set the nonlinear constraints on the output predictions `Ŷ` and terminal states `x̂end`."
-function set_nonlincon!(
-    estim::MovingHorizonEstimator, ::NonLinModel, optim::JuMP.GenericModel{JNT}
-) where JNT<:Real
-    optim, con = estim.optim, estim.con
-    Z̃var = optim[:Z̃var]
-    nonlin_constraints = JuMP.all_constraints(optim, JuMP.NonlinearExpr, MOI.LessThan{JNT})
-    map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
-    for i in findall(.!isinf.(con.X̂0min))
-        gfunc_i = optim[Symbol("g_X̂0min_$(i)")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in findall(.!isinf.(con.X̂0max))
-        gfunc_i = optim[Symbol("g_X̂0max_$(i)")]
-        @constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in findall(.!isinf.(con.V̂min))
-        gfunc_i = optim[Symbol("g_V̂min_$(i)")]
-        JuMP.@constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    for i in findall(.!isinf.(con.V̂max))
-        gfunc_i = optim[Symbol("g_V̂max_$(i)")]
-        JuMP.@constraint(optim, gfunc_i(Z̃var...) <= 0)
-    end
-    return nothing
-end
-
 "By default, there is no nonlinear constraint, thus do nothing."
-set_nonlincon_exp!(::MovingHorizonEstimator, ::SimModel, _ ) = nothing
+set_nonlincon!(::MovingHorizonEstimator, ::SimModel, _ , _ ) = nothing
 
 """
-    set_nonlincon_exp!(estim::MovingHorizonEstimator, ::NonLinModel, g_oracle)
+    set_nonlincon!(estim::MovingHorizonEstimator, ::NonLinModel, optim, g_oracle)
 
 Set the nonlinear inequality constraints for `NonLinModel`, if any.
 """
-function set_nonlincon_exp!(estim::MovingHorizonEstimator, ::NonLinModel, g_oracle)
-    optim = estim.optim
+function set_nonlincon!(
+    estim::MovingHorizonEstimator, ::NonLinModel, optim::JuMP.GenericModel{JNT}, g_oracle
+) where JNT<:Real
     Z̃var = optim[:Z̃var]
     nonlin_constraints = JuMP.all_constraints(
-        optim, JuMP.Vector{JuMP.VariableRef}, Ipopt._VectorNonlinearOracle
+        optim, JuMP.Vector{JuMP.VariableRef}, MOI.VectorNonlinearOracle{JNT}
     )
     map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
+    optim[:g_oracle]   = g_oracle
     any(estim.con.i_g) && @constraint(optim, Z̃var in g_oracle)
     return nothing
 end

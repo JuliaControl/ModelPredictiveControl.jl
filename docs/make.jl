@@ -10,6 +10,7 @@ links = InterLinks(
     "Julia" => "https://docs.julialang.org/en/v1/objects.inv",
     "ControlSystemsBase" => "https://juliacontrol.github.io/ControlSystems.jl/stable/objects.inv",
     "JuMP" => "https://jump.dev/JuMP.jl/stable/objects.inv",
+    "MathOptInterface" => "https://jump.dev/MathOptInterface.jl/stable/objects.inv",
     "DifferentiationInterface" => "https://juliadiff.org/DifferentiationInterface.jl/DifferentiationInterface/stable/objects.inv",
     "ForwardDiff" => "https://juliadiff.org/ForwardDiff.jl/stable/objects.inv",
     "LowLevelParticleFilters" => "https://baggepinnen.github.io/LowLevelParticleFilters.jl/stable/objects.inv",
