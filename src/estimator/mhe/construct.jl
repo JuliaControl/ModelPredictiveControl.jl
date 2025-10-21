@@ -1292,7 +1292,7 @@ end
 
 Return the operators for the nonlinear optimization of [`MovingHorizonEstimator`](@ref).
 
-Return `g_oracle`, the [`VectorNonlinearOracle`](@extref MOI MathOptInterface.VectorNonlinearOracle)
+Return `g_oracle`, the [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
 for the ineqaulity constraints. Note that `g_oracle` only includes the non-`Inf`
 inequality constraints, thus it must be re-constructed if they change. Also return `J_op`, 
 the [`NonlinearOperator`](@extref JuMP NonlinearOperator) for the objective function, based
