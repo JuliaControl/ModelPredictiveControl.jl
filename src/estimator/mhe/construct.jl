@@ -61,6 +61,7 @@ struct MovingHorizonEstimator{
     con::EstimatorConstraint{NT}
     gradient::GB
     jacobian::JB
+    oracle::Bool
     covestim::CE
     Z̃::Vector{NT}
     lastu0::Vector{NT}
@@ -112,7 +113,7 @@ struct MovingHorizonEstimator{
     function MovingHorizonEstimator{NT}(
         model::SM, 
         He, i_ym, nint_u, nint_ym, cov::KC, Cwt, 
-        optim::JM, gradient::GB, jacobian::JB, covestim::CE;
+        optim::JM, gradient::GB, jacobian::JB, oracle, covestim::CE;
         direct=true
     ) where {
             NT<:Real, 
@@ -161,7 +162,7 @@ struct MovingHorizonEstimator{
             model,
             cov,
             optim, con, 
-            gradient, jacobian,
+            gradient, jacobian, oracle,
             covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
             He, nε,
@@ -267,6 +268,8 @@ transcription for now.
    function when `model` is not a [`LinModel`](@ref), see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
 - `jacobian=AutoForwardDiff()` : an `AbstractADType` backend for the Jacobian of the
    constraints when `model` is not a [`LinModel`](@ref), see `gradient` above for the options.
+- `oracle=JuMP.solver_name(optim)=="Ipopt"`: use the efficient [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
+   for the nonlinear constraints (not supported by most optimizers for now).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
 
@@ -386,6 +389,7 @@ function MovingHorizonEstimator(
     optim::JM = default_optim_mhe(model),
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
+    oracle::Bool = JuMP.solver_name(optim)=="Ipopt",
     direct = true,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
@@ -401,7 +405,8 @@ function MovingHorizonEstimator(
     R̂   = Diagonal([σR;].^2)
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
     return MovingHorizonEstimator(
-        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt; direct, optim, gradient, jacobian
+        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt; 
+        direct, optim, gradient, jacobian, oracle
     )
 end
 
@@ -414,6 +419,7 @@ default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_brid
         optim=default_optim_mhe(model), 
         gradient=AutoForwardDiff(),
         jacobian=AutoForwardDiff(),
+        oracle=JuMP.solver_name(optim)=="Ipopt",
         direct=true,
         covestim=default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     )
@@ -434,6 +440,7 @@ function MovingHorizonEstimator(
     optim::JM = default_optim_mhe(model),
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
+    oracle::Bool = JuMP.solver_name(optim)=="Ipopt",
     direct = true,
     covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
@@ -443,11 +450,10 @@ function MovingHorizonEstimator(
     return MovingHorizonEstimator{NT}(
         model, 
         He, i_ym, nint_u, nint_ym, cov, Cwt, 
-        optim, gradient, jacobian, covestim; 
+        optim, gradient, jacobian, oracle, covestim; 
         direct
     )
 end
-
 
 function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
@@ -706,8 +712,7 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        g_oracle, = get_nonlinops(estim, optim)
-        set_nonlincon!(estim, model, optim, g_oracle)
+        reset_nonlincon!(estim, model)
     else
         i_b, i_g = init_matconstraint_mhe(model, 
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
@@ -717,6 +722,24 @@ function setconstraint!(
         end
     end
     return estim
+end
+
+"By default, no nonlinear constraints, return nothing."
+reset_nonlincon!(::MovingHorizonEstimator, ::SimModel) = nothing
+
+"""
+    reset_nonlincon!(estim::MovingHorizonEstimator, model::NonLinModel)
+
+Re-construct nonlinear constraints and add them to `estim.optim`.
+"""
+function reset_nonlincon!(estim::MovingHorizonEstimator, model::NonLinModel)
+    optim = estim.optim
+    if estim.oracle
+        g_oracle, = get_nonlinops(estim, optim)
+        set_nonlincon!(estim, model, optim, g_oracle)
+    else
+        set_nonlincon_leg!(estim, model, optim)
+    end
 end
 
 @doc raw"""
@@ -1280,10 +1303,20 @@ function init_optimization!(
         end
     end
     # constraints with vector nonlinear oracle, objective function with splatting:
-    g_oracle, J_op = get_nonlinops(estim, optim)
-    optim[:J_op] = J_op
+    if estim.oracle
+        g_oracle, J_op = get_nonlinops(estim, optim)
+        optim[:J_op] = J_op
+    else
+        J_func, ∇J_func!, g_funcs, ∇g_funcs! = get_optim_functions(estim, optim)
+        @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
+    end
     @objective(optim, Min, J_op(Z̃var...))
-    set_nonlincon!(estim, model, optim, g_oracle)
+    if estim.oracle
+        set_nonlincon!(estim, model, optim, g_oracle)
+    else
+        init_nonlincon_leg!(estim, g_funcs, ∇g_funcs!)
+        set_nonlincon_leg!(estim, model, optim)
+    end
     return nothing
 end
 
