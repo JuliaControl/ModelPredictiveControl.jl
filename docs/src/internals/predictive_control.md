@@ -24,8 +24,7 @@ ModelPredictiveControl.relaxterminal
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
 ModelPredictiveControl.init_matconstraint_mpc
-ModelPredictiveControl.init_nonlincon!
-ModelPredictiveControl.get_optim_functions(::NonLinMPC, ::ModelPredictiveControl.GenericModel)
+ModelPredictiveControl.get_nonlinops(::NonLinMPC, ::ModelPredictiveControl.GenericModel)
 ```
 
 ## Update Quadratic Optimization

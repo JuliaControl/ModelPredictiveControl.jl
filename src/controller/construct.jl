@@ -439,12 +439,8 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
-        if JuMP.solver_name(optim) ≠ "Ipopt"
-            set_nonlincon!(mpc, model, transcription, optim)
-        else
-            g_oracle, geq_oracle = get_nonlinops(mpc, optim)
-            set_nonlincon_exp!(mpc, g_oracle, geq_oracle)
-        end
+        g_oracle, geq_oracle = get_nonlinops(mpc, optim)
+        set_nonlincon!(mpc, optim, g_oracle, geq_oracle)
     else
         i_b, i_g = init_matconstraint_mpc(
             model, transcription, nc,
@@ -458,11 +454,11 @@ function setconstraint!(
     return mpc
 end
 
-"By default, no nonlinear operators, return 4 nothing"
-get_nonlinops(::PredictiveController, _ ) = (nothing, nothing, nothing, nothing)
+"By default, no nonlinear operators, return 3 nothing"
+get_nonlinops(::PredictiveController, _ ) = (nothing, nothing, nothing)
 
 "By default, no nonlinear constraints, return nothing."
-set_nonlincon_exp!(::PredictiveController, _ , _ ) = nothing
+set_nonlincon!(::PredictiveController, _ , _ , _ ) = nothing
 
 """
     default_Hp(model::LinModel)
