@@ -1190,6 +1190,13 @@ end
     setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
     @test all((mhe3.con.C_v̂min, mhe3.con.C_v̂max) .≈ (0.03(11:18), 0.04(11:18)))
 
+    # TODO: delete these tests when the deprecated legacy splatting syntax will be.
+    mhe4 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3, oracle=false)
+    setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
+    @test all((mhe3.con.C_x̂min, mhe3.con.C_x̂max) .≈ (0.01(3:10), 0.02(3:10)))
+    setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
+    @test all((mhe3.con.C_v̂min, mhe3.con.C_v̂max) .≈ (0.03(11:18), 0.04(11:18)))
+
     @test_throws ArgumentError setconstraint!(mhe2, x̂min=[-1])
     @test_throws ArgumentError setconstraint!(mhe2, x̂max=[+1])
     @test_throws ArgumentError setconstraint!(mhe2, ŵmin=[-1])
@@ -1325,6 +1332,54 @@ end
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     info = getinfo(mhe2)
     @test info[:V̂] ≈ [-1,-1] atol=5e-2
+
+    # TODO: delete these tests when the deprecated legacy splatting syntax will be.
+    mhe3 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0, oracle=false)
+
+    setconstraint!(mhe3, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe3, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe3, v̂min=[-100,-100], v̂max=[100,100])
+
+    setconstraint!(mhe3, x̂min=[1,1], x̂max=[100,100])
+    preparestate!(mhe3, [50, 30])
+    x̂ = updatestate!(mhe3, [10, 50], [50, 30])
+    @test x̂ ≈ [1, 1] atol=5e-2
+
+    setconstraint!(mhe3, x̂min=[-100,-100], x̂max=[-1,-1])
+    preparestate!(mhe3, [50, 30])
+    x̂ = updatestate!(mhe3, [10, 50], [50, 30])
+    @test x̂ ≈ [-1, -1] atol=5e-2
+
+    setconstraint!(mhe3, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe3, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe3, v̂min=[-100,-100], v̂max=[100,100])
+
+    setconstraint!(mhe3, ŵmin=[1,1], ŵmax=[100,100])
+    preparestate!(mhe3, [50, 30])
+    x̂ = updatestate!(mhe3, [10, 50], [50, 30])
+    @test mhe3.Ŵ ≈ [1,1] atol=5e-2
+
+    setconstraint!(mhe3, ŵmin=[-100,-100], ŵmax=[-1,-1])
+    preparestate!(mhe3, [50, 30])
+    x̂ = updatestate!(mhe3, [10, 50], [50, 30])
+    @test mhe3.Ŵ ≈ [-1,-1] atol=5e-2
+
+    setconstraint!(mhe3, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe3, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe3, v̂min=[-100,-100], v̂max=[100,100])
+
+    setconstraint!(mhe3, v̂min=[1,1], v̂max=[100,100])
+    preparestate!(mhe3, [50, 30])
+    x̂ = updatestate!(mhe3, [10, 50], [50, 30])
+    info = getinfo(mhe3)
+    @test info[:V̂] ≈ [1,1] atol=5e-2
+
+    setconstraint!(mhe3, v̂min=[-100,-100], v̂max=[-1,-1])
+    preparestate!(mhe3, [50, 30])
+    x̂ = updatestate!(mhe3, [10, 50], [50, 30])
+    info = getinfo(mhe3)
+    @test info[:V̂] ≈ [-1,-1] atol=5e-2
+    
 end
 
 @testitem "MovingHorizonEstimator set model" setup=[SetupMPCtests] begin
