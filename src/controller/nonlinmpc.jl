@@ -28,6 +28,7 @@ struct NonLinMPC{
     con::ControllerConstraint{NT, GCfunc}
     gradient::GB
     jacobian::JB
+    oracle::Bool
     Z̃::Vector{NT}
     ŷ::Vector{NT}
     Hp::Int
@@ -67,7 +68,7 @@ struct NonLinMPC{
         estim::SE, Hp, Hc, nb, weights::CW,
         JE::JEfunc, gc!::GCfunc, nc, p::PT, 
         transcription::TM, optim::JM, 
-        gradient::GB, jacobian::JB
+        gradient::GB, jacobian::JB, oracle
     ) where {
             NT<:Real, 
             SE<:StateEstimator,
@@ -117,7 +118,7 @@ struct NonLinMPC{
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE, CW, TM, JM, GB, JB, PT, JEfunc, GCfunc}(
             estim, transcription, optim, con,
-            gradient, jacobian,
+            gradient, jacobian, oracle,
             Z̃, ŷ,
             Hp, Hc, nϵ, nb,
             weights,
@@ -217,6 +218,8 @@ This controller allocates memory at each time step for the optimization.
    function, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
+- `oracle=JuMP.solver_name(optim)=="Ipopt"`: use the efficient [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
+   for the nonlinear constraints (not supported by most optimizers for now).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
@@ -311,13 +314,14 @@ function NonLinMPC(
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
+    oracle::Bool = JuMP.solver_name(optim)=="Ipopt",
     kwargs...
 )
     estim = default_estimator(model; kwargs...)
     return NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
-        transcription, optim, gradient, jacobian
+        transcription, optim, gradient, jacobian, oracle
     )
 end
 
@@ -375,6 +379,7 @@ function NonLinMPC(
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
+    oracle::Bool = JuMP.solver_name(optim)=="Ipopt"
 ) where {
     NT<:Real, 
     SE<:StateEstimator{NT}
@@ -390,7 +395,8 @@ function NonLinMPC(
     gc! = get_mutating_gc(NT, gc)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     return NonLinMPC{NT}(
-        estim, Hp, Hc, nb, weights, JE, gc!, nc, p, transcription, optim, gradient, jacobian
+        estim, Hp, Hc, nb, weights, JE, gc!, nc, p, 
+        transcription, optim, gradient, jacobian, oracle
     )
 end
 
@@ -540,12 +546,39 @@ function init_optimization!(
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    # constraints with vector nonlinear oracle, objective function with splatting:
-    g_oracle, geq_oracle, J_op = get_nonlinops(mpc, optim)
-    optim[:J_op] = J_op
+    if mpc.oracle
+        g_oracle, geq_oracle, J_op = get_nonlinops(mpc, optim)
+        optim[:J_op] = J_op
+    else
+        J_func, ∇J_func!, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs! = get_optim_functions(
+            mpc, optim
+        )
+        @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
+    end
     @objective(optim, Min, J_op(Z̃var...))
-    set_nonlincon!(mpc, optim, g_oracle, geq_oracle) 
+    if mpc.oracle
+        set_nonlincon!(mpc, optim, g_oracle, geq_oracle)
+    else
+        init_nonlincon_leg!(
+            mpc, model, transcription, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs!
+        )
+        set_nonlincon_leg!(mpc, model, transcription, optim)
+    end
     return nothing
+end
+
+"""
+    reset_nonlincon!(mpc::NonLinMPC)
+
+Re-construct nonlinear constraints and add them to `mpc.optim`.
+"""
+function reset_nonlincon!(mpc::NonLinMPC)
+    if mpc.oracle
+        g_oracle, geq_oracle = get_nonlinops(mpc, mpc.optim)
+        set_nonlincon!(mpc, mpc.optim, g_oracle, geq_oracle)
+    else
+        set_nonlincon_leg!(mpc, mpc.estim.model, mpc.transcription, mpc.optim)
+    end
 end
 
 """

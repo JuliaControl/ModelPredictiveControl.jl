@@ -25,6 +25,7 @@ include("controller/execute.jl")
 include("controller/explicitmpc.jl")
 include("controller/linmpc.jl")
 include("controller/nonlinmpc.jl")
+include("controller/legacy.jl")
 
 function Base.show(io::IO, mpc::PredictiveController)
     estim, model = mpc.estim, mpc.estim.model
