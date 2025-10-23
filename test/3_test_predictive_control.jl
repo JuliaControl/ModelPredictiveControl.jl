@@ -1035,8 +1035,19 @@ end
             ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
 
     # TODO: delete these tests when the deprecated legacy splatting syntax will be.
-    nmpc_lin_leg = NonLinMPC(linmodel1, Hp=1, Hc=1, oracle=false)
-    nmpc_ms_leg  = NonLinMPC(nonlinmodel, Hp=1, Hc=1, oracle=false, transcription=MultipleShooting())
+    gc_leg! =  (LHS,_,_,_,_,_) -> (LHS[begin] = -1)
+    nc_leg  = 1
+    nmpc_lin_leg = setconstraint!(
+        NonLinMPC(linmodel1, Hp=1, Hc=1, gc=gc_leg!, nc=nc_leg, oracle=false),
+        ymin=[-1e3, -1e3], ymax=[1e3,1e3]
+    )
+    nmpc_ms_leg = setconstraint!(
+        NonLinMPC(
+            nonlinmodel, Hp=1, Hc=1, gc=gc_leg!, nc=nc_leg, 
+            oracle=false, transcription=MultipleShooting()
+        ),
+        ymin=[-1e3, -1e3], ymax=[1e3,1e3]
+    )
     nmpc_leg = NonLinMPC(nonlinmodel, Hp=1, Hc=1, oracle=false)
 
     setconstraint!(nmpc_leg, umin=[-5, -9.9], umax=[100,99])
