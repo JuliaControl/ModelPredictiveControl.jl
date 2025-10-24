@@ -1191,10 +1191,10 @@ end
     @test all((mhe3.con.C_v̂min, mhe3.con.C_v̂max) .≈ (0.03(11:18), 0.04(11:18)))
 
     # TODO: delete these tests when the deprecated legacy splatting syntax will be.
-    mhe4 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3, oracle=false)
-    setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
-    @test all((mhe3.con.C_x̂min, mhe3.con.C_x̂max) .≈ (0.01(3:10), 0.02(3:10)))
-    setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
+    @test_nowarn mhe4 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3, oracle=false)
+    @test_nowarn setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
+    @test_nowarn @test all((mhe3.con.C_x̂min, mhe3.con.C_x̂max) .≈ (0.01(3:10), 0.02(3:10)))
+    @test_nowarn setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
     @test all((mhe3.con.C_v̂min, mhe3.con.C_v̂max) .≈ (0.03(11:18), 0.04(11:18)))
 
     @test_throws ArgumentError setconstraint!(mhe2, x̂min=[-1])
