@@ -1035,20 +1035,20 @@ end
             ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
 
     # TODO: delete these tests when the deprecated legacy splatting syntax will be.
-    gc_leg! =  (LHS,_,_,_,_,_) -> (LHS[begin] = -1)
-    nc_leg  = 1
-    nmpc_lin_leg = setconstraint!(
+    @test_nowarn gc_leg! =  (LHS,_,_,_,_,_) -> (LHS[begin] = -1)
+    @test_nowarn nc_leg  = 1
+    @test_nowarn nmpc_lin_leg = setconstraint!(
         NonLinMPC(linmodel1, Hp=1, Hc=1, gc=gc_leg!, nc=nc_leg, oracle=false),
         ymin=[-1e3, -1e3], ymax=[1e3,1e3]
     )
-    nmpc_ms_leg = setconstraint!(
+    @test_nowarn nmpc_ms_leg = setconstraint!(
         NonLinMPC(
             nonlinmodel, Hp=1, Hc=1, gc=gc_leg!, nc=nc_leg, 
             oracle=false, transcription=MultipleShooting()
         ),
         ymin=[-1e3, -1e3], ymax=[1e3,1e3]
     )
-    nmpc_leg = NonLinMPC(nonlinmodel, Hp=1, Hc=1, oracle=false)
+    @test_nowarn nmpc_leg = NonLinMPC(nonlinmodel, Hp=1, Hc=1, oracle=false)
 
     setconstraint!(nmpc_leg, umin=[-5, -9.9], umax=[100,99])
     @test all((nmpc_leg.con.U0min, nmpc_leg.con.U0max) .≈ ([-5, -9.9], [100,99]))
@@ -1245,91 +1245,91 @@ end
 
     # TODO: delete these tests when the deprecated legacy splatting syntax will be.
 
-    nmpc_leg = NonLinMPC(nonlinmodel; Hp, Hc=5, gc, nc=2Hp, p=[0; 0], oracle=false)
-    JuMP.set_attribute(nmpc_leg.optim, "constr_viol_tol", 1e-3)
+    @test_nowarn nmpc_leg = NonLinMPC(nonlinmodel; Hp, Hc=5, gc, nc=2Hp, p=[0; 0], oracle=false)
+    @test_nowarn JuMP.set_attribute(nmpc_leg.optim, "constr_viol_tol", 1e-3)
 
-    setconstraint!(nmpc_leg, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
-    setconstraint!(nmpc_leg, umin=[-1e6], umax=[+1e6])
-    setconstraint!(nmpc_leg, Δumin=[-15], Δumax=[15])
-    setconstraint!(nmpc_leg, ymin=[-100], ymax=[100])
-    preparestate!(nmpc_leg, [0])
+    @test_nowarn setconstraint!(nmpc_leg, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
+    @test_nowarn setconstraint!(nmpc_leg, umin=[-1e6], umax=[+1e6])
+    @test_nowarn setconstraint!(nmpc_leg, Δumin=[-15], Δumax=[15])
+    @test_nowarn setconstraint!(nmpc_leg, ymin=[-100], ymax=[100])
+    @test_nowarn preparestate!(nmpc_leg, [0])
     
-    setconstraint!(nmpc_leg, umin=[-3], umax=[4])
-    moveinput!(nmpc_leg, [-100])
-    info = getinfo(nmpc_leg)
+    @test_nowarn setconstraint!(nmpc_leg, umin=[-3], umax=[4])
+    @test_nowarn moveinput!(nmpc_leg, [-100])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test all(isapprox.(info[:U], -3; atol=1e-1))
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
+    @test_nowarn moveinput!(nmpc_leg, [100])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test all(isapprox.(info[:U], 4; atol=1e-1))
-    setconstraint!(nmpc_leg, umin=[-1e6], umax=[+1e6])
+    @test_nowarn setconstraint!(nmpc_leg, umin=[-1e6], umax=[+1e6])
 
-    setconstraint!(nmpc_leg, Δumin=[-1.5], Δumax=[1.25])
-    moveinput!(nmpc_leg, [-100])
-    info = getinfo(nmpc_leg)
+    @test_nowarn setconstraint!(nmpc_leg, Δumin=[-1.5], Δumax=[1.25])
+    @test_nowarn moveinput!(nmpc_leg, [-100])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test all(isapprox.(info[:ΔU], -1.5; atol=1e-1))
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
+    @test_nowarn moveinput!(nmpc_leg, [100])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test all(isapprox.(info[:ΔU], 1.25; atol=1e-1))
-    setconstraint!(nmpc_leg, Δumin=[-1e6], Δumax=[+1e6])
+    @test_nowarn setconstraint!(nmpc_leg, Δumin=[-1e6], Δumax=[+1e6])
 
-    setconstraint!(nmpc_leg, ymin=[-0.5], ymax=[0.9])
-    moveinput!(nmpc_leg, [-100])
-    info = getinfo(nmpc_leg)
+    @test_nowarn setconstraint!(nmpc_leg, ymin=[-0.5], ymax=[0.9])
+    @test_nowarn moveinput!(nmpc_leg, [-100])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test all(isapprox.(info[:Ŷ], -0.5; atol=1e-1))
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
+    @test_nowarn moveinput!(nmpc_leg, [100])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test all(isapprox.(info[:Ŷ], 0.9; atol=1e-1))
-    setconstraint!(nmpc_leg, ymin=[-100], ymax=[100])
+    @test_nowarn setconstraint!(nmpc_leg, ymin=[-100], ymax=[100])
 
-    setconstraint!(nmpc_leg, Ymin=[-0.5; fill(-100, Hp-1)], Ymax=[0.9; fill(+100, Hp-1)])
-    moveinput!(nmpc_leg, [-200])
-    info = getinfo(nmpc_leg)
+    @test_nowarn setconstraint!(nmpc_leg, Ymin=[-0.5; fill(-100, Hp-1)], Ymax=[0.9; fill(+100, Hp-1)])
+    @test_nowarn moveinput!(nmpc_leg, [-200])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test info[:Ŷ][end]   ≈ -100  atol=1e-1
     @test info[:Ŷ][begin] ≈ -0.5 atol=1e-1
-    moveinput!(nmpc_leg, [200])
-    info = getinfo(nmpc_leg)
+    @test_nowarn moveinput!(nmpc_leg, [200])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test info[:Ŷ][end]   ≈ 100  atol=1e-1
     @test info[:Ŷ][begin] ≈ 0.9 atol=1e-1
-    setconstraint!(nmpc_leg, ymin=[-100], ymax=[100])
+    @test_nowarn setconstraint!(nmpc_leg, ymin=[-100], ymax=[100])
     
-    setconstraint!(nmpc_leg, x̂min=[-1e-6,-Inf], x̂max=[+1e-6,+Inf])
-    moveinput!(nmpc_leg, [-10])
-    info = getinfo(nmpc_leg)
+    @test_nowarn setconstraint!(nmpc_leg, x̂min=[-1e-6,-Inf], x̂max=[+1e-6,+Inf])
+    @test_nowarn moveinput!(nmpc_leg, [-10])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
-    moveinput!(nmpc_leg, [10])
-    info = getinfo(nmpc_leg)
+    @test_nowarn moveinput!(nmpc_leg, [10])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
-    setconstraint!(nmpc_leg, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
+    @test_nowarn setconstraint!(nmpc_leg, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
 
-    nmpc_leg.p .= [1; 0]
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
+    @test_nowarn nmpc_leg.p .= [1; 0]
+    @test_nowarn moveinput!(nmpc_leg, [100])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test all(isapprox.(info[:U], 4.2; atol=1e-1))
     @test all(isapprox.(info[:gc][1:Hp], 0.0; atol=1e-1))
 
-    nmpc_leg.p .= [0; 1]
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
+    @test_nowarn nmpc_leg.p .= [0; 1]
+    @test_nowarn moveinput!(nmpc_leg, [100])
+    @test_nowarn info = getinfo(nmpc_leg)
     @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
     @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
 
-    nmpc_ms = NonLinMPC(
+    @test_nowarn nmpc_ms = NonLinMPC(
         nonlinmodel; Hp, Hc=5, transcription=MultipleShooting(), gc, nc=2Hp, p=[0; 0]
     )
-    JuMP.set_attribute(nmpc_ms.optim, "constr_viol_tol", 1e-3)
+    @test_nowarn JuMP.set_attribute(nmpc_ms.optim, "constr_viol_tol", 1e-3)
 
-    setconstraint!(nmpc_ms, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
-    setconstraint!(nmpc_ms, ymin=[-100], ymax=[100])
-    preparestate!(nmpc_ms, [0])
+    @test_nowarn setconstraint!(nmpc_ms, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
+    @test_nowarn setconstraint!(nmpc_ms, ymin=[-100], ymax=[100])
+    @test_nowarn preparestate!(nmpc_ms, [0])
 
-    setconstraint!(nmpc_ms, ymin=[-0.5], ymax=[0.9])
-    moveinput!(nmpc_ms, [-100])
-    info = getinfo(nmpc_ms)
+    @test_nowarn setconstraint!(nmpc_ms, ymin=[-0.5], ymax=[0.9])
+    @test_nowarn moveinput!(nmpc_ms, [-100])
+    @test_nowarn info = getinfo(nmpc_ms)
     @test all(isapprox.(info[:Ŷ], -0.5; atol=1e-1))
-    moveinput!(nmpc_ms, [100])
-    info = getinfo(nmpc_ms)
+    @test_nowarn moveinput!(nmpc_ms, [100])
+    @test_nowarn info = getinfo(nmpc_ms)
     @test all(isapprox.(info[:Ŷ], 0.9; atol=1e-1))
-    setconstraint!(nmpc_ms, ymin=[-100], ymax=[100])
+    @test_nowarn setconstraint!(nmpc_ms, ymin=[-100], ymax=[100])
 
     setconstraint!(nmpc_ms, x̂min=[-1e-6,-Inf], x̂max=[+1e-6,+Inf])
     moveinput!(nmpc_ms, [-10])
