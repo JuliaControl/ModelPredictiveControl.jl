@@ -81,11 +81,12 @@ end
     preparestate!(mpc1, [10])
     u = moveinput!(mpc1, r)
     @test u ≈ [1] atol=1e-2
-    u = mpc1(r)
+    u = mpc1(r, lastu=[-1])
     @test u ≈ [1] atol=1e-2
     info = getinfo(mpc1)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ r[1] atol=1e-2
+    @test info[:ΔU] ≈ [2.0] atol=1e-2
     mpc2 = LinMPC(linmodel, Nwt=[0], Cwt=Inf, Hp=1000, Hc=1)
     preparestate!(mpc2, [10])
     u = moveinput!(mpc2, r)
@@ -515,11 +516,12 @@ end
     preparestate!(mpc1, y)
     u = moveinput!(mpc1, r)
     @test u ≈ [1] atol=1e-2
-    u = mpc1(r)
+    u = mpc1(r, lastu=[-1])
     @test u ≈ [1] atol=1e-2
     info = getinfo(mpc1)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ r[1] atol=1e-2
+    @test info[:ΔU] ≈ [2.0] atol=1e-2
     mpc2 = ExplicitMPC(model, Nwt=[0], Hp=1000, Hc=1)
     preparestate!(mpc2, y)
     u = moveinput!(mpc2, [5])
@@ -756,11 +758,12 @@ end
     preparestate!(nmpc_lin, [10])
     u = moveinput!(nmpc_lin, ry)
     @test u ≈ [1] atol=5e-2
-    u = nmpc_lin(ry)
+    u = nmpc_lin(ry, lastu=[-1])
     @test u ≈ [1] atol=5e-2
     info = getinfo(nmpc_lin)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ ry[1] atol=5e-2
+    @test info[:ΔU] ≈ [2.0] atol=5e-2
     setmodel!(nmpc_lin; Mwt=[0], Lwt=[1])
     u = moveinput!(nmpc_lin; R̂u=fill(ru[1], Hp))
     @test u ≈ [4] atol=5e-2
