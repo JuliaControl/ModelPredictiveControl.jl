@@ -68,7 +68,7 @@ struct NonLinMPC{
         estim::SE, Hp, Hc, nb, weights::CW,
         JE::JEfunc, gc!::GCfunc, nc, p::PT, 
         transcription::TM, optim::JM, 
-        gradient::GB, jacobian::JB, oracle
+        gradient::GB, jacobian::JB, hessian::HB, oracle
     ) where {
             NT<:Real, 
             SE<:StateEstimator,
@@ -77,6 +77,7 @@ struct NonLinMPC{
             JM<:JuMP.GenericModel,
             GB<:AbstractADType,
             JB<:AbstractADType,
+            HB<:Union{AbstractADType, Nothing},
             PT<:Any,
             JEfunc<:Function, 
             GCfunc<:Function, 
@@ -218,6 +219,8 @@ This controller allocates memory at each time step for the optimization.
    function, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
+- `hessian=false` : an `AbstractADType` backend for the Hessian of the Lagrangian, see 
+   `gradient` above for the options (`false` to skip it and use `optim` approximation). 
 - `oracle=JuMP.solver_name(optim)=="Ipopt"`: use the efficient [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
    for the nonlinear constraints (not supported by most optimizers for now).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
@@ -314,6 +317,7 @@ function NonLinMPC(
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
+    hessian::Union{AbstractADType, Bool, Nothing} = false,
     oracle::Bool = JuMP.solver_name(optim)=="Ipopt",
     kwargs...
 )
@@ -321,7 +325,7 @@ function NonLinMPC(
     return NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
-        transcription, optim, gradient, jacobian, oracle
+        transcription, optim, gradient, jacobian, hessian, oracle
     )
 end
 
@@ -379,6 +383,7 @@ function NonLinMPC(
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
+    hessian::Union{AbstractADType, Bool, Nothing} = false,
     oracle::Bool = JuMP.solver_name(optim)=="Ipopt"
 ) where {
     NT<:Real, 
@@ -394,14 +399,23 @@ function NonLinMPC(
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
+    hessian = default_hessian(gradient, jacobian, hessian)
     return NonLinMPC{NT}(
         estim, Hp, Hc, nb, weights, JE, gc!, nc, p, 
-        transcription, optim, gradient, jacobian, oracle
+        transcription, optim, gradient, jacobian, hessian, oracle
     )
 end
 
 default_jacobian(::SingleShooting)      = DEFAULT_NONLINMPC_JACDENSE
 default_jacobian(::TranscriptionMethod) = DEFAULT_NONLINMPC_JACSPARSE
+
+function default_hessian(gradient, jacobian, hessian::Bool)
+    if hessian
+        return DEFAULT_NONLINMPC_HESSIAN
+    else
+        return nothing
+    end
+end
 
 """
     validate_JE(NT, JE) -> nothing
