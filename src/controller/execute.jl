@@ -37,6 +37,7 @@ See also [`LinMPC`](@ref), [`ExplicitMPC`](@ref), [`NonLinMPC`](@ref).
 - `mpc::PredictiveController` : solve optimization problem of `mpc`.
 - `ry=mpc.estim.model.yop` : current output setpoints ``\mathbf{r_y}(k)``.
 - `d=[]` : current measured disturbances ``\mathbf{d}(k)``.
+- `lastu=mpc.lastu0+mpc.estim.model.uop`: last manipulated input ``\mathbf{u}(k-1)``.
 - `D̂=repeat(d, mpc.Hp)` or *`Dhat`* : predicted measured disturbances ``\mathbf{D̂}``, constant
    in the future by default or ``\mathbf{d̂}(k+j)=\mathbf{d}(k)`` for ``j=1`` to ``H_p``.
 - `R̂y=repeat(ry, mpc.Hp)` or *`Rhaty`* : predicted output setpoints ``\mathbf{R̂_y}``, constant
@@ -59,6 +60,7 @@ function moveinput!(
     mpc::PredictiveController, 
     ry::Vector = mpc.estim.model.yop, 
     d ::Vector = mpc.buffer.empty;
+    lastu::Vector = (mpc.buffer.u .= mpc.lastu0 .+ mpc.estim.model.uop),
     Dhat ::Vector = repeat!(mpc.buffer.D̂, d,  mpc.Hp),
     Rhaty::Vector = repeat!(mpc.buffer.Ŷ, ry, mpc.Hp),
     Rhatu::Vector = mpc.Uop,
@@ -69,8 +71,8 @@ function moveinput!(
     if mpc.estim.direct && !mpc.estim.corrected[]
         @warn "preparestate! should be called before moveinput! with current estimators"
     end
-    validate_args(mpc, ry, d, D̂, R̂y, R̂u)
-    initpred!(mpc, mpc.estim.model, d, D̂, R̂y, R̂u)
+    validate_args(mpc, ry, d, lastu, D̂, R̂y, R̂u)
+    initpred!(mpc, mpc.estim.model, d, lastu, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model, mpc.transcription)
     linconstrainteq!(mpc, mpc.estim.model, mpc.transcription)
     Z̃ = optim_objective!(mpc)
@@ -189,7 +191,7 @@ function addinfo!(info, mpc::PredictiveController)
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u) -> nothing
+    initpred!(mpc::PredictiveController, model::LinModel, d, lastu, D̂, R̂y, R̂u) -> nothing
 
 Init linear model prediction matrices `F, q̃, r` and current estimated output `ŷ`.
 
@@ -208,8 +210,8 @@ They are computed with these equations using in-place operations:
 \end{aligned}
 ```
 """
-function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂u)
-    F   = initpred_common!(mpc, model, d, D̂, R̂y, R̂u)
+function initpred!(mpc::PredictiveController, model::LinModel, d, lastu, D̂, R̂y, R̂u)
+    F   = initpred_common!(mpc, model, d, lastu, D̂, R̂y, R̂u)
     F .+= mpc.B                                 # F = F + B
     mul!(F, mpc.K, mpc.estim.x̂0, 1, 1)          # F = F + K*x̂0
     mul!(F, mpc.V, mpc.lastu0, 1, 1)            # F = F + V*lastu0
@@ -241,24 +243,25 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, D̂, R̂y, R̂
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
+    initpred!(mpc::PredictiveController, model::SimModel, d, lastu, D̂, R̂y, R̂u)
 
-Init `ŷ, F, d0, D̂0, D̂e, R̂y, R̂u` vectors when model is not a [`LinModel`](@ref).
+Init `lastu0, ŷ, F, d0, D̂0, D̂e, R̂y, R̂u` vectors when model is not a [`LinModel`](@ref).
 """
-function initpred!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
-    F = initpred_common!(mpc, model, d, D̂, R̂y, R̂u)
+function initpred!(mpc::PredictiveController, model::SimModel, d, lastu, D̂, R̂y, R̂u)
+    F = initpred_common!(mpc, model, d, lastu, D̂, R̂y, R̂u)
     return nothing
 end
 
 """
-    initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u) -> mpc.F
+    initpred_common!(mpc::PredictiveController, model::SimModel, d, lastu, D̂, R̂y, R̂u) -> F
 
 Common computations of `initpred!` for all types of [`SimModel`](@ref).
 
 Will also init `mpc.F` with 0 values, or with the stochastic predictions `Ŷs` if `mpc.estim`
 is an [`InternalModel`](@ref). The function returns `mpc.F`.
 """
-function initpred_common!(mpc::PredictiveController, model::SimModel, d, D̂, R̂y, R̂u)
+function initpred_common!(mpc::PredictiveController, model::SimModel, d, lastu, D̂, R̂y, R̂u)
+    mpc.lastu0 .= lastu .- model.uop
     mul!(mpc.Tu_lastu0, mpc.Tu, mpc.lastu0)
     mpc.ŷ .= evaloutput(mpc.estim, d)
     if model.nd > 0
