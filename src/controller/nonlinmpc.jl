@@ -706,6 +706,8 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
         hessian_lagrangian_structure = ∇²gi_structure,
         eval_hessian_lagrangian = ∇²gi_func!
     )
+    #TODO: verify if I must fill only upper/lower triangular part ?
+    #TODO: add Hessian for 1. Jfunc and 2. geq
     # ------------- equality constraints : nonlinear oracle ------------------------------
     function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
