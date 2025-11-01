@@ -1372,6 +1372,7 @@ function get_nonlinops(
     ∇gi_prep = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_context...; strict)
     estim.Nk[] = 0
     ∇gi = init_diffmat(JNT, jac, ∇gi_prep, nZ̃, ngi)
+    ∇gi_structure = init_diffstructure(∇gi)
     function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
         if isdifferent(Z̃_arg, Z̃_∇gi)
             Z̃_∇gi .= Z̃_arg
@@ -1385,11 +1386,10 @@ function get_nonlinops(
     end
     function ∇gi_func!(∇gi_vec, Z̃_arg)
         update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        return diffmat2vec!(∇gi_vec, ∇gi)
+        return diffmat2vec!(∇gi_vec, ∇gi, ∇gi_structure)
     end
     gi_min = fill(-myInf, ngi)
     gi_max = zeros(JNT,   ngi)
-    ∇gi_structure = init_diffstructure(∇gi)
     g_oracle = MOI.VectorNonlinearOracle(;
         dimension = nZ̃,
         l = gi_min,
