@@ -71,9 +71,27 @@ function init_diffstructure(A::AbstractSparseMatrix)
 end
 init_diffstructure(A::AbstractMatrix)= Tuple.(CartesianIndices(A))[:]
 
-"Store the differentiation matrix `A` in the vector `v` as required by `JuMP.jl.`" 
-diffmat2vec!(v::AbstractVector, A::AbstractSparseMatrix)    = v   .= nonzeros(A)
-diffmat2vec!(v::AbstractVector, A::AbstractMatrix)          = v[:] = A
+"Get the lower-triangular indices from the differentiation matrix structure."
+function lowertriangle_indices(diffmat_struct::Vector{Tuple{Int, Int}})
+    return [(i,j) for (i,j) in diffmat_struct if i ≥ j]
+end
+
+"Fill the lower triangular part of A in-place with the corresponding part in B."
+function fill_lowertriangle!(A::AbstractMatrix, B::AbstractMatrix)
+    for j in axes(A, 2), i in axes(A, 1)
+        (i ≥ j) && (A[i, j] = B[i, j])
+    end
+    return A
+end
+
+"Store the diff. matrix `A` in the vector `v` with list of nonzero indices `i_vec`" 
+function diffmat2vec!(v::AbstractVector, A::AbstractMatrix, i_vec::Vector{Tuple{Int, Int}})
+    for i in eachindex(v)
+        i_A, j_A = i_vec[i]
+        v[i] = A[i_A, j_A]
+    end
+    return v
+end
 
 backend_str(backend::AbstractADType) = string(nameof(typeof(backend)))
 function backend_str(backend::AutoSparse)
