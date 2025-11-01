@@ -335,21 +335,21 @@ JuMP.set_attribute(mhe_pendulum_madnlp_pred.optim, "tol", 1e-7)
 samples, evals, seconds = 25, 1, 15*60
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
     @benchmarkable(
-        sim!($mhe_pendulum_ipopt_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        sim!($mhe_pendulum_ipopt_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Prediction form"] =
     @benchmarkable(
-        sim!($mhe_pendulum_ipopt_pred, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        sim!($mhe_pendulum_ipopt_pred, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["MadNLP"]["Current form"] =
     @benchmarkable(
-        sim!($mhe_pendulum_madnlp_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        sim!($mhe_pendulum_madnlp_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["MadNLP"]["Prediction form"] =
     @benchmarkable(
-        sim!($mhe_pendulum_madnlp_pred, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0),
+        sim!($mhe_pendulum_madnlp_pred, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
