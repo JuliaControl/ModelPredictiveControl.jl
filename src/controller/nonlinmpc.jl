@@ -223,7 +223,8 @@ This controller allocates memory at each time step for the optimization.
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
 - `hessian=false` : an `AbstractADType` backend for the Hessian of the Lagrangian, see 
-   `gradient` above for the options (`false` to skip it and use `optim` approximation). 
+   `gradient` above for the options. The default `false` skip it and use the quasi-Newton
+    method of `optim`, which is always the case if `oracle=false` (see Extended Help).
 - `oracle=JuMP.solver_name(optim)=="Ipopt"`: use the efficient [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
    for the nonlinear constraints (not supported by most optimizers for now).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
@@ -282,9 +283,9 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     the `gc` argument (both `gc` and `gc!` accepts non-mutating and mutating functions). 
     
     By default, the optimization relies on dense [`ForwardDiff`](@extref ForwardDiff)
-    automatic differentiation (AD) to compute the objective and constraint derivatives. One
-    exception: if `transcription` is not a [`SingleShooting`](@ref), the `jacobian` argument
-    defaults to this [sparse backend](@extref DifferentiationInterface AutoSparse-object):
+    automatic differentiation (AD) to compute the objective and constraint derivatives. Two
+    exceptions: if `transcription` is not a [`SingleShooting`](@ref), the `jacobian`
+    argument defaults to this [sparse backend](@extref DifferentiationInterface AutoSparse-object):
     ```julia
     AutoSparse(
         AutoForwardDiff(); 
@@ -292,6 +293,10 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
         coloring_algorithm = GreedyColoringAlgorithm()
     )
     ```
+    This is also the sparse backend selected for the Hessian of the Lagrangian function if 
+    `oracle=true` and `hessian=true`, which is the second exception. Second order 
+    derivatives are only supported with `oracle=true` option.
+    
     Optimizers generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
     state-space functions must be compatible with this feature. See [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
     for common mistakes when writing these functions.
@@ -402,7 +407,7 @@ function NonLinMPC(
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-    hessian = default_hessian(gradient, jacobian, hessian)
+    hessian = validate_hessian(hessian, gradient, oracle)
     return NonLinMPC{NT}(
         estim, Hp, Hc, nb, weights, JE, gc!, nc, p, 
         transcription, optim, gradient, jacobian, hessian, oracle
@@ -411,14 +416,6 @@ end
 
 default_jacobian(::SingleShooting)      = DEFAULT_NONLINMPC_JACDENSE
 default_jacobian(::TranscriptionMethod) = DEFAULT_NONLINMPC_JACSPARSE
-
-function default_hessian(gradient, jacobian, hessian::Bool)
-    if hessian
-        return DEFAULT_NONLINMPC_HESSIAN
-    else
-        return nothing
-    end
-end
 
 """
     validate_JE(NT, JE) -> nothing
@@ -511,6 +508,34 @@ function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, 
         )
     end
     return nothing
+end
+
+"""
+    validate_hessian(hessian, gradient, oracle) -> backend
+
+Validate `hessian` argument and return the differentiation backend.
+"""
+function validate_hessian(hessian, gradient, oracle)
+    if hessian == true
+        backend = DEFAULT_NONLINMPC_HESSIAN
+    elseif hessian == false || isnothing(hessian)
+        backend = nothing
+    else
+        backend = hessian
+    end
+    if oracle == false && !isnothing(backend)
+        error("Second order derivatives are only supported with oracle=true.")
+    end
+    if oracle == true && !isnothing(backend)
+        hess = dense_backend(backend)
+        grad = dense_backend(gradient)
+        if hess != grad
+            @info "The objective function gradient will be computed with the hessian "*
+                "backend ($(backend_str(hess)))\n instead of the one in gradient "*
+                "argument ($(backend_str(grad))) for efficiency."
+        end
+    end
+    return backend
 end
 
 """

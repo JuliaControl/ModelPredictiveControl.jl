@@ -69,11 +69,11 @@ function init_diffstructure(A::AbstractSparseMatrix)
     I, J = findnz(A)
     return collect(zip(I, J))
 end
-init_diffstructure(A::AbstractMatrix)= Tuple.(CartesianIndices(A))[:]
+init_diffstructure(A::AbstractMatrix) = Tuple.(CartesianIndices(A))[:]
 
-"Get the lower-triangular indices from the differentiation matrix structure."
-function lowertriangle_indices(diffmat_struct::Vector{Tuple{Int, Int}})
-    return [(i,j) for (i,j) in diffmat_struct if i ≥ j]
+"Get the lower-triangular indices from the differentiation matrix structure `i_vec`."
+function lowertriangle_indices(i_vec::Vector{Tuple{Int, Int}})
+    return [(i,j) for (i,j) in i_vec if i ≥ j]
 end
 
 "Fill the lower triangular part of A in-place with the corresponding part in B."
@@ -100,6 +100,14 @@ function backend_str(backend::AutoSparse)
             " $(nameof(typeof(backend.coloring_algorithm))))"
     return str
 end
+function backend_str(backend::SecondOrder)
+    str =   "SecondOrder ($(nameof(typeof(backend.outer))),"*
+                        " $(nameof(typeof(backend.inner))))"
+    return str
+end
+dense_backend(backend::AbstractADType) = backend
+dense_backend(backend::AutoSparse) = backend.dense_ad
+dense_backend(backend::SecondOrder) = backend.inner
 
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
