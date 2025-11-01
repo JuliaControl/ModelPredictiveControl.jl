@@ -484,7 +484,7 @@ JuMP.unset_time_limit_sec(nmpc2_ipopt_tc.optim)
 samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
-        sim!($nmpc2_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0), progress=false,
+        sim!($nmpc2_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["MultipleShooting"] =
