@@ -730,7 +730,8 @@ end
     @test nmpc18.gradient == AutoFiniteDiff()
     @test nmpc18.jacobian == AutoFiniteDiff()
     @test nmpc18.hessian  == AutoFiniteDiff()
-    nmpc19 = NonLinMPC(nonlinmodel, Hc=1, Hp=10, Cwt=Inf, 
+    nonlinmodel_simple = NonLinModel((x,u,_,_)->x+u,(x,_,_)->x, 1, 1, 1, 1, solver=nothing)
+    nmpc19 = NonLinMPC(nonlinmodel_simple, Hc=1, Hp=10, Cwt=Inf, 
         hessian=SecondOrder(AutoForwardDiff(), AutoForwardDiff())
     )
     @test nmpc19.hessian == SecondOrder(AutoForwardDiff(), AutoForwardDiff())
