@@ -94,6 +94,7 @@ function diffmat2vec!(v::AbstractVector, A::AbstractMatrix, i_vec::Vector{Tuple{
 end
 
 backend_str(backend::AbstractADType) = string(nameof(typeof(backend)))
+backend_str(backend::Nothing) = "nothing"
 function backend_str(backend::AutoSparse)
     str =   "AutoSparse ($(nameof(typeof(backend.dense_ad))),"*
             " $(nameof(typeof(backend.sparsity_detector))),"*

@@ -981,4 +981,5 @@ end
 function print_backends(io::IO, mpc::NonLinMPC)
     println(io, "├ gradient: $(backend_str(mpc.gradient))")
     println(io, "├ jacobian: $(backend_str(mpc.jacobian))")
+    println(io, "├ hessian: $(backend_str(mpc.hessian))")
 end
