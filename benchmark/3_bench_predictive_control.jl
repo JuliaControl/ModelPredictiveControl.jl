@@ -47,16 +47,16 @@ nmpc_nonlin_ss = NonLinMPC(
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10    
 )
 nmpc_nonlin_ss_hess = NonLinMPC(
-    nonlinmodel_c, transcription=SingleShooting(), hessian=true,
-    Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
+    nonlinmodel, transcription=SingleShooting(), hessian=true,
+    Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10   
 )
 nmpc_nonlin_ms = NonLinMPC(
     nonlinmodel, transcription=MultipleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10    
 )
 nmpc_nonlin_ms_hess = NonLinMPC(
-    nonlinmodel_c, transcription=MultipleShooting(), hessian=true,
-    Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
+    nonlinmodel, transcription=MultipleShooting(), hessian=true,
+    Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10 
 )
 nmpc_nonlin_tc = NonLinMPC(
     nonlinmodel_c, transcription=TrapezoidalCollocation(),
