@@ -730,6 +730,11 @@ end
     @test nmpc18.gradient == AutoFiniteDiff()
     @test nmpc18.jacobian == AutoFiniteDiff()
     @test nmpc18.hessian  == AutoFiniteDiff()
+    nmpc19 = NonLinMPC(nonlinmodel, Hc=1, Hp=10, Cwt=Inf, 
+        hessian=SecondOrder(AutoForwardDiff(), AutoForardDiff())
+    )
+    @test nmpc19.hessian == SecondOrder(AutoForwardDiff(), AutoForardDiff())
+    @test_nowarn repr(nmpc19) # printing SecondOrder backends, for coverage
 
     nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc15  = NonLinMPC(nonlinmodel2, Hp=15)
