@@ -724,10 +724,12 @@ end
     @test size(nmpc17.con.Aeq, 1) == nmpc17.estim.nx̂*nmpc17.Hp
     nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
         gradient=AutoFiniteDiff(), 
-        jacobian=AutoFiniteDiff()
+        jacobian=AutoFiniteDiff(),
+        hessian=AutoFiniteDiff()
     )
     @test nmpc18.gradient == AutoFiniteDiff()
     @test nmpc18.jacobian == AutoFiniteDiff()
+    @test nmpc18.hessian  == AutoFiniteDiff()
 
     nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc15  = NonLinMPC(nonlinmodel2, Hp=15)
@@ -742,6 +744,7 @@ end
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
     @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation())
     @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation(2))
+    @test_throws ErrorException NonLinMPC(linmodel1, oracle=false, hessian=AutoFiniteDiff())
 
     @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, JE=(Ue,_,_,_)->Ue)
     @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
@@ -856,7 +859,8 @@ end
     nmpc10 = setconstraint!(NonLinMPC(
         nonlinmodel, Nwt=[0], Hp=100, Hc=1, 
         gradient=AutoFiniteDiff(),
-        jacobian=AutoFiniteDiff()), 
+        jacobian=AutoFiniteDiff(),
+        hessian=true),
         ymax=[100], ymin=[-100]
     )
     preparestate!(nmpc10, [0], [0])
