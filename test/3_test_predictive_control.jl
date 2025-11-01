@@ -731,7 +731,7 @@ end
     @test nmpc18.jacobian == AutoFiniteDiff()
     @test nmpc18.hessian  == AutoFiniteDiff()
     nmpc19 = NonLinMPC(nonlinmodel, Hc=1, Hp=10, Cwt=Inf, 
-        hessian=SecondOrder(AutoForwardDiff(), AutoForardDiff())
+        hessian=SecondOrder(AutoForwardDiff(), AutoForwardDiff())
     )
     @test nmpc19.hessian == SecondOrder(AutoForwardDiff(), AutoForardDiff())
     @test_nowarn repr(nmpc19) # printing SecondOrder backends, for coverage
