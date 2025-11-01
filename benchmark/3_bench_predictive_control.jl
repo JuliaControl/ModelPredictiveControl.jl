@@ -294,7 +294,7 @@ optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_b
 transcription, hessian = MultipleShooting(), true
 nmpc_ipopt_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
 nmpc_ipopt_ms_hess = setconstraint!(nmpc_ipopt_ms_hess; umin, umax)
-JuMP.unset_time_limit_sec(nmpc_nmpc_ipopt_ms_hess.optim)
+JuMP.unset_time_limit_sec(nmpc_ipopt_ms_hess.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 transcription = MultipleShooting(f_threads=true)
