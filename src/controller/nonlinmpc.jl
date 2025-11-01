@@ -589,8 +589,9 @@ function init_optimization!(
         end
     end
     if mpc.oracle
-        g_oracle, geq_oracle, J_op = get_nonlinops(mpc, optim)
-        optim[:J_op] = J_op
+        J_op = get_nonlinobj_op(mpc, optim)
+        g_oracle, geq_oracle = get_nonlincon_oracle(mpc, optim)
+        
     else
         J_func, ∇J_func!, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs! = get_optim_functions(
             mpc, optim
@@ -616,7 +617,7 @@ Re-construct nonlinear constraints and add them to `mpc.optim`.
 """
 function reset_nonlincon!(mpc::NonLinMPC)
     if mpc.oracle
-        g_oracle, geq_oracle = get_nonlinops(mpc, mpc.optim)
+        g_oracle, geq_oracle = get_nonlincon_oracle(mpc, mpc.optim)
         set_nonlincon!(mpc, mpc.optim, g_oracle, geq_oracle)
     else
         set_nonlincon_leg!(mpc, mpc.estim.model, mpc.transcription, mpc.optim)
@@ -624,30 +625,22 @@ function reset_nonlincon!(mpc::NonLinMPC)
 end
 
 """
-    get_nonlinops(mpc::NonLinMPC, optim) -> g_oracle, geq_oracle, J_op
+    get_nonlincon_oracle(mpc::NonLinMPC, optim) -> g_oracle, geq_oracle
 
-Return the operators for the nonlinear optimization of `mpc` [`NonLinMPC`](@ref) controller.
+Return the nonlinear constraint oracles for [`NonLinMPC`](@ref) `mpc`.
 
 Return `g_oracle` and `geq_oracle`, the inequality and equality [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
 for the two respective constraints. Note that `g_oracle` only includes the non-`Inf`
-inequality constraints, thus it must be re-constructed if they change. Also return `J_op`, 
-the [`NonlinearOperator`](@extref JuMP NonlinearOperator) for the objective function, based
-on the splatting syntax. This method is really intricate and that's because of 3 elements:
-
-- These functions are used inside the nonlinear optimization, so they must be type-stable
-  and as efficient as possible. All the function outputs and derivatives are cached and
-  updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
-- The splatting syntax for objective functions implies the use of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
-  and memoization to avoid redundant computations. This is already complex, but it's even
-  worse knowing that the automatic differentiation tools do not support splatting.
-- The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
-  and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
+inequality constraints, thus it must be re-constructed if they change. This method is really
+intricate because the oracles are used inside the nonlinear optimization, so they must be
+type-stable and as efficient as possible. All the function outputs and derivatives are 
+ached and updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
 """
-function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
+function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
     # ----------- common cache for all functions  ----------------------------------------
     model = mpc.estim.model
     transcription = mpc.transcription
-    grad, jac, hess = mpc.gradient, mpc.jacobian, mpc.hessian
+    jac, hess = mpc.jacobian, mpc.hessian
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
     nk = get_nk(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
@@ -658,7 +651,6 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
     strict = Val(true)
     myNaN, myInf                      = convert(JNT, NaN), convert(JNT, Inf)
-    J::Vector{JNT}                    = zeros(JNT, 1)
     ΔŨ::Vector{JNT}                   = zeros(JNT, nΔŨ)
     x̂0end::Vector{JNT}                = zeros(JNT, nx̂)
     K0::Vector{JNT}                   = zeros(JNT, nK)
@@ -667,7 +659,7 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
     Û0::Vector{JNT}, X̂0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nX̂)
     gc::Vector{JNT}, g::Vector{JNT}   = zeros(JNT, nc),  zeros(JNT, ng)
     gi::Vector{JNT}, geq::Vector{JNT} = zeros(JNT, ngi), zeros(JNT, neq)
-    λi::Vector{JNT}, λeq::Vector{JNT} = zeros(JNT, ngi), zeros(JNT, neq)
+    λi::Vector{JNT}, λeq::Vector{JNT} = ones(JNT, ngi), ones(JNT, neq)
     # -------------- inequality constraint: nonlinear oracle -----------------------------
     function gi!(gi, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
@@ -694,7 +686,9 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
             Cache(Û0), Cache(K0), Cache(X̂0), 
             Cache(gc), Cache(geq), Cache(g), Cache(gi)
         )
-        ∇²gi_prep = prepare_hessian(ℓ_gi, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...; strict)
+        ∇²gi_prep = prepare_hessian(
+            ℓ_gi, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...; strict
+        )
         ∇²ℓ_gi    = init_diffmat(JNT, hess, ∇²gi_prep, nZ̃, nZ̃)
         ∇²gi_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_gi))
     end
@@ -755,7 +749,9 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
             Cache(Û0), Cache(K0),   Cache(X̂0),
             Cache(gc), Cache(geq), Cache(g)
         )
-        ∇²geq_prep = prepare_hessian(ℓ_geq, hess, Z̃_∇geq, Constant(λeq), ∇²geq_context...; strict)
+        ∇²geq_prep = prepare_hessian(
+            ℓ_geq, hess, Z̃_∇geq, Constant(λeq), ∇²geq_context...; strict
+        )
         ∇²ℓ_geq = init_diffmat(JNT, hess, ∇²geq_prep, nZ̃, nZ̃)
         ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
     end
@@ -791,7 +787,47 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
         hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²geq_structure,
         eval_hessian_lagrangian      = isnothing(hess) ? nothing           : ∇²geq_func!
     )
-    # ------------- objective function: splatting syntax ---------------------------------
+    return g_oracle, geq_oracle
+end
+
+"""
+    get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) -> J_op
+
+Return the nonlinear operator for the objective function of `mpc` [`NonLinMPC`](@ref).
+
+It is based on the splatting syntax. This method is really intricate and that's because of:
+
+- These functions are used inside the nonlinear optimization, so they must be type-stable
+  and as efficient as possible. All the function outputs and derivatives are cached and
+  updated in-place if required to use the efficient [`value_and_gradient!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
+- The splatting syntax for objective functions implies the use of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
+  and memoization to avoid redundant computations. This is already complex, but it's even
+  worse knowing that the automatic differentiation tools do not support splatting.
+- The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
+  and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
+"""
+function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
+    model = mpc.estim.model
+    transcription = mpc.transcription
+    grad, hess = mpc.gradient, mpc.hessian
+    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
+    nk = get_nk(model, transcription)
+    Hp, Hc = mpc.Hp, mpc.Hc
+    ng = length(mpc.con.i_g)
+    nc, neq = mpc.con.nc, mpc.con.neq
+    nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
+    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+    strict = Val(true)
+    myNaN                            = convert(JNT, NaN)
+    J::Vector{JNT}                   = zeros(JNT, 1)
+    ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
+    x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
+    K0::Vector{JNT}                  = zeros(JNT, nK)
+    Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
+    U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
+    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
+    geq::Vector{JNT}                 = zeros(JNT, neq)
     function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
@@ -870,12 +906,12 @@ function get_nonlinops(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<
             return fill_lowertriangle!(∇²J_arg, ∇²J)
         end
     end
-    J_op = if !isnothing(hess)
-        JuMP.add_nonlinear_operator(optim, nZ̃, J_func, ∇J_func!, ∇²J_func!, name=:J_op)
+    if !isnothing(hess)
+        @operator(optim, J_op, nZ̃, J_func, ∇J_func!, ∇²J_func!)
     else
-        JuMP.add_nonlinear_operator(optim, nZ̃, J_func, ∇J_func!, name=:J_op)
+        @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
     end
-    return g_oracle, geq_oracle, J_op
+    return J_op
 end
 
 """
