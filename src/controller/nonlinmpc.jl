@@ -242,6 +242,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ transcription: MultipleShooting
 ├ gradient: AutoForwardDiff
 ├ jacobian: AutoSparse (AutoForwardDiff, TracerSparsityDetector, GreedyColoringAlgorithm)
+├ hessian: nothing
 └ dimensions:
   ├ 20 prediction steps Hp
   ├ 10 control steps Hc
@@ -355,10 +356,11 @@ julia> mpc = NonLinMPC(estim, Hp=20, Cwt=1e6)
 NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ estimator: UnscentedKalmanFilter
 ├ model: NonLinModel
-├ optimizer: Ipopt
+├ optimizer: Ipopt 
 ├ transcription: SingleShooting
 ├ gradient: AutoForwardDiff
 ├ jacobian: AutoForwardDiff
+├ hessian: nothing
 └ dimensions:
   ├ 20 prediction steps Hp
   ├  2 control steps Hc
