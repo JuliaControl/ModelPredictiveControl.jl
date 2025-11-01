@@ -733,7 +733,7 @@ end
     nmpc19 = NonLinMPC(nonlinmodel, Hc=1, Hp=10, Cwt=Inf, 
         hessian=SecondOrder(AutoForwardDiff(), AutoForwardDiff())
     )
-    @test nmpc19.hessian == SecondOrder(AutoForwardDiff(), AutoForardDiff())
+    @test nmpc19.hessian == SecondOrder(AutoForwardDiff(), AutoForwardDiff())
     @test_nowarn repr(nmpc19) # printing SecondOrder backends, for coverage
 
     nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1, solver=nothing)
