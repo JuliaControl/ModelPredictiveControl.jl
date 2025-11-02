@@ -1379,19 +1379,19 @@ function get_nonlinobj_op(
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
     Z̃_J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
-    J_context = (
+    J_cache = (
         Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0),
         Cache(g),
         Cache(x̄),
     )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
     estim.Nk[] = He
-    ∇J_prep = prepare_gradient(J!, grad, Z̃_J, J_context...; strict)
+    ∇J_prep = prepare_gradient(J!, grad, Z̃_J, J_cache...; strict)
     estim.Nk[] = 0
     ∇J = Vector{JNT}(undef, nZ̃)
     if !isnothing(hess)
         estim.Nk[] = He # see comment above
-        ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_context...; strict)
+        ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_cache...; strict)
         estim.Nk[] = 0
         ∇²J = init_diffmat(JNT, hess, ∇²J_prep, nZ̃, nZ̃)
     end
@@ -1400,7 +1400,7 @@ function get_nonlinobj_op(
             if isdifferent(Z̃_arg, Z̃_∇J)
                 Z̃_∇J .= Z̃_arg
                 J[], _ = value_gradient_and_hessian!(
-                    J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_context...
+                    J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_cache...
                 )
             end
         end    
@@ -1408,7 +1408,7 @@ function get_nonlinobj_op(
         function (J, ∇J, Z̃_∇J, Z̃_arg)
             if isdifferent(Z̃_arg, Z̃_∇J)
                 Z̃_∇J .= Z̃_arg
-                J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_J, J_context...)
+                J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_J, J_cache...)
             end
         end
     end
@@ -1484,28 +1484,28 @@ function get_nonlincon_oracle(
         gi .= @views g[i_g]
         return nothing
     end
-    function ℓ_gi(Z̃, V̂, X̂0, û0, k0, ŷ0, g, gi)
+    function ℓ_gi(Z̃, λi, V̂, X̂0, û0, k0, ŷ0, g, gi)
         update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
         gi .= @views g[i_g]
         return dot(λi, gi)
     end
     Z̃_∇gi = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
-    ∇gi_context = (
+    ∇gi_cache = (
         Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g)
     )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
     estim.Nk[] = He
-    ∇gi_prep = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_context...; strict)
+    ∇gi_prep = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_cache...; strict)
     estim.Nk[] = 0
     ∇gi = init_diffmat(JNT, jac, ∇gi_prep, nZ̃, ngi)
     ∇gi_structure = init_diffstructure(∇gi)
     if !isnothing(hess)
-        ∇²gi_context = (
+        ∇²gi_cache = (
             Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g), Cache(gi)
         )
         estim.Nk[] = He # see comment above
         ∇²gi_prep = prepare_hessian(
-            ℓ_gi, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...; strict
+            ℓ_gi, hess, Z̃_∇gi, Constant(λi), ∇²gi_cache...; strict
         )
         estim.Nk[] = 0
         ∇²ℓ_gi    = init_diffmat(JNT, hess, ∇²gi_prep, nZ̃, nZ̃)
@@ -1514,7 +1514,7 @@ function get_nonlincon_oracle(
     function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
         if isdifferent(Z̃_arg, Z̃_∇gi)
             Z̃_∇gi .= Z̃_arg
-            value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_context...)
+            value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_cache...)
         end
         return nothing
     end
@@ -1529,7 +1529,7 @@ function get_nonlincon_oracle(
     function ∇²gi_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
         Z̃_∇gi  .= Z̃_arg
         λi     .= λ_arg
-        hessian!(ℓ_gi, ∇²ℓ_gi, ∇²gi_prep, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...)
+        hessian!(ℓ_gi, ∇²ℓ_gi, ∇²gi_prep, hess, Z̃_∇gi, Constant(λi), ∇²gi_cache...)
         return diffmat2vec!(∇²ℓ_arg, ∇²ℓ_gi, ∇²gi_structure)
     end
     gi_min = fill(-myInf, ngi)

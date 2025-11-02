@@ -641,15 +641,15 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
     Z̃_J = fill(myNaN, nZ̃)      # NaN to force update at first call
-    J_context = (
+    J_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K0), Cache(X̂0), 
         Cache(gc), Cache(g), Cache(geq),
     )
-    ∇J_prep = prepare_gradient(J!, grad, Z̃_J, J_context...; strict)
+    ∇J_prep = prepare_gradient(J!, grad, Z̃_J, J_cache...; strict)
     ∇J  = Vector{JNT}(undef, nZ̃)
     if !isnothing(hess)
-        ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_context...; strict)
+        ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_cache...; strict)
         ∇²J = init_diffmat(JNT, hess, ∇²J_prep, nZ̃, nZ̃)
     end
     update_objective! = if !isnothing(hess)
@@ -657,7 +657,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
             if isdifferent(Z̃_arg, Z̃_J)
                 Z̃_J .= Z̃_arg
                 J[], _ = value_gradient_and_hessian!(
-                    J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_context...
+                    J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_cache...
                 )
             end
         end
@@ -666,7 +666,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
             if isdifferent(Z̃_arg, Z̃_∇J)
                 Z̃_∇J .= Z̃_arg
                 J[], _ = value_and_gradient!(
-                    J!, ∇J, ∇J_prep, grad, Z̃_∇J, J_context...
+                    J!, ∇J, ∇J_prep, grad, Z̃_∇J, J_cache...
                 )
             end
         end
@@ -774,22 +774,22 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         return dot(λi, gi)
     end
     Z̃_∇gi  = fill(myNaN, nZ̃)      # NaN to force update at first call
-    ∇gi_context = (
+    ∇gi_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K0), Cache(X̂0), 
         Cache(gc), Cache(geq), Cache(g)
     )
-    ∇gi_prep  = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_context...; strict)
+    ∇gi_prep  = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_cache...; strict)
     ∇gi = init_diffmat(JNT, jac, ∇gi_prep, nZ̃, ngi)
     ∇gi_structure  = init_diffstructure(∇gi)
     if !isnothing(hess)
-        ∇²gi_context = (
+        ∇²gi_cache = (
             Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
             Cache(Û0), Cache(K0), Cache(X̂0), 
             Cache(gc), Cache(geq), Cache(g), Cache(gi)
         )
         ∇²gi_prep = prepare_hessian(
-            ℓ_gi, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...; strict
+            ℓ_gi, hess, Z̃_∇gi, Constant(λi), ∇²gi_cache...; strict
         )
         ∇²ℓ_gi    = init_diffmat(JNT, hess, ∇²gi_prep, nZ̃, nZ̃)
         ∇²gi_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_gi))
@@ -797,7 +797,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
         if isdifferent(Z̃_arg, Z̃_∇gi)
             Z̃_∇gi .= Z̃_arg
-            value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_context...)
+            value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_cache...)
         end
         return nothing
     end
@@ -812,7 +812,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     function ∇²gi_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
         Z̃_∇gi  .= Z̃_arg
         λi     .= λ_arg
-        hessian!(ℓ_gi, ∇²ℓ_gi, ∇²gi_prep, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...)
+        hessian!(ℓ_gi, ∇²ℓ_gi, ∇²gi_prep, hess, Z̃_∇gi, Constant(λi), ∇²gi_cache...)
         return diffmat2vec!(∇²ℓ_arg, ∇²ℓ_gi, ∇²gi_structure)
     end
     gi_min = fill(-myInf, ngi)
@@ -837,22 +837,22 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         return dot(λeq, geq)
     end
     Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update at first call
-    ∇geq_context = (
+    ∇geq_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
         Cache(Û0), Cache(K0),   Cache(X̂0),
         Cache(gc), Cache(g)
     )
-    ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)
+    ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z̃_∇geq, ∇geq_cache...; strict)
     ∇geq    = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
     ∇geq_structure  = init_diffstructure(∇geq)
     if !isnothing(hess)
-        ∇²geq_context = (
+        ∇²geq_cache = (
             Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
             Cache(Û0), Cache(K0),   Cache(X̂0),
             Cache(gc), Cache(geq), Cache(g)
         )
         ∇²geq_prep = prepare_hessian(
-            ℓ_geq, hess, Z̃_∇geq, Constant(λeq), ∇²geq_context...; strict
+            ℓ_geq, hess, Z̃_∇geq, Constant(λeq), ∇²geq_cache...; strict
         )
         ∇²ℓ_geq = init_diffmat(JNT, hess, ∇²geq_prep, nZ̃, nZ̃)
         ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
@@ -860,7 +860,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
         if isdifferent(Z̃_arg, Z̃_∇geq)
             Z̃_∇geq .= Z̃_arg
-            value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_context...)
+            value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_cache...)
         end
         return nothing
     end
@@ -875,7 +875,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     function ∇²geq_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
         Z̃_∇geq .= Z̃_arg
         λeq    .= λ_arg
-        hessian!(ℓ_geq, ∇²ℓ_geq, ∇²geq_prep, hess, Z̃_∇geq, Constant(λeq), ∇²geq_context...)
+        hessian!(ℓ_geq, ∇²ℓ_geq, ∇²geq_prep, hess, Z̃_∇geq, Constant(λeq), ∇²geq_cache...)
         return diffmat2vec!(∇²ℓ_arg, ∇²ℓ_geq, ∇²geq_structure)
     end
     geq_min = geq_max = zeros(JNT, neq)
