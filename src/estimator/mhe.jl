@@ -13,6 +13,7 @@ end
 function print_backends(io::IO, estim::MovingHorizonEstimator, ::SimModel)
     println(io, "├ gradient: $(backend_str(estim.gradient))")
     println(io, "├ jacobian: $(backend_str(estim.jacobian))")
+    println(io, "├ hessian: $(backend_str(estim.hessian))")
 end
 "No differentiation backends to print for `LinModel`."
 print_backends(::IO, ::MovingHorizonEstimator, ::LinModel) = nothing

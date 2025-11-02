@@ -409,7 +409,7 @@ function NonLinMPC(
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-    hessian = validate_hessian(hessian, gradient, oracle)
+    hessian = validate_hessian(hessian, gradient, oracle, DEFAULT_NONLINMPC_HESSIAN)
     return NonLinMPC{NT}(
         estim, Hp, Hc, nb, weights, JE, gc!, nc, p, 
         transcription, optim, gradient, jacobian, hessian, oracle
@@ -513,34 +513,6 @@ function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, 
 end
 
 """
-    validate_hessian(hessian, gradient, oracle) -> backend
-
-Validate `hessian` argument and return the differentiation backend.
-"""
-function validate_hessian(hessian, gradient, oracle)
-    if hessian == true
-        backend = DEFAULT_NONLINMPC_HESSIAN
-    elseif hessian == false || isnothing(hessian)
-        backend = nothing
-    else
-        backend = hessian
-    end
-    if oracle == false && !isnothing(backend)
-        error("Second order derivatives are only supported with oracle=true.")
-    end
-    if oracle == true && !isnothing(backend)
-        hess = dense_backend(backend)
-        grad = dense_backend(gradient)
-        if hess != grad
-            @info "The objective function gradient will be computed with the hessian "*
-                "backend ($(backend_str(hess)))\n instead of the one in gradient "*
-                "argument ($(backend_str(grad))) for efficiency."
-        end
-    end
-    return backend
-end
-
-"""
     addinfo!(info, mpc::NonLinMPC) -> info
 
 For [`NonLinMPC`](@ref), add `:sol` and the optimal economic cost `:JE`.
@@ -627,6 +599,134 @@ function reset_nonlincon!(mpc::NonLinMPC)
 end
 
 """
+    get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) -> J_op
+
+Return the nonlinear operator for the objective of `mpc` [`NonLinMPC`](@ref).
+
+It is based on the splatting syntax. This method is really intricate and that's because of:
+
+- These functions are used inside the nonlinear optimization, so they must be type-stable
+  and as efficient as possible. All the function outputs and derivatives are cached and
+  updated in-place if required to use the efficient [`value_and_gradient!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
+- The splatting syntax for objective functions implies the use of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
+  and memoization to avoid redundant computations. This is already complex, but it's even
+  worse knowing that the automatic differentiation tools do not support splatting.
+- The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
+  and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
+"""
+function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
+    model = mpc.estim.model
+    transcription = mpc.transcription
+    grad, hess = mpc.gradient, mpc.hessian
+    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
+    nk = get_nk(model, transcription)
+    Hp, Hc = mpc.Hp, mpc.Hc
+    ng = length(mpc.con.i_g)
+    nc, neq = mpc.con.nc, mpc.con.neq
+    nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
+    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+    strict = Val(true)
+    myNaN                            = convert(JNT, NaN)
+    J::Vector{JNT}                   = zeros(JNT, 1)
+    ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
+    x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
+    K0::Vector{JNT}                  = zeros(JNT, nK)
+    Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
+    U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
+    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
+    geq::Vector{JNT}                 = zeros(JNT, neq)
+    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+    end
+    Z̃_J = fill(myNaN, nZ̃)      # NaN to force update at first call
+    J_context = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(gc), Cache(g), Cache(geq),
+    )
+    ∇J_prep = prepare_gradient(J!, grad, Z̃_J, J_context...; strict)
+    ∇J  = Vector{JNT}(undef, nZ̃)
+    if !isnothing(hess)
+        ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_context...; strict)
+        ∇²J = init_diffmat(JNT, hess, ∇²J_prep, nZ̃, nZ̃)
+    end
+    update_objective! = if !isnothing(hess)
+        function (J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_J)
+                Z̃_J .= Z̃_arg
+                J[], _ = value_gradient_and_hessian!(
+                    J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_context...
+                )
+            end
+        end
+    else
+        update_objective! = function (J, ∇J, Z̃_∇J, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_∇J)
+                Z̃_∇J .= Z̃_arg
+                J[], _ = value_and_gradient!(
+                    J!, ∇J, ∇J_prep, grad, Z̃_∇J, J_context...
+                )
+            end
+        end
+    end
+    J_func = if !isnothing(hess)
+        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+            return J[]::T
+        end
+    else
+        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, Z̃_J, Z̃_arg)
+            return J[]::T
+        end
+    end
+    ∇J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
+        if !isnothing(hess)
+            function (Z̃_arg)
+                update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+                return ∇J[]
+            end
+        else
+            function (Z̃_arg)
+                update_objective!(J, ∇J, Z̃_J, Z̃_arg)
+                return ∇J[]
+            end
+        end
+    else                        # multivariate syntax (see JuMP.@operator doc):
+        if !isnothing(hess)
+            function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+                update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+                return ∇J_arg .= ∇J
+            end
+        else
+            function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+                update_objective!(J, ∇J, Z̃_J, Z̃_arg)
+                return ∇J_arg .= ∇J
+            end
+        end
+    end
+    ∇²J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
+        function (Z̃_arg)
+            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+            return ∇²J[]
+        end
+    else                        # multivariate syntax (see JuMP.@operator doc):
+        function (∇²J_arg::AbstractMatrix{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+            return fill_lowertriangle!(∇²J_arg, ∇²J)
+        end
+    end
+    if !isnothing(hess)
+        @operator(optim, J_op, nZ̃, J_func, ∇J_func!, ∇²J_func!)
+    else
+        @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
+    end
+    return J_op
+end
+
+"""
     get_nonlincon_oracle(mpc::NonLinMPC, optim) -> g_oracle, geq_oracle
 
 Return the nonlinear constraint oracles for [`NonLinMPC`](@ref) `mpc`.
@@ -661,7 +761,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     Û0::Vector{JNT}, X̂0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nX̂)
     gc::Vector{JNT}, g::Vector{JNT}   = zeros(JNT, nc),  zeros(JNT, ng)
     gi::Vector{JNT}, geq::Vector{JNT} = zeros(JNT, ngi), zeros(JNT, neq)
-    λi::Vector{JNT}, λeq::Vector{JNT} = ones(JNT, ngi), ones(JNT, neq)
+    λi::Vector{JNT}, λeq::Vector{JNT} = ones(JNT, ngi),  ones(JNT, neq)
     # -------------- inequality constraint: nonlinear oracle -----------------------------
     function gi!(gi, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
@@ -725,7 +825,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         jacobian_structure = ∇gi_structure,
         eval_jacobian = ∇gi_func!,
         hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²gi_structure,
-        eval_hessian_lagrangian      = isnothing(hess) ? nothing           : ∇²gi_func!
+        eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²gi_func!
     )
     # ------------- equality constraints : nonlinear oracle ------------------------------
     function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
@@ -790,130 +890,6 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         eval_hessian_lagrangian      = isnothing(hess) ? nothing           : ∇²geq_func!
     )
     return g_oracle, geq_oracle
-end
-
-"""
-    get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) -> J_op
-
-Return the nonlinear operator for the objective function of `mpc` [`NonLinMPC`](@ref).
-
-It is based on the splatting syntax. This method is really intricate and that's because of:
-
-- These functions are used inside the nonlinear optimization, so they must be type-stable
-  and as efficient as possible. All the function outputs and derivatives are cached and
-  updated in-place if required to use the efficient [`value_and_gradient!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
-- The splatting syntax for objective functions implies the use of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
-  and memoization to avoid redundant computations. This is already complex, but it's even
-  worse knowing that the automatic differentiation tools do not support splatting.
-- The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
-  and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
-"""
-function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where JNT<:Real
-    model = mpc.estim.model
-    transcription = mpc.transcription
-    grad, hess = mpc.gradient, mpc.hessian
-    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk(model, transcription)
-    Hp, Hc = mpc.Hp, mpc.Hc
-    ng = length(mpc.con.i_g)
-    nc, neq = mpc.con.nc, mpc.con.neq
-    nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
-    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
-    strict = Val(true)
-    myNaN                            = convert(JNT, NaN)
-    J::Vector{JNT}                   = zeros(JNT, 1)
-    ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
-    x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
-    K0::Vector{JNT}                  = zeros(JNT, nK)
-    Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
-    U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
-    Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
-    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
-    geq::Vector{JNT}                 = zeros(JNT, neq)
-    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
-    end
-    Z̃_J = fill(myNaN, nZ̃)      # NaN to force update at first call
-    J_context = (
-        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-        Cache(Û0), Cache(K0), Cache(X̂0), 
-        Cache(gc), Cache(g), Cache(geq),
-    )
-    ∇J_prep = prepare_gradient(J!, grad, Z̃_J, J_context...; strict)
-    ∇J  = Vector{JNT}(undef, nZ̃)
-    if !isnothing(hess)
-        ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_context...; strict)
-        ∇²J = init_diffmat(JNT, hess, ∇²J_prep, nZ̃, nZ̃)
-    end
-    update_objective! = if !isnothing(hess)
-        function (J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_J)
-                Z̃_J .= Z̃_arg
-                J[], _ = value_gradient_and_hessian!(J!, ∇J, ∇²J, hess, Z̃_J, J_context...)
-            end
-        end
-    else
-        update_objective! = function (J, ∇J, Z̃_∇J, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_∇J)
-                Z̃_∇J .= Z̃_arg
-                J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_∇J, J_context...)
-            end
-        end
-    end
-    J_func = if !isnothing(hess)
-        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-            return J[]::T
-        end
-    else
-        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-            update_objective!(J, ∇J, Z̃_J, Z̃_arg)
-            return J[]::T
-        end
-    end
-    ∇J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
-        if !isnothing(hess)
-            function (Z̃_arg)
-                update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-                return ∇J[]
-            end
-        else
-            function (Z̃_arg)
-                update_objective!(J, ∇J, Z̃_J, Z̃_arg)
-                return ∇J[]
-            end
-        end
-    else                        # multivariate syntax (see JuMP.@operator doc):
-        if !isnothing(hess)
-            function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-                update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-                return ∇J_arg .= ∇J
-            end
-        else
-            function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-                update_objective!(J, ∇J, Z̃_J, Z̃_arg)
-                return ∇J_arg .= ∇J
-            end
-        end
-    end
-    ∇²J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
-        function (Z̃_arg)
-            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-            return ∇²J[]
-        end
-    else                        # multivariate syntax (see JuMP.@operator doc):
-        function (∇²J_arg::AbstractMatrix{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-            return fill_lowertriangle!(∇²J_arg, ∇²J)
-        end
-    end
-    if !isnothing(hess)
-        @operator(optim, J_op, nZ̃, J_func, ∇J_func!, ∇²J_func!)
-    else
-        @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
-    end
-    return J_op
 end
 
 """

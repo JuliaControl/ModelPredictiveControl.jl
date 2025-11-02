@@ -2,6 +2,11 @@ const DEFAULT_LINMHE_OPTIMIZER    = OSQP.MathOptInterfaceOSQP.Optimizer
 const DEFAULT_NONLINMHE_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
 const DEFAULT_NONLINMHE_GRADIENT  = AutoForwardDiff()
 const DEFAULT_NONLINMHE_JACOBIAN  = AutoForwardDiff()
+const DEFAULT_NONLINMHE_HESSIAN   = AutoSparse(
+    AutoForwardDiff();
+    sparsity_detector=TracerSparsityDetector(),
+    coloring_algorithm=GreedyColoringAlgorithm(),
+) 
 
 @doc raw"""
 Include all the data for the constraints of [`MovingHorizonEstimator`](@ref).
@@ -51,6 +56,7 @@ struct MovingHorizonEstimator{
     JM<:JuMP.GenericModel,
     GB<:AbstractADType,
     JB<:AbstractADType,
+    HB<:Union{AbstractADType, Nothing}, 
     CE<:KalmanEstimator,
 } <: StateEstimator{NT}
     model::SM
@@ -61,6 +67,7 @@ struct MovingHorizonEstimator{
     con::EstimatorConstraint{NT}
     gradient::GB
     jacobian::JB
+    hessian::HB
     oracle::Bool
     covestim::CE
     Z̃::Vector{NT}
@@ -113,7 +120,7 @@ struct MovingHorizonEstimator{
     function MovingHorizonEstimator{NT}(
         model::SM, 
         He, i_ym, nint_u, nint_ym, cov::KC, Cwt, 
-        optim::JM, gradient::GB, jacobian::JB, oracle, covestim::CE;
+        optim::JM, gradient::GB, jacobian::JB, hessian::HB, oracle, covestim::CE;
         direct=true
     ) where {
             NT<:Real, 
@@ -122,6 +129,7 @@ struct MovingHorizonEstimator{
             JM<:JuMP.GenericModel, 
             GB<:AbstractADType,
             JB<:AbstractADType,
+            HB<:Union{AbstractADType, Nothing},
             CE<:KalmanEstimator{NT}
         }
         nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
@@ -158,11 +166,11 @@ struct MovingHorizonEstimator{
         P̂arr_old = copy(cov.P̂_0)
         Nk = [0]
         corrected = [false]
-        estim = new{NT, SM, KC, JM, GB, JB, CE}(
+        estim = new{NT, SM, KC, JM, GB, JB, HB, CE}(
             model,
             cov,
             optim, con, 
-            gradient, jacobian, oracle,
+            gradient, jacobian, hessian, oracle,
             covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
             He, nε,
@@ -268,6 +276,9 @@ transcription for now.
    function when `model` is not a [`LinModel`](@ref), see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
 - `jacobian=AutoForwardDiff()` : an `AbstractADType` backend for the Jacobian of the
    constraints when `model` is not a [`LinModel`](@ref), see `gradient` above for the options.
+- `hessian=false` : an `AbstractADType` backend for the Hessian of the Lagrangian, see 
+   `gradient` above for the options. The default `false` skip it and use the quasi-Newton
+    method of `optim`, which is always the case if `oracle=false` (see Extended Help).
 - `oracle=JuMP.solver_name(optim)=="Ipopt"`: use the efficient [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
    for the nonlinear constraints (not supported by most optimizers for now).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
@@ -363,7 +374,16 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
       [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
       for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
-    
+
+    One exception about AD: the selected backend for the Hessian of the Lagrangian function
+    with `oracle=true` and `hessian=true` options is sparse:
+    ```julia
+    AutoSparse(
+        AutoForwardDiff(); 
+        sparsity_detector  = TracerSparsityDetector(), 
+        coloring_algorithm = GreedyColoringAlgorithm()
+    )
+    ```
     The slack variable ``ε`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
     problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
@@ -389,6 +409,7 @@ function MovingHorizonEstimator(
     optim::JM = default_optim_mhe(model),
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
+    hessian::Union{AbstractADType, Bool, Nothing} = false,
     oracle::Bool = JuMP.solver_name(optim)=="Ipopt",
     direct = true,
     σP_0       = sigmaP_0,
@@ -406,7 +427,7 @@ function MovingHorizonEstimator(
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
     return MovingHorizonEstimator(
         model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt; 
-        direct, optim, gradient, jacobian, oracle
+        direct, optim, gradient, jacobian, hessian, oracle
     )
 end
 
@@ -440,17 +461,19 @@ function MovingHorizonEstimator(
     optim::JM = default_optim_mhe(model),
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
+    hessian::Union{AbstractADType, Bool, Nothing} = false,
     oracle::Bool = JuMP.solver_name(optim)=="Ipopt",
     direct = true,
     covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0, He)
+    hessian = validate_hessian(hessian, gradient, oracle, DEFAULT_NONLINMHE_HESSIAN)
     validate_covestim(cov, covestim)
     return MovingHorizonEstimator{NT}(
         model, 
         He, i_ym, nint_u, nint_ym, cov, Cwt, 
-        optim, gradient, jacobian, oracle, covestim; 
+        optim, gradient, jacobian, hessian, oracle, covestim; 
         direct
     )
 end
@@ -735,7 +758,7 @@ Re-construct nonlinear constraints and add them to `estim.optim`.
 function reset_nonlincon!(estim::MovingHorizonEstimator, model::NonLinModel)
     optim = estim.optim
     if estim.oracle
-        g_oracle, = get_nonlinops(estim, optim)
+        g_oracle = get_nonlincon_oracle(estim, optim)
         set_nonlincon!(estim, model, optim, g_oracle)
     else
         set_nonlincon_leg!(estim, model, optim)
@@ -1304,8 +1327,8 @@ function init_optimization!(
     end
     # constraints with vector nonlinear oracle, objective function with splatting:
     if estim.oracle
-        g_oracle, J_op = get_nonlinops(estim, optim)
-        optim[:J_op] = J_op
+        J_op = get_nonlinobj_op(estim, optim)
+        g_oracle = get_nonlincon_oracle(estim, optim)
     else
         J_func, ∇J_func!, g_funcs, ∇g_funcs! = get_optim_functions(estim, optim)
         @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
@@ -1321,47 +1344,150 @@ function init_optimization!(
 end
 
 """
-    get_nonlinops(estim::MovingHorizonEstimator, optim) -> g_oracle, J_op
+    get_nonlinobj_op(estim::MovingHorizonEstimator, optim) -> J_op
 
-Return the operators for the nonlinear optimization of [`MovingHorizonEstimator`](@ref).
+Return the nonlinear operator for the objective of `estim` [`MovingHorizonEstimator`](@ref).
 
-Return `g_oracle`, the [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
-for the ineqaulity constraints. Note that `g_oracle` only includes the non-`Inf`
-inequality constraints, thus it must be re-constructed if they change. Also return `J_op`, 
-the [`NonlinearOperator`](@extref JuMP NonlinearOperator) for the objective function, based
-on the splatting syntax. This method is really intricate and that's because of 2 elements:
+It is based on the splatting syntax. This method is really intricate and that's because of:
 
 - These functions are used inside the nonlinear optimization, so they must be type-stable
   and as efficient as possible. All the function outputs and derivatives are cached and
-  updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
+  updated in-place if required to use the efficient [`value_and_gradient!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
 - The splatting syntax for objective functions implies the use of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
   and memoization to avoid redundant computations. This is already complex, but it's even
   worse knowing that the automatic differentiation tools do not support splatting.
 """
-function get_nonlinops(
+function get_nonlinobj_op(
     estim::MovingHorizonEstimator, optim::JuMP.GenericModel{JNT}
 ) where JNT<:Real
-    # ----------- common cache for Jfunc and gfuncs  --------------------------------------
     model, con = estim.model, estim.con
-    grad, jac = estim.gradient, estim.jacobian
-    nx̂, nym, nŷ, nu, nε, nk = estim.nx̂, estim.nym, model.ny, model.nu, estim.nε, model.nk
+    grad, hess = estim.gradient, estim.hessian
+    nx̂, nym, nŷ, nu, nk = estim.nx̂, estim.nym, model.ny, model.nu, model.nk
+    He = estim.He
+    ng = length(con.i_g)
+    nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
+    strict = Val(true)
+    myNaN                            = convert(JNT, NaN)
+    J::Vector{JNT}                   = zeros(JNT, 1)
+    V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
+    k0::Vector{JNT}                  = zeros(JNT, nk)
+    û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
+    g::Vector{JNT}                   = zeros(JNT, ng) 
+    x̄::Vector{JNT}                   = zeros(JNT, nx̂)
+    function J!(Z̃, V̂, X̂0, û0, k0, ŷ0, g, x̄)
+        update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
+        return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
+    end
+    Z̃_J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    J_context = (
+        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0),
+        Cache(g),
+        Cache(x̄),
+    )
+    # temporarily "fill" the estimation window for the preparation of the gradient: 
+    estim.Nk[] = He
+    ∇J_prep = prepare_gradient(J!, grad, Z̃_J, J_context...; strict)
+    estim.Nk[] = 0
+    ∇J = Vector{JNT}(undef, nZ̃)
+    if !isnothing(hess)
+        estim.Nk[] = He # see comment above
+        ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_context...; strict)
+        estim.Nk[] = 0
+        ∇²J = init_diffmat(JNT, hess, ∇²J_prep, nZ̃, nZ̃)
+    end
+    update_objective! = if !isnothing(hess)
+        function (J, ∇J, ∇²J, Z̃_∇J, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_∇J)
+                Z̃_∇J .= Z̃_arg
+                J[], _ = value_gradient_and_hessian!(
+                    J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_context...
+                )
+            end
+        end    
+    else
+        function (J, ∇J, Z̃_∇J, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_∇J)
+                Z̃_∇J .= Z̃_arg
+                J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_J, J_context...)
+            end
+        end
+    end
+    J_func = if !isnothing(hess)
+        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+            return J[]::T
+        end
+    else
+        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, Z̃_J, Z̃_arg)
+            return J[]::T
+        end
+    end
+    # only the multivariate syntax of JuMP.@operator, univariate is impossible for MHE
+    # since Z̃ comprises the arrival state estimate AND the estimated process noise:
+    ∇J_func! = if !isnothing(hess)
+        function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+            return ∇J_arg .= ∇J
+        end
+    else
+        function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            update_objective!(J, ∇J, Z̃_J, Z̃_arg)
+            return ∇J_arg .= ∇J
+        end
+    end
+    function ∇²J_func!(∇²J_arg::AbstractMatrix{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+        update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+        return fill_lowertriangle!(∇²J_arg, ∇²J)
+    end
+    if !isnothing(hess)
+        @operator(optim, J_op, nZ̃, J_func, ∇J_func!, ∇²J_func!)
+    else
+        @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
+    end
+    return J_op
+end
+
+"""
+    get_nonlincon_oracle(estim::MovingHorizonEstimator, optim) -> g_oracle, geq_oracle
+
+Return the nonlinear constraint oracles for [`MovingHorizonEstimator`](@ref) `estim`.
+
+Return `g_oracle` and `geq_oracle`, the inequality and equality [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
+for the two respective constraints. Note that `g_oracle` only includes the non-`Inf`
+inequality constraints, thus it must be re-constructed if they change. This method is really
+intricate because the oracles are used inside the nonlinear optimization, so they must be
+type-stable and as efficient as possible. All the function outputs and derivatives are 
+ached and updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
+"""
+function get_nonlincon_oracle(
+    estim::MovingHorizonEstimator, ::JuMP.GenericModel{JNT}
+) where JNT<:Real
+    # ----------- common cache for all functions  ----------------------------------------
+    model, con = estim.model, estim.con
+    jac, hess = estim.jacobian, estim.hessian
+    nx̂, nym, nŷ, nu, nk = estim.nx̂, estim.nym, model.ny, model.nu, model.nk
     He = estim.He
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(con.i_g), sum(con.i_g)
     nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
     strict = Val(true)
     myNaN, myInf                     = convert(JNT, NaN), convert(JNT, Inf)
-    J::Vector{JNT}                   = zeros(JNT, 1)
     V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
     k0::Vector{JNT}                  = zeros(JNT, nk)
     û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
     g::Vector{JNT}, gi::Vector{JNT}  = zeros(JNT, ng), zeros(JNT, ngi)
-    x̄::Vector{JNT}                   = zeros(JNT, nx̂)
-    # -------------- inequality constraint: nonlinear oracle -----------------------------
+    λi::Vector{JNT}                  = ones(JNT, ngi)
+    # -------------- inequality constraint: nonlinear oracle -------------------------
     function gi!(gi, Z̃, V̂, X̂0, û0, k0, ŷ0, g)
         update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
         gi .= @views g[i_g]
         return nothing
+    end
+    function ℓ_gi(Z̃, V̂, X̂0, û0, k0, ŷ0, g, gi)
+        update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
+        gi .= @views g[i_g]
+        return dot(λi, gi)
     end
     Z̃_∇gi = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇gi_context = (
@@ -1373,6 +1499,18 @@ function get_nonlinops(
     estim.Nk[] = 0
     ∇gi = init_diffmat(JNT, jac, ∇gi_prep, nZ̃, ngi)
     ∇gi_structure = init_diffstructure(∇gi)
+    if !isnothing(hess)
+        ∇²gi_context = (
+            Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g), Cache(gi)
+        )
+        estim.Nk[] = He # see comment above
+        ∇²gi_prep = prepare_hessian(
+            ℓ_gi, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...; strict
+        )
+        estim.Nk[] = 0
+        ∇²ℓ_gi    = init_diffmat(JNT, hess, ∇²gi_prep, nZ̃, nZ̃)
+        ∇²gi_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_gi))
+    end
     function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
         if isdifferent(Z̃_arg, Z̃_∇gi)
             Z̃_∇gi .= Z̃_arg
@@ -1380,13 +1518,19 @@ function get_nonlinops(
         end
         return nothing
     end
-    function gi_func!(gi_vec, Z̃_arg)
+    function gi_func!(gi_arg, Z̃_arg)
         update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        return gi_vec .= gi
+        return gi_arg .= gi
     end
-    function ∇gi_func!(∇gi_vec, Z̃_arg)
+    function ∇gi_func!(∇gi_arg, Z̃_arg)
         update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        return diffmat2vec!(∇gi_vec, ∇gi, ∇gi_structure)
+        return diffmat2vec!(∇gi_arg, ∇gi, ∇gi_structure)
+    end
+    function ∇²gi_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
+        Z̃_∇gi  .= Z̃_arg
+        λi     .= λ_arg
+        hessian!(ℓ_gi, ∇²ℓ_gi, ∇²gi_prep, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...)
+        return diffmat2vec!(∇²ℓ_arg, ∇²ℓ_gi, ∇²gi_structure)
     end
     gi_min = fill(-myInf, ngi)
     gi_max = zeros(JNT,   ngi)
@@ -1396,42 +1540,11 @@ function get_nonlinops(
         u = gi_max,
         eval_f = gi_func!,
         jacobian_structure = ∇gi_structure,
-        eval_jacobian = ∇gi_func!
+        eval_jacobian = ∇gi_func!,
+        hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²gi_structure,
+        eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²gi_func!
     )
-    # ------------- objective function: splatting syntax ---------------------------------
-    function J!(Z̃, V̂, X̂0, û0, k0, ŷ0, g, x̄)
-        update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
-        return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
-    end
-    Z̃_∇J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
-    ∇J_context = (
-        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0),
-        Cache(g),
-        Cache(x̄),
-    )
-    # temporarily "fill" the estimation window for the preparation of the gradient: 
-    estim.Nk[] = He
-    ∇J_prep = prepare_gradient(J!, grad, Z̃_∇J, ∇J_context...; strict)
-    estim.Nk[] = 0
-    ∇J = Vector{JNT}(undef, nZ̃)
-    function update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇J)
-            Z̃_∇J .= Z̃_arg
-            J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_∇J, ∇J_context...)
-        end
-    end    
-    function J_func(Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-        update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
-        return J[]::T
-    end
-    function ∇J_func!(∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-        # only the multivariate syntax of JuMP.@operator, univariate is impossible for MHE
-        # since Z̃ comprises the arrival state estimate AND the estimated process noise
-        update_objective!(J, ∇J, Z̃_∇J, Z̃_arg)
-        return ∇J_arg .= ∇J
-    end
-    J_op = JuMP.add_nonlinear_operator(optim, nZ̃, J_func, ∇J_func!, name=:J_op)
-    g_oracle, J_op
+    return g_oracle
 end
 
 "By default, there is no nonlinear constraint, thus do nothing."
