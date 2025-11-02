@@ -291,10 +291,11 @@ julia> model = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver
 julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP_0=[0.01])
 MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
 ├ model: NonLinModel
-├ optimizer: Ipopt
+├ optimizer: Ipopt 
 ├ gradient: AutoForwardDiff
 ├ jacobian: AutoForwardDiff
-├ arrival covariance: UnscentedKalmanFilter
+├ hessian: nothing
+├ arrival covariance: UnscentedKalmanFilter 
 └ dimensions:
   ├ 5 estimation steps He
   ├ 0 slack variable ε (estimation constraints)
