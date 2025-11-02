@@ -266,7 +266,8 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
     ẼZ̃ = @views [estim.ẽx̄[:, 1:nZ̃]; estim.Ẽ[1:nYm, 1:nZ̃]]
     FZ̃ = @views [estim.fx̄; estim.F[1:nYm]]
-    invQ̂_Nk, invR̂_Nk = @views invQ̂_He[1:nŴ, 1:nŴ], invR̂_He[1:nYm, 1:nYm]
+    invQ̂_Nk = trunc_cov(estim.cov.invQ̂_He, estim.nx̂, Nk, estim.He)
+    invR̂_Nk = trunc_cov(estim.cov.invR̂_He, estim.nym, Nk, estim.He)
     M_Nk = [invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
     Ñ_Nk = [fill(C, nε, nε) zeros(nε, nx̂+nŴ); zeros(nx̂, nε+nx̂+nŴ); zeros(nŴ, nε+nx̂) invQ̂_Nk]
     M_Nk_ẼZ̃ = M_Nk*ẼZ̃
@@ -477,6 +478,28 @@ function set_warmstart_mhe!(V̂, X̂0, estim::MovingHorizonEstimator{NT}, Z̃var
     return Z̃s
 end
 
+"Truncate the inverse covariance `invA_He` to the window size `Nk` if `Nk < He`."
+function trunc_cov(invA_He::Hermitian{<:Real, <:AbstractMatrix}, n, Nk, He) 
+    if Nk < He
+        nA = Nk*n
+        # avoid views since allocations only when Nk < He and we want type-stability:
+        return Hermitian(invA_He[1:nA, 1:nA], :L)
+    else
+        return invA_He
+    end
+end
+function trunc_cov(
+    invA_He::Hermitian{NT, Diagonal{NT, Vector{NT}}}, n, Nk, He
+) where NT <:Real
+    if Nk < He
+        nA = Nk*n
+        # avoid views since allocations only when Nk < He and we want type-stability:
+        return Hermitian(Diagonal(invA_He.data.diag[1:nA]), :L)
+    else
+        return invA_He
+    end
+end
+
 "Correct the covariance estimate at arrival using `covestim` [`StateEstimator`](@ref)."
 function correct_cov!(estim::MovingHorizonEstimator)
     nym, nd = estim.nym, estim.model.nd
@@ -573,12 +596,15 @@ function obj_nonlinprog!(
     nε, Nk = estim.nε, estim.Nk[] 
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.cov.invP̄
     nx̃ = nε + nx̂
-    invQ̂_Nk, invR̂_Nk = @views estim.cov.invQ̂_He[1:nŴ, 1:nŴ], estim.cov.invR̂_He[1:nYm, 1:nYm]
+    invQ̂_Nk = trunc_cov(estim.cov.invQ̂_He, estim.nx̂, Nk, estim.He)
+    invR̂_Nk = trunc_cov(estim.cov.invR̂_He, estim.nym, Nk, estim.He)
     x̂0arr, Ŵ, V̂ = @views Z̃[nx̃-nx̂+1:nx̃], Z̃[nx̃+1:nx̃+nŴ], V̂[1:nYm]
     x̄ .= estim.x̂0arr_old .- x̂0arr
     Jε = nε ≠ 0 ? estim.C*Z̃[begin]^2 : zero(NT)
     return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jε
 end
+
+
 
 @doc raw"""
     predict_mhe!(V̂, X̂0, _, _, _, estim::MovingHorizonEstimator, model::LinModel, Z̃) -> V̂, X̂0
