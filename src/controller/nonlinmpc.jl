@@ -222,11 +222,11 @@ This controller allocates memory at each time step for the optimization.
    function, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
-- `hessian=false` : an `AbstractADType` backend for the Hessian of the Lagrangian, see 
-   `gradient` above for the options. The default `false` skip it and use the quasi-Newton
-    method of `optim`, which is always the case if `oracle=false` (see Extended Help).
-- `oracle=JuMP.solver_name(optim)=="Ipopt"`: use the efficient [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
-   for the nonlinear constraints (not supported by most optimizers for now).
+- `hessian=false` : an `AbstractADType` backend or `Bool` for the Hessian of the Lagrangian, 
+   see `gradient` above for the options. The default `false` skip it and use the quasi-Newton
+   method of `optim`, which is always the case if `oracle=false` (see Extended Help).
+- `oracle=JuMP.solver_name(optim)=="Ipopt"` : a `Bool` to use the [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
+   for efficient nonlinear constraints (not supported by most optimizers for now).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
@@ -409,7 +409,7 @@ function NonLinMPC(
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-    hessian = validate_hessian(hessian, gradient, oracle)
+    hessian = validate_hessian(hessian, gradient, oracle, DEFAULT_NONLINMPC_HESSIAN)
     return NonLinMPC{NT}(
         estim, Hp, Hc, nb, weights, JE, gc!, nc, p, 
         transcription, optim, gradient, jacobian, hessian, oracle
@@ -513,34 +513,6 @@ function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, 
 end
 
 """
-    validate_hessian(hessian, gradient, oracle) -> backend
-
-Validate `hessian` argument and return the differentiation backend.
-"""
-function validate_hessian(hessian, gradient, oracle)
-    if hessian == true
-        backend = DEFAULT_NONLINMPC_HESSIAN
-    elseif hessian == false || isnothing(hessian)
-        backend = nothing
-    else
-        backend = hessian
-    end
-    if oracle == false && !isnothing(backend)
-        error("Second order derivatives are only supported with oracle=true.")
-    end
-    if oracle == true && !isnothing(backend)
-        hess = dense_backend(backend)
-        grad = dense_backend(gradient)
-        if hess != grad
-            @info "The objective function gradient will be computed with the hessian "*
-                "backend ($(backend_str(hess)))\n instead of the one in gradient "*
-                "argument ($(backend_str(grad))) for efficiency."
-        end
-    end
-    return backend
-end
-
-"""
     addinfo!(info, mpc::NonLinMPC) -> info
 
 For [`NonLinMPC`](@ref), add `:sol` and the optimal economic cost `:JE`.
@@ -627,175 +599,9 @@ function reset_nonlincon!(mpc::NonLinMPC)
 end
 
 """
-    get_nonlincon_oracle(mpc::NonLinMPC, optim) -> g_oracle, geq_oracle
-
-Return the nonlinear constraint oracles for [`NonLinMPC`](@ref) `mpc`.
-
-Return `g_oracle` and `geq_oracle`, the inequality and equality [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
-for the two respective constraints. Note that `g_oracle` only includes the non-`Inf`
-inequality constraints, thus it must be re-constructed if they change. This method is really
-intricate because the oracles are used inside the nonlinear optimization, so they must be
-type-stable and as efficient as possible. All the function outputs and derivatives are 
-ached and updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
-"""
-function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
-    # ----------- common cache for all functions  ----------------------------------------
-    model = mpc.estim.model
-    transcription = mpc.transcription
-    jac, hess = mpc.jacobian, mpc.hessian
-    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk(model, transcription)
-    Hp, Hc = mpc.Hp, mpc.Hc
-    i_g = findall(mpc.con.i_g) # convert to non-logical indices for non-allocating @views
-    ng, ngi = length(mpc.con.i_g), sum(mpc.con.i_g)
-    nc, neq = mpc.con.nc, mpc.con.neq
-    nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
-    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
-    strict = Val(true)
-    myNaN, myInf                      = convert(JNT, NaN), convert(JNT, Inf)
-    ΔŨ::Vector{JNT}                   = zeros(JNT, nΔŨ)
-    x̂0end::Vector{JNT}                = zeros(JNT, nx̂)
-    K0::Vector{JNT}                   = zeros(JNT, nK)
-    Ue::Vector{JNT}, Ŷe::Vector{JNT}  = zeros(JNT, nUe), zeros(JNT, nŶe)
-    U0::Vector{JNT}, Ŷ0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nŶ)
-    Û0::Vector{JNT}, X̂0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nX̂)
-    gc::Vector{JNT}, g::Vector{JNT}   = zeros(JNT, nc),  zeros(JNT, ng)
-    gi::Vector{JNT}, geq::Vector{JNT} = zeros(JNT, ngi), zeros(JNT, neq)
-    λi::Vector{JNT}, λeq::Vector{JNT} = ones(JNT, ngi), ones(JNT, neq)
-    # -------------- inequality constraint: nonlinear oracle -----------------------------
-    function gi!(gi, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-        gi .= @views g[i_g]
-        return nothing
-    end
-    function ℓ_gi(Z̃, λi, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g, gi)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-        gi .= @views g[i_g]
-        return dot(λi, gi)
-    end
-    Z̃_∇gi  = fill(myNaN, nZ̃)      # NaN to force update at first call
-    ∇gi_context = (
-        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-        Cache(Û0), Cache(K0), Cache(X̂0), 
-        Cache(gc), Cache(geq), Cache(g)
-    )
-    ∇gi_prep  = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_context...; strict)
-    ∇gi = init_diffmat(JNT, jac, ∇gi_prep, nZ̃, ngi)
-    ∇gi_structure  = init_diffstructure(∇gi)
-    if !isnothing(hess)
-        ∇²gi_context = (
-            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-            Cache(Û0), Cache(K0), Cache(X̂0), 
-            Cache(gc), Cache(geq), Cache(g), Cache(gi)
-        )
-        ∇²gi_prep = prepare_hessian(
-            ℓ_gi, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...; strict
-        )
-        ∇²ℓ_gi    = init_diffmat(JNT, hess, ∇²gi_prep, nZ̃, nZ̃)
-        ∇²gi_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_gi))
-    end
-    function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇gi)
-            Z̃_∇gi .= Z̃_arg
-            value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_context...)
-        end
-        return nothing
-    end
-    function gi_func!(gi_arg, Z̃_arg)
-        update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        return gi_arg .= gi
-    end
-    function ∇gi_func!(∇gi_arg, Z̃_arg)
-        update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg) 
-        return diffmat2vec!(∇gi_arg, ∇gi, ∇gi_structure)
-    end
-    function ∇²gi_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
-        Z̃_∇gi  .= Z̃_arg
-        λi     .= λ_arg
-        hessian!(ℓ_gi, ∇²ℓ_gi, ∇²gi_prep, hess, Z̃_∇gi, Constant(λi), ∇²gi_context...)
-        return diffmat2vec!(∇²ℓ_arg, ∇²ℓ_gi, ∇²gi_structure)
-    end
-    gi_min = fill(-myInf, ngi)
-    gi_max = zeros(JNT,   ngi)
-    g_oracle = MOI.VectorNonlinearOracle(;
-        dimension = nZ̃,
-        l = gi_min,
-        u = gi_max,
-        eval_f = gi_func!,
-        jacobian_structure = ∇gi_structure,
-        eval_jacobian = ∇gi_func!,
-        hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²gi_structure,
-        eval_hessian_lagrangian      = isnothing(hess) ? nothing           : ∇²gi_func!
-    )
-    # ------------- equality constraints : nonlinear oracle ------------------------------
-    function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-        return nothing
-    end
-    function ℓ_geq(Z̃, λeq, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-        return dot(λeq, geq)
-    end
-    Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update at first call
-    ∇geq_context = (
-        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
-        Cache(Û0), Cache(K0),   Cache(X̂0),
-        Cache(gc), Cache(g)
-    )
-    ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)
-    ∇geq    = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
-    ∇geq_structure  = init_diffstructure(∇geq)
-    if !isnothing(hess)
-        ∇²geq_context = (
-            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
-            Cache(Û0), Cache(K0),   Cache(X̂0),
-            Cache(gc), Cache(geq), Cache(g)
-        )
-        ∇²geq_prep = prepare_hessian(
-            ℓ_geq, hess, Z̃_∇geq, Constant(λeq), ∇²geq_context...; strict
-        )
-        ∇²ℓ_geq = init_diffmat(JNT, hess, ∇²geq_prep, nZ̃, nZ̃)
-        ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
-    end
-    function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇geq)
-            Z̃_∇geq .= Z̃_arg
-            value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_context...)
-        end
-        return nothing
-    end
-    function geq_func!(geq_arg, Z̃_arg)
-        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-        return geq_arg .= geq
-    end
-    function ∇geq_func!(∇geq_arg, Z̃_arg)
-        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-        return diffmat2vec!(∇geq_arg, ∇geq, ∇geq_structure)
-    end
-    function ∇²geq_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
-        Z̃_∇geq .= Z̃_arg
-        λeq    .= λ_arg
-        hessian!(ℓ_geq, ∇²ℓ_geq, ∇²geq_prep, hess, Z̃_∇geq, Constant(λeq), ∇²geq_context...)
-        return diffmat2vec!(∇²ℓ_arg, ∇²ℓ_geq, ∇²geq_structure)
-    end
-    geq_min = geq_max = zeros(JNT, neq)
-    geq_oracle = MOI.VectorNonlinearOracle(;
-        dimension = nZ̃,
-        l = geq_min,
-        u = geq_max,
-        eval_f = geq_func!,
-        jacobian_structure = ∇geq_structure,
-        eval_jacobian = ∇geq_func!,
-        hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²geq_structure,
-        eval_hessian_lagrangian      = isnothing(hess) ? nothing           : ∇²geq_func!
-    )
-    return g_oracle, geq_oracle
-end
-
-"""
     get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) -> J_op
 
-Return the nonlinear operator for the objective function of `mpc` [`NonLinMPC`](@ref).
+Return the nonlinear operator for the objective of `mpc` [`NonLinMPC`](@ref).
 
 It is based on the splatting syntax. This method is really intricate and that's because of:
 
@@ -835,29 +641,33 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
     Z̃_J = fill(myNaN, nZ̃)      # NaN to force update at first call
-    J_context = (
+    J_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K0), Cache(X̂0), 
         Cache(gc), Cache(g), Cache(geq),
     )
-    ∇J_prep = prepare_gradient(J!, grad, Z̃_J, J_context...; strict)
+    ∇J_prep = prepare_gradient(J!, grad, Z̃_J, J_cache...; strict)
     ∇J  = Vector{JNT}(undef, nZ̃)
     if !isnothing(hess)
-        ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_context...; strict)
+        ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_cache...; strict)
         ∇²J = init_diffmat(JNT, hess, ∇²J_prep, nZ̃, nZ̃)
     end
     update_objective! = if !isnothing(hess)
         function (J, ∇J, ∇²J, Z̃_J, Z̃_arg)
             if isdifferent(Z̃_arg, Z̃_J)
                 Z̃_J .= Z̃_arg
-                J[], _ = value_gradient_and_hessian!(J!, ∇J, ∇²J, hess, Z̃_J, J_context...)
+                J[], _ = value_gradient_and_hessian!(
+                    J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_cache...
+                )
             end
         end
     else
         update_objective! = function (J, ∇J, Z̃_∇J, Z̃_arg)
             if isdifferent(Z̃_arg, Z̃_∇J)
                 Z̃_∇J .= Z̃_arg
-                J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_∇J, J_context...)
+                J[], _ = value_and_gradient!(
+                    J!, ∇J, ∇J_prep, grad, Z̃_∇J, J_cache...
+                )
             end
         end
     end
@@ -914,6 +724,172 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
         @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
     end
     return J_op
+end
+
+"""
+    get_nonlincon_oracle(mpc::NonLinMPC, optim) -> g_oracle, geq_oracle
+
+Return the nonlinear constraint oracles for [`NonLinMPC`](@ref) `mpc`.
+
+Return `g_oracle` and `geq_oracle`, the inequality and equality [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
+for the two respective constraints. Note that `g_oracle` only includes the non-`Inf`
+inequality constraints, thus it must be re-constructed if they change. This method is really
+intricate because the oracles are used inside the nonlinear optimization, so they must be
+type-stable and as efficient as possible. All the function outputs and derivatives are 
+ached and updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
+"""
+function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
+    # ----------- common cache for all functions  ----------------------------------------
+    model = mpc.estim.model
+    transcription = mpc.transcription
+    jac, hess = mpc.jacobian, mpc.hessian
+    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
+    nk = get_nk(model, transcription)
+    Hp, Hc = mpc.Hp, mpc.Hc
+    i_g = findall(mpc.con.i_g) # convert to non-logical indices for non-allocating @views
+    ng, ngi = length(mpc.con.i_g), sum(mpc.con.i_g)
+    nc, neq = mpc.con.nc, mpc.con.neq
+    nZ̃, nU, nŶ, nX̂, nK = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
+    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+    strict = Val(true)
+    myNaN, myInf                      = convert(JNT, NaN), convert(JNT, Inf)
+    ΔŨ::Vector{JNT}                   = zeros(JNT, nΔŨ)
+    x̂0end::Vector{JNT}                = zeros(JNT, nx̂)
+    K0::Vector{JNT}                   = zeros(JNT, nK)
+    Ue::Vector{JNT}, Ŷe::Vector{JNT}  = zeros(JNT, nUe), zeros(JNT, nŶe)
+    U0::Vector{JNT}, Ŷ0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Û0::Vector{JNT}, X̂0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nX̂)
+    gc::Vector{JNT}, g::Vector{JNT}   = zeros(JNT, nc),  zeros(JNT, ng)
+    gi::Vector{JNT}, geq::Vector{JNT} = zeros(JNT, ngi), zeros(JNT, neq)
+    λi::Vector{JNT}, λeq::Vector{JNT} = ones(JNT, ngi),  ones(JNT, neq)
+    # -------------- inequality constraint: nonlinear oracle -----------------------------
+    function gi!(gi, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        gi .= @views g[i_g]
+        return nothing
+    end
+    function ℓ_gi(Z̃, λi, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g, gi)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        gi .= @views g[i_g]
+        return dot(λi, gi)
+    end
+    Z̃_∇gi  = fill(myNaN, nZ̃)      # NaN to force update at first call
+    ∇gi_cache = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(gc), Cache(geq), Cache(g)
+    )
+    ∇gi_prep  = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_cache...; strict)
+    ∇gi = init_diffmat(JNT, jac, ∇gi_prep, nZ̃, ngi)
+    ∇gi_structure  = init_diffstructure(∇gi)
+    if !isnothing(hess)
+        ∇²gi_cache = (
+            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+            Cache(Û0), Cache(K0), Cache(X̂0), 
+            Cache(gc), Cache(geq), Cache(g), Cache(gi)
+        )
+        ∇²gi_prep = prepare_hessian(
+            ℓ_gi, hess, Z̃_∇gi, Constant(λi), ∇²gi_cache...; strict
+        )
+        ∇²ℓ_gi    = init_diffmat(JNT, hess, ∇²gi_prep, nZ̃, nZ̃)
+        ∇²gi_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_gi))
+    end
+    function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇gi)
+            Z̃_∇gi .= Z̃_arg
+            value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_cache...)
+        end
+        return nothing
+    end
+    function gi_func!(gi_arg, Z̃_arg)
+        update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
+        return gi_arg .= gi
+    end
+    function ∇gi_func!(∇gi_arg, Z̃_arg)
+        update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg) 
+        return diffmat2vec!(∇gi_arg, ∇gi, ∇gi_structure)
+    end
+    function ∇²gi_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
+        Z̃_∇gi  .= Z̃_arg
+        λi     .= λ_arg
+        hessian!(ℓ_gi, ∇²ℓ_gi, ∇²gi_prep, hess, Z̃_∇gi, Constant(λi), ∇²gi_cache...)
+        return diffmat2vec!(∇²ℓ_arg, ∇²ℓ_gi, ∇²gi_structure)
+    end
+    gi_min = fill(-myInf, ngi)
+    gi_max = zeros(JNT,   ngi)
+    g_oracle = MOI.VectorNonlinearOracle(;
+        dimension = nZ̃,
+        l = gi_min,
+        u = gi_max,
+        eval_f = gi_func!,
+        jacobian_structure = ∇gi_structure,
+        eval_jacobian = ∇gi_func!,
+        hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²gi_structure,
+        eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²gi_func!
+    )
+    # ------------- equality constraints : nonlinear oracle ------------------------------
+    function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return nothing
+    end
+    function ℓ_geq(Z̃, λeq, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return dot(λeq, geq)
+    end
+    Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update at first call
+    ∇geq_cache = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
+        Cache(Û0), Cache(K0),   Cache(X̂0),
+        Cache(gc), Cache(g)
+    )
+    ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z̃_∇geq, ∇geq_cache...; strict)
+    ∇geq    = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
+    ∇geq_structure  = init_diffstructure(∇geq)
+    if !isnothing(hess)
+        ∇²geq_cache = (
+            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
+            Cache(Û0), Cache(K0),   Cache(X̂0),
+            Cache(gc), Cache(geq), Cache(g)
+        )
+        ∇²geq_prep = prepare_hessian(
+            ℓ_geq, hess, Z̃_∇geq, Constant(λeq), ∇²geq_cache...; strict
+        )
+        ∇²ℓ_geq = init_diffmat(JNT, hess, ∇²geq_prep, nZ̃, nZ̃)
+        ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
+    end
+    function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇geq)
+            Z̃_∇geq .= Z̃_arg
+            value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_cache...)
+        end
+        return nothing
+    end
+    function geq_func!(geq_arg, Z̃_arg)
+        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        return geq_arg .= geq
+    end
+    function ∇geq_func!(∇geq_arg, Z̃_arg)
+        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        return diffmat2vec!(∇geq_arg, ∇geq, ∇geq_structure)
+    end
+    function ∇²geq_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
+        Z̃_∇geq .= Z̃_arg
+        λeq    .= λ_arg
+        hessian!(ℓ_geq, ∇²ℓ_geq, ∇²geq_prep, hess, Z̃_∇geq, Constant(λeq), ∇²geq_cache...)
+        return diffmat2vec!(∇²ℓ_arg, ∇²ℓ_geq, ∇²geq_structure)
+    end
+    geq_min = geq_max = zeros(JNT, neq)
+    geq_oracle = MOI.VectorNonlinearOracle(;
+        dimension = nZ̃,
+        l = geq_min,
+        u = geq_max,
+        eval_f = geq_func!,
+        jacobian_structure = ∇geq_structure,
+        eval_jacobian = ∇geq_func!,
+        hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²geq_structure,
+        eval_hessian_lagrangian      = isnothing(hess) ? nothing           : ∇²geq_func!
+    )
+    return g_oracle, geq_oracle
 end
 
 """

@@ -895,10 +895,14 @@ end
     @test isa(mhe13, MovingHorizonEstimator{Float32})
 
     mhe14 = MovingHorizonEstimator(
-        nonlinmodel, He=5, gradient=AutoFiniteDiff(), jacobian=AutoFiniteDiff()
+        nonlinmodel, He=5, 
+        gradient=AutoFiniteDiff(), 
+        jacobian=AutoFiniteDiff(),
+        hessian=AutoFiniteDiff()
     )
     @test mhe14.gradient == AutoFiniteDiff()
     @test mhe14.jacobian == AutoFiniteDiff()
+    @test mhe14.hessian == AutoFiniteDiff()
 
     @test_throws ArgumentError MovingHorizonEstimator(linmodel)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
@@ -952,30 +956,39 @@ end
     preparestate!(mhe1, [51, 32], [5])
     @test mhe1([5]) ≈ [51, 32] atol=1e-3
 
-    mhe1 = MovingHorizonEstimator(nonlinmodel, He=2, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
-    JuMP.set_attribute(mhe1.optim, "tol", 1e-7)
-    preparestate!(mhe1, [50, 30], [5])
-    x̂ = updatestate!(mhe1, [10, 50], [50, 30], [5])
+    mhe1b = MovingHorizonEstimator(nonlinmodel, He=2, nint_u=[1, 1], nint_ym=0, direct=false)
+    JuMP.set_attribute(mhe1b.optim, "tol", 1e-7)
+    preparestate!(mhe1b, [50, 30], [5])
+    x̂ = updatestate!(mhe1b, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
-    @test mhe1.x̂0 ≈ zeros(6) atol=1e-9
-    info = getinfo(mhe1)
+    @test mhe1b.x̂0 ≈ zeros(6) atol=1e-9
+    info = getinfo(mhe1b)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
 
-    @test initstate!(mhe1, [11, 52], [50, 30], [5]) ≈ zeros(6) atol=1e-9
-    @test mhe1.lastu0 ≈ [1, 2]
-    setstate!(mhe1, [1,2,3,4,5,6])
-    @test mhe1.x̂0 ≈ [1,2,3,4,5,6]
+    mhe1c = MovingHorizonEstimator(nonlinmodel, He=2, direct=false, hessian=true)
+    preparestate!(mhe1c, [50, 30], [5])
+    x̂ = updatestate!(mhe1c, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-9
+    @test mhe1c.x̂0 ≈ zeros(6) atol=1e-9
+    info = getinfo(mhe1c)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+
+    @test initstate!(mhe1c, [11, 52], [50, 30], [5]) ≈ zeros(6) atol=1e-9
+    @test mhe1c.lastu0 ≈ [1, 2]
+    setstate!(mhe1c, [1,2,3,4,5,6])
+    @test mhe1c.x̂0 ≈ [1,2,3,4,5,6]
     for i in 1:40
-        preparestate!(mhe1, [50, 30], [5])
-        updatestate!(mhe1, [11, 52], [50, 30], [5])
+        preparestate!(mhe1c, [50, 30], [5])
+        updatestate!(mhe1c, [11, 52], [50, 30], [5])
     end
-    @test mhe1([5]) ≈ [50, 30] atol=1e-3
+    @test mhe1c([5]) ≈ [50, 30] atol=1e-3
     for i in 1:40
-        preparestate!(mhe1, [51, 32], [5])
-        updatestate!(mhe1, [10, 50], [51, 32], [5])
+        preparestate!(mhe1c, [51, 32], [5])
+        updatestate!(mhe1c, [10, 50], [51, 32], [5])
     end
-    @test mhe1([5]) ≈ [51, 32] atol=1e-3
+    @test mhe1c([5]) ≈ [51, 32] atol=1e-3
 
     mhe2 = MovingHorizonEstimator(linmodel, He=2)
     preparestate!(mhe2, [50, 30], [5])

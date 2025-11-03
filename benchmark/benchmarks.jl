@@ -1,6 +1,6 @@
 using BenchmarkTools
 using ModelPredictiveControl, ControlSystemsBase, LinearAlgebra
-using JuMP, OSQP, DAQP, Ipopt, MadNLP
+using JuMP, OSQP, DAQP, Ipopt, MadNLP, UnoSolver
 
 const SUITE = BenchmarkGroup(["ModelPredictiveControl"])
 

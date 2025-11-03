@@ -110,6 +110,30 @@ dense_backend(backend::AbstractADType) = backend
 dense_backend(backend::AutoSparse) = backend.dense_ad
 dense_backend(backend::SecondOrder) = backend.inner
 
+"Validate `hessian` keyword argument and return the differentiation `backend`."
+function validate_hessian(hessian, gradient, oracle, default)
+    if hessian == true
+        backend = default
+    elseif hessian == false || isnothing(hessian)
+        backend = nothing
+    else
+        backend = hessian
+    end
+    if oracle == false && !isnothing(backend)
+        error("Second order derivatives are only supported with oracle=true.")
+    end
+    if oracle == true && !isnothing(backend)
+        hess = dense_backend(backend)
+        grad = dense_backend(gradient)
+        if hess != grad
+            @info "The objective function gradient will be computed with the hessian "*
+                "backend ($(backend_str(hess)))\n instead of the one in gradient "*
+                "argument ($(backend_str(grad))) for efficiency."
+        end
+    end
+    return backend
+end
+
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
 
