@@ -279,8 +279,8 @@ transcription for now.
 - `hessian=false` : an `AbstractADType` backend for the Hessian of the Lagrangian, see 
    `gradient` above for the options. The default `false` skip it and use the quasi-Newton
     method of `optim`, which is always the case if `oracle=false` (see Extended Help).
-- `oracle=JuMP.solver_name(optim)=="Ipopt"`: use the efficient [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
-   for the nonlinear constraints (not supported by most optimizers for now).
+- `oracle=JuMP.solver_name(optim)=="Ipopt"` : a `Bool` to use the [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
+   for efficient nonlinear constraints (not supported by most optimizers for now).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
 

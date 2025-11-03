@@ -222,11 +222,11 @@ This controller allocates memory at each time step for the optimization.
    function, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
-- `hessian=false` : an `AbstractADType` backend for the Hessian of the Lagrangian, see 
-   `gradient` above for the options. The default `false` skip it and use the quasi-Newton
-    method of `optim`, which is always the case if `oracle=false` (see Extended Help).
-- `oracle=JuMP.solver_name(optim)=="Ipopt"`: use the efficient [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
-   for the nonlinear constraints (not supported by most optimizers for now).
+- `hessian=false` : an `AbstractADType` backend or `Bool` for the Hessian of the Lagrangian, 
+   see `gradient` above for the options. The default `false` skip it and use the quasi-Newton
+   method of `optim`, which is always the case if `oracle=false` (see Extended Help).
+- `oracle=JuMP.solver_name(optim)=="Ipopt"` : a `Bool` to use the [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
+   for efficient nonlinear constraints (not supported by most optimizers for now).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 

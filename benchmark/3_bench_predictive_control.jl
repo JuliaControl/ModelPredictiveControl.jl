@@ -318,7 +318,13 @@ optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 transcription = SingleShooting()
 nmpc_madnlp_ss = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 nmpc_madnlp_ss = setconstraint!(nmpc_madnlp_ss; umin, umax)
-JuMP.unset_time_limit_sec(nmpc_madnlp_ss.optim) 
+JuMP.unset_time_limit_sec(nmpc_madnlp_ss.optim)
+
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="filtersqp"), add_bridges=false)
+transcription, hessian, oracle = MultipleShooting(), true, true
+nmpc_uno_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian, oracle)
+nmpc_uno_ms_hess = setconstraint!(nmpc_uno_ms_hess; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_uno_ms_hess.optim)
 
 # TODO: does not work well with MadNLP and MultipleShooting or TrapezoidalCollocation, 
 # figure out why. Current theory: 
@@ -375,6 +381,11 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting"] =
         sim!($nmpc_madnlp_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Uno"]["MultipleShooting (Hessian)"] = 
+    @benchmarkable(
+        sim!($nmpc_uno_ms_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )    
 
 # ----------------- Case study: Pendulum economic --------------------------------
 model2, p = pendulum_model2, pendulum_p2
