@@ -18,7 +18,8 @@ ModelPredictiveControl.relaxX̂
 ModelPredictiveControl.relaxŴ
 ModelPredictiveControl.relaxV̂
 ModelPredictiveControl.init_matconstraint_mhe
-ModelPredictiveControl.get_nonlinops(::MovingHorizonEstimator, ::ModelPredictiveControl.GenericModel)
+ModelPredictiveControl.get_nonlinobj_op(::MovingHorizonEstimator, ::ModelPredictiveControl.GenericModel)
+ModelPredictiveControl.get_nonlincon_oracle(::MovingHorizonEstimator, ::ModelPredictiveControl.GenericModel)
 ```
 
 ## Augmented Model
