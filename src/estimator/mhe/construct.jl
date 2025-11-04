@@ -1478,7 +1478,7 @@ function get_nonlincon_oracle(
     k0::Vector{JNT}                  = zeros(JNT, nk)
     û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
     g::Vector{JNT}, gi::Vector{JNT}  = zeros(JNT, ng), zeros(JNT, ngi)
-    λi::Vector{JNT}                  = ones(JNT, ngi)
+    λi::Vector{JNT}                  = rand(JNT, ngi)
     # -------------- inequality constraint: nonlinear oracle -------------------------
     function gi!(gi, Z̃, V̂, X̂0, û0, k0, ŷ0, g)
         update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
