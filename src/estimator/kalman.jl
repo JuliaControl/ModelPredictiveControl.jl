@@ -1111,8 +1111,8 @@ function get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)
     x̂0 = zeros(NT, nx̂)
     û0 = Cache(zeros(NT, nu))
     k0 = Cache(zeros(NT, nk))
-    cst_u0 = Constant(zeros(NT, nu))
-    cst_d0 = Constant(zeros(NT, nd))
+    cst_u0 = Constant(rand(NT, nu))
+    cst_d0 = Constant(rand(NT, nd))
     F̂prep = prepare_jacobian(
         f̂_ekf!, x̂0next, jacobian, x̂0, û0, k0, cst_u0, cst_d0; strict
     )
