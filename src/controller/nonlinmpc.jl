@@ -716,7 +716,6 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
     else                        # multivariate syntax (see JuMP.@operator doc):
         function (∇²J_arg::AbstractMatrix{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
             update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-            #println(typeof(∇²J_arg))
             return fill_diffstructure!(∇²J_arg, ∇²J, ∇²J_structure)
         end
     end
