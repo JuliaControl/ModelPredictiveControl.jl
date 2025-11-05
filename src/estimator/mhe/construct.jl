@@ -1395,6 +1395,7 @@ function get_nonlinobj_op(
         ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_cache...; strict)
         estim.Nk[] = 0
         ∇²J = init_diffmat(JNT, hess, ∇²J_prep, nZ̃, nZ̃)
+        ∇²J_structure = lowertriangle_indices(init_diffstructure(∇²J))
     end
     update_objective! = if !isnothing(hess)
         function (J, ∇J, ∇²J, Z̃_∇J, Z̃_arg)
@@ -1439,7 +1440,7 @@ function get_nonlinobj_op(
     end
     function ∇²J_func!(∇²J_arg::AbstractMatrix{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
         update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-        return fill_lowertriangle!(∇²J_arg, ∇²J)
+        return fill_diffstructure!(∇²J_arg, ∇²J, ∇²J_structure)
     end
     if !isnothing(hess)
         @operator(optim, J_op, nZ̃, J_func, ∇J_func!, ∇²J_func!)
@@ -1525,13 +1526,13 @@ function get_nonlincon_oracle(
     end
     function ∇gi_func!(∇gi_arg, Z̃_arg)
         update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        return diffmat2vec!(∇gi_arg, ∇gi, ∇gi_structure)
+        return fill_diffstructure!(∇gi_arg, ∇gi, ∇gi_structure)
     end
     function ∇²gi_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
         Z̃_∇gi  .= Z̃_arg
         λi     .= λ_arg
         hessian!(ℓ_gi, ∇²ℓ_gi, ∇²gi_prep, hess, Z̃_∇gi, Constant(λi), ∇²gi_cache...)
-        return diffmat2vec!(∇²ℓ_arg, ∇²ℓ_gi, ∇²gi_structure)
+        return fill_diffstructure!(∇²ℓ_arg, ∇²ℓ_gi, ∇²gi_structure)
     end
     gi_min = fill(-myInf, ngi)
     gi_max = zeros(JNT,   ngi)
