@@ -76,14 +76,6 @@ function lowertriangle_indices(i_vec::Vector{Tuple{Int, Int}})
     return [(i,j) for (i,j) in i_vec if i ≥ j]
 end
 
-"Fill the lower triangular part of A in-place with the corresponding part in B."
-function fill_lowertriangle!(A::AbstractMatrix, B::AbstractMatrix)
-    for j in axes(A, 2), i in axes(A, 1)
-        (i ≥ j) && (A[i, j] = B[i, j])
-    end
-    return A
-end
-
 "Store the diff. matrix `A` in the vector `v` with list of nonzero indices `i_vec`." 
 function fill_diffstructure!(
     v::AbstractVector, A::AbstractMatrix, i_vec::Vector{Tuple{Int, Int}}
