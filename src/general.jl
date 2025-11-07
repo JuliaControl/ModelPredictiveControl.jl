@@ -6,6 +6,15 @@ const DEFAULT_LWT = 0.0
 const DEFAULT_CWT = 1e5
 const DEFAULT_EWT = 0.0
 
+"All deterministic algorithms for matrix coloring order in `SparseMatrixColoring.jl`."
+const ALL_COLORING_ORDERS = (
+    NaturalOrder(),
+    LargestFirst(),
+    SmallestLast(),
+    IncidenceDegree(),
+    DynamicLargestFirst(),
+)
+
 "Termination status that means 'no solution available'."
 const ERROR_STATUSES = (
     JuMP.INFEASIBLE, JuMP.DUAL_INFEASIBLE, JuMP.LOCALLY_INFEASIBLE, 
