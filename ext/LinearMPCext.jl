@@ -1,6 +1,6 @@
 module LinearMPCext
 
-using LinearMPCext
+using ModelPredictiveControl, LinearMPC
 
 export hi
 
