@@ -51,7 +51,7 @@ Our goal is controlling the first output $y_1$, but the second one $y_2$ should 
 35:
 
 ```julia
-mhe = MovingHorizonEstimator(model)
+mhe = MovingHorizonEstimator(model, He=10)
 mpc = LinMPC(mhe, Mwt=[1, 0], Nwt=[0.1])
 mpc = setconstraint!(mpc, ymax=[Inf, 35])
 ```
