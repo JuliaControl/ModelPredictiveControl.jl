@@ -51,14 +51,13 @@ Our goal is controlling the first output $y_1$, but the second one $y_2$ should 
 35:
 
 ```julia
-mhe = MovingHorizonEstimator(model, He=10)
-mpc = LinMPC(mhe, Mwt=[1, 0], Nwt=[0.1])
+mpc = LinMPC(model, Mwt=[1, 0], Nwt=[0.1])
 mpc = setconstraint!(mpc, ymax=[Inf, 35])
 ```
 
-The keyword arguments `He`, `Mwt` and `Nwt` are the estimation horizon, the output setpoint
-tracking and move suppression weights, respectively. A setpoint step change of five tests
-`mpc` controller in closed-loop. The result is displayed with [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl):
+The keyword arguments `Mwt` and `Nwt` are the output setpoint tracking and move suppression
+weights, respectively. A setpoint step change of five tests `mpc` controller in closed-loop.
+The result is displayed with [`Plots.jl`](https://github.com/JuliaPlots/Plots.jl):
 
 ```julia
 using Plots
