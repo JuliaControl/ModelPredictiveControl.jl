@@ -391,7 +391,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
         ))
     )
     ```
-    that is, it will test all coloring orders at preparation and keep the best. 
+    that is, it will test many coloring orders at preparation and keep the best. 
     
     The slack variable ``ε`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
