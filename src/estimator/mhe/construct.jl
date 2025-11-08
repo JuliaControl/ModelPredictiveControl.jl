@@ -5,7 +5,7 @@ const DEFAULT_NONLINMHE_JACOBIAN  = AutoForwardDiff()
 const DEFAULT_NONLINMHE_HESSIAN   = AutoSparse(
     AutoForwardDiff();
     sparsity_detector=TracerSparsityDetector(),
-    coloring_algorithm=GreedyColoringAlgorithm(),
+    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS),
 ) 
 
 @doc raw"""
@@ -382,9 +382,17 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     AutoSparse(
         AutoForwardDiff(); 
         sparsity_detector  = TracerSparsityDetector(), 
-        coloring_algorithm = GreedyColoringAlgorithm()
+        coloring_algorithm = GreedyColoringAlgorithm((
+            NaturalOrder(),
+            LargestFirst(),
+            SmallestLast(),
+            IncidenceDegree(),
+            DynamicLargestFirst()
+        ))
     )
     ```
+    that is, it will test many coloring orders at preparation and keep the best. 
+    
     The slack variable ``ε`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
     problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
