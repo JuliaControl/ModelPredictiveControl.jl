@@ -291,10 +291,16 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     AutoSparse(
         AutoForwardDiff(); 
         sparsity_detector  = TracerSparsityDetector(), 
-        coloring_algorithm = GreedyColoringAlgorithm(ALL_COLORING_ORDERS)
+        coloring_algorithm = GreedyColoringAlgorithm((
+            NaturalOrder(),
+            LargestFirst(),
+            SmallestLast(),
+            IncidenceDegree(),
+            DynamicLargestFirst()
+        ))
     )
     ```
-    that is, it will test all coloring orders at preparation and keep the best. This is
+    that is, it will test many coloring orders at preparation and keep the best. This is
     also the sparse backend selected for the Hessian of the Lagrangian function if 
     `oracle=true` and `hessian=true`, which is the second exception. Second order 
     derivatives are only supported with `oracle=true` option.

@@ -382,7 +382,13 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     AutoSparse(
         AutoForwardDiff(); 
         sparsity_detector  = TracerSparsityDetector(), 
-        coloring_algorithm = GreedyColoringAlgorithm(ALL_COLORING_ORDERS)
+        coloring_algorithm = GreedyColoringAlgorithm((
+            NaturalOrder(),
+            LargestFirst(),
+            SmallestLast(),
+            IncidenceDegree(),
+            DynamicLargestFirst()
+        ))
     )
     ```
     that is, it will test all coloring orders at preparation and keep the best. 
