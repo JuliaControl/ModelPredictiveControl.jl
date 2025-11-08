@@ -309,6 +309,12 @@ nmpc_ipopt_tc = setconstraint!(nmpc_ipopt_tc; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_ipopt_tc.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = TrapezoidalCollocation(), true
+nmpc_ipopt_tc_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
+nmpc_ipopt_tc_hess = setconstraint!(nmpc_ipopt_tc_hess; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_ipopt_tc_hess.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 transcription = TrapezoidalCollocation(f_threads=true)
 nmpc_ipopt_tct = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 nmpc_ipopt_tct = setconstraint!(nmpc_ipopt_tct; umin, umax)
@@ -369,6 +375,11 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["MultipleShooting (thr
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation"] =
     @benchmarkable(
         sim!($nmpc_ipopt_tc, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($nmpc_ipopt_tc_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation (threaded)"] =
@@ -481,6 +492,14 @@ nmpc2_ipopt_ms = setconstraint!(nmpc2_ipopt_ms; umin, umax)
 JuMP.unset_time_limit_sec(nmpc2_ipopt_ms.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = MultipleShooting(), true
+nmpc2_ipopt_ms_hess = NonLinMPC(estim2; 
+    Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=Pmax, optim, transcription, hessian
+)
+nmpc2_ipopt_ms_hess = setconstraint!(nmpc2_ipopt_ms_hess; umin, umax)
+JuMP.unset_time_limit_sec(nmpc2_ipopt_ms_hess.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 transcription = TrapezoidalCollocation()
 nmpc2_ipopt_tc = NonLinMPC(estim2; 
     Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=Pmax, optim, transcription
@@ -488,9 +507,13 @@ nmpc2_ipopt_tc = NonLinMPC(estim2;
 nmpc2_ipopt_tc = setconstraint!(nmpc2_ipopt_tc; umin, umax)
 JuMP.unset_time_limit_sec(nmpc2_ipopt_tc.optim)
 
-# TODO: test custom constraints with MadNLP and SingleShooting, see comment above.
-# TODO: test custom constraints with MadNLP and MultipleShooting, see comment above.
-# TODO: test custom constraints with MadNLP and TrapezoidalCollocation, see comment above.
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = TrapezoidalCollocation(), true
+nmpc2_ipopt_tc_hess = NonLinMPC(estim2; 
+    Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=Pmax, optim, transcription, hessian
+)
+nmpc2_ipopt_tc = setconstraint!(nmpc2_ipopt_tc_hess; umin, umax)
+JuMP.unset_time_limit_sec(nmpc2_ipopt_tc_hess.optim)
 
 samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["SingleShooting"] = 
@@ -503,9 +526,19 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["MultipleShooti
         sim!($nmpc2_ipopt_ms, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["MultipleShooting (Hessian)"] =
+    @benchmarkable(
+        sim!($nmpc2_ipopt_ms_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["TrapezoidalCollocation"] =
     @benchmarkable(
         sim!($nmpc2_ipopt_tc, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["TrapezoidalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($nmpc2_ipopt_tc_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
 
