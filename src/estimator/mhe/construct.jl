@@ -5,7 +5,7 @@ const DEFAULT_NONLINMHE_JACOBIAN  = AutoForwardDiff()
 const DEFAULT_NONLINMHE_HESSIAN   = AutoSparse(
     AutoForwardDiff();
     sparsity_detector=TracerSparsityDetector(),
-    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS),
+    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
 ) 
 
 @doc raw"""
