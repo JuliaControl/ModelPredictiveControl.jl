@@ -5,7 +5,7 @@ const DEFAULT_NONLINMPC_JACDENSE  = AutoForwardDiff()
 const DEFAULT_NONLINMPC_JACSPARSE = AutoSparse(
     AutoForwardDiff();
     sparsity_detector=TracerSparsityDetector(),
-    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS),
+    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
 )
 const DEFAULT_NONLINMPC_HESSIAN = DEFAULT_NONLINMPC_JACSPARSE
 
@@ -291,13 +291,16 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     AutoSparse(
         AutoForwardDiff(); 
         sparsity_detector  = TracerSparsityDetector(), 
-        coloring_algorithm = GreedyColoringAlgorithm((
+        coloring_algorithm = GreedyColoringAlgorithm(
+            (
             NaturalOrder(),
             LargestFirst(),
             SmallestLast(),
             IncidenceDegree(),
             DynamicLargestFirst()
-        ))
+            ), 
+        postprocessing = true
+        )
     )
     ```
     that is, it will test many coloring orders at preparation and keep the best. This is

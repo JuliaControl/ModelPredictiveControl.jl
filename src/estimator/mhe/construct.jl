@@ -5,7 +5,7 @@ const DEFAULT_NONLINMHE_JACOBIAN  = AutoForwardDiff()
 const DEFAULT_NONLINMHE_HESSIAN   = AutoSparse(
     AutoForwardDiff();
     sparsity_detector=TracerSparsityDetector(),
-    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS),
+    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
 ) 
 
 @doc raw"""
@@ -382,13 +382,16 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     AutoSparse(
         AutoForwardDiff(); 
         sparsity_detector  = TracerSparsityDetector(), 
-        coloring_algorithm = GreedyColoringAlgorithm((
+        coloring_algorithm = GreedyColoringAlgorithm(
+            (
             NaturalOrder(),
             LargestFirst(),
             SmallestLast(),
             IncidenceDegree(),
             DynamicLargestFirst()
-        ))
+            ), 
+        postprocessing = true
+        )
     )
     ```
     that is, it will test many coloring orders at preparation and keep the best. 
