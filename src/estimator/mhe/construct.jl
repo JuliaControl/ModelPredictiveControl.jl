@@ -384,11 +384,12 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
         sparsity_detector  = TracerSparsityDetector(), 
         coloring_algorithm = GreedyColoringAlgorithm(
             (
-            NaturalOrder(),
-            LargestFirst(),
-            SmallestLast(),
-            IncidenceDegree(),
-            DynamicLargestFirst()
+                NaturalOrder(),
+                LargestFirst(),
+                SmallestLast(),
+                IncidenceDegree(),
+                DynamicLargestFirst(),
+                RandomOrder(StableRNG(0), 0)
             ), 
         postprocessing = true
         )
