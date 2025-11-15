@@ -18,8 +18,6 @@ using SparseMatrixColorings: GreedyColoringAlgorithm, sparsity_pattern
 using SparseMatrixColorings: NaturalOrder, LargestFirst, SmallestLast
 using SparseMatrixColorings: IncidenceDegree, DynamicLargestFirst, RandomOrder
 
-using SparseMatrixColorings: ncolors
-
 import ProgressLogging
 
 import ForwardDiff

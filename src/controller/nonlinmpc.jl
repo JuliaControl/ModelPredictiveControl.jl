@@ -663,8 +663,6 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
         ∇²J_prep = prepare_hessian(J!, hess, Z̃_J, J_cache...; strict)
         ∇²J = init_diffmat(JNT, hess, ∇²J_prep, nZ̃, nZ̃)
         ∇²J_structure = lowertriangle_indices(init_diffstructure(∇²J))
-        @show ncolors(∇²J_prep)
-        display(sparsity_pattern(∇²J_prep))
     end
     update_objective! = if !isnothing(hess)
         function (J, ∇J, ∇²J, Z̃_J, Z̃_arg)
