@@ -418,16 +418,34 @@ empc_ipopt_ss = setconstraint!(empc_ipopt_ss; umin, umax)
 JuMP.unset_time_limit_sec(empc_ipopt_ss.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = SingleShooting(), true
+empc_ipopt_ss_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, hessian, p)
+empc_ipopt_ss_hess = setconstraint!(empc_ipopt_ss_hess; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_ss_hess.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 transcription = MultipleShooting()
 empc_ipopt_ms = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
 empc_ipopt_ms = setconstraint!(empc_ipopt_ms; umin, umax)
 JuMP.unset_time_limit_sec(empc_ipopt_ms.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = MultipleShooting(), true
+empc_ipopt_ms_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, hessian, p)
+empc_ipopt_ms_hess = setconstraint!(empc_ipopt_ms_hess; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_ms_hess.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 transcription = TrapezoidalCollocation()
 empc_ipopt_tc = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
 empc_ipopt_tc = setconstraint!(empc_ipopt_tc; umin, umax)
 JuMP.unset_time_limit_sec(empc_ipopt_tc.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = TrapezoidalCollocation(), true
+empc_ipopt_tc_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, hessian, p)
+empc_ipopt_tc_hess = setconstraint!(empc_ipopt_tc_hess; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_tc_hess.optim)
 
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 transcription = SingleShooting()
