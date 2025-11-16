@@ -418,16 +418,34 @@ empc_ipopt_ss = setconstraint!(empc_ipopt_ss; umin, umax)
 JuMP.unset_time_limit_sec(empc_ipopt_ss.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = SingleShooting(), true
+empc_ipopt_ss_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, hessian, p)
+empc_ipopt_ss_hess = setconstraint!(empc_ipopt_ss_hess; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_ss_hess.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 transcription = MultipleShooting()
 empc_ipopt_ms = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
 empc_ipopt_ms = setconstraint!(empc_ipopt_ms; umin, umax)
 JuMP.unset_time_limit_sec(empc_ipopt_ms.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = MultipleShooting(), true
+empc_ipopt_ms_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, hessian, p)
+empc_ipopt_ms_hess = setconstraint!(empc_ipopt_ms_hess; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_ms_hess.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 transcription = TrapezoidalCollocation()
 empc_ipopt_tc = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
 empc_ipopt_tc = setconstraint!(empc_ipopt_tc; umin, umax)
 JuMP.unset_time_limit_sec(empc_ipopt_tc.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = TrapezoidalCollocation(), true
+empc_ipopt_tc_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, hessian, p)
+empc_ipopt_tc_hess = setconstraint!(empc_ipopt_tc_hess; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_tc_hess.optim)
 
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 transcription = SingleShooting()
@@ -443,14 +461,29 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting"] =
         sim!($empc_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting (Hessian)"] = 
+    @benchmarkable(
+        sim!($empc_ipopt_ss_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($empc_ipopt_ms, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["MultipleShooting (Hessian)"] =
+    @benchmarkable(
+        sim!($empc_ipopt_ms_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["TrapezoidalCollocation"] =
     @benchmarkable(
         sim!($empc_ipopt_tc, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["TrapezoidalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($empc_ipopt_tc_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["MadNLP"]["SingleShooting"] = 
