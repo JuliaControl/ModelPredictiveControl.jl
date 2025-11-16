@@ -461,14 +461,29 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting"] =
         sim!($empc_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting (Hessian)"] = 
+    @benchmarkable(
+        sim!($empc_ipopt_ss_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($empc_ipopt_ms, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["MultipleShooting (Hessian)"] =
+    @benchmarkable(
+        sim!($empc_ipopt_ms_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["TrapezoidalCollocation"] =
     @benchmarkable(
         sim!($empc_ipopt_tc, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["TrapezoidalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($empc_ipopt_tc_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["MadNLP"]["SingleShooting"] = 
