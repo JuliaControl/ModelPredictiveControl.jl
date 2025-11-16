@@ -13,6 +13,7 @@ const ALL_COLORING_ORDERS = (
     SmallestLast(),
     IncidenceDegree(),
     DynamicLargestFirst(),
+    RandomOrder(StableRNG(0), 0)
 )
 
 "Termination status that means 'no solution available'."

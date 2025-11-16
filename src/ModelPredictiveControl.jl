@@ -3,6 +3,7 @@ module ModelPredictiveControl
 using PrecompileTools 
 using LinearAlgebra, SparseArrays
 using Random: randn
+using StableRNGs: StableRNG
 
 using RecipesBase
 
@@ -15,7 +16,7 @@ using DifferentiationInterface: Constant, Cache
 using SparseConnectivityTracer: TracerSparsityDetector
 using SparseMatrixColorings: GreedyColoringAlgorithm, sparsity_pattern
 using SparseMatrixColorings: NaturalOrder, LargestFirst, SmallestLast
-using SparseMatrixColorings: IncidenceDegree, DynamicLargestFirst
+using SparseMatrixColorings: IncidenceDegree, DynamicLargestFirst, RandomOrder
 
 import ProgressLogging
 
