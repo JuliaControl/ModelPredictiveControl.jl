@@ -105,8 +105,17 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:d`   : current measured disturbance, ``\mathbf{d}(k)``
 
 For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
-solution summary that can be printed. Lastly, the economical cost `:JE` and the custom
-nonlinear constraints `:gc` values at the optimum are also available for [`NonLinMPC`](@ref).
+solution summary that can be printed. Lastly, for [`NonLinMPC`](@ref), the following fields
+are also available:
+
+- `:JE`: economic cost value at the optimum, ``J_E``
+- `:gc`: custom nonlinear constraints values at the optimum, ``\mathbf{g_c}``
+- `:∇J` or *`:nablaJ`* : gradient of the objective function, ``\mathbf{\nabla} J``
+- `:∇²J` or *`:nabla2J`* : Hessian of the objective function, ``\mathbf{\nabla^2}J``
+- `:∇g` or *`:nablag`* : Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
+- `:∇²ℓg` or *`:nabla2lg`* : Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
+- `:∇geq` or *`:nablageq`* : Jacobian of the equality constraint, ``\mathbf{\nabla g_{eq}}``
+- `:∇²ℓgeq` or *`:nabla2lgeq`* : Hessian of the equality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g_{eq}}}``
 
 # Examples
 ```jldoctest

@@ -526,7 +526,8 @@ end
 """
     addinfo!(info, mpc::NonLinMPC) -> info
 
-For [`NonLinMPC`](@ref), add `:sol` and the optimal economic cost `:JE`.
+For [`NonLinMPC`](@ref), add `:sol`, the custom nonlinear objective `:JE`, the custom
+constraint `:gc`, and the various derivatives.
 """
 function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     U, Ŷ, D̂, ŷ, d, ϵ = info[:U], info[:Ŷ], info[:D̂], info[:ŷ], info[:d], info[:ϵ]
@@ -536,9 +537,99 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     JE = mpc.JE(Ue, Ŷe, D̂e, mpc.p)
     LHS = Vector{NT}(undef, mpc.con.nc)
     mpc.con.gc!(LHS, Ue, Ŷe, D̂e, mpc.p, ϵ)
+    model, optim = mpc.estim.model, mpc.optim
+    transcription = mpc.transcription
+    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
+    nk = get_nk(model, transcription)
+    Hp, Hc = mpc.Hp, mpc.Hc
+    ng = length(mpc.con.i_g)
+    nc, neq = mpc.con.nc, mpc.con.neq
+    nU, nŶ, nX̂, nK = mpc.Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
+    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+    ΔŨ     = zeros(NT, nΔŨ)
+    x̂0end  = zeros(NT, nx̂)
+    K0     = zeros(NT, nK)
+    Ue, Ŷe = zeros(NT, nUe), zeros(NT, nŶe)
+    U0, Ŷ0 = zeros(NT, nU),  zeros(NT, nŶ)
+    Û0, X̂0 = zeros(NT, nU),  zeros(NT, nX̂)
+    gc, g  = zeros(NT, nc),  zeros(NT, ng)
+    geq    = zeros(NT, neq)
+    J_cache = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(gc), Cache(g), Cache(geq),
+    )
+    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+    end
+    if !isnothing(mpc.hessian)
+        _, ∇J, ∇²J = value_gradient_and_hessian(J!, mpc.hessian, mpc.Z̃, J_cache...)
+    else
+        ∇J, ∇²J = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
+    end
+    JNT = typeof(mpc.optim).parameters[1]
+    nonlin_constraints = JuMP.all_constraints(
+        optim, JuMP.Vector{JuMP.VariableRef}, MOI.VectorNonlinearOracle{JNT}
+    )
+    g_con, geq_func = nonlin_constraints
+    λ, λeq = JuMP.dual.(g_con), JuMP.dual.(geq_func)
+    display(λ)
+    display(λeq)
+    g_cache = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(gc), Cache(geq),
+    )
+    function g!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return nothing
+    end
+    ∇g = jacobian(g!, g, mpc.jacobian, mpc.Z̃, g_cache...)
+    #=
+    if !isnothing(mpc.hessian)
+        function ℓ_g(Z̃, λ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+            return dot(λ, g)
+        end
+        ∇²g_cache = (
+            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+            Cache(Û0), Cache(K0), Cache(X̂0), 
+            Cache(gc), Cache(geq), Cache(g)
+        )
+        ∇²ℓg = hessian(ℓ_g, mpc.hessian, mpc.Z̃, Constant(λ), ∇²g_cache...)
+    else
+        ∇²ℓg = nothing
+    end
+    =# ∇²ℓg = nothing #TODO: delete this line when enabling the above block
+    geq_cache = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
+        Cache(Û0), Cache(K0),   Cache(X̂0),
+        Cache(gc), Cache(g)
+    )
+    function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return nothing
+    end
+    ∇geq = jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
+    ∇²ℓgeq = nothing # TODO: implement later
+
     info[:JE]  = JE 
     info[:gc] = LHS
+    info[:∇J] = ∇J
+    info[:∇²J] = ∇²J
+    info[:∇g] = ∇g
+    info[:∇²ℓg] = ∇²ℓg
+    info[:∇geq] = ∇geq
+    info[:∇²ℓgeq] = ∇²ℓgeq
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
+    # --- non-Unicode fields ---
+    info[:nablaJ] = ∇J
+    info[:nabla2J] = ∇²J
+    info[:nablag] = ∇g
+    info[:nabla2lg] = ∇²ℓg
+    info[:nablageq] = ∇geq
+    info[:nabla2lgeq] = ∇²ℓgeq
     return info
 end
 
