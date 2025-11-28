@@ -16,6 +16,14 @@ const ALL_COLORING_ORDERS = (
     RandomOrder(StableRNG(0), 0)
 )
 
+const HIDDEN_GETINFO_KEYS_MHE = (
+    :What, :xhatarr, :epsilon, :Xhat, :xhat, :Vhat, :Pbar, :xbar, :Yhat, :Yhatm
+)
+
+const HIDDEN_GETINFO_KEYS_MPC = (
+    :DeltaU, :epsilon, :Dhat, :yhat, :Yhat, :xhatend, :Yhats, :Rhaty, :Rhatu
+)
+
 "Termination status that means 'no solution available'."
 const ERROR_STATUSES = (
     JuMP.INFEASIBLE, JuMP.DUAL_INFEASIBLE, JuMP.LOCALLY_INFEASIBLE, 
@@ -40,6 +48,10 @@ function info2debugstr(info)
     mystr = "Content of getinfo dictionary:\n"
     for (key, value) in info
         (key == :sol) && continue
+        if key in HIDDEN_GETINFO_KEYS_MHE || key in HIDDEN_GETINFO_KEYS_MPC
+            # skip the redundant non-Unicode keys
+            continue
+        end
         mystr *= "  :$key => $value\n"
     end
     if haskey(info, :sol)
