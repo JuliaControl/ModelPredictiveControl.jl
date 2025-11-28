@@ -17,7 +17,7 @@ const ALL_COLORING_ORDERS = (
 )
 
 const HIDDEN_GETINFO_KEYS_MHE = (
-    :What, :xhatarr, :epsilon, :Xhat, :xhat, :Vhat, :Pbar, :xbar, :Yhat, :Yhatm
+    :What, :xhatarr, :epsilon, :Xhat, :xhat, :Vhat, :Pbar, :xbar, :Yhat, :Yhatm, :ϵ
 )
 
 const HIDDEN_GETINFO_KEYS_MPC = (
