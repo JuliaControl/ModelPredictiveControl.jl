@@ -172,6 +172,12 @@ UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Prediction for
         setup=preparestate!($mhe_lin_pred, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
+UNIT_ESTIM["MovingHorizonEstimator"]["getinfo!"]["LinModel"] =
+    @benchmarkable(
+        getinfo($mhe_lin_curr),
+        setup=preparestate!($mhe_lin_curr, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
 UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["NonLinModel"]["Current form"] =
     @benchmarkable(
         preparestate!($mhe_nonlin_curr, $y, $d),
@@ -193,7 +199,13 @@ UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["NonLinModel"]["Prediction 
         updatestate!($mhe_nonlin_pred, $u, $y, $d),
         setup=preparestate!($mhe_nonlin_pred, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
-    ) 
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["getinfo!"]["NonLinModel"] =
+    @benchmarkable(
+        getinfo($mhe_nonlin_curr),
+        setup=preparestate!($mhe_nonlin_curr, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
 
 ## ----------------------------------------------------------------------------------------
 ## ----------------- CASE STUDIES ---------------------------------------------------------
