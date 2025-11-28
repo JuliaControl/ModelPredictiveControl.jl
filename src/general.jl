@@ -56,8 +56,9 @@ function info2debugstr(info)
     end
     if haskey(info, :sol)
         split_sol = split(string(info[:sol]), "\n")
-        solstr = join((lpad(line, length(line) + 2) for line in split_sol), "\n", "")
-        mystr *= "  :sol => \n"*solstr
+        # Add the treeview prefix to each line
+        solstr = join(("   " * line for line in split_sol), "\n")
+        mystr *= "  :sol => \n" * solstr * "\n"  # Ensure a trailing newline
     end
     return mystr
 end
