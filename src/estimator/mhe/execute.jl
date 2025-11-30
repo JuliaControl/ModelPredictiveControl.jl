@@ -163,8 +163,84 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:Yhatm] = info[:Ŷm]
     # --- deprecated fields ---
     info[:ϵ] = info[:ε]
+    info = addinfo!(info, estim, model)
     return info
 end
+
+
+"""
+    addinfo!(info, estim::MovingHorizonEstimator, model::NonLinModel)
+
+For [`NonLinModel`](@ref), add the various derivatives.
+"""
+function addinfo!(
+    info, estim::MovingHorizonEstimator{NT}, model::NonLinModel
+) where NT <:Real
+    # --- derivatives ---
+    optim, con = estim.optim, estim.con
+    nx̂, nym, nŷ, nu, nk = estim.nx̂, estim.nym, model.ny, model.nu, model.nk
+    He = estim.He
+    ng = length(con.i_g)
+    nV̂, nX̂, ng = He*nym, He*nx̂, length(con.i_g)
+    V̂,  X̂0 = zeros(NT, nV̂), zeros(NT, nX̂)
+    k0     = zeros(NT, nk)
+    û0, ŷ0 = zeros(NT, nu), zeros(NT, nŷ)
+    g      = zeros(NT, ng) 
+    x̄      = zeros(NT, nx̂)
+    J_cache = (
+        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0),
+        Cache(g),
+        Cache(x̄),
+    )
+    function J!(Z̃, V̂, X̂0, û0, k0, ŷ0, g, x̄)
+        update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
+        return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
+    end
+    if !isnothing(estim.hessian)
+        _, ∇J, ∇²J = value_gradient_and_hessian(J!, estim.hessian, estim.Z̃, J_cache...)
+    else
+        ∇J, ∇²J = gradient(J!, estim.gradient, estim.Z̃, J_cache...), nothing
+    end
+    JNT = typeof(optim).parameters[1]
+    nonlin_constraints = JuMP.all_constraints(
+        optim, JuMP.Vector{JuMP.VariableRef}, MOI.VectorNonlinearOracle{JNT}
+    )
+    g_con = nonlin_constraints[1]
+    λ = JuMP.dual.(g_con)
+    display(λ)
+    ∇g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0))
+    function g!(g, Z̃, V̂, X̂0, û0, k0, ŷ0)
+        update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
+        return nothing
+    end
+    ∇g = jacobian(g!, g, estim.jacobian, estim.Z̃, ∇g_cache...)
+    #=
+    if !isnothing(estim.hessian)
+        function ℓ_g(Z̃, λ, V̂, X̂0, û0, k0, ŷ0, g)
+            update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
+            return dot(λ, g)
+        end
+        ∇²g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g))
+        ∇²ℓg = hessian(ℓ_g, estim.hessian, estim.Z̃, Constant(λ), ∇²g_cache...)
+    else
+        ∇²ℓg = nothing
+    end
+    =# ∇²ℓg = nothing #TODO: delete this line when enabling the above block
+
+    info[:∇J] = ∇J
+    info[:∇²J] = ∇²J
+    info[:∇g] = ∇g
+    info[:∇²ℓg] = ∇²ℓg
+    # --- non-Unicode fields ---
+    info[:nablaJ] = ∇J
+    info[:nabla2J] = ∇²J
+    info[:nablag] = ∇g
+    info[:nabla2lg] = ∇²ℓg
+    return info
+end
+
+"Nothing to add in the `info` dict for [`LinModel`](@ref)."
+addinfo!(info, ::MovingHorizonEstimator, ::LinModel) = info
 
 """
     getε(estim::MovingHorizonEstimator, Z̃) -> ε
