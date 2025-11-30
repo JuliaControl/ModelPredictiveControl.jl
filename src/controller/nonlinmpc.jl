@@ -573,15 +573,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     else
         ∇J, ∇²J = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
     end
-    JNT = typeof(optim).parameters[1]
-    nonlin_constraints = JuMP.all_constraints(
-        optim, JuMP.Vector{JuMP.VariableRef}, MOI.VectorNonlinearOracle{JNT}
-    )
-    g_con, geq_con = nonlin_constraints
-    display(g_con)
-    display(geq_con)
-    λ, λeq = JuMP.dual.(g_con), JuMP.dual.(geq_con)
-    println(JuMP.dual.(JuMP.FixBoundRef.(optim[:Z̃var])))
+    nonlincon = optim[:nonlinconstraint]
+    nonlinconeq = optim[:nonlinconstrainteq]
+    λ, λeq = JuMP.dual.(nonlincon), JuMP.dual.(nonlinconeq)
     display(λ)
     display(λeq)
 

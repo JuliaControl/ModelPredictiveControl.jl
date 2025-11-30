@@ -201,13 +201,10 @@ function addinfo!(
     else
         ∇J, ∇²J = gradient(J!, estim.gradient, estim.Z̃, J_cache...), nothing
     end
-    JNT = typeof(optim).parameters[1]
-    nonlin_constraints = JuMP.all_constraints(
-        optim, JuMP.Vector{JuMP.VariableRef}, MOI.VectorNonlinearOracle{JNT}
-    )
-    g_con = nonlin_constraints[1]
-    λ = JuMP.dual.(g_con)
+    nonlincon = optim[:nonlinconstraint]
+    λ = JuMP.dual.(nonlincon)
     display(λ)
+
     ∇g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0))
     function g!(g, Z̃, V̂, X̂0, û0, k0, ŷ0)
         update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
