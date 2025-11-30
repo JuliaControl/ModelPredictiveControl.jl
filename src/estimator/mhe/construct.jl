@@ -1575,7 +1575,7 @@ function set_nonlincon!(
         optim, JuMP.Vector{JuMP.VariableRef}, MOI.VectorNonlinearOracle{JNT}
     )
     map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
-    optim[:g_oracle]   = g_oracle
-    any(estim.con.i_g) && @constraint(optim, Z̃var in g_oracle)
+    JuMP.unregister(optim, :nonlinconstraint)
+    any(estim.con.i_g) && @constraint(optim, nonlinconstraint, Z̃var in g_oracle)
     return nothing
 end

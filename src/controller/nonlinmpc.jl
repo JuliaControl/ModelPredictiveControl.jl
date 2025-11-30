@@ -1040,10 +1040,10 @@ function set_nonlincon!(
         optim, JuMP.Vector{JuMP.VariableRef}, MOI.VectorNonlinearOracle{JNT}
     )
     map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
-    optim[:g_oracle]   = g_oracle
-    optim[:geq_oracle] = geq_oracle
-    any(mpc.con.i_g) && @constraint(optim, Z̃var in g_oracle)
-    mpc.con.neq > 0  && @constraint(optim, Z̃var in geq_oracle)
+    JuMP.unregister(optim, :nonlinconstraint)
+    JuMP.unregister(optim, :nonlinconstrainteq)
+    any(mpc.con.i_g) && @constraint(optim, nonlinconstraint, Z̃var in g_oracle)
+    mpc.con.neq > 0  && @constraint(optim, nonlinconstrainteq, Z̃var in geq_oracle)
     return nothing
 end
 
