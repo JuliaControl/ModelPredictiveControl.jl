@@ -573,12 +573,6 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     else
         ∇J, ∇²J = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
     end
-    nonlincon = optim[:nonlinconstraint]
-    nonlinconeq = optim[:nonlinconstrainteq]
-    λ, λeq = JuMP.dual.(nonlincon), JuMP.dual.(nonlinconeq)
-    display(λ)
-    display(λeq)
-
     ∇g_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K0), Cache(X̂0), 
@@ -589,7 +583,6 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         return nothing
     end
     ∇g = jacobian(g!, g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    #=
     if !isnothing(mpc.hessian)
         function ℓ_g(Z̃, λ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
@@ -600,11 +593,13 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             Cache(Û0), Cache(K0), Cache(X̂0), 
             Cache(gc), Cache(geq), Cache(g)
         )
+        nonlincon = optim[:nonlinconstraint]
+        λ = JuMP.dual.(nonlincon) # FIXME: does not work for now
+        λ = ones(NT, ng)
         ∇²ℓg = hessian(ℓ_g, mpc.hessian, mpc.Z̃, Constant(λ), ∇²g_cache...)
     else
         ∇²ℓg = nothing
     end
-    =# ∇²ℓg = nothing #TODO: delete this line when enabling the above block
     geq_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
         Cache(Û0), Cache(K0),   Cache(X̂0),
@@ -615,9 +610,23 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         return nothing
     end
     ∇geq = jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
-    ∇²ℓgeq = nothing # TODO: implement later
-
-
+    if !isnothing(mpc.hessian)
+        ∇²geq_cache = (
+            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
+            Cache(Û0), Cache(K0),   Cache(X̂0),
+            Cache(gc), Cache(geq), Cache(g)
+        )
+        function ℓ_geq(Z̃, λeq, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+            return dot(λeq, geq)
+        end
+        nonlinconeq = optim[:nonlinconstrainteq]
+        λeq = JuMP.dual.(nonlinconeq) # FIXME: does not work for now
+        λeq = ones(NT, neq)
+        ∇²ℓgeq = hessian(ℓ_geq, mpc.hessian, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+    else
+        ∇²ℓgeq = nothing
+    end
     info[:∇J] = ∇J
     info[:∇²J] = ∇²J
     info[:∇g] = ∇g

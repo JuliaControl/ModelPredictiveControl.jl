@@ -201,29 +201,25 @@ function addinfo!(
     else
         ∇J, ∇²J = gradient(J!, estim.gradient, estim.Z̃, J_cache...), nothing
     end
-    nonlincon = optim[:nonlinconstraint]
-    λ = JuMP.dual.(nonlincon)
-    display(λ)
-
     ∇g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0))
     function g!(g, Z̃, V̂, X̂0, û0, k0, ŷ0)
         update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
         return nothing
     end
     ∇g = jacobian(g!, g, estim.jacobian, estim.Z̃, ∇g_cache...)
-    #=
     if !isnothing(estim.hessian)
+        ∇²g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g))
         function ℓ_g(Z̃, λ, V̂, X̂0, û0, k0, ŷ0, g)
             update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
             return dot(λ, g)
         end
-        ∇²g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g))
+        nonlincon = optim[:nonlinconstraint]
+        λ = JuMP.dual.(nonlincon) # FIXME: does not work for now
+        λ = ones(NT, ng)
         ∇²ℓg = hessian(ℓ_g, estim.hessian, estim.Z̃, Constant(λ), ∇²g_cache...)
     else
         ∇²ℓg = nothing
     end
-    =# ∇²ℓg = nothing #TODO: delete this line when enabling the above block
-
     info[:∇J] = ∇J
     info[:∇²J] = ∇²J
     info[:∇g] = ∇g
