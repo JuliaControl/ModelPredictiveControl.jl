@@ -94,6 +94,15 @@ following fields:
 - `:D`   : measured disturbances over ``N_k``, ``\mathbf{D}``
 - `:sol` : solution summary of the optimizer for printing
 
+For [`NonLinModel`](@ref), it also includes the following derivative fields:
+
+- `:JE`: economic cost value at the optimum, ``J_E``
+- `:gc`: custom nonlinear constraints values at the optimum, ``\mathbf{g_c}``
+- `:∇J` or *`:nablaJ`* : gradient of the objective function, ``\mathbf{\nabla} J``
+- `:∇²J` or *`:nabla2J`* : Hessian of the objective function, ``\mathbf{\nabla^2}J``
+- `:∇g` or *`:nablag`* : Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
+- `:∇²ℓg` or *`:nabla2lg`* : Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
+
 # Examples
 ```jldoctest
 julia> model = LinModel(ss(1.0, 1.0, 1.0, 0, 5.0));
@@ -176,7 +185,7 @@ For [`NonLinModel`](@ref), add the various derivatives.
 function addinfo!(
     info, estim::MovingHorizonEstimator{NT}, model::NonLinModel
 ) where NT <:Real
-    # --- derivatives ---
+    # --- objective derivatives ---
     optim, con = estim.optim, estim.con
     nx̂, nym, nŷ, nu, nk = estim.nx̂, estim.nym, model.ny, model.nu, model.nk
     He = estim.He
@@ -200,6 +209,9 @@ function addinfo!(
     else
         ∇J, ∇²J = gradient(J!, estim.gradient, estim.Z̃, J_cache...), nothing
     end
+    # --- inequality constraint derivatives ---
+    old_i_g = copy(estim.con.i_g)
+    estim.con.i_g .= 1 # temporarily set all constraints as finite so g is entirely computed
     ∇g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0))
     function g!(g, Z̃, V̂, X̂0, û0, k0, ŷ0)
         update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
@@ -219,6 +231,7 @@ function addinfo!(
     else
         ∇²ℓg = nothing
     end
+    estim.con.i_g .= old_i_g # restore original finite/infinite constraint indices
     info[:∇J] = ∇J
     info[:∇²J] = ∇²J
     info[:∇g] = ∇g

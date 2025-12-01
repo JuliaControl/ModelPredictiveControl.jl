@@ -541,7 +541,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     info[:JE]  = JE 
     info[:gc] = LHS
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
-    # --- derivatives ---
+    # --- objective derivatives ---
     model, optim = mpc.estim.model, mpc.optim
     transcription = mpc.transcription
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
@@ -573,6 +573,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     else
         ∇J, ∇²J = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
     end
+    # --- inequality constraint derivatives ---
+    old_i_g = copy(mpc.con.i_g)
+    mpc.con.i_g .= 1 # temporarily set all constraints as finite so g is entirely computed
     ∇g_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K0), Cache(X̂0), 
@@ -600,6 +603,8 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     else
         ∇²ℓg = nothing
     end
+    mpc.con.i_g .= old_i_g # restore original finite/infinite constraint indices
+    # --- equality constraint derivatives ---
     geq_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
         Cache(Û0), Cache(K0),   Cache(X̂0),
