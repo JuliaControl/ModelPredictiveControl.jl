@@ -180,7 +180,6 @@ function addinfo!(
     optim, con = estim.optim, estim.con
     nx̂, nym, nŷ, nu, nk = estim.nx̂, estim.nym, model.ny, model.nu, model.nk
     He = estim.He
-    ng = length(con.i_g)
     nV̂, nX̂, ng = He*nym, He*nx̂, length(con.i_g)
     V̂,  X̂0 = zeros(NT, nV̂), zeros(NT, nX̂)
     k0     = zeros(NT, nk)
