@@ -218,7 +218,7 @@ function addinfo!(
         return nothing
     end
     ∇g = jacobian(g!, g, estim.jacobian, estim.Z̃, ∇g_cache...)
-    if !isnothing(estim.hessian) && any(con.i_g) 
+    if !isnothing(estim.hessian) && any(old_i_g) 
         ∇²g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g))
         function ℓ_g(Z̃, λ, V̂, X̂0, û0, k0, ŷ0, g)
             update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)

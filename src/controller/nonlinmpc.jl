@@ -586,7 +586,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         return nothing
     end
     ∇g = jacobian(g!, g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    if !isnothing(mpc.hessian) && any(con.i_g)
+    if !isnothing(mpc.hessian) && any(old_i_g) 
         function ℓ_g(Z̃, λ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λ, g)
