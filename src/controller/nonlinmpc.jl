@@ -542,13 +542,13 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     info[:gc] = LHS
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
     # --- objective derivatives ---
-    model, optim = mpc.estim.model, mpc.optim
+    model, optim, con = mpc.estim.model, mpc.optim, mpc.con
     transcription = mpc.transcription
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
     nk = get_nk(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
-    ng = length(mpc.con.i_g)
-    nc, neq = mpc.con.nc, mpc.con.neq
+    ng = length(con.i_g)
+    nc, neq = con.nc, con.neq
     nU, nŶ, nX̂, nK = mpc.Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
     ΔŨ     = zeros(NT, nΔŨ)
@@ -574,8 +574,8 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         ∇J, ∇²J = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
     end
     # --- inequality constraint derivatives ---
-    old_i_g = copy(mpc.con.i_g)
-    mpc.con.i_g .= 1 # temporarily set all constraints as finite so g is entirely computed
+    old_i_g = copy(con.i_g)
+    con.i_g .= 1 # temporarily set all constraints as finite so g is entirely computed
     ∇g_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K0), Cache(X̂0), 
@@ -586,7 +586,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         return nothing
     end
     ∇g = jacobian(g!, g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    if !isnothing(mpc.hessian)
+    if !isnothing(mpc.hessian) && any(con.i_g)
         function ℓ_g(Z̃, λ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λ, g)
@@ -603,7 +603,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     else
         ∇²ℓg = nothing
     end
-    mpc.con.i_g .= old_i_g # restore original finite/infinite constraint indices
+    con.i_g .= old_i_g # restore original finite/infinite constraint indices
     # --- equality constraint derivatives ---
     geq_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
@@ -615,7 +615,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         return nothing
     end
     ∇geq = jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
-    if !isnothing(mpc.hessian)
+    if !isnothing(mpc.hessian) && con.neq > 0
         ∇²geq_cache = (
             Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
             Cache(Û0), Cache(K0),   Cache(X̂0),
