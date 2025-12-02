@@ -848,7 +848,7 @@ end
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
     transcription = MultipleShooting(f_threads=true, h_threads=true)
-    nmpc8t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
+    nmpc8t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription, hessian=true)
     nmpc8t = setconstraint!(nmpc8t, ymax=[100], ymin=[-100]) # coverage of getinfo! Hessians of Lagrangian
     preparestate!(nmpc8t, [0], [0])
     u = moveinput!(nmpc8t, [10], [0])
