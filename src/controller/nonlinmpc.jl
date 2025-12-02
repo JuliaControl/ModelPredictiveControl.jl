@@ -586,7 +586,11 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         return nothing
     end
     ∇g = jacobian(g!, g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    if !isnothing(mpc.hessian) && any(old_i_g) 
+    if !isnothing(mpc.hessian) && any(old_i_g)
+        @warn(
+            "Retrieving optimal Hessian of the Lagrangian is not fully supported yet.\n"*
+            "Its nonzero coefficients are random values for now.", maxlog=1
+        )
         function ℓ_g(Z̃, λ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λ, g)
@@ -598,7 +602,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         )
         nonlincon = optim[:nonlinconstraint]
         λ = JuMP.dual.(nonlincon) # FIXME: does not work for now
-        λ = ones(NT, ng)
+        λ = rand(NT, ng)
         ∇²ℓg = hessian(ℓ_g, mpc.hessian, mpc.Z̃, Constant(λ), ∇²g_cache...)
     else
         ∇²ℓg = nothing
@@ -616,6 +620,10 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     end
     ∇geq = jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
     if !isnothing(mpc.hessian) && con.neq > 0
+        @warn(
+            "Retrieving optimal Hessian of the Lagrangian is not fully supported yet.\n"*
+            "Its nonzero coefficients are random values for now.", maxlog=1
+        )
         ∇²geq_cache = (
             Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
             Cache(Û0), Cache(K0),   Cache(X̂0),

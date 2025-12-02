@@ -103,6 +103,9 @@ For [`NonLinModel`](@ref), it also includes the following derivative fields:
 - `:∇g` or *`:nablag`* : Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
 - `:∇²ℓg` or *`:nabla2lg`* : Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
 
+Note that Hessian of Lagrangians are not fully supported yet. Their nonzero coefficients are
+random values for now.
+
 # Examples
 ```jldoctest
 julia> model = LinModel(ss(1.0, 1.0, 1.0, 0, 5.0));
@@ -218,7 +221,11 @@ function addinfo!(
         return nothing
     end
     ∇g = jacobian(g!, g, estim.jacobian, estim.Z̃, ∇g_cache...)
-    if !isnothing(estim.hessian) && any(old_i_g) 
+    if !isnothing(estim.hessian) && any(old_i_g)
+        @warn(
+            "Retrieving optimal Hessian of the Lagrangian is not fully supported yet.\n"*
+            "Its nonzero coefficients are random values for now.", maxlog=1
+        )
         ∇²g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g))
         function ℓ_g(Z̃, λ, V̂, X̂0, û0, k0, ŷ0, g)
             update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)

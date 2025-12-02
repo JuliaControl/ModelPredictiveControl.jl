@@ -814,7 +814,6 @@ end
     preparestate!(nmpc4, [0], [0])
     u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
-    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
     nmpc5 = NonLinMPC(nonlinmodel, Hp=1, Hc=1, Cwt=Inf, transcription=MultipleShooting())
     nmpc5 = setconstraint!(nmpc5, ymin=[1])
     f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
@@ -830,6 +829,7 @@ end
     preparestate!(nmpc5_1, [0.0])
     u = moveinput!(nmpc5_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
     nmpc6  = NonLinMPC(linmodel3, Hp=10)
     preparestate!(nmpc6, [0])
     @test moveinput!(nmpc6, [0]) ≈ [0.0] atol=5e-2
@@ -849,6 +849,7 @@ end
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
     transcription = MultipleShooting(f_threads=true, h_threads=true)
     nmpc8t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
+    nmpc8t = setconstraint!(nmpc8t, ymax=[100], ymin=[-100]) # coverage of getinfo! Hessians of Lagrangian
     preparestate!(nmpc8t, [0], [0])
     u = moveinput!(nmpc8t, [10], [0])
     @test u ≈ [2] atol=5e-2
