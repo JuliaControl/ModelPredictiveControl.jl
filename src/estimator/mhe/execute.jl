@@ -703,7 +703,6 @@ function con_nonlinprog_mhe!(g, estim::MovingHorizonEstimator, ::SimModel, X̂0,
     nX̂con, nX̂ = length(estim.con.X̂0min), estim.nx̂ *estim.Nk[]
     nV̂con, nV̂ = length(estim.con.V̂min),  estim.nym*estim.Nk[]
     for i in eachindex(g)
-        estim.con.i_g[i] || continue
         if i ≤ nX̂con
             j = i
             jcon = nX̂con-nX̂+j

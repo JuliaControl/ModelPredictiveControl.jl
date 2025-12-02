@@ -1030,7 +1030,6 @@ function con_nonlinprog!(
 )
     nŶ = length(Ŷ0)
     for i in eachindex(g)
-        mpc.con.i_g[i] || continue
         if i ≤ nŶ
             j = i
             g[i] = (mpc.con.Y0min[j] - Ŷ0[j])     - ϵ*mpc.con.C_ymin[j]
@@ -1060,7 +1059,6 @@ function con_nonlinprog!(
 )
     nx̂, nŶ = length(x̂0end), length(Ŷ0)
     for i in eachindex(g)
-        mpc.con.i_g[i] || continue
         if i ≤ nŶ
             j = i
             g[i] = (mpc.con.Y0min[j] - Ŷ0[j])     - ϵ*mpc.con.C_ymin[j]
