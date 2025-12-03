@@ -526,9 +526,11 @@ end
 """
     addinfo!(info, mpc::NonLinMPC) -> info
 
-For [`NonLinMPC`](@ref), add `:sol` and the optimal economic cost `:JE`.
+For [`NonLinMPC`](@ref), add `:sol`, the custom nonlinear objective `:JE`, the custom
+constraint `:gc`, and the various derivatives.
 """
 function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
+    # --- variables specific to NonLinMPC ---
     U, Ŷ, D̂, ŷ, d, ϵ = info[:U], info[:Ŷ], info[:D̂], info[:ŷ], info[:d], info[:ϵ]
     Ue = [U; U[(end - mpc.estim.model.nu + 1):end]]
     Ŷe = [ŷ; Ŷ]
@@ -539,6 +541,118 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     info[:JE]  = JE 
     info[:gc] = LHS
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
+    # --- objective derivatives ---
+    model, optim, con = mpc.estim.model, mpc.optim, mpc.con
+    transcription = mpc.transcription
+    nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
+    nk = get_nk(model, transcription)
+    Hp, Hc = mpc.Hp, mpc.Hc
+    ng = length(con.i_g)
+    nc, neq = con.nc, con.neq
+    nU, nŶ, nX̂, nK = mpc.Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
+    nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
+    ΔŨ     = zeros(NT, nΔŨ)
+    x̂0end  = zeros(NT, nx̂)
+    K0     = zeros(NT, nK)
+    Ue, Ŷe = zeros(NT, nUe), zeros(NT, nŶe)
+    U0, Ŷ0 = zeros(NT, nU),  zeros(NT, nŶ)
+    Û0, X̂0 = zeros(NT, nU),  zeros(NT, nX̂)
+    gc, g  = zeros(NT, nc),  zeros(NT, ng)
+    geq    = zeros(NT, neq)
+    J_cache = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(gc), Cache(g), Cache(geq),
+    )
+    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+    end
+    if !isnothing(mpc.hessian)
+        _, ∇J, ∇²J = value_gradient_and_hessian(J!, mpc.hessian, mpc.Z̃, J_cache...)
+    else
+        ∇J, ∇²J = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
+    end
+    # --- inequality constraint derivatives ---
+    old_i_g = copy(con.i_g)
+    con.i_g .= 1 # temporarily set all constraints as finite so g is entirely computed
+    ∇g_cache = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(gc), Cache(geq),
+    )
+    function g!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return nothing
+    end
+    ∇g = jacobian(g!, g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
+    if !isnothing(mpc.hessian) && any(old_i_g)
+        @warn(
+            "Retrieving optimal Hessian of the Lagrangian is not fully supported yet.\n"*
+            "Its nonzero coefficients are random values for now.", maxlog=1
+        )
+        function ℓ_g(Z̃, λ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+            return dot(λ, g)
+        end
+        ∇²g_cache = (
+            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
+            Cache(Û0), Cache(K0), Cache(X̂0), 
+            Cache(gc), Cache(geq), Cache(g)
+        )
+        nonlincon = optim[:nonlinconstraint]
+        λ = JuMP.dual.(nonlincon) # FIXME: does not work for now
+        λ = rand(NT, ng)
+        ∇²ℓg = hessian(ℓ_g, mpc.hessian, mpc.Z̃, Constant(λ), ∇²g_cache...)
+    else
+        ∇²ℓg = nothing
+    end
+    con.i_g .= old_i_g # restore original finite/infinite constraint indices
+    # --- equality constraint derivatives ---
+    geq_cache = (
+        Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
+        Cache(Û0), Cache(K0),   Cache(X̂0),
+        Cache(gc), Cache(g)
+    )
+    function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+        return nothing
+    end
+    ∇geq = jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
+    if !isnothing(mpc.hessian) && con.neq > 0
+        @warn(
+            "Retrieving optimal Hessian of the Lagrangian is not fully supported yet.\n"*
+            "Its nonzero coefficients are random values for now.", maxlog=1
+        )
+        ∇²geq_cache = (
+            Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
+            Cache(Û0), Cache(K0),   Cache(X̂0),
+            Cache(gc), Cache(geq), Cache(g)
+        )
+        function ℓ_geq(Z̃, λeq, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+            return dot(λeq, geq)
+        end
+        nonlinconeq = optim[:nonlinconstrainteq]
+        λeq = JuMP.dual.(nonlinconeq) # FIXME: does not work for now
+        λeq = ones(NT, neq)
+        ∇²ℓgeq = hessian(ℓ_geq, mpc.hessian, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+    else
+        ∇²ℓgeq = nothing
+    end
+    info[:∇J] = ∇J
+    info[:∇²J] = ∇²J
+    info[:∇g] = ∇g
+    info[:∇²ℓg] = ∇²ℓg
+    info[:∇geq] = ∇geq
+    info[:∇²ℓgeq] = ∇²ℓgeq
+    # --- non-Unicode fields ---
+    info[:nablaJ] = ∇J
+    info[:nabla2J] = ∇²J
+    info[:nablag] = ∇g
+    info[:nabla2lg] = ∇²ℓg
+    info[:nablageq] = ∇geq
+    info[:nabla2lgeq] = ∇²ℓgeq
     return info
 end
 
@@ -942,10 +1056,10 @@ function set_nonlincon!(
         optim, JuMP.Vector{JuMP.VariableRef}, MOI.VectorNonlinearOracle{JNT}
     )
     map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
-    optim[:g_oracle]   = g_oracle
-    optim[:geq_oracle] = geq_oracle
-    any(mpc.con.i_g) && @constraint(optim, Z̃var in g_oracle)
-    mpc.con.neq > 0  && @constraint(optim, Z̃var in geq_oracle)
+    JuMP.unregister(optim, :nonlinconstraint)
+    JuMP.unregister(optim, :nonlinconstrainteq)
+    any(mpc.con.i_g) && @constraint(optim, nonlinconstraint, Z̃var in g_oracle)
+    mpc.con.neq > 0  && @constraint(optim, nonlinconstrainteq, Z̃var in geq_oracle)
     return nothing
 end
 
