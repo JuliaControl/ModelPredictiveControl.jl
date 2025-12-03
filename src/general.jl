@@ -18,7 +18,7 @@ const ALL_COLORING_ORDERS = (
 
 const HIDDEN_GETINFO_KEYS_MHE = (
     :What, :xhatarr, :epsilon, :Xhat, :xhat, :Vhat, :Pbar, :xbar, :Yhat, :Yhatm, :ϵ,
-    :nablaJ, :nabla2J, :nablag, :nabla2lg
+    :nablaJ, :nabla2J, :nablag, :nabla2lg, :nablageq, :nabla2lgeq
 )
 
 const HIDDEN_GETINFO_KEYS_MPC = (

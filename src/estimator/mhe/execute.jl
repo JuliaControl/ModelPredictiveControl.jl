@@ -98,13 +98,13 @@ For [`NonLinModel`](@ref), it also includes the following derivative fields:
 
 - `:JE`: economic cost value at the optimum, ``J_E``
 - `:gc`: custom nonlinear constraints values at the optimum, ``\mathbf{g_c}``
-- `:∇J` or *`:nablaJ`* : gradient of the objective function, ``\mathbf{\nabla} J``
-- `:∇²J` or *`:nabla2J`* : Hessian of the objective function, ``\mathbf{\nabla^2}J``
-- `:∇g` or *`:nablag`* : Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
-- `:∇²ℓg` or *`:nabla2lg`* : Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
+- `:∇J` or *`:nablaJ`* : optimal gradient of the objective function, ``\mathbf{\nabla} J``
+- `:∇²J` or *`:nabla2J`* : optimal Hessian of the objective function, ``\mathbf{\nabla^2}J``
+- `:∇g` or *`:nablag`* : optimal Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
+- `:∇²ℓg` or *`:nabla2lg`* : optimal Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
 
-Note that Hessian of Lagrangians are not fully supported yet. Their nonzero coefficients are
-random values for now.
+Note that retrieving optimal Hessians of Lagrangian are not fully supported yet. Their
+nonzero coefficients are random values for now.
 
 # Examples
 ```jldoctest
