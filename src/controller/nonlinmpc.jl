@@ -526,8 +526,8 @@ end
 """
     addinfo!(info, mpc::NonLinMPC) -> info
 
-For [`NonLinMPC`](@ref), add `:sol`, the custom nonlinear objective `:JE`, the custom
-constraint `:gc`, and the various derivatives.
+For [`NonLinMPC`](@ref), add `:sol`, the custom nonlinear objective `:JE`, the nonlinear
+constraint vectors and the various derivatives.
 """
 function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     # --- variables specific to NonLinMPC ---
