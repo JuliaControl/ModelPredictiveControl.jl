@@ -94,12 +94,11 @@ following fields:
 - `:D`   : measured disturbances over ``N_k``, ``\mathbf{D}``
 - `:sol` : solution summary of the optimizer for printing
 
-For [`NonLinModel`](@ref), it also includes the following derivative fields:
+For [`NonLinModel`](@ref), it also includes the following fields:
 
-- `:JE`: economic cost value at the optimum, ``J_E``
-- `:gc`: custom nonlinear constraints values at the optimum, ``\mathbf{g_c}``
 - `:∇J` or *`:nablaJ`* : optimal gradient of the objective function, ``\mathbf{\nabla} J``
 - `:∇²J` or *`:nabla2J`* : optimal Hessian of the objective function, ``\mathbf{\nabla^2}J``
+- `:g` : optimal nonlinear inequality constraint values, ``\mathbf{g}``
 - `:∇g` or *`:nablag`* : optimal Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
 - `:∇²ℓg` or *`:nabla2lg`* : optimal Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
 
@@ -220,7 +219,7 @@ function addinfo!(
         update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
         return nothing
     end
-    ∇g = jacobian(g!, g, estim.jacobian, estim.Z̃, ∇g_cache...)
+    g, ∇g = value_and_jacobian(g!, g, estim.jacobian, estim.Z̃, ∇g_cache...)
     if !isnothing(estim.hessian) && any(old_i_g)
         @warn(
             "Retrieving optimal Hessian of the Lagrangian is not fully supported yet.\n"*
@@ -241,6 +240,7 @@ function addinfo!(
     estim.con.i_g .= old_i_g # restore original finite/infinite constraint indices
     info[:∇J] = ∇J
     info[:∇²J] = ∇²J
+    info[:g] = g
     info[:∇g] = ∇g
     info[:∇²ℓg] = ∇²ℓg
     # --- non-Unicode fields ---
