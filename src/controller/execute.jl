@@ -112,8 +112,10 @@ are also available:
 - `:gc`: custom nonlinear constraints values at the optimum, ``\mathbf{g_c}``
 - `:∇J` or *`:nablaJ`* : optimal gradient of the objective function, ``\mathbf{\nabla} J``
 - `:∇²J` or *`:nabla2J`* : optimal Hessian of the objective function, ``\mathbf{\nabla^2}J``
+- `:g` : optimal nonlinear inequality constraint values, ``\mathbf{g}``
 - `:∇g` or *`:nablag`* : optimal Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
 - `:∇²ℓg` or *`:nabla2lg`* : optimal Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
+- `:geq` : optimal nonlinear equality constraint values, ``\mathbf{g_{eq}}``
 - `:∇geq` or *`:nablageq`* : optimal Jacobian of the equality constraint, ``\mathbf{\nabla g_{eq}}``
 - `:∇²ℓgeq` or *`:nabla2lgeq`* : optimal Hessian of the equality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g_{eq}}}``
 
