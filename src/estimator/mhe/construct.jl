@@ -1504,9 +1504,7 @@ function get_nonlincon_oracle(
         return dot(λi, gi)
     end
     Z̃_∇gi = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
-    ∇gi_cache = (
-        Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g)
-    )
+    ∇gi_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0), Cache(g))
     # temporarily "fill" the estimation window for the preparation of the gradient: 
     estim.Nk[] = He
     ∇gi_prep = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_cache...; strict)
@@ -1577,7 +1575,7 @@ function set_nonlincon!(
         optim, JuMP.Vector{JuMP.VariableRef}, MOI.VectorNonlinearOracle{JNT}
     )
     map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
-    optim[:g_oracle]   = g_oracle
-    any(estim.con.i_g) && @constraint(optim, Z̃var in g_oracle)
+    JuMP.unregister(optim, :nonlinconstraint)
+    any(estim.con.i_g) && @constraint(optim, nonlinconstraint, Z̃var in g_oracle)
     return nothing
 end

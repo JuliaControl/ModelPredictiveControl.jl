@@ -967,6 +967,7 @@ end
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
 
     mhe1c = MovingHorizonEstimator(nonlinmodel, He=2, direct=false, hessian=true)
+    mhe1c = setconstraint!(mhe1c, v̂min = [-1000, -1000], v̂max = [1000, 1000]) # coverage of getinfo Hessian of Lagrangian
     preparestate!(mhe1c, [50, 30], [5])
     x̂ = updatestate!(mhe1c, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9

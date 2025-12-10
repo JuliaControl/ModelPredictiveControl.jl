@@ -25,6 +25,12 @@ UNIT_MPC["LinMPC"]["moveinput!"]["MultipleShooting"] =
         setup=preparestate!($linmpc_ms, $y, $d),
         samples=samples, evals=evals, seconds=seconds
     )
+UNIT_MPC["LinMPC"]["getinfo!"] =
+    @benchmarkable(
+        getinfo($linmpc_ss),
+        setup=(preparestate!($linmpc_ss, $y, $d); moveinput!($linmpc_ss, $y, $d)),
+        samples=samples, evals=evals, seconds=seconds
+    )
 
 empc = ExplicitMPC(linmodel, Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10)
 
@@ -76,6 +82,12 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["LinModel"]["MultipleShooting"] =
         setup=preparestate!($nmpc_lin_ms, $y, $d),
         samples=samples, evals=evals, seconds=seconds
     )
+UNIT_MPC["NonLinMPC"]["getinfo!"]["LinModel"] =
+    @benchmarkable(
+        getinfo($nmpc_lin_ss),
+        setup=(preparestate!($nmpc_lin_ss, $y, $d); moveinput!($nmpc_lin_ss, $y, $d)),
+        samples=samples, evals=evals, seconds=seconds
+    )
 UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["SingleShooting"] =
     @benchmarkable(
         moveinput!($nmpc_nonlin_ss, $y, $d),
@@ -104,6 +116,12 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["TrapezoidalCollocation"] =
     @benchmarkable(
         moveinput!($nmpc_nonlin_tc, $y_c, $d_c),
         setup=preparestate!($nmpc_nonlin_tc, $y_c, $d_c),
+        samples=samples, evals=evals, seconds=seconds
+    )
+UNIT_MPC["NonLinMPC"]["getinfo!"]["NonLinModel"] =
+    @benchmarkable(
+        getinfo($nmpc_nonlin_ss),
+        setup=(preparestate!($nmpc_nonlin_ss, $y, $d); moveinput!($nmpc_nonlin_ss, $y, $d)),
         samples=samples, evals=evals, seconds=seconds
     )
 

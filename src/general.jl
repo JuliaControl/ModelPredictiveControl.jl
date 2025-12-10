@@ -16,6 +16,16 @@ const ALL_COLORING_ORDERS = (
     RandomOrder(StableRNG(0), 0)
 )
 
+const HIDDEN_GETINFO_KEYS_MHE = (
+    :What, :xhatarr, :epsilon, :Xhat, :xhat, :Vhat, :Pbar, :xbar, :Yhat, :Yhatm, :ϵ,
+    :nablaJ, :nabla2J, :nablag, :nabla2lg, :nablageq, :nabla2lgeq
+)
+
+const HIDDEN_GETINFO_KEYS_MPC = (
+    :DeltaU, :epsilon, :Dhat, :yhat, :Yhat, :xhatend, :Yhats, :Rhaty, :Rhatu,
+    :nablaJ, :nabla2J, :nablag, :nabla2lg, :nablageq, :nabla2lgeq
+)
+
 "Termination status that means 'no solution available'."
 const ERROR_STATUSES = (
     JuMP.INFEASIBLE, JuMP.DUAL_INFEASIBLE, JuMP.LOCALLY_INFEASIBLE, 
@@ -40,12 +50,17 @@ function info2debugstr(info)
     mystr = "Content of getinfo dictionary:\n"
     for (key, value) in info
         (key == :sol) && continue
+        if key in HIDDEN_GETINFO_KEYS_MHE || key in HIDDEN_GETINFO_KEYS_MPC
+            # skip the redundant non-Unicode keys
+            continue
+        end
         mystr *= "  :$key => $value\n"
     end
     if haskey(info, :sol)
         split_sol = split(string(info[:sol]), "\n")
-        solstr = join((lpad(line, length(line) + 2) for line in split_sol), "\n", "")
-        mystr *= "  :sol => \n"*solstr
+        # Add the treeview prefix to each line
+        solstr = join(("   " * line for line in split_sol), "\n")
+        mystr *= "  :sol => \n" * solstr * "\n"  # Ensure a trailing newline
     end
     return mystr
 end

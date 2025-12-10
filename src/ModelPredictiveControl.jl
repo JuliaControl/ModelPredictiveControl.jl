@@ -9,6 +9,9 @@ using RecipesBase
 
 using DifferentiationInterface: ADTypes.AbstractADType, AutoForwardDiff
 using DifferentiationInterface: AutoSparse, SecondOrder
+using DifferentiationInterface: gradient, jacobian, hessian
+using DifferentiationInterface: value_and_gradient, value_and_jacobian
+using DifferentiationInterface: value_gradient_and_hessian
 using DifferentiationInterface: gradient!, value_and_gradient!, prepare_gradient
 using DifferentiationInterface: jacobian!, value_and_jacobian!, prepare_jacobian 
 using DifferentiationInterface: hessian!, value_gradient_and_hessian!, prepare_hessian

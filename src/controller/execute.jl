@@ -105,8 +105,22 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:d`   : current measured disturbance, ``\mathbf{d}(k)``
 
 For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
-solution summary that can be printed. Lastly, the economical cost `:JE` and the custom
-nonlinear constraints `:gc` values at the optimum are also available for [`NonLinMPC`](@ref).
+solution summary that can be printed. Lastly, for [`NonLinMPC`](@ref), the following fields
+are also available:
+
+- `:JE`: economic cost value at the optimum, ``J_E``
+- `:gc`: custom nonlinear constraints values at the optimum, ``\mathbf{g_c}``
+- `:∇J` or *`:nablaJ`* : optimal gradient of the objective function, ``\mathbf{\nabla} J``
+- `:∇²J` or *`:nabla2J`* : optimal Hessian of the objective function, ``\mathbf{\nabla^2}J``
+- `:g` : optimal nonlinear inequality constraint values, ``\mathbf{g}``
+- `:∇g` or *`:nablag`* : optimal Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
+- `:∇²ℓg` or *`:nabla2lg`* : optimal Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
+- `:geq` : optimal nonlinear equality constraint values, ``\mathbf{g_{eq}}``
+- `:∇geq` or *`:nablageq`* : optimal Jacobian of the equality constraint, ``\mathbf{\nabla g_{eq}}``
+- `:∇²ℓgeq` or *`:nabla2lgeq`* : optimal Hessian of the equality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g_{eq}}}``
+
+Note that retrieving optimal Hessians of Lagrangian are not fully supported yet. Their
+nonzero coefficients are random values for now.
 
 # Examples
 ```jldoctest
