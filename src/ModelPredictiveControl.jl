@@ -51,6 +51,13 @@ export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, mov
 export TranscriptionMethod, SingleShooting, MultipleShooting, TrapezoidalCollocation
 export SimResult, getinfo, sim!
 
+export hi
+
+struct NonExt end
+struct Ext end
+
+hi(::NonExt) = println("hello wold with a number")
+
 include("general.jl")
 include("sim_model.jl")
 include("state_estim.jl")

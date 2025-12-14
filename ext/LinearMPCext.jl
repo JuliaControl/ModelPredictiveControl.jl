@@ -2,8 +2,7 @@ module LinearMPCext
 
 using ModelPredictiveControl, LinearMPC
 
-export hi
 
-hi() = println("hello world!")
+ModelPredictiveControl.hi(::ModelPredictiveControl.Ext) = println("hello world!")
 
 end # LinearMPCext
