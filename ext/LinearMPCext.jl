@@ -53,6 +53,10 @@ function validate_compatibility(mpc::ModelPredictiveControl.LinMPC)
               "is currently $(JuMP.solver_name(mpc.optim)).\n"*
               "The results in closed-loop may be different."
     end
+    nΔU = mpc.Hc*mpc.estim.model.nu
+    if any(isfinite, mpc.con.ΔŨmin[1:nΔU]) || any(isfinite, mpc.con.ΔŨmin[1:nΔU])
+        error("LinearMPC.MPC does not support constraints on input increments Δu")
+    end
     return nothing
 end
 
