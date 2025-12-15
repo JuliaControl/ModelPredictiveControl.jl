@@ -102,9 +102,6 @@ For [`NonLinModel`](@ref), it also includes the following fields:
 - `:∇g` or *`:nablag`* : optimal Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
 - `:∇²ℓg` or *`:nabla2lg`* : optimal Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
 
-Note that retrieving optimal Hessians of Lagrangian are not fully supported yet. Their
-nonzero coefficients are random values for now.
-
 # Examples
 ```jldoctest
 julia> model = LinModel(ss(1.0, 1.0, 1.0, 0, 5.0));
