@@ -593,7 +593,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         catch err
             if err isa MOI.GetAttributeNotAllowed{MOI.LagrangeMultiplier}
                 @warn(
-                    "Retrieving optimal Hessian of the Lagrangian is not supported.\n"*
+                    "The optimizer does not support retrieving optimal Hessian of the Lagrangian.\n"*
                     "Its nonzero coefficients will be random values.", maxlog=1
                 )
                 rand(sum(old_i_g))
@@ -635,7 +635,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         catch err
             if err isa MOI.GetAttributeNotAllowed{MOI.LagrangeMultiplier}
                 @warn(
-                    "Retrieving optimal Hessian of the Lagrangian is not supported.\n"*
+                    "The optimizer does not support retrieving optimal Hessian of the Lagrangian.\n"*
                     "Its nonzero coefficients will be random values.", maxlog=1
                 )
                 rand(con.neq)
