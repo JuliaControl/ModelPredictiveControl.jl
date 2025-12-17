@@ -587,22 +587,31 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     end
     g, ∇g = value_and_jacobian(g!, g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
     if !isnothing(mpc.hessian) && any(old_i_g)
-        @warn(
-            "Retrieving optimal Hessian of the Lagrangian is not fully supported yet.\n"*
-            "Its nonzero coefficients are random values for now.", maxlog=1
-        )
-        function ℓ_g(Z̃, λ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
-            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-            return dot(λ, g)
+        nonlincon = optim[:nonlinconstraint]
+        λi = try
+            JuMP.get_attribute(nonlincon, MOI.LagrangeMultiplier())
+        catch err
+            if err isa MOI.GetAttributeNotAllowed{MOI.LagrangeMultiplier}
+                @warn(
+                    "The optimizer does not support retrieving optimal Hessian of the Lagrangian.\n"*
+                    "Its nonzero coefficients will be random values.", maxlog=1
+                )
+                rand(sum(old_i_g))
+            else
+                rethrow()
+            end
         end
+        λ = zeros(NT, ng)
+        λ[old_i_g] = λi
         ∇²g_cache = (
             Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
             Cache(Û0), Cache(K0), Cache(X̂0), 
             Cache(gc), Cache(geq), Cache(g)
         )
-        nonlincon = optim[:nonlinconstraint]
-        λ = JuMP.dual.(nonlincon) # FIXME: does not work for now
-        λ = rand(NT, ng)
+        function ℓ_g(Z̃, λ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq, g)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+            return dot(λ, g)
+        end
         ∇²ℓg = hessian(ℓ_g, mpc.hessian, mpc.Z̃, Constant(λ), ∇²g_cache...)
     else
         ∇²ℓg = nothing
@@ -620,10 +629,20 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     end
     geq, ∇geq = value_and_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
     if !isnothing(mpc.hessian) && con.neq > 0
-        @warn(
-            "Retrieving optimal Hessian of the Lagrangian is not fully supported yet.\n"*
-            "Its nonzero coefficients are random values for now.", maxlog=1
-        )
+        nonlinconeq = optim[:nonlinconstrainteq]
+        λeq = try
+            JuMP.get_attribute(nonlinconeq, MOI.LagrangeMultiplier())
+        catch err
+            if err isa MOI.GetAttributeNotAllowed{MOI.LagrangeMultiplier}
+                @warn(
+                    "The optimizer does not support retrieving optimal Hessian of the Lagrangian.\n"*
+                    "Its nonzero coefficients will be random values.", maxlog=1
+                )
+                rand(con.neq)
+            else
+                rethrow()
+            end
+        end
         ∇²geq_cache = (
             Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
             Cache(Û0), Cache(K0),   Cache(X̂0),
@@ -633,9 +652,6 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λeq, geq)
         end
-        nonlinconeq = optim[:nonlinconstrainteq]
-        λeq = JuMP.dual.(nonlinconeq) # FIXME: does not work for now
-        λeq = ones(NT, neq)
         ∇²ℓgeq = hessian(ℓ_geq, mpc.hessian, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
     else
         ∇²ℓgeq = nothing

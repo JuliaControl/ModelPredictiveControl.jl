@@ -119,9 +119,6 @@ are also available:
 - `:∇geq` or *`:nablageq`* : optimal Jacobian of the equality constraint, ``\mathbf{\nabla g_{eq}}``
 - `:∇²ℓgeq` or *`:nabla2lgeq`* : optimal Hessian of the equality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g_{eq}}}``
 
-Note that retrieving optimal Hessians of Lagrangian are not fully supported yet. Their
-nonzero coefficients are random values for now.
-
 # Examples
 ```jldoctest
 julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1, Hc=1);
