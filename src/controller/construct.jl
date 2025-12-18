@@ -661,8 +661,8 @@ function init_defaultcon_mpc(
     x̂0min,      x̂0max   = fill(convert(NT,-Inf), nx̂), fill(convert(NT,+Inf), nx̂)
     c_umin,     c_umax  = fill(zero(NT), nu), fill(zero(NT), nu)
     c_Δumin,    c_Δumax = fill(zero(NT), nu), fill(zero(NT), nu)
-    c_ymin,     c_ymax  = fill(one(NT),  ny), fill(one(NT),  ny)
-    c_x̂min,     c_x̂max  = fill(zero(NT), nx̂), fill(zero(NT), nx̂)
+    c_ymin,     c_ymax  = fill(one(NT), ny),  fill(one(NT), ny)
+    c_x̂min,     c_x̂max  = fill(one(NT), nx̂),  fill(one(NT), nx̂)
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max = 
         repeat_constraints(Hp, Hc, u0min, u0max, Δumin, Δumax, y0min, y0max)
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
