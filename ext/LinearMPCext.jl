@@ -29,6 +29,8 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         Cwt = weights.Ñ_Hc[end, end]
         newmpc.settings.soft_weight = Cwt
     end
+    # --- Custom move blocking ---
+    # LinearMPC.move_block!(newmpc, mpc.nb) # un-comment when debugged
     # --- Manipulated inputs constraints ---
     Umin, Umax = mpc.con.U0min + mpc.Uop, mpc.con.U0max + mpc.Uop
     C_u = -mpc.con.A_Umin[:, end]
