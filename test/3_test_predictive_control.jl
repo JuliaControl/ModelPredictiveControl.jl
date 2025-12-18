@@ -244,6 +244,16 @@ end
     model = LinModel(sys, Ts, i_d=[3])
     mpc = LinMPC(model, Hp=1, Hc=1)
 
+    # test default constraints before modifying any:
+    @test all((mpc.con.U0min, mpc.con.U0max) .≈ (fill(-Inf, model.nu), fill(Inf, model.nu)))
+    @test all((mpc.con.ΔŨmin, mpc.con.ΔŨmax) .≈ (vcat(fill(-Inf, model.nu), 0), vcat(fill(Inf, model.nu), Inf)))
+    @test all((mpc.con.Y0min, mpc.con.Y0max) .≈ (fill(-Inf, model.ny), fill(Inf, model.ny)))
+    @test all((mpc.con.x̂0min, mpc.con.x̂0max) .≈ (fill(-Inf, mpc.estim.nx̂), fill(Inf, mpc.estim.nx̂)))
+    @test all((-mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]) .≈ (fill(0.0, model.nu), fill(0.0, model.nu)))
+    @test all((-mpc.con.A_ΔŨmin[1:end-1, end], -mpc.con.A_ΔŨmax[1:end-1, end]) .≈ (fill(0.0, model.nu), fill(0.0, model.nu)))
+    @test all((-mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]) .≈ (fill(1.0, model.ny), fill(1.0, model.ny)))
+    @test all((-mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]) .≈ (fill(1.0, mpc.estim.nx̂), fill(1.0, mpc.estim.nx̂)))
+
     setconstraint!(mpc, umin=[-5, -9.9], umax=[100,99])
     @test all((mpc.con.U0min, mpc.con.U0max) .≈ ([-5, -9.9], [100,99]))
     setconstraint!(mpc, Δumin=[-5,-10], Δumax=[6,11])
