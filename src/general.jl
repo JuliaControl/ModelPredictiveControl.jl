@@ -173,6 +173,14 @@ function repeatdiag(A::Hermitian{NT, Diagonal{NT, Vector{NT}}}, n::Int) where {N
     return Hermitian(repeatdiag(A.data, n), :L) # to return hermitian of a `Diagonal`
 end
 
+"Check if matrix `A` is block diagonal with `m` blocks, where each block is `n × n`."
+function isblockdiag(A::AbstractMatrix, n::Int, m::Int)
+    @assert size(A) == (n*m, n*m) "A size does not match the specified block dimensions."
+    blocks = [A[(i-1)*n+1:i*n, (i-1)*n+1:i*n] for i in 1:m]
+    A_blockdiag = blockdiag(sparse.(blocks)...)
+    return isapprox(A, A_blockdiag)
+end
+
 "In-place version of `repeat` but for vectors only."
 function repeat!(Y::Vector, a::Vector, n::Int)
     na = length(a)
