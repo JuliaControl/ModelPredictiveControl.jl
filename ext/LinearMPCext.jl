@@ -8,7 +8,7 @@ import ModelPredictiveControl: isblockdiag
 
 function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     model, estim, weights = mpc.estim.model, mpc.estim, mpc.weights
-    nu, ny, nd = model.nu, model.ny, model.nd
+    nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
     validate_compatibility(mpc)
     # --- Model parameters ---
     F, G, Gd = estim.Â, estim.B̂u, estim.B̂d
@@ -32,7 +32,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     # --- Manipulated inputs constraints ---
     Umin, Umax = mpc.con.U0min + mpc.Uop, mpc.con.U0max + mpc.Uop
     C_u = -mpc.con.A_Umin[:, end]
-    Au = Matrix{Float64}(I, nu, nu)
+    I_u = Matrix{Float64}(I, nu, nu)
     for k in 0:Hc-1 # Hp-1 # TODO: modify this once debugged
         umin_k, umax_k = Umin[k*nu+1:(k+1)*nu], Umax[k*nu+1:(k+1)*nu]
         c_u_k = C_u[k*nu+1:(k+1)*nu]
@@ -41,14 +41,13 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
             lb = isfinite(umin_k[i]) ? [umin_k[i]] : zeros(0)
             ub = isfinite(umax_k[i]) ? [umax_k[i]] : zeros(0)
             soft = (c_u_k[i] > 0)
-            Au_i = Au[i:i, :]
-            add_constraint!(newmpc; Au=Au_i, lb, ub, ks, soft)
+            Au = I_u[i:i, :]
+            add_constraint!(newmpc; Au, lb, ub, ks, soft)
         end
     end
     # --- Output constraints ---
     Ymin, Ymax = mpc.con.Y0min + mpc.Yop, mpc.con.Y0max + mpc.Yop
     C_y = -mpc.con.A_Ymin[:, end]
-    Ax, Ad = C, Dd
     for k in 1:Hp
         ymin_k, ymax_k = Ymin[(k-1)*ny+1:k*ny], Ymax[(k-1)*ny+1:k*ny]
         c_y_k = C_y[(k-1)*ny+1:k*ny]
@@ -57,9 +56,21 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
             lb = isfinite(ymin_k[i]) ? [ymin_k[i]] : zeros(0)
             ub = isfinite(ymax_k[i]) ? [ymax_k[i]] : zeros(0)
             soft = (c_y_k[i] > 0)
-            Ax_i, Ad_i = Ax[i:i, :], Ad[i:i, :]
-            add_constraint!(newmpc; Ax=Ax_i, Ad=Ad_i, lb, ub, ks, soft)
+            Ax, Ad = C[i:i, :], Dd[i:i, :]
+            add_constraint!(newmpc; Ax, Ad, lb, ub, ks, soft)
         end
+    end
+    # --- Terminal constraints ---
+    x̂min, x̂max = mpc.con.x̂0min + estim.x̂op, mpc.con.x̂0max + estim.x̂op
+    c_x̂ = -mpc.con.A_x̂min[:, end]
+    I_x̂ = Matrix{Float64}(I, nx̂, nx̂)
+    ks = [Hp+1] # a `1` in ks argument corresponds to the present time step k+0
+    for i in 1:nx̂
+        lb = isfinite(x̂min[i]) ? [x̂min[i]] : zeros(0)
+        ub = isfinite(x̂max[i]) ? [x̂max[i]] : zeros(0)
+        soft = (c_x̂[i] > 0)
+        Ax = I_x̂[i:i, :]
+        add_constraint!(newmpc; Ax, lb, ub, ks, soft)
     end
     return newmpc
 end
@@ -115,11 +126,12 @@ function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
     ΔŨmin, ΔŨmax = mpc.con.ΔŨmin, mpc.con.ΔŨmax
     C_umin, C_umax = -mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]
     C_ymin, C_ymax = -mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]
+    C_x̂min, C_x̂max = -mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]
     is0or1(C) = all(x -> x ≈ 0 || x ≈ 1, C)
     if !is0or1(C_umin) || !is0or1(C_umax) || !is0or1(C_ymin) || !is0or1(C_ymax) 
         error("LinearMPC does not support softness parameters c ≠ 0 or 1.")
     end
-    if !isapprox(C_umin, C_umax) || !isapprox(C_ymin, C_ymax)
+    if !isapprox(C_umin, C_umax) || !isapprox(C_ymin, C_ymax) || !isapprox(C_x̂min, C_x̂max)
         error("LinearMPC does not support different softness parameters for lower and upper bounds.")
     end
     nΔU = mpc.Hc*mpc.estim.model.nu
