@@ -255,7 +255,7 @@ end
 
 @doc raw"""
     init_predmat(
-        model::LinModel, estim, transcription::SingleShooting, Hp, Hc
+        model::LinModel, estim, transcription::SingleShooting, Hp, Hc, nb
     ) -> E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
 
 Construct the prediction matrices for [`LinModel`](@ref) and [`SingleShooting`](@ref).
@@ -355,7 +355,7 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     ```
 """
 function init_predmat(
-    model::LinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, nb
 ) where {NT<:Real}
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
@@ -394,10 +394,15 @@ function init_predmat(
     ex̂ = Matrix{NT}(undef, nx̂, nZ)
     E  = zeros(NT, Hp*ny, nZ) 
     for j=1:Hc # truncated with control horizon
-        iRow = (ny*(j-1)+1):(ny*Hp)
         iCol = (1:nu) .+ nu*(j-1)
-        E[iRow, iCol] = V[iRow .- ny*(j-1),:]
-        ex̂[:  , iCol] = W(Hp-j)*B̂u
+        for i=j:Hc
+            i_Q = i == j ? 0 : nb[i-1]
+            
+        end
+
+
+        n = j > 1 ? nb[j-1] : 0
+        ex̂[:  , iCol] = W(Hp-n-1)*B̂u
     end
     # --- current measured disturbances d0 and predictions D̂0 ---
     gx̂ = getpower(Âpow, Hp-1)*B̂d
@@ -431,7 +436,7 @@ end
 
 @doc raw"""
     init_predmat(
-        model::LinModel, estim, transcription::MultipleShooting, Hp, Hc
+        model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb
     ) -> E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
     
 Construct the prediction matrices for [`LinModel`](@ref) and [`MultipleShooting`](@ref).
@@ -451,7 +456,7 @@ They are defined in the Extended Help section.
     ```
 """
 function init_predmat(
-    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc, nb
 ) where {NT<:Real}
     Ĉ, D̂d = estim.Ĉ, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
@@ -476,12 +481,12 @@ function init_predmat(
 end
 
 """
-    init_predmat(model::NonLinModel, estim, transcription::SingleShooting, Hp, Hc) 
+    init_predmat(model::NonLinModel, estim, transcription::SingleShooting, Hp, Hc, nb) 
 
 Return empty matrices for [`SingleShooting`](@ref) of [`NonLinModel`](@ref)
 """
 function init_predmat(
-    model::NonLinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -496,7 +501,7 @@ function init_predmat(
 end
 
 @doc raw"""
-    init_predmat(model::NonLinModel, estim, transcription::TranscriptionMethod, Hp, Hc)
+    init_predmat(model::NonLinModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb)
 
 Return the terminal state matrices for [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
 
@@ -509,7 +514,7 @@ given in the Extended Help section.
     for ``\mathbf{e_x̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``
 """
 function init_predmat(
-    model::NonLinModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
