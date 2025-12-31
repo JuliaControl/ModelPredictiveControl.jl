@@ -313,10 +313,10 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     ```math
     \begin{aligned}
     \mathbf{E} &= \begin{bmatrix}
-        \mathbf{Q}(0,   n_1)           & \mathbf{0}                       & \cdots & \mathbf{0}                                        \\
-        \mathbf{Q}(n_1, n_2)           & \mathbf{Q}(0, n_2)               & \cdots & \mathbf{0}                                        \\
-        \vdots                         & \vdots                           & \ddots & \vdots                                            \\
-        \mathbf{Q}(n_{H_c-1}, n_{H_c}) & \mathbf{Q}(n_{H_c-2}, n_{H_c-1}) & \cdots & \mathbf{Q}(0, n_{H_c}) \end{bmatrix} \\
+        \mathbf{Q}(0,   n_1)           & \mathbf{0}                     & \cdots & \mathbf{0}                                        \\
+        \mathbf{Q}(n_1, n_2)           & \mathbf{Q}(0, n_2)             & \cdots & \mathbf{0}                                        \\
+        \vdots                         & \vdots                         & \ddots & \vdots                                            \\
+        \mathbf{Q}(n_{H_c-1}, n_{H_c}) & \mathbf{Q}(n_{H_c-2}, n_{H_c}) & \cdots & \mathbf{Q}(0, n_{H_c}) \end{bmatrix} \\
     \mathbf{G} &= \begin{bmatrix}
         \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
         \mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
