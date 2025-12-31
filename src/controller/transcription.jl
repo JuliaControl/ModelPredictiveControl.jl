@@ -332,7 +332,7 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
         \mathbf{Ĉ}\mathbf{Â}^{2}        \\
         \vdots                          \\
         \mathbf{Ĉ}\mathbf{Â}^{H_p}      \end{bmatrix} \\
-    \mathbf{V} &= Q(0, H_p)             \\
+    \mathbf{V} &= \mathbf{Q}(0, H_p)             \\
     \mathbf{B} &= \begin{bmatrix}
         \mathbf{Ĉ W}(0)                 \\
         \mathbf{Ĉ W}(1)                 \\
@@ -376,9 +376,16 @@ function init_predmat(
     end
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Âpow_csum  = cumsum(Âpow, dims=3)
-    # two helper functions to improve code clarity and be similar to eqs. in docstring:
+    # three helper functions to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
     W(m) = @views Âpow_csum[:,:, m+1]
+    function Q!(Q, i, j)
+        for ℓ=1:j
+            iRows = (1:ny) .+ ny*(ℓ-1)
+            Q[iRows, :] = Ĉ*W(i+ℓ-1)*B̂u
+        end
+        return Q
+    end
     # --- current state estimates x̂0 ---
     kx̂ = getpower(Âpow, Hp)
     K  = Matrix{NT}(undef, Hp*ny, nx̂)
@@ -387,7 +394,7 @@ function init_predmat(
         K[iRow,:] = Ĉ*getpower(Âpow, j)
     end    
     # --- previous manipulated inputs lastu0 ---
-    vx̂ = W(H_p-1)*B̂u
+    vx̂ = W(Hp-1)*B̂u
     V  = Matrix{NT}(undef, Hp*ny, nu)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
