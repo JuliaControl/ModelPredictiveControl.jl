@@ -295,7 +295,7 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
 # Extended Help
 !!! details "Extended Help"
     Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` (see 
-    [`augment_model`](@ref)), the following two functions with integer arguments:
+    [`augment_model`](@ref)), and the following two functions with integer arguments:
     ```math
     \begin{aligned}
     \mathbf{Q}(i, j) &= \begin{bmatrix}
@@ -307,7 +307,9 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     \mathbf{W}(m)    &= ∑_{ℓ=0}^m \mathbf{Â}^ℓ      
     \end{aligned}
     ```
-    the prediction matrices are computed by :
+    the prediction matrices are computed from the [`move_blocking`](@ref) vector 
+    ``\mathbf{n_b} = [\begin{smallmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{smallmatrix}]'``
+    and the following equations:
     ```math
     \begin{aligned}
     \mathbf{E} &= \begin{bmatrix}
@@ -343,9 +345,10 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     \begin{aligned}
     \mathbf{e_x̂} &= \begin{bmatrix} 
                         \mathbf{W}(H_p-1)\mathbf{B̂_u} & 
-                        \mathbf{W}(H_p-2)\mathbf{B̂_u} & 
+                        \mathbf{W}(H_p-n_1-1)\mathbf{B̂_u} &
+                        \mathbf{W}(H_p-n_2-1)\mathbf{B̂_u} & 
                         \cdots & 
-                        \mathbf{W}(H_p-H_c+1)\mathbf{B̂_u} \end{bmatrix} \\
+                        \mathbf{W}(H_p-n_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
     \mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
     \mathbf{j_x̂} &= \begin{bmatrix} 
                         \mathbf{Â}^{H_p-2} \mathbf{B̂_d} & 
