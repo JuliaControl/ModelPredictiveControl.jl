@@ -344,11 +344,11 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     ```math
     \begin{aligned}
     \mathbf{e_x̂} &= \begin{bmatrix} 
-                        \mathbf{W}(H_p-1)\mathbf{B̂_u} & 
-                        \mathbf{W}(H_p-n_1-1)\mathbf{B̂_u} &
-                        \mathbf{W}(H_p-n_2-1)\mathbf{B̂_u} & 
+                        \mathbf{W}(H_p-1)     \mathbf{B̂_u} & 
+                        \mathbf{W}(H_p-n_1-1) \mathbf{B̂_u} &
+                        \mathbf{W}(H_p-n_2-1) \mathbf{B̂_u} & 
                         \cdots & 
-                        \mathbf{W}(H_p-n_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
+                        \mathbf{W}(H_p-n_{H_c-1}-1) \mathbf{B̂_u} \end{bmatrix} \\
     \mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
     \mathbf{j_x̂} &= \begin{bmatrix} 
                         \mathbf{Â}^{H_p-2} \mathbf{B̂_d} & 
@@ -376,8 +376,9 @@ function init_predmat(
     end
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Âpow_csum  = cumsum(Âpow, dims=3)
-    # helper function to improve code clarity and be similar to eqs. in docstring:
+    # two helper functions to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
+    W(m) = @views Âpow_csum[:,:, m+1]
     # --- current state estimates x̂0 ---
     kx̂ = getpower(Âpow, Hp)
     K  = Matrix{NT}(undef, Hp*ny, nx̂)
@@ -386,11 +387,11 @@ function init_predmat(
         K[iRow,:] = Ĉ*getpower(Âpow, j)
     end    
     # --- previous manipulated inputs lastu0 ---
-    vx̂ = getpower(Âpow_csum, Hp-1)*B̂u
+    vx̂ = W(H_p-1)*B̂u
     V  = Matrix{NT}(undef, Hp*ny, nu)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
-        V[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)*B̂u
+        V[iRow,:] = Ĉ*W(j-1)*B̂u
     end
     # --- decision variables Z ---
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -400,7 +401,7 @@ function init_predmat(
         iRow = (ny*(j-1)+1):(ny*Hp)
         iCol = (1:nu) .+ nu*(j-1)
         E[iRow, iCol] = V[iRow .- ny*(j-1),:]
-        ex̂[:  , iCol] = getpower(Âpow_csum, Hp-j)*B̂u
+        ex̂[:  , iCol] = W(Hp-j)*B̂u
     end
     # --- current measured disturbances d0 and predictions D̂0 ---
     gx̂ = getpower(Âpow, Hp-1)*B̂d
@@ -420,11 +421,11 @@ function init_predmat(
         end
     end
     # --- state x̂op and state update f̂op operating points ---
-    coef_bx̂ = getpower(Âpow_csum, Hp-1)
+    coef_bx̂ = W(Hp-1)
     coef_B  = Matrix{NT}(undef, ny*Hp, nx̂)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
-        coef_B[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)
+        coef_B[iRow,:] = Ĉ*W(j-1)
     end
     f̂op_n_x̂op = estim.f̂op - estim.x̂op
     bx̂ = coef_bx̂ * f̂op_n_x̂op
