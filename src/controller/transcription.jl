@@ -295,15 +295,26 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
 # Extended Help
 !!! details "Extended Help"
     Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` (see 
-    [`augment_model`](@ref)), and the function ``\mathbf{W}(j) = ∑_{i=0}^j \mathbf{Â}^i``,
+    [`augment_model`](@ref)), the following two functions with integer arguments:
+    ```math
+    \begin{aligned}
+    \mathbf{Q}(i, j) &= \begin{bmatrix}
+        \mathbf{Ĉ W}(i+0)\mathbf{B̂_u}               \\
+        \mathbf{Ĉ W}(i+1)\mathbf{B̂_u}               \\
+        \vdots                                      \\
+        \mathbf{Ĉ W}(i+j-1)\mathbf{B̂_u}
+    \end{bmatrix}                                   \\
+    \mathbf{W}(m)    &= ∑_{ℓ=0}^m \mathbf{Â}^ℓ      
+    \end{aligned}
+    ```
     the prediction matrices are computed by :
     ```math
     \begin{aligned}
     \mathbf{E} &= \begin{bmatrix}
-        \mathbf{Ĉ W}(0)\mathbf{B̂_u}     & \mathbf{0}                      & \cdots & \mathbf{0}                                        \\
-        \mathbf{Ĉ W}(1)\mathbf{B̂_u}     & \mathbf{Ĉ W}(0)\mathbf{B̂_u}     & \cdots & \mathbf{0}                                        \\
-        \vdots                          & \vdots                          & \ddots & \vdots                                            \\
-        \mathbf{Ĉ W}(H_p-1)\mathbf{B̂_u} & \mathbf{Ĉ W}(H_p-2)\mathbf{B̂_u} & \cdots & \mathbf{Ĉ W}(H_p-H_c+1)\mathbf{B̂_u} \end{bmatrix} \\
+        \mathbf{Q}(0,   n_1)           & \mathbf{0}                       & \cdots & \mathbf{0}                                        \\
+        \mathbf{Q}(n_1, n_2)           & \mathbf{Q}(0, n_2)               & \cdots & \mathbf{0}                                        \\
+        \vdots                         & \vdots                           & \ddots & \vdots                                            \\
+        \mathbf{Q}(n_{H_c-1}, n_{H_c}) & \mathbf{Q}(n_{H_c-2}, n_{H_c-1}) & \cdots & \mathbf{Q}(0, n_{H_c}) \end{bmatrix} \\
     \mathbf{G} &= \begin{bmatrix}
         \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
         \mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
@@ -319,11 +330,7 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
         \mathbf{Ĉ}\mathbf{Â}^{2}        \\
         \vdots                          \\
         \mathbf{Ĉ}\mathbf{Â}^{H_p}      \end{bmatrix} \\
-    \mathbf{V} &= \begin{bmatrix}
-        \mathbf{Ĉ W}(0)\mathbf{B̂_u}     \\
-        \mathbf{Ĉ W}(1)\mathbf{B̂_u}     \\
-        \vdots                          \\
-        \mathbf{Ĉ W}(H_p-1)\mathbf{B̂_u} \end{bmatrix} \\
+    \mathbf{V} &= Q(0, H_p)             \\
     \mathbf{B} &= \begin{bmatrix}
         \mathbf{Ĉ W}(0)                 \\
         \mathbf{Ĉ W}(1)                 \\
