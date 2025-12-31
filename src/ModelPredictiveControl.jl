@@ -51,6 +51,29 @@ export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, mov
 export TranscriptionMethod, SingleShooting, MultipleShooting, TrapezoidalCollocation
 export SimResult, getinfo, sim!
 
+"""
+    LinearMPC.MPC(mpc::ModelPredictiveControl.LinMPC)
+
+Convert a `ModelPredictiveControl.LinMPC` object to a `LinearMPC.MPC` object.
+
+The package need to be installed and available in the current Julia environment. Once
+converted, the `LinearMPC.MPC` object can be used to generate lightweight C code for
+embedded applications using the `codegen` function. Note that not all features of
+[`LinMPC`] are supported, including these restrictions:
+
+- the solver is limited to `DAQP`.
+- the transcription method must be [`SingleShooting`](@ref).
+- the state estimator must be a [`SteadyKalmanFilter`](@ref) with `direct=true`.
+- ``\\mathbf{Δu_{min}}`` and ``\\mathbf{Δu_{max}}`` constraints are not supported for now.
+
+e.g. the solver is limited to `DAQP` and only single shooting
+transcription with a steady Kalman filter is supported. The weights and constraints
+    
+    See the `LinearMPC` documentation for
+more details.
+"""
+function MPC end
+
 include("general.jl")
 include("sim_model.jl")
 include("state_estim.jl")

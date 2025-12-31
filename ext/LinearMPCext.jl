@@ -20,17 +20,17 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     Q, R = estim.cov.Q̂, estim.cov.R̂
     set_state_observer!(newmpc; C=estim.Ĉm, Q, R)
     # --- Objective function weights ---
-    Q  = weights.M_Hp[1:ny, 1:ny]
+    Q = weights.M_Hp[1:ny, 1:ny]
     Qf = weights.M_Hp[end-ny+1:end, end-ny+1:end]
     Rr = weights.Ñ_Hc[1:nu, 1:nu]
-    R  = weights.L_Hp[1:nu, 1:nu]
+    R = weights.L_Hp[1:nu, 1:nu]
     LinearMPC.set_objective!(newmpc; Q, Rr, R, Qf)
     if !weights.isinf_C
         Cwt = weights.Ñ_Hc[end, end]
         newmpc.settings.soft_weight = Cwt
     end
     # --- Custom move blocking ---
-    #LinearMPC.move_block!(newmpc, mpc.nb) # un-comment when debugged
+    LinearMPC.move_block!(newmpc, mpc.nb) # un-comment when debugged
     # --- Manipulated inputs constraints ---
     Umin, Umax = mpc.con.U0min + mpc.Uop, mpc.con.U0max + mpc.Uop
     C_u = -mpc.con.A_Umin[:, end]
@@ -42,13 +42,13 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     umin_end = mapslices(maximum, Umin_finals; dims=2)
     umax_end = mapslices(minimum, Umax_finals; dims=2)
     for k in 0:Hc-1
-        if k < Hc-1
+        if k < Hc - 1
             umin_k, umax_k = Umin[k*nu+1:(k+1)*nu], Umax[k*nu+1:(k+1)*nu]
         else
             umin_k, umax_k = umin_end, umax_end
         end
         c_u_k = C_u[k*nu+1:(k+1)*nu]
-        ks = [k+1] # a `1` in ks argument corresponds to the present time step k+0
+        ks = [k + 1] # a `1` in ks argument corresponds to the present time step k+0
         for i in 1:nu
             lb = isfinite(umin_k[i]) ? [umin_k[i]] : zeros(0)
             ub = isfinite(umax_k[i]) ? [umax_k[i]] : zeros(0)
@@ -63,7 +63,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     for k in 1:Hp
         ymin_k, ymax_k = Ymin[(k-1)*ny+1:k*ny], Ymax[(k-1)*ny+1:k*ny]
         c_y_k = C_y[(k-1)*ny+1:k*ny]
-        ks = [k+1] # a `1` in ks argument corresponds to the present time step k+0
+        ks = [k + 1] # a `1` in ks argument corresponds to the present time step k+0
         for i in 1:ny
             lb = isfinite(ymin_k[i]) ? [ymin_k[i]] : zeros(0)
             ub = isfinite(ymax_k[i]) ? [ymax_k[i]] : zeros(0)
@@ -76,7 +76,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     x̂min, x̂max = mpc.con.x̂0min + estim.x̂op, mpc.con.x̂0max + estim.x̂op
     c_x̂ = -mpc.con.A_x̂min[:, end]
     I_x̂ = Matrix{Float64}(I, nx̂, nx̂)
-    ks = [Hp+1] # a `1` in ks argument corresponds to the present time step k+0
+    ks = [Hp + 1] # a `1` in ks argument corresponds to the present time step k+0
     for i in 1:nx̂
         lb = isfinite(x̂min[i]) ? [x̂min[i]] : zeros(0)
         ub = isfinite(x̂max[i]) ? [x̂max[i]] : zeros(0)
@@ -87,7 +87,6 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     return newmpc
 end
 
-
 function validate_compatibility(mpc::ModelPredictiveControl.LinMPC)
     if mpc.transcription isa MultipleShooting
         error("LinearMPC only supports SingleShooting transcription.")
@@ -96,8 +95,8 @@ function validate_compatibility(mpc::ModelPredictiveControl.LinMPC)
         error("LinearMPC only supports SteadyKalmanFilter with direct=true option.")
     end
     if JuMP.solver_name(mpc.optim) != "DAQP"
-        @warn "LinearMPC relies on DAQP, and the solver in the mpc object "*
-              "is currently $(JuMP.solver_name(mpc.optim)).\n"*
+        @warn "LinearMPC relies on DAQP, and the solver in the mpc object " *
+              "is currently $(JuMP.solver_name(mpc.optim)).\n" *
               "The results in closed-loop may be different."
     end
     validate_weights(mpc)
@@ -108,7 +107,7 @@ end
 function validate_weights(mpc::ModelPredictiveControl.LinMPC)
     ny, nu = mpc.estim.model.ny, mpc.estim.model.nu
     Hp, Hc = mpc.Hp, mpc.Hc
-    nΔU = Hc*nu
+    nΔU = Hc * nu
     M_Hp, N_Hc, L_Hp = mpc.weights.M_Hp, mpc.weights.Ñ_Hc[1:nΔU, 1:nΔU], mpc.weights.L_Hp
     M_1, N_1, L_1 = M_Hp[1:ny, 1:ny], N_Hc[1:nu, 1:nu], L_Hp[1:nu, 1:nu]
     for i in 2:mpc.Hp-1 # last block is terminal weight, can be different
@@ -141,19 +140,23 @@ function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
     C_ymin, C_ymax = -mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]
     C_x̂min, C_x̂max = -mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]
     is0or1(C) = all(x -> x ≈ 0 || x ≈ 1, C)
-    if !is0or1(C_umin) || !is0or1(C_umax) || !is0or1(C_ymin) || !is0or1(C_ymax) 
+    if !is0or1(C_umin) || !is0or1(C_umax) || !is0or1(C_ymin) || !is0or1(C_ymax)
         error("LinearMPC does not support softness parameters c ≠ 0 or 1.")
     end
     if !isapprox(C_umin, C_umax) || !isapprox(C_ymin, C_ymax) || !isapprox(C_x̂min, C_x̂max)
         error("LinearMPC does not support different softness parameters for lower and upper bounds.")
     end
-    nΔU = mpc.Hc*mpc.estim.model.nu
+    nΔU = mpc.Hc * mpc.estim.model.nu
     if any(isfinite, ΔŨmin[1:nΔU]) || any(isfinite, ΔŨmax[1:nΔU])
         error("LinearMPC does not support constraints on input increments Δu")
     end
     return nothing
 end
 
+"test 2"
 LinearMPC.MPC(mpc::ModelPredictiveControl.LinMPC) = convert(LinearMPC.MPC, mpc)
+
+"test 3"
+MPC(mpc::ModelPredictiveControl.LinMPC) = convert(LinearMPC.MPC, mpc)
 
 end # LinearMPCext
