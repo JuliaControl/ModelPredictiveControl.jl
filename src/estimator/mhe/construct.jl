@@ -1249,6 +1249,8 @@ function init_predmat_mhe(
     # --- state x̂op and state update f̂op operating points ---
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Âpow_csum  = cumsum(Âpow3D, dims=3)
+    # helper function to improve code clarity and be similar to eqs. in docstring:
+    S(j) = @views Âpow_csum[:,:, j+1]
     f̂_op_n_x̂op = (f̂op - x̂op)
     coef_B  = zeros(NT, nym*He, nx̂)
     row_begin = iszero(p) ? 0    : 1
@@ -1256,14 +1258,14 @@ function init_predmat_mhe(
     j=0
     for i=row_begin:row_end
         iRow = (1:nym) .+ nym*i
-        coef_B[iRow,:] = -Ĉm*getpower(Âpow_csum, j)
+        coef_B[iRow,:] = -Ĉm*S(j)
         j+=1
     end
     B = coef_B*f̂_op_n_x̂op
     coef_Bx̂ = Matrix{NT}(undef, nx̂*He, nx̂)
     for j=0:He-1
         iRow = (1:nx̂)  .+ nx̂*j
-        coef_Bx̂[iRow,:] = getpower(Âpow_csum, j)
+        coef_Bx̂[iRow,:] = S(j)
     end
     Bx̂ = coef_Bx̂*f̂_op_n_x̂op
     return E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
