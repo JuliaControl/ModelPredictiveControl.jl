@@ -344,21 +344,13 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     ```math
     \begin{aligned}
     \mathbf{e_x̂} &= \begin{bmatrix} 
-                        \mathbf{W}(H_p-1)     \mathbf{B̂_u} & 
-                        \mathbf{W}(H_p-n_1-1) \mathbf{B̂_u} &
-                        \mathbf{W}(H_p-n_2-1) \mathbf{B̂_u} & 
-                        \cdots & 
-                        \mathbf{W}(H_p-n_{H_c-1}-1) \mathbf{B̂_u} \end{bmatrix} \\
+        \mathbf{W}(H_p-1)\mathbf{B̂_u} & \mathbf{W}(H_p-n_1-1)\mathbf{B̂_u} & \cdots & \mathbf{W}(H_p-n_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
     \mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
     \mathbf{j_x̂} &= \begin{bmatrix} 
-                        \mathbf{Â}^{H_p-2} \mathbf{B̂_d} & 
-                        \mathbf{Â}^{H_p-3} \mathbf{B̂_d} & 
-                        \cdots & 
-                        \mathbf{0} 
-                    \end{bmatrix} \\
+        \mathbf{Â}^{H_p-2}\mathbf{B̂_d} & \mathbf{Â}^{H_p-3}\mathbf{B̂_d} & \cdots & \mathbf{0}                                \end{bmatrix} \\
     \mathbf{k_x̂} &= \mathbf{Â}^{H_p} \\
     \mathbf{v_x̂} &= \mathbf{W}(H_p-1)\mathbf{B̂_u} \\
-    \mathbf{b_x̂} &= \mathbf{W}(H_p-1)    \mathbf{\big(f̂_{op} - x̂_{op}\big)}
+    \mathbf{b_x̂} &= \mathbf{W}(H_p-1)\mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
 """
@@ -392,14 +384,11 @@ function init_predmat(
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
         K[iRow,:] = Ĉ*getpower(Âpow, j)
-    end    
+    end
     # --- previous manipulated inputs lastu0 ---
     vx̂ = W(Hp-1)*B̂u
     V  = Matrix{NT}(undef, Hp*ny, nu)
-    for j=1:Hp
-        iRow = (1:ny) .+ ny*(j-1)
-        V[iRow,:] = Ĉ*W(j-1)*B̂u
-    end
+    Q!(V, 0, Hp)
     # --- decision variables Z ---
     nZ = get_nZ(estim, transcription, Hp, Hc)
     ex̂ = Matrix{NT}(undef, nx̂, nZ)
