@@ -298,25 +298,24 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     [`augment_model`](@ref)), and the following two functions with integer arguments:
     ```math
     \begin{aligned}
-    \mathbf{Q}(i, j) &= \begin{bmatrix}
-        \mathbf{Ĉ W}(i+0)\mathbf{B̂_u}               \\
-        \mathbf{Ĉ W}(i+1)\mathbf{B̂_u}               \\
+    \mathbf{Q}(i, k, b) &= \begin{bmatrix}
+        \mathbf{Ĉ W}(i-b+0)\mathbf{B̂_u}             \\
+        \mathbf{Ĉ W}(i-b+1)\mathbf{B̂_u}             \\
         \vdots                                      \\
-        \mathbf{Ĉ W}(i+j-1)\mathbf{B̂_u}
+        \mathbf{Ĉ W}(k-b-1)\mathbf{B̂_u}
     \end{bmatrix}                                   \\
-    \mathbf{W}(m)    &= ∑_{ℓ=0}^m \mathbf{Â}^ℓ      
+    \mathbf{W}(m) &= ∑_{ℓ=0}^m \mathbf{Â}^ℓ      
     \end{aligned}
     ```
-    the prediction matrices are computed from the [`move_blocking`](@ref) vector 
-    ``\mathbf{n_b} = [\begin{smallmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{smallmatrix}]'``
-    and the following equations:
+    the prediction matrices are computed from the ``j_ℓ`` integers introduced in the 
+    [`move_blocking`](@ref) documentation and the following equations:
     ```math
     \begin{aligned}
     \mathbf{E} &= \begin{bmatrix}
-        \mathbf{Q}(0,   n_1)           & \mathbf{0}                     & \cdots & \mathbf{0}                                        \\
-        \mathbf{Q}(n_1, n_2)           & \mathbf{Q}(0, n_2)             & \cdots & \mathbf{0}                                        \\
-        \vdots                         & \vdots                         & \ddots & \vdots                                            \\
-        \mathbf{Q}(n_{H_c-1}, n_{H_c}) & \mathbf{Q}(n_{H_c-2}, n_{H_c}) & \cdots & \mathbf{Q}(0, n_{H_c}) \end{bmatrix} \\
+        \mathbf{Q}(0,   j_1, 0)           & \mathbf{0}                          & \cdots & \mathbf{0}                                \\
+        \mathbf{Q}(j_1, j_2, 0)           & \mathbf{Q}(j_1, j_2, j_1)           & \cdots & \mathbf{0}                                \\
+        \vdots                            & \vdots                              & \ddots & \vdots                                    \\
+        \mathbf{Q}(j_{H_c-1}, j_{H_c}, 0) & \mathbf{Q}(j_{H_c-1}, j_{H_c}, j_1) & \cdots & \mathbf{Q}(j_{H_c-1}, j_{H_c}, j_{H_c-1}) \end{bmatrix} \\
     \mathbf{G} &= \begin{bmatrix}
         \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
         \mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
@@ -332,7 +331,7 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
         \mathbf{Ĉ}\mathbf{Â}^{2}        \\
         \vdots                          \\
         \mathbf{Ĉ}\mathbf{Â}^{H_p}      \end{bmatrix} \\
-    \mathbf{V} &= \mathbf{Q}(0, H_p)             \\
+    \mathbf{V} &= \mathbf{Q}(0, H_p, 0) \\
     \mathbf{B} &= \begin{bmatrix}
         \mathbf{Ĉ W}(0)                 \\
         \mathbf{Ĉ W}(1)                 \\
@@ -344,7 +343,7 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     ```math
     \begin{aligned}
     \mathbf{e_x̂} &= \begin{bmatrix} 
-        \mathbf{W}(H_p-1)\mathbf{B̂_u} & \mathbf{W}(H_p-n_1-1)\mathbf{B̂_u} & \cdots & \mathbf{W}(H_p-n_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
+        \mathbf{W}(H_p-1)\mathbf{B̂_u} & \mathbf{W}(H_p-j_1-1)\mathbf{B̂_u} & \cdots & \mathbf{W}(H_p-j_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
     \mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
     \mathbf{j_x̂} &= \begin{bmatrix} 
         \mathbf{Â}^{H_p-2}\mathbf{B̂_d} & \mathbf{Â}^{H_p-3}\mathbf{B̂_d} & \cdots & \mathbf{0}                                \end{bmatrix} \\
@@ -400,10 +399,12 @@ function init_predmat(
         iCol = (1:nu) .+ nu*(j-1)
         for i=1:Hc-j+1
             i_Q = i > 1 ? nb[i-1] : 0
+            @show i
             j_Q = nb[i + j - 1]
             iRow = (1:ny*j_Q) .+ ny*sum(nb[1:i+j-2])
             Q = @views E[iRow, iCol]
             Q!(Q, i_Q, j_Q)
+            @show i_Q, j_Q
         end
         n = j > 1 ? nb[j-1] : 0
         ex̂[:  , iCol] = W(Hp-n-1)*B̂u
