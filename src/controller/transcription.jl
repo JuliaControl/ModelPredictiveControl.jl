@@ -353,6 +353,9 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     \mathbf{b_x̂} &= \mathbf{W}(H_p-1)\mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
+    The complex structure of the ``\mathbf{E}`` and ``\mathbf{e_x̂}`` matrices is due to the
+    move blocking implementation: the decision variable ``\mathbf{Z}`` only contains the
+    input increment ``\mathbf{Δu}`` of the free moves.
 """
 function init_predmat(
     model::LinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, nb
@@ -393,14 +396,15 @@ function init_predmat(
     nZ = get_nZ(estim, transcription, Hp, Hc)
     ex̂ = Matrix{NT}(undef, nx̂, nZ)
     E  = zeros(NT, Hp*ny, nZ) 
-    for j=1:Hc # truncated with control horizon
+    for j=1:Hc
         iCol = (1:nu) .+ nu*(j-1)
-        for i=j:Hc
-            i_Q = i == j ? 0 : nb[i-1]
-            
+        for i=1:j
+            i_Q = i > 1 ? nb[i-1] : 0
+            j_Q = nb[j - i + 1]
+            iRow = (1:ny*j_Q) .+ nu*sum(nb[1:i-1])
+            Q = @views E[iRow, iCol]
+            Q!(Q, i_Q, j_Q)
         end
-
-
         n = j > 1 ? nb[j-1] : 0
         ex̂[:  , iCol] = W(Hp-n-1)*B̂u
     end
