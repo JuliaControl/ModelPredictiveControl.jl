@@ -1475,13 +1475,11 @@ end
 
 @testitem "LinMPC v.s. NonLinMPC with move blocking" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel = setop!(LinModel(sys,Ts,i_d=[3]), uop=[10,50], yop=[50,30], dop=[20])
     G = tf( 10, [400,  1])
-    Ts = 100.0
-    linmodel = LinModel(G, Ts)
+    linmodel = LinModel(G, 100.0)
     f = (x, u, _, p) -> p.A * x + p.Bu * u
     h = (x, _, p)    -> p.C * x
-    nonlinmodel = NonLinModel(f, h, Ts, 1, 1, 1, p=linmodel, solver=nothing)
+    nonlinmodel = NonLinModel(f, h, 100.0, 1, 1, 1, p=linmodel, solver=nothing)
     Mwt, Nwt, Hp, Hc = [1], [0], 30, [1, 2, 3, 24]
     N = 25
     mpc1 = LinMPC(linmodel; Mwt, Nwt, Hp, Hc, transcription=SingleShooting())
