@@ -370,6 +370,7 @@ function init_predmat(
     end
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Âpow_csum  = cumsum(Âpow, dims=3)
+    jℓ = cumsum(nb) # introduced in move_blocking docstring
     # three helper functions to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
     W(m) = @views Âpow_csum[:,:, m+1]
@@ -380,7 +381,6 @@ function init_predmat(
         end
         return Q
     end
-    jℓ = cumsum(nb)
     # --- current state estimates x̂0 ---
     kx̂ = getpower(Âpow, Hp)
     K  = Matrix{NT}(undef, Hp*ny, nx̂)
@@ -399,22 +399,16 @@ function init_predmat(
     for j=1:Hc
         iCol = (1:nu) .+ nu*(j-1)
         for i=j:Hc
-            @show i, j
             i_Q = (i == 1 && j == 1) ? 0 : jℓ[i-1]
             k_Q = jℓ[i]
             b_Q = (j == 1) ? 0 : jℓ[j-1]
             iRow = (1:ny*nb[i]) .+ ny*i_Q
-            @show iRow
             Q = @views E[iRow, iCol]
             Q!(Q, i_Q, k_Q, b_Q)
         end
         j_ex̂ = (j == 1) ? 0 : jℓ[j-1]
-        ex̂[:  , iCol] = W(Hp - j_ex̂ - 1)*B̂u
-    end
-
-    display(E)
-
-    
+        ex̂[:, iCol] = W(Hp - j_ex̂ - 1)*B̂u
+    end    
     # --- current measured disturbances d0 and predictions D̂0 ---
     gx̂ = getpower(Âpow, Hp-1)*B̂d
     G  = Matrix{NT}(undef, Hp*ny, nd)
