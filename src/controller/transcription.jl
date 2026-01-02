@@ -298,11 +298,11 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     [`augment_model`](@ref)), and the following two functions with integer arguments:
     ```math
     \begin{aligned}
-    \mathbf{Q}(i, k, b) &= \begin{bmatrix}
+    \mathbf{Q}(i, m, b) &= \begin{bmatrix}
         \mathbf{Ĉ W}(i-b+0)\mathbf{B̂_u}             \\
         \mathbf{Ĉ W}(i-b+1)\mathbf{B̂_u}             \\
         \vdots                                      \\
-        \mathbf{Ĉ W}(k-b-1)\mathbf{B̂_u}
+        \mathbf{Ĉ W}(m-b-1)\mathbf{B̂_u}
     \end{bmatrix}                                   \\
     \mathbf{W}(m) &= ∑_{ℓ=0}^m \mathbf{Â}^ℓ      
     \end{aligned}
@@ -374,8 +374,8 @@ function init_predmat(
     # three helper functions to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
     W(m) = @views Âpow_csum[:,:, m+1]
-    function Q!(Q, i, k, b)
-        for ℓ=0:k-i-1
+    function Q!(Q, i, m, b)
+        for ℓ=0:m-i-1
             iRows = (1:ny) .+ ny*ℓ
             Q[iRows, :] = Ĉ * W(i-b+ℓ) * B̂u
         end
@@ -400,11 +400,11 @@ function init_predmat(
         iCol = (1:nu) .+ nu*(j-1)
         for i=j:Hc
             i_Q = (i == 1 && j == 1) ? 0 : jℓ[i-1]
-            k_Q = jℓ[i]
+            m_Q = jℓ[i]
             b_Q = (j == 1) ? 0 : jℓ[j-1]
             iRow = (1:ny*nb[i]) .+ ny*i_Q
             Q = @views E[iRow, iCol]
-            Q!(Q, i_Q, k_Q, b_Q)
+            Q!(Q, i_Q, m_Q, b_Q)
         end
         j_ex̂ = (j == 1) ? 0 : jℓ[j-1]
         ex̂[:, iCol] = W(Hp - j_ex̂ - 1)*B̂u
