@@ -500,8 +500,8 @@ strictly positive integers):
     \mathbf{n_b} = \begin{bmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{bmatrix}'
 ```
 Introducing the notation ``j_ℓ = ∑_{i=1}^{ℓ} n_i`` to convert from block lengths to discrete
-time steps, the vector that includes all the manipulated input free moves ``\mathbf{Δu}`` is
-then defined as:
+time steps, the vector that includes all the free moves of the manipulated input is then
+defined as:
 ```math
 \mathbf{ΔU} = \begin{bmatrix}
     \mathbf{Δu}(k + 0)                        \\
