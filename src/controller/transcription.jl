@@ -558,27 +558,44 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
 
 # Extended Help
 !!! details "Extended Help"
-    The matrices are computed by:
+    Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` (see 
+    [`augment_model`](@ref)), the [`move_blocking`](@ref) vector ``\mathbf{n_b}``, and the
+    following ``\mathbf{Q}(n_i)`` matrix of size `(nx̂*ni, nu)`:
+    ```math
+    \mathbf{Q}(n_i) =       \begin{bmatrix}
+        \mathbf{B̂_u}        \\
+        \mathbf{B̂_u}        \\
+        \vdots              \\
+        \mathbf{B̂_u}        \end{bmatrix}            
+    ```
+    The defect matrices are computed with:
     ```math
     \begin{aligned}
     \mathbf{E_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0}   & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}  &  \mathbf{0}      \\
-        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}  &  \mathbf{0}      \\
-        \vdots       & \vdots       & \ddots & \vdots       &  \vdots     &  \vdots     & \ddots &  \vdots      &  \vdots          \\
-        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{B̂_u} &  \mathbf{0} &  \mathbf{0} & \cdots &  \mathbf{Â}  & -\mathbf{I}      \end{bmatrix} \\
+        \mathbf{E_{ŝ}^{Δu}} & \mathbf{E_{ŝ}^{x̂}}                                                    \end{bmatrix} \\
+    \mathbf{E_{ŝ}^{Δu}} &= \begin{bmatrix}
+        \mathbf{Q}(n_1)     & \mathbf{0}          & \cdots & \mathbf{0}                             \\
+        \mathbf{Q}(n_2)     & \mathbf{Q}(n_2)     & \cdots & \mathbf{0}                             \\
+        \vdots              & \vdots              & \ddots & \vdots                                 \\
+        \mathbf{Q}(n_{H_c}) & \mathbf{Q}(n_{H_c}) & \cdots & \mathbf{Q}(n_{H_c})                    \end{bmatrix} \\
+    \mathbf{E_{ŝ}^{x̂}} &= \begin{bmatrix}
+        -\mathbf{I}  &  \mathbf{0}  & \cdots &  \mathbf{0}    \\
+         \mathbf{Â}  & -\mathbf{I}  & \cdots &  \mathbf{0}    \\
+        \vdots       &  \vdots      & \ddots &  \vdots        \\
+         \mathbf{0}  &  \mathbf{0}  & \cdots & -\mathbf{I}    \end{bmatrix} \\
     \mathbf{G_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                          \end{bmatrix} \\
+        \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                          \end{bmatrix} \\
     \mathbf{J_ŝ} &= \begin{bmatrix}
-        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                            \\
-        \mathbf{B̂_d} & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                            \\
-        \vdots       & \vdots       & \ddots & \vdots       & \vdots                                                \\
-        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_d} & \mathbf{0}                                            \end{bmatrix} \\
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                            \\
+        \mathbf{B̂_d} & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                            \\
+        \vdots       & \vdots       & \ddots & \vdots       & \vdots                                \\
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_d} & \mathbf{0}                            \end{bmatrix} \\
     \mathbf{K_ŝ} &= \begin{bmatrix}
-        \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                            \end{bmatrix} \\
+        \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                            \end{bmatrix} \\
     \mathbf{V_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \vdots \\ \mathbf{B̂_u}                                                      \end{bmatrix} \\
+        \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \vdots \\ \mathbf{B̂_u}                                      \end{bmatrix} \\
     \mathbf{B_ŝ} &= \begin{bmatrix}
-        \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}                  \end{bmatrix}
+        \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}  \end{bmatrix}
     \end{aligned}
     ```
 """
