@@ -499,15 +499,16 @@ strictly positive integers):
 ```math
     \mathbf{n_b} = \begin{bmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{bmatrix}'
 ```
-The vector that includes all the manipulated input increments ``\mathbf{Δu}`` is then
+Introducing the notation ``j_ℓ = ∑_{i=1}^{ℓ} n_i`` to convert from block lengths to discrete
+time steps, the vector that includes all the free moves of the manipulated input is then
 defined as:
 ```math
 \mathbf{ΔU} = \begin{bmatrix}
-    \mathbf{Δu}(k + 0)                                  \\[0.1em]
-    \mathbf{Δu}(k + ∑_{i=1}^1 n_i)                      \\[0.1em]
-    \mathbf{Δu}(k + ∑_{i=1}^2 n_i)                      \\[0.1em]
-    \vdots                                              \\[0.1em]
-    \mathbf{Δu}(k + ∑_{i=1}^{H_c-1} n_i)   
+    \mathbf{Δu}(k + 0)                        \\
+    \mathbf{Δu}(k + j_1)                      \\
+    \mathbf{Δu}(k + j_2)                      \\
+    \vdots                                    \\
+    \mathbf{Δu}(k + j_{H_c-1})   
 \end{bmatrix}
 ```
 The provided `nb` vector is modified to ensure `sum(nb) == Hp`:

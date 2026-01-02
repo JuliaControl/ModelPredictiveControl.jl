@@ -255,7 +255,7 @@ end
 
 @doc raw"""
     init_predmat(
-        model::LinModel, estim, transcription::SingleShooting, Hp, Hc
+        model::LinModel, estim, transcription::SingleShooting, Hp, Hc, nb
     ) -> E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
 
 Construct the prediction matrices for [`LinModel`](@ref) and [`SingleShooting`](@ref).
@@ -295,15 +295,27 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
 # Extended Help
 !!! details "Extended Help"
     Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` (see 
-    [`augment_model`](@ref)), and the function ``\mathbf{W}(j) = ∑_{i=0}^j \mathbf{Â}^i``,
-    the prediction matrices are computed by :
+    [`augment_model`](@ref)), and the following two functions with integer arguments:
+    ```math
+    \begin{aligned}
+    \mathbf{Q}(i, m, b) &= \begin{bmatrix}
+        \mathbf{Ĉ W}(i-b+0)\mathbf{B̂_u}             \\
+        \mathbf{Ĉ W}(i-b+1)\mathbf{B̂_u}             \\
+        \vdots                                      \\
+        \mathbf{Ĉ W}(m-b-1)\mathbf{B̂_u}
+    \end{bmatrix}                                   \\
+    \mathbf{W}(m) &= ∑_{ℓ=0}^m \mathbf{Â}^ℓ      
+    \end{aligned}
+    ```
+    the prediction matrices are computed from the ``j_ℓ`` integers introduced in the 
+    [`move_blocking`](@ref) documentation and the following equations:
     ```math
     \begin{aligned}
     \mathbf{E} &= \begin{bmatrix}
-        \mathbf{Ĉ W}(0)\mathbf{B̂_u}     & \mathbf{0}                      & \cdots & \mathbf{0}                                        \\
-        \mathbf{Ĉ W}(1)\mathbf{B̂_u}     & \mathbf{Ĉ W}(0)\mathbf{B̂_u}     & \cdots & \mathbf{0}                                        \\
-        \vdots                          & \vdots                          & \ddots & \vdots                                            \\
-        \mathbf{Ĉ W}(H_p-1)\mathbf{B̂_u} & \mathbf{Ĉ W}(H_p-2)\mathbf{B̂_u} & \cdots & \mathbf{Ĉ W}(H_p-H_c+1)\mathbf{B̂_u} \end{bmatrix} \\
+        \mathbf{Q}(0,   j_1, 0)           & \mathbf{0}                          & \cdots & \mathbf{0}                                \\
+        \mathbf{Q}(j_1, j_2, 0)           & \mathbf{Q}(j_1, j_2, j_1)           & \cdots & \mathbf{0}                                \\
+        \vdots                            & \vdots                              & \ddots & \vdots                                    \\
+        \mathbf{Q}(j_{H_c-1}, j_{H_c}, 0) & \mathbf{Q}(j_{H_c-1}, j_{H_c}, j_1) & \cdots & \mathbf{Q}(j_{H_c-1}, j_{H_c}, j_{H_c-1}) \end{bmatrix} \\
     \mathbf{G} &= \begin{bmatrix}
         \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
         \mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
@@ -319,11 +331,7 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
         \mathbf{Ĉ}\mathbf{Â}^{2}        \\
         \vdots                          \\
         \mathbf{Ĉ}\mathbf{Â}^{H_p}      \end{bmatrix} \\
-    \mathbf{V} &= \begin{bmatrix}
-        \mathbf{Ĉ W}(0)\mathbf{B̂_u}     \\
-        \mathbf{Ĉ W}(1)\mathbf{B̂_u}     \\
-        \vdots                          \\
-        \mathbf{Ĉ W}(H_p-1)\mathbf{B̂_u} \end{bmatrix} \\
+    \mathbf{V} &= \mathbf{Q}(0, H_p, 0) \\
     \mathbf{B} &= \begin{bmatrix}
         \mathbf{Ĉ W}(0)                 \\
         \mathbf{Ĉ W}(1)                 \\
@@ -335,25 +343,21 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     ```math
     \begin{aligned}
     \mathbf{e_x̂} &= \begin{bmatrix} 
-                        \mathbf{W}(H_p-1)\mathbf{B̂_u} & 
-                        \mathbf{W}(H_p-2)\mathbf{B̂_u} & 
-                        \cdots & 
-                        \mathbf{W}(H_p-H_c+1)\mathbf{B̂_u} \end{bmatrix} \\
+        \mathbf{W}(H_p-1)\mathbf{B̂_u} & \mathbf{W}(H_p-j_1-1)\mathbf{B̂_u} & \cdots & \mathbf{W}(H_p-j_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
     \mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
     \mathbf{j_x̂} &= \begin{bmatrix} 
-                        \mathbf{Â}^{H_p-2} \mathbf{B̂_d} & 
-                        \mathbf{Â}^{H_p-3} \mathbf{B̂_d} & 
-                        \cdots & 
-                        \mathbf{0} 
-                    \end{bmatrix} \\
+        \mathbf{Â}^{H_p-2}\mathbf{B̂_d} & \mathbf{Â}^{H_p-3}\mathbf{B̂_d} & \cdots & \mathbf{0}                                \end{bmatrix} \\
     \mathbf{k_x̂} &= \mathbf{Â}^{H_p} \\
     \mathbf{v_x̂} &= \mathbf{W}(H_p-1)\mathbf{B̂_u} \\
-    \mathbf{b_x̂} &= \mathbf{W}(H_p-1)    \mathbf{\big(f̂_{op} - x̂_{op}\big)}
+    \mathbf{b_x̂} &= \mathbf{W}(H_p-1)\mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
+    The complex structure of the ``\mathbf{E}`` and ``\mathbf{e_x̂}`` matrices is due to the
+    move blocking implementation: the decision variable ``\mathbf{Z}`` only contains the
+    input increment ``\mathbf{Δu}`` of the free moves (see [`move_blocking`](@ref)).
 """
 function init_predmat(
-    model::LinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, nb
 ) where {NT<:Real}
     Â, B̂u, Ĉ, B̂d, D̂d = estim.Â, estim.B̂u, estim.Ĉ, estim.B̂d, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
@@ -366,32 +370,45 @@ function init_predmat(
     end
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Âpow_csum  = cumsum(Âpow, dims=3)
-    # helper function to improve code clarity and be similar to eqs. in docstring:
+    jℓ = cumsum(nb) # introduced in move_blocking docstring
+    # three helper functions to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
+    W(m) = @views Âpow_csum[:,:, m+1]
+    function Q!(Q, i, m, b)
+        for ℓ=0:m-i-1
+            iRows = (1:ny) .+ ny*ℓ
+            Q[iRows, :] = Ĉ * W(i-b+ℓ) * B̂u
+        end
+        return Q
+    end
     # --- current state estimates x̂0 ---
     kx̂ = getpower(Âpow, Hp)
     K  = Matrix{NT}(undef, Hp*ny, nx̂)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
         K[iRow,:] = Ĉ*getpower(Âpow, j)
-    end    
-    # --- previous manipulated inputs lastu0 ---
-    vx̂ = getpower(Âpow_csum, Hp-1)*B̂u
-    V  = Matrix{NT}(undef, Hp*ny, nu)
-    for j=1:Hp
-        iRow = (1:ny) .+ ny*(j-1)
-        V[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)*B̂u
     end
+    # --- previous manipulated inputs lastu0 ---
+    vx̂ = W(Hp-1)*B̂u
+    V  = Matrix{NT}(undef, Hp*ny, nu)
+    Q!(V, 0, Hp, 0)
     # --- decision variables Z ---
     nZ = get_nZ(estim, transcription, Hp, Hc)
     ex̂ = Matrix{NT}(undef, nx̂, nZ)
     E  = zeros(NT, Hp*ny, nZ) 
-    for j=1:Hc # truncated with control horizon
-        iRow = (ny*(j-1)+1):(ny*Hp)
+    for j=1:Hc
         iCol = (1:nu) .+ nu*(j-1)
-        E[iRow, iCol] = V[iRow .- ny*(j-1),:]
-        ex̂[:  , iCol] = getpower(Âpow_csum, Hp-j)*B̂u
-    end
+        for i=j:Hc
+            i_Q = (i == 1 && j == 1) ? 0 : jℓ[i-1]
+            m_Q = jℓ[i]
+            b_Q = (j == 1) ? 0 : jℓ[j-1]
+            iRow = (1:ny*nb[i]) .+ ny*i_Q
+            Q = @views E[iRow, iCol]
+            Q!(Q, i_Q, m_Q, b_Q)
+        end
+        j_ex̂ = (j == 1) ? 0 : jℓ[j-1]
+        ex̂[:, iCol] = W(Hp - j_ex̂ - 1)*B̂u
+    end    
     # --- current measured disturbances d0 and predictions D̂0 ---
     gx̂ = getpower(Âpow, Hp-1)*B̂d
     G  = Matrix{NT}(undef, Hp*ny, nd)
@@ -410,11 +427,11 @@ function init_predmat(
         end
     end
     # --- state x̂op and state update f̂op operating points ---
-    coef_bx̂ = getpower(Âpow_csum, Hp-1)
+    coef_bx̂ = W(Hp-1)
     coef_B  = Matrix{NT}(undef, ny*Hp, nx̂)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
-        coef_B[iRow,:] = Ĉ*getpower(Âpow_csum, j-1)
+        coef_B[iRow,:] = Ĉ*W(j-1)
     end
     f̂op_n_x̂op = estim.f̂op - estim.x̂op
     bx̂ = coef_bx̂ * f̂op_n_x̂op
@@ -424,7 +441,7 @@ end
 
 @doc raw"""
     init_predmat(
-        model::LinModel, estim, transcription::MultipleShooting, Hp, Hc
+        model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb
     ) -> E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
     
 Construct the prediction matrices for [`LinModel`](@ref) and [`MultipleShooting`](@ref).
@@ -444,7 +461,7 @@ They are defined in the Extended Help section.
     ```
 """
 function init_predmat(
-    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc, nb
 ) where {NT<:Real}
     Ĉ, D̂d = estim.Ĉ, estim.D̂d
     nu, nx̂, ny, nd = model.nu, estim.nx̂, model.ny, model.nd
@@ -469,12 +486,12 @@ function init_predmat(
 end
 
 """
-    init_predmat(model::NonLinModel, estim, transcription::SingleShooting, Hp, Hc) 
+    init_predmat(model::NonLinModel, estim, transcription::SingleShooting, Hp, Hc, nb) 
 
 Return empty matrices for [`SingleShooting`](@ref) of [`NonLinModel`](@ref)
 """
 function init_predmat(
-    model::NonLinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -489,7 +506,7 @@ function init_predmat(
 end
 
 @doc raw"""
-    init_predmat(model::NonLinModel, estim, transcription::TranscriptionMethod, Hp, Hc)
+    init_predmat(model::NonLinModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb)
 
 Return the terminal state matrices for [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
 
@@ -502,7 +519,7 @@ given in the Extended Help section.
     for ``\mathbf{e_x̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``
 """
 function init_predmat(
-    model::NonLinModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -522,7 +539,7 @@ function init_predmat(
 end
 
 @doc raw"""
-    init_defectmat(model::LinModel, estim, transcription::MultipleShooting, Hp, Hc)
+    init_defectmat(model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb)
 
 Init the matrices for computing the defects over the predicted states. 
 
@@ -541,35 +558,63 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
 
 # Extended Help
 !!! details "Extended Help"
-    The matrices are computed by:
+    Using the augmented matrices ``\mathbf{Â, B̂_u, Ĉ, B̂_d, D̂_d}`` in `estim` (see 
+    [`augment_model`](@ref)), the [`move_blocking`](@ref) vector ``\mathbf{n_b}``, and the
+    following ``\mathbf{Q}(n_i)`` matrix of size `(nx̂*ni, nu)`:
+    ```math
+    \mathbf{Q}(n_i) =       \begin{bmatrix}
+        \mathbf{B̂_u}        \\
+        \mathbf{B̂_u}        \\
+        \vdots              \\
+        \mathbf{B̂_u}        \end{bmatrix}            
+    ```
+    The defect matrices are computed with:
     ```math
     \begin{aligned}
     \mathbf{E_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_u} & \mathbf{0}   & \cdots & \mathbf{0}   & -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}  &  \mathbf{0}      \\
-        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{0}   &  \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}  &  \mathbf{0}      \\
-        \vdots       & \vdots       & \ddots & \vdots       &  \vdots     &  \vdots     & \ddots &  \vdots      &  \vdots          \\
-        \mathbf{B̂_u} & \mathbf{B̂_u} & \cdots & \mathbf{B̂_u} &  \mathbf{0} &  \mathbf{0} & \cdots &  \mathbf{Â}  & -\mathbf{I}      \end{bmatrix} \\
+        \mathbf{E_{ŝ}^{Δu}} & \mathbf{E_{ŝ}^{x̂}}                                                    \end{bmatrix} \\
+    \mathbf{E_{ŝ}^{Δu}} &= \begin{bmatrix}
+        \mathbf{Q}(n_1)     & \mathbf{0}          & \cdots & \mathbf{0}                             \\
+        \mathbf{Q}(n_2)     & \mathbf{Q}(n_2)     & \cdots & \mathbf{0}                             \\
+        \vdots              & \vdots              & \ddots & \vdots                                 \\
+        \mathbf{Q}(n_{H_c}) & \mathbf{Q}(n_{H_c}) & \cdots & \mathbf{Q}(n_{H_c})                    \end{bmatrix} \\
+    \mathbf{E_{ŝ}^{x̂}} &= \begin{bmatrix}
+        -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}  &  \mathbf{0}                             \\
+         \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}  &  \mathbf{0}                             \\
+         \vdots     &  \vdots     & \ddots &  \vdots      &  \vdots                                 \\
+         \mathbf{0} &  \mathbf{0} & \cdots &  \mathbf{Â}  & -\mathbf{I}                             \end{bmatrix} \\
     \mathbf{G_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                          \end{bmatrix} \\
+        \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                          \end{bmatrix} \\
     \mathbf{J_ŝ} &= \begin{bmatrix}
-        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                            \\
-        \mathbf{B̂_d} & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                                            \\
-        \vdots       & \vdots       & \ddots & \vdots       & \vdots                                                \\
-        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_d} & \mathbf{0}                                            \end{bmatrix} \\
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                            \\
+        \mathbf{B̂_d} & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                            \\
+        \vdots       & \vdots       & \ddots & \vdots       & \vdots                                \\
+        \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_d} & \mathbf{0}                            \end{bmatrix} \\
     \mathbf{K_ŝ} &= \begin{bmatrix}
-        \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                                            \end{bmatrix} \\
+        \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                            \end{bmatrix} \\
     \mathbf{V_ŝ} &= \begin{bmatrix}
-        \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \vdots \\ \mathbf{B̂_u}                                                      \end{bmatrix} \\
+        \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \vdots \\ \mathbf{B̂_u}                                      \end{bmatrix} \\
     \mathbf{B_ŝ} &= \begin{bmatrix}
-        \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}                  \end{bmatrix}
+        \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}  \end{bmatrix}
     \end{aligned}
     ```
+    The ``\mathbf{E_ŝ^{Δu}}`` matrix structure is due to the move blocking implementation:
+    the ``\mathbf{ΔU}`` vector only contains the input increment of the free moves 
+    (see [`move_blocking`](@ref)).
 """
 function init_defectmat(
-    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc, nb
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
+    # helper function to be similar to eqs. in docstring:
+    function Q!(Q, ni)
+        for ℓ=0:ni-1
+            iRows = (1:nx̂) .+ nx̂*ℓ
+            Q[iRows, :] = B̂u
+        end
+        return Q
+    end
     # --- current state estimates x̂0 ---
     Kŝ = [Â; zeros(NT, nx̂*(Hp-1), nx̂)]
     # --- previous manipulated inputs lastu0 ---
@@ -577,10 +622,14 @@ function init_defectmat(
     # --- decision variables Z ---
     nI_nx̂ = Matrix{NT}(-I, nx̂, nx̂)
     Eŝ = [zeros(nx̂*Hp, nu*Hc) repeatdiag(nI_nx̂, Hp)]
-    for j=1:Hc, i=j:Hp
-        iRow = (1:nx̂) .+ nx̂*(i-1)
+    for j=1:Hc
         iCol = (1:nu) .+ nu*(j-1)
-        Eŝ[iRow, iCol] = B̂u
+        for i=j:Hc
+            ni = nb[i]
+            iRow = (1:nx̂*ni) .+ nx̂*sum(nb[1:i-1])
+            Q = @views Eŝ[iRow, iCol]
+            Q!(Q, ni)
+        end
     end
     for j=1:Hp-1
         iRow = (1:nx̂) .+ nx̂*j
@@ -596,12 +645,12 @@ function init_defectmat(
 end
 
 """
-    init_defectmat(model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc)
+    init_defectmat(model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb)
 
 Return empty matrices for all other cases (N/A).
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
+    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
