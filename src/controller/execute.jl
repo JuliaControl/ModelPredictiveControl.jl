@@ -639,7 +639,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     mpc.V .= V
     mpc.B .= B
     # --- defect matrices ---
-    Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc)
+    Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
     A_ŝ, Ẽŝ = augmentdefect(Eŝ, mpc.nϵ)
     con.Ẽŝ .= Ẽŝ
     con.Gŝ .= Gŝ

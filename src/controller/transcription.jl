@@ -539,7 +539,7 @@ function init_predmat(
 end
 
 @doc raw"""
-    init_defectmat(model::LinModel, estim, transcription::MultipleShooting, Hp, Hc)
+    init_defectmat(model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb)
 
 Init the matrices for computing the defects over the predicted states. 
 
@@ -598,12 +598,23 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
         \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}  \end{bmatrix}
     \end{aligned}
     ```
+    The ``\mathbf{E_ŝ^{Δu}}`` matrix structure is due to the move blocking implementation:
+    the ``\mathbf{ΔU}`` vector only contains the input increment of the free moves 
+    (see [`move_blocking`](@ref)).
 """
 function init_defectmat(
-    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc, nb
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
+    # helper function to be similar to eqs. in docstring:
+    function Q!(Q, ni)
+        for ℓ=0:ni-1
+            iRows = (1:nx̂) .+ nx̂*ℓ
+            Q[iRows, :] = B̂u
+        end
+        return Q
+    end
     # --- current state estimates x̂0 ---
     Kŝ = [Â; zeros(NT, nx̂*(Hp-1), nx̂)]
     # --- previous manipulated inputs lastu0 ---
@@ -611,10 +622,14 @@ function init_defectmat(
     # --- decision variables Z ---
     nI_nx̂ = Matrix{NT}(-I, nx̂, nx̂)
     Eŝ = [zeros(nx̂*Hp, nu*Hc) repeatdiag(nI_nx̂, Hp)]
-    for j=1:Hc, i=j:Hp
-        iRow = (1:nx̂) .+ nx̂*(i-1)
+    for j=1:Hc
         iCol = (1:nu) .+ nu*(j-1)
-        Eŝ[iRow, iCol] = B̂u
+        for i=j:Hc
+            ni = nb[i]
+            iRow = (1:nx̂*ni) .+ nx̂*sum(nb[1:i-1])
+            Q = @views Eŝ[iRow, iCol]
+            Q!(Q, ni)
+        end
     end
     for j=1:Hp-1
         iRow = (1:nx̂) .+ nx̂*j
@@ -630,12 +645,12 @@ function init_defectmat(
 end
 
 """
-    init_defectmat(model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc)
+    init_defectmat(model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb)
 
 Return empty matrices for all other cases (N/A).
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
+    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
