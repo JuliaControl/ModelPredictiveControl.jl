@@ -373,13 +373,14 @@ function init_predmat(
     # three helper functions to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
     W(m) = @views Âpow_csum[:,:, m+1]
-    function Q!(Q, i, j)
-        for ℓ=1:j
-            iRows = (1:ny) .+ ny*(ℓ-1)
-            Q[iRows, :] = Ĉ*W(i+ℓ-1)*B̂u
+    function Q!(Q, i, k, b)
+        for ℓ=0:k-i-1
+            iRows = (1:ny) .+ ny*ℓ
+            Q[iRows, :] = Ĉ * W(i-b+ℓ) * B̂u
         end
         return Q
     end
+    jℓ = cumsum(nb)
     # --- current state estimates x̂0 ---
     kx̂ = getpower(Âpow, Hp)
     K  = Matrix{NT}(undef, Hp*ny, nx̂)
@@ -390,27 +391,28 @@ function init_predmat(
     # --- previous manipulated inputs lastu0 ---
     vx̂ = W(Hp-1)*B̂u
     V  = Matrix{NT}(undef, Hp*ny, nu)
-    Q!(V, 0, Hp)
+    Q!(V, 0, Hp, 0)
     # --- decision variables Z ---
     nZ = get_nZ(estim, transcription, Hp, Hc)
     ex̂ = Matrix{NT}(undef, nx̂, nZ)
     E  = zeros(NT, Hp*ny, nZ) 
     for j=1:Hc
         iCol = (1:nu) .+ nu*(j-1)
-        for i=1:Hc-j+1
-            i_Q = i > 1 ? nb[i-1] : 0
-            @show i
-            j_Q = nb[i + j - 1]
-            iRow = (1:ny*j_Q) .+ ny*sum(nb[1:i+j-2])
+        for i=j:Hc
+            @show i, j
+            i_Q = (i == 1 && j == 1) ? 0 : jℓ[i-1]
+            k_Q = jℓ[i]
+            b_Q = (j == 1) ? 0 : jℓ[j-1]
+            iRow = (1:ny*nb[i]) .+ ny*i_Q
+            @show iRow
             Q = @views E[iRow, iCol]
-            Q!(Q, i_Q, j_Q)
-            @show i_Q, j_Q
+            Q!(Q, i_Q, k_Q, b_Q)
         end
-        n = j > 1 ? nb[j-1] : 0
-        ex̂[:  , iCol] = W(Hp-n-1)*B̂u
+        j_ex̂ = (j == 1) ? 0 : jℓ[j-1]
+        ex̂[:  , iCol] = W(Hp - j_ex̂ - 1)*B̂u
     end
 
-    #display(E)
+    display(E)
 
     
     # --- current measured disturbances d0 and predictions D̂0 ---
