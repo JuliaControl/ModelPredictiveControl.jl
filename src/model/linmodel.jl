@@ -136,7 +136,7 @@ LinModel with a sample time Ts = 0.1 s:
     
     It is assumed that ``\mathbf{D_u=0}`` (or `sys` is strictly proper) since otherwise the
     resulting discrete controller would be acausal in its implementation (≠ mathematical
-    causality). Indeed, at each sampling instant `k`, the predictive controller will:
+    causality). Indeed, at each sampling instant ``k``, the predictive controller will:
     
     1. sample an output ``\mathbf{y}(k)`` from the plant
     2. computes an action ``\mathbf{u}(k)`` and 
