@@ -1480,7 +1480,7 @@ end
     f = (x, u, _, p) -> p.A * x + p.Bu * u
     h = (x, _, p)    -> p.C * x
     nonlinmodel = NonLinModel(f, h, 100.0, 1, 1, 1, p=linmodel, solver=nothing)
-    Mwt, Nwt, Hp, Hc = [1], [0], 30, [2, 2, 3, 23]
+    Mwt, Nwt, Hp, Hc = [1], [0], 30, [2, 3, 4, 21]
     N = 25
     mpc1 = LinMPC(linmodel; Mwt, Nwt, Hp, Hc, transcription=SingleShooting())
     mpc2 = LinMPC(linmodel; Mwt, Nwt, Hp, Hc, transcription=MultipleShooting())
