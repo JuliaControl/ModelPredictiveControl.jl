@@ -511,7 +511,6 @@ moves of the manipulated input is then defined as:
 \mathbf{ΔU} = \begin{bmatrix}
     \mathbf{Δu}(k + j_0)                      \\
     \mathbf{Δu}(k + j_1)                      \\
-    \mathbf{Δu}(k + j_2)                      \\
     \vdots                                    \\
     \mathbf{Δu}(k + j_{H_c-1})   
 \end{bmatrix}
