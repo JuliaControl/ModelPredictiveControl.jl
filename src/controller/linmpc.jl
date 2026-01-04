@@ -137,10 +137,11 @@ Time-varying and non-diagonal weights are also supported. Modify the last block 
 ``\mathbf{Z}`` depends on the chosen [`TranscriptionMethod`](@ref) (default to
 [`SingleShooting`](@ref), hence ``\mathbf{Z = ΔU}``). The ``\mathbf{ΔU}`` includes the input
 increments ``\mathbf{Δu}(k+j) = \mathbf{u}(k+j) - \mathbf{u}(k+j-1)`` from ``j=0`` to
-``H_c-1``, the ``\mathbf{Ŷ}`` vector, the output predictions ``\mathbf{ŷ}(k+j)`` from
-``j=1`` to ``H_p``, and the ``\mathbf{U}`` vector, the manipulated inputs ``\mathbf{u}(k+j)``
-from ``j=0`` to ``H_p-1``. The slack variable ``ϵ`` relaxes the constraints, as described
-in [`setconstraint!`](@ref) documentation. See Extended Help for a detailed nomenclature. 
+``H_c-1`` (without any custom move blocking), the ``\mathbf{Ŷ}`` vector, the output
+predictions ``\mathbf{ŷ}(k+j)`` from ``j=1`` to ``H_p``, and the ``\mathbf{U}`` vector, the
+manipulated inputs ``\mathbf{u}(k+j)`` from ``j=0`` to ``H_p-1``. The slack variable ``ϵ``
+relaxes the constraints, as described in [`setconstraint!`](@ref) documentation. See
+Extended Help for a detailed nomenclature. 
 
 This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) with default
 arguments. This controller allocates memory at each time step for the optimization.
