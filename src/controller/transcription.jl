@@ -401,8 +401,7 @@ function init_predmat(
         iCol = (1:nu) .+ nu*j
         for i=j:Hc-1
             i_Q, m_Q, b_Q = jℓ(i), jℓ(i+1), jℓ(j)
-            ni = nb[i+1]
-            iRow = (1:ny*ni) .+ ny*i_Q
+            iRow = (1:ny*nb[i+1]) .+ ny*i_Q
             Q = @views E[iRow, iCol]
             Q!(Q, i_Q, m_Q, b_Q)
         end
