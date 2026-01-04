@@ -1472,3 +1472,40 @@ end
     @test U_linmpc ≈ U_nonlinmpc2 rtol=1e-3 atol=1e-3
     @test U_nonlinmpc1 ≈ U_nonlinmpc2 rtol=1e-3 atol=1e-3
 end
+
+@testitem "LinMPC v.s. NonLinMPC with move blocking" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    G = tf( 10, [400,  1])
+    linmodel = LinModel(G, 100.0)
+    f = (x, u, _, p) -> p.A * x + p.Bu * u
+    h = (x, _, p)    -> p.C * x
+    nonlinmodel = NonLinModel(f, h, 100.0, 1, 1, 1, p=linmodel, solver=nothing)
+    Mwt, Nwt, Hp, Hc = [1], [0], 30, [2, 3, 4, 21]
+    N = 25
+    mpc1 = LinMPC(linmodel; Mwt, Nwt, Hp, Hc, transcription=SingleShooting())
+    mpc2 = LinMPC(linmodel; Mwt, Nwt, Hp, Hc, transcription=MultipleShooting())
+    mpc3 = NonLinMPC(linmodel; Mwt, Nwt, Hp, Hc, transcription=SingleShooting())
+    mpc4 = NonLinMPC(linmodel; Mwt, Nwt, Hp, Hc, transcription=MultipleShooting())
+    mpc5 = NonLinMPC(nonlinmodel; Mwt, Nwt, Hp, Hc, transcription=SingleShooting())
+    mpc6 = NonLinMPC(nonlinmodel; Mwt, Nwt, Hp, Hc, transcription=MultipleShooting())
+    U1, U2, U3 = zeros(1, N), zeros(1, N), zeros(1, N)
+    U4, U5, U6 = zeros(1, N), zeros(1, N), zeros(1, N)
+    for i=1:N
+        r = [5.0]
+        y = linmodel()
+        preparestate!(mpc1, y); preparestate!(mpc2, y); preparestate!(mpc3, y);
+        preparestate!(mpc4, y); preparestate!(mpc5, y); preparestate!(mpc6, y);
+        u1 = moveinput!(mpc1, r); u2 = moveinput!(mpc2, r); u3 = moveinput!(mpc3, r);
+        u4 = moveinput!(mpc4, r); u5 = moveinput!(mpc5, r); u6 = moveinput!(mpc6, r);
+        U1[:, i] = u1; U2[:, i] = u2; U3[:, i] = u3;
+        U4[:, i] = u4; U5[:, i] = u5; U6[:, i] = u6;
+        updatestate!(mpc1, u1, y); updatestate!(mpc2, u2, y); updatestate!(mpc3, u3, y);
+        updatestate!(mpc4, u4, y); updatestate!(mpc5, u5, y); updatestate!(mpc6, u6, y);
+        updatestate!(linmodel, u1);
+    end
+    @test U1 ≈ U2 rtol=1e-3 atol=1e-3
+    @test U1 ≈ U3 rtol=1e-3 atol=1e-3
+    @test U1 ≈ U4 rtol=1e-3 atol=1e-3
+    @test U1 ≈ U5 rtol=1e-3 atol=1e-3
+    @test U1 ≈ U6 rtol=1e-3 atol=1e-3
+end

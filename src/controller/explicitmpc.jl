@@ -53,7 +53,7 @@ struct ExplicitMPC{
         validate_transcription(model, transcription)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
-        E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
+        E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc, nb)
         # dummy val (updated just before optimization):
         F = zeros(NT, ny*Hp)
         P̃Δu, P̃u, Ẽ = PΔu, Pu, E # no slack variable ϵ for ExplicitMPC
@@ -226,9 +226,9 @@ addinfo!(info, mpc::ExplicitMPC) = info
 function setmodel_controller!(mpc::ExplicitMPC, uop_old, _ )
     model, estim, transcription = mpc.estim.model, mpc.estim, mpc.transcription
     weights = mpc.weights
-    nu, ny, nd, Hp, Hc = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc
+    nu, ny, nd, Hp, Hc, nb = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc, mpc.nb
     # --- predictions matrices ---
-    E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc)
+    E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc, nb)
     Ẽ = E  # no slack variable ϵ for ExplicitMPC
     mpc.Ẽ .= Ẽ
     mpc.G .= G
