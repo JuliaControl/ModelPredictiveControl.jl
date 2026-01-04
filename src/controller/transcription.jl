@@ -261,7 +261,7 @@ end
 Construct the prediction matrices for [`LinModel`](@ref) and [`SingleShooting`](@ref).
 
 The model predictions are evaluated from the deviation vectors (see [`setop!`](@ref)), the
-decision variable ``\mathbf{Z}`` (see [`TranscriptionMethod`](@ref)), and:
+decision variable ``\mathbf{Z = ΔU}`` (with a [`SingleShooting`](@ref) transcription), and:
 ```math
 \begin{aligned}
     \mathbf{Ŷ_0} &= \mathbf{E Z} + \mathbf{G d_0}(k) + \mathbf{J D̂_0} 
@@ -274,7 +274,7 @@ in which ``\mathbf{x̂_0}(k) = \mathbf{x̂}_i(k) - \mathbf{x̂_{op}}``, with ``i
 `estim.direct==true`, otherwise ``i = k - 1``. The predicted outputs ``\mathbf{Ŷ_0}`` and
 measured disturbances ``\mathbf{D̂_0}`` respectively include ``\mathbf{ŷ_0}(k+j)`` and 
 ``\mathbf{d̂_0}(k+j)`` values with ``j=1`` to ``H_p``, and input increments ``\mathbf{ΔU}``,
-``\mathbf{Δu}(k+j)`` from ``j=0`` to ``H_c-1``. The vector ``\mathbf{B}`` contains the
+``\mathbf{Δu}(k+j_ℓ)`` from ``ℓ=0`` to ``H_c-1``. The vector ``\mathbf{B}`` contains the
 contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}``
 operating points (for linearization at non-equilibrium point, see [`linearize`](@ref)). The
 stochastic predictions ``\mathbf{Ŷ_s=0}`` if `estim` is not a [`InternalModel`](@ref), see
@@ -312,10 +312,10 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     ```math
     \begin{aligned}
     \mathbf{E} &= \begin{bmatrix}
-        \mathbf{Q}(0,   j_1, 0)           & \mathbf{0}                          & \cdots & \mathbf{0}                                \\
-        \mathbf{Q}(j_1, j_2, 0)           & \mathbf{Q}(j_1, j_2, j_1)           & \cdots & \mathbf{0}                                \\
-        \vdots                            & \vdots                              & \ddots & \vdots                                    \\
-        \mathbf{Q}(j_{H_c-1}, j_{H_c}, 0) & \mathbf{Q}(j_{H_c-1}, j_{H_c}, j_1) & \cdots & \mathbf{Q}(j_{H_c-1}, j_{H_c}, j_{H_c-1}) \end{bmatrix} \\
+        \mathbf{Q}(j_0, j_1, j_0)           & \mathbf{0}                          & \cdots & \mathbf{0}                                \\
+        \mathbf{Q}(j_1, j_2, j_0)           & \mathbf{Q}(j_1, j_2, j_1)           & \cdots & \mathbf{0}                                \\
+        \vdots                              & \vdots                              & \ddots & \vdots                                    \\
+        \mathbf{Q}(j_{H_c-1}, j_{H_c}, j_0) & \mathbf{Q}(j_{H_c-1}, j_{H_c}, j_1) & \cdots & \mathbf{Q}(j_{H_c-1}, j_{H_c}, j_{H_c-1}) \end{bmatrix} \\
     \mathbf{G} &= \begin{bmatrix}
         \mathbf{Ĉ}\mathbf{Â}^{0} \mathbf{B̂_d}     \\ 
         \mathbf{Ĉ}\mathbf{Â}^{1} \mathbf{B̂_d}     \\ 
@@ -343,7 +343,7 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     ```math
     \begin{aligned}
     \mathbf{e_x̂} &= \begin{bmatrix} 
-        \mathbf{W}(H_p-1)\mathbf{B̂_u} & \mathbf{W}(H_p-j_1-1)\mathbf{B̂_u} & \cdots & \mathbf{W}(H_p-j_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
+        \mathbf{W}(H_p-j_0-1)\mathbf{B̂_u} & \mathbf{W}(H_p-j_1-1)\mathbf{B̂_u} & \cdots & \mathbf{W}(H_p-j_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
     \mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
     \mathbf{j_x̂} &= \begin{bmatrix} 
         \mathbf{Â}^{H_p-2}\mathbf{B̂_d} & \mathbf{Â}^{H_p-3}\mathbf{B̂_d} & \cdots & \mathbf{0}                                \end{bmatrix} \\
@@ -370,10 +370,11 @@ function init_predmat(
     end
     # Apow_csum 3D array : Apow_csum[:,:,1] = A^0, Apow_csum[:,:,2] = A^1 + A^0, ...
     Âpow_csum  = cumsum(Âpow, dims=3)
-    jℓ = cumsum(nb) # introduced in move_blocking docstring
-    # three helper functions to improve code clarity and be similar to eqs. in docstring:
+    jℓ_data = [0; cumsum(nb)] # introduced in move_blocking docstring
+    # four helper functions to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
-    W(m) = @views Âpow_csum[:,:, m+1]
+    W(m)  = @views Âpow_csum[:,:, m+1]
+    jℓ(ℓ) = jℓ_data[ℓ+1]
     function Q!(Q, i, m, b)
         for ℓ=0:m-i-1
             iRows = (1:ny) .+ ny*ℓ
@@ -396,18 +397,16 @@ function init_predmat(
     nZ = get_nZ(estim, transcription, Hp, Hc)
     ex̂ = Matrix{NT}(undef, nx̂, nZ)
     E  = zeros(NT, Hp*ny, nZ) 
-    for j=1:Hc
-        iCol = (1:nu) .+ nu*(j-1)
-        for i=j:Hc
-            i_Q = (i == 1 && j == 1) ? 0 : jℓ[i-1]
-            m_Q = jℓ[i]
-            b_Q = (j == 1) ? 0 : jℓ[j-1]
-            iRow = (1:ny*nb[i]) .+ ny*i_Q
+    for j=0:Hc-1
+        iCol = (1:nu) .+ nu*j
+        for i=j:Hc-1
+            i_Q, m_Q, b_Q = jℓ(i), jℓ(i+1), jℓ(j)
+            ni = nb[i+1]
+            iRow = (1:ny*ni) .+ ny*i_Q
             Q = @views E[iRow, iCol]
             Q!(Q, i_Q, m_Q, b_Q)
         end
-        j_ex̂ = (j == 1) ? 0 : jℓ[j-1]
-        ex̂[:, iCol] = W(Hp - j_ex̂ - 1)*B̂u
+        ex̂[:, iCol] = W(Hp - jℓ(j) - 1)*B̂u
     end    
     # --- current measured disturbances d0 and predictions D̂0 ---
     gx̂ = getpower(Âpow, Hp-1)*B̂d
@@ -453,10 +452,10 @@ They are defined in the Extended Help section.
     They are all appropriately sized zero matrices ``\mathbf{0}``, except for:
     ```math
     \begin{aligned}
-    \mathbf{E}   &= [\begin{smallmatrix}\mathbf{0} & \mathbf{E^†} \end{smallmatrix}]    \\
-    \mathbf{E^†} &= \text{diag}\mathbf{(Ĉ,Ĉ,...,Ĉ)}                                     \\
-    \mathbf{J}   &= \text{diag}\mathbf{(D̂_d,D̂_d,...,D̂_d)}                               \\
-    \mathbf{e_x̂} &= [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]   
+    \mathbf{E}     &= [\begin{smallmatrix}\mathbf{0} & \mathbf{E^{x̂}} \end{smallmatrix}]  \\
+    \mathbf{E^{x̂}} &= \text{diag}\mathbf{(Ĉ,Ĉ,...,Ĉ)}                                     \\
+    \mathbf{J}     &= \text{diag}\mathbf{(D̂_d,D̂_d,...,D̂_d)}                               \\
+    \mathbf{e_x̂}   &= [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]   
     \end{aligned}
     ```
 """
@@ -543,8 +542,10 @@ end
 
 Init the matrices for computing the defects over the predicted states. 
 
-An equation similar to the prediction matrices (see 
-[`init_predmat`](@ref)) computes the defects over the predicted states:
+Knowing that the decision vector ``\mathbf{Z}`` contains both ``\mathbf{ΔU}`` and 
+``\mathbf{X̂_0}`` vectors (with a [`MultipleShooting`](@ref) transcription), an equation
+similar to the prediction matrices (see [`init_predmat`](@ref)) computes the defects over
+the predicted states:
 ```math
 \begin{aligned}
     \mathbf{Ŝ} &= \mathbf{E_ŝ Z} + \mathbf{G_ŝ d_0}(k)  + \mathbf{J_ŝ D̂_0} 
