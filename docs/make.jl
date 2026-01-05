@@ -5,9 +5,7 @@ push!(LOAD_PATH,"../src/")
 
 using Documenter, DocumenterInterLinks
 using ModelPredictiveControl
-using LinearMPC
-
-ExtModule = Base.get_extension(ModelPredictiveControl, :LinearMPCext)
+import LinearMPC
 
 links = InterLinks(
     "Julia" => "https://docs.julialang.org/en/v1/objects.inv",
@@ -28,7 +26,6 @@ DocMeta.setdocmeta!(
 makedocs(
     sitename    = "ModelPredictiveControl.jl",
     #format = Documenter.LaTeX(platform = "none"),
-    modules     = [ModelPredictiveControl, ExtModule],
     doctest     = true,
     plugins     = [links],
     format      = Documenter.HTML(
