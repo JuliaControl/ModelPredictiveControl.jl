@@ -158,19 +158,20 @@ end
 
 Convert a `ModelPredictiveControl.LinMPC` object to a `LinearMPC.MPC` object.
 
-The `LinearMPC` package need to be installed and available in the current Julia environment.
-The converted object can be used to generate lightweight C-code for embedded applications
-using the `LinearMPC.codegen` function. Note that not all features of [`LinMPC`](@ref) are
-supported, including these restrictions:
+The `LinearMPC` package needs to be installed and available in the activated Julia
+environment. The converted object can be used to generate lightweight C-code for embedded
+applications using the `LinearMPC.codegen` function. Note that not all features of [`LinMPC`](@ref)
+are supported, including these restrictions:
 
 - the solver is limited to [`DAQP`](https://darnstrom.github.io/daqp/).
 - the transcription method must be [`SingleShooting`](@ref).
 - the state estimator must be a [`SteadyKalmanFilter`](@ref) with `direct=true`.
-- ``\mathbf{Δu_{min}}`` and ``\mathbf{Δu_{max}}`` constraints are not supported for now.
 - only block-diagonal weights are allowed.
+- ``\mathbf{Δu_{min}}`` and ``\mathbf{Δu_{max}}`` constraints are not supported for now.
 
-See the [LinearMPC.jl](@extref LinearMPC) documentation for more details on the supported
-features and how to generate code. 
+But the package has also several exclusive functionalities, such as pre-stabilization,
+constrained explicit MPC, and binary manipulated inputs. See the [LinearMPC.jl](@extref LinearMPC)
+documentation for more details on the supported features and how to generate code. 
 
 # Examples
 ```jldoctest
