@@ -77,7 +77,7 @@ for more detailed examples.
 
 - 🏭️ **Plant Model**: Linear or nonlinear models exploiting multiple dispatch.
 - ⛳️ **Objectives**: Tracking for inputs/outputs, move suppression, terminal costs, and economic costs.
-- ⏳ **Horizons**: Distinct prediction/control horizons with custom move blocking.
+- ⏳️ **Horizons**: Distinct prediction/control horizons with custom move blocking.
 - 📸 **Linearization**: Auto-differentiation for exact Jacobians.
 - ⚙️ **Adaptive MPC**: Manual model updates or automatic successive linearization.
 - 🏎️ **Explicit MPC**: Specialized for unconstrained problems.
