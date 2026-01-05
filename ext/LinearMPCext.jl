@@ -167,10 +167,11 @@ are supported, including these restrictions:
 - the transcription method must be [`SingleShooting`](@ref).
 - the state estimator must be a [`SteadyKalmanFilter`](@ref) with `direct=true`.
 - only block-diagonal weights are allowed.
-- ``\mathbf{Δu_{min}}`` and ``\mathbf{Δu_{max}}`` constraints are not supported for now.
+- input increment constraints ``\mathbf{Δu_{min}}`` and ``\mathbf{Δu_{max}}`` are not
+  supported for now.
 
 But the package has also several exclusive functionalities, such as pre-stabilization,
-constrained explicit MPC, and binary manipulated inputs. See the [LinearMPC.jl](@extref LinearMPC)
+constrained explicit MPC, and binary manipulated inputs. See the [`LinearMPC.jl`](@extref LinearMPC)
 documentation for more details on the supported features and how to generate code. 
 
 # Examples
