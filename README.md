@@ -14,7 +14,7 @@ for the linear systems, [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) for the
 optimization and [`DifferentiationInterface.jl`](https://github.com/JuliaDiff/DifferentiationInterface.jl)
 for the derivatives.
 
-## Installation
+## 🛠️ Installation
 
 To install the `ModelPredictiveControl` package, run this command in the Julia REPL:
 
@@ -22,7 +22,7 @@ To install the `ModelPredictiveControl` package, run this command in the Julia R
 using Pkg; Pkg.add("ModelPredictiveControl")
 ```
 
-## Getting Started
+## 🚀 Getting Started
 
 To construct model predictive controllers (MPCs), we must first specify a plant model that
 is typically extracted from input-output data using [system identification](https://github.com/baggepinnen/ControlSystemIdentification.jl).
@@ -71,7 +71,7 @@ plot(res, plotry=true, plotymax=true)
 See the [manual](https://JuliaControl.github.io/ModelPredictiveControl.jl/stable/manual/linmpc/)
 for more detailed examples.
 
-## Features
+## ✨ Features
 
 ### 🎯 Model Predictive Control Features
 
