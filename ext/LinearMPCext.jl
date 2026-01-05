@@ -153,29 +153,49 @@ function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
     return nothing
 end
 
-"""
+@doc raw"""
     LinearMPC.MPC(mpc::ModelPredictiveControl.LinMPC)
 
 Convert a `ModelPredictiveControl.LinMPC` object to a `LinearMPC.MPC` object.
 
-The package need to be installed and available in the current Julia environment. Once
-converted, the `LinearMPC.MPC` object can be used to generate lightweight C code for
-embedded applications using the `codegen` function. Note that not all features of
-[`LinMPC`] are supported, including these restrictions:
+The package need to be installed and available in the current Julia environment. The 
+converted object can be used to generate lightweight C-code for embedded applications using
+the `codegen` function. Note that not all features of [`LinMPC`] are supported, including
+these restrictions:
 
-- the solver is limited to `DAQP`.
+- the solver is limited to [`DAQP`](https://darnstrom.github.io/daqp/).
 - the transcription method must be [`SingleShooting`](@ref).
 - the state estimator must be a [`SteadyKalmanFilter`](@ref) with `direct=true`.
 - ``\\mathbf{Δu_{min}}`` and ``\\mathbf{Δu_{max}}`` constraints are not supported for now.
+- only block-diagonal weights are allowed.
 
-e.g. the solver is limited to `DAQP` and only single shooting
-transcription with a steady Kalman filter is supported. The weights and constraints
-    
-    See the `LinearMPC` documentation for
-more details.
+See the [LinearMPC.jl](@extref LinearMPC) documentation for more details on the supported
+features and how to generate code. 
+
+# Examples
+```jldoctest
+julia> import LinearMPC, JuMP, DAQP;
+
+julia> mpc1 = LinMPC(LinModel(tf(2, [10, 1]), 1.0); optim=JuMP.Model(DAQP.Optimizer));
+
+julia> mpc1 = setconstraint!(mpc1, ymax=[10.1]);
+
+julia> preparestate!(mpc1, [1.0]);
+
+julia> u1 = round.(moveinput!(mpc1, [10.0]), digits=3)
+1-element Vector{Float64}:
+ 18.813
+
+julia> mpc2 = LinearMPC.MPC(mpc1);
+
+julia> x̂2 = LinearMPC.correct_state!(mpc2, [1.0]);
+
+julia> u2 = round.(LinearMPC.compute_control(mpc2, x̂2, r=[10.0]), digits=3)
+1-element Vector{Float64}:
+ 18.813
+```
 """
 LinearMPC.MPC(mpc::ModelPredictiveControl.LinMPC) = convert(LinearMPC.MPC, mpc)
-
 
 
 end # LinearMPCext

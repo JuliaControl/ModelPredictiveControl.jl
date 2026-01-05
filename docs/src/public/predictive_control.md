@@ -72,7 +72,7 @@ PredictiveController
 LinMPC
 ```
 
-### Conversion to `LinearMPC.jl` (code generation)
+### Conversion to LinearMPC.jl (code generation)
 
 ```@docs
 LinearMPC.MPC
