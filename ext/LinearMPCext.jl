@@ -154,7 +154,7 @@ function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
 end
 
 @doc raw"""
-    LinearMPC.MPC(mpc::ModelPredictiveControl.LinMPC)
+    LinearMPC.MPC(mpc::LinMPC)
 
 Convert a `ModelPredictiveControl.LinMPC` object to a `LinearMPC.MPC` object.
 
