@@ -499,14 +499,18 @@ strictly positive integers):
 ```math
     \mathbf{n_b} = \begin{bmatrix} n_1 & n_2 & \cdots & n_{H_c} \end{bmatrix}'
 ```
-Introducing the notation ``j_ℓ = ∑_{i=1}^{ℓ} n_i`` to convert from block lengths to discrete
-time steps, the vector that includes all the free moves of the manipulated input is then
-defined as:
+Introducing the notation:
+```math
+j_ℓ =                                   \begin{cases}
+    0                   & ℓ = 0         \\
+    ∑_{i=1}^{ℓ} n_i     & ℓ > 0         \end{cases}
+```
+to convert from block lengths to discrete time steps, the vector that includes all the free
+moves of the manipulated input is then defined as:
 ```math
 \mathbf{ΔU} = \begin{bmatrix}
-    \mathbf{Δu}(k + 0)                        \\
+    \mathbf{Δu}(k + j_0)                      \\
     \mathbf{Δu}(k + j_1)                      \\
-    \mathbf{Δu}(k + j_2)                      \\
     \vdots                                    \\
     \mathbf{Δu}(k + j_{H_c-1})   
 \end{bmatrix}
