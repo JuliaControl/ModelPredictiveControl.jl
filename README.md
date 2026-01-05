@@ -73,77 +73,31 @@ for more detailed examples.
 
 ## Features
 
-### Model Predictive Control Features
+### 🎯 Model Predictive Control Features
 
-- linear and nonlinear plant models exploiting multiple dispatch
-- model linearization based on automatic differentiation (exact Jacobians)
-- supported objective function terms:
-  - output setpoint tracking
-  - move suppression
-  - input setpoint tracking
-  - terminal costs
-  - custom economic costs (economic model predictive control)
-- control horizon distinct from prediction horizon and custom move blocking
-- adaptive linear model predictive controller
-  - manual model modification
-  - automatic successive linearization of a nonlinear model
-  - objective function weights and covariance matrices modification
-- explicit predictive controller for problems without constraint
-- online-tunable soft and hard constraints on:
-  - output predictions
-  - manipulated inputs
-  - manipulated inputs increments
-  - terminal states to ensure nominal stability
-- custom nonlinear inequality constraints (soft or hard)
-- supported feedback strategy:
-  - state estimator (see State Estimation features)
-  - internal model structure with a custom stochastic model
-- automatic model augmentation with integrating states for offset-free tracking
-- support for unmeasured model outputs
-- feedforward action with measured disturbances that supports direct transmission
-- custom predictions for (or preview):
-  - output setpoints
-  - measured disturbances
-  - input setpoints
-- easy integration with `Plots.jl`
-- optimization based on `JuMP.jl` to quickly compare multiple optimizers:
-  - many quadratic solvers for linear control
-  - many nonlinear solvers for nonlinear control (local or global)
-- derivatives based on `DifferentiationInterface.jl` to compare different approaches:
-  - automatic differentiation (exact solution)
-  - symbolic differentiation (exact solution)
-  - finite difference (approximate solution)
-- supported transcription methods of the optimization problem:
-  - direct single shooting
-  - direct multiple shooting
-  - trapezoidal collocation
-- additional information about the optimum to ease troubleshooting
-- real-time control loop features:
-  - implementations that carefully limits the allocations
-  - simple soft real-time utilities
+- 🏭️ **Plant Model**: Linear or nonlinear models exploiting multiple dispatch.
+- ⛳️ **Objectives**: Tracking for inputs/outputs, move suppression, terminal costs, and economic costs.
+- ⏳ **Horizons**: Distinct prediction/control horizons with custom move blocking.
+- 📸 **Linearization**: Auto-differentiation for exact Jacobians.
+- ⚙️ **Adaptive MPC**: Manual model updates or automatic successive linearization.
+- 🏎️ **Explicit MPC**: Specialized for unconstrained problems.
+- 🚧 **Constraints**: Soft/hard limits on inputs, outputs, increments, and terminal states.
+- 🔁 **Feedback**: Internal model or state estimators (see features below).
+- 📡 **Feedforward**: Integrated support for measured disturbances. 
+- 🔮 **Preview**: Custom predictions for setpoints and measured disturbances.
+- 📈 **Offset-Free**: Automatic model augmentation with integrators.
+- 📊 **Visuals**: Easy integration with `Plots.jl`.
+- 🧩 **Solvers**: Optimization via `JuMP.jl` (quadratic & nonlinear) and derivatives via `DifferentiationInterface.jl`.
+- 📝 **Transcription**: Direct single/multiple shooting and trapezoidal collocation.
+- 🩺 **Troubleshooting**: Detailed diagnostic information about optimum.
+- ⏱️ **Real-Time**: Optimized for low memory allocations with soft real-time utilities.
 
-### State Estimation Features
+### 🔭 State Estimation Features
 
-- supported state estimators/observers:
-  - steady-state Kalman filter
-  - Kalman filter
-  - Luenberger observer
-  - internal model structure
-  - extended Kalman filter
-  - unscented Kalman filter
-  - moving horizon estimator
-- disable built-in observer to manually provide your own state estimate
-- easily estimate unmeasured disturbances by adding one or more integrators at the:
-  - manipulated inputs
-  - measured outputs
-- bumpless manual to automatic transfer for control with a proper initial estimate
-- estimators in two possible forms:
-  - filter (or current) form to improve accuracy and robustness
-  - predictor (or delayed) form to reduce computational load
-- moving horizon estimator in two formulations:
-  - linear plant models (quadratic optimization)
-  - nonlinear plant models (nonlinear optimization)
-- moving horizon estimator online-tunable soft and hard constraints on:
-  - state estimates
-  - process noise estimates
-  - sensor noise estimates
+- 🔍️ **Estimators**: Many Kalman filters, Luenberger, and Moving Horizon Estimator (MHE).
+- 🎛️ **Customization**: Ability to use custom/external state estimates.
+- 🌊 **Disturbances**: Estimate unmeasured disturbances via integrators on inputs/outputs.
+- 🛣️ **Bumpless Transfer**: Smooth transitions from manual to automatic control.
+- ⌚️ **Timing**: Estimators available in filter (current) or predictor (delayed) forms.
+- 🏷️ **MHE Types**: Formulations for both linear (quadratic optimization) and nonlinear plants.
+- 🛡️ **MHE Constraints**: Tunable soft/hard constraints on state and noise estimates.
