@@ -20,7 +20,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     xo = estim.x̂op
     uo = model.uop
     yo = model.yop
-    !iszero(y0) && error("LinearMPC does not support non-zero output operating points.")
+    !iszero(yo) && error("LinearMPC does not support non-zero output operating points.")
     LinearMPC.set_operating_point!(newmpc; xo, uo, relinearize=false)
     # --- State observer parameters ---
     Q, R = estim.cov.Q̂, estim.cov.R̂
