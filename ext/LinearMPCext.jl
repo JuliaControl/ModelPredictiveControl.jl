@@ -25,6 +25,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         @warn "LinearMPC does not support measured disturbance operating points dop.\n" *
               "Ensure to subtract the operating point from the measurement at each time "*
               "step before solving the MPC problem."
+    end
     LinearMPC.set_operating_point!(newmpc; xo, uo, relinearize=false)
     # --- State observer parameters ---
     Q, R = estim.cov.Q̂, estim.cov.R̂
