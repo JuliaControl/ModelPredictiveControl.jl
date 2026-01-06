@@ -16,6 +16,12 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     Np = Hp = mpc.Hp
     Nc = Hc = mpc.Hc
     newmpc = LinearMPC.MPC(F, G; Gd, C, Dd, Np, Nc)
+    # --- Operating points ---
+    xo = estim.x̂op
+    uo = model.uop
+    yo = model.yop
+    !iszero(y0) && error("LinearMPC does not support non-zero output operating points.")
+    LinearMPC.set_operating_point!(newmpc; xo, uo, relinearize=false)
     # --- State observer parameters ---
     Q, R = estim.cov.Q̂, estim.cov.R̂
     set_state_observer!(newmpc; C=estim.Ĉm, Q, R)
@@ -180,21 +186,19 @@ julia> import LinearMPC, JuMP, DAQP;
 
 julia> mpc1 = LinMPC(LinModel(tf(2, [10, 1]), 1.0); optim=JuMP.Model(DAQP.Optimizer));
 
-julia> mpc1 = setconstraint!(mpc1, ymax=[10.1]);
-
 julia> preparestate!(mpc1, [1.0]);
 
-julia> u1 = round.(moveinput!(mpc1, [10.0]), digits=3)
+julia> u1 = moveinput!(mpc1, [10.0]); round.(u1, digits=6)
 1-element Vector{Float64}:
- 18.813
+ 17.577311
 
 julia> mpc2 = LinearMPC.MPC(mpc1);
 
 julia> x̂2 = LinearMPC.correct_state!(mpc2, [1.0]);
 
-julia> u2 = round.(LinearMPC.compute_control(mpc2, x̂2, r=[10.0]), digits=3)
+julia> u2 = LinearMPC.compute_control(mpc2, x̂2, r=[10.0]); round.(u2, digits=6)
 1-element Vector{Float64}:
- 18.813
+ 17.577311
 ```
 """
 LinearMPC.MPC(mpc::ModelPredictiveControl.LinMPC) = convert(LinearMPC.MPC, mpc)
