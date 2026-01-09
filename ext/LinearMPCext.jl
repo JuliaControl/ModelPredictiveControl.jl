@@ -17,16 +17,12 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     Nc = Hc = mpc.Hc
     newmpc = LinearMPC.MPC(F, G; Gd, C, Dd, Np, Nc)
     # --- Operating points ---
-    xo = estim.x̂op
-    uo = model.uop
-    yo = model.yop
-    !iszero(yo) && error("LinearMPC does not support non-zero output operating points yop.")
-    if !iszero(model.dop)
-        @warn "LinearMPC does not support measured disturbance operating points dop.\n" *
-              "Ensure to subtract the operating point from the measurement at each time "*
-              "step before solving the MPC problem."
-    end
-    LinearMPC.set_operating_point!(newmpc; xo, uo, relinearize=false)
+    uoff = model.uop
+    doff = model.dop
+    yoff = model.yop
+    xoff = estim.x̂op
+    foff = estim.f̂op
+    LinearMPC.set_offset!(newmpc; uo=uoff, ho=yoff)
     # --- State observer parameters ---
     Q, R = estim.cov.Q̂, estim.cov.R̂
     set_state_observer!(newmpc; C=estim.Ĉm, Q, R)
