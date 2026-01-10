@@ -22,7 +22,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     yoff = model.yop
     xoff = estim.x̂op
     foff = estim.f̂op
-    LinearMPC.set_offset!(newmpc; uo=uoff, ho=yoff)
+    LinearMPC.set_offset!(newmpc; uo=uoff, yo=yoff, dooff=doff, xo=xoff, fo=foff)
     # --- State observer parameters ---
     Q, R = estim.cov.Q̂, estim.cov.R̂
     set_state_observer!(newmpc; C=estim.Ĉm, Q, R)
