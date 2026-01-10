@@ -20,13 +20,11 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     xo = estim.x̂op
     uo = model.uop
     yo = model.yop
-    !iszero(yo) && error("LinearMPC does not support non-zero output operating points yop.")
     if !iszero(model.dop)
         @warn "LinearMPC does not support measured disturbance operating points dop.\n" *
               "Ensure to subtract the operating point from the measurement at each time "*
               "step before solving the MPC problem."
     end
-    LinearMPC.set_operating_point!(newmpc; xo, uo, relinearize=false)
     # --- State observer parameters ---
     Q, R = estim.cov.Q̂, estim.cov.R̂
     set_state_observer!(newmpc; C=estim.Ĉm, Q, R)
@@ -69,10 +67,10 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         end
     end
     # --- Output constraints ---
-    Ymin, Ymax = mpc.con.Y0min + mpc.Yop, mpc.con.Y0max + mpc.Yop
+    Y0min, Y0max = mpc.con.Y0min, mpc.con.Y0max
     C_y = -mpc.con.A_Ymin[:, end]
     for k in 1:Hp
-        ymin_k, ymax_k = Ymin[(k-1)*ny+1:k*ny], Ymax[(k-1)*ny+1:k*ny]
+        ymin_k, ymax_k = Y0min[(k-1)*ny+1:k*ny], Y0max[(k-1)*ny+1:k*ny]
         c_y_k = C_y[(k-1)*ny+1:k*ny]
         ks = [k + 1] # a `1` in ks argument corresponds to the present time step k+0
         for i in 1:ny
@@ -84,13 +82,13 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         end
     end
     # --- Terminal constraints ---
-    x̂min, x̂max = mpc.con.x̂0min + estim.x̂op, mpc.con.x̂0max + estim.x̂op
+    x̂0min, x̂0max = mpc.con.x̂0min, mpc.con.x̂0max
     c_x̂ = -mpc.con.A_x̂min[:, end]
     I_x̂ = Matrix{Float64}(I, nx̂, nx̂)
     ks = [Hp + 1] # a `1` in ks argument corresponds to the present time step k+0
     for i in 1:nx̂
-        lb = isfinite(x̂min[i]) ? [x̂min[i]] : zeros(0)
-        ub = isfinite(x̂max[i]) ? [x̂max[i]] : zeros(0)
+        lb = isfinite(x̂0min[i]) ? [x̂0min[i]] : zeros(0)
+        ub = isfinite(x̂0max[i]) ? [x̂0max[i]] : zeros(0)
         soft = (c_x̂[i] > 0)
         Ax = I_x̂[i:i, :]
         add_constraint!(newmpc; Ax, lb, ub, ks, soft)
