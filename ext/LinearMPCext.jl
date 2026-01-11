@@ -189,15 +189,15 @@ julia> mpc1 = LinMPC(LinModel(tf(2, [10, 1]), 1.0); optim=JuMP.Model(DAQP.Optimi
 
 julia> preparestate!(mpc1, [1.0]);
 
-julia> u1 = moveinput!(mpc1, [10.0]); round.(u1, digits=6)
+julia> u = moveinput!(mpc1, [10.0]); round.(u, digits=6)
 1-element Vector{Float64}:
  17.577311
 
 julia> mpc2 = LinearMPC.MPC(mpc1);
 
-julia> x̂2 = LinearMPC.correct_state!(mpc2, [1.0]);
+julia> x̂ = LinearMPC.correct_state!(mpc2, [1.0]);
 
-julia> u2 = LinearMPC.compute_control(mpc2, x̂2, r=[10.0]); round.(u2, digits=6)
+julia> u = LinearMPC.compute_control(mpc2, x̂, r=[10.0]); round.(u, digits=6)
 1-element Vector{Float64}:
  17.577311
 ```
