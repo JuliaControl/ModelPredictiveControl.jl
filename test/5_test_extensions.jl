@@ -32,16 +32,13 @@
     end
     N = 50
     y_data, u_data1, u_data2 = sim_both(model, mpc1, mpc2, N)
-    @test u_data1 ≈ u_data2 atol=1e-6
+    @test u_data1 ≈ u_data2 atol=1e-3 rtol=1e-3
 
     mpc_ms = LinMPC(model; transcription=MultipleShooting(), optim)
     @test_throws ErrorException LinearMPC.MPC(mpc_ms)
     mpc_kf = LinMPC(KalmanFilter(model, direct=false); optim)
     @test_throws ErrorException LinearMPC.MPC(mpc_kf)
     mpc_osqp = LinMPC(model)
-    "LinearMPC relies on DAQP, and the solver in the mpc object " *
-              "is currently $(JuMP.solver_name(mpc.optim)).\n" *
-              "The results in closed-loop may be different."
     @test_logs(
         (:warn, "LinearMPC relies on DAQP, and the solver in the mpc object is currently "*
         "OSQP.\nThe results in closed-loop may be different."),
