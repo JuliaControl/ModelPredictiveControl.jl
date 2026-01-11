@@ -148,10 +148,10 @@ function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
     C_x̂min, C_x̂max = -mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]
     is0or1(C) = all(x -> x ≈ 0 || x ≈ 1, C)
     if !is0or1(C_umin) || !is0or1(C_umax) || !is0or1(C_ymin) || !is0or1(C_ymax)
-        error("LinearMPC does not support softness parameters c ≠ 0 or 1.")
+        error("LinearMPC only supports softness parameters c = 0 or 1.")
     end
     if !isapprox(C_umin, C_umax) || !isapprox(C_ymin, C_ymax) || !isapprox(C_x̂min, C_x̂max)
-        error("LinearMPC does not support different softness parameters for lower and upper bounds.")
+        error("LinearMPC only supports identical softness parameters for lower and upper bounds.")
     end
     nΔU = mpc.Hc * mpc.estim.model.nu
     if any(isfinite, ΔŨmin[1:nΔU]) || any(isfinite, ΔŨmax[1:nΔU])
