@@ -58,12 +58,12 @@ julia> u = moveinput!(mpc, ry); round.(u, digits=3)
 """
 function moveinput!(
     mpc::PredictiveController, 
-    ry::Vector = mpc.estim.model.yop, 
-    d ::Vector = mpc.buffer.empty;
-    lastu::Vector = (mpc.buffer.u .= mpc.lastu0 .+ mpc.estim.model.uop),
-    Dhat ::Vector = repeat!(mpc.buffer.D̂, d,  mpc.Hp),
-    Rhaty::Vector = repeat!(mpc.buffer.Ŷ, ry, mpc.Hp),
-    Rhatu::Vector = mpc.Uop,
+    ry::AbstractVector = mpc.estim.model.yop, 
+    d ::AbstractVector = mpc.buffer.empty;
+    lastu::AbstractVector = (mpc.buffer.u .= mpc.lastu0 .+ mpc.estim.model.uop),
+    Dhat ::AbstractVector = repeat!(mpc.buffer.D̂, d,  mpc.Hp),
+    Rhaty::AbstractVector = repeat!(mpc.buffer.Ŷ, ry, mpc.Hp),
+    Rhatu::AbstractVector = mpc.Uop,
     D̂  = Dhat,
     R̂y = Rhaty,
     R̂u = Rhatu
