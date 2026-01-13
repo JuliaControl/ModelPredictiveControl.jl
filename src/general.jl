@@ -182,7 +182,7 @@ function isblockdiag(A::AbstractMatrix, n::Int, m::Int)
 end
 
 "In-place version of `repeat` but for vectors only."
-function repeat!(Y::Vector, a::Vector, n::Int)
+function repeat!(Y::AbstractVector, a::AbstractVector, n::Int)
     na = length(a)
     for i=0:n-1
         # stop if Y is too short, another clearer error is thrown later in the code:
