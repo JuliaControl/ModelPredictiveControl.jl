@@ -1,9 +1,10 @@
 module LinearMPCext
 
-using ModelPredictiveControl, LinearMPC
+using ModelPredictiveControl
 using LinearAlgebra, SparseArrays
 using JuMP
 
+import LinearMPC
 import ModelPredictiveControl: isblockdiag
 
 function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
@@ -25,16 +26,20 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     LinearMPC.set_offset!(newmpc; uo=uoff, ho=yoff, doff=doff, xo=xoff, fo=foff)
     # --- State observer parameters ---
     Q, R = estim.cov.Q̂, estim.cov.R̂
-    set_state_observer!(newmpc; C=estim.Ĉm, Q, R)
+    LinearMPC.set_state_observer!(newmpc; C=estim.Ĉm, Q, R)
     # --- Objective function weights ---
     Q = weights.M_Hp[1:ny, 1:ny]
     Qf = weights.M_Hp[end-ny+1:end, end-ny+1:end]
     Rr = weights.Ñ_Hc[1:nu, 1:nu]
     R = weights.L_Hp[1:nu, 1:nu]
     LinearMPC.set_objective!(newmpc; Q, Rr, R, Qf)
-    if !weights.isinf_C
+    only_hard = weights.isinf_C
+    if !only_hard
+        # LinearMPC relies on a different softening mechanism, so we apply
+        # an approximate conversion factor on the softening weight:
         Cwt = weights.Ñ_Hc[end, end]
-        newmpc.settings.soft_weight = Cwt
+        conversion_factor = 0.1 #0.09066
+        newmpc.settings.soft_weight = conversion_factor*Cwt
     end
     # --- Custom move blocking ---
     LinearMPC.move_block!(newmpc, mpc.nb) # un-comment when debugged
@@ -59,9 +64,26 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         for i in 1:nu
             lb = isfinite(umin_k[i]) ? [umin_k[i]] : zeros(0)
             ub = isfinite(umax_k[i]) ? [umax_k[i]] : zeros(0)
-            soft = (c_u_k[i] > 0)
+            soft = !only_hard && c_u_k[i] > 0
             Au = I_u[i:i, :]
-            add_constraint!(newmpc; Au, lb, ub, ks, soft)
+            LinearMPC.add_constraint!(newmpc; Au, lb, ub, ks, soft)
+        end
+    end
+    # --- Input increment constraints ---
+    nΔU = Hc * nu
+    ΔUmin, ΔUmax = mpc.con.ΔŨmin[1:nΔU], mpc.con.ΔŨmax[1:nΔU]
+    C_Δu = -mpc.con.A_ΔŨmin[1:nΔU, end]
+    I_Δu = Matrix{Float64}(I, nu, nu)
+    for k in 0:Hc-1
+        Δumin_k, Δumax_k = ΔUmin[k*nu+1:(k+1)*nu], ΔUmax[k*nu+1:(k+1)*nu]
+        c_Δu_k = C_Δu[k*nu+1:(k+1)*nu]
+        ks = [k + 1] # a `1` in ks argument corresponds to the present time step k+0
+        for i in 1:nu
+            lb = isfinite(Δumin_k[i]) ? [Δumin_k[i]] : zeros(0)
+            ub = isfinite(Δumax_k[i]) ? [Δumax_k[i]] : zeros(0)
+            soft = !only_hard && c_Δu_k[i] > 0
+            Au, Aup = I_Δu[i:i, :], -I_Δu[i:i, :]
+            LinearMPC.add_constraint!(newmpc; Au, Aup, lb, ub, ks, soft)
         end
     end
     # --- Output constraints ---
@@ -74,9 +96,9 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         for i in 1:ny
             lb = isfinite(ymin_k[i]) ? [ymin_k[i]] : zeros(0)
             ub = isfinite(ymax_k[i]) ? [ymax_k[i]] : zeros(0)
-            soft = (c_y_k[i] > 0)
+            soft = !only_hard && c_y_k[i] > 0
             Ax, Ad = C[i:i, :], Dd[i:i, :]
-            add_constraint!(newmpc; Ax, Ad, lb, ub, ks, soft)
+            LinearMPC.add_constraint!(newmpc; Ax, Ad, lb, ub, ks, soft)
         end
     end
     # --- Terminal constraints ---
@@ -87,9 +109,9 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     for i in 1:nx̂
         lb = isfinite(x̂0min[i]) ? [x̂0min[i]] : zeros(0)
         ub = isfinite(x̂0max[i]) ? [x̂0max[i]] : zeros(0)
-        soft = (c_x̂[i] > 0)
+        soft = !only_hard && c_x̂[i] > 0
         Ax = I_x̂[i:i, :]
-        add_constraint!(newmpc; Ax, lb, ub, ks, soft)
+        LinearMPC.add_constraint!(newmpc; Ax, lb, ub, ks, soft)
     end
     return newmpc
 end
@@ -142,20 +164,36 @@ function validate_weights(mpc::ModelPredictiveControl.LinMPC)
 end
 
 function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
-    ΔŨmin, ΔŨmax = mpc.con.ΔŨmin, mpc.con.ΔŨmax
-    C_umin, C_umax = -mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]
-    C_ymin, C_ymax = -mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]
-    C_x̂min, C_x̂max = -mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]
+    nΔU = mpc.Hc * mpc.estim.model.nu
+    C_umin, C_umax   = -mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]
+    C_Δumin, C_Δumax = -mpc.con.A_ΔŨmin[1:nΔU, end], -mpc.con.A_ΔŨmax[1:nΔU, end]
+    C_ymin, C_ymax   = -mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]
+    C_x̂min, C_x̂max   = -mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]
     is0or1(C) = all(x -> x ≈ 0 || x ≈ 1, C)
-    if !is0or1(C_umin) || !is0or1(C_umax) || !is0or1(C_ymin) || !is0or1(C_ymax)
+    if (
+        !is0or1(C_umin)  || !is0or1(C_umax)  || 
+        !is0or1(C_Δumin) || !is0or1(C_Δumax) ||
+        !is0or1(C_ymin)  || !is0or1(C_ymax)  || 
+        !is0or1(C_x̂min)  || !is0or1(C_x̂max) 
+        
+    )
         error("LinearMPC only supports softness parameters c = 0 or 1.")
     end
-    if !isapprox(C_umin, C_umax) || !isapprox(C_ymin, C_ymax) || !isapprox(C_x̂min, C_x̂max)
+    if (
+        !isapprox(C_umin, C_umax)   || 
+        !isapprox(C_Δumin, C_Δumax) ||
+        !isapprox(C_ymin, C_ymax)   || 
+        !isapprox(C_x̂min, C_x̂max)   
+    )
         error("LinearMPC only supports identical softness parameters for lower and upper bounds.")
     end
-    nΔU = mpc.Hc * mpc.estim.model.nu
-    if any(isfinite, ΔŨmin[1:nΔU]) || any(isfinite, ΔŨmax[1:nΔU])
-        error("LinearMPC does not support constraints on input increments Δu")
+    issoft(C) = any(x -> x > 0, C)
+    if !mpc.weights.isinf_C && sum(mpc.con.i_b) > 1 # ignore the slack variable ϵ bound
+        if issoft(C_umin) || issoft(C_Δumin) || issoft(C_ymin) || issoft(C_x̂min)
+            @warn "The LinearMPC conversion applies an approximate conversion " *
+                  "of the soft constraints.\n You may need to adjust the soft_weight "*
+                  "field of the LinearMPC.MPC object to replicate behaviors."
+        end
     end
     return nothing
 end
@@ -174,8 +212,8 @@ are supported, including these restrictions:
 - the transcription method must be [`SingleShooting`](@ref).
 - the state estimator must be a [`SteadyKalmanFilter`](@ref) with `direct=true`.
 - only block-diagonal weights are allowed.
-- input increment constraints ``\mathbf{Δu_{min}}`` and ``\mathbf{Δu_{max}}`` are not
-  supported for now.
+- the constraint relaxation mechanism is different, so a 1-on-1 conversion of the soft 
+  constraints is impossible (use `Cwt=Inf` to disable relaxation).
 
 But the package has also several exclusive functionalities, such as pre-stabilization,
 constrained explicit MPC, and binary manipulated inputs. See the [`LinearMPC.jl`](@extref LinearMPC)
