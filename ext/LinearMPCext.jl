@@ -9,13 +9,15 @@ import ModelPredictiveControl: isblockdiag
 
 function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     model, estim, weights = mpc.estim.model, mpc.estim, mpc.weights
-    nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
+    nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
+    Hp, Hc = mpc.Hp, mpc.Hc
+    nΔU = Hc * nu
     validate_compatibility(mpc)
     # --- Model parameters ---
     F, G, Gd = estim.Â, estim.B̂u, estim.B̂d
     C, Dd = estim.Ĉ, estim.D̂d
-    Np = Hp = mpc.Hp
-    Nc = Hc = mpc.Hc
+    Np = Hp
+    Nc = Hc
     newmpc = LinearMPC.MPC(F, G; Gd, C, Dd, Np, Nc)
     # --- Operating points ---
     uoff = model.uop
@@ -33,19 +35,29 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     Rr = weights.Ñ_Hc[1:nu, 1:nu]
     R = weights.L_Hp[1:nu, 1:nu]
     LinearMPC.set_objective!(newmpc; Q, Rr, R, Qf)
+    # --- Custom move blocking ---
+    LinearMPC.move_block!(newmpc, mpc.nb) # un-comment when debugged
+    # ---- Constraint softening ---
     only_hard = weights.isinf_C
     if !only_hard
         # LinearMPC relies on a different softening mechanism, so we apply
-        # an approximate conversion factor on the softening weight:
+        # an approximate conversion factor on the softening weight Cwt:
+        nsoft = sum((mpc.con.A[:,end] .< 0) .& (mpc.con.i_b)) - 1
+        conversion_factor = 1/2/nsoft
         Cwt = weights.Ñ_Hc[end, end]
-        conversion_factor = 0.1 #0.09066
         newmpc.settings.soft_weight = conversion_factor*Cwt
+        C_u  = -mpc.con.A_Umin[:, end]
+        C_Δu = -mpc.con.A_ΔŨmin[1:nΔU, end]
+        C_y  = -mpc.con.A_Ymin[:, end]
+        c_x̂  = -mpc.con.A_x̂min[:, end]
+    else
+        C_u  = zeros(nu*Hp)
+        C_Δu = zeros(nu*Hc)
+        C_y  = zeros(ny*Hp)
+        c_x̂  = zeros(nx̂)
     end
-    # --- Custom move blocking ---
-    LinearMPC.move_block!(newmpc, mpc.nb) # un-comment when debugged
     # --- Manipulated inputs constraints ---
     Umin, Umax = mpc.con.U0min + mpc.Uop, mpc.con.U0max + mpc.Uop
-    C_u = -mpc.con.A_Umin[:, end]
     I_u = Matrix{Float64}(I, nu, nu)
     # add_constraint! does not support u bounds pass the control horizon Hc
     # so we compute the extremum bounds from k=Hc-1 to Hp, and apply them at k=Hc-1
@@ -70,9 +82,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         end
     end
     # --- Input increment constraints ---
-    nΔU = Hc * nu
     ΔUmin, ΔUmax = mpc.con.ΔŨmin[1:nΔU], mpc.con.ΔŨmax[1:nΔU]
-    C_Δu = -mpc.con.A_ΔŨmin[1:nΔU, end]
     I_Δu = Matrix{Float64}(I, nu, nu)
     for k in 0:Hc-1
         Δumin_k, Δumax_k = ΔUmin[k*nu+1:(k+1)*nu], ΔUmax[k*nu+1:(k+1)*nu]
@@ -88,7 +98,6 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     end
     # --- Output constraints ---
     Y0min, Y0max = mpc.con.Y0min, mpc.con.Y0max
-    C_y = -mpc.con.A_Ymin[:, end]
     for k in 1:Hp
         ymin_k, ymax_k = Y0min[(k-1)*ny+1:k*ny], Y0max[(k-1)*ny+1:k*ny]
         c_y_k = C_y[(k-1)*ny+1:k*ny]
@@ -103,7 +112,6 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     end
     # --- Terminal constraints ---
     x̂0min, x̂0max = mpc.con.x̂0min, mpc.con.x̂0max
-    c_x̂ = -mpc.con.A_x̂min[:, end]
     I_x̂ = Matrix{Float64}(I, nx̂, nx̂)
     ks = [Hp + 1] # a `1` in ks argument corresponds to the present time step k+0
     for i in 1:nx̂
@@ -165,6 +173,7 @@ end
 
 function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
     nΔU = mpc.Hc * mpc.estim.model.nu
+    mpc.weights.isinf_C && return nothing # only hard constraints are entirely supported
     C_umin, C_umax   = -mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]
     C_Δumin, C_Δumax = -mpc.con.A_ΔŨmin[1:nΔU, end], -mpc.con.A_ΔŨmax[1:nΔU, end]
     C_ymin, C_ymax   = -mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]
