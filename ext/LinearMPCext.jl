@@ -40,8 +40,8 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     # ---- Constraint softening ---
     only_hard = weights.isinf_C
     if !only_hard
-        # LinearMPC relies on a different softening mechanism, so we apply
-        # an approximate conversion factor on the softening weight Cwt:
+        # LinearMPC relies on a different softening mechanism (new implicit slack for each
+        # softened bounds), so we apply an approximate conversion factor on the Cwt weight:
         nsoft = sum((mpc.con.A[:,end] .< 0) .& (mpc.con.i_b)) - 1
         conversion_factor = 1/2/nsoft
         Cwt = weights.Ñ_Hc[end, end]
