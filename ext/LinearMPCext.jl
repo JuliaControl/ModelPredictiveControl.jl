@@ -40,15 +40,23 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     # ---- Constraint softening ---
     only_hard = weights.isinf_C
     if !only_hard
+        issoft(C) = any(x -> x > 0, C)
+        C_u  = -mpc.con.A_Umin[:, end]
+        C_Δu = -mpc.con.A_ΔŨmin[1:nΔU, end]
+        C_y  = -mpc.con.A_Ymin[:, end]
+        c_x̂  = -mpc.con.A_x̂min[:, end]
+        if sum(mpc.con.i_b) > 1 # ignore the slack variable ϵ bound
+            if issoft(C_u) || issoft(C_Δu) || issoft(C_y) || issoft(C_x̂)
+                @warn "The LinearMPC conversion applies an approximate conversion " *
+                    "of the soft constraints.\n You may need to adjust the soft_weight "*
+                    "field of the LinearMPC.MPC object to replicate behaviors."
+            end
+        end
         # LinearMPC relies on a different softening mechanism (new implicit slacks for each
         # softened bounds), so we apply an approximate conversion factor on the Cwt weight:
         Cwt = weights.Ñ_Hc[end, end]
         nsoft = sum((mpc.con.A[:,end] .< 0) .& (mpc.con.i_b)) - 1
         newmpc.settings.soft_weight = 10*sqrt(nsoft*Cwt)
-        C_u  = -mpc.con.A_Umin[:, end]
-        C_Δu = -mpc.con.A_ΔŨmin[1:nΔU, end]
-        C_y  = -mpc.con.A_Ymin[:, end]
-        c_x̂  = -mpc.con.A_x̂min[:, end]
     else
         C_u  = zeros(nu*Hp)
         C_Δu = zeros(nu*Hc)
@@ -194,14 +202,6 @@ function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
         !isapprox(C_x̂min, C_x̂max)   
     )
         error("LinearMPC only supports identical softness parameters for lower and upper bounds.")
-    end
-    issoft(C) = any(x -> x > 0, C)
-    if !mpc.weights.isinf_C && sum(mpc.con.i_b) > 1 # ignore the slack variable ϵ bound
-        if issoft(C_umin) || issoft(C_Δumin) || issoft(C_ymin) || issoft(C_x̂min)
-            @warn "The LinearMPC conversion applies an approximate conversion " *
-                  "of the soft constraints.\n You may need to adjust the soft_weight "*
-                  "field of the LinearMPC.MPC object to replicate behaviors."
-        end
     end
     return nothing
 end
