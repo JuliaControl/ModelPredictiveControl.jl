@@ -47,9 +47,9 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         c_x̂  = -mpc.con.A_x̂min[:, end]
         if sum(mpc.con.i_b) > 1 # ignore the slack variable ϵ bound
             if issoft(C_u) || issoft(C_Δu) || issoft(C_y) || issoft(C_x̂)
-                @warn "The LinearMPC conversion applies an approximate conversion " *
-                    "of the soft constraints.\n You may need to adjust the soft_weight "*
-                    "field of the LinearMPC.MPC object to replicate behaviors."
+                @warn "The LinearMPC conversion is approximate for the soft constraints.\n"*
+                    "You may need to adjust the soft_weight field of the "*
+                    "LinearMPC.MPC object to replicate behaviors."
             end
         end
         # LinearMPC relies on a different softening mechanism (new implicit slacks for each
