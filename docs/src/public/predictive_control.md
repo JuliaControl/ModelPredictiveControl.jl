@@ -72,6 +72,12 @@ PredictiveController
 LinMPC
 ```
 
+### Conversion to LinearMPC.jl (code generation)
+
+```@docs
+LinearMPC.MPC
+```
+
 ## ExplicitMPC
 
 ```@docs

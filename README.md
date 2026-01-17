@@ -91,6 +91,7 @@ for more detailed examples.
 - 📝 **Transcription**: Direct single/multiple shooting and trapezoidal collocation.
 - 🩺 **Troubleshooting**: Detailed diagnostic information about optimum.
 - ⏱️ **Real-Time**: Optimized for low memory allocations with soft real-time utilities.
+- 📟️ **Embedded**: Lightweight C code generation via `LinearMPC.jl`
 
 ### 🔭 State Estimation Features
 

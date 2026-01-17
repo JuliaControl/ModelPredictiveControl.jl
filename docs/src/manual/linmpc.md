@@ -201,7 +201,7 @@ For the CSTR, we will bound the innovation term ``\mathbf{y}(k) - \mathbf{ŷ}(k
 estim = MovingHorizonEstimator(model, He=10, nint_u=[1, 1], σQint_u = [1, 2])
 estim = setconstraint!(estim, v̂min=[-1, -0.5], v̂max=[+1, +0.5])
 mpc_mhe = LinMPC(estim, Hp=10, Hc=2, Mwt=[1, 1], Nwt=[0.1, 0.1])
-mpc_mhe = setconstraint!(mpc_mhe, ymin=[45, -Inf])
+mpc_mhe = setconstraint!(mpc_mhe, ymin=[48, -Inf])
 ```
 
 The rejection is indeed improved:

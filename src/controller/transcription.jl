@@ -256,7 +256,7 @@ end
 @doc raw"""
     init_predmat(
         model::LinModel, estim, transcription::SingleShooting, Hp, Hc, nb
-    ) -> E, G, J, K, V, ex̂, gx̂, jx̂, kx̂, vx̂
+    ) -> E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ 
 
 Construct the prediction matrices for [`LinModel`](@ref) and [`SingleShooting`](@ref).
 
@@ -484,7 +484,9 @@ function init_predmat(
 end
 
 """
-    init_predmat(model::NonLinModel, estim, transcription::SingleShooting, Hp, Hc, nb) 
+    init_predmat(
+        model::NonLinModel, estim, transcription::SingleShooting, Hp, Hc, nb
+    ) -> E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 
 Return empty matrices for [`SingleShooting`](@ref) of [`NonLinModel`](@ref)
 """
@@ -504,7 +506,9 @@ function init_predmat(
 end
 
 @doc raw"""
-    init_predmat(model::NonLinModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb)
+    init_predmat(
+        model::NonLinModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb
+    ) -> E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 
 Return the terminal state matrices for [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
 
@@ -537,7 +541,9 @@ function init_predmat(
 end
 
 @doc raw"""
-    init_defectmat(model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb)
+    init_defectmat(
+        model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb
+    ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 
 Init the matrices for computing the defects over the predicted states. 
 
@@ -645,7 +651,9 @@ function init_defectmat(
 end
 
 """
-    init_defectmat(model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb)
+    init_defectmat(
+        model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb
+    ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 
 Return empty matrices for all other cases (N/A).
 """
