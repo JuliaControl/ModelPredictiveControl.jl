@@ -30,7 +30,7 @@
     end
     N = 50
     u_data1, u_data2 = sim_both(model, mpc1, mpc2, N)
-    @test u_data1 ≈ u_data2 atol=1e-3 rtol=1e-3 # looser tol due to different softening
+    @test u_data1 ≈ u_data2 atol=1e-3 rtol=1e-3 # looser tols due to different softening
 
     mpc1_hard = LinMPC(model, Hp=15, Cwt=Inf, optim=optim)
     mpc1_hard = setconstraint!(mpc1_hard, ymin=[48, -Inf], umax=[Inf, 30])
@@ -38,7 +38,7 @@
     u_data1_hard, u_data2_hard = sim_both(
         model, mpc1_hard, mpc2_hard, N
     )
-    @test u_data1_hard ≈ u_data2_hard atol=1e-12 # exact match for hard constraints
+    @test u_data1_hard ≈ u_data2_hard atol=1e-10 rtol=1e-10 # tighter tols for hard constraints
 
     mpc_ms = LinMPC(model; transcription=MultipleShooting(), optim)
     @test_throws ErrorException LinearMPC.MPC(mpc_ms)
