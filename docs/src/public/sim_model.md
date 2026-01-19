@@ -14,7 +14,7 @@ method to manually modify them.
 !!! info
     The nomenclature in this page introduces the model manipulated input ``\mathbf{u}``,
     measured disturbances ``\mathbf{d}``, state ``\mathbf{x}`` and output ``\mathbf{y}``,
-    four vectors of `nu`, `nd`, `nx` and `ny` elements, respectively. The ``\mathbf{z}``
+    four vectors of `nu`, `nd`, `nx` and `ny` elements, respectively. The ``\mathbf{s}``
     vector combines the elements of ``\mathbf{u}`` and ``\mathbf{d}``.
 
 ## SimModel
