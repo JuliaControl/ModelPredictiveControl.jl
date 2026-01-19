@@ -212,7 +212,7 @@ end
 Convert a `ModelPredictiveControl.LinMPC` object to a `LinearMPC.MPC` object.
 
 The `LinearMPC` package needs to be installed and available in the activated Julia
-environment. The converted object can be used to generate lightweight C-code for embedded
+environment. The converted object can be used to generate lightweight C code for embedded
 applications using the `LinearMPC.codegen` function. Note that not all features of [`LinMPC`](@ref)
 are supported, including these restrictions:
 
