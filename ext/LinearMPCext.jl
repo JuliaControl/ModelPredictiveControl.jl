@@ -221,7 +221,8 @@ are supported, including these restrictions:
 - the state estimator must be a [`SteadyKalmanFilter`](@ref) with `direct=true`.
 - only block-diagonal weights are allowed.
 - the constraint relaxation mechanism is different, so a 1-on-1 conversion of the soft 
-  constraints is impossible (use `Cwt=Inf` to disable relaxation).
+  constraints is impossible; expect differences in closed-loop behavior near the soft
+  bounds (or use `Cwt=Inf` to disable relaxation)
 
 But the package has also several exclusive functionalities, such as pre-stabilization,
 constrained explicit MPC, and binary manipulated inputs. See the [`LinearMPC.jl`](@extref LinearMPC)
