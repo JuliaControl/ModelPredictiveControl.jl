@@ -193,15 +193,15 @@ The predictive controllers support both soft and hard constraints, defined by:
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
 end of the horizon (see Extended Help). See [`MovingHorizonEstimator`](@ref) constraints
-for details on bounds and softness parameters ``\mathbf{c}``. The custom linear constraints
-are defined as:
+for details on bounds and softness parameters ``\mathbf{c}``. The custom linear inequality
+constraints are defined as:
 ```math
     g(k+j) =
-    \mathbf{a_{\hat{y}}'}   \mathbf{\hat{y}}(k+j)   +     
-    \mathbf{a_{r_y}'}       \mathbf{\hat{r}_y}(k+j) +   
-    \mathbf{a_{u}'}         \mathbf{u}(k+j)         +                   
-    \mathbf{a_{\Delta u}'}  \mathbf{\Delta u}(k+j)  +     
-    \mathbf{a_{d}'}         \mathbf{\hat{d}}(k+j) 
+    \mathbf{g_{\hat{y}}'}   \mathbf{\hat{y}}(k+j)   +     
+    \mathbf{g_{r_y}'}       \mathbf{\hat{r}_y}(k+j) +   
+    \mathbf{g_{u}'}         \mathbf{u}(k+j)         +                   
+    \mathbf{g_{\Delta u}'}  \mathbf{\Delta u}(k+j)  +     
+    \mathbf{g_{d}'}         \mathbf{\hat{d}}(k+j) 
 ```
 The output, terminal and custom linear constraints are all soft by default. See Extended
 Help for time-varying constraints.
