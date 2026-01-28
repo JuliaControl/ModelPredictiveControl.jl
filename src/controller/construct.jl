@@ -187,13 +187,24 @@ The predictive controllers support both soft and hard constraints, defined by:
     \mathbf{u_{min}  - c_{u_{min}}}  ϵ ≤&&\       \mathbf{u}(k+j) &≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad  j = 0, 1 ,..., H_p - 1 \\
     \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ ≤&&\      \mathbf{Δu}(k+j) &≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad  j = 0, 1 ,..., H_c - 1 \\
     \mathbf{y_{min}  - c_{y_{min}}}  ϵ ≤&&\       \mathbf{ŷ}(k+j) &≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad  j = 1, 2 ,..., H_p     \\
+            g_{min}  - c_{g_{min}}   ϵ ≤&&\                g(k+j) &≤         g_{max}  + c_{g_{max}}   ϵ &&\qquad  j = 0, 1 ,..., H_p \\
     \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ ≤&&\     \mathbf{x̂}_i(k+j) &≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad  j = H_p
 \end{alignat*}
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
 end of the horizon (see Extended Help). See [`MovingHorizonEstimator`](@ref) constraints
-for details on bounds and softness parameters ``\mathbf{c}``. The output and terminal 
-constraints are all soft by default. See Extended Help for time-varying constraints.
+for details on bounds and softness parameters ``\mathbf{c}``. The custom linear constraints
+are defined as:
+```math
+    g(k+j) =
+    \mathbf{a_{\hat{y}}'}   \mathbf{\hat{y}}(k+j)   +     
+    \mathbf{a_{r_y}'}       \mathbf{\hat{r}_y}(k+j) +   
+    \mathbf{a_{u}'}         \mathbf{u}(k+j)         +                   
+    \mathbf{a_{\Delta u}'}  \mathbf{\Delta u}(k+j)  +     
+    \mathbf{a_{d}'}         \mathbf{\hat{d}}(k+j) 
+```
+The output, terminal and custom linear constraints are all soft by default. See Extended
+Help for time-varying constraints.
 
 # Arguments
 !!! info
