@@ -187,24 +187,14 @@ The predictive controllers support both soft and hard constraints, defined by:
     \mathbf{u_{min}  - c_{u_{min}}}  ϵ ≤&&\       \mathbf{u}(k+j) &≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad  j = 0, 1 ,..., H_p - 1 \\
     \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ ≤&&\      \mathbf{Δu}(k+j) &≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad  j = 0, 1 ,..., H_c - 1 \\
     \mathbf{y_{min}  - c_{y_{min}}}  ϵ ≤&&\       \mathbf{ŷ}(k+j) &≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad  j = 1, 2 ,..., H_p     \\
-            g_{min}  - c_{g_{min}}   ϵ ≤&&\                g(k+j) &≤         g_{max}  + c_{g_{max}}   ϵ &&\qquad  j = 0, 1 ,..., H_p \\
     \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ ≤&&\     \mathbf{x̂}_i(k+j) &≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad  j = H_p
 \end{alignat*}
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
 end of the horizon (see Extended Help). See [`MovingHorizonEstimator`](@ref) constraints
-for details on bounds and softness parameters ``\mathbf{c}``. The custom linear inequality
-constraints are defined as:
-```math
-    g(k+j) =
-    \mathbf{g_{\hat{y}}'}   \mathbf{\hat{y}}(k+j)   +     
-    \mathbf{g_{r_y}'}       \mathbf{\hat{r}_y}(k+j) +   
-    \mathbf{g_{u}'}         \mathbf{u}(k+j)         +                   
-    \mathbf{g_{\Delta u}'}  \mathbf{\Delta u}(k+j)  +     
-    \mathbf{g_{d}'}         \mathbf{\hat{d}}(k+j) 
-```
-The output, terminal and custom linear constraints are all soft by default. See Extended
-Help for time-varying constraints.
+for details on bounds and softness parameters ``\mathbf{c}``. The output and terminal 
+constraints are all soft by default. See Extended Help for time-varying constraints and
+custom linear constraints.
 
 # Arguments
 !!! info
@@ -226,6 +216,8 @@ Help for time-varying constraints.
 - `c_x̂min=fill(1.0,nx̂)` / `c_x̂max=fill(1.0,nx̂)` : `x̂min` / `x̂max` softness weight ``\mathbf{c_{x̂_{min/max}}}``
 - all the keyword arguments above but with a first capital letter, except for the terminal
   constraints, e.g. `Ymax` or `C_Δumin`: for time-varying constraints (see Extended Help)
+- `Gmin` / `Gmax` / `C_Gmin` / `C_Gmax` : custom linear bounds and softness weights over the
+   prediction horizon, default bounds are `±Inf` and weights are `1.0` (see Extended Help)
 
 # Examples
 ```jldoctest
@@ -268,18 +260,34 @@ LinMPC controller with a sample time Ts = 4.0 s:
         create the controller (but different than `±Inf`).
 
     It is also possible to specify time-varying constraints over ``H_p`` and ``H_c`` 
-    horizons. In such a case, they are defined by:
+    horizons. The custom linear inequality constraints are also time-varying but over
+    ``H_p + 1`` steps. In such cases, they are all defined by:
     ```math 
     \begin{alignat*}{3}
         \mathbf{U_{min}  - C_{u_{min}}}  ϵ ≤&&\ \mathbf{U}  &≤ \mathbf{U_{max}  + C_{u_{max}}}  ϵ \\
         \mathbf{ΔU_{min} - C_{Δu_{min}}} ϵ ≤&&\ \mathbf{ΔU} &≤ \mathbf{ΔU_{max} + C_{Δu_{max}}} ϵ \\
-        \mathbf{Y_{min}  - C_{y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + C_{y_{max}}}  ϵ
+        \mathbf{Y_{min}  - C_{y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + C_{y_{max}}}  ϵ \\
+        \mathbf{G_{min}  - C_{G_{min}}}  ϵ ≤&&\ \mathbf{G}  &≤ \mathbf{G_{max}  + C_{G_{max}}}  ϵ 
     \end{alignat*}
     ```
     For this, use the same keyword arguments as above but with a first capital letter:
+
     - `Umin`  / `Umax`  / `C_umin`  / `C_umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
     - `ΔUmin` / `ΔUmax` / `C_Δumin` / `C_Δumax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
     - `Ymin`  / `Ymax`  / `C_ymin`  / `C_ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
+    - `Gmin`  / `Gmax`  / `C_Gmin`  / `C_Gmax`  : custom linear constraints `(nG*(Hp+1),)`.
+    
+    The custom constraints are all gathered in the vector:
+    ```math                                                                                        
+    \mathbf{G} =                                                                                            \begin{bmatrix}
+        \mathbf{G_x̂ x̂}_i(k+0)   + \mathbf{G_u u}(k+0)   + \mathbf{G_d d}(k+0)   + \mathbf{G_r r_y}(k+0)     \\
+        \mathbf{G_x̂ x̂}_i(k+1)   + \mathbf{G_u u}(k+1)   + \mathbf{G_d d̂}(k+1)   + \mathbf{G_r r̂_y}(k+1)     \\
+        \vdots                                                                                              \\
+        \mathbf{G_x̂ x̂}_i(k+H_p) + \mathbf{G_u u}(k+H_p) + \mathbf{G_d d̂}(k+H_p) + \mathbf{G_r r̂_y}(k+H_p)   \end{bmatrix} 
+    ```
+    The matrices ``\mathbf{G_x̂}``, ``\mathbf{G_u}``, ``\mathbf{G_d}`` and ``\mathbf{G_r}``
+    have `nG` rows and are provided at construction time. The terms with ``\mathbf{G_x̂}``
+    are present only if the model is a [`LinModel`](@ref).
 """
 function setconstraint!(
     mpc::PredictiveController; 
