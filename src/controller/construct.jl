@@ -287,7 +287,8 @@ LinMPC controller with a sample time Ts = 4.0 s:
     ```
     The matrices ``\mathbf{G_x̂}``, ``\mathbf{G_u}``, ``\mathbf{G_d}`` and ``\mathbf{G_r}``
     have `nG` rows and are provided at construction time. The terms with ``\mathbf{G_x̂}``
-    are present only if the model is a [`LinModel`](@ref).
+    are present only if the model is a [`LinModel`](@ref) or if the transcription is a
+    [`MultipleShooting`](@ref).
 """
 function setconstraint!(
     mpc::PredictiveController; 
