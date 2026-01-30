@@ -100,12 +100,14 @@ struct NonLinMPC{
         Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
         # dummy vals (updated just before optimization):
         F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
+        Gy, Gu, Gd, Gr = zeros(0, ny), zeros(0, nu), zeros(0, nd), zeros(0, ny) # TODO: DELETE THIS !!!!
         con, nϵ, P̃Δu, P̃u, Ẽ = init_defaultcon_mpc(
             estim, weights, transcription,
             Hp, Hc, 
             PΔu, Pu, E, 
             ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
             Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+            Gy, Gu, Gd, Gr,
             gc!, nc
         )
         warn_cond = iszero(weights.E) ? 1e6 : Inf # condition number warning only if Ewt==0

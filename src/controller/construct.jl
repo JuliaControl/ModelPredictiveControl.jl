@@ -143,6 +143,8 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     Y0max   ::Vector{NT}
     x̂0min   ::Vector{NT}
     x̂0max   ::Vector{NT}
+    Gmin    ::Vector{NT}
+    Gmax    ::Vector{NT}
     # A matrices for the linear inequality constraints:
     A_Umin  ::SparseMatrixCSC{NT, Int}
     A_Umax  ::SparseMatrixCSC{NT, Int}
@@ -152,6 +154,8 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     A_Ymax  ::Matrix{NT}
     A_x̂min  ::Matrix{NT}
     A_x̂max  ::Matrix{NT}
+    A_Gmin  ::Matrix{NT}
+    A_Gmax  ::Matrix{NT}
     A       ::Matrix{NT}
     # b vector for the linear inequality constraints:
     b       ::Vector{NT}
@@ -164,6 +168,8 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     beq     ::Vector{NT}
     # nonlinear equality constraints:
     neq     ::Int
+    # custom linear equality constraints:
+    nG      ::Int
     # constraint softness parameter vectors for the nonlinear inequality constraints:
     C_ymin  ::Vector{NT}
     C_ymax  ::Vector{NT}
@@ -286,8 +292,8 @@ LinMPC controller with a sample time Ts = 4.0 s:
         \mathbf{G_y ŷ}(k+H_p) + \mathbf{G_u u}(k+H_p) + \mathbf{G_d d̂}(k+H_p) + \mathbf{G_r r̂_y}(k+H_p)   \end{bmatrix} 
     ```
     The matrices ``\mathbf{G_y}``, ``\mathbf{G_u}``, ``\mathbf{G_d}`` and ``\mathbf{G_r}``
-    have `nG` rows and are provided at construction time. The terms with ``\mathbf{G_y}``
-    are present only if the model is a [`LinModel`](@ref).
+    are provided at construction time and they must have the same number of rows. The terms
+    with ``\mathbf{G_y}`` are present only if the model is a [`LinModel`](@ref).
 """
 function setconstraint!(
     mpc::PredictiveController; 
@@ -586,10 +592,10 @@ function validate_custom_lincon(model::SimModel, Gy, Gu, Gd, Gr)
     size(Gu, 2) == nu || throw(DimensionMismatch("Gu must have $nu columns."))
     size(Gd, 2) == nd || throw(DimensionMismatch("Gd must have $nd columns."))
     size(Gr, 2) == ny || throw(DimensionMismatch("Gr must have $ny columns."))
-    nG = size(Gy, 1)
-    size(Gu, 1) == nG || throw(DimensionMismatch("Gu must have $nG rows."))
-    size(Gd, 1) == nG || throw(DimensionMismatch("Gd must have $nG rows."))
-    size(Gr, 1) == nG || throw(DimensionMismatch("Gr must have $nG rows."))
+    nGr = size(Gr, 1)
+    size(Gy, 1) == nGr || throw(DimensionMismatch("Gy must have $nGr rows."))
+    size(Gu, 1) == nGr || throw(DimensionMismatch("Gu must have $nGr rows."))
+    size(Gd, 1) == nGr || throw(DimensionMismatch("Gd must have $nGr rows."))
     return nothing
 end
 
@@ -676,6 +682,7 @@ verify_cond(::TranscriptionMethod,_,_) = nothing
         PΔu, Pu, E, 
         ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
         Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+        Gy, Gu, Gd, Gr,
         gc!=nothing, nc=0
     ) -> con, nϵ, P̃Δu, P̃u, Ẽ
 
@@ -691,19 +698,23 @@ function init_defaultcon_mpc(
     PΔu, Pu, E, 
     ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
     Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+    Gy, Gu, Gd, Gr,
     gc!::GCfunc = nothing, nc = 0
 ) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
+    nG = size(Gr, 1)*(Hp+1)
     nϵ = weights.isinf_C ? 0 : 1
     u0min,      u0max   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     Δumin,      Δumax   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     y0min,      y0max   = fill(convert(NT,-Inf), ny), fill(convert(NT,+Inf), ny)
     x̂0min,      x̂0max   = fill(convert(NT,-Inf), nx̂), fill(convert(NT,+Inf), nx̂)
+    Gmin,       Gmax    = fill(convert(NT,-Inf), nG), fill(convert(NT,+Inf), nG)
     c_umin,     c_umax  = fill(zero(NT), nu), fill(zero(NT), nu)
     c_Δumin,    c_Δumax = fill(zero(NT), nu), fill(zero(NT), nu)
     c_ymin,     c_ymax  = fill(one(NT), ny),  fill(one(NT), ny)
     c_x̂min,     c_x̂max  = fill(one(NT), nx̂),  fill(one(NT), nx̂)
+    C_Gmin,     C_Gmax  = fill(one(NT), nG),  fill(one(NT), nG)
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max = 
         repeat_constraints(Hp, Hc, u0min, u0max, Δumin, Δumax, y0min, y0max)
     C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
@@ -712,15 +723,17 @@ function init_defaultcon_mpc(
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃Δu = relaxΔU(PΔu, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ)
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
+    A_Gmin,  A_Gmax = custom_lincon(mode, transcription, nG, Gy, Gu, Gd, Gr, Ẽ)
     A_ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
     i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
     i_x̂min,  i_x̂max  = .!isinf.(x̂0min), .!isinf.(x̂0max)
+    i_Gmin,  i_Gmax  = .!isinf.(Gmin),  .!isinf.(Gmax)
     i_b, i_g, A, Aeq, neq = init_matconstraint_mpc(
         model, transcription, nc,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, i_Gmin, i_Gmax,
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min, A_Gmin, A_Gmax,
         A_ŝ
     )
     # dummy b and beq vectors (updated just before optimization)
@@ -728,12 +741,13 @@ function init_defaultcon_mpc(
     con = ControllerConstraint{NT, GCfunc}(
         ẽx̂      , fx̂     , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
         Ẽŝ      , Fŝ     , Gŝ     , Jŝ       , Kŝ     , Vŝ     , Bŝ     ,
-        U0min   , U0max  , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max,
-        A_Umin  , A_Umax , A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
+        U0min   , U0max  , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max  , Gmin   , Gmax,
+        A_Umin  , A_Umax , A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max , A_Gmin , A_Gmax,
         A       , b      , i_b    , 
         A_ŝ     ,
         Aeq     , beq    ,
         neq     ,
+        nG,
         C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc
     )

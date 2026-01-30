@@ -48,7 +48,8 @@ struct LinMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function LinMPC{NT}(
-        estim::SE, Hp, Hc, nb, weights::CW, 
+        estim::SE, Hp, Hc, nb, weights::CW,
+        Gy, Gu, Gd, Gr,
         transcription::TM, optim::JM
     ) where {
             NT<:Real, 
@@ -77,7 +78,8 @@ struct LinMPC{
             Hp, Hc, 
             PΔu, Pu, E, 
             ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-            Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+            Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+            Gy, Gu, Gd, Gr
         )
         H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
@@ -299,7 +301,7 @@ function LinMPC(
     nb = move_blocking(Hp, Hc)
     Hc = get_Hc(nb)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-    return LinMPC{NT}(estim, Hp, Hc, nb, weights, transcription, optim)
+    return LinMPC{NT}(estim, Hp, Hc, nb, weights, Gy, Gu, Gd, Gr, transcription, optim)
 end
 
 """

@@ -135,22 +135,27 @@ function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
 end
 
 function custom_lincon(
-    model::LinModel, ::TranscriptionMethod, Gy, Gu, Gd, Gr
+    model::LinModel{NT}, ::TranscriptionMethod, nG, Gy, Gu, Gd, Gr, Ẽ
 ) where {NT<:Real}
     validate_custom_lincon(model, Gy, Gu, Gd, Gr)
-
+    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
+    return A_Gmin, A_Gmax
 end
 
 function custom_lincon(
-    model::NonLinModel, ::SingleShooting, Gy, Gu, Gd, Gr
-)
+    model::NonLinModel{NT}, ::SingleShooting, nG, Gy, Gu, Gd, Gr, Ẽ
+) where {NT<:Real}
     validate_custom_lincon(model, Gy, Gu, Gd, Gr)
+    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
+    return A_Gmin, A_Gmax
 end
 
 function custom_lincon(
-    model::NonLinModel, ::TranscriptionMethod, Gy, Gu, Gd, Gr
-)
+    model::NonLinModel{NT}, ::TranscriptionMethod, nG, Gy, Gu, Gd, Gr, Ẽ
+) where {NT<:Real}
     validate_custom_lincon(model, Gy, Gu, Gd, Gr)
+    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
+    return A_Gmin, A_Gmax
 end
 
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
@@ -692,7 +697,7 @@ end
 @doc raw"""
     init_matconstraint_mpc(
         model::LinModel, transcription::TranscriptionMethod, nc::Int,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, i_Gmin, i_Gmax,
         args...
     ) -> i_b, i_g, A, Aeq, neq
 
@@ -712,23 +717,36 @@ The argument `nc` is the number of custom nonlinear inequality constraints in
 finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
 also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a 
 case, `args`  needs to contain all the inequality and equality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ`. The integer `neq`
-is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
+`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_Gmin, A_Gmax, A_ŝ`. 
+The integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
     ::LinModel{NT}, ::TranscriptionMethod, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, i_Gmin, i_Gmax,
     args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂min, A_x̂max, A_ŝ = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Ymin; A_Ymax; A_x̂min; A_x̂max]
+        (
+            A_Umin,  A_Umax, 
+            A_ΔŨmin, A_ΔŨmax, 
+            A_Ymin,  A_Ymax, 
+            A_x̂min,  A_x̂max, 
+            A_Gmin,  A_Gmax, 
+            A_ŝ
+        ) = args
+        A = [
+            A_Umin;  A_Umax; 
+            A_ΔŨmin; A_ΔŨmax; 
+            A_Ymin;  A_Ymax; 
+            A_x̂min;  A_x̂max; 
+            A_Gmin;  A_Gmax
+        ]
         Aeq = A_ŝ
         neq = 0
     end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max]
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_x̂min; i_x̂max; i_Gmin; i_Gmax]
     i_g = trues(nc)
     return i_b, i_g, A, Aeq, neq
 end
@@ -736,18 +754,18 @@ end
 "Init `i_b` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
 function init_matconstraint_mpc(
     ::NonLinModel{NT}, ::SingleShooting, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, i_Gmin, i_Gmax,
     args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ , A_ŝ = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax]
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , _ , _ , A_Gmin, A_Gmax, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Gmin; A_Gmax]
         Aeq = A_ŝ
         neq = 0
     end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax]
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Gmin; i_Gmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
     return i_b, i_g, A, Aeq, neq
 end
@@ -755,19 +773,19 @@ end
 "Init `i_b` without output constraints if `NonLinModel` and other `TranscriptionMethod`."
 function init_matconstraint_mpc(
     ::NonLinModel{NT}, ::TranscriptionMethod, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, 
+    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max, i_Gmin, i_Gmax,
     args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else    
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_x̂min, A_x̂max, A_ŝ = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_x̂min; A_x̂max]
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Gmin, A_Gmax, A_x̂min, A_x̂max, A_ŝ = args
+        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_x̂min; A_x̂max; A_Gmin; A_Gmax]
         Aeq = A_ŝ
         nΔŨ, nZ̃ = size(A_ΔŨmin)
         neq = nZ̃ - nΔŨ
     end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_x̂min; i_x̂max]
+    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_x̂min; i_x̂max; i_Gmin; i_Gmax]
     i_g = [i_Ymin; i_Ymax; trues(nc)]
     return i_b, i_g, A, Aeq, neq
 end
