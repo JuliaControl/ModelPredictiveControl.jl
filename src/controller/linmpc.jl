@@ -198,6 +198,11 @@ LinMPC controller with a sample time Ts = 4.0 s:
     for over-actuated systems, when `nu > ny` (e.g. prioritize solutions with lower 
     economical costs). The default `Lwt` value implies that this feature is disabled by default.
 
+    The custom linear constraint matrices `Gy`, `Gu`, `Gd`, and `Gr` allow to define
+    constraints based on linear combinations of outputs, manipulated inputs, measured
+    disturbances, and output setpoints, respectively. See the Extended Help section in
+    [`setconstraint!`](@ref) documentation for more details.
+
     The objective function follows this nomenclature:
 
     | VARIABLE             | DESCRIPTION                                              | SIZE             |

@@ -169,6 +169,10 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     # nonlinear equality constraints:
     neq     ::Int
     # custom linear equality constraints:
+    Ḡy      ::SparseMatrixCSC{NT, Int}
+    Ḡu      ::SparseMatrixCSC{NT, Int}
+    Ḡd      ::SparseMatrixCSC{NT, Int}
+    Ḡr      ::SparseMatrixCSC{NT, Int}
     nG      ::Int
     # constraint softness parameter vectors for the nonlinear inequality constraints:
     C_ymin  ::Vector{NT}
@@ -707,6 +711,7 @@ function init_defaultcon_mpc(
 ) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
+    validate_custom_lincon(model, Gy, Gu, Gd, Gr)
     nG = size(Gr, 1)*(Hp+1)
     nϵ = weights.isinf_C ? 0 : 1
     u0min,      u0max   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
@@ -727,7 +732,11 @@ function init_defaultcon_mpc(
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃Δu = relaxΔU(PΔu, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ)
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
-    A_Gmin,  A_Gmax = custom_lincon(model, transcription, nG, Gy, Gu, Gd, Gr, Ẽ)
+    Ḡy = sparse(repeatdiag(Gy, Hp+1))
+    Ḡu = sparse(repeatdiag(Gu, Hp+1))
+    Ḡd = sparse(repeatdiag(Gd, Hp+1))
+    Ḡr = sparse(repeatdiag(Gr, Hp+1))
+    A_Gmin,  A_Gmax = custom_lincon(model, transcription, nG, Ḡy, Ḡu, Ḡd, Ḡr, Ẽ)
     A_ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
     i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
@@ -745,12 +754,15 @@ function init_defaultcon_mpc(
     con = ControllerConstraint{NT, GCfunc}(
         ẽx̂      , fx̂     , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
         Ẽŝ      , Fŝ     , Gŝ     , Jŝ       , Kŝ     , Vŝ     , Bŝ     ,
-        U0min   , U0max  , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max  , Gmin   , Gmax,
-        A_Umin  , A_Umax , A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max , A_Gmin , A_Gmax,
+        U0min   , U0max  , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max  , 
+        Gmin    , Gmax   ,
+        A_Umin  , A_Umax , A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max , 
+        A_Gmin  , A_Gmax ,
         A       , b      , i_b    , 
         A_ŝ     ,
         Aeq     , beq    ,
         neq     ,
+        Ḡy      , Ḡu     , Ḡd     , Ḡr ,
         nG,
         C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
         gc!     , nc

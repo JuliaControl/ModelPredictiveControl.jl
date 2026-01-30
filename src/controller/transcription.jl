@@ -134,30 +134,6 @@ function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
 
-function custom_lincon(
-    model::LinModel{NT}, ::TranscriptionMethod, nG, Gy, Gu, Gd, Gr, Ẽ
-) where {NT<:Real}
-    validate_custom_lincon(model, Gy, Gu, Gd, Gr)
-    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
-    return A_Gmin, A_Gmax
-end
-
-function custom_lincon(
-    model::NonLinModel{NT}, ::SingleShooting, nG, Gy, Gu, Gd, Gr, Ẽ
-) where {NT<:Real}
-    validate_custom_lincon(model, Gy, Gu, Gd, Gr)
-    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
-    return A_Gmin, A_Gmax
-end
-
-function custom_lincon(
-    model::NonLinModel{NT}, ::TranscriptionMethod, nG, Gy, Gu, Gd, Gr, Ẽ
-) where {NT<:Real}
-    validate_custom_lincon(model, Gy, Gu, Gd, Gr)
-    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
-    return A_Gmin, A_Gmax
-end
-
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
 get_nk(model::SimModel, ::ShootingMethod) = model.nk
 get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.nc
@@ -692,6 +668,27 @@ function init_defectmat(
     Vŝ = zeros(NT, 0, nu)
     Bŝ = zeros(NT, 0)
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+end
+
+function custom_lincon(
+    model::LinModel{NT}, ::TranscriptionMethod, nG, Ḡy, Ḡu, Ḡd, Ḡr, Ẽ
+) where {NT<:Real}
+    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
+    return A_Gmin, A_Gmax
+end
+
+function custom_lincon(
+    model::NonLinModel{NT}, ::SingleShooting, nG, Ḡy, Ḡu, Ḡd, Ḡr, Ẽ
+) where {NT<:Real}
+    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
+    return A_Gmin, A_Gmax
+end
+
+function custom_lincon(
+    model::NonLinModel{NT}, ::TranscriptionMethod, nG, Ḡy, Ḡu, Ḡd, Ḡr, Ẽ
+) where {NT<:Real}
+    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
+    return A_Gmin, A_Gmax
 end
 
 @doc raw"""
