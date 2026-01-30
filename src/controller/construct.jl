@@ -279,11 +279,11 @@ LinMPC controller with a sample time Ts = 4.0 s:
     
     The custom constraints are all gathered in the vector:
     ```math                                                                                        
-    \mathbf{G} =                                                                                            \begin{bmatrix}
-        \mathbf{G_x̂ x̂}_i(k+0)   + \mathbf{G_u u}(k+0)   + \mathbf{G_d d}(k+0)   + \mathbf{G_r r_y}(k+0)     \\
-        \mathbf{G_x̂ x̂}_i(k+1)   + \mathbf{G_u u}(k+1)   + \mathbf{G_d d̂}(k+1)   + \mathbf{G_r r̂_y}(k+1)     \\
-        \vdots                                                                                              \\
-        \mathbf{G_x̂ x̂}_i(k+H_p) + \mathbf{G_u u}(k+H_p) + \mathbf{G_d d̂}(k+H_p) + \mathbf{G_r r̂_y}(k+H_p)   \end{bmatrix} 
+    \mathbf{G} =                                                                                          \begin{bmatrix}
+        \mathbf{G_ŷ ŷ}(k+0)   + \mathbf{G_u u}(k+0)   + \mathbf{G_d d}(k+0)   + \mathbf{G_r r_y}(k+0)     \\
+        \mathbf{G_ŷ ŷ}(k+1)   + \mathbf{G_u u}(k+1)   + \mathbf{G_d d̂}(k+1)   + \mathbf{G_r r̂_y}(k+1)     \\
+        \vdots                                                                                            \\
+        \mathbf{G_ŷ ŷ}(k+H_p) + \mathbf{G_u u}(k+H_p) + \mathbf{G_d d̂}(k+H_p) + \mathbf{G_r r̂_y}(k+H_p)   \end{bmatrix} 
     ```
     The matrices ``\mathbf{G_x̂}``, ``\mathbf{G_u}``, ``\mathbf{G_d}`` and ``\mathbf{G_r}``
     have `nG` rows and are provided at construction time. The terms with ``\mathbf{G_x̂}``
