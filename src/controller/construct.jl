@@ -449,13 +449,16 @@ function setconstraint!(
     i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(con.Y0min), .!isinf.(con.Y0max)
     i_x̂min,  i_x̂max  = .!isinf.(con.x̂0min), .!isinf.(con.x̂0max)
+    i_Gmin,  i_Gmax  = .!isinf.(con.Gmin),  .!isinf.(con.Gmax)
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(
             model, transcription, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
             i_Ymin, i_Ymax, i_x̂min, i_x̂max,
+            i_Gmin, i_Gmax,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
             con.A_Ymin, con.A_Ymax, con.A_x̂min, con.A_x̂max,
+            con.A_Gmin, con.A_Gmax,
             con.A_ŝ
         )
         A = con.A[con.i_b, :]
@@ -469,7 +472,8 @@ function setconstraint!(
         i_b, i_g = init_matconstraint_mpc(
             model, transcription, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
-            i_Ymin, i_Ymax, i_x̂min, i_x̂max
+            i_Ymin, i_Ymax, i_x̂min, i_x̂max,
+            i_Gmin, i_Gmax
         )
         if i_b ≠ con.i_b || i_g ≠ con.i_g
             error("Cannot modify ±Inf constraints after calling moveinput!")
@@ -723,7 +727,7 @@ function init_defaultcon_mpc(
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃Δu = relaxΔU(PΔu, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ)
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
-    A_Gmin,  A_Gmax = custom_lincon(mode, transcription, nG, Gy, Gu, Gd, Gr, Ẽ)
+    A_Gmin,  A_Gmax = custom_lincon(model, transcription, nG, Gy, Gu, Gd, Gr, Ẽ)
     A_ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
     i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
