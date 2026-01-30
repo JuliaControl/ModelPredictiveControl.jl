@@ -280,15 +280,14 @@ LinMPC controller with a sample time Ts = 4.0 s:
     The custom constraints are all gathered in the vector:
     ```math                                                                                        
     \mathbf{G} =                                                                                          \begin{bmatrix}
-        \mathbf{G_ŷ ŷ}(k+0)   + \mathbf{G_u u}(k+0)   + \mathbf{G_d d}(k+0)   + \mathbf{G_r r_y}(k+0)     \\
-        \mathbf{G_ŷ ŷ}(k+1)   + \mathbf{G_u u}(k+1)   + \mathbf{G_d d̂}(k+1)   + \mathbf{G_r r̂_y}(k+1)     \\
+        \mathbf{G_y ŷ}(k+0)   + \mathbf{G_u u}(k+0)   + \mathbf{G_d d}(k+0)   + \mathbf{G_r r_y}(k+0)     \\
+        \mathbf{G_y ŷ}(k+1)   + \mathbf{G_u u}(k+1)   + \mathbf{G_d d̂}(k+1)   + \mathbf{G_r r̂_y}(k+1)     \\
         \vdots                                                                                            \\
-        \mathbf{G_ŷ ŷ}(k+H_p) + \mathbf{G_u u}(k+H_p) + \mathbf{G_d d̂}(k+H_p) + \mathbf{G_r r̂_y}(k+H_p)   \end{bmatrix} 
+        \mathbf{G_y ŷ}(k+H_p) + \mathbf{G_u u}(k+H_p) + \mathbf{G_d d̂}(k+H_p) + \mathbf{G_r r̂_y}(k+H_p)   \end{bmatrix} 
     ```
-    The matrices ``\mathbf{G_x̂}``, ``\mathbf{G_u}``, ``\mathbf{G_d}`` and ``\mathbf{G_r}``
-    have `nG` rows and are provided at construction time. The terms with ``\mathbf{G_x̂}``
-    are present only if the model is a [`LinModel`](@ref) or if the transcription is not a
-    [`SingleShooting`](@ref).
+    The matrices ``\mathbf{G_y}``, ``\mathbf{G_u}``, ``\mathbf{G_d}`` and ``\mathbf{G_r}``
+    have `nG` rows and are provided at construction time. The terms with ``\mathbf{G_y}``
+    are present only if the model is a [`LinModel`](@ref).
 """
 function setconstraint!(
     mpc::PredictiveController; 
@@ -576,6 +575,23 @@ end
 "Get the actual control Horizon `Hc` (integer) from the move blocking vector `nb`."
 get_Hc(nb::AbstractVector{Int}) = length(nb)
 
+"Validate the custom linear constraint matrices dimensions."
+function validate_custom_lincon(model::SimModel, Gy, Gu, Gd, Gr)
+    nu, nd, ny = model.nu, model.nd, model.ny
+    isnothing(Gy) && (Gy = zeros(NT, 0, nx̂))
+    isnothing(Gu) && (Gu = zeros(NT, 0, nu))
+    isnothing(Gd) && (Gd = zeros(NT, 0, nd))
+    isnothing(Gr) && (Gr = zeros(NT, 0, ny))
+    size(Gy, 2) == ny || throw(DimensionMismatch("Gy must have $ny columns."))
+    size(Gu, 2) == nu || throw(DimensionMismatch("Gu must have $nu columns."))
+    size(Gd, 2) == nd || throw(DimensionMismatch("Gd must have $nd columns."))
+    size(Gr, 2) == ny || throw(DimensionMismatch("Gr must have $ny columns."))
+    nG = size(Gy, 1)
+    size(Gu, 1) == nG || throw(DimensionMismatch("Gu must have $nG rows."))
+    size(Gd, 1) == nG || throw(DimensionMismatch("Gd must have $nG rows."))
+    size(Gr, 1) == nG || throw(DimensionMismatch("Gr must have $nG rows."))
+    return nothing
+end
 
 """
     validate_args(mpc::PredictiveController, ry, d, lastu, D̂, R̂y, R̂u)

@@ -134,6 +134,25 @@ function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
 
+function custom_lincon(
+    model::LinModel, ::TranscriptionMethod, Gy, Gu, Gd, Gr
+) where {NT<:Real}
+    validate_custom_lincon(model, Gy, Gu, Gd, Gr)
+
+end
+
+function custom_lincon(
+    model::NonLinModel, ::SingleShooting, Gy, Gu, Gd, Gr
+)
+    validate_custom_lincon(model, Gy, Gu, Gd, Gr)
+end
+
+function custom_lincon(
+    model::NonLinModel, ::TranscriptionMethod, Gy, Gu, Gd, Gr
+)
+    validate_custom_lincon(model, Gy, Gu, Gd, Gr)
+end
+
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
 get_nk(model::SimModel, ::ShootingMethod) = model.nk
 get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.nc
@@ -156,8 +175,7 @@ in which ``\mathbf{P_{Δu}}`` is defined in the Extended Help section.
     Following the decision variable definition of the [`TranscriptionMethod`](@ref), the
     conversion matrix ``\mathbf{P_{Δu}}``, we have:
     - ``\mathbf{P_{Δu}} = \mathbf{I}`` if `transcription` is a [`SingleShooting`](@ref)
-    - ``\mathbf{P_{Δu}} = [\begin{smallmatrix}\mathbf{I} & \mathbf{0} \end{smallmatrix}]``
-      if `transcription` is a [`MultipleShooting`](@ref)
+    - ``\mathbf{P_{Δu}} = [\begin{smallmatrix}\mathbf{I} & \mathbf{0} \end{smallmatrix}]`` otherwise.
     The matrix is store as as `SparseMatrixCSC` to support both cases efficiently.
 """
 function init_ZtoΔU end

@@ -147,6 +147,7 @@ This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) wit
 arguments. This controller allocates memory at each time step for the optimization.
 
 # Arguments
+
 - `model::LinModel` : model used for controller predictions and state estimations.
 - `Hp::Int=10+nk` : prediction horizon ``H_p``, `nk` is the number of delays in `model`.
 - `Hc::Union{Int, Vector{Int}}=2` : control horizon ``H_c``, custom move blocking pattern is 
@@ -158,6 +159,10 @@ arguments. This controller allocates memory at each time step for the optimizati
 - `N_Hc=Diagonal(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
 - `L_Hp=Diagonal(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
+- `Gy=zeros(0,model.ny)` : custom linear constraint matrix for output (see Extended Help).
+- `Gu=zeros(0,model.nu)` : custom linear constraint matrix for manipulated input (see Extended Help).
+- `Gd=zeros(0,model.nd)` : custom linear constraint matrix for meas. disturbance (see Extended Help).
+- `Gr=zeros(0,model.ny)` : custom linear constraint matrix for output setpoint (see Extended Help).
 - `transcription=SingleShooting()` : [`SingleShooting`](@ref) or [`MultipleShooting`](@ref).
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](@extref) object (default to 
@@ -222,12 +227,19 @@ function LinMPC(
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt = DEFAULT_CWT,
+    Gy = zeros(0, model.ny),
+    Gu = zeros(0, model.nu),
+    Gd = zeros(0, model.nd),
+    Gr = zeros(0, model.ny),
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
-    return LinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, transcription, optim)
+    return LinMPC(
+        estim; 
+        Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, Gy, Gu, Gd, Gr, transcription, optim
+    )
 end
 
 
@@ -271,8 +283,12 @@ function LinMPC(
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
     Cwt  = DEFAULT_CWT,
+    Gy = zeros(0, estim.model.ny),
+    Gu = zeros(0, estim.model.nu),
+    Gd = zeros(0, estim.model.nd),
+    Gr = zeros(0, estim.model.ny),
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
-    optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
+    optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false)
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
     isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 
     nk = estimate_delays(estim.model)
