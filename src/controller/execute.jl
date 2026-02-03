@@ -258,8 +258,8 @@ end
 
 Init `lastu0, ŷ, F, d0, D̂0, D̂e, R̂y, R̂u` vectors when model is not a [`LinModel`](@ref).
 """
-function initpred!(mpc::PredictiveController, model::SimModel, d, lastu, D̂, R̂y, R̂u)
-    F = initpred_common!(mpc, model, ry, d, lastu, D̂, R̂y, R̂u)
+function initpred!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u)
+    initpred_common!(mpc, model, ry, d, lastu, D̂, R̂y, R̂u)
     return nothing
 end
 
