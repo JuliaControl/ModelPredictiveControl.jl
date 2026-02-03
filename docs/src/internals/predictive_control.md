@@ -21,6 +21,8 @@ ModelPredictiveControl.relaxU
 ModelPredictiveControl.relaxΔU
 ModelPredictiveControl.relaxŶ
 ModelPredictiveControl.relaxterminal
+ModelPredictiveControl.relaxG
+ModelPredictiveControl.augmentdefect
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
 ModelPredictiveControl.init_matconstraint_mpc

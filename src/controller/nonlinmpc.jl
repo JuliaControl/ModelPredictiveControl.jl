@@ -34,6 +34,7 @@ struct NonLinMPC{
     oracle::Bool
     Z̃::Vector{NT}
     ŷ::Vector{NT}
+    ry::Vector{NT}
     Hp::Int
     Hc::Int
     nϵ::Int
@@ -69,6 +70,7 @@ struct NonLinMPC{
     buffer::PredictiveControllerBuffer{NT}
     function NonLinMPC{NT}(
         estim::SE, Hp, Hc, nb, weights::CW,
+        Gy, Gu, Gd, Gr,
         JE::JEfunc, gc!::GCfunc, nc, p::PT, 
         transcription::TM, optim::JM, 
         gradient::GB, jacobian::JB, hessian::HB, oracle
@@ -87,26 +89,25 @@ struct NonLinMPC{
         }
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
-        ŷ = copy(model.yop) # dummy vals (updated just before optimization)
+        ŷ, ry = copy(model.yop), copy(model.yop) # dummy vals (updated just before optimization)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         lastu0 = zeros(NT, nu)
+        Gy, Gu, Gd, Gr, nG = validate_custom_lincon(model, Gy, Gu, Gd, Gr)
         validate_transcription(model, transcription)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
             model, estim, transcription, Hp, Hc, nb
         )
+        F = zeros(NT, ny*Hp) # dummy value (updated just before optimization)
         Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
-        # dummy vals (updated just before optimization):
-        F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
-        Gy, Gu, Gd, Gr = zeros(0, ny), zeros(0, nu), zeros(0, nd), zeros(0, ny) # TODO: DELETE THIS !!!!
         con, nϵ, P̃Δu, P̃u, Ẽ = init_defaultcon_mpc(
             estim, weights, transcription,
             Hp, Hc, 
             PΔu, Pu, E, 
-            ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-            Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+            ex̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+            Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
             Gy, Gu, Gd, Gr,
             gc!, nc
         )
@@ -125,7 +126,7 @@ struct NonLinMPC{
         mpc = new{NT, SE, CW, TM, JM, GB, JB, HB, PT, JEfunc, GCfunc}(
             estim, transcription, optim, con,
             gradient, jacobian, hessian, oracle,
-            Z̃, ŷ,
+            Z̃, ŷ, ry,
             Hp, Hc, nϵ, nb,
             weights,
             JE, p,
@@ -209,13 +210,17 @@ This controller allocates memory at each time step for the optimization.
 - `N_Hc=Diagonal(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
 - `L_Hp=Diagonal(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
+- `Gy=nothing` : custom linear constraint matrix for output (see Extended Help).
+- `Gu=nothing` : custom linear constraint matrix for manipulated input (see Extended Help).
+- `Gd=nothing` : custom linear constraint matrix for meas. disturbance (see Extended Help).
+- `Gr=nothing` : custom linear constraint matrix for output setpoint (see Extended Help).
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
 - `JE=(_,_,_,_)->0.0` : economic or custom cost function ``J_E(\mathbf{U_e}, \mathbf{Ŷ_e},
    \mathbf{D̂_e}, \mathbf{p})``.
-- `gc=(_,_,_,_,_,_)->nothing` or `gc!` : custom inequality constraint function 
+- `gc=(_,_,_,_,_,_)->nothing` or `gc!` : custom nonlinear inequality constraint function 
    ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ)``, mutating or 
    not (details in Extended Help).
-- `nc=0` : number of custom inequality constraints.
+- `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
 - `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
@@ -261,6 +266,9 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     `NonLinMPC` controllers based on [`LinModel`](@ref) compute the predictions with matrix 
     algebra instead of a `for` loop. This feature can accelerate the optimization, especially
     for the constraint handling, and is not available in any other package, to my knowledge.
+    See [`setconstraint!`](@ref) for details about the custom linear inequality constraint
+    matrices `Gy`, `Gu`, `Gd` and `Gr`. The `Gy` keyword argument can be provided only if
+    `model` is a [`LinModel`](@ref)).
 
     The economic cost ``J_E`` and custom constraint ``\mathbf{g_c}`` functions receive the
     extended vectors ``\mathbf{U_e}`` (`nu*Hp+nu` elements), ``\mathbf{Ŷ_e}`` (`ny+ny*Hp`
@@ -328,6 +336,10 @@ function NonLinMPC(
     M_Hp = Diagonal(repeat(Mwt, Hp)),
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
+    Gy = nothing,
+    Gu = nothing,
+    Gd = nothing,
+    Gr = nothing,
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE ::Function = (_,_,_,_) -> 0.0,
@@ -347,6 +359,7 @@ function NonLinMPC(
     return NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
+        Gy, Gu, Gd, Gr,
         transcription, optim, gradient, jacobian, hessian, oracle
     )
 end
@@ -395,6 +408,10 @@ function NonLinMPC(
     M_Hp = Diagonal(repeat(Mwt, Hp)),
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
+    Gy = nothing,
+    Gu = nothing,
+    Gd = nothing,
+    Gr = nothing,
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE ::Function = (_,_,_,_) -> 0.0,
@@ -424,7 +441,7 @@ function NonLinMPC(
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     hessian = validate_hessian(hessian, gradient, oracle, DEFAULT_NONLINMPC_HESSIAN)
     return NonLinMPC{NT}(
-        estim, Hp, Hc, nb, weights, JE, gc!, nc, p, 
+        estim, Hp, Hc, nb, weights, Gy, Gu, Gd, Gr, JE, gc!, nc, p, 
         transcription, optim, gradient, jacobian, hessian, oracle
     )
 end

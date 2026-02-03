@@ -670,27 +670,6 @@ function init_defectmat(
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 end
 
-function custom_lincon(
-    model::LinModel{NT}, ::TranscriptionMethod, nG, Ḡy, Ḡu, Ḡd, Ḡr, Ẽ
-) where {NT<:Real}
-    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
-    return A_Gmin, A_Gmax
-end
-
-function custom_lincon(
-    model::NonLinModel{NT}, ::SingleShooting, nG, Ḡy, Ḡu, Ḡd, Ḡr, Ẽ
-) where {NT<:Real}
-    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
-    return A_Gmin, A_Gmax
-end
-
-function custom_lincon(
-    model::NonLinModel{NT}, ::TranscriptionMethod, nG, Ḡy, Ḡu, Ḡd, Ḡr, Ẽ
-) where {NT<:Real}
-    A_Gmin, A_Gmax = zeros(NT, nG, size(Ẽ,2)), zeros(NT, nG, size(Ẽ,2)) 
-    return A_Gmin, A_Gmax
-end
-
 @doc raw"""
     init_matconstraint_mpc(
         model::LinModel, transcription::TranscriptionMethod, nc::Int,
@@ -794,10 +773,12 @@ Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ 
 
 Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d_0}(k) + \mathbf{j_x̂ D̂_0} + \mathbf{k_x̂ x̂_0}(k) + 
 \mathbf{v_x̂ u_0}(k-1) + \mathbf{b_x̂}`` vector for the terminal constraints, see
-[`init_predmat`](@ref).
+[`init_predmat`](@ref). The ``\mathbf{F_G}`` vector for the custom linear constraints is
+also updated, see [`relaxG`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
     nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
+    nḠ = length(mpc.con.Gmin)
     nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
     fx̂ .= mpc.con.bx̂
     mul!(fx̂, mpc.con.kx̂, mpc.estim.x̂0, 1, 1)
@@ -806,6 +787,7 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
         mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
         mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
     end
+    mpc.con.nG > 0 && linconstraint_custom!(mpc, model)
     n = 0
     mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
     n += nU
@@ -822,6 +804,10 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
     mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂0min + fx̂
     n += nx̂
     mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂0max - fx̂
+    n += nx̂
+    mpc.con.b[(n+1):(n+nḠ)]  .= @. -mpc.con.Gmin + mpc.con.FG
+    n += nḠ
+    mpc.con.b[(n+1):(n+nḠ)]  .= @. +mpc.con.Gmax - mpc.con.FG
     if any(mpc.con.i_b) 
         lincon = mpc.optim[:linconstraint]
         JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
@@ -831,9 +817,11 @@ end
 
 "Set `b` excluding predicted output constraints for `NonLinModel` and not `SingleShooting`."
 function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod)
-    nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
-    nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
+    nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
+    nḠ = length(mpc.con.Gmin)
+    nx̂ = mpc.estim.nx̂
     # here, updating fx̂ is not necessary since fx̂ = 0
+    mpc.con.nG > 0 && linconstraint_custom!(mpc, model)
     n = 0
     mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
     n += nU
@@ -846,6 +834,10 @@ function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::Transcriptio
     mpc.con.b[(n+1):(n+nx̂)]  .= @. -mpc.con.x̂0min
     n += nx̂
     mpc.con.b[(n+1):(n+nx̂)]  .= @. +mpc.con.x̂0max
+    n += nx̂
+    mpc.con.b[(n+1):(n+nḠ)]  .= @. -mpc.con.Gmin + mpc.con.FG
+    n += nḠ
+    mpc.con.b[(n+1):(n+nḠ)]  .= @. +mpc.con.Gmax - mpc.con.FG
     if any(mpc.con.i_b) 
         lincon = mpc.optim[:linconstraint]
         JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
@@ -855,6 +847,8 @@ end
 "Also exclude terminal constraints for `NonLinModel` and `SingleShooting`."
 function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::SingleShooting)
     nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
+    nḠ = length(mpc.con.Gmin)
+    mpc.con.nG > 0 && linconstraint_custom!(mpc, model)
     n = 0
     mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
     n += nU
@@ -863,12 +857,47 @@ function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::SingleShooti
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
     n += nΔŨ
     mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
+    n += nΔŨ
+    mpc.con.b[(n+1):(n+nḠ)]  .= @. -mpc.con.Gmin + mpc.con.FG
+    n += nḠ
+    mpc.con.b[(n+1):(n+nḠ)]  .= @. +mpc.con.Gmax - mpc.con.FG
     if any(mpc.con.i_b) 
         lincon = mpc.optim[:linconstraint]
         @views JuMP.set_normalized_rhs(lincon, mpc.con.b[mpc.con.i_b])
     end
     return nothing
 end
+
+"Init the ``\\mathbf{F_G}`` vector for the linear model custom inequality constraints."
+function linconstraint_custom!(mpc::PredictiveController,  model::SimModel)
+    ny, nu, nd, buffer = model.ny, model.nu, model.nd, mpc.buffer
+    FG = mpc.con.FG
+    Ue_term, D̂e_term, R̂e_term = buffer.Ue, buffer.D̂e, buffer.Ŷe
+    FG .= 0
+    Ue_term[1:end-nu]     .= mpc.Tu_lastu0 .+ mpc.Uop
+    Ue_term[end-nu+1:end] .= mpc.lastu0    .+ model.uop
+    mul!(FG, mpc.con.Ḡu, Ue_term, 1, 1)
+    if model.nd > 0
+        D̂e_term[1:nd]     .= mpc.d0 .+ model.dop
+        D̂e_term[nd+1:end] .= mpc.D̂0 .+ model.D̂op
+        mul!(FG, mpc.con.Ḡd, D̂e_term, 1, 1)
+    end
+    R̂e_term[1:ny]     .= mpc.ry
+    R̂e_term[ny+1:end] .= mpc.R̂y
+    mul!(FG, mpc.con.Ḡr, R̂e_term, 1, 1)
+    return linconstraint_custom_outputs!(mpc, model)
+end
+
+"Also include the `Ḡy` term in the custom linear constraints for [`LinModel`](@ref)."
+function linconstraint_custom_outputs!(mpc::PredictiveController,  model::LinModel)
+    Ŷe_term, FG, ny = mpc.buffer.Ŷe, mpc.con.FG, model.ny
+    Ŷe_term[1:ny]     .= mpc.ŷ
+    Ŷe_term[ny+1:end] .= mpc.F .+ mpc.Yop
+    mul!(FG, mpc.con.Ḡy, Ŷe_term, 1, 1)
+    return nothing
+end
+linconstraint_custom_outputs!(::PredictiveController, ::SimModel) = nothing
+
 
 @doc raw"""
     linconstrainteq!(

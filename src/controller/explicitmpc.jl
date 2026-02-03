@@ -7,6 +7,7 @@ struct ExplicitMPC{
     transcription::SingleShooting
     Z̃::Vector{NT}
     ŷ::Vector{NT}
+    ry::Vector{NT}
     Hp::Int
     Hc::Int
     nϵ::Int
@@ -44,7 +45,7 @@ struct ExplicitMPC{
     ) where {NT<:Real, SE<:StateEstimator, CW<:ControllerWeights}
         model = estim.model
         nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
-        ŷ = copy(model.yop) # dummy vals (updated just before optimization)
+        ŷ, ry = copy(model.yop), copy(model.yop) # dummy vals (updated just before optimization)
         nϵ = 0    # no slack variable ϵ for ExplicitMPC
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
@@ -54,8 +55,7 @@ struct ExplicitMPC{
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
         E, G, J, K, V, B = init_predmat(model, estim, transcription, Hp, Hc, nb)
-        # dummy val (updated just before optimization):
-        F = zeros(NT, ny*Hp)
+        F = zeros(NT, ny*Hp) # dummy value (updated just before optimization)
         P̃Δu, P̃u, Ẽ = PΔu, Pu, E # no slack variable ϵ for ExplicitMPC
         H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
@@ -71,7 +71,7 @@ struct ExplicitMPC{
         mpc = new{NT, SE, CW}(
             estim,
             transcription,
-            Z̃, ŷ,
+            Z̃, ŷ, ry,
             Hp, Hc, nϵ, nb,
             weights,
             R̂u, R̂y,
