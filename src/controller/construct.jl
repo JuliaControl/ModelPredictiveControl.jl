@@ -182,9 +182,11 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     beq     ::Vector{NT}
     # nonlinear equality constraints:
     neq     ::Int
-    # constraint softness parameter vectors for the nonlinear inequality constraints:
+    # constraint softness parameter vectors needing seperate storage:
     C_ymin  ::Vector{NT}
     C_ymax  ::Vector{NT}
+    C_wmin  ::Vector{NT}
+    C_wmax  ::Vector{NT}
     c_x̂min  ::Vector{NT}
     c_x̂max  ::Vector{NT}
     # indices of finite numbers in the g vector (nonlinear inequality constraints):
@@ -478,11 +480,13 @@ function setconstraint!(
         if !isnothing(C_wmin)
             size(C_wmin) == (nw*(Hp+1),) || throw(ArgumentError("C_wmin size must be $((nw*(Hp+1),))"))
             any(<(0), C_wmin) && error("C_wmin weights should be non-negative")
+            con.C_wmin .= C_wmin
             con.A_Wmin[:, end] .= -C_wmin
         end
         if !isnothing(C_wmax)
             size(C_wmax) == (nw*(Hp+1),) || throw(ArgumentError("C_wmax size must be $((nw*(Hp+1),))"))
             any(<(0), C_wmax) && error("C_wmax weights should be non-negative")
+            con.C_wmax .= C_wmax
             con.A_Wmax[:, end] .= -C_wmax
         end
         if !isnothing(c_x̂min)
@@ -833,7 +837,7 @@ function init_defaultcon_mpc(
         A_ŝ     ,
         Aeq     , beq    ,
         neq     ,
-        C_ymin  , C_ymax , c_x̂min  , c_x̂max , 
+        C_ymin  , C_ymax , C_wmin  , C_wmax   , c_x̂min , c_x̂max , 
         i_g     ,
         gc!     , nc
     )
