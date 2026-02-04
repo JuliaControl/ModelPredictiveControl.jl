@@ -234,7 +234,7 @@ custom linear constraints.
 - all the keyword arguments above but with a first capital letter, except for the terminal
   constraints, e.g. `Ymax` or `C_Δumin`: for time-varying constraints (see Extended Help)
 - `Gmin` / `Gmax` / `C_Gmin` / `C_Gmax` : custom linear bounds and softness weights over the
-   prediction horizon, default bounds are `±Inf` and weights are `1.0` (see Extended Help)
+   prediction horizon, default bounds are `±Inf` and softness weights are `1.0` (see Extended Help)
 
 # Examples
 ```jldoctest

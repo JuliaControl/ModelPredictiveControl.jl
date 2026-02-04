@@ -33,7 +33,7 @@ ModelPredictiveControl.get_nonlincon_oracle(::NonLinMPC, ::ModelPredictiveContro
 ## Update Quadratic Optimization
 
 ```@docs
-ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any, ::Any)
+ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
 ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel, ::TranscriptionMethod)
 ModelPredictiveControl.linconstrainteq!
 ```
