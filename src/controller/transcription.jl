@@ -773,7 +773,7 @@ Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ 
 
 Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d_0}(k) + \mathbf{j_x̂ D̂_0} + \mathbf{k_x̂ x̂_0}(k) + 
 \mathbf{v_x̂ u_0}(k-1) + \mathbf{b_x̂}`` vector for the terminal constraints, see
-[`init_predmat`](@ref). The ``\mathbf{F_W}`` vector for the custom linear constraints is
+[`init_predmat`](@ref). The ``\mathbf{F_w}`` vector for the custom linear constraints is
 also updated, see [`relaxW`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
@@ -868,7 +868,7 @@ function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::SingleShooti
     return nothing
 end
 
-"Init the ``\\mathbf{F_W}`` vector for the linear model custom inequality constraints."
+"Init the ``\\mathbf{F_w}`` vector for the linear model custom inequality constraints."
 function linconstraint_custom!(mpc::PredictiveController,  model::SimModel)
     ny, nu, nd, buffer = model.ny, model.nu, model.nd, mpc.buffer
     Fw = mpc.con.Fw
@@ -879,7 +879,7 @@ function linconstraint_custom!(mpc::PredictiveController,  model::SimModel)
     mul!(Fw, mpc.con.W̄u, Ue_term, 1, 1)
     if model.nd > 0
         D̂e_term[1:nd]     .= mpc.d0 .+ model.dop
-        D̂e_term[nd+1:end] .= mpc.D̂0 .+ model.D̂op
+        D̂e_term[nd+1:end] .= mpc.D̂0 .+ mpc.Dop
         mul!(Fw, mpc.con.W̄d, D̂e_term, 1, 1)
     end
     R̂e_term[1:ny]     .= mpc.ry

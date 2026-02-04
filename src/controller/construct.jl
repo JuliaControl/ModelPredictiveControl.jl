@@ -993,11 +993,11 @@ By introducing the following block-diagonal matrices with ``H_p + 1`` blocks:
 the ``\mathbf{W}`` vector defined in the Extended Help section of [`setconstraint!`](@ref)
 can be expressed as:
 ```math
-\mathbf{W} = \mathbf{E_W} \mathbf{Z} + \mathbf{F_W}
+\mathbf{W} = \mathbf{E_w} \mathbf{Z} + \mathbf{F_w}
 ```
 in which:
 ```math
-\mathbf{E_W} = \mathbf{W̄_y} [\begin{smallmatrix} \mathbf{0}   \\ \mathbf{E}   \end{smallmatrix}] + 
+\mathbf{E_w} = \mathbf{W̄_y} [\begin{smallmatrix} \mathbf{0}   \\ \mathbf{E}   \end{smallmatrix}] + 
                \mathbf{W̄_u} [\begin{smallmatrix} \mathbf{P_u} \\ \mathbf{p_u} \end{smallmatrix}]
 ```
 The ``\mathbf{E}`` matrix appears in the linear output prediction equation 
@@ -1005,10 +1005,10 @@ The ``\mathbf{E}`` matrix appears in the linear output prediction equation
 ``\mathbf{U = P_u Z + T_u u}(k-1)``. The ``\mathbf{p_u}`` matrix corresponds to the last
 `nu` rows of ``\mathbf{P_u}``. The ``\mathbf{W̄_u}`` term assumes that ``H_c ≤ H_p``, hence
 ``\mathbf{Δu}(k + H_c) = \mathbf{0}`` and ``\mathbf{u}(k + H_c) = \mathbf{u}(k + H_c - 1)``.
-The ``\mathbf{F_W}`` vector is updated at each control period `k` in [`linconstraint!`](@ref)
+The ``\mathbf{F_w}`` vector is updated at each control period `k` in [`linconstraint!`](@ref)
 method, and is defined as:
 ```math
-\mathbf{F_W} =  
+\mathbf{F_w} =  
     \mathbf{W̄_y} [\begin{smallmatrix} \mathbf{ŷ}(k)       \\ \mathbf{F + Y_{op}} \end{smallmatrix}] + 
     \mathbf{W̄_u} [\begin{smallmatrix} \mathbf{T_u u}(k-1) \\ \mathbf{u}(k-1)     \end{smallmatrix}] +
     \mathbf{W̄_d} [\begin{smallmatrix} \mathbf{d}(k)       \\ \mathbf{D̂}          \end{smallmatrix}] +
@@ -1016,16 +1016,16 @@ method, and is defined as:
 ```
 Denoting the decision variables augmented with the slack variable
 ``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, the function
-returns the ``\mathbf{Ẽ_W}`` matrix that appears in the custom constraint equation
-``\mathbf{W = Ẽ_W Z̃ + F_W}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
+returns the ``\mathbf{Ẽ_w}`` matrix that appears in the custom constraint equation
+``\mathbf{W = Ẽ_w Z̃ + F_w}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
     \mathbf{A_{W_{min}}} \\ 
     \mathbf{A_{W_{max}}}
 \end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
-    - \mathbf{W_{min} + F_W} \\
-    + \mathbf{W_{max} - F_W}
+    - \mathbf{W_{min} + F_w} \\
+    + \mathbf{W_{max} - F_w}
 \end{bmatrix}
 ```
 """
