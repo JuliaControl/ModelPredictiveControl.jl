@@ -70,7 +70,7 @@ struct NonLinMPC{
     buffer::PredictiveControllerBuffer{NT}
     function NonLinMPC{NT}(
         estim::SE, Hp, Hc, nb, weights::CW,
-        Gy, Gu, Gd, Gr,
+        Wy, Wu, Wd, Wr,
         JE::JEfunc, gc!::GCfunc, nc, p::PT, 
         transcription::TM, optim::JM, 
         gradient::GB, jacobian::JB, hessian::HB, oracle
@@ -88,12 +88,12 @@ struct NonLinMPC{
             GCfunc<:Function, 
         }
         model = estim.model
-        nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
+        nu, ny, nd = model.nu, model.ny, model.nd
         ŷ, ry = copy(model.yop), copy(model.yop) # dummy vals (updated just before optimization)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         lastu0 = zeros(NT, nu)
-        Gy, Gu, Gd, Gr, nG = validate_custom_lincon(model, Gy, Gu, Gd, Gr)
+        Wy, Wu, Wd, Wr = validate_custom_lincon(model, Wy, Wu, Wd, Wr)
         validate_transcription(model, transcription)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
@@ -108,7 +108,7 @@ struct NonLinMPC{
             PΔu, Pu, E, 
             ex̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
             Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
-            Gy, Gu, Gd, Gr,
+            Wy, Wu, Wd, Wr,
             gc!, nc
         )
         warn_cond = iszero(weights.E) ? 1e6 : Inf # condition number warning only if Ewt==0
@@ -336,10 +336,10 @@ function NonLinMPC(
     M_Hp = Diagonal(repeat(Mwt, Hp)),
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
-    Gy = nothing,
-    Gu = nothing,
-    Gd = nothing,
-    Gr = nothing,
+    Wy = nothing,
+    Wu = nothing,
+    Wd = nothing,
+    Wr = nothing,
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE ::Function = (_,_,_,_) -> 0.0,
@@ -359,7 +359,7 @@ function NonLinMPC(
     return NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
-        Gy, Gu, Gd, Gr,
+        Wy, Wu, Wd, Wr,
         transcription, optim, gradient, jacobian, hessian, oracle
     )
 end
@@ -408,10 +408,10 @@ function NonLinMPC(
     M_Hp = Diagonal(repeat(Mwt, Hp)),
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
-    Gy = nothing,
-    Gu = nothing,
-    Gd = nothing,
-    Gr = nothing,
+    Wy = nothing,
+    Wu = nothing,
+    Wd = nothing,
+    Wr = nothing,
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
     JE ::Function = (_,_,_,_) -> 0.0,
@@ -441,7 +441,7 @@ function NonLinMPC(
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     hessian = validate_hessian(hessian, gradient, oracle, DEFAULT_NONLINMPC_HESSIAN)
     return NonLinMPC{NT}(
-        estim, Hp, Hc, nb, weights, Gy, Gu, Gd, Gr, JE, gc!, nc, p, 
+        estim, Hp, Hc, nb, weights, Wy, Wu, Wd, Wr, JE, gc!, nc, p, 
         transcription, optim, gradient, jacobian, hessian, oracle
     )
 end

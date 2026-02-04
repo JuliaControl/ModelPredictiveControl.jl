@@ -50,7 +50,7 @@ struct LinMPC{
     buffer::PredictiveControllerBuffer{NT}
     function LinMPC{NT}(
         estim::SE, Hp, Hc, nb, weights::CW,
-        Gy, Gu, Gd, Gr,
+        Wy, Wu, Wd, Wr,
         transcription::TM, optim::JM
     ) where {
             NT<:Real, 
@@ -60,12 +60,12 @@ struct LinMPC{
             JM<:JuMP.GenericModel
         }
         model = estim.model
-        nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
+        nu, ny, nd = model.nu, model.ny, model.nd
         ŷ, ry = copy(model.yop), copy(model.yop) # dummy vals (updated just before optimization)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         lastu0 = zeros(NT, nu)
-        Gy, Gu, Gd, Gr, nG = validate_custom_lincon(model, Gy, Gu, Gd, Gr)
+        Wy, Wu, Wd, Wr = validate_custom_lincon(model, Wy, Wu, Wd, Wr)
         validate_transcription(model, transcription)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
@@ -80,7 +80,7 @@ struct LinMPC{
             PΔu, Pu, E, 
             ex̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
             Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
-            Gy, Gu, Gd, Gr
+            Wy, Wu, Wd, Wr
         )
         H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
@@ -161,10 +161,10 @@ arguments. This controller allocates memory at each time step for the optimizati
 - `M_Hp=Diagonal(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
 - `N_Hc=Diagonal(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
 - `L_Hp=Diagonal(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
-- `Gy=nothing` : custom linear constraint matrix for output (see Extended Help).
-- `Gu=nothing` : custom linear constraint matrix for manipulated input (see Extended Help).
-- `Gd=nothing` : custom linear constraint matrix for meas. disturbance (see Extended Help).
-- `Gr=nothing` : custom linear constraint matrix for output setpoint (see Extended Help).
+- `Wy=nothing` : custom linear constraint matrix for output (see Extended Help).
+- `Wu=nothing` : custom linear constraint matrix for manipulated input (see Extended Help).
+- `Wd=nothing` : custom linear constraint matrix for meas. disturbance (see Extended Help).
+- `Wr=nothing` : custom linear constraint matrix for output setpoint (see Extended Help).
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `transcription=SingleShooting()` : [`SingleShooting`](@ref) or [`MultipleShooting`](@ref).
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
@@ -199,7 +199,7 @@ LinMPC controller with a sample time Ts = 4.0 s:
     for over-actuated systems, when `nu > ny` (e.g. prioritize solutions with lower 
     economical costs). The default `Lwt` value implies that this feature is disabled by default.
 
-    The custom linear constraint matrices `Gy`, `Gu`, `Gd`, and `Gr` allow to define
+    The custom linear constraint matrices `Wy`, `Wu`, `Wd`, and `Wr` allow to define
     constraints based on linear combinations of outputs, manipulated inputs, measured
     disturbances, and output setpoints, respectively. See the Extended Help section in
     [`setconstraint!`](@ref) documentation for more details.
@@ -234,10 +234,10 @@ function LinMPC(
     M_Hp = Diagonal(repeat(Mwt, Hp)),
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
-    Gy = nothing,
-    Gu = nothing,
-    Gd = nothing,
-    Gr = nothing,
+    Wy = nothing,
+    Wu = nothing,
+    Wd = nothing,
+    Wr = nothing,
     Cwt = DEFAULT_CWT,
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
@@ -246,7 +246,7 @@ function LinMPC(
     estim = SteadyKalmanFilter(model; kwargs...)
     return LinMPC(
         estim; 
-        Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, Gy, Gu, Gd, Gr, transcription, optim
+        Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, Wy, Wu, Wd, Wr, transcription, optim
     )
 end
 
@@ -290,10 +290,10 @@ function LinMPC(
     M_Hp = Diagonal(repeat(Mwt, Hp)),
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
-    Gy = nothing,
-    Gu = nothing,
-    Gd = nothing,
-    Gr = nothing,
+    Wy = nothing,
+    Wu = nothing,
+    Wd = nothing,
+    Wr = nothing,
     Cwt  = DEFAULT_CWT,
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false)
@@ -307,7 +307,7 @@ function LinMPC(
     nb = move_blocking(Hp, Hc)
     Hc = get_Hc(nb)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-    return LinMPC{NT}(estim, Hp, Hc, nb, weights, Gy, Gu, Gd, Gr, transcription, optim)
+    return LinMPC{NT}(estim, Hp, Hc, nb, weights, Wy, Wu, Wd, Wr, transcription, optim)
 end
 
 """
