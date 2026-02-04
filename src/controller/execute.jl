@@ -629,11 +629,14 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     weights = mpc.weights
     nu, ny, nd, Hp, Hc, nb = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc, mpc.nb
     optim, con = mpc.optim, mpc.con
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    Pu = mpc.P̃u[:, 1:nZ]
     # --- prediction matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
         model, estim, transcription, Hp, Hc, nb
     )
     A_Ymin, A_Ymax, Ẽ = relaxŶ(E, con.C_ymin, con.C_ymax, mpc.nϵ)
+    A_Wmin, A_Wmax, Ẽw = relaxW(E, Pu, Hp, con.W̄y, con.W̄u, con.C_wmin, con.C_wmax, mpc.nϵ)
     A_x̂min, A_x̂max, ẽx̂ = relaxterminal(ex̂, con.c_x̂min, con.c_x̂max, mpc.nϵ)
     mpc.Ẽ .= Ẽ
     mpc.G .= G
@@ -641,6 +644,13 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     mpc.K .= K
     mpc.V .= V
     mpc.B .= B
+    # --- terminal constraints ---
+    con.ẽx̂ .= ẽx̂ 
+    con.gx̂ .= gx̂
+    con.jx̂ .= jx̂
+    con.kx̂ .= kx̂
+    con.vx̂ .= vx̂
+    con.bx̂ .= bx̂
     # --- defect matrices ---
     Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
     A_ŝ, Ẽŝ = augmentdefect(Eŝ, mpc.nϵ)
@@ -650,15 +660,13 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.Kŝ .= Kŝ
     con.Vŝ .= Vŝ
     con.Bŝ .= Bŝ
+    # --- custom linear constraints ---
+    con.Ẽw .= Ẽw
     # --- linear inequality constraints ---
-    con.ẽx̂ .= ẽx̂ 
-    con.gx̂ .= gx̂
-    con.jx̂ .= jx̂
-    con.kx̂ .= kx̂
-    con.vx̂ .= vx̂
-    con.bx̂ .= bx̂
     con.A_Ymin .= A_Ymin
     con.A_Ymax .= A_Ymax
+    con.A_Wmin .= A_Wmin
+    con.A_Wmax .= A_Wmax
     con.A_x̂min .= A_x̂min
     con.A_x̂max .= A_x̂max
     con.A .= [
