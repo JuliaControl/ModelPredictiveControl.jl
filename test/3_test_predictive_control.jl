@@ -6,9 +6,9 @@
     @test size(mpc1.Ẽ,1) == 15*mpc1.estim.model.ny
     mpc2 = LinMPC(model, Hc=4, Cwt=Inf)
     @test size(mpc2.Ẽ,2) == 4*mpc2.estim.model.nu
-    mpc3 = LinMPC(model, Hc=4, Cwt=1e6)
+    mpc3 = LinMPC(model, Hc=4, Cwt=1e4)
     @test size(mpc3.Ẽ,2) == 4*mpc3.estim.model.nu + 1
-    @test mpc3.weights.Ñ_Hc[end] ≈ 1e6
+    @test mpc3.weights.Ñ_Hc[end] ≈ 1e4
     mpc4 = LinMPC(model, Mwt=[1,2], Hp=15)
     @test mpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     @test mpc4.weights.M_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
@@ -53,14 +53,12 @@
     mpc16 = LinMPC(model, Hc=[1,2,3,6,6,6], Hp=10, Cwt=Inf)
     @test mpc16.Hc == 4 # the last 2 elements of Hc are ignored
     @test size(mpc16.P̃u) == (10*mpc1.estim.model.nu, 4*mpc1.estim.model.nu)
-    
-    Wy = ones(3, ny)
+    Wy = ones(3, model.ny)
     mpc17 = LinMPC(model; Wy)
     @test mpc17.con.W̄y ≈ ModelPredictiveControl.repeatdiag(Wy, mpc17.Hp+1)
-    @test mpc17.con.W̄u ≈ zeros(model.nu*(mpc17.Hp+1), model.nu*(mpc17.Hp+1))
-    @test mpc17.con.W̄d ≈ zeros(model.nd*(mpc17.Hp+1), model.nd*(mpc17.Hp+1))
-    @test mpc17.con.W̄r ≈ zeros(model.ny*(mpc17.Hp+1), model.ny*(mpc17.Hp+1))
-    
+    @test mpc17.con.W̄u ≈ zeros(3*(mpc17.Hp+1), model.nu*(mpc17.Hp+1))
+    @test mpc17.con.W̄d ≈ zeros(3*(mpc17.Hp+1), model.nd*(mpc17.Hp+1))
+    @test mpc17.con.W̄r ≈ zeros(3*(mpc17.Hp+1), model.ny*(mpc17.Hp+1))
     Wy = ones(2, model.ny)
     Wu = 2*ones(2, model.nu)
     Wd = 3*ones(2, model.nd)
@@ -87,11 +85,11 @@
     @test_throws ArgumentError LinMPC(model, Nwt=[-1,1])
     @test_throws ArgumentError LinMPC(model, Lwt=[-1,1])
     @test_throws ArgumentError LinMPC(model, Cwt=-1)
-    @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, ny+1))
-    @test_throws DimensionMismatch LinMPC(model, Wu=ones(2, nu-1))
-    @test_throws DimensionMismatch LinMPC(model, Wd=ones(2, nd+1))
-    @test_throws DimensionMismatch LinMPC(model, Wr=ones(2, ny-1))
-    @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, ny), Wu=ones(3, nu))
+    @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, model.ny+1))
+    @test_throws DimensionMismatch LinMPC(model, Wu=ones(2, model.nu-1))
+    @test_throws DimensionMismatch LinMPC(model, Wd=ones(2, model.nd+1))
+    @test_throws DimensionMismatch LinMPC(model, Wr=ones(2, model.ny-1))
+    @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, model.ny), Wu=ones(3, model.nu))
 end
 
 @testitem "LinMPC moves and getinfo" setup=[SetupMPCtests] begin
@@ -264,16 +262,18 @@ end
 @testitem "LinMPC set constraints" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(sys, Ts, i_d=[3])
-    mpc = LinMPC(model, Hp=1, Hc=1)
+    mpc = LinMPC(model, Hp=1, Hc=1, Wr=ones(2, 2))
 
     # test default constraints before modifying any:
     @test all((mpc.con.U0min, mpc.con.U0max) .≈ (fill(-Inf, model.nu), fill(Inf, model.nu)))
     @test all((mpc.con.ΔŨmin, mpc.con.ΔŨmax) .≈ (vcat(fill(-Inf, model.nu), 0), vcat(fill(Inf, model.nu), Inf)))
     @test all((mpc.con.Y0min, mpc.con.Y0max) .≈ (fill(-Inf, model.ny), fill(Inf, model.ny)))
+    @test all((mpc.con.Wmin,  mpc.con.Wmax)  .≈ (fill(-Inf, 2mpc.con.nw), fill(Inf, 2mpc.con.nw)))
     @test all((mpc.con.x̂0min, mpc.con.x̂0max) .≈ (fill(-Inf, mpc.estim.nx̂), fill(Inf, mpc.estim.nx̂)))
     @test all((-mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]) .≈ (fill(0.0, model.nu), fill(0.0, model.nu)))
     @test all((-mpc.con.A_ΔŨmin[1:end-1, end], -mpc.con.A_ΔŨmax[1:end-1, end]) .≈ (fill(0.0, model.nu), fill(0.0, model.nu)))
     @test all((-mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]) .≈ (fill(1.0, model.ny), fill(1.0, model.ny)))
+    @test all((-mpc.con.A_Wmin[:, end], -mpc.con.A_Wmax[:, end]) .≈ (fill(1.0, 2mpc.con.nw), fill(1.0, 2mpc.con.nw)))
     @test all((-mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]) .≈ (fill(1.0, mpc.estim.nx̂), fill(1.0, mpc.estim.nx̂)))
 
     setconstraint!(mpc, umin=[-5, -9.9], umax=[100,99])
@@ -697,9 +697,9 @@ end
     @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
     nmpc2 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=Inf)
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
-    nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e6)
+    nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e4)
     @test size(nmpc3.Ẽ, 2) == 4*nonlinmodel.nu + 1
-    @test nmpc3.weights.Ñ_Hc[end] == 1e6
+    @test nmpc3.weights.Ñ_Hc[end] == 1e4
     nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[1,2])
     @test nmpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     @test nmpc4.weights.M_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
