@@ -211,10 +211,10 @@ The predictive controllers support both soft and hard constraints, defined by:
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
 end of the horizon (see Extended Help). See [`MovingHorizonEstimator`](@ref) constraints
-for details on bounds and softness parameters ``\mathbf{c}``. The penultimate line with
-``\mathbf{w}`` vector is for the custom linear inequality constraints. See Extended Help for 
-details on custom linear and time-varying constraints. The output, custom linear and
-terminal constraints are all soft by default.
+for details on bounds and softness parameters ``\mathbf{c}``. The penultimate line with the
+``\mathbf{w}`` vector is for custom linear inequality constraints. See Extended Help for 
+details on this and time-varying bounds. The output, custom and terminal constraints are all
+soft by default.
 
 # Arguments
 !!! info
@@ -234,6 +234,7 @@ terminal constraints are all soft by default.
 - `c_umin=fill(0.0,nu)` / `c_umax=fill(0.0,nu)` : `umin` / `umax` softness weight ``\mathbf{c_{u_{min/max}}}``
 - `c_Δumin=fill(0.0,nu)` / `c_Δumax=fill(0.0,nu)` : `Δumin` / `Δumax` softness weight ``\mathbf{c_{Δu_{min/max}}}``
 - `c_ymin=fill(1.0,ny)` / `c_ymax=fill(1.0,ny)` : `ymin` / `ymax` softness weight ``\mathbf{c_{y_{min/max}}}``
+- `c_wmin=fill(1.0,nw)` / `c_wmax=fill(1.0,nw)` : `wmin` / `wmax` softness weight ``\mathbf{c_{w_{min/max}}}``
 - `c_x̂min=fill(1.0,nx̂)` / `c_x̂max=fill(1.0,nx̂)` : `x̂min` / `x̂max` softness weight ``\mathbf{c_{x̂_{min/max}}}``
 - all the keyword arguments above but with a first capital letter, except for the terminal
   constraints, e.g. `Ymax` or `C_Δumin`: for time-varying constraints (see Extended Help)
@@ -295,13 +296,18 @@ LinMPC controller with a sample time Ts = 4.0 s:
     - `Ymin`  / `Ymax`  / `C_ymin`  / `C_ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
     - `Wmin`  / `Wmax`  / `C_wmin`  / `C_wmax`  : custom linear constraints `(nw*(Hp+1),)`.
     
-    The custom constraints are all gathered in the vector:
-    ```math                                                                                        
-    \mathbf{W} =                                                                                          \begin{bmatrix}
+    The custom linear inequality constraints are all gathered in the vector:
+    ```math   
+    \begin{aligned}                                                                                     
+    \mathbf{W}
+        &=                                                                                                \begin{bmatrix} 
+        \mathbf{w}(k+0)      \\ \mathbf{w}(k+1)      \\ \vdots               \\ \mathbf{w}(k+H_p)         \end{bmatrix}   \\
+        &=                                                                                                \begin{bmatrix}
         \mathbf{W_y ŷ}(k+0)   + \mathbf{W_u u}(k+0)   + \mathbf{W_d d}(k+0)   + \mathbf{W_r r_y}(k+0)     \\
         \mathbf{W_y ŷ}(k+1)   + \mathbf{W_u u}(k+1)   + \mathbf{W_d d̂}(k+1)   + \mathbf{W_r r̂_y}(k+1)     \\
         \vdots                                                                                            \\
         \mathbf{W_y ŷ}(k+H_p) + \mathbf{W_u u}(k+H_p) + \mathbf{W_d d̂}(k+H_p) + \mathbf{W_r r̂_y}(k+H_p)   \end{bmatrix} 
+    \end{aligned}
     ```
     The matrices ``\mathbf{W_y}``, ``\mathbf{W_u}``, ``\mathbf{W_d}`` and ``\mathbf{W_r}``
     must have `nw` rows and are provided at construction time. The terms with
