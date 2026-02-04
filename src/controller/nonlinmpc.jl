@@ -210,10 +210,10 @@ This controller allocates memory at each time step for the optimization.
 - `N_Hc=Diagonal(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
 - `L_Hp=Diagonal(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
-- `Gy=nothing` : custom linear constraint matrix for output (see Extended Help).
-- `Gu=nothing` : custom linear constraint matrix for manipulated input (see Extended Help).
-- `Gd=nothing` : custom linear constraint matrix for meas. disturbance (see Extended Help).
-- `Gr=nothing` : custom linear constraint matrix for output setpoint (see Extended Help).
+- `Wy=nothing` : custom linear constraint matrix for output (see Extended Help).
+- `Wu=nothing` : custom linear constraint matrix for manipulated input (see Extended Help).
+- `Wd=nothing` : custom linear constraint matrix for meas. disturbance (see Extended Help).
+- `Wr=nothing` : custom linear constraint matrix for output setpoint (see Extended Help).
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
 - `JE=(_,_,_,_)->0.0` : economic or custom cost function ``J_E(\mathbf{U_e}, \mathbf{Ŷ_e},
    \mathbf{D̂_e}, \mathbf{p})``.
@@ -267,7 +267,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     algebra instead of a `for` loop. This feature can accelerate the optimization, especially
     for the constraint handling, and is not available in any other package, to my knowledge.
     See [`setconstraint!`](@ref) for details about the custom linear inequality constraint
-    matrices `Gy`, `Gu`, `Gd` and `Gr`. The `Gy` keyword argument can be provided only if
+    matrices `Wy`, `Wu`, `Wd` and `Wr`. The `Wy` keyword argument can be provided only if
     `model` is a [`LinModel`](@ref)).
 
     The economic cost ``J_E`` and custom constraint ``\mathbf{g_c}`` functions receive the

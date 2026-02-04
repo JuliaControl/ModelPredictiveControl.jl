@@ -20,8 +20,8 @@ ModelPredictiveControl.init_defectmat
 ModelPredictiveControl.relaxU
 ModelPredictiveControl.relaxΔU
 ModelPredictiveControl.relaxŶ
+ModelPredictiveControl.relaxW
 ModelPredictiveControl.relaxterminal
-ModelPredictiveControl.relaxG
 ModelPredictiveControl.augmentdefect
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred

@@ -143,12 +143,12 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     # custom linear equality constraints:
     ẼW      ::Matrix{NT}
     FW      ::Vector{NT}
-    Ḡy      ::SparseMatrixCSC{NT, Int}
-    Ḡu      ::SparseMatrixCSC{NT, Int}
-    Ḡd      ::SparseMatrixCSC{NT, Int}
-    Ḡr      ::SparseMatrixCSC{NT, Int}
+    W̄y      ::SparseMatrixCSC{NT, Int}
+    W̄u      ::SparseMatrixCSC{NT, Int}
+    W̄d      ::SparseMatrixCSC{NT, Int}
+    W̄r      ::SparseMatrixCSC{NT, Int}
     nw      ::Int
-    # bounds over the prediction horizon (deviation vectors from operating points):
+    # bounds over the prediction horizon (deviation vectors from operating points): 
     U0min   ::Vector{NT}
     U0max   ::Vector{NT}
     ΔŨmin   ::Vector{NT}
@@ -472,12 +472,12 @@ function setconstraint!(
         if !isnothing(C_wmin)
             size(C_wmin) == (nw*(Hp+1),) || throw(ArgumentError("C_wmin size must be $((nw*(Hp+1),))"))
             any(<(0), C_wmin) && error("C_wmin weights should be non-negative")
-            con.A_Gmin[:, end] .= -C_wmin
+            con.A_Wmin[:, end] .= -C_wmin
         end
         if !isnothing(C_wmax)
             size(C_wmax) == (nw*(Hp+1),) || throw(ArgumentError("C_wmax size must be $((nw*(Hp+1),))"))
             any(<(0), C_wmax) && error("C_wmax weights should be non-negative")
-            con.A_Gmax[:, end] .= -C_wmax
+            con.A_Wmax[:, end] .= -C_wmax
         end
         if !isnothing(c_x̂min)
             size(c_x̂min) == (nx̂,) || throw(ArgumentError("c_x̂min size must be $((nx̂,))"))
@@ -811,7 +811,7 @@ function init_defaultcon_mpc(
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂max, A_x̂min,
         A_ŝ
     )
-    # dummy fx̂, FG and Fŝ vectors (updated just before optimization)
+    # dummy fx̂, FW and Fŝ vectors (updated just before optimization)
     fx̂, FW, Fŝ = zeros(NT, nx̂), zeros(NT, nW), zeros(NT, nx̂*Hp)
     # dummy b and beq vectors (updated just before optimization)
     b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
