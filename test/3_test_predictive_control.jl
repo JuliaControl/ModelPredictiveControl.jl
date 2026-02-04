@@ -265,51 +265,75 @@ end
     mpc = LinMPC(model, Hp=1, Hc=1, Wr=ones(2, 2))
 
     # test default constraints before modifying any:
-    @test all((mpc.con.U0min, mpc.con.U0max) .≈ (fill(-Inf, model.nu), fill(Inf, model.nu)))
-    @test all((mpc.con.ΔŨmin, mpc.con.ΔŨmax) .≈ (vcat(fill(-Inf, model.nu), 0), vcat(fill(Inf, model.nu), Inf)))
-    @test all((mpc.con.Y0min, mpc.con.Y0max) .≈ (fill(-Inf, model.ny), fill(Inf, model.ny)))
-    @test all((mpc.con.Wmin,  mpc.con.Wmax)  .≈ (fill(-Inf, 2mpc.con.nw), fill(Inf, 2mpc.con.nw)))
-    @test all((mpc.con.x̂0min, mpc.con.x̂0max) .≈ (fill(-Inf, mpc.estim.nx̂), fill(Inf, mpc.estim.nx̂)))
-    @test all((-mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]) .≈ (fill(0.0, model.nu), fill(0.0, model.nu)))
-    @test all((-mpc.con.A_ΔŨmin[1:end-1, end], -mpc.con.A_ΔŨmax[1:end-1, end]) .≈ (fill(0.0, model.nu), fill(0.0, model.nu)))
-    @test all((-mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]) .≈ (fill(1.0, model.ny), fill(1.0, model.ny)))
-    @test all((-mpc.con.A_Wmin[:, end], -mpc.con.A_Wmax[:, end]) .≈ (fill(1.0, 2mpc.con.nw), fill(1.0, 2mpc.con.nw)))
-    @test all((-mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]) .≈ (fill(1.0, mpc.estim.nx̂), fill(1.0, mpc.estim.nx̂)))
+    @test mpc.con.U0min ≈ fill(-Inf, model.nu)
+    @test mpc.con.U0max ≈ fill(Inf, model.nu)
+    @test mpc.con.ΔŨmin ≈ vcat(fill(-Inf, model.nu), 0)
+    @test mpc.con.ΔŨmax ≈ vcat(fill(Inf, model.nu), Inf)
+    @test mpc.con.Y0min ≈ fill(-Inf, model.ny)
+    @test mpc.con.Y0max ≈ fill(Inf, model.ny)
+    @test mpc.con.Wmin  ≈ fill(-Inf, 2mpc.con.nw)
+    @test mpc.con.Wmax  ≈ fill(Inf, 2mpc.con.nw)
+    @test mpc.con.x̂0min ≈ fill(-Inf, mpc.estim.nx̂)
+    @test mpc.con.x̂0max ≈ fill(Inf, mpc.estim.nx̂)
+    @test -mpc.con.A_Umin[:, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_Umax[:, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_ΔŨmin[1:end-1, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_ΔŨmax[1:end-1, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_Ymin[:, end] ≈ fill(1.0, model.ny)
+    @test -mpc.con.A_Ymax[:, end] ≈ fill(1.0, model.ny)
+    @test -mpc.con.A_Wmin[:, end] ≈ fill(1.0, 2mpc.con.nw)
+    @test -mpc.con.A_Wmax[:, end] ≈ fill(1.0, 2mpc.con.nw)
+    @test -mpc.con.A_x̂min[:, end] ≈ fill(1.0, mpc.estim.nx̂)
+    @test -mpc.con.A_x̂max[:, end] ≈ fill(1.0, mpc.estim.nx̂)
 
     setconstraint!(mpc, umin=[-5, -9.9], umax=[100,99])
-    @test all((mpc.con.U0min, mpc.con.U0max) .≈ ([-5, -9.9], [100,99]))
+    @test mpc.con.U0min ≈ [-5, -9.9]
+    @test mpc.con.U0max ≈ [100,99]
     setconstraint!(mpc, Δumin=[-5,-10], Δumax=[6,11])
-    @test all((mpc.con.ΔŨmin, mpc.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
+    @test mpc.con.ΔŨmin ≈ [-5,-10,0]
+    @test mpc.con.ΔŨmax ≈ [6,11,Inf]
     setconstraint!(mpc, ymin=[-6, -11],ymax=[55, 35])
-    @test all((mpc.con.Y0min, mpc.con.Y0max) .≈ ([-6,-11], [55,35]))
+    @test mpc.con.Y0min ≈ [-6,-11]
+    @test mpc.con.Y0max ≈ [55,35]
     setconstraint!(mpc, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((mpc.con.x̂0min, mpc.con.x̂0max) .≈ ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test mpc.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
+    @test mpc.con.x̂0max ≈ [21,22,23,24,25,26]
 
     setconstraint!(mpc, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
-    @test all((-mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]) .≈ ([0.01,0.02], [0.03,0.04]))
+    @test -mpc.con.A_Umin[:, end] ≈ [0.01,0.02]
+    @test -mpc.con.A_Umax[:, end] ≈ [0.03,0.04]
     setconstraint!(mpc, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
-    @test all((-mpc.con.A_ΔŨmin[1:end-1, end], -mpc.con.A_ΔŨmax[1:end-1, end]) .≈ ([0.05,0.06], [0.07,0.08]))
+    @test -mpc.con.A_ΔŨmin[1:end-1, end] ≈ [0.05,0.06]
+    @test -mpc.con.A_ΔŨmax[1:end-1, end] ≈ [0.07,0.08]
     setconstraint!(mpc, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
-    @test all((-mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]) .≈ ([1.00,1.01], [1.02,1.03]))
+    @test -mpc.con.A_Ymin[:, end] ≈ [1.00,1.01]
+    @test -mpc.con.A_Ymax[:, end] ≈ [1.02,1.03]
     setconstraint!(mpc, c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36])
-    @test all((-mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]) .≈ ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
+    @test -mpc.con.A_x̂min[:, end] ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
+    @test -mpc.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
 
     model2 = LinModel(tf([2], [10, 1]), 3.0)
     mpc2 = LinMPC(model2, Hp=50, Hc=5)
 
     setconstraint!(mpc2, Umin=-1(1:50).-1, Umax=+1(1:50).+1)
-    @test all((mpc2.con.U0min, mpc2.con.U0max) .≈ (-1(1:50).-1, +1(1:50).+1))
+    @test mpc2.con.U0min ≈ -1(1:50).-1
+    @test mpc2.con.U0max ≈ +1(1:50).+1
     setconstraint!(mpc2, ΔUmin=-1(1:5).-2, ΔUmax=+1(1:5).+2)
-    @test all((mpc2.con.ΔŨmin, mpc2.con.ΔŨmax) .≈ ([-1(1:5).-2; 0], [+1(1:5).+2; Inf]))
+    @test mpc2.con.ΔŨmin ≈ [-1(1:5).-2; 0]
+    @test mpc2.con.ΔŨmax ≈ [+1(1:5).+2; Inf]
     setconstraint!(mpc2, Ymin=-1(1:50).-3, Ymax=+1(1:50).+3)
-    @test all((mpc2.con.Y0min, mpc2.con.Y0max) .≈ (-1(1:50).-3, +1(1:50).+3))
+    @test mpc2.con.Y0min ≈ -1(1:50).-3
+    @test mpc2.con.Y0max ≈ +1(1:50).+3
 
     setconstraint!(mpc2, C_umin=+1(1:50).+4, C_umax=+1(1:50).+4)
-    @test all((-mpc2.con.A_Umin[:, end], -mpc2.con.A_Umax[:, end]) .≈ (+1(1:50).+4, +1(1:50).+4))
+    @test -mpc2.con.A_Umin[:, end] ≈ +1(1:50).+4
+    @test -mpc2.con.A_Umax[:, end] ≈ +1(1:50).+4
     setconstraint!(mpc2, C_Δumin=+1(1:5).+5, C_Δumax=+1(1:5).+5)
-    @test all((-mpc2.con.A_ΔŨmin[1:end-1, end], -mpc2.con.A_ΔŨmax[1:end-1, end]) .≈ (+1(1:5).+5, +1(1:5).+5))
+    @test -mpc2.con.A_ΔŨmin[1:end-1, end] ≈ +1(1:5).+5
+    @test -mpc2.con.A_ΔŨmax[1:end-1, end] ≈ +1(1:5).+5
     setconstraint!(mpc2, C_ymin=+1(1:50).+6, C_ymax=+1(1:50).+6)
-    @test all((-mpc2.con.A_Ymin[:, end], -mpc2.con.A_Ymax[:, end]) .≈ (+1(1:50).+6, +1(1:50).+6))
+    @test -mpc2.con.A_Ymin[:, end] ≈ +1(1:50).+6
+    @test -mpc2.con.A_Ymax[:, end] ≈ +1(1:50).+6
     setconstraint!(mpc2, c_umin=[0], c_umax=[0], c_Δumin=[0], c_Δumax=[0], c_ymin=[1], c_ymax=[1])
 
     @test_throws ArgumentError setconstraint!(mpc, umin=[0,0,0])
@@ -1036,7 +1060,7 @@ end
 
     setconstraint!(nmpc_lin, ymin=[5,10],ymax=[55, 35])
     @test nmpc_lin.con.Y0min ≈ [5,10]
-    @test nmpc_lin.con.Y0max ≈ [55, 35]
+    @test nmpc_lin.con.Y0max ≈ [55,35]
     setconstraint!(nmpc_lin, c_ymin=[1.0,1.1], c_ymax=[1.2,1.3])
     @test -nmpc_lin.con.A_Ymin[:, end] ≈ [1.0,1.1]
     @test -nmpc_lin.con.A_Ymax[:, end] ≈ [1.2,1.3]
@@ -1049,7 +1073,6 @@ end
     )
     @test -nmpc_lin.con.A_x̂min[:, end] ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
     @test -nmpc_lin.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
-    @test -nmpc_lin.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
 
     f = (x,u,d,_) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h = (x,d,_)   -> linmodel1.C*x + linmodel1.Dd*d
@@ -1057,30 +1080,35 @@ end
     nmpc = NonLinMPC(nonlinmodel, Hp=1, Hc=1)
 
     setconstraint!(nmpc, umin=[-5, -9.9], umax=[100,99])
-    @test all((nmpc.con.U0min, nmpc.con.U0max) .≈ ([-5, -9.9], [100,99]))
+    @test nmpc.con.U0min ≈ [-5, -9.9]
+    @test nmpc.con.U0max ≈ [100,99]
     setconstraint!(nmpc, Δumin=[-5,-10], Δumax=[6,11])
-    @test all((nmpc.con.ΔŨmin, nmpc.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
+    @test nmpc.con.ΔŨmin ≈ [-5,-10,0]
+    @test nmpc.con.ΔŨmax ≈ [6,11,Inf]
     setconstraint!(nmpc, ymin=[-6, -11],ymax=[55, 35])
-    @test all((nmpc.con.Y0min, nmpc.con.Y0max) .≈ ([-6,-11], [55,35]))
+    @test nmpc.con.Y0min ≈ [-6,-11]
+    @test nmpc.con.Y0max ≈ [55,35]
     setconstraint!(nmpc, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((nmpc.con.x̂0min, nmpc.con.x̂0max) .≈ 
-            ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test nmpc.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
+    @test nmpc.con.x̂0max ≈ [21,22,23,24,25,26]
 
     setconstraint!(nmpc, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
-    @test all((-nmpc.con.A_Umin[:, end], -nmpc.con.A_Umax[:, end]) .≈ 
-            ([0.01,0.02], [0.03,0.04]))
+    @test -nmpc.con.A_Umin[:, end] ≈ [0.01,0.02]
+    @test -nmpc.con.A_Umax[:, end] ≈ [0.03,0.04]
     setconstraint!(nmpc, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
-    @test all((-nmpc.con.A_ΔŨmin[1:end-1, end], -nmpc.con.A_ΔŨmax[1:end-1, end]) .≈ 
-            ([0.05,0.06], [0.07,0.08]))
+    @test -nmpc.con.A_ΔŨmin[1:end-1, end] ≈ [0.05,0.06]
+    @test -nmpc.con.A_ΔŨmax[1:end-1, end] ≈ [0.07,0.08]
     setconstraint!(nmpc, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
-    @test all((-nmpc.con.A_Ymin, -nmpc.con.A_Ymax) .≈ (zeros(0,3), zeros(0,3)))
-    @test all((nmpc.con.C_ymin, nmpc.con.C_ymax) .≈ ([1.00,1.01], [1.02,1.03]))
+    @test -nmpc.con.A_Ymin ≈ zeros(0,3)
+    @test -nmpc.con.A_Ymax ≈ zeros(0,3)
+    @test nmpc.con.C_ymin ≈ [1.00,1.01]
+    @test nmpc.con.C_ymax ≈ [1.02,1.03]
     setconstraint!(nmpc, 
         c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], 
         c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36]
     )
-    @test all((nmpc.con.c_x̂min, nmpc.con.c_x̂max) .≈ 
-            ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
+    @test nmpc.con.c_x̂min ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
+    @test nmpc.con.c_x̂max ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
 
     # TODO: delete these tests when the deprecated legacy splatting syntax will be.
     gc_leg! =  (LHS,_,_,_,_,_) -> (LHS[begin] = -1)
@@ -1099,34 +1127,40 @@ end
     nmpc_leg = NonLinMPC(nonlinmodel, Hp=1, Hc=1, oracle=false)
 
     setconstraint!(nmpc_leg, umin=[-5, -9.9], umax=[100,99])
-    @test all((nmpc_leg.con.U0min, nmpc_leg.con.U0max) .≈ ([-5, -9.9], [100,99]))
+    @test nmpc_leg.con.U0min ≈ [-5, -9.9]
+    @test nmpc_leg.con.U0max ≈ [100,99]
     setconstraint!(nmpc_leg, Δumin=[-5,-10], Δumax=[6,11])
-    @test all((nmpc_leg.con.ΔŨmin, nmpc_leg.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
+    @test nmpc_leg.con.ΔŨmin ≈ [-5,-10,0]
+    @test nmpc_leg.con.ΔŨmax ≈ [6,11,Inf]
     setconstraint!(nmpc_leg, ymin=[-6, -11],ymax=[55, 35])
-    @test all((nmpc_leg.con.Y0min, nmpc_leg.con.Y0max) .≈ ([-6,-11], [55,35]))
+    @test nmpc_leg.con.Y0min ≈ [-6,-11]
+    @test nmpc_leg.con.Y0max ≈ [55,35]
     setconstraint!(nmpc_leg, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((nmpc_leg.con.x̂0min, nmpc_leg.con.x̂0max) .≈ 
-            ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test nmpc_leg.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
+    @test nmpc_leg.con.x̂0max ≈ [21,22,23,24,25,26]
 
     setconstraint!(nmpc_leg, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
-    @test all((-nmpc_leg.con.A_Umin[:, end], -nmpc_leg.con.A_Umax[:, end]) .≈ 
-            ([0.01,0.02], [0.03,0.04]))
+    @test -nmpc_leg.con.A_Umin[:, end] ≈ [0.01,0.02]
+    @test -nmpc_leg.con.A_Umax[:, end] ≈ [0.03,0.04]
     setconstraint!(nmpc_leg, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
-    @test all((-nmpc_leg.con.A_ΔŨmin[1:end-1, end], -nmpc_leg.con.A_ΔŨmax[1:end-1, end]) .≈ 
-            ([0.05,0.06], [0.07,0.08]))
+    @test -nmpc_leg.con.A_ΔŨmin[1:end-1, end] ≈ [0.05,0.06]
+    @test -nmpc_leg.con.A_ΔŨmax[1:end-1, end] ≈ [0.07,0.08]
     setconstraint!(nmpc_leg, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
-    @test all((-nmpc_leg.con.A_Ymin, -nmpc_leg.con.A_Ymax) .≈ (zeros(0,3), zeros(0,3)))
-    @test all((nmpc_leg.con.C_ymin, nmpc_leg.con.C_ymax) .≈ ([1.00,1.01], [1.02,1.03]))
+    @test -nmpc_leg.con.A_Ymin ≈ zeros(0,3)
+    @test -nmpc_leg.con.A_Ymax ≈ zeros(0,3)
+    @test nmpc_leg.con.C_ymin ≈ [1.00,1.01]
+    @test nmpc_leg.con.C_ymax ≈ [1.02,1.03]
     setconstraint!(nmpc_leg, 
         c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], 
         c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36]
     )
-    @test all((nmpc_leg.con.c_x̂min, nmpc_leg.con.c_x̂max) .≈ 
-            ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
+    @test nmpc_leg.con.c_x̂min ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
+    @test nmpc_leg.con.c_x̂max ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
     
     nmpc_ms = NonLinMPC(nonlinmodel, Hp=1, Hc=1, transcription=MultipleShooting())
     
-    setconnmpc_ms.con.Y0min ≈ [-6,-11]
+    setconstraint!(nmpc_ms, ymin=[-6, -11],ymax=[55, 35])
+    @test nmpc_ms.con.Y0min ≈ [-6,-11]
     @test nmpc_ms.con.Y0max ≈ [55,35]
     setconstraint!(nmpc_ms, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
     @test nmpc_ms.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
@@ -1141,10 +1175,6 @@ end
         c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], 
         c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36]
     )
-    @test -nmpc_lin.con.A_x̂min[:, end] ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
-    @test -nmpc_lin.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
-    @test nmpc_ms.con.c_x̂min ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
-    @test nmpc_ms.con.c_x̂max ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
     @test -nmpc_lin.con.A_x̂min[:, end] ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
     @test -nmpc_lin.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
     @test nmpc_ms.con.c_x̂min ≈ [0.21,0.22,0.23,0.24,0.25,0.26]

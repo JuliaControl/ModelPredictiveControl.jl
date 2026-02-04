@@ -1163,35 +1163,51 @@ end
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     mhe1 = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe1, x̂min=[-51,-52], x̂max=[53,54])
-    @test all((mhe1.con.X̂0min, mhe1.con.X̂0max) .≈ ([-51,-52], [53,54]))
-    @test all((mhe1.con.x̃0min[2:end], mhe1.con.x̃0max[2:end]) .≈ ([-51,-52], [53,54]))
+    @test mhe1.con.X̂0min ≈ [-51,-52]
+    @test mhe1.con.X̂0max ≈ [53,54]
+    @test mhe1.con.x̃0min[2:end] ≈ [-51,-52]
+    @test mhe1.con.x̃0max[2:end] ≈ [53,54]
     setconstraint!(mhe1, ŵmin=[-55,-56], ŵmax=[57,58])
-    @test all((mhe1.con.Ŵmin, mhe1.con.Ŵmax) .≈ ([-55,-56], [57,58]))
+    @test mhe1.con.Ŵmin ≈ [-55,-56]
+    @test mhe1.con.Ŵmax ≈ [57,58]
     setconstraint!(mhe1, v̂min=[-59,-60], v̂max=[61,62])
-    @test all((mhe1.con.V̂min, mhe1.con.V̂max) .≈ ([-59,-60], [61,62]))
+    @test mhe1.con.V̂min ≈ [-59,-60]
+    @test mhe1.con.V̂max ≈ [61,62]
     setconstraint!(mhe1, c_x̂min=[0.01,0.02], c_x̂max=[0.03,0.04])
-    @test all((-mhe1.con.A_X̂min[:, end], -mhe1.con.A_X̂max[:, end]) .≈ ([0.01, 0.02], [0.03,0.04]))
-    @test all((-mhe1.con.A_x̃min[2:end, end], -mhe1.con.A_x̃max[2:end, end]) .≈ ([0.01,0.02], [0.03,0.04]))
+    @test -mhe1.con.A_X̂min[:, end] ≈ [0.01, 0.02]
+    @test -mhe1.con.A_X̂max[:, end] ≈ [0.03,0.04]
+    @test -mhe1.con.A_x̃min[2:end, end] ≈ [0.01,0.02]
+    @test -mhe1.con.A_x̃max[2:end, end] ≈ [0.03,0.04]
     setconstraint!(mhe1, c_ŵmin=[0.05,0.06], c_ŵmax=[0.07,0.08])
-    @test all((-mhe1.con.A_Ŵmin[:, end], -mhe1.con.A_Ŵmax[:, end]) .≈ ([0.05, 0.06], [0.07,0.08]))
+    @test -mhe1.con.A_Ŵmin[:, end] ≈ [0.05, 0.06]
+    @test -mhe1.con.A_Ŵmax[:, end] ≈ [0.07,0.08]
     setconstraint!(mhe1, c_v̂min=[0.09,0.10], c_v̂max=[0.11,0.12])
-    @test all((-mhe1.con.A_V̂min[:, end], -mhe1.con.A_V̂max[:, end]) .≈ ([0.09, 0.10], [0.11,0.12]))
+    @test -mhe1.con.A_V̂min[:, end] ≈ [0.09, 0.10]
+    @test -mhe1.con.A_V̂max[:, end] ≈ [0.11,0.12]
 
     mhe2 = MovingHorizonEstimator(linmodel, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe2, X̂min=-1(1:10), X̂max=1(1:10))
-    @test all((mhe2.con.X̂0min, mhe2.con.X̂0max) .≈ (-1(3:10), 1(3:10)))
-    @test all((mhe2.con.x̃0min[2:end], mhe2.con.x̃0max[2:end]) .≈ (-1(1:2),  1(1:2)))
+    @test mhe2.con.X̂0min ≈ -1(3:10)
+    @test mhe2.con.X̂0max ≈ 1(3:10)
+    @test mhe2.con.x̃0min[2:end] ≈ -1(1:2)
+    @test mhe2.con.x̃0max[2:end] ≈ 1(1:2)
     setconstraint!(mhe2, Ŵmin=-1(11:18), Ŵmax=1(11:18))
-    @test all((mhe2.con.Ŵmin, mhe2.con.Ŵmax) .≈ (-1(11:18), 1(11:18)))
+    @test mhe2.con.Ŵmin ≈ -1(11:18)
+    @test mhe2.con.Ŵmax ≈ 1(11:18)
     setconstraint!(mhe2, V̂min=-1(31:38), V̂max=1(31:38))
-    @test all((mhe2.con.V̂min, mhe2.con.V̂max) .≈ (-1(31:38), 1(31:38)))
+    @test mhe2.con.V̂min ≈ -1(31:38)
+    @test mhe2.con.V̂max ≈ 1(31:38)
     setconstraint!(mhe2, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
-    @test all((-mhe2.con.A_X̂min[:, end], -mhe2.con.A_X̂max[:, end]) .≈ (0.01(3:10), 0.02(3:10)))
-    @test all((-mhe2.con.A_x̃min[2:end, end], -mhe2.con.A_x̃max[2:end, end]) .≈ (0.01(1:2), 0.02(1:2)))
+    @test -mhe2.con.A_X̂min[:, end] ≈ 0.01(3:10)
+    @test -mhe2.con.A_X̂max[:, end] ≈ 0.02(3:10)
+    @test -mhe2.con.A_x̃min[2:end, end] ≈ 0.01(1:2)
+    @test -mhe2.con.A_x̃max[2:end, end] ≈ 0.02(1:2)
     setconstraint!(mhe2, C_ŵmin=0.03(11:18), C_ŵmax=0.04(11:18))
-    @test all((-mhe2.con.A_Ŵmin[:, end], -mhe2.con.A_Ŵmax[:, end]) .≈ (0.03(11:18), 0.04(11:18)))
+    @test -mhe2.con.A_Ŵmin[:, end] ≈ 0.03(11:18)
+    @test -mhe2.con.A_Ŵmax[:, end] ≈ 0.04(11:18)
     setconstraint!(mhe2, C_v̂min=0.05(31:38), C_v̂max=0.06(31:38))
-    @test all((-mhe2.con.A_V̂min[:, end], -mhe2.con.A_V̂max[:, end]) .≈ (0.05(31:38), 0.06(31:38)))
+    @test -mhe2.con.A_V̂min[:, end] ≈ 0.05(31:38)
+    @test -mhe2.con.A_V̂max[:, end] ≈ 0.06(31:38)
 
     f(x,u,d,model) = model.A*x + model.Bu*u
     h(x,d,model)   = model.C*x 
@@ -1200,16 +1216,20 @@ end
 
     mhe3 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
-    @test all((mhe3.con.C_x̂min, mhe3.con.C_x̂max) .≈ (0.01(3:10), 0.02(3:10)))
+    @test mhe3.con.C_x̂min ≈ 0.01(3:10)
+    @test mhe3.con.C_x̂max ≈ 0.02(3:10)
     setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
-    @test all((mhe3.con.C_v̂min, mhe3.con.C_v̂max) .≈ (0.03(11:18), 0.04(11:18)))
+    @test mhe3.con.C_v̂min ≈ 0.03(11:18)
+    @test mhe3.con.C_v̂max ≈ 0.04(11:18)
 
     # TODO: delete these tests when the deprecated legacy splatting syntax will be.
     mhe4 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3, oracle=false)
     setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
-    @test all((mhe3.con.C_x̂min, mhe3.con.C_x̂max) .≈ (0.01(3:10), 0.02(3:10)))
+    @test mhe3.con.C_x̂min ≈ 0.01(3:10)
+    @test mhe3.con.C_x̂max ≈ 0.02(3:10)
     setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
-    @test all((mhe3.con.C_v̂min, mhe3.con.C_v̂max) .≈ (0.03(11:18), 0.04(11:18)))
+    @test mhe3.con.C_v̂min ≈ 0.03(11:18)
+    @test mhe3.con.C_v̂max ≈ 0.04(11:18)
 
     @test_throws ArgumentError setconstraint!(mhe2, x̂min=[-1])
     @test_throws ArgumentError setconstraint!(mhe2, x̂max=[+1])
