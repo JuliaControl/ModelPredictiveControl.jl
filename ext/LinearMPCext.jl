@@ -180,6 +180,7 @@ end
 
 function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
     nΔU = mpc.Hc * mpc.estim.model.nu
+    mpc.con.nw > 0 && error("Conversion of custom linear inequality constraints is not supported for now.")
     mpc.weights.isinf_C && return nothing # only hard constraints are entirely supported
     C_umin, C_umax   = -mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]
     C_Δumin, C_Δumax = -mpc.con.A_ΔŨmin[1:nΔU, end], -mpc.con.A_ΔŨmax[1:nΔU, end]
