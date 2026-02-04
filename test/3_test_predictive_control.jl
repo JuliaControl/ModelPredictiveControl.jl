@@ -295,6 +295,9 @@ end
     setconstraint!(mpc, ymin=[-6, -11],ymax=[55, 35])
     @test mpc.con.Y0min ≈ [-6,-11]
     @test mpc.con.Y0max ≈ [55,35]
+    setconstraint!(mpc, wmin=[-7, -12], wmax=[75, 65])
+    @test mpc.con.Wmin  ≈ [-7, -12, -7, -12]
+    @test mpc.con.Wmax  ≈ [75, 65, 75, 65]
     setconstraint!(mpc, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
     @test mpc.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
     @test mpc.con.x̂0max ≈ [21,22,23,24,25,26]
@@ -308,6 +311,9 @@ end
     setconstraint!(mpc, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
     @test -mpc.con.A_Ymin[:, end] ≈ [1.00,1.01]
     @test -mpc.con.A_Ymax[:, end] ≈ [1.02,1.03]
+    setconstraint!(mpc, c_wmin=[2.00,2.01], c_wmax=[2.02,2.03])
+    @test -mpc.con.A_Wmin[:, end] ≈ [2.00,2.01,2.00,2.01]
+    @test -mpc.con.A_Wmax[:, end] ≈ [2.02,2.03,2.02,2.03]
     setconstraint!(mpc, c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36])
     @test -mpc.con.A_x̂min[:, end] ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
     @test -mpc.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
@@ -324,6 +330,7 @@ end
     setconstraint!(mpc2, Ymin=-1(1:50).-3, Ymax=+1(1:50).+3)
     @test mpc2.con.Y0min ≈ -1(1:50).-3
     @test mpc2.con.Y0max ≈ +1(1:50).+3
+    #setconstraint!(mpc3)
 
     setconstraint!(mpc2, C_umin=+1(1:50).+4, C_umax=+1(1:50).+4)
     @test -mpc2.con.A_Umin[:, end] ≈ +1(1:50).+4

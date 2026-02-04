@@ -445,6 +445,8 @@ function setconstraint!(
         isnothing(C_Δumax)  && !isnothing(c_Δumax)  && (C_Δumax = repeat(c_Δumax, Hc))
         isnothing(C_ymin)   && !isnothing(c_ymin)   && (C_ymin  = repeat(c_ymin,  Hp))
         isnothing(C_ymax)   && !isnothing(c_ymax)   && (C_ymax  = repeat(c_ymax,  Hp))
+        isnothing(C_wmin)   && !isnothing(c_wmin)   && (C_wmin  = repeat(c_wmin,  Hp+1))
+        isnothing(C_wmax)   && !isnothing(c_wmax)   && (C_wmax  = repeat(c_wmax,  Hp+1))
         if !isnothing(C_umin)
             size(C_umin) == (nu*Hp,) || throw(ArgumentError("C_umin size must be $((nu*Hp,))"))
             any(<(0), C_umin) && error("C_umin weights should be non-negative")
