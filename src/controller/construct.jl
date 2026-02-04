@@ -141,8 +141,8 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     Vŝ      ::Matrix{NT}
     Bŝ      ::Vector{NT}
     # custom linear equality constraints:
-    ẼW      ::Matrix{NT}
-    FW      ::Vector{NT}
+    Ẽw      ::Matrix{NT}
+    Fw      ::Vector{NT}
     W̄y      ::SparseMatrixCSC{NT, Int}
     W̄u      ::SparseMatrixCSC{NT, Int}
     W̄d      ::SparseMatrixCSC{NT, Int}
@@ -803,7 +803,7 @@ function init_defaultcon_mpc(
     A_Umin,  A_Umax, P̃u  = relaxU(Pu, C_umin, C_umax, nϵ)
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃Δu = relaxΔU(PΔu, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ)
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
-    A_Wmin,  A_Wmax, ẼW = relaxW(E, Pu, Hp, W̄y, W̄u, C_wmin, C_wmax, nϵ)
+    A_Wmin,  A_Wmax, Ẽw = relaxW(E, Pu, Hp, W̄y, W̄u, C_wmin, C_wmax, nϵ)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
     A_ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
     i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
@@ -817,14 +817,14 @@ function init_defaultcon_mpc(
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂max, A_x̂min,
         A_ŝ
     )
-    # dummy fx̂, FW and Fŝ vectors (updated just before optimization)
-    fx̂, FW, Fŝ = zeros(NT, nx̂), zeros(NT, nW), zeros(NT, nx̂*Hp)
+    # dummy fx̂, Fw and Fŝ vectors (updated just before optimization)
+    fx̂, Fw, Fŝ = zeros(NT, nx̂), zeros(NT, nW), zeros(NT, nx̂*Hp)
     # dummy b and beq vectors (updated just before optimization)
     b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
     con = ControllerConstraint{NT, GCfunc}(
         ẽx̂      , fx̂     , gx̂      , jx̂       , kx̂     , vx̂     , bx̂     ,
         Ẽŝ      , Fŝ     , Gŝ      , Jŝ       , Kŝ     , Vŝ     , Bŝ     ,
-        ẼW      , FW     , W̄y      , W̄u       , W̄d     , W̄r     , nw     ,
+        Ẽw      , Fw     , W̄y      , W̄u       , W̄d     , W̄r     , nw     ,
         U0min   , U0max  , ΔŨmin   , ΔŨmax    , 
         Y0min   , Y0max  , Wmin    , Wmax     , x̂0min  , x̂0max  , 
         A_Umin  , A_Umax , A_ΔŨmin , A_ΔŨmax  , 
@@ -973,7 +973,7 @@ function relaxŶ(E::AbstractMatrix{NT}, C_ymin, C_ymax, nϵ) where NT<:Real
 end
 
 @doc raw"""
-    relaxW(E, Pu, nw, W̄y, W̄u, C_wmin, C_wmax, nϵ) -> A_Wmin, A_Wmax, ẼW
+    relaxW(E, Pu, nw, W̄y, W̄u, C_wmin, C_wmax, nϵ) -> A_Wmin, A_Wmax, Ẽw
 
 Construct and augment the custom linear constraints with slack variable ϵ for softening.
 
@@ -1036,17 +1036,17 @@ function relaxW(E::AbstractMatrix{NT}, Pu, Hp, W̄y, W̄u, C_wmin, C_wmax, nϵ) 
         Wy_terms = W̄y*[zeros(NT, ny, size(E, 2)); E]
     end
     Wu_terms = W̄u*[Pu; Pu[end-nu+1:end, :]]
-    EW = Wy_terms + Wu_terms
+    Ew = Wy_terms + Wu_terms
     if nϵ == 1 # Z̃ = [Z; ϵ]
         # ϵ impacts custom constraint calculations:
-        A_Wmin, A_Wmax = -[EW  C_wmin], [EW -C_wmax]
+        A_Wmin, A_Wmax = -[Ew  C_wmin], [Ew -C_wmax]
         # ϵ has no impact on custom constraint predictions:
-        ẼW = [EW zeros(NT, nW, 1)]
+        Ẽw = [Ew zeros(NT, nW, 1)]
     else # Z̃ = Z (only hard constraints)
-        ẼW = EW
-        A_Wmin, A_Wmax = -EW, EW
+        Ẽw = Ew
+        A_Wmin, A_Wmax = -Ew, Ew
     end
-    return A_Wmin, A_Wmax, ẼW
+    return A_Wmin, A_Wmax, Ẽw
 end
 
 @doc raw"""
