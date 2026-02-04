@@ -49,10 +49,10 @@
     @test skalmanfilter9.cov.Q̂ ≈ I(4)
     @test skalmanfilter9.cov.R̂ ≈ I(2)
 
-    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=[1,1,1])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=[-1,0])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=0, σQ=[1])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=0, σR=[1,1,1])
+    @test_throws DimensionMismatch SteadyKalmanFilter(linmodel, nint_ym=[1,1,1])
+    @test_throws ArgumentError SteadyKalmanFilter(linmodel, nint_ym=[-1,0])
+    @test_throws DimensionMismatch SteadyKalmanFilter(linmodel, nint_ym=0, σQ=[1])
+    @test_throws DimensionMismatch SteadyKalmanFilter(linmodel, nint_ym=0, σR=[1,1,1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel3, nint_ym=[1, 0, 0])
     model_unobs = LinModel([1 0;0 1.5], [1; 0], [1 0], zeros(2,0), zeros(1,0), 1.0)
     @test_throws ErrorException SteadyKalmanFilter(model_unobs, nint_ym=[1])
@@ -188,7 +188,7 @@ end
     kalmanfilter8 = KalmanFilter(linmodel2)
     @test isa(kalmanfilter8, KalmanFilter{Float32})
 
-    @test_throws ErrorException KalmanFilter(linmodel, nint_ym=0, σP_0=[1])
+    @test_throws DimensionMismatch KalmanFilter(linmodel, nint_ym=0, σP_0=[1])
 end
 
 @testitem "KalmanFilter estimator methods" setup=[SetupMPCtests] begin
@@ -302,8 +302,8 @@ end
     lo6 = Luenberger(linmodel2)
     @test isa(lo6, Luenberger{Float32})
 
-    @test_throws ErrorException Luenberger(linmodel, nint_ym=[1,1,1])
-    @test_throws ErrorException Luenberger(linmodel, nint_ym=[-1,0])
+    @test_throws DimensionMismatch Luenberger(linmodel, nint_ym=[1,1,1])
+    @test_throws ArgumentError Luenberger(linmodel, nint_ym=[-1,0])
     @test_throws ErrorException Luenberger(linmodel, poles=[0.5])
     @test_throws ErrorException Luenberger(linmodel, poles=fill(1.5, lo1.nx̂))
     @test_throws ErrorException Luenberger(LinModel(tf(1,[1, 0]),0.1), poles=[0.5,0.6])
@@ -1603,8 +1603,8 @@ end
 @testitem "ManualEstimator construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = LinModel(sys,Ts,i_u=[1,2])
-    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
-    h(x,d,model)   = model.C*x + model.Du*d
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Du*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
 
     manual1 = ManualEstimator(linmodel)
@@ -1651,8 +1651,8 @@ end
 @testitem "ManualEstimator estimator methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = LinModel(sys,Ts,i_u=[1,2])
-    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
-    h(x,d,model)   = model.C*x + model.Du*d
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Du*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, 0, solver=nothing, p=linmodel)
 
     manual1 = ManualEstimator(linmodel)
