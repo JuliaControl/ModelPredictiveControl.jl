@@ -53,6 +53,23 @@
     mpc16 = LinMPC(model, Hc=[1,2,3,6,6,6], Hp=10, Cwt=Inf)
     @test mpc16.Hc == 4 # the last 2 elements of Hc are ignored
     @test size(mpc16.P̃u) == (10*mpc1.estim.model.nu, 4*mpc1.estim.model.nu)
+    
+    Wy = ones(3, ny)
+    mpc17 = LinMPC(model; Wy)
+    @test mpc17.con.W̄y ≈ ModelPredictiveControl.repeatdiag(Wy, mpc17.Hp+1)
+    @test mpc17.con.W̄u ≈ zeros(model.nu*(mpc17.Hp+1), model.nu*(mpc17.Hp+1))
+    @test mpc17.con.W̄d ≈ zeros(model.nd*(mpc17.Hp+1), model.nd*(mpc17.Hp+1))
+    @test mpc17.con.W̄r ≈ zeros(model.ny*(mpc17.Hp+1), model.ny*(mpc17.Hp+1))
+    
+    Wy = ones(2, model.ny)
+    Wu = 2*ones(2, model.nu)
+    Wd = 3*ones(2, model.nd)
+    Wr = 0.5*ones(2, model.ny)
+    mpc18 = LinMPC(model; Wy, Wu, Wd, Wr)
+    @test mpc18.con.W̄y ≈ ModelPredictiveControl.repeatdiag(Wy, mpc18.Hp+1)
+    @test mpc18.con.W̄u ≈ ModelPredictiveControl.repeatdiag(Wu, mpc18.Hp+1)
+    @test mpc18.con.W̄d ≈ ModelPredictiveControl.repeatdiag(Wd, mpc18.Hp+1)
+    @test mpc18.con.W̄r ≈ ModelPredictiveControl.repeatdiag(Wr, mpc18.Hp+1)
 
     @test_logs(
         (:warn, 
@@ -62,14 +79,19 @@
     )
     @test_throws ArgumentError LinMPC(model, Hc=0)
     @test_throws ArgumentError LinMPC(model, Hp=1, Hc=2)
-    @test_throws ArgumentError LinMPC(model, Mwt=[1])
-    @test_throws ArgumentError LinMPC(model, Mwt=[1])
-    @test_throws ArgumentError LinMPC(model, Lwt=[1])
-    @test_throws ArgumentError LinMPC(model, Cwt=[1])
+    @test_throws DimensionMismatch LinMPC(model, Mwt=[1])
+    @test_throws DimensionMismatch LinMPC(model, Mwt=[1])
+    @test_throws DimensionMismatch LinMPC(model, Lwt=[1])
+    @test_throws DimensionMismatch LinMPC(model, Cwt=[1])
     @test_throws ArgumentError LinMPC(model, Mwt=[-1,1])
     @test_throws ArgumentError LinMPC(model, Nwt=[-1,1])
     @test_throws ArgumentError LinMPC(model, Lwt=[-1,1])
     @test_throws ArgumentError LinMPC(model, Cwt=-1)
+    @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, ny+1))
+    @test_throws DimensionMismatch LinMPC(model, Wu=ones(2, nu-1))
+    @test_throws DimensionMismatch LinMPC(model, Wd=ones(2, nd+1))
+    @test_throws DimensionMismatch LinMPC(model, Wr=ones(2, ny-1))
+    @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, ny), Wu=ones(3, nu))
 end
 
 @testitem "LinMPC moves and getinfo" setup=[SetupMPCtests] begin
