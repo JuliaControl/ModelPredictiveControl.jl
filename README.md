@@ -81,9 +81,10 @@ for more detailed examples.
 - 📸 **Linearization**: Auto-differentiation for exact Jacobians.
 - ⚙️ **Adaptive MPC**: Manual model updates or automatic successive linearization.
 - 🏎️ **Explicit MPC**: Specialized for unconstrained problems.
-- 🚧 **Constraints**: Soft/hard limits on inputs, outputs, increments, and terminal states.
+- 🚧 **Bounds**: Soft/hard limits on inputs, outputs, increments, and terminal states.
+- 🚫 **Contraints**: Soft/hard custom linear and nonlinear inequality constraints.
 - 🔁 **Feedback**: Internal model or state estimators (see features below).
-- 📡 **Feedforward**: Integrated support for measured disturbances. 
+- 📡 **Feedforward**: Integrated support for measured disturbances.
 - 🔮 **Preview**: Custom predictions for setpoints and measured disturbances.
 - 📈 **Offset-Free**: Automatic model augmentation with integrators.
 - 📊 **Visuals**: Easy integration with `Plots.jl`.
