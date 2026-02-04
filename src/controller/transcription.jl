@@ -298,12 +298,12 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
     ```math
     \begin{aligned}
     \mathbf{Q}(i, m, b) &= \begin{bmatrix}
-        \mathbf{Ĉ W}(i-b+0)\mathbf{B̂_u}             \\
-        \mathbf{Ĉ W}(i-b+1)\mathbf{B̂_u}             \\
+        \mathbf{Ĉ S}(i-b+0)\mathbf{B̂_u}             \\
+        \mathbf{Ĉ S}(i-b+1)\mathbf{B̂_u}             \\
         \vdots                                      \\
-        \mathbf{Ĉ W}(m-b-1)\mathbf{B̂_u}
+        \mathbf{Ĉ S}(m-b-1)\mathbf{B̂_u}
     \end{bmatrix}                                   \\
-    \mathbf{W}(m) &= ∑_{ℓ=0}^m \mathbf{Â}^ℓ      
+    \mathbf{S}(m) &= ∑_{ℓ=0}^m \mathbf{Â}^ℓ      
     \end{aligned}
     ```
     the prediction matrices are computed from the ``j_ℓ`` integers introduced in the 
@@ -332,23 +332,23 @@ each control period ``k``, see [`initpred!`](@ref) and [`linconstraint!`](@ref).
         \mathbf{Ĉ}\mathbf{Â}^{H_p}      \end{bmatrix} \\
     \mathbf{V} &= \mathbf{Q}(0, H_p, 0) \\
     \mathbf{B} &= \begin{bmatrix}
-        \mathbf{Ĉ W}(0)                 \\
-        \mathbf{Ĉ W}(1)                 \\
+        \mathbf{Ĉ S}(0)                 \\
+        \mathbf{Ĉ S}(1)                 \\
         \vdots                          \\
-        \mathbf{Ĉ W}(H_p-1)             \end{bmatrix}   \mathbf{\big(f̂_{op} - x̂_{op}\big)} 
+        \mathbf{Ĉ S}(H_p-1)             \end{bmatrix}   \mathbf{\big(f̂_{op} - x̂_{op}\big)} 
     \end{aligned}
     ```
     For the terminal constraints, the matrices are computed with:
     ```math
     \begin{aligned}
     \mathbf{e_x̂} &= \begin{bmatrix} 
-        \mathbf{W}(H_p-j_0-1)\mathbf{B̂_u} & \mathbf{W}(H_p-j_1-1)\mathbf{B̂_u} & \cdots & \mathbf{W}(H_p-j_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
+        \mathbf{S}(H_p-j_0-1)\mathbf{B̂_u} & \mathbf{S}(H_p-j_1-1)\mathbf{B̂_u} & \cdots & \mathbf{S}(H_p-j_{H_c-1}-1)\mathbf{B̂_u} \end{bmatrix} \\
     \mathbf{g_x̂} &= \mathbf{Â}^{H_p-1} \mathbf{B̂_d} \\
     \mathbf{j_x̂} &= \begin{bmatrix} 
         \mathbf{Â}^{H_p-2}\mathbf{B̂_d} & \mathbf{Â}^{H_p-3}\mathbf{B̂_d} & \cdots & \mathbf{0}                                \end{bmatrix} \\
     \mathbf{k_x̂} &= \mathbf{Â}^{H_p} \\
-    \mathbf{v_x̂} &= \mathbf{W}(H_p-1)\mathbf{B̂_u} \\
-    \mathbf{b_x̂} &= \mathbf{W}(H_p-1)\mathbf{\big(f̂_{op} - x̂_{op}\big)}
+    \mathbf{v_x̂} &= \mathbf{S}(H_p-1)\mathbf{B̂_u} \\
+    \mathbf{b_x̂} &= \mathbf{S}(H_p-1)\mathbf{\big(f̂_{op} - x̂_{op}\big)}
     \end{aligned}
     ```
     The complex structure of the ``\mathbf{E}`` and ``\mathbf{e_x̂}`` matrices is due to the
@@ -372,12 +372,12 @@ function init_predmat(
     jℓ_data = [0; cumsum(nb)] # introduced in move_blocking docstring
     # four helper functions to improve code clarity and be similar to eqs. in docstring:
     getpower(array3D, power) = @views array3D[:,:, power+1]
-    W(m)  = @views Âpow_csum[:,:, m+1]
+    S(m)  = @views Âpow_csum[:,:, m+1]
     jℓ(ℓ) = jℓ_data[ℓ+1]
     function Q!(Q, i, m, b)
         for ℓ=0:m-i-1
             iRows = (1:ny) .+ ny*ℓ
-            Q[iRows, :] = Ĉ * W(i-b+ℓ) * B̂u
+            Q[iRows, :] = Ĉ * S(i-b+ℓ) * B̂u
         end
         return Q
     end
@@ -389,7 +389,7 @@ function init_predmat(
         K[iRow,:] = Ĉ*getpower(Âpow, j)
     end
     # --- previous manipulated inputs lastu0 ---
-    vx̂ = W(Hp-1)*B̂u
+    vx̂ = S(Hp-1)*B̂u
     V  = Matrix{NT}(undef, Hp*ny, nu)
     Q!(V, 0, Hp, 0)
     # --- decision variables Z ---
@@ -404,7 +404,7 @@ function init_predmat(
             Q = @views E[iRow, iCol]
             Q!(Q, i_Q, m_Q, b_Q)
         end
-        ex̂[:, iCol] = W(Hp - jℓ(j) - 1)*B̂u
+        ex̂[:, iCol] = S(Hp - jℓ(j) - 1)*B̂u
     end    
     # --- current measured disturbances d0 and predictions D̂0 ---
     gx̂ = getpower(Âpow, Hp-1)*B̂d
@@ -424,11 +424,11 @@ function init_predmat(
         end
     end
     # --- state x̂op and state update f̂op operating points ---
-    coef_bx̂ = W(Hp-1)
+    coef_bx̂ = S(Hp-1)
     coef_B  = Matrix{NT}(undef, ny*Hp, nx̂)
     for j=1:Hp
         iRow = (1:ny) .+ ny*(j-1)
-        coef_B[iRow,:] = Ĉ*W(j-1)
+        coef_B[iRow,:] = Ĉ*S(j-1)
     end
     f̂op_n_x̂op = estim.f̂op - estim.x̂op
     bx̂ = coef_bx̂ * f̂op_n_x̂op
