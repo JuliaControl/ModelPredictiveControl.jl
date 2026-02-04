@@ -319,7 +319,7 @@ end
     @test -mpc.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
 
     model2 = LinModel(tf([2], [10, 1]), 3.0)
-    mpc2 = LinMPC(model2, Hp=50, Hc=5)
+    mpc2 = LinMPC(model2, Hp=50, Hc=5, Wr=[1])
 
     setconstraint!(mpc2, Umin=-1(1:50).-1, Umax=+1(1:50).+1)
     @test mpc2.con.U0min ≈ -1(1:50).-1
@@ -330,31 +330,40 @@ end
     setconstraint!(mpc2, Ymin=-1(1:50).-3, Ymax=+1(1:50).+3)
     @test mpc2.con.Y0min ≈ -1(1:50).-3
     @test mpc2.con.Y0max ≈ +1(1:50).+3
-    #setconstraint!(mpc3)
+    setconstraint!(mpc2, Wmin=-1(1:51).-4, Wmax=+1(1:51).+4)
+    @test mpc2.con.Wmin ≈ -1(1:51).-4
+    @test mpc2.con.Wmax ≈ +1(1:51).+4
 
-    setconstraint!(mpc2, C_umin=+1(1:50).+4, C_umax=+1(1:50).+4)
-    @test -mpc2.con.A_Umin[:, end] ≈ +1(1:50).+4
-    @test -mpc2.con.A_Umax[:, end] ≈ +1(1:50).+4
-    setconstraint!(mpc2, C_Δumin=+1(1:5).+5, C_Δumax=+1(1:5).+5)
-    @test -mpc2.con.A_ΔŨmin[1:end-1, end] ≈ +1(1:5).+5
-    @test -mpc2.con.A_ΔŨmax[1:end-1, end] ≈ +1(1:5).+5
-    setconstraint!(mpc2, C_ymin=+1(1:50).+6, C_ymax=+1(1:50).+6)
-    @test -mpc2.con.A_Ymin[:, end] ≈ +1(1:50).+6
-    @test -mpc2.con.A_Ymax[:, end] ≈ +1(1:50).+6
-    setconstraint!(mpc2, c_umin=[0], c_umax=[0], c_Δumin=[0], c_Δumax=[0], c_ymin=[1], c_ymax=[1])
+    setconstraint!(mpc2, C_umin=+1(1:50).+5, C_umax=+1(1:50).+5)
+    @test -mpc2.con.A_Umin[:, end] ≈ +1(1:50).+5
+    @test -mpc2.con.A_Umax[:, end] ≈ +1(1:50).+5
+    setconstraint!(mpc2, C_Δumin=+1(1:5).+6, C_Δumax=+1(1:5).+6)
+    @test -mpc2.con.A_ΔŨmin[1:end-1, end] ≈ +1(1:5).+6
+    @test -mpc2.con.A_ΔŨmax[1:end-1, end] ≈ +1(1:5).+6
+    setconstraint!(mpc2, C_ymin=+1(1:50).+7, C_ymax=+1(1:50).+7)
+    @test -mpc2.con.A_Ymin[:, end] ≈ +1(1:50).+7
+    @test -mpc2.con.A_Ymax[:, end] ≈ +1(1:50).+7
+    setconstraint!(mpc2, C_wmin=+1(1:51).+8, C_wmax=+1(1:51).+8)
+    @test -mpc2.con.A_Wmin[:, end] ≈ +1(1:51).+8
+    @test -mpc2.con.A_Wmax[:, end] ≈ +1(1:51).+8
 
-    @test_throws ArgumentError setconstraint!(mpc, umin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, umax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, Δumin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, Δumax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, ymin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, ymax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_umin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_umax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_Δumin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_Δumax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_ymin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_ymax=[0,0,0])
+    setconstraint!(mpc2, 
+        c_umin=[0], c_umax=[0], c_Δumin=[0], c_Δumax=[0], 
+        c_ymin=[1], c_ymax=[1], c_wmin=[1],  c_wmax=[1]
+    )
+
+    @test_throws DimensionMismatch setconstraint!(mpc, umin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, umax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, Δumin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, Δumax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, ymin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, ymax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_umin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_umax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_Δumin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_Δumax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_ymin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_ymax=[0,0,0])
 
     preparestate!(mpc, mpc.estim.model.yop, mpc.estim.model.dop)
     moveinput!(mpc, [0, 0], [0])
@@ -806,7 +815,7 @@ end
     @test isa(nmpc15.estim, UnscentedKalmanFilter{Float32})
     @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
 
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
+    @test_throws DimensionMismatch NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
     @test_throws ArgumentError NonLinMPC(nonlinmodel)
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, JE  = (_,_,_)->0.0)
     @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)

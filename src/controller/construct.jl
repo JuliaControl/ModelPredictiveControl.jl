@@ -349,84 +349,84 @@ function setconstraint!(
     nϵ, nw, nc = mpc.nϵ, con.nw, con.nc
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
     if isnothing(Umin) && !isnothing(umin)
-        size(umin) == (nu,) || throw(ArgumentError("umin size must be $((nu,))"))
+        size(umin) == (nu,) || throw(DimensionMismatch("umin size must be $((nu,))"))
         for i = 1:nu*Hp
             con.U0min[i] = umin[(i-1) % nu + 1] - mpc.Uop[i]
         end
     elseif !isnothing(Umin)
-        size(Umin) == (nu*Hp,) || throw(ArgumentError("Umin size must be $((nu*Hp,))"))
+        size(Umin) == (nu*Hp,) || throw(DimensionMismatch("Umin size must be $((nu*Hp,))"))
         con.U0min .= Umin .- mpc.Uop
     end
     if isnothing(Umax) && !isnothing(umax)
-        size(umax) == (nu,) || throw(ArgumentError("umax size must be $((nu,))"))
+        size(umax) == (nu,) || throw(DimensionMismatch("umax size must be $((nu,))"))
         for i = 1:nu*Hp
             con.U0max[i] = umax[(i-1) % nu + 1] - mpc.Uop[i]
         end
     elseif !isnothing(Umax)
-        size(Umax)   == (nu*Hp,) || throw(ArgumentError("Umax size must be $((nu*Hp,))"))
+        size(Umax)   == (nu*Hp,) || throw(DimensionMismatch("Umax size must be $((nu*Hp,))"))
         con.U0max .= Umax .- mpc.Uop
     end
     if isnothing(ΔUmin) && !isnothing(Δumin)
-        size(Δumin) == (nu,) || throw(ArgumentError("Δumin size must be $((nu,))"))
+        size(Δumin) == (nu,) || throw(DimensionMismatch("Δumin size must be $((nu,))"))
         for i = 1:nu*Hc
             con.ΔŨmin[i] = Δumin[(i-1) % nu + 1]
         end
     elseif !isnothing(ΔUmin)
-        size(ΔUmin)  == (nu*Hc,) || throw(ArgumentError("ΔUmin size must be $((nu*Hc,))"))
+        size(ΔUmin)  == (nu*Hc,) || throw(DimensionMismatch("ΔUmin size must be $((nu*Hc,))"))
         con.ΔŨmin[1:nu*Hc] .= ΔUmin
     end
     if isnothing(ΔUmax) && !isnothing(Δumax)
-        size(Δumax) == (nu,) || throw(ArgumentError("Δumax size must be $((nu,))"))
+        size(Δumax) == (nu,) || throw(DimensionMismatch("Δumax size must be $((nu,))"))
         for i = 1:nu*Hc
             con.ΔŨmax[i] = Δumax[(i-1) % nu + 1]
         end
     elseif !isnothing(ΔUmax)
-        size(ΔUmax)  == (nu*Hc,) || throw(ArgumentError("ΔUmax size must be $((nu*Hc,))"))
+        size(ΔUmax)  == (nu*Hc,) || throw(DimensionMismatch("ΔUmax size must be $((nu*Hc,))"))
         con.ΔŨmax[1:nu*Hc] .= ΔUmax
     end
     if isnothing(Ymin) && !isnothing(ymin)
-        size(ymin) == (ny,) || throw(ArgumentError("ymin size must be $((ny,))"))
+        size(ymin) == (ny,) || throw(DimensionMismatch("ymin size must be $((ny,))"))
         for i = 1:ny*Hp
             con.Y0min[i] = ymin[(i-1) % ny + 1] - mpc.Yop[i]
         end
     elseif !isnothing(Ymin)
-        size(Ymin) == (ny*Hp,) || throw(ArgumentError("Ymin size must be $((ny*Hp,))"))
+        size(Ymin) == (ny*Hp,) || throw(DimensionMismatch("Ymin size must be $((ny*Hp,))"))
         con.Y0min .= Ymin .- mpc.Yop
     end
     if isnothing(Ymax) && !isnothing(ymax)
-        size(ymax) == (ny,) || throw(ArgumentError("ymax size must be $((ny,))"))
+        size(ymax) == (ny,) || throw(DimensionMismatch("ymax size must be $((ny,))"))
         for i = 1:ny*Hp
             con.Y0max[i] = ymax[(i-1) % ny + 1] - mpc.Yop[i]
         end
     elseif !isnothing(Ymax)
-        size(Ymax) == (ny*Hp,) || throw(ArgumentError("Ymax size must be $((ny*Hp,))"))
+        size(Ymax) == (ny*Hp,) || throw(DimensionMismatch("Ymax size must be $((ny*Hp,))"))
         con.Y0max .= Ymax .- mpc.Yop
     end
 
     if isnothing(Wmin) && !isnothing(wmin)
-        size(wmin) == (nw,) || throw(ArgumentError("wmin size must be $((nw,))"))
+        size(wmin) == (nw,) || throw(DimensionMismatch("wmin size must be $((nw,))"))
         for i = 1:nw*(Hp+1)
             con.Wmin[i] = wmin[(i-1) % nw + 1]
         end
     elseif !isnothing(Wmin)
-        size(Wmin) == (nw*(Hp+1),) || throw(ArgumentError("Wmin size must be $((nw*(Hp+1),))"))
+        size(Wmin) == (nw*(Hp+1),) || throw(DimensionMismatch("Wmin size must be $((nw*(Hp+1),))"))
         con.Wmin .= Wmin
     end
     if isnothing(Wmax) && !isnothing(wmax)
-        size(wmax) == (nw,) || throw(ArgumentError("wmax size must be $((nw,))"))
+        size(wmax) == (nw,) || throw(DimensionMismatch("wmax size must be $((nw,))"))
         for i = 1:nw*(Hp+1)
             con.Wmax[i] = wmax[(i-1) % nw + 1]
         end
     elseif !isnothing(Wmax)
-        size(Wmax) == (nw*(Hp+1),) || throw(ArgumentError("Wmax size must be $((nw*(Hp+1),))"))
+        size(Wmax) == (nw*(Hp+1),) || throw(DimensionMismatch("Wmax size must be $((nw*(Hp+1),))"))
         con.Wmax .= Wmax
     end
     if !isnothing(x̂min)
-        size(x̂min) == (nx̂,) || throw(ArgumentError("x̂min size must be $((nx̂,))"))
+        size(x̂min) == (nx̂,) || throw(DimensionMismatch("x̂min size must be $((nx̂,))"))
         con.x̂0min .= x̂min .- mpc.estim.x̂op
     end
     if !isnothing(x̂max)
-        size(x̂max) == (nx̂,) || throw(ArgumentError("x̂max size must be $((nx̂,))"))
+        size(x̂max) == (nx̂,) || throw(DimensionMismatch("x̂max size must be $((nx̂,))"))
         con.x̂0max .= x̂max .- mpc.estim.x̂op
     end
     allECRs = (
@@ -448,57 +448,57 @@ function setconstraint!(
         isnothing(C_wmin)   && !isnothing(c_wmin)   && (C_wmin  = repeat(c_wmin,  Hp+1))
         isnothing(C_wmax)   && !isnothing(c_wmax)   && (C_wmax  = repeat(c_wmax,  Hp+1))
         if !isnothing(C_umin)
-            size(C_umin) == (nu*Hp,) || throw(ArgumentError("C_umin size must be $((nu*Hp,))"))
+            size(C_umin) == (nu*Hp,) || throw(DimensionMismatch("C_umin size must be $((nu*Hp,))"))
             any(<(0), C_umin) && error("C_umin weights should be non-negative")
             con.A_Umin[:, end] .= -C_umin
         end
         if !isnothing(C_umax)
-            size(C_umax) == (nu*Hp,) || throw(ArgumentError("C_umax size must be $((nu*Hp,))"))
+            size(C_umax) == (nu*Hp,) || throw(DimensionMismatch("C_umax size must be $((nu*Hp,))"))
             any(<(0), C_umax) && error("C_umax weights should be non-negative")
             con.A_Umax[:, end] .= -C_umax
         end
         if !isnothing(C_Δumin)
-            size(C_Δumin) == (nu*Hc,) || throw(ArgumentError("C_Δumin size must be $((nu*Hc,))"))
+            size(C_Δumin) == (nu*Hc,) || throw(DimensionMismatch("C_Δumin size must be $((nu*Hc,))"))
             any(<(0), C_Δumin) && error("C_Δumin weights should be non-negative")
             con.A_ΔŨmin[1:end-1, end] .= -C_Δumin 
         end
         if !isnothing(C_Δumax)
-            size(C_Δumax) == (nu*Hc,) || throw(ArgumentError("C_Δumax size must be $((nu*Hc,))"))
+            size(C_Δumax) == (nu*Hc,) || throw(DimensionMismatch("C_Δumax size must be $((nu*Hc,))"))
             any(<(0), C_Δumax) && error("C_Δumax weights should be non-negative")
             con.A_ΔŨmax[1:end-1, end] .= -C_Δumax
         end
         if !isnothing(C_ymin)
-            size(C_ymin) == (ny*Hp,) || throw(ArgumentError("C_ymin size must be $((ny*Hp,))"))
+            size(C_ymin) == (ny*Hp,) || throw(DimensionMismatch("C_ymin size must be $((ny*Hp,))"))
             any(<(0), C_ymin) && error("C_ymin weights should be non-negative")
             con.C_ymin .= C_ymin
             size(con.A_Ymin, 1) ≠ 0 && (con.A_Ymin[:, end] .= -con.C_ymin) # for LinModel
         end
         if !isnothing(C_ymax)
-            size(C_ymax) == (ny*Hp,) || throw(ArgumentError("C_ymax size must be $((ny*Hp,))"))
+            size(C_ymax) == (ny*Hp,) || throw(DimensionMismatch("C_ymax size must be $((ny*Hp,))"))
             any(<(0), C_ymax) && error("C_ymax weights should be non-negative")
             con.C_ymax .= C_ymax
             size(con.A_Ymax, 1) ≠ 0 && (con.A_Ymax[:, end] .= -con.C_ymax) # for LinModel
         end
         if !isnothing(C_wmin)
-            size(C_wmin) == (nw*(Hp+1),) || throw(ArgumentError("C_wmin size must be $((nw*(Hp+1),))"))
+            size(C_wmin) == (nw*(Hp+1),) || throw(DimensionMismatch("C_wmin size must be $((nw*(Hp+1),))"))
             any(<(0), C_wmin) && error("C_wmin weights should be non-negative")
             con.C_wmin .= C_wmin
             con.A_Wmin[:, end] .= -C_wmin
         end
         if !isnothing(C_wmax)
-            size(C_wmax) == (nw*(Hp+1),) || throw(ArgumentError("C_wmax size must be $((nw*(Hp+1),))"))
+            size(C_wmax) == (nw*(Hp+1),) || throw(DimensionMismatch("C_wmax size must be $((nw*(Hp+1),))"))
             any(<(0), C_wmax) && error("C_wmax weights should be non-negative")
             con.C_wmax .= C_wmax
             con.A_Wmax[:, end] .= -C_wmax
         end
         if !isnothing(c_x̂min)
-            size(c_x̂min) == (nx̂,) || throw(ArgumentError("c_x̂min size must be $((nx̂,))"))
+            size(c_x̂min) == (nx̂,) || throw(DimensionMismatch("c_x̂min size must be $((nx̂,))"))
             any(<(0), c_x̂min) && error("c_x̂min weights should be non-negative")
             con.c_x̂min .= c_x̂min
             size(con.A_x̂min, 1) ≠ 0 && (con.A_x̂min[:, end] .= -con.c_x̂min) # for LinModel
         end
         if !isnothing(c_x̂max)
-            size(c_x̂max) == (nx̂,) || throw(ArgumentError("c_x̂max size must be $((nx̂,))"))
+            size(c_x̂max) == (nx̂,) || throw(DimensionMismatch("c_x̂max size must be $((nx̂,))"))
             any(<(0), c_x̂max) && error("c_x̂max weights should be non-negative")
             con.c_x̂max .= c_x̂max
             size(con.A_x̂max, 1) ≠ 0 && (con.A_x̂max[:, end] .= -con.c_x̂max) # for LinModel
