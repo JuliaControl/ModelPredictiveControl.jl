@@ -14,7 +14,8 @@ real-time optimization. Modern MPCs based on closed-loop state estimators are th
 of the package, but classical approaches that rely on internal models are also possible. The
 `JuMP` and `DifferentiationInterface` dependencies allows the user to test different
 optimizers and automatic differentiation (AD) backends easily if the performances of the
-default settings are not satisfactory.
+default settings are not satisfactory. Linear MPC controllers can be exported to lightweight
+and standalone C code via the `LinearMPC` package extension.
 
 The documentation is divided in two parts:
 
