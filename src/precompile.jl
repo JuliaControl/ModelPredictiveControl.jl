@@ -74,7 +74,7 @@ R̂y = repeat([55; 30], 10)
     nmpc_skf.estim()
     nmpc_skf([55, 30])
 
-    sim!(model, 2)
+    res = sim!(model, 2)
     res_man = SimResult(model, res.U_data, res.Y_data; X_data=res.X_data)
 
     exmpc = ExplicitMPC(model)
