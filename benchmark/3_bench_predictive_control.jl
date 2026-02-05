@@ -410,11 +410,12 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting"] =
         sim!($nmpc_madnlp_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
-CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Uno"]["MultipleShooting (Hessian)"] = 
-    @benchmarkable(
-        sim!($nmpc_uno_ms_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
-    )    
+# Commenting out Uno solver for now (2026-02-05), it makes julia crash.
+# CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Uno"]["MultipleShooting (Hessian)"] = 
+#     @benchmarkable(
+#         sim!($nmpc_uno_ms_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+#         samples=samples, evals=evals, seconds=seconds
+#     )    
 
 # ----------------- Case study: Pendulum economic --------------------------------
 model2, p = pendulum_model2, pendulum_p2
