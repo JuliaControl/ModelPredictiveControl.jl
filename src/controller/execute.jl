@@ -303,6 +303,45 @@ end
 "Fill `Ŷs` vector with 0 values when `estim` is not an [`InternalModel`](@ref)."
 predictstoch!(Ŷs, mpc::PredictiveController, ::StateEstimator) = (Ŷs .= 0; nothing)
 
+@doc raw"""
+    linconstraint_custom!(mpc::PredictiveController, model::SimModel)
+
+Init the ``\mathbf{F_w}`` vector for the custom linear inequality constraints.
+
+See [`relaxW`](@ref) for the definition of the vector. The function does nothing if
+`mpc.con.nw < 1`.
+"""
+function linconstraint_custom!(mpc::PredictiveController, model::SimModel)
+    mpc.con.nw < 1 && return nothing
+    ny, nu, nd, buffer = model.ny, model.nu, model.nd, mpc.buffer
+    Fw = mpc.con.Fw
+    Ue_term, D̂e_term, R̂e_term = buffer.Ue, buffer.D̂e, buffer.Ŷe
+    Fw .= 0
+    Ue_term[1:end-nu]     .= mpc.Tu_lastu0 .+ mpc.Uop
+    Ue_term[end-nu+1:end] .= mpc.lastu0    .+ model.uop
+    mul!(Fw, mpc.con.W̄u, Ue_term, 1, 1)
+    if model.nd > 0
+        D̂e_term[1:nd]     .= mpc.d0 .+ model.dop
+        D̂e_term[nd+1:end] .= mpc.D̂0 .+ mpc.Dop
+        mul!(Fw, mpc.con.W̄d, D̂e_term, 1, 1)
+    end
+    R̂e_term[1:ny]     .= mpc.ry
+    R̂e_term[ny+1:end] .= mpc.R̂y
+    mul!(Fw, mpc.con.W̄r, R̂e_term, 1, 1)
+    return linconstraint_custom_outputs!(mpc, model)
+end
+
+"Also include the `W̄y` term in the custom linear constraints for [`LinModel`](@ref)."
+function linconstraint_custom_outputs!(mpc::PredictiveController, model::LinModel)
+    Ŷe_term, Fw, ny = mpc.buffer.Ŷe, mpc.con.Fw, model.ny
+    Ŷe_term[1:ny]     .= mpc.ŷ
+    Ŷe_term[ny+1:end] .= mpc.F .+ mpc.Yop
+    mul!(Fw, mpc.con.W̄y, Ŷe_term, 1, 1)
+    return nothing
+end
+"Do nothing for other model types."
+linconstraint_custom_outputs!(::PredictiveController, ::SimModel) = nothing
+
 """
     extended_vectors!(Ue, Ŷe, mpc::PredictiveController, U0, Ŷ0) -> Ue, Ŷe
 

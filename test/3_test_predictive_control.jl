@@ -1523,6 +1523,28 @@ end
     @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
     @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
 
+    linmodel2 = LinModel([tf([2], [2500, 1]) tf(0.1, [2000, 1])], 3000.0, i_d=[2])
+    f = (x,u,d,p) -> p.A*x + p.Bu*u + p.Bd*d
+    h = (x,d,p)   -> p.C*x + p.Dd*d
+    nonlinmodel2 = NonLinModel(f, h, linmodel2.Ts, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+    nonlinmodel2 = setop!(nonlinmodel2, uop=[25], dop=[30], yop=[50])
+    nmpc_wu = NonLinMPC(nonlinmodel2, Nwt=[0], Cwt=Inf, Hp=100, Hc=1, Wu=[1])
+    nmpc_wu = setconstraint!(nmpc_wu, wmax=[20])
+    preparestate!(nmpc_wu, [50], [30])
+    u = moveinput!(nmpc_wu, [100], [30])
+    @test all(isapprox.(getinfo(nmpc_wu)[:U], 20.0; atol=1e-1))
+    nmpc_wd = NonLinMPC(nonlinmodel2, Nwt=[0], Cwt=Inf, Hp=100, Hc=1, Wu=[1], Wd=[1])
+    nmpc_wd = setconstraint!(nmpc_wd, wmax=[45])
+    preparestate!(nmpc_wd, [50], [30])
+    u = moveinput!(nmpc_wd, [100], [30])
+    @test all(isapprox.(getinfo(nmpc_wd)[:U], 45-30; atol=1e-1))
+    nmpc_wr = NonLinMPC(nonlinmodel2, Nwt=[0], Cwt=Inf, Hp=100, Hc=1, Wu=[1], Wr=[1])
+    nmpc_wr = setconstraint!(nmpc_wr, wmax=[145])
+    preparestate!(nmpc_wr, [50], [30])
+    u = moveinput!(nmpc_wr, [100], [30])
+    @show getinfo(nmpc_wr)[:U]
+    @test all(isapprox.(getinfo(nmpc_wr)[:U], 145-100; atol=1e-1))
+
 end
 
 @testitem "NonLinMPC set model" setup=[SetupMPCtests] begin

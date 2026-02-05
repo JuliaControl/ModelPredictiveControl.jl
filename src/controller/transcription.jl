@@ -787,7 +787,7 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
         mul!(fx̂, mpc.con.gx̂, mpc.d0, 1, 1)
         mul!(fx̂, mpc.con.jx̂, mpc.D̂0, 1, 1)
     end
-    mpc.con.nw > 0 && linconstraint_custom!(mpc, model)
+    linconstraint_custom!(mpc, model)
     n = 0
     mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
     n += nU
@@ -816,12 +816,12 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
 end
 
 "Set `b` excluding predicted output constraints for `NonLinModel` and not `SingleShooting`."
-function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod)
+function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod)
     nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
     nW = length(mpc.con.Wmin)
     nx̂ = mpc.estim.nx̂
     # here, updating fx̂ is not necessary since fx̂ = 0
-    mpc.con.nw > 0 && linconstraint_custom!(mpc, model)
+    linconstraint_custom!(mpc, model)
     n = 0
     mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
     n += nU
@@ -845,10 +845,10 @@ function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::Transcriptio
 end
 
 "Also exclude terminal constraints for `NonLinModel` and `SingleShooting`."
-function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::SingleShooting)
+function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::SingleShooting)
     nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
     nW = length(mpc.con.Wmin)
-    mpc.con.nw > 0 && linconstraint_custom!(mpc, model)
+    linconstraint_custom!(mpc, model)
     n = 0
     mpc.con.b[(n+1):(n+nU)]  .= @. -mpc.con.U0min + mpc.Tu_lastu0
     n += nU
@@ -867,38 +867,6 @@ function linconstraint!(mpc::PredictiveController, ::NonLinModel, ::SingleShooti
     end
     return nothing
 end
-
-"Init the ``\\mathbf{F_w}`` vector for the linear model custom inequality constraints."
-function linconstraint_custom!(mpc::PredictiveController,  model::SimModel)
-    ny, nu, nd, buffer = model.ny, model.nu, model.nd, mpc.buffer
-    Fw = mpc.con.Fw
-    Ue_term, D̂e_term, R̂e_term = buffer.Ue, buffer.D̂e, buffer.Ŷe
-    Fw .= 0
-    Ue_term[1:end-nu]     .= mpc.Tu_lastu0 .+ mpc.Uop
-    Ue_term[end-nu+1:end] .= mpc.lastu0    .+ model.uop
-    mul!(Fw, mpc.con.W̄u, Ue_term, 1, 1)
-    if model.nd > 0
-        D̂e_term[1:nd]     .= mpc.d0 .+ model.dop
-        D̂e_term[nd+1:end] .= mpc.D̂0 .+ mpc.Dop
-        mul!(Fw, mpc.con.W̄d, D̂e_term, 1, 1)
-    end
-    R̂e_term[1:ny]     .= mpc.ry
-    R̂e_term[ny+1:end] .= mpc.R̂y
-    mul!(Fw, mpc.con.W̄r, R̂e_term, 1, 1)
-    return linconstraint_custom_outputs!(mpc, model)
-end
-
-"Also include the `W̄y` term in the custom linear constraints for [`LinModel`](@ref)."
-function linconstraint_custom_outputs!(mpc::PredictiveController,  model::LinModel)
-    Ŷe_term, Fw, ny = mpc.buffer.Ŷe, mpc.con.Fw, model.ny
-    Ŷe_term[1:ny]     .= mpc.ŷ
-    Ŷe_term[ny+1:end] .= mpc.F .+ mpc.Yop
-    mul!(Fw, mpc.con.W̄y, Ŷe_term, 1, 1)
-    return nothing
-end
-"Do nothing for other model types."
-linconstraint_custom_outputs!(::PredictiveController, ::SimModel) = nothing
-
 
 @doc raw"""
     linconstrainteq!(
