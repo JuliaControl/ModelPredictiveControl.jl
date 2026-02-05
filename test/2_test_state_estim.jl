@@ -815,14 +815,10 @@ end
     @test_throws ErrorException setmodel!(ekf2, deepcopy(nonlinmodel))
 end
 
-@testitem "MovingHorizonEstimator construction" setup=[SetupMPCtests] begin
+@testitem "MovingHorizonEstimator construction (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    using JuMP, Ipopt, DifferentiationInterface
     import FiniteDiff
     linmodel = LinModel(sys,Ts,i_d=[3])
-    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
-    h(x,d,model)   = model.C*x + model.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
 
     mhe1 = MovingHorizonEstimator(linmodel, He=5)
     @test mhe1.nym == 2
@@ -831,33 +827,26 @@ end
     @test mhe1.nx̂ == 6
     @test size(mhe1.Ẽ, 2) == 6*mhe1.nx̂
 
-    mhe2 = MovingHorizonEstimator(nonlinmodel, He=5)
-    @test mhe2.nym == 2
-    @test mhe2.nyu == 0
-    @test mhe2.nxs == 2
-    @test mhe2.nx̂ == 6
-    @test size(mhe1.Ẽ, 2) == 6*mhe1.nx̂
-
-    mhe3 = MovingHorizonEstimator(nonlinmodel, He=5, i_ym=[2])
+    mhe3 = MovingHorizonEstimator(linmodel, He=5, i_ym=[2])
     @test mhe3.nym == 1
     @test mhe3.nyu == 1
     @test mhe3.nxs == 1
     @test mhe3.nx̂ == 5
 
-    mhe4 = MovingHorizonEstimator(nonlinmodel, He=5, σQ=[1,2,3,4], σQint_ym=[5, 6], σR=[7, 8])
+    mhe4 = MovingHorizonEstimator(linmodel, He=5, σQ=[1,2,3,4], σQint_ym=[5, 6], σR=[7, 8])
     @test mhe4.cov.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test mhe4.cov.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
     
-    mhe5 = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=[2,2])
+    mhe5 = MovingHorizonEstimator(linmodel, He=5, nint_ym=[2,2])
     @test mhe5.nxs == 4
     @test mhe5.nx̂ == 8
 
-    mhe6 = MovingHorizonEstimator(nonlinmodel, He=5, σP_0=[1,2,3,4], σPint_ym_0=[5,6])
+    mhe6 = MovingHorizonEstimator(linmodel, He=5, σP_0=[1,2,3,4], σPint_ym_0=[5,6])
     @test mhe6.cov.P̂_0       ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test mhe6.P̂arr_old ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test mhe6.cov.P̂_0 !== mhe6.P̂arr_old
 
-    mhe7 = MovingHorizonEstimator(nonlinmodel, He=10)
+    mhe7 = MovingHorizonEstimator(linmodel, He=10)
     @test mhe7.He == 10
     @test length(mhe7.X̂0)  == mhe7.He*6
     @test length(mhe7.Y0m) == mhe7.He*2
@@ -865,11 +854,40 @@ end
     @test length(mhe7.D0)  == (mhe7.He+mhe7.direct)*1
     @test length(mhe7.Ŵ)   == mhe7.He*6
 
-    mhe8 = MovingHorizonEstimator(nonlinmodel, He=5, nint_u=[1, 1], nint_ym=[0, 0])
+    mhe8 = MovingHorizonEstimator(linmodel, He=5, nint_u=[1, 1], nint_ym=[0, 0])
     @test mhe8.nxs == 2
     @test mhe8.nx̂  == 6
     @test mhe8.nint_u  == [1, 1]
     @test mhe8.nint_ym == [0, 0]
+
+    mhe12 = MovingHorizonEstimator(linmodel, He=5, Cwt=1e3)
+    @test size(mhe12.Ẽ, 2) == 6*mhe12.nx̂ + 1
+    @test mhe12.C == 1e3
+
+    linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    mhe13 = MovingHorizonEstimator(linmodel2, He=5)
+    @test isa(mhe13, MovingHorizonEstimator{Float32})    
+
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
+end
+
+@testitem "MovingHorizonEstimator construction (NonLinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using JuMP, Ipopt, DifferentiationInterface
+    import FiniteDiff
+    linmodel = LinModel(sys,Ts,i_d=[3])
+    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h(x,d,model)   = model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
+
+    mhe2 = MovingHorizonEstimator(nonlinmodel, He=5)
+    @test mhe2.nym == 2
+    @test mhe2.nyu == 0
+    @test mhe2.nxs == 2
+    @test mhe2.nx̂ == 6
+    @test size(mhe2.Ẽ, 2) == 6*mhe2.nx̂
 
     I_6 = Matrix{Float64}(I, 6, 6)
     I_2 = Matrix{Float64}(I, 2, 2)
@@ -886,14 +904,6 @@ end
     )
     @test solver_name(mhe10.optim) == "Ipopt"
 
-    mhe12 = MovingHorizonEstimator(nonlinmodel, He=5, Cwt=1e3)
-    @test size(mhe12.Ẽ, 2) == 6*mhe12.nx̂ + 1
-    @test mhe12.C == 1e3
-
-    linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
-    mhe13 = MovingHorizonEstimator(linmodel2, He=5)
-    @test isa(mhe13, MovingHorizonEstimator{Float32})
-
     mhe14 = MovingHorizonEstimator(
         nonlinmodel, He=5, 
         gradient=AutoFiniteDiff(), 
@@ -904,9 +914,6 @@ end
     @test mhe14.jacobian == AutoFiniteDiff()
     @test mhe14.hessian == AutoFiniteDiff()
 
-    @test_throws ArgumentError MovingHorizonEstimator(linmodel)
-    @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
-    @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
     @test_throws ErrorException MovingHorizonEstimator(
         nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf; optim, 
         covestim = InternalModel(nonlinmodel)
