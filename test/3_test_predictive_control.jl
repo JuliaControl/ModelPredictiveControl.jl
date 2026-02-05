@@ -1542,7 +1542,6 @@ end
     nmpc_wr = setconstraint!(nmpc_wr, wmax=[145])
     preparestate!(nmpc_wr, [50], [30])
     u = moveinput!(nmpc_wr, [100], [30])
-    @show getinfo(nmpc_wr)[:U]
     @test all(isapprox.(getinfo(nmpc_wr)[:U], 145-100; atol=1e-1))
 
 end
