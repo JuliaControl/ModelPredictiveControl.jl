@@ -131,7 +131,6 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         ks = [k + 1]
         for i in 1:nw
             Wy_i, Wu_i, Wd_i, Wr_i = Wy[i:i, :], Wu[i:i, :], Wd[i:i, :], Wr[i:i, :] 
-            
             lb_k_i = wmin_k[i:i] - Wy_i*yoff
             ub_k_i = wmax_k[i:i] - Wy_i*yoff
             lb = isfinite(lb_k_i[]) ? lb_k_i : zeros(0)
