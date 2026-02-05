@@ -757,7 +757,57 @@ end
     @test mpc.weights.L_Hp ≈ diagm(1.1:1000.1)
 end
 
-@testitem "NonLinMPC construction" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC construction (LinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    linmodel1 = LinModel(sys,Ts,i_d=[3])
+    nmpc0 = NonLinMPC(linmodel1, Hp=15)
+    @test isa(nmpc0.estim, SteadyKalmanFilter)
+    nmpc3 = NonLinMPC(linmodel1, Hp=15, Hc=4, Cwt=1e4)
+    @test size(nmpc3.Ẽ, 2) == 4*linmodel1.nu + 1
+    @test nmpc3.weights.Ñ_Hc[end] == 1e4
+    nmpc4 = NonLinMPC(linmodel1, Hp=15, Mwt=[1,2])
+    @test nmpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
+    @test nmpc4.weights.M_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
+    nmpc5 = NonLinMPC(linmodel1, Hp=15 ,Nwt=[3,4], Cwt=1e3, Hc=5)
+    @test nmpc5.weights.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
+    @test nmpc5.weights.Ñ_Hc isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
+    nmpc6 = NonLinMPC(linmodel1, Hp=15, Lwt=[0,1])
+    @test nmpc6.weights.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
+    @test nmpc6.weights.L_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
+    nmpc7 = NonLinMPC(linmodel1, Hp=15, Ewt=1e-3, JE=(Ue,Ŷe,D̂e,p) -> p*dot(Ue,Ŷe)+sum(D̂e), p=10)
+    @test nmpc7.weights.E == 1e-3
+    @test nmpc7.JE([1,2],[3,4],[4,6],10) == 10*dot([1,2],[3,4])+sum([4,6])
+    nmpc10 = NonLinMPC(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
+    @test nmpc10.estim.nint_u  == [1, 1]
+    @test nmpc10.estim.nint_ym == [0, 0]
+    nmpc12 = NonLinMPC(linmodel1, Hp=10, M_Hp=Hermitian(diagm(1.01:0.01:1.2), :L))
+    @test nmpc12.weights.M_Hp ≈ diagm(1.01:0.01:1.2)
+    @test nmpc12.weights.M_Hp isa Hermitian{Float64, Matrix{Float64}}
+    nmpc13 = NonLinMPC(linmodel1, Hp=10, N_Hc=Hermitian(diagm([0.1,0.11,0.12,0.13]), :L), Cwt=Inf)
+    @test nmpc13.weights.Ñ_Hc ≈ diagm([0.1,0.11,0.12,0.13])
+    @test nmpc13.weights.Ñ_Hc isa Hermitian{Float64, Matrix{Float64}}
+    nmcp14 = NonLinMPC(linmodel1, Hp=10, L_Hp=Hermitian(diagm(0.001:0.001:0.02), :L))
+    @test nmcp14.weights.L_Hp ≈ diagm(0.001:0.001:0.02)
+    @test nmcp14.weights.L_Hp isa Hermitian{Float64, Matrix{Float64}}
+    nmpc15 = NonLinMPC(linmodel1, Hp=10, gc=(Ue,Ŷe,D̂e,p,ϵ)-> [p*dot(Ue,Ŷe)+sum(D̂e)+ϵ], nc=1, p=10)
+    LHS = zeros(1)
+    nmpc15.con.gc!(LHS,[1,2],[3,4],[4,6],10,0.1) 
+    @test LHS ≈ [10*dot([1,2],[3,4])+sum([4,6])+0.1]
+    nmpc17 = NonLinMPC(linmodel1, Hp=10, transcription=MultipleShooting())
+    @test nmpc17.transcription == MultipleShooting()
+    @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
+    @test size(nmpc17.con.Aeq, 1) == nmpc17.estim.nx̂*nmpc17.Hp
+    
+    @test_throws DimensionMismatch NonLinMPC(linmodel1, Hp=15, Ewt=[1, 1])
+    @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, JE  = (_,_,_)->0.0)
+    @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
+    @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
+
+    @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, JE=(Ue,_,_,_)->Ue)
+    @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
+end
+
+@testitem "NonLinMPC construction (NonLinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using JuMP, Ipopt, DifferentiationInterface
     import FiniteDiff
@@ -767,26 +817,12 @@ end
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, p=linmodel1, solver=nothing)
+
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
     @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
     nmpc2 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=Inf)
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
-    nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e4)
-    @test size(nmpc3.Ẽ, 2) == 4*nonlinmodel.nu + 1
-    @test nmpc3.weights.Ñ_Hc[end] == 1e4
-    nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[1,2])
-    @test nmpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
-    @test nmpc4.weights.M_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
-    nmpc5 = NonLinMPC(nonlinmodel, Hp=15 ,Nwt=[3,4], Cwt=1e3, Hc=5)
-    @test nmpc5.weights.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
-    @test nmpc5.weights.Ñ_Hc isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
-    nmpc6 = NonLinMPC(nonlinmodel, Hp=15, Lwt=[0,1])
-    @test nmpc6.weights.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    @test nmpc6.weights.L_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
-    nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(Ue,Ŷe,D̂e,p) -> p*dot(Ue,Ŷe)+sum(D̂e), p=10)
-    @test nmpc7.weights.E == 1e-3
-    @test nmpc7.JE([1,2],[3,4],[4,6],10) == 10*dot([1,2],[3,4])+sum([4,6])
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     nmpc8 = NonLinMPC(nonlinmodel, Hp=15, optim=optim)
     @test solver_name(nmpc8.optim) == "Ipopt"
@@ -794,25 +830,9 @@ end
     im = InternalModel(nonlinmodel)
     nmpc9 = NonLinMPC(im, Hp=15)
     @test isa(nmpc9.estim, InternalModel)
-    nmpc10 = NonLinMPC(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
-    @test nmpc10.estim.nint_u  == [1, 1]
-    @test nmpc10.estim.nint_ym == [0, 0]
     nmpc11 = NonLinMPC(nonlinmodel, Hp=15, nint_u=[1, 1], nint_ym=[0, 0])
     @test nmpc11.estim.nint_u  == [1, 1]
     @test nmpc11.estim.nint_ym == [0, 0]
-    nmpc12 = NonLinMPC(nonlinmodel, Hp=10, M_Hp=Hermitian(diagm(1.01:0.01:1.2), :L))
-    @test nmpc12.weights.M_Hp ≈ diagm(1.01:0.01:1.2)
-    @test nmpc12.weights.M_Hp isa Hermitian{Float64, Matrix{Float64}}
-    nmpc13 = NonLinMPC(nonlinmodel, Hp=10, N_Hc=Hermitian(diagm([0.1,0.11,0.12,0.13]), :L), Cwt=Inf)
-    @test nmpc13.weights.Ñ_Hc ≈ diagm([0.1,0.11,0.12,0.13])
-    @test nmpc13.weights.Ñ_Hc isa Hermitian{Float64, Matrix{Float64}}
-    nmcp14 = NonLinMPC(nonlinmodel, Hp=10, L_Hp=Hermitian(diagm(0.001:0.001:0.02), :L))
-    @test nmcp14.weights.L_Hp ≈ diagm(0.001:0.001:0.02)
-    @test nmcp14.weights.L_Hp isa Hermitian{Float64, Matrix{Float64}}
-    nmpc15 = NonLinMPC(nonlinmodel, Hp=10, gc=(Ue,Ŷe,D̂e,p,ϵ)-> [p*dot(Ue,Ŷe)+sum(D̂e)+ϵ], nc=1, p=10)
-    LHS = zeros(1)
-    nmpc15.con.gc!(LHS,[1,2],[3,4],[4,6],10,0.1) 
-    @test LHS ≈ [10*dot([1,2],[3,4])+sum([4,6])+0.1]
     gc! = (LHS,_,_,_,_,_)-> (LHS .= 0.0) # useless, only for coverage
     nmpc16 = NonLinMPC(nonlinmodel, Hp=10, transcription=MultipleShooting(), nc=10, gc=gc!)
     @test nmpc16.transcription == MultipleShooting()
@@ -825,10 +845,6 @@ end
     @test length(nmpc16.Z̃) == nonlinmodel_c.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
     @test nmpc16.con.neq == nmpc16.estim.nx̂*nmpc16.Hp
     @test nmpc16.con.nc == 10
-    nmpc17 = NonLinMPC(linmodel1, Hp=10, transcription=MultipleShooting())
-    @test nmpc17.transcription == MultipleShooting()
-    @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
-    @test size(nmpc17.con.Aeq, 1) == nmpc17.estim.nx̂*nmpc17.Hp
     nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
         gradient=AutoFiniteDiff(), 
         jacobian=AutoFiniteDiff(),
@@ -850,17 +866,10 @@ end
     @test isa(nmpc15.estim, UnscentedKalmanFilter{Float32})
     @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
 
-    @test_throws DimensionMismatch NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
     @test_throws ArgumentError NonLinMPC(nonlinmodel)
-    @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, JE  = (_,_,_)->0.0)
-    @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
-    @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
     @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation())
     @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation(2))
     @test_throws ErrorException NonLinMPC(linmodel1, oracle=false, hessian=AutoFiniteDiff())
-
-    @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, JE=(Ue,_,_,_)->Ue)
-    @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
 end
 
 @testitem "NonLinMPC moves and getinfo" setup=[SetupMPCtests] begin
