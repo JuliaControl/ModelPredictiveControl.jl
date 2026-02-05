@@ -9,7 +9,7 @@ import ModelPredictiveControl: isblockdiag
 
 function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     model, estim, weights = mpc.estim.model, mpc.estim, mpc.weights
-    nu, ny, nx̂, nw = model.nu, model.ny, estim.nx̂, mpc.con.nw
+    nu, ny, nd, nx̂, nw = model.nu, model.ny, model.nd, estim.nx̂, mpc.con.nw
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU = Hc * nu
     validate_compatibility(mpc)
@@ -121,16 +121,31 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     end
     # --- Custom linear constraints ---
     Wmin, Wmax = mpc.con.Wmin, mpc.con.Wmax
+    Wy = mpc.con.W̄y[1:nw, 1:ny]
+    Wu = mpc.con.W̄u[1:nw, 1:nu]
+    Wd = mpc.con.W̄d[1:nw, 1:nd]
+    Wr = mpc.con.W̄r[1:nw, 1:ny]
     for k in 1:Hp+1
         wmin_k, wmax_k = Wmin[(k-1)*nw+1:k*nw], Wmax[(k-1)*nw+1:k*nw]
         c_w_k = C_w[(k-1)*nw+1:k*nw]
         ks = [k + 1]
         for i in 1:nw
-            lb = isfinite(wmin_k[i]) ? [wmin_k[i]] : zeros(0)
-            ub = isfinite(wmax_k[i]) ? [wmax_k[i]] : zeros(0)
-            soft = !only_hard && c_w_k[i] > 0 
+            Wy_i, Wu_i, Wd_i, Wr_i = Wy[i:i, :], Wu[i:i, :], Wd[i:i, :], Wr[i:i, :] 
             
-
+            lb_k_i = wmin_k[i:i] - Wy_i*yoff
+            ub_k_i = wmax_k[i:i] - Wy_i*yoff
+            @show lb_k_i
+            @show ub_k_i
+            lb = isfinite(lb_k_i[]) ? lb_k_i : zeros(0)
+            ub = isfinite(ub_k_i[]) ? ub_k_i : zeros(0)
+            soft = !only_hard && c_w_k[i] > 0 
+            Ax = Wy_i*C
+            Ad = Wy_i*Dd
+            @show Ax
+            @show Ad
+            LinearMPC.add_constraint!(newmpc; Ax, Ad, lb, ub, ks, soft)
+            
+        end
     end
     # --- Terminal constraints ---
     x̂0min, x̂0max = mpc.con.x̂0min, mpc.con.x̂0max
