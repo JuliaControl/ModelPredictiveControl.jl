@@ -134,17 +134,14 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
             
             lb_k_i = wmin_k[i:i] - Wy_i*yoff
             ub_k_i = wmax_k[i:i] - Wy_i*yoff
-            @show lb_k_i
-            @show ub_k_i
             lb = isfinite(lb_k_i[]) ? lb_k_i : zeros(0)
             ub = isfinite(ub_k_i[]) ? ub_k_i : zeros(0)
             soft = !only_hard && c_w_k[i] > 0 
             Ax = Wy_i*C
-            Ad = Wy_i*Dd
-            @show Ax
-            @show Ad
-            LinearMPC.add_constraint!(newmpc; Ax, Ad, lb, ub, ks, soft)
-            
+            Au = Wu_i
+            Ad = Wy_i*Dd + Wd_i
+            Ar = Wr_i
+            LinearMPC.add_constraint!(newmpc; Ax, Au, Ad, Ar, lb, ub, ks, soft)
         end
     end
     # --- Terminal constraints ---
