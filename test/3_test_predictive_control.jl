@@ -1058,8 +1058,8 @@ end
 @testitem "NonLinMPC and ManualEstimator v.s. default" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = LinModel(tf(5, [200, 1]), 300.0)
-    f(x,u,_,p) = p.A*x + p.Bu*u
-    h(x,_,p)   = p.C*x
+    f = (x,u,_,p) -> p.A*x + p.Bu*u
+    h = (x,_,p)   -> p.C*x
     model = setop!(NonLinModel(f, h, 300.0, 1, 1, 1; solver=nothing, p=linmodel), yop=[10])
     r = [15]
     outdist = [5]
