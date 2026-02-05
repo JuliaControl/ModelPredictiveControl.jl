@@ -872,11 +872,12 @@ end
     @test_throws ErrorException NonLinMPC(linmodel1, oracle=false, hessian=AutoFiniteDiff())
 end
 
-@testitem "NonLinMPC moves and getinfo" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves and getinfo (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
+    
     Hp = 100
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=Hp, Hc=1)
     ry, ru = [15], [4]
@@ -898,6 +899,7 @@ end
     end
     R̂y, R̂u = fill(ry[1], Hp), fill(ru[1], Hp)
     p = [1, R̂y, 0, R̂u]
+    
     nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, p=p, Hp=Hp, Hc=1)
     preparestate!(nmpc, [10])
     u = moveinput!(nmpc)
@@ -907,10 +909,43 @@ end
     nmpc.p .= [0, R̂y, 1, R̂u]
     u = moveinput!(nmpc)
     @test u ≈ [4] atol=5e-2
+    
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
+    nmpc6  = NonLinMPC(linmodel3, Hp=10)
+    preparestate!(nmpc6, [0])
+    @test moveinput!(nmpc6, [0]) ≈ [0.0] atol=5e-2
+    
+    nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
+    preparestate!(nmpc9, [10])
+    u = moveinput!(nmpc9, [20])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc9)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 20 atol=5e-2
+    
+    # coverage of the branch with error termination status (with an infeasible problem):
+    nmpc_infeas = NonLinMPC(linmodel, Hp=1, Hc=1, Cwt=Inf)
+    nmpc_infeas = setconstraint!(nmpc_infeas, umin=[+1], umax=[-1])
+    preparestate!(nmpc_infeas, [0], [0])
+    @test_logs(
+        (:error, "MPC terminated without solution: returning last solution shifted "*
+                 "(more info in debug log)"), 
+        moveinput!(nmpc_infeas, [0], [0])
+    )
+
+    @test_nowarn ModelPredictiveControl.info2debugstr(info)
+end
+
+
+@testitem "NonLinMPC moves and getinfo (NonLinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+    
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1)
     preparestate!(nmpc2, [0], [0])
     # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
@@ -922,40 +957,43 @@ end
     info = getinfo(nmpc2)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 7d[1] atol=5e-2
+    
     nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=100, Hc=1)
     preparestate!(nmpc3, [0], [0])
     u = moveinput!(nmpc3, 7d, d)
     @test u ≈ [0] atol=5e-2
+    
     nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[0], Nwt=[0], Lwt=[1])
     preparestate!(nmpc4, [0], [0])
     u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
+    
     nmpc5 = NonLinMPC(nonlinmodel, Hp=1, Hc=1, Cwt=Inf, transcription=MultipleShooting())
     nmpc5 = setconstraint!(nmpc5, ymin=[1])
     f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
     h! = (y,x,_,_) -> y .= x 
     nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
     transcription = TrapezoidalCollocation(0, f_threads=true, h_threads=true)
+    
     nmpc5 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc5, [0.0])
     u = moveinput!(nmpc5, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
-    transcription = TrapezoidalCollocation(1)
+
+    transcription = TrapezoidalCollocation(1)    
     nmpc5_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc5_1, [0.0])
     u = moveinput!(nmpc5_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
-    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
-    nmpc6  = NonLinMPC(linmodel3, Hp=10)
-    preparestate!(nmpc6, [0])
-    @test moveinput!(nmpc6, [0]) ≈ [0.0] atol=5e-2
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+    
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
     ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0], nonlinmodel2.p)
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0] atol=5e-2
     transcription = MultipleShooting()
+    
     nmpc8 = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc8, [0], [0])
     u = moveinput!(nmpc8, [10], [0])
@@ -963,6 +1001,7 @@ end
     info = getinfo(nmpc8)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    
     transcription = MultipleShooting(f_threads=true, h_threads=true)
     nmpc8t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription, hessian=true)
     nmpc8t = setconstraint!(nmpc8t, ymax=[100], ymin=[-100]) # coverage of getinfo! Hessians of Lagrangian
@@ -972,13 +1011,7 @@ end
     info = getinfo(nmpc8t)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
-    nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
-    preparestate!(nmpc9, [10])
-    u = moveinput!(nmpc9, [20])
-    @test u ≈ [2] atol=5e-2
-    info = getinfo(nmpc9)
-    @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 20 atol=5e-2
+
     nmpc10 = setconstraint!(NonLinMPC(
         nonlinmodel, Nwt=[0], Hp=100, Hc=1, 
         gradient=AutoFiniteDiff(),
@@ -992,24 +1025,12 @@ end
     info = getinfo(nmpc10)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    
     nmpc11 = NonLinMPC(nonlinmodel, Hp=10, Hc=[1, 2, 3, 4], Nwt=[10])
     preparestate!(nmpc11, y, [0])
     moveinput!(nmpc11, [10], [0])
     ΔU_diff = diff(getinfo(nmpc11)[:U])
     @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
-
-    # coverage of the branch with error termination status (with an infeasible problem):
-    nmpc_infeas = NonLinMPC(nonlinmodel, Hp=1, Hc=1, Cwt=Inf)
-    nmpc_infeas = setconstraint!(nmpc_infeas, umin=[+1], umax=[-1])
-    preparestate!(nmpc_infeas, [0], [0])
-    @test_logs(
-        (:error, "MPC terminated without solution: returning last solution shifted "*
-                 "(more info in debug log)"), 
-        moveinput!(nmpc_infeas, [0], [0])
-    )
-
-
-    @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
 @testitem "NonLinMPC step disturbance rejection" setup=[SetupMPCtests] begin
