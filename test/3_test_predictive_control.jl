@@ -926,16 +926,15 @@ end
     # coverage of the branch with error termination status (with an infeasible problem):
     nmpc_infeas = NonLinMPC(linmodel, Hp=1, Hc=1, Cwt=Inf)
     nmpc_infeas = setconstraint!(nmpc_infeas, umin=[+1], umax=[-1])
-    preparestate!(nmpc_infeas, [0], [0])
+    preparestate!(nmpc_infeas, [0])
     @test_logs(
         (:error, "MPC terminated without solution: returning last solution shifted "*
                  "(more info in debug log)"), 
-        moveinput!(nmpc_infeas, [0], [0])
+        moveinput!(nmpc_infeas, [0])
     )
 
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
-
 
 @testitem "NonLinMPC moves and getinfo (NonLinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
@@ -1263,7 +1262,7 @@ end
 
 end
 
-@testitem "NonLinMPC constraint violation" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC constraint violation (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP
     gc(Ue, Ŷe, _ ,p , ϵ) = [p[1]*(Ue[1:end-1] .- 4.2 .- ϵ); p[2]*(Ŷe[2:end] .- 3.14 .- ϵ)]
     Hp=50
@@ -1336,7 +1335,14 @@ end
     info = getinfo(nmpc_lin)
     @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
     @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
+end
 
+@testitem "NonLinMPC constraint violation (NonLinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP
+    gc(Ue, Ŷe, _ ,p , ϵ) = [p[1]*(Ue[1:end-1] .- 4.2 .- ϵ); p[2]*(Ŷe[2:end] .- 3.14 .- ϵ)]
+    Hp=50
+
+    linmodel = LinModel(tf([2], [10000, 1]), 3000.0)
     f = (x,u,_,p) -> p.A*x + p.Bu*u
     h = (x,_,p)   -> p.C*x
     nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing, p=linmodel)
