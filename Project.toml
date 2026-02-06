@@ -1,6 +1,6 @@
 name = "ModelPredictiveControl"
 uuid = "61f9bdb8-6ae4-484a-811f-bbf86720c31c"
-version = "1.15.0"
+version = "1.16.0"
 authors = ["Francis Gagnon"]
 
 [deps]
