@@ -68,18 +68,8 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     # --- Manipulated inputs constraints ---
     Umin, Umax = mpc.con.U0min + mpc.Uop, mpc.con.U0max + mpc.Uop
     I_u = Matrix{Float64}(I, nu, nu)
-    # add_constraint! does not support u bounds pass the control horizon Hc
-    # so we compute the extremum bounds from k=Hc-1 to Hp, and apply them at k=Hc-1
-    Umin_finals = reshape(Umin[nu*(Hc-1)+1:end], nu, :)
-    Umax_finals = reshape(Umax[nu*(Hc-1)+1:end], nu, :)
-    umin_end = mapslices(maximum, Umin_finals; dims=2)
-    umax_end = mapslices(minimum, Umax_finals; dims=2)
-    for k = 0:Hc-1
-        if k < Hc - 1
-            umin_k, umax_k = Umin[k*nu+1:(k+1)*nu], Umax[k*nu+1:(k+1)*nu]
-        else
-            umin_k, umax_k = umin_end, umax_end
-        end
+    for k = 0:Hp-1
+        umin_k, umax_k = Umin[k*nu+1:(k+1)*nu], Umax[k*nu+1:(k+1)*nu]
         c_u_k = C_u[k*nu+1:(k+1)*nu]
         ks = [k + 1] # a `1` in ks argument corresponds to the present time step k+0
         for i in 1:nu
