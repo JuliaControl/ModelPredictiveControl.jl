@@ -130,7 +130,6 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
             Au = Wu_i
             Ad = Wy_i*Dd + Wd_i
             Ar = Wr_i
-            Au |> display
             LinearMPC.add_constraint!(newmpc; Ax, Au, Ad, Ar, lb, ub, ks, soft)
         end
     end
