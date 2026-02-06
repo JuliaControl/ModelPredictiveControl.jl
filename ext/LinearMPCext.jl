@@ -115,9 +115,9 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     Wu = mpc.con.W̄u[1:nw, 1:nu]
     Wd = mpc.con.W̄d[1:nw, 1:nd]
     Wr = mpc.con.W̄r[1:nw, 1:ny]
-    for k in 1:Hp+1
-        wmin_k, wmax_k = Wmin[(k-1)*nw+1:k*nw], Wmax[(k-1)*nw+1:k*nw]
-        c_w_k = C_w[(k-1)*nw+1:k*nw]
+    for k in 0:Hp
+        wmin_k, wmax_k = Wmin[k*nw+1:(k+1)*nw], Wmax[k*nw+1:(k+1)*nw]
+        c_w_k = C_w[k*nw+1:(k+1)*nw]
         ks = [k + 1]
         for i in 1:nw
             Wy_i, Wu_i, Wd_i, Wr_i = Wy[i:i, :], Wu[i:i, :], Wd[i:i, :], Wr[i:i, :] 
@@ -130,6 +130,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
             Au = Wu_i
             Ad = Wy_i*Dd + Wd_i
             Ar = Wr_i
+            Au |> display
             LinearMPC.add_constraint!(newmpc; Ax, Au, Ad, Ar, lb, ub, ks, soft)
         end
     end
