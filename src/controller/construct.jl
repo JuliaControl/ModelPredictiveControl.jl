@@ -7,6 +7,9 @@ struct PredictiveControllerBuffer{NT<:Real}
     D̂ ::Vector{NT}
     Ŷ ::Vector{NT}
     U ::Vector{NT}
+    D̂e::Vector{NT}
+    Ŷe::Vector{NT}
+    Ue::Vector{NT}
     Ẽ ::Matrix{NT}
     P̃u::Matrix{NT}
     empty::Vector{NT}
@@ -22,17 +25,20 @@ The buffer is used to store intermediate results during computation without allo
 function PredictiveControllerBuffer(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp::Int, Hc::Int, nϵ::Int
 ) where NT <: Real
-    nu, ny, nd, nx̂ = estim.model.nu, estim.model.ny, estim.model.nd, estim.nx̂
+    nu, ny, nd = estim.model.nu, estim.model.ny, estim.model.nd
     nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
     u  = Vector{NT}(undef, nu)
     Z̃  = Vector{NT}(undef, nZ̃)
     D̂  = Vector{NT}(undef, nd*Hp)
     Ŷ  = Vector{NT}(undef, ny*Hp)
     U  = Vector{NT}(undef, nu*Hp)
+    D̂e = Vector{NT}(undef, nd*(Hp+1))
+    Ŷe = Vector{NT}(undef, ny*(Hp+1))
+    Ue = Vector{NT}(undef, nu*(Hp+1))
     Ẽ  = Matrix{NT}(undef, ny*Hp, nZ̃)
     P̃u = Matrix{NT}(undef, nu*Hp, nZ̃)
     empty = Vector{NT}(undef, 0)
-    return PredictiveControllerBuffer{NT}(u, Z̃, D̂, Ŷ, U, Ẽ, P̃u, empty)
+    return PredictiveControllerBuffer{NT}(u, Z̃, D̂, Ŷ, U, D̂e, Ŷe, Ue, Ẽ, P̃u, empty)
 end
 
 "Include all the objective function weights of [`PredictiveController`](@ref)"
@@ -102,18 +108,18 @@ function validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, C=Inf, E=nothing)
     Hp < 1  && throw(ArgumentError("Prediction horizon Hp should be ≥ 1"))
     Hc < 1  && throw(ArgumentError("Control horizon Hc should be ≥ 1"))
     Hc > Hp && throw(ArgumentError("Control horizon Hc should be ≤ prediction horizon Hp"))
-    size(M_Hp) ≠ (nM,nM) && throw(ArgumentError("M_Hp size $(size(M_Hp)) ≠ (ny*Hp, ny*Hp) ($nM,$nM)"))
-    size(N_Hc) ≠ (nN,nN) && throw(ArgumentError("N_Hc size $(size(N_Hc)) ≠ (nu*Hc, nu*Hc) ($nN,$nN)"))
-    size(L_Hp) ≠ (nL,nL) && throw(ArgumentError("L_Hp size $(size(L_Hp)) ≠ (nu*Hp, nu*Hp) ($nL,$nL)"))
+    size(M_Hp) ≠ (nM,nM) && throw(DimensionMismatch("M_Hp size $(size(M_Hp)) ≠ (ny*Hp, ny*Hp) ($nM,$nM)"))
+    size(N_Hc) ≠ (nN,nN) && throw(DimensionMismatch("N_Hc size $(size(N_Hc)) ≠ (nu*Hc, nu*Hc) ($nN,$nN)"))
+    size(L_Hp) ≠ (nL,nL) && throw(DimensionMismatch("L_Hp size $(size(L_Hp)) ≠ (nu*Hp, nu*Hp) ($nL,$nL)"))
     (isdiag(M_Hp) && any(diag(M_Hp) .< 0)) && throw(ArgumentError("Mwt values should be nonnegative"))
     (isdiag(N_Hc) && any(diag(N_Hc) .< 0)) && throw(ArgumentError("Nwt values should be nonnegative"))
     (isdiag(L_Hp) && any(diag(L_Hp) .< 0)) && throw(ArgumentError("Lwt values should be nonnegative"))
     !ishermitian(M_Hp) && throw(ArgumentError("M_Hp should be hermitian"))
     !ishermitian(N_Hc) && throw(ArgumentError("N_Hc should be hermitian"))
     !ishermitian(L_Hp) && throw(ArgumentError("L_Hp should be hermitian"))
-    size(C) ≠ ()    && throw(ArgumentError("Cwt should be a real scalar"))
+    size(C) ≠ ()    && throw(DimensionMismatch("Cwt should be a real scalar"))
     C < 0           && throw(ArgumentError("Cwt weight should be ≥ 0"))
-    !isnothing(E) && size(E) ≠ () && throw(ArgumentError("Ewt should be a real scalar"))
+    !isnothing(E) && size(E) ≠ () && throw(DimensionMismatch("Ewt should be a real scalar"))
 end
 
 "Include all the data for the constraints of [`PredictiveController`](@ref)"
@@ -134,13 +140,23 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     Kŝ      ::Matrix{NT}
     Vŝ      ::Matrix{NT}
     Bŝ      ::Vector{NT}
-    # bounds over the prediction horizon (deviation vectors from operating points):
+    # custom linear equality constraints:
+    Ẽw      ::Matrix{NT}
+    Fw      ::Vector{NT}
+    W̄y      ::SparseMatrixCSC{NT, Int}
+    W̄u      ::SparseMatrixCSC{NT, Int}
+    W̄d      ::SparseMatrixCSC{NT, Int}
+    W̄r      ::SparseMatrixCSC{NT, Int}
+    nw      ::Int
+    # bounds over the prediction horizon (deviation vectors from operating points): 
     U0min   ::Vector{NT}
     U0max   ::Vector{NT}
     ΔŨmin   ::Vector{NT}
     ΔŨmax   ::Vector{NT}
     Y0min   ::Vector{NT}
     Y0max   ::Vector{NT}
+    Wmin    ::Vector{NT}
+    Wmax    ::Vector{NT}
     x̂0min   ::Vector{NT}
     x̂0max   ::Vector{NT}
     # A matrices for the linear inequality constraints:
@@ -150,6 +166,8 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     A_ΔŨmax ::SparseMatrixCSC{NT, Int}
     A_Ymin  ::Matrix{NT}
     A_Ymax  ::Matrix{NT}
+    A_Wmin  ::Matrix{NT}
+    A_Wmax  ::Matrix{NT}
     A_x̂min  ::Matrix{NT}
     A_x̂max  ::Matrix{NT}
     A       ::Matrix{NT}
@@ -164,9 +182,11 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     beq     ::Vector{NT}
     # nonlinear equality constraints:
     neq     ::Int
-    # constraint softness parameter vectors for the nonlinear inequality constraints:
+    # constraint softness parameter vectors needing seperate storage:
     C_ymin  ::Vector{NT}
     C_ymax  ::Vector{NT}
+    C_wmin  ::Vector{NT}
+    C_wmax  ::Vector{NT}
     c_x̂min  ::Vector{NT}
     c_x̂max  ::Vector{NT}
     # indices of finite numbers in the g vector (nonlinear inequality constraints):
@@ -187,13 +207,16 @@ The predictive controllers support both soft and hard constraints, defined by:
     \mathbf{u_{min}  - c_{u_{min}}}  ϵ ≤&&\       \mathbf{u}(k+j) &≤ \mathbf{u_{max}  + c_{u_{max}}}  ϵ &&\qquad  j = 0, 1 ,..., H_p - 1 \\
     \mathbf{Δu_{min} - c_{Δu_{min}}} ϵ ≤&&\      \mathbf{Δu}(k+j) &≤ \mathbf{Δu_{max} + c_{Δu_{max}}} ϵ &&\qquad  j = 0, 1 ,..., H_c - 1 \\
     \mathbf{y_{min}  - c_{y_{min}}}  ϵ ≤&&\       \mathbf{ŷ}(k+j) &≤ \mathbf{y_{max}  + c_{y_{max}}}  ϵ &&\qquad  j = 1, 2 ,..., H_p     \\
-    \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ ≤&&\     \mathbf{x̂}_i(k+j) &≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad  j = H_p
+    \mathbf{w_{min}  - c_{w_{min}}}  ϵ ≤&&\       \mathbf{w}(k+j) &≤ \mathbf{w_{max}  + c_{w_{max}}}  ϵ &&\qquad  j = 0, 1 ,..., H_p     \\
+    \mathbf{x̂_{min}  - c_{x̂_{min}}}  ϵ ≤&&\   \mathbf{x̂}_i(k+H_p) &≤ \mathbf{x̂_{max}  + c_{x̂_{max}}}  ϵ &&\qquad
 \end{alignat*}
 ```
 and also ``ϵ ≥ 0``. The last line is the terminal constraints applied on the states at the
 end of the horizon (see Extended Help). See [`MovingHorizonEstimator`](@ref) constraints
-for details on bounds and softness parameters ``\mathbf{c}``. The output and terminal 
-constraints are all soft by default. See Extended Help for time-varying constraints.
+for details on bounds and softness parameters ``\mathbf{c}``. The penultimate line with the
+``\mathbf{w}`` vector is for custom linear inequality constraints. See Extended Help for 
+details on this and time-varying bounds. The output, custom and terminal constraints are all
+soft by default.
 
 # Arguments
 !!! info
@@ -208,10 +231,12 @@ constraints are all soft by default. See Extended Help for time-varying constrai
 - `umin=fill(-Inf,nu)` / `umax=fill(+Inf,nu)` : manipulated input bound ``\mathbf{u_{min/max}}``
 - `Δumin=fill(-Inf,nu)` / `Δumax=fill(+Inf,nu)` : manipulated input increment bound ``\mathbf{Δu_{min/max}}``
 - `ymin=fill(-Inf,ny)` / `ymax=fill(+Inf,ny)` : predicted output bound ``\mathbf{y_{min/max}}``
+- `wmin=fill(-Inf,nw)` / `wmax=fill(+Inf,nw)` : custom linear constraint bound ``\mathbf{w_{min/max}}``
 - `x̂min=fill(-Inf,nx̂)` / `x̂max=fill(+Inf,nx̂)` : terminal constraint bound ``\mathbf{x̂_{min/max}}``
 - `c_umin=fill(0.0,nu)` / `c_umax=fill(0.0,nu)` : `umin` / `umax` softness weight ``\mathbf{c_{u_{min/max}}}``
 - `c_Δumin=fill(0.0,nu)` / `c_Δumax=fill(0.0,nu)` : `Δumin` / `Δumax` softness weight ``\mathbf{c_{Δu_{min/max}}}``
 - `c_ymin=fill(1.0,ny)` / `c_ymax=fill(1.0,ny)` : `ymin` / `ymax` softness weight ``\mathbf{c_{y_{min/max}}}``
+- `c_wmin=fill(1.0,nw)` / `c_wmax=fill(1.0,nw)` : `wmin` / `wmax` softness weight ``\mathbf{c_{w_{min/max}}}``
 - `c_x̂min=fill(1.0,nx̂)` / `c_x̂max=fill(1.0,nx̂)` : `x̂min` / `x̂max` softness weight ``\mathbf{c_{x̂_{min/max}}}``
 - all the keyword arguments above but with a first capital letter, except for the terminal
   constraints, e.g. `Ymax` or `C_Δumin`: for time-varying constraints (see Extended Help)
@@ -256,36 +281,61 @@ LinMPC controller with a sample time Ts = 4.0 s:
         later at runtime, set the bound to an absolute value sufficiently large when you
         create the controller (but different than `±Inf`).
 
-    It is also possible to specify time-varying constraints over ``H_p`` and ``H_c`` 
-    horizons. In such a case, they are defined by:
+    It is also possible to specify time-varying constraints over the horizons. In such
+    cases, they are all defined by:
     ```math 
     \begin{alignat*}{3}
         \mathbf{U_{min}  - C_{u_{min}}}  ϵ ≤&&\ \mathbf{U}  &≤ \mathbf{U_{max}  + C_{u_{max}}}  ϵ \\
         \mathbf{ΔU_{min} - C_{Δu_{min}}} ϵ ≤&&\ \mathbf{ΔU} &≤ \mathbf{ΔU_{max} + C_{Δu_{max}}} ϵ \\
-        \mathbf{Y_{min}  - C_{y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + C_{y_{max}}}  ϵ
+        \mathbf{Y_{min}  - C_{y_{min}}}  ϵ ≤&&\ \mathbf{Ŷ}  &≤ \mathbf{Y_{max}  + C_{y_{max}}}  ϵ \\
+        \mathbf{W_{min}  - C_{w_{min}}}  ϵ ≤&&\ \mathbf{W}  &≤ \mathbf{W_{max}  + C_{w_{max}}}  ϵ 
     \end{alignat*}
     ```
     For this, use the same keyword arguments as above but with a first capital letter:
+
     - `Umin`  / `Umax`  / `C_umin`  / `C_umax`  : ``\mathbf{U}`` constraints `(nu*Hp,)`.
     - `ΔUmin` / `ΔUmax` / `C_Δumin` / `C_Δumax` : ``\mathbf{ΔU}`` constraints `(nu*Hc,)`.
     - `Ymin`  / `Ymax`  / `C_ymin`  / `C_ymax`  : ``\mathbf{Ŷ}`` constraints `(ny*Hp,)`.
+    - `Wmin`  / `Wmax`  / `C_wmin`  / `C_wmax`  : custom linear constraints `(nw*(Hp+1),)`.
+    
+    The custom linear inequality constraints are all gathered in the vector:
+    ```math   
+    \begin{aligned}                                                                                     
+    \mathbf{W}
+        &=                                                                                                \begin{bmatrix} 
+        \mathbf{w}(k+0)      \\ \mathbf{w}(k+1)      \\ \vdots               \\ \mathbf{w}(k+H_p)         \end{bmatrix}   \\
+        &=                                                                                                \begin{bmatrix}
+        \mathbf{W_y ŷ}(k+0)   + \mathbf{W_u u}(k+0)   + \mathbf{W_d d}(k+0)   + \mathbf{W_r r_y}(k+0)     \\
+        \mathbf{W_y ŷ}(k+1)   + \mathbf{W_u u}(k+1)   + \mathbf{W_d d̂}(k+1)   + \mathbf{W_r r̂_y}(k+1)     \\
+        \vdots                                                                                            \\
+        \mathbf{W_y ŷ}(k+H_p) + \mathbf{W_u u}(k+H_p) + \mathbf{W_d d̂}(k+H_p) + \mathbf{W_r r̂_y}(k+H_p)   \end{bmatrix} 
+    \end{aligned}
+    ```
+    The matrices ``\mathbf{W_y}``, ``\mathbf{W_u}``, ``\mathbf{W_d}`` and ``\mathbf{W_r}``
+    must have `nw` rows and are provided at construction time. The terms with
+    ``\mathbf{W_y}`` are present only if the model is a [`LinModel`](@ref). Any `nothing`
+    value for these matrices is treated as a zero matrix.
 """
 function setconstraint!(
     mpc::PredictiveController; 
     umin        = nothing, umax        = nothing,
     Deltaumin   = nothing, Deltaumax   = nothing,
     ymin        = nothing, ymax        = nothing,
+    wmin        = nothing, wmax        = nothing,
     xhatmin     = nothing, xhatmax     = nothing,
     c_umin      = nothing, c_umax      = nothing,
     c_Deltaumin = nothing, c_Deltaumax = nothing,
     c_ymin      = nothing, c_ymax      = nothing,
+    c_wmin      = nothing, c_wmax      = nothing,
     c_xhatmin   = nothing, c_xhatmax   = nothing,
     Umin        = nothing, Umax        = nothing,
     DeltaUmin   = nothing, DeltaUmax   = nothing,
     Ymin        = nothing, Ymax        = nothing,
+    Wmin        = nothing, Wmax        = nothing,
     C_umax      = nothing, C_umin      = nothing,
     C_Deltaumax = nothing, C_Deltaumin = nothing,
     C_ymax      = nothing, C_ymin      = nothing,
+    C_wmax      = nothing, C_wmin      = nothing,
     Δumin   = Deltaumin,   Δumax = Deltaumax,
     x̂min    = xhatmin,     x̂max = xhatmax,
     c_Δumin = c_Deltaumin, c_Δumax = c_Deltaumax,
@@ -296,73 +346,93 @@ function setconstraint!(
     model, con =  mpc.estim.model, mpc.con
     transcription, optim = mpc.transcription, mpc.optim
     nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
-    nϵ, nc = mpc.nϵ, con.nc
+    nϵ, nw, nc = mpc.nϵ, con.nw, con.nc
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
     if isnothing(Umin) && !isnothing(umin)
-        size(umin) == (nu,) || throw(ArgumentError("umin size must be $((nu,))"))
+        size(umin) == (nu,) || throw(DimensionMismatch("umin size must be $((nu,))"))
         for i = 1:nu*Hp
             con.U0min[i] = umin[(i-1) % nu + 1] - mpc.Uop[i]
         end
     elseif !isnothing(Umin)
-        size(Umin) == (nu*Hp,) || throw(ArgumentError("Umin size must be $((nu*Hp,))"))
+        size(Umin) == (nu*Hp,) || throw(DimensionMismatch("Umin size must be $((nu*Hp,))"))
         con.U0min .= Umin .- mpc.Uop
     end
     if isnothing(Umax) && !isnothing(umax)
-        size(umax) == (nu,) || throw(ArgumentError("umax size must be $((nu,))"))
+        size(umax) == (nu,) || throw(DimensionMismatch("umax size must be $((nu,))"))
         for i = 1:nu*Hp
             con.U0max[i] = umax[(i-1) % nu + 1] - mpc.Uop[i]
         end
     elseif !isnothing(Umax)
-        size(Umax)   == (nu*Hp,) || throw(ArgumentError("Umax size must be $((nu*Hp,))"))
+        size(Umax)   == (nu*Hp,) || throw(DimensionMismatch("Umax size must be $((nu*Hp,))"))
         con.U0max .= Umax .- mpc.Uop
     end
     if isnothing(ΔUmin) && !isnothing(Δumin)
-        size(Δumin) == (nu,) || throw(ArgumentError("Δumin size must be $((nu,))"))
+        size(Δumin) == (nu,) || throw(DimensionMismatch("Δumin size must be $((nu,))"))
         for i = 1:nu*Hc
             con.ΔŨmin[i] = Δumin[(i-1) % nu + 1]
         end
     elseif !isnothing(ΔUmin)
-        size(ΔUmin)  == (nu*Hc,) || throw(ArgumentError("ΔUmin size must be $((nu*Hc,))"))
+        size(ΔUmin)  == (nu*Hc,) || throw(DimensionMismatch("ΔUmin size must be $((nu*Hc,))"))
         con.ΔŨmin[1:nu*Hc] .= ΔUmin
     end
     if isnothing(ΔUmax) && !isnothing(Δumax)
-        size(Δumax) == (nu,) || throw(ArgumentError("Δumax size must be $((nu,))"))
+        size(Δumax) == (nu,) || throw(DimensionMismatch("Δumax size must be $((nu,))"))
         for i = 1:nu*Hc
             con.ΔŨmax[i] = Δumax[(i-1) % nu + 1]
         end
     elseif !isnothing(ΔUmax)
-        size(ΔUmax)  == (nu*Hc,) || throw(ArgumentError("ΔUmax size must be $((nu*Hc,))"))
+        size(ΔUmax)  == (nu*Hc,) || throw(DimensionMismatch("ΔUmax size must be $((nu*Hc,))"))
         con.ΔŨmax[1:nu*Hc] .= ΔUmax
     end
     if isnothing(Ymin) && !isnothing(ymin)
-        size(ymin) == (ny,) || throw(ArgumentError("ymin size must be $((ny,))"))
+        size(ymin) == (ny,) || throw(DimensionMismatch("ymin size must be $((ny,))"))
         for i = 1:ny*Hp
             con.Y0min[i] = ymin[(i-1) % ny + 1] - mpc.Yop[i]
         end
     elseif !isnothing(Ymin)
-        size(Ymin)   == (ny*Hp,) || throw(ArgumentError("Ymin size must be $((ny*Hp,))"))
+        size(Ymin) == (ny*Hp,) || throw(DimensionMismatch("Ymin size must be $((ny*Hp,))"))
         con.Y0min .= Ymin .- mpc.Yop
     end
     if isnothing(Ymax) && !isnothing(ymax)
-        size(ymax) == (ny,) || throw(ArgumentError("ymax size must be $((ny,))"))
+        size(ymax) == (ny,) || throw(DimensionMismatch("ymax size must be $((ny,))"))
         for i = 1:ny*Hp
             con.Y0max[i] = ymax[(i-1) % ny + 1] - mpc.Yop[i]
         end
     elseif !isnothing(Ymax)
-        size(Ymax)   == (ny*Hp,) || throw(ArgumentError("Ymax size must be $((ny*Hp,))"))
+        size(Ymax) == (ny*Hp,) || throw(DimensionMismatch("Ymax size must be $((ny*Hp,))"))
         con.Y0max .= Ymax .- mpc.Yop
     end
+
+    if isnothing(Wmin) && !isnothing(wmin)
+        size(wmin) == (nw,) || throw(DimensionMismatch("wmin size must be $((nw,))"))
+        for i = 1:nw*(Hp+1)
+            con.Wmin[i] = wmin[(i-1) % nw + 1]
+        end
+    elseif !isnothing(Wmin)
+        size(Wmin) == (nw*(Hp+1),) || throw(DimensionMismatch("Wmin size must be $((nw*(Hp+1),))"))
+        con.Wmin .= Wmin
+    end
+    if isnothing(Wmax) && !isnothing(wmax)
+        size(wmax) == (nw,) || throw(DimensionMismatch("wmax size must be $((nw,))"))
+        for i = 1:nw*(Hp+1)
+            con.Wmax[i] = wmax[(i-1) % nw + 1]
+        end
+    elseif !isnothing(Wmax)
+        size(Wmax) == (nw*(Hp+1),) || throw(DimensionMismatch("Wmax size must be $((nw*(Hp+1),))"))
+        con.Wmax .= Wmax
+    end
     if !isnothing(x̂min)
-        size(x̂min) == (nx̂,) || throw(ArgumentError("x̂min size must be $((nx̂,))"))
+        size(x̂min) == (nx̂,) || throw(DimensionMismatch("x̂min size must be $((nx̂,))"))
         con.x̂0min .= x̂min .- mpc.estim.x̂op
     end
     if !isnothing(x̂max)
-        size(x̂max) == (nx̂,) || throw(ArgumentError("x̂max size must be $((nx̂,))"))
+        size(x̂max) == (nx̂,) || throw(DimensionMismatch("x̂max size must be $((nx̂,))"))
         con.x̂0max .= x̂max .- mpc.estim.x̂op
     end
     allECRs = (
-        c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax,
-        C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax, c_x̂min, c_x̂max,
+        c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax, c_wmin, c_wmax,
+        C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax, C_wmin, C_wmax,
+        c_x̂min, c_x̂max,
     )
     if any(ECR -> !isnothing(ECR), allECRs)
         nϵ == 1 || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
@@ -375,47 +445,61 @@ function setconstraint!(
         isnothing(C_Δumax)  && !isnothing(c_Δumax)  && (C_Δumax = repeat(c_Δumax, Hc))
         isnothing(C_ymin)   && !isnothing(c_ymin)   && (C_ymin  = repeat(c_ymin,  Hp))
         isnothing(C_ymax)   && !isnothing(c_ymax)   && (C_ymax  = repeat(c_ymax,  Hp))
+        isnothing(C_wmin)   && !isnothing(c_wmin)   && (C_wmin  = repeat(c_wmin,  Hp+1))
+        isnothing(C_wmax)   && !isnothing(c_wmax)   && (C_wmax  = repeat(c_wmax,  Hp+1))
         if !isnothing(C_umin)
-            size(C_umin) == (nu*Hp,) || throw(ArgumentError("C_umin size must be $((nu*Hp,))"))
-            any(C_umin .< 0) && error("C_umin weights should be non-negative")
+            size(C_umin) == (nu*Hp,) || throw(DimensionMismatch("C_umin size must be $((nu*Hp,))"))
+            any(<(0), C_umin) && error("C_umin weights should be non-negative")
             con.A_Umin[:, end] .= -C_umin
         end
         if !isnothing(C_umax)
-            size(C_umax) == (nu*Hp,) || throw(ArgumentError("C_umax size must be $((nu*Hp,))"))
-            any(C_umax .< 0) && error("C_umax weights should be non-negative")
+            size(C_umax) == (nu*Hp,) || throw(DimensionMismatch("C_umax size must be $((nu*Hp,))"))
+            any(<(0), C_umax) && error("C_umax weights should be non-negative")
             con.A_Umax[:, end] .= -C_umax
         end
         if !isnothing(C_Δumin)
-            size(C_Δumin) == (nu*Hc,) || throw(ArgumentError("C_Δumin size must be $((nu*Hc,))"))
-            any(C_Δumin .< 0) && error("C_Δumin weights should be non-negative")
+            size(C_Δumin) == (nu*Hc,) || throw(DimensionMismatch("C_Δumin size must be $((nu*Hc,))"))
+            any(<(0), C_Δumin) && error("C_Δumin weights should be non-negative")
             con.A_ΔŨmin[1:end-1, end] .= -C_Δumin 
         end
         if !isnothing(C_Δumax)
-            size(C_Δumax) == (nu*Hc,) || throw(ArgumentError("C_Δumax size must be $((nu*Hc,))"))
-            any(C_Δumax .< 0) && error("C_Δumax weights should be non-negative")
+            size(C_Δumax) == (nu*Hc,) || throw(DimensionMismatch("C_Δumax size must be $((nu*Hc,))"))
+            any(<(0), C_Δumax) && error("C_Δumax weights should be non-negative")
             con.A_ΔŨmax[1:end-1, end] .= -C_Δumax
         end
         if !isnothing(C_ymin)
-            size(C_ymin) == (ny*Hp,) || throw(ArgumentError("C_ymin size must be $((ny*Hp,))"))
-            any(C_ymin .< 0) && error("C_ymin weights should be non-negative")
+            size(C_ymin) == (ny*Hp,) || throw(DimensionMismatch("C_ymin size must be $((ny*Hp,))"))
+            any(<(0), C_ymin) && error("C_ymin weights should be non-negative")
             con.C_ymin .= C_ymin
             size(con.A_Ymin, 1) ≠ 0 && (con.A_Ymin[:, end] .= -con.C_ymin) # for LinModel
         end
         if !isnothing(C_ymax)
-            size(C_ymax) == (ny*Hp,) || throw(ArgumentError("C_ymax size must be $((ny*Hp,))"))
-            any(C_ymax .< 0) && error("C_ymax weights should be non-negative")
+            size(C_ymax) == (ny*Hp,) || throw(DimensionMismatch("C_ymax size must be $((ny*Hp,))"))
+            any(<(0), C_ymax) && error("C_ymax weights should be non-negative")
             con.C_ymax .= C_ymax
             size(con.A_Ymax, 1) ≠ 0 && (con.A_Ymax[:, end] .= -con.C_ymax) # for LinModel
         end
+        if !isnothing(C_wmin)
+            size(C_wmin) == (nw*(Hp+1),) || throw(DimensionMismatch("C_wmin size must be $((nw*(Hp+1),))"))
+            any(<(0), C_wmin) && error("C_wmin weights should be non-negative")
+            con.C_wmin .= C_wmin
+            con.A_Wmin[:, end] .= -C_wmin
+        end
+        if !isnothing(C_wmax)
+            size(C_wmax) == (nw*(Hp+1),) || throw(DimensionMismatch("C_wmax size must be $((nw*(Hp+1),))"))
+            any(<(0), C_wmax) && error("C_wmax weights should be non-negative")
+            con.C_wmax .= C_wmax
+            con.A_Wmax[:, end] .= -C_wmax
+        end
         if !isnothing(c_x̂min)
-            size(c_x̂min) == (nx̂,) || throw(ArgumentError("c_x̂min size must be $((nx̂,))"))
-            any(c_x̂min .< 0) && error("c_x̂min weights should be non-negative")
+            size(c_x̂min) == (nx̂,) || throw(DimensionMismatch("c_x̂min size must be $((nx̂,))"))
+            any(<(0), c_x̂min) && error("c_x̂min weights should be non-negative")
             con.c_x̂min .= c_x̂min
             size(con.A_x̂min, 1) ≠ 0 && (con.A_x̂min[:, end] .= -con.c_x̂min) # for LinModel
         end
         if !isnothing(c_x̂max)
-            size(c_x̂max) == (nx̂,) || throw(ArgumentError("c_x̂max size must be $((nx̂,))"))
-            any(c_x̂max .< 0) && error("c_x̂max weights should be non-negative")
+            size(c_x̂max) == (nx̂,) || throw(DimensionMismatch("c_x̂max size must be $((nx̂,))"))
+            any(<(0), c_x̂max) && error("c_x̂max weights should be non-negative")
             con.c_x̂max .= c_x̂max
             size(con.A_x̂max, 1) ≠ 0 && (con.A_x̂max[:, end] .= -con.c_x̂max) # for LinModel
         end
@@ -423,14 +507,17 @@ function setconstraint!(
     i_Umin,  i_Umax  = .!isinf.(con.U0min), .!isinf.(con.U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(con.ΔŨmin), .!isinf.(con.ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(con.Y0min), .!isinf.(con.Y0max)
+    i_Wmin,  i_Wmax  = .!isinf.(con.Wmin),  .!isinf.(con.Wmax)
     i_x̂min,  i_x̂max  = .!isinf.(con.x̂0min), .!isinf.(con.x̂0max)
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(
             model, transcription, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
-            i_Ymin, i_Ymax, i_x̂min, i_x̂max,
+            i_Ymin, i_Ymax, i_Wmin, i_Wmax,
+            i_x̂min, i_x̂max,
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
-            con.A_Ymin, con.A_Ymax, con.A_x̂min, con.A_x̂max,
+            con.A_Ymin, con.A_Ymax, con.A_Wmin, con.A_Wmax,
+            con.A_x̂min, con.A_x̂max,
             con.A_ŝ
         )
         A = con.A[con.i_b, :]
@@ -444,7 +531,8 @@ function setconstraint!(
         i_b, i_g = init_matconstraint_mpc(
             model, transcription, nc,
             i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, 
-            i_Ymin, i_Ymax, i_x̂min, i_x̂max
+            i_Ymin, i_Ymax, i_Wmin, i_Wmax,
+            i_x̂min, i_x̂max,
         )
         if i_b ≠ con.i_b || i_g ≠ con.i_g
             error("Cannot modify ±Inf constraints after calling moveinput!")
@@ -464,7 +552,8 @@ Estimate the default prediction horizon `Hp` for [`LinModel`](@ref).
 default_Hp(model::LinModel) = DEFAULT_HP0 + estimate_delays(model)
 "Throw an error when model is not a [`LinModel`](@ref)."
 function default_Hp(::SimModel)
-    throw(ArgumentError("Prediction horizon Hp must be explicitly specified if model is not a LinModel."))
+    msg = "Prediction horizon Hp must be explicitly specified if model is not a LinModel."
+    throw(ArgumentError(msg))
 end
 
 """
@@ -556,6 +645,37 @@ end
 "Get the actual control Horizon `Hc` (integer) from the move blocking vector `nb`."
 get_Hc(nb::AbstractVector{Int}) = length(nb)
 
+"Validate the custom linear constraint matrices dimensions."
+function validate_custom_lincon(model::SimModel{NT}, Wy, Wu, Wd, Wr) where NT<:Real
+    nu, nd, ny = model.nu, model.nd, model.ny
+    if !isa(model, LinModel) && !isnothing(Wy)
+        throw(ArgumentError("Wy matrix can be specified only with LinModel."))
+    end
+    nw = if !isnothing(Wy)
+        size(Wy, 1)
+    elseif !isnothing(Wu)
+        size(Wu, 1)
+    elseif !isnothing(Wd)
+        size(Wd, 1)
+    elseif !isnothing(Wr)
+        size(Wr, 1)
+    else
+        0
+    end
+    Wy = isnothing(Wy) ? zeros(NT, nw, ny) : Wy
+    Wu = isnothing(Wu) ? zeros(NT, nw, nu) : Wu
+    Wd = isnothing(Wd) ? zeros(NT, nw, nd) : Wd
+    Wr = isnothing(Wr) ? zeros(NT, nw, ny) : Wr
+    size(Wy, 2) == ny || throw(DimensionMismatch("Wy must have $ny columns."))
+    size(Wu, 2) == nu || throw(DimensionMismatch("Wu must have $nu columns."))
+    size(Wd, 2) == nd || throw(DimensionMismatch("Wd must have $nd columns."))
+    size(Wr, 2) == ny || throw(DimensionMismatch("Wr must have $ny columns."))
+    if size(Wy, 1) != nw || size(Wu, 1) != nw || size(Wd, 1) != nw || size(Wr, 1) != nw
+        msg = "all custom linear constraint matrices must have the same number of rows."
+        throw(DimensionMismatch(msg))
+    end
+    return Wy, Wu, Wd, Wr
+end
 
 """
     validate_args(mpc::PredictiveController, ry, d, lastu, D̂, R̂y, R̂u)
@@ -638,8 +758,9 @@ verify_cond(::TranscriptionMethod,_,_) = nothing
         transcription::TranscriptionMethod,
         Hp, Hc, 
         PΔu, Pu, E, 
-        ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-        Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+        ex̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+        Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+        Wy, Wu, Wd, Wr,
         gc!=nothing, nc=0
     ) -> con, nϵ, P̃Δu, P̃u, Ẽ
 
@@ -653,66 +774,89 @@ function init_defaultcon_mpc(
     transcription::TranscriptionMethod,
     Hp,  Hc, 
     PΔu, Pu, E, 
-    ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-    Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+    ex̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+    Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+    Wy, Wu, Wd, Wr,
     gc!::GCfunc = nothing, nc = 0
 ) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
     model = estim.model
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
+    nw = size(Wy, 1)
+    nW = nw*(Hp+1)
     nϵ = weights.isinf_C ? 0 : 1
     u0min,      u0max   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     Δumin,      Δumax   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     y0min,      y0max   = fill(convert(NT,-Inf), ny), fill(convert(NT,+Inf), ny)
+    wmin,       wmax    = fill(convert(NT,-Inf), nw), fill(convert(NT,+Inf), nw)
     x̂0min,      x̂0max   = fill(convert(NT,-Inf), nx̂), fill(convert(NT,+Inf), nx̂)
     c_umin,     c_umax  = fill(zero(NT), nu), fill(zero(NT), nu)
     c_Δumin,    c_Δumax = fill(zero(NT), nu), fill(zero(NT), nu)
     c_ymin,     c_ymax  = fill(one(NT), ny),  fill(one(NT), ny)
+    c_wmin,     c_wmax  = fill(one(NT), nw),  fill(one(NT), nw)
     c_x̂min,     c_x̂max  = fill(one(NT), nx̂),  fill(one(NT), nx̂)
-    U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max = 
-        repeat_constraints(Hp, Hc, u0min, u0max, Δumin, Δumax, y0min, y0max)
-    C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax = 
-        repeat_constraints(Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax)
+    U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax = 
+        repeat_constraints(
+            Hp, Hc, u0min, u0max, Δumin, Δumax, y0min, y0max, wmin, wmax
+        )
+    C_umin, C_umax, C_Δumin, C_Δumax, C_ymin, C_ymax, C_wmin, C_wmax = 
+        repeat_constraints(
+            Hp, Hc, c_umin, c_umax, c_Δumin, c_Δumax, c_ymin, c_ymax, c_wmin, c_wmax
+        )
+    W̄y = sparse(repeatdiag(Wy, Hp+1))
+    W̄u = sparse(repeatdiag(Wu, Hp+1))
+    W̄d = sparse(repeatdiag(Wd, Hp+1))
+    W̄r = sparse(repeatdiag(Wr, Hp+1))
     A_Umin,  A_Umax, P̃u  = relaxU(Pu, C_umin, C_umax, nϵ)
     A_ΔŨmin, A_ΔŨmax, ΔŨmin, ΔŨmax, P̃Δu = relaxΔU(PΔu, C_Δumin, C_Δumax, ΔUmin, ΔUmax, nϵ)
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
+    A_Wmin,  A_Wmax, Ẽw = relaxW(E, Pu, Hp, W̄y, W̄u, C_wmin, C_wmax, nϵ)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
     A_ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
     i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
+    i_Wmin,  i_Wmax  = .!isinf.(Wmin),  .!isinf.(Wmax)
     i_x̂min,  i_x̂max  = .!isinf.(x̂0min), .!isinf.(x̂0max)
     i_b, i_g, A, Aeq, neq = init_matconstraint_mpc(
         model, transcription, nc,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_x̂min, i_x̂max,
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_x̂max, A_x̂min,
+        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂max, A_x̂min,
         A_ŝ
     )
+    # dummy fx̂, Fw and Fŝ vectors (updated just before optimization)
+    fx̂, Fw, Fŝ = zeros(NT, nx̂), zeros(NT, nW), zeros(NT, nx̂*Hp)
     # dummy b and beq vectors (updated just before optimization)
     b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
     con = ControllerConstraint{NT, GCfunc}(
-        ẽx̂      , fx̂     , gx̂     , jx̂       , kx̂     , vx̂     , bx̂     ,
-        Ẽŝ      , Fŝ     , Gŝ     , Jŝ       , Kŝ     , Vŝ     , Bŝ     ,
-        U0min   , U0max  , ΔŨmin  , ΔŨmax    , Y0min  , Y0max  , x̂0min  , x̂0max,
-        A_Umin  , A_Umax , A_ΔŨmin, A_ΔŨmax  , A_Ymin , A_Ymax , A_x̂min , A_x̂max,
-        A       , b      , i_b    , 
+        ẽx̂      , fx̂     , gx̂      , jx̂       , kx̂     , vx̂     , bx̂     ,
+        Ẽŝ      , Fŝ     , Gŝ      , Jŝ       , Kŝ     , Vŝ     , Bŝ     ,
+        Ẽw      , Fw     , W̄y      , W̄u       , W̄d     , W̄r     , nw     ,
+        U0min   , U0max  , ΔŨmin   , ΔŨmax    , 
+        Y0min   , Y0max  , Wmin    , Wmax     , x̂0min  , x̂0max  , 
+        A_Umin  , A_Umax , A_ΔŨmin , A_ΔŨmax  , 
+        A_Ymin  , A_Ymax , A_Wmin  , A_Wmax   , A_x̂min , A_x̂max , 
+        A       , b      , i_b     , 
         A_ŝ     ,
         Aeq     , beq    ,
         neq     ,
-        C_ymin  , C_ymax , c_x̂min , c_x̂max , i_g,
+        C_ymin  , C_ymax , C_wmin  , C_wmax   , c_x̂min , c_x̂max , 
+        i_g     ,
         gc!     , nc
     )
     return con, nϵ, P̃Δu, P̃u, Ẽ
 end
 
-"Repeat predictive controller constraints over prediction `Hp` and control `Hc` horizons."
-function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax)
+"Repeat predictive controller constraints over their respective horizons."
+function repeat_constraints(Hp, Hc, umin, umax, Δumin, Δumax, ymin, ymax, wmin, wmax)
     Umin  = repeat(umin, Hp)
     Umax  = repeat(umax, Hp)
     ΔUmin = repeat(Δumin, Hc)
     ΔUmax = repeat(Δumax, Hc)
     Ymin  = repeat(ymin, Hp)
     Ymax  = repeat(ymax, Hp)
-    return Umin, Umax, ΔUmin, ΔUmax, Ymin, Ymax
+    Wmin  = repeat(wmin, Hp+1)
+    Wmax  = repeat(wmax, Hp+1)
+    return Umin, Umax, ΔUmin, ΔUmax, Ymin, Ymax, Wmin, Wmax
 end
 
 @doc raw"""
@@ -832,6 +976,83 @@ function relaxŶ(E::AbstractMatrix{NT}, C_ymin, C_ymax, nϵ) where NT<:Real
         A_Ymin, A_Ymax = -E,  E
     end
     return A_Ymin, A_Ymax, Ẽ
+end
+
+@doc raw"""
+    relaxW(E, Pu, nw, W̄y, W̄u, C_wmin, C_wmax, nϵ) -> A_Wmin, A_Wmax, Ẽw
+
+Construct and augment the custom linear constraints with slack variable ϵ for softening.
+
+By introducing the following block-diagonal matrices with ``H_p + 1`` blocks:
+```math
+\begin{aligned}
+\mathbf{W̄_y} &= \mathrm{diag}(\mathbf{W_y}, \mathbf{W_y}, \dots, \mathbf{W_y}) \\
+\mathbf{W̄_u} &= \mathrm{diag}(\mathbf{W_u}, \mathbf{W_u}, \dots, \mathbf{W_u}) \\
+\mathbf{W̄_d} &= \mathrm{diag}(\mathbf{W_d}, \mathbf{W_d}, \dots, \mathbf{W_d}) \\
+\mathbf{W̄_r} &= \mathrm{diag}(\mathbf{W_r}, \mathbf{W_r}, \dots, \mathbf{W_r}) 
+\end{aligned}
+```
+the ``\mathbf{W}`` vector defined in the Extended Help section of [`setconstraint!`](@ref)
+can be expressed as:
+```math
+\mathbf{W} = \mathbf{E_w} \mathbf{Z} + \mathbf{F_w}
+```
+in which:
+```math
+\mathbf{E_w} = \mathbf{W̄_y} [\begin{smallmatrix} \mathbf{0}   \\ \mathbf{E}   \end{smallmatrix}] + 
+               \mathbf{W̄_u} [\begin{smallmatrix} \mathbf{P_u} \\ \mathbf{p_u} \end{smallmatrix}]
+```
+The ``\mathbf{E}`` matrix appears in the linear output prediction equation 
+``\mathbf{Ŷ_0 = E Z + F}``, and ``\mathbf{P_u}``, in the conversion equation 
+``\mathbf{U = P_u Z + T_u u}(k-1)``. The ``\mathbf{p_u}`` matrix corresponds to the last
+`nu` rows of ``\mathbf{P_u}``. The ``\mathbf{W̄_u}`` term assumes that ``H_c ≤ H_p``, hence
+``\mathbf{Δu}(k + H_c) = \mathbf{0}`` and ``\mathbf{u}(k + H_c) = \mathbf{u}(k + H_c - 1)``.
+The ``\mathbf{F_w}`` vector is updated at each control period `k` in [`linconstraint!`](@ref)
+method, and is defined as:
+```math
+\mathbf{F_w} =  
+    \mathbf{W̄_y} [\begin{smallmatrix} \mathbf{ŷ}(k)       \\ \mathbf{F + Y_{op}} \end{smallmatrix}] + 
+    \mathbf{W̄_u} [\begin{smallmatrix} \mathbf{T_u u}(k-1) \\ \mathbf{u}(k-1)     \end{smallmatrix}] +
+    \mathbf{W̄_d} [\begin{smallmatrix} \mathbf{d}(k)       \\ \mathbf{D̂}          \end{smallmatrix}] +
+    \mathbf{W̄_r} [\begin{smallmatrix} \mathbf{r_y}(k)     \\ \mathbf{R̂_y}        \end{smallmatrix}]
+```
+Denoting the decision variables augmented with the slack variable
+``\mathbf{Z̃} = [\begin{smallmatrix} \mathbf{Z} \\ ϵ \end{smallmatrix}]``, the function
+returns the ``\mathbf{Ẽ_w}`` matrix that appears in the custom constraint equation
+``\mathbf{W = Ẽ_w Z̃ + F_w}``, and the ``\mathbf{A}`` matrices for the inequality constraints:
+```math
+\begin{bmatrix} 
+    \mathbf{A_{W_{min}}} \\ 
+    \mathbf{A_{W_{max}}}
+\end{bmatrix} \mathbf{Z̃} ≤
+\begin{bmatrix}
+    - \mathbf{W_{min} + F_w} \\
+    + \mathbf{W_{max} - F_w}
+\end{bmatrix}
+```
+"""
+function relaxW(E::AbstractMatrix{NT}, Pu, Hp, W̄y, W̄u, C_wmin, C_wmax, nϵ) where {NT<:Real}
+    nW = size(W̄y, 1)
+    ny = size(W̄y, 2) ÷ (Hp + 1)
+    nu = size(Pu, 1) ÷ Hp    
+    if iszero(size(E, 1))
+        # model is not a LinModel, thus no Wy terms in the custom constraints:
+        Wy_terms = zeros(NT, nW, size(E, 2))
+    else
+        Wy_terms = W̄y*[zeros(NT, ny, size(E, 2)); E]
+    end
+    Wu_terms = W̄u*[Pu; Pu[end-nu+1:end, :]]
+    Ew = Wy_terms + Wu_terms
+    if nϵ == 1 # Z̃ = [Z; ϵ]
+        # ϵ impacts custom constraint calculations:
+        A_Wmin, A_Wmax = -[Ew  C_wmin], [Ew -C_wmax]
+        # ϵ has no impact on custom constraint predictions:
+        Ẽw = [Ew zeros(NT, nW, 1)]
+    else # Z̃ = Z (only hard constraints)
+        Ẽw = Ew
+        A_Wmin, A_Wmax = -Ew, Ew
+    end
+    return A_Wmin, A_Wmax, Ẽw
 end
 
 @doc raw"""

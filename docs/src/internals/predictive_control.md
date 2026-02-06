@@ -20,7 +20,9 @@ ModelPredictiveControl.init_defectmat
 ModelPredictiveControl.relaxU
 ModelPredictiveControl.relaxΔU
 ModelPredictiveControl.relaxŶ
+ModelPredictiveControl.relaxW
 ModelPredictiveControl.relaxterminal
+ModelPredictiveControl.augmentdefect
 ModelPredictiveControl.init_quadprog
 ModelPredictiveControl.init_stochpred
 ModelPredictiveControl.init_matconstraint_mpc
@@ -31,7 +33,7 @@ ModelPredictiveControl.get_nonlincon_oracle(::NonLinMPC, ::ModelPredictiveContro
 ## Update Quadratic Optimization
 
 ```@docs
-ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any, ::Any)
+ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
 ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel, ::TranscriptionMethod)
 ModelPredictiveControl.linconstrainteq!
 ```

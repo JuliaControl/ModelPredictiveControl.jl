@@ -122,14 +122,16 @@ Also validate initial estimate covariance `P̂_0`, if provided.
 function validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing)
     nym = length(i_ym)
     nx̂  = model.nx + sum(nint_u) + sum(nint_ym)
-    size(Q̂)  ≠ (nx̂, nx̂)     && error("Q̂ size $(size(Q̂)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
+    (any(<(0), nint_u) || any(<(0), nint_ym)) && return nothing # a clearer error is thrown later 
+    size(Q̂)  ≠ (nx̂, nx̂)     && throw(DimensionMismatch("Q̂ size $(size(Q̂)) ≠ nx̂, nx̂ $((nx̂, nx̂))"))
     !ishermitian(Q̂)         && error("Q̂ is not Hermitian")
-    size(R̂)  ≠ (nym, nym)   && error("R̂ size $(size(R̂)) ≠ nym, nym $((nym, nym))")
+    size(R̂)  ≠ (nym, nym)   && throw(DimensionMismatch("R̂ size $(size(R̂)) ≠ nym, nym $((nym, nym))"))
     !ishermitian(R̂)         && error("R̂ is not Hermitian")
     if ~isnothing(P̂_0)
-        size(P̂_0) ≠ (nx̂, nx̂) && error("P̂_0 size $(size(P̂_0)) ≠ nx̂, nx̂ $((nx̂, nx̂))")
+        size(P̂_0) ≠ (nx̂, nx̂) && throw(DimensionMismatch("P̂_0 size $(size(P̂_0)) ≠ nx̂, nx̂ $((nx̂, nx̂))"))
         !ishermitian(P̂_0)    && error("P̂_0 is not Hermitian")
     end
+    return nothing
 end
 
 @doc raw"""
@@ -210,9 +212,10 @@ function init_integrators(nint::IntVectorOrInt, ny, varname::String)
         nint = fill(0, ny)
     end
     if length(nint) ≠ ny
-        error("nint_$(varname) length ($(length(nint))) ≠ n$(varname) ($ny)")
+        msg = "nint_$(varname) length ($(length(nint))) ≠ n$(varname) ($ny)" 
+        throw(DimensionMismatch(msg))
     end
-    any(nint .< 0) && error("nint_$(varname) values should be ≥ 0")
+    any(nint .< 0) && throw(ArgumentError("nint_$(varname) values should be ≥ 0"))
     nx = sum(nint)
     A, C = zeros(nx, nx), zeros(ny, nx)
     if nx ≠ 0

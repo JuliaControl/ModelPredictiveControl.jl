@@ -6,9 +6,9 @@
     @test size(mpc1.Ẽ,1) == 15*mpc1.estim.model.ny
     mpc2 = LinMPC(model, Hc=4, Cwt=Inf)
     @test size(mpc2.Ẽ,2) == 4*mpc2.estim.model.nu
-    mpc3 = LinMPC(model, Hc=4, Cwt=1e6)
+    mpc3 = LinMPC(model, Hc=4, Cwt=1e4)
     @test size(mpc3.Ẽ,2) == 4*mpc3.estim.model.nu + 1
-    @test mpc3.weights.Ñ_Hc[end] ≈ 1e6
+    @test mpc3.weights.Ñ_Hc[end] ≈ 1e4
     mpc4 = LinMPC(model, Mwt=[1,2], Hp=15)
     @test mpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
     @test mpc4.weights.M_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
@@ -53,6 +53,21 @@
     mpc16 = LinMPC(model, Hc=[1,2,3,6,6,6], Hp=10, Cwt=Inf)
     @test mpc16.Hc == 4 # the last 2 elements of Hc are ignored
     @test size(mpc16.P̃u) == (10*mpc1.estim.model.nu, 4*mpc1.estim.model.nu)
+    Wy = ones(3, model.ny)
+    mpc17 = LinMPC(model; Wy)
+    @test mpc17.con.W̄y ≈ ModelPredictiveControl.repeatdiag(Wy, mpc17.Hp+1)
+    @test mpc17.con.W̄u ≈ zeros(3*(mpc17.Hp+1), model.nu*(mpc17.Hp+1))
+    @test mpc17.con.W̄d ≈ zeros(3*(mpc17.Hp+1), model.nd*(mpc17.Hp+1))
+    @test mpc17.con.W̄r ≈ zeros(3*(mpc17.Hp+1), model.ny*(mpc17.Hp+1))
+    Wy = ones(2, model.ny)
+    Wu = 2*ones(2, model.nu)
+    Wd = 3*ones(2, model.nd)
+    Wr = 0.5*ones(2, model.ny)
+    mpc18 = LinMPC(model; Wy, Wu, Wd, Wr)
+    @test mpc18.con.W̄y ≈ ModelPredictiveControl.repeatdiag(Wy, mpc18.Hp+1)
+    @test mpc18.con.W̄u ≈ ModelPredictiveControl.repeatdiag(Wu, mpc18.Hp+1)
+    @test mpc18.con.W̄d ≈ ModelPredictiveControl.repeatdiag(Wd, mpc18.Hp+1)
+    @test mpc18.con.W̄r ≈ ModelPredictiveControl.repeatdiag(Wr, mpc18.Hp+1)
 
     @test_logs(
         (:warn, 
@@ -62,14 +77,19 @@
     )
     @test_throws ArgumentError LinMPC(model, Hc=0)
     @test_throws ArgumentError LinMPC(model, Hp=1, Hc=2)
-    @test_throws ArgumentError LinMPC(model, Mwt=[1])
-    @test_throws ArgumentError LinMPC(model, Mwt=[1])
-    @test_throws ArgumentError LinMPC(model, Lwt=[1])
-    @test_throws ArgumentError LinMPC(model, Cwt=[1])
+    @test_throws DimensionMismatch LinMPC(model, Mwt=[1])
+    @test_throws DimensionMismatch LinMPC(model, Mwt=[1])
+    @test_throws DimensionMismatch LinMPC(model, Lwt=[1])
+    @test_throws DimensionMismatch LinMPC(model, Cwt=[1])
     @test_throws ArgumentError LinMPC(model, Mwt=[-1,1])
     @test_throws ArgumentError LinMPC(model, Nwt=[-1,1])
     @test_throws ArgumentError LinMPC(model, Lwt=[-1,1])
     @test_throws ArgumentError LinMPC(model, Cwt=-1)
+    @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, model.ny+1))
+    @test_throws DimensionMismatch LinMPC(model, Wu=ones(2, model.nu-1))
+    @test_throws DimensionMismatch LinMPC(model, Wd=ones(2, model.nd+1))
+    @test_throws DimensionMismatch LinMPC(model, Wr=ones(2, model.ny-1))
+    @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, model.ny), Wu=ones(3, model.nu))
 end
 
 @testitem "LinMPC moves and getinfo" setup=[SetupMPCtests] begin
@@ -242,67 +262,121 @@ end
 @testitem "LinMPC set constraints" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(sys, Ts, i_d=[3])
-    mpc = LinMPC(model, Hp=1, Hc=1)
+    mpc = LinMPC(model, Hp=1, Hc=1, Wr=ones(2, 2))
 
     # test default constraints before modifying any:
-    @test all((mpc.con.U0min, mpc.con.U0max) .≈ (fill(-Inf, model.nu), fill(Inf, model.nu)))
-    @test all((mpc.con.ΔŨmin, mpc.con.ΔŨmax) .≈ (vcat(fill(-Inf, model.nu), 0), vcat(fill(Inf, model.nu), Inf)))
-    @test all((mpc.con.Y0min, mpc.con.Y0max) .≈ (fill(-Inf, model.ny), fill(Inf, model.ny)))
-    @test all((mpc.con.x̂0min, mpc.con.x̂0max) .≈ (fill(-Inf, mpc.estim.nx̂), fill(Inf, mpc.estim.nx̂)))
-    @test all((-mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]) .≈ (fill(0.0, model.nu), fill(0.0, model.nu)))
-    @test all((-mpc.con.A_ΔŨmin[1:end-1, end], -mpc.con.A_ΔŨmax[1:end-1, end]) .≈ (fill(0.0, model.nu), fill(0.0, model.nu)))
-    @test all((-mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]) .≈ (fill(1.0, model.ny), fill(1.0, model.ny)))
-    @test all((-mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]) .≈ (fill(1.0, mpc.estim.nx̂), fill(1.0, mpc.estim.nx̂)))
+    @test mpc.con.U0min ≈ fill(-Inf, model.nu)
+    @test mpc.con.U0max ≈ fill(Inf, model.nu)
+    @test mpc.con.ΔŨmin ≈ vcat(fill(-Inf, model.nu), 0)
+    @test mpc.con.ΔŨmax ≈ vcat(fill(Inf, model.nu), Inf)
+    @test mpc.con.Y0min ≈ fill(-Inf, model.ny)
+    @test mpc.con.Y0max ≈ fill(Inf, model.ny)
+    @test mpc.con.Wmin  ≈ fill(-Inf, 2mpc.con.nw)
+    @test mpc.con.Wmax  ≈ fill(Inf, 2mpc.con.nw)
+    @test mpc.con.x̂0min ≈ fill(-Inf, mpc.estim.nx̂)
+    @test mpc.con.x̂0max ≈ fill(Inf, mpc.estim.nx̂)
+    @test -mpc.con.A_Umin[:, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_Umax[:, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_ΔŨmin[1:end-1, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_ΔŨmax[1:end-1, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_Ymin[:, end] ≈ fill(1.0, model.ny)
+    @test -mpc.con.A_Ymax[:, end] ≈ fill(1.0, model.ny)
+    @test -mpc.con.A_Wmin[:, end] ≈ fill(1.0, 2mpc.con.nw)
+    @test -mpc.con.A_Wmax[:, end] ≈ fill(1.0, 2mpc.con.nw)
+    @test -mpc.con.A_x̂min[:, end] ≈ fill(1.0, mpc.estim.nx̂)
+    @test -mpc.con.A_x̂max[:, end] ≈ fill(1.0, mpc.estim.nx̂)
 
     setconstraint!(mpc, umin=[-5, -9.9], umax=[100,99])
-    @test all((mpc.con.U0min, mpc.con.U0max) .≈ ([-5, -9.9], [100,99]))
+    @test mpc.con.U0min ≈ [-5, -9.9]
+    @test mpc.con.U0max ≈ [100,99]
     setconstraint!(mpc, Δumin=[-5,-10], Δumax=[6,11])
-    @test all((mpc.con.ΔŨmin, mpc.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
+    @test mpc.con.ΔŨmin ≈ [-5,-10,0]
+    @test mpc.con.ΔŨmax ≈ [6,11,Inf]
     setconstraint!(mpc, ymin=[-6, -11],ymax=[55, 35])
-    @test all((mpc.con.Y0min, mpc.con.Y0max) .≈ ([-6,-11], [55,35]))
+    @test mpc.con.Y0min ≈ [-6,-11]
+    @test mpc.con.Y0max ≈ [55,35]
+    setconstraint!(mpc, wmin=[-7, -12], wmax=[75, 65])
+    @test mpc.con.Wmin  ≈ [-7, -12, -7, -12]
+    @test mpc.con.Wmax  ≈ [75, 65, 75, 65]
     setconstraint!(mpc, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((mpc.con.x̂0min, mpc.con.x̂0max) .≈ ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test mpc.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
+    @test mpc.con.x̂0max ≈ [21,22,23,24,25,26]
 
     setconstraint!(mpc, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
-    @test all((-mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]) .≈ ([0.01,0.02], [0.03,0.04]))
+    @test -mpc.con.A_Umin[:, end] ≈ [0.01,0.02]
+    @test -mpc.con.A_Umax[:, end] ≈ [0.03,0.04]
     setconstraint!(mpc, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
-    @test all((-mpc.con.A_ΔŨmin[1:end-1, end], -mpc.con.A_ΔŨmax[1:end-1, end]) .≈ ([0.05,0.06], [0.07,0.08]))
+    @test -mpc.con.A_ΔŨmin[1:end-1, end] ≈ [0.05,0.06]
+    @test -mpc.con.A_ΔŨmax[1:end-1, end] ≈ [0.07,0.08]
     setconstraint!(mpc, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
-    @test all((-mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]) .≈ ([1.00,1.01], [1.02,1.03]))
+    @test -mpc.con.A_Ymin[:, end] ≈ [1.00,1.01]
+    @test -mpc.con.A_Ymax[:, end] ≈ [1.02,1.03]
+    setconstraint!(mpc, c_wmin=[2.00,2.01], c_wmax=[2.02,2.03])
+    @test -mpc.con.A_Wmin[:, end] ≈ [2.00,2.01,2.00,2.01]
+    @test -mpc.con.A_Wmax[:, end] ≈ [2.02,2.03,2.02,2.03]
     setconstraint!(mpc, c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36])
-    @test all((-mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]) .≈ ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
+    @test -mpc.con.A_x̂min[:, end] ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
+    @test -mpc.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
 
     model2 = LinModel(tf([2], [10, 1]), 3.0)
-    mpc2 = LinMPC(model2, Hp=50, Hc=5)
+    mpc2 = LinMPC(model2, Hp=50, Hc=5, Wr=[1])
 
     setconstraint!(mpc2, Umin=-1(1:50).-1, Umax=+1(1:50).+1)
-    @test all((mpc2.con.U0min, mpc2.con.U0max) .≈ (-1(1:50).-1, +1(1:50).+1))
+    @test mpc2.con.U0min ≈ -1(1:50).-1
+    @test mpc2.con.U0max ≈ +1(1:50).+1
     setconstraint!(mpc2, ΔUmin=-1(1:5).-2, ΔUmax=+1(1:5).+2)
-    @test all((mpc2.con.ΔŨmin, mpc2.con.ΔŨmax) .≈ ([-1(1:5).-2; 0], [+1(1:5).+2; Inf]))
+    @test mpc2.con.ΔŨmin ≈ [-1(1:5).-2; 0]
+    @test mpc2.con.ΔŨmax ≈ [+1(1:5).+2; Inf]
     setconstraint!(mpc2, Ymin=-1(1:50).-3, Ymax=+1(1:50).+3)
-    @test all((mpc2.con.Y0min, mpc2.con.Y0max) .≈ (-1(1:50).-3, +1(1:50).+3))
+    @test mpc2.con.Y0min ≈ -1(1:50).-3
+    @test mpc2.con.Y0max ≈ +1(1:50).+3
+    setconstraint!(mpc2, Wmin=-1(1:51).-4, Wmax=+1(1:51).+4)
+    @test mpc2.con.Wmin ≈ -1(1:51).-4
+    @test mpc2.con.Wmax ≈ +1(1:51).+4
 
-    setconstraint!(mpc2, C_umin=+1(1:50).+4, C_umax=+1(1:50).+4)
-    @test all((-mpc2.con.A_Umin[:, end], -mpc2.con.A_Umax[:, end]) .≈ (+1(1:50).+4, +1(1:50).+4))
-    setconstraint!(mpc2, C_Δumin=+1(1:5).+5, C_Δumax=+1(1:5).+5)
-    @test all((-mpc2.con.A_ΔŨmin[1:end-1, end], -mpc2.con.A_ΔŨmax[1:end-1, end]) .≈ (+1(1:5).+5, +1(1:5).+5))
-    setconstraint!(mpc2, C_ymin=+1(1:50).+6, C_ymax=+1(1:50).+6)
-    @test all((-mpc2.con.A_Ymin[:, end], -mpc2.con.A_Ymax[:, end]) .≈ (+1(1:50).+6, +1(1:50).+6))
-    setconstraint!(mpc2, c_umin=[0], c_umax=[0], c_Δumin=[0], c_Δumax=[0], c_ymin=[1], c_ymax=[1])
+    setconstraint!(mpc2, C_umin=+1(1:50).+5, C_umax=+1(1:50).+5)
+    @test -mpc2.con.A_Umin[:, end] ≈ +1(1:50).+5
+    @test -mpc2.con.A_Umax[:, end] ≈ +1(1:50).+5
+    setconstraint!(mpc2, C_Δumin=+1(1:5).+6, C_Δumax=+1(1:5).+6)
+    @test -mpc2.con.A_ΔŨmin[1:end-1, end] ≈ +1(1:5).+6
+    @test -mpc2.con.A_ΔŨmax[1:end-1, end] ≈ +1(1:5).+6
+    setconstraint!(mpc2, C_ymin=+1(1:50).+7, C_ymax=+1(1:50).+7)
+    @test -mpc2.con.A_Ymin[:, end] ≈ +1(1:50).+7
+    @test -mpc2.con.A_Ymax[:, end] ≈ +1(1:50).+7
+    setconstraint!(mpc2, C_wmin=+1(1:51).+8, C_wmax=+1(1:51).+8)
+    @test -mpc2.con.A_Wmin[:, end] ≈ +1(1:51).+8
+    @test -mpc2.con.A_Wmax[:, end] ≈ +1(1:51).+8
 
-    @test_throws ArgumentError setconstraint!(mpc, umin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, umax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, Δumin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, Δumax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, ymin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, ymax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_umin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_umax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_Δumin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_Δumax=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_ymin=[0,0,0])
-    @test_throws ArgumentError setconstraint!(mpc, c_ymax=[0,0,0])
+    setconstraint!(mpc2, 
+        c_umin=[0], c_umax=[0], c_Δumin=[0], c_Δumax=[0], 
+        c_ymin=[1], c_ymax=[1], c_wmin=[1],  c_wmax=[1]
+    )
 
+    @test_throws DimensionMismatch setconstraint!(mpc, umin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, umax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, Δumin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, Δumax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, ymin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, ymax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, wmin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, wmax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_umin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_umax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_Δumin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_Δumax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_ymin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_ymax=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_wmin=[0,0,0])
+    @test_throws DimensionMismatch setconstraint!(mpc, c_wmax=[0,0,0])
+    @test_throws ErrorException setconstraint!(mpc, c_umin=[-1,-1])
+    @test_throws ErrorException setconstraint!(mpc, c_umax=[-1,-1])
+    @test_throws ErrorException setconstraint!(mpc, c_Δumin=[-1,-1])
+    @test_throws ErrorException setconstraint!(mpc, c_Δumax=[-1,-1])
+    @test_throws ErrorException setconstraint!(mpc, c_ymin=[-1,-1])
+    @test_throws ErrorException setconstraint!(mpc, c_ymax=[-1,-1])
+    @test_throws ErrorException setconstraint!(mpc, c_wmin=[-1,-1])
+    @test_throws ErrorException setconstraint!(mpc, c_wmax=[-1,-1])
+    
     preparestate!(mpc, mpc.estim.model.yop, mpc.estim.model.dop)
     moveinput!(mpc, [0, 0], [0])
     @test_throws ErrorException setconstraint!(mpc, c_umin=[1, 1], c_umax=[1, 1])
@@ -374,6 +448,37 @@ end
     info = getinfo(mpc)
     @test info[:x̂end][1] ≈ 0 atol=1e-1
     setconstraint!(mpc, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
+
+    model2 = LinModel([tf([2], [10, 1]) tf(0.1, [7, 1])], 3.0, i_d=[2])
+    model2 = setop!(model2, uop=[25], dop=[30], yop=[50])
+    mpc_wy = LinMPC(model2, Nwt=[0], Cwt=Inf, Hp=50, Hc=50, Wy=[1])
+    mpc_wy = setconstraint!(mpc_wy, wmin=[36], wmax=[75])
+    preparestate!(mpc_wy, [50], [30])
+    u = moveinput!(mpc_wy, [0], [30])
+    @test all(isapprox.(getinfo(mpc_wy)[:Ŷ], 36; atol=1e-1))
+    u = moveinput!(mpc_wy, [100], [30])
+    @test all(isapprox.(getinfo(mpc_wy)[:Ŷ], 75; atol=1e-1))
+    mpc_wu = LinMPC(model2, Nwt=[0], Cwt=Inf, Hp=50, Hc=50, Wu=[1])
+    mpc_wu = setconstraint!(mpc_wu, wmin=[4], wmax=[20])
+    preparestate!(mpc_wu, [50], [30])
+    u = moveinput!(mpc_wu, [0], [30])
+    @test all(isapprox.(getinfo(mpc_wu)[:U], 4; atol=1e-1))
+    u = moveinput!(mpc_wu, [100], [30])
+    @test all(isapprox.(getinfo(mpc_wu)[:U], 20; atol=1e-1))
+    mpc_wd = LinMPC(model2, Nwt=[0], Cwt=Inf, Hp=50, Hc=50, Wd=[1], Wy=[1])
+    mpc_wd = setconstraint!(mpc_wd, wmin=[56], wmax=[95])
+    preparestate!(mpc_wd, [50], [30])
+    u = moveinput!(mpc_wd, [0], [30])
+    @test all(isapprox.(getinfo(mpc_wd)[:Ŷ], 56-30; atol=1e-1))
+    u = moveinput!(mpc_wd, [100], [30])
+    @test all(isapprox.(getinfo(mpc_wd)[:Ŷ], 95-30; atol=1e-1))
+    mpc_wr = LinMPC(model2, Nwt=[0], Cwt=Inf, Hp=50, Hc=50, Wr=[1], Wy=[1])
+    mpc_wr = setconstraint!(mpc_wr, wmin=[52], wmax=[175])
+    preparestate!(mpc_wr, [50], [30])
+    u = moveinput!(mpc_wr, [21], [30])
+    @test all(isapprox.(getinfo(mpc_wr)[:Ŷ], 52-21; atol=1e-1))    
+    u = moveinput!(mpc_wr, [100], [30])
+    @test all(isapprox.(getinfo(mpc_wr)[:Ŷ], 175-100; atol=1e-1))
 end
 
 @testitem "LinMPC terminal cost" setup=[SetupMPCtests] begin
@@ -660,7 +765,57 @@ end
     @test mpc.weights.L_Hp ≈ diagm(1.1:1000.1)
 end
 
-@testitem "NonLinMPC construction" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC construction (LinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    linmodel1 = LinModel(sys,Ts,i_d=[3])
+    nmpc0 = NonLinMPC(linmodel1, Hp=15)
+    @test isa(nmpc0.estim, SteadyKalmanFilter)
+    nmpc3 = NonLinMPC(linmodel1, Hp=15, Hc=4, Cwt=1e4)
+    @test size(nmpc3.Ẽ, 2) == 4*linmodel1.nu + 1
+    @test nmpc3.weights.Ñ_Hc[end] == 1e4
+    nmpc4 = NonLinMPC(linmodel1, Hp=15, Mwt=[1,2])
+    @test nmpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
+    @test nmpc4.weights.M_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
+    nmpc5 = NonLinMPC(linmodel1, Hp=15 ,Nwt=[3,4], Cwt=1e3, Hc=5)
+    @test nmpc5.weights.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
+    @test nmpc5.weights.Ñ_Hc isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
+    nmpc6 = NonLinMPC(linmodel1, Hp=15, Lwt=[0,1])
+    @test nmpc6.weights.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
+    @test nmpc6.weights.L_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
+    nmpc7 = NonLinMPC(linmodel1, Hp=15, Ewt=1e-3, JE=(Ue,Ŷe,D̂e,p) -> p*dot(Ue,Ŷe)+sum(D̂e), p=10)
+    @test nmpc7.weights.E == 1e-3
+    @test nmpc7.JE([1,2],[3,4],[4,6],10) == 10*dot([1,2],[3,4])+sum([4,6])
+    nmpc10 = NonLinMPC(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
+    @test nmpc10.estim.nint_u  == [1, 1]
+    @test nmpc10.estim.nint_ym == [0, 0]
+    nmpc12 = NonLinMPC(linmodel1, Hp=10, M_Hp=Hermitian(diagm(1.01:0.01:1.2), :L))
+    @test nmpc12.weights.M_Hp ≈ diagm(1.01:0.01:1.2)
+    @test nmpc12.weights.M_Hp isa Hermitian{Float64, Matrix{Float64}}
+    nmpc13 = NonLinMPC(linmodel1, Hp=10, N_Hc=Hermitian(diagm([0.1,0.11,0.12,0.13]), :L), Cwt=Inf)
+    @test nmpc13.weights.Ñ_Hc ≈ diagm([0.1,0.11,0.12,0.13])
+    @test nmpc13.weights.Ñ_Hc isa Hermitian{Float64, Matrix{Float64}}
+    nmcp14 = NonLinMPC(linmodel1, Hp=10, L_Hp=Hermitian(diagm(0.001:0.001:0.02), :L))
+    @test nmcp14.weights.L_Hp ≈ diagm(0.001:0.001:0.02)
+    @test nmcp14.weights.L_Hp isa Hermitian{Float64, Matrix{Float64}}
+    nmpc15 = NonLinMPC(linmodel1, Hp=10, gc=(Ue,Ŷe,D̂e,p,ϵ)-> [p*dot(Ue,Ŷe)+sum(D̂e)+ϵ], nc=1, p=10)
+    LHS = zeros(1)
+    nmpc15.con.gc!(LHS,[1,2],[3,4],[4,6],10,0.1) 
+    @test LHS ≈ [10*dot([1,2],[3,4])+sum([4,6])+0.1]
+    nmpc17 = NonLinMPC(linmodel1, Hp=10, transcription=MultipleShooting())
+    @test nmpc17.transcription == MultipleShooting()
+    @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
+    @test size(nmpc17.con.Aeq, 1) == nmpc17.estim.nx̂*nmpc17.Hp
+    
+    @test_throws DimensionMismatch NonLinMPC(linmodel1, Hp=15, Ewt=[1, 1])
+    @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, JE  = (_,_,_)->0.0)
+    @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
+    @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
+
+    @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, JE=(Ue,_,_,_)->Ue)
+    @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
+end
+
+@testitem "NonLinMPC construction (NonLinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using JuMP, Ipopt, DifferentiationInterface
     import FiniteDiff
@@ -670,26 +825,12 @@ end
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, p=linmodel1, solver=nothing)
+
     nmpc1 = NonLinMPC(nonlinmodel, Hp=15)
     @test isa(nmpc1.estim, UnscentedKalmanFilter)
     @test size(nmpc1.R̂y, 1) == 15*nmpc1.estim.model.ny
     nmpc2 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=Inf)
     @test size(nmpc2.Ẽ, 2) == 4*nonlinmodel.nu
-    nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Hc=4, Cwt=1e6)
-    @test size(nmpc3.Ẽ, 2) == 4*nonlinmodel.nu + 1
-    @test nmpc3.weights.Ñ_Hc[end] == 1e6
-    nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[1,2])
-    @test nmpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
-    @test nmpc4.weights.M_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
-    nmpc5 = NonLinMPC(nonlinmodel, Hp=15 ,Nwt=[3,4], Cwt=1e3, Hc=5)
-    @test nmpc5.weights.Ñ_Hc ≈ Diagonal(diagm([repeat(Float64[3, 4], 5); [1e3]]))
-    @test nmpc5.weights.Ñ_Hc isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
-    nmpc6 = NonLinMPC(nonlinmodel, Hp=15, Lwt=[0,1])
-    @test nmpc6.weights.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
-    @test nmpc6.weights.L_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
-    nmpc7 = NonLinMPC(nonlinmodel, Hp=15, Ewt=1e-3, JE=(Ue,Ŷe,D̂e,p) -> p*dot(Ue,Ŷe)+sum(D̂e), p=10)
-    @test nmpc7.weights.E == 1e-3
-    @test nmpc7.JE([1,2],[3,4],[4,6],10) == 10*dot([1,2],[3,4])+sum([4,6])
     optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "nlp_scaling_max_gradient"=>1.0))
     nmpc8 = NonLinMPC(nonlinmodel, Hp=15, optim=optim)
     @test solver_name(nmpc8.optim) == "Ipopt"
@@ -697,25 +838,9 @@ end
     im = InternalModel(nonlinmodel)
     nmpc9 = NonLinMPC(im, Hp=15)
     @test isa(nmpc9.estim, InternalModel)
-    nmpc10 = NonLinMPC(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
-    @test nmpc10.estim.nint_u  == [1, 1]
-    @test nmpc10.estim.nint_ym == [0, 0]
     nmpc11 = NonLinMPC(nonlinmodel, Hp=15, nint_u=[1, 1], nint_ym=[0, 0])
     @test nmpc11.estim.nint_u  == [1, 1]
     @test nmpc11.estim.nint_ym == [0, 0]
-    nmpc12 = NonLinMPC(nonlinmodel, Hp=10, M_Hp=Hermitian(diagm(1.01:0.01:1.2), :L))
-    @test nmpc12.weights.M_Hp ≈ diagm(1.01:0.01:1.2)
-    @test nmpc12.weights.M_Hp isa Hermitian{Float64, Matrix{Float64}}
-    nmpc13 = NonLinMPC(nonlinmodel, Hp=10, N_Hc=Hermitian(diagm([0.1,0.11,0.12,0.13]), :L), Cwt=Inf)
-    @test nmpc13.weights.Ñ_Hc ≈ diagm([0.1,0.11,0.12,0.13])
-    @test nmpc13.weights.Ñ_Hc isa Hermitian{Float64, Matrix{Float64}}
-    nmcp14 = NonLinMPC(nonlinmodel, Hp=10, L_Hp=Hermitian(diagm(0.001:0.001:0.02), :L))
-    @test nmcp14.weights.L_Hp ≈ diagm(0.001:0.001:0.02)
-    @test nmcp14.weights.L_Hp isa Hermitian{Float64, Matrix{Float64}}
-    nmpc15 = NonLinMPC(nonlinmodel, Hp=10, gc=(Ue,Ŷe,D̂e,p,ϵ)-> [p*dot(Ue,Ŷe)+sum(D̂e)+ϵ], nc=1, p=10)
-    LHS = zeros(1)
-    nmpc15.con.gc!(LHS,[1,2],[3,4],[4,6],10,0.1) 
-    @test LHS ≈ [10*dot([1,2],[3,4])+sum([4,6])+0.1]
     gc! = (LHS,_,_,_,_,_)-> (LHS .= 0.0) # useless, only for coverage
     nmpc16 = NonLinMPC(nonlinmodel, Hp=10, transcription=MultipleShooting(), nc=10, gc=gc!)
     @test nmpc16.transcription == MultipleShooting()
@@ -728,10 +853,6 @@ end
     @test length(nmpc16.Z̃) == nonlinmodel_c.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
     @test nmpc16.con.neq == nmpc16.estim.nx̂*nmpc16.Hp
     @test nmpc16.con.nc == 10
-    nmpc17 = NonLinMPC(linmodel1, Hp=10, transcription=MultipleShooting())
-    @test nmpc17.transcription == MultipleShooting()
-    @test length(nmpc17.Z̃) == linmodel1.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
-    @test size(nmpc17.con.Aeq, 1) == nmpc17.estim.nx̂*nmpc17.Hp
     nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
         gradient=AutoFiniteDiff(), 
         jacobian=AutoFiniteDiff(),
@@ -753,24 +874,19 @@ end
     @test isa(nmpc15.estim, UnscentedKalmanFilter{Float32})
     @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
 
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=15, Ewt=[1, 1])
     @test_throws ArgumentError NonLinMPC(nonlinmodel)
-    @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, JE  = (_,_,_)->0.0)
-    @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
-    @test_throws ErrorException NonLinMPC(nonlinmodel, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
     @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation())
     @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation(2))
     @test_throws ErrorException NonLinMPC(linmodel1, oracle=false, hessian=AutoFiniteDiff())
-
-    @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, JE=(Ue,_,_,_)->Ue)
-    @test_logs (:warn, Regex(".*")) NonLinMPC(nonlinmodel, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Wy=[1 0;0 1])
 end
 
-@testitem "NonLinMPC moves and getinfo" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves and getinfo (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
+    
     Hp = 100
     nmpc_lin = NonLinMPC(linmodel, Nwt=[0], Hp=Hp, Hc=1)
     ry, ru = [15], [4]
@@ -792,6 +908,7 @@ end
     end
     R̂y, R̂u = fill(ry[1], Hp), fill(ru[1], Hp)
     p = [1, R̂y, 0, R̂u]
+    
     nmpc = NonLinMPC(linmodel, Mwt=[0], Nwt=[0], Cwt=Inf, Ewt=1, JE=JE, p=p, Hp=Hp, Hc=1)
     preparestate!(nmpc, [10])
     u = moveinput!(nmpc)
@@ -801,10 +918,42 @@ end
     nmpc.p .= [0, R̂y, 1, R̂u]
     u = moveinput!(nmpc)
     @test u ≈ [4] atol=5e-2
+    
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
+    nmpc6  = NonLinMPC(linmodel3, Hp=10)
+    preparestate!(nmpc6, [0])
+    @test moveinput!(nmpc6, [0]) ≈ [0.0] atol=5e-2
+    
+    nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
+    preparestate!(nmpc9, [10])
+    u = moveinput!(nmpc9, [20])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc9)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 20 atol=5e-2
+    
+    # coverage of the branch with error termination status (with an infeasible problem):
+    nmpc_infeas = NonLinMPC(linmodel, Hp=1, Hc=1, Cwt=Inf)
+    nmpc_infeas = setconstraint!(nmpc_infeas, umin=[+1], umax=[-1])
+    preparestate!(nmpc_infeas, [0])
+    @test_logs(
+        (:error, "MPC terminated without solution: returning last solution shifted "*
+                 "(more info in debug log)"), 
+        moveinput!(nmpc_infeas, [0])
+    )
+
+    @test_nowarn ModelPredictiveControl.info2debugstr(info)
+end
+
+@testitem "NonLinMPC moves and getinfo (NonLinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
     linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+    
     nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1)
     preparestate!(nmpc2, [0], [0])
     # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
@@ -816,40 +965,43 @@ end
     info = getinfo(nmpc2)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 7d[1] atol=5e-2
+    
     nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=100, Hc=1)
     preparestate!(nmpc3, [0], [0])
     u = moveinput!(nmpc3, 7d, d)
     @test u ≈ [0] atol=5e-2
+    
     nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[0], Nwt=[0], Lwt=[1])
     preparestate!(nmpc4, [0], [0])
     u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
     @test u ≈ [12] atol=5e-2
+    
     nmpc5 = NonLinMPC(nonlinmodel, Hp=1, Hc=1, Cwt=Inf, transcription=MultipleShooting())
     nmpc5 = setconstraint!(nmpc5, ymin=[1])
     f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
     h! = (y,x,_,_) -> y .= x 
     nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
     transcription = TrapezoidalCollocation(0, f_threads=true, h_threads=true)
+    
     nmpc5 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc5, [0.0])
     u = moveinput!(nmpc5, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
-    transcription = TrapezoidalCollocation(1)
+
+    transcription = TrapezoidalCollocation(1)    
     nmpc5_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc5_1, [0.0])
     u = moveinput!(nmpc5_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
-    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), 0, 0, 3000.0)
-    nmpc6  = NonLinMPC(linmodel3, Hp=10)
-    preparestate!(nmpc6, [0])
-    @test moveinput!(nmpc6, [0]) ≈ [0.0] atol=5e-2
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+    
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
     ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0], nonlinmodel2.p)
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0] atol=5e-2
     transcription = MultipleShooting()
+    
     nmpc8 = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc8, [0], [0])
     u = moveinput!(nmpc8, [10], [0])
@@ -857,6 +1009,7 @@ end
     info = getinfo(nmpc8)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    
     transcription = MultipleShooting(f_threads=true, h_threads=true)
     nmpc8t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription, hessian=true)
     nmpc8t = setconstraint!(nmpc8t, ymax=[100], ymin=[-100]) # coverage of getinfo! Hessians of Lagrangian
@@ -866,13 +1019,7 @@ end
     info = getinfo(nmpc8t)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
-    nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
-    preparestate!(nmpc9, [10])
-    u = moveinput!(nmpc9, [20])
-    @test u ≈ [2] atol=5e-2
-    info = getinfo(nmpc9)
-    @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 20 atol=5e-2
+
     nmpc10 = setconstraint!(NonLinMPC(
         nonlinmodel, Nwt=[0], Hp=100, Hc=1, 
         gradient=AutoFiniteDiff(),
@@ -886,24 +1033,12 @@ end
     info = getinfo(nmpc10)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    
     nmpc11 = NonLinMPC(nonlinmodel, Hp=10, Hc=[1, 2, 3, 4], Nwt=[10])
     preparestate!(nmpc11, y, [0])
     moveinput!(nmpc11, [10], [0])
     ΔU_diff = diff(getinfo(nmpc11)[:U])
     @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
-
-    # coverage of the branch with error termination status (with an infeasible problem):
-    nmpc_infeas = NonLinMPC(nonlinmodel, Hp=1, Hc=1, Cwt=Inf)
-    nmpc_infeas = setconstraint!(nmpc_infeas, umin=[+1], umax=[-1])
-    preparestate!(nmpc_infeas, [0], [0])
-    @test_logs(
-        (:error, "MPC terminated without solution: returning last solution shifted "*
-                 "(more info in debug log)"), 
-        moveinput!(nmpc_infeas, [0], [0])
-    )
-
-
-    @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
 @testitem "NonLinMPC step disturbance rejection" setup=[SetupMPCtests] begin
@@ -961,8 +1096,8 @@ end
 @testitem "NonLinMPC and ManualEstimator v.s. default" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = LinModel(tf(5, [200, 1]), 300.0)
-    f(x,u,_,p) = p.A*x + p.Bu*u
-    h(x,_,p)   = p.C*x
+    f = (x,u,_,p) -> p.A*x + p.Bu*u
+    h = (x,_,p)   -> p.C*x
     model = setop!(NonLinModel(f, h, 300.0, 1, 1, 1; solver=nothing, p=linmodel), yop=[10])
     r = [15]
     outdist = [5]
@@ -1013,19 +1148,20 @@ end
     nmpc_lin = NonLinMPC(linmodel1, Hp=1, Hc=1)
 
     setconstraint!(nmpc_lin, ymin=[5,10],ymax=[55, 35])
-    @test all((nmpc_lin.con.Y0min, nmpc_lin.con.Y0max) .≈ ([5,10], [55,35]))
+    @test nmpc_lin.con.Y0min ≈ [5,10]
+    @test nmpc_lin.con.Y0max ≈ [55,35]
     setconstraint!(nmpc_lin, c_ymin=[1.0,1.1], c_ymax=[1.2,1.3])
-    @test all((-nmpc_lin.con.A_Ymin[:, end], -nmpc_lin.con.A_Ymax[:, end]) .≈ 
-            ([1.0,1.1], [1.2,1.3]))
+    @test -nmpc_lin.con.A_Ymin[:, end] ≈ [1.0,1.1]
+    @test -nmpc_lin.con.A_Ymax[:, end] ≈ [1.2,1.3]
     setconstraint!(nmpc_lin, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((nmpc_lin.con.x̂0min, nmpc_lin.con.x̂0max) .≈ 
-            ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test nmpc_lin.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
+    @test nmpc_lin.con.x̂0max ≈ [21,22,23,24,25,26]
     setconstraint!(nmpc_lin, 
         c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], 
         c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36]
     )
-    @test all((-nmpc_lin.con.A_x̂min[:, end], -nmpc_lin.con.A_x̂max[:, end]) .≈ 
-            ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
+    @test -nmpc_lin.con.A_x̂min[:, end] ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
+    @test -nmpc_lin.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
 
     f = (x,u,d,_) -> linmodel1.A*x + linmodel1.Bu*u + linmodel1.Bd*d
     h = (x,d,_)   -> linmodel1.C*x + linmodel1.Dd*d
@@ -1033,30 +1169,35 @@ end
     nmpc = NonLinMPC(nonlinmodel, Hp=1, Hc=1)
 
     setconstraint!(nmpc, umin=[-5, -9.9], umax=[100,99])
-    @test all((nmpc.con.U0min, nmpc.con.U0max) .≈ ([-5, -9.9], [100,99]))
+    @test nmpc.con.U0min ≈ [-5, -9.9]
+    @test nmpc.con.U0max ≈ [100,99]
     setconstraint!(nmpc, Δumin=[-5,-10], Δumax=[6,11])
-    @test all((nmpc.con.ΔŨmin, nmpc.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
+    @test nmpc.con.ΔŨmin ≈ [-5,-10,0]
+    @test nmpc.con.ΔŨmax ≈ [6,11,Inf]
     setconstraint!(nmpc, ymin=[-6, -11],ymax=[55, 35])
-    @test all((nmpc.con.Y0min, nmpc.con.Y0max) .≈ ([-6,-11], [55,35]))
+    @test nmpc.con.Y0min ≈ [-6,-11]
+    @test nmpc.con.Y0max ≈ [55,35]
     setconstraint!(nmpc, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((nmpc.con.x̂0min, nmpc.con.x̂0max) .≈ 
-            ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test nmpc.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
+    @test nmpc.con.x̂0max ≈ [21,22,23,24,25,26]
 
     setconstraint!(nmpc, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
-    @test all((-nmpc.con.A_Umin[:, end], -nmpc.con.A_Umax[:, end]) .≈ 
-            ([0.01,0.02], [0.03,0.04]))
+    @test -nmpc.con.A_Umin[:, end] ≈ [0.01,0.02]
+    @test -nmpc.con.A_Umax[:, end] ≈ [0.03,0.04]
     setconstraint!(nmpc, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
-    @test all((-nmpc.con.A_ΔŨmin[1:end-1, end], -nmpc.con.A_ΔŨmax[1:end-1, end]) .≈ 
-            ([0.05,0.06], [0.07,0.08]))
+    @test -nmpc.con.A_ΔŨmin[1:end-1, end] ≈ [0.05,0.06]
+    @test -nmpc.con.A_ΔŨmax[1:end-1, end] ≈ [0.07,0.08]
     setconstraint!(nmpc, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
-    @test all((-nmpc.con.A_Ymin, -nmpc.con.A_Ymax) .≈ (zeros(0,3), zeros(0,3)))
-    @test all((nmpc.con.C_ymin, nmpc.con.C_ymax) .≈ ([1.00,1.01], [1.02,1.03]))
+    @test -nmpc.con.A_Ymin ≈ zeros(0,3)
+    @test -nmpc.con.A_Ymax ≈ zeros(0,3)
+    @test nmpc.con.C_ymin ≈ [1.00,1.01]
+    @test nmpc.con.C_ymax ≈ [1.02,1.03]
     setconstraint!(nmpc, 
         c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], 
         c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36]
     )
-    @test all((nmpc.con.c_x̂min, nmpc.con.c_x̂max) .≈ 
-            ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
+    @test nmpc.con.c_x̂min ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
+    @test nmpc.con.c_x̂max ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
 
     # TODO: delete these tests when the deprecated legacy splatting syntax will be.
     gc_leg! =  (LHS,_,_,_,_,_) -> (LHS[begin] = -1)
@@ -1075,54 +1216,62 @@ end
     nmpc_leg = NonLinMPC(nonlinmodel, Hp=1, Hc=1, oracle=false)
 
     setconstraint!(nmpc_leg, umin=[-5, -9.9], umax=[100,99])
-    @test all((nmpc_leg.con.U0min, nmpc_leg.con.U0max) .≈ ([-5, -9.9], [100,99]))
+    @test nmpc_leg.con.U0min ≈ [-5, -9.9]
+    @test nmpc_leg.con.U0max ≈ [100,99]
     setconstraint!(nmpc_leg, Δumin=[-5,-10], Δumax=[6,11])
-    @test all((nmpc_leg.con.ΔŨmin, nmpc_leg.con.ΔŨmax) .≈ ([-5,-10,0], [6,11,Inf]))
+    @test nmpc_leg.con.ΔŨmin ≈ [-5,-10,0]
+    @test nmpc_leg.con.ΔŨmax ≈ [6,11,Inf]
     setconstraint!(nmpc_leg, ymin=[-6, -11],ymax=[55, 35])
-    @test all((nmpc_leg.con.Y0min, nmpc_leg.con.Y0max) .≈ ([-6,-11], [55,35]))
+    @test nmpc_leg.con.Y0min ≈ [-6,-11]
+    @test nmpc_leg.con.Y0max ≈ [55,35]
     setconstraint!(nmpc_leg, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((nmpc_leg.con.x̂0min, nmpc_leg.con.x̂0max) .≈ 
-            ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test nmpc_leg.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
+    @test nmpc_leg.con.x̂0max ≈ [21,22,23,24,25,26]
 
     setconstraint!(nmpc_leg, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
-    @test all((-nmpc_leg.con.A_Umin[:, end], -nmpc_leg.con.A_Umax[:, end]) .≈ 
-            ([0.01,0.02], [0.03,0.04]))
+    @test -nmpc_leg.con.A_Umin[:, end] ≈ [0.01,0.02]
+    @test -nmpc_leg.con.A_Umax[:, end] ≈ [0.03,0.04]
     setconstraint!(nmpc_leg, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
-    @test all((-nmpc_leg.con.A_ΔŨmin[1:end-1, end], -nmpc_leg.con.A_ΔŨmax[1:end-1, end]) .≈ 
-            ([0.05,0.06], [0.07,0.08]))
+    @test -nmpc_leg.con.A_ΔŨmin[1:end-1, end] ≈ [0.05,0.06]
+    @test -nmpc_leg.con.A_ΔŨmax[1:end-1, end] ≈ [0.07,0.08]
     setconstraint!(nmpc_leg, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
-    @test all((-nmpc_leg.con.A_Ymin, -nmpc_leg.con.A_Ymax) .≈ (zeros(0,3), zeros(0,3)))
-    @test all((nmpc_leg.con.C_ymin, nmpc_leg.con.C_ymax) .≈ ([1.00,1.01], [1.02,1.03]))
+    @test -nmpc_leg.con.A_Ymin ≈ zeros(0,3)
+    @test -nmpc_leg.con.A_Ymax ≈ zeros(0,3)
+    @test nmpc_leg.con.C_ymin ≈ [1.00,1.01]
+    @test nmpc_leg.con.C_ymax ≈ [1.02,1.03]
     setconstraint!(nmpc_leg, 
         c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], 
         c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36]
     )
-    @test all((nmpc_leg.con.c_x̂min, nmpc_leg.con.c_x̂max) .≈ 
-            ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
+    @test nmpc_leg.con.c_x̂min ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
+    @test nmpc_leg.con.c_x̂max ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
     
     nmpc_ms = NonLinMPC(nonlinmodel, Hp=1, Hc=1, transcription=MultipleShooting())
     
     setconstraint!(nmpc_ms, ymin=[-6, -11],ymax=[55, 35])
-    @test all((nmpc_ms.con.Y0min, nmpc_ms.con.Y0max) .≈ ([-6,-11], [55,35]))
+    @test nmpc_ms.con.Y0min ≈ [-6,-11]
+    @test nmpc_ms.con.Y0max ≈ [55,35]
     setconstraint!(nmpc_ms, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test all((nmpc_ms.con.x̂0min, nmpc_ms.con.x̂0max) .≈ 
-            ([-21,-22,-23,-24,-25,-26], [21,22,23,24,25,26]))
+    @test nmpc_ms.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
+    @test nmpc_ms.con.x̂0max ≈ [21,22,23,24,25,26]
 
     setconstraint!(nmpc_ms, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
-    @test all((-nmpc_ms.con.A_Ymin, -nmpc_ms.con.A_Ymax) .≈ (zeros(0,9), zeros(0,9)))
-    @test all((nmpc_ms.con.C_ymin, nmpc_ms.con.C_ymax) .≈ ([1.00,1.01], [1.02,1.03]))
+    @test -nmpc_ms.con.A_Ymin ≈ zeros(0,9)
+    @test -nmpc_ms.con.A_Ymax ≈ zeros(0,9)
+    @test nmpc_ms.con.C_ymin ≈ [1.00,1.01]
+    @test nmpc_ms.con.C_ymax ≈ [1.02,1.03]
     setconstraint!(nmpc_ms, 
         c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], 
         c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36]
     )
-    @test all((-nmpc_lin.con.A_x̂min[:, end], -nmpc_lin.con.A_x̂max[:, end]) .≈ 
-            ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
-    @test all((nmpc_ms.con.c_x̂min, nmpc_ms.con.c_x̂max) .≈ 
-            ([0.21,0.22,0.23,0.24,0.25,0.26], [0.31,0.32,0.33,0.34,0.35,0.36]))
+    @test -nmpc_lin.con.A_x̂min[:, end] ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
+    @test -nmpc_lin.con.A_x̂max[:, end] ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
+    @test nmpc_ms.con.c_x̂min ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
+    @test nmpc_ms.con.c_x̂max ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
 
 end
 
-@testitem "NonLinMPC constraint violation" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC constraint violation (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP
     gc(Ue, Ŷe, _ ,p , ϵ) = [p[1]*(Ue[1:end-1] .- 4.2 .- ϵ); p[2]*(Ŷe[2:end] .- 3.14 .- ϵ)]
     Hp=50
@@ -1195,7 +1344,14 @@ end
     info = getinfo(nmpc_lin)
     @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
     @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
+end
 
+@testitem "NonLinMPC constraint violation (NonLinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP
+    gc(Ue, Ŷe, _ ,p , ϵ) = [p[1]*(Ue[1:end-1] .- 4.2 .- ϵ); p[2]*(Ŷe[2:end] .- 3.14 .- ϵ)]
+    Hp=50
+
+    linmodel = LinModel(tf([2], [10000, 1]), 3000.0)
     f = (x,u,_,p) -> p.A*x + p.Bu*u
     h = (x,_,p)   -> p.C*x
     nonlinmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, solver=nothing, p=linmodel)
@@ -1375,6 +1531,27 @@ end
     info = getinfo(nmpc_ms)
     @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
     @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
+
+    linmodel2 = LinModel([tf([2], [2500, 1]) tf(0.1, [2000, 1])], 3000.0, i_d=[2])
+    f = (x,u,d,p) -> p.A*x + p.Bu*u + p.Bd*d
+    h = (x,d,p)   -> p.C*x + p.Dd*d
+    nonlinmodel2 = NonLinModel(f, h, linmodel2.Ts, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+    nonlinmodel2 = setop!(nonlinmodel2, uop=[25], dop=[30], yop=[50])
+    nmpc_wu = NonLinMPC(nonlinmodel2, Nwt=[0], Cwt=Inf, Hp=100, Hc=1, Wu=[1])
+    nmpc_wu = setconstraint!(nmpc_wu, wmax=[20])
+    preparestate!(nmpc_wu, [50], [30])
+    u = moveinput!(nmpc_wu, [100], [30])
+    @test all(isapprox.(getinfo(nmpc_wu)[:U], 20.0; atol=1e-1))
+    nmpc_wd = NonLinMPC(nonlinmodel2, Nwt=[0], Cwt=Inf, Hp=100, Hc=1, Wu=[1], Wd=[1])
+    nmpc_wd = setconstraint!(nmpc_wd, wmax=[45])
+    preparestate!(nmpc_wd, [50], [30])
+    u = moveinput!(nmpc_wd, [100], [30])
+    @test all(isapprox.(getinfo(nmpc_wd)[:U], 45-30; atol=1e-1))
+    nmpc_wr = NonLinMPC(nonlinmodel2, Nwt=[0], Cwt=Inf, Hp=100, Hc=1, Wu=[1], Wr=[1])
+    nmpc_wr = setconstraint!(nmpc_wr, wmax=[145])
+    preparestate!(nmpc_wr, [50], [30])
+    u = moveinput!(nmpc_wr, [100], [30])
+    @test all(isapprox.(getinfo(nmpc_wr)[:U], 145-100; atol=1e-1))
 
 end
 

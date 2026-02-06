@@ -72,7 +72,7 @@ function moveinput!(
         @warn "preparestate! should be called before moveinput! with current estimators"
     end
     validate_args(mpc, ry, d, lastu, D̂, R̂y, R̂u)
-    initpred!(mpc, mpc.estim.model, d, lastu, D̂, R̂y, R̂u)
+    initpred!(mpc, mpc.estim.model, ry, d, lastu, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model, mpc.transcription)
     linconstrainteq!(mpc, mpc.estim.model, mpc.transcription)
     Z̃ = optim_objective!(mpc)
@@ -202,7 +202,7 @@ function addinfo!(info, mpc::PredictiveController)
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::LinModel, d, lastu, D̂, R̂y, R̂u) -> nothing
+    initpred!(mpc::PredictiveController, model::LinModel, ry, d, lastu, D̂, R̂y, R̂u) -> nothing
 
 Init linear model prediction matrices `F, q̃, r` and current estimated output `ŷ`.
 
@@ -221,8 +221,8 @@ They are computed with these equations using in-place operations:
 \end{aligned}
 ```
 """
-function initpred!(mpc::PredictiveController, model::LinModel, d, lastu, D̂, R̂y, R̂u)
-    F   = initpred_common!(mpc, model, d, lastu, D̂, R̂y, R̂u)
+function initpred!(mpc::PredictiveController, model::LinModel, ry, d, lastu, D̂, R̂y, R̂u)
+    F   = initpred_common!(mpc, model, ry, d, lastu, D̂, R̂y, R̂u)
     F .+= mpc.B                                 # F = F + B
     mul!(F, mpc.K, mpc.estim.x̂0, 1, 1)          # F = F + K*x̂0
     mul!(F, mpc.V, mpc.lastu0, 1, 1)            # F = F + V*lastu0
@@ -254,24 +254,26 @@ function initpred!(mpc::PredictiveController, model::LinModel, d, lastu, D̂, R�
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::SimModel, d, lastu, D̂, R̂y, R̂u)
+    initpred!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u) -> nothing
 
 Init `lastu0, ŷ, F, d0, D̂0, D̂e, R̂y, R̂u` vectors when model is not a [`LinModel`](@ref).
 """
-function initpred!(mpc::PredictiveController, model::SimModel, d, lastu, D̂, R̂y, R̂u)
-    F = initpred_common!(mpc, model, d, lastu, D̂, R̂y, R̂u)
+function initpred!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u)
+    initpred_common!(mpc, model, ry, d, lastu, D̂, R̂y, R̂u)
     return nothing
 end
 
 """
-    initpred_common!(mpc::PredictiveController, model::SimModel, d, lastu, D̂, R̂y, R̂u) -> F
+    initpred_common!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u) -> F
 
 Common computations of `initpred!` for all types of [`SimModel`](@ref).
 
 Will also init `mpc.F` with 0 values, or with the stochastic predictions `Ŷs` if `mpc.estim`
 is an [`InternalModel`](@ref). The function returns `mpc.F`.
 """
-function initpred_common!(mpc::PredictiveController, model::SimModel, d, lastu, D̂, R̂y, R̂u)
+function initpred_common!(
+    mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u
+)
     mpc.lastu0 .= lastu .- model.uop
     mul!(mpc.Tu_lastu0, mpc.Tu, mpc.lastu0)
     mpc.ŷ .= evaloutput(mpc.estim, d)
@@ -281,6 +283,7 @@ function initpred_common!(mpc::PredictiveController, model::SimModel, d, lastu, 
         mpc.D̂e[1:model.nd]     .= d
         mpc.D̂e[model.nd+1:end] .= D̂
     end
+    mpc.ry .= ry
     mpc.R̂y .= R̂y
     mpc.R̂u .= R̂u
     predictstoch!(mpc.F, mpc, mpc.estim)
@@ -299,6 +302,45 @@ function predictstoch!(Ŷs, mpc::PredictiveController, estim::InternalModel)
 end
 "Fill `Ŷs` vector with 0 values when `estim` is not an [`InternalModel`](@ref)."
 predictstoch!(Ŷs, mpc::PredictiveController, ::StateEstimator) = (Ŷs .= 0; nothing)
+
+@doc raw"""
+    linconstraint_custom!(mpc::PredictiveController, model::SimModel)
+
+Init the ``\mathbf{F_w}`` vector for the custom linear inequality constraints.
+
+See [`relaxW`](@ref) for the definition of the vector. The function does nothing if
+`mpc.con.nw < 1`.
+"""
+function linconstraint_custom!(mpc::PredictiveController, model::SimModel)
+    mpc.con.nw < 1 && return nothing
+    ny, nu, nd, buffer = model.ny, model.nu, model.nd, mpc.buffer
+    Fw = mpc.con.Fw
+    Ue_term, D̂e_term, R̂e_term = buffer.Ue, buffer.D̂e, buffer.Ŷe
+    Fw .= 0
+    Ue_term[1:end-nu]     .= mpc.Tu_lastu0 .+ mpc.Uop
+    Ue_term[end-nu+1:end] .= mpc.lastu0    .+ model.uop
+    mul!(Fw, mpc.con.W̄u, Ue_term, 1, 1)
+    if model.nd > 0
+        D̂e_term[1:nd]     .= mpc.d0 .+ model.dop
+        D̂e_term[nd+1:end] .= mpc.D̂0 .+ mpc.Dop
+        mul!(Fw, mpc.con.W̄d, D̂e_term, 1, 1)
+    end
+    R̂e_term[1:ny]     .= mpc.ry
+    R̂e_term[ny+1:end] .= mpc.R̂y
+    mul!(Fw, mpc.con.W̄r, R̂e_term, 1, 1)
+    return linconstraint_custom_outputs!(mpc, model)
+end
+
+"Also include the `W̄y` term in the custom linear constraints for [`LinModel`](@ref)."
+function linconstraint_custom_outputs!(mpc::PredictiveController, model::LinModel)
+    Ŷe_term, Fw, ny = mpc.buffer.Ŷe, mpc.con.Fw, model.ny
+    Ŷe_term[1:ny]     .= mpc.ŷ
+    Ŷe_term[ny+1:end] .= mpc.F .+ mpc.Yop
+    mul!(Fw, mpc.con.W̄y, Ŷe_term, 1, 1)
+    return nothing
+end
+"Do nothing for other model types."
+linconstraint_custom_outputs!(::PredictiveController, ::SimModel) = nothing
 
 """
     extended_vectors!(Ue, Ŷe, mpc::PredictiveController, U0, Ŷ0) -> Ue, Ŷe
@@ -626,11 +668,14 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     weights = mpc.weights
     nu, ny, nd, Hp, Hc, nb = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc, mpc.nb
     optim, con = mpc.optim, mpc.con
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    Pu = mpc.P̃u[:, 1:nZ]
     # --- prediction matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
         model, estim, transcription, Hp, Hc, nb
     )
     A_Ymin, A_Ymax, Ẽ = relaxŶ(E, con.C_ymin, con.C_ymax, mpc.nϵ)
+    A_Wmin, A_Wmax, Ẽw = relaxW(E, Pu, Hp, con.W̄y, con.W̄u, con.C_wmin, con.C_wmax, mpc.nϵ)
     A_x̂min, A_x̂max, ẽx̂ = relaxterminal(ex̂, con.c_x̂min, con.c_x̂max, mpc.nϵ)
     mpc.Ẽ .= Ẽ
     mpc.G .= G
@@ -638,6 +683,13 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     mpc.K .= K
     mpc.V .= V
     mpc.B .= B
+    # --- terminal constraints ---
+    con.ẽx̂ .= ẽx̂ 
+    con.gx̂ .= gx̂
+    con.jx̂ .= jx̂
+    con.kx̂ .= kx̂
+    con.vx̂ .= vx̂
+    con.bx̂ .= bx̂
     # --- defect matrices ---
     Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
     A_ŝ, Ẽŝ = augmentdefect(Eŝ, mpc.nϵ)
@@ -647,15 +699,13 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.Kŝ .= Kŝ
     con.Vŝ .= Vŝ
     con.Bŝ .= Bŝ
+    # --- custom linear constraints ---
+    con.Ẽw .= Ẽw
     # --- linear inequality constraints ---
-    con.ẽx̂ .= ẽx̂ 
-    con.gx̂ .= gx̂
-    con.jx̂ .= jx̂
-    con.kx̂ .= kx̂
-    con.vx̂ .= vx̂
-    con.bx̂ .= bx̂
     con.A_Ymin .= A_Ymin
     con.A_Ymax .= A_Ymax
+    con.A_Wmin .= A_Wmin
+    con.A_Wmax .= A_Wmax
     con.A_x̂min .= A_x̂min
     con.A_x̂max .= A_x̂max
     con.A .= [

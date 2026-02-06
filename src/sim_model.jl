@@ -359,11 +359,6 @@ function validate_args(model::SimModel, d, u=nothing)
     end
 end
 
-"Convert vectors to single column matrices when necessary."
-to_mat(A::AbstractVector, _ ...) = reshape(A, length(A), 1)
-to_mat(A::AbstractMatrix, _ ...) = A
-to_mat(A::Real, dims...) = fill(A, dims)
-
 include("model/linmodel.jl")
 include("model/linearization.jl")
 include("model/nonlinmodel.jl")

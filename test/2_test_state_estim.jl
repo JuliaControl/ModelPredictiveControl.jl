@@ -49,10 +49,10 @@
     @test skalmanfilter9.cov.Q̂ ≈ I(4)
     @test skalmanfilter9.cov.R̂ ≈ I(2)
 
-    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=[1,1,1])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=[-1,0])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=0, σQ=[1])
-    @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_ym=0, σR=[1,1,1])
+    @test_throws DimensionMismatch SteadyKalmanFilter(linmodel, nint_ym=[1,1,1])
+    @test_throws ArgumentError SteadyKalmanFilter(linmodel, nint_ym=[-1,0])
+    @test_throws DimensionMismatch SteadyKalmanFilter(linmodel, nint_ym=0, σQ=[1])
+    @test_throws DimensionMismatch SteadyKalmanFilter(linmodel, nint_ym=0, σR=[1,1,1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel3, nint_ym=[1, 0, 0])
     model_unobs = LinModel([1 0;0 1.5], [1; 0], [1 0], zeros(2,0), zeros(1,0), 1.0)
     @test_throws ErrorException SteadyKalmanFilter(model_unobs, nint_ym=[1])
@@ -188,7 +188,7 @@ end
     kalmanfilter8 = KalmanFilter(linmodel2)
     @test isa(kalmanfilter8, KalmanFilter{Float32})
 
-    @test_throws ErrorException KalmanFilter(linmodel, nint_ym=0, σP_0=[1])
+    @test_throws DimensionMismatch KalmanFilter(linmodel, nint_ym=0, σP_0=[1])
 end
 
 @testitem "KalmanFilter estimator methods" setup=[SetupMPCtests] begin
@@ -302,8 +302,8 @@ end
     lo6 = Luenberger(linmodel2)
     @test isa(lo6, Luenberger{Float32})
 
-    @test_throws ErrorException Luenberger(linmodel, nint_ym=[1,1,1])
-    @test_throws ErrorException Luenberger(linmodel, nint_ym=[-1,0])
+    @test_throws DimensionMismatch Luenberger(linmodel, nint_ym=[1,1,1])
+    @test_throws ArgumentError Luenberger(linmodel, nint_ym=[-1,0])
     @test_throws ErrorException Luenberger(linmodel, poles=[0.5])
     @test_throws ErrorException Luenberger(linmodel, poles=fill(1.5, lo1.nx̂))
     @test_throws ErrorException Luenberger(LinModel(tf(1,[1, 0]),0.1), poles=[0.5,0.6])
@@ -815,14 +815,10 @@ end
     @test_throws ErrorException setmodel!(ekf2, deepcopy(nonlinmodel))
 end
 
-@testitem "MovingHorizonEstimator construction" setup=[SetupMPCtests] begin
+@testitem "MovingHorizonEstimator construction (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    using JuMP, Ipopt, DifferentiationInterface
     import FiniteDiff
     linmodel = LinModel(sys,Ts,i_d=[3])
-    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
-    h(x,d,model)   = model.C*x + model.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
 
     mhe1 = MovingHorizonEstimator(linmodel, He=5)
     @test mhe1.nym == 2
@@ -831,33 +827,26 @@ end
     @test mhe1.nx̂ == 6
     @test size(mhe1.Ẽ, 2) == 6*mhe1.nx̂
 
-    mhe2 = MovingHorizonEstimator(nonlinmodel, He=5)
-    @test mhe2.nym == 2
-    @test mhe2.nyu == 0
-    @test mhe2.nxs == 2
-    @test mhe2.nx̂ == 6
-    @test size(mhe1.Ẽ, 2) == 6*mhe1.nx̂
-
-    mhe3 = MovingHorizonEstimator(nonlinmodel, He=5, i_ym=[2])
+    mhe3 = MovingHorizonEstimator(linmodel, He=5, i_ym=[2])
     @test mhe3.nym == 1
     @test mhe3.nyu == 1
     @test mhe3.nxs == 1
     @test mhe3.nx̂ == 5
 
-    mhe4 = MovingHorizonEstimator(nonlinmodel, He=5, σQ=[1,2,3,4], σQint_ym=[5, 6], σR=[7, 8])
+    mhe4 = MovingHorizonEstimator(linmodel, He=5, σQ=[1,2,3,4], σQint_ym=[5, 6], σR=[7, 8])
     @test mhe4.cov.Q̂ ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test mhe4.cov.R̂ ≈ Hermitian(diagm(Float64[49, 64]))
     
-    mhe5 = MovingHorizonEstimator(nonlinmodel, He=5, nint_ym=[2,2])
+    mhe5 = MovingHorizonEstimator(linmodel, He=5, nint_ym=[2,2])
     @test mhe5.nxs == 4
     @test mhe5.nx̂ == 8
 
-    mhe6 = MovingHorizonEstimator(nonlinmodel, He=5, σP_0=[1,2,3,4], σPint_ym_0=[5,6])
+    mhe6 = MovingHorizonEstimator(linmodel, He=5, σP_0=[1,2,3,4], σPint_ym_0=[5,6])
     @test mhe6.cov.P̂_0       ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test mhe6.P̂arr_old ≈ Hermitian(diagm(Float64[1, 4, 9 ,16, 25, 36]))
     @test mhe6.cov.P̂_0 !== mhe6.P̂arr_old
 
-    mhe7 = MovingHorizonEstimator(nonlinmodel, He=10)
+    mhe7 = MovingHorizonEstimator(linmodel, He=10)
     @test mhe7.He == 10
     @test length(mhe7.X̂0)  == mhe7.He*6
     @test length(mhe7.Y0m) == mhe7.He*2
@@ -865,11 +854,40 @@ end
     @test length(mhe7.D0)  == (mhe7.He+mhe7.direct)*1
     @test length(mhe7.Ŵ)   == mhe7.He*6
 
-    mhe8 = MovingHorizonEstimator(nonlinmodel, He=5, nint_u=[1, 1], nint_ym=[0, 0])
+    mhe8 = MovingHorizonEstimator(linmodel, He=5, nint_u=[1, 1], nint_ym=[0, 0])
     @test mhe8.nxs == 2
     @test mhe8.nx̂  == 6
     @test mhe8.nint_u  == [1, 1]
     @test mhe8.nint_ym == [0, 0]
+
+    mhe12 = MovingHorizonEstimator(linmodel, He=5, Cwt=1e3)
+    @test size(mhe12.Ẽ, 2) == 6*mhe12.nx̂ + 1
+    @test mhe12.C == 1e3
+
+    linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    mhe13 = MovingHorizonEstimator(linmodel2, He=5)
+    @test isa(mhe13, MovingHorizonEstimator{Float32})    
+
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
+end
+
+@testitem "MovingHorizonEstimator construction (NonLinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using JuMP, Ipopt, DifferentiationInterface
+    import FiniteDiff
+    linmodel = LinModel(sys,Ts,i_d=[3])
+    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h(x,d,model)   = model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
+
+    mhe2 = MovingHorizonEstimator(nonlinmodel, He=5)
+    @test mhe2.nym == 2
+    @test mhe2.nyu == 0
+    @test mhe2.nxs == 2
+    @test mhe2.nx̂ == 6
+    @test size(mhe2.Ẽ, 2) == 6*mhe2.nx̂
 
     I_6 = Matrix{Float64}(I, 6, 6)
     I_2 = Matrix{Float64}(I, 2, 2)
@@ -886,14 +904,6 @@ end
     )
     @test solver_name(mhe10.optim) == "Ipopt"
 
-    mhe12 = MovingHorizonEstimator(nonlinmodel, He=5, Cwt=1e3)
-    @test size(mhe12.Ẽ, 2) == 6*mhe12.nx̂ + 1
-    @test mhe12.C == 1e3
-
-    linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
-    mhe13 = MovingHorizonEstimator(linmodel2, He=5)
-    @test isa(mhe13, MovingHorizonEstimator{Float32})
-
     mhe14 = MovingHorizonEstimator(
         nonlinmodel, He=5, 
         gradient=AutoFiniteDiff(), 
@@ -904,9 +914,6 @@ end
     @test mhe14.jacobian == AutoFiniteDiff()
     @test mhe14.hessian == AutoFiniteDiff()
 
-    @test_throws ArgumentError MovingHorizonEstimator(linmodel)
-    @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
-    @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
     @test_throws ErrorException MovingHorizonEstimator(
         nonlinmodel, 5, 1:2, 0, [1, 1], I_6, I_6, I_2, Inf; optim, 
         covestim = InternalModel(nonlinmodel)
@@ -917,15 +924,86 @@ end
     )
 end
 
-@testitem "MovingHorizonEstimator estimation and getinfo" setup=[SetupMPCtests] begin
+@testitem "MovingHorizonEstimator estimation and getinfo (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
-    using JuMP, Ipopt, DAQP
+    using JuMP, DAQP
+    linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
+    linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
+
+    mhe2 = MovingHorizonEstimator(linmodel, He=2)
+    preparestate!(mhe2, [50, 30], [5])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-9
+    @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
+    preparestate!(mhe2, [50, 30], [5])
+    info = getinfo(mhe2)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+    for i in 1:40
+        preparestate!(mhe2, [50, 30], [5])
+        updatestate!(mhe2, [11, 52], [50, 30], [5])
+    end
+    preparestate!(mhe2, [50, 30], [5])
+    @test mhe2([5]) ≈ [50, 30] atol=1e-3
+    for i in 1:40
+        preparestate!(mhe2, [51, 32], [5])
+        updatestate!(mhe2, [10, 50], [51, 32], [5])
+    end
+    preparestate!(mhe2, [51, 32], [5])
+    @test mhe2([5]) ≈ [51, 32] atol=1e-3
+
+    mhe2 = MovingHorizonEstimator(linmodel, He=2, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
+    preparestate!(mhe2, [50, 30], [5])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-9
+    @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
+    info = getinfo(mhe2)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+    for i in 1:40
+        preparestate!(mhe2, [50, 30], [5])
+        updatestate!(mhe2, [11, 52], [50, 30], [5])
+    end
+    @test mhe2([5]) ≈ [50, 30] atol=1e-2
+    for i in 1:40
+        preparestate!(mhe2, [51, 32], [5])
+        updatestate!(mhe2, [10, 50], [51, 32], [5])
+    end
+    @test mhe2([5]) ≈ [51, 32] atol=1e-2
+
+    Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
+    R̂ = diagm([1, 1].^2)
+    optim = Model(DAQP.Optimizer)
+    covestim = SteadyKalmanFilter(linmodel, 1:2, 0, 0, Q̂, R̂)
+    P̂_0 = covestim.cov.P̂
+    mhe3 = MovingHorizonEstimator(linmodel, 2, 1:2, 0, 0, P̂_0, Q̂, R̂; optim, covestim)
+    preparestate!(mhe3, [50, 30], [5])
+    x̂ = updatestate!(mhe3, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(4) atol=1e-9
+    @test mhe3.x̂0 ≈ zeros(4) atol=1e-9
+    preparestate!(mhe3, [50, 30], [5])
+    info = getinfo(mhe3)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+
+    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
+    mhe3 = MovingHorizonEstimator(linmodel3, He=1)
+    preparestate!(mhe3, [0])
+    x̂ = updatestate!(mhe3, [0], [0])
+    @test x̂ ≈ [0, 0] atol=1e-3
+    @test isa(x̂, Vector{Float32})
+end
+
+@testitem "MovingHorizonEstimator estimation and getinfo (NonLinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using JuMP, Ipopt
     linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
     linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
+
 
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
     JuMP.set_attribute(mhe1.optim, "tol", 1e-7)
@@ -991,69 +1069,6 @@ end
     end
     @test mhe1c([5]) ≈ [51, 32] atol=1e-3
 
-    mhe2 = MovingHorizonEstimator(linmodel, He=2)
-    preparestate!(mhe2, [50, 30], [5])
-    x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
-    @test x̂ ≈ zeros(6) atol=1e-9
-    @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
-    preparestate!(mhe2, [50, 30], [5])
-    info = getinfo(mhe2)
-    @test info[:x̂] ≈ x̂ atol=1e-9
-    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
-    for i in 1:40
-        preparestate!(mhe2, [50, 30], [5])
-        updatestate!(mhe2, [11, 52], [50, 30], [5])
-    end
-    preparestate!(mhe2, [50, 30], [5])
-    @test mhe2([5]) ≈ [50, 30] atol=1e-3
-    for i in 1:40
-        preparestate!(mhe2, [51, 32], [5])
-        updatestate!(mhe2, [10, 50], [51, 32], [5])
-    end
-    preparestate!(mhe2, [51, 32], [5])
-    @test mhe2([5]) ≈ [51, 32] atol=1e-3
-
-    mhe2 = MovingHorizonEstimator(linmodel, He=2, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
-    preparestate!(mhe2, [50, 30], [5])
-    x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
-    @test x̂ ≈ zeros(6) atol=1e-9
-    @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
-    info = getinfo(mhe2)
-    @test info[:x̂] ≈ x̂ atol=1e-9
-    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
-    for i in 1:40
-        preparestate!(mhe2, [50, 30], [5])
-        updatestate!(mhe2, [11, 52], [50, 30], [5])
-    end
-    @test mhe2([5]) ≈ [50, 30] atol=1e-2
-    for i in 1:40
-        preparestate!(mhe2, [51, 32], [5])
-        updatestate!(mhe2, [10, 50], [51, 32], [5])
-    end
-    @test mhe2([5]) ≈ [51, 32] atol=1e-2
-
-    Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
-    R̂ = diagm([1, 1].^2)
-    optim = Model(DAQP.Optimizer)
-    covestim = SteadyKalmanFilter(linmodel, 1:2, 0, 0, Q̂, R̂)
-    P̂_0 = covestim.cov.P̂
-    mhe3 = MovingHorizonEstimator(linmodel, 2, 1:2, 0, 0, P̂_0, Q̂, R̂; optim, covestim)
-    preparestate!(mhe3, [50, 30], [5])
-    x̂ = updatestate!(mhe3, [10, 50], [50, 30], [5])
-    @test x̂ ≈ zeros(4) atol=1e-9
-    @test mhe3.x̂0 ≈ zeros(4) atol=1e-9
-    preparestate!(mhe3, [50, 30], [5])
-    info = getinfo(mhe3)
-    @test info[:x̂] ≈ x̂ atol=1e-9
-    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
-
-    linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
-    mhe3 = MovingHorizonEstimator(linmodel3, He=1)
-    preparestate!(mhe3, [0])
-    x̂ = updatestate!(mhe3, [0], [0])
-    @test x̂ ≈ [0, 0] atol=1e-3
-    @test isa(x̂, Vector{Float32})
-    
     Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
     R̂ = diagm([1, 1].^2)
     optim = Model(Ipopt.Optimizer)
@@ -1085,6 +1100,7 @@ end
     @test x̂ ≈ zeros(6) atol=1e-9
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
     @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
+
 end
 
 @testitem "MovingHorizonEstimator estimation with unfilled window" setup=[SetupMPCtests] begin
@@ -1163,35 +1179,51 @@ end
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     mhe1 = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe1, x̂min=[-51,-52], x̂max=[53,54])
-    @test all((mhe1.con.X̂0min, mhe1.con.X̂0max) .≈ ([-51,-52], [53,54]))
-    @test all((mhe1.con.x̃0min[2:end], mhe1.con.x̃0max[2:end]) .≈ ([-51,-52], [53,54]))
+    @test mhe1.con.X̂0min ≈ [-51,-52]
+    @test mhe1.con.X̂0max ≈ [53,54]
+    @test mhe1.con.x̃0min[2:end] ≈ [-51,-52]
+    @test mhe1.con.x̃0max[2:end] ≈ [53,54]
     setconstraint!(mhe1, ŵmin=[-55,-56], ŵmax=[57,58])
-    @test all((mhe1.con.Ŵmin, mhe1.con.Ŵmax) .≈ ([-55,-56], [57,58]))
+    @test mhe1.con.Ŵmin ≈ [-55,-56]
+    @test mhe1.con.Ŵmax ≈ [57,58]
     setconstraint!(mhe1, v̂min=[-59,-60], v̂max=[61,62])
-    @test all((mhe1.con.V̂min, mhe1.con.V̂max) .≈ ([-59,-60], [61,62]))
+    @test mhe1.con.V̂min ≈ [-59,-60]
+    @test mhe1.con.V̂max ≈ [61,62]
     setconstraint!(mhe1, c_x̂min=[0.01,0.02], c_x̂max=[0.03,0.04])
-    @test all((-mhe1.con.A_X̂min[:, end], -mhe1.con.A_X̂max[:, end]) .≈ ([0.01, 0.02], [0.03,0.04]))
-    @test all((-mhe1.con.A_x̃min[2:end, end], -mhe1.con.A_x̃max[2:end, end]) .≈ ([0.01,0.02], [0.03,0.04]))
+    @test -mhe1.con.A_X̂min[:, end] ≈ [0.01, 0.02]
+    @test -mhe1.con.A_X̂max[:, end] ≈ [0.03,0.04]
+    @test -mhe1.con.A_x̃min[2:end, end] ≈ [0.01,0.02]
+    @test -mhe1.con.A_x̃max[2:end, end] ≈ [0.03,0.04]
     setconstraint!(mhe1, c_ŵmin=[0.05,0.06], c_ŵmax=[0.07,0.08])
-    @test all((-mhe1.con.A_Ŵmin[:, end], -mhe1.con.A_Ŵmax[:, end]) .≈ ([0.05, 0.06], [0.07,0.08]))
+    @test -mhe1.con.A_Ŵmin[:, end] ≈ [0.05, 0.06]
+    @test -mhe1.con.A_Ŵmax[:, end] ≈ [0.07,0.08]
     setconstraint!(mhe1, c_v̂min=[0.09,0.10], c_v̂max=[0.11,0.12])
-    @test all((-mhe1.con.A_V̂min[:, end], -mhe1.con.A_V̂max[:, end]) .≈ ([0.09, 0.10], [0.11,0.12]))
+    @test -mhe1.con.A_V̂min[:, end] ≈ [0.09, 0.10]
+    @test -mhe1.con.A_V̂max[:, end] ≈ [0.11,0.12]
 
     mhe2 = MovingHorizonEstimator(linmodel, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe2, X̂min=-1(1:10), X̂max=1(1:10))
-    @test all((mhe2.con.X̂0min, mhe2.con.X̂0max) .≈ (-1(3:10), 1(3:10)))
-    @test all((mhe2.con.x̃0min[2:end], mhe2.con.x̃0max[2:end]) .≈ (-1(1:2),  1(1:2)))
+    @test mhe2.con.X̂0min ≈ -1(3:10)
+    @test mhe2.con.X̂0max ≈ 1(3:10)
+    @test mhe2.con.x̃0min[2:end] ≈ -1(1:2)
+    @test mhe2.con.x̃0max[2:end] ≈ 1(1:2)
     setconstraint!(mhe2, Ŵmin=-1(11:18), Ŵmax=1(11:18))
-    @test all((mhe2.con.Ŵmin, mhe2.con.Ŵmax) .≈ (-1(11:18), 1(11:18)))
+    @test mhe2.con.Ŵmin ≈ -1(11:18)
+    @test mhe2.con.Ŵmax ≈ 1(11:18)
     setconstraint!(mhe2, V̂min=-1(31:38), V̂max=1(31:38))
-    @test all((mhe2.con.V̂min, mhe2.con.V̂max) .≈ (-1(31:38), 1(31:38)))
+    @test mhe2.con.V̂min ≈ -1(31:38)
+    @test mhe2.con.V̂max ≈ 1(31:38)
     setconstraint!(mhe2, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
-    @test all((-mhe2.con.A_X̂min[:, end], -mhe2.con.A_X̂max[:, end]) .≈ (0.01(3:10), 0.02(3:10)))
-    @test all((-mhe2.con.A_x̃min[2:end, end], -mhe2.con.A_x̃max[2:end, end]) .≈ (0.01(1:2), 0.02(1:2)))
+    @test -mhe2.con.A_X̂min[:, end] ≈ 0.01(3:10)
+    @test -mhe2.con.A_X̂max[:, end] ≈ 0.02(3:10)
+    @test -mhe2.con.A_x̃min[2:end, end] ≈ 0.01(1:2)
+    @test -mhe2.con.A_x̃max[2:end, end] ≈ 0.02(1:2)
     setconstraint!(mhe2, C_ŵmin=0.03(11:18), C_ŵmax=0.04(11:18))
-    @test all((-mhe2.con.A_Ŵmin[:, end], -mhe2.con.A_Ŵmax[:, end]) .≈ (0.03(11:18), 0.04(11:18)))
+    @test -mhe2.con.A_Ŵmin[:, end] ≈ 0.03(11:18)
+    @test -mhe2.con.A_Ŵmax[:, end] ≈ 0.04(11:18)
     setconstraint!(mhe2, C_v̂min=0.05(31:38), C_v̂max=0.06(31:38))
-    @test all((-mhe2.con.A_V̂min[:, end], -mhe2.con.A_V̂max[:, end]) .≈ (0.05(31:38), 0.06(31:38)))
+    @test -mhe2.con.A_V̂min[:, end] ≈ 0.05(31:38)
+    @test -mhe2.con.A_V̂max[:, end] ≈ 0.06(31:38)
 
     f(x,u,d,model) = model.A*x + model.Bu*u
     h(x,d,model)   = model.C*x 
@@ -1200,29 +1232,33 @@ end
 
     mhe3 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
-    @test all((mhe3.con.C_x̂min, mhe3.con.C_x̂max) .≈ (0.01(3:10), 0.02(3:10)))
+    @test mhe3.con.C_x̂min ≈ 0.01(3:10)
+    @test mhe3.con.C_x̂max ≈ 0.02(3:10)
     setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
-    @test all((mhe3.con.C_v̂min, mhe3.con.C_v̂max) .≈ (0.03(11:18), 0.04(11:18)))
+    @test mhe3.con.C_v̂min ≈ 0.03(11:18)
+    @test mhe3.con.C_v̂max ≈ 0.04(11:18)
 
     # TODO: delete these tests when the deprecated legacy splatting syntax will be.
     mhe4 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, Cwt=1e3, oracle=false)
     setconstraint!(mhe3, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
-    @test all((mhe3.con.C_x̂min, mhe3.con.C_x̂max) .≈ (0.01(3:10), 0.02(3:10)))
+    @test mhe3.con.C_x̂min ≈ 0.01(3:10)
+    @test mhe3.con.C_x̂max ≈ 0.02(3:10)
     setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
-    @test all((mhe3.con.C_v̂min, mhe3.con.C_v̂max) .≈ (0.03(11:18), 0.04(11:18)))
+    @test mhe3.con.C_v̂min ≈ 0.03(11:18)
+    @test mhe3.con.C_v̂max ≈ 0.04(11:18)
 
-    @test_throws ArgumentError setconstraint!(mhe2, x̂min=[-1])
-    @test_throws ArgumentError setconstraint!(mhe2, x̂max=[+1])
-    @test_throws ArgumentError setconstraint!(mhe2, ŵmin=[-1])
-    @test_throws ArgumentError setconstraint!(mhe2, ŵmax=[+1])
-    @test_throws ArgumentError setconstraint!(mhe2, v̂min=[-1])
-    @test_throws ArgumentError setconstraint!(mhe2, v̂max=[+1])
-    @test_throws ArgumentError setconstraint!(mhe2, c_x̂min=[-1])
-    @test_throws ArgumentError setconstraint!(mhe2, c_x̂max=[+1])
-    @test_throws ArgumentError setconstraint!(mhe2, c_ŵmin=[-1])
-    @test_throws ArgumentError setconstraint!(mhe2, c_ŵmax=[+1])
-    @test_throws ArgumentError setconstraint!(mhe2, c_v̂min=[-1])
-    @test_throws ArgumentError setconstraint!(mhe2, c_v̂max=[+1])
+    @test_throws DimensionMismatch setconstraint!(mhe2, x̂min=[-1])
+    @test_throws DimensionMismatch setconstraint!(mhe2, x̂max=[+1])
+    @test_throws DimensionMismatch setconstraint!(mhe2, ŵmin=[-1])
+    @test_throws DimensionMismatch setconstraint!(mhe2, ŵmax=[+1])
+    @test_throws DimensionMismatch setconstraint!(mhe2, v̂min=[-1])
+    @test_throws DimensionMismatch setconstraint!(mhe2, v̂max=[+1])
+    @test_throws DimensionMismatch setconstraint!(mhe2, c_x̂min=[+2])
+    @test_throws DimensionMismatch setconstraint!(mhe2, c_x̂max=[+1])
+    @test_throws DimensionMismatch setconstraint!(mhe2, c_ŵmin=[+2])
+    @test_throws DimensionMismatch setconstraint!(mhe2, c_ŵmax=[+1])
+    @test_throws DimensionMismatch setconstraint!(mhe2, c_v̂min=[+2])
+    @test_throws DimensionMismatch setconstraint!(mhe2, c_v̂max=[+1])
 
     preparestate!(mhe1, [50, 30])
     updatestate!(mhe1, [10, 50], [50, 30])
@@ -1583,8 +1619,8 @@ end
 @testitem "ManualEstimator construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = LinModel(sys,Ts,i_u=[1,2])
-    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
-    h(x,d,model)   = model.C*x + model.Du*d
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Du*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
 
     manual1 = ManualEstimator(linmodel)
@@ -1631,8 +1667,8 @@ end
 @testitem "ManualEstimator estimator methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = LinModel(sys,Ts,i_u=[1,2])
-    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
-    h(x,d,model)   = model.C*x + model.Du*d
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Du*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, 0, solver=nothing, p=linmodel)
 
     manual1 = ManualEstimator(linmodel)

@@ -192,6 +192,11 @@ function repeat!(Y::AbstractVector, a::AbstractVector, n::Int)
     return Y
 end
 
+"Convert vectors to single column matrices when necessary."
+to_mat(A::AbstractVector, _ ...) = reshape(A, length(A), 1)
+to_mat(A::AbstractMatrix, _ ...) = A
+to_mat(A::Real, dims...) = fill(A, dims)
+
 "Convert 1-element vectors and normal matrices to Hermitians."
 to_hermitian(A::AbstractVector) = Hermitian(reshape(A, 1, 1), :L)
 to_hermitian(A::AbstractMatrix) = Hermitian(A, :L)

@@ -16,6 +16,7 @@ struct LinMPC{
     con::ControllerConstraint{NT, Nothing}
     Z̃::Vector{NT}
     ŷ::Vector{NT}
+    ry::Vector{NT}
     Hp::Int
     Hc::Int
     nϵ::Int
@@ -48,7 +49,8 @@ struct LinMPC{
     Dop::Vector{NT}
     buffer::PredictiveControllerBuffer{NT}
     function LinMPC{NT}(
-        estim::SE, Hp, Hc, nb, weights::CW, 
+        estim::SE, Hp, Hc, nb, weights::CW,
+        Wy, Wu, Wd, Wr,
         transcription::TM, optim::JM
     ) where {
             NT<:Real, 
@@ -58,26 +60,27 @@ struct LinMPC{
             JM<:JuMP.GenericModel
         }
         model = estim.model
-        nu, ny, nd, nx̂ = model.nu, model.ny, model.nd, estim.nx̂
-        ŷ = copy(model.yop) # dummy vals (updated just before optimization)
+        nu, ny, nd = model.nu, model.ny, model.nd
+        ŷ, ry = copy(model.yop), copy(model.yop) # dummy vals (updated just before optimization)
         # dummy vals (updated just before optimization):
         R̂y, R̂u, Tu_lastu0 = zeros(NT, ny*Hp), zeros(NT, nu*Hp), zeros(NT, nu*Hp)
         lastu0 = zeros(NT, nu)
+        Wy, Wu, Wd, Wr = validate_custom_lincon(model, Wy, Wu, Wd, Wr)
         validate_transcription(model, transcription)
         PΔu = init_ZtoΔU(estim, transcription, Hp, Hc)
         Pu, Tu = init_ZtoU(estim, transcription, Hp, Hc, nb)
         E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(
             model, estim, transcription, Hp, Hc, nb
         )
+        F = zeros(NT, ny*Hp) # dummy value (updated just before optimization)
         Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
-        # dummy vals (updated just before optimization):
-        F, fx̂, Fŝ  = zeros(NT, ny*Hp), zeros(NT, nx̂), zeros(NT, nx̂*Hp)
         con, nϵ, P̃Δu, P̃u, Ẽ = init_defaultcon_mpc(
             estim, weights, transcription,
             Hp, Hc, 
             PΔu, Pu, E, 
-            ex̂, fx̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-            Eŝ, Fŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+            ex̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
+            Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+            Wy, Wu, Wd, Wr
         )
         H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u)
         # dummy vals (updated just before optimization):
@@ -91,7 +94,7 @@ struct LinMPC{
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE, CW, TM, JM}(
             estim, transcription, optim, con,
-            Z̃, ŷ,
+            Z̃, ŷ, ry,
             Hp, Hc, nϵ, nb,
             weights,
             R̂u, R̂y,
@@ -147,6 +150,7 @@ This method uses the default state estimator, a [`SteadyKalmanFilter`](@ref) wit
 arguments. This controller allocates memory at each time step for the optimization.
 
 # Arguments
+
 - `model::LinModel` : model used for controller predictions and state estimations.
 - `Hp::Int=10+nk` : prediction horizon ``H_p``, `nk` is the number of delays in `model`.
 - `Hc::Union{Int, Vector{Int}}=2` : control horizon ``H_c``, custom move blocking pattern is 
@@ -157,6 +161,10 @@ arguments. This controller allocates memory at each time step for the optimizati
 - `M_Hp=Diagonal(repeat(Mwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{M}_{H_p}``.
 - `N_Hc=Diagonal(repeat(Nwt,Hc))` : positive semidefinite symmetric matrix ``\mathbf{N}_{H_c}``.
 - `L_Hp=Diagonal(repeat(Lwt,Hp))` : positive semidefinite symmetric matrix ``\mathbf{L}_{H_p}``.
+- `Wy=nothing` : custom linear constraint matrix for output (see Extended Help).
+- `Wu=nothing` : custom linear constraint matrix for manipulated input (see Extended Help).
+- `Wd=nothing` : custom linear constraint matrix for meas. disturbance (see Extended Help).
+- `Wr=nothing` : custom linear constraint matrix for output setpoint (see Extended Help).
 - `Cwt=1e5` : slack variable weight ``C`` (scalar), use `Cwt=Inf` for hard constraints only.
 - `transcription=SingleShooting()` : [`SingleShooting`](@ref) or [`MultipleShooting`](@ref).
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
@@ -191,6 +199,11 @@ LinMPC controller with a sample time Ts = 4.0 s:
     for over-actuated systems, when `nu > ny` (e.g. prioritize solutions with lower 
     economical costs). The default `Lwt` value implies that this feature is disabled by default.
 
+    The custom linear constraint matrices `Wy`, `Wu`, `Wd`, and `Wr` allow to define
+    constraints based on linear combinations of outputs, manipulated inputs, measured
+    disturbances, and output setpoints, respectively. See the Extended Help section in
+    [`setconstraint!`](@ref) documentation for more details.
+
     The objective function follows this nomenclature:
 
     | VARIABLE             | DESCRIPTION                                              | SIZE             |
@@ -221,13 +234,20 @@ function LinMPC(
     M_Hp = Diagonal(repeat(Mwt, Hp)),
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
+    Wy = nothing,
+    Wu = nothing,
+    Wd = nothing,
+    Wr = nothing,
     Cwt = DEFAULT_CWT,
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
-    return LinMPC(estim; Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, transcription, optim)
+    return LinMPC(
+        estim; 
+        Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, Wy, Wu, Wd, Wr, transcription, optim
+    )
 end
 
 
@@ -270,9 +290,13 @@ function LinMPC(
     M_Hp = Diagonal(repeat(Mwt, Hp)),
     N_Hc = Diagonal(repeat(Nwt, get_Hc(move_blocking(Hp, Hc)))),
     L_Hp = Diagonal(repeat(Lwt, Hp)),
+    Wy = nothing,
+    Wu = nothing,
+    Wd = nothing,
+    Wr = nothing,
     Cwt  = DEFAULT_CWT,
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
-    optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
+    optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false)
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
     isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 
     nk = estimate_delays(estim.model)
@@ -283,7 +307,7 @@ function LinMPC(
     nb = move_blocking(Hp, Hc)
     Hc = get_Hc(nb)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-    return LinMPC{NT}(estim, Hp, Hc, nb, weights, transcription, optim)
+    return LinMPC{NT}(estim, Hp, Hc, nb, weights, Wy, Wu, Wd, Wr, transcription, optim)
 end
 
 """
