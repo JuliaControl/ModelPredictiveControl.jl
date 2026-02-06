@@ -878,6 +878,7 @@ end
     @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation())
     @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation(2))
     @test_throws ErrorException NonLinMPC(linmodel1, oracle=false, hessian=AutoFiniteDiff())
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Wy=[1 0;0 1])
 end
 
 @testitem "NonLinMPC moves and getinfo (LinModel)" setup=[SetupMPCtests] begin
