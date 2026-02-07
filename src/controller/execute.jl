@@ -104,9 +104,12 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:u`   : current optimal manipulated input, ``\mathbf{u}(k)``
 - `:d`   : current measured disturbance, ``\mathbf{d}(k)``
 
-For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the field `:sol` also contains the optimizer
-solution summary that can be printed. Lastly, for [`NonLinMPC`](@ref), the following fields
-are also available:
+For [`LinMPC`](@ref) and [`NonLinMPC`](@ref), the following fields are also available:
+
+- `:W` : custom linear inequality constraint vector at the optimum, ``\mathbf{W}``.
+- `:sol` : a [solution summary](@extref JuMP solution_summary) that can be printed. 
+
+Lastly, the following fields are also available for [`NonLinMPC`](@ref) only:
 
 - `:JE`: economic cost value at the optimum, ``J_E``
 - `:gc`: custom nonlinear constraints values at the optimum, ``\mathbf{g_c}``
@@ -194,9 +197,14 @@ end
 """
     addinfo!(info, mpc::PredictiveController) -> info
 
-By default, add the solution summary `:sol` that can be printed to `info`.
+By default, add the custom linear inrquality vector `W` and the solution summary `:sol` that
+can be printed to `info`.
 """
-function addinfo!(info, mpc::PredictiveController)
+function addinfo!(info, mpc::PredictiveController{NT}) where NT<:Real
+    nW = mpc.con.nw*(mpc.Hp+1)
+    W = Vector{NT}(undef, nW)
+    W .= mul!(W, mpc.con.Ẽw, mpc.Z̃) .+ mpc.con.Fw
+    info[:W] = W
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
     return info
 end
