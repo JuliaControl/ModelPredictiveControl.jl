@@ -121,3 +121,9 @@ MultipleShooting
 ```@docs
 TrapezoidalCollocation
 ```
+
+### OrthogonalCollocation
+
+```@docs
+OrthogonalCollocation
+```

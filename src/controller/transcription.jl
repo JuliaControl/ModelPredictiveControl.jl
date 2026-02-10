@@ -116,6 +116,27 @@ struct TrapezoidalCollocation <: CollocationMethod
     end
 end
 
+
+@doc raw"""
+    OrthogonalCollocation(h::Int=0, nc=5; f_threads=false, h_threads=false)
+
+Construct an orthogonal collocation [`TranscriptionMethod`](@ref) with `h`th order hold.
+
+
+"""
+struct OrthogonalCollocation <: CollocationMethod
+    h:Int
+    nc::Int
+    f_threads::Bool
+    h_threads::Bool
+    function OrthogonalCollocation(h::Int=0, nc=5; f_threads=false, h_thread=false)
+        if !(h == 0 || h == 1)
+            throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
+        end
+        return new(h, nc, )
+    end
+end
+
 function validate_transcription(::LinModel, ::CollocationMethod)
     throw(ArgumentError("Collocation methods are not supported for LinModel."))
     return nothing
