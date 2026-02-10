@@ -120,9 +120,7 @@ end
 @doc raw"""
     OrthogonalCollocation(h::Int=0, nc=5; f_threads=false, h_threads=false)
 
-Construct an orthogonal collocation [`TranscriptionMethod`](@ref) with `h`th order hold.
-
-
+Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
@@ -131,10 +129,11 @@ struct OrthogonalCollocation <: CollocationMethod
     h_threads::Bool
     function OrthogonalCollocation(h::Int=0, nc=5; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
-            throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
+            throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
         end
         if nc>5
-            throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
+            throw(ArgumentError("nc argument must be ≤ 5 for OrthogonalCollocation."))
+        end
         return new(h, nc, f_threads, h_threads)
     end
 end
