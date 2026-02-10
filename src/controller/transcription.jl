@@ -125,15 +125,17 @@ Construct an orthogonal collocation [`TranscriptionMethod`](@ref) with `h`th ord
 
 """
 struct OrthogonalCollocation <: CollocationMethod
-    h:Int
+    h::Int
     nc::Int
     f_threads::Bool
     h_threads::Bool
-    function OrthogonalCollocation(h::Int=0, nc=5; f_threads=false, h_thread=false)
+    function OrthogonalCollocation(h::Int=0, nc=5; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
             throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
         end
-        return new(h, nc, )
+        if nc>5
+            throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
+        return new(h, nc, f_threads, h_threads)
     end
 end
 
