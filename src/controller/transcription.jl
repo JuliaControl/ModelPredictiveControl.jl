@@ -121,6 +121,13 @@ end
     OrthogonalCollocation(h::Int=0, nc=5; f_threads=false, h_threads=false)
 
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
+
+The decision variable includes the collocations points (excluding ``ϵ``):
+
+``math
+\mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
+``
+
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
