@@ -104,44 +104,42 @@ transcription method.
 """
 struct TrapezoidalCollocation <: CollocationMethod
     h::Int
-    nc::Int
+    np::Int
     f_threads::Bool
     h_threads::Bool
     function TrapezoidalCollocation(h::Int=0; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
             throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
         end
-        nc = 2 # 2 collocation points per interval for trapezoidal rule
-        return new(h, nc, f_threads, h_threads)
+        np = 2 # 2 collocation points per intervals for trapezoidal rule
+        return new(h, np, f_threads, h_threads)
     end
 end
 
 
 @doc raw"""
-    OrthogonalCollocation(h::Int=0, nc=5; f_threads=false, h_threads=false)
+    OrthogonalCollocation(h::Int=0, np=5; f_threads=false, h_threads=false)
 
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
 The decision variable includes the collocations points (excluding ``ϵ``):
 
-``math
+```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
-``
+```
+where ``\mathbf{K}`` includes all the (intermediate) collocation points.
 
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
-    nc::Int
+    np::Int
     f_threads::Bool
     h_threads::Bool
-    function OrthogonalCollocation(h::Int=0, nc=5; f_threads=false, h_threads=false)
+    function OrthogonalCollocation(h::Int=0, np=5; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
             throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
         end
-        if nc>5
-            throw(ArgumentError("nc argument must be ≤ 5 for OrthogonalCollocation."))
-        end
-        return new(h, nc, f_threads, h_threads)
+        return new(h, np, f_threads, h_threads)
     end
 end
 
@@ -165,7 +163,7 @@ end
 
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
 get_nk(model::SimModel, ::ShootingMethod) = model.nk
-get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.nc
+get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.np
 
 @doc raw"""
     init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
