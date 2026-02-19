@@ -104,42 +104,60 @@ transcription method.
 """
 struct TrapezoidalCollocation <: CollocationMethod
     h::Int
-    np::Int
+    no::Int
     f_threads::Bool
     h_threads::Bool
     function TrapezoidalCollocation(h::Int=0; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
             throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
         end
-        np = 2 # 2 collocation points per intervals for trapezoidal rule
-        return new(h, np, f_threads, h_threads)
+        no = 2 # 2 collocation points per intervals for trapezoidal rule
+        return new(h, no, f_threads, h_threads)
     end
 end
 
 
 @doc raw"""
-    OrthogonalCollocation(h::Int=0, np=5; f_threads=false, h_threads=false)
+    OrthogonalCollocation(h::Int=0, no=5; f_threads=false, h_threads=false)
 
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
-The decision variable includes the collocations points (excluding ``ϵ``):
-
+The `h` argument is the hold order for ``\mathbf{u}``, and `no`, the number of collocation
+points. The decision variable is similar to [`MultipleShooting`](@ref), but it also includes
+the collocation points (excluding ``ϵ``):
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
-where ``\mathbf{K}`` includes all the (intermediate) collocation points.
+where ``\mathbf{K}`` comprises all the intermediate stages of the deterministic state only:
+```math
+\mathbf{K} =                            \begin{bmatrix}
+    \mathbf{k}_{1}(k+0)                 \\
+    \mathbf{k}_{2}(k+0)                 \\
+    \vdots                              \\
+    \mathbf{k}_{n_p}(k+0)               \\
+    \mathbf{k}_{1}(k+1)                 \\
+    \mathbf{k}_{2}(k+1)                 \\
+    \vdots                              \\
+    \mathbf{k}_{n_p}(k+H_p)             \end{bmatrix}
+```
+and ``\mathbf{k}_p(k+j)`` is the deterministic state prediction for the ``p``th collocation
+point at the ``j``th stage/iterval (details in Extended Help).
 
+# Extended Help
+!!! details "Extended Help"
+    See the Extended Help of [`TrapezoidalCollocation`](@ref) to understand why the 
+    stochastic states are left out of the ``\mathbf{K}`` vector.
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
-    np::Int
+    no::Int
     f_threads::Bool
     h_threads::Bool
-    function OrthogonalCollocation(h::Int=0, np=5; f_threads=false, h_threads=false)
+    function OrthogonalCollocation(h::Int=0, no=5; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
             throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
         end
-        return new(h, np, f_threads, h_threads)
+        return new(h, no, f_threads, h_threads)
     end
 end
 
@@ -160,10 +178,13 @@ end
 function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
+function get_nZ(estim::StateEstimator, transcription::OrthogonalCollocation, Hp, Hc)
+    return estim.model.nu*Hc + estim.nx̂*Hp + estim.model.nx*transcription.no*Hp
+end
 
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
 get_nk(model::SimModel, ::ShootingMethod) = model.nk
-get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.np
+get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
 
 @doc raw"""
     init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
