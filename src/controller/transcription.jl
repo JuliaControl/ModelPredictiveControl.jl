@@ -767,6 +767,32 @@ function init_matconstraint_mpc(
 end
 
 @doc raw"""
+    init_decision!(mpc::PredictiveController, ::SingleShooting)
+
+Init the decision vector ``\mathbf{Z̃ = ΔŨ}`` with zeros for [`SingleShooting`](@ref).
+"""
+init_decision!(mpc::PredictiveController, ::SingleShooting, _) = (mpc.Z̃ .= 0; nothing)
+
+@dow raw"""
+    init_decision!(mpc::PredictiveController, ::TranscriptionMethod)
+
+Also init the state part of the decision vector for other [`TranscriptionMethod`](@ref)s.
+
+The ``\mathbf{X̂_0}`` component is assumed constant over ``H_p`` at the current value stored
+in `mpc.estim.x̂0`.
+"""
+function init_decision!(mpc::PredictiveController, ::TranscriptionMethod)
+    nΔU, nx̂ = mpc.Hc*mpc.model.nu, mpc.estim.nx̂
+    mpc.Z̃ .= 0
+    for j=1:mpc.Hp
+        iRow = nΔU .+ (1:nx̂) .+ nx̂*(j-1)
+        mpc.Z̃[iRow] .= mpc.estim.x̂0
+    end
+    return nothing
+end
+
+
+@doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``).

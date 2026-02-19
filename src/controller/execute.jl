@@ -1,15 +1,17 @@
 @doc raw"""
     initstate!(mpc::PredictiveController, u, ym, d=[]) -> x̂
 
-Init the states of `mpc.estim` [`StateEstimator`](@ref) and warm start `mpc.Z̃` at zero.
+Init the states of `mpc.estim` [`StateEstimator`](@ref) and the warm start value `mpc.Z̃`.
 
 It also stores `u - mpc.estim.model.uop` at `mpc.lastu0` for converting the input increments
-``\mathbf{ΔU}`` to inputs ``\mathbf{U}``.
+``\mathbf{ΔU}`` to inputs ``\mathbf{U}``. See [`init_decision!`](@ref) for details on how 
+`mpc.Z̃` is initialized. The function returns the initial state estimate `x̂`.
 """
 function initstate!(mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty)
-    mpc.Z̃ .= 0
+    x̂ = initstate!(mpc.estim, u, ym, d)
     mpc.lastu0 .= u .- mpc.estim.model.uop
-    return initstate!(mpc.estim, u, ym, d)
+    init_decision!(mpc, mpc.transcription, x̂)
+    return x̂
 end
 
 @doc raw"""

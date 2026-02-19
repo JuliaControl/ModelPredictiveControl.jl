@@ -30,6 +30,12 @@ ModelPredictiveControl.get_nonlinobj_op(::NonLinMPC, ::ModelPredictiveControl.Ge
 ModelPredictiveControl.get_nonlincon_oracle(::NonLinMPC, ::ModelPredictiveControl.GenericModel)
 ```
 
+## Init Decision Vector
+
+```@docs
+ModelPredictiveControl.init_decision!
+```
+
 ## Update Quadratic Optimization
 
 ```@docs
