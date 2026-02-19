@@ -123,8 +123,8 @@ end
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
 The `h` argument is the hold order for ``\mathbf{u}``, and `no`, the number of collocation
-points. The decision variable is similar to [`MultipleShooting`](@ref), but it also includes
-the collocation points (excluding ``ϵ``):
+points ``n_o``. The decision variable is similar to [`MultipleShooting`](@ref), but it also
+includes the collocation points (excluding ``ϵ``):
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -134,11 +134,11 @@ where ``\mathbf{K}`` comprises all the intermediate stages of the deterministic 
     \mathbf{k}_{1}(k+0)                 \\
     \mathbf{k}_{2}(k+0)                 \\
     \vdots                              \\
-    \mathbf{k}_{n_p}(k+0)               \\
+    \mathbf{k}_{n_o}(k+0)               \\
     \mathbf{k}_{1}(k+1)                 \\
     \mathbf{k}_{2}(k+1)                 \\
     \vdots                              \\
-    \mathbf{k}_{n_p}(k+H_p)             \end{bmatrix}
+    \mathbf{k}_{n_o}(k+H_p)             \end{bmatrix}
 ```
 and ``\mathbf{k}_p(k+j)`` is the deterministic state prediction for the ``p``th collocation
 point at the ``j``th stage/iterval (details in Extended Help).
@@ -835,8 +835,7 @@ Set and return the warm-start value of `Z̃var` for [`SingleShooting`](@ref) tra
 
 If supported by `mpc.optim`, it warm-starts the solver at:
 ```math
-\mathbf{Z̃_s} = 
-\begin{bmatrix}
+\mathbf{Z̃_s} =                  \begin{bmatrix}
     \mathbf{Δu}(k+0|k-1)        \\ 
     \mathbf{Δu}(k+1|k-1)        \\ 
     \vdots                      \\
@@ -860,14 +859,56 @@ function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
 end
 
 @doc raw"""
+    set_warmstart!(mpc::PredictiveController, ::OrthogonalCollocation, Z̃var) -> Z̃s
+
+Set and return the warm-start value of `Z̃var` for other [`OrthogonalCollocation`](@ref).
+
+It warm-starts the solver at:
+```math
+\mathbf{Z̃_s} =                      \begin{bmatrix}
+    \mathbf{Δu}(k+0|k-1)            \\ 
+    \mathbf{Δu}(k+1|k-1)            \\ 
+    \vdots                          \\
+    \mathbf{Δu}(k+H_c-2|k-1)        \\
+    \mathbf{0}                      \\
+    \mathbf{x̂_0}(k+1|k-1)           \\
+    \mathbf{x̂_0}(k+2|k-1)           \\
+    \vdots                          \\
+    \mathbf{x̂_0}(k+H_p-1|k-1)       \\
+    \mathbf{x̂_0}(k+H_p-1|k-1)       \\
+    \mathbf{k}_{1}(k+1|k-1)         \\
+    \mathbf{k}_{2}(k+1|k-1)         \\
+    \vdots                          \\
+    \mathbf{k}_{n_o}(k+1|k-1)       \\
+    ϵ(k-1)
+\end{bmatrix}
+```
+where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
+last control period ``k-1``, expressed as a deviation from the operating point 
+``\mathbf{x̂_{op}}``.
+"""
+function set_warmstart!(mpc::PredictiveController, ::OrthogonalCollocation, Z̃var)
+    nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
+    # --- input increments ΔU ---
+    Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
+    Z̃s[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    # --- predicted states X̂0 ---
+    Z̃s[(Hc*nu+1):(Hc*nu+Hp*nx̂-nx̂)]       .= @views mpc.Z̃[(Hc*nu+nx̂+1):(Hc*nu+Hp*nx̂)]
+    Z̃s[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)] .= @views mpc.Z̃[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)]
+    # --- slack variable ϵ ---
+    mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
+    JuMP.set_start_value.(Z̃var, Z̃s)
+    return Z̃s
+end
+
+@doc raw"""
     set_warmstart!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var) -> Z̃s
 
 Set and return the warm-start value of `Z̃var` for other [`TranscriptionMethod`](@ref).
 
 It warm-starts the solver at:
 ```math
-\mathbf{Z̃_s} =
-\begin{bmatrix}
+\mathbf{Z̃_s} =                  \begin{bmatrix}
     \mathbf{Δu}(k+0|k-1)        \\ 
     \mathbf{Δu}(k+1|k-1)        \\ 
     \vdots                      \\
