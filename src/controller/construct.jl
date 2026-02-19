@@ -724,6 +724,75 @@ function init_ZtoΔU(
 end
 
 @doc raw"""
+    init_ZtoU(estim, transcription, Hp, Hc, nb) -> Pu, Tu
+
+Init decision variables to inputs over ``H_p`` conversion matrices.
+
+The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{U}``, the manipulated
+inputs over ``H_p``, is computed by:
+```math
+\mathbf{U} = \mathbf{P_u} \mathbf{Z} + \mathbf{T_u} \mathbf{u}(k-1)
+```
+The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    With ``n_i``, the ``i``th element of the ``\mathbf{n_b}`` vector defined in [`move_blocking`](@ref)
+    documentation, we introduce the ``\mathbf{Q}(n_i)`` matrix of size `(nu*ni, nu)`:
+    ```math
+    \mathbf{Q}(n_i) =       \begin{bmatrix}
+        \mathbf{I}          \\
+        \mathbf{I}          \\
+        \vdots              \\
+        \mathbf{I}          \end{bmatrix}            
+    ```
+    The ``\mathbf{U}`` vector and the conversion matrices are defined as:
+    ```math
+    \mathbf{U} = \begin{bmatrix}
+        \mathbf{u}(k + 0)                                                                   \\
+        \mathbf{u}(k + 1)                                                                   \\
+        \vdots                                                                              \\
+        \mathbf{u}(k + H_p - 1)                                                             \end{bmatrix} , \quad
+    \mathbf{P_u^†} = \begin{bmatrix}
+        \mathbf{Q}(n_1)         & \mathbf{0}            & \cdots    & \mathbf{0}            \\
+        \mathbf{Q}(n_2)         & \mathbf{Q}(n_2)       & \cdots    & \mathbf{0}            \\
+        \vdots                  & \vdots                & \ddots    & \vdots                \\
+        \mathbf{Q}(n_{H_c})     & \mathbf{Q}(n_{H_c})   & \cdots    & \mathbf{Q}(n_{H_c})   \end{bmatrix} , \quad
+    \mathbf{T_u} = \begin{bmatrix}
+        \mathbf{I}                                                                          \\
+        \mathbf{I}                                                                          \\
+        \vdots                                                                              \\
+        \mathbf{I}                                                                          \end{bmatrix}
+    ```
+    and, depending on the transcription method, we have:
+    - ``\mathbf{P_u} = \mathbf{P_u^†}`` if `transcription` is a [`SingleShooting`](@ref)
+    - ``\mathbf{P_u} = [\begin{smallmatrix}\mathbf{P_u^†} & \mathbf{0} \end{smallmatrix}]``
+      if `transcription` is a [`MultipleShooting`](@ref)
+    The conversion matrices are stored as `SparseMatrixCSC` since it was benchmarked that it
+    is generally more performant than normal dense matrices, even for small `nu`, `Hp` and 
+    `Hc` values. Using `Bool` element type and `BitMatrix` is also slower.
+"""
+function init_ZtoU(
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, nb
+) where {NT<:Real}
+    nu = estim.model.nu
+    I_nu = sparse(Matrix{NT}(I, nu, nu))
+    PuDagger = Matrix{NT}(undef, nu*Hp, nu*Hc)
+    for i=1:Hc
+        ni    = nb[i]
+        Q_ni  = repeat(I_nu, ni, 1)
+        iRows = (1:nu*ni) .+ @views nu*sum(nb[1:i-1])
+        PuDagger[iRows, :] = [repeat(Q_ni, 1, i) spzeros(nu*ni, nu*(Hc-i))]
+    end
+    PuDagger = sparse(PuDagger)
+    nΔU = estim.model.nu*Hc
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    Pu = [PuDagger spzeros(NT, nΔU, nZ - nΔU)]
+    Tu = repeat(I_nu, Hp)
+    return Pu, Tu
+end
+
+@doc raw"""
     init_quadprog(
         model::LinModel, transcriptions::TranscriptionMethod, weights::ControllerWeights, 
         Ẽ, P̃Δu, P̃u; warn_cond=1e6
