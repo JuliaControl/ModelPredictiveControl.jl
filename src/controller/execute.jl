@@ -10,7 +10,7 @@ It also stores `u - mpc.estim.model.uop` at `mpc.lastu0` for converting the inpu
 function initstate!(mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty)
     x̂ = initstate!(mpc.estim, u, ym, d)
     mpc.lastu0 .= u .- mpc.estim.model.uop
-    init_decision!(mpc, mpc.transcription, x̂)
+    init_decision!(mpc, mpc.transcription)
     return x̂
 end
 

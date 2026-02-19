@@ -286,7 +286,11 @@ function sim_closedloop!(
     X̂_data    = Matrix{NT}(undef, estim.nx̂, N)
     setstate!(plant, x_0)
     lastd, lasty = d, evaloutput(plant, d)
+    # 1st `setstate!`, for correct `mpc.Z̃` initialization in `initstate!`:
+    isnothing(x̂_0) || setstate!(est_mpc, x̂_0) 
+    # calling `initstate!` no matter what, to initialize `mpc.Z̃` and covariance matrices:
     initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
+    # 2nd `setstate!`, since `initstate!` overwrite the state for `LinModel`:
     isnothing(x̂_0) || setstate!(est_mpc, x̂_0)
     @progressif progress name="$(nameof(typeof(est_mpc))) simulation" for i=1:N
         d = lastd + d_step + d_noise.*randn(plant.nd)
