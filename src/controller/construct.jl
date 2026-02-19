@@ -693,6 +693,37 @@ function validate_args(mpc::PredictiveController, ry, d, lastu, D̂, R̂y, R̂u)
 end
 
 @doc raw"""
+    init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
+
+Init decision variables to input increments over ``H_c`` conversion matrix `PΔu`.
+
+The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{ΔU}``, the input
+increments over ``H_c``, is computed by:
+```math
+\mathbf{ΔU} = \mathbf{P_{Δu}} \mathbf{Z}
+```
+
+in which ``\mathbf{P_{Δu}}`` is defined in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    Following the decision variable definition of the [`TranscriptionMethod`](@ref), the
+    conversion matrix ``\mathbf{P_{Δu}}``, we have:
+    - ``\mathbf{P_{Δu}} = \mathbf{I}`` if `transcription` is a [`SingleShooting`](@ref)
+    - ``\mathbf{P_{Δu}} = [\begin{smallmatrix}\mathbf{I} & \mathbf{0} \end{smallmatrix}]`` otherwise.
+    The matrix is store as as `SparseMatrixCSC` to support both cases efficiently.
+"""
+function init_ZtoΔU(
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
+) where {NT<:Real}
+    I_nu_Hc = sparse(Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc))
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nΔU = estim.model.nu*Hc
+    PΔu = [I_nu_Hc spzeros(NT, nΔU, nZ - nΔU)]
+    return PΔu
+end
+
+@doc raw"""
     init_quadprog(
         model::LinModel, transcriptions::TranscriptionMethod, weights::ControllerWeights, 
         Ẽ, P̃Δu, P̃u; warn_cond=1e6

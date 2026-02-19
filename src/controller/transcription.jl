@@ -187,44 +187,6 @@ get_nk(model::SimModel, ::ShootingMethod) = model.nk
 get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
 
 @doc raw"""
-    init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
-
-Init decision variables to input increments over ``H_c`` conversion matrix `PΔu`.
-
-The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{ΔU}``, the input
-increments over ``H_c``, is computed by:
-```math
-\mathbf{ΔU} = \mathbf{P_{Δu}} \mathbf{Z}
-```
-
-in which ``\mathbf{P_{Δu}}`` is defined in the Extended Help section.
-
-# Extended Help
-!!! details "Extended Help"
-    Following the decision variable definition of the [`TranscriptionMethod`](@ref), the
-    conversion matrix ``\mathbf{P_{Δu}}``, we have:
-    - ``\mathbf{P_{Δu}} = \mathbf{I}`` if `transcription` is a [`SingleShooting`](@ref)
-    - ``\mathbf{P_{Δu}} = [\begin{smallmatrix}\mathbf{I} & \mathbf{0} \end{smallmatrix}]`` otherwise.
-    The matrix is store as as `SparseMatrixCSC` to support both cases efficiently.
-"""
-function init_ZtoΔU end
-
-function init_ZtoΔU(
-    estim::StateEstimator{NT}, ::SingleShooting, _ , Hc
-) where {NT<:Real}
-    PΔu = sparse(Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc))
-    return PΔu
-end
-
-function init_ZtoΔU(
-    estim::StateEstimator{NT}, ::TranscriptionMethod, Hp, Hc
-) where {NT<:Real}
-    I_nu_Hc = sparse(Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc))
-    PΔu = [I_nu_Hc spzeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
-    return PΔu
-end
-
-@doc raw"""
     init_ZtoU(estim, transcription, Hp, Hc, nb) -> Pu, Tu
 
 Init decision variables to inputs over ``H_p`` conversion matrices.
@@ -295,9 +257,11 @@ function init_PUmat(_,::SingleShooting,_,_,PuDagger::AbstractMatrix{NT}) where N
     return PuDagger
 end
 function init_PUmat(
-    estim, ::TranscriptionMethod, Hp, _ , PuDagger::AbstractMatrix{NT}
+    estim, transcription::TranscriptionMethod, Hp, Hc, PuDagger::AbstractMatrix{NT}
 ) where NT<:Real
-    return [PuDagger spzeros(NT, estim.model.nu*Hp, estim.nx̂*Hp)]
+    nΔU = estim.model.nu*Hc
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    return [PuDagger spzeros(NT, nΔU, nZ - nΔU)]
 end
 
 @doc raw"""
