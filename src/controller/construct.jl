@@ -785,9 +785,8 @@ function init_ZtoU(
         PuDagger[iRows, :] = [repeat(Q_ni, 1, i) spzeros(nu*ni, nu*(Hc-i))]
     end
     PuDagger = sparse(PuDagger)
-    nΔU = estim.model.nu*Hc
     nZ = get_nZ(estim, transcription, Hp, Hc)
-    Pu = [PuDagger spzeros(NT, nΔU, nZ - nΔU)]
+    Pu = [PuDagger spzeros(NT, nu*Hp, nZ - nu*Hc)]
     Tu = repeat(I_nu, Hp)
     return Pu, Tu
 end
