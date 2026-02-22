@@ -86,10 +86,12 @@ simulated with these solvers.
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
-moderately stiff systems and is A-stable. Note that the built-in [`StateEstimator`](@ref)
-will still use the `solver` provided at the construction of the [`NonLinModel`](@ref) to
-estimate the plant states, not the trapezoidal rule (see `supersample` option of 
-[`RungeKutta`](@ref) for stiff systems). See Extended Help for more details.
+moderately stiff systems and is A-stable. See Extended Help for more details.
+
+!!! warning
+The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
+construction of the [`NonLinModel`](@ref) to estimate the plant states, not the trapezoidal
+rule (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
 transcription method.
@@ -143,6 +145,14 @@ where ``\mathbf{K}`` comprises all the intermediate stages of the deterministic 
 and ``\mathbf{k}_p(k+j)`` is the deterministic state prediction for the ``p``th collocation
 point at the ``j``th stage/iterval (details in Extended Help).
 
+!!! warning
+    The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
+    construction of the [`NonLinModel`](@ref) to estimate the plant states, not orthogonal
+    collocation (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
+
+Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
+transcription method.
+
 # Extended Help
 !!! details "Extended Help"
     See the Extended Help of [`TrapezoidalCollocation`](@ref) to understand why the 
@@ -161,6 +171,7 @@ struct OrthogonalCollocation <: CollocationMethod
         x, _ = FastGaussQuadrature.gaussradau(no)
         # we reverse the nodes to include the τ=1.0 node:
         τ = (reverse(-x) .+ 1) ./ 2
+
         return new(h, no, f_threads, h_threads, τ)
     end
 end
@@ -1241,6 +1252,68 @@ the ``\mathbf{A_s, C_{s_u}}`` matrices are defined in [`init_estimstoch`](@ref) 
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K0, 
     mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
+    U0, Z̃
+)
+    nu, nx̂, nd, nx, h = model.nu, mpc.estim.nx̂, model.nd, model.nx, transcription.h
+    Hp, Hc = mpc.Hp, mpc.Hc
+    nΔU, nX̂ = nu*Hc, nx̂*Hp
+    f_threads = transcription.f_threads
+    Ts, p = model.Ts, model.p
+    As, Cs_u = mpc.estim.As, mpc.estim.Cs_u
+    nk = get_nk(model, transcription)
+    D̂0 = mpc.D̂0
+    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    @threadsif f_threads for j=1:Hp
+        if j < 2
+            x̂0 = @views mpc.estim.x̂0[1:nx̂]
+            d̂0 = @views mpc.d0[1:nd]
+        else
+            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
+            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+        end
+        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
+        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
+        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
+        x0, xs              = @views x̂0[1:nx], x̂0[nx+1:end]
+        x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
+        sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
+        k1, k2              = @views k0[1:nx], k0[nx+1:2*nx]
+        # ----------------- stochastic defects -----------------------------------------
+        xsnext = @views x̂0next[nx+1:end]
+        mul!(xsnext, As, xs)
+        ssnext .= @. xsnext - xsnext_Z̃
+        # ----------------- deterministic defects --------------------------------------
+        u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
+        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        mul!(û0, Cs_u, xs)                 # ys_u(k) = Cs_u*xs(k)
+        û0 .+= u0                          #   û0(k) = u0(k) + ys_u(k)
+        if f_threads || h < 1 || j < 2
+            # we need to recompute k1 with multi-threading, even with h==1, since the 
+            # last iteration (j-1) may not be executed (iterations are re-orderable)
+            model.f!(k1, x0, û0, d̂0, p)
+        else
+            k1 .= @views K0[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+        end
+        if h < 1 || j ≥ Hp
+            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
+            û0next = û0
+        else
+            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
+            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
+            mul!(û0next, Cs_u, xsnext_Z̃)      # ys_u(k+1) = Cs_u*xs(k+1)
+            û0next .+= u0next                 #   û0(k+1) = u0(k+1) + ys_u(k+1)
+        end
+        model.f!(k2, x0next_Z̃, û0next, d̂0next, p)
+        sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k1 + k2)
+    end
+    return geq
+end
+
+function con_nonlinprogeq!(
+    geq, X̂0, Û0, K0, 
+    mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
     nu, nx̂, nd, nx, h = model.nu, mpc.estim.nx̂, model.nd, model.nx, transcription.h
