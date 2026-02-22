@@ -89,9 +89,9 @@ equality constraint function and by using the implicit trapezoidal rule. It can 
 moderately stiff systems and is A-stable. See Extended Help for more details.
 
 !!! warning
-The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
-construction of the [`NonLinModel`](@ref) to estimate the plant states, not the trapezoidal
-rule (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
+    The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
+    construction of the [`NonLinModel`](@ref) to estimate the plant states, not the 
+    trapezoidal rule (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
 transcription method.
