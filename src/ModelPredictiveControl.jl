@@ -37,6 +37,8 @@ import JuMP: @variable, @operator, @constraint, @objective
 
 import OSQP, Ipopt
 
+import FastGaussQuadrature
+
 export SimModel, LinModel, NonLinModel
 export DiffSolver, RungeKutta, ForwardEuler
 export setop!, setname!

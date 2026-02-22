@@ -153,11 +153,15 @@ struct OrthogonalCollocation <: CollocationMethod
     no::Int
     f_threads::Bool
     h_threads::Bool
+    τ::Vector{Float64}
     function OrthogonalCollocation(h::Int=0, no=5; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
             throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
         end
-        return new(h, no, f_threads, h_threads)
+        x, _ = FastGaussQuadrature.gaussradau(no)
+        # we reverse the nodes to include the τ=1.0 node:
+        τ = (reverse(-x) .+ 1) ./ 2
+        return new(h, no, f_threads, h_threads, τ)
     end
 end
 
@@ -452,11 +456,15 @@ given in the Extended Help section.
 !!! details "Extended Help"
     The terminal state matrices all appropriately sized zero matrices ``\mathbf{0}``, except
     for ``\mathbf{e_x̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``
+    if `transcription` is a [`MultipleShooting`](@ref), and ``\mathbf{e_x̂} = 
+    [\begin{smallmatrix}\mathbf{0} & \mathbf{I} & \mathbf{0}\end{smallmatrix}]`` otherwise.
 """
 function init_predmat(
     model::NonLinModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
+    nΔU = nu*Hc
+    nX̂0 = nx̂*Hp
     nZ = get_nZ(estim, transcription, Hp, Hc)
     E  = zeros(NT, 0, nZ)
     G  = zeros(NT, 0, nd)
@@ -464,7 +472,8 @@ function init_predmat(
     K  = zeros(NT, 0, nx̂)
     V  = zeros(NT, 0, nu)
     B  = zeros(NT, 0)
-    ex̂ = [zeros(NT, nx̂, Hc*nu + (Hp-1)*nx̂) I]
+    myzeros = zeros(nx̂, nZ - nΔU - nX̂0)
+    ex̂ = [zeros(NT, nx̂, nΔU + nX̂0 - nx̂) I myzeros]
     gx̂ = zeros(NT, nx̂, nd)
     jx̂ = zeros(NT, nx̂, nd*Hp)
     kx̂ = zeros(NT, nx̂, nx̂)
