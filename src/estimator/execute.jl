@@ -116,7 +116,7 @@ end
 State update function of the stochastic model only.
 """
 function fs!(x̂0next, estim::StateEstimator, model::SimModel, x̂0)
-    xs, xsnext = x̂0[model.nx+1:end], x̂0next[model.nx+1:end]
+    xs, xsnext = @views x̂0[model.nx+1:end], x̂0next[model.nx+1:end]
     mul!(xsnext, estim.As, xs)
     return nothing
 end
@@ -127,7 +127,7 @@ end
 Compute the disturbed input of the augmented model ``\mathbf{û_0}`` from `x̂0` and `u0`.
 """
 function f̂_input!(û0, estim::StateEstimator, model::SimModel, x̂0, u0)
-    xs = x̂0[model.nx+1:end]
+    xs = @views x̂0[model.nx+1:end]
     mul!(û0, estim.Cs_u, xs)      # ys_u = Cs_u*xs
     û0 .+= u0                     # û0 = u0 + ys_u  
     return nothing

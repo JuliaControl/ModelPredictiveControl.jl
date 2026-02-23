@@ -1280,12 +1280,14 @@ function con_nonlinprogeq!(
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
-        x0       = @views x̂0[1:nx]
-        x0next_Z̃ = @views x̂0next_Z̃[1:nx]
-        sdnext   = @views ŝnext[1:nx]
-        k1, k2   = @views k0[1:nx], k0[nx+1:2*nx]
+        x0                  = @views x̂0[1:nx]
+        xsnext              = @views x̂0next[nx+1:end]
+        x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
+        sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
+        k1, k2              = @views k0[1:nx], k0[nx+1:2*nx]
         # ----------------- stochastic defects -----------------------------------------
         fs!(x̂0next, mpc.estim, model, x̂0)
+        ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- deterministic defects --------------------------------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
