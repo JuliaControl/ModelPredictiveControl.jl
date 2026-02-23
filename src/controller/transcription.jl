@@ -1281,19 +1281,16 @@ function con_nonlinprogeq!(
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
-        x0, xs              = @views x̂0[1:nx], x̂0[nx+1:end]
-        x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
-        sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
-        k1, k2              = @views k0[1:nx], k0[nx+1:2*nx]
+        x0       = @views x̂0[1:nx]
+        x0next_Z̃ = @views x̂0next_Z̃[1:nx]
+        sdnext   = @views ŝnext[1:nx]
+        k1, k2   = @views k0[1:nx], k0[nx+1:2*nx]
         # ----------------- stochastic defects -----------------------------------------
-        xsnext = @views x̂0next[nx+1:end]
-        mul!(xsnext, As, xs)
-        ssnext .= @. xsnext - xsnext_Z̃
+        fs!(x̂0next, mpc.estim, model, x̂0)
         # ----------------- deterministic defects --------------------------------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        mul!(û0, Cs_u, xs)                 # ys_u(k) = Cs_u*xs(k)
-        û0 .+= u0                          #   û0(k) = u0(k) + ys_u(k)
+        f̂_input!(û0, mpc.estim, model, x̂0, u0)
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
@@ -1307,8 +1304,7 @@ function con_nonlinprogeq!(
         else
             u0next = @views U0[(1 + nu*j):(nu*(j+1))]
             û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
-            mul!(û0next, Cs_u, xsnext_Z̃)      # ys_u(k+1) = Cs_u*xs(k+1)
-            û0next .+= u0next                 #   û0(k+1) = u0(k+1) + ys_u(k+1)
+            f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
         end
         model.f!(k2, x0next_Z̃, û0next, d̂0next, p)
         sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k1 + k2)
