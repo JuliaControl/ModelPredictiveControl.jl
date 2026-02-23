@@ -124,13 +124,14 @@ end
 
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
-The `h` argument is the hold order for ``\mathbf{u}``, and `no`, the number of collocation
-points ``n_o``. The decision variable is similar to [`MultipleShooting`](@ref), but it also
-includes the collocation points (excluding ``ϵ``):
+Also known as pseudo-spectral method. The `h` argument is the hold order for ``\mathbf{u}``,
+and `no`, the number of collocation points ``n_o``. The decision variable is similar to
+[`MultipleShooting`](@ref), but it also includes the collocation points (excluding ``ϵ``):
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
-where ``\mathbf{K}`` comprises all the intermediate stages of the deterministic state only:
+where ``\mathbf{K}`` comprises all the intermediate stages of the deterministic state only
+(the first `nx` elements of ``\mathbf{x̂}``):
 ```math
 \mathbf{K} =                            \begin{bmatrix}
     \mathbf{k}_{1}(k+0)                 \\
@@ -143,15 +144,15 @@ where ``\mathbf{K}`` comprises all the intermediate stages of the deterministic 
     \mathbf{k}_{n_o}(k+H_p)             \end{bmatrix}
 ```
 and ``\mathbf{k}_p(k+j)`` is the deterministic state prediction for the ``p``th collocation
-point at the ``j``th stage/iterval (details in Extended Help).
+point at the ``j``th stage/interval/finite element (details in Extended Help).
 
 !!! warning
     The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
     construction of the [`NonLinModel`](@ref) to estimate the plant states, not orthogonal
     collocation (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
 
-Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
-transcription method.
+Sparse optimizers like `Ipopt` and sparse Jacobian computations are highly recommended for
+this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 
 # Extended Help
 !!! details "Extended Help"
