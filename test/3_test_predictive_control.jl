@@ -989,7 +989,7 @@ end
     @test u ≈ [1.0] atol=5e-2
 
     transcription = TrapezoidalCollocation(1)    
-    nmpc5_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
+    nmpc5_1 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc5_1, [0.0])
     u = moveinput!(nmpc5_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
