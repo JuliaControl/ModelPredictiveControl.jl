@@ -1044,7 +1044,7 @@ function predict!(
     for j=1:Hp
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        k     = @views K[(1 + nk*(j-1)):(nk*j)]
+        k      = @views K[(1 + nk*(j-1)):(nk*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, k, mpc.estim, model, x̂0, u0, d̂0)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
@@ -1216,7 +1216,7 @@ function con_nonlinprogeq!(
         end
         u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k       = @views   K[(1 + nk*(j-1)):(nk*j)]
+        k        = @views    K[(1 + nk*(j-1)):(nk*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
@@ -1284,7 +1284,7 @@ function con_nonlinprogeq!(
             x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
             d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        k       = @views   K[(1 + nk*(j-1)):(nk*j)]
+        k        = @views    K[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
@@ -1343,7 +1343,7 @@ function con_nonlinprogeq!(
             x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
             d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        k        = @views   K[(1 + nk*(j-1)):(nk*j)]
+        k        = @views    K[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  

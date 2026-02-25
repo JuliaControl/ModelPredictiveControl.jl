@@ -142,7 +142,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info = Dict{Symbol, Any}()
     ΔŨ     = Vector{NT}(undef, nΔŨ)
     x̂0end  = similar(mpc.estim.x̂0)
-    K     = Vector{NT}(undef, nK) 
+    K      = Vector{NT}(undef, nK) 
     Ue, Ŷe = Vector{NT}(undef, nUe), Vector{NT}(undef, nŶe)
     U0, Ŷ0 = similar(mpc.Uop), similar(mpc.Yop)
     Û0, X̂0 = Vector{NT}(undef, nÛ0), Vector{NT}(undef, nX̂0)
