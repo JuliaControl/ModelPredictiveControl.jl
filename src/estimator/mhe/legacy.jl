@@ -20,18 +20,18 @@ function get_optim_functions(
     myNaN = convert(JNT, NaN)
     J::Vector{JNT}                   = zeros(JNT, 1)
     V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
-    k0::Vector{JNT}                  = zeros(JNT, nk)
+    k::Vector{JNT}                  = zeros(JNT, nk)
     û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
     g::Vector{JNT}                   = zeros(JNT, ng)
     x̄::Vector{JNT}                   = zeros(JNT, nx̂)
     # --------------------- objective functions -------------------------------------------
-    function Jfunc!(Z̃, V̂, X̂0, û0, k0, ŷ0, g, x̄)
-        update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
+    function Jfunc!(Z̃, V̂, X̂0, û0, k, ŷ0, g, x̄)
+        update_prediction!(V̂, X̂0, û0, k, ŷ0, g, estim, Z̃)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
     Z̃_∇J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇J_context = (
-        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0),
+        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0),
         Cache(g),
         Cache(x̄),
     )
@@ -57,12 +57,12 @@ function get_optim_functions(
         return ∇Jarg .= ∇J
     end
     # --------------------- inequality constraint functions -------------------------------
-    function gfunc!(g, Z̃, V̂, X̂0, û0, k0, ŷ0)
-        return update_prediction!(V̂, X̂0, û0, k0, ŷ0, g, estim, Z̃)
+    function gfunc!(g, Z̃, V̂, X̂0, û0, k, ŷ0)
+        return update_prediction!(V̂, X̂0, û0, k, ŷ0, g, estim, Z̃)
     end
     Z̃_∇g = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇g_context = (
-        Cache(V̂), Cache(X̂0), Cache(û0), Cache(k0), Cache(ŷ0),
+        Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0),
     )
     # temporarily enable all the inequality constraints for sparsity detection:
     estim.con.i_g .= true  

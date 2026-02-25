@@ -168,14 +168,14 @@ function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂0next, _ , k0, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    f̂!(x̂0next, _ , k, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
 
 State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
 It calls [`f!`](@ref) directly since this estimator does not augment the states.
 """
-function f̂!(x̂0next, _ , k0, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
-    f!(x̂0next, k0, model, x̂0, u0, d0, model.p)
+function f̂!(x̂0next, _ , k, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    f!(x̂0next, k, model, x̂0, u0, d0, model.p)
     x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
@@ -307,8 +307,8 @@ function update_estimate!(estim::InternalModel, _ , d0, u0)
     model = estim.model
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
-    x̂dnext, k0 = estim.buffer.x̂, estim.buffer.k
-    f!(x̂dnext, k0, model, x̂d, u0, d0, model.p) 
+    x̂dnext, k = estim.buffer.x̂, estim.buffer.k
+    f!(x̂dnext, k, model, x̂d, u0, d0, model.p) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = estim.x̂snext

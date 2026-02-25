@@ -298,15 +298,15 @@ LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 
 """
-    f!(x0next, k0, model::NonLinModel, x0, u0, d0, p)
+    f!(x0next, k, model::NonLinModel, x0, u0, d0, p)
 
 Compute `x0next` using the [`DiffSolver`](@ref) in `model.solver` and `model.f!`.
 
-The method mutates `x0next` and `k0` arguments in-place. The latter is used to store the
+The method mutates `x0next` and `k` arguments in-place. The latter is used to store the
 intermediate stage values of the solver.
 """
-function f!(x0next, k0, model::NonLinModel, x0, u0, d0, p)
-    return solver_f!(x0next, k0, model.f!, model.Ts, model.solver, x0, u0, d0, p)
+function f!(x0next, k, model::NonLinModel, x0, u0, d0, p)
+    return solver_f!(x0next, k, model.f!, model.Ts, model.solver, x0, u0, d0, p)
 end
 
 """

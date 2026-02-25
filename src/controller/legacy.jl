@@ -23,21 +23,21 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     J::Vector{JNT}                   = zeros(JNT, 1)
     ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
     x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
-    K0::Vector{JNT}                  = zeros(JNT, nK)
+    K::Vector{JNT}                  = zeros(JNT, nK)
     Ue::Vector{JNT}, Ŷe::Vector{JNT} = zeros(JNT, nUe), zeros(JNT, nŶe)
     U0::Vector{JNT}, Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
     Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
     gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                 = zeros(JNT, neq)
     # ---------------------- objective function ------------------------------------------- 
-    function Jfunc!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+    function Jfunc!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
     end
     Z̃_∇J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇J_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(Û0), Cache(K), Cache(X̂0), 
         Cache(gc), Cache(g), Cache(geq),
     )
     ∇J_prep = prepare_gradient(Jfunc!, grad, Z̃_∇J, ∇J_context...; strict)
@@ -64,14 +64,14 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         end
     end
     # --------------------- inequality constraint functions -------------------------------
-    function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, geq)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+    function gfunc!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return g
     end
     Z̃_∇g = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇g_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-        Cache(Û0), Cache(K0), Cache(X̂0), 
+        Cache(Û0), Cache(K), Cache(X̂0), 
         Cache(gc), Cache(geq),
     )
     # temporarily enable all the inequality constraints for sparsity detection:
@@ -109,14 +109,14 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
         ∇g_funcs![i] = ∇gfuncs_i!
     end
     # --------------------- equality constraint functions ---------------------------------
-    function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g) 
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
+    function geqfunc!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g) 
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return geq
     end
     Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update_predictions! at first call
     ∇geq_context = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
-        Cache(Û0), Cache(K0),   Cache(X̂0),
+        Cache(Û0), Cache(K),   Cache(X̂0),
         Cache(gc), Cache(g)
     )
     ∇geq_prep = prepare_jacobian(geqfunc!, geq, jac, Z̃_∇geq, ∇geq_context...; strict)

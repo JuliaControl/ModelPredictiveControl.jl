@@ -327,16 +327,16 @@ end
     nonlinmodel3 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=RungeKutta())
     linmodel3 = linearize(nonlinmodel3; x, u, d)
     x0, u0, d0 = x - nonlinmodel3.xop, u - nonlinmodel3.uop, d - nonlinmodel3.dop
-    x0next, k0, y0 = nonlinmodel3.buffer.x, nonlinmodel3.buffer.k, nonlinmodel3.buffer.y
+    x0next, k, y0 = nonlinmodel3.buffer.x, nonlinmodel3.buffer.k, nonlinmodel3.buffer.y
     backend = AutoForwardDiff()
-    f_A(x0next, x0, k0)  = ModelPredictiveControl.f!(x0next, k0, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
-    f_Bu(x0next, u0, k0) = ModelPredictiveControl.f!(x0next, k0, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
-    f_Bd(x0next, d0, k0) = ModelPredictiveControl.f!(x0next, k0, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
+    f_A(x0next, x0, k)  = ModelPredictiveControl.f!(x0next, k, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
+    f_Bu(x0next, u0, k) = ModelPredictiveControl.f!(x0next, k, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
+    f_Bd(x0next, d0, k) = ModelPredictiveControl.f!(x0next, k, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
     h_C(y0, x0)  = ModelPredictiveControl.h!(y0, nonlinmodel3, x0, d0, nonlinmodel3.p)
     h_Dd(y0, d0) = ModelPredictiveControl.h!(y0, nonlinmodel3, x0, d0, nonlinmodel3.p)
-    A  = jacobian(f_A,  x0next, backend, x0, Cache(k0))
-    Bu = jacobian(f_Bu, x0next, backend, u0, Cache(k0))
-    Bd = jacobian(f_Bd, x0next, backend, d0, Cache(k0))
+    A  = jacobian(f_A,  x0next, backend, x0, Cache(k))
+    Bu = jacobian(f_Bu, x0next, backend, u0, Cache(k))
+    Bd = jacobian(f_Bd, x0next, backend, d0, Cache(k))
     C  = jacobian(h_C,  y0, backend, x0)
     Dd = jacobian(h_Dd, y0, backend, d0)
     @test linmodel3.A  ≈ A

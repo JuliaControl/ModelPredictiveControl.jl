@@ -126,7 +126,7 @@ Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@
 
 Also known as pseudo-spectral method. The `h` argument is the hold order for ``\mathbf{u}``,
 and `no`, the number of collocation points ``n_o``. The decision variable is similar to
-[`MultipleShooting`](@ref), but it also includes the collocation points (excluding ``ϵ``):
+[`MultipleShooting`](@ref), but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -143,7 +143,7 @@ where ``\mathbf{K}`` comprises all the intermediate stages of the deterministic 
     \vdots                              \\
     \mathbf{k}_{n_o}(k+H_p)             \end{bmatrix}
 ```
-and ``\mathbf{k}_p(k+j)`` is the deterministic state prediction for the ``p``th collocation
+and ``\mathbf{k}_o(k+j)`` is the deterministic state prediction for the ``o``th collocation
 point at the ``j``th stage/interval/finite element (details in Extended Help).
 
 !!! warning
@@ -165,16 +165,29 @@ struct OrthogonalCollocation <: CollocationMethod
     f_threads::Bool
     h_threads::Bool
     τ::Vector{Float64}
-    function OrthogonalCollocation(h::Int=0, no=5; f_threads=false, h_threads=false)
+    Dτ::Matrix{Float64}
+    function OrthogonalCollocation(h::Int=0, no::Int=5; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
             throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
-        end
-        x, _ = FastGaussQuadrature.gaussradau(no)
+        end        
+        # TODO: move τ and Dτ to NonLinMPC object to construct with adequate types (e.g. Float32)
+        Dτ, τ = init_diffmatrix(Float64, no)
+        return new(h, no, f_threads, h_threads, τ, Dτ)
+    end
+end
+
+function init_diffmatrix(T, no, quadrature=:gaussradau)
+    if quadrature == :gaussradau
+        x, _ = FastGaussQuadrature.gaussradau(no, T)
         # we reverse the nodes to include the τ=1.0 node:
         τ = (reverse(-x) .+ 1) ./ 2
-
-        return new(h, no, f_threads, h_threads, τ)
+        A = τ.^(0:no-1)'.*(1:no)'
+        B = τ.^(1:no)'
+        Dτ = (A/B)
+    else
+        throw(ArgumentError("Only :gaussradau scheme is currently implemented."))
     end
+    return Dτ, τ
 end
 
 function validate_transcription(::LinModel, ::CollocationMethod)
@@ -1003,14 +1016,14 @@ end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, X̂0, Û0, K0,
+        Ŷ0, x̂0end, X̂0, Û0, K,
         mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
         U0, _
     ) -> Ŷ0, x̂0end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
-The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments. The augmented model of
+The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K` arguments. The augmented model of
 [`f̂!`](@ref) and [`ĥ!`](@ref) functions is called recursively in a `for` loop:
 ```math
 \begin{aligned}
@@ -1020,7 +1033,7 @@ The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments. The aug
 ```
 """
 function predict!(
-    Ŷ0, x̂0end, X̂0, Û0, K0,
+    Ŷ0, x̂0end, X̂0, Û0, K,
     mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
     U0, _
 )
@@ -1031,9 +1044,9 @@ function predict!(
     for j=1:Hp
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
+        k     = @views K[(1 + nk*(j-1)):(nk*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
+        f̂!(x̂0next, û0, k, mpc.estim, model, x̂0, u0, d̂0)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         d̂0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
@@ -1167,14 +1180,14 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K0
+        geq, X̂0, Û0, K
         mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
         U0, Z̃
     )
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The nonlinear 
+The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. The nonlinear 
 equality constraints `geq` only includes the augmented state defects, computed with:
 ```math
 \mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d̂_0}(k)\Big) 
@@ -1184,7 +1197,7 @@ in which the augmented state ``\mathbf{x̂_0}`` are extracted from the decision 
 `Z̃`, and ``\mathbf{f̂}`` is the augmented state function defined in [`f̂!`](@ref).
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K0, 
+    geq, X̂0, Û0, K, 
     mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, U0, Z̃
 )
     nu, nx̂, nd, nk = model.nu, mpc.estim.nx̂, model.nd, model.nk
@@ -1203,11 +1216,11 @@ function con_nonlinprogeq!(
         end
         u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        k       = @views   K[(1 + nk*(j-1)):(nk*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
+        f̂!(x̂0next, û0, k, mpc.estim, model, x̂0, u0, d̂0)
         ŝnext .= x̂0next .- x̂0next_Z̃
     end
     return geq
@@ -1215,14 +1228,14 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K0
+        geq, X̂0, Û0, K
         mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
         U0, Z̃
     )
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. 
+The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. 
 
 The nonlinear equality constraints `geq` only includes the state defects. The deterministic
 and stochastic states are handled separately since collocation methods require continuous-
@@ -1251,7 +1264,7 @@ in which ``h`` is the hold order `transcription.h` and the disturbed input is:
 the ``\mathbf{A_s, C_{s_u}}`` matrices are defined in [`init_estimstoch`](@ref) doc.
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K0, 
+    geq, X̂0, Û0, K, 
     mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
     U0, Z̃
 )
@@ -1271,7 +1284,7 @@ function con_nonlinprogeq!(
             x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
             d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        k       = @views   K[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
@@ -1280,7 +1293,7 @@ function con_nonlinprogeq!(
         xsnext              = @views x̂0next[nx+1:end]
         x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
         sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
-        k1, k2              = @views k0[1:nx], k0[nx+1:2*nx]
+        k1, k2              = @views k[1:nx], k[nx+1:2*nx]
         # ----------------- stochastic defects -----------------------------------------
         fs!(x̂0next, mpc.estim, model, x̂0)
         ssnext .= @. xsnext - xsnext_Z̃
@@ -1293,7 +1306,7 @@ function con_nonlinprogeq!(
             # last iteration (j-1) may not be executed (iterations are re-orderable)
             model.f!(k1, x0, û0, d̂0, p)
         else
-            k1 .= @views K0[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+            k1 .= @views K[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1 || j ≥ Hp
             # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
@@ -1310,7 +1323,7 @@ function con_nonlinprogeq!(
 end
 
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K0, 
+    geq, X̂0, Û0, K, 
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
@@ -1319,7 +1332,6 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     Ts, p = model.Ts, model.p
-    As, Cs_u = mpc.estim.As, mpc.estim.Cs_u
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
@@ -1331,30 +1343,28 @@ function con_nonlinprogeq!(
             x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
             d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        k        = @views   K[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
-        x0, xs              = @views x̂0[1:nx], x̂0[nx+1:end]
+        x0                  = @views x̂0[1:nx]
+        xsnext              = @views x̂0next[nx+1:end]
         x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
         sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
-        k1, k2              = @views k0[1:nx], k0[nx+1:2*nx]
         # ----------------- stochastic defects -----------------------------------------
-        xsnext = @views x̂0next[nx+1:end]
-        mul!(xsnext, As, xs)
+        fs!(x̂0next, mpc.estim, model, x̂0)
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- deterministic defects --------------------------------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        mul!(û0, Cs_u, xs)                 # ys_u(k) = Cs_u*xs(k)
-        û0 .+= u0                          #   û0(k) = u0(k) + ys_u(k)
+        f̂_input!(û0, mpc.estim, model, x̂0, u0)
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
             model.f!(k1, x0, û0, d̂0, p)
         else
-            k1 .= @views K0[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+            k1 .= @views K[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1 || j ≥ Hp
             # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
@@ -1362,8 +1372,7 @@ function con_nonlinprogeq!(
         else
             u0next = @views U0[(1 + nu*j):(nu*(j+1))]
             û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
-            mul!(û0next, Cs_u, xsnext_Z̃)      # ys_u(k+1) = Cs_u*xs(k+1)
-            û0next .+= u0next                 #   û0(k+1) = u0(k+1) + ys_u(k+1)
+            f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
         end
         model.f!(k2, x0next_Z̃, û0next, d̂0next, p)
         sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k1 + k2)
