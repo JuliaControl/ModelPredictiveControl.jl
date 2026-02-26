@@ -42,6 +42,8 @@ struct NonLinMPC{
     weights::CW
     JE::JEfunc
     p::PT
+    Mo::SparseMatrixCSC{NT, Int}
+    Co::SparseMatrixCSC{NT, Int}
     R̂u::Vector{NT}
     R̂y::Vector{NT}
     lastu0::Vector{NT}
@@ -120,6 +122,7 @@ struct NonLinMPC{
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         test_custom_functions(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
+        Mo, Co = init_orthocolloc(model, transcription)
         nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
@@ -130,6 +133,7 @@ struct NonLinMPC{
             Hp, Hc, nϵ, nb,
             weights,
             JE, p,
+            Mo, Co,
             R̂u, R̂y,
             lastu0,
             P̃Δu, P̃u, Tu, Tu_lastu0,

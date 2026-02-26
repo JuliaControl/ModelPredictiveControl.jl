@@ -1,3 +1,5 @@
+const COLLOCATION_NODE_TYPE = Float64
+
 """
 Abstract supertype of all transcription methods of [`PredictiveController`](@ref).
 
@@ -125,8 +127,9 @@ end
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
 Also known as pseudo-spectral method. The `h` argument is the hold order for ``\mathbf{u}``,
-and `no`, the number of collocation points ``n_o``. The decision variable is similar to
-[`MultipleShooting`](@ref), but it also includes the collocation points:
+and `no`, the number of collocation points ``n_o``. Only zero-order hold is currently
+implemented, so `h` must be `0`. The decision variable is similar to [`MultipleShooting`](@ref),
+but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -164,30 +167,70 @@ struct OrthogonalCollocation <: CollocationMethod
     no::Int
     f_threads::Bool
     h_threads::Bool
-    τ::Vector{Float64}
-    Dτ::Matrix{Float64}
-    function OrthogonalCollocation(h::Int=0, no::Int=5; f_threads=false, h_threads=false)
-        if !(h == 0 || h == 1)
-            throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
-        end        
-        # TODO: move τ and Dτ to NonLinMPC object to construct with adequate types (e.g. Float32)
-        Dτ, τ = init_diffmatrix(Float64, no)
-        return new(h, no, f_threads, h_threads, τ, Dτ)
+    τ::Vector{COLLOCATION_NODE_TYPE}
+    function OrthogonalCollocation(
+        h::Int=0, no::Int=5; f_threads=false, h_threads=false, roots=:gaussradau
+    )
+        if !(h == 0)
+            throw(ArgumentError("Only the zero-order hold (h=0) is currently implemented."))
+        end
+        if roots==:gaussradau            
+            x, _ = FastGaussQuadrature.gaussradau(no, COLLOCATION_NODE_TYPE)
+            # we reverse the nodes to include the τ=1.0 node:
+            τ = (reverse(-x) .+ 1) ./ 2
+        elseif roots==:gausslegendre
+            x, _ = FastGaussQuadrature.gausslegendre(no)
+            # converting [-1, 1] to [0, 1] (see 
+            # https://en.wikipedia.org/wiki/Gaussian_quadrature#Change_of_interval):
+            τ = (x .+ 1) ./ 2
+        else
+            throw(ArgumentError("roots argument must be :gaussradau or :gausslegendre."))
+        end
+        return new(h, no, f_threads, h_threads, τ)
     end
 end
 
-function init_diffmatrix(T, no, quadrature=:gaussradau)
-    if quadrature == :gaussradau
-        x, _ = FastGaussQuadrature.gaussradau(no, T)
-        # we reverse the nodes to include the τ=1.0 node:
-        τ = (reverse(-x) .+ 1) ./ 2
-        A = τ.^(0:no-1)'.*(1:no)'
-        B = τ.^(1:no)'
-        Dτ = (A/B)
-    else
-        throw(ArgumentError("Only :gaussradau scheme is currently implemented."))
+"""
+    init_orthocolloc(model::SimModel, transcription::OrthogonalCollocation) -> Mo, o
+
+Init the differentiation `Mo` and continuity `Co` matrices of [`OrthogonalCollocation`](@ref).
+"""
+function init_orthocolloc(
+    model::SimModel{NT}, transcription::OrthogonalCollocation
+) where {NT<:Real}
+    nx, no = model.nx, transcription.no
+    τ = transcription.τ
+    Po = Matrix{NT}(undef, nx*no, nx*no) # polynomial matrix (w/o the Y-intercept term)
+    Ṗo = Matrix{NT}(undef, nx*no, nx*no) # polynomial derivative matrix
+    for j=1:no, i=1:no
+        iRows = (1:nx) .+ nx*(i-1)
+        iCols = (1:nx) .+ nx*(j-1)
+        Po[iRows, iCols] = (τ[i]^j)*I(nx)
+        Ṗo[iRows, iCols] = (j*τ[i]^(j-1))*I(nx)
     end
-    return Dτ, τ
+    Mo = sparse((Ṗo/Po)/model.Ts)
+    Co = Matrix{NT}(undef, nx, nx*no)
+    for j=1:no
+        iCols = (1:nx) .+ nx*(j-1)
+        Co[:, iCols] = lagrange_end(j, τ)*I(nx)
+    end
+    Co = sparse(Co)
+    return Mo, Co
+end
+"Return empty sparse matrices for other [`TranscriptionMethod`](@ref)"
+init_orthocolloc(::SimModel, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0)
+
+"Evaluate the Lagrange basis polynomial ``L_j`` at `τ=1`."
+function lagrange_end(j, τ_values)
+    τ_val = 1 # evaluating the Lagrange polynomial at τ=1 (the end of the interval)
+    τj = τ_values[j]
+    Lj = 1
+    for i in eachindex(τ_values)
+        i == j && continue
+        τi = τ_values[i]
+        Lj *= (τ_val - τi)/(τj - τi)
+    end
+    return Lj
 end
 
 function validate_transcription(::LinModel, ::CollocationMethod)
@@ -1297,7 +1340,7 @@ function con_nonlinprogeq!(
         # ----------------- stochastic defects -----------------------------------------
         fs!(x̂0next, mpc.estim, model, x̂0)
         ssnext .= @. xsnext - xsnext_Z̃
-        # ----------------- deterministic defects --------------------------------------
+        # ----------------- deterministic defects: trapezoidal collocation -------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0, u0)
@@ -1331,10 +1374,11 @@ function con_nonlinprogeq!(
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
-    Ts, p = model.Ts, model.p
+    p = model.p
+    no, Mo = transcription.no, mpc.Mo
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
-    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0 = @views mpc.estim.x̂0[1:nx̂]
@@ -1344,6 +1388,7 @@ function con_nonlinprogeq!(
             d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         k        = @views    K[(1 + nk*(j-1)):(nk*j)]
+        k_Z̃      = @views  K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
@@ -1355,17 +1400,13 @@ function con_nonlinprogeq!(
         # ----------------- stochastic defects -----------------------------------------
         fs!(x̂0next, mpc.estim, model, x̂0)
         ssnext .= @. xsnext - xsnext_Z̃
-        # ----------------- deterministic defects --------------------------------------
+        # ----------------- deterministic defects: orthogonal collocation --------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0, u0)
-        if f_threads || h < 1 || j < 2
-            # we need to recompute k1 with multi-threading, even with h==1, since the 
-            # last iteration (j-1) may not be executed (iterations are re-orderable)
-            model.f!(k1, x0, û0, d̂0, p)
-        else
-            k1 .= @views K[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
-        end
+        
+
+
         if h < 1 || j ≥ Hp
             # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
             û0next = û0
@@ -1374,8 +1415,27 @@ function con_nonlinprogeq!(
             û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
             f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
         end
-        model.f!(k2, x0next_Z̃, û0next, d̂0next, p)
-        sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k1 + k2)
+
+        # TODO: remove this allocation
+        Δk = similar(k)
+        for o=1:no
+            ko   = @views   k[(1 + (o-1)*nx):(o*nx)]
+            ko_Z̃ = @views k_Z̃[(1 + (o-1)*nx):(o*nx)]
+            Δko  = @views  Δk[(1 + (o-1)*nx):(o*nx)]
+            Δko .= ko_Z̃ .- x0
+            if o < no
+                model.f!(ko, ko_Z̃, û0, d̂0, p)
+            else
+                model.f!(ko, ko_Z̃, û0next, d̂0next, p)
+            end
+        end
+        # TODO: remove this allocation
+        display(Δk)
+        ẋ0 = Mo*Δk
+        display(ẋ0)
+        
+        sdnext .= @. ẋ0 - k
+
     end
     return geq
 end
