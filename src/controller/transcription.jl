@@ -122,7 +122,9 @@ end
 
 
 @doc raw"""
-    OrthogonalCollocation(h::Int=0, no=5; f_threads=false, h_threads=false)
+    OrthogonalCollocation(
+        h::Int=0, no=5; f_threads=false, h_threads=false, roots=:gaussradau
+    )
 
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
@@ -133,7 +135,7 @@ but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
-where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministic state only
+where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministic states
 (the first `nx` elements of ``\mathbf{x̂}``):
 ```math
 \mathbf{K} =                            \begin{bmatrix}
@@ -142,8 +144,10 @@ where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministi
     \vdots                              \\
     \mathbf{k}(k+H_p-1)                 \end{bmatrix}
 ```
-and ``\mathbf{k}(k+j)`` comprises the deterministic state predictions for the ``n_o`` 
+and ``\mathbf{k}(k+j)`` includes the deterministic state predictions for the ``n_o`` 
 collocation points at the ``j``th stage/interval/finite element (details in Extended Help).
+The `roots` keyword argument is either `:gaussradau` or `:gausslegendre`, for the roots of 
+the Gauss-Radau or Gauss-Legendre quadrature, respectively.
 
 This transcription computes the predictions by enforcing the collocation and continuity
 constraints at the collocation points. It is efficient for highly stiff systems, but 
@@ -165,8 +169,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 
     The collocation points are the roots of orthogonal polynomials, which are optimal for
     approximating the state trajectories with polynomials of degree ``n_o``. The method then
-    enforces the system dynamics at these collocation points. See [`con_nonlinprogeq!`](@ref)
-    for details on the implementation.
+    enforces the system dynamics at these points. See [`con_nonlinprogeq!`](@ref) for
+    details on the implementation.
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
@@ -1399,6 +1403,7 @@ model dynamics are computed by:
         \mathbf{f}\Big(\mathbf{k}_2(k+j+1), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
         \vdots                                                                                        \\
         \mathbf{f}\Big(\mathbf{k}_{n_o}(k+j+1), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big) \end{bmatrix}
+\end{aligned}
 ```
 for ``j = 0, 1, ... , H_p-1``, and knowing that ``\mathbf{k}(k+j+1)`` include all the
 ``\mathbf{k}_i(k+j+1)`` collocation points.  The defects related to the continuity of 
