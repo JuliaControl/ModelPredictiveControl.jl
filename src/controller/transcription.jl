@@ -161,6 +161,25 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 !!! details "Extended Help"
     See the Extended Help of [`TrapezoidalCollocation`](@ref) to understand why the 
     stochastic states are left out of the ``\mathbf{K}`` vector.
+
+    The collocation points are the roots of orthogonal polynomials, which are optimal for
+    approximating the state trajectories with polynomials of degree ``n_o``. The method then
+    enforces the system dynamics at these collocation points, which leads to a more accurate
+    solution than the trapezoidal rule for the same number of collocation points.
+
+    The differentiation ``\mathbf{M_o}`` and continuity ``\mathbf{C_o}`` matrices are:
+    ```math
+    \begin{aligned}
+        \mathbf{M_o} &= \begin{bmatrix}
+            \mathbf{Ṗ_o} \mathbf{P_o}^{-1} & \mathbf{0}                     & \cdots & \mathbf{0}                                \\
+            \mathbf{0}                     & \mathbf{Ṗ_o} \mathbf{P_o}^{-1} & \cdots & \mathbf{0}                                \\
+            \vdots                         & \vdots                         & \ddots & \vdots                                    \\
+            \mathbf{0}                     & \mathbf{0}                     & \cdots & \mathbf{Ṗ_o} \mathbf{P_o}^{-1}            \end{bmatrix}  \\ 
+        \mathbf{C_o} &= [\begin{smallmatrix}\mathbf{C_o^{x̂}} & \mathbf{C_o^{x̂}} & ... & \mathbf{C_o^{x̂}}\end{smallmatrix}]
+    \end{aligned}
+    ```
+    where ``\mathbf{P_o}`` is the polynomial matrix (w/o the Y-intercept term) and 
+    ``\mathbf{Ṗ_o}`` is its derivative matrix, both evaluated at the collocation points. 
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
