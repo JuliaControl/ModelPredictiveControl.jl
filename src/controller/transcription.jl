@@ -1375,7 +1375,7 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     p = model.p
-    no, Mo = transcription.no, mpc.Mo
+    no, Mo, Co = transcription.no, mpc.Mo, mpc.Co
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
@@ -1404,7 +1404,8 @@ function con_nonlinprogeq!(
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0, u0)
-        
+        # something like this:
+        #     sdnext .= @. x0 - x0next_Z̃
 
 
         if h < 1 || j ≥ Hp
