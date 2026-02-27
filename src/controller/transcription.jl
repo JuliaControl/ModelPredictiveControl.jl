@@ -133,21 +133,22 @@ but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
-where ``\mathbf{K}`` comprises all the intermediate stages of the deterministic state only
+where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministic state only
 (the first `nx` elements of ``\mathbf{x̂}``):
 ```math
 \mathbf{K} =                            \begin{bmatrix}
-    \mathbf{k}_{1}(k+0)                 \\
-    \mathbf{k}_{2}(k+0)                 \\
+    \mathbf{k}(k+0)                     \\
+    \mathbf{k}(k+1)                     \\
     \vdots                              \\
-    \mathbf{k}_{n_o}(k+0)               \\
-    \mathbf{k}_{1}(k+1)                 \\
-    \mathbf{k}_{2}(k+1)                 \\
-    \vdots                              \\
-    \mathbf{k}_{n_o}(k+H_p)             \end{bmatrix}
+    \mathbf{k}(k+H_p-1)                 \end{bmatrix}
 ```
-and ``\mathbf{k}_o(k+j)`` is the deterministic state prediction for the ``o``th collocation
-point at the ``j``th stage/interval/finite element (details in Extended Help).
+and ``\mathbf{k}(k+j)`` comprises the deterministic state predictions for the ``n_o`` 
+collocation points at the ``j``th stage/interval/finite element (details in Extended Help).
+
+This transcription computes the predictions by enforcing the collocation and continuity
+constraints at the collocation points. It is efficient for highly stiff systems, but 
+generally more expensive than the other methods for non-stiff systems. See Extended Help for
+more details.
 
 !!! warning
     The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
@@ -164,22 +165,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 
     The collocation points are the roots of orthogonal polynomials, which are optimal for
     approximating the state trajectories with polynomials of degree ``n_o``. The method then
-    enforces the system dynamics at these collocation points, which leads to a more accurate
-    solution than the trapezoidal rule for the same number of collocation points.
-
-    The differentiation ``\mathbf{M_o}`` and continuity ``\mathbf{C_o}`` matrices are:
-    ```math
-    \begin{aligned}
-        \mathbf{M_o} &= \begin{bmatrix}
-            \mathbf{Ṗ_o} \mathbf{P_o}^{-1} & \mathbf{0}                     & \cdots & \mathbf{0}                                \\
-            \mathbf{0}                     & \mathbf{Ṗ_o} \mathbf{P_o}^{-1} & \cdots & \mathbf{0}                                \\
-            \vdots                         & \vdots                         & \ddots & \vdots                                    \\
-            \mathbf{0}                     & \mathbf{0}                     & \cdots & \mathbf{Ṗ_o} \mathbf{P_o}^{-1}            \end{bmatrix}  \\ 
-        \mathbf{C_o} &= [\begin{smallmatrix}\mathbf{C_o^{x̂}} & \mathbf{C_o^{x̂}} & ... & \mathbf{C_o^{x̂}}\end{smallmatrix}]
-    \end{aligned}
-    ```
-    where ``\mathbf{P_o}`` is the polynomial matrix (w/o the Y-intercept term) and 
-    ``\mathbf{Ṗ_o}`` is its derivative matrix, both evaluated at the collocation points. 
+    enforces the system dynamics at these collocation points. See [`con_nonlinprogeq!`](@ref)
+    for details on the implementation.
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
@@ -1089,10 +1076,11 @@ The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K` arguments. The augm
 [`f̂!`](@ref) and [`ĥ!`](@ref) functions is called recursively in a `for` loop:
 ```math
 \begin{aligned}
-\mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d̂_0}(k) \Big) \\
-\mathbf{ŷ_0}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d̂_0}(k) \Big)
+\mathbf{x̂_0}(k+j+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k+j), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j) \Big) \\
+\mathbf{ŷ_0}(k+j)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k+j), \mathbf{d̂_0}(k+j) \Big)
 \end{aligned}
 ```
+for ``j = 0, 1, ... , H_p``.
 """
 function predict!(
     Ŷ0, x̂0end, X̂0, Û0, K,
@@ -1131,9 +1119,10 @@ Compute vectors if `model` is a [`NonLinModel`](@ref) and other [`TranscriptionM
 The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
 is called multiple times in a `for` loop:
 ```math
-\mathbf{ŷ_0}(k) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d̂_0}(k) \Big)
+\mathbf{ŷ_0}(k+j) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k+j), \mathbf{d̂_0}(k+j) \Big)
 ```
-in which ``\mathbf{x̂_0}`` is the augmented state extracted from the decision variable `Z̃`.
+for ``j = 1, 2, ... , H_p``, and in which ``\mathbf{x̂_0}`` is the augmented state extracted
+from the decision variable `Z̃`.
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
@@ -1245,18 +1234,19 @@ end
         geq, X̂0, Û0, K
         mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
         U0, Z̃
-    )
+    ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
 The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. The nonlinear 
 equality constraints `geq` only includes the augmented state defects, computed with:
 ```math
-\mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d̂_0}(k)\Big) 
-                    - \mathbf{x̂_0}(k+1)
+\mathbf{ŝ}(k+j+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k+j), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j)\Big) 
+                    - \mathbf{x̂_0}(k+j+1)
 ```
-in which the augmented state ``\mathbf{x̂_0}`` are extracted from the decision variables 
-`Z̃`, and ``\mathbf{f̂}`` is the augmented state function defined in [`f̂!`](@ref).
+for ``j = 0, 1, ... , H_p-1``, and in which the augmented state ``\mathbf{x̂_0}`` are
+extracted from the decision variables `Z̃`, and ``\mathbf{f̂}`` is the augmented state
+function defined in [`f̂!`](@ref).
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K, 
@@ -1293,7 +1283,7 @@ end
         geq, X̂0, Û0, K
         mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
         U0, Z̃
-    )
+    ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
@@ -1305,18 +1295,18 @@ time state-space models, and the stochastic model of the unmeasured disturbances
 is discrete-time. The deterministic and stochastic defects are respectively computed with:
 ```math
 \begin{aligned}
-\mathbf{s_d}(k+1) &= \mathbf{x_0}(k) - \mathbf{x_0}(k+1) 
+\mathbf{s_d}(k+j+1) &= \mathbf{x_0}(k+j) - \mathbf{x_0}(k+j+1) 
                       + 0.5 T_s (\mathbf{k}_1 + \mathbf{k}_2) \\
-\mathbf{s_s}(k+1) &= \mathbf{A_s x_s}(k) - \mathbf{x_s}(k+1)
+\mathbf{s_s}(k+j+1) &= \mathbf{A_s x_s}(k+j) - \mathbf{x_s}(k+j+1)
 \end{aligned}
 ```
-in which ``\mathbf{x_0}`` and ``\mathbf{x_s}`` are the deterministic and stochastic states 
-extracted from the decision variables `Z̃`. The ``\mathbf{k}`` coefficients are 
-evaluated from the continuous-time function `model.f!` and:
+for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x_0}`` and ``\mathbf{x_s}`` are the
+deterministic and stochastic states extracted from the decision variables `Z̃`. The
+``\mathbf{k}`` coefficients are  evaluated from the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
-\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),   \mathbf{û_0}(k),   \mathbf{d̂_0}(k)  \Big) \\
-\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0}(k+1), \mathbf{û_0}(k+h), \mathbf{d̂_0}(k+1)\Big) 
+\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),   \mathbf{û_0}(k),   \mathbf{d̂_0}(k), \mathbf{p}\Big) \\
+\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0}(k+1), \mathbf{û_0}(k+h), \mathbf{d̂_0}(k+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input is:
@@ -1384,6 +1374,61 @@ function con_nonlinprogeq!(
     return geq
 end
 
+
+@doc raw"""
+    con_nonlinprogeq!(
+        geq, X̂0, Û0, K, 
+        mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
+        U0, Z̃
+    ) -> geq
+
+Nonlinear equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocation`](@ref).
+
+Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized to the
+interval ``[0, 1]``, each state trajectories are approximated by a distinct polynomial
+of degree ``n_o``.
+
+The defects between the deterministic state derivative at the collocation points and the
+model dynamics are computed by:
+```math
+\begin{aligned}
+\mathbf{s_k}(k+j+1) 
+    & = \mathbf{M_o} [\mathbf{k}(k+j+1) - \mathbf{x_0}(k+j+1)]  
+    & - \begin{bmatrix}
+        \mathbf{f}\Big(\mathbf{k}_1(k+j+1), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
+        \mathbf{f}\Big(\mathbf{k}_2(k+j+1), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
+        \vdots                                                                                        \\
+        \mathbf{f}\Big(\mathbf{k}_{n_o}(k+j+1), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big) \end{bmatrix}
+```
+for ``j = 0, 1, ... , H_p-1``, and knowing that ``\mathbf{k}(k+j+1)`` include all the
+``\mathbf{k}_i(k+j+1)`` collocation points.  The defects related to the continuity of 
+the deterministic state trajectories are given by:
+```math
+    \mathbf{s_c}(k+j+1) = \mathbf{C_o} \mathbf{k}(k+j) - \mathbf{x_0}(k+j+1)
+```
+for ``j = 0, 1, ... , H_p-1``. The defects of the stochastic states ``\mathbf{s_s}`` are
+computed as in the [`TrapezoidalCollocation`](@ref) method. The differentiation 
+``\mathbf{M_o}`` and continuity ``\mathbf{C_o}`` matrices 
+```math
+\begin{aligned}
+    \mathbf{P_o} &=                                                                               \begin{bmatrix}
+        τ_1^1 \mathbf{I}       & τ_1^2 \mathbf{I}       & \cdots & τ_1^{n_o} \mathbf{I}           \\
+        τ_2^1 \mathbf{I}       & τ_2^2 \mathbf{I}       & \cdots & τ_2^{n_o} \mathbf{I}           \\
+        \vdots                 & \vdots                 & \ddots & \vdots                         \\
+        τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
+    \mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
+        1*τ_1^0 \mathbf{I}     & 2*τ_1^1 \mathbf{I}     & \cdots & n_o*τ_1^{n_o-1} \mathbf{I}     \\
+        1*τ_2^0 \mathbf{I}     & 2*τ_2^1 \mathbf{I}     & \cdots & n_o*τ_2^{n_o-1} \mathbf{I}     \\
+        \vdots                 & \vdots                 & \ddots & \vdots                         \\
+        1*τ_{n_o}^0 \mathbf{I} & 2*τ_{n_o}^1 \mathbf{I} & \cdots & n_o*τ_{n_o}^{n_o-1} \mathbf{I} \end{bmatrix} \\
+    \mathbf{M_o} &= \mathbf{Ṗ_o} \mathbf{P_o}^{-1} \\
+    \mathbf{C_o} &= \begin{bmatrix}
+        L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix}
+\end{aligned}
+```
+where ``\mathbf{P_o}`` is the polynomial matrix (w/o the Y-intercept term), 
+``\mathbf{Ṗ_o}``, its derivative matrix, and ``L_o(τ)``, the Lagrange basis polynomials.
+"""
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K, 
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
