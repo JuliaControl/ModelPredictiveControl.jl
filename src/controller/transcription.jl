@@ -1422,11 +1422,11 @@ computed as in the [`TrapezoidalCollocation`](@ref) method. The differentiation
         \vdots                 & \vdots                 & \ddots & \vdots                         \\
         τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
     \mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
-        1*τ_1^0 \mathbf{I}     & 2*τ_1^1 \mathbf{I}     & \cdots & n_o*τ_1^{n_o-1} \mathbf{I}     \\
-        1*τ_2^0 \mathbf{I}     & 2*τ_2^1 \mathbf{I}     & \cdots & n_o*τ_2^{n_o-1} \mathbf{I}     \\
+        1τ_1^0 \mathbf{I}     & 2τ_1^1 \mathbf{I}     & \cdots & n_o τ_1^{n_o-1} \mathbf{I}     \\
+        1τ_2^0 \mathbf{I}     & 2τ_2^1 \mathbf{I}     & \cdots & n_o τ_2^{n_o-1} \mathbf{I}     \\
         \vdots                 & \vdots                 & \ddots & \vdots                         \\
-        1*τ_{n_o}^0 \mathbf{I} & 2*τ_{n_o}^1 \mathbf{I} & \cdots & n_o*τ_{n_o}^{n_o-1} \mathbf{I} \end{bmatrix} \\
-    \mathbf{M_o} &= \mathbf{Ṗ_o} \mathbf{P_o}^{-1} \\
+        1τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I} \end{bmatrix} \\
+    \mathbf{M_o} &= \mathbf{Ṗ_o} \mathbf{P_o}^{-1} \\
     \mathbf{C_o} &= \begin{bmatrix}
         L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix}
 \end{aligned}
