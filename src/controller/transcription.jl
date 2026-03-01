@@ -1290,40 +1290,39 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K
+        geq, X̂0, Û0, K̇
         mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
         U0, Z̃
     ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. 
-
-The nonlinear equality constraints `geq` only includes the state defects. The deterministic
-and stochastic states are handled separately since collocation methods require continuous-
-time state-space models, and the stochastic model of the unmeasured disturbances
-is discrete-time. The deterministic and stochastic defects are respectively computed with:
+The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The nonlinear equality
+constraints `geq` only includes the state defects. The deterministic and stochastic states
+are handled separately since collocation methods require continuous-time state-space models,
+and the stochastic model of the unmeasured disturbances is discrete-time. The deterministic
+and stochastic defects are respectively computed with:
 ```math
 \begin{aligned}
 \mathbf{s_d}(k+j+1) &= \mathbf{x_0}(k+j) - \mathbf{x_0}(k+j+1) 
-                      + 0.5 T_s [\mathbf{k}_1(k+j) + \mathbf{k}_2(k+j)] \\
+                      + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] \\
 \mathbf{s_s}(k+j+1) &= \mathbf{A_s x_s}(k+j) - \mathbf{x_s}(k+j+1)
 \end{aligned}
 ```
 for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x_0}`` and ``\mathbf{x_s}`` are the
 deterministic and stochastic states extracted from the decision variables `Z̃`. The
-``\mathbf{k}`` coefficients are  evaluated from the continuous-time function `model.f!` and:
+``\mathbf{k̇}`` coefficients are  evaluated from the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
-\mathbf{k}_1(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
-\mathbf{k}_2(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j+1), \mathbf{û_0}(k+j+h), \mathbf{d̂_0}(k+j+1), \mathbf{p}\Big) 
+\mathbf{k̇}_1(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
+\mathbf{k̇}_2(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j+1), \mathbf{û_0}(k+j+h), \mathbf{d̂_0}(k+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
 is defined in [`f̂_input!`](@ref).
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K, 
+    geq, X̂0, Û0, K̇, 
     mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
     U0, Z̃
 )
@@ -1343,7 +1342,7 @@ function con_nonlinprogeq!(
             x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
             d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        k        = @views    K[(1 + nk*(j-1)):(nk*j)]
+        k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
@@ -1352,7 +1351,7 @@ function con_nonlinprogeq!(
         xsnext              = @views x̂0next[nx+1:end]
         x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
         sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
-        k1, k2              = @views k[1:nx], k[nx+1:2*nx]
+        k̇1, k̇2              = @views k̇[1:nx], k̇[nx+1:2*nx]
         # ----------------- stochastic defects -----------------------------------------
         fs!(x̂0next, mpc.estim, model, x̂0)
         ssnext .= @. xsnext - xsnext_Z̃
@@ -1363,9 +1362,9 @@ function con_nonlinprogeq!(
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
-            model.f!(k1, x0, û0, d̂0, p)
+            model.f!(k̇1, x0, û0, d̂0, p)
         else
-            k1 .= @views K[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+            k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1 || j ≥ Hp
             # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
@@ -1375,8 +1374,8 @@ function con_nonlinprogeq!(
             û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
             f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
         end
-        model.f!(k2, x0next_Z̃, û0next, d̂0next, p)
-        sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k1 + k2)
+        model.f!(k̇2, x0next_Z̃, û0next, d̂0next, p)
+        sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k̇1 + k̇2)
     end
     return geq
 end
@@ -1384,15 +1383,16 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K, 
+        geq, X̂0, Û0, K̇, 
         mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
         U0, Z̃
     ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocation`](@ref).
 
-The defects between the deterministic state derivative at the ``n_o`` collocation points and
-the model dynamics are computed by:
+The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The defects between
+the deterministic state derivative at the ``n_o`` collocation points and the model dynamics
+are computed by:
 ```math
 \begin{aligned}
 \mathbf{s_k}(k+j+1)                                                                                   &
@@ -1445,7 +1445,7 @@ L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K, 
+    geq, X̂0, Û0, K̇,  
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
@@ -1466,7 +1466,7 @@ function con_nonlinprogeq!(
             x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
             d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        k        = @views    K[(1 + nk*(j-1)):(nk*j)]
+        k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views  K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
@@ -1487,21 +1487,21 @@ function con_nonlinprogeq!(
         
 
         # TODO: remove this allocation
-        Δk = similar(k)
+        Δk = similar(k̇)
         for o=1:no
-            ko   = @views   k[(1 + (o-1)*nx):(o*nx)]
+            k̇o   = @views   k̇[(1 + (o-1)*nx):(o*nx)]
             ko_Z̃ = @views k_Z̃[(1 + (o-1)*nx):(o*nx)]
             Δko  = @views  Δk[(1 + (o-1)*nx):(o*nx)]
             Δko .= ko_Z̃ .- x0
-            model.f!(ko, ko_Z̃, û0, d̂0, p)
+            model.f!(k̇o, ko_Z̃, û0, d̂0, p)
         end
         # TODO: remove the following allocations
         #display(Δk)
         ẋ0 = Mo*Δk
         #display(ẋ0)
         
-        sknext .= ẋ0 .- k
-        scnext .= Co*x0 .+ λo*k - x0next_Z̃
+        sknext .= ẋ0 .- k̇
+        scnext .= Co*x0 .+ λo*k̇ - x0next_Z̃
     end
     return geq
 end
