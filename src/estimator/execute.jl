@@ -108,7 +108,7 @@ function f̂!(x̂0next, û0, k, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, 
     return nothing
 end
 
-#TODO: delete the following two generic functions and replace with linear eq. constraints
+#TODO: delete the following generic functions and replace with linear eq. constraints
 
 """
     fs!(x̂0next, estim::StateEstimator, model::SimModel, x̂0) -> nothing
@@ -124,7 +124,14 @@ end
 @doc raw"""
     f̂_input!(û0, estim::StateEstimator, model::SimModel, x̂0, u0) -> nothing
 
-Compute the disturbed input of the augmented model ``\mathbf{û_0}`` from `x̂0` and `u0`.
+Compute the disturbed input ``\mathbf{û_0}`` of the augmented model from `x̂0` and `u0`.
+
+It mutates `û0` in place with the following equation:
+```math
+\mathbf{û_0}(k) = \mathbf{u_0}(k) + \mathbf{C_{s_u} x_s}(k)
+```
+where ``\mathbf{C_{s_u}}`` is defined in [`init_estimstoch`](@ref), and ``\mathbf{x_s}`` is
+extracted from `x̂0` as the last `estim.nxs` elements.
 """
 function f̂_input!(û0, estim::StateEstimator, model::SimModel, x̂0, u0)
     xs = @views x̂0[model.nx+1:end]

@@ -167,10 +167,11 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     See the Extended Help of [`TrapezoidalCollocation`](@ref) to understand why the 
     stochastic states are left out of the ``\mathbf{K}`` vector.
 
-    The collocation points are the roots of orthogonal polynomials, which are optimal for
-    approximating the state trajectories with polynomials of degree ``n_o``. The method then
-    enforces the system dynamics at these points. See [`con_nonlinprogeq!`](@ref) for
-    details on the implementation.
+    The collocation points are located at the roots of orthogonal polynomials, which is 
+    "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
+    The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
+    is more accurate than Gauss-Radau but only A-stable, while the latter being L-stable. 
+    See [`con_nonlinprogeq!`](@ref) for details on the implementation.
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
@@ -201,7 +202,7 @@ struct OrthogonalCollocation <: CollocationMethod
 end
 
 """
-    init_orthocolloc(model::SimModel, transcription::OrthogonalCollocation) -> Mo, o
+    init_orthocolloc(model::SimModel, transcription::OrthogonalCollocation) -> Mo, Co, λo
 
 Init the differentiation `Mo` and continuity `Co` matrices of [`OrthogonalCollocation`](@ref).
 """
@@ -222,21 +223,26 @@ function init_orthocolloc(
     Co = Matrix{NT}(undef, nx, nx*no)
     for j=1:no
         iCols = (1:nx) .+ nx*(j-1)
-        Co[:, iCols] = lagrange_end(j, τ)*I(nx)
+        Co[:, iCols] = lagrange_end(j, transcription)*I(nx)
     end
     Co = sparse(Co)
-    return Mo, Co
+    λo = lagrange_end(0, transcription)
+    display(Co)
+    display(λo)
+    return Mo, Co, λo
 end
 "Return empty sparse matrices for other [`TranscriptionMethod`](@ref)"
-init_orthocolloc(::SimModel, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0)
+init_orthocolloc(::SimModel, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0), NaN
 
 "Evaluate the Lagrange basis polynomial ``L_j`` at `τ=1`."
-function lagrange_end(j, τ_values)
-    τ_val = 1 # evaluating the Lagrange polynomial at τ=1 (the end of the interval)
-    τj = τ_values[j]
+function lagrange_end(j, transcription::OrthogonalCollocation)
+    τ_val = 1
+    τ_values = [0; transcription.τ] # including the τ=0 node for the Lagrange polynomials
+    j_index = j + 1 # because of the τ=0 node
+    τj = τ_values[j_index]
     Lj = 1
     for i in eachindex(τ_values)
-        i == j && continue
+        i == j_index && continue
         τi = τ_values[i]
         Lj *= (τ_val - τi)/(τj - τi)
     end
@@ -1300,7 +1306,7 @@ is discrete-time. The deterministic and stochastic defects are respectively comp
 ```math
 \begin{aligned}
 \mathbf{s_d}(k+j+1) &= \mathbf{x_0}(k+j) - \mathbf{x_0}(k+j+1) 
-                      + 0.5 T_s (\mathbf{k}_1 + \mathbf{k}_2) \\
+                      + 0.5 T_s [\mathbf{k}_1(k+j) + \mathbf{k}_2(k+j)] \\
 \mathbf{s_s}(k+j+1) &= \mathbf{A_s x_s}(k+j) - \mathbf{x_s}(k+j+1)
 \end{aligned}
 ```
@@ -1309,15 +1315,12 @@ deterministic and stochastic states extracted from the decision variables `Z̃`.
 ``\mathbf{k}`` coefficients are  evaluated from the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
-\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),   \mathbf{û_0}(k),   \mathbf{d̂_0}(k), \mathbf{p}\Big) \\
-\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0}(k+1), \mathbf{û_0}(k+h), \mathbf{d̂_0}(k+1), \mathbf{p}\Big) 
+\mathbf{k}_1(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
+\mathbf{k}_2(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j+1), \mathbf{û_0}(k+j+h), \mathbf{d̂_0}(k+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
-in which ``h`` is the hold order `transcription.h` and the disturbed input is:
-```math
-\mathbf{û_0}(k) = \mathbf{u_0}(k) + \mathbf{C_{s_u} x_s}(k)
-``` 
-the ``\mathbf{A_s, C_{s_u}}`` matrices are defined in [`init_estimstoch`](@ref) doc.
+in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
+is defined in [`f̂_input!`](@ref).
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K, 
@@ -1388,32 +1391,35 @@ end
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocation`](@ref).
 
-Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized to the
-interval ``[0, 1]``, each state trajectories are approximated by a distinct polynomial
-of degree ``n_o``.
-
-The defects between the deterministic state derivative at the collocation points and the
-model dynamics are computed by:
+The defects between the deterministic state derivative at the ``n_o`` collocation points and
+the model dynamics are computed by:
 ```math
 \begin{aligned}
-\mathbf{s_k}(k+j+1) 
-    & = \mathbf{M_o} [\mathbf{k}(k+j+1) - \mathbf{x_0}(k+j+1)]  
-    & - \begin{bmatrix}
-        \mathbf{f}\Big(\mathbf{k}_1(k+j+1), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
-        \mathbf{f}\Big(\mathbf{k}_2(k+j+1), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
+\mathbf{s_k}(k+j+1)                                                                                   &
+    = \mathbf{M_o} [\mathbf{k}(k+j+1) - \mathbf{x_0}(k+j+1)]                                          \\ &\quad
+      - \begin{bmatrix}
+        \mathbf{f}\Big(\mathbf{k}_1(k+j+1), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
+        \mathbf{f}\Big(\mathbf{k}_2(k+j+1), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
         \vdots                                                                                        \\
-        \mathbf{f}\Big(\mathbf{k}_{n_o}(k+j+1), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big) \end{bmatrix}
+        \mathbf{f}\Big(\mathbf{k}_{n_o}(k+j+1), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big) \end{bmatrix}
 \end{aligned}
 ```
-for ``j = 0, 1, ... , H_p-1``, and knowing that ``\mathbf{k}(k+j+1)`` include all the
-``\mathbf{k}_i(k+j+1)`` collocation points.  The defects related to the continuity of 
-the deterministic state trajectories are given by:
+for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}(k+j+1)`` vectors are
+extracted from the decision variable `Z̃` and they include all the ``\mathbf{k}_i(k+j+1)`` 
+collocation points. The vectors ``\mathbf{x_0}(k+j+1)`` are the deterministic state for time
+``k+j+1``, also extracted from `Z̃`. The disturbed input ``\mathbf{û_0}(k+j)`` is defined in
+[`f̂_input!`](@ref). The defects for the stochastic states ``\mathbf{s_s}`` are computed as
+in the [`TrapezoidalCollocation`](@ref) method, and the ones for the continuity constraint
+of the deterministic state trajectories are given by:
 ```math
-    \mathbf{s_c}(k+j+1) = \mathbf{C_o} \mathbf{k}(k+j) - \mathbf{x_0}(k+j+1)
+\mathbf{s_c}(k+j+1) = λ_o \mathbf{x_0}(k+j) +  \mathbf{C_o k}(k+j) - \mathbf{x_0}(k+j+1)
 ```
-for ``j = 0, 1, ... , H_p-1``. The defects of the stochastic states ``\mathbf{s_s}`` are
-computed as in the [`TrapezoidalCollocation`](@ref) method. The differentiation 
-``\mathbf{M_o}`` and continuity ``\mathbf{C_o}`` matrices 
+for ``j = 0, 1, ... , H_p-1``. 
+
+Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized to the
+interval ``[0, 1]``, and ``τ_0=0``, each state trajectories are approximated by a distinct
+polynomial of degree ``n_o``. The differentiation matrix ``\mathbf{M_o}``, continuity
+matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed with:
 ```math
 \begin{aligned}
     \mathbf{P_o} &=                                                                               \begin{bmatrix}
@@ -1422,17 +1428,21 @@ computed as in the [`TrapezoidalCollocation`](@ref) method. The differentiation
         \vdots                 & \vdots                 & \ddots & \vdots                         \\
         τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
     \mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
-        1τ_1^0 \mathbf{I}     & 2τ_1^1 \mathbf{I}     & \cdots & n_o τ_1^{n_o-1} \mathbf{I}     \\
-        1τ_2^0 \mathbf{I}     & 2τ_2^1 \mathbf{I}     & \cdots & n_o τ_2^{n_o-1} \mathbf{I}     \\
+        τ_1^0 \mathbf{I}     & 2τ_1^1 \mathbf{I}     & \cdots & n_o τ_1^{n_o-1} \mathbf{I}        \\
+        τ_2^0 \mathbf{I}     & 2τ_2^1 \mathbf{I}     & \cdots & n_o τ_2^{n_o-1} \mathbf{I}        \\
         \vdots                 & \vdots                 & \ddots & \vdots                         \\
-        1τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I} \end{bmatrix} \\
-    \mathbf{M_o} &= \mathbf{Ṗ_o} \mathbf{P_o}^{-1} \\
-    \mathbf{C_o} &= \begin{bmatrix}
+        τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
+    \mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
+    \mathbf{λ_o} &= L_0(1)                                                                        \\
+    \mathbf{C_o} &=                                                                               \begin{bmatrix}
         L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix}
 \end{aligned}
 ```
-where ``\mathbf{P_o}`` is the polynomial matrix (w/o the Y-intercept term), 
-``\mathbf{Ṗ_o}``, its derivative matrix, and ``L_o(τ)``, the Lagrange basis polynomials.
+where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values, and ``\mathbf{Ṗ_o}``,
+to evaluate its derivatives. The Lagrange polynomial basis  ``L_j(τ)`` are defined as:
+```math
+L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
+```
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K, 
@@ -1444,7 +1454,7 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     p = model.p
-    no, Mo, Co = transcription.no, mpc.Mo, mpc.Co
+    no, Mo, Co, λo = transcription.no, transcription.Mo, transcription.Co, transcription.λo
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
@@ -1458,14 +1468,15 @@ function con_nonlinprogeq!(
         end
         k        = @views    K[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views  K_Z̃[(1 + nk*(j-1)):(nk*j)] 
-        d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
-        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
+        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
+        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
+        scnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
+        sknext              = @views geq[(1 + nx̂*Hp + (j-1)*no*nx):(nx̂*Hp + j*no*nx)]
         x0                  = @views x̂0[1:nx]
         xsnext              = @views x̂0next[nx+1:end]
         x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
-        sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
+        
         # ----------------- stochastic defects -----------------------------------------
         fs!(x̂0next, mpc.estim, model, x̂0)
         ssnext .= @. xsnext - xsnext_Z̃
@@ -1473,18 +1484,7 @@ function con_nonlinprogeq!(
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0, u0)
-        # something like this:
-        #     sdnext .= @. x0 - x0next_Z̃
-
-
-        if h < 1 || j ≥ Hp
-            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
-            û0next = û0
-        else
-            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
-            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
-            f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
-        end
+        
 
         # TODO: remove this allocation
         Δk = similar(k)
@@ -1493,19 +1493,15 @@ function con_nonlinprogeq!(
             ko_Z̃ = @views k_Z̃[(1 + (o-1)*nx):(o*nx)]
             Δko  = @views  Δk[(1 + (o-1)*nx):(o*nx)]
             Δko .= ko_Z̃ .- x0
-            if o < no
-                model.f!(ko, ko_Z̃, û0, d̂0, p)
-            else
-                model.f!(ko, ko_Z̃, û0next, d̂0next, p)
-            end
+            model.f!(ko, ko_Z̃, û0, d̂0, p)
         end
-        # TODO: remove this allocation
-        display(Δk)
+        # TODO: remove the following allocations
+        #display(Δk)
         ẋ0 = Mo*Δk
-        display(ẋ0)
+        #display(ẋ0)
         
-        sdnext .= @. ẋ0 - k
-
+        sknext .= ẋ0 .- k
+        scnext .= Co*x0 .+ λo*k - x0next_Z̃
     end
     return geq
 end
