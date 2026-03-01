@@ -1433,7 +1433,7 @@ matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed wit
         \vdots                 & \vdots                 & \ddots & \vdots                         \\
         τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
     \mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
-    \mathbf{λ_o} &= L_0(1)                                                                        \\
+            λ_o  &= L_0(1)                                                                        \\
     \mathbf{C_o} &=                                                                               \begin{bmatrix}
         L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix}
 \end{aligned}
@@ -1501,7 +1501,7 @@ function con_nonlinprogeq!(
         #display(ẋ0)
         
         sknext .= ẋ0 .- k̇
-        scnext .= Co*x0 .+ λo*k̇ - x0next_Z̃
+        scnext .= λo*x0 + Co*k_Z̃ - x0next_Z̃
     end
     return geq
 end
