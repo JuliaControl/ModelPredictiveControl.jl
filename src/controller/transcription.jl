@@ -1437,7 +1437,7 @@ matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed wit
 \end{aligned}
 ```
 where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values, and ``\mathbf{Ṗ_o}``,
-to evaluate its derivatives. The Lagrange polynomial basis  ``L_j(τ)`` are defined as:
+to evaluate its derivatives. The Lagrange polynomial  ``L_j(τ)`` bases are defined as:
 ```math
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
