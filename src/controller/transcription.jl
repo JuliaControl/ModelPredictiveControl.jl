@@ -227,8 +227,6 @@ function init_orthocolloc(
     end
     Co = sparse(Co)
     λo = lagrange_end(0, transcription)
-    display(Co)
-    display(λo)
     return Mo, Co, λo
 end
 "Return empty sparse matrices for other [`TranscriptionMethod`](@ref)"
