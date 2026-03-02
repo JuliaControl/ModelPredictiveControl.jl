@@ -1442,18 +1442,16 @@ are computed by:
 \end{aligned}
 ```
 for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_o(k+j)`` vectors are
-extracted from the decision variable `Z̃`. The vectors ``\mathbf{x_0}(k+j)`` are the
-deterministic state for time ``k+j``, also extracted from `Z̃`. The disturbed input
-``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for the stochastic
-states ``\mathbf{s_s}`` are computed as in the [`TrapezoidalCollocation`](@ref) method, and
-the ones for the continuity constraint of the deterministic state trajectories are given by:
+extracted from the decision variable `Z̃`. The ``\mathbf{x_0}`` vectors are the
+deterministic state extracted from `Z̃`. The disturbed input ``\mathbf{û_0}(k+j)`` is defined
+in [`f̂_input!`](@ref). The defects for the stochastic states ``\mathbf{s_s}`` are computed
+as in the [`TrapezoidalCollocation`](@ref) method, and the ones for the continuity
+constraint of the deterministic state trajectories are given by:
 ```math
 \mathbf{s_c}(k+j+1) = λ_o \mathbf{x_0}(k+j) +  \mathbf{C_o k}(k+j) - \mathbf{x_0}(k+j+1)
 ```
-for ``j = 0, 1, ... , H_p-1``. 
-
-The differentiation matrix ``\mathbf{M_o}`` and the continuity matrix ``\mathbf{C_o}`` and
-coefficient ``λ_o`` are introduced in [`init_orthocolloc`](@ref) documentation.
+for ``j = 0, 1, ... , H_p-1``. The differentiation matrix ``\mathbf{M_o}``, the continuity
+matrix ``\mathbf{C_o}`` and the coefficient ``λ_o`` are introduced in [`init_orthocolloc`](@ref).
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K̇,  
