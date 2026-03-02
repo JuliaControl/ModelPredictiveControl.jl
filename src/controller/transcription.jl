@@ -1484,6 +1484,7 @@ function con_nonlinprogeq!(
     nx̂_nk = nx̂ + nk
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
+    ΔK = similar(K̇) # TODO: remove this allocation
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1493,6 +1494,7 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
+        Δk       = @views    ΔK[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         x̂0next   = @views    X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
@@ -1510,11 +1512,10 @@ function con_nonlinprogeq!(
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
-        Δk = similar(k̇) # TODO: remove this allocation
         for o=1:no
             k̇o   = @views   k̇[(1 + (o-1)*nx):(o*nx)]
-            ko_Z̃ = @views k_Z̃[(1 + (o-1)*nx):(o*nx)]
             Δko  = @views  Δk[(1 + (o-1)*nx):(o*nx)]
+            ko_Z̃ = @views k_Z̃[(1 + (o-1)*nx):(o*nx)]
             Δko .= @. ko_Z̃ - x0_Z̃
             model.f!(k̇o, ko_Z̃, û0, d̂0, p)
         end
