@@ -201,10 +201,38 @@ struct OrthogonalCollocation <: CollocationMethod
     end
 end
 
-"""
+@doc raw"""
     init_orthocolloc(model::SimModel, transcription::OrthogonalCollocation) -> Mo, Co, λo
 
-Init the differentiation `Mo` and continuity `Co` matrices of [`OrthogonalCollocation`](@ref).
+Init the differentiation and continuity matrices of [`OrthogonalCollocation`](@ref).
+
+Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized to the
+interval ``[0, 1]``, and ``τ_0=0``, each state trajectories are approximated by a distinct
+polynomial of degree ``n_o``. The differentiation matrix ``\mathbf{M_o}``, continuity
+matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed with:
+```math
+\begin{aligned}
+    \mathbf{P_o} &=                                                                               \begin{bmatrix}
+        τ_1^1 \mathbf{I}       & τ_1^2 \mathbf{I}       & \cdots & τ_1^{n_o} \mathbf{I}           \\
+        τ_2^1 \mathbf{I}       & τ_2^2 \mathbf{I}       & \cdots & τ_2^{n_o} \mathbf{I}           \\
+        \vdots                 & \vdots                 & \ddots & \vdots                         \\
+        τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
+    \mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
+        τ_1^0 \mathbf{I}       & 2τ_1^1 \mathbf{I}      & \cdots & n_o τ_1^{n_o-1} \mathbf{I}     \\
+        τ_2^0 \mathbf{I}       & 2τ_2^1 \mathbf{I}      & \cdots & n_o τ_2^{n_o-1} \mathbf{I}     \\
+        \vdots                 & \vdots                 & \ddots & \vdots                         \\
+        τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
+    \mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
+            λ_o  &= L_0(1)                                                                        \\
+    \mathbf{C_o} &=                                                                               \begin{bmatrix}
+        L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix}
+\end{aligned}
+```
+where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values, and ``\mathbf{Ṗ_o}``,
+to evaluate its derivatives. The Lagrange polynomial  ``L_j(τ)`` bases are defined as:
+```math
+L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
+```
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
@@ -1403,44 +1431,20 @@ are computed by:
 \end{aligned}
 ```
 for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}(k+j+1)`` vectors are
-extracted from the decision variable `Z̃` and they include all the ``\mathbf{k}_i(k+j+1)`` 
-collocation points. The vectors ``\mathbf{x_0}(k+j+1)`` are the deterministic state for time
-``k+j+1``, also extracted from `Z̃`. The disturbed input ``\mathbf{û_0}(k+j)`` is defined in
-[`f̂_input!`](@ref). The defects for the stochastic states ``\mathbf{s_s}`` are computed as
-in the [`TrapezoidalCollocation`](@ref) method, and the ones for the continuity constraint
-of the deterministic state trajectories are given by:
+extracted from the decision variable `Z̃` and they incorporate all the collocation points 
+``\mathbf{k}_i(k+j+1)`` for ``i = 1, 2, ..., n_o``, hence `nx*no` elements. The vectors
+``\mathbf{x_0}(k+j+1)`` are the deterministic state for time ``k+j+1``, also extracted from
+`Z̃`. The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects
+for the stochastic states ``\mathbf{s_s}`` are computed as in the [`TrapezoidalCollocation`](@ref)
+method, and the ones for the continuity constraint of the deterministic state trajectories
+are given by:
 ```math
 \mathbf{s_c}(k+j+1) = λ_o \mathbf{x_0}(k+j) +  \mathbf{C_o k}(k+j) - \mathbf{x_0}(k+j+1)
 ```
 for ``j = 0, 1, ... , H_p-1``. 
 
-Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized to the
-interval ``[0, 1]``, and ``τ_0=0``, each state trajectories are approximated by a distinct
-polynomial of degree ``n_o``. The differentiation matrix ``\mathbf{M_o}``, continuity
-matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed with:
-```math
-\begin{aligned}
-    \mathbf{P_o} &=                                                                               \begin{bmatrix}
-        τ_1^1 \mathbf{I}       & τ_1^2 \mathbf{I}       & \cdots & τ_1^{n_o} \mathbf{I}           \\
-        τ_2^1 \mathbf{I}       & τ_2^2 \mathbf{I}       & \cdots & τ_2^{n_o} \mathbf{I}           \\
-        \vdots                 & \vdots                 & \ddots & \vdots                         \\
-        τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
-    \mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
-        τ_1^0 \mathbf{I}     & 2τ_1^1 \mathbf{I}     & \cdots & n_o τ_1^{n_o-1} \mathbf{I}        \\
-        τ_2^0 \mathbf{I}     & 2τ_2^1 \mathbf{I}     & \cdots & n_o τ_2^{n_o-1} \mathbf{I}        \\
-        \vdots                 & \vdots                 & \ddots & \vdots                         \\
-        τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
-    \mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
-            λ_o  &= L_0(1)                                                                        \\
-    \mathbf{C_o} &=                                                                               \begin{bmatrix}
-        L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix}
-\end{aligned}
-```
-where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values, and ``\mathbf{Ṗ_o}``,
-to evaluate its derivatives. The Lagrange polynomial  ``L_j(τ)`` bases are defined as:
-```math
-L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
-```
+The differentiation matrix ``\mathbf{M_o}`` and the continuity matrix ``\mathbf{C_o}`` and
+coefficient ``λ_o`` are introduced in [`init_orthocolloc`](@ref) documentation.
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K̇,  
@@ -1454,6 +1458,7 @@ function con_nonlinprogeq!(
     p = model.p
     no, Mo, Co, λo = transcription.no, mpc.Mo, mpc.Co, mpc.λo
     nk = get_nk(model, transcription)
+    nx̂_nk = nx̂ + nk
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     @threadsif f_threads for j=1:Hp
@@ -1464,26 +1469,24 @@ function con_nonlinprogeq!(
             x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
             d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
-        k_Z̃      = @views  K_Z̃[(1 + nk*(j-1)):(nk*j)] 
-        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
-        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        scnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
-        sknext              = @views geq[(1 + nx̂*Hp + (j-1)*no*nx):(nx̂*Hp + j*no*nx)]
-        x0                  = @views x̂0[1:nx]
-        xsnext              = @views x̂0next[nx+1:end]
-        x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
-        
+        k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
+        k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
+        x̂0next   = @views    X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        x̂0next_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
+        scnext   = @views   geq[(1 + nx̂_nk*(j-1)     ):(nx̂_nk*(j-1) + nx)]
+        ssnext   = @views   geq[(1 + nx̂_nk*(j-1) + nx):(nx̂_nk*(j-1) + nx̂)]
+        sknext   = @views   geq[(1 + nx̂_nk*(j-1) + nx̂):(nx̂_nk*j         )]
+        x0       = @views x̂0[1:nx]
+        x0next_Z̃ = @views x̂0next_Z̃[1:nx]
+        xsnext   = @views x̂0next[nx+1:end]
+        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
         # ----------------- stochastic defects -----------------------------------------
         fs!(x̂0next, mpc.estim, model, x̂0)
         ssnext .= @. xsnext - xsnext_Z̃
-        # ----------------- deterministic defects: orthogonal collocation --------------
+        # ----------------- collocation point defects ----------------------------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0, u0)
-        
-
         # TODO: remove this allocation
         Δk = similar(k̇)
         for o=1:no
@@ -1494,12 +1497,13 @@ function con_nonlinprogeq!(
             model.f!(k̇o, ko_Z̃, û0, d̂0, p)
         end
         # TODO: remove the following allocations
-        #display(Δk)
-        ẋ0 = Mo*Δk
-        #display(ẋ0)
-        
-        sknext .= ẋ0 .- k̇
+        k̇_Z̃ = Mo*Δk
+        sknext .= @. k̇_Z̃ - k̇
+        # ----------------- continuity constraint defects ------------------------------
         scnext .= λo*x0 + Co*k_Z̃ - x0next_Z̃
+    end
+    if eltype(geq) == Float64
+        println(geq)
     end
     return geq
 end
