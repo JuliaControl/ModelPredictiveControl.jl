@@ -3,8 +3,8 @@ const COLLOCATION_NODE_TYPE = Float64
 """
 Abstract supertype of all transcription methods of [`PredictiveController`](@ref).
 
-The module currently supports [`SingleShooting`](@ref), [`MultipleShooting`](@ref) and
-[`TrapezoidalCollocation`](@ref) transcription methods.
+The module currently supports [`SingleShooting`](@ref), [`MultipleShooting`](@ref),
+[`TrapezoidalCollocation`](@ref) and [`OrthogonalCollocation`](@ref) transcription methods.
 """
 abstract type TranscriptionMethod end
 abstract type ShootingMethod    <: TranscriptionMethod end
@@ -129,9 +129,9 @@ end
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
 Also known as pseudo-spectral method. The `h` argument is the hold order for ``\mathbf{u}``,
-and `no`, the number of collocation points ``n_o``. Only zero-order hold is currently
-implemented, so `h` must be `0`. The decision variable is similar to [`MultipleShooting`](@ref),
-but it also includes the collocation points:
+and `no` argument, the number of collocation points ``n_o``. Only zero-order hold is
+currently implemented, so `h` must be `0`. The decision variable is similar to
+[`MultipleShooting`](@ref), but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -150,8 +150,8 @@ where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministi
 ```
 and ``\mathbf{k}_o(k+j)`` is the deterministic state prediction for the ``o``th collocation
 point at the ``j``th stage/interval/finite element (details in Extended Help). The `roots`
-keyword argument is either `:gaussradau` or `:gausslegendre`, for the roots of the
-Gauss-Radau or Gauss-Legendre quadrature, respectively.
+keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or 
+Gauss-Legendre quadrature, respectively.
 
 This transcription computes the predictions by enforcing the collocation and continuity
 constraints at the collocation points. It is efficient for highly stiff systems, but 
@@ -169,7 +169,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 # Extended Help
 !!! details "Extended Help"
     As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
-    states are left out of the ``\mathbf{K}`` vector since collocation methods required
+    states are left out of the ``\mathbf{K}`` vector since collocation methods require
     continuous-time dynamics and the stochastic model is discrete.
 
     The collocation points are located at the roots of orthogonal polynomials, which is 
@@ -1302,11 +1302,11 @@ function con_nonlinprogeq!(
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)] 
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂0 = @views mpc.estim.x̂0[1:nx̂]
-            d̂0 = @views mpc.d0[1:nd]
+            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            d̂0   = @views mpc.d0[1:nd]
         else
-            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
-            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
+            d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
@@ -1314,8 +1314,8 @@ function con_nonlinprogeq!(
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k, mpc.estim, model, x̂0, u0, d̂0)
-        ŝnext .= x̂0next .- x̂0next_Z̃
+        f̂!(x̂0next, û0, k, mpc.estim, model, x̂0_Z̃, u0, d̂0)
+        ŝnext .= @. x̂0next - x̂0next_Z̃
     end
     return geq
 end
@@ -1368,33 +1368,34 @@ function con_nonlinprogeq!(
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂0 = @views mpc.estim.x̂0[1:nx̂]
-            d̂0 = @views mpc.d0[1:nd]
+            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            d̂0   = @views mpc.d0[1:nd]
         else
-            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
-            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
+            d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
-        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
-        x0                  = @views x̂0[1:nx]
-        xsnext              = @views x̂0next[nx+1:end]
-        x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
-        sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
-        k̇1, k̇2              = @views k̇[1:nx], k̇[nx+1:2*nx]
+        sdnext   = @views  geq[(1 + nx̂*(j-1)     ):(nx̂*(j-1) + nx)]
+        ssnext   = @views  geq[(1 + nx̂*(j-1) + nx):(nx̂*j         )]
+        x0_Z̃     = @views  x̂0_Z̃[1:nx]
+        x0next_Z̃ = @views x̂0next_Z̃[1:nx]
+        k̇1, k̇2   = @views k̇[1:nx], k̇[nx+1:2*nx]
         # ----------------- stochastic defects -----------------------------------------
-        fs!(x̂0next, mpc.estim, model, x̂0)
+        xsnext   = @views x̂0next[nx+1:end]
+        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
+        fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- deterministic defects: trapezoidal collocation -------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        f̂_input!(û0, mpc.estim, model, x̂0, u0)
+        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
-            model.f!(k̇1, x0, û0, d̂0, p)
+            model.f!(k̇1, x0_Z̃, û0, d̂0, p)
         else
             k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end
@@ -1407,7 +1408,7 @@ function con_nonlinprogeq!(
             f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
         end
         model.f!(k̇2, x0next_Z̃, û0next, d̂0next, p)
-        sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k̇1 + k̇2)
+        sdnext .= @. x0_Z̃ - x0next_Z̃ + 0.5*Ts*(k̇1 + k̇2)
     end
     return geq
 end
@@ -1471,11 +1472,11 @@ function con_nonlinprogeq!(
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂0 = @views mpc.estim.x̂0[1:nx̂]
-            d̂0 = @views mpc.d0[1:nd]
+            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            d̂0   = @views mpc.d0[1:nd]
         else
-            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
-            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
+            d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
@@ -1484,31 +1485,31 @@ function con_nonlinprogeq!(
         scnext   = @views   geq[(1 + nx̂_nk*(j-1)     ):(nx̂_nk*(j-1) + nx)]
         ssnext   = @views   geq[(1 + nx̂_nk*(j-1) + nx):(nx̂_nk*(j-1) + nx̂)]
         sk       = @views   geq[(1 + nx̂_nk*(j-1) + nx̂):(nx̂_nk*j         )]
-        x0       = @views x̂0[1:nx]
+        x0_Z̃     = @views     x̂0_Z̃[1:nx]
         x0next_Z̃ = @views x̂0next_Z̃[1:nx]
-        xsnext   = @views x̂0next[nx+1:end]
-        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
         # ----------------- stochastic defects -----------------------------------------
-        fs!(x̂0next, mpc.estim, model, x̂0)
+        xsnext   = @views   x̂0next[nx+1:end]
+        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
+        fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- collocation point defects ----------------------------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        f̂_input!(û0, mpc.estim, model, x̂0, u0)
+        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
         # TODO: remove this allocation
         Δk = similar(k̇)
         for o=1:no
             k̇o   = @views   k̇[(1 + (o-1)*nx):(o*nx)]
             ko_Z̃ = @views k_Z̃[(1 + (o-1)*nx):(o*nx)]
             Δko  = @views  Δk[(1 + (o-1)*nx):(o*nx)]
-            Δko .= ko_Z̃ .- x0
+            Δko .= ko_Z̃ .- x0_Z̃
             model.f!(k̇o, ko_Z̃, û0, d̂0, p)
         end
         # TODO: remove the following allocations
         k̇_Z̃ = Mo*Δk
         sk .= @. k̇_Z̃ - k̇
         # ----------------- continuity constraint defects ------------------------------
-        scnext .= λo*x0 + Co*k_Z̃ - x0next_Z̃
+        scnext .= λo*x0_Z̃ + Co*k_Z̃ - x0next_Z̃
     end
     return geq
 end
