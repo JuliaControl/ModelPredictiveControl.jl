@@ -146,7 +146,7 @@ where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministi
     \mathbf{k}_{1}(k+1)                 \\
     \mathbf{k}_{2}(k+1)                 \\
     \vdots                              \\
-    \mathbf{k}_{n_o}(k+H_p)             \end{bmatrix}
+    \mathbf{k}_{n_o}(k+H_p-1)           \end{bmatrix}
 ```
 and ``\mathbf{k}_o(k+j)`` is the deterministic state prediction for the ``o``th collocation
 point at the ``j``th stage/interval/finite element (details in Extended Help). The `roots`
@@ -974,9 +974,10 @@ last control period ``k-1``, and ``ϵ(k-1)``, the slack variable of the last con
 """
 function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
     nu, Hc, Z̃s = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
+    nΔU = nu*Hc
     # --- input increments ΔU ---
-    Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
-    Z̃s[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    Z̃s[1:(nΔU-nu)] .= @views mpc.Z̃[nu+1:nΔU]
+    Z̃s[(nΔU-nu+1):(nΔU)] .= 0
     # --- slack variable ϵ ---
     mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
     JuMP.set_start_value.(Z̃var, Z̃s)
@@ -1001,25 +1002,35 @@ It warm-starts the solver at:
     \vdots                          \\
     \mathbf{x̂_0}(k+H_p-1|k-1)       \\
     \mathbf{x̂_0}(k+H_p-1|k-1)       \\
-    \mathbf{k}_{1}(k+1|k-1)         \\
-    \mathbf{k}_{2}(k+1|k-1)         \\
+    \mathbf{k}(k+0|k-1)             \\
+    \mathbf{k}(k+1|k-1)             \\
     \vdots                          \\
-    \mathbf{k}_{n_o}(k+1|k-1)       \\
+    \mathbf{k}(k+H_p-2|k-1)         \\
+    \mathbf{k}(k+H_p-2|k-1)         \\
     ϵ(k-1)
 \end{bmatrix}
 ```
 where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
 last control period ``k-1``, expressed as a deviation from the operating point 
-``\mathbf{x̂_{op}}``.
+``\mathbf{x̂_{op}}``. The vector ``\mathbf{k}(k+j|k-1) include the ``n_o`` intermediate
+stage predictions for the interval ``k+j``, and is also computed at the last control period.
 """
-function set_warmstart!(mpc::PredictiveController, ::OrthogonalCollocation, Z̃var)
-    nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
+function set_warmstart!(
+    mpc::PredictiveController, transcription::OrthogonalCollocation, Z̃var
+)
+    nu, nx̂ = mpc.estim.model.nu, mpc.estim.nx̂
+    Hp, Hc, Z̃s  = mpc.Hp, mpc.Hc, mpc.buffer.Z̃
+    nk = get_nk(mpc.estim.model, transcription)
+    nΔU, nX̂, nK = nu*Hc, nx̂*Hp, nk*Hp
     # --- input increments ΔU ---
-    Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
-    Z̃s[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    Z̃s[1:(nΔU-nu)]       .= @views mpc.Z̃[(nu+1):(nΔU)]
+    Z̃s[(nΔU-nu+1):(nΔU)] .= 0
     # --- predicted states X̂0 ---
-    Z̃s[(Hc*nu+1):(Hc*nu+Hp*nx̂-nx̂)]       .= @views mpc.Z̃[(Hc*nu+nx̂+1):(Hc*nu+Hp*nx̂)]
-    Z̃s[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)] .= @views mpc.Z̃[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)]
+    Z̃s[(nΔU+1):(nΔU+nX̂-nx̂)]    .= @views mpc.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
+    Z̃s[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)] .= @views mpc.Z̃[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)]
+    # --- collocation points K ---
+    Z̃s[(nΔU+nX̂+1):(nΔU+nX̂+nK-nk)]    .= @views mpc.Z̃[(nΔU+nX̂+nk+1):(nΔU+nX̂+nK)]
+    Z̃s[(nΔU+nX̂+nK-nk+1):(nΔU+nX̂+nK)] .= @views mpc.Z̃[(nΔU+nX̂+nK-nk+1):(nΔU+nX̂+nK)]
     # --- slack variable ϵ ---
     mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
     JuMP.set_start_value.(Z̃var, Z̃s)
@@ -1053,12 +1064,13 @@ last control period ``k-1``, expressed as a deviation from the operating point
 """
 function set_warmstart!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var)
     nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
+    nΔU, nX̂ = nu*Hc, nx̂*Hp
     # --- input increments ΔU ---
-    Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
-    Z̃s[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    Z̃s[1:(nΔU-nu)] .= @views mpc.Z̃[nu+1:nΔU]
+    Z̃s[(nΔU-nu+1):(nΔU)] .= 0
     # --- predicted states X̂0 ---
-    Z̃s[(Hc*nu+1):(Hc*nu+Hp*nx̂-nx̂)]       .= @views mpc.Z̃[(Hc*nu+nx̂+1):(Hc*nu+Hp*nx̂)]
-    Z̃s[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)] .= @views mpc.Z̃[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)]
+    Z̃s[(nΔU+1):(nΔU+nX̂-nx̂)]    .= @views mpc.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
+    Z̃s[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)] .= @views mpc.Z̃[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)]
     # --- slack variable ϵ ---
     mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
     JuMP.set_start_value.(Z̃var, Z̃s)
@@ -1427,24 +1439,27 @@ The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The 
 the deterministic state derivative at the ``n_o`` collocation points and the model dynamics
 are computed by:
 ```math
-\begin{aligned}
-\mathbf{s_k}(k+j)                                                                                 &
+\mathbf{s_k}(k+j)                                                                                 
     = \mathbf{M_o} \begin{bmatrix}                                          
-        \mathbf{k}_1(k+j) - \mathbf{x_0}(k+j)                                                       \\
-        \mathbf{k}_2(k+j) - \mathbf{x_0}(k+j)                                                       \\
-        \vdots                                                                                      \\
-        \mathbf{k}_{n_o}(k+j) - \mathbf{x_0}(k+j)                                                   \\ \end{bmatrix}                                                                                     \\ &\quad
+        \mathbf{k}_1(k+j) - \mathbf{x_0}(k+j)                       \\
+        \mathbf{k}_2(k+j) - \mathbf{x_0}(k+j)                       \\
+        \vdots                                                      \\
+        \mathbf{k}_{n_o}(k+j) - \mathbf{x_0}(k+j)                   \\ \end{bmatrix}                                                                                     
     - \begin{bmatrix}
-        \mathbf{f}\Big(\mathbf{k}_1(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
-        \mathbf{f}\Big(\mathbf{k}_2(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
-        \vdots                                                                                      \\
-        \mathbf{f}\Big(\mathbf{k}_{n_o}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big) \end{bmatrix}
-\end{aligned}
+        \mathbf{k̇}_1(k+j)                                           \\
+        \mathbf{k̇}_2(k+j)                                           \\
+        \vdots                                                      \\
+        \mathbf{k̇}_{n_o}(k+j)                                       \end{bmatrix}
 ```
 for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_o(k+j)`` vectors are
 extracted from the decision variable `Z̃`. The ``\mathbf{x_0}`` vectors are the
-deterministic state extracted from `Z̃`. The disturbed input ``\mathbf{û_0}(k+j)`` is defined
-in [`f̂_input!`](@ref). The defects for the stochastic states ``\mathbf{s_s}`` are computed
+deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_o`` vector for the ``o``th 
+collocation point is computed from the continuous-time function `model.f!` and:
+```math
+\mathbf{k̇}_o(k+j) =  \mathbf{f}\Big(\mathbf{k_o}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)
+```
+The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for
+the stochastic states ``\mathbf{s_s}`` are computed
 as in the [`TrapezoidalCollocation`](@ref) method, and the ones for the continuity
 constraint of the deterministic state trajectories are given by:
 ```math
@@ -1500,7 +1515,7 @@ function con_nonlinprogeq!(
             k̇o   = @views   k̇[(1 + (o-1)*nx):(o*nx)]
             ko_Z̃ = @views k_Z̃[(1 + (o-1)*nx):(o*nx)]
             Δko  = @views  Δk[(1 + (o-1)*nx):(o*nx)]
-            Δko .= ko_Z̃ .- x0_Z̃
+            Δko .= @. ko_Z̃ - x0_Z̃
             model.f!(k̇o, ko_Z̃, û0, d̂0, p)
         end
         # TODO: remove the following allocations
