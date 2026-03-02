@@ -149,7 +149,7 @@ where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministi
     \vdots                              \\
     \mathbf{k}_{n_o}(k+H_p-1)           \end{bmatrix}
 ```
-and ``\mathbf{k}_o(k+j)`` is the deterministic state prediction for the ``o``th collocation
+and ``\mathbf{k}_i(k+j)`` is the deterministic state prediction for the ``i``th collocation
 point at the ``j``th stage/interval/finite element (details in Extended Help). The `roots`
 keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or 
 Gauss-Legendre quadrature, respectively.
@@ -1452,12 +1452,12 @@ are computed by:
         \vdots                                                      \\
         \mathbf{k̇}_{n_o}(k+j)                                       \end{bmatrix}
 ```
-for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_o(k+j)`` vectors are
+for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` vectors are
 extracted from the decision variable `Z̃`. The ``\mathbf{x_0}`` vectors are the
-deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_o`` derivative for the ``o``th 
+deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_i`` derivative for the ``i``th 
 collocation point is computed from the continuous-time function `model.f!` and:
 ```math
-\mathbf{k̇}_o(k+j) =  \mathbf{f}\Big(\mathbf{k}_o(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)
+\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)
 ```
 The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for
 the stochastic states ``\mathbf{s_s}`` are computed
@@ -1512,10 +1512,10 @@ function con_nonlinprogeq!(
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
-        for o=1:no
-            k̇o   = @views   k̇[(1 + (o-1)*nx):(o*nx)]
-            Δko  = @views  Δk[(1 + (o-1)*nx):(o*nx)]
-            ko_Z̃ = @views k_Z̃[(1 + (o-1)*nx):(o*nx)]
+        for i=1:no
+            k̇o   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
+            Δko  = @views  Δk[(1 + (i-1)*nx):(i*nx)]
+            ko_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
             Δko .= @. ko_Z̃ - x0_Z̃
             model.f!(k̇o, ko_Z̃, û0, d̂0, p)
         end
