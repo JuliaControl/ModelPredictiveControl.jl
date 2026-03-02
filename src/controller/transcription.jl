@@ -123,7 +123,7 @@ end
 
 @doc raw"""
     OrthogonalCollocation(
-        h::Int=0, no=5; f_threads=false, h_threads=false, roots=:gaussradau
+        h::Int=0, no=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
 
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
@@ -180,7 +180,7 @@ struct OrthogonalCollocation <: CollocationMethod
     h_threads::Bool
     τ::Vector{COLLOCATION_NODE_TYPE}
     function OrthogonalCollocation(
-        h::Int=0, no::Int=5; f_threads=false, h_threads=false, roots=:gaussradau
+        h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
         if !(h == 0)
             throw(ArgumentError("Only the zero-order hold (h=0) is currently implemented."))
@@ -204,7 +204,7 @@ end
 @doc raw"""
     init_orthocolloc(model::SimModel, transcription::OrthogonalCollocation) -> Mo, Co, λo
 
-Init the differentiation and continuity matrices of [`OrthogonalCollocation`](@ref).
+Init the differentiation and continuity matrices for [`OrthogonalCollocation`](@ref).
 
 Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized to the
 interval ``[0, 1]``, and ``τ_0=0``, each state trajectories are approximated by a distinct
@@ -223,13 +223,14 @@ matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed wit
         \vdots                 & \vdots                 & \ddots & \vdots                         \\
         τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
     \mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
-            λ_o  &= L_0(1)                                                                        \\
     \mathbf{C_o} &=                                                                               \begin{bmatrix}
-        L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix}
+        L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix} \\
+            λ_o  &= L_0(1)                                                                        
 \end{aligned}
 ```
-where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values, and ``\mathbf{Ṗ_o}``,
-to evaluate its derivatives. The Lagrange polynomial  ``L_j(τ)`` bases are defined as:
+where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values w/o the Y-intercept,
+and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagrange polynomial  ``L_j(τ)`` bases
+are defined as:
 ```math
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
@@ -257,7 +258,7 @@ function init_orthocolloc(
     λo = lagrange_end(0, transcription)
     return Mo, Co, λo
 end
-"Return empty sparse matrices for other [`TranscriptionMethod`](@ref)"
+"Return empty sparse matrices and `NaN` for other [`TranscriptionMethod`](@ref)"
 init_orthocolloc(::SimModel, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0), NaN
 
 "Evaluate the Lagrange basis polynomial ``L_j`` at `τ=1`."
@@ -1501,9 +1502,6 @@ function con_nonlinprogeq!(
         sknext .= @. k̇_Z̃ - k̇
         # ----------------- continuity constraint defects ------------------------------
         scnext .= λo*x0 + Co*k_Z̃ - x0next_Z̃
-    end
-    if eltype(geq) == Float64
-        println(geq)
     end
     return geq
 end
