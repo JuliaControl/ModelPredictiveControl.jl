@@ -128,10 +128,11 @@ end
 
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
-Also known as pseudo-spectral method. The `h` argument is the hold order for ``\mathbf{u}``,
-and `no` argument, the number of collocation points ``n_o``. Only zero-order hold is
-currently implemented, so `h` must be `0`. The decision variable is similar to
-[`MultipleShooting`](@ref), but it also includes the collocation points:
+Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)s
+only. The `h` argument is the hold order for ``\mathbf{u}``, and `no` argument, the number
+of collocation points ``n_o``. Only zero-order hold is currently implemented, so `h` must
+be `0`. The decision variable is similar to [`MultipleShooting`](@ref), but it also includes
+the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -1012,7 +1013,7 @@ It warm-starts the solver at:
 ```
 where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
 last control period ``k-1``, expressed as a deviation from the operating point 
-``\mathbf{x̂_{op}}``. The vector ``\mathbf{k}(k+j|k-1) include the ``n_o`` intermediate
+``\mathbf{x̂_{op}}``. The vector ``\mathbf{k}(k+j|k-1)`` include the ``n_o`` intermediate
 stage predictions for the interval ``k+j``, and is also computed at the last control period.
 """
 function set_warmstart!(
@@ -1453,10 +1454,10 @@ are computed by:
 ```
 for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_o(k+j)`` vectors are
 extracted from the decision variable `Z̃`. The ``\mathbf{x_0}`` vectors are the
-deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_o`` vector for the ``o``th 
+deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_o`` derivative for the ``o``th 
 collocation point is computed from the continuous-time function `model.f!` and:
 ```math
-\mathbf{k̇}_o(k+j) =  \mathbf{f}\Big(\mathbf{k_o}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)
+\mathbf{k̇}_o(k+j) =  \mathbf{f}\Big(\mathbf{k}_o(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)
 ```
 The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for
 the stochastic states ``\mathbf{s_s}`` are computed
