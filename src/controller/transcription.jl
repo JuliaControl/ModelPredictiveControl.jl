@@ -139,15 +139,19 @@ where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministi
 (the first `nx` elements of ``\mathbf{x̂}``):
 ```math
 \mathbf{K} =                            \begin{bmatrix}
-    \mathbf{k}(k+0)                     \\
-    \mathbf{k}(k+1)                     \\
+    \mathbf{k}_{1}(k+0)                 \\
+    \mathbf{k}_{2}(k+0)                 \\
     \vdots                              \\
-    \mathbf{k}(k+H_p-1)                 \end{bmatrix}
+    \mathbf{k}_{n_o}(k+0)               \\
+    \mathbf{k}_{1}(k+1)                 \\
+    \mathbf{k}_{2}(k+1)                 \\
+    \vdots                              \\
+    \mathbf{k}_{n_o}(k+H_p)             \end{bmatrix}
 ```
-and ``\mathbf{k}(k+j)`` includes the deterministic state predictions for the ``n_o`` 
-collocation points at the ``j``th stage/interval/finite element (details in Extended Help).
-The `roots` keyword argument is either `:gaussradau` or `:gausslegendre`, for the roots of 
-the Gauss-Radau or Gauss-Legendre quadrature, respectively.
+and ``\mathbf{k}_o(k+j)`` is the deterministic state prediction for the ``o``th collocation
+point at the ``j``th stage/interval/finite element (details in Extended Help). The `roots`
+keyword argument is either `:gaussradau` or `:gausslegendre`, for the roots of the
+Gauss-Radau or Gauss-Legendre quadrature, respectively.
 
 This transcription computes the predictions by enforcing the collocation and continuity
 constraints at the collocation points. It is efficient for highly stiff systems, but 
@@ -164,8 +168,9 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 
 # Extended Help
 !!! details "Extended Help"
-    See the Extended Help of [`TrapezoidalCollocation`](@ref) to understand why the 
-    stochastic states are left out of the ``\mathbf{K}`` vector.
+    As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
+    states are left out of the ``\mathbf{K}`` vector since collocation methods required
+    continuous-time dynamics and the stochastic model is discrete.
 
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
@@ -1422,7 +1427,7 @@ the deterministic state derivative at the ``n_o`` collocation points and the mod
 are computed by:
 ```math
 \begin{aligned}
-\mathbf{s_k}(k+j+1)                                                                                 &
+\mathbf{s_k}(k+j)                                                                                 &
     = \mathbf{M_o} \begin{bmatrix}                                          
         \mathbf{k}_1(k+j) - \mathbf{x_0}(k+j)                                                       \\
         \mathbf{k}_2(k+j) - \mathbf{x_0}(k+j)                                                       \\
@@ -1435,7 +1440,7 @@ are computed by:
         \mathbf{f}\Big(\mathbf{k}_{n_o}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big) \end{bmatrix}
 \end{aligned}
 ```
-for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` vectors are
+for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_o(k+j)`` vectors are
 extracted from the decision variable `Z̃`. The vectors ``\mathbf{x_0}(k+j)`` are the
 deterministic state for time ``k+j``, also extracted from `Z̃`. The disturbed input
 ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for the stochastic
@@ -1478,7 +1483,7 @@ function con_nonlinprogeq!(
         x̂0next_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         scnext   = @views   geq[(1 + nx̂_nk*(j-1)     ):(nx̂_nk*(j-1) + nx)]
         ssnext   = @views   geq[(1 + nx̂_nk*(j-1) + nx):(nx̂_nk*(j-1) + nx̂)]
-        sknext   = @views   geq[(1 + nx̂_nk*(j-1) + nx̂):(nx̂_nk*j         )]
+        sk       = @views   geq[(1 + nx̂_nk*(j-1) + nx̂):(nx̂_nk*j         )]
         x0       = @views x̂0[1:nx]
         x0next_Z̃ = @views x̂0next_Z̃[1:nx]
         xsnext   = @views x̂0next[nx+1:end]
@@ -1501,7 +1506,7 @@ function con_nonlinprogeq!(
         end
         # TODO: remove the following allocations
         k̇_Z̃ = Mo*Δk
-        sknext .= @. k̇_Z̃ - k̇
+        sk .= @. k̇_Z̃ - k̇
         # ----------------- continuity constraint defects ------------------------------
         scnext .= λo*x0 + Co*k_Z̃ - x0next_Z̃
     end
