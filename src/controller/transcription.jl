@@ -1331,8 +1331,8 @@ and the stochastic model of the unmeasured disturbances is discrete-time. The de
 and stochastic defects are respectively computed with:
 ```math
 \begin{aligned}
-\mathbf{s_d}(k+j+1) &= \mathbf{x_0}(k+j) - \mathbf{x_0}(k+j+1) 
-                      + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] \\
+\mathbf{s_d}(k+j+1) &= \mathbf{x_0}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
+                       - \mathbf{x_0}(k+j+1)                                                \\
 \mathbf{s_s}(k+j+1) &= \mathbf{A_s x_s}(k+j) - \mathbf{x_s}(k+j+1)
 \end{aligned}
 ```
@@ -1422,23 +1422,25 @@ the deterministic state derivative at the ``n_o`` collocation points and the mod
 are computed by:
 ```math
 \begin{aligned}
-\mathbf{s_k}(k+j+1)                                                                                   &
-    = \mathbf{M_o} [\mathbf{k}(k+j+1) - \mathbf{x_0}(k+j+1)]                                          \\ &\quad
-      - \begin{bmatrix}
-        \mathbf{f}\Big(\mathbf{k}_1(k+j+1), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
-        \mathbf{f}\Big(\mathbf{k}_2(k+j+1), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
-        \vdots                                                                                        \\
-        \mathbf{f}\Big(\mathbf{k}_{n_o}(k+j+1), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big) \end{bmatrix}
+\mathbf{s_k}(k+j+1)                                                                                 &
+    = \mathbf{M_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(k+j) - \mathbf{x_0}(k+j)                                                       \\
+        \mathbf{k}_2(k+j) - \mathbf{x_0}(k+j)                                                       \\
+        \vdots                                                                                      \\
+        \mathbf{k}_{n_o}(k+j) - \mathbf{x_0}(k+j)                                                   \\ \end{bmatrix}                                                                                     \\ &\quad
+    - \begin{bmatrix}
+        \mathbf{f}\Big(\mathbf{k}_1(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
+        \mathbf{f}\Big(\mathbf{k}_2(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)     \\
+        \vdots                                                                                      \\
+        \mathbf{f}\Big(\mathbf{k}_{n_o}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big) \end{bmatrix}
 \end{aligned}
 ```
-for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}(k+j+1)`` vectors are
-extracted from the decision variable `Z̃` and they incorporate all the collocation points 
-``\mathbf{k}_i(k+j+1)`` for ``i = 1, 2, ..., n_o``, hence `nx*no` elements. The vectors
-``\mathbf{x_0}(k+j+1)`` are the deterministic state for time ``k+j+1``, also extracted from
-`Z̃`. The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects
-for the stochastic states ``\mathbf{s_s}`` are computed as in the [`TrapezoidalCollocation`](@ref)
-method, and the ones for the continuity constraint of the deterministic state trajectories
-are given by:
+for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` vectors are
+extracted from the decision variable `Z̃`. The vectors ``\mathbf{x_0}(k+j)`` are the
+deterministic state for time ``k+j``, also extracted from `Z̃`. The disturbed input
+``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for the stochastic
+states ``\mathbf{s_s}`` are computed as in the [`TrapezoidalCollocation`](@ref) method, and
+the ones for the continuity constraint of the deterministic state trajectories are given by:
 ```math
 \mathbf{s_c}(k+j+1) = λ_o \mathbf{x_0}(k+j) +  \mathbf{C_o k}(k+j) - \mathbf{x_0}(k+j+1)
 ```
