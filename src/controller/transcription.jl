@@ -1506,12 +1506,11 @@ function con_nonlinprogeq!(
         xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
         fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
         ssnext .= @. xsnext - xsnext_Z̃
-        # ----------------- collocation point defects ----------------------------------
+        # ----------------- collocation constraint defects -----------------------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
-        # TODO: remove this allocation
-        Δk = similar(k̇)
+        Δk = similar(k̇) # TODO: remove this allocation
         for o=1:no
             k̇o   = @views   k̇[(1 + (o-1)*nx):(o*nx)]
             ko_Z̃ = @views k_Z̃[(1 + (o-1)*nx):(o*nx)]
@@ -1519,11 +1518,9 @@ function con_nonlinprogeq!(
             Δko .= @. ko_Z̃ - x0_Z̃
             model.f!(k̇o, ko_Z̃, û0, d̂0, p)
         end
-        # TODO: remove the following allocations
-        k̇_Z̃ = Mo*Δk
-        sk .= @. k̇_Z̃ - k̇
+        sk .= mul!(sk, Mo, Δk) .- k̇
         # ----------------- continuity constraint defects ------------------------------
-        scnext .= λo*x0_Z̃ + Co*k_Z̃ - x0next_Z̃
+        scnext .= mul!(scnext, Co, k_Z̃) .+ (λo.*x0_Z̃) .- x0next_Z̃
     end
     return geq
 end
