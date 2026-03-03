@@ -32,7 +32,7 @@ function get_optim_functions(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT
     # ---------------------- objective function ------------------------------------------- 
     function Jfunc!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K0, X̂0, gc, g, geq, mpc, Z̃)
-        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ, Z̃)
     end
     Z̃_∇J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇J_context = (
