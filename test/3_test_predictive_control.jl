@@ -810,6 +810,7 @@ end
     @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, JE  = (_,_,_)->0.0)
     @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
     @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
+    @test_throws ArgumentError NonLinMPC(linmodel1, transcription=TrapezoidalCollocation())
 
     @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, JE=(Ue,_,_,_)->Ue)
     @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
@@ -875,10 +876,11 @@ end
     @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
 
     @test_throws ArgumentError NonLinMPC(nonlinmodel)
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation())
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation(2))
-    @test_throws ErrorException NonLinMPC(linmodel1, oracle=false, hessian=AutoFiniteDiff())
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, Wy=[1 0;0 1])
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, transcription=TrapezoidalCollocation())
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, transcription=TrapezoidalCollocation(2))
+    @test_throws ErrorException NonLinMPC(linmodel1,  Hp=2, oracle=false, hessian=AutoFiniteDiff())
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, Wy=[1 0;0 1])
+    @test_throws ArgumentError OrthogonalCollocation(roots=:gausslobatto)
 end
 
 @testitem "NonLinMPC moves and getinfo (LinModel)" setup=[SetupMPCtests] begin
@@ -993,8 +995,20 @@ end
     preparestate!(nmpc5_1, [0.0])
     u = moveinput!(nmpc5_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
-    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+
+    transcription = OrthogonalCollocation(0, 4)
+    nmpc6 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc6, [0.0])
+    u = moveinput!(nmpc6, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
+
+    transcription = OrthogonalCollocation(roots=:gausslegendre)
+    nmpc6_1 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc6_1, [0.0])
+    u = moveinput!(nmpc6_1, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
     
+    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
     ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0], nonlinmodel2.p)
@@ -1024,8 +1038,8 @@ end
         nonlinmodel, Nwt=[0], Hp=100, Hc=1, 
         gradient=AutoFiniteDiff(),
         jacobian=AutoFiniteDiff(),
-        hessian=true),
-        ymax=[100], ymin=[-100]
+        hessian=AutoFiniteDiff()
+        ), ymax=[100], ymin=[-100]
     )
     preparestate!(nmpc10, [0], [0])
     u = moveinput!(nmpc10, [10], [0])
