@@ -880,6 +880,7 @@ end
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, transcription=TrapezoidalCollocation(2))
     @test_throws ErrorException NonLinMPC(linmodel1,  Hp=2, oracle=false, hessian=AutoFiniteDiff())
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, Wy=[1 0;0 1])
+    @test_throws ArgumentError OrthogonalCollocation(roots=:gausslobatto)
 end
 
 @testitem "NonLinMPC moves and getinfo (LinModel)" setup=[SetupMPCtests] begin
@@ -999,6 +1000,12 @@ end
     nmpc6 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc6, [0.0])
     u = moveinput!(nmpc6, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
+
+    transcription = OrthogonalCollocation(roots=:gausslegendre)
+    nmpc6_1 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc6_1, [0.0])
+    u = moveinput!(nmpc6_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
     
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
