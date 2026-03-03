@@ -1024,8 +1024,8 @@ end
         nonlinmodel, Nwt=[0], Hp=100, Hc=1, 
         gradient=AutoFiniteDiff(),
         jacobian=AutoFiniteDiff(),
-        hessian=true),
-        ymax=[100], ymin=[-100]
+        hessian=AutoFiniteDiff()
+        ), ymax=[100], ymin=[-100]
     )
     preparestate!(nmpc10, [0], [0])
     u = moveinput!(nmpc10, [10], [0])
