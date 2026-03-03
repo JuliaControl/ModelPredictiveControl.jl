@@ -1458,12 +1458,16 @@ extracted from the decision variable `Z̃`. The ``\mathbf{x_0}`` vectors are the
 deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_i`` derivative for the ``i``th 
 collocation point is computed from the continuous-time function `model.f!` and:
 ```math
-\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)
+\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_0}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
 ```
-The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for
-the stochastic states ``\mathbf{s_s}`` are computed
-as in the [`TrapezoidalCollocation`](@ref) method, and the ones for the continuity
-constraint of the deterministic state trajectories are given by:
+The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). Based on the 
+normalized time ``τ_i ∈ [0, 1]``, measured disturbances are linearly interpolated:
+```math
+\mathbf{d̂}_i(k+j) = (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)
+```
+The defects for the stochastic states ``\mathbf{s_s}`` are computed as in the
+[`TrapezoidalCollocation`](@ref) method, and the ones for the continuity constraint of the
+deterministic state trajectories are given by:
 ```math
 \mathbf{s_c}(k+j+1) 
     = \mathbf{C_o} \begin{bmatrix}                                          
@@ -1481,16 +1485,18 @@ function con_nonlinprogeq!(
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
-    nu, nx̂, nd, nx, h = model.nu, mpc.estim.nx̂, model.nd, model.nx, transcription.h
+    nu, nx̂, nd, nx = model.nu, mpc.estim.nx̂, model.nd, model.nx
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     p = model.p
-    no, Mo, Co, λo = transcription.no, mpc.Mo, mpc.Co, mpc.λo
+    no, τ = transcription.no, transcription.τ
+    Mo, Co, λo = mpc.Mo, mpc.Co, mpc.λo
     nk = get_nk(model, transcription)
     nx̂_nk = nx̂ + nk
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
+    di = mpc.estim.buffer.d
     ΔK = similar(K̇) # TODO: remove this allocation
     @threadsif f_threads for j=1:Hp
         if j < 2
@@ -1503,6 +1509,7 @@ function con_nonlinprogeq!(
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         Δk       = @views    ΔK[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
+        d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views    X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         scnext   = @views   geq[(1 + nx̂_nk*(j-1)     ):(nx̂_nk*(j-1) + nx)]
@@ -1520,11 +1527,12 @@ function con_nonlinprogeq!(
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
         for i=1:no
-            k̇o   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
-            Δko  = @views  Δk[(1 + (i-1)*nx):(i*nx)]
-            ko_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
-            Δko .= @. ko_Z̃ - x0_Z̃
-            model.f!(k̇o, ko_Z̃, û0, d̂0, p)
+            k̇i   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
+            Δki  = @views  Δk[(1 + (i-1)*nx):(i*nx)]
+            ki_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
+            Δki .= @. ki_Z̃ - x0_Z̃
+            di  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
+            model.f!(k̇i, ki_Z̃, û0, d̂0, p)
         end
         sk .= mul!(sk, Mo, Δk) .- k̇
         # ----------------- continuity constraint defects ------------------------------
