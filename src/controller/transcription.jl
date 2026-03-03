@@ -1464,7 +1464,13 @@ the stochastic states ``\mathbf{s_s}`` are computed
 as in the [`TrapezoidalCollocation`](@ref) method, and the ones for the continuity
 constraint of the deterministic state trajectories are given by:
 ```math
-\mathbf{s_c}(k+j+1) = λ_o \mathbf{x_0}(k+j) +  \mathbf{C_o k}(k+j) - \mathbf{x_0}(k+j+1)
+\mathbf{s_c}(k+j+1) 
+    = \mathbf{C_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(k+j)                                           \\
+        \mathbf{k}_2(k+j)                                           \\
+        \vdots                                                      \\
+        \mathbf{k}_{n_o}(k+j)                                       \end{bmatrix}       
+    + λ_o \mathbf{x_0}(k+j) - \mathbf{x_0}(k+j+1)
 ```
 for ``j = 0, 1, ... , H_p-1``. The differentiation matrix ``\mathbf{M_o}``, the continuity
 matrix ``\mathbf{C_o}`` and the coefficient ``λ_o`` are introduced in [`init_orthocolloc`](@ref).
