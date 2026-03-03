@@ -446,7 +446,7 @@ end
 con_custom!(gc, ::PredictiveController, _ , _, _ ) = gc
 
 "By default, the economic term is zero."
-function obj_econ(::PredictiveController, ::SimModel, _ , ::AbstractVector{NT}) where NT
+function obj_econ(::PredictiveController, ::SimModel, _ , ::AbstractVector{NT}, _ ) where NT
     return zero(NT)
 end
 

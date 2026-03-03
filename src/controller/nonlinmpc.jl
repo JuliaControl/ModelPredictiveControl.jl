@@ -158,7 +158,7 @@ controller minimizes the following objective function at each discrete time ``k`
                        + \mathbf{(ΔU)}'      \mathbf{N}_{H_c} \mathbf{(ΔU)}        \\&
                        + \mathbf{(R̂_u - U)}' \mathbf{L}_{H_p} \mathbf{(R̂_u - U)} 
                        + C ϵ^2  
-                       + E J_E(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p})
+                       + E J_E(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ)
 \end{aligned}
 ```
 subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraints:
@@ -215,8 +215,8 @@ This controller allocates memory at each time step for the optimization.
 - `Wd=nothing` : custom linear constraint matrix for meas. disturbance (see Extended Help).
 - `Wr=nothing` : custom linear constraint matrix for output setpoint (see Extended Help).
 - `Ewt=0.0` : economic costs weight ``E`` (scalar). 
-- `JE=(_,_,_,_)->0.0` : economic or custom cost function ``J_E(\mathbf{U_e}, \mathbf{Ŷ_e},
-   \mathbf{D̂_e}, \mathbf{p})``.
+- `JE=(_,_,_,_,_)->0.0` : economic or custom cost function ``J_E(\mathbf{U_e}, \mathbf{Ŷ_e},
+   \mathbf{D̂_e}, \mathbf{p}, ϵ)``.
 - `gc=(_,_,_,_,_,_)->nothing` or `gc!` : custom nonlinear inequality constraint function 
    ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ)``, mutating or 
    not (details in Extended Help).
@@ -273,8 +273,8 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     The economic cost ``J_E`` and custom constraint ``\mathbf{g_c}`` functions receive the
     extended vectors ``\mathbf{U_e}`` (`nu*Hp+nu` elements), ``\mathbf{Ŷ_e}`` (`ny+ny*Hp`
     elements) and  ``\mathbf{D̂_e}`` (`nd+nd*Hp` elements) as arguments. They all include the
-    values from ``k`` to ``k + H_p`` (inclusively). The custom constraint also receives the
-    slack ``ϵ`` (scalar), which is always zero if `Cwt=Inf`.
+    values from ``k`` to ``k + H_p`` (inclusively). They also receives the slack ``ϵ``
+    (scalar), which is always zero if `Cwt=Inf`.
     
     More precisely, the last two time steps in ``\mathbf{U_e}`` are forced to be equal, i.e.
     ``\mathbf{u}(k+H_p) = \mathbf{u}(k+H_p-1)``, since ``H_c ≤ H_p`` implies that
@@ -342,7 +342,7 @@ function NonLinMPC(
     Wr = nothing,
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE ::Function = (_,_,_,_) -> 0.0,
+    JE ::Function = (_,_,_,_,_) -> 0.0,
     gc!::Function = (_,_,_,_,_,_) -> nothing,
     gc ::Function = gc!,
     nc::Int = 0,
@@ -414,7 +414,7 @@ function NonLinMPC(
     Wr = nothing,
     Cwt  = DEFAULT_CWT,
     Ewt  = DEFAULT_EWT,
-    JE ::Function = (_,_,_,_) -> 0.0,
+    JE ::Function = (_,_,_,_,_) -> 0.0,
     gc!::Function = (_,_,_,_,_,_) -> nothing,
     gc ::Function = gc!,
     nc = 0,
@@ -455,11 +455,11 @@ default_jacobian(::TranscriptionMethod) = DEFAULT_NONLINMPC_JACSPARSE
 Validate `JE` function argument signature.
 """
 function validate_JE(NT, JE)
-    #                       Ue,         Ŷe,         D̂e,         p
-    if !hasmethod(JE, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any})
+    #                       Ue,         Ŷe,         D̂e,         p,   ϵ
+    if !hasmethod(JE, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any, NT})
         error(
             "the economic cost function has no method with type signature "*
-            "JE(Ue::Vector{$(NT)}, Ŷe::Vector{$(NT)}, D̂e::Vector{$(NT)}, p::Any)"
+            "JE(Ue::Vector{$(NT)}, Ŷe::Vector{$(NT)}, D̂e::Vector{$(NT)}, p::Any, ϵ::$(NT))"
         )
     end
     return nothing
@@ -514,19 +514,20 @@ should ease troubleshooting of simple bugs e.g.: the user forgets to set the `nc
 function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
     uop, dop, yop = model.uop, model.dop, model.yop
     Ue, Ŷe, D̂e = [Uop; uop], [yop; Yop], [dop; Dop]
+    ϵ = zero(NT)
     try
-        val::NT = JE(Ue, Ŷe, D̂e, p)
+        val::NT = JE(Ue, Ŷe, D̂e, p, ϵ)
     catch err
         @warn(
             """
-            Calling the JE function with Ue, Ŷe, D̂e arguments fixed at uop=$uop, 
-            yop=$yop, dop=$dop failed with the following stacktrace. Did you forget
+            Calling the JE function with Ue, Ŷe, D̂e, ϵ arguments fixed at uop=$uop, 
+            yop=$yop, dop=$dop, ϵ=0 failed with the following stacktrace. Did you forget
             to set the keyword argument p?
             """, 
             exception=(err, catch_backtrace())
         )
     end
-    ϵ, gc = zero(NT), Vector{NT}(undef, nc) 
+    gc = Vector{NT}(undef, nc) 
     try
         gc!(gc, Ue, Ŷe, D̂e, p, ϵ)
     catch err
@@ -554,7 +555,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     Ue = [U; U[(end - mpc.estim.model.nu + 1):end]]
     Ŷe = [ŷ; Ŷ]
     D̂e = [d; D̂] 
-    JE = mpc.JE(Ue, Ŷe, D̂e, mpc.p)
+    JE = mpc.JE(Ue, Ŷe, D̂e, mpc.p, ϵ)
     LHS = Vector{NT}(undef, mpc.con.nc)
     mpc.con.gc!(LHS, Ue, Ŷe, D̂e, mpc.p, ϵ)
     info[:JE]  = JE 
@@ -1112,9 +1113,9 @@ end
 
 "Evaluate the economic term `E*JE` of the objective function for [`NonLinMPC`](@ref)."
 function obj_econ(
-    mpc::NonLinMPC, ::SimModel, Ue, Ŷe::AbstractVector{NT}
+    mpc::NonLinMPC, ::SimModel, Ue, Ŷe::AbstractVector{NT}, ϵ
 ) where NT<:Real
-    E_JE = mpc.weights.iszero_E ? zero(NT) : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p)
+    E_JE = mpc.weights.iszero_E ? zero(NT) : mpc.weights.E*mpc.JE(Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
     return E_JE
 end
 
