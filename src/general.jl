@@ -141,7 +141,7 @@ dense_backend(backend::AutoSparse) = backend.dense_ad
 dense_backend(backend::SecondOrder) = backend.inner
 
 "Validate `hessian` keyword argument and return the differentiation `backend`."
-function validate_hessian(hessian, gradient, oracle, default)
+function validate_hessian(hessian, gradient, default)
     if hessian == true
         backend = default
     elseif hessian == false || isnothing(hessian)
@@ -149,10 +149,7 @@ function validate_hessian(hessian, gradient, oracle, default)
     else
         backend = hessian
     end
-    if oracle == false && !isnothing(backend)
-        error("Second order derivatives are only supported with oracle=true.")
-    end
-    if oracle == true && !isnothing(backend)
+    if !isnothing(backend)
         hess = dense_backend(backend)
         grad = dense_backend(gradient)
         if hess != grad

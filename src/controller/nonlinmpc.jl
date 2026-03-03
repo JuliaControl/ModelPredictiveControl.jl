@@ -31,7 +31,6 @@ struct NonLinMPC{
     gradient::GB
     jacobian::JB
     hessian::HB
-    oracle::Bool
     Z̃::Vector{NT}
     ŷ::Vector{NT}
     ry::Vector{NT}
@@ -73,7 +72,7 @@ struct NonLinMPC{
         Wy, Wu, Wd, Wr,
         JE::JEfunc, gc!::GCfunc, nc, p::PT, 
         transcription::TM, optim::JM, 
-        gradient::GB, jacobian::JB, hessian::HB, oracle
+        gradient::GB, jacobian::JB, hessian::HB
     ) where {
             NT<:Real, 
             SE<:StateEstimator,
@@ -125,7 +124,7 @@ struct NonLinMPC{
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE, CW, TM, JM, GB, JB, HB, PT, JEfunc, GCfunc}(
             estim, transcription, optim, con,
-            gradient, jacobian, hessian, oracle,
+            gradient, jacobian, hessian,
             Z̃, ŷ, ry,
             Hp, Hc, nϵ, nb,
             weights,
@@ -230,10 +229,8 @@ This controller allocates memory at each time step for the optimization.
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
 - `hessian=false` : an `AbstractADType` backend or `Bool` for the Hessian of the Lagrangian, 
-   see `gradient` above for the options. The default `false` skip it and use the quasi-Newton
-   method of `optim`, which is always the case if `oracle=false` (see Extended Help).
-- `oracle=JuMP.solver_name(optim)=="Ipopt"` : a `Bool` to use the [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
-   for efficient nonlinear constraints (not supported by most optimizers for now).
+   see `gradient` above for the options. The default `false` skip it and use the
+   quasi-Newton method of `optim` (see Extended Help).
 - additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
@@ -316,8 +313,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     ```
     that is, it will test many coloring orders at preparation and keep the best. This is
     also the sparse backend selected for the Hessian of the Lagrangian function if 
-    `oracle=true` and `hessian=true`, which is the second exception. Second order 
-    derivatives are only supported with `oracle=true` option.
+    `hessian=true`, which is the second exception.
     
     Optimizers generally benefit from exact derivatives like AD. However, the [`NonLinModel`](@ref) 
     state-space functions must be compatible with this feature. See [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
@@ -352,7 +348,6 @@ function NonLinMPC(
     gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
     hessian::Union{AbstractADType, Bool, Nothing} = false,
-    oracle::Bool = JuMP.solver_name(optim)=="Ipopt",
     kwargs...
 )
     estim = default_estimator(model; kwargs...)
@@ -360,7 +355,7 @@ function NonLinMPC(
         estim; 
         Hp, Hc, Mwt, Nwt, Lwt, Cwt, Ewt, JE, gc, nc, p, M_Hp, N_Hc, L_Hp, 
         Wy, Wu, Wd, Wr,
-        transcription, optim, gradient, jacobian, hessian, oracle
+        transcription, optim, gradient, jacobian, hessian
     )
 end
 
@@ -423,8 +418,7 @@ function NonLinMPC(
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
-    hessian::Union{AbstractADType, Bool, Nothing} = false,
-    oracle::Bool = JuMP.solver_name(optim)=="Ipopt"
+    hessian::Union{AbstractADType, Bool, Nothing} = false
 ) where {
     NT<:Real, 
     SE<:StateEstimator{NT}
@@ -439,10 +433,10 @@ function NonLinMPC(
     validate_JE(NT, JE)
     gc! = get_mutating_gc(NT, gc)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-    hessian = validate_hessian(hessian, gradient, oracle, DEFAULT_NONLINMPC_HESSIAN)
+    hessian = validate_hessian(hessian, gradient, DEFAULT_NONLINMPC_HESSIAN)
     return NonLinMPC{NT}(
         estim, Hp, Hc, nb, weights, Wy, Wu, Wd, Wr, JE, gc!, nc, p, 
-        transcription, optim, gradient, jacobian, hessian, oracle
+        transcription, optim, gradient, jacobian, hessian
     )
 end
 
@@ -724,25 +718,10 @@ function init_optimization!(
             JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
         end
     end
-    if mpc.oracle
-        J_op = get_nonlinobj_op(mpc, optim)
-        g_oracle, geq_oracle = get_nonlincon_oracle(mpc, optim)
-        
-    else
-        J_func, ∇J_func!, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs! = get_optim_functions(
-            mpc, optim
-        )
-        @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
-    end
+    J_op = get_nonlinobj_op(mpc, optim)
+    g_oracle, geq_oracle = get_nonlincon_oracle(mpc, optim)
     @objective(optim, Min, J_op(Z̃var...))
-    if mpc.oracle
-        set_nonlincon!(mpc, optim, g_oracle, geq_oracle)
-    else
-        init_nonlincon_leg!(
-            mpc, model, transcription, g_funcs, ∇g_funcs!, geq_funcs, ∇geq_funcs!
-        )
-        set_nonlincon_leg!(mpc, model, transcription, optim)
-    end
+    set_nonlincon!(mpc, optim, g_oracle, geq_oracle)
     return nothing
 end
 
@@ -752,12 +731,8 @@ end
 Re-construct nonlinear constraints and add them to `mpc.optim`.
 """
 function reset_nonlincon!(mpc::NonLinMPC)
-    if mpc.oracle
-        g_oracle, geq_oracle = get_nonlincon_oracle(mpc, mpc.optim)
-        set_nonlincon!(mpc, mpc.optim, g_oracle, geq_oracle)
-    else
-        set_nonlincon_leg!(mpc, mpc.estim.model, mpc.transcription, mpc.optim)
-    end
+    g_oracle, geq_oracle = get_nonlincon_oracle(mpc, mpc.optim)
+    set_nonlincon!(mpc, mpc.optim, g_oracle, geq_oracle)
 end
 
 """
