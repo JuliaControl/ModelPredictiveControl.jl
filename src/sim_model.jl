@@ -220,15 +220,6 @@ function preparestate!(model::SimModel)
     return x 
 end
 
-function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
-    Base.depwarn(
-        "The method preparestate!(model::SimModel, u, d=[]) is deprecated. Use "*
-        " preparestate!(model::SimModel) instead.",
-        :preparestate!,
-    )
-    return preparestate!(model)
-end
-
 @doc raw"""
     updatestate!(model::SimModel, u, d=[]) -> xnext
 
