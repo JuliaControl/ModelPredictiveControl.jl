@@ -379,19 +379,13 @@ nmpc_uno_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription,
 nmpc_uno_ms_hess = setconstraint!(nmpc_uno_ms_hess; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_uno_ms_hess.optim)
 
-# TODO: does not work well with MadNLP and MultipleShooting or TrapezoidalCollocation, 
-# figure out why. Current theory: 
-# MadNLP LBFGS approximation is less robust than Ipopt version. Re-test when exact Hessians
-# will be supported in ModelPredictiveControl.jl. The following attributes kinda work with 
-# the MadNLP LBFGS approximation but super slow (~1000 times slower than Ipopt):
-# optim = JuMP.Model(MadNLP.Optimizer)
-# transcription = MultipleShooting()
-# nmpc_madnlp_ms = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
-# nmpc_madnlp_ms = setconstraint!(nmpc_madnlp_ms; umin, umax)
-# JuMP.unset_time_limit_sec(nmpc_madnlp_ms.optim)
-# JuMP.set_attribute(nmpc_madnlp_ms.optim, "hessian_approximation", MadNLP.CompactLBFGS)
-# MadNLP_QNopt = MadNLP.QuasiNewtonOptions(; max_history=42)
-# JuMP.set_attribute(nmpc_madnlp_ms.optim, "quasi_newton_options", MadNLP_QNopt)
+# skip MadNLP.jl with MultipleShooting and hessian=false, their LBFGS does not work well
+
+optim = JuMP.Model(MadNLP.Optimizer)
+transcription, hessian = MultipleShooting(), true
+nmpc_madnlp_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
+nmpc_madnlp_ms_hess = setconstraint!(nmpc_madnlp_ms_hess; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_madnlp_ms_hess.optim)
 
 samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["SingleShooting"] = 
@@ -437,6 +431,11 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocatio
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting"] = 
     @benchmarkable(
         sim!($nmpc_madnlp_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["MultipleShooting (Hessian)"] = 
+    @benchmarkable(
+        sim!($nmpc_madnlp_ms_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds
     )
 # CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Uno"]["MultipleShooting (Hessian)"] = 
