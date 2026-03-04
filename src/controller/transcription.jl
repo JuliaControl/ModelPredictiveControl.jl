@@ -1,8 +1,10 @@
+const COLLOCATION_NODE_TYPE = Float64
+
 """
 Abstract supertype of all transcription methods of [`PredictiveController`](@ref).
 
-The module currently supports [`SingleShooting`](@ref), [`MultipleShooting`](@ref) and
-[`TrapezoidalCollocation`](@ref) transcription methods.
+The module currently supports [`SingleShooting`](@ref), [`MultipleShooting`](@ref),
+[`TrapezoidalCollocation`](@ref) and [`OrthogonalCollocation`](@ref) transcription methods.
 """
 abstract type TranscriptionMethod end
 abstract type ShootingMethod    <: TranscriptionMethod end
@@ -81,15 +83,17 @@ only. The decision variables are the same as for [`MultipleShooting`](@ref), hen
 computational costs. See the same docstring for descriptions of `f_threads` and `h_threads`
 keywords. The `h` argument is `0` or `1`, for piecewise constant or linear manipulated 
 inputs ``\mathbf{u}`` (`h=1` is slightly less expensive). Note that the various [`DiffSolver`](@ref) 
-here assume zero-order hold, so `h=1` will induce a plant-model  mismatch if the plant is
-simulated with these solvers. 
+here assume zero-order hold, so `h=1` will induce a plant-model mismatch if the plant is
+simulated with these solvers. Measured disturbances ``\mathbf{d}`` are piecewise linear.
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
-moderately stiff systems and is A-stable. Note that the built-in [`StateEstimator`](@ref)
-will still use the `solver` provided at the construction of the [`NonLinModel`](@ref) to
-estimate the plant states, not the trapezoidal rule (see `supersample` option of 
-[`RungeKutta`](@ref) for stiff systems). See Extended Help for more details.
+moderately stiff systems and is A-stable. See Extended Help for more details.
+
+!!! warning
+    The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
+    construction of the [`NonLinModel`](@ref) to estimate the plant states, not the 
+    trapezoidal rule (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
 transcription method.
@@ -104,16 +108,179 @@ transcription method.
 """
 struct TrapezoidalCollocation <: CollocationMethod
     h::Int
-    nc::Int
+    no::Int
     f_threads::Bool
     h_threads::Bool
     function TrapezoidalCollocation(h::Int=0; f_threads=false, h_threads=false)
         if !(h == 0 || h == 1)
             throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
         end
-        nc = 2 # 2 collocation points per interval for trapezoidal rule
-        return new(h, nc, f_threads, h_threads)
+        no = 2 # 2 collocation points per intervals for trapezoidal rule
+        return new(h, no, f_threads, h_threads)
     end
+end
+
+
+@doc raw"""
+    OrthogonalCollocation(
+        h::Int=0, no=3; f_threads=false, h_threads=false, roots=:gaussradau
+    )
+
+Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
+
+Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)s
+only. The `h` argument is the hold order for ``\mathbf{u}``, and `no` argument, the number
+of collocation points ``n_o``. Only zero-order hold is currently implemented, so `h` must
+be `0`. The decision variable is similar to [`MultipleShooting`](@ref), but it also includes
+the collocation points:
+```math
+\mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
+```
+where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministic states
+(the first `nx` elements of ``\mathbf{x̂}``):
+```math
+\mathbf{K} =                            \begin{bmatrix}
+    \mathbf{k}_{1}(k+0)                 \\
+    \mathbf{k}_{2}(k+0)                 \\
+    \vdots                              \\
+    \mathbf{k}_{n_o}(k+0)               \\
+    \mathbf{k}_{1}(k+1)                 \\
+    \mathbf{k}_{2}(k+1)                 \\
+    \vdots                              \\
+    \mathbf{k}_{n_o}(k+H_p-1)           \end{bmatrix}
+```
+and ``\mathbf{k}_i(k+j)`` is the deterministic state prediction for the ``i``th collocation
+point at the ``j``th stage/interval/finite element (details in Extended Help). The `roots`
+keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or 
+Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstring for
+descriptions of `f_threads` and `h_threads` keywords.
+
+This transcription computes the predictions by enforcing the collocation and continuity
+constraints at the collocation points. It is efficient for highly stiff systems, but 
+generally more expensive than the other methods for non-stiff systems. See Extended Help for
+more details.
+
+!!! warning
+    The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
+    construction of the [`NonLinModel`](@ref) to estimate the plant states, not orthogonal
+    collocation (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
+
+Sparse optimizers like `Ipopt` and sparse Jacobian computations are highly recommended for
+this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
+
+# Extended Help
+!!! details "Extended Help"
+    As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
+    states are left out of the ``\mathbf{K}`` vector since collocation methods require
+    continuous-time dynamics and the stochastic model is discrete.
+
+    The collocation points are located at the roots of orthogonal polynomials, which is 
+    "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
+    The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
+    is more accurate than Gauss-Radau but only A-stable, while the latter being L-stable. 
+    See [`con_nonlinprogeq!`](@ref) for details on the implementation.
+"""
+struct OrthogonalCollocation <: CollocationMethod
+    h::Int
+    no::Int
+    f_threads::Bool
+    h_threads::Bool
+    τ::Vector{COLLOCATION_NODE_TYPE}
+    function OrthogonalCollocation(
+        h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
+    )
+        if !(h == 0)
+            throw(ArgumentError("Only the zero-order hold (h=0) is currently implemented."))
+        end
+        if roots==:gaussradau            
+            x, _ = FastGaussQuadrature.gaussradau(no, COLLOCATION_NODE_TYPE)
+            # we reverse the nodes to include the τ=1.0 node:
+            τ = (reverse(-x) .+ 1) ./ 2
+        elseif roots==:gausslegendre
+            x, _ = FastGaussQuadrature.gausslegendre(no)
+            # converting [-1, 1] to [0, 1] (see 
+            # https://en.wikipedia.org/wiki/Gaussian_quadrature#Change_of_interval):
+            τ = (x .+ 1) ./ 2
+        else
+            throw(ArgumentError("roots argument must be :gaussradau or :gausslegendre."))
+        end
+        return new(h, no, f_threads, h_threads, τ)
+    end
+end
+
+@doc raw"""
+    init_orthocolloc(model::SimModel, transcription::OrthogonalCollocation) -> Mo, Co, λo
+
+Init the differentiation and continuity matrices for [`OrthogonalCollocation`](@ref).
+
+Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized to the
+interval ``[0, 1]``, and ``τ_0=0``, each state trajectories are approximated by a distinct
+polynomial of degree ``n_o``. The differentiation matrix ``\mathbf{M_o}``, continuity
+matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed with:
+```math
+\begin{aligned}
+    \mathbf{P_o} &=                                                                               \begin{bmatrix}
+        τ_1^1 \mathbf{I}       & τ_1^2 \mathbf{I}       & \cdots & τ_1^{n_o} \mathbf{I}           \\
+        τ_2^1 \mathbf{I}       & τ_2^2 \mathbf{I}       & \cdots & τ_2^{n_o} \mathbf{I}           \\
+        \vdots                 & \vdots                 & \ddots & \vdots                         \\
+        τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
+    \mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
+        τ_1^0 \mathbf{I}       & 2τ_1^1 \mathbf{I}      & \cdots & n_o τ_1^{n_o-1} \mathbf{I}     \\
+        τ_2^0 \mathbf{I}       & 2τ_2^1 \mathbf{I}      & \cdots & n_o τ_2^{n_o-1} \mathbf{I}     \\
+        \vdots                 & \vdots                 & \ddots & \vdots                         \\
+        τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
+    \mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
+    \mathbf{C_o} &=                                                                               \begin{bmatrix}
+        L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix} \\
+            λ_o  &= L_0(1)                                                                        
+\end{aligned}
+```
+where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values w/o the Y-intercept,
+and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagrange polynomial  ``L_j(τ)`` bases
+are defined as:
+```math
+L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
+```
+"""
+function init_orthocolloc(
+    model::SimModel{NT}, transcription::OrthogonalCollocation
+) where {NT<:Real}
+    nx, no = model.nx, transcription.no
+    τ = transcription.τ
+    Po = Matrix{NT}(undef, nx*no, nx*no) # polynomial matrix (w/o the Y-intercept term)
+    Ṗo = Matrix{NT}(undef, nx*no, nx*no) # polynomial derivative matrix
+    for j=1:no, i=1:no
+        iRows = (1:nx) .+ nx*(i-1)
+        iCols = (1:nx) .+ nx*(j-1)
+        Po[iRows, iCols] = (τ[i]^j)*I(nx)
+        Ṗo[iRows, iCols] = (j*τ[i]^(j-1))*I(nx)
+    end
+    Mo = sparse((Ṗo/Po)/model.Ts)
+    Co = Matrix{NT}(undef, nx, nx*no)
+    for j=1:no
+        iCols = (1:nx) .+ nx*(j-1)
+        Co[:, iCols] = lagrange_end(j, transcription)*I(nx)
+    end
+    Co = sparse(Co)
+    λo = lagrange_end(0, transcription)
+    return Mo, Co, λo
+end
+"Return empty sparse matrices and `NaN` for other [`TranscriptionMethod`](@ref)"
+init_orthocolloc(::SimModel, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0), NaN
+
+"Evaluate the Lagrange basis polynomial ``L_j`` at `τ=1`."
+function lagrange_end(j, transcription::OrthogonalCollocation)
+    τ_val = 1
+    τ_values = [0; transcription.τ] # including the τ=0 node for the Lagrange polynomials
+    j_index = j + 1 # because of the τ=0 node
+    τj = τ_values[j_index]
+    Lj = 1
+    for i in eachindex(τ_values)
+        i == j_index && continue
+        τi = τ_values[i]
+        Lj *= (τ_val - τi)/(τj - τi)
+    end
+    return Lj
 end
 
 function validate_transcription(::LinModel, ::CollocationMethod)
@@ -133,124 +300,13 @@ end
 function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
+function get_nZ(estim::StateEstimator, transcription::OrthogonalCollocation, Hp, Hc)
+    return estim.model.nu*Hc + estim.nx̂*Hp + estim.model.nx*transcription.no*Hp
+end
 
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
 get_nk(model::SimModel, ::ShootingMethod) = model.nk
-get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.nc
-
-@doc raw"""
-    init_ZtoΔU(estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc) -> PΔu
-
-Init decision variables to input increments over ``H_c`` conversion matrix `PΔu`.
-
-The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{ΔU}``, the input
-increments over ``H_c``, is computed by:
-```math
-\mathbf{ΔU} = \mathbf{P_{Δu}} \mathbf{Z}
-```
-
-in which ``\mathbf{P_{Δu}}`` is defined in the Extended Help section.
-
-# Extended Help
-!!! details "Extended Help"
-    Following the decision variable definition of the [`TranscriptionMethod`](@ref), the
-    conversion matrix ``\mathbf{P_{Δu}}``, we have:
-    - ``\mathbf{P_{Δu}} = \mathbf{I}`` if `transcription` is a [`SingleShooting`](@ref)
-    - ``\mathbf{P_{Δu}} = [\begin{smallmatrix}\mathbf{I} & \mathbf{0} \end{smallmatrix}]`` otherwise.
-    The matrix is store as as `SparseMatrixCSC` to support both cases efficiently.
-"""
-function init_ZtoΔU end
-
-function init_ZtoΔU(
-    estim::StateEstimator{NT}, ::SingleShooting, _ , Hc
-) where {NT<:Real}
-    PΔu = sparse(Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc))
-    return PΔu
-end
-
-function init_ZtoΔU(
-    estim::StateEstimator{NT}, ::TranscriptionMethod, Hp, Hc
-) where {NT<:Real}
-    I_nu_Hc = sparse(Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc))
-    PΔu = [I_nu_Hc spzeros(NT, estim.model.nu*Hc, estim.nx̂*Hp)]
-    return PΔu
-end
-
-@doc raw"""
-    init_ZtoU(estim, transcription, Hp, Hc, nb) -> Pu, Tu
-
-Init decision variables to inputs over ``H_p`` conversion matrices.
-
-The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{U}``, the manipulated
-inputs over ``H_p``, is computed by:
-```math
-\mathbf{U} = \mathbf{P_u} \mathbf{Z} + \mathbf{T_u} \mathbf{u}(k-1)
-```
-The ``\mathbf{P_u}`` and ``\mathbf{T_u}`` matrices are defined in the Extended Help section.
-
-# Extended Help
-!!! details "Extended Help"
-    With ``n_i``, the ``i``th element of the ``\mathbf{n_b}`` vector defined in [`move_blocking`](@ref)
-    documentation, we introduce the ``\mathbf{Q}(n_i)`` matrix of size `(nu*ni, nu)`:
-    ```math
-    \mathbf{Q}(n_i) =       \begin{bmatrix}
-        \mathbf{I}          \\
-        \mathbf{I}          \\
-        \vdots              \\
-        \mathbf{I}          \end{bmatrix}            
-    ```
-    The ``\mathbf{U}`` vector and the conversion matrices are defined as:
-    ```math
-    \mathbf{U} = \begin{bmatrix}
-        \mathbf{u}(k + 0)                                                                   \\
-        \mathbf{u}(k + 1)                                                                   \\
-        \vdots                                                                              \\
-        \mathbf{u}(k + H_p - 1)                                                             \end{bmatrix} , \quad
-    \mathbf{P_u^†} = \begin{bmatrix}
-        \mathbf{Q}(n_1)         & \mathbf{0}            & \cdots    & \mathbf{0}            \\
-        \mathbf{Q}(n_2)         & \mathbf{Q}(n_2)       & \cdots    & \mathbf{0}            \\
-        \vdots                  & \vdots                & \ddots    & \vdots                \\
-        \mathbf{Q}(n_{H_c})     & \mathbf{Q}(n_{H_c})   & \cdots    & \mathbf{Q}(n_{H_c})   \end{bmatrix} , \quad
-    \mathbf{T_u} = \begin{bmatrix}
-        \mathbf{I}                                                                          \\
-        \mathbf{I}                                                                          \\
-        \vdots                                                                              \\
-        \mathbf{I}                                                                          \end{bmatrix}
-    ```
-    and, depending on the transcription method, we have:
-    - ``\mathbf{P_u} = \mathbf{P_u^†}`` if `transcription` is a [`SingleShooting`](@ref)
-    - ``\mathbf{P_u} = [\begin{smallmatrix}\mathbf{P_u^†} & \mathbf{0} \end{smallmatrix}]``
-      if `transcription` is a [`MultipleShooting`](@ref)
-    The conversion matrices are stored as `SparseMatrixCSC` since it was benchmarked that it
-    is generally more performant than normal dense matrices, even for small `nu`, `Hp` and 
-    `Hc` values. Using `Bool` element type and `BitMatrix` is also slower.
-"""
-function init_ZtoU(
-    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, nb
-) where {NT<:Real}
-    nu = estim.model.nu
-    I_nu = sparse(Matrix{NT}(I, nu, nu))
-    PuDagger = Matrix{NT}(undef, nu*Hp, nu*Hc)
-    for i=1:Hc
-        ni    = nb[i]
-        Q_ni  = repeat(I_nu, ni, 1)
-        iRows = (1:nu*ni) .+ @views nu*sum(nb[1:i-1])
-        PuDagger[iRows, :] = [repeat(Q_ni, 1, i) spzeros(nu*ni, nu*(Hc-i))]
-    end
-    PuDagger = sparse(PuDagger)
-    Pu = init_PUmat(estim, transcription, Hp, Hc, PuDagger)
-    Tu = repeat(I_nu, Hp)
-    return Pu, Tu
-end
-
-function init_PUmat(_,::SingleShooting,_,_,PuDagger::AbstractMatrix{NT}) where NT<:Real
-    return PuDagger
-end
-function init_PUmat(
-    estim, ::TranscriptionMethod, Hp, _ , PuDagger::AbstractMatrix{NT}
-) where NT<:Real
-    return [PuDagger spzeros(NT, estim.model.nu*Hp, estim.nx̂*Hp)]
-end
+get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
 
 @doc raw"""
     init_predmat(
@@ -518,11 +574,15 @@ given in the Extended Help section.
 !!! details "Extended Help"
     The terminal state matrices all appropriately sized zero matrices ``\mathbf{0}``, except
     for ``\mathbf{e_x̂} = [\begin{smallmatrix}\mathbf{0} & \mathbf{I}\end{smallmatrix}]``
+    if `transcription` is a [`MultipleShooting`](@ref), and ``\mathbf{e_x̂} = 
+    [\begin{smallmatrix}\mathbf{0} & \mathbf{I} & \mathbf{0}\end{smallmatrix}]`` otherwise.
 """
 function init_predmat(
     model::NonLinModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
+    nΔU = nu*Hc
+    nX̂0 = nx̂*Hp
     nZ = get_nZ(estim, transcription, Hp, Hc)
     E  = zeros(NT, 0, nZ)
     G  = zeros(NT, 0, nd)
@@ -530,7 +590,8 @@ function init_predmat(
     K  = zeros(NT, 0, nx̂)
     V  = zeros(NT, 0, nu)
     B  = zeros(NT, 0)
-    ex̂ = [zeros(NT, nx̂, Hc*nu + (Hp-1)*nx̂) I]
+    myzeros = zeros(nx̂, nZ - nΔU - nX̂0)
+    ex̂ = [zeros(NT, nx̂, nΔU + nX̂0 - nx̂) I myzeros]
     gx̂ = zeros(NT, nx̂, nd)
     jx̂ = zeros(NT, nx̂, nd*Hp)
     kx̂ = zeros(NT, nx̂, nx̂)
@@ -901,8 +962,7 @@ Set and return the warm-start value of `Z̃var` for [`SingleShooting`](@ref) tra
 
 If supported by `mpc.optim`, it warm-starts the solver at:
 ```math
-\mathbf{Z̃_s} = 
-\begin{bmatrix}
+\mathbf{Z̃_s} =                  \begin{bmatrix}
     \mathbf{Δu}(k+0|k-1)        \\ 
     \mathbf{Δu}(k+1|k-1)        \\ 
     \vdots                      \\
@@ -916,9 +976,63 @@ last control period ``k-1``, and ``ϵ(k-1)``, the slack variable of the last con
 """
 function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
     nu, Hc, Z̃s = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
+    nΔU = nu*Hc
     # --- input increments ΔU ---
-    Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
-    Z̃s[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    Z̃s[1:(nΔU-nu)] .= @views mpc.Z̃[nu+1:nΔU]
+    Z̃s[(nΔU-nu+1):(nΔU)] .= 0
+    # --- slack variable ϵ ---
+    mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
+    JuMP.set_start_value.(Z̃var, Z̃s)
+    return Z̃s
+end
+
+@doc raw"""
+    set_warmstart!(mpc::PredictiveController, ::OrthogonalCollocation, Z̃var) -> Z̃s
+
+Set and return the warm-start value of `Z̃var` for other [`OrthogonalCollocation`](@ref).
+
+It warm-starts the solver at:
+```math
+\mathbf{Z̃_s} =                      \begin{bmatrix}
+    \mathbf{Δu}(k+0|k-1)            \\ 
+    \mathbf{Δu}(k+1|k-1)            \\ 
+    \vdots                          \\
+    \mathbf{Δu}(k+H_c-2|k-1)        \\
+    \mathbf{0}                      \\
+    \mathbf{x̂_0}(k+1|k-1)           \\
+    \mathbf{x̂_0}(k+2|k-1)           \\
+    \vdots                          \\
+    \mathbf{x̂_0}(k+H_p-1|k-1)       \\
+    \mathbf{x̂_0}(k+H_p-1|k-1)       \\
+    \mathbf{k}(k+0|k-1)             \\
+    \mathbf{k}(k+1|k-1)             \\
+    \vdots                          \\
+    \mathbf{k}(k+H_p-2|k-1)         \\
+    \mathbf{k}(k+H_p-2|k-1)         \\
+    ϵ(k-1)
+\end{bmatrix}
+```
+where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
+last control period ``k-1``, expressed as a deviation from the operating point 
+``\mathbf{x̂_{op}}``. The vector ``\mathbf{k}(k+j|k-1)`` include the ``n_o`` intermediate
+stage predictions for the interval ``k+j``, and is also computed at the last control period.
+"""
+function set_warmstart!(
+    mpc::PredictiveController, transcription::OrthogonalCollocation, Z̃var
+)
+    nu, nx̂ = mpc.estim.model.nu, mpc.estim.nx̂
+    Hp, Hc, Z̃s  = mpc.Hp, mpc.Hc, mpc.buffer.Z̃
+    nk = get_nk(mpc.estim.model, transcription)
+    nΔU, nX̂, nK = nu*Hc, nx̂*Hp, nk*Hp
+    # --- input increments ΔU ---
+    Z̃s[1:(nΔU-nu)]       .= @views mpc.Z̃[(nu+1):(nΔU)]
+    Z̃s[(nΔU-nu+1):(nΔU)] .= 0
+    # --- predicted states X̂0 ---
+    Z̃s[(nΔU+1):(nΔU+nX̂-nx̂)]    .= @views mpc.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
+    Z̃s[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)] .= @views mpc.Z̃[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)]
+    # --- collocation points K ---
+    Z̃s[(nΔU+nX̂+1):(nΔU+nX̂+nK-nk)]    .= @views mpc.Z̃[(nΔU+nX̂+nk+1):(nΔU+nX̂+nK)]
+    Z̃s[(nΔU+nX̂+nK-nk+1):(nΔU+nX̂+nK)] .= @views mpc.Z̃[(nΔU+nX̂+nK-nk+1):(nΔU+nX̂+nK)]
     # --- slack variable ϵ ---
     mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
     JuMP.set_start_value.(Z̃var, Z̃s)
@@ -932,8 +1046,7 @@ Set and return the warm-start value of `Z̃var` for other [`TranscriptionMethod`
 
 It warm-starts the solver at:
 ```math
-\mathbf{Z̃_s} =
-\begin{bmatrix}
+\mathbf{Z̃_s} =                  \begin{bmatrix}
     \mathbf{Δu}(k+0|k-1)        \\ 
     \mathbf{Δu}(k+1|k-1)        \\ 
     \vdots                      \\
@@ -953,12 +1066,13 @@ last control period ``k-1``, expressed as a deviation from the operating point
 """
 function set_warmstart!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var)
     nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
+    nΔU, nX̂ = nu*Hc, nx̂*Hp
     # --- input increments ΔU ---
-    Z̃s[1:(Hc*nu-nu)] .= @views mpc.Z̃[nu+1:Hc*nu]
-    Z̃s[(Hc*nu-nu+1):(Hc*nu)] .= 0
+    Z̃s[1:(nΔU-nu)] .= @views mpc.Z̃[nu+1:nΔU]
+    Z̃s[(nΔU-nu+1):(nΔU)] .= 0
     # --- predicted states X̂0 ---
-    Z̃s[(Hc*nu+1):(Hc*nu+Hp*nx̂-nx̂)]       .= @views mpc.Z̃[(Hc*nu+nx̂+1):(Hc*nu+Hp*nx̂)]
-    Z̃s[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)] .= @views mpc.Z̃[(Hc*nu+Hp*nx̂-nx̂+1):(Hc*nu+Hp*nx̂)]
+    Z̃s[(nΔU+1):(nΔU+nX̂-nx̂)]    .= @views mpc.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
+    Z̃s[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)] .= @views mpc.Z̃[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)]
     # --- slack variable ϵ ---
     mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
     JuMP.set_start_value.(Z̃var, Z̃s)
@@ -1007,24 +1121,25 @@ end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, X̂0, Û0, K0,
+        Ŷ0, x̂0end, X̂0, Û0, K,
         mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
         U0, _
     ) -> Ŷ0, x̂0end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
-The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K0` arguments. The augmented model of
+The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K` arguments. The augmented model of
 [`f̂!`](@ref) and [`ĥ!`](@ref) functions is called recursively in a `for` loop:
 ```math
 \begin{aligned}
-\mathbf{x̂_0}(k+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d̂_0}(k) \Big) \\
-\mathbf{ŷ_0}(k)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d̂_0}(k) \Big)
+\mathbf{x̂_0}(k+j+1) &= \mathbf{f̂}\Big(\mathbf{x̂_0}(k+j), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j) \Big) \\
+\mathbf{ŷ_0}(k+j)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k+j), \mathbf{d̂_0}(k+j) \Big)
 \end{aligned}
 ```
+for ``j = 0, 1, ... , H_p``.
 """
 function predict!(
-    Ŷ0, x̂0end, X̂0, Û0, K0,
+    Ŷ0, x̂0end, X̂0, Û0, K,
     mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
     U0, _
 )
@@ -1035,9 +1150,9 @@ function predict!(
     for j=1:Hp
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        k0     = @views K0[(1 + nk*(j-1)):(nk*j)]
+        k      = @views K[(1 + nk*(j-1)):(nk*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
+        f̂!(x̂0next, û0, k, mpc.estim, model, x̂0, u0, d̂0)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         d̂0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
@@ -1060,9 +1175,10 @@ Compute vectors if `model` is a [`NonLinModel`](@ref) and other [`TranscriptionM
 The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
 is called multiple times in a `for` loop:
 ```math
-\mathbf{ŷ_0}(k) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k), \mathbf{d̂_0}(k) \Big)
+\mathbf{ŷ_0}(k+j) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k+j), \mathbf{d̂_0}(k+j) \Big)
 ```
-in which ``\mathbf{x̂_0}`` is the augmented state extracted from the decision variable `Z̃`.
+for ``j = 1, 2, ... , H_p``, and in which ``\mathbf{x̂_0}`` is the augmented state extracted
+from the decision variable `Z̃`.
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
@@ -1171,24 +1287,25 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K0
+        geq, X̂0, Û0, K
         mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
         U0, Z̃
-    )
+    ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. The nonlinear 
+The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. The nonlinear 
 equality constraints `geq` only includes the augmented state defects, computed with:
 ```math
-\mathbf{ŝ}(k+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k), \mathbf{u_0}(k), \mathbf{d̂_0}(k)\Big) 
-                    - \mathbf{x̂_0}(k+1)
+\mathbf{ŝ}(k+j+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k+j), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j)\Big) 
+                    - \mathbf{x̂_0}(k+j+1)
 ```
-in which the augmented state ``\mathbf{x̂_0}`` are extracted from the decision variables 
-`Z̃`, and ``\mathbf{f̂}`` is the augmented state function defined in [`f̂!`](@ref).
+for ``j = 0, 1, ... , H_p-1``, and in which the augmented state ``\mathbf{x̂_0}`` are
+extracted from the decision variables `Z̃`, and ``\mathbf{f̂}`` is the augmented state
+function defined in [`f̂!`](@ref).
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K0, 
+    geq, X̂0, Û0, K, 
     mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, U0, Z̃
 )
     nu, nx̂, nd, nk = model.nu, mpc.estim.nx̂, model.nd, model.nk
@@ -1199,63 +1316,59 @@ function con_nonlinprogeq!(
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)] 
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂0 = @views mpc.estim.x̂0[1:nx̂]
-            d̂0 = @views mpc.d0[1:nd]
+            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            d̂0   = @views mpc.d0[1:nd]
         else
-            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
-            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
+            d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        k        = @views    K[(1 + nk*(j-1)):(nk*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k0, mpc.estim, model, x̂0, u0, d̂0)
-        ŝnext .= x̂0next .- x̂0next_Z̃
+        f̂!(x̂0next, û0, k, mpc.estim, model, x̂0_Z̃, u0, d̂0)
+        ŝnext .= @. x̂0next - x̂0next_Z̃
     end
     return geq
 end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K0
+        geq, X̂0, Û0, K̇
         mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
         U0, Z̃
-    )
+    ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K0` vectors in argument. 
-
-The nonlinear equality constraints `geq` only includes the state defects. The deterministic
-and stochastic states are handled separately since collocation methods require continuous-
-time state-space models, and the stochastic model of the unmeasured disturbances
-is discrete-time. The deterministic and stochastic defects are respectively computed with:
+The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The nonlinear equality
+constraints `geq` only includes the state defects. The deterministic and stochastic states
+are handled separately since collocation methods require continuous-time state-space models,
+and the stochastic model of the unmeasured disturbances is discrete-time. The deterministic
+and stochastic defects are respectively computed with:
 ```math
 \begin{aligned}
-\mathbf{s_d}(k+1) &= \mathbf{x_0}(k) - \mathbf{x_0}(k+1) 
-                      + 0.5 T_s (\mathbf{k}_1 + \mathbf{k}_2) \\
-\mathbf{s_s}(k+1) &= \mathbf{A_s x_s}(k) - \mathbf{x_s}(k+1)
+\mathbf{s_d}(k+j+1) &= \mathbf{x_0}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
+                       - \mathbf{x_0}(k+j+1)                                                \\
+\mathbf{s_s}(k+j+1) &= \mathbf{A_s x_s}(k+j) - \mathbf{x_s}(k+j+1)
 \end{aligned}
 ```
-in which ``\mathbf{x_0}`` and ``\mathbf{x_s}`` are the deterministic and stochastic states 
-extracted from the decision variables `Z̃`. The ``\mathbf{k}`` coefficients are 
-evaluated from the continuous-time function `model.f!` and:
+for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x_0}`` and ``\mathbf{x_s}`` are the
+deterministic and stochastic states extracted from the decision variables `Z̃`. The
+``\mathbf{k̇}`` coefficients are  evaluated from the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
-\mathbf{k}_1 &= \mathbf{f}\Big(\mathbf{x_0}(k),   \mathbf{û_0}(k),   \mathbf{d̂_0}(k)  \Big) \\
-\mathbf{k}_2 &= \mathbf{f}\Big(\mathbf{x_0}(k+1), \mathbf{û_0}(k+h), \mathbf{d̂_0}(k+1)\Big) 
+\mathbf{k̇}_1(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
+\mathbf{k̇}_2(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j+1), \mathbf{û_0}(k+j+h), \mathbf{d̂_0}(k+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
-in which ``h`` is the hold order `transcription.h` and the disturbed input is:
-```math
-\mathbf{û_0}(k) = \mathbf{u_0}(k) + \mathbf{C_{s_u} x_s}(k)
-``` 
-the ``\mathbf{A_s, C_{s_u}}`` matrices are defined in [`init_estimstoch`](@ref) doc.
+in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
+is defined in [`f̂_input!`](@ref).
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K0, 
+    geq, X̂0, Û0, K̇, 
     mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
     U0, Z̃
 )
@@ -1269,35 +1382,36 @@ function con_nonlinprogeq!(
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂0 = @views mpc.estim.x̂0[1:nx̂]
-            d̂0 = @views mpc.d0[1:nd]
+            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            d̂0   = @views mpc.d0[1:nd]
         else
-            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
-            d̂0 = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
+            d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        k0       = @views   K0[(1 + nk*(j-1)):(nk*j)]
+        k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
-        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]  
-        x0                  = @views x̂0[1:nx]
-        xsnext              = @views x̂0next[nx+1:end]
-        x0next_Z̃, xsnext_Z̃  = @views x̂0next_Z̃[1:nx], x̂0next_Z̃[nx+1:end]
-        sdnext, ssnext      = @views ŝnext[1:nx], ŝnext[nx+1:end]
-        k1, k2              = @views k0[1:nx], k0[nx+1:2*nx]
+        sdnext   = @views  geq[(1 + nx̂*(j-1)     ):(nx̂*(j-1) + nx)]
+        ssnext   = @views  geq[(1 + nx̂*(j-1) + nx):(nx̂*j         )]
+        x0_Z̃     = @views  x̂0_Z̃[1:nx]
+        x0next_Z̃ = @views x̂0next_Z̃[1:nx]
+        k̇1, k̇2   = @views k̇[1:nx], k̇[nx+1:2*nx]
         # ----------------- stochastic defects -----------------------------------------
-        fs!(x̂0next, mpc.estim, model, x̂0)
+        xsnext   = @views x̂0next[nx+1:end]
+        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
+        fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
         ssnext .= @. xsnext - xsnext_Z̃
-        # ----------------- deterministic defects --------------------------------------
+        # ----------------- deterministic defects: trapezoidal collocation -------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        f̂_input!(û0, mpc.estim, model, x̂0, u0)
+        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
-            model.f!(k1, x0, û0, d̂0, p)
+            model.f!(k̇1, x0_Z̃, û0, d̂0, p)
         else
-            k1 .= @views K0[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+            k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1 || j ≥ Hp
             # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
@@ -1307,8 +1421,122 @@ function con_nonlinprogeq!(
             û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
             f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
         end
-        model.f!(k2, x0next_Z̃, û0next, d̂0next, p)
-        sdnext .= @. x0 - x0next_Z̃ + 0.5*Ts*(k1 + k2)
+        model.f!(k̇2, x0next_Z̃, û0next, d̂0next, p)
+        sdnext .= @. x0_Z̃ - x0next_Z̃ + 0.5*Ts*(k̇1 + k̇2)
+    end
+    return geq
+end
+
+
+@doc raw"""
+    con_nonlinprogeq!(
+        geq, X̂0, Û0, K̇, 
+        mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
+        U0, Z̃
+    ) -> geq
+
+Nonlinear equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocation`](@ref).
+
+The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The defects between
+the deterministic state derivative at the ``n_o`` collocation points and the model dynamics
+are computed by:
+```math
+\mathbf{s_k}(k+j)                                                                                 
+    = \mathbf{M_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(k+j) - \mathbf{x_0}(k+j)                       \\
+        \mathbf{k}_2(k+j) - \mathbf{x_0}(k+j)                       \\
+        \vdots                                                      \\
+        \mathbf{k}_{n_o}(k+j) - \mathbf{x_0}(k+j)                   \\ \end{bmatrix}                                                                                     
+    - \begin{bmatrix}
+        \mathbf{k̇}_1(k+j)                                           \\
+        \mathbf{k̇}_2(k+j)                                           \\
+        \vdots                                                      \\
+        \mathbf{k̇}_{n_o}(k+j)                                       \end{bmatrix}
+```
+for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` vectors are
+extracted from the decision variable `Z̃`. The ``\mathbf{x_0}`` vectors are the
+deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_i`` derivative for the ``i``th 
+collocation point is computed from the continuous-time function `model.f!` and:
+```math
+\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_0}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
+```
+The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). Based on the 
+normalized time ``τ_i ∈ [0, 1]``, measured disturbances are linearly interpolated:
+```math
+\mathbf{d̂}_i(k+j) = (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)
+```
+The defects for the stochastic states ``\mathbf{s_s}`` are computed as in the
+[`TrapezoidalCollocation`](@ref) method, and the ones for the continuity constraint of the
+deterministic state trajectories are given by:
+```math
+\mathbf{s_c}(k+j+1) 
+    = \mathbf{C_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(k+j)                                           \\
+        \mathbf{k}_2(k+j)                                           \\
+        \vdots                                                      \\
+        \mathbf{k}_{n_o}(k+j)                                       \end{bmatrix}       
+    + λ_o \mathbf{x_0}(k+j) - \mathbf{x_0}(k+j+1)
+```
+for ``j = 0, 1, ... , H_p-1``. The differentiation matrix ``\mathbf{M_o}``, the continuity
+matrix ``\mathbf{C_o}`` and the coefficient ``λ_o`` are introduced in [`init_orthocolloc`](@ref).
+"""
+function con_nonlinprogeq!(
+    geq, X̂0, Û0, K̇,  
+    mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
+    U0, Z̃
+)
+    nu, nx̂, nd, nx = model.nu, mpc.estim.nx̂, model.nd, model.nx
+    Hp, Hc = mpc.Hp, mpc.Hc
+    nΔU, nX̂ = nu*Hc, nx̂*Hp
+    f_threads = transcription.f_threads
+    p = model.p
+    no, τ = transcription.no, transcription.τ
+    Mo, Co, λo = mpc.Mo, mpc.Co, mpc.λo
+    nk = get_nk(model, transcription)
+    nx̂_nk = nx̂ + nk
+    D̂0 = mpc.D̂0
+    X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
+    di = mpc.estim.buffer.d
+    ΔK = similar(K̇) # TODO: remove this allocation
+    @threadsif f_threads for j=1:Hp
+        if j < 2
+            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            d̂0   = @views mpc.d0[1:nd]
+        else
+            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
+            d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
+        end
+        k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
+        Δk       = @views    ΔK[(1 + nk*(j-1)):(nk*j)]
+        k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
+        d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
+        x̂0next   = @views    X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        x̂0next_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
+        scnext   = @views   geq[(1 + nx̂_nk*(j-1)     ):(nx̂_nk*(j-1) + nx)]
+        ssnext   = @views   geq[(1 + nx̂_nk*(j-1) + nx):(nx̂_nk*(j-1) + nx̂)]
+        sk       = @views   geq[(1 + nx̂_nk*(j-1) + nx̂):(nx̂_nk*j         )]
+        x0_Z̃     = @views     x̂0_Z̃[1:nx]
+        x0next_Z̃ = @views x̂0next_Z̃[1:nx]
+        # ----------------- stochastic defects -----------------------------------------
+        xsnext   = @views   x̂0next[nx+1:end]
+        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
+        fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
+        ssnext .= @. xsnext - xsnext_Z̃
+        # ----------------- collocation constraint defects -----------------------------
+        u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
+        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
+        for i=1:no
+            k̇i   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
+            Δki  = @views  Δk[(1 + (i-1)*nx):(i*nx)]
+            ki_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
+            Δki .= @. ki_Z̃ - x0_Z̃
+            di  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
+            model.f!(k̇i, ki_Z̃, û0, d̂0, p)
+        end
+        sk .= mul!(sk, Mo, Δk) .- k̇
+        # ----------------- continuity constraint defects ------------------------------
+        scnext .= mul!(scnext, Co, k_Z̃) .+ (λo.*x0_Z̃) .- x0next_Z̃
     end
     return geq
 end
