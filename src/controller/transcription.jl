@@ -989,7 +989,7 @@ end
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::OrthogonalCollocation, Z̃var) -> Z̃s
 
-Set and return the warm-start value of `Z̃var` for other [`OrthogonalCollocation`](@ref).
+Set and return the warm-start value of `Z̃var` for [`OrthogonalCollocation`](@ref).
 
 It warm-starts the solver at:
 ```math
