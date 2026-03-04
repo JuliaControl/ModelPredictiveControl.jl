@@ -782,9 +782,9 @@ end
     nmpc6 = NonLinMPC(linmodel1, Hp=15, Lwt=[0,1])
     @test nmpc6.weights.L_Hp ≈ Diagonal(diagm(repeat(Float64[0, 1], 15)))
     @test nmpc6.weights.L_Hp isa Hermitian{Float64, Diagonal{Float64, Vector{Float64}}}
-    nmpc7 = NonLinMPC(linmodel1, Hp=15, Ewt=1e-3, JE=(Ue,Ŷe,D̂e,p) -> p*dot(Ue,Ŷe)+sum(D̂e), p=10)
+    nmpc7 = NonLinMPC(linmodel1, Hp=15, Ewt=1e-3, JE=(Ue,Ŷe,D̂e,p,_) -> p*dot(Ue,Ŷe)+sum(D̂e), p=10)
     @test nmpc7.weights.E == 1e-3
-    @test nmpc7.JE([1,2],[3,4],[4,6],10) == 10*dot([1,2],[3,4])+sum([4,6])
+    @test nmpc7.JE([1,2],[3,4],[4,6],10,0) == 10*dot([1,2],[3,4])+sum([4,6])
     nmpc10 = NonLinMPC(linmodel1, nint_u=[1, 1], nint_ym=[0, 0])
     @test nmpc10.estim.nint_u  == [1, 1]
     @test nmpc10.estim.nint_ym == [0, 0]
@@ -808,11 +808,12 @@ end
     
     @test_throws DimensionMismatch NonLinMPC(linmodel1, Hp=15, Ewt=[1, 1])
     @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, JE  = (_,_,_)->0.0)
+    @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, JE  = (_,_,_,_)->0.0)
     @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
     @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
     @test_throws ArgumentError NonLinMPC(linmodel1, transcription=TrapezoidalCollocation())
 
-    @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, JE=(Ue,_,_,_)->Ue)
+    @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, JE=(Ue,_,_,_,_)->Ue)
     @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
 end
 
@@ -903,7 +904,7 @@ end
     setmodel!(nmpc_lin; Mwt=[0], Lwt=[1])
     u = moveinput!(nmpc_lin; R̂u=fill(ru[1], Hp))
     @test u ≈ [4] atol=5e-2
-    function JE(Ue, Ŷe, _ , p)
+    function JE(Ue, Ŷe, _ , p, _ )
         Wy, R̂y, Wu, R̂u = p
         return Wy*sum((R̂y-Ŷe[2:end]).^2) + Wu*sum((R̂u-Ue[1:end-1]).^2)
     end

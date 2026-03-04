@@ -421,7 +421,7 @@ model2, p = pendulum_model2, pendulum_p2
 plant2 = deepcopy(model2)
 plant2.p[3] = 1.25*p[3]  # plant-model mismatch
 estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
-function JE(UE, ŶE, _ , p)
+function JE(UE, ŶE, _ , p, _)
     Ts = p
     τ, ω = @views UE[1:end-1], ŶE[2:2:end-1]
     return Ts*dot(τ, ω)

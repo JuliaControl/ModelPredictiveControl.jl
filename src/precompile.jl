@@ -21,7 +21,7 @@ function h!(y, x, _ , p)
 end
 p = (sys2.A, sys2.B, sys2.C)
 
-function JE( _ , Ŷe, _ , R̂y)
+function JE( _ , Ŷe, _ , R̂y , _ )
     Ŷ = @views Ŷe[3:end]
     Ȳ = R̂y - Ŷ
     return dot(Ȳ, Ȳ)
