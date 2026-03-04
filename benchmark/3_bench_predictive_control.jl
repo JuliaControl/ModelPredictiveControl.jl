@@ -44,26 +44,32 @@ nmpc_lin_ss = NonLinMPC(
     linmodel, transcription=SingleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10
 )
+JuMP.set_attribute(nmpc_lin_ss.optim, "tol", 1e-7)
 nmpc_lin_ms = NonLinMPC(
     linmodel, transcription=MultipleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10
 )
+JuMP.set_attribute(nmpc_lin_ms.optim, "tol", 1e-7)
 nmpc_nonlin_ss = NonLinMPC(
     nonlinmodel, transcription=SingleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10    
 )
+JuMP.set_attribute(nmpc_nonlin_ss.optim, "tol", 1e-7)
 nmpc_nonlin_ss_hess = NonLinMPC(
     nonlinmodel, transcription=SingleShooting(), hessian=true,
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10   
 )
+JuMP.set_attribute(nmpc_nonlin_ss_hess.optim, "tol", 1e-7)
 nmpc_nonlin_ms = NonLinMPC(
     nonlinmodel, transcription=MultipleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10    
 )
+JuMP.set_attribute(nmpc_nonlin_ms.optim, "tol", 1e-7)
 nmpc_nonlin_ms_hess = NonLinMPC(
     nonlinmodel, transcription=MultipleShooting(), hessian=true,
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10 
 )
+JuMP.set_attribute(nmpc_nonlin_ms_hess.optim, "tol", 1e-7)
 nmpc_nonlin_tc = NonLinMPC(
     nonlinmodel_c, transcription=TrapezoidalCollocation(),
     Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
