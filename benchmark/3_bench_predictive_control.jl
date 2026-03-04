@@ -448,7 +448,7 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["OrthogonalCollocation
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting (Hessian)"] = 
     @benchmarkable(
-        sim!($nmpc_madnlp_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        sim!($nmpc_madnlp_ss_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["MultipleShooting (Hessian)"] = 
