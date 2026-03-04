@@ -400,6 +400,7 @@ is actually slower in the [`MultipleShooting`](@ref) case, so only one method is
 function obj_nonlinprog!(
     Ȳ, Ū, mpc::PredictiveController, Ue, Ŷe, ΔŨ::AbstractVector{NT}
 ) where NT<:Real
+    model = mpc.estim.model
     nu, ny = model.nu, model.ny
     # --- output setpoint tracking term ---
     if mpc.weights.iszero_M_Hp[]
