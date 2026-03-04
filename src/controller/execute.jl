@@ -155,7 +155,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     U .= U0 .+ mpc.Uop
     Ŷ .= Ŷ0 .+ mpc.Yop
     D̂ .= mpc.D̂0 + mpc.Dop
-    J = obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ, Z̃)
+    J = obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     Ŷs = similar(mpc.Yop)
     predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]   = Z̃[1:mpc.Hc*model.nu]
@@ -387,15 +387,18 @@ end
 iszero_nc(mpc::PredictiveController) = (mpc.con.nc == 0)
 
 """
-    obj_nonlinprog!(Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ, Z̃)
+    obj_nonlinprog!(Ȳ, Ū, mpc::PredictiveController, Ue, Ŷe, ΔŨ)
 
 Nonlinear programming objective method when `model` is not a [`LinModel`](@ref). The
 function `dot(x, A, x)` is a performant way of calculating `x'*A*x`. This method mutates
 `Ȳ` and `Ū` arguments, without assuming any initial values (it recuperates the values in
 `Ŷe` and `Ue` arguments).
+
+Note that a specialized version on [`LinModel`](@ref) that uses the Hessian matrix `mpc.H̃`
+is actually slower in the [`MultipleShooting`](@ref) case, so only one method is defined.
 """
 function obj_nonlinprog!(
-    Ȳ, Ū, mpc::PredictiveController, model::SimModel, Ue, Ŷe, ΔŨ, ::AbstractVector{NT}
+    Ȳ, Ū, mpc::PredictiveController, Ue, Ŷe, ΔŨ::AbstractVector{NT}
 ) where NT<:Real
     nu, ny = model.nu, model.ny
     # --- output setpoint tracking term ---
@@ -423,23 +426,6 @@ function obj_nonlinprog!(
     # --- economic term ---
     E_JE = obj_econ(mpc, model, Ue, Ŷe)
     return JR̂y + JΔŨ + JR̂u + E_JE
-end
-
-"""
-    obj_nonlinprog!( _ , _ , mpc::PredictiveController, model::LinModel, Ue, Ŷe, ΔŨ, Z̃)
-
-Nonlinear programming objective function when `model` is a [`LinModel`](@ref).
-
-The method is called by the nonlinear optimizer of [`NonLinMPC`](@ref) controllers. It can
-also be called on any [`PredictiveController`](@ref)s to evaluate the objective function `J`
-at specific `Ue`, `Ŷe` and `Z̃`, values. It does not mutate any argument.
-"""
-function obj_nonlinprog!(
-    _, _, mpc::PredictiveController, model::LinModel, Ue, Ŷe, _ , Z̃::AbstractVector{NT}
-) where NT <: Real
-    JQP  = obj_quadprog(Z̃, mpc.H̃, mpc.q̃) + mpc.r[]
-    E_JE = obj_econ(mpc, model, Ue, Ŷe)
-    return JQP + E_JE
 end
 
 "No custom nonlinear constraints `gc` by default, return `gc` unchanged." 
