@@ -1198,7 +1198,7 @@ end
 
 Augment defect equality constraints with slack variable ϵ if `nϵ == 1`.
 
-It returns the ``\mathbf{Ẽŝ}`` matrix that appears in the defect equation 
+It returns the ``\mathbf{Ẽ_ŝ}`` matrix that appears in the defect equation 
 ``\mathbf{Ŝ = Ẽ_ŝ Z̃ + F_ŝ}`` and the ``\mathbf{A}`` matrix for the equality constraints:
 ```math
 \mathbf{A_ŝ Z̃} = - \mathbf{F_ŝ}
