@@ -123,7 +123,7 @@ end
 
 @doc raw"""
     OrthogonalCollocation(
-        h::Int=0, no=3; f_threads=false, h_threads=false, roots=:gaussradau
+        h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
 
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
