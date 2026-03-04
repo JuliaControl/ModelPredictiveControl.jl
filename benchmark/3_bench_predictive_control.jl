@@ -44,30 +44,47 @@ nmpc_lin_ss = NonLinMPC(
     linmodel, transcription=SingleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10
 )
+JuMP.set_attribute(nmpc_lin_ss.optim, "tol", 1e-7)
 nmpc_lin_ms = NonLinMPC(
     linmodel, transcription=MultipleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10
 )
+JuMP.set_attribute(nmpc_lin_ms.optim, "tol", 1e-7)
 nmpc_nonlin_ss = NonLinMPC(
     nonlinmodel, transcription=SingleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10    
 )
+JuMP.set_attribute(nmpc_nonlin_ss.optim, "tol", 1e-7)
 nmpc_nonlin_ss_hess = NonLinMPC(
     nonlinmodel, transcription=SingleShooting(), hessian=true,
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10   
 )
+JuMP.set_attribute(nmpc_nonlin_ss_hess.optim, "tol", 1e-7)
 nmpc_nonlin_ms = NonLinMPC(
     nonlinmodel, transcription=MultipleShooting(),
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10    
 )
+JuMP.set_attribute(nmpc_nonlin_ms.optim, "tol", 1e-7)
 nmpc_nonlin_ms_hess = NonLinMPC(
     nonlinmodel, transcription=MultipleShooting(), hessian=true,
     Mwt=[1, 1], Nwt=[0.1, 0.1], Lwt=[0.1, 0.1], Hp=10 
 )
+JuMP.set_attribute(nmpc_nonlin_ms_hess.optim, "tol", 1e-7)
 nmpc_nonlin_tc = NonLinMPC(
     nonlinmodel_c, transcription=TrapezoidalCollocation(),
     Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
 )
+JuMP.set_attribute(nmpc_nonlin_tc.optim, "tol", 1e-7)
+nmpc_nonlin_oc = NonLinMPC(
+    nonlinmodel_c, transcription=OrthogonalCollocation(),
+    Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
+)
+JuMP.set_attribute(nmpc_nonlin_oc.optim, "tol", 1e-7)
+nmpc_nonlin_oc_hess = NonLinMPC(
+    nonlinmodel_c, transcription=OrthogonalCollocation(), hessian=true,
+    Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
+)
+JuMP.set_attribute(nmpc_nonlin_oc_hess.optim, "tol", 1e-7)
 
 samples, evals, seconds = 10000, 1, 60
 UNIT_MPC["NonLinMPC"]["moveinput!"]["LinModel"]["SingleShooting"] =
@@ -116,6 +133,18 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["TrapezoidalCollocation"] =
     @benchmarkable(
         moveinput!($nmpc_nonlin_tc, $y_c, $d_c),
         setup=preparestate!($nmpc_nonlin_tc, $y_c, $d_c),
+        samples=samples, evals=evals, seconds=seconds
+    )
+UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["OrthogonalCollocation"] =
+    @benchmarkable(
+        moveinput!($nmpc_nonlin_oc, $y_c, $d_c),
+        setup=preparestate!($nmpc_nonlin_oc, $y_c, $d_c),
+        samples=samples, evals=evals, seconds=seconds
+    )
+UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["OrthogonalCollocationHessian"] =
+    @benchmarkable(
+        moveinput!($nmpc_nonlin_oc_hess, $y_c, $d_c),
+        setup=preparestate!($nmpc_nonlin_oc_hess, $y_c, $d_c),
         samples=samples, evals=evals, seconds=seconds
     )
 UNIT_MPC["NonLinMPC"]["getinfo!"]["NonLinModel"] =
@@ -239,12 +268,8 @@ optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
 transcription = SingleShooting()
 mpc_d_daqp_ss = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
 
-# # Skip DAQP with MultipleShooting, it is not designed for sparse Hessians. Kind of works 
-# # with "eps_prox" configured to 1e-6, but not worth it.
-# optim = JuMP.Model(DAQP.Optimizer, add_bridges=false)
-# transcription = MultipleShooting()
-# mpc_d_daqp_ms = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
-# JuMP.set_attribute(mpc_d_daqp_ms.optim, "eps_prox", 1e-6)
+# Skip DAQP with MultipleShooting, it is not designed for sparse Hessians. Kind of works 
+# with "eps_prox" configured to 1e-6, but not worth it.
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 transcription = SingleShooting()
@@ -338,11 +363,25 @@ nmpc_ipopt_tct = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 nmpc_ipopt_tct = setconstraint!(nmpc_ipopt_tct; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_ipopt_tct.optim)
 
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = OrthogonalCollocation()
+nmpc_ipopt_oc = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
+nmpc_ipopt_oc = setconstraint!(nmpc_ipopt_oc; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_ipopt_oc.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = OrthogonalCollocation(), true
+nmpc_ipopt_oc_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
+nmpc_ipopt_oc_hess = setconstraint!(nmpc_ipopt_oc_hess; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_ipopt_oc_hess.optim)
+
+# skip MadNLP.jl with hessian=false, their LBFGS does not work well
+
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
-transcription = SingleShooting()
-nmpc_madnlp_ss = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
-nmpc_madnlp_ss = setconstraint!(nmpc_madnlp_ss; umin, umax)
-JuMP.unset_time_limit_sec(nmpc_madnlp_ss.optim)
+transcription, hessian = SingleShooting(), true
+nmpc_madnlp_ss_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
+nmpc_madnlp_ss_hess = setconstraint!(nmpc_madnlp_ss_hess; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_madnlp_ss_hess.optim)
 
 optim = JuMP.Model(()->UnoSolver.Optimizer(preset="filtersqp"), add_bridges=false)
 transcription, hessian = MultipleShooting(), true
@@ -350,71 +389,79 @@ nmpc_uno_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription,
 nmpc_uno_ms_hess = setconstraint!(nmpc_uno_ms_hess; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_uno_ms_hess.optim)
 
-# TODO: does not work well with MadNLP and MultipleShooting or TrapezoidalCollocation, 
-# figure out why. Current theory: 
-# MadNLP LBFGS approximation is less robust than Ipopt version. Re-test when exact Hessians
-# will be supported in ModelPredictiveControl.jl. The following attributes kinda work with 
-# the MadNLP LBFGS approximation but super slow (~1000 times slower than Ipopt):
-# optim = JuMP.Model(MadNLP.Optimizer)
-# transcription = MultipleShooting()
-# nmpc_madnlp_ms = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
-# nmpc_madnlp_ms = setconstraint!(nmpc_madnlp_ms; umin, umax)
-# JuMP.unset_time_limit_sec(nmpc_madnlp_ms.optim)
-# JuMP.set_attribute(nmpc_madnlp_ms.optim, "hessian_approximation", MadNLP.CompactLBFGS)
-# MadNLP_QNopt = MadNLP.QuasiNewtonOptions(; max_history=42)
-# JuMP.set_attribute(nmpc_madnlp_ms.optim, "quasi_newton_options", MadNLP_QNopt)
+optim = JuMP.Model(MadNLP.Optimizer)
+transcription, hessian = MultipleShooting(), true
+nmpc_madnlp_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
+nmpc_madnlp_ms_hess = setconstraint!(nmpc_madnlp_ms_hess; umin, umax)
+JuMP.unset_time_limit_sec(nmpc_madnlp_ms_hess.optim)
 
 samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
         sim!($nmpc_ipopt_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["SingleShooting (Hessian)"] = 
     @benchmarkable(
         sim!($nmpc_ipopt_ss_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($nmpc_ipopt_ms, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["MultipleShooting (Hessian)"] =
     @benchmarkable(
         sim!($nmpc_ipopt_ms_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["MultipleShooting (threaded)"] =
     @benchmarkable(
         sim!($nmpc_ipopt_mst, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation"] =
     @benchmarkable(
         sim!($nmpc_ipopt_tc, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation (Hessian)"] =
     @benchmarkable(
         sim!($nmpc_ipopt_tc_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["TrapezoidalCollocation (threaded)"] =
     @benchmarkable(
         sim!($nmpc_ipopt_tct, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
-CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting"] = 
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["OrthogonalCollocation"] =
     @benchmarkable(
-        sim!($nmpc_madnlp_ss, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        sim!($nmpc_ipopt_oc, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
-# CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Uno"]["MultipleShooting (Hessian)"] = 
-#     @benchmarkable(
-#         sim!($nmpc_uno_ms_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-#        samples=samples, evals=evals, seconds=seconds
-#     )    
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["OrthogonalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($nmpc_ipopt_oc_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["SingleShooting (Hessian)"] = 
+    @benchmarkable(
+        sim!($nmpc_madnlp_ss_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["MadNLP"]["MultipleShooting (Hessian)"] = 
+    @benchmarkable(
+        sim!($nmpc_madnlp_ms_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Uno"]["MultipleShooting (Hessian)"] = 
+    @benchmarkable(
+        sim!($nmpc_uno_ms_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+
 
 # ----------------- Case study: Pendulum economic --------------------------------
 model2, p = pendulum_model2, pendulum_p2
@@ -465,49 +512,80 @@ empc_ipopt_tc_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, opti
 empc_ipopt_tc_hess = setconstraint!(empc_ipopt_tc_hess; umin, umax)
 JuMP.unset_time_limit_sec(empc_ipopt_tc_hess.optim)
 
-optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
-transcription = SingleShooting()
-empc_madnlp_ss = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
-empc_madnlp_ss = setconstraint!(empc_madnlp_ss; umin, umax)
-JuMP.unset_time_limit_sec(empc_madnlp_ss.optim)
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = OrthogonalCollocation()
+empc_ipopt_oc = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
+empc_ipopt_oc = setconstraint!(empc_ipopt_oc; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_oc.optim)
 
-# TODO: test EMPC with MadNLP and MultipleShooting and TrapezoidalCollocation, see comment above.
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription, hessian = OrthogonalCollocation(), true
+empc_ipopt_oc_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, p)
+empc_ipopt_oc_hess = setconstraint!(empc_ipopt_oc_hess; umin, umax)
+JuMP.unset_time_limit_sec(empc_ipopt_oc_hess.optim)
+
+optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
+transcription, hessian = SingleShooting(), true
+empc_madnlp_ss_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, hessian, p)
+empc_madnlp_ss_hess = setconstraint!(empc_madnlp_ss_hess; umin, umax)
+JuMP.unset_time_limit_sec(empc_madnlp_ss_hess.optim)
+
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="filtersqp"), add_bridges=false)
+transcription, hessian = MultipleShooting(), true
+empc_uno_ss_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, hessian, p)
+empc_uno_ss_hess = setconstraint!(empc_uno_ss_hess; umin, umax)
+JuMP.unset_time_limit_sec(empc_uno_ss_hess.optim)
 
 samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
         sim!($empc_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["SingleShooting (Hessian)"] = 
     @benchmarkable(
         sim!($empc_ipopt_ss_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($empc_ipopt_ms, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["MultipleShooting (Hessian)"] =
     @benchmarkable(
         sim!($empc_ipopt_ms_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["TrapezoidalCollocation"] =
     @benchmarkable(
         sim!($empc_ipopt_tc, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["TrapezoidalCollocation (Hessian)"] =
     @benchmarkable(
         sim!($empc_ipopt_tc_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
-CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["MadNLP"]["SingleShooting"] = 
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["OrthogonalCollocation"] =
     @benchmarkable(
-        sim!($empc_madnlp_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        sim!($empc_ipopt_oc, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Ipopt"]["OrthogonalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($empc_ipopt_oc_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["MadNLP"]["SingleShooting (Hessian)"] = 
+    @benchmarkable(
+        sim!($empc_madnlp_ss_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_MPC["Pendulum"]["NonLinMPC"]["Economic"]["Uno"]["MultipleShooting (Hessian)"] = 
+    @benchmarkable(
+        sim!($empc_uno_ss_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 
 # -------------- Case study: Pendulum custom constraints --------------------------
@@ -570,27 +648,27 @@ samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["SingleShooting"] = 
     @benchmarkable(
         sim!($nmpc2_ipopt_ss, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["MultipleShooting"] =
     @benchmarkable(
         sim!($nmpc2_ipopt_ms, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["MultipleShooting (Hessian)"] =
     @benchmarkable(
         sim!($nmpc2_ipopt_ms_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["TrapezoidalCollocation"] =
     @benchmarkable(
         sim!($nmpc2_ipopt_tc, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_MPC["Pendulum"]["NonLinMPC"]["Custom constraints"]["Ipopt"]["TrapezoidalCollocation (Hessian)"] =
     @benchmarkable(
         sim!($nmpc2_ipopt_tc_hess, $N, $ry; plant=$plant2, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 
 # ----------------- Case study: Pendulum successive linearization -------------------------
