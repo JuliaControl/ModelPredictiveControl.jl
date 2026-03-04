@@ -584,7 +584,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     )
     function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
-        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     end
     if !isnothing(mpc.hessian)
         _, ∇J, ∇²J = value_gradient_and_hessian(J!, mpc.hessian, mpc.Z̃, J_cache...)
@@ -780,7 +780,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
     geq::Vector{JNT}                 = zeros(JNT, neq)
     function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
-        return obj_nonlinprog!(Ŷ0, U0, mpc, model, Ue, Ŷe, ΔŨ)
+        return obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     end
     Z̃_J = fill(myNaN, nZ̃)      # NaN to force update at first call
     J_cache = (
