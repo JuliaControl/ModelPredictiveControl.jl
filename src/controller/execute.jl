@@ -185,7 +185,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     return info
 end
 
-@dow raw"""
+@doc raw"""
     getϵ(mpc::PredictiveController, Z̃orΔŨ) -> ϵ
 
 Get the slack `ϵ` from `Z̃orΔŨ` if present, otherwise return 0.
