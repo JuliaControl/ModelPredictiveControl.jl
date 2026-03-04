@@ -101,7 +101,7 @@ R̂y = repeat([55; 30], 10)
     preparestate!(nmpc_ekf, [55, 30])
     nmpc_ekf([55, 30])
 
-    transcription = TrapezoidalCollocation()
+    transcription = OrthogonalCollocation()
     nmpc_mhe = setconstraint!(NonLinMPC(
         MovingHorizonEstimator(nlmodel, He=2); transcription, Hp=10, Cwt=Inf), ymin=[45, -Inf]
     )
