@@ -191,7 +191,7 @@ output vector of `plant` argument corresponds to the model output vector in `mpc
 We can now define the ``J_E`` function and the `empc` controller:
 
 ```@example man_nonlin
-function JE(Ue, Ŷe, _ , p)
+function JE(Ue, Ŷe, _ , p, _ )
     Ts = p
     τ, ω = Ue[1:end-1], Ŷe[2:2:end-1]
     return Ts*sum(τ.*ω)

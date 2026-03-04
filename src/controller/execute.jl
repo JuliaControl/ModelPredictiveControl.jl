@@ -185,13 +185,16 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     return info
 end
 
-"""
-    getϵ(mpc::PredictiveController, Z̃) -> ϵ
+@doc raw"""
+    getϵ(mpc::PredictiveController, Z̃orΔŨ) -> ϵ
 
-Get the slack `ϵ` from the decision vector `Z̃` if present, otherwise return 0.
+Get the slack `ϵ` from `Z̃orΔŨ` if present, otherwise return 0.
+
+The argument `Z̃orΔŨ` can be the augmented decision vector ``\mathbf{Z̃}`` or the augmented
+input increment vector ``\mathbf{ΔŨ}``, it works with both.
 """
-function getϵ(mpc::PredictiveController, Z̃::AbstractVector{NT}) where NT<:Real
-    return mpc.nϵ ≠ 0 ? Z̃[end] : zero(NT)
+function getϵ(mpc::PredictiveController, Z̃orΔŨ::AbstractVector{NT}) where NT<:Real
+    return mpc.nϵ ≠ 0 ? Z̃orΔŨ[end] : zero(NT)
 end
 
 """
@@ -425,7 +428,8 @@ function obj_nonlinprog!(
         JR̂u = dot(Ū, mpc.weights.L_Hp, Ū)
     end
     # --- economic term ---
-    E_JE = obj_econ(mpc, model, Ue, Ŷe)
+    ϵ = getϵ(mpc, ΔŨ)
+    E_JE = obj_econ(mpc, model, Ue, Ŷe, ϵ)
     return JR̂y + JΔŨ + JR̂u + E_JE
 end
 
@@ -433,7 +437,7 @@ end
 con_custom!(gc, ::PredictiveController, _ , _, _ ) = gc
 
 "By default, the economic term is zero."
-function obj_econ(::PredictiveController, ::SimModel, _ , ::AbstractVector{NT}) where NT
+function obj_econ(::PredictiveController, ::SimModel, _ , ::AbstractVector{NT}, _ ) where NT
     return zero(NT)
 end
 
