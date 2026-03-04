@@ -810,6 +810,7 @@ end
     @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, JE  = (_,_,_)->0.0)
     @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc  = (_,_,_,_)->[0.0], nc=1)
     @test_throws ErrorException NonLinMPC(linmodel1, Hp=15, gc! = (_,_,_,_)->[0.0], nc=1)
+    @test_throws ArgumentError NonLinMPC(linmodel1, transcription=TrapezoidalCollocation())
 
     @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, JE=(Ue,_,_,_)->Ue)
     @test_logs (:warn, Regex(".*")) NonLinMPC(linmodel1, Hp=15, gc=(Ue,_,_,_,_)->Ue, nc=0)    
@@ -875,10 +876,10 @@ end
     @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
 
     @test_throws ArgumentError NonLinMPC(nonlinmodel)
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation())
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, transcription=TrapezoidalCollocation(2))
-    @test_throws ErrorException NonLinMPC(linmodel1, oracle=false, hessian=AutoFiniteDiff())
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, Wy=[1 0;0 1])
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, transcription=TrapezoidalCollocation())
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, transcription=TrapezoidalCollocation(2))
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, Wy=[1 0;0 1])
+    @test_throws ArgumentError OrthogonalCollocation(roots=:gausslobatto)
 end
 
 @testitem "NonLinMPC moves and getinfo (LinModel)" setup=[SetupMPCtests] begin
@@ -993,8 +994,20 @@ end
     preparestate!(nmpc5_1, [0.0])
     u = moveinput!(nmpc5_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
-    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+
+    transcription = OrthogonalCollocation(0, 4)
+    nmpc6 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc6, [0.0])
+    u = moveinput!(nmpc6, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
+
+    transcription = OrthogonalCollocation(roots=:gausslegendre)
+    nmpc6_1 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc6_1, [0.0])
+    u = moveinput!(nmpc6_1, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
     
+    nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
     ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0], nonlinmodel2.p)
@@ -1024,8 +1037,8 @@ end
         nonlinmodel, Nwt=[0], Hp=100, Hc=1, 
         gradient=AutoFiniteDiff(),
         jacobian=AutoFiniteDiff(),
-        hessian=true),
-        ymax=[100], ymin=[-100]
+        hessian=AutoFiniteDiff()
+        ), ymax=[100], ymin=[-100]
     )
     preparestate!(nmpc10, [0], [0])
     u = moveinput!(nmpc10, [10], [0])
@@ -1199,53 +1212,6 @@ end
     @test nmpc.con.c_x̂min ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
     @test nmpc.con.c_x̂max ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
 
-    # TODO: delete these tests when the deprecated legacy splatting syntax will be.
-    gc_leg! =  (LHS,_,_,_,_,_) -> (LHS[begin] = -1)
-    nc_leg  = 1
-    nmpc_lin_leg = setconstraint!(
-        NonLinMPC(linmodel1, Hp=1, Hc=1, gc=gc_leg!, nc=nc_leg, oracle=false),
-        ymin=[-1e3, -1e3], ymax=[1e3,1e3]
-    )
-    nmpc_ms_leg = setconstraint!(
-        NonLinMPC(
-            nonlinmodel, Hp=1, Hc=1, gc=gc_leg!, nc=nc_leg, 
-            oracle=false, transcription=MultipleShooting()
-        ),
-        ymin=[-1e3, -1e3], ymax=[1e3,1e3]
-    )
-    nmpc_leg = NonLinMPC(nonlinmodel, Hp=1, Hc=1, oracle=false)
-
-    setconstraint!(nmpc_leg, umin=[-5, -9.9], umax=[100,99])
-    @test nmpc_leg.con.U0min ≈ [-5, -9.9]
-    @test nmpc_leg.con.U0max ≈ [100,99]
-    setconstraint!(nmpc_leg, Δumin=[-5,-10], Δumax=[6,11])
-    @test nmpc_leg.con.ΔŨmin ≈ [-5,-10,0]
-    @test nmpc_leg.con.ΔŨmax ≈ [6,11,Inf]
-    setconstraint!(nmpc_leg, ymin=[-6, -11],ymax=[55, 35])
-    @test nmpc_leg.con.Y0min ≈ [-6,-11]
-    @test nmpc_leg.con.Y0max ≈ [55,35]
-    setconstraint!(nmpc_leg, x̂min=[-21,-22,-23,-24,-25,-26], x̂max=[21,22,23,24,25,26])
-    @test nmpc_leg.con.x̂0min ≈ [-21,-22,-23,-24,-25,-26]
-    @test nmpc_leg.con.x̂0max ≈ [21,22,23,24,25,26]
-
-    setconstraint!(nmpc_leg, c_umin=[0.01,0.02], c_umax=[0.03,0.04])
-    @test -nmpc_leg.con.A_Umin[:, end] ≈ [0.01,0.02]
-    @test -nmpc_leg.con.A_Umax[:, end] ≈ [0.03,0.04]
-    setconstraint!(nmpc_leg, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
-    @test -nmpc_leg.con.A_ΔŨmin[1:end-1, end] ≈ [0.05,0.06]
-    @test -nmpc_leg.con.A_ΔŨmax[1:end-1, end] ≈ [0.07,0.08]
-    setconstraint!(nmpc_leg, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
-    @test -nmpc_leg.con.A_Ymin ≈ zeros(0,3)
-    @test -nmpc_leg.con.A_Ymax ≈ zeros(0,3)
-    @test nmpc_leg.con.C_ymin ≈ [1.00,1.01]
-    @test nmpc_leg.con.C_ymax ≈ [1.02,1.03]
-    setconstraint!(nmpc_leg, 
-        c_x̂min=[0.21,0.22,0.23,0.24,0.25,0.26], 
-        c_x̂max=[0.31,0.32,0.33,0.34,0.35,0.36]
-    )
-    @test nmpc_leg.con.c_x̂min ≈ [0.21,0.22,0.23,0.24,0.25,0.26]
-    @test nmpc_leg.con.c_x̂max ≈ [0.31,0.32,0.33,0.34,0.35,0.36]
-    
     nmpc_ms = NonLinMPC(nonlinmodel, Hp=1, Hc=1, transcription=MultipleShooting())
     
     setconstraint!(nmpc_ms, ymin=[-6, -11],ymax=[55, 35])
@@ -1420,76 +1386,6 @@ end
     nmpc.p .= [0; 1]
     moveinput!(nmpc, [100])
     info = getinfo(nmpc)
-    @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
-    @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
-
-    # TODO: delete these tests when the deprecated legacy splatting syntax will be.
-
-    nmpc_leg = NonLinMPC(nonlinmodel; Hp, Hc=5, gc, nc=2Hp, p=[0; 0], oracle=false)
-    JuMP.set_attribute(nmpc_leg.optim, "constr_viol_tol", 1e-3)
-
-    setconstraint!(nmpc_leg, x̂min=[-1e6,-Inf], x̂max=[+1e6,+Inf])
-    setconstraint!(nmpc_leg, umin=[-1e6], umax=[+1e6])
-    setconstraint!(nmpc_leg, Δumin=[-15], Δumax=[15])
-    setconstraint!(nmpc_leg, ymin=[-100], ymax=[100])
-    preparestate!(nmpc_leg, [0])
-    
-    setconstraint!(nmpc_leg, umin=[-3], umax=[4])
-    moveinput!(nmpc_leg, [-100])
-    info = getinfo(nmpc_leg)
-    @test all(isapprox.(info[:U], -3; atol=1e-1))
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
-    @test all(isapprox.(info[:U], 4; atol=1e-1))
-    setconstraint!(nmpc_leg, umin=[-1e6], umax=[+1e6])
-
-    setconstraint!(nmpc_leg, Δumin=[-1.5], Δumax=[1.25])
-    moveinput!(nmpc_leg, [-100])
-    info = getinfo(nmpc_leg)
-    @test all(isapprox.(info[:ΔU], -1.5; atol=1e-1))
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
-    @test all(isapprox.(info[:ΔU], 1.25; atol=1e-1))
-    setconstraint!(nmpc_leg, Δumin=[-1e6], Δumax=[+1e6])
-
-    setconstraint!(nmpc_leg, ymin=[-0.5], ymax=[0.9])
-    moveinput!(nmpc_leg, [-100])
-    info = getinfo(nmpc_leg)
-    @test all(isapprox.(info[:Ŷ], -0.5; atol=1e-1))
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
-    @test all(isapprox.(info[:Ŷ], 0.9; atol=1e-1))
-    setconstraint!(nmpc_leg, ymin=[-100], ymax=[100])
-
-    setconstraint!(nmpc_leg, Ymin=[-0.5; fill(-100, Hp-1)], Ymax=[0.9; fill(+100, Hp-1)])
-    moveinput!(nmpc_leg, [-200])
-    info = getinfo(nmpc_leg)
-    @test info[:Ŷ][end]   ≈ -100  atol=1e-1
-    @test info[:Ŷ][begin] ≈ -0.5 atol=1e-1
-    moveinput!(nmpc_leg, [200])
-    info = getinfo(nmpc_leg)
-    @test info[:Ŷ][end]   ≈ 100  atol=1e-1
-    @test info[:Ŷ][begin] ≈ 0.9 atol=1e-1
-    setconstraint!(nmpc_leg, ymin=[-100], ymax=[100])
-    
-    setconstraint!(nmpc_leg, x̂min=[-1e-6,-Inf], x̂max=[+1e-6,+Inf])
-    moveinput!(nmpc_leg, [-10])
-    info = getinfo(nmpc_leg)
-    @test info[:x̂end][1] ≈ 0 atol=1e-1
-    moveinput!(nmpc_leg, [10])
-    info = getinfo(nmpc_leg)
-    @test info[:x̂end][1] ≈ 0 atol=1e-1
-    setconstraint!(nmpc_leg, x̂min=[-1e6,-Inf], x̂max=[1e6,+Inf])
-
-    nmpc_leg.p .= [1; 0]
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
-    @test all(isapprox.(info[:U], 4.2; atol=1e-1))
-    @test all(isapprox.(info[:gc][1:Hp], 0.0; atol=1e-1))
-
-    nmpc_leg.p .= [0; 1]
-    moveinput!(nmpc_leg, [100])
-    info = getinfo(nmpc_leg)
     @test all(isapprox.(info[:Ŷ], 3.14; atol=1e-1))
     @test all(isapprox.(info[:gc][Hp+1:end], 0.0; atol=1e-1))
 

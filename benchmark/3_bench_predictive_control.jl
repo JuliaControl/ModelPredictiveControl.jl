@@ -345,8 +345,8 @@ nmpc_madnlp_ss = setconstraint!(nmpc_madnlp_ss; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_madnlp_ss.optim)
 
 optim = JuMP.Model(()->UnoSolver.Optimizer(preset="filtersqp"), add_bridges=false)
-transcription, hessian, oracle = MultipleShooting(), true, true
-nmpc_uno_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian, oracle)
+transcription, hessian = MultipleShooting(), true
+nmpc_uno_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
 nmpc_uno_ms_hess = setconstraint!(nmpc_uno_ms_hess; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_uno_ms_hess.optim)
 
