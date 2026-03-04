@@ -163,7 +163,7 @@ function linearize!(
     nonlinmodel = model
     buffer = nonlinmodel.buffer
     # --- remove the operating points of the nonlinear model (typically zeros) ---
-    x0, u0, d0, k0 = buffer.x, buffer.u, buffer.d, buffer.k
+    x0, u0, d0, k = buffer.x, buffer.u, buffer.d, buffer.k
     x0 .= x .- nonlinmodel.xop
     u0 .= u .- nonlinmodel.uop
     d0 .= d .- nonlinmodel.dop
@@ -175,7 +175,7 @@ function linearize!(
     y0 .+= nonlinmodel.yop
     y = y0
     # --- compute the nonlinear model next state at operating points ---
-    f!(x0next, k0, nonlinmodel, x0, u0, d0, model.p)
+    f!(x0next, k, nonlinmodel, x0, u0, d0, model.p)
     x0next .+= nonlinmodel.fop 
     xnext = x0next  # xnext = f(x0,u0,d0) + fop - xop + xop = f(x0,u0,d0) + fop
     # --- recompute x since it was modified in buffer.x ---

@@ -220,15 +220,6 @@ function preparestate!(model::SimModel)
     return x 
 end
 
-function preparestate!(model::SimModel, ::Any , ::Any=model.buffer.empty)
-    Base.depwarn(
-        "The method preparestate!(model::SimModel, u, d=[]) is deprecated. Use "*
-        " preparestate!(model::SimModel) instead.",
-        :preparestate!,
-    )
-    return preparestate!(model)
-end
-
 @doc raw"""
     updatestate!(model::SimModel, u, d=[]) -> xnext
 
@@ -247,10 +238,10 @@ julia> x = updatestate!(model, [1])
 """
 function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: Real
     validate_args(model::SimModel, d, u)
-    u0, d0, x0next, k0 = model.buffer.u, model.buffer.d, model.buffer.x, model.buffer.k
+    u0, d0, x0next, k = model.buffer.u, model.buffer.d, model.buffer.x, model.buffer.k
     u0 .= u .- model.uop
     d0 .= d .- model.dop
-    f!(x0next, k0, model, model.x0, u0, d0, model.p)
+    f!(x0next, k, model, model.x0, u0, d0, model.p)
     x0next  .+= model.fop .- model.xop
     model.x0 .= x0next
     xnext   = x0next

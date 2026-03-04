@@ -1,6 +1,5 @@
 include("mhe/construct.jl")
 include("mhe/execute.jl")
-include("mhe/legacy.jl")
 
 "Print optimizer and other information for `MovingHorizonEstimator`."
 function print_details(io::IO, estim::MovingHorizonEstimator)

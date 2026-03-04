@@ -37,6 +37,8 @@ import JuMP: @variable, @operator, @constraint, @objective
 
 import OSQP, Ipopt
 
+import FastGaussQuadrature
+
 export SimModel, LinModel, NonLinModel
 export DiffSolver, RungeKutta, ForwardEuler
 export setop!, setname!
@@ -48,7 +50,8 @@ export MovingHorizonEstimator
 export ManualEstimator
 export default_nint, initstate!
 export PredictiveController, ExplicitMPC, LinMPC, NonLinMPC, setconstraint!, moveinput!
-export TranscriptionMethod, SingleShooting, MultipleShooting, TrapezoidalCollocation
+export TranscriptionMethod, SingleShooting, MultipleShooting
+export TrapezoidalCollocation, OrthogonalCollocation
 export SimResult, getinfo, sim!
 
 include("general.jl")
