@@ -880,7 +880,7 @@ for the two respective constraints. Note that `g_oracle` only includes the non-`
 inequality constraints, thus it must be re-constructed if they change. This method is really
 intricate because the oracles are used inside the nonlinear optimization, so they must be
 type-stable and as efficient as possible. All the function outputs and derivatives are 
-ached and updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
+cached and updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
 """
 function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JNT<:Real
     # ----------- common cache for all functions  ----------------------------------------
