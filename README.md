@@ -89,7 +89,7 @@ for more detailed examples.
 - 📈 **Offset-Free**: Automatic model augmentation with integrators.
 - 📊 **Visuals**: Easy integration with `Plots.jl`.
 - 🧩 **Solvers**: Optimization via `JuMP.jl` (quadratic & nonlinear) and derivatives via `DifferentiationInterface.jl`.
-- 📝 **Transcription**: Direct single/multiple shooting and trapezoidal collocation.
+- 📝 **Transcription**: Direct single/multiple shooting and trapezoidal/orthogonal collocation.
 - 🩺 **Troubleshooting**: Detailed diagnostic information about optimum.
 - ⏱️ **Real-Time**: Optimized for low memory allocations with soft real-time utilities.
 - 📟️ **Embedded**: Lightweight C code generation via `LinearMPC.jl`
