@@ -68,6 +68,17 @@ nmpc_nonlin_tc = NonLinMPC(
     nonlinmodel_c, transcription=TrapezoidalCollocation(),
     Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
 )
+JuMP.set_attribute(nmpc_nonlin_tc.optim, "tol", 1e-7)
+nmpc_nonlin_oc = NonLinMPC(
+    nonlinmodel_c, transcription=OrthogonalCollocation(),
+    Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
+)
+JuMP.set_attribute(nmpc_nonlin_oc.optim, "tol", 1e-7)
+nmpc_nonlin_oc_hess = NonLinMPC(
+    nonlinmodel_c, transcription=OrthogonalCollocation(), hessian=true,
+    Mwt=[1], Nwt=[0.1], Lwt=[0.1], Hp=10    
+)
+JuMP.set_attribute(nmpc_nonlin_oc_hess.optim, "tol", 1e-7)
 
 samples, evals, seconds = 10000, 1, 60
 UNIT_MPC["NonLinMPC"]["moveinput!"]["LinModel"]["SingleShooting"] =
@@ -116,6 +127,18 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["TrapezoidalCollocation"] =
     @benchmarkable(
         moveinput!($nmpc_nonlin_tc, $y_c, $d_c),
         setup=preparestate!($nmpc_nonlin_tc, $y_c, $d_c),
+        samples=samples, evals=evals, seconds=seconds
+    )
+UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["OrthogonalCollocation"] =
+    @benchmarkable(
+        moveinput!($nmpc_nonlin_oc, $y_c, $d_c),
+        setup=preparestate!($nmpc_nonlin_oc, $y_c, $d_c),
+        samples=samples, evals=evals, seconds=seconds
+    )
+UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["OrthogonalCollocationHessian"] =
+    @benchmarkable(
+        moveinput!($nmpc_nonlin_oc_hess, $y_c, $d_c),
+        setup=preparestate!($nmpc_nonlin_oc_hess, $y_c, $d_c),
         samples=samples, evals=evals, seconds=seconds
     )
 UNIT_MPC["NonLinMPC"]["getinfo!"]["NonLinModel"] =
