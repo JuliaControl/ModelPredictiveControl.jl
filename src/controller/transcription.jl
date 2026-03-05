@@ -129,10 +129,9 @@ end
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
 Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)s
-only. The `h` argument is the hold order for ``\mathbf{u}``, and `no` argument, the number
-of collocation points ``n_o``. Only zero-order hold is currently implemented, so `h` must
-be `0`. The decision variable is similar to [`MultipleShooting`](@ref), but it also includes
-the collocation points:
+only. The `h` argument is the hold order for ``\mathbf{u}``, and the `no` argument, the
+number of collocation points ``n_o``. The decision variable is similar to [`MultipleShooting`](@ref),
+but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -187,9 +186,6 @@ struct OrthogonalCollocation <: CollocationMethod
     function OrthogonalCollocation(
         h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
-        if !(h == 0)
-            throw(ArgumentError("Only the zero-order hold (h=0) is currently implemented."))
-        end
         if roots==:gaussradau            
             x, _ = FastGaussQuadrature.gaussradau(no, COLLOCATION_NODE_TYPE)
             # we reverse the nodes to include the τ=1.0 node:
@@ -1378,6 +1374,10 @@ function con_nonlinprogeq!(
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    # prefilling Û0 to avoid race-condition:
+    # TODO: do the same in orthogonoal collocation and I will be able to interpolate
+
+
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1456,16 +1456,21 @@ extracted from the decision variable `Z̃`. The ``\mathbf{x_0}`` vectors are the
 deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_i`` derivative for the ``i``th 
 collocation point is computed from the continuous-time function `model.f!` and:
 ```math
-\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_0}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
+\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_i}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
 ```
-The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). Based on the 
-normalized time ``τ_i ∈ [0, 1]``, measured disturbances are linearly interpolated:
+Based on the normalized time ``τ_i ∈ [0, 1]`` and hold order `transcription.h`, the inputs
+and disturbances are piecewise constant or linear:
 ```math
-\mathbf{d̂}_i(k+j) = (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)
+\begin{aligned}
+\mathbf{û}_i(k+j) &=                                                                        \begin{cases}
+                     \mathbf{û_0}(k+1)                                    &  h = 0          \\
+                     (1-τ_i)\mathbf{û_0}(k+j) + τ_i\mathbf{û_0}(k+j+1)    &  h = 1          \end{cases} \\
+\mathbf{d̂}_i(k+j) &= (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)                      
+\end{aligned}
 ```
-The defects for the stochastic states ``\mathbf{s_s}`` are computed as in the
-[`TrapezoidalCollocation`](@ref) method, and the ones for the continuity constraint of the
-deterministic state trajectories are given by:
+The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for
+the stochastic states ``\mathbf{s_s}`` are computed as the [`TrapezoidalCollocation`](@ref)
+method, and the ones for the continuity constraint of the deterministic states are:
 ```math
 \mathbf{s_c}(k+j+1) 
     = \mathbf{C_o} \begin{bmatrix}                                          
@@ -1520,8 +1525,17 @@ function con_nonlinprogeq!(
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- collocation constraint defects -----------------------------
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
+        if j ≥ Hp
+            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
+            u0next = u0
+        else
+            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
+        end
+
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
+        f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
+
         Δk = k̇
         for i=1:no
             Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x0_Z̃
