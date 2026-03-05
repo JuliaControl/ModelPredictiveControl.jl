@@ -1495,7 +1495,6 @@ function con_nonlinprogeq!(
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     di = mpc.estim.buffer.d
-    ΔK = similar(K̇) # TODO: remove this allocation
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1505,7 +1504,6 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
-        Δk       = @views    ΔK[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views    X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
@@ -1524,15 +1522,18 @@ function con_nonlinprogeq!(
         u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
+        Δk = k̇
+        for i=1:no
+            Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x0_Z̃
+        end
+        mul!(sk, Mo, Δk)
         for i=1:no
             k̇i   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
-            Δki  = @views  Δk[(1 + (i-1)*nx):(i*nx)]
             ki_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
-            Δki .= @. ki_Z̃ - x0_Z̃
             di  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
             model.f!(k̇i, ki_Z̃, û0, d̂0, p)
         end
-        sk .= mul!(sk, Mo, Δk) .- k̇
+        sk .-= k̇
         # ----------------- continuity constraint defects ------------------------------
         scnext .= mul!(scnext, Co, k_Z̃) .+ (λo.*x0_Z̃) .- x0next_Z̃
     end
