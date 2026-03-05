@@ -153,12 +153,10 @@ and ``\mathbf{k}_i(k+j)`` is the deterministic state prediction for the ``i``th 
 point at the ``j``th stage/interval/finite element (details in Extended Help). The `roots`
 keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or 
 Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstring for
-descriptions of `f_threads` and `h_threads` keywords.
-
-This transcription computes the predictions by enforcing the collocation and continuity
-constraints at the collocation points. It is efficient for highly stiff systems, but 
-generally more expensive than the other methods for non-stiff systems. See Extended Help for
-more details.
+descriptions of `f_threads` and `h_threads` keywords. This transcription computes the
+predictions by enforcing the collocation and continuity constraints at the collocation
+points. It is efficient for highly stiff systems, but generally more expensive than the
+other methods for non-stiff systems. See Extended Help for more details.
 
 !!! warning
     The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
@@ -178,7 +176,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
     The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
     is more accurate than Gauss-Radau but only A-stable, while the latter being L-stable. 
-    See [`con_nonlinprogeq!`](@ref) for details on the implementation.
+    See [`con_nonlinprogeq!`](@ref) for implementation details.
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
