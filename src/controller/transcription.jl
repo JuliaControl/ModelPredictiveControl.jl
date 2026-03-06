@@ -1374,10 +1374,11 @@ function con_nonlinprogeq!(
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    # prefilling Û0 to avoid race-condition:
-    # TODO: do the same in orthogonoal collocation and I will be able to interpolate
-
-
+    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and ûnext are needed):
+        x̂0_Z̃ =   @views j < 1 ? mpc.estim.x̂0[1:nx̂] : X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
+        u0, û0 = @views U0[(1 + nu*j):(nu*(j+1))],  Û0[(1 + nu*j):(nu*(j+1))]
+        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
+    end
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1401,23 +1402,14 @@ function con_nonlinprogeq!(
         fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- deterministic defects: trapezoidal collocation -------------
-        u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
-        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
+        û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        û0next = @views h < 1 || j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
             model.f!(k̇1, x0_Z̃, û0, d̂0, p)
         else
             k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
-        end
-        if h < 1 || j ≥ Hp
-            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
-            û0next = û0
-        else
-            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
-            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
-            f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
         end
         model.f!(k̇2, x0next_Z̃, û0next, d̂0next, p)
         sdnext .= @. x0_Z̃ - x0next_Z̃ + 0.5*Ts*(k̇1 + k̇2)
