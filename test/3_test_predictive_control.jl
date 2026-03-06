@@ -997,13 +997,13 @@ end
     @test u ≈ [1.0] atol=5e-2
 
     transcription = OrthogonalCollocation(0, 4)
-    nmpc6 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
+    nmpc6 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc6, [0.0])
     u = moveinput!(nmpc6, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
 
-    transcription = OrthogonalCollocation(roots=:gausslegendre)
-    nmpc6_1 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
+    transcription = OrthogonalCollocation(1, roots=:gausslegendre)
+    nmpc6_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc6_1, [0.0])
     u = moveinput!(nmpc6_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
