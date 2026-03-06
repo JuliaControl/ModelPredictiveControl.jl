@@ -955,36 +955,53 @@ end
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
-    
-    nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1)
-    preparestate!(nmpc2, [0], [0])
-    # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
-    d = [0.1]
-    u = moveinput!(nmpc2, 7d, d)
-    @test u ≈ [0] atol=5e-2
-    u = nmpc2(7d, d)
-    @test u ≈ [0] atol=5e-2
-    info = getinfo(nmpc2)
-    @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 7d[1] atol=5e-2
-    
-    nmpc3 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=100, Hc=1)
-    preparestate!(nmpc3, [0], [0])
-    u = moveinput!(nmpc3, 7d, d)
-    @test u ≈ [0] atol=5e-2
-    
-    nmpc4 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[0], Nwt=[0], Lwt=[1])
-    preparestate!(nmpc4, [0], [0])
-    u = moveinput!(nmpc4, [0], d, R̂u=fill(12, nmpc4.Hp))
-    @test u ≈ [12] atol=5e-2
-    
-    nmpc5 = NonLinMPC(nonlinmodel, Hp=1, Hc=1, Cwt=Inf, transcription=MultipleShooting())
-    nmpc5 = setconstraint!(nmpc5, ymin=[1])
+
     f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
     h! = (y,x,_,_) -> y .= x 
     nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
-    transcription = TrapezoidalCollocation(0, f_threads=true, h_threads=true)
     
+    nmpc1 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1)
+    preparestate!(nmpc1, [0], [0])
+    # if d=[0.1], the output will eventually reach 7*0.1=0.7, no action needed (u=0):
+    d = [0.1]
+    u = moveinput!(nmpc1, 7d, d)
+    @test u ≈ [0] atol=5e-2
+    u = nmpc1(7d, d)
+    @test u ≈ [0] atol=5e-2
+    info = getinfo(nmpc1)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 7d[1] atol=5e-2
+    
+    nmpc2 = NonLinMPC(nonlinmodel, Nwt=[0], Cwt=Inf, Hp=100, Hc=1)
+    preparestate!(nmpc2, [0], [0])
+    u = moveinput!(nmpc2, 7d, d)
+    @test u ≈ [0] atol=5e-2
+    
+    nmpc3 = NonLinMPC(nonlinmodel, Hp=15, Mwt=[0], Nwt=[0], Lwt=[1])
+    preparestate!(nmpc3, [0], [0])
+    u = moveinput!(nmpc3, [0], d, R̂u=fill(12, nmpc3.Hp))
+    @test u ≈ [12] atol=5e-2
+
+    transcription = MultipleShooting()
+    nmpc4 = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc4, [0], [0])
+    u = moveinput!(nmpc4, [10], [0])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc4)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    
+    transcription = MultipleShooting(f_threads=true, h_threads=true)
+    nmpc4t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription, hessian=true)
+    nmpc4t = setconstraint!(nmpc4t, ymax=[100], ymin=[-100]) # coverage of getinfo! Hessians of Lagrangian
+    preparestate!(nmpc4t, [0], [0])
+    u = moveinput!(nmpc4t, [10], [0])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc4t)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 10 atol=5e-2
+
+    transcription = TrapezoidalCollocation(0, f_threads=true, h_threads=true)
     nmpc5 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc5, [0.0])
     u = moveinput!(nmpc5, [1/0.001])
@@ -1014,25 +1031,6 @@ end
     ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0], nonlinmodel2.p)
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0] atol=5e-2
-    transcription = MultipleShooting()
-    
-    nmpc8 = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
-    preparestate!(nmpc8, [0], [0])
-    u = moveinput!(nmpc8, [10], [0])
-    @test u ≈ [2] atol=5e-2
-    info = getinfo(nmpc8)
-    @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 10 atol=5e-2
-    
-    transcription = MultipleShooting(f_threads=true, h_threads=true)
-    nmpc8t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription, hessian=true)
-    nmpc8t = setconstraint!(nmpc8t, ymax=[100], ymin=[-100]) # coverage of getinfo! Hessians of Lagrangian
-    preparestate!(nmpc8t, [0], [0])
-    u = moveinput!(nmpc8t, [10], [0])
-    @test u ≈ [2] atol=5e-2
-    info = getinfo(nmpc8t)
-    @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 10 atol=5e-2
 
     nmpc10 = setconstraint!(NonLinMPC(
         nonlinmodel, Nwt=[0], Hp=100, Hc=1, 
