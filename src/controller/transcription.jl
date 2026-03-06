@@ -1374,7 +1374,7 @@ function con_nonlinprogeq!(
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and ûnext are needed):
+    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and û0next are needed):
         x̂0_Z̃ =   @views j < 1 ? mpc.estim.x̂0[1:nx̂] : X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
         u0, û0 = @views U0[(1 + nu*j):(nu*(j+1))],  Û0[(1 + nu*j):(nu*(j+1))]
         f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
@@ -1402,8 +1402,7 @@ function con_nonlinprogeq!(
         fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- deterministic defects: trapezoidal collocation -------------
-        û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        û0next = @views h < 1 || j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
+        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
@@ -1411,7 +1410,13 @@ function con_nonlinprogeq!(
         else
             k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end
-        model.f!(k̇2, x0next_Z̃, û0next, d̂0next, p)
+        if h < 1
+            model.f!(k̇2, x0next_Z̃, û0, d̂0next, p)
+        else
+            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
+            û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
+            model.f!(k̇2, x0next_Z̃, û0next, d̂0next, p)
+        end
         sdnext .= @. x0_Z̃ - x0next_Z̃ + 0.5*Ts*(k̇1 + k̇2)
     end
     return geq
@@ -1480,7 +1485,7 @@ function con_nonlinprogeq!(
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
-    nu, nx̂, nd, nx = model.nu, mpc.estim.nx̂, model.nd, model.nx
+    nu, nx̂, nd, nx, h = model.nu, mpc.estim.nx̂, model.nd, model.nx, transcription.h
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
@@ -1491,7 +1496,12 @@ function con_nonlinprogeq!(
     nx̂_nk = nx̂ + nk
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
-    di = mpc.estim.buffer.d
+    D̂temp = mpc.buffer.D̂
+    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and û0next are needed):
+        x̂0_Z̃ =   @views j < 1 ? mpc.estim.x̂0[1:nx̂] : X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
+        u0, û0 = @views U0[(1 + nu*j):(nu*(j+1))],  Û0[(1 + nu*j):(nu*(j+1))]
+        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
+    end
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1516,28 +1526,28 @@ function con_nonlinprogeq!(
         fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- collocation constraint defects -----------------------------
-        u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
-        if j ≥ Hp
-            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
-            u0next = u0
-        else
-            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
-        end
-
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
-        f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
-
         Δk = k̇
         for i=1:no
             Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x0_Z̃
         end
         mul!(sk, Mo, Δk)
+        d̂i = @views D̂temp[(1 + nd*(j-1)):(nd*j)]
+        if h > 0
+            ûi = similar(û0) # TODO: remove this allocation
+        end
         for i=1:no
             k̇i   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
             ki_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
-            di  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
-            model.f!(k̇i, ki_Z̃, û0, d̂0, p)
+            d̂i  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
+            if h < 1
+                model.f!(k̇i, ki_Z̃, û0, d̂i, p)
+            else
+                # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
+                û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
+                ûi .= (1-τ[i]).*û0 .+ τ[i].*û0next
+                model.f!(k̇i, ki_Z̃, ûi, d̂i, p)
+            end
         end
         sk .-= k̇
         # ----------------- continuity constraint defects ------------------------------
