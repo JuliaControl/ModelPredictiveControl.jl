@@ -129,10 +129,9 @@ end
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
 Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)s
-only. The `h` argument is the hold order for ``\mathbf{u}``, and `no` argument, the number
-of collocation points ``n_o``. Only zero-order hold is currently implemented, so `h` must
-be `0`. The decision variable is similar to [`MultipleShooting`](@ref), but it also includes
-the collocation points:
+only. The `h` argument is the hold order for ``\mathbf{u}``, and the `no` argument, the
+number of collocation points ``n_o``. The decision variable is similar to [`MultipleShooting`](@ref),
+but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -187,9 +186,6 @@ struct OrthogonalCollocation <: CollocationMethod
     function OrthogonalCollocation(
         h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
-        if !(h == 0)
-            throw(ArgumentError("Only the zero-order hold (h=0) is currently implemented."))
-        end
         if roots==:gaussradau            
             x, _ = FastGaussQuadrature.gaussradau(no, COLLOCATION_NODE_TYPE)
             # we reverse the nodes to include the τ=1.0 node:
@@ -1378,6 +1374,11 @@ function con_nonlinprogeq!(
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and û0next are needed):
+        x̂0_Z̃ =   @views j < 1 ? mpc.estim.x̂0[1:nx̂] : X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
+        u0, û0 = @views U0[(1 + nu*j):(nu*(j+1))],  Û0[(1 + nu*j):(nu*(j+1))]
+        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
+    end
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1401,9 +1402,7 @@ function con_nonlinprogeq!(
         fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- deterministic defects: trapezoidal collocation -------------
-        u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
@@ -1411,15 +1410,13 @@ function con_nonlinprogeq!(
         else
             k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end
-        if h < 1 || j ≥ Hp
-            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc ≤ Hp implies Δu(k+Hp) = 0
-            û0next = û0
+        if h < 1
+            model.f!(k̇2, x0next_Z̃, û0, d̂0next, p)
         else
-            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
-            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
-            f̂_input!(û0next, mpc.estim, model, x̂0next_Z̃, u0next)
+            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
+            û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
+            model.f!(k̇2, x0next_Z̃, û0next, d̂0next, p)
         end
-        model.f!(k̇2, x0next_Z̃, û0next, d̂0next, p)
         sdnext .= @. x0_Z̃ - x0next_Z̃ + 0.5*Ts*(k̇1 + k̇2)
     end
     return geq
@@ -1456,16 +1453,21 @@ extracted from the decision variable `Z̃`. The ``\mathbf{x_0}`` vectors are the
 deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_i`` derivative for the ``i``th 
 collocation point is computed from the continuous-time function `model.f!` and:
 ```math
-\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_0}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
+\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_i}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
 ```
-The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). Based on the 
-normalized time ``τ_i ∈ [0, 1]``, measured disturbances are linearly interpolated:
+Based on the normalized time ``τ_i ∈ [0, 1]`` and hold order `transcription.h`, the inputs
+and disturbances are piecewise constant or linear:
 ```math
-\mathbf{d̂}_i(k+j) = (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)
+\begin{aligned}
+\mathbf{û}_i(k+j) &=                                                                        \begin{cases}
+                     \mathbf{û_0}(k+1)                                    &  h = 0          \\
+                     (1-τ_i)\mathbf{û_0}(k+j) + τ_i\mathbf{û_0}(k+j+1)    &  h = 1          \end{cases} \\
+\mathbf{d̂}_i(k+j) &= (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)                      
+\end{aligned}
 ```
-The defects for the stochastic states ``\mathbf{s_s}`` are computed as in the
-[`TrapezoidalCollocation`](@ref) method, and the ones for the continuity constraint of the
-deterministic state trajectories are given by:
+The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for
+the stochastic states ``\mathbf{s_s}`` are computed as the [`TrapezoidalCollocation`](@ref)
+method, and the ones for the continuity constraint of the deterministic states are:
 ```math
 \mathbf{s_c}(k+j+1) 
     = \mathbf{C_o} \begin{bmatrix}                                          
@@ -1483,7 +1485,7 @@ function con_nonlinprogeq!(
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
-    nu, nx̂, nd, nx = model.nu, mpc.estim.nx̂, model.nd, model.nx
+    nu, nx̂, nd, nx, h = model.nu, mpc.estim.nx̂, model.nd, model.nx, transcription.h
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
@@ -1494,8 +1496,12 @@ function con_nonlinprogeq!(
     nx̂_nk = nx̂ + nk
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
-    di = mpc.estim.buffer.d
-    ΔK = similar(K̇) # TODO: remove this allocation
+    D̂temp = mpc.buffer.D̂
+    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and û0next are needed):
+        x̂0_Z̃ =   @views j < 1 ? mpc.estim.x̂0[1:nx̂] : X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
+        u0, û0 = @views U0[(1 + nu*j):(nu*(j+1))],  Û0[(1 + nu*j):(nu*(j+1))]
+        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
+    end
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1505,7 +1511,6 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
-        Δk       = @views    ΔK[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next   = @views    X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
@@ -1521,18 +1526,30 @@ function con_nonlinprogeq!(
         fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
         ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- collocation constraint defects -----------------------------
-        u0 = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
+        Δk = k̇
+        for i=1:no
+            Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x0_Z̃
+        end
+        mul!(sk, Mo, Δk)
+        d̂i = @views D̂temp[(1 + nd*(j-1)):(nd*j)]
+        if h > 0
+            ûi = similar(û0) # TODO: remove this allocation
+        end
         for i=1:no
             k̇i   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
-            Δki  = @views  Δk[(1 + (i-1)*nx):(i*nx)]
             ki_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
-            Δki .= @. ki_Z̃ - x0_Z̃
-            di  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
-            model.f!(k̇i, ki_Z̃, û0, d̂0, p)
+            d̂i  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
+            if h < 1
+                model.f!(k̇i, ki_Z̃, û0, d̂i, p)
+            else
+                # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
+                û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
+                ûi .= (1-τ[i]).*û0 .+ τ[i].*û0next
+                model.f!(k̇i, ki_Z̃, ûi, d̂i, p)
+            end
         end
-        sk .= mul!(sk, Mo, Δk) .- k̇
+        sk .-= k̇
         # ----------------- continuity constraint defects ------------------------------
         scnext .= mul!(scnext, Co, k_Z̃) .+ (λo.*x0_Z̃) .- x0next_Z̃
     end
