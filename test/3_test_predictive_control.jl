@@ -877,10 +877,11 @@ end
     @test isa(nmpc15.optim, JuMP.GenericModel{Float64}) # Ipopt does not support Float32
 
     @test_throws ArgumentError NonLinMPC(nonlinmodel)
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, transcription=TrapezoidalCollocation())
-    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, transcription=TrapezoidalCollocation(2))
     @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, Wy=[1 0;0 1])
+    @test_throws ArgumentError NonLinMPC(nonlinmodel, Hp=2, transcription=TrapezoidalCollocation())
+    @test_throws ArgumentError TrapezoidalCollocation(2)
     @test_throws ArgumentError OrthogonalCollocation(roots=:gausslobatto)
+    @test_throws ArgumentError OrthogonalCollocation(2)
 end
 
 @testitem "NonLinMPC moves and getinfo (LinModel)" setup=[SetupMPCtests] begin
