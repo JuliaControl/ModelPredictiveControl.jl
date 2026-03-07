@@ -129,9 +129,9 @@ end
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
 Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)s
-only. The `h` argument is the hold order for ``\mathbf{u}``, and the `no` argument, the
-number of collocation points ``n_o``. The decision variable is similar to [`MultipleShooting`](@ref),
-but it also includes the collocation points:
+only. The `h` argument is the hold order for ``\mathbf{u}`` (`0` or `1`), and the `no`
+argument, the number of collocation points ``n_o``. The decision variable is similar to
+[`MultipleShooting`](@ref), but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
