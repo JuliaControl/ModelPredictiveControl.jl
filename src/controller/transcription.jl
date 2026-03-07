@@ -704,6 +704,33 @@ function init_defectmat(
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 end
 
+function init_defectmat(
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::CollocationMethod, Hp, Hc, _
+)
+    
+end
+
+"""
+    init_defectmat(
+        model::NonLinModel, estim::IntenalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+    ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+
+Return empty matrices for [`InternalModel`](@ref) (state vector is not augmented).
+"""
+function init_defectmat(
+    model::NonLinModel, estim::IntenalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+) where {NT<:Real}
+    nx̂, nu, nd = estim.nx̂, model.nu, model.nd
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    Eŝ = zeros(NT, 0, nZ)
+    Gŝ = zeros(NT, 0, nd)
+    Jŝ = zeros(NT, 0, nd*Hp)
+    Kŝ = zeros(NT, 0, nx̂)
+    Vŝ = zeros(NT, 0, nu)
+    Bŝ = zeros(NT, 0)
+    return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+end
+
 """
     init_defectmat(
         model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb
