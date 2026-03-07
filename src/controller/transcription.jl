@@ -186,6 +186,9 @@ struct OrthogonalCollocation <: CollocationMethod
     function OrthogonalCollocation(
         h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
+        if !(h == 0 || h == 1)
+            throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
+        end
         if roots==:gaussradau            
             x, _ = FastGaussQuadrature.gaussradau(no, COLLOCATION_NODE_TYPE)
             # we reverse the nodes to include the τ=1.0 node:
