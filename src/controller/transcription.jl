@@ -129,9 +129,9 @@ end
 Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
 
 Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)s
-only. The `h` argument is the hold order for ``\mathbf{u}``, and the `no` argument, the
-number of collocation points ``n_o``. The decision variable is similar to [`MultipleShooting`](@ref),
-but it also includes the collocation points:
+only. The `h` argument is the hold order for ``\mathbf{u}`` (`0` or `1`), and the `no`
+argument, the number of collocation points ``n_o``. The decision variable is similar to
+[`MultipleShooting`](@ref), but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -186,6 +186,9 @@ struct OrthogonalCollocation <: CollocationMethod
     function OrthogonalCollocation(
         h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
+        if !(h == 0 || h == 1)
+            throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
+        end
         if roots==:gaussradau            
             x, _ = FastGaussQuadrature.gaussradau(no, COLLOCATION_NODE_TYPE)
             # we reverse the nodes to include the τ=1.0 node:
