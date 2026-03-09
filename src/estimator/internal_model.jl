@@ -190,13 +190,6 @@ Does nothing since [`InternalModel`](@ref) does not augment the state vector.
 fs!( _ , ::InternalModel, ::SimModel, _ ) = nothing
 
 @doc raw"""
-    f̂_input!(û0, estim::InternalModel, model::SimModel, x̂0, u0) -> nothing
-
-Compute `û0 .= u0` since [`InternalModel`](@ref) does not augment the state vector.
-"""
-f̂_input!(û0, ::InternalModel, ::SimModel, _ , u0) = (û0 .= u0; nothing)
-
-@doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
 
 Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h!`](@ref).

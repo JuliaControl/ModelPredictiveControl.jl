@@ -1397,7 +1397,7 @@ deterministic and stochastic states extracted from the decision variables `Z̃`.
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
-is defined in [`f̂_input!`](@ref).
+is defined in [`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K̇, 
@@ -1412,11 +1412,7 @@ function con_nonlinprogeq!(
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and û0next are needed):
-        x̂0_Z̃ =   @views j < 1 ? mpc.estim.x̂0[1:nx̂] : X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
-        u0, û0 = @views U0[(1 + nu*j):(nu*(j+1))],  Û0[(1 + nu*j):(nu*(j+1))]
-        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
-    end
+    disturbedinput!(Û0, mpc, estim, U0, X̂0_Z̃)
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1503,9 +1499,9 @@ and disturbances are piecewise constant or linear:
 \mathbf{d̂}_i(k+j) &= (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)                      
 \end{aligned}
 ```
-The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for
-the stochastic states ``\mathbf{s_s}`` are computed as the [`TrapezoidalCollocation`](@ref)
-method, and the ones for the continuity constraint of the deterministic states are:
+The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref). The stochastic state 
+defects ``\mathbf{s_s}`` are computed as the [`TrapezoidalCollocation`](@ref) method, and
+the ones for the continuity constraint of the deterministic states are:
 ```math
 \mathbf{s_c}(k+j+1) 
     = \mathbf{C_o} \begin{bmatrix}                                          
@@ -1535,11 +1531,7 @@ function con_nonlinprogeq!(
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     D̂temp = mpc.buffer.D̂
-    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and û0next are needed):
-        x̂0_Z̃ =   @views j < 1 ? mpc.estim.x̂0[1:nx̂] : X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
-        u0, û0 = @views U0[(1 + nu*j):(nu*(j+1))],  Û0[(1 + nu*j):(nu*(j+1))]
-        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
-    end
+    disturbedinput!(Û0, mpc, estim, U0, X̂0_Z̃)
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
