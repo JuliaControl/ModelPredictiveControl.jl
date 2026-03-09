@@ -709,19 +709,27 @@ end
 
 function init_defectmat(
     model::NonLinModel, estim::StateEstimator{NT}, transcription::CollocationMethod, Hp, Hc, _
-)
-    
+) where {NT<:Real}
+    nx̂, nu, nd = estim.nx̂, model.nu, model.nd
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    Eŝ = zeros(NT, 0, nZ)
+    Gŝ = zeros(NT, 0, nd)
+    Jŝ = zeros(NT, 0, nd*Hp)
+    Kŝ = zeros(NT, 0, nx̂)
+    Vŝ = zeros(NT, 0, nu)
+    Bŝ = zeros(NT, 0)
+    return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 end
 
 """
     init_defectmat(
-        model::NonLinModel, estim::IntenalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+        model::NonLinModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
     ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 
 Return empty matrices for [`InternalModel`](@ref) (state vector is not augmented).
 """
 function init_defectmat(
-    model::NonLinModel, estim::IntenalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+    model::NonLinModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -778,7 +786,7 @@ The argument `nc` is the number of custom nonlinear inequality constraints in
 finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
 also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a 
 case, `args`  needs to contain all the inequality and equality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂min, A_x̂max, A_ŝ`. 
+`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂min, A_x̂max, A_Ŝ`. 
 The integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
@@ -795,7 +803,7 @@ function init_matconstraint_mpc(
             A_Ymin,  A_Ymax, 
             A_Wmin,  A_Wmax,
             A_x̂min,  A_x̂max,  
-            A_ŝ
+            A_Ŝ
         ) = args
         A = [
             A_Umin;  A_Umax; 
@@ -804,7 +812,7 @@ function init_matconstraint_mpc(
             A_Wmin;  A_Wmax
             A_x̂min;  A_x̂max;
         ]
-        Aeq = A_ŝ
+        Aeq = A_Ŝ
         neq = 0
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
@@ -821,9 +829,9 @@ function init_matconstraint_mpc(
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, _ , _ , A_ŝ = args
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, _ , _ , A_Ŝ = args
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax]
-        Aeq = A_ŝ
+        Aeq = A_Ŝ
         neq = 0
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Wmin; i_Wmax]
@@ -840,9 +848,9 @@ function init_matconstraint_mpc(
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else    
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, A_x̂min, A_x̂max, A_ŝ = args
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, A_x̂min, A_x̂max, A_Ŝ = args
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax; A_x̂min; A_x̂max]
-        Aeq = A_ŝ
+        Aeq = A_Ŝ
         nΔŨ, nZ̃ = size(A_ΔŨmin)
         neq = nZ̃ - nΔŨ
     end

@@ -176,7 +176,7 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     # indices of finite numbers in the b vector (linear inequality constraints):
     i_b     ::BitVector
     # A matrices for the linear equality constraints:
-    A_ŝ     ::Matrix{NT}
+    A_Ŝ     ::Matrix{NT}
     Aeq     ::Matrix{NT}
     # b vector for the linear equality constraints:
     beq     ::Vector{NT}
@@ -518,7 +518,7 @@ function setconstraint!(
             con.A_Umin, con.A_Umax, con.A_ΔŨmin, con.A_ΔŨmax, 
             con.A_Ymin, con.A_Ymax, con.A_Wmin, con.A_Wmax,
             con.A_x̂min, con.A_x̂max,
-            con.A_ŝ
+            con.A_Ŝ
         )
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
@@ -910,7 +910,7 @@ function init_defaultcon_mpc(
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
     A_Wmin,  A_Wmax, Ẽw = relaxW(E, Pu, Hp, W̄y, W̄u, C_wmin, C_wmax, nϵ)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
-    A_ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
+    A_Ŝ, Ẽŝ = augmentdefect(Eŝ, nϵ)
     i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
@@ -920,7 +920,7 @@ function init_defaultcon_mpc(
         model, transcription, nc,
         i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂max, A_x̂min,
-        A_ŝ
+        A_Ŝ
     )
     # dummy fx̂, Fw and Fŝ vectors (updated just before optimization)
     fx̂, Fw, Fŝ = zeros(NT, nx̂), zeros(NT, nW), zeros(NT, nx̂*Hp)
@@ -935,7 +935,7 @@ function init_defaultcon_mpc(
         A_Umin  , A_Umax , A_ΔŨmin , A_ΔŨmax  , 
         A_Ymin  , A_Ymax , A_Wmin  , A_Wmax   , A_x̂min , A_x̂max , 
         A       , b      , i_b     , 
-        A_ŝ     ,
+        A_Ŝ     ,
         Aeq     , beq    ,
         neq     ,
         C_ymin  , C_ymax , C_wmin  , C_wmax   , c_x̂min , c_x̂max , 
@@ -1194,14 +1194,14 @@ function relaxterminal(ex̂::AbstractMatrix{NT}, c_x̂min, c_x̂max, nϵ) where 
 end
 
 @doc raw"""
-    augmentdefect(Eŝ, nϵ) -> A_ŝ, Ẽŝ
+    augmentdefect(Eŝ, nϵ) -> A_Ŝ, Ẽŝ
 
 Augment defect equality constraints with slack variable ϵ if `nϵ == 1`.
 
 It returns the ``\mathbf{Ẽ_ŝ}`` matrix that appears in the defect equation 
 ``\mathbf{Ŝ = Ẽ_ŝ Z̃ + F_ŝ}`` and the ``\mathbf{A}`` matrix for the equality constraints:
 ```math
-\mathbf{A_ŝ Z̃} = - \mathbf{F_ŝ}
+\mathbf{A_Ŝ Z̃} = - \mathbf{F_ŝ}
 ```
 """
 function augmentdefect(Eŝ::AbstractMatrix{NT}, nϵ) where NT<:Real
@@ -1210,8 +1210,8 @@ function augmentdefect(Eŝ::AbstractMatrix{NT}, nϵ) where NT<:Real
     else # Z̃ = Z (only hard constraints)
         Ẽŝ = Eŝ
     end
-    A_ŝ = Ẽŝ
-    return A_ŝ, Ẽŝ
+    A_Ŝ = Ẽŝ
+    return A_Ŝ, Ẽŝ
 end
 
 @doc raw"""
