@@ -720,7 +720,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.bx̂ .= bx̂
     # --- defect matrices ---
     Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
-    A_Ŝ, Ẽŝ = augmentdefect(Eŝ, mpc.nϵ)
+    Aeq, Ẽŝ = augmentdefect(Eŝ, mpc.nϵ)
     con.Ẽŝ .= Ẽŝ
     con.Gŝ .= Gŝ
     con.Jŝ .= Jŝ
@@ -747,8 +747,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
         con.A_x̂max
     ]
     # --- linear equality constraints ---
-    con.A_Ŝ .= A_Ŝ
-    con.Aeq .= A_Ŝ
+    con.Aeq .= Aeq
     # --- operating points ---
     con.U0min .+= mpc.Uop # convert U0 to U with the old operating point
     con.U0max .+= mpc.Uop # convert U0 to U with the old operating point
