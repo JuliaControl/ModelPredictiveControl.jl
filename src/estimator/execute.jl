@@ -108,19 +108,6 @@ function f̂!(x̂0next, û0, k, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, 
     return nothing
 end
 
-#TODO: delete the following generic functions and replace with linear eq. constraints
-
-"""
-    fs!(x̂0next, estim::StateEstimator, model::SimModel, x̂0) -> nothing
-
-State update function of the stochastic model only.
-"""
-function fs!(x̂0next, estim::StateEstimator, model::SimModel, x̂0)
-    xs, xsnext = @views x̂0[model.nx+1:end], x̂0next[model.nx+1:end]
-    mul!(xsnext, estim.As, xs)
-    return nothing
-end
-
 @doc raw"""
     ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, d0) -> nothing
 
