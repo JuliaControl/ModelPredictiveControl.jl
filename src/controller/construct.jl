@@ -133,13 +133,13 @@ struct ControllerConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     vx̂      ::Matrix{NT}
     bx̂      ::Vector{NT}
     # matrices for the zero defect constraints (N/A for single shooting transcriptions):
-    Ẽŝ      ::Matrix{NT}
-    Fŝ      ::Vector{NT}
-    Gŝ      ::Matrix{NT}
-    Jŝ      ::Matrix{NT}
-    Kŝ      ::Matrix{NT}
-    Vŝ      ::Matrix{NT}
-    Bŝ      ::Vector{NT}
+    ẼS      ::Matrix{NT}
+    FS      ::Vector{NT}
+    GS      ::Matrix{NT}
+    JS      ::Matrix{NT}
+    KS      ::Matrix{NT}
+    VS      ::Matrix{NT}
+    BS      ::Vector{NT}
     # custom linear equality constraints:
     Ẽw      ::Matrix{NT}
     Fw      ::Vector{NT}
@@ -857,7 +857,7 @@ verify_cond(::TranscriptionMethod,_,_) = nothing
         Hp, Hc, 
         PΔu, Pu, E, 
         ex̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-        Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+        ES, GS, JS, KS, VS, BS,
         Wy, Wu, Wd, Wr,
         gc!=nothing, nc=0
     ) -> con, nϵ, P̃Δu, P̃u, Ẽ
@@ -873,7 +873,7 @@ function init_defaultcon_mpc(
     Hp,  Hc, 
     PΔu, Pu, E, 
     ex̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-    Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+    ES, GS, JS, KS, VS, BS,
     Wy, Wu, Wd, Wr,
     gc!::GCfunc = nothing, nc = 0
 ) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
@@ -881,7 +881,7 @@ function init_defaultcon_mpc(
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
     nw = size(Wy, 1)
     nW = nw*(Hp+1)
-    nFŝ = size(Eŝ, 1)
+    nS = size(ES, 1)
     nϵ = weights.isinf_C ? 0 : 1
     u0min,      u0max   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     Δumin,      Δumax   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
@@ -910,7 +910,7 @@ function init_defaultcon_mpc(
     A_Ymin,  A_Ymax, Ẽ  = relaxŶ(E, C_ymin, C_ymax, nϵ)
     A_Wmin,  A_Wmax, Ẽw = relaxW(E, Pu, Hp, W̄y, W̄u, C_wmin, C_wmax, nϵ)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
-    Aeq, Ẽŝ = augmentdefect(Eŝ, nϵ)
+    Aeq, ẼS = augmentdefect(ES, nϵ)
     i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
     i_ΔŨmin, i_ΔŨmax = .!isinf.(ΔŨmin), .!isinf.(ΔŨmax)
     i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
@@ -922,13 +922,13 @@ function init_defaultcon_mpc(
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂max, A_x̂min,
         Aeq
     )
-    # dummy fx̂, Fw and Fŝ vectors (updated just before optimization)
-    fx̂, Fw, Fŝ = zeros(NT, nx̂), zeros(NT, nW), zeros(NT, nFŝ)
+    # dummy fx̂, Fw and FS vectors (updated just before optimization)
+    fx̂, Fw, FS = zeros(NT, nx̂), zeros(NT, nW), zeros(NT, nS)
     # dummy b and beq vectors (updated just before optimization)
     b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
     con = ControllerConstraint{NT, GCfunc}(
         ẽx̂      , fx̂     , gx̂      , jx̂       , kx̂     , vx̂     , bx̂     ,
-        Ẽŝ      , Fŝ     , Gŝ      , Jŝ       , Kŝ     , Vŝ     , Bŝ     ,
+        ẼS      , FS     , GS      , JS       , KS     , VS     , BS     ,
         Ẽw      , Fw     , W̄y      , W̄u       , W̄d     , W̄r     , nw     ,
         U0min   , U0max  , ΔŨmin   , ΔŨmax    , 
         Y0min   , Y0max  , Wmin    , Wmax     , x̂0min  , x̂0max  , 
@@ -1193,24 +1193,24 @@ function relaxterminal(ex̂::AbstractMatrix{NT}, c_x̂min, c_x̂max, nϵ) where 
 end
 
 @doc raw"""
-    augmentdefect(Eŝ, nϵ) -> Aeq, Ẽŝ
+    augmentdefect(ES, nϵ) -> Aeq, ẼS
 
 Augment defect equality constraints with slack variable ϵ if `nϵ == 1`.
 
-It returns the ``\mathbf{Ẽ_ŝ}`` matrix that appears in the linear defect equation 
-``\mathbf{Ẽ_ŝ Z̃ + F_ŝ}`` and the ``\mathbf{A}`` matrix for the equality constraints:
+It returns the ``\mathbf{Ẽ_S}`` matrix that appears in the linear defect equation 
+``\mathbf{Ẽ_S Z̃ + F_S}`` and the ``\mathbf{A}`` matrix for the equality constraints:
 ```math
-\mathbf{A_{eq} Z̃} = \mathbf{b_{eq}} = - \mathbf{F_ŝ}
+\mathbf{A_{eq} Z̃} = \mathbf{b_{eq}} = - \mathbf{F_S}
 ```
 """
-function augmentdefect(Eŝ::AbstractMatrix{NT}, nϵ) where NT<:Real
+function augmentdefect(ES::AbstractMatrix{NT}, nϵ) where NT<:Real
     if nϵ == 1 # Z̃ = [Z; ϵ]
-        Ẽŝ = [Eŝ zeros(NT, size(Eŝ, 1), 1)]
+        ẼS = [ES zeros(NT, size(ES, 1), 1)]
     else # Z̃ = Z (only hard constraints)
-        Ẽŝ = Eŝ
+        ẼS = ES
     end
-    Aeq = Ẽŝ
-    return Aeq, Ẽŝ
+    Aeq = ẼS
+    return Aeq, ẼS
 end
 
 @doc raw"""

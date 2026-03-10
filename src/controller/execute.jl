@@ -719,14 +719,14 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.vx̂ .= vx̂
     con.bx̂ .= bx̂
     # --- defect matrices ---
-    Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
-    Aeq, Ẽŝ = augmentdefect(Eŝ, mpc.nϵ)
-    con.Ẽŝ .= Ẽŝ
-    con.Gŝ .= Gŝ
-    con.Jŝ .= Jŝ
-    con.Kŝ .= Kŝ
-    con.Vŝ .= Vŝ
-    con.Bŝ .= Bŝ
+    ES, GS, JS, KS, VS, BS = init_defectmat(model, estim, transcription, Hp, Hc, nb)
+    Aeq, ẼS = augmentdefect(ES, mpc.nϵ)
+    con.ẼS .= ẼS
+    con.GS .= GS
+    con.JS .= JS
+    con.KS .= KS
+    con.VS .= VS
+    con.BS .= BS
     # --- custom linear constraints ---
     con.Ẽw .= Ẽw
     # --- linear inequality constraints ---

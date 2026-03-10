@@ -600,24 +600,24 @@ end
 @doc raw"""
     init_defectmat(
         model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb
-    ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects over the predicted states. 
 
 Knowing that the decision vector ``\mathbf{Z}`` contains both ``\mathbf{ΔU}`` and 
 ``\mathbf{X̂_0}`` vectors (with a [`MultipleShooting`](@ref) transcription), an equation
-similar to the prediction matrices (see [`init_predmat`](@ref)) computes the defects over
-the predicted states:
+similar to the prediction matrices (see [`init_predmat`](@ref)) computes the defects of
+the estimated states of ``H_p``:
 ```math
 \begin{aligned}
-    \mathbf{Ŝ} &= \mathbf{E_ŝ Z} + \mathbf{G_ŝ d_0}(k)  + \mathbf{J_ŝ D̂_0} 
-                                 + \mathbf{K_ŝ x̂_0}(k)  + \mathbf{V_ŝ u_0}(k-1) 
-                                 + \mathbf{B_ŝ}                                         \\
-               &= \mathbf{E_ŝ Z} + \mathbf{F_ŝ}
+    \mathbf{Ŝ} &= \mathbf{E_S Z} + \mathbf{G_S d_0}(k)  + \mathbf{J_S D̂_0} 
+                                 + \mathbf{K_S x̂_0}(k)  + \mathbf{V_S u_0}(k-1) 
+                                 + \mathbf{B_S}                                         \\
+               &= \mathbf{E_S Z} + \mathbf{F_S}
 \end{aligned}
 ```   
 They are forced to be ``\mathbf{Ŝ = 0}`` using the optimization equality constraints. The
-matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in the Extended Help section.
+matrices ``\mathbf{E_S, G_S, J_S, K_S, V_S, B_S}`` are defined in the Extended Help section.
 
 # Extended Help
 !!! details "Extended Help"
@@ -634,34 +634,34 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
     The defect matrices are computed with:
     ```math
     \begin{aligned}
-    \mathbf{E_ŝ} &= \begin{bmatrix}
-        \mathbf{E_{ŝ}^{Δu}} & \mathbf{E_{ŝ}^{x̂}}                                                    \end{bmatrix} \\
-    \mathbf{E_{ŝ}^{Δu}} &= \begin{bmatrix}
+    \mathbf{E_S} &= \begin{bmatrix}
+        \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}}                                                    \end{bmatrix} \\
+    \mathbf{E_{S}^{Δu}} &= \begin{bmatrix}
         \mathbf{Q}(n_1)     & \mathbf{0}          & \cdots & \mathbf{0}                             \\
         \mathbf{Q}(n_2)     & \mathbf{Q}(n_2)     & \cdots & \mathbf{0}                             \\
         \vdots              & \vdots              & \ddots & \vdots                                 \\
         \mathbf{Q}(n_{H_c}) & \mathbf{Q}(n_{H_c}) & \cdots & \mathbf{Q}(n_{H_c})                    \end{bmatrix} \\
-    \mathbf{E_{ŝ}^{x̂}} &= \begin{bmatrix}
+    \mathbf{E_{S}^{x̂}} &= \begin{bmatrix}
         -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}  &  \mathbf{0}                             \\
          \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}  &  \mathbf{0}                             \\
          \vdots     &  \vdots     & \ddots &  \vdots      &  \vdots                                 \\
          \mathbf{0} &  \mathbf{0} & \cdots &  \mathbf{Â}  & -\mathbf{I}                             \end{bmatrix} \\
-    \mathbf{G_ŝ} &= \begin{bmatrix}
+    \mathbf{G_S} &= \begin{bmatrix}
         \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                          \end{bmatrix} \\
-    \mathbf{J_ŝ} &= \begin{bmatrix}
+    \mathbf{J_S} &= \begin{bmatrix}
         \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                            \\
         \mathbf{B̂_d} & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                            \\
         \vdots       & \vdots       & \ddots & \vdots       & \vdots                                \\
         \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_d} & \mathbf{0}                            \end{bmatrix} \\
-    \mathbf{K_ŝ} &= \begin{bmatrix}
+    \mathbf{K_S} &= \begin{bmatrix}
         \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                            \end{bmatrix} \\
-    \mathbf{V_ŝ} &= \begin{bmatrix}
+    \mathbf{V_S} &= \begin{bmatrix}
         \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \vdots \\ \mathbf{B̂_u}                                      \end{bmatrix} \\
-    \mathbf{B_ŝ} &= \begin{bmatrix}
+    \mathbf{B_S} &= \begin{bmatrix}
         \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}  \end{bmatrix}
     \end{aligned}
     ```
-    The ``\mathbf{E_ŝ^{Δu}}`` matrix structure is due to the move blocking implementation:
+    The ``\mathbf{E_S^{Δu}}`` matrix structure is due to the move blocking implementation:
     the ``\mathbf{ΔU}`` vector only contains the input increment of the free moves 
     (see [`move_blocking`](@ref)).
 """
@@ -679,66 +679,39 @@ function init_defectmat(
         return Q
     end
     # --- current state estimates x̂0 ---
-    Kŝ = [Â; zeros(NT, nx̂*(Hp-1), nx̂)]
+    KS = [Â; zeros(NT, nx̂*(Hp-1), nx̂)]
     # --- previous manipulated inputs lastu0 ---
-    Vŝ = repeat(B̂u, Hp)
+    VS = repeat(B̂u, Hp)
     # --- decision variables Z ---
     nI_nx̂ = Matrix{NT}(-I, nx̂, nx̂)
-    Eŝ = [zeros(NT, nx̂*Hp, nu*Hc) repeatdiag(nI_nx̂, Hp)]
+    ES = [zeros(NT, nx̂*Hp, nu*Hc) repeatdiag(nI_nx̂, Hp)]
     for j=1:Hc
         iCol = (1:nu) .+ nu*(j-1)
         for i=j:Hc
             ni = nb[i]
             iRow = (1:nx̂*ni) .+ nx̂*sum(nb[1:i-1])
-            Q = @views Eŝ[iRow, iCol]
+            Q = @views ES[iRow, iCol]
             Q!(Q, ni)
         end
     end
     for j=1:Hp-1
         iRow = (1:nx̂) .+ nx̂*j
         iCol = (1:nx̂) .+ nx̂*(j-1) .+ nu*Hc
-        Eŝ[iRow, iCol] = Â
+        ES[iRow, iCol] = Â
     end
     # --- current measured disturbances d0 and predictions D̂0 ---
-    Gŝ = [B̂d; zeros(NT, nx̂*(Hp-1), nd)]
-    Jŝ = [zeros(NT, nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
+    GS = [B̂d; zeros(NT, nx̂*(Hp-1), nd)]
+    JS = [zeros(NT, nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
     # --- state x̂op and state update f̂op operating points ---
-    Bŝ = repeat(estim.f̂op - estim.x̂op, Hp)
-    return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    BS = repeat(estim.f̂op - estim.x̂op, Hp)
+    return ES, GS, JS, KS, VS, BS
 end
 
-function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::CollocationMethod, Hp, Hc, _
-) where {NT<:Real}
-    nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
-    nZ = get_nZ(estim, transcription, Hp, Hc)
-    nK = nZ - nu*Hc - nx̂*Hp
-    As = estim.As
-    # --- current state estimates x̂0 ---
-    Kŝ = zeros(NT, nxs*Hp, nx̂)
-    Kŝ[1:nxs, nx+1:end] = As
-    # --- previous manipulated inputs lastu0 ---
-    Vŝ = zeros(nxs*Hp, nu)
-    # --- decision variables Z ---
-    zeros_nI = [zeros(NT, nxs, nx) -I]
-    Eŝ = [zeros(NT, nxs*Hp, nu*Hc) repeatdiag(zeros_nI, Hp) zeros(NT, nxs*Hp, nK)]
-    for j=1:Hp-1
-        iRow = (1:nxs) .+ nxs*j
-        iCol = (nx+1:nx̂) .+ nx̂*(j-1) .+ nu*Hc
-        Eŝ[iRow, iCol] = As
-    end
-    # --- current measured disturbances d0 and predictions D̂0 ---
-    Gŝ = zeros(NT, nxs*Hp, nd)
-    Jŝ = zeros(NT, nxs*Hp, nd*Hp)
-    # --- state x̂op and state update f̂op operating points ---
-    Bŝ = zeros(NT, nxs*Hp)
-    return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
-end
 
 """
     init_defectmat(
         model::SimModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
-    ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`InternalModel`](@ref) (state vector is not augmented).
 """
@@ -747,19 +720,19 @@ function init_defectmat(
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
-    Eŝ = zeros(NT, 0, nZ)
-    Gŝ = zeros(NT, 0, nd)
-    Jŝ = zeros(NT, 0, nd*Hp)
-    Kŝ = zeros(NT, 0, nx̂)
-    Vŝ = zeros(NT, 0, nu)
-    Bŝ = zeros(NT, 0)
-    return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    ES = zeros(NT, 0, nZ)
+    GS = zeros(NT, 0, nd)
+    JS = zeros(NT, 0, nd*Hp)
+    KS = zeros(NT, 0, nx̂)
+    VS = zeros(NT, 0, nu)
+    BS = zeros(NT, 0)
+    return ES, GS, JS, KS, VS, BS
 end
 
 """
     init_defectmat(
         model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb
-    ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for all other cases (N/A).
 """
@@ -768,13 +741,13 @@ function init_defectmat(
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
-    Eŝ = zeros(NT, 0, nZ)
-    Gŝ = zeros(NT, 0, nd)
-    Jŝ = zeros(NT, 0, nd*Hp)
-    Kŝ = zeros(NT, 0, nx̂)
-    Vŝ = zeros(NT, 0, nu)
-    Bŝ = zeros(NT, 0)
-    return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    ES = zeros(NT, 0, nZ)
+    GS = zeros(NT, 0, nd)
+    JS = zeros(NT, 0, nd*Hp)
+    KS = zeros(NT, 0, nx̂)
+    VS = zeros(NT, 0, nu)
+    BS = zeros(NT, 0)
+    return ES, GS, JS, KS, VS, BS
 end
 
 @doc raw"""
@@ -979,21 +952,21 @@ end
 
 Set `beq` vector for the linear model equality constraints (``\mathbf{A_{eq} Z̃ = b_{eq}}``).
 
-Also init ``\mathbf{F_ŝ} = \mathbf{G_ŝ d_0}(k) + \mathbf{J_ŝ D̂_0} + \mathbf{K_ŝ x̂_0}(k) + 
-\mathbf{V_ŝ u_0}(k-1) + \mathbf{B_ŝ}``, see [`init_defectmat`](@ref).
+Also init ``\mathbf{F_S} = \mathbf{G_S d_0}(k) + \mathbf{J_S D̂_0} + \mathbf{K_S x̂_0}(k) + 
+\mathbf{V_S u_0}(k-1) + \mathbf{B_S}``, see [`init_defectmat`](@ref).
 """
 function linconstrainteq!(
     mpc::PredictiveController, model::LinModel, ::StateEstimator, ::MultipleShooting
 )
-    Fŝ  = mpc.con.Fŝ
-    Fŝ .= mpc.con.Bŝ
-    mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0, 1, 1)
-    mul!(Fŝ, mpc.con.Vŝ, mpc.lastu0, 1, 1)
+    FS  = mpc.con.FS
+    FS .= mpc.con.BS
+    mul!(FS, mpc.con.KS, mpc.estim.x̂0, 1, 1)
+    mul!(FS, mpc.con.VS, mpc.lastu0, 1, 1)
     if model.nd > 0
-        mul!(Fŝ, mpc.con.Gŝ, mpc.d0, 1, 1)
-        mul!(Fŝ, mpc.con.Jŝ, mpc.D̂0, 1, 1)
+        mul!(FS, mpc.con.GS, mpc.d0, 1, 1)
+        mul!(FS, mpc.con.JS, mpc.D̂0, 1, 1)
     end
-    mpc.con.beq .= @. -Fŝ
+    mpc.con.beq .= @. -FS
     linconeq = mpc.optim[:linconstrainteq]
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
@@ -1002,10 +975,10 @@ end
 function linconstrainteq!(
     mpc::PredictiveController, ::SimModel, ::StateSpace, ::CollocationMethod
 )
-    Fŝ  = mpc.con.Fŝ
-    # the only non-zeros matrices are Eŝ and Kŝ:
-    mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0)
-    mpc.con.beq .= @. -Fŝ
+    FS  = mpc.con.FS
+    # the only non-zeros matrices are ES and KS:
+    mul!(FS, mpc.con.KS, mpc.estim.x̂0)
+    mpc.con.beq .= @. -FS
     linconeq = mpc.optim[:linconstrainteq]
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
