@@ -1375,20 +1375,16 @@ end
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
 The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The nonlinear equality
-constraints `geq` only includes the state defects. The deterministic and stochastic states
-are handled separately since collocation methods require continuous-time state-space models,
-and the stochastic model of the unmeasured disturbances is discrete-time. The deterministic
-and stochastic defects are respectively computed with:
+constraints `geq` includes the defects of the deterministic states only. The stochastic
+states are handled seperatly as linear equality constraints, see [`init_defectmat`](@ref).
+The deterministic state defects are computed with:
 ```math
-\begin{aligned}
-\mathbf{s_d}(k+j+1) &= \mathbf{x_0}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
-                       - \mathbf{x_0}(k+j+1)                                                \\
-\mathbf{s_s}(k+j+1) &= \mathbf{A_s x_s}(k+j) - \mathbf{x_s}(k+j+1)
-\end{aligned}
+\mathbf{s_d}(k+j+1) = \mathbf{x_0}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
+                       - \mathbf{x_0}(k+j+1)                                              
 ```
-for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x_0}`` and ``\mathbf{x_s}`` are the
-deterministic and stochastic states extracted from the decision variables `Z̃`. The
-``\mathbf{k̇}`` coefficients are  evaluated from the continuous-time function `model.f!` and:
+for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x_0}`` is the deterministic state
+extracted from the decision variables `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated
+from the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
 \mathbf{k̇}_1(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
@@ -1427,7 +1423,6 @@ function con_nonlinprogeq!(
         x0_Z̃     = @views  x̂0_Z̃[1:nx]
         x0next_Z̃ = @views x̂0next_Z̃[1:nx]
         k̇1, k̇2   = @views k̇[1:nx], k̇[nx+1:2*nx]
-        # ----------------- deterministic defects: trapezoidal collocation -------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
@@ -1491,9 +1486,9 @@ and disturbances are piecewise constant or linear:
 \mathbf{d̂}_i(k+j) &= (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)                      
 \end{aligned}
 ```
-The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref). The stochastic state 
-defects ``\mathbf{s_s}`` are computed as the [`TrapezoidalCollocation`](@ref) method, and
-the ones for the continuity constraint of the deterministic states are:
+The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref). The defects of the 
+stochastic states are linear equality constraints (see [`init_defectmat`](@ref)), and the 
+ones for the continuity constraint of the deterministic states are:
 ```math
 \mathbf{s_c}(k+j+1) 
     = \mathbf{C_o} \begin{bmatrix}                                          
