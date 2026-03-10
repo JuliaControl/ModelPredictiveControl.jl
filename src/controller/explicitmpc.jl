@@ -192,6 +192,7 @@ function Base.show(io::IO, mpc::ExplicitMPC)
 end
 
 linconstraint!(::ExplicitMPC, ::LinModel, ::TranscriptionMethod) = nothing
+linconstrainteq!(::ExplicitMPC, ::LinMode, ::StateEstimator, ::TranscriptionMethod) = nothing
 
 @doc raw"""
     optim_objective!(mpc::ExplicitMPC) -> Z̃
