@@ -881,6 +881,7 @@ function init_defaultcon_mpc(
     nu, ny, nx̂ = model.nu, model.ny, estim.nx̂
     nw = size(Wy, 1)
     nW = nw*(Hp+1)
+    nFŝ = size(Eŝ, 1)
     nϵ = weights.isinf_C ? 0 : 1
     u0min,      u0max   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     Δumin,      Δumax   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
@@ -922,7 +923,7 @@ function init_defaultcon_mpc(
         Aeq
     )
     # dummy fx̂, Fw and Fŝ vectors (updated just before optimization)
-    fx̂, Fw, Fŝ = zeros(NT, nx̂), zeros(NT, nW), zeros(NT, nx̂*Hp)
+    fx̂, Fw, Fŝ = zeros(NT, nx̂), zeros(NT, nW), zeros(NT, nFŝ)
     # dummy b and beq vectors (updated just before optimization)
     b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
     con = ControllerConstraint{NT, GCfunc}(

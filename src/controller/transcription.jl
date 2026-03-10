@@ -684,7 +684,7 @@ function init_defectmat(
     Vŝ = repeat(B̂u, Hp)
     # --- decision variables Z ---
     nI_nx̂ = Matrix{NT}(-I, nx̂, nx̂)
-    Eŝ = [zeros(nx̂*Hp, nu*Hc) repeatdiag(nI_nx̂, Hp)]
+    Eŝ = [zeros(NT, nx̂*Hp, nu*Hc) repeatdiag(nI_nx̂, Hp)]
     for j=1:Hc
         iCol = (1:nu) .+ nu*(j-1)
         for i=j:Hc
@@ -700,36 +700,50 @@ function init_defectmat(
         Eŝ[iRow, iCol] = Â
     end
     # --- current measured disturbances d0 and predictions D̂0 ---
-    Gŝ = [B̂d; zeros(NT, (Hp-1)*nx̂, nd)]
-    Jŝ = [zeros(nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
+    Gŝ = [B̂d; zeros(NT, nx̂*(Hp-1), nd)]
+    Jŝ = [zeros(NT, nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
     # --- state x̂op and state update f̂op operating points ---
     Bŝ = repeat(estim.f̂op - estim.x̂op, Hp)
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 end
 
 function init_defectmat(
-    model::NonLinModel, estim::StateEstimator{NT}, transcription::CollocationMethod, Hp, Hc, _
+    model::SimModel, estim::StateEstimator{NT}, transcription::CollocationMethod, Hp, Hc, _
 ) where {NT<:Real}
-    nx̂, nu, nd = estim.nx̂, model.nu, model.nd
+    nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
     nZ = get_nZ(estim, transcription, Hp, Hc)
-    Eŝ = zeros(NT, 0, nZ)
-    Gŝ = zeros(NT, 0, nd)
-    Jŝ = zeros(NT, 0, nd*Hp)
-    Kŝ = zeros(NT, 0, nx̂)
-    Vŝ = zeros(NT, 0, nu)
-    Bŝ = zeros(NT, 0)
+    nK = nZ - nu*Hc - nx̂*Hp
+    As = estim.As
+    # --- current state estimates x̂0 ---
+    Kŝ = zeros(NT, nxs*Hp, nx̂)
+    Kŝ[1:nxs, nx+1:end] = As
+    # --- previous manipulated inputs lastu0 ---
+    Vŝ = zeros(nxs*Hp, nu)
+    # --- decision variables Z ---
+    zeros_nI = [zeros(NT, nxs, nx) -I]
+    Eŝ = [zeros(NT, nxs*Hp, nu*Hc) repeatdiag(zeros_nI, Hp) zeros(NT, nxs*Hp, nK)]
+    for j=1:Hp-1
+        iRow = (1:nxs) .+ nxs*j
+        iCol = (nx+1:nx̂) .+ nx̂*(j-1) .+ nu*Hc
+        Eŝ[iRow, iCol] = As
+    end
+    # --- current measured disturbances d0 and predictions D̂0 ---
+    Gŝ = zeros(NT, nxs*Hp, nd)
+    Jŝ = zeros(NT, nxs*Hp, nd*Hp)
+    # --- state x̂op and state update f̂op operating points ---
+    Bŝ = zeros(NT, nxs*Hp)
     return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 end
 
 """
     init_defectmat(
-        model::NonLinModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+        model::SimModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
     ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
 
 Return empty matrices for [`InternalModel`](@ref) (state vector is not augmented).
 """
 function init_defectmat(
-    model::NonLinModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+    model::SimModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -812,7 +826,7 @@ function init_matconstraint_mpc(
             A_Wmin;  A_Wmax
             A_x̂min;  A_x̂max;
         ]
-        neq = 0
+        neq = 0 # number of nonlinear equality constraints
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
     i_g = trues(nc)
@@ -830,7 +844,7 @@ function init_matconstraint_mpc(
     else
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, _ , _ , Aeq = args
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax]
-        neq = 0
+        neq = 0 # number of nonlinear equality constraints
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Wmin; i_Wmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
@@ -849,7 +863,7 @@ function init_matconstraint_mpc(
         A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq = args
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax; A_x̂min; A_x̂max]
         nΔŨ, nZ̃ = size(A_ΔŨmin)
-        neq = nZ̃ - nΔŨ
+        neq = nZ̃ - nΔŨ - size(Aeq, 1)  # number of nonlinear equality constraints
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
     i_g = [i_Ymin; i_Ymax; trues(nc)]
@@ -960,7 +974,7 @@ end
 
 @doc raw"""
     linconstrainteq!(
-        mpc::PredictiveController, model::LinModel, transcription::MultipleShooting
+        mpc::PredictiveController, model::LinModel, ::StateEstimator, ::MultipleShooting
     )
 
 Set `beq` vector for the linear model equality constraints (``\mathbf{A_{eq} Z̃ = b_{eq}}``).
@@ -968,7 +982,9 @@ Set `beq` vector for the linear model equality constraints (``\mathbf{A_{eq} Z̃
 Also init ``\mathbf{F_ŝ} = \mathbf{G_ŝ d_0}(k) + \mathbf{J_ŝ D̂_0} + \mathbf{K_ŝ x̂_0}(k) + 
 \mathbf{V_ŝ u_0}(k-1) + \mathbf{B_ŝ}``, see [`init_defectmat`](@ref).
 """
-function linconstrainteq!(mpc::PredictiveController, model::LinModel, ::MultipleShooting)
+function linconstrainteq!(
+    mpc::PredictiveController, model::LinModel, ::StateEstimator, ::MultipleShooting
+)
     Fŝ  = mpc.con.Fŝ
     Fŝ .= mpc.con.Bŝ
     mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0, 1, 1)
@@ -982,7 +998,20 @@ function linconstrainteq!(mpc::PredictiveController, model::LinModel, ::Multiple
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
-linconstrainteq!(::PredictiveController, ::SimModel, ::TranscriptionMethod) = nothing
+
+function linconstrainteq!(
+    mpc::PredictiveController, ::SimModel, ::StateSpace, ::CollocationMethod
+)
+    Fŝ  = mpc.con.Fŝ
+    # the only non-zeros matrices are Eŝ and Kŝ:
+    mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0)
+    mpc.con.beq .= @. -Fŝ
+    linconeq = mpc.optim[:linconstrainteq]
+    JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    return nothing
+end
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::TranscriptionMethod) = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod) = nothing
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
@@ -1420,18 +1449,11 @@ function con_nonlinprogeq!(
         end
         k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
-        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
-        sdnext   = @views  geq[(1 + nx̂*(j-1)     ):(nx̂*(j-1) + nx)]
-        ssnext   = @views  geq[(1 + nx̂*(j-1) + nx):(nx̂*j         )]
+        sdnext   = @views  geq[(1 + nx*(j-1)     ):(nx*(j-1) + nx)]
         x0_Z̃     = @views  x̂0_Z̃[1:nx]
         x0next_Z̃ = @views x̂0next_Z̃[1:nx]
         k̇1, k̇2   = @views k̇[1:nx], k̇[nx+1:2*nx]
-        # ----------------- stochastic defects -----------------------------------------
-        xsnext   = @views x̂0next[nx+1:end]
-        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
-        fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
-        ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- deterministic defects: trapezoidal collocation -------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         if f_threads || h < 1 || j < 2
@@ -1524,7 +1546,7 @@ function con_nonlinprogeq!(
     no, τ = transcription.no, transcription.τ
     Mo, Co, λo = mpc.Mo, mpc.Co, mpc.λo
     nk = get_nk(model, transcription)
-    nx̂_nk = nx̂ + nk
+    nx_nk = nx + nk
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     D̂temp = mpc.buffer.D̂
@@ -1540,18 +1562,11 @@ function con_nonlinprogeq!(
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        x̂0next   = @views    X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
-        scnext   = @views   geq[(1 + nx̂_nk*(j-1)     ):(nx̂_nk*(j-1) + nx)]
-        ssnext   = @views   geq[(1 + nx̂_nk*(j-1) + nx):(nx̂_nk*(j-1) + nx̂)]
-        sk       = @views   geq[(1 + nx̂_nk*(j-1) + nx̂):(nx̂_nk*j         )]
+        scnext   = @views   geq[(1 + nx_nk*(j-1)     ):(nx_nk*(j-1) + nx)]
+        sk       = @views   geq[(1 + nx_nk*(j-1) + nx):(nx_nk*j         )]
         x0_Z̃     = @views     x̂0_Z̃[1:nx]
         x0next_Z̃ = @views x̂0next_Z̃[1:nx]
-        # ----------------- stochastic defects -----------------------------------------
-        xsnext   = @views   x̂0next[nx+1:end]
-        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
-        fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
-        ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- collocation constraint defects -----------------------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         Δk = k̇
