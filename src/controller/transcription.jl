@@ -599,7 +599,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb
+        model::LinModel, estim::StateEstimator, transcription::MultipleShooting, Hp, Hc, nb
     ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects over the predicted states. 
@@ -709,8 +709,8 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::CollocationMethod, Hp, Hc, _
-    ) 
+        model::SimModel, ::StateEstimator, ::TranscriptionMethod, Hp, Hc, _
+    ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects of the stochastic states only.
 
@@ -751,7 +751,7 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     - else ``\mathbf{E_S} = [\begin{smallmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} \end{smallmatrix}]``
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::CollocationMethod, Hp, Hc, _
+    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -780,13 +780,13 @@ end
 
 """
     init_defectmat(
-        model::SimModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+        model::SimModel, estim::InternalModel, ::TranscriptionMethod, Hp, Hc, _
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`InternalModel`](@ref) (state vector is not augmented).
 """
 function init_defectmat(
-    model::SimModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+    model::SimModel, estim::InternalModel{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -801,13 +801,13 @@ end
 
 """
     init_defectmat(
-        model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb
+        model::SimModel, estim::StateEstimator, ::TranscriptionMethod, Hp, Hc, nb
     ) -> ES, GS, JS, KS, VS, BS
 
-Return empty matrices for all other cases (N/A).
+Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
+    model::SimModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, _
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -1042,8 +1042,15 @@ function linconstrainteq!(
     return nothing
 end
 
+"""
+    linconstrainteq!(
+        mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
+    )
+
+Do the same for [`SimModel`](@ref), but using simpler equations (stochastic defects only).
+"""
 function linconstrainteq!(
-    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::CollocationMethod
+    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
 )
     FS  = mpc.con.FS
     # the only non-zeros matrices are ES and KS:
@@ -1053,8 +1060,10 @@ function linconstrainteq!(
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
+"Do nothing for [`InternalModel`](@ref) (state is not augmented)."
 linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::TranscriptionMethod) = nothing
-linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod) = nothing
+"Do nothing for [`SingleShooting`](@ref) (N/A)."
+linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting)      = nothing
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
@@ -1414,7 +1423,8 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     D̂0 = mpc.D̂0
-    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)] 
+    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1423,13 +1433,18 @@ function con_nonlinprogeq!(
             x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
         k        = @views    K[(1 + nk*(j-1)):(nk*j)]
         x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
         ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, k, mpc.estim, model, x̂0_Z̃, u0, d̂0)
+
+        @views xdnext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
+
+    f!(xdnext, k, model, xd, û0, d0, model.p)
+
+
         ŝnext .= @. x̂0next - x̂0next_Z̃
     end
     return geq
