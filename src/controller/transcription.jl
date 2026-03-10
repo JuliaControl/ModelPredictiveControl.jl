@@ -1043,7 +1043,7 @@ function linconstrainteq!(
 end
 
 function linconstrainteq!(
-    mpc::PredictiveController, ::SimModel, ::StateSpace, ::CollocationMethod
+    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::CollocationMethod
 )
     FS  = mpc.con.FS
     # the only non-zeros matrices are ES and KS:
