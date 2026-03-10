@@ -191,8 +191,8 @@ function Base.show(io::IO, mpc::ExplicitMPC)
     print_estim_dim(io, mpc.estim, n)
 end
 
-linconstraint!(::ExplicitMPC, ::LinModel, ::TranscriptionMethod) = nothing
-linconstrainteq!(::ExplicitMPC, ::LinModel, ::StateEstimator, ::TranscriptionMethod) = nothing
+linconstraint!(::ExplicitMPC, ::LinModel, ::SingleShooting) = nothing
+linconstrainteq!(::ExplicitMPC, ::LinModel, ::StateEstimator, ::SingleShooting) = nothing
 
 @doc raw"""
     optim_objective!(mpc::ExplicitMPC) -> Z̃
