@@ -1053,7 +1053,7 @@ function linconstrainteq!(
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
-linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::TranscriptionMethod) = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::CollocationMethod  ) = nothing
 linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod) = nothing
 
 @doc raw"""
