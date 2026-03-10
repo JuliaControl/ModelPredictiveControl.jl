@@ -193,6 +193,7 @@ end
 
 linconstraint!(::ExplicitMPC, ::LinModel, ::SingleShooting) = nothing
 linconstrainteq!(::ExplicitMPC, ::LinModel, ::StateEstimator, ::SingleShooting) = nothing
+linconstrainteq!(::ExplicitMPC, ::LinModel, ::InternalModel, ::SingleShooting)  = nothing
 
 @doc raw"""
     optim_objective!(mpc::ExplicitMPC) -> Z̃
