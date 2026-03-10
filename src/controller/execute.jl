@@ -74,7 +74,7 @@ function moveinput!(
     validate_args(mpc, ry, d, lastu, D̂, R̂y, R̂u)
     initpred!(mpc, mpc.estim.model, ry, d, lastu, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model, mpc.transcription)
-    linconstrainteq!(mpc, mpc.estim.model, mpc.transcription)
+    linconstrainteq!(mpc, mpc.estim.model, mpc.estim, mpc.transcription)
     Z̃ = optim_objective!(mpc)
     return getinput!(mpc, Z̃)
 end
