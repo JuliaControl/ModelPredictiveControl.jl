@@ -853,7 +853,7 @@ end
     nmpc16 = NonLinMPC(nonlinmodel_c, Hp=10, transcription=TrapezoidalCollocation(), nc=10, gc=gc!)
     @test nmpc16.transcription == TrapezoidalCollocation()
     @test length(nmpc16.Z̃) == nonlinmodel_c.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
-    @test nmpc16.con.neq == nmpc16.estim.nx*nmpc16.Hp
+    @test nmpc16.con.neq == nmpc16.estim.model.nx*nmpc16.Hp
     @test nmpc16.con.nc == 10
     nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
         gradient=AutoFiniteDiff(), 
