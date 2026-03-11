@@ -786,17 +786,9 @@ end
 Return empty matrices for [`InternalModel`](@ref) (the state vector is not augmented).
 """
 function init_defectmat(
-    model::SimModel, estim::InternalModel{NT}, transcription::TranscriptionMethod, Hp, Hc, _
-) where {NT<:Real}
-    nx̂, nu, nd = estim.nx̂, model.nu, model.nd
-    nZ = get_nZ(estim, transcription, Hp, Hc)
-    ES = zeros(NT, 0, nZ)
-    GS = zeros(NT, 0, nd)
-    JS = zeros(NT, 0, nd*Hp)
-    KS = zeros(NT, 0, nx̂)
-    VS = zeros(NT, 0, nu)
-    BS = zeros(NT, 0)
-    return ES, GS, JS, KS, VS, BS
+    ::SimModel, estim::InternalModel, transcription::TranscriptionMethod, Hp, Hc, _
+)
+    return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
 
 """
@@ -807,8 +799,21 @@ end
 Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, _
+    ::SimModel, estim::StateEstimator, transcription::SingleShooting, Hp, Hc, _
+)
+    return init_defectmat_empty(estim, transcription, Hp, Hc)
+end
+
+function init_defectmat(
+    ::SimModel, estim::InternalModel, transcription::SingleShooting, Hp, Hc, _
+)
+    return init_defectmat_empty(estim, transcription, Hp, Hc)
+end
+
+function init_defectmat_empty(
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
 ) where {NT<:Real}
+    model = estim.model
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
     ES = zeros(NT, 0, nZ)
