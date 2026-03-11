@@ -1403,21 +1403,26 @@ end
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. The nonlinear 
-equality constraints `geq` only includes the augmented state defects, computed with:
+The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. The defects of the 
+stochastic states are linear equality constraints (see [`init_defectmat`](@ref)). The
+defects of the deterministic states are computed with:
+with:
 ```math
-\mathbf{ŝ}(k+j+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k+j), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j)\Big) 
-                    - \mathbf{x̂_0}(k+j+1)
+\mathbf{ŝ_d}(k+j+1) = \mathbf{f}\Big(\mathbf{x_0}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j)\Big) 
+                      - \mathbf{x_0}(k+j+1)
 ```
-for ``j = 0, 1, ... , H_p-1``, and in which the augmented state ``\mathbf{x̂_0}`` are
-extracted from the decision variables `Z̃`, and ``\mathbf{f̂}`` is the augmented state
-function defined in [`f̂!`](@ref).
+for ``j = 0, 1, ... , H_p-1``, and in which the deterministic state ``\mathbf{x_0}`` are
+extracted from the decision variables `Z̃`, ``\mathbf{f}`` is the deterministic state update
+function [`f!`](@ref), the disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref)
+documentation. The defects of the stochastic states are linear equality constraints (see
+[`init_defectmat`](@ref)).
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K, 
-    mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, U0, Z̃
+    mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
+    U0, Z̃
 )
-    nu, nx̂, nd, nk = model.nu, mpc.estim.nx̂, model.nd, model.nk
+    nx̂, nx, nu, nd, nk = mpc.estim.nx̂, model.nx, model.nu, model.nd, model.nk
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
@@ -1426,25 +1431,19 @@ function con_nonlinprogeq!(
     disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            x0_Z̃ = @views mpc.estim.x̂0[1:nx]
             d̂0   = @views mpc.d0[1:nd]
         else
-            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
+            x0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx + nx̂*(j-2))]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
         k        = @views    K[(1 + nk*(j-1)):(nk*j)]
-        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
-        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k, mpc.estim, model, x̂0_Z̃, u0, d̂0)
-
-        @views xdnext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
-
-    f!(xdnext, k, model, xd, û0, d0, model.p)
-
-
-        ŝnext .= @. x̂0next - x̂0next_Z̃
+        x0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx + nx̂*(j-1))]
+        x0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx + nx̂*(j-1))]
+        sdnext    = @views geq[(1 + nx*(j-1)):(nx*j)]
+        f!(x0next, k, model, x0_Z̃, û0, d̂0, model.p)
+        sdnext .= @. x0next - x0next_Z̃
     end
     return geq
 end
@@ -1458,10 +1457,8 @@ end
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The nonlinear equality
-constraints `geq` includes the defects of the deterministic states only. The stochastic
-states are handled seperatly as linear equality constraints, see [`init_defectmat`](@ref).
-The deterministic state defects are computed with:
+The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The deterministic
+state defects are computed with:
 ```math
 \mathbf{s_d}(k+j+1) = \mathbf{x_0}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
                        - \mathbf{x_0}(k+j+1)                                              
