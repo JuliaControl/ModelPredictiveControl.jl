@@ -232,9 +232,9 @@ matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed wit
             λ_o  &= L_0(1)                                                                        
 \end{aligned}
 ```
-where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values w/o the Y-intercept,
-and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagrange polynomial  ``L_j(τ)`` bases
-are defined as:
+where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values w/o the coefficients
+and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagrange polynomial
+``L_j(τ)`` bases are defined as:
 ```math
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
