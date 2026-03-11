@@ -562,6 +562,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
     # --- objective derivatives ---
     model, optim, con = mpc.estim.model, mpc.optim, mpc.con
+    hess = mpc.hessian
     transcription = mpc.transcription
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
     nk = get_nk(model, transcription)
@@ -588,8 +589,8 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     end
-    if !isnothing(mpc.hessian)
-        _, ∇J_opt, ∇²J_opt = value_gradient_and_hessian(J!, mpc.hessian, mpc.Z̃, J_cache...)
+    if !isnothing(hess)
+        _, ∇J_opt, ∇²J_opt = value_gradient_and_hessian(J!, hess, mpc.Z̃, J_cache...)
     else
         ∇J_opt, ∇²J_opt = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
     end
@@ -605,7 +606,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         return nothing
     end
     g_opt, ∇g_opt = value_and_jacobian(gi!, gi, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    if !isnothing(mpc.hessian) && ngi > 0
+    if !isnothing(hess) && ngi > 0
         nonlincon = optim[:nonlinconstraint]
         λi = try
             JuMP.get_attribute(nonlincon, MOI.LagrangeMultiplier())
@@ -630,7 +631,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             gi .= @views g[i_g]
             return dot(λi, gi)
         end
-        ∇²ℓg_opt = hessian(ℓ_gi, mpc.hessian, mpc.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_opt = hessian(ℓ_gi, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
     else
         ∇²ℓg_opt = nothing
     end
@@ -645,7 +646,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         return nothing
     end
     geq_opt, ∇geq_opt = value_and_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
-    if !isnothing(mpc.hessian) && con.neq > 0
+    if !isnothing(hess) && con.neq > 0
         nonlinconeq = optim[:nonlinconstrainteq]
         λeq = try
             JuMP.get_attribute(nonlinconeq, MOI.LagrangeMultiplier())
@@ -669,7 +670,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λeq, geq)
         end
-        ∇²ℓgeq_opt = hessian(ℓ_geq, mpc.hessian, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_opt = hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
     else
         ∇²ℓgeq_opt = nothing
     end

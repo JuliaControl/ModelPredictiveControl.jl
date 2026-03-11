@@ -188,38 +188,38 @@ function addinfo!(
 ) where NT <:Real
     # --- objective derivatives ---
     optim, con = estim.optim, estim.con
+    hess = estim.hessian
     nx̂, nym, nŷ, nu, nk = estim.nx̂, estim.nym, model.ny, model.nu, model.nk
     He = estim.He
-    nV̂, nX̂, ng = He*nym, He*nx̂, length(con.i_g)
+    i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
+    ng, ngi = length(con.i_g), sum(con.i_g)
+    nV̂, nX̂ = He*nym, He*nx̂
     V̂,  X̂0 = zeros(NT, nV̂), zeros(NT, nX̂)
-    k     = zeros(NT, nk)
+    k      = zeros(NT, nk)
     û0, ŷ0 = zeros(NT, nu), zeros(NT, nŷ)
-    g      = zeros(NT, ng) 
+    g, gi  = zeros(NT, ng), zeros(NT, ngi)
     x̄      = zeros(NT, nx̂)
     J_cache = (
-        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0),
-        Cache(g),
-        Cache(x̄),
+        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), Cache(g), Cache(x̄),
     )
     function J!(Z̃, V̂, X̂0, û0, k, ŷ0, g, x̄)
         update_prediction!(V̂, X̂0, û0, k, ŷ0, g, estim, Z̃)
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
-    if !isnothing(estim.hessian)
-        _, ∇J, ∇²J = value_gradient_and_hessian(J!, estim.hessian, estim.Z̃, J_cache...)
+    if !isnothing(hess)
+        _, ∇J_opt, ∇²J_opt = value_gradient_and_hessian(J!, hess, estim.Z̃, J_cache...)
     else
-        ∇J, ∇²J = gradient(J!, estim.gradient, estim.Z̃, J_cache...), nothing
+        ∇J_opt, ∇²J_opt = gradient(J!, estim.gradient, estim.Z̃, J_cache...), nothing
     end
     # --- inequality constraint derivatives ---
-    old_i_g = copy(estim.con.i_g)
-    estim.con.i_g .= 1 # temporarily set all constraints as finite so g is entirely computed
-    ∇g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0))
-    function g!(g, Z̃, V̂, X̂0, û0, k, ŷ0)
+    ∇g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), Cache(g))
+    function gi!(gi, Z̃, V̂, X̂0, û0, k, ŷ0, g)
         update_prediction!(V̂, X̂0, û0, k, ŷ0, g, estim, Z̃)
+        gi .= @views g[i_g]
         return nothing
     end
-    g, ∇g = value_and_jacobian(g!, g, estim.jacobian, estim.Z̃, ∇g_cache...)
-    if !isnothing(estim.hessian) && any(old_i_g)
+    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, estim.jacobian, estim.Z̃, ∇g_cache...)
+    if !isnothing(hess) && ngi > 0
         nonlincon = optim[:nonlinconstraint]
         λi = try
             JuMP.get_attribute(nonlincon, MOI.LagrangeMultiplier())
@@ -229,33 +229,35 @@ function addinfo!(
                     "The optimizer does not support retrieving optimal Hessian of the Lagrangian.\n"*
                     "Its nonzero coefficients will be random values.", maxlog=1
                 )
-                rand(sum(old_i_g))
+                rand(ngi)
             else
                 rethrow()
             end
         end
-        λ = zeros(NT, ng)
-        λ[old_i_g] .= λi
-        ∇²g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), Cache(g))
-        function ℓ_g(Z̃, λ, V̂, X̂0, û0, k, ŷ0, g)
+        ∇²g_cache = (
+            Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), Cache(g), Cache(gi)
+        )
+        function ℓ_gi(Z̃, λi, V̂, X̂0, û0, k, ŷ0, g, gi)
             update_prediction!(V̂, X̂0, û0, k, ŷ0, g, estim, Z̃)
-            return dot(λ, g)
+            @show size(g)
+            @show size(gi)
+            gi .= @views g[i_g]
+            return dot(λi, gi)
         end
-        ∇²ℓg = hessian(ℓ_g, estim.hessian, estim.Z̃, Constant(λ), ∇²g_cache...)
+        ∇²ℓg_opt = hessian(ℓ_gi, hess, estim.Z̃, Constant(λi), ∇²g_cache...)
     else
-        ∇²ℓg = nothing
+        ∇²ℓg_opt = nothing
     end
-    estim.con.i_g .= old_i_g # restore original finite/infinite constraint indices
-    info[:∇J] = ∇J
-    info[:∇²J] = ∇²J
-    info[:g] = g
-    info[:∇g] = ∇g
-    info[:∇²ℓg] = ∇²ℓg
+    info[:∇J] = ∇J_opt
+    info[:∇²J] = ∇²J_opt
+    info[:g] = g_opt
+    info[:∇g] = ∇g_opt
+    info[:∇²ℓg] = ∇²ℓg_opt
     # --- non-Unicode fields ---
-    info[:nablaJ] = ∇J
-    info[:nabla2J] = ∇²J
-    info[:nablag] = ∇g
-    info[:nabla2lg] = ∇²ℓg
+    info[:nablaJ] = ∇J_opt
+    info[:nabla2J] = ∇²J_opt
+    info[:nablag] = ∇g_opt
+    info[:nabla2lg] = ∇²ℓg_opt
     return info
 end
 
