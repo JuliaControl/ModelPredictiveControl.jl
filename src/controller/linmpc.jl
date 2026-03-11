@@ -73,13 +73,13 @@ struct LinMPC{
             model, estim, transcription, Hp, Hc, nb
         )
         F = zeros(NT, ny*Hp) # dummy value (updated just before optimization)
-        Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
+        ES, GS, JS, KS, VS, BS = init_defectmat(model, estim, transcription, Hp, Hc, nb)
         con, nϵ, P̃Δu, P̃u, Ẽ = init_defaultcon_mpc(
             estim, weights, transcription,
             Hp, Hc, 
             PΔu, Pu, E, 
             ex̂, gx̂, jx̂, kx̂, vx̂, bx̂, 
-            Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ,
+            ES, GS, JS, KS, VS, BS,
             Wy, Wu, Wd, Wr
         )
         H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u)

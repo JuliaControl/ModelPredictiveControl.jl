@@ -27,7 +27,6 @@ ModelPredictiveControl.get_nonlincon_oracle(::MovingHorizonEstimator, ::ModelPre
 ```@docs
 ModelPredictiveControl.f̂!
 ModelPredictiveControl.ĥ!
-ModelPredictiveControl.f̂_input!
 ```
 
 ## Update Quadratic Optimization

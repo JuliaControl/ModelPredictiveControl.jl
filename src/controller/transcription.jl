@@ -600,24 +600,24 @@ end
 @doc raw"""
     init_defectmat(
         model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb
-    ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects over the predicted states. 
 
 Knowing that the decision vector ``\mathbf{Z}`` contains both ``\mathbf{ΔU}`` and 
 ``\mathbf{X̂_0}`` vectors (with a [`MultipleShooting`](@ref) transcription), an equation
-similar to the prediction matrices (see [`init_predmat`](@ref)) computes the defects over
-the predicted states:
+similar to the prediction matrices (see [`init_predmat`](@ref)) computes the defects of
+the estimated states of ``H_p``:
 ```math
 \begin{aligned}
-    \mathbf{Ŝ} &= \mathbf{E_ŝ Z} + \mathbf{G_ŝ d_0}(k)  + \mathbf{J_ŝ D̂_0} 
-                                 + \mathbf{K_ŝ x̂_0}(k)  + \mathbf{V_ŝ u_0}(k-1) 
-                                 + \mathbf{B_ŝ}                                         \\
-               &= \mathbf{E_ŝ Z} + \mathbf{F_ŝ}
+    \mathbf{Ŝ} &= \mathbf{E_S Z} + \mathbf{G_S d_0}(k)  + \mathbf{J_S D̂_0} 
+                                 + \mathbf{K_S x̂_0}(k)  + \mathbf{V_S u_0}(k-1) 
+                                 + \mathbf{B_S}                                         \\
+               &= \mathbf{E_S Z} + \mathbf{F_S}
 \end{aligned}
 ```   
 They are forced to be ``\mathbf{Ŝ = 0}`` using the optimization equality constraints. The
-matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in the Extended Help section.
+matrices ``\mathbf{E_S, G_S, J_S, K_S, V_S, B_S}`` are defined in the Extended Help section.
 
 # Extended Help
 !!! details "Extended Help"
@@ -634,34 +634,34 @@ matrices ``\mathbf{E_ŝ, G_ŝ, J_ŝ, K_ŝ, V_ŝ, B_ŝ}`` are defined in th
     The defect matrices are computed with:
     ```math
     \begin{aligned}
-    \mathbf{E_ŝ} &= \begin{bmatrix}
-        \mathbf{E_{ŝ}^{Δu}} & \mathbf{E_{ŝ}^{x̂}}                                                    \end{bmatrix} \\
-    \mathbf{E_{ŝ}^{Δu}} &= \begin{bmatrix}
+    \mathbf{E_S} &= \begin{bmatrix}
+        \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}}                                                    \end{bmatrix} \\
+    \mathbf{E_{S}^{Δu}} &= \begin{bmatrix}
         \mathbf{Q}(n_1)     & \mathbf{0}          & \cdots & \mathbf{0}                             \\
         \mathbf{Q}(n_2)     & \mathbf{Q}(n_2)     & \cdots & \mathbf{0}                             \\
         \vdots              & \vdots              & \ddots & \vdots                                 \\
         \mathbf{Q}(n_{H_c}) & \mathbf{Q}(n_{H_c}) & \cdots & \mathbf{Q}(n_{H_c})                    \end{bmatrix} \\
-    \mathbf{E_{ŝ}^{x̂}} &= \begin{bmatrix}
-        -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}  &  \mathbf{0}                             \\
-         \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}  &  \mathbf{0}                             \\
-         \vdots     &  \vdots     & \ddots &  \vdots      &  \vdots                                 \\
-         \mathbf{0} &  \mathbf{0} & \cdots &  \mathbf{Â}  & -\mathbf{I}                             \end{bmatrix} \\
-    \mathbf{G_ŝ} &= \begin{bmatrix}
+    \mathbf{E_{S}^{x̂}} &= \begin{bmatrix}
+       -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}  &  \mathbf{0}                              \\
+        \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}  &  \mathbf{0}                              \\
+        \vdots     &  \vdots     & \ddots &  \vdots      &  \vdots                                  \\
+        \mathbf{0} &  \mathbf{0} & \cdots &  \mathbf{Â}  & -\mathbf{I}                              \end{bmatrix} \\
+    \mathbf{G_S} &= \begin{bmatrix}
         \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                          \end{bmatrix} \\
-    \mathbf{J_ŝ} &= \begin{bmatrix}
+    \mathbf{J_S} &= \begin{bmatrix}
         \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                            \\
         \mathbf{B̂_d} & \mathbf{0}   & \cdots & \mathbf{0}   & \mathbf{0}                            \\
         \vdots       & \vdots       & \ddots & \vdots       & \vdots                                \\
         \mathbf{0}   & \mathbf{0}   & \cdots & \mathbf{B̂_d} & \mathbf{0}                            \end{bmatrix} \\
-    \mathbf{K_ŝ} &= \begin{bmatrix}
+    \mathbf{K_S} &= \begin{bmatrix}
         \mathbf{Â} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                            \end{bmatrix} \\
-    \mathbf{V_ŝ} &= \begin{bmatrix}
+    \mathbf{V_S} &= \begin{bmatrix}
         \mathbf{B̂_u} \\ \mathbf{B̂_u} \\ \vdots \\ \mathbf{B̂_u}                                      \end{bmatrix} \\
-    \mathbf{B_ŝ} &= \begin{bmatrix}
+    \mathbf{B_S} &= \begin{bmatrix}
         \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}  \end{bmatrix}
     \end{aligned}
     ```
-    The ``\mathbf{E_ŝ^{Δu}}`` matrix structure is due to the move blocking implementation:
+    The ``\mathbf{E_S^{Δu}}`` matrix structure is due to the move blocking implementation:
     the ``\mathbf{ΔU}`` vector only contains the input increment of the free moves 
     (see [`move_blocking`](@ref)).
 """
@@ -679,38 +679,130 @@ function init_defectmat(
         return Q
     end
     # --- current state estimates x̂0 ---
-    Kŝ = [Â; zeros(NT, nx̂*(Hp-1), nx̂)]
+    KS = [Â; zeros(NT, nx̂*(Hp-1), nx̂)]
     # --- previous manipulated inputs lastu0 ---
-    Vŝ = repeat(B̂u, Hp)
+    VS = repeat(B̂u, Hp)
     # --- decision variables Z ---
     nI_nx̂ = Matrix{NT}(-I, nx̂, nx̂)
-    Eŝ = [zeros(nx̂*Hp, nu*Hc) repeatdiag(nI_nx̂, Hp)]
+    ES = [zeros(NT, nx̂*Hp, nu*Hc) repeatdiag(nI_nx̂, Hp)]
     for j=1:Hc
         iCol = (1:nu) .+ nu*(j-1)
         for i=j:Hc
             ni = nb[i]
             iRow = (1:nx̂*ni) .+ nx̂*sum(nb[1:i-1])
-            Q = @views Eŝ[iRow, iCol]
+            Q = @views ES[iRow, iCol]
             Q!(Q, ni)
         end
     end
     for j=1:Hp-1
         iRow = (1:nx̂) .+ nx̂*j
         iCol = (1:nx̂) .+ nx̂*(j-1) .+ nu*Hc
-        Eŝ[iRow, iCol] = Â
+        ES[iRow, iCol] = Â
     end
     # --- current measured disturbances d0 and predictions D̂0 ---
-    Gŝ = [B̂d; zeros(NT, (Hp-1)*nx̂, nd)]
-    Jŝ = [zeros(nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
+    GS = [B̂d; zeros(NT, nx̂*(Hp-1), nd)]
+    JS = [zeros(NT, nx̂, nd*Hp); repeatdiag(B̂d, Hp-1) zeros(NT, nx̂*(Hp-1), nd)]
     # --- state x̂op and state update f̂op operating points ---
-    Bŝ = repeat(estim.f̂op - estim.x̂op, Hp)
-    return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    BS = repeat(estim.f̂op - estim.x̂op, Hp)
+    return ES, GS, JS, KS, VS, BS
+end
+
+@doc raw"""
+    init_defectmat(
+        model::SimModel, estim::StateEstimator, transcription::CollocationMethod, Hp, Hc, _
+    ) 
+
+Init the matrices for computing the defects of the stochastic states only.
+
+The documentation of [`init_estimstoch`](@ref) shows that the stochastic model of the 
+unmeasured disturbances is linear and discrete-time. The defect of the stochastic states
+over ``H_p`` is therefore:
+```math
+\begin{aligned}
+    \mathbf{Ŝ_s} &= \mathbf{E_S Z} + \mathbf{K_S x̂_0}(k)  \\
+                 &= \mathbf{E_S Z} + \mathbf{F_S}
+\end{aligned}
+```   
+The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    Using the stochastic matrix ``\mathbf{A_s}`` in `estim` (see [`init_estimstoch`](@ref)),
+    the defect matrices are computed with:
+    ```math
+    \begin{aligned}
+    \mathbf{E_{S}^{Δu}} &= \mathbf{0}                                                                           \\
+    \mathbf{E_{S}^{x̂}}  &= \begin{bmatrix}
+        \mathbf{0} &-\mathbf{I}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
+        \mathbf{0} & \mathbf{A_s} & \mathbf{0} &-\mathbf{I} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
+        \vdots     & \vdots       & \vdots     & \vdots     & \ddots & \vdots       & \vdots     & \vdots       \\
+        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{A_s} & \mathbf{0} &-\mathbf{I}   \end{bmatrix} \\
+    \mathbf{E_{S}^{k}} &= \mathbf{0}                                                                            \\
+    \mathbf{K_S}       &= \begin{bmatrix}
+        \mathbf{0} & \mathbf{A_s}                                                                               \\                                          
+        \mathbf{0} & \mathbf{0}                                                                                 \\   
+        \vdots     & \vdots                                                                                     \\
+        \mathbf{0} & \mathbf{0}                                                                                 \end{bmatrix}
+    \end{aligned}
+    ```
+    and:
+    - if `transcription` is an [`OrthogonalCollocation`](@ref), ``\mathbf{E_S} = [\begin{smallmatrix} 
+      \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} & \mathbf{E_{S}^{k}} \end{smallmatrix}]``
+    - else ``\mathbf{E_S} = [\begin{smallmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} \end{smallmatrix}]``
+"""
+function init_defectmat(
+    model::SimModel, estim::StateEstimator{NT}, transcription::CollocationMethod, Hp, Hc, _
+) where {NT<:Real}
+    nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nK = nZ - nu*Hc - nx̂*Hp
+    As = estim.As
+    # --- current state estimates x̂0 ---
+    KS = zeros(NT, nxs*Hp, nx̂)
+    KS[1:nxs, nx+1:end] = As
+    # --- previous manipulated inputs lastu0 ---
+    VS = zeros(nxs*Hp, nu)
+    # --- decision variables Z ---
+    zeros_nI = [zeros(NT, nxs, nx) -I]
+    ES = [zeros(NT, nxs*Hp, nu*Hc) repeatdiag(zeros_nI, Hp) zeros(NT, nxs*Hp, nK)]
+    for j=1:Hp-1
+        iRow = (1:nxs) .+ nxs*j
+        iCol = (nx+1:nx̂) .+ nx̂*(j-1) .+ nu*Hc
+        ES[iRow, iCol] = As
+    end
+    # --- current measured disturbances d0 and predictions D̂0 ---
+    GS = zeros(NT, nxs*Hp, nd)
+    JS = zeros(NT, nxs*Hp, nd*Hp)
+    # --- state x̂op and state update f̂op operating points ---
+    BS = zeros(NT, nxs*Hp)
+    return ES, GS, JS, KS, VS, BS
+end
+
+"""
+    init_defectmat(
+        model::SimModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+    ) -> ES, GS, JS, KS, VS, BS
+
+Return empty matrices for [`InternalModel`](@ref) (state vector is not augmented).
+"""
+function init_defectmat(
+    model::SimModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+) where {NT<:Real}
+    nx̂, nu, nd = estim.nx̂, model.nu, model.nd
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    ES = zeros(NT, 0, nZ)
+    GS = zeros(NT, 0, nd)
+    JS = zeros(NT, 0, nd*Hp)
+    KS = zeros(NT, 0, nx̂)
+    VS = zeros(NT, 0, nu)
+    BS = zeros(NT, 0)
+    return ES, GS, JS, KS, VS, BS
 end
 
 """
     init_defectmat(
         model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb
-    ) -> Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for all other cases (N/A).
 """
@@ -719,13 +811,13 @@ function init_defectmat(
 ) where {NT<:Real}
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
-    Eŝ = zeros(NT, 0, nZ)
-    Gŝ = zeros(NT, 0, nd)
-    Jŝ = zeros(NT, 0, nd*Hp)
-    Kŝ = zeros(NT, 0, nx̂)
-    Vŝ = zeros(NT, 0, nu)
-    Bŝ = zeros(NT, 0)
-    return Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ
+    ES = zeros(NT, 0, nZ)
+    GS = zeros(NT, 0, nd)
+    JS = zeros(NT, 0, nd*Hp)
+    KS = zeros(NT, 0, nx̂)
+    VS = zeros(NT, 0, nu)
+    BS = zeros(NT, 0)
+    return ES, GS, JS, KS, VS, BS
 end
 
 @doc raw"""
@@ -751,7 +843,7 @@ The argument `nc` is the number of custom nonlinear inequality constraints in
 finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
 also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a 
 case, `args`  needs to contain all the inequality and equality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂min, A_x̂max, A_ŝ`. 
+`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq`. 
 The integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
@@ -768,7 +860,7 @@ function init_matconstraint_mpc(
             A_Ymin,  A_Ymax, 
             A_Wmin,  A_Wmax,
             A_x̂min,  A_x̂max,  
-            A_ŝ
+            Aeq
         ) = args
         A = [
             A_Umin;  A_Umax; 
@@ -777,8 +869,7 @@ function init_matconstraint_mpc(
             A_Wmin;  A_Wmax
             A_x̂min;  A_x̂max;
         ]
-        Aeq = A_ŝ
-        neq = 0
+        neq = 0 # number of nonlinear equality constraints
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
     i_g = trues(nc)
@@ -794,10 +885,9 @@ function init_matconstraint_mpc(
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, _ , _ , A_ŝ = args
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, _ , _ , Aeq = args
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax]
-        Aeq = A_ŝ
-        neq = 0
+        neq = 0 # number of nonlinear equality constraints
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Wmin; i_Wmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
@@ -813,11 +903,10 @@ function init_matconstraint_mpc(
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else    
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, A_x̂min, A_x̂max, A_ŝ = args
+        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq = args
         A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax; A_x̂min; A_x̂max]
-        Aeq = A_ŝ
         nΔŨ, nZ̃ = size(A_ΔŨmin)
-        neq = nZ̃ - nΔŨ
+        neq = nZ̃ - nΔŨ - size(Aeq, 1)  # number of nonlinear equality constraints
     end
     i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
     i_g = [i_Ymin; i_Ymax; trues(nc)]
@@ -928,29 +1017,44 @@ end
 
 @doc raw"""
     linconstrainteq!(
-        mpc::PredictiveController, model::LinModel, transcription::MultipleShooting
+        mpc::PredictiveController, model::LinModel, ::StateEstimator, ::MultipleShooting
     )
 
 Set `beq` vector for the linear model equality constraints (``\mathbf{A_{eq} Z̃ = b_{eq}}``).
 
-Also init ``\mathbf{F_ŝ} = \mathbf{G_ŝ d_0}(k) + \mathbf{J_ŝ D̂_0} + \mathbf{K_ŝ x̂_0}(k) + 
-\mathbf{V_ŝ u_0}(k-1) + \mathbf{B_ŝ}``, see [`init_defectmat`](@ref).
+Also init ``\mathbf{F_S} = \mathbf{G_S d_0}(k) + \mathbf{J_S D̂_0} + \mathbf{K_S x̂_0}(k) + 
+\mathbf{V_S u_0}(k-1) + \mathbf{B_S}``, see [`init_defectmat`](@ref).
 """
-function linconstrainteq!(mpc::PredictiveController, model::LinModel, ::MultipleShooting)
-    Fŝ  = mpc.con.Fŝ
-    Fŝ .= mpc.con.Bŝ
-    mul!(Fŝ, mpc.con.Kŝ, mpc.estim.x̂0, 1, 1)
-    mul!(Fŝ, mpc.con.Vŝ, mpc.lastu0, 1, 1)
+function linconstrainteq!(
+    mpc::PredictiveController, model::LinModel, ::StateEstimator, ::MultipleShooting
+)
+    FS  = mpc.con.FS
+    FS .= mpc.con.BS
+    mul!(FS, mpc.con.KS, mpc.estim.x̂0, 1, 1)
+    mul!(FS, mpc.con.VS, mpc.lastu0, 1, 1)
     if model.nd > 0
-        mul!(Fŝ, mpc.con.Gŝ, mpc.d0, 1, 1)
-        mul!(Fŝ, mpc.con.Jŝ, mpc.D̂0, 1, 1)
+        mul!(FS, mpc.con.GS, mpc.d0, 1, 1)
+        mul!(FS, mpc.con.JS, mpc.D̂0, 1, 1)
     end
-    mpc.con.beq .= @. -Fŝ
+    mpc.con.beq .= @. -FS
     linconeq = mpc.optim[:linconstrainteq]
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
-linconstrainteq!(::PredictiveController, ::SimModel, ::TranscriptionMethod) = nothing
+
+function linconstrainteq!(
+    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::CollocationMethod
+)
+    FS  = mpc.con.FS
+    # the only non-zeros matrices are ES and KS:
+    mul!(FS, mpc.con.KS, mpc.estim.x̂0)
+    mpc.con.beq .= @. -FS
+    linconeq = mpc.optim[:linconstrainteq]
+    JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    return nothing
+end
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::CollocationMethod  ) = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod) = nothing
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
@@ -1341,20 +1445,16 @@ end
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
 The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The nonlinear equality
-constraints `geq` only includes the state defects. The deterministic and stochastic states
-are handled separately since collocation methods require continuous-time state-space models,
-and the stochastic model of the unmeasured disturbances is discrete-time. The deterministic
-and stochastic defects are respectively computed with:
+constraints `geq` includes the defects of the deterministic states only. The stochastic
+states are handled seperatly as linear equality constraints, see [`init_defectmat`](@ref).
+The deterministic state defects are computed with:
 ```math
-\begin{aligned}
-\mathbf{s_d}(k+j+1) &= \mathbf{x_0}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
-                       - \mathbf{x_0}(k+j+1)                                                \\
-\mathbf{s_s}(k+j+1) &= \mathbf{A_s x_s}(k+j) - \mathbf{x_s}(k+j+1)
-\end{aligned}
+\mathbf{s_d}(k+j+1) = \mathbf{x_0}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
+                       - \mathbf{x_0}(k+j+1)                                              
 ```
-for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x_0}`` and ``\mathbf{x_s}`` are the
-deterministic and stochastic states extracted from the decision variables `Z̃`. The
-``\mathbf{k̇}`` coefficients are  evaluated from the continuous-time function `model.f!` and:
+for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x_0}`` is the deterministic state
+extracted from the decision variables `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated
+from the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
 \mathbf{k̇}_1(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
@@ -1362,7 +1462,7 @@ deterministic and stochastic states extracted from the decision variables `Z̃`.
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
-is defined in [`f̂_input!`](@ref).
+is defined in [`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K̇, 
@@ -1377,11 +1477,7 @@ function con_nonlinprogeq!(
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and û0next are needed):
-        x̂0_Z̃ =   @views j < 1 ? mpc.estim.x̂0[1:nx̂] : X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
-        u0, û0 = @views U0[(1 + nu*j):(nu*(j+1))],  Û0[(1 + nu*j):(nu*(j+1))]
-        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
-    end
+    disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1392,19 +1488,11 @@ function con_nonlinprogeq!(
         end
         k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
-        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
-        sdnext   = @views  geq[(1 + nx̂*(j-1)     ):(nx̂*(j-1) + nx)]
-        ssnext   = @views  geq[(1 + nx̂*(j-1) + nx):(nx̂*j         )]
+        sdnext   = @views  geq[(1 + nx*(j-1)     ):(nx*(j-1) + nx)]
         x0_Z̃     = @views  x̂0_Z̃[1:nx]
         x0next_Z̃ = @views x̂0next_Z̃[1:nx]
         k̇1, k̇2   = @views k̇[1:nx], k̇[nx+1:2*nx]
-        # ----------------- stochastic defects -----------------------------------------
-        xsnext   = @views x̂0next[nx+1:end]
-        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
-        fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
-        ssnext .= @. xsnext - xsnext_Z̃
-        # ----------------- deterministic defects: trapezoidal collocation -------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
@@ -1468,9 +1556,9 @@ and disturbances are piecewise constant or linear:
 \mathbf{d̂}_i(k+j) &= (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)                      
 \end{aligned}
 ```
-The disturbed input ``\mathbf{û_0}(k+j)`` is defined in [`f̂_input!`](@ref). The defects for
-the stochastic states ``\mathbf{s_s}`` are computed as the [`TrapezoidalCollocation`](@ref)
-method, and the ones for the continuity constraint of the deterministic states are:
+The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref). The defects of the 
+stochastic states are linear equality constraints (see [`init_defectmat`](@ref)), and the 
+ones for the continuity constraint of the deterministic states are:
 ```math
 \mathbf{s_c}(k+j+1) 
     = \mathbf{C_o} \begin{bmatrix}                                          
@@ -1496,15 +1584,11 @@ function con_nonlinprogeq!(
     no, τ = transcription.no, transcription.τ
     Mo, Co, λo = mpc.Mo, mpc.Co, mpc.λo
     nk = get_nk(model, transcription)
-    nx̂_nk = nx̂ + nk
+    nx_nk = nx + nk
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     D̂temp = mpc.buffer.D̂
-    for j=0:Hp-1 # prefilling Û0 to avoid race-condition (both û0 and û0next are needed):
-        x̂0_Z̃ =   @views j < 1 ? mpc.estim.x̂0[1:nx̂] : X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)] 
-        u0, û0 = @views U0[(1 + nu*j):(nu*(j+1))],  Û0[(1 + nu*j):(nu*(j+1))]
-        f̂_input!(û0, mpc.estim, model, x̂0_Z̃, u0)
-    end
+    disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
@@ -1516,18 +1600,11 @@ function con_nonlinprogeq!(
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        x̂0next   = @views    X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
-        scnext   = @views   geq[(1 + nx̂_nk*(j-1)     ):(nx̂_nk*(j-1) + nx)]
-        ssnext   = @views   geq[(1 + nx̂_nk*(j-1) + nx):(nx̂_nk*(j-1) + nx̂)]
-        sk       = @views   geq[(1 + nx̂_nk*(j-1) + nx̂):(nx̂_nk*j         )]
+        scnext   = @views   geq[(1 + nx_nk*(j-1)     ):(nx_nk*(j-1) + nx)]
+        sk       = @views   geq[(1 + nx_nk*(j-1) + nx):(nx_nk*j         )]
         x0_Z̃     = @views     x̂0_Z̃[1:nx]
         x0next_Z̃ = @views x̂0next_Z̃[1:nx]
-        # ----------------- stochastic defects -----------------------------------------
-        xsnext   = @views   x̂0next[nx+1:end]
-        xsnext_Z̃ = @views x̂0next_Z̃[nx+1:end]
-        fs!(x̂0next, mpc.estim, model, x̂0_Z̃)
-        ssnext .= @. xsnext - xsnext_Z̃
         # ----------------- collocation constraint defects -----------------------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         Δk = k̇

@@ -74,7 +74,7 @@ function moveinput!(
     validate_args(mpc, ry, d, lastu, D̂, R̂y, R̂u)
     initpred!(mpc, mpc.estim.model, ry, d, lastu, D̂, R̂y, R̂u)
     linconstraint!(mpc, mpc.estim.model, mpc.transcription)
-    linconstrainteq!(mpc, mpc.estim.model, mpc.transcription)
+    linconstrainteq!(mpc, mpc.estim.model, mpc.estim, mpc.transcription)
     Z̃ = optim_objective!(mpc)
     return getinput!(mpc, Z̃)
 end
@@ -312,7 +312,36 @@ function predictstoch!(Ŷs, mpc::PredictiveController, estim::InternalModel)
     return nothing
 end
 "Fill `Ŷs` vector with 0 values when `estim` is not an [`InternalModel`](@ref)."
-predictstoch!(Ŷs, mpc::PredictiveController, ::StateEstimator) = (Ŷs .= 0; nothing)
+predictstoch!(Ŷs, ::PredictiveController, ::StateEstimator) = (Ŷs .= 0; nothing)
+
+"""
+    disturbedinput!(Û0, mpc::PredictiveController, estim::StateEstimator, U0, X̂0) -> nothing
+
+Fill disturbed inputs of the augmented model `Û0` in-place with stochastic states in `X̂0`
+
+Both `Û0` and `U0` variables include deviation vectors from ``k+0`` to ``k+H_p-1``. The
+predicted states `X̂0` include deviation vectors from ``k+1`` to ``k+H_p-1`` (the current one
+is stored in `estim.x̂0`).
+
+This function is used for the collocation methods that directly call the state derivative 
+function `estim.model.f!` with the manipulated inputs augmented with the estimated 
+disturbances at model input (see [`init_estimstoch`](@ref)). It's also necessary to prefill
+the `Û0` vector before anything since both `û0` and `û0next` are needed at each stage with
+hold order `h>0`, thus potential race conditions with multi-threading.
+"""
+function disturbedinput!(Û0, mpc::PredictiveController, estim::StateEstimator, U0, X̂0)
+    nu, nx, nx̂ = estim.model.nu, estim.model.nx, estim.nx̂
+    Cs_u = estim.Cs_u
+    Û0 .= U0                            
+    for j=0:mpc.Hp-1
+        xs = @views j < 1 ? estim.x̂0[(nx+1):(nx̂)] : X̂0[(nx+1+nx̂*(j-1)):(nx̂*j)] 
+        û0 = @views Û0[(1+nu*j):(nu*(j+1))]
+        mul!(û0, Cs_u, xs, 1, 1)                    # û0 = u0 + Cs_u*xs               
+    end
+    return nothing
+end
+"No input disturbances for [`InternalModel`](@ref), hence do `Û0 .= U0`."
+disturbedinput!(Û0, ::PredictiveController, ::InternalModel, U0, _) = (Û0 .= U0; nothing)
 
 @doc raw"""
     linconstraint_custom!(mpc::PredictiveController, model::SimModel)
@@ -690,14 +719,14 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.vx̂ .= vx̂
     con.bx̂ .= bx̂
     # --- defect matrices ---
-    Eŝ, Gŝ, Jŝ, Kŝ, Vŝ, Bŝ = init_defectmat(model, estim, transcription, Hp, Hc, nb)
-    A_ŝ, Ẽŝ = augmentdefect(Eŝ, mpc.nϵ)
-    con.Ẽŝ .= Ẽŝ
-    con.Gŝ .= Gŝ
-    con.Jŝ .= Jŝ
-    con.Kŝ .= Kŝ
-    con.Vŝ .= Vŝ
-    con.Bŝ .= Bŝ
+    ES, GS, JS, KS, VS, BS = init_defectmat(model, estim, transcription, Hp, Hc, nb)
+    Aeq, ẼS = augmentdefect(ES, mpc.nϵ)
+    con.ẼS .= ẼS
+    con.GS .= GS
+    con.JS .= JS
+    con.KS .= KS
+    con.VS .= VS
+    con.BS .= BS
     # --- custom linear constraints ---
     con.Ẽw .= Ẽw
     # --- linear inequality constraints ---
@@ -718,8 +747,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
         con.A_x̂max
     ]
     # --- linear equality constraints ---
-    con.A_ŝ .= A_ŝ
-    con.Aeq .= A_ŝ
+    con.Aeq .= Aeq
     # --- operating points ---
     con.U0min .+= mpc.Uop # convert U0 to U with the old operating point
     con.U0max .+= mpc.Uop # convert U0 to U with the old operating point
