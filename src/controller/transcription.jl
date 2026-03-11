@@ -1050,8 +1050,9 @@ end
 Do the same for [`SimModel`](@ref), but using simpler equations (stochastic defects only).
 """
 function linconstrainteq!(
-    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
+    mpc::PredictiveController, ::SimModel, estim::StateEstimator, ::TranscriptionMethod
 )
+    (estim.nxs < 1) && return nothing # no stochastic state ⟹ no linear eq. constraint
     FS  = mpc.con.FS
     # the only non-zeros matrices are ES and KS:
     mul!(FS, mpc.con.KS, mpc.estim.x̂0)
@@ -1061,7 +1062,7 @@ function linconstrainteq!(
     return nothing
 end
 linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::TranscriptionMethod) = nothing
-linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod) = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting)      = nothing
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
