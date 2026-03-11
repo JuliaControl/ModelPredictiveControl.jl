@@ -1060,10 +1060,8 @@ function linconstrainteq!(
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
-"Do nothing for [`InternalModel`](@ref) (state is not augmented)."
 linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::TranscriptionMethod) = nothing
-"Do nothing for [`SingleShooting`](@ref) (N/A)."
-linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting)      = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod) = nothing
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
