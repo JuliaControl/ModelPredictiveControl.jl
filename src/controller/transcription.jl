@@ -1450,15 +1450,14 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K̇
+        geq, _ , Û0, K̇
         mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
         U0, Z̃
     ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The deterministic
-state defects are computed with:
+The deterministic state defects are computed with:
 ```math
 \mathbf{s_d}(k+j+1) = \mathbf{x_0}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
                        - \mathbf{x_0}(k+j+1)                                              
@@ -1527,16 +1526,15 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K̇, 
+        geq, _ , Û0, K̇, 
         mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
         U0, Z̃
     ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The defects between
-the deterministic state derivative at the ``n_o`` collocation points and the model dynamics
-are computed by:
+The defects between the deterministic state derivative at the ``n_o`` collocation points and
+the model dynamics are computed by:
 ```math
 \mathbf{s_k}(k+j)                                                                                 
     = \mathbf{M_o} \begin{bmatrix}                                          
@@ -1583,7 +1581,7 @@ for ``j = 0, 1, ... , H_p-1``. The differentiation matrix ``\mathbf{M_o}``, the 
 matrix ``\mathbf{C_o}`` and the coefficient ``λ_o`` are introduced in [`init_orthocolloc`](@ref).
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K̇,  
+    geq, _ , Û0, K̇,  
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
