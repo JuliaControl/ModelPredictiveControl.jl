@@ -783,7 +783,7 @@ end
         model::SimModel, estim::InternalModel, ::TranscriptionMethod, Hp, Hc, _
     ) -> ES, GS, JS, KS, VS, BS
 
-Return empty matrices for [`InternalModel`](@ref) (state vector is not augmented).
+Return empty matrices for [`InternalModel`](@ref) (the state vector is not augmented).
 """
 function init_defectmat(
     model::SimModel, estim::InternalModel{NT}, transcription::TranscriptionMethod, Hp, Hc, _
@@ -1061,7 +1061,9 @@ function linconstrainteq!(
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
+"No linear equality constraints for [`InternalModel`](@ref) (state is not augmented)."
 linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::TranscriptionMethod) = nothing
+"No linear equality constraints for [`SingleShooting`(@ref) (N/A).]"
 linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting)      = nothing
 
 @doc raw"""
