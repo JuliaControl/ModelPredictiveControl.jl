@@ -1375,9 +1375,7 @@ function get_nonlinobj_op(
     end
     Z̃_J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     J_cache = (
-        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0),
-        Cache(g),
-        Cache(x̄),
+        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), Cache(g), Cache(x̄),
     )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
     estim.Nk[] = He
@@ -1466,7 +1464,7 @@ function get_nonlincon_oracle(
     He = estim.He
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(con.i_g), sum(con.i_g)
-    nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
+    nV̂, nX̂, nZ̃ = He*nym, He*nx̂, length(estim.Z̃)
     strict = Val(true)
     myNaN, myInf                     = convert(JNT, NaN), convert(JNT, Inf)
     V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)

@@ -554,30 +554,32 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     Ue = [U; U[(end - mpc.estim.model.nu + 1):end]]
     Ŷe = [ŷ; Ŷ]
     D̂e = [d; D̂] 
-    JE = mpc.JE(Ue, Ŷe, D̂e, mpc.p, ϵ)
-    LHS = Vector{NT}(undef, mpc.con.nc)
-    mpc.con.gc!(LHS, Ue, Ŷe, D̂e, mpc.p, ϵ)
-    info[:JE]  = JE 
-    info[:gc] = LHS
+    JE_opt = mpc.JE(Ue, Ŷe, D̂e, mpc.p, ϵ)
+    gc_opt = Vector{NT}(undef, mpc.con.nc)
+    mpc.con.gc!(gc_opt, Ue, Ŷe, D̂e, mpc.p, ϵ)
+    info[:JE]  = JE_opt
+    info[:gc] = gc_opt
     info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
     # --- objective derivatives ---
     model, optim, con = mpc.estim.model, mpc.optim, mpc.con
+    hess = mpc.hessian
     transcription = mpc.transcription
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
     nk = get_nk(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
-    ng = length(con.i_g)
+    i_g = findall(mpc.con.i_g) # convert to non-logical indices for non-allocating @views
+    ng, ngi = length(mpc.con.i_g), sum(mpc.con.i_g)
     nc, neq = con.nc, con.neq
     nU, nŶ, nX̂, nK = mpc.Hp*nu, Hp*ny, Hp*nx̂, Hp*nk
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
     ΔŨ     = zeros(NT, nΔŨ)
     x̂0end  = zeros(NT, nx̂)
     K     = zeros(NT, nK)
-    Ue, Ŷe = zeros(NT, nUe), zeros(NT, nŶe)
-    U0, Ŷ0 = zeros(NT, nU),  zeros(NT, nŶ)
-    Û0, X̂0 = zeros(NT, nU),  zeros(NT, nX̂)
-    gc, g  = zeros(NT, nc),  zeros(NT, ng)
-    geq    = zeros(NT, neq)
+    Ue, Ŷe  = zeros(NT, nUe), zeros(NT, nŶe)
+    U0, Ŷ0  = zeros(NT, nU),  zeros(NT, nŶ)
+    Û0, X̂0  = zeros(NT, nU),  zeros(NT, nX̂)
+    gc, g   = zeros(NT, nc),  zeros(NT, ng)
+    gi, geq = zeros(NT, ngi), zeros(NT, neq)
     J_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K), Cache(X̂0), 
@@ -587,25 +589,24 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     end
-    if !isnothing(mpc.hessian)
-        _, ∇J, ∇²J = value_gradient_and_hessian(J!, mpc.hessian, mpc.Z̃, J_cache...)
+    if !isnothing(hess)
+        _, ∇J_opt, ∇²J_opt = value_gradient_and_hessian(J!, hess, mpc.Z̃, J_cache...)
     else
-        ∇J, ∇²J = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
+        ∇J_opt, ∇²J_opt = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
     end
     # --- inequality constraint derivatives ---
-    old_i_g = copy(con.i_g)
-    con.i_g .= 1 # temporarily set all constraints as finite so g is entirely computed
     ∇g_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K), Cache(X̂0), 
-        Cache(gc), Cache(geq),
+        Cache(gc), Cache(geq), Cache(g)
     )
-    function g!(g, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, geq)
+    function gi!(gi, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, geq, g)
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
+        gi .= @views g[i_g]
         return nothing
     end
-    g, ∇g = value_and_jacobian(g!, g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    if !isnothing(mpc.hessian) && any(old_i_g)
+    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, mpc.jacobian, mpc.Z̃, ∇g_cache...)
+    if !isnothing(hess) && ngi > 0
         nonlincon = optim[:nonlinconstraint]
         λi = try
             JuMP.get_attribute(nonlincon, MOI.LagrangeMultiplier())
@@ -615,27 +616,25 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
                     "The optimizer does not support retrieving optimal Hessian of the Lagrangian.\n"*
                     "Its nonzero coefficients will be random values.", maxlog=1
                 )
-                rand(sum(old_i_g))
+                rand(ngi)
             else
                 rethrow()
             end
         end
-        λ = zeros(NT, ng)
-        λ[old_i_g] = λi
         ∇²g_cache = (
             Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
             Cache(Û0), Cache(K), Cache(X̂0), 
-            Cache(gc), Cache(geq), Cache(g)
+            Cache(gc), Cache(geq), Cache(g), Cache(gi)
         )
-        function ℓ_g(Z̃, λ, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, geq, g)
+        function ℓ_gi(Z̃, λi, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, geq, g, gi)
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
-            return dot(λ, g)
+            gi .= @views g[i_g]
+            return dot(λi, gi)
         end
-        ∇²ℓg = hessian(ℓ_g, mpc.hessian, mpc.Z̃, Constant(λ), ∇²g_cache...)
+        ∇²ℓg_opt = hessian(ℓ_gi, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
     else
-        ∇²ℓg = nothing
+        ∇²ℓg_opt = nothing
     end
-    con.i_g .= old_i_g # restore original finite/infinite constraint indices
     # --- equality constraint derivatives ---
     geq_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
@@ -646,8 +645,8 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return nothing
     end
-    geq, ∇geq = value_and_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
-    if !isnothing(mpc.hessian) && con.neq > 0
+    geq_opt, ∇geq_opt = value_and_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
+    if !isnothing(hess) && con.neq > 0
         nonlinconeq = optim[:nonlinconstrainteq]
         λeq = try
             JuMP.get_attribute(nonlinconeq, MOI.LagrangeMultiplier())
@@ -671,25 +670,25 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λeq, geq)
         end
-        ∇²ℓgeq = hessian(ℓ_geq, mpc.hessian, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_opt = hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
     else
-        ∇²ℓgeq = nothing
+        ∇²ℓgeq_opt = nothing
     end
-    info[:∇J] = ∇J
-    info[:∇²J] = ∇²J
-    info[:g] = g
-    info[:∇g] = ∇g
-    info[:∇²ℓg] = ∇²ℓg
-    info[:geq] = geq
-    info[:∇geq] = ∇geq
-    info[:∇²ℓgeq] = ∇²ℓgeq
+    info[:∇J] = ∇J_opt
+    info[:∇²J] = ∇²J_opt
+    info[:g] = g_opt
+    info[:∇g] = ∇g_opt
+    info[:∇²ℓg] = ∇²ℓg_opt
+    info[:geq] = geq_opt
+    info[:∇geq] = ∇geq_opt
+    info[:∇²ℓgeq] = ∇²ℓgeq_opt
     # --- non-Unicode fields ---
-    info[:nablaJ] = ∇J
-    info[:nabla2J] = ∇²J
-    info[:nablag] = ∇g
-    info[:nabla2lg] = ∇²ℓg
-    info[:nablageq] = ∇geq
-    info[:nabla2lgeq] = ∇²ℓgeq
+    info[:nablaJ] = ∇J_opt
+    info[:nabla2J] = ∇²J_opt
+    info[:nablag] = ∇g_opt
+    info[:nabla2lg] = ∇²ℓg_opt
+    info[:nablageq] = ∇geq_opt
+    info[:nabla2lgeq] = ∇²ℓgeq_opt
     return info
 end
 
