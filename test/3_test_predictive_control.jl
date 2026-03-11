@@ -847,14 +847,14 @@ end
     nmpc16 = NonLinMPC(nonlinmodel, Hp=10, transcription=MultipleShooting(), nc=10, gc=gc!)
     @test nmpc16.transcription == MultipleShooting()
     @test length(nmpc16.Z̃) == nonlinmodel.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
-    @test nmpc16.con.neq == nmpc16.estim.nx̂*nmpc16.Hp
-    @test nmpc16.con.nc == 10
-    nonlinmodel_c = NonLinModel((ẋ,x,u,_,_)->ẋ .= -0.1x .+ u, (y,x,_,_)->y.=x, 1, 1, 1, 1)
-    nmpc16 = NonLinMPC(nonlinmodel_c, Hp=10, transcription=TrapezoidalCollocation(), nc=10, gc=gc!)
-    @test nmpc16.transcription == TrapezoidalCollocation()
-    @test length(nmpc16.Z̃) == nonlinmodel_c.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
     @test nmpc16.con.neq == nmpc16.estim.model.nx*nmpc16.Hp
     @test nmpc16.con.nc == 10
+    nonlinmodel_c = NonLinModel((ẋ,x,u,_,_)->ẋ .= -0.1x .+ u, (y,x,_,_)->y.=x, 1, 1, 1, 1)
+    nmpc17 = NonLinMPC(nonlinmodel_c, Hp=10, transcription=TrapezoidalCollocation(), nc=10, gc=gc!)
+    @test nmpc17.transcription == TrapezoidalCollocation()
+    @test length(nmpc17.Z̃) == nonlinmodel_c.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
+    @test nmpc17.con.neq == nmpc17.estim.model.nx*nmpc17.Hp
+    @test nmpc17.con.nc == 10
     nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
         gradient=AutoFiniteDiff(), 
         jacobian=AutoFiniteDiff(),
