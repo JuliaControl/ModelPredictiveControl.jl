@@ -1548,9 +1548,9 @@ the model dynamics are computed by:
 ```
 for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` vectors are
 extracted from the decision variable `Z̃`. The ``\mathbf{x̂_d}`` vectors are the
-deterministic states extracted from ``\mathbf{X̂_̂0}`` in the decision vector `Z̃`. The
-``\mathbf{k̇}_i`` derivative for the ``i``th collocation point is computed from the
-continuous-time function `model.f!` and:
+deterministic states extracted from ``\mathbf{X̂_̂0}`` also in `Z̃`, and they correspond to the
+states at the beginning of the interval ``τ_0=0``. The ``\mathbf{k̇}_i`` derivative for the
+``i``th collocation point is computed from the continuous-time function `model.f!` and:
 ```math
 \mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_i}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
 ```
