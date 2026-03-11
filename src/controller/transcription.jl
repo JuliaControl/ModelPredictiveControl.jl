@@ -232,9 +232,9 @@ matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed wit
             λ_o  &= L_0(1)                                                                        
 \end{aligned}
 ```
-where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values w/o the Y-intercept,
-and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagrange polynomial  ``L_j(τ)`` bases
-are defined as:
+where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values w/o the coefficients
+and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagrange polynomial
+``L_j(τ)`` bases are defined as:
 ```math
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
@@ -599,7 +599,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb
+        model::LinModel, estim::StateEstimator, transcription::MultipleShooting, Hp, Hc, nb
     ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects over the predicted states. 
@@ -709,8 +709,8 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::CollocationMethod, Hp, Hc, _
-    ) 
+        model::SimModel, ::StateEstimator, ::TranscriptionMethod, Hp, Hc, _
+    ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects of the stochastic states only.
 
@@ -751,7 +751,7 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     - else ``\mathbf{E_S} = [\begin{smallmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} \end{smallmatrix}]``
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::CollocationMethod, Hp, Hc, _
+    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -780,35 +780,40 @@ end
 
 """
     init_defectmat(
-        model::SimModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
+        model::SimModel, estim::InternalModel, ::TranscriptionMethod, Hp, Hc, _
     ) -> ES, GS, JS, KS, VS, BS
 
-Return empty matrices for [`InternalModel`](@ref) (state vector is not augmented).
+Return empty matrices for [`InternalModel`](@ref) (the state vector is not augmented).
 """
 function init_defectmat(
-    model::SimModel, estim::InternalModel{NT}, transcription::CollocationMethod, Hp, Hc, _
-) where {NT<:Real}
-    nx̂, nu, nd = estim.nx̂, model.nu, model.nd
-    nZ = get_nZ(estim, transcription, Hp, Hc)
-    ES = zeros(NT, 0, nZ)
-    GS = zeros(NT, 0, nd)
-    JS = zeros(NT, 0, nd*Hp)
-    KS = zeros(NT, 0, nx̂)
-    VS = zeros(NT, 0, nu)
-    BS = zeros(NT, 0)
-    return ES, GS, JS, KS, VS, BS
+    ::SimModel, estim::InternalModel, transcription::TranscriptionMethod, Hp, Hc, _
+)
+    return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
 
 """
     init_defectmat(
-        model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb
+        model::SimModel, estim::StateEstimator, ::TranscriptionMethod, Hp, Hc, nb
     ) -> ES, GS, JS, KS, VS, BS
 
-Return empty matrices for all other cases (N/A).
+Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
+    ::SimModel, estim::StateEstimator, transcription::SingleShooting, Hp, Hc, _
+)
+    return init_defectmat_empty(estim, transcription, Hp, Hc)
+end
+
+function init_defectmat(
+    ::SimModel, estim::InternalModel, transcription::SingleShooting, Hp, Hc, _
+)
+    return init_defectmat_empty(estim, transcription, Hp, Hc)
+end
+
+function init_defectmat_empty(
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
 ) where {NT<:Real}
+    model = estim.model
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
     nZ = get_nZ(estim, transcription, Hp, Hc)
     ES = zeros(NT, 0, nZ)
@@ -1042,9 +1047,17 @@ function linconstrainteq!(
     return nothing
 end
 
+"""
+    linconstrainteq!(
+        mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
+    )
+
+Do the same for [`SimModel`](@ref), but using simpler equations (stochastic defects only).
+"""
 function linconstrainteq!(
-    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::CollocationMethod
+    mpc::PredictiveController, ::SimModel, estim::StateEstimator, ::TranscriptionMethod
 )
+    (estim.nxs < 1) && return nothing # no stochastic state ⟹ no linear eq. constraint
     FS  = mpc.con.FS
     # the only non-zeros matrices are ES and KS:
     mul!(FS, mpc.con.KS, mpc.estim.x̂0)
@@ -1053,8 +1066,11 @@ function linconstrainteq!(
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
-linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::CollocationMethod  ) = nothing
-linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod) = nothing
+"No linear equality constraints for [`InternalModel`](@ref) (state is not augmented)."
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel, ::TranscriptionMethod) = nothing
+"No linear equality constraints for [`SingleShooting`(@ref) (N/A).]"
+linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting)     = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::SingleShooting)     = nothing
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
@@ -1395,77 +1411,79 @@ end
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. The nonlinear 
-equality constraints `geq` only includes the augmented state defects, computed with:
+The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. The defects of the 
+stochastic states are linear equality constraints (see [`init_defectmat`](@ref)). The
+defects of the deterministic states are computed with:
 ```math
-\mathbf{ŝ}(k+j+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k+j), \mathbf{u_0}(k+j), \mathbf{d̂_0}(k+j)\Big) 
-                    - \mathbf{x̂_0}(k+j+1)
+\mathbf{ŝ_d}(k+j+1) = \mathbf{f}\Big(\mathbf{x̂_d}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j)\Big) 
+                      - \mathbf{x̂_d}(k+j+1)
 ```
-for ``j = 0, 1, ... , H_p-1``, and in which the augmented state ``\mathbf{x̂_0}`` are
-extracted from the decision variables `Z̃`, and ``\mathbf{f̂}`` is the augmented state
-function defined in [`f̂!`](@ref).
+for ``j = 0, 1, ... , H_p-1`` and in which the deterministic state ``\mathbf{x̂_d}`` are the
+first `model.nx` elements of the augmented states ``\mathbf{x̂_0}``, and they extracted from
+the decision variable `Z̃`. The function ``\mathbf{f}`` is the deterministic state update
+function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref)
+documentation. The defects of the stochastic states are linear equality constraints (see
+[`init_defectmat`](@ref)).
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K, 
-    mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, U0, Z̃
+    mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
+    U0, Z̃
 )
-    nu, nx̂, nd, nk = model.nu, mpc.estim.nx̂, model.nd, model.nk
+    nx̂, nx, nu, nd, nk = mpc.estim.nx̂, model.nx, model.nu, model.nd, model.nk
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     D̂0 = mpc.D̂0
-    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)] 
+    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
             d̂0   = @views mpc.d0[1:nd]
         else
-            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
+            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        u0       = @views   U0[(1 + nu*(j-1)):(nu*j)]
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
         k        = @views    K[(1 + nk*(j-1)):(nk*j)]
-        x̂0next   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
-        ŝnext    = @views  geq[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k, mpc.estim, model, x̂0_Z̃, u0, d̂0)
-        ŝnext .= @. x̂0next - x̂0next_Z̃
+        x̂dnext   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        sdnext    = @views geq[(1 + nx*(j-1)):(nx*j)]
+        f!(x̂dnext, k, model, x̂d_Z̃, û0, d̂0, model.p)
+        sdnext .= @. x̂dnext - x̂dnext_Z̃
     end
     return geq
 end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K̇
+        geq, _ , Û0, K̇
         mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
         U0, Z̃
     ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The nonlinear equality
-constraints `geq` includes the defects of the deterministic states only. The stochastic
-states are handled seperatly as linear equality constraints, see [`init_defectmat`](@ref).
 The deterministic state defects are computed with:
 ```math
-\mathbf{s_d}(k+j+1) = \mathbf{x_0}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
-                       - \mathbf{x_0}(k+j+1)                                              
+\mathbf{ŝ_d}(k+j+1) = \mathbf{x̂_d}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
+                       - \mathbf{x̂_d}(k+j+1)                                              
 ```
-for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x_0}`` is the deterministic state
-extracted from the decision variables `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated
+for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x̂_d}`` are the deterministic states
+extracted from the decision variable `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated
 from the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
-\mathbf{k̇}_1(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
-\mathbf{k̇}_2(k+j) &= \mathbf{f}\Big(\mathbf{x_0}(k+j+1), \mathbf{û_0}(k+j+h), \mathbf{d̂_0}(k+j+1), \mathbf{p}\Big) 
+\mathbf{k̇}_1(k+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
+\mathbf{k̇}_2(k+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(k+j+1), \mathbf{û_0}(k+j+h), \mathbf{d̂_0}(k+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
 is defined in [`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K̇, 
+    geq, _ , Û0, K̇, 
     mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
     U0, Z̃
 )
@@ -1480,35 +1498,33 @@ function con_nonlinprogeq!(
     disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
             d̂0   = @views mpc.d0[1:nd]
         else
-            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
+            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
-        x̂0next_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]  
-        sdnext   = @views  geq[(1 + nx*(j-1)     ):(nx*(j-1) + nx)]
-        x0_Z̃     = @views  x̂0_Z̃[1:nx]
-        x0next_Z̃ = @views x̂0next_Z̃[1:nx]
+        x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
+        sdnext   = @views  geq[(1 + nx*(j-1)):(nx*(j-1) + nx)]
         k̇1, k̇2   = @views k̇[1:nx], k̇[nx+1:2*nx]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
-            model.f!(k̇1, x0_Z̃, û0, d̂0, p)
+            model.f!(k̇1, x̂d_Z̃, û0, d̂0, p)
         else
             k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1
-            model.f!(k̇2, x0next_Z̃, û0, d̂0next, p)
+            model.f!(k̇2, x̂dnext_Z̃, û0, d̂0next, p)
         else
             # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
             û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
-            model.f!(k̇2, x0next_Z̃, û0next, d̂0next, p)
+            model.f!(k̇2, x̂dnext_Z̃, û0next, d̂0next, p)
         end
-        sdnext .= @. x0_Z̃ - x0next_Z̃ + 0.5*Ts*(k̇1 + k̇2)
+        sdnext .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
     end
     return geq
 end
@@ -1516,23 +1532,22 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K̇, 
+        geq, _ , Û0, K̇, 
         mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
         U0, Z̃
     ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocation`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K̇` vectors in argument. The defects between
-the deterministic state derivative at the ``n_o`` collocation points and the model dynamics
-are computed by:
+The defects between the deterministic state derivative at the ``n_o`` collocation points and
+the model dynamics are computed by:
 ```math
 \mathbf{s_k}(k+j)                                                                                 
     = \mathbf{M_o} \begin{bmatrix}                                          
-        \mathbf{k}_1(k+j) - \mathbf{x_0}(k+j)                       \\
-        \mathbf{k}_2(k+j) - \mathbf{x_0}(k+j)                       \\
+        \mathbf{k}_1(k+j) - \mathbf{x̂_d}(k+j)                       \\
+        \mathbf{k}_2(k+j) - \mathbf{x̂_d}(k+j)                       \\
         \vdots                                                      \\
-        \mathbf{k}_{n_o}(k+j) - \mathbf{x_0}(k+j)                   \\ \end{bmatrix}                                                                                     
+        \mathbf{k}_{n_o}(k+j) - \mathbf{x̂_d}(k+j)                   \end{bmatrix}                                                                                     
     - \begin{bmatrix}
         \mathbf{k̇}_1(k+j)                                           \\
         \mathbf{k̇}_2(k+j)                                           \\
@@ -1540,9 +1555,10 @@ are computed by:
         \mathbf{k̇}_{n_o}(k+j)                                       \end{bmatrix}
 ```
 for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` vectors are
-extracted from the decision variable `Z̃`. The ``\mathbf{x_0}`` vectors are the
-deterministic state extracted from `Z̃`. The ``\mathbf{k̇}_i`` derivative for the ``i``th 
-collocation point is computed from the continuous-time function `model.f!` and:
+extracted from the decision variable `Z̃`. The ``\mathbf{x̂_d}`` vectors are the
+deterministic states extracted from ``\mathbf{X̂_0}`` also in `Z̃`, and they correspond to the
+states at the beginning of the interval ``τ_0=0``. The ``\mathbf{k̇}_i`` derivative for the
+``i``th collocation point is computed from the continuous-time function `model.f!` and:
 ```math
 \mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_i}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
 ```
@@ -1566,13 +1582,13 @@ ones for the continuity constraint of the deterministic states are:
         \mathbf{k}_2(k+j)                                           \\
         \vdots                                                      \\
         \mathbf{k}_{n_o}(k+j)                                       \end{bmatrix}       
-    + λ_o \mathbf{x_0}(k+j) - \mathbf{x_0}(k+j+1)
+    + λ_o \mathbf{x̂_d}(k+j) - \mathbf{x̂_d}(k+j+1)
 ```
 for ``j = 0, 1, ... , H_p-1``. The differentiation matrix ``\mathbf{M_o}``, the continuity
-matrix ``\mathbf{C_o}`` and the coefficient ``λ_o`` are introduced in [`init_orthocolloc`](@ref).
+matrix ``\mathbf{C_o}`` and the coefficient ``λ_o`` are introduced in [`init_orthocolloc`](@ref). 
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K̇,  
+    geq, _ , Û0, K̇,  
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
@@ -1591,25 +1607,23 @@ function con_nonlinprogeq!(
     disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂0_Z̃ = @views mpc.estim.x̂0[1:nx̂]
+            x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
             d̂0   = @views mpc.d0[1:nd]
         else
-            x̂0_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))] 
+            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        x̂0next_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
+        x̂dnext_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
         scnext   = @views   geq[(1 + nx_nk*(j-1)     ):(nx_nk*(j-1) + nx)]
         sk       = @views   geq[(1 + nx_nk*(j-1) + nx):(nx_nk*j         )]
-        x0_Z̃     = @views     x̂0_Z̃[1:nx]
-        x0next_Z̃ = @views x̂0next_Z̃[1:nx]
         # ----------------- collocation constraint defects -----------------------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         Δk = k̇
         for i=1:no
-            Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x0_Z̃
+            Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
         end
         mul!(sk, Mo, Δk)
         d̂i = @views D̂temp[(1 + nd*(j-1)):(nd*j)]
@@ -1631,7 +1645,7 @@ function con_nonlinprogeq!(
         end
         sk .-= k̇
         # ----------------- continuity constraint defects ------------------------------
-        scnext .= mul!(scnext, Co, k_Z̃) .+ (λo.*x0_Z̃) .- x0next_Z̃
+        scnext .= mul!(scnext, Co, k_Z̃) .+ (λo.*x̂d_Z̃) .- x̂dnext_Z̃
     end
     return geq
 end

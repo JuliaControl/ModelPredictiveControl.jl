@@ -325,11 +325,11 @@ Both `Û0` and `U0` variables include deviation vectors from ``k+0`` to ``k+H_p
 predicted states `X̂0` include deviation vectors from ``k+1`` to ``k+H_p-1`` (the current one
 is stored in `estim.x̂0`).
 
-This function is used for the collocation methods that directly call the state derivative 
+This function is needed for the collocation methods that directly call the state derivative 
 function `estim.model.f!` with the manipulated inputs augmented with the estimated 
 disturbances at model input (see [`init_estimstoch`](@ref)). It's also necessary to prefill
-the `Û0` vector before anything since both `û0` and `û0next` are needed at each stage with
-hold order `h>0`, thus potential race conditions with multi-threading.
+the `Û0` vector before anything else since both `û0` and `û0next` are needed at each stage
+with hold order `h>0`, thus potential race conditions with multi-threading.
 """
 function disturbedinput!(Û0, mpc::PredictiveController, estim::StateEstimator, U0, X̂0)
     nu, nx, nx̂ = estim.model.nu, estim.model.nx, estim.nx̂

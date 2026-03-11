@@ -180,15 +180,6 @@ function f̂!(x̂0next, _ , k, estim::InternalModel, model::NonLinModel, x̂0, u
     return nothing
 end
 
-#TODO: delete the following 2 generic functions and replace with linear eq. constraints. 
-
-"""
-    fs!(x̂0next, estim::InternalModel, model::SimModel, _ ) -> nothing
-
-Does nothing since [`InternalModel`](@ref) does not augment the state vector.
-"""
-fs!( _ , ::InternalModel, ::SimModel, _ ) = nothing
-
 @doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
 

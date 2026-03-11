@@ -45,6 +45,7 @@ ModelPredictiveControl.linconstrainteq!
 ModelPredictiveControl.optim_objective!(::PredictiveController)
 ModelPredictiveControl.set_warmstart!
 ModelPredictiveControl.predict!
+ModelPredictiveControl.disturbedinput!
 ModelPredictiveControl.con_nonlinprog!
 ModelPredictiveControl.con_nonlinprogeq!
 ModelPredictiveControl.getinput!
