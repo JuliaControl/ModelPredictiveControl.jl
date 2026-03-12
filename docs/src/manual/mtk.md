@@ -86,7 +86,7 @@ function generate_f_h(model, inputs, outputs)
         try
             # MTK.jl supports a `u` argument in `h_ip` function but not this package. We set
             # `u` as a vector of nothing and `h_ip` function will presumably throw an
-            # MethodError it this argument is used inside the function
+            # MethodError if this argument is used inside the function
             h_ip(y, x, u_nothing, p, nothing)
         catch err
             if err isa MethodError
