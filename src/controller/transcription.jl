@@ -1567,7 +1567,7 @@ and disturbances are piecewise constant or linear:
 ```math
 \begin{aligned}
 \mathbf{û}_i(k+j) &=                                                                        \begin{cases}
-                     \mathbf{û_0}(k+1)                                    &  h = 0          \\
+                     \mathbf{û_0}(k+j)                                    &  h = 0          \\
                      (1-τ_i)\mathbf{û_0}(k+j) + τ_i\mathbf{û_0}(k+j+1)    &  h = 1          \end{cases} \\
 \mathbf{d̂}_i(k+j) &= (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)                      
 \end{aligned}
