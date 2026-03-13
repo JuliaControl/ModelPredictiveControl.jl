@@ -22,7 +22,7 @@ const HIDDEN_GETINFO_KEYS_MHE = (
 )
 
 const HIDDEN_GETINFO_KEYS_MPC = (
-    :DeltaU, :epsilon, :Dhat, :yhat, :Yhat, :xhatend, :Yhats, :Rhaty, :Rhatu,
+    :DeltaU, :epsilon, :Dhat, :xhat, :yhat, :Yhat, :xhatend, :Yhats, :Rhaty, :Rhatu,
     :nablaJ, :nabla2J, :nablag, :nabla2lg, :nablageq, :nabla2lgeq
 )
 
