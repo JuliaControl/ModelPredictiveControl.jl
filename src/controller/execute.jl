@@ -93,6 +93,7 @@ The function should be called after calling [`moveinput!`](@ref). It returns the
 - `:ΔU` or *`:DeltaU`* : optimal manipulated input increments over ``H_c``, ``\mathbf{ΔU}``
 - `:ϵ` or *`:epsilon`* : optimal slack variable, ``ϵ``
 - `:D̂` or *`:Dhat`* : predicted measured disturbances over ``H_p``, ``\mathbf{D̂}``
+- `:x̂` or *`:xhat`* : current estimated state, ``\mathbf{x̂}_i(k)``
 - `:ŷ` or *`:yhat`* : current estimated output, ``\mathbf{ŷ}(k)``
 - `:Ŷ` or *`:Yhat`* : optimal predicted outputs over ``H_p``, ``\mathbf{Ŷ}``
 - `:Ŷs` or *`:Yhats`* : predicted stochastic output over ``H_p`` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``
@@ -167,6 +168,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info[:u]    = info[:U][1:model.nu]
     info[:d]    = mpc.d0 + model.dop
     info[:D̂]    = D̂
+    info[:x̂]    = mpc.estim.x̂0 .+ mpc.estim.x̂op
     info[:ŷ]    = mpc.ŷ
     info[:Ŷ]    = Ŷ
     info[:x̂end] = x̂0end + mpc.estim.x̂op
@@ -177,6 +179,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     info[:DeltaU] = info[:ΔU]
     info[:epsilon] = info[:ϵ]
     info[:Dhat] = info[:D̂]
+    info[:xhat] = info[:x̂]
     info[:yhat] = info[:ŷ]
     info[:Yhat] = info[:Ŷ]
     info[:xhatend] = info[:x̂end]
