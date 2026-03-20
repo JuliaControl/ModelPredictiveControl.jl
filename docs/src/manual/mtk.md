@@ -23,35 +23,22 @@ the last section.
     will work for all corner cases.
 
 !!! compat
-    The example works on `ModelingToolkit.jl` v10 (corresponding to the following `[compat]`
-    entry: `ModelingToolkit = "10"`).
+    The example works on `ModelingToolkit.jl` v11 (corresponding to the following `[compat]`
+    entry: `ModelingToolkit = "11"`).
 
 We first construct and instantiate the pendulum model:
 
 ```@example 1
 using ModelPredictiveControl, ModelingToolkit
 using ModelingToolkit: D_nounits as D, t_nounits as t, varmap_to_vars
-@mtkmodel Pendulum begin
-    @parameters begin
-        g = 9.8
-        L = 0.4
-        K = 1.2
-        m = 0.3
-    end
-    @variables begin
-        θ(t) # state
-        ω(t) # state
-        τ(t) # input
-        y(t) # output
-    end
-    @equations begin
-        D(θ)    ~ ω
-        D(ω)    ~ -g/L*sin(θ) - K/m*ω + τ/m/L^2
-        y       ~ θ * 180 / π
-    end
-end
-@named mtk_model = Pendulum()
-mtk_model = complete(mtk_model)
+@parameters g=9.8 L=0.4 K=1.2 m=0.3
+@variables θ(t)=0 ω(t)=0 τ(t)=0 y(t)
+eqs = [
+    D(θ) ~ ω
+    D(ω) ~ -g/L*sin(θ) - K/m*ω + τ/m/L^2
+    y ~ θ * 180 / π
+]
+@named mtk_model = System(eqs, t)
 ```
 
 We than convert the MTK model to an [input-output system](https://docs.sciml.ai/ModelingToolkit/stable/basics/InputOutput/):
@@ -59,7 +46,7 @@ We than convert the MTK model to an [input-output system](https://docs.sciml.ai/
 ```@example 1
 function generate_f_h(model, inputs, outputs)
     (_, f_ip), x_sym, p_sym, io_sys = ModelingToolkit.generate_control_function(
-        model, inputs, split=false; outputs
+        model, inputs, split=false, simplify=true
     )
     if any(ModelingToolkit.is_alg_equation, equations(io_sys)) 
         error("Systems with algebraic equations are not supported")
@@ -98,10 +85,11 @@ function generate_f_h(model, inputs, outputs)
         end
         return nothing
     end
-    p = varmap_to_vars(defaults(io_sys), p_sym)
+    println(bindings(io_sys))
+    p = varmap_to_vars(bindings(io_sys), p_sym)
     return f!, h!, p, x_sym, nu, nx, ny
 end
-inputs, outputs = [mtk_model.τ], [mtk_model.y]
+inputs, outputs = [τ], [y]
 f!, h!, p, x_sym, nu, nx, ny = generate_f_h(mtk_model, inputs, outputs)
 x_sym
 ```
@@ -121,8 +109,8 @@ model = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)
 We also instantiate a plant model with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
-@named mtk_plant = Pendulum(K=1.25*defaults(mtk_model)[mtk_model.K])
-mtk_plant = complete(mtk_plant)
+plant_bindings = merge(bindings(mtk_model), Dict(K => 1.25 * bindings(mtk_model)[K]))
+@named mtk_plant = System(eqs, t, [θ, ω, τ, y], [g, L, K, m]; bindings=plant_bindings)
 inputs, outputs = [mtk_plant.τ], [mtk_plant.y]
 f2!, h2!, p2 = generate_f_h(mtk_plant, inputs, outputs)
 plant = setname!(NonLinModel(f2!, h2!, Ts, nu, nx, ny; p=p2), u=vu, x=vx, y=vy)
