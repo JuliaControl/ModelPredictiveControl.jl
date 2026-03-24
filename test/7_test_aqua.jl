@@ -5,5 +5,5 @@
     # `JuMP.@operator`, and JuMP will never call these functions with 0 argument, so
     # defining zero-argument methods would be useless, so I disable this check here.
     unbound_args = false
-    Aqua.test_all(ModelPredictiveControl, unbound_args)
+    Aqua.test_all(ModelPredictiveControl; unbound_args)
 end
