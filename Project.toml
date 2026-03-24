@@ -30,6 +30,7 @@ LinearMPC = "82e1c212-e1a2-49d2-b26a-a31d6968e3bd"
 LinearMPCext = "LinearMPC"
 
 [compat]
+Aqua = "0.8"
 ControlSystemsBase = "1.18.2"
 DAQP = "0.6, 0.7.1"
 DifferentiationInterface = "0.7.11"
@@ -59,6 +60,7 @@ TestItems = "1"
 julia = "1.10"
 
 [extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 DAQP = "c47d62df-3981-49c8-9651-128b1cd08617"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
@@ -69,4 +71,4 @@ TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 
 [targets]
-test = ["Test", "TestItems", "TestItemRunner", "Documenter", "Plots", "DAQP", "FiniteDiff", "LinearMPC"]
+test = ["Test", "TestItems", "TestItemRunner", "Documenter", "Plots", "DAQP", "FiniteDiff", "LinearMPC", "Aqua"]
