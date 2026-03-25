@@ -30,7 +30,7 @@ We first construct and instantiate the pendulum model:
 
 ```@example 1
 using ModelPredictiveControl, ModelingToolkit
-using ModelingToolkit: D_nounits as D, t_nounits as t, varmap_to_vars
+using ModelingToolkit: D_nounits as D, t_nounits as t
 @parameters g=9.8 L=0.4 K=1.2 m=0.3
 @variables θ(t)=0 ω(t)=0 τ(t)=0 y(t)
 eqs = [
@@ -85,20 +85,27 @@ function generate_f_h(model, inputs, outputs)
         end
         return nothing
     end
-    println(bindings(io_sys))
-    p = varmap_to_vars(bindings(io_sys), p_sym)
-    return f!, h!, p, x_sym, nu, nx, ny
+    ic = initial_conditions(io_sys)
+    p_map = Dict(sym => ic[sym] for sym in p_sym if haskey(ic, sym))
+    p = ModelingToolkit.varmap_to_vars(p_map, p_sym)
+    return f!, h!, p, x_sym, p_sym, nu, nx, ny
 end
 inputs, outputs = [τ], [y]
-f!, h!, p, x_sym, nu, nx, ny = generate_f_h(mtk_model, inputs, outputs)
+f!, h!, p, x_sym, p_sym, nu, nx, ny = generate_f_h(mtk_model, inputs, outputs)
 x_sym
 ```
 
 Since MTK is an acausal modeling framework, we do not have the control on the state
 realization chosen by the package. The content of `x_sym` above shows it settled for the
 state vector ``\mathbf{x}(t) = [\begin{smallmatrix}ω(t) && θ(t)\end{smallmatrix}]'``,
-that is, the states of the [last section](@ref man_nonlin) in the reverse order. We can now
-construct a [`NonLinModel`](@ref) with this specific state realization:
+that is, the states of the [last section](@ref man_nonlin) in the reverse order. As the same
+also applies for the parameters, the `p_sym` object informs on how the `p` vector is sorted:
+
+```@example 1
+[p_sym p]
+```
+
+We can now construct a [`NonLinModel`](@ref) with this specific state realization:
 
 ```@example 1
 vu, vx, vy = ["\$τ\$ (Nm)"], ["\$ω\$ (rad/s)", "\$θ\$ (rad)"], ["\$θ\$ (°)"]
@@ -106,14 +113,13 @@ Ts = 0.1
 model = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)
 ```
 
-We also instantiate a plant model with a 25 % larger friction coefficient ``K``:
+We also instantiate a plant model with a 25 % larger friction coefficient ``K``, which is
+the third element of `p`, as shown above:
 
 ```@example 1
-plant_bindings = merge(bindings(mtk_model), Dict(K => 1.25 * bindings(mtk_model)[K]))
-@named mtk_plant = System(eqs, t, [θ, ω, τ, y], [g, L, K, m]; bindings=plant_bindings)
-inputs, outputs = [mtk_plant.τ], [mtk_plant.y]
-f2!, h2!, p2 = generate_f_h(mtk_plant, inputs, outputs)
-plant = setname!(NonLinModel(f2!, h2!, Ts, nu, nx, ny; p=p2), u=vu, x=vx, y=vy)
+p2 = copy(p)
+p2[3] = 1.25*p[3]
+plant = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p=p2), u=vu, x=vx, y=vy)
 ```
 
 ## Controller Design
