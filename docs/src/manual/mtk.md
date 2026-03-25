@@ -82,7 +82,15 @@ function generate_f_h(model, inputs, outputs)
         return nothing
     end
     ic = initial_conditions(io_sys)
-    p_map = Dict(sym => ic[sym] for sym in p_sym)
+    p_map = try
+        Dict(sym => ic[sym] for sym in p_sym)
+    catch err 
+        if err isa KeyError # the key presumably appears in `bindings(io_sys)`:
+            error("Non-constant parameter values are not supported (a.k.a. bindings)")
+        else
+            rethrow()
+        end
+    end
     p = ModelingToolkit.varmap_to_vars(p_map, p_sym)
     return f!, h!, p, x_sym, p_sym, nu, nx, ny
 end
