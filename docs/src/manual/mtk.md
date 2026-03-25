@@ -22,36 +22,19 @@ the last section.
     as a basic starting template to combine both packages. There is no guarantee that it
     will work for all corner cases.
 
-!!! compat
-    The example works on `ModelingToolkit.jl` v10 (corresponding to the following `[compat]`
-    entry: `ModelingToolkit = "10"`).
-
 We first construct and instantiate the pendulum model:
 
 ```@example 1
 using ModelPredictiveControl, ModelingToolkit
-using ModelingToolkit: D_nounits as D, t_nounits as t, varmap_to_vars
-@mtkmodel Pendulum begin
-    @parameters begin
-        g = 9.8
-        L = 0.4
-        K = 1.2
-        m = 0.3
-    end
-    @variables begin
-        θ(t) # state
-        ω(t) # state
-        τ(t) # input
-        y(t) # output
-    end
-    @equations begin
-        D(θ)    ~ ω
-        D(ω)    ~ -g/L*sin(θ) - K/m*ω + τ/m/L^2
-        y       ~ θ * 180 / π
-    end
-end
-@named mtk_model = Pendulum()
-mtk_model = complete(mtk_model)
+using ModelingToolkit: D_nounits as D, t_nounits as t
+@parameters g=9.8 L=0.4 K=1.2 m=0.3
+@variables θ(t)=0 ω(t)=0 τ(t)=0 y(t)
+eqs = [
+    D(θ) ~ ω
+    D(ω) ~ -g/L*sin(θ) - K/m*ω + τ/m/L^2
+    y ~ θ * 180 / π
+]
+@named mtk_model = System(eqs, t)
 ```
 
 We than convert the MTK model to an [input-output system](https://docs.sciml.ai/ModelingToolkit/stable/basics/InputOutput/):
@@ -59,7 +42,7 @@ We than convert the MTK model to an [input-output system](https://docs.sciml.ai/
 ```@example 1
 function generate_f_h(model, inputs, outputs)
     (_, f_ip), x_sym, p_sym, io_sys = ModelingToolkit.generate_control_function(
-        model, inputs, split=false; outputs
+        model, inputs, split=false, simplify=true
     )
     if any(ModelingToolkit.is_alg_equation, equations(io_sys)) 
         error("Systems with algebraic equations are not supported")
@@ -98,19 +81,35 @@ function generate_f_h(model, inputs, outputs)
         end
         return nothing
     end
-    p = varmap_to_vars(defaults(io_sys), p_sym)
-    return f!, h!, p, x_sym, nu, nx, ny
+    ic = initial_conditions(io_sys)
+    p_map = try
+        Dict(sym => ic[sym] for sym in p_sym)
+    catch err 
+        if err isa KeyError # the key presumably appears in `bindings(io_sys)`:
+            error("Non-constant parameter values are not supported (a.k.a. bindings)")
+        else
+            rethrow()
+        end
+    end
+    p = ModelingToolkit.varmap_to_vars(p_map, p_sym)
+    return f!, h!, p, x_sym, p_sym, nu, nx, ny
 end
-inputs, outputs = [mtk_model.τ], [mtk_model.y]
-f!, h!, p, x_sym, nu, nx, ny = generate_f_h(mtk_model, inputs, outputs)
+inputs, outputs = [τ], [y]
+f!, h!, p, x_sym, p_sym, nu, nx, ny = generate_f_h(mtk_model, inputs, outputs)
 x_sym
 ```
 
 Since MTK is an acausal modeling framework, we do not have the control on the state
 realization chosen by the package. The content of `x_sym` above shows it settled for the
 state vector ``\mathbf{x}(t) = [\begin{smallmatrix}ω(t) && θ(t)\end{smallmatrix}]'``,
-that is, the states of the [last section](@ref man_nonlin) in the reverse order. We can now
-construct a [`NonLinModel`](@ref) with this specific state realization:
+that is, the states of the [last section](@ref man_nonlin) in the reverse order. As the same
+also applies for the parameters, the `p_sym` object informs on how the `p` vector is sorted:
+
+```@example 1
+[p_sym p]
+```
+
+We can now construct a [`NonLinModel`](@ref) with this specific state realization:
 
 ```@example 1
 vu, vx, vy = ["\$τ\$ (Nm)"], ["\$ω\$ (rad/s)", "\$θ\$ (rad)"], ["\$θ\$ (°)"]
@@ -118,14 +117,13 @@ Ts = 0.1
 model = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)
 ```
 
-We also instantiate a plant model with a 25 % larger friction coefficient ``K``:
+We also instantiate a plant model with a 25 % larger friction coefficient ``K``, which is
+the third element of `p`, as shown above:
 
 ```@example 1
-@named mtk_plant = Pendulum(K=1.25*defaults(mtk_model)[mtk_model.K])
-mtk_plant = complete(mtk_plant)
-inputs, outputs = [mtk_plant.τ], [mtk_plant.y]
-f2!, h2!, p2 = generate_f_h(mtk_plant, inputs, outputs)
-plant = setname!(NonLinModel(f2!, h2!, Ts, nu, nx, ny; p=p2), u=vu, x=vx, y=vy)
+p2 = copy(p)
+p2[3] = 1.25*p[3]
+plant = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p=p2), u=vu, x=vx, y=vy)
 ```
 
 ## Controller Design
