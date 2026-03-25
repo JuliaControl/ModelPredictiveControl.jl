@@ -709,7 +709,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, ::StateEstimator, ::TranscriptionMethod, Hp, Hc, _
+        model::SimModel, estim::StateEstimator, ::TranscriptionMethod, Hp, Hc, _
     ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects of the stochastic states only.
@@ -751,7 +751,8 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     - else ``\mathbf{E_S} = [\begin{smallmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} \end{smallmatrix}]``
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
+    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, 
+    Hp, Hc, _
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -780,20 +781,20 @@ end
 
 """
     init_defectmat(
-        model::SimModel, estim::InternalModel, ::TranscriptionMethod, Hp, Hc, _
+        model::NonLinModel, estim::InternalModel, ::TranscriptionMethod, Hp, Hc, _
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`InternalModel`](@ref) (the state vector is not augmented).
 """
 function init_defectmat(
-    ::SimModel, estim::InternalModel, transcription::TranscriptionMethod, Hp, Hc, _
+    ::NonLinModel, estim::InternalModel, transcription::TranscriptionMethod, Hp, Hc, _
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
 
 """
     init_defectmat(
-        model::SimModel, estim::StateEstimator, ::TranscriptionMethod, Hp, Hc, nb
+        model::SimModel, estim::StateEstimator, transcription::SingleShooting, Hp, Hc, _
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
@@ -805,10 +806,11 @@ function init_defectmat(
 end
 
 function init_defectmat(
-    ::SimModel, estim::InternalModel, transcription::SingleShooting, Hp, Hc, _
+    ::NonLinModel, estim::InternalModel, transcription::SingleShooting, Hp, Hc, _
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
+
 
 function init_defectmat_empty(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
@@ -1067,10 +1069,10 @@ function linconstrainteq!(
     return nothing
 end
 "No linear equality constraints for [`InternalModel`](@ref) (state is not augmented)."
-linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel, ::TranscriptionMethod) = nothing
+linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel, ::TranscriptionMethod) = nothing
 "No linear equality constraints for [`SingleShooting`(@ref) (N/A).]"
-linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting)     = nothing
-linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::SingleShooting)     = nothing
+linconstrainteq!(::PredictiveController, ::SimModel,    ::StateEstimator, ::SingleShooting)  = nothing
+linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel,  ::SingleShooting)  = nothing
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s

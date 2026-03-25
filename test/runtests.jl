@@ -10,5 +10,6 @@ include("3_test_predictive_control.jl")
 include("4_test_plot_sim.jl")
 include("5_test_extensions.jl")
 include("6_test_doctest.jl")
+include("7_test_aqua.jl")
 
 nothing
