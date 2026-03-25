@@ -86,7 +86,7 @@ function generate_f_h(model, inputs, outputs)
         return nothing
     end
     ic = initial_conditions(io_sys)
-    p_map = Dict(sym => ic[sym] for sym in p_sym if haskey(ic, sym))
+    p_map = Dict(sym => ic[sym] for sym in p_sym)
     p = ModelingToolkit.varmap_to_vars(p_map, p_sym)
     return f!, h!, p, x_sym, p_sym, nu, nx, ny
 end
