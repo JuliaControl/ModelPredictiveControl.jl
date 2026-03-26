@@ -56,6 +56,7 @@ export SimResult, getinfo, sim!
 
 include("general.jl")
 include("sim_model.jl")
+include("transcription.jl")
 include("state_estim.jl")
 include("predictive_control.jl")
 include("plot_sim.jl")
