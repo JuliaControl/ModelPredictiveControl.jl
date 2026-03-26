@@ -117,12 +117,12 @@ Ts = 0.1
 model = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)
 ```
 
-We also instantiate a plant model with a 25 % larger friction coefficient ``K``, which is
-the third element of `p`, as shown above:
+We also instantiate a plant model with a 25 % larger friction coefficient ``K``:
 
 ```@example 1
+i_K = findfirst(==("K"), string.(p_sym))
 p2 = copy(p)
-p2[3] = 1.25*p[3]
+p2[i_K] = 1.25*p[i_K]
 plant = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p=p2), u=vu, x=vx, y=vy)
 ```
 
