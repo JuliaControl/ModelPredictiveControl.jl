@@ -32,7 +32,7 @@ LinearMPCext = "LinearMPC"
 [compat]
 Aqua = "0.8"
 ControlSystemsBase = "1.18.2"
-DAQP = "0.6, 0.7.1"
+DAQP = "0.6, 0.7.1, 0.8"
 DifferentiationInterface = "0.7.11"
 Documenter = "1"
 FastGaussQuadrature = "1.1.0"
