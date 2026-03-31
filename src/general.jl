@@ -140,6 +140,10 @@ dense_backend(backend::AbstractADType) = backend
 dense_backend(backend::AutoSparse) = backend.dense_ad
 dense_backend(backend::SecondOrder) = backend.inner
 
+"Get the number of colors in preparation object `prep`, or `nothing` if not applicable."
+get_ncolors(::Prep) = nothing
+get_ncolors(prep::Union{SparseJacobianPrep, SparseHessianPrep}) = ncolors(prep)
+
 "Validate `hessian` keyword argument and return the differentiation `backend`."
 function validate_hessian(hessian, gradient, default)
     if hessian == true
