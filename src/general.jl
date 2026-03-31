@@ -18,12 +18,16 @@ const ALL_COLORING_ORDERS = (
 
 const HIDDEN_GETINFO_KEYS_MHE = (
     :What, :xhatarr, :epsilon, :Xhat, :xhat, :Vhat, :Pbar, :xbar, :Yhat, :Yhatm, :ϵ,
-    :nablaJ, :nabla2J, :nablag, :nabla2lg, :nablageq, :nabla2lgeq
+    :nablaJ, :nabla2J, :nabla2J_ncolors, 
+    :nablag, :nablag_ncolors, :nabla2lg, :nabla2lg_ncolors, 
+    :nablageq, :nablag_ncolors, :nabla2lgeq, :nabla2lgeq_ncolors
 )
 
 const HIDDEN_GETINFO_KEYS_MPC = (
     :DeltaU, :epsilon, :Dhat, :xhat, :yhat, :Yhat, :xhatend, :Yhats, :Rhaty, :Rhatu,
-    :nablaJ, :nabla2J, :nablag, :nabla2lg, :nablageq, :nabla2lgeq
+    :nablaJ, :nabla2J, :nabla2J_ncolors,
+    :nablag, :nablag_ncolors, :nabla2lg, :nabla2lg_ncolors,
+    :nablageq, :nablag_ncolors, :nabla2lgeq, :nabla2lgeq_ncolors
 )
 
 "Termination status that means 'no solution available'."
