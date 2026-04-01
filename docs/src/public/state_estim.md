@@ -31,7 +31,9 @@ solving the MPC problem with [`moveinput!`](@ref), for when the estimations are 
     The nomenclature in this page introduces the estimated state ``\mathbf{x̂}`` and output
     ``\mathbf{ŷ}`` vectors of respectively `nx̂` and `ny` elements. Also, all the estimators
     support measured ``\mathbf{y^m}`` (`nym` elements) and unmeasured ``\mathbf{y^u}``
-    (`nyu` elements) model output, where ``\mathbf{y}`` refers to all of them.
+    (`nyu` elements) model output, where ``\mathbf{y}`` refers to all of them. See the page
+    [Function: Predictive Controllers](@ref func_predictive_control) for a block diagram
+    overview.
 
 ## StateEstimator
 

@@ -15,7 +15,9 @@ method to manually modify them.
     The nomenclature in this page introduces the model manipulated input ``\mathbf{u}``,
     measured disturbances ``\mathbf{d}``, state ``\mathbf{x}`` and output ``\mathbf{y}``,
     four vectors of `nu`, `nd`, `nx` and `ny` elements, respectively. The ``\mathbf{s}``
-    vector combines the elements of ``\mathbf{u}`` and ``\mathbf{d}``.
+    vector combines the elements of ``\mathbf{u}`` and ``\mathbf{d}``. See the page
+    [Function: Predictive Controllers](@ref func_predictive_control) for a block diagram
+    overview.
 
 ## SimModel
 
