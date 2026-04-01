@@ -1,4 +1,4 @@
-# Functions: Predictive Controllers
+# [Functions: Predictive Controllers](@id func_predictive_control)
 
 ```@contents
 Pages = ["predictive_control.md"]
@@ -59,6 +59,14 @@ any custom move blocking):
 ```
 
 in which ``\mathbf{ΔU}`` is a vector of `nu*Hc` elements.
+
+The following block diagram depicts the main signals and their interconnections, in which
+the gray parts are features that are less commonly used, thus disabled by default.
+
+```@raw html
+<p><img src="../../assets/control_topology.svg" alt="control_tropology" width=625
+    style="background-color:white; border:20px solid white; display: block"/></p>
+```
 
 ## PredictiveController
 
