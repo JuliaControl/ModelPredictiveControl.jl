@@ -98,9 +98,12 @@ For [`NonLinModel`](@ref), it also includes the following fields:
 
 - `:∇J` or *`:nablaJ`* : optimal gradient of the objective function, ``\mathbf{\nabla} J``
 - `:∇²J` or *`:nabla2J`* : optimal Hessian of the objective function, ``\mathbf{\nabla^2}J``
+- `:∇²J_ncolors` or *`:nabla2J_ncolors`* : number of colors in `:∇²J` sparsity pattern
 - `:g` : optimal nonlinear inequality constraint values, ``\mathbf{g}``
 - `:∇g` or *`:nablag`* : optimal Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
+- `:∇g_ncolors` or *`:nablag_ncolors`* : number of colors in `:∇g` sparsity pattern
 - `:∇²ℓg` or *`:nabla2lg`* : optimal Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
+- `:∇²ℓg_ncolors` or *`:nabla2lg_ncolors`* : number of colors in `:∇²ℓg` sparsity pattern
 
 Note that the inequality constraint vectors and matrices only include the non-`Inf` values.
 
@@ -207,9 +210,13 @@ function addinfo!(
         return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
     end
     if !isnothing(hess)
-        _, ∇J_opt, ∇²J_opt = value_gradient_and_hessian(J!, hess, estim.Z̃, J_cache...)
+        prep_∇²J = prepare_hessian(J!, hess, estim.Z̃, J_cache...)
+        _, ∇J_opt, ∇²J_opt = value_gradient_and_hessian(J!, prep_∇²J, hess, estim.Z̃, J_cache...)
+        ∇²J_ncolors = get_ncolors(prep_∇²J)
     else
-        ∇J_opt, ∇²J_opt = gradient(J!, estim.gradient, estim.Z̃, J_cache...), nothing
+        prep_∇J = prepare_gradient(J!, estim.gradient, estim.Z̃, J_cache...)
+        ∇J_opt = gradient(J!, prep_∇J, estim.gradient, estim.Z̃, J_cache...)
+        ∇²J_opt, ∇²J_ncolors = nothing, nothing
     end
     # --- inequality constraint derivatives ---
     ∇g_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), Cache(g))
@@ -218,7 +225,9 @@ function addinfo!(
         gi .= @views g[i_g]
         return nothing
     end
-    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, estim.jacobian, estim.Z̃, ∇g_cache...)
+    prep_∇g = prepare_jacobian(gi!, gi, estim.jacobian, estim.Z̃, ∇g_cache...)
+    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, prep_∇g, estim.jacobian, estim.Z̃, ∇g_cache...)
+    ∇g_ncolors = get_ncolors(prep_∇g)
     if !isnothing(hess) && ngi > 0
         nonlincon = optim[:nonlinconstraint]
         λi = try
@@ -239,25 +248,31 @@ function addinfo!(
         )
         function ℓ_gi(Z̃, λi, V̂, X̂0, û0, k, ŷ0, g, gi)
             update_prediction!(V̂, X̂0, û0, k, ŷ0, g, estim, Z̃)
-            @show size(g)
-            @show size(gi)
             gi .= @views g[i_g]
             return dot(λi, gi)
         end
-        ∇²ℓg_opt = hessian(ℓ_gi, hess, estim.Z̃, Constant(λi), ∇²g_cache...)
+        prep_∇²ℓg = prepare_hessian(ℓ_gi, hess, estim.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_opt = hessian(ℓ_gi, prep_∇²ℓg, hess, estim.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_ncolors = get_ncolors(prep_∇²ℓg)
     else
-        ∇²ℓg_opt = nothing
+        ∇²ℓg_opt, ∇²ℓg_ncolors = nothing, nothing
     end
     info[:∇J] = ∇J_opt
     info[:∇²J] = ∇²J_opt
+    info[:∇²J_ncolors] = ∇²J_ncolors
     info[:g] = g_opt
     info[:∇g] = ∇g_opt
+    info[:∇g_ncolors] = ∇g_ncolors
     info[:∇²ℓg] = ∇²ℓg_opt
+    info[:∇²ℓg_ncolors] = ∇²ℓg_ncolors
     # --- non-Unicode fields ---
     info[:nablaJ] = ∇J_opt
     info[:nabla2J] = ∇²J_opt
+    info[:nabla2J_ncolors] = ∇²J_ncolors
     info[:nablag] = ∇g_opt
+    info[:nablag_ncolors] = ∇g_ncolors
     info[:nabla2lg] = ∇²ℓg_opt
+    info[:nabla2lg_ncolors] = ∇²ℓg_ncolors
     return info
 end
 

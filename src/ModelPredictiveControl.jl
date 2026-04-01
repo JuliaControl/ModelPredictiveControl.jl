@@ -9,6 +9,7 @@ using RecipesBase
 
 using DifferentiationInterface: ADTypes.AbstractADType, AutoForwardDiff
 using DifferentiationInterface: AutoSparse, SecondOrder
+using DifferentiationInterface: Prep, SparseJacobianPrep, SparseHessianPrep
 using DifferentiationInterface: gradient, jacobian, hessian
 using DifferentiationInterface: value_and_gradient, value_and_jacobian
 using DifferentiationInterface: value_gradient_and_hessian
@@ -20,6 +21,7 @@ using SparseConnectivityTracer: TracerSparsityDetector
 using SparseMatrixColorings: GreedyColoringAlgorithm, sparsity_pattern
 using SparseMatrixColorings: NaturalOrder, LargestFirst, SmallestLast
 using SparseMatrixColorings: IncidenceDegree, DynamicLargestFirst, RandomOrder
+using SparseMatrixColorings: ncolors
 
 import ProgressLogging
 

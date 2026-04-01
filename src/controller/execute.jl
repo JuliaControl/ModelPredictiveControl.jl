@@ -117,12 +117,17 @@ Lastly, the following fields are also available for [`NonLinMPC`](@ref) only:
 - `:gc`: custom nonlinear constraints values at the optimum, ``\mathbf{g_c}``
 - `:∇J` or *`:nablaJ`* : optimal gradient of the objective function, ``\mathbf{\nabla} J``
 - `:∇²J` or *`:nabla2J`* : optimal Hessian of the objective function, ``\mathbf{\nabla^2}J``
+- `:∇²J_ncolors` or *`:nabla2J_ncolors`* : number of colors in `:∇²J` sparsity pattern
 - `:g` : optimal nonlinear inequality constraint values, ``\mathbf{g}``
 - `:∇g` or *`:nablag`* : optimal Jacobian of the inequality constraint, ``\mathbf{\nabla g}``
+- `:∇g_ncolors` or *`:nablag_ncolors`* : number of colors in `:∇g` sparsity pattern
 - `:∇²ℓg` or *`:nabla2lg`* : optimal Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
+- `:∇²ℓg_ncolors` or *`:nabla2lg_ncolors`* : number of colors in `:∇²ℓg` sparsity pattern
 - `:geq` : optimal nonlinear equality constraint values, ``\mathbf{g_{eq}}``
 - `:∇geq` or *`:nablageq`* : optimal Jacobian of the equality constraint, ``\mathbf{\nabla g_{eq}}``
+- `:∇geq_ncolors` or *`:nablageq_ncolors`* : number of colors in `:∇geq` sparsity pattern
 - `:∇²ℓgeq` or *`:nabla2lgeq`* : optimal Hessian of the equality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g_{eq}}}``
+- `:∇²ℓgeq_ncolors` or *`:nabla2lgeq_ncolors`* : number of colors in `:∇²ℓgeq` sparsity pattern
 
 Note that the inequality constraint vectors and matrices only include the non-`Inf` values.
 
