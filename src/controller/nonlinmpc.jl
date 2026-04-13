@@ -590,9 +590,13 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         return obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     end
     if !isnothing(hess)
-        _, ∇J_opt, ∇²J_opt = value_gradient_and_hessian(J!, hess, mpc.Z̃, J_cache...)
+        prep_∇²J = prepare_hessian(J!, hess, mpc.Z̃, J_cache...)
+        _, ∇J_opt, ∇²J_opt = value_gradient_and_hessian(J!, prep_∇²J, hess, mpc.Z̃, J_cache...)
+        ∇²J_ncolors = get_ncolors(prep_∇²J)
     else
-        ∇J_opt, ∇²J_opt = gradient(J!, mpc.gradient, mpc.Z̃, J_cache...), nothing
+        prep_∇J = prepare_gradient(J!, mpc.gradient, mpc.Z̃, J_cache...)
+        ∇J_opt = gradient(J!, prep_∇J, mpc.gradient, mpc.Z̃, J_cache...)
+        ∇²J_opt, ∇²J_ncolors = nothing, nothing
     end
     # --- inequality constraint derivatives ---
     ∇g_cache = (
@@ -605,7 +609,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         gi .= @views g[i_g]
         return nothing
     end
-    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, mpc.jacobian, mpc.Z̃, ∇g_cache...)
+    prep_∇g = prepare_jacobian(gi!, gi, mpc.jacobian, mpc.Z̃, ∇g_cache...)
+    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, prep_∇g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
+    ∇g_ncolors = get_ncolors(prep_∇g)
     if !isnothing(hess) && ngi > 0
         nonlincon = optim[:nonlinconstraint]
         λi = try
@@ -631,9 +637,11 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             gi .= @views g[i_g]
             return dot(λi, gi)
         end
-        ∇²ℓg_opt = hessian(ℓ_gi, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
+        prep_∇²ℓg = prepare_hessian(ℓ_gi, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_opt = hessian(ℓ_gi, prep_∇²ℓg, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_ncolors = get_ncolors(prep_∇²ℓg)
     else
-        ∇²ℓg_opt = nothing
+        ∇²ℓg_opt, ∇²ℓg_ncolors = nothing, nothing
     end
     # --- equality constraint derivatives ---
     geq_cache = (
@@ -645,7 +653,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return nothing
     end
-    geq_opt, ∇geq_opt = value_and_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
+    prep_∇geq = prepare_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
+    geq_opt, ∇geq_opt = value_and_jacobian(geq!, geq, prep_∇geq, mpc.jacobian, mpc.Z̃, geq_cache...)
+    ∇geq_ncolors = get_ncolors(prep_∇geq)
     if !isnothing(hess) && con.neq > 0
         nonlinconeq = optim[:nonlinconstrainteq]
         λeq = try
@@ -670,25 +680,37 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λeq, geq)
         end
-        ∇²ℓgeq_opt = hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        prep_∇²ℓgeq = prepare_hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_opt = hessian(ℓ_geq, prep_∇²ℓgeq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_ncolors = get_ncolors(prep_∇²ℓgeq)
     else
-        ∇²ℓgeq_opt = nothing
+        ∇²ℓgeq_opt, ∇²ℓgeq_ncolors = nothing, nothing
     end
     info[:∇J] = ∇J_opt
     info[:∇²J] = ∇²J_opt
+    info[:∇²J_ncolors] = ∇²J_ncolors
     info[:g] = g_opt
     info[:∇g] = ∇g_opt
+    info[:∇g_ncolors] = ∇g_ncolors
     info[:∇²ℓg] = ∇²ℓg_opt
+    info[:∇²ℓg_ncolors] = ∇²ℓg_ncolors
     info[:geq] = geq_opt
     info[:∇geq] = ∇geq_opt
+    info[:∇geq_ncolors] = ∇geq_ncolors
     info[:∇²ℓgeq] = ∇²ℓgeq_opt
+    info[:∇²ℓgeq_ncolors] = ∇²ℓgeq_ncolors
     # --- non-Unicode fields ---
     info[:nablaJ] = ∇J_opt
     info[:nabla2J] = ∇²J_opt
+    info[:nabla2J_ncolors] = ∇²J_ncolors
     info[:nablag] = ∇g_opt
+    info[:nablag_ncolors] = ∇g_ncolors
     info[:nabla2lg] = ∇²ℓg_opt
+    info[:nabla2lg_ncolors] = ∇²ℓg_ncolors
     info[:nablageq] = ∇geq_opt
+    info[:nablageq_ncolors] = ∇geq_ncolors
     info[:nabla2lgeq] = ∇²ℓgeq_opt
+    info[:nabla2lgeq_ncolors] = ∇²ℓgeq_ncolors
     return info
 end
 
