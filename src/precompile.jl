@@ -87,16 +87,20 @@ R̂y = repeat([55; 30], 10)
     nlmodel = setop!(nlmodel, uop=[10, 10], yop=[50, 30])
     y = nlmodel()
 
-    transcription = MultipleShooting(f_threads=true)
+    transcription = MultipleShooting()
+    hessian = true
     nmpc_ukf = setconstraint!(NonLinMPC(
-        UnscentedKalmanFilter(nlmodel); Hp=10, transcription, Cwt=1e3), ymin=[45, -Inf]
+        UnscentedKalmanFilter(nlmodel); Hp=10, transcription, hessian, Cwt=1e3), 
+        ymin=[45, -Inf]
     )
     initstate!(nmpc_ukf, nlmodel.uop, y)
     preparestate!(nmpc_ukf, [55, 30])
     nmpc_ukf([55, 30])
     sim!(nmpc_ukf, 2, [55, 30])
 
-    nmpc_ekf = setconstraint!(NonLinMPC(ExtendedKalmanFilter(model), Cwt=Inf), ymin=[45, -Inf])
+    nmpc_ekf = setconstraint!(NonLinMPC(
+        ExtendedKalmanFilter(model), Cwt=Inf), ymin=[45, -Inf]
+    )
     initstate!(nmpc_ekf, model.uop, model())
     preparestate!(nmpc_ekf, [55, 30])
     nmpc_ekf([55, 30])
