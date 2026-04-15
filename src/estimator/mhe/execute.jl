@@ -493,7 +493,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     nŵ, nx̂, Nk =  estim.nx̂, estim.nx̂, estim.Nk[]
     nx̃ = estim.nε + nx̂
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    Z̃s = set_warmstart_mhe(estim, Z̃var)
+    Z̃s = set_warmstart_mhe!(estim, Z̃var)
     # ------- solve optimization problem --------------
     try
         JuMP.optimize!(optim)
@@ -540,7 +540,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
 end
 
 @doc raw"""
-    set_warmstart_mhe(estim::MovingHorizonEstimator, Z̃var) -> Z̃s
+    set_warmstart_mhe!(estim::MovingHorizonEstimator, Z̃var) -> Z̃s
 
 Set and return the warm-start value of `Z̃var` for [`MovingHorizonEstimator`](@ref).
 
@@ -563,7 +563,7 @@ computed at the last time step ``k-1``. If the objective function is not finite 
 point, all the process noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. The
 method mutates all the arguments.
 """
-function set_warmstart_mhe(estim::MovingHorizonEstimator{NT}, Z̃var) where NT<:Real
+function set_warmstart_mhe!(estim::MovingHorizonEstimator{NT}, Z̃var) where NT<:Real
     model, buffer = estim.model, estim.buffer
     nε, nx̂, nŵ, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.Nk[]
     nx̃ = nε + nx̂
