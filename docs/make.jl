@@ -48,6 +48,7 @@ makedocs(
                 "Plant Models" => "public/sim_model.md",
                 "State Estimators" => "public/state_estim.md",
                 "Predictive Controllers" => "public/predictive_control.md",
+                "Transcription Methods" => "public/transcription.md",
                 "Generic Functions" => "public/generic_func.md",
                 "Simulations and Plots" => "public/plot_sim.md",
             ],

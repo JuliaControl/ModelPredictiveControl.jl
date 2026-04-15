@@ -1,7 +1,7 @@
 const COLLOCATION_NODE_TYPE = Float64
 
 """
-Abstract supertype of all transcription methods of [`PredictiveController`](@ref).
+Abstract supertype of all transcription methods for the optimal control/estimation problems.
 
 The module currently supports [`SingleShooting`](@ref), [`MultipleShooting`](@ref),
 [`TrapezoidalCollocation`](@ref) and [`OrthogonalCollocation`](@ref) transcription methods.
