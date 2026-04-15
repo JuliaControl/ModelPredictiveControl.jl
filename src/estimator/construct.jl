@@ -1,8 +1,11 @@
 struct StateEstimatorBuffer{NT<:Real}
     u ::Vector{NT}
     û ::Vector{NT}
-    k::Vector{NT}
+    k ::Vector{NT}
     x̂ ::Vector{NT}
+    Z̃ ::Vector{NT}
+    V̂ ::Vector{NT}
+    X̂ ::Vector{NT}
     P̂ ::Matrix{NT}
     Q̂ ::Matrix{NT}
     R̂ ::Matrix{NT}
@@ -21,12 +24,19 @@ Create a buffer for `StateEstimator` objects for estimated states and measured o
 The buffer is used to store intermediate results during estimation without allocating.
 """
 function StateEstimatorBuffer{NT}(
-    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0
+    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0, He::Int=0, nε::Int=0
 ) where NT <: Real
+    nŵ = nx̂
+    nZ̃ = nx̂ + nŵ*He + nε
+    nV̂ = nym*He
+    nX̂ = nx̂*He
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)
     k  = Vector{NT}(undef, nk)
     x̂  = Vector{NT}(undef, nx̂)
+    Z̃  = Vector{NT}(undef, nZ̃)
+    V̂  = Vector{NT}(undef, nV̂)
+    X̂  = Vector{NT}(undef, nX̂)
     P̂  = Matrix{NT}(undef, nx̂, nx̂)
     Q̂  = Matrix{NT}(undef, nx̂, nx̂)
     R̂  = Matrix{NT}(undef, nym, nym)
@@ -35,7 +45,7 @@ function StateEstimatorBuffer{NT}(
     ŷ  = Vector{NT}(undef, ny)
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
-    return StateEstimatorBuffer{NT}(u, û, k, x̂, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty)
+    return StateEstimatorBuffer{NT}(u, û, k, x̂, Z̃, V̂, X̂, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty)
 end
 
 "Include all the covariance matrices for the Kalman filters and moving horizon estimator."
