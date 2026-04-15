@@ -4,7 +4,7 @@ const COLLOCATION_NODE_TYPE = Float64
 Abstract supertype of all transcription methods for the optimal control/estimation problems.
 
 The module currently supports [`SingleShooting`](@ref), [`MultipleShooting`](@ref),
-[`TrapezoidalCollocation`](@ref) and [`OrthogonalCollocation`](@ref) transcription methods.
+[`TrapezoidalCollocation`](@ref) and [`OrthogonalCollocation`](@ref) transcriptions.
 """
 abstract type TranscriptionMethod end
 abstract type ShootingMethod    <: TranscriptionMethod end
@@ -15,8 +15,21 @@ abstract type CollocationMethod <: TranscriptionMethod end
 
 Construct a direct single shooting [`TranscriptionMethod`](@ref).
 
-The decision variable in the optimization problem is (excluding the slack ``ϵ`` and without
-any custom move blocking):
+For [`MovingHorizonEstimator`](@ref) objects, the decision variable in the optimization
+problem is (excluding the slack ``ϵ``):
+```math
+\mathbf{Z} =                        
+    =                               \begin{bmatrix} 
+    \mathbf{x̂}_k(k-N_k+p)           \\
+    \mathbf{Ŵ}                      \end{bmatrix}
+    =                               \begin{bmatrix}
+    \mathbf{x̂}_k(k-N_k+p)           \\
+    \mathbf{ŵ}(k-N_k+p+0)           \\
+    \mathbf{ŵ}(k-N_k+p+1)           \\
+    \vdots                          \\
+    \mathbf{ŵ}(k+p-1)               \end{bmatrix}
+```
+and, for [`PredictiveController`](@ref) types (without any custom move blocking):
 ```math
 \mathbf{Z} = \mathbf{ΔU} =          \begin{bmatrix} 
     \mathbf{Δu}(k+0)                \\ 
@@ -24,10 +37,11 @@ any custom move blocking):
     \vdots                          \\ 
     \mathbf{Δu}(k+H_c-1)            \end{bmatrix}
 ```
+
 This method computes the predictions by calling the augmented discrete-time model
-recursively over the prediction horizon ``H_p`` in the objective function, or by updating
-the linear coefficients of the quadratic optimization for [`LinModel`](@ref). It is 
-generally  more efficient for small control horizon ``H_c``, stable and mildly nonlinear
+recursively over the horizon in the objective function, or by updating the linear
+coefficients of the quadratic optimization for [`LinModel`](@ref). It is 
+generally  more efficient for small ``H_c`` or ``H_e`` values, stable and mildly nonlinear
 plant model/constraints.
 """
 struct SingleShooting <: ShootingMethod end
@@ -103,8 +117,8 @@ transcription method.
     Note that the stochastic model of the unmeasured disturbances is strictly discrete-time,
     as described in [`ModelPredictiveControl.init_estimstoch`](@ref). Collocation methods
     require continuous-time dynamics. Because of this, the stochastic states are transcribed
-    separately using a [`MultipleShooting`](@ref) method. See [`con_nonlinprogeq!`](@ref)
-    for more details.
+    separately using a [`MultipleShooting`](@ref) method and by exploiting its linear
+    structure. See [`con_nonlinprogeq!`](@ref) for more details.
 """
 struct TrapezoidalCollocation <: CollocationMethod
     h::Int

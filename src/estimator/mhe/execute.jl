@@ -379,8 +379,8 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
     ẼZ̃ = @views [estim.ẽx̄[:, 1:nZ̃]; estim.Ẽ[1:nYm, 1:nZ̃]]
     FZ̃ = @views [estim.fx̄; estim.F[1:nYm]]
-    invQ̂_Nk = trunc_cov(estim.cov.invQ̂_He, estim.nx̂, Nk, estim.He)
-    invR̂_Nk = trunc_cov(estim.cov.invR̂_He, estim.nym, Nk, estim.He)
+    invQ̂_Nk = trunc_cov(invQ̂_He, estim.nx̂,  Nk, estim.He)
+    invR̂_Nk = trunc_cov(invR̂_He, estim.nym, Nk, estim.He)
     M_Nk = [invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
     Ñ_Nk = [fill(C, nε, nε) zeros(nε, nx̂+nŴ); zeros(nx̂, nε+nx̂+nŴ); zeros(nŴ, nε+nx̂) invQ̂_Nk]
     M_Nk_ẼZ̃ = M_Nk*ẼZ̃
@@ -709,7 +709,7 @@ function obj_nonlinprog!(
     nε, Nk = estim.nε, estim.Nk[] 
     nYm, nŴ, nx̂, invP̄ = Nk*estim.nym, Nk*estim.nx̂, estim.nx̂, estim.cov.invP̄
     nx̃ = nε + nx̂
-    invQ̂_Nk = trunc_cov(estim.cov.invQ̂_He, estim.nx̂, Nk, estim.He)
+    invQ̂_Nk = trunc_cov(estim.cov.invQ̂_He, estim.nx̂,  Nk, estim.He)
     invR̂_Nk = trunc_cov(estim.cov.invR̂_He, estim.nym, Nk, estim.He)
     x̂0arr, Ŵ, V̂ = @views Z̃[nx̃-nx̂+1:nx̃], Z̃[nx̃+1:nx̃+nŴ], V̂[1:nYm]
     x̄ .= estim.x̂0arr_old .- x̂0arr
