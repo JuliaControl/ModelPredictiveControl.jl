@@ -577,7 +577,7 @@ function set_warmstart_mhe(estim::MovingHorizonEstimator{NT}, Z̃var) where NT<:
     Z̃s[nx̃+1:end] = estim.Ŵ
     # verify definiteness of objective function:
     V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
-    V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, Z̃s)
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, Z̃s)
     Js = obj_nonlinprog!(x̄, estim, model, V̂, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+1:end] = 0
