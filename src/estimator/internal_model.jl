@@ -326,9 +326,12 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 """
 function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) where NT<:Real
     x̂d, x̂s = estim.x̂d, estim.x̂s
-    # also updates estim.x̂0 (they are the same object):
-    # TODO: use estim.buffer.x̂ to reduce the allocation:
-    x̂d .= (I - model.A)\(model.Bu*u0 + model.Bd*d0 + model.fop - model.xop)
+    x̂_tmp = estim.buffer.x̂
+    x̂_tmp .= estim.f̂op .- estim.x̂op
+    mul!(x̂_tmp, model.Bu, u0, 1, 1)
+    mul!(x̂_tmp, model.Bd, d0, 1, 1)
+    M = I - model.A
+    x̂d .= M\x̂_tmp # also updates estim.x̂0 (they are the same object)
     ŷ0d = estim.buffer.ŷ
     h!(ŷ0d, model, x̂d, d0, model.p)
     ŷs = ŷ0d

@@ -490,12 +490,10 @@ If first warm-starts the solver with [`set_warmstart_mhe!`](@ref). It then calls
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, optim, buffer = estim.model, estim.optim, estim.buffer
-    nym, nx̂, nŵ, nε, Nk = estim.nym, estim.nx̂, estim.nx̂, estim.nε, estim.Nk[]
-    nx̃ = nε + nx̂
+    nŵ, nx̂, Nk =  estim.nx̂, estim.nx̂, estim.Nk[]
+    nx̃ = estim.nε + nx̂
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    V̂   = Vector{NT}(undef, nym*Nk)     # TODO: remove this allocation
-    X̂0  = Vector{NT}(undef, nx̂*Nk)      # TODO: remove this allocation
-    Z̃s = set_warmstart_mhe!(V̂, X̂0, estim, Z̃var)
+    Z̃s = set_warmstart_mhe!(estim, Z̃var)
     # ------- solve optimization problem --------------
     try
         JuMP.optimize!(optim)
@@ -534,14 +532,15 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     # --------- update estimate -----------------------
     û0, ŷ0, k = buffer.û, buffer.ŷ, buffer.k
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
-    V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.Z̃)
-    x̂0next    = @views X̂0[end-nx̂+1:end] 
+    V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.Z̃)
+    x̂0next    = @views X̂0[Nk*nx̂-nx̂+1:Nk*nx̂]
     estim.x̂0 .= x̂0next
     return estim.Z̃
 end
 
 @doc raw"""
-    set_warmstart_mhe!(V̂, X̂0, estim::MovingHorizonEstimator, Z̃var) -> Z̃s
+    set_warmstart_mhe!(estim::MovingHorizonEstimator, Z̃var) -> Z̃s
 
 Set and return the warm-start value of `Z̃var` for [`MovingHorizonEstimator`](@ref).
 
@@ -564,11 +563,11 @@ computed at the last time step ``k-1``. If the objective function is not finite 
 point, all the process noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. The
 method mutates all the arguments.
 """
-function set_warmstart_mhe!(V̂, X̂0, estim::MovingHorizonEstimator{NT}, Z̃var) where NT<:Real
+function set_warmstart_mhe!(estim::MovingHorizonEstimator{NT}, Z̃var) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nε, nx̂, nŵ, nZ̃, Nk = estim.nε, estim.nx̂, estim.nx̂, length(estim.Z̃), estim.Nk[]
+    nε, nx̂, nŵ, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.Nk[]
     nx̃ = nε + nx̂
-    Z̃s  = Vector{NT}(undef, nZ̃)  # TODO: remove this allocation
+    Z̃s = estim.buffer.Z̃
     û0, ŷ0, x̄, k = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
@@ -577,7 +576,8 @@ function set_warmstart_mhe!(V̂, X̂0, estim::MovingHorizonEstimator{NT}, Z̃var
     # --- process noise estimates Ŵ ---
     Z̃s[nx̃+1:end] = estim.Ŵ
     # verify definiteness of objective function:
-    V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, Z̃s)
+    V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, Z̃s)
     Js = obj_nonlinprog!(x̄, estim, model, V̂, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+1:end] = 0
