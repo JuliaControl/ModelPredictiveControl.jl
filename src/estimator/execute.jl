@@ -213,8 +213,15 @@ measured outputs ``\mathbf{y^m}``.
 function init_estimate!(estim::StateEstimator, ::LinModel, y0m, d0, u0)
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     Ĉm, D̂dm = estim.Ĉm, estim.D̂dm
-    # TODO: use estim.buffer.x̂ to reduce allocations
-    estim.x̂0 .= [I - Â; Ĉm]\[B̂u*u0 + B̂d*d0 + estim.f̂op - estim.x̂op; y0m - D̂dm*d0]
+    x̂_tmp, ŷ_tmp = estim.buffer.x̂, estim.buffer.ŷ
+    x̂_tmp .= estim.f̂op .- estim.x̂op
+    mul!(x̂_tmp, B̂u, u0, 1, 1)
+    mul!(x̂_tmp, B̂d, d0, 1, 1)
+    ŷm_tmp = @views ŷ_tmp[estim.i_ym]
+    mul!(ŷm_tmp, D̂dm, d0)
+    ŷm_tmp .= y0m .- ŷm_tmp
+    M = [I - Â; Ĉm]
+    estim.x̂0 .= M\[x̂_tmp; ŷm_tmp]
     return nothing
 end
 """

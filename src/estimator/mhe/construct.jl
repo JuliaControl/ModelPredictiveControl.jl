@@ -160,7 +160,7 @@ struct MovingHorizonEstimator{
         nD0 = direct ? nd*(He+1) : nd*He
         U0, D0  = zeros(NT, nu*He), zeros(NT, nD0) 
         Ŵ = zeros(NT, nx̂*He)
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(cov.P̂_0)
         Nk = [0]
