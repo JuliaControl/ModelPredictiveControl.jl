@@ -18,8 +18,8 @@ Construct a direct single shooting [`TranscriptionMethod`](@ref).
 For [`MovingHorizonEstimator`](@ref) objects, the decision variable in the optimization
 problem is (excluding the slack ``ϵ``):
 ```math
-\mathbf{Z} =                        
-    =                               \begin{bmatrix} 
+\mathbf{Z}                        
+    = \begin{bmatrix} 
     \mathbf{x̂}_k(k-N_k+p)           \\
     \mathbf{Ŵ}                      \end{bmatrix}
     =                               \begin{bmatrix}
@@ -51,9 +51,24 @@ struct SingleShooting <: ShootingMethod end
 
 Construct a direct multiple shooting [`TranscriptionMethod`](@ref).
 
-The decision variable is (excluding ``ϵ``):
+For [`MovingHorizonEstimator`](@ref) objects, the decision variable is (excluding ``ϵ``):
 ```math
-\mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \end{bmatrix}
+\mathbf{Z} =                        \begin{bmatrix}
+    \mathbf{X̂_0}                    \\
+    \mathbf{Ŵ}                      \\
+    \mathbf{X̂_0}                    \end{bmatrix}
+    =                               \begin{bmatrix} 
+    \mathbf{x̂}_k(k-N_k+p)           \\
+    \mathbf{Ŵ}                      \\
+    \mathbf{x̂}_k(k-N_k+p)
+    =                               \begin{bmatrix}
+
+```
+and, for [`PredictiveController`](@ref) types:
+```math
+\mathbf{Z} =                        \begin{bmatrix} 
+    \mathbf{ΔU}                     \\ 
+    \mathbf{X̂_0}                    \end{bmatrix}
 ```
 thus it also includes the predicted states, expressed as deviation vectors from the
 operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
@@ -68,11 +83,13 @@ where ``\mathbf{x̂}_i(k+j)`` is the state prediction for time ``k+j``, estimate
 observer at time ``i=k`` or ``i=k-1`` depending on its `direct` flag. Note that 
 ``\mathbf{X̂_0 = X̂}`` if the operating point is zero, which is typically the case in practice
 for [`NonLinModel`](@ref). 
+
+# TODO: the subscript notation is presumably wrong for the MHE.
     
-This transcription computes the predictions by calling the augmented discrete-time model
+This transcription codmputes the predictions by calling the augmented discrete-time model
 in the equality constraint function recursively over ``H_p``, or by updating the linear
 equality constraint vector for [`LinModel`](@ref). It is generally more efficient for large
-control horizon ``H_c``, unstable or highly nonlinear models/constraints. Multithreading
+``H_c`` or ``H_e`` values, unstable or highly nonlinear models/constraints. Multithreading
 with `f_threads` or `h_threads` keyword arguments can be advantageous if ``\mathbf{f}`` or 
 ``\mathbf{h}`` in the [`NonLinModel`](@ref) is expensive to evaluate, respectively.
 

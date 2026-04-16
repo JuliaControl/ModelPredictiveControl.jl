@@ -1279,6 +1279,12 @@ function init_predmat_mhe(
     return E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 end
 
+function init_defectmat_mhe(
+    model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, p
+) where {NT<:Real}
+    
+end
+
 """
     init_optimization!(
         estim::MovingHorizonEstimator, model::LinModel, optim::JuMP.GenericModel
