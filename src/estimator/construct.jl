@@ -370,7 +370,7 @@ function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0)
 end
 
 """
-    default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
+    default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0) -> nint_ym
 
 One integrator on each measured output by default for other cases e.g. [`NonLinModel`](@ref).
 
