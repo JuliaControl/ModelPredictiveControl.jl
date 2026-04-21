@@ -68,7 +68,7 @@ end
 @doc raw"""
     LinModel(sys::StateSpace[, Ts]; i_u=1:size(sys,2), i_d=Int[])
 
-Construct a linear model from state-space model `sys` with sampling time `Ts` in second.
+Construct a linear model from state-space model `sys` with sampling time `Ts` in seconds.
 
 The system `sys` can be continuous or discrete-time (`Ts` can be omitted for the latter).
 For continuous dynamics, its state-space equations are (discrete case in Extended Help):
