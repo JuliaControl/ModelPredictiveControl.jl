@@ -133,9 +133,9 @@ form. The optional parameter `NT` explicitly set the number type of vectors (def
 See also [`LinModel`](@ref).
 
 # Arguments
-- `f::Function` or `f!`: state function.
-- `h::Function` or `h!`: output function.
-- `Ts`: sampling time of in second.
+- `f::Function` or `f!`: state function of the model.
+- `h::Function` or `h!`: output function of the model.
+- `Ts`: sampling time of the model in seconds.
 - `nu`: number of manipulated inputs.
 - `nx`: number of states.
 - `ny`: number of outputs.
