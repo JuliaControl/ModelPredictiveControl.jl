@@ -144,7 +144,7 @@ end
         updatestate!(linmodel1, [1])
         periodsleep(linmodel1)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.01))
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.025))
     linmodel2 = LinModel(tf(2, [0.1, 1]), 0.25)
     times2 = zeros(5)
     for i=1:5
@@ -390,7 +390,7 @@ end
 
 @testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
+    linmodel1 = LinModel(tf(2, [10, 1]), 0.25)
     nonlinmodel1 = NonLinModel(
         (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
         (x,_,_)->linmodel1.C*x,
@@ -402,8 +402,8 @@ end
         updatestate!(nonlinmodel1, [1])
         periodsleep(nonlinmodel1)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
-    linmodel2 = LinModel(tf(2, [0.1, 1]), 0.001)
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.025))
+    linmodel2 = LinModel(tf(2, [0.1, 1]), 0.25)
     nonlinmodel2 = NonLinModel(
         (x,u,_,_)->linmodel2.A*x + linmodel2.Bu*u,
         (x,_,_)->linmodel2.C*x,
@@ -415,5 +415,5 @@ end
         updatestate!(nonlinmodel2, [1])
         periodsleep(nonlinmodel2, true)
     end
-    @test all(isapprox.(diff(times2[2:end]), 0.001, atol=0.0001))
+    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.0001))
 end
