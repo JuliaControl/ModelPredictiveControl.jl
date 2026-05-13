@@ -194,25 +194,28 @@ end
 
 Construct a moving horizon estimator (MHE) based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
 
-It can handle constraints on the estimates, see [`setconstraint!`](@ref). Additionally, 
-`model` is not linearized like the [`ExtendedKalmanFilter`](@ref), and the probability 
-distribution is not approximated like the [`UnscentedKalmanFilter`](@ref). The computational
-costs are drastically higher, however, since it minimizes the following objective function
-at each discrete time ``k``:
+It can handle constraints on the estimates. Additionally, `model` is not linearized like the
+[`ExtendedKalmanFilter`](@ref), and the probability  distribution is not approximated like
+the [`UnscentedKalmanFilter`](@ref). The computational costs are drastically higher, 
+however, since it minimizes the following objective function at each discrete time ``k``:
 ```math
 \min_{\mathbf{x̂}_k(k-N_k+p), \mathbf{Ŵ}, ε}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
                                             + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
                                             + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
                                             + C ε^2
 ```
-in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
+subject to [`setconstraints!`](@ref) bounds, and the custom inequality constraints:
+```math
+\mathbf{g_c}(\mathbf{X̂, Ŵ, V̂, U, Y^m, D, P̄, x̄, p}, ε) ≤ \mathbf{0}
+```
+and in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
 ```math
 \begin{aligned}
     \mathbf{x̄} &= \mathbf{x̂}_{k-N_k}(k-N_k+p) - \mathbf{x̂}_k(k-N_k+p) \\
     \mathbf{P̄} &= \mathbf{P̂}_{k-N_k}(k-N_k+p)
 \end{aligned}
 ```
-and the covariances are repeated ``N_k`` times:
+The covariances are repeated ``N_k`` times:
 ```math
 \begin{aligned}
     \mathbf{Q̂}_{N_k} &= \text{diag}\mathbf{(Q̂,Q̂,...,Q̂)}  \\

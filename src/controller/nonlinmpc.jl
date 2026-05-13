@@ -167,7 +167,7 @@ controller minimizes the following objective function at each discrete time ``k`
 ```
 subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraints:
 ```math
-\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}
+\mathbf{g_c}(\mathbf{U_e, Ŷ_e, D̂_e, p}, ϵ) ≤ \mathbf{0}
 ```
 with the decision variables ``\mathbf{Z}`` and slack ``ϵ``. By default, a [`SingleShooting`](@ref)
 transcription method is used, hence ``\mathbf{Z=ΔU}``. The economic function ``J_E`` can
