@@ -125,7 +125,7 @@ end
 """
     validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing)
 
-Validate sizes and Hermitianity of process `Q̂`` and sensor `R̂` noises covariance matrices.
+Validate sizes and Hermitianity of process `Q̂` and sensor `R̂` noises covariance matrices.
 
 Also validate initial estimate covariance `P̂_0`, if provided.
 """

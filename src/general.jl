@@ -211,7 +211,7 @@ to_hermitian(A) = A
 """
 Compute the inverse of a the Hermitian positive definite matrix `A` in-place and return it.
 
-There is 3 methods for this function:
+There are 3 methods for this function:
 - If `A` is a `Hermitian{<Real, Matrix{<:Real}}`, it uses `LAPACK.potrf!` and 
   `LAPACK.potri!` functions to compute the Cholesky factor and then the inverse. This is
   allocation-free. See <https://tinyurl.com/4pwdwbcj> for the source.
