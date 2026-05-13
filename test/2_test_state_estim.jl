@@ -1423,6 +1423,8 @@ end
     @test mhe2.cov.R̂ ≈ [1e-6]
     @test mhe2.cov.invR̂_He ≈ diagm(repeat([1e6], He))
     @test_throws ErrorException setmodel!(mhe2, deepcopy(nonlinmodel))
+    @test_throws ErrorException setmodel!(mhe, Q̂=diagm([-0.1]))
+    @test_throws ErrorException setmodel!(mhe, R̂=diagm([-0.1]))
 end
 
 @testitem "MovingHorizonEstimator v.s. Kalman filters" setup=[SetupMPCtests] begin
