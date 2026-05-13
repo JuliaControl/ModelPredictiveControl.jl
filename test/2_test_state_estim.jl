@@ -1410,14 +1410,18 @@ end
     @test mhe.con.x̃0max ≈ [+1000 - 8.0]
     setmodel!(mhe, Q̂=[1e-3], R̂=[1e-6])
     @test mhe.cov.Q̂ ≈ [1e-3]
+    @test mhe.cov.invQ̂_He ≈ diagm(repeat([1e3], He))
     @test mhe.cov.R̂ ≈ [1e-6]
+    @test mhe.cov.invR̂_He ≈ diagm(repeat([1e6], He))
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Du*d
     nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1, p=linmodel, solver=nothing)
     mhe2 = MovingHorizonEstimator(nonlinmodel; He, nint_ym=0)
     setmodel!(mhe2, Q̂=[1e-3], R̂=[1e-6])
     @test mhe2.cov.Q̂ ≈ [1e-3]
+    @test mhe2.cov.invQ̂_He ≈ diagm(repeat([1e3], He))
     @test mhe2.cov.R̂ ≈ [1e-6]
+    @test mhe2.cov.invR̂_He ≈ diagm(repeat([1e6], He))
     @test_throws ErrorException setmodel!(mhe2, deepcopy(nonlinmodel))
 end
 

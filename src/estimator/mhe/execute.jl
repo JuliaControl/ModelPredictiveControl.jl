@@ -952,14 +952,30 @@ function setmodel_estimator!(
         estim.cov.Q̂ .= to_hermitian(Q̂)
         invQ̂  = Hermitian(estim.buffer.Q̂, :L)
         invQ̂ .= estim.cov.Q̂
-        inv!(invQ̂)
+        try
+            inv!(invQ̂)
+        catch err
+            if err isa PosDefException
+                error("Q̂ is not positive definite")
+            else
+                rethrow()
+            end
+        end
         estim.cov.invQ̂_He .= Hermitian(repeatdiag(invQ̂, He), :L)
     end
     if !isnothing(R̂) 
         estim.cov.R̂ .= to_hermitian(R̂)
         invR̂  = Hermitian(estim.buffer.R̂, :L)
         invR̂ .= estim.cov.R̂
-        inv!(invR̂)
+        try
+            inv!(invR̂)
+        catch err
+            if err isa PosDefException
+                error("R̂ is not positive definite")
+            else
+                rethrow()
+            end
+        end
         estim.cov.invR̂_He .= Hermitian(repeatdiag(invR̂, He), :L)
     end
     return nothing
