@@ -751,7 +751,7 @@ function predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim::MovingHorizonEstimator, m
     nu, nd, nx̂, nŵ, nym = model.nu, model.nd, estim.nx̂, estim.nx̂, estim.nym
     nx̃ = nε + nx̂
     x̂0 = @views Z̃[nx̃-nx̂+1:nx̃]
-    if estim.direct
+    if estim.direct # p = 0
         ŷ0next = ŷ0
         d0 = @views estim.D0[1:nd]
         for j=1:Nk
@@ -767,11 +767,11 @@ function predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim::MovingHorizonEstimator, m
             V̂[(1 + nym*(j-1)):(nym*j)] .= y0nextm .- ŷ0nextm
             x̂0, d0 = x̂0next, d0next
         end        
-    else
+    else        # p = 1
         for j=1:Nk
             y0m = @views estim.Y0m[(1 + nym * (j-1)):(nym*j)]
-            d0  = @views estim.D0[ (1 + nd  * (j-1)):(nd*j)]
             u0  = @views estim.U0[ (1 + nu  * (j-1)):(nu*j)]
+            d0  = @views estim.D0[ (1 + nd*j):(nd*(j+1))] # 1st one is d(k-Nk), not used
             ŵ   = @views Z̃[(1 + nx̃ + nŵ*(j-1)):(nx̃ + nŵ*j)]
             ĥ!(ŷ0, estim, model, x̂0, d0)
             ŷ0m = @views ŷ0[estim.i_ym]
