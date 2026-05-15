@@ -1,4 +1,4 @@
-<img width="822" height="618" alt="image" src="https://github.com/user-attachments/assets/f69baf89-667d-4743-a7dd-1135a3b4164d" />
+<img width="411" height="309" alt="image" src="https://github.com/user-attachments/assets/f69baf89-667d-4743-a7dd-1135a3b4164d" />
 
 # ModelPredictiveControl.jl
 
