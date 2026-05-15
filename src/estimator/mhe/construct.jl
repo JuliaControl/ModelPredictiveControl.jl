@@ -205,7 +205,7 @@ however, since it minimizes the following objective function at each discrete ti
 ```
 subject to [`setconstraints!`](@ref) bounds, and the custom inequality constraints:
 ```math
-\mathbf{g_c}(\mathbf{X̂, Ŵ, V̂, U, Y^m, D, P̄, x̄, p}, ε) ≤ \mathbf{0}
+\mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε) ≤ \mathbf{0}
 ```
 and in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
 ```math
@@ -230,9 +230,10 @@ N_k =                     \begin{cases}
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` respectively encompass the estimated process
 noises ``\mathbf{ŵ}(k-j+p)`` from ``j=N_k`` to ``1`` and sensor noises ``\mathbf{v̂}(k-j+1)``
 from ``j=N_k`` to ``1``. The Extended Help defines the two vectors, the slack variable
-``ε``, and the estimation of the covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If
-the keyword argument `direct=true` (default value), the constant ``p=0`` in the equations
-above, and the MHE is in the current form. Else ``p=1``, leading to the prediction form.
+``ε``, the other vector arguments of the ``\mathbf{g_c}`` function, and the estimation of
+the covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If the keyword argument
+`direct=true` (default value), the constant ``p=0`` in the equations above, and the MHE is
+in the current form. Else ``p=1``, leading to the prediction form.
 
 See [`UnscentedKalmanFilter`](@ref) for details on the augmented process model and 
 ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. This estimator allocates a fair amount of memory 
@@ -337,6 +338,15 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
     `direct=false`.
+
+    | VECTOR           | DESCRIPTION                              | SIZE            | FIRST TIME STEP     | LAST TIME STEP |
+    | :--------------- | :--------------------------------------- | :-------------- | :------------------ | :------------- | 
+    | ``\mathbf{X̂}``   | estimated states over the window         | `(nx̂*(Nk+1),)`  | ``k - N_k + 1 + p`` | ``k + p``      |
+    | ``\mathbf{V̂}``   | estimated sensor noises over the window  | `(nym*Nk,)`     | ``k - N_k + 1``     | ``k``          |
+    | ``\mathbf{Ŵ}``   | estimated process noises over the window | `(nx̂*Nk,)`      | ``k - N_k + p``     | ``k - 1 + p``  |
+    | ``\mathbf{U}``   | manipulated inputs over the window       | `(nu*Nk,)`      | ``k - N_k + p``     | ``k - 1 + p``  |
+    | ``\mathbf{Y^m}`` | measured outputs over the window         | `(nym*Nk,)`     | ``k - N_k + 1``     | ``k``          |
+    | ``\mathbf{D}``   | measured disturbances over the window    | `(nd*(Nk+1),)`  | ``k - N_k``         | ``k``          |
 
     The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
     and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation
