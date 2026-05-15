@@ -1,7 +1,7 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="/docs/src/assets/logo-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="/docs/src/assets/logo.svg">
-  <img alt="Logo" src="/docs/src/assets/logo.svg" style="width: 200%;">
+  <img alt="Logo" src="/docs/src/assets/logo.svg" style="width: 100%;">
 </picture>
 
 # ModelPredictiveControl.jl
