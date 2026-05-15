@@ -10,7 +10,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , d0, u0)
     estim.H̃         .= 0
     estim.q̃         .= 0
     estim.r         .= 0
-    estim.direct && estim.U0[1:estim.model.nu] .= u0  # add u0(-1) to the data windows
+    estim.direct && (estim.U0[1:estim.model.nu] .= u0)  # add u0(-1) to the data windows
     estim.D0[1:estim.model.nd] .= d0 # add d0(-1) to the data windows
     estim.lastu0 .= u0
     # estim.cov.P̂_0 is P̂(-1|-1) if estim.direct==false, else P̂(-1|0)
