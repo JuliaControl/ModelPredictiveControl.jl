@@ -1,4 +1,8 @@
-<img width="411" height="309" alt="image" src="https://github.com/user-attachments/assets/f69baf89-667d-4743-a7dd-1135a3b4164d" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/docs/src/assets/logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="/docs/src/assets/logo.svg">
+  <img alt="Logo" src="/docs/src/assets/logo.svg" style="width: 200%;">
+</picture>
 
 # ModelPredictiveControl.jl
 
