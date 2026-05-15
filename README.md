@@ -1,3 +1,9 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/docs/src/assets/logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="/docs/src/assets/logo.svg">
+  <img alt="Logo" src="/docs/src/assets/logo.svg" style="width: 250px;">
+</picture>
+
 # ModelPredictiveControl.jl
 
 [![Build Status](https://github.com/JuliaControl/ModelPredictiveControl.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JuliaControl/ModelPredictiveControl.jl/actions/workflows/CI.yml?query=branch%3Amain)

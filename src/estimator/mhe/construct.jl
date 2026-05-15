@@ -157,8 +157,7 @@ struct MovingHorizonEstimator{
         Z̃ = zeros(NT, nZ̃)
         X̂op = repeat(x̂op, He)
         X̂0, Y0m = zeros(NT, nx̂*He), zeros(NT, nym*He)
-        nD0 = direct ? nd*(He+1) : nd*He
-        U0, D0  = zeros(NT, nu*He), zeros(NT, nD0) 
+        U0, D0  = zeros(NT, nu*He), zeros(NT, nd*(He+1)) 
         Ŵ = zeros(NT, nx̂*He)
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
         x̂0arr_old = zeros(NT, nx̂)
@@ -1041,14 +1040,14 @@ produces an estimator in the current form, while the prediction form is obtained
                                         &= \mathbf{E Z + F}
 \end{aligned}
 ```
-in which ``\mathbf{U_0}`` and ``\mathbf{Y_0^m}`` respectively include the deviation values of
-the manipulated inputs ``\mathbf{u_0}(k-j+p)`` from ``j=N_k`` to ``1`` and measured outputs
-``\mathbf{y_0^m}(k-j+1)`` from ``j=N_k`` to ``1``. The vector ``\mathbf{D_0}`` comprises one 
-additional measured disturbance if ``p=0``, that is, it includes the deviation vectors
-``\mathbf{d_0}(k-j+1)`` from ``j=N_k+1-p`` to ``1``. The constant ``\mathbf{B}`` is the
-contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}``
-operating points (for linearization, see [`augment_model`](@ref) and [`linearize`](@ref)).
-The method also returns the matrices for the estimation error at arrival:
+in which ``\mathbf{U_0}`` and ``\mathbf{Y_0^m}`` respectively include the deviation values
+of the manipulated inputs ``\mathbf{u_0}(k-j+p)`` from ``j=N_k`` to ``1`` and measured
+outputs ``\mathbf{y_0^m}(k-j+1)`` from ``j=N_k`` to ``1``. The vector ``\mathbf{D_0}``
+includes the the measured disturbance deviation values ``\mathbf{d_0}(k-j)`` from from
+``j=N_k`` to ``0``. The constant ``\mathbf{B}`` is the contribution for non-zero state
+``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}`` operating points (for linearization,
+see [`augment_model`](@ref) and [`linearize`](@ref)). The method also returns the matrices
+for the estimation error at arrival:
 ```math
     \mathbf{x̄} = \mathbf{x̂_0^†}(k-N_k+p) - \mathbf{x̂_0}(k-N_k+p) = \mathbf{e_x̄ Z + f_x̄}
 ```
@@ -1111,10 +1110,10 @@ see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstrain
         \vdots                                      & \vdots                                        & \ddots & \vdots       \\
         \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_u}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_u}    & \cdots & \mathbf{0}   \end{bmatrix} \\
     \mathbf{J} &= - \begin{bmatrix}
-        \mathbf{D̂_d^m}                              & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
-        \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂_d^m}                                & \cdots & \mathbf{0}   \\ 
-        \vdots                                      & \vdots                                        & \ddots & \vdots       \\
-        \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{D̂_d^m} \end{bmatrix} \\
+        \mathbf{0}  & \mathbf{D̂_d^m}                              & \mathbf{0}                                    & \cdots & \mathbf{0}   \\ 
+        \mathbf{0}  & \mathbf{Ĉ^m}\mathbf{Â}^{0}\mathbf{B̂_d}      & \mathbf{D̂_d^m}                                & \cdots & \mathbf{0}   \\ 
+        \vdots      & \vdots                                      & \vdots                                        & \ddots & \vdots       \\
+        \mathbf{0}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-2}\mathbf{B̂_d}  & \mathbf{Ĉ^m}\mathbf{Â}^{H_e-3}\mathbf{B̂_d}    & \cdots & \mathbf{D̂_d^m} \end{bmatrix} \\
     \mathbf{B} &= - \begin{bmatrix}
         \mathbf{0}                           \\  
         \mathbf{Ĉ^m S}(0)                    \\
@@ -1141,8 +1140,8 @@ see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstrain
         \vdots                              & \vdots                            & \ddots & \vdots                       \\
         \mathbf{Â}^{H_e-1}\mathbf{B̂_d}      & \mathbf{Â}^{H_e-2}\mathbf{B̂_d}    & \cdots & \mathbf{Â}^{0}\mathbf{B̂_d}   \end{bmatrix} \ , \quad
     \mathbf{J_x̂} = \begin{cases}
-        [\begin{smallmatrix} \mathbf{J_x̂^†} & \mathbf{0} \end{smallmatrix}]     & p=0                                   \\
-                             \mathbf{J_x̂^†}                                     & p=1                                   \end{cases}   \\
+        [\begin{smallmatrix} \mathbf{J_x̂^†} & \mathbf{0}      \end{smallmatrix}]   & p=0                                \\
+        [\begin{smallmatrix} \mathbf{0}     & \mathbf{J_x̂^†}  \end{smallmatrix}]   & p=1                                \end{cases}   \\
     \mathbf{B_x̂} &= \begin{bmatrix}
         \mathbf{S}(0)                    \\
         \mathbf{S}(1)                    \\
@@ -1221,11 +1220,9 @@ function init_predmat_mhe(
     # --- measured disturbances D ---
     nĈm_Âpow_B̂d = reduce(vcat, getpower(nĈm_Âpow3D, i)*B̂d for i=0:He-1)
     nĈm_Âpow_B̂d = [-D̂dm; nĈm_Âpow_B̂d]
-    J = zeros(NT, nym*He, nd*(He+1-p))
-    col_begin = iszero(p) ? 1    : 0
-    col_end   = iszero(p) ? He+1 : He
-    i=0
-    for j=col_begin:col_end-1
+    J = zeros(NT, nym*He, nd*(He+1))
+    i = 0
+    for j=1:He
         iRow = (1 + i*nym):(nym*He)
         iCol = (1:nd) .+ j*nd
         J[iRow, iCol] = nĈm_Âpow_B̂d[1:length(iRow) ,:]
@@ -1233,10 +1230,10 @@ function init_predmat_mhe(
     end
     iszero(p) && @views (J[:, 1:nd] = nĈm_Âpow_B̂d[nym+1:end, :])
     Âpow_B̂d = reduce(vcat, getpower(Âpow3D, i)*B̂d for i=0:He-1)
-    Jx̂ = zeros(NT, nx̂*He, nd*(He+1-p))
+    Jx̂ = zeros(NT, nx̂*He, nd*(He+1))
     for j=0:He-1
         iRow = (1 + j*nx̂):(nx̂*He)
-        iCol = (1:nd) .+ j*nd
+        iCol = (1:nd) .+ j*nd .+ p
         Jx̂[iRow, iCol] = Âpow_B̂d[1:length(iRow) ,:]
     end
     # --- state x̂op and state update f̂op operating points ---
