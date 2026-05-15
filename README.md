@@ -1,3 +1,5 @@
+<img width="411" height="309" alt="image" src="https://github.com/user-attachments/assets/f69baf89-667d-4743-a7dd-1135a3b4164d" />
+
 # ModelPredictiveControl.jl
 
 [![Build Status](https://github.com/JuliaControl/ModelPredictiveControl.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JuliaControl/ModelPredictiveControl.jl/actions/workflows/CI.yml?query=branch%3Amain)
