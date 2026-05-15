@@ -10,13 +10,10 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, _ , d0, u0)
     estim.H̃         .= 0
     estim.q̃         .= 0
     estim.r         .= 0
-    if estim.direct
-        # add u0(-1) and d0(-1) to the data windows:
-        estim.U0[1:estim.model.nu] .= u0
-        estim.D0[1:estim.model.nd] .= d0
-    end
+    estim.direct && estim.U0[1:estim.model.nu] .= u0  # add u0(-1) to the data windows
+    estim.D0[1:estim.model.nd] .= d0 # add d0(-1) to the data windows
     estim.lastu0 .= u0
-    # estim.cov.P̂_0 is in fact P̂(-1|-1) is estim.direct==false, else P̂(-1|0)
+    # estim.cov.P̂_0 is P̂(-1|-1) if estim.direct==false, else P̂(-1|0)
     invert_cov!(estim, estim.cov.P̂_0)
     estim.P̂arr_old  .= estim.cov.P̂_0
     estim.x̂0arr_old .= 0
@@ -323,10 +320,7 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.Nk .= estim.He
     else
         estim.Y0m[(1 + nym*(Nk-1)):(nym*Nk)]  .= y0m
-        if nd > 0
-            # D0 include 1 additional measured disturbance if direct==true (p==0):
-            estim.D0[(1 + nd*(Nk-p)):(nd*Nk+1-p)] .= d0 
-        end  
+        nd > 0 && (estim.D0[(1 + nd*Nk):(nd*(Nk+1))] .= d0)
         estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]     .= u0
         estim.X̂0[(1 + nx̂*(Nk-1)):(nx̂*Nk)]     .= x̂0
         estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]      .= ŵ
