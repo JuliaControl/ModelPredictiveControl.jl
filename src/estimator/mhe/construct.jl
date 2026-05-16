@@ -119,6 +119,7 @@ struct MovingHorizonEstimator{
     function MovingHorizonEstimator{NT}(
         model::SM, 
         He, i_ym, nint_u, nint_ym, cov::KC, Cwt, 
+        gc, nc, p,
         optim::JM, gradient::GB, jacobian::JB, hessian::HB, covestim::CE;
         direct=true
     ) where {
@@ -203,7 +204,7 @@ however, since it minimizes the following objective function at each discrete ti
                                             + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
                                             + C ε^2
 ```
-subject to [`setconstraints!`](@ref) bounds, and the custom inequality constraints:
+subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraints:
 ```math
 \mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε) ≤ \mathbf{0}
 ```
@@ -271,6 +272,11 @@ transcription for now.
 - `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
+- `gc=(_,_,_,_,_,_,_,_,_,_,_)->nothing` or `gc!` : custom nonlinear inequality constraint function 
+   ``\\mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε)``, mutating or not (details in
+   Extended Help).
+- `nc=0` : number of custom nonlinear inequality constraints.
+- `p=model.p` : ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
 - `optim=default_optim_mhe(model)` : a [`JuMP.Model`](@extref) object with a quadratic or
    nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
@@ -428,6 +434,10 @@ function MovingHorizonEstimator(
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
     sigmaQint_ym   = fill(1, max(sum(nint_ym), 0)),
     Cwt::Real = Inf,
+    gc!::Function = (_,_,_,_,_,_,_,_,_,_,_) -> nothing,
+    gc ::Function = gc!,
+    nc ::Int = 0,
+    p = model.p,
     optim::JM = default_optim_mhe(model),
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
@@ -447,8 +457,8 @@ function MovingHorizonEstimator(
     R̂   = Diagonal([σR;].^2)
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
     return MovingHorizonEstimator(
-        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt; 
-        direct, optim, gradient, jacobian, hessian
+        model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt;
+        gc, gc!, nc, p, direct, optim, gradient, jacobian, hessian
     )
 end
 
@@ -458,6 +468,9 @@ default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_brid
 @doc raw"""
     MovingHorizonEstimator(
         model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
+        gc!=(_,_,_,_,_,_,_,_,_,_,_) -> nothing,
+        gc=gc!,
+        nc=0,
         optim=default_optim_mhe(model), 
         gradient=AutoForwardDiff(),
         jacobian=AutoForwardDiff(),
@@ -479,6 +492,10 @@ of [`setstate!`](@ref) at the desired value.
 """
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
+    gc!::Function = (_,_,_,_,_,_,_,_,_,_,_) -> nothing,
+    gc ::Function = gc!,
+    nc = 0,
+    p = model.p,
     optim::JM = default_optim_mhe(model),
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
@@ -492,7 +509,8 @@ function MovingHorizonEstimator(
     validate_covestim(cov, covestim)
     return MovingHorizonEstimator{NT}(
         model, 
-        He, i_ym, nint_u, nint_ym, cov, Cwt, 
+        He, i_ym, nint_u, nint_ym, cov, Cwt,
+        gc, nc, p,
         optim, gradient, jacobian, hessian, covestim; 
         direct
     )

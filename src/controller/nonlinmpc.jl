@@ -222,8 +222,8 @@ This controller allocates memory at each time step for the optimization.
 - `JE=(_,_,_,_,_)->0.0` : economic or custom cost function ``J_E(\mathbf{U_e}, \mathbf{Ŷ_e},
    \mathbf{D̂_e}, \mathbf{p}, ϵ)``.
 - `gc=(_,_,_,_,_,_)->nothing` or `gc!` : custom nonlinear inequality constraint function 
-   ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ)``, mutating or 
-   not (details in Extended Help).
+   ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e, D̂_e, p}, ϵ)``, mutating or not (details in
+   Extended Help).
 - `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
 - `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
