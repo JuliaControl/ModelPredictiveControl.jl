@@ -204,7 +204,7 @@ however, since it minimizes the following objective function at each discrete ti
                                             + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
                                             + C ε^2
 ```
-subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraints:
+subject to [`setconstraint!`](@ref) bounds, and the custom nonlinear inequality constraints:
 ```math
 \mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε) ≤ \mathbf{0}
 ```
@@ -277,7 +277,7 @@ transcription for now.
    Extended Help).
 - `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
-- `optim=default_optim_mhe(model)` : a [`JuMP.Model`](@extref) object with a quadratic or
+- `optim=default_optim_mhe(model,nc)` : a [`JuMP.Model`](@extref) object with a quadratic or
    nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
 - `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
@@ -446,7 +446,7 @@ function MovingHorizonEstimator(
     gc ::Function = gc!,
     nc ::Int = 0,
     p = model.p,
-    optim::JM = default_optim_mhe(model),
+    optim::JM = default_optim_mhe(model, nc),
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
     hessian::Union{AbstractADType, Bool, Nothing} = false,
@@ -470,8 +470,14 @@ function MovingHorizonEstimator(
     )
 end
 
-default_optim_mhe(::LinModel) = JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=false)
-default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
+"Default optimizer for MHE, depending on the model and the number of custom NL constraints."
+function default_optim_mhe(model::SimModel, nc)
+    if model isa LinModel && iszero(nc)
+        return JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=false)
+    else
+        return JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
+    end
+end
 
 @doc raw"""
     MovingHorizonEstimator(
@@ -479,7 +485,7 @@ default_optim_mhe(::SimModel) = JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_brid
         gc!=(_,_,_,_,_,_,_,_,_,_,_) -> nothing,
         gc=gc!,
         nc=0,
-        optim=default_optim_mhe(model), 
+        optim=default_optim_mhe(model, nc), 
         gradient=AutoForwardDiff(),
         jacobian=AutoForwardDiff(),
         hessian=false,
@@ -504,7 +510,7 @@ function MovingHorizonEstimator(
     gc ::Function = gc!,
     nc = 0,
     p = model.p,
-    optim::JM = default_optim_mhe(model),
+    optim::JM = default_optim_mhe(model, nc),
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
     hessian::Union{AbstractADType, Bool, Nothing} = false,
