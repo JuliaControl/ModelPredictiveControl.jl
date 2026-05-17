@@ -231,10 +231,10 @@ N_k =                     \begin{cases}
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` respectively encompass the estimated process
 noises ``\mathbf{ŵ}(k-j+p)`` from ``j=N_k`` to ``1`` and sensor noises ``\mathbf{v̂}(k-j+1)``
 from ``j=N_k`` to ``1``. The Extended Help defines the two vectors, the slack variable
-``ε``, the other vector arguments of the ``\mathbf{g_c}`` function, and the estimation of
-the covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If the keyword argument
-`direct=true` (default value), the constant ``p=0`` in the equations above, and the MHE is
-in the current form. Else ``p=1``, leading to the prediction form.
+``ε``, the other arguments of the ``\mathbf{g_c}`` function, and the estimation of the
+covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If the keyword argument `direct=true`
+(default value), the constant ``p=0`` in the equations above, and the MHE is in the current
+form. Else ``p=1``, leading to the prediction form.
 
 See [`UnscentedKalmanFilter`](@ref) for details on the augmented process model and 
 ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. This estimator allocates a fair amount of memory 
@@ -273,7 +273,7 @@ transcription for now.
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
 - `gc=(_,_,_,_,_,_,_,_,_,_,_)->nothing` or `gc!` : custom nonlinear inequality constraint function 
-   ``\\mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε)``, mutating or not (details in
+   ``\mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε)``, mutating or not (details in
    Extended Help).
 - `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
@@ -343,16 +343,28 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     with ``p=1`` is particularly useful for the MHE since it moves its expensive
     computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
-    `direct=false`.
+    `direct=false`. 
 
-    | VECTOR           | DESCRIPTION                              | SIZE            | FIRST TIME STEP     | LAST TIME STEP |
-    | :--------------- | :--------------------------------------- | :-------------- | :------------------ | :------------- | 
-    | ``\mathbf{X̂}``   | estimated states over the window         | `(nx̂*(Nk+1),)`  | ``k - N_k + 1 + p`` | ``k + p``      |
-    | ``\mathbf{V̂}``   | estimated sensor noises over the window  | `(nym*Nk,)`     | ``k - N_k + 1``     | ``k``          |
-    | ``\mathbf{Ŵ}``   | estimated process noises over the window | `(nx̂*Nk,)`      | ``k - N_k + p``     | ``k - 1 + p``  |
-    | ``\mathbf{U}``   | manipulated inputs over the window       | `(nu*Nk,)`      | ``k - N_k + p``     | ``k - 1 + p``  |
-    | ``\mathbf{Y^m}`` | measured outputs over the window         | `(nym*Nk,)`     | ``k - N_k + 1``     | ``k``          |
-    | ``\mathbf{D}``   | measured disturbances over the window    | `(nd*(Nk+1),)`  | ``k - N_k``         | ``k``          |
+    The argument ``\mathbf{p}`` in the ``\mathbf{g_c}`` function is a custom parameter
+    object of any type, but use a mutable one if you want to modify it later e.g.: a vector.
+    The slack variable ``ε`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
+    It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
+    problems with two or more types of bounds, to ensure feasibility (e.g. on ``\mathbf{x̂}``
+    and ``\mathbf{v̂}``). The following table details the other arguments of ``\mathbf{g_c}``, 
+    including the time steps of the first and last sample in them. Note that the vectors
+    will grows with time until ``N_k = H_e`` is reached, and the windows don't start at the
+    same time step (a side-effect of the current form).
+
+    | ARGUMENT         | SIZE            | FIRST SAMPLE    | LAST SAMPLE     |
+    | :--------------- | :-------------- | :-------------- | :-------------- | 
+    | ``\mathbf{X̂}``   | `(nx̂*(Nk+1),)`  | ``k - N_k + p`` | ``k + p``       |
+    | ``\mathbf{V̂}``   | `(nym*Nk,)`     | ``k - N_k + 1`` | ``k``           |
+    | ``\mathbf{Ŵ}``   | `(nx̂*Nk,)`      | ``k - N_k + p`` | ``k - 1 + p``   |
+    | ``\mathbf{U}``   | `(nu*Nk,)`      | ``k - N_k + p`` | ``k - 1 + p``   |
+    | ``\mathbf{Y^m}`` | `(nym*Nk,)`     | ``k - N_k + 1`` | ``k``           |
+    | ``\mathbf{D}``   | `(nd*(Nk+1),)`  | ``k - N_k``     | ``k``           |
+    | ``\mathbf{P̄}``   | `(nx̂, nx̂)`      | ``k - N_k + p`` | ``k - N_k + p`` |
+    | ``\mathbf{x̄}``   | `(nx̂,)`         | ``k - N_k + p`` | ``k - N_k + p`` |
 
     The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
     and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation
@@ -411,14 +423,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     )
     ```
     that is, it will test many coloring orders at preparation and keep the best. 
-    
-    The slack variable ``ε`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
-    It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
-    problems with two or more types of bounds, to ensure feasibility (e.g. on the estimated
-    state ``\mathbf{x̂}`` and sensor noise ``\mathbf{v̂}``). Note that if `Cwt≠Inf`, the
-    attribute `nlp_scaling_max_gradient` of `Ipopt` is set to  `10/Cwt` (if not already set), 
-    to scale the small values of ``ε``. Use the second constructor to specify the arrival
-    covariance estimation method.
+
+    Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
+    `10/Cwt` (if not already set), to scale the small values of ``ε``. Use the second
+    constructor to specify the arrival covariance estimation method.
 """
 function MovingHorizonEstimator(
     model::SM;
