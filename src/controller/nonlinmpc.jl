@@ -121,7 +121,7 @@ struct NonLinMPC{
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
-        test_custom_functions(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
+        test_custom_function_mpc(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
         Mo, Co, λo = init_orthocolloc(model, transcription)
         nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
@@ -442,7 +442,7 @@ function NonLinMPC(
     nb = move_blocking(Hp, Hc)
     Hc = get_Hc(nb)
     validate_JE(NT, JE)
-    gc! = get_mutating_gc(NT, gc)
+    gc! = get_mutating_gc_mpc(NT, gc)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     hessian = validate_hessian(hessian, gradient, DEFAULT_NONLINMPC_HESSIAN)
     return NonLinMPC{NT}(
@@ -471,18 +471,23 @@ function validate_JE(NT, JE)
 end
 
 """
-    validate_gc(NT, gc) -> ismutating
+    validate_gc_mpc(NT, gc) -> ismutating
 
-Validate `gc` function argument signature and return `true` if it is mutating.
+Validate `gc` function argument signature for MPC and return `true` if it is mutating.
 """
-function validate_gc(NT, gc)
+function validate_gc_mpc(NT, gc)
     ismutating = hasmethod(
         gc, 
         #     LHS,        Ue,         Ŷe,         D̂e,         p,   ϵ
         Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}
     )
+    isnonmutating = hasmethod(
+        gc, 
+        #     Ue,         Ŷe,         D̂e,         p,   ϵ
+        Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}
+    )
     #                                      Ue,         Ŷe,         D̂e,         p,   ϵ
-    if !(ismutating || hasmethod(gc, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}))
+    if !(ismutating || isnonmutating)
         error(
             "the custom constraint function has no method with type signature "*
             "gc(Ue::Vector{$(NT)}, Ŷe::Vector{$(NT)}, D̂e::Vector{$(NT)}, p::Any, ϵ::$(NT)) "*
@@ -494,8 +499,8 @@ function validate_gc(NT, gc)
 end
 
 "Get mutating custom constraint function `gc!` from the provided function in argument."
-function get_mutating_gc(NT, gc)
-    ismutating_gc = validate_gc(NT, gc)
+function get_mutating_gc_mpc(NT, gc)
+    ismutating_gc = validate_gc_mpc(NT, gc)
     gc! = if ismutating_gc
         gc
     else
@@ -508,7 +513,7 @@ function get_mutating_gc(NT, gc)
 end
 
 """
-    test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
+    test_custom_function_mpc(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
 
 Test the custom functions `JE` and `gc!` at the operating point `Uop`, `Yop`, `Dop`.
 
@@ -516,7 +521,7 @@ This function is called at the end of `NonLinMPC` construction. It warns the use
 custom cost `JE` and constraint `gc!` functions crash at `model` operating points. This
 should ease troubleshooting of simple bugs e.g.: the user forgets to set the `nc` argument.
 """
-function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
+function test_custom_function_mpc(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
     uop, dop, yop = model.uop, model.dop, model.yop
     Ue, Ŷe, D̂e = [Uop; uop], [yop; Yop], [dop; Dop]
     ϵ = zero(NT)

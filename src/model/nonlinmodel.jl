@@ -249,11 +249,15 @@ Validate `f` function argument signature and return `true` if it is mutating.
 function validate_f(NT, f)
     ismutating = hasmethod(
         f, 
-        #       ẋ or xnext, x,          u,          d,          p    
+        #       ẋ or xnext, x         , u         , d         , p    
         Tuple{  Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any}
     )
-    #                                     x,          u,          d,          p
-    if !(ismutating || hasmethod(f, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any}))
+    isnonmutating = hasmethod(
+        f, 
+        #     x,          u         , d         , p    
+        Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any}
+    )
+    if !(ismutating || isnonmutating)
         error(
             "the state function has no method with type signature "*
             "f(x::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any) or "*
@@ -272,11 +276,15 @@ Validate `h` function argument signature and return `true` if it is mutating.
 function validate_h(NT, h)
     ismutating = hasmethod(
         h, 
-        #     y,          x,          d,          p
+        #     y         , x         , d         , p
         Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any}
     )
-    #                                     x,          d,          p
-    if !(ismutating || hasmethod(h, Tuple{Vector{NT}, Vector{NT}, Any}))
+    isnonmutating = hasmethod(
+        h, 
+        #     x         , d         , p
+        Tuple{Vector{NT}, Vector{NT}, Any}
+    )
+    if !(ismutating || isnonmutating)
         error(
             "the output function has no method with type signature "*
             "h(x::Vector{$(NT)}, d::Vector{$(NT)}, p::Any) or mutating form "*
