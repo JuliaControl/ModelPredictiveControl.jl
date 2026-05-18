@@ -290,8 +290,8 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     are the current state estimator output and measured disturbance, respectively, and 
     ``\mathbf{Ŷ}`` and ``\mathbf{D̂}``, their respective predictions from ``k+1`` to ``k+H_p``. 
     If `LHS` represents the result of the left-hand side in the inequality 
-    ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``,
-    the function `gc` can be implemented in two possible ways:
+    ``\mathbf{g_c}(\mathbf{U_e, Ŷ_e, D̂_e, p}, ϵ) ≤ \mathbf{0}``, the function `gc` can be
+    implemented in two possible ways:
     
     1. **Non-mutating function** (out-of-place): define it as `gc(Ue, Ŷe, D̂e, p, ϵ) -> LHS`.
        This syntax is simple and intuitive but it allocates more memory.
