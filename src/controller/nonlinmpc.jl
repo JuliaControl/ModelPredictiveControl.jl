@@ -931,7 +931,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     myNaN, myInf                      = convert(JNT, NaN), convert(JNT, Inf)
     ΔŨ::Vector{JNT}                   = zeros(JNT, nΔŨ)
     x̂0end::Vector{JNT}                = zeros(JNT, nx̂)
-    K::Vector{JNT}                   = zeros(JNT, nK)
+    K::Vector{JNT}                    = zeros(JNT, nK)
     Ue::Vector{JNT}, Ŷe::Vector{JNT}  = zeros(JNT, nUe), zeros(JNT, nŶe)
     U0::Vector{JNT}, Ŷ0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nŶ)
     Û0::Vector{JNT}, X̂0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nX̂)
@@ -1119,7 +1119,7 @@ end
 Evaluate the custom inequality constraint `gc` in-place and return it.
 """
 function con_custom!(gc, mpc::NonLinMPC, Ue, Ŷe, ϵ)
-    mpc.con.nc ≠ 0 && mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
+    mpc.con.nc > 0 && mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
     return gc
 end
 
