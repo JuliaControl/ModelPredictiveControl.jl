@@ -115,11 +115,17 @@ struct MovingHorizonEstimator{
     q̃::Vector{NT}
     r::Vector{NT}
     C::NT
-    X̂op::Vector{NT}
+    X̂op ::Vector{NT}
+    Uop ::Vector{NT}
+    Yopm::Vector{NT}
+    Dop ::Vector{NT}
     X̂0 ::Vector{NT}
     Y0m::Vector{NT}
+    Ym ::Vector{NT}
     U0 ::Vector{NT}
+    U  ::Vector{NT}
     D0 ::Vector{NT}
+    D  ::Vector{NT}
     Ŵ  ::Vector{NT}
     x̂0arr_old::Vector{NT}
     P̂arr_old ::Hermitian{NT, Matrix{NT}}
@@ -167,9 +173,14 @@ struct MovingHorizonEstimator{
         # dummy values, updated before optimization:
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
-        X̂op = repeat(x̂op, He)
-        X̂0, Y0m = zeros(NT, nx̂*He), zeros(NT, nym*He)
-        U0, D0  = zeros(NT, nu*He), zeros(NT, nd*(He+1)) 
+        X̂op  = repeat(x̂op, He)
+        Uop  = repeat(model.uop, He)
+        Yopm = repeat(model.yop[i_ym], He)
+        Dop  = repeat(model.dop, He+1)
+        X̂0 = zeros(NT, nx̂*He)
+        Y0m, Ym = zeros(NT, nym*He),    zeros(NT, nym*He)
+        U0,  U  = zeros(NT, nu*He),     zeros(NT, nu*He)
+        D0,  D  = zeros(NT, nd*(He+1)), zeros(NT, nd*(He+1))
         Ŵ = zeros(NT, nx̂*He)
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
         x̂0arr_old = zeros(NT, nx̂)
@@ -190,7 +201,8 @@ struct MovingHorizonEstimator{
             Ẽ, F, G, J, B, ẽx̄, fx̄,
             H̃, q̃, r,
             Cwt,
-            X̂op, X̂0, Y0m, U0, D0, Ŵ, 
+            X̂op, Uop, Yopm, Dop,
+            X̂0, Y0m, Ym, U0, U, D0, D, Ŵ,
             x̂0arr_old, P̂arr_old, Nk,
             direct, corrected,
             buffer
@@ -376,6 +388,19 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     | ``\mathbf{D}``   | `(nd*(Nk+1),)`  | ``k - N_k``     | ``k``           |
     | ``\mathbf{P̄}``   | `(nx̂, nx̂)`      | ``k - N_k + p`` | ``k - N_k + p`` |
     | ``\mathbf{x̄}``   | `(nx̂,)`         | ``k - N_k + p`` | ``k - N_k + p`` |
+
+    If `LHS` represents the result of the left-hand side in the inequality 
+    ``\mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε) ≤ \mathbf{0}``,
+    the function `gc` can be implemented in two possible ways:
+    
+    1. **Non-mutating function** (out-of-place): define it as `gc(X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄,
+        p, ε) -> LHS`. This syntax is simple and intuitive but it allocates more memory.
+    2. **Mutating function** (in-place): define it as `gc!(LHS, X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄,
+       p, ε) -> nothing`. This syntax reduces the allocations and potentially the
+       computational burden as well.
+
+    The keyword argument `nc` is the number of elements in `LHS`, and `gc!`, an alias for
+    the `gc` argument (both `gc` and `gc!` accepts non-mutating and mutating functions). 
 
     The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
     and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation

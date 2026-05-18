@@ -326,6 +326,10 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]      .= ŵ
     end
     estim.x̂0arr_old .= @views estim.X̂0[1:nx̂]
+    # data windows including operating points, needed for custom NL constraints:
+    estim.U  .= estim.U0   .+ estim.Uop
+    estim.Ym .= estim.Y0m  .+ estim.Yopm
+    estim.D  .= estim.D0   .+ estim.Dop
     return ismoving
 end
     
