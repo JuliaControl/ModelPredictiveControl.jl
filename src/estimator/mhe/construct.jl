@@ -893,7 +893,8 @@ function setconstraint!(
     i_Ŵmin, i_Ŵmax  = .!isinf.(con.Ŵmin),  .!isinf.(con.Ŵmax)
     i_V̂min, i_V̂max  = .!isinf.(con.V̂min),  .!isinf.(con.V̂max)
     if notSolvedYet
-        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(model, 
+        con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(
+            model, con.nc,
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max,
             con.A_x̃min, con.A_x̃max, con.A_X̂min, con.A_X̂max, 
             con.A_Ŵmin, con.A_Ŵmax, con.A_V̂min, con.A_V̂max
@@ -930,7 +931,8 @@ function reset_nonlincon!(estim::MovingHorizonEstimator, model::NonLinModel)
 end
 
 @doc raw"""
-    init_matconstraint_mhe(model::LinModel, 
+    init_matconstraint_mhe(
+        model::LinModel, nc::Int,
         i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
     ) -> i_b, i_g, A
 
@@ -943,17 +945,19 @@ The linear and nonlinear inequality constraints are respectively defined as:
     \mathbf{g(Z̃)} &≤ \mathbf{0}
 \end{aligned}
 ```
-`i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are finite numbers. 
-`i_g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if `model` is a 
-[`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if `args` is
-provided. In such a case, `args`  needs to contain all the inequality constraint matrices: 
-`A_x̃min, A_x̃max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max`.
+The argument `nc` is the number of custom nonlinear inequality constraints in
+``\mathbf{g_c}``. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
+finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if
+`model` is a [`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if
+`args` is provided. In such a case, `args`  needs to contain all the inequality constraint
+matrices: `A_x̃min, A_x̃max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max`.
 """
-function init_matconstraint_mhe(::LinModel{NT}, 
+function init_matconstraint_mhe(
+    ::LinModel{NT}, nc::Int,
     i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
 ) where {NT<:Real}
     i_b = [i_x̃min; i_x̃max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax; i_V̂min; i_V̂max]
-    i_g = BitVector()
+    i_g = trues(nc)
     if isempty(args)
         A = zeros(NT, length(i_b), 0)
     else
@@ -964,11 +968,12 @@ function init_matconstraint_mhe(::LinModel{NT},
 end
 
 "Init `i_b, A` without state and sensor noise constraints if `model` is not a [`LinModel`](@ref)."
-function init_matconstraint_mhe(::SimModel{NT}, 
+function init_matconstraint_mhe(
+    ::SimModel{NT}, nc::Int,
     i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
 ) where {NT<:Real}
     i_b = [i_x̃min; i_x̃max; i_Ŵmin; i_Ŵmax]
-    i_g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max]
+    i_g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max; trues(nc)]
     if isempty(args)
         A = zeros(NT, length(i_b), 0)
     else
@@ -1010,7 +1015,8 @@ function init_defaultcon_mhe(
     i_X̂min, i_X̂max = .!isinf.(X̂min), .!isinf.(X̂max)
     i_Ŵmin, i_Ŵmax = .!isinf.(Ŵmin), .!isinf.(Ŵmax)
     i_V̂min, i_V̂max = .!isinf.(V̂min), .!isinf.(V̂max)
-    i_b, i_g, A = init_matconstraint_mhe(model, 
+    i_b, i_g, A = init_matconstraint_mhe(
+        model, nc,
         i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max,
         A_x̃min, A_x̃max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max
     )
