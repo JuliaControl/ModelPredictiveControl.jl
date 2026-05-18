@@ -366,17 +366,24 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     with ``p=1`` is particularly useful for the MHE since it moves its expensive
     computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
-    `direct=false`. 
+    `direct=false`.
+
+    The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
+    and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation
+    scheme is identical, that is `nint_u=0` and `nint_ym` computed by [`default_nint`](@ref).
+    Note that the constructor does not validate the observability of the resulting augmented
+    [`NonLinModel`](@ref). In such cases, it is the user's responsibility to ensure that it
+    is still observable.
 
     The argument ``\mathbf{p}`` in the ``\mathbf{g_c}`` function is a custom parameter
     object of any type, but use a mutable one if you want to modify it later e.g.: a vector.
     The slack variable ``ε`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
-    It is disabled by default for the MHE (from `Cwt=Inf`) but it should be activated for
-    problems with two or more types of bounds, to ensure feasibility (e.g. on ``\mathbf{x̂}``
-    and ``\mathbf{v̂}``). The following table details the other arguments of ``\mathbf{g_c}``, 
-    including the time steps of the first and last sample in them. Note that the vectors
-    will grows with time until ``N_k = H_e`` is reached, and the windows don't start at the
-    same time step (a side-effect of the current form).
+    It is disabled thus always zero by default for the MHE (from `Cwt=Inf`) but it should be
+    activated for problems with two or more types of bounds, to ensure feasibility (e.g. on
+    ``\mathbf{x̂}`` and ``\mathbf{v̂}``). The following table details the other arguments of
+    ``\mathbf{g_c}``, including the time steps of the first and last sample in them. Note
+    that the vectors will grows with time until ``N_k = H_e`` is reached, and the windows
+    don't start at the same time step (a side-effect of the current form).
 
     | ARGUMENT         | SIZE            | FIRST SAMPLE    | LAST SAMPLE     |
     | :--------------- | :-------------- | :-------------- | :-------------- | 
@@ -393,21 +400,14 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     ``\mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε) ≤ \mathbf{0}``,
     the function `gc` can be implemented in two possible ways:
     
-    1. **Non-mutating function** (out-of-place): define it as `gc(X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄,
-        p, ε) -> LHS`. This syntax is simple and intuitive but it allocates more memory.
-    2. **Mutating function** (in-place): define it as `gc!(LHS, X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄,
+    1. **Non-mutating function** (out-of-place): define it as `gc(X̂, V̂, Ŵ, U, Ym, D, P̄, x̄,
+       p, ε) -> LHS`. This syntax is simple and intuitive but it allocates more memory.
+    2. **Mutating function** (in-place): define it as `gc!(LHS, X̂, V̂, Ŵ, U, Ym, D, P̄, x̄,
        p, ε) -> nothing`. This syntax reduces the allocations and potentially the
        computational burden as well.
 
     The keyword argument `nc` is the number of elements in `LHS`, and `gc!`, an alias for
-    the `gc` argument (both `gc` and `gc!` accepts non-mutating and mutating functions). 
-
-    The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
-    and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation
-    scheme is identical, that is `nint_u=0` and `nint_ym` computed by [`default_nint`](@ref).
-    Note that the constructor does not validate the observability of the resulting augmented
-    [`NonLinModel`](@ref). In such cases, it is the user's responsibility to ensure that it
-    is still observable.
+    the `gc` argument (both `gc` and `gc!` accepts non-mutating and mutating functions).
 
     The estimation covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)`` gives an uncertainty
     on the state estimate at the beginning of the window ``k-N_k+p``, that is, in the past.
