@@ -907,11 +907,12 @@ function setconstraint!(
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
         reset_nonlincon!(estim, model)
     else
-        i_b, i_g = init_matconstraint_mhe(model, 
+        i_b, i_g = init_matconstraint_mhe(
+            model, con.nc,
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
         )
         if i_b ≠ con.i_b || i_g ≠ con.i_g
-            error("Cannot modify ±Inf constraints after calling updatestate!")
+            error("Cannot modify ±Inf constraints after first solve of estimation problem")
         end
     end
     return estim
