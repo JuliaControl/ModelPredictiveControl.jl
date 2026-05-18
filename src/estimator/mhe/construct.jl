@@ -1634,13 +1634,15 @@ function get_nonlincon_oracle(
     He = estim.He
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(con.i_g), sum(con.i_g)
+    nc = con.nc
     nV̂, nX̂, nZ̃ = He*nym, He*nx̂, length(estim.Z̃)
     strict = Val(true)
     myNaN, myInf                     = convert(JNT, NaN), convert(JNT, Inf)
     V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
     k::Vector{JNT}                   = zeros(JNT, nk)
     û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
-    g::Vector{JNT}, gi::Vector{JNT}  = zeros(JNT, ng), zeros(JNT, ngi)
+    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc), zeros(JNT, ng)
+    gi::Vector{JNT}                 = zeros(JNT, ngi)
     λi::Vector{JNT}                  = rand(JNT, ngi)
     # -------------- inequality constraint: nonlinear oracle -------------------------
     function gi!(gi, Z̃, V̂, X̂0, û0, k, ŷ0, g)

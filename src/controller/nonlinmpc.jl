@@ -1086,7 +1086,7 @@ function update_predictions!(
     ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
     Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, K, mpc, model, transcription, U0, Z̃)
     Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
-    ϵ = getϵ(mpc, Z̃)
+    ϵ   = getϵ(mpc, Z̃)
     gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
     g   = con_nonlinprog!(g, mpc, model, transcription, x̂0end, Ŷ0, gc, ϵ)
     geq = con_nonlinprogeq!(geq, X̂0, Û0, K, mpc, model, transcription, U0, Z̃)
