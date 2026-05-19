@@ -1527,25 +1527,27 @@ function get_nonlinobj_op(
 ) where JNT<:Real
     model, con = estim.model, estim.con
     grad, hess = estim.gradient, estim.hessian
-    nx̂, nym, nŷ, nu, nk = estim.nx̂, estim.nym, model.ny, model.nu, model.nk
+    nx̂, nym, nŷ, nu, nk, nc = estim.nx̂, estim.nym, model.ny, model.nu, model.nk, con.nc
     He = estim.He
     ng = length(con.i_g)
-    nV̂, nX̂, ng, nZ̃ = He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
+    nŴ, nV̂, nX̂, ng, nZ̃ = He*nx̂, He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
     strict = Val(true)
     myNaN                            = convert(JNT, NaN)
     J::Vector{JNT}                   = zeros(JNT, 1)
+    Ŵ::Vector{JNT}                   = zeros(JNT, nŴ)
     V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
     k::Vector{JNT}                   = zeros(JNT, nk)
     û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
-    g::Vector{JNT}                   = zeros(JNT, ng) 
     x̄::Vector{JNT}                   = zeros(JNT, nx̂)
-    function J!(Z̃, V̂, X̂0, û0, k, ŷ0, g, x̄)
-        update_prediction!(V̂, X̂0, û0, k, ŷ0, g, estim, Z̃)
-        return obj_nonlinprog!(x̄, estim, model, V̂, Z̃)
+    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc), zeros(JNT, ng) 
+    function J!(Z̃, Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g)
+        update_prediction!(Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, estim, Z̃)
+        return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
     Z̃_J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     J_cache = (
-        Cache(V̂),  Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), Cache(g), Cache(x̄),
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), 
+        Cache(x̄), Cache(gc), Cache(g),
     )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
     estim.Nk[] = He
@@ -1635,28 +1637,33 @@ function get_nonlincon_oracle(
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(con.i_g), sum(con.i_g)
     nc = con.nc
-    nV̂, nX̂, nZ̃ = He*nym, He*nx̂, length(estim.Z̃)
+    nŴ, nV̂, nX̂, nZ̃ = He*nx̂, He*nym, He*nx̂, length(estim.Z̃)
     strict = Val(true)
     myNaN, myInf                     = convert(JNT, NaN), convert(JNT, Inf)
+    Ŵ::Vector{JNT}                   = zeros(JNT, nŴ)
     V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
     k::Vector{JNT}                   = zeros(JNT, nk)
     û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
+    x̄::Vector{JNT}                   = zeros(JNT, nx̂)
     gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc), zeros(JNT, ng)
-    gi::Vector{JNT}                 = zeros(JNT, ngi)
+    gi::Vector{JNT}                  = zeros(JNT, ngi)
     λi::Vector{JNT}                  = rand(JNT, ngi)
     # -------------- inequality constraint: nonlinear oracle -------------------------
-    function gi!(gi, Z̃, V̂, X̂0, û0, k, ŷ0, g)
-        update_prediction!(V̂, X̂0, û0, k, ŷ0, g, estim, Z̃)
+    function gi!(gi, Z̃, Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g)
+        update_prediction!(Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, estim, Z̃)
         gi .= @views g[i_g]
         return nothing
     end
-    function ℓ_gi(Z̃, λi, V̂, X̂0, û0, k, ŷ0, g, gi)
-        update_prediction!(V̂, X̂0, û0, k, ŷ0, g, estim, Z̃)
+    function ℓ_gi(Z̃, λi, Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, gi)
+        update_prediction!(Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, estim, Z̃)
         gi .= @views g[i_g]
         return dot(λi, gi)
     end
     Z̃_∇gi = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
-    ∇gi_cache = (Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), Cache(g))
+    ∇gi_cache = (
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), 
+        Cache(x̄), Cache(gc), Cache(g),
+    )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
     estim.Nk[] = He
     ∇gi_prep = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_cache...; strict)
@@ -1665,7 +1672,8 @@ function get_nonlincon_oracle(
     ∇gi_structure = init_diffstructure(∇gi)
     if !isnothing(hess)
         ∇²gi_cache = (
-            Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), Cache(g), Cache(gi)
+            Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), 
+            Cache(x̄), Cache(gc), Cache(g), Cache(gi)
         )
         estim.Nk[] = He # see comment above
         ∇²gi_prep = prepare_hessian(
