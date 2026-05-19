@@ -687,7 +687,9 @@ Objective function of [`MovingHorizonEstimator`](@ref) when `model` is a [`LinMo
 It can be called on a [`MovingHorizonEstimator`](@ref) object to evaluate the objective 
 function at specific `Z̃`.
 """
-function obj_nonlinprog(estim::MovingHorizonEstimator, ::LinModel, _ , _ , Z̃)
+function obj_nonlinprog(
+    estim::MovingHorizonEstimator, ::LinModel, _ , _ , Z̃::AbstractVector{NT}
+) where NT<:Real
     return obj_quadprog(Z̃, estim.H̃, estim.q̃) + estim.r[]
 end
 

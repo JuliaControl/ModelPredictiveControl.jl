@@ -280,9 +280,9 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
 
     | ARGUMENT         | SIZE           | FIRST SAMPLE | LAST SAMPLE |
     | :--------------- | :------------- | :----------- | :-----------|
-    | ``\mathbf{U_e}`` | `(nu*(Hp+1),)` | ``k + 0``    | ``k + H_p`` |
-    | ``\mathbf{Ŷ_e}`` | `(ny*(Hp+1),)` | ``k + 0``    | ``k + H_p`` |
-    | ``\mathbf{D̂_e}`` | `(nd*(Hp+1),)` | ``k + 0``    | ``k + H_p`` |
+    | ``\mathbf{U_e}`` | `(nu*(Hp+1),)` | ``k``        | ``k + H_p`` |
+    | ``\mathbf{Ŷ_e}`` | `(ny*(Hp+1),)` | ``k``        | ``k + H_p`` |
+    | ``\mathbf{D̂_e}`` | `(nd*(Hp+1),)` | ``k``        | ``k + H_p`` |
     
     More precisely, the last two time steps in ``\mathbf{U_e}`` are forced to be equal, i.e.
     ``\mathbf{u}(k+H_p) = \mathbf{u}(k+H_p-1)``, since ``H_c ≤ H_p`` implies that
