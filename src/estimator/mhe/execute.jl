@@ -282,6 +282,12 @@ function getarrival!(x̂0arr, estim::MovingHorizonEstimator, Z̃)
     return x̂0arr .= @views Z̃[nx̃-estim.nx̂+1:nx̃]
 end
 
+"Get the estimated process noise over the horizon from the decision vector `Z̃`."
+function getŴ!(Ŵ, estim::MovingHorizonEstimator, Z̃)
+    nx̃ = estim.nε + estim.nx̂
+    return Ŵ .= @views Z̃[(nx̃ + 1):(nx̃ + estim.nx̂*estim.He)]
+end
+
 """
     getε(estim::MovingHorizonEstimator, Z̃) -> ε
 
@@ -700,7 +706,7 @@ function obj_nonlinprog(estim::MovingHorizonEstimator, ::LinModel, _ , _ , _ , Z
 end
 
 """
-    obj_nonlinprog(estim::MovingHorizonEstimator, model::SimModel, x̄, V̂, Ŵ, _ )
+    obj_nonlinprog(estim::MovingHorizonEstimator, model::SimModel, x̄, V̂, Ŵ, Z̃)
 
 Objective function of the MHE when `model` is not a [`LinModel`](@ref).
 
@@ -715,8 +721,8 @@ function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, x̄, V̂, Ŵ
         nŴ, nYm = Nk*estim.nx̂, Nk*estim.nym
         Ŵ, V̂ = Ŵ[1:nŴ], V̂[1:nYm]
     end
-    ε = getε(estim, Z̃)
-    return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + estim.C*ε^2
+    Jε = estim.nε > 0 ? estim.C*Z̃[begin]^2 : 0
+    return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jε
 end
 
 @doc raw"""
@@ -741,6 +747,7 @@ function predict_mhe!(
 )
     nε, Nk = estim.nε, estim.Nk[]
     if Nk < estim.He
+        # avoid views since allocations only when Nk < He and we want fast mul!:
         nX̂, nŴ, nYm = estim.nx̂*Nk, estim.nx̂*Nk, estim.nym*Nk
         nZ̃ = nε + estim.nx̂ + nŴ
         Ẽ,  F  = estim.Ẽ[1:nYm, 1:nZ̃],     estim.F[1:nYm]
@@ -821,18 +828,15 @@ The method mutates all the arguments before `estim` argument.
 function update_prediction!(
     Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, estim::MovingHorizonEstimator, Z̃
 )
-    nŵ, nx̂, nε, Nk = estim.nx̂, estim.nx̂, estim.nε, estim.Nk[]
     model = estim.model
-    nx̃ = nε + nx̂
-    nŴ = nŵ*Nk
     x̂0arr = x̄
     getarrival!(x̂0arr, estim, Z̃) 
     x̄ .= estim.x̂0arr_old .- x̂0arr
-    Ŵ[1:nŴ] .= @views Z̃[(nx̃+1):(nx̃+nŴ)]
-    V̂, X̂0  = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
-    ε  = getε(estim, Z̃)
-    #gc = con_custom_mhe!(gc, estim, V̂, X̂0, Z̃, x̄, ε) 
-    g  = con_nonlinprog_mhe!(g, estim, model, X̂0, V̂, gc, ε)
+    Ŵ     = getŴ!(Ŵ, estim, Z̃)
+    V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
+    ε     = getε(estim, Z̃)
+    # gc = con_custom_mhe!(gc, estim, V̂, X̂0, Z̃, x̄, ε) 
+    g     = con_nonlinprog_mhe!(g, estim, model, X̂0, V̂, gc, ε)
     return nothing
 end
 
