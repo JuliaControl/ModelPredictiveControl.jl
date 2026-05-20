@@ -1532,22 +1532,22 @@ function get_nonlinobj_op(
     ng = length(con.i_g)
     nŴ, nV̂, nX̂, ng, nZ̃ = He*nx̂, He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
     strict = Val(true)
-    myNaN                            = convert(JNT, NaN)
-    J::Vector{JNT}                   = zeros(JNT, 1)
-    Ŵ::Vector{JNT}                   = zeros(JNT, nŴ)
-    V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
-    k::Vector{JNT}                   = zeros(JNT, nk)
-    û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
-    x̄::Vector{JNT}                   = zeros(JNT, nx̂)
-    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc), zeros(JNT, ng) 
-    function J!(Z̃, Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g)
-        update_prediction!(Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, estim, Z̃)
+    myNaN                               = convert(JNT, NaN)
+    J::Vector{JNT}                      = zeros(JNT, 1)
+    Ŵ::Vector{JNT}                      = zeros(JNT, nŴ)
+    V̂::Vector{JNT},     X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
+    k::Vector{JNT}                      = zeros(JNT, nk)
+    û0::Vector{JNT},    ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
+    x̂0arr::Vector{JNT}, x̄::Vector{JNT}  = zeros(JNT, nx̂), zeros(JNT, nx̂)
+    gc::Vector{JNT},    g::Vector{JNT}  = zeros(JNT, nc), zeros(JNT, ng) 
+    function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g)
+        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim, Z̃)
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
     Z̃_J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     J_cache = (
-        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), 
-        Cache(x̄), Cache(gc), Cache(g),
+        Cache(x̂0arr), Cache(x̄), Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
     )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
     estim.Nk[] = He
@@ -1639,30 +1639,30 @@ function get_nonlincon_oracle(
     nc = con.nc
     nŴ, nV̂, nX̂, nZ̃ = He*nx̂, He*nym, He*nx̂, length(estim.Z̃)
     strict = Val(true)
-    myNaN, myInf                     = convert(JNT, NaN), convert(JNT, Inf)
-    Ŵ::Vector{JNT}                   = zeros(JNT, nŴ)
-    V̂::Vector{JNT},  X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
-    k::Vector{JNT}                   = zeros(JNT, nk)
-    û0::Vector{JNT}, ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
-    x̄::Vector{JNT}                   = zeros(JNT, nx̂)
-    gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc), zeros(JNT, ng)
-    gi::Vector{JNT}                  = zeros(JNT, ngi)
-    λi::Vector{JNT}                  = rand(JNT, ngi)
+    myNaN, myInf                          = convert(JNT, NaN), convert(JNT, Inf)
+    Ŵ::Vector{JNT}                        = zeros(JNT, nŴ)
+    V̂::Vector{JNT},     X̂0::Vector{JNT}   = zeros(JNT, nV̂), zeros(JNT, nX̂)
+    k::Vector{JNT}                        = zeros(JNT, nk)
+    û0::Vector{JNT},    ŷ0::Vector{JNT}   = zeros(JNT, nu), zeros(JNT, nŷ)
+    x̂0arr::Vector{JNT}, x̄::Vector{JNT}    = zeros(JNT, nx̂), zeros(JNT, nx̂)
+    gc::Vector{JNT},    g::Vector{JNT}    = zeros(JNT, nc), zeros(JNT, ng)
+    gi::Vector{JNT}                       = zeros(JNT, ngi)
+    λi::Vector{JNT}                       = rand(JNT, ngi)
     # -------------- inequality constraint: nonlinear oracle -------------------------
-    function gi!(gi, Z̃, Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g)
-        update_prediction!(Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, estim, Z̃)
+    function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g)
+        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim, Z̃)
         gi .= @views g[i_g]
         return nothing
     end
-    function ℓ_gi(Z̃, λi, Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, gi)
-        update_prediction!(Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, estim, Z̃)
+    function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, gi)
+        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim, Z̃)
         gi .= @views g[i_g]
         return dot(λi, gi)
     end
     Z̃_∇gi = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇gi_cache = (
-        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), 
-        Cache(x̄), Cache(gc), Cache(g),
+        Cache(x̂0arr), Cache(x̄), Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
     )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
     estim.Nk[] = He
@@ -1672,8 +1672,8 @@ function get_nonlincon_oracle(
     ∇gi_structure = init_diffstructure(∇gi)
     if !isnothing(hess)
         ∇²gi_cache = (
-            Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(û0), Cache(k), Cache(ŷ0), 
-            Cache(x̄), Cache(gc), Cache(g), Cache(gi)
+            Cache(x̂0arr), Cache(x̄), Cache(Ŵ), Cache(V̂), Cache(X̂0),     
+            Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g), Cache(gi)
         )
         estim.Nk[] = He # see comment above
         ∇²gi_prep = prepare_hessian(

@@ -817,7 +817,7 @@ end
 
 """
     update_predictions!(
-        Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, 
+        x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, 
         estim::MovingHorizonEstimator, Z̃
     ) -> nothing
 
@@ -826,12 +826,11 @@ Update in-place the vectors for the predictions of `estim` estimator at decision
 The method mutates all the arguments before `estim` argument.
 """
 function update_prediction!(
-    Ŵ, V̂, X̂0, û0, k, ŷ0, x̄, gc, g, estim::MovingHorizonEstimator, Z̃
+    x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim::MovingHorizonEstimator, Z̃
 )
     model = estim.model
-    x̂0arr = x̄
-    getarrival!(x̂0arr, estim, Z̃) 
-    x̄ .= estim.x̂0arr_old .- x̂0arr
+    x̂0arr = getarrival!(x̂0arr, estim, Z̃)
+    x̄    .= estim.x̂0arr_old .- x̂0arr
     Ŵ     = getŴ!(Ŵ, estim, Z̃)
     V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
     ε     = getε(estim, Z̃)
