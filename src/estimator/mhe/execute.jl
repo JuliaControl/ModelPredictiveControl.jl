@@ -928,11 +928,10 @@ function setmodel_estimator!(
     estim.f̂op .= f̂op
     estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     # --- predictions matrices ---
-    p = estim.direct ? 0 : 1
     E, G, J, B, _ , Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
         model, He, estim.i_ym, 
         estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, 
-        estim.x̂op, estim.f̂op, p
+        estim.x̂op, estim.f̂op, estim.direct
     )
     A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nε, con.C_x̂min, con.C_x̂max, Ex̂)   
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(model, nε, con.C_v̂min, con.C_v̂max, E) 
