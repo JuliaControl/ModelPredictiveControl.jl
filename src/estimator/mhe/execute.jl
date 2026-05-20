@@ -149,7 +149,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:x̂arr] = x̂0arr + estim.x̂op
     info[:ε]  = nε ≠ 0 ? estim.Z̃[begin] : zero(NT)
     info[:J]  = obj_nonlinprog(estim, estim.model, x̄, V̂, estim.Ŵ, estim.Z̃)
-    info[:X̂]  = X̂0       .+ @views [estim.x̂op; estim.X̂op[1:nx̂*Nk]]
+    info[:X̂]  = (X̂0       .+ @views [estim.x̂op; estim.X̂op])[1:nx̂*(Nk+1)]
     info[:x̂]  = estim.x̂0 .+ estim.x̂op
     info[:V̂]  = V̂
     info[:P̄]  = estim.P̂arr_old
