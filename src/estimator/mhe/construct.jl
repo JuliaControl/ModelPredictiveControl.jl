@@ -229,7 +229,7 @@ however, since it minimizes the following objective function at each discrete ti
 ```
 subject to [`setconstraint!`](@ref) bounds and the custom nonlinear inequality constraints:
 ```math
-\mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε) ≤ \mathbf{0}
+\mathbf{g_c}(\mathbf{X̂_e, V̂_e, Ŵ_e, U_e, Y_e^m, D_e, P̄, x̄, p}, ε) ≤ \mathbf{0}
 ```
 and in which the arrival costs are evaluated from the states estimated at time ``k-N_k``:
 ```math
@@ -253,11 +253,14 @@ N_k =                     \begin{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` respectively encompass the estimated process
 noises ``\mathbf{ŵ}(k-j+p)`` from ``j=N_k`` to ``1`` and sensor noises ``\mathbf{v̂}(k-j+1)``
-from ``j=N_k`` to ``1``. The Extended Help defines the two vectors, the slack variable
-``ε``, the other arguments of the ``\mathbf{g_c}`` function, and the estimation of the
-covariance at arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If the keyword argument `direct=true`
-(default value), the constant ``p=0`` in the equations above, and the MHE is in the current
-form. Else ``p=1``, leading to the prediction form.
+from ``j=N_k`` to ``1``. The arguments of ``\mathbf{g_c}`` include the extended vectors of
+the estimated states ``\mathbf{X̂_e}``, estimated sensor noises ``\mathbf{V̂_e}``,  estimated
+process noises ``\mathbf{Ŵ_e}``, manipulated inputs ``\mathbf{U_e}``, measured outputs
+``\mathbf{Y_e^m}``and measured disturbances ``\mathbf{D_e}``. The Extended Help details all
+these vectors, the slack variable ``ε`` and the estimation of the covariance at arrival 
+``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If the keyword argument `direct=true` (default value), the
+constant ``p=0`` in the equations above, and the MHE is in the current form. Else ``p=1``,
+leading to the prediction form.
 
 See [`UnscentedKalmanFilter`](@ref) for details on the augmented process model and 
 ``\mathbf{R̂}, \mathbf{Q̂}`` covariances. This estimator allocates a fair amount of memory 
@@ -380,30 +383,36 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     The slack variable ``ε`` relaxes the constraints if enabled, see [`setconstraint!`](@ref). 
     It is disabled thus always zero by default for the MHE (from `Cwt=Inf`) but it should be
     activated for problems with two or more types of bounds, to ensure feasibility (e.g. on
-    ``\mathbf{x̂}`` and ``\mathbf{v̂}``). The following table details the other arguments of
-    ``\mathbf{g_c}``, including the time steps of the first and last sample in them. Note
-    that the vectors will grows with time until ``N_k = H_e`` is reached, and the windows
-    don't start at the same time step (a side-effect of the current form).
+    ``\mathbf{x̂}`` and ``\mathbf{v̂}``). The following table details the arguments of 
+    ``\mathbf{g_c}``, including the time steps of the first and last sample in them. 
 
-    | ARGUMENT         | SIZE            | FIRST SAMPLE    | LAST SAMPLE     |
-    | :--------------- | :-------------- | :-------------- | :-------------- | 
-    | ``\mathbf{X̂}``   | `(nx̂*(Nk+1),)`  | ``k - N_k + p`` | ``k + p``       |
-    | ``\mathbf{V̂}``   | `(nym*Nk,)`     | ``k - N_k + 1`` | ``k``           |
-    | ``\mathbf{Ŵ}``   | `(nx̂*Nk,)`      | ``k - N_k + p`` | ``k - 1 + p``   |
-    | ``\mathbf{U}``   | `(nu*Nk,)`      | ``k - N_k + p`` | ``k - 1 + p``   |
-    | ``\mathbf{Y^m}`` | `(nym*Nk,)`     | ``k - N_k + 1`` | ``k``           |
-    | ``\mathbf{D}``   | `(nd*(Nk+1),)`  | ``k - N_k``     | ``k``           |
-    | ``\mathbf{P̄}``   | `(nx̂, nx̂)`      | ``k - N_k + p`` | ``k - N_k + p`` |
-    | ``\mathbf{x̄}``   | `(nx̂,)`         | ``k - N_k + p`` | ``k - N_k + p`` |
+    !!! warning
+        The vectors will grows with time until ``N_k = H_e`` is reached. The time steps are
+        also *artificially aligned* to ease the user life, but some data at boundaries are
+        unavailable e.g.: ``\mathbf{u}(k)`` with ``p=0``. They are filled with `NaN` values.
+        The exact time steps of the `NaN`s are detailed in the last column below.
+
+    | ARGUMENT           | SIZE            | FIRST SAMPLE    | LAST SAMPLE     | MISSING SAMPLES (NAN)      |
+    | :---------------   | :-------------- | :-------------- | :-------------- | :------------------------- |
+    | ``\mathbf{X̂_e}``   | `((Nk+1)*nx̂,)`  | ``k - N_k + p`` | ``k + p``       | —                          |
+    | ``\mathbf{V̂_e}``   | `((Nk+1)*nym,)` | ``k - N_k + p`` | ``k + p``       | ``k - N_k, k + 1``         |
+    | ``\mathbf{Ŵ_e}``   | `((Nk+1)*nx̂,)`  | ``k - N_k + p`` | ``k + p``       | ``k - N_k + p - 1, k + p`` |
+    | ``\mathbf{U_e}``   | `((Nk+1)*nu,)`  | ``k - N_k + p`` | ``k + p``       | ``k + p``                  |
+    | ``\mathbf{Y_e^m}`` | `((Nk+1)*nym,)` | ``k - N_k + p`` | ``k + p``       | ``k + 1``                  |
+    | ``\mathbf{D_e}``   | `((Nk+1)*nd,)`  | ``k - N_k + p`` | ``k + p``       | ``k + 1``                  |
+    | ``\mathbf{P̄}``     | `(nx̂, nx̂)`      | ``k - N_k + p`` | ``k - N_k + p`` | —                          |
+    | ``\mathbf{x̄}``     | `(nx̂,)`         | ``k - N_k + p`` | ``k - N_k + p`` | —                          |
+    | ``\mathbf{p}``     | var.            | —               | —               | —                          |
+    | ``ε``              | `()`            | —               | —               | —                          |
 
     If `LHS` represents the result of the left-hand side in the inequality 
-    ``\mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε) ≤ \mathbf{0}``,
+    ``\mathbf{g_c}(\mathbf{X̂_e, V̂_e, Ŵ_e, U_e, Y_e^m, D_e, P̄, x̄, p}, ε) ≤ \mathbf{0}``,
     the function `gc` can be implemented in two possible ways:
     
-    1. **Non-mutating function** (out-of-place): define it as `gc(X̂, V̂, Ŵ, U, Ym, D, P̄, x̄,
-       p, ε) -> LHS`. This syntax is simple and intuitive but it allocates more memory.
-    2. **Mutating function** (in-place): define it as `gc!(LHS, X̂, V̂, Ŵ, U, Ym, D, P̄, x̄,
-       p, ε) -> nothing`. This syntax reduces the allocations and potentially the
+    1. **Non-mutating function** (out-of-place): define it as `gc(X̂e, V̂e, Ŵe, Ue, Yem, De, 
+       P̄, x̄, p, ε) -> LHS`. This syntax is simple and intuitive but it allocates more memory.
+    2. **Mutating function** (in-place): define it as `gc!(LHS, X̂e, V̂e, Ŵe, Ue, Yme, De, P̄,
+       x̄, p, ε) -> nothing`. This syntax reduces the allocations and potentially the
        computational burden as well.
 
     The keyword argument `nc` is the number of elements in `LHS`, and `gc!`, an alias for
