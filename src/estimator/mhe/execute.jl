@@ -2,14 +2,14 @@
 function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0) 
     model = estim.model
     estim.Z̃         .= 0
-    estim.X̂0        .= 0
-    estim.Y0m       .= 0
+    estim.X̂0        .= NaN
+    estim.Y0m       .= NaN
     estim.Yem       .= NaN
-    estim.U0        .= 0
+    estim.U0        .= NaN
     estim.Ue        .= NaN
-    estim.D0        .= 0
+    estim.D0        .= NaN
     estim.De        .= NaN
-    estim.Ŵ         .= 0
+    estim.Ŵ         .= NaN
     estim.Nk        .= 0
     estim.H̃         .= 0
     estim.q̃         .= 0
@@ -406,33 +406,52 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     invP̄, invQ̂_He, invR̂_He = estim.cov.invP̄, estim.cov.invQ̂_He, estim.cov.invR̂_He
     F, C, optim = estim.F, estim.C, estim.optim
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
-    nYm, nŴ = nym*Nk, nŵ*Nk
+    nU, nYm, nD, nŴ = model.nu*Nk, estim.nym*Nk, model.nd*Nk, nŵ*Nk
     nZ̃ = nε + nx̂ + nŴ
-    # --- update F and fx̄ vectors for MHE predictions ---
-    F .= estim.Y0m .+ estim.B
-    mul!(F, estim.G, estim.U0, 1, 1)
-    if model.nd > 0
-        mul!(F, estim.J, estim.D0, 1, 1)
+    # --- truncate vector and matrices if necessary ---
+    if Nk < estim.He
+        # avoid views since allocations only when Nk < He and we want fast mul!:
+        Y0m, B = estim.Y0m[1:nYm],     estim.B[1:nYm]
+        G, U0  = estim.G[1:nYm, 1:nU], estim.U0[1:nU]
+        J, D0  = estim.J[1:nYm, 1:nD], estim.D0[1:nD]
+        Ẽ, ẽx̄  = estim.Ẽ[1:nYm, 1:nZ̃], estim.ẽx̄[:, 1:nZ̃]
+        F, q̃   = @views estim.F[1:nYm], estim.q̃[1:nZ̃]
+        H̃_data = @views estim.H̃.data[1:nZ̃, 1:nZ̃]
+        H̃      = @views estim.H̃[1:nZ̃, 1:nZ̃]
+        Z̃var   = @views optim[:Z̃var][1:nZ̃]
+    else
+        Y0m, B = estim.Y0m, estim.B
+        G, U0  = estim.G, estim.U0
+        J, D0  = estim.J, estim.D0
+        Ẽ, ẽx̄  = estim.Ẽ, estim.ẽx̄
+        F, q̃   = estim.F, estim.q̃
+        H̃_data = estim.H̃.data
+        H̃      = estim.H̃
+        Z̃var   = optim[:Z̃var]
     end
-    estim.fx̄ .= estim.x̂0arr_old
+    invQ̂_Nk = trunc_cov(invQ̂_He, nx̂, Nk, estim.He)
+    invR̂_Nk = trunc_cov(invR̂_He, nym, Nk, estim.He)
+    fx̄ = estim.fx̄
+    r = estim.r
+    # --- update F and fx̄ vectors for MHE predictions ---
+    F .= Y0m .+ B
+    mul!(F, G, U0, 1, 1)
+    (model.nd > 0) && mul!(F, J, D0, 1, 1)
+    fx̄ .= estim.x̂0arr_old
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
-    ẼZ̃ = @views [estim.ẽx̄[:, 1:nZ̃]; estim.Ẽ[1:nYm, 1:nZ̃]]
-    FZ̃ = @views [estim.fx̄; estim.F[1:nYm]]
-    invQ̂_Nk = trunc_cov(invQ̂_He, estim.nx̂, Nk, estim.He)
-    invR̂_Nk = trunc_cov(invR̂_He, estim.nym, Nk, estim.He)
+    ẼZ̃ = [ẽx̄; Ẽ]
+    FZ̃ = [fx̄; F]
     M_Nk = [invP̄ zeros(nx̂, nYm); zeros(nYm, nx̂) invR̂_Nk]
     Ñ_Nk = [fill(C, nε, nε) zeros(nε, nx̂+nŴ); zeros(nx̂, nε+nx̂+nŴ); zeros(nŴ, nε+nx̂) invQ̂_Nk]
     M_Nk_ẼZ̃ = M_Nk*ẼZ̃
-    @views mul!(estim.q̃[1:nZ̃], M_Nk_ẼZ̃', FZ̃)
-    @views lmul!(2, estim.q̃[1:nZ̃])
-    estim.r .= dot(FZ̃, M_Nk, FZ̃)
-    estim.H̃.data[1:nZ̃, 1:nZ̃] .= Ñ_Nk
-    @views mul!(estim.H̃.data[1:nZ̃, 1:nZ̃], ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
-    @views lmul!(2, estim.H̃.data[1:nZ̃, 1:nZ̃])
-    Z̃var_Nk::Vector{JuMP.VariableRef} = @views optim[:Z̃var][1:nZ̃]
-    H̃_Nk = @views estim.H̃[1:nZ̃,1:nZ̃]
-    q̃_Nk = @views estim.q̃[1:nZ̃]
-    JuMP.set_objective_function(optim, obj_quadprog(Z̃var_Nk, H̃_Nk, q̃_Nk))
+    mul!(q̃, M_Nk_ẼZ̃', FZ̃)
+    lmul!(2, q̃)
+    r .= dot(FZ̃, M_Nk, FZ̃)
+    H̃_data .= Ñ_Nk
+    mul!(H̃_data, ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
+    lmul!(2, H̃_data)
+    println(q̃)
+    JuMP.set_objective_function(optim, obj_quadprog(Z̃var, H̃, q̃))
     return nothing
 end
 "Does nothing if `model` is not a [`LinModel`](@ref)."
