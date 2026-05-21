@@ -115,8 +115,7 @@ struct MovingHorizonEstimator{
     q̃::Vector{NT}
     r::Vector{NT}
     C::NT
-    X̂op ::Vector{NT}
-    X̂0 ::Vector{NT}
+    X̂op::Vector{NT}
     Y0m::Vector{NT}
     Yem::Vector{NT}
     U0 ::Vector{NT}
@@ -124,6 +123,7 @@ struct MovingHorizonEstimator{
     D0 ::Vector{NT}
     De ::Vector{NT}
     Ŵ  ::Vector{NT}
+    X̂0_old   ::Vector{NT}
     x̂0arr_old::Vector{NT}
     P̂arr_old ::Hermitian{NT, Matrix{NT}}
     Nk::Vector{Int}
@@ -171,16 +171,16 @@ struct MovingHorizonEstimator{
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
         X̂op  = repeat(x̂op, He)
-        X̂0 = fill(NT(NaN), nx̂*He)
         Y0m, Yem = fill(NT(NaN), nym*He),    fill(NT(NaN), nym*(He+1))
         U0,  Ue  = fill(NT(NaN), nu*He),     fill(NT(NaN),  nu*(He+1))
         D0,  De  = fill(NT(NaN), nd*(He+1)), fill(NT(NaN),  nd*(He+1))
-        Ŵ = fill(NT(NaN), nx̂*He)
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
+        Ŵ        = fill(NT(NaN), nx̂*He)
+        X̂0_old   = fill(NT(NaN), nx̂*He)
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(cov.P̂_0)
         Nk = [0]
         corrected = [false]
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
         estim = new{NT, SM, KC, JM, GB, JB, HB, GCfunc, CE}(
             model,
             cov,
@@ -196,8 +196,8 @@ struct MovingHorizonEstimator{
             H̃, q̃, r,
             Cwt,
             X̂op, 
-            X̂0, Y0m, Yem, U0, Ue, D0, De, Ŵ,
-            x̂0arr_old, P̂arr_old, Nk,
+            Y0m, Yem, U0, Ue, D0, De, Ŵ, 
+            X̂0_old, x̂0arr_old, P̂arr_old, Nk,
             direct, corrected,
             buffer
         )

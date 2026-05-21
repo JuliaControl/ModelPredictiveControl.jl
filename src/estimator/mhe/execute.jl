@@ -2,7 +2,6 @@
 function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0) 
     model = estim.model
     estim.Z̃         .= 0
-    estim.X̂0        .= NaN
     estim.Y0m       .= NaN
     estim.Yem       .= NaN
     estim.U0        .= NaN
@@ -10,10 +9,13 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     estim.D0        .= NaN
     estim.De        .= NaN
     estim.Ŵ         .= NaN
+    estim.X̂0_old    .= NaN
     estim.Nk        .= 0
+    estim.F         .= 0
     estim.H̃         .= 0
     estim.q̃         .= 0
     estim.r         .= 0
+    estim.con.Fx̂    .= 0
     if estim.direct
         # add y0m(-1) to the extended data window (custom NL constraints):
         estim.Yem[1:model.ny] .= y0m .+ @views model.yop[estim.i_ym]
@@ -332,15 +334,16 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     yopm = @views model.yop[estim.i_ym]
     Nk = estim.Nk[]
     p = estim.direct ? 0 : 1 # u0 argument is u0(k-1) if estim.direct, else u0(k)
-    x̂0, ŵ = estim.x̂0, 0      # ŵ(k-1+p) = 0 for warm-start
+    x̂0_old = estim.x̂0        # x̂0_old is x̂0(k-1|k-1) if estim.direct, else x̂0(k|k-1)
+    ŵ = 0                    # ŵ(k-1+p) = 0 for warm-start
     estim.Nk .+= 1
     Nk = estim.Nk[]
     ismoving = (Nk > estim.He)
     # --- data windows for the predictions ---
     # see MovingHorzionEstimator extended help for the exact time steps in each data window
     if ismoving
-        estim.Y0m[1:end-nym]     .= @views estim.Y0m[nym+1:end]
-        estim.Yem[1:end-nym]     .= @views estim.Yem[nym+1:end]
+        estim.Y0m[1:end-nym]        .= @views estim.Y0m[nym+1:end]
+        estim.Yem[1:end-nym]        .= @views estim.Yem[nym+1:end]
         estim.Y0m[end-nym+1:end]                        .= y0m
         estim.Yem[(end-nym+1 - p*nym):(end - p*nym)]    .= y0m .+ yopm
         if nd > 0
@@ -349,14 +352,14 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
             estim.D0[end-nd+1:end]                      .= d0
             estim.De[(end-nd+1 - p*nd):(end - p*nd)]    .= d0 .+ model.dop
         end
-        estim.U0[1:end-nu]       .= @views estim.U0[nu+1:end]
-        estim.Ue[1:end-nu]       .= @views estim.Ue[nu+1:end]
+        estim.U0[1:end-nu]          .= @views estim.U0[nu+1:end]
+        estim.Ue[1:end-nu]          .= @views estim.Ue[nu+1:end]
         estim.U0[end-nu+1:end]                          .= u0
         estim.Ue[(end-nu+1 - nu):(end - nu)]            .= u0 .+ model.uop
-        estim.X̂0[1:end-nx̂]       .= @views estim.X̂0[nx̂+1:end]
-        estim.X̂0[end-nx̂+1:end]   .= x̂0
-        estim.Ŵ[1:end-nŵ]        .= @views estim.Ŵ[nŵ+1:end]
-        estim.Ŵ[end-nŵ+1:end]    .= ŵ
+        estim.Ŵ[1:end-nŵ]           .= @views estim.Ŵ[nŵ+1:end]
+        estim.Ŵ[end-nŵ+1:end]       .= ŵ
+        estim.X̂0_old[1:end-nx̂]      .= @views estim.X̂0_old[nx̂+1:end]
+        estim.X̂0_old[end-nx̂+1:end]  .= x̂0_old
         estim.Nk .= estim.He
     else
         estim.Y0m[(1 + nym*(Nk-1)):(nym*Nk)]            .= y0m
@@ -367,10 +370,12 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         end
         estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0
         estim.Ue[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0 .+ model.uop
-        estim.X̂0[(1 + nx̂*(Nk-1)):(nx̂*Nk)]               .= x̂0
         estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]                .= ŵ
+        estim.X̂0_old[(1 + nx̂*(Nk-1)):(nx̂*Nk)]           .= x̂0_old
     end
-    estim.x̂0arr_old .= @views estim.X̂0[1:nx̂]
+    estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
+    @show estim.X̂0_old
+    @show estim.x̂0arr_old
     return ismoving
 end
     
@@ -450,7 +455,6 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     H̃_data .= Ñ_Nk
     mul!(H̃_data, ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
     lmul!(2, H̃_data)
-    println(q̃)
     JuMP.set_objective_function(optim, obj_quadprog(Z̃var, H̃, q̃))
     return nothing
 end
@@ -466,33 +470,47 @@ Also init ``\mathbf{F_x̂ = G_x̂ U_0 + J_x̂ D_0 + B_x̂}`` vector for the stat
 [`init_predmat_mhe`](@ref).
 """
 function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
-    Fx̂  = estim.con.Fx̂
-    Fx̂ .= estim.con.Bx̂
-    mul!(Fx̂, estim.con.Gx̂, estim.U0, 1, 1)
-    if model.nd > 0
-        mul!(Fx̂, estim.con.Jx̂, estim.D0, 1, 1)
+    nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
+    nU, nX̂, nD = model.nu*Nk, estim.nx̂*Nk, model.nd*Nk
+    # --- truncate vector and matrices if necessary ---
+    if Nk < estim.He
+        # avoid views since allocations only when Nk < He and we want fast mul!:
+        Bx̂     = estim.con.Bx̂[1:nX̂]
+        Gx̂, U0 = estim.con.Gx̂[1:nX̂, 1:nU], estim.U0[1:nU]
+        Jx̂, D0 = estim.con.Jx̂[1:nX̂, 1:nD], estim.D0[1:nD]
+        Fx̂     = @views estim.con.Fx̂[1:nX̂]
+    else
+        Bx̂     = estim.con.Bx̂
+        Gx̂, U0 = estim.con.Gx̂, estim.U0
+        Jx̂, D0 = estim.con.Jx̂, estim.D0
+        Fx̂     = estim.con.Fx̂
     end
-    X̂0min, X̂0max = trunc_bounds(estim, estim.con.X̂0min, estim.con.X̂0max, estim.nx̂)
-    Ŵmin, Ŵmax   = trunc_bounds(estim, estim.con.Ŵmin,  estim.con.Ŵmax,  estim.nx̂)
-    V̂min, V̂max   = trunc_bounds(estim, estim.con.V̂min,  estim.con.V̂max,  estim.nym)
-    nX̂, nŴ, nV̂ = length(X̂0min), length(Ŵmin), length(V̂min)
+    X̂0min, X̂0max = trunc_bounds(estim, estim.con.X̂0min, estim.con.X̂0max, nx̂)
+    Ŵmin, Ŵmax   = trunc_bounds(estim, estim.con.Ŵmin,  estim.con.Ŵmax,  nŵ)
+    V̂min, V̂max   = trunc_bounds(estim, estim.con.V̂min,  estim.con.V̂max,  nym)
+    # --- update Fx̂ vectors for MHE state constraints ---
+    Fx̂ .= Bx̂
+    mul!(Fx̂, Gx̂, U0, 1, 1)
+    model.nd > 0 && mul!(Fx̂, Jx̂, D0, 1, 1)
+    # --- update b vector for linear inequality constraints ---
+    nX̂_He, nŴ_He, nV̂_He = length(X̂0min), length(Ŵmin), length(V̂min)
     nx̃ = length(estim.con.x̃0min)
     n = 0
     estim.con.b[(n+1):(n+nx̃)] .= @. -estim.con.x̃0min
     n += nx̃
     estim.con.b[(n+1):(n+nx̃)] .= @. +estim.con.x̃0max
     n += nx̃
-    estim.con.b[(n+1):(n+nX̂)] .= @. -X̂0min + Fx̂
-    n += nX̂
-    estim.con.b[(n+1):(n+nX̂)] .= @. +X̂0max - Fx̂
-    n += nX̂
-    estim.con.b[(n+1):(n+nŴ)] .= @. -Ŵmin
-    n += nŴ
-    estim.con.b[(n+1):(n+nŴ)] .= @. +Ŵmax
-    n += nŴ
-    estim.con.b[(n+1):(n+nV̂)] .= @. -V̂min + estim.F
-    n += nV̂
-    estim.con.b[(n+1):(n+nV̂)] .= @. +V̂max - estim.F
+    estim.con.b[(n+1):(n+nX̂_He)] .= @. -X̂0min + estim.con.Fx̂
+    n += nX̂_He
+    estim.con.b[(n+1):(n+nX̂_He)] .= @. +X̂0max - estim.con.Fx̂
+    n += nX̂_He
+    estim.con.b[(n+1):(n+nŴ_He)] .= @. -Ŵmin
+    n += nŴ_He
+    estim.con.b[(n+1):(n+nŴ_He)] .= @. +Ŵmax
+    n += nŴ_He
+    estim.con.b[(n+1):(n+nV̂_He)] .= @. -V̂min + estim.F
+    n += nV̂_He
+    estim.con.b[(n+1):(n+nV̂_He)] .= @. +V̂max - estim.F
     if any(estim.con.i_b) 
         lincon = estim.optim[:linconstraint]
         JuMP.set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
@@ -502,16 +520,18 @@ end
 
 "Set `b` excluding state and sensor noise bounds if `model` is not a [`LinModel`](@ref)."
 function linconstraint!(estim::MovingHorizonEstimator, ::SimModel)
+    # --- truncate vector and matrices if necessary ---
     Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, estim.nx̂)
-    nx̃, nŴ = length(estim.con.x̃0min), length(Ŵmin)
+    # --- update b vector for linear inequality constraints ---
+    nx̃, nŴ_He = length(estim.con.x̃0min), length(Ŵmin)
     n = 0
     estim.con.b[(n+1):(n+nx̃)] .= @. -estim.con.x̃0min
     n += nx̃
     estim.con.b[(n+1):(n+nx̃)] .= @. +estim.con.x̃0max
     n += nx̃
-    estim.con.b[(n+1):(n+nŴ)] .= @. -Ŵmin
-    n += nŴ
-    estim.con.b[(n+1):(n+nŴ)] .= @. +Ŵmax
+    estim.con.b[(n+1):(n+nŴ_He)] .= @. -Ŵmin
+    n += nŴ_He
+    estim.con.b[(n+1):(n+nŴ_He)] .= @. +Ŵmax
     if any(estim.con.i_b) 
         lincon = estim.optim[:linconstraint]
         JuMP.set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
@@ -591,10 +611,10 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     x̂0arr, û0, ŷ0, k = buffer.x̂, buffer.û, buffer.ŷ, buffer.k
     V̂, X̂0  = buffer.V̂, buffer.X̂
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
-    getarrival!(x̂0arr, estim, estim.Z̃) 
+    getarrival!(x̂0arr, estim, estim.Z̃)
     predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, estim.Ŵ, estim.Z̃)
-    x̂0next    = @views X̂0[Nk*nx̂-nx̂+1:Nk*nx̂]
-    estim.x̂0 .= x̂0next
+    x̂0corrORnext = @views X̂0[Nk*nx̂-nx̂+1:Nk*nx̂]
+    estim.x̂0 .= x̂0corrORnext
     return estim.Z̃
 end
 
@@ -1021,23 +1041,23 @@ function setmodel_estimator!(
     JuMP.unregister(estim.optim, :linconstraint)
     @constraint(estim.optim, linconstraint, A*Z̃var .≤ b)
     # --- data windows ---
-    for i in 1:He
-        # convert x̂0 to x̂ with the old operating point:
-        estim.X̂0[(1+nx̂*(i-1)):(nx̂*i)]    .+= x̂op_old 
+    for i in 1:He 
         # convert y0m to ym with the old operating point:
-        estim.Y0m[(1+nym*(i-1)):(nym*i)] .+= @views yop_old[estim.i_ym]
+        estim.Y0m[(1+nym*(i-1)):(nym*i)]  .+= @views yop_old[estim.i_ym]
         # convert u0 to u with the old operating point:
-        estim.U0[(1+nu*(i-1)):(nu*i)]    .+= uop_old
+        estim.U0[(1+nu*(i-1)):(nu*i)]     .+= uop_old
         # convert d0 to d with the old operating point:
-        estim.D0[(1+nd*(i-1)):(nd*i)]    .+= dop_old
-        # convert x̂ to x̂0 with the new operating point:
-        estim.X̂0[(1+nx̂*(i-1)):(nx̂*i)]    .-= x̂op
+        estim.D0[(1+nd*(i-1)):(nd*i)]     .+= dop_old
+         # convert x̂0 to x̂ with the old operating point:
+        estim.X̂0_old[(1+nx̂*(i-1)):(nx̂*i)] .+= x̂op_old
         # convert ym to y0m with the new operating point:
-        estim.Y0m[(1+nym*(i-1)):(nym*i)] .-= @views model.yop[estim.i_ym]
+        estim.Y0m[(1+nym*(i-1)):(nym*i)]  .-= @views model.yop[estim.i_ym]
         # convert u to u0 with the new operating point:
-        estim.U0[(1+nu*(i-1)):(nu*i)]    .-= model.uop
+        estim.U0[(1+nu*(i-1)):(nu*i)]     .-= model.uop
         # convert d to d0 with the new operating point:
-        estim.D0[(1+nd*(i-1)):(nd*i)]    .-= model.dop
+        estim.D0[(1+nd*(i-1)):(nd*i)]     .-= model.dop
+        # convert x̂ to x̂0 with the new operating point:
+        estim.X̂0_old[(1+nx̂*(i-1)):(nx̂*i)] .-= x̂op
     end
     estim.lastu0        .+= uop_old
     estim.Z̃[nε+1:nε+nx̂] .+= x̂op_old
