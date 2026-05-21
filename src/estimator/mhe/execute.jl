@@ -329,6 +329,7 @@ window (the correct value if `estim.direct`).
 function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.lastu0)
     model = estim.model
     nx̂, nym, nd, nu, nŵ = estim.nx̂, estim.nym, model.nd, model.nu, estim.nx̂
+    yopm = @views model.yop[estim.i_ym]
     Nk = estim.Nk[]
     p = estim.direct ? 0 : 1 # u0 argument is u0(k-1) if estim.direct, else u0(k)
     x̂0, ŵ = estim.x̂0, 0      # ŵ(k-1+p) = 0 for warm-start
@@ -336,50 +337,40 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     Nk = estim.Nk[]
     ismoving = (Nk > estim.He)
     # --- data windows for the predictions ---
+    # see MovingHorzionEstimator extended help for the exact time steps in each data window
     if ismoving
         estim.Y0m[1:end-nym]     .= @views estim.Y0m[nym+1:end]
-        estim.Y0m[end-nym+1:end] .= y0m
+        estim.Yem[1:end-nym]     .= @views estim.Yem[nym+1:end]
+        estim.Y0m[end-nym+1:end]                        .= y0m
+        estim.Yem[(end-nym+1 - p*nym):(end - p*nym)]    .= y0m .+ yopm
         if nd > 0
             estim.D0[1:end-nd]       .= @views estim.D0[nd+1:end]
-            estim.D0[end-nd+1:end]   .= d0
+            estim.De[1:end-nd]       .= @views estim.De[nd+1:end]
+            estim.D0[end-nd+1:end]                      .= d0
+            estim.De[(end-nd+1 - p*nd):(end - p*nd)]    .= d0 .+ model.dop
         end
         estim.U0[1:end-nu]       .= @views estim.U0[nu+1:end]
-        estim.U0[end-nu+1:end]   .= u0
+        estim.Ue[1:end-nu]       .= @views estim.Ue[nu+1:end]
+        estim.U0[end-nu+1:end]                          .= u0
+        estim.Ue[(end-nu+1 - nu):(end - nu)]            .= u0 .+ model.uop
         estim.X̂0[1:end-nx̂]       .= @views estim.X̂0[nx̂+1:end]
         estim.X̂0[end-nx̂+1:end]   .= x̂0
         estim.Ŵ[1:end-nŵ]        .= @views estim.Ŵ[nŵ+1:end]
         estim.Ŵ[end-nŵ+1:end]    .= ŵ
         estim.Nk .= estim.He
     else
-        estim.Y0m[(1 + nym*(Nk-1)):(nym*Nk)]  .= y0m
-        nd > 0 && (estim.D0[(1 + nd*Nk):(nd*(Nk+1))] .= d0)
-        estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]     .= u0
-        estim.X̂0[(1 + nx̂*(Nk-1)):(nx̂*Nk)]     .= x̂0
-        estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]      .= ŵ
+        estim.Y0m[(1 + nym*(Nk-1)):(nym*Nk)]            .= y0m
+        estim.Yem[(1 + nym*(Nk-p)):(nym*(Nk-p+1))]      .= y0m .+ yopm
+        if nd > 0 
+            estim.D0[(1 + nd*Nk):(nd*(Nk+1))]           .= d0
+            estim.De[(1 + nd*(Nk-p)):(nd*(Nk-p+1))]     .= d0 .+ model.dop
+        end
+        estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0
+        estim.Ue[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0 .+ model.uop
+        estim.X̂0[(1 + nx̂*(Nk-1)):(nx̂*Nk)]               .= x̂0
+        estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]                .= ŵ
     end
     estim.x̂0arr_old .= @views estim.X̂0[1:nx̂]
-    # --- extended data windows for custom NL constraints ---
-    # see MovingHorzionEstimator extended help for the exact time steps in each data window
-    yopm = @views model.yop[estim.i_ym]
-    # TODO: move above
-    if ismoving
-        estim.Yem[1:end-nym] .= @views estim.Yem[nym+1:end]
-        estim.Yem[(end-nym+1 - p*nym):(end - p*nym)] .= y0m .+ yopm
-        if nd > 0
-            estim.De[1:end-nd] .= @views estim.De[nd+1:end]
-            estim.De[(end-nd+1 - p*nd):(end - p*nd)] .= d0 .+ model.dop
-        end
-        estim.Ue[1:end-nu] .= @views estim.Ue[nu+1:end]
-        estim.Ue[(end-nu+1 - nu):(end - nu)] = u0 .+ model.uop
-    else
-        estim.Yem[(1 + nym*(Nk-p)):(nym*(Nk-p+1))] .= y0m .+ yopm
-        nd > 0 && (estim.De[(1 + nd*(Nk-p)):(nd*(Nk-p+1))] .= d0 .+ model.dop)
-        estim.Ue[(1 + nu*(Nk-1)):(nu*Nk)] .= u0 .+ model.uop
-    end
-    @show estim.Nk
-    @show estim.Yem
-    @show estim.De
-    @show estim.Ue
     return ismoving
 end
     
