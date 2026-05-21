@@ -116,16 +116,13 @@ struct MovingHorizonEstimator{
     r::Vector{NT}
     C::NT
     X̂op ::Vector{NT}
-    Uop ::Vector{NT}
-    Yopm::Vector{NT}
-    Dop ::Vector{NT}
     X̂0 ::Vector{NT}
     Y0m::Vector{NT}
-    Ym ::Vector{NT}
+    Yem::Vector{NT}
     U0 ::Vector{NT}
-    U  ::Vector{NT}
+    Ue ::Vector{NT}
     D0 ::Vector{NT}
-    D  ::Vector{NT}
+    De ::Vector{NT}
     Ŵ  ::Vector{NT}
     x̂0arr_old::Vector{NT}
     P̂arr_old ::Hermitian{NT, Matrix{NT}}
@@ -174,13 +171,10 @@ struct MovingHorizonEstimator{
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
         X̂op  = repeat(x̂op, He)
-        Uop  = repeat(model.uop, He)
-        Yopm = repeat(model.yop[i_ym], He)
-        Dop  = repeat(model.dop, He+1)
         X̂0 = zeros(NT, nx̂*He)
-        Y0m, Ym = zeros(NT, nym*He),    zeros(NT, nym*He)
-        U0,  U  = zeros(NT, nu*He),     zeros(NT, nu*He)
-        D0,  D  = zeros(NT, nd*(He+1)), zeros(NT, nd*(He+1))
+        Y0m, Yem = zeros(NT, nym*He),    fill(NT(NaN), nym*(He+1))
+        U0,  Ue  = zeros(NT, nu*He),     fill(NT(NaN),  nu*(He+1))
+        D0,  De  = zeros(NT, nd*(He+1)), fill(NT(NaN),  nd*(He+1))
         Ŵ = zeros(NT, nx̂*He)
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
         x̂0arr_old = zeros(NT, nx̂)
@@ -201,8 +195,8 @@ struct MovingHorizonEstimator{
             Ẽ, F, G, J, B, ẽx̄, fx̄,
             H̃, q̃, r,
             Cwt,
-            X̂op, Uop, Yopm, Dop,
-            X̂0, Y0m, Ym, U0, U, D0, D, Ŵ,
+            X̂op, 
+            X̂0, Y0m, Yem, U0, Ue, D0, De, Ŵ,
             x̂0arr_old, P̂arr_old, Nk,
             direct, corrected,
             buffer
@@ -387,7 +381,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     ``\mathbf{g_c}``, including the time steps of the first and last sample in them. 
 
     !!! warning
-        The vectors will grows with time until ``N_k = H_e`` is reached. The time steps are
+        The vectors will grows with time until ``N_k = H_e`` is reached. The time series are
         also *artificially aligned* to ease the user life, but some data at boundaries are
         unavailable e.g.: ``\mathbf{u}(k)`` with ``p=0``. They are filled with `NaN` values.
         The exact time steps of the `NaN`s are detailed in the last column below.
