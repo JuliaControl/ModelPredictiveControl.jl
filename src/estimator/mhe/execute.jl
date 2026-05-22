@@ -883,7 +883,7 @@ end
 
 """
     update_predictions!(
-        x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, 
+        x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, 
         estim::MovingHorizonEstimator, Z̃
     ) -> nothing
 
@@ -892,32 +892,67 @@ Update in-place the vectors for the predictions of `estim` estimator at decision
 The method mutates all the arguments before `estim` argument.
 """
 function update_prediction!(
-    x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim::MovingHorizonEstimator, Z̃
+    x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim::MovingHorizonEstimator, Z̃
 )
-    model = estim.model
-    x̂0arr = getarrival!(x̂0arr, estim, Z̃)
-    x̄    .= estim.x̂0arr_old .- x̂0arr
-    Ŵ     = getŴ!(Ŵ, estim, Z̃)
-    V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
-    ε     = getε(estim, Z̃)
-    # gc = con_custom_mhe!(gc, estim, V̂, X̂0, Z̃, x̄, ε) 
-    g     = con_nonlinprog_mhe!(g, estim, model, X̂0, V̂, gc, ε)
+    x̂0arr      = getarrival!(x̂0arr, estim, Z̃)
+    x̄         .= estim.x̂0arr_old .- x̂0arr
+    Ŵ          = getŴ!(Ŵ, estim, Z̃)
+    V̂, X̂0      = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, estim.model, x̂0arr, Ŵ, Z̃)
+    Ŵe, V̂e, X̂e = extended_vectors!(Ŵe, V̂e, X̂e, estim, Ŵ, V̂, X̂0, x̂0arr)
+    ε          = getε(estim, Z̃)
+    gc         = con_custom_mhe!(gc, estim, X̂e, V̂e, Ŵe, x̄, ε) 
+    g          = con_nonlinprog_mhe!(g, estim, estim.model, X̂0, V̂, gc, ε)
     return nothing
+end
+
+"""
+    extended_vectors!(
+        Ŵe, V̂e, X̂e, estim::MovingHorizonEstimator, Ŵ, V̂, X̂0, x̂0arr
+    ) -> Ŵe, V̂e, X̂e
+
+Compute the extended `Ŵe, V̂e` and `X̂e` vectors for NLP using the `Ŵ, V̂` and `X̂0` vectors.
+
+See [`MovingHorizonEstimator`](@ref) for the definition of the vectors, the exact time
+steps of the samples in them and the missing values with `NaN`s. The method mutates all
+the arguments before `estim` argument.
+"""
+function extended_vectors!(Ŵe, V̂e, X̂e, estim::MovingHorizonEstimator, Ŵ, V̂, X̂0, x̂0arr)
+    nym, nŵ, nx̂ = estim.nym, estim.nx̂, estim.nx̂
+    Ŵe[1:end-nŵ]            .= Ŵ
+    Ŵe[end-nŵ+1:end]        .= NaN
+    X̂e[1:nx̂]                .= x̂0arr .+ estim.x̂op
+    X̂e[nx̂+1:end]            .= X̂0 .+ estim.X̂op
+    if estim.direct
+        V̂e[1:nym]           .= NaN
+        V̂e[1+nym:end]       .= V̂
+    else
+        V̂e[1:end-nym]       .= V̂
+        V̂e[end-nym+1:end]   .= NaN
+    end
+    return Ŵe, V̂e, X̂e
 end
 
 
 """
-    con_custom_mhe!(gc, estim::MovingHorizonEstimator, V̂, X̂0, Z̃, x̄, ε) -> gc
+    con_custom_mhe!(gc, estim::MovingHorizonEstimator, X̂e, V̂e, Ŵe, x̄, ε) -> gc
 
 Evaluate the custom inequality constraint `gc` in-place for [`MovingHorizonEstimator`](@ref).
 """
-function con_custom_mhe!(gc, estim::MovingHorizonEstimator, V̂, X̂0, Z̃, x̄, ε)
+function con_custom_mhe!(gc, estim::MovingHorizonEstimator, X̂e, V̂e, Ŵe, x̄, ε) 
     if estim.con.nc > 0
         P̄ = estim.P̂arr_old
-        nx̂, nε, Nk = estim.nx̂, estim.nε, estim.Nk[]
-        nx̃ = nε + nx̂
-        X̂ = [x̂0arr .+ estim.x̂op; X̂0 .+ estim.X̂op]
-        estim.con.gc!(gc, X̂, V̂, Ŵ, U, Ym, D, P̄, x̄, p, ε)
+        Nk = estim.Nk[]
+        Ue, Yem, De = estim.Ue, estim.Yem, estim.De
+        if Nk < estim.He
+            # avoid views since allocations only when Nk < He and we want fast mul!:
+            nX̂e, nŴe, nYem = (Nk+1)*estim.nx̂, (Nk+1)*estim.nx̂, (Nk+1)*estim.nym
+            nUe, nDe       = (Nk+1)*estim.model.nu, (Nk+1)*estim.model.nd
+            Ue, Yem, De = estim.Ue[1:nUe], estim.Yem[1:nYem], estim.De[1:nDe]
+            X̂e, V̂e, Ŵe  = X̂e[1:nX̂e], V̂e[1:nYem], Ŵe[1:nŴe]
+        else
+            Ue, Yem, De = estim.Ue, estim.Yem, estim.De
+        end
+        estim.con.gc!(gc, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, estim.p, ε)
     end 
     return gc
 end
@@ -946,17 +981,32 @@ function con_nonlinprog_mhe!(g, estim::MovingHorizonEstimator, ::SimModel, X̂0,
             j = i - 2nX̂con
             jcon = nV̂con-nV̂+j
             g[i] = j > nV̂ ? 0 : estim.con.V̂min[jcon] - V̂[j] - ε*estim.con.C_v̂min[jcon]
-        else
+        elseif i ≤ 2nX̂con + 2nV̂con
             j = i - 2nX̂con - nV̂con
             jcon = nV̂con-nV̂+j
             g[i] = j > nV̂ ? 0 : V̂[j] - estim.con.V̂max[jcon] - ε*estim.con.C_v̂max[jcon]
+        else
+            j = i - 2nX̂con - 2nV̂con
+            g[i] = gc[j]
         end
     end
     return g
 end
 
-"No nonlinear constraints if `model` is a [`LinModel`](@ref), return `g` unchanged."
-con_nonlinprog_mhe!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , _ , _ ) = g
+"""
+    con_nonlinprog_mhe!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , gc, _ )
+
+Compute the same but for [`LinModel`](@ref). 
+
+The nonlinear custom inequality constraints in `gc` are the only nonlinear constraints
+for this case. 
+"""
+function con_nonlinprog_mhe!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , gc , _ )
+    for i in eachindex(g)
+        g[i] = gc[i]
+    end
+    return g
+end
 
 "Throw an error if P̂ != nothing."
 function setstate_cov!(::MovingHorizonEstimator, P̂)

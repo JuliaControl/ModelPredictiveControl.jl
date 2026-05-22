@@ -1330,7 +1330,7 @@ The method mutates the `g` vectors in argument and returns it. Only the custom c
 `gc` are include in the `g` vector.
 """
 function con_nonlinprog!(
-    g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
+    g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, _
 )
     for i in eachindex(g)
         g[i] = gc[i]

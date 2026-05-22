@@ -86,6 +86,19 @@ function limit_solve_time(optim::GenericModel, Ts)
     end
 end
 
+"Set the maximum gradient scaling in `optim` to `10.0/C` if optimizer is `Ipopt`."
+function set_scaling_gradient!(optim::JuMP.GenericModel, C)
+    if !isinf(C) && JuMP.solver_name(optim) == "Ipopt"
+        try
+            JuMP.get_attribute(optim, "nlp_scaling_max_gradient")
+        catch
+            # default "nlp_scaling_max_gradient" to `10.0/C` if not already set:
+            JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
+        end
+    end
+    return nothing
+end
+
 "Init a differentiation result matrix as dense or sparse matrix, as required by `backend`."
 init_diffmat(T, ::AbstractADType, _ , nx, ny) = zeros(T, ny, nx)
 function init_diffmat(T, ::AutoSparse, prep , _ , _ )

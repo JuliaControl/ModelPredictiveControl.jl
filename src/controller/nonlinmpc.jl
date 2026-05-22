@@ -736,11 +736,11 @@ function init_optimization!(
     mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel{JNT}
 )  where JNT<:Real
     # --- variables and linear constraints ---
-    con, transcription = mpc.con, mpc.transcription
+    con = mpc.con
     nZ̃ = length(mpc.Z̃)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
-    limit_solve_time(mpc.optim, mpc.estim.model.Ts)
+    limit_solve_time(mpc.optim, model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
@@ -749,15 +749,8 @@ function init_optimization!(
     beq = con.beq
     @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     # --- nonlinear optimization init ---
-    if mpc.nϵ == 1 && JuMP.solver_name(optim) == "Ipopt"
-        C = mpc.weights.Ñ_Hc[end]
-        try
-            JuMP.get_attribute(optim, "nlp_scaling_max_gradient")
-        catch
-            # default "nlp_scaling_max_gradient" to `10.0/C` if not already set:
-            JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
-        end
-    end
+    C = mpc.nϵ > 0 ? mpc.weights.Cwt : Inf
+    set_scaling_gradient!(optim, C)
     J_op = get_nonlinobj_op(mpc, optim)
     g_oracle, geq_oracle = get_nonlincon_oracle(mpc, optim)
     @objective(optim, Min, J_op(Z̃var...))

@@ -66,7 +66,8 @@ struct MovingHorizonEstimator{
     JM<:JuMP.GenericModel,
     GB<:AbstractADType,
     JB<:AbstractADType,
-    HB<:Union{AbstractADType, Nothing}, 
+    HB<:Union{AbstractADType, Nothing},
+    PT<:Any,
     GCfunc<:Function,
     CE<:KalmanEstimator,
 } <: StateEstimator{NT}
@@ -92,6 +93,7 @@ struct MovingHorizonEstimator{
     nym::Int
     nyu::Int
     nxs::Int
+    p::PT
     As  ::Matrix{NT}
     Cs_u::Matrix{NT}
     Cs_y::Matrix{NT}
@@ -133,7 +135,7 @@ struct MovingHorizonEstimator{
     function MovingHorizonEstimator{NT}(
         model::SM, 
         He, i_ym, nint_u, nint_ym, cov::KC, Cwt, 
-        gc!::GCfunc, nc, p,
+        gc!::GCfunc, nc, p::PT,
         optim::JM, gradient::GB, jacobian::JB, hessian::HB, covestim::CE;
         direct=true
     ) where {
@@ -144,6 +146,7 @@ struct MovingHorizonEstimator{
             GB<:AbstractADType,
             JB<:AbstractADType,
             HB<:Union{AbstractADType, Nothing},
+            PT<:Any,
             GCfunc<:Function,
             CE<:KalmanEstimator{NT}
         }
@@ -181,7 +184,7 @@ struct MovingHorizonEstimator{
         Nk = [0]
         corrected = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
-        estim = new{NT, SM, KC, JM, GB, JB, HB, GCfunc, CE}(
+        estim = new{NT, SM, KC, JM, GB, JB, HB, PT, GCfunc, CE}(
             model,
             cov,
             optim, con, 
@@ -190,6 +193,7 @@ struct MovingHorizonEstimator{
             Z̃, lastu0, x̂op, f̂op, x̂0, 
             He, nε,
             i_ym, nx̂, nym, nyu, nxs, 
+            p,
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             Ẽ, F, G, J, B, ẽx̄, fx̄,
@@ -386,18 +390,18 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
         unavailable e.g.: ``\mathbf{u}(k)`` with ``p=0``. They are filled with `NaN` values.
         The exact time steps of the `NaN`s are detailed in the last column below.
 
-    | ARGUMENT           | SIZE            | FIRST SAMPLE    | LAST SAMPLE     | MISSING SAMPLES (NAN)      |
-    | :---------------   | :-------------- | :-------------- | :-------------- | :------------------------- |
-    | ``\mathbf{X̂_e}``   | `((Nk+1)*nx̂,)`  | ``k - N_k + p`` | ``k + p``       | —                          |
-    | ``\mathbf{V̂_e}``   | `((Nk+1)*nym,)` | ``k - N_k + p`` | ``k + p``       | ``k - N_k, k + 1``         |
-    | ``\mathbf{Ŵ_e}``   | `((Nk+1)*nx̂,)`  | ``k - N_k + p`` | ``k + p``       | ``k - N_k + p - 1, k + p`` |
-    | ``\mathbf{U_e}``   | `((Nk+1)*nu,)`  | ``k - N_k + p`` | ``k + p``       | ``k + p``                  |
-    | ``\mathbf{Y_e^m}`` | `((Nk+1)*nym,)` | ``k - N_k + p`` | ``k + p``       | ``k + 1``                  |
-    | ``\mathbf{D_e}``   | `((Nk+1)*nd,)`  | ``k - N_k + p`` | ``k + p``       | ``k + 1``                  |
-    | ``\mathbf{P̄}``     | `(nx̂, nx̂)`      | ``k - N_k + p`` | ``k - N_k + p`` | —                          |
-    | ``\mathbf{x̄}``     | `(nx̂,)`         | ``k - N_k + p`` | ``k - N_k + p`` | —                          |
-    | ``\mathbf{p}``     | var.            | —               | —               | —                          |
-    | ``ε``              | `()`            | —               | —               | —                          |
+    | ARGUMENT           | SIZE            | FIRST SAMPLE    | LAST SAMPLE     | MISSING SAMPLES    |
+    | :---------------   | :-------------- | :-------------- | :-------------- | :----------------- |
+    | ``\mathbf{X̂_e}``   | `((Nk+1)*nx̂,)`  | ``k - N_k + p`` | ``k + p``       | —                  |
+    | ``\mathbf{V̂_e}``   | `((Nk+1)*nym,)` | ``k - N_k + p`` | ``k + p``       | ``k - N_k, k + 1`` |
+    | ``\mathbf{Ŵ_e}``   | `((Nk+1)*nx̂,)`  | ``k - N_k + p`` | ``k + p``       | ``k + p``          |
+    | ``\mathbf{U_e}``   | `((Nk+1)*nu,)`  | ``k - N_k + p`` | ``k + p``       | ``k + p``          |
+    | ``\mathbf{Y_e^m}`` | `((Nk+1)*nym,)` | ``k - N_k + p`` | ``k + p``       | ``k + 1``          |
+    | ``\mathbf{D_e}``   | `((Nk+1)*nd,)`  | ``k - N_k + p`` | ``k + p``       | ``k + 1``          |
+    | ``\mathbf{P̄}``     | `(nx̂, nx̂)`      | ``k - N_k + p`` | ``k - N_k + p`` | —                  |
+    | ``\mathbf{x̄}``     | `(nx̂,)`         | ``k - N_k + p`` | ``k - N_k + p`` | —                  |
+    | ``\mathbf{p}``     | var.            | —               | —               | —                  |
+    | ``ε``              | `()`            | —               | —               | —                  |
 
     If `LHS` represents the result of the left-hand side in the inequality 
     ``\mathbf{g_c}(\mathbf{X̂_e, V̂_e, Ŵ_e, U_e, Y_e^m, D_e, P̄, x̄, p}, ε) ≤ \mathbf{0}``,
@@ -405,7 +409,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     
     1. **Non-mutating function** (out-of-place): define it as `gc(X̂e, V̂e, Ŵe, Ue, Yem, De, 
        P̄, x̄, p, ε) -> LHS`. This syntax is simple and intuitive but it allocates more memory.
-    2. **Mutating function** (in-place): define it as `gc!(LHS, X̂e, V̂e, Ŵe, Ue, Yme, De, P̄,
+    2. **Mutating function** (in-place): define it as `gc!(LHS, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄,
        x̄, p, ε) -> nothing`. This syntax reduces the allocations and potentially the
        computational burden as well.
 
@@ -921,7 +925,7 @@ function setconstraint!(
     return estim
 end
 
-"By default, no nonlinear constraints, return nothing."
+"By default, no nonlinear constraints or only custom ones, do and return nothing."
 reset_nonlincon!(::MovingHorizonEstimator, ::SimModel) = nothing
 
 """
@@ -931,7 +935,7 @@ Re-construct nonlinear constraints and add them to `estim.optim`.
 """
 function reset_nonlincon!(estim::MovingHorizonEstimator, model::NonLinModel)
     g_oracle = get_nonlincon_oracle(estim, estim.optim)
-    set_nonlincon!(estim, model, estim.optim, g_oracle)
+    set_nonlincon!(estim, estim.optim, g_oracle)
 end
 
 @doc raw"""
@@ -1462,15 +1466,21 @@ Init the quadratic optimization of [`MovingHorizonEstimator`](@ref).
 function init_optimization!(
     estim::MovingHorizonEstimator, model::LinModel, optim::JuMP.GenericModel,
 )
+    C, con = estim.C, estim.con
     nZ̃ = length(estim.Z̃)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(optim, model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
-    A = estim.con.A[estim.con.i_b, :]
-    b = estim.con.b[estim.con.i_b]
+    A = con.A[con.i_b, :]
+    b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
     @objective(optim, Min, obj_quadprog(Z̃var, estim.H̃, estim.q̃))
+    if con.nc > 0
+        set_scaling_gradient!(optim, C)
+        g_oracle = get_nonlincon_oracle(estim, optim)  
+        set_nonlincon!(estim, optim, g_oracle)
+    end
     return nothing
 end
 
@@ -1491,23 +1501,16 @@ function init_optimization!(
     JuMP.set_silent(optim)
     limit_solve_time(optim, model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
-    A = estim.con.A[con.i_b, :]
-    b = estim.con.b[con.i_b]
+    A = con.A[con.i_b, :]
+    b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
     # --- nonlinear optimization init ---
-    if !isinf(C) && JuMP.solver_name(optim) == "Ipopt"
-        try
-            JuMP.get_attribute(optim, "nlp_scaling_max_gradient")
-        catch
-            # default "nlp_scaling_max_gradient" to `10.0/C` if not already set:
-            JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
-        end
-    end
+    set_scaling_gradient!(optim, C)
     # constraints with vector nonlinear oracle, objective function with splatting:    
     J_op = get_nonlinobj_op(estim, optim)
     g_oracle = get_nonlincon_oracle(estim, optim)  
     @objective(optim, Min, J_op(Z̃var...))
-    set_nonlincon!(estim, model, optim, g_oracle)
+    set_nonlincon!(estim, optim, g_oracle)
     return nothing
 end
 
@@ -1534,23 +1537,28 @@ function get_nonlinobj_op(
     He = estim.He
     ng = length(con.i_g)
     nŴ, nV̂, nX̂, ng, nZ̃ = He*nx̂, He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
+    nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
     myNaN                               = convert(JNT, NaN)
     J::Vector{JNT}                      = zeros(JNT, 1)
-    x̂0arr::Vector{JNT}, x̄::Vector{JNT}  = zeros(JNT, nx̂), zeros(JNT, nx̂)
+    x̂0arr::Vector{JNT}, x̄::Vector{JNT}  = zeros(JNT, nx̂),  zeros(JNT, nx̂)
     Ŵ::Vector{JNT}                      = zeros(JNT, nŴ)
-    V̂::Vector{JNT},     X̂0::Vector{JNT} = zeros(JNT, nV̂), zeros(JNT, nX̂)
+    V̂::Vector{JNT},     X̂0::Vector{JNT} = zeros(JNT, nV̂),  zeros(JNT, nX̂)
+    Ŵe::Vector{JNT}                     = zeros(JNT, nŴe)
+    V̂e::Vector{JNT},    X̂e::Vector{JNT} = zeros(JNT, nV̂e), zeros(JNT, nX̂e)
     k::Vector{JNT}                      = zeros(JNT, nk)
-    û0::Vector{JNT},    ŷ0::Vector{JNT} = zeros(JNT, nu), zeros(JNT, nŷ)
-    gc::Vector{JNT},    g::Vector{JNT}  = zeros(JNT, nc), zeros(JNT, ng) 
-    function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g)
-        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim, Z̃)
+    û0::Vector{JNT},    ŷ0::Vector{JNT} = zeros(JNT, nu),  zeros(JNT, nŷ)
+    gc::Vector{JNT},    g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng) 
+    function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g)
+        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
     Z̃_J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     J_cache = (
-        Cache(x̂0arr), Cache(x̄), Cache(Ŵ), Cache(V̂), Cache(X̂0), 
-        Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
+        Cache(x̂0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(Ŵe), Cache(V̂e), Cache(X̂e),
+        Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
     )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
     estim.Nk[] = He
@@ -1641,30 +1649,35 @@ function get_nonlincon_oracle(
     ng, ngi = length(con.i_g), sum(con.i_g)
     nc = con.nc
     nŴ, nV̂, nX̂, nZ̃ = He*nx̂, He*nym, He*nx̂, length(estim.Z̃)
+    nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
     myNaN, myInf                          = convert(JNT, NaN), convert(JNT, Inf)
     x̂0arr::Vector{JNT}, x̄::Vector{JNT}    = zeros(JNT, nx̂), zeros(JNT, nx̂)
     Ŵ::Vector{JNT}                        = zeros(JNT, nŴ)
-    V̂::Vector{JNT},     X̂0::Vector{JNT}   = zeros(JNT, nV̂), zeros(JNT, nX̂)
+    V̂::Vector{JNT},     X̂0::Vector{JNT}   = zeros(JNT, nV̂),  zeros(JNT, nX̂)
+    Ŵe::Vector{JNT}                       = zeros(JNT, nŴe)
+    V̂e::Vector{JNT},    X̂e::Vector{JNT}   = zeros(JNT, nV̂e), zeros(JNT, nX̂e)
     k::Vector{JNT}                        = zeros(JNT, nk)
     û0::Vector{JNT},    ŷ0::Vector{JNT}   = zeros(JNT, nu), zeros(JNT, nŷ)
     gc::Vector{JNT},    g::Vector{JNT}    = zeros(JNT, nc), zeros(JNT, ng)
     gi::Vector{JNT}                       = zeros(JNT, ngi)
     λi::Vector{JNT}                       = rand(JNT, ngi)
     # -------------- inequality constraint: nonlinear oracle -------------------------
-    function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g)
-        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim, Z̃)
+    function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g)
+        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
         gi .= @views g[i_g]
         return nothing
     end
-    function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, gi)
-        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim, Z̃)
+    function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, gi)
+        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
         gi .= @views g[i_g]
         return dot(λi, gi)
     end
     Z̃_∇gi = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
     ∇gi_cache = (
-        Cache(x̂0arr), Cache(x̄), Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(x̂0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(Ŵe), Cache(V̂e), Cache(X̂e),
         Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
     )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
@@ -1675,7 +1688,9 @@ function get_nonlincon_oracle(
     ∇gi_structure = init_diffstructure(∇gi)
     if !isnothing(hess)
         ∇²gi_cache = (
-            Cache(x̂0arr), Cache(x̄), Cache(Ŵ), Cache(V̂), Cache(X̂0),     
+            Cache(x̂0arr), Cache(x̄), 
+            Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+            Cache(Ŵe), Cache(V̂e), Cache(X̂e),    
             Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g), Cache(gi)
         )
         estim.Nk[] = He # see comment above
@@ -1722,16 +1737,13 @@ function get_nonlincon_oracle(
     return g_oracle
 end
 
-"By default, there is no nonlinear constraint, thus do nothing."
-set_nonlincon!(::MovingHorizonEstimator, ::SimModel, _ , _ ) = nothing
-
 """
-    set_nonlincon!(estim::MovingHorizonEstimator, ::NonLinModel, optim, g_oracle)
+    set_nonlincon!(estim::MovingHorizonEstimator, optim, g_oracle)
 
-Set the nonlinear inequality constraints for `NonLinModel`, if any.
+Set the nonlinear inequality constraints of `estim`, if any.
 """
 function set_nonlincon!(
-    estim::MovingHorizonEstimator, ::NonLinModel, optim::JuMP.GenericModel{JNT}, g_oracle
+    estim::MovingHorizonEstimator, optim::JuMP.GenericModel{JNT}, g_oracle
 ) where JNT<:Real
     Z̃var = optim[:Z̃var]
     nonlin_constraints = JuMP.all_constraints(
