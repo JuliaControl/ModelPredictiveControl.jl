@@ -749,7 +749,7 @@ function init_optimization!(
     beq = con.beq
     @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     # --- nonlinear optimization init ---
-    C = mpc.nϵ > 0 ? mpc.weights.Cwt : Inf
+    C = mpc.nϵ > 0 ? mpc.weights.Ñ_Hc[end, end] : Inf
     set_scaling_gradient!(optim, C)
     J_op = get_nonlinobj_op(mpc, optim)
     g_oracle, geq_oracle = get_nonlincon_oracle(mpc, optim)
