@@ -455,7 +455,7 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     H̃_data .= Ñ_Nk
     mul!(H̃_data, ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
     lmul!(2, H̃_data)
-    @show estim.q̃
+    display(estim.q̃)
     display(estim.H̃)
     JuMP.set_objective_function(optim, obj_quadprog(Z̃var, H̃, q̃))
     return nothing
