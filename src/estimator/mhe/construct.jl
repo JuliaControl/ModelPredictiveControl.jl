@@ -183,6 +183,7 @@ struct MovingHorizonEstimator{
         P̂arr_old = copy(cov.P̂_0)
         Nk = [0]
         corrected = [false]
+        test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p)
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
         estim = new{NT, SM, KC, JM, GB, JB, HB, PT, GCfunc, CE}(
             model,
@@ -647,19 +648,23 @@ function get_mutating_gc_mhe(NT, gc)
 end
 
 """
-    test_custom_function_mhe(NT, model::SimModel, gc!, nc, X̂op, Ymop, Uop, Dop, p) -> nothing
+    test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op, p) -> nothing
 
-Test the custom functions `gc!` at the operating points 
+Test the custom functions `gc!` at the operating points.
 
 This function is called at the end of `MovingHorizonEstimator` construction. It warns the
-user if the custom constraint `gc!` functions crash at `model` operating points. This
+user if the custom constraint `gc!` function crashes at `model` operating points. This
 should ease troubleshooting of simple bugs e.g.: the user forgets to set the `nc` argument.
 """
-function test_custom_function_mhe(NT, model::SimModel, gc!, nc, X̂op, Ymop, Uop, Dop, p)
+function test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op, p)
+    nŵ, nym = length(x̂op), length(i_ym)
     uop, dop, yop = model.uop, model.dop, model.yop
+    yopm = yop[i_ym]
+    X̂e, V̂e,  Ŵe = repeat(x̂op, He+1), zeros(NT, (He+1)*nym), zeros(NT, (He+1)*nŵ)
+    Ue, Yem, De = repeat(uop, He+1), repeat(yopm, He+1),    repeat(dop, He+1)
     gc = Vector{NT}(undef, nc) 
     try
-        gc!(gc, X̂, V̂, Ŵ, U, Ym, D, P̄, x̄, p, 0.0)
+        gc!(gc, X̂e, V̂e, Ŵe, Ue, Yem, De, I, x̂op, p, zero(NT))
     catch err
         @warn(
             """
