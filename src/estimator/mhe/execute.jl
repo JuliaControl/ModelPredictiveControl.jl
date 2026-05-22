@@ -208,19 +208,24 @@ function addinfo!(
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(con.i_g), sum(con.i_g)
     nV̂, nX̂, nŴ = He*nym, He*nx̂, He*nx̂
-    x̂0arr, x̄ = zeros(NT, nx̂), zeros(NT, nx̂)
-    V̂,  X̂0   = zeros(NT, nV̂), zeros(NT, nX̂)
-    Ŵ        = zeros(NT, nŴ)
-    k        = zeros(NT, nk)
-    û0, ŷ0   = zeros(NT, nu), zeros(NT, nŷ)
-    gc, g    = zeros(NT, nc), zeros(NT, ng) 
-    gi       = zeros(NT, ngi)
+    nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
+    x̂0arr, x̄  = zeros(NT, nx̂), zeros(NT, nx̂)
+    Ŵ         = zeros(NT, nŴ)
+    V̂, X̂0     = zeros(NT, nV̂),  zeros(NT, nX̂)
+    Ŵe        = zeros(NT, nŴe)
+    V̂e, X̂e    = zeros(NT, nV̂e), zeros(NT, nX̂e)
+    k         = zeros(NT, nk)
+    û0, ŷ0    = zeros(NT, nu), zeros(NT, nŷ)
+    gc, g     = zeros(NT, nc), zeros(NT, ng) 
+    gi        = zeros(NT, ngi)
     J_cache = (
-        Cache(x̂0arr), Cache(x̄), Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(x̂0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(Ŵe), Cache(V̂e), Cache(X̂e),
         Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
     )
-    function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g)
-        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim, Z̃)
+    function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g)
+        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
     if !isnothing(hess)
@@ -234,11 +239,13 @@ function addinfo!(
     end
     # --- inequality constraint derivatives ---
     ∇g_cache = (
-        Cache(x̂0arr), Cache(x̄), Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(x̂0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(Ŵe), Cache(V̂e), Cache(X̂e),
         Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
     )
-    function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g)
-        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim, Z̃)
+    function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g)
+        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
         gi .= @views g[i_g]
         return nothing
     end
@@ -261,11 +268,13 @@ function addinfo!(
             end
         end
         ∇²g_cache = (
-            Cache(x̂0arr), Cache(x̄), Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+            Cache(x̂0arr), Cache(x̄), 
+            Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+            Cache(Ŵe), Cache(V̂e), Cache(X̂e),
             Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g), Cache(gi)
         )
-        function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, gi)
-            update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, û0, k, ŷ0, gc, g, estim, Z̃)
+        function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, gi)
+            update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
             gi .= @views g[i_g]
             return dot(λi, gi)
         end
