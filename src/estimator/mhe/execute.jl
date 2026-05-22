@@ -374,8 +374,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.X̂0_old[(1 + nx̂*(Nk-1)):(nx̂*Nk)]           .= x̂0_old
     end
     estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
-    #@show estim.X̂0_old
-    #@show estim.x̂0arr_old
     return ismoving
 end
     
@@ -411,7 +409,7 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     invP̄, invQ̂_He, invR̂_He = estim.cov.invP̄, estim.cov.invQ̂_He, estim.cov.invR̂_He
     F, C, optim = estim.F, estim.C, estim.optim
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
-    nU, nYm, nD, nŴ = model.nu*Nk, estim.nym*Nk, model.nd*Nk, nŵ*Nk
+    nU, nYm, nŴ, nD = model.nu*Nk, estim.nym*Nk, nŵ*Nk, model.nd*(Nk+1)
     nZ̃ = nε + nx̂ + nŴ
     # --- truncate vector and matrices if necessary ---
     if Nk < estim.He
@@ -455,8 +453,6 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     H̃_data .= Ñ_Nk
     mul!(H̃_data, ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
     lmul!(2, H̃_data)
-    display(estim.q̃)
-    display(estim.H̃)
     JuMP.set_objective_function(optim, obj_quadprog(Z̃var, H̃, q̃))
     return nothing
 end
