@@ -653,24 +653,35 @@ end
 Test the custom functions `gc!` at the operating points.
 
 This function is called at the end of `MovingHorizonEstimator` construction. It warns the
-user if the custom constraint `gc!` function crashes at `model` operating points. This
-should ease troubleshooting of simple bugs e.g.: the user forgets to set the `nc` argument.
+user if the custom constraint `gc!` function crashes at `model` operating points. It
+will also verify the custom function work with the growing windows. It should ease
+troubleshooting of simple bugs e.g.: the user forgets to set the `nc` argument.
 """
 function test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op, p)
-    nŵ, nym = length(x̂op), length(i_ym)
+    nx̂, nŵ, nym = length(x̂op), length(x̂op), length(i_ym)
+    nu, nd = model.nu, model.nd
     uop, dop, yop = model.uop, model.dop, model.yop
     yopm = yop[i_ym]
-    X̂e, V̂e,  Ŵe = repeat(x̂op, He+1), zeros(NT, (He+1)*nym), zeros(NT, (He+1)*nŵ)
-    Ue, Yem, De = repeat(uop, He+1), repeat(yopm, He+1),    repeat(dop, He+1)
+    X̂e_He, V̂e_He,  Ŵe_He = repeat(x̂op, He+1), zeros(NT, (He+1)*nym), zeros(NT, (He+1)*nŵ)
+    Ue_He, Yem_He, De_He = repeat(uop, He+1), repeat(yopm, He+1),    repeat(dop, He+1)
+    x̄ = zeros(NT, nx̂)
+    P̄ = Hermitian(Matrix{NT}(I, 4, 4), :L)
+    ε = zero(NT)
     gc = Vector{NT}(undef, nc) 
     try
-        gc!(gc, X̂e, V̂e, Ŵe, Ue, Yem, De, I, x̂op, p, zero(NT))
+        for i in 2:He+1
+            X̂e, V̂e, Ŵe  = X̂e_He[1:(i*nx̂)], V̂e_He[1:(i*nym)],  Ŵe_He[1:(i*nŵ)]
+            Ue, Yem, De = Ue_He[1:(i*nu)], Yem_He[1:(i*nym)], De_He[1:(i*nd)]
+            gc!(gc, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ε)
+        end
     catch err
         @warn(
             """
-            Calling the gc function with Ue, Ŷe, D̂e, ϵ arguments fixed at uop=$uop,
-            yop=$yop, dop=$dop, ϵ=0 failed with the following stacktrace. Did you 
-            forget to set the keyword argument p or nc?
+            Calling the gc function with X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, ε arguments
+            fixed at x̂op=$x̂op, uop=$uop, yop=$yop, dop=$dop, 
+            P̄=I, x̄=0, p=$p, ϵ=0 failed with the following stacktrace. 
+            Did you forget to set the keyword argument p or nc? 
+            Did you handle the growing data windows in your function?
             """, 
             exception=(err, catch_backtrace())
         )
