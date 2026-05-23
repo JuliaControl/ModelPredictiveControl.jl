@@ -1,6 +1,7 @@
 "Reset the data windows and time-varying variables for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0) 
     model = estim.model
+    nu, ny, nd = model.nu, model.ny, model.nd
     estim.Z̃         .= 0
     estim.Y0m       .= NaN
     estim.Yem       .= NaN
