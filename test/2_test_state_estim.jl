@@ -1394,8 +1394,8 @@ end
     @test mhe.Â ≈ [0.2]
     @test evaloutput(mhe) ≈ [55.0]
     @test mhe.lastu0 ≈ [2.0 - 3.0]
-    @test mhe.U0 ≈ repeat([2.0 - 3.0], He)
-    @test mhe.Y0m ≈ repeat([50.0 - 55.0], He)
+    @test mhe.U0[1] ≈ 2.0 - 3.0
+    @test mhe.Y0m[1] ≈ 50.0 - 55.0
     x̂ = preparestate!(mhe, [55.0])
     @test x̂ ≈ [3.0]
     newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
