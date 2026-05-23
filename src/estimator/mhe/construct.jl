@@ -637,12 +637,10 @@ end
 "Get mutating custom constraint function `gc!` from the provided function in argument."
 function get_mutating_gc_mhe(NT, gc)
     ismutating_gc = validate_gc_mhe(NT, gc)
-    @show ismutating_gc
     gc! = if ismutating_gc
         gc
     else
         function gc!(LHS, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ϵ)
-            println("ASDS")
             LHS .= gc(X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ϵ)
             return nothing
         end
