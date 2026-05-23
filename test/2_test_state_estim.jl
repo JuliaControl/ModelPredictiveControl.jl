@@ -1402,7 +1402,7 @@ end
     setmodel!(mhe, newlinmodel)
     @test mhe.x̂0   ≈ [3.0 - 8.0]
     @test mhe.Z̃[1] ≈ 3.0 - 8.0
-    @test mhe.X̂0_old   ≈ repeat([3.0 - 8.0], He)
+    @test mhe.X̂0_old[1] ≈ 3.0 - 8.0
     @test mhe.x̂0arr_old ≈ [3.0 - 8.0]
     @test mhe.con.X̂0min ≈ repeat([-1000 - 8.0], He)
     @test mhe.con.X̂0max ≈ repeat([+1000 - 8.0], He)
