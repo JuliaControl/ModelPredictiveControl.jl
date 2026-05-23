@@ -464,7 +464,6 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     H̃_data .= Ñ_Nk
     mul!(H̃_data, ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
     lmul!(2, H̃_data)
-    println(q̃)
     JuMP.set_objective_function(optim, obj_quadprog(Z̃var, H̃, q̃))
     return nothing
 end
@@ -481,7 +480,7 @@ Also init ``\mathbf{F_x̂ = G_x̂ U_0 + J_x̂ D_0 + B_x̂}`` vector for the stat
 """
 function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
-    nU, nX̂, nD = model.nu*Nk, estim.nx̂*Nk, model.nd*Nk
+    nU, nX̂, nD = model.nu*Nk, estim.nx̂*Nk, model.nd*(Nk+1)
     # --- truncate vector and matrices if necessary ---
     if Nk < estim.He
         # avoid views since allocations only when Nk < He and we want fast mul!:
@@ -623,7 +622,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
     getarrival!(x̂0arr, estim, estim.Z̃)
     predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, estim.Ŵ, estim.Z̃)
-    x̂0corrORnext = @views X̂0[Nk*nx̂-nx̂+1:Nk*nx̂]
+    x̂0corrORnext = @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     estim.x̂0 .= x̂0corrORnext
     return estim.Z̃
 end
