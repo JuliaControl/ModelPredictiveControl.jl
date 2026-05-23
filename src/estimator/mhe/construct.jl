@@ -570,7 +570,7 @@ function MovingHorizonEstimator(
     return MovingHorizonEstimator{NT}(
         model, 
         He, i_ym, nint_u, nint_ym, cov, Cwt,
-        gc, nc, p,
+        gc!, nc, p,
         optim, gradient, jacobian, hessian, covestim; 
         direct
     )
@@ -604,30 +604,30 @@ function validate_gc_mhe(NT, gc)
     ismutating = hasmethod(
         gc, 
         Tuple{
-        #   LHS,      , X̂           V̂         , Ŵ,
+        #   LHS,      , X̂e        , V̂e         , Ŵe
             Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, 
-        #   U         , Ym        , D         , P̄                 , x̄         , p  , ε    
+        #   Ue        , Yem       , De         , P̄                 , x̄         , p  , ε    
             Vector{NT}, Vector{NT}, Vector{NT}, AbstractMatrix{NT}, Vector{NT}, Any, NT
         }
     )
     isnonmutating = hasmethod(
         gc, 
         Tuple{
-        #   X̂           V̂         , Ŵ,
+        #   X̂e        , V̂e        , Ŵe
             Vector{NT}, Vector{NT}, Vector{NT}, 
-        #   U         , Ym        , D         , P̄                 , x̄         , p  , ε
+        #   Ue        , Yem       , De        , P̄                 , x̄         , p  , ε
             Vector{NT}, Vector{NT}, Vector{NT}, AbstractMatrix{NT}, Vector{NT}, Any, NT
         }
     )
     if !(ismutating || isnonmutating)
         error(
             "the custom constraint function has no method with type signature "*
-            "gc(X̂::Vector{$(NT)}, V̂::Vector{$(NT)}, Ŵ::Vector{$(NT)}, "*
-            "U::Vector{$(NT)}, Ym::Vector{$(NT)}, D::Vector{$(NT)}, "*
+            "gc(X̂e::Vector{$(NT)}, V̂e::Vector{$(NT)}, Ŵe::Vector{$(NT)}, "*
+            "Ue::Vector{$(NT)}, Yem::Vector{$(NT)}, De::Vector{$(NT)}, "*
             "P̄::Vector{$(NT)}, x̄::Vector{$(NT)}, p::Any, ϵ::$(NT)) "*
             "or mutating form gc!(LHS::Vector{$(NT)}, "*
-            "X̂::Vector{$(NT)}, V̂::Vector{$(NT)}, Ŵ::Vector{$(NT)}, "*
-            "U::Vector{$(NT)}, Ym::Vector{$(NT)}, D::Vector{$(NT)}, "*
+            "X̂e::Vector{$(NT)}, V̂e::Vector{$(NT)}, Ŵe::Vector{$(NT)}, "*
+            "Ue::Vector{$(NT)}, Yem::Vector{$(NT)}, De::Vector{$(NT)}, "*
             "P̄::Vector{$(NT)}, x̄::Vector{$(NT)}, p::Any, ϵ::$(NT))"
         )
     end
@@ -637,11 +637,13 @@ end
 "Get mutating custom constraint function `gc!` from the provided function in argument."
 function get_mutating_gc_mhe(NT, gc)
     ismutating_gc = validate_gc_mhe(NT, gc)
+    @show ismutating_gc
     gc! = if ismutating_gc
         gc
     else
-        function gc!(LHS, X̂, V̂, Ŵ, U, Ym, D, P̄, x̄, p, ϵ)
-            LHS .= gc(X̂, V̂, Ŵ, U, Ym, D, P̄, x̄, p, ϵ)
+        function gc!(LHS, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ϵ)
+            println("ASDS")
+            LHS .= gc(X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ϵ)
             return nothing
         end
     end
