@@ -190,11 +190,11 @@ struct OrthogonalCollocation <: CollocationMethod
             throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
         end
         if roots==:gaussradau            
-            x, _ = FastGaussQuadrature.gaussradau(COLLOCATION_NODE_TYPE, no)
+            x, _ = FastGaussQuadrature.gaussradau(no, COLLOCATION_NODE_TYPE)
             # we reverse the nodes to include the τ=1.0 node:
             τ = (reverse(-x) .+ 1) ./ 2
         elseif roots==:gausslegendre
-            x, _ = FastGaussQuadrature.gausslegendre(COLLOCATION_NODE_TYPE, no)
+            x, _ = FastGaussQuadrature.gausslegendre(no)
             # converting [-1, 1] to [0, 1] (see 
             # https://en.wikipedia.org/wiki/Gaussian_quadrature#Change_of_interval):
             τ = (x .+ 1) ./ 2
