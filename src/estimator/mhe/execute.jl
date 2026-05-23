@@ -18,14 +18,14 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     estim.con.Fx̂    .= 0
     if estim.direct
         # add y0m(-1) to the extended data window (custom NL constraints):
-        estim.Yem[1:model.ny] .= y0m .+ @views model.yop[estim.i_ym]
+        estim.Yem[1:ny] .= y0m .+ @views yop[estim.i_ym]
         # add u0(-1) to the two data windows:
-        estim.U0[1:model.nu] .= u0
-        estim.Ue[1:model.nu] .= u0 .+ model.uop
+        estim.U0[1:nu] .= u0
+        estim.Ue[1:nu] .= u0 .+ uop
         # add d0(-1) to the extended data window (custom NL constraints):
-        model.nd > 0 && (estim.De[1:model.nd] .= d0 .+ model.dop)
+        nd > 0 && (estim.De[1:nd] .= d0 .+ dop)
     end 
-    model.nd > 0 && (estim.D0[1:model.nd] .= d0) # add d0(-1) to the data window
+    nd > 0 && (estim.D0[1:nd] .= d0) # add d0(-1) to the data window
     estim.lastu0 .= u0
     # estim.cov.P̂_0 is P̂(-1|-1) if estim.direct==false, else P̂(-1|0)
     invert_cov!(estim, estim.cov.P̂_0)
@@ -462,6 +462,7 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     H̃_data .= Ñ_Nk
     mul!(H̃_data, ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
     lmul!(2, H̃_data)
+    println(q̃)
     JuMP.set_objective_function(optim, obj_quadprog(Z̃var, H̃, q̃))
     return nothing
 end
