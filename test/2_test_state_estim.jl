@@ -848,7 +848,7 @@ end
 
     mhe7 = MovingHorizonEstimator(linmodel, He=10)
     @test mhe7.He == 10
-    @test length(mhe7.X̂0)  == mhe7.He*6
+    @test length(mhe7.X̂0_old)  == mhe7.He*6
     @test length(mhe7.Y0m) == mhe7.He*2
     @test length(mhe7.U0)  == mhe7.He*2
     @test length(mhe7.D0)  == (mhe7.He+mhe7.direct)*1
@@ -1402,7 +1402,7 @@ end
     setmodel!(mhe, newlinmodel)
     @test mhe.x̂0   ≈ [3.0 - 8.0]
     @test mhe.Z̃[1] ≈ 3.0 - 8.0
-    @test mhe.X̂0   ≈ repeat([3.0 - 8.0], He)
+    @test mhe.X̂0_old   ≈ repeat([3.0 - 8.0], He)
     @test mhe.x̂0arr_old ≈ [3.0 - 8.0]
     @test mhe.con.X̂0min ≈ repeat([-1000 - 8.0], He)
     @test mhe.con.X̂0max ≈ repeat([+1000 - 8.0], He)
