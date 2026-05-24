@@ -30,10 +30,10 @@ The documentation is divided in two parts:
 ```@contents
 Depth = 2
 Pages = [
-    "manual/installation.md",
-    "manual/linmpc.md",
-    "manual/nonlinmpc.md",
-    "manual/mtk.md"
+    joinpath("manual", "installation.md"),
+    joinpath("manual", "linmpc.md"),
+    joinpath("manual", "nonlinmpc.md"),
+    joinpath("manual", "mtk.md")
 ]
 ```
 
@@ -42,11 +42,11 @@ Pages = [
 ```@contents
 Depth = 2
 Pages = [
-    "public/sim_model.md",
-    "public/state_estim.md",
-    "public/predictive_control.md",
-    "public/generic_func.md",
-    "public/plot_sim.md",
+    joinpath("public", "sim_model.md"),
+    joinpath("public", "state_estim.md"),
+    joinpath("public", "predictive_control.md"),
+    joinpath("public", "generic_func.md"),
+    joinpath("public", "plot_sim.md")
 ]
 ```
 
@@ -55,8 +55,8 @@ Pages = [
 ```@contents
 Depth = 1
 Pages = [
-    "internals/sim_model.md",
-    "internals/state_estim.md",
-    "internals/predictive_control.md",
+    joinpath("internals", "sim_model.md"),
+    joinpath("internals", "state_estim.md"),
+    joinpath("internals", "predictive_control.md")
 ]
 ```

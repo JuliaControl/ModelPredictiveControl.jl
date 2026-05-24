@@ -95,6 +95,7 @@ struct KalmanCovariances{
                 rethrow()
             end
         end
+        invQ̂_He = Hermitian(repeatdiag(invQ̂, He), :L)
         try
             inv!(invR̂)
         catch err
@@ -104,10 +105,7 @@ struct KalmanCovariances{
                 rethrow()
             end
         end
-        invQ̂_He = repeatdiag(invQ̂, He)
-        invR̂_He = repeatdiag(invR̂, He)
-        invQ̂_He = Hermitian(invQ̂_He, :L)
-        invR̂_He = Hermitian(invR̂_He, :L)
+        invR̂_He = Hermitian(repeatdiag(invR̂, He), :L)
         return new{NT, Q̂C, R̂C}(P̂_0, P̂, Q̂, R̂, invP̄, invQ̂_He, invR̂_He)
     end
 end
@@ -125,7 +123,7 @@ end
 """
     validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing)
 
-Validate sizes and Hermitianity of process `Q̂`` and sensor `R̂` noises covariance matrices.
+Validate sizes and Hermitianity of process `Q̂` and sensor `R̂` noises covariance matrices.
 
 Also validate initial estimate covariance `P̂_0`, if provided.
 """

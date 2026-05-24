@@ -121,7 +121,7 @@ struct NonLinMPC{
         # dummy vals (updated just before optimization):
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
-        test_custom_functions(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
+        test_custom_function_mpc(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
         Mo, Co, λo = init_orthocolloc(model, transcription)
         nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
@@ -167,7 +167,7 @@ controller minimizes the following objective function at each discrete time ``k`
 ```
 subject to [`setconstraint!`](@ref) bounds, and the custom inequality constraints:
 ```math
-\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}
+\mathbf{g_c}(\mathbf{U_e, Ŷ_e, D̂_e, p}, ϵ) ≤ \mathbf{0}
 ```
 with the decision variables ``\mathbf{Z}`` and slack ``ϵ``. By default, a [`SingleShooting`](@ref)
 transcription method is used, hence ``\mathbf{Z=ΔU}``. The economic function ``J_E`` can
@@ -222,8 +222,8 @@ This controller allocates memory at each time step for the optimization.
 - `JE=(_,_,_,_,_)->0.0` : economic or custom cost function ``J_E(\mathbf{U_e}, \mathbf{Ŷ_e},
    \mathbf{D̂_e}, \mathbf{p}, ϵ)``.
 - `gc=(_,_,_,_,_,_)->nothing` or `gc!` : custom nonlinear inequality constraint function 
-   ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ)``, mutating or 
-   not (details in Extended Help).
+   ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e, D̂_e, p}, ϵ)``, mutating or not (details in
+   Extended Help).
 - `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
 - `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
@@ -276,13 +276,15 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     extended vectors ``\mathbf{U_e}``, ``\mathbf{Ŷ_e}`` and  ``\mathbf{D̂_e}`` as arguments. 
     They also receives the slack ``ϵ`` (scalar), which is always zero if `Cwt=Inf`. The 
     following table details the vector sizes and the time steps of the first and last data
-    point in them:
+    point in them.
 
-    | VECTOR           | SIZE           | FIRST TIME STEP | LAST TIME STEP |
-    | :--------------- | :------------- | :-------------- | :------------- |
-    | ``\mathbf{U_e}`` | `(nu*(Hp+1),)` | ``k + 0``       | ``k + H_p``    |
-    | ``\mathbf{Ŷ_e}`` | `(ny*(Hp+1),)` | ``k + 0``       | ``k + H_p``    |
-    | ``\mathbf{D̂_e}`` | `(nd*(Hp+1),)` | ``k + 0``       | ``k + H_p``    |
+    | ARGUMENT         | SIZE           | FIRST SAMPLE | LAST SAMPLE |
+    | :--------------- | :------------- | :----------- | :-----------|
+    | ``\mathbf{U_e}`` | `((Hp+1)*nu,)` | ``k``        | ``k + H_p`` |
+    | ``\mathbf{Ŷ_e}`` | `((Hp+1)*ny,)` | ``k``        | ``k + H_p`` |
+    | ``\mathbf{D̂_e}`` | `((Hp+1)*nd,)` | ``k``        | ``k + H_p`` |
+    | ``\mathbf{p}``   | var.           | —            | —           |
+    | ``ϵ``            | `()`           | —            | —           |
     
     More precisely, the last two time steps in ``\mathbf{U_e}`` are forced to be equal, i.e.
     ``\mathbf{u}(k+H_p) = \mathbf{u}(k+H_p-1)``, since ``H_c ≤ H_p`` implies that
@@ -290,8 +292,8 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     are the current state estimator output and measured disturbance, respectively, and 
     ``\mathbf{Ŷ}`` and ``\mathbf{D̂}``, their respective predictions from ``k+1`` to ``k+H_p``. 
     If `LHS` represents the result of the left-hand side in the inequality 
-    ``\mathbf{g_c}(\mathbf{U_e}, \mathbf{Ŷ_e}, \mathbf{D̂_e}, \mathbf{p}, ϵ) ≤ \mathbf{0}``,
-    the function `gc` can be implemented in two possible ways:
+    ``\mathbf{g_c}(\mathbf{U_e, Ŷ_e, D̂_e, p}, ϵ) ≤ \mathbf{0}``, the function `gc` can be
+    implemented in two possible ways:
     
     1. **Non-mutating function** (out-of-place): define it as `gc(Ue, Ŷe, D̂e, p, ϵ) -> LHS`.
        This syntax is simple and intuitive but it allocates more memory.
@@ -442,7 +444,7 @@ function NonLinMPC(
     nb = move_blocking(Hp, Hc)
     Hc = get_Hc(nb)
     validate_JE(NT, JE)
-    gc! = get_mutating_gc(NT, gc)
+    gc! = get_mutating_gc_mpc(NT, gc)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     hessian = validate_hessian(hessian, gradient, DEFAULT_NONLINMPC_HESSIAN)
     return NonLinMPC{NT}(
@@ -471,18 +473,23 @@ function validate_JE(NT, JE)
 end
 
 """
-    validate_gc(NT, gc) -> ismutating
+    validate_gc_mpc(NT, gc) -> ismutating
 
-Validate `gc` function argument signature and return `true` if it is mutating.
+Validate `gc` function argument signature for MPC and return `true` if it is mutating.
 """
-function validate_gc(NT, gc)
+function validate_gc_mpc(NT, gc)
     ismutating = hasmethod(
         gc, 
         #     LHS,        Ue,         Ŷe,         D̂e,         p,   ϵ
         Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}
     )
+    isnonmutating = hasmethod(
+        gc, 
+        #     Ue,         Ŷe,         D̂e,         p,   ϵ
+        Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}
+    )
     #                                      Ue,         Ŷe,         D̂e,         p,   ϵ
-    if !(ismutating || hasmethod(gc, Tuple{Vector{NT}, Vector{NT}, Vector{NT}, Any, NT}))
+    if !(ismutating || isnonmutating)
         error(
             "the custom constraint function has no method with type signature "*
             "gc(Ue::Vector{$(NT)}, Ŷe::Vector{$(NT)}, D̂e::Vector{$(NT)}, p::Any, ϵ::$(NT)) "*
@@ -494,8 +501,8 @@ function validate_gc(NT, gc)
 end
 
 "Get mutating custom constraint function `gc!` from the provided function in argument."
-function get_mutating_gc(NT, gc)
-    ismutating_gc = validate_gc(NT, gc)
+function get_mutating_gc_mpc(NT, gc)
+    ismutating_gc = validate_gc_mpc(NT, gc)
     gc! = if ismutating_gc
         gc
     else
@@ -508,7 +515,7 @@ function get_mutating_gc(NT, gc)
 end
 
 """
-    test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
+    test_custom_function_mpc(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
 
 Test the custom functions `JE` and `gc!` at the operating point `Uop`, `Yop`, `Dop`.
 
@@ -516,7 +523,7 @@ This function is called at the end of `NonLinMPC` construction. It warns the use
 custom cost `JE` and constraint `gc!` functions crash at `model` operating points. This
 should ease troubleshooting of simple bugs e.g.: the user forgets to set the `nc` argument.
 """
-function test_custom_functions(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
+function test_custom_function_mpc(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Dop, p)
     uop, dop, yop = model.uop, model.dop, model.yop
     Ue, Ŷe, D̂e = [Uop; uop], [yop; Yop], [dop; Dop]
     ϵ = zero(NT)
@@ -729,11 +736,11 @@ function init_optimization!(
     mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel{JNT}
 )  where JNT<:Real
     # --- variables and linear constraints ---
-    con, transcription = mpc.con, mpc.transcription
+    con = mpc.con
     nZ̃ = length(mpc.Z̃)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
-    limit_solve_time(mpc.optim, mpc.estim.model.Ts)
+    limit_solve_time(mpc.optim, model.Ts)
     @variable(optim, Z̃var[1:nZ̃])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
@@ -742,15 +749,8 @@ function init_optimization!(
     beq = con.beq
     @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     # --- nonlinear optimization init ---
-    if mpc.nϵ == 1 && JuMP.solver_name(optim) == "Ipopt"
-        C = mpc.weights.Ñ_Hc[end]
-        try
-            JuMP.get_attribute(optim, "nlp_scaling_max_gradient")
-        catch
-            # default "nlp_scaling_max_gradient" to `10.0/C` if not already set:
-            JuMP.set_attribute(optim, "nlp_scaling_max_gradient", 10.0/C)
-        end
-    end
+    C = mpc.nϵ > 0 ? mpc.weights.Ñ_Hc[end, end] : Inf
+    set_scaling_gradient!(optim, C)
     J_op = get_nonlinobj_op(mpc, optim)
     g_oracle, geq_oracle = get_nonlincon_oracle(mpc, optim)
     @objective(optim, Min, J_op(Z̃var...))
@@ -926,7 +926,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     myNaN, myInf                      = convert(JNT, NaN), convert(JNT, Inf)
     ΔŨ::Vector{JNT}                   = zeros(JNT, nΔŨ)
     x̂0end::Vector{JNT}                = zeros(JNT, nx̂)
-    K::Vector{JNT}                   = zeros(JNT, nK)
+    K::Vector{JNT}                    = zeros(JNT, nK)
     Ue::Vector{JNT}, Ŷe::Vector{JNT}  = zeros(JNT, nUe), zeros(JNT, nŶe)
     U0::Vector{JNT}, Ŷ0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nŶ)
     Û0::Vector{JNT}, X̂0::Vector{JNT}  = zeros(JNT, nU),  zeros(JNT, nX̂)
@@ -1081,7 +1081,7 @@ function update_predictions!(
     ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
     Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, K, mpc, model, transcription, U0, Z̃)
     Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
-    ϵ = getϵ(mpc, Z̃)
+    ϵ   = getϵ(mpc, Z̃)
     gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
     g   = con_nonlinprog!(g, mpc, model, transcription, x̂0end, Ŷ0, gc, ϵ)
     geq = con_nonlinprogeq!(geq, X̂0, Û0, K, mpc, model, transcription, U0, Z̃)
@@ -1114,7 +1114,7 @@ end
 Evaluate the custom inequality constraint `gc` in-place and return it.
 """
 function con_custom!(gc, mpc::NonLinMPC, Ue, Ŷe, ϵ)
-    mpc.con.nc ≠ 0 && mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
+    mpc.con.nc > 0 && mpc.con.gc!(gc, Ue, Ŷe, mpc.D̂e, mpc.p, ϵ)
     return gc
 end
 

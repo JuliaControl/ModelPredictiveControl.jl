@@ -206,7 +206,7 @@ The argument `Z̃orΔŨ` can be the augmented decision vector ``\mathbf{Z̃}`` 
 input increment vector ``\mathbf{ΔŨ}``, it works with both.
 """
 function getϵ(mpc::PredictiveController, Z̃orΔŨ::AbstractVector{NT}) where NT<:Real
-    return mpc.nϵ ≠ 0 ? Z̃orΔŨ[end] : zero(NT)
+    return mpc.nϵ > 0 ? Z̃orΔŨ[end] : zero(NT)
 end
 
 """
