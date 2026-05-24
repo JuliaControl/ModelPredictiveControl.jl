@@ -868,6 +868,18 @@ end
     mhe13 = MovingHorizonEstimator(linmodel2, He=5)
     @test isa(mhe13, MovingHorizonEstimator{Float32})    
 
+    function gcl(X̂e, _ , _ , _ , _ , _ , _ , _ , nx, ε)
+        gc = X̂e .- 100 .- ε   
+        return [gc; zeros(nc .- length(X̂e))]
+    end
+    He = 3
+    nx̂ = linmodel.nx
+    nc = nx̂*(He+1)
+    mhe = MovingHorizonEstimator(linmodel, nint_ym=0, Cwt=1e5, He=He, gc=gcl, nc=nc, p=nc)
+    @test mhe.con.nc == nc
+    @test mhe.nε > 0
+    @test mhe.He == 3
+
     @test_throws ArgumentError MovingHorizonEstimator(linmodel)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
@@ -1324,8 +1336,8 @@ end
     info = getinfo(mhe)
     @test info[:V̂] ≈ [-1,-1] atol=5e-2
 
-    f(x,u,_,model) = model.A*x + model.Bu*u
-    h(x,_,model)   = model.C*x
+    f = (x,u,_,model) -> model.A*x + model.Bu*u
+    h = (x,_,model)   -> model.C*x
     nonlinmodel = NonLinModel(f, h, Ts, 2, 2, 2, p=linmodel, solver=nothing)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30])
     mhe2 = MovingHorizonEstimator(nonlinmodel, He=1, nint_ym=0)
@@ -1373,6 +1385,60 @@ end
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
     info = getinfo(mhe2)
     @test info[:V̂] ≈ [-1,-1] atol=5e-2
+
+    linmodel2 = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
+    linmodel2 = setop!(linmodel2, uop=[10,50], yop=[50,30], dop=[5])
+    function gclv!(LHS, X̂e, _, _, _, _, _, _, _, nx̂, _ )
+        for i in 1:div(length(X̂e), nx̂)
+            LHS[(i-1)+1] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
+        end
+        return nothing
+    end
+    nx̂ = linmodel2.nx
+    nc = 2
+    mhe = MovingHorizonEstimator(linmodel2, He=1, gc=gclv!, nc=nc, nint_ym=0, p=nx̂)
+    preparestate!(mhe, [50, 30], [5])
+    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
+    @test x̂[1] ≈ 0.5 atol = 5e-2
+
+    function gcln!(LHS, _, _, Ŵe, _, _, _, _,_, nx̂, _)
+            LHS .= Ŵe[1:nx̂]
+        return nothing
+    end
+    nx̂ = linmodel2.nx
+    nc = linmodel2.nx
+    mhe = MovingHorizonEstimator(linmodel2, He=1, gc=gcln!, nc=nc, nint_ym=0, direct=false, p=nx̂)
+    preparestate!(mhe, [50, 30], [5])
+    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
+    @test mhe.Ŵ ≈ zeros(nx̂) atol=5e-2
+    
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Dd*d
+    nonlinmodel2 = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel2)
+    nonlinmodel2 = setop!(nonlinmodel2, uop=[10,50], yop=[50,30], dop=[5])
+    function gcnlv!(LHS, X̂e, _, _, _, _, _, _, _, nx̂, _)
+        for i in 1:div(length(X̂e), nx̂)
+            LHS[(i-1)+1] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
+        end
+        return nothing
+    end
+    nc = 2
+    nx̂ = nonlinmodel2.nx
+    mhe = MovingHorizonEstimator(nonlinmodel2, He=1, gc=gcnlv!, nc=nc, nint_ym=0, p=nx̂)
+    preparestate!(mhe, [50, 30], [5])
+    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
+    @test x̂[1] ≈ 0.5 atol = 5e-2
+
+    function gclnl!(LHS, _, _, Ŵe, _, _, _, _,_, nx̂, _)
+            LHS .= Ŵe[1:nx̂]
+        return nothing
+    end
+    nx̂ = nonlinmodel2.nx
+    nc = nonlinmodel2.nx
+    mhe = MovingHorizonEstimator(nonlinmodel2, He=1, gc=gclnl!, nc=nc, nint_ym=0, p=nx̂)
+    preparestate!(mhe, [50, 30], [5])
+    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
+    @test mhe.Ŵ ≈ zeros(nx̂) atol=5e-2
 
 end
 
@@ -1564,142 +1630,6 @@ end
         updatestate!(mhe2_nonlin, [11, 50], y, [25])
     end
     @test X̂_lin ≈ X̂_nonlin atol=1e-3 rtol=1e-3
-end
-
-
-@testitem "MovingHorizonEstimator construction with custom constraint (LinModel)" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
-    linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
-    
-    # Custom constraint: simple bound on states using only X̂e and ε
-    function gc_lin(X̂e, _ , _ , _ , _ , _ , _ , _ ,nX̂e , ε)
-        gc = X̂e .- 100 .- ε    # all states must be <= 100
-        return [gc; zeros(nX̂e .- length(X̂e))]
-    end
-    He = 3
-    nx̂ = length(linmodel.A) + 2  # number of states (with augmentation)
-    nc = nx̂ * (He+1) # Approximate constraint count for He=3
-    nX̂e = nx̂ * (He+1)
-    mhe = MovingHorizonEstimator(linmodel, Cwt=1e5, He=He, gc=gc_lin, nc=nc, p=nX̂e)
-    
-    @test mhe.con.nc == nc
-    @test mhe.nε > 0
-    @test mhe.He == 3
-end
-
-@testitem "MovingHorizonEstimator custom constraint violation (LinModel)" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
-    linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
-    
-    # Custom constraint function using only X̂e and ε
-    # This constraint enforces that the first state must be >= 0.5
-    function gc_constraint!(LHS, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ε)
-        nx̂ = 4  # number of states (with augmentation)
-        # Extract and constrain first state at each time step
-        for i in 1:div(length(X̂e), nx̂)
-            LHS[(i-1)+1] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
-        end
-        return nothing
-    end
-    
-    nc = 3  # One constraint per time step (He=1 initially, but grows)
-    mhe = MovingHorizonEstimator(linmodel, He=1, gc=gc_constraint!, nc=nc, Cwt=1e3, nint_ym=0)
-    
-    preparestate!(mhe, [50, 30], [5])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
-    # The constraint should be satisfied (first state should be >= 0.5)
-    @test x̂[1] >= 0.5 - 0.1  # Allow some tolerance
-end
-
-@testitem "MovingHorizonEstimator custom constraint violation (NonLinModel)" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    using JuMP, Ipopt
-    linmodel = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
-    linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
-    
-    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
-    h = (x,d,model)   -> model.C*x + model.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
-    nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
-    
-    # Custom constraint function using only X̂e and ε
-    # This constraint enforces that the first state must be >= 0.5
-    function gc_constraint_nl!(LHS, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ε)
-        nx̂ = 6  # number of states (with augmentation)
-        # Extract and constrain first state at each time step
-        for i in 1:div(length(X̂e), nx̂)
-            LHS[(i-1)+1] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
-        end
-        return nothing
-    end
-    
-    nc = 3  # One constraint per time step
-    optim = Model(Ipopt.Optimizer)
-    mhe = MovingHorizonEstimator(nonlinmodel, He=1, gc=gc_constraint_nl!, nc=nc, Cwt=1e3, nint_ym=0; optim)
-    
-    preparestate!(mhe, [50, 30], [5])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
-    # The constraint should be satisfied (first state should be >= 0.5)
-    @test x̂[1] >= 0.5 - 0.1  # Allow some tolerance
-end
-
-@testitem "MovingHorizonEstimator custom constraint on noise (LinModel)" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
-    linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
-    
-    # Custom constraint function using Ŵe and ε
-    # This constraint enforces that process noise must be <= 0
-    function gc_noise_constraint!(LHS, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ε)
-        nx̂ = 4  # number of states (with augmentation)
-        # Constraint: all process noise components must be <= 0
-        for i in 1:length(Ŵe)
-            LHS[i] = Ŵe[i]  # Ŵe <= 0
-        end
-        return nothing
-    end
-    
-    nc = 4 * 2  # Two time steps with 4 states each
-    mhe = MovingHorizonEstimator(linmodel, He=1, gc=gc_noise_constraint!, nc=nc, Cwt=1e3, nint_ym=0)
-    
-    preparestate!(mhe, [50, 30], [5])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
-    # The constraint should be satisfied (process noise should be <= 0)
-    @test all(mhe.Ŵ .<= 0.1)  # Allow some tolerance
-end
-
-@testitem "MovingHorizonEstimator custom constraint on noise (NonLinModel)" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    using JuMP, Ipopt
-    linmodel = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
-    linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
-    
-    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
-    h = (x,d,model)   -> model.C*x + model.Dd*d
-    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
-    nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
-    
-    # Custom constraint function using Ŵe and ε
-    # This constraint enforces that process noise must be <= 0
-    function gc_noise_constraint_nl!(LHS, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ε)
-        nx̂ = 6  # number of states (with augmentation)
-        # Constraint: all process noise components must be <= 0
-        for i in 1:length(Ŵe)
-            LHS[i] = Ŵe[i]  # Ŵe <= 0
-        end
-        return nothing
-    end
-    
-    nc = 6 * 2  # Two time steps with 6 states each
-    optim = Model(Ipopt.Optimizer)
-    mhe = MovingHorizonEstimator(nonlinmodel, He=1, gc=gc_noise_constraint_nl!, nc=nc, Cwt=1e3, nint_ym=0; optim)
-    
-    preparestate!(mhe, [50, 30], [5])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
-    # The constraint should be satisfied (process noise should be <= 0)
-    @test all(mhe.Ŵ .<= 0.1)  # Allow some tolerance
 end
 
 @testitem "ManualEstimator construction" setup=[SetupMPCtests] begin
