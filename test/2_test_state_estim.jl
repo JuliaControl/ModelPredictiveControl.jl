@@ -1395,8 +1395,8 @@ end
         return nothing
     end
     nx̂ = linmodel2.nx
-    nc = 2
-    mhe = MovingHorizonEstimator(linmodel2, He=1, gc=gclv!, nc=nc, nint_ym=0, p=nx̂)
+    nc = 6
+    mhe = MovingHorizonEstimator(linmodel2, He=5, gc=gclv!, nc=nc, nint_ym=0, p=nx̂)
     preparestate!(mhe, [50, 30], [5])
     x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
     @test x̂[1] ≈ 0.5 atol = 5e-2
