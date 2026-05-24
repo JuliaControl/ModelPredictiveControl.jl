@@ -857,6 +857,10 @@ function predict_mhe!(
 )
     nu, nd, nx̂, nŵ, nym, Nk = model.nu, model.nd, estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
     x̂0 = x̂0arr
+    if Nk < estim.He
+        V̂  .= 0 # fill unused values a 0 for tracer sparsity detection
+        X̂0 .= 0
+    end
     if estim.direct     # p = 0
         ŷ0next = ŷ0
         d0 = @views estim.D0[1:nd]
