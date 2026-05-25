@@ -299,8 +299,8 @@ transcription for now.
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
 - `gc=(_,_,_,_,_,_,_,_,_,_,_)->nothing` or `gc!` : custom nonlinear inequality constraint function 
-   ``\mathbf{g_c}(\mathbf{X̂, V̂, Ŵ, U, Y^m, D, P̄, x̄, p}, ε)``, mutating or not (details in
-   Extended Help).
+   ``\mathbf{g_c}(\mathbf{X̂_e, V̂_e, Ŵ_e, U_e, Y_e^m, D_e, P̄, x̄, p}, ε)``, mutating or not 
+   (details in Extended Help).
 - `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
 - `optim=default_optim_mhe(model,nc)` : a [`JuMP.Model`](@extref) object with a quadratic or
