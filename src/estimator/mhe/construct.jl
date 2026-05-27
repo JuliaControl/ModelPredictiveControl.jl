@@ -252,12 +252,12 @@ N_k =                     \begin{cases}
     H_e     &  k ≥ H_e    \end{cases}
 ```
 The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` respectively encompass the estimated process
-noises ``\mathbf{ŵ}(k-j+p)`` from ``j=N_k`` to ``1`` and sensor noises ``\mathbf{v̂}(k-j+1)``
-from ``j=N_k`` to ``1``. The arguments of ``\mathbf{g_c}`` include the extended vectors of
-the estimated states ``\mathbf{X̂_e}``, estimated sensor noises ``\mathbf{V̂_e}``,  estimated
-process noises ``\mathbf{Ŵ_e}``, manipulated inputs ``\mathbf{U_e}``, measured outputs
-``\mathbf{Y_e^m}``and measured disturbances ``\mathbf{D_e}``. The Extended Help details all
-these vectors, the slack variable ``ε`` and the estimation of the covariance at arrival 
+noises ``\mathbf{ŵ}(k-j+p)`` and sensor noises ``\mathbf{v̂}(k-j+1)`` from ``j=N_k`` to ``1``.
+The arguments of ``\mathbf{g_c}`` include the extended vectors of the estimated states 
+``\mathbf{X̂_e}``, estimated sensor noises ``\mathbf{V̂_e}``,  estimated process noises
+``\mathbf{Ŵ_e}``, manipulated inputs ``\mathbf{U_e}``, measured outputs ``\mathbf{Y_e^m}``
+and measured disturbances ``\mathbf{D_e}``. The Extended Help details all these vectors, the
+slack variable ``ε`` and the estimation of the covariance at arrival 
 ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If the keyword argument `direct=true` (default value), the
 constant ``p=0`` in the equations above, and the MHE is in the current form. Else ``p=1``,
 leading to the prediction form.
