@@ -109,4 +109,5 @@ for more detailed examples.
 - 🛣️ **Bumpless Transfer**: Smooth transitions from manual to automatic control.
 - ⌚️ **Timing**: Estimators available in filter (current) or predictor (delayed) forms.
 - 🏷️ **MHE Types**: Formulations for both linear (quadratic optimization) and nonlinear plants.
-- 🛡️ **MHE Constraints**: Tunable soft/hard constraints on state and noise estimates.
+- 🚧 **MHE Bounds**: Soft/hard limits on state and noise estimates.
+- 🚫 **MHE Constraints**: Soft/hard custom nonlinear inequality constrains.
