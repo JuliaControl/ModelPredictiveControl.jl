@@ -32,13 +32,17 @@ function Base.show(io::IO, estim::StateEstimator)
     model = estim.model
     nu, nd = model.nu, model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
-    n = maximum(ndigits.((nu, nx̂, nym, nyu, nd))) + 1
+    other_dims = get_other_dims(estim)
+    n = maximum(ndigits.((nu, nx̂, nym, nyu, nd, other_dims...))) + 1
     println(io, "$(nameof(typeof(estim))) estimator with a sample time Ts = $(model.Ts) s:")
     println(io, "├ model: $(nameof(typeof(estim.model)))")
     print_details(io, estim)
     println(io, "└ dimensions:")
     print_estim_dim(io, estim, n)
 end
+
+"Return additional dimensions on `estim` if any, for adequate padding with spaces."
+get_other_dims(::StateEstimator) = tuple()
 
 "Print additional details of `estim` if any (no details by default)."
 print_details(::IO, ::StateEstimator) = nothing

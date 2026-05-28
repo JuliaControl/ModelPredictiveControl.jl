@@ -31,7 +31,8 @@ function Base.show(io::IO, mpc::PredictiveController)
     Hp, Hc, nϵ = mpc.Hp, mpc.Hc, mpc.nϵ
     nu, nd = model.nu, model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
-    n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
+    other_dims = get_other_dims(estim)
+    n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd, other_dims...))) + 1
     println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = $(model.Ts) s:")
     println(io, "├ estimator: $(nameof(typeof(mpc.estim)))")
     println(io, "├ model: $(nameof(typeof(model)))")
