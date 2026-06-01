@@ -666,7 +666,7 @@ function test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op,
     X̂e_He, V̂e_He,  Ŵe_He = repeat(x̂op, He+1), zeros(NT, (He+1)*nym), zeros(NT, (He+1)*nŵ)
     Ue_He, Yem_He, De_He = repeat(uop, He+1), repeat(yopm, He+1),    repeat(dop, He+1)
     x̄ = zeros(NT, nx̂)
-    P̄ = Hermitian(Matrix{NT}(I, 4, 4), :L)
+    P̄ = Hermitian(Matrix{NT}(I, nx̂, nx̂), :L)
     ε = zero(NT)
     gc = Vector{NT}(undef, nc) 
     try
