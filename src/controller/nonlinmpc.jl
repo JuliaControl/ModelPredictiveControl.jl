@@ -542,6 +542,7 @@ function test_custom_function_mpc(NT, model::SimModel, JE, gc!, nc, Uop, Yop, Do
     gc = Vector{NT}(undef, nc) 
     try
         gc!(gc, Ue, Ŷe, D̂e, p, ϵ)
+        all(isfinite, gc) || error("the gc function returned non-finite values: gc = $gc")
     catch err
         @warn(
             """

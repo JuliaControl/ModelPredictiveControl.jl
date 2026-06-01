@@ -184,7 +184,7 @@ struct MovingHorizonEstimator{
         P̂arr_old = copy(cov.P̂_0)
         Nk = [0]
         corrected = [false]
-        test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p)
+        test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p, direct)
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
         estim = new{NT, SM, KC, JM, GB, JB, HB, PT, GCfunc, CE}(
             model,
@@ -649,16 +649,18 @@ function get_mutating_gc_mhe(NT, gc)
 end
 
 """
-    test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op, p) -> nothing
+    test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op, p, direct) -> nothing
 
 Test the custom functions `gc!` at the operating points.
 
 This function is called at the end of `MovingHorizonEstimator` construction. It warns the
 user if the custom constraint `gc!` function crashes at `model` operating points. It
-will also verify the custom function work with the growing windows. It should ease
-troubleshooting of simple bugs e.g.: the user forgets to set the `nc` argument.
+will also verify the custom function work with the growing windows, and with the `NaN` 
+values at the boundaries (see [`MovingHorizonEstimator`](@ref) Extended Help for details on
+the data windows). It should ease troubleshooting of simple bugs e.g.: the user forgets to
+set the `nc` argument.
 """
-function test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op, p)
+function test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op, p, direct)
     nx̂, nŵ, nym = length(x̂op), length(x̂op), length(i_ym)
     nu, nd = model.nu, model.nd
     uop, dop, yop = model.uop, model.dop, model.yop
@@ -673,7 +675,17 @@ function test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op,
         for i in 2:He+1
             X̂e, V̂e, Ŵe  = X̂e_He[1:(i*nx̂)], V̂e_He[1:(i*nym)],  Ŵe_He[1:(i*nŵ)]
             Ue, Yem, De = Ue_He[1:(i*nu)], Yem_He[1:(i*nym)], De_He[1:(i*nd)]
+            if direct
+                V̂e[1:nym] .= NaN
+            else
+                V̂e[end-nym+1:end]  .= NaN
+                Yem[end-nym+1:end] .= NaN
+                De[end-nd+1:end]   .= NaN
+            end
+            Ŵe[end-nŵ+1:end] .= NaN
+            Ue[end-nu+1:end] .= NaN
             gc!(gc, X̂e, V̂e, Ŵe, Ue, Yem, De, P̄, x̄, p, ε)
+            all(isfinite, gc) || error("the gc function returned non-finite values: gc = $gc")
         end
     catch err
         @warn(
@@ -682,7 +694,9 @@ function test_custom_function_mhe(NT, model::SimModel, i_ym, He, gc!, nc, x̂op,
             fixed at x̂op=$x̂op, uop=$uop, yop=$yop, dop=$dop, 
             P̄=I, x̄=0, p=$p, ϵ=0 failed with the following stacktrace. 
             Did you forget to set the keyword argument p or nc? 
-            Did you handle the growing data windows in your function?
+            Did you handle the growing data windows with the NaN values at the boundaries?
+            See the Extended Help of MovingHorizonEstimator for details on the arguments and
+            the data windows.
             """, 
             exception=(err, catch_backtrace())
         )
