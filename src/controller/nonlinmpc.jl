@@ -733,9 +733,7 @@ end
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(
-    mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel{JNT}
-)  where JNT<:Real
+function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel)  
     # --- variables and linear constraints ---
     con = mpc.con
     nZ̃ = length(mpc.Z̃)
@@ -756,6 +754,36 @@ function init_optimization!(
     g_oracle, geq_oracle = get_nonlincon_oracle(mpc, optim)
     @objective(optim, Min, J_op(Z̃var...))
     set_nonlincon!(mpc, optim, g_oracle, geq_oracle)
+    return nothing
+end
+
+function init_optimization!(mpc::NonLinMPC, model::LinModel, optim::JuMP.GenericModel) 
+    # --- variables and linear constraints ---
+    con = mpc.con
+    nZ̃ = length(mpc.Z̃)
+    JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
+    JuMP.set_silent(optim)
+    limit_solve_time(mpc.optim, model.Ts)
+    @variable(optim, Z̃var[1:nZ̃])
+    A = con.A[con.i_b, :]
+    b = con.b[con.i_b]
+    @constraint(optim, linconstraint, A*Z̃var .≤ b)
+    Aeq = con.Aeq
+    beq = con.beq
+    @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
+    C = mpc.nϵ > 0 ? mpc.weights.Ñ_Hc[end, end] : Inf
+    set_scaling_gradient!(optim, C)
+    if mpc.weights.iszero_E
+        set_objective_hessian!(mpc, model, Z̃var)
+    else
+        # --- nonlinear optimization init for the custom NL objective ---
+        Jop = get_nonlinobj_op(mpc, optim)
+        @objective(optim, Min, Jop(Z̃var...))
+    end
+    if con.nc > 0
+        g_oracle, geq_oracle = get_nonlincon_oracle(mpc, optim)
+        set_nonlincon!(mpc, optim, g_oracle, geq_oracle)
+    end
     return nothing
 end
 

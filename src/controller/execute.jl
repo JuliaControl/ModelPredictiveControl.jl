@@ -494,10 +494,9 @@ If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls
 """
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model, optim = mpc.estim.model, mpc.optim
-    nu, Hc = model.nu, mpc.Hc 
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     Z̃s = set_warmstart!(mpc, mpc.transcription, Z̃var)
-    set_objective_linear_coef!(mpc, Z̃var)
+    set_objective_linear_coef!(mpc, model, Z̃var)
     try
         JuMP.optimize!(optim)
     catch err
@@ -534,8 +533,14 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     return mpc.Z̃
 end
 
-"By default, no need to modify the objective function."
-set_objective_linear_coef!(::PredictiveController, _ ) = nothing
+"By default, no need to update the objective function."
+set_objective_linear_coef!(::PredictiveController, ::SimModel, _ ) = nothing
+
+"Update the linear coefficients of the quadratic objective with `mpc.q̃` if applicable."
+function set_objective_linear_coef!(mpc::PredictiveController, ::LinModel, Z̃var)
+    mpc.weights.iszero_E && JuMP.set_objective_coefficient(mpc.optim, Z̃var, mpc.q̃)
+    return nothing
+end
 
 """
     preparestate!(mpc::PredictiveController, ym, d=[]) -> x̂
@@ -794,9 +799,15 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     JuMP.delete(optim, optim[:linconstrainteq])
     JuMP.unregister(optim, :linconstrainteq)
     @constraint(optim, linconstrainteq, con.Aeq*Z̃var .== con.beq)
-    set_objective_hessian!(mpc, Z̃var)
+    set_objective_hessian!(mpc, model, Z̃var)
     return nothing
 end
 
-"No need to set the objective Hessian by default (only needed for quadratic optimization)."
-set_objective_hessian!(::PredictiveController, _ ) = nothing
+"No need to set the objective Hessian by default (only needed for quadratic objective)."
+set_objective_hessian!(::PredictiveController, ::SimModel, _ ) = nothing
+
+"Set the objective Hessian with `mpc.H̃` if the objective is quadratic."
+function set_objective_hessian!(mpc::PredictiveController, ::LinModel, Z̃var)
+    mpc.weights.iszero_E && @objective(mpc.optim, Min, obj_quadprog(Z̃var, mpc.H̃, mpc.q̃))
+    return nothing
+end
