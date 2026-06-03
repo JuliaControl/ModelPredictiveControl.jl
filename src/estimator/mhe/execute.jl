@@ -137,7 +137,6 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, buffer, Nk = estim.model, estim.buffer, estim.Nk[]
     nu, ny, nd = model.nu, model.ny, model.nd
     nx̂, nym, nŵ, nε = estim.nx̂, estim.nym, estim.nx̂, estim.nε
-    nx̃ = nε + nx̂
     info = Dict{Symbol, Any}()
     V̂,  X̂0 = buffer.V̂, buffer.X̂
     x̂0arr, û0, k, ŷ0 = buffer.x̂, buffer.û, buffer.k, buffer.ŷ
