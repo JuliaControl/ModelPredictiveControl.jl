@@ -156,3 +156,6 @@ function setstate_cov!(::ManualEstimator, P̂)
     isnothing(P̂) || error("ManualEstimator does not compute an estimation covariance matrix P̂.")
     return nothing
 end
+
+"No details for `ManualEstimator`."
+print_details(::IO, ::ManualEstimator) = nothing

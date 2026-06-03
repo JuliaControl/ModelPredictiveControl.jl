@@ -328,6 +328,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
 ├ jacobian: AutoForwardDiff
 ├ hessian: nothing
 ├ arrival covariance: UnscentedKalmanFilter 
+├ direct: true
 └ dimensions:
   ├ 5 estimation steps He
   ├ 0 slack variable ε (estimation constraints)
@@ -752,6 +753,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
 ├ model: LinModel
 ├ optimizer: OSQP
 ├ arrival covariance: KalmanFilter
+├ direct: true
 └ dimensions:
   ├ 3 estimation steps He
   ├ 0 slack variable ε (estimation constraints)

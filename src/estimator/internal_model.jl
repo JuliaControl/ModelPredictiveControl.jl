@@ -82,6 +82,7 @@ estimator is allocation-free if `model` simulations do not allocate.
 julia> estim = InternalModel(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5), i_ym=[2])
 InternalModel estimator with a sample time Ts = 0.5 s:
 ├ model: LinModel
+├ direct: true
 └ dimensions:
   ├ 1 manipulated inputs u
   ├ 2 estimated states x̂
