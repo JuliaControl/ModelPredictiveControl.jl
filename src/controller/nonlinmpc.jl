@@ -862,7 +862,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
             end
         end
     else
-        update_objective! = function (J, ∇J, Z̃_∇J, Z̃_arg)
+        function (J, ∇J, Z̃_∇J, Z̃_arg)
             if isdifferent(Z̃_arg, Z̃_∇J)
                 Z̃_∇J .= Z̃_arg
                 J[], _ = value_and_gradient!(

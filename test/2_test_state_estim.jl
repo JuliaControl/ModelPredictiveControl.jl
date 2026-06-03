@@ -1287,7 +1287,7 @@ end
     @test_throws ArgumentError setconstraint!(mhe4, c_v̂max=[1,1])
 end
 
-@testitem "MHE constraint violation" setup=[SetupMPCtests] begin
+@testitem "MHE constraint violation (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
     mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0)
@@ -1335,6 +1335,37 @@ end
     x̂ = updatestate!(mhe, [10, 50], [50, 30])
     info = getinfo(mhe)
     @test info[:V̂] ≈ [-1,-1] atol=5e-2
+
+    linmodel2 = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
+    linmodel2 = setop!(linmodel2, uop=[10,50], yop=[50,30], dop=[5])
+    function gclv!(LHS, X̂e, _, _, _, _, _, _, _, nx̂, _ )
+        for i in 1:div(length(X̂e), nx̂)
+            LHS[(i-1)+1] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
+        end
+        return nothing
+    end
+    nx̂ = linmodel2.nx
+    nc = 6
+    mhe = MovingHorizonEstimator(linmodel2, He=5, gc=gclv!, nc=nc, nint_ym=0, p=nx̂)
+    preparestate!(mhe, [50, 30], [5])
+    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
+    @test x̂[1] ≈ 0.5 atol = 5e-2
+
+    function gcln!(LHS, _, _, Ŵe, _, _, _, _,_, nx̂, _)
+            LHS .= Ŵe[1:nx̂]
+        return nothing
+    end
+    nx̂ = linmodel2.nx
+    nc = linmodel2.nx
+    mhe = MovingHorizonEstimator(linmodel2, He=1, gc=gcln!, nc=nc, nint_ym=0, direct=false, p=nx̂)
+    preparestate!(mhe, [50, 30], [5])
+    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
+    @test mhe.Ŵ ≈ zeros(nx̂) atol=5e-2
+end
+
+@testitem "MHE constraint violation (NonLinModel)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
 
     f = (x,u,_,model) -> model.A*x + model.Bu*u
     h = (x,_,model)   -> model.C*x
@@ -1388,30 +1419,7 @@ end
 
     linmodel2 = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
     linmodel2 = setop!(linmodel2, uop=[10,50], yop=[50,30], dop=[5])
-    function gclv!(LHS, X̂e, _, _, _, _, _, _, _, nx̂, _ )
-        for i in 1:div(length(X̂e), nx̂)
-            LHS[(i-1)+1] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
-        end
-        return nothing
-    end
-    nx̂ = linmodel2.nx
-    nc = 6
-    mhe = MovingHorizonEstimator(linmodel2, He=5, gc=gclv!, nc=nc, nint_ym=0, p=nx̂)
-    preparestate!(mhe, [50, 30], [5])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
-    @test x̂[1] ≈ 0.5 atol = 5e-2
 
-    function gcln!(LHS, _, _, Ŵe, _, _, _, _,_, nx̂, _)
-            LHS .= Ŵe[1:nx̂]
-        return nothing
-    end
-    nx̂ = linmodel2.nx
-    nc = linmodel2.nx
-    mhe = MovingHorizonEstimator(linmodel2, He=1, gc=gcln!, nc=nc, nint_ym=0, direct=false, p=nx̂)
-    preparestate!(mhe, [50, 30], [5])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
-    @test mhe.Ŵ ≈ zeros(nx̂) atol=5e-2
-    
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
     nonlinmodel2 = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel2)
@@ -1424,9 +1432,9 @@ end
     end
     nc = 2
     nx̂ = nonlinmodel2.nx
-    mhe = MovingHorizonEstimator(nonlinmodel2, He=1, gc=gcnlv!, nc=nc, nint_ym=0, p=nx̂)
-    preparestate!(mhe, [50, 30], [5])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
+    mhe2 = MovingHorizonEstimator(nonlinmodel2, He=1, gc=gcnlv!, nc=nc, nint_ym=0, p=nx̂)
+    preparestate!(mhe2, [50, 30], [5])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
     @test x̂[1] ≈ 0.5 atol = 5e-2
 
     function gclnl!(LHS, _, _, Ŵe, _, _, _, _,_, nx̂, _)
@@ -1435,11 +1443,10 @@ end
     end
     nx̂ = nonlinmodel2.nx
     nc = nonlinmodel2.nx
-    mhe = MovingHorizonEstimator(nonlinmodel2, He=1, gc=gclnl!, nc=nc, nint_ym=0, p=nx̂)
-    preparestate!(mhe, [50, 30], [5])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
-    @test mhe.Ŵ ≈ zeros(nx̂) atol=5e-2
-
+    mhe2 = MovingHorizonEstimator(nonlinmodel2, He=1, gc=gclnl!, nc=nc, nint_ym=0, p=nx̂)
+    preparestate!(mhe2, [50, 30], [5])
+    x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
+    @test mhe2.Ŵ ≈ zeros(nx̂) atol=5e-2
 end
 
 @testitem "MHE set model" setup=[SetupMPCtests] begin

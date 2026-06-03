@@ -93,7 +93,7 @@ following fields:
 
 - `:Ŵ` or *`:What`* : optimal estimated process noise over ``N_k``, ``\mathbf{Ŵ}``
 - `:ε` or *`:epsilon`* : optimal slack variable, ``ε``
-- `:X̂` or *`:Xhat`* : optimal estimated states over ``N_k+1``, ``\mathbf{X̂}``
+- `:X̂` or *`:Xhat`* : optimal estimated states over ``N_k``, ``\mathbf{X̂}``
 - `:x̂` or *`:xhat`* : optimal estimated state, ``\mathbf{x̂}_k(k+p)``
 - `:V̂` or *`:Vhat`* : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``
 - `:P̄` or *`:Pbar`* : estimation error covariance at arrival, ``\mathbf{P̄}``
@@ -104,10 +104,11 @@ following fields:
 - `:J`   : objective value optimum, ``J``
 - `:Ym`  : measured outputs over ``N_k``, ``\mathbf{Y^m}``
 - `:U`   : manipulated inputs over ``N_k``, ``\mathbf{U}``
-- `:D`   : measured disturbances over ``N_k``, ``\mathbf{D}``
+- `:D`   : measured disturbances over ``N_k+1``, ``\mathbf{D}``
 - `:sol` : solution summary of the optimizer for printing
 
-For [`NonLinModel`](@ref), it also includes the following fields:
+For [`NonLinModel`](@ref) or under custom nonlinear inequality constraints (`nc>0`), it also
+includes the following fields:
 
 - `:∇J` or *`:nablaJ`* : optimal gradient of the objective function, ``\mathbf{\nabla} J``
 - `:∇²J` or *`:nabla2J`* : optimal Hessian of the objective function, ``\mathbf{\nabla^2}J``
@@ -136,42 +137,39 @@ julia> round.(getinfo(estim)[:Ŷ], digits=3)
 function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, buffer, Nk = estim.model, estim.buffer, estim.Nk[]
     nu, ny, nd = model.nu, model.ny, model.nd
-    nx̂, nym, nŵ, nε = estim.nx̂, estim.nym, estim.nx̂, estim.nε
-    nx̃ = nε + nx̂
+    nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
+    Z̃, Ŵ = estim.Z̃, estim.Ŵ
     info = Dict{Symbol, Any}()
+    Ŷ0 = Vector{NT}(undef, ny*Nk)
     V̂,  X̂0 = buffer.V̂, buffer.X̂
     x̂0arr, û0, k, ŷ0 = buffer.x̂, buffer.û, buffer.k, buffer.ŷ
-    x̂0arr  = getarrival!(x̂0arr, estim, estim.Z̃)
+    x̂0arr  = getarrival!(x̂0arr, estim, Z̃)
     x̄      = estim.x̂0arr_old - x̂0arr
-    V̂,  X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, estim.Ŵ, estim.Z̃)
-    X̂0 = [x̂0arr; X̂0]
-    Ym0, U0, D0 = estim.Y0m[1:nym*Nk], estim.U0[1:nu*Nk], estim.D0[1:nd*Nk]
-    Ŷ0m, Ŷ0 = Vector{NT}(undef, nym*Nk), Vector{NT}(undef, ny*Nk)
+    V̂,  X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
+    Ŷ0     = predict_outputs_mhe!(Ŷ0, estim, X̂0, x̂0arr)
+    J      = obj_nonlinprog(estim, estim.model, x̄, V̂, Ŵ, Z̃)
+    Ym0, U0, D0 = estim.Y0m[1:nym*Nk], estim.U0[1:nu*Nk], estim.D0[1:nd*(Nk+1)]
+    Ym, U, D, Ŷ, X̂, x̂arr = Ym0, U0, D0, Ŷ0, X̂0, x̂0arr
     for i=1:Nk
-        d0 = @views D0[(1 + nd*(i-1)):(nd*i)]
-        x̂0 = @views X̂0[(1 + nx̂*(i-1)):(nx̂*i)]
-        @views ĥ!(Ŷ0[(1 + ny*(i-1)):(ny*i)], estim, model, x̂0, d0)
-        Ŷ0m[(1 + nym*(i-1)):(nym*i)] .= @views Ŷ0[(1 + ny*(i-1)):(ny*i)][estim.i_ym]
-    end
-    Ym, U, D, Ŷm, Ŷ = Ym0, U0, D0, Ŷ0m, Ŷ0
-    for i=1:Nk
-        Ŷ[(1 + ny*(i-1)):(ny*i)]    .+= model.yop
-        Ŷm[(1 + nym*(i-1)):(nym*i)] .+= @views model.yop[estim.i_ym]
+        X̂[( 1 +  nx̂*(i-1)):(nx̂*i)]  .+= estim.x̂op
+        Ŷ[( 1 +  ny*(i-1)):(ny*i)]  .+= model.yop
         Ym[(1 + nym*(i-1)):(nym*i)] .+= @views model.yop[estim.i_ym]
-        U[(1 + nu*(i-1)):(nu*i)]    .+= model.uop
-        D[(1 + nd*(i-1)):(nd*i)]    .+= model.dop
+        U[( 1 +  nu*(i-1)):(nu*i)]  .+= model.uop
+        D[( 1 +  nd*(i-1)):(nd*i)]  .+= model.dop
     end
-    info[:Ŵ] = estim.Ŵ[1:Nk*nŵ]
-    info[:x̂arr] = x̂0arr + estim.x̂op
-    info[:ε]  = nε ≠ 0 ? estim.Z̃[begin] : zero(NT)
-    info[:J]  = obj_nonlinprog(estim, estim.model, x̄, V̂, estim.Ŵ, estim.Z̃)
-    info[:X̂]  = (X̂0       .+ @views [estim.x̂op; estim.X̂op])[1:nx̂*(Nk+1)]
+    D[end-nd+1:end] .+= model.dop
+    x̂arr            .+= estim.x̂op
+    info[:Ŵ]  = Ŵ[1:nŵ*Nk]
+    info[:ε]  = getε(estim, Z̃)
+    info[:X̂]  = X̂
     info[:x̂]  = estim.x̂0 .+ estim.x̂op
     info[:V̂]  = V̂
     info[:P̄]  = estim.P̂arr_old
     info[:x̄]  = x̄
     info[:Ŷ]  = Ŷ
-    info[:Ŷm] = Ŷm
+    info[:Ŷm] = Ŷ[vec(estim.i_ym .+ ny.*(0:Nk-1)')]
+    info[:x̂arr] = x̂arr
+    info[:J]  = J
     info[:Ym] = Ym
     info[:U]  = U 
     info[:D]  = D
@@ -195,13 +193,12 @@ end
 
 
 """
-    addinfo!(info, estim::MovingHorizonEstimator, model::NonLinModel)
+    addinfo!(info, estim::MovingHorizonEstimator, model::SimModel) -> info
 
-For [`NonLinModel`](@ref), add the various derivatives.
+Add the various derivatives if model is *not* a [`LinModel`](@ref) or if `nc > 0`.
 """
-function addinfo!(
-    info, estim::MovingHorizonEstimator{NT}, model::NonLinModel
-) where NT <:Real
+function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) where NT <:Real
+    model isa LinModel && iszero(estim.con.nc) && return info
     # --- objective derivatives ---
     optim, con = estim.optim, estim.con
     hess = estim.hessian
@@ -304,9 +301,6 @@ function addinfo!(
     info[:nabla2lg_ncolors] = ∇²ℓg_ncolors
     return info
 end
-
-"Nothing to add in the `info` dict for [`LinModel`](@ref)."
-addinfo!(info, ::MovingHorizonEstimator, ::LinModel) = info
 
 "Get the estimated state at arrival from the decision vector `Z̃`."
 function getarrival!(x̂0arr, estim::MovingHorizonEstimator, Z̃) 
@@ -856,9 +850,9 @@ function predict_mhe!(
     V̂, X̂0, û0, k, ŷ0, estim::MovingHorizonEstimator, model::SimModel, x̂0arr, Ŵ, _ 
 )
     nu, nd, nx̂, nŵ, nym, Nk = model.nu, model.nd, estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
-    x̂0 = x̂0arr
+    x̂0 = @views x̂0arr[1:nx̂]
     if Nk < estim.He
-        V̂  .= 0 # fill unused values a 0 for tracer sparsity detection
+        V̂  .= 0 # fill unused values with 0s for tracer sparsity detection
         X̂0 .= 0
     end
     if estim.direct     # p = 0
@@ -895,6 +889,32 @@ function predict_mhe!(
     return V̂, X̂0
 end
 
+@doc raw"""
+    predict_outputs_mhe!(Ŷ0, estim::MovingHorizonEstimator, X̂0, x̂0arr) -> Ŷ0
+
+Predict in-place the outputs of `estim` [`MovingHorizonEstimator`](@ref).
+
+This function is not used for the optimization, but it can be useful to predict the
+estimated outputs ``\mathbf{ŷ_0}(k-j+1)`` from ``j=N_k`` to ``1``, stored in-place in the
+`Ŷ0` vector. The argument `X̂0` is computed from [`predict_mhe!`](@ref) and contains the
+estimated states from ``k-N_k+1+p`` to ``k+p``. The argument `x̂0arr` is computed from
+[`getarrival!`](@ref) and contains the arrival state estimate for the time step ``k-N_k+p``. 
+"""
+function predict_outputs_mhe!(Ŷ0, estim::MovingHorizonEstimator, X̂0, x̂0arr)
+    model = estim.model
+    nd, ny, nx̂, Nk = model.nd, model.ny, estim.nx̂, estim.Nk[]
+    D0 = estim.D0
+    p = estim.direct ? 0 : 1
+    x̂0 = @views estim.direct ? X̂0[1:nx̂] : x̂0arr[1:nx̂]
+    for j=1:Nk
+        d0 = @views D0[(1 + nd*j):(nd*(j+1))] # 1st data in D0 is d0(k-Nk), not used here
+        ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
+        ĥ!(ŷ0, estim, estim.model, x̂0, d0)
+        j < Nk || break
+        x̂0 = @views X̂0[(1 + nx̂*(j-p)):(nx̂*(j-p+1))]
+    end
+    return Ŷ0
+end
 
 """
     update_predictions!(

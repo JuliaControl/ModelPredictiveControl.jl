@@ -1250,10 +1250,10 @@ in which ``\mathbf{U_0}`` and ``\mathbf{Y_0^m}`` respectively include the deviat
 of the manipulated inputs ``\mathbf{u_0}(k-j+p)`` from ``j=N_k`` to ``1`` and measured
 outputs ``\mathbf{y_0^m}(k-j+1)`` from ``j=N_k`` to ``1``. The vector ``\mathbf{D_0}``
 includes the the measured disturbance deviation values ``\mathbf{d_0}(k-j)`` from from
-``j=N_k`` to ``0``. The constant ``\mathbf{B}`` is the contribution for non-zero state
-``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}`` operating points (for linearization,
-see [`augment_model`](@ref) and [`linearize`](@ref)). The method also returns the matrices
-for the estimation error at arrival:
+``j=N_k`` to ``0``, thus one additional data point. The constant ``\mathbf{B}`` is the
+contribution for non-zero state ``\mathbf{x̂_{op}}`` and state update ``\mathbf{f̂_{op}}``
+operating points (for linearization, see [`augment_model`](@ref) and [`linearize`](@ref)).
+The method also returns the matrices for the estimation error at arrival:
 ```math
     \mathbf{x̄} = \mathbf{x̂_0^†}(k-N_k+p) - \mathbf{x̂_0}(k-N_k+p) = \mathbf{e_x̄ Z + f_x̄}
 ```
