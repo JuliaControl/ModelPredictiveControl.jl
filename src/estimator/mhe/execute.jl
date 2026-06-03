@@ -139,7 +139,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
     Z̃, Ŵ = estim.Z̃, estim.Ŵ
     info = Dict{Symbol, Any}()
-    Ŷ0m, Ŷ0 = Vector{NT}(undef, nym*Nk), Vector{NT}(undef, ny*Nk)
+    Ŷ0 = Vector{NT}(undef, ny*Nk)
     V̂,  X̂0 = buffer.V̂, buffer.X̂
     x̂0arr, û0, k, ŷ0 = buffer.x̂, buffer.û, buffer.k, buffer.ŷ
     x̂0arr  = getarrival!(x̂0arr, estim, Z̃)
@@ -148,11 +148,10 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     Ŷ0     = predict_outputs_mhe!(Ŷ0, estim, X̂0, x̂0arr)
     J      = obj_nonlinprog(estim, estim.model, x̄, V̂, Ŵ, Z̃)
     Ym0, U0, D0 = estim.Y0m[1:nym*Nk], estim.U0[1:nu*Nk], estim.D0[1:nd*(Nk+1)]
-    Ym, U, D, Ŷm, Ŷ, X̂, x̂arr = Ym0, U0, D0, Ŷ0m, Ŷ0, X̂0, x̂0arr
+    Ym, U, D, Ŷ, X̂, x̂arr = Ym0, U0, D0, Ŷ0, X̂0, x̂0arr
     for i=1:Nk
         X̂[( 1 +  nx̂*(i-1)):(nx̂*i)]  .+= estim.x̂op
         Ŷ[( 1 +  ny*(i-1)):(ny*i)]  .+= model.yop
-        Ŷm[(1 + nym*(i-1)):(nym*i)] .+= @views model.yop[estim.i_ym]
         Ym[(1 + nym*(i-1)):(nym*i)] .+= @views model.yop[estim.i_ym]
         U[( 1 +  nu*(i-1)):(nu*i)]  .+= model.uop
         D[( 1 +  nd*(i-1)):(nd*i)]  .+= model.dop
@@ -167,7 +166,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:P̄]  = estim.P̂arr_old
     info[:x̄]  = x̄
     info[:Ŷ]  = Ŷ
-    info[:Ŷm] = Ŷm
+    info[:Ŷm] = Ŷ[vec(estim.i_ym .+ ny.*(0:Nk-1)')]
     info[:x̂arr] = x̂arr
     info[:J]  = J
     info[:Ym] = Ym
