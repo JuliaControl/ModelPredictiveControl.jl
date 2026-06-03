@@ -37,7 +37,7 @@ function Base.show(io::IO, estim::StateEstimator)
     println(io, "$(nameof(typeof(estim))) estimator with a sample time Ts = $(model.Ts) s:")
     println(io, "├ model: $(nameof(typeof(estim.model)))")
     print_details(io, estim)
-    println(io, "├ direct: $(estim.direct) ")
+    println(io, "├ direct: $(estim.direct)")
     println(io, "└ dimensions:")
     print_estim_dim(io, estim, n)
 end
