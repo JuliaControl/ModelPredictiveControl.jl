@@ -44,8 +44,10 @@ end
 "Return additional dimensions on `estim` if any, for adequate padding with spaces."
 get_other_dims(::StateEstimator) = tuple()
 
-"Print additional details of `estim` if any (no details by default)."
-print_details(::IO, ::StateEstimator) = nothing
+"Print only the `estim.direct` field by default."
+function print_details(io::IO, estim::StateEstimator)
+    println(io, "├ direct: $(estim.direct)")
+end
 
 "Print the overall dimensions of the state estimator `estim` with left padding `n`."
 function print_estim_dim(io::IO, estim::StateEstimator, n)

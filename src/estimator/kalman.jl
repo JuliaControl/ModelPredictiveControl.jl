@@ -119,6 +119,7 @@ julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 julia> estim = SteadyKalmanFilter(model, i_ym=[2], σR=[1], σQint_ym=[0.01])
 SteadyKalmanFilter estimator with a sample time Ts = 0.5 s:
 ├ model: LinModel
+├ direct: true
 └ dimensions:
   ├ 1 manipulated inputs u (0 integrating states)
   ├ 3 estimated states x̂
@@ -410,6 +411,7 @@ julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 julia> estim = KalmanFilter(model, i_ym=[2], σR=[1], σP_0=[100, 100], σQint_ym=[0.01])
 KalmanFilter estimator with a sample time Ts = 0.5 s:
 ├ model: LinModel
+├ direct: true
 └ dimensions:
   ├ 1 manipulated inputs u (0 integrating states)
   ├ 3 estimated states x̂
@@ -656,6 +658,7 @@ julia> model = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σPint_ym_0=[1, 1])
 UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s:
 ├ model: NonLinModel
+├ direct: true
 └ dimensions:
   ├ 1 manipulated inputs u (0 integrating states)
   ├ 3 estimated states x̂
@@ -1023,6 +1026,7 @@ julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP_0=[0.1], 
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s:
 ├ model: NonLinModel
 ├ jacobian: AutoForwardDiff
+├ direct: true
 └ dimensions:
   ├ 1 manipulated inputs u (0 integrating states)
   ├ 2 estimated states x̂
@@ -1190,8 +1194,10 @@ function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT
     return predict_estimate_kf!(estim, u0, d0, F̂)
 end
 
+"Print the `jacobian` backend and `direct` flag for [`ExtendedKalmanFilter`](@ref)."
 function print_details(io::IO, estim::ExtendedKalmanFilter)
     println(io, "├ jacobian: $(backend_str(estim.jacobian))")
+    println(io, "├ direct: $(estim.direct)")
 end
 
 "Set `estim.cov.P̂` to `estim.cov.P̂_0` for the time-varying Kalman Filters."

@@ -9,9 +9,10 @@ function print_details(io::IO, estim::MovingHorizonEstimator)
     println(io, "├ optimizer: $(JuMP.solver_name(estim.optim)) ")
     print_backends(io, estim, estim.model)
     println(io, "├ arrival covariance: $(nameof(typeof(estim.covestim))) ")
+    println(io, "├ direct: $(estim.direct)")
 end
 
-"Print the differentiation backends for `SimModel`."
+"Print the differentiation backends of `MovingHorizonEstimator` for `SimModel`."
 function print_backends(io::IO, estim::MovingHorizonEstimator, ::SimModel)
     println(io, "├ gradient: $(backend_str(estim.gradient))")
     println(io, "├ jacobian: $(backend_str(estim.jacobian))")
