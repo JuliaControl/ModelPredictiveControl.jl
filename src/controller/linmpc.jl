@@ -329,18 +329,6 @@ function init_optimization!(mpc::LinMPC, model::LinModel, optim::JuMP.GenericMod
     Aeq = con.Aeq
     beq = con.beq
     @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
-    set_objective_hessian!(mpc, Z̃var)
-    return nothing
-end
-
-"For [`LinMPC`](@ref), set the QP linear coefficient `q̃` just before optimization."
-function set_objective_linear_coef!(mpc::LinMPC, Z̃var)
-    JuMP.set_objective_coefficient(mpc.optim, Z̃var, mpc.q̃)
-    return nothing
-end
-
-"Update the quadratic objective function for [`LinMPC`](@ref) controllers."
-function set_objective_hessian!(mpc::LinMPC, Z̃var)
-    @objective(mpc.optim, Min, obj_quadprog(Z̃var, mpc.H̃, mpc.q̃))
+    set_objective_hessian!(mpc, model, Z̃var)
     return nothing
 end

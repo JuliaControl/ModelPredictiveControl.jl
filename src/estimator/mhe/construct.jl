@@ -1499,6 +1499,7 @@ function init_optimization!(
 )
     C, con = estim.C, estim.con
     nZ̃ = length(estim.Z̃)
+    # --- variables and linear constraints ---
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(optim, model.Ts)
@@ -1508,7 +1509,9 @@ function init_optimization!(
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
     @objective(optim, Min, obj_quadprog(Z̃var, estim.H̃, estim.q̃))
     if con.nc > 0
+        # --- nonlinear optimization init for the custom NL constraints ---
         set_scaling_gradient!(optim, C)
+        # constraints with vector nonlinear oracle 
         g_oracle = get_nonlincon_oracle(estim, optim)  
         set_nonlincon!(estim, optim, g_oracle)
     end
