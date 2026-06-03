@@ -104,7 +104,7 @@ following fields:
 - `:J`   : objective value optimum, ``J``
 - `:Ym`  : measured outputs over ``N_k``, ``\mathbf{Y^m}``
 - `:U`   : manipulated inputs over ``N_k``, ``\mathbf{U}``
-- `:D`   : measured disturbances over ``N_k``, ``\mathbf{D}``
+- `:D`   : measured disturbances over ``N_k+1``, ``\mathbf{D}``
 - `:sol` : solution summary of the optimizer for printing
 
 For [`NonLinModel`](@ref), it also includes the following fields:
