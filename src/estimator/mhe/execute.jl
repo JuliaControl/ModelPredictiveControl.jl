@@ -107,7 +107,8 @@ following fields:
 - `:D`   : measured disturbances over ``N_k+1``, ``\mathbf{D}``
 - `:sol` : solution summary of the optimizer for printing
 
-For [`NonLinModel`](@ref), it also includes the following fields:
+For [`NonLinModel`](@ref) or under custom nonlinear inequality constraints (`nc>0`), it also
+includes the following fields:
 
 - `:∇J` or *`:nablaJ`* : optimal gradient of the objective function, ``\mathbf{\nabla} J``
 - `:∇²J` or *`:nabla2J`* : optimal Hessian of the objective function, ``\mathbf{\nabla^2}J``
@@ -192,13 +193,12 @@ end
 
 
 """
-    addinfo!(info, estim::MovingHorizonEstimator, model::NonLinModel)
+    addinfo!(info, estim::MovingHorizonEstimator, model::SimModel) -> info
 
-For [`NonLinModel`](@ref), add the various derivatives.
+Add the various derivatives if model is *not* a [`LinModel`](@ref) or if `nc > 0`.
 """
-function addinfo!(
-    info, estim::MovingHorizonEstimator{NT}, model::NonLinModel
-) where NT <:Real
+function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) where NT <:Real
+    model isa LinModel && iszero(estim.con.nc) && return info
     # --- objective derivatives ---
     optim, con = estim.optim, estim.con
     hess = estim.hessian
@@ -301,9 +301,6 @@ function addinfo!(
     info[:nabla2lg_ncolors] = ∇²ℓg_ncolors
     return info
 end
-
-"Nothing to add in the `info` dict for [`LinModel`](@ref)."
-addinfo!(info, ::MovingHorizonEstimator, ::LinModel) = info
 
 "Get the estimated state at arrival from the decision vector `Z̃`."
 function getarrival!(x̂0arr, estim::MovingHorizonEstimator, Z̃) 
