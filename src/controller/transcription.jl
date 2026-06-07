@@ -1421,11 +1421,10 @@ defects of the deterministic states are computed with:
                       - \mathbf{x̂_d}(k+j+1)
 ```
 for ``j = 0, 1, ... , H_p-1`` and in which the deterministic state ``\mathbf{x̂_d}`` are the
-first `model.nx` elements of the augmented states ``\mathbf{x̂_0}``, and they extracted from
-the decision variable `Z̃`. The function ``\mathbf{f}`` is the deterministic state update
-function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref)
-documentation. The defects of the stochastic states are linear equality constraints (see
-[`init_defectmat`](@ref)).
+first `model.nx` elements of the augmented states ``\mathbf{x̂_0}``, and they are
+extracted from the decision variable `Z̃`. The function ``\mathbf{f}`` is the deterministic
+state update function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is defined in
+[`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K, 
