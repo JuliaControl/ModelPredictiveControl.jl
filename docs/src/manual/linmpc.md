@@ -293,3 +293,68 @@ savefig("plot4_LinMPC.svg"); nothing # hide
 Note that measured disturbances are assumed constant in the future by default but custom
 ``\mathbf{D̂}`` predictions are possible. The same applies for the setpoint predictions
 ``\mathbf{R̂_y}``.
+
+## Generating C code
+
+The [`LinearMPC.jl`](@extref LinearMPC) package extension provides code generation
+capabilities to export the controller as optimized C code. First, install the package with:
+
+```test
+using Pkg; Pkg.add("LinearMPC")
+```
+
+The feedforward MPC controller can be converted to a [`LinearMPC.MPC`](@ref) object using:
+
+```@example 1
+import LinearMPC
+c_mpc_d = LinearMPC.MPC(mpc_d);
+```
+
+We test the converted controller in closed-loop to verify that it behaves identically to the
+original one:
+
+```@example 1
+function test_c_mpc_d(c_mpc_d, model)
+    N = 200
+    ry, ul = [50, 30], 0
+    dop = 20
+    u = model.uop
+    u_data, y_data, ry_data = zeros(model.nu, N), zeros(model.ny, N), zeros(model.ny, N)
+    for i = 1:N
+        i == 51  && (ry = [50, 35])
+        i == 101 && (ry = [54, 30])
+        i == 151 && (ul = -20)
+        d = [ul .+ dop]
+        y = model()
+        x̂ = LinearMPC.correct_state!(c_mpc_d, y, d)
+        u = LinearMPC.compute_control(c_mpc_d, x̂; r=ry, d=d, uprev=u)
+        u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
+        LinearMPC.predict_state!(c_mpc_d, u, d)
+        updatestate!(model, u + [0; ul])
+    end
+    return u_data, y_data, ry_data
+end
+setstate!(model, zeros(model.nx))
+LinearMPC.set_state!(c_mpc_d, zeros(c_mpc_d.model.nx))
+u_data, y_data, ry_data = test_c_mpc_d(c_mpc_d, model)
+plot_data(t_data, u_data, y_data, ry_data)
+savefig("plot5_LinMPC.svg"); nothing # hide
+```
+
+![plot5_LinMPC](plot5_LinMPC.svg)
+
+The closed-loop simulation matches the results of the previous section, as expected. We
+can now generate the C code using:
+
+```julia
+LinearMPC.codegen(c_mpc_d; dir="codegen", fname="mpc_funcs")
+```
+
+The three C functions to call at each control periods are declared in the generated file
+`codegen/mpc_funcs.h`:
+
+```C
+void mpc_correct_state(c_float* state, c_float* measurement, c_float* distrubance);  
+int mpc_compute_control(c_float* control, c_float* state, c_float* reference, c_float* disturbance);
+void mpc_predict_state(c_float* state, c_float* control, c_float* disturbance);
+```
