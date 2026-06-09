@@ -281,7 +281,7 @@ Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0`, measured outputs `y0
 The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂s` estimates with:
 ```math
 \begin{aligned}
-    \mathbf{x̂_d}(k+1) &= \mathbf{f}\Big( \mathbf{x̂_d}(k), \mathbf{u}(k), \mathbf{d}(k) \Big) \\
+    \mathbf{x̂_d}(k+1) &= \mathbf{f}\Big( \mathbf{x̂_d}(k), \mathbf{u}(k), \mathbf{d}(k), \mathbf{p} \Big) \\
     \mathbf{x̂_s}(k+1) &= \mathbf{Â_s x̂_s}(k) + \mathbf{B̂_s ŷ_s}(k)
 \end{aligned}
 ```

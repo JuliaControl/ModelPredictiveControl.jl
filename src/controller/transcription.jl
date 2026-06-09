@@ -1561,7 +1561,7 @@ deterministic states extracted from ``\mathbf{X̂_0}`` also in `Z̃`, and they c
 states at the beginning of the interval ``τ_0=0``. The ``\mathbf{k̇}_i`` derivative for the
 ``i``th collocation point is computed from the continuous-time function `model.f!` and:
 ```math
-\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_i}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
+\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û}_i(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
 ```
 Based on the normalized time ``τ_i ∈ [0, 1]`` and hold order `transcription.h`, the inputs
 and disturbances are piecewise constant or linear:

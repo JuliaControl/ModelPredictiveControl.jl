@@ -438,9 +438,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
 
     The optimization and the update of the arrival covariance depend on `model`:
 
-    - If `model` is a [`LinModel`](@ref), the optimization is treated as a quadratic program
-      with a time-varying Hessian, which is generally cheaper than nonlinear programming. By
-      default, a [`KalmanFilter`](@ref) estimates the arrival covariance (customizable).
+    - If `model` is a [`LinModel`](@ref) and `nc=0`, the optimization is treated as a
+      quadratic program with a time-varying Hessian, which is generally cheaper than
+      nonlinear programming. By default, a [`KalmanFilter`](@ref) estimates the arrival
+      covariance (customizable).
     - Else, a nonlinear program with dense [`ForwardDiff`](@extref ForwardDiff) automatic
       differentiation (AD) compute the objective and constraint derivatives by default 
       (customizable). Optimizers generally benefit from exact derivatives like AD. However, 
