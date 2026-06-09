@@ -313,7 +313,7 @@ nothing # hide
 ```
 
 We test the converted controller in closed-loop to verify that it behaves identically to the
-original one:
+original one, notably because of the two different solvers:
 
 ```@example 1
 function test_c_mpc_d(c_mpc_d, model)
