@@ -348,8 +348,8 @@ savefig("plot5_LinMPC.svg"); nothing # hide
 The closed-loop simulation matches the results of the previous section, as expected. We
 can now generate the C code using:
 
-```julia
-LinearMPC.codegen(c_mpc_d; dir="codegen", fname="mpc_funcs");
+```@example 1
+LinearMPC.codegen(c_mpc_d; dir="codegen", fname="mpc_funcs")
 ```
 
 The three C functions to call at each control period are declared in the generated
