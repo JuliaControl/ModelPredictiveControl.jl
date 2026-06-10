@@ -348,7 +348,7 @@ savefig("plot5_LinMPC.svg"); nothing # hide
 The closed-loop simulation matches the results of the previous section, as expected. We
 can now generate the C code using:
 
-```julia
+```@example 1
 LinearMPC.codegen(c_mpc_d; dir="codegen", fname="mpc_funcs")
 ```
 
@@ -383,7 +383,7 @@ int main(){
 }
 ```
 
-compile with using `gcc *.c -o main.bin` and run it with `./main.bin`. The printed `u` value
+compile it using `gcc *.c -o main.bin` and run it with `./main.bin`. The printed `u` value
 should be identical to:
 
 ```@example 1
