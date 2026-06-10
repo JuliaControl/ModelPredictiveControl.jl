@@ -349,7 +349,7 @@ The closed-loop simulation matches the results of the previous section, as expec
 can now generate the C code using:
 
 ```julia
-LinearMPC.codegen(c_mpc_d; dir="codegen", fname="mpc_funcs")
+LinearMPC.codegen(c_mpc_d; dir="codegen", fname="mpc_funcs");
 ```
 
 The three C functions to call at each control period are declared in the generated
@@ -383,7 +383,7 @@ int main(){
 }
 ```
 
-compile with using `gcc *.c -o main.bin` and run it with `./main.bin`. The printed `u` value
+compile it using `gcc *.c -o main.bin` and run it with `./main.bin`. The printed `u` value
 should be identical to:
 
 ```@example 1
