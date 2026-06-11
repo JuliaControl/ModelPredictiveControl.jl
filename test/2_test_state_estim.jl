@@ -871,14 +871,14 @@ end
     covestim = SteadyKalmanFilter(linmodel)
     σP_0 = 1:4
     σPint_ym_0 = 5:6
-    mhe14 = MovingHorizonEstimator(linmodel; He=5, σP_0, σPint_ym_0, covestim)
+    mhe14 = MovingHorizonEstimator(linmodel; He=1, σP_0, σPint_ym_0, covestim)
     @test mhe14.cov.invP̄ ≈ inv(diagm((1:6).^2))
     preparestate!(mhe14, linmodel.yop, linmodel.dop)
     @test mhe14.cov.invP̄ ≈ inv(diagm((1:6).^2))
 
     covestim = SteadyKalmanFilter(linmodel)
     σP_0 = nothing
-    mhe15 = MovingHorizonEstimator(linmodel; He=5, σP_0, covestim)
+    mhe15 = MovingHorizonEstimator(linmodel; He=1, σP_0, covestim)
     @test mhe15.cov.invP̄ ≈ inv(covestim.cov.P̂)
 
     function gcl(X̂e, _ , _ , _ , _ , _ , _ , _ , nx, ε)
