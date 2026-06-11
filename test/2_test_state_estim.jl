@@ -866,7 +866,20 @@ end
 
     linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mhe13 = MovingHorizonEstimator(linmodel2, He=5)
-    @test isa(mhe13, MovingHorizonEstimator{Float32})    
+    @test isa(mhe13, MovingHorizonEstimator{Float32})   
+    
+    covestim = SteadyKalmanFilter(linmodel)
+    σP_0 = 1:4
+    σPint_ym_0 = 5:6
+    mhe14 = MovingHorizonEstimator(linmodel; He=5, σP_0, σPint_ym_0, covestim)
+    @test mhe14.cov.invP̄ ≈ inv(diagm((1:6).^2))
+    preparestate!(mhe14, linmodel.yop, linmodel.dop)
+    @test mhe14.cov.invP̄ ≈ inv(diagm((1:6).^2))
+
+    covestim = SteadyKalmanFilter(linmodel)
+    σP_0 = nothing
+    mhe15 = MovingHorizonEstimator(linmodel; He=5, σP_0, covestim)
+    @test mhe15.cov.invP̄ ≈ inv(covestim.cov.P̂)
 
     function gcl(X̂e, _ , _ , _ , _ , _ , _ , _ , nx, ε)
         gc = X̂e .- 100 .- ε   
@@ -883,6 +896,7 @@ end
     @test_throws ArgumentError MovingHorizonEstimator(linmodel)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=1, σP_0=nothing)
 end
 
 @testitem "MHE construction (NonLinModel)" setup=[SetupMPCtests] begin
