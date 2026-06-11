@@ -278,25 +278,25 @@ transcription for now.
 - `model::SimModel` : (deterministic) model for the estimations.
 - `He=nothing` : estimation horizon ``H_e``, must be specified.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
-    are unmeasured ``\mathbf{y^u}``.
+   are unmeasured ``\mathbf{y^u}``.
 - `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
-    covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
+   covariance ``\mathbf{P}(0)``, specified as a standard deviation vector.
 - `σQ=fill(1/model.nx,model.nx)` or *`sigmaQ`* : main diagonal of the process noise
-    covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
+   covariance ``\mathbf{Q}`` of `model`, specified as a standard deviation vector.
 - `σR=fill(1,length(i_ym))` or *`sigmaR`* : main diagonal of the sensor noise covariance
-    ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
+   ``\mathbf{R}`` of `model` measured outputs, specified as a standard deviation vector.
 - `nint_u=0`: integrator quantity for the stochastic model of the unmeasured disturbances at
-    the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
+   the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
 - `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
-    disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
+   disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
 - `σQint_u=fill(1,sum(nint_u))` or *`sigmaQint_u`* : same than `σQ` but for the unmeasured
-    disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
+   disturbances at manipulated inputs ``\mathbf{Q_{int_u}}`` (composed of integrators).
 - `σPint_u_0=fill(1,sum(nint_u))` or *`sigmaPint_u_0`* : same than `σP_0` but for the unmeasured
-    disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
+   disturbances at manipulated inputs ``\mathbf{P_{int_u}}(0)`` (composed of integrators).
 - `σQint_ym=fill(1,sum(nint_ym))` or *`sigmaQint_u`* : same than `σQ` for the unmeasured
-    disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
+   disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `σPint_ym_0=fill(1,sum(nint_ym))` or *`sigmaPint_ym_0`* : same than `σP_0` but for the unmeasured
-    disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
+   disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `Cwt=Inf` : slack variable weight ``C``, default to `Inf` meaning hard constraints only.
 - `gc=(_,_,_,_,_,_,_,_,_,_,_)->nothing` or `gc!` : custom nonlinear inequality constraint function 
    ``\mathbf{g_c}(\mathbf{X̂_e, V̂_e, Ŵ_e, U_e, Y_e^m, D_e, P̄, x̄, p}, ε)``, mutating or not 
@@ -313,6 +313,8 @@ transcription for now.
 - `hessian=false` : an `AbstractADType` backend for the Hessian of the Lagrangian, see 
    `gradient` above for the options. The default `false` skip it and use the quasi-Newton
    method of `optim` (see Extended Help).
+- `covestim=nothing`: a [`StateEstimator`](@ref) object for the arrival covariance estimation
+   ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``, `nothing` means the default choice (see Extended Help).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
 
@@ -449,7 +451,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
       [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
       for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
-
+    
     One exception about AD: the selected backend for the Hessian of the Lagrangian function
     with `hessian=true` options is sparse:
     ```julia
@@ -469,7 +471,15 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
         )
     )
     ```
-    that is, it will test many coloring orders at preparation and keep the best. 
+    that is, it will test many coloring orders at preparation and keep the best. The
+    argument `covestim` customizes the arrival covariance estimator. The supported types are
+    [`SteadyKalmanFilter`](@ref), [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref)
+    and [`ExtendedKalmanFilter`](@ref). A constant arrival covariance is supported using
+    the [`SteadyKalmanFilter`](@ref). The constant is fixed by `σP_0`, `σPint_ym_0` and
+    `σPint_u_0` arguments. If `isnothing(σP_0)`, it is fixed at `covestim.cov.P̂`, which is
+    the steady-state value ``\mathbf{P̂}(∞)`` for the [`SteadyKalmanFilter`](@ref). For
+    [`NonLinModel`](@ref), construct a [`SteadyKalmanFilter`](@ref) with an arbitrary
+    [`LinModel`](@ref), as long as the number of estimated states `nx̂` matches the MHE.
 
     Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
     `10/Cwt` (if not already set), to scale the small values of ``ε``. Use the second
@@ -497,6 +507,7 @@ function MovingHorizonEstimator(
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
     hessian::Union{AbstractADType, Bool, Nothing} = false,
+    covestim::Union{StateEstimator, Nothing} = nothing,
     direct = true,
     σP_0       = sigmaP_0,
     σQ         = sigmaQ,
@@ -507,23 +518,14 @@ function MovingHorizonEstimator(
     σQint_ym   = sigmaQint_ym,
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     # estimated covariances matrices (variance = σ²) :
-    P̂_0 = Diagonal([σP_0; σPint_u_0; σPint_ym_0].^2)
+    P̂_0 = isnothing(σP_0) ? nothing : Diagonal([σP_0; σPint_u_0; σPint_ym_0].^2)
     Q̂   = Diagonal([σQ;  σQint_u;  σQint_ym ].^2)
     R̂   = Diagonal([σR;].^2)
     isnothing(He) && throw(ArgumentError("Estimation horizon He must be explicitly specified")) 
     return MovingHorizonEstimator(
         model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt;
-        gc, gc!, nc, p, direct, optim, gradient, jacobian, hessian
+        gc, gc!, nc, p, optim, gradient, jacobian, hessian, covestim, direct
     )
-end
-
-"Default optimizer for MHE, depending on the model and the number of custom NL constraints."
-function default_optim_mhe(model::SimModel, nc)
-    if model isa LinModel && iszero(nc)
-        return JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=false)
-    else
-        return JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
-    end
 end
 
 @doc raw"""
@@ -536,20 +538,15 @@ end
         gradient=AutoForwardDiff(),
         jacobian=AutoForwardDiff(),
         hessian=false,
+        covestim=nothing,
         direct=true,
-        covestim=default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     )
 
 Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
 
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂_i}, \mathbf{Q̂, R̂}``,
-where ``\mathbf{P̂_i}`` is the initial estimation covariance, provided by `P̂_0` argument. The
-keyword argument `covestim` also allows specifying a custom [`StateEstimator`](@ref) object
-for the estimation of covariance at the arrival ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. The
-supported types are [`SteadyKalmanFilter`](@ref), [`KalmanFilter`](@ref), 
-[`UnscentedKalmanFilter`](@ref) and [`ExtendedKalmanFilter`](@ref). A constant arrival
-covariance is supported with [`SteadyKalmanFilter`](@ref), and by setting the `P̂` argument 
-of [`setstate!`](@ref) at the desired value.
+where ``\mathbf{P̂_i}`` is the initial estimation covariance. Its value is provided by `P̂_0`
+argument. If `isnothing(P̂_0)`, its value will be fetch in `covestim.cov.P̂`.
 """
 function MovingHorizonEstimator(
     model::SM, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt=Inf;
@@ -561,14 +558,24 @@ function MovingHorizonEstimator(
     gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
     jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
     hessian::Union{AbstractADType, Bool, Nothing} = false,
+    covestim::Union{StateEstimator, Nothing} = nothing,
     direct = true,
-    covestim::CE = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
-) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel, CE<:StateEstimator{NT}}
+) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
+    if isnothing(P̂_0)
+        if isnothing(covestim)
+            throw(ArgumentError("a covestim argument should be specified to fetch its covariance P̂"))
+        end
+        P̂_0 = covestim.cov.P̂ 
+    end
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0, He)
     gc! = get_mutating_gc_mhe(NT, gc)
     hessian = validate_hessian(hessian, gradient, DEFAULT_NONLINMHE_HESSIAN)
+    if isnothing(covestim)
+        covestim = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    end
     validate_covestim(cov, covestim)
+    setstate!(covestim, covestim.x̂0 + covestim.x̂op, P̂_0)
     return MovingHorizonEstimator{NT}(
         model, 
         He, i_ym, nint_u, nint_ym, cov, Cwt,
@@ -578,17 +585,30 @@ function MovingHorizonEstimator(
     )
 end
 
-function default_covestim_mhe(model::LinModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
-    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+"Default optimizer for MHE, depending on the model and the number of custom NL constraints."
+function default_optim_mhe(model::SimModel, nc)
+    if model isa LinModel && iszero(nc)
+        return JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=false)
+    else
+        return JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
+    end
 end
+
+"Default arrival covariance estimator for MHE, depending on the model type only."
 function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
-    return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    if model isa LinModel
+        return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    else
+        return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    end
 end
 
 "Validate covestim type and dimensions."
 function validate_covestim(cov::KalmanCovariances, covestim::KalmanEstimator)
-    if size(cov.P̂) != size(covestim.cov.P̂)
-        throw(ArgumentError("estimation covariance covestim.cov.P̂ size does not match the MHE"))
+    invP̄, P̂ = cov.invP̄, covestim.cov.P̂
+    nx̂ = size(invP̄, 1)
+    if size(invP̄) != size(P̂)
+        throw(ArgumentError("P̂ covariance size $(size(P̂)) of covestim does match nx̂=$nx̂"))
     end
     return nothing
 end
