@@ -146,6 +146,7 @@ UNIT_ESTIM["ExtendedKalmanFilter"]["evaloutput"]["NonLinModel"] =
 
 mhe_lin_curr    = MovingHorizonEstimator(linmodel, He=10, direct=true)
 mhe_lin_pred    = MovingHorizonEstimator(linmodel, He=10, direct=false)
+mhe_lin_skf    = MovingHorizonEstimator(linmodel, He=10, covestim=SteadyKalmanFilter(linmodel))
 mhe_nonlin_curr = MovingHorizonEstimator(nonlinmodel, He=10, direct=true)
 mhe_nonlin_pred = MovingHorizonEstimator(nonlinmodel, He=10, direct=false)
 
@@ -159,6 +160,17 @@ UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Current form"]
     @benchmarkable(
         updatestate!($mhe_lin_curr, $u, $y, $d),
         setup=preparestate!($mhe_lin_curr, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Constant arr. cov."] =
+    @benchmarkable(
+        preparestate!($mhe_lin_skf, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Constant arr. cov."] = 
+    @benchmarkable(
+        updatestate!($mhe_lin_skf, $u, $y, $d),
+        setup=preparestate!($mhe_lin_skf, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
 UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Prediction form"] =
