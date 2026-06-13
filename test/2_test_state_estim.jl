@@ -1012,7 +1012,7 @@ end
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
     covestim = SteadyKalmanFilter(linmodel)
-    mhe3b = MovingHorizonEstimator(linmodel; He=5, σP_0=nothing, covestim)
+    mhe3b = MovingHorizonEstimator(linmodel; He=1, σP_0=nothing, covestim)
     preparestate!(mhe3b, [50, 30], [5])
     x̂ = updatestate!(mhe3b, [10, 50], [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
