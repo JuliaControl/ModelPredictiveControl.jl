@@ -1011,6 +1011,17 @@ end
     info = getinfo(mhe3)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+    covestim = SteadyKalmanFilter(linmodel)
+    mhe3b = MovingHorizonEstimator(linmodel; He=1, σP_0=nothing, covestim)
+    preparestate!(mhe3b, [50, 30], [5])
+    x̂ = updatestate!(mhe3b, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-9
+    @test mhe3b.x̂0 ≈ zeros(6) atol=1e-9
+    @test mhe3b.cov.invP̄ ≈ inv(covestim.cov.P̂)
+    preparestate!(mhe3b, [50, 30], [5])
+    info = getinfo(mhe3b)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
 
     linmodel3 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mhe3 = MovingHorizonEstimator(linmodel3, He=1)
@@ -1181,7 +1192,7 @@ end
     @test mhe.cov.invP̄ ≈ invP̄_copy
     @test_logs(
         (:error, "Arrival covariance P̄ is not invertible: keeping the old one"), 
-        ModelPredictiveControl.invert_cov!(mhe, Hermitian(zeros(mhe.nx̂, mhe.nx̂),:L))
+        ModelPredictiveControl.invert_cov!(mhe, mhe.covestim)
     )
     mhe.P̂arr_old[1, 1] = Inf # Inf to trigger fallback
     P̂arr_old_copy = deepcopy(mhe.P̂arr_old)
