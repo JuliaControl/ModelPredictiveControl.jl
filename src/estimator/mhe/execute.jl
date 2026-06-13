@@ -709,7 +709,7 @@ function correct_cov!(estim::MovingHorizonEstimator)
         correct_estimate!(estim.covestim, y0marr, d0arr)
         all(isfinite, estim.covestim.cov.P̂) || error("Arrival covariance P̄ is not finite")
         estim.P̂arr_old .= estim.covestim.cov.P̂
-        invert_cov!(estim, estim.P̂arr_old)
+        update_arrival_cov!(estim)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not positive definite: keeping the old one")
@@ -736,7 +736,7 @@ function update_cov!(estim::MovingHorizonEstimator)
         update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
         all(isfinite, estim.covestim.cov.P̂) || error("Arrival covariance P̄ is not finite")
         estim.P̂arr_old .= estim.covestim.cov.P̂
-        invert_cov!(estim, estim.P̂arr_old)
+        update_arrival_cov!(estim)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not positive definite: keeping the old one")
@@ -761,6 +761,19 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
             rethrow()
         end
     end
+    return nothing
+end
+
+"Update the arrival covariance matrix at the next time step based on the covariance estimator type."
+function update_arrival_cov!(estim::MovingHorizonEstimator)
+    _update_arrival_cov!(estim, estim.covestim)
+end
+
+function _update_arrival_cov!(estim::MovingHorizonEstimator, ::StateEstimator)
+    invert_cov!(estim, estim.P̂arr_old)
+end
+
+function _update_arrival_cov!(estim::MovingHorizonEstimator, ::SteadyKalmanFilter)
     return nothing
 end
 
