@@ -30,8 +30,8 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     nd > 0 && (estim.D0[1:nd] .= d0) # add d0(-1) to the data window
     estim.lastu0 .= u0
     # estim.cov.P̂_0 is P̂(-1|-1) if estim.direct==false, else P̂(-1|0)
-    invert_cov!(estim, estim.cov.P̂_0)
     estim.P̂arr_old  .= estim.cov.P̂_0
+    invert_cov!(estim, estim.covestim)
     estim.x̂0arr_old .= 0
     return nothing
 end
@@ -709,7 +709,7 @@ function correct_cov!(estim::MovingHorizonEstimator)
         correct_estimate!(estim.covestim, y0marr, d0arr)
         all(isfinite, estim.covestim.cov.P̂) || error("Arrival covariance P̄ is not finite")
         estim.P̂arr_old .= estim.covestim.cov.P̂
-        update_arrival_cov!(estim)
+        invert_cov!(estim, estim.covestim)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not positive definite: keeping the old one")
@@ -736,7 +736,7 @@ function update_cov!(estim::MovingHorizonEstimator)
         update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
         all(isfinite, estim.covestim.cov.P̂) || error("Arrival covariance P̄ is not finite")
         estim.P̂arr_old .= estim.covestim.cov.P̂
-        update_arrival_cov!(estim)
+        invert_cov!(estim, estim.covestim)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not positive definite: keeping the old one")
@@ -749,8 +749,9 @@ function update_cov!(estim::MovingHorizonEstimator)
     return nothing
 end
 
-"Invert the covariance estimate at arrival `P̄`."
-function invert_cov!(estim::MovingHorizonEstimator, P̄)
+"Invert the covariance estimate at arrival `P̄` and store it in `estim.cov.invP̄`."
+function invert_cov!(estim::MovingHorizonEstimator, covestim::StateEstimator)
+    P̄ = estim.P̂arr_old
     estim.cov.invP̄ .= P̄
     try
         inv!(estim.cov.invP̄)
@@ -763,14 +764,8 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
     end
     return nothing
 end
-
-"Invert the arrival covariance matrix and store the result in `estim.invP̄`."
-function invert_arrival_cov!(estim::MovingHorizonEstimator, ::StateEstimator)
-    invert_cov!(estim, estim.P̂arr_old)
-    return nothing
-end
-"Do nothing if `covestim` is a [`SteadyKalmanFilter`](@ref)."
-update_arrival_cov!(estim::MovingHorizonEstimator, ::SteadyKalmanFilter) = nothing
+"Do nothing if `covestim` is a [`SteadyKalmanFilter`]."
+invert_cov!(::MovingHorizonEstimator, ::SteadyKalmanFilter) = nothing
 
 
 """
