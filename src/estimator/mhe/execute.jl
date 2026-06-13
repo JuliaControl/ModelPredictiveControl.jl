@@ -764,18 +764,14 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
     return nothing
 end
 
-"Update the arrival covariance matrix at the next time step based on the covariance estimator type."
-function update_arrival_cov!(estim::MovingHorizonEstimator)
-    _update_arrival_cov!(estim, estim.covestim)
-end
-
-function _update_arrival_cov!(estim::MovingHorizonEstimator, ::StateEstimator)
+"Invert the arrival covariance matrix and store the result in `estim.invP̄`."
+function invert_arrival_cov!(estim::MovingHorizonEstimator, ::StateEstimator)
     invert_cov!(estim, estim.P̂arr_old)
-end
-
-function _update_arrival_cov!(estim::MovingHorizonEstimator, ::SteadyKalmanFilter)
     return nothing
 end
+"Do nothing if `covestim` is a [`SteadyKalmanFilter`](@ref)."
+update_arrival_cov!(estim::MovingHorizonEstimator, ::SteadyKalmanFilter) = nothing
+
 
 """
     obj_nonlinprog(estim::MovingHorizonEstimator, ::LinModel, _ , _ , _ , Z̃) 
