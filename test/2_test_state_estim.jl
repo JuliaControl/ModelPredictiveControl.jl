@@ -1192,7 +1192,7 @@ end
     @test mhe.cov.invP̄ ≈ invP̄_copy
     @test_logs(
         (:error, "Arrival covariance P̄ is not invertible: keeping the old one"), 
-        ModelPredictiveControl.invert_cov!(mhe, Hermitian(zeros(mhe.nx̂, mhe.nx̂),:L))
+        ModelPredictiveControl.invert_cov!(mhe, mhe.covestim)
     )
     mhe.P̂arr_old[1, 1] = Inf # Inf to trigger fallback
     P̂arr_old_copy = deepcopy(mhe.P̂arr_old)
