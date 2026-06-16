@@ -28,7 +28,7 @@ include("controller/nonlinmpc.jl")
 
 function Base.show(io::IO, mpc::PredictiveController)
     estim, model = mpc.estim, mpc.estim.model
-    Hp, Hc, nϵ = mpc.Hp, mpc.Hc, mpc.nϵ
+    Hp, Hc = mpc.Hp, mpc.Hc
     nu, nd = model.nu, model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     other_dims = get_other_dims(estim)
@@ -40,14 +40,19 @@ function Base.show(io::IO, mpc::PredictiveController)
     println(io, "├ transcription: $(nameof(typeof(mpc.transcription)))")
     print_backends(io, mpc)
     println(io, "└ dimensions:")
-    println(io, "  ├$(lpad(Hp, n)) prediction steps Hp")
-    println(io, "  ├$(lpad(Hc, n)) control steps Hc")
-    println(io, "  ├$(lpad(nϵ, n)) slack variable ϵ (control constraints)")
-    print_estim_dim(io, mpc.estim, n)
+    println(io, "  ├ variable: ")
+    println(io, "  | ├$(lpad(Hp, n)) prediction steps Hp")
+    println(io, "  | ├$(lpad(Hc, n)) control steps Hc")
+    print_estim_dim(io, mpc.estim, n, firstchars="  |")
+    println(io) # add a linebreak since `print_estim_dim` ends with a `print` (w/o ln) 
+    print_optim_dim(io, mpc)
 end
 
 "No differentiation backends to print for a `PredictiveController` by default."
 print_backends(::IO, ::PredictiveController) = nothing
+
+"No dimensions related to the optimization problem by default."
+print_optim_dim(io::IO, ::PredictiveController) =  println(io, "  └ optimization: nothing")
 
 "Functor allowing callable `PredictiveController` object as an alias for `moveinput!`."
 function (mpc::PredictiveController)(

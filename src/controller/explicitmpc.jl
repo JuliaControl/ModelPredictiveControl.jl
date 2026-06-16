@@ -188,6 +188,8 @@ function Base.show(io::IO, mpc::ExplicitMPC)
     println(io, "├ estimator: $(nameof(typeof(mpc.estim)))")
     println(io, "├ model: $(nameof(typeof(model)))")
     println(io, "└ dimensions:")
+    println(io, "  ├$(lpad(Hp, n)) prediction steps Hp")
+    println(io, "  ├$(lpad(Hc, n)) control steps Hc")
     print_estim_dim(io, mpc.estim, n)
 end
 
