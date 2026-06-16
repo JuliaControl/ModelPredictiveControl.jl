@@ -332,13 +332,17 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
 ├ arrival covariance: UnscentedKalmanFilter 
 ├ direct: true
 └ dimensions:
-  ├ 5 estimation steps He
-  ├ 0 slack variable ε (estimation constraints)
-  ├ 1 manipulated inputs u (0 integrating states)
-  ├ 2 estimated states x̂
-  ├ 1 measured outputs ym (1 integrating states)
-  ├ 0 unmeasured outputs yu
-  └ 0 measured disturbances d
+  │ ├ 5 estimation steps He
+  │ ├ 0 slack variable ε (estimation constraints)
+  │ ├ 1 manipulated inputs u (0 integrating states)
+  │ ├ 2 estimated states x̂
+  │ ├ 1 measured outputs ym (1 integrating states)
+  │ ├ 0 unmeasured outputs yu
+  │ └ 0 measured disturbances d
+  └ optimization:
+    ├ 12 decision variables Z̃ (0 slack variable)
+    ├  0 linear inequality constraints A
+    └  0 nonlinear inequality constraints g (0 custom)
 ```
 
 # Extended Help
@@ -772,17 +776,21 @@ julia> estim = MovingHorizonEstimator(LinModel(ss(0.5,1,1,0,1)), He=3);
 julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
 MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
 ├ model: LinModel
-├ optimizer: OSQP
-├ arrival covariance: KalmanFilter
+├ optimizer: OSQP 
+├ arrival covariance: KalmanFilter 
 ├ direct: true
 └ dimensions:
-  ├ 3 estimation steps He
-  ├ 0 slack variable ε (estimation constraints)
-  ├ 1 manipulated inputs u (0 integrating states)
-  ├ 2 estimated states x̂
-  ├ 1 measured outputs ym (1 integrating states)
-  ├ 0 unmeasured outputs yu
-  └ 0 measured disturbances d
+  │ ├ 3 estimation steps He
+  │ ├ 0 slack variable ε (estimation constraints)
+  │ ├ 1 manipulated inputs u (0 integrating states)
+  │ ├ 2 estimated states x̂
+  │ ├ 1 measured outputs ym (1 integrating states)
+  │ ├ 0 unmeasured outputs yu
+  │ └ 0 measured disturbances d
+  └ optimization:
+    ├  8 decision variables Z̃ (0 slack variable)
+    ├ 16 linear inequality constraints A
+    └  0 nonlinear inequality constraints g (0 custom)
 ```
 
 # Extended Help

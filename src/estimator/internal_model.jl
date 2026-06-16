@@ -358,13 +358,14 @@ function evaloutput(estim::InternalModel, d)
 end
 
 "Print InternalModel information without i/o integrators."
-function print_estim_dim(io::IO, estim::InternalModel, n)
+function print_estim_dim(io::IO, estim::InternalModel, n; firstchars=" ")
     nu, nd = estim.model.nu, estim.model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
-    println(io, "  ├$(lpad(nu, n)) manipulated inputs u")
-    println(io, "  ├$(lpad(nx̂, n)) estimated states x̂")
-    println(io, "  ├$(lpad(nym, n)) measured outputs ym")
-    println(io, "  ├$(lpad(nyu, n)) unmeasured outputs yu")
-    print(io,   "  └$(lpad(nd, n)) measured disturbances d")
+    f = firstchars
+    println(io, "$f ├$(lpad(nu, n)) manipulated inputs u")
+    println(io, "$f ├$(lpad(nx̂, n)) estimated states x̂")
+    println(io, "$f ├$(lpad(nym, n)) measured outputs ym")
+    println(io, "$f ├$(lpad(nyu, n)) unmeasured outputs yu")
+    print(io,   "$f └$(lpad(nd, n)) measured disturbances d")
 end
 

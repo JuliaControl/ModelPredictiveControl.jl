@@ -253,14 +253,19 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ jacobian: AutoSparse (AutoForwardDiff, TracerSparsityDetector, GreedyColoringAlgorithm)
 ├ hessian: nothing
 └ dimensions:
-  ├ 20 prediction steps Hp
-  ├ 10 control steps Hc
-  ├  1 slack variable ϵ (control constraints)
-  ├  1 manipulated inputs u (0 integrating states)
-  ├  2 estimated states x̂
-  ├  1 measured outputs ym (1 integrating states)
-  ├  0 unmeasured outputs yu
-  └  0 measured disturbances d
+  │ ├ 20 prediction steps Hp
+  │ ├ 10 control steps Hc
+  │ ├  1 manipulated inputs u (0 integrating states)
+  │ ├  2 estimated states x̂
+  │ ├  1 measured outputs ym (1 integrating states)
+  │ ├  0 unmeasured outputs yu
+  │ └  0 measured disturbances d
+  └ optimization:
+    ├ 51 decision variables Z̃ (1 slack variable)
+    ├  1 linear inequality constraints A (0 custom)
+    ├ 20 linear equality constraints Aeq
+    ├  0 nonlinear inequality constraints g (0 custom)
+    └ 20 nonlinear equality constraints geq
 ```
 
 # Extended Help
@@ -396,14 +401,19 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ jacobian: AutoForwardDiff
 ├ hessian: nothing
 └ dimensions:
-  ├ 20 prediction steps Hp
-  ├  2 control steps Hc
-  ├  1 slack variable ϵ (control constraints)
-  ├  1 manipulated inputs u (0 integrating states)
-  ├  2 estimated states x̂
-  ├  1 measured outputs ym (1 integrating states)
-  ├  0 unmeasured outputs yu
-  └  0 measured disturbances d
+  │ ├ 20 prediction steps Hp
+  │ ├  2 control steps Hc
+  │ ├  1 manipulated inputs u (0 integrating states)
+  │ ├  2 estimated states x̂
+  │ ├  1 measured outputs ym (1 integrating states)
+  │ ├  0 unmeasured outputs yu
+  │ └  0 measured disturbances d
+  └ optimization:
+    ├ 3 decision variables Z̃ (1 slack variable)
+    ├ 1 linear inequality constraints A (0 custom)
+    ├ 0 linear equality constraints Aeq
+    ├ 0 nonlinear inequality constraints g (0 custom)
+    └ 0 nonlinear equality constraints geq
 ```
 """
 function NonLinMPC(

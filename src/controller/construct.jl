@@ -248,17 +248,20 @@ julia> mpc = setconstraint!(mpc, umin=[0], umax=[100], Δumin=[-10], Δumax=[+10
 LinMPC controller with a sample time Ts = 4.0 s:
 ├ estimator: SteadyKalmanFilter
 ├ model: LinModel
-├ optimizer: OSQP
+├ optimizer: OSQP 
 ├ transcription: SingleShooting
 └ dimensions:
-  ├ 10 prediction steps Hp
-  ├  2 control steps Hc
-  ├  1 slack variable ϵ (control constraints)
-  ├  1 manipulated inputs u (0 integrating states)
-  ├  2 estimated states x̂
-  ├  1 measured outputs ym (1 integrating states)
-  ├  0 unmeasured outputs yu
-  └  0 measured disturbances d
+  │ ├ 10 prediction steps Hp
+  │ ├  2 control steps Hc
+  │ ├  1 manipulated inputs u (0 integrating states)
+  │ ├  2 estimated states x̂
+  │ ├  1 measured outputs ym (1 integrating states)
+  │ ├  0 unmeasured outputs yu
+  │ └  0 measured disturbances d
+  └ optimization:
+    ├  3 decision variables Z̃ (1 slack variable)
+    ├ 25 linear inequality constraints A (0 custom)
+    └  0 linear equality constraints Aeq
 ```
 
 # Extended Help
