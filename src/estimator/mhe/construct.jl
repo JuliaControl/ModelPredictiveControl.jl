@@ -333,7 +333,6 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
 ├ direct: true
 └ dimensions:
   │ ├ 5 estimation steps He
-  │ ├ 0 slack variable ε (estimation constraints)
   │ ├ 1 manipulated inputs u (0 integrating states)
   │ ├ 2 estimated states x̂
   │ ├ 1 measured outputs ym (1 integrating states)
@@ -781,7 +780,6 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
 ├ direct: true
 └ dimensions:
   │ ├ 3 estimation steps He
-  │ ├ 0 slack variable ε (estimation constraints)
   │ ├ 1 manipulated inputs u (0 integrating states)
   │ ├ 2 estimated states x̂
   │ ├ 1 measured outputs ym (1 integrating states)
