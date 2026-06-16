@@ -27,11 +27,20 @@ function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n)
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     He, nε = estim.He, estim.nε
     niu, niym = sum(estim.nint_u), sum(estim.nint_ym)
-    println(io, "  ├$(lpad(He, n)) estimation steps He")
-    println(io, "  ├$(lpad(nε, n)) slack variable ε (estimation constraints)")
-    println(io, "  ├$(lpad(nu, n)) manipulated inputs u ($niu integrating states)")
-    println(io, "  ├$(lpad(nx̂, n)) estimated states x̂")
-    println(io, "  ├$(lpad(nym, n)) measured outputs ym ($niym integrating states)")
-    println(io, "  ├$(lpad(nyu, n)) unmeasured outputs yu")
-    print(io,   "  └$(lpad(nd, n)) measured disturbances d")
+    println(io, "  ├ variable: ")
+    println(io, "  │ ├$(lpad(He, n)) estimation steps He")
+    println(io, "  │ ├$(lpad(nε, n)) slack variable ε (estimation constraints)")
+    println(io, "  │ ├$(lpad(nu, n)) manipulated inputs u ($niu integrating states)")
+    println(io, "  │ ├$(lpad(nx̂, n)) estimated states x̂")
+    println(io, "  │ ├$(lpad(nym, n)) measured outputs ym ($niym integrating states)")
+    println(io, "  │ ├$(lpad(nyu, n)) unmeasured outputs yu")
+    println(io, "  │ └$(lpad(nd, n)) measured disturbances d")
+    nZ̃, nε = length(estim.Z̃), estim.nε
+    nA = sum(estim.con.i_b)
+    ng, nc = sum(estim.con.i_g), estim.con.nc 
+    m = maximum(ndigits.((nZ̃, nA, ng))) + 1
+    println(io, "  └ optimization:")
+    println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nε slack variable)")
+    println(io, "    ├$(lpad(nA, m)) linear inequality constraints A")
+    print(io,   "    └$(lpad(ng, m)) nonlinear inequality constraints g ($nc custom)")
 end

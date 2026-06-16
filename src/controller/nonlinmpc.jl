@@ -1167,11 +1167,11 @@ function print_optim_dim(io::IO, mpc::NonLinMPC)
     nZ̃, nϵ = length(mpc.Z̃), mpc.nϵ
     nA, nW, nAeq = sum(mpc.con.i_b) , mpc.con.nw*(mpc.Hp + 1), size(mpc.con.Aeq, 1)
     ng, nc, neq = sum(mpc.con.i_g), mpc.con.nc, mpc.con.neq
-    n = maximum(ndigits.((nZ̃, nA, nAeq, ng, neq))) + 1
+    m = maximum(ndigits.((nZ̃, nA, nAeq, ng, neq))) + 1
     println(io, "  └ optimization:")
-    println(io, "    ├$(lpad(nZ̃, n)) decision variables Z̃ ($nϵ slack variable)")
-    println(io, "    ├$(lpad(nA, n)) linear inequality constraints A ($nW custom)")
-    println(io, "    ├$(lpad(nAeq, n)) linear equality constraints Aeq")
-    println(io, "    ├$(lpad(ng, n)) nonlinear inequality constraints g ($nc custom)")
-    print(io,   "    └$(lpad(neq, n)) nonlinear equality constraints geq")
+    println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nϵ slack variable)")
+    println(io, "    ├$(lpad(nA, m)) linear inequality constraints A ($nW custom)")
+    println(io, "    ├$(lpad(nAeq, m)) linear equality constraints Aeq")
+    println(io, "    ├$(lpad(ng, m)) nonlinear inequality constraints g ($nc custom)")
+    print(io,   "    └$(lpad(neq, m)) nonlinear equality constraints geq")
 end
