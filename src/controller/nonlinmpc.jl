@@ -253,14 +253,19 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ jacobian: AutoSparse (AutoForwardDiff, TracerSparsityDetector, GreedyColoringAlgorithm)
 ├ hessian: nothing
 └ dimensions:
-  ├ 20 prediction steps Hp
-  ├ 10 control steps Hc
-  ├  1 slack variable ϵ (control constraints)
-  ├  1 manipulated inputs u (0 integrating states)
-  ├  2 estimated states x̂
-  ├  1 measured outputs ym (1 integrating states)
-  ├  0 unmeasured outputs yu
-  └  0 measured disturbances d
+  │ ├ 20 prediction steps Hp
+  │ ├ 10 control steps Hc
+  │ ├  1 manipulated inputs u (0 integrating states)
+  │ ├  2 estimated states x̂
+  │ ├  1 measured outputs ym (1 integrating states)
+  │ ├  0 unmeasured outputs yu
+  │ └  0 measured disturbances d
+  └ optimization:
+    ├ 51 decision variables Z̃ (1 slack variable)
+    ├  1 linear inequality constraints A (0 custom)
+    ├ 20 linear equality constraints Aeq
+    ├  0 nonlinear inequality constraints g (0 custom)
+    └ 20 nonlinear equality constraints geq
 ```
 
 # Extended Help
@@ -396,14 +401,19 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ jacobian: AutoForwardDiff
 ├ hessian: nothing
 └ dimensions:
-  ├ 20 prediction steps Hp
-  ├  2 control steps Hc
-  ├  1 slack variable ϵ (control constraints)
-  ├  1 manipulated inputs u (0 integrating states)
-  ├  2 estimated states x̂
-  ├  1 measured outputs ym (1 integrating states)
-  ├  0 unmeasured outputs yu
-  └  0 measured disturbances d
+  │ ├ 20 prediction steps Hp
+  │ ├  2 control steps Hc
+  │ ├  1 manipulated inputs u (0 integrating states)
+  │ ├  2 estimated states x̂
+  │ ├  1 measured outputs ym (1 integrating states)
+  │ ├  0 unmeasured outputs yu
+  │ └  0 measured disturbances d
+  └ optimization:
+    ├ 3 decision variables Z̃ (1 slack variable)
+    ├ 1 linear inequality constraints A (0 custom)
+    ├ 0 linear equality constraints Aeq
+    ├ 0 nonlinear inequality constraints g (0 custom)
+    └ 0 nonlinear equality constraints geq
 ```
 """
 function NonLinMPC(
@@ -1160,4 +1170,18 @@ function print_backends(io::IO, mpc::NonLinMPC)
     println(io, "├ gradient: $(backend_str(mpc.gradient))")
     println(io, "├ jacobian: $(backend_str(mpc.jacobian))")
     println(io, "├ hessian: $(backend_str(mpc.hessian))")
+end
+
+"Print the decision variable, linear and nonlinear constraint dimensions for `NonLinMPC`."
+function print_optim_dim(io::IO, mpc::NonLinMPC)
+    nZ̃, nϵ = length(mpc.Z̃), mpc.nϵ
+    nA, nW, nAeq = sum(mpc.con.i_b) , mpc.con.nw*(mpc.Hp + 1), size(mpc.con.Aeq, 1)
+    ng, nc, neq = sum(mpc.con.i_g), mpc.con.nc, mpc.con.neq
+    m = maximum(ndigits.((nZ̃, nA, nAeq, ng, neq))) + 1
+    println(io, "  └ optimization:")
+    println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nϵ slack variable)")
+    println(io, "    ├$(lpad(nA, m)) linear inequality constraints A ($nW custom)")
+    println(io, "    ├$(lpad(nAeq, m)) linear equality constraints Aeq")
+    println(io, "    ├$(lpad(ng, m)) nonlinear inequality constraints g ($nc custom)")
+    print(io,   "    └$(lpad(neq, m)) nonlinear equality constraints geq")
 end

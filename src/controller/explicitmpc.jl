@@ -122,6 +122,8 @@ ExplicitMPC controller with a sample time Ts = 4.0 s:
 ├ estimator: SteadyKalmanFilter
 ├ model: LinModel
 └ dimensions:
+  ├ 30 prediction steps Hp
+  ├  1 control steps Hc
   ├  1 manipulated inputs u (0 integrating states)
   ├  4 estimated states x̂
   ├  2 measured outputs ym (2 integrating states)
@@ -188,6 +190,8 @@ function Base.show(io::IO, mpc::ExplicitMPC)
     println(io, "├ estimator: $(nameof(typeof(mpc.estim)))")
     println(io, "├ model: $(nameof(typeof(model)))")
     println(io, "└ dimensions:")
+    println(io, "  ├$(lpad(Hp, n)) prediction steps Hp")
+    println(io, "  ├$(lpad(Hc, n)) control steps Hc")
     print_estim_dim(io, mpc.estim, n)
 end
 

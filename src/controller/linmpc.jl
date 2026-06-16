@@ -180,17 +180,20 @@ julia> mpc = LinMPC(model, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
 LinMPC controller with a sample time Ts = 4.0 s:
 ├ estimator: SteadyKalmanFilter
 ├ model: LinModel
-├ optimizer: OSQP
+├ optimizer: OSQP 
 ├ transcription: SingleShooting
 └ dimensions:
-  ├ 30 prediction steps Hp
-  ├  1 control steps Hc
-  ├  1 slack variable ϵ (control constraints)
-  ├  1 manipulated inputs u (0 integrating states)
-  ├  4 estimated states x̂
-  ├  2 measured outputs ym (2 integrating states)
-  ├  0 unmeasured outputs yu
-  └  0 measured disturbances d
+  │ ├ 30 prediction steps Hp
+  │ ├  1 control steps Hc
+  │ ├  1 manipulated inputs u (0 integrating states)
+  │ ├  4 estimated states x̂
+  │ ├  2 measured outputs ym (2 integrating states)
+  │ ├  0 unmeasured outputs yu
+  │ └  0 measured disturbances d
+  └ optimization:
+    ├ 2 decision variables Z̃ (1 slack variable)
+    ├ 1 linear inequality constraints A (0 custom)
+    └ 0 linear equality constraints Aeq
 ```
 
 # Extended Help
@@ -267,17 +270,20 @@ julia> mpc = LinMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
 LinMPC controller with a sample time Ts = 4.0 s:
 ├ estimator: KalmanFilter
 ├ model: LinModel
-├ optimizer: OSQP
+├ optimizer: OSQP 
 ├ transcription: SingleShooting
 └ dimensions:
-  ├ 30 prediction steps Hp
-  ├  1 control steps Hc
-  ├  1 slack variable ϵ (control constraints)
-  ├  1 manipulated inputs u (0 integrating states)
-  ├  3 estimated states x̂
-  ├  1 measured outputs ym (1 integrating states)
-  ├  1 unmeasured outputs yu
-  └  0 measured disturbances d
+  │ ├ 30 prediction steps Hp
+  │ ├  1 control steps Hc
+  │ ├  1 manipulated inputs u (0 integrating states)
+  │ ├  3 estimated states x̂
+  │ ├  1 measured outputs ym (1 integrating states)
+  │ ├  1 unmeasured outputs yu
+  │ └  0 measured disturbances d
+  └ optimization:
+    ├ 2 decision variables Z̃ (1 slack variable)
+    ├ 1 linear inequality constraints A (0 custom)
+    └ 0 linear equality constraints Aeq
 ```
 """
 function LinMPC(
@@ -331,4 +337,15 @@ function init_optimization!(mpc::LinMPC, model::LinModel, optim::JuMP.GenericMod
     @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     set_objective_hessian!(mpc, model, Z̃var)
     return nothing
+end
+
+"Print the decision variable and linear constraint dimensions for `LinMPC`."
+function print_optim_dim(io::IO, mpc::LinMPC)
+    nZ̃, nϵ = length(mpc.Z̃), mpc.nϵ
+    nA, nW, nAeq = sum(mpc.con.i_b) , mpc.con.nw*(mpc.Hp + 1), size(mpc.con.Aeq, 1)
+    m = maximum(ndigits.((nZ̃, nA, nAeq))) + 1
+    println(io, "  └ optimization:")
+    println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nϵ slack variable)")
+    println(io, "    ├$(lpad(nA, m)) linear inequality constraints A ($nW custom)")
+    print(io,   "    └$(lpad(nAeq, m)) linear equality constraints Aeq")
 end
