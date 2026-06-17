@@ -756,8 +756,8 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.A .= [
         con.A_Umin
         con.A_Umax 
-        con.A_ΔŨmin 
-        con.A_ΔŨmax 
+        con.A_ΔUmin 
+        con.A_ΔUmax 
         con.A_Ymin  
         con.A_Ymax 
         con.A_x̂min  

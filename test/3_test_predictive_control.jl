@@ -264,8 +264,8 @@ end
     # test default constraints before modifying any:
     @test mpc.con.U0min ≈ fill(-Inf, model.nu)
     @test mpc.con.U0max ≈ fill(Inf, model.nu)
-    @test mpc.con.ΔŨmin ≈ vcat(fill(-Inf, model.nu), 0)
-    @test mpc.con.ΔŨmax ≈ vcat(fill(Inf, model.nu), Inf)
+    @test mpc.con.ΔUmin ≈ fill(-Inf, model.nu)
+    @test mpc.con.ΔUmax ≈ fill(Inf, model.nu)
     @test mpc.con.Y0min ≈ fill(-Inf, model.ny)
     @test mpc.con.Y0max ≈ fill(Inf, model.ny)
     @test mpc.con.Wmin  ≈ fill(-Inf, 2mpc.con.nw)
@@ -274,8 +274,8 @@ end
     @test mpc.con.x̂0max ≈ fill(Inf, mpc.estim.nx̂)
     @test -mpc.con.A_Umin[:, end] ≈ fill(0.0, model.nu)
     @test -mpc.con.A_Umax[:, end] ≈ fill(0.0, model.nu)
-    @test -mpc.con.A_ΔŨmin[1:end-1, end] ≈ fill(0.0, model.nu)
-    @test -mpc.con.A_ΔŨmax[1:end-1, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_ΔUmin[:, end] ≈ fill(0.0, model.nu)
+    @test -mpc.con.A_ΔUmax[:, end] ≈ fill(0.0, model.nu)
     @test -mpc.con.A_Ymin[:, end] ≈ fill(1.0, model.ny)
     @test -mpc.con.A_Ymax[:, end] ≈ fill(1.0, model.ny)
     @test -mpc.con.A_Wmin[:, end] ≈ fill(1.0, 2mpc.con.nw)
@@ -287,8 +287,8 @@ end
     @test mpc.con.U0min ≈ [-5, -9.9]
     @test mpc.con.U0max ≈ [100,99]
     setconstraint!(mpc, Δumin=[-5,-10], Δumax=[6,11])
-    @test mpc.con.ΔŨmin ≈ [-5,-10,0]
-    @test mpc.con.ΔŨmax ≈ [6,11,Inf]
+    @test mpc.con.ΔUmin ≈ [-5,-10]
+    @test mpc.con.ΔUmax ≈ [6,11]
     setconstraint!(mpc, ymin=[-6, -11],ymax=[55, 35])
     @test mpc.con.Y0min ≈ [-6,-11]
     @test mpc.con.Y0max ≈ [55,35]
@@ -303,8 +303,8 @@ end
     @test -mpc.con.A_Umin[:, end] ≈ [0.01,0.02]
     @test -mpc.con.A_Umax[:, end] ≈ [0.03,0.04]
     setconstraint!(mpc, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
-    @test -mpc.con.A_ΔŨmin[1:end-1, end] ≈ [0.05,0.06]
-    @test -mpc.con.A_ΔŨmax[1:end-1, end] ≈ [0.07,0.08]
+    @test -mpc.con.A_ΔUmin[:, end] ≈ [0.05,0.06]
+    @test -mpc.con.A_ΔUmax[:, end] ≈ [0.07,0.08]
     setconstraint!(mpc, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
     @test -mpc.con.A_Ymin[:, end] ≈ [1.00,1.01]
     @test -mpc.con.A_Ymax[:, end] ≈ [1.02,1.03]
@@ -322,8 +322,8 @@ end
     @test mpc2.con.U0min ≈ -1(1:50).-1
     @test mpc2.con.U0max ≈ +1(1:50).+1
     setconstraint!(mpc2, ΔUmin=-1(1:5).-2, ΔUmax=+1(1:5).+2)
-    @test mpc2.con.ΔŨmin ≈ [-1(1:5).-2; 0]
-    @test mpc2.con.ΔŨmax ≈ [+1(1:5).+2; Inf]
+    @test mpc2.con.ΔUmin ≈ -1(1:5).-2
+    @test mpc2.con.ΔUmax ≈ +1(1:5).+2
     setconstraint!(mpc2, Ymin=-1(1:50).-3, Ymax=+1(1:50).+3)
     @test mpc2.con.Y0min ≈ -1(1:50).-3
     @test mpc2.con.Y0max ≈ +1(1:50).+3
@@ -335,8 +335,8 @@ end
     @test -mpc2.con.A_Umin[:, end] ≈ +1(1:50).+5
     @test -mpc2.con.A_Umax[:, end] ≈ +1(1:50).+5
     setconstraint!(mpc2, C_Δumin=+1(1:5).+6, C_Δumax=+1(1:5).+6)
-    @test -mpc2.con.A_ΔŨmin[1:end-1, end] ≈ +1(1:5).+6
-    @test -mpc2.con.A_ΔŨmax[1:end-1, end] ≈ +1(1:5).+6
+    @test -mpc2.con.A_ΔUmin[:, end] ≈ +1(1:5).+6
+    @test -mpc2.con.A_ΔUmax[:, end] ≈ +1(1:5).+6
     setconstraint!(mpc2, C_ymin=+1(1:50).+7, C_ymax=+1(1:50).+7)
     @test -mpc2.con.A_Ymin[:, end] ≈ +1(1:50).+7
     @test -mpc2.con.A_Ymax[:, end] ≈ +1(1:50).+7
@@ -1182,8 +1182,8 @@ end
     @test nmpc.con.U0min ≈ [-5, -9.9]
     @test nmpc.con.U0max ≈ [100,99]
     setconstraint!(nmpc, Δumin=[-5,-10], Δumax=[6,11])
-    @test nmpc.con.ΔŨmin ≈ [-5,-10,0]
-    @test nmpc.con.ΔŨmax ≈ [6,11,Inf]
+    @test nmpc.con.ΔUmin ≈ [-5,-10]
+    @test nmpc.con.ΔUmax ≈ [6,11]
     setconstraint!(nmpc, ymin=[-6, -11],ymax=[55, 35])
     @test nmpc.con.Y0min ≈ [-6,-11]
     @test nmpc.con.Y0max ≈ [55,35]
@@ -1195,8 +1195,8 @@ end
     @test -nmpc.con.A_Umin[:, end] ≈ [0.01,0.02]
     @test -nmpc.con.A_Umax[:, end] ≈ [0.03,0.04]
     setconstraint!(nmpc, c_Δumin=[0.05,0.06], c_Δumax=[0.07,0.08])
-    @test -nmpc.con.A_ΔŨmin[1:end-1, end] ≈ [0.05,0.06]
-    @test -nmpc.con.A_ΔŨmax[1:end-1, end] ≈ [0.07,0.08]
+    @test -nmpc.con.A_ΔUmin[:, end] ≈ [0.05,0.06]
+    @test -nmpc.con.A_ΔUmax[:, end] ≈ [0.07,0.08]
     setconstraint!(nmpc, c_ymin=[1.00,1.01], c_ymax=[1.02,1.03])
     @test -nmpc.con.A_Ymin ≈ zeros(0,3)
     @test -nmpc.con.A_Ymax ≈ zeros(0,3)

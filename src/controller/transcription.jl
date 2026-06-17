@@ -827,10 +827,46 @@ function init_defectmat_empty(
     return ES, GS, JS, KS, VS, BS
 end
 
+"""
+    box_constraints_mpc!(
+        Z̃min, Z̃max, transcription::TranscriptionMethod, nϵ
+        ΔUmin  , ΔUmax  , x̂0min , x̂0max , 
+        A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max 
+    ) -> Z̃min, Z̃max
+
+Fill in-place the decision variable box constraints `Z̃min` and `Z̃max`.
+"""
+function box_constraints_mpc!(
+    Z̃min, Z̃max, ::TranscriptionMethod, nϵ,
+    ΔUmin  , ΔUmax  , x̂0min , x̂0max , 
+    A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max 
+)
+    nΔU = length(ΔUmin)
+    Z̃min .= -Inf
+    Z̃max .=  Inf
+    nϵ > 0 && (Z̃min[end] = 0)
+    if nϵ > 0
+        n_C_Δumin = @views A_ΔUmin[:, end]
+        n_C_Δumax = @views A_ΔUmax[:, end]
+        for i in eachindex(ΔUmin)
+            iszero(n_C_Δumin[i]) && (Z̃min[i] = ΔUmin[i])
+        end
+        for i in eachindex(ΔUmax)
+            iszero(n_C_Δumax[i]) && (Z̃max[i] = ΔUmax[i])
+        end
+    else
+        Z̃min[1:nΔU] .= ΔUmin
+        Z̃max[1:nΔU] .= ΔUmax
+    end
+    println(Z̃min)
+    println(Z̃max)
+    return Z̃min, Z̃max
+end
+
 @doc raw"""
     init_matconstraint_mpc(
         model::LinModel, transcription::TranscriptionMethod, nc::Int,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+        i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
         args...
     ) -> i_b, i_g, A, Aeq, neq
 
@@ -850,12 +886,12 @@ The argument `nc` is the number of custom nonlinear inequality constraints in
 finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
 also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a 
 case, `args`  needs to contain all the inequality and equality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq`. 
+`A_Umin, A_Umax, A_ΔUmin, A_ΔUmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq`. 
 The integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
     ::LinModel{NT}, ::TranscriptionMethod, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+    i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
     args...
 ) where {NT<:Real}
     if isempty(args)
@@ -863,7 +899,7 @@ function init_matconstraint_mpc(
     else
         (
             A_Umin,  A_Umax, 
-            A_ΔŨmin, A_ΔŨmax, 
+            A_ΔUmin, A_ΔUmax, 
             A_Ymin,  A_Ymax, 
             A_Wmin,  A_Wmax,
             A_x̂min,  A_x̂max,  
@@ -871,14 +907,14 @@ function init_matconstraint_mpc(
         ) = args
         A = [
             A_Umin;  A_Umax; 
-            A_ΔŨmin; A_ΔŨmax; 
+            A_ΔUmin; A_ΔUmax; 
             A_Ymin;  A_Ymax; 
             A_Wmin;  A_Wmax
             A_x̂min;  A_x̂max;
         ]
         neq = 0 # number of nonlinear equality constraints
     end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
+    i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
     i_g = trues(nc)
     return i_b, i_g, A, Aeq, neq
 end
@@ -886,17 +922,17 @@ end
 "Init `i_b` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
 function init_matconstraint_mpc(
     ::NonLinModel{NT}, ::SingleShooting, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+    i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
     args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, _ , _ , Aeq = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax]
+        A_Umin, A_Umax, A_ΔUmin, A_ΔUmax, _ , _ , A_Wmin, A_Wmax, _ , _ , Aeq = args
+        A   = [A_Umin; A_Umax; A_ΔUmin; A_ΔUmax; A_Wmin; A_Wmax]
         neq = 0 # number of nonlinear equality constraints
     end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Wmin; i_Wmax]
+    i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Wmin; i_Wmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
     return i_b, i_g, A, Aeq, neq
 end
@@ -904,18 +940,18 @@ end
 "Init `i_b` without output constraints if `NonLinModel` and other `TranscriptionMethod`."
 function init_matconstraint_mpc(
     ::NonLinModel{NT}, ::TranscriptionMethod, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+    i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
     args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else    
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax; A_x̂min; A_x̂max]
-        nΔŨ, nZ̃ = size(A_ΔŨmin)
+        A_Umin, A_Umax, A_ΔUmin, A_ΔUmax, _ , _ , A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq = args
+        A   = [A_Umin; A_Umax; A_ΔUmin; A_ΔUmax; A_Wmin; A_Wmax; A_x̂min; A_x̂max]
+        nΔŨ, nZ̃ = size(A_ΔUmin)
         neq = nZ̃ - nΔŨ - size(Aeq, 1)  # number of nonlinear equality constraints
     end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
+    i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
     i_g = [i_Ymin; i_Ymax; trues(nc)]
     return i_b, i_g, A, Aeq, neq
 end
@@ -931,7 +967,7 @@ Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d_0}(k) + \mathbf{j_x̂ D̂_0} + \mat
 also updated, see [`relaxW`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
-    nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
+    nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔUmin), length(mpc.con.Y0min)
     nW = length(mpc.con.Wmin)
     nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
     fx̂ .= mpc.con.bx̂
