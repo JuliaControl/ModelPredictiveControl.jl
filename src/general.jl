@@ -185,6 +185,9 @@ end
 "Verify that x and y elements are different using `!==`."
 isdifferent(x, y) = any(xi !== yi for (xi, yi) in zip(x, y))
 
+"Verify that the `Inf` values in `Z̃new` are the same that in `Z̃old`."
+diff_infs(Z̃new, Z̃old) = any(isinf(x) ≠ isinf(y) for (x,y) in zip(Z̃new, Z̃old))
+
 "Generate a block diagonal matrix repeating `n` times the matrix `A`."
 repeatdiag(A, n::Int) = kron(I(n), A)
 function repeatdiag(A::Hermitian{NT, Diagonal{NT, Vector{NT}}}, n::Int) where {NT<:Real}
