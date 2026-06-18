@@ -961,12 +961,6 @@ function setconstraint!(
         con.x̂0min,  con.x̂0max,  con.Ŵmin,   con.Ŵmax, 
         con.A_x̂min, con.A_x̂max, con.A_ŵmin, con.A_ŵmax 
     )
-    #=
-    i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
-    i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
-    i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
-    i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
-    =#   
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(
             model, con.nc,
@@ -1018,11 +1012,11 @@ end
 
 @doc raw"""
     init_matconstraint_mhe(
-        model::LinModel, nc::Int,
-        i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
-    ) -> i_b, i_g, A
+        model::LinModel, nc,
+        x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
+    ) -> b, g, A
 
-Init `i_b`, `i_g` and `A` matrices for the MHE linear inequality constraints.
+Init `i_b`, `g` and `A` matrices for the MHE linear inequality constraints.
 
 The linear and nonlinear inequality constraints are respectively defined as:
 ```math
@@ -1032,41 +1026,61 @@ The linear and nonlinear inequality constraints are respectively defined as:
 \end{aligned}
 ```
 The argument `nc` is the number of custom nonlinear inequality constraints in
-``\mathbf{g_c}``. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
-finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if
+``\mathbf{g_c}``. `b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
+finite numbers. `g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if
 `model` is a [`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if
 `args` is provided. In such a case, `args`  needs to contain all the inequality constraint
-matrices: `A_x̃min, A_x̃max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max`.
+matrices: `A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max`.
 """
 function init_matconstraint_mhe(
-    ::LinModel{NT}, nc::Int,
-    i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
+    ::LinModel{NT}, nc,
+    x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
-    i_b = [i_x̃min; i_x̃max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax; i_V̂min; i_V̂max]
-    i_g = trues(nc)
     if isempty(args)
-        A = zeros(NT, length(i_b), 0)
+        A = zeros(NT, length(b), 0)
     else
-        A_x̃min, A_x̃max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max = args
-        A = [A_x̃min; A_x̃max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max = args
+        A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
     end
-    return i_b, i_g, A
+    i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
+    i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
+    i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
+    deletex̂_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max)
+    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂)
+    i_b = [i_x̂min; i_x̂max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax; i_V̂min; i_V̂max]
+    g = trues(nc)
+    return i_b, g, A
 end
 
 "Init `i_b, A` without state and sensor noise constraints if `model` is not a [`LinModel`](@ref)."
 function init_matconstraint_mhe(
-    ::SimModel{NT}, nc::Int,
-    i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max, args...
+    ::SimModel{NT}, nc,
+    x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
-    i_b = [i_x̃min; i_x̃max; i_Ŵmin; i_Ŵmax]
-    i_g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max; trues(nc)]
     if isempty(args)
-        A = zeros(NT, length(i_b), 0)
+        A = zeros(NT, length(b), 0)
     else
-        A_x̃min, A_x̃max, _ , _ , A_Ŵmin, A_Ŵmax, _ , _ = args
-        A = [A_x̃min; A_x̃max; A_Ŵmin; A_Ŵmax]
+        A_x̂min, A_x̂max, _ , _ , A_Ŵmin, A_Ŵmax, _ , _ = args
+        A = [A_x̂min; A_x̂max; A_Ŵmin; A_Ŵmax]
     end
-    return i_b, i_g, A
+    i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
+    i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
+    i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
+    deletex̂_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max)
+    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂)
+    i_b = [i_x̂min; i_x̂max; i_Ŵmin; i_Ŵmax]
+    g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max; trues(nc)]
+    return i_b, g, A
+end
+
+function deletex̂arr_lincon!(i_x̂min, i_x̂max, model::SimModel, Z̃min, Z̃max)
+    return i_x̂min, i_x̂max
+end
+    
+function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model::SimModel, Z̃min, Z̃max, nx̂)
+    return i_Ŵmin, i_Ŵmax
 end
 
 """
