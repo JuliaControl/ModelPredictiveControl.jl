@@ -536,6 +536,12 @@ function setconstraint!(
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
+        for i in eachindex(Z̃var)
+            JuMP.has_lower_bound(Z̃var[i]) && JuMP.delete_lower_bound(Z̃var[i])
+            JuMP.has_upper_bound(Z̃var[i]) && JuMP.delete_upper_bound(Z̃var[i])
+            !isinf(con.Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], con.Z̃min[i])
+            !isinf(con.Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], con.Z̃max[i])
+        end
         reset_nonlincon!(mpc)
     else
         i_b, i_g = init_matconstraint_mpc(

@@ -496,7 +496,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model, optim = mpc.estim.model, mpc.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     Z̃s = set_warmstart!(mpc, mpc.transcription, Z̃var)
-    set_objective_linear_coef!(mpc, model, Z̃var)
+    set_variable_attributes!(mpc, model, Z̃var)
     try
         JuMP.optimize!(optim)
     catch err
@@ -533,14 +533,31 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     return mpc.Z̃
 end
 
-"By default, no need to update the objective function."
-set_objective_linear_coef!(::PredictiveController, ::SimModel, _ ) = nothing
+"""
+    set_variable_attributes!(mpc::PredictiveController, model::SimModel, Z̃var)
 
-"Update the linear coefficients of the quadratic objective with `mpc.q̃` if applicable."
-function set_objective_linear_coef!(mpc::PredictiveController, ::LinModel, Z̃var)
+Update the box constraint bounds on the decision variable `Z̃var`.
+"""
+function set_variable_attributes!(mpc::PredictiveController, ::SimModel, Z̃var)
+    Z̃min, Z̃max = mpc.con.Z̃min, mpc.con.Z̃max
+    foreach(i -> !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i]), eachindex(Z̃min))
+    foreach(i -> !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i]), eachindex(Z̃max))
+    return nothing
+end
+
+"""
+    set_variable_attributes!(mpc::PredictiveController, model::LinModel, Z̃var)
+
+Also update the linear coefficients of the quadratic objective with `mpc.q̃` if applicable.
+"""
+function set_variable_attributes!(mpc::PredictiveController, ::LinModel, Z̃var)
+    Z̃min, Z̃max = mpc.con.Z̃min, mpc.con.Z̃max
+    foreach(i -> !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i]), eachindex(Z̃min))
+    foreach(i -> !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i]), eachindex(Z̃max))
     mpc.weights.iszero_E && JuMP.set_objective_coefficient(mpc.optim, Z̃var, mpc.q̃)
     return nothing
 end
+
 
 """
     preparestate!(mpc::PredictiveController, ym, d=[]) -> x̂

@@ -750,7 +750,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.Generic
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(mpc.optim, model.Ts)
-    @variable(optim, Z̃var[1:nZ̃])
+    @variable(optim, con.Z̃min[i] ≤ Z̃var[i=1:nZ̃] ≤ con.Z̃max[i])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
