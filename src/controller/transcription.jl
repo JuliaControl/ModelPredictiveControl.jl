@@ -966,7 +966,7 @@ function boxconstraint_terminal!(
     end
     return Z̃min, Z̃max
 end
-boxconstraint_terminal!(Z̃min, Z̃max, ::SingleShooting, _ , _ , _ , _ ) = Z̃min, Z̃max
+boxconstraint_terminal!(Z̃min, Z̃max, ::SingleShooting, _, _ , _, _, _, _, _) = Z̃min, Z̃max
 
 "Unset `i_ΔUmin` and `i_ΔUmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
 function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max)
