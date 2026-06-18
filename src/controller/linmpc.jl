@@ -192,7 +192,7 @@ LinMPC controller with a sample time Ts = 4.0 s:
   │ └  0 measured disturbances d
   └ optimization:
     ├ 2 decision variables Z̃ (1 slack variable)
-    ├ 1 linear inequality constraints A (0 custom)
+    ├ 0 linear inequality constraints A (0 custom)
     └ 0 linear equality constraints Aeq
 ```
 
@@ -282,7 +282,7 @@ LinMPC controller with a sample time Ts = 4.0 s:
   │ └  0 measured disturbances d
   └ optimization:
     ├ 2 decision variables Z̃ (1 slack variable)
-    ├ 1 linear inequality constraints A (0 custom)
+    ├ 0 linear inequality constraints A (0 custom)
     └ 0 linear equality constraints Aeq
 ```
 """

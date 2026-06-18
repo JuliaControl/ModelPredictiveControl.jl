@@ -262,7 +262,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
   │ └  0 measured disturbances d
   └ optimization:
     ├ 51 decision variables Z̃ (1 slack variable)
-    ├  1 linear inequality constraints A (0 custom)
+    ├  0 linear inequality constraints A (0 custom)
     ├ 20 linear equality constraints Aeq
     ├  0 nonlinear inequality constraints g (0 custom)
     └ 20 nonlinear equality constraints geq
@@ -410,7 +410,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
   │ └  0 measured disturbances d
   └ optimization:
     ├ 3 decision variables Z̃ (1 slack variable)
-    ├ 1 linear inequality constraints A (0 custom)
+    ├ 0 linear inequality constraints A (0 custom)
     ├ 0 linear equality constraints Aeq
     ├ 0 nonlinear inequality constraints g (0 custom)
     └ 0 nonlinear equality constraints geq
