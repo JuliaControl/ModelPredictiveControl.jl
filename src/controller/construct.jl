@@ -348,9 +348,9 @@ function setconstraint!(
     ΔUmin   = DeltaUmin,   ΔUmax = DeltaUmax,
     C_Δumin = C_Deltaumin, C_Δumax = C_Deltaumax,
 )
-    model, con =  mpc.estim.model, mpc.con
+    model, estim, con =  mpc.estim.model, mpc.estim, mpc.con
     transcription, optim = mpc.transcription, mpc.optim
-    nu, ny, nx̂, Hp, Hc = model.nu, model.ny, mpc.estim.nx̂, mpc.Hp, mpc.Hc
+    nu, ny, nx̂, Hp, Hc = model.nu, model.ny, estim.nx̂, mpc.Hp, mpc.Hc
     nϵ, nw, nc = mpc.nϵ, con.nw, con.nc
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
     if isnothing(Umin) && !isnothing(umin)
@@ -513,14 +513,14 @@ function setconstraint!(
     i_Ymin,  i_Ymax  = .!isinf.(con.Y0min), .!isinf.(con.Y0max)
     i_Wmin,  i_Wmax  = .!isinf.(con.Wmin),  .!isinf.(con.Wmax)
     i_x̂min,  i_x̂max  = .!isinf.(con.x̂0min), .!isinf.(con.x̂0max)
-    box_constraints_mpc!(
-        con.Z̃min, con.Z̃max, transcription, nϵ,
-        con.ΔUmin, con.ΔUmax, con.x̂0min, con.x̂0max, 
+    Z̃min, Z̃max = init_boxconstraint_mpc(
+        estim, transcription, Hp, Hc, nϵ,
+        con.ΔUmin  , con.ΔUmax  , con.x̂0min , con.x̂0max , 
         con.A_ΔUmin, con.A_ΔUmax, con.A_x̂min, con.A_x̂max 
     )
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(
-            model, transcription, nc,
+            model, transcription, Z̃min, Z̃max, nc, nϵ,
             i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, 
             i_Ymin, i_Ymax, i_Wmin, i_Wmax,
             i_x̂min, i_x̂max,
@@ -529,6 +529,7 @@ function setconstraint!(
             con.A_x̂min, con.A_x̂max,
             con.Aeq
         )
+        con.Z̃min[:], con.Z̃max[:] = Z̃min, Z̃max
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
         Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
@@ -538,17 +539,22 @@ function setconstraint!(
         reset_nonlincon!(mpc)
     else
         i_b, i_g = init_matconstraint_mpc(
-            model, transcription, nc,
+            model, transcription, Z̃min, Z̃max, nc, nϵ,
             i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, 
             i_Ymin, i_Ymax, i_Wmin, i_Wmax,
             i_x̂min, i_x̂max,
         )
-        if i_b ≠ con.i_b || i_g ≠ con.i_g
+        diff_Z̃min, diff_Z̃max = diff_infs(Z̃min, con.Z̃min), diff_infs(Z̃max, con.Z̃max)
+        if i_b ≠ con.i_b || i_g ≠ con.i_g || diff_Z̃min || diff_Z̃max
             error("Cannot modify ±Inf constraints after calling moveinput!")
         end
+        con.Z̃min[:], con.Z̃max[:] = Z̃min, Z̃max
     end
     return mpc
 end
+
+"Verify that the `Inf` values in `Z̃new` are the same that in `Z̃old`."
+diff_infs(Z̃new, Z̃old) = any(isinf(x) ≠ isinf(y) for (x,y) in zip(Z̃new, Z̃old))
 
 "By default, no nonlinear constraints, return nothing."
 reset_nonlincon!(::PredictiveController) = nothing
@@ -893,13 +899,11 @@ function init_defaultcon_mpc(
     nW = nw*(Hp+1)
     nS = size(ES, 1)
     nϵ = weights.isinf_C ? 0 : 1
-    nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
     u0min,      u0max   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     Δumin,      Δumax   = fill(convert(NT,-Inf), nu), fill(convert(NT,+Inf), nu)
     y0min,      y0max   = fill(convert(NT,-Inf), ny), fill(convert(NT,+Inf), ny)
     wmin,       wmax    = fill(convert(NT,-Inf), nw), fill(convert(NT,+Inf), nw)
     x̂0min,      x̂0max   = fill(convert(NT,-Inf), nx̂), fill(convert(NT,+Inf), nx̂)
-    Z̃min,       Z̃max    = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
     c_umin,     c_umax  = fill(zero(NT), nu), fill(zero(NT), nu)
     c_Δumin,    c_Δumax = fill(zero(NT), nu), fill(zero(NT), nu)
     c_ymin,     c_ymax  = fill(one(NT), ny),  fill(one(NT), ny)
@@ -928,13 +932,13 @@ function init_defaultcon_mpc(
     i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
     i_Wmin,  i_Wmax  = .!isinf.(Wmin),  .!isinf.(Wmax)
     i_x̂min,  i_x̂max  = .!isinf.(x̂0min), .!isinf.(x̂0max)
-    box_constraints_mpc!(
-        Z̃min, Z̃max, transcription, nϵ,
+    Z̃min, Z̃max = init_boxconstraint_mpc(
+        estim, transcription, Hp, Hc, nϵ,
         ΔUmin  , ΔUmax  , x̂0min , x̂0max , 
         A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max 
-    ) 
+    )
     i_b, i_g, A, Aeq, neq = init_matconstraint_mpc(
-        model, transcription, nc,
+        model, transcription, Z̃min, Z̃max, nc, nϵ,
         i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
         A_Umin, A_Umax, A_ΔUmin, A_ΔUmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂max, A_x̂min,
         Aeq
@@ -960,19 +964,6 @@ function init_defaultcon_mpc(
         gc!     , nc
     )
     return con, nϵ, P̃Δu, P̃u, Ẽ
-end
-
-function init_boxconstraints_mpc(i_ΔUmin, i_ΔUmax, A_ΔUmin, A_ΔUmax, nϵ)
-    if nϵ > 0 # input increment bounds are box constraints if hard (instead of linear):
-        n_C_Δumin = @views A_ΔUmin[:, end]
-        n_C_Δumax = @views A_ΔUmax[:, end]
-        i_ΔUmin  .= @. i_ΔUmin & (n_C_Δumin < 0) 
-        i_ΔUmax  .= @. i_ΔUmax & (n_C_Δumax < 0)
-    end
-    println(i_ΔUmin)
-    println(i_ΔUmax)
-
-    return Z̃min, Z̃max
 end
 
 "Repeat predictive controller constraints over their respective horizons."
