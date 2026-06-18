@@ -827,44 +827,10 @@ function init_defectmat_empty(
     return ES, GS, JS, KS, VS, BS
 end
 
-"""
-    init_boxconstraints_mpc(
-        model::StateEstimator, transcription::TranscriptionMethod, Hp, Hc, nϵ,
-        ΔUmin  , ΔUmax  , x̂0min , x̂0max , 
-        A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max 
-    ) -> Z̃min, Z̃max
-
-Init the decision variable box constraints `Z̃min` and `Z̃max`.
-"""
-function init_boxconstraint_mpc(
-    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, nϵ,
-    ΔUmin  , ΔUmax  , x̂0min , x̂0max , 
-    A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max 
-) where {NT<:Real}
-    nΔU = estim.model.nu*Hc
-    nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
-    Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
-    nϵ > 0 && (Z̃min[end] = 0)
-    if nϵ > 0
-        n_C_Δumin = @views A_ΔUmin[:, end]
-        n_C_Δumax = @views A_ΔUmax[:, end]
-        for i in eachindex(ΔUmin)
-            iszero(n_C_Δumin[i]) && (Z̃min[i] = ΔUmin[i])
-        end
-        for i in eachindex(ΔUmax)
-            iszero(n_C_Δumax[i]) && (Z̃max[i] = ΔUmax[i])
-        end
-    else
-        Z̃min[1:nΔU] .= ΔUmin
-        Z̃max[1:nΔU] .= ΔUmax
-    end
-    return Z̃min, Z̃max
-end
-
 @doc raw"""
     init_matconstraint_mpc(
-        model::LinModel, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
-        i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+        model::LinModel, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ 
+        U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
         args...
     ) -> i_b, i_g, A, Aeq, neq
 
@@ -888,8 +854,8 @@ case, `args`  needs to contain all the inequality and equality constraint matric
 The integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
-    ::LinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
-    i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+    model::LinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
+    U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
     if isempty(args)
@@ -912,25 +878,23 @@ function init_matconstraint_mpc(
         ]
         neq = 0 # number of nonlinear equality constraints
     end
-    i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
-    nU, nΔU, nŶ, nW = length(i_Umin), length(i_ΔUmin), length(i_Ymin), length(i_Wmin)
-    i_b = delete_lincon!(i_b,transcription, nU, nΔU, nŶ, nW, Z̃min, Z̃max)
+    i_Umin,  i_Umax  = @. !isinf(U0min), !isinf(U0max)
+    i_ΔUmin, i_ΔUmax = @. !isinf(ΔUmin), !isinf(ΔUmax)
+    i_Ymin,  i_Ymax  = @. !isinf(Y0min), !isinf(Y0max)
+    i_Wmin,  i_Wmax  = @. !isinf(Wmin),  !isinf(Wmax)
+    i_x̂min,  i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    nΔU, nX̂ = length(ΔUmin), length(x̂0min)*length(Y0min)÷model.ny 
+    deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, model, transcription, Z̃min, Z̃max)
+    deletex̂_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
+    i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]    
     i_g = trues(nc)
     return i_b, i_g, A, Aeq, neq
 end
 
-function delete_lincon!(i_b, ::TranscriptionMethod, nU, nΔU, nŶ, nW, Z̃min, Z̃max)
-    i_ΔUmin, ΔUmin = @views i_b[2nU+1:2nU+nΔU], Z̃min[1:nΔU]
-    foreach(i -> !isinf(ΔUmin[i]) && (i_ΔUmin[i] = false), eachindex(ΔUmin))
-    i_ΔUmax, ΔUmax = @views i_b[2nU+nΔU+1:2nU+2nΔU], Z̃max[1:nΔU]
-    foreach(i -> !isinf(ΔUmax[i]) && (i_ΔUmax[i] = false), eachindex(ΔUmax))
-    return i_b
-end 
-
 "Init `i_b` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
 function init_matconstraint_mpc(
-    ::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc, nϵ,
-    i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+    model::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc, nϵ,
+    U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
     if isempty(args)
@@ -940,17 +904,23 @@ function init_matconstraint_mpc(
         A   = [A_Umin; A_Umax; A_ΔUmin; A_ΔUmax; A_Wmin; A_Wmax]
         neq = 0 # number of nonlinear equality constraints
     end
+    i_Umin,  i_Umax  = @. !isinf(U0min), !isinf(U0max)
+    i_ΔUmin, i_ΔUmax = @. !isinf(ΔUmin), !isinf(ΔUmax)
+    i_Ymin,  i_Ymax  = @. !isinf(Y0min), !isinf(Y0max)
+    i_Wmin,  i_Wmax  = @. !isinf(Wmin),  !isinf(Wmax)
+    i_x̂min,  i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    nΔU, nX̂ = length(ΔUmin), length(x̂0min)*length(Y0min)÷model.ny 
+    deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, model, transcription, Z̃min, Z̃max)
+    deletex̂_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
     i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Wmin; i_Wmax]
-    nU, nΔU, nŶ, nW = length(i_Umin), length(i_ΔUmin), length(i_Ymin), length(i_Wmin)
-    i_b = delete_lincon!(i_b,transcription, nU, nΔU, nŶ, nW, Z̃min, Z̃max)
-    i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
+    i_g = [i_Ymin; i_Ymax; i_x̂min; i_x̂max; trues(nc)]
     return i_b, i_g, A, Aeq, neq
 end
 
 "Init `i_b` without output constraints if `NonLinModel` and other `TranscriptionMethod`."
 function init_matconstraint_mpc(
-    ::NonLinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
-    i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+    model::NonLinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
+    U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
     if isempty(args)
@@ -962,12 +932,60 @@ function init_matconstraint_mpc(
         nAeq = size(Aeq, 1)             # number of linear equality constraint
         neq  = nZ̃ - nΔU - nϵ - nAeq     # number of nonlinear equality constraints
     end
+    i_Umin,  i_Umax  = @. !isinf(U0min), !isinf(U0max)
+    i_ΔUmin, i_ΔUmax = @. !isinf(ΔUmin), !isinf(ΔUmax)
+    i_Ymin,  i_Ymax  = @. !isinf(Y0min), !isinf(Y0max)
+    i_Wmin,  i_Wmax  = @. !isinf(Wmin),  !isinf(Wmax)
+    i_x̂min,  i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    nΔU, nX̂ = length(ΔUmin), length(x̂0min)*length(Y0min)÷model.ny 
+    deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, model, transcription, Z̃min, Z̃max)
+    deletex̂_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
     i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
-    nU, nΔU, nŶ, nW = length(i_Umin), length(i_ΔUmin), length(i_Ymin), length(i_Wmin)
-    i_b = delete_lincon!(i_b,transcription, nU, nΔU, nŶ, nW, Z̃min, Z̃max)
     i_g = [i_Ymin; i_Ymax; trues(nc)]
     return i_b, i_g, A, Aeq, neq
 end 
+
+"Modify `Z̃min` and `Z̃max` in-place to include terminal constraint if applicable."
+function boxconstraint_terminal!(
+    Z̃min, Z̃max, ::TranscriptionMethod, nΔU, nX̂, nϵ, x̂0min, x̂0max, A_x̂min, A_x̂max, 
+)
+    nx̂ = length(x̂0min)
+    i_base = nΔU + nX̂ - nx̂
+    if nϵ > 0
+        n_C_x̂min = @views A_x̂min[:, end]
+        n_C_x̂max = @views A_x̂max[:, end]
+        for i in eachindex(x̂0min)
+            iszero(n_C_x̂min[i]) && (Z̃min[i_base + i] = x̂0min[i])
+        end
+        for i in eachindex(x̂0max)
+            iszero(n_C_x̂max[i]) && (Z̃max[i_base + i] = x̂0max[i])
+        end
+    else
+        Z̃max[i_base+1:i_base+nx̂] .= x̂0min
+        Z̃max[i_base+1:i_base+nx̂] .= x̂0max
+    end
+    return Z̃min, Z̃max
+end
+boxconstraint_terminal!(Z̃min, Z̃max, ::SingleShooting, _ , _ , _ , _ ) = Z̃min, Z̃max
+
+"Unset `i_ΔUmin` and `i_ΔUmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
+function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max)
+    nΔU = length(i_ΔUmin)
+    ΔUmin, ΔUmax = @views Z̃min[1:nΔU], @views Z̃max[1:nΔU]
+    foreach(i -> !isinf(ΔUmin[i]) && (i_ΔUmin[i] = false), eachindex(ΔUmin))
+    foreach(i -> !isinf(ΔUmax[i]) && (i_ΔUmax[i] = false), eachindex(ΔUmax))
+    return i_ΔUmin, i_ΔUmax
+end 
+
+"Unset `i_x̂min` and `i_x̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
+function deletex̂_lincon!(i_x̂min, i_x̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
+    nx̂ = length(i_x̂min)
+    x̂0min, x̂0max = @views Z̃min[nΔU+nX̂-nx̂+1:nΔU+nX̂], @views Z̃max[nΔU+nX̂-nx̂+1:nΔU+nX̂]
+    foreach(i -> !isinf(x̂0min[i]) && (i_x̂min[i] = false), eachindex(x̂0min))
+    foreach(i -> !isinf(x̂0max[i]) && (i_x̂max[i] = false), eachindex(x̂0max))
+    return i_x̂min, i_x̂max
+end
+deletex̂_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)

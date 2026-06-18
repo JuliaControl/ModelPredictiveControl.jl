@@ -508,24 +508,19 @@ function setconstraint!(
             size(con.A_x̂max, 1) ≠ 0 && (con.A_x̂max[:, end] .= -con.c_x̂max) # for LinModel
         end
     end
-    i_Umin,  i_Umax  = .!isinf.(con.U0min), .!isinf.(con.U0max)
-    i_ΔUmin, i_ΔUmax = .!isinf.(con.ΔUmin), .!isinf.(con.ΔUmax)
-    i_Ymin,  i_Ymax  = .!isinf.(con.Y0min), .!isinf.(con.Y0max)
-    i_Wmin,  i_Wmax  = .!isinf.(con.Wmin),  .!isinf.(con.Wmax)
-    i_x̂min,  i_x̂max  = .!isinf.(con.x̂0min), .!isinf.(con.x̂0max)
     Z̃min, Z̃max = init_boxconstraint_mpc(
         estim, transcription, Hp, Hc, nϵ,
-        con.ΔUmin  , con.ΔUmax  , con.x̂0min , con.x̂0max , 
+        con.ΔUmin, con.ΔUmax, con.x̂0min, con.x̂0max, 
         con.A_ΔUmin, con.A_ΔUmax, con.A_x̂min, con.A_x̂max 
     )
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(
             model, transcription, Z̃min, Z̃max, nc, nϵ,
-            i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, 
-            i_Ymin, i_Ymax, i_Wmin, i_Wmax,
-            i_x̂min, i_x̂max,
+            con.U0min,  con.U0max,  con.ΔUmin,   con.ΔUmax,   
+            con.Y0min,  con.Y0max,  con.Wmin,    con.Wmax,   
+            con.x̂0min,  con.x̂0max,
             con.A_Umin, con.A_Umax, con.A_ΔUmin, con.A_ΔUmax, 
-            con.A_Ymin, con.A_Ymax, con.A_Wmin, con.A_Wmax,
+            con.A_Ymin, con.A_Ymax, con.A_Wmin,  con.A_Wmax,
             con.A_x̂min, con.A_x̂max,
             con.Aeq
         )
@@ -546,9 +541,9 @@ function setconstraint!(
     else
         i_b, i_g = init_matconstraint_mpc(
             model, transcription, Z̃min, Z̃max, nc, nϵ,
-            i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, 
-            i_Ymin, i_Ymax, i_Wmin, i_Wmax,
-            i_x̂min, i_x̂max,
+            con.U0min,  con.U0max,  con.ΔUmin,   con.ΔUmax,   
+            con.Y0min,  con.Y0max,  con.Wmin,    con.Wmax,   
+            con.x̂0min,  con.x̂0max
         )
         diff_Z̃min, diff_Z̃max = diff_infs(Z̃min, con.Z̃min), diff_infs(Z̃max, con.Z̃max)
         if i_b ≠ con.i_b || i_g ≠ con.i_g || diff_Z̃min || diff_Z̃max
@@ -933,19 +928,13 @@ function init_defaultcon_mpc(
     A_Wmin,  A_Wmax, Ẽw = relaxW(E, Pu, Hp, W̄y, W̄u, C_wmin, C_wmax, nϵ)
     A_x̂min,  A_x̂max, ẽx̂ = relaxterminal(ex̂, c_x̂min, c_x̂max, nϵ)
     Aeq, ẼS = augmentdefect(ES, nϵ)
-    i_Umin,  i_Umax  = .!isinf.(U0min), .!isinf.(U0max)
-    i_ΔUmin, i_ΔUmax = .!isinf.(ΔUmin), .!isinf.(ΔUmax)
-    i_Ymin,  i_Ymax  = .!isinf.(Y0min), .!isinf.(Y0max)
-    i_Wmin,  i_Wmax  = .!isinf.(Wmin),  .!isinf.(Wmax)
-    i_x̂min,  i_x̂max  = .!isinf.(x̂0min), .!isinf.(x̂0max)
     Z̃min, Z̃max = init_boxconstraint_mpc(
         estim, transcription, Hp, Hc, nϵ,
-        ΔUmin  , ΔUmax  , x̂0min , x̂0max , 
-        A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max 
+        ΔUmin, ΔUmax, x̂0min, x̂0max, A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max 
     )
     i_b, i_g, A, Aeq, neq = init_matconstraint_mpc(
         model, transcription, Z̃min, Z̃max, nc, nϵ,
-        i_Umin, i_Umax, i_ΔUmin, i_ΔUmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+        U0min,  U0max,  ΔUmin,   ΔUmax,   Y0min,  Y0max,  Wmin,   Wmax,   x̂0min,  x̂0max,
         A_Umin, A_Umax, A_ΔUmin, A_ΔUmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂max, A_x̂min,
         Aeq
     )
@@ -1229,6 +1218,41 @@ function augmentdefect(ES::AbstractMatrix{NT}, nϵ) where NT<:Real
     end
     Aeq = ẼS
     return Aeq, ẼS
+end
+
+"""
+    init_boxconstraints_mpc(
+        estim::StateEstimator, transcription::TranscriptionMethod, Hp, Hc, nϵ,
+        ΔUmin, ΔUmax, x̂0min, x̂0max, A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max 
+    ) -> Z̃min, Z̃max
+
+Init the decision variable box constraints `Z̃min` and `Z̃max`.
+"""
+function init_boxconstraint_mpc(
+    estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, nϵ,
+    ΔUmin, ΔUmax, x̂0min, x̂0max, A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max
+) where {NT<:Real}
+    nΔU, nX̂ = estim.model.nu*Hc, estim.nx̂*Hp
+    nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
+    Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
+    nϵ > 0 && (Z̃min[end] = 0)
+    if nϵ > 0
+        n_C_Δumin = @views A_ΔUmin[:, end]
+        n_C_Δumax = @views A_ΔUmax[:, end]
+        for i in eachindex(ΔUmin)
+            iszero(n_C_Δumin[i]) && (Z̃min[i] = ΔUmin[i])
+        end
+        for i in eachindex(ΔUmax)
+            iszero(n_C_Δumax[i]) && (Z̃max[i] = ΔUmax[i])
+        end
+    else
+        Z̃min[1:nΔU] .= ΔUmin
+        Z̃max[1:nΔU] .= ΔUmax
+    end
+    Z̃min, Z̃max = boxconstraint_terminal!(
+        Z̃min, Z̃max, transcription, nΔU, nX̂, nϵ, x̂0min, x̂0max, A_x̂min, A_x̂max
+    )
+    return Z̃min, Z̃max
 end
 
 @doc raw"""

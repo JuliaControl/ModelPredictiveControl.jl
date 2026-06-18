@@ -236,8 +236,8 @@ This controller allocates memory at each time step for the optimization.
 - `hessian=false` : an `AbstractADType` backend or `Bool` for the Hessian of the Lagrangian, 
    see `gradient` above for the options. The default `false` skip it and use the
    quasi-Newton method of `optim` (see Extended Help).
-- additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
-  (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
+-  additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
+   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
 # Examples
 ```jldoctest
