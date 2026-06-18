@@ -248,13 +248,13 @@ end
 He = 4; nint_u = [1, 1]; σQint_u = [1, 2]
 v̂min, v̂max = [-1, -0.5], [+1, +0.5]
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 direct = true
 mhe_cstr_osqp_curr = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
 mhe_cstr_osqp_curr = setconstraint!(mhe_cstr_osqp_curr; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_cstr_osqp_curr.optim)
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 direct = false
 mhe_cstr_osqp_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
 mhe_cstr_osqp_pred = setconstraint!(mhe_cstr_osqp_pred; v̂min, v̂max)
