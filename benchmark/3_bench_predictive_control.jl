@@ -181,12 +181,12 @@ function test_mpc(mpc, plant)
     return U, Y, Ry
 end
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = SingleShooting()
 mpc_osqp_ss = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_osqp_ss.optim)
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = MultipleShooting()
 mpc_osqp_ms = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_osqp_ms.optim)
@@ -254,12 +254,12 @@ function test_mpc_d(mpc_d, plant)
     return U, Y, Ry
 end
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = SingleShooting()
 mpc_d_osqp_ss = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_d_osqp_ss.optim)
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = MultipleShooting()
 mpc_d_osqp_ms = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_d_osqp_ms.optim)
@@ -705,7 +705,7 @@ function sim2!(mpc, nlmodel, N, ry, plant, x, 𝕩̂, y_step)
 end
 x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180]; y_step=[0]
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = SingleShooting()
 mpc3_osqp_ss = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 mpc3_osqp_ss = setconstraint!(mpc3_osqp_ss; umin, umax)
@@ -713,7 +713,7 @@ JuMP.unset_time_limit_sec(mpc3_osqp_ss.optim)
 JuMP.set_attribute(mpc3_osqp_ss.optim, "polish", true) # needed to 
 JuMP.set_attribute(mpc3_osqp_ss.optim, "sigma",  1e-9) # needed to 
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = MultipleShooting()
 mpc3_osqp_ms = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 mpc3_osqp_ms = setconstraint!(mpc3_osqp_ms; umin, umax)
