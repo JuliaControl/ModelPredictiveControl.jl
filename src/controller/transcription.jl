@@ -873,7 +873,7 @@ function init_matconstraint_mpc(
             A_Umin;  A_Umax; 
             A_ΔUmin; A_ΔUmax; 
             A_Ymin;  A_Ymax; 
-            A_Wmin;  A_Wmax
+            A_Wmin;  A_Wmax;
             A_x̂min;  A_x̂max;
         ]
         neq = 0 # number of nonlinear equality constraints
@@ -961,7 +961,7 @@ function boxconstraint_terminal!(
             iszero(n_C_x̂max[i]) && (Z̃max[i_base + i] = x̂0max[i])
         end
     else
-        Z̃max[i_base+1:i_base+nx̂] .= x̂0min
+        Z̃min[i_base+1:i_base+nx̂] .= x̂0min
         Z̃max[i_base+1:i_base+nx̂] .= x̂0max
     end
     return Z̃min, Z̃max
