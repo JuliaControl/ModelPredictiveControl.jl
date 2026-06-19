@@ -534,8 +534,8 @@ function setconstraint!(
         for i in eachindex(Z̃var)
             JuMP.has_lower_bound(Z̃var[i]) && JuMP.delete_lower_bound(Z̃var[i])
             JuMP.has_upper_bound(Z̃var[i]) && JuMP.delete_upper_bound(Z̃var[i])
-            !isinf(con.Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], con.Z̃min[i])
-            !isinf(con.Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], con.Z̃max[i])
+            !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
+            !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i])
         end
         reset_nonlincon!(mpc)
     else
@@ -550,6 +550,10 @@ function setconstraint!(
             error("Cannot modify ±Inf constraints after calling moveinput!")
         end
         con.Z̃min[:], con.Z̃max[:] = Z̃min, Z̃max
+        for i in eachindex(Z̃var)
+            !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], con.Z̃min[i])
+            !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], con.Z̃max[i])
+        end
     end
     return mpc
 end
