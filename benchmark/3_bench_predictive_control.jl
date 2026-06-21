@@ -212,7 +212,7 @@ transcription = MultipleShooting()
 mpc_ipopt_ms = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_ipopt_ms.optim) 
 
-samples, evals = 5000, 1
+samples, evals = 10000, 1
 CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["OSQP"]["SingleShooting"] = 
     @benchmarkable(test_mpc($mpc_osqp_ss, $plant); 
         samples=samples, evals=evals
@@ -281,7 +281,7 @@ transcription = MultipleShooting()
 mpc_d_ipopt_ms = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_d_ipopt_ms.optim)
 
-samples, evals = 5000, 1
+samples, evals = 10000, 1
 CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["OSQP"]["SingleShooting"] = 
     @benchmarkable(test_mpc_d($mpc_d_osqp_ss, $plant); 
         samples=samples, evals=evals
