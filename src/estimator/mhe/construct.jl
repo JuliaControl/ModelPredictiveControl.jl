@@ -1068,7 +1068,7 @@ function init_matconstraint_mhe(
     i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
     i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
     i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
-    deletex̂_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max)
+    deletex̂arr_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max)
     deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂)
     i_b = [i_x̂min; i_x̂max; i_Ŵmin; i_Ŵmax]
     g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max; trues(nc)]
@@ -1099,33 +1099,29 @@ function init_defaultcon_mhe(
     nŵ = nx̂
     nZ̃, nX̂, nŴ, nYm = nx̂+nŵ*He, nx̂*He, nŵ*He, nym*He
     nε = isinf(C) ? 0 : 1
-    x̂min, x̂max = fill(convert(NT,-Inf), nx̂),  fill(convert(NT,+Inf), nx̂)
-    X̂min, X̂max = fill(convert(NT,-Inf), nX̂),  fill(convert(NT,+Inf), nX̂)
-    Ŵmin, Ŵmax = fill(convert(NT,-Inf), nŴ),  fill(convert(NT,+Inf), nŴ)
-    V̂min, V̂max = fill(convert(NT,-Inf), nYm), fill(convert(NT,+Inf), nYm)
+    x̂0min, x̂0max = fill(convert(NT,-Inf), nx̂),  fill(convert(NT,+Inf), nx̂)
+    X̂0min, X̂0max = fill(convert(NT,-Inf), nX̂),  fill(convert(NT,+Inf), nX̂)
+    Ŵmin, Ŵmax   = fill(convert(NT,-Inf), nŴ),  fill(convert(NT,+Inf), nŴ)
+    V̂min, V̂max   = fill(convert(NT,-Inf), nYm), fill(convert(NT,+Inf), nYm)
     c_x̂min, c_x̂max = fill(0.0, nx̂),  fill(0.0, nx̂)
     C_x̂min, C_x̂max = fill(0.0, nX̂),  fill(0.0, nX̂)
     C_ŵmin, C_ŵmax = fill(0.0, nŴ),  fill(0.0, nŴ)
     C_v̂min, C_v̂max = fill(0.0, nYm), fill(0.0, nYm)
-    A_x̃min, A_x̃max, x̃min, x̃max, ẽx̄ = relaxarrival(model, nε, c_x̂min, c_x̂max, x̂min, x̂max, ex̄)
+    A_x̂min, A_x̂max, ẽx̄ = relaxarrival(model, nε, c_x̂min, c_x̂max, ex̄)
     A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nε, C_x̂min, C_x̂max, Ex̂)
     A_Ŵmin, A_Ŵmax = relaxŴ(model, nε, C_ŵmin, C_ŵmax, nx̂)
     A_V̂min, A_V̂max, Ẽ = relaxV̂(model, nε, C_v̂min, C_v̂max, E)
-    i_x̃min, i_x̃max = .!isinf.(x̃min), .!isinf.(x̃max)
-    i_X̂min, i_X̂max = .!isinf.(X̂min), .!isinf.(X̂max)
-    i_Ŵmin, i_Ŵmax = .!isinf.(Ŵmin), .!isinf.(Ŵmax)
-    i_V̂min, i_V̂max = .!isinf.(V̂min), .!isinf.(V̂max)
     i_b, i_g, A = init_matconstraint_mhe(
         model, nc,
-        i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max,
-        A_x̃min, A_x̃max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max
+        x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max
     )
     b = zeros(NT, size(A, 1)) # dummy b vector (updated just before optimization)
     con = EstimatorConstraint{NT, GCfunc}(
         Ẽx̂, Fx̂, Gx̂, Jx̂, Bx̂,
-        x̃min, x̃max, X̂min, X̂max, Ŵmin, Ŵmax, V̂min, V̂max,
+        x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
         Z̃min, Z̃max,
-        A_x̃min, A_x̃max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max,
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max,
         A, b,
         C_x̂min, C_x̂max, C_v̂min, C_v̂max,
         i_b, i_g,
@@ -1283,14 +1279,15 @@ end
 """
     init_boxconstraints_mhe(
         model::SimModel, He, nε,
-        x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmin 
+        x̂0min, x̂0max, Ŵmin, Ŵmax, 
+        A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmin 
     ) -> Z̃min, Z̃max
 
-Init the decision variable box constraints `Z̃min` and `Z̃max`.
+Init the decision variable box constraints `Z̃min` and `Z̃max` for the [`MovingHorizonEstimator](@ref).
 """
-function init_boxconstraint_mpc(
+function init_boxconstraint_mhe(
     model::SimModel{NT}, He, nε,
-    x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmin 
+    x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
     # TODO: fill it here
     #=
