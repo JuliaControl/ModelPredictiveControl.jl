@@ -288,7 +288,7 @@ We construct the controller by enabling relaxation with the `Cwt` argument, and 
 specifying the number of custom inequality constraints `nc`:
 
 ```@example man_nonlin
-Cwt, Pmax, nc = 1e5, 3, Hp+1
+Cwt, Pmax, nc = 1e4, 3, Hp+1
 nmpc2 = NonLinMPC(estim2; Hp, Hc, Nwt=Nwt, Mwt=[0.5, 0], Cwt, gc!, nc, p=Pmax)
 nmpc2 = setconstraint!(nmpc2; umin, umax)
 using JuMP; unset_time_limit_sec(nmpc2.optim) # hide

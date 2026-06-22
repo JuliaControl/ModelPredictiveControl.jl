@@ -575,7 +575,7 @@ function gc!(LHS, Ue, Ŷe, _, p, ϵ)
     end
     return nothing
 end
-Cwt, Pmax, nc = 1e5, 3, Hp+1
+Cwt, Pmax, nc = 1e4, 3, Hp+1
 x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180; 0]
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
