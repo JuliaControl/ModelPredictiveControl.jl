@@ -786,6 +786,12 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.Y0max .-= mpc.Yop # convert Y to Y0 with the new operating point
     con.x̂0min .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     con.x̂0max .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    # --- box constraints ---
+    Z̃min, Z̃max = init_boxconstraint_mpc(
+        estim, transcription, Hp, Hc, mpc.nϵ,
+        con.ΔUmin, con.ΔUmax, con.x̂0min, con.x̂0max, 
+        con.A_ΔUmin, con.A_ΔUmax, con.A_x̂min, con.A_x̂max 
+    )
     # --- quadratic programming Hessian matrix ---
     # do not verify the condition number of the Hessian here:
     H̃ = init_quadprog(model, transcription, weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u; warn_cond=Inf)
@@ -798,6 +804,12 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     JuMP.delete(optim, optim[:linconstraint])
     JuMP.unregister(optim, :linconstraint)
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
+    for i in eachindex(Z̃var)
+        JuMP.has_lower_bound(Z̃var[i]) && JuMP.delete_lower_bound(Z̃var[i])
+        JuMP.has_upper_bound(Z̃var[i]) && JuMP.delete_upper_bound(Z̃var[i])
+        !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
+        !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i])
+    end
     JuMP.delete(optim, optim[:linconstrainteq])
     JuMP.unregister(optim, :linconstrainteq)
     @constraint(optim, linconstrainteq, con.Aeq*Z̃var .== con.beq)
