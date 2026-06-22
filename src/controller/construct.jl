@@ -513,6 +513,7 @@ function setconstraint!(
         con.ΔUmin, con.ΔUmax, con.x̂0min, con.x̂0max, 
         con.A_ΔUmin, con.A_ΔUmax, con.A_x̂min, con.A_x̂max 
     )
+    Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mpc(
             model, transcription, Z̃min, Z̃max, nc, nϵ,
@@ -527,7 +528,6 @@ function setconstraint!(
         con.Z̃min[:], con.Z̃max[:] = Z̃min, Z̃max
         A = con.A[con.i_b, :]
         b = con.b[con.i_b]
-        Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
