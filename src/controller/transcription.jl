@@ -885,7 +885,7 @@ function init_matconstraint_mpc(
     i_x̂min,  i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
     nΔU, nX̂ = length(ΔUmin), length(x̂0min)*length(Y0min)÷model.ny 
     deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, model, transcription, Z̃min, Z̃max)
-    deletex̂_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
+    deletex̂end_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
     i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]    
     i_g = trues(nc)
     return i_b, i_g, A, Aeq, neq
@@ -911,7 +911,7 @@ function init_matconstraint_mpc(
     i_x̂min,  i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
     nΔU, nX̂ = length(ΔUmin), length(x̂0min)*length(Y0min)÷model.ny 
     deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, model, transcription, Z̃min, Z̃max)
-    deletex̂_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
+    deletex̂end_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
     i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Wmin; i_Wmax]
     i_g = [i_Ymin; i_Ymax; i_x̂min; i_x̂max; trues(nc)]
     return i_b, i_g, A, Aeq, neq
@@ -939,7 +939,7 @@ function init_matconstraint_mpc(
     i_x̂min,  i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
     nΔU, nX̂ = length(ΔUmin), length(x̂0min)*length(Y0min)÷model.ny 
     deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, model, transcription, Z̃min, Z̃max)
-    deletex̂_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
+    deletex̂end_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
     i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
     i_g = [i_Ymin; i_Ymax; trues(nc)]
     return i_b, i_g, A, Aeq, neq
@@ -978,14 +978,14 @@ function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModel, ::TranscriptionMethod
 end 
 
 "Unset `i_x̂min` and `i_x̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deletex̂_lincon!(i_x̂min, i_x̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
+function deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
     nx̂ = length(i_x̂min)
     x̂0min, x̂0max = @views Z̃min[nΔU+nX̂-nx̂+1:nΔU+nX̂], @views Z̃max[nΔU+nX̂-nx̂+1:nΔU+nX̂]
     foreach(i -> !isinf(x̂0min[i]) && (i_x̂min[i] = false), eachindex(x̂0min))
     foreach(i -> !isinf(x̂0max[i]) && (i_x̂max[i] = false), eachindex(x̂0max))
     return i_x̂min, i_x̂max
 end
-deletex̂_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
+deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)
