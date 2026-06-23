@@ -1227,16 +1227,16 @@ end
     @test mhe1.con.V̂min ≈ [-59,-60]
     @test mhe1.con.V̂max ≈ [61,62]
     setconstraint!(mhe1, c_x̂min=[0.01,0.02], c_x̂max=[0.03,0.04])
-    @test -mhe1.con.A_X̂min[:, end] ≈ [0.01, 0.02]
-    @test -mhe1.con.A_X̂max[:, end] ≈ [0.03,0.04]
-    @test -mhe1.con.A_x̃min[2:end, end] ≈ [0.01,0.02]
-    @test -mhe1.con.A_x̃max[2:end, end] ≈ [0.03,0.04]
+    @test -mhe1.con.A_X̂min[:, begin] ≈ [0.01, 0.02]
+    @test -mhe1.con.A_X̂max[:, begin] ≈ [0.03,0.04]
+    @test -mhe1.con.A_x̃min[2:end, begin] ≈ [0.01,0.02]
+    @test -mhe1.con.A_x̃max[2:end, begin] ≈ [0.03,0.04]
     setconstraint!(mhe1, c_ŵmin=[0.05,0.06], c_ŵmax=[0.07,0.08])
-    @test -mhe1.con.A_Ŵmin[:, end] ≈ [0.05, 0.06]
-    @test -mhe1.con.A_Ŵmax[:, end] ≈ [0.07,0.08]
+    @test -mhe1.con.A_Ŵmin[:, begin] ≈ [0.05, 0.06]
+    @test -mhe1.con.A_Ŵmax[:, begin] ≈ [0.07,0.08]
     setconstraint!(mhe1, c_v̂min=[0.09,0.10], c_v̂max=[0.11,0.12])
-    @test -mhe1.con.A_V̂min[:, end] ≈ [0.09, 0.10]
-    @test -mhe1.con.A_V̂max[:, end] ≈ [0.11,0.12]
+    @test -mhe1.con.A_V̂min[:, begin] ≈ [0.09, 0.10]
+    @test -mhe1.con.A_V̂max[:, begin] ≈ [0.11,0.12]
 
     mhe2 = MovingHorizonEstimator(linmodel, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe2, X̂min=-1(1:10), X̂max=1(1:10))
@@ -1251,16 +1251,16 @@ end
     @test mhe2.con.V̂min ≈ -1(31:38)
     @test mhe2.con.V̂max ≈ 1(31:38)
     setconstraint!(mhe2, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
-    @test -mhe2.con.A_X̂min[:, end] ≈ 0.01(3:10)
-    @test -mhe2.con.A_X̂max[:, end] ≈ 0.02(3:10)
-    @test -mhe2.con.A_x̃min[2:end, end] ≈ 0.01(1:2)
-    @test -mhe2.con.A_x̃max[2:end, end] ≈ 0.02(1:2)
+    @test -mhe2.con.A_X̂min[:, begin] ≈ 0.01(3:10)
+    @test -mhe2.con.A_X̂max[:, begin] ≈ 0.02(3:10)
+    @test -mhe2.con.A_x̃min[2:end, begin] ≈ 0.01(1:2)
+    @test -mhe2.con.A_x̃max[2:end, begin] ≈ 0.02(1:2)
     setconstraint!(mhe2, C_ŵmin=0.03(11:18), C_ŵmax=0.04(11:18))
-    @test -mhe2.con.A_Ŵmin[:, end] ≈ 0.03(11:18)
-    @test -mhe2.con.A_Ŵmax[:, end] ≈ 0.04(11:18)
+    @test -mhe2.con.A_Ŵmin[:, begin] ≈ 0.03(11:18)
+    @test -mhe2.con.A_Ŵmax[:, begin] ≈ 0.04(11:18)
     setconstraint!(mhe2, C_v̂min=0.05(31:38), C_v̂max=0.06(31:38))
-    @test -mhe2.con.A_V̂min[:, end] ≈ 0.05(31:38)
-    @test -mhe2.con.A_V̂max[:, end] ≈ 0.06(31:38)
+    @test -mhe2.con.A_V̂min[:, begin] ≈ 0.05(31:38)
+    @test -mhe2.con.A_V̂max[:, begin] ≈ 0.06(31:38)
 
     f(x,u,d,model) = model.A*x + model.Bu*u
     h(x,d,model)   = model.C*x 
