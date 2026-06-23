@@ -423,7 +423,6 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
         G, U0      = estim.G[1:nYm, 1:nU], estim.U0[1:nU]
         J, D0      = estim.J[1:nYm, 1:nD], estim.D0[1:nD]
         Ẽ, ẽx̄      = estim.Ẽ[1:nYm, 1:nZ̃], estim.ẽx̄[:, 1:nZ̃]
-        Z̃min, Z̃max = mpc.con.Z̃min[1:nZ̃], mpc.con.Z̃max[1:nZ̃]
         F, q̃       = @views estim.F[1:nYm], estim.q̃[1:nZ̃]
         H̃_data     = @views estim.H̃.data[1:nZ̃, 1:nZ̃]
         H̃          = @views estim.H̃[1:nZ̃, 1:nZ̃]
@@ -433,7 +432,6 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
         G, U0      = estim.G, estim.U0
         J, D0      = estim.J, estim.D0
         Ẽ, ẽx̄      = estim.Ẽ, estim.ẽx̄
-        Z̃min, Z̃max = mpc.con.Z̃min, mpc.con.Z̃max
         F, q̃       = estim.F, estim.q̃
         H̃_data     = estim.H̃.data
         H̃          = estim.H̃
