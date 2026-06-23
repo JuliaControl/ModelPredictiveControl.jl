@@ -42,7 +42,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
     if !only_hard
         issoft(C) = any(x -> x > 0, C)
         C_u  = -mpc.con.A_Umin[:, end]
-        C_Δu = -mpc.con.A_ΔŨmin[1:nΔU, end]
+        C_Δu = -mpc.con.A_ΔUmin[:, end]
         C_y  = -mpc.con.A_Ymin[:, end]
         C_w  = -mpc.con.A_Wmin[:, end]
         c_x̂  = -mpc.con.A_x̂min[:, end]
@@ -56,7 +56,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         # LinearMPC relies on a different softening mechanism (new implicit slacks for each
         # softened bounds), so we apply an approximate conversion factor on the Cwt weight:
         Cwt = weights.Ñ_Hc[end, end]
-        nsoft = sum((mpc.con.A[:,end] .< 0) .& (mpc.con.i_b)) - 1
+        nsoft = sum((mpc.con.A[:,end] .< 0) .& (mpc.con.i_b))
         newmpc.settings.soft_weight = 10*sqrt(nsoft*Cwt)
     else
         C_u  = zeros(nu*Hp)
@@ -81,7 +81,7 @@ function Base.convert(::Type{LinearMPC.MPC}, mpc::ModelPredictiveControl.LinMPC)
         end
     end
     # --- Input increment constraints ---
-    ΔUmin, ΔUmax = mpc.con.ΔŨmin[1:nΔU], mpc.con.ΔŨmax[1:nΔU]
+    ΔUmin, ΔUmax = mpc.con.ΔUmin, mpc.con.ΔUmax
     I_Δu = Matrix{Float64}(I, nu, nu)
     for k = 0:Hc-1
         Δumin_k, Δumax_k = ΔUmin[k*nu+1:(k+1)*nu], ΔUmax[k*nu+1:(k+1)*nu]
@@ -198,7 +198,7 @@ function validate_constraints(mpc::ModelPredictiveControl.LinMPC)
     nΔU = mpc.Hc * mpc.estim.model.nu
     mpc.weights.isinf_C && return nothing # only hard constraints are entirely supported
     C_umin, C_umax   = -mpc.con.A_Umin[:, end], -mpc.con.A_Umax[:, end]
-    C_Δumin, C_Δumax = -mpc.con.A_ΔŨmin[1:nΔU, end], -mpc.con.A_ΔŨmax[1:nΔU, end]
+    C_Δumin, C_Δumax = -mpc.con.A_ΔUmin[:, end], -mpc.con.A_ΔUmax[:, end]
     C_ymin, C_ymax   = -mpc.con.A_Ymin[:, end], -mpc.con.A_Ymax[:, end]
     C_wmin, C_wmax   = -mpc.con.A_Wmin[:, end], -mpc.con.A_Wmax[:, end]
     C_x̂min, C_x̂max   = -mpc.con.A_x̂min[:, end], -mpc.con.A_x̂max[:, end]

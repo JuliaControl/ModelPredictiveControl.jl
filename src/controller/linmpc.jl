@@ -192,7 +192,7 @@ LinMPC controller with a sample time Ts = 4.0 s:
   │ └  0 measured disturbances d
   └ optimization:
     ├ 2 decision variables Z̃ (1 slack variable)
-    ├ 1 linear inequality constraints A (0 custom)
+    ├ 0 linear inequality constraints A (0 custom)
     └ 0 linear equality constraints Aeq
 ```
 
@@ -243,7 +243,7 @@ function LinMPC(
     Wr = nothing,
     Cwt = DEFAULT_CWT,
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
-    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false),
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=true),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
@@ -282,7 +282,7 @@ LinMPC controller with a sample time Ts = 4.0 s:
   │ └  0 measured disturbances d
   └ optimization:
     ├ 2 decision variables Z̃ (1 slack variable)
-    ├ 1 linear inequality constraints A (0 custom)
+    ├ 0 linear inequality constraints A (0 custom)
     └ 0 linear equality constraints Aeq
 ```
 """
@@ -302,7 +302,7 @@ function LinMPC(
     Wr = nothing,
     Cwt  = DEFAULT_CWT,
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
-    optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=false)
+    optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=true)
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
     isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 
     nk = estimate_delays(estim.model)
@@ -328,7 +328,7 @@ function init_optimization!(mpc::LinMPC, model::LinModel, optim::JuMP.GenericMod
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(mpc.optim, model.Ts)
-    @variable(optim, Z̃var[1:nZ̃])
+    @variable(optim, con.Z̃min[i] ≤ Z̃var[i=1:nZ̃] ≤ con.Z̃max[i])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
