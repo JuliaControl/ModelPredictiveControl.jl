@@ -1331,8 +1331,8 @@ function init_boxconstraint_mhe(
             iszero(n_C_Ŵmax[i]) && (Z̃min[nε + nx̂ + i] = Ŵmax[i])
         end
     else
-        Z̃min[1:nx̂] .= ΔUmin
-        Z̃max[1:nx̂] .= ΔUmax
+        Z̃min[1:nx̂] .= x̂0min
+        Z̃max[1:nx̂] .= x̂0max
         Z̃min[nx̂+1:end] .= Ŵmin
         Z̃max[nx̂+1:end] .= Ŵmax
     end
