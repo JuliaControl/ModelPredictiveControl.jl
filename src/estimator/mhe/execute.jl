@@ -1059,6 +1059,7 @@ function setmodel_estimator!(
 )
     con = estim.con
     nx̂, nym, nu, nd, He, nε = estim.nx̂, estim.nym, model.nu, model.nd, estim.He, estim.nε
+    nŵ = nx̂
     As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
     Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
     # --- update augmented state-space matrices ---
