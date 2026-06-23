@@ -1315,11 +1315,15 @@ end
 @testitem "MHE constraint violation (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0)
+    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, Cwt=1e5)
 
     setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
     setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
+
+    # activating soft constraints to ensure that they work as intended:
+    setconstraint!(mhe, c_v̂min=[1, 1], c_v̂max=[1, 1])
+    setconstraint!(mhe, c_x̂min=[1, 1], c_x̂max=[1, 1])
 
     setconstraint!(mhe, x̂min=[1,1], x̂max=[100,100])
     preparestate!(mhe, [50, 30])
