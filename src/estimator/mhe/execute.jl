@@ -409,7 +409,6 @@ of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
             r        &= \mathbf{F_Z̃}' \mathbf{M}_{N_k} \mathbf{F_Z̃}
 \end{aligned}
 ```
-It also update the box constraint bounds on the decision variable `Z̃var`.
 """
 function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     invP̄, invQ̂_He, invR̂_He = estim.cov.invP̄, estim.cov.invQ̂_He, estim.cov.invR̂_He
@@ -462,24 +461,10 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     mul!(H̃_data, ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
     lmul!(2, H̃_data)
     JuMP.set_objective_function(optim, obj_quadprog(Z̃var, H̃, q̃))
-    foreach(i -> !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i]), eachindex(Z̃min))
-    foreach(i -> !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i]), eachindex(Z̃max))
     return nothing
 end
-"Only update the box constraints if `model` is not a [`LinModel`](@ref)."
-function initpred!(estim::MovingHorizonEstimator, model::SimModel)
-    nZ̃ = estim.nε + estim.nx̂ + estim.nx̂*estim.He
-    if Nk < estim.He
-        Z̃min, Z̃max = mpc.con.Z̃min[1:nZ̃], mpc.con.Z̃max[1:nZ̃]
-        Z̃var = @views optim[:Z̃var][1:nZ̃]
-    else
-        Z̃min, Z̃max = mpc.con.Z̃min, mpc.con.Z̃max
-        Z̃var = optim[:Z̃var]
-    end
-    foreach(i -> !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i]), eachindex(Z̃min))
-    foreach(i -> !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i]), eachindex(Z̃max))
-    return nothing
-end
+"Does nothing if `model` is not a [`LinModel`](@ref)."
+initpred!(::MovingHorizonEstimator, ::SimModel) = nothing
 
 @doc raw"""
     linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
@@ -1138,12 +1123,25 @@ function setmodel_estimator!(
         con.A_V̂min
         con.A_V̂max
     ]
+    Z̃min, Z̃max = init_boxconstraint_mhe(
+        model, He, nx̂, nŵ, nε,
+        con.x̂0min,  con.x̂0max,  con.Ŵmin,   con.Ŵmax, 
+        con.A_x̂min, con.A_x̂max, con.A_Ŵmin, con.A_Ŵmax 
+    )
+    con.Z̃min .= Z̃min
+    con.Z̃max .= Z̃max
+    Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
     A = con.A[con.i_b, :]
     b = zeros(count(con.i_b)) # dummy value, updated before optimization (avoid ±Inf)
-    Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
+    # deletion is required for sparse solvers like OSQP, when the sparsity pattern changes
     JuMP.delete(estim.optim, estim.optim[:linconstraint])
     JuMP.unregister(estim.optim, :linconstraint)
     @constraint(estim.optim, linconstraint, A*Z̃var .≤ b)
+    for i in eachindex(Z̃var)
+        # deletion not required here since changing op. pts won't change finite status
+        !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
+        !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i])
+    end
     # --- data windows ---
     for i in 1:He 
         # convert y0m to ym with the old operating point:

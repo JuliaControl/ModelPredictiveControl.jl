@@ -842,7 +842,7 @@ function setconstraint!(
     C_v̂min = C_vhatmin, C_v̂max = C_vhatmax,
 )
     model, optim, con = estim.model, estim.optim, estim.con
-    nx̂, nŵ, nym, He = estim.nx̂, estim.nx̂, estim.nym, estim.He
+    nε, nx̂, nŵ, nym, He = estim.nε, estim.nx̂, estim.nx̂, estim.nym, estim.He
     nX̂con = nx̂*(He+1)
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
     C = estim.C
@@ -956,31 +956,31 @@ function setconstraint!(
             size(con.A_V̂max, 1) ≠ 0 && (con.A_V̂max[:, end] = -con.C_v̂max) # for LinModel
         end
     end
-    Z̃min, Z̃max = init_boxconstraint_mpc(
-        model, transcription, He, nϵ,
+    Z̃min, Z̃max = init_boxconstraint_mhe(
+        model, He, nx̂, nŵ, nε,
         con.x̂0min,  con.x̂0max,  con.Ŵmin,   con.Ŵmax, 
-        con.A_x̂min, con.A_x̂max, con.A_ŵmin, con.A_ŵmax 
+        con.A_x̂min, con.A_x̂max, con.A_Ŵmin, con.A_Ŵmax 
     )
+    Z̃var = optim[:Z̃var]
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(
-            mode, Z̃min, Z̃max, con.nc, con.nc,
+            model, Z̃min, Z̃max, con.nc,
             con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, 
             con.Ŵmin,   con.Ŵmax,   con.V̂min,   con.V̂max,
-            con.A_x̃min, con.A_x̃max, con.A_X̂min, con.A_X̂max, 
+            con.A_x̂min, con.A_x̂max, con.A_X̂min, con.A_X̂max, 
             con.A_Ŵmin, con.A_Ŵmax, con.A_V̂min, con.A_V̂max
         )
         con.Z̃min[:], con.Z̃max[:] = Z̃min, Z̃max
         A = con.A[con.i_b, :]
         b = zeros(count(con.i_b)) # dummy value, updated before optimization (avoid ±Inf)
-        Z̃var = optim[:Z̃var]
         JuMP.delete(optim, optim[:linconstraint])
         JuMP.unregister(optim, :linconstraint)
         @constraint(optim, linconstraint, A*Z̃var .≤ b)
         for i in eachindex(Z̃var)
             JuMP.has_lower_bound(Z̃var[i]) && JuMP.delete_lower_bound(Z̃var[i])
             JuMP.has_upper_bound(Z̃var[i]) && JuMP.delete_upper_bound(Z̃var[i])
-            !isinf(con.Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], con.Z̃min[i])
-            !isinf(con.Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], con.Z̃max[i])
+            !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
+            !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i])
         end
         reset_nonlincon!(estim, model)
     else
@@ -993,6 +993,10 @@ function setconstraint!(
             error("Cannot modify ±Inf constraints after first solve of estimation problem")
         end
         con.Z̃min[:], con.Z̃max[:] = Z̃min, Z̃max
+        for i in eachindex(Z̃var)
+            !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
+            !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i])
+        end
     end
     return estim
 end
@@ -1046,8 +1050,10 @@ function init_matconstraint_mhe(
     i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
     i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
     i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
-    deletex̂_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max)
-    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂)
+    nx̂ = length(x̂0min)
+    nε = length(Z̃min) - length(Ŵmin) - nx̂
+    deletex̂arr_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max, nε)
+    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂, nε)
     i_b = [i_x̂min; i_x̂max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax; i_V̂min; i_V̂max]
     g = trues(nc)
     return i_b, g, A
@@ -1068,18 +1074,29 @@ function init_matconstraint_mhe(
     i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
     i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
     i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
-    deletex̂arr_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max)
-    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂)
+    nx̂ = length(x̂0min)
+    nε = length(Z̃min) - length(Ŵmin) - nx̂
+    deletex̂arr_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max, nε)
+    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂, nε)
     i_b = [i_x̂min; i_x̂max; i_Ŵmin; i_Ŵmax]
     g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max; trues(nc)]
     return i_b, g, A
 end
 
-function deletex̂arr_lincon!(i_x̂min, i_x̂max, model::SimModel, Z̃min, Z̃max)
+"Unset `i_x̂min` and `i_x̂min` elements if finite box constraints in `Z̃min` and `Z̃max`."
+function deletex̂arr_lincon!(i_x̂min, i_x̂max, ::SimModel, Z̃min, Z̃max, nε)
+    nx̂ = length(i_x̂min)
+    x̂0min, x̂0max = @views Z̃min[(nε+1):(nε+nx̂)], @views Z̃max[(nε+1):(nε+nx̂)]
+    foreach(i -> !isinf(x̂0min[i]) && (i_x̂min[i] = false), eachindex(i_x̂min))
+    foreach(i -> !isinf(x̂0max[i]) && (i_x̂max[i] = false), eachindex(i_x̂max))
     return i_x̂min, i_x̂max
 end
     
-function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model::SimModel, Z̃min, Z̃max, nx̂)
+"Unset `i_Ŵmin` and `i_Ŵmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
+function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModel, Z̃min, Z̃max, nx̂, nε)
+    Ŵmin, Ŵmax = @views Z̃min[nε+nx̂+1:end], Z̃max[nε+nx̂+1:end]
+    foreach(i -> !isinf(Ŵmin[i]) && (i_Ŵmin[i] = false), eachindex(i_Ŵmin))
+    foreach(i -> !isinf(Ŵmax[i]) && (i_Ŵmax[i] = false), eachindex(i_Ŵmax))
     return i_Ŵmin, i_Ŵmax
 end
 
@@ -1097,7 +1114,7 @@ function init_defaultcon_mhe(
     gc!::GCfunc = nothing, nc = 0
 ) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
     nŵ = nx̂
-    nZ̃, nX̂, nŴ, nYm = nx̂+nŵ*He, nx̂*He, nŵ*He, nym*He
+    nX̂, nŴ, nYm = nx̂*He, nŵ*He, nym*He
     nε = isinf(C) ? 0 : 1
     x̂0min, x̂0max = fill(convert(NT,-Inf), nx̂),  fill(convert(NT,+Inf), nx̂)
     X̂0min, X̂0max = fill(convert(NT,-Inf), nX̂),  fill(convert(NT,+Inf), nX̂)
@@ -1111,8 +1128,12 @@ function init_defaultcon_mhe(
     A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nε, C_x̂min, C_x̂max, Ex̂)
     A_Ŵmin, A_Ŵmax = relaxŴ(model, nε, C_ŵmin, C_ŵmax, nx̂)
     A_V̂min, A_V̂max, Ẽ = relaxV̂(model, nε, C_v̂min, C_v̂max, E)
+    Z̃min, Z̃max = init_boxconstraint_mhe(
+        model, He, nx̂, nŵ, nε,
+        x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmax
+    )
     i_b, i_g, A = init_matconstraint_mhe(
-        model, Z̃min, Z̃max, con.nc, nc,
+        model, Z̃min, Z̃max, nc,
         x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
         A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max
     )
@@ -1277,41 +1298,44 @@ function relaxV̂(::SimModel{NT}, nε, C_v̂min, C_v̂max, E) where {NT<:Real}
 end
 
 """
-    init_boxconstraints_mhe(
-        model::SimModel, He, nε,
+    init_boxconstraint_mhe(
+        model::SimModel, He, nx̂, nŵ, nε,
         x̂0min, x̂0max, Ŵmin, Ŵmax, 
         A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmin 
     ) -> Z̃min, Z̃max
 
-Init the decision variable box constraints `Z̃min` and `Z̃max` for the [`MovingHorizonEstimator](@ref).
+Init the decision variable box constraints `Z̃min` and `Z̃max` for [`MovingHorizonEstimator`](@ref).
 """
 function init_boxconstraint_mhe(
-    model::SimModel{NT}, He, nε,
+    ::SimModel{NT}, He, nx̂, nŵ, nε,
     x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
-    # TODO: fill it here
-    #=
-    nΔU, nX̂ = estim.model.nu*Hc, estim.nx̂*Hp
-    nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nε
+    nZ̃ = nε + nx̂ + nŵ*He
     Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
-    nε > 0 && (Z̃min[end] = 0)
+    nε > 0 && (Z̃min[begin] = 0)
     if nε > 0
-        n_C_Δumin = @views A_ΔUmin[:, end]
-        n_C_Δumax = @views A_ΔUmax[:, end]
-        for i in eachindex(ΔUmin)
-            iszero(n_C_Δumin[i]) && (Z̃min[i] = ΔUmin[i])
+        n_C_x̂min = @views A_x̂min[:, begin]
+        n_C_x̂max = @views A_x̂max[:, begin]
+        n_C_Ŵmin = @views A_Ŵmin[:, begin]
+        n_C_Ŵmax = @views A_Ŵmax[:, begin]
+        for i in eachindex(x̂0min)
+            iszero(n_C_x̂min[i]) && (Z̃min[nε + i] = x̂0min[i])
         end
-        for i in eachindex(ΔUmax)
-            iszero(n_C_Δumax[i]) && (Z̃max[i] = ΔUmax[i])
+        for i in eachindex(x̂0max)
+            iszero(n_C_x̂max[i]) && (Z̃max[nε + i] = x̂0max[i])
+        end
+        for i in eachindex(Ŵmin)
+            iszero(n_C_Ŵmin[i]) && (Z̃min[nε + nx̂ + i] = Ŵmin[i])
+        end
+        for i in eachindex(Ŵmax)
+            iszero(n_C_Ŵmax[i]) && (Z̃min[nε + nx̂ + i] = Ŵmax[i])
         end
     else
-        Z̃min[1:nΔU] .= ΔUmin
-        Z̃max[1:nΔU] .= ΔUmax
+        Z̃min[1:nx̂] .= ΔUmin
+        Z̃max[1:nx̂] .= ΔUmax
+        Z̃min[nx̂+1:end] .= Ŵmin
+        Z̃max[nx̂+1:end] .= Ŵmax
     end
-    Z̃min, Z̃max = boxconstraint_terminal!(
-        Z̃min, Z̃max, transcription, nΔU, nX̂, nε, x̂0min, x̂0max, A_x̂min, A_x̂max
-    )
-    =#
     return Z̃min, Z̃max
 end
 
