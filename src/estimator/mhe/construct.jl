@@ -963,7 +963,7 @@ function setconstraint!(
     )
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(
-            model, con.nc,
+            mode, Z̃min, Z̃max, con.nc, con.nc,
             con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, 
             con.Ŵmin,   con.Ŵmax,   con.V̂min,   con.V̂max,
             con.A_x̃min, con.A_x̃max, con.A_X̂min, con.A_X̂max, 
@@ -985,7 +985,7 @@ function setconstraint!(
         reset_nonlincon!(estim, model)
     else
         i_b, i_g = init_matconstraint_mhe(
-            model, con.nc,
+            model, Z̃min, Z̃max, con.nc, 
             i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
         )
         diff_Z̃min, diff_Z̃max = diff_infs(Z̃min, con.Z̃min), diff_infs(Z̃max, con.Z̃max)
@@ -1012,7 +1012,7 @@ end
 
 @doc raw"""
     init_matconstraint_mhe(
-        model::LinModel, nc,
+        model::LinModel, Z̃min, Z̃max, nc,
         x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
     ) -> b, g, A
 
@@ -1033,7 +1033,7 @@ finite numbers. `g` is a similar vector but for the indices of ``\mathbf{g}`` (e
 matrices: `A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max`.
 """
 function init_matconstraint_mhe(
-    ::LinModel{NT}, nc,
+    ::LinModel{NT}, Z̃min, Z̃max, nc,
     x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
     if isempty(args)
@@ -1055,7 +1055,7 @@ end
 
 "Init `i_b, A` without state and sensor noise constraints if `model` is not a [`LinModel`](@ref)."
 function init_matconstraint_mhe(
-    ::SimModel{NT}, nc,
+    model::SimModel{NT}, Z̃min, Z̃max, nc,
     x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
     if isempty(args)
@@ -1112,7 +1112,7 @@ function init_defaultcon_mhe(
     A_Ŵmin, A_Ŵmax = relaxŴ(model, nε, C_ŵmin, C_ŵmax, nx̂)
     A_V̂min, A_V̂max, Ẽ = relaxV̂(model, nε, C_v̂min, C_v̂max, E)
     i_b, i_g, A = init_matconstraint_mhe(
-        model, nc,
+        model, Z̃min, Z̃max, con.nc, nc,
         x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
         A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max
     )
