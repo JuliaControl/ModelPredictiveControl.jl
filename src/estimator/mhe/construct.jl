@@ -790,7 +790,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
   │ └ 0 measured disturbances d
   └ optimization:
     ├  8 decision variables Z̃ (0 slack variable)
-    ├ 16 linear inequality constraints A
+    ├ 12 linear inequality constraints A
     └  0 nonlinear inequality constraints g (0 custom)
 ```
 
