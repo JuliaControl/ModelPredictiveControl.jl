@@ -922,38 +922,38 @@ function setconstraint!(
         if !isnothing(C_x̂min)
             size(C_x̂min) == (nX̂con,) || throw(DimensionMismatch("C_x̂min size must be $((nX̂con,))"))
             any(C_x̂min .< 0) && error("C_x̂min weights should be non-negative")
-            con.A_x̂min[:, end] .= @views -C_x̂min[1:nx̂] 
+            con.A_x̂min[:, begin] .= @views -C_x̂min[1:nx̂] 
             con.C_x̂min .= @views C_x̂min[nx̂+1:end]
-            size(con.A_X̂min, 1) ≠ 0 && (con.A_X̂min[:, end] = -con.C_x̂min) # for LinModel
+            size(con.A_X̂min, 1) ≠ 0 && (con.A_X̂min[:, begin] = -con.C_x̂min) # for LinModel
         end
         if !isnothing(C_x̂max)
             size(C_x̂max) == (nX̂con,) || throw(DimensionMismatch("C_x̂max size must be $((nX̂con,))"))
             any(C_x̂max .< 0) && error("C_x̂max weights should be non-negative")
-            con.A_x̂max[:, end] .= @views -C_x̂max[1:nx̂]
+            con.A_x̂max[:, begin] .= @views -C_x̂max[1:nx̂]
             con.C_x̂max .= @views C_x̂max[nx̂+1:end]
-            size(con.A_X̂max, 1) ≠ 0 && (con.A_X̂max[:, end] = -con.C_x̂max) # for LinModel
+            size(con.A_X̂max, 1) ≠ 0 && (con.A_X̂max[:, begin] = -con.C_x̂max) # for LinModel
         end
         if !isnothing(C_ŵmin)
             size(C_ŵmin) == (nŵ*He,) || throw(DimensionMismatch("C_ŵmin size must be $((nŵ*He,))"))
             any(C_ŵmin .< 0) && error("C_ŵmin weights should be non-negative")
-            con.A_Ŵmin[:, end] .= -C_ŵmin
+            con.A_Ŵmin[:, begin] .= -C_ŵmin
         end
         if !isnothing(C_ŵmax)
             size(C_ŵmax) == (nŵ*He,) || throw(DimensionMismatch("C_ŵmax size must be $((nŵ*He,))"))
             any(C_ŵmax .< 0) && error("C_ŵmax weights should be non-negative")
-            con.A_Ŵmax[:, end] .= -C_ŵmax
+            con.A_Ŵmax[:, begin] .= -C_ŵmax
         end
         if !isnothing(C_v̂min)
             size(C_v̂min) == (nym*He,) || throw(DimensionMismatch("C_v̂min size must be $((nym*He,))"))
             any(C_v̂min .< 0) && error("C_v̂min weights should be non-negative")
             con.C_v̂min .= C_v̂min
-            size(con.A_V̂min, 1) ≠ 0 && (con.A_V̂min[:, end] = -con.C_v̂min) # for LinModel
+            size(con.A_V̂min, 1) ≠ 0 && (con.A_V̂min[:, begin] = -con.C_v̂min) # for LinModel
         end
         if !isnothing(C_v̂max)
             size(C_v̂max) == (nym*He,) || throw(DimensionMismatch("C_v̂max size must be $((nym*He,))"))
             any(C_v̂max .< 0) && error("C_v̂max weights should be non-negative")
             con.C_v̂max .= C_v̂max
-            size(con.A_V̂max, 1) ≠ 0 && (con.A_V̂max[:, end] = -con.C_v̂max) # for LinModel
+            size(con.A_V̂max, 1) ≠ 0 && (con.A_V̂max[:, begin] = -con.C_v̂max) # for LinModel
         end
     end
     Z̃min, Z̃max = init_boxconstraint_mhe(

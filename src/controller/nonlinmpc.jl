@@ -236,8 +236,8 @@ This controller allocates memory at each time step for the optimization.
 - `hessian=false` : an `AbstractADType` backend or `Bool` for the Hessian of the Lagrangian, 
    see `gradient` above for the options. The default `false` skip it and use the
    quasi-Newton method of `optim` (see Extended Help).
-- additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
-  (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
+-  additional keyword arguments are passed to [`UnscentedKalmanFilter`](@ref) constructor 
+   (or [`SteadyKalmanFilter`](@ref), for [`LinModel`](@ref)).
 
 # Examples
 ```jldoctest
@@ -262,7 +262,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
   │ └  0 measured disturbances d
   └ optimization:
     ├ 51 decision variables Z̃ (1 slack variable)
-    ├  1 linear inequality constraints A (0 custom)
+    ├  0 linear inequality constraints A (0 custom)
     ├ 20 linear equality constraints Aeq
     ├  0 nonlinear inequality constraints g (0 custom)
     └ 20 nonlinear equality constraints geq
@@ -410,7 +410,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
   │ └  0 measured disturbances d
   └ optimization:
     ├ 3 decision variables Z̃ (1 slack variable)
-    ├ 1 linear inequality constraints A (0 custom)
+    ├ 0 linear inequality constraints A (0 custom)
     ├ 0 linear equality constraints Aeq
     ├ 0 nonlinear inequality constraints g (0 custom)
     └ 0 nonlinear equality constraints geq
@@ -750,7 +750,7 @@ function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.Generic
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
     limit_solve_time(mpc.optim, model.Ts)
-    @variable(optim, Z̃var[1:nZ̃])
+    @variable(optim, con.Z̃min[i] ≤ Z̃var[i=1:nZ̃] ≤ con.Z̃max[i])
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
