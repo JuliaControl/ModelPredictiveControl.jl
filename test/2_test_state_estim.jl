@@ -1315,55 +1315,66 @@ end
 @testitem "MHE constraint violation (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, Cwt=1e5)
+    mhe_soft = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, Cwt=1e5)
 
-    setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
-    setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
-    setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
+    setconstraint!(mhe_soft, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe_soft, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe_soft, v̂min=[-100,-100], v̂max=[100,100])
 
-    # activating soft constraints to ensure that they work as intended:
-    setconstraint!(mhe, c_v̂min=[1, 1], c_v̂max=[1, 1])
-    setconstraint!(mhe, c_x̂min=[1, 1], c_x̂max=[1, 1])
+    # activating all soft constraints to ensure that they work as intended:
+    setconstraint!(mhe_soft, c_x̂min=[1, 1], c_x̂max=[1, 1])
+    setconstraint!(mhe_soft, c_ŵmin=[0.1, 0.1], c_ŵmax=[0.1, 0.1])
+    setconstraint!(mhe_soft, c_v̂min=[1, 1], c_v̂max=[1, 1])
 
-    setconstraint!(mhe, x̂min=[1,1], x̂max=[100,100])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test x̂ ≈ [1, 1] atol=5e-2
+    mhe_hard = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, Cwt=Inf)
 
-    setconstraint!(mhe, x̂min=[-100,-100], x̂max=[-1,-1])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test x̂ ≈ [-1, -1] atol=5e-2
+    setconstraint!(mhe_hard, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe_hard, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe_hard, v̂min=[-100,-100], v̂max=[100,100])
 
-    setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
-    setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
-    setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
+    function test_bound_violation(mhe)
+        setconstraint!(mhe, x̂min=[1,1], x̂max=[100,100])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        @test x̂ ≈ [1, 1] atol=5e-2
 
-    setconstraint!(mhe, ŵmin=[1,1], ŵmax=[100,100])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test mhe.Ŵ ≈ [1,1] atol=5e-2
+        setconstraint!(mhe, x̂min=[-100,-100], x̂max=[-1,-1])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        @test x̂ ≈ [-1, -1] atol=5e-2
 
-    setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[-1,-1])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test mhe.Ŵ ≈ [-1,-1] atol=5e-2
+        setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
+        setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
+        setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
 
-    setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
-    setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
-    setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
+        setconstraint!(mhe, ŵmin=[1,1], ŵmax=[100,100])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        @test mhe.Ŵ ≈ [1,1] atol=5e-2
 
-    setconstraint!(mhe, v̂min=[1,1], v̂max=[100,100])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    info = getinfo(mhe)
-    @test info[:V̂] ≈ [1,1] atol=5e-2
+        setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[-1,-1])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        @test mhe.Ŵ ≈ [-1,-1] atol=5e-2
 
-    setconstraint!(mhe, v̂min=[-100,-100], v̂max=[-1,-1])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    info = getinfo(mhe)
-    @test info[:V̂] ≈ [-1,-1] atol=5e-2
+        setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
+        setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
+        setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
+
+        setconstraint!(mhe, v̂min=[1,1], v̂max=[100,100])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        info = getinfo(mhe)
+        @test info[:V̂] ≈ [1,1] atol=5e-2
+
+        setconstraint!(mhe, v̂min=[-100,-100], v̂max=[-1,-1])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        info = getinfo(mhe)
+        @test info[:V̂] ≈ [-1,-1] atol=5e-2
+    end
+    test_bound_violation(mhe_soft)
+    test_bound_violation(mhe_hard)
 
     linmodel2 = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
     linmodel2 = setop!(linmodel2, uop=[10,50], yop=[50,30], dop=[5])
