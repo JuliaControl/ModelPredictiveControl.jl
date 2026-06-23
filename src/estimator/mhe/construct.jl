@@ -986,7 +986,8 @@ function setconstraint!(
     else
         i_b, i_g = init_matconstraint_mhe(
             model, Z̃min, Z̃max, con.nc, 
-            i_x̃min, i_x̃max, i_X̂min, i_X̂max, i_Ŵmin, i_Ŵmax, i_V̂min, i_V̂max
+            con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, 
+            con.Ŵmin,   con.Ŵmax,   con.V̂min,   con.V̂max
         )
         diff_Z̃min, diff_Z̃max = diff_infs(Z̃min, con.Z̃min), diff_infs(Z̃max, con.Z̃max)
         if i_b ≠ con.i_b || i_g ≠ con.i_g || diff_Z̃min || diff_Z̃max
@@ -1041,7 +1042,7 @@ function init_matconstraint_mhe(
     x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
     if isempty(args)
-        A = zeros(NT, length(b), 0)
+        A = nothing
     else
         A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max = args
         A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
@@ -1065,7 +1066,7 @@ function init_matconstraint_mhe(
     x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
     if isempty(args)
-        A = zeros(NT, length(b), 0)
+        A = nothing
     else
         A_x̂min, A_x̂max, _ , _ , A_Ŵmin, A_Ŵmax, _ , _ = args
         A = [A_x̂min; A_x̂max; A_Ŵmin; A_Ŵmax]
