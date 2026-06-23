@@ -1037,7 +1037,7 @@ finite numbers. `g` is a similar vector but for the indices of ``\mathbf{g}`` (e
 matrices: `A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max`.
 """
 function init_matconstraint_mhe(
-    ::LinModel{NT}, Z̃min, Z̃max, nc,
+    model::LinModel{NT}, Z̃min, Z̃max, nc,
     x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
     if isempty(args)
