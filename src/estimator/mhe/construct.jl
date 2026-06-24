@@ -922,15 +922,15 @@ function setconstraint!(
         if !isnothing(C_x̂min)
             size(C_x̂min) == (nX̂con,) || throw(DimensionMismatch("C_x̂min size must be $((nX̂con,))"))
             any(C_x̂min .< 0) && error("C_x̂min weights should be non-negative")
-            con.A_x̂min[:, begin] .= @views -C_x̂min[1:nx̂] 
-            con.C_x̂min .= @views C_x̂min[nx̂+1:end]
+            con.A_x̂min[:, begin] .= @. @views -C_x̂min[1:nx̂] 
+            con.C_x̂min .= @. @views C_x̂min[nx̂+1:end]
             size(con.A_X̂min, 1) ≠ 0 && (con.A_X̂min[:, begin] = -con.C_x̂min) # for LinModel
         end
         if !isnothing(C_x̂max)
             size(C_x̂max) == (nX̂con,) || throw(DimensionMismatch("C_x̂max size must be $((nX̂con,))"))
             any(C_x̂max .< 0) && error("C_x̂max weights should be non-negative")
-            con.A_x̂max[:, begin] .= @views -C_x̂max[1:nx̂]
-            con.C_x̂max .= @views C_x̂max[nx̂+1:end]
+            con.A_x̂max[:, begin] .= @. @views -C_x̂max[1:nx̂]
+            con.C_x̂max .= @. @views C_x̂max[nx̂+1:end]
             size(con.A_X̂max, 1) ≠ 0 && (con.A_X̂max[:, begin] = -con.C_x̂max) # for LinModel
         end
         if !isnothing(C_ŵmin)
