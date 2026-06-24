@@ -261,7 +261,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
   │ ├  0 unmeasured outputs yu
   │ └  0 measured disturbances d
   └ optimization:
-    ├ 51 decision variables Z̃ (1 slack variable)
+    ├ 51 decision variables Z̃ (1 slack variable, 1 bounds)
     ├  0 linear inequality constraints A (0 custom)
     ├ 20 linear equality constraints Aeq
     ├  0 nonlinear inequality constraints g (0 custom)
@@ -391,7 +391,7 @@ julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver
 
 julia> estim = UnscentedKalmanFilter(model, σQint_ym=[0.05]);
 
-julia> mpc = NonLinMPC(estim, Hp=20, Cwt=1e6)
+julia> mpc = NonLinMPC(estim, Hp=20, Cwt=1e4)
 NonLinMPC controller with a sample time Ts = 10.0 s:
 ├ estimator: UnscentedKalmanFilter
 ├ model: NonLinModel
@@ -409,7 +409,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
   │ ├  0 unmeasured outputs yu
   │ └  0 measured disturbances d
   └ optimization:
-    ├ 3 decision variables Z̃ (1 slack variable)
+    ├ 3 decision variables Z̃ (1 slack variable, 1 bounds)
     ├ 0 linear inequality constraints A (0 custom)
     ├ 0 linear equality constraints Aeq
     ├ 0 nonlinear inequality constraints g (0 custom)
