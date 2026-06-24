@@ -558,9 +558,6 @@ function setconstraint!(
     return mpc
 end
 
-"Verify that the `Inf` values in `Z̃new` are the same that in `Z̃old`."
-diff_infs(Z̃new, Z̃old) = any(isinf(x) ≠ isinf(y) for (x,y) in zip(Z̃new, Z̃old))
-
 "By default, no nonlinear constraints, return nothing."
 reset_nonlincon!(::PredictiveController) = nothing
 

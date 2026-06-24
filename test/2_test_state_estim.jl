@@ -1218,8 +1218,8 @@ end
     setconstraint!(mhe1, x̂min=[-51,-52], x̂max=[53,54])
     @test mhe1.con.X̂0min ≈ [-51,-52]
     @test mhe1.con.X̂0max ≈ [53,54]
-    @test mhe1.con.x̃0min[2:end] ≈ [-51,-52]
-    @test mhe1.con.x̃0max[2:end] ≈ [53,54]
+    @test mhe1.con.x̂0min ≈ [-51,-52]
+    @test mhe1.con.x̂0max ≈ [53,54]
     setconstraint!(mhe1, ŵmin=[-55,-56], ŵmax=[57,58])
     @test mhe1.con.Ŵmin ≈ [-55,-56]
     @test mhe1.con.Ŵmax ≈ [57,58]
@@ -1229,8 +1229,8 @@ end
     setconstraint!(mhe1, c_x̂min=[0.01,0.02], c_x̂max=[0.03,0.04])
     @test -mhe1.con.A_X̂min[:, begin] ≈ [0.01, 0.02]
     @test -mhe1.con.A_X̂max[:, begin] ≈ [0.03,0.04]
-    @test -mhe1.con.A_x̃min[2:end, begin] ≈ [0.01,0.02]
-    @test -mhe1.con.A_x̃max[2:end, begin] ≈ [0.03,0.04]
+    @test -mhe1.con.A_x̂min[:, begin] ≈ [0.01,0.02]
+    @test -mhe1.con.A_x̂max[:, begin] ≈ [0.03,0.04]
     setconstraint!(mhe1, c_ŵmin=[0.05,0.06], c_ŵmax=[0.07,0.08])
     @test -mhe1.con.A_Ŵmin[:, begin] ≈ [0.05, 0.06]
     @test -mhe1.con.A_Ŵmax[:, begin] ≈ [0.07,0.08]
@@ -1242,8 +1242,8 @@ end
     setconstraint!(mhe2, X̂min=-1(1:10), X̂max=1(1:10))
     @test mhe2.con.X̂0min ≈ -1(3:10)
     @test mhe2.con.X̂0max ≈ 1(3:10)
-    @test mhe2.con.x̃0min[2:end] ≈ -1(1:2)
-    @test mhe2.con.x̃0max[2:end] ≈ 1(1:2)
+    @test mhe2.con.x̂0min ≈ -1(1:2)
+    @test mhe2.con.x̂0max ≈ 1(1:2)
     setconstraint!(mhe2, Ŵmin=-1(11:18), Ŵmax=1(11:18))
     @test mhe2.con.Ŵmin ≈ -1(11:18)
     @test mhe2.con.Ŵmax ≈ 1(11:18)
@@ -1253,8 +1253,8 @@ end
     setconstraint!(mhe2, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
     @test -mhe2.con.A_X̂min[:, begin] ≈ 0.01(3:10)
     @test -mhe2.con.A_X̂max[:, begin] ≈ 0.02(3:10)
-    @test -mhe2.con.A_x̃min[2:end, begin] ≈ 0.01(1:2)
-    @test -mhe2.con.A_x̃max[2:end, begin] ≈ 0.02(1:2)
+    @test -mhe2.con.A_x̂min[:, begin] ≈ 0.01(1:2)
+    @test -mhe2.con.A_x̂max[:, begin] ≈ 0.02(1:2)
     setconstraint!(mhe2, C_ŵmin=0.03(11:18), C_ŵmax=0.04(11:18))
     @test -mhe2.con.A_Ŵmin[:, begin] ≈ 0.03(11:18)
     @test -mhe2.con.A_Ŵmax[:, begin] ≈ 0.04(11:18)
@@ -1519,8 +1519,8 @@ end
     @test mhe.x̂0arr_old ≈ [3.0 - 8.0]
     @test mhe.con.X̂0min ≈ repeat([-1000 - 8.0], He)
     @test mhe.con.X̂0max ≈ repeat([+1000 - 8.0], He)
-    @test mhe.con.x̃0min ≈ [-1000 - 8.0]
-    @test mhe.con.x̃0max ≈ [+1000 - 8.0]
+    @test mhe.con.x̂0min ≈ [-1000 - 8.0]
+    @test mhe.con.x̂0max ≈ [+1000 - 8.0]
     setmodel!(mhe, Q̂=[1e-3], R̂=[1e-6])
     @test mhe.cov.Q̂ ≈ [1e-3]
     @test mhe.cov.invQ̂_He ≈ diagm(repeat([1e3], He))
