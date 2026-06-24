@@ -38,9 +38,11 @@ function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n; firstchars=no
         nA = sum(estim.con.i_b)
         ng, nc = sum(estim.con.i_g), estim.con.nc 
         m = maximum(ndigits.((nZ̃, nA, ng))) + 1
+        i_nZ̃min, i_nZ̃max = @. !isinf(estim.con.Z̃min), !isinf(estim.con.Z̃max)
+        nZ̃bounds = sum(i_nZ̃min) + sum(i_nZ̃max)
         println(io)
         println(io, "  └ optimization:")
-        println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nε slack variable)")
+        println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nε slack variable, $nZ̃bounds bounds)")
         println(io, "    ├$(lpad(nA, m)) linear inequality constraints A")
         print(io,   "    └$(lpad(ng, m)) nonlinear inequality constraints g ($nc custom)")
     end
