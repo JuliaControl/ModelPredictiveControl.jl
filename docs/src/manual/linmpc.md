@@ -293,3 +293,102 @@ savefig("plot4_LinMPC.svg"); nothing # hide
 Note that measured disturbances are assumed constant in the future by default but custom
 ``\mathbf{D̂}`` predictions are possible. The same applies for the setpoint predictions
 ``\mathbf{R̂_y}``.
+
+## Generating C code
+
+The [`LinearMPC.jl`](@extref LinearMPC) package extension provides code generation
+capabilities to export the controller as optimized and standalone C code. First, install the
+package with:
+
+```test
+using Pkg; Pkg.add("LinearMPC")
+```
+
+The feedforward MPC controller can be converted to a [`LinearMPC.MPC`](@ref) object using:
+
+```@example 1
+import LinearMPC
+c_mpc_d = LinearMPC.MPC(mpc_d);
+nothing # hide
+```
+
+We test the converted controller in closed-loop to verify that it behaves identically to the
+original one, notably because of the two different solvers:
+
+```@example 1
+function test_c_mpc_d(c_mpc_d, model)
+    N = 200
+    ry, ul = [50, 30], 0
+    dop = 20
+    u = model.uop
+    u_data, y_data, ry_data = zeros(model.nu, N), zeros(model.ny, N), zeros(model.ny, N)
+    for i = 1:N
+        i == 51  && (ry = [50, 35])
+        i == 101 && (ry = [54, 30])
+        i == 151 && (ul = -20)
+        d = [ul .+ dop]
+        y = model()
+        x̂ = LinearMPC.correct_state!(c_mpc_d, y, d)
+        u = LinearMPC.compute_control(c_mpc_d, x̂; r=ry, d=d, uprev=u)
+        u_data[:,i], y_data[:,i], ry_data[:,i] = u, y, ry
+        LinearMPC.predict_state!(c_mpc_d, u, d)
+        updatestate!(model, u + [0; ul])
+    end
+    return u_data, y_data, ry_data
+end
+setstate!(model, zeros(model.nx))
+LinearMPC.set_state!(c_mpc_d, zeros(c_mpc_d.model.nx))
+u_data, y_data, ry_data = test_c_mpc_d(c_mpc_d, model)
+plot_data(t_data, u_data, y_data, ry_data)
+savefig("plot5_LinMPC.svg"); nothing # hide
+```
+
+![plot5_LinMPC](plot5_LinMPC.svg)
+
+The closed-loop simulation matches the results of the previous section, as expected. We
+can now generate the C code using:
+
+```@example 1
+LinearMPC.codegen(c_mpc_d; dir="codegen", fname="mpc_funcs")
+```
+
+The three C functions to call at each control period are declared in the generated
+`codegen/mpc_funcs.h` file, and they receive pointers of `c_float` arrays:
+
+```C
+void mpc_correct_state(c_float* state, c_float* measurement, c_float* disturbance);  
+int mpc_compute_control(c_float* control, c_float* state, c_float* reference, c_float* disturbance);
+void mpc_predict_state(c_float* state, c_float* control, c_float* disturbance);
+```
+
+For example, on Linux, you can add the following code in a new `main.c` file:
+
+```C
+#include "mpc_funcs.h" 
+#include <stdio.h>
+int main(){
+    // initialize arrays:
+    c_float u[2] = {20, 20};
+    c_float x[6] = {0, 0, 0, 0, 0, 0};
+    c_float r[2] = {50, 35};
+    c_float y[2] = {50, 30};
+    c_float d[1] = {20};
+    // execute one control period:
+    mpc_correct_state(x, y, d);
+    mpc_compute_control(u, x, r, d);
+    mpc_predict_state(x, u, d);
+    // print the computed control:
+    printf("The computed u value is: [%f, %f]\n", u[0], u[1]);
+    return 0;
+}
+```
+
+compile it using `gcc *.c -o main.bin` and run it with `./main.bin`. The printed `u` value
+should be identical to:
+
+```@example 1
+LinearMPC.set_state!(c_mpc_d, zeros(c_mpc_d.model.nx))
+x̂ = LinearMPC.correct_state!(c_mpc_d, [50, 30], [20])
+u = LinearMPC.compute_control(c_mpc_d, x̂; r=[50, 35], d=[20], uprev=[20, 20])
+println("The computed u value is: $(round.(u, digits=6))")
+```

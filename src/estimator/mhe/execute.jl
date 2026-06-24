@@ -30,8 +30,8 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     nd > 0 && (estim.D0[1:nd] .= d0) # add d0(-1) to the data window
     estim.lastu0 .= u0
     # estim.cov.P̂_0 is P̂(-1|-1) if estim.direct==false, else P̂(-1|0)
-    invert_cov!(estim, estim.cov.P̂_0)
     estim.P̂arr_old  .= estim.cov.P̂_0
+    invert_cov!(estim, estim.covestim)
     estim.x̂0arr_old .= 0
     return nothing
 end
@@ -419,23 +419,23 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     # --- truncate vector and matrices if necessary ---
     if Nk < estim.He
         # avoid views since allocations only when Nk < He and we want fast mul!:
-        Y0m, B = estim.Y0m[1:nYm],     estim.B[1:nYm]
-        G, U0  = estim.G[1:nYm, 1:nU], estim.U0[1:nU]
-        J, D0  = estim.J[1:nYm, 1:nD], estim.D0[1:nD]
-        Ẽ, ẽx̄  = estim.Ẽ[1:nYm, 1:nZ̃], estim.ẽx̄[:, 1:nZ̃]
-        F, q̃   = @views estim.F[1:nYm], estim.q̃[1:nZ̃]
-        H̃_data = @views estim.H̃.data[1:nZ̃, 1:nZ̃]
-        H̃      = @views estim.H̃[1:nZ̃, 1:nZ̃]
-        Z̃var   = @views optim[:Z̃var][1:nZ̃]
+        Y0m, B     = estim.Y0m[1:nYm],     estim.B[1:nYm]
+        G, U0      = estim.G[1:nYm, 1:nU], estim.U0[1:nU]
+        J, D0      = estim.J[1:nYm, 1:nD], estim.D0[1:nD]
+        Ẽ, ẽx̄      = estim.Ẽ[1:nYm, 1:nZ̃], estim.ẽx̄[:, 1:nZ̃]
+        F, q̃       = @views estim.F[1:nYm], estim.q̃[1:nZ̃]
+        H̃_data     = @views estim.H̃.data[1:nZ̃, 1:nZ̃]
+        H̃          = @views estim.H̃[1:nZ̃, 1:nZ̃]
+        Z̃var       = @views optim[:Z̃var][1:nZ̃]
     else
-        Y0m, B = estim.Y0m, estim.B
-        G, U0  = estim.G, estim.U0
-        J, D0  = estim.J, estim.D0
-        Ẽ, ẽx̄  = estim.Ẽ, estim.ẽx̄
-        F, q̃   = estim.F, estim.q̃
-        H̃_data = estim.H̃.data
-        H̃      = estim.H̃
-        Z̃var   = optim[:Z̃var]
+        Y0m, B     = estim.Y0m, estim.B
+        G, U0      = estim.G, estim.U0
+        J, D0      = estim.J, estim.D0
+        Ẽ, ẽx̄      = estim.Ẽ, estim.ẽx̄
+        F, q̃       = estim.F, estim.q̃
+        H̃_data     = estim.H̃.data
+        H̃          = estim.H̃
+        Z̃var       = optim[:Z̃var]
     end
     invQ̂_Nk = trunc_cov(invQ̂_He, nx̂, Nk, estim.He)
     invR̂_Nk = trunc_cov(invR̂_He, nym, Nk, estim.He)
@@ -497,12 +497,12 @@ function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
     model.nd > 0 && mul!(Fx̂, Jx̂, D0, 1, 1)
     # --- update b vector for linear inequality constraints ---
     nX̂_He, nŴ_He, nV̂_He = length(X̂0min), length(Ŵmin), length(V̂min)
-    nx̃ = length(estim.con.x̃0min)
+    nx̂ = length(estim.con.x̂0min)
     n = 0
-    estim.con.b[(n+1):(n+nx̃)] .= @. -estim.con.x̃0min
-    n += nx̃
-    estim.con.b[(n+1):(n+nx̃)] .= @. +estim.con.x̃0max
-    n += nx̃
+    estim.con.b[(n+1):(n+nx̂)] .= @. -estim.con.x̂0min
+    n += nx̂
+    estim.con.b[(n+1):(n+nx̂)] .= @. +estim.con.x̂0max
+    n += nx̂
     estim.con.b[(n+1):(n+nX̂_He)] .= @. -X̂0min + estim.con.Fx̂
     n += nX̂_He
     estim.con.b[(n+1):(n+nX̂_He)] .= @. +X̂0max - estim.con.Fx̂
@@ -526,12 +526,12 @@ function linconstraint!(estim::MovingHorizonEstimator, ::SimModel)
     # --- truncate vector and matrices if necessary ---
     Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, estim.nx̂)
     # --- update b vector for linear inequality constraints ---
-    nx̃, nŴ_He = length(estim.con.x̃0min), length(Ŵmin)
+    nx̂, nŴ_He = length(estim.con.x̂0min), length(Ŵmin)
     n = 0
-    estim.con.b[(n+1):(n+nx̃)] .= @. -estim.con.x̃0min
-    n += nx̃
-    estim.con.b[(n+1):(n+nx̃)] .= @. +estim.con.x̃0max
-    n += nx̃
+    estim.con.b[(n+1):(n+nx̂)] .= @. -estim.con.x̂0min
+    n += nx̂
+    estim.con.b[(n+1):(n+nx̂)] .= @. +estim.con.x̂0max
+    n += nx̂
     estim.con.b[(n+1):(n+nŴ_He)] .= @. -Ŵmin
     n += nŴ_He
     estim.con.b[(n+1):(n+nŴ_He)] .= @. +Ŵmax
@@ -709,7 +709,7 @@ function correct_cov!(estim::MovingHorizonEstimator)
         correct_estimate!(estim.covestim, y0marr, d0arr)
         all(isfinite, estim.covestim.cov.P̂) || error("Arrival covariance P̄ is not finite")
         estim.P̂arr_old .= estim.covestim.cov.P̂
-        invert_cov!(estim, estim.P̂arr_old)
+        invert_cov!(estim, estim.covestim)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not positive definite: keeping the old one")
@@ -736,7 +736,7 @@ function update_cov!(estim::MovingHorizonEstimator)
         update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
         all(isfinite, estim.covestim.cov.P̂) || error("Arrival covariance P̄ is not finite")
         estim.P̂arr_old .= estim.covestim.cov.P̂
-        invert_cov!(estim, estim.P̂arr_old)
+        invert_cov!(estim, estim.covestim)
     catch err
         if err isa PosDefException
             @error("Arrival covariance P̄ is not positive definite: keeping the old one")
@@ -749,8 +749,9 @@ function update_cov!(estim::MovingHorizonEstimator)
     return nothing
 end
 
-"Invert the covariance estimate at arrival `P̄`."
-function invert_cov!(estim::MovingHorizonEstimator, P̄)
+"Invert the covariance estimate at arrival `P̄` and store it in `estim.cov.invP̄`."
+function invert_cov!(estim::MovingHorizonEstimator, covestim::StateEstimator)
+    P̄ = estim.P̂arr_old
     estim.cov.invP̄ .= P̄
     try
         inv!(estim.cov.invP̄)
@@ -763,6 +764,9 @@ function invert_cov!(estim::MovingHorizonEstimator, P̄)
     end
     return nothing
 end
+"Do nothing if `covestim` is a [`SteadyKalmanFilter`]."
+invert_cov!(::MovingHorizonEstimator, ::SteadyKalmanFilter) = nothing
+
 
 """
     obj_nonlinprog(estim::MovingHorizonEstimator, ::LinModel, _ , _ , _ , Z̃) 
@@ -1055,6 +1059,7 @@ function setmodel_estimator!(
 )
     con = estim.con
     nx̂, nym, nu, nd, He, nε = estim.nx̂, estim.nym, model.nu, model.nd, estim.He, estim.nε
+    nŵ = nx̂
     As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
     Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y, verify_obsv=false)
     # --- update augmented state-space matrices ---
@@ -1088,18 +1093,18 @@ function setmodel_estimator!(
     con.Gx̂ .= Gx̂
     con.Jx̂ .= Jx̂
     con.Bx̂ .= Bx̂
-    # convert x̃0 to x̃ with the old operating point:
-    con.x̃0min[end-nx̂+1:end] .+= x̂op_old 
-    con.x̃0max[end-nx̂+1:end] .+= x̂op_old
+    # convert x̂0 to x̂ with the old operating point:
+    con.x̂0min .+= x̂op_old 
+    con.x̂0max .+= x̂op_old
     # convert X̂0 to X̂ with the old operating point:
     con.X̂0min .+= estim.X̂op
     con.X̂0max .+= estim.X̂op
     for i in 0:He-1
         estim.X̂op[(1+nx̂*i):(nx̂+nx̂*i)] .= estim.x̂op
     end
-    # convert x̃ to x̃0 with the new operating point:
-    con.x̃0min[end-nx̂+1:end] .-= estim.x̂op 
-    con.x̃0max[end-nx̂+1:end] .-= estim.x̂op 
+    # convert x̂ to x̂0 with the new operating point:
+    con.x̂0min .-= estim.x̂op 
+    con.x̂0max .-= estim.x̂op 
     # convert X̂ to X̂0 with the new operating point:
     con.X̂0min .-= estim.X̂op
     con.X̂0max .-= estim.X̂op
@@ -1108,8 +1113,8 @@ function setmodel_estimator!(
     con.A_V̂min .= A_V̂min
     con.A_V̂max .= A_V̂max
     con.A .= [
-        con.A_x̃min
-        con.A_x̃max
+        con.A_x̂min
+        con.A_x̂max
         con.A_X̂min
         con.A_X̂max
         con.A_Ŵmin
@@ -1117,12 +1122,25 @@ function setmodel_estimator!(
         con.A_V̂min
         con.A_V̂max
     ]
+    Z̃min, Z̃max = init_boxconstraint_mhe(
+        model, He, nx̂, nŵ, nε,
+        con.x̂0min,  con.x̂0max,  con.Ŵmin,   con.Ŵmax, 
+        con.A_x̂min, con.A_x̂max, con.A_Ŵmin, con.A_Ŵmax 
+    )
+    con.Z̃min .= Z̃min
+    con.Z̃max .= Z̃max
+    Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
     A = con.A[con.i_b, :]
     b = zeros(count(con.i_b)) # dummy value, updated before optimization (avoid ±Inf)
-    Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
+    # deletion is required for sparse solvers like OSQP, when the sparsity pattern changes
     JuMP.delete(estim.optim, estim.optim[:linconstraint])
     JuMP.unregister(estim.optim, :linconstraint)
     @constraint(estim.optim, linconstraint, A*Z̃var .≤ b)
+    for i in eachindex(Z̃var)
+        # deletion not required here since changing op. pts won't change finite status
+        !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
+        !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i])
+    end
     # --- data windows ---
     for i in 1:He 
         # convert y0m to ym with the old operating point:

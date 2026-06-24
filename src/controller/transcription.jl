@@ -829,8 +829,8 @@ end
 
 @doc raw"""
     init_matconstraint_mpc(
-        model::LinModel, transcription::TranscriptionMethod, nc::Int,
-        i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+        model::LinModel, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ 
+        U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
         args...
     ) -> i_b, i_g, A, Aeq, neq
 
@@ -850,12 +850,12 @@ The argument `nc` is the number of custom nonlinear inequality constraints in
 finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
 also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a 
 case, `args`  needs to contain all the inequality and equality constraint matrices: 
-`A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq`. 
+`A_Umin, A_Umax, A_ΔUmin, A_ΔUmax, A_Ymin, A_Ymax, A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq`. 
 The integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
-    ::LinModel{NT}, ::TranscriptionMethod, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+    model::LinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
+    U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
     if isempty(args)
@@ -863,7 +863,7 @@ function init_matconstraint_mpc(
     else
         (
             A_Umin,  A_Umax, 
-            A_ΔŨmin, A_ΔŨmax, 
+            A_ΔUmin, A_ΔUmax, 
             A_Ymin,  A_Ymax, 
             A_Wmin,  A_Wmax,
             A_x̂min,  A_x̂max,  
@@ -871,54 +871,121 @@ function init_matconstraint_mpc(
         ) = args
         A = [
             A_Umin;  A_Umax; 
-            A_ΔŨmin; A_ΔŨmax; 
+            A_ΔUmin; A_ΔUmax; 
             A_Ymin;  A_Ymax; 
-            A_Wmin;  A_Wmax
+            A_Wmin;  A_Wmax;
             A_x̂min;  A_x̂max;
         ]
         neq = 0 # number of nonlinear equality constraints
     end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
+    i_Umin,  i_Umax  = @. !isinf(U0min), !isinf(U0max)
+    i_ΔUmin, i_ΔUmax = @. !isinf(ΔUmin), !isinf(ΔUmax)
+    i_Ymin,  i_Ymax  = @. !isinf(Y0min), !isinf(Y0max)
+    i_Wmin,  i_Wmax  = @. !isinf(Wmin),  !isinf(Wmax)
+    i_x̂min,  i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    nΔU, nX̂ = length(ΔUmin), length(x̂0min)*length(Y0min)÷model.ny 
+    deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, model, transcription, Z̃min, Z̃max)
+    deletex̂end_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
+    i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Ymin; i_Ymax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]    
     i_g = trues(nc)
     return i_b, i_g, A, Aeq, neq
 end
 
 "Init `i_b` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
 function init_matconstraint_mpc(
-    ::NonLinModel{NT}, ::SingleShooting, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+    model::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc, nϵ,
+    U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, _ , _ , Aeq = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax]
+        A_Umin, A_Umax, A_ΔUmin, A_ΔUmax, _ , _ , A_Wmin, A_Wmax, _ , _ , Aeq = args
+        A   = [A_Umin; A_Umax; A_ΔUmin; A_ΔUmax; A_Wmin; A_Wmax]
         neq = 0 # number of nonlinear equality constraints
     end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Wmin; i_Wmax]
-    i_g = [i_Ymin; i_Ymax; i_x̂min;  i_x̂max; trues(nc)]
+    i_Umin,  i_Umax  = @. !isinf(U0min), !isinf(U0max)
+    i_ΔUmin, i_ΔUmax = @. !isinf(ΔUmin), !isinf(ΔUmax)
+    i_Ymin,  i_Ymax  = @. !isinf(Y0min), !isinf(Y0max)
+    i_Wmin,  i_Wmax  = @. !isinf(Wmin),  !isinf(Wmax)
+    i_x̂min,  i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    nΔU, nX̂ = length(ΔUmin), length(x̂0min)*length(Y0min)÷model.ny 
+    deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, model, transcription, Z̃min, Z̃max)
+    deletex̂end_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
+    i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Wmin; i_Wmax]
+    i_g = [i_Ymin; i_Ymax; i_x̂min; i_x̂max; trues(nc)]
     return i_b, i_g, A, Aeq, neq
 end
 
 "Init `i_b` without output constraints if `NonLinModel` and other `TranscriptionMethod`."
 function init_matconstraint_mpc(
-    ::NonLinModel{NT}, ::TranscriptionMethod, nc::Int,
-    i_Umin, i_Umax, i_ΔŨmin, i_ΔŨmax, i_Ymin, i_Ymax, i_Wmin, i_Wmax, i_x̂min, i_x̂max,
+    model::NonLinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
+    U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else    
-        A_Umin, A_Umax, A_ΔŨmin, A_ΔŨmax, _ , _ , A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq = args
-        A   = [A_Umin; A_Umax; A_ΔŨmin; A_ΔŨmax; A_Wmin; A_Wmax; A_x̂min; A_x̂max]
-        nΔŨ, nZ̃ = size(A_ΔŨmin)
-        neq = nZ̃ - nΔŨ - size(Aeq, 1)  # number of nonlinear equality constraints
+        A_Umin, A_Umax, A_ΔUmin, A_ΔUmax, _ , _ , A_Wmin, A_Wmax, A_x̂min, A_x̂max, Aeq = args
+        A   = [A_Umin; A_Umax; A_ΔUmin; A_ΔUmax; A_Wmin; A_Wmax; A_x̂min; A_x̂max]
+        nΔU, nZ̃ = size(A_ΔUmin)
+        nAeq = size(Aeq, 1)             # number of linear equality constraint
+        neq  = nZ̃ - nΔU - nϵ - nAeq     # number of nonlinear equality constraints
     end
-    i_b = [i_Umin; i_Umax; i_ΔŨmin; i_ΔŨmax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
+    i_Umin,  i_Umax  = @. !isinf(U0min), !isinf(U0max)
+    i_ΔUmin, i_ΔUmax = @. !isinf(ΔUmin), !isinf(ΔUmax)
+    i_Ymin,  i_Ymax  = @. !isinf(Y0min), !isinf(Y0max)
+    i_Wmin,  i_Wmax  = @. !isinf(Wmin),  !isinf(Wmax)
+    i_x̂min,  i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    nΔU, nX̂ = length(ΔUmin), length(x̂0min)*length(Y0min)÷model.ny 
+    deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, model, transcription, Z̃min, Z̃max)
+    deletex̂end_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nΔU, nX̂)
+    i_b = [i_Umin; i_Umax; i_ΔUmin; i_ΔUmax; i_Wmin; i_Wmax; i_x̂min; i_x̂max]
     i_g = [i_Ymin; i_Ymax; trues(nc)]
     return i_b, i_g, A, Aeq, neq
+end 
+
+"Modify `Z̃min` and `Z̃max` in-place to include terminal constraint if applicable."
+function boxconstraint_terminal!(
+    Z̃min, Z̃max, ::TranscriptionMethod, nΔU, nX̂, nϵ, x̂0min, x̂0max, A_x̂min, A_x̂max, 
+)
+    nx̂ = length(x̂0min)
+    i_base = nΔU + nX̂ - nx̂
+    if nϵ > 0
+        n_C_x̂min = @views A_x̂min[:, end]
+        n_C_x̂max = @views A_x̂max[:, end]
+        for i in eachindex(x̂0min)
+            iszero(n_C_x̂min[i]) && (Z̃min[i_base + i] = x̂0min[i])
+        end
+        for i in eachindex(x̂0max)
+            iszero(n_C_x̂max[i]) && (Z̃max[i_base + i] = x̂0max[i])
+        end
+    else
+        Z̃min[i_base+1:i_base+nx̂] .= x̂0min
+        Z̃max[i_base+1:i_base+nx̂] .= x̂0max
+    end
+    return Z̃min, Z̃max
 end
+boxconstraint_terminal!(Z̃min, Z̃max, ::SingleShooting, _, _ , _, _, _, _, _) = Z̃min, Z̃max
+
+"Unset `i_ΔUmin` and `i_ΔUmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
+function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max)
+    nΔU = length(i_ΔUmin)
+    ΔUmin, ΔUmax = @views Z̃min[1:nΔU], @views Z̃max[1:nΔU]
+    foreach(i -> !isinf(ΔUmin[i]) && (i_ΔUmin[i] = false), eachindex(ΔUmin))
+    foreach(i -> !isinf(ΔUmax[i]) && (i_ΔUmax[i] = false), eachindex(ΔUmax))
+    return i_ΔUmin, i_ΔUmax
+end 
+
+"Unset `i_x̂min` and `i_x̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
+function deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
+    nx̂ = length(i_x̂min)
+    x̂0min, x̂0max = @views Z̃min[nΔU+nX̂-nx̂+1:nΔU+nX̂], @views Z̃max[nΔU+nX̂-nx̂+1:nΔU+nX̂]
+    foreach(i -> !isinf(x̂0min[i]) && (i_x̂min[i] = false), eachindex(x̂0min))
+    foreach(i -> !isinf(x̂0max[i]) && (i_x̂max[i] = false), eachindex(x̂0max))
+    return i_x̂min, i_x̂max
+end
+deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)
@@ -931,7 +998,7 @@ Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d_0}(k) + \mathbf{j_x̂ D̂_0} + \mat
 also updated, see [`relaxW`](@ref).
 """
 function linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
-    nU, nΔŨ, nY = length(mpc.con.U0min), length(mpc.con.ΔŨmin), length(mpc.con.Y0min)
+    nU, nΔU, nY = length(mpc.con.U0min), length(mpc.con.ΔUmin), length(mpc.con.Y0min)
     nW = length(mpc.con.Wmin)
     nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
     fx̂ .= mpc.con.bx̂
@@ -947,10 +1014,10 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
     n += nU
     mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
     n += nU
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
-    n += nΔŨ
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
-    n += nΔŨ
+    mpc.con.b[(n+1):(n+nΔU)] .= @. -mpc.con.ΔUmin
+    n += nΔU
+    mpc.con.b[(n+1):(n+nΔU)] .= @. +mpc.con.ΔUmax
+    n += nΔU
     mpc.con.b[(n+1):(n+nY)]  .= @. -mpc.con.Y0min + mpc.F
     n += nY
     mpc.con.b[(n+1):(n+nY)]  .= @. +mpc.con.Y0max - mpc.F
@@ -971,7 +1038,7 @@ end
 
 "Set `b` excluding predicted output constraints for `NonLinModel` and not `SingleShooting`."
 function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod)
-    nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
+    nU, nΔU = length(mpc.con.U0min), length(mpc.con.ΔUmin)
     nW = length(mpc.con.Wmin)
     nx̂ = mpc.estim.nx̂
     # here, updating fx̂ is not necessary since fx̂ = 0
@@ -981,10 +1048,10 @@ function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::Transcr
     n += nU
     mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
     n += nU
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
-    n += nΔŨ
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
-    n += nΔŨ
+    mpc.con.b[(n+1):(n+nΔU)] .= @. -mpc.con.ΔUmin
+    n += nΔU
+    mpc.con.b[(n+1):(n+nΔU)] .= @. +mpc.con.ΔUmax
+    n += nΔU
     mpc.con.b[(n+1):(n+nW)]  .= @. -mpc.con.Wmin + mpc.con.Fw
     n += nW
     mpc.con.b[(n+1):(n+nW)]  .= @. +mpc.con.Wmax - mpc.con.Fw
@@ -1000,7 +1067,7 @@ end
 
 "Also exclude terminal constraints for `NonLinModel` and `SingleShooting`."
 function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::SingleShooting)
-    nU, nΔŨ = length(mpc.con.U0min), length(mpc.con.ΔŨmin)
+    nU, nΔU = length(mpc.con.U0min), length(mpc.con.ΔUmin)
     nW = length(mpc.con.Wmin)
     linconstraint_custom!(mpc, model)
     n = 0
@@ -1008,10 +1075,10 @@ function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::SingleS
     n += nU
     mpc.con.b[(n+1):(n+nU)]  .= @. +mpc.con.U0max - mpc.Tu_lastu0
     n += nU
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. -mpc.con.ΔŨmin
-    n += nΔŨ
-    mpc.con.b[(n+1):(n+nΔŨ)] .= @. +mpc.con.ΔŨmax
-    n += nΔŨ
+    mpc.con.b[(n+1):(n+nΔU)] .= @. -mpc.con.ΔUmin
+    n += nΔU
+    mpc.con.b[(n+1):(n+nΔU)] .= @. +mpc.con.ΔUmax
+    n += nΔU
     mpc.con.b[(n+1):(n+nW)]  .= @. -mpc.con.Wmin + mpc.con.Fw
     n += nW
     mpc.con.b[(n+1):(n+nW)]  .= @. +mpc.con.Wmax - mpc.con.Fw
@@ -1421,11 +1488,10 @@ defects of the deterministic states are computed with:
                       - \mathbf{x̂_d}(k+j+1)
 ```
 for ``j = 0, 1, ... , H_p-1`` and in which the deterministic state ``\mathbf{x̂_d}`` are the
-first `model.nx` elements of the augmented states ``\mathbf{x̂_0}``, and they extracted from
-the decision variable `Z̃`. The function ``\mathbf{f}`` is the deterministic state update
-function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref)
-documentation. The defects of the stochastic states are linear equality constraints (see
-[`init_defectmat`](@ref)).
+first `model.nx` elements of the augmented states ``\mathbf{x̂_0}``, and they are
+extracted from the decision variable `Z̃`. The function ``\mathbf{f}`` is the deterministic
+state update function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is defined in
+[`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq!(
     geq, X̂0, Û0, K, 
@@ -1562,7 +1628,7 @@ deterministic states extracted from ``\mathbf{X̂_0}`` also in `Z̃`, and they c
 states at the beginning of the interval ``τ_0=0``. The ``\mathbf{k̇}_i`` derivative for the
 ``i``th collocation point is computed from the continuous-time function `model.f!` and:
 ```math
-\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û_i}(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
+\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û}_i(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
 ```
 Based on the normalized time ``τ_i ∈ [0, 1]`` and hold order `transcription.h`, the inputs
 and disturbances are piecewise constant or linear:

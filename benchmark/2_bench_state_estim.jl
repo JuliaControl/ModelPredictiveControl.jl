@@ -146,6 +146,7 @@ UNIT_ESTIM["ExtendedKalmanFilter"]["evaloutput"]["NonLinModel"] =
 
 mhe_lin_curr    = MovingHorizonEstimator(linmodel, He=10, direct=true)
 mhe_lin_pred    = MovingHorizonEstimator(linmodel, He=10, direct=false)
+mhe_lin_skf    = MovingHorizonEstimator(linmodel, He=10, covestim=SteadyKalmanFilter(linmodel))
 mhe_nonlin_curr = MovingHorizonEstimator(nonlinmodel, He=10, direct=true)
 mhe_nonlin_pred = MovingHorizonEstimator(nonlinmodel, He=10, direct=false)
 
@@ -159,6 +160,17 @@ UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Current form"]
     @benchmarkable(
         updatestate!($mhe_lin_curr, $u, $y, $d),
         setup=preparestate!($mhe_lin_curr, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Constant arr. cov."] =
+    @benchmarkable(
+        preparestate!($mhe_lin_skf, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Constant arr. cov."] = 
+    @benchmarkable(
+        updatestate!($mhe_lin_skf, $u, $y, $d),
+        setup=preparestate!($mhe_lin_skf, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
 UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Prediction form"] =
@@ -236,13 +248,13 @@ end
 He = 4; nint_u = [1, 1]; σQint_u = [1, 2]
 v̂min, v̂max = [-1, -0.5], [+1, +0.5]
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 direct = true
 mhe_cstr_osqp_curr = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
 mhe_cstr_osqp_curr = setconstraint!(mhe_cstr_osqp_curr; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_cstr_osqp_curr.optim)
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 direct = false
 mhe_cstr_osqp_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
 mhe_cstr_osqp_pred = setconstraint!(mhe_cstr_osqp_pred; v̂min, v̂max)
@@ -260,18 +272,6 @@ mhe_cstr_daqp_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, 
 mhe_cstr_daqp_pred = setconstraint!(mhe_cstr_daqp_pred; v̂min, v̂max)
 JuMP.set_attribute(mhe_cstr_daqp_pred.optim, "eps_prox", 1e-6) # needed to support hessians H≥0
 
-optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
-direct = true
-mhe_cstr_ipopt_curr = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
-mhe_cstr_ipopt_curr = setconstraint!(mhe_cstr_ipopt_curr; v̂min, v̂max)
-JuMP.unset_time_limit_sec(mhe_cstr_ipopt_curr.optim)
-
-optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
-direct = false
-mhe_cstr_ipopt_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
-mhe_cstr_ipopt_pred = setconstraint!(mhe_cstr_ipopt_pred; v̂min, v̂max)
-JuMP.unset_time_limit_sec(mhe_cstr_ipopt_pred.optim)
-
 samples, evals = 10000, 1
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Current form"] =
     @benchmarkable(test_mhe($mhe_cstr_osqp_curr, $plant); 
@@ -287,14 +287,6 @@ CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["DAQP"]["Current form"] =
     )
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["DAQP"]["Prediction form"] =
     @benchmarkable(test_mhe($mhe_cstr_daqp_pred, $plant);
-        samples=samples, evals=evals
-    )
-CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
-    @benchmarkable(test_mhe($mhe_cstr_ipopt_curr, $plant); 
-        samples=samples, evals=evals
-    )
-CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["Ipopt"]["Prediction form"] =
-    @benchmarkable(test_mhe($mhe_cstr_ipopt_pred, $plant);
         samples=samples, evals=evals
     )
 

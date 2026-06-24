@@ -533,14 +533,16 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     return mpc.Z̃
 end
 
-"By default, no need to update the objective function."
-set_objective_linear_coef!(::PredictiveController, ::SimModel, _ ) = nothing
 
-"Update the linear coefficients of the quadratic objective with `mpc.q̃` if applicable."
+"By default, no need to update the objective function."
+set_objective_linear_coef!(::PredictiveController, ::SimModel, _) = nothing
+
+"Update the linear coefficients of the quadratic objective with `mpc.q̃` for `LinModel`."
 function set_objective_linear_coef!(mpc::PredictiveController, ::LinModel, Z̃var)
     mpc.weights.iszero_E && JuMP.set_objective_coefficient(mpc.optim, Z̃var, mpc.q̃)
     return nothing
 end
+
 
 """
     preparestate!(mpc::PredictiveController, ym, d=[]) -> x̂
@@ -756,8 +758,8 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.A .= [
         con.A_Umin
         con.A_Umax 
-        con.A_ΔŨmin 
-        con.A_ΔŨmax 
+        con.A_ΔUmin 
+        con.A_ΔUmax 
         con.A_Ymin  
         con.A_Ymax 
         con.A_x̂min  
@@ -784,6 +786,14 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     con.Y0max .-= mpc.Yop # convert Y to Y0 with the new operating point
     con.x̂0min .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     con.x̂0max .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    # --- box constraints ---
+    Z̃min, Z̃max = init_boxconstraint_mpc(
+        estim, transcription, Hp, Hc, mpc.nϵ,
+        con.ΔUmin, con.ΔUmax, con.x̂0min, con.x̂0max, 
+        con.A_ΔUmin, con.A_ΔUmax, con.A_x̂min, con.A_x̂max 
+    )
+    con.Z̃min .= Z̃min
+    con.Z̃max .= Z̃max
     # --- quadratic programming Hessian matrix ---
     # do not verify the condition number of the Hessian here:
     H̃ = init_quadprog(model, transcription, weights, mpc.Ẽ, mpc.P̃Δu, mpc.P̃u; warn_cond=Inf)
@@ -796,6 +806,11 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     JuMP.delete(optim, optim[:linconstraint])
     JuMP.unregister(optim, :linconstraint)
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
+    for i in eachindex(Z̃var)
+        # deletion not required here since changing op. pts won't change finite status
+        !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
+        !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i])
+    end
     JuMP.delete(optim, optim[:linconstrainteq])
     JuMP.unregister(optim, :linconstrainteq)
     @constraint(optim, linconstrainteq, con.Aeq*Z̃var .== con.beq)

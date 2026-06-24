@@ -866,7 +866,20 @@ end
 
     linmodel2 = LinModel{Float32}(0.5*ones(1,1), ones(1,1), ones(1,1), zeros(1,0), zeros(1,0), 1.0)
     mhe13 = MovingHorizonEstimator(linmodel2, He=5)
-    @test isa(mhe13, MovingHorizonEstimator{Float32})    
+    @test isa(mhe13, MovingHorizonEstimator{Float32})   
+    
+    covestim = SteadyKalmanFilter(linmodel)
+    σP_0 = 1:4
+    σPint_ym_0 = 5:6
+    mhe14 = MovingHorizonEstimator(linmodel; He=1, σP_0, σPint_ym_0, covestim)
+    @test mhe14.cov.invP̄ ≈ inv(diagm((1:6).^2))
+    preparestate!(mhe14, linmodel.yop, linmodel.dop)
+    @test mhe14.cov.invP̄ ≈ inv(diagm((1:6).^2))
+
+    covestim = SteadyKalmanFilter(linmodel)
+    σP_0 = nothing
+    mhe15 = MovingHorizonEstimator(linmodel; He=1, σP_0, covestim)
+    @test mhe15.cov.invP̄ ≈ inv(covestim.cov.P̂)
 
     function gcl(X̂e, _ , _ , _ , _ , _ , _ , _ , nx, ε)
         gc = X̂e .- 100 .- ε   
@@ -883,6 +896,7 @@ end
     @test_throws ArgumentError MovingHorizonEstimator(linmodel)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
+    @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=1, σP_0=nothing)
 end
 
 @testitem "MHE construction (NonLinModel)" setup=[SetupMPCtests] begin
@@ -995,6 +1009,17 @@ end
     @test mhe3.x̂0 ≈ zeros(4) atol=1e-9
     preparestate!(mhe3, [50, 30], [5])
     info = getinfo(mhe3)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+    covestim = SteadyKalmanFilter(linmodel)
+    mhe3b = MovingHorizonEstimator(linmodel; He=1, σP_0=nothing, covestim)
+    preparestate!(mhe3b, [50, 30], [5])
+    x̂ = updatestate!(mhe3b, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-9
+    @test mhe3b.x̂0 ≈ zeros(6) atol=1e-9
+    @test mhe3b.cov.invP̄ ≈ inv(covestim.cov.P̂)
+    preparestate!(mhe3b, [50, 30], [5])
+    info = getinfo(mhe3b)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
 
@@ -1167,7 +1192,7 @@ end
     @test mhe.cov.invP̄ ≈ invP̄_copy
     @test_logs(
         (:error, "Arrival covariance P̄ is not invertible: keeping the old one"), 
-        ModelPredictiveControl.invert_cov!(mhe, Hermitian(zeros(mhe.nx̂, mhe.nx̂),:L))
+        ModelPredictiveControl.invert_cov!(mhe, mhe.covestim)
     )
     mhe.P̂arr_old[1, 1] = Inf # Inf to trigger fallback
     P̂arr_old_copy = deepcopy(mhe.P̂arr_old)
@@ -1193,8 +1218,8 @@ end
     setconstraint!(mhe1, x̂min=[-51,-52], x̂max=[53,54])
     @test mhe1.con.X̂0min ≈ [-51,-52]
     @test mhe1.con.X̂0max ≈ [53,54]
-    @test mhe1.con.x̃0min[2:end] ≈ [-51,-52]
-    @test mhe1.con.x̃0max[2:end] ≈ [53,54]
+    @test mhe1.con.x̂0min ≈ [-51,-52]
+    @test mhe1.con.x̂0max ≈ [53,54]
     setconstraint!(mhe1, ŵmin=[-55,-56], ŵmax=[57,58])
     @test mhe1.con.Ŵmin ≈ [-55,-56]
     @test mhe1.con.Ŵmax ≈ [57,58]
@@ -1202,23 +1227,23 @@ end
     @test mhe1.con.V̂min ≈ [-59,-60]
     @test mhe1.con.V̂max ≈ [61,62]
     setconstraint!(mhe1, c_x̂min=[0.01,0.02], c_x̂max=[0.03,0.04])
-    @test -mhe1.con.A_X̂min[:, end] ≈ [0.01, 0.02]
-    @test -mhe1.con.A_X̂max[:, end] ≈ [0.03,0.04]
-    @test -mhe1.con.A_x̃min[2:end, end] ≈ [0.01,0.02]
-    @test -mhe1.con.A_x̃max[2:end, end] ≈ [0.03,0.04]
+    @test -mhe1.con.A_X̂min[:, begin] ≈ [0.01, 0.02]
+    @test -mhe1.con.A_X̂max[:, begin] ≈ [0.03,0.04]
+    @test -mhe1.con.A_x̂min[:, begin] ≈ [0.01,0.02]
+    @test -mhe1.con.A_x̂max[:, begin] ≈ [0.03,0.04]
     setconstraint!(mhe1, c_ŵmin=[0.05,0.06], c_ŵmax=[0.07,0.08])
-    @test -mhe1.con.A_Ŵmin[:, end] ≈ [0.05, 0.06]
-    @test -mhe1.con.A_Ŵmax[:, end] ≈ [0.07,0.08]
+    @test -mhe1.con.A_Ŵmin[:, begin] ≈ [0.05, 0.06]
+    @test -mhe1.con.A_Ŵmax[:, begin] ≈ [0.07,0.08]
     setconstraint!(mhe1, c_v̂min=[0.09,0.10], c_v̂max=[0.11,0.12])
-    @test -mhe1.con.A_V̂min[:, end] ≈ [0.09, 0.10]
-    @test -mhe1.con.A_V̂max[:, end] ≈ [0.11,0.12]
+    @test -mhe1.con.A_V̂min[:, begin] ≈ [0.09, 0.10]
+    @test -mhe1.con.A_V̂max[:, begin] ≈ [0.11,0.12]
 
     mhe2 = MovingHorizonEstimator(linmodel, He=4, nint_ym=0, Cwt=1e3)
     setconstraint!(mhe2, X̂min=-1(1:10), X̂max=1(1:10))
     @test mhe2.con.X̂0min ≈ -1(3:10)
     @test mhe2.con.X̂0max ≈ 1(3:10)
-    @test mhe2.con.x̃0min[2:end] ≈ -1(1:2)
-    @test mhe2.con.x̃0max[2:end] ≈ 1(1:2)
+    @test mhe2.con.x̂0min ≈ -1(1:2)
+    @test mhe2.con.x̂0max ≈ 1(1:2)
     setconstraint!(mhe2, Ŵmin=-1(11:18), Ŵmax=1(11:18))
     @test mhe2.con.Ŵmin ≈ -1(11:18)
     @test mhe2.con.Ŵmax ≈ 1(11:18)
@@ -1226,16 +1251,16 @@ end
     @test mhe2.con.V̂min ≈ -1(31:38)
     @test mhe2.con.V̂max ≈ 1(31:38)
     setconstraint!(mhe2, C_x̂min=0.01(1:10), C_x̂max=0.02(1:10))
-    @test -mhe2.con.A_X̂min[:, end] ≈ 0.01(3:10)
-    @test -mhe2.con.A_X̂max[:, end] ≈ 0.02(3:10)
-    @test -mhe2.con.A_x̃min[2:end, end] ≈ 0.01(1:2)
-    @test -mhe2.con.A_x̃max[2:end, end] ≈ 0.02(1:2)
+    @test -mhe2.con.A_X̂min[:, begin] ≈ 0.01(3:10)
+    @test -mhe2.con.A_X̂max[:, begin] ≈ 0.02(3:10)
+    @test -mhe2.con.A_x̂min[:, begin] ≈ 0.01(1:2)
+    @test -mhe2.con.A_x̂max[:, begin] ≈ 0.02(1:2)
     setconstraint!(mhe2, C_ŵmin=0.03(11:18), C_ŵmax=0.04(11:18))
-    @test -mhe2.con.A_Ŵmin[:, end] ≈ 0.03(11:18)
-    @test -mhe2.con.A_Ŵmax[:, end] ≈ 0.04(11:18)
+    @test -mhe2.con.A_Ŵmin[:, begin] ≈ 0.03(11:18)
+    @test -mhe2.con.A_Ŵmax[:, begin] ≈ 0.04(11:18)
     setconstraint!(mhe2, C_v̂min=0.05(31:38), C_v̂max=0.06(31:38))
-    @test -mhe2.con.A_V̂min[:, end] ≈ 0.05(31:38)
-    @test -mhe2.con.A_V̂max[:, end] ≈ 0.06(31:38)
+    @test -mhe2.con.A_V̂min[:, begin] ≈ 0.05(31:38)
+    @test -mhe2.con.A_V̂max[:, begin] ≈ 0.06(31:38)
 
     f(x,u,d,model) = model.A*x + model.Bu*u
     h(x,d,model)   = model.C*x 
@@ -1290,51 +1315,66 @@ end
 @testitem "MHE constraint violation (LinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])
-    mhe = MovingHorizonEstimator(linmodel, He=1, nint_ym=0)
+    mhe_soft = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, Cwt=1e5)
 
-    setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
-    setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
-    setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
+    setconstraint!(mhe_soft, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe_soft, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe_soft, v̂min=[-100,-100], v̂max=[100,100])
 
-    setconstraint!(mhe, x̂min=[1,1], x̂max=[100,100])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test x̂ ≈ [1, 1] atol=5e-2
+    # activating all soft constraints to ensure that they work as intended:
+    setconstraint!(mhe_soft, c_x̂min=[1, 1], c_x̂max=[1, 1])
+    setconstraint!(mhe_soft, c_ŵmin=[0.1, 0.1], c_ŵmax=[0.1, 0.1])
+    setconstraint!(mhe_soft, c_v̂min=[1, 1], c_v̂max=[1, 1])
 
-    setconstraint!(mhe, x̂min=[-100,-100], x̂max=[-1,-1])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test x̂ ≈ [-1, -1] atol=5e-2
+    mhe_hard = MovingHorizonEstimator(linmodel, He=1, nint_ym=0, Cwt=Inf)
 
-    setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
-    setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
-    setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
+    setconstraint!(mhe_hard, x̂min=[-100,-100], x̂max=[100,100])
+    setconstraint!(mhe_hard, ŵmin=[-100,-100], ŵmax=[100,100])
+    setconstraint!(mhe_hard, v̂min=[-100,-100], v̂max=[100,100])
 
-    setconstraint!(mhe, ŵmin=[1,1], ŵmax=[100,100])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test mhe.Ŵ ≈ [1,1] atol=5e-2
+    function test_bound_violation(mhe)
+        setconstraint!(mhe, x̂min=[1,1], x̂max=[100,100])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        @test x̂ ≈ [1, 1] atol=5e-2
 
-    setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[-1,-1])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    @test mhe.Ŵ ≈ [-1,-1] atol=5e-2
+        setconstraint!(mhe, x̂min=[-100,-100], x̂max=[-1,-1])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        @test x̂ ≈ [-1, -1] atol=5e-2
 
-    setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
-    setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
-    setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
+        setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
+        setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
+        setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
 
-    setconstraint!(mhe, v̂min=[1,1], v̂max=[100,100])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    info = getinfo(mhe)
-    @test info[:V̂] ≈ [1,1] atol=5e-2
+        setconstraint!(mhe, ŵmin=[1,1], ŵmax=[100,100])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        @test mhe.Ŵ ≈ [1,1] atol=5e-2
 
-    setconstraint!(mhe, v̂min=[-100,-100], v̂max=[-1,-1])
-    preparestate!(mhe, [50, 30])
-    x̂ = updatestate!(mhe, [10, 50], [50, 30])
-    info = getinfo(mhe)
-    @test info[:V̂] ≈ [-1,-1] atol=5e-2
+        setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[-1,-1])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        @test mhe.Ŵ ≈ [-1,-1] atol=5e-2
+
+        setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
+        setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
+        setconstraint!(mhe, v̂min=[-100,-100], v̂max=[100,100])
+
+        setconstraint!(mhe, v̂min=[1,1], v̂max=[100,100])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        info = getinfo(mhe)
+        @test info[:V̂] ≈ [1,1] atol=5e-2
+
+        setconstraint!(mhe, v̂min=[-100,-100], v̂max=[-1,-1])
+        preparestate!(mhe, [50, 30])
+        x̂ = updatestate!(mhe, [10, 50], [50, 30])
+        info = getinfo(mhe)
+        @test info[:V̂] ≈ [-1,-1] atol=5e-2
+    end
+    test_bound_violation(mhe_soft)
+    test_bound_violation(mhe_hard)
 
     linmodel2 = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
     linmodel2 = setop!(linmodel2, uop=[10,50], yop=[50,30], dop=[5])
@@ -1479,8 +1519,8 @@ end
     @test mhe.x̂0arr_old ≈ [3.0 - 8.0]
     @test mhe.con.X̂0min ≈ repeat([-1000 - 8.0], He)
     @test mhe.con.X̂0max ≈ repeat([+1000 - 8.0], He)
-    @test mhe.con.x̃0min ≈ [-1000 - 8.0]
-    @test mhe.con.x̃0max ≈ [+1000 - 8.0]
+    @test mhe.con.x̂0min ≈ [-1000 - 8.0]
+    @test mhe.con.x̂0max ≈ [+1000 - 8.0]
     setmodel!(mhe, Q̂=[1e-3], R̂=[1e-6])
     @test mhe.cov.Q̂ ≈ [1e-3]
     @test mhe.cov.invQ̂_He ≈ diagm(repeat([1e3], He))

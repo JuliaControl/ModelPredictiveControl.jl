@@ -181,12 +181,12 @@ function test_mpc(mpc, plant)
     return U, Y, Ry
 end
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = SingleShooting()
 mpc_osqp_ss = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_osqp_ss.optim)
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = MultipleShooting()
 mpc_osqp_ms = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_osqp_ms.optim)
@@ -202,17 +202,7 @@ mpc_daqp_ss = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf
 # mpc_daqp_ms = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
 # JuMP.set_attribute(mpc_daqp_ms.optim, "eps_prox", 1e-6)
 
-optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
-transcription = SingleShooting()
-mpc_ipopt_ss = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
-JuMP.unset_time_limit_sec(mpc_ipopt_ss.optim)
-
-optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
-transcription = MultipleShooting()
-mpc_ipopt_ms = setconstraint!(LinMPC(model; optim, transcription), ymin=[45, -Inf])
-JuMP.unset_time_limit_sec(mpc_ipopt_ms.optim) 
-
-samples, evals = 5000, 1
+samples, evals = 10000, 1
 CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["OSQP"]["SingleShooting"] = 
     @benchmarkable(test_mpc($mpc_osqp_ss, $plant); 
         samples=samples, evals=evals
@@ -223,14 +213,6 @@ CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["OSQP"]["MultipleShooting"] =
     )
 CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["DAQP"]["SingleShooting"] =
     @benchmarkable(test_mpc($mpc_daqp_ss, $plant); 
-        samples=samples, evals=evals
-    )
-CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["Ipopt"]["SingleShooting"] =
-    @benchmarkable(test_mpc($mpc_ipopt_ss, $plant); 
-    samples=samples, evals=evals
-)
-CASE_MPC["CSTR"]["LinMPC"]["Without feedforward"]["Ipopt"]["MultipleShooting"] =
-    @benchmarkable(test_mpc($mpc_ipopt_ms, $plant); 
         samples=samples, evals=evals
     )
 
@@ -254,12 +236,12 @@ function test_mpc_d(mpc_d, plant)
     return U, Y, Ry
 end
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = SingleShooting()
 mpc_d_osqp_ss = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_d_osqp_ss.optim)
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = MultipleShooting()
 mpc_d_osqp_ms = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
 JuMP.unset_time_limit_sec(mpc_d_osqp_ms.optim)
@@ -271,17 +253,7 @@ mpc_d_daqp_ss = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, 
 # Skip DAQP with MultipleShooting, it is not designed for sparse Hessians. Kind of works 
 # with "eps_prox" configured to 1e-6, but not worth it.
 
-optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
-transcription = SingleShooting()
-mpc_d_ipopt_ss = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
-JuMP.unset_time_limit_sec(mpc_d_ipopt_ss.optim)
-
-optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
-transcription = MultipleShooting()
-mpc_d_ipopt_ms = setconstraint!(LinMPC(model_d; optim, transcription), ymin=[45, -Inf])
-JuMP.unset_time_limit_sec(mpc_d_ipopt_ms.optim)
-
-samples, evals = 5000, 1
+samples, evals = 10000, 1
 CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["OSQP"]["SingleShooting"] = 
     @benchmarkable(test_mpc_d($mpc_d_osqp_ss, $plant); 
         samples=samples, evals=evals
@@ -292,14 +264,6 @@ CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["OSQP"]["MultipleShooting"] =
     )
 CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["DAQP"]["SingleShooting"] =
     @benchmarkable(test_mpc_d($mpc_d_daqp_ss, $plant); 
-        samples=samples, evals=evals
-    )
-CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["SingleShooting"] =
-    @benchmarkable(test_mpc_d($mpc_d_ipopt_ss, $plant); 
-        samples=samples, evals=evals
-    )
-CASE_MPC["CSTR"]["LinMPC"]["With feedforward"]["Ipopt"]["MultipleShooting"] =
-    @benchmarkable(test_mpc_d($mpc_d_ipopt_ms, $plant); 
         samples=samples, evals=evals
     )
 
@@ -611,7 +575,7 @@ function gc!(LHS, Ue, Ŷe, _, p, ϵ)
     end
     return nothing
 end
-Cwt, Pmax, nc = 1e5, 3, Hp+1
+Cwt, Pmax, nc = 1e4, 3, Hp+1
 x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180; 0]
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
@@ -705,7 +669,7 @@ function sim2!(mpc, nlmodel, N, ry, plant, x, 𝕩̂, y_step)
 end
 x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180]; y_step=[0]
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = SingleShooting()
 mpc3_osqp_ss = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 mpc3_osqp_ss = setconstraint!(mpc3_osqp_ss; umin, umax)
@@ -713,7 +677,7 @@ JuMP.unset_time_limit_sec(mpc3_osqp_ss.optim)
 JuMP.set_attribute(mpc3_osqp_ss.optim, "polish", true) # needed to 
 JuMP.set_attribute(mpc3_osqp_ss.optim, "sigma",  1e-9) # needed to 
 
-optim = JuMP.Model(OSQP.Optimizer, add_bridges=false)
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 transcription = MultipleShooting()
 mpc3_osqp_ms = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
 mpc3_osqp_ms = setconstraint!(mpc3_osqp_ms; umin, umax)
@@ -726,18 +690,6 @@ mpc3_daqp_ss = setconstraint!(mpc3_daqp_ss; umin, umax)
 
 # skip DAQP with MultipleShooting, it is not designed for sparse Hessians
 # did not found any settings that works well here (always reach the iteration limit).
-
-optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
-transcription = SingleShooting()
-mpc3_ipopt_ss = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
-mpc3_ipopt_ss = setconstraint!(mpc3_ipopt_ss; umin, umax)
-JuMP.unset_time_limit_sec(mpc3_ipopt_ss.optim)
-
-optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
-transcription = MultipleShooting()
-mpc3_ipopt_ms = LinMPC(kf; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription)
-mpc3_ipopt_ms = setconstraint!(mpc3_ipopt_ms; umin, umax)
-JuMP.unset_time_limit_sec(mpc3_ipopt_ms.optim)
 
 samples, evals = 10000, 1
 CASE_MPC["Pendulum"]["LinMPC"]["Successive linearization"]["OSQP"]["SingleShooting"] = 
@@ -753,15 +705,5 @@ CASE_MPC["Pendulum"]["LinMPC"]["Successive linearization"]["OSQP"]["MultipleShoo
 CASE_MPC["Pendulum"]["LinMPC"]["Successive linearization"]["DAQP"]["SingleShooting"] = 
     @benchmarkable(
         sim2!($mpc3_daqp_ss, $model, $N, $ry, $plant, $x_0, $x̂_0, $y_step),
-        samples=samples, evals=evals
-    )
-CASE_MPC["Pendulum"]["LinMPC"]["Successive linearization"]["Ipopt"]["SingleShooting"] = 
-    @benchmarkable(
-        sim2!($mpc3_ipopt_ss, $model, $N, $ry, $plant, $x_0, $x̂_0, $y_step),
-        samples=samples, evals=evals
-    )
-CASE_MPC["Pendulum"]["LinMPC"]["Successive linearization"]["Ipopt"]["MultipleShooting"] = 
-    @benchmarkable(
-        sim2!($mpc3_ipopt_ms, $model, $N, $ ry, $plant, $x_0, $x̂_0, $y_step),
         samples=samples, evals=evals
     )
