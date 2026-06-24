@@ -342,7 +342,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
   │ ├ 0 unmeasured outputs yu
   │ └ 0 measured disturbances d
   └ optimization:
-    ├ 12 decision variables Z̃ (0 slack variable)
+    ├ 12 decision variables Z̃ (0 slack variable, 0 bounds)
     ├  0 linear inequality constraints A
     └  0 nonlinear inequality constraints g (0 custom)
 ```
@@ -789,7 +789,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
   │ ├ 0 unmeasured outputs yu
   │ └ 0 measured disturbances d
   └ optimization:
-    ├  8 decision variables Z̃ (0 slack variable)
+    ├  8 decision variables Z̃ (0 slack variable, 4 bounds)
     ├ 12 linear inequality constraints A
     └  0 nonlinear inequality constraints g (0 custom)
 ```
