@@ -344,8 +344,10 @@ function print_optim_dim(io::IO, mpc::LinMPC)
     nZ̃, nϵ = length(mpc.Z̃), mpc.nϵ
     nA, nW, nAeq = sum(mpc.con.i_b) , mpc.con.nw*(mpc.Hp + 1), size(mpc.con.Aeq, 1)
     m = maximum(ndigits.((nZ̃, nA, nAeq))) + 1
+    i_nZ̃min, i_nZ̃max = @. !isinf(mpc.con.Z̃min), !isinf(mpc.con.Z̃max)
+    nZ̃bounds = sum(i_nZ̃min) + sum(i_nZ̃max)
     println(io, "  └ optimization:")
-    println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nϵ slack variable)")
+    println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nϵ slack variable, $nZ̃bounds bounds)")
     println(io, "    ├$(lpad(nA, m)) linear inequality constraints A ($nW custom)")
     print(io,   "    └$(lpad(nAeq, m)) linear equality constraints Aeq")
 end
