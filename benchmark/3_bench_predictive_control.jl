@@ -347,7 +347,7 @@ nmpc_madnlp_ss_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcripti
 nmpc_madnlp_ss_hess = setconstraint!(nmpc_madnlp_ss_hess; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_madnlp_ss_hess.optim)
 
-optim = JuMP.Model(()->UnoSolver.Optimizer(preset="filtersqp"), add_bridges=false)
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="funnelsqp"), add_bridges=false)
 transcription, hessian = MultipleShooting(), true
 nmpc_uno_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
 nmpc_uno_ms_hess = setconstraint!(nmpc_uno_ms_hess; umin, umax)
@@ -359,11 +359,12 @@ nmpc_madnlp_ms_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcripti
 nmpc_madnlp_ms_hess = setconstraint!(nmpc_madnlp_ms_hess; umin, umax)
 JuMP.unset_time_limit_sec(nmpc_madnlp_ms_hess.optim)
 
-optim = JuMP.Model(()->UnoSolver.Optimizer(preset="filtersqp"), add_bridges=false)
-transcription, hessian = OrthogonalCollocation(), true
-nmpc_uno_oc_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
-nmpc_uno_oc_hess = setconstraint!(nmpc_uno_oc_hess; umin, umax)
-JuMP.unset_time_limit_sec(nmpc_uno_oc_hess.optim)
+# # commenting out this case study, it crashes on latest UnoSolver v0.3.4
+# optim = JuMP.Model(()->UnoSolver.Optimizer(preset="funnelsqp"), add_bridges=false)
+# transcription, hessian = OrthogonalCollocation(), true
+# nmpc_uno_oc_hess = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt, optim, transcription, hessian)
+# nmpc_uno_oc_hess = setconstraint!(nmpc_uno_oc_hess; umin, umax)
+# JuMP.unset_time_limit_sec(nmpc_uno_oc_hess.optim)
 
 samples, evals, seconds = 100, 1, 15*60
 CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Ipopt"]["SingleShooting"] = 
@@ -431,11 +432,11 @@ CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Uno"]["MultipleShooting (Hessi
         sim!($nmpc_uno_ms_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
-CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Uno"]["OrthogonalCollocation (Hessian)"] = 
-    @benchmarkable(
-        sim!($nmpc_uno_oc_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
-    )
+# CASE_MPC["Pendulum"]["NonLinMPC"]["Noneconomic"]["Uno"]["OrthogonalCollocation (Hessian)"] = 
+#     @benchmarkable(
+#         sim!($nmpc_uno_oc_hess, $N, $ry; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+#         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+#     )
 
 # ----------------- Case study: Pendulum economic --------------------------------
 model2, p = pendulum_model2, pendulum_p2
@@ -504,7 +505,7 @@ empc_madnlp_ss_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, opt
 empc_madnlp_ss_hess = setconstraint!(empc_madnlp_ss_hess; umin, umax)
 JuMP.unset_time_limit_sec(empc_madnlp_ss_hess.optim)
 
-optim = JuMP.Model(()->UnoSolver.Optimizer(preset="filtersqp"), add_bridges=false)
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="funnelsqp"), add_bridges=false)
 transcription, hessian = MultipleShooting(), true
 empc_uno_ss_hess = NonLinMPC(estim2; Hp, Hc, Nwt, Mwt=Mwt2, Cwt, JE, Ewt, optim, transcription, hessian, p)
 empc_uno_ss_hess = setconstraint!(empc_uno_ss_hess; umin, umax)
