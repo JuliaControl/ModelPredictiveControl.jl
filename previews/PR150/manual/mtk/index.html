@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>ModelingToolkit · ModelPredictiveControl.jl</title><meta name="title" content="ModelingToolkit · ModelPredictiveControl.jl"/><meta property="og:title" content="ModelingToolkit · ModelPredictiveControl.jl"/><meta property="twitter:title" content="ModelingToolkit · ModelPredictiveControl.jl"/><meta name="description" content="Documentation for ModelPredictiveControl.jl."/><meta property="og:description" content="Documentation for ModelPredictiveControl.jl."/><meta property="twitter:description" content="Documentation for ModelPredictiveControl.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img class="docs-light-only" src="../../assets/logo.svg" alt="ModelPredictiveControl.jl logo"/><img class="docs-dark-only" src="../../assets/logo-dark.svg" alt="ModelPredictiveControl.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">ModelPredictiveControl.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../installation/">Installation</a></li><li><input class="collapse-toggle" id="menuitem-2-2" type="checkbox" checked/><label class="tocitem" for="menuitem-2-2"><span class="docs-label">Examples</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../linmpc/">Linear Design</a></li><li><a class="tocitem" href="../nonlinmpc/">Nonlinear Design</a></li><li class="is-active"><a class="tocitem" href>ModelingToolkit</a><ul class="internal"><li><a class="tocitem" href="#Pendulum-Model"><span>Pendulum Model</span></a></li><li><a class="tocitem" href="#Controller-Design"><span>Controller Design</span></a></li><li><a class="tocitem" href="#Acknowledgement"><span>Acknowledgement</span></a></li></ul></li></ul></li></ul></li><li><span class="tocitem">Functions</span><ul><li><input class="collapse-toggle" id="menuitem-3-1" type="checkbox"/><label class="tocitem" for="menuitem-3-1"><span class="docs-label">Public</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../public/sim_model/">Plant Models</a></li><li><a class="tocitem" href="../../public/state_estim/">State Estimators</a></li><li><a class="tocitem" href="../../public/predictive_control/">Predictive Controllers</a></li><li><a class="tocitem" href="../../public/generic_func/">Generic Functions</a></li><li><a class="tocitem" href="../../public/plot_sim/">Simulations and Plots</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-3-2" type="checkbox"/><label class="tocitem" for="menuitem-3-2"><span class="docs-label">Internals</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../internals/sim_model/">Plant Models</a></li><li><a class="tocitem" href="../../internals/state_estim/">State Estimators</a></li><li><a class="tocitem" href="../../internals/predictive_control/">Predictive Controllers</a></li></ul></li></ul></li><li><a class="tocitem" href="../../func_index/">Index</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>ModelingToolkit</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>ModelingToolkit</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/JuliaControl/ModelPredictiveControl.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/JuliaControl/ModelPredictiveControl.jl/blob/main/docs/src/manual/mtk.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="man_mtk"><a class="docs-heading-anchor" href="#man_mtk">Manual: ModelingToolkit Integration</a><a id="man_mtk-1"></a><a class="docs-heading-anchor-permalink" href="#man_mtk" title="Permalink"></a></h1><ul><li><a href="#man_mtk">Manual: ModelingToolkit Integration</a></li><li class="no-marker"><ul><li><a href="#Pendulum-Model">Pendulum Model</a></li><li><a href="#Controller-Design">Controller Design</a></li><li><a href="#Acknowledgement">Acknowledgement</a></li></ul></li></ul><h2 id="Pendulum-Model"><a class="docs-heading-anchor" href="#Pendulum-Model">Pendulum Model</a><a id="Pendulum-Model-1"></a><a class="docs-heading-anchor-permalink" href="#Pendulum-Model" title="Permalink"></a></h2><p>This example integrates the simple pendulum model of the <a href="../nonlinmpc/#man_nonlin">last section</a> in the <a href="https://docs.sciml.ai/ModelingToolkit/stable/"><code>ModelingToolkit.jl</code></a> (MTK) framework and extracts appropriate <code>f!</code> and <code>h!</code> functions to construct a <a href="../../public/sim_model/#NonLinModel"><code>NonLinModel</code></a>. An <a href="../../public/predictive_control/#NonLinMPC"><code>NonLinMPC</code></a> is designed from this model and simulated to reproduce the results of the last section.</p><div class="admonition is-danger"><header class="admonition-header">Disclaimer</header><div class="admonition-body"><p>This simple example is not an official interface to <code>ModelingToolkit.jl</code>. It is provided as a basic starting template to combine both packages. There is no guarantee that it will work for all corner cases.</p></div></div><div class="admonition is-compat"><header class="admonition-header">Compat</header><div class="admonition-body"><p>The example relies on features and bugfixes of <code>ModelingToolkit.jl</code> v9.50.</p></div></div><p>We first construct and instantiate the pendulum model:</p><pre><code class="language-julia hljs">using ModelPredictiveControl, ModelingToolkit
+using ModelingToolkit: D_nounits as D, t_nounits as t, varmap_to_vars
+@mtkmodel Pendulum begin
+    @parameters begin
+        g = 9.8
+        L = 0.4
+        K = 1.2
+        m = 0.3
+    end
+    @variables begin
+        θ(t) # state
+        ω(t) # state
+        τ(t) # input
+        y(t) # output
+    end
+    @equations begin
+        D(θ)    ~ ω
+        D(ω)    ~ -g/L*sin(θ) - K/m*ω + τ/m/L^2
+        y       ~ θ * 180 / π
+    end
+end
+@named mtk_model = Pendulum()
+mtk_model = complete(mtk_model)</code></pre><p class="math-container">\[ \begin{align}
+\frac{\mathrm{d} \theta\left( t \right)}{\mathrm{d}t} &amp;= \omega\left( t \right) \\
+\frac{\mathrm{d} \omega\left( t \right)}{\mathrm{d}t} &amp;= \frac{ - g \sin\left( \theta\left( t \right) \right)}{L} + \frac{\tau\left( t \right)}{L^{2} m} + \frac{ - K \omega\left( t \right)}{m} \\
+y\left( t \right) &amp;= 57.296 \theta\left( t \right)
+\end{align}
+ \]</p><p>We than convert the MTK model to an <a href="https://docs.sciml.ai/ModelingToolkit/stable/basics/InputOutput/">input-output system</a>:</p><pre><code class="language-julia hljs">function generate_f_h(model, inputs, outputs)
+    (_, f_ip), dvs, psym, io_sys = ModelingToolkit.generate_control_function(
+        model, inputs, split=false; outputs
+    )
+    if any(ModelingToolkit.is_alg_equation, equations(io_sys))
+        error(&quot;Systems with algebraic equations are not supported&quot;)
+    end
+    nu, nx, ny = length(inputs), length(dvs), length(outputs)
+    vx = string.(dvs)
+    p = varmap_to_vars(defaults(io_sys), psym)
+    function f!(ẋ, x, u, _ , p)
+        try
+            f_ip(ẋ, x, u, p, nothing)
+        catch err
+            if err isa MethodError
+                error(&quot;NonLinModel does not support a time argument t in the f function, &quot;*
+                      &quot;see the constructor docstring for a workaround.&quot;)
+            else
+                rethrow()
+            end
+        end
+        return nothing
+    end
+    (_, h_ip) = ModelingToolkit.build_explicit_observed_function(
+        io_sys, outputs; inputs, return_inplace = true
+    )
+    u_nothing = fill(nothing, nu)
+    function h!(y, x, _ , p)
+        try
+            # MTK.jl supports a `u` argument in `h_ip` function but not this package. We set
+            # `u` as a vector of nothing and `h_ip` function will presumably throw an
+            # MethodError it this argument is used inside the function
+            h_ip(y, x, u_nothing, p, nothing)
+        catch err
+            if err isa MethodError
+                error(&quot;NonLinModel only support strictly proper systems (no manipulated &quot;*
+                      &quot;input argument u in the output function h)&quot;)
+            else
+                rethrow()
+            end
+        end
+        return nothing
+    end
+    return f!, h!, p, nu, nx, ny, vx
+end
+inputs, outputs = [mtk_model.τ], [mtk_model.y]
+f!, h!, p, nu, nx, ny, vx = generate_f_h(mtk_model, inputs, outputs)
+Ts = 0.1
+vu, vy = [&quot;\$τ\$ (Nm)&quot;], [&quot;\$θ\$ (°)&quot;]</code></pre><p>A <a href="../../public/sim_model/#NonLinModel"><code>NonLinModel</code></a> can now be constructed:</p><pre><code class="language-julia hljs">model = setname!(NonLinModel(f!, h!, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">NonLinModel with a sample time Ts = 0.1 s, RungeKutta(4) solver and:
+ 1 manipulated inputs u
+ 2 states x
+ 1 outputs y
+ 0 measured disturbances d</code></pre><p>We also instantiate a plant model with a 25 % larger friction coefficient <span>$K$</span>:</p><pre><code class="language-julia hljs">mtk_model.K = defaults(mtk_model)[mtk_model.K] * 1.25
+f_plant, h_plant, p = generate_f_h(mtk_model, inputs, outputs)
+plant = setname!(NonLinModel(f_plant, h_plant, Ts, nu, nx, ny; p); u=vu, x=vx, y=vy)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">NonLinModel with a sample time Ts = 0.1 s, RungeKutta(4) solver and:
+ 1 manipulated inputs u
+ 2 states x
+ 1 outputs y
+ 0 measured disturbances d</code></pre><h2 id="Controller-Design"><a class="docs-heading-anchor" href="#Controller-Design">Controller Design</a><a id="Controller-Design-1"></a><a class="docs-heading-anchor-permalink" href="#Controller-Design" title="Permalink"></a></h2><p>We can than reproduce the Kalman filter and the controller design of the <a href="../nonlinmpc/#man_nonlin">last section</a>:</p><pre><code class="language-julia hljs">α=0.01; σQ=[0.1, 1.0]; σR=[5.0]; nint_u=[1]; σQint_u=[0.1]
+estim = UnscentedKalmanFilter(model; α, σQ, σR, nint_u, σQint_u)
+Hp, Hc, Mwt, Nwt = 20, 2, [0.5], [2.5]
+nmpc = NonLinMPC(estim; Hp, Hc, Mwt, Nwt, Cwt=Inf)
+umin, umax = [-1.5], [+1.5]
+nmpc = setconstraint!(nmpc; umin, umax)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">NonLinMPC controller with a sample time Ts = 0.1 s, Ipopt optimizer, UnscentedKalmanFilter estimator and:
+ 20 prediction steps Hp
+  2 control steps Hc
+  0 slack variable ϵ (control constraints)
+  1 manipulated inputs u (1 integrating states)
+  3 estimated states x̂
+  1 measured outputs ym (0 integrating states)
+  0 unmeasured outputs yu
+  0 measured disturbances d</code></pre><p>The 180° setpoint response is identical:</p><pre><code class="language-julia hljs">using Plots
+N = 35
+res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
+plot(res_ry)</code></pre><p><img src="../plot1_MTK.svg" alt="plot1_MTK"/></p><p>and also the output disturbance rejection:</p><pre><code class="language-julia hljs">res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
+plot(res_yd)</code></pre><p><img src="../plot2_MTK.svg" alt="plot2_MTK"/></p><h2 id="Acknowledgement"><a class="docs-heading-anchor" href="#Acknowledgement">Acknowledgement</a><a id="Acknowledgement-1"></a><a class="docs-heading-anchor-permalink" href="#Acknowledgement" title="Permalink"></a></h2><p>Authored by <code>1-Bart-1</code> and <code>baggepinnen</code>, thanks for the contribution.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../nonlinmpc/">« Nonlinear Design</a><a class="docs-footer-nextpage" href="../../public/sim_model/">Plant Models »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Wednesday 15 January 2025 19:10">Wednesday 15 January 2025</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
