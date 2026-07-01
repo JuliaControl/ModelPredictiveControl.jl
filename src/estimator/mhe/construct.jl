@@ -2,11 +2,7 @@ const DEFAULT_LINMHE_OPTIMIZER    = OSQP.MathOptInterfaceOSQP.Optimizer
 const DEFAULT_NONLINMHE_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
 const DEFAULT_NONLINMHE_GRADIENT  = AutoForwardDiff()
 const DEFAULT_NONLINMHE_JACOBIAN  = AutoForwardDiff()
-const DEFAULT_NONLINMHE_HESSIAN   = AutoSparse(
-    AutoForwardDiff();
-    sparsity_detector=TracerSparsityDetector(),
-    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
-) 
+const DEFAULT_NONLINMHE_HESSIAN   = AutoForwardDiff()
 
 @doc raw"""
 Include all the data for the constraints of [`MovingHorizonEstimator`](@ref).
@@ -457,35 +453,6 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
       [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
       for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
-    
-    One exception about AD: the selected backend for the Hessian of the Lagrangian function
-    with `hessian=true` options is sparse:
-    ```julia
-    AutoSparse(
-        AutoForwardDiff(); 
-        sparsity_detector  = TracerSparsityDetector(), 
-        coloring_algorithm = GreedyColoringAlgorithm(
-            (
-                NaturalOrder(),
-                LargestFirst(),
-                SmallestLast(),
-                IncidenceDegree(),
-                DynamicLargestFirst(),
-                RandomOrder(StableRNG(0), 0)
-            ), 
-        postprocessing = true
-        )
-    )
-    ```
-    that is, it will test many coloring orders at preparation and keep the best. The
-    argument `covestim` customizes the arrival covariance estimator. The supported types are
-    [`SteadyKalmanFilter`](@ref), [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref)
-    and [`ExtendedKalmanFilter`](@ref). A constant arrival covariance is supported using
-    the [`SteadyKalmanFilter`](@ref). The constant is fixed by `σP_0`, `σPint_ym_0` and
-    `σPint_u_0` arguments. If `isnothing(σP_0)`, it is fixed at `covestim.cov.P̂`, which is
-    the steady-state value ``\mathbf{P̂}(∞)`` for the [`SteadyKalmanFilter`](@ref). For
-    [`NonLinModel`](@ref), construct a [`SteadyKalmanFilter`](@ref) with an arbitrary
-    [`LinModel`](@ref), as long as the number of estimated states `nx̂` matches the MHE.
 
     Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
     `10/Cwt` (if not already set), to scale the small values of ``ε``. Use the second
