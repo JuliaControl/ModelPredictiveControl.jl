@@ -265,6 +265,10 @@ end
     @test_throws ErrorException NonLinModel(
         (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
         (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
+
+    @test_throws ArgumentError RungeKutta(2)
+    @test_throws ArgumentError RungeKutta(0)
+    @test_throws ArgumentError RungeKutta(4, supersample=0)
 end
 
 @testitem "NonLinModel sim methods" setup=[SetupMPCtests] begin

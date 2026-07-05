@@ -177,3 +177,24 @@ end
     u_data1, u_data2 = sim_wr(model, mpc1, mpc2, N)
     @test u_data1 ≈ u_data2 atol=1e-2 rtol=1e-2
 end
+
+@testitem "LinearMPCext unsupported features" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, DAQP
+    import LinearMPC
+    optim = Model(DAQP.Optimizer)
+    model = LinModel(tf([2], [10, 1]), 3.0)
+    mpc = LinMPC(model, Hp=3, M_Hp=diagm([1, 1, 3]); optim)
+    @test_nowarn LinearMPC.MPC(mpc)
+    mpc = LinMPC(model, Hp=3, M_Hp=diagm([1, 2, 3]); optim)
+    @test_throws ErrorException LinearMPC.MPC(mpc)
+    mpc = LinMPC(model, Hc=3, N_Hc=diagm([1, 2, 3]); optim)
+    @test_throws ErrorException LinearMPC.MPC(mpc)
+    mpc = LinMPC(model, Hp=3, L_Hp=diagm([1, 2, 3]); optim)
+    @test_throws ErrorException LinearMPC.MPC(mpc)
+    mpc = setconstraint!(LinMPC(model; optim), c_ymin=[1], c_ymax=[0.5])
+    @test_throws ErrorException LinearMPC.MPC(mpc)
+    mpc = setconstraint!(LinMPC(model; optim), c_ymin=[0.5], c_ymax=[0.5])
+    @test_logs (:warn, 
+        "LinearMPC only supports softness parameters c = 0 or 1.\n"*
+        "All constraints with c > 0 will be considered soft.") LinearMPC.MPC(mpc)
+end
