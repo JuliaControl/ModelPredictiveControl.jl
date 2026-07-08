@@ -246,17 +246,18 @@ function init_orthocolloc(
     τ = transcription.τ
     Po = Matrix{NT}(undef, nx*no, nx*no) # polynomial matrix (w/o the Y-intercept term)
     Ṗo = Matrix{NT}(undef, nx*no, nx*no) # polynomial derivative matrix
+    I_nx = I(nx)
     for j=1:no, i=1:no
         iRows = (1:nx) .+ nx*(i-1)
         iCols = (1:nx) .+ nx*(j-1)
-        Po[iRows, iCols] = (τ[i]^j)*I
-        Ṗo[iRows, iCols] = (j*τ[i]^(j-1))*I
+        Po[iRows, iCols] = (τ[i]^j)*I_nx
+        Ṗo[iRows, iCols] = (j*τ[i]^(j-1))*I_nx
     end
     Mo = sparse((Ṗo/Po)/model.Ts)
     Co = Matrix{NT}(undef, nx, nx*no)
     for j=1:no
         iCols = (1:nx) .+ nx*(j-1)
-        Co[:, iCols] = lagrange_end(j, transcription)*I
+        Co[:, iCols] = lagrange_end(j, transcription)*I_nx
     end
     Co = sparse(Co)
     λo = lagrange_end(0, transcription)
