@@ -780,6 +780,22 @@ function init_defectmat(
     return ES, GS, JS, KS, VS, BS
 end
 
+function init_defectmat(
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::OrthogonalCollocation, 
+    Hp, Hc, _
+) where {NT<:Real}
+    nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
+    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nK = nZ - nu*Hc - nx̂*Hp
+    As = estim.As
+    # --- current measured disturbances d0 and predictions D̂0 ---
+    GS = zeros(NT, nx̂*Hp, nd)
+    JS = zeros(NT, nx̂*Hp, nd*Hp)
+    # --- state x̂op and state update f̂op operating points ---
+    BS = zeros(NT, nx̂*Hp)
+    return ES, GS, JS, KS, VS, BS
+end
+
 """
     init_defectmat(
         model::NonLinModel, estim::InternalModel, ::TranscriptionMethod, Hp, Hc, _
@@ -1666,8 +1682,7 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     p = model.p
-    no, τ = transcription.no, transcription.τ
-    Mo, Co, λo = mpc.Mo, mpc.Co, mpc.λo
+    Mo, no, τ =  mpc.Mo, transcription.no, transcription.τ
     nk = get_nk(model, transcription)
     nx_nk = nx + nk
     D̂0 = mpc.D̂0
@@ -1685,9 +1700,7 @@ function con_nonlinprogeq!(
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        x̂dnext_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
-        scnext   = @views   geq[(1 + nx_nk*(j-1)     ):(nx_nk*(j-1) + nx)]
-        sk       = @views   geq[(1 + nx_nk*(j-1) + nx):(nx_nk*j         )]
+        sk       = @views   geq[(1 + nx_nk*(j-1) + nx):(nx_nk*j)]
         # ----------------- collocation constraint defects -----------------------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         Δk = k̇
@@ -1713,8 +1726,6 @@ function con_nonlinprogeq!(
             end
         end
         sk .-= k̇
-        # ----------------- continuity constraint defects ------------------------------
-        scnext .= mul!(scnext, Co, k_Z̃) .+ (λo.*x̂d_Z̃) .- x̂dnext_Z̃
     end
     return geq
 end
