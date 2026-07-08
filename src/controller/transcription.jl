@@ -600,7 +600,8 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::LinModel, estim::StateEstimator, transcription::MultipleShooting, Hp, Hc, nb
+        model::LinModel, estim::StateEstimator, transcription::MultipleShooting, 
+        Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects over the predicted states. 
@@ -667,7 +668,8 @@ matrices ``\mathbf{E_S, G_S, J_S, K_S, V_S, B_S}`` are defined in the Extended H
     (see [`move_blocking`](@ref)).
 """
 function init_defectmat(
-    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc, nb
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, 
+    Hp, Hc, nb, ::Any=nothing, ::Any=nothing
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
@@ -710,7 +712,8 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, ::TranscriptionMethod, Hp, Hc, _
+        model::SimModel, estim::StateEstimator, ::TranscriptionMethod, 
+        Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects of the stochastic states only.
@@ -753,7 +756,7 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
 """
 function init_defectmat(
     model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, 
-    Hp, Hc, _
+    Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
     nZ = get_nZ(estim, transcription, Hp, Hc)
@@ -782,12 +785,31 @@ end
 
 function init_defectmat(
     model::NonLinModel, estim::StateEstimator{NT}, transcription::OrthogonalCollocation, 
-    Hp, Hc, _
+    Hp, Hc, _ , Co, λo
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
-    nZ = get_nZ(estim, transcription, Hp, Hc)
-    nK = nZ - nu*Hc - nx̂*Hp
+    nk = get_nk(model, transcription)
     As = estim.As
+    λo_I = λo*I(nx)
+    # --- current state estimates x̂0 ---
+    KS = zeros(NT, nx̂*Hp, nx̂)
+    KS[1:nx, 1:nx]       = λo_I
+    KS[nx+1:nx̂, nx+1:nx̂] = As
+    # --- previous manipulated inputs lastu0 ---
+    VS = zeros(nxs*Hp, nu)
+    # --- decision variables Z ---
+    ESΔu = zeros(NT, nx̂*Hp, nu*Hc)
+    ESx̂  = diagm(fill(NT(-1.0), nx̂*Hp))
+    for j=1:Hp-1
+        iRow_λo = (1:nx)    .+ nx̂*j
+        iCol_λo = (1:nx)    .+ nx̂*(j-1)
+        iRow_As = (nx+1:nx̂) .+ nx̂*j
+        iCol_As = (nx+1:nx̂) .+ nx̂*(j-1)
+        ESx̂[iRow_λo, iCol_λo] = λo_I
+        ESx̂[iRow_As, iCol_As] = As
+    end
+    ESk = repeatdiag([Co; zeros(NT, nxs, nk)], Hp)
+    ES  = [ESΔu ESx̂ ESk]
     # --- current measured disturbances d0 and predictions D̂0 ---
     GS = zeros(NT, nx̂*Hp, nd)
     JS = zeros(NT, nx̂*Hp, nd*Hp)
@@ -798,32 +820,37 @@ end
 
 """
     init_defectmat(
-        model::NonLinModel, estim::InternalModel, ::TranscriptionMethod, Hp, Hc, _
+        model::NonLinModel, estim::InternalModel, ::TranscriptionMethod,
+        Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`InternalModel`](@ref) (the state vector is not augmented).
 """
 function init_defectmat(
-    ::NonLinModel, estim::InternalModel, transcription::TranscriptionMethod, Hp, Hc, _
+    ::NonLinModel, estim::InternalModel, transcription::TranscriptionMethod, 
+    Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
 
 """
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::SingleShooting, Hp, Hc, _
+        model::SimModel, estim::StateEstimator, transcription::SingleShooting, 
+        Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
 """
 function init_defectmat(
-    ::SimModel, estim::StateEstimator, transcription::SingleShooting, Hp, Hc, _
+    ::SimModel, estim::StateEstimator, transcription::SingleShooting,
+    Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
 
 function init_defectmat(
-    ::NonLinModel, estim::InternalModel, transcription::SingleShooting, Hp, Hc, _
+    ::NonLinModel, estim::InternalModel, transcription::SingleShooting,
+    Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
@@ -1684,7 +1711,6 @@ function con_nonlinprogeq!(
     p = model.p
     Mo, no, τ =  mpc.Mo, transcription.no, transcription.τ
     nk = get_nk(model, transcription)
-    nx_nk = nx + nk
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     D̂temp = mpc.buffer.D̂
@@ -1700,7 +1726,7 @@ function con_nonlinprogeq!(
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        sk       = @views   geq[(1 + nx_nk*(j-1) + nx):(nx_nk*j)]
+        sk       = @views   geq[(1 + nk*(j-1)):(nk*j)]
         # ----------------- collocation constraint defects -----------------------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         Δk = k̇
