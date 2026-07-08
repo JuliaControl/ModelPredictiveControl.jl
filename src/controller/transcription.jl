@@ -607,7 +607,7 @@ Init the matrices for computing the defects over the predicted states.
 Knowing that the decision vector ``\mathbf{Z}`` contains both ``\mathbf{ΔU}`` and 
 ``\mathbf{X̂_0}`` vectors (with a [`MultipleShooting`](@ref) transcription), an equation
 similar to the prediction matrices (see [`init_predmat`](@ref)) computes the defects of
-the estimated states of ``H_p``:
+the estimated states over ``H_p``:
 ```math
 \begin{aligned}
     \mathbf{Ŝ} &= \mathbf{E_S Z} + \mathbf{G_S d_0}(k)  + \mathbf{J_S D̂_0} 
