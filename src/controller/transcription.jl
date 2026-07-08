@@ -1154,11 +1154,11 @@ If supported by `mpc.optim`, it warm-starts the solver at:
     \vdots                      \\
     \mathbf{Δu}(k+H_c-2|k-1)    \\
     \mathbf{0}                  \\
-    ϵ(k-1)
+    ϵ_{k-1}
 \end{bmatrix}
 ```
 where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
-last control period ``k-1``, and ``ϵ(k-1)``, the slack variable of the last control period.
+last control period ``k-1``, and ``ϵ_{k-1}``, the slack variable of the last control period.
 """
 function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
     nu, Hc, Z̃s = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
@@ -1195,7 +1195,7 @@ It warm-starts the solver at:
     \vdots                          \\
     \mathbf{k}(k+H_p-2|k-1)         \\
     \mathbf{k}(k+H_p-2|k-1)         \\
-    ϵ(k-1)
+    ϵ_{k-1}
 \end{bmatrix}
 ```
 where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
@@ -1243,7 +1243,7 @@ It warm-starts the solver at:
     \vdots                      \\
     \mathbf{x̂_0}(k+H_p-1|k-1)   \\
     \mathbf{x̂_0}(k+H_p-1|k-1)   \\
-    ϵ(k-1)
+    ϵ_{k-1}
 \end{bmatrix}
 ```
 where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
