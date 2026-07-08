@@ -249,14 +249,14 @@ function init_orthocolloc(
     for j=1:no, i=1:no
         iRows = (1:nx) .+ nx*(i-1)
         iCols = (1:nx) .+ nx*(j-1)
-        Po[iRows, iCols] = (τ[i]^j)*I(nx)
-        Ṗo[iRows, iCols] = (j*τ[i]^(j-1))*I(nx)
+        Po[iRows, iCols] = (τ[i]^j)*I
+        Ṗo[iRows, iCols] = (j*τ[i]^(j-1))*I
     end
     Mo = sparse((Ṗo/Po)/model.Ts)
     Co = Matrix{NT}(undef, nx, nx*no)
     for j=1:no
         iCols = (1:nx) .+ nx*(j-1)
-        Co[:, iCols] = lagrange_end(j, transcription)*I(nx)
+        Co[:, iCols] = lagrange_end(j, transcription)*I
     end
     Co = sparse(Co)
     λo = lagrange_end(0, transcription)
