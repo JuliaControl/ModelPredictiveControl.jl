@@ -238,8 +238,20 @@ and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagran
 ```math
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
-The ``\mathbf{M_o}`` matrix is used in the collocation constraints (nonlinear), and the
-``\mathbf{C_o}`` and ``λ_o`` constants, in the continuity constraints (linear).
+
+The collocation constraints are nonlinear, but the defects of deterministic states 
+``\mathbf{x̂_d}`` for the continuity constraints are in fact linear equality constraints:
+```math
+\mathbf{s_c}(k+j+1) = \mathbf{0} =
+    = \mathbf{C_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(k+j)                                           \\
+        \mathbf{k}_2(k+j)                                           \\
+        \vdots                                                      \\
+        \mathbf{k}_{n_o}(k+j)                                       \end{bmatrix}       
+    + λ_o \mathbf{x̂_d}(k+j) - \mathbf{x̂_d}(k+j+1)
+```
+for ``j = 0, 1, ... , H_p-1``. The ``\mathbf{k}_i(k+j)`` and ``\mathbf{x̂_d}(k+j)`` vectors
+are all directly extracted from the decision variable `Z̃`.
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
@@ -714,7 +726,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, ::TranscriptionMethod, 
+        model::SimModel, estim::StateEstimator, transcription::TranscriptionMethod, 
         Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
@@ -782,7 +794,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, ::TranscriptionMethod, 
+        model::SimModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
         Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
