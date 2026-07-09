@@ -243,7 +243,7 @@ The collocation constraints are nonlinear, but the defects of deterministic stat
 ``\mathbf{x̂_d}`` for the continuity constraints are in fact linear equality constraints:
 ```math
 \mathbf{s_c}(k+j+1) = \mathbf{0} =
-    = \mathbf{C_o} \begin{bmatrix}                                          
+    \mathbf{C_o} \begin{bmatrix}                                          
         \mathbf{k}_1(k+j)                                           \\
         \mathbf{k}_2(k+j)                                           \\
         \vdots                                                      \\
