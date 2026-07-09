@@ -103,7 +103,10 @@ struct NonLinMPC{
             model, estim, transcription, Hp, Hc, nb
         )
         F = zeros(NT, ny*Hp) # dummy value (updated just before optimization)
-        ES, GS, JS, KS, VS, BS = init_defectmat(model, estim, transcription, Hp, Hc, nb)
+        Mo, Co, λo = init_orthocolloc(model, transcription)
+        ES, GS, JS, KS, VS, BS = init_defectmat(
+            model, estim, transcription, Hp, Hc, nb, Co, λo
+        )
         con, nϵ, P̃Δu, P̃u, Ẽ = init_defaultcon_mpc(
             estim, weights, transcription,
             Hp, Hc, 
@@ -122,7 +125,6 @@ struct NonLinMPC{
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         test_custom_function_mpc(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
-        Mo, Co, λo = init_orthocolloc(model, transcription)
         nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)

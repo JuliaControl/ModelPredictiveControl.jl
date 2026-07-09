@@ -639,7 +639,7 @@ If supported by `estim.optim`, it warm-starts the solver at:
     \mathbf{0}                      \\
 \end{bmatrix}
 ```
-where ``ε(k-1)``, ``\mathbf{x̂}_{k-1}(k-N_k+p)`` and ``\mathbf{ŵ}_{k-1}(k-j)`` are
+where ``ε_{k-1}``, ``\mathbf{x̂}_{k-1}(k-N_k+p)`` and ``\mathbf{ŵ}_{k-1}(k-j)`` are
 respectively the slack variable, the arrival state estimate and the process noise estimates
 computed at the last time step ``k-1``. If the objective function is not finite at this
 point, all the process noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. The

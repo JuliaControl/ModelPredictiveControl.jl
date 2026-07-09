@@ -238,6 +238,20 @@ and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagran
 ```math
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
+
+The collocation constraints are nonlinear, but the defects of deterministic states 
+``\mathbf{x̂_d}`` for the continuity constraints are in fact linear equality constraints:
+```math
+\mathbf{s_c}(k+j+1) = \mathbf{0} =
+    \mathbf{C_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(k+j)                                           \\
+        \mathbf{k}_2(k+j)                                           \\
+        \vdots                                                      \\
+        \mathbf{k}_{n_o}(k+j)                                       \end{bmatrix}       
+    + λ_o \mathbf{x̂_d}(k+j) - \mathbf{x̂_d}(k+j+1)
+```
+for ``j = 0, 1, ... , H_p-1``. The ``\mathbf{k}_i(k+j)`` and ``\mathbf{x̂_d}(k+j)`` vectors
+are all directly extracted from the decision variable `Z̃`.
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
@@ -246,17 +260,18 @@ function init_orthocolloc(
     τ = transcription.τ
     Po = Matrix{NT}(undef, nx*no, nx*no) # polynomial matrix (w/o the Y-intercept term)
     Ṗo = Matrix{NT}(undef, nx*no, nx*no) # polynomial derivative matrix
+    I_nx = I(nx)
     for j=1:no, i=1:no
         iRows = (1:nx) .+ nx*(i-1)
         iCols = (1:nx) .+ nx*(j-1)
-        Po[iRows, iCols] = (τ[i]^j)*I(nx)
-        Ṗo[iRows, iCols] = (j*τ[i]^(j-1))*I(nx)
+        Po[iRows, iCols] = (τ[i]^j)*I_nx
+        Ṗo[iRows, iCols] = (j*τ[i]^(j-1))*I_nx
     end
     Mo = sparse((Ṗo/Po)/model.Ts)
     Co = Matrix{NT}(undef, nx, nx*no)
     for j=1:no
         iCols = (1:nx) .+ nx*(j-1)
-        Co[:, iCols] = lagrange_end(j, transcription)*I(nx)
+        Co[:, iCols] = lagrange_end(j, transcription)*I_nx
     end
     Co = sparse(Co)
     λo = lagrange_end(0, transcription)
@@ -599,7 +614,8 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::LinModel, estim::StateEstimator, transcription::MultipleShooting, Hp, Hc, nb
+        model::LinModel, estim::StateEstimator, transcription::MultipleShooting, 
+        Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects over the predicted states. 
@@ -607,7 +623,7 @@ Init the matrices for computing the defects over the predicted states.
 Knowing that the decision vector ``\mathbf{Z}`` contains both ``\mathbf{ΔU}`` and 
 ``\mathbf{X̂_0}`` vectors (with a [`MultipleShooting`](@ref) transcription), an equation
 similar to the prediction matrices (see [`init_predmat`](@ref)) computes the defects of
-the estimated states of ``H_p``:
+the estimated states over ``H_p``:
 ```math
 \begin{aligned}
     \mathbf{Ŝ} &= \mathbf{E_S Z} + \mathbf{G_S d_0}(k)  + \mathbf{J_S D̂_0} 
@@ -642,10 +658,10 @@ matrices ``\mathbf{E_S, G_S, J_S, K_S, V_S, B_S}`` are defined in the Extended H
         \vdots              & \vdots              & \ddots & \vdots                                 \\
         \mathbf{Q}(n_{H_c}) & \mathbf{Q}(n_{H_c}) & \cdots & \mathbf{Q}(n_{H_c})                    \end{bmatrix} \\
     \mathbf{E_{S}^{x̂}} &= \begin{bmatrix}
-       -\mathbf{I} &  \mathbf{0} & \cdots &  \mathbf{0}  &  \mathbf{0}                              \\
-        \mathbf{Â} & -\mathbf{I} & \cdots &  \mathbf{0}  &  \mathbf{0}                              \\
-        \vdots     &  \vdots     & \ddots &  \vdots      &  \vdots                                  \\
-        \mathbf{0} &  \mathbf{0} & \cdots &  \mathbf{Â}  & -\mathbf{I}                              \end{bmatrix} \\
+        \mathbf{-I} &  \mathbf{0}  & \cdots &  \mathbf{0}  & \mathbf{0}                             \\
+        \mathbf{Â}  &  \mathbf{-I} & \cdots &  \mathbf{0}  & \mathbf{0}                             \\
+        \vdots      &  \vdots      & \ddots &  \vdots      & \vdots                                 \\
+        \mathbf{0}  &  \mathbf{0}  & \cdots &  \mathbf{Â}  & \mathbf{-I}                            \end{bmatrix} \\
     \mathbf{G_S} &= \begin{bmatrix}
         \mathbf{B̂_d} \\ \mathbf{0} \\ \vdots \\ \mathbf{0}                                          \end{bmatrix} \\
     \mathbf{J_S} &= \begin{bmatrix}
@@ -666,7 +682,8 @@ matrices ``\mathbf{E_S, G_S, J_S, K_S, V_S, B_S}`` are defined in the Extended H
     (see [`move_blocking`](@ref)).
 """
 function init_defectmat(
-    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, Hp, Hc, nb
+    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, 
+    Hp, Hc, nb, ::Any=nothing, ::Any=nothing
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
@@ -709,18 +726,19 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, ::TranscriptionMethod, Hp, Hc, _
+        model::SimModel, estim::StateEstimator, transcription::TranscriptionMethod, 
+        Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the defects of the stochastic states only.
 
 The documentation of [`init_estimstoch`](@ref) shows that the stochastic model of the 
 unmeasured disturbances is linear and discrete-time. The defect of the stochastic states
-over ``H_p`` is therefore:
+over ``H_p`` is therefore computed by:
 ```math
 \begin{aligned}
-    \mathbf{Ŝ_s} &= \mathbf{E_S Z} + \mathbf{K_S x̂_0}(k)  \\
-                 &= \mathbf{E_S Z} + \mathbf{F_S}
+    \mathbf{Ŝ} &= \mathbf{E_S Z} + \mathbf{K_S x̂_0}(k)  \\
+               &= \mathbf{E_S Z} + \mathbf{F_S}
 \end{aligned}
 ```   
 The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended Help section.
@@ -731,32 +749,26 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     the defect matrices are computed with:
     ```math
     \begin{aligned}
-    \mathbf{E_{S}^{Δu}} &= \mathbf{0}                                                                           \\
+    \mathbf{E_{S}^{Δu}} &= \mathbf{0}                                                                            \\
     \mathbf{E_{S}^{x̂}}  &= \begin{bmatrix}
-        \mathbf{0} &-\mathbf{I}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
-        \mathbf{0} & \mathbf{A_s} & \mathbf{0} &-\mathbf{I} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
-        \vdots     & \vdots       & \vdots     & \vdots     & \ddots & \vdots       & \vdots     & \vdots       \\
-        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{A_s} & \mathbf{0} &-\mathbf{I}   \end{bmatrix} \\
-    \mathbf{E_{S}^{k}} &= \mathbf{0}                                                                            \\
+        \mathbf{0} & \mathbf{-I}  & \mathbf{0} & \mathbf{0}  & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
+        \mathbf{0} & \mathbf{A_s} & \mathbf{0} & \mathbf{-I} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
+        \vdots     & \vdots       & \vdots     & \vdots      & \ddots & \vdots       & \vdots     & \vdots       \\
+        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}  & \cdots & \mathbf{A_s} & \mathbf{0} & \mathbf{-I}  \end{bmatrix} \\
+    \mathbf{E_S}       &= \begin{bmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}}                               \end{bmatrix} \\
     \mathbf{K_S}       &= \begin{bmatrix}
-        \mathbf{0} & \mathbf{A_s}                                                                               \\                                          
-        \mathbf{0} & \mathbf{0}                                                                                 \\   
-        \vdots     & \vdots                                                                                     \\
-        \mathbf{0} & \mathbf{0}                                                                                 \end{bmatrix}
+        \mathbf{0} & \mathbf{A_s}                                                                                \\                                          
+        \mathbf{0} & \mathbf{0}                                                                                  \\   
+        \vdots     & \vdots                                                                                      \\
+        \mathbf{0} & \mathbf{0}                                                                                  \end{bmatrix}
     \end{aligned}
     ```
-    and:
-    - if `transcription` is an [`OrthogonalCollocation`](@ref), ``\mathbf{E_S} = [\begin{smallmatrix} 
-      \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} & \mathbf{E_{S}^{k}} \end{smallmatrix}]``
-    - else ``\mathbf{E_S} = [\begin{smallmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} \end{smallmatrix}]``
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, 
-    Hp, Hc, _
+    model::SimModel, estim::StateEstimator{NT}, ::TranscriptionMethod, 
+    Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
-    nZ = get_nZ(estim, transcription, Hp, Hc)
-    nK = nZ - nu*Hc - nx̂*Hp
     As = estim.As
     # --- current state estimates x̂0 ---
     KS = zeros(NT, nxs*Hp, nx̂)
@@ -764,13 +776,14 @@ function init_defectmat(
     # --- previous manipulated inputs lastu0 ---
     VS = zeros(nxs*Hp, nu)
     # --- decision variables Z ---
-    zeros_nI = [zeros(NT, nxs, nx) -I]
-    ES = [zeros(NT, nxs*Hp, nu*Hc) repeatdiag(zeros_nI, Hp) zeros(NT, nxs*Hp, nK)]
+    ESΔu = zeros(NT, nxs*Hp, nu*Hc)
+    ESx̂  = repeatdiag([zeros(NT, nxs, nx) -I], Hp)
     for j=1:Hp-1
-        iRow = (1:nxs) .+ nxs*j
-        iCol = (nx+1:nx̂) .+ nx̂*(j-1) .+ nu*Hc
-        ES[iRow, iCol] = As
+        iRow = (1:nxs)   .+ nxs*j
+        iCol = (nx+1:nx̂) .+ nx̂*(j-1)
+        ESx̂[iRow, iCol] = As
     end
+    ES = [ESΔu ESx̂]
     # --- current measured disturbances d0 and predictions D̂0 ---
     GS = zeros(NT, nxs*Hp, nd)
     JS = zeros(NT, nxs*Hp, nd*Hp)
@@ -779,38 +792,147 @@ function init_defectmat(
     return ES, GS, JS, KS, VS, BS
 end
 
+@doc raw"""
+    init_defectmat(
+        model::SimModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
+        Hp, Hc, nb, Co=nothing, λo=nothing
+    ) -> ES, GS, JS, KS, VS, BS
+
+Init the matrices for computing the continuity constraints and stochastic state defects.
+
+The documentation of [`init_orthocolloc`](@ref) shows that continuity constraints of the
+[`OrthogonalCollocation`](@ref) are in fact linear. Combined with the stochastic state
+defects, the linear equality constraints for this transcription is given by:
+```math
+\begin{aligned}
+    \mathbf{Ŝ} &= \mathbf{E_S Z} + \mathbf{K_S x̂_0}(k)  \\
+               &= \mathbf{E_S Z} + \mathbf{F_S}
+\end{aligned}
+```   
+The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended Help section.
+
+
+# Extended Help
+!!! details "Extended Help"
+    Using the stochastic matrix ``\mathbf{A_s}`` in `estim` and the continuity constraints
+    constants of [`init_orthocolloc`](@ref), the defect matrices are:
+    ```math
+    \begin{aligned}
+    \mathbf{E_{S}^{Δu}} &= \mathbf{0}                                                                                               \\
+    \mathbf{E_{S}^{x̂}}  &= \begin{bmatrix}
+       \mathbf{-I}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}    \\
+        \mathbf{0}    & \mathbf{-I}  & \mathbf{0} &\mathbf{0}  & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}    \\
+        λ_o\mathbf{I} & \mathbf{0}   &\mathbf{-I} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}    \\
+        \mathbf{0}    & \mathbf{A_s} & \mathbf{0} &\mathbf{-I} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}    \\
+        \vdots        & \vdots       & \vdots     & \vdots     & \ddots & \vdots        & \vdots       & \vdots     & \vdots        \\
+        \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & λ_o\mathbf{I} & \mathbf{0}   & \mathbf{-I} & \mathbf{0}   \\   
+        \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{A_s} & \mathbf{0}  & \mathbf{-I}  \end{bmatrix} \\
+    \mathbf{E_{S}^{k}} &= \begin{bmatrix}
+       \mathbf{C_o}   & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \\
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \\
+        \mathbf{0}    & \mathbf{C_o} & \cdots & \mathbf{0}                                                                          \\
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \\
+        \vdots        & \vdots       & \ddots & \vdots                                                                              \\
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{C_o}                                                                        \\   
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \end{bmatrix} \\
+    \mathbf{E_S}       &= \begin{bmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} & \mathbf{E_{S}^{k}}                             \end{bmatrix} \\
+    \mathbf{K_S}       &= \begin{bmatrix}
+        λ_o\mathbf{I} & \mathbf{0}                                                                                                  \\                                          
+        \mathbf{0}    & \mathbf{A_s}                                                                                                \\
+        \mathbf{0}    & \mathbf{0}                                                                                                  \\    
+        \vdots        & \vdots                                                                                                      \\
+        \mathbf{0}    & \mathbf{0}                                                                                                  \end{bmatrix}
+    \end{aligned}
+    ```
+    Note that if `estim` is an [`InternalModel`](@ref), the state vector is not augmented so
+    the rows of ``\mathbf{E_S}`` and ``\mathbf{K_S}`` with an even index are removed. 
+"""
+function init_defectmat(
+    model::NonLinModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
+    Hp, Hc, _ , Co, λo
+)
+    As, nxs = estim.As, estim.nxs
+    return init_defectmat_orthocolloc(model, estim, transcription, Hp, Hc, Co, λo, As, nxs)
+end
+
+function init_defectmat(
+    model::NonLinModel, estim::InternalModel{NT}, transcription::OrthogonalCollocation, 
+    Hp, Hc, _ , Co, λo
+) where {NT<:Real}
+    As, nxs = zeros(NT, 0, 0), 0 # the state vector is not augmented, no stochastic defects
+    return init_defectmat_orthocolloc(model, estim, transcription, Hp, Hc, Co, λo, As, nxs)
+end
+
+function init_defectmat_orthocolloc(
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::OrthogonalCollocation, 
+    Hp, Hc, Co, λo, As, nxs
+) where {NT<:Real}
+    nu, nx, nd, nx̂ = model.nu, model.nx, model.nd, estim.nx̂
+    nk = get_nk(model, transcription)
+    λo_I = λo*I(nx)
+    # --- current state estimates x̂0 ---
+    KS = zeros(NT, nx̂*Hp, nx̂)
+    KS[1:nx, 1:nx]       = λo_I
+    KS[nx+1:nx̂, nx+1:nx̂] = As
+    # --- previous manipulated inputs lastu0 ---
+    VS = zeros(nx̂*Hp, nu)
+    # --- decision variables Z ---
+    ESΔu = zeros(NT, nx̂*Hp, nu*Hc)
+    ESx̂  = diagm(fill(NT(-1.0), nx̂*Hp))
+    for j=1:Hp-1
+        iRow_λo = (1:nx)    .+ nx̂*j
+        iCol_λo = (1:nx)    .+ nx̂*(j-1)
+        iRow_As = (nx+1:nx̂) .+ nx̂*j
+        iCol_As = (nx+1:nx̂) .+ nx̂*(j-1)
+        ESx̂[iRow_λo, iCol_λo] = λo_I
+        ESx̂[iRow_As, iCol_As] = As
+    end
+    ESk = repeatdiag([Co; zeros(NT, nxs, nk)], Hp)
+    ES  = [ESΔu ESx̂ ESk]
+    # --- current measured disturbances d0 and predictions D̂0 ---
+    GS = zeros(NT, nx̂*Hp, nd)
+    JS = zeros(NT, nx̂*Hp, nd*Hp)
+    # --- state x̂op and state update f̂op operating points ---
+    BS = zeros(NT, nx̂*Hp)
+    return ES, GS, JS, KS, VS, BS
+end
+
 """
     init_defectmat(
-        model::NonLinModel, estim::InternalModel, ::TranscriptionMethod, Hp, Hc, _
+        model::NonLinModel, estim::InternalModel, ::TranscriptionMethod,
+        Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`InternalModel`](@ref) (the state vector is not augmented).
 """
 function init_defectmat(
-    ::NonLinModel, estim::InternalModel, transcription::TranscriptionMethod, Hp, Hc, _
+    ::NonLinModel, estim::InternalModel, transcription::TranscriptionMethod, 
+    Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
 
 """
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::SingleShooting, Hp, Hc, _
+        model::SimModel, estim::StateEstimator, transcription::SingleShooting, 
+        Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
 """
 function init_defectmat(
-    ::SimModel, estim::StateEstimator, transcription::SingleShooting, Hp, Hc, _
+    ::SimModel, estim::StateEstimator, transcription::SingleShooting,
+    Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
 
 function init_defectmat(
-    ::NonLinModel, estim::InternalModel, transcription::SingleShooting, Hp, Hc, _
+    ::NonLinModel, estim::InternalModel, transcription::SingleShooting,
+    Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
-
 
 function init_defectmat_empty(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
@@ -1154,11 +1276,11 @@ If supported by `mpc.optim`, it warm-starts the solver at:
     \vdots                      \\
     \mathbf{Δu}(k+H_c-2|k-1)    \\
     \mathbf{0}                  \\
-    ϵ(k-1)
+    ϵ_{k-1}
 \end{bmatrix}
 ```
 where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
-last control period ``k-1``, and ``ϵ(k-1)``, the slack variable of the last control period.
+last control period ``k-1``, and ``ϵ_{k-1}``, the slack variable of the last control period.
 """
 function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
     nu, Hc, Z̃s = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
@@ -1195,7 +1317,7 @@ It warm-starts the solver at:
     \vdots                          \\
     \mathbf{k}(k+H_p-2|k-1)         \\
     \mathbf{k}(k+H_p-2|k-1)         \\
-    ϵ(k-1)
+    ϵ_{k-1}
 \end{bmatrix}
 ```
 where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
@@ -1243,7 +1365,7 @@ It warm-starts the solver at:
     \vdots                      \\
     \mathbf{x̂_0}(k+H_p-1|k-1)   \\
     \mathbf{x̂_0}(k+H_p-1|k-1)   \\
-    ϵ(k-1)
+    ϵ_{k-1}
 \end{bmatrix}
 ```
 where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
@@ -1665,10 +1787,8 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     p = model.p
-    no, τ = transcription.no, transcription.τ
-    Mo, Co, λo = mpc.Mo, mpc.Co, mpc.λo
+    Mo, no, τ =  mpc.Mo, transcription.no, transcription.τ
     nk = get_nk(model, transcription)
-    nx_nk = nx + nk
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     D̂temp = mpc.buffer.D̂
@@ -1684,9 +1804,7 @@ function con_nonlinprogeq!(
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        x̂dnext_Z̃ = @views  X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
-        scnext   = @views   geq[(1 + nx_nk*(j-1)     ):(nx_nk*(j-1) + nx)]
-        sk       = @views   geq[(1 + nx_nk*(j-1) + nx):(nx_nk*j         )]
+        sk       = @views   geq[(1 + nk*(j-1)):(nk*j)]
         # ----------------- collocation constraint defects -----------------------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         Δk = k̇
@@ -1712,8 +1830,6 @@ function con_nonlinprogeq!(
             end
         end
         sk .-= k̇
-        # ----------------- continuity constraint defects ------------------------------
-        scnext .= mul!(scnext, Co, k_Z̃) .+ (λo.*x̂d_Z̃) .- x̂dnext_Z̃
     end
     return geq
 end
