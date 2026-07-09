@@ -238,6 +238,8 @@ and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagran
 ```math
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
+The ``\mathbf{M_o}`` matrix is used in the collocation constraints (nonlinear), and the
+``\mathbf{C_o}`` and ``λ_o`` constants, in the continuity constraints (linear).
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
@@ -784,19 +786,34 @@ function init_defectmat(
 end
 
 function init_defectmat(
-    model::NonLinModel, estim::StateEstimator{NT}, transcription::OrthogonalCollocation, 
+    model::NonLinModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
+    Hp, Hc, _ , Co, λo
+)
+    As, nxs = estim.As, estim.nxs
+    return init_defectmat_orthocolloc(model, estim, transcription, Hp, Hc, Co, λo, As, nxs)
+end
+
+function init_defectmat(
+    model::NonLinModel, estim::InternalModel{NT}, transcription::OrthogonalCollocation, 
     Hp, Hc, _ , Co, λo
 ) where {NT<:Real}
-    nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
+    As, nxs = zeros(NT, 0, 0), 0 # the state vector is not augmented, no stochastic defects
+    return init_defectmat_orthocolloc(model, estim, transcription, Hp, Hc, Co, λo, As, nxs)
+end
+
+function init_defectmat_orthocolloc(
+    model::NonLinModel, estim::StateEstimator{NT}, transcription::OrthogonalCollocation, 
+    Hp, Hc, Co, λo, As, nxs
+) where {NT<:Real}
+    nu, nx, nd, nx̂ = model.nu, model.nx, model.nd, estim.nx̂
     nk = get_nk(model, transcription)
-    As = estim.As
     λo_I = λo*I(nx)
     # --- current state estimates x̂0 ---
     KS = zeros(NT, nx̂*Hp, nx̂)
     KS[1:nx, 1:nx]       = λo_I
     KS[nx+1:nx̂, nx+1:nx̂] = As
     # --- previous manipulated inputs lastu0 ---
-    VS = zeros(nxs*Hp, nu)
+    VS = zeros(nx̂*Hp, nu)
     # --- decision variables Z ---
     ESΔu = zeros(NT, nx̂*Hp, nu*Hc)
     ESx̂  = diagm(fill(NT(-1.0), nx̂*Hp))
@@ -854,7 +871,6 @@ function init_defectmat(
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
 end
-
 
 function init_defectmat_empty(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
