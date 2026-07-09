@@ -859,30 +859,37 @@ end
     @test nmpc11.estim.nint_ym == [0, 0]
     gc! = (LHS,_,_,_,_,_)-> (LHS .= 0.0) # useless, only for coverage
     nmpc16 = NonLinMPC(nonlinmodel, Hp=10, transcription=MultipleShooting(), nc=10, gc=gc!)
-    @test nmpc16.transcription == MultipleShooting()
+    @test isa(nmpc16.transcription, MultipleShooting)
     @test length(nmpc16.Z̃) == nonlinmodel.nu*nmpc16.Hc + nmpc16.estim.nx̂*nmpc16.Hp + nmpc16.nϵ
     @test nmpc16.con.neq == nmpc16.estim.model.nx*nmpc16.Hp
     @test nmpc16.con.nc == 10
     nonlinmodel_c = NonLinModel((ẋ,x,u,_,_)->ẋ .= -0.1x .+ u, (y,x,_,_)->y.=x, 1, 1, 1, 1)
     nmpc17 = NonLinMPC(nonlinmodel_c, Hp=10, transcription=TrapezoidalCollocation(), nc=10, gc=gc!)
-    @test nmpc17.transcription == TrapezoidalCollocation()
+    @test isa(nmpc17.transcription, TrapezoidalCollocation)
     @test length(nmpc17.Z̃) == nonlinmodel_c.nu*nmpc17.Hc + nmpc17.estim.nx̂*nmpc17.Hp + nmpc17.nϵ
     @test nmpc17.con.neq == nmpc17.estim.model.nx*nmpc17.Hp
     @test nmpc17.con.nc == 10
-    nmpc18 = NonLinMPC(nonlinmodel, Hp=10, 
+    nmpc18 = NonLinMPC(
+        InternalModel(nonlinmodel_c), Hp=10, transcription=OrthogonalCollocation(), Cwt=Inf
+    )
+    @test isa(nmpc18.transcription, OrthogonalCollocation)
+    Hp, Hc, no, nx̂ = nmpc18.Hp, nmpc18.Hc, nmpc18.transcription.no, nmpc18.estim.nx̂
+    @test length(nmpc18.Z̃) == nonlinmodel_c.nu*Hc + nx̂*Hp + nonlinmodel_c.nx*Hp*no
+    @test nmpc18.con.neq == nonlinmodel_c.nx*Hp*no
+    nmpc19 = NonLinMPC(nonlinmodel, Hp=10, 
         gradient=AutoFiniteDiff(), 
         jacobian=AutoFiniteDiff(),
         hessian=AutoFiniteDiff()
     )
-    @test nmpc18.gradient == AutoFiniteDiff()
-    @test nmpc18.jacobian == AutoFiniteDiff()
-    @test nmpc18.hessian  == AutoFiniteDiff()
+    @test nmpc19.gradient == AutoFiniteDiff()
+    @test nmpc19.jacobian == AutoFiniteDiff()
+    @test nmpc19.hessian  == AutoFiniteDiff()
     nonlinmodel_simple = NonLinModel((x,u,_,_)->x+u,(x,_,_)->x, 1, 1, 1, 1, solver=nothing)
-    nmpc19 = NonLinMPC(nonlinmodel_simple, Hc=1, Hp=10, Cwt=Inf, 
+    nmpc20 = NonLinMPC(nonlinmodel_simple, Hc=1, Hp=10, Cwt=Inf, 
         hessian=SecondOrder(AutoForwardDiff(), AutoForwardDiff())
     )
-    @test nmpc19.hessian == SecondOrder(AutoForwardDiff(), AutoForwardDiff())
-    @test_nowarn repr(nmpc19) # printing SecondOrder backends, for coverage
+    @test nmpc20.hessian == SecondOrder(AutoForwardDiff(), AutoForwardDiff())
+    @test_nowarn repr(nmpc20) # printing SecondOrder backends, for coverage
 
     nonlinmodel2 = NonLinModel{Float32}(f, h, Ts, 2, 4, 2, 1, solver=nothing)
     nmpc15  = NonLinMPC(nonlinmodel2, Hp=15)
