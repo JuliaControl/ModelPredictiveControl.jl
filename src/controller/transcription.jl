@@ -1762,20 +1762,9 @@ and disturbances are piecewise constant or linear:
 \mathbf{d̂}_i(k+j) &= (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)                      
 \end{aligned}
 ```
-The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref). The defects of the 
-stochastic states are linear equality constraints (see [`init_defectmat`](@ref)), and the 
-ones for the continuity constraint of the deterministic states are:
-```math
-\mathbf{s_c}(k+j+1) 
-    = \mathbf{C_o} \begin{bmatrix}                                          
-        \mathbf{k}_1(k+j)                                           \\
-        \mathbf{k}_2(k+j)                                           \\
-        \vdots                                                      \\
-        \mathbf{k}_{n_o}(k+j)                                       \end{bmatrix}       
-    + λ_o \mathbf{x̂_d}(k+j) - \mathbf{x̂_d}(k+j+1)
-```
-for ``j = 0, 1, ... , H_p-1``. The differentiation matrix ``\mathbf{M_o}``, the continuity
-matrix ``\mathbf{C_o}`` and the coefficient ``λ_o`` are introduced in [`init_orthocolloc`](@ref). 
+The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref). The defects for the
+continuity constraints and stochastic states are linear equality constraints (see
+[`init_defectmat`](@ref)).
 """
 function con_nonlinprogeq!(
     geq, _ , Û0, K̇,  
