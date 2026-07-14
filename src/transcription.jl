@@ -34,15 +34,16 @@ plant model/constraints. The Extended Help details transcription of
 # Extended Help
 !!! details "Extended Help"
     For [`MovingHorizonEstimator`](@ref), the decision variable is:
-   ```math
+    ```math
     \mathbf{Z}
         =                                           \begin{bmatrix} 
-        \mathbf{x̂}_0(k-N_k+p)                       \\
+        \mathbf{x̂_0}(k-N_k+p)                       \\
         \mathbf{Ŵ}                                  \end{bmatrix}
         =                                           \begin{bmatrix} 
         \mathbf{x̂}_k(k-N_k+p) - \mathbf{x̂_{op}}     \\
         \mathbf{Ŵ}                                  \end{bmatrix}
     ``` 
+
 """
 struct SingleShooting <: ShootingMethod end
 
