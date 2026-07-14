@@ -103,35 +103,3 @@ NonLinMPC
 ```@docs
 moveinput!
 ```
-
-## Direct Transcription Methods
-
-### TranscriptionMethod
-
-```@docs
-ModelPredictiveControl.TranscriptionMethod
-```
-
-### SingleShooting
-
-```@docs
-SingleShooting
-```
-
-### MultipleShooting
-
-```@docs
-MultipleShooting
-```
-
-### TrapezoidalCollocation
-
-```@docs
-TrapezoidalCollocation
-```
-
-### OrthogonalCollocation
-
-```@docs
-OrthogonalCollocation
-```

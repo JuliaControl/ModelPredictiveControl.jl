@@ -15,8 +15,8 @@ abstract type CollocationMethod <: TranscriptionMethod end
 
 Construct a direct single shooting [`TranscriptionMethod`](@ref).
 
-The decision variable in the optimization problem is (excluding the slack ``ϵ`` and without
-any custom move blocking):
+In the case of [`PredictiveController`](@ref) types, the decision variable in the
+optimization problem is (excluding the slack ``ϵ``, and without any custom move blocking):
 ```math
 \mathbf{Z} = \mathbf{ΔU} =          \begin{bmatrix} 
     \mathbf{Δu}(k+0)                \\ 
@@ -28,7 +28,21 @@ This method computes the predictions by calling the augmented discrete-time mode
 recursively over the prediction horizon ``H_p`` in the objective function, or by updating
 the linear coefficients of the quadratic optimization for [`LinModel`](@ref). It is 
 generally  more efficient for small control horizon ``H_c``, stable and mildly nonlinear
-plant model/constraints.
+plant model/constraints. The Extended Help details transcription of 
+[`MovingHorizonEstimator`](@ref) objects.
+
+# Extended Help
+!!! details "Extended Help"
+    For [`MovingHorizonEstimator`](@ref), the decision variable is:
+   ```math
+    \mathbf{Z}
+        =                                           \begin{bmatrix} 
+        \mathbf{x̂}_0(k-N_k+p)                       \\
+        \mathbf{Ŵ}                                  \end{bmatrix}
+        =                                           \begin{bmatrix} 
+        \mathbf{x̂}_k(k-N_k+p) - \mathbf{x̂_{op}}     \\
+        \mathbf{Ŵ}                                  \end{bmatrix}
+    ``` 
 """
 struct SingleShooting <: ShootingMethod end
 
