@@ -250,8 +250,8 @@ The collocation constraints are nonlinear, but the defects of deterministic stat
         \mathbf{k}_{n_o}(k+j)                                       \end{bmatrix}       
     + λ_o \mathbf{x̂_d}(k+j) - \mathbf{x̂_d}(k+j+1)
 ```
-for ``j = 0, 1, ... , H_p-1``. The ``\mathbf{k}_i(k+j)`` and ``\mathbf{x̂_d}(k+j)`` vectors
-are all directly extracted from the decision variable `Z̃`.
+for ``j = 0, 1, ... , H_p-1``. The ``\mathbf{k}_i`` and ``\mathbf{x̂_d}`` vectors are all
+directly extracted from the decision variable `Z̃`.
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
