@@ -374,8 +374,10 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
     with ``p=1`` is particularly useful for the MHE since it moves its expensive
     computations after the MPC optimization. That is, [`preparestate!`](@ref) will solve the
     optimization by default, but it can be postponed to [`updatestate!`](@ref) with
-    `direct=false`.
-
+    `direct=false`. If a `NaN` value appears in the ``\mathbf{y^m}(k-j)`` vectors it will
+    be ignored in the objective function. An error will be thrown if it appears in
+    ``\mathbf{u}`` or ``\mathbf{d}`` vectors since they are arguments of the dynamics.
+    
     The Extended Help of [`SteadyKalmanFilter`](@ref) details the tuning of the covariances
     and the augmentation with `nint_ym` and `nint_u` arguments. The default augmentation
     scheme is identical, that is `nint_u=0` and `nint_ym` computed by [`default_nint`](@ref).

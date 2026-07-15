@@ -332,11 +332,18 @@ Add data to the observation windows of the moving horizon estimator and clamp `e
 If ``k ≥ H_e``, the observation windows are moving in time and `estim.Nk` is clamped to
 `estim.He`. It returns `true` if the observation windows are moving, `false` otherwise.
 If no `u0` argument is provided, the manipulated input of the last time step is added to its
-window (the correct value if `estim.direct`).
+window (the correct value if `estim.direct`). 
 """
 function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.lastu0)
     model = estim.model
     nx̂, nym, nd, nu, nŵ = estim.nx̂, estim.nym, model.nd, model.nu, estim.nx̂
+    # --- check for NaN values in the arguments ---
+    any(isnan, u0) && throw(ArgumentError("NaN values in the MHE manipulated input u"))
+    if any(isnan, y0m)
+        @warn "NaN values in the MHE measurements ym: ignoring them in the objective"
+    end
+    any(isnan, d0) && throw(ArgumentError("NaN values in the MHE measured disturbance d"))
+    # --- data windows for the predictions ---
     yopm = @views model.yop[estim.i_ym]
     Nk = estim.Nk[]
     p = estim.direct ? 0 : 1 # u0 argument is u0(k-1) if estim.direct, else u0(k)
@@ -345,7 +352,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     estim.Nk .+= 1
     Nk = estim.Nk[]
     ismoving = (Nk > estim.He)
-    # --- data windows for the predictions ---
     # see MovingHorzionEstimator extended help for the exact time steps in each data window
     if ismoving
         estim.Y0m[1:end-nym]        .= @views estim.Y0m[nym+1:end]
@@ -379,6 +385,7 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]                .= ŵ
         estim.X̂0_old[(1 + nx̂*(Nk-1)):(nx̂*Nk)]           .= x̂0_old
     end
+    # --- update the arrival state estimated at k-Nk ---
     estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
     return ismoving
 end
@@ -447,6 +454,12 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     mul!(F, G, U0, 1, 1)
     (model.nd > 0) && mul!(F, J, D0, 1, 1)
     fx̄ .= estim.x̂0arr_old
+    if any(isnan, F) # ignore NaN values in V̂ for the objective function:
+        i_nan = findall(isnan, F)
+        Ẽ, F = copy(Ẽ), copy(F)
+        Ẽ[i_nan, :]  .= 0
+        F[i_nan]     .= 0
+    end
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
     ẼZ̃ = [ẽx̄; Ẽ]
     FZ̃ = [fx̄; F]
@@ -796,6 +809,9 @@ function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, x̄, V̂, Ŵ
     if Nk < estim.He
         nŴ, nYm = Nk*estim.nx̂, Nk*estim.nym
         Ŵ, V̂ = Ŵ[1:nŴ], V̂[1:nYm]
+    end
+    if any(isnan, V̂) # ignore NaN values in V̂ for the objective function:
+        V̂ = [isnan(v) ? 0 : v for v in V̂]
     end
     Jε = estim.nε > 0 ? estim.C*Z̃[begin]^2 : 0
     return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jε
