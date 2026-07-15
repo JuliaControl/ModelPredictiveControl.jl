@@ -379,6 +379,10 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.X̂0_old[(1 + nx̂*(Nk-1)):(nx̂*Nk)]           .= x̂0_old
     end
     estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
+    Y0m = @views estim.Y0m[1:nym*estim.Nk[]]
+    if any(isnan, Y0m)
+        @warn "NaN values in the MHE measured outputs: ignoring them in the objective"
+    end
     return ismoving
 end
     
@@ -446,13 +450,12 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     mul!(F, G, U0, 1, 1)
     (model.nd > 0) && mul!(F, J, D0, 1, 1)
     fx̄ .= estim.x̂0arr_old
-    # --- handle non-finite values in Y0m ---
-    if any(!isfinite, Y0m)
-        @warn "Non-finite values in the MHE measured outputs: ignoring them in the objective"
-        i_nonfinite = findall(!isfinite, Y0m)
-        Ẽ, F = copy(Ẽ), copy(F)
-        Ẽ[i_nonfinite, :]  .= 0
-        F[i_nonfinite]     .= 0
+    if any(isnan, F) # handle NaN values in V̂
+        
+        i_nan = findall(isnan, F)
+        Ẽ, F = copy(Ẽ), copy(F)
+        Ẽ[i_nan, :]  .= 0
+        F[i_nan]     .= 0
     end
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
     ẼZ̃ = [ẽx̄; Ẽ]
@@ -803,6 +806,9 @@ function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, x̄, V̂, Ŵ
     if Nk < estim.He
         nŴ, nYm = Nk*estim.nx̂, Nk*estim.nym
         Ŵ, V̂ = Ŵ[1:nŴ], V̂[1:nYm]
+    end
+    if any(isnan, V̂) # handle NaN values in V̂
+        V̂ = [isnan(v) ? 0 : v for v in V̂]
     end
     Jε = estim.nε > 0 ? estim.C*Z̃[begin]^2 : 0
     return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jε
