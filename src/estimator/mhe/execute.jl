@@ -606,9 +606,9 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
         @debug info2debugstr(getinfo(estim))
     end
     if iserror(optim)
-        estim.Z̃ .= Z̃s
+        estim.Z̃[1:nx̃+nŵ*Nk] .= @views Z̃s[1:nx̃+nŵ*Nk]
     else
-        estim.Z̃ .= JuMP.value.(Z̃var)
+        estim.Z̃[1:nx̃+nŵ*Nk] .= @views JuMP.value.(Z̃var[1:nx̃+nŵ*Nk])
     end
     # --------- update estimate -----------------------
     x̂0arr, û0, ŷ0, k = buffer.x̂, buffer.û, buffer.ŷ, buffer.k
@@ -750,7 +750,7 @@ function update_cov!(estim::MovingHorizonEstimator)
 end
 
 "Invert the covariance estimate at arrival `P̄` and store it in `estim.cov.invP̄`."
-function invert_cov!(estim::MovingHorizonEstimator, covestim::StateEstimator)
+function invert_cov!(estim::MovingHorizonEstimator, ::StateEstimator)
     P̄ = estim.P̂arr_old
     estim.cov.invP̄ .= P̄
     try
