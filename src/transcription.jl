@@ -1,7 +1,7 @@
 const COLLOCATION_NODE_TYPE = Float64
 
 """
-Abstract supertype of all transcription methods of [`PredictiveController`](@ref).
+Abstract supertype of all transcription methods for the optimization problems.
 
 The module currently supports [`SingleShooting`](@ref), [`MultipleShooting`](@ref),
 [`TrapezoidalCollocation`](@ref) and [`OrthogonalCollocation`](@ref) transcription methods.
@@ -33,17 +33,22 @@ plant model/constraints. The Extended Help details transcription of
 
 # Extended Help
 !!! details "Extended Help"
-    For [`MovingHorizonEstimator`](@ref), the decision variable is:
+    For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
     ```math
     \mathbf{Z}
         =                                           \begin{bmatrix} 
         \mathbf{x̂_0}(k-N_k+p)                       \\
-        \mathbf{Ŵ}                                  \end{bmatrix}
+        \mathbf{Ŵ}                                  \\
+        \mathbf{0}                               
+        \end{bmatrix}
         =                                           \begin{bmatrix} 
         \mathbf{x̂}_k(k-N_k+p) - \mathbf{x̂_{op}}     \\
-        \mathbf{Ŵ}                                  \end{bmatrix}
+        \mathbf{Ŵ}                                  \\
+        \mathbf{0}                                  \end{bmatrix}
     ``` 
-
+    The vector ``\mathbf{0}`` with `nx̂*(He-Nk)` zeros is appended when ``N_k < H_e`` (at the
+    beginning), to 
+    
 """
 struct SingleShooting <: ShootingMethod end
 
@@ -52,7 +57,7 @@ struct SingleShooting <: ShootingMethod end
 
 Construct a direct multiple shooting [`TranscriptionMethod`](@ref).
 
-The decision variable is (excluding ``ϵ``):
+The decision variable of [`PredictiveController`](@ref) is (excluding ``ϵ``):
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \end{bmatrix}
 ```
@@ -78,7 +83,15 @@ with `f_threads` or `h_threads` keyword arguments can be advantageous if ``\math
 ``\mathbf{h}`` in the [`NonLinModel`](@ref) is expensive to evaluate, respectively.
 
 Sparse optimizers like `OSQP` or `Ipopt` and sparse Jacobian computations are recommended
-for this transcription method.
+for this transcription method. The transcription of [`MovingHorizonEstimator`](@ref) is
+provided in the Extended Help.
+
+!!! details "Extended Help"
+    For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
+    ```math
+    \mathbf{Z} =                                                            \begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p) \\  \mathbf{X̂_0} \\  \mathbf{Ŵ}               \end{bmatrix}
+    ``` 
 """
 struct MultipleShooting <: ShootingMethod 
     f_threads::Bool
