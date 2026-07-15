@@ -336,6 +336,13 @@ window (the correct value if `estim.direct`).
 function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.lastu0)
     model = estim.model
     nx̂, nym, nd, nu, nŵ = estim.nx̂, estim.nym, model.nd, model.nu, estim.nx̂
+    # --- check for NaN values in the arguments ---
+    any(isnan, u0) && throw(ArgumentError("NaN values in the MHE manipulated input u"))
+    if any(isnan, y0m)
+        @warn "NaN values in the MHE measurements ym: ignoring them in the objective"
+    end
+    any(isnan, d0) && throw(ArgumentError("NaN values in the MHE measured disturbance d"))
+    # --- data windows for the predictions ---
     yopm = @views model.yop[estim.i_ym]
     Nk = estim.Nk[]
     p = estim.direct ? 0 : 1 # u0 argument is u0(k-1) if estim.direct, else u0(k)
@@ -344,7 +351,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     estim.Nk .+= 1
     Nk = estim.Nk[]
     ismoving = (Nk > estim.He)
-    # --- data windows for the predictions ---
     # see MovingHorzionEstimator extended help for the exact time steps in each data window
     if ismoving
         estim.Y0m[1:end-nym]        .= @views estim.Y0m[nym+1:end]
@@ -378,11 +384,8 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]                .= ŵ
         estim.X̂0_old[(1 + nx̂*(Nk-1)):(nx̂*Nk)]           .= x̂0_old
     end
+    # --- update the arrival state estimated at k-Nk ---
     estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
-    Y0m = @views estim.Y0m[1:nym*estim.Nk[]]
-    if any(isnan, Y0m)
-        @warn "NaN values in the MHE measurement window Ym: ignoring them in the objective"
-    end
     return ismoving
 end
     
