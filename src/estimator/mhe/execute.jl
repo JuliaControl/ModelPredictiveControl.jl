@@ -450,7 +450,7 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     mul!(F, G, U0, 1, 1)
     (model.nd > 0) && mul!(F, J, D0, 1, 1)
     fx̄ .= estim.x̂0arr_old
-    if any(isnan, F) # handle NaN values in V̂
+    if any(isnan, F) # ignore NaN values in V̂ for the objective function:
         i_nan = findall(isnan, F)
         Ẽ, F = copy(Ẽ), copy(F)
         Ẽ[i_nan, :]  .= 0
@@ -806,7 +806,7 @@ function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, x̄, V̂, Ŵ
         nŴ, nYm = Nk*estim.nx̂, Nk*estim.nym
         Ŵ, V̂ = Ŵ[1:nŴ], V̂[1:nYm]
     end
-    if any(isnan, V̂) # handle NaN values in V̂
+    if any(isnan, V̂) # ignore NaN values in V̂ for the objective function:
         V̂ = [isnan(v) ? 0 : v for v in V̂]
     end
     Jε = estim.nε > 0 ? estim.C*Z̃[begin]^2 : 0
