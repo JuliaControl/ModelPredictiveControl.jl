@@ -331,7 +331,7 @@ Add data to the observation windows of the moving horizon estimator and clamp `e
 If ``k ≥ H_e``, the observation windows are moving in time and `estim.Nk` is clamped to
 `estim.He`. It returns `true` if the observation windows are moving, `false` otherwise.
 If no `u0` argument is provided, the manipulated input of the last time step is added to its
-window (the correct value if `estim.direct`).
+window (the correct value if `estim.direct`). 
 """
 function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.lastu0)
     model = estim.model
@@ -381,7 +381,7 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
     Y0m = @views estim.Y0m[1:nym*estim.Nk[]]
     if any(isnan, Y0m)
-        @warn "NaN values in the MHE measured outputs: ignoring them in the objective"
+        @warn "NaN values in the MHE measurement window Ym: ignoring them in the objective"
     end
     return ismoving
 end
@@ -451,7 +451,6 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     (model.nd > 0) && mul!(F, J, D0, 1, 1)
     fx̄ .= estim.x̂0arr_old
     if any(isnan, F) # handle NaN values in V̂
-        
         i_nan = findall(isnan, F)
         Ẽ, F = copy(Ẽ), copy(F)
         Ẽ[i_nan, :]  .= 0
