@@ -446,6 +446,14 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     mul!(F, G, U0, 1, 1)
     (model.nd > 0) && mul!(F, J, D0, 1, 1)
     fx̄ .= estim.x̂0arr_old
+    # --- handle non-finite values in Y0m ---
+    if any(!isfinite, Y0m)
+        @warn "Non-finite values in the MHE measured outputs: ignoring them in the objective"
+        i_nonfinite = findall(!isfinite, Y0m)
+        Ẽ, F = copy(Ẽ), copy(F)
+        Ẽ[i_nonfinite, :]  .= 0
+        F[i_nonfinite]     .= 0
+    end
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
     ẼZ̃ = [ẽx̄; Ẽ]
     FZ̃ = [fx̄; F]
