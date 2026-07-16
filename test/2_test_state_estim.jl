@@ -1029,6 +1029,14 @@ end
     x̂ = updatestate!(mhe3, [0], [0])
     @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
+
+    mhe4 = MovingHorizonEstimator(linmodel, He=2)
+    @test_logs(
+        (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
+        preparestate!(mhe4, [50, NaN], [5])
+    )
+    @test mhe4.x̂0 ≈ zeros(6) atol=1e-9
+    
 end
 
 @testitem "MHE estimation and getinfo (NonLinModel)" setup=[SetupMPCtests] begin
@@ -1137,6 +1145,13 @@ end
     @test x̂ ≈ zeros(6) atol=1e-9
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
     @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
+
+    mhe7 = MovingHorizonEstimator(nonlinmodel, He=2)
+    @test_logs(
+        (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
+        preparestate!(mhe7, [50, NaN], [5])
+    )
+    @test mhe7.x̂0 ≈ zeros(6) atol=1e-9
 
 end
 

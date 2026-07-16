@@ -148,12 +148,13 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     V̂,  X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
     Ŷ0     = predict_outputs_mhe!(Ŷ0, estim, X̂0, x̂0arr)
     J      = obj_nonlinprog(estim, estim.model, x̄, V̂, Ŵ, Z̃)
+    yopm   = model.yop[estim.i_ym]
     Ym0, U0, D0 = estim.Y0m[1:nym*Nk], estim.U0[1:nu*Nk], estim.D0[1:nd*(Nk+1)]
     Ym, U, D, Ŷ, X̂, x̂arr = Ym0, U0, D0, Ŷ0, X̂0, x̂0arr
     for i=1:Nk
         X̂[( 1 +  nx̂*(i-1)):(nx̂*i)]  .+= estim.x̂op
         Ŷ[( 1 +  ny*(i-1)):(ny*i)]  .+= model.yop
-        Ym[(1 + nym*(i-1)):(nym*i)] .+= @views model.yop[estim.i_ym]
+        Ym[(1 + nym*(i-1)):(nym*i)] .+= yopm
         U[( 1 +  nu*(i-1)):(nu*i)]  .+= model.uop
         D[( 1 +  nd*(i-1)):(nd*i)]  .+= model.dop
     end
@@ -161,9 +162,9 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     x̂arr            .+= estim.x̂op
     info[:Ŵ]  = Ŵ[1:nŵ*Nk]
     info[:ε]  = getε(estim, Z̃)
-    info[:X̂]  = X̂
+    info[:X̂]  = X̂[1:nx̂*Nk]
     info[:x̂]  = estim.x̂0 .+ estim.x̂op
-    info[:V̂]  = V̂
+    info[:V̂]  = V̂[1:nym*Nk]
     info[:P̄]  = estim.P̂arr_old
     info[:x̄]  = x̄
     info[:Ŷ]  = Ŷ
@@ -331,11 +332,18 @@ Add data to the observation windows of the moving horizon estimator and clamp `e
 If ``k ≥ H_e``, the observation windows are moving in time and `estim.Nk` is clamped to
 `estim.He`. It returns `true` if the observation windows are moving, `false` otherwise.
 If no `u0` argument is provided, the manipulated input of the last time step is added to its
-window (the correct value if `estim.direct`).
+window (the correct value if `estim.direct`). 
 """
 function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.lastu0)
     model = estim.model
     nx̂, nym, nd, nu, nŵ = estim.nx̂, estim.nym, model.nd, model.nu, estim.nx̂
+    # --- check for NaN values in the arguments ---
+    any(isnan, u0) && throw(ArgumentError("NaN values in the MHE manipulated input u"))
+    if any(isnan, y0m)
+        @warn "NaN values in the MHE measurements ym: ignoring them in the objective"
+    end
+    any(isnan, d0) && throw(ArgumentError("NaN values in the MHE measured disturbance d"))
+    # --- data windows for the predictions ---
     yopm = @views model.yop[estim.i_ym]
     Nk = estim.Nk[]
     p = estim.direct ? 0 : 1 # u0 argument is u0(k-1) if estim.direct, else u0(k)
@@ -344,7 +352,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     estim.Nk .+= 1
     Nk = estim.Nk[]
     ismoving = (Nk > estim.He)
-    # --- data windows for the predictions ---
     # see MovingHorzionEstimator extended help for the exact time steps in each data window
     if ismoving
         estim.Y0m[1:end-nym]        .= @views estim.Y0m[nym+1:end]
@@ -378,6 +385,7 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]                .= ŵ
         estim.X̂0_old[(1 + nx̂*(Nk-1)):(nx̂*Nk)]           .= x̂0_old
     end
+    # --- update the arrival state estimated at k-Nk ---
     estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
     return ismoving
 end
@@ -446,6 +454,12 @@ function initpred!(estim::MovingHorizonEstimator, model::LinModel)
     mul!(F, G, U0, 1, 1)
     (model.nd > 0) && mul!(F, J, D0, 1, 1)
     fx̄ .= estim.x̂0arr_old
+    if any(isnan, F) # ignore NaN values in V̂ for the objective function:
+        i_nan = findall(isnan, F)
+        Ẽ, F = copy(Ẽ), copy(F)
+        Ẽ[i_nan, :]  .= 0
+        F[i_nan]     .= 0
+    end
     # --- update H̃, q̃ and p vectors for quadratic optimization ---
     ẼZ̃ = [ẽx̄; Ẽ]
     FZ̃ = [fx̄; F]
@@ -606,9 +620,9 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
         @debug info2debugstr(getinfo(estim))
     end
     if iserror(optim)
-        estim.Z̃ .= Z̃s
+        estim.Z̃[1:nx̃+nŵ*Nk] .= @views Z̃s[1:nx̃+nŵ*Nk]
     else
-        estim.Z̃ .= JuMP.value.(Z̃var)
+        estim.Z̃[1:nx̃+nŵ*Nk] .= @views JuMP.value.(Z̃var[1:nx̃+nŵ*Nk])
     end
     # --------- update estimate -----------------------
     x̂0arr, û0, ŷ0, k = buffer.x̂, buffer.û, buffer.ŷ, buffer.k
@@ -750,7 +764,7 @@ function update_cov!(estim::MovingHorizonEstimator)
 end
 
 "Invert the covariance estimate at arrival `P̄` and store it in `estim.cov.invP̄`."
-function invert_cov!(estim::MovingHorizonEstimator, covestim::StateEstimator)
+function invert_cov!(estim::MovingHorizonEstimator, ::StateEstimator)
     P̄ = estim.P̂arr_old
     estim.cov.invP̄ .= P̄
     try
@@ -795,6 +809,9 @@ function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, x̄, V̂, Ŵ
     if Nk < estim.He
         nŴ, nYm = Nk*estim.nx̂, Nk*estim.nym
         Ŵ, V̂ = Ŵ[1:nŴ], V̂[1:nYm]
+    end
+    if any(isnan, V̂) # ignore NaN values in V̂ for the objective function:
+        V̂ = [isnan(v) ? 0 : v for v in V̂]
     end
     Jε = estim.nε > 0 ? estim.C*Z̃[begin]^2 : 0
     return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jε
