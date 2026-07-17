@@ -273,7 +273,7 @@ function update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
     if !estim.direct
         correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
     end
-    return predict_estimate_obsv!(estim::StateEstimator, y0m, d0, u0)
+    return predict_estimate_obsv!(estim, y0m, d0, u0)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
