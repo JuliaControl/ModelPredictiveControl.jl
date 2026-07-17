@@ -26,7 +26,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     Âs::Matrix{NT}
     B̂s::Matrix{NT}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function InternalModel{NT}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
@@ -45,7 +45,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         x̂s, x̂snext = zeros(NT, nxs), zeros(NT, nxs)
         ŷs = zeros(NT, ny)
         direct = true # InternalModel always uses direct transmission from ym
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model, 
@@ -54,7 +54,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             Âs, B̂s,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -348,7 +348,7 @@ end
 
 # Compute estimated output with current stochastic estimate `estim.ŷs` for `InternalModel`
 function evaloutput(estim::InternalModel, d)
-    if !estim.corrected[]
+    if !estim.prepared[]
         @warn "preparestate! should be called before evaloutput with InternalModel"
     end
     validate_args(estim.model, d)

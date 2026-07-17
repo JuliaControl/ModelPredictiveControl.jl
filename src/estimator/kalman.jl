@@ -30,7 +30,7 @@ struct SteadyKalmanFilter{
     D̂dm ::Matrix{NT}
     K̂::Matrix{NT}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function SteadyKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true
@@ -46,7 +46,7 @@ struct SteadyKalmanFilter{
         K̂, P̂ = init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct)
         cov.P̂ .= P̂
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM, KC}(
             model,
@@ -56,7 +56,7 @@ struct SteadyKalmanFilter{
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             K̂,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -333,7 +333,7 @@ struct KalmanFilter{
     D̂dm ::Matrix{NT}
     K̂::Matrix{NT}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function KalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true
@@ -347,7 +347,7 @@ struct KalmanFilter{
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         K̂ = zeros(NT, nx̂, nym)
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM, KC}(
             model, 
@@ -357,7 +357,7 @@ struct KalmanFilter{
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             K̂,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -555,7 +555,7 @@ struct UnscentedKalmanFilter{
     m̂::Vector{NT}
     Ŝ::Diagonal{NT, Vector{NT}}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function UnscentedKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC, α, β, κ; direct=true
@@ -573,7 +573,7 @@ struct UnscentedKalmanFilter{
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
         X̂0,  X̄0  = zeros(NT, nx̂, nσ),  zeros(NT, nx̂, nσ)
         Ŷ0m, Ȳ0m = zeros(NT, nym, nσ), zeros(NT, nym, nσ)
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM, KC}(
             model,
@@ -585,7 +585,7 @@ struct UnscentedKalmanFilter{
             K̂, 
             M̂, X̂0, X̄0, Ŷ0m, Ȳ0m,
             nσ, γ, m̂, Ŝ,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -932,7 +932,7 @@ struct ExtendedKalmanFilter{
     linfuncF̂!::FF
     linfuncĤ!::HF
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function ExtendedKalmanFilter{NT}(
         model::SM, 
@@ -957,7 +957,7 @@ struct ExtendedKalmanFilter{
         K̂ = zeros(NT, nx̂, nym)
         F̂_û, F̂ = zeros(NT, nx̂+nu, nx̂), zeros(NT, nx̂, nx̂)
         Ĥ,  Ĥm = zeros(NT, ny, nx̂),    zeros(NT, nym, nx̂)
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM, KC, JB, FF, HF}(
             model,
@@ -969,7 +969,7 @@ struct ExtendedKalmanFilter{
             K̂,
             F̂_û, F̂, Ĥ, Ĥm,
             jacobian, linfuncF̂!, linfuncĤ!,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
