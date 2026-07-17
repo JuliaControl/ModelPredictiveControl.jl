@@ -147,7 +147,11 @@ function correct_estimate!(estim::Union{SteadyKalmanFilter, Luenberger}, y0m, d0
     return nothing
 end
 
-"Prediction step of [`SteadyKalmanFilter`](@ref) and [`Luenberger`](@ref), see [`correct_estimate!`](@ref)."
+"""
+    predict_estimate!(estim::Union{SteadyKalmanFilter, Luenberger}, u0, d0)
+
+Prediction step of [`SteadyKalmanFilter`](@ref) and [`Luenberger`](@ref), see [`correct_estimate!`](@ref).
+"""
 function predict_estimate!(estim::Union{SteadyKalmanFilter, Luenberger}, u0, d0)
     x̂0corr = estim.x̂0
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d

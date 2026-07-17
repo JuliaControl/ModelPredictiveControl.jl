@@ -435,7 +435,11 @@ below, see [^2] for details.
 """
 correct_estimate!(estim::KalmanFilter, y0m, d0) = correct_kf!(estim, y0m, d0, estim.Ĉm)
 
-"Prediction step of [`KalmanFilter`](@ref), see equations in [`correct_estimate!`](@ref)."
+"""
+    predict_estimate!(estim::KalmanFilter, u0, d0)
+
+Prediction step of [`KalmanFilter`](@ref), see [`correct_estimate!`](@ref) for equations.
+"""
 predict_estimate!(estim::KalmanFilter, u0, d0) = predict_kf!(estim, u0, d0, estim.Â)
 
 struct UnscentedKalmanFilter{
@@ -773,7 +777,11 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
     return nothing
 end
 
-"Prediction step of [`UnscentedKalmanFilter`](@ref), see [`correct_estimate!`](@ref)."
+"""
+    predict_estimate!(estim::UnscentedKalmanFilter, u0, d0)
+
+Prediction step of [`UnscentedKalmanFilter`](@ref), see [`correct_estimate!`](@ref).
+"""
 function predict_estimate!(estim::UnscentedKalmanFilter, u0, d0)
     x̂0corr, X̂0corr, P̂corr = estim.x̂0, estim.X̂0, estim.cov.P̂
     Q̂, nx̂ = estim.cov.Q̂, estim.nx̂
@@ -1089,7 +1097,11 @@ function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
     return correct_kf!(estim, y0m, d0, Ĥm)
 end
 
-"Prediction step of [`ExtendedKalmanFilter`](@ref), see [`correct_estimate!`](@ref)."
+"""
+    predict_estimate!(estim::ExtendedKalmanFilter, u0, d0)
+
+Prediction step of [`ExtendedKalmanFilter`](@ref), see [`correct_estimate!`](@ref).
+"""
 function predict_estimate!(estim::ExtendedKalmanFilter, u0, d0)
     cst_u0, cst_d0 = Constant(u0), Constant(d0)
     x̂0corr = estim.x̂0
