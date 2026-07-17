@@ -44,7 +44,10 @@ import FastGaussQuadrature
 export SimModel, LinModel, NonLinModel
 export DiffSolver, RungeKutta, ForwardEuler
 export setop!, setname!
-export setstate!, setmodel!, preparestate!, updatestate!, evaloutput, linearize, linearize!
+export linearize, linearize!
+export evaloutput
+export setstate!, preparestate!, updatestate!, correctstate!, predictstate!
+export setmodel!
 export savetime!, periodsleep
 export StateEstimator, InternalModel, Luenberger
 export SteadyKalmanFilter, KalmanFilter, UnscentedKalmanFilter, ExtendedKalmanFilter

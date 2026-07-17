@@ -114,27 +114,51 @@ function validate_luenberger(model, nint_u, nint_ym, poles)
     any(abs.(poles) .≥ 1) && error("Observer poles should be inside the unit circles.")
 end
 
+@doc raw"""
+    correct_estimate!(estim::Union{SteadyKalmanFilter, Luenberger}, y0m, d0)
 
-"""
-    correct_estimate!(estim::Luenberger, y0m, d0, _ )
+Correct `estim.x̂0` estimate with current measured outputs `y0m` and disturbances `d0`.
 
-Identical to [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
+The computations are identical for both [`SteadyKalmanFilter`](@ref) and [`Luenberger`](@ref)
+state estimators. It will corrects the state estimate with the precomputed Kalman/observer
+gain ``\mathbf{K̂}``. The correction and prediction step equations are provided below.
+
+# Correction Step
+```math
+\mathbf{x̂}_k(k) = \mathbf{x̂}_{k-1}(k) + \mathbf{K̂}[\mathbf{y^m}(k) - \mathbf{Ĉ^m x̂}_{k-1}(k)
+                                                                   - \mathbf{D̂_d^m d}(k)    ]
+```
+
+# Prediction Step
+```math
+\mathbf{x̂}_{k}(k+1) = \mathbf{Â x̂}_{k}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
+```
 """
-function correct_estimate!(estim::Luenberger, y0m, d0)
-    return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+function correct_estimate!(estim::Union{SteadyKalmanFilter, Luenberger}, y0m, d0)
+    Ĉm, D̂dm, K̂ = estim.Ĉm, estim.D̂dm, estim.K̂
+    ŷ0m = @views estim.buffer.ŷ[estim.i_ym]
+    # in-place operations to reduce allocations:
+    mul!(ŷ0m, Ĉm, estim.x̂0) 
+    mul!(ŷ0m, D̂dm, d0, 1, 1)
+    v̂  = ŷ0m
+    v̂ .= y0m .- ŷ0m
+    x̂0corr = estim.x̂0
+    mul!(x̂0corr, K̂, v̂, 1, 1)
+    return nothing
 end
 
-
-"""
-    update_estimate!(estim::Luenberger, y0m, d0, u0)
-
-Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
-"""
-function update_estimate!(estim::Luenberger, y0m, d0, u0)
-    if !estim.direct
-        correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
-    end
-    return predict_estimate_obsv!(estim, y0m, d0, u0)
+"Prediction step of [`SteadyKalmanFilter`](@ref) and [`Luenberger`](@ref), see [`correct_estimate!`](@ref)."
+function predict_estimate!(estim::Union{SteadyKalmanFilter, Luenberger}, u0, d0)
+    x̂0corr = estim.x̂0
+    Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
+    x̂0next = estim.buffer.x̂
+    # in-place operations to reduce allocations:
+    mul!(x̂0next, Â, x̂0corr)
+    mul!(x̂0next, B̂u, u0, 1, 1)
+    mul!(x̂0next, B̂d, d0, 1, 1)
+    x̂0next  .+= estim.f̂op .- estim.x̂op
+    estim.x̂0 .= x̂0next
+    return nothing
 end
 
 "Throw an error if P̂ != nothing."

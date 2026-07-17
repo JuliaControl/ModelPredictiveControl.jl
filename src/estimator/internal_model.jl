@@ -274,9 +274,9 @@ function correct_estimate!(estim::InternalModel, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, _ , d0, u0)
+    predict_estimate!(estim::InternalModel, u0, d0)
 
-Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
+Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0` and measured disturbances `d0`.
 
 The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂s` estimates with:
 ```math
@@ -288,7 +288,7 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(estim::InternalModel, _ , d0, u0)
+function predict_estimate!(estim::InternalModel, u0, d0)
     model = estim.model
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------

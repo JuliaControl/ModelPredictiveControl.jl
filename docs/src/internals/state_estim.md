@@ -57,13 +57,7 @@ ModelPredictiveControl.remove_op!
 ModelPredictiveControl.init_estimate!
 ```
 
-## Correct Estimate
-
-```@docs
-ModelPredictiveControl.correct_estimate!
-```
-
-## Update Estimate
+## Predict and Correct Estimate
 
 !!! info
     All these methods assume that the `u0`, `y0m` and `d0` arguments are deviation vectors
@@ -74,5 +68,6 @@ ModelPredictiveControl.correct_estimate!
     ``\mathbf{x̂_0}``, respectively.
 
 ```@docs
-ModelPredictiveControl.update_estimate!
+ModelPredictiveControl.correct_estimate!
+ModelPredictiveControl.predict_estimate!
 ```

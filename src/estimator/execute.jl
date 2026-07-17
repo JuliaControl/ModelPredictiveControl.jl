@@ -1,15 +1,13 @@
 """
-    remove_op!(estim::StateEstimator, ym, d, u=nothing) -> y0m, d0, u0
+    remove_op!(estim::StateEstimator, ym=nothing, d=nothing, u=nothing) -> y0m, d0, u0
 
 Remove operating pts on measured outputs `ym`, disturbances `d` and inputs `u` (if provided).
 """
-function remove_op!(estim::StateEstimator, ym, d, u=nothing)
+function remove_op!(estim::StateEstimator, ym=nothing, d=nothing, u=nothing)
     y0m, u0, d0 = estim.buffer.ym, estim.buffer.u, estim.buffer.d
-    y0m .= @views ym .- estim.model.yop[estim.i_ym]
-    d0  .= d  .- estim.model.dop
-    if !isnothing(u)
-        u0 .= u .- estim.model.uop
-    end
+    !isnothing(ym) && (y0m .= @views ym .- estim.model.yop[estim.i_ym])
+    !isnothing(d)  && (d0  .= d  .- estim.model.dop)
+    !isnothing(u)  && (u0  .= u .- estim.model.uop)
     return y0m, d0, u0
 end
 
@@ -298,11 +296,19 @@ julia> x̂ = preparestate!(estim1, [1])
 """
 function preparestate!(estim::StateEstimator, ym, d=estim.buffer.empty)
     if estim.direct
-        validate_args(estim, ym, d)
-        y0m, d0 = remove_op!(estim, ym, d)
-        correct_estimate!(estim, y0m, d0)
-        estim.corrected[] = true
+        x̂ = correctstate!(estim, ym, d)
+    else
+        x̂  = estim.buffer.x̂
+        x̂ .= estim.x̂0 .+ estim.x̂op
     end
+    return x̂
+end
+
+function correctstate!(estim::StateEstimator, ym, d=estim.buffer.empty)
+    validate_args(estim, ym, d)
+    y0m, d0 = remove_op!(estim, ym, d)
+    correct_estimate!(estim, y0m, d0)
+    estim.corrected[] = true 
     x̂  = estim.buffer.x̂
     x̂ .= estim.x̂0 .+ estim.x̂op
     return x̂
@@ -314,12 +320,13 @@ end
 Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
 
 This function should be called at the end of each discrete time step. It removes the 
-operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and returns the
-state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
-should be called prior to this one to correct the estimate when applicable (if
-`estim.direct == true`). Note that the [`MovingHorizonEstimator`](@ref) with the default
-`direct=true` option is not able to estimate ``\mathbf{x̂}_k(k+1)``, the returned value
-is therefore the current corrected state ``\mathbf{x̂}_k(k)``.
+operating points with [`remove_op!`](@ref), calls [`correct_estimate!`](@ref) if 
+`estim.direct == false`, calls [`predict_estimate!`](@ref), and returns the state estimate
+for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
+should be called prior to this one to correct the estimate if `estim.direct == true`. Note
+that the [`MovingHorizonEstimator`](@ref) with the default `direct=true` option is not able
+to estimate ``\mathbf{x̂}_k(k+1)``, the returned value is therefore the current corrected
+state ``\mathbf{x̂}_k(k)``.
 
 # Examples
 ```jldoctest
@@ -339,13 +346,28 @@ function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     end
     validate_args(estim, ym, d, u)
     y0m, d0, u0 = remove_op!(estim, ym, d, u)
-    update_estimate!(estim, y0m, d0, u0)
+    update_estimate!(estim, u0, y0m, d0)
     estim.corrected[] = false
     x̂next  = estim.buffer.x̂
     x̂next .= estim.x̂0 .+ estim.x̂op
     return x̂next
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
+
+"Call [`correct_estimate!`](@ref) if `!direct` and [`predict_estimate!`](@ref) methods."
+function update_estimate!(estim::StateEstimator, u0, y0m, d0)
+    estim.direct || correct_estimate!(estim, y0m, d0)
+    return predict_estimate!(estim, u0, d0)
+end
+
+function predictstate!(estim, u, d=estim.buffer.empty)
+    validate_args(estim, estim.buffer.empty, d, u)
+    _ , d0, u0 = remove_op!(estim, nothing, d, u)
+    predict_estimate!(estim, u0, d0)
+    x̂next  = estim.buffer.x̂
+    x̂next .= estim.x̂0 .+ estim.x̂op
+    return x̂next
+end
 
 
 """
