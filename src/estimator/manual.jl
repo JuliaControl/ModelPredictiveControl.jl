@@ -149,7 +149,7 @@ end
 
 Do nothing for [`ManualEstimator`](@ref).
 """
-update_estimate!(::ManualEstimator, y0m, d0, u0) = nothing
+update_estimate!(::ManualEstimator,_,_,_) = nothing
 
 "Throw an error if P̂ != nothing."
 function setstate_cov!(::ManualEstimator, P̂)

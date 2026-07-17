@@ -297,12 +297,13 @@ julia> x̂ = preparestate!(estim1, [1])
 ```
 """
 function preparestate!(estim::StateEstimator, ym, d=estim.buffer.empty)
+    isnothing(ym) && (ym = estim.buffer.ym; ym .= NaN) # nothing: skip correction step
     if estim.direct
         validate_args(estim, ym, d)
         y0m, d0 = remove_op!(estim, ym, d)
         correct_estimate!(estim, y0m, d0)
-        estim.prepared[] = true
     end
+    estim.prepared[] = true
     x̂  = estim.buffer.x̂
     x̂ .= estim.x̂0 .+ estim.x̂op
     return x̂
@@ -334,6 +335,7 @@ julia> x̂ = updatestate!(kf, u, ym) # x̂[2] is the integrator state (nint_ym a
 ```
 """
 function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
+    isnothing(ym) && (ym = estim.buffer.ym; ym .= NaN) # nothing: skip correction step
     if estim.direct && !estim.prepared[]
         error("preparestate! must be called before updatestate! with direct=true option")
     end

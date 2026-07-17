@@ -121,6 +121,7 @@ end
 Identical to [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function correct_estimate!(estim::Luenberger, y0m, d0)
+    any(isnan, y0m) && return nothing # skip correction step
     return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
 end
 
@@ -131,10 +132,10 @@ end
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function update_estimate!(estim::Luenberger, y0m, d0, u0)
-    if !estim.direct
-        correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+    if !estim.direct && all(isfinite, y0m)
+        correct_estimate_obsv!(estim, y0m, d0)
     end
-    return predict_estimate_obsv!(estim, y0m, d0, u0)
+    return predict_estimate_obsv!(estim, u0, d0)
 end
 
 "Throw an error if P̂ != nothing."

@@ -259,18 +259,19 @@ end
 Compute the current stochastic output estimation `ŷs` for [`InternalModel`](@ref).
 
 It evaluates ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` and 
-``\mathbf{ŷ_s^u = 0}`` for the measured and unmeasured outputs, respectively.
+``\mathbf{ŷ_s^u = 0}`` for the measured and unmeasured outputs, respectively. If there
+is a `NaN` in `y0m`, its associated stochastic output will be `0`.
 """
 function correct_estimate!(estim::InternalModel, y0m, d0)
     ŷ0d = estim.buffer.ŷ
     ĥ!(ŷ0d, estim, estim.model, estim.x̂d, d0)
     ŷs = estim.ŷs
-    for j in eachindex(ŷs) # broadcasting was allocating unexpectedly, so we use a loop
-        if j in estim.i_ym
-            i = estim.i_ym[j]
-            ŷs[j] = y0m[i] - ŷ0d[j]
+    for i in eachindex(ŷs) # broadcasting was allocating unexpectedly, so we use a loop
+        if i in estim.i_ym
+            y0m_i = y0m[estim.i_ym[i]]
+            ŷs[i] = isfinite(y0m_i) ? y0m_i - ŷ0d[i] : 0
         else
-            ŷs[j] = 0
+            ŷs[i] = 0
         end
     end
     return nothing

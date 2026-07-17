@@ -243,6 +243,7 @@ It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)``. See the docstr
 [`update_estimate!(::SteadyKalmanFilter, ::Any, ::Any)`](@ref) for the equations.
 """
 function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
+    any(isnan, y0m) && return nothing # skip correction step
     return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
 end
 
@@ -270,15 +271,15 @@ provided below.
 ```
 """
 function update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
-    if !estim.direct
-        correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+    if !estim.direct && all(isfinite, y0m)
+        correct_estimate_obsv!(estim, y0m, d0)
     end
-    return predict_estimate_obsv!(estim, y0m, d0, u0)
+    return predict_estimate_obsv!(estim, u0, d0)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function correct_estimate_obsv!(estim::StateEstimator, y0m, d0, K̂)
-    Ĉm, D̂dm = estim.Ĉm, estim.D̂dm
+function correct_estimate_obsv!(estim::StateEstimator, y0m, d0)
+    Ĉm, D̂dm, K̂ = estim.Ĉm, estim.D̂dm, estim.K̂
     ŷ0m = @views estim.buffer.ŷ[estim.i_ym]
     # in-place operations to reduce allocations:
     mul!(ŷ0m, Ĉm, estim.x̂0) 
@@ -291,7 +292,7 @@ function correct_estimate_obsv!(estim::StateEstimator, y0m, d0, K̂)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function predict_estimate_obsv!(estim::StateEstimator, _ , d0, u0)
+function predict_estimate_obsv!(estim::StateEstimator, u0, d0)
     x̂0corr = estim.x̂0
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     x̂0next = estim.buffer.x̂
@@ -472,6 +473,7 @@ It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)`` estimation cova
 ``\mathbf{P̂}_{k}(k)``.
 """
 function correct_estimate!(estim::KalmanFilter, y0m, d0)
+    any(isnan, y0m) && return nothing # skip correction step
     return correct_estimate_kf!(estim, y0m, d0, estim.Ĉm)
 end
 
@@ -510,7 +512,7 @@ provided below, see [^2] for details.
      <https://en.wikipedia.org/wiki/Kalman_filter>, Accessed 2024-08-08.
 """
 function update_estimate!(estim::KalmanFilter, y0m, d0, u0)
-    if !estim.direct
+    if !estim.direct && all(isfinite, y0m)
         correct_estimate_kf!(estim, y0m, d0, estim.Ĉm)
     end
     return predict_estimate_kf!(estim, u0, d0, estim.Â)
@@ -767,6 +769,7 @@ end
 Do the same but for the [`UnscentedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
+    any(isnan, y0m) && return nothing # skip correction step
     x̂0, P̂, R̂, K̂ = estim.x̂0, estim.cov.P̂, estim.cov.R̂, estim.K̂
     nx̂ = estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
@@ -859,7 +862,7 @@ step is skipped if `estim.direct == true` since it's already done by the user.
      ISBN9780470045343.
 """
 function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
-    if !estim.direct
+    if !estim.direct && all(isfinite, y0m)
         correct_estimate!(estim, y0m, d0)
     end
     x̂0corr, X̂0corr, P̂corr = estim.x̂0, estim.X̂0, estim.cov.P̂
@@ -1136,6 +1139,7 @@ end
 Do the same but for the [`ExtendedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
+    any(isnan, y0m) && return nothing # skip correction step
     x̂0 = estim.x̂0
     cst_d0 = Constant(d0)
     ŷ0, Ĥ, Ĥm = estim.buffer.ŷ, estim.Ĥ, estim.Ĥm
@@ -1184,7 +1188,7 @@ and prediction step equations are provided below. The correction step is skipped
 ```
 """
 function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
-    if !estim.direct
+    if !estim.direct && all(isfinite, y0m)
         correct_estimate!(estim, y0m, d0)
     end
     cst_u0, cst_d0 = Constant(u0), Constant(d0)
