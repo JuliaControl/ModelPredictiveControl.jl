@@ -253,10 +253,13 @@ function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
     return nothing
 end
 
-"""
+@doc raw"""
     correct_estimate!(estim::InternalModel, y0m, d0)
 
 Compute the current stochastic output estimation `ŷs` for [`InternalModel`](@ref).
+
+It evaluates ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` and 
+``\mathbf{ŷ_s^u = 0}`` for the measured and unmeasured outputs, respectively.
 """
 function correct_estimate!(estim::InternalModel, y0m, d0)
     ŷ0d = estim.buffer.ŷ
