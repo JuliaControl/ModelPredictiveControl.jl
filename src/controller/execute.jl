@@ -553,6 +553,15 @@ function preparestate!(mpc::PredictiveController, ym, d=mpc.estim.buffer.empty)
     return preparestate!(mpc.estim, ym, d)
 end
 
+"""
+    correctstate!(mpc::PredictiveController, ym, d=[]) -> x̂
+
+Call [`correctstate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
+"""
+function correctstate!(mpc::PredictiveController, ym, d=mpc.estim.buffer.empty) 
+    return correctstate!(mpc.estim, ym, d)
+end
+
 @doc raw"""
     getinput!(mpc::PredictiveController, Z̃) -> u
 
@@ -583,6 +592,16 @@ function updatestate!(mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty
     return updatestate!(mpc.estim, u, ym, d)
 end
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
+
+
+"""
+    predictstate!(mpc::PredictiveController, u, d=[]) -> x̂next
+
+Call [`predictstate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
+"""
+function predictstate!(mpc::PredictiveController, u, d=mpc.estim.buffer.empty)
+    return predictstate!(mpc.estim, u, d)
+end
 
 """
     savetime!(mpc::PredictiveController) -> t

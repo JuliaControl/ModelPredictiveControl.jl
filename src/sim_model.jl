@@ -221,6 +221,13 @@ function preparestate!(model::SimModel)
 end
 
 @doc raw"""
+    correctstate!(model::SimModel) -> x
+
+Do nothing for [`SimModel`](@ref) and return the current model state ``\mathbf{x}(k)``.
+"""
+correctstate!(model::SimModel) = preparestate!(model::SimModel)
+
+@doc raw"""
     updatestate!(model::SimModel, u, d=[]) -> xnext
 
 Update `model.x0` states with current inputs `u` and meas. dist. `d` for the next time step.
@@ -248,6 +255,13 @@ function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: 
     xnext .+= model.xop
     return xnext
 end
+
+"""
+    predictstate!(model::SimModel, u, d=[]) -> xnext
+
+Same as [`updatestate!`](@ref) for [`SimModel`](@ref).
+"""
+predictstate!(model::SimModel, u, d=model.buffer.empty) = updatestate!(model, u, d)
 
 @doc raw"""
     evaloutput(model::SimModel, d=[]) -> y

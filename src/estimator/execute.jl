@@ -296,14 +296,27 @@ julia> x̂ = preparestate!(estim1, [1])
 """
 function preparestate!(estim::StateEstimator, ym, d=estim.buffer.empty)
     if estim.direct
-        x̂ = correctstate!(estim, ym, d)
-    else
-        x̂  = estim.buffer.x̂
-        x̂ .= estim.x̂0 .+ estim.x̂op
+        validate_args(estim, ym, d)
+        y0m, d0 = remove_op!(estim, ym, d)
+        correct_estimate!(estim, y0m, d0)
+        estim.corrected[] = true 
     end
+    x̂  = estim.buffer.x̂
+    x̂ .= estim.x̂0 .+ estim.x̂op
     return x̂
 end
 
+@doc raw"""
+    correctstate!(estim::StateEstimator, ym, d=[]) -> x̂
+
+Perform the correction step of `estim` with measured outputs `ym` and disturbances `d`.
+
+It removes the operating points with [`remove_op!`](@ref), calls [`correct_estimate!`](@ref),
+and returns the corrected state estimate ``\mathbf{x̂}_k(k)``. This is a lower-level function
+than [`preparestate!`](@ref). Be sure to call it before [`moveinput!`](@ref) if
+`estim.direct == true`, or after otherwise. This method is not supported by
+[`MovingHorizonEstimator`](@ref), use [`preparestate!`](@ref) instead.
+"""
 function correctstate!(estim::StateEstimator, ym, d=estim.buffer.empty)
     validate_args(estim, ym, d)
     y0m, d0 = remove_op!(estim, ym, d)
@@ -354,13 +367,19 @@ function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
 end
 updatestate!(::StateEstimator, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
-"Call [`correct_estimate!`](@ref) if `!direct` and [`predict_estimate!`](@ref) methods."
-function update_estimate!(estim::StateEstimator, u0, y0m, d0)
-    estim.direct || correct_estimate!(estim, y0m, d0)
-    return predict_estimate!(estim, u0, d0)
-end
+@doc raw"""
+    predictstate!(estim::StateEstimator, u, d=[]) -> x̂next
 
-function predictstate!(estim, u, d=estim.buffer.empty)
+Preform the prediction step of `estim` with current inputs `u` and disturbances `d`.
+
+It removes the operating points with [`remove_op!`](@ref), calls [`predict_estimate!`](@ref),
+and returns the state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. This is a 
+lower-level function than [`updatestate!`](@ref). Be sure to call [`correctstate!`](@ref) 
+before this function if a new measurement is available, but the correction step can be
+skipped otherwise. This method is not supported by [`MovingHorizonEstimator`](@ref),
+use [`updatestate!`](@ref).
+"""
+function predictstate!(estim::StateEstimator, u, d=estim.buffer.empty)
     validate_args(estim, estim.buffer.empty, d, u)
     _ , d0, u0 = remove_op!(estim, nothing, d, u)
     predict_estimate!(estim, u0, d0)
@@ -369,6 +388,11 @@ function predictstate!(estim, u, d=estim.buffer.empty)
     return x̂next
 end
 
+"Call [`correct_estimate!`](@ref) if `!direct` and [`predict_estimate!`](@ref) methods."
+function update_estimate!(estim::StateEstimator, u0, y0m, d0)
+    estim.direct || correct_estimate!(estim, y0m, d0)
+    return predict_estimate!(estim, u0, d0)
+end
 
 """
     savetime!(estim::StateEstimator) -> t

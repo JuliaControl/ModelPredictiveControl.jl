@@ -36,10 +36,17 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     return nothing
 end
 
+function correctstate!(::MovingHorizonEstimator,_,_)
+    error(
+        "MovingHorizonEstimator does not support correctstate!, call preparestate! instead.\n",
+        "The ym argument supports NaN values, to skip unavailable measurements."
+    )
+end
+
 """
     correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
 
-Do the same but for [`MovingHorizonEstimator`](@ref) objects.
+Correct [`MovingHorizonEstimator`](@ref) state `estim.x̂0` if `estim.direct == true`.
 """
 function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
     if estim.direct
@@ -50,6 +57,14 @@ function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
         optim_objective!(estim)
     end
     return nothing
+end
+
+
+function predictstate!(::MovingHorizonEstimator,_,_)
+    error(
+        "MovingHorizonEstimator does not support predictstate!, call updatestate! instead.\n",
+        "The ym argument supports NaN values, to skip unavailable measurements."
+    )
 end
 
 @doc raw"""
