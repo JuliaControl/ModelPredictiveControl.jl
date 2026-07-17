@@ -122,7 +122,7 @@ Identical to [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenb
 """
 function correct_estimate!(estim::Luenberger, y0m, d0)
     any(isnan, y0m) && return nothing # skip correction step
-    return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+    return correct_estimate_obsv!(estim, y0m, d0)
 end
 
 

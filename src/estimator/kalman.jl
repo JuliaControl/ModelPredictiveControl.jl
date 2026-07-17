@@ -244,7 +244,7 @@ It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)``. See the docstr
 """
 function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
     any(isnan, y0m) && return nothing # skip correction step
-    return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+    return correct_estimate_obsv!(estim, y0m, d0)
 end
 
 @doc raw"""
