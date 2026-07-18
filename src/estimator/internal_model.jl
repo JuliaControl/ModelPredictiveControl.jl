@@ -98,8 +98,9 @@ InternalModel estimator with a sample time Ts = 0.5 s:
     supposes 1 integrator per measured outputs by default, assuming that the current stochastic
     estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` is constant in the 
     future. This is the dynamic matrix control (DMC) strategy, which is simple but sometimes
-    too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this. The following
-    block diagram summarizes the internal model structure.
+    too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this. If there
+    is a `NaN` in ``\mathbf{y^m}(k)``, its associated stochastic output will be `0`. The
+    following block diagram summarizes the internal model structure.
 
     ![block diagram of the internal model structure](../assets/imc.svg)
 """
