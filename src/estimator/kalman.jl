@@ -243,7 +243,10 @@ It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)``. See the docstr
 [`update_estimate!(::SteadyKalmanFilter)`](@ref) for the equations.
 """
 function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
-    any(isnan, y0m) && return nothing # skip correction step
+    if any(isnan, y0m)
+        @warn "NaN values in the Kalman filter measurements ym: skipping correction step"
+        return nothing
+    end
     return correct_estimate_obsv!(estim, y0m, d0)
 end
 
@@ -278,7 +281,7 @@ function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function correct_estimate_obsv!(estim::StateEstimator, y0m, d0)
+function correct_estimate_obsv!(estim::Union{SteadyKalmanFilter, Luenberger}, y0m, d0)
     Ĉm, D̂dm, K̂ = estim.Ĉm, estim.D̂dm, estim.K̂
     ŷ0m = @views estim.buffer.ŷ[estim.i_ym]
     # in-place operations to reduce allocations:
@@ -292,7 +295,7 @@ function correct_estimate_obsv!(estim::StateEstimator, y0m, d0)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function predict_estimate_obsv!(estim::StateEstimator, u0, d0)
+function predict_estimate_obsv!(estim::Union{SteadyKalmanFilter, Luenberger}, u0, d0)
     x̂0corr = estim.x̂0
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     x̂0next = estim.buffer.x̂
@@ -473,7 +476,10 @@ It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)`` estimation cova
 ``\mathbf{P̂}_{k}(k)``.
 """
 function correct_estimate!(estim::KalmanFilter, y0m, d0)
-    any(isnan, y0m) && return nothing # skip correction step
+    if any(isnan, y0m)
+        @warn "NaN values in the Kalman filter measurements ym: skipping correction step"
+        return nothing
+    end
     return correct_estimate_kf!(estim, y0m, d0, estim.Ĉm)
 end
 
@@ -769,7 +775,10 @@ end
 Do the same but for the [`UnscentedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
-    any(isnan, y0m) && return nothing # skip correction step
+    if any(isnan, y0m)
+        @warn "NaN values in the Kalman filter measurements ym: skipping correction step"
+        return nothing
+    end
     x̂0, P̂, R̂, K̂ = estim.x̂0, estim.cov.P̂, estim.cov.R̂, estim.K̂
     nx̂ = estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
@@ -1139,7 +1148,10 @@ end
 Do the same but for the [`ExtendedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
-    any(isnan, y0m) && return nothing # skip correction step
+    if any(isnan, y0m)
+        @warn "NaN values in the Kalman filter measurements ym: skipping correction step"
+        return nothing
+    end
     x̂0 = estim.x̂0
     cst_d0 = Constant(d0)
     ŷ0, Ĥ, Ĥm = estim.buffer.ŷ, estim.Ĥ, estim.Ĥm

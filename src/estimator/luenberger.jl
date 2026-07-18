@@ -121,7 +121,10 @@ end
 Identical to [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function correct_estimate!(estim::Luenberger, y0m, d0)
-    any(isnan, y0m) && return nothing # skip correction step
+    if any(isnan, y0m)
+        @warn "NaN values in the Luenberger measurements ym: skipping correction step"
+        return nothing
+    end
     return correct_estimate_obsv!(estim, y0m, d0)
 end
 

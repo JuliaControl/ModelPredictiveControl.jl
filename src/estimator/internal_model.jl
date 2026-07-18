@@ -264,6 +264,9 @@ It evaluates ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` and
 is a `NaN` in `y0m`, its associated stochastic output will be `0`.
 """
 function correct_estimate!(estim::InternalModel, y0m, d0)
+    if !all(isfinite, y0m)
+        @warn "NaN values in the internal model measurements ym: assigning them ŷs=0"
+    end
     ŷ0d = estim.buffer.ŷ
     ĥ!(ŷ0d, estim, estim.model, estim.x̂d, d0)
     ŷs = estim.ŷs
