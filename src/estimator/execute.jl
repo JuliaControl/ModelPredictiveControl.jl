@@ -278,7 +278,9 @@ delayed/predictor (2.) formulation:
 
 1. If `estim.direct` is `true`, it removes the operating points with [`remove_op!`](@ref),
    calls [`correct_estimate!`](@ref), and returns the corrected state estimate 
-   ``\mathbf{x̂}_k(k)``.
+   ``\mathbf{x̂}_k(k)``. The correction step is skipped if `isnothing(ym)`, in case the 
+   measured outputs are temporarily unavailable. The [`MovingHorizonEstimator`](@ref) and
+   [`InternalModel`](@ref) also support partial correction with `NaN` values in `ym`.
 2. Else, it does nothing and returns the current best estimate ``\mathbf{x̂}_{k-1}(k)``.
 
 # Examples
@@ -318,9 +320,11 @@ This function should be called at the end of each discrete time step. It removes
 operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and returns the
 state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
 should be called prior to this one to correct the estimate when applicable (if
-`estim.direct == true`). Note that the [`MovingHorizonEstimator`](@ref) with the default
-`direct=true` option is not able to estimate ``\mathbf{x̂}_k(k+1)``, the returned value
-is therefore the current corrected state ``\mathbf{x̂}_k(k)``.
+`estim.direct == true`). If `isnothing(ym)`, only the prediction step is performed in 
+[`update_estimate!`](@ref), in case the measured outputs are temporarily unavailable. Note
+that the [`MovingHorizonEstimator`](@ref) with the default `direct=true` option is not able
+to estimate ``\mathbf{x̂}_k(k+1)``, the returned value is therefore the current corrected
+state ``\mathbf{x̂}_k(k)``.
 
 # Examples
 ```jldoctest
