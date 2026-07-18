@@ -21,6 +21,12 @@ evaloutput
 
 ## Change State x
 
+### Init State x
+
+```@docs
+initstate!
+```
+
 ### Prepare State x
 
 ```@docs
@@ -31,12 +37,6 @@ preparestate!
 
 ```@docs
 updatestate!
-```
-
-### Init State x
-
-```@docs
-initstate!
 ```
 
 ### Set State x

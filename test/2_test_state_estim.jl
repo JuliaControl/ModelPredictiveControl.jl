@@ -112,6 +112,13 @@ end
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
     @test_throws ArgumentError updatestate!(kalmanfilter1, [10, 50])
+    kalmanfilter4 = SteadyKalmanFilter(linmodel, nint_ym=[1, 1], direct=true)
+    kalmanfilter4.x̂0 .= 7
+    @test_logs(
+        (:warn, "NaN values in the Kalman filter measurements ym: skipping correction step"),
+        preparestate!(kalmanfilter4, [55, NaN])
+    )
+    @test all(kalmanfilter4.x̂0 .≈ 7)
 end 
 
 @testitem "SKF set model" setup=[SetupMPCtests] begin
@@ -238,6 +245,13 @@ end
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
     @test_throws ArgumentError updatestate!(kalmanfilter1, [10, 50])
+    kalmanfilter4 = KalmanFilter(linmodel, direct=true)
+    kalmanfilter4.x̂0 .= 7
+    @test_logs(
+        (:warn, "NaN values in the Kalman filter measurements ym: skipping correction step"),
+        preparestate!(kalmanfilter4, [55, NaN])
+    )
+    @test all(kalmanfilter4.x̂0 .≈ 7)
 end
 
 @testitem "KF set model" setup=[SetupMPCtests] begin
@@ -355,6 +369,13 @@ end
     @test x̂ ≈ [0, 0]
     @test isa(x̂, Vector{Float32})
     @test_throws ErrorException setstate!(lo1, [1,2,3,4], diagm(.1:.1:.4))
+    lo4 = Luenberger(linmodel, nint_ym=[1, 1], direct=true)
+    lo4.x̂0 .= 7
+    @test_logs(
+        (:warn, "NaN values in the Luenberger measurements ym: skipping correction step"),
+        preparestate!(lo4, [55, NaN])
+    )
+    @test all(lo4.x̂0 .≈ 7)
 end
 
 @testitem "Luenb. set model" setup=[SetupMPCtests] begin
@@ -474,6 +495,13 @@ end
     @test x̂ ≈ [0]
     @test isa(x̂, Vector{Float32})
     @test_throws ErrorException setstate!(internalmodel1, [1,2,3,4], diagm(.1:.1:.4))
+    internalmodel4 = InternalModel(linmodel)
+    internalmodel4.ŷs .= 7
+    @test_logs(
+        (:warn, "NaN values in the internal model measurements ym: assigning them ŷs=0"),
+        preparestate!(internalmodel4, [50+7, NaN])
+    )
+    @test internalmodel4.ŷs ≈ [7, 0]
 end
 
 @testitem "IM set model" setup=[SetupMPCtests] begin
@@ -616,6 +644,13 @@ end
     x̂ = updatestate!(ukf3, [0], [0])
     @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
+    ukf4 = UnscentedKalmanFilter(linmodel, direct=true)
+    ukf4.x̂0 .= 7
+    @test_logs(
+        (:warn, "NaN values in the Kalman filter measurements ym: skipping correction step"),
+        preparestate!(ukf4, [55, NaN])
+    )
+    @test all(ukf4.x̂0 .≈ 7)
 end
 
 @testitem "UKF set model" setup=[SetupMPCtests] begin
@@ -777,6 +812,13 @@ end
     @test updatestate!(ekf4, [10, 50], [50, 30]) ≈ zeros(4) atol=1e-9
     preparestate!(ekf4, [50, 30])
     @test evaloutput(ekf4) ≈ ekf4() ≈ [50, 30]
+    ekf5 = ExtendedKalmanFilter(linmodel, direct=true)
+    ekf5.x̂0 .= 7
+    @test_logs(
+        (:warn, "NaN values in the Kalman filter measurements ym: skipping correction step"),
+        preparestate!(ekf5, [55, NaN])
+    )
+    @test all(ekf5.x̂0 .≈ 7)
 end
 
 @testitem "EKF set model" setup=[SetupMPCtests] begin

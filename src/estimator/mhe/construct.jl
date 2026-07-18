@@ -129,7 +129,7 @@ struct MovingHorizonEstimator{
     P̂arr_old ::Hermitian{NT, Matrix{NT}}
     Nk::Vector{Int}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function MovingHorizonEstimator{NT}(
         model::SM, 
@@ -182,7 +182,7 @@ struct MovingHorizonEstimator{
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(cov.P̂_0)
         Nk = [0]
-        corrected = [false]
+        prepared = [false]
         test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p, direct)
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
         estim = new{NT, SM, KC, JM, GB, JB, HB, PT, GCfunc, CE}(
@@ -203,7 +203,7 @@ struct MovingHorizonEstimator{
             X̂op, 
             Y0m, Yem, U0, Ue, D0, De, Ŵ, 
             X̂0_old, x̂0arr_old, P̂arr_old, Nk,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
         init_optimization!(estim, model, optim)

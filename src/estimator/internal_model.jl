@@ -26,7 +26,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     Âs::Matrix{NT}
     B̂s::Matrix{NT}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function InternalModel{NT}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
@@ -45,7 +45,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         x̂s, x̂snext = zeros(NT, nxs), zeros(NT, nxs)
         ŷs = zeros(NT, ny)
         direct = true # InternalModel always uses direct transmission from ym
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model, 
@@ -54,7 +54,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             As, Bs, Cs, Ds, 
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             Âs, B̂s,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -98,8 +98,9 @@ InternalModel estimator with a sample time Ts = 0.5 s:
     supposes 1 integrator per measured outputs by default, assuming that the current stochastic
     estimate ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` is constant in the 
     future. This is the dynamic matrix control (DMC) strategy, which is simple but sometimes
-    too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this. The following
-    block diagram summarizes the internal model structure.
+    too aggressive. Additional poles and zeros in `stoch_ym` can mitigate this. If there
+    is a `NaN` in ``\mathbf{y^m}(k)``, its associated stochastic output will be `0`. The
+    following block diagram summarizes the internal model structure.
 
     ![block diagram of the internal model structure](../assets/imc.svg)
 """
@@ -253,28 +254,35 @@ function setmodel_estimator!(estim::InternalModel, model, _ , _ , _ , _ , _ )
     return nothing
 end
 
-"""
+@doc raw"""
     correct_estimate!(estim::InternalModel, y0m, d0)
 
 Compute the current stochastic output estimation `ŷs` for [`InternalModel`](@ref).
+
+It evaluates ``\mathbf{ŷ_s^m}(k) = \mathbf{y^m}(k) - \mathbf{ŷ_d^m}(k)`` and 
+``\mathbf{ŷ_s^u = 0}`` for the measured and unmeasured outputs, respectively. If there
+is a `NaN` in `y0m`, its associated stochastic output will be `0`.
 """
 function correct_estimate!(estim::InternalModel, y0m, d0)
+    if !all(isfinite, y0m)
+        @warn "NaN values in the internal model measurements ym: assigning them ŷs=0"
+    end
     ŷ0d = estim.buffer.ŷ
     ĥ!(ŷ0d, estim, estim.model, estim.x̂d, d0)
     ŷs = estim.ŷs
-    for j in eachindex(ŷs) # broadcasting was allocating unexpectedly, so we use a loop
-        if j in estim.i_ym
-            i = estim.i_ym[j]
-            ŷs[j] = y0m[i] - ŷ0d[j]
+    for i in eachindex(ŷs) # broadcasting was allocating unexpectedly, so we use a loop
+        if i in estim.i_ym
+            y0m_i = y0m[estim.i_ym[i]]
+            ŷs[i] = isfinite(y0m_i) ? y0m_i - ŷ0d[i] : 0
         else
-            ŷs[j] = 0
+            ŷs[i] = 0
         end
     end
     return nothing
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel, _ , d0, u0)
+    update_estimate!(estim::InternalModel,  u0, _ , d0)
 
 Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -288,7 +296,7 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(estim::InternalModel, _ , d0, u0)
+function update_estimate!(estim::InternalModel, u0, _ , d0)
     model = estim.model
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
@@ -345,7 +353,7 @@ end
 
 # Compute estimated output with current stochastic estimate `estim.ŷs` for `InternalModel`
 function evaloutput(estim::InternalModel, d)
-    if !estim.corrected[]
+    if !estim.prepared[]
         @warn "preparestate! should be called before evaloutput with InternalModel"
     end
     validate_args(estim.model, d)
