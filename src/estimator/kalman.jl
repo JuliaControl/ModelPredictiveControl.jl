@@ -281,7 +281,7 @@ function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function correct_estimate_obsv!(estim::Union{SteadyKalmanFilter, Luenberger}, y0m, d0)
+function correct_estimate_obsv!(estim::StateEstimator, y0m, d0)
     Ĉm, D̂dm, K̂ = estim.Ĉm, estim.D̂dm, estim.K̂
     ŷ0m = @views estim.buffer.ŷ[estim.i_ym]
     # in-place operations to reduce allocations:
@@ -295,7 +295,7 @@ function correct_estimate_obsv!(estim::Union{SteadyKalmanFilter, Luenberger}, y0
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function predict_estimate_obsv!(estim::Union{SteadyKalmanFilter, Luenberger}, u0, d0)
+function predict_estimate_obsv!(estim::StateEstimator, u0, d0)
     x̂0corr = estim.x̂0
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     x̂0next = estim.buffer.x̂
