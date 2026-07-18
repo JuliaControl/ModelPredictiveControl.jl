@@ -145,7 +145,7 @@ function ManualEstimator(
 end
 
 """
-    update_estimate!(estim::ManualEstimator, y0m, d0, u0)
+    update_estimate!(estim::ManualEstimator, u0, y0m, d0)
 
 Do nothing for [`ManualEstimator`](@ref).
 """

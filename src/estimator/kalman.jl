@@ -240,7 +240,7 @@ end
 Correct `estim.x̂0` with measured outputs `y0m` and disturbances `d0` for current time step.
 
 It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)``. See the docstring of
-[`update_estimate!(::SteadyKalmanFilter, ::Any, ::Any)`](@ref) for the equations.
+[`update_estimate!(::SteadyKalmanFilter)`](@ref) for the equations.
 """
 function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
     any(isnan, y0m) && return nothing # skip correction step
@@ -248,7 +248,7 @@ function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
+    update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
 
 Update `estim.x̂0` estimate with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -270,7 +270,7 @@ provided below.
 \mathbf{x̂}_{k}(k+1) = \mathbf{Â x̂}_{k}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
 ```
 """
-function update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
+function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
     if !estim.direct && all(isfinite, y0m)
         correct_estimate_obsv!(estim, y0m, d0)
     end
@@ -479,7 +479,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::KalmanFilter, y0m, d0, u0)
+    update_estimate!(estim::KalmanFilter, u0, y0m, d0)
 
 Update [`KalmanFilter`](@ref) state `estim.x̂0` and estimation error covariance `estim.cov.P̂`.
 
@@ -511,7 +511,7 @@ provided below, see [^2] for details.
 [^2]: "Kalman Filter", *Wikipedia: The Free Encyclopedia*, 
      <https://en.wikipedia.org/wiki/Kalman_filter>, Accessed 2024-08-08.
 """
-function update_estimate!(estim::KalmanFilter, y0m, d0, u0)
+function update_estimate!(estim::KalmanFilter, u0, y0m, d0)
     if !estim.direct && all(isfinite, y0m)
         correct_estimate_kf!(estim, y0m, d0, estim.Ĉm)
     end
@@ -818,7 +818,7 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
+    update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     
 Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂0` and covariance estimate `estim.cov.P̂`.
 
@@ -861,7 +861,7 @@ step is skipped if `estim.direct == true` since it's already done by the user.
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, <https://doi.org/10.1002/0470045345.ch14>, 
      ISBN9780470045343.
 """
-function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
+function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     if !estim.direct && all(isfinite, y0m)
         correct_estimate!(estim, y0m, d0)
     end
@@ -1150,7 +1150,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::ExtendedKalmanFilter, y0m, d0, u0)
+    update_estimate!(estim::ExtendedKalmanFilter, u0, y0m, d0)
 
 Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂0` and covariance `estim.cov.P̂`.
 
@@ -1187,7 +1187,7 @@ and prediction step equations are provided below. The correction step is skipped
 \end{aligned}
 ```
 """
-function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
+function update_estimate!(estim::ExtendedKalmanFilter{NT}, u0, y0m, d0) where NT<:Real
     if !estim.direct && all(isfinite, y0m)
         correct_estimate!(estim, y0m, d0)
     end

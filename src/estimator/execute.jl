@@ -345,7 +345,7 @@ function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     end
     validate_args(estim, ym, d, u)
     y0m, d0, u0 = remove_op!(estim, ym, d, u)
-    update_estimate!(estim, y0m, d0, u0)
+    update_estimate!(estim, u0, y0m, d0)
     estim.prepared[] = false
     x̂next  = estim.buffer.x̂
     x̂next .= estim.x̂0 .+ estim.x̂op
