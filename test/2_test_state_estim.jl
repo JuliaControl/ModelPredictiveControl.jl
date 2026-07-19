@@ -119,6 +119,11 @@ end
         preparestate!(kalmanfilter4, [55, NaN])
     )
     @test all(kalmanfilter4.x̂0 .≈ 7)
+    kalmanfilter5 = SteadyKalmanFilter(linmodel, nint_ym=[1, 1], direct=false)
+    @test_logs(
+        (:warn, "NaN values in the Kalman filter measurements ym: skipping correction step"),
+        updatestate!(kalmanfilter5, [10, 50], [55, NaN])
+    )
 end 
 
 @testitem "SKF set model" setup=[SetupMPCtests] begin
@@ -252,6 +257,11 @@ end
         preparestate!(kalmanfilter4, [55, NaN])
     )
     @test all(kalmanfilter4.x̂0 .≈ 7)
+    kalmanfilter5 = KalmanFilter(linmodel, direct=false)
+    @test_logs(
+        (:warn, "NaN values in the Kalman filter measurements ym: skipping correction step"),
+        updatestate!(kalmanfilter5, [10,50], [55, NaN])
+    )
 end
 
 @testitem "KF set model" setup=[SetupMPCtests] begin
@@ -376,6 +386,11 @@ end
         preparestate!(lo4, [55, NaN])
     )
     @test all(lo4.x̂0 .≈ 7)
+    lo5 = Luenberger(linmodel, nint_ym=[1, 1], direct=false)
+    @test_logs(
+        (:warn, "NaN values in the Luenberger measurements ym: skipping correction step"),
+        updatestate!(lo5, [10, 50], [55, NaN])
+    )
 end
 
 @testitem "Luenb. set model" setup=[SetupMPCtests] begin
@@ -589,7 +604,7 @@ end
 
 @testitem "UKF estimator methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel = LinModel(sys,Ts,i_u=[1,2])
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10, 50], yop=[50, 30])
     function f!(xnext, x,u,_,model)
         mul!(xnext, model.A, x)
         mul!(xnext, model.Bu, u, 1, 1)
@@ -651,6 +666,11 @@ end
         preparestate!(ukf4, [55, NaN])
     )
     @test all(ukf4.x̂0 .≈ 7)
+    ukf5 = UnscentedKalmanFilter(linmodel, direct=false)
+    @test_logs(
+        (:warn, "NaN values in the Kalman filter measurements ym: skipping correction step"),
+        updatestate!(ukf5, [10, 50], [55, NaN])
+    )
 end
 
 @testitem "UKF set model" setup=[SetupMPCtests] begin
@@ -752,7 +772,7 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
-    linmodel = LinModel(sys,Ts,i_u=[1,2])
+    linmodel = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10, 50], yop=[50,30])
     function f!(xnext, x,u,_,model)
         mul!(xnext, model.A, x)
         mul!(xnext, model.Bu, u, 1, 1)
@@ -819,6 +839,11 @@ end
         preparestate!(ekf5, [55, NaN])
     )
     @test all(ekf5.x̂0 .≈ 7)
+    ekf6 = ExtendedKalmanFilter(linmodel, direct=false)
+    @test_logs(
+        (:warn, "NaN values in the Kalman filter measurements ym: skipping correction step"),
+        updatestate!(ekf6, [10, 50], [55, NaN])
+    )
 end
 
 @testitem "EKF set model" setup=[SetupMPCtests] begin
@@ -1072,12 +1097,17 @@ end
     @test x̂ ≈ [0, 0] atol=1e-3
     @test isa(x̂, Vector{Float32})
 
-    mhe4 = MovingHorizonEstimator(linmodel, He=2)
+    mhe4 = MovingHorizonEstimator(linmodel, He=2, direct=true)
     @test_logs(
         (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
         preparestate!(mhe4, [50, NaN], [5])
     )
     @test mhe4.x̂0 ≈ zeros(6) atol=1e-9
+    mhe5 = MovingHorizonEstimator(linmodel, He=2, direct=false)
+    @test_logs(
+        (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
+        updatestate!(mhe5, [10, 50], [50, NaN], [5])
+    )
     
 end
 
