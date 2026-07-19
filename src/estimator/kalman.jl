@@ -274,8 +274,8 @@ provided below.
 ```
 """
 function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
-    if !estim.direct && all(isfinite, y0m)
-        correct_estimate_obsv!(estim, y0m, d0)
+    if !estim.direct
+        correct_estimate!(estim, y0m, d0)
     end
     return predict_estimate_obsv!(estim, u0, d0)
 end
@@ -518,8 +518,8 @@ provided below, see [^2] for details.
      <https://en.wikipedia.org/wiki/Kalman_filter>, Accessed 2024-08-08.
 """
 function update_estimate!(estim::KalmanFilter, u0, y0m, d0)
-    if !estim.direct && all(isfinite, y0m)
-        correct_estimate_kf!(estim, y0m, d0, estim.Ĉm)
+    if !estim.direct
+        correct_estimate!(estim, y0m, d0)
     end
     return predict_estimate_kf!(estim, u0, d0, estim.Â)
 end
@@ -871,7 +871,7 @@ step is skipped if `estim.direct == true` since it's already done by the user.
      ISBN9780470045343.
 """
 function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
-    if !estim.direct && all(isfinite, y0m)
+    if !estim.direct
         correct_estimate!(estim, y0m, d0)
     end
     x̂0corr, X̂0corr, P̂corr = estim.x̂0, estim.X̂0, estim.cov.P̂
@@ -1200,7 +1200,7 @@ and prediction step equations are provided below. The correction step is skipped
 ```
 """
 function update_estimate!(estim::ExtendedKalmanFilter{NT}, u0, y0m, d0) where NT<:Real
-    if !estim.direct && all(isfinite, y0m)
+    if !estim.direct
         correct_estimate!(estim, y0m, d0)
     end
     cst_u0, cst_d0 = Constant(u0), Constant(d0)
