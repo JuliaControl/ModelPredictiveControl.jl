@@ -22,7 +22,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     D̂dm ::Matrix{NT}
     K̂::Matrix{NT}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function Luenberger{NT, SM}(
         model, i_ym, nint_u, nint_ym, poles; direct=true
@@ -41,7 +41,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             error("Cannot compute the Luenberger gain K̂ with specified poles.")
         end
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model, 
@@ -50,7 +50,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             K̂,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -121,20 +121,24 @@ end
 Identical to [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function correct_estimate!(estim::Luenberger, y0m, d0)
-    return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+    if any(isnan, y0m)
+        @warn "NaN values in the Luenberger measurements ym: skipping correction step"
+        return nothing
+    end
+    return correct_estimate_obsv!(estim, y0m, d0)
 end
 
 
 """
-    update_estimate!(estim::Luenberger, y0m, d0, u0)
+    update_estimate!(estim::Luenberger, u0, y0m, d0)
 
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
-function update_estimate!(estim::Luenberger, y0m, d0, u0)
-    if !estim.direct
-        correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+function update_estimate!(estim::Luenberger, u0, y0m, d0)
+    if !estim.direct && all(isfinite, y0m)
+        correct_estimate_obsv!(estim, y0m, d0)
     end
-    return predict_estimate_obsv!(estim, y0m, d0, u0)
+    return predict_estimate_obsv!(estim, u0, d0)
 end
 
 "Throw an error if P̂ != nothing."

@@ -21,7 +21,7 @@ struct ManualEstimator{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     Ĉm  ::Matrix{NT}
     D̂dm ::Matrix{NT}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function ManualEstimator{NT}(
         model::SM, i_ym, nint_u, nint_ym
@@ -35,7 +35,7 @@ struct ManualEstimator{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         direct = false
-        corrected = [true]
+        prepared = [true]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM}(
             model,
@@ -43,7 +43,7 @@ struct ManualEstimator{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
             i_ym, nx̂, nym, nyu, nxs, 
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -145,11 +145,11 @@ function ManualEstimator(
 end
 
 """
-    update_estimate!(estim::ManualEstimator, y0m, d0, u0)
+    update_estimate!(estim::ManualEstimator, u0, y0m, d0)
 
 Do nothing for [`ManualEstimator`](@ref).
 """
-update_estimate!(::ManualEstimator, y0m, d0, u0) = nothing
+update_estimate!(::ManualEstimator,_,_,_) = nothing
 
 "Throw an error if P̂ != nothing."
 function setstate_cov!(::ManualEstimator, P̂)

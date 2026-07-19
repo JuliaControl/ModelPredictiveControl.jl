@@ -53,7 +53,7 @@ function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0)
+    update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0)
     
 Update [`MovingHorizonEstimator`](@ref) state `estim.x̂0`.
 
@@ -67,7 +67,7 @@ step ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated using `estim.covestim` objec
 also stores `u0` at `estim.lastu0`, so it can be added to the data window at the next time
 step in [`correct_estimate!`](@ref).
 """
-function update_estimate!(estim::MovingHorizonEstimator, y0m, d0, u0)
+function update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0)
     if !estim.direct
         add_data_windows!(estim, y0m, d0, u0)
         initpred!(estim, estim.model)
@@ -747,7 +747,7 @@ function update_cov!(estim::MovingHorizonEstimator)
     estim.covestim.x̂0     .= estim.x̂0arr_old
     estim.covestim.cov.P̂  .= estim.P̂arr_old
     try
-        update_estimate!(estim.covestim, y0marr, d0arr, u0arr)
+        update_estimate!(estim.covestim, u0arr, y0marr, d0arr)
         all(isfinite, estim.covestim.cov.P̂) || error("Arrival covariance P̄ is not finite")
         estim.P̂arr_old .= estim.covestim.cov.P̂
         invert_cov!(estim, estim.covestim)

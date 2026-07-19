@@ -252,7 +252,7 @@ julia> ŷ = evaloutput(kf)
 ```
 """
 function evaloutput(estim::StateEstimator{NT}, d=estim.buffer.empty) where NT <: Real
-    if estim.direct && !estim.corrected[]
+    if estim.direct && !estim.prepared[]
         @warn "preparestate! should be called before evaloutput with current estimators"
     end
     validate_args(estim.model, d)
@@ -278,7 +278,9 @@ delayed/predictor (2.) formulation:
 
 1. If `estim.direct` is `true`, it removes the operating points with [`remove_op!`](@ref),
    calls [`correct_estimate!`](@ref), and returns the corrected state estimate 
-   ``\mathbf{x̂}_k(k)``.
+   ``\mathbf{x̂}_k(k)``. The correction step is skipped if `isnothing(ym)`, in case the 
+   measured outputs are temporarily unavailable. The [`MovingHorizonEstimator`](@ref) and
+   [`InternalModel`](@ref) also support partial correction with `NaN` values in `ym`.
 2. Else, it does nothing and returns the current best estimate ``\mathbf{x̂}_{k-1}(k)``.
 
 # Examples
@@ -297,12 +299,13 @@ julia> x̂ = preparestate!(estim1, [1])
 ```
 """
 function preparestate!(estim::StateEstimator, ym, d=estim.buffer.empty)
+    isnothing(ym) && (ym = estim.buffer.ym; ym .= NaN) # nothing: skip correction step
     if estim.direct
         validate_args(estim, ym, d)
         y0m, d0 = remove_op!(estim, ym, d)
         correct_estimate!(estim, y0m, d0)
-        estim.corrected[] = true
     end
+    estim.prepared[] = true
     x̂  = estim.buffer.x̂
     x̂ .= estim.x̂0 .+ estim.x̂op
     return x̂
@@ -317,9 +320,11 @@ This function should be called at the end of each discrete time step. It removes
 operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and returns the
 state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
 should be called prior to this one to correct the estimate when applicable (if
-`estim.direct == true`). Note that the [`MovingHorizonEstimator`](@ref) with the default
-`direct=true` option is not able to estimate ``\mathbf{x̂}_k(k+1)``, the returned value
-is therefore the current corrected state ``\mathbf{x̂}_k(k)``.
+`estim.direct == true`). If `isnothing(ym)`, only the prediction step is performed in 
+[`update_estimate!`](@ref), for when the measured outputs are temporarily unavailable. Note
+that the [`MovingHorizonEstimator`](@ref) with the default `direct=true` option is not able
+to estimate ``\mathbf{x̂}_k(k+1)``, the returned value is therefore the current corrected
+state ``\mathbf{x̂}_k(k)``.
 
 # Examples
 ```jldoctest
@@ -334,13 +339,14 @@ julia> x̂ = updatestate!(kf, u, ym) # x̂[2] is the integrator state (nint_ym a
 ```
 """
 function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
-    if estim.direct && !estim.corrected[]
+    isnothing(ym) && (ym = estim.buffer.ym; ym .= NaN) # nothing: skip correction step
+    if estim.direct && !estim.prepared[]
         error("preparestate! must be called before updatestate! with direct=true option")
     end
     validate_args(estim, ym, d, u)
     y0m, d0, u0 = remove_op!(estim, ym, d, u)
-    update_estimate!(estim, y0m, d0, u0)
-    estim.corrected[] = false
+    update_estimate!(estim, u0, y0m, d0)
+    estim.prepared[] = false
     x̂next  = estim.buffer.x̂
     x̂next .= estim.x̂0 .+ estim.x̂op
     return x̂next

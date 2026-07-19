@@ -68,7 +68,7 @@ function moveinput!(
     R̂y = Rhaty,
     R̂u = Rhatu
 )
-    if mpc.estim.direct && !mpc.estim.corrected[]
+    if mpc.estim.direct && !mpc.estim.prepared[]
         @warn "preparestate! should be called before moveinput! with current estimators"
     end
     validate_args(mpc, ry, d, lastu, D̂, R̂y, R̂u)

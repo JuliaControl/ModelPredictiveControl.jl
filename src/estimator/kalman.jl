@@ -30,7 +30,7 @@ struct SteadyKalmanFilter{
     D̂dm ::Matrix{NT}
     K̂::Matrix{NT}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function SteadyKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true
@@ -46,7 +46,7 @@ struct SteadyKalmanFilter{
         K̂, P̂ = init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct)
         cov.P̂ .= P̂
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM, KC}(
             model,
@@ -56,7 +56,7 @@ struct SteadyKalmanFilter{
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             K̂,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -240,14 +240,18 @@ end
 Correct `estim.x̂0` with measured outputs `y0m` and disturbances `d0` for current time step.
 
 It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)``. See the docstring of
-[`update_estimate!(::SteadyKalmanFilter, ::Any, ::Any)`](@ref) for the equations.
+[`update_estimate!(::SteadyKalmanFilter)`](@ref) for the equations.
 """
 function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
-    return correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+    if any(isnan, y0m)
+        @warn "NaN values in the Kalman filter measurements ym: skipping correction step"
+        return nothing
+    end
+    return correct_estimate_obsv!(estim, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
+    update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
 
 Update `estim.x̂0` estimate with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -269,16 +273,16 @@ provided below.
 \mathbf{x̂}_{k}(k+1) = \mathbf{Â x̂}_{k}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
 ```
 """
-function update_estimate!(estim::SteadyKalmanFilter, y0m, d0, u0)
-    if !estim.direct
-        correct_estimate_obsv!(estim, y0m, d0, estim.K̂)
+function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
+    if !estim.direct && all(isfinite, y0m)
+        correct_estimate_obsv!(estim, y0m, d0)
     end
-    return predict_estimate_obsv!(estim::StateEstimator, y0m, d0, u0)
+    return predict_estimate_obsv!(estim, u0, d0)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function correct_estimate_obsv!(estim::StateEstimator, y0m, d0, K̂)
-    Ĉm, D̂dm = estim.Ĉm, estim.D̂dm
+function correct_estimate_obsv!(estim::StateEstimator, y0m, d0)
+    Ĉm, D̂dm, K̂ = estim.Ĉm, estim.D̂dm, estim.K̂
     ŷ0m = @views estim.buffer.ŷ[estim.i_ym]
     # in-place operations to reduce allocations:
     mul!(ŷ0m, Ĉm, estim.x̂0) 
@@ -291,7 +295,7 @@ function correct_estimate_obsv!(estim::StateEstimator, y0m, d0, K̂)
 end
 
 "Allow code reuse for `SteadyKalmanFilter` and `Luenberger` (observers with constant gain)."
-function predict_estimate_obsv!(estim::StateEstimator, _ , d0, u0)
+function predict_estimate_obsv!(estim::StateEstimator, u0, d0)
     x̂0corr = estim.x̂0
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     x̂0next = estim.buffer.x̂
@@ -333,7 +337,7 @@ struct KalmanFilter{
     D̂dm ::Matrix{NT}
     K̂::Matrix{NT}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function KalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true
@@ -347,7 +351,7 @@ struct KalmanFilter{
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         K̂ = zeros(NT, nx̂, nym)
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM, KC}(
             model, 
@@ -357,7 +361,7 @@ struct KalmanFilter{
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             K̂,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -472,12 +476,16 @@ It computes the corrected state estimate ``\mathbf{x̂}_{k}(k)`` estimation cova
 ``\mathbf{P̂}_{k}(k)``.
 """
 function correct_estimate!(estim::KalmanFilter, y0m, d0)
+    if any(isnan, y0m)
+        @warn "NaN values in the Kalman filter measurements ym: skipping correction step"
+        return nothing
+    end
     return correct_estimate_kf!(estim, y0m, d0, estim.Ĉm)
 end
 
 
 @doc raw"""
-    update_estimate!(estim::KalmanFilter, y0m, d0, u0)
+    update_estimate!(estim::KalmanFilter, u0, y0m, d0)
 
 Update [`KalmanFilter`](@ref) state `estim.x̂0` and estimation error covariance `estim.cov.P̂`.
 
@@ -509,8 +517,8 @@ provided below, see [^2] for details.
 [^2]: "Kalman Filter", *Wikipedia: The Free Encyclopedia*, 
      <https://en.wikipedia.org/wiki/Kalman_filter>, Accessed 2024-08-08.
 """
-function update_estimate!(estim::KalmanFilter, y0m, d0, u0)
-    if !estim.direct
+function update_estimate!(estim::KalmanFilter, u0, y0m, d0)
+    if !estim.direct && all(isfinite, y0m)
         correct_estimate_kf!(estim, y0m, d0, estim.Ĉm)
     end
     return predict_estimate_kf!(estim, u0, d0, estim.Â)
@@ -555,7 +563,7 @@ struct UnscentedKalmanFilter{
     m̂::Vector{NT}
     Ŝ::Diagonal{NT, Vector{NT}}
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function UnscentedKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC, α, β, κ; direct=true
@@ -573,7 +581,7 @@ struct UnscentedKalmanFilter{
         M̂ = Hermitian(zeros(NT, nym, nym), :L)
         X̂0,  X̄0  = zeros(NT, nx̂, nσ),  zeros(NT, nx̂, nσ)
         Ŷ0m, Ȳ0m = zeros(NT, nym, nσ), zeros(NT, nym, nσ)
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM, KC}(
             model,
@@ -585,7 +593,7 @@ struct UnscentedKalmanFilter{
             K̂, 
             M̂, X̂0, X̄0, Ŷ0m, Ȳ0m,
             nσ, γ, m̂, Ŝ,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -767,6 +775,10 @@ end
 Do the same but for the [`UnscentedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
+    if any(isnan, y0m)
+        @warn "NaN values in the Kalman filter measurements ym: skipping correction step"
+        return nothing
+    end
     x̂0, P̂, R̂, K̂ = estim.x̂0, estim.cov.P̂, estim.cov.R̂, estim.K̂
     nx̂ = estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
@@ -815,7 +827,7 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
+    update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     
 Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂0` and covariance estimate `estim.cov.P̂`.
 
@@ -858,8 +870,8 @@ step is skipped if `estim.direct == true` since it's already done by the user.
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, <https://doi.org/10.1002/0470045345.ch14>, 
      ISBN9780470045343.
 """
-function update_estimate!(estim::UnscentedKalmanFilter, y0m, d0, u0)
-    if !estim.direct
+function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
+    if !estim.direct && all(isfinite, y0m)
         correct_estimate!(estim, y0m, d0)
     end
     x̂0corr, X̂0corr, P̂corr = estim.x̂0, estim.X̂0, estim.cov.P̂
@@ -932,7 +944,7 @@ struct ExtendedKalmanFilter{
     linfuncF̂!::FF
     linfuncĤ!::HF
     direct::Bool
-    corrected::Vector{Bool}
+    prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function ExtendedKalmanFilter{NT}(
         model::SM, 
@@ -957,7 +969,7 @@ struct ExtendedKalmanFilter{
         K̂ = zeros(NT, nx̂, nym)
         F̂_û, F̂ = zeros(NT, nx̂+nu, nx̂), zeros(NT, nx̂, nx̂)
         Ĥ,  Ĥm = zeros(NT, ny, nx̂),    zeros(NT, nym, nx̂)
-        corrected = [false]
+        prepared = [false]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
         return new{NT, SM, KC, JB, FF, HF}(
             model,
@@ -969,7 +981,7 @@ struct ExtendedKalmanFilter{
             K̂,
             F̂_û, F̂, Ĥ, Ĥm,
             jacobian, linfuncF̂!, linfuncĤ!,
-            direct, corrected,
+            direct, prepared,
             buffer
         )
     end
@@ -1136,6 +1148,10 @@ end
 Do the same but for the [`ExtendedKalmanFilter`](@ref).
 """
 function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
+    if any(isnan, y0m)
+        @warn "NaN values in the Kalman filter measurements ym: skipping correction step"
+        return nothing
+    end
     x̂0 = estim.x̂0
     cst_d0 = Constant(d0)
     ŷ0, Ĥ, Ĥm = estim.buffer.ŷ, estim.Ĥ, estim.Ĥm
@@ -1146,7 +1162,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::ExtendedKalmanFilter, y0m, d0, u0)
+    update_estimate!(estim::ExtendedKalmanFilter, u0, y0m, d0)
 
 Update [`ExtendedKalmanFilter`](@ref) state `estim.x̂0` and covariance `estim.cov.P̂`.
 
@@ -1183,8 +1199,8 @@ and prediction step equations are provided below. The correction step is skipped
 \end{aligned}
 ```
 """
-function update_estimate!(estim::ExtendedKalmanFilter{NT}, y0m, d0, u0) where NT<:Real
-    if !estim.direct
+function update_estimate!(estim::ExtendedKalmanFilter{NT}, u0, y0m, d0) where NT<:Real
+    if !estim.direct && all(isfinite, y0m)
         correct_estimate!(estim, y0m, d0)
     end
     cst_u0, cst_d0 = Constant(u0), Constant(d0)
