@@ -46,9 +46,10 @@ plant model/constraints. The Extended Help details transcription of
         \mathbf{Ŵ}                                  \\
         \mathbf{0}                                  \end{bmatrix}
     ``` 
-    The vector ``\mathbf{0}`` with `nx̂*(He-Nk)` zeros is appended when ``N_k < H_e`` (at the
-    beginning), to 
-    
+    The vector ``\mathbf{0}`` with `nx̂*(He-Nk)` zeros is for the unused decision variables
+    at the beginning, when the data windows are growing (``N_k < H_e``). The number of
+    elements in ``\mathbf{Z}`` is therefore constant. The ``\mathbf{Ŵ}`` vector is defined
+    in the Extended Help of [`MovingHorizonEstimator`](@ref).
 """
 struct SingleShooting <: ShootingMethod end
 
@@ -89,9 +90,24 @@ provided in the Extended Help.
 !!! details "Extended Help"
     For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
     ```math
-    \mathbf{Z} =                                                            \begin{bmatrix} 
-        \mathbf{x̂_0}(k-N_k+p) \\  \mathbf{X̂_0} \\  \mathbf{Ŵ}               \end{bmatrix}
-    ``` 
+    \mathbf{Z} =                    \begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p)       \\  
+        \mathbf{X̂_0}                \\         
+        \mathbf{0}                  \\ 
+        \mathbf{Ŵ}                  \\
+        \mathbf{0}                  \end{bmatrix}
+    ```
+    thus the deviation value of arrival state estimate ``\mathbf{x̂_0}(k-N_k+p)`` is kept out
+    of the estimated states over ``N_k``:
+    ```math
+    \mathbf{X̂_0} = \mathbf{X̂ - X̂_{op}} =                    \begin{bmatrix} 
+        \mathbf{x̂}_k(k-N_k+p+1)     - \mathbf{x̂_{op}}       \\ 
+        \mathbf{x̂}_k(k-N_k+p+2)     - \mathbf{x̂_{op}}       \\ 
+        \vdots                                              \\ 
+        \mathbf{x̂}_k(k+p)           - \mathbf{x̂_{op}}       \end{bmatrix}
+    ```
+    Similarly to [`SingleShooting`](@ref), the two ``\mathbf{0}`` vectors with zeros is
+    for the unused decision variables at the beginning.
 """
 struct MultipleShooting <: ShootingMethod 
     f_threads::Bool
