@@ -135,8 +135,8 @@ end
 Same than [`update_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """
 function update_estimate!(estim::Luenberger, u0, y0m, d0)
-    if !estim.direct && all(isfinite, y0m)
-        correct_estimate_obsv!(estim, y0m, d0)
+    if !estim.direct
+        correct_estimate!(estim, y0m, d0)
     end
     return predict_estimate_obsv!(estim, u0, d0)
 end
