@@ -1,5 +1,6 @@
 include("mhe/construct.jl")
 include("mhe/execute.jl")
+include("mhe/transcription.jl")
 
 "Return estimation horizon He and slack variables length nε for `MovingHorizonEstimator`."
 get_other_dims(estim::MovingHorizonEstimator) = (estim.He, estim.nε)
@@ -7,6 +8,7 @@ get_other_dims(estim::MovingHorizonEstimator) = (estim.He, estim.nε)
 "Print optimizer and other information for `MovingHorizonEstimator`."
 function print_details(io::IO, estim::MovingHorizonEstimator)
     println(io, "├ optimizer: $(JuMP.solver_name(estim.optim)) ")
+    println(io, "├ transcription: $(nameof(typeof(estim.transcription)))")
     print_backends(io, estim, estim.model)
     println(io, "├ arrival covariance: $(nameof(typeof(estim.covestim))) ")
     println(io, "├ direct: $(estim.direct)")
