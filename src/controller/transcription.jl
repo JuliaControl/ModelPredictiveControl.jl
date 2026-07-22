@@ -1243,25 +1243,47 @@ end
         mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
     )
 
-Do the same for [`SimModel`](@ref), but using simpler equations (stochastic defects only).
+Do the same for [`SimModel`](@ref), but using simpler equations.
+    
+The linear equality constraints include the stochastic defects only, and the continuity
+constraints of [`OrthogonalCollocation`](@ref), if applicable.
 """
 function linconstrainteq!(
-    mpc::PredictiveController, ::SimModel, estim::StateEstimator, ::TranscriptionMethod
+    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
 )
-    (estim.nxs < 1) && return nothing # no stochastic state ⟹ no linear eq. constraint
     FS  = mpc.con.FS
-    # the only non-zeros matrices are ES and KS:
-    mul!(FS, mpc.con.KS, mpc.estim.x̂0)
+    mul!(FS, mpc.con.KS, mpc.estim.x̂0) # the only non-zero matrix is KS
     mpc.con.beq .= @. -FS
     linconeq = mpc.optim[:linconstrainteq]
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
 end
-"No linear equality constraints for [`InternalModel`](@ref) (state is not augmented)."
-linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel, ::TranscriptionMethod) = nothing
-"No linear equality constraints for [`SingleShooting`(@ref) (N/A).]"
-linconstrainteq!(::PredictiveController, ::SimModel,    ::StateEstimator, ::SingleShooting)  = nothing
-linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel,  ::SingleShooting)  = nothing
+
+"""
+    linconstrainteq!(
+        mpc::PredictiveController, ::SimModel, ::InternalModel, ::OrthogonalCollocation
+    )
+
+Same as above but only for the continuity constraints of [`OrthogonalCollocation`](@ref).
+
+There are no stochastic defects, the [`InternalModel`](@ref) does not augment the states.
+"""
+function linconstrainteq!(
+    mpc::PredictiveController, ::SimModel, ::InternalModel, ::OrthogonalCollocation
+)
+    FS  = mpc.con.FS
+    mul!(FS, mpc.con.KS, mpc.estim.x̂0) # the only non-zero matrix is KS
+    mpc.con.beq .= @. -FS
+    linconeq = mpc.optim[:linconstrainteq]
+    JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    return nothing
+end
+"No linear equality constraints for other cases of [`InternalModel`](@ref)."
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel, ::TranscriptionMethod) = nothing
+"No linear equality constraints for all cases of [`SingleShooting`(@ref) (N/A).]"
+linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting) = nothing 
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::SingleShooting) = nothing
+linconstrainteq!(::PredictiveController, ::LinModel, ::InternalModel,  ::SingleShooting) = nothing 
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
