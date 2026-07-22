@@ -1012,8 +1012,8 @@ function setmodel_estimator!(
         estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, 
         estim.x̂op, estim.f̂op, estim.direct
     )
-    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nε, con.C_x̂min, con.C_x̂max, Ex̂)   
-    A_V̂min, A_V̂max, Ẽ  = relaxV̂(model, nε, con.C_v̂min, con.C_v̂max, E) 
+    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(Ex̂, con.C_x̂min, con.C_x̂max, nε)   
+    A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, con.C_v̂min, con.C_v̂max, nε) 
     estim.Ẽ .= Ẽ
     estim.G .= G
     estim.J .= J

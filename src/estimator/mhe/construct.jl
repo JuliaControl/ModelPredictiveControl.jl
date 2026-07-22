@@ -44,8 +44,8 @@ struct EstimatorConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     A_x̂max  ::Matrix{NT}
     A_X̂min  ::Matrix{NT}
     A_X̂max  ::Matrix{NT}
-    A_Ŵmin  ::Matrix{NT}
-    A_Ŵmax  ::Matrix{NT}
+    A_Ŵmin  ::SparseMatrixCSC{NT,Int}
+    A_Ŵmax  ::SparseMatrixCSC{NT,Int}
     A_V̂min  ::Matrix{NT}
     A_V̂max  ::Matrix{NT}
     A       ::Matrix{NT}
@@ -120,6 +120,7 @@ struct MovingHorizonEstimator{
     D̂d  ::Matrix{NT}
     Ĉm  ::Matrix{NT}
     D̂dm ::Matrix{NT}
+    Tŵ::SparseMatrixCSC{NT, Int}
     Ẽ ::Matrix{NT}
     F ::Vector{NT}
     G ::Matrix{NT}
@@ -177,6 +178,7 @@ struct MovingHorizonEstimator{
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
+        Tŵ = init_ZtoŴ(model, transcription, He, nx̂)
         E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
             model, transcription, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
         )
@@ -186,7 +188,12 @@ struct MovingHorizonEstimator{
         # dummy values (updated just before optimization):
         F, fx̄ = zeros(NT, nym*He), zeros(NT, nx̂)
         con, nε, Ẽ, ẽx̄ = init_defaultcon_mhe(
-            model, He, Cwt, nx̂, nym, E, ex̄, Ex̂, Gx̂, Jx̂, Bx̂, ES, GS, JS, BS,
+            model, transcription, 
+            He, Cwt, nx̂, nym, 
+            Tŵ, E, ex̄, 
+            Ex̂, Gx̂, Jx̂, Bx̂, 
+            ES, GS, JS, BS, 
+            gc!, nc
         )
         nZ̃ = size(Ẽ, 2)
         # dummy values, updated before optimization:
@@ -216,6 +223,7 @@ struct MovingHorizonEstimator{
             p,
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
+            Tŵ,
             Ẽ, F, G, J, B, ẽx̄, fx̄,
             H̃, q̃, r,
             Cwt,
@@ -833,6 +841,7 @@ function setconstraint!(
     C_v̂min = C_vhatmin, C_v̂max = C_vhatmax,
 )
     model, optim, con = estim.model, estim.optim, estim.con
+    transcription = estim.transcription
     nε, nx̂, nŵ, nym, He = estim.nε, estim.nx̂, estim.nx̂, estim.nym, estim.He
     nX̂con = nx̂*(He+1)
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
@@ -955,11 +964,12 @@ function setconstraint!(
     Z̃var = optim[:Z̃var]
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(
-            model, Z̃min, Z̃max, con.nc,
+            model, transcription, Z̃min, Z̃max, con.nc,
             con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, 
             con.Ŵmin,   con.Ŵmax,   con.V̂min,   con.V̂max,
             con.A_x̂min, con.A_x̂max, con.A_X̂min, con.A_X̂max, 
-            con.A_Ŵmin, con.A_Ŵmax, con.A_V̂min, con.A_V̂max
+            con.A_Ŵmin, con.A_Ŵmax, con.A_V̂min, con.A_V̂max,
+            con.Aeq
         )
         con.Z̃min[:], con.Z̃max[:] = Z̃min, Z̃max
         A = con.A[con.i_b, :]
@@ -976,7 +986,7 @@ function setconstraint!(
         reset_nonlincon!(estim, model)
     else
         i_b, i_g = init_matconstraint_mhe(
-            model, Z̃min, Z̃max, con.nc, 
+            model, transcription, Z̃min, Z̃max, con.nc, 
             con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, 
             con.Ŵmin,   con.Ŵmax,   con.V̂min,   con.V̂max
         )
@@ -1006,75 +1016,6 @@ function reset_nonlincon!(estim::MovingHorizonEstimator, model::NonLinModel)
     set_nonlincon!(estim, estim.optim, g_oracle)
 end
 
-@doc raw"""
-    init_matconstraint_mhe(
-        model::LinModel, Z̃min, Z̃max, nc,
-        x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
-    ) -> b, g, A
-
-Init `i_b`, `g` and `A` matrices for the MHE linear inequality constraints.
-
-The linear and nonlinear inequality constraints are respectively defined as:
-```math
-\begin{aligned} 
-    \mathbf{A Z̃ } &≤ \mathbf{b} \\ 
-    \mathbf{g(Z̃)} &≤ \mathbf{0}
-\end{aligned}
-```
-The argument `nc` is the number of custom nonlinear inequality constraints in
-``\mathbf{g_c}``. `b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
-finite numbers. `g` is a similar vector but for the indices of ``\mathbf{g}`` (empty if
-`model` is a [`LinModel`](@ref)). The method also returns the ``\mathbf{A}`` matrix if
-`args` is provided. In such a case, `args`  needs to contain all the inequality constraint
-matrices: `A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max`.
-"""
-function init_matconstraint_mhe(
-    model::LinModel{NT}, Z̃min, Z̃max, nc,
-    x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
-) where {NT<:Real}
-    if isempty(args)
-        A = nothing
-    else
-        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max = args
-        A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
-    end
-    i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
-    i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
-    i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
-    i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
-    nx̂ = length(x̂0min)
-    nε = length(Z̃min) - length(Ŵmin) - nx̂
-    deletex̂arr_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max, nε)
-    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂, nε)
-    i_b = [i_x̂min; i_x̂max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax; i_V̂min; i_V̂max]
-    g = trues(nc)
-    return i_b, g, A
-end
-
-"Init `i_b, A` without state and sensor noise constraints if `model` is not a [`LinModel`](@ref)."
-function init_matconstraint_mhe(
-    model::SimModel{NT}, Z̃min, Z̃max, nc,
-    x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
-) where {NT<:Real}
-    if isempty(args)
-        A = nothing
-    else
-        A_x̂min, A_x̂max, _ , _ , A_Ŵmin, A_Ŵmax, _ , _ = args
-        A = [A_x̂min; A_x̂max; A_Ŵmin; A_Ŵmax]
-    end
-    i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
-    i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
-    i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
-    i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
-    nx̂ = length(x̂0min)
-    nε = length(Z̃min) - length(Ŵmin) - nx̂
-    deletex̂arr_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max, nε)
-    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂, nε)
-    i_b = [i_x̂min; i_x̂max; i_Ŵmin; i_Ŵmax]
-    g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max; trues(nc)]
-    return i_b, g, A
-end
-
 "Unset `i_x̂min` and `i_x̂min` elements if finite box constraints in `Z̃min` and `Z̃max`."
 function deletex̂arr_lincon!(i_x̂min, i_x̂max, ::SimModel, Z̃min, Z̃max, nε)
     nx̂ = length(i_x̂min)
@@ -1094,10 +1035,12 @@ end
 
 """
     init_defaultcon_mhe(
-        model::SimModel, He, Cwt, nx̂, nym, 
-        E, ex̄, 
+        model::SimModel, transcription::TranscriptionMethod, 
+        He, Cwt, nx̂, nym, 
+        Tŵ, E, ex̄, 
         Ex̂, Gx̂, Jx̂, Bx̂,
         ES, GS, JS, BS,
+        gc!::Function, nc
     ) -> con, Ẽ, ẽx̄
 
     Init `EstimatatorConstraint` struct with default parameters based on model `model`.
@@ -1105,12 +1048,13 @@ end
 Also return `Ẽ` and `ẽx̄` matrices for the the augmented decision vector `Z̃`.
 """
 function init_defaultcon_mhe(
-    model::SimModel{NT}, He, Cwt, nx̂, nym, 
-    E, ex̄, 
+    model::SimModel{NT}, transcription::TranscriptionMethod, 
+    He, Cwt, nx̂, nym,
+    Tŵ, E, ex̄, 
     Ex̂, Gx̂, Jx̂, Bx̂, 
     ES, GS, JS, BS,
-    gc!::GCfunc = nothing, nc = 0
-) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
+    gc!::GCfunc, nc
+) where {NT<:Real, GCfunc<:Function}
     nŵ = nx̂
     nX̂, nŴ, nYm = nx̂*He, nŵ*He, nym*He
     nε = isinf(Cwt) ? 0 : 1
@@ -1123,19 +1067,19 @@ function init_defaultcon_mhe(
     C_x̂min, C_x̂max = fill(0.0, nX̂),  fill(0.0, nX̂)
     C_ŵmin, C_ŵmax = fill(0.0, nŴ),  fill(0.0, nŴ)
     C_v̂min, C_v̂max = fill(0.0, nYm), fill(0.0, nYm)
-    A_x̂min, A_x̂max, ẽx̄ = relaxarrival(model, nε, c_x̂min, c_x̂max, ex̄)
-    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nε, C_x̂min, C_x̂max, Ex̂)
-    A_Ŵmin, A_Ŵmax     = relaxŴ(model, nε, C_ŵmin, C_ŵmax, nx̂)
-    A_V̂min, A_V̂max, Ẽ  = relaxV̂(model, nε, C_v̂min, C_v̂max, E)
+    A_x̂min, A_x̂max, ẽx̄ = relaxarrival(ex̄, c_x̂min, c_x̂max, nε)
+    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(Ex̂, C_x̂min, C_x̂max, nε)
+    A_Ŵmin, A_Ŵmax     = relaxŴ(Tŵ, C_ŵmin, C_ŵmax, nε)
+    A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, C_v̂min, C_v̂max , nε)
     Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
     Z̃min, Z̃max = init_boxconstraint_mhe(
         model, He, nx̂, nŵ, nε,
         x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmax
     )
     i_b, i_g, A, Aeq, neq = init_matconstraint_mhe(
-        model, Z̃min, Z̃max, nc,
+        model, transcription, Z̃min, Z̃max, nc,
         x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
-        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq
     )
     # dummy vectors (updated just before optimization):
     Fx̂, FS = zeros(NT, nx̂*He), zeros(NT, nS)
@@ -1157,7 +1101,7 @@ function init_defaultcon_mhe(
 end
 
 @doc raw"""
-    relaxarrival(model::SimModel, nε, c_x̂min, c_x̂max, ex̄) -> A_x̂min, A_x̂max, ẽx̄
+    relaxarrival(ex̄, c_x̂min, c_x̂maxm, nε) -> A_x̂min, A_x̂max, ẽx̄
 
 Augment arrival state constraints with slack variable ε for softening the MHE.
 
@@ -1177,7 +1121,7 @@ matrices for the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxarrival(::SimModel{NT}, nε, c_x̂min, c_x̂max, ex̄) where NT<:Real
+function relaxarrival(ex̄::AbstractMatrix{NT}, c_x̂min, c_x̂max, nε) where NT<:Real
     ex̂ = -ex̄
     if nε ≠ 0 # Z̃ = [ε; Z]
         # ε impacts arrival state constraint calculations:
@@ -1192,7 +1136,7 @@ function relaxarrival(::SimModel{NT}, nε, c_x̂min, c_x̂max, ex̄) where NT<:R
 end
 
 @doc raw"""
-    relaxX̂(model::SimModel, nε, C_x̂min, C_x̂max, Ex̂) -> A_X̂min, A_X̂max, Ẽx̂
+    relaxX̂(Ex̂, C_x̂min, C_x̂max, nε) -> A_X̂min, A_X̂max, Ẽx̂
 
 Augment estimated state constraints with slack variable ε for softening the MHE.
 
@@ -1213,8 +1157,12 @@ also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 in which ``\mathbf{X̂_{min}, X̂_{max}}`` and ``\mathbf{X̂_{op}}`` vectors respectively contains
 ``\mathbf{x̂_{min}, x̂_{max}}`` and ``\mathbf{x̂_{op}}`` repeated ``H_e`` times.
 """
-function relaxX̂(::LinModel{NT}, nε, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
+function relaxX̂(Ex̂::AbstractMatrix{NT}, C_x̂min, C_x̂max, nε) where NT<:Real
     if nε ≠ 0 # Z̃ = [ε; Z]
+        if iszero(size(Ex̂, 1))
+            # model is not a LinModel, thus X̂ constraints are not linear:
+            C_x̂min = C_x̂max = zeros(NT, 0, 1)
+        end
         # ε impacts estimated process noise constraint calculations:
         A_X̂min, A_X̂max = -[C_x̂min Ex̂], [-C_x̂max Ex̂]
         # ε has no impact on estimated process noises:
@@ -1226,15 +1174,8 @@ function relaxX̂(::LinModel{NT}, nε, C_x̂min, C_x̂max, Ex̂) where {NT<:Real
     return A_X̂min, A_X̂max, Ẽx̂
 end
 
-"Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxX̂(::SimModel{NT}, nε, C_x̂min, C_x̂max, Ex̂) where {NT<:Real}
-    Ẽx̂ = [zeros(NT, 0, nε) Ex̂]
-    A_X̂min, A_X̂max = -Ẽx̂,  Ẽx̂
-    return A_X̂min, A_X̂max, Ẽx̂
-end
-
 @doc raw"""
-    relaxŴ(model::SimModel, nε, C_ŵmin, C_ŵmax, nx̂) -> A_Ŵmin, A_Ŵmax
+    relaxŴ(Tŵ, C_ŵmin, C_ŵmax, nε) -> A_Ŵmin, A_Ŵmax
 
 Augment estimated process noise constraints with slack variable ε for softening the MHE.
 
@@ -1242,7 +1183,7 @@ Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z
 [\begin{smallmatrix} ε \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{A}`` 
 matrices for the inequality constraints:
 ```math
-\begin{bmatrix} 
+\begin{bmatrix}
     \mathbf{A_{Ŵ_{min}}} \\ 
     \mathbf{A_{Ŵ_{max}}}
 \end{bmatrix} \mathbf{Z̃} ≤
@@ -1252,18 +1193,17 @@ matrices for the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxŴ(::SimModel{NT}, nε, C_ŵmin, C_ŵmax, nx̂) where {NT<:Real}
-    A = [zeros(NT, length(C_ŵmin), nx̂) I]
+function relaxŴ(Tŵ::AbstractMatrix{NT}, C_ŵmin, C_ŵmax, nε) where NT<:Real
     if nε ≠ 0 # Z̃ = [ε; Z]
-        A_Ŵmin, A_Ŵmax = -[C_ŵmin A], [-C_ŵmax A]
+        A_Ŵmin, A_Ŵmax = -[C_ŵmin Tŵ], [-C_ŵmax Tŵ]
     else # Z̃ = Z (only hard constraints)
-        A_Ŵmin, A_Ŵmax = -A, A
+        A_Ŵmin, A_Ŵmax = -Tŵ, Tŵ
     end
     return A_Ŵmin, A_Ŵmax
 end
 
 @doc raw"""
-    relaxV̂(model::SimModel, nε, C_v̂min, C_v̂max, E) -> A_V̂min, A_V̂max, Ẽ
+    relaxV̂(E, C_v̂min, C_v̂max, nε) -> A_V̂min, A_V̂max, Ẽ
 
 Augment estimated sensor noise constraints with slack variable ε for softening the MHE.
 
@@ -1282,8 +1222,12 @@ also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 \end{bmatrix}
 ```
 """
-function relaxV̂(::LinModel{NT}, nε, C_v̂min, C_v̂max, E) where {NT<:Real}
+function relaxV̂(E::AbstractMatrix{NT}, C_v̂min, C_v̂max, nε) where NT<:Real
     if nε ≠ 0 # Z̃ = [ε; Z]
+        if iszero(size(E, 1))
+            # model is not a LinModel, thus V̂ constraints are not linear:
+            C_v̂min = C_v̂max = zeros(NT, 0, 1)
+        end
         # ε impacts estimated sensor noise constraint calculations:
         A_V̂min, A_V̂max = -[C_v̂min E], [-C_v̂max E]
         # ε has no impact on estimated sensor noises:
@@ -1292,13 +1236,6 @@ function relaxV̂(::LinModel{NT}, nε, C_v̂min, C_v̂max, E) where {NT<:Real}
         Ẽ = E
         A_V̂min, A_V̂max = -Ẽ, Ẽ
     end
-    return A_V̂min, A_V̂max, Ẽ
-end
-
-"Return empty matrices if model is not a [`LinModel`](@ref)"
-function relaxV̂(::SimModel{NT}, nε, C_v̂min, C_v̂max, E) where {NT<:Real}
-    Ẽ = [zeros(NT, 0, nε) E]
-    A_V̂min, A_V̂max = -Ẽ, Ẽ
     return A_V̂min, A_V̂max, Ẽ
 end
 
@@ -1364,6 +1301,9 @@ function init_optimization!(
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
+    Aeq = con.Aeq
+    beq = con.beq
+    @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     @objective(optim, Min, obj_quadprog(Z̃var, estim.H̃, estim.q̃))
     if con.nc > 0
         # --- nonlinear optimization init for the custom NL constraints ---
@@ -1395,6 +1335,9 @@ function init_optimization!(
     A = con.A[con.i_b, :]
     b = con.b[con.i_b]
     @constraint(optim, linconstraint, A*Z̃var .≤ b)
+    Aeq = con.Aeq
+    beq = con.beq
+    @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
     # --- nonlinear optimization init ---
     set_scaling_gradient!(optim, C)
     # constraints with vector nonlinear oracle, objective function with splatting:    

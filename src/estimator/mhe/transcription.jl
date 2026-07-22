@@ -1,4 +1,29 @@
 @doc raw"""
+    init_ZtoŴ(model::SimModel, transcription::SingleShooting, He, nx̂) -> Tŵ
+
+Init decision variables to estimated process noise over ``H_e`` conversion matrix `Tŵ`.
+
+The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{Ŵ}``, the estimated
+process noise over ``H_e``, is computed by:
+```math
+\mathbf{Ŵ} = \mathbf{T_{ŵ}} \mathbf{Z}
+```
+in which ``\mathbf{T_{ŵ}} = [\begin{smallmatrix} \mathbf{0} & \mathbf{I} \end{smallmatrix}]``
+and ``\mathbf{0}`` is properly sized for the `transcription` instance.
+"""
+function init_ZtoŴ(::SimModel{NT}, ::SingleShooting, He, nx̂) where NT<:Real
+    nŵ = nx̂
+    Tŵ = [spzeros(NT, nŵ*He, nx̂) I]
+    return Tŵ
+end
+
+function init_ZtoŴ(::SimModel{NT}, ::TranscriptionMethod, He, nx̂) where NT<:Real
+    nŵ = nx̂
+    Tŵ = [spzeros(NT, nŵ*He, nx̂ + nx̂*He) I] 
+    return Tŵ
+end
+
+@doc raw"""
     init_predmat_mhe(
         model::LinModel, transcription::SingleShooting,
         He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
@@ -328,6 +353,94 @@ function init_defectmat_mhe(
     # --- state x̂op and state update f̂op operating points ---
     BS = repeat(f̂op - x̂op, He)
     return ES, GS, JS, BS
+end
+
+"Return empty matrices for [`SingleShooting`](@ref) transcription (N/A)."
+function init_defectmat_mhe(
+    model::SimModel{NT}, ::SingleShooting, He, Â, _ , _ , _ , _ , _
+) where {NT<:Real}
+    nu, nd = model.nu, model.nd
+    nx̂ = size(Â, 2)
+    nŵ = nx̂
+    ES = zeros(NT, 0, nx̂ + nŵ*He)
+    GS = zeros(NT, 0, nu*He)
+    JS = zeros(NT, 0, nd*(He+1))
+    BS = zeros(NT, 0)
+    return ES, GS, JS, BS
+end
+
+@doc raw"""
+    init_matconstraint_mhe(
+        model::LinModel, transcription::SingleShooting, Z̃min, Z̃max, nc,
+        x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
+    ) -> i_b, i_g, A, Aeq, neq
+
+Init `i_b`, `i_g`, `neq`, and `A` and `Aeq` matrices for all the MHE constraints.
+
+The linear and nonlinear inequality constraints are respectively defined as:
+```math
+\begin{aligned} 
+    \mathbf{A Z̃ }       &≤ \mathbf{b}           \\ 
+    \mathbf{A_{eq} Z̃}   &= \mathbf{b_{eq}}      \\
+    \mathbf{g(Z̃)}       &≤ \mathbf{0}           \\
+    \mathbf{g_{eq}(Z̃)}  &= \mathbf{0}           
+\end{aligned}
+```
+The argument `nc` is the number of custom nonlinear inequality constraints in
+``\mathbf{g_c}``. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
+finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
+also returns the `\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a
+case, `args`  needs to contain all the inequality and equality constraint matrices: 
+`A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq`. The integer `neq` is
+the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
+"""
+function init_matconstraint_mhe(
+    model::LinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc,
+    x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
+) where {NT<:Real}
+    if isempty(args)
+        A, Aeq, neq = nothing, nothing, nothing
+    else
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq = args
+        A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
+        neq = 0 # number of nonlinear equality constraints
+    end
+    i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
+    i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
+    i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
+    nx̂ = length(x̂0min)
+    nε = length(Z̃min) - length(Ŵmin) - nx̂
+    deletex̂arr_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max, nε)
+    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂, nε)
+    i_b = [i_x̂min; i_x̂max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax; i_V̂min; i_V̂max]
+    i_g = trues(nc)
+    return i_b, i_g, A, Aeq, neq
+end
+
+"Init `i_b, A` without state and sensor noise constraints if `model` is not a [`LinModel`](@ref)."
+function init_matconstraint_mhe(
+    model::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc,
+    x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
+) where {NT<:Real}
+    if isempty(args)
+        A, Aeq, neq = nothing, nothing, nothing
+    else
+        A_x̂min, A_x̂max, _ , _ , A_Ŵmin, A_Ŵmax, _ , _ , Aeq = args
+        A = [A_x̂min; A_x̂max; A_Ŵmin; A_Ŵmax]
+        neq = 0 # number of nonlinear equality constraints
+    end
+    i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
+    i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
+    i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
+    i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
+    nx̂ = length(x̂0min)
+    nε = length(Z̃min) - length(Ŵmin) - nx̂
+    deletex̂arr_lincon!(i_x̂min, i_x̂max, model, Z̃min, Z̃max, nε)
+    deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, Z̃min, Z̃max, nx̂, nε)
+    i_b = [i_x̂min; i_x̂max; i_Ŵmin; i_Ŵmax]
+    i_g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max; trues(nc)]
+    return i_b, i_g, i_g, A, Aeq, neq
 end
 
 @doc raw"""

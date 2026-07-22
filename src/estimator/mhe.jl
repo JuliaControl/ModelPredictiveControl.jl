@@ -37,8 +37,8 @@ function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n; firstchars=no
     print(io,   "  │ └$(lpad(nd, n)) measured disturbances d")
     if isnothing(firstchars) # the user prints the MHE object itself, not a controller:
         nZ̃, nε = length(estim.Z̃), estim.nε
-        nA = sum(estim.con.i_b)
-        ng, nc = sum(estim.con.i_g), estim.con.nc 
+        nA, nAeq     = sum(estim.con.i_b), size(estim.con.Aeq, 1)
+        ng, nc, neq  = sum(estim.con.i_g), estim.con.nc, estim.con.neq
         m = maximum(ndigits.((nZ̃, nA, ng))) + 1
         i_nZ̃min, i_nZ̃max = @. !isinf(estim.con.Z̃min), !isinf(estim.con.Z̃max)
         nZ̃bounds = sum(i_nZ̃min) + sum(i_nZ̃max)
@@ -46,6 +46,8 @@ function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n; firstchars=no
         println(io, "  └ optimization:")
         println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nε slack variable, $nZ̃bounds bounds)")
         println(io, "    ├$(lpad(nA, m)) linear inequality constraints A")
-        print(io,   "    └$(lpad(ng, m)) nonlinear inequality constraints g ($nc custom)")
+        println(io, "    ├$(lpad(nAeq, m)) linear equality constraints Aeq")
+        println(io, "    ├$(lpad(ng, m)) nonlinear inequality constraints g ($nc custom)")
+        print(io,   "    └$(lpad(neq, m)) nonlinear equality constraints geq")
     end
 end

@@ -657,7 +657,7 @@ The linear and nonlinear constraints are respectively defined as:
     \mathbf{A Z̃ }       &≤ \mathbf{b}           \\ 
     \mathbf{A_{eq} Z̃}   &= \mathbf{b_{eq}}      \\
     \mathbf{g(Z̃)}       &≤ \mathbf{0}           \\
-    \mathbf{g_{eq}(Z̃)}  &= \mathbf{0}           \\
+    \mathbf{g_{eq}(Z̃)}  &= \mathbf{0}           
 \end{aligned}
 ```
 The argument `nc` is the number of custom nonlinear inequality constraints in
