@@ -69,6 +69,29 @@ function info2debugstr(info)
     return mystr
 end
 
+@doc raw"""
+    augmentdefect(ES, nϵ; slackfirst=false) -> Aeq, ẼS
+
+Augment defect equality constraints with slack variable ϵ if `nϵ == 1`.
+
+It returns the ``\mathbf{Ẽ_S}`` matrix that appears in the linear defect equation 
+``\mathbf{Ẽ_S Z̃ + F_S}`` and the ``\mathbf{A}`` matrix for the equality constraints:
+```math
+\mathbf{A_{eq} Z̃} = \mathbf{b_{eq}} = - \mathbf{F_S}
+```
+The slack is assumed to be 1st element of the decision vector if `slackfirst`, else the last.
+"""
+function augmentdefect(ES::AbstractMatrix{NT}, nϵ; slackfirst=false) where NT<:Real
+    if nϵ == 1 # Z̃ = [Z; ϵ] (or Z̃ = [ϵ; Z] if slackfirst == true)
+        zero_vec = zeros(NT, size(ES, 1), 1)
+        ẼS = slackfirst ? [zero_vec ES] : [ES zero_vec]
+    else # Z̃ = Z (only hard constraints)
+        ẼS = ES
+    end
+    Aeq = ẼS
+    return Aeq, ẼS
+end
+
 "Evaluate the quadratic programming objective function `0.5x'*H*x + q'*x` at `x`."
 obj_quadprog(x, H, q) = 0.5*dot(x, H, x) + q'*x  # dot(x, H, x) is faster than x'*H*x
 

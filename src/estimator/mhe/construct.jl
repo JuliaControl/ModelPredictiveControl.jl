@@ -21,6 +21,12 @@ struct EstimatorConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     Gx̂      ::Matrix{NT}
     Jx̂      ::Matrix{NT}
     Bx̂      ::Vector{NT}
+    # matrices for the zero defect constraints (N/A for single shooting transcriptions):
+    ẼS      ::Matrix{NT}
+    FS      ::Vector{NT}
+    GS      ::Matrix{NT}
+    JS      ::Matrix{NT}
+    BS      ::Vector{NT}
     # bounds over the estimation windows (deviation vectors from operating points):
     x̂0min   ::Vector{NT}
     x̂0max   ::Vector{NT}
@@ -45,13 +51,19 @@ struct EstimatorConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     A       ::Matrix{NT}
     # b vector for the linear inequality constraints:
     b       ::Vector{NT}
+    # indices of finite numbers in the b vector (linear inequality constraints):
+    i_b     ::BitVector
+    # Aeq matrix for the linear equality constraints:
+    Aeq     ::Matrix{NT}
+    # beq vector for the linear equality constraints:
+    beq     ::Vector{NT}
+    # number of nonlinear equality constraints:
+    neq     ::Int
     # constraint softness parameter vectors needing separate storage:
     C_x̂min  ::Vector{NT}
     C_x̂max  ::Vector{NT}
     C_v̂min  ::Vector{NT}
     C_v̂max  ::Vector{NT}
-    # indices of finite numbers in the b vector (linear inequality constraints):
-    i_b     ::BitVector
     # indices of finite numbers in the g vectors (nonlinear inequality constraints):
     i_g     ::BitVector
     # custom nonlinear inequality constraints:
@@ -172,9 +184,9 @@ struct MovingHorizonEstimator{
             model, transcription, He, Â, B̂u, B̂d, x̂op, f̂op, direct
         ) 
         # dummy values (updated just before optimization):
-        F, fx̄, Fx̂ = zeros(NT, nym*He), zeros(NT, nx̂), zeros(NT, nx̂*He)
+        F, fx̄ = zeros(NT, nym*He), zeros(NT, nx̂)
         con, nε, Ẽ, ẽx̄ = init_defaultcon_mhe(
-            model, He, Cwt, nx̂, nym, E, ex̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂, gc!, nc
+            model, He, Cwt, nx̂, nym, E, ex̄, Ex̂, Gx̂, Jx̂, Bx̂, ES, GS, JS, BS,
         )
         nZ̃ = size(Ẽ, 2)
         # dummy values, updated before optimization:
@@ -1082,7 +1094,10 @@ end
 
 """
     init_defaultcon_mhe(
-        model::SimModel, He, C, nx̂, nym, E, ex̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂
+        model::SimModel, He, Cwt, nx̂, nym, 
+        E, ex̄, 
+        Ex̂, Gx̂, Jx̂, Bx̂,
+        ES, GS, JS, BS,
     ) -> con, Ẽ, ẽx̄
 
     Init `EstimatatorConstraint` struct with default parameters based on model `model`.
@@ -1090,12 +1105,16 @@ end
 Also return `Ẽ` and `ẽx̄` matrices for the the augmented decision vector `Z̃`.
 """
 function init_defaultcon_mhe(
-    model::SimModel{NT}, He, C, nx̂, nym, E, ex̄, Ex̂, Fx̂, Gx̂, Jx̂, Bx̂, 
+    model::SimModel{NT}, He, Cwt, nx̂, nym, 
+    E, ex̄, 
+    Ex̂, Gx̂, Jx̂, Bx̂, 
+    ES, GS, JS, BS,
     gc!::GCfunc = nothing, nc = 0
 ) where {NT<:Real, GCfunc<:Union{Nothing, Function}}
     nŵ = nx̂
     nX̂, nŴ, nYm = nx̂*He, nŵ*He, nym*He
-    nε = isinf(C) ? 0 : 1
+    nε = isinf(Cwt) ? 0 : 1
+    nS = size(ES, 1)
     x̂0min, x̂0max = fill(convert(NT,-Inf), nx̂),  fill(convert(NT,+Inf), nx̂)
     X̂0min, X̂0max = fill(convert(NT,-Inf), nX̂),  fill(convert(NT,+Inf), nX̂)
     Ŵmin, Ŵmax   = fill(convert(NT,-Inf), nŴ),  fill(convert(NT,+Inf), nŴ)
@@ -1106,26 +1125,32 @@ function init_defaultcon_mhe(
     C_v̂min, C_v̂max = fill(0.0, nYm), fill(0.0, nYm)
     A_x̂min, A_x̂max, ẽx̄ = relaxarrival(model, nε, c_x̂min, c_x̂max, ex̄)
     A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(model, nε, C_x̂min, C_x̂max, Ex̂)
-    A_Ŵmin, A_Ŵmax = relaxŴ(model, nε, C_ŵmin, C_ŵmax, nx̂)
-    A_V̂min, A_V̂max, Ẽ = relaxV̂(model, nε, C_v̂min, C_v̂max, E)
+    A_Ŵmin, A_Ŵmax     = relaxŴ(model, nε, C_ŵmin, C_ŵmax, nx̂)
+    A_V̂min, A_V̂max, Ẽ  = relaxV̂(model, nε, C_v̂min, C_v̂max, E)
+    Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
     Z̃min, Z̃max = init_boxconstraint_mhe(
         model, He, nx̂, nŵ, nε,
         x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmax
     )
-    i_b, i_g, A = init_matconstraint_mhe(
+    i_b, i_g, A, Aeq, neq = init_matconstraint_mhe(
         model, Z̃min, Z̃max, nc,
         x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
         A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max
     )
-    b = zeros(NT, size(A, 1)) # dummy b vector (updated just before optimization)
+    # dummy vectors (updated just before optimization):
+    Fx̂, FS = zeros(NT, nx̂*He), zeros(NT, nS)
+    b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
     con = EstimatorConstraint{NT, GCfunc}(
         Ẽx̂, Fx̂, Gx̂, Jx̂, Bx̂,
+        ẼS, FS, GS, JS, BS,
         x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
         Z̃min, Z̃max,
         A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max,
-        A, b,
+        A, b, i_b,
+        Aeq, beq,
+        neq,
         C_x̂min, C_x̂max, C_v̂min, C_v̂max,
-        i_b, i_g,
+        i_g,
         gc!, nc
     )
     return con, nε, Ẽ, ẽx̄
