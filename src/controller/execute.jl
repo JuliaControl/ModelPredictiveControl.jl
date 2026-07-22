@@ -715,7 +715,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     weights = mpc.weights
     nu, ny, nd, Hp, Hc, nb = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc, mpc.nb
     optim, con = mpc.optim, mpc.con
-    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
     Pu = mpc.P̃u[:, 1:nZ]
     # --- prediction matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(

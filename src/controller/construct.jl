@@ -26,7 +26,7 @@ function PredictiveControllerBuffer(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp::Int, Hc::Int, nϵ::Int
 ) where NT<:Real
     nu, ny, nd = estim.model.nu, estim.model.ny, estim.model.nd
-    nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
+    nZ̃ = get_nZ_mpc(estim, transcription, Hp, Hc) + nϵ
     u = Vector{NT}(undef, nu)
     Z̃ = Vector{NT}(undef, nZ̃)
     D̂ = Vector{NT}(undef, nd*Hp)
@@ -734,7 +734,7 @@ function init_ZtoΔU(
     estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc
 ) where {NT<:Real}
     I_nu_Hc = sparse(Matrix{NT}(I, estim.model.nu*Hc, estim.model.nu*Hc))
-    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
     nΔU = estim.model.nu*Hc
     PΔu = [I_nu_Hc spzeros(NT, nΔU, nZ - nΔU)]
     return PΔu
@@ -802,7 +802,7 @@ function init_ZtoU(
         PuDagger[iRows, :] = [repeat(Q_ni, 1, i) spzeros(nu*ni, nu*(Hc-i))]
     end
     PuDagger = sparse(PuDagger)
-    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
     Pu = [PuDagger spzeros(NT, nu*Hp, nZ - nu*Hc)]
     Tu = repeat(I_nu, Hp)
     return Pu, Tu
@@ -1211,7 +1211,7 @@ function init_boxconstraint_mpc(
     ΔUmin, ΔUmax, x̂0min, x̂0max, A_ΔUmin, A_ΔUmax, A_x̂min, A_x̂max
 ) where {NT<:Real}
     nΔU, nX̂ = estim.model.nu*Hc, estim.nx̂*Hp
-    nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
+    nZ̃ = get_nZ_mpc(estim, transcription, Hp, Hc) + nϵ
     Z̃min, Z̃max = fill(convert(NT, -Inf), nZ̃), fill(convert(NT, +Inf), nZ̃)
     nϵ > 0 && (Z̃min[end] = 0)
     if nϵ > 0

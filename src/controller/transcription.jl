@@ -1,17 +1,17 @@
 "Get the number of elements in the optimization decision vector `Z`."
-function get_nZ(estim::StateEstimator, ::SingleShooting, _ , Hc)
+function get_nZ_mpc(estim::StateEstimator, ::SingleShooting, _ , Hc)
     return estim.model.nu*Hc
 end
-function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
+function get_nZ_mpc(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp
 end
-function get_nZ(estim::StateEstimator, transcription::OrthogonalCollocation, Hp, Hc)
+function get_nZ_mpc(estim::StateEstimator, transcription::OrthogonalCollocation, Hp, Hc)
     return estim.model.nu*Hc + estim.nx̂*Hp + estim.model.nx*transcription.no*Hp
 end
 
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
-get_nk(model::SimModel, ::ShootingMethod) = model.nk
-get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
+get_nk_mpc(model::SimModel, ::ShootingMethod) = model.nk
+get_nk_mpc(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
 
 @doc raw"""
     init_predmat(
@@ -154,7 +154,7 @@ function init_predmat(
     V  = Matrix{NT}(undef, Hp*ny, nu)
     Q!(V, 0, Hp, 0)
     # --- decision variables Z ---
-    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
     ex̂ = Matrix{NT}(undef, nx̂, nZ)
     E  = zeros(NT, Hp*ny, nZ) 
     for j=0:Hc-1
@@ -254,7 +254,7 @@ function init_predmat(
     model::NonLinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
-    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
     E  = zeros(NT, 0, nZ)
     G  = zeros(NT, 0, nd)
     J  = zeros(NT, 0, nd*Hp)
@@ -288,7 +288,7 @@ function init_predmat(
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     nΔU = nu*Hc
     nX̂0 = nx̂*Hp
-    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
     E  = zeros(NT, 0, nZ)
     G  = zeros(NT, 0, nd)
     J  = zeros(NT, 0, nd*Hp)
@@ -561,7 +561,7 @@ function init_defectmat_orthocolloc(
     Hp, Hc, Co, λo, As, nxs
 ) where {NT<:Real}
     nu, nx, nd, nx̂ = model.nu, model.nx, model.nd, estim.nx̂
-    nk = get_nk(model, transcription)
+    nk = get_nk_mpc(model, transcription)
     λo_I = λo*I(nx)
     # --- current state estimates x̂0 ---
     KS = zeros(NT, nx̂*Hp, nx̂)
@@ -632,7 +632,7 @@ function init_defectmat_empty(
 ) where {NT<:Real}
     model = estim.model
     nx̂, nu, nd = estim.nx̂, model.nu, model.nd
-    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
     ES = zeros(NT, 0, nZ)
     GS = zeros(NT, 0, nd)
     JS = zeros(NT, 0, nd*Hp)
@@ -1023,7 +1023,7 @@ function set_warmstart!(
 )
     nu, nx̂ = mpc.estim.model.nu, mpc.estim.nx̂
     Hp, Hc, Z̃s  = mpc.Hp, mpc.Hc, mpc.buffer.Z̃
-    nk = get_nk(mpc.estim.model, transcription)
+    nk = get_nk_mpc(mpc.estim.model, transcription)
     nΔU, nX̂, nK = nu*Hc, nx̂*Hp, nk*Hp
     # --- input increments ΔU ---
     Z̃s[1:(nΔU-nu)]       .= @views mpc.Z̃[(nu+1):(nΔU)]
@@ -1375,7 +1375,7 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     Ts, p = model.Ts, model.p
-    nk = get_nk(model, transcription)
+    nk = get_nk_mpc(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
@@ -1470,7 +1470,7 @@ function con_nonlinprogeq!(
     f_threads = transcription.f_threads
     p = model.p
     Mo, no, τ =  mpc.Mo, transcription.no, transcription.τ
-    nk = get_nk(model, transcription)
+    nk = get_nk_mpc(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     D̂temp = mpc.buffer.D̂

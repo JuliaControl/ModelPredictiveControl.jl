@@ -1,27 +1,6 @@
-@doc raw"""
-    init_ZtoŴ(model::SimModel, transcription::SingleShooting, He, nx̂) -> Tŵ
-
-Init decision variables to estimated process noise over ``H_e`` conversion matrix `Tŵ`.
-
-The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{Ŵ}``, the estimated
-process noise over ``H_e``, is computed by:
-```math
-\mathbf{Ŵ} = \mathbf{T_{ŵ}} \mathbf{Z}
-```
-in which ``\mathbf{T_{ŵ}} = [\begin{smallmatrix} \mathbf{0} & \mathbf{I} \end{smallmatrix}]``
-and ``\mathbf{0}`` is properly sized for the `transcription` instance.
-"""
-function init_ZtoŴ(::SimModel{NT}, ::SingleShooting, He, nx̂) where NT<:Real
-    nŵ = nx̂
-    Tŵ = [spzeros(NT, nŵ*He, nx̂) I]
-    return Tŵ
-end
-
-function init_ZtoŴ(::SimModel{NT}, ::TranscriptionMethod, He, nx̂) where NT<:Real
-    nŵ = nx̂
-    Tŵ = [spzeros(NT, nŵ*He, nx̂ + nx̂*He) I] 
-    return Tŵ
-end
+"Get the number of elements in the optimization decision vector `Z`"
+get_nZ_mhe(::SingleShooting, He, nx̂, nŵ) = nx̂ + nŵ*He
+get_nZ_mhe(::TranscriptionMethod, He, nx̂, nŵ) = nx̂ + nx̂*He + nŵ*He
 
 @doc raw"""
     init_predmat_mhe(

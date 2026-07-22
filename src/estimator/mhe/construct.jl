@@ -173,12 +173,13 @@ struct MovingHorizonEstimator{
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
-        nx̂  = model.nx + nxs
+        nx̂ = model.nx + nxs
+        nŵ = nx̂ 
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
-        Tŵ = init_ZtoŴ(model, transcription, He, nx̂)
+        Tŵ = init_ZtoŴ(model, transcription, He, nx̂, nŵ)
         E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
             model, transcription, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
         )
@@ -195,7 +196,7 @@ struct MovingHorizonEstimator{
             ES, GS, JS, BS, 
             gc!, nc
         )
-        nZ̃ = size(Ẽ, 2)
+        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
         # dummy values, updated before optimization:
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
@@ -957,7 +958,7 @@ function setconstraint!(
         end
     end
     Z̃min, Z̃max = init_boxconstraint_mhe(
-        model, He, nx̂, nŵ, nε,
+        model, transcription, He, nx̂, nŵ, nε,
         con.x̂0min,  con.x̂0max,  con.Ŵmin,   con.Ŵmax, 
         con.A_x̂min, con.A_x̂max, con.A_Ŵmin, con.A_Ŵmax 
     )
@@ -1033,6 +1034,27 @@ function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModel, Z̃min, Z̃max, nx̂,
     return i_Ŵmin, i_Ŵmax
 end
 
+@doc raw"""
+    init_ZtoŴ(model::SimModel, transcription::TranscriptionMethod, He, nx̂, nŵ) -> Tŵ
+
+Init decision variables to estimated process noise over ``H_e`` conversion matrix `Tŵ`.
+
+The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{Ŵ}``, the estimated
+process noise over ``H_e``, is computed by:
+```math
+\mathbf{Ŵ} = \mathbf{T_ŵ Z}
+```
+in which ``\mathbf{T_{ŵ}} = [\begin{smallmatrix} \mathbf{0} & \mathbf{I} \end{smallmatrix}]``
+and ``\mathbf{0}`` is properly sized for the `transcription` instance.
+"""
+function init_ZtoŴ(
+    ::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
+) where {NT<:Real}
+    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nŵ)
+    Tŵ = [spzeros(NT, nŴ, nZ-nŴ) I]
+    return Tŵ
+end
+
 """
     init_defaultcon_mhe(
         model::SimModel, transcription::TranscriptionMethod, 
@@ -1073,7 +1095,7 @@ function init_defaultcon_mhe(
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, C_v̂min, C_v̂max , nε)
     Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
     Z̃min, Z̃max = init_boxconstraint_mhe(
-        model, He, nx̂, nŵ, nε,
+        model, transcription, He, nx̂, nŵ, nε,
         x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmax
     )
     i_b, i_g, A, Aeq, neq = init_matconstraint_mhe(
@@ -1241,7 +1263,7 @@ end
 
 """
     init_boxconstraint_mhe(
-        model::SimModel, He, nx̂, nŵ, nε,
+        model::SimModel, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
         x̂0min, x̂0max, Ŵmin, Ŵmax, 
         A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmin 
     ) -> Z̃min, Z̃max
@@ -1249,12 +1271,13 @@ end
 Init the decision variable box constraints `Z̃min` and `Z̃max` for [`MovingHorizonEstimator`](@ref).
 """
 function init_boxconstraint_mhe(
-    ::SimModel{NT}, He, nx̂, nŵ, nε,
+    ::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
     x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
-    nZ̃ = nε + nx̂ + nŵ*He
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
     Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
     nε > 0 && (Z̃min[begin] = 0)
+    nŴ = nŵ*He
     if nε > 0
         n_C_x̂min = @views A_x̂min[:, begin]
         n_C_x̂max = @views A_x̂max[:, begin]
@@ -1267,16 +1290,16 @@ function init_boxconstraint_mhe(
             iszero(n_C_x̂max[i]) && (Z̃max[nε + i] = x̂0max[i])
         end
         for i in eachindex(Ŵmin)
-            iszero(n_C_Ŵmin[i]) && (Z̃min[nε + nx̂ + i] = Ŵmin[i])
+            iszero(n_C_Ŵmin[i]) && (Z̃min[nZ̃ - nŴ + i] = Ŵmin[i])
         end
         for i in eachindex(Ŵmax)
-            iszero(n_C_Ŵmax[i]) && (Z̃min[nε + nx̂ + i] = Ŵmax[i])
+            iszero(n_C_Ŵmax[i]) && (Z̃min[nZ̃ - nŴ + i] = Ŵmax[i])
         end
     else
         Z̃min[1:nx̂] .= x̂0min
         Z̃max[1:nx̂] .= x̂0max
-        Z̃min[nx̂+1:end] .= Ŵmin
-        Z̃max[nx̂+1:end] .= Ŵmax
+        Z̃min[nZ̃-nŴ+1:end] .= Ŵmin
+        Z̃max[nZ̃-nŴ+1:end] .= Ŵmax
     end
     return Z̃min, Z̃max
 end
