@@ -1,9 +1,10 @@
 @doc raw"""
     init_predmat_mhe(
-        model::LinModel, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+        model::LinModel, transcription::SingleShooting,
+        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
     ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 
-Construct the [`MovingHorizonEstimator`](@ref) prediction matrices for [`LinModel`](@ref) `model`.
+Construct the MHE prediction matrices for [`LinModel`](@ref) and [`SingleShooting`](@ref).
 
 We first introduce the deviation vector of the estimated state at arrival 
 ``\mathbf{x̂_0}(k-N_k+p) = \mathbf{x̂}_k(k-N_k+p) - \mathbf{x̂_{op}}`` (see [`setop!`](@ref)),
@@ -129,7 +130,7 @@ see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstrain
     All these matrices are truncated when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
-    model::LinModel{NT}, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+    model::LinModel{NT}, ::SingleShooting, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
     nym, nx̂ = length(i_ym), size(Â, 2)
@@ -239,23 +240,94 @@ function init_predmat_mhe(
     return E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 end
 
-"Return empty matrices if `model` is not a [`LinModel`](@ref), except for `ex̄`."
+"""
+    init_predmat_mhe(
+        model::LinModel, transcription::MultipleShooting, 
+        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+    ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
+
+TBW
+"""
 function init_predmat_mhe(
-    model::SimModel{NT}, He, i_ym, Â, _ , _ , _ , _ , _ , _ , direct
+    model::LinModel{NT}, ::MultipleShooting, 
+    He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
 ) where {NT<:Real}
+    nu, nd = model.nu, model.nd
     nym, nx̂ = length(i_ym), size(Â, 2)
     nŵ = nx̂
     p = direct ? 0 : 1
+    nX̂, nŴ, nV̂, nU, nD = nx̂*He, nŵ*He, nym*He, nu*He, nd*(He+1)
+    # --- decision variables Z ---
+    E  = [zeros(NT, nV̂, (1-p)*nx̂) repeatdiag(-Ĉm, He) zeros(NT, nV̂, p*nx̂ + nŴ)]
+    ex̄ = [-I zeros(NT, nx̂, nX̂ + nŴ)]
+    Ex̂ = [zeros(NT, nX̂, nx̂) I zeros(NT, nX̂, nŴ)]
+    # --- manipulated inputs U ---
+    G  = zeros(NT, nV̂, nU)
+    Gx̂ = zeros(NT, nX̂, nU)
+    # --- measured disturbances D ---
+    J  = [zeros(NT, nV̂, nd) repeatdiag(-D̂dm, He)]
+    Jx̂ = zeros(NT, nX̂, nD)
+    # --- state x̂op and state update f̂op operating points ---
+    B  = zeros(NT, nV̂)
+    Bx̂ = zeros(NT, nX̂)
+    return E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
+end
+
+"""
+    init_predmat_mhe(
+        model::SimModel, ::SingleShooting, He, i_ym, Â, _ , _ , _ , _ , _ , _ , _
+    ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
+
+Return empty matrices if `model` is not a [`LinModel`](@ref), except for `ex̄`.
+"""
+function init_predmat_mhe(
+    model::SimModel{NT}, ::SingleShooting, He, i_ym, Â, _ , _ , _ , _ , _ , _ , _
+) where {NT<:Real}
+    nym, nx̂ = length(i_ym), size(Â, 2)
+    nŵ = nx̂
     E  = zeros(NT, 0, nx̂ + nŵ*He)
     ex̄ = [-I zeros(NT, nx̂, nŵ*He)]
     Ex̂ = zeros(NT, 0, nx̂ + nŵ*He)
     G  = zeros(NT, 0, model.nu*He)
     Gx̂ = zeros(NT, 0, model.nu*He)
-    J  = zeros(NT, 0, model.nd*(He+1-p))
-    Jx̂ = zeros(NT, 0, model.nd*He)
+    J  = zeros(NT, 0, model.nd*(He+1))
+    Jx̂ = zeros(NT, 0, model.nd*(He+1))
     B  = zeros(NT, nym*He)
     Bx̂ = zeros(NT, nx̂*He)
     return E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
+end
+
+"""
+    init_defectmat_mhe(
+        model::LinModel, transcription::MultipleShooting, 
+        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+    ) -> ES, GS, JS, BS
+
+TBW
+"""
+function init_defectmat_mhe(
+    model::LinModel{NT}, ::MultipleShooting, He, Â, B̂u, B̂d, x̂op, f̂op, direct
+) where {NT<:Real}
+    nd = model.nd
+    nx̂ = size(Â, 2)
+    nŵ = nx̂
+    nX̂ = nx̂*He
+    p = direct ? 0 : 1
+    # --- decision variables Z ---
+    nI_nx̂ = Matrix{NT}(-I, nx̂, nx̂)
+    I_nx̂  = Matrix{NT}(I, nŵ, nŵ)
+    ES = [zeros(NT, nX̂, nx̂) repeatdiag(nI_nx̂, He) repeatdiag(I_nx̂, He)]
+    for j=1:He
+        iRowCol = (1:nx̂) .+ nx̂*(j-1)
+        ES[iRowCol, iRowCol] = Â
+    end
+    # --- manipulated inputs U ---
+    GS = repeatdiag(B̂u, He)
+    # --- measured disturbances D ---
+    JS = [zeros(NT, nX̂, p*nd) repeatdiag(B̂d, He) zeros(NT, nX̂, (1-p)*nd)]
+    # --- state x̂op and state update f̂op operating points ---
+    BS = repeat(f̂op - x̂op, He)
+    return ES, GS, JS, BS
 end
 
 @doc raw"""

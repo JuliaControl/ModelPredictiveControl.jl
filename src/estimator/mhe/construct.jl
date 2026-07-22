@@ -166,8 +166,11 @@ struct MovingHorizonEstimator{
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
-            model, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+            model, transcription, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
         )
+        ES, GS, JS, BS = init_defectmat_mhe(
+            model, transcription, He, Â, B̂u, B̂d, x̂op, f̂op, direct
+        ) 
         # dummy values (updated just before optimization):
         F, fx̄, Fx̂ = zeros(NT, nym*He), zeros(NT, nx̂), zeros(NT, nx̂*He)
         con, nε, Ẽ, ẽx̄ = init_defaultcon_mhe(

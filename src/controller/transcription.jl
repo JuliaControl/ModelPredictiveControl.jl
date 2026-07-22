@@ -1,5 +1,5 @@
 "Get the number of elements in the optimization decision vector `Z`."
-function get_nZ(estim::StateEstimator, ::SingleShooting, Hp, Hc)
+function get_nZ(estim::StateEstimator, ::SingleShooting, _ , Hc)
     return estim.model.nu*Hc
 end
 function get_nZ(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
