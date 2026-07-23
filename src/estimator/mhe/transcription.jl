@@ -422,7 +422,7 @@ function init_matconstraint_mhe(
     return i_b, i_g, i_g, A, Aeq, neq
 end
 
-"Truncate prediction matrices if Nk < He"
+"For [`SingleShooting`](@ref), truncate the end of prediction matrices if `Nk < He`"
 function trunc_predmat(estim::MovingHorizonEstimator, ::SingleShooting)
     model, F = estim.model, estim.F
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
@@ -448,6 +448,7 @@ function trunc_predmat(estim::MovingHorizonEstimator, ::SingleShooting)
     return Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var
 end
 
+"For [`MultipleShooting`](@ref), extract subparts of the prediction matrices if `Nk < He`."
 function trunc_predmat(estim::MovingHorizonEstimator, ::MultipleShooting)
     model, F = estim.model, estim.F
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
@@ -571,4 +572,127 @@ function linconstrainteq!(
     estim::MovingHorizonEstimator, model::LinModel, ::TranscriptionMethod
 )
     return nothing
+end
+
+
+@doc raw"""
+    set_warmstart_mhe!(
+        estim::MovingHorizonEstimator, transcription::SingleShooting, Z̃var
+    ) -> Z̃s
+
+Set and return the warm-start value of `Z̃var` for [`MovingHorizonEstimator`](@ref).
+
+If supported by `estim.optim` and based a [`SingleShooting`](@ref) transcription, it
+warm-starts the solver at:
+```math
+\mathbf{Z̃_s} = 
+\begin{bmatrix}
+    ε_{k-1}                         \\
+    \mathbf{x̂_0^†}(k-N_k+p)         \\ 
+    \mathbf{ŵ}(k-N_k+p+0|k-1)       \\ 
+    \mathbf{ŵ}(k-N_k+p+1|k-1)       \\ 
+    \vdots                          \\
+    \mathbf{ŵ}(k+p-3|k-1)           \\
+    \mathbf{ŵ}(k+p-2|k-1)           \\
+    \mathbf{0}                      \\
+\end{bmatrix}
+```
+where ``ε_{k-1}`` and ``\mathbf{ŵ}(k-j|k-1)`` are respectively the slack variable and the
+process noise estimates computed at the last time step ``k-1``. The vector 
+``\mathbf{x̂_0^†}(k-N_k+p)`` is the deviation vector of the state at the arrival estimated
+at time ``k-N_k``. If the objective function is not finite at this point, all the process
+noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. The method mutates all the
+arguments.
+"""
+function set_warmstart_mhe!(
+    estim::MovingHorizonEstimator{NT}, ::SingleShooting, Z̃var
+) where NT<:Real
+    model, buffer = estim.model, estim.buffer
+    nε, nx̂, nŵ, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.Nk[]
+    nx̃ = nε + nx̂
+    Z̃s = estim.buffer.Z̃
+    û0, ŷ0, x̄, k = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
+    # --- slack variable ε ---
+    estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
+    # --- arrival state estimate x̂0arr ---
+    Z̃s[nε+1:nx̃] = estim.x̂0arr_old
+    # --- process noise estimates Ŵ ---
+    Z̃s[nx̃+1:end] = estim.Ŵ
+    # verify definiteness of objective function:
+    V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
+    x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, estim.Ŵ, Z̃s)
+    Js = obj_nonlinprog(estim, model, x̄, V̂, estim.Ŵ, Z̃s)
+    if !isfinite(Js)
+        Z̃s[nx̃+1:end] .= 0
+    end
+    # --- unused variable in Z̃ (applied only when Nk < He) ---
+    # We force the update of the NLP gradient and jacobian by warm-starting the unused 
+    # variable in Z̃ at 1. Since estim.Ŵ is initialized with 0s, at least 1 variable in Z̃s
+    # will be inevitably different at the following time step.
+    Z̃s[nx̃+Nk*nŵ+1:end] .= 1
+    JuMP.set_start_value.(Z̃var, Z̃s)
+    return Z̃s
+end
+
+@doc raw"""
+    set_warmstart_mhe!(
+        estim::MovingHorizonEstimator, transcription::MultipleShooting, Z̃var
+    ) -> Z̃s
+
+Do the same but based on a [`MultipleShooting`](@ref) transcription.
+
+If supported by `estim.optim`, it warm-starts the solver at:
+```math
+\mathbf{Z̃_s} = 
+\begin{bmatrix}
+    ε_{k-1}                         \\
+    \mathbf{x̂_0^†}(k-N_k+p)         \\ 
+    \mathbf{x̂_0}(k-N_k+p+1|k-1)     \\
+    \mathbf{x̂_0}(k-N_k+p+2|k-1)     \\
+    \vdots                          \\
+    \mathbf{x̂_0}(k+p-2|k-1)         \\
+    \mathbf{x̂_0}(k+p-1|k-1)         \\
+    \mathbf{x̂_0}(k+p-1|k-1)         \\
+    \mathbf{ŵ}(k-N_k+p+0|k-1)       \\ 
+    \mathbf{ŵ}(k-N_k+p+1|k-1)       \\ 
+    \vdots                          \\
+    \mathbf{ŵ}(k+p-3|k-1)           \\
+    \mathbf{ŵ}(k+p-2|k-1)           \\
+    \mathbf{0}                      \\
+\end{bmatrix}
+```
+where ``\mathbf{x̂_0}(k-j|k-1)`` is the predicted state for time ``k-j`` computed at the
+last control period ``k-1``, expressed as a deviation from the operating point 
+``\mathbf{x̂_{op}}``. 
+"""
+function set_warmstart_mhe!(
+    estim::MovingHorizonEstimator{NT}, ::MultipleShooting, Z̃var
+) where NT<:Real
+    model, buffer = estim.model, estim.buffer
+    nε, nx̂, nŵ, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.Nk[]
+    nx̃ = nε + nx̂
+    Z̃s = estim.buffer.Z̃
+    û0, ŷ0, x̄, k = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
+    # --- slack variable ε ---
+    estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
+    # --- arrival state estimate x̂0arr ---
+    Z̃s[nε+1:nx̃] = estim.x̂0arr_old
+    # --- process noise estimates Ŵ ---
+    Z̃s[nx̃+1:end] = estim.Ŵ
+    # verify definiteness of objective function:
+    V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
+    x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, estim.Ŵ, Z̃s)
+    Js = obj_nonlinprog(estim, model, x̄, V̂, estim.Ŵ, Z̃s)
+    if !isfinite(Js)
+        Z̃s[nx̃+1:end] .= 0
+    end
+    # --- unused variable in Z̃ (applied only when Nk < He) ---
+    # We force the update of the NLP gradient and jacobian by warm-starting the unused 
+    # variable in Z̃ at 1. Since estim.Ŵ is initialized with 0s, at least 1 variable in Z̃s
+    # will be inevitably different at the following time step.
+    Z̃s[nx̃+Nk*nŵ+1:end] .= 1
+    JuMP.set_start_value.(Z̃var, Z̃s)
+    return Z̃s
 end

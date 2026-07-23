@@ -212,7 +212,7 @@ struct MovingHorizonEstimator{
         Nk = [0]
         prepared = [false]
         test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p, direct)
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε, transcription)
         estim = new{NT, SM, KC, TM, JM, GB, JB, HB, PT, GCfunc, CE}(
             model, transcription, optim, con, 
             gradient, jacobian, hessian,

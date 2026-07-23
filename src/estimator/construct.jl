@@ -17,17 +17,21 @@ struct StateEstimatorBuffer{NT<:Real}
 end
 
 @doc raw"""
-    StateEstimatorBuffer{NT}(nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0)
+    StateEstimatorBuffer{NT}(
+        nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0
+        He::Int=0, nε::Int=0, transcription::TranscriptionMethod = SingleShooting()
+    )
 
 Create a buffer for `StateEstimator` objects for estimated states and measured outputs.
 
 The buffer is used to store intermediate results during estimation without allocating.
 """
 function StateEstimatorBuffer{NT}(
-    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0, He::Int=0, nε::Int=0
+    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0, 
+    He::Int=0, nε::Int=0, transcription::TranscriptionMethod = SingleShooting()
 ) where NT <: Real
     nŵ = nx̂
-    nZ̃ = nx̂ + nŵ*He + nε
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
     nV̂ = nym*He
     nX̂ = nx̂*He
     u  = Vector{NT}(undef, nu)

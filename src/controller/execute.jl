@@ -487,7 +487,7 @@ end
 
 Optimize the objective function of `mpc` [`PredictiveController`](@ref) and return the solution `Z̃`.
 
-If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls 
+If first warm-starts the solver with [`set_warmstart_mpc!`](@ref). It then calls 
 `JuMP.optimize!(mpc.optim)` and extract the solution. A failed optimization prints an 
 `@error` log in the REPL and returns the warm-start value. A failed optimization also prints
 [`getinfo`](@ref) results in the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
@@ -495,7 +495,7 @@ If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model, optim = mpc.estim.model, mpc.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    Z̃s = set_warmstart!(mpc, mpc.transcription, Z̃var)
+    Z̃s = set_warmstart_mpc!(mpc, mpc.transcription, Z̃var)
     set_objective_linear_coef!(mpc, model, Z̃var)
     try
         JuMP.optimize!(optim)

@@ -494,7 +494,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     nŵ, nx̂, Nk =  estim.nx̂, estim.nx̂, estim.Nk[]
     nx̃ = estim.nε + nx̂
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    Z̃s = set_warmstart_mhe!(estim, Z̃var)
+    Z̃s = set_warmstart_mhe!(estim, estim.transcription, Z̃var)
     # ------- solve optimization problem --------------
     try
         JuMP.optimize!(optim)
@@ -539,59 +539,6 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     x̂0corrORnext = @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     estim.x̂0 .= x̂0corrORnext
     return estim.Z̃
-end
-
-@doc raw"""
-    set_warmstart_mhe!(estim::MovingHorizonEstimator, Z̃var) -> Z̃s
-
-Set and return the warm-start value of `Z̃var` for [`MovingHorizonEstimator`](@ref).
-
-If supported by `estim.optim`, it warm-starts the solver at:
-```math
-\mathbf{Z̃_s} = 
-\begin{bmatrix}
-    ε_{k-1}                         \\
-    \mathbf{x̂}_{k-1}(k-N_k+p)       \\ 
-    \mathbf{ŵ}_{k-1}(k-N_k+p+0)     \\ 
-    \mathbf{ŵ}_{k-1}(k-N_k+p+1)     \\ 
-    \vdots                          \\
-    \mathbf{ŵ}_{k-1}(k-p-2)         \\
-    \mathbf{0}                      \\
-\end{bmatrix}
-```
-where ``ε_{k-1}``, ``\mathbf{x̂}_{k-1}(k-N_k+p)`` and ``\mathbf{ŵ}_{k-1}(k-j)`` are
-respectively the slack variable, the arrival state estimate and the process noise estimates
-computed at the last time step ``k-1``. If the objective function is not finite at this
-point, all the process noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. The
-method mutates all the arguments.
-"""
-function set_warmstart_mhe!(estim::MovingHorizonEstimator{NT}, Z̃var) where NT<:Real
-    model, buffer = estim.model, estim.buffer
-    nε, nx̂, nŵ, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.Nk[]
-    nx̃ = nε + nx̂
-    Z̃s = estim.buffer.Z̃
-    û0, ŷ0, x̄, k = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
-    # --- slack variable ε ---
-    estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
-    # --- arrival state estimate x̂0arr ---
-    Z̃s[nε+1:nx̃] = estim.x̂0arr_old
-    # --- process noise estimates Ŵ ---
-    Z̃s[nx̃+1:end] = estim.Ŵ
-    # verify definiteness of objective function:
-    V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
-    x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
-    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, estim.Ŵ, Z̃s)
-    Js = obj_nonlinprog(estim, model, x̄, V̂, estim.Ŵ, Z̃s)
-    if !isfinite(Js)
-        Z̃s[nx̃+1:end] .= 0
-    end
-    # --- unused variable in Z̃ (applied only when Nk < He) ---
-    # We force the update of the NLP gradient and jacobian by warm-starting the unused 
-    # variable in Z̃ at 1. Since estim.Ŵ is initialized with 0s, at least 1 variable in Z̃s
-    # will be inevitably different at the following time step.
-    Z̃s[nx̃+Nk*nŵ+1:end] .= 1
-    JuMP.set_start_value.(Z̃var, Z̃s)
-    return Z̃s
 end
 
 "Truncate and return the data windows if `Nk < He"
