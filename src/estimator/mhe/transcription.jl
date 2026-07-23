@@ -427,33 +427,53 @@ function trunc_predmat(estim::MovingHorizonEstimator, ::SingleShooting)
     model, F = estim.model, estim.F
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
     nU, nYm, nŴ, nD = model.nu*Nk, nym*Nk, nŵ*Nk, model.nd*(Nk+1)
-    nZ = nx̂ + nŴ
-    nZ̃ = nε + nZ 
+    nZ = get_nZ_mhe(transcription, Nk, nx̂, nŵ)
+    nZ̃ = nε + nZ
     if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
-        Ẽ, G, J = estim.Ẽ[1:nYm, 1:nZ̃], estim.G[1:nYm, 1:nU], estim.J[1:nYm, 1:nD]
-        B       = estim.B[1:nYm]
+        Ẽ       = estim.Ẽ[1:nYm, 1:nZ̃]
+        G, J, B = estim.G[1:nYm, 1:nU], estim.J[1:nYm, 1:nD], estim.B[1:nYm]
         ẽx̄      = estim.ẽx̄[:, 1:nZ̃]
         Tŵ      = estim.Tŵ[1:nŴ, 1:nZ]
-        F       = @views estim.F[1:nYm]
+        F       = @views estim.F[1:nYm] # views here since they will store results
         H̃_data  = @views estim.H̃.data[1:nZ̃, 1:nZ̃]
         H̃       = @views estim.H̃[1:nZ̃, 1:nZ̃]
         q̃       = @views estim.q̃[1:nZ̃]
         Z̃var    = @views estim.optim[:Z̃var][1:nZ̃]
     else
-        Ẽ, G, J =  estim.Ẽ, estim.G, estim.J
-        B       = estim.B
-        ẽx̄      = estim.ẽx̄
-        Tŵ      = estim.Tŵ
-        F       = estim.F
-        H̃_data  = estim.H̃.data
-        H̃       = estim.H̃
-        q̃       = estim.q̃
-        Z̃var    = estim.optim[:Z̃var]
+        Ẽ, F, G, J, B = estim.Ẽ, estim.F, estim.G, estim.J, estim.B
+        ẽx̄, Tŵ        = estim.ẽx̄, estim.Tŵ
+        H̃, H̃_data, q̃  = estim.H̃, estim.H̃.data, estim.q̃
+        Z̃var          = estim.optim[:Z̃var]
     end
     return Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var
 end
 
 function trunc_predmat(estim::MovingHorizonEstimator, ::MultipleShooting)
+    model, F = estim.model, estim.F
+    nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
+    nU, nYm, nŴ, nD = model.nu*Nk, nym*Nk, nŵ*Nk, model.nd*(Nk+1)
+    nx̂_nX̂    = nx̂ + nx̂*Nk 
+    nx̂_nX̂_He = nx̂ + nx̂*estim.He
+    if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
+        i_Z̃_He  = [(1):(nε + nx̂_nX̂); (nε + nx̂_nX̂_He + 1):(nε + nx̂_nX̂_He + nŴ)]
+        i_Z_He  = [(1):(nx̂_nX̂); (nx̂_nX̂_He + 1):(nx̂_nX̂_He + nŴ)]
+        Ẽ       = estim.Ẽ[1:nYm, i_Z̃_He]
+        G, J, B = estim.G[1:nYm, 1:nU], estim.J[1:nYm, 1:nD], estim.B[1:nYm]
+        ẽx̄      = estim.ẽx̄[:, i_Z̃_He]
+        Tŵ      = estim.Tŵ[1:nŴ, i_Z_He]
+        F       = @views estim.F[1:nYm] # views here since they will store results
+        H̃_data  = @views estim.H̃.data[i_Z̃_He, i_Z̃_He]
+        H̃       = @views estim.H̃[i_Z̃_He, i_Z̃_He]
+        q̃       = @views estim.q̃[i_Z̃_He]
+        Z̃var    = @views estim.optim[:Z̃var][i_Z̃_He]
+    else
+        Ẽ, F, G, J, B = estim.Ẽ, estim.F, estim.G, estim.J, estim.B
+        ẽx̄, Tŵ        = estim.ẽx̄, estim.Tŵ
+        H̃, H̃_data, q̃  = estim.H̃, estim.H̃.data, estim.q̃
+        Z̃var          = estim.optim[:Z̃var]
+    end
+    return Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var
+
 end
 
 @doc raw"""

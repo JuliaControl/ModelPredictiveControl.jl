@@ -338,8 +338,7 @@ function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<
     F, C, optim = estim.F, estim.C, estim.optim
     fx̄, r = estim.fx̄, estim.r
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
-    nU, nYm, nŴ, nD = model.nu*Nk, estim.nym*Nk, nŵ*Nk, model.nd*(Nk+1)
-    nZ̃ = nε + nx̂ + nŴ
+    nYm, nZ = estim.nym*Nk, get_nZ_mhe(estim.transcription, Nk, nx̂, nŵ)
     # --- truncate vectors and matrices if Nk < He ---
     U0, Y0m, D0 = trunc_windows(estim)
     Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var = trunc_predmat(estim, estim.transcription)
@@ -361,7 +360,7 @@ function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<
     ẼZ̃ = [ẽx̄; Ẽ]
     FZ̃ = [fx̄; F]
     M_Nk = [invP̄ zeros(NT, nx̂, nYm); zeros(NT, nYm, nx̂) invR̂_Nk]
-    Ñ_Nk = [fill(C, nε, nε) zeros(NT, nε, nx̂+nŴ); zeros(NT, nx̂+nŴ, nε) (Tŵ'invQ̂_Nk*Tŵ)]
+    Ñ_Nk = [fill(C, nε, nε) zeros(NT, nε, nZ); zeros(NT, nZ, nε) Tŵ'invQ̂_Nk*Tŵ]
     M_Nk_ẼZ̃ = M_Nk*ẼZ̃
     mul!(q̃, M_Nk_ẼZ̃', FZ̃)
     lmul!(2, q̃)
