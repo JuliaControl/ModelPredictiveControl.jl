@@ -1039,8 +1039,9 @@ end
 
 Init decision variables to estimated process noise over ``H_e`` conversion matrix `Tŵ`.
 
-The conversion from the decision variables ``\mathbf{Z}`` to ``\mathbf{Ŵ}``, the estimated
-process noise over ``H_e``, is computed by:
+This is for the [`MovingHorizonEstimator`](@ref) only. The conversion from the decision
+variables ``\mathbf{Z}`` to ``\mathbf{Ŵ}``, the estimated process noise over ``H_e``, is
+computed by:
 ```math
 \mathbf{Ŵ} = \mathbf{T_ŵ Z}
 ```

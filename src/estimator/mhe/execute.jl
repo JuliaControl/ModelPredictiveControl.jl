@@ -46,7 +46,8 @@ function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
         ismoving = add_data_windows!(estim, y0m, d0)
         ismoving && correct_cov!(estim)
         initpred!(estim, estim.model)
-        linconstraint!(estim, estim.model)
+        linconstraint!(estim, estim.model, estim.transcription)
+        linconstrainteq!(estim, estim.model, estim.transcription)
         optim_objective!(estim)
     end
     return nothing
@@ -303,6 +304,78 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     return info
 end
 
+@doc raw"""
+    initpred!(estim::MovingHorizonEstimator, model::LinModel) -> nothing
+
+Init quadratic optimization matrices `F, fx̄, H̃, q̃, r` for [`MovingHorizonEstimator`](@ref).
+
+See [`init_predmat_mhe`](@ref) for the definition of the vectors ``\mathbf{F, f_x̄}``. It
+also inits `estim.optim` objective function, expressed as the quadratic general form:
+```math
+    J = \min_{\mathbf{Z̃}} \frac{1}{2}\mathbf{Z̃' H̃ Z̃} + \mathbf{q̃' Z̃} + r 
+```
+in which ``\mathbf{Z̃} = [\begin{smallmatrix} ε \\ \mathbf{Z} \end{smallmatrix}]``. Note that
+``r`` is useless at optimization but required to evaluate the objective minima ``J``. The 
+Hessian ``\mathbf{H̃}`` matrix of the quadratic general form is not constant here because
+of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
+```math
+\begin{aligned}
+    \mathbf{F}       &= \mathbf{G U_0} + \mathbf{J D_0} + \mathbf{Y_0^m} + \mathbf{B}       \\
+    \mathbf{f_x̄}     &= \mathbf{x̂_0^†}(k-N_k+1)                                             \\
+    \mathbf{F_Z̃}     &= [\begin{smallmatrix}\mathbf{f_x̄} \\ \mathbf{F} \end{smallmatrix}]   \\
+    \mathbf{Ẽ_Z̃}     &= [\begin{smallmatrix}\mathbf{ẽ_x̄} \\ \mathbf{Ẽ} \end{smallmatrix}]   \\
+    \mathbf{M}_{N_k} &= \mathrm{diag}(\mathbf{P̄}^{-1}, \mathbf{R̂}_{N_k}^{-1})               \\
+    \mathbf{Ñ}_{N_k} &= \mathrm{diag}(C, \mathbf{T_ŵ}'\mathbf{Q̂}_{N_k}^{-1}\mathbf{T_ŵ})    \\
+    \mathbf{H̃}       &= 2(\mathbf{Ẽ_Z̃}' \mathbf{M}_{N_k} \mathbf{Ẽ_Z̃} + \mathbf{Ñ}_{N_k})   \\
+    \mathbf{q̃}       &= 2(\mathbf{M}_{N_k} \mathbf{Ẽ_Z̃})' \mathbf{F_Z̃}                      \\
+            r        &= \mathbf{F_Z̃}' \mathbf{M}_{N_k} \mathbf{F_Z̃}
+\end{aligned}
+See [`init_ZtoŴ`](@ref) for the definition of the conversion matrix ``\mathbf{T_ŵ}``.
+```
+"""
+function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<:Real
+    invP̄, invQ̂_He, invR̂_He = estim.cov.invP̄, estim.cov.invQ̂_He, estim.cov.invR̂_He
+    F, C, optim = estim.F, estim.C, estim.optim
+    fx̄, r = estim.fx̄, estim.r
+    nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
+    nU, nYm, nŴ, nD = model.nu*Nk, estim.nym*Nk, nŵ*Nk, model.nd*(Nk+1)
+    nZ̃ = nε + nx̂ + nŴ
+    # --- truncate vectors and matrices if Nk < He ---
+    U0, Y0m, D0 = trunc_windows(estim)
+    Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var = trunc_predmat(estim, estim.transcription)
+    invQ̂_Nk = trunc_cov(invQ̂_He, nx̂, Nk, estim.He)
+    invR̂_Nk = trunc_cov(invR̂_He, nym, Nk, estim.He)
+    # --- update F and fx̄ vectors for MHE predictions ---
+    F .= Y0m .+ B
+    mul!(F, G, U0, 1, 1)
+    (model.nd > 0) && mul!(F, J, D0, 1, 1)
+    fx̄ .= estim.x̂0arr_old
+    # --- handle NaN values in V̂ for the objective function ---
+    if any(isnan, F)
+        i_nan = findall(isnan, F)
+        Ẽ, F = copy(Ẽ), copy(F)
+        Ẽ[i_nan, :]  .= 0
+        F[i_nan]     .= 0
+    end
+    # --- update H̃, q̃ and r vectors for quadratic optimization ---
+    ẼZ̃ = [ẽx̄; Ẽ]
+    FZ̃ = [fx̄; F]
+    M_Nk = [invP̄ zeros(NT, nx̂, nYm); zeros(NT, nYm, nx̂) invR̂_Nk]
+    Ñ_Nk = [fill(C, nε, nε) zeros(NT, nε, nx̂+nŴ); zeros(NT, nx̂+nŴ, nε) (Tŵ'invQ̂_Nk*Tŵ)]
+    M_Nk_ẼZ̃ = M_Nk*ẼZ̃
+    mul!(q̃, M_Nk_ẼZ̃', FZ̃)
+    lmul!(2, q̃)
+    r .= dot(FZ̃, M_Nk, FZ̃)
+    H̃_data .= Ñ_Nk
+    mul!(H̃_data, ẼZ̃', M_Nk_ẼZ̃, 1, 1) 
+    lmul!(2, H̃_data)
+    # --- update the quadratic objective function ---
+    JuMP.set_objective_function(optim, obj_quadprog(Z̃var, H̃, q̃))
+    return nothing
+end
+"Does nothing if `model` is not a [`LinModel`](@ref)."
+initpred!(::MovingHorizonEstimator, ::SimModel) = nothing
+
 "Get the estimated state at arrival from the decision vector `Z̃`."
 function getarrival!(x̂0arr, estim::MovingHorizonEstimator, Z̃) 
     nx̃ = estim.nε + estim.nx̂
@@ -388,84 +461,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     # --- update the arrival state estimated at k-Nk ---
     estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
     return ismoving
-end
-
-@doc raw"""
-    linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
-
-Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MHE.
-
-Also init ``\mathbf{F_x̂ = G_x̂ U_0 + J_x̂ D_0 + B_x̂}`` vector for the state constraints, see 
-[`init_predmat_mhe`](@ref).
-"""
-function linconstraint!(estim::MovingHorizonEstimator, model::LinModel)
-    nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
-    nU, nX̂, nD = model.nu*Nk, estim.nx̂*Nk, model.nd*(Nk+1)
-    # --- truncate vector and matrices if necessary ---
-    if Nk < estim.He
-        # avoid views since allocations only when Nk < He and we want fast mul!:
-        Bx̂     = estim.con.Bx̂[1:nX̂]
-        Gx̂, U0 = estim.con.Gx̂[1:nX̂, 1:nU], estim.U0[1:nU]
-        Jx̂, D0 = estim.con.Jx̂[1:nX̂, 1:nD], estim.D0[1:nD]
-        Fx̂     = @views estim.con.Fx̂[1:nX̂]
-    else
-        Bx̂     = estim.con.Bx̂
-        Gx̂, U0 = estim.con.Gx̂, estim.U0
-        Jx̂, D0 = estim.con.Jx̂, estim.D0
-        Fx̂     = estim.con.Fx̂
-    end
-    X̂0min, X̂0max = trunc_bounds(estim, estim.con.X̂0min, estim.con.X̂0max, nx̂)
-    Ŵmin, Ŵmax   = trunc_bounds(estim, estim.con.Ŵmin,  estim.con.Ŵmax,  nŵ)
-    V̂min, V̂max   = trunc_bounds(estim, estim.con.V̂min,  estim.con.V̂max,  nym)
-    # --- update Fx̂ vectors for MHE state constraints ---
-    Fx̂ .= Bx̂
-    mul!(Fx̂, Gx̂, U0, 1, 1)
-    model.nd > 0 && mul!(Fx̂, Jx̂, D0, 1, 1)
-    # --- update b vector for linear inequality constraints ---
-    nX̂_He, nŴ_He, nV̂_He = length(X̂0min), length(Ŵmin), length(V̂min)
-    nx̂ = length(estim.con.x̂0min)
-    n = 0
-    estim.con.b[(n+1):(n+nx̂)] .= @. -estim.con.x̂0min
-    n += nx̂
-    estim.con.b[(n+1):(n+nx̂)] .= @. +estim.con.x̂0max
-    n += nx̂
-    estim.con.b[(n+1):(n+nX̂_He)] .= @. -X̂0min + estim.con.Fx̂
-    n += nX̂_He
-    estim.con.b[(n+1):(n+nX̂_He)] .= @. +X̂0max - estim.con.Fx̂
-    n += nX̂_He
-    estim.con.b[(n+1):(n+nŴ_He)] .= @. -Ŵmin
-    n += nŴ_He
-    estim.con.b[(n+1):(n+nŴ_He)] .= @. +Ŵmax
-    n += nŴ_He
-    estim.con.b[(n+1):(n+nV̂_He)] .= @. -V̂min + estim.F
-    n += nV̂_He
-    estim.con.b[(n+1):(n+nV̂_He)] .= @. +V̂max - estim.F
-    if any(estim.con.i_b) 
-        lincon = estim.optim[:linconstraint]
-        JuMP.set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
-    end
-    return nothing
-end
-
-"Set `b` excluding state and sensor noise bounds if `model` is not a [`LinModel`](@ref)."
-function linconstraint!(estim::MovingHorizonEstimator, ::SimModel)
-    # --- truncate vector and matrices if necessary ---
-    Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, estim.nx̂)
-    # --- update b vector for linear inequality constraints ---
-    nx̂, nŴ_He = length(estim.con.x̂0min), length(Ŵmin)
-    n = 0
-    estim.con.b[(n+1):(n+nx̂)] .= @. -estim.con.x̂0min
-    n += nx̂
-    estim.con.b[(n+1):(n+nx̂)] .= @. +estim.con.x̂0max
-    n += nx̂
-    estim.con.b[(n+1):(n+nŴ_He)] .= @. -Ŵmin
-    n += nŴ_He
-    estim.con.b[(n+1):(n+nŴ_He)] .= @. +Ŵmax
-    if any(estim.con.i_b) 
-        lincon = estim.optim[:linconstraint]
-        JuMP.set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
-    end
-    return nothing
 end
 
 "Truncate the bounds `Bmin` and `Bmax` to the window size `Nk` if `Nk < He`."
@@ -598,6 +593,23 @@ function set_warmstart_mhe!(estim::MovingHorizonEstimator{NT}, Z̃var) where NT<
     Z̃s[nx̃+Nk*nŵ+1:end] .= 1
     JuMP.set_start_value.(Z̃var, Z̃s)
     return Z̃s
+end
+
+"Truncate and return the data windows if `Nk < He"
+function trunc_windows(estim::MovingHorizonEstimator)
+    model, Nk = estim.model, estim.Nk[]
+    nym, nu, nd = estim.nym, model.nu, model.nd
+    nU, nYm, nD = nu*Nk, nym*Nk, nd*(Nk+1)
+    if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
+        U0  = estim.U0[1:nU]
+        Y0m = estim.Y0m[1:nYm]
+        D0  = estim.D0[1:nD]
+    else
+        U0  = estim.U0
+        Y0m = estim.Y0m
+        D0  = estim.D0
+    end
+    return U0, Y0m, D0
 end
 
 "Truncate the inverse covariance `invA_He` to the window size `Nk` if `Nk < He`."
