@@ -1243,10 +1243,11 @@ end
         mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
     )
 
-Do the same for [`SimModel`](@ref), but using simpler equations.
+By default, fallback to doing same the but using the shorter equations.
     
 The linear equality constraints include the stochastic defects only, and the continuity
-constraints of [`OrthogonalCollocation`](@ref), if applicable.
+constraints of [`OrthogonalCollocation`](@ref), if applicable. See [`init_defectmat`](@ref)
+for the equation.
 """
 function linconstrainteq!(
     mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
@@ -1261,7 +1262,7 @@ end
 
 """
     linconstrainteq!(
-        mpc::PredictiveController, ::SimModel, ::InternalModel, ::OrthogonalCollocation
+        mpc::PredictiveController, ::NonLinModel, ::InternalModel, ::OrthogonalCollocation
     )
 
 Same as above but only for the continuity constraints of [`OrthogonalCollocation`](@ref).
@@ -1269,7 +1270,7 @@ Same as above but only for the continuity constraints of [`OrthogonalCollocation
 There are no stochastic defects, the [`InternalModel`](@ref) does not augment the states.
 """
 function linconstrainteq!(
-    mpc::PredictiveController, ::SimModel, ::InternalModel, ::OrthogonalCollocation
+    mpc::PredictiveController, ::NonLinModel, ::InternalModel, ::OrthogonalCollocation
 )
     FS  = mpc.con.FS
     mul!(FS, mpc.con.KS, mpc.estim.x̂0) # the only non-zero matrix is KS
@@ -1280,10 +1281,9 @@ function linconstrainteq!(
 end
 "No linear equality constraints for other cases of [`InternalModel`](@ref)."
 linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel, ::TranscriptionMethod) = nothing
-"No linear equality constraints for all cases of [`SingleShooting`(@ref) (N/A).]"
+"No linear equality constraints for all cases of [`SingleShooting`](@ref) (N/A)."
 linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting) = nothing 
-linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::SingleShooting) = nothing
-linconstrainteq!(::PredictiveController, ::LinModel, ::InternalModel,  ::SingleShooting) = nothing 
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::SingleShooting) = nothing 
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
