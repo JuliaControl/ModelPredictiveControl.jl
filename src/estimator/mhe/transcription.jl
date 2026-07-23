@@ -588,9 +588,9 @@ warm-starts the solver at:
 \mathbf{Z̃_s} = 
 \begin{bmatrix}
     ε_{k-1}                         \\
-    \mathbf{x̂_0^†}(k-N_k+p)         \\ 
-    \mathbf{ŵ}(k-N_k+p+0|k-1)       \\ 
-    \mathbf{ŵ}(k-N_k+p+1|k-1)       \\ 
+    \mathbf{x̂_0^†}(k-N_k+p)         \\
+    \mathbf{ŵ}(k-N_k+p+0|k-1)       \\
+    \mathbf{ŵ}(k-N_k+p+1|k-1)       \\
     \vdots                          \\
     \mathbf{ŵ}(k+p-3|k-1)           \\
     \mathbf{ŵ}(k+p-2|k-1)           \\
@@ -618,7 +618,7 @@ function set_warmstart_mhe!(
     Z̃s[nε+1:nx̃] = estim.x̂0arr_old
     # --- process noise estimates Ŵ ---
     Z̃s[nx̃+1:end] = estim.Ŵ
-    # verify definiteness of objective function:
+    # --- verify definiteness of objective function ---
     V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, estim.Ŵ, Z̃s)
@@ -647,15 +647,15 @@ If supported by `estim.optim`, it warm-starts the solver at:
 \mathbf{Z̃_s} = 
 \begin{bmatrix}
     ε_{k-1}                         \\
-    \mathbf{x̂_0^†}(k-N_k+p)         \\ 
+    \mathbf{x̂_0^†}(k-N_k+p)         \\
     \mathbf{x̂_0}(k-N_k+p+1|k-1)     \\
     \mathbf{x̂_0}(k-N_k+p+2|k-1)     \\
     \vdots                          \\
     \mathbf{x̂_0}(k+p-2|k-1)         \\
     \mathbf{x̂_0}(k+p-1|k-1)         \\
     \mathbf{x̂_0}(k+p-1|k-1)         \\
-    \mathbf{ŵ}(k-N_k+p+0|k-1)       \\ 
-    \mathbf{ŵ}(k-N_k+p+1|k-1)       \\ 
+    \mathbf{ŵ}(k-N_k+p+0|k-1)       \\
+    \mathbf{ŵ}(k-N_k+p+1|k-1)       \\
     \vdots                          \\
     \mathbf{ŵ}(k+p-3|k-1)           \\
     \mathbf{ŵ}(k+p-2|k-1)           \\
@@ -671,16 +671,19 @@ function set_warmstart_mhe!(
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
     nε, nx̂, nŵ, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.Nk[]
-    nx̃ = nε + nx̂
+    nx̃, nX̂ = nε + nx̂, nx̂*estim.He
     Z̃s = estim.buffer.Z̃
     û0, ŷ0, x̄, k = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
     # --- arrival state estimate x̂0arr ---
     Z̃s[nε+1:nx̃] = estim.x̂0arr_old
+    # --- state estimates X̂0 --- # mpc.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
+    Z̃s[(nx̃+1):(nx̃+nX̂-nx̂)]    .= @views estim.Z̃[(nx̃+nx̂+1):(nx̃+nX̂)]
+    Z̃s[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)] .= @views estim.Z̃[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)]
     # --- process noise estimates Ŵ ---
-    Z̃s[nx̃+1:end] = estim.Ŵ
-    # verify definiteness of objective function:
+    Z̃s[(nx̃+nX̂+1):end] = estim.Ŵ
+    # --- verify definiteness of objective function ---
     V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, estim.Ŵ, Z̃s)
