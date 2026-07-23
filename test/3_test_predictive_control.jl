@@ -1030,7 +1030,7 @@ end
     @test u ≈ [1.0] atol=5e-2
 
     transcription = TrapezoidalCollocation(1)    
-    nmpc5_1 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
+    nmpc5_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc5_1, [0.0])
     u = moveinput!(nmpc5_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
@@ -1042,10 +1042,13 @@ end
     @test u ≈ [1.0] atol=5e-2
 
     transcription = OrthogonalCollocation(1, roots=:gausslegendre)
-    nmpc6_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
+    nmpc6_1 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
     preparestate!(nmpc6_1, [0.0])
     u = moveinput!(nmpc6_1, [1/0.001])
     @test u ≈ [1.0] atol=5e-2
+    setstate!(nmpc6_1, [5.0])
+    moveinput!(nmpc6_1)
+    @test nmpc6_1.con.FS ≈ nmpc6_1.con.KS*nmpc6_1.estim.x̂0 # OC + IMC: special lin. eq. method
     
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)

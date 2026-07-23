@@ -1280,10 +1280,10 @@ function linconstrainteq!(
     return nothing
 end
 "No linear equality constraints for other cases of [`InternalModel`](@ref)."
-linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel, ::TranscriptionMethod) = nothing
+linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel, ::TranscriptionMethod) = nothing
 "No linear equality constraints for all cases of [`SingleShooting`](@ref) (N/A)."
-linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting) = nothing 
-linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::SingleShooting) = nothing 
+linconstrainteq!(::PredictiveController, ::SimModel,    ::StateEstimator, ::SingleShooting) = nothing 
+linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel,  ::SingleShooting) = nothing 
 
 @doc raw"""
     set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
