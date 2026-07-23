@@ -630,7 +630,7 @@ function set_warmstart_mhe!(
     # We force the update of the NLP gradient and jacobian by warm-starting the unused 
     # variable in Z̃ at 1. Since estim.Ŵ is initialized with 0s, at least 1 variable in Z̃s
     # will be inevitably different at the following time step.
-    Z̃s[nx̃+Nk*nŵ+1:end] .= 1
+    Z̃s[nx̃+nŵ*Nk+1:end] .= 1
     JuMP.set_start_value.(Z̃var, Z̃s)
     return Z̃s
 end
@@ -689,13 +689,13 @@ function set_warmstart_mhe!(
     predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, estim.Ŵ, Z̃s)
     Js = obj_nonlinprog(estim, model, x̄, V̂, estim.Ŵ, Z̃s)
     if !isfinite(Js)
-        Z̃s[nx̃+1:end] .= 0
+        Z̃s[nx̃+nX̂+1:end] .= 0
     end
     # --- unused variable in Z̃ (applied only when Nk < He) ---
     # We force the update of the NLP gradient and jacobian by warm-starting the unused 
     # variable in Z̃ at 1. Since estim.Ŵ is initialized with 0s, at least 1 variable in Z̃s
     # will be inevitably different at the following time step.
-    Z̃s[nx̃+Nk*nŵ+1:end] .= 1
+    Z̃s[nx̃+nX̂+nŵ*Nk+1:end] .= 1
     JuMP.set_start_value.(Z̃var, Z̃s)
     return Z̃s
 end
