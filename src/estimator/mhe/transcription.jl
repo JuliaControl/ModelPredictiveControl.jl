@@ -423,8 +423,8 @@ function init_matconstraint_mhe(
 end
 
 "For [`SingleShooting`](@ref), truncate the end of prediction matrices if `Nk < He`"
-function trunc_predmat(estim::MovingHorizonEstimator, ::SingleShooting)
-    model, F = estim.model, estim.F
+function trunc_predmat(estim::MovingHorizonEstimator, transcription::SingleShooting)
+    model = estim.model
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
     nU, nYm, nŴ, nD = model.nu*Nk, nym*Nk, nŵ*Nk, model.nd*(Nk+1)
     nZ = get_nZ_mhe(transcription, Nk, nx̂, nŵ)
@@ -450,7 +450,7 @@ end
 
 "For [`MultipleShooting`](@ref), extract subparts of the prediction matrices if `Nk < He`."
 function trunc_predmat(estim::MovingHorizonEstimator, ::MultipleShooting)
-    model, F = estim.model, estim.F
+    model = estim.model
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
     nU, nYm, nŴ, nD = model.nu*Nk, nym*Nk, nŵ*Nk, model.nd*(Nk+1)
     nx̂_nX̂    = nx̂ + nx̂*Nk 
@@ -475,6 +475,28 @@ function trunc_predmat(estim::MovingHorizonEstimator, ::MultipleShooting)
     end
     return Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var
 
+end
+
+function trunc_defectmat(estim::MovingHorizonEstimator)
+    model, con = estim.model, estim.con
+    FS = con.FS
+    nx̂, nŵ, nε, Nk = estim.nx̂, estim.nx̂, estim.nε, estim.Nk[]
+    nU, nŴ, nX̂, nD = model.nu*Nk, nŵ*Nk, nx̂*Nk, model.nd*(Nk+1)
+    nx̂_nX̂    = nx̂ + nX̂ 
+    nx̂_nX̂_He = nx̂ + nx̂*estim.He
+    if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
+        i_Z̃_He     = [(1):(nε + nx̂_nX̂); (nε + nx̂_nX̂_He + 1):(nε + nx̂_nX̂_He + nŴ)]
+        ẼS         = con.ẼS[1:nX̂, i_Z̃_He]
+        GS, JS, BS = con.GS[1:nX̂, 1:nU], con.JS[1:nX̂, 1:nD], con.BS[1:nX̂]
+        FS         = @views  con.FS[1:nX̂] # views here since they will store results
+        beq        = @views con.beq[1:nX̂]
+        Z̃var       = @views estim.optim[:Z̃var][i_Z̃_He]
+    else
+        ẼS, FS, GS, JS, BS = con.ẼS, con.FS, con.GS, con.JS, con.BS
+        beq  = con.beq
+        Z̃var =estim.optim[:Z̃var]
+    end
+    return ẼS, FS, GS, JS, BS, beq, Z̃var
 end
 
 @doc raw"""
@@ -569,10 +591,33 @@ end
 TBW
 """
 function linconstrainteq!(
-    estim::MovingHorizonEstimator, model::LinModel, ::TranscriptionMethod
+    estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod
 )
+
+    ẼS, FS, GS, JS, BS, beq, Z̃var = trunc_defectmat(estim)
+    U0, _ , D0 = trunc_windows(estim)
+    FS .= BS
+    mul!(FS, GS, U0, 1, 1)
+    if model.nd > 0
+        mul!(FS, JS, D0, 1, 1)
+    end
+    beq .= @. -FS
+    linconeq = estim.optim[:linconstrainteq]
+    #if estim.Nk[] < estim.He
+        Aeq = ẼS
+        JuMP.delete(estim.optim, linconeq)
+        JuMP.unregister(estim.optim, :linconstrainteq)
+        @constraint(estim.optim, linconstrainteq, Aeq*Z̃var .== beq)
+    #else
+    #    println(linconeq)
+    #    println(beq)
+    #    JuMP.set_normalized_rhs(linconeq, beq)
+    #end
     return nothing
 end
+linconstrainteq!(::MovingHorizonEstimator, ::LinModel, ::SingleShooting) = nothing
+
+
 
 
 @doc raw"""
@@ -678,7 +723,7 @@ function set_warmstart_mhe!(
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
     # --- arrival state estimate x̂0arr ---
     Z̃s[nε+1:nx̃] = estim.x̂0arr_old
-    # --- state estimates X̂0 --- # mpc.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
+    # --- state estimates X̂0 --- # estim.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
     Z̃s[(nx̃+1):(nx̃+nX̂-nx̂)]    .= @views estim.Z̃[(nx̃+nx̂+1):(nx̃+nX̂)]
     Z̃s[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)] .= @views estim.Z̃[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)]
     # --- process noise estimates Ŵ ---
