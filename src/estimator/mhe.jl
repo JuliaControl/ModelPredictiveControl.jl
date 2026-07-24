@@ -1,5 +1,6 @@
 include("mhe/construct.jl")
 include("mhe/execute.jl")
+include("mhe/transcription.jl")
 
 "Return estimation horizon He and slack variables length nε for `MovingHorizonEstimator`."
 get_other_dims(estim::MovingHorizonEstimator) = (estim.He, estim.nε)
@@ -7,6 +8,7 @@ get_other_dims(estim::MovingHorizonEstimator) = (estim.He, estim.nε)
 "Print optimizer and other information for `MovingHorizonEstimator`."
 function print_details(io::IO, estim::MovingHorizonEstimator)
     println(io, "├ optimizer: $(JuMP.solver_name(estim.optim)) ")
+    println(io, "├ transcription: $(nameof(typeof(estim.transcription)))")
     print_backends(io, estim, estim.model)
     println(io, "├ arrival covariance: $(nameof(typeof(estim.covestim))) ")
     println(io, "├ direct: $(estim.direct)")
@@ -35,8 +37,8 @@ function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n; firstchars=no
     print(io,   "  │ └$(lpad(nd, n)) measured disturbances d")
     if isnothing(firstchars) # the user prints the MHE object itself, not a controller:
         nZ̃, nε = length(estim.Z̃), estim.nε
-        nA = sum(estim.con.i_b)
-        ng, nc = sum(estim.con.i_g), estim.con.nc 
+        nA, nAeq     = sum(estim.con.i_b), size(estim.con.Aeq, 1)
+        ng, nc, neq  = sum(estim.con.i_g), estim.con.nc, estim.con.neq
         m = maximum(ndigits.((nZ̃, nA, ng))) + 1
         i_nZ̃min, i_nZ̃max = @. !isinf(estim.con.Z̃min), !isinf(estim.con.Z̃max)
         nZ̃bounds = sum(i_nZ̃min) + sum(i_nZ̃max)
@@ -44,6 +46,8 @@ function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n; firstchars=no
         println(io, "  └ optimization:")
         println(io, "    ├$(lpad(nZ̃, m)) decision variables Z̃ ($nε slack variable, $nZ̃bounds bounds)")
         println(io, "    ├$(lpad(nA, m)) linear inequality constraints A")
-        print(io,   "    └$(lpad(ng, m)) nonlinear inequality constraints g ($nc custom)")
+        println(io, "    ├$(lpad(nAeq, m)) linear equality constraints Aeq")
+        println(io, "    ├$(lpad(ng, m)) nonlinear inequality constraints g ($nc custom)")
+        print(io,   "    └$(lpad(neq, m)) nonlinear equality constraints geq")
     end
 end

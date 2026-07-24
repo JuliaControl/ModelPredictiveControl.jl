@@ -487,7 +487,7 @@ end
 
 Optimize the objective function of `mpc` [`PredictiveController`](@ref) and return the solution `Z̃`.
 
-If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls 
+If first warm-starts the solver with [`set_warmstart_mpc!`](@ref). It then calls 
 `JuMP.optimize!(mpc.optim)` and extract the solution. A failed optimization prints an 
 `@error` log in the REPL and returns the warm-start value. A failed optimization also prints
 [`getinfo`](@ref) results in the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
@@ -495,7 +495,7 @@ If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model, optim = mpc.estim.model, mpc.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    Z̃s = set_warmstart!(mpc, mpc.transcription, Z̃var)
+    Z̃s = set_warmstart_mpc!(mpc, mpc.transcription, Z̃var)
     set_objective_linear_coef!(mpc, model, Z̃var)
     try
         JuMP.optimize!(optim)
@@ -715,7 +715,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     weights = mpc.weights
     nu, ny, nd, Hp, Hc, nb = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc, mpc.nb
     optim, con = mpc.optim, mpc.con
-    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
     Pu = mpc.P̃u[:, 1:nZ]
     # --- prediction matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(

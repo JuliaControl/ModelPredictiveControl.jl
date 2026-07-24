@@ -125,7 +125,7 @@ struct NonLinMPC{
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         test_custom_function_mpc(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
-        nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
+        nZ̃ = get_nZ_mpc(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE, CW, TM, JM, GB, JB, HB, PT, JEfunc, GCfunc}(
@@ -591,7 +591,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     hess = mpc.hessian
     transcription = mpc.transcription
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk(model, transcription)
+    nk = get_nk_mpc(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     i_g = findall(mpc.con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(mpc.con.i_g), sum(mpc.con.i_g)
@@ -830,7 +830,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
     transcription = mpc.transcription
     grad, hess = mpc.gradient, mpc.hessian
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk(model, transcription)
+    nk = get_nk_mpc(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     ng = length(mpc.con.i_g)
     nc, neq = mpc.con.nc, mpc.con.neq
@@ -956,7 +956,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     transcription = mpc.transcription
     jac, hess = mpc.jacobian, mpc.hessian
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk(model, transcription)
+    nk = get_nk_mpc(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     i_g = findall(mpc.con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(mpc.con.i_g), sum(mpc.con.i_g)

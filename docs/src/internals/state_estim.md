@@ -12,6 +12,7 @@ ModelPredictiveControl.init_integrators
 ModelPredictiveControl.augment_model
 ModelPredictiveControl.init_ukf
 ModelPredictiveControl.init_internalmodel
+ModelPredictiveControl.init_ZtoŴ
 ModelPredictiveControl.init_predmat_mhe
 ModelPredictiveControl.relaxarrival
 ModelPredictiveControl.relaxX̂
