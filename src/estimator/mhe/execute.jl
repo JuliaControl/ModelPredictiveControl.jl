@@ -340,7 +340,7 @@ function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
     nYm, nZ = estim.nym*Nk, get_nZ_mhe(estim.transcription, Nk, nx̂, nŵ)
     # --- truncate vectors and matrices if Nk < He ---
-    U0, Y0m, D0 = trunc_windows(estim)
+    U0, D0, Y0m = trunc_windows(estim)
     Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var = trunc_predmat(estim, estim.transcription)
     invQ̂_Nk = trunc_cov(invQ̂_He, nx̂, Nk, estim.He)
     invR̂_Nk = trunc_cov(invR̂_He, nym, Nk, estim.He)
@@ -548,14 +548,14 @@ function trunc_windows(estim::MovingHorizonEstimator)
     nU, nYm, nD = nu*Nk, nym*Nk, nd*(Nk+1)
     if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
         U0  = estim.U0[1:nU]
-        Y0m = estim.Y0m[1:nYm]
         D0  = estim.D0[1:nD]
+        Y0m = estim.Y0m[1:nYm]
     else
         U0  = estim.U0
-        Y0m = estim.Y0m
         D0  = estim.D0
+        Y0m = estim.Y0m
     end
-    return U0, Y0m, D0
+    return U0, D0, Y0m
 end
 
 "Truncate the inverse covariance `invA_He` to the window size `Nk` if `Nk < He`."

@@ -595,19 +595,23 @@ function linconstrainteq!(
 )
 
     ẼS, FS, GS, JS, BS, beq, Z̃var = trunc_defectmat(estim)
-    U0, _ , D0 = trunc_windows(estim)
+    U0, D0 = trunc_windows(estim)
     FS .= BS
     mul!(FS, GS, U0, 1, 1)
     if model.nd > 0
         mul!(FS, JS, D0, 1, 1)
     end
     beq .= @. -FS
+    
+    
+    
     linconeq = estim.optim[:linconstrainteq]
+    Aeq = ẼS
+    JuMP.delete(estim.optim, linconeq)
+    JuMP.unregister(estim.optim, :linconstrainteq)
+    @constraint(estim.optim, linconstrainteq, Aeq*Z̃var .== beq)
     #if estim.Nk[] < estim.He
-        Aeq = ẼS
-        JuMP.delete(estim.optim, linconeq)
-        JuMP.unregister(estim.optim, :linconstrainteq)
-        @constraint(estim.optim, linconstrainteq, Aeq*Z̃var .== beq)
+
     #else
     #    println(linconeq)
     #    println(beq)
