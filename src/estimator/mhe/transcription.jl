@@ -474,7 +474,6 @@ function trunc_predmat(estim::MovingHorizonEstimator, ::MultipleShooting)
         Z̃var          = estim.optim[:Z̃var]
     end
     return Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var
-
 end
 
 function trunc_defectmat(estim::MovingHorizonEstimator)
@@ -488,15 +487,17 @@ function trunc_defectmat(estim::MovingHorizonEstimator)
         i_Z̃_He     = [(1):(nε + nx̂_nX̂); (nε + nx̂_nX̂_He + 1):(nε + nx̂_nX̂_He + nŴ)]
         ẼS         = con.ẼS[1:nX̂, i_Z̃_He]
         GS, JS, BS = con.GS[1:nX̂, 1:nU], con.JS[1:nX̂, 1:nD], con.BS[1:nX̂]
-        FS         = @views  con.FS[1:nX̂] # views here since they will store results
+        FS         = @views con.FS[1:nX̂] # views here since they will store results
+        Aeq        = @views con.Aeq[1:nX̂, i_Z̃_He]
         beq        = @views con.beq[1:nX̂]
         Z̃var       = @views estim.optim[:Z̃var][i_Z̃_He]
     else
         ẼS, FS, GS, JS, BS = con.ẼS, con.FS, con.GS, con.JS, con.BS
+        Aeq  = con.Aeq
         beq  = con.beq
-        Z̃var =estim.optim[:Z̃var]
+        Z̃var = estim.optim[:Z̃var]
     end
-    return ẼS, FS, GS, JS, BS, beq, Z̃var
+    return ẼS, FS, GS, JS, BS, Aeq, beq, Z̃var
 end
 
 @doc raw"""
@@ -593,8 +594,8 @@ TBW
 function linconstrainteq!(
     estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod
 )
-
-    ẼS, FS, GS, JS, BS, beq, Z̃var = trunc_defectmat(estim)
+    optim = estim.optim
+    ẼS, FS, GS, JS, BS, Aeq, beq, Z̃var = trunc_defectmat(estim)
     U0, D0 = trunc_windows(estim)
     FS .= BS
     mul!(FS, GS, U0, 1, 1)
@@ -602,21 +603,24 @@ function linconstrainteq!(
         mul!(FS, JS, D0, 1, 1)
     end
     beq .= @. -FS
-    
-    
-    
-    linconeq = estim.optim[:linconstrainteq]
-    Aeq = ẼS
-    JuMP.delete(estim.optim, linconeq)
-    JuMP.unregister(estim.optim, :linconstrainteq)
-    @constraint(estim.optim, linconstrainteq, Aeq*Z̃var .== beq)
-    #if estim.Nk[] < estim.He
-
-    #else
-    #    println(linconeq)
-    #    println(beq)
-    #    JuMP.set_normalized_rhs(linconeq, beq)
-    #end
+    Aeq .= @.  ẼS
+    if haskey(optim, :linconstrainteq_temp)
+        JuMP.delete(optim, optim[:linconstrainteq_temp])
+        JuMP.unregister(optim, :linconstrainteq_temp)
+    end
+    if estim.Nk[] < estim.He
+        if haskey(optim, :linconstrainteq)
+            JuMP.delete(optim, optim[:linconstrainteq])
+            JuMP.unregister(optim, :linconstrainteq)
+        end
+        @constraint(optim, linconstrainteq_temp, Aeq*Z̃var .== beq)
+    else
+        if haskey(optim, :linconstrainteq)
+            JuMP.set_normalized_rhs(optim[:linconstrainteq], beq)
+        else
+            @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
+        end
+    end
     return nothing
 end
 linconstrainteq!(::MovingHorizonEstimator, ::LinModel, ::SingleShooting) = nothing
