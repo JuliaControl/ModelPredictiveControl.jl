@@ -976,9 +976,8 @@ function setmodel_estimator!(
     # --- predictions matrices ---
     E, G, J, B, _ , Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
         model, transcription,
-        He, estim.i_ym, 
-        estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, 
-        estim.x̂op, estim.f̂op, estim.direct
+        He, estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, estim.x̂op, estim.f̂op, 
+        estim.direct
     )
     A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(Ex̂, con.C_x̂min, con.C_x̂max, nε)   
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, con.C_v̂min, con.C_v̂max, nε) 

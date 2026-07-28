@@ -5,7 +5,7 @@ get_nZ_mhe(::TranscriptionMethod, He, nx̂, nŵ) = nx̂ + nx̂*He + nŵ*He
 @doc raw"""
     init_predmat_mhe(
         model::LinModel, transcription::SingleShooting,
-        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
     ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 
 Construct the MHE prediction matrices for [`LinModel`](@ref) and [`SingleShooting`](@ref).
@@ -134,10 +134,10 @@ see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstrain
     All these matrices are truncated when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
-    model::LinModel{NT}, ::SingleShooting, He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+    model::LinModel{NT}, ::SingleShooting, He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
-    nym, nx̂ = length(i_ym), size(Â, 2)
+    nym, nx̂ = size(Ĉm, 1), size(Â, 2)
     nŵ = nx̂
     p = direct ? 0 : 1
     # --- pre-compute matrix powers ---
@@ -247,17 +247,17 @@ end
 """
     init_predmat_mhe(
         model::LinModel, transcription::MultipleShooting, 
-        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
     ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 
 TBW
 """
 function init_predmat_mhe(
     model::LinModel{NT}, ::MultipleShooting, 
-    He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+    He, Â, _ , Ĉm, _ , D̂dm, _ , _ , direct
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
-    nym, nx̂ = length(i_ym), size(Â, 2)
+    nym, nx̂ = size(Ĉm, 1), size(Â, 2)
     nŵ = nx̂
     p = direct ? 0 : 1
     nX̂, nŴ, nV̂, nU, nD = nx̂*He, nŵ*He, nym*He, nu*He, nd*(He+1)
@@ -279,15 +279,17 @@ end
 
 """
     init_predmat_mhe(
-        model::SimModel, ::SingleShooting, He, i_ym, Â, _ , _ , _ , _ , _ , _ , _
+        model::SimModel, ::SingleShooting, 
+        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
     ) -> E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂
 
 Return empty matrices if `model` is not a [`LinModel`](@ref), except for `ex̄`.
 """
 function init_predmat_mhe(
-    model::SimModel{NT}, ::SingleShooting, He, i_ym, Â, _ , _ , _ , _ , _ , _ , _
+    model::SimModel{NT}, ::SingleShooting, 
+    He, Â, _ , Ĉm, _ , _ , _ , _ , _
 ) where {NT<:Real}
-    nym, nx̂ = length(i_ym), size(Â, 2)
+    nym, nx̂ = size(Ĉm, 1), size(Â, 2)
     nŵ = nx̂
     E  = zeros(NT, 0, nx̂ + nŵ*He)
     ex̄ = [-I zeros(NT, nx̂, nŵ*He)]
