@@ -9,14 +9,6 @@ const DEFAULT_EWT = 0.0
 const DEFAULT_QP_OPTIMIZER  = OSQP.MathOptInterfaceOSQP.Optimizer
 const DEFAULT_NLP_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
 
-const DEFAULT_GRADIENT  = AutoForwardDiff()
-const DEFAULT_JACDENSE  = AutoForwardDiff()
-const DEFAULT_JACSPARSE = AutoSparse(
-    AutoForwardDiff();
-    sparsity_detector=TracerSparsityDetector(),
-    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
-)
-
 "All deterministic algorithms for matrix coloring order in `SparseMatrixColoring.jl`."
 const ALL_COLORING_ORDERS = (
     NaturalOrder(),
@@ -25,6 +17,14 @@ const ALL_COLORING_ORDERS = (
     IncidenceDegree(),
     DynamicLargestFirst(),
     RandomOrder(StableRNG(0), 0)
+)
+
+const DEFAULT_GRADIENT  = AutoForwardDiff()
+const DEFAULT_JACDENSE  = AutoForwardDiff()
+const DEFAULT_JACSPARSE = AutoSparse(
+    AutoForwardDiff();
+    sparsity_detector=TracerSparsityDetector(),
+    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
 )
 
 const HIDDEN_GETINFO_KEYS_MHE = (
