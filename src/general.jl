@@ -133,9 +133,6 @@ function set_scaling_gradient!(optim::JuMP.GenericModel, C)
     return nothing
 end
 
-default_jacobian(::SingleShooting)      = DEFAULT_JACDENSE
-default_jacobian(::TranscriptionMethod) = DEFAULT_JACSPARSE
-
 "Init a differentiation result matrix as dense or sparse matrix, as required by `backend`."
 init_diffmat(T, ::AbstractADType, _ , nx, ny) = zeros(T, ny, nx)
 function init_diffmat(T, ::AutoSparse, prep , _ , _ )

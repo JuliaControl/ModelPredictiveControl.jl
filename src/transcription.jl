@@ -339,6 +339,9 @@ function lagrange_end(j, transcription::OrthogonalCollocation)
     return Lj
 end
 
+default_jacobian(::SingleShooting)      = DEFAULT_JACDENSE
+default_jacobian(::TranscriptionMethod) = DEFAULT_JACSPARSE
+
 function validate_transcription(::LinModel, ::CollocationMethod)
     throw(ArgumentError("Collocation methods are not supported for LinModel."))
     return nothing
