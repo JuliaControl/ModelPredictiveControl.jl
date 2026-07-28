@@ -139,7 +139,6 @@ struct MovingHorizonEstimator{
     Ue ::Vector{NT}
     D0 ::Vector{NT}
     De ::Vector{NT}
-    Ŵ  ::Vector{NT}
     X̂0_old   ::Vector{NT}
     x̂0arr_old::Vector{NT}
     P̂arr_old ::Hermitian{NT, Matrix{NT}}
@@ -204,7 +203,6 @@ struct MovingHorizonEstimator{
         Y0m, Yem = fill(NT(NaN), nym*He),    fill(NT(NaN), nym*(He+1))
         U0,  Ue  = fill(NT(NaN), nu*He),     fill(NT(NaN),  nu*(He+1))
         D0,  De  = fill(NT(NaN), nd*(He+1)), fill(NT(NaN),  nd*(He+1))
-        Ŵ        = fill(NT(NaN), nx̂*He)
         X̂0_old   = fill(NT(NaN), nx̂*He)
         D0[1:nd] .= 0 # D0 start with d0(-1) and it should not be NaN
         x̂0arr_old = zeros(NT, nx̂)
@@ -212,7 +210,7 @@ struct MovingHorizonEstimator{
         Nk = [0]
         prepared = [false]
         test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p, direct)
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nε, transcription)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nŵ, nε, transcription)
         estim = new{NT, SM, KC, TM, JM, GB, JB, HB, PT, GCfunc, CE}(
             model, transcription, optim, con, 
             gradient, jacobian, hessian,
@@ -229,7 +227,7 @@ struct MovingHorizonEstimator{
             H̃, q̃, r,
             Cwt,
             X̂op, 
-            Y0m, Yem, U0, Ue, D0, De, Ŵ, 
+            Y0m, Yem, U0, Ue, D0, De, 
             X̂0_old, x̂0arr_old, P̂arr_old, Nk,
             direct, prepared,
             buffer

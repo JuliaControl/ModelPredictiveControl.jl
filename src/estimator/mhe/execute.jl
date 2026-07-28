@@ -10,7 +10,6 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     estim.Ue        .= NaN
     estim.D0        .= NaN
     estim.De        .= NaN
-    estim.Ŵ         .= NaN
     estim.X̂0_old    .= NaN
     estim.Nk        .= 0
     estim.F         .= 0
@@ -48,7 +47,8 @@ function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
         initpred!(estim, estim.model)
         linconstraint!(estim, estim.model, estim.transcription)
         linconstrainteq!(estim, estim.model, estim.transcription)
-        optim_objective!(estim)
+        Z̃ = optim_objective!(estim)
+        getstate!(estim, Z̃)
     end
     return nothing
 end
@@ -72,8 +72,10 @@ function update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0)
     if !estim.direct
         add_data_windows!(estim, y0m, d0, u0)
         initpred!(estim, estim.model)
-        linconstraint!(estim, estim.model)
-        optim_objective!(estim)
+        linconstraint!(estim, estim.model, estim.transcription)
+        linconstrainteq!(estim, estim.model, estim.transcription)
+        Z̃ = optim_objective!(estim)
+        getstate!(estim, Z̃)
     end
     (estim.Nk[] == estim.He) && update_cov!(estim)
     estim.lastu0 .= u0
@@ -139,17 +141,18 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, buffer, Nk = estim.model, estim.buffer, estim.Nk[]
     nu, ny, nd = model.nu, model.ny, model.nd
     nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
-    Z̃, Ŵ = estim.Z̃, estim.Ŵ
+    Z̃ = estim.Z̃
     info = Dict{Symbol, Any}()
     Ŷ0 = Vector{NT}(undef, ny*Nk)
-    V̂,  X̂0 = buffer.V̂, buffer.X̂
+    V̂, Ŵ, X̂0 = buffer.V̂, buffer.Ŵ, buffer.X̂
     x̂0arr, û0, k, ŷ0 = buffer.x̂, buffer.û, buffer.k, buffer.ŷ
-    x̂0arr  = getarrival!(x̂0arr, estim, Z̃)
-    x̄      = estim.x̂0arr_old - x̂0arr
-    V̂,  X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
-    Ŷ0     = predict_outputs_mhe!(Ŷ0, estim, X̂0, x̂0arr)
-    J      = obj_nonlinprog(estim, estim.model, x̄, V̂, Ŵ, Z̃)
-    yopm   = model.yop[estim.i_ym]
+    x̂0arr = getarrival!(x̂0arr, estim, Z̃)
+    Ŵ     = getŴ!(Ŵ, estim, Z̃)
+    x̄     = estim.x̂0arr_old - x̂0arr
+    V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
+    Ŷ0    = predict_outputs_mhe!(Ŷ0, estim, X̂0, x̂0arr)
+    J     = obj_nonlinprog(estim, estim.model, x̄, V̂, Ŵ, Z̃)
+    yopm  = model.yop[estim.i_ym]
     Ym0, U0, D0 = estim.Y0m[1:nym*Nk], estim.U0[1:nu*Nk], estim.D0[1:nd*(Nk+1)]
     Ym, U, D, Ŷ, X̂, x̂arr = Ym0, U0, D0, Ŷ0, X̂0, x̂0arr
     for i=1:Nk
@@ -420,7 +423,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     Nk = estim.Nk[]
     p = estim.direct ? 0 : 1 # u0 argument is u0(k-1) if estim.direct, else u0(k)
     x̂0_old = estim.x̂0        # x̂0_old is x̂0(k-1|k-1) if estim.direct, else x̂0(k|k-1)
-    ŵ = 0                    # ŵ(k-1+p) = 0 for warm-start
     estim.Nk .+= 1
     Nk = estim.Nk[]
     ismoving = (Nk > estim.He)
@@ -440,8 +442,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         estim.Ue[1:end-nu]          .= @views estim.Ue[nu+1:end]
         estim.U0[end-nu+1:end]                          .= u0
         estim.Ue[(end-nu+1 - nu):(end - nu)]            .= u0 .+ model.uop
-        estim.Ŵ[1:end-nŵ]           .= @views estim.Ŵ[nŵ+1:end]
-        estim.Ŵ[end-nŵ+1:end]       .= ŵ
         estim.X̂0_old[1:end-nx̂]      .= @views estim.X̂0_old[nx̂+1:end]
         estim.X̂0_old[end-nx̂+1:end]  .= x̂0_old
         estim.Nk .= estim.He
@@ -454,7 +454,6 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
         end
         estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0
         estim.Ue[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0 .+ model.uop
-        estim.Ŵ[(1 + nŵ*(Nk-1)):(nŵ*Nk)]                .= ŵ
         estim.X̂0_old[(1 + nx̂*(Nk-1)):(nx̂*Nk)]           .= x̂0_old
     end
     # --- update the arrival state estimated at k-Nk ---
@@ -490,9 +489,7 @@ If first warm-starts the solver with [`set_warmstart_mhe!`](@ref). It then calls
 [`getinfo`](@ref) results in the debug log [if activated](@extref Julia Example:-Enable-debug-level-messages).
 """
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
-    model, optim, buffer = estim.model, estim.optim, estim.buffer
-    nŵ, nx̂, Nk =  estim.nx̂, estim.nx̂, estim.Nk[]
-    nx̃ = estim.nε + nx̂
+    optim = estim.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     Z̃s = set_warmstart_mhe!(estim, estim.transcription, Z̃var)
     # ------- solve optimization problem --------------
@@ -526,19 +523,32 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
         @debug info2debugstr(getinfo(estim))
     end
     if iserror(optim)
-        estim.Z̃[1:nx̃+nŵ*Nk] .= @views Z̃s[1:nx̃+nŵ*Nk]
+        estim.Z̃ .= Z̃s
     else
-        estim.Z̃[1:nx̃+nŵ*Nk] .= @views JuMP.value.(Z̃var[1:nx̃+nŵ*Nk])
+        estim.Z̃ .= JuMP.value.(Z̃var)
     end
-    # --------- update estimate -----------------------
+    fill0unused!(estim.Z̃, estim, estim.transcription)
+    return estim.Z̃
+end
+
+@doc raw"""
+    getstate!(estim::MovingHorizonEstimator, Z̃)
+
+Get current or next state estimate `x̂0corrORnext` from the solution `Z̃` and store it.
+
+It extract and store in `estim.x̂0` the current corrected state if `estim.direct`, or the
+next one otherwise.
+"""
+function getstate!(estim::MovingHorizonEstimator, Z̃)
+    buffer, nx̂, Nk = estim.buffer, estim.nx̂, estim.Nk[]
     x̂0arr, û0, ŷ0, k = buffer.x̂, buffer.û, buffer.ŷ, buffer.k
-    V̂, X̂0  = buffer.V̂, buffer.X̂
-    estim.Ŵ[1:nŵ*Nk] .= @views estim.Z̃[nx̃+1:nx̃+nŵ*Nk] # update Ŵ with optimum for warm-start
-    getarrival!(x̂0arr, estim, estim.Z̃)
-    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, estim.Ŵ, estim.Z̃)
+    V̂, Ŵ, X̂0  = buffer.V̂, buffer.Ŵ, buffer.X̂
+    getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
+    getarrival!(x̂0arr, estim, Z̃)
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, estim.model, x̂0arr, Ŵ, Z̃)
     x̂0corrORnext = @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     estim.x̂0 .= x̂0corrORnext
-    return estim.Z̃
+    return nothing
 end
 
 "Truncate and return the data windows if `Nk < He"

@@ -2,6 +2,28 @@
 get_nZ_mhe(::SingleShooting, He, nx̂, nŵ) = nx̂ + nŵ*He
 get_nZ_mhe(::TranscriptionMethod, He, nx̂, nŵ) = nx̂ + nx̂*He + nŵ*He
 
+function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
+    He, nx̂, nŵ, Nk = estim.He, estim.nx̂, estim.nx̂, estim.Nk[]
+    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
+    Ŵ[1:nŵ*Nk] = @views Z̃[(nZ̃ - nŵ*He + 1):(nZ̃ - nŵ*He + nŵ*Nk)] 
+    return Ŵ
+end
+
+"Fill the unused decision variables in `Z̃` with `0`s (only when `Nk < He`)."
+function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::SingleShooting)
+    nŵ, nx̂, Nk =  estim.nx̂, estim.nx̂, estim.Nk[]
+    nx̃ = estim.nε + nx̂
+    Z̃[(nx̃ + nŵ*Nk + 1):end] .= 0 # unused decision variables after Ŵ vector
+    return nothing
+end
+function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::TranscriptionMethod)
+    nŵ, nx̂, He, Nk =  estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
+    nx̃ = estim.nε + nx̂
+    Z̃[(nx̃ + nx̂*Nk + 1):(nx̃ + nx̂*He)] .= 0 # unused decision variables after X̂0 vector
+    Z̃[(nx̃ + nx̂*He + nŵ*Nk + 1):end]  .= 0 # unused decision variables after Ŵ vector
+    return nothing
+end
+
 @doc raw"""
     init_predmat_mhe(
         model::LinModel, transcription::SingleShooting,
@@ -604,7 +626,7 @@ function linconstrainteq!(
     end
     beq .= @. -FS
     Aeq .= @.  ẼS
-    if haskey(optim, :linconstrainteq_temp)
+    if haskey(optim, :linconstrainteq_temp) # temporary since only used once when Nk < He
         JuMP.delete(optim, optim[:linconstrainteq_temp])
         JuMP.unregister(optim, :linconstrainteq_temp)
     end
@@ -658,11 +680,11 @@ noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. The method mutates
 arguments.
 """
 function set_warmstart_mhe!(
-    estim::MovingHorizonEstimator{NT}, ::SingleShooting, Z̃var
+    estim::MovingHorizonEstimator{NT}, transcription::SingleShooting, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nε, nx̂, nŵ, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.Nk[]
-    nx̃ = nε + nx̂
+    nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
+    nx̃, nŴ = nε + nx̂, nŵ*He
     Z̃s = estim.buffer.Z̃
     û0, ŷ0, x̄, k = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
     # --- slack variable ε ---
@@ -670,12 +692,14 @@ function set_warmstart_mhe!(
     # --- arrival state estimate x̂0arr ---
     Z̃s[nε+1:nx̃] = estim.x̂0arr_old
     # --- process noise estimates Ŵ ---
-    Z̃s[nx̃+1:end] = estim.Ŵ
+    Z̃s[(nx̃+1):(nx̃+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nŵ+1):(nx̃+nŴ)]
+    Z̃s[(nx̃+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
-    V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
+    V̂, Ŵ, X̂0 = estim.buffer.V̂, estim.buffer.Ŵ, estim.buffer.X̂
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
-    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, estim.Ŵ, Z̃s)
-    Js = obj_nonlinprog(estim, model, x̄, V̂, estim.Ŵ, Z̃s)
+    getŴ!(Ŵ, estim, transcription, Z̃s) 
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, Ŵ, Z̃s)
+    Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+1:end] .= 0
     end
@@ -720,27 +744,29 @@ last control period ``k-1``, expressed as a deviation from the operating point
 ``\mathbf{x̂_{op}}``. 
 """
 function set_warmstart_mhe!(
-    estim::MovingHorizonEstimator{NT}, ::MultipleShooting, Z̃var
+    estim::MovingHorizonEstimator{NT}, transcription::MultipleShooting, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nε, nx̂, nŵ, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.Nk[]
-    nx̃, nX̂ = nε + nx̂, nx̂*estim.He
+    nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
+    nx̃, nŴ, nX̂ = nε + nx̂, nŵ*He, nx̂*He
     Z̃s = estim.buffer.Z̃
     û0, ŷ0, x̄, k = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
     # --- arrival state estimate x̂0arr ---
     Z̃s[nε+1:nx̃] = estim.x̂0arr_old
-    # --- state estimates X̂0 --- # estim.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
+    # --- state estimates X̂0 --- 
     Z̃s[(nx̃+1):(nx̃+nX̂-nx̂)]    .= @views estim.Z̃[(nx̃+nx̂+1):(nx̃+nX̂)]
     Z̃s[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)] .= @views estim.Z̃[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)]
     # --- process noise estimates Ŵ ---
-    Z̃s[(nx̃+nX̂+1):end] = estim.Ŵ
+    Z̃s[(nx̃+nX̂+1):(nx̃+nX̂+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nX̂+nŵ+1):(nx̃+nX̂+nŴ)]
+    Z̃s[(nx̃+nX̂+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
-    V̂, X̂0 = estim.buffer.V̂, estim.buffer.X̂
+    V̂, Ŵ, X̂0 = estim.buffer.V̂, estim.buffer.Ŵ, estim.buffer.X̂
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
-    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, estim.Ŵ, Z̃s)
-    Js = obj_nonlinprog(estim, model, x̄, V̂, estim.Ŵ, Z̃s)
+    getŴ!(Ŵ, estim, transcription, Z̃s)
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, Ŵ, Z̃s)
+    Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+nX̂+1:end] .= 0
     end
