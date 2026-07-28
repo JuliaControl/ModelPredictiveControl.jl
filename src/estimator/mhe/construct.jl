@@ -1,9 +1,9 @@
-const DEFAULT_MHE_TRANSCRIPTION   = SingleShooting()
-const DEFAULT_LINMHE_OPTIMIZER    = OSQP.MathOptInterfaceOSQP.Optimizer
-const DEFAULT_NONLINMHE_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
-const DEFAULT_NONLINMHE_GRADIENT  = AutoForwardDiff()
-const DEFAULT_NONLINMHE_JACOBIAN  = AutoForwardDiff()
-const DEFAULT_NONLINMHE_HESSIAN   = AutoForwardDiff()
+const DEFAULT_MHE_TRANSCRIPTION = SingleShooting()
+const DEFAULT_NONLINMHE_HESSIAN = AutoSparse(
+    AutoForwardDiff();
+    sparsity_detector=TracerSparsityDetector(),
+    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
+)
 
 @doc raw"""
 Include all the data for the constraints of [`MovingHorizonEstimator`](@ref).
@@ -333,8 +333,8 @@ at each time step for the optimization.
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
 - `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
    function when `model` is not a [`LinModel`](@ref), see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
-- `jacobian=AutoForwardDiff()` : an `AbstractADType` backend for the Jacobian of the
-   constraints when `model` is not a [`LinModel`](@ref), see `gradient` above for the options.
+- `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
+   of the nonlinear constraints, see `gradient` above for the options (default in Extended Help).
 - `hessian=false` : an `AbstractADType` backend for the Hessian of the Lagrangian, see 
    `gradient` above for the options. The default `false` skip it and use the quasi-Newton
    method of `optim` (see Extended Help).
@@ -536,8 +536,8 @@ function MovingHorizonEstimator(
     p = model.p,
     transcription::ShootingMethod = DEFAULT_MHE_TRANSCRIPTION,
     optim::JM = default_optim_mhe(model, nc),
-    gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
-    jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
+    gradient::AbstractADType = DEFAULT_GRADIENT,
+    jacobian::AbstractADType = default_jacobian(transcription),
     hessian::Union{AbstractADType, Bool, Nothing} = false,
     covestim::Union{StateEstimator, Nothing} = nothing,
     direct = true,
@@ -589,8 +589,8 @@ function MovingHorizonEstimator(
     p = model.p,
     transcription::ShootingMethod = DEFAULT_MHE_TRANSCRIPTION,
     optim::JM = default_optim_mhe(model, nc),
-    gradient::AbstractADType = DEFAULT_NONLINMHE_GRADIENT,
-    jacobian::AbstractADType = DEFAULT_NONLINMHE_JACOBIAN,
+    gradient::AbstractADType = DEFAULT_GRADIENT,
+    jacobian::AbstractADType = default_jacobian(transcription),
     hessian::Union{AbstractADType, Bool, Nothing} = false,
     covestim::Union{StateEstimator, Nothing} = nothing,
     direct = true,
@@ -622,9 +622,9 @@ end
 "Default optimizer for MHE, depending on the model and the number of custom NL constraints."
 function default_optim_mhe(model::SimModel, nc)
     if model isa LinModel && iszero(nc)
-        return JuMP.Model(DEFAULT_LINMHE_OPTIMIZER, add_bridges=true)
+        return JuMP.Model(DEFAULT_QP_OPTIMIZER, add_bridges=true)
     else
-        return JuMP.Model(DEFAULT_NONLINMHE_OPTIMIZER, add_bridges=false)
+        return JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false)
     end
 end
 

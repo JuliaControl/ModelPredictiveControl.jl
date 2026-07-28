@@ -953,7 +953,7 @@ end
 function setmodel_estimator!(
     estim::MovingHorizonEstimator, model, uop_old, yop_old, dop_old, Q̂, R̂
 )
-    con = estim.con
+    transcription, con = estim.transcription, estim.con
     nx̂, nym, nu, nd, He, nε = estim.nx̂, estim.nym, model.nu, model.nd, estim.He, estim.nε
     nŵ = nx̂
     As, Cs_u, Cs_y = estim.As, estim.Cs_u, estim.Cs_y
@@ -1019,9 +1019,9 @@ function setmodel_estimator!(
         con.A_V̂max
     ]
     Z̃min, Z̃max = init_boxconstraint_mhe(
-        model, He, nx̂, nŵ, nε,
-        con.x̂0min,  con.x̂0max,  con.Ŵmin,   con.Ŵmax, 
-        con.A_x̂min, con.A_x̂max, con.A_Ŵmin, con.A_Ŵmax 
+        model, transcription, He, nx̂, nŵ, nε,
+        con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max,  con.Ŵmin,   con.Ŵmax, 
+        con.A_x̂min, con.A_x̂max, con.C_x̂min, con.C_x̂max, con.A_Ŵmin, con.A_Ŵmax 
     )
     con.Z̃min .= Z̃min
     con.Z̃max .= Z̃max

@@ -705,7 +705,8 @@ function linconstrainteq!(
     end
     return nothing
 end
-linconstrainteq!(::MovingHorizonEstimator, ::LinModel, ::SingleShooting) = nothing
+"No linear equality constraints for all cases of [`SingleShooting`](@ref)."
+linconstrainteq!(::MovingHorizonEstimator, ::SimModel, ::SingleShooting) = nothing
 
 
 

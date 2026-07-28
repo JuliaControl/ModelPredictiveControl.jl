@@ -1,4 +1,3 @@
-const DEFAULT_LINMPC_OPTIMIZER = OSQP.MathOptInterfaceOSQP.Optimizer
 const DEFAULT_LINMPC_TRANSCRIPTION = SingleShooting()
 
 struct LinMPC{
@@ -243,7 +242,7 @@ function LinMPC(
     Wr = nothing,
     Cwt = DEFAULT_CWT,
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
-    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=true),
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_QP_OPTIMIZER, add_bridges=true),
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
@@ -302,7 +301,7 @@ function LinMPC(
     Wr = nothing,
     Cwt  = DEFAULT_CWT,
     transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
-    optim::JM = JuMP.Model(DEFAULT_LINMPC_OPTIMIZER, add_bridges=true)
+    optim::JM = JuMP.Model(DEFAULT_QP_OPTIMIZER, add_bridges=true)
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
     isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 
     nk = estimate_delays(estim.model)

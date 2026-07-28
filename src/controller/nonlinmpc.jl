@@ -1,13 +1,9 @@
 const DEFAULT_NONLINMPC_TRANSCRIPTION = SingleShooting()
-const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
-const DEFAULT_NONLINMPC_GRADIENT  = AutoForwardDiff()
-const DEFAULT_NONLINMPC_JACDENSE  = AutoForwardDiff()
-const DEFAULT_NONLINMPC_JACSPARSE = AutoSparse(
+const DEFAULT_NONLINMPC_HESSIAN = AutoSparse(
     AutoForwardDiff();
     sparsity_detector=TracerSparsityDetector(),
     coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
 )
-const DEFAULT_NONLINMPC_HESSIAN = DEFAULT_NONLINMPC_JACSPARSE
 
 struct NonLinMPC{
     NT<:Real,
@@ -364,8 +360,8 @@ function NonLinMPC(
     nc::Int = 0,
     p = model.p,
     transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
-    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
-    gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
+    gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
     hessian::Union{AbstractADType, Bool, Nothing} = false,
     kwargs...
@@ -440,8 +436,8 @@ function NonLinMPC(
     nc = 0,
     p = estim.model.p,
     transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
-    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
-    gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
+    gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
     hessian::Union{AbstractADType, Bool, Nothing} = false
 ) where {
@@ -464,9 +460,6 @@ function NonLinMPC(
         transcription, optim, gradient, jacobian, hessian
     )
 end
-
-default_jacobian(::SingleShooting)      = DEFAULT_NONLINMPC_JACDENSE
-default_jacobian(::TranscriptionMethod) = DEFAULT_NONLINMPC_JACSPARSE
 
 """
     validate_JE(NT, JE) -> nothing
