@@ -1105,6 +1105,7 @@ function set_warmstart_mpc!(mpc::PredictiveController, ::TranscriptionMethod, Z�
     return Z̃s
 end
 
+"Get the input increments `ΔŨ` augmented with the slack `ϵ` from the decision vector `Z̃`."
 getΔŨ!(ΔŨ, ::PredictiveController, ::SingleShooting, Z̃) = (ΔŨ .= Z̃)
 function getΔŨ!(ΔŨ, mpc::PredictiveController, ::TranscriptionMethod, Z̃)
     # avoid explicit matrix multiplication with mpc.P̃Δu for performance:
@@ -1113,6 +1114,8 @@ function getΔŨ!(ΔŨ, mpc::PredictiveController, ::TranscriptionMethod, Z̃)
     mpc.nϵ == 1 && (ΔŨ[end] = Z̃[end])
     return ΔŨ
 end
+
+"Get the manipulated input `U0` from the decision vector `Z̃`."
 getU0!(U0, mpc::PredictiveController, Z̃) = (mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_lastu0)
 
 @doc raw"""

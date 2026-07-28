@@ -2,28 +2,6 @@
 get_nZ_mhe(::SingleShooting, He, nx̂, nŵ) = nx̂ + nŵ*He
 get_nZ_mhe(::TranscriptionMethod, He, nx̂, nŵ) = nx̂ + nx̂*He + nŵ*He
 
-function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
-    He, nx̂, nŵ, Nk = estim.He, estim.nx̂, estim.nx̂, estim.Nk[]
-    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
-    Ŵ[1:nŵ*Nk] = @views Z̃[(nZ̃ - nŵ*He + 1):(nZ̃ - nŵ*He + nŵ*Nk)] 
-    return Ŵ
-end
-
-"Fill the unused decision variables in `Z̃` with `0`s (only when `Nk < He`)."
-function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::SingleShooting)
-    nŵ, nx̂, Nk =  estim.nx̂, estim.nx̂, estim.Nk[]
-    nx̃ = estim.nε + nx̂
-    Z̃[(nx̃ + nŵ*Nk + 1):end] .= 0 # unused decision variables after Ŵ vector
-    return nothing
-end
-function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::TranscriptionMethod)
-    nŵ, nx̂, He, Nk =  estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
-    nx̃ = estim.nε + nx̂
-    Z̃[(nx̃ + nx̂*Nk + 1):(nx̃ + nx̂*He)] .= 0 # unused decision variables after X̂0 vector
-    Z̃[(nx̃ + nx̂*He + nŵ*Nk + 1):end]  .= 0 # unused decision variables after Ŵ vector
-    return nothing
-end
-
 @doc raw"""
     init_predmat_mhe(
         model::LinModel, transcription::SingleShooting,
@@ -777,4 +755,27 @@ function set_warmstart_mhe!(
     Z̃s[nx̃+nX̂+nŵ*Nk+1:end] .= 1
     JuMP.set_start_value.(Z̃var, Z̃s)
     return Z̃s
+end
+
+"Get the estimated process noise from the decision vector `Z̃`."
+function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
+    He, nx̂, nŵ, Nk = estim.He, estim.nx̂, estim.nx̂, estim.Nk[]
+    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
+    Ŵ[1:nŵ*Nk] .= @views Z̃[(nZ̃ - nŵ*He + 1):(nZ̃ - nŵ*He + nŵ*Nk)] 
+    return Ŵ
+end
+
+"Fill the unused decision variables in `Z̃` with `0`s (only when `Nk < He`)."
+function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::SingleShooting)
+    nŵ, nx̂, Nk =  estim.nx̂, estim.nx̂, estim.Nk[]
+    nx̃ = estim.nε + nx̂
+    Z̃[(nx̃ + nŵ*Nk + 1):end] .= 0 # unused decision variables after Ŵ vector
+    return nothing
+end
+function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::TranscriptionMethod)
+    nŵ, nx̂, He, Nk =  estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
+    nx̃ = estim.nε + nx̂
+    Z̃[(nx̃ + nx̂*Nk + 1):(nx̃ + nx̂*He)] .= 0 # unused decision variables after X̂0 vector
+    Z̃[(nx̃ + nx̂*He + nŵ*Nk + 1):end]  .= 0 # unused decision variables after Ŵ vector
+    return nothing
 end
