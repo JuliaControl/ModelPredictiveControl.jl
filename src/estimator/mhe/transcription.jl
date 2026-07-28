@@ -674,7 +674,7 @@ end
 TBW
 """
 function linconstrainteq!(
-    estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod
+    estim::MovingHorizonEstimator, model::LinModel, ::MultipleShooting
 )
     optim = estim.optim
     ẼS, FS, GS, JS, BS, Aeq, beq, Z̃var = trunc_defectmat(estim)
