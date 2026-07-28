@@ -421,7 +421,7 @@ function init_matconstraint_mhe(
     deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, transcription, Z̃min, Z̃max)
     i_b = [i_x̂min; i_x̂max; i_Ŵmin; i_Ŵmax]
     i_g = [i_X̂min; i_X̂max; i_V̂min; i_V̂max; trues(nc)]
-    return i_b, i_g, i_g, A, Aeq, neq
+    return i_b, i_g, A, Aeq, neq
 end
 
 "Init `i_b, A` without sensor noise constraints if `NonLinModel` and other `TranscriptionMethod`."
@@ -448,7 +448,7 @@ function init_matconstraint_mhe(
     deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, transcription, Z̃min, Z̃max)
     i_b = [i_x̂min; i_x̂max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax]
     i_g = [i_V̂min; i_V̂max; trues(nc)]
-    return i_b, i_g, i_g, A, Aeq, neq
+    return i_b, i_g, A, Aeq, neq
 end
 
 "Modify `Z̃min` and `Z̃max` in-place to include state estimate constraints if applicable."
