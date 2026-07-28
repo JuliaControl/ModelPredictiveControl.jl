@@ -534,10 +534,10 @@ end
 @doc raw"""
     getstate!(estim::MovingHorizonEstimator, Z̃)
 
-Get current or next state estimate `x̂0corrORnext` from the solution `Z̃` and store it.
+Get current or next state estimate from the solution `Z̃` and store it.
 
-It extract and store in `estim.x̂0` the current corrected state if `estim.direct`, or the
-next one otherwise.
+It extracts and stores at `estim.x̂0` the current corrected state if `estim.direct == true`, 
+otherwise the state is for the next time step.
 """
 function getstate!(estim::MovingHorizonEstimator, Z̃)
     buffer, nx̂, Nk = estim.buffer, estim.nx̂, estim.Nk[]
@@ -546,8 +546,7 @@ function getstate!(estim::MovingHorizonEstimator, Z̃)
     getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
     getarrival!(x̂0arr, estim, Z̃)
     predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, estim.model, x̂0arr, Ŵ, Z̃)
-    x̂0corrORnext = @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
-    estim.x̂0 .= x̂0corrORnext
+    estim.x̂0 .= @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     return nothing
 end
 

@@ -957,13 +957,13 @@ function setconstraint!(
     end
     Z̃min, Z̃max = init_boxconstraint_mhe(
         model, transcription, He, nx̂, nŵ, nε,
-        con.x̂0min,  con.x̂0max,  con.Ŵmin,   con.Ŵmax, 
-        con.A_x̂min, con.A_x̂max, con.A_Ŵmin, con.A_Ŵmax 
+        con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max,  con.Ŵmin,   con.Ŵmax, 
+        con.A_x̂min, con.A_x̂max, con.C_x̂min, con.C_x̂max, con.A_Ŵmin, con.A_Ŵmax 
     )
     Z̃var = optim[:Z̃var]
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(
-            model, transcription, Z̃min, Z̃max, con.nc,
+            model, transcription, Z̃min, Z̃max, con.nc, nε,
             con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, 
             con.Ŵmin,   con.Ŵmax,   con.V̂min,   con.V̂max,
             con.A_x̂min, con.A_x̂max, con.A_X̂min, con.A_X̂max, 
@@ -985,7 +985,7 @@ function setconstraint!(
         reset_nonlincon!(estim, model)
     else
         i_b, i_g = init_matconstraint_mhe(
-            model, transcription, Z̃min, Z̃max, con.nc, 
+            model, transcription, Z̃min, Z̃max, con.nc, nε,
             con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, 
             con.Ŵmin,   con.Ŵmax,   con.V̂min,   con.V̂max
         )
@@ -1013,23 +1013,6 @@ Re-construct nonlinear constraints and add them to `estim.optim`.
 function reset_nonlincon!(estim::MovingHorizonEstimator, model::NonLinModel)
     g_oracle = get_nonlincon_oracle(estim, estim.optim)
     set_nonlincon!(estim, estim.optim, g_oracle)
-end
-
-"Unset `i_x̂min` and `i_x̂min` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deletex̂arr_lincon!(i_x̂min, i_x̂max, ::SimModel, Z̃min, Z̃max, nε)
-    nx̂ = length(i_x̂min)
-    x̂0min, x̂0max = @views Z̃min[(nε+1):(nε+nx̂)], @views Z̃max[(nε+1):(nε+nx̂)]
-    foreach(i -> !isinf(x̂0min[i]) && (i_x̂min[i] = false), eachindex(i_x̂min))
-    foreach(i -> !isinf(x̂0max[i]) && (i_x̂max[i] = false), eachindex(i_x̂max))
-    return i_x̂min, i_x̂max
-end
-    
-"Unset `i_Ŵmin` and `i_Ŵmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModel, Z̃min, Z̃max, nx̂, nε)
-    Ŵmin, Ŵmax = @views Z̃min[nε+nx̂+1:end], Z̃max[nε+nx̂+1:end]
-    foreach(i -> !isinf(Ŵmin[i]) && (i_Ŵmin[i] = false), eachindex(i_Ŵmin))
-    foreach(i -> !isinf(Ŵmax[i]) && (i_Ŵmax[i] = false), eachindex(i_Ŵmax))
-    return i_Ŵmin, i_Ŵmax
 end
 
 @doc raw"""
@@ -1095,10 +1078,11 @@ function init_defaultcon_mhe(
     Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
     Z̃min, Z̃max = init_boxconstraint_mhe(
         model, transcription, He, nx̂, nŵ, nε,
-        x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmax
+        x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
+        A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
     )
     i_b, i_g, A, Aeq, neq = init_matconstraint_mhe(
-        model, transcription, Z̃min, Z̃max, nc,
+        model, transcription, Z̃min, Z̃max, nc, nε,
         x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
         A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq
     )
@@ -1263,15 +1247,16 @@ end
 """
     init_boxconstraint_mhe(
         model::SimModel, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
-        x̂0min, x̂0max, Ŵmin, Ŵmax, 
-        A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmin 
+        x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
+        A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
     ) -> Z̃min, Z̃max
 
 Init the decision variable box constraints `Z̃min` and `Z̃max` for [`MovingHorizonEstimator`](@ref).
 """
 function init_boxconstraint_mhe(
     ::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
-    x̂0min, x̂0max, Ŵmin, Ŵmax, A_x̂min, A_x̂max, A_Ŵmin, A_Ŵmax
+    x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
+    A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
     nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
     Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
@@ -1300,6 +1285,9 @@ function init_boxconstraint_mhe(
         Z̃min[nZ̃-nŴ+1:end] .= Ŵmin
         Z̃max[nZ̃-nŴ+1:end] .= Ŵmax
     end
+    Z̃min, Z̃max = boxconstraint_states!(
+        Z̃min, Z̃max, transcription, nx̂, nε, X̂0min, X̂0max, C_x̂min, C_x̂max
+    )
     return Z̃min, Z̃max
 end
 

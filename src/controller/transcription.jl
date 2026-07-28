@@ -706,7 +706,7 @@ function init_matconstraint_mpc(
     return i_b, i_g, A, Aeq, neq
 end
 
-"Init `i_b` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
+"Init `i_b, A` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
 function init_matconstraint_mpc(
     model::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc, nϵ,
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
@@ -732,7 +732,7 @@ function init_matconstraint_mpc(
     return i_b, i_g, A, Aeq, neq
 end
 
-"Init `i_b` without output constraints if `NonLinModel` and other `TranscriptionMethod`."
+"Init `i_b, A` without output constraints if `NonLinModel` and other `TranscriptionMethod`."
 function init_matconstraint_mpc(
     model::NonLinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
@@ -776,8 +776,8 @@ function boxconstraint_terminal!(
             iszero(n_C_x̂max[i]) && (Z̃max[i_base + i] = x̂0max[i])
         end
     else
-        Z̃min[i_base+1:i_base+nx̂] .= x̂0min
-        Z̃max[i_base+1:i_base+nx̂] .= x̂0max
+        Z̃min[(i_base+1):(i_base+nx̂)] .= x̂0min
+        Z̃max[(i_base+1):(i_base+nx̂)] .= x̂0max
     end
     return Z̃min, Z̃max
 end
