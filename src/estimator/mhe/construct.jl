@@ -482,6 +482,36 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
       for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
       estimates the arrival covariance by default.
 
+    Two exceptions about AD: if `transcription` is not a [`SingleShooting`](@ref), the 
+    `jacobian` argument and the `hessian=true` option default to this sparse backend:
+    ```julia
+    AutoSparse(
+        AutoForwardDiff(); 
+        sparsity_detector  = TracerSparsityDetector(), 
+        coloring_algorithm = GreedyColoringAlgorithm(
+            (
+                NaturalOrder(),
+                LargestFirst(),
+                SmallestLast(),
+                IncidenceDegree(),
+                DynamicLargestFirst(),
+                RandomOrder(StableRNG(0), 0)
+            ), 
+        postprocessing = true
+        )
+    )
+    ```
+    that is, it will test many coloring orders at preparation and keep the best. The
+    argument `covestim` customizes the arrival covariance estimator. The supported types are
+    [`SteadyKalmanFilter`](@ref), [`KalmanFilter`](@ref), [`UnscentedKalmanFilter`](@ref)
+    and [`ExtendedKalmanFilter`](@ref). A constant arrival covariance is supported using
+    the [`SteadyKalmanFilter`](@ref). The constant is fixed by `σP_0`, `σPint_ym_0` and
+    `σPint_u_0` arguments. If `isnothing(σP_0)`, it is fixed at `covestim.cov.P̂`, which is
+    the steady-state value ``\mathbf{P̂}(∞)`` for the [`SteadyKalmanFilter`](@ref). For
+    [`NonLinModel`](@ref) with constant arrival covariance, construct a [`SteadyKalmanFilter`](@ref)
+    with an arbitrary [`LinModel`](@ref), as long as the number of estimated states `nx̂`
+    matches the MHE.
+
     Note that if `Cwt≠Inf`, the attribute `nlp_scaling_max_gradient` of `Ipopt` is set to 
     `10/Cwt` (if not already set), to scale the small values of ``ε``. Use the second
     constructor to specify the arrival covariance estimation method.
