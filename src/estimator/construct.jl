@@ -7,6 +7,7 @@ struct StateEstimatorBuffer{NT<:Real}
     V̂ ::Vector{NT}
     Ŵ ::Vector{NT}
     X̂ ::Vector{NT}
+    Ŷ ::Vector{NT}
     P̂ ::Matrix{NT}
     Q̂ ::Matrix{NT}
     R̂ ::Matrix{NT}
@@ -34,9 +35,7 @@ function StateEstimatorBuffer{NT}(
     transcription::TranscriptionMethod = SingleShooting()
 ) where NT <: Real
     nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
-    nŴ = nŵ*He
-    nV̂ = nym*He
-    nX̂ = nx̂*He
+    nV̂, nŴ, nX̂, nŶ = nym*He, nŵ*He, nx̂*He, ny*He
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)
     k  = Vector{NT}(undef, nk)
@@ -45,6 +44,7 @@ function StateEstimatorBuffer{NT}(
     V̂  = Vector{NT}(undef, nV̂)
     Ŵ  = Vector{NT}(undef, nŴ)
     X̂  = Vector{NT}(undef, nX̂)
+    Ŷ  = Vector{NT}(undef, nŶ)
     P̂  = Matrix{NT}(undef, nx̂, nx̂)
     Q̂  = Matrix{NT}(undef, nx̂, nx̂)
     R̂  = Matrix{NT}(undef, nym, nym)
@@ -53,7 +53,7 @@ function StateEstimatorBuffer{NT}(
     ŷ  = Vector{NT}(undef, ny)
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
-    return StateEstimatorBuffer{NT}(u, û, k, x̂, Z̃, V̂, Ŵ, X̂, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty)
+    return StateEstimatorBuffer{NT}(u, û, k, x̂, Z̃, V̂, Ŵ, X̂, Ŷ, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty)
 end
 
 "Include all the covariance matrices for the Kalman filters and moving horizon estimator."

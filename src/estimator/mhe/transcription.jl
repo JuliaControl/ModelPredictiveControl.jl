@@ -795,10 +795,10 @@ function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::SingleShooting, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
+    nu, nk = model.nu, model.nk
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ = nε + nx̂, nŵ*He
     Z̃s = estim.buffer.Z̃
-    û0, ŷ0, x̄, k = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
     # --- arrival state estimate x̂0arr ---
@@ -807,10 +807,13 @@ function set_warmstart_mhe!(
     Z̃s[(nx̃+1):(nx̃+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nŵ+1):(nx̃+nŴ)]
     Z̃s[(nx̃+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
-    V̂, Ŵ, X̂0 = estim.buffer.V̂, estim.buffer.Ŵ, estim.buffer.X̂
+    x̄ = buffer.x̂
+    V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
+    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk) # TODO: remove the 2 allocations
+    x̂0arr = estim.x̂0arr_old
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s) 
-    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, transcription, estim.x̂0arr_old, Ŵ, Z̃s)
+    predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃s)
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+1:end] .= 0
@@ -858,7 +861,8 @@ last control period ``k-1``, expressed as a deviation from the operating point
 function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::MultipleShooting, Z̃var
 ) where NT<:Real
-    model, buffer = estim.model, estim.buffer
+model, buffer = estim.model, estim.buffer
+    nu, nk = model.nu, model.nk
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂ = nε + nx̂, nŵ*He, nx̂*He
     Z̃s = estim.buffer.Z̃
@@ -874,10 +878,13 @@ function set_warmstart_mhe!(
     Z̃s[(nx̃+nX̂+1):(nx̃+nX̂+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nX̂+nŵ+1):(nx̃+nX̂+nŴ)]
     Z̃s[(nx̃+nX̂+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
-    V̂, Ŵ, X̂0 = estim.buffer.V̂, estim.buffer.Ŵ, estim.buffer.X̂
+    x̄ = buffer.x̂
+    V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
+    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk) # TODO: remove the 2 allocations
+    x̂0arr = estim.x̂0arr_old
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
-    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, transcription, estim.x̂0arr_old, Ŵ, Z̃s)
+    predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃s)
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+nX̂+1:end] .= 0

@@ -139,17 +139,17 @@ julia> round.(getinfo(estim)[:Ŷ], digits=3)
 """
 function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, buffer, Nk = estim.model, estim.buffer, estim.Nk[]
-    nu, ny, nd = model.nu, model.ny, model.nd
+    nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
     nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
     Z̃ = estim.Z̃
     info = Dict{Symbol, Any}()
-    V̂, Ŵ, X̂0 = buffer.V̂, buffer.Ŵ, buffer.X̂
-    x̂0arr, û0, k, ŷ0 = buffer.x̂, buffer.û, buffer.k, buffer.ŷ
-    x̄, Ŷ0 = Vector{NT}(undef, nx̂), Vector{NT}(undef, ny*Nk)
+    V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
+    x̂0arr = buffer.x̂
+    x̄, Û0, K = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk)
     x̂0arr = getarrival!(x̂0arr, estim, Z̃)
     Ŵ     = getŴ!(Ŵ, estim, Z̃)
     x̄     = getx̄!(x̄, estim, x̂0arr)
-    V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
+    V̂, X̂0 = predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃)
     Ŷ0    = predict_outputs_mhe!(Ŷ0, estim, X̂0, x̂0arr)
     J     = obj_nonlinprog(estim, estim.model, x̄, V̂, Ŵ, Z̃)
     yopm  = model.yop[estim.i_ym]
@@ -212,24 +212,25 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(con.i_g), sum(con.i_g)
     nV̂, nX̂, nŴ = He*nym, He*nx̂, He*nx̂
+    nK, nU, nŶ = He*nk, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     x̂0arr, x̄  = zeros(NT, nx̂), zeros(NT, nx̂)
     Ŵ         = zeros(NT, nŴ)
     V̂, X̂0     = zeros(NT, nV̂),  zeros(NT, nX̂)
     Ŵe        = zeros(NT, nŴe)
     V̂e, X̂e    = zeros(NT, nV̂e), zeros(NT, nX̂e)
-    k         = zeros(NT, nk)
-    û0, ŷ0    = zeros(NT, nu), zeros(NT, nŷ)
+    K         = zeros(NT, nK)
+    Û0, Ŷ0    = zeros(NT, nU),  zeros(NT, nŶ)
     gc, g     = zeros(NT, nc), zeros(NT, ng) 
     gi        = zeros(NT, ngi)
     J_cache = (
         Cache(x̂0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-        Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
+        Cache(Û0), Cache(K), Cache(Ŷ0), Cache(gc), Cache(g),
     )
-    function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g)
-        update_predictions!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
+    function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g)
+        update_predictions!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, estim, Z̃)
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
     if !isnothing(hess)
@@ -246,10 +247,10 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
         Cache(x̂0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-        Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
+        Cache(Û0), Cache(K), Cache(Ŷ0), Cache(gc), Cache(g),
     )
-    function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g)
-        update_predictions!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
+    function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g)
+        update_predictions!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, estim, Z̃)
         gi .= @views g[i_g]
         return nothing
     end
@@ -275,10 +276,10 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
             Cache(x̂0arr), Cache(x̄), 
             Cache(Ŵ), Cache(V̂), Cache(X̂0), 
             Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-            Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g), Cache(gi)
+            Cache(Û0), Cache(K), Cache(Ŷ0), Cache(gc), Cache(g), Cache(gi)
         )
-        function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, gi)
-            update_predictions!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
+        function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, gi)
+            update_predictions!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, estim, Z̃)
             gi .= @views g[i_g]
             return dot(λi, gi)
         end
@@ -542,13 +543,15 @@ Get current or next state estimate from the solution `Z̃` and store it.
 It extracts and stores at `estim.x̂0` the current corrected state if `estim.direct == true`, 
 otherwise the state is for the next time step.
 """
-function getstate!(estim::MovingHorizonEstimator, Z̃)
-    buffer, nx̂, Nk = estim.buffer, estim.nx̂, estim.Nk[]
-    x̂0arr, û0, ŷ0, k = buffer.x̂, buffer.û, buffer.ŷ, buffer.k
-    V̂, Ŵ, X̂0  = buffer.V̂, buffer.Ŵ, buffer.X̂
+function getstate!(estim::MovingHorizonEstimator{NT}, Z̃) where NT<:Real
+    model, buffer = estim.model, estim.buffer
+    nu, nk, nx̂, Nk = model.nu, model.nk, estim.nx̂, estim.Nk[]
+    x̂0arr = buffer.x̂
+    V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
+    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk) # TODO: remove the 2 allocations
     getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
     getarrival!(x̂0arr, estim, Z̃)
-    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, estim.model, estim.transcription, x̂0arr, Ŵ, Z̃)
+    predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃)
     estim.x̂0 .= @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     return nothing
 end
