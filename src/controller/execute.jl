@@ -168,7 +168,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷs = similar(mpc.Yop)
     predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]    = Z̃[1:mpc.Hc*model.nu]
-    info[:ϵ]     = getϵ(mpc, Z̃)
+    info[:ϵ]     = getslack(mpc, Z̃)
     info[:J]     = J
     info[:U]     = U
     info[:u]     = info[:U][1:model.nu]
@@ -198,14 +198,14 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
 end
 
 @doc raw"""
-    getϵ(mpc::PredictiveController, Z̃orΔŨ) -> ϵ
+    getslack(mpc::PredictiveController, Z̃orΔŨ) -> ϵ
 
 Get the slack `ϵ` from `Z̃orΔŨ` if present, otherwise return 0.
 
 The argument `Z̃orΔŨ` can be the augmented decision vector ``\mathbf{Z̃}`` or the augmented
 input increment vector ``\mathbf{ΔŨ}``, it works with both.
 """
-function getϵ(mpc::PredictiveController, Z̃orΔŨ::AbstractVector{NT}) where NT<:Real
+function getslack(mpc::PredictiveController, Z̃orΔŨ::AbstractVector{NT}) where NT<:Real
     return mpc.nϵ > 0 ? Z̃orΔŨ[end] : zero(NT)
 end
 
@@ -472,7 +472,7 @@ function obj_nonlinprog!(
         JR̂u = dot(Ū, mpc.weights.L_Hp, Ū)
     end
     # --- economic term ---
-    ϵ = getϵ(mpc, ΔŨ)
+    ϵ = getslack(mpc, ΔŨ)
     E_JE = obj_econ(mpc, model, Ue, Ŷe, ϵ)
     return JR̂y + JΔŨ + JR̂u + E_JE
 end

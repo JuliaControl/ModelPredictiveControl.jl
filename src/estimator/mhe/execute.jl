@@ -143,12 +143,12 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
     Z̃ = estim.Z̃
     info = Dict{Symbol, Any}()
-    Ŷ0 = Vector{NT}(undef, ny*Nk)
     V̂, Ŵ, X̂0 = buffer.V̂, buffer.Ŵ, buffer.X̂
     x̂0arr, û0, k, ŷ0 = buffer.x̂, buffer.û, buffer.k, buffer.ŷ
+    x̄, Ŷ0 = Vector{NT}(undef, nx̂), Vector{NT}(undef, ny*Nk)
     x̂0arr = getarrival!(x̂0arr, estim, Z̃)
     Ŵ     = getŴ!(Ŵ, estim, Z̃)
-    x̄     = estim.x̂0arr_old - x̂0arr
+    x̄     = getx̄!(x̄, estim, x̂0arr)
     V̂, X̂0 = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, x̂0arr, Ŵ, Z̃)
     Ŷ0    = predict_outputs_mhe!(Ŷ0, estim, X̂0, x̂0arr)
     J     = obj_nonlinprog(estim, estim.model, x̄, V̂, Ŵ, Z̃)
@@ -165,7 +165,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     D[end-nd+1:end] .+= model.dop
     x̂arr            .+= estim.x̂op
     info[:Ŵ]  = Ŵ[1:nŵ*Nk]
-    info[:ε]  = getε(estim, Z̃)
+    info[:ε]  = getslack(estim, Z̃)
     info[:X̂]  = X̂[1:nx̂*Nk]
     info[:x̂]  = estim.x̂0 .+ estim.x̂op
     info[:V̂]  = V̂[1:nym*Nk]
@@ -229,7 +229,7 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
         Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
     )
     function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g)
-        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
+        update_predictions!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
     if !isnothing(hess)
@@ -249,7 +249,7 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
         Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g),
     )
     function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g)
-        update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
+        update_predictions!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
         gi .= @views g[i_g]
         return nothing
     end
@@ -278,7 +278,7 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
             Cache(û0), Cache(k), Cache(ŷ0), Cache(gc), Cache(g), Cache(gi)
         )
         function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, gi)
-            update_prediction!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
+            update_predictions!(x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim, Z̃)
             gi .= @views g[i_g]
             return dot(λi, gi)
         end
@@ -384,6 +384,9 @@ function getarrival!(x̂0arr, estim::MovingHorizonEstimator, Z̃)
     return x̂0arr .= @views Z̃[nx̃-estim.nx̂+1:nx̃]
 end
 
+"Get the estimation error at arrival from the estimated state at arrival `x̂0arr`."
+getx̄!(x̄, estim::MovingHorizonEstimator, x̂0arr) = (x̄ .= estim.x̂0arr_old .- x̂0arr)
+
 "Get the estimated process noise over the horizon from the decision vector `Z̃`."
 function getŴ!(Ŵ, estim::MovingHorizonEstimator, Z̃)
     nx̃ = estim.nε + estim.nx̂
@@ -391,11 +394,11 @@ function getŴ!(Ŵ, estim::MovingHorizonEstimator, Z̃)
 end
 
 """
-    getε(estim::MovingHorizonEstimator, Z̃) -> ε
+    getslack(estim::MovingHorizonEstimator, Z̃) -> ε
 
 Get the slack `ε` from the decision vector `Z̃` if present, otherwise return 0.
 """
-function getε(estim::MovingHorizonEstimator, Z̃::AbstractVector{NT}) where NT<:Real
+function getslack(estim::MovingHorizonEstimator, Z̃::AbstractVector{NT}) where NT<:Real
     return estim.nε > 0 ? Z̃[begin] : zero(NT)
 end
 
@@ -737,54 +740,50 @@ end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, û0, k, ŷ0, estim::MovingHorizonEstimator, model::SimModel, x̂0arr, Ŵ, _ 
+        V̂, X̂0, Û0, K, Ŷ0, estim::MovingHorizonEstimator, model::SimModel, x̂0arr, Ŵ, _ 
     ) -> V̂, X̂0
 
 Compute the vectors when `model` is *not* a [`LinModel`](@ref).
 
-The function mutates `V̂`, `X̂0`, `û0` and `ŷ0` vector arguments. The augmented model of
+The function mutates `V̂`, `X̂0`, `Û0`, `K` and `Ŷ0` vector arguments. The augmented model of
 [`f̂!`](@ref) and [`ĥ!`](@ref) is called recursively in a `for` loop from ``j=1`` to ``N_k``,
 and by adding the estimated process noise ``\mathbf{ŵ}``.
 """
 function predict_mhe!(
-    V̂, X̂0, û0, k, ŷ0, estim::MovingHorizonEstimator, model::SimModel, x̂0arr, Ŵ, _ 
+    V̂, X̂0, Û0, K, Ŷ0, estim::MovingHorizonEstimator, model::SimModel, x̂0arr, Ŵ, _ 
 )
-    nu, nd, nx̂, nŵ, nym, Nk = model.nu, model.nd, estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
+    nu, nd, ny, nk = model.nu, model.nd, model.ny, model.nk
+    nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
+    p = estim.direct ? 0 : 1
     x̂0 = @views x̂0arr[1:nx̂]
-    if Nk < estim.He
-        V̂  .= 0 # fill unused values with 0s for tracer sparsity detection
-        X̂0 .= 0
-    end
-    if estim.direct     # p = 0
-        ŷ0next = ŷ0
-        d0 = @views estim.D0[1:nd]
-        for j=1:Nk
-            u0  = @views estim.U0[ (1 + nu  * (j-1)):(nu*j)]
-            ŵ   = @views Ŵ[(1 + nŵ*(j-1)):(nŵ*j)]
-            x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
-            f̂!(x̂0next, û0, k, estim, model, x̂0, u0, d0)
-            x̂0next .+= ŵ
-            y0nextm = @views estim.Y0m[(1 + nym * (j-1)):(nym*j)]
-            d0next  = @views estim.D0[(1 + nd*j):(nd*(j+1))]
+    for j=1:Nk
+        u0      = @views  estim.U0[(1+nu*(j-1)):(nu*j)]
+        d0      = @views  estim.D0[(1+nd*(j+p-1)):(nd*(j+p))]
+        ŵ       = @views         Ŵ[(1+nŵ*(j-1)):(nŵ*j)]
+        k       = @views         K[(1+nk*(j-1)):(nk*j)]
+        û0      = @views        Û0[(1+nu*(j-1)):(nu*j)]
+        x̂0next  = @views        X̂0[(1+nx̂*(j-1)):(nx̂*j)]
+        f̂!(x̂0next, û0, k, estim, model, x̂0, u0, d0)
+        x̂0next .+= ŵ
+        if estim.direct
+            ŷ0next  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
+            y0nextm = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
+            v̂next   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
+            d0next  = @views  estim.D0[(1 + nd*j):(nd*(j+1))]
             ĥ!(ŷ0next, estim, model, x̂0next, d0next)
-            ŷ0nextm = @views ŷ0next[estim.i_ym]
-            V̂[(1 + nym*(j-1)):(nym*j)] .= y0nextm .- ŷ0nextm
-            x̂0, d0 = x̂0next, d0next
-        end        
-    else                # p = 1
-        for j=1:Nk
-            y0m = @views estim.Y0m[(1 + nym * (j-1)):(nym*j)]
-            u0  = @views estim.U0[ (1 + nu  * (j-1)):(nu*j)]
-            d0  = @views estim.D0[ (1 + nd*j):(nd*(j+1))] # 1st one is d(k-Nk), not used
-            ŵ   = @views Ŵ[(1 + nŵ*(j-1)):(nŵ*j)]
+            v̂next .= @views y0nextm .- ŷ0next[estim.i_ym]
+        else
+            ŷ0      = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
+            y0m     = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
+            v̂       = @views         V̂[(1 + nym*(j-1)):(nym*j)]
             ĥ!(ŷ0, estim, model, x̂0, d0)
-            ŷ0m = @views ŷ0[estim.i_ym]
-            V̂[(1 + nym*(j-1)):(nym*j)] .= y0m .- ŷ0m
-            x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
-            f̂!(x̂0next, û0, k, estim, model, x̂0, u0, d0)
-            x̂0next .+= ŵ
-            x̂0 = x̂0next
+            v̂ .= @views y0m .- ŷ0[estim.i_ym]
         end
+        x̂0 = x̂0next
+    end
+    if Nk < estim.He  # fill unused values with 0s for tracer sparsity detection:
+        V̂[nym*Nk+1:end] .= 0
+        X̂0[nx̂*Nk+1:end] .= 0
     end
     return V̂, X̂0
 end
@@ -818,7 +817,7 @@ end
 
 """
     update_predictions!(
-        x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, 
+        x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, 
         estim::MovingHorizonEstimator, Z̃
     ) -> nothing
 
@@ -826,17 +825,17 @@ Update in-place the vectors for the predictions of `estim` estimator at decision
 
 The method mutates all the arguments before `estim` argument.
 """
-function update_prediction!(
-    x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, û0, k, ŷ0, gc, g, estim::MovingHorizonEstimator, Z̃
+function update_predictions!(
+    x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, estim::MovingHorizonEstimator, Z̃
 )
     x̂0arr      = getarrival!(x̂0arr, estim, Z̃)
-    x̄         .= estim.x̂0arr_old .- x̂0arr
+    x̄          = getx̄!(x̄, estim, x̂0arr)
     Ŵ          = getŴ!(Ŵ, estim, Z̃)
-    V̂, X̂0      = predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, estim.model, x̂0arr, Ŵ, Z̃)
+    V̂, X̂0      = predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, estim.model, x̂0arr, Ŵ, Z̃)
     Ŵe, V̂e, X̂e = extended_vectors!(Ŵe, V̂e, X̂e, estim, Ŵ, V̂, X̂0, x̂0arr)
-    ε          = getε(estim, Z̃)
+    ε          = getslack(estim, Z̃)
     gc         = con_custom_mhe!(gc, estim, X̂e, V̂e, Ŵe, x̄, ε) 
-    g          = con_nonlinprog_mhe!(g, estim, estim.model, X̂0, V̂, gc, ε)
+    g          = con_nonlinprog_mhe!(g, estim, estim.model, estim.transcription, X̂0, V̂, gc, ε)
     return nothing
 end
 
