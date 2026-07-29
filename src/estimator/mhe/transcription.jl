@@ -810,7 +810,7 @@ function set_warmstart_mhe!(
     V̂, Ŵ, X̂0 = estim.buffer.V̂, estim.buffer.Ŵ, estim.buffer.X̂
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s) 
-    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, Ŵ, Z̃s)
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, transcription, estim.x̂0arr_old, Ŵ, Z̃s)
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+1:end] .= 0
@@ -877,7 +877,7 @@ function set_warmstart_mhe!(
     V̂, Ŵ, X̂0 = estim.buffer.V̂, estim.buffer.Ŵ, estim.buffer.X̂
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
-    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, estim.x̂0arr_old, Ŵ, Z̃s)
+    predict_mhe!(V̂, X̂0, û0, k, ŷ0, estim, model, transcription, estim.x̂0arr_old, Ŵ, Z̃s)
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+nX̂+1:end] .= 0
@@ -912,6 +912,97 @@ function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::TranscriptionMethod)
     Z̃[(nx̃ + nx̂*Nk + 1):(nx̃ + nx̂*He)] .= 0 # unused decision variables after X̂0 vector
     Z̃[(nx̃ + nx̂*He + nŵ*Nk + 1):end]  .= 0 # unused decision variables after Ŵ vector
     return nothing
+end
+
+@doc raw"""
+    predict_mhe!(
+        V̂, X̂0, _, _, _, estim::MovingHorizonEstimator, model::LinModel, _ , _ , Z̃
+    ) -> V̂, X̂0
+
+Compute the `V̂` vector and `X̂0` vectors for the `MovingHorizonEstimator` and `LinModel`.
+
+The function mutates `V̂` and `X̂0` vector arguments. The vector `V̂` is the estimated sensor
+noises from ``k-N_k+1`` to ``k``. The `X̂0` vector is estimated states from ``k-N_k+2`` to 
+``k+1``. The computations are (by truncating the matrices when `N_k < H_e`):
+```math
+\begin{aligned}
+\mathbf{V̂}   &= \mathbf{Ẽ Z̃}   + \mathbf{F}     \\
+\mathbf{X̂_0} &= \mathbf{Ẽ_x̂ Z̃} + \mathbf{F_x̂}
+\end{aligned}
+```
+"""
+function predict_mhe!(
+    V̂, X̂0, _ , _ , _ , estim::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod, _ , _ , Z̃
+)
+    nε, Nk = estim.nε, estim.Nk[]
+    if Nk < estim.He
+        # avoid views since allocations only when Nk < He and we want fast mul!:
+        nX̂, nŴ, nYm = estim.nx̂*Nk, estim.nx̂*Nk, estim.nym*Nk
+        nZ̃ = nε + estim.nx̂ + nŴ
+        Ẽ,  F  = estim.Ẽ[1:nYm, 1:nZ̃],     estim.F[1:nYm]
+        Ẽx̂, Fx̂ = estim.con.Ẽx̂[1:nX̂, 1:nZ̃], estim.con.Fx̂[1:nX̂]
+        Z̃ = Z̃[1:nZ̃]
+        V̂_res, X̂0_res = @views V̂[1:nYm], X̂0[1:nX̂]
+    else
+        Ẽ, F = estim.Ẽ, estim.F
+        Ẽx̂, Fx̂ = estim.con.Ẽx̂, estim.con.Fx̂
+        V̂_res, X̂0_res = V̂, X̂0
+    end
+    V̂_res  .= mul!(V̂_res, Ẽ, Z̃) .+ F
+    X̂0_res .= mul!(X̂0_res, Ẽx̂, Z̃) .+ Fx̂
+    return V̂, X̂0
+end
+
+@doc raw"""
+    predict_mhe!(
+        V̂, X̂0, Û0, K, Ŷ0, 
+        estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, x̂0arr, Ŵ, _ 
+    ) -> V̂, X̂0
+
+Compute the vectors when `model` is a [`NonLinModel`](@ref) with [`SingleShooting`](@ref).
+
+The function mutates `V̂`, `X̂0`, `Û0`, `K` and `Ŷ0` vector arguments. The augmented model of
+[`f̂!`](@ref) and [`ĥ!`](@ref) is called recursively in a `for` loop from ``j=1`` to ``N_k``,
+and by adding the estimated process noise ``\mathbf{ŵ}``.
+"""
+function predict_mhe!(
+    V̂, X̂0, Û0, K, Ŷ0, 
+    estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, x̂0arr, Ŵ, _ 
+)
+    nu, nd, ny, nk = model.nu, model.nd, model.ny, model.nk
+    nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
+    p = estim.direct ? 0 : 1
+    x̂0 = @views x̂0arr[1:nx̂]
+    for j=1:Nk
+        u0      = @views  estim.U0[(1+nu*(j-1)):(nu*j)]
+        d0      = @views  estim.D0[(1+nd*(j+p-1)):(nd*(j+p))]
+        ŵ       = @views         Ŵ[(1+nŵ*(j-1)):(nŵ*j)]
+        k       = @views         K[(1+nk*(j-1)):(nk*j)]
+        û0      = @views        Û0[(1+nu*(j-1)):(nu*j)]
+        x̂0next  = @views        X̂0[(1+nx̂*(j-1)):(nx̂*j)]
+        f̂!(x̂0next, û0, k, estim, model, x̂0, u0, d0)
+        x̂0next .+= ŵ
+        if estim.direct
+            ŷ0next  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
+            y0nextm = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
+            v̂next   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
+            d0next  = @views  estim.D0[(1 + nd*j):(nd*(j+1))]
+            ĥ!(ŷ0next, estim, model, x̂0next, d0next)
+            v̂next .= @views y0nextm .- ŷ0next[estim.i_ym]
+        else
+            ŷ0      = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
+            y0m     = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
+            v̂       = @views         V̂[(1 + nym*(j-1)):(nym*j)]
+            ĥ!(ŷ0, estim, model, x̂0, d0)
+            v̂ .= @views y0m .- ŷ0[estim.i_ym]
+        end
+        x̂0 = x̂0next
+    end
+    if Nk < estim.He  # fill unused values with 0s for tracer sparsity detection:
+        V̂[nym*Nk+1:end] .= 0
+        X̂0[nx̂*Nk+1:end] .= 0
+    end
+    return V̂, X̂0
 end
 
 """
