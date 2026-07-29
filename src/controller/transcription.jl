@@ -1219,9 +1219,9 @@ function predict!(
     X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
     D̂0 = mpc.D̂0
     @threadsif h_threads for j=1:Hp
-        x̂0 = @views X̂0[(1 +  nx̂*(j-1)):(nx̂*j)]
-        d̂0 = @views D̂0[(1 +  nd*(j-1)):(nd*j)]
-        ŷ0 = @views Ŷ0[(1 +  ny*(j-1)):(ny*j)]
+        x̂0 = @views X̂0[(1+nx̂*(j-1)):(nx̂*j)]
+        d̂0 = @views D̂0[(1+nd*(j-1)):(nd*j)]
+        ŷ0 = @views Ŷ0[(1+ny*(j-1)):(ny*j)]
         ĥ!(ŷ0, mpc.estim, model, x̂0, d̂0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.

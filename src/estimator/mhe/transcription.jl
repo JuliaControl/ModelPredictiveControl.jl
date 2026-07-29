@@ -923,7 +923,9 @@ end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, _, _, _, estim::MovingHorizonEstimator, model::LinModel, _ , _ , Z̃
+        V̂, X̂0, _ , _ , _ , 
+        estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod, 
+        _ , _ , Z̃
     ) -> V̂, X̂0
 
 Compute the `V̂` vector and `X̂0` vectors for the `MovingHorizonEstimator` and `LinModel`.
@@ -939,7 +941,9 @@ noises from ``k-N_k+1`` to ``k``. The `X̂0` vector is estimated states from ``k
 ```
 """
 function predict_mhe!(
-    V̂, X̂0, _ , _ , _ , estim::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod, _ , _ , Z̃
+    V̂, X̂0, _ , _ , _ , 
+    estim::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod, 
+    _ , _ , Z̃
 )
     nε, Nk = estim.nε, estim.Nk[]
     if Nk < estim.He
@@ -963,7 +967,8 @@ end
 @doc raw"""
     predict_mhe!(
         V̂, X̂0, Û0, K, Ŷ0, 
-        estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, x̂0arr, Ŵ, _ 
+        estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
+        x̂0arr, Ŵ, _ 
     ) -> V̂, X̂0
 
 Compute the vectors when `model` is a [`NonLinModel`](@ref) with [`SingleShooting`](@ref).
@@ -974,7 +979,8 @@ and by adding the estimated process noise ``\mathbf{ŵ}``.
 """
 function predict_mhe!(
     V̂, X̂0, Û0, K, Ŷ0, 
-    estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, x̂0arr, Ŵ, _ 
+    estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
+    x̂0arr, Ŵ, _ 
 )
     nu, nd, ny, nk = model.nu, model.nd, model.ny, model.nk
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
@@ -1011,6 +1017,62 @@ function predict_mhe!(
     end
     return V̂, X̂0
 end
+
+@doc raw"""
+    predict_mhe!(
+        V̂, X̂0, _ , _ , Ŷ0, 
+        estim::MovingHorizonEstimator, model::NonLinModel, ::TranscriptionMethod, 
+        x̂0arr , _ , Z̃ 
+    ) -> V̂, X̂0
+
+Compute the vectors when `model` is a [`NonLinModel`](@ref) and other [`TreanscriptionMethod`](@ref).
+
+The function mutates `V̂`, `X̂0`, `Û0`, `K` and `Ŷ0` vector arguments. The augmented model of
+[`f̂!`](@ref) and [`ĥ!`](@ref) is called recursively in a `for` loop from ``j=1`` to ``N_k``,
+and by adding the estimated process noise ``\mathbf{ŵ}``.
+
+MPC: (TO MODIF)
+
+The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
+is called multiple times in a `for` loop:
+```math
+\mathbf{ŷ_0}(k+j) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k+j), \mathbf{d̂_0}(k+j) \Big)
+```
+for ``j = 1, 2, ... , H_p``, and in which ``\mathbf{x̂_0}`` is the augmented state extracted
+from the decision va
+
+
+"""
+function predict_mhe!(
+    V̂, X̂0, _ , _ , Ŷ0, 
+    estim::MovingHorizonEstimator, model::NonLinModel, transcription::TranscriptionMethod, 
+    x̂0arr, _ , Z̃ 
+)
+    nd, ny = model.nd, model.ny
+    nx̂, nε, nym, Nk = estim.nx̂, estim.nε, estim.nym, estim.Nk[]
+    nx̃ = nε + nx̂
+    h_threads = transcription.h_threads
+    X̂0[1:nx̂*Nk] .= @views Z̃[(nx̃+1):(nx̃+nx̂*Nk)]
+    @threadsif h_threads for j=1:Nk
+        if estim.direct
+            x̂0 = @views X̂0[(1+nx̂*(j-1)):(nx̂*j)]
+        else
+            x̂0 = @views j < 2 ? x̂0arr[1:nx̂] : X̂0[(1+nx̂*(j-2)):(nx̂*(j-1))]
+        end
+        d0  = @views estim.D0[(1+nd*j):(nd*(j+1))] # the 1st nd elements are not needed here
+        ŷ0  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
+        v̂   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
+        y0m = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
+        ĥ!(ŷ0, estim, model, x̂0, d0)
+        v̂ .= @views y0m .- ŷ0[estim.i_ym]
+    end
+    if Nk < estim.He  # fill unused values with 0s for tracer sparsity detection:
+        V̂[nym*Nk+1:end] .= 0
+        X̂0[nx̂*Nk+1:end] .= 0
+    end
+    return V̂, X̂0
+end
+
 
 """
     con_nonlinprog_mhe!(
