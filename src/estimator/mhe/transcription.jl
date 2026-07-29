@@ -1156,7 +1156,8 @@ end
 @doc raw"""
     con_nonlinprogeq_mhe!(
         geq, X̂0, Û0, K,
-        estim::MovingHorizonEstimator, model::NonLinModel, ::MultipleShooting, x̂0arr, Ŵ, Z̃
+        estim::MovingHorizonEstimator, model::NonLinModel, ::MultipleShooting, 
+        x̂0arr, Ŵ, Z̃
     ) -> geq
 
 Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
@@ -1172,7 +1173,8 @@ extracted from the decision variable `Z̃`. The function ``\mathbf{f̂}`` is def
 """
 function con_nonlinprogeq_mhe!(
     geq, X̂0, Û0, K,
-    estim::MovingHorizonEstimator, model::NonLinModel, ::MultipleShooting, x̂0arr, Ŵ, Z̃
+    estim::MovingHorizonEstimator, model::NonLinModel, transcription::MultipleShooting, 
+    x̂0arr, Ŵ, Z̃
 )
     nu, nd, nk = model.nu, model.nd, model.nk
     nε, nx̂, He = estim.nε, estim.nx̂, estim.He
