@@ -337,9 +337,12 @@ is stored in `estim.x̂0`).
 
 This function is needed for the collocation methods that directly call the state derivative 
 function `estim.model.f!` with the manipulated inputs augmented with the estimated 
-disturbances at model input (see [`init_estimstoch`](@ref)). It's also necessary to prefill
-the `Û0` vector before anything else since both `û0` and `û0next` are needed at each stage
-with hold order `h>0`, thus potential race conditions with multi-threading.
+disturbances at model input (see [`init_estimstoch`](@ref)). This is also needed for
+[`MultipleShooting`](@ref) since it calls the discrete-time update function of the
+deterministic model [`f!`](@ref) to treat the stochastic defects as linear equality
+constraints. Lastly, it's also necessary to prefill the `Û0` vector before anything else
+since both `û0` and `û0next` are needed at each stage with hold order `h>0`, thus potential
+race conditions with multi-threading.
 """
 function disturbedinput!(Û0, mpc::PredictiveController, estim::StateEstimator, U0, X̂0)
     nu, nx, nx̂ = estim.model.nu, estim.model.nx, estim.nx̂

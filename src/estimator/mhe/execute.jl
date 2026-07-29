@@ -892,57 +892,6 @@ function con_custom_mhe!(gc, estim::MovingHorizonEstimator, X̂e, V̂e, Ŵe, x�
     return gc
 end
 
-"""
-    con_nonlinprog_mhe!(
-        g, estim::MovingHorizonEstimator, model::SimModel, X̂0, V̂, gc, ε
-    ) -> g
-
-Compute nonlinear constrains `g` in-place for [`MovingHorizonEstimator`](@ref).
-"""
-function con_nonlinprog_mhe!(g, estim::MovingHorizonEstimator, ::SimModel, X̂0, V̂, gc, ε)
-    nX̂con, nX̂ = length(estim.con.X̂0min), estim.nx̂ *estim.Nk[]
-    nV̂con, nV̂ = length(estim.con.V̂min),  estim.nym*estim.Nk[]
-    for i in eachindex(g)
-        estim.con.i_g[i] || continue
-        if i ≤ nX̂con
-            j = i
-            jcon = nX̂con-nX̂+j
-            g[i] = j > nX̂ ? 0 : estim.con.X̂0min[jcon] - X̂0[j] - ε*estim.con.C_x̂min[jcon]
-        elseif i ≤ 2nX̂con
-            j = i - nX̂con
-            jcon = nX̂con-nX̂+j
-            g[i] = j > nX̂ ? 0 : X̂0[j] - estim.con.X̂0max[jcon] - ε*estim.con.C_x̂max[jcon]
-        elseif i ≤ 2nX̂con + nV̂con
-            j = i - 2nX̂con
-            jcon = nV̂con-nV̂+j
-            g[i] = j > nV̂ ? 0 : estim.con.V̂min[jcon] - V̂[j] - ε*estim.con.C_v̂min[jcon]
-        elseif i ≤ 2nX̂con + 2nV̂con
-            j = i - 2nX̂con - nV̂con
-            jcon = nV̂con-nV̂+j
-            g[i] = j > nV̂ ? 0 : V̂[j] - estim.con.V̂max[jcon] - ε*estim.con.C_v̂max[jcon]
-        else
-            j = i - 2nX̂con - 2nV̂con
-            g[i] = gc[j]
-        end
-    end
-    return g
-end
-
-"""
-    con_nonlinprog_mhe!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , gc, _ )
-
-Compute the same but for [`LinModel`](@ref). 
-
-The nonlinear custom inequality constraints in `gc` are the only nonlinear constraints
-for this case. 
-"""
-function con_nonlinprog_mhe!(g, ::MovingHorizonEstimator, ::LinModel, _ , _ , gc , _ )
-    for i in eachindex(g)
-        g[i] = gc[i]
-    end
-    return g
-end
-
 "Throw an error if P̂ != nothing."
 function setstate_cov!(::MovingHorizonEstimator, P̂)
     isnothing(P̂) || error("MovingHorizonEstimator does not compute an estimation covariance matrix P̂.")
@@ -973,12 +922,12 @@ function setmodel_estimator!(
     estim.f̂op .= f̂op
     estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     # --- predictions matrices ---
-    E, G, J, B, _ , Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
+    E, G, J, B, _ , EX̂, GX̂, JX̂, BX̂ = init_predmat_mhe(
         model, transcription,
         He, estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, estim.x̂op, estim.f̂op, 
         estim.direct
     )
-    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(Ex̂, con.C_x̂min, con.C_x̂max, nε)   
+    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(EX̂, con.C_x̂min, con.C_x̂max, nε)   
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, con.C_v̂min, con.C_v̂max, nε) 
     estim.Ẽ .= Ẽ
     estim.G .= G
@@ -986,9 +935,9 @@ function setmodel_estimator!(
     estim.B .= B
     # --- linear inequality constraints ---
     con.Ẽx̂ .= Ẽx̂
-    con.Gx̂ .= Gx̂
-    con.Jx̂ .= Jx̂
-    con.Bx̂ .= Bx̂
+    con.GX̂ .= GX̂
+    con.JX̂ .= JX̂
+    con.BX̂ .= BX̂
     # convert x̂0 to x̂ with the old operating point:
     con.x̂0min .+= x̂op_old 
     con.x̂0max .+= x̂op_old

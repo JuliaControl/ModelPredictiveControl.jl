@@ -18,9 +18,9 @@ struct EstimatorConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     # matrices for the estimated state constraints:
     Ẽx̂      ::Matrix{NT}
     Fx̂      ::Vector{NT}
-    Gx̂      ::Matrix{NT}
-    Jx̂      ::Matrix{NT}
-    Bx̂      ::Vector{NT}
+    GX̂      ::Matrix{NT}
+    JX̂      ::Matrix{NT}
+    BX̂      ::Vector{NT}
     # matrices for the zero defect constraints (N/A for single shooting transcriptions):
     ẼS      ::Matrix{NT}
     FS      ::Vector{NT}
@@ -179,7 +179,7 @@ struct MovingHorizonEstimator{
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         Tŵ = init_ZtoŴ(model, transcription, He, nx̂, nŵ)
-        E, G, J, B, ex̄, Ex̂, Gx̂, Jx̂, Bx̂ = init_predmat_mhe(
+        E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂ = init_predmat_mhe(
             model, transcription, He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
         )
         ES, GS, JS, BS = init_defectmat_mhe(
@@ -191,7 +191,7 @@ struct MovingHorizonEstimator{
             model, transcription, 
             He, Cwt, nx̂, nym, 
             Tŵ, E, ex̄, 
-            Ex̂, Gx̂, Jx̂, Bx̂, 
+            EX̂, GX̂, JX̂, BX̂, 
             ES, GS, JS, BS, 
             gc!, nc
         )
@@ -327,7 +327,7 @@ at each time step for the optimization.
    (details in Extended Help).
 - `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
-- `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
+- `transcription=SingleShooting()` : [`SingleShooting`](@ref) or [`MultipleShooting`](@ref).
 - `optim=default_optim_mhe(model,nc)` : a [`JuMP.Model`](@extref) object with a quadratic or
    nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
@@ -1072,7 +1072,7 @@ end
         model::SimModel, transcription::TranscriptionMethod, 
         He, Cwt, nx̂, nym, 
         Tŵ, E, ex̄, 
-        Ex̂, Gx̂, Jx̂, Bx̂,
+        EX̂, GX̂, JX̂, BX̂,
         ES, GS, JS, BS,
         gc!::Function, nc
     ) -> con, Ẽ, ẽx̄
@@ -1085,7 +1085,7 @@ function init_defaultcon_mhe(
     model::SimModel{NT}, transcription::TranscriptionMethod, 
     He, Cwt, nx̂, nym,
     Tŵ, E, ex̄, 
-    Ex̂, Gx̂, Jx̂, Bx̂, 
+    EX̂, GX̂, JX̂, BX̂, 
     ES, GS, JS, BS,
     gc!::GCfunc, nc
 ) where {NT<:Real, GCfunc<:Function}
@@ -1102,7 +1102,7 @@ function init_defaultcon_mhe(
     C_ŵmin, C_ŵmax = fill(0.0, nŴ),  fill(0.0, nŴ)
     C_v̂min, C_v̂max = fill(0.0, nYm), fill(0.0, nYm)
     A_x̂min, A_x̂max, ẽx̄ = relaxarrival(ex̄, c_x̂min, c_x̂max, nε)
-    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(Ex̂, C_x̂min, C_x̂max, nε)
+    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(EX̂, C_x̂min, C_x̂max, nε)
     A_Ŵmin, A_Ŵmax     = relaxŴ(Tŵ, C_ŵmin, C_ŵmax, nε)
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, C_v̂min, C_v̂max , nε)
     Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
@@ -1120,7 +1120,7 @@ function init_defaultcon_mhe(
     Fx̂, FS = zeros(NT, nx̂*He), zeros(NT, nS)
     b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
     con = EstimatorConstraint{NT, GCfunc}(
-        Ẽx̂, Fx̂, Gx̂, Jx̂, Bx̂,
+        Ẽx̂, Fx̂, GX̂, JX̂, BX̂,
         ẼS, FS, GS, JS, BS,
         x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
         Z̃min, Z̃max,
@@ -1171,7 +1171,7 @@ function relaxarrival(ex̄::AbstractMatrix{NT}, c_x̂min, c_x̂max, nε) where N
 end
 
 @doc raw"""
-    relaxX̂(Ex̂, C_x̂min, C_x̂max, nε) -> A_X̂min, A_X̂max, Ẽx̂
+    relaxX̂(EX̂, C_x̂min, C_x̂max, nε) -> A_X̂min, A_X̂max, Ẽx̂
 
 Augment estimated state constraints with slack variable ε for softening the MHE.
 
@@ -1192,19 +1192,19 @@ also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 in which ``\mathbf{X̂_{min}, X̂_{max}}`` and ``\mathbf{X̂_{op}}`` vectors respectively contains
 ``\mathbf{x̂_{min}, x̂_{max}}`` and ``\mathbf{x̂_{op}}`` repeated ``H_e`` times.
 """
-function relaxX̂(Ex̂::AbstractMatrix{NT}, C_x̂min, C_x̂max, nε) where NT<:Real
+function relaxX̂(EX̂::AbstractMatrix{NT}, C_x̂min, C_x̂max, nε) where NT<:Real
     if nε ≠ 0 # Z̃ = [ε; Z]
-        if iszero(size(Ex̂, 1))
-            # model is not a LinModel, thus X̂ constraints are not linear:
+        if iszero(size(EX̂, 1))
+            # model is not a LinModel or SingleShooting, thus X̂ constraints are not linear:
             C_x̂min = C_x̂max = zeros(NT, 0, 1)
         end
         # ε impacts estimated process noise constraint calculations:
-        A_X̂min, A_X̂max = -[C_x̂min Ex̂], [-C_x̂max Ex̂]
+        A_X̂min, A_X̂max = -[C_x̂min EX̂], [-C_x̂max EX̂]
         # ε has no impact on estimated process noises:
-        Ẽx̂ = [zeros(NT, size(Ex̂, 1), 1) Ex̂] 
+        Ẽx̂ = [zeros(NT, size(EX̂, 1), 1) EX̂] 
     else # Z̃ = Z (only hard constraints)
-        Ẽx̂ = Ex̂
-        A_X̂min, A_X̂max = -Ex̂, Ex̂
+        Ẽx̂ = EX̂
+        A_X̂min, A_X̂max = -EX̂, EX̂
     end
     return A_X̂min, A_X̂max, Ẽx̂
 end

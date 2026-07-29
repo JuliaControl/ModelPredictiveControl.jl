@@ -1231,35 +1231,16 @@ end
 
 """
     con_nonlinprog!(
-        g, mpc::PredictiveController, model::LinModel, ::TranscriptionMethod, _ , _ , gc, ϵ
-    ) -> g
-
-Nonlinear constrains when `model` is a [`LinModel`](@ref).
-
-The method mutates the `g` vectors in argument and returns it. Only the custom constraints
-`gc` are include in the `g` vector.
-"""
-function con_nonlinprog!(
-    g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, _
-)
-    for i in eachindex(g)
-        g[i] = gc[i]
-    end
-    return g
-end
-
-"""
-    con_nonlinprog!(
-        g, mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod, x̂0end, Ŷ0, gc, ϵ
+        g, mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, _ , Ŷ0, gc, ϵ
     ) -> g
 
 Nonlinear constrains when `model` is a [`NonLinModel`](@ref) with non-[`SingleShooting`](@ref).
 
 The method mutates the `g` vectors in argument and returns it. The output prediction and the
-custom constraints are include in the `g` vector.
+custom constraints are included in the `g` vector.
 """
 function con_nonlinprog!(
-    g, mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, x̂0end, Ŷ0, gc, ϵ
+    g, mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, _ , Ŷ0, gc, ϵ
 )
     nŶ = length(Ŷ0)
     for i in eachindex(g)
@@ -1286,7 +1267,7 @@ end
 Nonlinear constrains when `model` is [`NonLinModel`](@ref) with [`SingleShooting`](@ref).
 
 The method mutates the `g` vectors in argument and returns it. The output prediction, 
-the terminal state and the custom constraints are include in the `g` vector.
+the terminal state and the custom constraints are included in the `g` vector.
 """
 function con_nonlinprog!(
     g, mpc::PredictiveController, ::NonLinModel, ::SingleShooting, x̂0end, Ŷ0, gc, ϵ
@@ -1310,6 +1291,25 @@ function con_nonlinprog!(
             j = i - 2nŶ - 2nx̂
             g[i] = gc[j]
         end
+    end
+    return g
+end
+
+"""
+    con_nonlinprog!(
+        g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, _
+    ) -> g
+
+Compute the same but for [`LinModel`](@ref). 
+
+The nonlinear custom inequality constraints in `gc` are the only nonlinear constraints
+for this case. 
+"""
+function con_nonlinprog!(
+    g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, _
+)
+    for i in eachindex(g)
+        g[i] = gc[i]
     end
     return g
 end
