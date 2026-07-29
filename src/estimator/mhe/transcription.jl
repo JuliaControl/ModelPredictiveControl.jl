@@ -1027,21 +1027,8 @@ end
 
 Compute the vectors when `model` is a [`NonLinModel`](@ref) and other [`TreanscriptionMethod`](@ref).
 
-The function mutates `V̂`, `X̂0`, `Û0`, `K` and `Ŷ0` vector arguments. The augmented model of
-[`f̂!`](@ref) and [`ĥ!`](@ref) is called recursively in a `for` loop from ``j=1`` to ``N_k``,
-and by adding the estimated process noise ``\mathbf{ŵ}``.
-
-MPC: (TO MODIF)
-
-The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
-is called multiple times in a `for` loop:
-```math
-\mathbf{ŷ_0}(k+j) = \mathbf{ĥ}\Big(\mathbf{x̂_0}(k+j), \mathbf{d̂_0}(k+j) \Big)
-```
-for ``j = 1, 2, ... , H_p``, and in which ``\mathbf{x̂_0}`` is the augmented state extracted
-from the decision va
-
-
+The function mutates `V̂`, `X̂0`, and `Ŷ0` vector arguments. The augmented output function 
+[`ĥ!`](@ref) is called multiple times in a `for` loop from ``j=1`` to ``N_k``.
 """
 function predict_mhe!(
     V̂, X̂0, _ , _ , Ŷ0, 
