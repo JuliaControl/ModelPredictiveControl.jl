@@ -172,7 +172,7 @@ end
 @doc raw"""
     f̂!(x̂0next, _ , k, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
 
-State function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
+State update function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
 It calls [`f!`](@ref) directly since this estimator does not augment the states.
 """

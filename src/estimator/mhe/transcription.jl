@@ -862,7 +862,7 @@ last control period ``k-1``, expressed as a deviation from the operating point
 function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::MultipleShooting, Z̃var
 ) where NT<:Real
-model, buffer = estim.model, estim.buffer
+    model, buffer = estim.model, estim.buffer
     nu, nk = model.nu, model.nk
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂ = nε + nx̂, nŵ*He, nx̂*He

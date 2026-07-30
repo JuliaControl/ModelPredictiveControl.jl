@@ -16,7 +16,7 @@ end
 @doc raw"""
     f̂!(x̂0next, û0, k, estim::StateEstimator, model::SimModel, x̂0, u0, d0) -> nothing
 
-Mutating state function ``\mathbf{f̂}`` of the augmented model.
+Mutating state update function ``\mathbf{f̂}`` of the augmented model.
 
 By introducing an augmented state vector ``\mathbf{x̂_0}`` like in [`augment_model`](@ref), 
 the function returns the next state of the augmented model, as deviation vectors:
