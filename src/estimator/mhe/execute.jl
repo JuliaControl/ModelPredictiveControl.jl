@@ -121,6 +121,11 @@ includes the following fields:
 - `:∇g_ncolors` or *`:nablag_ncolors`* : number of colors in `:∇g` sparsity pattern
 - `:∇²ℓg` or *`:nabla2lg`* : optimal Hessian of the inequality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g}}``
 - `:∇²ℓg_ncolors` or *`:nabla2lg_ncolors`* : number of colors in `:∇²ℓg` sparsity pattern
+- `:geq` : optimal nonlinear equality constraint values, ``\mathbf{g_{eq}}``
+- `:∇geq` or *`:nablageq`* : optimal Jacobian of the equality constraint, ``\mathbf{\nabla g_{eq}}``
+- `:∇geq_ncolors` or *`:nablageq_ncolors`* : number of colors in `:∇geq` sparsity pattern
+- `:∇²ℓgeq` or *`:nabla2lgeq`* : optimal Hessian of the equality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g_{eq}}}``
+- `:∇²ℓgeq_ncolors` or *`:nabla2lgeq_ncolors`* : number of colors in `:∇²ℓgeq` sparsity pattern
 
 Note that the inequality constraint vectors and matrices only include the non-`Inf` values.
 
