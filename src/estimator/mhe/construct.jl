@@ -1427,8 +1427,7 @@ function get_nonlinobj_op(
     geq::Vector{JNT}                    = zeros(JNT, neq)
     function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-            estim, Z̃
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
         )
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
@@ -1547,16 +1546,14 @@ function get_nonlincon_oracle(
     # -------------- inequality constraint: nonlinear oracle -------------------------
     function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-            estim, Z̃
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return nothing
     end
     function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, gi)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-            estim, Z̃
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return dot(λi, gi)
@@ -1628,15 +1625,13 @@ function get_nonlincon_oracle(
     # ------------- equality constraints : nonlinear oracle ------------------------------
     function geq!(geq, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-            estim, Z̃
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
         )
         return nothing
     end
     function ℓ_geq(Z̃, λeq, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-            estim, Z̃
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
         )
         return dot(λeq, geq)
     end

@@ -239,8 +239,7 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     )
     function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-            estim, Z̃
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
         )
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
@@ -263,8 +262,7 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     )
     function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-            estim, Z̃
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return nothing
@@ -297,8 +295,7 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
         )
         function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, gi)
             update_predictions!(
-                x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-                estim, Z̃
+                x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
             )
             gi .= @views g[i_g]
             return dot(λi, gi)
@@ -319,8 +316,7 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     )
     function geq!(geq, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-            estim, Z̃
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
         )
         return nothing
     end
@@ -351,8 +347,7 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
         )
         function ℓ_geq(Z̃, λeq, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
             update_predictions!(
-                x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-                estim, Z̃
+                x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
             )
             return dot(λeq, geq)
         end
@@ -779,6 +774,7 @@ function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, x̄, V̂, Ŵ
         nŴ, nYm = Nk*estim.nx̂, Nk*estim.nym
         Ŵ, V̂ = Ŵ[1:nŴ], V̂[1:nYm]
     end
+    display(V̂)
     if any(isnan, V̂) # ignore NaN values in V̂ for the objective function:
         V̂ = [isnan(v) ? 0 : v for v in V̂]
     end
@@ -815,7 +811,7 @@ end
 
 """
     update_predictions!(
-        x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq
+        x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq,
         estim::MovingHorizonEstimator, Z̃
     ) -> nothing
 
@@ -824,8 +820,7 @@ Update in-place the vectors for the predictions of `estim` estimator at decision
 The method mutates all the arguments before `estim` argument.
 """
 function update_predictions!(
-    x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
-    estim::MovingHorizonEstimator, Z̃
+    x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim::MovingHorizonEstimator, Z̃
 )
     model, transcription = estim.model, estim.transcription
     x̂0arr = getarrival!(x̂0arr, estim, Z̃)
