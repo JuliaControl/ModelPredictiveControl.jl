@@ -351,8 +351,8 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
             )
             return dot(λeq, geq)
         end
-        ∇²ℓgeq_prep = prepare_hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
-        ∇²ℓgeq_opt = hessian(ℓ_geq, ∇²ℓgeq_prep, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_prep = prepare_hessian(ℓ_geq, hess, estim.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_opt = hessian(ℓ_geq, ∇²ℓgeq_prep, hess, estim.Z̃, Constant(λeq), ∇²geq_cache...)
         ∇²ℓgeq_ncolors = get_ncolors(∇²ℓgeq_prep)
     else
         ∇²ℓgeq_opt, ∇²ℓgeq_ncolors = nothing, nothing
