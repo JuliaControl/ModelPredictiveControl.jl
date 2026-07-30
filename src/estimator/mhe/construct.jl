@@ -1041,8 +1041,8 @@ reset_nonlincon!(::MovingHorizonEstimator, ::SimModel) = nothing
 Re-construct nonlinear constraints and add them to `estim.optim`.
 """
 function reset_nonlincon!(estim::MovingHorizonEstimator, model::NonLinModel)
-    g_oracle = get_nonlincon_oracle(estim, estim.optim)
-    set_nonlincon!(estim, estim.optim, g_oracle)
+    g_oracle, geq_oracle = get_nonlincon_oracle(estim, estim.optim)
+    set_nonlincon!(estim, estim.optim, g_oracle, geq_oracle)
 end
 
 @doc raw"""
@@ -1349,8 +1349,8 @@ function init_optimization!(
         # --- nonlinear optimization init for the custom NL constraints ---
         set_scaling_gradient!(optim, C)
         # constraints with vector nonlinear oracle 
-        g_oracle = get_nonlincon_oracle(estim, optim)  
-        set_nonlincon!(estim, optim, g_oracle)
+        g_oracle, geq_oracle = get_nonlincon_oracle(estim, optim)  
+        set_nonlincon!(estim, optim, g_oracle, geq_oracle)
     end
     return nothing
 end
@@ -1382,9 +1382,9 @@ function init_optimization!(
     set_scaling_gradient!(optim, C)
     # constraints with vector nonlinear oracle, objective function with splatting:    
     J_op = get_nonlinobj_op(estim, optim)
-    g_oracle = get_nonlincon_oracle(estim, optim)  
+    g_oracle, geq_oracle = get_nonlincon_oracle(estim, optim)  
     @objective(optim, Min, J_op(Z̃var...))
-    set_nonlincon!(estim, optim, g_oracle)
+    set_nonlincon!(estim, optim, g_oracle, geq_oracle)
     return nothing
 end
 
@@ -1533,17 +1533,17 @@ function get_nonlincon_oracle(
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
     myNaN, myInf                          = convert(JNT, NaN), convert(JNT, Inf)
-    x̂0arr::Vector{JNT}, x̄::Vector{JNT}    = zeros(JNT, nx̂), zeros(JNT, nx̂)
+    x̂0arr::Vector{JNT}, x̄::Vector{JNT}    = zeros(JNT, nx̂),  zeros(JNT, nx̂)
     Ŵ::Vector{JNT}                        = zeros(JNT, nŴ)
     V̂::Vector{JNT},     X̂0::Vector{JNT}   = zeros(JNT, nV̂),  zeros(JNT, nX̂)
     Ŵe::Vector{JNT}                       = zeros(JNT, nŴe)
     V̂e::Vector{JNT},    X̂e::Vector{JNT}   = zeros(JNT, nV̂e), zeros(JNT, nX̂e)
     K::Vector{JNT}                        = zeros(JNT, nK)
     Û0::Vector{JNT},    Ŷ0::Vector{JNT}   = zeros(JNT, nU),  zeros(JNT, nŶ)
-    gc::Vector{JNT},    g::Vector{JNT}    = zeros(JNT, nc), zeros(JNT, ng)
+    gc::Vector{JNT},    g::Vector{JNT}    = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                      = zeros(JNT, neq)
     gi::Vector{JNT}                       = zeros(JNT, ngi)
-    λi::Vector{JNT}                       = rand(JNT, ngi)
+    λi::Vector{JNT},    λeq::Vector{JNT}  = rand(JNT, ngi),  rand(JNT, neq)
     # -------------- inequality constraint: nonlinear oracle -------------------------
     function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
         update_predictions!(
@@ -1569,7 +1569,7 @@ function get_nonlincon_oracle(
         Cache(Û0), Cache(K), Cache(Ŷ0), 
         Cache(gc), Cache(g), Cache(geq)
     )
-    # temporarily "fill" the estimation window for the preparation of the gradient: 
+    # temporarily "fill" the estimation windows for the preparation of the gradient: 
     estim.Nk[] = He
     ∇gi_prep = prepare_jacobian(gi!, gi, jac, Z̃_∇gi, ∇gi_cache...; strict)
     estim.Nk[] = 0
@@ -1625,16 +1625,92 @@ function get_nonlincon_oracle(
         hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²gi_structure,
         eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²gi_func!
     )
-    return g_oracle
+    # ------------- equality constraints : nonlinear oracle ------------------------------
+    function geq!(geq, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g)
+        update_predictions!(
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
+            estim, Z̃
+        )
+        return nothing
+    end
+    function ℓ_geq(Z̃, λeq, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
+        update_predictions!(
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
+            estim, Z̃
+        )
+        return dot(λeq, geq)
+    end
+    Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update at first call
+    ∇geq_cache = (
+        Cache(x̂0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(Ŵe), Cache(V̂e), Cache(X̂e),
+        Cache(Û0), Cache(K), Cache(Ŷ0), 
+        Cache(gc), Cache(g)
+    )
+    estim.Nk[] = He # see comment above
+    ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z̃_∇geq, ∇geq_cache...; strict)
+    estim.Nk[] = 0
+    ∇geq    = init_diffmat(JNT, jac, ∇geq_prep, nZ̃, neq)
+    ∇geq_structure  = init_diffstructure(∇geq)
+    if !isnothing(hess)
+        ∇²geq_cache = (
+            Cache(x̂0arr), Cache(x̄), 
+            Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+            Cache(Ŵe), Cache(V̂e), Cache(X̂e),
+            Cache(Û0), Cache(K), Cache(Ŷ0), 
+            Cache(gc), Cache(g), Cache(geq)
+        )
+        estim.Nk[] = He # see comment above
+        ∇²geq_prep = prepare_hessian(
+            ℓ_geq, hess, Z̃_∇geq, Constant(λeq), ∇²geq_cache...; strict
+        )
+        estim.Nk[] = 0
+        ∇²ℓ_geq = init_diffmat(JNT, hess, ∇²geq_prep, nZ̃, nZ̃)
+        ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
+    end
+    function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇geq)
+            Z̃_∇geq .= Z̃_arg
+            value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_cache...)
+        end
+        return nothing
+    end
+    function geq_func!(geq_arg, Z̃_arg)
+        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        return geq_arg .= geq
+    end
+    function ∇geq_func!(∇geq_arg, Z̃_arg)
+        update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        return fill_diffstructure!(∇geq_arg, ∇geq, ∇geq_structure)
+    end
+    function ∇²geq_func!(∇²ℓ_arg, Z̃_arg, λ_arg)
+        Z̃_∇geq .= Z̃_arg
+        λeq    .= λ_arg
+        hessian!(ℓ_geq, ∇²ℓ_geq, ∇²geq_prep, hess, Z̃_∇geq, Constant(λeq), ∇²geq_cache...)
+        return fill_diffstructure!(∇²ℓ_arg, ∇²ℓ_geq, ∇²geq_structure)
+    end
+    geq_min = geq_max = zeros(JNT, neq)
+    geq_oracle = MOI.VectorNonlinearOracle(;
+        dimension = nZ̃,
+        l = geq_min,
+        u = geq_max,
+        eval_f = geq_func!,
+        jacobian_structure = ∇geq_structure,
+        eval_jacobian = ∇geq_func!,
+        hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²geq_structure,
+        eval_hessian_lagrangian      = isnothing(hess) ? nothing           : ∇²geq_func!
+    )
+    return g_oracle, geq_oracle
 end
 
 """
-    set_nonlincon!(estim::MovingHorizonEstimator, optim, g_oracle)
+    set_nonlincon!(estim::MovingHorizonEstimator, optim, g_oracle, geq_oracle)
 
-Set the nonlinear inequality constraints of `estim`, if any.
+Set the nonlinear inequality and equality constraints of `estim`, if any.
 """
 function set_nonlincon!(
-    estim::MovingHorizonEstimator, optim::JuMP.GenericModel{JNT}, g_oracle
+    estim::MovingHorizonEstimator, optim::JuMP.GenericModel{JNT}, g_oracle, geq_oracle
 ) where JNT<:Real
     Z̃var = optim[:Z̃var]
     nonlin_constraints = JuMP.all_constraints(
@@ -1642,6 +1718,8 @@ function set_nonlincon!(
     )
     map(con_ref -> JuMP.delete(optim, con_ref), nonlin_constraints)
     JuMP.unregister(optim, :nonlinconstraint)
+    JuMP.unregister(optim, :nonlinconstrainteq)
     any(estim.con.i_g) && @constraint(optim, nonlinconstraint, Z̃var in g_oracle)
+    estim.con.neq > 0  && @constraint(optim, nonlinconstrainteq, Z̃var in geq_oracle)
     return nothing
 end

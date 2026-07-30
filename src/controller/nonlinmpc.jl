@@ -1092,7 +1092,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         jacobian_structure = ∇geq_structure,
         eval_jacobian = ∇geq_func!,
         hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²geq_structure,
-        eval_hessian_lagrangian      = isnothing(hess) ? nothing           : ∇²geq_func!
+        eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²geq_func!
     )
     return g_oracle, geq_oracle
 end
@@ -1125,7 +1125,7 @@ end
 """
     set_nonlincon!(mpc::NonLinMPC, optim, g_oracle, geq_oracle)
 
-Set the nonlinear inequality and equality constraints for `NonLinMPC`, if any.
+Set the nonlinear inequality and equality constraints of `mpc`, if any.
 """
 function set_nonlincon!(
     mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}, g_oracle, geq_oracle
