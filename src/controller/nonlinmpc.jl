@@ -628,9 +628,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         gi .= @views g[i_g]
         return nothing
     end
-    prep_∇g = prepare_jacobian(gi!, gi, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, prep_∇g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    ∇g_ncolors = get_ncolors(prep_∇g)
+    ∇g_prep = prepare_jacobian(gi!, gi, mpc.jacobian, mpc.Z̃, ∇g_cache...)
+    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, ∇g_prep, mpc.jacobian, mpc.Z̃, ∇g_cache...)
+    ∇g_ncolors = get_ncolors(∇g_prep)
     if !isnothing(hess) && ngi > 0
         nonlincon = optim[:nonlinconstraint]
         λi = try
@@ -656,9 +656,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             gi .= @views g[i_g]
             return dot(λi, gi)
         end
-        prep_∇²ℓg = prepare_hessian(ℓ_gi, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
-        ∇²ℓg_opt = hessian(ℓ_gi, prep_∇²ℓg, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
-        ∇²ℓg_ncolors = get_ncolors(prep_∇²ℓg)
+        ∇²ℓg_prep = prepare_hessian(ℓ_gi, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_opt = hessian(ℓ_gi, ∇²ℓg_prep, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_ncolors = get_ncolors(∇²ℓg_prep)
     else
         ∇²ℓg_opt, ∇²ℓg_ncolors = nothing, nothing
     end
@@ -672,9 +672,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return nothing
     end
-    prep_∇geq = prepare_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
-    geq_opt, ∇geq_opt = value_and_jacobian(geq!, geq, prep_∇geq, mpc.jacobian, mpc.Z̃, geq_cache...)
-    ∇geq_ncolors = get_ncolors(prep_∇geq)
+    ∇geq_prep = prepare_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
+    geq_opt, ∇geq_opt = value_and_jacobian(geq!, geq, ∇geq_prep, mpc.jacobian, mpc.Z̃, geq_cache...)
+    ∇geq_ncolors = get_ncolors(∇geq_prep)
     if !isnothing(hess) && con.neq > 0
         nonlinconeq = optim[:nonlinconstrainteq]
         λeq = try
@@ -699,9 +699,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λeq, geq)
         end
-        prep_∇²ℓgeq = prepare_hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
-        ∇²ℓgeq_opt = hessian(ℓ_geq, prep_∇²ℓgeq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
-        ∇²ℓgeq_ncolors = get_ncolors(prep_∇²ℓgeq)
+        ∇²ℓgeq_prep = prepare_hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_opt = hessian(ℓ_geq, ∇²ℓgeq_prep, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_ncolors = get_ncolors(∇²ℓgeq_prep)
     else
         ∇²ℓgeq_opt, ∇²ℓgeq_ncolors = nothing, nothing
     end

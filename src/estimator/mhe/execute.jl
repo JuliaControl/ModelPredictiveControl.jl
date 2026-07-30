@@ -147,7 +147,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     x̂0arr = buffer.x̂
     x̄, Û0, K = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk)
     x̂0arr = getarrival!(x̂0arr, estim, Z̃)
-    Ŵ     = getŴ!(Ŵ, estim, Z̃)
+    Ŵ     = getŴ!(Ŵ, estim, estim.transcription, Z̃)
     x̄     = getx̄!(x̄, estim, x̂0arr)
     V̂, X̂0 = predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃)
     Ŷ0    = predict_outputs_mhe!(Ŷ0, estim, X̂0, x̂0arr)
@@ -264,9 +264,9 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
         gi .= @views g[i_g]
         return nothing
     end
-    prep_∇g = prepare_jacobian(gi!, gi, estim.jacobian, estim.Z̃, ∇g_cache...)
-    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, prep_∇g, estim.jacobian, estim.Z̃, ∇g_cache...)
-    ∇g_ncolors = get_ncolors(prep_∇g)
+    ∇g_prep = prepare_jacobian(gi!, gi, estim.jacobian, estim.Z̃, ∇g_cache...)
+    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, ∇g_prep, estim.jacobian, estim.Z̃, ∇g_cache...)
+    ∇g_ncolors = get_ncolors(∇g_prep)
     if !isnothing(hess) && ngi > 0
         nonlincon = optim[:nonlinconstraint]
         λi = try
@@ -298,11 +298,64 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
             gi .= @views g[i_g]
             return dot(λi, gi)
         end
-        prep_∇²ℓg = prepare_hessian(ℓ_gi, hess, estim.Z̃, Constant(λi), ∇²g_cache...)
-        ∇²ℓg_opt = hessian(ℓ_gi, prep_∇²ℓg, hess, estim.Z̃, Constant(λi), ∇²g_cache...)
-        ∇²ℓg_ncolors = get_ncolors(prep_∇²ℓg)
+        ∇²ℓg_prep = prepare_hessian(ℓ_gi, hess, estim.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_opt = hessian(ℓ_gi, ∇²ℓg_prep, hess, estim.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_ncolors = get_ncolors(∇²ℓg_prep)
     else
         ∇²ℓg_opt, ∇²ℓg_ncolors = nothing, nothing
+    end
+    # --- equality constraint derivatives ---
+    ∇geq_cache = (
+        Cache(x̂0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(Ŵe), Cache(V̂e), Cache(X̂e),
+        Cache(Û0), Cache(K), Cache(Ŷ0), 
+        Cache(gc), Cache(g)
+    )
+    function geq!(geq, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g)
+        update_predictions!(
+            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
+            estim, Z̃
+        )
+        return nothing
+    end
+    ∇geq_prep = prepare_jacobian(geq!, geq, estim.jacobian, estim.Z̃, ∇geq_cache...)
+    geq_opt, ∇geq_opt = value_and_jacobian(geq!, geq, ∇geq_prep, estim.jacobian, estim.Z̃, ∇geq_cache...)
+    ∇geq_ncolors = get_ncolors(∇geq_prep)
+    if !isnothing(hess) && con.neq > 0
+        nonlinconeq = optim[:nonlinconstrainteq]
+        λeq = try
+            JuMP.get_attribute(nonlinconeq, MOI.LagrangeMultiplier())
+        catch err
+            if err isa MOI.GetAttributeNotAllowed{MOI.LagrangeMultiplier}
+                @warn(
+                    "The optimizer does not support retrieving optimal Hessian of the Lagrangian.\n"*
+                    "Its nonzero coefficients will be random values.", maxlog=1
+                )
+                rand(con.neq)
+            else
+                rethrow()
+            end
+        end
+        ∇²geq_cache = (
+            Cache(x̂0arr), Cache(x̄), 
+            Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+            Cache(Ŵe), Cache(V̂e), Cache(X̂e),
+            Cache(Û0), Cache(K), Cache(Ŷ0), 
+            Cache(gc), Cache(g), Cache(geq)
+        )
+        function ℓ_geq(Z̃, λeq, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
+            update_predictions!(
+                x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, 
+                estim, Z̃
+            )
+            return dot(λeq, geq)
+        end
+        ∇²ℓgeq_prep = prepare_hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_opt = hessian(ℓ_geq, ∇²ℓgeq_prep, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_ncolors = get_ncolors(∇²ℓgeq_prep)
+    else
+        ∇²ℓgeq_opt, ∇²ℓgeq_ncolors = nothing, nothing
     end
     info[:∇J] = ∇J_opt
     info[:∇²J] = ∇²J_opt
@@ -312,6 +365,11 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     info[:∇g_ncolors] = ∇g_ncolors
     info[:∇²ℓg] = ∇²ℓg_opt
     info[:∇²ℓg_ncolors] = ∇²ℓg_ncolors
+    info[:geq] = geq_opt
+    info[:∇geq] = ∇geq_opt
+    info[:∇geq_ncolors] = ∇geq_ncolors
+    info[:∇²ℓgeq] = ∇²ℓgeq_opt
+    info[:∇²ℓgeq_ncolors] = ∇²ℓgeq_ncolors
     # --- non-Unicode fields ---
     info[:nablaJ] = ∇J_opt
     info[:nabla2J] = ∇²J_opt
@@ -320,6 +378,10 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     info[:nablag_ncolors] = ∇g_ncolors
     info[:nabla2lg] = ∇²ℓg_opt
     info[:nabla2lg_ncolors] = ∇²ℓg_ncolors
+    info[:nablageq] = ∇geq_opt
+    info[:nablageq_ncolors] = ∇geq_ncolors
+    info[:nabla2lgeq] = ∇²ℓgeq_opt
+    info[:nabla2lgeq_ncolors] = ∇²ℓgeq_ncolors
     return info
 end
 
