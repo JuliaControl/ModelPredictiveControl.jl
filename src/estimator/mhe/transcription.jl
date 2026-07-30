@@ -481,9 +481,10 @@ function init_matconstraint_mhe(
     else
         A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, _ , _ , Aeq = args
         A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax]
-        nx̂, nZ̃ = size(A_x̂min)
-        nAeq = size(Aeq, 1)             # number of linear equality constraints
-        neq  = nZ̃ - nε - nx̂ - nAeq      # number of nonlinear equality constraints
+        nŴ, nZ̃ = size(A_Ŵmin)
+        nx̂ = length(x̂0min)
+        nAeq = size(Aeq, 1)                  # number of linear equality constraints
+        neq  = nZ̃ - nŴ - nε - nx̂ - nAeq      # number of nonlinear equality constraints
     end
     i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
     i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
@@ -1205,3 +1206,5 @@ function con_nonlinprogeq_mhe!(
     Nk < He && (geq[nx̂*Nk+1:end] .= 0)
     return geq
 end
+"No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
+con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod, _,_,_) = geq
