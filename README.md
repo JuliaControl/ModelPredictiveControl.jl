@@ -13,7 +13,7 @@
 [![doc-dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaControl.github.io/ModelPredictiveControl.jl/dev)
 [![arXiv](https://img.shields.io/badge/arXiv-2411.09764-b31b1b.svg)](https://arxiv.org/abs/2411.09764)
 
-An open source [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_control)
+An open source [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_control) and [moving horizon estimation](https://en.wikipedia.org/wiki/Moving_horizon_estimation)
 package for Julia.
 
 The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl/ControlSystems.jl)
