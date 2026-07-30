@@ -403,10 +403,12 @@ end
 "Get the estimation error at arrival from the estimated state at arrival `x̂0arr`."
 getx̄!(x̄, estim::MovingHorizonEstimator, x̂0arr) = (x̄ .= estim.x̂0arr_old .- x̂0arr)
 
-"Get the estimated process noise over the horizon from the decision vector `Z̃`."
-function getŴ!(Ŵ, estim::MovingHorizonEstimator, Z̃)
-    nx̃ = estim.nε + estim.nx̂
-    return Ŵ .= @views Z̃[(nx̃ + 1):(nx̃ + estim.nx̂*estim.He)]
+"Get the estimated process noise from the decision vector `Z̃`."
+function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
+    He, nx̂, nŵ, Nk = estim.He, estim.nx̂, estim.nx̂, estim.Nk[]
+    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
+    Ŵ[1:nŵ*Nk] .= @views Z̃[(nZ̃ - nŵ*He + 1):(nZ̃ - nŵ*He + nŵ*Nk)] 
+    return Ŵ
 end
 
 """
@@ -567,8 +569,9 @@ function getstate!(estim::MovingHorizonEstimator{NT}, Z̃) where NT<:Real
     getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
     getarrival!(x̂0arr, estim, Z̃)
     predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃)
-    @show V̂
-    @show Ŵ
+    @show V̂[1:estim.nym*Nk]
+    @show Ŵ[1:estim.nx̂*Nk]
+    @show X̂0[1:estim.nx̂*Nk]
     estim.x̂0 .= @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     return nothing
 end
@@ -763,7 +766,7 @@ function update_predictions!(
     model, transcription = estim.model, estim.transcription
     x̂0arr = getarrival!(x̂0arr, estim, Z̃)
     x̄     = getx̄!(x̄, estim, x̂0arr)
-    Ŵ     = getŴ!(Ŵ, estim, Z̃)
+    Ŵ     = getŴ!(Ŵ, estim, transcription, Z̃)
     V̂, X̂0 = predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, transcription, x̂0arr, Ŵ, Z̃)
     Ŵe, V̂e, X̂e = extended_vectors!(Ŵe, V̂e, X̂e, estim, Ŵ, V̂, X̂0, x̂0arr)
     ε   = getslack(estim, Z̃)

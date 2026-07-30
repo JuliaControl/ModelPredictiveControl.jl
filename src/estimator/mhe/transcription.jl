@@ -899,14 +899,6 @@ function set_warmstart_mhe!(
     return Z̃s
 end
 
-"Get the estimated process noise from the decision vector `Z̃`."
-function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
-    He, nx̂, nŵ, Nk = estim.He, estim.nx̂, estim.nx̂, estim.Nk[]
-    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
-    Ŵ[1:nŵ*Nk] .= @views Z̃[(nZ̃ - nŵ*He + 1):(nZ̃ - nŵ*He + nŵ*Nk)] 
-    return Ŵ
-end
-
 "Fill the unused decision variables in `Z̃` with `0`s (only when `Nk < He`)."
 function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::SingleShooting)
     nŵ, nx̂, Nk =  estim.nx̂, estim.nx̂, estim.Nk[]
@@ -1204,6 +1196,10 @@ function con_nonlinprogeq_mhe!(
         ŝnext   .= @. x̂0next - x̂0next_Z̃
     end
     Nk < He && (geq[nx̂*Nk+1:end] .= 0)
+    if eltype(geq) == Float64
+        #println(geq[1:nx̂*Nk])
+        println(Ŵ[1:nŵ*Nk])
+    end
     return geq
 end
 "No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
