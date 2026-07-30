@@ -569,9 +569,6 @@ function getstate!(estim::MovingHorizonEstimator{NT}, Z̃) where NT<:Real
     getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
     getarrival!(x̂0arr, estim, Z̃)
     predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃)
-    @show V̂[1:estim.nym*Nk]
-    @show Ŵ[1:estim.nx̂*Nk]
-    @show X̂0[1:estim.nx̂*Nk]
     estim.x̂0 .= @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     return nothing
 end

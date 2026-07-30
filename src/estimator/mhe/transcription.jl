@@ -1196,10 +1196,6 @@ function con_nonlinprogeq_mhe!(
         ŝnext   .= @. x̂0next - x̂0next_Z̃
     end
     Nk < He && (geq[nx̂*Nk+1:end] .= 0)
-    if eltype(geq) == Float64
-        #println(geq[1:nx̂*Nk])
-        println(Ŵ[1:nŵ*Nk])
-    end
     return geq
 end
 "No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
