@@ -34,7 +34,7 @@ ModelPredictiveControl.ĥ!
 
 ```@docs
 ModelPredictiveControl.initpred!(::MovingHorizonEstimator, ::LinModel)
-ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel)
+ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod)
 ```
 
 ## Solve Optimization Problem
