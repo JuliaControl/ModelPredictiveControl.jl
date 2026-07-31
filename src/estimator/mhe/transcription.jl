@@ -783,14 +783,16 @@ warm-starts the solver at:
     \mathbf{ŵ}(k+p-3|k-1)           \\
     \mathbf{ŵ}(k+p-2|k-1)           \\
     \mathbf{0}                      \\
+    \mathbf{0_ŵ}
 \end{bmatrix}
 ```
 where ``ε_{k-1}`` and ``\mathbf{ŵ}(k-j|k-1)`` are respectively the slack variable and the
 process noise estimates computed at the last time step ``k-1``. The vector 
 ``\mathbf{x̂_0^†}(k-N_k+p)`` is the deviation vector of the state at the arrival estimated
 at time ``k-N_k``. If the objective function is not finite at this point, all the process
-noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. The method mutates all the
-arguments.
+noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. See the Extended Help of 
+[`SingleShooting`](@ref) for the defintion of vector ``\mathbf{0_ŵ}``. The method mutates
+all the arguments.
 """
 function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::SingleShooting, Z̃var
@@ -847,17 +849,20 @@ If supported by `estim.optim`, it warm-starts the solver at:
     \mathbf{x̂_0}(k+p-2|k-1)         \\
     \mathbf{x̂_0}(k+p-1|k-1)         \\
     \mathbf{x̂_0}(k+p-1|k-1)         \\
+    \mathbf{0_x̂}                    \\
     \mathbf{ŵ}(k-N_k+p+0|k-1)       \\
     \mathbf{ŵ}(k-N_k+p+1|k-1)       \\
     \vdots                          \\
     \mathbf{ŵ}(k+p-3|k-1)           \\
     \mathbf{ŵ}(k+p-2|k-1)           \\
     \mathbf{0}                      \\
+    \mathbf{0_ŵ}
 \end{bmatrix}
 ```
 where ``\mathbf{x̂_0}(k-j|k-1)`` is the predicted state for time ``k-j`` computed at the
 last control period ``k-1``, expressed as a deviation from the operating point 
-``\mathbf{x̂_{op}}``. 
+``\mathbf{x̂_{op}}``. See the Extended Help of [`MultipleShooting`](@ref) for the defintion 
+of vectors ``\mathbf{0_x̂}`` and ``\mathbf{0_ŵ}``.
 """
 function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::MultipleShooting, Z̃var
