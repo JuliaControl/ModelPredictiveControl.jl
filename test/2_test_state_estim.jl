@@ -919,7 +919,6 @@ end
     @test length(mhe7.Y0m) == mhe7.He*2
     @test length(mhe7.U0)  == mhe7.He*2
     @test length(mhe7.D0)  == (mhe7.He+mhe7.direct)*1
-    @test length(mhe7.Ŵ)   == mhe7.He*6
 
     mhe8 = MovingHorizonEstimator(linmodel, He=5, nint_u=[1, 1], nint_ym=[0, 0])
     @test mhe8.nxs == 2
@@ -1443,12 +1442,12 @@ end
         setconstraint!(mhe, ŵmin=[1,1], ŵmax=[100,100])
         preparestate!(mhe, [50, 30])
         x̂ = updatestate!(mhe, [10, 50], [50, 30])
-        @test mhe.Ŵ ≈ [1,1] atol=5e-2
+        @test getinfo(mhe)[:Ŵ] ≈ [1,1] atol=5e-2
 
         setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[-1,-1])
         preparestate!(mhe, [50, 30])
         x̂ = updatestate!(mhe, [10, 50], [50, 30])
-        @test mhe.Ŵ ≈ [-1,-1] atol=5e-2
+        @test getinfo(mhe)[:Ŵ] ≈ [-1,-1] atol=5e-2
 
         setconstraint!(mhe, x̂min=[-100,-100], x̂max=[100,100])
         setconstraint!(mhe, ŵmin=[-100,-100], ŵmax=[100,100])
@@ -1527,12 +1526,12 @@ end
     setconstraint!(mhe2, ŵmin=[1,1], ŵmax=[100,100])
     preparestate!(mhe2, [50, 30])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
-    @test mhe2.Ŵ ≈ [1,1] atol=5e-2
+    @test getinfo(mhe2)[:Ŵ] ≈ [1,1] atol=5e-2
 
     setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[-1,-1])
     preparestate!(mhe2, [50, 30])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30])
-    @test mhe2.Ŵ ≈ [-1,-1] atol=5e-2
+    @test getinfo(mhe2)[:Ŵ] ≈ [-1,-1] atol=5e-2
 
     setconstraint!(mhe2, x̂min=[-100,-100], x̂max=[100,100])
     setconstraint!(mhe2, ŵmin=[-100,-100], ŵmax=[100,100])

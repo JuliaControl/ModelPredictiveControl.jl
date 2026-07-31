@@ -176,7 +176,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:V̂]  = V̂[1:nym*Nk]
     info[:P̄]  = estim.P̂arr_old
     info[:x̄]  = x̄
-    info[:Ŷ]  = Ŷ
+    info[:Ŷ]  = Ŷ[1:ny*Nk]
     info[:Ŷm] = Ŷ[vec(estim.i_ym .+ ny.*(0:Nk-1)')]
     info[:x̂arr] = x̂arr
     info[:J]  = J
