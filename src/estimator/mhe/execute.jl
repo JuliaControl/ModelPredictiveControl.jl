@@ -810,9 +810,6 @@ function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, x̄, V̂, Ŵ
         nŴ, nYm = Nk*estim.nx̂, Nk*estim.nym
         Ŵ, V̂ = Ŵ[1:nŴ], V̂[1:nYm]
     end
-    if any(isnan, V̂) # ignore NaN values in V̂ for the objective function:
-        V̂ = [isnan(v) ? 0 : v for v in V̂]
-    end
     Jε = estim.nε > 0 ? estim.C*Z̃[begin]^2 : 0
     return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jε
 end
@@ -889,6 +886,9 @@ function predict_mhe!(
             d0next  = @views estim.D0[(1 + nd*j):(nd*(j+1))]
             ĥ!(ŷ0next, estim, model, x̂0next, d0next)
             ŷ0nextm = @views ŷ0next[estim.i_ym]
+            if any(isnan, y0nextm)
+                y0nextm = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0nextm, ŷ0nextm)]
+            end
             V̂[(1 + nym*(j-1)):(nym*j)] .= y0nextm .- ŷ0nextm
             x̂0, d0 = x̂0next, d0next
         end        
@@ -900,6 +900,9 @@ function predict_mhe!(
             ŵ   = @views Ŵ[(1 + nŵ*(j-1)):(nŵ*j)]
             ĥ!(ŷ0, estim, model, x̂0, d0)
             ŷ0m = @views ŷ0[estim.i_ym]
+            if any(isnan, y0m)
+                y0m = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0m, ŷ0m)]
+            end
             V̂[(1 + nym*(j-1)):(nym*j)] .= y0m .- ŷ0m
             x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
             f̂!(x̂0next, û0, k, estim, model, x̂0, u0, d0)
