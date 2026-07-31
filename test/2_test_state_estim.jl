@@ -1492,7 +1492,7 @@ end
     mhe = MovingHorizonEstimator(linmodel2, He=1, gc=gcln!, nc=nc, nint_ym=0, direct=false, p=nx̂)
     preparestate!(mhe, [50, 30], [5])
     x̂ = updatestate!(mhe, [10, 50], [50, 30], [5])
-    @test mhe.Ŵ ≈ zeros(nx̂) atol=5e-2
+    @test getinfo(mhe)[:Ŵ] ≈ zeros(nx̂) atol=5e-2
 end
 
 @testitem "MHE constraint violation (NonLinModel)" setup=[SetupMPCtests] begin
@@ -1578,7 +1578,7 @@ end
     mhe2 = MovingHorizonEstimator(nonlinmodel2, He=1, gc=gclnl!, nc=nc, nint_ym=0, p=nx̂)
     preparestate!(mhe2, [50, 30], [5])
     x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
-    @test mhe2.Ŵ ≈ zeros(nx̂) atol=5e-2
+    @test getinfo(mhe2)[:Ŵ] ≈ zeros(nx̂) atol=5e-2
 end
 
 @testitem "MHE set model" setup=[SetupMPCtests] begin
