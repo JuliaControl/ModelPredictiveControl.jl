@@ -1026,7 +1026,7 @@ end
         x̂0arr , _ , Z̃ 
     ) -> V̂, X̂0
 
-Compute the vectors when `model` is a [`NonLinModel`](@ref) and other [`TreanscriptionMethod`](@ref).
+Compute the vectors when `model` is a [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
 
 The function mutates `V̂`, `X̂0`, and `Ŷ0` vector arguments. The augmented output function 
 [`ĥ!`](@ref) is called multiple times in a `for` loop from ``j=1`` to ``N_k``.
