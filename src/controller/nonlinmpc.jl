@@ -1,13 +1,9 @@
 const DEFAULT_NONLINMPC_TRANSCRIPTION = SingleShooting()
-const DEFAULT_NONLINMPC_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
-const DEFAULT_NONLINMPC_GRADIENT  = AutoForwardDiff()
-const DEFAULT_NONLINMPC_JACDENSE  = AutoForwardDiff()
-const DEFAULT_NONLINMPC_JACSPARSE = AutoSparse(
+const DEFAULT_NONLINMPC_HESSIAN = AutoSparse(
     AutoForwardDiff();
     sparsity_detector=TracerSparsityDetector(),
     coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
 )
-const DEFAULT_NONLINMPC_HESSIAN = DEFAULT_NONLINMPC_JACSPARSE
 
 struct NonLinMPC{
     NT<:Real,
@@ -125,7 +121,7 @@ struct NonLinMPC{
         d0, D̂0, D̂e = zeros(NT, nd), zeros(NT, nd*Hp), zeros(NT, nd + nd*Hp)
         Uop, Yop, Dop = repeat(model.uop, Hp), repeat(model.yop, Hp), repeat(model.dop, Hp)
         test_custom_function_mpc(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
-        nZ̃ = get_nZ(estim, transcription, Hp, Hc) + nϵ
+        nZ̃ = get_nZ_mpc(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE, CW, TM, JM, GB, JB, HB, PT, JEfunc, GCfunc}(
@@ -364,8 +360,8 @@ function NonLinMPC(
     nc::Int = 0,
     p = model.p,
     transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
-    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
-    gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
+    gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
     hessian::Union{AbstractADType, Bool, Nothing} = false,
     kwargs...
@@ -440,8 +436,8 @@ function NonLinMPC(
     nc = 0,
     p = estim.model.p,
     transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
-    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NONLINMPC_OPTIMIZER, add_bridges=false),
-    gradient::AbstractADType = DEFAULT_NONLINMPC_GRADIENT,
+    optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
+    gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
     hessian::Union{AbstractADType, Bool, Nothing} = false
 ) where {
@@ -464,9 +460,6 @@ function NonLinMPC(
         transcription, optim, gradient, jacobian, hessian
     )
 end
-
-default_jacobian(::SingleShooting)      = DEFAULT_NONLINMPC_JACDENSE
-default_jacobian(::TranscriptionMethod) = DEFAULT_NONLINMPC_JACSPARSE
 
 """
     validate_JE(NT, JE) -> nothing
@@ -591,7 +584,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     hess = mpc.hessian
     transcription = mpc.transcription
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk(model, transcription)
+    nk = get_nk_mpc(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     i_g = findall(mpc.con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(mpc.con.i_g), sum(mpc.con.i_g)
@@ -635,9 +628,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         gi .= @views g[i_g]
         return nothing
     end
-    prep_∇g = prepare_jacobian(gi!, gi, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, prep_∇g, mpc.jacobian, mpc.Z̃, ∇g_cache...)
-    ∇g_ncolors = get_ncolors(prep_∇g)
+    ∇g_prep = prepare_jacobian(gi!, gi, mpc.jacobian, mpc.Z̃, ∇g_cache...)
+    g_opt, ∇g_opt = value_and_jacobian(gi!, gi, ∇g_prep, mpc.jacobian, mpc.Z̃, ∇g_cache...)
+    ∇g_ncolors = get_ncolors(∇g_prep)
     if !isnothing(hess) && ngi > 0
         nonlincon = optim[:nonlinconstraint]
         λi = try
@@ -663,9 +656,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             gi .= @views g[i_g]
             return dot(λi, gi)
         end
-        prep_∇²ℓg = prepare_hessian(ℓ_gi, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
-        ∇²ℓg_opt = hessian(ℓ_gi, prep_∇²ℓg, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
-        ∇²ℓg_ncolors = get_ncolors(prep_∇²ℓg)
+        ∇²ℓg_prep = prepare_hessian(ℓ_gi, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_opt = hessian(ℓ_gi, ∇²ℓg_prep, hess, mpc.Z̃, Constant(λi), ∇²g_cache...)
+        ∇²ℓg_ncolors = get_ncolors(∇²ℓg_prep)
     else
         ∇²ℓg_opt, ∇²ℓg_ncolors = nothing, nothing
     end
@@ -679,9 +672,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return nothing
     end
-    prep_∇geq = prepare_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
-    geq_opt, ∇geq_opt = value_and_jacobian(geq!, geq, prep_∇geq, mpc.jacobian, mpc.Z̃, geq_cache...)
-    ∇geq_ncolors = get_ncolors(prep_∇geq)
+    ∇geq_prep = prepare_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
+    geq_opt, ∇geq_opt = value_and_jacobian(geq!, geq, ∇geq_prep, mpc.jacobian, mpc.Z̃, geq_cache...)
+    ∇geq_ncolors = get_ncolors(∇geq_prep)
     if !isnothing(hess) && con.neq > 0
         nonlinconeq = optim[:nonlinconstrainteq]
         λeq = try
@@ -706,9 +699,9 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λeq, geq)
         end
-        prep_∇²ℓgeq = prepare_hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
-        ∇²ℓgeq_opt = hessian(ℓ_geq, prep_∇²ℓgeq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
-        ∇²ℓgeq_ncolors = get_ncolors(prep_∇²ℓgeq)
+        ∇²ℓgeq_prep = prepare_hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_opt = hessian(ℓ_geq, ∇²ℓgeq_prep, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
+        ∇²ℓgeq_ncolors = get_ncolors(∇²ℓgeq_prep)
     else
         ∇²ℓgeq_opt, ∇²ℓgeq_ncolors = nothing, nothing
     end
@@ -830,7 +823,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
     transcription = mpc.transcription
     grad, hess = mpc.gradient, mpc.hessian
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk(model, transcription)
+    nk = get_nk_mpc(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     ng = length(mpc.con.i_g)
     nc, neq = mpc.con.nc, mpc.con.neq
@@ -956,7 +949,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     transcription = mpc.transcription
     jac, hess = mpc.jacobian, mpc.hessian
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk(model, transcription)
+    nk = get_nk_mpc(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     i_g = findall(mpc.con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(mpc.con.i_g), sum(mpc.con.i_g)
@@ -1099,7 +1092,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         jacobian_structure = ∇geq_structure,
         eval_jacobian = ∇geq_func!,
         hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²geq_structure,
-        eval_hessian_lagrangian      = isnothing(hess) ? nothing           : ∇²geq_func!
+        eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²geq_func!
     )
     return g_oracle, geq_oracle
 end
@@ -1122,7 +1115,7 @@ function update_predictions!(
     ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
     Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, K, mpc, model, transcription, U0, Z̃)
     Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
-    ϵ   = getϵ(mpc, Z̃)
+    ϵ   = getslack(mpc, Z̃)
     gc  = con_custom!(gc, mpc, Ue, Ŷe, ϵ)
     g   = con_nonlinprog!(g, mpc, model, transcription, x̂0end, Ŷ0, gc, ϵ)
     geq = con_nonlinprogeq!(geq, X̂0, Û0, K, mpc, model, transcription, U0, Z̃)
@@ -1132,7 +1125,7 @@ end
 """
     set_nonlincon!(mpc::NonLinMPC, optim, g_oracle, geq_oracle)
 
-Set the nonlinear inequality and equality constraints for `NonLinMPC`, if any.
+Set the nonlinear inequality and equality constraints of `mpc`, if any.
 """
 function set_nonlincon!(
     mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}, g_oracle, geq_oracle

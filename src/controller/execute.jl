@@ -168,7 +168,7 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     Ŷs = similar(mpc.Yop)
     predictstoch!(Ŷs, mpc, mpc.estim)
     info[:ΔU]    = Z̃[1:mpc.Hc*model.nu]
-    info[:ϵ]     = getϵ(mpc, Z̃)
+    info[:ϵ]     = getslack(mpc, Z̃)
     info[:J]     = J
     info[:U]     = U
     info[:u]     = info[:U][1:model.nu]
@@ -198,14 +198,14 @@ function getinfo(mpc::PredictiveController{NT}) where NT<:Real
 end
 
 @doc raw"""
-    getϵ(mpc::PredictiveController, Z̃orΔŨ) -> ϵ
+    getslack(mpc::PredictiveController, Z̃orΔŨ) -> ϵ
 
 Get the slack `ϵ` from `Z̃orΔŨ` if present, otherwise return 0.
 
 The argument `Z̃orΔŨ` can be the augmented decision vector ``\mathbf{Z̃}`` or the augmented
 input increment vector ``\mathbf{ΔŨ}``, it works with both.
 """
-function getϵ(mpc::PredictiveController, Z̃orΔŨ::AbstractVector{NT}) where NT<:Real
+function getslack(mpc::PredictiveController, Z̃orΔŨ::AbstractVector{NT}) where NT<:Real
     return mpc.nϵ > 0 ? Z̃orΔŨ[end] : zero(NT)
 end
 
@@ -337,9 +337,12 @@ is stored in `estim.x̂0`).
 
 This function is needed for the collocation methods that directly call the state derivative 
 function `estim.model.f!` with the manipulated inputs augmented with the estimated 
-disturbances at model input (see [`init_estimstoch`](@ref)). It's also necessary to prefill
-the `Û0` vector before anything else since both `û0` and `û0next` are needed at each stage
-with hold order `h>0`, thus potential race conditions with multi-threading.
+disturbances at model input (see [`init_estimstoch`](@ref)). This is also needed for
+[`MultipleShooting`](@ref) since it calls the discrete-time update function of the
+deterministic model [`f!`](@ref) to treat the stochastic defects as linear equality
+constraints. Lastly, it's also necessary to prefill the `Û0` vector before anything else
+since both `û0` and `û0next` are needed at each stage with hold order `h>0`, thus potential
+race conditions with multi-threading.
 """
 function disturbedinput!(Û0, mpc::PredictiveController, estim::StateEstimator, U0, X̂0)
     nu, nx, nx̂ = estim.model.nu, estim.model.nx, estim.nx̂
@@ -469,7 +472,7 @@ function obj_nonlinprog!(
         JR̂u = dot(Ū, mpc.weights.L_Hp, Ū)
     end
     # --- economic term ---
-    ϵ = getϵ(mpc, ΔŨ)
+    ϵ = getslack(mpc, ΔŨ)
     E_JE = obj_econ(mpc, model, Ue, Ŷe, ϵ)
     return JR̂y + JΔŨ + JR̂u + E_JE
 end
@@ -487,7 +490,7 @@ end
 
 Optimize the objective function of `mpc` [`PredictiveController`](@ref) and return the solution `Z̃`.
 
-If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls 
+If first warm-starts the solver with [`set_warmstart_mpc!`](@ref). It then calls 
 `JuMP.optimize!(mpc.optim)` and extract the solution. A failed optimization prints an 
 `@error` log in the REPL and returns the warm-start value. A failed optimization also prints
 [`getinfo`](@ref) results in the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
@@ -495,7 +498,7 @@ If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls
 function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model, optim = mpc.estim.model, mpc.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    Z̃s = set_warmstart!(mpc, mpc.transcription, Z̃var)
+    Z̃s = set_warmstart_mpc!(mpc, mpc.transcription, Z̃var)
     set_objective_linear_coef!(mpc, model, Z̃var)
     try
         JuMP.optimize!(optim)
@@ -715,7 +718,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     weights = mpc.weights
     nu, ny, nd, Hp, Hc, nb = model.nu, model.ny, model.nd, mpc.Hp, mpc.Hc, mpc.nb
     optim, con = mpc.optim, mpc.con
-    nZ = get_nZ(estim, transcription, Hp, Hc)
+    nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
     Pu = mpc.P̃u[:, 1:nZ]
     # --- prediction matrices ---
     E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂ = init_predmat(

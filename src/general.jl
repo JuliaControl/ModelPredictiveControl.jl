@@ -6,6 +6,9 @@ const DEFAULT_LWT = 0.0
 const DEFAULT_CWT = 1e5
 const DEFAULT_EWT = 0.0
 
+const DEFAULT_QP_OPTIMIZER  = OSQP.MathOptInterfaceOSQP.Optimizer
+const DEFAULT_NLP_OPTIMIZER = optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes")
+
 "All deterministic algorithms for matrix coloring order in `SparseMatrixColoring.jl`."
 const ALL_COLORING_ORDERS = (
     NaturalOrder(),
@@ -14,6 +17,14 @@ const ALL_COLORING_ORDERS = (
     IncidenceDegree(),
     DynamicLargestFirst(),
     RandomOrder(StableRNG(0), 0)
+)
+
+const DEFAULT_GRADIENT  = AutoForwardDiff()
+const DEFAULT_JACDENSE  = AutoForwardDiff()
+const DEFAULT_JACSPARSE = AutoSparse(
+    AutoForwardDiff();
+    sparsity_detector=TracerSparsityDetector(),
+    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
 )
 
 const HIDDEN_GETINFO_KEYS_MHE = (
@@ -67,6 +78,29 @@ function info2debugstr(info)
         mystr *= "  :sol => \n" * solstr * "\n"  # Ensure a trailing newline
     end
     return mystr
+end
+
+@doc raw"""
+    augmentdefect(ES, nϵ; slackfirst=false) -> Aeq, ẼS
+
+Augment defect equality constraints with slack variable ϵ if `nϵ == 1`.
+
+It returns the ``\mathbf{Ẽ_S}`` matrix that appears in the linear defect equation 
+``\mathbf{Ẽ_S Z̃ + F_S}`` and the ``\mathbf{A}`` matrix for the equality constraints:
+```math
+\mathbf{A_{eq} Z̃} = \mathbf{b_{eq}} = - \mathbf{F_S}
+```
+The slack is assumed to be 1st element of the decision vector if `slackfirst`, else the last.
+"""
+function augmentdefect(ES::AbstractMatrix{NT}, nϵ; slackfirst=false) where NT<:Real
+    if nϵ == 1 # Z̃ = [Z; ϵ] (or Z̃ = [ϵ; Z] if slackfirst == true)
+        zero_vec = zeros(NT, size(ES, 1), 1)
+        ẼS = slackfirst ? [zero_vec ES] : [ES zero_vec]
+    else # Z̃ = Z (only hard constraints)
+        ẼS = ES
+    end
+    Aeq = ẼS
+    return Aeq, ẼS
 end
 
 "Evaluate the quadratic programming objective function `0.5x'*H*x + q'*x` at `x`."

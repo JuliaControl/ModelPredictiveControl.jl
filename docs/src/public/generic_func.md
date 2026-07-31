@@ -7,6 +7,38 @@ Pages = ["generic_func.md"]
 This page contains the documentation of functions that are generic to [`SimModel`](@ref),
 [`StateEstimator`](@ref) and [`PredictiveController`](@ref) types.
 
+## Direct Transcription Methods
+
+### TranscriptionMethod
+
+```@docs
+ModelPredictiveControl.TranscriptionMethod
+```
+
+### SingleShooting
+
+```@docs
+SingleShooting
+```
+
+### MultipleShooting
+
+```@docs
+MultipleShooting
+```
+
+### TrapezoidalCollocation
+
+```@docs
+TrapezoidalCollocation
+```
+
+### OrthogonalCollocation
+
+```@docs
+OrthogonalCollocation
+```
+
 ## Set Constraint
 
 ```@docs

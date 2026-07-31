@@ -19,12 +19,12 @@ julia> u = mpc([5]); round.(u, digits=3)
 """
 abstract type PredictiveController{NT<:Real} end
 
-include("controller/transcription.jl")
 include("controller/construct.jl")
 include("controller/execute.jl")
 include("controller/explicitmpc.jl")
 include("controller/linmpc.jl")
 include("controller/nonlinmpc.jl")
+include("controller/transcription.jl")
 
 function Base.show(io::IO, mpc::PredictiveController)
     estim, model = mpc.estim, mpc.estim.model

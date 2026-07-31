@@ -12,6 +12,7 @@ ModelPredictiveControl.init_integrators
 ModelPredictiveControl.augment_model
 ModelPredictiveControl.init_ukf
 ModelPredictiveControl.init_internalmodel
+ModelPredictiveControl.init_ZtoŴ
 ModelPredictiveControl.init_predmat_mhe
 ModelPredictiveControl.relaxarrival
 ModelPredictiveControl.relaxX̂
@@ -33,7 +34,7 @@ ModelPredictiveControl.ĥ!
 
 ```@docs
 ModelPredictiveControl.initpred!(::MovingHorizonEstimator, ::LinModel)
-ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel)
+ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod)
 ```
 
 ## Solve Optimization Problem
