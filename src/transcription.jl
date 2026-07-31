@@ -39,14 +39,14 @@ plant model/constraints. The Extended Help details transcription of
         =                                           \begin{bmatrix} 
         \mathbf{x̂_0}(k-N_k+p)                       \\
         \mathbf{Ŵ}                                  \\
-        \mathbf{0}                               
+        \mathbf{0_ŵ}                               
         \end{bmatrix}
         =                                           \begin{bmatrix} 
         \mathbf{x̂}_k(k-N_k+p) - \mathbf{x̂_{op}}     \\
         \mathbf{Ŵ}                                  \\
-        \mathbf{0}                                  \end{bmatrix}
+        \mathbf{0_ŵ}                                \end{bmatrix}
     ``` 
-    The vector ``\mathbf{0}`` with `nx̂*(He-Nk)` zeros is for the unused decision variables
+    The vector ``\mathbf{0_ŵ}`` with `nx̂*(He-Nk)` zeros is for the unused decision variables
     at the beginning, when the data windows are growing (``N_k < H_e``). The number of
     elements in ``\mathbf{Z}`` is therefore constant. The ``\mathbf{Ŵ}`` vector is defined
     in the Extended Help of [`MovingHorizonEstimator`](@ref).
@@ -93,9 +93,9 @@ provided in the Extended Help.
     \mathbf{Z} =                    \begin{bmatrix} 
         \mathbf{x̂_0}(k-N_k+p)       \\  
         \mathbf{X̂_0}                \\         
-        \mathbf{0}                  \\ 
+        \mathbf{0_x̂}                \\ 
         \mathbf{Ŵ}                  \\
-        \mathbf{0}                  \end{bmatrix}
+        \mathbf{0_ŵ}                \end{bmatrix}
     ```
     thus the deviation value of arrival state estimate ``\mathbf{x̂_0}(k-N_k+p)`` is kept out
     of the estimated states over ``N_k``:
@@ -106,8 +106,8 @@ provided in the Extended Help.
         \vdots                                              \\ 
         \mathbf{x̂}_k(k+p)           - \mathbf{x̂_{op}}       \end{bmatrix}
     ```
-    Similarly to [`SingleShooting`](@ref), the two ``\mathbf{0}`` vectors with zeros is
-    for the unused decision variables at the beginning.
+    Similarly to [`SingleShooting`](@ref), the ``\mathbf{0_x̂}`` and ``\mathbf{0_ŵ}`` vectors
+    with zeros is for the unused decision variables at the beginning.
 """
 struct MultipleShooting <: ShootingMethod 
     f_threads::Bool
