@@ -1113,14 +1113,14 @@ end
 
 @testitem "MHE estimation and getinfo (NonLinModel)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
-    using JuMP, Ipopt
+    using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
+    import ForwardDiff
     linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
     linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
     h(x,d,model)   = model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
-
 
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
     JuMP.set_attribute(mhe1.optim, "tol", 1e-7)
@@ -1218,7 +1218,13 @@ end
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
     @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
 
-    mhe7 = MovingHorizonEstimator(nonlinmodel, He=2)
+    hessian = AutoSparse(
+        AutoForwardDiff();
+        sparsity_detector=TracerSparsityDetector(),
+        coloring_algorithm=GreedyColoringAlgorithm(),
+    )
+
+    mhe7 = MovingHorizonEstimator(nonlinmodel; He=2, hessian)
     @test_logs(
         (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
         preparestate!(mhe7, [50, NaN], [5])

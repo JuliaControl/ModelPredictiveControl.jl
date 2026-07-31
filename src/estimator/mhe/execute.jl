@@ -887,11 +887,7 @@ function predict_mhe!(
             ĥ!(ŷ0next, estim, model, x̂0next, d0next)
             ŷ0nextm = @views ŷ0next[estim.i_ym]
             if any(isnan, y0nextm)
-                for i in eachindex(y0nextm)
-                    if isnan(y0nextm[i])
-                        y0nextm[i] = ŷ0nextm[i]
-                    end
-                end
+                y0nextm = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0nextm, ŷ0nextm)]
             end
             V̂[(1 + nym*(j-1)):(nym*j)] .= y0nextm .- ŷ0nextm
             x̂0, d0 = x̂0next, d0next
@@ -905,11 +901,7 @@ function predict_mhe!(
             ĥ!(ŷ0, estim, model, x̂0, d0)
             ŷ0m = @views ŷ0[estim.i_ym]
             if any(isnan, y0m)
-                for i in eachindex(y0m)
-                    if isnan(y0m[i])
-                        y0m[i] = ŷ0m[i]
-                    end
-                end
+                y0m = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0m, ŷ0m)]
             end
             V̂[(1 + nym*(j-1)):(nym*j)] .= y0m .- ŷ0m
             x̂0next = @views X̂0[(1 + nx̂ *(j-1)):(nx̂ *j)]
