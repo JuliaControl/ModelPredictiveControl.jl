@@ -774,9 +774,6 @@ function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, x̄, V̂, Ŵ
         nŴ, nYm = Nk*estim.nx̂, Nk*estim.nym
         Ŵ, V̂ = Ŵ[1:nŴ], V̂[1:nYm]
     end
-    if any(isnan, V̂) # ignore NaN values in V̂ for the objective function:
-        V̂ = [isnan(v) ? 0 : v for v in V̂]
-    end
     Jε = estim.nε > 0 ? estim.C*Z̃[begin]^2 : 0
     return dot(x̄, invP̄, x̄) + dot(Ŵ, invQ̂_Nk, Ŵ) + dot(V̂, invR̂_Nk, V̂) + Jε
 end
