@@ -926,6 +926,14 @@ end
     @test mhe8.nint_u  == [1, 1]
     @test mhe8.nint_ym == [0, 0]
 
+    mhe9 = MovingHorizonEstimator(linmodel, He=5, transcription=SingleShooting())
+    @test mhe9.transcription isa SingleShooting
+    @test length(mhe9.Z̃) == mhe9.nx̂ + mhe9.nx̂*mhe9.He
+
+    mhe10 = MovingHorizonEstimator(linmodel, He=5, transcription=MultipleShooting())
+    @test mhe10.transcription isa MultipleShooting
+    @test length(mhe10.Z̃) == mhe10.nx̂ + mhe10.nx̂*mhe10.He + mhe10.nx̂*mhe10.He 
+
     mhe12 = MovingHorizonEstimator(linmodel, He=5, Cwt=1e3)
     @test size(mhe12.Ẽ, 2) == 6*mhe12.nx̂ + 1
     @test mhe12.C == 1e3
@@ -980,6 +988,12 @@ end
     @test mhe2.nxs == 2
     @test mhe2.nx̂ == 6
     @test size(mhe2.Ẽ, 2) == 6*mhe2.nx̂
+
+    mhe3 = MovingHorizonEstimator(nonlinmodel, He=5, transcription=MultipleShooting())
+    @test mhe3.transcription isa MultipleShooting
+    
+    mhe4 = MovingHorizonEstimator(nonlinmodel, He=5, transcription=SingleShooting())
+    @test mhe4.transcription isa SingleShooting
 
     I_6 = Matrix{Float64}(I, 6, 6)
     I_2 = Matrix{Float64}(I, 2, 2)
@@ -1108,6 +1122,22 @@ end
         updatestate!(mhe5, [10, 50], [50, NaN], [5])
     )
     
+    mhe5 = MovingHorizonEstimator(linmodel, He=2, direct=true, transcription=MultipleShooting())
+    for i in 1:40
+        preparestate!(mhe5, [51, 32], [5])
+        updatestate!(mhe5, [10, 50], [51, 32], [5])
+    end
+    preparestate!(mhe5, [51, 32], [5])
+    @test mhe5([5]) ≈ [51, 32] atol=1e-3
+
+    mhe6 = MovingHorizonEstimator(linmodel, He=2, direct=false, transcription=MultipleShooting())
+    for i in 1:40
+        preparestate!(mhe6, [51, 32], [5])
+        updatestate!(mhe6, [10, 50], [51, 32], [5])
+    end
+    preparestate!(mhe6, [51, 32], [5])
+    @test mhe6([5]) ≈ [51, 32] atol=1e-3
+
 end
 
 @testitem "MHE estimation and getinfo (NonLinModel)" setup=[SetupMPCtests] begin
@@ -1184,6 +1214,22 @@ end
         updatestate!(mhe1c, [10, 50], [51, 32], [5])
     end
     @test mhe1c([5]) ≈ [51, 32] atol=1e-3
+
+    mhe2 = MovingHorizonEstimator(nonlinmodel, He=2, transcription=MultipleShooting())
+    for i in 1:40
+        preparestate!(mhe2, [50, 30], [5])
+        updatestate!(mhe2, [11, 52], [50, 30], [5])
+    end
+    preparestate!(mhe2, [50, 30], [5])
+    @test mhe2([5]) ≈ [50, 30] atol=1e-3
+
+    mhe3 = MovingHorizonEstimator(nonlinmodel, He=2, transcription=MultipleShooting(f_threads=true))
+    for i in 1:40
+        preparestate!(mhe3, [50, 30], [5])
+        updatestate!(mhe3, [11, 52], [50, 30], [5])
+    end
+    preparestate!(mhe3, [50, 30], [5])
+    @test mhe3([5]) ≈ [50, 30] atol=1e-3
 
     Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
     R̂ = diagm([1, 1].^2)
