@@ -994,13 +994,21 @@ function predict_mhe!(
             v̂next   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
             d0next  = @views  estim.D0[(1 + nd*j):(nd*(j+1))]
             ĥ!(ŷ0next, estim, model, x̂0next, d0next)
-            v̂next .= @views y0nextm .- ŷ0next[estim.i_ym]
+            ŷ0nextm = @views ŷ0next[estim.i_ym]
+            if any(isnan, y0nextm)
+                y0nextm = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0nextm, ŷ0nextm)]
+            end
+            v̂next .= y0nextm .- ŷ0nextm
         else
             ŷ0      = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
             y0m     = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
             v̂       = @views         V̂[(1 + nym*(j-1)):(nym*j)]
             ĥ!(ŷ0, estim, model, x̂0, d0)
-            v̂ .= @views y0m .- ŷ0[estim.i_ym]
+            ŷ0m = @views ŷ0[estim.i_ym]
+            if any(isnan, y0m)
+                y0m = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0m, ŷ0m)]
+            end
+            v̂ .= y0m .- ŷ0m
         end
         x̂0 = x̂0next
     end
@@ -1044,7 +1052,11 @@ function predict_mhe!(
         v̂   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
         y0m = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
         ĥ!(ŷ0, estim, model, x̂0, d0)
-        v̂ .= @views y0m .- ŷ0[estim.i_ym]
+        ŷ0m = @views ŷ0[estim.i_ym]
+            if any(isnan, y0m)
+                y0m = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0m, ŷ0m)]
+            end
+        v̂ .= y0m .- ŷ0m
     end
     if Nk < estim.He  # fill unused values with 0s for tracer sparsity detection:
         V̂[nym*Nk+1:end] .= 0
