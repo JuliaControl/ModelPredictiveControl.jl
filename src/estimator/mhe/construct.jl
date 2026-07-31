@@ -351,6 +351,7 @@ julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP_0=[0.01])
 MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
 ├ model: NonLinModel
 ├ optimizer: Ipopt 
+├ transcription: SingleShooting
 ├ gradient: AutoForwardDiff
 ├ jacobian: AutoForwardDiff
 ├ hessian: nothing
@@ -366,7 +367,9 @@ MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
   └ optimization:
     ├ 12 decision variables Z̃ (0 slack variable, 0 bounds)
     ├  0 linear inequality constraints A
-    └  0 nonlinear inequality constraints g (0 custom)
+    ├  0 linear equality constraints Aeq
+    ├  0 nonlinear inequality constraints g (0 custom)
+    └  0 nonlinear equality constraints geq
 ```
 
 # Extended Help
@@ -807,6 +810,7 @@ julia> estim = setconstraint!(estim, x̂min=[-50, -50], x̂max=[50, 50])
 MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
 ├ model: LinModel
 ├ optimizer: OSQP 
+├ transcription: SingleShooting
 ├ arrival covariance: KalmanFilter 
 ├ direct: true
 └ dimensions:
@@ -819,7 +823,9 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
   └ optimization:
     ├  8 decision variables Z̃ (0 slack variable, 4 bounds)
     ├ 12 linear inequality constraints A
-    └  0 nonlinear inequality constraints g (0 custom)
+    ├  0 linear equality constraints Aeq
+    ├  0 nonlinear inequality constraints g (0 custom)
+    └  0 nonlinear equality constraints geq
 ```
 
 # Extended Help
