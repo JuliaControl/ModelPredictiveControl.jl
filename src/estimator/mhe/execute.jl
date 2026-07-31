@@ -467,9 +467,9 @@ getx̄!(x̄, estim::MovingHorizonEstimator, x̂0arr) = (x̄ .= estim.x̂0arr_old
 
 "Get the estimated process noise from the decision vector `Z̃`."
 function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
-    He, nx̂, nŵ, Nk = estim.He, estim.nx̂, estim.nx̂, estim.Nk[]
+    He, nx̂, nŵ = estim.He, estim.nx̂, estim.nx̂
     nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
-    Ŵ[1:nŵ*Nk] .= @views Z̃[(nZ̃ - nŵ*He + 1):(nZ̃ - nŵ*He + nŵ*Nk)] 
+    Ŵ[1:nŵ*He] .= @views Z̃[(nZ̃ - nŵ*He + 1):end] 
     return Ŵ
 end
 
