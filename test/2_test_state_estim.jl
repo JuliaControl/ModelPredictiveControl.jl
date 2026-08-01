@@ -1215,7 +1215,11 @@ end
     end
     @test mhe1c([5]) ≈ [51, 32] atol=1e-3
 
-    mhe2 = MovingHorizonEstimator(nonlinmodel, He=3, transcription=MultipleShooting())
+    gc!(gc, args...) = (gc[1] = 0) #for coverage only
+    mhe2 = MovingHorizonEstimator(
+        nonlinmodel, He=3, transcription=MultipleShooting(), gc! = gc!, nc = 1
+    )
+    mhe2 = setconstraint!(mhe2, v̂min = [-1000, -1000], v̂max = [1000, 1000]) # for coverage only
     for i in 1:40
         preparestate!(mhe2, [50, 30], [5])
         updatestate!(mhe2, [11, 52], [50, 30], [5])
