@@ -87,6 +87,7 @@ Sparse optimizers like `OSQP` or `Ipopt` and sparse Jacobian computations are re
 for this transcription method. The transcription of [`MovingHorizonEstimator`](@ref) is
 provided in the Extended Help.
 
+# Extended Help
 !!! details "Extended Help"
     For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
     ```math
