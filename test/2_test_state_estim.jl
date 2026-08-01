@@ -1413,6 +1413,11 @@ end
     @test mhe3.con.C_v̂min ≈ 0.03(11:18)
     @test mhe3.con.C_v̂max ≈ 0.04(11:18)
 
+    mhe4 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, transcription=MultipleShooting())
+    setconstraint!(mhe4, X̂min=-0.1(1:10), X̂max=0.1(1:10))
+    @test mhe4.con.Z̃min[1:10] ≈ -0.1(1:10)
+    @test mhe4.con.Z̃max[1:10] ≈  0.1(1:10)
+
     @test_throws DimensionMismatch setconstraint!(mhe2, x̂min=[-1])
     @test_throws DimensionMismatch setconstraint!(mhe2, x̂max=[+1])
     @test_throws DimensionMismatch setconstraint!(mhe2, ŵmin=[-1])
