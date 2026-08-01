@@ -1151,7 +1151,7 @@ end
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
 
-    mhe1 = MovingHorizonEstimator(nonlinmodel, He=2)
+    mhe1 = MovingHorizonEstimator(nonlinmodel, He=3)
     JuMP.set_attribute(mhe1.optim, "tol", 1e-7)
     preparestate!(mhe1, [50, 30], [5])
     x̂ = updatestate!(mhe1, [10, 50], [50, 30], [5])
@@ -1215,7 +1215,11 @@ end
     end
     @test mhe1c([5]) ≈ [51, 32] atol=1e-3
 
-    mhe2 = MovingHorizonEstimator(nonlinmodel, He=2, transcription=MultipleShooting())
+    gc!(gc, args...) = (gc[1] = 0) #for coverage only
+    mhe2 = MovingHorizonEstimator(
+        nonlinmodel, He=3, transcription=MultipleShooting(), gc! = gc!, nc = 1
+    )
+    mhe2 = setconstraint!(mhe2, v̂min = [-1000, -1000], v̂max = [1000, 1000]) # for coverage only
     for i in 1:40
         preparestate!(mhe2, [50, 30], [5])
         updatestate!(mhe2, [11, 52], [50, 30], [5])
@@ -1223,7 +1227,9 @@ end
     preparestate!(mhe2, [50, 30], [5])
     @test mhe2([5]) ≈ [50, 30] atol=1e-3
 
-    mhe3 = MovingHorizonEstimator(nonlinmodel, He=2, transcription=MultipleShooting(f_threads=true))
+    mhe3 = MovingHorizonEstimator(
+        nonlinmodel, He=3, direct=false, transcription=MultipleShooting(f_threads=true)
+    )
     for i in 1:40
         preparestate!(mhe3, [50, 30], [5])
         updatestate!(mhe3, [11, 52], [50, 30], [5])
@@ -1412,6 +1418,11 @@ end
     setconstraint!(mhe3, C_v̂min=0.03(11:18), C_v̂max=0.04(11:18))
     @test mhe3.con.C_v̂min ≈ 0.03(11:18)
     @test mhe3.con.C_v̂max ≈ 0.04(11:18)
+
+    mhe4 = MovingHorizonEstimator(nonlinmodel, He=4, nint_ym=0, transcription=MultipleShooting())
+    setconstraint!(mhe4, X̂min=-0.1(1:10), X̂max=0.1(1:10))
+    @test mhe4.con.Z̃min[1:10] ≈ -0.1(1:10)
+    @test mhe4.con.Z̃max[1:10] ≈  0.1(1:10)
 
     @test_throws DimensionMismatch setconstraint!(mhe2, x̂min=[-1])
     @test_throws DimensionMismatch setconstraint!(mhe2, x̂max=[+1])

@@ -1,6 +1,7 @@
 # ModelPredictiveControl.jl
 
 An open source [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_control)
+and [moving horizon estimation](https://en.wikipedia.org/wiki/Moving_horizon_estimation)
 package for Julia.
 
 The package depends on [`ControlSystemsBase.jl`](https://github.com/JuliaControl/ControlSystems.jl)
