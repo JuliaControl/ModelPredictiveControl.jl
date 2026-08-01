@@ -247,10 +247,10 @@ It can handle constraints on the estimates. Additionally, `model` is not lineari
 the [`UnscentedKalmanFilter`](@ref). The computational costs are drastically higher, 
 however, since it minimizes the following objective function at each discrete time ``k``:
 ```math
-\min_{\mathbf{x̂}_k(k-N_k+p), \mathbf{Ŵ}, ε}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
-                                            + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
-                                            + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
-                                            + C ε^2
+\min_{\mathbf{Z}, ε}   \mathbf{x̄}' \mathbf{P̄}^{-1}       \mathbf{x̄} 
+                     + \mathbf{Ŵ}' \mathbf{Q̂}_{N_k}^{-1} \mathbf{Ŵ}  
+                     + \mathbf{V̂}' \mathbf{R̂}_{N_k}^{-1} \mathbf{V̂}
+                     + C ε^2
 ```
 subject to [`setconstraint!`](@ref) bounds and the custom nonlinear inequality constraints:
 ```math
@@ -276,13 +276,15 @@ N_k =                     \begin{cases}
     k + 1   &  k < H_e    \\
     H_e     &  k ≥ H_e    \end{cases}
 ```
-The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` respectively encompass the estimated process
-noises ``\mathbf{ŵ}(k-j+p)`` and sensor noises ``\mathbf{v̂}(k-j+1)`` from ``j=N_k`` to ``1``.
-The arguments of ``\mathbf{g_c}`` include the extended vectors of the estimated states 
-``\mathbf{X̂_e}``, estimated sensor noises ``\mathbf{V̂_e}``,  estimated process noises
-``\mathbf{Ŵ_e}``, manipulated inputs ``\mathbf{U_e}``, measured outputs ``\mathbf{Y_e^m}``
-and measured disturbances ``\mathbf{D_e}``. The Extended Help details all these vectors, the
-slack variable ``ε`` and the estimation of the covariance at arrival 
+The chosen [`TranscriptionMethod`](@ref) determines the content of the decision vector
+``\mathbf{Z}`` (default to [`SingleShooting`](@ref), hence both ``\mathbf{x̂}_k(k-N_k+p)``
+and ``\mathbf{Ŵ}``). The vectors ``\mathbf{Ŵ}`` and ``\mathbf{V̂}`` respectively encompass 
+the estimated process noises ``\mathbf{ŵ}(k-j+p)`` and sensor noises ``\mathbf{v̂}(k-j+1)``
+from ``j=N_k`` to ``1``. The arguments of ``\mathbf{g_c}`` include the extended vectors of
+the estimated states ``\mathbf{X̂_e}``, estimated sensor noises ``\mathbf{V̂_e}``,  estimated
+process noises ``\mathbf{Ŵ_e}``, manipulated inputs ``\mathbf{U_e}``, measured outputs 
+``\mathbf{Y_e^m}`` and measured disturbances ``\mathbf{D_e}``. The Extended Help details all
+these vectors, the slack variable ``ε`` and the estimation of the covariance at arrival 
 ``\mathbf{P̂}_{k-N_k}(k-N_k+p)``. If the keyword argument `direct=true` (default value), the
 constant ``p=0`` in the equations above, and the MHE is in the current form. Else ``p=1``,
 leading to the prediction form.
