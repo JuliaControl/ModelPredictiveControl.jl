@@ -411,8 +411,8 @@ of the time-varying ``\mathbf{P̄}`` covariance . The computed variables are:
     \mathbf{q̃}       &= 2(\mathbf{M}_{N_k} \mathbf{Ẽ_Z̃})' \mathbf{F_Z̃}                      \\
             r        &= \mathbf{F_Z̃}' \mathbf{M}_{N_k} \mathbf{F_Z̃}
 \end{aligned}
-See [`init_ZtoŴ`](@ref) for the definition of the conversion matrix ``\mathbf{T_ŵ}``.
 ```
+See [`init_ZtoŴ`](@ref) for the definition of the conversion matrix ``\mathbf{T_ŵ}``.
 """
 function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<:Real
     invP̄, invQ̂_He, invR̂_He = estim.cov.invP̄, estim.cov.invQ̂_He, estim.cov.invR̂_He
