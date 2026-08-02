@@ -407,7 +407,7 @@ They are forced to be ``\mathbf{Ŝ = 0}`` using the optimization equality const
 matrices ``\mathbf{E_S, G_S, J_S, B_S}`` are defined in the Extended Help section.
 
 # Extended Help
-!!! Extended Help
+!!! details "Extended Help"
     The defect matrices are computed with:
 """
 function init_defectmat_mhe(
