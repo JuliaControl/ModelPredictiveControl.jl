@@ -16,8 +16,8 @@ the former is always a linear inequality constraint (it's a decision variable). 
 """
 struct EstimatorConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     # matrices for the estimated state constraints:
-    Ẽx̂      ::Matrix{NT}
-    Fx̂      ::Vector{NT}
+    ẼX̂      ::Matrix{NT}
+    FX̂      ::Vector{NT}
     GX̂      ::Matrix{NT}
     JX̂      ::Matrix{NT}
     BX̂      ::Vector{NT}
@@ -1110,7 +1110,7 @@ function init_defaultcon_mhe(
     C_ŵmin, C_ŵmax = fill(0.0, nŴ),  fill(0.0, nŴ)
     C_v̂min, C_v̂max = fill(0.0, nYm), fill(0.0, nYm)
     A_x̂min, A_x̂max, ẽx̄ = relaxarrival(ex̄, c_x̂min, c_x̂max, nε)
-    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(EX̂, C_x̂min, C_x̂max, nε)
+    A_X̂min, A_X̂max, ẼX̂ = relaxX̂(EX̂, C_x̂min, C_x̂max, nε)
     A_Ŵmin, A_Ŵmax     = relaxŴ(Tŵ, C_ŵmin, C_ŵmax, nε)
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, C_v̂min, C_v̂max , nε)
     Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
@@ -1125,10 +1125,10 @@ function init_defaultcon_mhe(
         A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq
     )
     # dummy vectors (updated just before optimization):
-    Fx̂, FS = zeros(NT, nx̂*He), zeros(NT, nS)
+    FX̂, FS = zeros(NT, nx̂*He), zeros(NT, nS)
     b, beq = zeros(NT, size(A, 1)), zeros(NT, size(Aeq, 1))
     con = EstimatorConstraint{NT, GCfunc}(
-        Ẽx̂, Fx̂, GX̂, JX̂, BX̂,
+        ẼX̂, FX̂, GX̂, JX̂, BX̂,
         ẼS, FS, GS, JS, BS,
         x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
         Z̃min, Z̃max,
@@ -1179,13 +1179,13 @@ function relaxarrival(ex̄::AbstractMatrix{NT}, c_x̂min, c_x̂max, nε) where N
 end
 
 @doc raw"""
-    relaxX̂(EX̂, C_x̂min, C_x̂max, nε) -> A_X̂min, A_X̂max, Ẽx̂
+    relaxX̂(EX̂, C_x̂min, C_x̂max, nε) -> A_X̂min, A_X̂max, ẼX̂
 
 Augment estimated state constraints with slack variable ε for softening the MHE.
 
 Denoting the MHE decision variable augmented with the slack variable ``\mathbf{Z̃} = 
-[\begin{smallmatrix} ε \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{Ẽ_x̂}``
-matrix that appears in estimated states equation ``\mathbf{X̂} = \mathbf{Ẽ_x̂ Z̃ + F_x̂}``. It
+[\begin{smallmatrix} ε \\ \mathbf{Z} \end{smallmatrix}]``, it returns the ``\mathbf{Ẽ_X̂}``
+matrix that appears in estimated states equation ``\mathbf{X̂_0} = \mathbf{Ẽ_X̂ Z̃ + F_X̂}``. It
 also returns the ``\mathbf{A}`` matrices for the inequality constraints:
 ```math
 \begin{bmatrix} 
@@ -1193,8 +1193,8 @@ also returns the ``\mathbf{A}`` matrices for the inequality constraints:
     \mathbf{A_{X̂_{max}}}
 \end{bmatrix} \mathbf{Z̃} ≤
 \begin{bmatrix}
-    - \mathbf{(X̂_{min} - X̂_{op}) + F_x̂} \\
-    + \mathbf{(X̂_{max} - X̂_{op}) - F_x̂}
+    - \mathbf{(X̂_{min} - X̂_{op}) + F_X̂} \\
+    + \mathbf{(X̂_{max} - X̂_{op}) - F_X̂}
 \end{bmatrix}
 ```
 in which ``\mathbf{X̂_{min}, X̂_{max}}`` and ``\mathbf{X̂_{op}}`` vectors respectively contains
@@ -1209,12 +1209,12 @@ function relaxX̂(EX̂::AbstractMatrix{NT}, C_x̂min, C_x̂max, nε) where NT<:R
         # ε impacts estimated process noise constraint calculations:
         A_X̂min, A_X̂max = -[C_x̂min EX̂], [-C_x̂max EX̂]
         # ε has no impact on estimated process noises:
-        Ẽx̂ = [zeros(NT, size(EX̂, 1), 1) EX̂] 
+        ẼX̂ = [zeros(NT, size(EX̂, 1), 1) EX̂] 
     else # Z̃ = Z (only hard constraints)
-        Ẽx̂ = EX̂
+        ẼX̂ = EX̂
         A_X̂min, A_X̂max = -EX̂, EX̂
     end
-    return A_X̂min, A_X̂max, Ẽx̂
+    return A_X̂min, A_X̂max, ẼX̂
 end
 
 @doc raw"""

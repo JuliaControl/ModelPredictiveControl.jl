@@ -14,6 +14,7 @@ ModelPredictiveControl.init_ukf
 ModelPredictiveControl.init_internalmodel
 ModelPredictiveControl.init_ZtoŴ
 ModelPredictiveControl.init_predmat_mhe
+ModelPredictiveControl.init_defectmat_mhe
 ModelPredictiveControl.relaxarrival
 ModelPredictiveControl.relaxX̂
 ModelPredictiveControl.relaxŴ
@@ -44,6 +45,8 @@ ModelPredictiveControl.optim_objective!(::MovingHorizonEstimator)
 ModelPredictiveControl.set_warmstart_mhe!
 ModelPredictiveControl.predict_mhe!
 ModelPredictiveControl.con_nonlinprog_mhe!
+ModelPredictiveControl.con_nonlinprogeq_mhe!
+ModelPredictiveControl.getstate!
 ```
 
 ## Remove Operating Points

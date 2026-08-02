@@ -41,11 +41,11 @@ from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
 ```math
 \begin{aligned}
     \mathbf{X̂_0}  &= \mathbf{E_X̂ Z + G_X̂ U_0 + J_X̂ D_0 + B_X̂} \\
-                  &= \mathbf{E_X̂ Z + F_x̂}
+                  &= \mathbf{E_X̂ Z + F_X̂}
 \end{aligned}
 ```
 The matrices ``\mathbf{E, G, J, B, E_X̂, G_X̂, J_X̂, B_X̂}`` are defined in the Extended Help 
-section. The vectors ``\mathbf{F, F_x̂, f_x̄}`` are recalculated at each discrete time step, 
+section. The vectors ``\mathbf{F, F_X̂, f_x̄}`` are recalculated at each discrete time step, 
 see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstraint!(::MovingHorizonEstimator, ::LinModel)`](@ref).
 
 # Extended Help
@@ -244,7 +244,7 @@ function init_predmat_mhe(
     return E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 end
 
-"""
+@doc raw"""
     init_predmat_mhe(
         model::LinModel, transcription::MultipleShooting, 
         He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
@@ -252,7 +252,62 @@ end
 
 Construct them for [`LinModel`](@ref) and [`MultipleShooting`](@ref).
 
-TBW
+The ``\mathbf{e_x̄}`` is identical to the [`SingleShooting`](@ref) transcription. The other
+matrices are defined in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    The matrices are compute by (notice the minus signs after the equalities):
+    ```math
+    \begin{aligned}
+    \mathbf{E} &= - \begin{bmatrix} 
+        \mathbf{E^x̂} & \mathbf{E^ŵ}                                                          \end{bmatrix} \\
+    \mathbf{G} &=   \mathbf{0}                                                               \\
+    \mathbf{J} &= - \begin{bmatrix}
+        \mathbf{0}  & \mathbf{D̂_d^m}    & \mathbf{0}     & \cdots & \mathbf{0}               \\ 
+        \mathbf{0}  & \mathbf{0}        & \mathbf{D̂_d^m} & \cdots & \mathbf{0}               \\ 
+        \vdots      & \vdots            & \vdots         & \ddots & \vdots                   \\
+        \mathbf{0}  & \mathbf{0}        & \mathbf{0}     & \cdots & \mathbf{D̂_d^m}           \end{bmatrix} \\
+    \mathbf{B} &=   \mathbf{0}
+    \end{aligned}
+    ```
+    The ``\mathbf{E^ŵ}`` matrix is an appropriately size ``\mathbf{0}`` matrix and, for 
+    ``p=0``, we have:
+    ```math
+    \mathbf{E^x̂} = \begin{bmatrix}
+        \mathbf{0}      & \mathbf{Ĉ^m}      & \mathbf{0}     & \cdots       & \mathbf{0}     \\ 
+        \mathbf{0}      & \mathbf{0}        & \mathbf{Ĉ^m}   & \cdots       & \mathbf{0}     \\ 
+        \vdots          & \vdots            & \vdots         & \ddots       & \vdots         \\
+        \mathbf{0}      & \mathbf{0}        & \mathbf{0}     & \cdots       & \mathbf{Ĉ^m}   \end{bmatrix}
+    ```
+    or, for ``p=1``:
+    ```math
+    \mathbf{E^x̂} = \begin{bmatrix}
+        \mathbf{Ĉ^m}   & \mathbf{0}         & \cdots        & \mathbf{0}   & \mathbf{0}      \\ 
+        \mathbf{0}     & \mathbf{Ĉ^m}       & \cdots        & \mathbf{0}   & \mathbf{0}      \\ 
+        \vdots         & \vdots             & \ddots        & \vdots       & \vdots          \\
+        \mathbf{0}     & \mathbf{0}         & \cdots        & \mathbf{Ĉ^m} & \mathbf{0}      \end{bmatrix}
+    ```
+    The matrices for the estimated states are computed by:
+    ```math
+    \begin{aligned}
+    \mathbf{E_X̂} &= \begin{bmatrix} 
+        \mathbf{E_X̂^x̂} & \mathbf{E_X̂^ŵ}                                                      \end{bmatrix} \\
+    \mathbf{G_X̂} &= \mathbf{0}                                                               \\
+    \mathbf{J_X̂} &= \mathbf{0}                                                               \\
+    \mathbf{B_X̂} &= \mathbf{0}
+    \end{aligned}
+    ```
+    The ``\mathbf{E_X̂^ŵ}`` matrix is an appropriately size ``\mathbf{0}`` matrix and:
+    ```math
+    \mathbf{E_X̂^x̂} = \begin{bmatrix}
+        \mathbf{0}      & \mathbf{I}        & \mathbf{0}     & \cdots       & \mathbf{0}     \\ 
+        \mathbf{0}      & \mathbf{0}        & \mathbf{I}     & \cdots       & \mathbf{0}     \\ 
+        \vdots          & \vdots            & \vdots         & \ddots       & \vdots         \\
+        \mathbf{0}      & \mathbf{0}        & \mathbf{0}     & \cdots       & \mathbf{I}     \end{bmatrix}
+    ```
+    The appropriate rows and columns on these matrices are selected using the slicing
+    operator `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
     model::LinModel{NT}, ::MultipleShooting, 
@@ -333,13 +388,64 @@ function init_predmat_mhe(
     return E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 end
 
-"""
+@doc raw"""
     init_defectmat_mhe(
         model::LinModel, transcription::MultipleShooting, 
         He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
     ) -> ES, GS, JS, BS
 
-TBW
+Init the matrices for computing the defects over the predicted states.
+
+With a [`MultipleShooting`](@ref) transcription, the decision vector ``\mathbf{Z}`` contains
+the arrival state estimate ``\mathbf{x̂_0}(k-N_k+p)``, the stage states ``\mathbf{X̂_0}`` 
+(both defined as deviation vector from ``\mathbf{x̂_{op}}``) and the estimated process noises
+``\mathbf{Ŵ}``. Knowing this, an equation similar to the prediction matrices (see 
+[`init_predmat_mhe`](@ref)) computes the defects of the estimated states over ``H_e``:
+```math
+\begin{aligned}
+    \mathbf{Ŝ}  &= \mathbf{E_S Z} + \mathbf{G_S U_0}  + \mathbf{J_S D_0} + \mathbf{B_S}       \\
+                &= \mathbf{E_S Z} + \mathbf{F_S}
+\end{aligned}
+```   
+They are forced to be ``\mathbf{Ŝ = 0}`` using the optimization equality constraints. The
+matrices ``\mathbf{E_S, G_S, J_S, B_S}`` are defined in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    The defect matrices are computed with:
+    ```math
+    \begin{aligned}
+    \mathbf{E_S} &= \begin{bmatrix}
+        \mathbf{E_S^x̂} & \mathbf{E_S^ŵ}                                                             \end{bmatrix} \\
+    \mathbf{E_S^x̂} &= \begin{bmatrix}
+        \mathbf{Â}     & \mathbf{-I}    & \mathbf{0}    & \cdots    & \mathbf{0} & \mathbf{0}       \\
+        \mathbf{0}     & \mathbf{Â}     & \mathbf{-I}   & \cdots    & \mathbf{0} & \mathbf{0}       \\
+        \vdots         & \vdots         & \vdots        & \ddots    & \vdots     & \vdots           \\
+        \mathbf{0}     & \mathbf{0}     & \mathbf{0}    & \cdots    & \mathbf{Â} & \mathbf{-I}      \end{bmatrix} \\
+    \mathbf{E_S^ŵ} &= \begin{bmatrix}
+        \mathbf{I}     &  \mathbf{0}    & \cdots        & \mathbf{0}                                \\
+        \mathbf{0}     &  \mathbf{I}    & \cdots        & \mathbf{0}                                \\
+        \vdots         &  \vdots        & \ddots        & \vdots                                    \\
+        \mathbf{0}     &  \mathbf{0}    & \cdots        & \mathbf{I}                                \end{bmatrix} \\
+    \mathbf{G_S} &= \begin{bmatrix}
+        \mathbf{B̂_u}   &  \mathbf{0}    & \cdots        & \mathbf{0}                                \\
+        \mathbf{0}     &  \mathbf{B̂_u}  & \cdots        & \mathbf{0}                                \\
+        \vdots         &  \vdots        & \ddots        & \vdots                                    \\
+        \mathbf{0}     &  \mathbf{0}    & \cdots        & \mathbf{B̂_u}                              \end{bmatrix} \\
+    \mathbf{J_S^†} &= \begin{bmatrix}
+        \mathbf{B̂_d}   & \mathbf{0}     & \cdots        & \mathbf{0}                                \\
+        \mathbf{0}     & \mathbf{B̂_d}   & \cdots        & \mathbf{0}                                \\
+        \vdots         & \vdots         & \ddots        & \vdots                                    \\
+        \mathbf{0}     & \mathbf{0}     & \cdots        & \mathbf{B̂_d}                              \end{bmatrix} \ , \quad
+    \mathbf{J_S} &= \begin{cases}
+        [\begin{smallmatrix} \mathbf{J_S^†} & \mathbf{0}      \end{smallmatrix}]   & p=0            \\
+        [\begin{smallmatrix} \mathbf{0}     & \mathbf{J_S^†}  \end{smallmatrix}]   & p=1            \end{cases}   \\
+    \mathbf{B_S} &= \begin{bmatrix}
+        \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}  \end{bmatrix}
+    \end{aligned}
+    ```
+    The appropriate rows and columns on these matrices are selected using the slicing
+    operator `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
 """
 function init_defectmat_mhe(
     model::LinModel{NT}, ::MultipleShooting, He, Â, B̂u, B̂d, x̂op, f̂op, direct
@@ -637,7 +743,7 @@ end
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MHE.
 
-Also init ``\mathbf{F_x̂ = G_X̂ U_0 + J_X̂ D_0 + B_X̂}`` vector for the state constraints, see 
+Also init ``\mathbf{F_X̂ = G_X̂ U_0 + J_X̂ D_0 + B_X̂}`` vector for the state constraints, see 
 [`init_predmat_mhe`](@ref).
 """
 function linconstraint!(
@@ -651,20 +757,20 @@ function linconstraint!(
         BX̂     = estim.con.BX̂[1:nX̂]
         GX̂, U0 = estim.con.GX̂[1:nX̂, 1:nU], estim.U0[1:nU]
         JX̂, D0 = estim.con.JX̂[1:nX̂, 1:nD], estim.D0[1:nD]
-        Fx̂     = @views estim.con.Fx̂[1:nX̂]
+        FX̂     = @views estim.con.FX̂[1:nX̂]
     else
         BX̂     = estim.con.BX̂
         GX̂, U0 = estim.con.GX̂, estim.U0
         JX̂, D0 = estim.con.JX̂, estim.D0
-        Fx̂     = estim.con.Fx̂
+        FX̂     = estim.con.FX̂
     end
     X̂0min, X̂0max = trunc_bounds(estim, estim.con.X̂0min, estim.con.X̂0max, nx̂)
     Ŵmin, Ŵmax   = trunc_bounds(estim, estim.con.Ŵmin,  estim.con.Ŵmax,  nŵ)
     V̂min, V̂max   = trunc_bounds(estim, estim.con.V̂min,  estim.con.V̂max,  nym)
-    # --- update Fx̂ vectors for MHE state constraints ---
-    Fx̂ .= BX̂
-    mul!(Fx̂, GX̂, U0, 1, 1)
-    model.nd > 0 && mul!(Fx̂, JX̂, D0, 1, 1)
+    # --- update FX̂ vectors for MHE state constraints ---
+    FX̂ .= BX̂
+    mul!(FX̂, GX̂, U0, 1, 1)
+    model.nd > 0 && mul!(FX̂, JX̂, D0, 1, 1)
     # --- update b vector for linear inequality constraints ---
     nX̂_He, nŴ_He, nV̂_He = length(X̂0min), length(Ŵmin), length(V̂min)
     nx̂ = length(estim.con.x̂0min)
@@ -673,9 +779,9 @@ function linconstraint!(
     n += nx̂
     estim.con.b[(n+1):(n+nx̂)] .= @. +estim.con.x̂0max
     n += nx̂
-    estim.con.b[(n+1):(n+nX̂_He)] .= @. -X̂0min + estim.con.Fx̂
+    estim.con.b[(n+1):(n+nX̂_He)] .= @. -X̂0min + estim.con.FX̂
     n += nX̂_He
-    estim.con.b[(n+1):(n+nX̂_He)] .= @. +X̂0max - estim.con.Fx̂
+    estim.con.b[(n+1):(n+nX̂_He)] .= @. +X̂0max - estim.con.FX̂
     n += nX̂_He
     estim.con.b[(n+1):(n+nŴ_He)] .= @. -Ŵmin
     n += nŴ_He
@@ -934,7 +1040,7 @@ noises from ``k-N_k+1`` to ``k``. The `X̂0` vector is estimated states from ``k
 ```math
 \begin{aligned}
 \mathbf{V̂}   &= \mathbf{Ẽ Z̃}   + \mathbf{F}     \\
-\mathbf{X̂_0} &= \mathbf{Ẽ_x̂ Z̃} + \mathbf{F_x̂}
+\mathbf{X̂_0} &= \mathbf{Ẽ_X̂ Z̃} + \mathbf{F_X̂}
 \end{aligned}
 ```
 """
@@ -949,16 +1055,16 @@ function predict_mhe!(
         nX̂, nŴ, nYm = estim.nx̂*Nk, estim.nx̂*Nk, estim.nym*Nk
         nZ̃ = nε + estim.nx̂ + nŴ
         Ẽ,  F  = estim.Ẽ[1:nYm, 1:nZ̃],     estim.F[1:nYm]
-        Ẽx̂, Fx̂ = estim.con.Ẽx̂[1:nX̂, 1:nZ̃], estim.con.Fx̂[1:nX̂]
+        ẼX̂, FX̂ = estim.con.ẼX̂[1:nX̂, 1:nZ̃], estim.con.FX̂[1:nX̂]
         Z̃ = Z̃[1:nZ̃]
         V̂_res, X̂0_res = @views V̂[1:nYm], X̂0[1:nX̂]
     else
         Ẽ, F = estim.Ẽ, estim.F
-        Ẽx̂, Fx̂ = estim.con.Ẽx̂, estim.con.Fx̂
+        ẼX̂, FX̂ = estim.con.ẼX̂, estim.con.FX̂
         V̂_res, X̂0_res = V̂, X̂0
     end
     V̂_res  .= mul!(V̂_res, Ẽ, Z̃) .+ F
-    X̂0_res .= mul!(X̂0_res, Ẽx̂, Z̃) .+ Fx̂
+    X̂0_res .= mul!(X̂0_res, ẼX̂, Z̃) .+ FX̂
     return V̂, X̂0
 end
 
