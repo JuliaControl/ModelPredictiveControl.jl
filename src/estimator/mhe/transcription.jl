@@ -260,7 +260,8 @@ matrices are defined in the Extended Help section.
     The matrices are compute by (notice the minus signs after the equalities):
     ```math
     \begin{aligned}
-    \mathbf{E} &= - \begin{bmatrix} \mathbf{E^x̂} & \mathbf{E^ŵ} \end{bmatrix}                \\
+    \mathbf{E} &= - \begin{bmatrix} 
+        \mathbf{E^x̂} & \mathbf{E^ŵ}                                                          \end{bmatrix} \\
     \mathbf{G} &=   \mathbf{0}                                                               \\
     \mathbf{J} &= - \begin{bmatrix}
         \mathbf{0}  & \mathbf{D̂_d^m}    & \mathbf{0}     & \cdots & \mathbf{0}               \\ 
@@ -290,7 +291,8 @@ matrices are defined in the Extended Help section.
     The matrices for the estimated states are computed by:
     ```math
     \begin{aligned}
-    \mathbf{E_X̂} &= \begin{bmatrix} \mathbf{E_X̂^x̂} & \mathbf{E_X̂^ŵ} \end{bmatrix}            \\
+    \mathbf{E_X̂} &= \begin{bmatrix} 
+        \mathbf{E_X̂^x̂} & \mathbf{E_X̂^ŵ}                                                      \end{bmatrix} \\
     \mathbf{G_X̂} &= \mathbf{0}                                                               \\
     \mathbf{J_X̂} &= \mathbf{0}                                                               \\
     \mathbf{B_X̂} &= \mathbf{0}
@@ -304,6 +306,8 @@ matrices are defined in the Extended Help section.
         \vdots          & \vdots            & \vdots         & \ddots       & \vdots         \\
         \mathbf{0}      & \mathbf{0}        & \mathbf{0}     & \cdots       & \mathbf{I}     \end{bmatrix}
     ```
+    The appropriate rows and columns on these matrices are selected using the slicing
+    operators `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
     model::LinModel{NT}, ::MultipleShooting, 
@@ -409,6 +413,36 @@ matrices ``\mathbf{E_S, G_S, J_S, B_S}`` are defined in the Extended Help sectio
 # Extended Help
 !!! details "Extended Help"
     The defect matrices are computed with:
+    ```math
+    \begin{aligned}
+    \mathbf{E_S} &= \begin{bmatrix}
+        \mathbf{E_S^x̂} & \mathbf{E_S^ŵ}                                                             \end{bmatrix} \\
+    \mathbf{E_S^x̂} &= \begin{bmatrix}
+        \mathbf{Â}     & \mathbf{-I}    & \mathbf{0}    & \cdots    & \mathbf{0} & \mathbf{0}       \\
+        \mathbf{0}     & \mathbf{Â}     & \mathbf{-I}   & \cdots    & \mathbf{0} & \mathbf{0}       \\
+        \vdots         & \vdots         & \vdots        & \ddots    & \vdots     & \vdots           \\
+        \mathbf{0}     & \mathbf{0}     & \mathbf{0}    & \cdots    & \mathbf{Â} & \mathbf{-I}      \end{bmatrix} \\
+    \mathbf{E_S^ŵ} &= \begin{bmatrix}
+        \mathbf{I}     &  \mathbf{0}    & \cdots        & \mathbf{0}                                \\
+        \mathbf{)}     &  \mathbf{I}    & \cdots        & \mathbf{0}                                \\
+        \vdots         &  \vdots        & \ddots        & \vdots                                    \\
+        \mathbf{0}     &  \mathbf{0}    & \cdots        & \mathbf{I}                                \end{bmatrix} \\
+    \mathbf{G_S} &= \begin{bmatrix}
+        \mathbf{B̂_u}   &  \mathbf{0}    & \cdots        & \mathbf{0}                                \\
+        \mathbf{)}     &  \mathbf{B̂_u}  & \cdots        & \mathbf{0}                                \\
+        \vdots         &  \vdots        & \ddots        & \vdots                                    \\
+        \mathbf{0}     &  \mathbf{0}    & \cdots        & \mathbf{B̂_u}                              \end{bmatrix} \\
+    \mathbf{J_S} &= \begin{bmatrix}
+        \mathbf{B̂_d}   & \mathbf{0}     & \cdots        & \mathbf{0}   & \mathbf{0}                 \\
+        \mathbf{0}     & \mathbf{B̂_u}   & \cdots        & \mathbf{0}   & \mathbf{0}                 \\
+        \vdots         & \vdots         & \ddots        & \vdots       & \vdots                     \\
+        \mathbf{0}     & \mathbf{0}     & \cdots        & \mathbf{B̂_d} & \mathbf{0}                 \end{bmatrix} \\
+    \mathbf{B_S} &= \begin{bmatrix}
+        \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}  \end{bmatrix}
+    \end{aligned}
+    ```
+    The appropriate rows and columns on these matrices are selected using the slicing
+    operators `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
 """
 function init_defectmat_mhe(
     model::LinModel{NT}, ::MultipleShooting, He, Â, B̂u, B̂d, x̂op, f̂op, direct
