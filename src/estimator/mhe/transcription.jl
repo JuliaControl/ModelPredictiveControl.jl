@@ -307,7 +307,7 @@ matrices are defined in the Extended Help section.
         \mathbf{0}      & \mathbf{0}        & \mathbf{0}     & \cdots       & \mathbf{I}     \end{bmatrix}
     ```
     The appropriate rows and columns on these matrices are selected using the slicing
-    operators `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
+    operator `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
     model::LinModel{NT}, ::MultipleShooting, 
@@ -397,10 +397,10 @@ end
 Init the matrices for computing the defects over the predicted states.
 
 With a [`MultipleShooting`](@ref) transcription, the decision vector ``\mathbf{Z}`` contains
-the arrival state estimate ``\mathbf{x̂_0}(k-N_k+p)``, the following states ``\mathbf{X̂_0}``
-(both defined as deviation vector from ``\mathbf{x̂_{op}}``) and the estimated process noise
-``\mathbf{Ŵ}``, an equation similar to the prediction matrices (see [`init_predmat_mhe`](@ref))
-computes the defects of the estimated states over ``H_e``:
+the arrival state estimate ``\mathbf{x̂_0}(k-N_k+p)``, the stage states ``\mathbf{X̂_0}`` 
+(both defined as deviation vector from ``\mathbf{x̂_{op}}``) and the estimated process noises
+``\mathbf{Ŵ}``. Knowing this, an equation similar to the prediction matrices (see 
+[`init_predmat_mhe`](@ref)) computes the defects of the estimated states over ``H_e``:
 ```math
 \begin{aligned}
     \mathbf{Ŝ}  &= \mathbf{E_S Z} + \mathbf{G_S U_0}  + \mathbf{J_S D̂_0} + \mathbf{B_S}       \\
@@ -424,25 +424,28 @@ matrices ``\mathbf{E_S, G_S, J_S, B_S}`` are defined in the Extended Help sectio
         \mathbf{0}     & \mathbf{0}     & \mathbf{0}    & \cdots    & \mathbf{Â} & \mathbf{-I}      \end{bmatrix} \\
     \mathbf{E_S^ŵ} &= \begin{bmatrix}
         \mathbf{I}     &  \mathbf{0}    & \cdots        & \mathbf{0}                                \\
-        \mathbf{)}     &  \mathbf{I}    & \cdots        & \mathbf{0}                                \\
+        \mathbf{0}     &  \mathbf{I}    & \cdots        & \mathbf{0}                                \\
         \vdots         &  \vdots        & \ddots        & \vdots                                    \\
         \mathbf{0}     &  \mathbf{0}    & \cdots        & \mathbf{I}                                \end{bmatrix} \\
     \mathbf{G_S} &= \begin{bmatrix}
         \mathbf{B̂_u}   &  \mathbf{0}    & \cdots        & \mathbf{0}                                \\
-        \mathbf{)}     &  \mathbf{B̂_u}  & \cdots        & \mathbf{0}                                \\
+        \mathbf{0}     &  \mathbf{B̂_u}  & \cdots        & \mathbf{0}                                \\
         \vdots         &  \vdots        & \ddots        & \vdots                                    \\
         \mathbf{0}     &  \mathbf{0}    & \cdots        & \mathbf{B̂_u}                              \end{bmatrix} \\
-    \mathbf{J_S} &= \begin{bmatrix}
-        \mathbf{B̂_d}   & \mathbf{0}     & \cdots        & \mathbf{0}   & \mathbf{0}                 \\
-        \mathbf{0}     & \mathbf{B̂_u}   & \cdots        & \mathbf{0}   & \mathbf{0}                 \\
-        \vdots         & \vdots         & \ddots        & \vdots       & \vdots                     \\
-        \mathbf{0}     & \mathbf{0}     & \cdots        & \mathbf{B̂_d} & \mathbf{0}                 \end{bmatrix} \\
+    \mathbf{J_S^†} &= \begin{bmatrix}
+        \mathbf{B̂_d}   & \mathbf{0}     & \cdots        & \mathbf{0}                                \\
+        \mathbf{0}     & \mathbf{B̂_d}   & \cdots        & \mathbf{0}                                \\
+        \vdots         & \vdots         & \ddots        & \vdots                                    \\
+        \mathbf{0}     & \mathbf{0}     & \cdots        & \mathbf{B̂_d}                              \end{bmatrix} \ , \quad
+    \mathbf{J_S} &= \begin{cases}
+        [\begin{smallmatrix} \mathbf{J_S^†} & \mathbf{0}      \end{smallmatrix}]   & p=0            \\
+        [\begin{smallmatrix} \mathbf{0}     & \mathbf{J_S^†}  \end{smallmatrix}]   & p=1            \end{cases}   \\
     \mathbf{B_S} &= \begin{bmatrix}
         \mathbf{f̂_{op} - x̂_{op}} \\ \mathbf{f̂_{op} - x̂_{op}} \\ \vdots \\ \mathbf{f̂_{op} - x̂_{op}}  \end{bmatrix}
     \end{aligned}
     ```
     The appropriate rows and columns on these matrices are selected using the slicing
-    operators `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
+    operator `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
 """
 function init_defectmat_mhe(
     model::LinModel{NT}, ::MultipleShooting, He, Â, B̂u, B̂d, x̂op, f̂op, direct
