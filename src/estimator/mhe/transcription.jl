@@ -743,7 +743,7 @@ end
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MHE.
 
-Also init ``\mathbf{F_x̂ = G_X̂ U_0 + J_X̂ D_0 + B_X̂}`` vector for the state constraints, see 
+Also init ``\mathbf{F_X̂ = G_X̂ U_0 + J_X̂ D_0 + B_X̂}`` vector for the state constraints, see 
 [`init_predmat_mhe`](@ref).
 """
 function linconstraint!(
@@ -757,20 +757,20 @@ function linconstraint!(
         BX̂     = estim.con.BX̂[1:nX̂]
         GX̂, U0 = estim.con.GX̂[1:nX̂, 1:nU], estim.U0[1:nU]
         JX̂, D0 = estim.con.JX̂[1:nX̂, 1:nD], estim.D0[1:nD]
-        Fx̂     = @views estim.con.Fx̂[1:nX̂]
+        FX̂     = @views estim.con.FX̂[1:nX̂]
     else
         BX̂     = estim.con.BX̂
         GX̂, U0 = estim.con.GX̂, estim.U0
         JX̂, D0 = estim.con.JX̂, estim.D0
-        Fx̂     = estim.con.Fx̂
+        FX̂     = estim.con.FX̂
     end
     X̂0min, X̂0max = trunc_bounds(estim, estim.con.X̂0min, estim.con.X̂0max, nx̂)
     Ŵmin, Ŵmax   = trunc_bounds(estim, estim.con.Ŵmin,  estim.con.Ŵmax,  nŵ)
     V̂min, V̂max   = trunc_bounds(estim, estim.con.V̂min,  estim.con.V̂max,  nym)
-    # --- update Fx̂ vectors for MHE state constraints ---
-    Fx̂ .= BX̂
-    mul!(Fx̂, GX̂, U0, 1, 1)
-    model.nd > 0 && mul!(Fx̂, JX̂, D0, 1, 1)
+    # --- update FX̂ vectors for MHE state constraints ---
+    FX̂ .= BX̂
+    mul!(FX̂, GX̂, U0, 1, 1)
+    model.nd > 0 && mul!(FX̂, JX̂, D0, 1, 1)
     # --- update b vector for linear inequality constraints ---
     nX̂_He, nŴ_He, nV̂_He = length(X̂0min), length(Ŵmin), length(V̂min)
     nx̂ = length(estim.con.x̂0min)
@@ -779,9 +779,9 @@ function linconstraint!(
     n += nx̂
     estim.con.b[(n+1):(n+nx̂)] .= @. +estim.con.x̂0max
     n += nx̂
-    estim.con.b[(n+1):(n+nX̂_He)] .= @. -X̂0min + estim.con.Fx̂
+    estim.con.b[(n+1):(n+nX̂_He)] .= @. -X̂0min + estim.con.FX̂
     n += nX̂_He
-    estim.con.b[(n+1):(n+nX̂_He)] .= @. +X̂0max - estim.con.Fx̂
+    estim.con.b[(n+1):(n+nX̂_He)] .= @. +X̂0max - estim.con.FX̂
     n += nX̂_He
     estim.con.b[(n+1):(n+nŴ_He)] .= @. -Ŵmin
     n += nŴ_He
@@ -1040,7 +1040,7 @@ noises from ``k-N_k+1`` to ``k``. The `X̂0` vector is estimated states from ``k
 ```math
 \begin{aligned}
 \mathbf{V̂}   &= \mathbf{Ẽ Z̃}   + \mathbf{F}     \\
-\mathbf{X̂_0} &= \mathbf{Ẽ_x̂ Z̃} + \mathbf{F_x̂}
+\mathbf{X̂_0} &= \mathbf{Ẽ_X̂ Z̃} + \mathbf{F_X̂}
 \end{aligned}
 ```
 """
@@ -1055,16 +1055,16 @@ function predict_mhe!(
         nX̂, nŴ, nYm = estim.nx̂*Nk, estim.nx̂*Nk, estim.nym*Nk
         nZ̃ = nε + estim.nx̂ + nŴ
         Ẽ,  F  = estim.Ẽ[1:nYm, 1:nZ̃],     estim.F[1:nYm]
-        Ẽx̂, Fx̂ = estim.con.Ẽx̂[1:nX̂, 1:nZ̃], estim.con.Fx̂[1:nX̂]
+        ẼX̂, FX̂ = estim.con.ẼX̂[1:nX̂, 1:nZ̃], estim.con.FX̂[1:nX̂]
         Z̃ = Z̃[1:nZ̃]
         V̂_res, X̂0_res = @views V̂[1:nYm], X̂0[1:nX̂]
     else
         Ẽ, F = estim.Ẽ, estim.F
-        Ẽx̂, Fx̂ = estim.con.Ẽx̂, estim.con.Fx̂
+        ẼX̂, FX̂ = estim.con.ẼX̂, estim.con.FX̂
         V̂_res, X̂0_res = V̂, X̂0
     end
     V̂_res  .= mul!(V̂_res, Ẽ, Z̃) .+ F
-    X̂0_res .= mul!(X̂0_res, Ẽx̂, Z̃) .+ Fx̂
+    X̂0_res .= mul!(X̂0_res, ẼX̂, Z̃) .+ FX̂
     return V̂, X̂0
 end
 

@@ -16,7 +16,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     estim.H̃         .= 0
     estim.q̃         .= 0
     estim.r         .= 0
-    estim.con.Fx̂    .= 0
+    estim.con.FX̂    .= 0
     if estim.direct
         # add y0m(-1) to the extended data window (custom NL constraints):
         estim.Yem[1:ny] .= y0m .+ @views yop[estim.i_ym]
@@ -918,14 +918,14 @@ function setmodel_estimator!(
         He, estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, estim.x̂op, estim.f̂op, 
         estim.direct
     )
-    A_X̂min, A_X̂max, Ẽx̂ = relaxX̂(EX̂, con.C_x̂min, con.C_x̂max, nε)   
+    A_X̂min, A_X̂max, ẼX̂ = relaxX̂(EX̂, con.C_x̂min, con.C_x̂max, nε)   
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, con.C_v̂min, con.C_v̂max, nε) 
     estim.Ẽ .= Ẽ
     estim.G .= G
     estim.J .= J
     estim.B .= B
     # --- linear inequality constraints ---
-    con.Ẽx̂ .= Ẽx̂
+    con.ẼX̂ .= ẼX̂
     con.GX̂ .= GX̂
     con.JX̂ .= JX̂
     con.BX̂ .= BX̂
