@@ -41,11 +41,11 @@ from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
 ```math
 \begin{aligned}
     \mathbf{X̂_0}  &= \mathbf{E_X̂ Z + G_X̂ U_0 + J_X̂ D_0 + B_X̂} \\
-                  &= \mathbf{E_X̂ Z + F_x̂}
+                  &= \mathbf{E_X̂ Z + F_X̂}
 \end{aligned}
 ```
 The matrices ``\mathbf{E, G, J, B, E_X̂, G_X̂, J_X̂, B_X̂}`` are defined in the Extended Help 
-section. The vectors ``\mathbf{F, F_x̂, f_x̄}`` are recalculated at each discrete time step, 
+section. The vectors ``\mathbf{F, F_X̂, f_x̄}`` are recalculated at each discrete time step, 
 see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstraint!(::MovingHorizonEstimator, ::LinModel)`](@ref).
 
 # Extended Help
@@ -271,7 +271,7 @@ matrices are defined in the Extended Help section.
     \end{aligned}
     ```
     The ``\mathbf{E^ŵ}`` matrix is an appropriately size ``\mathbf{0}`` matrix and, for 
-    ``p=0`` we have:
+    ``p=0``, we have:
     ```math
     \mathbf{E^x̂} = \begin{bmatrix}
         \mathbf{0}      & \mathbf{Ĉ^m}      & \mathbf{0}     & \cdots       & \mathbf{0}     \\ 
@@ -283,9 +283,9 @@ matrices are defined in the Extended Help section.
     ```math
     \mathbf{E^x̂} = \begin{bmatrix}
         \mathbf{Ĉ^m}   & \mathbf{0}         & \cdots        & \mathbf{0}   & \mathbf{0}      \\ 
-        \mathbf{0}     & \mathbf{Ĉ^m}       & \cdots        & \mathbf{0}   &                 \\ 
-        \vdots         & \vdots             & \ddots        & \vdots       &                 \\
-        \mathbf{0}     & \mathbf{0}         & \cdots        & \mathbf{Ĉ^m} &                 \end{bmatrix}
+        \mathbf{0}     & \mathbf{Ĉ^m}       & \cdots        & \mathbf{0}   & \mathbf{0}      \\ 
+        \vdots         & \vdots             & \ddots        & \vdots       & \vdots          \\
+        \mathbf{0}     & \mathbf{0}         & \cdots        & \mathbf{Ĉ^m} & \mathbf{0}      \end{bmatrix}
     ```
     The matrices for the estimated states are computed by:
     ```math
@@ -384,13 +384,31 @@ function init_predmat_mhe(
     return E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 end
 
-"""
+@doc raw"""
     init_defectmat_mhe(
         model::LinModel, transcription::MultipleShooting, 
         He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
     ) -> ES, GS, JS, BS
 
-TBW
+Init the matrices for computing the defects over the predicted states.
+
+With a [`MultipleShooting`](@ref) transcription, the decision vector ``\mathbf{Z}`` contains
+the arrival state estimate ``\mathbf{x̂_0}(k-N_k+p)``, the following states ``\mathbf{X̂_0}``
+(both defined as deviation vector from ``\mathbf{x̂_{op}}``) and the estimated process noise
+``\mathbf{Ŵ}``, an equation similar to the prediction matrices (see [`init_predmat_mhe`](@ref))
+computes the defects of the estimated states over ``H_e``:
+```math
+\begin{aligned}
+    \mathbf{Ŝ}  &= \mathbf{E_S Z} + \mathbf{G_S U_0}  + \mathbf{J_S D̂_0} + \mathbf{B_S}       \\
+                &= \mathbf{E_S Z} + \mathbf{F_S}
+\end{aligned}
+```   
+They are forced to be ``\mathbf{Ŝ = 0}`` using the optimization equality constraints. The
+matrices ``\mathbf{E_S, G_S, J_S, B_S}`` are defined in the Extended Help section.
+
+# Extended Help
+!!! Extended Help
+    The defect matrices are computed with:
 """
 function init_defectmat_mhe(
     model::LinModel{NT}, ::MultipleShooting, He, Â, B̂u, B̂d, x̂op, f̂op, direct
