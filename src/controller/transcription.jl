@@ -202,7 +202,7 @@ end
         model::LinModel, estim, transcription::MultipleShooting, Hp, Hc, nb
     ) -> E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
     
-Construct the prediction matrices for [`LinModel`](@ref) and [`MultipleShooting`](@ref).
+Construct them for [`LinModel`](@ref) and [`MultipleShooting`](@ref).
 
 They are defined in the Extended Help section.
 

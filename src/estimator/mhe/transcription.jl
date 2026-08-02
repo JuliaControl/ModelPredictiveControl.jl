@@ -244,7 +244,7 @@ function init_predmat_mhe(
     return E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 end
 
-"""
+@doc raw"""
     init_predmat_mhe(
         model::LinModel, transcription::MultipleShooting, 
         He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
@@ -252,7 +252,58 @@ end
 
 Construct them for [`LinModel`](@ref) and [`MultipleShooting`](@ref).
 
-TBW
+The ``\mathbf{e_x̄}`` is identical to the [`SingleShooting`](@ref) transcription. The other
+matrices are defined in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    The matrices are compute by (notice the minus signs after the equalities):
+    ```math
+    \begin{aligned}
+    \mathbf{E} &= - \begin{bmatrix} \mathbf{E^x̂} & \mathbf{E^ŵ} \end{bmatrix}                \\
+    \mathbf{G} &=   \mathbf{0}                                                               \\
+    \mathbf{J} &= - \begin{bmatrix}
+        \mathbf{0}  & \mathbf{D̂_d^m}    & \mathbf{0}     & \cdots & \mathbf{0}               \\ 
+        \mathbf{0}  & \mathbf{0}        & \mathbf{D̂_d^m} & \cdots & \mathbf{0}               \\ 
+        \vdots      & \vdots            & \vdots         & \ddots & \vdots                   \\
+        \mathbf{0}  & \mathbf{0}        & \mathbf{0}     & \cdots & \mathbf{D̂_d^m}           \end{bmatrix} \\
+    \mathbf{B} &=   \mathbf{0}
+    \end{aligned}
+    ```
+    The ``\mathbf{E^ŵ}`` matrix is an appropriately size ``\mathbf{0}`` matrix and, for 
+    ``p=0`` we have:
+    ```math
+    \mathbf{E^x̂} = \begin{bmatrix}
+        \mathbf{0}      & \mathbf{Ĉ^m}      & \mathbf{0}     & \cdots       & \mathbf{0}     \\ 
+        \mathbf{0}      & \mathbf{0}        & \mathbf{Ĉ^m}   & \cdots       & \mathbf{0}     \\ 
+        \vdots          & \vdots            & \vdots         & \ddots       & \vdots         \\
+        \mathbf{0}      & \mathbf{0}        & \mathbf{0}     & \cdots       & \mathbf{Ĉ^m}   \end{bmatrix}
+    ```
+    or, for ``p=1``:
+    ```math
+    \mathbf{E^x̂} = \begin{bmatrix}
+        \mathbf{Ĉ^m}   & \mathbf{0}         & \cdots        & \mathbf{0}   & \mathbf{0}      \\ 
+        \mathbf{0}     & \mathbf{Ĉ^m}       & \cdots        & \mathbf{0}   &                 \\ 
+        \vdots         & \vdots             & \ddots        & \vdots       &                 \\
+        \mathbf{0}     & \mathbf{0}         & \cdots        & \mathbf{Ĉ^m} &                 \end{bmatrix}
+    ```
+    The matrices for the estimated states are computed by:
+    ```math
+    \begin{aligned}
+    \mathbf{E_X̂} &= \begin{bmatrix} \mathbf{E_X̂^x̂} & \mathbf{E_X̂^ŵ} \end{bmatrix}            \\
+    \mathbf{G_X̂} &= \mathbf{0}                                                               \\
+    \mathbf{J_X̂} &= \mathbf{0}                                                               \\
+    \mathbf{B_X̂} &= \mathbf{0}
+    \end{aligned}
+    ```
+    The ``\mathbf{E_X̂^ŵ}`` matrix is an appropriately size ``\mathbf{0}`` matrix and:
+    ```math
+    \mathbf{E_X̂^x̂} = \begin{bmatrix}
+        \mathbf{0}      & \mathbf{I}        & \mathbf{0}     & \cdots       & \mathbf{0}     \\ 
+        \mathbf{0}      & \mathbf{0}        & \mathbf{I}     & \cdots       & \mathbf{0}     \\ 
+        \vdots          & \vdots            & \vdots         & \ddots       & \vdots         \\
+        \mathbf{0}      & \mathbf{0}        & \mathbf{0}     & \cdots       & \mathbf{I}     \end{bmatrix}
+    ```
 """
 function init_predmat_mhe(
     model::LinModel{NT}, ::MultipleShooting, 
