@@ -403,7 +403,7 @@ the arrival state estimate ``\mathbf{x̂_0}(k-N_k+p)``, the stage states ``\math
 [`init_predmat_mhe`](@ref)) computes the defects of the estimated states over ``H_e``:
 ```math
 \begin{aligned}
-    \mathbf{Ŝ}  &= \mathbf{E_S Z} + \mathbf{G_S U_0}  + \mathbf{J_S D̂_0} + \mathbf{B_S}       \\
+    \mathbf{Ŝ}  &= \mathbf{E_S Z} + \mathbf{G_S U_0}  + \mathbf{J_S D_0} + \mathbf{B_S}       \\
                 &= \mathbf{E_S Z} + \mathbf{F_S}
 \end{aligned}
 ```   
