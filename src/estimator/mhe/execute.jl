@@ -506,7 +506,9 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     Nk = estim.Nk[]
     p = estim.direct ? 0 : 1 # u0 argument is u0(k-1) if estim.direct, else u0(k)
     x̂0_old = estim.x̂0        # x̂0_old is x̂0(k-1|k-1) if estim.direct, else x̂0(k|k-1)
-    estim.Nk .+= 1
+    if !estim.direct || !estim.prepared[] 
+        estim.Nk .+= 1 # direct=true: only increments if updatestate! was called
+    end
     Nk = estim.Nk[]
     ismoving = (Nk > estim.He)
     # see MovingHorzionEstimator extended help for the exact time steps in each data window
