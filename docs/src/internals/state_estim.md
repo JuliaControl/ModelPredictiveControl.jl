@@ -4,6 +4,44 @@
 Pages = ["state_estim.md"]
 ```
 
+Similarly to [Function: Predictive Controllers](@ref func_predictive_control) page, the
+various data windows of the [`MovingHorizonEstimator`](@ref) are explicitly defined here
+as a preamble, to help the development of its internals. Note that they are not needed for 
+the other [`StateEstimator`](@ref) types.
+
+At the ``k``th control period, the vectors that encompass the historical deviation values of
+the manipulated input ``\mathbf{u_0}``, estimated state ``\mathbf{x̂_0}`` and measured
+output ``\mathbf{y_0^m}`` over the window length ``N_k`` are:
+
+```math
+    \mathbf{U_0} = \begin{bmatrix}
+        \mathbf{u_0}(k-N_k+p+0)   \\ \mathbf{u_0}(k-N_k+p+1)   \\ \vdots  \\ \mathbf{u_0}(k+p-1)
+    \end{bmatrix} \: , \quad
+    \mathbf{X̂_0} = \begin{bmatrix}
+        \mathbf{x̂_0}(k-N_k+p+1)   \\ \mathbf{x̂_0}(k-N_k+p+2)   \\ \vdots  \\ \mathbf{x̂_0}(k+p)
+    \end{bmatrix} \: , \quad
+    \mathbf{Y_0^m} = \begin{bmatrix}
+        \mathbf{y_0^m}(k-N_k+1)   \\ \mathbf{y_0^m}(k-N_k+1)   \\ \vdots  \\ \mathbf{y_0^m}(k-N_k+1)
+    \end{bmatrix} \quad \text{and} \quad
+```
+
+in which ``\mathbf{U_0}``, ``\mathbf{X̂_0}`` and  ``\mathbf{Y_0^m}`` are vectors of `nu*Nk`,
+`nx̂*Nk` and `nym*Nk` elements, respectively. Notice that ``\mathbf{U_0}`` and
+``\mathbf{X̂_0}`` vectors are always shifted by one time step. Additionally, ``\mathbf{U_0}``
+and ``\mathbf{Y_0^m}`` are aligned only if ``p=1`` (`direct=false`). Lastly it is worth
+noting that the arrival state estimate ``\mathbf{x̂_0}(k-N_k+p)`` is left out of the
+``\mathbf{X̂_0}`` vector. The historical deviation values of the measured disturbances
+``\mathbf{d_0}`` always includes one additional data point compared to the other windows:
+
+```math
+    \mathbf{D_0} = \begin{bmatrix}
+        \mathbf{d_0}(k-N_k+0)   \\ \mathbf{d_0}(k-N_k+1)   \\ \vdots  \\ \mathbf{d_0}(k) 
+    \end{bmatrix}
+```
+
+See the Extended Help of the [`MovingHorizonEstimator`](@ref) for the definition of the
+with the estimated process noises ``Ŵ`` and sensor noises ``V̂`` windows.
+
 ## Estimator Construction
 
 ```@docs
