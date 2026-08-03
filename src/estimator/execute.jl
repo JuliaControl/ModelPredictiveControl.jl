@@ -183,7 +183,8 @@ function initstate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     # --- init covariance error estimate, if applicable ---
     init_estimate_cov!(estim, y0m, d0, u0)
     estim.prepared[] = false
-    x̂ = estim.x̂0 + estim.x̂op
+    x̂  = estim.buffer.x̂
+    x̂ .= estim.x̂0 .+ estim.x̂op
     return x̂
 end
 
