@@ -239,6 +239,12 @@ mhe_cstr_osqp_curr = setconstraint!(mhe_cstr_osqp_curr; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_cstr_osqp_curr.optim)
 
 optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
+transcription = MultipleShooting()
+mhe_cstr_osqp_ms = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, transcription)
+mhe_cstr_osqp_ms = setconstraint!(mhe_cstr_osqp_ms; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_cstr_osqp_ms.optim)
+
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 direct = false
 mhe_cstr_osqp_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
 mhe_cstr_osqp_pred = setconstraint!(mhe_cstr_osqp_pred; v̂min, v̂max)
@@ -259,6 +265,10 @@ JuMP.set_attribute(mhe_cstr_daqp_pred.optim, "eps_prox", 1e-6) # needed to suppo
 samples, evals = 10000, 1
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Current form"] =
     @benchmarkable(test_mhe($mhe_cstr_osqp_curr, $plant); 
+        samples=samples, evals=evals
+    )
+CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["MultipleShooting"] =
+    @benchmarkable(test_mhe($mhe_cstr_osqp_ms, $plant); 
         samples=samples, evals=evals
     )
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Prediction form"] =
