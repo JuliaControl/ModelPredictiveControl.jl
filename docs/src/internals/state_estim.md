@@ -21,7 +21,7 @@ output ``\mathbf{y_0^m}`` over the window length ``N_k`` are:
         \mathbf{x̂_0}(k-N_k+p+1)   \\ \mathbf{x̂_0}(k-N_k+p+2)   \\ \vdots  \\ \mathbf{x̂_0}(k+p)
     \end{bmatrix} \quad \text{and} \quad
     \mathbf{Y_0^m} = \begin{bmatrix}
-        \mathbf{y_0^m}(k-N_k+1)   \\ \mathbf{y_0^m}(k-N_k+1)   \\ \vdots  \\ \mathbf{y_0^m}(k-N_k+1)
+        \mathbf{y_0^m}(k-N_k+1)   \\ \mathbf{y_0^m}(k-N_k+2)   \\ \vdots  \\ \mathbf{y_0^m}(k)
     \end{bmatrix} 
 ```
 
