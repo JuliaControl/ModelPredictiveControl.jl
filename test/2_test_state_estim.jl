@@ -75,6 +75,7 @@ end
     @test evaloutput(kalmanfilter1) ≈ kalmanfilter1() ≈ [50, 30]
     @test evaloutput(kalmanfilter1, d) ≈ kalmanfilter1(d) ≈ [50, 30]
     @test initstate!(kalmanfilter1, [10, 50], [50, 30+1]) ≈ [zeros(3); [1]]
+    @test kalmanfilter1.prepared[] == false
     linmodel2 = LinModel(append(tf(1, [1, 0]), tf(2, [10, 1])), 1.0)
     kalmanfilter2 = SteadyKalmanFilter(linmodel2, nint_u=[1, 1], direct=false)
     x = initstate!(kalmanfilter2, [10, 3], [0.5, 6+0.1])
