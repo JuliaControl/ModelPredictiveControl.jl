@@ -146,9 +146,11 @@ UNIT_ESTIM["ExtendedKalmanFilter"]["evaloutput"]["NonLinModel"] =
 
 mhe_lin_curr    = MovingHorizonEstimator(linmodel, He=10, direct=true)
 mhe_lin_pred    = MovingHorizonEstimator(linmodel, He=10, direct=false)
-mhe_lin_skf    = MovingHorizonEstimator(linmodel, He=10, covestim=SteadyKalmanFilter(linmodel))
+mhe_lin_ms      = MovingHorizonEstimator(linmodel, He=10, transcription=MultipleShooting())
+mhe_lin_skf     = MovingHorizonEstimator(linmodel, He=10, covestim=SteadyKalmanFilter(linmodel))
 mhe_nonlin_curr = MovingHorizonEstimator(nonlinmodel, He=10, direct=true)
 mhe_nonlin_pred = MovingHorizonEstimator(nonlinmodel, He=10, direct=false)
+mhe_nonlin_ms   = MovingHorizonEstimator(nonlinmodel, He=10, transcription=MultipleShooting())
 
 samples, evals, seconds = 10000, 1, 60
 UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Current form"] =
@@ -159,6 +161,11 @@ UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Current form"
 UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Constant arr. cov."] =
     @benchmarkable(
         preparestate!($mhe_lin_skf, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["MultipleShooting"] =
+    @benchmarkable(
+        preparestate!($mhe_lin_ms, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
 UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Prediction form"] =
@@ -176,6 +183,11 @@ UNIT_ESTIM["MovingHorizonEstimator"]["getinfo!"]["LinModel"] =
 UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["NonLinModel"]["Current form"] =
     @benchmarkable(
         preparestate!($mhe_nonlin_curr, $y, $d),
+        samples=samples, evals=evals, seconds=seconds,
+    )
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["NonLinModel"]["MultipleShooting"] =
+    @benchmarkable(
+        preparestate!($mhe_nonlin_ms, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
 UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["NonLinModel"]["Prediction form"] =
