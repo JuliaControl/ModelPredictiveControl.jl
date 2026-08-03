@@ -1038,10 +1038,15 @@ end
 
     mhe2 = MovingHorizonEstimator(linmodel, He=2)
     preparestate!(mhe2, [50, 30], [5])
+    @test mhe2.Nk[] == 1
+    preparestate!(mhe2, [50, 30], [5])
+    @test mhe2.Nk[] == 1
     x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
+    @test mhe2.Nk[] == 1
     @test x̂ ≈ zeros(6) atol=1e-9
     @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
     preparestate!(mhe2, [50, 30], [5])
+    @test mhe2.Nk[] == 2
     info = getinfo(mhe2)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
@@ -1060,7 +1065,9 @@ end
 
     mhe2 = MovingHorizonEstimator(linmodel, He=2, nint_u=[1, 1], nint_ym=[0, 0], direct=false)
     preparestate!(mhe2, [50, 30], [5])
+    @test mhe2.Nk[] == 0
     x̂ = updatestate!(mhe2, [10, 50], [50, 30], [5])
+    @test mhe2.Nk[] == 1
     @test x̂ ≈ zeros(6) atol=1e-9
     @test mhe2.x̂0 ≈ zeros(6) atol=1e-9
     info = getinfo(mhe2)
