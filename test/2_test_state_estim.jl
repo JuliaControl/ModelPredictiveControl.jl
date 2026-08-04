@@ -1677,15 +1677,19 @@ end
     @test mhe.cov.R̂ ≈ [1e-6]
     @test mhe.cov.invR̂_He ≈ diagm(repeat([1e6], He))
 
-    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
-    h(x,d,model)   = model.C*x + model.Du*d
-    nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1, p=linmodel, solver=nothing)
-    mhe2 = MovingHorizonEstimator(nonlinmodel; He, nint_ym=0)
-    setmodel!(mhe2, Q̂=[1e-3], R̂=[1e-6])
-    @test mhe2.cov.Q̂ ≈ [1e-3]
-    @test mhe2.cov.invQ̂_He ≈ diagm(repeat([1e3], He))
-    @test mhe2.cov.R̂ ≈ [1e-6]
-    @test mhe2.cov.invR̂_He ≈ diagm(repeat([1e6], He))
+    linmodel = LinModel([0.5], [0.3], [1.0], 0, 0, 10.0)
+    linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
+    mhe2 = MovingHorizonEstimator(
+        linmodel; He, nint_ym=0, direct=false, transcription=SingleShooting()
+    )
+    x̂ = updatestate!(mhe2, [2.0 + 1.0], [50.0])
+    @test x̂ ≈ [3.0 + 0.3] atol=1e-3
+    newlinmodel = LinModel([0.5], [0.9], [1.0], 0, 0, 10.0)
+    newlinmodel = setop!(newlinmodel, uop=[3.0], yop=[55.0], xop=[8.0], fop=[8.0])
+    setmodel!(mhe2, newlinmodel)
+    initstate!(mhe2, [3.0], [55.0])
+    x̂ = updatestate!(mhe2, [3.0 + 1.0], [55.0])
+    @test x̂ ≈ [8.0 + 0.9] atol=1e-3
 
     linmodel = LinModel([0.5], [0.3], [1.0], 0, 0, 10.0)
     linmodel = setop!(linmodel, uop=[2.0], yop=[50.0], xop=[3.0], fop=[3.0])
@@ -1700,10 +1704,20 @@ end
     initstate!(mhe3, [3.0], [55.0])
     x̂ = updatestate!(mhe3, [3.0 + 1.0], [55.0])
     @test x̂ ≈ [8.0 + 0.9] atol=1e-3
+
+    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h(x,d,model)   = model.C*x + model.Du*d
+    nonlinmodel = NonLinModel(f, h, 10.0, 1, 1, 1, p=linmodel, solver=nothing)
+    mhe5 = MovingHorizonEstimator(nonlinmodel; He, nint_ym=0)
+    setmodel!(mhe5, Q̂=[1e-3], R̂=[1e-6])
+    @test mhe5.cov.Q̂ ≈ [1e-3]
+    @test mhe5.cov.invQ̂_He ≈ diagm(repeat([1e3], He))
+    @test mhe5.cov.R̂ ≈ [1e-6]
+    @test mhe5.cov.invR̂_He ≈ diagm(repeat([1e6], He))
     
-    @test_throws ErrorException setmodel!(mhe2, deepcopy(nonlinmodel))
+    @test_throws ErrorException setmodel!(mhe5, deepcopy(nonlinmodel))
     @test_throws ErrorException setmodel!(mhe, Q̂=diagm([-0.1]))
-    @test_throws ErrorException setmodel!(mhe, R̂=diagm([-0.1]))=#
+    @test_throws ErrorException setmodel!(mhe, R̂=diagm([-0.1]))
 
 end
 
