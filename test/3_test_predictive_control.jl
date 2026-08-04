@@ -1131,16 +1131,17 @@ end
     f(x,u,_,model) = model.A*x + model.Bu*u
     h(x,_,model)   = model.C*x
     nlmodel = NonLinModel(f, h, linmodel.Ts, 1, 1, 1, 0, p=linmodel, solver=nothing)
+    nlmodel = setop!(nlmodel, yop=[10])
     u, ym = let nlmodel=nlmodel, r=r, outdist=outdist
         estim = UnscentedKalmanFilter(nlmodel, nint_u=[1])
-        nmpc_nint_ym = NonLinMPC(estim; Hp=10, transcription=MultipleShooting())
+        nmpc_nint_u_ms = NonLinMPC(estim; Hp=10, transcription=MultipleShooting())
         nlmodel.x0 .= 0
         ym, u = nlmodel() - outdist, [0.0]
         for i=1:25
             ym = nlmodel() - outdist
-            preparestate!(nmpc_nint_ym, ym)
-            u = moveinput!(nmpc_nint_ym, r)
-            updatestate!(nmpc_nint_ym, u, ym)
+            preparestate!(nmpc_nint_u_ms, ym)
+            u = moveinput!(nmpc_nint_u_ms, r)
+            updatestate!(nmpc_nint_u_ms, u, ym)
             updatestate!(nlmodel, u)
         end
         u, ym
