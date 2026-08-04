@@ -572,6 +572,7 @@ end
         gc!=(_,_,_,_,_,_,_,_,_,_,_) -> nothing,
         gc=gc!,
         nc=0,
+        transcription=SingleShooting(),
         optim=default_optim_mhe(model, nc), 
         gradient=AutoForwardDiff(),
         jacobian=AutoForwardDiff(),
