@@ -368,6 +368,25 @@ mhe_pendulum_madnlp_predh = MovingHorizonEstimator(
 mhe_pendulum_madnlp_pred = setconstraint!(mhe_pendulum_madnlp_predh; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_pendulum_madnlp_predh.optim)
 
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="funnelsqp"), add_bridges=false)
+direct = true
+hessian = true
+mhe_pendulum_uno_currh = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct, hessian
+)
+mhe_pendulum_uno_currh = setconstraint!(mhe_pendulum_uno_currh; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_uno_currh.optim)
+
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="funnelsqp"), add_bridges=false)
+direct = true
+hessian = true
+transcription = MultipleShooting()
+mhe_pendulum_uno_currhms = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct, hessian, transcription
+)
+mhe_pendulum_uno_currhms = setconstraint!(mhe_pendulum_uno_currhms; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_uno_currhms.optim)
+
 samples, evals, seconds = 25, 1, 15*60
 # CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
 #     @benchmarkable(
@@ -407,5 +426,15 @@ CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["MadNLP"]["Current form (Hessia
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["MadNLP"]["Prediction form (Hessian)"] =
     @benchmarkable(
         sim!($mhe_pendulum_madnlp_predh, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Uno"]["Current form (Hessian)"] =
+    @benchmarkable(
+        sim!($mhe_pendulum_uno_currh, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Uno"]["Current form (Hessian, MultipleShooting)"] =
+    @benchmarkable(
+        sim!($mhe_pendulum_uno_currhms, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
