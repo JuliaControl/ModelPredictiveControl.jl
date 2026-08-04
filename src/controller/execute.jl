@@ -770,7 +770,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
     ]
     # --- linear equality constraints ---
     con.Aeq .= Aeq
-    # --- operating points ---
+    # --- bound constraint operating points ---
     con.U0min .+= mpc.Uop # convert U0 to U with the old operating point
     con.U0max .+= mpc.Uop # convert U0 to U with the old operating point
     con.Y0min .+= mpc.Yop # convert Y0 to Y with the old operating point
