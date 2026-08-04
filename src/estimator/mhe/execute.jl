@@ -1009,6 +1009,9 @@ function setmodel_estimator!(
     JuMP.delete(estim.optim, estim.optim[:linconstraint])
     JuMP.unregister(estim.optim, :linconstraint)
     @constraint(estim.optim, linconstraint, A*Z̃var .≤ b)
+    JuMP.delete(estim.optim, estim.optim[:linconstrainteq])
+    JuMP.unregister(estim.optim, :linconstrainteq)
+    @constraint(optim, linconstrainteq, con.Aeq*Z̃var .== con.beq)
     for i in eachindex(Z̃var)
         # deletion not required here since changing op. pts won't change finite status
         !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
