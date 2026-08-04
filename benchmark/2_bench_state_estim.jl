@@ -146,9 +146,11 @@ UNIT_ESTIM["ExtendedKalmanFilter"]["evaloutput"]["NonLinModel"] =
 
 mhe_lin_curr    = MovingHorizonEstimator(linmodel, He=10, direct=true)
 mhe_lin_pred    = MovingHorizonEstimator(linmodel, He=10, direct=false)
-mhe_lin_skf    = MovingHorizonEstimator(linmodel, He=10, covestim=SteadyKalmanFilter(linmodel))
+mhe_lin_ms      = MovingHorizonEstimator(linmodel, He=10, transcription=MultipleShooting())
+mhe_lin_skf     = MovingHorizonEstimator(linmodel, He=10, covestim=SteadyKalmanFilter(linmodel))
 mhe_nonlin_curr = MovingHorizonEstimator(nonlinmodel, He=10, direct=true)
 mhe_nonlin_pred = MovingHorizonEstimator(nonlinmodel, He=10, direct=false)
+mhe_nonlin_ms   = MovingHorizonEstimator(nonlinmodel, He=10, transcription=MultipleShooting())
 
 samples, evals, seconds = 10000, 1, 60
 UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Current form"] =
@@ -156,26 +158,14 @@ UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Current form"
         preparestate!($mhe_lin_curr, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
-UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Current form"] = 
-    @benchmarkable(
-        updatestate!($mhe_lin_curr, $u, $y, $d),
-        setup=preparestate!($mhe_lin_curr, $y, $d),
-        samples=samples, evals=evals, seconds=seconds,
-    )
 UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Constant arr. cov."] =
     @benchmarkable(
         preparestate!($mhe_lin_skf, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
-UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Constant arr. cov."] = 
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["MultipleShooting"] =
     @benchmarkable(
-        updatestate!($mhe_lin_skf, $u, $y, $d),
-        setup=preparestate!($mhe_lin_skf, $y, $d),
-        samples=samples, evals=evals, seconds=seconds,
-    )
-UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["LinModel"]["Prediction form"] =
-    @benchmarkable(
-        preparestate!($mhe_lin_pred, $y, $d),
+        preparestate!($mhe_lin_ms, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
 UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["LinModel"]["Prediction form"] =
@@ -195,15 +185,9 @@ UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["NonLinModel"]["Current fo
         preparestate!($mhe_nonlin_curr, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
-UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["NonLinModel"]["Current form"] = 
+UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["NonLinModel"]["MultipleShooting"] =
     @benchmarkable(
-        updatestate!($mhe_nonlin_curr, $u, $y, $d),
-        setup=preparestate!($mhe_nonlin_curr, $y, $d),
-        samples=samples, evals=evals, seconds=seconds,
-    )
-UNIT_ESTIM["MovingHorizonEstimator"]["preparestate!"]["NonLinModel"]["Prediction form"] =
-    @benchmarkable(
-        preparestate!($mhe_nonlin_pred, $y, $d),
+        preparestate!($mhe_nonlin_ms, $y, $d),
         samples=samples, evals=evals, seconds=seconds,
     )
 UNIT_ESTIM["MovingHorizonEstimator"]["updatestate!"]["NonLinModel"]["Prediction form"] =
@@ -255,6 +239,12 @@ mhe_cstr_osqp_curr = setconstraint!(mhe_cstr_osqp_curr; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_cstr_osqp_curr.optim)
 
 optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
+transcription = MultipleShooting()
+mhe_cstr_osqp_ms = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, transcription)
+mhe_cstr_osqp_ms = setconstraint!(mhe_cstr_osqp_ms; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_cstr_osqp_ms.optim)
+
+optim = JuMP.Model(OSQP.Optimizer, add_bridges=true)
 direct = false
 mhe_cstr_osqp_pred = MovingHorizonEstimator(model; He, nint_u, σQint_u, optim, direct)
 mhe_cstr_osqp_pred = setconstraint!(mhe_cstr_osqp_pred; v̂min, v̂max)
@@ -275,6 +265,10 @@ JuMP.set_attribute(mhe_cstr_daqp_pred.optim, "eps_prox", 1e-6) # needed to suppo
 samples, evals = 10000, 1
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Current form"] =
     @benchmarkable(test_mhe($mhe_cstr_osqp_curr, $plant); 
+        samples=samples, evals=evals
+    )
+CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["MultipleShooting"] =
+    @benchmarkable(test_mhe($mhe_cstr_osqp_ms, $plant); 
         samples=samples, evals=evals
     )
 CASE_ESTIM["CSTR"]["MovingHorizonEstimator"]["OSQP"]["Prediction form"] =
@@ -300,15 +294,17 @@ N = 35;
 
 x_0 = [0.1, 0.1]; x̂_0 = [0, 0, 0]; u = [0.5]
 
+### The MHE without exact Hessians does not work well on the inverted pendulum, commenting them:
+# optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+# direct = true
+# mhe_pendulum_ipopt_curr = MovingHorizonEstimator(
+#     model; He, σQ, σR, nint_u, σQint_u, optim, direct
+# )
+# mhe_pendulum_ipopt_curr = setconstraint!(mhe_pendulum_ipopt_curr; v̂min, v̂max)
+# JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_curr.optim)
+
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
 direct = true
-mhe_pendulum_ipopt_curr = MovingHorizonEstimator(
-    model; He, σQ, σR, nint_u, σQint_u, optim, direct
-)
-mhe_pendulum_ipopt_curr = setconstraint!(mhe_pendulum_ipopt_curr; v̂min, v̂max)
-JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_curr.optim)
-JuMP.set_attribute(mhe_pendulum_ipopt_curr.optim, "tol", 1e-7)
-
 hessian = true
 mhe_pendulum_ipopt_currh = MovingHorizonEstimator(
     model; He, σQ, σR, nint_u, σQint_u, optim, direct, hessian
@@ -317,21 +313,42 @@ mhe_pendulum_ipopt_currh = setconstraint!(mhe_pendulum_ipopt_currh; v̂min, v̂m
 JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_currh.optim)
 
 optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
-direct = false
-mhe_pendulum_ipopt_pred = MovingHorizonEstimator(
-    model; He, σQ, σR, nint_u, σQint_u, optim, direct
+direct = true
+hessian = true
+transcription = MultipleShooting()
+mhe_pendulum_ipopt_currhms = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct, hessian, transcription
 )
-mhe_pendulum_ipopt_pred = setconstraint!(mhe_pendulum_ipopt_pred; v̂min, v̂max)
-JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_pred.optim)
-JuMP.set_attribute(mhe_pendulum_ipopt_pred.optim, "tol", 1e-7)
+mhe_pendulum_ipopt_currhms = setconstraint!(mhe_pendulum_ipopt_currhms; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_currhms.optim)
 
+# ## The MHE without exact Hessians does not work well on the inverted pendulum, commenting them:
+# optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+# direct = false
+# mhe_pendulum_ipopt_pred = MovingHorizonEstimator(
+#     model; He, σQ, σR, nint_u, σQint_u, optim, direct
+# )
+# mhe_pendulum_ipopt_pred = setconstraint!(mhe_pendulum_ipopt_pred; v̂min, v̂max)
+# JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_pred.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+direct = false
 hessian = true
 mhe_pendulum_ipopt_predh = MovingHorizonEstimator(
     model; He, σQ, σR, nint_u, σQint_u, optim, direct, hessian
 )
 mhe_pendulum_ipopt_predh = setconstraint!(mhe_pendulum_ipopt_predh; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_predh.optim)
-JuMP.set_attribute(mhe_pendulum_ipopt_predh.optim, "tol", 1e-7)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+direct = false
+hessian = true
+transcription = MultipleShooting()
+mhe_pendulum_ipopt_predhms = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct, hessian, transcription
+)
+mhe_pendulum_ipopt_predhms = setconstraint!(mhe_pendulum_ipopt_predhms; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_ipopt_predhms.optim)
 
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 direct = true
@@ -341,7 +358,6 @@ mhe_pendulum_madnlp_currh = MovingHorizonEstimator(
 )
 mhe_pendulum_madnlp_currh = setconstraint!(mhe_pendulum_madnlp_currh; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_pendulum_madnlp_currh.optim)
-JuMP.set_attribute(mhe_pendulum_madnlp_currh.optim, "tol", 1e-7)
 
 optim = JuMP.Model(MadNLP.Optimizer, add_bridges=false)
 direct = false
@@ -351,27 +367,55 @@ mhe_pendulum_madnlp_predh = MovingHorizonEstimator(
 )
 mhe_pendulum_madnlp_pred = setconstraint!(mhe_pendulum_madnlp_predh; v̂min, v̂max)
 JuMP.unset_time_limit_sec(mhe_pendulum_madnlp_predh.optim)
-JuMP.set_attribute(mhe_pendulum_madnlp_predh.optim, "tol", 1e-7)
+
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="funnelsqp"), add_bridges=false)
+direct = true
+hessian = true
+mhe_pendulum_uno_currh = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct, hessian
+)
+mhe_pendulum_uno_currh = setconstraint!(mhe_pendulum_uno_currh; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_uno_currh.optim)
+
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="funnelsqp"), add_bridges=false)
+direct = true
+hessian = true
+transcription = MultipleShooting()
+mhe_pendulum_uno_currhms = MovingHorizonEstimator(
+    model; He, σQ, σR, nint_u, σQint_u, optim, direct, hessian, transcription
+)
+mhe_pendulum_uno_currhms = setconstraint!(mhe_pendulum_uno_currhms; v̂min, v̂max)
+JuMP.unset_time_limit_sec(mhe_pendulum_uno_currhms.optim)
 
 samples, evals, seconds = 25, 1, 15*60
-CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
-    @benchmarkable(
-        sim!($mhe_pendulum_ipopt_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
-        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
-    )
+# CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form"] =
+#     @benchmarkable(
+#         sim!($mhe_pendulum_ipopt_curr, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+#         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+#     )
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form (Hessian)"] =
     @benchmarkable(
         sim!($mhe_pendulum_ipopt_currh, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
-CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Prediction form"] =
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Current form (Hessian, MultipleShooting)"] =
     @benchmarkable(
-        sim!($mhe_pendulum_ipopt_pred, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        sim!($mhe_pendulum_ipopt_currhms, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
+# CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Prediction form"] =
+#     @benchmarkable(
+#         sim!($mhe_pendulum_ipopt_pred, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+#         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+#     )
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Prediction form (Hessian)"] =
     @benchmarkable(
         sim!($mhe_pendulum_ipopt_predh, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Ipopt"]["Prediction form (Hessian, MultipleShooting)"] =
+    @benchmarkable(
+        sim!($mhe_pendulum_ipopt_predhms, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["MadNLP"]["Current form (Hessian)"] =
@@ -382,5 +426,15 @@ CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["MadNLP"]["Current form (Hessia
 CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["MadNLP"]["Prediction form (Hessian)"] =
     @benchmarkable(
         sim!($mhe_pendulum_madnlp_predh, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Uno"]["Current form (Hessian)"] =
+    @benchmarkable(
+        sim!($mhe_pendulum_uno_currh, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Uno"]["Current form (Hessian, MultipleShooting)"] =
+    @benchmarkable(
+        sim!($mhe_pendulum_uno_currhms, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
