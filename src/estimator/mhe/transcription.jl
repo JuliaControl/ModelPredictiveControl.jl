@@ -489,8 +489,8 @@ end
 
 @doc raw"""
     init_defectmat_mhe(
-    model::SimModel{NT}, transcription::TranscriptionMethod, He, Â, _ , _ , _ , _ , As, _
-) where {NT<:Real}
+        model::SimModel, transcription::TranscriptionMethod, He, Â, _ , _ , _ , _ , As, _
+    ) -> ES, GS, JS, BS
 
 Init the matrices for computing the defects of the stochastic states only.
 
@@ -855,8 +855,8 @@ end
 
 """
     linconstrainteq!(
-    estim::MovingHorizonEstimator, ::SimModel, transcription::TranscriptionMethod
-)
+        estim::MovingHorizonEstimator, ::SimModel, transcription::TranscriptionMethod
+    )
 
 By default, only update `Aeq` when `Nk < He` for other [`TranscriptionMethod`](@ref).
 
