@@ -141,6 +141,37 @@ function ĥ!(ŷ0, model::SimModel, Cs_y, x̂0, d0)
     return nothing
 end
 
+"""
+    disturbedinput!(Û0, estim::StateEstimator, x̂0, X̂0, U0) -> Û0
+
+Fill disturbed inputs of the augmented model `Û0` in-place with the stochastic states in `X̂0`.
+
+Both `Û0` and `U0` variables include deviation vectors from ``k+0`` to ``k+N-1``. The
+predicted states `X̂0` include deviation vectors from ``k+1`` to ``k+N``, and `x̂0` is the
+value at ``k``.
+
+This function is needed for the collocation methods that directly call the state derivative 
+function `estim.model.f!` with the manipulated inputs augmented with the estimated 
+disturbances at model input (see [`init_estimstoch`](@ref)). This is also needed for
+[`MultipleShooting`](@ref) since it calls the discrete-time update function of the
+deterministic model [`f!`](@ref) to treat the stochastic defects as linear equality
+constraints. Lastly, it's also necessary to prefill the `Û0` vector before anything else
+since both `û0` and `û0next` are needed at each stage with hold order `h>0`, thus potential
+race conditions with multi-threading.
+"""
+function disturbedinput!(Û0, estim::StateEstimator, x̂0, X̂0, U0)
+    nu, nx, nx̂ = estim.model.nu, estim.model.nx, estim.nx̂
+    N = length(Û0) ÷ nu
+    Cs_u = estim.Cs_u
+    Û0 .= U0                            
+    for j=0:N-1
+        xs = @views j < 1 ? x̂0[(nx+1):(nx̂)] : X̂0[(nx+1+nx̂*(j-1)):(nx̂*j)] 
+        û0 = @views Û0[(1+nu*j):(nu*(j+1))]
+        mul!(û0, Cs_u, xs, 1, 1)                    # û0 = u0 + Cs_u*xs               
+    end
+    return Û0
+end
+
 @doc raw"""
     initstate!(estim::StateEstimator, u, ym, d=[]) -> x̂
 

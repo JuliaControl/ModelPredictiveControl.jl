@@ -191,6 +191,8 @@ function ĥ!(ŷ0, ::InternalModel, model::NonLinModel, x̂0, d0)
     return h!(ŷ0, model, x̂0, d0, model.p)
 end
 
+"No input disturbances for [`InternalModel`](@ref), return `Û0 .= U0`."
+disturbedinput!(Û0, ::InternalModel, _ , _ , U0) = (Û0 .= U0)
 
 @doc raw"""
     init_internalmodel(As, Bs, Cs, Ds) -> Âs, B̂s

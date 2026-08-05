@@ -17,6 +17,7 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     estim.q̃         .= 0
     estim.r         .= 0
     estim.con.FX̂    .= 0
+    estim.con.FS    .= 0
     if estim.direct
         # add y0m(-1) to the extended data window (custom NL constraints):
         estim.Yem[1:ny] .= y0m .+ @views yop[estim.i_ym]
@@ -422,7 +423,7 @@ function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<
     nYm, nZ = estim.nym*Nk, get_nZ_mhe(estim.transcription, Nk, nx̂, nŵ)
     # --- truncate vectors and matrices if Nk < He ---
     U0, D0, Y0m = trunc_windows(estim)
-    Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var = trunc_predmat(estim, estim.transcription)
+    Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var = trunc_predmat(estim)
     invQ̂_Nk = trunc_cov(invQ̂_He, nx̂, Nk, estim.He)
     invR̂_Nk = trunc_cov(invR̂_He, nym, Nk, estim.He)
     # --- update F and fx̄ vectors for MHE predictions ---
@@ -650,6 +651,55 @@ function trunc_windows(estim::MovingHorizonEstimator)
         Y0m = estim.Y0m
     end
     return U0, D0, Y0m
+end
+
+"Truncate or extract subparts of the prediction matrices if `Nk < He`"
+function trunc_predmat(estim::MovingHorizonEstimator)
+    model, transcription = estim.model, estim.transcription
+    nŵ, nym, nε, Nk = estim.nx̂, estim.nym, estim.nε, estim.Nk[]
+    nU, nYm, nŴ, nD = model.nu*Nk, nym*Nk, nŵ*Nk, model.nd*(Nk+1)
+    if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
+        i_Z̃_Nk = get_i_Z̃_Nk(estim, transcription)
+        i_Z_Nk  = nε < 1 ? i_Z̃_Nk : i_Z̃_Nk[begin+1:end] .- 1
+        Ẽ       = estim.Ẽ[1:nYm, i_Z̃_Nk]
+        G, J, B = estim.G[1:nYm, 1:nU], estim.J[1:nYm, 1:nD], estim.B[1:nYm]
+        ẽx̄      = estim.ẽx̄[:, i_Z̃_Nk]
+        Tŵ      = estim.Tŵ[1:nŴ, i_Z_Nk]
+        F       = @views estim.F[1:nYm] # views here since they will store results
+        H̃_data  = @views estim.H̃.data[i_Z̃_Nk, i_Z̃_Nk]
+        H̃       = @views estim.H̃[i_Z̃_Nk, i_Z̃_Nk]
+        q̃       = @views estim.q̃[i_Z̃_Nk]
+        Z̃var    = @views estim.optim[:Z̃var][i_Z̃_Nk]
+    else
+        Ẽ, F, G, J, B = estim.Ẽ, estim.F, estim.G, estim.J, estim.B
+        ẽx̄, Tŵ        = estim.ẽx̄, estim.Tŵ
+        H̃, H̃_data, q̃  = estim.H̃, estim.H̃.data, estim.q̃
+        Z̃var          = estim.optim[:Z̃var]
+    end
+    return Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var
+end
+
+"Extract subparts of the defect matrices if `Nk < He`"
+function trunc_defectmat(estim::MovingHorizonEstimator)
+    model, transcription, con = estim.model, estim.transcription, estim.con
+    FS = con.FS
+    nx̂, Nk = estim.nx̂, estim.Nk[]
+    nU, nX̂, nD = model.nu*Nk, nx̂*Nk, model.nd*(Nk+1)
+    if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
+        i_Z̃_Nk     = get_i_Z̃_Nk(estim, transcription)
+        ẼS         = con.ẼS[1:nX̂, i_Z̃_Nk]
+        GS, JS, BS = con.GS[1:nX̂, 1:nU], con.JS[1:nX̂, 1:nD], con.BS[1:nX̂]
+        FS         = @views con.FS[1:nX̂] # views here since they will store results
+        Aeq        = @views con.Aeq[1:nX̂, i_Z̃_Nk]
+        beq        = @views con.beq[1:nX̂]
+        Z̃var       = @views estim.optim[:Z̃var][i_Z̃_Nk]
+    else
+        ẼS, FS, GS, JS, BS = con.ẼS, con.FS, con.GS, con.JS, con.BS
+        Aeq  = con.Aeq
+        beq  = con.beq
+        Z̃var = estim.optim[:Z̃var]
+    end
+    return ẼS, FS, GS, JS, BS, Aeq, beq, Z̃var
 end
 
 "Truncate the inverse covariance `invA_He` to the window size `Nk` if `Nk < He`."
@@ -931,8 +981,8 @@ function setmodel_estimator!(
     con.BX̂ .= BX̂
     # --- defect matrices ---
     ES, GS, JS, BS = init_defectmat_mhe(
-        model, transcription, He, estim.Â, estim.B̂u, estim.B̂d, estim.x̂op, estim.f̂op, 
-        estim.direct
+        model, transcription, He, 
+        estim.Â, estim.B̂u, estim.B̂d, estim.x̂op, estim.f̂op, estim.As, estim.direct
     )
     Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
     con.ẼS .= ẼS
