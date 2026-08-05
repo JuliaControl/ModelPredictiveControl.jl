@@ -545,7 +545,7 @@ end
 
 "Return empty matrices for [`SingleShooting`](@ref) transcription on any `SimModel` (N/A)."
 function init_defectmat_mhe(
-    model::SimModel{NT}, transcription::SingleShooting, He, Â, _ , _ , _ , _ , _
+    model::SimModel{NT}, transcription::SingleShooting, He, Â, _ , _ , _ , _ , _ , _
 ) where {NT<:Real}
     nx̂ = size(Â, 2)
     nŵ = nx̂
