@@ -2,6 +2,21 @@
 get_nZ_mhe(::SingleShooting, He, nx̂, nŵ) = nx̂ + nŵ*He
 get_nZ_mhe(::TranscriptionMethod, He, nx̂, nŵ) = nx̂ + nx̂*He + nŵ*He
 
+"Get the element indices in the decision vector `Z̃` that applies to a `Nk` window length."
+function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::TranscriptionMethod)
+    nx̂, nŵ, nε, Nk = estim.nx̂, estim.nx̂, estim.nε, estim.Nk[]
+    nŴ, nX̂   = nŵ*Nk, nx̂*Nk
+    nx̂_nX̂    = nx̂ + nX̂ 
+    nx̂_nX̂_He = nx̂ + nx̂*estim.He
+    i_Z̃_NK = [(1):(nε + nx̂_nX̂); (nε + nx̂_nX̂_He + 1):(nε + nx̂_nX̂_He + nŴ)]
+    return i_Z̃_NK
+end
+function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::SingleShooting) 
+    nŵ, Nk = estim.nx̂, estim.Nk[]
+    nx̃ = estim.nε + estim.nx̂
+    return (1):(nx̃ + nŵ*Nk)
+end
+
 @doc raw"""
     init_predmat_mhe(
         model::LinModel, transcription::SingleShooting,
@@ -498,7 +513,11 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
         \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{A_s} & \mathbf{0}  & \mathbf{-I} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
         \vdots     & \vdots       & \vdots     & \vdots       & \mathbf{0}  & \mathbf{0}  & \ddots & \vdots       & \vdots     & \vdots       \\
         \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}   & \mathbf{0}  & \mathbf{0}  & \cdots & \mathbf{A_s} & \mathbf{0} & \mathbf{-I}  \end{bmatrix} \\
-    \mathbf{E_S^ŵ} &= \mathbf{0}                                                                                                              \\
+    \mathbf{E_S^ŵ} &= \begin{bmatrix}
+        \mathbf{0} & \mathbf{I}   & \mathbf{0} & \mathbf{0}   & \cdots      & \mathbf{0}  & \mathbf{0}                                        \\
+        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{I}   & \cdots      & \mathbf{0}  & \mathbf{0}                                        \\
+        \vdots     & \vdots       & \vdots     & \vdots       & \ddots      & \vdots      & \vdots                                            \\
+        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}   & \cdots      & \mathbf{0}  & \mathbf{I}                                        \end{bmatrix} \\
     \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^ŵ}                                                                         \end{bmatrix}
     \end{aligned}
     ```
@@ -509,13 +528,14 @@ function init_defectmat_mhe(
     nx̂, nxs = size(Â, 2), size(As, 2)
     nx = nx̂ - nxs
     nŵ = nx̂
+    nw = nŵ - nxs
     ESx̂ = [zeros(NT, nxs*He, nx̂) repeatdiag([zeros(NT, nxs, nx) -I], He)]
     for j=1:He
         iRow = (1:nxs)   .+ nxs*(j-1)
-        iCol = (nx+1:nx̂) .+ nxs*(j-1)
+        iCol = (nx+1:nx̂) .+  nx̂*(j-1)
         ESx̂[iRow, iCol] = As
     end
-    ESŵ = zeros(NT, nxs*He, nŵ*He)
+    ESŵ = repeatdiag([zeros(NT, nxs, nw) I], He)
     ES = [ESx̂ ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
     JS = zeros(NT, nxs*He, model.nd*(He+1))
@@ -699,90 +719,12 @@ function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModel, ::TranscriptionMethod
     return i_Ŵmin, i_Ŵmax
 end
 
-"For [`SingleShooting`](@ref), truncate the end of prediction matrices if `Nk < He`"
-function trunc_predmat(estim::MovingHorizonEstimator, transcription::SingleShooting)
-    model = estim.model
-    nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
-    nU, nYm, nŴ, nD = model.nu*Nk, nym*Nk, nŵ*Nk, model.nd*(Nk+1)
-    nZ = get_nZ_mhe(transcription, Nk, nx̂, nŵ)
-    nZ̃ = nε + nZ
-    if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
-        Ẽ       = estim.Ẽ[1:nYm, 1:nZ̃]
-        G, J, B = estim.G[1:nYm, 1:nU], estim.J[1:nYm, 1:nD], estim.B[1:nYm]
-        ẽx̄      = estim.ẽx̄[:, 1:nZ̃]
-        Tŵ      = estim.Tŵ[1:nŴ, 1:nZ]
-        F       = @views estim.F[1:nYm] # views here since they will store results
-        H̃_data  = @views estim.H̃.data[1:nZ̃, 1:nZ̃]
-        H̃       = @views estim.H̃[1:nZ̃, 1:nZ̃]
-        q̃       = @views estim.q̃[1:nZ̃]
-        Z̃var    = @views estim.optim[:Z̃var][1:nZ̃]
-    else
-        Ẽ, F, G, J, B = estim.Ẽ, estim.F, estim.G, estim.J, estim.B
-        ẽx̄, Tŵ        = estim.ẽx̄, estim.Tŵ
-        H̃, H̃_data, q̃  = estim.H̃, estim.H̃.data, estim.q̃
-        Z̃var          = estim.optim[:Z̃var]
-    end
-    return Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var
-end
-
-"For [`MultipleShooting`](@ref), extract subparts of the prediction matrices if `Nk < He`."
-function trunc_predmat(estim::MovingHorizonEstimator, ::MultipleShooting)
-    model = estim.model
-    nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
-    nU, nYm, nŴ, nD = model.nu*Nk, nym*Nk, nŵ*Nk, model.nd*(Nk+1)
-    nx̂_nX̂    = nx̂ + nx̂*Nk 
-    nx̂_nX̂_He = nx̂ + nx̂*estim.He
-    if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
-        i_Z̃_He  = [(1):(nε + nx̂_nX̂); (nε + nx̂_nX̂_He + 1):(nε + nx̂_nX̂_He + nŴ)]
-        i_Z_He  = [(1):(nx̂_nX̂); (nx̂_nX̂_He + 1):(nx̂_nX̂_He + nŴ)]
-        Ẽ       = estim.Ẽ[1:nYm, i_Z̃_He]
-        G, J, B = estim.G[1:nYm, 1:nU], estim.J[1:nYm, 1:nD], estim.B[1:nYm]
-        ẽx̄      = estim.ẽx̄[:, i_Z̃_He]
-        Tŵ      = estim.Tŵ[1:nŴ, i_Z_He]
-        F       = @views estim.F[1:nYm] # views here since they will store results
-        H̃_data  = @views estim.H̃.data[i_Z̃_He, i_Z̃_He]
-        H̃       = @views estim.H̃[i_Z̃_He, i_Z̃_He]
-        q̃       = @views estim.q̃[i_Z̃_He]
-        Z̃var    = @views estim.optim[:Z̃var][i_Z̃_He]
-    else
-        Ẽ, F, G, J, B = estim.Ẽ, estim.F, estim.G, estim.J, estim.B
-        ẽx̄, Tŵ        = estim.ẽx̄, estim.Tŵ
-        H̃, H̃_data, q̃  = estim.H̃, estim.H̃.data, estim.q̃
-        Z̃var          = estim.optim[:Z̃var]
-    end
-    return Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var
-end
-
-function trunc_defectmat(estim::MovingHorizonEstimator)
-    model, con = estim.model, estim.con
-    FS = con.FS
-    nx̂, nŵ, nε, Nk = estim.nx̂, estim.nx̂, estim.nε, estim.Nk[]
-    nU, nŴ, nX̂, nD = model.nu*Nk, nŵ*Nk, nx̂*Nk, model.nd*(Nk+1)
-    nx̂_nX̂    = nx̂ + nX̂ 
-    nx̂_nX̂_He = nx̂ + nx̂*estim.He
-    if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
-        i_Z̃_He     = [(1):(nε + nx̂_nX̂); (nε + nx̂_nX̂_He + 1):(nε + nx̂_nX̂_He + nŴ)]
-        ẼS         = con.ẼS[1:nX̂, i_Z̃_He]
-        GS, JS, BS = con.GS[1:nX̂, 1:nU], con.JS[1:nX̂, 1:nD], con.BS[1:nX̂]
-        FS         = @views con.FS[1:nX̂] # views here since they will store results
-        Aeq        = @views con.Aeq[1:nX̂, i_Z̃_He]
-        beq        = @views con.beq[1:nX̂]
-        Z̃var       = @views estim.optim[:Z̃var][i_Z̃_He]
-    else
-        ẼS, FS, GS, JS, BS = con.ẼS, con.FS, con.GS, con.JS, con.BS
-        Aeq  = con.Aeq
-        beq  = con.beq
-        Z̃var = estim.optim[:Z̃var]
-    end
-    return ẼS, FS, GS, JS, BS, Aeq, beq, Z̃var
-end
-
 @doc raw"""
     linconstraint!(
         estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod
     )
 
-Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MHE.
+Set `b` vector for the linear inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MHE.
 
 Also init ``\mathbf{F_X̂ = G_X̂ U_0 + J_X̂ D_0 + B_X̂}`` vector for the state constraints, see 
 [`init_predmat_mhe`](@ref).
@@ -861,12 +803,22 @@ function linconstraint!(
     return nothing
 end
 
-"""
+@doc raw"""
     linconstrainteq!(
-        estim::MovingHorizonEstimator, model::LinModel, ::TranscriptionMethod
+        estim::MovingHorizonEstimator, model::LinModel, ::MultipleShooting
     )
 
-TBW
+Set `Aeq` matrix and `beq` vector for the linear equality constraints of MHE.
+
+They are defined by ``\mathbf{A_{eq} Z̃ ≤ b_{eq}}``. The method also inits 
+``\mathbf{F_S = G_S U_0 + J_S D_0 + B_S}`` vector for the state defect constraints, see 
+[`init_defectmat_mhe`](@ref). 
+
+The number of linear equality constraints grows when ``N_k < H_e``. A temporary
+`:linconstrainteq_temp` structure is overwritten at each time
+step during this period. A permanent `:linconstrainteq` structure is created when 
+``N_k = H_e`` is reached. From this point on, only the the ``beq`` vector is updated
+with `JuMP.set_normalized_rhs` function for efficiency.
 """
 function linconstrainteq!(
     estim::MovingHorizonEstimator, model::LinModel, ::MultipleShooting
@@ -881,7 +833,7 @@ function linconstrainteq!(
     end
     beq .= @. -FS
     Aeq .= @.  ẼS
-    if haskey(optim, :linconstrainteq_temp) # temporary since only used once when Nk < He
+    if haskey(optim, :linconstrainteq_temp)
         JuMP.delete(optim, optim[:linconstrainteq_temp])
         JuMP.unregister(optim, :linconstrainteq_temp)
     end
@@ -900,8 +852,50 @@ function linconstrainteq!(
     end
     return nothing
 end
-function linconstrainteq!(::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod)
-    # TODO: handle stochastic defects as linear equality constraints
+
+"""
+    linconstrainteq!(
+    estim::MovingHorizonEstimator, ::SimModel, transcription::TranscriptionMethod
+)
+
+By default, only update `Aeq` when `Nk < He` for other [`TranscriptionMethod`](@refs).
+
+The linear equality constraints include the stochastic defects only, and the `beq`
+vector is only zeros for this specific case. See [`init_defectmat_mhe`](@ref) for the 
+equations.
+"""
+function linconstrainteq!(
+    estim::MovingHorizonEstimator, ::SimModel, transcription::TranscriptionMethod
+)
+    optim, con, Nk = estim.optim, estim.con, estim.Nk[]
+    nŝ = size(con.Aeq, 1) ÷ estim.He # number of state defects per time step
+    nŜ = nŝ*Nk
+    if Nk < estim.He # avoid views since allocations only when Nk < He and we want fast mul!
+        i_Z̃_Nk = get_i_Z̃_Nk(estim, transcription)
+        ẼS = con.ẼS[1:nŜ, i_Z̃_Nk]
+        Aeq, beq = @views con.Aeq[1:nŜ, i_Z̃_Nk], con.beq[1:nŜ]
+        Z̃var     = @views optim[:Z̃var][i_Z̃_Nk]
+    else
+        ẼS       = con.ẼS
+        Aeq, beq = con.Aeq, con.beq
+        Z̃var     = optim[:Z̃var]
+    end
+    Aeq .= ẼS
+    if haskey(optim, :linconstrainteq_temp)
+        JuMP.delete(optim, optim[:linconstrainteq_temp])
+        JuMP.unregister(optim, :linconstrainteq_temp)
+    end
+    if estim.Nk[] < estim.He
+        if haskey(optim, :linconstrainteq)
+            JuMP.delete(optim, optim[:linconstrainteq])
+            JuMP.unregister(optim, :linconstrainteq)
+        end
+        @constraint(optim, linconstrainteq_temp, Aeq*Z̃var .== beq)
+    else
+        if !haskey(optim, :linconstrainteq)
+            @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
+        end
+    end
     return nothing
 end
 "No linear equality constraints for all cases of [`SingleShooting`](@ref)."
@@ -1334,11 +1328,11 @@ function con_nonlinprogeq_mhe!(
     x̂0arr, Ŵ, Z̃
 )
     nu, nx, nd, nk = model.nu, model.nx, model.nd, model.nk
-    nε, nx̂, He = estim.nε, estim.nx̂, estim.He
+    nx̂, nxs, nŵ, He = estim.nx̂, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
-    nŵ = nx̂
-    nx̃ = nε + nx̂
+    nw = nŵ - nxs
+    nx̃ = estim.nε + nx̂
     p = estim.direct ? 0 : 1
     X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)]
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
@@ -1349,15 +1343,15 @@ function con_nonlinprogeq_mhe!(
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
         end
         d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
-        ŵ        = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*j)]
         k        = @views          K[(1 + nk*(j-1)):(nk*j)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
-        x̂0next   = @views         X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        x̂0next_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
+        ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
+        x̂dnext   = @views         X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         sdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
-        f̂!(x̂0next, û0, k, estim, model, x̂0, u0, d0)
-        x̂0next .+= ŵ
-        sdnext   .= @. x̂dnext - x̂dnext_Z̃
+        f!(x̂dnext, k, model, x̂d_Z̃, û0, d0, model.p)
+        x̂dnext .+= ŵd
+        sdnext  .= @. x̂dnext - x̂dnext_Z̃
     end
     Nk < He && (geq[nx̂*Nk+1:end] .= 0)
     return geq
