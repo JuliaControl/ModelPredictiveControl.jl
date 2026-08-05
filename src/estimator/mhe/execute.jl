@@ -924,26 +924,22 @@ function setmodel_estimator!(
     estim.G .= G
     estim.J .= J
     estim.B .= B
-    # --- linear inequality constraints ---
+    # --- state estimate constraints ---
     con.ẼX̂ .= ẼX̂
     con.GX̂ .= GX̂
     con.JX̂ .= JX̂
     con.BX̂ .= BX̂
-    # convert x̂0 to x̂ with the old operating point:
-    con.x̂0min .+= x̂op_old 
-    con.x̂0max .+= x̂op_old
-    # convert X̂0 to X̂ with the old operating point:
-    con.X̂0min .+= estim.X̂op
-    con.X̂0max .+= estim.X̂op
-    for i in 0:He-1
-        estim.X̂op[(1+nx̂*i):(nx̂+nx̂*i)] .= estim.x̂op
-    end
-    # convert x̂ to x̂0 with the new operating point:
-    con.x̂0min .-= estim.x̂op 
-    con.x̂0max .-= estim.x̂op 
-    # convert X̂ to X̂0 with the new operating point:
-    con.X̂0min .-= estim.X̂op
-    con.X̂0max .-= estim.X̂op
+    # --- defect matrices ---
+    ES, GS, JS, BS = init_defectmat_mhe(
+        model, transcription, He, estim.Â, estim.B̂u, estim.B̂d, estim.x̂op, estim.f̂op, 
+        estim.direct
+    )
+    Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
+    con.ẼS .= ẼS
+    con.GS .= GS
+    con.JS .= JS
+    con.BS .= BS
+    # --- linear inequality constraints ---
     con.A_X̂min .= A_X̂min
     con.A_X̂max .= A_X̂max
     con.A_V̂min .= A_V̂min
@@ -958,26 +954,21 @@ function setmodel_estimator!(
         con.A_V̂min
         con.A_V̂max
     ]
-    Z̃min, Z̃max = init_boxconstraint_mhe(
-        model, transcription, He, nx̂, nŵ, nε,
-        con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max,  con.Ŵmin,   con.Ŵmax, 
-        con.A_x̂min, con.A_x̂max, con.C_x̂min, con.C_x̂max, con.A_Ŵmin, con.A_Ŵmax 
-    )
-    con.Z̃min .= Z̃min
-    con.Z̃max .= Z̃max
-    Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
-    A = con.A[con.i_b, :]
-    b = zeros(count(con.i_b)) # dummy value, updated before optimization (avoid ±Inf)
-    # deletion is required for sparse solvers like OSQP, when the sparsity pattern changes
-    JuMP.delete(estim.optim, estim.optim[:linconstraint])
-    JuMP.unregister(estim.optim, :linconstraint)
-    @constraint(estim.optim, linconstraint, A*Z̃var .≤ b)
-    for i in eachindex(Z̃var)
-        # deletion not required here since changing op. pts won't change finite status
-        !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
-        !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i])
+    # --- linear equality constraints ---
+    con.Aeq .= Aeq
+    # --- bound constraint operating points ---
+    con.x̂0min .+= x̂op_old   # convert x̂0 to x̂ with the old operating point
+    con.x̂0max .+= x̂op_old   # convert x̂0 to x̂ with the old operating point
+    con.X̂0min .+= estim.X̂op # convert X̂0 to X̂ with the old operating point
+    con.X̂0max .+= estim.X̂op # convert X̂0 to X̂ with the old operating point
+    for i in 0:He-1
+        estim.X̂op[(1+nx̂*i):(nx̂+nx̂*i)] .= estim.x̂op
     end
-    # --- data windows ---
+    con.x̂0min .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    con.x̂0max .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
+    con.X̂0min .-= estim.X̂op # convert X̂ to X̂0 with the new operating point
+    con.X̂0max .-= estim.X̂op # convert X̂ to X̂0 with the new operating point
+    # --- data windows operating points ---
     for i in 1:He 
         # convert y0m to ym with the old operating point:
         estim.Y0m[(1+nym*(i-1)):(nym*i)]  .+= @views yop_old[estim.i_ym]
@@ -1002,6 +993,32 @@ function setmodel_estimator!(
     estim.lastu0        .-= model.uop
     estim.Z̃[nε+1:nε+nx̂] .-= x̂op
     estim.x̂0arr_old     .-= x̂op
+    # --- box constraints ---
+    Z̃min, Z̃max = init_boxconstraint_mhe(
+        model, transcription, He, nx̂, nŵ, nε,
+        con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max,  con.Ŵmin,   con.Ŵmax, 
+        con.A_x̂min, con.A_x̂max, con.C_x̂min, con.C_x̂max, con.A_Ŵmin, con.A_Ŵmax 
+    )
+    con.Z̃min .= Z̃min
+    con.Z̃max .= Z̃max
+    # --- JuMP optimization ---
+    Z̃var::Vector{JuMP.VariableRef} = estim.optim[:Z̃var]
+    A = con.A[con.i_b, :]
+    b = zeros(count(con.i_b)) # dummy value, updated before optimization (avoid ±Inf)
+    # deletion is required for sparse solvers like OSQP, when the sparsity pattern changes
+    JuMP.delete(estim.optim, estim.optim[:linconstraint])
+    JuMP.unregister(estim.optim, :linconstraint)
+    @constraint(estim.optim, linconstraint, A*Z̃var .≤ b)
+    if haskey(estim.optim, :linconstrainteq) # the key will be absent when Nk < He
+        JuMP.delete(estim.optim, estim.optim[:linconstrainteq])
+        JuMP.unregister(estim.optim, :linconstrainteq)
+        @constraint(estim.optim, linconstrainteq, con.Aeq*Z̃var .== con.beq)
+    end
+    for i in eachindex(Z̃var)
+        # deletion not required here since changing op. pts won't change finite status
+        !isinf(Z̃min[i]) && JuMP.set_lower_bound(Z̃var[i], Z̃min[i])
+        !isinf(Z̃max[i]) && JuMP.set_upper_bound(Z̃var[i], Z̃max[i])
+    end
     # --- covariance matrices ---
     if !isnothing(Q̂)
         estim.cov.Q̂ .= to_hermitian(Q̂)
