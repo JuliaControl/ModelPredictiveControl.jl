@@ -504,7 +504,7 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
     ```
 """
 function init_defectmat_mhe(
-    model::SimModel{NT}, transcription::TranscriptionMethod, He, Â, _ , _ , _ , _ , As, _
+    model::SimModel{NT}, ::TranscriptionMethod, He, Â, _ , _ , _ , _ , As, _
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
     nx = nx̂ - nxs
@@ -517,7 +517,6 @@ function init_defectmat_mhe(
     end
     ESŵ = zeros(NT, nxs*He, nŵ*He)
     ES = [ESx̂ ESŵ]
-    display(ES)
     GS = zeros(NT, nxs*He, model.nu*He)
     JS = zeros(NT, nxs*He, model.nd*(He+1))
     BS = zeros(NT, nxs*He)
@@ -1334,7 +1333,7 @@ function con_nonlinprogeq_mhe!(
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::MultipleShooting, 
     x̂0arr, Ŵ, Z̃
 )
-    nu, nd, nk = model.nu, model.nd, model.nk
+    nu, nx, nd, nk = model.nu, model.nx, model.nd, model.nk
     nε, nx̂, He = estim.nε, estim.nx̂, estim.He
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
@@ -1342,23 +1341,23 @@ function con_nonlinprogeq_mhe!(
     nx̃ = nε + nx̂
     p = estim.direct ? 0 : 1
     X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)]
+    Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
     @threadsif f_threads for j=1:Nk
         if j < 2
-            x̂0 = @views x̂0arr[1:nx̂]
+            x̂d_Z̃ = @views x̂0arr[1:nx]
         else
-            x̂0 = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-1))]
+            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
         end
-        u0       = @views   estim.U0[(1 + nu*(j-1)):(nu*j)]
         d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
         ŵ        = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*j)]
         k        = @views          K[(1 + nk*(j-1)):(nk*j)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         x̂0next   = @views         X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         x̂0next_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*j)]
-        ŝnext    = @views        geq[(1 + nx̂*(j-1)):(nx̂*j)]
+        sdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
         f̂!(x̂0next, û0, k, estim, model, x̂0, u0, d0)
         x̂0next .+= ŵ
-        ŝnext   .= @. x̂0next - x̂0next_Z̃
+        sdnext   .= @. x̂dnext - x̂dnext_Z̃
     end
     Nk < He && (geq[nx̂*Nk+1:end] .= 0)
     return geq

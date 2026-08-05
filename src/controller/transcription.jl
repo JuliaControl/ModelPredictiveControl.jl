@@ -1347,7 +1347,7 @@ function con_nonlinprogeq!(
     f_threads = transcription.f_threads
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
+    Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
@@ -1406,7 +1406,7 @@ function con_nonlinprogeq!(
     nk = get_nk_mpc(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
+    Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
@@ -1502,7 +1502,7 @@ function con_nonlinprogeq!(
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     D̂temp = mpc.buffer.D̂
-    disturbedinput!(Û0, mpc, mpc.estim, U0, X̂0_Z̃)
+    Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
