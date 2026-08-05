@@ -981,8 +981,8 @@ function setmodel_estimator!(
     con.BX̂ .= BX̂
     # --- defect matrices ---
     ES, GS, JS, BS = init_defectmat_mhe(
-        model, transcription, He, estim.Â, estim.B̂u, estim.B̂d, estim.x̂op, estim.f̂op, 
-        estim.direct
+        model, transcription, He, 
+        estim.Â, estim.B̂u, estim.B̂d, estim.x̂op, estim.f̂op, estim.As, estim.direct
     )
     Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
     con.ẼS .= ẼS
