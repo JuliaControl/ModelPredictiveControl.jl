@@ -858,7 +858,7 @@ end
     estim::MovingHorizonEstimator, ::SimModel, transcription::TranscriptionMethod
 )
 
-By default, only update `Aeq` when `Nk < He` for other [`TranscriptionMethod`](@refs).
+By default, only update `Aeq` when `Nk < He` for other [`TranscriptionMethod`](@ref).
 
 The linear equality constraints include the stochastic defects only, and the `beq`
 vector is only zeros for this specific case. See [`init_defectmat_mhe`](@ref) for the 
