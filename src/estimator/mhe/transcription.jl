@@ -1454,8 +1454,7 @@ function con_nonlinprogeq_mhe!(
         if h < 1
             model.f!(k̇2, x̂dnext_Z̃, û0, d0next, model.p)
         else
-            # TODO: better comment here (we don't have the last u0 value, no choice!)
-            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
+            # special case: û0(k+p) ≈ û0(k+p-1), since û0(k+p) is not available at k!
             û0next = @views j ≥ Nk ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
             model.f!(k̇2, x̂dnext_Z̃, û0next, d0next, model.p)
         end
