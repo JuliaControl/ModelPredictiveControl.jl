@@ -584,7 +584,7 @@ The linear and nonlinear inequality constraints are respectively defined as:
 The argument `nc` is the number of custom nonlinear inequality constraints in
 ``\mathbf{g_c}``. `i_b` is a `BitVector` including the indices of ``\mathbf{b}`` that are
 finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
-also returns the `\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a
+also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a
 case, `args`  needs to contain all the inequality and equality constraint matrices: 
 `A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq`. The integer `neq` is
 the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
