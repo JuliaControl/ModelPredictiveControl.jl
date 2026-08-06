@@ -9,10 +9,6 @@ function get_nZ_mpc(estim::StateEstimator, transcription::OrthogonalCollocation,
     return estim.model.nu*Hc + estim.nx̂*Hp + estim.model.nx*transcription.no*Hp
 end
 
-"Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
-get_nk_mpc(model::SimModel, ::ShootingMethod) = model.nk
-get_nk_mpc(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
-
 @doc raw"""
     init_predmat(
         model::LinModel, estim, transcription::SingleShooting, Hp, Hc, nb
@@ -561,7 +557,7 @@ function init_defectmat_orthocolloc(
     Hp, Hc, Co, λo, As, nxs
 ) where {NT<:Real}
     nu, nx, nd, nx̂ = model.nu, model.nx, model.nd, estim.nx̂
-    nk = get_nk_mpc(model, transcription)
+    nk = get_nk(model, transcription)
     λo_I = λo*I(nx)
     # --- current state estimates x̂0 ---
     KS = zeros(NT, nx̂*Hp, nx̂)
@@ -1049,7 +1045,7 @@ function set_warmstart_mpc!(
 )
     nu, nx̂ = mpc.estim.model.nu, mpc.estim.nx̂
     Hp, Hc, Z̃s  = mpc.Hp, mpc.Hc, mpc.buffer.Z̃
-    nk = get_nk_mpc(mpc.estim.model, transcription)
+    nk = get_nk(mpc.estim.model, transcription)
     nΔU, nX̂, nK = nu*Hc, nx̂*Hp, nk*Hp
     # --- input increments ΔU ---
     Z̃s[1:(nΔU-nu)]       .= @views mpc.Z̃[(nu+1):(nΔU)]
@@ -1403,7 +1399,7 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     Ts, p = model.Ts, model.p
-    nk = get_nk_mpc(model, transcription)
+    nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
@@ -1498,7 +1494,7 @@ function con_nonlinprogeq!(
     f_threads = transcription.f_threads
     p = model.p
     Mo, no, τ =  mpc.Mo, transcription.no, transcription.τ
-    nk = get_nk_mpc(model, transcription)
+    nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
     D̂temp = mpc.buffer.D̂

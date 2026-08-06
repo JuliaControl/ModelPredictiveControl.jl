@@ -352,3 +352,7 @@ function validate_transcription(::NonLinModel{<:Real, <:EmptySolver}, ::Collocat
     return nothing
 end
 validate_transcription(::SimModel, ::TranscriptionMethod) = nothing
+
+"Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
+get_nk(model::SimModel, ::ShootingMethod) = model.nk
+get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no

@@ -213,7 +213,8 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     # --- objective derivatives ---
     optim, con = estim.optim, estim.con
     hess = estim.hessian
-    nx̂, nym, nŷ, nu, nk, nc = estim.nx̂, estim.nym, model.ny, model.nu, model.nk, con.nc
+    nx̂, nym, nŷ, nu, nc = estim.nx̂, estim.nym, model.ny, model.nu, con.nc
+    nk = get_nk(model, estim.transcription)
     He = estim.He
     nc, neq, ng = con.nc, con.neq, length(con.i_g)
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views

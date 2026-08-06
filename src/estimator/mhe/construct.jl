@@ -170,6 +170,7 @@ struct MovingHorizonEstimator{
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
+        validate_transcription(model, transcription)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂ = model.nx + nxs
@@ -1416,7 +1417,8 @@ function get_nonlinobj_op(
 ) where JNT<:Real
     model, con = estim.model, estim.con
     grad, hess = estim.gradient, estim.hessian
-    nx̂, nym, nŷ, nu, nk = estim.nx̂, estim.nym, model.ny, model.nu, model.nk
+    nx̂, nym, nŷ, nu = estim.nx̂, estim.nym, model.ny, model.nu
+    nk = get_nk(model, estim.transcription)
     He = estim.He
     nc, neq, ng = con.nc, con.neq, length(con.i_g)
     nŴ, nV̂, nX̂, ng, nZ̃ = He*nx̂, He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
@@ -1531,7 +1533,8 @@ function get_nonlincon_oracle(
     # ----------- common cache for all functions  ----------------------------------------
     model, con = estim.model, estim.con
     jac, hess = estim.jacobian, estim.hessian
-    nx̂, nym, nŷ, nu, nk = estim.nx̂, estim.nym, model.ny, model.nu, model.nk
+    nx̂, nym, nŷ, nu = estim.nx̂, estim.nym, model.ny, model.nu
+    nk = get_nk(model, estim.transcription)
     He = estim.He
     nc, neq, ng = con.nc, con.neq, length(con.i_g)
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
