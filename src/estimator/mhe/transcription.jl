@@ -780,9 +780,38 @@ function linconstraint!(
     return nothing
 end
 
-"Set `b` excluding state and sensor noise bounds if `model` is not a [`LinModel`](@ref)."
+"Set `b` excluding sensor noise bounds if for `NonLinModel` and non-`SingleShooting`."
 function linconstraint!(
-    estim::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod
+    estim::MovingHorizonEstimator, ::NonLinModel, ::TranscriptionMethod
+)
+    nx̂, nŵ = estim.nx̂, estim.nx̂
+    # --- truncate vector and matrices if necessary ---
+    X̂0min, X̂0max = trunc_bounds(estim, estim.con.X̂0min, estim.con.X̂0max, nx̂)
+    Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, nŵ)
+    # --- update b vector for linear inequality constraints ---
+    nx̂, nŴ_He, nX̂_He = length(estim.con.x̂0min), length(Ŵmin), length(X̂0min)
+    n = 0
+    estim.con.b[(n+1):(n+nx̂)] .= @. -estim.con.x̂0min
+    n += nx̂
+    estim.con.b[(n+1):(n+nx̂)] .= @. +estim.con.x̂0max
+    n += nx̂
+    estim.con.b[(n+1):(n+nX̂_He)] .= @. -X̂0min + estim.con.FX̂
+    n += nX̂_He
+    estim.con.b[(n+1):(n+nX̂_He)] .= @. +X̂0max - estim.con.FX̂
+    n += nX̂_He
+    estim.con.b[(n+1):(n+nŴ_He)] .= @. -Ŵmin
+    n += nŴ_He
+    estim.con.b[(n+1):(n+nŴ_He)] .= @. +Ŵmax
+    if any(estim.con.i_b) 
+        lincon = estim.optim[:linconstraint]
+        JuMP.set_normalized_rhs(lincon, estim.con.b[estim.con.i_b])
+    end
+    return nothing
+end
+
+"Set `b` excluding state and sensor noise bounds for `NonLinModel` and `SingleShooting`."
+function linconstraint!(
+    estim::MovingHorizonEstimator, ::NonLinModel, ::SingleShooting
 )
     # --- truncate vector and matrices if necessary ---
     Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, estim.nx̂)
