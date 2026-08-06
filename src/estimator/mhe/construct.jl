@@ -329,7 +329,7 @@ at each time step for the optimization.
    (details in Extended Help).
 - `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
-- `transcription=SingleShooting()` : [`SingleShooting`](@ref) or [`MultipleShooting`](@ref).
+- `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
 - `optim=default_optim_mhe(model,nc)` : a [`JuMP.Model`](@extref) object with a quadratic or
    nonlinear optimizer for solving (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl),
    or [`OSQP`](https://osqp.org/docs/parsers/jump.html) if `model` is a [`LinModel`](@ref)).
@@ -539,7 +539,7 @@ function MovingHorizonEstimator(
     gc ::Function = gc!,
     nc ::Int = 0,
     p = model.p,
-    transcription::ShootingMethod = DEFAULT_MHE_TRANSCRIPTION,
+    transcription::TranscriptionMethod = DEFAULT_MHE_TRANSCRIPTION,
     optim::JM = default_optim_mhe(model, nc),
     gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
@@ -593,7 +593,7 @@ function MovingHorizonEstimator(
     gc ::Function = gc!,
     nc = 0,
     p = model.p,
-    transcription::ShootingMethod = DEFAULT_MHE_TRANSCRIPTION,
+    transcription::TranscriptionMethod = DEFAULT_MHE_TRANSCRIPTION,
     optim::JM = default_optim_mhe(model, nc),
     gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
