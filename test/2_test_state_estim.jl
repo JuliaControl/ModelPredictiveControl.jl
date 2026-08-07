@@ -1333,7 +1333,7 @@ end
     end
     preparestate!(mhe2, model())
     @test mhe2() ≈ model() atol = 1e-6
-    =#
+    
 end
 
 @testitem "MHE fallbacks for arrival covariance estimation" setup=[SetupMPCtests] begin
