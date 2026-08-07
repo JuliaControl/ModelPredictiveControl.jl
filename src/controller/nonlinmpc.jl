@@ -584,7 +584,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     hess = mpc.hessian
     transcription = mpc.transcription
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk_mpc(model, transcription)
+    nk = get_nk(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     i_g = findall(mpc.con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(mpc.con.i_g), sum(mpc.con.i_g)
@@ -823,7 +823,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
     transcription = mpc.transcription
     grad, hess = mpc.gradient, mpc.hessian
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk_mpc(model, transcription)
+    nk = get_nk(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     ng = length(mpc.con.i_g)
     nc, neq = mpc.con.nc, mpc.con.neq
@@ -949,7 +949,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     transcription = mpc.transcription
     jac, hess = mpc.jacobian, mpc.hessian
     nu, ny, nx̂, nϵ = model.nu, model.ny, mpc.estim.nx̂, mpc.nϵ
-    nk = get_nk_mpc(model, transcription)
+    nk = get_nk(model, transcription)
     Hp, Hc = mpc.Hp, mpc.Hc
     i_g = findall(mpc.con.i_g) # convert to non-logical indices for non-allocating @views
     ng, ngi = length(mpc.con.i_g), sum(mpc.con.i_g)

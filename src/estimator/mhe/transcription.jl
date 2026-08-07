@@ -914,7 +914,7 @@ function linconstrainteq!(
         JuMP.delete(optim, optim[:linconstrainteq_temp])
         JuMP.unregister(optim, :linconstrainteq_temp)
     end
-    if estim.Nk[] < estim.He
+    if Nk < estim.He
         if haskey(optim, :linconstrainteq)
             JuMP.delete(optim, optim[:linconstrainteq])
             JuMP.unregister(optim, :linconstrainteq)
@@ -1002,10 +1002,10 @@ end
 
 @doc raw"""
     set_warmstart_mhe!(
-        estim::MovingHorizonEstimator, transcription::MultipleShooting, Z̃var
+        estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃var
     ) -> Z̃s
 
-Do the same but based on a [`MultipleShooting`](@ref) transcription.
+Do the same but for other transcription [`TranscriptionMethod`](@ref).
 
 If supported by `estim.optim`, it warm-starts the solver at:
 ```math
@@ -1035,7 +1035,7 @@ last control period ``k-1``, expressed as a deviation from the operating point
 of vectors ``\mathbf{0_x̂}`` and ``\mathbf{0_ŵ}``.
 """
 function set_warmstart_mhe!(
-    estim::MovingHorizonEstimator{NT}, transcription::MultipleShooting, Z̃var
+    estim::MovingHorizonEstimator{NT}, transcription::TranscriptionMethod, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
     nu, nk = model.nu, model.nk
@@ -1342,13 +1342,14 @@ end
 
 Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. The defects of the
-estimated states are computed with:
+The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. By introducing 
+the integer ``ℓ = k - N_k + p`` to shorten the notation, the defects of the estimated states
+are computed with:
 ```math
-\mathbf{ŝ}(k+j+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(k+j), \mathbf{u_0}(k+j), \mathbf{d_0}(k+j)\Big) 
-                      - \mathbf{x̂_0}(k+j+1)
+\mathbf{ŝ}(ℓ+j+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(ℓ+j), \mathbf{u_0}(ℓ+j), \mathbf{d_0}(ℓ+j)\Big) 
+                           + \mathbf{ŵ}(ℓ+j) - \mathbf{x̂_0}(ℓ+j+1)
 ```
-for ``j = 0, 1, ... , H_p-1`` and in which the augmented state vectors ``\mathbf{x̂_0}`` are 
+for ``j = 0, 1, ... , N_k-1`` and in which the augmented state vectors ``\mathbf{x̂_0}`` are 
 extracted from the decision variable `Z̃`. The function ``\mathbf{f̂}`` is defined at [`f̂!`](@ref).
 """
 function con_nonlinprogeq_mhe!(
@@ -1385,5 +1386,85 @@ function con_nonlinprogeq_mhe!(
     Nk < He && (geq[nx̂*Nk+1:end] .= 0)
     return geq
 end
+
+@doc raw"""
+    con_nonlinprogeq_mhe!(
+        geq, X̂0, Û0, K̇,
+        estim::MovingHorizonEstimator, model::NonLinModel, ::TrapezoidalCollocation, 
+        x̂0arr, Ŵ, Z̃
+    ) -> geq
+
+Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
+
+By introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the deterministic
+state defects are computed with:
+```math
+\mathbf{ŝ_d}(ℓ+j+1) = \mathbf{x̂_d}(ℓ+j) + 0.5 T_s [\mathbf{k̇}_1(ℓ+j) + \mathbf{k̇}_2(ℓ+j)] 
+                       + \mathbf{ŵ_d}(ℓ+j) - \mathbf{x̂_d}(ℓ+j+1)                                              
+```
+for ``j = 0, 1, ... , N_k-1``, and in which ``\mathbf{x̂_d}`` and ``\mathbf{ŵ_d}`` are the
+deterministic state and process noise estimates, respectively, extracted from the decision
+variable `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated from the continuous-time
+function `model.f!` and:
+```math
+\begin{aligned}
+\mathbf{k̇}_1(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d̂_0}(ℓ+j),   \mathbf{p}\Big) \\
+\mathbf{k̇}_2(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{û_0}(ℓ+j+h), \mathbf{d̂_0}(ℓ+j+1), \mathbf{p}\Big) 
+\end{aligned}
+```
+in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
+is defined in [`f̂!`](@ref) documentation.
+"""
+function con_nonlinprogeq_mhe!(
+    geq, _ , Û0, K̇,
+    estim::MovingHorizonEstimator, model::NonLinModel, transcription::TrapezoidalCollocation, 
+    x̂0arr, Ŵ, Z̃
+)
+    nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
+    nx̂, nxs, nŵ, He = estim.nx̂, estim.nxs, estim.nx̂, estim.He
+    Nk = estim.Nk[]
+    f_threads = transcription.f_threads
+    Ts = model.Ts
+    nk = get_nk(model, transcription)
+    nw = nŵ - nxs
+    nx̃ = estim.nε + nx̂
+    p = estim.direct ? 0 : 1
+    X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)]
+    Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
+    @threadsif f_threads for j=1:Nk
+        if j < 2
+            x̂d_Z̃ = @views x̂0arr[1:nx]
+        else
+            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
+        end
+        d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
+        û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
+        k̇        = @views          K̇[(1 + nk*(j-1)):(nk*j)]
+        ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
+        x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        sdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
+        k̇1, k̇2   = @views          k̇[1:nx], k̇[nx+1:2*nx]    
+        d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
+        if f_threads || h < 1 || j < 2
+            # we need to recompute k1 with multi-threading, even with h==1, since the 
+            # last iteration (j-1) may not be executed (iterations are re-orderable)
+            model.f!(k̇1, x̂d_Z̃, û0, d0, model.p)
+        else
+            k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+        end
+        if h < 1
+            model.f!(k̇2, x̂dnext_Z̃, û0, d0next, model.p)
+        else
+            # special case: û0(k+p) ≈ û0(k+p-1), since û0(k+p) is not available at k!
+            û0next = @views j ≥ Nk ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
+            model.f!(k̇2, x̂dnext_Z̃, û0next, d0next, model.p)
+        end
+        sdnext  .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
+        sdnext .+= ŵd
+    end
+    Nk < He && (geq[nx̂*Nk+1:end] .= 0)
+    return geq
+end
+
 "No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
 con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod, _,_,_) = geq

@@ -136,9 +136,11 @@ equality constraint function and by using the implicit trapezoidal rule. It can 
 moderately stiff systems and is A-stable. See Extended Help for more details.
 
 !!! warning
-    The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
-    construction of the [`NonLinModel`](@ref) to estimate the plant states, not the 
-    trapezoidal rule (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
+    Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
+    `TrapezoidalCollocation` transcription, the built-in [`StateEstimator`](@ref) will
+    still use the `solver` provided at the construction of the [`NonLinModel`](@ref) to
+    estimate the plant states, not the trapezoidal rule (see `supersample` option of
+    [`RungeKutta`](@ref) for stiff systems).
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
 transcription method.
@@ -149,7 +151,7 @@ transcription method.
     as described in [`ModelPredictiveControl.init_estimstoch`](@ref). Collocation methods
     require continuous-time dynamics. Because of this, the stochastic states are transcribed
     separately using a [`MultipleShooting`](@ref) method. See [`con_nonlinprogeq!`](@ref)
-    for more details.
+    and [`con_nonlinprogeq_mhe!`](@ref) for more details.
 """
 struct TrapezoidalCollocation <: CollocationMethod
     h::Int
@@ -200,7 +202,8 @@ Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstrin
 descriptions of `f_threads` and `h_threads` keywords. This transcription computes the
 predictions by enforcing the collocation and continuity constraints at the collocation
 points. It is efficient for highly stiff systems, but generally more expensive than the
-other methods for non-stiff systems. See Extended Help for more details.
+other methods for non-stiff systems. This transcription is not supported by the
+[`MovingHorizonEstimator`](@ref) for now. See Extended Help for more details.
 
 !!! warning
     The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
@@ -352,3 +355,7 @@ function validate_transcription(::NonLinModel{<:Real, <:EmptySolver}, ::Collocat
     return nothing
 end
 validate_transcription(::SimModel, ::TranscriptionMethod) = nothing
+
+"Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
+get_nk(model::SimModel, ::ShootingMethod) = model.nk
+get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no

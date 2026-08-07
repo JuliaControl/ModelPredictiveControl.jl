@@ -1168,13 +1168,13 @@ end
     @test mhe1.lastu0 ≈ [1, 2]
     setstate!(mhe1, [1,2,3,4,5,6])
     @test mhe1.x̂0 ≈ [1,2,3,4,5,6]
-    for i in 1:40
+    for i in 1:50
         preparestate!(mhe1, [50, 30], [5])
         updatestate!(mhe1, [11, 52], [50, 30], [5])
     end
     preparestate!(mhe1, [50, 30], [5])
     @test mhe1([5]) ≈ [50, 30] atol=1e-3
-    for i in 1:40
+    for i in 1:50
         preparestate!(mhe1, [51, 32], [5])
         updatestate!(mhe1, [10, 50], [51, 32], [5])
     end
@@ -1205,12 +1205,12 @@ end
     @test mhe1c.lastu0 ≈ [1, 2]
     setstate!(mhe1c, [1,2,3,4,5,6])
     @test mhe1c.x̂0 ≈ [1,2,3,4,5,6]
-    for i in 1:40
+    for i in 1:50
         preparestate!(mhe1c, [50, 30], [5])
         updatestate!(mhe1c, [11, 52], [50, 30], [5])
     end
     @test mhe1c([5]) ≈ [50, 30] atol=1e-3
-    for i in 1:40
+    for i in 1:50
         preparestate!(mhe1c, [51, 32], [5])
         updatestate!(mhe1c, [10, 50], [51, 32], [5])
     end
@@ -1221,7 +1221,7 @@ end
         nonlinmodel, He=3, transcription=MultipleShooting(), gc! = gc!, nc = 1
     )
     mhe2 = setconstraint!(mhe2, v̂min = [-1000, -1000], v̂max = [1000, 1000]) # for coverage only
-    for i in 1:40
+    for i in 1:50
         preparestate!(mhe2, [50, 30], [5])
         updatestate!(mhe2, [11, 52], [50, 30], [5])
     end
@@ -1231,12 +1231,13 @@ end
     mhe3 = MovingHorizonEstimator(
         nonlinmodel, He=3, direct=false, transcription=MultipleShooting(f_threads=true)
     )
-    for i in 1:40
+    for i in 1:50
         preparestate!(mhe3, [50, 30], [5])
         updatestate!(mhe3, [11, 52], [50, 30], [5])
     end
     preparestate!(mhe3, [50, 30], [5])
     @test mhe3([5]) ≈ [50, 30] atol=1e-3
+
 
     Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
     R̂ = diagm([1, 1].^2)
@@ -1252,6 +1253,30 @@ end
     info = getinfo(mhe5)
     @test info[:x̂] ≈ x̂ atol=1e-9
     @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+
+    f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
+    h! = (y,x,_,_)   -> y .= x 
+    nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
+    transcription = TrapezoidalCollocation(f_threads=true, h_threads=true)
+    mhe6 = MovingHorizonEstimator(
+        nonlinmodel_c; He=3, direct=false, transcription
+    )
+    for i in 1:50
+        preparestate!(mhe6, [13])
+        updatestate!(mhe6, [-6], [13])
+    end
+    preparestate!(mhe6, [13])
+    @test mhe6() ≈ [13] atol=1e-3
+    transcription = TrapezoidalCollocation(1)
+    mhe7 = MovingHorizonEstimator(
+        nonlinmodel_c; He=3, direct=true, transcription
+    )
+    for i in 1:50
+        preparestate!(mhe7, [13])
+        updatestate!(mhe7, [-6], [13])
+    end
+    preparestate!(mhe7, [13])
+    @test mhe7() ≈ [13] atol=1e-3
 
     # coverage of the branch with error termination status (with an infeasible problem):
     mhe_infeas = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
@@ -1308,6 +1333,7 @@ end
     end
     preparestate!(mhe2, model())
     @test mhe2() ≈ model() atol = 1e-6
+    
 end
 
 @testitem "MHE fallbacks for arrival covariance estimation" setup=[SetupMPCtests] begin
