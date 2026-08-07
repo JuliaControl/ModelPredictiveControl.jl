@@ -1400,11 +1400,12 @@ By introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the de
 state defects are computed with:
 ```math
 \mathbf{ŝ_d}(ℓ+j+1) = \mathbf{x̂_d}(ℓ+j) + 0.5 T_s [\mathbf{k̇}_1(ℓ+j) + \mathbf{k̇}_2(ℓ+j)] 
-                       + \mathbf{ŵ}(ℓ+j) - \mathbf{x̂_d}(ℓ+j+1)                                              
+                       + \mathbf{ŵ_d}(ℓ+j) - \mathbf{x̂_d}(ℓ+j+1)                                              
 ```
-for ``j = 0, 1, ... , N_k-1``, and in which ``\mathbf{x̂_d}`` are the deterministic states
-extracted from the decision variable `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated
-from the continuous-time function `model.f!` and:
+for ``j = 0, 1, ... , N_k-1``, and in which ``\mathbf{x̂_d}`` and ``\mathbf{ŵ_d}`` are the
+deterministic state and process noise estimates, respectively, extracted from the decision
+variable `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated from the continuous-time
+function `model.f!` and:
 ```math
 \begin{aligned}
 \mathbf{k̇}_1(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d̂_0}(ℓ+j),   \mathbf{p}\Big) \\
