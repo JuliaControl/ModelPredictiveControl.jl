@@ -177,8 +177,9 @@ Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@
 
 Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)s
 only. The `h` argument is the hold order for ``\mathbf{u}`` (`0` or `1`), and the `no`
-argument, the number of collocation points ``n_o``. The decision variable is similar to
-[`MultipleShooting`](@ref), but it also includes the collocation points:
+argument, the number of collocation points ``n_o``. The decision variable of
+[`PredictiveController`](@ref) is similar to [`MultipleShooting`](@ref), but it also
+includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -202,13 +203,15 @@ Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstrin
 descriptions of `f_threads` and `h_threads` keywords. This transcription computes the
 predictions by enforcing the collocation and continuity constraints at the collocation
 points. It is efficient for highly stiff systems, but generally more expensive than the
-other methods for non-stiff systems. This transcription is not supported by the
-[`MovingHorizonEstimator`](@ref) for now. See Extended Help for more details.
+other methods for non-stiff systems. See Extended Help for more details and transcription
+of [`MovingHorizonEstimator`](@ref) objects.
 
 !!! warning
-    The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
-    construction of the [`NonLinModel`](@ref) to estimate the plant states, not orthogonal
-    collocation (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
+    Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
+    `OrthogonalCollocation` transcription, the built-in [`StateEstimator`](@ref) will still
+    use the `solver` provided at the construction of the [`NonLinModel`](@ref) to estimate
+    the plant states, not orthogonal collocation (see `supersample` option of 
+    [`RungeKutta`](@ref) for stiff systems).
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are highly recommended for
 this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
@@ -218,6 +221,32 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
     states are left out of the ``\mathbf{K}`` vector since collocation methods require
     continuous-time dynamics and the stochastic model is discrete.
+
+    For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
+    ```math
+    \mathbf{Z} =                    \begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p)       \\  
+        \mathbf{X̂_0}                \\         
+        \mathbf{0_x̂}                \\
+        \mathbf{K}                  \\         
+        \mathbf{0_k}                \\ 
+        \mathbf{Ŵ}                  \\
+        \mathbf{0_ŵ}                \end{bmatrix}
+    ```
+    The Extended Help of [`SingleShooting`](@ref) and [`MultipleShooting`](@ref) introduces
+    all these variables, except for vector with the intermediate stages of the deterministic
+    states at the collation points:
+    ```math
+    \mathbf{K} =                            \begin{bmatrix}
+        \mathbf{k}_{1}(k+N_k+p+0)           \\
+        \mathbf{k}_{2}(k+N_k+p+0)           \\
+        \vdots                              \\
+        \mathbf{k}_{n_o}(k+N_k+p+0)         \\
+        \mathbf{k}_{1}(k+N_k+p+1)           \\
+        \mathbf{k}_{2}(k+N_k+p+1)           \\
+        \vdots                              \\
+        \mathbf{k}_{n_o}(k+p-1)             \end{bmatrix}
+    ```
 
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
@@ -287,19 +316,23 @@ and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagran
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
 
-The collocation constraints are nonlinear, but the defects of deterministic states 
+The collocation constraints are nonlinear, but the defects of the deterministic states 
 ``\mathbf{x̂_d}`` for the continuity constraints are in fact linear equality constraints:
 ```math
-\mathbf{s_c}(k+j+1) = \mathbf{0} =
+\begin{aligned}
+\mathbf{s_c}(k+1) 
+    &=                                                                          
     \mathbf{C_o} \begin{bmatrix}                                          
-        \mathbf{k}_1(k+j)                                           \\
-        \mathbf{k}_2(k+j)                                           \\
-        \vdots                                                      \\
-        \mathbf{k}_{n_o}(k+j)                                       \end{bmatrix}       
-    + λ_o \mathbf{x̂_d}(k+j) - \mathbf{x̂_d}(k+j+1)
+        \mathbf{k}_1(k)                                                                         \\
+        \mathbf{k}_2(k)                                                                         \\
+        \vdots                                                                                  \\
+        \mathbf{k}_{n_o}(k)                                                                     \end{bmatrix}
+    + λ_o \mathbf{x̂_d}(k) - \mathbf{x̂_d}(k+1)                                                   \\
+    &= \mathbf{0}
+\end{aligned}
 ```
-for ``j = 0, 1, ... , H_p-1``. The ``\mathbf{k}_i`` and ``\mathbf{x̂_d}`` vectors are all
-directly extracted from the decision variable `Z̃`.
+This is a purely linear relation since the ``\mathbf{k}_i`` and ``\mathbf{x̂_d}`` vectors are
+all directly extracted from the decision variable `Z̃`.
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
