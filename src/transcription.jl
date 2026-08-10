@@ -309,15 +309,15 @@ matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed wit
             λ_o  &= L_0(1)                                                                        
 \end{aligned}
 ```
-where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values w/o the coefficients
-and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagrange polynomial
-``L_j(τ)`` bases are defined as:
+where ``T_s`` is the sampling time `model.Ts`, ``\mathbf{P_o}`` is a matrix to evaluate the
+polynomial values w/o the coefficients and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate 
+its derivatives. The Lagrange polynomial ``L_j(τ)`` bases are defined as:
 ```math
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
 
 The ``\mathbf{M_o}`` matrix is used in the nonlinear collocation constraints. The defects
-between the deterministic state derivative at the ``n_o`` collocation points and the model
+between the deterministic state derivative for the ``n_o`` collocation points and the model
 dynamics at the discrete time ``k`` are given by:
 ```math
 \begin{aligned}
@@ -336,9 +336,10 @@ dynamics at the discrete time ``k`` are given by:
 \end{aligned}
 ```
 knowing that the ``\mathbf{k}_i(k)`` vectors are directly extracted from the decision
-variables in `Z̃`. The ``\mathbf{x̂_d}`` vector is the deterministic state at the beginning of
-the interval ``τ_0=0``, and is also extracted from `Z̃`. The ``\mathbf{k̇}_i`` derivative for
-the ``i``th collocation point is computed from the continuous-time function `model.f!` and:
+variables in `Z̃`. The ``\mathbf{x̂_d}(k)`` vector is the estimated deterministic state at the
+beginning of the interval ``τ_0=0``, and is also extracted from `Z̃`. The ``\mathbf{k̇}_i``
+derivatives for the ``i``th collocation point are computed from the continuous-time function
+`model.f!` and:
 ```math
 \mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
 ```
@@ -369,7 +370,7 @@ in fact linear equality constraints:
 \end{aligned}
 ```
 This is a purely linear relation since the ``\mathbf{k}_i`` and ``\mathbf{x̂_d}`` vectors are
-all extracted the decision variables in `Z̃`.
+all extracted from the decision variables in `Z̃`.
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
