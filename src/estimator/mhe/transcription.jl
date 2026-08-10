@@ -543,6 +543,66 @@ function init_defectmat_mhe(
     return ES, GS, JS, BS
 end
 
+
+
+@doc raw"""
+    init_defectmat_mhe(
+        model::SimModel, transcription::OrthogonalCollocation, He, Â, _ , _ , _ , _ , As, _
+    ) -> ES, GS, JS, BS
+
+Init the matrices for computing the continuity constraints and stochastic state defects.
+
+The documentation of [`init_estimstoch`](@ref) shows that the stochastic model of the 
+unmeasured disturbances is linear and discrete-time. The defect of the stochastic states
+over ``H_p`` is therefore computed by:
+```math
+    \mathbf{Ŝ} = \mathbf{E_S Z} 
+```   
+The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
+
+# Extended Help
+!!! details "Extended Help"
+    Using the stochastic matrix ``\mathbf{A_s}`` of [`init_estimstoch`](@ref)), the defect
+    matrices is computed with:
+    ```math
+    \begin{aligned}
+    \mathbf{E_S^x̂} &= \begin{bmatrix}
+        \mathbf{0} & \mathbf{A_s} & \mathbf{0} & \mathbf{-I}  & \mathbf{0}  & \mathbf{0}  & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
+        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{A_s} & \mathbf{0}  & \mathbf{-I} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
+        \vdots     & \vdots       & \vdots     & \vdots       & \mathbf{0}  & \mathbf{0}  & \ddots & \vdots       & \vdots     & \vdots       \\
+        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}   & \mathbf{0}  & \mathbf{0}  & \cdots & \mathbf{A_s} & \mathbf{0} & \mathbf{-I}  \end{bmatrix} \\
+    \mathbf{E_S^ŵ} &= \begin{bmatrix}
+        \mathbf{0} & \mathbf{I}   & \mathbf{0} & \mathbf{0}   & \cdots      & \mathbf{0}  & \mathbf{0}                                        \\
+        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{I}   & \cdots      & \mathbf{0}  & \mathbf{0}                                        \\
+        \vdots     & \vdots       & \vdots     & \vdots       & \ddots      & \vdots      & \vdots                                            \\
+        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}   & \cdots      & \mathbf{0}  & \mathbf{I}                                        \end{bmatrix} \\
+    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^ŵ}                                                                         \end{bmatrix}
+    \end{aligned}
+    ```
+"""
+function init_defectmat_mhe(
+    model::SimModel{NT}, ::OrthogonalCollocation, He, Â, _ , _ , _ , _ , As, _
+) where {NT<:Real}
+    nx̂, nxs = size(Â, 2), size(As, 2)
+    nx = nx̂ - nxs
+    nŵ = nx̂
+    nw = nŵ - nxs
+    ESx̂ = [zeros(NT, nxs*He, nx̂) repeatdiag([zeros(NT, nxs, nx) -I], He)]
+    for j=1:He
+        iRow = (1:nxs)   .+ nxs*(j-1)
+        iCol = (nx+1:nx̂) .+  nx̂*(j-1)
+        ESx̂[iRow, iCol] = As
+    end
+    ESŵ = repeatdiag([zeros(NT, nxs, nw) I], He)
+    ES = [ESx̂ ESŵ]
+    GS = zeros(NT, nxs*He, model.nu*He)
+    JS = zeros(NT, nxs*He, model.nd*(He+1))
+    BS = zeros(NT, nxs*He)
+    return ES, GS, JS, BS
+end
+
+
+
 "Return empty matrices for [`SingleShooting`](@ref) transcription on any `SimModel` (N/A)."
 function init_defectmat_mhe(
     model::SimModel{NT}, transcription::SingleShooting, He, Â, _ , _ , _ , _ , _ , _

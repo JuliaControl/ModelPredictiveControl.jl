@@ -108,6 +108,9 @@ struct MovingHorizonEstimator{
     nyu::Int
     nxs::Int
     p::PT
+    Mo::SparseMatrixCSC{NT, Int}
+    Co::SparseMatrixCSC{NT, Int}
+    λo::NT
     As  ::Matrix{NT}
     Cs_u::Matrix{NT}
     Cs_y::Matrix{NT}
@@ -171,9 +174,6 @@ struct MovingHorizonEstimator{
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
         validate_transcription(model, transcription)
-        if transcription isa OrthogonalCollocation 
-            error("OrthogonalCollocation is not supported for the MHE for now.")
-        end
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂ = model.nx + nxs
@@ -186,6 +186,7 @@ struct MovingHorizonEstimator{
         E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂ = init_predmat_mhe(
             model, transcription, He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
         )
+        Mo, Co, λo = init_orthocolloc(model, transcription)
         ES, GS, JS, BS = init_defectmat_mhe(
             model, transcription, He, Â, B̂u, B̂d, x̂op, f̂op, As, direct
         ) 
@@ -224,6 +225,7 @@ struct MovingHorizonEstimator{
             He, nε,
             i_ym, nx̂, nym, nyu, nxs, 
             p,
+            Mo, Co, λo,
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             Tŵ,

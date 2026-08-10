@@ -316,13 +316,50 @@ and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagran
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
 
-The collocation constraints are nonlinear, but the defects of the deterministic states 
-``\mathbf{x̂_d}`` for the continuity constraints are in fact linear equality constraints:
+The ``\mathbf{M_o}`` matrix is used in the nonlinear collocation constraints. The defects
+between the deterministic state derivative at the ``n_o`` collocation points and the model
+dynamics at the discrete time ``k`` are given by:
+```math
+\begin{aligned}
+\mathbf{s_k}(k)                                                              
+    &= \mathbf{M_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(k) - \mathbf{x̂_d}(k)                                                    \\
+        \mathbf{k}_2(k) - \mathbf{x̂_d}(k)                                                    \\
+        \vdots                                                                               \\
+        \mathbf{k}_{n_o}(k) - \mathbf{x̂_d}(k)                                                \end{bmatrix}                                                                                   
+    - \begin{bmatrix}
+        \mathbf{k̇}_1(k)                                                                      \\
+        \mathbf{k̇}_2(k)                                                                      \\
+        \vdots                                                                               \\
+        \mathbf{k̇}_{n_o}(k)                                                                  \end{bmatrix} \\
+    &= \mathbf{0}
+\end{aligned}
+```
+knowing that the ``\mathbf{k}_i(k)`` vectors are directly extracted from the decision
+variables in `Z̃`. The ``\mathbf{x̂_d}`` vector is the deterministic state at the beginning of
+the interval ``τ_0=0``, and is also extracted from `Z̃`. The ``\mathbf{k̇}_i`` derivative for
+the ``i``th collocation point is computed from the continuous-time function `model.f!` and:
+```math
+\mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
+```
+Based on the normalized time ``τ_i ∈ [0, 1]`` and hold order `transcription.h`, the inputs
+and disturbances are piecewise constant or linear:
+```math
+\begin{aligned}
+\mathbf{û}_i(k) &=                                                                           \begin{cases}
+                    \mathbf{û_0}(k)                                  &  h = 0                \\
+                    (1-τ_i)\mathbf{û_0}(k) + τ_i\mathbf{û_0}(k+1)    &  h = 1                \end{cases} \\
+\mathbf{d̂}_i(k) &=  (1-τ_i)\mathbf{d̂_0}(k) + τ_i\mathbf{d̂_0}(k+1)                      
+\end{aligned}
+```
+The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref). 
+
+The defects of the deterministic states ``\mathbf{x̂_d}`` for the continuity constraints are
+in fact linear equality constraints:
 ```math
 \begin{aligned}
 \mathbf{s_c}(k+1) 
-    &=                                                                          
-    \mathbf{C_o} \begin{bmatrix}                                          
+    &= \mathbf{C_o} \begin{bmatrix}                                          
         \mathbf{k}_1(k)                                                                         \\
         \mathbf{k}_2(k)                                                                         \\
         \vdots                                                                                  \\
@@ -332,7 +369,7 @@ The collocation constraints are nonlinear, but the defects of the deterministic 
 \end{aligned}
 ```
 This is a purely linear relation since the ``\mathbf{k}_i`` and ``\mathbf{x̂_d}`` vectors are
-all directly extracted from the decision variable `Z̃`.
+all directly extracted the decision variables in `Z̃`.
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
