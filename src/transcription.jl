@@ -147,10 +147,11 @@ transcription method.
 
 # Extended Help
 !!! details "Extended Help"
-    Note that the stochastic model of the unmeasured disturbances is strictly discrete-time,
-    as described in [`ModelPredictiveControl.init_estimstoch`](@ref). Collocation methods
-    require continuous-time dynamics. Because of this, the stochastic states are transcribed
-    separately using a [`MultipleShooting`](@ref) method. See [`con_nonlinprogeq!`](@ref)
+    Note that the stochastic model of the unmeasured disturbances is strictly linear and
+    discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
+    Collocation methods require continuous-time dynamics. Because of this, and also to
+    reduce the number of nonlinear constraints, the stochastic states are transcribed
+    separately using a linear [`MultipleShooting`](@ref) method. See [`con_nonlinprogeq!`](@ref)
     and [`con_nonlinprogeq_mhe!`](@ref) for more details.
 """
 struct TrapezoidalCollocation <: CollocationMethod
@@ -219,8 +220,9 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 # Extended Help
 !!! details "Extended Help"
     As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
-    states are left out of the ``\mathbf{K}`` vector since collocation methods require
-    continuous-time dynamics and the stochastic model is discrete.
+    states are left out of the ``\mathbf{K}`` vector to reduce the dimensions, and also
+    because collocation methods require continuous-time dynamics and the stochastic model is
+    discrete.
 
     For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
     ```math
@@ -234,8 +236,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{0_ŵ}                \end{bmatrix}
     ```
     The Extended Help of [`SingleShooting`](@ref) and [`MultipleShooting`](@ref) introduces
-    all these variables, except for vector with the intermediate stages of the deterministic
-    states at the collation points:
+    all these variables, except for the vector with the intermediate stages of the
+    deterministic states at the collation points:
     ```math
     \mathbf{K} =                            \begin{bmatrix}
         \mathbf{k}_{1}(k+N_k+p+0)           \\
@@ -252,7 +254,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
     The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
     is more accurate than Gauss-Radau but only A-stable, while the latter being L-stable. 
-    See [`con_nonlinprogeq!`](@ref) for implementation details.
+    See [`init_orthocolloc`](@ref) and [`con_nonlinprogeq!`](@ref) for details.
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
