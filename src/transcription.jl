@@ -342,8 +342,8 @@ the ``i``th collocation point is computed from the continuous-time function `mod
 ```math
 \mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
 ```
-Based on the normalized time ``τ_i ∈ [0, 1]`` and hold order `transcription.h`, the inputs
-and disturbances are piecewise constant or linear:
+Based on the normalized time ``τ_i`` and the hold order `transcription.h`, the inputs and
+disturbances are piecewise constant or linear:
 ```math
 \begin{aligned}
 \mathbf{û}_i(k) &=                                                                           \begin{cases}
@@ -352,7 +352,7 @@ and disturbances are piecewise constant or linear:
 \mathbf{d̂}_i(k) &=  (1-τ_i)\mathbf{d̂_0}(k) + τ_i\mathbf{d̂_0}(k+1)                      
 \end{aligned}
 ```
-The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref). 
+The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref).
 
 The defects of the deterministic states ``\mathbf{x̂_d}`` for the continuity constraints are
 in fact linear equality constraints:
@@ -369,7 +369,7 @@ in fact linear equality constraints:
 \end{aligned}
 ```
 This is a purely linear relation since the ``\mathbf{k}_i`` and ``\mathbf{x̂_d}`` vectors are
-all directly extracted the decision variables in `Z̃`.
+all extracted the decision variables in `Z̃`.
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
