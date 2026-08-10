@@ -198,14 +198,14 @@ where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministi
     \mathbf{k}_{n_o}(k+H_p-1)           \end{bmatrix}
 ```
 and ``\mathbf{k}_i(k+j)`` is the deterministic state prediction for the ``i``th collocation
-point at the ``j``th stage/interval/finite element (details in Extended Help). The `roots`
-keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or 
-Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstring for
-descriptions of `f_threads` and `h_threads` keywords. This transcription computes the
-predictions by enforcing the collocation and continuity constraints at the collocation
-points. It is efficient for highly stiff systems, but generally more expensive than the
-other methods for non-stiff systems. See Extended Help for more details and transcription
-of [`MovingHorizonEstimator`](@ref) objects.
+point at the ``j``th stage/interval (details in Extended Help). The `roots` keyword argument
+is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or Gauss-Legendre quadrature, 
+respectively. See [`MultipleShooting`](@ref) docstring for descriptions of `f_threads` and
+`h_threads` keywords. This transcription computes the predictions by enforcing the
+collocation and continuity constraints at the collocation points. It is efficient for highly
+stiff systems, but generally more expensive than the other methods for non-stiff systems.
+See Extended Help for details and the transcription of [`MovingHorizonEstimator`](@ref) 
+objects.
 
 !!! warning
     Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
