@@ -288,25 +288,26 @@ end
 Init the differentiation and continuity matrices for [`OrthogonalCollocation`](@ref).
 
 Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized to the
-interval ``[0, 1]``, and ``τ_0=0``, each state trajectories are approximated by a distinct
-polynomial of degree ``n_o``. The differentiation matrix ``\mathbf{M_o}``, continuity
-matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed with:
+interval ``[0, 1]`` with ``τ_0=0``, the trajectories for each state are approximated by a
+distinct polynomial of degree ``n_o``. The differentiation matrix ``\mathbf{M_o}``, the
+continuity matrix ``\mathbf{C_o}`` and the continuity coefficient ``λ_o`` are pre-computed
+with the identity matrix ``\mathbf{I}`` of size `(model.nx, model.nx)` and:
 ```math
 \begin{aligned}
-    \mathbf{P_o} &=                                                                               \begin{bmatrix}
-        τ_1^1 \mathbf{I}       & τ_1^2 \mathbf{I}       & \cdots & τ_1^{n_o} \mathbf{I}           \\
-        τ_2^1 \mathbf{I}       & τ_2^2 \mathbf{I}       & \cdots & τ_2^{n_o} \mathbf{I}           \\
-        \vdots                 & \vdots                 & \ddots & \vdots                         \\
-        τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
-    \mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
-        τ_1^0 \mathbf{I}       & 2τ_1^1 \mathbf{I}      & \cdots & n_o τ_1^{n_o-1} \mathbf{I}     \\
-        τ_2^0 \mathbf{I}       & 2τ_2^1 \mathbf{I}      & \cdots & n_o τ_2^{n_o-1} \mathbf{I}     \\
-        \vdots                 & \vdots                 & \ddots & \vdots                         \\
-        τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
-    \mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
-    \mathbf{C_o} &=                                                                               \begin{bmatrix}
-        L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix} \\
-            λ_o  &= L_0(1)                                                                        
+\mathbf{P_o} &=                                                                               \begin{bmatrix}
+    τ_1^1 \mathbf{I}       & τ_1^2 \mathbf{I}       & \cdots & τ_1^{n_o} \mathbf{I}           \\
+    τ_2^1 \mathbf{I}       & τ_2^2 \mathbf{I}       & \cdots & τ_2^{n_o} \mathbf{I}           \\
+    \vdots                 & \vdots                 & \ddots & \vdots                         \\
+    τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
+\mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
+    τ_1^0 \mathbf{I}       & 2τ_1^1 \mathbf{I}      & \cdots & n_o τ_1^{n_o-1} \mathbf{I}     \\
+    τ_2^0 \mathbf{I}       & 2τ_2^1 \mathbf{I}      & \cdots & n_o τ_2^{n_o-1} \mathbf{I}     \\
+    \vdots                 & \vdots                 & \ddots & \vdots                         \\
+    τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
+\mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
+\mathbf{C_o} &=                                                                               \begin{bmatrix}
+    L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix} \\
+        λ_o  &= L_0(1)                                                                        
 \end{aligned}
 ```
 where ``T_s`` is the sampling time `model.Ts`, ``\mathbf{P_o}`` is a matrix to evaluate the
@@ -344,7 +345,7 @@ derivatives for the ``i``th collocation point are computed from the continuous-t
 \mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
 ```
 Based on the normalized time ``τ_i`` and the hold order `transcription.h`, the inputs and
-disturbances are piecewise constant or linear:
+disturbances are either piecewise constant or linear:
 ```math
 \begin{aligned}
 \mathbf{û}_i(k) &=                                                                           \begin{cases}
@@ -396,7 +397,12 @@ function init_orthocolloc(
     λo = lagrange_end(0, transcription)
     return Mo, Co, λo
 end
-"Return empty sparse matrices and `NaN` for other [`TranscriptionMethod`](@ref)"
+
+"""
+    init_orthocolloc(model::SimModel, transcription::TranscriptionMethod)
+
+Return empty sparse matrices and `NaN` value for other [`TranscriptionMethod`](@ref) types.
+"""
 init_orthocolloc(::SimModel, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0), NaN
 
 "Evaluate the Lagrange basis polynomial ``L_j`` at `τ=1`."

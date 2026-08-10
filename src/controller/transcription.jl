@@ -1378,8 +1378,8 @@ The deterministic state defects are computed with:
                        - \mathbf{x̂_d}(k+j+1)                                              
 ```
 for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x̂_d}`` are the deterministic states
-extracted from the decision variable `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated
-from the continuous-time function `model.f!` and:
+extracted from the decision variable `Z̃`. The ``\mathbf{k̇}`` coefficients are evaluated from
+the continuous-time function `model.f!` and:
 ```math
 \begin{aligned}
 \mathbf{k̇}_1(k+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
@@ -1464,24 +1464,10 @@ the model dynamics are computed by:
 for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` vectors are
 extracted from the decision variables in `Z̃`. The ``\mathbf{x̂_d}`` vectors are the
 deterministic states extracted from ``\mathbf{X̂_0}`` also in `Z̃`, and they correspond to the
-states at the beginning of the interval ``τ_0=0``. The ``\mathbf{k̇}_i`` derivative for the
-``i``th collocation point is computed from the continuous-time function `model.f!` and:
-```math
-\mathbf{k̇}_i(k+j) =  \mathbf{f}\Big(\mathbf{k}_i(k+j), \mathbf{û}_i(k+j), \mathbf{d̂}_i(k+j), \mathbf{p}\Big)
-```
-Based on the normalized time ``τ_i ∈ [0, 1]`` and hold order `transcription.h`, the inputs
-and disturbances are piecewise constant or linear:
-```math
-\begin{aligned}
-\mathbf{û}_i(k+j) &=                                                                        \begin{cases}
-                     \mathbf{û_0}(k+j)                                    &  h = 0          \\
-                     (1-τ_i)\mathbf{û_0}(k+j) + τ_i\mathbf{û_0}(k+j+1)    &  h = 1          \end{cases} \\
-\mathbf{d̂}_i(k+j) &= (1-τ_i)\mathbf{d̂_0}(k+j) + τ_i\mathbf{d̂_0}(k+j+1)                      
-\end{aligned}
-```
-The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref). The defects for the
-continuity constraints and stochastic states are linear equality constraints (see
-[`init_defectmat`](@ref)).
+states at the beginning of the interval ``τ_0=0``. The ``\mathbf{k̇}_i`` vectors are
+evaluated from the continuous-time function `model.f`, as described in [`init_orthocolloc`](@ref)
+documentation. The defects for the continuity constraints and the stochastic states are
+linear equality constraints (see [`init_defectmat`](@ref) for details).
 """
 function con_nonlinprogeq!(
     geq, _ , Û0, K̇,  
