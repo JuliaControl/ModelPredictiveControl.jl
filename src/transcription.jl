@@ -240,12 +240,12 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     deterministic states at the collation points:
     ```math
     \mathbf{K} =                            \begin{bmatrix}
-        \mathbf{k}_{1}(k+N_k+p+0)           \\
-        \mathbf{k}_{2}(k+N_k+p+0)           \\
+        \mathbf{k}_{1}(k-N_k+p+0)           \\
+        \mathbf{k}_{2}(k-N_k+p+0)           \\
         \vdots                              \\
-        \mathbf{k}_{n_o}(k+N_k+p+0)         \\
-        \mathbf{k}_{1}(k+N_k+p+1)           \\
-        \mathbf{k}_{2}(k+N_k+p+1)           \\
+        \mathbf{k}_{n_o}(k-N_k+p+0)         \\
+        \mathbf{k}_{1}(k-N_k+p+1)           \\
+        \mathbf{k}_{2}(k-N_k+p+1)           \\
         \vdots                              \\
         \mathbf{k}_{n_o}(k+p-1)             \end{bmatrix}
     ```
