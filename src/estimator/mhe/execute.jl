@@ -421,7 +421,9 @@ function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<
     F, C, optim = estim.F, estim.C, estim.optim
     fx̄, r = estim.fx̄, estim.r
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
-    nYm, nZ = estim.nym*Nk, get_nZ_mhe(estim.transcription, Nk, nx̂, nŵ)
+    nYm = estim.nym*Nk
+    nk = get_nk(model, estim.transcription)
+    nZ = get_nZ_mhe(estim.transcription, Nk, nx̂, nk, nŵ)
     # --- truncate vectors and matrices if Nk < He ---
     U0, D0, Y0m = trunc_windows(estim)
     Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var = trunc_predmat(estim)
@@ -470,7 +472,8 @@ getx̄!(x̄, estim::MovingHorizonEstimator, x̂0arr) = (x̄ .= estim.x̂0arr_old
 "Get the estimated process noise from the decision vector `Z̃`."
 function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
     He, nx̂, nŵ = estim.He, estim.nx̂, estim.nx̂
-    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
+    nk = get_nk(estim.model, transcription)
+    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
     Ŵ[1:nŵ*He] .= @views Z̃[(nZ̃ - nŵ*He + 1):end] 
     return Ŵ
 end

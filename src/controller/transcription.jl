@@ -484,7 +484,7 @@ end
 @doc raw"""
     init_defectmat(
         model::SimModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
-        Hp, Hc, nb, Co=nothing, λo=nothing
+        Hp, Hc, _ , Co, λo
     ) -> ES, GS, JS, KS, VS, BS
 
 Init the matrices for computing the continuity constraints and stochastic state defects.

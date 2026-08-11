@@ -34,7 +34,7 @@ function StateEstimatorBuffer{NT}(
     He::Int=0, nŵ::Int=nx̂, nε::Int=0,
     transcription::TranscriptionMethod = SingleShooting()
 ) where NT <: Real
-    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
     nV̂, nŴ, nX̂, nŶ = nym*He, nŵ*He, nx̂*He, ny*He
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)

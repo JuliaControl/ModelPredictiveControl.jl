@@ -1,6 +1,7 @@
 "Get the number of elements in the optimization decision vector `Z`"
-get_nZ_mhe(::SingleShooting, He, nx̂, nŵ) = nx̂ + nŵ*He
-get_nZ_mhe(::TranscriptionMethod, He, nx̂, nŵ) = nx̂ + nx̂*He + nŵ*He
+get_nZ_mhe(::SingleShooting, He, nx̂, _ , nŵ) = nx̂ + nŵ*He
+get_nZ_mhe(::TranscriptionMethod, He, nx̂, _ , nŵ) = nx̂ + nx̂*He + nŵ*He
+get_nZ_mhe(::OrthogonalCollocation, He, nx̂, nk, nŵ) = nx̂ + nx̂*He + nk*He + nŵ*He
 
 "Get the element indices in the decision vector `Z̃` that applies to a `Nk` window length."
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::TranscriptionMethod)
@@ -390,7 +391,8 @@ function init_predmat_mhe(
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
     nŵ = nx̂
-    nZ = get_nZ_mhe(transcription, He, nx̂, nŵ)
+    nk = get_nk(model, transcription)
+    nZ = get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
     E  = zeros(NT, 0, nZ)
     ex̄ = [-I zeros(NT, nx̂, nZ - nx̂)]
     EX̂ = [zeros(NT, nx̂*He, nx̂) I zeros(NT, nx̂*He, nZ - nx̂ - nx̂*He)]
@@ -406,7 +408,7 @@ end
 @doc raw"""
     init_defectmat_mhe(
         model::LinModel, transcription::MultipleShooting, direct::Bool,
-        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, As
+        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, _ , _ , _
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the defects over the predicted states.
@@ -463,7 +465,8 @@ matrices ``\mathbf{E_S, G_S, J_S, B_S}`` are defined in the Extended Help sectio
     operator `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
 """
 function init_defectmat_mhe(
-    model::LinModel{NT}, ::MultipleShooting, direct::Bool, He, Â, B̂u, B̂d, x̂op, f̂op, _ 
+    model::LinModel{NT}, ::MultipleShooting, direct::Bool, 
+    He, Â, B̂u, B̂d, x̂op, f̂op, _ , _ , _
 ) where {NT<:Real}
     nd = model.nd
     nx̂ = size(Â, 2)
@@ -490,7 +493,7 @@ end
 @doc raw"""
     init_defectmat_mhe(
         model::SimModel, transcription::TranscriptionMethod, direct::Bool,
-        He, Â, _ , _ , _ , _ , As
+        He, Â, _ , _ , _ , _ , As, _ , _
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the defects of the stochastic states only.
@@ -525,19 +528,20 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
     ```
 """
 function init_defectmat_mhe(
-    model::SimModel{NT}, ::TranscriptionMethod, ::Bool, He, Â, _ , _ , _ , _ , As
+    model::SimModel{NT}, ::TranscriptionMethod, ::Bool, 
+    He, Â, _ , _ , _ , _ , As, _ , _
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
-    nx = nx̂ - nxs
-    nŵ = nx̂
-    nw = nŵ - nxs
+    nx  = nx̂ - nxs
+    nŵ  = nx̂
+    nŵd = nŵ - nxs
     ESx̂ = [zeros(NT, nxs*He, nx̂) repeatdiag([zeros(NT, nxs, nx) -I], He)]
     for j=1:He
         iRow = (1:nxs)   .+ nxs*(j-1)
         iCol = (nx+1:nx̂) .+  nx̂*(j-1)
         ESx̂[iRow, iCol] = As
     end
-    ESŵ = repeatdiag([zeros(NT, nxs, nw) I], He)
+    ESŵ = repeatdiag([zeros(NT, nxs, nŵd) I], He)
     ES = [ESx̂ ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
     JS = zeros(NT, nxs*He, model.nd*(He+1))
@@ -548,7 +552,7 @@ end
 @doc raw"""
     init_defectmat_mhe(
         model::SimModel, transcription::OrthogonalCollocation, direct::Bool
-        He, Â, _ , _ , _ , _ , As
+        He, Â, _ , _ , _ , _ , As, Co, λo
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the continuity constraints and stochastic state defects.
@@ -590,21 +594,25 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
     ```
 """
 function init_defectmat_mhe(
-    model::SimModel{NT}, ::OrthogonalCollocation, ::Bool,
-    He, Â, _ , _ , _ , _ , As
+    model::SimModel{NT}, transcription::OrthogonalCollocation, ::Bool,
+    He, Â, _ , _ , _ , _ , As, Co, λo
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
-    nx = nx̂ - nxs
-    nŵ = nx̂
-    nw = nŵ - nxs
-    ESx̂ = [zeros(NT, nxs*He, nx̂) repeatdiag([zeros(NT, nxs, nx) -I], He)]
+    nx  = nx̂ - nxs
+    nk = get_nk(model, transcription)
+    λo_I = λo*I(nx)
+    ESx̂ = [zeros(NT, nx̂*He, nx̂) -I]
     for j=1:He
-        iRow = (1:nxs)   .+ nxs*(j-1)
-        iCol = (nx+1:nx̂) .+  nx̂*(j-1)
+        iRow = (1:nx) .+ (j-1)*nx̂
+        iCol = (1:nx) .+ (j-1)*nx̂
+        ESx̂[iRow, iCol] = λo_I
+        iRow = (nx+1:nx̂) .+ (j-1)*nx̂
+        iCol = (nx+1:nx̂) .+ (j-1)*nx̂
         ESx̂[iRow, iCol] = As
     end
-    ESŵ = repeatdiag([zeros(NT, nxs, nw) I], He)
-    ES = [ESx̂ ESŵ]
+    ESk = repeatdiag([Co; zeros(NT, nxs, nk)], He)
+    ESŵ = I # will be different if nŵ ≠ nx̂ is implemented
+    ES = [ESx̂ ESk ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
     JS = zeros(NT, nxs*He, model.nd*(He+1))
     BS = zeros(NT, nxs*He)
@@ -613,7 +621,8 @@ end
 
 "Return empty matrices for [`SingleShooting`](@ref) transcription on any `SimModel` (N/A)."
 function init_defectmat_mhe(
-    model::SimModel{NT}, transcription::SingleShooting, ::Bool, He, Â, _ , _ , _ , _ , _ 
+    model::SimModel{NT}, transcription::SingleShooting, ::Bool, 
+    He, Â, _ , _ , _ , _ , _ , _ , _
 ) where {NT<:Real}
     nx̂ = size(Â, 2)
     nŵ = nx̂

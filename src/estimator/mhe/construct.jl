@@ -169,7 +169,8 @@ struct MovingHorizonEstimator{
             GCfunc<:Function,
             CE<:KalmanEstimator{NT}
         }
-        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+        nu, ny, nd = model.nu, model.ny, model.nd
+        nk = get_nk(model, transcription)
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
@@ -188,7 +189,7 @@ struct MovingHorizonEstimator{
         )
         Mo, Co, λo = init_orthocolloc(model, transcription)
         ES, GS, JS, BS = init_defectmat_mhe(
-            model, transcription, direct, He, Â, B̂u, B̂d, x̂op, f̂op, As
+            model, transcription, direct, He, Â, B̂u, B̂d, x̂op, f̂op, As, Co, λo
         ) 
         # dummy values (updated just before optimization):
         F, fx̄ = zeros(NT, nym*He), zeros(NT, nx̂)
@@ -200,7 +201,7 @@ struct MovingHorizonEstimator{
             ES, GS, JS, BS, 
             gc!, nc
         )
-        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
+        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
         # dummy values, updated before optimization:
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
@@ -1075,9 +1076,10 @@ in which ``\mathbf{T_{ŵ}} = [\begin{smallmatrix} \mathbf{0} & \mathbf{I} \end{
 and ``\mathbf{0}`` is properly sized for the `transcription` instance.
 """
 function init_ZtoŴ(
-    ::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
+    model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
 ) where {NT<:Real}
-    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nŵ)
+    nk = get_nk(model, transcription)
+    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
     Tŵ = [spzeros(NT, nŴ, nZ-nŴ) I]
     return Tŵ
 end
@@ -1299,11 +1301,12 @@ end
 Init the decision variable box constraints `Z̃min` and `Z̃max` for [`MovingHorizonEstimator`](@ref).
 """
 function init_boxconstraint_mhe(
-    ::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
+    model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
     x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
     A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
-    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
+    nk = get_nk(model, transcription)
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
     Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
     nε > 0 && (Z̃min[begin] = 0)
     nŴ = nŵ*He
