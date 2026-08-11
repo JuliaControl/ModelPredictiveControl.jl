@@ -1356,9 +1356,9 @@ function con_nonlinprogeq!(
         k        = @views    K[(1 + nk*(j-1)):(nk*j)]
         x̂dnext   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
-        sdnext    = @views geq[(1 + nx*(j-1)):(nx*j)]
+        ŝdnext    = @views geq[(1 + nx*(j-1)):(nx*j)]
         f!(x̂dnext, k, model, x̂d_Z̃, û0, d̂0, model.p)
-        sdnext .= @. x̂dnext - x̂dnext_Z̃
+        ŝdnext .= @. x̂dnext - x̂dnext_Z̃
     end
     return geq
 end
@@ -1414,7 +1414,7 @@ function con_nonlinprogeq!(
         k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
-        sdnext   = @views  geq[(1 + nx*(j-1)):(nx*(j-1) + nx)]
+        ŝdnext   = @views  geq[(1 + nx*(j-1)):(nx*(j-1) + nx)]
         k̇1, k̇2   = @views k̇[1:nx], k̇[nx+1:2*nx]
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         if f_threads || h < 1 || j < 2
@@ -1431,7 +1431,7 @@ function con_nonlinprogeq!(
             û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
             model.f!(k̇2, x̂dnext_Z̃, û0next, d̂0next, p)
         end
-        sdnext .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
+        ŝdnext .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
     end
     return geq
 end
@@ -1449,7 +1449,7 @@ Nonlinear equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocat
 The defects between the deterministic state derivative at the ``n_o`` collocation points and
 the model dynamics are computed by:
 ```math
-\mathbf{s_k}(k+j)                                                                                 
+\mathbf{ŝ_k}(k+j)                                                                                 
     = \mathbf{M_o} \begin{bmatrix}                                          
         \mathbf{k}_1(k+j) - \mathbf{x̂_d}(k+j)                       \\
         \mathbf{k}_2(k+j) - \mathbf{x̂_d}(k+j)                       \\
@@ -1496,14 +1496,14 @@ function con_nonlinprogeq!(
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        sk       = @views   geq[(1 + nk*(j-1)):(nk*j)]
+        ŝk       = @views   geq[(1 + nk*(j-1)):(nk*j)]
         # ----------------- collocation constraint defects -----------------------------
         û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         Δk = k̇
         for i=1:no
             Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
         end
-        mul!(sk, Mo, Δk)
+        mul!(ŝk, Mo, Δk)
         d̂i = @views D̂temp[(1 + nd*(j-1)):(nd*j)]
         if h > 0
             ûi = similar(û0) # TODO: remove this allocation
@@ -1521,7 +1521,7 @@ function con_nonlinprogeq!(
                 model.f!(k̇i, ki_Z̃, ûi, d̂i, p)
             end
         end
-        sk .-= k̇
+        ŝk .-= k̇
     end
     return geq
 end

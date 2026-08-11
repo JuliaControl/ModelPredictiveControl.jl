@@ -324,7 +324,7 @@ between the deterministic state derivative for the ``n_o`` collocation points an
 dynamics at the discrete time ``k`` are given by:
 ```math
 \begin{aligned}
-\mathbf{s_k}(k)                                                              
+\mathbf{ŝ_k}(k)                                                              
     &= \mathbf{M_o} \begin{bmatrix}                                          
         \mathbf{k}_1(k) - \mathbf{x̂_d}(k)                                                    \\
         \mathbf{k}_2(k) - \mathbf{x̂_d}(k)                                                    \\
@@ -362,7 +362,7 @@ The defects of the deterministic states ``\mathbf{x̂_d}`` for the continuity co
 in fact linear equality constraints:
 ```math
 \begin{aligned}
-\mathbf{s_c}(k+1) 
+\mathbf{ŝ_c}(k+1) 
     &= \mathbf{C_o} \begin{bmatrix}                                          
         \mathbf{k}_1(k)                                                                         \\
         \mathbf{k}_2(k)                                                                         \\
