@@ -406,7 +406,7 @@ end
 @doc raw"""
     init_defectmat_mhe(
         model::LinModel, transcription::MultipleShooting, 
-        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, _ , direct
+        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, As, direct
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the defects over the predicted states.
@@ -496,7 +496,7 @@ Init the matrices for computing the defects of the stochastic states only.
 
 The documentation of [`init_estimstoch`](@ref) shows that the stochastic model of the 
 unmeasured disturbances is linear and discrete-time. The defect of the stochastic states
-over ``H_p`` is therefore computed by:
+over ``H_e`` is therefore computed by:
 ```math
     \mathbf{Ŝ} = \mathbf{E_S Z} 
 ```   
@@ -504,8 +504,9 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
 
 # Extended Help
 !!! details "Extended Help"
-    Using the stochastic matrix ``\mathbf{A_s}`` of [`init_estimstoch`](@ref)), the defect
-    matrices is computed with:
+    Using the stochastic matrix ``\mathbf{A_s}`` of [`init_estimstoch`](@ref)), and
+    updating the stochastic states by adding their associated process noise estimates 
+    ``\mathbf{ŵ_s}``, the defect matrices are computed with:
     ```math
     \begin{aligned}
     \mathbf{E_S^x̂} &= \begin{bmatrix}
@@ -543,8 +544,6 @@ function init_defectmat_mhe(
     return ES, GS, JS, BS
 end
 
-
-
 @doc raw"""
     init_defectmat_mhe(
         model::SimModel, transcription::OrthogonalCollocation, He, Â, _ , _ , _ , _ , As, _
@@ -552,9 +551,9 @@ end
 
 Init the matrices for computing the continuity constraints and stochastic state defects.
 
-The documentation of [`init_estimstoch`](@ref) shows that the stochastic model of the 
-unmeasured disturbances is linear and discrete-time. The defect of the stochastic states
-over ``H_p`` is therefore computed by:
+The documentation of [`init_orthocolloc`](@ref) shows that continuity constraints of the
+[`OrthogonalCollocation`](@ref) are in fact linear. Combined with the stochastic state
+defects, the linear equality constraints for this transcription is given by:
 ```math
     \mathbf{Ŝ} = \mathbf{E_S Z} 
 ```   
@@ -562,21 +561,29 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
 
 # Extended Help
 !!! details "Extended Help"
-    Using the stochastic matrix ``\mathbf{A_s}`` of [`init_estimstoch`](@ref)), the defect
-    matrices is computed with:
+    Using the stochastic matrix ``\mathbf{A_s}`` of [`init_estimstoch`](@ref)), and by
+    updating the states by adding their process noise estimates ``\mathbf{ŵ}``, the defect
+    matrices are computed with:
     ```math
     \begin{aligned}
-    \mathbf{E_S^x̂} &= \begin{bmatrix}
-        \mathbf{0} & \mathbf{A_s} & \mathbf{0} & \mathbf{-I}  & \mathbf{0}  & \mathbf{0}  & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
-        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{A_s} & \mathbf{0}  & \mathbf{-I} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
-        \vdots     & \vdots       & \vdots     & \vdots       & \mathbf{0}  & \mathbf{0}  & \ddots & \vdots       & \vdots     & \vdots       \\
-        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}   & \mathbf{0}  & \mathbf{0}  & \cdots & \mathbf{A_s} & \mathbf{0} & \mathbf{-I}  \end{bmatrix} \\
-    \mathbf{E_S^ŵ} &= \begin{bmatrix}
-        \mathbf{0} & \mathbf{I}   & \mathbf{0} & \mathbf{0}   & \cdots      & \mathbf{0}  & \mathbf{0}                                        \\
-        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{I}   & \cdots      & \mathbf{0}  & \mathbf{0}                                        \\
-        \vdots     & \vdots       & \vdots     & \vdots       & \ddots      & \vdots      & \vdots                                            \\
-        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}   & \cdots      & \mathbf{0}  & \mathbf{I}                                        \end{bmatrix} \\
-    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^ŵ}                                                                         \end{bmatrix}
+    \mathbf{E_S^x̂}  &= \begin{bmatrix}
+        λ_o\mathbf{I} & \mathbf{0}   &\mathbf{-I}    & \mathbf{0}   & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}           \\
+        \mathbf{0}    & \mathbf{A_s} & \mathbf{0}    & \mathbf{-I}  & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}           \\
+        \mathbf{0}    & \mathbf{0}   & λ_o\mathbf{I} & \mathbf{0}   & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}           \\
+        \mathbf{0}    & \mathbf{0}   & \mathbf{0}    & \mathbf{A_s} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}           \\
+        \vdots        & \vdots       & \vdots        & \vdots       & \ddots & \vdots        & \vdots       & \vdots     & \vdots               \\
+        \mathbf{0}    & \mathbf{0}   & \mathbf{0}    & \mathbf{0}   & \cdots & λ_o\mathbf{I} & \mathbf{0}   & \mathbf{-I} & \mathbf{0}          \\   
+        \mathbf{0}    & \mathbf{0}   & \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}    & \mathbf{A_s} & \mathbf{0}  & \mathbf{-I}         \end{bmatrix} \\
+    \mathbf{E_S^k} &= \begin{bmatrix}
+       \mathbf{C_o}   & \mathbf{0}   & \cdots & \mathbf{0}                                                                                      \\
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                                      \\
+        \mathbf{0}    & \mathbf{C_o} & \cdots & \mathbf{0}                                                                                      \\
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                                      \\
+        \vdots        & \vdots       & \ddots & \vdots                                                                                          \\
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{C_o}                                                                                    \\ 
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                                      \end{bmatrix} \\
+        \mathbf{E_S^ŵ} &= \mathbf{I}                                                                                                            \\
+    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^k} & \mathbf{E_S^ŵ}                                                          \end{bmatrix} \\
     \end{aligned}
     ```
 """

@@ -372,10 +372,12 @@ in fact linear equality constraints:
     &= \mathbf{0}
 \end{aligned}
 ```
-The estimated process noises of the deterministic states ``\mathbf{ŵ_d}(k) = \mathbf{0}`` 
-for [`NonLinMPC`](@ref) objects (only used for [`MovingHorizonEstimator`]). This is a
-purely linear equation since the ``\mathbf{k}_i``, ``\mathbf{x̂_d}`` and ``\mathbf{ŵ_d}``
-vectors are all extracted from the decision variables in `Z̃`.
+This is a purely linear equation since the ``\mathbf{k}_i``, ``\mathbf{x̂_d}`` and 
+``\mathbf{ŵ_d}`` vectors are all extracted from the decision variables in `Z̃`. The estimated
+process noises of the deterministic states ``\mathbf{ŵ_d}(k) = \mathbf{0}`` for [`NonLinMPC`](@ref) 
+objects (only used for [`MovingHorizonEstimator`](@ref)). Note that handling the estimated 
+process noise in the continuity constraint implicitly assumes that it's a discrete
+stochastic process (like all the other [`StateEstimator`](@ref) types in this package).
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
