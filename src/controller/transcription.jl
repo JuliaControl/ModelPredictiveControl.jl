@@ -533,8 +533,9 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
         \mathbf{0}    & \mathbf{0}                                                                                                  \end{bmatrix}
     \end{aligned}
     ```
-    Note that if `estim` is an [`InternalModel`](@ref), the state vector is not augmented so
-    the rows of ``\mathbf{E_S}`` and ``\mathbf{K_S}`` with an even index are removed. 
+    Note that if `estim` is an [`InternalModel`](@ref), the state vector is not augmented 
+    hence the rows of ``\mathbf{E_S}`` and ``\mathbf{K_S}`` related to the stochastic states
+    are removed (2nd row of blocks, 4th row of blocks, and so on). 
 """
 function init_defectmat(
     model::NonLinModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
