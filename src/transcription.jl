@@ -353,7 +353,7 @@ disturbances are either piecewise constant or linear:
 \mathbf{û}_i(k) &=                                                                           \begin{cases}
                     \mathbf{û_0}(k)                                  &  h = 0                \\
                     (1-τ_i)\mathbf{û_0}(k) + τ_i\mathbf{û_0}(k+1)    &  h = 1                \end{cases} \\
-\mathbf{d̂}_i(k) &=  (1-τ_i)\mathbf{d̂_0}(k) + τ_i\mathbf{d̂_0}(k+1)                      
+\mathbf{d}_i(k) &=  (1-τ_i)\mathbf{d_0}(k) + τ_i\mathbf{d_0}(k+1)                      
 \end{aligned}
 ```
 The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref).
