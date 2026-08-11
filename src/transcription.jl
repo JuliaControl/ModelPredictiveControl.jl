@@ -368,12 +368,14 @@ in fact linear equality constraints:
         \mathbf{k}_2(k)                                                                         \\
         \vdots                                                                                  \\
         \mathbf{k}_{n_o}(k)                                                                     \end{bmatrix}
-    + λ_o \mathbf{x̂_d}(k) - \mathbf{x̂_d}(k+1)                                                   \\
+    + λ_o \mathbf{x̂_d}(k) + \mathbf{ŵ_d}(k) - \mathbf{x̂_d}(k+1)                                 \\
     &= \mathbf{0}
 \end{aligned}
 ```
-This is a purely linear relation since the ``\mathbf{k}_i`` and ``\mathbf{x̂_d}`` vectors are
-all extracted from the decision variables in `Z̃`.
+The estimated process noises of the deterministic states ``\mathbf{ŵ_d}(k) = \mathbf{0}`` 
+for [`NonLinMPC`](@ref) objects (only used for [`MovingHorizonEstimator`]). This is a
+purely linear equation since the ``\mathbf{k}_i``, ``\mathbf{x̂_d}`` and ``\mathbf{ŵ_d}``
+vectors are all extracted from the decision variables in `Z̃`.
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
