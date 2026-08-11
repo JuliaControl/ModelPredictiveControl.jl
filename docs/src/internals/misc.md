@@ -1,4 +1,4 @@
-# Functions: Miscellaneous Internal Methods
+# Functions: Miscellaneous Internals
 
 ```@contents
 Pages = ["misc.md"]
