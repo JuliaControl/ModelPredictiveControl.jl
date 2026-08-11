@@ -19,8 +19,8 @@ end
 
 @doc raw"""
     init_predmat_mhe(
-        model::LinModel, transcription::SingleShooting,
-        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+        model::LinModel, transcription::SingleShooting, direct::Bool,
+        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
     ) -> E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 
 Construct the MHE prediction matrices for [`LinModel`](@ref) and [`SingleShooting`](@ref).
@@ -149,7 +149,7 @@ see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstrain
     All these matrices are truncated when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
-    model::LinModel{NT}, ::SingleShooting, He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+    model::LinModel{NT}, ::SingleShooting, direct::Bool, He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
@@ -261,8 +261,8 @@ end
 
 @doc raw"""
     init_predmat_mhe(
-        model::LinModel, transcription::MultipleShooting, 
-        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+        model::LinModel, transcription::MultipleShooting, direct::Bool,
+        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
     ) -> E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 
 Construct them for [`LinModel`](@ref) and [`MultipleShooting`](@ref).
@@ -325,8 +325,8 @@ matrices are defined in the Extended Help section.
     operator `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
 """
 function init_predmat_mhe(
-    model::LinModel{NT}, ::MultipleShooting, 
-    He, Â, _ , Ĉm, _ , D̂dm, _ , _ , direct
+    model::LinModel{NT}, ::MultipleShooting, direct::Bool,
+    He, Â, _ , Ĉm, _ , D̂dm, _ , _ 
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
@@ -351,15 +351,15 @@ end
 
 """
     init_predmat_mhe(
-        model::SimModel, ::SingleShooting, 
-        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+        model::SimModel, transcription::SingleShooting, direct::Bool,
+        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
     ) -> E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 
 Return empty matrices for [`SingleShooting`](@ref) and non-`LinModel`, except for `ex̄`.
 """
 function init_predmat_mhe(
-    model::SimModel{NT}, transcription::SingleShooting, 
-    He, Â, _ , Ĉm, _ , _ , _ , _ , _
+    model::SimModel{NT}, transcription::SingleShooting, ::Bool,
+    He, Â, _ , Ĉm, _ , _ , _ , _ 
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
     nŵ = nx̂
@@ -378,15 +378,15 @@ end
 
 """
     init_predmat_mhe(
-        model::SimModel, ::TranscriptionMethod, 
-        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+        model::SimModel, transcription::TranscriptionMethod, direct::Bool
+        He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
     ) -> E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 
 Return `ex̄, EX̂, GX̂, JX̂, BX̂` and empty matrices non-`LinModel` and other [`TranscriptionMethod`](@ref).
 """
 function init_predmat_mhe(
-    model::SimModel{NT}, transcription::TranscriptionMethod, 
-    He, Â, _ , Ĉm, _ , _ , _ , _ , _
+    model::SimModel{NT}, transcription::TranscriptionMethod, ::Bool,
+    He, Â, _ , Ĉm, _ , _ , _ , _ 
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
     nŵ = nx̂
@@ -405,8 +405,8 @@ end
 
 @doc raw"""
     init_defectmat_mhe(
-        model::LinModel, transcription::MultipleShooting, 
-        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, As, direct
+        model::LinModel, transcription::MultipleShooting, direct::Bool,
+        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, As
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the defects over the predicted states.
@@ -463,7 +463,7 @@ matrices ``\mathbf{E_S, G_S, J_S, B_S}`` are defined in the Extended Help sectio
     operator `A[i_rows, i_cols]` when ``N_k < H_e`` (at the beginning).
 """
 function init_defectmat_mhe(
-    model::LinModel{NT}, ::MultipleShooting, He, Â, B̂u, B̂d, x̂op, f̂op, _ , direct
+    model::LinModel{NT}, ::MultipleShooting, direct::Bool, He, Â, B̂u, B̂d, x̂op, f̂op, _ 
 ) where {NT<:Real}
     nd = model.nd
     nx̂ = size(Â, 2)
@@ -489,7 +489,8 @@ end
 
 @doc raw"""
     init_defectmat_mhe(
-        model::SimModel, transcription::TranscriptionMethod, He, Â, _ , _ , _ , _ , As, _
+        model::SimModel, transcription::TranscriptionMethod, direct::Bool,
+        He, Â, _ , _ , _ , _ , As
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the defects of the stochastic states only.
@@ -524,7 +525,7 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
     ```
 """
 function init_defectmat_mhe(
-    model::SimModel{NT}, ::TranscriptionMethod, He, Â, _ , _ , _ , _ , As, _
+    model::SimModel{NT}, ::TranscriptionMethod, ::Bool, He, Â, _ , _ , _ , _ , As
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
     nx = nx̂ - nxs
@@ -546,7 +547,8 @@ end
 
 @doc raw"""
     init_defectmat_mhe(
-        model::SimModel, transcription::OrthogonalCollocation, He, Â, _ , _ , _ , _ , As, _
+        model::SimModel, transcription::OrthogonalCollocation, direct::Bool
+        He, Â, _ , _ , _ , _ , As
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the continuity constraints and stochastic state defects.
@@ -588,7 +590,8 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
     ```
 """
 function init_defectmat_mhe(
-    model::SimModel{NT}, ::OrthogonalCollocation, He, Â, _ , _ , _ , _ , As, _
+    model::SimModel{NT}, ::OrthogonalCollocation, ::Bool,
+    He, Â, _ , _ , _ , _ , As
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
     nx = nx̂ - nxs
@@ -608,11 +611,9 @@ function init_defectmat_mhe(
     return ES, GS, JS, BS
 end
 
-
-
 "Return empty matrices for [`SingleShooting`](@ref) transcription on any `SimModel` (N/A)."
 function init_defectmat_mhe(
-    model::SimModel{NT}, transcription::SingleShooting, He, Â, _ , _ , _ , _ , _ , _
+    model::SimModel{NT}, transcription::SingleShooting, ::Bool, He, Â, _ , _ , _ , _ , _ 
 ) where {NT<:Real}
     nx̂ = size(Â, 2)
     nŵ = nx̂
