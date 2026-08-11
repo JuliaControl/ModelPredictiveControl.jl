@@ -59,5 +59,6 @@ Pages = [
     joinpath("internals", "sim_model.md"),
     joinpath("internals", "state_estim.md"),
     joinpath("internals", "predictive_control.md")
+    joinpath("internals", "misc.md")
 ]
 ```
