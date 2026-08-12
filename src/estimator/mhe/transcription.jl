@@ -1061,7 +1061,8 @@ function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::SingleShooting, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nu, nk = model.nu, model.nk
+    nu = model.nu
+    nk = get_nk(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ = nε + nx̂, nŵ*He
     Z̃s = estim.buffer.Z̃
@@ -1095,12 +1096,99 @@ end
 
 @doc raw"""
     set_warmstart_mhe!(
+        estim::MovingHorizonEstimator, transcription::OrthogonalCollocation, Z̃var
+    ) -> Z̃s
+
+Do the same but for [`OrthogonalCollocation`](@ref).
+
+It warm-starts the solver at:
+```math
+\mathbf{Z̃_s} = 
+\begin{bmatrix}
+    ε_{k-1}                         \\
+    \mathbf{x̂_0^†}(k-N_k+p)         \\
+    \mathbf{x̂_0}(k-N_k+p+1|k-1)     \\
+    \mathbf{x̂_0}(k-N_k+p+2|k-1)     \\
+    \vdots                          \\
+    \mathbf{x̂_0}(k+p-2|k-1)         \\
+    \mathbf{x̂_0}(k+p-1|k-1)         \\
+    \mathbf{x̂_0}(k+p-1|k-1)         \\
+    \mathbf{0_x̂}                    \\
+    \mathbf{k}(k-N_k+p+0|k-1)       \\
+    \mathbf{k}(k-N_k+p+1|k-1)       \\
+    \vdots                          \\
+    \mathbf{k}(k+p-3|k-1)           \\
+    \mathbf{k}(k+p-2|k-1)           \\
+    \mathbf{k}(k+p-2|k-1)           \\
+    \mathbf{0_k}                    \\
+    \mathbf{ŵ}(k-N_k+p+0|k-1)       \\
+    \mathbf{ŵ}(k-N_k+p+1|k-1)       \\
+    \vdots                          \\
+    \mathbf{ŵ}(k+p-3|k-1)           \\
+    \mathbf{ŵ}(k+p-2|k-1)           \\
+    \mathbf{0}                      \\
+    \mathbf{0_ŵ}
+\end{bmatrix}
+```
+where ``\mathbf{x̂_0}(k-j|k-1)`` is the predicted state for time ``k-j`` computed at the
+last control period ``k-1``, expressed as a deviation from the operating point 
+``\mathbf{x̂_{op}}``. The vector ``\mathbf{k}(k-j|k-1)`` include the ``n_o`` intermediate
+stage predictions for the interval ``k-j``, and is also computed at the last control period.
+See the Extended Help of [`MultipleShooting`](@ref) and [`OrthogonalCollocation`](@ref) for
+the defintion of vectors ``\mathbf{0_x̂}``, ``\mathbf{0_k}`` and ``\mathbf{0_ŵ}``.
+"""
+function set_warmstart_mhe!(
+    estim::MovingHorizonEstimator{NT}, transcription::OrthogonalCollocation, Z̃var
+) where NT<:Real
+    model, buffer = estim.model, estim.buffer
+    nu = model.nu
+    nk = get_nk(estim.model, transcription)
+    nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
+    nx̃, nŴ, nX̂, nK = nε + nx̂, nŵ*He, nx̂*He, nk*He
+    Z̃s = estim.buffer.Z̃
+    û0, ŷ0, x̄, k = buffer.û, buffer.ŷ, buffer.x̂, buffer.k
+    # --- slack variable ε ---
+    estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
+    # --- arrival state estimate x̂0arr ---
+    Z̃s[nε+1:nx̃] = estim.x̂0arr_old
+    # --- state estimates X̂0 --- 
+    Z̃s[(nx̃+1):(nx̃+nX̂-nx̂)]    .= @views estim.Z̃[(nx̃+nx̂+1):(nx̃+nX̂)]
+    Z̃s[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)] .= @views estim.Z̃[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)]
+    # --- collocation points K --- 
+    Z̃s[(nx̃+nX̂+1):(nx̃+nX̂+nK-nk)]    .= @views estim.Z̃[(nx̃+nX̂+nk+1):(nx̃+nX̂+nK)]
+    Z̃s[(nx̃+nX̂+nK-nk+1):(nx̃+nX̂+nK)] .= @views estim.Z̃[(nx̃+nX̂+nK-nk+1):(nx̃+nX̂+nK)]
+    # --- process noise estimates Ŵ ---
+    Z̃s[(nx̃+nX̂+nK+1):(nx̃+nX̂+nK+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nX̂+nK+nŵ+1):(nx̃+nX̂+nK+nŴ)]
+    Z̃s[(nx̃+nX̂+nK+nŴ-nŵ+1):end]  .= 0
+    # --- verify definiteness of objective function ---
+    x̄ = buffer.x̂
+    V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
+    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk) # TODO: remove the 2 allocations
+    x̂0arr = estim.x̂0arr_old
+    x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
+    getŴ!(Ŵ, estim, transcription, Z̃s)
+    predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃s)
+    Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
+    if !isfinite(Js)
+        Z̃s[nx̃+nX̂+nK+1:end] .= 0
+    end
+    # --- unused variable in Z̃ (applied only when Nk < He) ---
+    # We force the update of the NLP gradient and jacobian by warm-starting the unused 
+    # variable in Z̃ at 1. Since estim.Ŵ is initialized with 0s, at least 1 variable in Z̃s
+    # will be inevitably different at the following time step.
+    Z̃s[nx̃+nX̂+nK+nŵ*Nk+1:end] .= 1
+    JuMP.set_start_value.(Z̃var, Z̃s)
+    return Z̃s
+end
+
+@doc raw"""
+    set_warmstart_mhe!(
         estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃var
     ) -> Z̃s
 
 Do the same but for other transcription [`TranscriptionMethod`](@ref).
 
-If supported by `estim.optim`, it warm-starts the solver at:
+It warm-starts the solver at:
 ```math
 \mathbf{Z̃_s} = 
 \begin{bmatrix}
@@ -1122,16 +1210,13 @@ If supported by `estim.optim`, it warm-starts the solver at:
     \mathbf{0_ŵ}
 \end{bmatrix}
 ```
-where ``\mathbf{x̂_0}(k-j|k-1)`` is the predicted state for time ``k-j`` computed at the
-last control period ``k-1``, expressed as a deviation from the operating point 
-``\mathbf{x̂_{op}}``. See the Extended Help of [`MultipleShooting`](@ref) for the defintion 
-of vectors ``\mathbf{0_x̂}`` and ``\mathbf{0_ŵ}``.
 """
 function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::TranscriptionMethod, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nu, nk = model.nu, model.nk
+    nu = model.nu
+    nk = get_nk(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂ = nε + nx̂, nŵ*He, nx̂*He
     Z̃s = estim.buffer.Z̃
