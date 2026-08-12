@@ -585,7 +585,7 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
 # Extended Help
 !!! details "Extended Help"
     Using the stochastic matrix ``\mathbf{A_s}`` of [`init_estimstoch`](@ref)), and by
-    updating the states by adding their process noise estimates ``\mathbf{ŵ}``, the defect
+    updating the states by adding the process noise estimates ``\mathbf{ŵ}``, the defect
     matrices are computed with:
     ```math
     \begin{aligned}
