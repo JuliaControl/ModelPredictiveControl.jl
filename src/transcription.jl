@@ -254,7 +254,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
     The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
     is more accurate than Gauss-Radau but only A-stable, while the latter being L-stable. 
-    See [`init_orthocolloc`](@ref) and [`con_nonlinprogeq!`](@ref) for details.
+    See [`init_orthocolloc`](@ref), [`con_nonlinprogeq!`](@ref) and [`con_nonlinprogeq_mhe](@ref)
+    for more details.
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
