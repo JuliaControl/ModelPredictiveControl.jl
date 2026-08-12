@@ -627,9 +627,7 @@ function init_defectmat_mhe(
         iCol = (nx+1:nx̂) .+ (j-1)*nx̂
         ESx̂[iRow, iCol] = As
     end
-    display(ESx̂)
     ESk = repeatdiag([Co; zeros(NT, nxs, nk)], He)
-    display(Matrix(ESk))
     ESŵ = I # will be different if nŵ ≠ nx̂ is implemented
     ES = [ESx̂ ESk ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
@@ -1638,7 +1636,7 @@ function con_nonlinprogeq_mhe!(
                 model.f!(k̇i, ki_Z̃, û0, di, model.p)
             else
                 # special case: û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k
-                û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
+                û0next = @views j ≥ Nk ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
                 ûi .= (1-τ[i]).*û0 .+ τ[i].*û0next
                 model.f!(k̇i, ki_Z̃, ûi, di, model.p)
             end
