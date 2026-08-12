@@ -443,3 +443,8 @@ validate_transcription(::SimModel, ::TranscriptionMethod) = nothing
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
 get_nk(model::SimModel, ::ShootingMethod) = model.nk
 get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
+
+transcription_str(transription::TranscriptionMethod) = string(nameof(typeof(transription)))
+function transcription_str(transription::OrthogonalCollocation)
+    return "$(nameof(typeof(transription))) ($(transription.no) collocation points)"
+end
