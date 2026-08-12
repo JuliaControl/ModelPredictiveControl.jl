@@ -652,7 +652,8 @@ function init_defectmat_mhe_empty(
     model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
-    nZ = get_nZ_mhe(transcription, He, nx̂, nŵ)
+    nk = get_nk(model, transcription)
+    nZ = get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
     ES = zeros(NT, 0, nZ)
     GS = zeros(NT, 0, nu*He)
     JS = zeros(NT, 0, nd*(He+1))
