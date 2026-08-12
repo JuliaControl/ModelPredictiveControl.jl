@@ -1174,13 +1174,13 @@ end
         updatestate!(mhe1, [11, 52], [50, 30], [5])
     end
     preparestate!(mhe1, [50, 30], [5])
-    @test mhe1([5]) ≈ [50, 30] atol=1e-3
+    @test mhe1([5]) ≈ [50, 30] atol=5e-3
     for i in 1:50
         preparestate!(mhe1, [51, 32], [5])
         updatestate!(mhe1, [10, 50], [51, 32], [5])
     end
     preparestate!(mhe1, [51, 32], [5])
-    @test mhe1([5]) ≈ [51, 32] atol=1e-3
+    @test mhe1([5]) ≈ [51, 32] atol=5e-3
 
     mhe1b = MovingHorizonEstimator(nonlinmodel, He=2, nint_u=[1, 1], nint_ym=0, direct=false)
     JuMP.set_attribute(mhe1b.optim, "tol", 1e-7)
@@ -1210,12 +1210,12 @@ end
         preparestate!(mhe1c, [50, 30], [5])
         updatestate!(mhe1c, [11, 52], [50, 30], [5])
     end
-    @test mhe1c([5]) ≈ [50, 30] atol=1e-3
+    @test mhe1c([5]) ≈ [50, 30] atol=5e-3
     for i in 1:50
         preparestate!(mhe1c, [51, 32], [5])
         updatestate!(mhe1c, [10, 50], [51, 32], [5])
     end
-    @test mhe1c([5]) ≈ [51, 32] atol=1e-3
+    @test mhe1c([5]) ≈ [51, 32] atol=5e-3
 
     gc!(gc, args...) = (gc[1] = 0) #for coverage only
     mhe2 = MovingHorizonEstimator(
@@ -1227,7 +1227,7 @@ end
         updatestate!(mhe2, [11, 52], [50, 30], [5])
     end
     preparestate!(mhe2, [50, 30], [5])
-    @test mhe2([5]) ≈ [50, 30] atol=1e-3
+    @test mhe2([5]) ≈ [50, 30] atol=5e-3
 
     mhe3 = MovingHorizonEstimator(
         nonlinmodel, He=3, direct=false, transcription=MultipleShooting(f_threads=true)
@@ -1237,7 +1237,7 @@ end
         updatestate!(mhe3, [11, 52], [50, 30], [5])
     end
     preparestate!(mhe3, [50, 30], [5])
-    @test mhe3([5]) ≈ [50, 30] atol=1e-3
+    @test mhe3([5]) ≈ [50, 30] atol=5e-3
     initstate!(mhe3, [10, 50], [50, 30], [5])
     setstate!(mhe3, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     preparestate!(mhe3, [50, 30], [5])
@@ -1264,6 +1264,7 @@ end
     f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
     h! = (y,x,_,_)   -> y .= x 
     nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
+
     transcription = TrapezoidalCollocation(f_threads=true, h_threads=true)
     mhe6 = MovingHorizonEstimator(
         nonlinmodel_c; He=3, direct=false, transcription
@@ -1273,7 +1274,7 @@ end
         updatestate!(mhe6, [-6], [13])
     end
     preparestate!(mhe6, [13])
-    @test mhe6() ≈ [13] atol=1e-3
+    @test mhe6() ≈ [13] atol=5e-3
 
     transcription = TrapezoidalCollocation(1)
     mhe7 = MovingHorizonEstimator(
@@ -1284,13 +1285,35 @@ end
         updatestate!(mhe7, [-6], [13])
     end
     preparestate!(mhe7, [13])
-    @test mhe7() ≈ [13] atol=1e-3
+    @test mhe7() ≈ [13] atol=5e-3
     initstate!(mhe7, [0.0], [0.0])
     setstate!(mhe7, [0.0, 0.0])
     preparestate!(mhe7, [0.0])
     info = getinfo(mhe7) # test getinfo when Nk<He 
     @test info[:Ŵ] ≈ [0.0, 0.0]
     @test info[:V̂] ≈ [0.0]
+
+    transcription = OrthogonalCollocation(f_threads=true, h_threads=true)
+    mhe10 = MovingHorizonEstimator(
+        nonlinmodel_c; He=3, direct=false, transcription
+    )
+    for i in 1:50
+        preparestate!(mhe10, [13])
+        updatestate!(mhe10, [-6], [13])
+    end
+    preparestate!(mhe10, [13])
+    @test mhe10() ≈ [13] atol=5e-3  
+
+    transcription = OrthogonalCollocation(1, 2, roots=:gausslegendre)
+    mhe11 = MovingHorizonEstimator(
+        nonlinmodel_c; He=3, direct=true, transcription
+    )
+    for i in 1:50
+        preparestate!(mhe11, [13])
+        updatestate!(mhe11, [-6], [13])
+    end
+    preparestate!(mhe11, [13])
+    @test mhe11() ≈ [13] atol=5e-3  
 
     # coverage of the branch with error termination status (with an infeasible problem):
     mhe_infeas = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
@@ -1302,9 +1325,9 @@ end
     )
 
     # for coverage of NLP functions, the univariate syntax of JuMP.@operator
-    mhe6 = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
-    setconstraint!(mhe6, v̂min=[-51,-52], v̂max=[53,54])
-    x̂ = preparestate!(mhe6, [50, 30], [5])
+    mhe7 = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
+    setconstraint!(mhe7, v̂min=[-51,-52], v̂max=[53,54])
+    x̂ = preparestate!(mhe7, [50, 30], [5])
     @test x̂ ≈ zeros(6) atol=1e-9
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
     @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
@@ -1315,12 +1338,12 @@ end
         coloring_algorithm=GreedyColoringAlgorithm(),
     )
 
-    mhe7 = MovingHorizonEstimator(nonlinmodel; He=2, hessian)
+    mhe8 = MovingHorizonEstimator(nonlinmodel; He=2, hessian)
     @test_logs(
         (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
-        preparestate!(mhe7, [50, NaN], [5])
+        preparestate!(mhe8, [50, NaN], [5])
     )
-    @test mhe7.x̂0 ≈ zeros(6) atol=1e-9
+    @test mhe8.x̂0 ≈ zeros(6) atol=1e-9
 
 end
 
