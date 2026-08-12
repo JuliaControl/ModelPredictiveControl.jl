@@ -589,7 +589,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
             MOIU.reset_optimizer(optim)
             JuMP.optimize!(optim)
         else
-            rethrow(err)
+            rethrow()
         end
     end
     # -------- error handling -------------------------
