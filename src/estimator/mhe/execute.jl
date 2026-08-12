@@ -474,7 +474,7 @@ function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::Transcriptio
     He, nx̂, nŵ = estim.He, estim.nx̂, estim.nx̂
     nk = get_nk(estim.model, transcription)
     nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
-    Ŵ[1:nŵ*He] .= @views Z̃[(nZ̃ - nŵ*He + 1):end] 
+    Ŵ .= @views Z̃[(nZ̃ - nŵ*He + 1):end] 
     return Ŵ
 end
 
