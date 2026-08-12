@@ -381,7 +381,8 @@ function init_predmat_mhe(
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
     nŵ = nx̂
-    nZ = get_nZ_mhe(transcription, He, nx̂, nŵ)
+    nk = get_nk(model, transcription)
+    nZ = get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
     E  = zeros(NT, 0, nZ)
     ex̄ = [-I zeros(NT, nx̂, nZ - nx̂)]
     EX̂ = zeros(NT, 0, nZ)
