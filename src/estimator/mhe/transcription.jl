@@ -1559,7 +1559,7 @@ function con_nonlinprogeq_mhe!(
         x̂dnext .+= ŵd
         ŝdnext  .= @. x̂dnext - x̂dnext_Z̃
     end
-    Nk < He && (geq[nx̂*Nk+1:end] .= 0)
+    Nk < He && (geq[nx*Nk+1:end] .= 0)
     return geq
 end
 
@@ -1638,7 +1638,7 @@ function con_nonlinprogeq_mhe!(
         ŝdnext  .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
         ŝdnext .+= ŵd
     end
-    Nk < He && (geq[nx̂*Nk+1:end] .= 0)
+    Nk < He && (geq[nx*Nk+1:end] .= 0)
     return geq
 end
 

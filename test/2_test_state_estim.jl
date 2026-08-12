@@ -1145,6 +1145,7 @@ end
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
     import ForwardDiff
+
     linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
     linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
@@ -1237,7 +1238,13 @@ end
     end
     preparestate!(mhe3, [50, 30], [5])
     @test mhe3([5]) ≈ [50, 30] atol=1e-3
-
+    initstate!(mhe3, [10, 50], [50, 30], [5])
+    setstate!(mhe3, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    preparestate!(mhe3, [50, 30], [5])
+    updatestate!(mhe3, [10, 50], [50, 30], [5])
+    info = getinfo(mhe3) # test getinfo when Nk<He 
+    @test info[:Ŵ] ≈ [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    @test info[:V̂] ≈ [0.0, 0.0]    
 
     Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
     R̂ = diagm([1, 1].^2)
@@ -1267,6 +1274,7 @@ end
     end
     preparestate!(mhe6, [13])
     @test mhe6() ≈ [13] atol=1e-3
+
     transcription = TrapezoidalCollocation(1)
     mhe7 = MovingHorizonEstimator(
         nonlinmodel_c; He=3, direct=true, transcription
@@ -1277,6 +1285,12 @@ end
     end
     preparestate!(mhe7, [13])
     @test mhe7() ≈ [13] atol=1e-3
+    initstate!(mhe7, [0.0], [0.0])
+    setstate!(mhe7, [0.0, 0.0])
+    preparestate!(mhe7, [0.0])
+    info = getinfo(mhe7) # test getinfo when Nk<He 
+    @test info[:Ŵ] ≈ [0.0, 0.0]
+    @test info[:V̂] ≈ [0.0]
 
     # coverage of the branch with error termination status (with an infeasible problem):
     mhe_infeas = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
