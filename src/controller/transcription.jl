@@ -1399,7 +1399,7 @@ function con_nonlinprogeq!(
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
-    Ts, p = model.Ts, model.p
+    Ts = model.Ts
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
@@ -1412,12 +1412,12 @@ function con_nonlinprogeq!(
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
+        û0      =  @views   Û0[(1 + nu*(j-1)):(nu*j)]
         k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
         ŝdnext   = @views  geq[(1 + nx*(j-1)):(nx*(j-1) + nx)]
         k̇1, k̇2   = @views k̇[1:nx], k̇[nx+1:2*nx]
-        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
@@ -1426,11 +1426,11 @@ function con_nonlinprogeq!(
             k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1
-            model.f!(k̇2, x̂dnext_Z̃, û0, d̂0next, p)
+            model.f!(k̇2, x̂dnext_Z̃, û0, d̂0next, model.p)
         else
             # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
             û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
-            model.f!(k̇2, x̂dnext_Z̃, û0next, d̂0next, p)
+            model.f!(k̇2, x̂dnext_Z̃, û0next, d̂0next, model.p)
         end
         ŝdnext .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
     end
@@ -1462,13 +1462,11 @@ the model dynamics are computed by:
         \vdots                                                      \\
         \mathbf{k̇}_{n_o}(k+j)                                       \end{bmatrix}
 ```
-for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` vectors are
-extracted from the decision variables in `Z̃`. The ``\mathbf{x̂_d}`` vectors are the
-deterministic states extracted from ``\mathbf{X̂_0}`` also in `Z̃`, and they correspond to the
-states at the beginning of the interval ``τ_0=0``. The ``\mathbf{k̇}_i`` vectors are
-evaluated from the continuous-time function `model.f`, as described in [`init_orthocolloc`](@ref)
-documentation. The defects for the continuity constraints and the stochastic states are
-linear equality constraints (see [`init_defectmat`](@ref) for details).
+for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` and 
+``\mathbf{x̂_d}(k+j)`` vectors are extracted from the decision variables in `Z̃`. The
+``\mathbf{k̇}_i`` vectors are evaluated from the continuous-time function `model.f`, as
+described in [`init_orthocolloc`](@ref). The defects for the continuity constraints and the
+stochastic states are linear equality constraints (see [`init_defectmat`](@ref)).
 """
 function con_nonlinprogeq!(
     geq, _ , Û0, K̇,  
@@ -1479,7 +1477,6 @@ function con_nonlinprogeq!(
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
-    p = model.p
     Mo, no, τ =  mpc.Mo, transcription.no, transcription.τ
     nk = get_nk(model, transcription)
     D̂0 = mpc.D̂0
@@ -1494,12 +1491,12 @@ function con_nonlinprogeq!(
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
+        û0       = @views    Û0[(1 + nu*(j-1)):(nu*j)]
         k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
         k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
         ŝk       = @views   geq[(1 + nk*(j-1)):(nk*j)]
         # ----------------- collocation constraint defects -----------------------------
-        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
         Δk = k̇
         for i=1:no
             Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
@@ -1514,12 +1511,12 @@ function con_nonlinprogeq!(
             ki_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
             d̂i  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
             if h < 1
-                model.f!(k̇i, ki_Z̃, û0, d̂i, p)
+                model.f!(k̇i, ki_Z̃, û0, d̂i, model.p)
             else
                 # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
                 û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
                 ûi .= (1-τ[i]).*û0 .+ τ[i].*û0next
-                model.f!(k̇i, ki_Z̃, ûi, d̂i, p)
+                model.f!(k̇i, ki_Z̃, ûi, d̂i, model.p)
             end
         end
         ŝk .-= k̇

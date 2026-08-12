@@ -5,11 +5,28 @@ get_nZ_mhe(::OrthogonalCollocation, He, nx̂, nk, nŵ) = nx̂ + nx̂*He + nk*He
 
 "Get the element indices in the decision vector `Z̃` that applies to a `Nk` window length."
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::TranscriptionMethod)
-    nx̂, nŵ, nε, Nk = estim.nx̂, estim.nx̂, estim.nε, estim.Nk[]
+    nx̂, nŵ, Nk = estim.nx̂, estim.nx̂, estim.Nk[]
     nŴ, nX̂   = nŵ*Nk, nx̂*Nk
-    nx̂_nX̂    = nx̂ + nX̂ 
-    nx̂_nX̂_He = nx̂ + nx̂*estim.He
-    i_Z̃_NK = [(1):(nε + nx̂_nX̂); (nε + nx̂_nX̂_He + 1):(nε + nx̂_nX̂_He + nŴ)]
+    nx̃ = estim.nε + nx̂
+    nx̃_nX̂_He = nx̃ + nx̂*estim.He
+    i_Z̃_NK = [
+        (1):(nx̃ + nX̂);
+        (1 + nx̃_nX̂_He):(nx̃_nX̂_He + nŴ)
+    ]
+    return i_Z̃_NK
+end
+function get_i_Z̃_Nk(estim::MovingHorizonEstimator, transcription::OrthogonalCollocation)
+    nx̂, nŵ, Nk = estim.nx̂, estim.nx̂, estim.Nk[]
+    nk = get_nk(estim.model, transcription)
+    nŴ, nX̂, nK  = nŵ*Nk, nx̂*Nk, nk*Nk
+    nx̃ = estim.nε + nx̂
+    nx̃_nX̂_He = nx̃ + nx̂*estim.He
+    nx̃_nX̂_nK_He = nx̃_nX̂_He + nk*estim.He
+    i_Z̃_NK = [
+        (1):(nx̃ + nX̂);
+        (1 + nx̃_nX̂_He):(nx̃_nX̂_He + nK);
+        (1 + nx̃_nX̂_nK_He):(nx̃_nX̂_nK_He + nŴ);
+    ]
     return i_Z̃_NK
 end
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::SingleShooting) 
@@ -610,7 +627,9 @@ function init_defectmat_mhe(
         iCol = (nx+1:nx̂) .+ (j-1)*nx̂
         ESx̂[iRow, iCol] = As
     end
+    display(ESx̂)
     ESk = repeatdiag([Co; zeros(NT, nxs, nk)], He)
+    display(Matrix(ESk))
     ESŵ = I # will be different if nŵ ≠ nx̂ is implemented
     ES = [ESx̂ ESk ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
@@ -1007,9 +1026,6 @@ end
 "No linear equality constraints for all cases of [`SingleShooting`](@ref)."
 linconstrainteq!(::MovingHorizonEstimator, ::SimModel, ::SingleShooting) = nothing
 
-
-
-
 @doc raw"""
     set_warmstart_mhe!(
         estim::MovingHorizonEstimator, transcription::SingleShooting, Z̃var
@@ -1247,7 +1263,7 @@ function predict_mhe!(
             d0next  = @views  estim.D0[(1 + nd*j):(nd*(j+1))]
             ĥ!(ŷ0next, estim, model, x̂0next, d0next)
             ŷ0nextm = @views ŷ0next[estim.i_ym]
-            if any(isnan, y0nextm)
+            if any(isnan, y0nextm) # nan in Y0m: y0m=ŷ0m => associated v̂ value = 0
                 y0nextm = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0nextm, ŷ0nextm)]
             end
             v̂next .= y0nextm .- ŷ0nextm
@@ -1299,15 +1315,15 @@ function predict_mhe!(
         else
             x̂0 = @views j < 2 ? x̂0arr[1:nx̂] : X̂0[(1+nx̂*(j-2)):(nx̂*(j-1))]
         end
-        d0  = @views estim.D0[(1+nd*j):(nd*(j+1))] # the 1st nd elements are not needed here
+        d0  = @views  estim.D0[(1+nd*j):(nd*(j+1))] # the 1st nd elements are not needed here
         ŷ0  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
         v̂   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
         y0m = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
         ĥ!(ŷ0, estim, model, x̂0, d0)
         ŷ0m = @views ŷ0[estim.i_ym]
-            if any(isnan, y0m)
-                y0m = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0m, ŷ0m)]
-            end
+        if any(isnan, y0m) # nan in Y0m: y0m=ŷ0m => associated v̂ value = 0
+            y0m = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0m, ŷ0m)]
+        end
         v̂ .= y0m .- ŷ0m
     end
     if Nk < estim.He  # fill unused values with 0s for tracer sparsity detection:
@@ -1455,10 +1471,10 @@ function con_nonlinprogeq_mhe!(
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
         x̂dnext   = @views         X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
-        sdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
+        ŝdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
         f!(x̂dnext, k, model, x̂d_Z̃, û0, d0, model.p)
         x̂dnext .+= ŵd
-        sdnext  .= @. x̂dnext - x̂dnext_Z̃
+        ŝdnext  .= @. x̂dnext - x̂dnext_Z̃
     end
     Nk < He && (geq[nx̂*Nk+1:end] .= 0)
     return geq
@@ -1466,7 +1482,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, X̂0, Û0, K̇,
+        geq, _ , Û0, K̇,
         estim::MovingHorizonEstimator, model::NonLinModel, ::TrapezoidalCollocation, 
         x̂0arr, Ŵ, Z̃
     ) -> geq
@@ -1519,7 +1535,7 @@ function con_nonlinprogeq_mhe!(
         k̇        = @views          K̇[(1 + nk*(j-1)):(nk*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
         x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
-        sdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
+        ŝdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
         k̇1, k̇2   = @views          k̇[1:nx], k̇[nx+1:2*nx]    
         d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
         if f_threads || h < 1 || j < 2
@@ -1532,14 +1548,102 @@ function con_nonlinprogeq_mhe!(
         if h < 1
             model.f!(k̇2, x̂dnext_Z̃, û0, d0next, model.p)
         else
-            # special case: û0(k+p) ≈ û0(k+p-1), since û0(k+p) is not available at k!
+            # special case: û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k
             û0next = @views j ≥ Nk ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
             model.f!(k̇2, x̂dnext_Z̃, û0next, d0next, model.p)
         end
-        sdnext  .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
-        sdnext .+= ŵd
+        ŝdnext  .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
+        ŝdnext .+= ŵd
     end
     Nk < He && (geq[nx̂*Nk+1:end] .= 0)
+    return geq
+end
+
+@doc raw"""
+    con_nonlinprogeq_mhe!(
+        geq, _ , Û0, K̇,
+        estim::MovingHorizonEstimator, model::NonLinModel, ::OrthogonalCollocation, 
+        x̂0arr, _ , Z̃
+    ) -> geq
+
+Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocation`](@ref).
+
+By introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the defects between
+the deterministic state derivative at the ``n_o`` collocation points and the model dynamics
+are computed by:
+```math
+\mathbf{ŝ_k}(ℓ+j)                                                                                 
+    = \mathbf{M_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(ℓ+j) - \mathbf{x̂_d}(ℓ+j)                       \\
+        \mathbf{k}_2(ℓ+j) - \mathbf{x̂_d}(ℓ+j)                       \\
+        \vdots                                                      \\
+        \mathbf{k}_{n_o}(ℓ+j) - \mathbf{x̂_d}(ℓ+j)                   \end{bmatrix}                                                                                     
+    - \begin{bmatrix}
+        \mathbf{k̇}_1(ℓ+j)                                           \\
+        \mathbf{k̇}_2(ℓ+j)                                           \\
+        \vdots                                                      \\
+        \mathbf{k̇}_{n_o}(ℓ+j)                                       \end{bmatrix}
+```
+for ``j = 0, 1, ... , N_k-1``, and knowing that the ``\mathbf{k}_i(ℓ+j)`` and 
+``\mathbf{x̂_d}(ℓ+j)`` vectors are extracted from the decision variables in `Z̃`. The
+``\mathbf{k̇}_i`` vectors are evaluated from the continuous-time function `model.f`, as
+described in [`init_orthocolloc`](@ref). The defects for the continuity constraints and the
+stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@ref)).
+"""
+function con_nonlinprogeq_mhe!(
+    geq, _ , Û0, K̇,
+    estim::MovingHorizonEstimator, model::NonLinModel, transcription::OrthogonalCollocation, 
+    x̂0arr, _ , Z̃
+)
+    nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
+    nx̂, He = estim.nx̂, estim.He
+    Nk = estim.Nk[]
+    f_threads = transcription.f_threads
+    Mo, no, τ =  estim.Mo, transcription.no, transcription.τ
+    nk = get_nk(model, transcription)
+    nx̃ = estim.nε + nx̂
+    p = estim.direct ? 0 : 1
+    X̂0_Z̃, K_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)], Z̃[(nx̃+nx̂*He+1):(nx̃+nx̂*He+nk*He)]
+    Dtemp = estim.buffer.D
+    Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
+    @threadsif f_threads for j=1:Nk
+        if j < 2
+            x̂d_Z̃ = @views x̂0arr[1:nx]
+        else
+            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
+        end
+        d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
+        û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
+        k̇        = @views          K̇[(1 + nk*(j-1)):(nk*j)]
+        k_Z̃      = @views        K_Z̃[(1 + nk*(j-1)):(nk*j)]
+        ŝk       = @views        geq[(1 + nk*(j-1)):(nk*j)]
+        d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
+        # ----------------- collocation constraint defects -----------------------------
+        Δk = k̇
+        for i=1:no
+            Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
+        end
+        mul!(ŝk, Mo, Δk)
+        di = @views Dtemp[(1 + nd*(j-1)):(nd*j)]
+        if h > 0
+            ûi = similar(û0) # TODO: remove this allocation
+        end
+        for i=1:no
+            k̇i   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
+            ki_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
+            di  .= (1-τ[i]).*d0 .+ τ[i].*d0next
+            if h < 1
+                model.f!(k̇i, ki_Z̃, û0, di, model.p)
+            else
+                # special case: û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k
+                û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
+                ûi .= (1-τ[i]).*û0 .+ τ[i].*û0next
+                model.f!(k̇i, ki_Z̃, ûi, di, model.p)
+            end
+        end
+        ŝk .-= k̇
+    end
+    Nk < He && (geq[nk*Nk+1:end] .= 0)
     return geq
 end
 
