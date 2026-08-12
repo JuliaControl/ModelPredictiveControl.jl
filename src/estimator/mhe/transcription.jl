@@ -1260,8 +1260,20 @@ end
 function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::TranscriptionMethod)
     nŵ, nx̂, He, Nk =  estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃ = estim.nε + nx̂
-    Z̃[(nx̃ + nx̂*Nk + 1):(nx̃ + nx̂*He)] .= 0 # unused decision variables after X̂0 vector
-    Z̃[(nx̃ + nx̂*He + nŵ*Nk + 1):end]  .= 0 # unused decision variables after Ŵ vector
+    nx̃_nX̂_He = nx̃ + nx̂*He
+    Z̃[(nx̃ + nx̂*Nk + 1):(nx̃_nX̂_He)] .= 0 # unused decision variables after X̂0 vector
+    Z̃[(nx̃_nX̂_He + nŵ*Nk + 1):end]  .= 0 # unused decision variables after Ŵ vector
+    return nothing
+end
+function fill0unused!(Z̃, estim::MovingHorizonEstimator, transcription::OrthogonalCollocation)
+    nŵ, nx̂, He, Nk =  estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
+    nx̃ = estim.nε + nx̂
+    nk = get_nk(estim.model, transcription)
+    nx̃_nX̂_He    = nx̃ + nx̂*He
+    nx̃_nX̂_nK_He = nx̃_nX̂_He + nk*He
+    Z̃[(nx̃ + nx̂*Nk + 1):(nx̃_nX̂_He)]          .= 0 # unused decision variables after X̂0 vector
+    Z̃[(nx̃_nX̂_He + nk*Nk + 1):(nx̃_nX̂_nK_He)] .= 0 # unused decision variables after K vector
+    Z̃[(nx̃_nX̂_nK_He + nŵ*Nk + 1):end]        .= 0 # unused decision variables after Ŵ vector
     return nothing
 end
 
