@@ -1,4 +1,4 @@
-struct LinModel{NT<:Real} <: SimModel{NT}
+struct LinModel{NT<:Real} <: ODEmodel{NT}
     A   ::Matrix{NT}
     Bu  ::Matrix{NT}
     C   ::Matrix{NT}

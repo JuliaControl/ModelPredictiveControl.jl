@@ -1,4 +1,4 @@
-struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
+struct InternalModel{NT<:Real, SM<:ODEmodel} <: StateEstimator{NT}
     model::SM
     x̂op::Vector{NT}
     f̂op::Vector{NT}
@@ -30,7 +30,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     buffer::StateEstimatorBuffer{NT}
     function InternalModel{NT}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
-    ) where {NT<:Real, SM<:SimModel}
+    ) where {NT<:Real, SM<:ODEmodel}
         nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
         nym, nyu = validate_ym(model, i_ym)
         validate_internalmodel(model, nym, Csm, Dsm)
@@ -61,7 +61,7 @@ struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
 end
 
 @doc raw"""
-    InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(I,I,I,I,model.Ts))
+    InternalModel(model::ODEmodel; i_ym=1:model.ny, stoch_ym=ss(I,I,I,I,model.Ts))
 
 Construct an internal model estimator based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
 
@@ -108,7 +108,7 @@ function InternalModel(
     model::SM;
     i_ym::AbstractVector{Int} = 1:model.ny,
     stoch_ym::LTISystem = (In = I(length(i_ym)); ss(In, In, In, In, model.Ts))
-) where {NT<:Real, SM<:SimModel{NT}}
+) where {NT<:Real, SM<:ODEmodel{NT}}
     stoch_ym = minreal(ss(stoch_ym))
     if iscontinuous(stoch_ym)
         stoch_ym = c2d(stoch_ym, model.Ts, :tustin)
@@ -124,7 +124,7 @@ function InternalModel(
 end
 
 "Validate if deterministic `model` and stochastic model `Csm, Dsm` for `InternalModel`s."
-function validate_internalmodel(model::SimModel, nym, Csm, Dsm)
+function validate_internalmodel(model::ODEmodel, nym, Csm, Dsm)
     validate_poles(model)
     if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
         error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
@@ -144,7 +144,7 @@ function validate_poles(model::LinModel)
     end
     return nothing
 end
-validate_poles(::SimModel) = nothing
+validate_poles(::ODEmodel) = nothing
 
 @doc raw"""
     matrices_internalmodel(model::LinModel) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
@@ -162,7 +162,7 @@ function matrices_internalmodel(model::LinModel)
     return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
 "Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref)."
-function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
+function matrices_internalmodel(model::ODEmodel{NT}) where NT<:Real
     nu, nx, nd, ny = model.nu, model.nx, model.nd, model.ny
     Â, B̂u, Ĉ, B̂d, D̂d = zeros(NT,0,nx), zeros(NT,0,nu), zeros(NT,ny,0), zeros(NT,0,nd), zeros(NT,ny,0)
     x̂op, f̂op = copy(model.xop), copy(model.fop)

@@ -22,7 +22,7 @@ struct NonLinModel{
     PT<:Any, 
     JB<:AbstractADType,
     LF<:Function
-} <: SimModel{NT}
+} <: ODEmodel{NT}
     x0::Vector{NT}
     solver::DS
     f!::F
@@ -293,9 +293,6 @@ function validate_h(NT, h)
     end
     return ismutating
 end
-
-"Do nothing if `model` is a [`NonLinModel`](@ref)."
-steadystate!(::SimModel, _ , _ ) = nothing
 
 """
     LinModel(model::NonLinModel; x=model.x0+model.xop, u=model.uop, d=model.dop)

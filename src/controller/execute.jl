@@ -277,25 +277,25 @@ function initpred!(mpc::PredictiveController, model::LinModel, ry, d, lastu, D̂
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u) -> nothing
+    initpred!(mpc::PredictiveController, model::ODEmodel, ry, d, lastu, D̂, R̂y, R̂u) -> nothing
 
 Init `lastu0, ŷ, F, d0, D̂0, D̂e, R̂y, R̂u` vectors when model is not a [`LinModel`](@ref).
 """
-function initpred!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u)
+function initpred!(mpc::PredictiveController, model::ODEmodel, ry, d, lastu, D̂, R̂y, R̂u)
     initpred_common!(mpc, model, ry, d, lastu, D̂, R̂y, R̂u)
     return nothing
 end
 
 """
-    initpred_common!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u) -> F
+    initpred_common!(mpc::PredictiveController, model::ODEmodel, ry, d, lastu, D̂, R̂y, R̂u) -> F
 
-Common computations of `initpred!` for all types of [`SimModel`](@ref).
+Common computations of `initpred!` for all types of [`ODEmodel`](@ref).
 
 Will also init `mpc.F` with 0 values, or with the stochastic predictions `Ŷs` if `mpc.estim`
 is an [`InternalModel`](@ref). The function returns `mpc.F`.
 """
 function initpred_common!(
-    mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u
+    mpc::PredictiveController, model::ODEmodel, ry, d, lastu, D̂, R̂y, R̂u
 )
     mpc.lastu0 .= lastu .- model.uop
     mul!(mpc.Tu_lastu0, mpc.Tu, mpc.lastu0)
@@ -327,14 +327,14 @@ end
 predictstoch!(Ŷs, ::PredictiveController, ::StateEstimator) = (Ŷs .= 0; nothing)
 
 @doc raw"""
-    linconstraint_custom!(mpc::PredictiveController, model::SimModel)
+    linconstraint_custom!(mpc::PredictiveController, model::ODEmodel)
 
 Init the ``\mathbf{F_w}`` vector for the custom linear inequality constraints.
 
 See [`relaxW`](@ref) for the definition of the vector. The function does nothing if
 `mpc.con.nw < 1`.
 """
-function linconstraint_custom!(mpc::PredictiveController, model::SimModel)
+function linconstraint_custom!(mpc::PredictiveController, model::ODEmodel)
     mpc.con.nw < 1 && return nothing
     ny, nu, nd, buffer = model.ny, model.nu, model.nd, mpc.buffer
     Fw = mpc.con.Fw
@@ -363,7 +363,7 @@ function linconstraint_custom_outputs!(mpc::PredictiveController, model::LinMode
     return nothing
 end
 "Do nothing for other model types."
-linconstraint_custom_outputs!(::PredictiveController, ::SimModel) = nothing
+linconstraint_custom_outputs!(::PredictiveController, ::ODEmodel) = nothing
 
 """
     extended_vectors!(Ue, Ŷe, mpc::PredictiveController, U0, Ŷ0) -> Ue, Ŷe
@@ -449,7 +449,7 @@ end
 con_custom!(gc, ::PredictiveController, _ , _, _ ) = gc
 
 "By default, the economic term is zero."
-function obj_econ(::PredictiveController, ::SimModel, _ , ::AbstractVector{NT}, _ ) where NT
+function obj_econ(::PredictiveController, ::ODEmodel, _ , ::AbstractVector{NT}, _ ) where NT
     return zero(NT)
 end
 
@@ -506,7 +506,7 @@ end
 
 
 "By default, no need to update the objective function."
-set_objective_linear_coef!(::PredictiveController, ::SimModel, _) = nothing
+set_objective_linear_coef!(::PredictiveController, ::ODEmodel, _) = nothing
 
 "Update the linear coefficients of the quadratic objective with `mpc.q̃` for `LinModel`."
 function set_objective_linear_coef!(mpc::PredictiveController, ::LinModel, Z̃var)
@@ -790,7 +790,7 @@ function setmodel_controller!(mpc::PredictiveController, uop_old, x̂op_old)
 end
 
 "No need to set the objective Hessian by default (only needed for quadratic objective)."
-set_objective_hessian!(::PredictiveController, ::SimModel, _ ) = nothing
+set_objective_hessian!(::PredictiveController, ::ODEmodel, _ ) = nothing
 
 "Set the objective Hessian with `mpc.H̃` if the objective is quadratic."
 function set_objective_hessian!(mpc::PredictiveController, ::LinModel, Z̃var)

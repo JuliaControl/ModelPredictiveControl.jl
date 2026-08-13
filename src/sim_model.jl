@@ -18,6 +18,10 @@ julia> y = model()
 """
 abstract type SimModel{NT<:Real} end
 
+abstract type ODEmodel{NT<:Real} <: SimModel{NT} end
+
+abstract type DAEmodel{NT<:Real} <: SimModel{NT} end
+
 struct SimModelBuffer{NT<:Real}
     u::Vector{NT}
     x::Vector{NT}
@@ -369,6 +373,9 @@ end
 
 "Print additional details of `model` if any (no details by default)."
 print_details(::IO, ::SimModel) = nothing
+
+"Do nothing if `model` is not a [`LinModel`](@ref)."
+steadystate!(::SimModel, _ , _ ) = nothing
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=model.buffer.empty) = evaloutput(model::SimModel, d)

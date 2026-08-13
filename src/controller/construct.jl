@@ -94,7 +94,7 @@ end
 
 "Outer constructor to validate and convert weight matrices if necessary."
 function ControllerWeights(
-    model::SimModel{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
+    model::ODEmodel{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
 ) where {NT<:Real}
     validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     M_Hp, N_Hc, L_Hp = NT.(M_Hp), NT.(N_Hc), NT.(L_Hp)
@@ -568,7 +568,7 @@ Estimate the default prediction horizon `Hp` for [`LinModel`](@ref).
 """
 default_Hp(model::LinModel) = DEFAULT_HP0 + estimate_delays(model)
 "Throw an error when model is not a [`LinModel`](@ref)."
-function default_Hp(::SimModel)
+function default_Hp(::ODEmodel)
     msg = "Prediction horizon Hp must be explicitly specified if model is not a LinModel."
     throw(ArgumentError(msg))
 end

@@ -527,7 +527,7 @@ end
 
 struct UnscentedKalmanFilter{
     NT<:Real, 
-    SM<:SimModel,
+    SM<:ODEmodel,
     KC<:KalmanCovariances
 } <: KalmanEstimator{NT}
     model::SM
@@ -567,7 +567,7 @@ struct UnscentedKalmanFilter{
     buffer::StateEstimatorBuffer{NT}
     function UnscentedKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC, α, β, κ; direct=true
-    ) where {NT<:Real, SM<:SimModel{NT}, KC<:KalmanCovariances}
+    ) where {NT<:Real, SM<:ODEmodel{NT}, KC<:KalmanCovariances}
         nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -600,9 +600,9 @@ struct UnscentedKalmanFilter{
 end
 
 @doc raw"""
-    UnscentedKalmanFilter(model::SimModel; <keyword arguments>)
+    UnscentedKalmanFilter(model::ODEmodel; <keyword arguments>)
 
-Construct an unscented Kalman Filter with the [`SimModel`](@ref) `model`.
+Construct an unscented Kalman Filter with the [`ODEmodel`](@ref) `model`.
 
 Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The unscented Kalman filter
 is based on the process model :
@@ -632,7 +632,7 @@ This estimator is allocation-free if `model` simulations do not allocate.
 !!! info
     Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
-- `model::SimModel` : (deterministic) model for the estimations.
+- `model::ODEmodel` : (deterministic) model for the estimations.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
     are unmeasured ``\mathbf{y^u}``.
 - `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
@@ -710,7 +710,7 @@ function UnscentedKalmanFilter(
     α = alpha,
     β = beta,
     κ = kappa,
-) where {NT<:Real, SM<:SimModel{NT}}
+) where {NT<:Real, SM<:ODEmodel{NT}}
     # estimated covariances matrices (variance = σ²) :
     P̂_0 = Diagonal([σP_0; σPint_u_0; σPint_ym_0].^2)
     Q̂   = Diagonal([σQ;  σQint_u;  σQint_ym ].^2)
@@ -729,7 +729,7 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 """
 function UnscentedKalmanFilter(
     model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α=1e-3, β=2, κ=0; direct=true
-) where {NT<:Real, SM<:SimModel{NT}}
+) where {NT<:Real, SM<:ODEmodel{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
     return UnscentedKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, cov, α, β, κ; direct)
@@ -907,7 +907,7 @@ end
 
 struct ExtendedKalmanFilter{
         NT<:Real, 
-        SM<:SimModel, 
+        SM<:ODEmodel, 
         KC<:KalmanCovariances,
         JB<:AbstractADType, 
         FF<:Function,
@@ -952,7 +952,7 @@ struct ExtendedKalmanFilter{
         jacobian::JB, linfuncF̂!::FF, linfuncĤ!::HF, direct=true
     ) where {
             NT<:Real, 
-            SM<:SimModel, 
+            SM<:ODEmodel, 
             KC<:KalmanCovariances, 
             JB<:AbstractADType, 
             FF<:Function,
@@ -988,9 +988,9 @@ struct ExtendedKalmanFilter{
 end
 
 @doc raw"""
-    ExtendedKalmanFilter(model::SimModel; <keyword arguments>)
+    ExtendedKalmanFilter(model::ODEmodel; <keyword arguments>)
 
-Construct an extended Kalman Filter with the [`SimModel`](@ref) `model`.
+Construct an extended Kalman Filter with the [`ODEmodel`](@ref) `model`.
 
 Both [`LinModel`](@ref) and [`NonLinModel`](@ref) are supported. The process model is
 identical to [`UnscentedKalmanFilter`](@ref). By default, the Jacobians of the augmented
@@ -1004,7 +1004,7 @@ differentiation. This estimator is allocation-free if `model` simulations do not
 !!! info
     Keyword arguments with *`emphasis`* are non-Unicode alternatives.
 
-- `model::SimModel` : (deterministic) model for the estimations.
+- `model::ODEmodel` : (deterministic) model for the estimations.
 - `i_ym=1:model.ny` : `model` output indices that are measured ``\mathbf{y^m}``, the rest 
     are unmeasured ``\mathbf{y^u}``.
 - `σP_0=fill(1/model.nx,model.nx)` or *`sigmaP_0`* : main diagonal of the initial estimate
@@ -1068,7 +1068,7 @@ function ExtendedKalmanFilter(
     σQint_u    = sigmaQint_u,
     σPint_ym_0 = sigmaPint_ym_0,
     σQint_ym   = sigmaQint_ym,
-) where {NT<:Real, SM<:SimModel{NT}}
+) where {NT<:Real, SM<:ODEmodel{NT}}
     # estimated covariances matrices (variance = σ²) :
     P̂_0 = Diagonal([σP_0; σPint_u_0; σPint_ym_0].^2)
     Q̂   = Diagonal([σQ;  σQint_u;  σQint_ym ].^2)
@@ -1089,7 +1089,7 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 """
 function ExtendedKalmanFilter(
     model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian=AutoForwardDiff(), direct=true
-) where {NT<:Real, SM<:SimModel{NT}}
+) where {NT<:Real, SM<:ODEmodel{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)    
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
     linfuncF̂!, linfuncĤ! = get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)

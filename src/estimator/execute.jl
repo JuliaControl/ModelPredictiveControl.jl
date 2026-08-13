@@ -14,7 +14,7 @@ function remove_op!(estim::StateEstimator, ym, d, u=nothing)
 end
 
 @doc raw"""
-    f̂!(x̂0next, û0, k, estim::StateEstimator, model::SimModel, x̂0, u0, d0) -> nothing
+    f̂!(x̂0next, û0, k, estim::StateEstimator, model::ODEmodel, x̂0, u0, d0) -> nothing
 
 Mutating state update function ``\mathbf{f̂}`` of the augmented model.
 
@@ -61,7 +61,7 @@ The operating points are handled inside ``\mathbf{f̂}``. See Extended Help for 
     are computed by [`augment_model`](@ref) (almost always zeros in practice for 
     [`NonLinModel`](@ref)).
 """
-function f̂!(x̂0next, û0, k, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
+function f̂!(x̂0next, û0, k, estim::StateEstimator, model::ODEmodel, x̂0, u0, d0)
     return f̂!(x̂0next, û0, k, model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0)
 end
 
@@ -92,11 +92,11 @@ function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
 end
 
 """
-    f̂!(x̂0next, û0, k, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+    f̂!(x̂0next, û0, k, model::ODEmodel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
 
-Same than [`f̂!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
+Same than [`f̂!`](@ref) for [`ODEmodel`](@ref) but without the `estim` argument.
 """
-function f̂!(x̂0next, û0, k, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+function f̂!(x̂0next, û0, k, model::ODEmodel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
     @views xdnext, xsnext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
@@ -109,11 +109,11 @@ function f̂!(x̂0next, û0, k, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, 
 end
 
 @doc raw"""
-    ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, d0) -> nothing
+    ĥ!(ŷ0, estim::StateEstimator, model::ODEmodel, x̂0, d0) -> nothing
 
 Mutating output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂!`](@ref).
 """
-function ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, d0)
+function ĥ!(ŷ0, estim::StateEstimator, model::ODEmodel, x̂0, d0)
     return ĥ!(ŷ0, model, estim.Cs_y, x̂0, d0)
 end
 
@@ -129,11 +129,11 @@ function ĥ!(ŷ0, estim::StateEstimator, ::LinModel, x̂0, d0)
 end
 
 """
-    ĥ!(ŷ0, model::SimModel, Cs_y, x̂0, d0)
+    ĥ!(ŷ0, model::ODEmodel, Cs_y, x̂0, d0)
 
-Same than [`ĥ!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
+Same than [`ĥ!`](@ref) for [`ODEmodel`](@ref) but without the `estim` argument.
 """
-function ĥ!(ŷ0, model::SimModel, Cs_y, x̂0, d0)
+function ĥ!(ŷ0, model::ODEmodel, Cs_y, x̂0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
     h!(ŷ0, model, xd, d0, model.p)  # y0 = h(xd, d0)

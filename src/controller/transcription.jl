@@ -415,7 +415,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::TranscriptionMethod, 
+        model::ODEmodel, estim::StateEstimator, transcription::TranscriptionMethod, 
         Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
@@ -454,7 +454,7 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     ```
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, ::TranscriptionMethod, 
+    model::ODEmodel, estim::StateEstimator{NT}, ::TranscriptionMethod, 
     Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
@@ -483,7 +483,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
+        model::ODEmodel, estim::StateEstimator, transcription::OrthogonalCollocation, 
         Hp, Hc, _ , Co, λo
     ) -> ES, GS, JS, KS, VS, BS
 
@@ -604,14 +604,14 @@ end
 
 """
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::SingleShooting, 
+        model::ODEmodel, estim::StateEstimator, transcription::SingleShooting, 
         Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
 """
 function init_defectmat(
-    ::SimModel, estim::StateEstimator, transcription::SingleShooting,
+    ::ODEmodel, estim::StateEstimator, transcription::SingleShooting,
     Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
@@ -781,7 +781,7 @@ end
 boxconstraint_terminal!(Z̃min, Z̃max, ::SingleShooting, _, _ , _, _, _, _, _) = Z̃min, Z̃max
 
 "Unset `i_ΔUmin` and `i_ΔUmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max)
+function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::ODEmodel, ::TranscriptionMethod, Z̃min, Z̃max)
     nΔU = length(i_ΔUmin)
     ΔUmin, ΔUmax = @views Z̃min[1:nΔU], @views Z̃max[1:nΔU]
     foreach(i -> !isinf(ΔUmin[i]) && (i_ΔUmin[i] = false), eachindex(ΔUmin))
@@ -790,14 +790,14 @@ function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModel, ::TranscriptionMethod
 end 
 
 "Unset `i_x̂min` and `i_x̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
+function deletex̂end_lincon!(i_x̂min, i_x̂max, ::ODEmodel, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
     nx̂ = length(i_x̂min)
     x̂0min, x̂0max = @views Z̃min[nΔU+nX̂-nx̂+1:nΔU+nX̂], @views Z̃max[nΔU+nX̂-nx̂+1:nΔU+nX̂]
     foreach(i -> !isinf(x̂0min[i]) && (i_x̂min[i] = false), eachindex(x̂0min))
     foreach(i -> !isinf(x̂0max[i]) && (i_x̂max[i] = false), eachindex(x̂0max))
     return i_x̂min, i_x̂max
 end
-deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
+deletex̂end_lincon!(i_x̂min, i_x̂max, ::ODEmodel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel)
@@ -930,7 +930,7 @@ end
 
 """
     linconstrainteq!(
-        mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
+        mpc::PredictiveController, ::ODEmodel, ::StateEstimator, ::TranscriptionMethod
     )
 
 By default, fallback to doing same the but using the shorter equations.
@@ -940,7 +940,7 @@ constraints of [`OrthogonalCollocation`](@ref), if applicable. See [`init_defect
 for the equation.
 """
 function linconstrainteq!(
-    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
+    mpc::PredictiveController, ::ODEmodel, ::StateEstimator, ::TranscriptionMethod
 )
     FS  = mpc.con.FS
     mul!(FS, mpc.con.KS, mpc.estim.x̂0) # the only non-zero matrix is KS
@@ -972,7 +972,7 @@ end
 "No linear equality constraints for other cases of [`InternalModel`](@ref)."
 linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel, ::TranscriptionMethod) = nothing
 "No linear equality constraints for all cases of [`SingleShooting`](@ref) (N/A)."
-linconstrainteq!(::PredictiveController, ::SimModel,    ::StateEstimator, ::SingleShooting) = nothing 
+linconstrainteq!(::PredictiveController, ::ODEmodel,    ::StateEstimator, ::SingleShooting) = nothing 
 linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel,  ::SingleShooting) = nothing 
 
 @doc raw"""
@@ -1525,4 +1525,4 @@ function con_nonlinprogeq!(
 end
 
 "No eq. constraints for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
-con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::SimModel,::TranscriptionMethod,_,_)=geq
+con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::ODEmodel,::TranscriptionMethod,_,_)=geq
