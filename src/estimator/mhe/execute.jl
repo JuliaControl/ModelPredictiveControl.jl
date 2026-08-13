@@ -421,7 +421,9 @@ function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<
     F, C, optim = estim.F, estim.C, estim.optim
     fx̄, r = estim.fx̄, estim.r
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
-    nYm, nZ = estim.nym*Nk, get_nZ_mhe(estim.transcription, Nk, nx̂, nŵ)
+    nYm = estim.nym*Nk
+    nk = get_nk(model, estim.transcription)
+    nZ = get_nZ_mhe(estim.transcription, Nk, nx̂, nk, nŵ)
     # --- truncate vectors and matrices if Nk < He ---
     U0, D0, Y0m = trunc_windows(estim)
     Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var = trunc_predmat(estim)
@@ -470,8 +472,9 @@ getx̄!(x̄, estim::MovingHorizonEstimator, x̂0arr) = (x̄ .= estim.x̂0arr_old
 "Get the estimated process noise from the decision vector `Z̃`."
 function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
     He, nx̂, nŵ = estim.He, estim.nx̂, estim.nx̂
-    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
-    Ŵ[1:nŵ*He] .= @views Z̃[(nZ̃ - nŵ*He + 1):end] 
+    nk = get_nk(estim.model, transcription)
+    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
+    Ŵ .= @views Z̃[(nZ̃ - nŵ*He + 1):end] 
     return Ŵ
 end
 
@@ -586,7 +589,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
             MOIU.reset_optimizer(optim)
             JuMP.optimize!(optim)
         else
-            rethrow(err)
+            rethrow()
         end
     end
     # -------- error handling -------------------------
@@ -965,9 +968,8 @@ function setmodel_estimator!(
     estim.x̂0 .-= estim.x̂op # convert x̂ to x̂0 with the new operating point
     # --- predictions matrices ---
     E, G, J, B, _ , EX̂, GX̂, JX̂, BX̂ = init_predmat_mhe(
-        model, transcription,
-        He, estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, estim.x̂op, estim.f̂op, 
-        estim.direct
+        model, transcription, estim.direct,
+        He, estim.Â, estim.B̂u, estim.Ĉm, estim.B̂d, estim.D̂dm, estim.x̂op, estim.f̂op
     )
     A_X̂min, A_X̂max, ẼX̂ = relaxX̂(EX̂, con.C_x̂min, con.C_x̂max, nε)   
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, con.C_v̂min, con.C_v̂max, nε) 
@@ -982,8 +984,8 @@ function setmodel_estimator!(
     con.BX̂ .= BX̂
     # --- defect matrices ---
     ES, GS, JS, BS = init_defectmat_mhe(
-        model, transcription, He, 
-        estim.Â, estim.B̂u, estim.B̂d, estim.x̂op, estim.f̂op, estim.As, estim.direct
+        model, transcription, estim.direct, He, 
+        estim.Â, estim.B̂u, estim.B̂d, estim.x̂op, estim.f̂op, estim.As, estim.Co, estim.λo
     )
     Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
     con.ẼS .= ẼS

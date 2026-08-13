@@ -15,7 +15,6 @@ The prediction methodology of this module is mainly based on Maciejowski textboo
 ModelPredictiveControl.move_blocking
 ModelPredictiveControl.init_ZtoΔU   
 ModelPredictiveControl.init_ZtoU
-ModelPredictiveControl.init_orthocolloc
 ModelPredictiveControl.init_predmat
 ModelPredictiveControl.init_defectmat
 ModelPredictiveControl.relaxU
@@ -45,7 +44,6 @@ ModelPredictiveControl.linconstrainteq!
 ModelPredictiveControl.optim_objective!(::PredictiveController)
 ModelPredictiveControl.set_warmstart_mpc!
 ModelPredictiveControl.predict!
-ModelPredictiveControl.disturbedinput!
 ModelPredictiveControl.con_nonlinprog!
 ModelPredictiveControl.con_nonlinprogeq!
 ModelPredictiveControl.getinput!

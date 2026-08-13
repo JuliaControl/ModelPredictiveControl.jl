@@ -69,24 +69,6 @@ ModelPredictiveControl.f̂!
 ModelPredictiveControl.ĥ!
 ```
 
-## Update Quadratic Optimization
-
-```@docs
-ModelPredictiveControl.initpred!(::MovingHorizonEstimator, ::LinModel)
-ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod)
-```
-
-## Solve Optimization Problem
-
-```@docs
-ModelPredictiveControl.optim_objective!(::MovingHorizonEstimator)
-ModelPredictiveControl.set_warmstart_mhe!
-ModelPredictiveControl.predict_mhe!
-ModelPredictiveControl.con_nonlinprog_mhe!
-ModelPredictiveControl.con_nonlinprogeq_mhe!
-ModelPredictiveControl.getstate!
-```
-
 ## Remove Operating Points
 
 ```@docs
@@ -117,4 +99,23 @@ ModelPredictiveControl.correct_estimate!
 
 ```@docs
 ModelPredictiveControl.update_estimate!
+```
+
+## Update Quadratic Optimization
+
+```@docs
+ModelPredictiveControl.initpred!(::MovingHorizonEstimator, ::LinModel)
+ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod)
+```
+
+## Solve Optimization Problem
+
+```@docs
+ModelPredictiveControl.optim_objective!(::MovingHorizonEstimator)
+ModelPredictiveControl.set_warmstart_mhe!
+ModelPredictiveControl.disturbedinput!
+ModelPredictiveControl.predict_mhe!
+ModelPredictiveControl.con_nonlinprog_mhe!
+ModelPredictiveControl.con_nonlinprogeq_mhe!
+ModelPredictiveControl.getstate!
 ```

@@ -8,7 +8,7 @@ get_other_dims(estim::MovingHorizonEstimator) = (estim.He, estim.nε)
 "Print optimizer and other information for `MovingHorizonEstimator`."
 function print_details(io::IO, estim::MovingHorizonEstimator)
     println(io, "├ optimizer: $(JuMP.solver_name(estim.optim)) ")
-    println(io, "├ transcription: $(nameof(typeof(estim.transcription)))")
+    println(io, "├ transcription: $(transcription_str(estim.transcription))")
     print_backends(io, estim, estim.model)
     println(io, "├ arrival covariance: $(nameof(typeof(estim.covestim))) ")
     println(io, "├ direct: $(estim.direct)")

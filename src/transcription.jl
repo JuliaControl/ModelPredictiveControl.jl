@@ -147,10 +147,11 @@ transcription method.
 
 # Extended Help
 !!! details "Extended Help"
-    Note that the stochastic model of the unmeasured disturbances is strictly discrete-time,
-    as described in [`ModelPredictiveControl.init_estimstoch`](@ref). Collocation methods
-    require continuous-time dynamics. Because of this, the stochastic states are transcribed
-    separately using a [`MultipleShooting`](@ref) method. See [`con_nonlinprogeq!`](@ref)
+    Note that the stochastic model of the unmeasured disturbances is strictly linear and
+    discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
+    Collocation methods require continuous-time dynamics. Because of this, and also to
+    reduce the number of nonlinear constraints, the stochastic states are transcribed
+    separately using a linear [`MultipleShooting`](@ref) method. See [`con_nonlinprogeq!`](@ref)
     and [`con_nonlinprogeq_mhe!`](@ref) for more details.
 """
 struct TrapezoidalCollocation <: CollocationMethod
@@ -177,8 +178,9 @@ Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@
 
 Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)s
 only. The `h` argument is the hold order for ``\mathbf{u}`` (`0` or `1`), and the `no`
-argument, the number of collocation points ``n_o``. The decision variable is similar to
-[`MultipleShooting`](@ref), but it also includes the collocation points:
+argument, the number of collocation points ``n_o``. The decision variable of
+[`PredictiveController`](@ref) is similar to [`MultipleShooting`](@ref), but it also
+includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
 ```
@@ -196,19 +198,21 @@ where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministi
     \mathbf{k}_{n_o}(k+H_p-1)           \end{bmatrix}
 ```
 and ``\mathbf{k}_i(k+j)`` is the deterministic state prediction for the ``i``th collocation
-point at the ``j``th stage/interval/finite element (details in Extended Help). The `roots`
-keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or 
-Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstring for
-descriptions of `f_threads` and `h_threads` keywords. This transcription computes the
-predictions by enforcing the collocation and continuity constraints at the collocation
-points. It is efficient for highly stiff systems, but generally more expensive than the
-other methods for non-stiff systems. This transcription is not supported by the
-[`MovingHorizonEstimator`](@ref) for now. See Extended Help for more details.
+point at the ``j``th stage/interval (details in Extended Help). The `roots` keyword argument
+is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or Gauss-Legendre quadrature, 
+respectively. See [`MultipleShooting`](@ref) docstring for descriptions of `f_threads` and
+`h_threads` keywords. This transcription computes the predictions by enforcing the
+collocation and continuity constraints at the collocation points. It is efficient for highly
+stiff systems, but generally more expensive than the other methods for non-stiff systems.
+See Extended Help for details and the transcription of [`MovingHorizonEstimator`](@ref) 
+objects.
 
 !!! warning
-    The built-in [`StateEstimator`](@ref) will still use the `solver` provided at the
-    construction of the [`NonLinModel`](@ref) to estimate the plant states, not orthogonal
-    collocation (see `supersample` option of  [`RungeKutta`](@ref) for stiff systems).
+    Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
+    `OrthogonalCollocation` transcription, the built-in [`StateEstimator`](@ref) will still
+    use the `solver` provided at the construction of the [`NonLinModel`](@ref) to estimate
+    the plant states, not orthogonal collocation (see `supersample` option of 
+    [`RungeKutta`](@ref) for stiff systems).
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are highly recommended for
 this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
@@ -216,14 +220,42 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 # Extended Help
 !!! details "Extended Help"
     As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
-    states are left out of the ``\mathbf{K}`` vector since collocation methods require
-    continuous-time dynamics and the stochastic model is discrete.
+    states are left out of the ``\mathbf{K}`` vector to reduce the dimensions, and also
+    because collocation methods require continuous-time dynamics and the stochastic model is
+    discrete.
+
+    For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
+    ```math
+    \mathbf{Z} =                    \begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p)       \\  
+        \mathbf{X̂_0}                \\         
+        \mathbf{0_x̂}                \\
+        \mathbf{K}                  \\         
+        \mathbf{0_k}                \\ 
+        \mathbf{Ŵ}                  \\
+        \mathbf{0_ŵ}                \end{bmatrix}
+    ```
+    The Extended Help of [`SingleShooting`](@ref) and [`MultipleShooting`](@ref) introduces
+    all these variables, except for the vector with the intermediate stages of the
+    deterministic states at the collation points:
+    ```math
+    \mathbf{K} =                            \begin{bmatrix}
+        \mathbf{k}_{1}(k-N_k+p+0)           \\
+        \mathbf{k}_{2}(k-N_k+p+0)           \\
+        \vdots                              \\
+        \mathbf{k}_{n_o}(k-N_k+p+0)         \\
+        \mathbf{k}_{1}(k-N_k+p+1)           \\
+        \mathbf{k}_{2}(k-N_k+p+1)           \\
+        \vdots                              \\
+        \mathbf{k}_{n_o}(k+p-1)             \end{bmatrix}
+    ```
 
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
     The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
     is more accurate than Gauss-Radau but only A-stable, while the latter being L-stable. 
-    See [`con_nonlinprogeq!`](@ref) for implementation details.
+    See [`init_orthocolloc`](@ref), [`con_nonlinprogeq!`](@ref) and [`con_nonlinprogeq_mhe!`](@ref)
+    for more details.
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
@@ -259,47 +291,94 @@ end
 Init the differentiation and continuity matrices for [`OrthogonalCollocation`](@ref).
 
 Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized to the
-interval ``[0, 1]``, and ``τ_0=0``, each state trajectories are approximated by a distinct
-polynomial of degree ``n_o``. The differentiation matrix ``\mathbf{M_o}``, continuity
-matrix ``\mathbf{C_o}`` and continuity coefficient ``λ_o`` are pre-computed with:
+interval ``[0, 1]`` with ``τ_0=0``, the trajectories for each state are approximated by a
+distinct polynomial of degree ``n_o``. The differentiation matrix ``\mathbf{M_o}``, the
+continuity matrix ``\mathbf{C_o}`` and the continuity coefficient ``λ_o`` are pre-computed
+with the identity matrix ``\mathbf{I}`` of size `(model.nx, model.nx)` and:
 ```math
 \begin{aligned}
-    \mathbf{P_o} &=                                                                               \begin{bmatrix}
-        τ_1^1 \mathbf{I}       & τ_1^2 \mathbf{I}       & \cdots & τ_1^{n_o} \mathbf{I}           \\
-        τ_2^1 \mathbf{I}       & τ_2^2 \mathbf{I}       & \cdots & τ_2^{n_o} \mathbf{I}           \\
-        \vdots                 & \vdots                 & \ddots & \vdots                         \\
-        τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
-    \mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
-        τ_1^0 \mathbf{I}       & 2τ_1^1 \mathbf{I}      & \cdots & n_o τ_1^{n_o-1} \mathbf{I}     \\
-        τ_2^0 \mathbf{I}       & 2τ_2^1 \mathbf{I}      & \cdots & n_o τ_2^{n_o-1} \mathbf{I}     \\
-        \vdots                 & \vdots                 & \ddots & \vdots                         \\
-        τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
-    \mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
-    \mathbf{C_o} &=                                                                               \begin{bmatrix}
-        L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix} \\
-            λ_o  &= L_0(1)                                                                        
+\mathbf{P_o} &=                                                                               \begin{bmatrix}
+    τ_1^1 \mathbf{I}       & τ_1^2 \mathbf{I}       & \cdots & τ_1^{n_o} \mathbf{I}           \\
+    τ_2^1 \mathbf{I}       & τ_2^2 \mathbf{I}       & \cdots & τ_2^{n_o} \mathbf{I}           \\
+    \vdots                 & \vdots                 & \ddots & \vdots                         \\
+    τ_{n_o}^1 \mathbf{I}   & τ_{n_o}^2 \mathbf{I}   & \cdots & τ_{n_o}^{n_o} \mathbf{I}       \end{bmatrix} \\
+\mathbf{Ṗ_o} &=                                                                               \begin{bmatrix}
+    τ_1^0 \mathbf{I}       & 2τ_1^1 \mathbf{I}      & \cdots & n_o τ_1^{n_o-1} \mathbf{I}     \\
+    τ_2^0 \mathbf{I}       & 2τ_2^1 \mathbf{I}      & \cdots & n_o τ_2^{n_o-1} \mathbf{I}     \\
+    \vdots                 & \vdots                 & \ddots & \vdots                         \\
+    τ_{n_o}^0 \mathbf{I} & 2τ_{n_o}^1 \mathbf{I} & \cdots & n_o τ_{n_o}^{n_o-1} \mathbf{I}    \end{bmatrix} \\
+\mathbf{M_o} &= \frac{1}{T_s} \mathbf{Ṗ_o} \mathbf{P_o}^{-1}                                  \\
+\mathbf{C_o} &=                                                                               \begin{bmatrix}
+    L_1(1) \mathbf{I}      & L_2(1) \mathbf{I}      & \cdots & L_{n_o}(1) \mathbf{I}          \end{bmatrix} \\
+        λ_o  &= L_0(1)                                                                        
 \end{aligned}
 ```
-where ``\mathbf{P_o}`` is a matrix to evaluate the polynamial values w/o the coefficients
-and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate its derivatives. The Lagrange polynomial
-``L_j(τ)`` bases are defined as:
+where ``T_s`` is the sampling time `model.Ts`, ``\mathbf{P_o}`` is a matrix to evaluate the
+polynomial values w/o the coefficients and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate 
+its derivatives. The Lagrange polynomial ``L_j(τ)`` bases are defined as:
 ```math
 L_j(τ) = \prod_{i=0, i≠j}^{n_o} \frac{τ - τ_i}{τ_j - τ_i}
 ```
 
-The collocation constraints are nonlinear, but the defects of deterministic states 
-``\mathbf{x̂_d}`` for the continuity constraints are in fact linear equality constraints:
+The ``\mathbf{M_o}`` matrix is used in the nonlinear collocation constraints. The defects
+between the deterministic state derivative for the ``n_o`` collocation points and the model
+dynamics at the discrete time ``k`` are given by:
 ```math
-\mathbf{s_c}(k+j+1) = \mathbf{0} =
-    \mathbf{C_o} \begin{bmatrix}                                          
-        \mathbf{k}_1(k+j)                                           \\
-        \mathbf{k}_2(k+j)                                           \\
-        \vdots                                                      \\
-        \mathbf{k}_{n_o}(k+j)                                       \end{bmatrix}       
-    + λ_o \mathbf{x̂_d}(k+j) - \mathbf{x̂_d}(k+j+1)
+\begin{aligned}
+\mathbf{ŝ_k}(k)                                                              
+    &= \mathbf{M_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(k) - \mathbf{x̂_d}(k)                                                    \\
+        \mathbf{k}_2(k) - \mathbf{x̂_d}(k)                                                    \\
+        \vdots                                                                               \\
+        \mathbf{k}_{n_o}(k) - \mathbf{x̂_d}(k)                                                \end{bmatrix}                                                                                   
+    - \begin{bmatrix}
+        \mathbf{k̇}_1(k)                                                                      \\
+        \mathbf{k̇}_2(k)                                                                      \\
+        \vdots                                                                               \\
+        \mathbf{k̇}_{n_o}(k)                                                                  \end{bmatrix} \\
+    &= \mathbf{0}
+\end{aligned}
 ```
-for ``j = 0, 1, ... , H_p-1``. The ``\mathbf{k}_i`` and ``\mathbf{x̂_d}`` vectors are all
-directly extracted from the decision variable `Z̃`.
+knowing that the ``\mathbf{k}_i(k)`` vectors are directly extracted from the decision
+variables in `Z̃`. The ``\mathbf{x̂_d}(k)`` vector is the estimated deterministic state at the
+beginning of the interval ``τ_0=0``, and is also extracted from `Z̃`. The ``\mathbf{k̇}_i``
+derivatives for the ``i``th collocation point are computed from the continuous-time function
+`model.f!` and:
+```math
+\mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
+```
+Based on the normalized time ``τ_i`` and the hold order `transcription.h`, the inputs and
+disturbances are either piecewise constant or linear:
+```math
+\begin{aligned}
+\mathbf{û}_i(k) &=                                                                           \begin{cases}
+                    \mathbf{û_0}(k)                                  &  h = 0                \\
+                    (1-τ_i)\mathbf{û_0}(k) + τ_i\mathbf{û_0}(k+1)    &  h = 1                \end{cases} \\
+\mathbf{d}_i(k) &=  (1-τ_i)\mathbf{d_0}(k) + τ_i\mathbf{d_0}(k+1)                      
+\end{aligned}
+```
+The disturbed input ``\mathbf{û_0}`` is defined in [`f̂!`](@ref).
+
+The defects of the deterministic states ``\mathbf{x̂_d}`` for the continuity constraints are
+in fact linear equality constraints:
+```math
+\begin{aligned}
+\mathbf{ŝ_c}(k+1) 
+    &= \mathbf{C_o} \begin{bmatrix}                                          
+        \mathbf{k}_1(k)                                                                         \\
+        \mathbf{k}_2(k)                                                                         \\
+        \vdots                                                                                  \\
+        \mathbf{k}_{n_o}(k)                                                                     \end{bmatrix}
+    + λ_o \mathbf{x̂_d}(k) + \mathbf{ŵ_d}(k) - \mathbf{x̂_d}(k+1)                                 \\
+    &= \mathbf{0}
+\end{aligned}
+```
+This is a purely linear equation since the ``\mathbf{k}_i``, ``\mathbf{x̂_d}`` and 
+``\mathbf{ŵ_d}`` vectors are all extracted from the decision variables in `Z̃`. The estimated
+process noises of the deterministic states ``\mathbf{ŵ_d}(k) = \mathbf{0}`` for [`NonLinMPC`](@ref) 
+objects (only used for [`MovingHorizonEstimator`](@ref)). Note that handling the estimated 
+process noise in the continuity constraint implicitly assumes that it's a discrete
+stochastic process (like all the other [`StateEstimator`](@ref) types in this package).
 """
 function init_orthocolloc(
     model::SimModel{NT}, transcription::OrthogonalCollocation
@@ -325,7 +404,12 @@ function init_orthocolloc(
     λo = lagrange_end(0, transcription)
     return Mo, Co, λo
 end
-"Return empty sparse matrices and `NaN` for other [`TranscriptionMethod`](@ref)"
+
+"""
+    init_orthocolloc(model::SimModel, transcription::TranscriptionMethod)
+
+Return empty sparse matrices and `NaN` value for other [`TranscriptionMethod`](@ref) types.
+"""
 init_orthocolloc(::SimModel, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0), NaN
 
 "Evaluate the Lagrange basis polynomial ``L_j`` at `τ=1`."
@@ -359,3 +443,8 @@ validate_transcription(::SimModel, ::TranscriptionMethod) = nothing
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
 get_nk(model::SimModel, ::ShootingMethod) = model.nk
 get_nk(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
+
+transcription_str(transription::TranscriptionMethod) = string(nameof(typeof(transription)))
+function transcription_str(transription::OrthogonalCollocation)
+    return "$(nameof(typeof(transription))) ($(transription.no) collocation points)"
+end

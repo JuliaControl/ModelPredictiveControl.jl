@@ -108,6 +108,9 @@ struct MovingHorizonEstimator{
     nyu::Int
     nxs::Int
     p::PT
+    Mo::SparseMatrixCSC{NT, Int}
+    Co::SparseMatrixCSC{NT, Int}
+    λo::NT
     As  ::Matrix{NT}
     Cs_u::Matrix{NT}
     Cs_y::Matrix{NT}
@@ -166,14 +169,12 @@ struct MovingHorizonEstimator{
             GCfunc<:Function,
             CE<:KalmanEstimator{NT}
         }
-        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+        nu, ny, nd = model.nu, model.ny, model.nd
+        nk = get_nk(model, transcription)
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
         validate_transcription(model, transcription)
-        if transcription isa OrthogonalCollocation 
-            error("OrthogonalCollocation is not supported for the MHE for now.")
-        end
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂ = model.nx + nxs
@@ -184,10 +185,11 @@ struct MovingHorizonEstimator{
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         Tŵ = init_ZtoŴ(model, transcription, He, nx̂, nŵ)
         E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂ = init_predmat_mhe(
-            model, transcription, He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, direct
+            model, transcription, direct, He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
         )
+        Mo, Co, λo = init_orthocolloc(model, transcription)
         ES, GS, JS, BS = init_defectmat_mhe(
-            model, transcription, He, Â, B̂u, B̂d, x̂op, f̂op, As, direct
+            model, transcription, direct, He, Â, B̂u, B̂d, x̂op, f̂op, As, Co, λo
         ) 
         # dummy values (updated just before optimization):
         F, fx̄ = zeros(NT, nym*He), zeros(NT, nx̂)
@@ -199,7 +201,7 @@ struct MovingHorizonEstimator{
             ES, GS, JS, BS, 
             gc!, nc
         )
-        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
+        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
         # dummy values, updated before optimization:
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
@@ -224,6 +226,7 @@ struct MovingHorizonEstimator{
             He, nε,
             i_ym, nx̂, nym, nyu, nxs, 
             p,
+            Mo, Co, λo,
             As, Cs_u, Cs_y, nint_u, nint_ym,
             Â, B̂u, Ĉ, B̂d, D̂d, Ĉm, D̂dm,
             Tŵ,
@@ -1073,9 +1076,10 @@ in which ``\mathbf{T_{ŵ}} = [\begin{smallmatrix} \mathbf{0} & \mathbf{I} \end{
 and ``\mathbf{0}`` is properly sized for the `transcription` instance.
 """
 function init_ZtoŴ(
-    ::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
+    model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
 ) where {NT<:Real}
-    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nŵ)
+    nk = get_nk(model, transcription)
+    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
     Tŵ = [spzeros(NT, nŴ, nZ-nŴ) I]
     return Tŵ
 end
@@ -1297,11 +1301,12 @@ end
 Init the decision variable box constraints `Z̃min` and `Z̃max` for [`MovingHorizonEstimator`](@ref).
 """
 function init_boxconstraint_mhe(
-    ::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
+    model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
     x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
     A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
-    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nŵ)
+    nk = get_nk(model, transcription)
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
     Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
     nε > 0 && (Z̃min[begin] = 0)
     nŴ = nŵ*He
