@@ -1421,7 +1421,7 @@ function con_nonlinprogeq!(
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
-            model.f!(k̇1, x̂d_Z̃, û0, d̂0, p)
+            model.f!(k̇1, x̂d_Z̃, û0, d̂0, model.p)
         else
             k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
         end

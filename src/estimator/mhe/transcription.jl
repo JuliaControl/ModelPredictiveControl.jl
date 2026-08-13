@@ -426,7 +426,7 @@ end
 @doc raw"""
     init_defectmat_mhe(
         model::LinModel, transcription::MultipleShooting, direct::Bool,
-        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, _ , _ , _
+        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, As, Co, λo
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the defects over the predicted states.
