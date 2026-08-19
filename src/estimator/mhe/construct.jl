@@ -617,7 +617,7 @@ function MovingHorizonEstimator(
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0, He)
     gc! = get_mutating_gc_mhe(NT, gc)
-    hessian = validate_hessian(hessian, gradient, DEFAULT_NONLINMHE_HESSIAN)
+    hessian = validate_hessian(hessian, DEFAULT_NONLINMHE_HESSIAN, gradient)
     if isnothing(covestim)
         covestim = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     end

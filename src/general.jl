@@ -48,6 +48,26 @@ const ERROR_STATUSES = (
     JuMP.INVALID_OPTION, JuMP.INTERRUPTED, JuMP.OTHER_ERROR
 )
 
+"""
+Abstract supertype of all transcription methods for the optimization problems.
+
+The `ShootingMethod` subtype includes the following concrete types:
+
+    - [`SingleShooting`](@ref)
+    - [`MultipleShooting`](@ref)
+
+and the `CollocationMethod` subtype includes the following concrete types:
+
+    - [`TrapezoidalCollocation`](@ref) 
+    - [`OrthogonalCollocation`](@ref)
+    
+"""
+abstract type TranscriptionMethod end 
+
+# Defined here instead of `src/transcription.jl` since `nonlindae.jl` needs them
+abstract type ShootingMethod    <: TranscriptionMethod end
+abstract type CollocationMethod <: TranscriptionMethod end
+
 "Verify that `optim` termination status is `OPTIMAL` or `LOCALLY_SOLVED`."
 function issolved(optim::JuMP.GenericModel)
     status = JuMP.termination_status(optim)
@@ -196,7 +216,7 @@ get_ncolors(::Prep) = nothing
 get_ncolors(prep::Union{SparseJacobianPrep, SparseHessianPrep}) = ncolors(prep)
 
 "Validate `hessian` keyword argument and return the differentiation `backend`."
-function validate_hessian(hessian, gradient, default)
+function validate_hessian(hessian, default, gradient=nothing)
     if hessian == true
         backend = default
     elseif hessian == false || isnothing(hessian)
@@ -204,7 +224,7 @@ function validate_hessian(hessian, gradient, default)
     else
         backend = hessian
     end
-    if !isnothing(backend)
+    if !isnothing(gradient) && !isnothing(backend) 
         hess = dense_backend(backend)
         grad = dense_backend(gradient)
         if hess != grad

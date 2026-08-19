@@ -19,7 +19,6 @@ julia> y = model()
 abstract type SimModel{NT<:Real} end
 
 abstract type ODEmodel{NT<:Real} <: SimModel{NT} end
-
 abstract type DAEmodel{NT<:Real} <: SimModel{NT} end
 
 struct SimModelBuffer{NT<:Real}
@@ -357,6 +356,7 @@ end
 include("model/linmodel.jl")
 include("model/linearization.jl")
 include("model/nonlinmodel.jl")
+include("model/nonlindaemodel.jl")
 
 function Base.show(io::IO, model::SimModel)
     nu, nd = model.nu, model.nd

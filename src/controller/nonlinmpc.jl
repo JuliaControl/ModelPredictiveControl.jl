@@ -454,7 +454,7 @@ function NonLinMPC(
     validate_JE(NT, JE)
     gc! = get_mutating_gc_mpc(NT, gc)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-    hessian = validate_hessian(hessian, gradient, DEFAULT_NONLINMPC_HESSIAN)
+    hessian = validate_hessian(hessian, DEFAULT_NONLINMPC_HESSIAN, gradient)
     return NonLinMPC{NT}(
         estim, Hp, Hc, nb, weights, Wy, Wu, Wd, Wr, JE, gc!, nc, p, 
         transcription, optim, gradient, jacobian, hessian
