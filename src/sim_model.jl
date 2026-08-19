@@ -356,7 +356,7 @@ end
 include("model/linmodel.jl")
 include("model/linearization.jl")
 include("model/nonlinmodel.jl")
-include("model/nonlindaemodel.jl")
+include("model/nonlinmodeldae.jl")
 
 function Base.show(io::IO, model::SimModel)
     nu, nd = model.nu, model.nd
