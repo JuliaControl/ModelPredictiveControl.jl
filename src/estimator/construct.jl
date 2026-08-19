@@ -174,7 +174,7 @@ where ``\mathbf{e}(k)`` is an unknown zero mean white noise and ``\mathbf{A_s} =
 it is thus ignored. The function [`init_integrators`](@ref) builds the state-space matrices.
 """
 function init_estimstoch(
-    model::ODEmodel{NT}, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVectorOrInt
+    model::SimModelODE{NT}, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVectorOrInt
 ) where {NT<:Real}
     nu, ny, nym = model.nu, model.ny, length(i_ym)
     As_u , Cs_u , nint_u  = init_integrators(nint_u , nu , "u")
@@ -198,7 +198,7 @@ function validate_ym(model::SimModel, i_ym)
 end
 
 "Convert the measured outputs stochastic model `stoch_ym` to all outputs `stoch_y`."
-function stoch_ym2y(model::ODEmodel{NT}, i_ym, Asm, Bsm, Csm, Dsm) where {NT<:Real}
+function stoch_ym2y(model::SimModelODE{NT}, i_ym, Asm, Bsm, Csm, Dsm) where {NT<:Real}
     As = Asm
     Bs = Bsm
     Cs = zeros(NT, model.ny, size(Csm,2))

@@ -276,7 +276,7 @@ struct OrthogonalCollocation <: CollocationMethod
 end
 
 @doc raw"""
-    init_orthocolloc(model::ODEmodel, transcription::OrthogonalCollocation) -> Mo, Co, λo
+    init_orthocolloc(model::SimModelODE, transcription::OrthogonalCollocation) -> Mo, Co, λo
 
 Init the differentiation and continuity matrices for [`OrthogonalCollocation`](@ref).
 
@@ -371,7 +371,7 @@ process noise in the continuity constraint implicitly assumes that it's a discre
 stochastic process (like all the other [`StateEstimator`](@ref) types in this package).
 """
 function init_orthocolloc(
-    model::ODEmodel{NT}, transcription::OrthogonalCollocation
+    model::SimModelODE{NT}, transcription::OrthogonalCollocation
 ) where {NT<:Real}
     nx, no = model.nx, transcription.no
     τ = transcription.τ
@@ -396,11 +396,11 @@ function init_orthocolloc(
 end
 
 """
-    init_orthocolloc(model::ODEmodel, transcription::TranscriptionMethod)
+    init_orthocolloc(model::SimModelODE, transcription::TranscriptionMethod)
 
 Return empty sparse matrices and `NaN` value for other [`TranscriptionMethod`](@ref) types.
 """
-init_orthocolloc(::ODEmodel, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0), NaN
+init_orthocolloc(::SimModelODE, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0), NaN
 
 "Evaluate the Lagrange basis polynomial ``L_j`` at `τ=1`."
 function lagrange_end(j, transcription::OrthogonalCollocation)
@@ -428,11 +428,11 @@ function validate_transcription(::NonLinModel{<:Real, <:EmptySolver}, ::Collocat
     throw(ArgumentError("Collocation methods require continuous-time NonLinModel."))
     return nothing
 end
-validate_transcription(::ODEmodel, ::TranscriptionMethod) = nothing
+validate_transcription(::SimModelODE, ::TranscriptionMethod) = nothing
 
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
-get_nk(model::ODEmodel, ::ShootingMethod) = model.nk
-get_nk(model::ODEmodel, transcription::CollocationMethod) = model.nx*transcription.no
+get_nk(model::SimModelODE, ::ShootingMethod) = model.nk
+get_nk(model::SimModelODE, transcription::CollocationMethod) = model.nx*transcription.no
 
 transcription_str(transription::TranscriptionMethod) = string(nameof(typeof(transription)))
 function transcription_str(transription::OrthogonalCollocation)

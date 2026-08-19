@@ -369,14 +369,14 @@ end
 
 """
     init_predmat_mhe(
-        model::ODEmodel, transcription::SingleShooting, direct::Bool,
+        model::SimModelODE, transcription::SingleShooting, direct::Bool,
         He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
     ) -> E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 
 Return empty matrices for [`SingleShooting`](@ref) and non-`LinModel`, except for `ex̄`.
 """
 function init_predmat_mhe(
-    model::ODEmodel{NT}, transcription::SingleShooting, ::Bool,
+    model::SimModelODE{NT}, transcription::SingleShooting, ::Bool,
     He, Â, _ , Ĉm, _ , _ , _ , _ 
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
@@ -397,14 +397,14 @@ end
 
 """
     init_predmat_mhe(
-        model::ODEmodel, transcription::TranscriptionMethod, direct::Bool
+        model::SimModelODE, transcription::TranscriptionMethod, direct::Bool
         He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
     ) -> E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 
 Return `ex̄, EX̂, GX̂, JX̂, BX̂` and empty matrices non-`LinModel` and other [`TranscriptionMethod`](@ref).
 """
 function init_predmat_mhe(
-    model::ODEmodel{NT}, transcription::TranscriptionMethod, ::Bool,
+    model::SimModelODE{NT}, transcription::TranscriptionMethod, ::Bool,
     He, Â, _ , Ĉm, _ , _ , _ , _ 
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
@@ -510,7 +510,7 @@ end
 
 @doc raw"""
     init_defectmat_mhe(
-        model::ODEmodel, transcription::TranscriptionMethod, direct::Bool,
+        model::SimModelODE, transcription::TranscriptionMethod, direct::Bool,
         He, Â, _ , _ , _ , _ , As, _ , _
     ) -> ES, GS, JS, BS
 
@@ -546,7 +546,7 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
     ```
 """
 function init_defectmat_mhe(
-    model::ODEmodel{NT}, ::TranscriptionMethod, ::Bool, 
+    model::SimModelODE{NT}, ::TranscriptionMethod, ::Bool, 
     He, Â, _ , _ , _ , _ , As, _ , _
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
@@ -569,7 +569,7 @@ end
 
 @doc raw"""
     init_defectmat_mhe(
-        model::ODEmodel, transcription::OrthogonalCollocation, direct::Bool
+        model::SimModelODE, transcription::OrthogonalCollocation, direct::Bool
         He, Â, _ , _ , _ , _ , As, Co, λo
     ) -> ES, GS, JS, BS
 
@@ -612,7 +612,7 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
     ```
 """
 function init_defectmat_mhe(
-    model::ODEmodel{NT}, transcription::OrthogonalCollocation, ::Bool,
+    model::SimModelODE{NT}, transcription::OrthogonalCollocation, ::Bool,
     He, Â, _ , _ , _ , _ , As, Co, λo
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
@@ -637,9 +637,9 @@ function init_defectmat_mhe(
     return ES, GS, JS, BS
 end
 
-"Return empty matrices for [`SingleShooting`](@ref) transcription on any `ODEmodel` (N/A)."
+"Return empty matrices for [`SingleShooting`](@ref) transcription on any `SimModelODE` (N/A)."
 function init_defectmat_mhe(
-    model::ODEmodel{NT}, transcription::SingleShooting, ::Bool, 
+    model::SimModelODE{NT}, transcription::SingleShooting, ::Bool, 
     He, Â, _ , _ , _ , _ , _ , _ , _
 ) where {NT<:Real}
     nx̂ = size(Â, 2)
@@ -648,7 +648,7 @@ function init_defectmat_mhe(
 end
 
 function init_defectmat_mhe_empty(
-    model::ODEmodel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
+    model::SimModelODE{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
     nk = get_nk(model, transcription)
@@ -784,7 +784,7 @@ boxconstraint_states!(Z̃min, Z̃max, ::SingleShooting, _, _, _, _, _, _) = Z̃m
 
 "Unset `i_x̂min` and `i_x̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
 function deletex̂arr_lincon!(
-    i_x̂min, i_x̂max, ::ODEmodel, ::TranscriptionMethod, Z̃min, Z̃max, nε
+    i_x̂min, i_x̂max, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max, nε
 )
     nx̂ = length(i_x̂min)
     x̂0min, x̂0max = @views Z̃min[(nε+1):(nε+nx̂)], @views Z̃max[(nε+1):(nε+nx̂)]
@@ -795,7 +795,7 @@ end
 
 "Unset `i_X̂min` and `i_X̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
 function deleteX̂_lincon!(
-    i_X̂min, i_X̂max, ::ODEmodel, ::TranscriptionMethod, Z̃min, Z̃max, nε, nx̂
+    i_X̂min, i_X̂max, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max, nε, nx̂
 )
     nx̃ = nε + nx̂
     nX̂ = length(i_X̂min)
@@ -804,10 +804,10 @@ function deleteX̂_lincon!(
     foreach(i -> !isinf(X̂0max[i]) && (i_X̂max[i] = false), eachindex(i_X̂max))
     return i_X̂min, i_X̂max
 end
-deleteX̂_lincon!(i_X̂min, i_X̂max, ::ODEmodel, ::SingleShooting, _, _, _, _) = i_X̂min, i_X̂max
+deleteX̂_lincon!(i_X̂min, i_X̂max, ::SimModelODE, ::SingleShooting, _, _, _, _) = i_X̂min, i_X̂max
     
 "Unset `i_Ŵmin` and `i_Ŵmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::ODEmodel, ::TranscriptionMethod, Z̃min, Z̃max)
+function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max)
     nŴ = length(i_Ŵmin)
     Ŵmin, Ŵmax = @views Z̃min[end-nŴ+1:end], Z̃max[end-nŴ+1:end]
     foreach(i -> !isinf(Ŵmin[i]) && (i_Ŵmin[i] = false), eachindex(i_Ŵmin))
@@ -980,7 +980,7 @@ end
 
 """
     linconstrainteq!(
-        estim::MovingHorizonEstimator, ::ODEmodel, transcription::TranscriptionMethod
+        estim::MovingHorizonEstimator, ::SimModelODE, transcription::TranscriptionMethod
     )
 
 By default, only update `Aeq` when `Nk < He` for other [`TranscriptionMethod`](@ref).
@@ -990,7 +990,7 @@ vector is only zeros for this specific case. See [`init_defectmat_mhe`](@ref) fo
 equations.
 """
 function linconstrainteq!(
-    estim::MovingHorizonEstimator, ::ODEmodel, transcription::TranscriptionMethod
+    estim::MovingHorizonEstimator, ::SimModelODE, transcription::TranscriptionMethod
 )
     optim, con, Nk = estim.optim, estim.con, estim.Nk[]
     nŝ = size(con.Aeq, 1) ÷ estim.He # number of state defects per time step
@@ -1024,7 +1024,7 @@ function linconstrainteq!(
     return nothing
 end
 "No linear equality constraints for all cases of [`SingleShooting`](@ref)."
-linconstrainteq!(::MovingHorizonEstimator, ::ODEmodel, ::SingleShooting) = nothing
+linconstrainteq!(::MovingHorizonEstimator, ::SimModelODE, ::SingleShooting) = nothing
 
 @doc raw"""
     set_warmstart_mhe!(
@@ -1744,4 +1744,4 @@ function con_nonlinprogeq_mhe!(
 end
 
 "No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
-con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::ODEmodel, ::TranscriptionMethod, _,_,_) = geq
+con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::SimModelODE, ::TranscriptionMethod, _,_,_) = geq

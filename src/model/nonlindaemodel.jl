@@ -4,7 +4,7 @@ const DEFAULT_NONLINDAE_HESSIAN = AutoSparse(
     coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
 )
 
-struct NonLinDAEmodel{
+struct NonLinModelDAE{
     NT<:Real, 
     TM<:CollocationMethod,
     JM<:JuMP.GenericModel,
@@ -14,7 +14,7 @@ struct NonLinDAEmodel{
     Q <:Function,
     H <:Function, 
     PT<:Any, 
-} <: DAEmodel{NT}
+} <: SimModelDAE{NT}
     x0::Vector{NT}
     transcription::TM
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
@@ -43,7 +43,7 @@ struct NonLinDAEmodel{
     dname::Vector{String}
     xname::Vector{String}
     buffer::SimModelBuffer{NT}
-    function NonLinDAEmodel{NT}(
+    function NonLinModelDAE{NT}(
         f!::F, q!::Q, h!::H, Ts, 
         nu, nx, nz, ny, nd, p::PT, 
         transcription::TM, optim::JM, 
@@ -87,7 +87,7 @@ struct NonLinDAEmodel{
     end
 end
 
-function NonLinDAEmodel{NT}(
+function NonLinModelDAE{NT}(
     f::Function, q::Function, h::Function, Ts::Real, 
     nu::Int, nx::Int, nz::Int, ny::Int, nd::Int=0;
     p=NT[], 
@@ -101,13 +101,13 @@ function NonLinDAEmodel{NT}(
     q! = q
     h! = h
     hessian = validate_hessian(hessian, DEFAULT_NONLINDAE_HESSIAN)
-    return NonLinDAEmodel{NT}(
+    return NonLinModelDAE{NT}(
         f!, q!, h!, Ts, nu, nx, nz, ny, nd, p, 
         transcription, optim, jacobian, hessian
     )
 end
 
-function NonLinDAEmodel(
+function NonLinModelDAE(
     f::Function, q::Function, h::Function, Ts::Real, 
     nu::Int, nx::Int, nz::Int, ny::Int, nd::Int=0;
     p=Float64[], 
@@ -116,7 +116,7 @@ function NonLinDAEmodel(
     jacobian = DEFAULT_JACSPARSE,
     hessian = false,
 )
-    return NonLinDAEmodel{Float64}(
+    return NonLinModelDAE{Float64}(
         f, q, h, Ts, nu, nx, nz, ny, nd; 
         p, transcription, optim, jacobian, hessian
     )

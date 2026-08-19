@@ -22,7 +22,7 @@ struct NonLinModel{
     PT<:Any, 
     JB<:AbstractADType,
     LF<:Function
-} <: ODEmodel{NT}
+} <: SimModelODE{NT}
     x0::Vector{NT}
     solver::DS
     f!::F

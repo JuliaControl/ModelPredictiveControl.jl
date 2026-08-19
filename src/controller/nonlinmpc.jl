@@ -148,9 +148,9 @@ struct NonLinMPC{
 end
 
 @doc raw"""
-    NonLinMPC(model::ODEmodel; <keyword arguments>)
+    NonLinMPC(model::SimModelODE; <keyword arguments>)
 
-Construct a nonlinear predictive controller based on [`ODEmodel`](@ref) `model`.
+Construct a nonlinear predictive controller based on [`SimModelODE`](@ref) `model`.
 
 Both [`NonLinModel`](@ref) and [`LinModel`](@ref) are supported (see Extended Help). The 
 controller minimizes the following objective function at each discrete time ``k``:
@@ -200,7 +200,7 @@ This controller allocates memory at each time step for the optimization.
     `MethodError: no method matching Float64(::ForwardDiff.Dual)`.
 
 # Arguments
-- `model::ODEmodel` : model used for controller predictions and state estimations.
+- `model::SimModelODE` : model used for controller predictions and state estimations.
 - `Hp::Int=10+nk` : prediction horizon ``H_p``, `nk` is the number of delays if `model` is a
    [`LinModel`](@ref) (must be specified otherwise).
 - `Hc::Union{Int, Vector{Int}}=2` : control horizon ``H_c``, custom move blocking pattern is 
@@ -339,7 +339,7 @@ NonLinMPC controller with a sample time Ts = 10.0 s:
     `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
 """
 function NonLinMPC(
-    model::ODEmodel;
+    model::SimModelODE;
     Hp::Int = default_Hp(model),
     Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, model.ny),
@@ -375,7 +375,7 @@ function NonLinMPC(
     )
 end
 
-default_estimator(model::ODEmodel; kwargs...) = UnscentedKalmanFilter(model; kwargs...)
+default_estimator(model::SimModelODE; kwargs...) = UnscentedKalmanFilter(model; kwargs...)
 default_estimator(model::LinModel; kwargs...) = SteadyKalmanFilter(model; kwargs...)
 
 """
@@ -734,11 +734,11 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
 end
 
 """
-    init_optimization!(mpc::NonLinMPC, model::ODEmodel, optim::JuMP.GenericModel) -> nothing
+    init_optimization!(mpc::NonLinMPC, model::SimModelODE, optim::JuMP.GenericModel) -> nothing
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC, model::ODEmodel, optim::JuMP.GenericModel)  
+function init_optimization!(mpc::NonLinMPC, model::SimModelODE, optim::JuMP.GenericModel)  
     # --- variables and linear constraints ---
     con = mpc.con
     nZ̃ = length(mpc.Z̃)

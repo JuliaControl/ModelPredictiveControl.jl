@@ -642,7 +642,7 @@ function default_optim_mhe(model::SimModel, nc)
 end
 
 "Default arrival covariance estimator for MHE, depending on the model type only."
-function default_covestim_mhe(model::ODEmodel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+function default_covestim_mhe(model::SimModelODE, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     if model isa LinModel
         return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     else

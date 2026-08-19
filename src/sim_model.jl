@@ -18,8 +18,8 @@ julia> y = model()
 """
 abstract type SimModel{NT<:Real} end
 
-abstract type ODEmodel{NT<:Real} <: SimModel{NT} end
-abstract type DAEmodel{NT<:Real} <: SimModel{NT} end
+abstract type SimModelODE{NT<:Real} <: SimModel{NT} end
+abstract type SimModelDAE{NT<:Real} <: SimModel{NT} end
 
 struct SimModelBuffer{NT<:Real}
     u::Vector{NT}

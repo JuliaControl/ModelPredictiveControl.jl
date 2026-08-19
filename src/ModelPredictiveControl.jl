@@ -41,7 +41,7 @@ import OSQP, Ipopt
 
 import FastGaussQuadrature
 
-export SimModel, LinModel, NonLinModel, NonLinDAEmodel
+export SimModel, LinModel, NonLinModel, NonLinModelDAE
 export DiffSolver, RungeKutta, ForwardEuler
 export setop!, setname!
 export setstate!, setmodel!, preparestate!, updatestate!, evaloutput, linearize, linearize!

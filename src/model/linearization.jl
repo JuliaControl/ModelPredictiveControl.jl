@@ -53,7 +53,7 @@ end
 
 
 @doc raw"""
-    linearize(model::ODEmodel; x=model.x0+model.xop, u=model.uop, d=model.dop) -> linmodel
+    linearize(model::SimModelODE; x=model.x0+model.xop, u=model.uop, d=model.dop) -> linmodel
 
 Linearize `model` at the operating points `x`, `u`, `d` and return the [`LinModel`](@ref).
 
@@ -120,7 +120,7 @@ julia> linmodel.A
     `h` functions must be compatible with this feature though. See [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
     for common mistakes when writing these functions.
 """
-function linearize(model::ODEmodel{NT}; kwargs...) where NT<:Real
+function linearize(model::SimModelODE{NT}; kwargs...) where NT<:Real
     nu, nx, ny, nd = model.nu, model.nx, model.ny, model.nd
     A  = Matrix{NT}(undef, nx, nx)
     Bu = Matrix{NT}(undef, nx, nu) 
@@ -136,7 +136,7 @@ function linearize(model::ODEmodel{NT}; kwargs...) where NT<:Real
 end
 
 """
-    linearize!(linmodel::LinModel, model::ODEmodel; <keyword arguments>) -> linmodel
+    linearize!(linmodel::LinModel, model::SimModelODE; <keyword arguments>) -> linmodel
 
 Linearize `model` and store the result in `linmodel` (in-place).
 
@@ -157,7 +157,7 @@ julia> linearize!(linmodel, model, x=[20.0], u=[0.0]); linmodel.A
 ```
 """
 function linearize!(
-    linmodel::LinModel, model::ODEmodel; 
+    linmodel::LinModel, model::SimModelODE; 
     x=(model.buffer.x.=model.x0.+model.xop), u=model.uop, d=model.dop
 )
     nonlinmodel = model
@@ -193,7 +193,7 @@ function linearize!(
 end
 
 "Call `linfunc!` function to compute the Jacobians of `model` at the linearization point."
-function linearize_core!(linmodel::LinModel, model::ODEmodel, x, u, d)
+function linearize_core!(linmodel::LinModel, model::SimModelODE, x, u, d)
     xnext, y = linmodel.buffer.x, linmodel.buffer.y
     A, Bu, C, Bd, Dd = linmodel.A, linmodel.Bu, linmodel.C, linmodel.Bd, linmodel.Dd
     cst_x = Constant(x)
