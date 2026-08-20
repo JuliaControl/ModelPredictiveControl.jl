@@ -18,7 +18,6 @@ jobs:
       testitem-timeout: 3600 # some Aqua tests are long (default 1200 is nor enough)
       include-rc-versions: true
       include-windows-x86: false
-      include-linux-x86: false
       include-macos-x64: false
     permissions: write-all
     secrets:
