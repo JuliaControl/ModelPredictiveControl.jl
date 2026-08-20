@@ -1625,6 +1625,7 @@ end
     linmodel2 = setop!(linmodel2, uop=[10,50], yop=[50,30], dop=[5])
     function gclv!(LHS, X̂e, _, _, _, _, _, _, _, nx̂, _ )
         nc_Nk = length(X̂e) ÷ nx̂
+        LHS .= 0 # for when Nk < He, fill unused values with 0s
         for i in 1:nc_Nk
             LHS[i] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
         end
@@ -1712,6 +1713,7 @@ end
     nonlinmodel2 = setop!(nonlinmodel2, uop=[10,50], yop=[50,30], dop=[5])
     function gcnlv!(LHS, X̂e, _, _, _, _, _, _, _, nx̂, _)
         nc_Nk = length(X̂e) ÷ nx̂
+        LHS .= 0 # for when Nk < He, fill unused values with 0s
         for i in 1:nc_Nk
             LHS[i] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
         end
