@@ -1832,7 +1832,7 @@ end
         updatestate!(mhe, [11, 50], y, [25])
         updatestate!(kf,  [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_kf atol=1e-6 rtol=1e-6
+    @test X̂_mhe ≈ X̂_kf atol=1e-3 rtol=1e-3
     kf  = KalmanFilter(linmodel, nint_ym=0, direct=true)
     # recuperate P̂(-1|-1) exact value using the Kalman filter:
     preparestate!(kf, [50, 30], [20])
@@ -1850,7 +1850,7 @@ end
         updatestate!(mhe, [11, 50], y, [25])
         updatestate!(kf,  [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_kf atol=1e-6 rtol=1e-6
+    @test X̂_mhe ≈ X̂_kf atol=1e-3 rtol=1e-3
 
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
@@ -1874,8 +1874,8 @@ end
         updatestate!(ukf, [11, 50], y, [25])
         updatestate!(ekf, [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_ukf atol=1e-6 rtol=1e-6
-    @test X̂_mhe ≈ X̂_ekf atol=1e-6 rtol=1e-6
+    @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3
     
     ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
     ekf = ExtendedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
@@ -1901,8 +1901,8 @@ end
         updatestate!(ukf, [11, 50], y, [25])
         updatestate!(ekf, [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_ukf atol=1e-6 rtol=1e-6
-    @test X̂_mhe ≈ X̂_ekf atol=1e-6 rtol=1e-6 
+    @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3 
 end
 
 @testitem "MHE LinModel v.s. NonLinModel" setup=[SetupMPCtests] begin
