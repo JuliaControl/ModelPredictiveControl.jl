@@ -312,7 +312,7 @@ julia> function sim_realtime!(model)
            t_0 = time()
            for i=1:3
                t = savetime!(model)      # first function called
-               println(round(t - t_0, digits=3))
+               println(round(t - t_0, digits=2))
                updatestate!(model, [1])
                periodsleep(model, true)  # last function called
            end
