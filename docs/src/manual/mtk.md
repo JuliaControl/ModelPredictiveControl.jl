@@ -4,10 +4,6 @@
 Pages = ["mtk.md"]
 ```
 
-```@codeblocks
-line_counter = :continue
-```
-
 ```@setup 1
 using Logging; errlogger = ConsoleLogger(stderr, Error);
 old_logger = global_logger(); global_logger(errlogger);
@@ -27,6 +23,10 @@ the last section.
     will work for all corner cases.
 
 We first construct and instantiate the pendulum model:
+
+```@codeblocks
+line_counter = :continue
+```
 
 ```@example 1
 using ModelPredictiveControl, ModelingToolkit

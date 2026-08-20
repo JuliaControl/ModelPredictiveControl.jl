@@ -4,10 +4,6 @@
 Pages = ["linmpc.md"]
 ```
 
-```@codeblocks
-line_counter = :continue
-```
-
 ## Linear Model
 
 The example considers a continuously stirred-tank reactor (CSTR) with a cold and hot water
@@ -50,6 +46,10 @@ the following linear model accurately describes the plant dynamics:
 
 We first need to construct a [`LinModel`](@ref) objet with [`setop!`](@ref) to handle the
 operating points:
+
+```@codeblocks
+line_counter = :continue
+```
 
 ```@example 1
 using ModelPredictiveControl, ControlSystemsBase

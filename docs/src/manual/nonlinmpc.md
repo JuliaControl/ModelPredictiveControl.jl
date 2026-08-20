@@ -4,10 +4,6 @@
 Pages = ["nonlinmpc.md"]
 ```
 
-```@codeblocks
-line_counter = :continue
-```
-
 ## Nonlinear Model
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum
@@ -43,6 +39,10 @@ the end of the pendulum in kg, all bundled in the parameter vector ``\mathbf{p} 
 [\begin{smallmatrix} g & L & K & m \end{smallmatrix}]'``. The [`NonLinModel`](@ref)
 constructor assumes by default that the state function `f` is continuous in time, that is,
 an ordinary differential equation system (like here):
+
+```@codeblocks
+line_counter = :continue
+```
 
 ```@example man_nonlin
 using ModelPredictiveControl
