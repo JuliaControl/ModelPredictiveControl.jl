@@ -4,6 +4,10 @@
 Pages = ["nonlinmpc.md"]
 ```
 
+```@codeblocks
+line_counter = :continue
+```
+
 ## Nonlinear Model
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum

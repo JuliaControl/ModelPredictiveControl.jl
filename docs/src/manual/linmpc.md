@@ -4,6 +4,10 @@
 Pages = ["linmpc.md"]
 ```
 
+```@codeblocks
+line_counter = :continue
+```
+
 ## Linear Model
 
 The example considers a continuously stirred-tank reactor (CSTR) with a cold and hot water
