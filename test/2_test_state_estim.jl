@@ -1379,7 +1379,7 @@ end
     @test mhe11() ≈ [13] atol=5e-3
 end
 
-@testitem "MHE estimation with unfilled window" setup=[SetupMPCtests] begin
+@testitem "MHE estim. with unfilled window" setup=[SetupMPCtests] begin
     f(x,u,_,_) = 0.5x + u
     h(x,_,_) = x
     model = NonLinModel(f, h, 10.0, 1, 1, 1, solver=nothing)
@@ -1405,7 +1405,7 @@ end
     
 end
 
-@testitem "MHE fallbacks for arrival covariance estimation" setup=[SetupMPCtests] begin
+@testitem "MHE fallbacks for arrival covariance" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(sys,Ts,i_u=[1,2], i_d=[3]), uop=[10,50], yop=[50,30], dop=[5])
     f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
