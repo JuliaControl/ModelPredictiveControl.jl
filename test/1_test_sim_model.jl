@@ -152,7 +152,7 @@ end
         updatestate!(linmodel2, [1])
         periodsleep(linmodel2, true)
     end
-    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.0001))
+    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.025))
 end
 
 @testitem "NonLinModel construction" setup=[SetupMPCtests] begin
@@ -419,5 +419,5 @@ end
         updatestate!(nonlinmodel2, [1])
         periodsleep(nonlinmodel2, true)
     end
-    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.0001))
+    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.025))
 end

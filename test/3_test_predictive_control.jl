@@ -581,7 +581,7 @@ end
 
 @testitem "LinMPC real-time simulations" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
+    linmodel1 = LinModel(tf(2, [10, 1]), 0.25)
     mpc1 = LinMPC(linmodel1)
     times1 = zeros(5)
     for i=1:5
@@ -590,7 +590,7 @@ end
         updatestate!(mpc1, [1], [1])
         periodsleep(mpc1, true)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.025))
 end
 
 @testitem "ExplicitMPC construction" setup=[SetupMPCtests] begin
