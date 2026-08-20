@@ -1624,8 +1624,9 @@ end
     linmodel2 = LinModel(sys, Ts, i_u=[1,2], i_d=[3])
     linmodel2 = setop!(linmodel2, uop=[10,50], yop=[50,30], dop=[5])
     function gclv!(LHS, X̂e, _, _, _, _, _, _, _, nx̂, _ )
-        for i in 1:div(length(X̂e), nx̂)
-            LHS[(i-1)+1] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
+        nc_Nk = length(X̂e) ÷ nx̂
+        for i in 1:nc_Nk
+            LHS[i] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
         end
         return nothing
     end
@@ -1710,8 +1711,9 @@ end
     nonlinmodel2 = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel2)
     nonlinmodel2 = setop!(nonlinmodel2, uop=[10,50], yop=[50,30], dop=[5])
     function gcnlv!(LHS, X̂e, _, _, _, _, _, _, _, nx̂, _)
-        for i in 1:div(length(X̂e), nx̂)
-            LHS[(i-1)+1] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
+        nc_Nk = length(X̂e) ÷ nx̂
+        for i in 1:nc_Nk
+            LHS[i] = 0.5 - X̂e[(i-1)*nx̂ + 1]  # First state >= 0.5
         end
         return nothing
     end
