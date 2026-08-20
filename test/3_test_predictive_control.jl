@@ -89,7 +89,7 @@
     @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, model.ny), Wu=ones(3, model.nu))
 end
 
-@testitem "LinMPC moves and getinfo" setup=[SetupMPCtests] begin
+@testitem "LinMPC moves & getinfo" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3), yop=[10])
@@ -637,7 +637,7 @@ end
 
 end
 
-@testitem "ExplicitMPC moves and getinfo" setup=[SetupMPCtests] begin
+@testitem "ExplicitMPC moves & getinfo" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(tf(5, [2, 1]), 3)
     mpc1 = ExplicitMPC(model, Nwt=[0], Hp=1000, Hc=1)
@@ -905,7 +905,7 @@ end
     @test_throws ArgumentError OrthogonalCollocation(2)
 end
 
-@testitem "NonLinMPC moves and getinfo (LinModel, SS)" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves & getinfo (LinModel, SS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
@@ -961,7 +961,7 @@ end
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
-@testitem "NonLinMPC moves and getinfo (LinModel, MS)" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves & getinfo (LinModel, MS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
@@ -976,7 +976,7 @@ end
     @test info[:Ŷ][end] ≈ 20 atol=5e-2
 end
 
-@testitem "NonLinMPC moves and getinfo (NonLinModel, SS)" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves & getinfo (NonLinModel, SS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
@@ -1035,7 +1035,7 @@ end
     @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
 end
 
-@testitem "NonLinMPC moves and getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves & getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
@@ -1064,7 +1064,7 @@ end
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
 end
 
-@testitem "NonLinMPC moves and getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves & getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
@@ -1090,7 +1090,7 @@ end
     @test u ≈ [1.0] atol=5e-2
 end
 
-@testitem "NonLinMPC moves and getinfo (NonLinModel, OC)" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves & getinfo (NonLinModel, OC)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff

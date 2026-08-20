@@ -1031,7 +1031,7 @@ end
     )
 end
 
-@testitem "MHE estimation and getinfo (LinModel)" setup=[SetupMPCtests] begin
+@testitem "MHE estim. & getinfo (LinModel, SS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     using JuMP, DAQP
     linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
@@ -1123,6 +1123,14 @@ end
         updatestate!(mhe5, [10, 50], [50, NaN], [5])
     )
     
+end
+
+@testitem "MHE estim. & getinfo (LinModel, MS)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using JuMP, DAQP
+    linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
+    linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
+
     mhe5 = MovingHorizonEstimator(linmodel, He=2, direct=true, transcription=MultipleShooting())
     for i in 1:40
         preparestate!(mhe5, [51, 32], [5])
@@ -1141,7 +1149,7 @@ end
 
 end
 
-@testitem "MHE estimation and getinfo (NonLinModel, SS)" setup=[SetupMPCtests] begin
+@testitem "MHE estim. & getinfo (NonLinModel, SS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
     import ForwardDiff
@@ -1271,7 +1279,7 @@ end
 
 end
 
-@testitem "MHE estimation and getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
+@testitem "MHE estim. & getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
     import ForwardDiff
@@ -1301,7 +1309,7 @@ end
     @test info[:V̂] ≈ [0.0, 0.0]
 end
 
-@testitem "MHE estimation and getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin
+@testitem "MHE estim. & getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
     import ForwardDiff
@@ -1339,7 +1347,7 @@ end
     @test info[:V̂] ≈ [0.0]
 end
 
-@testitem "MHE estimation and getinfo (NonLinModel, OC)" setup=[SetupMPCtests] begin
+@testitem "MHE estim. & getinfo (NonLinModel, OC)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
     import ForwardDiff
