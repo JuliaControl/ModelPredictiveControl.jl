@@ -1141,7 +1141,7 @@ end
 
 end
 
-@testitem "MHE estimation and getinfo (NonLinModel)" setup=[SetupMPCtests] begin
+@testitem "MHE estimation and getinfo (NonLinModel, SS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
     import ForwardDiff
@@ -1229,6 +1229,65 @@ end
     preparestate!(mhe2, [50, 30], [5])
     @test mhe2([5]) ≈ [50, 30] atol=5e-3
 
+    Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
+    R̂ = diagm([1, 1].^2)
+    optim = Model(Ipopt.Optimizer)
+    covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, 0, Q̂, Q̂, R̂)
+    mhe5 = MovingHorizonEstimator(nonlinmodel, 1, 1:2, 0, 0, Q̂, Q̂, R̂; optim, covestim)
+    preparestate!(mhe5, [50, 30], [5])
+    x̂ = updatestate!(mhe5, [10, 50], [50, 30], [5])
+    @test x̂ ≈ zeros(4) atol=1e-9
+    @test mhe5.x̂0 ≈ zeros(4) atol=1e-9
+    preparestate!(mhe5, [50, 30], [5])
+    @test evaloutput(mhe5, [5]) ≈ mhe5([5]) ≈ [50, 30]
+    info = getinfo(mhe5)
+    @test info[:x̂] ≈ x̂ atol=1e-9
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9  
+
+    # coverage of the branch with error termination status (with an infeasible problem):
+    mhe_infeas = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
+    mhe_infeas = setconstraint!(mhe_infeas, v̂min=[1, 1], v̂max=[-1, -1]) 
+    @test_logs(
+        (:error, "MHE terminated without solution: estimation in open-loop "*
+                 "(more info in debug log)"), 
+        preparestate!(mhe_infeas, [0, 0], [0])
+    )
+
+    # for coverage of NLP functions, the univariate syntax of JuMP.@operator
+    mhe7 = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
+    setconstraint!(mhe7, v̂min=[-51,-52], v̂max=[53,54])
+    x̂ = preparestate!(mhe7, [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-9
+    @test_nowarn ModelPredictiveControl.info2debugstr(info)
+    @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
+
+    hessian = AutoSparse(
+        AutoForwardDiff();
+        sparsity_detector=TracerSparsityDetector(),
+        coloring_algorithm=GreedyColoringAlgorithm(),
+    )
+
+    mhe8 = MovingHorizonEstimator(nonlinmodel; He=2, hessian)
+    @test_logs(
+        (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
+        preparestate!(mhe8, [50, NaN], [5])
+    )
+    @test mhe8.x̂0 ≈ zeros(6) atol=1e-9
+
+end
+
+@testitem "MHE estimation and getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
+    import ForwardDiff
+
+    linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
+    linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
+    f(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h(x,d,model)   = model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
+    nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
+
     mhe3 = MovingHorizonEstimator(
         nonlinmodel, He=3, direct=false, transcription=MultipleShooting(f_threads=true)
     )
@@ -1244,22 +1303,13 @@ end
     updatestate!(mhe3, [10, 50], [50, 30], [5])
     info = getinfo(mhe3) # test getinfo when Nk<He 
     @test info[:Ŵ] ≈ [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    @test info[:V̂] ≈ [0.0, 0.0]    
+    @test info[:V̂] ≈ [0.0, 0.0]
+end
 
-    Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
-    R̂ = diagm([1, 1].^2)
-    optim = Model(Ipopt.Optimizer)
-    covestim = ExtendedKalmanFilter(nonlinmodel, 1:2, 0, 0, Q̂, Q̂, R̂)
-    mhe5 = MovingHorizonEstimator(nonlinmodel, 1, 1:2, 0, 0, Q̂, Q̂, R̂; optim, covestim)
-    preparestate!(mhe5, [50, 30], [5])
-    x̂ = updatestate!(mhe5, [10, 50], [50, 30], [5])
-    @test x̂ ≈ zeros(4) atol=1e-9
-    @test mhe5.x̂0 ≈ zeros(4) atol=1e-9
-    preparestate!(mhe5, [50, 30], [5])
-    @test evaloutput(mhe5, [5]) ≈ mhe5([5]) ≈ [50, 30]
-    info = getinfo(mhe5)
-    @test info[:x̂] ≈ x̂ atol=1e-9
-    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9
+@testitem "MHE estimation and getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
+    import ForwardDiff
 
     f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
     h! = (y,x,_,_)   -> y .= x 
@@ -1292,6 +1342,16 @@ end
     info = getinfo(mhe7) # test getinfo when Nk<He 
     @test info[:Ŵ] ≈ [0.0, 0.0]
     @test info[:V̂] ≈ [0.0]
+end
+
+@testitem "MHE estimation and getinfo (NonLinModel, OC)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
+    import ForwardDiff
+
+    f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
+    h! = (y,x,_,_)   -> y .= x 
+    nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
 
     transcription = OrthogonalCollocation(f_threads=true, h_threads=true)
     mhe10 = MovingHorizonEstimator(
@@ -1313,38 +1373,7 @@ end
         updatestate!(mhe11, [-6], [13])
     end
     preparestate!(mhe11, [13])
-    @test mhe11() ≈ [13] atol=5e-3  
-
-    # coverage of the branch with error termination status (with an infeasible problem):
-    mhe_infeas = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
-    mhe_infeas = setconstraint!(mhe_infeas, v̂min=[1, 1], v̂max=[-1, -1]) 
-    @test_logs(
-        (:error, "MHE terminated without solution: estimation in open-loop "*
-                 "(more info in debug log)"), 
-        preparestate!(mhe_infeas, [0, 0], [0])
-    )
-
-    # for coverage of NLP functions, the univariate syntax of JuMP.@operator
-    mhe7 = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
-    setconstraint!(mhe7, v̂min=[-51,-52], v̂max=[53,54])
-    x̂ = preparestate!(mhe7, [50, 30], [5])
-    @test x̂ ≈ zeros(6) atol=1e-9
-    @test_nowarn ModelPredictiveControl.info2debugstr(info)
-    @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
-
-    hessian = AutoSparse(
-        AutoForwardDiff();
-        sparsity_detector=TracerSparsityDetector(),
-        coloring_algorithm=GreedyColoringAlgorithm(),
-    )
-
-    mhe8 = MovingHorizonEstimator(nonlinmodel; He=2, hessian)
-    @test_logs(
-        (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
-        preparestate!(mhe8, [50, NaN], [5])
-    )
-    @test mhe8.x̂0 ≈ zeros(6) atol=1e-9
-
+    @test mhe11() ≈ [13] atol=5e-3
 end
 
 @testitem "MHE estimation with unfilled window" setup=[SetupMPCtests] begin
