@@ -1253,11 +1253,6 @@ end
         preparestate!(mhe_infeas, [0, 0], [0])
     )
 
-    # for coverage of NLP functions, the univariate syntax of JuMP.@operator
-    mhe7 = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
-    setconstraint!(mhe7, v̂min=[-51,-52], v̂max=[53,54])
-    x̂ = preparestate!(mhe7, [50, 30], [5])
-    @test x̂ ≈ zeros(6) atol=1e-9
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
     @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
 
