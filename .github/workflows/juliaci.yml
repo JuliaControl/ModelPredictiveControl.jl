@@ -17,6 +17,7 @@ jobs:
     with:
       include-rc-versions: true
       include-windows-x86: false
+      include-linux-x86: false
       include-macos-x64: false
     permissions: write-all
     secrets:
