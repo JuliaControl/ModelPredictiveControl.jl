@@ -40,6 +40,10 @@ the end of the pendulum in kg, all bundled in the parameter vector ``\mathbf{p} 
 constructor assumes by default that the state function `f` is continuous in time, that is,
 an ordinary differential equation system (like here):
 
+```@codeblocks
+line_counter = :continue
+```
+
 ```@example man_nonlin
 using ModelPredictiveControl
 function f(x, u, _ , p)

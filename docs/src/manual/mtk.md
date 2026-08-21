@@ -24,6 +24,10 @@ the last section.
 
 We first construct and instantiate the pendulum model:
 
+```@codeblocks
+line_counter = :continue
+```
+
 ```@example 1
 using ModelPredictiveControl, ModelingToolkit
 using ModelingToolkit: D_nounits as D, t_nounits as t

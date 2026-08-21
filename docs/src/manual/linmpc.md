@@ -47,6 +47,10 @@ the following linear model accurately describes the plant dynamics:
 We first need to construct a [`LinModel`](@ref) objet with [`setop!`](@ref) to handle the
 operating points:
 
+```@codeblocks
+line_counter = :continue
+```
+
 ```@example 1
 using ModelPredictiveControl, ControlSystemsBase
 G = [ tf(1.90, [18, 1]) tf(1.90, [18, 1]);

@@ -2,6 +2,10 @@
 
 To install the `ModelPredictiveControl` package, run this command in the Julia REPL:
 
+```@codeblocks
+line_counter = :continue
+```
+
 ```julia
 using Pkg; Pkg.activate(); Pkg.add("ModelPredictiveControl")
 ```
