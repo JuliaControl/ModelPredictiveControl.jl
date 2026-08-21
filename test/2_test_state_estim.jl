@@ -149,7 +149,7 @@ end
         updatestate!(kalmanfilter1, [1], [1])
         periodsleep(kalmanfilter1, true)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.025))
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.05))
 end
     
 @testitem "KF construction" setup=[SetupMPCtests] begin

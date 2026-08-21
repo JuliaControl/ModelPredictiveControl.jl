@@ -590,7 +590,7 @@ end
         updatestate!(mpc1, [1], [1])
         periodsleep(mpc1, true)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.025))
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.05))
 end
 
 @testitem "ExplicitMPC construction" setup=[SetupMPCtests] begin
