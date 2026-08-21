@@ -15,7 +15,7 @@ jobs:
   julia-ci:
     uses: julia-testitems/testitem-workflow/.github/workflows/juliaci.yml@v2
     with:
-      testitem-timeout: null
+      testitem-timeout:
       include-rc-versions: true
       include-windows-x86: false
       include-linux-x86: false
