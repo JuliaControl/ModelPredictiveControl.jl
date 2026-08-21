@@ -3,8 +3,6 @@ on:
   pull_request_target:
     branches: [ main ]
     types: [labeled, opened, synchronize, reopened]
-permissions:
-  pull-requests: write    # needed to post comments
 jobs:
   bench:
     runs-on: ubuntu-latest
@@ -13,3 +11,4 @@ jobs:
       - uses: MilesCranmer/AirspeedVelocity.jl@action-v1
         with:
           julia-version: '1'
+          job-summary: 'true'
