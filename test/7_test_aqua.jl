@@ -37,10 +37,12 @@ end
     Aqua.test_piracies(ModelPredictiveControl)
 end
 
-@testitem "Aqua persistent tasks" begin
-    using Aqua
-    Aqua.test_persistent_tasks(ModelPredictiveControl)
-end
+### This package does not use a __init__ function, and will very likely never use one,
+### so the persistent task test is useless (and slow, because of the long precompilation)
+# @testitem "Aqua persistent tasks" begin
+#     using Aqua
+#     Aqua.test_persistent_tasks(ModelPredictiveControl)
+# end
 
 @testitem "Aqua undocumented names" begin
     using Aqua
