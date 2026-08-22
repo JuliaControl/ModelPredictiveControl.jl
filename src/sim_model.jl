@@ -289,7 +289,7 @@ function savetime!(model::SimModel)
     return model.t[]
 end
 
-"""
+@doc raw"""
     periodsleep(model::SimModel, busywait=false) -> nothing
 
 Sleep for `model.Ts` s minus the time elapsed since the last call to [`savetime!`](@ref).
@@ -305,7 +305,7 @@ simple soft real-time simulations, see the example below.
     restart it at a convenient time e.g.: just before calling `periodsleep`.
 
 # Examples
-```jldoctest
+```jldoctest; filter = r"(\d+\.\d)\d*" => s"\1"
 julia> model = LinModel(tf(2, [0.3, 1]), 0.25);
 
 julia> function sim_realtime!(model)
