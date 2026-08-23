@@ -3,6 +3,8 @@ on:
   pull_request_target:
     branches: [ main ]
     types: [labeled, opened, synchronize, reopened]
+permissions:
+  pull-requests: write    # needed to post comments
 jobs:
   bench:
     runs-on: ubuntu-latest
