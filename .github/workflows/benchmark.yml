@@ -13,4 +13,3 @@ jobs:
       - uses: MilesCranmer/AirspeedVelocity.jl@action-v1
         with:
           julia-version: '1'
-          job-summary: 'true'
