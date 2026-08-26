@@ -305,7 +305,7 @@ simple soft real-time simulations, see the example below.
     restart it at a convenient time e.g.: just before calling `periodsleep`.
 
 # Examples
-```jldoctest; filter = r"(\d+\.\d)\d*" => s"\1"
+```julia-repl
 julia> model = LinModel(tf(2, [0.3, 1]), 0.25);
 
 julia> function sim_realtime!(model)
