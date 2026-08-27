@@ -457,7 +457,12 @@ function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<
     JuMP.set_objective_function(optim, obj_quadprog(Z̃var, H̃, q̃))
     return nothing
 end
-"Does nothing if `model` is not a [`LinModel`](@ref)."
+
+"""
+    initpred!(estim::MovingHorizonEstimator, LinModel::SimModel) -> nothing
+
+Does nothing if `model` is not a [`LinModel`](@ref).
+"""
 initpred!(::MovingHorizonEstimator, ::SimModel) = nothing
 
 "Get the estimated state at arrival from the decision vector `Z̃`."

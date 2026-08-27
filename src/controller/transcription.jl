@@ -802,7 +802,7 @@ deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
 
-Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``).
+Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MPC.
 
 Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d_0}(k) + \mathbf{j_x̂ D̂_0} + \mathbf{k_x̂ x̂_0}(k) + 
 \mathbf{v_x̂ u_0}(k-1) + \mathbf{b_x̂}`` vector for the terminal constraints, see

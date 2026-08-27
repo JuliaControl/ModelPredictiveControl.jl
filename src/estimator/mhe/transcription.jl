@@ -816,9 +816,7 @@ function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModel, ::TranscriptionMethod
 end
 
 @doc raw"""
-    linconstraint!(
-        estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod
-    )
+    linconstraint!(estim::MovingHorizonEstimator, model::LinModel, ::TranscriptionMethod)
 
 Set `b` vector for the linear inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MHE.
 
