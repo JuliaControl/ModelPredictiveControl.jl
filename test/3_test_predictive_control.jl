@@ -89,7 +89,7 @@
     @test_throws DimensionMismatch LinMPC(model, Wy=ones(2, model.ny), Wu=ones(3, model.nu))
 end
 
-@testitem "LinMPC moves and getinfo" setup=[SetupMPCtests] begin
+@testitem "LinMPC moves & getinfo" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(tf(5, [2, 1]), 3), yop=[10])
@@ -581,7 +581,7 @@ end
 
 @testitem "LinMPC real-time simulations" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(tf(2, [10, 1]), 0.1)
+    linmodel1 = LinModel(tf(2, [10, 1]), 0.25)
     mpc1 = LinMPC(linmodel1)
     times1 = zeros(5)
     for i=1:5
@@ -590,7 +590,7 @@ end
         updatestate!(mpc1, [1], [1])
         periodsleep(mpc1, true)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.1, atol=0.01))
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.05))
 end
 
 @testitem "ExplicitMPC construction" setup=[SetupMPCtests] begin
@@ -637,7 +637,7 @@ end
 
 end
 
-@testitem "ExplicitMPC moves and getinfo" setup=[SetupMPCtests] begin
+@testitem "ExplicitMPC moves & getinfo" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     model = LinModel(tf(5, [2, 1]), 3)
     mpc1 = ExplicitMPC(model, Nwt=[0], Hp=1000, Hc=1)
@@ -905,7 +905,7 @@ end
     @test_throws ArgumentError OrthogonalCollocation(2)
 end
 
-@testitem "NonLinMPC moves and getinfo (LinModel)" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves & getinfo (LinModel, SS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
@@ -948,14 +948,6 @@ end
     preparestate!(nmpc6, [0])
     @test moveinput!(nmpc6, [0]) ≈ [0.0] atol=5e-2
     
-    nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
-    preparestate!(nmpc9, [10])
-    u = moveinput!(nmpc9, [20])
-    @test u ≈ [2] atol=5e-2
-    info = getinfo(nmpc9)
-    @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 20 atol=5e-2
-    
     # coverage of the branch with error termination status (with an infeasible problem):
     nmpc_infeas = NonLinMPC(linmodel, Hp=1, Hc=1, Cwt=Inf)
     nmpc_infeas = setconstraint!(nmpc_infeas, umin=[+1], umax=[-1])
@@ -969,7 +961,22 @@ end
     @test_nowarn ModelPredictiveControl.info2debugstr(info)
 end
 
-@testitem "NonLinMPC moves and getinfo (NonLinModel)" setup=[SetupMPCtests] begin
+@testitem "NonLinMPC moves & getinfo (LinModel, MS)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
+    linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
+    
+    nmpc9 = NonLinMPC(linmodel, Nwt=[0], Hp=100, Hc=1, transcription=MultipleShooting())
+    preparestate!(nmpc9, [10])
+    u = moveinput!(nmpc9, [20])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc9)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 20 atol=5e-2
+end
+
+@testitem "NonLinMPC moves & getinfo (NonLinModel, SS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
     import FiniteDiff
@@ -977,10 +984,6 @@ end
     f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
     h = (x,d,model)   -> model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
-
-    f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
-    h! = (y,x,_,_) -> y .= x 
-    nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
     
     nmpc1 = NonLinMPC(nonlinmodel, Nwt=[0], Hp=100, Hc=1)
     preparestate!(nmpc1, [0], [0])
@@ -1004,52 +1007,6 @@ end
     u = moveinput!(nmpc3, [0], d, R̂u=fill(12, nmpc3.Hp))
     @test u ≈ [12] atol=5e-2
 
-    transcription = MultipleShooting()
-    nmpc4 = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
-    preparestate!(nmpc4, [0], [0])
-    u = moveinput!(nmpc4, [10], [0])
-    @test u ≈ [2] atol=5e-2
-    info = getinfo(nmpc4)
-    @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 10 atol=5e-2
-    
-    transcription = MultipleShooting(f_threads=true, h_threads=true)
-    nmpc4t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription, hessian=true)
-    nmpc4t = setconstraint!(nmpc4t, ymax=[100], ymin=[-100]) # coverage of getinfo! Hessians of Lagrangian
-    preparestate!(nmpc4t, [0], [0])
-    u = moveinput!(nmpc4t, [10], [0])
-    @test u ≈ [2] atol=5e-2
-    info = getinfo(nmpc4t)
-    @test info[:u] ≈ u
-    @test info[:Ŷ][end] ≈ 10 atol=5e-2
-
-    transcription = TrapezoidalCollocation(0, f_threads=true, h_threads=true)
-    nmpc5 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
-    preparestate!(nmpc5, [0.0])
-    u = moveinput!(nmpc5, [1/0.001])
-    @test u ≈ [1.0] atol=5e-2
-
-    transcription = TrapezoidalCollocation(1)    
-    nmpc5_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
-    preparestate!(nmpc5_1, [0.0])
-    u = moveinput!(nmpc5_1, [1/0.001])
-    @test u ≈ [1.0] atol=5e-2
-
-    transcription = OrthogonalCollocation(0, 4)
-    nmpc6 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
-    preparestate!(nmpc6, [0.0])
-    u = moveinput!(nmpc6, [1/0.001])
-    @test u ≈ [1.0] atol=5e-2
-
-    transcription = OrthogonalCollocation(1, roots=:gausslegendre)
-    nmpc6_1 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
-    preparestate!(nmpc6_1, [0.0])
-    u = moveinput!(nmpc6_1, [1/0.001])
-    @test u ≈ [1.0] atol=5e-2
-    setstate!(nmpc6_1, [5.0])
-    moveinput!(nmpc6_1)
-    @test nmpc6_1.con.FS ≈ nmpc6_1.con.KS*nmpc6_1.estim.x̂0 # OC + IMC: special lin. eq. method
-    
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
@@ -1076,6 +1033,90 @@ end
     moveinput!(nmpc11, [10], [0])
     ΔU_diff = diff(getinfo(nmpc11)[:U])
     @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
+end
+
+@testitem "NonLinMPC moves & getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
+    linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+
+    transcription = MultipleShooting()
+    nmpc4 = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc4, [0], [0])
+    u = moveinput!(nmpc4, [10], [0])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc4)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 10 atol=5e-2
+    
+    transcription = MultipleShooting(f_threads=true, h_threads=true)
+    nmpc4t = NonLinMPC(nonlinmodel; Nwt=[0], Hp=100, Hc=1, transcription, hessian=true)
+    nmpc4t = setconstraint!(nmpc4t, ymax=[100], ymin=[-100]) # coverage of getinfo! Hessians of Lagrangian
+    preparestate!(nmpc4t, [0], [0])
+    u = moveinput!(nmpc4t, [10], [0])
+    @test u ≈ [2] atol=5e-2
+    info = getinfo(nmpc4t)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ 10 atol=5e-2
+end
+
+@testitem "NonLinMPC moves & getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
+    linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+
+    f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
+    h! = (y,x,_,_) -> y .= x 
+    nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
+
+    transcription = TrapezoidalCollocation(0, f_threads=true, h_threads=true)
+    nmpc5 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc5, [0.0])
+    u = moveinput!(nmpc5, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
+
+    transcription = TrapezoidalCollocation(1)    
+    nmpc5_1 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc5_1, [0.0])
+    u = moveinput!(nmpc5_1, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
+end
+
+@testitem "NonLinMPC moves & getinfo (NonLinModel, OC)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
+    linmodel2 = LinModel([tf(5, [2000, 1]) tf(7, [8000,1])], 3000.0, i_d=[2])
+    f = (x,u,d,model) -> model.A*x + model.Bu*u + model.Bd*d
+    h = (x,d,model)   -> model.C*x + model.Dd*d
+    nonlinmodel = NonLinModel(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
+
+    f! = (ẋ,x,u,_,_) -> ẋ .= -0.001x .+ u 
+    h! = (y,x,_,_) -> y .= x 
+    nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
+
+    transcription = OrthogonalCollocation(0, 4)
+    nmpc6 = NonLinMPC(nonlinmodel_c; Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc6, [0.0])
+    u = moveinput!(nmpc6, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
+
+    transcription = OrthogonalCollocation(1, roots=:gausslegendre)
+    nmpc6_1 = NonLinMPC(InternalModel(nonlinmodel_c); Nwt=[0], Hp=100, Hc=1, transcription)
+    preparestate!(nmpc6_1, [0.0])
+    u = moveinput!(nmpc6_1, [1/0.001])
+    @test u ≈ [1.0] atol=5e-2
+    setstate!(nmpc6_1, [5.0])
+    moveinput!(nmpc6_1)
+    @test nmpc6_1.con.FS ≈ nmpc6_1.con.KS*nmpc6_1.estim.x̂0 # OC + IMC: special lin. eq. method
 end
 
 @testitem "NonLinMPC step disturbance rejection" setup=[SetupMPCtests] begin

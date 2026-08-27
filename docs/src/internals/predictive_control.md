@@ -30,14 +30,6 @@ ModelPredictiveControl.get_nonlinobj_op(::NonLinMPC, ::ModelPredictiveControl.Ge
 ModelPredictiveControl.get_nonlincon_oracle(::NonLinMPC, ::ModelPredictiveControl.GenericModel)
 ```
 
-## Update Quadratic Optimization
-
-```@docs
-ModelPredictiveControl.initpred!(::PredictiveController, ::LinModel, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
-ModelPredictiveControl.linconstraint!(::PredictiveController, ::LinModel, ::TranscriptionMethod)
-ModelPredictiveControl.linconstrainteq!
-```
-
 ## Solve Optimization Problem
 
 ```@docs

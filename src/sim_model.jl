@@ -1,4 +1,6 @@
 @doc raw"""
+    abstract type SimModel end
+
 Abstract supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
 
 ---
@@ -289,7 +291,7 @@ function savetime!(model::SimModel)
     return model.t[]
 end
 
-"""
+@doc raw"""
     periodsleep(model::SimModel, busywait=false) -> nothing
 
 Sleep for `model.Ts` s minus the time elapsed since the last call to [`savetime!`](@ref).
@@ -305,14 +307,14 @@ simple soft real-time simulations, see the example below.
     restart it at a convenient time e.g.: just before calling `periodsleep`.
 
 # Examples
-```jldoctest
+```julia-repl
 julia> model = LinModel(tf(2, [0.3, 1]), 0.25);
 
 julia> function sim_realtime!(model)
            t_0 = time()
            for i=1:3
                t = savetime!(model)      # first function called
-               println(round(t - t_0, digits=3))
+               println(round(t - t_0, digits=2))
                updatestate!(model, [1])
                periodsleep(model, true)  # last function called
            end

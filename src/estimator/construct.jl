@@ -359,11 +359,8 @@ and unstable `model` (see Examples).
 ```jldoctest
 julia> model = LinModel(append(tf(3, [10, 1]), tf(2, [1, 0]), tf(4,[-5, 1])), 1.0);
 
-julia> nint_ym = default_nint(model)
-3-element Vector{Int64}:
- 1
- 0
- 1
+julia> default_nint(model) |> println
+[1, 0, 1]
 ```
 """
 function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0)

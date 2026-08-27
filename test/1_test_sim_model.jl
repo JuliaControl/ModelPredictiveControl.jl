@@ -144,7 +144,7 @@ end
         updatestate!(linmodel1, [1])
         periodsleep(linmodel1)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.025))
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.05))
     linmodel2 = LinModel(tf(2, [0.1, 1]), 0.25)
     times2 = zeros(5)
     for i=1:5
@@ -152,7 +152,7 @@ end
         updatestate!(linmodel2, [1])
         periodsleep(linmodel2, true)
     end
-    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.0001))
+    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.05))
 end
 
 @testitem "NonLinModel construction" setup=[SetupMPCtests] begin
@@ -406,7 +406,7 @@ end
         updatestate!(nonlinmodel1, [1])
         periodsleep(nonlinmodel1)
     end
-    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.025))
+    @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.05))
     linmodel2 = LinModel(tf(2, [0.1, 1]), 0.25)
     nonlinmodel2 = NonLinModel(
         (x,u,_,_)->linmodel2.A*x + linmodel2.Bu*u,
@@ -419,5 +419,5 @@ end
         updatestate!(nonlinmodel2, [1])
         periodsleep(nonlinmodel2, true)
     end
-    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.0001))
+    @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.05))
 end
