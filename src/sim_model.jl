@@ -1,4 +1,6 @@
 @doc raw"""
+    abstract type SimModel end
+
 Abstract supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
 
 ---
