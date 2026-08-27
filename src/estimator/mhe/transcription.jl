@@ -79,7 +79,7 @@ from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
 ```
 The matrices ``\mathbf{E, G, J, B, E_X̂, G_X̂, J_X̂, B_X̂}`` are defined in the Extended Help 
 section. The vectors ``\mathbf{F, F_X̂, f_x̄}`` are recalculated at each discrete time step, 
-see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstraint!(::MovingHorizonEstimator, ::LinModel)`](@ref).
+see [`initpred!`](@ref) and [`linconstraint!`](@ref).
 
 # Extended Help
 !!! details "Extended Help"

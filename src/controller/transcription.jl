@@ -800,7 +800,7 @@ end
 deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
 
 @doc raw"""
-    linconstraint!(mpc::PredictiveController, model::LinModel)
+    linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``).
 
