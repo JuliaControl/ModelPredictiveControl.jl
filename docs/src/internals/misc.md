@@ -10,7 +10,7 @@ Pages = ["misc.md"]
 ModelPredictiveControl.init_orthocolloc
 ```
 
-## Update Optimization Linear Terms
+## Update Linear and Quadratic Terms
 
 ```@docs
 ModelPredictiveControl.initpred!
