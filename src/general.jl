@@ -49,6 +49,8 @@ const ERROR_STATUSES = (
 )
 
 """
+    abstract type TranscriptionMethod end
+
 Abstract supertype of all transcription methods for the optimization problems.
 
 The `ShootingMethod` subtype includes the following concrete types:
