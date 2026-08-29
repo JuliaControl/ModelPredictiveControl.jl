@@ -302,6 +302,26 @@ function validate_h_dae(NT, h)
     return ismutating
 end
 
+"""
+    init_optimization!(model::NonLinModelDAE, optim::JuMP.GenericModel) -> nothing
+
+Init the nonlinear optimization for [`NonLinModelDAE`](@ref) model.
+"""
+function init_optimization!(model::NonLinModelDAE, optim::JuMP.GenericModel)  
+    # --- variables and linear constraints ---
+    nZ̃ = length(model.Z̃)
+    JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
+    JuMP.set_silent(optim)
+    @variable(optim, Z̃var[i=1:nZ̃])
+    Aeq = model.Aeq
+    beq = model.beq
+    @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
+    # --- nonlinear optimization init ---
+    geq_oracle = get_nonlincon_oracle(model, optim)
+    # set_nonlincon!(model, geq_oracle)
+    return nothing
+end
+
 
 function Base.show(io::IO, model::NonLinModelDAE)
     nu, nd = model.nu, model.nd
