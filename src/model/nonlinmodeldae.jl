@@ -10,8 +10,7 @@ struct NonLinModelDAE{
     JM<:JuMP.GenericModel,
     JB<:AbstractADType,
     HB<:Union{AbstractADType, Nothing}, 
-    F <:Function, 
-    Q <:Function,
+    F_Q <:Function,
     H <:Function, 
     PT<:Any, 
 } <: SimModelDAE{NT}
@@ -23,8 +22,7 @@ struct NonLinModelDAE{
     optim::JM
     jacobian::JB
     hessian::HB
-    f!::F
-    q!::Q
+    f_q!::F_Q
     h!::H
     p::PT
     Ts::NT
@@ -45,7 +43,7 @@ struct NonLinModelDAE{
     xname::Vector{String}
     buffer::SimModelBuffer{NT}
     function NonLinModelDAE{NT}(
-        f!::F, q!::Q, h!::H, Ts, 
+        f_q!::F_Q, h!::H, Ts, 
         nu, nx, nz, ny, nd, p::PT, 
         transcription::TM, optim::JM, 
         jacobian::JB, hessian::HB
@@ -55,8 +53,7 @@ struct NonLinModelDAE{
             JM<:JuMP.GenericModel,
             JB<:AbstractADType,
             HB<:Union{AbstractADType, Nothing},
-            F<:Function, 
-            Q<:Function,
+            F_Q<:Function,
             H<:Function, 
             PT<:Any
         }
@@ -74,11 +71,11 @@ struct NonLinModelDAE{
         z0 = zeros(NT, nz)
         t  = zeros(NT, 1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, TM, JM, JB, HB, F, Q, H, PT}(
+        return new{NT, TM, JM, JB, HB, F_Q, H, PT}(
             x0, z0,
             transcription,
             optim, jacobian, hessian,
-            f!, q!, h!,
+            f_q!, h!,
             p, 
             Ts, t,
             nu, nx, nz, ny, nd, 
@@ -90,7 +87,7 @@ struct NonLinModelDAE{
 end
 
 function NonLinModelDAE{NT}(
-    f::Function, q::Function, h::Function, Ts::Real, 
+    f_q::Function, h::Function, Ts::Real, 
     nu::Int, nx::Int, nz::Int, ny::Int, nd::Int=0;
     p=NT[], 
     transcription = OrthogonalCollocation(), 
@@ -98,16 +95,16 @@ function NonLinModelDAE{NT}(
     jacobian = DEFAULT_JACSPARSE,
     hessian = false,
 ) where {NT<:Real}
-    f!, q!, h! = get_mutating_functions_dae(NT, f, q, h)
+    f_q!, h! = get_mutating_functions_dae(NT, f_q, h)
     hessian = validate_hessian(hessian, DEFAULT_NONLINDAE_HESSIAN)
     return NonLinModelDAE{NT}(
-        f!, q!, h!, Ts, nu, nx, nz, ny, nd, p, 
+        f_q!, h!, Ts, nu, nx, nz, ny, nd, p, 
         transcription, optim, jacobian, hessian
     )
 end
 
 function NonLinModelDAE(
-    f::Function, q::Function, h::Function, Ts::Real, 
+    f_q::Function, h::Function, Ts::Real, 
     nu::Int, nx::Int, nz::Int, ny::Int, nd::Int=0;
     p=Float64[], 
     transcription = OrthogonalCollocation(), 
@@ -116,28 +113,21 @@ function NonLinModelDAE(
     hessian = false,
 )
     return NonLinModelDAE{Float64}(
-        f, q, h, Ts, nu, nx, nz, ny, nd; 
+        f_q, h, Ts, nu, nx, nz, ny, nd; 
         p, transcription, optim, jacobian, hessian
     )
 end
 
-"Get the mutating versions of the functions `f`, `q`, and `h` for a DAE model."
-function get_mutating_functions_dae(NT, f, q, h)
-    ismutating_f = validate_f_q_dae(NT, f, "f")
-    f! = if ismutating_f
-        f
+"Get the mutating versions of the functions `f_q` and `h` for a DAE model."
+function get_mutating_functions_dae(NT, f_q, h)
+    ismutating_f_q = validate_f_q_dae(NT, f_q)
+    f_q! = if ismutating_f_q
+        f_q
     else
-        function f!(ẋ, x, z, u, d, p)
-            ẋ .= f(x, z, u, d, p)
-            return nothing
-        end
-    end
-    ismutating_q = validate_f_q_dae(NT, q, "q")
-    q! = if ismutating_q
-        q
-    else
-        function q!(RHS, x, z, u, d, p)
-            RHS .= q(x, z, u, d, p)
+        function f_q!(ẋ, RHS, x, z, u, d, p)
+            ẋ_ret, RHS_ret = f_q(x, z, u, d, p)
+            ẋ   .= ẋ_ret
+            RHS .= RHS_ret
             return nothing
         end
     end
@@ -150,30 +140,33 @@ function get_mutating_functions_dae(NT, f, q, h)
             return nothing
         end
     end
-    return f!, q!, h!
+    return f_q!, h!
 end
 
 """
-    validate_f_q(NT, f_q, name) -> ismutating
+    validate_f_q(NT, f_q) -> ismutating
 
-Validate `f` or `q` function argument signature for DAEs and return `true` if mutating.
+Validate `f_q` function argument signature for DAEs and return `true` if mutating.
 """
-function validate_f_q_dae(NT, f_q, name)
+function validate_f_q_dae(NT, f_q)
     ismutating = hasmethod(
         f_q, 
-        #       ẋ or RHS  , x         , z         , u         , d         , p    
-        Tuple{  Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any}
+        #       ẋ         , RHS       , x         , z         , u         , d         , p    
+        Tuple{  Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any}
     )
     isnonmutating = hasmethod(
         f_q, 
         #     x,        , z         ,  u         , d         , p    
         Tuple{Vector{NT}, Vector{NT},  Vector{NT}, Vector{NT}, Any}
     )
+    if isnonmutating
+
+    end
     if !(ismutating || isnonmutating)
         error(
-            "the $(name) function has no method with type signature "*
-            "$(name)(x::Vector{$(NT)}, z::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any) or mutating form "*
-            "$(name)!(RHS::Vector{$(NT)}, x::Vector{$(NT)}, z::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any)"
+            "the state function has no method with type signature "*
+            "f_q(x::Vector{$(NT)}, z::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any) or mutating form "*
+            "f_q!(ẋ::Vector{$(NT)}, RHS::Vector{$(NT)}, x::Vector{$(NT)}, z::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any)"
         )
     end
     return ismutating
