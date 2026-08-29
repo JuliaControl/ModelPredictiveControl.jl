@@ -1,5 +1,17 @@
 const COLLOCATION_NODE_TYPE = Float64
 
+"""
+    abstract type TranscriptionMethod end
+
+Abstract supertype of all transcription methods for the optimization problems.
+
+The module currently supports [`SingleShooting`](@ref), [`MultipleShooting`](@ref),
+[`TrapezoidalCollocation`](@ref) and [`OrthogonalCollocation`](@ref) transcription methods.
+"""
+abstract type TranscriptionMethod end
+abstract type ShootingMethod    <: TranscriptionMethod end
+abstract type CollocationMethod <: TranscriptionMethod end
+
 @doc raw"""
     SingleShooting()
 

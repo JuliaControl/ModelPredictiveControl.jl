@@ -1,4 +1,6 @@
 @doc raw"""
+    abstract type PredictiveController end
+
 Abstract supertype of all predictive controllers.
 
 ---

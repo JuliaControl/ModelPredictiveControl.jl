@@ -116,7 +116,7 @@ end
 
 
 """
-    correct_estimate!(estim::Luenberger, y0m, d0, _ )
+    correct_estimate!(estim::Luenberger, y0m, d0)
 
 Identical to [`correct_estimate!(::SteadyKalmanFilter)`](@ref) but using [`Luenberger`](@ref).
 """

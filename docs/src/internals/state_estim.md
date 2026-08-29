@@ -101,13 +101,6 @@ ModelPredictiveControl.correct_estimate!
 ModelPredictiveControl.update_estimate!
 ```
 
-## Update Quadratic Optimization
-
-```@docs
-ModelPredictiveControl.initpred!(::MovingHorizonEstimator, ::LinModel)
-ModelPredictiveControl.linconstraint!(::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod)
-```
-
 ## Solve Optimization Problem
 
 ```@docs

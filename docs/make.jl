@@ -3,7 +3,7 @@ ENV["PLOTS_TEST"] = "true"
 ENV["GKSwstype"] = "nul"
 push!(LOAD_PATH,"../src/")
 
-using Documenter, DocumenterInterLinks
+using Documenter, DocumenterInterLinks, DocumenterCodeBlocks
 using ModelPredictiveControl
 import LinearMPC
 
@@ -28,7 +28,7 @@ makedocs(
     sitename    = "ModelPredictiveControl.jl",
     #format = Documenter.LaTeX(platform = "none"),
     doctest     = true,
-    plugins     = [links],
+    plugins     = [links, CodeBlocks()],
     format      = Documenter.HTML(
         prettyurls = get(ENV, "CI", nothing) == "true",
         edit_link = "main"

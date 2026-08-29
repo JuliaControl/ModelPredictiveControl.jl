@@ -1,3 +1,4 @@
+# TODO: add `skip=(Sys.ARCH==:x86)` because bug in DAQP.jl, and activate Linux x86 CI job in juliaci.yml
 @testitem "LinearMPCext general" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, JuMP, DAQP
     import LinearMPC

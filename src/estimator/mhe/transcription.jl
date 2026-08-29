@@ -79,7 +79,7 @@ from ``j=N_k-1`` to ``0``, also in deviation form, are computed with:
 ```
 The matrices ``\mathbf{E, G, J, B, E_X̂, G_X̂, J_X̂, B_X̂}`` are defined in the Extended Help 
 section. The vectors ``\mathbf{F, F_X̂, f_x̄}`` are recalculated at each discrete time step, 
-see [`initpred!(::MovingHorizonEstimator, ::LinModel)`](@ref) and [`linconstraint!(::MovingHorizonEstimator, ::LinModel)`](@ref).
+see [`initpred!`](@ref) and [`linconstraint!`](@ref).
 
 # Extended Help
 !!! details "Extended Help"
@@ -426,7 +426,7 @@ end
 @doc raw"""
     init_defectmat_mhe(
         model::LinModel, transcription::MultipleShooting, direct::Bool,
-        He, i_ym, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op, As, Co, λo
+        He, Â, B̂u, B̂d, x̂op, f̂op, As, Co, λo
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the defects over the predicted states.
@@ -511,7 +511,7 @@ end
 @doc raw"""
     init_defectmat_mhe(
         model::SimModelODE, transcription::TranscriptionMethod, direct::Bool,
-        He, Â, _ , _ , _ , _ , As, _ , _
+        He, Â, _ , _ , _ , _ , As, _ , _ 
     ) -> ES, GS, JS, BS
 
 Init the matrices for computing the defects of the stochastic states only.
@@ -816,9 +816,7 @@ function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModelODE, ::TranscriptionMet
 end
 
 @doc raw"""
-    linconstraint!(
-        estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod
-    )
+    linconstraint!(estim::MovingHorizonEstimator, model::LinModel, ::TranscriptionMethod)
 
 Set `b` vector for the linear inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MHE.
 
