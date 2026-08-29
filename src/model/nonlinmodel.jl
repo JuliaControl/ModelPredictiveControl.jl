@@ -93,11 +93,11 @@ end
     NonLinModel{NT}(f::Function,  h::Function,  Ts, nu, nx, ny, nd=0; <keyword arguments>)
     NonLinModel{NT}(f!::Function, h!::Function, Ts, nu, nx, ny, nd=0; <keyword arguments>)
 
-Construct a nonlinear model from state-space functions `f`/`f!` and `h`/`h!`.
+Construct a nonlinear ODE model from state-space functions `f`/`f!` and `h`/`h!`.
 
 Both continuous and discrete-time models are supported. The default arguments assume 
-continuous dynamics. Use `solver=nothing` for the discrete case (see Extended Help). The
-functions are defined as:
+continuous ordinary differentiation equations (ODE). Use `solver=nothing` for the discrete
+case (see Extended Help). The functions are defined as:
 ```math
 \begin{aligned}
     \mathbf{ẋ}(t) &= \mathbf{f}\Big( \mathbf{x}(t), \mathbf{u}(t), \mathbf{d}(t), \mathbf{p} \Big) \\
@@ -130,7 +130,7 @@ form. The optional parameter `NT` explicitly set the number type of vectors (def
     [`ExtendedKalmanFilter`](@ref), [`MovingHorizonEstimator`](@ref) and [`linearize`](@ref),
     except if a finite difference backend is used (e.g. [`AutoFiniteDiff`](@extref DifferentiationInterface List)).
 
-See also [`LinModel`](@ref).
+See also [`LinModel`](@ref), and [`NonLinModelDAE`](@ref) to include algebraic equations.
 
 # Arguments
 - `f::Function` or `f!`: state function of the model.

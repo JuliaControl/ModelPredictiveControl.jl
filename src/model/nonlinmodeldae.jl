@@ -86,6 +86,110 @@ struct NonLinModelDAE{
     end
 end
 
+@doc raw"""
+    NonLinModelDAE{NT}(f_q::Function,  h::Function,  Ts, nu, nx, nz, ny, nd=0; <kw args>)
+    NonLinModelDAE{NT}(f_q!::Function, h!::Function, Ts, nu, nx, nz, ny, nd=0; <kw args>)
+
+Construct a nonlinear DAE model from state-space functions `f_q`/`f_q!` and `h`/`h!`.
+
+It supports continuous differential and algebraic equations (DAE). The functions are:
+```math
+\begin{aligned}
+    \mathbf{ẋ}(t) &= \mathbf{f}\Big( \mathbf{x}(t), \mathbf{z}(t), \mathbf{u}(t), \mathbf{d}(t), \mathbf{p} \Big) \\
+    \mathbf{0}    &= \mathbf{q}\Big( \mathbf{x}(t), \mathbf{z}(t), \mathbf{u}(t), \mathbf{d}(t), \mathbf{p} \Big) \\
+    \mathbf{y}(t) &= \mathbf{h}\Big( \mathbf{x}(t), \mathbf{z}(t), \mathbf{d}(t), \mathbf{p} \Big)
+\end{aligned}
+```
+where ``\mathbf{x}``, ``\mathbf{y}``, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
+defined in [`NonLinModel`](@ref), and ``\mathbf{z}`` comprises the algebraic variables. The
+``\mathbf{f}`` and ``\mathbf{q}`` functions are combined into a single method since they
+typically share common computations. If `RHS` represents the result of the right-hand side
+in ``\mathbf{0 = q(x, z, u, d, p)}``, the functions can be implemented in two possible ways:
+
+1. **Non-mutating functions** (out-of-place): define them as `f_q(x, z, u, d, p) -> ẋ, RHS`
+   and `h(x, z, d, p) -> y`. This syntax is simple and intuitive but it allocates memory.
+2. **Mutating functions** (in-place): define them as `f_q!(ẋ, RHS, x, z, u, d, p) -> nothing`
+   and `h!(y, x, z, d, p) -> nothing`. This syntax reduces the allocations and potentially
+   the computational burden as well.
+
+!!! tip
+    Replace the `z`, `d` or `p` argument with `_` in your functions if not needed (see Examples below).
+    
+The optional parameter `NT` explicitly set the number type of vectors (default to `Float64`).
+
+!!! warning
+    The two functions must be in pure Julia to use the model in [`NonLinMPC`](@ref) and
+    [`MovingHorizonEstimator`](@ref), except if a finite difference backend is used (e.g. 
+    [`AutoFiniteDiff`](@extref DifferentiationInterface List)).
+
+See also [`NonLinModel`](@ref) for ODEs.
+
+# Arguments
+- `f_q::Function` or `f_q!`: state and algebraic function of the model.
+- `h::Function` or `h!`: output function of the model.
+- `Ts`: sampling time of the model in seconds.
+- `nu`: number of manipulated inputs.
+- `nx`: number of states.
+- `nz`: number of algebraic variables.
+- `ny`: number of outputs.
+- `nd=0`: number of measured disturbances.
+- `p=[]`: parameters of the model (any type).
+- `transcription=OrthogonalCollocation()` : a [`TrapezoidalCollocation`](@ref) or 
+   [`OrthogonalCollocation`](@ref) instance for open-loop simulations.
+- `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for open-loop simulations,
+   provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
+- `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
+   of the nonlinear constraints, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List)
+- `hessian=false` : an `AbstractADType` backend or `Bool` for the Hessian of the Lagrangian, 
+   see `jacobian` above for the options. The default `false` skip it and use the
+   quasi-Newton method of `optim` (see Extended Help).
+
+# Examples
+```jldoctest
+julia> f_q!(ẋ, RHS, x, z, u, _ , p) = (ẋ .= p*x .+ z; RHS .= z .- u; nothing);
+
+julia> h!(y, x, _ , _ , _ ) = (y .= 0.1x; nothing);
+
+julia> model1 = NonLinModelDAE(f_q!, h!, 5.0, 1, 1, 1, 1, p=-0.2)
+NonLinModelDAE with a sample time Ts = 5.0 s:
+├ optimizer: Ipopt
+├ transcription: OrthogonalCollocation (3 collocation points)
+├ jacobian: AutoSparse (AutoForwardDiff, TracerSparsityDetector, GreedyColoringAlgorithm)
+├ hessian: nothing
+└ dimensions:
+  ├ 1 manipulated inputs u
+  ├ 1 states x
+  ├ 1 algebraic variables z
+  ├ 1 outputs y
+  └ 0 measured disturbances d
+```
+
+# Extended Help
+!!! details "Extended Help"
+    If the dynamics are a function of the time, simply add a measured disturbance defined as
+    ``d(t) = t``. This object does not support the ``\mathbf{u}`` argument in ``\mathbf{h}``
+    function, see the Extended Help of [`LinModel`](@ref) for the justification.
+
+    The default `jacobian` backend is [sparse](@extref DifferentiationInterface AutoSparse-object):
+    ```julia
+    AutoSparse(
+        AutoForwardDiff(); 
+        sparsity_detector  = TracerSparsityDetector(), 
+        coloring_algorithm = GreedyColoringAlgorithm(
+            (
+                NaturalOrder(),
+                LargestFirst(),
+                SmallestLast(),
+                IncidenceDegree(),
+                DynamicLargestFirst(),
+                RandomOrder(StableRNG(0), 0)
+            ), 
+        postprocessing = true
+        )
+    )
+    ```
+    This is also the default differentiation backend for the Hessian if `hessian=true`.
+"""
 function NonLinModelDAE{NT}(
     f_q::Function, h::Function, Ts::Real, 
     nu::Int, nx::Int, nz::Int, ny::Int, nd::Int=0;
