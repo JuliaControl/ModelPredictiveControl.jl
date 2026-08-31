@@ -20,7 +20,10 @@ julia> y = model()
 """
 abstract type SimModel{NT<:Real} end
 
+"Abstract subtype of [`SimModel`](@ref) for ordinary differential equations."
 abstract type SimModelODE{NT<:Real} <: SimModel{NT} end
+
+"Abstract subtype of [`SimModel`](@ref) for differential and algebraic equations."
 abstract type SimModelDAE{NT<:Real} <: SimModel{NT} end
 
 struct SimModelBuffer{NT<:Real}

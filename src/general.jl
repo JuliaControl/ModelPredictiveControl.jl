@@ -53,12 +53,12 @@ const ERROR_STATUSES = (
 
 Abstract supertype of all transcription methods for the optimization problems.
 
-The `ShootingMethod` subtype includes the following concrete types:
+The [`ShootingMethod`](@ref) subtype includes the following concrete types:
 
     - [`SingleShooting`](@ref)
     - [`MultipleShooting`](@ref)
 
-and the `CollocationMethod` subtype includes the following concrete types:
+and the [`CollocationMethod`](@ref) subtype includes the following concrete types:
 
     - [`TrapezoidalCollocation`](@ref) 
     - [`OrthogonalCollocation`](@ref)
@@ -66,8 +66,12 @@ and the `CollocationMethod` subtype includes the following concrete types:
 """
 abstract type TranscriptionMethod end 
 
-# Defined here instead of `src/transcription.jl` since `nonlindae.jl` needs them
-abstract type ShootingMethod    <: TranscriptionMethod end
+# Defined here instead of `src/transcription.jl` since `nonlinnmodeldae.jl` needs them:
+
+"Abstract subtype of [`TranscriptionMethod`](@ref) for shooting methods."
+abstract type ShootingMethod <: TranscriptionMethod end
+
+"Abstract subtype of [`TranscriptionMethod`](@ref) for direct collocation methods."
 abstract type CollocationMethod <: TranscriptionMethod end
 
 "Verify that `optim` termination status is `OPTIMAL` or `LOCALLY_SOLVED`."

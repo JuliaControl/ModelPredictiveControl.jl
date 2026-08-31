@@ -4,6 +4,13 @@
 Pages = ["sim_model.md"]
 ```
 
+## Abstract Types
+
+```@docs
+ModelPredictiveControl.SimModelODE
+ModelPredictiveControl.SimModelDAE
+```
+
 ## State-Space Functions
 
 ```@docs

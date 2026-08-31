@@ -1,4 +1,4 @@
-const COLLOCATION_NODE_TYPE = Float64
+const COLLOCATION_NODE_TYPE::Type = Float64
 
 abstract type ShootingMethod    <: TranscriptionMethod end
 abstract type CollocationMethod <: TranscriptionMethod end
@@ -167,7 +167,7 @@ end
         h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
 
-Construct an orthogonal collocation on finite elements [`TranscriptionMethod`](@ref).
+Construct an orthogonal collocation [`TranscriptionMethod`](@ref).
 
 Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)s
 only. The `h` argument is the hold order for ``\mathbf{u}`` (`0` or `1`), and the `no`

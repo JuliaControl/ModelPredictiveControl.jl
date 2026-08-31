@@ -4,6 +4,13 @@
 Pages = ["misc.md"]
 ```
 
+## Abstract Types
+
+```@docs
+ModelPredictiveControl.ShootingMethod
+ModelPredictiveControl.CollocationMethod
+```
+
 ## Orthogonal Collocation
 
 ```@docs
