@@ -102,10 +102,11 @@ provided in the semi-explicit form:
 \end{aligned}
 ```
 where ``\mathbf{x}``, ``\mathbf{y}``, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
-defined in [`NonLinModel`](@ref), and ``\mathbf{a}`` comprises the algebraic variables. The
-``\mathbf{f}`` and ``\mathbf{q}`` functions are combined into a single method since they
-typically share common computations. If `RHS` represents the result of the right-hand side
-in ``\mathbf{0 = q(x, a, u, d, p)}``, the functions can be implemented in two possible ways:
+defined in [`NonLinModel`](@ref), and ``\mathbf{a}`` is the algebraic variable with `na`
+elements. The ``\mathbf{f}`` and ``\mathbf{q}`` functions are combined into a single method
+since they typically share common computations. If `RHS` represents the result of the
+right-hand side in ``\mathbf{0 = q(x, a, u, d, p)}``, the functions can be implemented in
+two possible ways:
 
 1. **Non-mutating functions** (out-of-place): define them as `f_q(x, a, u, d, p) -> ẋ, RHS`
    and `h(x, a, d, p) -> y`. This syntax is simple and intuitive but it allocates memory.
@@ -114,7 +115,8 @@ in ``\mathbf{0 = q(x, a, u, d, p)}``, the functions can be implemented in two po
    the computational burden as well.
 
 !!! tip
-    Replace the `a`, `d` or `p` argument with `_` in your functions if not needed (see Examples below).
+    Replace the `a`, `d` or `p` argument with `_` in your functions if not needed (see
+    Examples below).
     
 The optional parameter `NT` explicitly set the number type of vectors (default to `Float64`).
 
@@ -192,8 +194,7 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
     This is also the default differentiation backend for the Hessian if `hessian=true`.
 """
 function NonLinModelDAE{NT}(
-    f_q::Function, h::Function, Ts::Real, 
-    nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
+    f_q::Function, h::Function, Ts::Real, nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
     p=NT[], 
     transcription = OrthogonalCollocation(), 
     optim = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
@@ -264,9 +265,6 @@ function validate_f_q_dae(NT, f_q)
         #     x,        , a         ,  u         , d         , p    
         Tuple{Vector{NT}, Vector{NT},  Vector{NT}, Vector{NT}, Any}
     )
-    if isnonmutating
-
-    end
     if !(ismutating || isnonmutating)
         error(
             "the state function has no method with type signature "*
