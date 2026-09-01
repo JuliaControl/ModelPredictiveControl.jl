@@ -10,7 +10,7 @@ struct NonLinModelDAE{
     JM<:JuMP.GenericModel,
     JB<:AbstractADType,
     HB<:Union{AbstractADType, Nothing}, 
-    F_Q <:Function,
+    FQ <:Function,
     H <:Function, 
     PT<:Any, 
 } <: SimModelDAE{NT}
@@ -22,7 +22,7 @@ struct NonLinModelDAE{
     optim::JM
     jacobian::JB
     hessian::HB
-    f_q!::F_Q
+    fq!::FQ
     h!::H
     p::PT
     Ts::NT
@@ -43,9 +43,10 @@ struct NonLinModelDAE{
     xname::Vector{String}
     buffer::SimModelBuffer{NT}
     function NonLinModelDAE{NT}(
-        f_q!::F_Q, h!::H, Ts, 
-        nu, nx, na, ny, nd, p::PT, 
-        transcription::TM, optim::JM, 
+        fq!::FQ, h!::H, Ts, nu, nx, na, ny, nd, 
+        p::PT, 
+        transcription::TM, 
+        optim::JM, 
         jacobian::JB, hessian::HB
     ) where {
             NT<:Real, 
@@ -53,7 +54,7 @@ struct NonLinModelDAE{
             JM<:JuMP.GenericModel,
             JB<:AbstractADType,
             HB<:Union{AbstractADType, Nothing},
-            F_Q<:Function,
+            FQ<:Function,
             H<:Function, 
             PT<:Any
         }
@@ -71,11 +72,11 @@ struct NonLinModelDAE{
         a0 = zeros(NT, na)
         t  = zeros(NT, 1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, TM, JM, JB, HB, F_Q, H, PT}(
+        return new{NT, TM, JM, JB, HB, FQ, H, PT}(
             x0, a0,
             transcription,
             optim, jacobian, hessian,
-            f_q!, h!,
+            fq!, h!,
             p, 
             Ts, t,
             nu, nx, na, ny, nd, 
@@ -87,10 +88,10 @@ struct NonLinModelDAE{
 end
 
 @doc raw"""
-    NonLinModelDAE{NT}(f_q::Function,  h::Function,  Ts, nu, nx, na, ny, nd=0; <kw args>)
-    NonLinModelDAE{NT}(f_q!::Function, h!::Function, Ts, nu, nx, na, ny, nd=0; <kw args>)
+    NonLinModelDAE{NT}(fq::Function,  h::Function,  Ts, nu, nx, na, ny, nd=0; <kw args>)
+    NonLinModelDAE{NT}(fq!::Function, h!::Function, Ts, nu, nx, na, ny, nd=0; <kw args>)
 
-Construct a nonlinear DAE model from state-space functions `f_q`/`f_q!` and `h`/`h!`.
+Construct a nonlinear DAE model from state-space functions `fq`/`fq!` and `h`/`h!`.
 
 It supports continuous differential and algebraic equations (DAE). The functions are
 provided in the semi-explicit form:
@@ -108,9 +109,9 @@ since they typically share common computations. If `RHS` represents the result o
 right-hand side in ``\mathbf{0 = q(x, a, u, d, p)}``, the functions can be implemented in
 two possible ways:
 
-1. **Non-mutating functions** (out-of-place): define them as `f_q(x, a, u, d, p) -> ẋ, RHS`
+1. **Non-mutating functions** (out-of-place): define them as `fq(x, a, u, d, p) -> ẋ, RHS`
    and `h(x, a, d, p) -> y`. This syntax is simple and intuitive but it allocates memory.
-2. **Mutating functions** (in-place): define them as `f_q!(ẋ, RHS, x, a, u, d, p) -> nothing`
+2. **Mutating functions** (in-place): define them as `fq!(ẋ, RHS, x, a, u, d, p) -> nothing`
    and `h!(y, x, a, d, p) -> nothing`. This syntax reduces the allocations and potentially
    the computational burden as well.
 
@@ -128,7 +129,7 @@ The optional parameter `NT` explicitly set the number type of vectors (default t
 See also [`NonLinModel`](@ref) for ODEs.
 
 # Arguments
-- `f_q::Function` or `f_q!`: state and algebraic function of the model.
+- `fq::Function` or `fq!`: state and algebraic function of the model.
 - `h::Function` or `h!`: output function of the model.
 - `Ts`: sampling time of the model in seconds.
 - `nu`: number of manipulated inputs.
@@ -149,11 +150,11 @@ See also [`NonLinModel`](@ref) for ODEs.
 
 # Examples
 ```jldoctest
-julia> f_q!(ẋ, RHS, x, a, u, _ , p) = (ẋ .= p*x .+ a; RHS .= a .- u; nothing);
+julia> fq!(ẋ, RHS, x, a, u, _ , p) = (ẋ .= p*x .+ a; RHS .= a .- u; nothing);
 
 julia> h!(y, x, _ , _ , _ ) = (y .= 0.1x; nothing);
 
-julia> model1 = NonLinModelDAE(f_q!, h!, 5.0, 1, 1, 1, 1, p=-0.2)
+julia> model1 = NonLinModelDAE(fq!, h!, 5.0, 1, 1, 1, 1, p=-0.2)
 NonLinModelDAE with a sample time Ts = 5.0 s:
 ├ optimizer: Ipopt
 ├ transcription: OrthogonalCollocation (3 collocation points)
@@ -194,23 +195,23 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
     This is also the default differentiation backend for the Hessian if `hessian=true`.
 """
 function NonLinModelDAE{NT}(
-    f_q::Function, h::Function, Ts::Real, nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
+    fq::Function, h::Function, Ts::Real, nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
     p=NT[], 
     transcription = OrthogonalCollocation(), 
     optim = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     jacobian = DEFAULT_JACSPARSE,
     hessian = false,
 ) where {NT<:Real}
-    f_q!, h! = get_mutating_functions_dae(NT, f_q, h)
+    fq!, h! = get_mutating_functions_dae(NT, fq, h)
     hessian = validate_hessian(hessian, DEFAULT_NONLINDAE_HESSIAN)
     return NonLinModelDAE{NT}(
-        f_q!, h!, Ts, nu, nx, na, ny, nd, p, 
+        fq!, h!, Ts, nu, nx, na, ny, nd, p, 
         transcription, optim, jacobian, hessian
     )
 end
 
 function NonLinModelDAE(
-    f_q::Function, h::Function, Ts::Real, 
+    fq::Function, h::Function, Ts::Real, 
     nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
     p=Float64[], 
     transcription = OrthogonalCollocation(), 
@@ -219,19 +220,19 @@ function NonLinModelDAE(
     hessian = false,
 )
     return NonLinModelDAE{Float64}(
-        f_q, h, Ts, nu, nx, na, ny, nd; 
+        fq, h, Ts, nu, nx, na, ny, nd; 
         p, transcription, optim, jacobian, hessian
     )
 end
 
-"Get the mutating versions of the functions `f_q` and `h` for a DAE model."
-function get_mutating_functions_dae(NT, f_q, h)
-    ismutating_f_q = validate_f_q_dae(NT, f_q)
-    f_q! = if ismutating_f_q
-        f_q
+"Get the mutating versions of the functions `fq` and `h` for a DAE model."
+function get_mutating_functions_dae(NT, fq, h)
+    ismutating_f_q = validate_fq_dae(NT, fq)
+    fq! = if ismutating_f_q
+        fq
     else
-        function f_q!(ẋ, RHS, x, a, u, d, p)
-            ẋ_ret, RHS_ret = f_q(x, a, u, d, p)
+        function fq!(ẋ, RHS, x, a, u, d, p)
+            ẋ_ret, RHS_ret = fq(x, a, u, d, p)
             ẋ   .= ẋ_ret
             RHS .= RHS_ret
             return nothing
@@ -246,30 +247,30 @@ function get_mutating_functions_dae(NT, f_q, h)
             return nothing
         end
     end
-    return f_q!, h!
+    return fq!, h!
 end
 
 """
-    validate_f_q(NT, f_q) -> ismutating
+    validate_fq_dae(NT, fq) -> ismutating
 
-Validate `f_q` function argument signature for DAEs and return `true` if mutating.
+Validate `fq` function argument signature for DAEs and return `true` if mutating.
 """
-function validate_f_q_dae(NT, f_q)
+function validate_fq_dae(NT, fq)
     ismutating = hasmethod(
-        f_q, 
+        fq, 
         #       ẋ         , RHS       , x         , a         , u         , d         , p    
         Tuple{  Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any}
     )
     isnonmutating = hasmethod(
-        f_q, 
+        fq, 
         #     x,        , a         ,  u         , d         , p    
         Tuple{Vector{NT}, Vector{NT},  Vector{NT}, Vector{NT}, Any}
     )
     if !(ismutating || isnonmutating)
         error(
             "the state function has no method with type signature "*
-            "f_q(x::Vector{$(NT)}, a::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any) or mutating form "*
-            "f_q!(ẋ::Vector{$(NT)}, RHS::Vector{$(NT)}, x::Vector{$(NT)}, a::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any)"
+            "fq(x::Vector{$(NT)}, a::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any) or mutating form "*
+            "fq!(ẋ::Vector{$(NT)}, RHS::Vector{$(NT)}, x::Vector{$(NT)}, a::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any)"
         )
     end
     return ismutating
