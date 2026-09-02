@@ -1,4 +1,4 @@
-"Abstract supertype of all differential equation solvers."
+"Supertype of all differential equation solvers."
 abstract type DiffSolver end
 
 "Empty solver for nonlinear discrete-time models."
