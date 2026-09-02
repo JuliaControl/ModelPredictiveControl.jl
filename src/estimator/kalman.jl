@@ -1,4 +1,4 @@
-"Abstract supertype of all Kalman-type state estimators."
+"Supertype of all Kalman-type state estimators."
 abstract type KalmanEstimator{NT<:Real} <: StateEstimator{NT} end
 
 struct SteadyKalmanFilter{

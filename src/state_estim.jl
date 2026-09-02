@@ -1,7 +1,7 @@
 @doc raw"""
     abstract type StateEstimator end
 
-Abstract supertype of all state estimators.
+Supertype of all state estimators.
 
 ---
 
