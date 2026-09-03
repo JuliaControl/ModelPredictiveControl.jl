@@ -279,7 +279,7 @@ struct OrthogonalCollocation <: CollocationMethod
 end
 
 @doc raw"""
-    init_orthocolloc(model::SimModelODE, transcription::OrthogonalCollocation) -> Mo, Co, λo
+    init_orthocolloc(NT, transcription::OrthogonalCollocation, nx, Ts) -> Mo, Co, λo
 
 Init the differentiation and continuity matrices for [`OrthogonalCollocation`](@ref).
 
@@ -287,7 +287,7 @@ Introducing ``τ_i``, the ``i``th root of the orthogonal polynomial normalized t
 interval ``[0, 1]`` with ``τ_0=0``, the trajectories for each state are approximated by a
 distinct polynomial of degree ``n_o``. The differentiation matrix ``\mathbf{M_o}``, the
 continuity matrix ``\mathbf{C_o}`` and the continuity coefficient ``λ_o`` are pre-computed
-with the identity matrix ``\mathbf{I}`` of size `(model.nx, model.nx)` and:
+with the identity matrix ``\mathbf{I}`` of size `(nx, nx)` and:
 ```math
 \begin{aligned}
 \mathbf{P_o} &=                                                                               \begin{bmatrix}
@@ -306,7 +306,7 @@ with the identity matrix ``\mathbf{I}`` of size `(model.nx, model.nx)` and:
         λ_o  &= L_0(1)                                                                        
 \end{aligned}
 ```
-where ``T_s`` is the sampling time `model.Ts`, ``\mathbf{P_o}`` is a matrix to evaluate the
+where ``T_s`` is the sampling time `Ts`, ``\mathbf{P_o}`` is a matrix to evaluate the
 polynomial values w/o the coefficients and Y-intercept, and ``\mathbf{Ṗ_o}``, to evaluate 
 its derivatives. The Lagrange polynomial ``L_j(τ)`` bases are defined as:
 ```math
@@ -373,10 +373,8 @@ objects (only used for [`MovingHorizonEstimator`](@ref)). Note that handling the
 process noise in the continuity constraint implicitly assumes that it's a discrete
 stochastic process (like all the other [`StateEstimator`](@ref) types in this package).
 """
-function init_orthocolloc(
-    model::SimModelODE{NT}, transcription::OrthogonalCollocation
-) where {NT<:Real}
-    nx, no = model.nx, transcription.no
+function init_orthocolloc(NT, transcription::OrthogonalCollocation, nx, Ts)
+    no = transcription.no
     τ = transcription.τ
     Po = Matrix{NT}(undef, nx*no, nx*no) # polynomial matrix (w/o the Y-intercept term)
     Ṗo = Matrix{NT}(undef, nx*no, nx*no) # polynomial derivative matrix
@@ -387,7 +385,7 @@ function init_orthocolloc(
         Po[iRows, iCols] = (τ[i]^j)*I_nx
         Ṗo[iRows, iCols] = (j*τ[i]^(j-1))*I_nx
     end
-    Mo = sparse((Ṗo/Po)/model.Ts)
+    Mo = sparse((Ṗo/Po)/Ts)
     Co = Matrix{NT}(undef, nx, nx*no)
     for j=1:no
         iCols = (1:nx) .+ nx*(j-1)
@@ -399,11 +397,11 @@ function init_orthocolloc(
 end
 
 """
-    init_orthocolloc(model::SimModelODE, transcription::TranscriptionMethod)
+    init_orthocolloc(NT, transcription::TranscriptionMethod, _ , _ )
 
 Return empty sparse matrices and `NaN` value for other [`TranscriptionMethod`](@ref) types.
 """
-init_orthocolloc(::SimModelODE, ::TranscriptionMethod) = spzeros(0,0), spzeros(0,0), NaN
+init_orthocolloc(NT,::TranscriptionMethod,_,_) = spzeros(NT,0,0), spzeros(NT,0,0), NT(NaN)
 
 "Evaluate the Lagrange basis polynomial ``L_j`` at `τ=1`."
 function lagrange_end(j, transcription::OrthogonalCollocation)

@@ -15,16 +15,19 @@ struct NonLinModelDAE{
     PT<:Any, 
 } <: SimModelDAE{NT}
     x0::Vector{NT}
-    a0::Vector{NT}
     transcription::TM
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
     optim::JM
     jacobian::JB
     hessian::HB
+    Z::Vector{NT}
     fq!::FQ
     h!::H
     p::PT
+    Mo::SparseMatrixCSC{NT, Int}
+    Co::SparseMatrixCSC{NT, Int}
+    λo::NT
     Ts::NT
     t::Vector{NT}
     nu::Int
@@ -69,15 +72,18 @@ struct NonLinModelDAE{
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
         x0 = zeros(NT, nx)
-        a0 = zeros(NT, na)
         t  = zeros(NT, 1)
+        Mo, Co, λo = init_orthocolloc(NT, transcription, nx, Ts)
+        nZ = na + transcription.no * (nx + na)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         return new{NT, TM, JM, JB, HB, FQ, H, PT}(
-            x0, a0,
+            x0,
             transcription,
             optim, jacobian, hessian,
+            Z,
             fq!, h!,
-            p, 
+            p,
+            Mo, Co, λo,
             Ts, t,
             nu, nx, na, ny, nd, 
             uop, yop, dop, xop, fop,

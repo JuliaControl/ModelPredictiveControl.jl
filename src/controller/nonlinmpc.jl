@@ -99,7 +99,7 @@ struct NonLinMPC{
             model, estim, transcription, Hp, Hc, nb
         )
         F = zeros(NT, ny*Hp) # dummy value (updated just before optimization)
-        Mo, Co, λo = init_orthocolloc(model, transcription)
+        Mo, Co, λo = init_orthocolloc(NT, transcription, model.nx, model.Ts)
         ES, GS, JS, KS, VS, BS = init_defectmat(
             model, estim, transcription, Hp, Hc, nb, Co, λo
         )

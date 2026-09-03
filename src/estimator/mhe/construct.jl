@@ -187,7 +187,7 @@ struct MovingHorizonEstimator{
         E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂ = init_predmat_mhe(
             model, transcription, direct, He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
         )
-        Mo, Co, λo = init_orthocolloc(model, transcription)
+        Mo, Co, λo = init_orthocolloc(NT, transcription, model.nx, model.Ts)
         ES, GS, JS, BS = init_defectmat_mhe(
             model, transcription, direct, He, Â, B̂u, B̂d, x̂op, f̂op, As, Co, λo
         ) 
