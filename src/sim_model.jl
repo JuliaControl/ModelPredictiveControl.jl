@@ -345,6 +345,9 @@ function periodsleep(model::SimModel, busywait=false)
     return nothing
 end
 
+"The [`TranscriptionMethod`](@ref) is compatible with the [`SimModel`](@ref) by default."
+validate_transcription(::SimModel, ::TranscriptionMethod) = nothing
+
 """
     validate_args(model::SimModel, d, u=nothing)
 
@@ -357,6 +360,10 @@ function validate_args(model::SimModel, d, u=nothing)
         size(u) ≠ (nu,) && throw(DimensionMismatch("u size $(size(u)) ≠ manip. input size ($nu,)"))
     end
 end
+
+"Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
+get_nk(model::SimModelODE, ::ShootingMethod) = model.nk
+get_nk(model::SimModelODE, transcription::CollocationMethod) = model.nx*transcription.no
 
 include("model/linmodel.jl")
 include("model/linearization.jl")

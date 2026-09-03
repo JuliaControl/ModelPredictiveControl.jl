@@ -1,6 +1,27 @@
 const COLLOCATION_NODE_TYPE::Type = Float64
 
-abstract type ShootingMethod    <: TranscriptionMethod end
+"""
+    abstract type TranscriptionMethod end
+
+Supertype of all transcription methods for the optimization problems.
+
+The [`ShootingMethod`](@ref) subtype includes the following concrete types:
+
+    - [`SingleShooting`](@ref)
+    - [`MultipleShooting`](@ref)
+
+and the [`CollocationMethod`](@ref) subtype includes the following concrete types:
+
+    - [`TrapezoidalCollocation`](@ref) 
+    - [`OrthogonalCollocation`](@ref)
+    
+"""
+abstract type TranscriptionMethod end 
+
+"Abstract subtype of [`TranscriptionMethod`](@ref) for shooting methods."
+abstract type ShootingMethod <: TranscriptionMethod end
+
+"Abstract subtype of [`TranscriptionMethod`](@ref) for direct collocation methods."
 abstract type CollocationMethod <: TranscriptionMethod end
 
 @doc raw"""
@@ -420,20 +441,6 @@ end
 
 default_jacobian(::SingleShooting)      = DEFAULT_JACDENSE
 default_jacobian(::TranscriptionMethod) = DEFAULT_JACSPARSE
-
-function validate_transcription(::LinModel, ::CollocationMethod)
-    throw(ArgumentError("Collocation methods are not supported for LinModel."))
-    return nothing
-end
-function validate_transcription(::NonLinModel{<:Real, <:EmptySolver}, ::CollocationMethod)
-    throw(ArgumentError("Collocation methods require continuous-time NonLinModel."))
-    return nothing
-end
-validate_transcription(::SimModelODE, ::TranscriptionMethod) = nothing
-
-"Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
-get_nk(model::SimModelODE, ::ShootingMethod) = model.nk
-get_nk(model::SimModelODE, transcription::CollocationMethod) = model.nx*transcription.no
 
 transcription_str(transription::TranscriptionMethod) = string(nameof(typeof(transription)))
 function transcription_str(transription::OrthogonalCollocation)

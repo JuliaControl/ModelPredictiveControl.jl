@@ -28,6 +28,8 @@ struct NonLinModelDAE{
     Mo::SparseMatrixCSC{NT, Int}
     Co::SparseMatrixCSC{NT, Int}
     λo::NT
+    Aeq::Matrix{NT}
+    neq::Int
     Ts::NT
     t::Vector{NT}
     nu::Int
@@ -74,7 +76,10 @@ struct NonLinModelDAE{
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
         Mo, Co, λo = init_orthocolloc(NT, transcription, nx, Ts)
-        nZ = na + transcription.no * (nx + na)
+        nZ = get_nZ_dae(transcription, nx, na)
+        Z = zeros(NT, get_nZ_dae(transcription, nx, na))
+        Aeq = init_Aeq(NT, transcription, nx, na, Co, λo) 
+        neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         return new{NT, TM, JM, JB, HB, FQ, H, PT}(
             x0,
@@ -84,6 +89,7 @@ struct NonLinModelDAE{
             fq!, h!,
             p,
             Mo, Co, λo,
+            Aeq, neq,
             Ts, t,
             nu, nx, na, ny, nd, 
             uop, yop, dop, xop, fop,
@@ -111,12 +117,12 @@ provided in the semi-explicit form:
 where ``\mathbf{x}``, ``\mathbf{y}``, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
 defined in [`NonLinModel`](@ref), and ``\mathbf{a}`` is the algebraic variable with `na`
 elements. The ``\mathbf{f}`` and ``\mathbf{q}`` functions are combined into a single method
-since they typically share common computations. If `RHS` represents the result of the
-right-hand side in ``\mathbf{0 = q(x, a, u, d, p)}``, the functions can be implemented in
-two possible ways:
+`fq`/`fq!` since they typically share common computations. If `RHS` represents the result of
+the right-hand side in ``\mathbf{0 = q(x, a, u, d, p)}``, the functions can be implemented
+in two possible ways:
 
 1. **Non-mutating functions** (out-of-place): define them as `fq(x, a, u, d, p) -> ẋ, RHS`
-   and `h(x, a, d, p) -> y`. This syntax is simple and intuitive but it allocates memory.
+   and `h(x, a, d, p) -> y`. This syntax is simple and intuitive but it allocates more memory.
 2. **Mutating functions** (in-place): define them as `fq!(ẋ, RHS, x, a, u, d, p) -> nothing`
    and `h!(y, x, a, d, p) -> nothing`. This syntax reduces the allocations and potentially
    the computational burden as well.
@@ -126,6 +132,9 @@ two possible ways:
     Examples below).
     
 The optional parameter `NT` explicitly set the number type of vectors (default to `Float64`).
+Open loop simulations rely on a [`CollocationMethod`](@ref) and `JuMP.jl` as a root solver
+to avoid new dependencies, and also to provide a similar solving environnement as
+[`NonLinMPC`](@ref), for troubleshooting. 
 
 !!! warning
     The two functions must be in pure Julia to use the model in [`NonLinMPC`](@ref) and
@@ -135,7 +144,7 @@ The optional parameter `NT` explicitly set the number type of vectors (default t
 See also [`NonLinModel`](@ref) for ODEs.
 
 # Arguments
-- `fq::Function` or `fq!`: state and algebraic function of the model.
+- `fq::Function` or `fq!`: combined state and algebraic function of the model.
 - `h::Function` or `h!`: output function of the model.
 - `Ts`: sampling time of the model in seconds.
 - `nu`: number of manipulated inputs.
@@ -308,6 +317,20 @@ function validate_h_dae(NT, h)
     return ismutating
 end
 
+"Get the number of element in the optimization decision vector `Z` for DAE solving."
+function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
+    return nx + 2na + transcription.no*(nx + na)
+end
+get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
+
+
+function init_Aeq(NT, transcription::OrthogonalCollocation, nx, na, Co, λo)
+    nZ = get_nZ_dae(transcription, nx, na)
+    Aeq = zeros(NT, nx, nZ)
+    return Aeq
+end
+init_Aeq(NT, ::CollocationMethod, nx, na, _ , _ ) = zeros(NT, 0, nx + 2na)
+
 """
     init_optimization!(model::NonLinModelDAE, optim::JuMP.GenericModel) -> nothing
 
@@ -328,6 +351,8 @@ function init_optimization!(model::NonLinModelDAE, optim::JuMP.GenericModel)
     return nothing
 end
 
+"Warm start `model.Z` at zero if `model` is a [`NonLinModelDAE`](@ref)."
+steadystate!(model::NonLinModelDAE, _ , _ ) = (model.Z .= 0; nothing)
 
 function Base.show(io::IO, model::NonLinModelDAE)
     nu, nd = model.nu, model.nd
@@ -344,5 +369,13 @@ function Base.show(io::IO, model::NonLinModelDAE)
     println(io, "  ├$(lpad(nx, n)) states x")
     println(io, "  ├$(lpad(na, n)) algebraic variables a")
     println(io, "  ├$(lpad(ny, n)) outputs y")
-    print(io,   "  └$(lpad(nd, n)) measured disturbances d")
+    println(io, "  └$(lpad(nd, n)) measured disturbances d")
+    nZ = length(model.Z)
+    nAeq = size(model.Aeq, 1)
+    neq  = model.neq
+    m = maximum(ndigits.((nZ, nAeq, neq))) + 1
+    println(io, "  └ optimization:")
+    println(io, "    ├$(lpad(nZ, m)) decision variables Z")
+    println(io, "    ├$(lpad(nAeq, m)) linear equality constraints Aeq")
+    print(io,   "    └$(lpad(neq, m)) nonlinear equality constraints geq")
 end

@@ -294,6 +294,11 @@ function validate_h(NT, h)
     return ismutating
 end
 
+function validate_transcription(::NonLinModel{<:Real, <:EmptySolver}, ::CollocationMethod)
+    throw(ArgumentError("Collocation methods require continuous-time NonLinModel."))
+    return nothing
+end
+
 """
     LinModel(model::NonLinModel; x=model.x0+model.xop, u=model.uop, d=model.dop)
 

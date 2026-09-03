@@ -1,4 +1,4 @@
-"Get the number of elements in the optimization decision vector `Z`."
+"Get the number of elements in the optimization decision vector `Z` for MPC."
 function get_nZ_mpc(estim::StateEstimator, ::SingleShooting, _ , Hc)
     return estim.model.nu*Hc
 end

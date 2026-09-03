@@ -252,6 +252,11 @@ optional parameter `NT` explicitly set the number type of vectors (default to `F
 LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where NT<:Real
 LinModel(A, Bu, C, Bd, Dd, Ts) = LinModel{Float64}(A, Bu, C, Bd, Dd, Ts)
 
+function validate_transcription(::LinModel, ::CollocationMethod)
+    throw(ArgumentError("Collocation methods are not supported for LinModel."))
+    return nothing
+end
+
 @doc raw"""
     steadystate!(model::LinModel, u0, d0)
 
