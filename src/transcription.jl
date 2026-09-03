@@ -137,13 +137,15 @@ end
 
 Construct an implicit trapezoidal [`TranscriptionMethod`](@ref) with `h`th order hold.
 
-This is the simplest collocation method. It supports continuous-time [`NonLinModel`](@ref)s
-only. The decision variables are the same as for [`MultipleShooting`](@ref), hence similar
-computational costs. See the same docstring for descriptions of `f_threads` and `h_threads`
-keywords. The `h` argument is `0` or `1`, for piecewise constant or linear manipulated 
-inputs ``\mathbf{u}`` (`h=1` is slightly less expensive). Note that the various [`DiffSolver`](@ref) 
-here assume zero-order hold, so `h=1` will induce a plant-model mismatch if the plant is
-simulated with these solvers. Measured disturbances ``\mathbf{d}`` are piecewise linear.
+This is the simplest collocation method. It supports continuous-time [`NonLinModel`](@ref)
+and [`NonLinModelDAE`](@ref). For [`NonLinModel`](@ref), the decision variables are the same
+as for [`MultipleShooting`](@ref), hence similar computational costs. See the same docstring
+for descriptions of `f_threads` and `h_threads` keywords. The Extended Help details
+the decision variables for [`NonLinModelDAE`](@ref). The `h` argument is `0` or `1`, for 
+piecewise constant or linear manipulated inputs ``\mathbf{u}`` (`h=1` is slightly less
+expensive). Note that the various [`DiffSolver`](@ref) here assume zero-order hold, so `h=1`
+will induce a plant-model mismatch if the plant is simulated with these solvers. Measured
+disturbances ``\mathbf{d}`` are piecewise linear.
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
@@ -161,6 +163,39 @@ transcription method.
 
 # Extended Help
 !!! details "Extended Help"
+    The algebraic vector ``\mathbf{a}`` values at the boundaries is incorporated in the
+    decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
+    ```math
+    \mathbf{Z} =                    \begin{bmatrix} 
+        \mathbf{x_0}(k+1)           \\ 
+        \mathbf{a}(k+0)             \\ 
+        \mathbf{a}(k+1)             \end{bmatrix}
+    ```
+    For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
+    ```math
+    \mathbf{Z} =                    \begin{bmatrix} 
+        \mathbf{ΔU}                 \\
+        \mathbf{X̂_0}                \\
+        \mathbf{a}(k+0)             \\
+        \mathbf{a}(k+1)             \\
+        \vdots                      \\
+        \mathbf{a}(k+H_p)           \end{bmatrix}
+    ```
+    and, for [`MovingHorizonEstimator`](@ref) with DAEs:
+        ```math
+    \mathbf{Z} =                    \begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p)       \\  
+        \mathbf{X̂_0}                \\         
+        \mathbf{0_x̂}                \\
+        \mathbf{a}(k-N_k+p+0)       \\
+        \mathbf{a}(k-N_k+p+1)       \\
+        \vdots                      \\
+        \mathbf{a}(k+p)             \\
+        \mathbf{0_a}                \\
+        \mathbf{Ŵ}                  \\
+        \mathbf{0_ŵ}                \end{bmatrix}
+    ``` 
+
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
     Collocation methods require continuous-time dynamics. Because of this, and also to
