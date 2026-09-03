@@ -362,8 +362,8 @@ function validate_args(model::SimModel, d, u=nothing)
 end
 
 "Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
-get_nk̄(model::SimModelODE, ::ShootingMethod) = model.nk
-get_nk̄(model::SimModelODE, transcription::CollocationMethod) = model.nx*transcription.no
+get_nk̄(model::SimModel, ::ShootingMethod) = model.nk
+get_nk̄(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
 
 include("model/linmodel.jl")
 include("model/linearization.jl")
