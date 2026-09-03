@@ -26,7 +26,7 @@ struct ManualEstimator{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     function ManualEstimator{NT}(
         model::SM, i_ym, nint_u, nint_ym
     ) where {NT<:Real, SM<:SimModel{NT}}
-        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+        nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
@@ -36,7 +36,7 @@ struct ManualEstimator{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         direct = false
         prepared = [true]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄)
         return new{NT, SM}(
             model,
             x̂op, f̂op, x̂0,

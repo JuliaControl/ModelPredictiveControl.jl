@@ -516,7 +516,7 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
         \vdots        & \vdots       & \vdots     & \vdots     & \ddots & \vdots        & \vdots       & \vdots     & \vdots        \\
         \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & λ_o\mathbf{I} & \mathbf{0}   & \mathbf{-I} & \mathbf{0}   \\   
         \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{A_s} & \mathbf{0}  & \mathbf{-I}  \end{bmatrix} \\
-    \mathbf{E_{S}^{k}} &= \begin{bmatrix}
+    \mathbf{E_{S}^{k̄}} &= \begin{bmatrix}
        \mathbf{C_o}   & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \\
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \\
         \mathbf{0}    & \mathbf{C_o} & \cdots & \mathbf{0}                                                                          \\
@@ -524,7 +524,7 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
         \vdots        & \vdots       & \ddots & \vdots                                                                              \\
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{C_o}                                                                        \\   
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \end{bmatrix} \\
-    \mathbf{E_S}       &= \begin{bmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} & \mathbf{E_{S}^{k}}                             \end{bmatrix} \\
+    \mathbf{E_S}       &= \begin{bmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} & \mathbf{E_{S}^{k̄}}                             \end{bmatrix} \\
     \mathbf{K_S}       &= \begin{bmatrix}
         λ_o\mathbf{I} & \mathbf{0}                                                                                                  \\                                          
         \mathbf{0}    & \mathbf{A_s}                                                                                                \\
@@ -558,7 +558,7 @@ function init_defectmat_orthocolloc(
     Hp, Hc, Co, λo, As, nxs
 ) where {NT<:Real}
     nu, nx, nd, nx̂ = model.nu, model.nx, model.nd, estim.nx̂
-    nk = get_nk(model, transcription)
+    nk̄ = get_nk̄(model, transcription)
     λo_I = λo*I(nx)
     # --- current state estimates x̂0 ---
     KS = zeros(NT, nx̂*Hp, nx̂)
@@ -577,8 +577,8 @@ function init_defectmat_orthocolloc(
         ESx̂[iRow_λo, iCol_λo] = λo_I
         ESx̂[iRow_As, iCol_As] = As
     end
-    ESk = repeatdiag([Co; zeros(NT, nxs, nk)], Hp)
-    ES  = [ESΔu ESx̂ ESk]
+    ESk̄ = repeatdiag([Co; zeros(NT, nxs, nk̄)], Hp)
+    ES  = [ESΔu ESx̂ ESk̄]
     # --- current measured disturbances d0 and predictions D̂0 ---
     GS = zeros(NT, nx̂*Hp, nd)
     JS = zeros(NT, nx̂*Hp, nd*Hp)
@@ -1027,18 +1027,18 @@ It warm-starts the solver at:
     \mathbf{x̂_0}(k+H_p-2|k-1)       \\
     \mathbf{x̂_0}(k+H_p-1|k-1)       \\
     \mathbf{x̂_0}(k+H_p-1|k-1)       \\
-    \mathbf{k}(k+0|k-1)             \\
-    \mathbf{k}(k+1|k-1)             \\
+    \mathbf{k̄}(k+0|k-1)             \\
+    \mathbf{k̄}(k+1|k-1)             \\
     \vdots                          \\
-    \mathbf{k}(k+H_p-3|k-1)         \\
-    \mathbf{k}(k+H_p-2|k-1)         \\
-    \mathbf{k}(k+H_p-2|k-1)         \\
+    \mathbf{k̄}(k+H_p-3|k-1)         \\
+    \mathbf{k̄}(k+H_p-2|k-1)         \\
+    \mathbf{k̄}(k+H_p-2|k-1)         \\
     ϵ_{k-1}
 \end{bmatrix}
 ```
 where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
 last control period ``k-1``, expressed as a deviation from the operating point 
-``\mathbf{x̂_{op}}``. The vector ``\mathbf{k}(k+j|k-1)`` include the ``n_o`` intermediate
+``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k+j|k-1)`` include the ``n_o`` intermediate
 stage predictions for the interval ``k+j``, and is also computed at the last control period.
 """
 function set_warmstart_mpc!(
@@ -1046,8 +1046,8 @@ function set_warmstart_mpc!(
 )
     nu, nx̂ = mpc.estim.model.nu, mpc.estim.nx̂
     Hp, Hc, Z̃s  = mpc.Hp, mpc.Hc, mpc.buffer.Z̃
-    nk = get_nk(mpc.estim.model, transcription)
-    nΔU, nX̂, nK = nu*Hc, nx̂*Hp, nk*Hp
+    nk̄ = get_nk̄(mpc.estim.model, transcription)
+    nΔU, nX̂, nK = nu*Hc, nx̂*Hp, nk̄*Hp
     # --- input increments ΔU ---
     Z̃s[1:(nΔU-nu)]       .= @views mpc.Z̃[(nu+1):(nΔU)]
     Z̃s[(nΔU-nu+1):(nΔU)] .= 0
@@ -1055,8 +1055,8 @@ function set_warmstart_mpc!(
     Z̃s[(nΔU+1):(nΔU+nX̂-nx̂)]    .= @views mpc.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
     Z̃s[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)] .= @views mpc.Z̃[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)]
     # --- collocation points K ---
-    Z̃s[(nΔU+nX̂+1):(nΔU+nX̂+nK-nk)]    .= @views mpc.Z̃[(nΔU+nX̂+nk+1):(nΔU+nX̂+nK)]
-    Z̃s[(nΔU+nX̂+nK-nk+1):(nΔU+nX̂+nK)] .= @views mpc.Z̃[(nΔU+nX̂+nK-nk+1):(nΔU+nX̂+nK)]
+    Z̃s[(nΔU+nX̂+1):(nΔU+nX̂+nK-nk̄)]    .= @views mpc.Z̃[(nΔU+nX̂+nk̄+1):(nΔU+nX̂+nK)]
+    Z̃s[(nΔU+nX̂+nK-nk̄+1):(nΔU+nX̂+nK)] .= @views mpc.Z̃[(nΔU+nX̂+nK-nk̄+1):(nΔU+nX̂+nK)]
     # --- slack variable ϵ ---
     mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
     JuMP.set_start_value.(Z̃var, Z̃s)
@@ -1169,16 +1169,16 @@ function predict!(
     mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
     U0, _
 )
-    nu, nx̂, ny, nd, nk, Hp = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk, mpc.Hp
+    nu, nx̂, ny, nd, nk̄, Hp = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk̄, mpc.Hp
     D̂0 = mpc.D̂0
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
     d̂0 = @views mpc.d0[1:nd]
     for j=1:Hp
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        k      = @views K[(1 + nk*(j-1)):(nk*j)]
+        k̄      = @views K[(1 + nk̄*(j-1)):(nk̄*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k, mpc.estim, model, x̂0, u0, d̂0)
+        f̂!(x̂0next, û0, k̄, mpc.estim, model, x̂0, u0, d̂0)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         d̂0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
@@ -1338,7 +1338,7 @@ function con_nonlinprogeq!(
     mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
     U0, Z̃
 )
-    nx̂, nx, nu, nd, nk = mpc.estim.nx̂, model.nx, model.nu, model.nd, model.nk
+    nx̂, nx, nu, nd, nk̄ = mpc.estim.nx̂, model.nx, model.nu, model.nd, model.nk̄
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
@@ -1354,11 +1354,11 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k        = @views    K[(1 + nk*(j-1)):(nk*j)]
+        k̄        = @views    K[(1 + nk̄*(j-1)):(nk̄*j)]
         x̂dnext   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ŝdnext    = @views geq[(1 + nx*(j-1)):(nx*j)]
-        f!(x̂dnext, k, model, x̂d_Z̃, û0, d̂0, model.p)
+        f!(x̂dnext, k̄, model, x̂d_Z̃, û0, d̂0, model.p)
         ŝdnext .= @. x̂dnext - x̂dnext_Z̃
     end
     return geq
@@ -1400,7 +1400,7 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     Ts = model.Ts
-    nk = get_nk(model, transcription)
+    nk̄ = get_nk̄(model, transcription)
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
@@ -1413,7 +1413,7 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         û0      =  @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k̇        = @views    K̇[(1 + nk*(j-1)):(nk*j)]
+        k̇        = @views    K̇[(1 + nk̄*(j-1)):(nk̄*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
         ŝdnext   = @views  geq[(1 + nx*(j-1)):(nx*(j-1) + nx)]
@@ -1423,7 +1423,7 @@ function con_nonlinprogeq!(
             # last iteration (j-1) may not be executed (iterations are re-orderable)
             model.f!(k̇1, x̂d_Z̃, û0, d̂0, model.p)
         else
-            k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+            k̇1 .= @views K̇[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1
             model.f!(k̇2, x̂dnext_Z̃, û0, d̂0next, model.p)
@@ -1478,9 +1478,9 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     Mo, no, τ =  mpc.Mo, transcription.no, transcription.τ
-    nk = get_nk(model, transcription)
+    nk̄ = get_nk̄(model, transcription)
     D̂0 = mpc.D̂0
-    X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk*Hp)]
+    X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk̄*Hp)]
     D̂temp = mpc.buffer.D̂
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
     @threadsif f_threads for j=1:Hp
@@ -1492,14 +1492,14 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         û0       = @views    Û0[(1 + nu*(j-1)):(nu*j)]
-        k̇        = @views     K̇[(1 + nk*(j-1)):(nk*j)]
-        k_Z̃      = @views   K_Z̃[(1 + nk*(j-1)):(nk*j)] 
+        k̄dot     = @views     K̇[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄_Z̃      = @views   K_Z̃[(1 + nk̄*(j-1)):(nk̄*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        ŝk       = @views   geq[(1 + nk*(j-1)):(nk*j)]
+        ŝk       = @views   geq[(1 + nk̄*(j-1)):(nk̄*j)]
         # ----------------- collocation constraint defects -----------------------------
-        Δk = k̇
+        Δk = k̄dot
         for i=1:no
-            Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
+            Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
         end
         mul!(ŝk, Mo, Δk)
         d̂i = @views D̂temp[(1 + nd*(j-1)):(nd*j)]
@@ -1507,8 +1507,8 @@ function con_nonlinprogeq!(
             ûi = similar(û0) # TODO: remove this allocation
         end
         for i=1:no
-            k̇i   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
-            ki_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
+            k̇i   = @views   k̄dot[(1 + (i-1)*nx):(i*nx)]
+            ki_Z̃ = @views k̄_Z̃[(1 + (i-1)*nx):(i*nx)]
             d̂i  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
             if h < 1
                 model.f!(k̇i, ki_Z̃, û0, d̂i, model.p)
@@ -1519,7 +1519,7 @@ function con_nonlinprogeq!(
                 model.f!(k̇i, ki_Z̃, ûi, d̂i, model.p)
             end
         end
-        ŝk .-= k̇
+        ŝk .-= k̄dot
     end
     return geq
 end
