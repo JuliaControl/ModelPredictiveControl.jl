@@ -201,25 +201,26 @@ includes the collocation points:
 where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministic states
 (the first `nx` elements of ``\mathbf{x̂}``):
 ```math
-\mathbf{K} =                            \begin{bmatrix}
-    \mathbf{k}_{1}(k+0)                 \\
-    \mathbf{k}_{2}(k+0)                 \\
-    \vdots                              \\
-    \mathbf{k}_{n_o}(k+0)               \\
-    \mathbf{k}_{1}(k+1)                 \\
-    \mathbf{k}_{2}(k+1)                 \\
-    \vdots                              \\
-    \mathbf{k}_{n_o}(k+H_p-1)           \end{bmatrix}
+\mathbf{K} = \begin{bmatrix}
+    \mathbf{k̄}(k+0)                                                                     \\
+    \mathbf{k̄}(k+1)                                                                     \\
+    \vdots                                                                              \\
+    \mathbf{k̄}(k+H_p-1)                                                                 
+\end{bmatrix}                                                                           \quad \text{and} \quad
+\mathbf{k̄}(k+j) = \begin{bmatrix}
+    \mathbf{k}_1(k+j)                                                                   \\
+    \mathbf{k}_2(k+j)                                                                   \\
+    \vdots                                                                              \\
+    \mathbf{k}_{n_o}(k+j)                                                               
+\end{bmatrix}
 ```
-and ``\mathbf{k}_i(k+j)`` is the deterministic state prediction for the ``i``th collocation
-point at the ``j``th stage/interval (details in Extended Help). The `roots` keyword argument
-is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or Gauss-Legendre quadrature, 
-respectively. See [`MultipleShooting`](@ref) docstring for descriptions of `f_threads` and
-`h_threads` keywords. This transcription computes the predictions by enforcing the
-collocation and continuity constraints at the collocation points. It is efficient for highly
-stiff systems, but generally more expensive than the other methods for non-stiff systems.
-See Extended Help for details and the transcription of [`MovingHorizonEstimator`](@ref) 
-objects.
+The `roots` keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or
+Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstring for info
+on `f_threads` and `h_threads` keywords. This transcription computes thecpredictions by
+enforcing the collocation and continuity constraints at the collocationc points. It is
+efficient for highly stiff systems, but generally more expensive than the other methods for
+non-stiff systems. See Extended Help for details and the transcription of
+[`MovingHorizonEstimator`](@ref) objects.
 
 !!! warning
     Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
@@ -245,7 +246,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{X̂_0}                \\         
         \mathbf{0_x̂}                \\
         \mathbf{K}                  \\         
-        \mathbf{0_k}                \\ 
+        \mathbf{0_k̄}                \\ 
         \mathbf{Ŵ}                  \\
         \mathbf{0_ŵ}                \end{bmatrix}
     ```
@@ -253,17 +254,12 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     all these variables, except for the vector with the intermediate stages of the
     deterministic states at the collation points:
     ```math
-    \mathbf{K} =                            \begin{bmatrix}
-        \mathbf{k}_{1}(k-N_k+p+0)           \\
-        \mathbf{k}_{2}(k-N_k+p+0)           \\
-        \vdots                              \\
-        \mathbf{k}_{n_o}(k-N_k+p+0)         \\
-        \mathbf{k}_{1}(k-N_k+p+1)           \\
-        \mathbf{k}_{2}(k-N_k+p+1)           \\
-        \vdots                              \\
-        \mathbf{k}_{n_o}(k+p-1)             \end{bmatrix}
+    \mathbf{K} =                    \begin{bmatrix}
+        \mathbf{k̄}(k-N_k+p+0)       \\
+        \mathbf{k̄}(k-N_k+p+1)       \\
+        \vdots                      \\
+        \mathbf{k̄}(k+p-1)           \end{bmatrix}
     ```
-
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
     The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
@@ -341,8 +337,8 @@ dynamics at the discrete time ``k`` are given by:
 \begin{aligned}
 \mathbf{ŝ_k}(k)                                                              
     &= \mathbf{M_o} \begin{bmatrix}                                          
-        \mathbf{k}_1(k) - \mathbf{x̂_d}(k)                                                    \\
-        \mathbf{k}_2(k) - \mathbf{x̂_d}(k)                                                    \\
+        \mathbf{k}_1(k)     - \mathbf{x̂_d}(k)                                                \\
+        \mathbf{k}_2(k)     - \mathbf{x̂_d}(k)                                                \\
         \vdots                                                                               \\
         \mathbf{k}_{n_o}(k) - \mathbf{x̂_d}(k)                                                \end{bmatrix}                                                                                   
     - \begin{bmatrix}

@@ -34,7 +34,7 @@ struct NonLinModel{
     nx::Int
     ny::Int
     nd::Int
-    nk::Int
+    nk̄::Int
     uop::Vector{NT}
     yop::Vector{NT}
     dop::Vector{NT}
@@ -72,7 +72,7 @@ struct NonLinModel{
         x0 = zeros(NT, nx)
         t  = zeros(NT, 1)
         ni = solver.ni
-        nk = nx*(ni+1)
+        nk̄ = nx*(ni+1)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd, ni)
         return new{NT, DS, F, H, PT, JB, LF}(
             x0, 
@@ -80,7 +80,7 @@ struct NonLinModel{
             f!, h!,
             p, 
             Ts, t,
-            nu, nx, ny, nd, nk, 
+            nu, nx, ny, nd, nk̄, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
             jacobian, linfunc!,
@@ -308,15 +308,15 @@ LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 
 """
-    f!(x0next, k, model::NonLinModel, x0, u0, d0, p)
+    f!(x0next, k̄, model::NonLinModel, x0, u0, d0, p)
 
 Compute `x0next` using the [`DiffSolver`](@ref) in `model.solver` and `model.f!`.
 
-The method mutates `x0next` and `k` arguments in-place. The latter is used to store the
+The method mutates `x0next` and `k̄` arguments in-place. The latter is used to store the
 intermediate stage values of the solver.
 """
-function f!(x0next, k, model::NonLinModel, x0, u0, d0, p)
-    return solver_f!(x0next, k, model.f!, model.Ts, model.solver, x0, u0, d0, p)
+function f!(x0next, k̄, model::NonLinModel, x0, u0, d0, p)
+    return solver_f!(x0next, k̄, model.f!, model.Ts, model.solver, x0, u0, d0, p)
 end
 
 """

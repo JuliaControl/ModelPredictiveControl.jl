@@ -1,7 +1,7 @@
 "Get the number of elements in the optimization decision vector `Z`"
 get_nZ_mhe(::SingleShooting, He, nx̂, _ , nŵ) = nx̂ + nŵ*He
 get_nZ_mhe(::TranscriptionMethod, He, nx̂, _ , nŵ) = nx̂ + nx̂*He + nŵ*He
-get_nZ_mhe(::OrthogonalCollocation, He, nx̂, nk, nŵ) = nx̂ + nx̂*He + nk*He + nŵ*He
+get_nZ_mhe(::OrthogonalCollocation, He, nx̂, nk̄, nŵ) = nx̂ + nx̂*He + nk̄*He + nŵ*He
 
 "Get the element indices in the decision vector `Z̃` that applies to a `Nk` window length."
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::TranscriptionMethod)
@@ -17,11 +17,11 @@ function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::TranscriptionMethod)
 end
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, transcription::OrthogonalCollocation)
     nx̂, nŵ, Nk = estim.nx̂, estim.nx̂, estim.Nk[]
-    nk = get_nk(estim.model, transcription)
-    nŴ, nX̂, nK  = nŵ*Nk, nx̂*Nk, nk*Nk
+    nk̄ = get_nk̄(estim.model, transcription)
+    nŴ, nX̂, nK  = nŵ*Nk, nx̂*Nk, nk̄*Nk
     nx̃ = estim.nε + nx̂
     nx̃_nX̂_He = nx̃ + nx̂*estim.He
-    nx̃_nX̂_nK_He = nx̃_nX̂_He + nk*estim.He
+    nx̃_nX̂_nK_He = nx̃_nX̂_He + nk̄*estim.He
     i_Z̃_NK = [
         (1):(nx̃ + nX̂);
         (1 + nx̃_nX̂_He):(nx̃_nX̂_He + nK);
@@ -381,8 +381,8 @@ function init_predmat_mhe(
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
     nŵ = nx̂
-    nk = get_nk(model, transcription)
-    nZ = get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
+    nk̄ = get_nk̄(model, transcription)
+    nZ = get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
     E  = zeros(NT, 0, nZ)
     ex̄ = [-I zeros(NT, nx̂, nZ - nx̂)]
     EX̂ = zeros(NT, 0, nZ)
@@ -409,8 +409,8 @@ function init_predmat_mhe(
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
     nŵ = nx̂
-    nk = get_nk(model, transcription)
-    nZ = get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
+    nk̄ = get_nk̄(model, transcription)
+    nZ = get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
     E  = zeros(NT, 0, nZ)
     ex̄ = [-I zeros(NT, nx̂, nZ - nx̂)]
     EX̂ = [zeros(NT, nx̂*He, nx̂) I zeros(NT, nx̂*He, nZ - nx̂ - nx̂*He)]
@@ -598,7 +598,7 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
         \vdots        & \vdots       & \vdots        & \vdots       & \ddots & \vdots        & \vdots       & \vdots     & \vdots               \\
         \mathbf{0}    & \mathbf{0}   & \mathbf{0}    & \mathbf{0}   & \cdots & λ_o\mathbf{I} & \mathbf{0}   & \mathbf{-I} & \mathbf{0}          \\   
         \mathbf{0}    & \mathbf{0}   & \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}    & \mathbf{A_s} & \mathbf{0}  & \mathbf{-I}         \end{bmatrix} \\
-    \mathbf{E_S^k} &= \begin{bmatrix}
+    \mathbf{E_S^k̄} &= \begin{bmatrix}
        \mathbf{C_o}   & \mathbf{0}   & \cdots & \mathbf{0}                                                                                      \\
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                                      \\
         \mathbf{0}    & \mathbf{C_o} & \cdots & \mathbf{0}                                                                                      \\
@@ -607,7 +607,7 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{C_o}                                                                                    \\ 
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                                      \end{bmatrix} \\
         \mathbf{E_S^ŵ} &= \mathbf{I}                                                                                                            \\
-    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^k} & \mathbf{E_S^ŵ}                                                          \end{bmatrix} \\
+    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^k̄} & \mathbf{E_S^ŵ}                                                          \end{bmatrix} \\
     \end{aligned}
     ```
 """
@@ -617,7 +617,7 @@ function init_defectmat_mhe(
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
     nx  = nx̂ - nxs
-    nk = get_nk(model, transcription)
+    nk̄ = get_nk̄(model, transcription)
     λo_I = λo*I(nx)
     ESx̂ = [zeros(NT, nx̂*He, nx̂) -I]
     for j=1:He
@@ -628,9 +628,9 @@ function init_defectmat_mhe(
         iCol = (nx+1:nx̂) .+ (j-1)*nx̂
         ESx̂[iRow, iCol] = As
     end
-    ESk = repeatdiag([Co; zeros(NT, nxs, nk)], He)
+    ESk̄ = repeatdiag([Co; zeros(NT, nxs, nk̄)], He)
     ESŵ = I # will be different if nŵ ≠ nx̂ is implemented
-    ES = [ESx̂ ESk ESŵ]
+    ES = [ESx̂ ESk̄ ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
     JS = zeros(NT, nxs*He, model.nd*(He+1))
     BS = zeros(NT, nxs*He)
@@ -651,8 +651,8 @@ function init_defectmat_mhe_empty(
     model::SimModelODE{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
-    nk = get_nk(model, transcription)
-    nZ = get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
+    nk̄ = get_nk̄(model, transcription)
+    nZ = get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
     ES = zeros(NT, 0, nZ)
     GS = zeros(NT, 0, nu*He)
     JS = zeros(NT, 0, nd*(He+1))
@@ -1060,7 +1060,7 @@ function set_warmstart_mhe!(
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
     nu = model.nu
-    nk = get_nk(estim.model, transcription)
+    nk̄ = get_nk̄(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ = nε + nx̂, nŵ*He
     Z̃s = estim.buffer.Z̃
@@ -1074,7 +1074,7 @@ function set_warmstart_mhe!(
     # --- verify definiteness of objective function ---
     x̄ = buffer.x̂
     V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
-    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk) # TODO: remove the 2 allocations
+    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     x̂0arr = estim.x̂0arr_old
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s) 
@@ -1112,12 +1112,12 @@ It warm-starts the solver at:
     \mathbf{x̂_0}(k+p-1|k-1)         \\
     \mathbf{x̂_0}(k+p-1|k-1)         \\
     \mathbf{0_x̂}                    \\
-    \mathbf{k}(k-N_k+p+0|k-1)       \\
-    \mathbf{k}(k-N_k+p+1|k-1)       \\
+    \mathbf{k̄}(k-N_k+p+0|k-1)       \\
+    \mathbf{k̄}(k-N_k+p+1|k-1)       \\
     \vdots                          \\
-    \mathbf{k}(k+p-3|k-1)           \\
-    \mathbf{k}(k+p-2|k-1)           \\
-    \mathbf{k}(k+p-2|k-1)           \\
+    \mathbf{k̄}(k+p-3|k-1)           \\
+    \mathbf{k̄}(k+p-2|k-1)           \\
+    \mathbf{k̄}(k+p-2|k-1)           \\
     \mathbf{0_k}                    \\
     \mathbf{ŵ}(k-N_k+p+0|k-1)       \\
     \mathbf{ŵ}(k-N_k+p+1|k-1)       \\
@@ -1130,7 +1130,7 @@ It warm-starts the solver at:
 ```
 where ``\mathbf{x̂_0}(k-j|k-1)`` is the predicted state for time ``k-j`` computed at the
 last control period ``k-1``, expressed as a deviation from the operating point 
-``\mathbf{x̂_{op}}``. The vector ``\mathbf{k}(k-j|k-1)`` include the ``n_o`` intermediate
+``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k-j|k-1)`` include the ``n_o`` intermediate
 stage predictions for the interval ``k-j``, and is also computed at the last control period.
 See the Extended Help of [`MultipleShooting`](@ref) and [`OrthogonalCollocation`](@ref) for
 the defintion of vectors ``\mathbf{0_x̂}``, ``\mathbf{0_k}`` and ``\mathbf{0_ŵ}``.
@@ -1140,9 +1140,9 @@ function set_warmstart_mhe!(
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
     nu = model.nu
-    nk = get_nk(estim.model, transcription)
+    nk̄ = get_nk̄(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
-    nx̃, nŴ, nX̂, nK = nε + nx̂, nŵ*He, nx̂*He, nk*He
+    nx̃, nŴ, nX̂, nK = nε + nx̂, nŵ*He, nx̂*He, nk̄*He
     Z̃s = estim.buffer.Z̃
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
@@ -1152,15 +1152,15 @@ function set_warmstart_mhe!(
     Z̃s[(nx̃+1):(nx̃+nX̂-nx̂)]    .= @views estim.Z̃[(nx̃+nx̂+1):(nx̃+nX̂)]
     Z̃s[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)] .= @views estim.Z̃[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)]
     # --- collocation points K --- 
-    Z̃s[(nx̃+nX̂+1):(nx̃+nX̂+nK-nk)]    .= @views estim.Z̃[(nx̃+nX̂+nk+1):(nx̃+nX̂+nK)]
-    Z̃s[(nx̃+nX̂+nK-nk+1):(nx̃+nX̂+nK)] .= @views estim.Z̃[(nx̃+nX̂+nK-nk+1):(nx̃+nX̂+nK)]
+    Z̃s[(nx̃+nX̂+1):(nx̃+nX̂+nK-nk̄)]    .= @views estim.Z̃[(nx̃+nX̂+nk̄+1):(nx̃+nX̂+nK)]
+    Z̃s[(nx̃+nX̂+nK-nk̄+1):(nx̃+nX̂+nK)] .= @views estim.Z̃[(nx̃+nX̂+nK-nk̄+1):(nx̃+nX̂+nK)]
     # --- process noise estimates Ŵ ---
     Z̃s[(nx̃+nX̂+nK+1):(nx̃+nX̂+nK+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nX̂+nK+nŵ+1):(nx̃+nX̂+nK+nŴ)]
     Z̃s[(nx̃+nX̂+nK+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
     x̄ = buffer.x̂
     V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
-    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk) # TODO: remove the 2 allocations
+    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     x̂0arr = estim.x̂0arr_old
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
@@ -1213,7 +1213,7 @@ function set_warmstart_mhe!(
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
     nu = model.nu
-    nk = get_nk(estim.model, transcription)
+    nk̄ = get_nk̄(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂ = nε + nx̂, nŵ*He, nx̂*He
     Z̃s = estim.buffer.Z̃
@@ -1230,7 +1230,7 @@ function set_warmstart_mhe!(
     # --- verify definiteness of objective function ---
     x̄ = buffer.x̂
     V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
-    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk) # TODO: remove the 2 allocations
+    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     x̂0arr = estim.x̂0arr_old
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
@@ -1266,11 +1266,11 @@ end
 function fill0unused!(Z̃, estim::MovingHorizonEstimator, transcription::OrthogonalCollocation)
     nŵ, nx̂, He, Nk =  estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃ = estim.nε + nx̂
-    nk = get_nk(estim.model, transcription)
+    nk̄ = get_nk̄(estim.model, transcription)
     nx̃_nX̂_He    = nx̃ + nx̂*He
-    nx̃_nX̂_nK_He = nx̃_nX̂_He + nk*He
+    nx̃_nX̂_nK_He = nx̃_nX̂_He + nk̄*He
     Z̃[(nx̃ + nx̂*Nk + 1):(nx̃_nX̂_He)]          .= 0 # unused decision variables after X̂0 vector
-    Z̃[(nx̃_nX̂_He + nk*Nk + 1):(nx̃_nX̂_nK_He)] .= 0 # unused decision variables after K vector
+    Z̃[(nx̃_nX̂_He + nk̄*Nk + 1):(nx̃_nX̂_nK_He)] .= 0 # unused decision variables after K vector
     Z̃[(nx̃_nX̂_nK_He + nŵ*Nk + 1):end]        .= 0 # unused decision variables after Ŵ vector
     return nothing
 end
@@ -1336,7 +1336,7 @@ function predict_mhe!(
     estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
     x̂0arr, Ŵ, _ 
 )
-    nu, nd, ny, nk = model.nu, model.nd, model.ny, model.nk
+    nu, nd, ny, nk̄ = model.nu, model.nd, model.ny, model.nk̄
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
     p = estim.direct ? 0 : 1
     x̂0 = @views x̂0arr[1:nx̂]
@@ -1344,10 +1344,10 @@ function predict_mhe!(
         u0      = @views  estim.U0[(1+nu*(j-1)):(nu*j)]
         d0      = @views  estim.D0[(1+nd*(j+p-1)):(nd*(j+p))]
         ŵ       = @views         Ŵ[(1+nŵ*(j-1)):(nŵ*j)]
-        k       = @views         K[(1+nk*(j-1)):(nk*j)]
+        k̄       = @views         K[(1+nk̄*(j-1)):(nk̄*j)]
         û0      = @views        Û0[(1+nu*(j-1)):(nu*j)]
         x̂0next  = @views        X̂0[(1+nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k, estim, model, x̂0, u0, d0)
+        f̂!(x̂0next, û0, k̄, estim, model, x̂0, u0, d0)
         x̂0next .+= ŵ
         if estim.direct
             ŷ0next  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
@@ -1543,7 +1543,7 @@ function con_nonlinprogeq_mhe!(
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::MultipleShooting, 
     x̂0arr, Ŵ, Z̃
 )
-    nu, nx, nd, nk = model.nu, model.nx, model.nd, model.nk
+    nu, nx, nd, nk̄ = model.nu, model.nx, model.nd, model.nk̄
     nx̂, nxs, nŵ, He = estim.nx̂, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
@@ -1559,13 +1559,13 @@ function con_nonlinprogeq_mhe!(
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
         end
         d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
-        k        = @views          K[(1 + nk*(j-1)):(nk*j)]
+        k̄        = @views          K[(1 + nk̄*(j-1)):(nk̄*j)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
         x̂dnext   = @views         X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ŝdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
-        f!(x̂dnext, k, model, x̂d_Z̃, û0, d0, model.p)
+        f!(x̂dnext, k̄, model, x̂d_Z̃, û0, d0, model.p)
         x̂dnext .+= ŵd
         ŝdnext  .= @. x̂dnext - x̂dnext_Z̃
     end
@@ -1611,7 +1611,7 @@ function con_nonlinprogeq_mhe!(
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     Ts = model.Ts
-    nk = get_nk(model, transcription)
+    nk̄ = get_nk̄(model, transcription)
     nw = nŵ - nxs
     nx̃ = estim.nε + nx̂
     p = estim.direct ? 0 : 1
@@ -1625,18 +1625,18 @@ function con_nonlinprogeq_mhe!(
         end
         d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
-        k̇        = @views          K̇[(1 + nk*(j-1)):(nk*j)]
+        k̄dot     = @views          K̇[(1 + nk̄*(j-1)):(nk̄*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
         x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ŝdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
-        k̇1, k̇2   = @views          k̇[1:nx], k̇[nx+1:2*nx]    
+        k̇1, k̇2   = @views       k̄dot[1:nx], k̄dot[nx+1:2*nx]    
         d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
             model.f!(k̇1, x̂d_Z̃, û0, d0, model.p)
         else
-            k̇1 .= @views K̇[(1 + nk*(j-1)-nx):(nk*(j-1))] # k2 of of the last iter. j-1
+            k̇1 .= @views K̇[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1
             model.f!(k̇2, x̂dnext_Z̃, û0, d0next, model.p)
@@ -1694,10 +1694,10 @@ function con_nonlinprogeq_mhe!(
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     Mo, no, τ =  estim.Mo, transcription.no, transcription.τ
-    nk = get_nk(model, transcription)
+    nk̄ = get_nk̄(model, transcription)
     nx̃ = estim.nε + nx̂
     p = estim.direct ? 0 : 1
-    X̂0_Z̃, K_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)], Z̃[(nx̃+nx̂*He+1):(nx̃+nx̂*He+nk*He)]
+    X̂0_Z̃, K_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)], Z̃[(nx̃+nx̂*He+1):(nx̃+nx̂*He+nk̄*He)]
     Dtemp = estim.buffer.D
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
     @threadsif f_threads for j=1:Nk
@@ -1708,14 +1708,14 @@ function con_nonlinprogeq_mhe!(
         end
         d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
-        k̇        = @views          K̇[(1 + nk*(j-1)):(nk*j)]
-        k_Z̃      = @views        K_Z̃[(1 + nk*(j-1)):(nk*j)]
-        ŝk       = @views        geq[(1 + nk*(j-1)):(nk*j)]
+        k̄dot     = @views          K̇[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄_Z̃      = @views        K_Z̃[(1 + nk̄*(j-1)):(nk̄*j)]
+        ŝk       = @views        geq[(1 + nk̄*(j-1)):(nk̄*j)]
         d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
         # ----------------- collocation constraint defects -----------------------------
-        Δk = k̇
+        Δk = k̄dot
         for i=1:no
-            Δk[(1 + (i-1)*nx):(i*nx)] = @views k_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
+            Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
         end
         mul!(ŝk, Mo, Δk)
         di = @views Dtemp[(1 + nd*(j-1)):(nd*j)]
@@ -1723,8 +1723,8 @@ function con_nonlinprogeq_mhe!(
             ûi = similar(û0) # TODO: remove this allocation
         end
         for i=1:no
-            k̇i   = @views   k̇[(1 + (i-1)*nx):(i*nx)]
-            ki_Z̃ = @views k_Z̃[(1 + (i-1)*nx):(i*nx)]
+            k̇i   = @views k̄dot[(1 + (i-1)*nx):(i*nx)]
+            ki_Z̃ = @views  k̄_Z̃[(1 + (i-1)*nx):(i*nx)]
             di  .= (1-τ[i]).*d0 .+ τ[i].*d0next
             if h < 1
                 model.f!(k̇i, ki_Z̃, û0, di, model.p)
@@ -1735,9 +1735,9 @@ function con_nonlinprogeq_mhe!(
                 model.f!(k̇i, ki_Z̃, ûi, di, model.p)
             end
         end
-        ŝk .-= k̇
+        ŝk .-= k̄dot
     end
-    Nk < He && (geq[nk*Nk+1:end] .= 0)
+    Nk < He && (geq[nk̄*Nk+1:end] .= 0)
     return geq
 end
 

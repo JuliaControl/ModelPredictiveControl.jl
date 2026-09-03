@@ -170,7 +170,7 @@ struct MovingHorizonEstimator{
             CE<:KalmanEstimator{NT}
         }
         nu, ny, nd = model.nu, model.ny, model.nd
-        nk = get_nk(model, transcription)
+        nk̄ = get_nk̄(model, transcription)
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
@@ -201,7 +201,7 @@ struct MovingHorizonEstimator{
             ES, GS, JS, BS, 
             gc!, nc
         )
-        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
+        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
         # dummy values, updated before optimization:
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
@@ -216,7 +216,7 @@ struct MovingHorizonEstimator{
         Nk = [0]
         prepared = [false]
         test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p, direct)
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk, He, nŵ, nε, transcription)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄, He, nŵ, nε, transcription)
         estim = new{NT, SM, KC, TM, JM, GB, JB, HB, PT, GCfunc, CE}(
             model, transcription, optim, con, 
             gradient, jacobian, hessian,
@@ -1078,8 +1078,8 @@ and ``\mathbf{0}`` is properly sized for the `transcription` instance.
 function init_ZtoŴ(
     model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
 ) where {NT<:Real}
-    nk = get_nk(model, transcription)
-    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
+    nk̄ = get_nk̄(model, transcription)
+    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
     Tŵ = [spzeros(NT, nŴ, nZ-nŴ) I]
     return Tŵ
 end
@@ -1305,8 +1305,8 @@ function init_boxconstraint_mhe(
     x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
     A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
-    nk = get_nk(model, transcription)
-    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
+    nk̄ = get_nk̄(model, transcription)
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
     Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
     nε > 0 && (Z̃min[begin] = 0)
     nŴ = nŵ*He
@@ -1426,11 +1426,11 @@ function get_nonlinobj_op(
     model, con = estim.model, estim.con
     grad, hess = estim.gradient, estim.hessian
     nx̂, nym, nŷ, nu = estim.nx̂, estim.nym, model.ny, model.nu
-    nk = get_nk(model, estim.transcription)
+    nk̄ = get_nk̄(model, estim.transcription)
     He = estim.He
     nc, neq, ng = con.nc, con.neq, length(con.i_g)
     nŴ, nV̂, nX̂, ng, nZ̃ = He*nx̂, He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
-    nK, nU, nŶ = He*nk, He*nu, He*nŷ
+    nK, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
     myNaN                               = convert(JNT, NaN)
@@ -1542,13 +1542,13 @@ function get_nonlincon_oracle(
     model, con = estim.model, estim.con
     jac, hess = estim.jacobian, estim.hessian
     nx̂, nym, nŷ, nu = estim.nx̂, estim.nym, model.ny, model.nu
-    nk = get_nk(model, estim.transcription)
+    nk̄ = get_nk̄(model, estim.transcription)
     He = estim.He
     nc, neq, ng = con.nc, con.neq, length(con.i_g)
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ngi = sum(con.i_g)
     nŴ, nV̂, nX̂, nZ̃ = He*nx̂, He*nym, He*nx̂, length(estim.Z̃)
-    nK, nU, nŶ = He*nk, He*nu, He*nŷ
+    nK, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
     myNaN, myInf                          = convert(JNT, NaN), convert(JNT, Inf)

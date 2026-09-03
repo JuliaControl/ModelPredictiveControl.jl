@@ -144,7 +144,7 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 """
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     model, buffer, transcription = mpc.estim.model, mpc.buffer, mpc.transcription
-    nΔŨ, nK = mpc.Hc*model.nu + mpc.nϵ, mpc.Hp*model.nk
+    nΔŨ, nK = mpc.Hc*model.nu + mpc.nϵ, mpc.Hp*model.nk̄
     nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu
     nX̂0, nÛ0 = mpc.estim.nx̂*mpc.Hp, model.nu*mpc.Hp 
     Z̃ = mpc.Z̃

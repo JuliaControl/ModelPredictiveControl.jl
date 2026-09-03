@@ -1,7 +1,7 @@
 struct StateEstimatorBuffer{NT<:Real}
     u ::Vector{NT}
     û ::Vector{NT}
-    k ::Vector{NT}
+    k̄ ::Vector{NT}
     x̂ ::Vector{NT}
     Z̃ ::Vector{NT}
     V̂ ::Vector{NT}
@@ -21,7 +21,7 @@ end
 
 @doc raw"""
     StateEstimatorBuffer{NT}(
-        nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0
+        nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk̄::Int=0
         He::Int=0, nŵ::Int=nx̂, nε::Int=0, 
         transcription::TranscriptionMethod = SingleShooting()
     )
@@ -31,15 +31,15 @@ Create a buffer for `StateEstimator` objects for estimated states and measured o
 The buffer is used to store intermediate results during estimation without allocating.
 """
 function StateEstimatorBuffer{NT}(
-    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk::Int=0, 
+    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk̄::Int=0, 
     He::Int=0, nŵ::Int=nx̂, nε::Int=0,
     transcription::TranscriptionMethod = SingleShooting()
 ) where NT <: Real
-    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
     nV̂, nŴ, nX̂, nŶ, nD = nym*He, nŵ*He, nx̂*He, ny*He, nd*(He+1)
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)
-    k  = Vector{NT}(undef, nk)
+    k̄  = Vector{NT}(undef, nk̄)
     x̂  = Vector{NT}(undef, nx̂)
     Z̃  = Vector{NT}(undef, nZ̃)
     V̂  = Vector{NT}(undef, nV̂)
@@ -56,7 +56,7 @@ function StateEstimatorBuffer{NT}(
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
     return StateEstimatorBuffer{NT}(
-        u, û, k, x̂, Z̃, V̂, Ŵ, X̂, Ŷ, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
+        u, û, k̄, x̂, Z̃, V̂, Ŵ, X̂, Ŷ, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
     )
 end
 

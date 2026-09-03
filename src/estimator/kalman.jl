@@ -35,7 +35,7 @@ struct SteadyKalmanFilter{
     function SteadyKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true
     ) where {NT<:Real, SM<:LinModel, KC<:KalmanCovariances}
-        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+        nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
@@ -47,7 +47,7 @@ struct SteadyKalmanFilter{
         cov.P̂ .= P̂
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         prepared = [false]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄)
         return new{NT, SM, KC}(
             model,
             cov,
@@ -342,7 +342,7 @@ struct KalmanFilter{
     function KalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true
     ) where {NT<:Real, SM<:LinModel, KC<:KalmanCovariances}
-        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+        nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
@@ -352,7 +352,7 @@ struct KalmanFilter{
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         K̂ = zeros(NT, nx̂, nym)
         prepared = [false]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄)
         return new{NT, SM, KC}(
             model, 
             cov,
@@ -568,7 +568,7 @@ struct UnscentedKalmanFilter{
     function UnscentedKalmanFilter{NT}(
         model::SM, i_ym, nint_u, nint_ym, cov::KC, α, β, κ; direct=true
     ) where {NT<:Real, SM<:SimModelODE{NT}, KC<:KalmanCovariances}
-        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+        nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
@@ -582,7 +582,7 @@ struct UnscentedKalmanFilter{
         X̂0,  X̄0  = zeros(NT, nx̂, nσ),  zeros(NT, nx̂, nσ)
         Ŷ0m, Ȳ0m = zeros(NT, nym, nσ), zeros(NT, nym, nσ)
         prepared = [false]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄)
         return new{NT, SM, KC}(
             model,
             cov,
@@ -877,7 +877,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     x̂0corr, X̂0corr, P̂corr = estim.x̂0, estim.X̂0, estim.cov.P̂
     Q̂, nx̂ = estim.cov.Q̂, estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
-    x̂0next, û0, k = estim.buffer.x̂, estim.buffer.û, estim.buffer.k
+    x̂0next, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
     # in-place operations to reduce allocations:
     P̂corr_temp  = Hermitian(estim.buffer.P̂, :L)
     P̂corr_temp .= P̂corr
@@ -890,7 +890,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     X̂0next = X̂0corr
     for j in axes(X̂0next, 2)
         @views x̂0corr .= X̂0corr[:, j]
-        @views f̂!(X̂0next[:, j], û0, k, estim, estim.model, x̂0corr, u0, d0)
+        @views f̂!(X̂0next[:, j], û0, k̄, estim, estim.model, x̂0corr, u0, d0)
     end
     x̂0next .= mul!(x̂0corr, X̂0next, m̂)
     X̄0next  = estim.X̄0
@@ -958,7 +958,7 @@ struct ExtendedKalmanFilter{
             FF<:Function,
             HF<:Function
         }
-        nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+        nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
@@ -970,7 +970,7 @@ struct ExtendedKalmanFilter{
         F̂_û, F̂ = zeros(NT, nx̂+nu, nx̂), zeros(NT, nx̂, nx̂)
         Ĥ,  Ĥm = zeros(NT, ny, nx̂),    zeros(NT, nym, nx̂)
         prepared = [false]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk)
+        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄)
         return new{NT, SM, KC, JB, FF, HF}(
             model,
             cov,
@@ -1114,7 +1114,7 @@ objects with the linearization points.
 """
 function get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)
     As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
-    nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+    nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
     nx̂ = model.nx + size(As, 1)
     x̂op = f̂op = zeros(nx̂) # not important for Jacobian computations
     function f̂_ekf!(x̂0next, x̂0, û0, k, u0, d0)
@@ -1126,15 +1126,15 @@ function get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)
     ŷ0 = zeros(NT, ny)
     x̂0 = zeros(NT, nx̂)
     û0 = Cache(zeros(NT, nu))
-    k = Cache(zeros(NT, nk))
+    k̄  = Cache(zeros(NT, nk̄))
     cst_u0 = Constant(rand(NT, nu))
     cst_d0 = Constant(rand(NT, nd))
     F̂prep = prepare_jacobian(
-        f̂_ekf!, x̂0next, jacobian, x̂0, û0, k, cst_u0, cst_d0; strict
+        f̂_ekf!, x̂0next, jacobian, x̂0, û0, k̄, cst_u0, cst_d0; strict
     )
     Ĥprep = prepare_jacobian(ĥ_ekf!, ŷ0, jacobian, x̂0, cst_d0; strict)
     function linfuncF̂!(F̂, x̂0next, backend, x̂0, cst_u0, cst_d0)
-        return jacobian!(f̂_ekf!, x̂0next, F̂, F̂prep, backend, x̂0, û0, k, cst_u0, cst_d0)
+        return jacobian!(f̂_ekf!, x̂0next, F̂, F̂prep, backend, x̂0, û0, k̄, cst_u0, cst_d0)
     end
     function linfuncĤ!(Ĥ, ŷ0, backend, x̂0, cst_d0)
         return jacobian!(ĥ_ekf!, ŷ0, Ĥ, Ĥprep, backend, x̂0, cst_d0)
@@ -1275,9 +1275,9 @@ They predict the state `x̂` and covariance `P̂` with the same equations. See
 function predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, u0, d0, Â)
     x̂0corr, P̂corr = estim.x̂0, estim.cov.P̂
     Q̂ = estim.cov.Q̂
-    x̂0next, û0, k = estim.buffer.x̂, estim.buffer.û, estim.buffer.k
+    x̂0next, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
     # in-place operations to reduce allocations:
-    f̂!(x̂0next, û0, k, estim, estim.model, x̂0corr, u0, d0)
+    f̂!(x̂0next, û0, k̄, estim, estim.model, x̂0corr, u0, d0)
     P̂corr_Âᵀ = estim.buffer.P̂
     mul!(P̂corr_Âᵀ, P̂corr, Â')
     Â_P̂corr_Âᵀ = estim.buffer.Q̂
