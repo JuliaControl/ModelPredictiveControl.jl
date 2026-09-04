@@ -32,11 +32,11 @@ Construct a direct single shooting [`TranscriptionMethod`](@ref).
 In the case of [`PredictiveController`](@ref) types, the decision variable in the
 optimization problem is (excluding the slack ``ϵ``, and without any custom move blocking):
 ```math
-\mathbf{Z} = \mathbf{ΔU} =          \begin{bmatrix} 
-    \mathbf{Δu}(k+0)                \\ 
-    \mathbf{Δu}(k+1)                \\ 
-    \vdots                          \\ 
-    \mathbf{Δu}(k+H_c-1)            \end{bmatrix}
+\mathbf{Z} = \mathbf{ΔU} = \begin{bmatrix} 
+    \mathbf{Δu}(k+0)                                    \\ 
+    \mathbf{Δu}(k+1)                                    \\ 
+    \vdots                                              \\ 
+    \mathbf{Δu}(k+H_c-1)                                \end{bmatrix}
 ```
 This method computes the predictions by calling the augmented discrete-time model
 recursively over the prediction horizon ``H_p`` in the objective function, or by updating
@@ -49,16 +49,14 @@ plant model/constraints. The Extended Help details transcription of
 !!! details "Extended Help"
     For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
     ```math
-    \mathbf{Z}
-        =                                           \begin{bmatrix} 
-        \mathbf{x̂_0}(k-N_k+p)                       \\
-        \mathbf{Ŵ}                                  \\
-        \mathbf{0_ŵ}                               
-        \end{bmatrix}
-        =                                           \begin{bmatrix} 
-        \mathbf{x̂}_k(k-N_k+p) - \mathbf{x̂_{op}}     \\
-        \mathbf{Ŵ}                                  \\
-        \mathbf{0_ŵ}                                \end{bmatrix}
+    \mathbf{Z} = \begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p)                               \\
+        \mathbf{Ŵ}                                          \\
+        \mathbf{0_ŵ}                                        \end{bmatrix}
+    = \begin{bmatrix} 
+        \mathbf{x̂}_k(k-N_k+p) - \mathbf{x̂_{op}}             \\
+        \mathbf{Ŵ}                                          \\
+        \mathbf{0_ŵ}                                        \end{bmatrix}
     ``` 
     The vector ``\mathbf{0_ŵ}`` with `nx̂*(He-Nk)` zeros is for the unused decision variables
     at the beginning, when the data windows are growing (``N_k < H_e``). The number of
@@ -79,11 +77,11 @@ The decision variable of [`PredictiveController`](@ref) is (excluding ``ϵ``):
 thus it also includes the predicted states, expressed as deviation vectors from the
 operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
 ```math
-\mathbf{X̂_0} = \mathbf{X̂ - X̂_{op}} =            \begin{bmatrix} 
-    \mathbf{x̂}_i(k+1)     - \mathbf{x̂_{op}}     \\ 
-    \mathbf{x̂}_i(k+2)     - \mathbf{x̂_{op}}     \\ 
-    \vdots                                      \\ 
-    \mathbf{x̂}_i(k+H_p)   - \mathbf{x̂_{op}}     \end{bmatrix}
+\mathbf{X̂_0} = \mathbf{X̂ - X̂_{op}} = \begin{bmatrix} 
+    \mathbf{x̂}_i(k+1)     - \mathbf{x̂_{op}}                         \\ 
+    \mathbf{x̂}_i(k+2)     - \mathbf{x̂_{op}}                         \\ 
+    \vdots                                                          \\ 
+    \mathbf{x̂}_i(k+H_p)   - \mathbf{x̂_{op}}                         \end{bmatrix}
 ```
 where ``\mathbf{x̂}_i(k+j)`` is the state prediction for time ``k+j``, estimated by the
 observer at time ``i=k`` or ``i=k-1`` depending on its `direct` flag. Note that 
@@ -105,21 +103,21 @@ provided in the Extended Help.
 !!! details "Extended Help"
     For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
     ```math
-    \mathbf{Z} =                    \begin{bmatrix} 
-        \mathbf{x̂_0}(k-N_k+p)       \\  
-        \mathbf{X̂_0}                \\         
-        \mathbf{0_x̂}                \\ 
-        \mathbf{Ŵ}                  \\
-        \mathbf{0_ŵ}                \end{bmatrix}
+    \mathbf{Z} = \begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p)                                       \\  
+        \mathbf{X̂_0}                                                \\         
+        \mathbf{0_x̂}                                                \\ 
+        \mathbf{Ŵ}                                                  \\
+        \mathbf{0_ŵ}                                                \end{bmatrix}
     ```
     thus the deviation value of arrival state estimate ``\mathbf{x̂_0}(k-N_k+p)`` is kept out
     of the estimated states over ``N_k``:
     ```math
-    \mathbf{X̂_0} = \mathbf{X̂ - X̂_{op}} =                    \begin{bmatrix} 
-        \mathbf{x̂}_k(k-N_k+p+1)     - \mathbf{x̂_{op}}       \\ 
-        \mathbf{x̂}_k(k-N_k+p+2)     - \mathbf{x̂_{op}}       \\ 
-        \vdots                                              \\ 
-        \mathbf{x̂}_k(k+p)           - \mathbf{x̂_{op}}       \end{bmatrix}
+    \mathbf{X̂_0} = \mathbf{X̂ - X̂_{op}} = \begin{bmatrix} 
+        \mathbf{x̂}_k(k-N_k+p+1)     - \mathbf{x̂_{op}}               \\ 
+        \mathbf{x̂}_k(k-N_k+p+2)     - \mathbf{x̂_{op}}               \\ 
+        \vdots                                                      \\ 
+        \mathbf{x̂}_k(k+p)           - \mathbf{x̂_{op}}               \end{bmatrix}
     ```
     Similarly to [`SingleShooting`](@ref), the ``\mathbf{0_x̂}`` and ``\mathbf{0_ŵ}`` vectors
     with zeros is for the unused decision variables at the beginning.
@@ -163,38 +161,45 @@ transcription method.
 
 # Extended Help
 !!! details "Extended Help"
-    The algebraic vector ``\mathbf{a}`` values at the boundaries is incorporated in the
+    The algebraic vectors at the future time step ``\mathbf{a_0}`` is included in the 
     decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
     ```math
-    \mathbf{Z} =                    \begin{bmatrix} 
-        \mathbf{x_0}(k+1)           \\ 
-        \mathbf{a}(k+0)             \\ 
-        \mathbf{a}(k+1)             \end{bmatrix}
+    \mathbf{Z} = \begin{bmatrix} 
+        \mathbf{x_0}(k+1)                                               \\ 
+        \mathbf{a_0}(k+1)                                               \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
     ```math
-    \mathbf{Z} =                    \begin{bmatrix} 
-        \mathbf{ΔU}                 \\
-        \mathbf{X̂_0}                \\
-        \mathbf{a}(k+0)             \\
-        \mathbf{a}(k+1)             \\
-        \vdots                      \\
-        \mathbf{a}(k+H_p)           \end{bmatrix}
+    \mathbf{Z} = \begin{bmatrix} 
+        \mathbf{ΔU}                                                     \\
+        \mathbf{X̂_0}                                                    \\
+        \mathbf{A_0}                                                    \end{bmatrix}
+    \quad \text{and} \quad
+    \mathbf{A_0} = \begin{bmatrix}
+        \mathbf{a_0}(k+1)                                               \\
+        \mathbf{a_0}(k+2)                                               \\
+        \vdots                                                          \\
+        \mathbf{a_0}(k+H_p)                                             \end{bmatrix}
     ```
     and, for [`MovingHorizonEstimator`](@ref) with DAEs:
-        ```math
-    \mathbf{Z} =                    \begin{bmatrix} 
-        \mathbf{x̂_0}(k-N_k+p)       \\  
-        \mathbf{X̂_0}                \\         
-        \mathbf{0_x̂}                \\
-        \mathbf{a}(k-N_k+p+0)       \\
-        \mathbf{a}(k-N_k+p+1)       \\
-        \vdots                      \\
-        \mathbf{a}(k+p)             \\
-        \mathbf{0_a}                \\
-        \mathbf{Ŵ}                  \\
-        \mathbf{0_ŵ}                \end{bmatrix}
-    ``` 
+    ```math
+    \mathbf{Z} = \begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p)                                           \\  
+        \mathbf{X̂_0}                                                    \\         
+        \mathbf{0_x̂}                                                    \\
+        \mathbf{A_0}                                                    \\
+        \mathbf{0_a}                                                    \\
+        \mathbf{Ŵ}                                                      \\
+        \mathbf{0_ŵ}                                                    \end{bmatrix}
+    \quad \text{and} \quad
+    \mathbf{A_0} = \begin{bmatrix}
+        \mathbf{a_0}(k-N_k+p+1)                                         \\
+        \mathbf{a_0}(k-N_k+p+1)                                         \\
+        \vdots                                                          \\
+        \mathbf{a_0}(k+p)                                               \end{bmatrix}
+    ```
+    See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
+    two cases.
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
@@ -237,17 +242,16 @@ where ``\mathbf{K̄}`` encompasses all the intermediate stages of the determinis
 (the first `nx` elements of ``\mathbf{x̂}``):
 ```math
 \mathbf{K̄} = \begin{bmatrix}
-    \mathbf{k̄}(k+0)                                                                     \\
-    \mathbf{k̄}(k+1)                                                                     \\
-    \vdots                                                                              \\
-    \mathbf{k̄}(k+H_p-1)                                                                 
-\end{bmatrix}                                                                           \quad \text{and} \quad
+    \mathbf{k̄}(k+0)                                                 \\
+    \mathbf{k̄}(k+1)                                                 \\
+    \vdots                                                          \\
+    \mathbf{k̄}(k+H_p-1)                                             \end{bmatrix}  
+\quad \text{and} \quad
 \mathbf{k̄}(k+j) = \begin{bmatrix}
-    \mathbf{k}_1(k+j)                                                                   \\
-    \mathbf{k}_2(k+j)                                                                   \\
-    \vdots                                                                              \\
-    \mathbf{k}_{n_o}(k+j)                                                               
-\end{bmatrix}
+    \mathbf{k}_1(k+j)                                               \\
+    \mathbf{k}_2(k+j)                                               \\
+    \vdots                                                          \\
+    \mathbf{k}_{n_o}(k+j)                                           \end{bmatrix}
 ```
 The `roots` keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or
 Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstring for info
@@ -255,7 +259,7 @@ on `f_threads` and `h_threads` keywords. This transcription computes thecpredict
 enforcing the collocation and continuity constraints at the collocationc points. It is
 efficient for highly stiff systems, but generally more expensive than the other methods for
 non-stiff systems. See Extended Help for details and the transcription of
-[`MovingHorizonEstimator`](@ref) objects.
+[`MovingHorizonEstimator`](@ref) objects and [`NonLinModelDAE`](@ref).
 
 !!! warning
     Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
@@ -269,38 +273,92 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 
 # Extended Help
 !!! details "Extended Help"
-    As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
-    states are left out of the ``\mathbf{K̄}`` vector to reduce the dimensions, and also
-    because collocation methods require continuous-time dynamics and the stochastic model is
-    discrete.
-
-    For [`MovingHorizonEstimator`](@ref), the decision variable is (excluding slack `ε`):
+    For [`MovingHorizonEstimator`](@ref) based on [`NonLinModel`](@ref), the decision
+    variable is (excluding slack `ε`):
     ```math
-    \mathbf{Z} =                    \begin{bmatrix} 
-        \mathbf{x̂_0}(k-N_k+p)       \\  
-        \mathbf{X̂_0}                \\         
-        \mathbf{0_x̂}                \\
-        \mathbf{K̄}                  \\         
-        \mathbf{0_k̄}                \\ 
-        \mathbf{Ŵ}                  \\
-        \mathbf{0_ŵ}                \end{bmatrix}
+    \mathbf{Z} = begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p)                                       \\ 
+        \mathbf{X̂_0}                                                \\         
+        \mathbf{0_x̂}                                                \\
+        \mathbf{K̄}                                                  \\         
+        \mathbf{0_k̄}                                                \\ 
+        \mathbf{Ŵ}                                                  \\
+        \mathbf{0_ŵ}                                                \end{bmatrix}
     ```
     The Extended Help of [`SingleShooting`](@ref) and [`MultipleShooting`](@ref) introduces
     all these variables, except for the vector with the intermediate stages of the
     deterministic states at the collation points:
     ```math
-    \mathbf{K̄} =                    \begin{bmatrix}
-        \mathbf{k̄}(k-N_k+p+0)       \\
-        \mathbf{k̄}(k-N_k+p+1)       \\
-        \vdots                      \\
-        \mathbf{k̄}(k+p-1)           \end{bmatrix}
+    \mathbf{K̄} = \begin{bmatrix}
+        \mathbf{k̄}(k-N_k+p+0)                                       \\
+        \mathbf{k̄}(k-N_k+p+1)                                       \\
+        \vdots                                                      \\
+        \mathbf{k̄}(k+p-1)                                           \end{bmatrix}
     ```
+    
+    Introducing the vector with the algebraic variables at the collocation points:
+    ```math
+    \mathbf{ā}(k+j) = \begin{bmatrix}
+        \mathbf{ā}_1(k+j)                                           \\
+        \mathbf{ā}_2(k+j)                                           \\
+        \vdots                                                      \\
+        \mathbf{ā}_{n_o}(k+j)                                       \end{bmatrix}
+    ```
+    The algebraic vectors at the future time step ``\mathbf{a_0}`` is included in the 
+    decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
+    ```math
+    \mathbf{Z} = \begin{bmatrix} 
+        \mathbf{x_0}(k+1)                                           \\ 
+        \mathbf{a_0}(k+1)                                           \\
+        \mathbf{k̄}(k+0)                                             \\
+        \mathbf{ā}(k+0)                                             \end{bmatrix}
+    ```
+    For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
+    ```math
+    \mathbf{Z} = \begin{bmatrix} 
+        \mathbf{ΔU}                                                 \\
+        \mathbf{X̂_0}                                                \\
+        \mathbf{A_0}                                                \\
+        \mathbf{K̄}                                                  \\
+        \mathbf{Ā}                                                  \end{bmatrix}
+    \quad \text{and} \quad
+    \mathbf{Ā} = \begin{bmatrix}
+        \mathbf{ā}(k+0)                                             \\
+        \mathbf{ā}(k+1)                                             \\
+        \vdots                                                      \\
+        \mathbf{ā}(k+H_p-1)                                         \end{bmatrix}
+    ```
+    and, for [`MovingHorizonEstimator`](@ref) with DAEs:
+    ```math
+    \mathbf{Z} = \begin{bmatrix} 
+        \mathbf{x̂_0}(k-N_k+p)                                       \\  
+        \mathbf{X̂_0}                                                \\         
+        \mathbf{0_x̂}                                                \\
+        \mathbf{A_0}                                                \\
+        \mathbf{0_a}                                                \\
+        \mathbf{Ŵ}                                                  \\
+        \mathbf{0_ŵ}                                                \end{bmatrix}
+    \quad \text{and} \quad
+    \mathbf{Ā} = \begin{bmatrix}
+        \mathbf{ā}(k-N_k+p+0)                                       \\
+        \mathbf{ā}(k-N_k+p+1)                                       \\
+        \vdots                                                      \\
+        \mathbf{ā}(k+p-1)                                           \end{bmatrix}
+    ```
+    See the Extended Help of [`TrapezoidalCollocation`](@ref) for the exact definition of 
+    ``\mathbf{A_0}`` on the last two cases.
+    
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
     The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
     is more accurate than Gauss-Radau but only A-stable, while the latter being L-stable. 
     See [`init_orthocolloc`](@ref), [`con_nonlinprogeq!`](@ref) and [`con_nonlinprogeq_mhe!`](@ref)
     for more details.
+
+    As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
+    states are left out of the ``\mathbf{K̄}`` vector to reduce the dimensions, and also
+    because collocation methods require continuous-time dynamics and the stochastic model is
+    discrete.
 """
 struct OrthogonalCollocation <: CollocationMethod
     h::Int
