@@ -426,24 +426,24 @@ function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) w
     k̄::Vector{JNT},   ā::Vector{JNT}   = zeros(JNT, nk̄),  zeros(JNT, nā)
     q̄::Vector{JNT}                     = zeros(JNT, nā)
     geq::Vector{JNT}, λeq::Vector{JNT} = zeros(JNT, neq), rand(JNT, neq)
-    function geq!(geq, Z, k̄, ā) 
-        update_predictions!(k̄, ā, geq, model, Z)
+    function geq!(geq, Z, k̄, ā, q̄) 
+        update_predictions!(k̄, ā, q̄, geq, model, Z)
         return nothing
     end
-    function ℓ_geq(Z, λeq, k̄, ā, geq)
-        update_predictions!(k̄, ā, geq, model, Z)
+    function ℓ_geq(Z, λeq, k̄, ā, q̄, geq)
+        update_predictions!(k̄, ā, q̄, geq, model, Z)
         return dot(λeq, geq)
     end
     Z_∇geq = fill(myNaN, nZ)    # NaN to force update at first call
     ∇geq_cache = (
-        Cache(k̄), Cache(ā)
+        Cache(k̄), Cache(ā), Cache(q̄)
     )
     ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z_∇geq, ∇geq_cache...; strict)
     ∇geq    = init_diffmat(JNT, jac, ∇geq_prep, nZ, neq)
     ∇geq_structure  = init_diffstructure(∇geq)
     if !isnothing(hess)
         ∇²geq_cache = (
-            Cache(k̄), Cache(ā), Cache(geq)
+            Cache(k̄), Cache(ā), Cache(q̄), Cache(geq)
         )
         ∇²geq_prep = prepare_hessian(
             ℓ_geq, hess, Z_∇geq, Constant(λeq), ∇²geq_cache...; strict
@@ -498,11 +498,12 @@ function update_predictions!(k̄, ā, q̄, geq, model, Z)
 
     k̄ .= 0
     ā .= 0
+    q̄ .= 0
     geq .= 0
 
 
 
-
+#=
     nu, nx, na, nd = model.nu, model.nx, model.na, model.nd
     transcription = model.transcription
     Mo, no, τ =  model.Mo, transcription.no, transcription.τ
@@ -530,7 +531,7 @@ function update_predictions!(k̄, ā, q̄, geq, model, Z)
     end
     snext .-= k̄dot
     
-
+=#
     return nothing
 end
 
