@@ -314,7 +314,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{ā}_{n_o}(k+j)                                       \end{bmatrix}
     ```
     The algebraic vectors at the future time step ``\mathbf{a_0}`` is included in the 
-    decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
+    decision vector for open-loop simulations of DAEs:
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                           \\ 
@@ -322,7 +322,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{k̄}(k+0)                                             \\
         \mathbf{ā}(k+0)                                             \end{bmatrix}
     ```
-    For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
+    For [`NonLinMPC`](@ref) based on DAEs, the decision vector is:
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                 \\
