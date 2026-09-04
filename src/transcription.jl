@@ -304,7 +304,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{k̄}(k+p-1)                                           \end{bmatrix}
     ```
     
-    Introducing the vector with the algebraic variables at the collocation points:
+    The case of [`NonLinModelDAE`](@ref) requires the introduction the vector with the 
+    algebraic variables at the collocation points:
     ```math
     \mathbf{ā}(k+j) = \begin{bmatrix}
         \mathbf{ā}_1(k+j)                                           \\
