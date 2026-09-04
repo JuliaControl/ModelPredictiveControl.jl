@@ -231,12 +231,12 @@ argument, the number of collocation points ``n_o``. The decision variable of
 [`PredictiveController`](@ref) is similar to [`MultipleShooting`](@ref), but it also
 includes the collocation points:
 ```math
-\mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K} \end{bmatrix}
+\mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K̄} \end{bmatrix}
 ```
-where ``\mathbf{K}`` encompasses all the intermediate stages of the deterministic states
+where ``\mathbf{K̄}`` encompasses all the intermediate stages of the deterministic states
 (the first `nx` elements of ``\mathbf{x̂}``):
 ```math
-\mathbf{K} = \begin{bmatrix}
+\mathbf{K̄} = \begin{bmatrix}
     \mathbf{k̄}(k+0)                                                                     \\
     \mathbf{k̄}(k+1)                                                                     \\
     \vdots                                                                              \\
@@ -270,7 +270,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
 # Extended Help
 !!! details "Extended Help"
     As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
-    states are left out of the ``\mathbf{K}`` vector to reduce the dimensions, and also
+    states are left out of the ``\mathbf{K̄}`` vector to reduce the dimensions, and also
     because collocation methods require continuous-time dynamics and the stochastic model is
     discrete.
 
@@ -280,7 +280,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{x̂_0}(k-N_k+p)       \\  
         \mathbf{X̂_0}                \\         
         \mathbf{0_x̂}                \\
-        \mathbf{K}                  \\         
+        \mathbf{K̄}                  \\         
         \mathbf{0_k̄}                \\ 
         \mathbf{Ŵ}                  \\
         \mathbf{0_ŵ}                \end{bmatrix}
@@ -289,7 +289,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     all these variables, except for the vector with the intermediate stages of the
     deterministic states at the collation points:
     ```math
-    \mathbf{K} =                    \begin{bmatrix}
+    \mathbf{K̄} =                    \begin{bmatrix}
         \mathbf{k̄}(k-N_k+p+0)       \\
         \mathbf{k̄}(k-N_k+p+1)       \\
         \vdots                      \\

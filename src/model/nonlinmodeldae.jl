@@ -15,6 +15,9 @@ struct NonLinModelDAE{
     PT<:Any, 
 } <: SimModelDAE{NT}
     x0::Vector{NT}
+    a0::Vector{NT}
+    u0::Vector{NT}
+    d0::Vector{NT}
     transcription::TM
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
@@ -76,8 +79,11 @@ struct NonLinModelDAE{
         yname = ["\$y_{$i}\$" for i in 1:ny]
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
-        x0 = zeros(NT, nx)
+        x0, a0, u0, d0 = zeros(NT, nx), zeros(NT, na), zeros(NT, nu), zeros(NT, nd)
         t  = zeros(NT, 1)
+        # the updatestate!(model, u, d) API does not know the input `u` of the next time 
+        # step k+1, so only piecewise constant input `u` is supported here:
+        transcription.h > 0 && error("Only zero-order hold (h=0) is supported for simulations of DAEs")
         Mo, Co, λo = init_orthocolloc(NT, transcription, nx, Ts)
         nZ = get_nZ_dae(transcription, nx, na)
         Z = zeros(NT, get_nZ_dae(transcription, nx, na))
@@ -85,8 +91,8 @@ struct NonLinModelDAE{
         beq = zeros(NT, size(Aeq, 1))
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        return new{NT, TM, JM, JB, HB, FQ, H, PT}(
-            x0,
+        model = new{NT, TM, JM, JB, HB, FQ, H, PT}(
+            x0, a0, u0, d0,
             transcription,
             optim, jacobian, hessian,
             Z,
@@ -100,6 +106,8 @@ struct NonLinModelDAE{
             uname, yname, dname, xname,
             buffer
         )
+        init_optimization!(model, model.optim)
+        return model
     end
 end
 
@@ -321,11 +329,16 @@ function validate_h_dae(NT, h)
     return ismutating
 end
 
-"Get the number of element in the optimization decision vector `Z` for DAE solving."
+"Get the number of elements in the optimization decision vector `Z` for DAE solving."
 function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
     return nx + 2na + transcription.no*(nx + na)
 end
 get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
+
+"Get the number of elements in the algebraic variable over the collocation points `ā`."
+function get_nā(model::SimModelDAE, transcription::OrthogonalCollocation) 
+    return (transcription.no+1)*model.na
+end
 
 
 @doc raw"""
@@ -339,15 +352,15 @@ Knowing that the decision vector ``\mathbf{Z}`` contain ``\mathbf{x̂_0}(k+1)``,
 time ``k+1``:
 ```math
 \begin{aligned}
-    \mathbf{s}(k+1) &= \mathbf{E_s Z + K_s x_0}(k)  \\
+    \mathbf{s}(k+1) &= \mathbf{E_s Z + K_s x_0}(k)                                      \\
                     &= \mathbf{E_s Z + F_s}
 \end{aligned}
 ```   
-They are forced to be ``\mathbf{s}(k+1) = \mathbf{0}`` using the optimization equality
+It is forced to be ``\mathbf{s}(k+1) = \mathbf{0}`` using the optimization equality
 constraints.
 """
 function init_defectmat_dae(NT, transcription::OrthogonalCollocation, nx, na, Co, λo)
-    nā = transcription.no*na
+    nā = (1+transcription.no)*na
     Ks = λo*I(nx)
     Esx = -I
     Esk̄ = Co
@@ -355,9 +368,9 @@ function init_defectmat_dae(NT, transcription::OrthogonalCollocation, nx, na, Co
     Esa = zeros(NT, nx, na)
     Es = [Esx Esk̄ Esā Esa]
     Aeq = Es
+    display(Aeq)
     return Es, Ks, Aeq
 end
-
 
 """
     init_defectmat_dae(NT, ::CollocationMethod, nx, na, _ , _ ) -> Es, Ks, Aeq
@@ -378,16 +391,146 @@ Init the nonlinear optimization for [`NonLinModelDAE`](@ref) model.
 """
 function init_optimization!(model::NonLinModelDAE, optim::JuMP.GenericModel)  
     # --- variables and linear constraints ---
-    nZ̃ = length(model.Z̃)
+    nZ = length(model.Z)
     JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
     JuMP.set_silent(optim)
-    @variable(optim, Z̃var[i=1:nZ̃])
+    @variable(optim, Zvar[i=1:nZ])
     Aeq = model.Aeq
     beq = model.beq
-    @constraint(optim, linconstrainteq, Aeq*Z̃var .== beq)
+    @constraint(optim, linconstrainteq, Aeq*Zvar .== beq)
     # --- nonlinear optimization init ---
     geq_oracle = get_nonlincon_oracle(model, optim)
-    # set_nonlincon!(model, geq_oracle)
+    @constraint(optim, nonlinconstrainteq, Zvar in geq_oracle)
+    return nothing
+end
+
+"""
+    get_nonlincon_oracle(model::NonLinModelDAE, optim::JuMP.GenericModel) -> geq_oracle
+
+Return the nonlinear constraint oracle for [`NonLinModelDAE`](@ref) `model`.
+
+Return `geq_oracle`, the equality [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
+for the the nonlinear constraints. This method is really intricate because the oracles are
+used inside the nonlinear optimization, so they must be type-stable and as efficient as
+possible. All the function outputs and derivatives are cached and updated in-place if
+required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
+"""
+function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) where JNT<:Real
+    transcription = model.transcription
+    jac, hess = model.jacobian, model.hessian
+    nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
+    neq = model.neq
+    nZ = length(model.Z)
+    strict = Val(true) 
+    myNaN                              = convert(JNT, NaN)
+    k̄::Vector{JNT},   ā::Vector{JNT}   = zeros(JNT, nk̄),  zeros(JNT, nā)
+    q̄::Vector{JNT}                     = zeros(JNT, nā)
+    geq::Vector{JNT}, λeq::Vector{JNT} = zeros(JNT, neq), rand(JNT, neq)
+    function geq!(geq, Z, k̄, ā) 
+        update_predictions!(k̄, ā, geq, model, Z)
+        return nothing
+    end
+    function ℓ_geq(Z, λeq, k̄, ā, geq)
+        update_predictions!(k̄, ā, geq, model, Z)
+        return dot(λeq, geq)
+    end
+    Z_∇geq = fill(myNaN, nZ)    # NaN to force update at first call
+    ∇geq_cache = (
+        Cache(k̄), Cache(ā)
+    )
+    ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z_∇geq, ∇geq_cache...; strict)
+    ∇geq    = init_diffmat(JNT, jac, ∇geq_prep, nZ, neq)
+    ∇geq_structure  = init_diffstructure(∇geq)
+    if !isnothing(hess)
+        ∇²geq_cache = (
+            Cache(k̄), Cache(ā), Cache(geq)
+        )
+        ∇²geq_prep = prepare_hessian(
+            ℓ_geq, hess, Z_∇geq, Constant(λeq), ∇²geq_cache...; strict
+        )
+        ∇²ℓ_geq = init_diffmat(JNT, hess, ∇²geq_prep, nZ, nZ)
+        ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
+    end
+    function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
+        if isdifferent(Z̃_arg, Z̃_∇geq)
+            Z̃_∇geq .= Z̃_arg
+            value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_cache...)
+        end
+        return nothing
+    end
+    function geq_func!(geq_arg, Z_arg)
+        update_con_eq!(geq, ∇geq, Z_∇geq, Z_arg)
+        return geq_arg .= geq
+    end
+    function ∇geq_func!(∇geq_arg, Z_arg)
+        update_con_eq!(geq, ∇geq, Z_∇geq, Z_arg)
+        return fill_diffstructure!(∇geq_arg, ∇geq, ∇geq_structure)
+    end
+    function ∇²geq_func!(∇²ℓ_arg, Z_arg, λ_arg)
+        Z_∇geq .= Z_arg
+        λeq    .= λ_arg
+        hessian!(ℓ_geq, ∇²ℓ_geq, ∇²geq_prep, hess, Z_∇geq, Constant(λeq), ∇²geq_cache...)
+        return fill_diffstructure!(∇²ℓ_arg, ∇²ℓ_geq, ∇²geq_structure)
+    end
+    geq_min = geq_max = zeros(JNT, neq)
+    geq_oracle = MOI.VectorNonlinearOracle(;
+        dimension = nZ,
+        l = geq_min,
+        u = geq_max,
+        eval_f = geq_func!,
+        jacobian_structure = ∇geq_structure,
+        eval_jacobian = ∇geq_func!,
+        hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²geq_structure,
+        eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²geq_func!
+    )
+    return geq_oracle
+end
+
+"""
+    update_predictions!(k̄, ā, geq, model, Z)
+
+TBW
+"""
+function update_predictions!(k̄, ā, q̄, geq, model, Z)
+    
+
+
+
+    k̄ .= 0
+    ā .= 0
+    geq .= 0
+
+
+
+
+    nu, nx, na, nd = model.nu, model.nx, model.na, model.nd
+    transcription = model.transcription
+    Mo, no, τ =  model.Mo, transcription.no, transcription.τ
+    nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
+    x0, u0, d0 = model.x0, model.u0, model.d0
+    x0next_Z, k̄_Z, ā_Z = @views Z[1:nx], Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+nā)]
+
+    sk̄, sā, sanext = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+nā)], geq[(nk̄+nā+1):(nk̄+nā+na)]
+    k̄dot = k̄
+    Δk = k̄dot
+    for i=1:no
+        Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
+    end
+    mul!(snext, Mo, Δk)
+    d̂i = @views D̂temp[(1 + nd*(j-1)):(nd*j)]
+    if h > 0
+        ûi = similar(û0) # TODO: remove this allocation
+    end
+    for i=1:no
+        k̇i   = @views k̄dot[(1 + (i-1)*nx):(i*nx)]
+        qi   = @views    q̄[(1 + (1-i)*na):(i*na)]
+        ki_Z̃ = @views  k̄_Z[(1 + (i-1)*nx):(i*nx)]
+        model.fq!(k̇i, qi, ki_Z̃, û0, d̂i, model.p)
+        end
+    end
+    snext .-= k̄dot
+    
+
     return nothing
 end
 

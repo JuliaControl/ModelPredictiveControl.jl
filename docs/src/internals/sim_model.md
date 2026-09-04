@@ -11,6 +11,12 @@ ModelPredictiveControl.SimModelODE
 ModelPredictiveControl.SimModelDAE
 ```
 
+## Model Construction
+
+```@docs
+ModelPredictiveControl.init_defectmat_dae
+```
+
 ## State-Space Functions
 
 ```@docs
