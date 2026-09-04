@@ -18,10 +18,18 @@ and the [`CollocationMethod`](@ref) subtype includes the following concrete type
 """
 abstract type TranscriptionMethod end 
 
-"Abstract subtype of [`TranscriptionMethod`](@ref) for shooting methods."
+"""
+    abstract type ShootingMethod
+
+Abstract subtype of [`TranscriptionMethod`](@ref) for shooting methods.
+"""
 abstract type ShootingMethod <: TranscriptionMethod end
 
-"Abstract subtype of [`TranscriptionMethod`](@ref) for direct collocation methods."
+"""
+    abstract type CollocationMethod
+
+Abstract subtype of [`TranscriptionMethod`](@ref) for direct collocation methods.
+"""
 abstract type CollocationMethod <: TranscriptionMethod end
 
 @doc raw"""
@@ -276,7 +284,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     For [`MovingHorizonEstimator`](@ref) based on [`NonLinModel`](@ref), the decision
     variable is (excluding slack `ε`):
     ```math
-    \mathbf{Z} = begin{bmatrix} 
+    \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x̂_0}(k-N_k+p)                                       \\ 
         \mathbf{X̂_0}                                                \\         
         \mathbf{0_x̂}                                                \\
