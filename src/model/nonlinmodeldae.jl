@@ -28,7 +28,10 @@ struct NonLinModelDAE{
     Mo::SparseMatrixCSC{NT, Int}
     Co::SparseMatrixCSC{NT, Int}
     λo::NT
+    Ks::Matrix{NT}
+    Es::Matrix{NT}
     Aeq::Matrix{NT}
+    beq::Vector{NT}
     neq::Int
     Ts::NT
     t::Vector{NT}
@@ -78,7 +81,8 @@ struct NonLinModelDAE{
         Mo, Co, λo = init_orthocolloc(NT, transcription, nx, Ts)
         nZ = get_nZ_dae(transcription, nx, na)
         Z = zeros(NT, get_nZ_dae(transcription, nx, na))
-        Aeq = init_Aeq(NT, transcription, nx, na, Co, λo) 
+        Es, Ks, Aeq = init_defectmat_dae(NT, transcription, nx, na, Co, λo) 
+        beq = zeros(NT, size(Aeq, 1))
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         return new{NT, TM, JM, JB, HB, FQ, H, PT}(
@@ -89,7 +93,7 @@ struct NonLinModelDAE{
             fq!, h!,
             p,
             Mo, Co, λo,
-            Aeq, neq,
+            Ks, Es, Aeq, beq, neq,
             Ts, t,
             nu, nx, na, ny, nd, 
             uop, yop, dop, xop, fop,
@@ -324,12 +328,48 @@ end
 get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
 
 
-function init_Aeq(NT, transcription::OrthogonalCollocation, nx, na, Co, λo)
-    nZ = get_nZ_dae(transcription, nx, na)
-    Aeq = zeros(NT, nx, nZ)
-    return Aeq
+@doc raw"""
+    init_defectmat_dae(NT, ::OrthogonalCollocation, nx, na, Co, λo) -> Es, Ks, Aeq
+
+Init the matrices for computing the defect of the next state.
+
+Knowing that the decision vector ``\mathbf{Z}`` contain ``\mathbf{x̂_0}(k+1)``, 
+``\mathbf{k̄}(k+0)``, ``\mathbf{ā}(k+0)`` and ``\mathbf{a}(k+1)`` vectors with an 
+[`OrthogonalCollocation`](@ref), this linear equation compute the defect of the states at
+time ``k+1``:
+```math
+\begin{aligned}
+    \mathbf{s}(k+1) &= \mathbf{E_s Z + K_s x_0}(k)  \\
+                    &= \mathbf{E_s Z + F_s}
+\end{aligned}
+```   
+They are forced to be ``\mathbf{s}(k+1) = \mathbf{0}`` using the optimization equality
+constraints.
+"""
+function init_defectmat_dae(NT, transcription::OrthogonalCollocation, nx, na, Co, λo)
+    nā = transcription.no*na
+    Ks = λo*I(nx)
+    Esx = -I
+    Esk̄ = Co
+    Esā = zeros(NT, nx, nā)
+    Esa = zeros(NT, nx, na)
+    Es = [Esx Esk̄ Esā Esa]
+    Aeq = Es
+    return Es, Ks, Aeq
 end
-init_Aeq(NT, ::CollocationMethod, nx, na, _ , _ ) = zeros(NT, 0, nx + 2na)
+
+
+"""
+    init_defectmat_dae(NT, ::CollocationMethod, nx, na, _ , _ ) -> Es, Ks, Aeq
+
+No linear equality constraint for other [`CollocationMethod`](@ref)s, return empty matrices.
+"""
+function init_defectmat_dae(NT, ::CollocationMethod, nx, na, _ , _ ) 
+    Ks = zeros(NT, 0, nx)
+    Es = zeros(NT, 0, nx + 2na)
+    Aeq = Es
+    return Es, Ks, Aeq
+end
 
 """
     init_optimization!(model::NonLinModelDAE, optim::JuMP.GenericModel) -> nothing

@@ -7,13 +7,13 @@ Supertype of all transcription methods for the optimization problems.
 
 The [`ShootingMethod`](@ref) subtype includes the following concrete types:
 
-    - [`SingleShooting`](@ref)
-    - [`MultipleShooting`](@ref)
+- [`SingleShooting`](@ref)
+- [`MultipleShooting`](@ref)
 
 and the [`CollocationMethod`](@ref) subtype includes the following concrete types:
 
-    - [`TrapezoidalCollocation`](@ref) 
-    - [`OrthogonalCollocation`](@ref)
+- [`TrapezoidalCollocation`](@ref) 
+- [`OrthogonalCollocation`](@ref)
     
 """
 abstract type TranscriptionMethod end 
