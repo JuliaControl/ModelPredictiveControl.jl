@@ -145,13 +145,13 @@ julia> round.(getinfo(estim)[:Ŷ], digits=3)
 """
 function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, buffer, Nk = estim.model, estim.buffer, estim.Nk[]
-    nu, ny, nd, nk = model.nu, model.ny, model.nd, model.nk
+    nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
     nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
     Z̃ = estim.Z̃
     info = Dict{Symbol, Any}()
     V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
     x̂0arr = buffer.x̂
-    x̄, Û0, K = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk)
+    x̄, Û0, K = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk)
     x̂0arr = getarrival!(x̂0arr, estim, Z̃)
     Ŵ     = getŴ!(Ŵ, estim, estim.transcription, Z̃)
     x̄     = getx̄!(x̄, estim, x̂0arr)
@@ -214,13 +214,13 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     optim, con = estim.optim, estim.con
     hess = estim.hessian
     nx̂, nym, nŷ, nu, nc = estim.nx̂, estim.nym, model.ny, model.nu, con.nc
-    nk = get_nk(model, estim.transcription)
+    nk̄ = get_nk̄(model, estim.transcription)
     He = estim.He
     nc, neq, ng = con.nc, con.neq, length(con.i_g)
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ngi = sum(con.i_g)
     nV̂, nX̂, nŴ = He*nym, He*nx̂, He*nx̂
-    nK, nU, nŶ = He*nk, He*nu, He*nŷ
+    nK, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     x̂0arr, x̄  = zeros(NT, nx̂), zeros(NT, nx̂)
     Ŵ         = zeros(NT, nŴ)
@@ -422,8 +422,8 @@ function initpred!(estim::MovingHorizonEstimator{NT}, model::LinModel) where NT<
     fx̄, r = estim.fx̄, estim.r
     nx̂, nŵ, nym, nε, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.nε, estim.Nk[]
     nYm = estim.nym*Nk
-    nk = get_nk(model, estim.transcription)
-    nZ = get_nZ_mhe(estim.transcription, Nk, nx̂, nk, nŵ)
+    nk̄ = get_nk̄(model, estim.transcription)
+    nZ = get_nZ_mhe(estim.transcription, Nk, nx̂, nk̄, nŵ)
     # --- truncate vectors and matrices if Nk < He ---
     U0, D0, Y0m = trunc_windows(estim)
     Ẽ, F, G, J, B, ẽx̄, Tŵ, H̃, H̃_data, q̃, Z̃var = trunc_predmat(estim)
@@ -477,8 +477,8 @@ getx̄!(x̄, estim::MovingHorizonEstimator, x̂0arr) = (x̄ .= estim.x̂0arr_old
 "Get the estimated process noise from the decision vector `Z̃`."
 function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
     He, nx̂, nŵ = estim.He, estim.nx̂, estim.nx̂
-    nk = get_nk(estim.model, transcription)
-    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nk, nŵ)
+    nk̄ = get_nk̄(estim.model, transcription)
+    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
     Ŵ .= @views Z̃[(nZ̃ - nŵ*He + 1):end] 
     return Ŵ
 end
@@ -634,10 +634,10 @@ otherwise the state is for the next time step.
 """
 function getstate!(estim::MovingHorizonEstimator{NT}, Z̃) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nu, nk, nx̂, Nk = model.nu, model.nk, estim.nx̂, estim.Nk[]
+    nu, nk̄, nx̂, Nk = model.nu, model.nk̄, estim.nx̂, estim.Nk[]
     x̂0arr = buffer.x̂
     V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
-    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk*Nk) # TODO: remove the 2 allocations
+    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
     getarrival!(x̂0arr, estim, Z̃)
     predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃)

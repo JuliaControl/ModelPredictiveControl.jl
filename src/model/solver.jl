@@ -28,15 +28,15 @@ This solver is allocation-free if the `f!` and `h!` functions do not allocate.
 RungeKutta(order::Int=4; supersample::Int=1) = RungeKutta(order, supersample)
 
 "Solve the differential equation with the 4th order Runge-Kutta method."
-function solver_f!(xnext, k, f!::F, Ts, solver::RungeKutta{4}, x, u, d, p) where F
+function solver_f!(xnext, k̄, f!::F, Ts, solver::RungeKutta{4}, x, u, d, p) where F
     supersample = solver.supersample
     Ts_inner = Ts/supersample
     nx = length(x)
-    xcurr = @views k[1:nx]
-    k1 = @views k[(1nx + 1):(2nx)]
-    k2 = @views k[(2nx + 1):(3nx)]
-    k3 = @views k[(3nx + 1):(4nx)]
-    k4 = @views k[(4nx + 1):(5nx)]   
+    xcurr = @views k̄[1:nx]
+    k1 = @views k̄[(1nx + 1):(2nx)]
+    k2 = @views k̄[(2nx + 1):(3nx)]
+    k3 = @views k̄[(3nx + 1):(4nx)]
+    k4 = @views k̄[(4nx + 1):(5nx)]   
     @. xcurr = x
     for i=1:supersample
         f!(k1, xcurr, u, d, p)
@@ -63,12 +63,12 @@ const ForwardEuler(;supersample=1) = RungeKutta(1; supersample)
 
 
 "Solve the differential equation with the forward Euler method."
-function solver_f!(xnext, k, f!::F, Ts, solver::RungeKutta{1}, x, u, d, p) where F
+function solver_f!(xnext, k̄, f!::F, Ts, solver::RungeKutta{1}, x, u, d, p) where F
     supersample = solver.supersample
     Ts_inner = Ts/supersample
     nx = length(x)
-    xcurr = @views k[1:nx]
-    k1 = @views k[(1nx + 1):(2nx)]
+    xcurr = @views k̄[1:nx]
+    k1 = @views k̄[(1nx + 1):(2nx)]
     @. xcurr = x
     for i=1:supersample
         f!(k1, xcurr, u, d, p)

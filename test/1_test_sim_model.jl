@@ -221,8 +221,8 @@ end
     @test string(solver) == 
         "4th order Runge-Kutta differential equation solver with 1 supersamples."
     nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver, p=p)
-    xnext, k, y = nonlinmodel5.buffer.x, nonlinmodel5.buffer.k, nonlinmodel5.buffer.y
-    ModelPredictiveControl.f!(xnext, k, nonlinmodel5, [0; 0], [0], [0], nonlinmodel5.p)
+    xnext, k̄, y = nonlinmodel5.buffer.x, nonlinmodel5.buffer.k̄, nonlinmodel5.buffer.y
+    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel5, [0; 0], [0], [0], nonlinmodel5.p)
     @test xnext ≈ zeros(2)
     ModelPredictiveControl.h!(y, nonlinmodel5, [0; 0], [0], nonlinmodel5.p)
     @test y ≈ zeros(1)
@@ -239,14 +239,14 @@ end
         return nothing
     end
     nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta(), p=p)
-    xnext, k, y = nonlinmodel6.buffer.x, nonlinmodel6.buffer.k, nonlinmodel6.buffer.y
-    ModelPredictiveControl.f!(xnext, k, nonlinmodel6, [0; 0], [0], [0], nonlinmodel6.p)
+    xnext, k̄, y = nonlinmodel6.buffer.x, nonlinmodel6.buffer.k̄, nonlinmodel6.buffer.y
+    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel6, [0; 0], [0], [0], nonlinmodel6.p)
     @test xnext ≈ zeros(2)
     ModelPredictiveControl.h!(y, nonlinmodel6, [0; 0], [0], nonlinmodel6.p)
     @test y ≈ zeros(1)
     nonlinmodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler(), p=p)
-    xnext, k, y = nonlinmodel7.buffer.x, nonlinmodel7.buffer.k, nonlinmodel7.buffer.y
-    ModelPredictiveControl.f!(xnext, k, nonlinmodel7, [0; 0], [0], [0], nonlinmodel7.p)
+    xnext, k̄, y = nonlinmodel7.buffer.x, nonlinmodel7.buffer.k̄, nonlinmodel7.buffer.y
+    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel7, [0; 0], [0], [0], nonlinmodel7.p)
     @test xnext ≈ zeros(2)
     ModelPredictiveControl.h!(y, nonlinmodel7, [0; 0], [0], nonlinmodel7.p)
     @test y ≈ zeros(1)
@@ -330,7 +330,7 @@ end
     nonlinmodel3 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=RungeKutta())
     linmodel3 = linearize(nonlinmodel3; x, u, d)
     x0, u0, d0 = x - nonlinmodel3.xop, u - nonlinmodel3.uop, d - nonlinmodel3.dop
-    x0next, k, y0 = nonlinmodel3.buffer.x, nonlinmodel3.buffer.k, nonlinmodel3.buffer.y
+    x0next, k, y0 = nonlinmodel3.buffer.x, nonlinmodel3.buffer.k̄, nonlinmodel3.buffer.y
     backend = AutoForwardDiff()
     f_A(x0next, x0, k)  = ModelPredictiveControl.f!(x0next, k, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
     f_Bu(x0next, u0, k) = ModelPredictiveControl.f!(x0next, k, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
