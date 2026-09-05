@@ -314,7 +314,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{ā}_{n_o}(k+j)                                       \end{bmatrix}
     ```
     The algebraic vectors at the future time step ``\mathbf{a_0}`` is included in the 
-    decision vector for open-loop simulations of DAEs:
+    decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                           \\ 
@@ -322,7 +322,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{k̄}(k+0)                                             \\
         \mathbf{ā}(k+0)                                             \end{bmatrix}
     ```
-    For [`NonLinMPC`](@ref) based on DAEs, the decision vector is:
+    For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                 \\
@@ -337,7 +337,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \vdots                                                      \\
         \mathbf{ā}(k+H_p-1)                                         \end{bmatrix}
     ```
-    and, for [`MovingHorizonEstimator`](@ref) with DAEs:
+    and, for [`MovingHorizonEstimator`](@ref) with [`NonLinModelDAE`](@ref):
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x̂_0}(k-N_k+p)                                       \\  
@@ -345,6 +345,10 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{0_x̂}                                                \\
         \mathbf{A_0}                                                \\
         \mathbf{0_a}                                                \\
+        \mathbf{K̄}                                                  \\
+        \mathbf{0_k̄}                                                \\
+        \mathbf{Ā}                                                  \\
+        \mathbf{0_ā}                                                \\ 
         \mathbf{Ŵ}                                                  \\
         \mathbf{0_ŵ}                                                \end{bmatrix}
     \quad \text{and} \quad
