@@ -33,6 +33,7 @@ struct NonLinModelDAE{
     λo::NT
     Ks::Matrix{NT}
     Es::Matrix{NT}
+    Fs::Vector{NT}
     Aeq::Matrix{NT}
     beq::Vector{NT}
     neq::Int
@@ -87,7 +88,8 @@ struct NonLinModelDAE{
         Mo, Co, λo = init_orthocolloc(NT, transcription, nx, Ts)
         nZ = get_nZ_dae(transcription, nx, na)
         Z = zeros(NT, get_nZ_dae(transcription, nx, na))
-        Es, Ks, Aeq = init_defectmat_dae(NT, transcription, nx, na, Co, λo) 
+        Es, Ks, Aeq = init_defectmat_dae(NT, transcription, nx, na, Co, λo)
+        Fs  = zeros(NT, size(Aeq, 1))
         beq = zeros(NT, size(Aeq, 1))
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
@@ -99,7 +101,8 @@ struct NonLinModelDAE{
             fq!, h!,
             p,
             Mo, Co, λo,
-            Ks, Es, Aeq, beq, neq,
+            Ks, Es, Fs, 
+            Aeq, beq, neq,
             Ts, t,
             nu, nx, na, ny, nd, 
             uop, yop, dop, xop, fop,
@@ -331,15 +334,12 @@ end
 
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."
 function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
-    return nx + 2na + transcription.no*(nx + na)
+    return nx + na + transcription.no*nx + transcription.no*na
 end
-get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
+get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + na
 
 "Get the number of elements in the algebraic variable over the collocation points `ā`."
-function get_nā(model::SimModelDAE, transcription::OrthogonalCollocation) 
-    return (transcription.no+1)*model.na
-end
-
+get_nā(model::SimModelDAE, transcription::OrthogonalCollocation) = transcription.no*model.na
 
 @doc raw"""
     init_defectmat_dae(NT, ::OrthogonalCollocation, nx, na, Co, λo) -> Es, Ks, Aeq
@@ -360,7 +360,7 @@ It is forced to be ``\mathbf{s}(k+1) = \mathbf{0}`` using the optimization equal
 constraints.
 """
 function init_defectmat_dae(NT, transcription::OrthogonalCollocation, nx, na, Co, λo)
-    nā = (1+transcription.no)*na
+    nā = transcription.no*na
     Ks = λo*I(nx)
     Esx = -I
     Esk̄ = Co
@@ -368,7 +368,6 @@ function init_defectmat_dae(NT, transcription::OrthogonalCollocation, nx, na, Co
     Esa = zeros(NT, nx, na)
     Es = [Esx Esk̄ Esā Esa]
     Aeq = Es
-    display(Aeq)
     return Es, Ks, Aeq
 end
 
@@ -379,7 +378,7 @@ No linear equality constraint for other [`CollocationMethod`](@ref)s, return emp
 """
 function init_defectmat_dae(NT, ::CollocationMethod, nx, na, _ , _ ) 
     Ks = zeros(NT, 0, nx)
-    Es = zeros(NT, 0, nx + 2na)
+    Es = zeros(NT, 0, nx + na)
     Aeq = Es
     return Es, Ks, Aeq
 end
@@ -423,27 +422,26 @@ function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) w
     nZ = length(model.Z)
     strict = Val(true) 
     myNaN                              = convert(JNT, NaN)
-    k̄::Vector{JNT},   ā::Vector{JNT}   = zeros(JNT, nk̄),  zeros(JNT, nā)
-    q̄::Vector{JNT}                     = zeros(JNT, nā)
+    k̄::Vector{JNT},   q̄::Vector{JNT}   = zeros(JNT, nk̄),  zeros(JNT, nā)
     geq::Vector{JNT}, λeq::Vector{JNT} = zeros(JNT, neq), rand(JNT, neq)
-    function geq!(geq, Z, k̄, ā, q̄) 
-        update_predictions!(k̄, ā, q̄, geq, model, Z)
+    function geq!(geq, Z, k̄, q̄) 
+        update_predictions!(k̄, q̄, geq, model, Z)
         return nothing
     end
-    function ℓ_geq(Z, λeq, k̄, ā, q̄, geq)
-        update_predictions!(k̄, ā, q̄, geq, model, Z)
+    function ℓ_geq(Z, λeq, k̄, q̄, geq)
+        update_predictions!(k̄, q̄, geq, model, Z)
         return dot(λeq, geq)
     end
     Z_∇geq = fill(myNaN, nZ)    # NaN to force update at first call
     ∇geq_cache = (
-        Cache(k̄), Cache(ā), Cache(q̄)
+        Cache(k̄), Cache(q̄)
     )
     ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z_∇geq, ∇geq_cache...; strict)
     ∇geq    = init_diffmat(JNT, jac, ∇geq_prep, nZ, neq)
     ∇geq_structure  = init_diffstructure(∇geq)
     if !isnothing(hess)
         ∇²geq_cache = (
-            Cache(k̄), Cache(ā), Cache(q̄), Cache(geq)
+            Cache(k̄), Cache(q̄), Cache(geq)
         )
         ∇²geq_prep = prepare_hessian(
             ℓ_geq, hess, Z_∇geq, Constant(λeq), ∇²geq_cache...; strict
@@ -487,56 +485,105 @@ function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) w
 end
 
 """
-    update_predictions!(k̄, ā, geq, model, Z)
+    update_predictions!(k̄, q̄, geq, model, Z)
 
 TBW
 """
-function update_predictions!(k̄, ā, q̄, geq, model, Z)
-    
-
-
-
-    k̄ .= 0
-    ā .= 0
-    q̄ .= 0
-    geq .= 0
-
-
-
-#=
-    nu, nx, na, nd = model.nu, model.nx, model.na, model.nd
+function update_predictions!(k̄, q̄, geq, model, Z)
+    nx, na = model.nx, model.na
     transcription = model.transcription
-    Mo, no, τ =  model.Mo, transcription.no, transcription.τ
+    Mo, no =  model.Mo, transcription.no
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     x0, u0, d0 = model.x0, model.u0, model.d0
-    x0next_Z, k̄_Z, ā_Z = @views Z[1:nx], Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+nā)]
-
-    sk̄, sā, sanext = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+nā)], geq[(nk̄+nā+1):(nk̄+nā+na)]
-    k̄dot = k̄
-    Δk = k̄dot
+    x0next_Z, a0next_Z = @views Z[1:nx],                 Z[(nx+1):(nx+na)]
+    k̄_Z,      ā_Z      = @views Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):(nx+na+nk̄+nā)]
+    sk̄     = @views geq[1:nk̄]
+    sā     = @views geq[(nk̄+1):(nk̄+nā)] 
+    sanext = @views geq[(nk̄+nā+1):(nk̄+nā+na)]
+    Δk = k̄
     for i=1:no
-        Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
+        Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z[(1 + (i-1)*nx):(i*nx)] .- x0
     end
-    mul!(snext, Mo, Δk)
-    d̂i = @views D̂temp[(1 + nd*(j-1)):(nd*j)]
-    if h > 0
-        ûi = similar(û0) # TODO: remove this allocation
-    end
+    mul!(sk̄, Mo, Δk)
     for i=1:no
-        k̇i   = @views k̄dot[(1 + (i-1)*nx):(i*nx)]
-        qi   = @views    q̄[(1 + (1-i)*na):(i*na)]
-        ki_Z̃ = @views  k̄_Z[(1 + (i-1)*nx):(i*nx)]
-        model.fq!(k̇i, qi, ki_Z̃, û0, d̂i, model.p)
-        end
+        k̇i   = @views   k̄[(1 + (i-1)*nx):(i*nx)]
+        qi   = @views   q̄[(1 + (i-1)*na):(i*na)]
+        ki_Z = @views k̄_Z[(1 + (i-1)*nx):(i*nx)]
+        ai_Z = @views ā_Z[(1 + (i-1)*na):(i*na)]
+        model.fq!(k̇i, qi, ki_Z, ai_Z, u0, d0, model.p)
     end
-    snext .-= k̄dot
-    
-=#
+    sk̄ .-= k̄
+    sā  .= q̄
+    k̇next, qnext = @views k̄[1:nx], q̄[1:na]
+    model.fq!(k̇next, qnext, x0next_Z, a0next_Z, u0, d0, model.p)
+    sanext .= qnext
     return nothing
 end
 
 "Warm start `model.Z` at zero if `model` is a [`NonLinModelDAE`](@ref)."
 steadystate!(model::NonLinModelDAE, _ , _ ) = (model.Z .= 0; nothing)
+
+@doc raw"""
+    f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ ) -> nothing
+
+Solve the optimization `model.optim` problem for [`NonLinModelDAE`](@ref).
+
+After solving, the next state ``\mathbf{x_0}(k+1)`` will be stored in-place in `x0next`
+argument. The next algebraic variable ``\mathbf{a_0}(k+1)`` will be also internally stored
+in `model.a0`.
+"""
+function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
+    nx, na = model.nx, model.na
+    model.u0 .= u0
+    model.d0 .= d0
+    Fs = model.Fs
+    mul!(Fs, model.Ks, x0)
+    model.beq .= @. -Fs
+    linconeq = model.optim[:linconstrainteq]
+    JuMP.set_normalized_rhs(linconeq, model.beq)
+    Z = solve!(model)
+    x0next   .= @views Z[1:nx]
+    model.a0 .= @views Z[(nx+1):(nx+na)]
+    return nothing
+end
+
+function solve!(model::NonLinModelDAE)
+    optim = model.optim
+    Zvar::Vector{JuMP.VariableRef} = optim[:Zvar]
+    Zs = zeros(get_nZ_dae(model.transcription, model.nx, model.na)) #set_warmstart_mpc!(mpc, mpc.transcription, Zvar)
+    JuMP.optimize!(optim)
+    #=if !issolved(optim)
+        status = JuMP.termination_status(optim)
+        if iserror(optim)
+            @error(
+                "MPC terminated without solution: returning last solution shifted "*
+                "(more info in debug log)",
+                status
+            )
+        else
+            @warn(
+                "MPC termination status not OPTIMAL or LOCALLY_SOLVED: keeping solution "*
+                "anyway (more info in debug log)", 
+                status
+            )
+        end
+        @debug info2debugstr(getinfo(mpc))
+    end=#
+    if iserror(optim)
+        model.Z .= Zs
+    else
+        model.Z .= JuMP.value.(Zvar)
+    end
+    return model.Z
+end
+
+
+"""
+    h!(y0, model::NonLinModelDAE, x0, d0, p) -> nothing
+
+Call `model.h!` with algebraic variables stored in `model.a0` for [`NonLinModelDAE`](@ref).
+"""
+h!(y0, model::NonLinModelDAE, x0, d0, p) = model.h!(y0, x0, model.a0, d0, p)
 
 function Base.show(io::IO, model::NonLinModelDAE)
     nu, nd = model.nu, model.nd

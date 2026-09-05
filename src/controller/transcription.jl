@@ -666,7 +666,7 @@ case, `args`  needs to contain all the inequality and equality constraint matric
 The integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
-    model::LinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
+    model::LinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, _ ,
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
@@ -705,7 +705,7 @@ end
 
 "Init `i_b, A` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
 function init_matconstraint_mpc(
-    model::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc, nϵ,
+    model::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc, _ ,
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
