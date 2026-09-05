@@ -528,17 +528,16 @@ steadystate!(model::NonLinModelDAE, _ , _ ) = (model.Z .= 0; nothing)
 
 Solve the optimization `model.optim` problem for [`NonLinModelDAE`](@ref).
 
-After solving, the next state ``\mathbf{x_0}(k+1)`` will be stored in-place in `x0next`
-argument. The next algebraic variable ``\mathbf{a_0}(k+1)`` will be also internally stored
-in `model.a0`.
+After solving, the next state ``\mathbf{x_0}(k+1)`` will be stored in-place in the `x0next`
+argument. The next algebraic variable ``\mathbf{a_0}(k+1)`` will be also stored at
+`model.a0`.
 """
-function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
+function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _)
     nx, na = model.nx, model.na
     model.u0 .= u0
     model.d0 .= d0
-    Fs = model.Fs
-    mul!(Fs, model.Ks, x0)
-    model.beq .= @. -Fs
+    mul!(model.Fs, model.Ks, x0)
+    model.beq .= @. -model.Fs
     linconeq = model.optim[:linconstrainteq]
     JuMP.set_normalized_rhs(linconeq, model.beq)
     Z = solve!(model)
@@ -550,7 +549,7 @@ end
 function solve!(model::NonLinModelDAE)
     optim = model.optim
     Zvar::Vector{JuMP.VariableRef} = optim[:Zvar]
-    Zs = zeros(get_nZ_dae(model.transcription, model.nx, model.na)) #set_warmstart_mpc!(mpc, mpc.transcription, Zvar)
+    Zs = set_warmstart_dae!(model, model.transcription, Zvar)
     JuMP.optimize!(optim)
     #=if !issolved(optim)
         status = JuMP.termination_status(optim)
@@ -577,6 +576,53 @@ function solve!(model::NonLinModelDAE)
     return model.Z
 end
 
+@doc raw"""
+    set_warmstart_dae!(model::NonLinModelDAE, ::OrthogonalCollocation, Zvar) -> Zs
+
+Set and return the warm-start value of `Zvar` for [`NonLinModelDAE`](@ref).
+
+It warm-starts the solver at:
+```math
+\mathbf{Z_s} =                  \begin{bmatrix}
+    \mathbf{x_0}(k+1|k-1)           \\
+    \mathbf{x_0}(k+2|k-1)           \\
+    \vdots                          \\
+    \mathbf{x_0}(k+H_p-2|k-1)       \\
+    \mathbf{x_0}(k+H_p-1|k-1)       \\
+    \mathbf{x_0}(k+H_p-1|k-1)       \\
+    \mathbf{k̄}(k+0|k-1)             \\
+    \mathbf{k̄}(k+1|k-1)             \\
+    \vdots                          \\
+    \mathbf{k̄}(k+H_p-3|k-1)         \\
+    \mathbf{k̄}(k+H_p-2|k-1)         \\
+    \mathbf{k̄}(k+H_p-2|k-1)         
+\end{bmatrix}
+```
+where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
+last control period ``k-1``, and ``ϵ_{k-1}``, the slack variable of the last control period.
+"""
+function set_warmstart_dae!(
+    model::NonLinModelDAE{NT}, transcription::OrthogonalCollocation, Zvar
+) where NT<:Real
+    nZ = get_nZ_dae(transcription, model.nx, model.na)
+    Zs = zeros(NT, ) # TODO: remove this allocation
+    return Zs
+end
+
+"""
+    set_warmstart_dae!(model::NonLinModelDAE, ::CollocationMethod, Zvar) -> Zs
+
+Do the same but for other [`CollocationMethod`](@ref).
+
+
+"""
+function set_warmstart_dae!(
+    model::NonLinModelDAE{NT}, transcription::CollocationMethod, Zvar
+) where NT<:Real
+    nZ = get_nZ_dae(transcription, model.nx, model.na)
+    Zs = zeros(NT, ) # TODO: remove this allocation
+    return Zs
+end
 
 """
     h!(y0, model::NonLinModelDAE, x0, d0, p) -> nothing
@@ -584,6 +630,7 @@ end
 Call `model.h!` with algebraic variables stored in `model.a0` for [`NonLinModelDAE`](@ref).
 """
 h!(y0, model::NonLinModelDAE, x0, d0, p) = model.h!(y0, x0, model.a0, d0, p)
+
 
 function Base.show(io::IO, model::NonLinModelDAE)
     nu, nd = model.nu, model.nd
@@ -596,11 +643,11 @@ function Base.show(io::IO, model::NonLinModelDAE)
     println(io, "├ jacobian: $(backend_str(model.jacobian))")
     println(io, "├ hessian: $(backend_str(model.hessian))")
     println(io, "└ dimensions:")
-    println(io, "  ├$(lpad(nu, n)) manipulated inputs u")
-    println(io, "  ├$(lpad(nx, n)) states x")
-    println(io, "  ├$(lpad(na, n)) algebraic variables a")
-    println(io, "  ├$(lpad(ny, n)) outputs y")
-    println(io, "  └$(lpad(nd, n)) measured disturbances d")
+    println(io, "  │ ├$(lpad(nu, n)) manipulated inputs u")
+    println(io, "  │ ├$(lpad(nx, n)) states x")
+    println(io, "  │ ├$(lpad(na, n)) algebraic variables a")
+    println(io, "  │ ├$(lpad(ny, n)) outputs y")
+    println(io, "  │ └$(lpad(nd, n)) measured disturbances d")
     nZ = length(model.Z)
     nAeq = size(model.Aeq, 1)
     neq  = model.neq

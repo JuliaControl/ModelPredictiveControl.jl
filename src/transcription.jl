@@ -173,7 +173,8 @@ transcription method.
     decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
     ```math
     \mathbf{Z} = \begin{bmatrix} 
-        \mathbf{x_0}(k+1)                                               \\ 
+        \mathbf{x_0}(k+1)                                               \\
+        \mathbf{a_0}(k)                                                 \\
         \mathbf{a_0}(k+1)                                               \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
@@ -181,6 +182,7 @@ transcription method.
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                     \\
         \mathbf{X̂_0}                                                    \\
+        \mathbf{a_0}(k)                                                 \\
         \mathbf{A_0}                                                    \end{bmatrix}
     \quad \text{and} \quad
     \mathbf{A_0} = \begin{bmatrix}
@@ -195,6 +197,7 @@ transcription method.
         \mathbf{x̂_0}(k-N_k+p)                                           \\  
         \mathbf{X̂_0}                                                    \\         
         \mathbf{0_x̂}                                                    \\
+        \mathbf{a_0}(k-N_k+p)                                           \\
         \mathbf{A_0}                                                    \\
         \mathbf{0_a}                                                    \\
         \mathbf{Ŵ}                                                      \\
@@ -318,7 +321,6 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                           \\ 
-        \mathbf{a_0}(k+1)                                           \\
         \mathbf{k̄}(k+0)                                             \\
         \mathbf{ā}(k+0)                                             \end{bmatrix}
     ```
@@ -327,8 +329,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                 \\
         \mathbf{X̂_0}                                                \\
-        \mathbf{A_0}                                                \\
         \mathbf{K̄}                                                  \\
+        \mathbf{A_0}                                                \\
         \mathbf{Ā}                                                  \end{bmatrix}
     \quad \text{and} \quad
     \mathbf{Ā} = \begin{bmatrix}
@@ -343,10 +345,10 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{x̂_0}(k-N_k+p)                                       \\  
         \mathbf{X̂_0}                                                \\         
         \mathbf{0_x̂}                                                \\
-        \mathbf{A_0}                                                \\
-        \mathbf{0_a}                                                \\
         \mathbf{K̄}                                                  \\
         \mathbf{0_k̄}                                                \\
+        \mathbf{A_0}                                                \\
+        \mathbf{0_a}                                                \\
         \mathbf{Ā}                                                  \\
         \mathbf{0_ā}                                                \\ 
         \mathbf{Ŵ}                                                  \\
