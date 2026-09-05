@@ -365,8 +365,7 @@ function init_defectmat_dae(NT, transcription::OrthogonalCollocation, nx, na, Co
     Esx = -I
     Esk̄ = Co
     Esā = zeros(NT, nx, nā)
-    Esa = zeros(NT, nx, na)
-    Es = [Esx Esk̄ Esā Esa]
+    Es = [Esx Esk̄ Esā]
     Aeq = Es
     return Es, Ks, Aeq
 end
@@ -495,11 +494,9 @@ function update_predictions!(k̄, q̄, geq, model, Z)
     Mo, no =  model.Mo, transcription.no
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     x0, u0, d0 = model.x0, model.u0, model.d0
-    x0next_Z, a0next_Z = @views Z[1:nx],                 Z[(nx+1):(nx+na)]
-    k̄_Z,      ā_Z      = @views Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):(nx+na+nk̄+nā)]
+    k̄_Z, ā_Z = @views Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+nā)]
     sk̄     = @views geq[1:nk̄]
-    sā     = @views geq[(nk̄+1):(nk̄+nā)] 
-    sanext = @views geq[(nk̄+nā+1):(nk̄+nā+na)]
+    sā     = @views geq[(nk̄+1):(nk̄+nā)]
     Δk = k̄
     for i=1:no
         Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z[(1 + (i-1)*nx):(i*nx)] .- x0
@@ -514,9 +511,6 @@ function update_predictions!(k̄, q̄, geq, model, Z)
     end
     sk̄ .-= k̄
     sā  .= q̄
-    k̇next, qnext = @views k̄[1:nx], q̄[1:na]
-    model.fq!(k̇next, qnext, x0next_Z, a0next_Z, u0, d0, model.p)
-    sanext .= qnext
     return nothing
 end
 
