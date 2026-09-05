@@ -174,7 +174,7 @@ transcription method.
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                               \\
-        \mathbf{a_0}(k)                                                 \\
+        \mathbf{a_0}(k+0)                                               \\
         \mathbf{a_0}(k+1)                                               \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
@@ -182,7 +182,7 @@ transcription method.
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                     \\
         \mathbf{X̂_0}                                                    \\
-        \mathbf{a_0}(k)                                                 \\
+        \mathbf{a_0}(k+0)                                               \\
         \mathbf{A_0}                                                    \end{bmatrix}
     \quad \text{and} \quad
     \mathbf{A_0} = \begin{bmatrix}

@@ -489,14 +489,30 @@ end
 TBW
 """
 function update_predictions!(k̄, q̄, geq, model, Z)
+    x0, u0, d0 = model.x0, model.u0, model.d0
+    con_nonlinprogeq!(geq, k̄, q̄, model, model.transcription, x0, u0, d0, Z)
+    return nothing
+end
+
+function con_nonlinprogeq!(
+    geq, k̄, q̄, model::NonLinModelDAE, transcription::TrapezoidalCollocation, x0, u0, d0, Z
+)
+    # TODO: implement this:
     nx, na = model.nx, model.na
-    transcription = model.transcription
+    ā_Z = @views Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+nā)]
+    sā  = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+nā)]
+
+    return geq
+end
+
+function con_nonlinprogeq!(
+    geq, k̄, q̄, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
+)
+    nx, na = model.nx, model.na
     Mo, no =  model.Mo, transcription.no
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
-    x0, u0, d0 = model.x0, model.u0, model.d0
     k̄_Z, ā_Z = @views Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+nā)]
-    sk̄     = @views geq[1:nk̄]
-    sā     = @views geq[(nk̄+1):(nk̄+nā)]
+    sk̄,  sā  = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+nā)]
     Δk = k̄
     for i=1:no
         Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z[(1 + (i-1)*nx):(i*nx)] .- x0
@@ -511,7 +527,7 @@ function update_predictions!(k̄, q̄, geq, model, Z)
     end
     sk̄ .-= k̄
     sā  .= q̄
-    return nothing
+    return geq
 end
 
 "Warm start `model.Z` at zero if `model` is a [`NonLinModelDAE`](@ref)."
