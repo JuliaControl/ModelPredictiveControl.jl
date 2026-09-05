@@ -334,9 +334,9 @@ end
 
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."
 function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
-    return nx + na + transcription.no*nx + transcription.no*na
+    return nx + transcription.no*nx + transcription.no*na
 end
-get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + na
+get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
 
 "Get the number of elements in the algebraic variable over the collocation points `ā`."
 get_nā(model::SimModelDAE, transcription::OrthogonalCollocation) = transcription.no*model.na
