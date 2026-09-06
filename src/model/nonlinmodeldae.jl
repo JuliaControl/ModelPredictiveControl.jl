@@ -7,7 +7,8 @@ const DEFAULT_NONLINDAE_HESSIAN = AutoSparse(
 struct NonLinModelDAE{
     NT<:Real, 
     TM<:CollocationMethod,
-    JM<:JuMP.GenericModel,
+    JMS<:JuMP.GenericModel,
+    JMO<:JuMP.GenericModel,
     JB<:AbstractADType,
     HB<:Union{AbstractADType, Nothing}, 
     FQ <:Function,
@@ -20,7 +21,8 @@ struct NonLinModelDAE{
     transcription::TM
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
-    optim::JM
+    optim_state::JMS
+    optim_output::JMO
     jacobian::JB
     hessian::HB
     Z::Vector{NT}
@@ -57,12 +59,14 @@ struct NonLinModelDAE{
         fq!::FQ, h!::H, Ts, nu, nx, na, ny, nd, 
         p::PT, 
         transcription::TM, 
-        optim::JM, 
+        optim_state::JMS,
+        optim_output::JMO,
         jacobian::JB, hessian::HB
     ) where {
             NT<:Real, 
             TM<:CollocationMethod,
-            JM<:JuMP.GenericModel,
+            JMS<:JuMP.GenericModel,
+            JMO<:JuMP.GenericModel,
             JB<:AbstractADType,
             HB<:Union{AbstractADType, Nothing},
             FQ<:Function,
@@ -92,10 +96,10 @@ struct NonLinModelDAE{
         beq = zeros(NT, size(Aeq, 1))
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
-        model = new{NT, TM, JM, JB, HB, FQ, H, PT}(
+        model = new{NT, TM, JMS, JMO, JB, HB, FQ, H, PT}(
             x0, u0, d0,
             transcription,
-            optim, jacobian, hessian,
+            optim_state, optim_output, jacobian, hessian,
             Z,
             fq!, h!,
             p,
@@ -108,7 +112,7 @@ struct NonLinModelDAE{
             uname, yname, dname, xname,
             buffer
         )
-        init_optimization!(model, model.optim)
+        init_optimization!(model, model.optim_state, model.optim_output)
         return model
     end
 end
@@ -148,7 +152,8 @@ in two possible ways:
 The optional parameter `NT` explicitly set the number type of vectors (default to `Float64`).
 Open loop simulations rely on a [`CollocationMethod`](@ref) and `JuMP.jl` as a root solver
 to avoid new dependencies, and also to provide a similar solving environnement as
-[`NonLinMPC`](@ref), for troubleshooting. 
+[`NonLinMPC`](@ref), for troubleshooting. Computing the current model output ``\mathbf{y}(t)``
+also require solving the algebraic equation ``\mathbf{q}`` with `JuMP.jl`. 
 
 !!! warning
     The two functions must be in pure Julia to use the model in [`NonLinMPC`](@ref) and
@@ -169,7 +174,9 @@ See also [`NonLinModel`](@ref) for ODEs.
 - `p=[]`: parameters of the model (any type).
 - `transcription=OrthogonalCollocation()` : a [`TrapezoidalCollocation`](@ref) or 
    [`OrthogonalCollocation`](@ref) instance for open-loop simulations.
-- `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for open-loop simulations,
+- `optim_state=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for [`updatestate!`](@ref),
+   provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
+- `optim_output=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for [`evaloutput`](@ref),
    provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
 - `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
    of the nonlinear constraints, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List)
@@ -227,7 +234,8 @@ function NonLinModelDAE{NT}(
     fq::Function, h::Function, Ts::Real, nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
     p=NT[], 
     transcription = OrthogonalCollocation(), 
-    optim = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
+    optim_state   = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
+    optim_output  = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     jacobian = DEFAULT_JACSPARSE,
     hessian = false,
 ) where {NT<:Real}
@@ -235,7 +243,7 @@ function NonLinModelDAE{NT}(
     hessian = validate_hessian(hessian, DEFAULT_NONLINDAE_HESSIAN)
     return NonLinModelDAE{NT}(
         fq!, h!, Ts, nu, nx, na, ny, nd, p, 
-        transcription, optim, jacobian, hessian
+        transcription, optim_state, optim_output, jacobian, hessian
     )
 end
 
@@ -244,13 +252,14 @@ function NonLinModelDAE(
     nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
     p=Float64[], 
     transcription = OrthogonalCollocation(), 
-    optim = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
+    optim_state   = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
+    optim_output  = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     jacobian = DEFAULT_JACSPARSE,
     hessian = false,
 )
     return NonLinModelDAE{Float64}(
         fq, h, Ts, nu, nx, na, ny, nd; 
-        p, transcription, optim, jacobian, hessian
+        p, transcription, optim_state, optim_output, jacobian, hessian
     )
 end
 
@@ -383,22 +392,26 @@ function init_defectmat_dae(NT, ::CollocationMethod, nx, na, _ , _ )
 end
 
 """
-    init_optimization!(model::NonLinModelDAE, optim::JuMP.GenericModel) -> nothing
+    init_optimization!(
+        model::NonLinModelDAE, optim_state::JuMP.GenericModel, optim_output::JuMP.GenericModel
+    ) -> nothing
 
-Init the nonlinear optimization for [`NonLinModelDAE`](@ref) model.
+Init the two nonlinear optimization problems for [`NonLinModelDAE`](@ref) model.
 """
-function init_optimization!(model::NonLinModelDAE, optim::JuMP.GenericModel)  
+function init_optimization!(
+    model::NonLinModelDAE, optim_state::JuMP.GenericModel, optim_output::JuMP.GenericModel
+)  
     # --- variables and linear constraints ---
     nZ = length(model.Z)
-    JuMP.num_variables(optim) == 0 || JuMP.empty!(optim)
-    JuMP.set_silent(optim)
-    @variable(optim, Zvar[i=1:nZ])
+    JuMP.num_variables(optim_state) == 0 || JuMP.empty!(optim_state)
+    JuMP.set_silent(optim_state)
+    @variable(optim_state, Zvar[i=1:nZ])
     Aeq = model.Aeq
     beq = model.beq
-    @constraint(optim, linconstrainteq, Aeq*Zvar .== beq)
+    @constraint(optim_state, linconstrainteq, Aeq*Zvar .== beq)
     # --- nonlinear optimization init ---
-    geq_oracle = get_nonlincon_oracle(model, optim)
-    @constraint(optim, nonlinconstrainteq, Zvar in geq_oracle)
+    geq_oracle = get_nonlincon_oracle(model, optim_state)
+    @constraint(optim_state, nonlinconstrainteq, Zvar in geq_oracle)
     return nothing
 end
 
@@ -555,22 +568,21 @@ function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _)
     model.d0 .= d0
     linconstrainteq!(model, model.transcription)
     Z = solve!(model)
-    x0next   .= @views Z[1:nx]
-    model.a0 .= @views Z[(nx+1):(nx+na)]
+    x0next .= @views Z[1:nx]
     return nothing
 end
 
 function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
     mul!(model.Fs, model.Ks, model.x0)
     model.beq .= @. -model.Fs
-    linconeq = model.optim[:linconstrainteq]
+    linconeq = model.optim_state[:linconstrainteq]
     JuMP.set_normalized_rhs(linconeq, model.beq)
     return nothing
 end
 linconstrainteq!(::NonLinModelDAE, ::CollocationMethod) = nothing
 
 function solve!(model::NonLinModelDAE)
-    optim = model.optim
+    optim = model.optim_state
     Zvar::Vector{JuMP.VariableRef} = optim[:Zvar]
     Zs = set_warmstart_dae!(model, model.transcription, Zvar)
     JuMP.optimize!(optim)
@@ -655,9 +667,12 @@ end
 """
     h!(y0, model::NonLinModelDAE, x0, d0, p) -> nothing
 
-Call `model.h!` with algebraic variables stored in `model.a0` for [`NonLinModelDAE`](@ref).
+Solve the algebraic equation to get `z0` and call `model.h!` for [`NonLinModelDAE`](@ref).
 """
-h!(y0, model::NonLinModelDAE, x0, d0, p) = model.h!(y0, x0, model.a0, d0, p)
+function h!(y0, model::NonLinModelDAE, x0, d0, p)
+    a0 = 
+    return model.h!(y0, x0, a0, d0, p)
+end
 
 
 function Base.show(io::IO, model::NonLinModelDAE)
@@ -666,7 +681,8 @@ function Base.show(io::IO, model::NonLinModelDAE)
     na = model.na
     n = maximum(ndigits.((nu, nx, ny, nd))) + 1
     println(io, "$(nameof(typeof(model))) with a sample time Ts = $(model.Ts) s:")
-    println(io, "├ optimizer: $(JuMP.solver_name(model.optim))")
+    println(io, "├ state optimizer: $(JuMP.solver_name(model.optim_state))")
+    println(io, "├ output optimizer: $(JuMP.solver_name(model.optim_output))")
     println(io, "├ transcription: $(transcription_str(model.transcription))")
     println(io, "├ jacobian: $(backend_str(model.jacobian))")
     println(io, "├ hessian: $(backend_str(model.hessian))")
