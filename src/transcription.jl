@@ -210,7 +210,8 @@ transcription method.
         \mathbf{a_0}(k+p)                                               \end{bmatrix}
     ```
     See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
-    two cases.
+    two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
+    variables at the beginning (``N_k < He``).
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
@@ -361,7 +362,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{ā}(k+p-1)                                           \end{bmatrix}
     ```
     See the Extended Help of [`TrapezoidalCollocation`](@ref) for the exact definition of 
-    ``\mathbf{A_0}`` on the last two cases.
+    ``\mathbf{A_0}`` on the last two cases. All the ``\mathbf{0_{(•)}}`` are vectors with
+    zeros for the unused decision variables at the beginning (``N_k < He``).
     
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.

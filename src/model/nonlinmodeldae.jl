@@ -339,7 +339,8 @@ end
 get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
 
 "Get the number of elements in the algebraic variable over the collocation points `ā`."
-get_nā(model::SimModelDAE, transcription::OrthogonalCollocation) = transcription.no*model.na
+get_nā(model::SimModelDAE, transcription::CollocationMethod) = transcription.no*model.na
+
 
 @doc raw"""
     init_defectmat_dae(NT, ::OrthogonalCollocation, nx, na, Co, λo) -> Es, Ks, Aeq
@@ -377,7 +378,7 @@ No linear equality constraint for other [`CollocationMethod`](@ref)s, return emp
 """
 function init_defectmat_dae(NT, ::CollocationMethod, nx, na, _ , _ ) 
     Ks = zeros(NT, 0, nx)
-    Es = zeros(NT, 0, nx + na)
+    Es = zeros(NT, 0, nx + 2na)
     Aeq = Es
     return Es, Ks, Aeq
 end
@@ -497,11 +498,17 @@ end
 function con_nonlinprogeq!(
     geq, k̄, q̄, model::NonLinModelDAE, transcription::TrapezoidalCollocation, x0, u0, d0, Z
 )
-    # TODO: implement this:
     nx, na = model.nx, model.na
-    ā_Z = @views Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+nā)]
-    sā  = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+nā)]
-
+    Ts = model.Ts
+    x0next_Z, a0_Z, a0next_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
+    sknext, sq, sqnext  = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
+    k̇1, k̇2 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
+    q1, q2 = @views q̄[1:na], q̄[(na+1):(2na)]
+    model.fq!(k̇1, q1, x0,       a0_Z,     u0, d0, model.p)
+    model.fq!(k̇2, q2, x0next_Z, a0next_Z, u0, d0, model.p)
+    sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇1 + k̇2)
+    sq     .= q1
+    sqnext .= q2
     return geq
 end
 
@@ -512,7 +519,7 @@ function con_nonlinprogeq!(
     Mo, no =  model.Mo, transcription.no
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     k̄_Z, ā_Z = @views Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+nā)]
-    sk̄,  sā  = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+nā)]
+    sk̄,  sq̄  = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+nā)]
     Δk = k̄
     for i=1:no
         Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z[(1 + (i-1)*nx):(i*nx)] .- x0
@@ -526,7 +533,7 @@ function con_nonlinprogeq!(
         model.fq!(k̇i, qi, ki_Z, ai_Z, u0, d0, model.p)
     end
     sk̄ .-= k̄
-    sā  .= q̄
+    sq̄  .= q̄
     return geq
 end
 
@@ -544,17 +551,24 @@ argument. The next algebraic variable ``\mathbf{a_0}(k+1)`` will be also stored 
 """
 function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _)
     nx, na = model.nx, model.na
+    model.x0 .= x0
     model.u0 .= u0
     model.d0 .= d0
-    mul!(model.Fs, model.Ks, x0)
-    model.beq .= @. -model.Fs
-    linconeq = model.optim[:linconstrainteq]
-    JuMP.set_normalized_rhs(linconeq, model.beq)
+    linconstrainteq!(model, model.transcription)
     Z = solve!(model)
     x0next   .= @views Z[1:nx]
     model.a0 .= @views Z[(nx+1):(nx+na)]
     return nothing
 end
+
+function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
+    mul!(model.Fs, model.Ks, model.x0)
+    model.beq .= @. -model.Fs
+    linconeq = model.optim[:linconstrainteq]
+    JuMP.set_normalized_rhs(linconeq, model.beq)
+    return nothing
+end
+linconstrainteq!(::NonLinModelDAE, ::CollocationMethod) = nothing
 
 function solve!(model::NonLinModelDAE)
     optim = model.optim
@@ -593,44 +607,49 @@ Set and return the warm-start value of `Zvar` for [`NonLinModelDAE`](@ref).
 
 It warm-starts the solver at:
 ```math
-\mathbf{Z_s} =                  \begin{bmatrix}
-    \mathbf{x_0}(k+1|k-1)           \\
-    \mathbf{x_0}(k+2|k-1)           \\
-    \vdots                          \\
-    \mathbf{x_0}(k+H_p-2|k-1)       \\
-    \mathbf{x_0}(k+H_p-1|k-1)       \\
-    \mathbf{x_0}(k+H_p-1|k-1)       \\
-    \mathbf{k̄}(k+0|k-1)             \\
-    \mathbf{k̄}(k+1|k-1)             \\
-    \vdots                          \\
-    \mathbf{k̄}(k+H_p-3|k-1)         \\
-    \mathbf{k̄}(k+H_p-2|k-1)         \\
-    \mathbf{k̄}(k+H_p-2|k-1)         
-\end{bmatrix}
+\mathbf{Z_s} = \begin{bmatrix}
+    \mathbf{x_0}(k|k-1)                     \\
+    \mathbf{k̄}(k-1|k-1)                     \\
+    \mathbf{ā}(k-1|k-1)                     \end{bmatrix}
 ```
-where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
-last control period ``k-1``, and ``ϵ_{k-1}``, the slack variable of the last control period.
+where ``\mathbf{x_0}(k|k-1)`` is the state for time ``k`` computed at the last period
+``k-1``, and ``\mathbf{k̄}(k-1|k-1)`` and ``\mathbf{ā}(k-1|k-1)`` are respectively
+the state and algebraic variable intermediate values for time ``k-1`` computed at the last
+period ``k-1``.
 """
 function set_warmstart_dae!(
-    model::NonLinModelDAE{NT}, transcription::OrthogonalCollocation, Zvar
+    model::NonLinModelDAE{NT}, ::OrthogonalCollocation, Zvar
 ) where NT<:Real
-    nZ = get_nZ_dae(transcription, model.nx, model.na)
-    Zs = zeros(NT, ) # TODO: remove this allocation
+    Zs = model.Z
+    JuMP.set_start_value.(Zvar, Zs)
     return Zs
 end
 
-"""
-    set_warmstart_dae!(model::NonLinModelDAE, ::CollocationMethod, Zvar) -> Zs
+@doc raw"""
+    set_warmstart_dae!(model::NonLinModelDAE, ::TrapezoidalCollocation, Zvar) -> Zs
 
-Do the same but for other [`CollocationMethod`](@ref).
+Do the same but for [`TrapezoidalCollocation`](@ref).
 
-
+It warm-starts the solver at:
+```math
+\mathbf{Z_s} = \begin{bmatrix}
+    \mathbf{x_0}(k|k-1)                     \\
+    \mathbf{a_0}(k|k-1)                     \\
+    \mathbf{a_0}(k|k-1)                     \end{bmatrix}
+```
+where ``\mathbf{a_0}(k|k-1)`` is the algebraic variable for the time ``k`` computed at the
+last period ``k-1``.
 """
 function set_warmstart_dae!(
-    model::NonLinModelDAE{NT}, transcription::CollocationMethod, Zvar
+    model::NonLinModelDAE{NT}, transcription::TrapezoidalCollocation, Zvar
 ) where NT<:Real
-    nZ = get_nZ_dae(transcription, model.nx, model.na)
-    Zs = zeros(NT, ) # TODO: remove this allocation
+    nx, na = model.nx, model.na
+    nZ = get_nZ_dae(transcription, nx, na)
+    Zs = zeros(NT, nZ) # TODO: remove this allocation
+    Zs[1:nx]               = model.Z[1:nx]
+    Zs[(nx+1):(nx+na)]     = model.Z[(nx+na+1):(nx+2na)]
+    Zs[(nx+na+1):(nx+2na)] = model.Z[(nx+na+1):(nx+2na)]
+    JuMP.set_start_value.(Zvar, Zs)
     return Zs
 end
 
