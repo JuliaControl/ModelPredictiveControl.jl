@@ -15,7 +15,6 @@ struct NonLinModelDAE{
     PT<:Any, 
 } <: SimModelDAE{NT}
     x0::Vector{NT}
-    a0::Vector{NT}
     u0::Vector{NT}
     d0::Vector{NT}
     transcription::TM
@@ -80,7 +79,7 @@ struct NonLinModelDAE{
         yname = ["\$y_{$i}\$" for i in 1:ny]
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
-        x0, a0, u0, d0 = zeros(NT, nx), zeros(NT, na), zeros(NT, nu), zeros(NT, nd)
+        x0, u0, d0 = zeros(NT, nx), zeros(NT, nu), zeros(NT, nd)
         t  = zeros(NT, 1)
         # the updatestate!(model, u, d) API does not know the input `u` of the next time 
         # step k+1, so only piecewise constant input `u` is supported here:
@@ -94,7 +93,7 @@ struct NonLinModelDAE{
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         model = new{NT, TM, JM, JB, HB, FQ, H, PT}(
-            x0, a0, u0, d0,
+            x0, u0, d0,
             transcription,
             optim, jacobian, hessian,
             Z,
