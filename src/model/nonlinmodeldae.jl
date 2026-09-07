@@ -153,7 +153,7 @@ The optional parameter `NT` explicitly set the number type of vectors (default t
 Open loop simulations rely on a [`CollocationMethod`](@ref) and `JuMP.jl` as a root solver
 to avoid new dependencies, and also to provide a similar solving environnement as
 [`NonLinMPC`](@ref), for troubleshooting. Computing the current model output ``\mathbf{y}(t)``
-also require solving the algebraic equation ``\mathbf{q}`` with `JuMP.jl`. 
+also require solving the algebraic equation ``\mathbf{q}`` using `JuMP.jl`. 
 
 !!! warning
     The two functions must be in pure Julia to use the model in [`NonLinMPC`](@ref) and
@@ -410,25 +410,28 @@ function init_optimization!(
     beq = model.beq
     @constraint(optim_state, linconstrainteq, Aeq*Zvar .== beq)
     # --- nonlinear optimization init ---
-    geq_oracle = get_nonlincon_oracle(model, optim_state)
+    geq_oracle, q_oracle = get_nonlincon_oracle(model, optim_state)
     @constraint(optim_state, nonlinconstrainteq, Zvar in geq_oracle)
     return nothing
 end
 
 """
-    get_nonlincon_oracle(model::NonLinModelDAE, optim::JuMP.GenericModel) -> geq_oracle
+    get_nonlincon_oracle(
+        model::NonLinModelDAE, optim::JuMP.GenericModel
+    ) -> geq_oracle, q_oracle
 
-Return the nonlinear constraint oracle for [`NonLinModelDAE`](@ref) `model`.
+Return the nonlinear equality constraint oracles for [`NonLinModelDAE`](@ref) `model`.
 
-Return `geq_oracle`, the equality [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
-for the the nonlinear constraints. This method is really intricate because the oracles are
-used inside the nonlinear optimization, so they must be type-stable and as efficient as
-possible. All the function outputs and derivatives are cached and updated in-place if
-required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
+Return `geq_oracle` and `q_oracle`, the equality [`VectorNonlinearOracle`](@extref MathOptInterface MathOptInterface.VectorNonlinearOracle)
+for the collocation problem algebraic equation, respectively. This method is really
+intricate because the oracles are used inside the nonlinear optimization, so they must be
+type-stable and as efficient as possible. All the function outputs and derivatives are
+cached and updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
 """
 function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) where JNT<:Real
     transcription = model.transcription
     jac, hess = model.jacobian, model.hessian
+    nx, na = model.nx, model.na
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     neq = model.neq
     nZ = length(model.Z)
@@ -436,6 +439,9 @@ function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) w
     myNaN                              = convert(JNT, NaN)
     k̄::Vector{JNT},   q̄::Vector{JNT}   = zeros(JNT, nk̄),  zeros(JNT, nā)
     geq::Vector{JNT}, λeq::Vector{JNT} = zeros(JNT, neq), rand(JNT, neq)
+    q::Vector{JNT},   λq::Vector{JNT}  = zeros(JNT, na),  rand(JNT, na)
+    ẋ::Vector{JNT}                     = zeros(JNT, nx)
+    # -------------- collocation constraint: nonlinear oracle -------------------------
     function geq!(geq, Z, k̄, q̄) 
         update_predictions!(k̄, q̄, geq, model, Z)
         return nothing
@@ -493,7 +499,59 @@ function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) w
         hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²geq_structure,
         eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²geq_func!
     )
-    return geq_oracle
+    # -------------- algebraic equation: nonlinear oracle -------------------------
+    function q!(q, a, ẋ) 
+        model.fq!(ẋ, q, model.x0, a, model.u0, model.d0, model.p)
+        return nothing
+    end
+    function ℓ_q(a, λq, ẋ, q)
+        model.fq!(ẋ, q, model.x0, a, model.u0, model.d0, model.p)
+        return dot(λq, q)
+    end
+    a_∇q = fill(myNaN, na)    # NaN to force update at first call
+    ∇q_prep = prepare_jacobian(q!, q, jac, a_∇q, Cache(ẋ); strict)
+    ∇q      = init_diffmat(JNT, jac, ∇q_prep, na, na)
+    ∇q_structure  = init_diffstructure(∇q)
+    if !isnothing(hess)
+        ∇²q_prep = prepare_hessian(
+            ℓ_q, hess, a_∇q, Constant(λeq), Cache(ẋ), Cache(q); strict
+        )
+        ∇²ℓ_q = init_diffmat(JNT, hess, ∇²q_prep, na, na)
+        ∇²q_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_q))
+    end
+    function update_con_eq!(q, ∇q, a_∇q, a_arg)
+        if isdifferent(a_arg, a_∇q)
+            a_∇q .= a_arg
+            value_and_jacobian!(q!, q, ∇q, ∇q_prep, jac, a_∇q, Cache(ẋ))
+        end
+        return nothing
+    end
+    function q_func!(q_arg, a_arg)
+        update_con_eq!(q, ∇q, a_∇q, a_arg)
+        return q_arg .= q
+    end
+    function ∇q_func!(∇q_arg, a_arg)
+        update_con_eq!(q, ∇q, a_∇q, a_arg)
+        return fill_diffstructure!(∇q_arg, ∇q, ∇q_structure)
+    end
+    function ∇²q_func!(∇²ℓ_arg, a_arg, λ_arg)
+        a_∇q .= a_arg
+        λq   .= λ_arg
+        hessian!(ℓ_q, ∇²ℓ_q, ∇²q_prep, hess, a_∇q, Constant(λq), Cache(ẋ), Cache(q))
+        return fill_diffstructure!(∇²ℓ_arg, ∇²ℓ_q, ∇²q_structure)
+    end
+    q_min = q_max = zeros(JNT, neq)
+    q_oracle = MOI.VectorNonlinearOracle(;
+        dimension = na,
+        l = q_min,
+        u = q_max,
+        eval_f = q_func!,
+        jacobian_structure = ∇q_structure,
+        eval_jacobian = ∇q_func!,
+        hessian_lagrangian_structure = isnothing(hess) ? Tuple{Int,Int}[] : ∇²q_structure,
+        eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²q_func!
+    )
+    return geq_oracle, q_oracle
 end
 
 """
