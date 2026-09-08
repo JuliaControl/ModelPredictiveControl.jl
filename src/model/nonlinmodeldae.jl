@@ -591,8 +591,21 @@ function con_nonlinprogeq!(
     return geq
 end
 
-"Warm start `model.Z` at zero if `model` is a [`NonLinModelDAE`](@ref)."
-steadystate!(model::NonLinModelDAE, _ , _ ) = (model.Z .= 0; nothing)
+@doc raw"""
+    initstate_core!(model::NonLinModelDAE, u0, d0)
+
+Warm-start decision variable `model.Z` at zero if `model` is a [`NonLinModelDAE`](@ref).
+
+It also set `model.u0` and `model.d0` at `u0` and `d0` values. The `model.u0` field
+is used to solve the algebraic equation ```\mathbf{q}`` in [`evaloutput`](@ref) method (but
+it should not impact the result in theory since `model` is strictly proper w.r.t. `u0`).
+"""
+function initstate_core!(model::NonLinModelDAE, u0, d0) 
+    model.Z  .= 0
+    model.u0 .= u0
+    model.d0 .= d0
+    return nothing
+end
 
 @doc raw"""
     f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ ) -> nothing
@@ -612,6 +625,16 @@ function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _)
     Z = solve!(model)
     x0next .= @views Z[1:nx]
     return nothing
+end
+
+"""
+    h!(y0, model::NonLinModelDAE, x0, d0, p) -> nothing
+
+Solve the algebraic equation to get `z0` and call `model.h!` for [`NonLinModelDAE`](@ref).
+"""
+function h!(y0, model::NonLinModelDAE, x0, d0, p)
+    a0 = 
+    return model.h!(y0, x0, a0, d0, p)
 end
 
 function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
@@ -705,17 +728,6 @@ function set_warmstart_dae!(
     JuMP.set_start_value.(Zvar, Zs)
     return Zs
 end
-
-"""
-    h!(y0, model::NonLinModelDAE, x0, d0, p) -> nothing
-
-Solve the algebraic equation to get `z0` and call `model.h!` for [`NonLinModelDAE`](@ref).
-"""
-function h!(y0, model::NonLinModelDAE, x0, d0, p)
-    a0 = 
-    return model.h!(y0, x0, a0, d0, p)
-end
-
 
 function Base.show(io::IO, model::NonLinModelDAE)
     nu, nd = model.nu, model.nd

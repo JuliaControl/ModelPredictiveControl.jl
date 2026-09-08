@@ -199,7 +199,7 @@ end
 Init `model.x0` with manipulated inputs `u` and meas. dist. `d` steady-state.
 
 The method tries to initialize the model state ``\mathbf{x}`` at steady-state. It removes
-the operating points on `u` and `d` and calls [`steadystate!`](@ref):
+the operating points on `u` and `d` and calls [`initstate_core!`](@ref):
 
 - If `model` is a [`LinModel`](@ref), the method computes the steady-state of current
   inputs `u` and measured disturbances `d`.
@@ -222,7 +222,7 @@ function initstate!(model::SimModel, u, d=model.buffer.empty)
     u0, d0 = model.buffer.u, model.buffer.d
     u0 .= u .- model.uop
     d0 .= d .- model.dop
-    steadystate!(model, u0, d0)
+    initstate_core!(model, u0, d0)
     x  = model.buffer.x
     x .= model.x0 .+ model.xop
     return x
@@ -397,8 +397,12 @@ end
 "Print additional details of `model` if any (no details by default)."
 print_details(::IO, ::SimModel) = nothing
 
-"Do nothing if `model` is not a [`LinModel`](@ref)."
-steadystate!(::SimModel, _ , _ ) = nothing
+"""
+    initstate_core!(::SimModel, u0, d0)
+
+Do nothing at all by default.
+"""
+initstate_core!(::SimModel, _ , _ ) = nothing
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=model.buffer.empty) = evaloutput(model::SimModel, d)

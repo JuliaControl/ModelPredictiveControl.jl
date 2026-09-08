@@ -258,7 +258,7 @@ function validate_transcription(::LinModel, ::CollocationMethod)
 end
 
 @doc raw"""
-    steadystate!(model::LinModel, u0, d0)
+    initstate_core!(model::LinModel, u0, d0)
 
 Set `model.x0` to `u0` and `d0` steady-state if `model` is a [`LinModel`](@ref).
 
@@ -270,7 +270,7 @@ with constant manipulated inputs ``\mathbf{u_0 = u - u_{op}}`` and measured
 disturbances ``\mathbf{d_0 = d - d_{op}}``. The Moore-Penrose pseudo-inverse computes 
 ``\mathbf{(I - A)^{-1}}`` to support integrating `model` (integrator states will be 0).
 """
-function steadystate!(model::LinModel, u0, d0)
+function initstate_core!(model::LinModel, u0, d0)
     x_tmp = model.buffer.x
     x_tmp .= model.fop .- model.xop
     mul!(x_tmp, model.Bu, u0, 1, 1)

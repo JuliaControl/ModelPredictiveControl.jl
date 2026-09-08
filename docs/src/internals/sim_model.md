@@ -24,8 +24,8 @@ ModelPredictiveControl.f!
 ModelPredictiveControl.h!
 ```
 
-## Steady-State Calculation
+## Init State
 
 ```@docs
-ModelPredictiveControl.steadystate!
+ModelPredictiveControl.initstate_core!
 ```
