@@ -1,8 +1,4 @@
-const DEFAULT_NONLINDAE_HESSIAN = AutoSparse(
-    AutoForwardDiff();
-    sparsity_detector=TracerSparsityDetector(),
-    coloring_algorithm=GreedyColoringAlgorithm(ALL_COLORING_ORDERS, postprocessing=true),
-)
+const DEFAULT_NONLINDAE_HESSIAN = AutoForwardDiff()
 
 struct NonLinModelDAE{
     NT<:Real, 
@@ -389,18 +385,26 @@ Init the two nonlinear optimization problems for [`NonLinModelDAE`](@ref) model.
 """
 function init_optimization!(
     model::NonLinModelDAE, optim_state::JuMP.GenericModel, optim_output::JuMP.GenericModel
-)  
-    # --- variables and linear constraints ---
-    nZ = length(model.Z)
+)
+    if optim_state === optim_output
+        throw(ArgumentError("optim_state and optim_output must be different JuMP models"))
+    end
+    geq_oracle, q_oracle = get_nonlincon_oracle(model, optim_state)
+    # --- collocation problem: optim_state ---
     JuMP.num_variables(optim_state) == 0 || JuMP.empty!(optim_state)
     JuMP.set_silent(optim_state)
+    nZ = length(model.Z)
     @variable(optim_state, Zvar[i=1:nZ])
     Aeq = model.Aeq
     beq = model.beq
-    @constraint(optim_state, linconstrainteq, Aeq*Zvar .== beq)
-    # --- nonlinear optimization init ---
-    geq_oracle, q_oracle = get_nonlincon_oracle(model, optim_state)
+    @constraint(optim_state, linconstrainteq,    Aeq*Zvar .== beq)
     @constraint(optim_state, nonlinconstrainteq, Zvar in geq_oracle)
+    # --- algebraic equation: optim_output ---
+    JuMP.num_variables(optim_output) == 0 || JuMP.empty!(optim_output)
+    JuMP.set_silent(optim_output)
+    na = model.na
+    @variable(optim_output, qvar[i=1:na])
+    @constraint(optim_output, nonlinconstraintq, qvar in q_oracle)
     return nothing
 end
 
@@ -550,7 +554,7 @@ function update_predictions!(k̄, q̄, geq, model, Z)
 end
 
 function con_nonlinprogeq!(
-    geq, k̄, q̄, model::NonLinModelDAE, transcription::TrapezoidalCollocation, x0, u0, d0, Z
+    geq, k̄, q̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
 )
     nx, na = model.nx, model.na
     Ts = model.Ts
@@ -616,8 +620,8 @@ After solving, the next state ``\mathbf{x_0}(k+1)`` will be stored in-place in t
 argument. The next algebraic variable ``\mathbf{a_0}(k+1)`` will be also stored at
 `model.a0`.
 """
-function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _)
-    nx, na = model.nx, model.na
+function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
+    nx = model.nx
     model.x0 .= x0
     model.u0 .= u0
     model.d0 .= d0
