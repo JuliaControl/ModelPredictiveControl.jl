@@ -29,8 +29,8 @@ struct NonLinModelDAE{
     fq!::FQ
     h!::H
     p::PT
-    Mo::SparseMatrixCSC{NT, Int}
-    Co::SparseMatrixCSC{NT, Int}
+    Mo::Matrix{NT}
+    Co::Matrix{NT}
     λo::NT
     Ks::Matrix{NT}
     Es::Matrix{NT}
@@ -178,11 +178,11 @@ See also [`NonLinModel`](@ref) for ODEs.
    provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
 - `optim_output=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for [`evaloutput`](@ref),
    provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
-- `jacobian=default_jacobian(transcription)` : an `AbstractADType` backend for the Jacobian
-   of the nonlinear constraints, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List)
+- `jacobian=AutoForwardDiff()` : an `AbstractADType` backend for the Jacobian of the
+   nonlinear constraints, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List)
 - `hessian=false` : an `AbstractADType` backend or `Bool` for the Hessian of the Lagrangian, 
    see `jacobian` above for the options. The default `false` skip it and use the
-   quasi-Newton method of `optim` (see Extended Help).
+    quasi-Newton method of `optim` (see Extended Help).
 
 # Examples
 ```jldoctest
@@ -210,25 +210,9 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
     ``d(t) = t``. This object does not support the ``\mathbf{u}`` argument in ``\mathbf{h}``
     function, see the Extended Help of [`LinModel`](@ref) for the justification.
 
-    The default `jacobian` backend is [sparse](@extref DifferentiationInterface AutoSparse-object):
-    ```julia
-    AutoSparse(
-        AutoForwardDiff(); 
-        sparsity_detector  = TracerSparsityDetector(), 
-        coloring_algorithm = GreedyColoringAlgorithm(
-            (
-                NaturalOrder(),
-                LargestFirst(),
-                SmallestLast(),
-                IncidenceDegree(),
-                DynamicLargestFirst(),
-                RandomOrder(StableRNG(0), 0)
-            ), 
-        postprocessing = true
-        )
-    )
-    ```
-    This is also the default differentiation backend for the Hessian if `hessian=true`.
+    By default, a dense [`ForwardDiff`](@extref ForwardDiff) backend is used for the 
+    Jacobians of the nonlinear equality constraints. This is also the default backend for
+    the Hessians if `hessian=true`.
 """
 function NonLinModelDAE{NT}(
     fq::Function, h::Function, Ts::Real, nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
@@ -236,7 +220,7 @@ function NonLinModelDAE{NT}(
     transcription = OrthogonalCollocation(), 
     optim_state   = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     optim_output  = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
-    jacobian = DEFAULT_JACSPARSE,
+    jacobian = DEFAULT_JACDENSE,
     hessian = false,
 ) where {NT<:Real}
     fq!, h! = get_mutating_functions_dae(NT, fq, h)
@@ -254,7 +238,7 @@ function NonLinModelDAE(
     transcription = OrthogonalCollocation(), 
     optim_state   = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     optim_output  = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
-    jacobian = DEFAULT_JACSPARSE,
+    jacobian = DEFAULT_JACDENSE,
     hessian = false,
 )
     return NonLinModelDAE{Float64}(
@@ -500,26 +484,21 @@ function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) w
         eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²geq_func!
     )
     # -------------- algebraic equation: nonlinear oracle -------------------------
-    function q!(q, a, ẋ) 
-        model.fq!(ẋ, q, model.x0, a, model.u0, model.d0, model.p)
-        return nothing
-    end
+    q!(q, a, ẋ) = model.fq!(ẋ, q, model.x0, a, model.u0, model.d0, model.p)
     function ℓ_q(a, λq, ẋ, q)
         model.fq!(ẋ, q, model.x0, a, model.u0, model.d0, model.p)
         return dot(λq, q)
     end
     a_∇q = fill(myNaN, na)    # NaN to force update at first call
-    ∇q_prep = prepare_jacobian(q!, q, jac, a_∇q, Cache(ẋ); strict)
-    ∇q      = init_diffmat(JNT, jac, ∇q_prep, na, na)
-    ∇q_structure  = init_diffstructure(∇q)
+    ∇q_prep      = prepare_jacobian(q!, q, jac, a_∇q, Cache(ẋ); strict)
+    ∇q           = init_diffmat(JNT, jac, ∇q_prep, na, na)
+    ∇q_structure = init_diffstructure(∇q)
     if !isnothing(hess)
-        ∇²q_prep = prepare_hessian(
-            ℓ_q, hess, a_∇q, Constant(λeq), Cache(ẋ), Cache(q); strict
-        )
-        ∇²ℓ_q = init_diffmat(JNT, hess, ∇²q_prep, na, na)
+        ∇²q_prep = prepare_hessian(ℓ_q, hess, a_∇q, Constant(λq), Cache(ẋ), Cache(q); strict)
+        ∇²ℓ_q         = init_diffmat(JNT, hess, ∇²q_prep, na, na)
         ∇²q_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_q))
     end
-    function update_con_eq!(q, ∇q, a_∇q, a_arg)
+    function update_con_q!(q, ∇q, a_∇q, a_arg)
         if isdifferent(a_arg, a_∇q)
             a_∇q .= a_arg
             value_and_jacobian!(q!, q, ∇q, ∇q_prep, jac, a_∇q, Cache(ẋ))
@@ -527,11 +506,11 @@ function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) w
         return nothing
     end
     function q_func!(q_arg, a_arg)
-        update_con_eq!(q, ∇q, a_∇q, a_arg)
+        update_con_q!(q, ∇q, a_∇q, a_arg)
         return q_arg .= q
     end
     function ∇q_func!(∇q_arg, a_arg)
-        update_con_eq!(q, ∇q, a_∇q, a_arg)
+        update_con_q!(q, ∇q, a_∇q, a_arg)
         return fill_diffstructure!(∇q_arg, ∇q, ∇q_structure)
     end
     function ∇²q_func!(∇²ℓ_arg, a_arg, λ_arg)
