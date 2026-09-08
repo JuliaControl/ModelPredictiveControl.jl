@@ -192,16 +192,21 @@ julia> h!(y, x, _ , _ , _ ) = (y .= 0.1x; nothing);
 
 julia> model1 = NonLinModelDAE(fq!, h!, 5.0, 1, 1, 1, 1, p=-0.2)
 NonLinModelDAE with a sample time Ts = 5.0 s:
-├ optimizer: Ipopt
+├ state optimizer: Ipopt
+├ output optimizer: Ipopt
 ├ transcription: OrthogonalCollocation (3 collocation points)
-├ jacobian: AutoSparse (AutoForwardDiff, TracerSparsityDetector, GreedyColoringAlgorithm)
+├ jacobian: AutoForwardDiff
 ├ hessian: nothing
 └ dimensions:
-  ├ 1 manipulated inputs u
-  ├ 1 states x
-  ├ 1 algebraic variables a
-  ├ 1 outputs y
-  └ 0 measured disturbances d
+  │ ├ 1 manipulated inputs u
+  │ ├ 1 states x
+  │ ├ 1 algebraic variables a
+  │ ├ 1 outputs y
+  │ └ 0 measured disturbances d
+  └ optimization:
+    ├ 7 decision variables Z
+    ├ 1 linear equality constraints Aeq
+    └ 6 nonlinear equality constraints geq
 ```
 
 # Extended Help
