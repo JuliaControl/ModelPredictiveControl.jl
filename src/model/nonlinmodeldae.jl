@@ -753,6 +753,100 @@ function set_warmstart_dae!(
     return Zs
 end
 
+@doc raw"""
+    getinfo(model::NonLinModelDAE) -> info
+
+Get additional info about `model` [`NonLinModelDAE`](@ref) solution for troubleshooting.
+
+The function should be called after calling [`evaloutput`](@ref) or [`updatestate!`](@ref)
+on `model` object. It returns the dictionary `info` with the following fields:
+
+!!! info
+    Fields with *`emphasis`* are non-Unicode alternatives.
+
+- `:ΔU` or *`:DeltaU`* : optimal manipulated input increments over ``H_c``, ``\mathbf{ΔU}``
+- `:ϵ` or *`:epsilon`* : optimal slack variable, ``ϵ``
+- `:D̂` or *`:Dhat`* : predicted measured disturbances over ``H_p``, ``\mathbf{D̂}``
+- `:x̂` or *`:xhat`* : current estimated state, ``\mathbf{x̂}_i(k)``
+- `:ŷ` or *`:yhat`* : current estimated output, ``\mathbf{ŷ}(k)``
+- `:Ŷ` or *`:Yhat`* : optimal predicted outputs over ``H_p``, ``\mathbf{Ŷ}``
+- `:Ŷs` or *`:Yhats`* : predicted stochastic output over ``H_p`` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``
+- `:R̂y` or *`:Rhaty`* : predicted output setpoint over ``H_p``, ``\mathbf{R̂_y}``
+- `:R̂u` or *`:Rhatu`* : predicted manipulated input setpoint over ``H_p``, ``\mathbf{R̂_u}``
+- `:x̂end` or *`:xhatend`* : optimal terminal states, ``\mathbf{x̂}_i(k+H_p)``
+- `:J`     : objective value optimum, ``J``
+- `:U`     : optimal manipulated inputs over ``H_p``, ``\mathbf{U}``
+- `:u`     : current optimal manipulated input, ``\mathbf{u}(k)``
+- `:d`     : current measured disturbance, ``\mathbf{d}(k)``
+- `:geq` : optimal nonlinear equality constraint values, ``\mathbf{g_{eq}}``
+- `:∇geq` or *`:nablageq`* : optimal Jacobian of the equality constraint, ``\mathbf{\nabla g_{eq}}``
+- `:∇geq_ncolors` or *`:nablageq_ncolors`* : number of colors in `:∇geq` sparsity pattern
+- `:∇²ℓgeq` or *`:nabla2lgeq`* : optimal Hessian of the equality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g_{eq}}}``
+- `:∇²ℓgeq_ncolors` or *`:nabla2lgeq_ncolors`* : number of colors in `:∇²ℓgeq` sparsity pattern
+
+Note that the inequality constraint vectors and matrices only include the non-`Inf` values.
+
+# Examples
+```jldoctest
+julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1, Hc=1);
+
+julia> preparestate!(mpc, [0]); u = moveinput!(mpc, [10]);
+
+julia> round.(getinfo(mpc)[:Ŷ], digits=3)
+1-element Vector{Float64}:
+ 10.0
+```
+"""
+function getinfo(model::NonLinModelDAE{NT}) where NT<:Real
+    Z, a0 = model.Z, model.a0
+    info = Dict{Symbol, Any}()
+    #=a0     = Vector{NT}(undef, nΔŨ)
+    x̂0end  = similar(mpc.estim.x̂0)
+    K      = Vector{NT}(undef, nK) 
+    Ue, Ŷe = Vector{NT}(undef, nUe), Vector{NT}(undef, nŶe)
+    U0, Ŷ0 = similar(mpc.Uop), similar(mpc.Yop)
+    Û0, X̂0 = Vector{NT}(undef, nÛ0), Vector{NT}(undef, nX̂0)
+    U,  Ŷ  = buffer.U, buffer.Ŷ
+    D̂      = buffer.D̂
+    U0 = getU0!(U0, mpc, Z̃)
+    ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
+    Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, K, mpc, model, transcription, U0, Z̃)
+    Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
+    U .= U0 .+ mpc.Uop
+    Ŷ .= Ŷ0 .+ mpc.Yop
+    D̂ .= mpc.D̂0 + mpc.Dop
+    J = obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
+    Ŷs = similar(mpc.Yop)
+    predictstoch!(Ŷs, mpc, mpc.estim)
+    info[:a]     = a0
+    info[:ϵ]     = getslack(mpc, Z̃)
+    info[:J]     = J
+    info[:U]     = U
+    info[:u]     = info[:U][1:model.nu]
+    info[:lastu] = mpc.lastu0 .+ model.uop
+    info[:d]     = mpc.d0 + model.dop
+    info[:D̂]     = D̂
+    info[:x̂]     = mpc.estim.x̂0 .+ mpc.estim.x̂op
+    info[:ŷ]     = mpc.ŷ
+    info[:Ŷ]     = Ŷ
+    info[:x̂end]  = x̂0end + mpc.estim.x̂op
+    info[:Ŷs]    = Ŷs
+    info[:R̂y]    = mpc.R̂y
+    info[:R̂u]    = mpc.R̂u
+    # --- non-Unicode fields ---
+    info[:DeltaU] = info[:ΔU]
+    info[:epsilon] = info[:ϵ]
+    info[:Dhat] = info[:D̂]
+    info[:xhat] = info[:x̂]
+    info[:yhat] = info[:ŷ]
+    info[:Yhat] = info[:Ŷ]
+    info[:xhatend] = info[:x̂end]
+    info[:Yhats] = info[:Ŷs]
+    info[:Rhaty] = info[:R̂y]
+    info[:Rhatu] = info[:R̂u]=#
+    return info
+end
+
 function Base.show(io::IO, model::NonLinModelDAE)
     nu, nd = model.nu, model.nd
     nx, ny = model.nx, model.ny
