@@ -296,17 +296,15 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{0_k̄}                                                \\ 
         \mathbf{Ŵ}                                                  \\
         \mathbf{0_ŵ}                                                \end{bmatrix}
-    ```
-    The Extended Help of [`SingleShooting`](@ref) and [`MultipleShooting`](@ref) introduces
-    all these variables, except for the vector with the intermediate stages of the
-    deterministic states at the collation points:
-    ```math
+    \quad \text{and} \quad
     \mathbf{K̄} = \begin{bmatrix}
         \mathbf{k̄}(k-N_k+p+0)                                       \\
         \mathbf{k̄}(k-N_k+p+1)                                       \\
         \vdots                                                      \\
         \mathbf{k̄}(k+p-1)                                           \end{bmatrix}
     ```
+    The text above defines ``\mathbf{k̄}``. The Extended Help of [`SingleShooting`](@ref) and
+    [`MultipleShooting`](@ref) introduces all the other variables.
     
     The case of [`NonLinModelDAE`](@ref) requires the introduction the vector with the 
     algebraic variables at the collocation points:
