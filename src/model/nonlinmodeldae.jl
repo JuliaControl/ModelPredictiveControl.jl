@@ -12,6 +12,7 @@ struct NonLinModelDAE{
     PT<:Any, 
 } <: SimModelDAE{NT}
     x0::Vector{NT}
+    a0::Vector{NT}
     u0::Vector{NT}
     d0::Vector{NT}
     transcription::TM
@@ -79,7 +80,7 @@ struct NonLinModelDAE{
         yname = ["\$y_{$i}\$" for i in 1:ny]
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
-        x0, u0, d0 = zeros(NT, nx), zeros(NT, nu), zeros(NT, nd)
+        x0, a0, u0, d0 = zeros(NT, nx), zeros(NT, na), zeros(NT, nu), zeros(NT, nd)
         t  = zeros(NT, 1)
         # the updatestate!(model, u, d) API does not know the input `u` of the next time 
         # step k+1, so only piecewise constant input `u` is supported here:
@@ -93,7 +94,7 @@ struct NonLinModelDAE{
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         model = new{NT, TM, JMS, JMO, JB, HB, FQ, H, PT}(
-            x0, u0, d0,
+            x0, a0, u0, d0,
             transcription,
             optim_state, optim_output, jacobian, hessian,
             Z,
@@ -403,8 +404,8 @@ function init_optimization!(
     JuMP.num_variables(optim_output) == 0 || JuMP.empty!(optim_output)
     JuMP.set_silent(optim_output)
     na = model.na
-    @variable(optim_output, qvar[i=1:na])
-    @constraint(optim_output, nonlinconstraintq, qvar in q_oracle)
+    @variable(optim_output, a0var[i=1:na])
+    @constraint(optim_output, nonlinconstraintq, a0var in q_oracle)
     return nothing
 end
 
@@ -598,14 +599,17 @@ end
 @doc raw"""
     initstate_core!(model::NonLinModelDAE, u0, d0)
 
-Warm-start decision variable `model.Z` at zero if `model` is a [`NonLinModelDAE`](@ref).
+Warm-start `model.Z` and `model.a0` at zero if `model` is a [`NonLinModelDAE`](@ref).
 
-It also set `model.u0` and `model.d0` at `u0` and `d0` values. The `model.u0` field
-is used to solve the algebraic equation ```\mathbf{q}`` in [`evaloutput`](@ref) method (but
-it should not impact the result in theory since `model` is strictly proper w.r.t. `u0`).
+The field `model.a0` and `model.Z` respectively warm-start [`evaloutput`](@ref) and
+[`updatestate!`](@ref) solving. The method also set `model.u0` and `model.d0` at `u0` and
+`d0` values. The `model.u0` field is used to solve the algebraic equation ```\mathbf{q}``
+in [`evaloutput`](@ref) method (but it should not impact the result in theory since `model`
+is strictly proper w.r.t. `u0`).
 """
 function initstate_core!(model::NonLinModelDAE, u0, d0) 
     model.Z  .= 0
+    model.a0 .= 0
     model.u0 .= u0
     model.d0 .= d0
     return nothing
@@ -621,13 +625,12 @@ argument. The next algebraic variable ``\mathbf{a_0}(k+1)`` will be also stored 
 `model.a0`.
 """
 function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
-    nx = model.nx
     model.x0 .= x0
     model.u0 .= u0
     model.d0 .= d0
     linconstrainteq!(model, model.transcription)
-    Z = solve!(model)
-    x0next .= @views Z[1:nx]
+    Z = solve_state!(model)
+    x0next .= @views Z[1:model.nx]
     return nothing
 end
 
@@ -637,8 +640,11 @@ end
 Solve the algebraic equation to get `z0` and call `model.h!` for [`NonLinModelDAE`](@ref).
 """
 function h!(y0, model::NonLinModelDAE, x0, d0, p)
-    a0 = 
-    return model.h!(y0, x0, a0, d0, p)
+    model.x0 .= x0
+    model.d0 .= d0
+    a0 = solve_output!(model)
+    model.h!(y0, x0, a0, d0, p)
+    return nothing
 end
 
 function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
@@ -650,7 +656,7 @@ function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
 end
 linconstrainteq!(::NonLinModelDAE, ::CollocationMethod) = nothing
 
-function solve!(model::NonLinModelDAE)
+function solve_state!(model::NonLinModelDAE)
     optim = model.optim_state
     Zvar::Vector{JuMP.VariableRef} = optim[:Zvar]
     Zs = set_warmstart_dae!(model, model.transcription, Zvar)
@@ -678,6 +684,20 @@ function solve!(model::NonLinModelDAE)
         model.Z .= JuMP.value.(Zvar)
     end
     return model.Z
+end
+
+function solve_output!(model::NonLinModelDAE)
+    optim = model.optim_output
+    a0var::Vector{JuMP.VariableRef} = optim[:a0var]
+    a0s = model.a0
+    JuMP.set_start_value.(a0var, a0s)
+    JuMP.optimize!(optim)
+    if iserror(optim)
+        model.a0 .= a0s
+    else
+        model.a0 .= JuMP.value.(a0var)
+    end
+    return model.a0
 end
 
 @doc raw"""
