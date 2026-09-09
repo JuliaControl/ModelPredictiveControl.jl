@@ -76,7 +76,7 @@ examples.
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
-julia> estim = ManualEstimator(model, nint_ym=0) # disable augmentation with integrators
+julia> estim = ManualEstimator(model, nint_ym=0) # no augmentation with integrators
 ManualEstimator estimator with a sample time Ts = 0.5 s:
 ├ model: LinModel
 └ dimensions:
@@ -109,14 +109,14 @@ ManualEstimator estimator with a sample time Ts = 0.5 s:
                initstate!(estim, [0], [0])
                y_data, ŷ_data = zeros(5), zeros(5)
                for i=1:5
-                   y = model()                     # simulated measurement
-                   x̂ = preparestate!(estim, y)     # correct nonlinear MHE state estimate
-                   ŷ = estim()                     # nonlinear MHE estimated output
-                   setstate!(mpc, x̂)               # update MPC with the MHE corrected state 
+                   y = model()                  # simulated measurement
+                   x̂ = preparestate!(estim, y)  # correct nonlinear MHE state estimate
+                   ŷ = estim()                  # nonlinear MHE estimated output
+                   setstate!(mpc, x̂)            # update MPC with the MHE corrected state 
                    u = moveinput!(mpc, [0])
                    y_data[i], ŷ_data[i] = y[1], ŷ[1]
-                   updatestate!(estim, u, y)       # update nonlinear MHE estimation
-                   updatestate!(model, u .+ 0.5)   # update simulator with load disturbance
+                   updatestate!(estim, u, y)    # update nonlinear MHE estimation
+                   updatestate!(model, u.+0.5)  # update simulator with load disturbance
                end
                return collect([y_data ŷ_data]')
            end;

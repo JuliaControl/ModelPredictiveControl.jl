@@ -239,10 +239,10 @@ This controller allocates memory at each time step for the optimization.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->x, 5, 1, 1, 1, solver=nothing);
 
 julia> mpc = NonLinMPC(model, Hp=20, Hc=10, transcription=MultipleShooting())
-NonLinMPC controller with a sample time Ts = 10.0 s:
+NonLinMPC controller with a sample time Ts = 5.0 s:
 ├ estimator: UnscentedKalmanFilter
 ├ model: NonLinModel
 ├ optimizer: Ipopt 
@@ -385,12 +385,12 @@ Use custom state estimator `estim` to construct `NonLinMPC`.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.5x+u, (x,_,_)->x, 5, 1, 1, 1, solver=nothing);
 
 julia> estim = UnscentedKalmanFilter(model, σQint_ym=[0.05]);
 
 julia> mpc = NonLinMPC(estim, Hp=20, Cwt=1e4)
-NonLinMPC controller with a sample time Ts = 10.0 s:
+NonLinMPC controller with a sample time Ts = 5.0 s:
 ├ estimator: UnscentedKalmanFilter
 ├ model: NonLinModel
 ├ optimizer: Ipopt 

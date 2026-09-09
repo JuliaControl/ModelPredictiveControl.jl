@@ -7,15 +7,15 @@ Abstract supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
 
     (model::SimModel)(d=[]) -> y
 
-Functor allowing callable `SimModel` object as an alias for [`evaloutput`](@ref).
+Call [`evaloutput`](@ref) by calling a `SimModel` object.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_,_)->-x + u, (x,_,_)->x .+ 20, 4, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->-x+u, (x,_,_)->x.+5, 4, 1, 1, 1, solver=nothing);
 
 julia> y = model()
 1-element Vector{Float64}:
- 20.0
+ 5.0
 ```
 """
 abstract type SimModel{NT<:Real} end

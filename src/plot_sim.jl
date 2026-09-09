@@ -45,7 +45,9 @@ julia> model = LinModel(tf(1, [1, 1]), 1.0);
 
 julia> N = 5; U_data = fill(1.0, 1, N); Y_data = zeros(1, N);
 
-julia> foreach(i->(updatestate!(model, U_data[:, i]); Y_data[:, i] = model()), 1:N); Y_data
+julia> foreach(i->(updatestate!(model, U_data[:, i]); Y_data[:, i] = model()), 1:N);
+
+julia> Y_data
 1×5 Matrix{Float64}:
  0.632121  0.864665  0.950213  0.981684  0.993262
 
@@ -121,9 +123,9 @@ internal states.
 
 # Examples
 ```jldoctest
-julia> plant = NonLinModel((x,u,d,_)->0.1x+u+d, (x,_,_)->2x, 5, 1, 1, 1, 1, solver=nothing);
+julia> plant = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->x, 5, 1, 1, 1, solver=nothing);
 
-julia> res = sim!(plant, 15, [0], [0], x_0=[1])
+julia> res = sim!(plant, 15, [0], x_0=[1])
 Simulation results of NonLinModel with 15 time steps.
 ```
 """
@@ -197,9 +199,9 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 ```jldoctest
 julia> model = LinModel(tf(3, [30, 1]), 0.5);
 
-julia> estim = KalmanFilter(model, σR=[0.5], σQ=[0.25], σQint_ym=[0.01], σPint_ym_0=[0.1]);
+julia> estim = KalmanFilter(model, σR=[0.5], σQ=[0.2], σQint_ym=[0.01]);
 
-julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.25], x_0=[-10], x̂_0=[0, 0])
+julia> res = sim!(estim, 50, [0], y_noise=[0.5], x_noise=[0.2], x_0=[-10], x̂_0=[0, 0])
 Simulation results of KalmanFilter with 50 time steps.
 ```
 """
@@ -232,7 +234,7 @@ The keyword arguments are identical to [`sim!(::StateEstimator, ::Int)`](@ref).
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(2, [5, 1])], 4);
 
-julia> mpc = setconstraint!(LinMPC(model, Mwt=[0, 1], Nwt=[0.01], Hp=30), ymin=[0, -Inf]);
+julia> mpc = setconstraint!(LinMPC(model, Mwt=[0, 1], Nwt=[.01]), ymin=[0, -Inf]);
 
 julia> res = sim!(mpc, 25, [0, 0], y_noise=[0.1], y_step=[-10, 0])
 Simulation results of LinMPC with 25 time steps.
@@ -473,7 +475,7 @@ Plot the simulation results of a [`StateEstimator`](@ref).
 
 # Examples
 ```julia-repl
-julia> res = sim!(KalmanFilter(LinModel(tf(3, [2.0, 1]), 1.0)), 25, [0], y_step=[1]);
+julia> res = sim!(KalmanFilter(LinModel(tf(3, [2, 1]), 1.0)), 25, [0], y_step=[1]);
 
 julia> using Plots; plot(res, plotu=false, plotŷ=true, plotxwithx̂=true)
 ```

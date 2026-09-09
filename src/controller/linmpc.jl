@@ -263,7 +263,7 @@ Use custom state estimator `estim` to construct `LinMPC`.
 
 # Examples
 ```jldoctest
-julia> estim = KalmanFilter(LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 4), i_ym=[2]);
+julia> estim = KalmanFilter(LinModel([tf(6, [9, 1]); tf(2, [5, 1])], 4), i_ym=[2]);
 
 julia> mpc = LinMPC(estim, Mwt=[0, 1], Nwt=[0.5], Hp=30, Hc=1)
 LinMPC controller with a sample time Ts = 4.0 s:

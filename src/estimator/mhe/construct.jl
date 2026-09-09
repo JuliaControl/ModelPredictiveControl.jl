@@ -354,10 +354,10 @@ at each time step for the optimization.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->x, 5, 1, 1, 1, solver=nothing);
 
 julia> estim = MovingHorizonEstimator(model, He=5, σR=[1], σP_0=[0.01])
-MovingHorizonEstimator estimator with a sample time Ts = 10.0 s:
+MovingHorizonEstimator estimator with a sample time Ts = 5.0 s:
 ├ model: NonLinModel
 ├ optimizer: Ipopt 
 ├ transcription: SingleShooting
