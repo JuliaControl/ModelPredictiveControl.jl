@@ -607,14 +607,20 @@ prediction horizon ``H_p``.
 
 # Examples
 ```jldoctest
-julia> mpc = LinMPC(KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σR=[√25]), Hp=1, Hc=1);
+julia> model1 = LinModel(ss(0.1, 0.5, 1, 0, 4.0));
 
-julia> mpc.estim.model.A[1], mpc.estim.cov.R̂[1], mpc.weights.M_Hp[1], mpc.weights.Ñ_Hc[1]
+julia> mpc = LinMPC(KalmanFilter(model1, σR=[√25]), Hp=1, Hc=1); 
+
+julia> estim = mpc.estim;
+
+julia> estim.model.A[1], estim.cov.R̂[1], mpc.weights.M_Hp[1], mpc.weights.Ñ_Hc[1]
 (0.1, 25.0, 1.0, 0.1)
 
-julia> setmodel!(mpc, LinModel(ss(0.42, 0.5, 1, 0, 4.0)); R̂=[9], M_Hp=[10], Nwt=[0.666]);
+julia> model2 = LinModel(ss(0.42, 0.5, 1, 0, 4.0));
 
-julia> mpc.estim.model.A[1], mpc.estim.cov.R̂[1], mpc.weights.M_Hp[1], mpc.weights.Ñ_Hc[1]
+julia> setmodel!(mpc, model2; R̂=[9], M_Hp=[10], Nwt=[0.666]);
+
+julia> estim.model.A[1], estim.cov.R̂[1], mpc.weights.M_Hp[1], mpc.weights.Ñ_Hc[1]
 (0.42, 9.0, 10.0, 0.666)
 ```
 """

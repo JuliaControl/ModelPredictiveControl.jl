@@ -57,8 +57,8 @@ function generate_f_h(model, inputs, outputs)
             f_ip(ẋ, x, u, p, nothing)
         catch err
             if err isa MethodError
-                error("NonLinModel does not support a time argument t in the f function, "*
-                      "see the constructor docstring for a workaround.")
+                error("NonLinModel does not support a time argument t in the f "*
+                      "function, see the constructor docstring for a workaround.")
             else
                 rethrow()
             end
@@ -71,14 +71,14 @@ function generate_f_h(model, inputs, outputs)
     u_nothing = fill(nothing, nu)
     function h!(y, x, _ , p)
         try
-            # MTK.jl supports a `u` argument in `h_ip` function but not this package. We set
-            # `u` as a vector of nothing and `h_ip` function will presumably throw an
-            # MethodError if this argument is used inside the function
+            # MTK.jl supports a `u` argument in `h_ip` function but not this package. We
+            # set `u` as a vector of nothing and `h_ip` function will presumably throw
+            # an MethodError if this argument is used inside the function
             h_ip(y, x, u_nothing, p, nothing)
         catch err
             if err isa MethodError
-                error("NonLinModel only support strictly proper systems (no manipulated "*
-                      "input argument u in the output function h)")
+                error("NonLinModel only support strictly proper systems (no "*
+                      "manipulated input argument u in the output function h)")
             else
                 rethrow()
             end

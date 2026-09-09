@@ -69,7 +69,7 @@ the `jacobian` keyword argument at the construction of `model` to swap the backe
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_,_)->x.^3 + u, (x,_,_)->x, 0.1, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->x.^3+u, (x,_,_)->x, 5, 1, 1, 1, solver=nothing);
 
 julia> linmodel = linearize(model, x=[10.0], u=[0.0]); 
 
@@ -145,7 +145,7 @@ The keyword arguments are identical to [`linearize`](@ref). The code is allocati
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_,_)->x.^3 + u, (x,_,_)->x, 0.1, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->x.^3+u, (x,_,_)->x, 5, 1, 1, 1, solver=nothing);
 
 julia> linmodel = linearize(model, x=[10.0], u=[0.0]); linmodel.A
 1×1 Matrix{Float64}:

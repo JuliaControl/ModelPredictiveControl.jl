@@ -661,10 +661,10 @@ This estimator is allocation-free if `model` simulations do not allocate.
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->2x, 10.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.1x+u, (x,_,_)->x, 5, 1, 1, 1, solver=nothing);
 
 julia> estim = UnscentedKalmanFilter(model, σR=[1], nint_ym=[2], σPint_ym_0=[1, 1])
-UnscentedKalmanFilter estimator with a sample time Ts = 10.0 s:
+UnscentedKalmanFilter estimator with a sample time Ts = 5.0 s:
 ├ model: NonLinModel
 ├ direct: true
 └ dimensions:
@@ -1032,9 +1032,9 @@ differentiation. This estimator is allocation-free if `model` simulations do not
 
 # Examples
 ```jldoctest
-julia> model = NonLinModel((x,u,_,_)->0.2x+u, (x,_,_)->-3x, 5.0, 1, 1, 1, solver=nothing);
+julia> model = NonLinModel((x,u,_,_)->0.2x+u, (x,_,_)->x, 5, 1, 1, 1, solver=nothing);
 
-julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP_0=[0.1], σPint_ym_0=[0.1])
+julia> estim = ExtendedKalmanFilter(model, σQ=[2], σQint_ym=[2], σP_0=[0.1])
 ExtendedKalmanFilter estimator with a sample time Ts = 5.0 s:
 ├ model: NonLinModel
 ├ jacobian: AutoForwardDiff
