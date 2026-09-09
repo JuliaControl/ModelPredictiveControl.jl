@@ -132,13 +132,13 @@ provided in the semi-explicit form:
 where ``\mathbf{x}``, ``\mathbf{y}``, ``\mathbf{u}``, ``\mathbf{d}`` and ``\mathbf{p}`` are
 defined in [`NonLinModel`](@ref), and ``\mathbf{a}`` is the algebraic variable with `na`
 elements. The ``\mathbf{f}`` and ``\mathbf{q}`` functions are combined into a single method
-`fq`/`fq!` since they typically share common computations. If `RHS` represents the result of
-the right-hand side in ``\mathbf{0 = q(x, a, u, d, p)}``, the functions can be implemented
-in two possible ways:
+`fq`/`fq!` since they typically share common computations. If `res` represents the result of
+``\mathbf{q(x, a, u, d, p)}`` (or residuals), the functions can be implemented in two
+possible ways:
 
-1. **Non-mutating functions** (out-of-place): define them as `fq(x, a, u, d, p) -> ẋ, RHS`
+1. **Non-mutating functions** (out-of-place): define them as `fq(x, a, u, d, p) -> ẋ, res`
    and `h(x, a, d, p) -> y`. This syntax is simple and intuitive but it allocates more memory.
-2. **Mutating functions** (in-place): define them as `fq!(ẋ, RHS, x, a, u, d, p) -> nothing`
+2. **Mutating functions** (in-place): define them as `fq!(ẋ, res, x, a, u, d, p) -> nothing`
    and `h!(y, x, a, d, p) -> nothing`. This syntax reduces the allocations and potentially
    the computational burden as well.
 
@@ -183,7 +183,7 @@ See also [`NonLinModel`](@ref) for ODEs.
 
 # Examples
 ```jldoctest
-julia> fq!(ẋ, RHS, x, a, u, _ , p) = (ẋ .= p*x .+ a; RHS .= a .- u; nothing);
+julia> fq!(ẋ, res, x, a, u, _ , p) = (ẋ .= p*x .+ a; res .= a .- u; nothing);
 
 julia> h!(y, x, _ , _ , _ ) = (y .= 0.1x; nothing);
 
@@ -255,10 +255,10 @@ function get_mutating_functions_dae(NT, fq, h)
     fq! = if ismutating_f_q
         fq
     else
-        function fq!(ẋ, RHS, x, a, u, d, p)
-            ẋ_ret, RHS_ret = fq(x, a, u, d, p)
+        function fq!(ẋ, res, x, a, u, d, p)
+            ẋ_ret, res_ret = fq(x, a, u, d, p)
             ẋ   .= ẋ_ret
-            RHS .= RHS_ret
+            res .= res_ret
             return nothing
         end
     end
@@ -282,7 +282,7 @@ Validate `fq` function argument signature for DAEs and return `true` if mutating
 function validate_fq_dae(NT, fq)
     ismutating = hasmethod(
         fq, 
-        #       ẋ         , RHS       , x         , a         , u         , d         , p    
+        #       ẋ         , res       , x         , a         , u         , d         , p    
         Tuple{  Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Vector{NT}, Any}
     )
     isnonmutating = hasmethod(
@@ -294,7 +294,7 @@ function validate_fq_dae(NT, fq)
         error(
             "the state function has no method with type signature "*
             "fq(x::Vector{$(NT)}, a::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any) or mutating form "*
-            "fq!(ẋ::Vector{$(NT)}, RHS::Vector{$(NT)}, x::Vector{$(NT)}, a::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any)"
+            "fq!(ẋ::Vector{$(NT)}, res::Vector{$(NT)}, x::Vector{$(NT)}, a::Vector{$(NT)}, u::Vector{$(NT)}, d::Vector{$(NT)}, p::Any)"
         )
     end
     return ismutating
