@@ -136,7 +136,7 @@ used in the plotting functions.
 
 # Examples
 ```jldoctest
-julia> model = LinModel(tf(3, [10, 1]), 2.0)
+julia> model = LinModel(tf(3, [10, 1]), 2.0);
 
 julia> model = setname!(model, u=["\$A\$ (%)"], y=["\$T\$ (∘C)"])
 LinModel with a sample time Ts = 2.0 s:
