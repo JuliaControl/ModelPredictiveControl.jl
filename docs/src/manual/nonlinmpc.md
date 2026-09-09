@@ -130,7 +130,8 @@ The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. 
 
 ```@example man_nonlin
 using JuMP; unset_time_limit_sec(nmpc.optim) # hide
-res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
+ry = [180.0]
+res_ry = sim!(nmpc, N, ry, plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res_ry)
 savefig("plot3_NonLinMPC.svg"); nothing # hide
 ```
@@ -142,7 +143,7 @@ inverted position, the closed-loop response to a step disturbances of 10° is al
 satisfactory:
 
 ```@example man_nonlin
-res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
+res_yd = sim!(nmpc, N, ry, plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
 plot(res_yd)
 savefig("plot4_NonLinMPC.svg"); nothing # hide
 ```
@@ -185,8 +186,10 @@ Kalman Filter similar to the previous one (``\mathbf{y^m} = θ`` and ``\mathbf{y
 ```@example man_nonlin
 h2(x, _ , _ ) = [180/π*x[1], x[2]]
 nu, nx, ny = 1, 2, 2
-model2 = setname!(NonLinModel(f, h2, Ts, nu, nx, ny; p=p_model), u=vu, x=vx, y=[vy; vx[2]])
-plant2 = setname!(NonLinModel(f, h2, Ts, nu, nx, ny; p=p_plant), u=vu, x=vx, y=[vy; vx[2]])
+model2 = NonLinModel(f, h2, Ts, nu, nx, ny; p=p_model)
+model2 = setname!(model2, u=vu, x=vx, y=[vy; vx[2]])
+plant2 = NonLinModel(f, h2, Ts, nu, nx, ny; p=p_plant)
+plant2 = setname!(plant2, u=vu, x=vx, y=[vy; vx[2]])
 estim2 = UnscentedKalmanFilter(model2; σQ, σR, nint_u, σQint_u, i_ym=[1])
 ```
 
@@ -212,7 +215,8 @@ setpoint is similar:
 
 ```@example man_nonlin
 unset_time_limit_sec(empc.optim)    # hide
-res2_ry = sim!(empc, N, [180, 0], plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
+ry = [180.0, 0]
+res2_ry = sim!(empc, N, ry, plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
 plot(res2_ry, ploty=[1])
 savefig("plot5_NonLinMPC.svg"); nothing # hide
 ```
@@ -232,7 +236,7 @@ Dict(:W_nmpc => calcW(res_ry), :W_empc => calcW(res2_ry))
 Also, for a 10° step disturbance:
 
 ```@example man_nonlin
-res2_yd = sim!(empc, N, [180; 0]; plant=plant2, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10, 0])
+res2_yd = sim!(empc, N, ry; plant=plant2, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10, 0])
 plot(res2_yd, ploty=[1])
 savefig("plot6_NonLinMPC.svg"); nothing # hide
 ```
@@ -304,7 +308,7 @@ In addition to the 180° setpoint response:
 ```@example man_nonlin
 using Logging # hide
 res3_ry = with_logger(ConsoleLogger(stderr, Error)) do # hide
-res3_ry = sim!(nmpc2, N, [180; 0]; plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0]);
+res3_ry = sim!(nmpc2, N, ry; plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0]);
 end # hide
 nothing # hide
 ```
@@ -316,7 +320,7 @@ function plotWithPower(res, Pmax)
     t, τ, ω = res.T_data, res.U_data[1, :], res.X_data[2, :]
     P, Pmax = τ.*ω, fill(Pmax, size(t))
     plt1 = plot(res, ploty=[1])
-    plt2 = plot(t, P, label=raw"$P$", ylabel=raw"$P$ (W)", xlabel="Time (s)", legend=:right)
+    plt2 = plot(t, P, label="\$P\$", ylabel="\$P\$ (W)", xlabel="Time (s)", legend=:right)
     plot!(plt2, t, Pmax, label=raw"$P_\mathrm{max}$", linestyle=:dot, linewidth=1.5)
     return plot(plt1, plt2, layout=(2,1))
 end
@@ -353,7 +357,8 @@ mpc = setconstraint!(mpc, umin=[-1.5], umax=[+1.5])
 The linear controller satisfactorily rejects the 10° step disturbance:
 
 ```@example man_nonlin
-res_lin = sim!(mpc, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
+ry = [180.0]
+res_lin = sim!(mpc, N, ry; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin)
 savefig("plot9_NonLinMPC.svg"); nothing # hide
 ```
@@ -392,7 +397,7 @@ mpc2 = setconstraint!(mpc2; umin, umax)
 does slightly improve the rejection of the step disturbance:
 
 ```@example man_nonlin
-res_lin2 = sim!(mpc2, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
+res_lin2 = sim!(mpc2, N, ry; plant, x_0=[π, 0], y_step=[10])
 plot(res_lin2)
 savefig("plot10_NonLinMPC.svg"); nothing # hide
 ```
@@ -412,7 +417,7 @@ Superimposing the previous disturbance rejection to the newer one gives almost i
 results:
 
 ```@example man_nonlin
-res_ms = sim!(mpc_ms, N, [180.0]; plant, x_0=[π, 0], y_step=[10])
+res_ms = sim!(mpc_ms, N, ry; plant, x_0=[π, 0], y_step=[10])
 plot!(res_ms)
 savefig("plot10b_NonLinMPC.svg"); nothing # hide
 ```
@@ -426,7 +431,7 @@ For example, the 180° setpoint response from 0° is unsatisfactory since the pr
 poor in the first quadrant:
 
 ```@example man_nonlin
-res_lin3 = sim!(mpc2, N, [180.0]; plant, x_0=[0, 0])
+res_lin3 = sim!(mpc2, N, ry; plant, x_0=[0, 0])
 plot(res_lin3)
 savefig("plot11_NonLinMPC.svg"); nothing # hide
 ```
@@ -483,7 +488,7 @@ operating point. The [`SimResult`](@ref) object is for plotting purposes only. T
 [`LinMPC`](@ref) performances are similar to the nonlinear MPC, both for the 180° setpoint:
 
 ```@example man_nonlin
-x_0 = [0, 0]; x̂_0 = [0, 0, 0]; ry = [180]
+x_0 = [0, 0]; x̂_0 = [0, 0, 0];
 res_slin = sim_adapt!(mpc3, model, N, ry, plant, x_0, x̂_0)
 plot(res_slin)
 savefig("plot12_NonLinMPC.svg"); nothing # hide

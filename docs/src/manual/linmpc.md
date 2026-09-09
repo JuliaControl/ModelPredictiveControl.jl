@@ -245,7 +245,8 @@ We need to construct a new [`LinModel`](@ref) that includes the measured disturb
 ``\mathbf{d} = u_l`` and the operating point ``\mathbf{d_{op}} = 20``:
 
 ```@example 1
-model_d = setop!(LinModel([G G[1:2, 2]], Ts, i_d=[3]), uop=[20, 20], yop=[50, 30], dop=[20])
+model_d = LinModel([G G[1:2, 2]], Ts, i_d=[3])
+model_d = setop!(model_d, uop=[20, 20], yop=[50, 30], dop=[20])
 ```
 
 A [`LinMPC`](@ref) controller is constructed on this model:
