@@ -320,8 +320,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                           \\ 
-        \mathbf{k̄}(k+0)                                             \\
         \mathbf{a_0}(k+0)                                           \\
+        \mathbf{k̄}(k+0)                                             \\
         \mathbf{ā}(k+0)                                             \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
@@ -329,8 +329,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                 \\
         \mathbf{X̂_0}                                                \\
-        \mathbf{K̄}                                                  \\
         \mathbf{A_0}                                                \\
+        \mathbf{K̄}                                                  \\
         \mathbf{Ā}                                                  \end{bmatrix}
     \quad \text{and} \quad
     \mathbf{Ā} = \begin{bmatrix}
@@ -345,10 +345,10 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{x̂_0}(k-N_k+p)                                       \\  
         \mathbf{X̂_0}                                                \\         
         \mathbf{0_x̂}                                                \\
-        \mathbf{K̄}                                                  \\
-        \mathbf{0_k̄}                                                \\
         \mathbf{A_0}                                                \\
         \mathbf{0_a}                                                \\
+        \mathbf{K̄}                                                  \\
+        \mathbf{0_k̄}                                                \\
         \mathbf{Ā}                                                  \\
         \mathbf{0_ā}                                                \\ 
         \mathbf{Ŵ}                                                  \\

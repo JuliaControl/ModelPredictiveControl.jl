@@ -51,6 +51,7 @@ struct NonLinModelDAE{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    lastx0::Vector{NT}
     buffer::SimModelBuffer{NT}
     function NonLinModelDAE{NT}(
         fq!::FQ, h!::H, Ts, nu, nx, na, ny, nd, 
@@ -92,6 +93,7 @@ struct NonLinModelDAE{
         Fs  = zeros(NT, size(Aeq, 1))
         beq = zeros(NT, size(Aeq, 1))
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
+        lastx0 = zeros(NT, nx)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         model = new{NT, TM, JMS, JMO, JB, HB, FQ, H, PT}(
             x0, a0, u0, d0,
@@ -107,6 +109,7 @@ struct NonLinModelDAE{
             nu, nx, na, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
+            lastx0,
             buffer
         )
         init_optimization!(model, model.optim_state, model.optim_output)
@@ -334,7 +337,6 @@ get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
 
 "Get the number of elements in the algebraic variable over the collocation points `ā`."
 get_nā(model::SimModelDAE, transcription::OrthogonalCollocation) = transcription.no*model.na
-get_nā(model::SimModelDAE, ::TrapezoidalCollocation) = model.na
 
 @doc raw"""
     init_defectmat_dae(NT, ::OrthogonalCollocation, nx, na, Co, λo) -> Es, Ks, Aeq
@@ -342,7 +344,7 @@ get_nā(model::SimModelDAE, ::TrapezoidalCollocation) = model.na
 Init the matrices for computing the defect of the next state.
 
 Knowing that the decision vector ``\mathbf{Z}`` contain ``\mathbf{x̂_0}(k+1)``, 
-``\mathbf{k̄}(k+0)``, ``\mathbf{a}(k+0)`` and ``\mathbf{ā}(k+0)`` vectors with an 
+``\mathbf{a_0}(k+0)``, ``\mathbf{k̄}(k+0)`` and ``\mathbf{ā}(k+0)`` vectors with an 
 [`OrthogonalCollocation`](@ref), this linear equation compute the defect of the states at
 time ``k+1``:
 ```math
@@ -361,7 +363,7 @@ function init_defectmat_dae(NT, transcription::OrthogonalCollocation, nx, na, Co
     Esk̄ = Co
     Esa = zeros(NT, nx, na)
     Esā = zeros(NT, nx, nā)
-    Es = [Esx Esk̄ Esa Esā]
+    Es = [Esx Esa Esk̄ Esā]
     Aeq = Es
     return Es, Ks, Aeq
 end
@@ -569,8 +571,8 @@ function con_nonlinprogeq!(
     nx, na = model.nx, model.na
     Mo, no =  model.Mo, transcription.no
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
-    k̄_Z, a0_Z, ā_Z = @views Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+na)], Z[(nx+nk̄+na+1):end]
-    sk̄, q0, q̄  = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+na)], geq[(nk̄+na+1):(nk̄+na+nā)] 
+    a0_Z, k̄_Z, ā_Z = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
+    q0, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)] 
     @views model.fq!(k̄[1:nx], q0, x0, a0_Z, u0, d0, model.p)
     Δk = k̄
     for i=1:no
@@ -617,12 +619,15 @@ argument. The next algebraic variable ``\mathbf{a_0}(k+1)`` will be also stored 
 `model.a0`.
 """
 function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
+    nx, na = model.nx, model.na
     model.x0 .= x0
     model.u0 .= u0
     model.d0 .= d0
     linconstrainteq!(model, model.transcription)
     Z = solve_state!(model)
-    x0next .= @views Z[1:model.nx]
+    x0next       .= @views Z[1:nx]
+    model.a0     .= @views Z[(nx + 1):(nx + na)]
+    model.lastx0 .= x0
     return nothing
 end
 
@@ -756,6 +761,7 @@ on `model` object. It returns the dictionary `info` with the following fields:
 !!! info
     Fields with *`emphasis`* are non-Unicode alternatives.
 
+- `:xnext` : , ``\mathbf{x}(k+1)``
 - `:x` : , ``\mathbf{x}(k)``
 - `:a` : , ``\mathbf{a}(k)``
 - `:u` : , ``\mathbf{u}(k)``
