@@ -315,12 +315,13 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \vdots                                                      \\
         \mathbf{ā}_{n_o}(k+j)                                       \end{bmatrix}
     ```
-    The algebraic vectors at the future time step ``\mathbf{a_0}`` is included in the 
-    decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
+    Although not strictly needed, the current algebraic variable ``\mathbf{a_0}(k+0)`` is
+    still included in the decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                           \\ 
         \mathbf{k̄}(k+0)                                             \\
+        \mathbf{a_0}(k+0)                                           \\
         \mathbf{ā}(k+0)                                             \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
@@ -361,7 +362,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     ```
     See the Extended Help of [`TrapezoidalCollocation`](@ref) for the exact definition of 
     ``\mathbf{A_0}`` on the last two cases. All the ``\mathbf{0_{(•)}}`` are vectors with
-    zeros for the unused decision variables at the beginning (``N_k < He``).
+    zeros for the unused decision variables at the beginning (``N_k < H_e``).
     
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.

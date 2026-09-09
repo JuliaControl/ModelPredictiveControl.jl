@@ -328,13 +328,13 @@ end
 
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."
 function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
-    return nx + transcription.no*nx + transcription.no*na
+    return nx + transcription.no*nx + na + transcription.no*na
 end
 get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
 
 "Get the number of elements in the algebraic variable over the collocation points `ā`."
-get_nā(model::SimModelDAE, transcription::CollocationMethod) = transcription.no*model.na
-
+get_nā(model::SimModelDAE, transcription::OrthogonalCollocation) = transcription.no*model.na
+get_nā(model::SimModelDAE, ::TrapezoidalCollocation) = model.na
 
 @doc raw"""
     init_defectmat_dae(NT, ::OrthogonalCollocation, nx, na, Co, λo) -> Es, Ks, Aeq
@@ -342,7 +342,7 @@ get_nā(model::SimModelDAE, transcription::CollocationMethod) = transcription.n
 Init the matrices for computing the defect of the next state.
 
 Knowing that the decision vector ``\mathbf{Z}`` contain ``\mathbf{x̂_0}(k+1)``, 
-``\mathbf{k̄}(k+0)``, ``\mathbf{ā}(k+0)`` and ``\mathbf{a}(k+1)`` vectors with an 
+``\mathbf{k̄}(k+0)``, ``\mathbf{a}(k+0)`` and ``\mathbf{ā}(k+0)`` vectors with an 
 [`OrthogonalCollocation`](@ref), this linear equation compute the defect of the states at
 time ``k+1``:
 ```math
@@ -359,8 +359,9 @@ function init_defectmat_dae(NT, transcription::OrthogonalCollocation, nx, na, Co
     Ks = λo*I(nx)
     Esx = -I
     Esk̄ = Co
+    Esa = zeros(NT, nx, na)
     Esā = zeros(NT, nx, nā)
-    Es = [Esx Esk̄ Esā]
+    Es = [Esx Esk̄ Esa Esā]
     Aeq = Es
     return Es, Ks, Aeq
 end
@@ -425,46 +426,38 @@ cached and updated in-place if required to use the efficient [`value_and_jacobia
 function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) where JNT<:Real
     transcription = model.transcription
     jac, hess = model.jacobian, model.hessian
-    nx, na = model.nx, model.na
-    nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
-    neq = model.neq
+    nx, na, neq, nk̄ = model.nx, model.na, model.neq, get_nk̄(model, transcription)
     nZ = length(model.Z)
     strict = Val(true) 
     myNaN                              = convert(JNT, NaN)
-    k̄::Vector{JNT},   q̄::Vector{JNT}   = zeros(JNT, nk̄),  zeros(JNT, nā)
+    k̄::Vector{JNT}                     = zeros(JNT, nk̄)
     geq::Vector{JNT}, λeq::Vector{JNT} = zeros(JNT, neq), rand(JNT, neq)
     q::Vector{JNT},   λq::Vector{JNT}  = zeros(JNT, na),  rand(JNT, na)
     ẋ::Vector{JNT}                     = zeros(JNT, nx)
     # -------------- collocation constraint: nonlinear oracle -------------------------
-    function geq!(geq, Z, k̄, q̄) 
-        update_predictions!(k̄, q̄, geq, model, Z)
+    function geq!(geq, Z, k̄) 
+        update_predictions!(k̄, geq, model, Z)
         return nothing
     end
-    function ℓ_geq(Z, λeq, k̄, q̄, geq)
-        update_predictions!(k̄, q̄, geq, model, Z)
+    function ℓ_geq(Z, λeq, k̄, geq)
+        update_predictions!(k̄, geq, model, Z)
         return dot(λeq, geq)
     end
     Z_∇geq = fill(myNaN, nZ)    # NaN to force update at first call
-    ∇geq_cache = (
-        Cache(k̄), Cache(q̄)
-    )
-    ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z_∇geq, ∇geq_cache...; strict)
+    ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z_∇geq, Cache(k̄); strict)
     ∇geq    = init_diffmat(JNT, jac, ∇geq_prep, nZ, neq)
     ∇geq_structure  = init_diffstructure(∇geq)
     if !isnothing(hess)
-        ∇²geq_cache = (
-            Cache(k̄), Cache(q̄), Cache(geq)
-        )
         ∇²geq_prep = prepare_hessian(
-            ℓ_geq, hess, Z_∇geq, Constant(λeq), ∇²geq_cache...; strict
+            ℓ_geq, hess, Z_∇geq, Constant(λeq), Cache(k̄), Cache(geq); strict
         )
         ∇²ℓ_geq = init_diffmat(JNT, hess, ∇²geq_prep, nZ, nZ)
         ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
     end
-    function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇geq)
-            Z̃_∇geq .= Z̃_arg
-            value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_cache...)
+    function update_con_eq!(geq, ∇geq, Z_∇geq, Z_arg)
+        if isdifferent(Z_arg, Z_∇geq)
+            Z_∇geq .= Z_arg
+            value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z_∇geq, Cache(k̄))
         end
         return nothing
     end
@@ -479,7 +472,9 @@ function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) w
     function ∇²geq_func!(∇²ℓ_arg, Z_arg, λ_arg)
         Z_∇geq .= Z_arg
         λeq    .= λ_arg
-        hessian!(ℓ_geq, ∇²ℓ_geq, ∇²geq_prep, hess, Z_∇geq, Constant(λeq), ∇²geq_cache...)
+        hessian!(
+            ℓ_geq, ∇²ℓ_geq, ∇²geq_prep, hess, Z_∇geq, Constant(λeq), Cache(k̄), Cache(geq)
+        )
         return fill_diffstructure!(∇²ℓ_arg, ∇²ℓ_geq, ∇²geq_structure)
     end
     geq_min = geq_max = zeros(JNT, neq)
@@ -544,41 +539,39 @@ function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) w
 end
 
 """
-    update_predictions!(k̄, q̄, geq, model, Z)
+    update_predictions!(k̄, geq, model, Z)
 
 TBW
 """
-function update_predictions!(k̄, q̄, geq, model, Z)
+function update_predictions!(k̄, geq, model, Z)
     x0, u0, d0 = model.x0, model.u0, model.d0
-    con_nonlinprogeq!(geq, k̄, q̄, model, model.transcription, x0, u0, d0, Z)
+    con_nonlinprogeq!(geq, k̄, model, model.transcription, x0, u0, d0, Z)
     return nothing
 end
 
 function con_nonlinprogeq!(
-    geq, k̄, q̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
+    geq, k̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
 )
     nx, na = model.nx, model.na
     Ts = model.Ts
     x0next_Z, a0_Z, a0next_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
-    sknext, sq, sqnext  = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
+    sknext, q1, q2  = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
     k̇1, k̇2 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
-    q1, q2 = @views q̄[1:na], q̄[(na+1):(2na)]
     model.fq!(k̇1, q1, x0,       a0_Z,     u0, d0, model.p)
     model.fq!(k̇2, q2, x0next_Z, a0next_Z, u0, d0, model.p)
     sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇1 + k̇2)
-    sq     .= q1
-    sqnext .= q2
     return geq
 end
 
 function con_nonlinprogeq!(
-    geq, k̄, q̄, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
+    geq, k̄, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
 )
     nx, na = model.nx, model.na
     Mo, no =  model.Mo, transcription.no
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
-    k̄_Z, ā_Z = @views Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+nā)]
-    sk̄,  sq̄  = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+nā)]
+    k̄_Z, a0_Z, ā_Z = @views Z[(nx+1):(nx+nk̄)], Z[(nx+nk̄+1):(nx+nk̄+na)], Z[(nx+nk̄+na+1):end]
+    sk̄, q0, q̄  = @views geq[1:nk̄], geq[(nk̄+1):(nk̄+na)], geq[(nk̄+na+1):(nk̄+na+nā)] 
+    @views model.fq!(k̄[1:nx], q0, x0, a0_Z, u0, d0, model.p)
     Δk = k̄
     for i=1:no
         Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z[(1 + (i-1)*nx):(i*nx)] .- x0
@@ -592,7 +585,6 @@ function con_nonlinprogeq!(
         model.fq!(k̇i, qi, ki_Z, ai_Z, u0, d0, model.p)
     end
     sk̄ .-= k̄
-    sq̄  .= q̄
     return geq
 end
 
@@ -764,8 +756,12 @@ on `model` object. It returns the dictionary `info` with the following fields:
 !!! info
     Fields with *`emphasis`* are non-Unicode alternatives.
 
-- `:ΔU` or *`:DeltaU`* : optimal manipulated input increments over ``H_c``, ``\mathbf{ΔU}``
-- `:ϵ` or *`:epsilon`* : optimal slack variable, ``ϵ``
+- `:x` : , ``\mathbf{x}(k)``
+- `:a` : , ``\mathbf{a}(k)``
+- `:u` : , ``\mathbf{u}(k)``
+- `:d` : , ``\mathbf{u}(k)``
+- `:y` : , ``\mathbf{y}(k)``
+
 - `:D̂` or *`:Dhat`* : predicted measured disturbances over ``H_p``, ``\mathbf{D̂}``
 - `:x̂` or *`:xhat`* : current estimated state, ``\mathbf{x̂}_i(k)``
 - `:ŷ` or *`:yhat`* : current estimated output, ``\mathbf{ŷ}(k)``
