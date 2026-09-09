@@ -190,7 +190,7 @@ If applicable, it also sets the error covariance `estim.cov.P̂` to `estim.cov.P
 
 # Examples
 ```jldoctest
-julia> estim = SteadyKalmanFilter(LinModel(tf(3, [10, 1]), 0.5), nint_ym=[2], direct=false);
+julia> estim = Luenberger(LinModel(tf(3, [10, 1]), 0.5), nint_ym=[2], direct=false);
 
 julia> u = [1]; y = [3 - 0.1]; x̂ = round.(initstate!(estim, u, y), digits=3)
 3-element Vector{Float64}:
@@ -277,11 +277,11 @@ Calling a [`StateEstimator`](@ref) object calls this `evaloutput` method.
 
 # Examples
 ```jldoctest
-julia> kf = SteadyKalmanFilter(setop!(LinModel(tf(2, [10, 1]), 5), yop=[20]), direct=false);
+julia> kf = KalmanFilter(setop!(LinModel(tf(2, [10, 1]), 5), yop=[6]), direct=false);
 
 julia> ŷ = evaloutput(kf)
 1-element Vector{Float64}:
- 20.0
+ 6.0
 ```
 """
 function evaloutput(estim::StateEstimator{NT}, d=estim.buffer.empty) where NT <: Real
@@ -318,13 +318,13 @@ delayed/predictor (2.) formulation:
 
 # Examples
 ```jldoctest
-julia> estim2 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=true);
+julia> estim2 = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=true);
 
 julia> x̂ = round.(preparestate!(estim2, [1]), digits=2)
 1-element Vector{Float64}:
  0.5
 
-julia> estim1 = SteadyKalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=false);
+julia> estim1 = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4)), nint_ym=0, direct=false);
 
 julia> x̂ = preparestate!(estim1, [1])
 1-element Vector{Float64}:
@@ -462,7 +462,9 @@ augmented model is not verified (see Extended Help for more info).
 
 # Examples
 ```jldoctest
-julia> kf = KalmanFilter(LinModel(ss(0.1, 0.5, 1, 0, 4.0)), σQ=[√4.0], σQint_ym=[√0.25]);
+julia> model = LinModel(ss(0.1, 0.5, 1, 0, 4.0));
+
+julia> kf = KalmanFilter(model, σQ=[√4.0], σQint_ym=[√0.25]);
 
 julia> kf.model.A[], kf.cov.Q̂[1, 1], kf.cov.Q̂[2, 2] 
 (0.1, 4.0, 0.25)
