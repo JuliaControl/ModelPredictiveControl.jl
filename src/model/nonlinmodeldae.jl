@@ -393,7 +393,7 @@ function init_optimization!(
     if optim_state === optim_output
         throw(ArgumentError("optim_state and optim_output must be different JuMP models"))
     end
-    geq_oracle, q_oracle = get_nonlincon_oracle(model, optim_state)
+    geq_oracle, q_oracle = get_nonlincon_oracle(model, optim_state, optim_output)
     # --- collocation problem: optim_state ---
     JuMP.num_variables(optim_state) == 0 || JuMP.empty!(optim_state)
     JuMP.set_silent(optim_state)
@@ -414,7 +414,7 @@ end
 
 """
     get_nonlincon_oracle(
-        model::NonLinModelDAE, optim::JuMP.GenericModel
+        model::NonLinModelDAE, optim_state::JuMP.GenericModel, optim_output::JuMP.GenericModel
     ) -> geq_oracle, q_oracle
 
 Return the nonlinear equality constraint oracles for [`NonLinModelDAE`](@ref) `model`.
@@ -425,7 +425,9 @@ intricate because the oracles are used inside the nonlinear optimization, so the
 type-stable and as efficient as possible. All the function outputs and derivatives are
 cached and updated in-place if required to use the efficient [`value_and_jacobian!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
 """
-function get_nonlincon_oracle(model::NonLinModelDAE, ::JuMP.GenericModel{JNT}) where JNT<:Real
+function get_nonlincon_oracle(
+    model::NonLinModelDAE, ::JuMP.GenericModel{JNT}, ::JuMP.GenericModel{JNT}
+) where JNT<:Real
     transcription = model.transcription
     jac, hess = model.jacobian, model.hessian
     nx, na, neq, nk̄ = model.nx, model.na, model.neq, get_nk̄(model, transcription)
