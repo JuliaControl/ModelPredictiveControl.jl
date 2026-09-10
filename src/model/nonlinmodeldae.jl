@@ -13,8 +13,6 @@ struct NonLinModelDAE{
 } <: SimModelDAE{NT}
     x0::Vector{NT}
     a0::Vector{NT}
-    u0::Vector{NT}
-    d0::Vector{NT}
     transcription::TM
     # note: `NT` and the number type `JNT` in `JuMP.GenericModel{JNT}` can be
     # different since solvers that support non-Float64 are scarce.
@@ -51,7 +49,9 @@ struct NonLinModelDAE{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
-    lastx0::Vector{NT}
+    x0_optim::Vector{NT}
+    u0_optim::Vector{NT}
+    d0_optim::Vector{NT}
     buffer::SimModelBuffer{NT}
     function NonLinModelDAE{NT}(
         fq!::FQ, h!::H, Ts, nu, nx, na, ny, nd, 
@@ -81,7 +81,7 @@ struct NonLinModelDAE{
         yname = ["\$y_{$i}\$" for i in 1:ny]
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
-        x0, a0, u0, d0 = zeros(NT, nx), zeros(NT, na), zeros(NT, nu), zeros(NT, nd)
+        x0, a0 = zeros(NT, nx), zeros(NT, na)
         t  = zeros(NT, 1)
         # the updatestate!(model, u, d) API does not know the input `u` of the next time 
         # step k+1, so only piecewise constant input `u` is supported here:
@@ -93,10 +93,10 @@ struct NonLinModelDAE{
         Fs  = zeros(NT, size(Aeq, 1))
         beq = zeros(NT, size(Aeq, 1))
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
-        lastx0 = zeros(NT, nx)
+        x0_optim, u0_optim, d0_optim = zeros(NT, nx), zeros(NT, nu), zeros(NT, nd)
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
         model = new{NT, TM, JMS, JMO, JB, HB, FQ, H, PT}(
-            x0, a0, u0, d0,
+            x0, a0,
             transcription,
             optim_state, optim_output, jacobian, hessian,
             Z,
@@ -109,7 +109,7 @@ struct NonLinModelDAE{
             nu, nx, na, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
-            lastx0,
+            x0_optim, u0_optim, d0_optim,
             buffer
         )
         init_optimization!(model, model.optim_state, model.optim_output)
@@ -490,9 +490,11 @@ function get_nonlincon_oracle(
         eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²geq_func!
     )
     # -------------- algebraic equation: nonlinear oracle -------------------------
-    q!(q, a, ẋ) = model.fq!(ẋ, q, model.x0, a, model.u0, model.d0, model.p)
+    function q!(q, a, ẋ)
+        return model.fq!(ẋ, q, model.x0_optim, a, model.u0_optim, model.d0_optim, model.p)
+    end
     function ℓ_q(a, λq, ẋ, q)
-        model.fq!(ẋ, q, model.x0, a, model.u0, model.d0, model.p)
+        model.fq!(ẋ, q, model.x0_optim, a, model.u0_optim, model.d0_optim, model.p)
         return dot(λq, q)
     end
     a_∇q = fill(myNaN, na)    # NaN to force update at first call
@@ -525,7 +527,7 @@ function get_nonlincon_oracle(
         hessian!(ℓ_q, ∇²ℓ_q, ∇²q_prep, hess, a_∇q, Constant(λq), Cache(ẋ), Cache(q))
         return fill_diffstructure!(∇²ℓ_arg, ∇²ℓ_q, ∇²q_structure)
     end
-    q_min = q_max = zeros(JNT, neq)
+    q_min = q_max = zeros(JNT, na)
     q_oracle = MOI.VectorNonlinearOracle(;
         dimension = na,
         l = q_min,
@@ -545,7 +547,8 @@ end
 TBW
 """
 function update_predictions!(k̄, geq, model, Z)
-    con_nonlinprogeq!(geq, k̄, model, model.transcription, model.x0, model.u0, model.d0, Z)
+    x0, u0, d0 = model.x0_optim, model.u0_optim, model.d0_optim
+    con_nonlinprogeq!(geq, k̄, model, model.transcription, x0, u0, d0, Z)
     return nothing
 end
 
@@ -594,16 +597,17 @@ end
 Warm-start `model.Z` and `model.a0` at zero if `model` is a [`NonLinModelDAE`](@ref).
 
 The field `model.a0` and `model.Z` respectively warm-start [`evaloutput`](@ref) and
-[`updatestate!`](@ref) solving. The method also set `model.u0` and `model.d0` at `u0` and
-`d0` values. The `model.u0` field is used to solve the algebraic equation ```\mathbf{q}``
-in [`evaloutput`](@ref) method (but it should not impact the result in theory since `model`
-is strictly proper w.r.t. `u0`).
+[`updatestate!`](@ref) solving. The method also set `model.optim_u0` and `model.optim_d0` at
+`u0` and `d0` values. The `model.u0` field is used to solve the algebraic equation 
+``\mathbf{q}`` in [`evaloutput`](@ref) method (but it should not impact the result in theory
+since `model` is strictly proper w.r.t. `u0`).
 """
 function initstate_core!(model::NonLinModelDAE, u0, d0) 
     model.Z  .= 0
     model.a0 .= 0
-    model.u0 .= u0
-    model.d0 .= d0
+    model.x0_optim .= model.x0
+    model.u0_optim .= u0
+    model.d0_optim .= d0
     return nothing
 end
 
@@ -618,16 +622,15 @@ argument. The next algebraic variable ``\mathbf{a_0}(k+1)`` will be also stored 
 """
 function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
     nx, na = model.nx, model.na
-    model.x0 .= x0
-    model.u0 .= u0
-    model.d0 .= d0
+    model.x0_optim .= x0
+    model.u0_optim .= u0
+    model.d0_optim .= d0
     linconstrainteq!(model, model.transcription)
     Zvar = model.optim_state[:Zvar]
     Z = solve!(model, model.optim_state, Zvar, model.Z)
     x0next       .= @views Z[1:nx]
     model.a0     .= @views Z[(nx + 1):(nx + na)]
     model.Z      .= Z
-    model.lastx0 .= x0
     return nothing
 end
 
@@ -637,10 +640,10 @@ end
 Solve the algebraic equation to get `z0` and call `model.h!` for [`NonLinModelDAE`](@ref).
 """
 function h!(y0, model::NonLinModelDAE, x0, d0, p)
-    model.x0 .= x0
-    model.d0 .= d0
-    # old u value in q(x, a, u, d, p) solving since not available, but the model is
-    # strictly proper hence a possible impact on a0 but no direct impact on y0 at the end.
+    model.x0_optim .= x0
+    model.d0_optim .= d0
+    # model.u0_optim is not updated since u0 not available, but the model is strictly proper
+    # hence possible impacts on a0 vector but no direct impacts on y0 vector in the end.
     a0var = model.optim_output[:a0var]
     a0 = solve!(model, model.optim_output, a0var, model.a0)
     model.h!(y0, x0, a0, d0, p)
@@ -649,7 +652,7 @@ function h!(y0, model::NonLinModelDAE, x0, d0, p)
 end
 
 function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
-    mul!(model.Fs, model.Ks, model.x0)
+    mul!(model.Fs, model.Ks, model.x0_optim)
     model.beq .= @. -model.Fs
     linconeq = model.optim_state[:linconstrainteq]
     JuMP.set_normalized_rhs(linconeq, model.beq)
@@ -691,11 +694,11 @@ returns the dictionary `info` with the following fields:
 
 - `:xnext` : next state, ``\mathbf{x}(k+1)``
 - `:q` : current algebraic equation residuals `res`, ``\mathbf{q(x, a, u, d, p)}`` 
+- `:y` : current output, ``\mathbf{y}(k)``
 - `:x` : current state, ``\mathbf{x}(k)``
 - `:a` : current algebraic variable, ``\mathbf{a}(k)``
 - `:u` : current manipulated input, ``\mathbf{u}(k)``
 - `:d` : current measured disturbances, ``\mathbf{u}(k)``
-- `:y` : current output, ``\mathbf{y}(k)``
 
 The following two fields are also available if the related method is called at least once:
 
@@ -718,7 +721,8 @@ julia> round.(getinfo(model)[:a], digits=6)
 ```
 """
 function getinfo(model::NonLinModelDAE{NT}) where NT<:Real
-    x0, a0, u0, d0, p = model.lastx0, model.a0, model.u0, model.d0, model.p
+    x0, u0, d0 = model.x0_optim, model.u0_optim, model.d0_optim
+    a0, p =  model.a0, model.p
     buffer = model.buffer
     ẋ, q, y0 = buffer.x, buffer.a, buffer.y
     model.fq!(ẋ, q, x0, a0, u0, d0, p)
@@ -726,18 +730,18 @@ function getinfo(model::NonLinModelDAE{NT}) where NT<:Real
     y = y0
     y .+ model.yop
     x, u, d = buffer.x, buffer.u, buffer.d
-    x .= model.lastx0 .+ model.xop
-    u .= model.u0     .+ model.uop
-    d .= model.d0     .+ model.dop
-    a  = model.a0
+    x .= x0 .+ model.xop
+    u .= u0 .+ model.uop
+    d .= d0 .+ model.dop
+    a  = a0
     info = Dict{Symbol, Any}()
     info[:xnext] = model.x0 + model.xop
     info[:q] = q
+    info[:y] = y
     info[:x] = x
     info[:a] = a
     info[:u] = u
     info[:d] = d
-    info[:y] = y
     if JuMP.termination_status(model.optim_state) ≠ JuMP.OPTIMIZE_NOT_CALLED
         info[:sol_state]  = JuMP.solution_summary(model.optim_state,  verbose=true)
     end
