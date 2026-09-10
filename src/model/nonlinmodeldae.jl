@@ -346,12 +346,11 @@ function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
     funcQu! = (q, u) -> fq!(ẋ, q, x0, a0, u,  d0, p)
     funcQa! = (q, a) -> fq!(ẋ, q, x0, a,  u0, d0, p)
     funcHa! = (y, a) ->  h!(y, x0, a, d0, p)
-    isproper = try
+    S_Du = try
         S_Qu = jacobian_sparsity(funcQu!, q, u0, detector)
         S_Qa = jacobian_sparsity(funcQa!, q, a0, detector)
         S_Ha = jacobian_sparsity(funcHa!, y, a0, detector)
-        S_Du = S_Ha/S_Qa*S_Qu
-        iszero(S_Du)
+        S_Ha/S_Qa*S_Qu
     catch 
         @warn(
         """
@@ -359,11 +358,12 @@ function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
         $msg"""
         )
     end
-    if !isproper
+    if !iszero(S_Du)
         error(
         """
         The DAE is not globally strictly proper according to SparseConnectivityTracer.jl.
-        $msg"""
+        $(msg)The resulting sparsity structure of ∂h/∂u is provided below (should be all zeros).
+        $(sprint(show, MIME"text/plain"(), S_Du))""", 
         )
     end
     return nothing
