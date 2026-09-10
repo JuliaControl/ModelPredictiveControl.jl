@@ -40,6 +40,7 @@ abstract type SimModelDAE{NT<:Real} <: SimModel{NT} end
 struct SimModelBuffer{NT<:Real}
     u::Vector{NT}
     x::Vector{NT}
+    a::Vector{NT}
     y::Vector{NT}
     d::Vector{NT}
     k̄::Vector{NT}
@@ -47,24 +48,26 @@ struct SimModelBuffer{NT<:Real}
 end
 
 @doc raw"""
-    SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0)
+    SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0, na::Int=0)
 
 Create a buffer for `SimModel` objects for inputs, states, outputs, and disturbances.
 
 The buffer is used to store temporary results during simulation without allocating. The
 argument `ni` is the number of intermediate stage of the [`DiffSolver`](@ref), when 
-applicable.
+applicable. The field `na` is for the algebraic variables of [`NonLinModelDAE`](@ref).
 """
-function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0) where {NT<:Real}
+function SimModelBuffer{NT}(
+    nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0, na::Int=0
+) where {NT<:Real}
     u = Vector{NT}(undef, nu)
     x = Vector{NT}(undef, nx)
+    a = Vector{NT}(undef, na) # for NonLinModelDAE only (empty by default)
     y = Vector{NT}(undef, ny)
     d = Vector{NT}(undef, nd)
     k̄ = Vector{NT}(undef, nx*(ni+1)) # the "+1" is necessary because of super-sampling
     empty = Vector{NT}(undef, 0)
-    return SimModelBuffer{NT}(u, x, y, d, k̄, empty)
+    return SimModelBuffer{NT}(u, x, a, y, d, k̄, empty)
 end
-
 
 @doc raw"""
     setop!(model; uop=nothing, yop=nothing, dop=nothing, xop=nothing, fop=nothing) -> model

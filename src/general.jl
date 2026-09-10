@@ -62,20 +62,21 @@ end
 
 "Convert getinfo dictionary to a debug string (without any truncation)."
 function info2debugstr(info)
+    sol_keys = filter(key->startswith(string(key), "sol"), keys(info))
     mystr = "Content of getinfo dictionary:\n"
     for (key, value) in info
-        (key == :sol) && continue
+        key in sol_keys && continue  # skip the sol keys for now
         if key in HIDDEN_GETINFO_KEYS_MHE || key in HIDDEN_GETINFO_KEYS_MPC
             # skip the redundant non-Unicode keys
             continue
         end
         mystr *= "  :$key => $value\n"
     end
-    if haskey(info, :sol)
-        split_sol = split(string(info[:sol]), "\n")
+    for sol_key in sol_keys
+        split_sol = split(string(info[sol_key]), "\n")
         # Add the treeview prefix to each line
         solstr = join(("   " * line for line in split_sol), "\n")
-        mystr *= "  :sol => \n" * solstr * "\n"  # Ensure a trailing newline
+        mystr *= "  :$sol_key => \n" * solstr * "\n"  # Ensure a trailing newline
     end
     return mystr
 end

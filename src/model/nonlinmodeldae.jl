@@ -190,7 +190,7 @@ julia> fq!(ẋ, res, x, a, u, _ , p) = (ẋ .= p*x .+ a; res .= a .- u; nothing)
 
 julia> h!(y, x, _ , _ , _ ) = (y .= 0.1x; nothing);
 
-julia> model1 = NonLinModelDAE(fq!, h!, 5.0, 1, 1, 1, 1, p=-0.2)
+julia> model = NonLinModelDAE(fq!, h!, 5.0, 1, 1, 1, 1, p=-0.2)
 NonLinModelDAE with a sample time Ts = 5.0 s:
 ├ state optimizer: Ipopt
 ├ output optimizer: Ipopt
@@ -204,9 +204,9 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
   │ ├ 1 outputs y
   │ └ 0 measured disturbances d
   └ optimization:
-    ├ 7 decision variables Z
+    ├ 8 decision variables Z
     ├ 1 linear equality constraints Aeq
-    └ 6 nonlinear equality constraints geq
+    └ 7 nonlinear equality constraints geq
 ```
 
 # Extended Help
@@ -548,8 +548,7 @@ end
 TBW
 """
 function update_predictions!(k̄, geq, model, Z)
-    x0, u0, d0 = model.x0, model.u0, model.d0
-    con_nonlinprogeq!(geq, k̄, model, model.transcription, x0, u0, d0, Z)
+    con_nonlinprogeq!(geq, k̄, model, model.transcription, model.x0, model.u0, model.d0, Z)
     return nothing
 end
 
@@ -626,9 +625,11 @@ function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
     model.u0 .= u0
     model.d0 .= d0
     linconstrainteq!(model, model.transcription)
-    Z = solve_state!(model)
+    Zvar = model.optim_state[:Zvar]
+    Z = solve!(model, model.optim_state, Zvar, model.Z)
     x0next       .= @views Z[1:nx]
     model.a0     .= @views Z[(nx + 1):(nx + na)]
+    model.Z      .= Z
     model.lastx0 .= x0
     return nothing
 end
@@ -641,8 +642,12 @@ Solve the algebraic equation to get `z0` and call `model.h!` for [`NonLinModelDA
 function h!(y0, model::NonLinModelDAE, x0, d0, p)
     model.x0 .= x0
     model.d0 .= d0
-    a0 = solve_output!(model)
+    # old u value in q(x, a, u, d, p) solving since not available, but the model is
+    # strictly proper hence a possible impact on a0 but no direct impact on y0 at the end.
+    a0var = model.optim_output[:a0var]
+    a0 = solve!(model, model.optim_output, a0var, model.a0)
     model.h!(y0, x0, a0, d0, p)
+    model.a0 .= a0
     return nothing
 end
 
@@ -655,101 +660,28 @@ function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
 end
 linconstrainteq!(::NonLinModelDAE, ::CollocationMethod) = nothing
 
-function solve_state!(model::NonLinModelDAE)
-    optim = model.optim_state
-    Zvar::Vector{JuMP.VariableRef} = optim[:Zvar]
-    Zs = set_warmstart_dae!(model, model.transcription, Zvar)
+function solve!(model::NonLinModelDAE, optim, Zvar, Zs)
+    JuMP.set_start_value.(Zvar, Zs)
     JuMP.optimize!(optim)
-    #=if !issolved(optim)
+    if !issolved(optim)
         status = JuMP.termination_status(optim)
         if iserror(optim)
             @error(
-                "MPC terminated without solution: returning last solution shifted "*
+                "DAE terminated without solution: returning last solution "*
                 "(more info in debug log)",
                 status
             )
         else
             @warn(
-                "MPC termination status not OPTIMAL or LOCALLY_SOLVED: keeping solution "*
+                "DAE termination status not OPTIMAL or LOCALLY_SOLVED: keeping solution "*
                 "anyway (more info in debug log)", 
                 status
             )
         end
-        @debug info2debugstr(getinfo(mpc))
-    end=#
-    if iserror(optim)
-        model.Z .= Zs
-    else
-        model.Z .= JuMP.value.(Zvar)
+        @debug info2debugstr(getinfo(model))
     end
-    return model.Z
-end
-
-function solve_output!(model::NonLinModelDAE)
-    optim = model.optim_output
-    a0var::Vector{JuMP.VariableRef} = optim[:a0var]
-    a0s = model.a0
-    JuMP.set_start_value.(a0var, a0s)
-    JuMP.optimize!(optim)
-    if iserror(optim)
-        model.a0 .= a0s
-    else
-        model.a0 .= JuMP.value.(a0var)
-    end
-    return model.a0
-end
-
-@doc raw"""
-    set_warmstart_dae!(model::NonLinModelDAE, ::OrthogonalCollocation, Zvar) -> Zs
-
-Set and return the warm-start value of `Zvar` for [`NonLinModelDAE`](@ref).
-
-It warm-starts the solver at:
-```math
-\mathbf{Z_s} = \begin{bmatrix}
-    \mathbf{x_0}(k|k-1)                     \\
-    \mathbf{k̄}(k-1|k-1)                     \\
-    \mathbf{ā}(k-1|k-1)                     \end{bmatrix}
-```
-where ``\mathbf{x_0}(k|k-1)`` is the state for time ``k`` computed at the last period
-``k-1``, and ``\mathbf{k̄}(k-1|k-1)`` and ``\mathbf{ā}(k-1|k-1)`` are respectively
-the state and algebraic variable intermediate values for time ``k-1`` computed at the last
-period ``k-1``.
-"""
-function set_warmstart_dae!(
-    model::NonLinModelDAE{NT}, ::OrthogonalCollocation, Zvar
-) where NT<:Real
-    Zs = model.Z
-    JuMP.set_start_value.(Zvar, Zs)
-    return Zs
-end
-
-@doc raw"""
-    set_warmstart_dae!(model::NonLinModelDAE, ::TrapezoidalCollocation, Zvar) -> Zs
-
-Do the same but for [`TrapezoidalCollocation`](@ref).
-
-It warm-starts the solver at:
-```math
-\mathbf{Z_s} = \begin{bmatrix}
-    \mathbf{x_0}(k|k-1)                     \\
-    \mathbf{a_0}(k|k-1)                     \\
-    \mathbf{a_0}(k|k-1)                     \end{bmatrix}
-```
-where ``\mathbf{a_0}(k|k-1)`` is the algebraic variable for the time ``k`` computed at the
-last period ``k-1``.
-"""
-function set_warmstart_dae!(
-    model::NonLinModelDAE{NT}, transcription::TrapezoidalCollocation, Zvar
-) where NT<:Real
-    nx, na = model.nx, model.na
-    nZ = get_nZ_dae(transcription, nx, na)
-    Zs = zeros(NT, nZ) # TODO: remove this allocation
-    Zs[1:nx]               = model.Z[1:nx]
-    Zs[(nx+1):(nx+na)]     = model.Z[(nx+na+1):(nx+2na)]
-    Zs[(nx+na+1):(nx+2na)] = model.Z[(nx+na+1):(nx+2na)]
-    JuMP.set_start_value.(Zvar, Zs)
-    return Zs
+    Z = iserror(optim) ? Zs : JuMP.value.(Zvar)
+    return Z
 end
 
 @doc raw"""
@@ -757,97 +689,64 @@ end
 
 Get additional info about `model` [`NonLinModelDAE`](@ref) solution for troubleshooting.
 
-The function should be called after calling [`evaloutput`](@ref) or [`updatestate!`](@ref)
-on `model` object. It returns the dictionary `info` with the following fields:
+The function should be called after calling [`updatestate!`](@ref) on `model` object. It
+returns the dictionary `info` with the following fields:
 
-!!! info
-    Fields with *`emphasis`* are non-Unicode alternatives.
+- `:xnext` : next state, ``\mathbf{x}(k+1)``
+- `:q` : current algebraic equation residuals `res`, ``\mathbf{q(x, a, u, d, p)}`` 
+- `:x` : current state, ``\mathbf{x}(k)``
+- `:a` : current algebraic variable, ``\mathbf{a}(k)``
+- `:u` : current manipulated input, ``\mathbf{u}(k)``
+- `:d` : current measured disturbances, ``\mathbf{u}(k)``
+- `:y` : current output, ``\mathbf{y}(k)``
 
-- `:xnext` : , ``\mathbf{x}(k+1)``
-- `:x` : , ``\mathbf{x}(k)``
-- `:a` : , ``\mathbf{a}(k)``
-- `:u` : , ``\mathbf{u}(k)``
-- `:d` : , ``\mathbf{u}(k)``
-- `:y` : , ``\mathbf{y}(k)``
+The following two fields are also available if the related method is called at least once:
 
-- `:D̂` or *`:Dhat`* : predicted measured disturbances over ``H_p``, ``\mathbf{D̂}``
-- `:x̂` or *`:xhat`* : current estimated state, ``\mathbf{x̂}_i(k)``
-- `:ŷ` or *`:yhat`* : current estimated output, ``\mathbf{ŷ}(k)``
-- `:Ŷ` or *`:Yhat`* : optimal predicted outputs over ``H_p``, ``\mathbf{Ŷ}``
-- `:Ŷs` or *`:Yhats`* : predicted stochastic output over ``H_p`` of [`InternalModel`](@ref), ``\mathbf{Ŷ_s}``
-- `:R̂y` or *`:Rhaty`* : predicted output setpoint over ``H_p``, ``\mathbf{R̂_y}``
-- `:R̂u` or *`:Rhatu`* : predicted manipulated input setpoint over ``H_p``, ``\mathbf{R̂_u}``
-- `:x̂end` or *`:xhatend`* : optimal terminal states, ``\mathbf{x̂}_i(k+H_p)``
-- `:J`     : objective value optimum, ``J``
-- `:U`     : optimal manipulated inputs over ``H_p``, ``\mathbf{U}``
-- `:u`     : current optimal manipulated input, ``\mathbf{u}(k)``
-- `:d`     : current measured disturbance, ``\mathbf{d}(k)``
-- `:geq` : optimal nonlinear equality constraint values, ``\mathbf{g_{eq}}``
-- `:∇geq` or *`:nablageq`* : optimal Jacobian of the equality constraint, ``\mathbf{\nabla g_{eq}}``
-- `:∇geq_ncolors` or *`:nablageq_ncolors`* : number of colors in `:∇geq` sparsity pattern
-- `:∇²ℓgeq` or *`:nabla2lgeq`* : optimal Hessian of the equality Lagrangian, ``\mathbf{\nabla^2}\ell_{\mathbf{g_{eq}}}``
-- `:∇²ℓgeq_ncolors` or *`:nabla2lgeq_ncolors`* : number of colors in `:∇²ℓgeq` sparsity pattern
-
-Note that the inequality constraint vectors and matrices only include the non-`Inf` values.
+- `:sol_state` : solution summary of [`updatestate!`](@ref) optimizer for printing
+- `:sol_output` : solution summary of [`evaloutput`](@ref) optimizer for printing
 
 # Examples
 ```jldoctest
-julia> mpc = LinMPC(LinModel(tf(5, [2, 1]), 3), Nwt=[0], Hp=1, Hc=1);
+julia> fq!(ẋ, res, x, a, u, _ , p) = (ẋ .= p*x .+ a; res .= a .- u; nothing);
 
-julia> preparestate!(mpc, [0]); u = moveinput!(mpc, [10]);
+julia> h!(y, x, _ , _ , _ ) = (y .= 0.1x; nothing);
 
-julia> round.(getinfo(mpc)[:Ŷ], digits=3)
+julia> model = NonLinModelDAE(fq!, h!, 5.0, 1, 1, 1, 1, p=-0.2);
+
+julia> u = [7]; updatestate!(model, u);
+
+julia> round.(getinfo(model)[:a], digits=6)
 1-element Vector{Float64}:
- 10.0
+ 7.0
 ```
 """
 function getinfo(model::NonLinModelDAE{NT}) where NT<:Real
-    Z, a0 = model.Z, model.a0
+    x0, a0, u0, d0, p = model.lastx0, model.a0, model.u0, model.d0, model.p
+    buffer = model.buffer
+    ẋ, q, y0 = buffer.x, buffer.a, buffer.y
+    model.fq!(ẋ, q, x0, a0, u0, d0, p)
+    model.h!(y0, x0, a0, d0, p)
+    y = y0
+    y .+ model.yop
+    x, u, d = buffer.x, buffer.u, buffer.d
+    x .= model.lastx0 .+ model.xop
+    u .= model.u0     .+ model.uop
+    d .= model.d0     .+ model.dop
+    a  = model.a0
     info = Dict{Symbol, Any}()
-    #=a0     = Vector{NT}(undef, nΔŨ)
-    x̂0end  = similar(mpc.estim.x̂0)
-    K      = Vector{NT}(undef, nK) 
-    Ue, Ŷe = Vector{NT}(undef, nUe), Vector{NT}(undef, nŶe)
-    U0, Ŷ0 = similar(mpc.Uop), similar(mpc.Yop)
-    Û0, X̂0 = Vector{NT}(undef, nÛ0), Vector{NT}(undef, nX̂0)
-    U,  Ŷ  = buffer.U, buffer.Ŷ
-    D̂      = buffer.D̂
-    U0 = getU0!(U0, mpc, Z̃)
-    ΔŨ = getΔŨ!(ΔŨ, mpc, transcription, Z̃)
-    Ŷ0, x̂0end  = predict!(Ŷ0, x̂0end, X̂0, Û0, K, mpc, model, transcription, U0, Z̃)
-    Ue, Ŷe = extended_vectors!(Ue, Ŷe, mpc, U0, Ŷ0)
-    U .= U0 .+ mpc.Uop
-    Ŷ .= Ŷ0 .+ mpc.Yop
-    D̂ .= mpc.D̂0 + mpc.Dop
-    J = obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
-    Ŷs = similar(mpc.Yop)
-    predictstoch!(Ŷs, mpc, mpc.estim)
-    info[:a]     = a0
-    info[:ϵ]     = getslack(mpc, Z̃)
-    info[:J]     = J
-    info[:U]     = U
-    info[:u]     = info[:U][1:model.nu]
-    info[:lastu] = mpc.lastu0 .+ model.uop
-    info[:d]     = mpc.d0 + model.dop
-    info[:D̂]     = D̂
-    info[:x̂]     = mpc.estim.x̂0 .+ mpc.estim.x̂op
-    info[:ŷ]     = mpc.ŷ
-    info[:Ŷ]     = Ŷ
-    info[:x̂end]  = x̂0end + mpc.estim.x̂op
-    info[:Ŷs]    = Ŷs
-    info[:R̂y]    = mpc.R̂y
-    info[:R̂u]    = mpc.R̂u
-    # --- non-Unicode fields ---
-    info[:DeltaU] = info[:ΔU]
-    info[:epsilon] = info[:ϵ]
-    info[:Dhat] = info[:D̂]
-    info[:xhat] = info[:x̂]
-    info[:yhat] = info[:ŷ]
-    info[:Yhat] = info[:Ŷ]
-    info[:xhatend] = info[:x̂end]
-    info[:Yhats] = info[:Ŷs]
-    info[:Rhaty] = info[:R̂y]
-    info[:Rhatu] = info[:R̂u]=#
+    info[:xnext] = model.x0 + model.xop
+    info[:q] = q
+    info[:x] = x
+    info[:a] = a
+    info[:u] = u
+    info[:d] = d
+    info[:y] = y
+    if JuMP.termination_status(model.optim_state) ≠ JuMP.OPTIMIZE_NOT_CALLED
+        info[:sol_state]  = JuMP.solution_summary(model.optim_state,  verbose=true)
+    end
+    if JuMP.termination_status(model.optim_output) ≠ JuMP.OPTIMIZE_NOT_CALLED
+        info[:sol_output] = JuMP.solution_summary(model.optim_output, verbose=true)
+    end
     return info
 end
 
