@@ -86,6 +86,7 @@ struct NonLinModelDAE{
         # the updatestate!(model, u, d) API does not know the input `u` of the next time 
         # step k+1, so only piecewise constant input `u` is supported here:
         transcription.h > 0 && error("Only zero-order hold (h=0) is supported for simulations of DAEs")
+        validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
         Mo, Co, λo = init_orthocolloc(NT, transcription, nx, Ts)
         nZ = get_nZ_dae(transcription, nx, na)
         Z = zeros(NT, get_nZ_dae(transcription, nx, na))
@@ -327,6 +328,45 @@ function validate_h_dae(NT, h)
         )
     end
     return ismutating
+end
+
+"""
+    validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
+
+Validate if the DAE model is strictly proper with `SparseConnectivityTracer.jl`. 
+"""
+function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
+    msg = """
+    This package does not support a direct transmission from the input u to the output y. 
+    See the Extended Help of LinModel for the justification.
+    """
+    detector = TracerSparsityDetector()
+    ẋ, q, y = jacobian_buffer(zeros(nx), detector), zeros(na), zeros(ny)
+    x0, a0, u0, d0 = zeros(NT, nx), zeros(NT, na), zeros(NT, nu), zeros(NT, nd)
+    funcQu! = (q, u) -> fq!(ẋ, q, x0, a0, u,  d0, p)
+    funcQa! = (q, a) -> fq!(ẋ, q, x0, a,  u0, d0, p)
+    funcHa! = (y, a) ->  h!(y, x0, a, d0, p)
+    isproper = try
+        S_Qu = jacobian_sparsity(funcQu!, q, u0, detector)
+        S_Qa = jacobian_sparsity(funcQa!, q, a0, detector)
+        S_Ha = jacobian_sparsity(funcHa!, y, a0, detector)
+        S_Du = S_Ha/S_Qa*S_Qu
+        iszero(S_Du)
+    catch 
+        @warn(
+        """
+        Could not validate if the DAE is strictly proper with SparseConnectivityTracer.jl.
+        $msg"""
+        )
+    end
+    if !isproper
+        error(
+        """
+        The DAE is not globally strictly proper according to SparseConnectivityTracer.jl.
+        $msg"""
+        )
+    end
+    return nothing
 end
 
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."

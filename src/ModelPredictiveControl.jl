@@ -17,7 +17,7 @@ using DifferentiationInterface: gradient!, value_and_gradient!, prepare_gradient
 using DifferentiationInterface: jacobian!, value_and_jacobian!, prepare_jacobian 
 using DifferentiationInterface: hessian!, value_gradient_and_hessian!, prepare_hessian
 using DifferentiationInterface: Constant, Cache
-using SparseConnectivityTracer: TracerSparsityDetector
+using SparseConnectivityTracer: TracerSparsityDetector, jacobian_sparsity, jacobian_buffer
 using SparseMatrixColorings: GreedyColoringAlgorithm, sparsity_pattern
 using SparseMatrixColorings: NaturalOrder, LargestFirst, SmallestLast
 using SparseMatrixColorings: IncidenceDegree, DynamicLargestFirst, RandomOrder
