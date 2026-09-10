@@ -96,7 +96,7 @@ struct NonLinModelDAE{
         beq = zeros(NT, size(Aeq, 1))
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         x0_optim, u0_optim, d0_optim = zeros(NT, nx), zeros(NT, nu), zeros(NT, nd)
-        buffer = SimModelBuffer{NT}(nu, nx, ny, nd)
+        buffer = SimModelBuffer{NT}(nu, nx, ny, nd, 0, na)
         model = new{NT, TM, JMS, JMO, JB, HB, FQ, H, PT}(
             x0, a0,
             transcription,
