@@ -162,15 +162,15 @@ end
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1!(x,u,_,model) = model.A*x + model.Bu*u
     h1!(x,_,model)   = model.C*x
-    nonlinmodel1 = NonLinModel(f1!,h1!,Ts,2,2,2,solver=nothing,p=linmodel1)
-    @test nonlinmodel1.nx == 2
-    @test nonlinmodel1.nu == 2
-    @test nonlinmodel1.nd == 0
-    @test nonlinmodel1.ny == 2
-    xnext, y = nonlinmodel1.buffer.x, nonlinmodel1.buffer.y
-    nonlinmodel1.f!(xnext, [0,0],[0,0],[1],nonlinmodel1.p)
-    @test xnext ≈ zeros(2,)
-    nonlinmodel1.h!(y,[0,0],[1],nonlinmodel1.p)
+    daemodel = NonLinModel(f1!,h1!,Ts,2,2,2,solver=nothing,p=linmodel1)
+    @test daemodel.nx == 2
+    @test daemodel.nu == 2
+    @test daemodel.nd == 0
+    @test daemodel.ny == 2
+    ẋ, y = daemodel.buffer.x, daemodel.buffer.y
+    daemodel.f!(ẋ, [0,0],[0,0],[1],daemodel.p)
+    @test ẋ ≈ zeros(2,)
+    daemodel.h!(y,[0,0],[1],daemodel.p)
     @test y ≈ zeros(2,)
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
@@ -182,9 +182,9 @@ end
     @test nonlinmodel2.nu == 2
     @test nonlinmodel2.nd == 1
     @test nonlinmodel2.ny == 2
-    xnext, y = nonlinmodel2.buffer.x, nonlinmodel2.buffer.y
-    nonlinmodel2.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel2.p)
-    @test xnext ≈ zeros(4,)
+    ẋ, y = nonlinmodel2.buffer.x, nonlinmodel2.buffer.y
+    nonlinmodel2.f!(ẋ,[0,0,0,0],[0,0],[0],nonlinmodel2.p)
+    @test ẋ ≈ zeros(4,)
     nonlinmodel2.h!(y,[0,0,0,0],[0],nonlinmodel2.p)
     @test y ≈ zeros(2,)
 
@@ -203,9 +203,9 @@ end
         return nothing
     end
     nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel2)
-    xnext, y = nonlinmodel4.buffer.x, nonlinmodel4.buffer.y
-    nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel4.p)
-    @test xnext ≈ zeros(4)
+    ẋ, y = nonlinmodel4.buffer.x, nonlinmodel4.buffer.y
+    nonlinmodel4.f!(ẋ,[0,0,0,0],[0,0],[0],nonlinmodel4.p)
+    @test ẋ ≈ zeros(4)
     nonlinmodel4.h!(y,[0,0,0,0],[0],nonlinmodel4.p)
     @test y ≈ zeros(2)
 
@@ -221,9 +221,9 @@ end
     @test string(solver) == 
         "4th order Runge-Kutta differential equation solver with 1 supersamples."
     nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver, p=p)
-    xnext, k̄, y = nonlinmodel5.buffer.x, nonlinmodel5.buffer.k̄, nonlinmodel5.buffer.y
-    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel5, [0; 0], [0], [0], nonlinmodel5.p)
-    @test xnext ≈ zeros(2)
+    ẋ, k̄, y = nonlinmodel5.buffer.x, nonlinmodel5.buffer.k̄, nonlinmodel5.buffer.y
+    ModelPredictiveControl.f!(ẋ, k̄, nonlinmodel5, [0; 0], [0], [0], nonlinmodel5.p)
+    @test ẋ ≈ zeros(2)
     ModelPredictiveControl.h!(y, nonlinmodel5, [0; 0], [0], nonlinmodel5.p)
     @test y ≈ zeros(1)
 
@@ -239,15 +239,15 @@ end
         return nothing
     end
     nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta(), p=p)
-    xnext, k̄, y = nonlinmodel6.buffer.x, nonlinmodel6.buffer.k̄, nonlinmodel6.buffer.y
-    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel6, [0; 0], [0], [0], nonlinmodel6.p)
-    @test xnext ≈ zeros(2)
+    ẋ, k̄, y = nonlinmodel6.buffer.x, nonlinmodel6.buffer.k̄, nonlinmodel6.buffer.y
+    ModelPredictiveControl.f!(ẋ, k̄, nonlinmodel6, [0; 0], [0], [0], nonlinmodel6.p)
+    @test ẋ ≈ zeros(2)
     ModelPredictiveControl.h!(y, nonlinmodel6, [0; 0], [0], nonlinmodel6.p)
     @test y ≈ zeros(1)
     nonlinmodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler(), p=p)
-    xnext, k̄, y = nonlinmodel7.buffer.x, nonlinmodel7.buffer.k̄, nonlinmodel7.buffer.y
-    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel7, [0; 0], [0], [0], nonlinmodel7.p)
-    @test xnext ≈ zeros(2)
+    ẋ, k̄, y = nonlinmodel7.buffer.x, nonlinmodel7.buffer.k̄, nonlinmodel7.buffer.y
+    ModelPredictiveControl.f!(ẋ, k̄, nonlinmodel7, [0; 0], [0], [0], nonlinmodel7.p)
+    @test ẋ ≈ zeros(2)
     ModelPredictiveControl.h!(y, nonlinmodel7, [0; 0], [0], nonlinmodel7.p)
     @test y ≈ zeros(1)
     nonlinmodel8 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, p=p, jacobian=AutoFiniteDiff())
@@ -302,15 +302,15 @@ end
     Ts = 1.0
     f1!(x,u,d,_) = x.^5 .+ u.^4 .+ d.^3
     h1!(x,d,_)   = x.^2 .+ d
-    nonlinmodel1 = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=nothing)
+    daemodel = NonLinModel(f1!,h1!,Ts,1,1,1,1,solver=nothing)
     x, u, d = [2.0], [3.0], [4.0]
-    linmodel1 = linearize(nonlinmodel1; x, u, d)
+    linmodel1 = linearize(daemodel; x, u, d)
     @test linmodel1.A  ≈ 5*x.^4
     @test linmodel1.Bu ≈ 4*u.^3
     @test linmodel1.Bd ≈ 3*d.^2
     @test linmodel1.C  ≈ 2*x.^1
     @test linmodel1.Dd ≈ 1*d.^0
-    linmodel1b = LinModel(nonlinmodel1; x, u, d)
+    linmodel1b = LinModel(daemodel; x, u, d)
     @test linmodel1.A  ≈ linmodel1b.A
     @test linmodel1.Bu ≈ linmodel1b.Bu
     @test linmodel1.Bd ≈ linmodel1b.Bd
@@ -395,16 +395,16 @@ end
 @testitem "NonLinModel real time simulations" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = LinModel(tf(2, [10, 1]), 0.25)
-    nonlinmodel1 = NonLinModel(
+    daemodel = NonLinModel(
         (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
         (x,_,_)->linmodel1.C*x,
         linmodel1.Ts, 1, 1, 1, 0, solver=nothing
     )
     times1 = zeros(5)
     for i=1:5
-        times1[i] = savetime!(nonlinmodel1)
-        updatestate!(nonlinmodel1, [1])
-        periodsleep(nonlinmodel1)
+        times1[i] = savetime!(daemodel)
+        updatestate!(daemodel, [1])
+        periodsleep(daemodel)
     end
     @test all(isapprox.(diff(times1[2:end]), 0.25, atol=0.05))
     linmodel2 = LinModel(tf(2, [0.1, 1]), 0.25)
@@ -421,129 +421,89 @@ end
     end
     @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.05))
 end
-#=
+
 @testitem "NonLinModelDAE construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using JuMP, Ipopt
     using DifferentiationInterface
     import FiniteDiff
 
     function fq!(ẋ, res, x, a, u, _ , p)
-        ẋ[1] = -p  .* (x[1] .- 0.2 .* u[1])
-        res .= (x .- a)
+        ẋ[] = -p[] * (x[] - 0.2 * u[])
+        res[] = x[] - a[]
         return nothing
     end
-    function h!(y, x, a, d, p)
-        y .= 2 .* x .+ a
+    function h!(y, x, a, _ , _ )
+        y[] = 2*x[]+ a[]
     end
     nu, nx, na, ny = 1, 1, 1, 1
     Ts = 1
-    p = 0.5
+    p = [0.5]
+
+    dae = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p)
+    @test dae.nx == nx
+    @test dae.na == na
+    @test dae.nu == nu
+    @test dae.nd == 0
+    @test dae.ny == ny
+    @test dae.iszero_Ha == false 
+    ẋ, q, y = dae.buffer.x, dae.buffer.a, dae.buffer.y
+    dae.fq!(ẋ, q, [0], [0], [0], [0], dae.p)
+    @test ẋ ≈ zeros(1)
+    @test q ≈ zeros(1)
+    dae.h!(y,[0], [0], [0], dae.p)
+    @test y ≈ zeros(1)
 
     transcription = TrapezoidalCollocation()
-    model = NonLinModelDAE(fq, h!, Ts, nu, nx, na, ny; transcription, p)
+    dae2 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription)
+    @test dae2.transcription isa TrapezoidalCollocation
+    @test length(dae2.Z) == 3
+    @test size(dae2.Aeq, 1) == 0
 
-    @test nonlinmodel1.nx == 1
-    @test nonlinmodel1.nu == 2
-    @test nonlinmodel1.nd == 0
-    @test nonlinmodel1.ny == 2
-    xnext, y = nonlinmodel1.buffer.x, nonlinmodel1.buffer.y
-    nonlinmodel1.f!(xnext, [0,0],[0,0],[1],nonlinmodel1.p)
-    @test xnext ≈ zeros(2,)
-    nonlinmodel1.h!(y,[0,0],[1],nonlinmodel1.p)
-    @test y ≈ zeros(2,)
-#=
-    linmodel2 = LinModel(sys,Ts,i_d=[3])
-    f2(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
-    h2(x,d,model)   = model.C*x + model.Dd*d
-    nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1,solver=nothing,p=linmodel2)
+    transcription = OrthogonalCollocation(0, 4, roots=:gausslegendre)
+    dae3 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription)
+    @test dae3.transcription isa OrthogonalCollocation
+    @test length(dae3.Z) == 1 + 1 + 4 + 4
+    @test size(dae3.Aeq, 1) == 1
 
-    @test nonlinmodel2.nx == 4
-    @test nonlinmodel2.nu == 2
-    @test nonlinmodel2.nd == 1
-    @test nonlinmodel2.ny == 2
-    xnext, y = nonlinmodel2.buffer.x, nonlinmodel2.buffer.y
-    nonlinmodel2.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel2.p)
-    @test xnext ≈ zeros(4,)
-    nonlinmodel2.h!(y,[0,0,0,0],[0],nonlinmodel2.p)
-    @test y ≈ zeros(2,)
+    optim_state  = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "sb"=>"yes"))
+    optim_output = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer, "sb"=>"yes"))
+    dae4 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, optim_state, optim_output)
+    @test solver_name(dae4.optim_state)  == "Ipopt"
+    @test solver_name(dae4.optim_output) == "Ipopt"
 
-    nonlinmodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1,solver=nothing)
-    @test isa(nonlinmodel3, NonLinModel{Float32})
+    jacobian = AutoFiniteDiff()
+    hessian  = true
+    dae5 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, jacobian, hessian)
+    @test dae5.jacobian isa AutoFiniteDiff
+    @test dae5.hessian  isa AutoForwardDiff 
 
-    function f1!(xnext, x, u, d, model)
-        mul!(xnext, model.A,  x)
-        mul!(xnext, model.Bu, u, 1, 1)
-        mul!(xnext, model.Bd, d, 1, 1)
-        return nothing
-    end 
-    function h1!(y, x, d, model)
-        mul!(y, model.C,  x)
-        mul!(y, model.Dd, d, 1, 1)
-        return nothing
+    function h_no_a!(y, x, _ , _ , _ )
+        y .= 2 .* x
     end
-    nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel2)
-    xnext, y = nonlinmodel4.buffer.x, nonlinmodel4.buffer.y
-    nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel4.p)
-    @test xnext ≈ zeros(4)
-    nonlinmodel4.h!(y,[0,0,0,0],[0],nonlinmodel4.p)
-    @test y ≈ zeros(2)
+    dae6 = NonLinModelDAE(fq!, h_no_a!, Ts, nu, nx, na, ny; p)
+    @test dae6.iszero_Ha == true
 
-    A  = [0 0.5; -0.2 -0.1]
-    Bu = reshape([0; 0.5], 2, 1)
-    Bd = reshape([0; 0.5], 2, 1)
-    C  = [0.4 0]
-    Dd = reshape([0], 1, 1)
-    p=(; A, Bu, Bd, C, Dd)
-    f3(x, u, d, p) = p.A*x + p.Bu*u+ p.Bd*d
-    h3(x, d, p) = p.C*x + p.Dd*d
-    solver=RungeKutta(4)
-    @test string(solver) == 
-        "4th order Runge-Kutta differential equation solver with 1 supersamples."
-    nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver, p=p)
-    xnext, k̄, y = nonlinmodel5.buffer.x, nonlinmodel5.buffer.k̄, nonlinmodel5.buffer.y
-    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel5, [0; 0], [0], [0], nonlinmodel5.p)
-    @test xnext ≈ zeros(2)
-    ModelPredictiveControl.h!(y, nonlinmodel5, [0; 0], [0], nonlinmodel5.p)
-    @test y ≈ zeros(1)
+    dae7 = NonLinModelDAE{Float32}(fq!,h!, Ts, nu, nx, na, ny; p)
+    @test isa(dae7, NonLinModelDAE{Float32})
+    
+    @test_throws ErrorException NonLinModelDAE(
+        (x,u,p)->(x+u+p, 0.0),
+        (x,a,d,p)->(x+a+d+p), Ts, 1, 1, 1, 1)
+    @test_throws ErrorException NonLinModelDAE(
+        (x,a,u,d,p)->(x+u+p, a-x),
+        (x,a,d)->(x+a+d), Ts, 1, 1, 1, 1)
+    @test_throws ArgumentError NonLinModelDAE(
+        fq!, h!, Ts, 1, 1, 1, 1; p, optim_state, optim_output=optim_state
+    )
 
-    function f2!(ẋ, x, u , d, p)
-        mul!(ẋ, p.A, x)
-        mul!(ẋ, p.Bu, u, 1, 1)
-        mul!(ẋ, p.Bd, d, 1, 1)
-        return nothing
+    # DAE with direct transmission from input to output:
+    function fq_dt!(ẋ, res, x, a, u, _ , p) 
+        ẋ[] = -p[] * (x[] - 0.2 * u[])
+        res[] = a[] - u[]
     end
-    function h2!(y, x, d, p)
-        mul!(y, p.C, x)
-        mul!(y, p.Dd, d, 1, 1)
-        return nothing
-    end
-    nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta(), p=p)
-    xnext, k̄, y = nonlinmodel6.buffer.x, nonlinmodel6.buffer.k̄, nonlinmodel6.buffer.y
-    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel6, [0; 0], [0], [0], nonlinmodel6.p)
-    @test xnext ≈ zeros(2)
-    ModelPredictiveControl.h!(y, nonlinmodel6, [0; 0], [0], nonlinmodel6.p)
-    @test y ≈ zeros(1)
-    nonlinmodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler(), p=p)
-    xnext, k̄, y = nonlinmodel7.buffer.x, nonlinmodel7.buffer.k̄, nonlinmodel7.buffer.y
-    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel7, [0; 0], [0], [0], nonlinmodel7.p)
-    @test xnext ≈ zeros(2)
-    ModelPredictiveControl.h!(y, nonlinmodel7, [0; 0], [0], nonlinmodel7.p)
-    @test y ≈ zeros(1)
-    nonlinmodel8 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, p=p, jacobian=AutoFiniteDiff())
-    @test nonlinmodel8.jacobian == AutoFiniteDiff()
-
-    @test_throws ErrorException NonLinModel(
-        (x,u)->linmodel1.A*x + linmodel1.Bu*u,
-        (x,_,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
-    @test_throws ErrorException NonLinModel(
-        (x,u,_)->linmodel1.A*x + linmodel1.Bu*u,
-        (x,_,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
-    @test_throws ErrorException NonLinModel(
-        (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
-        (x)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
-    @test_throws ErrorException NonLinModel(
-        (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
-        (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
-=#
+    h_dt!(y, x, a, _ , _ ) = (y[] = 2*x[] + a[])
+    @test_throws ErrorException NonLinModelDAE(
+        fq_dt!, h_dt!, Ts, nu, nx, na, ny; p
+    )
 end
-=#
