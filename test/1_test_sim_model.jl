@@ -421,3 +421,129 @@ end
     end
     @test all(isapprox.(diff(times2[2:end]), 0.25, atol=0.05))
 end
+#=
+@testitem "NonLinModelDAE construction" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
+
+    function fq!(ẋ, res, x, a, u, _ , p)
+        ẋ[1] = -p  .* (x[1] .- 0.2 .* u[1])
+        res .= (x .- a)
+        return nothing
+    end
+    function h!(y, x, a, d, p)
+        y .= 2 .* x .+ a
+    end
+    nu, nx, na, ny = 1, 1, 1, 1
+    Ts = 1
+    p = 0.5
+
+    transcription = TrapezoidalCollocation()
+    model = NonLinModelDAE(fq, h!, Ts, nu, nx, na, ny; transcription, p)
+
+    @test nonlinmodel1.nx == 1
+    @test nonlinmodel1.nu == 2
+    @test nonlinmodel1.nd == 0
+    @test nonlinmodel1.ny == 2
+    xnext, y = nonlinmodel1.buffer.x, nonlinmodel1.buffer.y
+    nonlinmodel1.f!(xnext, [0,0],[0,0],[1],nonlinmodel1.p)
+    @test xnext ≈ zeros(2,)
+    nonlinmodel1.h!(y,[0,0],[1],nonlinmodel1.p)
+    @test y ≈ zeros(2,)
+#=
+    linmodel2 = LinModel(sys,Ts,i_d=[3])
+    f2(x,u,d,model) = model.A*x + model.Bu*u + model.Bd*d
+    h2(x,d,model)   = model.C*x + model.Dd*d
+    nonlinmodel2 = NonLinModel(f2,h2,Ts,2,4,2,1,solver=nothing,p=linmodel2)
+
+    @test nonlinmodel2.nx == 4
+    @test nonlinmodel2.nu == 2
+    @test nonlinmodel2.nd == 1
+    @test nonlinmodel2.ny == 2
+    xnext, y = nonlinmodel2.buffer.x, nonlinmodel2.buffer.y
+    nonlinmodel2.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel2.p)
+    @test xnext ≈ zeros(4,)
+    nonlinmodel2.h!(y,[0,0,0,0],[0],nonlinmodel2.p)
+    @test y ≈ zeros(2,)
+
+    nonlinmodel3 = NonLinModel{Float32}(f2,h2,Ts,2,4,2,1,solver=nothing)
+    @test isa(nonlinmodel3, NonLinModel{Float32})
+
+    function f1!(xnext, x, u, d, model)
+        mul!(xnext, model.A,  x)
+        mul!(xnext, model.Bu, u, 1, 1)
+        mul!(xnext, model.Bd, d, 1, 1)
+        return nothing
+    end 
+    function h1!(y, x, d, model)
+        mul!(y, model.C,  x)
+        mul!(y, model.Dd, d, 1, 1)
+        return nothing
+    end
+    nonlinmodel4 = NonLinModel(f1!, h1!, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel2)
+    xnext, y = nonlinmodel4.buffer.x, nonlinmodel4.buffer.y
+    nonlinmodel4.f!(xnext,[0,0,0,0],[0,0],[0],nonlinmodel4.p)
+    @test xnext ≈ zeros(4)
+    nonlinmodel4.h!(y,[0,0,0,0],[0],nonlinmodel4.p)
+    @test y ≈ zeros(2)
+
+    A  = [0 0.5; -0.2 -0.1]
+    Bu = reshape([0; 0.5], 2, 1)
+    Bd = reshape([0; 0.5], 2, 1)
+    C  = [0.4 0]
+    Dd = reshape([0], 1, 1)
+    p=(; A, Bu, Bd, C, Dd)
+    f3(x, u, d, p) = p.A*x + p.Bu*u+ p.Bd*d
+    h3(x, d, p) = p.C*x + p.Dd*d
+    solver=RungeKutta(4)
+    @test string(solver) == 
+        "4th order Runge-Kutta differential equation solver with 1 supersamples."
+    nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver, p=p)
+    xnext, k̄, y = nonlinmodel5.buffer.x, nonlinmodel5.buffer.k̄, nonlinmodel5.buffer.y
+    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel5, [0; 0], [0], [0], nonlinmodel5.p)
+    @test xnext ≈ zeros(2)
+    ModelPredictiveControl.h!(y, nonlinmodel5, [0; 0], [0], nonlinmodel5.p)
+    @test y ≈ zeros(1)
+
+    function f2!(ẋ, x, u , d, p)
+        mul!(ẋ, p.A, x)
+        mul!(ẋ, p.Bu, u, 1, 1)
+        mul!(ẋ, p.Bd, d, 1, 1)
+        return nothing
+    end
+    function h2!(y, x, d, p)
+        mul!(y, p.C, x)
+        mul!(y, p.Dd, d, 1, 1)
+        return nothing
+    end
+    nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta(), p=p)
+    xnext, k̄, y = nonlinmodel6.buffer.x, nonlinmodel6.buffer.k̄, nonlinmodel6.buffer.y
+    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel6, [0; 0], [0], [0], nonlinmodel6.p)
+    @test xnext ≈ zeros(2)
+    ModelPredictiveControl.h!(y, nonlinmodel6, [0; 0], [0], nonlinmodel6.p)
+    @test y ≈ zeros(1)
+    nonlinmodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler(), p=p)
+    xnext, k̄, y = nonlinmodel7.buffer.x, nonlinmodel7.buffer.k̄, nonlinmodel7.buffer.y
+    ModelPredictiveControl.f!(xnext, k̄, nonlinmodel7, [0; 0], [0], [0], nonlinmodel7.p)
+    @test xnext ≈ zeros(2)
+    ModelPredictiveControl.h!(y, nonlinmodel7, [0; 0], [0], nonlinmodel7.p)
+    @test y ≈ zeros(1)
+    nonlinmodel8 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, p=p, jacobian=AutoFiniteDiff())
+    @test nonlinmodel8.jacobian == AutoFiniteDiff()
+
+    @test_throws ErrorException NonLinModel(
+        (x,u)->linmodel1.A*x + linmodel1.Bu*u,
+        (x,_,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
+    @test_throws ErrorException NonLinModel(
+        (x,u,_)->linmodel1.A*x + linmodel1.Bu*u,
+        (x,_,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
+    @test_throws ErrorException NonLinModel(
+        (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
+        (x)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
+    @test_throws ErrorException NonLinModel(
+        (x,u,_,_)->linmodel1.A*x + linmodel1.Bu*u,
+        (x,_)->linmodel1.C*x, Ts, 2, 4, 2, 1, solver=nothing)
+=#
+end
+=#
