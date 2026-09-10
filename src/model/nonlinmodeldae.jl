@@ -52,6 +52,7 @@ struct NonLinModelDAE{
     x0_optim::Vector{NT}
     u0_optim::Vector{NT}
     d0_optim::Vector{NT}
+    iszero_Ha::Bool
     buffer::SimModelBuffer{NT}
     function NonLinModelDAE{NT}(
         fq!::FQ, h!::H, Ts, nu, nx, na, ny, nd, 
@@ -86,7 +87,7 @@ struct NonLinModelDAE{
         # the updatestate!(model, u, d) API does not know the input `u` of the next time 
         # step k+1, so only piecewise constant input `u` is supported here:
         transcription.h > 0 && error("Only zero-order hold (h=0) is supported for simulations of DAEs")
-        validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
+        iszero_Ha = validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
         Mo, Co, λo = init_orthocolloc(NT, transcription, nx, Ts)
         nZ = get_nZ_dae(transcription, nx, na)
         Z = zeros(NT, get_nZ_dae(transcription, nx, na))
@@ -111,6 +112,7 @@ struct NonLinModelDAE{
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
             x0_optim, u0_optim, d0_optim,
+            iszero_Ha,
             buffer
         )
         init_optimization!(model, model.optim_state, model.optim_output)
@@ -214,7 +216,10 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
 !!! details "Extended Help"
     If the dynamics are a function of the time, simply add a measured disturbance defined as
     ``d(t) = t``. This object does not support the ``\mathbf{u}`` argument in ``\mathbf{h}``
-    function, see the Extended Help of [`LinModel`](@ref) for the justification.
+    function, see the Extended Help of [`LinModel`](@ref) for the justification. More
+    precisely, it only supports strictly proper DAEs, so the constructor will verify there
+    are no global direct transmissions from ``\mathbf{u}`` to ``\mathbf{y}`` with the
+    functions ``mathbf{q}`` and ``\mathbf{h}`` using [`SparseConnectivityTracer.jl`](@extref SparseConnectivityTracer.jl).
 
     By default, a dense [`ForwardDiff`](@extref ForwardDiff) backend is used for the 
     Jacobians of the nonlinear equality constraints. This is also the default backend for
@@ -331,9 +336,12 @@ function validate_h_dae(NT, h)
 end
 
 """
-    validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
+    validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p) -> iszero_Ha
 
 Validate if the DAE model is strictly proper with `SparseConnectivityTracer.jl`. 
+
+It also returns `iszero_Ha` indicating wether or not that algebraic variable is used in `h!`
+function.
 """
 function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
     msg = """
@@ -346,27 +354,29 @@ function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
     funcQu! = (q, u) -> fq!(ẋ, q, x0, a0, u,  d0, p)
     funcQa! = (q, a) -> fq!(ẋ, q, x0, a,  u0, d0, p)
     funcHa! = (y, a) ->  h!(y, x0, a, d0, p)
-    S_Du = try
+    S_∂y∂u, iszero_Ha = try
         S_Qu = jacobian_sparsity(funcQu!, q, u0, detector)
         S_Qa = jacobian_sparsity(funcQa!, q, a0, detector)
         S_Ha = jacobian_sparsity(funcHa!, y, a0, detector)
-        S_Ha/S_Qa*S_Qu
+        S_∂y∂u = S_Ha/S_Qa*S_Qu
+        S_∂y∂u, iszero(S_Ha)
     catch 
         @warn(
         """
         Could not validate if the DAE is strictly proper with SparseConnectivityTracer.jl.
         $msg"""
         )
+        spzeros(ny, nu), false
     end
-    if !iszero(S_Du)
+    if !iszero(S_∂y∂u)
         error(
         """
         The DAE is not globally strictly proper according to SparseConnectivityTracer.jl.
         $(msg)The resulting sparsity structure of ∂h/∂u is provided below (should be all zeros).
-        $(sprint(show, MIME"text/plain"(), S_Du))""", 
+        $(sprint(show, MIME"text/plain"(), S_∂y∂u))""", 
         )
     end
-    return nothing
+    return iszero_Ha
 end
 
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."
@@ -677,17 +687,21 @@ end
 """
     h!(y0, model::NonLinModelDAE, x0, d0, p) -> nothing
 
-Solve the algebraic equation to get `z0` and call `model.h!` for [`NonLinModelDAE`](@ref).
+Solve the algebraic equation to get `a0` and call `model.h!` for [`NonLinModelDAE`](@ref).
 """
 function h!(y0, model::NonLinModelDAE, x0, d0, p)
-    model.x0_optim .= x0
-    model.d0_optim .= d0
-    # model.u0_optim is not updated since u0 not available, but the model is strictly proper
-    # hence possible impacts on a0 vector but no direct impacts on y0 vector in the end.
-    a0var = model.optim_output[:a0var]
-    a0 = solve!(model, model.optim_output, a0var, model.a0)
+    if !model.iszero_Ha
+        model.x0_optim .= x0
+        model.d0_optim .= d0
+        # model.u0_optim is not updated since u0 not available, but model is strictly proper
+        # hence possible impacts on a0 vector but no direct impacts on y0 vector in the end.
+        a0var = model.optim_output[:a0var]
+        a0 = solve!(model, model.optim_output, a0var, model.a0)
+        model.a0 .= a0
+    else # model.h! is not a function of a0, this vector is not needed here:
+        a0 = model.buffer.a
+    end
     model.h!(y0, x0, a0, d0, p)
-    model.a0 .= a0
     return nothing
 end
 

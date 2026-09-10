@@ -13,6 +13,7 @@ links = InterLinks(
     "JuMP" => "https://jump.dev/JuMP.jl/stable/objects.inv",
     "MathOptInterface" => "https://jump.dev/MathOptInterface.jl/stable/objects.inv",
     "DifferentiationInterface" => "https://juliadiff.org/DifferentiationInterface.jl/DifferentiationInterface/stable/objects.inv",
+    "SparseConnectivityTracer" => "https://adrianhill.de/SparseConnectivityTracer.jl/stable/objects.inv",
     "ForwardDiff" => "https://juliadiff.org/ForwardDiff.jl/stable/objects.inv",
     "LowLevelParticleFilters" => "https://baggepinnen.github.io/LowLevelParticleFilters.jl/stable/objects.inv",
     "LinearMPC" => "https://darnstrom.github.io/LinearMPC.jl/stable/objects.inv",
