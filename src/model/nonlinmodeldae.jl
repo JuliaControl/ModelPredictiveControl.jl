@@ -140,7 +140,7 @@ elements. The ``\mathbf{f}`` and ``\mathbf{q}`` functions are combined into a si
 ``\mathbf{q(x, a, u, d, p)}`` (or residuals), the functions can be implemented in two
 possible ways:
 
-1. **Non-mutating functions** (out-of-place): define them as `fq(x, a, u, d, p) -> ẋ, res`
+1. **Non-mutating functions** (out-of-place): define them as `fq(x, a, u, d, p) -> (ẋ, res)`
    and `h(x, a, d, p) -> y`. This syntax is simple and intuitive but it allocates more memory.
 2. **Mutating functions** (in-place): define them as `fq!(ẋ, res, x, a, u, d, p) -> nothing`
    and `h!(y, x, a, d, p) -> nothing`. This syntax reduces the allocations and potentially
