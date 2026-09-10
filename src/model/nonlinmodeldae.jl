@@ -599,8 +599,8 @@ Warm-start `model.Z` and `model.a0` at zero if `model` is a [`NonLinModelDAE`](@
 The field `model.a0` and `model.Z` respectively warm-start [`evaloutput`](@ref) and
 [`updatestate!`](@ref) solving. The method also set `model.optim_u0` and `model.optim_d0` at
 `u0` and `d0` values. The `model.u0` field is used to solve the algebraic equation 
-``\mathbf{q}`` in [`evaloutput`](@ref) method (but it should not impact the result in theory
-since `model` is strictly proper w.r.t. `u0`).
+``\mathbf{q}`` in [`evaloutput`](@ref) method, but it should not impact the result in theory
+since `model` is strictly proper w.r.t. `u0`.
 """
 function initstate_core!(model::NonLinModelDAE, u0, d0) 
     model.Z  .= 0
@@ -660,6 +660,11 @@ function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
 end
 linconstrainteq!(::NonLinModelDAE, ::CollocationMethod) = nothing
 
+"""
+    solve!(model::NonLinModelDAE, optim, Zvar, Zs)
+
+Solve optimization problem `optim` with the JuMP variable `Zvar` warm-started at `Zs`.
+"""
 function solve!(model::NonLinModelDAE, optim, Zvar, Zs)
     JuMP.set_start_value.(Zvar, Zs)
     JuMP.optimize!(optim)
@@ -715,7 +720,7 @@ julia> model = NonLinModelDAE(fq!, h!, 5.0, 1, 1, 1, 1, p=-0.2);
 
 julia> u = [7]; updatestate!(model, u);
 
-julia> round.(getinfo(model)[:a], digits=6)
+julia> a = round.(getinfo(model)[:a], digits=6)
 1-element Vector{Float64}:
  7.0
 ```
