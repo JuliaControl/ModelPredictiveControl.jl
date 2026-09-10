@@ -335,9 +335,6 @@ function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
 end
 get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
 
-"Get the number of elements in the algebraic variable over the collocation points `ā`."
-get_nā(model::SimModelDAE, transcription::OrthogonalCollocation) = transcription.no*model.na
-
 @doc raw"""
     init_defectmat_dae(NT, ::OrthogonalCollocation, nx, na, Co, λo) -> Es, Ks, Aeq
 
@@ -571,7 +568,7 @@ function con_nonlinprogeq!(
 )
     nx, na = model.nx, model.na
     Mo, no =  model.Mo, transcription.no
-    nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
+    nk̄, nā = get_nk̄(model, transcription), no*na
     a0_Z, k̄_Z, ā_Z = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
     q0, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)] 
     @views model.fq!(k̄[1:nx], q0, x0, a0_Z, u0, d0, model.p)
