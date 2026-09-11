@@ -39,7 +39,7 @@ function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n; firstchars=no
         nZ̃, nε = length(estim.Z̃), estim.nε
         nA, nAeq     = sum(estim.con.i_b), size(estim.con.Aeq, 1)
         ng, nc, neq  = sum(estim.con.i_g), estim.con.nc, estim.con.neq
-        m = maximum(ndigits.((nZ̃, nA, ng))) + 1
+        m = maximum(ndigits.((nZ̃, nA, nAeq, ng, neq))) + 1
         i_nZ̃min, i_nZ̃max = @. !isinf(estim.con.Z̃min), !isinf(estim.con.Z̃max)
         nZ̃bounds = sum(i_nZ̃min) + sum(i_nZ̃max)
         println(io)

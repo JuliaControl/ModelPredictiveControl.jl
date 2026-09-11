@@ -1,7 +1,7 @@
 @doc raw"""
     abstract type SimModel end
 
-Abstract supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
+Supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
 
 ---
 
@@ -20,9 +20,27 @@ julia> y = model()
 """
 abstract type SimModel{NT<:Real} end
 
+"""
+    abstract type SimModelODE <: SimModel
+
+Abstract subtype of [`SimModel`](@ref) for ordinary differential equations.
+    
+"""
+abstract type SimModelODE{NT<:Real} <: SimModel{NT} end
+
+
+"""
+    abstract type SimModelDAE <: SimModel
+
+Abstract subtype of [`SimModel`](@ref) for differential and algebraic equations.
+    
+"""
+abstract type SimModelDAE{NT<:Real} <: SimModel{NT} end
+
 struct SimModelBuffer{NT<:Real}
     u::Vector{NT}
     x::Vector{NT}
+    a::Vector{NT}
     y::Vector{NT}
     d::Vector{NT}
     k̄::Vector{NT}
@@ -30,24 +48,26 @@ struct SimModelBuffer{NT<:Real}
 end
 
 @doc raw"""
-    SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0)
+    SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0, na::Int=0)
 
 Create a buffer for `SimModel` objects for inputs, states, outputs, and disturbances.
 
 The buffer is used to store temporary results during simulation without allocating. The
 argument `ni` is the number of intermediate stage of the [`DiffSolver`](@ref), when 
-applicable.
+applicable. The field `na` is for the algebraic variables of [`NonLinModelDAE`](@ref).
 """
-function SimModelBuffer{NT}(nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0) where {NT<:Real}
+function SimModelBuffer{NT}(
+    nu::Int, nx::Int, ny::Int, nd::Int, ni::Int=0, na::Int=0
+) where {NT<:Real}
     u = Vector{NT}(undef, nu)
     x = Vector{NT}(undef, nx)
+    a = Vector{NT}(undef, na) # for NonLinModelDAE only (empty by default)
     y = Vector{NT}(undef, ny)
     d = Vector{NT}(undef, nd)
     k̄ = Vector{NT}(undef, nx*(ni+1)) # the "+1" is necessary because of super-sampling
     empty = Vector{NT}(undef, 0)
-    return SimModelBuffer{NT}(u, x, y, d, k̄, empty)
+    return SimModelBuffer{NT}(u, x, a, y, d, k̄, empty)
 end
-
 
 @doc raw"""
     setop!(model; uop=nothing, yop=nothing, dop=nothing, xop=nothing, fop=nothing) -> model
@@ -184,7 +204,7 @@ end
 Init `model.x0` with manipulated inputs `u` and meas. dist. `d` steady-state.
 
 The method tries to initialize the model state ``\mathbf{x}`` at steady-state. It removes
-the operating points on `u` and `d` and calls [`steadystate!`](@ref):
+the operating points on `u` and `d` and calls [`initstate_core!`](@ref):
 
 - If `model` is a [`LinModel`](@ref), the method computes the steady-state of current
   inputs `u` and measured disturbances `d`.
@@ -207,7 +227,7 @@ function initstate!(model::SimModel, u, d=model.buffer.empty)
     u0, d0 = model.buffer.u, model.buffer.d
     u0 .= u .- model.uop
     d0 .= d .- model.dop
-    steadystate!(model, u0, d0)
+    initstate_core!(model, u0, d0)
     x  = model.buffer.x
     x .= model.x0 .+ model.xop
     return x
@@ -341,6 +361,9 @@ function periodsleep(model::SimModel, busywait=false)
     return nothing
 end
 
+"The [`TranscriptionMethod`](@ref) is compatible with the [`SimModel`](@ref) by default."
+validate_transcription(::SimModel, ::TranscriptionMethod) = nothing
+
 """
     validate_args(model::SimModel, d, u=nothing)
 
@@ -354,9 +377,14 @@ function validate_args(model::SimModel, d, u=nothing)
     end
 end
 
+"Get length of the `k` vector with all the solver intermediate steps or all the collocation pts."
+get_nk̄(model::SimModel, ::ShootingMethod) = model.nk̄
+get_nk̄(model::SimModel, transcription::CollocationMethod) = model.nx*transcription.no
+
 include("model/linmodel.jl")
 include("model/linearization.jl")
 include("model/nonlinmodel.jl")
+include("model/nonlinmodeldae.jl")
 
 function Base.show(io::IO, model::SimModel)
     nu, nd = model.nu, model.nd
@@ -373,6 +401,13 @@ end
 
 "Print additional details of `model` if any (no details by default)."
 print_details(::IO, ::SimModel) = nothing
+
+"""
+    initstate_core!(::SimModel, u0, d0)
+
+Do nothing at all by default.
+"""
+initstate_core!(::SimModel, _ , _ ) = nothing
 
 "Functor allowing callable `SimModel` object as an alias for `evaloutput`."
 (model::SimModel)(d=model.buffer.empty) = evaloutput(model::SimModel, d)

@@ -369,14 +369,14 @@ end
 
 """
     init_predmat_mhe(
-        model::SimModel, transcription::SingleShooting, direct::Bool,
+        model::SimModelODE, transcription::SingleShooting, direct::Bool,
         He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
     ) -> E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 
 Return empty matrices for [`SingleShooting`](@ref) and non-`LinModel`, except for `ex̄`.
 """
 function init_predmat_mhe(
-    model::SimModel{NT}, transcription::SingleShooting, ::Bool,
+    model::SimModelODE{NT}, transcription::SingleShooting, ::Bool,
     He, Â, _ , Ĉm, _ , _ , _ , _ 
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
@@ -397,14 +397,14 @@ end
 
 """
     init_predmat_mhe(
-        model::SimModel, transcription::TranscriptionMethod, direct::Bool
+        model::SimModelODE, transcription::TranscriptionMethod, direct::Bool
         He, Â, B̂u, Ĉm, B̂d, D̂dm, x̂op, f̂op
     ) -> E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂
 
 Return `ex̄, EX̂, GX̂, JX̂, BX̂` and empty matrices non-`LinModel` and other [`TranscriptionMethod`](@ref).
 """
 function init_predmat_mhe(
-    model::SimModel{NT}, transcription::TranscriptionMethod, ::Bool,
+    model::SimModelODE{NT}, transcription::TranscriptionMethod, ::Bool,
     He, Â, _ , Ĉm, _ , _ , _ , _ 
 ) where {NT<:Real}
     nym, nx̂ = size(Ĉm, 1), size(Â, 2)
@@ -510,7 +510,7 @@ end
 
 @doc raw"""
     init_defectmat_mhe(
-        model::SimModel, transcription::TranscriptionMethod, direct::Bool,
+        model::SimModelODE, transcription::TranscriptionMethod, direct::Bool,
         He, Â, _ , _ , _ , _ , As, _ , _ 
     ) -> ES, GS, JS, BS
 
@@ -546,7 +546,7 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
     ```
 """
 function init_defectmat_mhe(
-    model::SimModel{NT}, ::TranscriptionMethod, ::Bool, 
+    model::SimModelODE{NT}, ::TranscriptionMethod, ::Bool, 
     He, Â, _ , _ , _ , _ , As, _ , _
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
@@ -569,7 +569,7 @@ end
 
 @doc raw"""
     init_defectmat_mhe(
-        model::SimModel, transcription::OrthogonalCollocation, direct::Bool
+        model::SimModelODE, transcription::OrthogonalCollocation, direct::Bool
         He, Â, _ , _ , _ , _ , As, Co, λo
     ) -> ES, GS, JS, BS
 
@@ -612,7 +612,7 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
     ```
 """
 function init_defectmat_mhe(
-    model::SimModel{NT}, transcription::OrthogonalCollocation, ::Bool,
+    model::SimModelODE{NT}, transcription::OrthogonalCollocation, ::Bool,
     He, Â, _ , _ , _ , _ , As, Co, λo
 ) where {NT<:Real}
     nx̂, nxs = size(Â, 2), size(As, 2)
@@ -637,9 +637,9 @@ function init_defectmat_mhe(
     return ES, GS, JS, BS
 end
 
-"Return empty matrices for [`SingleShooting`](@ref) transcription on any `SimModel` (N/A)."
+"Return empty matrices for [`SingleShooting`](@ref) transcription on any `SimModelODE` (N/A)."
 function init_defectmat_mhe(
-    model::SimModel{NT}, transcription::SingleShooting, ::Bool, 
+    model::SimModelODE{NT}, transcription::SingleShooting, ::Bool, 
     He, Â, _ , _ , _ , _ , _ , _ , _
 ) where {NT<:Real}
     nx̂ = size(Â, 2)
@@ -648,7 +648,7 @@ function init_defectmat_mhe(
 end
 
 function init_defectmat_mhe_empty(
-    model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
+    model::SimModelODE{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
 ) where {NT<:Real}
     nu, nd = model.nu, model.nd
     nk̄ = get_nk̄(model, transcription)
@@ -784,7 +784,7 @@ boxconstraint_states!(Z̃min, Z̃max, ::SingleShooting, _, _, _, _, _, _) = Z̃m
 
 "Unset `i_x̂min` and `i_x̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
 function deletex̂arr_lincon!(
-    i_x̂min, i_x̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nε
+    i_x̂min, i_x̂max, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max, nε
 )
     nx̂ = length(i_x̂min)
     x̂0min, x̂0max = @views Z̃min[(nε+1):(nε+nx̂)], @views Z̃max[(nε+1):(nε+nx̂)]
@@ -795,7 +795,7 @@ end
 
 "Unset `i_X̂min` and `i_X̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
 function deleteX̂_lincon!(
-    i_X̂min, i_X̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nε, nx̂
+    i_X̂min, i_X̂max, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max, nε, nx̂
 )
     nx̃ = nε + nx̂
     nX̂ = length(i_X̂min)
@@ -804,10 +804,10 @@ function deleteX̂_lincon!(
     foreach(i -> !isinf(X̂0max[i]) && (i_X̂max[i] = false), eachindex(i_X̂max))
     return i_X̂min, i_X̂max
 end
-deleteX̂_lincon!(i_X̂min, i_X̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_X̂min, i_X̂max
+deleteX̂_lincon!(i_X̂min, i_X̂max, ::SimModelODE, ::SingleShooting, _, _, _, _) = i_X̂min, i_X̂max
     
 "Unset `i_Ŵmin` and `i_Ŵmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max)
+function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max)
     nŴ = length(i_Ŵmin)
     Ŵmin, Ŵmax = @views Z̃min[end-nŴ+1:end], Z̃max[end-nŴ+1:end]
     foreach(i -> !isinf(Ŵmin[i]) && (i_Ŵmin[i] = false), eachindex(i_Ŵmin))
@@ -978,7 +978,7 @@ end
 
 """
     linconstrainteq!(
-        estim::MovingHorizonEstimator, ::SimModel, transcription::TranscriptionMethod
+        estim::MovingHorizonEstimator, ::SimModelODE, transcription::TranscriptionMethod
     )
 
 By default, only update `Aeq` when `Nk < He` for other [`TranscriptionMethod`](@ref).
@@ -988,7 +988,7 @@ vector is only zeros for this specific case. See [`init_defectmat_mhe`](@ref) fo
 equations.
 """
 function linconstrainteq!(
-    estim::MovingHorizonEstimator, ::SimModel, transcription::TranscriptionMethod
+    estim::MovingHorizonEstimator, ::SimModelODE, transcription::TranscriptionMethod
 )
     optim, con, Nk = estim.optim, estim.con, estim.Nk[]
     nŝ = size(con.Aeq, 1) ÷ estim.He # number of state defects per time step
@@ -1022,7 +1022,7 @@ function linconstrainteq!(
     return nothing
 end
 "No linear equality constraints for all cases of [`SingleShooting`](@ref)."
-linconstrainteq!(::MovingHorizonEstimator, ::SimModel, ::SingleShooting) = nothing
+linconstrainteq!(::MovingHorizonEstimator, ::SimModelODE, ::SingleShooting) = nothing
 
 @doc raw"""
     set_warmstart_mhe!(
@@ -1320,7 +1320,7 @@ end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, Û0, K, Ŷ0, 
+        V̂, X̂0, Û0, K̄, Ŷ0, 
         estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
         x̂0arr, Ŵ, _ 
     ) -> V̂, X̂0
@@ -1332,7 +1332,7 @@ The function mutates `V̂`, `X̂0`, `Û0`, `K` and `Ŷ0` vector arguments. The
 and by adding the estimated process noise ``\mathbf{ŵ}``.
 """
 function predict_mhe!(
-    V̂, X̂0, Û0, K, Ŷ0, 
+    V̂, X̂0, Û0, K̄, Ŷ0, 
     estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
     x̂0arr, Ŵ, _ 
 )
@@ -1344,7 +1344,7 @@ function predict_mhe!(
         u0      = @views  estim.U0[(1+nu*(j-1)):(nu*j)]
         d0      = @views  estim.D0[(1+nd*(j+p-1)):(nd*(j+p))]
         ŵ       = @views         Ŵ[(1+nŵ*(j-1)):(nŵ*j)]
-        k̄       = @views         K[(1+nk̄*(j-1)):(nk̄*j)]
+        k̄       = @views         K̄[(1+nk̄*(j-1)):(nk̄*j)]
         û0      = @views        Û0[(1+nu*(j-1)):(nu*j)]
         x̂0next  = @views        X̂0[(1+nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, k̄, estim, model, x̂0, u0, d0)
@@ -1521,7 +1521,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, X̂0, Û0, K,
+        geq, X̂0, Û0, K̄,
         estim::MovingHorizonEstimator, model::NonLinModel, ::MultipleShooting, 
         x̂0arr, Ŵ, Z̃
     ) -> geq
@@ -1539,7 +1539,7 @@ for ``j = 0, 1, ... , N_k-1`` and in which the augmented state vectors ``\mathbf
 extracted from the decision variable `Z̃`. The function ``\mathbf{f̂}`` is defined at [`f̂!`](@ref).
 """
 function con_nonlinprogeq_mhe!(
-    geq, X̂0, Û0, K,
+    geq, X̂0, Û0, K̄,
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::MultipleShooting, 
     x̂0arr, Ŵ, Z̃
 )
@@ -1559,7 +1559,7 @@ function con_nonlinprogeq_mhe!(
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
         end
         d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
-        k̄        = @views          K[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄        = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
         x̂dnext   = @views         X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
@@ -1575,7 +1575,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , Û0, K̇,
+        geq, _ , Û0, K̄,
         estim::MovingHorizonEstimator, model::NonLinModel, ::TrapezoidalCollocation, 
         x̂0arr, Ŵ, Z̃
     ) -> geq
@@ -1602,7 +1602,7 @@ in which ``h`` is the hold order `transcription.h` and the disturbed input ``\ma
 is defined in [`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , Û0, K̇,
+    geq, _ , Û0, K̄,
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::TrapezoidalCollocation, 
     x̂0arr, Ŵ, Z̃
 )
@@ -1625,18 +1625,18 @@ function con_nonlinprogeq_mhe!(
         end
         d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄dot     = @views          K̇[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄     = @views             K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
         x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ŝdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
-        k̇1, k̇2   = @views       k̄dot[1:nx], k̄dot[nx+1:2*nx]    
+        k̇1, k̇2   = @views          k̄[1:nx], k̄[nx+1:2*nx]    
         d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
             model.f!(k̇1, x̂d_Z̃, û0, d0, model.p)
         else
-            k̇1 .= @views K̇[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k2 of of the last iter. j-1
+            k̇1 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1
             model.f!(k̇2, x̂dnext_Z̃, û0, d0next, model.p)
@@ -1654,7 +1654,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , Û0, K̇,
+        geq, _ , Û0, K̄,
         estim::MovingHorizonEstimator, model::NonLinModel, ::OrthogonalCollocation, 
         x̂0arr, _ , Z̃
     ) -> geq
@@ -1685,7 +1685,7 @@ stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@r
 estimated process noise ``\mathbf{ŵ}(ℓ+j)`` are incorporated in the continuity constraint.
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , Û0, K̇,
+    geq, _ , Û0, K̄,
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::OrthogonalCollocation, 
     x̂0arr, _ , Z̃
 )
@@ -1708,22 +1708,22 @@ function con_nonlinprogeq_mhe!(
         end
         d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄dot     = @views          K̇[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄     = @views             K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         k̄_Z̃      = @views        K_Z̃[(1 + nk̄*(j-1)):(nk̄*j)]
-        ŝk       = @views        geq[(1 + nk̄*(j-1)):(nk̄*j)]
+        ŝk̄       = @views        geq[(1 + nk̄*(j-1)):(nk̄*j)]
         d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
         # ----------------- collocation constraint defects -----------------------------
-        Δk = k̄dot
+        Δk = k̄
         for i=1:no
             Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
         end
-        mul!(ŝk, Mo, Δk)
+        mul!(ŝk̄, Mo, Δk)
         di = @views Dtemp[(1 + nd*(j-1)):(nd*j)]
         if h > 0
             ûi = similar(û0) # TODO: remove this allocation
         end
         for i=1:no
-            k̇i   = @views k̄dot[(1 + (i-1)*nx):(i*nx)]
+            k̇i   = @views    k̄[(1 + (i-1)*nx):(i*nx)]
             ki_Z̃ = @views  k̄_Z̃[(1 + (i-1)*nx):(i*nx)]
             di  .= (1-τ[i]).*d0 .+ τ[i].*d0next
             if h < 1
@@ -1735,11 +1735,11 @@ function con_nonlinprogeq_mhe!(
                 model.f!(k̇i, ki_Z̃, ûi, di, model.p)
             end
         end
-        ŝk .-= k̄dot
+        ŝk̄ .-= k̄
     end
     Nk < He && (geq[nk̄*Nk+1:end] .= 0)
     return geq
 end
 
 "No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
-con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod, _,_,_) = geq
+con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::SimModelODE, ::TranscriptionMethod, _,_,_) = geq

@@ -866,7 +866,7 @@ end
 
 """
     update_predictions!(
-        x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq,
+        x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq,
         estim::MovingHorizonEstimator, Z̃
     ) -> nothing
 
@@ -875,18 +875,18 @@ Update in-place the vectors for the predictions of `estim` estimator at decision
 The method mutates all the arguments before `estim` argument.
 """
 function update_predictions!(
-    x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim::MovingHorizonEstimator, Z̃
+    x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim::MovingHorizonEstimator, Z̃
 )
     model, transcription = estim.model, estim.transcription
     x̂0arr = getarrival!(x̂0arr, estim, Z̃)
     x̄     = getx̄!(x̄, estim, x̂0arr)
     Ŵ     = getŴ!(Ŵ, estim, transcription, Z̃)
-    V̂, X̂0 = predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, transcription, x̂0arr, Ŵ, Z̃)
+    V̂, X̂0 = predict_mhe!(V̂, X̂0, Û0, K̄, Ŷ0, estim, model, transcription, x̂0arr, Ŵ, Z̃)
     Ŵe, V̂e, X̂e = extended_vectors!(Ŵe, V̂e, X̂e, estim, Ŵ, V̂, X̂0, x̂0arr)
     ε   = getslack(estim, Z̃)
     gc  = con_custom_mhe!(gc, estim, X̂e, V̂e, Ŵe, x̄, ε) 
     g   = con_nonlinprog_mhe!(g, estim, model, transcription, X̂0, V̂, gc, ε)
-    geq = con_nonlinprogeq_mhe!(geq, X̂0, Û0, K, estim, model, transcription, x̂0arr, Ŵ, Z̃)
+    geq = con_nonlinprogeq_mhe!(geq, X̂0, Û0, K̄, estim, model, transcription, x̂0arr, Ŵ, Z̃)
     return nothing
 end
 

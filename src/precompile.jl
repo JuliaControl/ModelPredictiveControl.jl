@@ -21,6 +21,15 @@ function h!(y, x, _ , p)
 end
 p = (sys2.A, sys2.B, sys2.C)
 
+function fq_dae!(ẋ, res, x, a, u, _ , _ )
+    ẋ[1] = -0.5*(x[1] - 0.2*u[1])
+    res .= (x .- a)
+    return nothing
+end
+function h_dae!(y, x, a, _ , _ )
+    y .= 2 .* x .+ a
+end
+
 function JE( _ , Ŷe, _ , R̂y , _ )
     Ŷ = @views Ŷe[3:end]
     Ȳ = R̂y - Ŷ
@@ -95,6 +104,8 @@ R̂y = repeat([55; 30], 3)
     linearizemodel = linearize(nlmodel)
     setmodel!(mpc_kf, linearizemodel)
 
+    daemodel = NonLinModelDAE(fq_dae!, h_dae!, 1.0, 1, 1, 1, 1)
+    sim!(daemodel, 2, [10])
 end
 
 end # @setup_workload

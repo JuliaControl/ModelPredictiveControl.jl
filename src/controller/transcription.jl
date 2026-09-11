@@ -1,4 +1,4 @@
-"Get the number of elements in the optimization decision vector `Z`."
+"Get the number of elements in the optimization decision vector `Z` for MPC."
 function get_nZ_mpc(estim::StateEstimator, ::SingleShooting, _ , Hc)
     return estim.model.nu*Hc
 end
@@ -415,7 +415,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::TranscriptionMethod, 
+        model::SimModelODE, estim::StateEstimator, transcription::TranscriptionMethod, 
         Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
@@ -454,7 +454,7 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     ```
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, ::TranscriptionMethod, 
+    model::SimModelODE, estim::StateEstimator{NT}, ::TranscriptionMethod, 
     Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
@@ -483,7 +483,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
+        model::SimModelODE, estim::StateEstimator, transcription::OrthogonalCollocation, 
         Hp, Hc, _ , Co, λo
     ) -> ES, GS, JS, KS, VS, BS
 
@@ -604,14 +604,14 @@ end
 
 """
     init_defectmat(
-        model::SimModel, estim::StateEstimator, transcription::SingleShooting, 
+        model::SimModelODE, estim::StateEstimator, transcription::SingleShooting, 
         Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
 """
 function init_defectmat(
-    ::SimModel, estim::StateEstimator, transcription::SingleShooting,
+    ::SimModelODE, estim::StateEstimator, transcription::SingleShooting,
     Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
@@ -666,7 +666,7 @@ case, `args`  needs to contain all the inequality and equality constraint matric
 The integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
-    model::LinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
+    model::LinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, _ ,
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
@@ -705,7 +705,7 @@ end
 
 "Init `i_b, A` without output & terminal constraints if `NonLinModel` and `SingleShooting`."
 function init_matconstraint_mpc(
-    model::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc, nϵ,
+    model::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc, _ ,
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
@@ -781,7 +781,7 @@ end
 boxconstraint_terminal!(Z̃min, Z̃max, ::SingleShooting, _, _ , _, _, _, _, _) = Z̃min, Z̃max
 
 "Unset `i_ΔUmin` and `i_ΔUmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max)
+function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max)
     nΔU = length(i_ΔUmin)
     ΔUmin, ΔUmax = @views Z̃min[1:nΔU], @views Z̃max[1:nΔU]
     foreach(i -> !isinf(ΔUmin[i]) && (i_ΔUmin[i] = false), eachindex(ΔUmin))
@@ -790,14 +790,14 @@ function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModel, ::TranscriptionMethod
 end 
 
 "Unset `i_x̂min` and `i_x̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
+function deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
     nx̂ = length(i_x̂min)
     x̂0min, x̂0max = @views Z̃min[nΔU+nX̂-nx̂+1:nΔU+nX̂], @views Z̃max[nΔU+nX̂-nx̂+1:nΔU+nX̂]
     foreach(i -> !isinf(x̂0min[i]) && (i_x̂min[i] = false), eachindex(x̂0min))
     foreach(i -> !isinf(x̂0max[i]) && (i_x̂max[i] = false), eachindex(x̂0max))
     return i_x̂min, i_x̂max
 end
-deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
+deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModelODE, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
@@ -930,7 +930,7 @@ end
 
 """
     linconstrainteq!(
-        mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
+        mpc::PredictiveController, ::SimModelODE, ::StateEstimator, ::TranscriptionMethod
     )
 
 By default, fallback to doing same the but using the shorter equations.
@@ -940,7 +940,7 @@ constraints of [`OrthogonalCollocation`](@ref), if applicable. See [`init_defect
 for the equation.
 """
 function linconstrainteq!(
-    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
+    mpc::PredictiveController, ::SimModelODE, ::StateEstimator, ::TranscriptionMethod
 )
     FS  = mpc.con.FS
     mul!(FS, mpc.con.KS, mpc.estim.x̂0) # the only non-zero matrix is KS
@@ -972,7 +972,7 @@ end
 "No linear equality constraints for other cases of [`InternalModel`](@ref)."
 linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel, ::TranscriptionMethod) = nothing
 "No linear equality constraints for all cases of [`SingleShooting`](@ref) (N/A)."
-linconstrainteq!(::PredictiveController, ::SimModel,    ::StateEstimator, ::SingleShooting) = nothing 
+linconstrainteq!(::PredictiveController, ::SimModelODE,    ::StateEstimator, ::SingleShooting) = nothing 
 linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel,  ::SingleShooting) = nothing 
 
 @doc raw"""
@@ -1147,7 +1147,7 @@ end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, X̂0, Û0, K,
+        Ŷ0, x̂0end, X̂0, Û0, K̄,
         mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
         U0, _
     ) -> Ŷ0, x̂0end
@@ -1165,7 +1165,7 @@ The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K` arguments. The augm
 for ``j = 0, 1, ... , H_p``.
 """
 function predict!(
-    Ŷ0, x̂0end, X̂0, Û0, K,
+    Ŷ0, x̂0end, X̂0, Û0, K̄,
     mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
     U0, _
 )
@@ -1176,7 +1176,7 @@ function predict!(
     for j=1:Hp
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄      = @views K[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄      = @views K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         f̂!(x̂0next, û0, k̄, mpc.estim, model, x̂0, u0, d̂0)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
@@ -1313,14 +1313,14 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K
+        geq, X̂0, Û0, K̄
         mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
         U0, Z̃
     ) -> geq
 
 Nonlinear equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. The defects of the 
+The method mutates the `geq`, `X̂0`, `Û0` and `K̄` vectors in argument. The defects of the 
 stochastic states are linear equality constraints (see [`init_defectmat`](@ref)). The
 defects of the deterministic states are computed with:
 ```math
@@ -1334,7 +1334,7 @@ state update function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is def
 [`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K, 
+    geq, X̂0, Û0, K̄, 
     mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
     U0, Z̃
 )
@@ -1354,7 +1354,7 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄        = @views    K[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄        = @views    K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         x̂dnext   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ŝdnext    = @views geq[(1 + nx*(j-1)):(nx*j)]
@@ -1366,7 +1366,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, _ , Û0, K̇
+        geq, _ , Û0, K̄
         mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
         U0, Z̃
     ) -> geq
@@ -1391,7 +1391,7 @@ in which ``h`` is the hold order `transcription.h` and the disturbed input ``\ma
 is defined in [`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq!(
-    geq, _ , Û0, K̇, 
+    geq, _ , Û0, K̄, 
     mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
     U0, Z̃
 )
@@ -1413,17 +1413,17 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         û0      =  @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k̇        = @views    K̇[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄        = @views    K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
         ŝdnext   = @views  geq[(1 + nx*(j-1)):(nx*(j-1) + nx)]
-        k̇1, k̇2   = @views k̇[1:nx], k̇[nx+1:2*nx]
+        k̇1, k̇2   = @views k̄[1:nx], k̄[nx+1:2*nx]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
             model.f!(k̇1, x̂d_Z̃, û0, d̂0, model.p)
         else
-            k̇1 .= @views K̇[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k2 of of the last iter. j-1
+            k̇1 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1
             model.f!(k̇2, x̂dnext_Z̃, û0, d̂0next, model.p)
@@ -1440,7 +1440,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, _ , Û0, K̇, 
+        geq, _ , Û0, K̄, 
         mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
         U0, Z̃
     ) -> geq
@@ -1469,7 +1469,7 @@ described in [`init_orthocolloc`](@ref). The defects for the continuity constrai
 stochastic states are linear equality constraints (see [`init_defectmat`](@ref)).
 """
 function con_nonlinprogeq!(
-    geq, _ , Û0, K̇,  
+    geq, _ , Û0, K̄,  
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
@@ -1480,7 +1480,7 @@ function con_nonlinprogeq!(
     Mo, no, τ =  mpc.Mo, transcription.no, transcription.τ
     nk̄ = get_nk̄(model, transcription)
     D̂0 = mpc.D̂0
-    X̂0_Z̃, K_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk̄*Hp)]
+    X̂0_Z̃, K̄_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk̄*Hp)]
     D̂temp = mpc.buffer.D̂
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
     @threadsif f_threads for j=1:Hp
@@ -1492,22 +1492,22 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         û0       = @views    Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄dot     = @views     K̇[(1 + nk̄*(j-1)):(nk̄*j)]
-        k̄_Z̃      = @views   K_Z̃[(1 + nk̄*(j-1)):(nk̄*j)] 
+        k̄        = @views     K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄_Z̃      = @views   K̄_Z̃[(1 + nk̄*(j-1)):(nk̄*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        ŝk       = @views   geq[(1 + nk̄*(j-1)):(nk̄*j)]
+        ŝk̄       = @views   geq[(1 + nk̄*(j-1)):(nk̄*j)]
         # ----------------- collocation constraint defects -----------------------------
-        Δk = k̄dot
+        Δk = k̄
         for i=1:no
             Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
         end
-        mul!(ŝk, Mo, Δk)
+        mul!(ŝk̄, Mo, Δk)
         d̂i = @views D̂temp[(1 + nd*(j-1)):(nd*j)]
         if h > 0
             ûi = similar(û0) # TODO: remove this allocation
         end
         for i=1:no
-            k̇i   = @views   k̄dot[(1 + (i-1)*nx):(i*nx)]
+            k̇i   = @views   k̄[(1 + (i-1)*nx):(i*nx)]
             ki_Z̃ = @views k̄_Z̃[(1 + (i-1)*nx):(i*nx)]
             d̂i  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
             if h < 1
@@ -1519,10 +1519,10 @@ function con_nonlinprogeq!(
                 model.f!(k̇i, ki_Z̃, ûi, d̂i, model.p)
             end
         end
-        ŝk .-= k̄dot
+        ŝk̄ .-= k̄
     end
     return geq
 end
 
 "No eq. constraints for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
-con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::SimModel,::TranscriptionMethod,_,_)=geq
+con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::SimModelODE,::TranscriptionMethod,_,_)=geq

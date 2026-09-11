@@ -37,6 +37,12 @@ LinModel
 NonLinModel
 ```
 
+## NonLinModelDAE
+
+```@docs
+NonLinModelDAE
+```
+
 ## Set Variable Names
 
 ```@docs

@@ -1,7 +1,7 @@
 @doc raw"""
     abstract type PredictiveController end
 
-Abstract supertype of all predictive controllers.
+Supertype of all predictive controllers.
 
 ---
 
@@ -38,7 +38,7 @@ function Base.show(io::IO, mpc::PredictiveController)
     println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = $(model.Ts) s:")
     println(io, "├ estimator: $(nameof(typeof(mpc.estim)))")
     println(io, "├ model: $(nameof(typeof(model)))")
-    println(io, "├ optimizer: $(JuMP.solver_name(mpc.optim)) ")
+    println(io, "├ optimizer: $(JuMP.solver_name(mpc.optim))")
     println(io, "├ transcription: $(transcription_str(mpc.transcription))")
     print_backends(io, mpc)
     println(io, "└ dimensions:")

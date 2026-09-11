@@ -62,20 +62,21 @@ end
 
 "Convert getinfo dictionary to a debug string (without any truncation)."
 function info2debugstr(info)
+    sol_keys = filter(key->startswith(string(key), "sol"), keys(info))
     mystr = "Content of getinfo dictionary:\n"
     for (key, value) in info
-        (key == :sol) && continue
+        key in sol_keys && continue  # skip the sol keys for now
         if key in HIDDEN_GETINFO_KEYS_MHE || key in HIDDEN_GETINFO_KEYS_MPC
             # skip the redundant non-Unicode keys
             continue
         end
         mystr *= "  :$key => $value\n"
     end
-    if haskey(info, :sol)
-        split_sol = split(string(info[:sol]), "\n")
+    for sol_key in sol_keys
+        split_sol = split(string(info[sol_key]), "\n")
         # Add the treeview prefix to each line
         solstr = join(("   " * line for line in split_sol), "\n")
-        mystr *= "  :sol => \n" * solstr * "\n"  # Ensure a trailing newline
+        mystr *= "  :$sol_key => \n" * solstr * "\n"  # Ensure a trailing newline
     end
     return mystr
 end
@@ -196,7 +197,7 @@ get_ncolors(::Prep) = nothing
 get_ncolors(prep::Union{SparseJacobianPrep, SparseHessianPrep}) = ncolors(prep)
 
 "Validate `hessian` keyword argument and return the differentiation `backend`."
-function validate_hessian(hessian, gradient, default)
+function validate_hessian(hessian, default, gradient=nothing)
     if hessian == true
         backend = default
     elseif hessian == false || isnothing(hessian)
@@ -204,7 +205,7 @@ function validate_hessian(hessian, gradient, default)
     else
         backend = hessian
     end
-    if !isnothing(backend)
+    if !isnothing(gradient) && !isnothing(backend) 
         hess = dense_backend(backend)
         grad = dense_backend(gradient)
         if hess != grad

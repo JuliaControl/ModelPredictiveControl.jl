@@ -17,7 +17,7 @@ using DifferentiationInterface: gradient!, value_and_gradient!, prepare_gradient
 using DifferentiationInterface: jacobian!, value_and_jacobian!, prepare_jacobian 
 using DifferentiationInterface: hessian!, value_gradient_and_hessian!, prepare_hessian
 using DifferentiationInterface: Constant, Cache
-using SparseConnectivityTracer: TracerSparsityDetector
+using SparseConnectivityTracer: TracerSparsityDetector, jacobian_sparsity, jacobian_buffer
 using SparseMatrixColorings: GreedyColoringAlgorithm, sparsity_pattern
 using SparseMatrixColorings: NaturalOrder, LargestFirst, SmallestLast
 using SparseMatrixColorings: IncidenceDegree, DynamicLargestFirst, RandomOrder
@@ -41,7 +41,7 @@ import OSQP, Ipopt
 
 import FastGaussQuadrature
 
-export SimModel, LinModel, NonLinModel
+export SimModel, LinModel, NonLinModel, NonLinModelDAE
 export DiffSolver, RungeKutta, ForwardEuler
 export setop!, setname!
 export setstate!, setmodel!, preparestate!, updatestate!, evaloutput, linearize, linearize!
@@ -57,8 +57,8 @@ export TrapezoidalCollocation, OrthogonalCollocation
 export SimResult, getinfo, sim!
 
 include("general.jl")
-include("sim_model.jl")
 include("transcription.jl")
+include("sim_model.jl")
 include("state_estim.jl")
 include("predictive_control.jl")
 include("plot_sim.jl")
