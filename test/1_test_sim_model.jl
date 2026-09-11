@@ -433,8 +433,17 @@ end
         res[] = x[] - a[]
         return nothing
     end
+    function fq(x, a, u, _ , p)
+        ẋ = -p .* (x .- 0.2 .* u)
+        res = x .- a
+        return ẋ, res
+    end
     function h!(y, x, a, _ , _ )
         y[] = 2*x[]+ a[]
+    end
+    function h(x, a, _ , _ )
+        y = 2 .* x .+  a
+        return y
     end
     nu, nx, na, ny = 1, 1, 1, 1
     Ts = 1
@@ -451,7 +460,14 @@ end
     dae.fq!(ẋ, q, [0], [0], [0], [0], dae.p)
     @test ẋ ≈ zeros(1)
     @test q ≈ zeros(1)
-    dae.h!(y,[0], [0], [0], dae.p)
+    dae.h!(y, [0], [0], [0], dae.p)
+    @test y ≈ zeros(1)
+
+    dae_oop = NonLinModelDAE(fq, h, Ts, nu, nx, na, ny; p)
+    dae_oop.fq!(ẋ, q, [0], [0], [0], [0], dae_oop.p)
+    @test ẋ ≈ zeros(1)
+    @test q ≈ zeros(1)
+    dae_oop.h!(y, [0], [0], [0], dae_oop.p)
     @test y ≈ zeros(1)
 
     transcription = TrapezoidalCollocation()
@@ -506,4 +522,47 @@ end
     @test_throws ErrorException NonLinModelDAE(
         fq_dt!, h_dt!, Ts, nu, nx, na, ny; p
     )
+end
+
+@testitem "NonLinModelDAE sim methods" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
+
+    function fq!(ẋ, res, x, a, u, _ , p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[])
+        res[] = x[] - a[]
+        return nothing
+    end
+    function h!(y, x, a, _ , _ )
+        y[] = 2*x[]+ a[]
+    end
+    nu, nx, na, ny = 1, 1, 1, 1
+    Ts = 1
+    p = [1.0]
+
+    transcription = OrthogonalCollocation(0, 4, roots=:gausslegendre)
+    dae = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription)
+    u = [0.0]
+    d = Float64[]
+
+    @test updatestate!(dae, u) ≈ zeros(1)
+    @test updatestate!(dae, u, d) ≈ zeros(1)
+    @test dae.x0 ≈ zeros(1)
+    @test evaloutput(dae) ≈ dae() ≈ zeros(1)
+
+    transcription = TrapezoidalCollocation()
+    dae2 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription)
+    @test updatestate!(dae2, u) ≈ zeros(1)
+    @test updatestate!(dae2, u, d) ≈ zeros(1)
+    @test dae2.x0 ≈ zeros(1)
+    @test evaloutput(dae2) ≈ dae2() ≈ zeros(1)
+
+    x = initstate!(dae, [10]) # do nothing for NonLinModelDAE
+    @test evaloutput(dae) ≈ [0]
+
+    @test_throws DimensionMismatch updatestate!(dae, zeros(2))
+    @test_throws DimensionMismatch updatestate!(dae, zeros(1), zeros(1))
+    @test_throws DimensionMismatch evaloutput(dae, zeros(1))
+
 end

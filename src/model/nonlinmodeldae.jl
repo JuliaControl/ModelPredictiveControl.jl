@@ -373,7 +373,8 @@ function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
         """
         The DAE is not globally strictly proper according to SparseConnectivityTracer.jl.
         $(msg)The resulting sparsity structure of ∂h/∂u is provided below (should be all zeros).
-        $(sprint(show, MIME"text/plain"(), S_∂y∂u))""", 
+        """,
+        sprint(show, MIME"text/plain"(), S_∂y∂u), 
         )
     end
     return iszero_Ha
