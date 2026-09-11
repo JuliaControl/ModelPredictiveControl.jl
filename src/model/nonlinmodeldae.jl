@@ -689,6 +689,10 @@ end
     h!(y0, model::NonLinModelDAE, x0, d0, p) -> nothing
 
 Solve the algebraic equation to get `a0` and call `model.h!` for [`NonLinModelDAE`](@ref).
+
+If `model.iszero_Ha` is `true`, the algebraic variable is not used in `model.h!` according
+to [`SparseConnectivityTracer.jl`](@extref SparseConnectivityTracer.jl), the algebraic
+equation solving is thus skipped and `model.h!` is called directly.
 """
 function h!(y0, model::NonLinModelDAE, x0, d0, p)
     if !model.iszero_Ha
