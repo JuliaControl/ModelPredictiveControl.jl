@@ -219,7 +219,7 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
     function, see the Extended Help of [`LinModel`](@ref) for the justification. More
     precisely, it only supports strictly proper DAEs, so the constructor will verify there
     are no global direct transmissions from ``\mathbf{u}`` to ``\mathbf{y}`` with the
-    functions ``mathbf{q}`` and ``\mathbf{h}`` using [`SparseConnectivityTracer.jl`](@extref SparseConnectivityTracer.jl).
+    functions ``\mathbf{q}`` and ``\mathbf{h}`` using [`SparseConnectivityTracer.jl`](@extref SparseConnectivityTracer.jl).
 
     By default, a dense [`ForwardDiff`](@extref ForwardDiff) backend is used for the 
     Jacobians of the nonlinear equality constraints. This is also the default backend for
