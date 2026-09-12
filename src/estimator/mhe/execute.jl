@@ -585,6 +585,7 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     optim = estim.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     Z̃s = set_warmstart_mhe!(estim, estim.transcription, Z̃var)
+    set_force∇!(estim)
     # ------- solve optimization problem --------------
     try
         JuMP.optimize!(optim)
@@ -622,6 +623,14 @@ function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     end
     fill0unused!(estim.Z̃, estim, estim.transcription)
     return estim.Z̃
+end
+
+"Force the computation of the derivatives for the first NLP iteration (if applicable)."
+function set_force∇!(estim::MovingHorizonEstimator)
+    estim.force∇J[] = true # the fields are ignored if QP instead of NLP 
+    estim.force∇g[] = true
+    estim.force∇geq[] = true
+    return nothing
 end
 
 @doc raw"""

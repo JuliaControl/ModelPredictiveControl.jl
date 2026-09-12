@@ -467,6 +467,7 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     model, optim = mpc.estim.model, mpc.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     Z̃s = set_warmstart_mpc!(mpc, mpc.transcription, Z̃var)
+    set_force∇!(mpc)
     set_objective_linear_coef!(mpc, model, Z̃var)
     try
         JuMP.optimize!(optim)
@@ -504,6 +505,8 @@ function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
     return mpc.Z̃
 end
 
+"By default, no need to force update the derivatives."
+set_force∇!(::PredictiveController) = nothing
 
 "By default, no need to update the objective function."
 set_objective_linear_coef!(::PredictiveController, ::SimModelODE, _) = nothing
@@ -513,7 +516,6 @@ function set_objective_linear_coef!(mpc::PredictiveController, ::LinModel, Z̃va
     mpc.weights.iszero_E && JuMP.set_objective_coefficient(mpc.optim, Z̃var, mpc.q̃)
     return nothing
 end
-
 
 """
     preparestate!(mpc::PredictiveController, ym, d=[]) -> x̂

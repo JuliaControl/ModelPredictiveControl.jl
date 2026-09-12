@@ -27,6 +27,9 @@ struct NonLinMPC{
     gradient::GB
     jacobian::JB
     hessian::HB
+    force∇J::Vector{Bool}
+    force∇g::Vector{Bool}
+    force∇geq::Vector{Bool}
     Z̃::Vector{NT}
     ŷ::Vector{NT}
     ry::Vector{NT}
@@ -123,10 +126,13 @@ struct NonLinMPC{
         test_custom_function_mpc(NT, model, JE, gc!, nc, Uop, Yop, Dop, p)
         nZ̃ = get_nZ_mpc(estim, transcription, Hp, Hc) + nϵ
         Z̃ = zeros(NT, nZ̃)
+        # force computation of derivatives for the first NLP iteration:
+        force∇J, force∇g, force∇geq = [true], [true], [true]
         buffer = PredictiveControllerBuffer(estim, transcription, Hp, Hc, nϵ)
         mpc = new{NT, SE, CW, TM, JM, GB, JB, HB, PT, JEfunc, GCfunc}(
             estim, transcription, optim, con,
             gradient, jacobian, hessian,
+            force∇J, force∇g, force∇geq,
             Z̃, ŷ, ry,
             Hp, Hc, nϵ, nb,
             weights,
@@ -859,7 +865,8 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
     end
     update_objective! = if !isnothing(hess)
         function (J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_J)
+            if isdifferent(Z̃_arg, Z̃_J) || mpc.force∇J[]
+                mpc.force∇J[] = false
                 Z̃_J .= Z̃_arg
                 J[], _ = value_gradient_and_hessian!(
                     J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_cache...
@@ -867,11 +874,12 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
             end
         end
     else
-        function (J, ∇J, Z̃_∇J, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_∇J)
-                Z̃_∇J .= Z̃_arg
+        function (J, ∇J, Z̃_J, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_J) || mpc.force∇J[]
+                mpc.force∇J[] = false
+                Z̃_J .= Z̃_arg
                 J[], _ = value_and_gradient!(
-                    J!, ∇J, ∇J_prep, grad, Z̃_∇J, J_cache...
+                    J!, ∇J, ∇J_prep, grad, Z̃_J, J_cache...
                 )
             end
         end
@@ -1000,7 +1008,8 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         ∇²gi_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_gi))
     end
     function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇gi)
+        if isdifferent(Z̃_arg, Z̃_∇gi) || mpc.force∇g[]
+            mpc.force∇g[] = false
             Z̃_∇gi .= Z̃_arg
             value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_cache...)
         end
@@ -1063,7 +1072,8 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
     end
     function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇geq)
+        if isdifferent(Z̃_arg, Z̃_∇geq) || mpc.force∇geq[]
+            mpc.force∇geq[] = false
             Z̃_∇geq .= Z̃_arg
             value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_cache...)
         end
@@ -1095,6 +1105,14 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²geq_func!
     )
     return g_oracle, geq_oracle
+end
+
+"Force the computation of the derivatives for the first NLP iteration."
+function set_force∇!(mpc::NonLinMPC)
+    mpc.force∇J[] = true
+    mpc.force∇g[] = true
+    mpc.force∇geq[] = true
+    return nothing
 end
 
 """

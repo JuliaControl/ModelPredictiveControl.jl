@@ -93,6 +93,9 @@ struct MovingHorizonEstimator{
     gradient::GB
     jacobian::JB
     hessian::HB
+    force∇J::Vector{Bool}
+    force∇g::Vector{Bool}
+    force∇geq::Vector{Bool}
     cov::KC
     covestim::CE
     Z̃::Vector{NT}
@@ -216,10 +219,13 @@ struct MovingHorizonEstimator{
         Nk = [0]
         prepared = [false]
         test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p, direct)
+        # force computation of derivatives for the first NLP iteration:
+        force∇J, force∇g, force∇geq = [true], [true], [true]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄, He, nŵ, nε, transcription)
         estim = new{NT, SM, KC, TM, JM, GB, JB, HB, PT, GCfunc, CE}(
             model, transcription, optim, con, 
             gradient, jacobian, hessian,
+            force∇J, force∇g, force∇geq,
             cov,
             covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
@@ -1471,18 +1477,20 @@ function get_nonlinobj_op(
         ∇²J_structure = lowertriangle_indices(init_diffstructure(∇²J))
     end
     update_objective! = if !isnothing(hess)
-        function (J, ∇J, ∇²J, Z̃_∇J, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_∇J)
-                Z̃_∇J .= Z̃_arg
+        function (J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_J) || estim.force∇J[]
+                estim.force∇J[] = false
+                Z̃_J .= Z̃_arg
                 J[], _ = value_gradient_and_hessian!(
                     J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_cache...
                 )
             end
         end    
     else
-        function (J, ∇J, Z̃_∇J, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_∇J)
-                Z̃_∇J .= Z̃_arg
+        function (J, ∇J, Z̃_J, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_J) || estim.force∇J[]
+                estim.force∇J[] = false
+                Z̃_J .= Z̃_arg
                 J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_J, J_cache...)
             end
         end
@@ -1610,7 +1618,8 @@ function get_nonlincon_oracle(
         ∇²gi_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_gi))
     end
     function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇gi)
+        if isdifferent(Z̃_arg, Z̃_∇gi) || estim.force∇g[]
+            estim.force∇g[] = false
             Z̃_∇gi .= Z̃_arg
             value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_cache...)
         end
@@ -1685,7 +1694,8 @@ function get_nonlincon_oracle(
         ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
     end
     function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇geq)
+        if isdifferent(Z̃_arg, Z̃_∇geq) || estim.force∇geq[]
+            estim.force∇geq[] = false
             Z̃_∇geq .= Z̃_arg
             value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_cache...)
         end

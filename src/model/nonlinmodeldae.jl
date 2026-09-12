@@ -20,6 +20,8 @@ struct NonLinModelDAE{
     optim_output::JMO
     jacobian::JB
     hessian::HB
+    force∇geq::Vector{Bool}
+    force∇q::Vector{Bool}
     Z::Vector{NT}
     fq!::FQ
     h!::H
@@ -96,11 +98,15 @@ struct NonLinModelDAE{
         beq = zeros(NT, size(Aeq, 1))
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         x0_optim, u0_optim, d0_optim = zeros(NT, nx), zeros(NT, nu), zeros(NT, nd)
+        # force computation of derivatives for the first NLP iteration:
+        force∇q, force∇geq = [true], [true]
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd, 0, na)
         model = new{NT, TM, JMS, JMO, JB, HB, FQ, H, PT}(
             x0, a0,
             transcription,
-            optim_state, optim_output, jacobian, hessian,
+            optim_state, optim_output, 
+            jacobian, hessian,
+            force∇q, force∇geq,
             Z,
             fq!, h!,
             p,
@@ -507,7 +513,8 @@ function get_nonlincon_oracle(
         ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
     end
     function update_con_eq!(geq, ∇geq, Z_∇geq, Z_arg)
-        if isdifferent(Z_arg, Z_∇geq)
+        if isdifferent(Z_arg, Z_∇geq) || model.force∇geq[]
+            model.force∇geq[] = false
             Z_∇geq .= Z_arg
             value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z_∇geq, Cache(k̄))
         end
@@ -558,7 +565,8 @@ function get_nonlincon_oracle(
         ∇²q_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_q))
     end
     function update_con_q!(q, ∇q, a_∇q, a_arg)
-        if isdifferent(a_arg, a_∇q)
+        if isdifferent(a_arg, a_∇q) || model.force∇q[]
+            model.force∇q[] = false
             a_∇q .= a_arg
             value_and_jacobian!(q!, q, ∇q, ∇q_prep, jac, a_∇q, Cache(ẋ))
         end
@@ -726,6 +734,7 @@ Solve optimization problem `optim` with the JuMP variable `Zvar` warm-started at
 """
 function solve!(model::NonLinModelDAE, optim, Zvar, Zs)
     JuMP.set_start_value.(Zvar, Zs)
+    set_force∇!(model)
     JuMP.optimize!(optim)
     if !issolved(optim)
         status = JuMP.termination_status(optim)
@@ -746,6 +755,13 @@ function solve!(model::NonLinModelDAE, optim, Zvar, Zs)
     end
     Z = iserror(optim) ? Zs : JuMP.value.(Zvar)
     return Z
+end
+
+"Force the computation of the derivatives for the first NLP iteration."
+function set_force∇!(model::NonLinModelDAE)
+    model.force∇geq[] = true
+    model.force∇q[]   = true
+    return nothing
 end
 
 @doc raw"""
