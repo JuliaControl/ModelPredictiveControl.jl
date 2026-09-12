@@ -1083,11 +1083,6 @@ function set_warmstart_mhe!(
     if !isfinite(Js)
         Z̃s[nx̃+1:end] .= 0 # Ŵ = 0
     end
-    # --- unused variable in Z̃ (applied only when Nk < He) ---
-    # We force the update of the NLP gradient and jacobian by warm-starting the unused 
-    # variable of Ŵ in Z̃ at 1. Since Ŵ is initialized with 0s, at least 1 variable in Z̃s
-    # will be inevitably different at the following time step.
-    Z̃s[nx̃+nŵ*Nk+1:end] .= 1
     JuMP.set_start_value.(Z̃var, Z̃s)
     return Z̃s
 end
@@ -1169,11 +1164,6 @@ function set_warmstart_mhe!(
     if !isfinite(Js)
         Z̃s[nx̃+nX̂+nK+1:end] .= 0 # Ŵ = 0
     end
-    # --- unused variable in Z̃ (applied only when Nk < He) ---
-    # We force the update of the NLP gradient and jacobian by warm-starting the unused 
-    # variable of Ŵ in Z̃ at 1. Since Ŵ is initialized with 0s, at least 1 variable in Z̃s
-    # will be inevitably different at the following time step.
-    Z̃s[nx̃+nX̂+nK+nŵ*Nk+1:end] .= 1
     JuMP.set_start_value.(Z̃var, Z̃s)
     return Z̃s
 end
@@ -1239,11 +1229,6 @@ function set_warmstart_mhe!(
     if !isfinite(Js)
         Z̃s[nx̃+nX̂+1:end] .= 0 # Ŵ = 0
     end
-    # --- unused variable in Z̃ (applied only when Nk < He) ---
-    # We force the update of the NLP gradient and jacobian by warm-starting the unused 
-    # variable of Ŵ in Z̃ at 1. Since Ŵ is initialized with 0s, at least 1 variable in Z̃s
-    # will be inevitably different at the following time step.
-    Z̃s[nx̃+nX̂+nŵ*Nk+1:end] .= 1
     JuMP.set_start_value.(Z̃var, Z̃s)
     return Z̃s
 end
