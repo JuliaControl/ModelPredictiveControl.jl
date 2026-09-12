@@ -1439,7 +1439,6 @@ function get_nonlinobj_op(
     nK̄, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
-    myNaN                               = convert(JNT, NaN)
     J::Vector{JNT}                      = zeros(JNT, 1)
     x̂0arr::Vector{JNT}, x̄::Vector{JNT}  = zeros(JNT, nx̂),  zeros(JNT, nx̂)
     Ŵ::Vector{JNT}                      = zeros(JNT, nŴ)
@@ -1456,7 +1455,7 @@ function get_nonlinobj_op(
         )
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
-    Z̃_J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    Z̃_J = zeros(JNT, nZ̃)
     J_cache = (
         Cache(x̂0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), 
@@ -1559,7 +1558,7 @@ function get_nonlincon_oracle(
     nK̄, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
-    myNaN, myInf                          = convert(JNT, NaN), convert(JNT, Inf)
+    myInf                                 = convert(JNT, Inf)
     x̂0arr::Vector{JNT}, x̄::Vector{JNT}    = zeros(JNT, nx̂),  zeros(JNT, nx̂)
     Ŵ::Vector{JNT}                        = zeros(JNT, nŴ)
     V̂::Vector{JNT},     X̂0::Vector{JNT}   = zeros(JNT, nV̂),  zeros(JNT, nX̂)
@@ -1586,7 +1585,7 @@ function get_nonlincon_oracle(
         gi .= @views g[i_g]
         return dot(λi, gi)
     end
-    Z̃_∇gi = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    Z̃_∇gi = zeros(JNT, nZ̃)
     ∇gi_cache = (
         Cache(x̂0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), 
@@ -1664,7 +1663,7 @@ function get_nonlincon_oracle(
         )
         return dot(λeq, geq)
     end
-    Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update at first call
+    Z̃_∇geq = zeros(JNT, nZ̃)
     ∇geq_cache = (
         Cache(x̂0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), 

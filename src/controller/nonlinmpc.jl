@@ -836,7 +836,6 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
     nZ̃, nU, nŶ, nX̂, nK̄ = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk̄
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
     strict = Val(true)
-    myNaN                            = convert(JNT, NaN)
     J::Vector{JNT}                   = zeros(JNT, 1)
     ΔŨ::Vector{JNT}                  = zeros(JNT, nΔŨ)
     x̂0end::Vector{JNT}               = zeros(JNT, nx̂)
@@ -850,7 +849,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     end
-    Z̃_J = fill(myNaN, nZ̃)      # NaN to force update at first call
+    Z̃_J = zeros(JNT, nZ̃)
     J_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K̄), Cache(X̂0), 
@@ -965,7 +964,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
     nZ̃, nU, nŶ, nX̂, nK̄ = length(mpc.Z̃), Hp*nu, Hp*ny, Hp*nx̂, Hp*nk̄
     nΔŨ, nUe, nŶe = nu*Hc + nϵ, nU + nu, nŶ + ny  
     strict = Val(true)
-    myNaN, myInf                      = convert(JNT, NaN), convert(JNT, Inf)
+    myInf                             = convert(JNT, Inf)
     ΔŨ::Vector{JNT}                   = zeros(JNT, nΔŨ)
     x̂0end::Vector{JNT}                = zeros(JNT, nx̂)
     K̄::Vector{JNT}                    = zeros(JNT, nK̄)
@@ -986,7 +985,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         gi .= @views g[i_g]
         return dot(λi, gi)
     end
-    Z̃_∇gi  = fill(myNaN, nZ̃)      # NaN to force update at first call
+    Z̃_∇gi = zeros(JNT, nZ̃)
     ∇gi_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
         Cache(Û0), Cache(K̄), Cache(X̂0), 
@@ -1050,7 +1049,7 @@ function get_nonlincon_oracle(mpc::NonLinMPC, ::JuMP.GenericModel{JNT}) where JN
         update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq, mpc, Z̃)
         return dot(λeq, geq)
     end
-    Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update at first call
+    Z̃_∇geq = zeros(JNT, nZ̃)
     ∇geq_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
         Cache(Û0), Cache(K̄),   Cache(X̂0),

@@ -487,7 +487,6 @@ function get_nonlincon_oracle(
     nx, na, neq, nk̄ = model.nx, model.na, model.neq, get_nk̄(model, transcription)
     nZ = length(model.Z)
     strict = Val(true) 
-    myNaN                              = convert(JNT, NaN)
     k̄::Vector{JNT}                     = zeros(JNT, nk̄)
     geq::Vector{JNT}, λeq::Vector{JNT} = zeros(JNT, neq), rand(JNT, neq)
     q::Vector{JNT},   λq::Vector{JNT}  = zeros(JNT, na),  rand(JNT, na)
@@ -501,7 +500,7 @@ function get_nonlincon_oracle(
         update_predictions!(k̄, geq, model, Z)
         return dot(λeq, geq)
     end
-    Z_∇geq = fill(myNaN, nZ)    # NaN to force update at first call
+    Z_∇geq = zeros(JNT, nZ)
     ∇geq_prep = prepare_jacobian(geq!, geq, jac, Z_∇geq, Cache(k̄); strict)
     ∇geq    = init_diffmat(JNT, jac, ∇geq_prep, nZ, neq)
     ∇geq_structure  = init_diffstructure(∇geq)
@@ -555,7 +554,7 @@ function get_nonlincon_oracle(
         model.fq!(ẋ, q, model.x0_optim, a, model.u0_optim, model.d0_optim, model.p)
         return dot(λq, q)
     end
-    a_∇q = fill(myNaN, na)    # NaN to force update at first call
+    a_∇q = zeros(JNT, na)
     ∇q_prep      = prepare_jacobian(q!, q, jac, a_∇q, Cache(ẋ); strict)
     ∇q           = init_diffmat(JNT, jac, ∇q_prep, na, na)
     ∇q_structure = init_diffstructure(∇q)
