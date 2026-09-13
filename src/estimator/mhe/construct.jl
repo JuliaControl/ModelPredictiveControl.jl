@@ -93,6 +93,9 @@ struct MovingHorizonEstimator{
     gradient::GB
     jacobian::JB
     hessian::HB
+    force∇J::Vector{Bool}
+    force∇g::Vector{Bool}
+    force∇geq::Vector{Bool}
     cov::KC
     covestim::CE
     Z̃::Vector{NT}
@@ -216,10 +219,13 @@ struct MovingHorizonEstimator{
         Nk = [0]
         prepared = [false]
         test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p, direct)
+        # force computation of derivatives for the first NLP iteration:
+        force∇J, force∇g, force∇geq = [true], [true], [true]
         buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄, He, nŵ, nε, transcription)
         estim = new{NT, SM, KC, TM, JM, GB, JB, HB, PT, GCfunc, CE}(
             model, transcription, optim, con, 
             gradient, jacobian, hessian,
+            force∇J, force∇g, force∇geq,
             cov,
             covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
@@ -1433,7 +1439,6 @@ function get_nonlinobj_op(
     nK̄, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
-    myNaN                               = convert(JNT, NaN)
     J::Vector{JNT}                      = zeros(JNT, 1)
     x̂0arr::Vector{JNT}, x̄::Vector{JNT}  = zeros(JNT, nx̂),  zeros(JNT, nx̂)
     Ŵ::Vector{JNT}                      = zeros(JNT, nŴ)
@@ -1450,7 +1455,7 @@ function get_nonlinobj_op(
         )
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
-    Z̃_J = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    Z̃_J = zeros(JNT, nZ̃)
     J_cache = (
         Cache(x̂0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), 
@@ -1471,18 +1476,20 @@ function get_nonlinobj_op(
         ∇²J_structure = lowertriangle_indices(init_diffstructure(∇²J))
     end
     update_objective! = if !isnothing(hess)
-        function (J, ∇J, ∇²J, Z̃_∇J, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_∇J)
-                Z̃_∇J .= Z̃_arg
+        function (J, ∇J, ∇²J, Z̃_J, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_J) || estim.force∇J[]
+                estim.force∇J[] = false
+                Z̃_J .= Z̃_arg
                 J[], _ = value_gradient_and_hessian!(
                     J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_cache...
                 )
             end
         end    
     else
-        function (J, ∇J, Z̃_∇J, Z̃_arg)
-            if isdifferent(Z̃_arg, Z̃_∇J)
-                Z̃_∇J .= Z̃_arg
+        function (J, ∇J, Z̃_J, Z̃_arg)
+            if isdifferent(Z̃_arg, Z̃_J) || estim.force∇J[]
+                estim.force∇J[] = false
+                Z̃_J .= Z̃_arg
                 J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_J, J_cache...)
             end
         end
@@ -1551,7 +1558,7 @@ function get_nonlincon_oracle(
     nK̄, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
-    myNaN, myInf                          = convert(JNT, NaN), convert(JNT, Inf)
+    myInf                                 = convert(JNT, Inf)
     x̂0arr::Vector{JNT}, x̄::Vector{JNT}    = zeros(JNT, nx̂),  zeros(JNT, nx̂)
     Ŵ::Vector{JNT}                        = zeros(JNT, nŴ)
     V̂::Vector{JNT},     X̂0::Vector{JNT}   = zeros(JNT, nV̂),  zeros(JNT, nX̂)
@@ -1578,7 +1585,7 @@ function get_nonlincon_oracle(
         gi .= @views g[i_g]
         return dot(λi, gi)
     end
-    Z̃_∇gi = fill(myNaN, nZ̃)      # NaN to force update_predictions! at first call
+    Z̃_∇gi = zeros(JNT, nZ̃)
     ∇gi_cache = (
         Cache(x̂0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), 
@@ -1610,7 +1617,8 @@ function get_nonlincon_oracle(
         ∇²gi_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_gi))
     end
     function update_con!(gi, ∇gi, Z̃_∇gi, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇gi)
+        if isdifferent(Z̃_arg, Z̃_∇gi) || estim.force∇g[]
+            estim.force∇g[] = false
             Z̃_∇gi .= Z̃_arg
             value_and_jacobian!(gi!, gi, ∇gi, ∇gi_prep, jac, Z̃_∇gi, ∇gi_cache...)
         end
@@ -1655,7 +1663,7 @@ function get_nonlincon_oracle(
         )
         return dot(λeq, geq)
     end
-    Z̃_∇geq = fill(myNaN, nZ̃)    # NaN to force update at first call
+    Z̃_∇geq = zeros(JNT, nZ̃)
     ∇geq_cache = (
         Cache(x̂0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), 
@@ -1685,7 +1693,8 @@ function get_nonlincon_oracle(
         ∇²geq_structure = lowertriangle_indices(init_diffstructure(∇²ℓ_geq))
     end
     function update_con_eq!(geq, ∇geq, Z̃_∇geq, Z̃_arg)
-        if isdifferent(Z̃_arg, Z̃_∇geq)
+        if isdifferent(Z̃_arg, Z̃_∇geq) || estim.force∇geq[]
+            estim.force∇geq[] = false
             Z̃_∇geq .= Z̃_arg
             value_and_jacobian!(geq!, geq, ∇geq, ∇geq_prep, jac, Z̃_∇geq, ∇geq_cache...)
         end
