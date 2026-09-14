@@ -289,7 +289,7 @@ function sim_closedloop!(
     X̂_data    = Matrix{NT}(undef, estim.nx̂, N)
     lastd, lasty = d, evaloutput(plant, d)
     initstate!(plant, lastu, lastd) # 
-    isnothing(x̂_0) || setstate!(plant, x_0)
+    isnothing(x_0) || setstate!(plant, x_0)
     initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
     isnothing(x̂_0) || setstate!(est_mpc, x̂_0)
     @progressif progress name="$(nameof(typeof(est_mpc))) simulation" for i=1:N
