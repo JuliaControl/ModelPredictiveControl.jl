@@ -422,7 +422,7 @@ The covariance error estimate `P̂` can be set only if `estim` is a [`StateEstim
 that computes it.
 """
 function setstate!(estim::StateEstimator, x̂, P̂=nothing)
-    size(x̂) == (estim.nx̂,) || error("x̂ size must be $((estim.nx̂,))")
+    size(x̂) == (estim.nx̂,) || size(x̂) == () || error("x̂ size must be $((estim.nx̂,))")
     estim.x̂0 .= x̂ .- estim.x̂op
     setstate_cov!(estim, P̂)
     return estim
