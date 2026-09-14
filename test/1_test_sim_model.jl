@@ -30,6 +30,8 @@
     linmodel4 = LinModel(Gss)
     setstate!(linmodel4, [1;-1])
     @test linmodel4.x0 ≈ [1;-1]
+    setstate!(linmodel4, 8)
+    @test linmodel4.x0 ≈ [8; 8]
 
     linmodel5 = LinModel(sys,Ts,i_d=[3])
     setop!(linmodel5, uop=[10,50], yop=[50,30], dop=[20])
@@ -502,6 +504,16 @@ end
 
     dae7 = NonLinModelDAE{Float32}(fq!,h!, Ts, nu, nx, na, ny; p)
     @test isa(dae7, NonLinModelDAE{Float32})
+
+    dae8 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, xs_0=[3])
+    @test dae8.xs_0   ≈ [3]
+    @test dae8.Z[1:1] ≈ [3]
+
+    transcription = OrthogonalCollocation(0, 1)
+    dae9 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, as_0=[4], transcription)
+    @test dae9.as_0    ≈ [4]
+    @test dae9.Z[2:2]  ≈ [4]
+    @test dae9.a0      ≈ [4]
     
     @test_throws ErrorException NonLinModelDAE(
         (x,u,p)->(x+u+p, 0.0),
@@ -542,24 +554,27 @@ end
     p = [1.0]
 
     transcription = OrthogonalCollocation(0, 4, roots=:gausslegendre)
-    dae = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription)
+    as_0 = [-1]
+    dae = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription, as_0)
     u = [0.0]
     d = Float64[]
 
-    @test updatestate!(dae, u) ≈ zeros(1)
-    @test updatestate!(dae, u, d) ≈ zeros(1)
-    @test dae.x0 ≈ zeros(1)
-    @test evaloutput(dae) ≈ dae() ≈ zeros(1)
+    @test updatestate!(dae, u) ≈ zeros(1) atol=1e-6
+    @test updatestate!(dae, u, d) ≈ zeros(1) atol=1e-6
+    @test dae.x0 ≈ zeros(1) atol=1e-6
+    @test evaloutput(dae) ≈ zeros(1) atol=1e-6
 
     transcription = TrapezoidalCollocation()
     dae2 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription)
-    @test updatestate!(dae2, u) ≈ zeros(1)
-    @test updatestate!(dae2, u, d) ≈ zeros(1)
-    @test dae2.x0 ≈ zeros(1)
-    @test evaloutput(dae2) ≈ dae2() ≈ zeros(1)
+    @test updatestate!(dae2, u) ≈ zeros(1) atol=1e-6
+    @test updatestate!(dae2, u, d) ≈ zeros(1) atol=1e-6
+    @test dae2.x0 ≈ zeros(1) atol=1e-6
+    @test dae2() ≈ zeros(1) atol=1e-6
 
-    x = initstate!(dae, [10]) # do nothing for NonLinModelDAE
-    @test evaloutput(dae) ≈ [0]
+    x = initstate!(dae, [10])
+    @test dae.a0 ≈ as_0 atol=1e-6
+    @test dae.Z[2:2] ≈ as_0 atol=1e-6
+    @test evaloutput(dae) ≈ [0] atol=1e-6
 
     @test_throws DimensionMismatch updatestate!(dae, zeros(2))
     @test_throws DimensionMismatch updatestate!(dae, zeros(1), zeros(1))

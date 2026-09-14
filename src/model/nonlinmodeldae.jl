@@ -51,6 +51,8 @@ struct NonLinModelDAE{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    xs_0::Vector{NT}
+    as_0::Vector{NT}
     x0_optim::Vector{NT}
     u0_optim::Vector{NT}
     d0_optim::Vector{NT}
@@ -59,6 +61,8 @@ struct NonLinModelDAE{
     function NonLinModelDAE{NT}(
         fq!::FQ, h!::H, Ts, nu, nx, na, ny, nd, 
         p::PT, 
+        xs_0,
+        as_0,
         transcription::TM, 
         optim_state::JMS,
         optim_output::JMO,
@@ -84,10 +88,12 @@ struct NonLinModelDAE{
         yname = ["\$y_{$i}\$" for i in 1:ny]
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
+        size(xs_0) ≠ (nx,) && throw(DimensionMismatch("xs_0 size $(size(xs_0)) ≠ state size ($nx,)"))
+        size(as_0) ≠ (na,) && throw(DimensionMismatch("as_0 size $(size(as_0)) ≠ alg. var. size ($na,)"))
         x0, a0 = zeros(NT, nx), zeros(NT, na)
         t  = zeros(NT, 1)
         # the updatestate!(model, u, d) API does not know the input `u` of the next time 
-        # step k+1, so only piecewise constant input `u` is supported here:
+        # step k+1, so only piecewise constant input `u` is supported here (h=0):
         transcription.h > 0 && error("Only zero-order hold (h=0) is supported for simulations of DAEs")
         iszero_Ha = validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
         Mo, Co, λo = init_orthocolloc(NT, transcription, nx, Ts)
@@ -117,10 +123,12 @@ struct NonLinModelDAE{
             nu, nx, na, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
+            xs_0, as_0,
             x0_optim, u0_optim, d0_optim,
             iszero_Ha,
             buffer
         )
+        reset_warmstart!(model, transcription)
         init_optimization!(model, model.optim_state, model.optim_output)
         return model
     end
@@ -181,6 +189,8 @@ See also [`NonLinModel`](@ref) for ODEs.
 - `ny`: number of outputs.
 - `nd=0`: number of measured disturbances.
 - `p=[]`: parameters of the model (any type).
+- `xs_0=zeros(nx)`: initial guess (optimization warm-start) for the states.
+- `as_0=zeros(na)`: initial guess (optimization warm-start) for the algebraic variables.
 - `transcription=OrthogonalCollocation()` : a [`TrapezoidalCollocation`](@ref) or 
    [`OrthogonalCollocation`](@ref) instance for open-loop simulations.
 - `optim_state=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for [`updatestate!`](@ref),
@@ -233,7 +243,9 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
 """
 function NonLinModelDAE{NT}(
     fq::Function, h::Function, Ts::Real, nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
-    p=NT[], 
+    p = NT[], 
+    xs_0 = zeros(NT, nx),
+    as_0 = zeros(NT, na),
     transcription = OrthogonalCollocation(), 
     optim_state   = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     optim_output  = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
@@ -243,7 +255,7 @@ function NonLinModelDAE{NT}(
     fq!, h! = get_mutating_functions_dae(NT, fq, h)
     hessian = validate_hessian(hessian, DEFAULT_NONLINDAE_HESSIAN)
     return NonLinModelDAE{NT}(
-        fq!, h!, Ts, nu, nx, na, ny, nd, p, 
+        fq!, h!, Ts, nu, nx, na, ny, nd, p, xs_0, as_0,
         transcription, optim_state, optim_output, jacobian, hessian
     )
 end
@@ -251,7 +263,9 @@ end
 function NonLinModelDAE(
     fq::Function, h::Function, Ts::Real, 
     nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
-    p=Float64[], 
+    p = Float64[],
+    xs_0 = zeros(nx),
+    as_0 = zeros(na),
     transcription = OrthogonalCollocation(), 
     optim_state   = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     optim_output  = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
@@ -260,7 +274,7 @@ function NonLinModelDAE(
 )
     return NonLinModelDAE{Float64}(
         fq, h, Ts, nu, nx, na, ny, nd; 
-        p, transcription, optim_state, optim_output, jacobian, hessian
+        p, xs_0, as_0, transcription, optim_state, optim_output, jacobian, hessian
     )
 end
 
@@ -391,6 +405,37 @@ function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
     return nx + transcription.no*nx + na + transcription.no*na
 end
 get_nZ_dae(::TrapezoidalCollocation, nx, na) = nx + 2na
+
+"""
+    reset_warmstart!(model::NonLinModelDAE, transcription::CollocationMethod)
+
+Reset warm-starting values `model.Z` and `model.a0` at construction values.
+"""
+function reset_warmstart!(model::NonLinModelDAE, transcription::OrthogonalCollocation)
+    nx, na, no = model.nx, model.na, transcription.no
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = model.as_0
+    nk̄ = nx*no
+    model.a0                      .= a0s
+    model.Z[1:nx]                 .= x0s
+    model.Z[(nx+1):(nx+na)]       .= a0s
+    model.Z[(nx+na+1):(nx+na+nk̄)] .= 0 # state derivative ki warm-started at 0 
+    ā_Z = @views model.Z[(nx+na+nk̄+1):end]
+    repeat!(ā_Z, a0s, no)
+    return nothing
+end
+function reset_warmstart!(model::NonLinModelDAE, ::TrapezoidalCollocation)
+    nx, na = model.nx, model.na
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = model.as_0
+    model.a0                 .= a0s
+    model.Z[1:nx]            .= x0s
+    model.Z[(nx+1):(nx+na)]  .= a0s
+    model.Z[(nx+na+1):end]   .= a0s
+    return nothing
+end
 
 @doc raw"""
     init_defectmat_dae(NT, ::OrthogonalCollocation, nx, na, Co, λo) -> Es, Ks, Aeq
@@ -652,7 +697,7 @@ end
 @doc raw"""
     initstate_core!(model::NonLinModelDAE, u0, d0)
 
-Warm-start `model.Z` and `model.a0` at zero if `model` is a [`NonLinModelDAE`](@ref).
+Reset warm-starting for `model.Z` and `model.a0` if `model` is a [`NonLinModelDAE`](@ref).
 
 The field `model.a0` and `model.Z` respectively warm-start [`evaloutput`](@ref) and
 [`updatestate!`](@ref) solving. The method also set `model.optim_u0` and `model.optim_d0` at
@@ -661,8 +706,7 @@ The field `model.a0` and `model.Z` respectively warm-start [`evaloutput`](@ref) 
 since `model` is strictly proper w.r.t. `u0`.
 """
 function initstate_core!(model::NonLinModelDAE, u0, d0) 
-    model.Z  .= 0
-    model.a0 .= 0
+    reset_warmstart!(model, model.transcription)
     model.x0_optim .= model.x0
     model.u0_optim .= u0
     model.d0_optim .= d0
