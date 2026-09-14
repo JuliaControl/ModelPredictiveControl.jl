@@ -1,7 +1,7 @@
-# [Manual: Nonlinear Design](@id man_nonlin)
+# [Manual: Nonlinear Design (ODE)](@id man_nonlin)
 
 ```@contents
-Pages = ["nonlinmpc.md"]
+Pages = ["nonlinmpc1.md"]
 ```
 
 ## Nonlinear Model
@@ -38,7 +38,7 @@ in which ``g`` is the gravitational acceleration in m/s², ``L``, the pendulum l
 the end of the pendulum in kg, all bundled in the parameter vector ``\mathbf{p} =
 [\begin{smallmatrix} g & L & K & m \end{smallmatrix}]'``. The [`NonLinModel`](@ref)
 constructor assumes by default that the state function `f` is continuous in time, that is,
-an ordinary differential equation system (like here):
+an ordinary differential equation (ODE) system (like here):
 
 ```@codeblocks
 line_counter = :continue
