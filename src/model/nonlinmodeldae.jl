@@ -189,8 +189,8 @@ See also [`NonLinModel`](@ref) for ODEs.
 - `ny`: number of outputs.
 - `nd=0`: number of measured disturbances.
 - `p=[]`: parameters of the model (any type).
-- `xs_0=zeros(nx)`: initial guess (or optimization warm-start) for the states.
-- `as_0=zeros(na)`: initial guess (or optimization warm-start) for the algebraic variables.
+- `xs_0=zeros(nx)`: initial guess (optimization warm-start) for the states.
+- `as_0=zeros(na)`: initial guess (optimization warm-start) for the algebraic variables.
 - `transcription=OrthogonalCollocation()` : a [`TrapezoidalCollocation`](@ref) or 
    [`OrthogonalCollocation`](@ref) instance for open-loop simulations.
 - `optim_state=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for [`updatestate!`](@ref),
