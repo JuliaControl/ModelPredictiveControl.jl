@@ -51,6 +51,7 @@ struct NonLinModelDAE{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    xs_0::Vector{NT}
     as_0::Vector{NT}
     x0_optim::Vector{NT}
     u0_optim::Vector{NT}
@@ -60,6 +61,7 @@ struct NonLinModelDAE{
     function NonLinModelDAE{NT}(
         fq!::FQ, h!::H, Ts, nu, nx, na, ny, nd, 
         p::PT, 
+        xs_0,
         as_0,
         transcription::TM, 
         optim_state::JMS,
@@ -86,6 +88,7 @@ struct NonLinModelDAE{
         yname = ["\$y_{$i}\$" for i in 1:ny]
         dname = ["\$d_{$i}\$" for i in 1:nd]
         xname = ["\$x_{$i}\$" for i in 1:nx]
+        size(xs_0) ≠ (nx,) && throw(DimensionMismatch("xs_0 size $(size(xs_0)) ≠ state size ($nx,)"))
         size(as_0) ≠ (na,) && throw(DimensionMismatch("as_0 size $(size(as_0)) ≠ alg. var. size ($na,)"))
         x0, a0 = zeros(NT, nx), zeros(NT, na)
         t  = zeros(NT, 1)
@@ -120,7 +123,7 @@ struct NonLinModelDAE{
             nu, nx, na, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
-            as_0,
+            xs_0, as_0,
             x0_optim, u0_optim, d0_optim,
             iszero_Ha,
             buffer
@@ -186,7 +189,8 @@ See also [`NonLinModel`](@ref) for ODEs.
 - `ny`: number of outputs.
 - `nd=0`: number of measured disturbances.
 - `p=[]`: parameters of the model (any type).
-- `as_0=zeros(na)`: initial guess (or warm-start) for the algebraic variables.
+- `xs_0=zeros(nx)`: initial guess (or optimization warm-start) for the states.
+- `as_0=zeros(na)`: initial guess (or optimization warm-start) for the algebraic variables.
 - `transcription=OrthogonalCollocation()` : a [`TrapezoidalCollocation`](@ref) or 
    [`OrthogonalCollocation`](@ref) instance for open-loop simulations.
 - `optim_state=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for [`updatestate!`](@ref),
@@ -240,6 +244,7 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
 function NonLinModelDAE{NT}(
     fq::Function, h::Function, Ts::Real, nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
     p = NT[], 
+    xs_0 = zeros(NT, nx),
     as_0 = zeros(NT, na),
     transcription = OrthogonalCollocation(), 
     optim_state   = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
@@ -250,7 +255,7 @@ function NonLinModelDAE{NT}(
     fq!, h! = get_mutating_functions_dae(NT, fq, h)
     hessian = validate_hessian(hessian, DEFAULT_NONLINDAE_HESSIAN)
     return NonLinModelDAE{NT}(
-        fq!, h!, Ts, nu, nx, na, ny, nd, p, as_0,
+        fq!, h!, Ts, nu, nx, na, ny, nd, p, xs_0, as_0,
         transcription, optim_state, optim_output, jacobian, hessian
     )
 end
@@ -259,6 +264,7 @@ function NonLinModelDAE(
     fq::Function, h::Function, Ts::Real, 
     nu::Int, nx::Int, na::Int, ny::Int, nd::Int=0;
     p = Float64[],
+    xs_0 = zeros(nx),
     as_0 = zeros(na),
     transcription = OrthogonalCollocation(), 
     optim_state   = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
@@ -268,7 +274,7 @@ function NonLinModelDAE(
 )
     return NonLinModelDAE{Float64}(
         fq, h, Ts, nu, nx, na, ny, nd; 
-        p, as_0, transcription, optim_state, optim_output, jacobian, hessian
+        p, xs_0, as_0, transcription, optim_state, optim_output, jacobian, hessian
     )
 end
 
@@ -407,7 +413,9 @@ Reset warm-starting values `model.Z` and `model.a0` at construction values.
 """
 function reset_warmstart!(model::NonLinModelDAE, transcription::OrthogonalCollocation)
     nx, na, no = model.nx, model.na, transcription.no
-    x0s, a0s = 0, model.as_0
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = model.as_0
     nk̄ = nx*no
     model.a0                      .= a0s
     model.Z[1:nx]                 .= x0s
@@ -419,7 +427,9 @@ function reset_warmstart!(model::NonLinModelDAE, transcription::OrthogonalColloc
 end
 function reset_warmstart!(model::NonLinModelDAE, ::TrapezoidalCollocation)
     nx, na = model.nx, model.na
-    x0s, a0s = 0, model.as_0
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = model.as_0
     model.a0                 .= a0s
     model.Z[1:nx]            .= x0s
     model.Z[(nx+1):(nx+na)]  .= a0s
