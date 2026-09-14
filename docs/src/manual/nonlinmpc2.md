@@ -28,7 +28,7 @@ K_a &= \frac{[\mathrm{H}^+][\mathrm{Ac}^-]}{[\mathrm{H}\mathrm{Ac}]}
 \end{aligned}
 ```
 
-We have one algebraic variable and two states, respectively denoted with:
+We respectively denote the algebraic variable and the two states with:
 
 ```math
 \begin{aligned}
