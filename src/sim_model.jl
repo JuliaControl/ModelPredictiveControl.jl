@@ -193,7 +193,7 @@ end
 Set `model.x0` to `x - model.xop` from the argument `x`. 
 """
 function setstate!(model::SimModel, x)
-    size(x) == (model.nx,) || error("x size must be $((model.nx,))")
+    size(x) == (model.nx,) || size(x) == () || error("x size must be $((model.nx,))")
     model.x0 .= x .- model.xop
     return model
 end
