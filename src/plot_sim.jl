@@ -142,6 +142,7 @@ function sim!(
     U_data  = Matrix{NT}(undef, plant.nu, N)
     D_data  = Matrix{NT}(undef, plant.nd, N)
     X_data  = Matrix{NT}(undef, plant.nx, N)
+    initstate!(plant, u, d)
     setstate!(plant, x_0)
     @progressif progress name="$(nameof(typeof(plant))) simulation" for i=1:N
         y = evaloutput(plant, d) 
@@ -189,8 +190,7 @@ vectors. The simulated sensor and process noises of `plant` are specified by `y_
 - `d_step  = zeros(plant.nd)` : step on measured disturbances ``\mathbf{d}``
 - `d_noise = zeros(plant.nd)` : additive gaussian noise on measured dist. ``\mathbf{d}``
 - `x_noise = zeros(plant.nx)` : additive gaussian noise on plant states ``\mathbf{x}``
-- `x_0 = plant.xop` : plant initial state ``\mathbf{x}(0)``, [`initstate!`](@ref)
-   is used if `nothing`
+- `x_0 = plant.xop` : plant initial state ``\mathbf{x}(0)``
 - `x̂_0 = nothing` or *`xhat_0`* : initial estimate ``\mathbf{x̂}(0)``, [`initstate!`](@ref)
    is used if `nothing`
 - `lastu = plant.uop` : last plant input ``\mathbf{u}`` for ``\mathbf{x̂}`` initialization
@@ -276,7 +276,8 @@ function sim_closedloop!(
 ) where {NT<:Real}
     model = estim.model
     model.Ts ≈ plant.Ts || error("Sampling time of controller/estimator ≠ plant.Ts")
-    old_x0    = copy(plant.x0)
+    old_x0    = plant.buffer.x
+    old_x0   .= plant.x0
     T_data    = collect(plant.Ts*(0:(N-1)))
     Y_data    = Matrix{NT}(undef, plant.ny, N)
     Ŷ_data    = Matrix{NT}(undef, model.ny, N)
@@ -288,8 +289,8 @@ function sim_closedloop!(
     X_data    = Matrix{NT}(undef, plant.nx, N)
     X̂_data    = Matrix{NT}(undef, estim.nx̂, N)
     lastd, lasty = d, evaloutput(plant, d)
-    initstate!(plant, lastu, lastd) # 
-    isnothing(x_0) || setstate!(plant, x_0)
+    initstate!(plant, lastu, lastd)
+    setstate!(plant, x_0)
     initstate!(est_mpc, lastu, lasty[estim.i_ym], lastd)
     isnothing(x̂_0) || setstate!(est_mpc, x̂_0)
     @progressif progress name="$(nameof(typeof(est_mpc))) simulation" for i=1:N
