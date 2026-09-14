@@ -83,6 +83,8 @@ end
     @test updatestate!(kalmanfilter2, [10, 3], [0.5, 6+0.1]) ≈ x
     setstate!(kalmanfilter1, [1,2,3,4])
     @test kalmanfilter1.x̂0 ≈ [1,2,3,4]
+    setstate!(kalmanfilter1, 8)
+    @test kalmanfilter1.x̂0 ≈ [8,8,8,8]
     for i in 1:40
         preparestate!(kalmanfilter1, [50, 30])
         updatestate!(kalmanfilter1, [11, 52], [50, 30])
@@ -490,6 +492,8 @@ end
     @test internalmodel1.x̂s ≈ zeros(2)
     setstate!(internalmodel1, [1,2])
     @test internalmodel1.x̂0 ≈ [1,2]
+    setstate!(internalmodel1, 8)
+    @test internalmodel1.x̂0 ≈ [8,8]
     linmodel2 = LinModel(append(tf(3, [5, 1]), tf(2, [10, 1])), 1.0)
     stoch_ym = append(tf([2.5, 1],[1.2, 1, 0]),tf([1.5, 1], [1.3, 1, 0]))
     internalmodel2 = InternalModel(linmodel2; stoch_ym)

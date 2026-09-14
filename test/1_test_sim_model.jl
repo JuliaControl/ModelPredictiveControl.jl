@@ -30,6 +30,8 @@
     linmodel4 = LinModel(Gss)
     setstate!(linmodel4, [1;-1])
     @test linmodel4.x0 ≈ [1;-1]
+    setstate!(linmodel4, 8)
+    @test linmodel4.x0 ≈ [8; 8]
 
     linmodel5 = LinModel(sys,Ts,i_d=[3])
     setop!(linmodel5, uop=[10,50], yop=[50,30], dop=[20])
