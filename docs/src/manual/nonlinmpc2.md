@@ -94,15 +94,15 @@ to the differential equations:
 
 ```math
 \begin{aligned}
-    \dot{c}_A(t) &= \frac{1}{V}(q_{Ain} c_{Ain} - q_{out} c_{Aout})         \\
-    \dot{c}_B(t) &= \frac{1}{V}(q_{Bin} c_{Bin} - q_{out} c_{Bout})
+    \dot{c}_A(t) &= \frac{60}{V}(q_{Ain} c_{Ain} - q_{out} c_{Aout})         \\
+    \dot{c}_B(t) &= \frac{60}{V}(q_{Bin} c_{Bin} - q_{out} c_{Bout})
 \end{aligned}
 ```
 
 in which the concentrations ``c`` are in mol/L, the tank volume ``V`` in L and the
-volumetric flow rates ``q`` in L/min. By assuming a perfectly mixed reactor and
-an overflow weir to draw the neutralized solution, the following relations evaluate
-the outlet terms:
+volumetric flow rates ``q`` in L/min. The accumulation terms ``\dot{c}`` are in mol/(L h)
+because of the ``60`` factor. By assuming a perfectly mixed reactor and an overflow weir to
+draw the neutralized solution, the following relations evaluate the outlet terms:
 
 ```math
 \begin{aligned}
@@ -131,8 +131,8 @@ function fq!(ẋ, res, x, a, u, d, p)
     q_out = q_Ain + q_Bin     # [L/min]
     c_Aout = c_A              # [mol/L]
     c_Bout = c_B              # [mol/L]
-    ẋ[1]   = (q_Ain * c_Ain - q_out * c_Aout) / V
-    ẋ[2]   = (q_Bin * c_Bin - q_out * c_Bout) / V
+    ẋ[1]   = (60/V)*(q_Ain * c_Ain - q_out * c_Aout)
+    ẋ[2]   = (60/V)*(q_Bin * c_Bin - q_out * c_Bout)
     res[1] = a_H + c_B - (Kw / a_H) - (Ka * c_A / (Ka + a_H))
     return nothing
 end
@@ -148,7 +148,7 @@ function h!(y, _, a, _ , _ )
     return nothing
 end
 
-Ts = 15.0 # Sample time [min]
+Ts = 0.5 # Sample time [h]
 nu, nx, na, ny, nd = 1, 2, 1, 1, 1
 p = [c_Ain, c_Bin, Kw, Ka, V]
 
@@ -160,7 +160,7 @@ model = setname!(model, u=vu, x=vx, y=vy, d=vd)
 u = [10.0]
 d = [10.0]
 x_0 = [0.055, 0.045]
-N = 100
+N = 50
 Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
 x = x_0
 let x=x, u=u, d=d
@@ -183,5 +183,6 @@ using Plots
 theme(:default)
 #theme(:dark)
 default(fontfamily="Computer Modern"); scalefontsizes(1.1)
-plot(res, plotx=true, plotd=false)
+p = plot(res, plotx=true, plotd=false, xlabel="Time (h)")
+xlabel!(p[3], "")
 ```
