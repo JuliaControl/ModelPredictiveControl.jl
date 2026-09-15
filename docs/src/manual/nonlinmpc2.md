@@ -19,10 +19,18 @@ measured disturbance:
 \end{aligned}
 ```
 
+The following figure depicts the pH neutralization process:
+
+```@raw html
+<p><img src="../../assets/ph_neutralization.svg" alt="ph_neutralization" width=250 
+    style="background-color:white; border:20px solid white; display: block; 
+    margin-left: auto; margin-right: auto;"/></p>
+```
+
 ### Instantaneous Charge Balance
 
 The solution must remain electrically neutral, i.e. the sum of the charges of all ions must
-equal zero. Here, the ions are:
+equal zero. The ions in this case study are:
 
 - Hydrogen ``[\mathrm{H}^+]``
 - Sodium ``[\mathrm{Na}^+]``
