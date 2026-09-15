@@ -1,4 +1,4 @@
-# [Manual: Nonlinear Design (DAE)](@id man_ade)
+# [Manual: Nonlinear Design (DAE)](@id man_dae)
 
 ```@contents
 Pages = ["nonlinmpc2.md"]
@@ -19,7 +19,8 @@ measured disturbance:
 \end{aligned}
 ```
 
-The following figure depicts the pH neutralization process:
+An overflow weir draws the neutralized solution, effectively keeping a constant volume of
+solution inside the tank. The following figure depicts the pH neutralization process:
 
 ```@raw html
 <p><img src="../../assets/ph_neutralization.svg" alt="ph_neutralization" width=250 
@@ -101,8 +102,8 @@ to the differential equations:
 
 in which the concentrations ``c`` are in mol/L, the tank volume ``V`` in L and the
 volumetric flow rates ``q`` in L/min. The accumulation terms ``\dot{c}`` are in mol/(L h)
-because of the 60 factors. By assuming a perfectly mixed reactor and an overflow weir to
-draw the neutralized solution, the following relations evaluate the outlet terms:
+because of the 60 factors. By assuming a perfectly mixed reactor and a constant volume
+because of the weir, the following relations compute the outflow terms:
 
 ```math
 \begin{aligned}
