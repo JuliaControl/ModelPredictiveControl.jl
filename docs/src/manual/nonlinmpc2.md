@@ -75,9 +75,9 @@ The pH is computed with:
     ```math
     0 = a_H^3 + (c_B + K_a) a_H^2 + \big(K_a(c_A + c_B) + K_w \big) a_H - K_w K_a
     ```
-    We could extract the positive root of this expression inside the output function `h!`
-    to transform the system to an ODE, effectively avoiding the increased complexity of
-    DAEs. The tutorial will still treat the system as a DAE to illustrate its API.
+    We could extract the positive real root of this expression inside the output function
+    `h!` to transform the system to an ODE, effectively avoiding the increased complexity
+    of DAEs. The tutorial will still treat the system as a DAE to illustrate its API.
 
 ### Mass Balance
 
