@@ -166,7 +166,6 @@ x = x_0
 let x=x, u=u, d=d
     setstate!(model, x)
     for i=1:N
-        #@show x
         d = [10.0]
         y = model(d)
         u = i < N/2 ? [10.0] : [9.5]
