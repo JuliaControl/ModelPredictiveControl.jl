@@ -4,7 +4,7 @@
 Pages = ["nonlinmpc2.md"]
 ```
 
-## Nonlinear Model
+## Nonlinear Model (DAE)
 
 In this example, the goal is to control the pH of a solution in a continuously stirred
 tank reactor (CSTR) for neutralization. The manipulated input is the inlet flow rate of

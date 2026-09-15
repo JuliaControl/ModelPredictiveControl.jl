@@ -4,7 +4,7 @@
 Pages = ["nonlinmpc1.md"]
 ```
 
-## Nonlinear Model
+## Nonlinear Model (ODE)
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum
 attached to a motor. Knowing that the manipulated input is the motor torque ``τ`` in Nm, the
