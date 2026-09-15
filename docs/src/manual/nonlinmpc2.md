@@ -154,7 +154,7 @@ p = [c_Ain, c_Bin, Kw, Ka, V]
 
 model = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny, nd; p, as_0=[1e-5])
 vu, vd = ["\$q_B\$ (L/min)"], ["\$q_A\$ (L/min)"]
-vx, vy = ["\$c_a\$ (mol/L)", "\$c_b\$ (mol/L)"], ["\$\\mathrm{pH}\$"]
+vx, vy = ["\$c_A\$ (mol/L)", "\$c_B\$ (mol/L)"], ["\$\\mathrm{pH}\$"]
 model = setname!(model, u=vu, x=vx, y=vy, d=vd)
 
 u = [10.0]
