@@ -554,8 +554,9 @@ end
     p = [1.0]
 
     transcription = OrthogonalCollocation(0, 4, roots=:gausslegendre)
+    xs_0 = [-0.5]
     as_0 = [-1]
-    dae = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription, as_0)
+    dae = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription, xs_0, as_0)
     u = [0.0]
     d = Float64[]
 
@@ -565,7 +566,7 @@ end
     @test evaloutput(dae) ≈ zeros(1) atol=1e-6
 
     transcription = TrapezoidalCollocation()
-    dae2 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription)
+    dae2 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription, as_0, xs_0)
     @test updatestate!(dae2, u) ≈ zeros(1) atol=1e-6
     @test updatestate!(dae2, u, d) ≈ zeros(1) atol=1e-6
     @test dae2.x0 ≈ zeros(1) atol=1e-6
@@ -573,8 +574,17 @@ end
 
     x = initstate!(dae, [10])
     @test dae.a0 ≈ as_0 atol=1e-6
-    @test dae.Z[2:2] ≈ as_0 atol=1e-6
+    @test dae.Z[1:1]  ≈ xs_0 atol=1e-6
+    @test dae.Z[2:2]  ≈ as_0 atol=1e-6
+    @test dae.Z[3:6]  ≈ repeat(xs_0, 4) atol=1e-6
+    @test dae.Z[7:10] ≈ repeat(as_0, 4) atol=1e-6
     @test evaloutput(dae) ≈ [0] atol=1e-6
+
+    x = initstate!(dae2, [10])
+    @test dae2.Z[1:1] ≈ xs_0 atol=1e-6
+    @test dae2.Z[2:2] ≈ as_0 atol=1e-6
+    @test dae2.Z[3:3] ≈ as_0 atol=1e-6
+    @test evaloutput(dae2) ≈ [0] atol=1e-6
 
     @test_throws DimensionMismatch updatestate!(dae, zeros(2))
     @test_throws DimensionMismatch updatestate!(dae, zeros(1), zeros(1))
