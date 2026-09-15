@@ -140,15 +140,12 @@ end
 
 function h!(y, _, a, _ , _ ) 
     a_H = a[1]
-    y[1] = try
-        -log10(a_H) # y = pH
+    pH = try
+        -log10(a_H)
     catch myerror
-        if myerror isa DomainError
-            NaN
-        else
-            rethrow()
-        end
+        myerror isa DomainError ? NaN : rethrow()
     end
+    y[1] = pH
     return nothing
 end
 
