@@ -420,7 +420,8 @@ function reset_warmstart!(model::NonLinModelDAE, transcription::OrthogonalColloc
     model.a0                      .= a0s
     model.Z[1:nx]                 .= x0s
     model.Z[(nx+1):(nx+na)]       .= a0s
-    model.Z[(nx+na+1):(nx+na+nk̄)] .= x0s
+    k̄_Z = @views model.Z[(nx+na+1):(nx+na+nk̄)]
+    repeat!(k̄_Z, x0s, no)
     ā_Z = @views model.Z[(nx+na+nk̄+1):end]
     repeat!(ā_Z, a0s, no)
     return nothing
