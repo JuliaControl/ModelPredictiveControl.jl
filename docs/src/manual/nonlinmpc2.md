@@ -117,12 +117,11 @@ The code is:
 ```@example 1
 using ModelPredictiveControl
 
-# Process parameters
-V = 1000.0      # Reactor volume [L]
-c_Ain = 0.1     # Feed concentration of weak acid [mol/L]
-c_Bin = 0.1     # Feed concentration of strong base [mol/L]
-Kw = 1.0e-14    # Water dissociation constant [mol^2/L^2]
-Ka = 1.75e-5    # Acid dissociation constant [mol/L]
+V = 1000.0      # reactor volume [L]
+c_Ain = 0.1     # feed concentration of weak acid [mol/L]
+c_Bin = 0.1     # feed concentration of strong base [mol/L]
+Kw = 1.0e-14    # water dissociation constant [mol^2/L^2]
+Ka = 1.75e-5    # acid dissociation constant [mol/L]
 
 function fq!(ẋ, res, x, a, u, d, p)
     c_Ain, c_Bin, Kw, Ka, V = p
