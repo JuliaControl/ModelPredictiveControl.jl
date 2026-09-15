@@ -37,7 +37,7 @@ equal zero. The ions in this case study are:
 - Hydroxide ``[\mathrm{OH}^-]``
 - Acetate ``[\mathrm{Ac}^-]``
 
-The steady-state charge balance leads to:
+The instantaneous charge balance leads to:
 
 ```math
 0 = [\mathrm{H}^+] + [\mathrm{Na}^+] - [\mathrm{OH}^-] - [\mathrm{Ac}^-]
