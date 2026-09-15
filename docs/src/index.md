@@ -33,7 +33,8 @@ Depth = 2
 Pages = [
     joinpath("manual", "installation.md"),
     joinpath("manual", "linmpc.md"),
-    joinpath("manual", "nonlinmpc.md"),
+    joinpath("manual", "nonlinmpc1.md"),
+    joinpath("manual", "nonlinmpc2.md"),
     joinpath("manual", "mtk.md")
 ]
 ```
