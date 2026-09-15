@@ -101,7 +101,7 @@ to the differential equations:
 
 in which the concentrations ``c`` are in mol/L, the tank volume ``V`` in L and the
 volumetric flow rates ``q`` in L/min. The accumulation terms ``\dot{c}`` are in mol/(L h)
-because of the ``60`` factor. By assuming a perfectly mixed reactor and an overflow weir to
+because of the 60 factors. By assuming a perfectly mixed reactor and an overflow weir to
 draw the neutralized solution, the following relations evaluate the outlet terms:
 
 ```math
