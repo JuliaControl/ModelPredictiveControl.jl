@@ -159,16 +159,16 @@ model = setname!(model, u=vu, x=vx, y=vy, d=vd)
 
 u = [10.0]
 d = [10.0]
-x_0 = [0.055, 0.045]
-N = 50
+x_0 = [0.051, 0.049]
+N = 61
 Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
 x = x_0
 let x=x, u=u, d=d
     setstate!(model, x)
     for i=1:N
-        d = [10.0]
+        d = i ≤ 2N÷3 ? [10.0] : [9.8]
         y = model(d)
-        u = i < N/2 ? [10.0] : [9.5]
+        u = i ≤ N÷3  ? [10.0] : [9.7]
         Y_data[:, i] = y
         U_data[:, i] = u
         D_data[:, i] = d
@@ -179,9 +179,10 @@ end
 res = SimResult(model, U_data, Y_data, D_data; X_data)
 
 using Plots
-theme(:default)
-#theme(:dark)
+#theme(:default)
+theme(:dark)
 default(fontfamily="Computer Modern"); scalefontsizes(1.1)
-p = plot(res, plotx=true, plotd=false, xlabel="Time (h)")
-xlabel!(p[3], "")
+#p = plot(res, plotx=true, plotd=false, xlabel="Time (h)")
+#xlabel!(p[3], "")
+p = plot(res, plotd=true, xlabel="Time (h)")
 ```
