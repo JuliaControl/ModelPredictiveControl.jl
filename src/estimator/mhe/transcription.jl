@@ -27,7 +27,7 @@ end
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, transcription::OrthogonalCollocation)
     nx̂, nŵ, Nk = estim.nx̂, estim.nx̂, estim.Nk[]
     na = get_na(estim.model)
-    nk̄, nā = get_nk̄(estim.model, transcription), transcription.no*na
+    nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
     nŴ, nX̂, nA, nK̄, nĀ  = nŵ*Nk, nx̂*Nk, na*Nk, nk̄*Nk, nā*Nk
     nx̃ = estim.nε + nx̂
     nx̃_nX̂_He             = nx̃ + nx̂*estim.He
@@ -1183,7 +1183,7 @@ function set_warmstart_mhe!(
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
     nu, na = model.nu, get_na(model)
-    nk̄, nā = get_nk̄(estim.model, transcription), na*transcription.no
+    nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂, nA, nK̄, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, nk̄*He, nā*He
     Z̃s = estim.buffer.Z̃
@@ -1454,18 +1454,18 @@ end
 @doc raw"""
     predict_mhe!(
         V̂, X̂0, A0, _ , _ , Ŷ0, 
-        estim::MovingHorizonEstimator, model::NonLinModel, ::TranscriptionMethod, 
+        estim::MovingHorizonEstimator, model::SimModel, ::TranscriptionMethod, 
         x̂0arr, a0arr, _ , Z̃ 
     ) -> V̂, X̂0, A0
 
-Compute the vectors when `model` is a [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
+Compute the vectors for all other cases.
 
 The function mutates `V̂`, `X̂0`, and `Ŷ0` vector arguments. The augmented output function 
 [`ĥ!`](@ref) is called multiple times in a `for` loop from ``j=1`` to ``N_k``.
 """
 function predict_mhe!(
-    V̂, X̂0, A0, _ , Ŷ0, 
-    estim::MovingHorizonEstimator, model::NonLinModel, transcription::TranscriptionMethod, 
+    V̂, X̂0, A0, _ , _ , Ŷ0, 
+    estim::MovingHorizonEstimator, model::SimModel, transcription::TranscriptionMethod, 
     x̂0arr, a0arr, _ , Z̃ 
 )
     nd, ny, na = model.nd, model.ny, get_na(model)
@@ -1498,40 +1498,7 @@ function predict_mhe!(
         V̂[nym*Nk+1:end] .= 0
         X̂0[nx̂*Nk+1:end] .= 0
     end
-    return V̂, X̂0
-end
-
-
-"""
-    con_nonlinprog_mhe!(
-        g, estim::MovingHorizonEstimator, ::NonLinModel, ::TranscriptionMethod, _ , V̂, gc, ε
-    ) -> g
-
-Nonlinear MHE constraint when `model` is [`NonLinModel`](@ref) with non-[`SingleShooting`](@ref).
-
-The method mutates the `g` vectors in argument and returns it. The estimated sensor noises 
-and custom constraints are included in the `g` vector.
-"""
-function con_nonlinprog_mhe!(
-    g, estim::MovingHorizonEstimator, ::NonLinModel, ::TranscriptionMethod, _ , V̂, gc, ε
-)
-    nV̂con, nV̂ = length(estim.con.V̂min),  estim.nym*estim.Nk[]
-    for i in eachindex(g)
-        estim.con.i_g[i] || continue
-        if i ≤ nV̂con
-            j = i
-            jcon = nV̂con-nV̂+j
-            g[i] = j > nV̂ ? 0 : estim.con.V̂min[jcon] - V̂[j] - ε*estim.con.C_v̂min[jcon]
-        elseif i ≤ 2nV̂con
-            j = i - nV̂con
-            jcon = nV̂con-nV̂+j
-            g[i] = j > nV̂ ? 0 : V̂[j] - estim.con.V̂max[jcon] - ε*estim.con.C_v̂max[jcon]
-        else
-            j = i - 2nV̂con
-            g[i] = gc[j]
-        end
-    end
-    return g
+    return V̂, X̂0, A0
 end
 
 """
@@ -1594,11 +1561,43 @@ function con_nonlinprog_mhe!(
     return g
 end
 
+"""
+    con_nonlinprog_mhe!(
+        g, estim::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod, _ , V̂, gc, ε
+    ) -> g
+
+Nonlinear MHE constraint for all other cases.
+
+The method mutates the `g` vectors in argument and returns it. The estimated sensor noises 
+and custom constraints are included in the `g` vector.
+"""
+function con_nonlinprog_mhe!(
+    g, estim::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod, _ , V̂, gc, ε
+)
+    nV̂con, nV̂ = length(estim.con.V̂min),  estim.nym*estim.Nk[]
+    for i in eachindex(g)
+        estim.con.i_g[i] || continue
+        if i ≤ nV̂con
+            j = i
+            jcon = nV̂con-nV̂+j
+            g[i] = j > nV̂ ? 0 : estim.con.V̂min[jcon] - V̂[j] - ε*estim.con.C_v̂min[jcon]
+        elseif i ≤ 2nV̂con
+            j = i - nV̂con
+            jcon = nV̂con-nV̂+j
+            g[i] = j > nV̂ ? 0 : V̂[j] - estim.con.V̂max[jcon] - ε*estim.con.C_v̂max[jcon]
+        else
+            j = i - 2nV̂con
+            g[i] = gc[j]
+        end
+    end
+    return g
+end
+
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, X̂0, Û0, K̄,
+        geq, X̂0, _ , Û0, K̄, _ ,
         estim::MovingHorizonEstimator, model::NonLinModel, ::MultipleShooting, 
-        x̂0arr, Ŵ, Z̃
+        x̂0arr, _ , Ŵ, Z̃
     ) -> geq
 
 Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
@@ -1614,9 +1613,9 @@ for ``j = 0, 1, ... , N_k-1`` and in which the augmented state vectors ``\mathbf
 extracted from the decision variable `Z̃`. The function ``\mathbf{f̂}`` is defined at [`f̂!`](@ref).
 """
 function con_nonlinprogeq_mhe!(
-    geq, X̂0, Û0, K̄,
+    geq, X̂0, _ , Û0, K̄, _ ,
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::MultipleShooting, 
-    x̂0arr, Ŵ, Z̃
+    x̂0arr, _ , Ŵ, Z̃
 )
     nu, nx, nd, nk̄ = model.nu, model.nx, model.nd, model.nk̄
     nx̂, nxs, nŵ, He = estim.nx̂, estim.nxs, estim.nx̂, estim.He
@@ -1650,17 +1649,17 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , Û0, K̄,
-        estim::MovingHorizonEstimator, model::NonLinModel, ::TrapezoidalCollocation, 
-        x̂0arr, Ŵ, Z̃
+        geq, _ , _ , Û0, K̄, Q̄,
+        estim::MovingHorizonEstimator, model::SimModel, ::TrapezoidalCollocation, 
+        x̂0arr, a0arr, Ŵ, Z̃
     ) -> geq
 
-Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
+Nonlinear MHE equality constrains for [`SimModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
 By introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the deterministic
 state defects are computed with:
 ```math
-\mathbf{ŝ_d}(ℓ+j+1) = \mathbf{x̂_d}(ℓ+j) + 0.5 T_s [\mathbf{k̇}_1(ℓ+j) + \mathbf{k̇}_2(ℓ+j)] 
+\mathbf{ŝ_k}(ℓ+j) = \mathbf{x̂_d}(ℓ+j) + 0.5 T_s [\mathbf{k̇}_1(ℓ+j) + \mathbf{k̇}_2(ℓ+j)] 
                        + \mathbf{ŵ_d}(ℓ+j) - \mathbf{x̂_d}(ℓ+j+1)                                              
 ```
 for ``j = 0, 1, ... , N_k-1``, and in which ``\mathbf{x̂_d}`` and ``\mathbf{ŵ_d}`` are the
@@ -1669,59 +1668,69 @@ variable `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated from the contin
 function `model.f!` and:
 ```math
 \begin{aligned}
-\mathbf{k̇}_1(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d̂_0}(ℓ+j),   \mathbf{p}\Big) \\
-\mathbf{k̇}_2(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{û_0}(ℓ+j+h), \mathbf{d̂_0}(ℓ+j+1), \mathbf{p}\Big) 
+\mathbf{k̇}_1(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a_0}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d̂_0}(ℓ+j),   \mathbf{p}\Big) \\
+\mathbf{k̇}_2(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{a_0}(ℓ+j+1), \mathbf{û_0}(ℓ+j+h), \mathbf{d̂_0}(ℓ+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
 is defined in [`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , Û0, K̄,
-    estim::MovingHorizonEstimator, model::NonLinModel, transcription::TrapezoidalCollocation, 
-    x̂0arr, Ŵ, Z̃
+    geq, _ , _ , Û0, K̄, Q̄,
+    estim::MovingHorizonEstimator, model::SimModel, transcription::TrapezoidalCollocation, 
+    x̂0arr, a0arr, Ŵ, Z̃
 )
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
     nx̂, nxs, nŵ, He = estim.nx̂, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     Ts = model.Ts
-    nk̄ = get_nk̄(model, transcription)
+    nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     nw = nŵ - nxs
     nx̃ = estim.nε + nx̂
+    nx̃_nX̂ = nx̃ + nx̂*estim.He
     p = estim.direct ? 0 : 1
-    X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)]
+    X̂0_Z̃, A0_Z̃ = @views Z̃[(nx̃+1):(nx̃_nX̂)], Z̃[(1 + nx̃_nX̂):(nx̃_nX̂ + na*Nk)]
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
+
+    # TODO: continue here, chose how to store ŝk, q1 and q2 in geq and choose if 
+    # TODO: precall fq! before the loop for the first one.
+    #@views fq!(K̄[1:nx], q0, model, x̂0arr[1:nx], a0arr, Û0[1:nu], estim.D0[])
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
+            a0   = @views a0arr[1:nx]
         else
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
+            a0   = @views A0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
         end
         d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄     = @views             K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄        = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        q̄        = @views          Q̄[(1 + nā*(j-1)):(nā*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
         x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
-        ŝdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
-        k̇1, k̇2   = @views          k̄[1:nx], k̄[nx+1:2*nx]    
+        a0next_Z̃ = @views       A0_Z̃[(1 + na*(j-1)):(na*(j-1) + na)]
+        ŝk       = @views        geq[(1 + nx*(j-1)):(nx*j)]
+        k̇1, k̇2   = @views          k̄[1:nx], k̄[nx+1:2nx]  
+        q1, q2   = @views          q̄[1:na], q̄[na+1:2na]
         d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
-            model.f!(k̇1, x̂d_Z̃, û0, d0, model.p)
+            fq!(k̇1, q1, model, x̂d_Z̃, a0, û0, d0)
         else
             k̇1 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k2 of of the last iter. j-1
         end
         if h < 1
-            model.f!(k̇2, x̂dnext_Z̃, û0, d0next, model.p)
+            fq!(k̇2, q2, model, x̂dnext_Z̃, a0next_Z̃, û0, d0next)
         else
             # special case: û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k
             û0next = @views j ≥ Nk ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
-            model.f!(k̇2, x̂dnext_Z̃, û0next, d0next, model.p)
+            fq!(k̇2, q2, model, x̂dnext_Z̃, a0next_Z̃, û0next, d0next)
         end
-        ŝdnext  .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
-        ŝdnext .+= ŵd
+        ŝk  .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
+        ŝk .+= ŵd
     end
     Nk < He && (geq[nx*Nk+1:end] .= 0)
     return geq
@@ -1729,18 +1738,18 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , Û0, K̄,
-        estim::MovingHorizonEstimator, model::NonLinModel, ::OrthogonalCollocation, 
-        x̂0arr, _ , Z̃
+        geq, _ , _ , Û0, K̄, Q̄,
+        estim::MovingHorizonEstimator, model::SimModel, ::OrthogonalCollocation, 
+        x̂0arr, a0arr, _ , Z̃
     ) -> geq
 
-Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocation`](@ref).
+Nonlinear MHE equality constrains for [`SimModel`](@ref) and [`OrthogonalCollocation`](@ref).
 
 By introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the defects between
 the deterministic state derivative at the ``n_o`` collocation points and the model dynamics
 are computed by:
 ```math
-\mathbf{ŝ_k}(ℓ+j)                                                                                 
+\mathbf{ŝ_k̄}(ℓ+j)                                                                                 
     = \mathbf{M_o} \begin{bmatrix}                                          
         \mathbf{k}_1(ℓ+j) - \mathbf{x̂_d}(ℓ+j)                       \\
         \mathbf{k}_2(ℓ+j) - \mathbf{x̂_d}(ℓ+j)                       \\
@@ -1760,9 +1769,9 @@ stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@r
 estimated process noise ``\mathbf{ŵ}(ℓ+j)`` are incorporated in the continuity constraint.
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , Û0, K̄,
-    estim::MovingHorizonEstimator, model::NonLinModel, transcription::OrthogonalCollocation, 
-    x̂0arr, _ , Z̃
+    geq, _ , _ , Û0, K̄, Q̄,
+    estim::MovingHorizonEstimator, model::SimModel, transcription::OrthogonalCollocation, 
+    x̂0arr, a0arr, _ , Z̃
 )
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
     nx̂, He = estim.nx̂, estim.He
@@ -1817,4 +1826,4 @@ function con_nonlinprogeq_mhe!(
 end
 
 "No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
-con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::SimModelODE, ::TranscriptionMethod, _,_,_) = geq
+con_nonlinprogeq_mhe!(geq,_,_,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod,_,_,_,_) = geq

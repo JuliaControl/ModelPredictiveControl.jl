@@ -404,6 +404,10 @@ end
 get_na(model::NonLinModelDAE) = model.na
 get_na(model::SimModel) = 0
 
+"Get length of the `ā` vector with all the algebraic variable collocation pts."
+get_nā(model::NonLinModelDAE, transcription::CollocationMethod) = model.nx*transcription.no
+get_nā(::SimModel, ::TranscriptionMethod) = 0
+
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."
 function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
     return nx + transcription.no*nx + na + transcription.no*na
@@ -679,7 +683,7 @@ function con_nonlinprogeq!(
 )
     nx, na = model.nx, model.na
     Mo, no =  model.Mo, transcription.no
-    nk̄, nā = get_nk̄(model, transcription), no*na
+    nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     a0_Z, k̄_Z, ā_Z = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
     q0, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)] 
     @views model.fq!(k̄[1:nx], q0, x0, a0_Z, u0, d0, model.p)
@@ -765,6 +769,12 @@ function h!(y0, model::NonLinModelDAE, x0, d0, p)
     model.h!(y0, x0, a0, d0, p)
     return nothing
 end
+
+"Call `model.fq!` for [`NonLinModelDAE`](@ref) or `model.f!` for [`NonLinModel`](@ref)."
+function fq!(ẋ0, q0, model::NonLinModelDAE, x0, a0, u0, d0)
+    return model.fq!(ẋ0, q0, x0, a0, u0, d0, model.p)
+end
+fq!(ẋ0, _ , model::NonLinModel, x0, _ , u0, d0)= model.f!(ẋ0, x0, u0, d0, model.p)
 
 function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
     mul!(model.Fs, model.Ks, model.x0_optim)
