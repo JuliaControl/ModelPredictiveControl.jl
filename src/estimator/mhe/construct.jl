@@ -173,7 +173,7 @@ struct MovingHorizonEstimator{
             CE<:KalmanEstimator{NT}
         }
         nu, ny, nd = model.nu, model.ny, model.nd
-        nk̄ = get_nk̄(model, transcription)
+        nk̄, na = get_nk̄(model, transcription), get_na(model)
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
@@ -204,7 +204,7 @@ struct MovingHorizonEstimator{
             ES, GS, JS, BS, 
             gc!, nc
         )
-        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
+        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
         # dummy values, updated before optimization:
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
@@ -221,7 +221,9 @@ struct MovingHorizonEstimator{
         test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p, direct)
         # force computation of derivatives for the first NLP iteration:
         force∇J, force∇g, force∇geq = [true], [true], [true]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄, He, nŵ, nε, transcription)
+        buffer = StateEstimatorBuffer{NT}(
+            nu, nx̂, nym, ny, nd, nk̄, na, He, nŵ, nε, transcription
+        )
         estim = new{NT, SM, KC, TM, JM, GB, JB, HB, PT, GCfunc, CE}(
             model, transcription, optim, con, 
             gradient, jacobian, hessian,
@@ -648,11 +650,16 @@ function default_optim_mhe(model::SimModel, nc)
 end
 
 "Default arrival covariance estimator for MHE, depending on the model type only."
-function default_covestim_mhe(model::SimModelODE, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     if model isa LinModel
         return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
-    else
+    elseif model isa NonLinModel
         return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    else
+        nx, nu, ny = model.nx, model.nu, model.ny
+        A, Bu, C = 0.1*I(nx), ones(nx, nu), ones(ny, nx)
+        dummy_model = LinModel(A, Bu, C, 0, 0, model.Ts)
+        return SteadyKalmanFilter(dummy_model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
     end
 end
 
@@ -1084,8 +1091,8 @@ and ``\mathbf{0}`` is properly sized for the `transcription` instance.
 function init_ZtoŴ(
     model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
 ) where {NT<:Real}
-    nk̄ = get_nk̄(model, transcription)
-    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
+    nk̄, na = get_nk̄(model, transcription), get_na(model)
+    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
     Tŵ = [spzeros(NT, nŴ, nZ-nŴ) I]
     return Tŵ
 end
@@ -1311,8 +1318,8 @@ function init_boxconstraint_mhe(
     x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
     A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
-    nk̄ = get_nk̄(model, transcription)
-    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
+    nk̄, na = get_nk̄(model, transcription), get_na(model)
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
     Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
     nε > 0 && (Z̃min[begin] = 0)
     nŴ = nŵ*He

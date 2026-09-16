@@ -129,17 +129,37 @@ function ĥ!(ŷ0, estim::StateEstimator, ::LinModel, x̂0, d0)
 end
 
 """
-    ĥ!(ŷ0, model::SimModelODE, Cs_y, x̂0, d0)
+    ĥ!(ŷ0, model::SimModelODE, Cs_y::AbstractMatrix, x̂0, d0)
 
 Same than [`ĥ!`](@ref) for [`SimModelODE`](@ref) but without the `estim` argument.
 """
-function ĥ!(ŷ0, model::SimModelODE, Cs_y, x̂0, d0)
+function ĥ!(ŷ0, model::SimModelODE, Cs_y::AbstractMatrix, x̂0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
     h!(ŷ0, model, xd, d0, model.p)  # y0 = h(xd, d0)
     mul!(ŷ0, Cs_y, xs, 1, 1)        # ŷ0 = y0 + Cs_y*xs
     return nothing
 end
+
+"""
+    ĥ!(ŷ0, estim::StateEstimator, model::NonLinModelDAE, a0, x̂0, d0)
+
+Same than [`ĥ!`](@ref) for [`NonLinModelDAE`](@ref) but with the algebraic variable `a0`.
+"""
+function ĥ!(ŷ0, estim::StateEstimator, model::NonLinModelDAE, a0, x̂0, d0)
+    # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
+    @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    model.h!(ŷ0, xd, a0, d0, model.p)
+    mul!(ŷ0, estim.Cs_y, xs, 1, 1)        # ŷ0 = y0 + Cs_y*xs
+    return nothing
+end
+
+"""
+    ĥ!(ŷ0, estim::StateEstimator, model::SimModelODE, _ , x̂0, d0)
+
+Ignore the algebraic variable argument for other [`SimModelODE`](@ref) types.
+"""
+ĥ!(ŷ0, estim::StateEstimator, model::SimModelODE, _ , x̂0, d0) = ĥ!(ŷ0, model, estim, x̂0, d0)
 
 """
     disturbedinput!(Û0, estim::StateEstimator, x̂0, X̂0, U0) -> Û0

@@ -152,7 +152,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
     x̂0arr = buffer.x̂
     x̄, Û0, K = Vector{NT}(undef, nx̂), Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk)
-    x̂0arr = getarrival!(x̂0arr, estim, Z̃)
+    x̂0arr = getx̂0arr!(x̂0arr, estim, Z̃)
     Ŵ     = getŴ!(Ŵ, estim, estim.transcription, Z̃)
     x̄     = getx̄!(x̄, estim, x̂0arr)
     V̂, X̂0 = predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃)
@@ -465,11 +465,20 @@ Does nothing if `model` is not a [`LinModel`](@ref).
 """
 initpred!(::MovingHorizonEstimator, ::SimModel) = nothing
 
-"Get the estimated state at arrival from the decision vector `Z̃`."
-function getarrival!(x̂0arr, estim::MovingHorizonEstimator, Z̃) 
-    nx̃ = estim.nε + estim.nx̂
-    return x̂0arr .= @views Z̃[nx̃-estim.nx̂+1:nx̃]
+"Get the estimated state at arrival `x̂0arr` from the decision vector `Z̃`."
+function getx̂0arr!(x̂0arr, estim::MovingHorizonEstimator, Z̃) 
+    return x̂0arr .= @views Z̃[(estim.nε + 1):(estim.nε + estim.nx̂)]
 end
+
+"Get algebraic variable at arrival `a0arr` from the decision vector `Z̃`."
+function geta0arr!(
+    a0arr, estim::MovingHorizonEstimator, ::CollocationMethod, Z̃
+)
+    na = get_na(estim.model)
+    nx̃_nX̂ = estim.nε + estim.nx̂ + estim.nx̂*estim.He 
+    return a0arr .= @views Z̃[(nx̃_nX̂ + 1):(nx̃_nX̂ + na)]
+end
+geta0arr!(a0arr, ::MovingHorizonEstimator, ::TranscriptionMethod, _ ) = a0arr
 
 "Get the estimation error at arrival from the estimated state at arrival `x̂0arr`."
 getx̄!(x̄, estim::MovingHorizonEstimator, x̂0arr) = (x̄ .= estim.x̂0arr_old .- x̂0arr)
@@ -477,8 +486,8 @@ getx̄!(x̄, estim::MovingHorizonEstimator, x̂0arr) = (x̄ .= estim.x̂0arr_old
 "Get the estimated process noise from the decision vector `Z̃`."
 function getŴ!(Ŵ, estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃)
     He, nx̂, nŵ = estim.He, estim.nx̂, estim.nx̂
-    nk̄ = get_nk̄(estim.model, transcription)
-    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
+    nk̄, na = get_nk̄(estim.model, transcription), get_na(estim.model)
+    nZ̃ = estim.nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
     Ŵ .= @views Z̃[(nZ̃ - nŵ*He + 1):end] 
     return Ŵ
 end
@@ -648,7 +657,7 @@ function getstate!(estim::MovingHorizonEstimator{NT}, Z̃) where NT<:Real
     V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
     Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
-    getarrival!(x̂0arr, estim, Z̃)
+    getx̂0arr!(x̂0arr, estim, Z̃)
     predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃)
     estim.x̂0 .= @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     return nothing
@@ -855,7 +864,7 @@ This function is not used for the optimization, but it can be useful to predict 
 estimated outputs ``\mathbf{ŷ_0}(k-j+1)`` from ``j=N_k`` to ``1``, stored in-place in the
 `Ŷ0` vector. The argument `X̂0` is computed from [`predict_mhe!`](@ref) and contains the
 estimated states from ``k-N_k+1+p`` to ``k+p``. The argument `x̂0arr` is computed from
-[`getarrival!`](@ref) and contains the arrival state estimate for the time step ``k-N_k+p``. 
+[`getx̂0arr!`](@ref) and contains the arrival state estimate for the time step ``k-N_k+p``. 
 """
 function predict_outputs_mhe!(Ŷ0, estim::MovingHorizonEstimator, X̂0, x̂0arr)
     model = estim.model
@@ -875,7 +884,7 @@ end
 
 """
     update_predictions!(
-        x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq,
+        x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ā, Ŷ0, gc, g, geq, 
         estim::MovingHorizonEstimator, Z̃
     ) -> nothing
 
@@ -884,18 +893,24 @@ Update in-place the vectors for the predictions of `estim` estimator at decision
 The method mutates all the arguments before `estim` argument.
 """
 function update_predictions!(
-    x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim::MovingHorizonEstimator, Z̃
+    x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ā, Ŷ0, gc, g, geq, 
+    estim::MovingHorizonEstimator, Z̃
 )
     model, transcription = estim.model, estim.transcription
-    x̂0arr = getarrival!(x̂0arr, estim, Z̃)
-    x̄     = getx̄!(x̄, estim, x̂0arr)
-    Ŵ     = getŴ!(Ŵ, estim, transcription, Z̃)
-    V̂, X̂0 = predict_mhe!(V̂, X̂0, Û0, K̄, Ŷ0, estim, model, transcription, x̂0arr, Ŵ, Z̃)
+    x̂0arr     = getx̂0arr!(x̂0arr, estim, Z̃)
+    a0arr     = geta0arr!(a0arr, estim, estim.transcription, Z̃)
+    x̄         = getx̄!(x̄, estim, x̂0arr)
+    Ŵ         = getŴ!(Ŵ, estim, transcription, Z̃)
+    V̂, X̂0, A0 = predict_mhe!(
+        V̂, X̂0, A0, Û0, K̄, Ŷ0, estim, model, transcription, x̂0arr, a0arr, Ŵ, Z̃
+    )
     Ŵe, V̂e, X̂e = extended_vectors!(Ŵe, V̂e, X̂e, estim, Ŵ, V̂, X̂0, x̂0arr)
     ε   = getslack(estim, Z̃)
     gc  = con_custom_mhe!(gc, estim, X̂e, V̂e, Ŵe, x̄, ε) 
     g   = con_nonlinprog_mhe!(g, estim, model, transcription, X̂0, V̂, gc, ε)
-    geq = con_nonlinprogeq_mhe!(geq, X̂0, Û0, K̄, estim, model, transcription, x̂0arr, Ŵ, Z̃)
+    geq = con_nonlinprogeq_mhe!(
+        geq, X̂0, A0, Û0, K̄, Ā, estim, model, transcription, x̂0arr, a0arr, Ŵ, Z̃
+    )
     return nothing
 end
 

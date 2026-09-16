@@ -400,6 +400,10 @@ function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
     return iszero_Ha
 end
 
+"Get the number of algebraic variable `na` in `model`."
+get_na(model::NonLinModelDAE) = model.na
+get_na(model::SimModel) = 0
+
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."
 function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
     return nx + transcription.no*nx + na + transcription.no*na
