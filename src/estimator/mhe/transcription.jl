@@ -1,7 +1,13 @@
 "Get the number of elements in the optimization decision vector `Z`"
-get_nZ_mhe(::SingleShooting, He, nx̂, _ , nŵ) = nx̂ + nŵ*He
-get_nZ_mhe(::TranscriptionMethod, He, nx̂, _ , nŵ) = nx̂ + nx̂*He + nŵ*He
-get_nZ_mhe(::OrthogonalCollocation, He, nx̂, nk̄, nŵ) = nx̂ + nx̂*He + nk̄*He + nŵ*He
+get_nZ_mhe(::SingleShooting, He, nx̂ , _ , nŵ, ::Any=0) = nx̂ + nŵ*He
+get_nZ_mhe(::MultipleShooting, He, nx̂ , _ , nŵ, ::Any=0) = nx̂ + nx̂*He + nŵ*He
+function get_nZ_mhe(::TrapezoidalCollocation, He, nx̂, _ , nŵ, na=0)
+    return nx̂ + nx̂*He + na + na*He + nŵ*He
+end
+function get_nZ_mhe(transcription::OrthogonalCollocation, He, nx̂, nk̄, nŵ, na=0) 
+    nā = na*transcription.no
+    return nx̂ + nx̂*He + na + na*He + nk̄*He + nā*He + nŵ*He
+end
 
 "Get the element indices in the decision vector `Z̃` that applies to a `Nk` window length."
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::TranscriptionMethod)
