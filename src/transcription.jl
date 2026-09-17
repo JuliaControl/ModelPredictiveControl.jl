@@ -175,21 +175,27 @@ transcription method.
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                               \\
         \mathbf{a_0}(k+0)                                               \\
-        \mathbf{a_0}(k+1)                                               \end{bmatrix}
+        \mathbf{a_1}(k+0)                                               \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                     \\
         \mathbf{X̂_0}                                                    \\
-        \mathbf{a_0}(k+0)                                               \\
-        \mathbf{A_0}                                                    \end{bmatrix}
-    \quad \text{and} \quad
+        \mathbf{A_0}                                                    \\
+        \mathbf{Ā}                                                      \end{bmatrix}
+    \: , \quad
     \mathbf{A_0} = \begin{bmatrix}
         \mathbf{a_0}(k+1)                                               \\
         \mathbf{a_0}(k+2)                                               \\
         \vdots                                                          \\
         \mathbf{a_0}(k+H_p)                                             \end{bmatrix}
+    \quad \text{and} \quad
+    \mathbf{Ā} = \begin{bmatrix}
+        \mathbf{a_1}(k+1)                                               \\
+        \mathbf{a_1}(k+2)                                               \\
+        \vdots                                                          \\
+        \mathbf{a_1}(k+H_p)                                             \end{bmatrix}
     ```
     and, for [`MovingHorizonEstimator`](@ref) with DAEs:
     ```math
@@ -202,12 +208,18 @@ transcription method.
         \mathbf{0_a}                                                    \\
         \mathbf{Ŵ}                                                      \\
         \mathbf{0_ŵ}                                                    \end{bmatrix}
-    \quad \text{and} \quad
+    \: , \quad
     \mathbf{A_0} = \begin{bmatrix}
         \mathbf{a_0}(k-N_k+p+1)                                         \\
         \mathbf{a_0}(k-N_k+p+2)                                         \\
         \vdots                                                          \\
         \mathbf{a_0}(k+p)                                               \end{bmatrix}
+    \quad \text{and} \quad
+    \mathbf{Ā} = \begin{bmatrix}
+        \mathbf{a_1}(k-N_k+p+1)                                         \\
+        \mathbf{a_1}(k-N_k+p+2)                                         \\
+        \vdots                                                          \\
+        \mathbf{a_1}(k+p)                                               \end{bmatrix}
     ```
     See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision

@@ -664,20 +664,34 @@ function update_predictions!(k̄, geq, model, Z)
     return nothing
 end
 
+"""
+    con_nonlinprogeq!(
+        geq, k̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
+    ) -> geq
+
+TBW
+"""
 function con_nonlinprogeq!(
     geq, k̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
 )
     nx, na = model.nx, model.na
     Ts = model.Ts
-    x0next_Z, a0_Z, a0next_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
-    sknext, q1, q2  = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
-    k̇1, k̇2 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
-    model.fq!(k̇1, q1, x0,       a0_Z,     u0, d0, model.p)
-    model.fq!(k̇2, q2, x0next_Z, a0next_Z, u0, d0, model.p)
-    sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇1 + k̇2)
+    x0next_Z, a0_Z, a1_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
+    sknext, q0, q1  = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
+    k̇0, k̇1 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
+    model.fq!(k̇0, q0, x0,       a0_Z, u0, d0, model.p)
+    model.fq!(k̇1, q1, x0next_Z, a1_Z, u0, d0, model.p)
+    sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇0 + k̇1)
     return geq
 end
 
+"""
+    con_nonlinprogeq!(
+        geq, k̄, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
+    ) -> geq
+
+TBW
+"""
 function con_nonlinprogeq!(
     geq, k̄, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
 )
