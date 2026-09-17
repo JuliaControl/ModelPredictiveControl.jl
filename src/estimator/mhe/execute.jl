@@ -884,7 +884,7 @@ end
 
 """
     update_predictions!(
-        x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ā, Ŷ0, gc, g, geq, 
+        x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, 
         estim::MovingHorizonEstimator, Z̃
     ) -> nothing
 
@@ -893,7 +893,7 @@ Update in-place the vectors for the predictions of `estim` estimator at decision
 The method mutates all the arguments before `estim` argument.
 """
 function update_predictions!(
-    x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ā, Ŷ0, gc, g, geq, 
+    x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, 
     estim::MovingHorizonEstimator, Z̃
 )
     model, transcription = estim.model, estim.transcription
@@ -909,7 +909,7 @@ function update_predictions!(
     gc  = con_custom_mhe!(gc, estim, X̂e, V̂e, Ŵe, x̄, ε) 
     g   = con_nonlinprog_mhe!(g, estim, model, transcription, X̂0, V̂, gc, ε)
     geq = con_nonlinprogeq_mhe!(
-        geq, X̂0, A0, Û0, K̄, Ā, estim, model, transcription, x̂0arr, a0arr, Ŵ, Z̃
+        geq, X̂0, A0, Û0, K̄, estim, model, transcription, x̂0arr, a0arr, Ŵ, Z̃
     )
     return nothing
 end
