@@ -402,10 +402,11 @@ end
 
 "Get the number of algebraic variable `na` in `model`."
 get_na(model::NonLinModelDAE) = model.na
-get_na(model::SimModel) = 0
+get_na(::SimModel) = 0
 
-"Get length of the `ā` vector with all the algebraic variable collocation pts."
-get_nā(model::NonLinModelDAE, transcription::CollocationMethod) = model.nx*transcription.no
+"Get length of the `ā` vector with all the algebraic variable collocation pts (excl. τ=1)."
+get_nā(model::NonLinModelDAE, transcription::OrthogonalCollocation) = model.na*transcription.no
+get_nā(model::NonLinModelDAE, ::TrapezoidalCollocation) = model.na
 get_nā(::SimModel, ::TranscriptionMethod) = 0
 
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."
