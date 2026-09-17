@@ -192,10 +192,10 @@ transcription method.
         \mathbf{a_0}(k+H_p)                                             \end{bmatrix}
     \quad \text{and} \quad
     \mathbf{Ā} = \begin{bmatrix}
-        \mathbf{a_1}(k+1)                                               \\
-        \mathbf{a_1}(k+2)                                               \\
+        \mathbf{a}(k+0)                                                 \\
+        \mathbf{a}(k+1)                                                 \\
         \vdots                                                          \\
-        \mathbf{a_1}(k+H_p)                                             \end{bmatrix}
+        \mathbf{a}(k+H_p-1)                                             \end{bmatrix}
     ```
     and, for [`MovingHorizonEstimator`](@ref) with DAEs:
     ```math
@@ -217,14 +217,16 @@ transcription method.
         \mathbf{a_0}(k+p)                                               \end{bmatrix}
     \quad \text{and} \quad
     \mathbf{Ā} = \begin{bmatrix}
-        \mathbf{a_1}(k-N_k+p+1)                                         \\
-        \mathbf{a_1}(k-N_k+p+2)                                         \\
+        \mathbf{a}(k-N_k+p)                                             \\
+        \mathbf{a}(k-N_k+p)                                             \\
         \vdots                                                          \\
-        \mathbf{a_1}(k+p)                                               \end{bmatrix}
+        \mathbf{a}(k)                                                   \end{bmatrix}
     ```
     See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
-    variables at the beginning (``N_k < H_e``).
+    variables at the beginning (``N_k < H_e``). The predicted outputs are computed from
+    the algebraic variables in ``\mathbf{A_0}``, while the values in ``\mathbf{Ā}`` are
+    strictly for the `fq!` function.
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
@@ -323,10 +325,10 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     algebraic variables at the collocation points:
     ```math
     \mathbf{ā}(k+j) = \begin{bmatrix}
-        \mathbf{ā}_1(k+j)                                           \\
-        \mathbf{ā}_2(k+j)                                           \\
+        \mathbf{a}_1(k+j)                                           \\
+        \mathbf{a}_2(k+j)                                           \\
         \vdots                                                      \\
-        \mathbf{ā}_{n_o}(k+j)                                       \end{bmatrix}
+        \mathbf{a}_{n_o}(k+j)                                       \end{bmatrix}
     ```
     Although not strictly needed, the current algebraic variable ``\mathbf{a_0}(k+0)`` is
     still included in the decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
@@ -387,7 +389,9 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{ā}(k+p-1)                                           \end{bmatrix}
     ```
     All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision variables at
-    the beginning in the [`MovingHorizonEstimator`](@ref) (``N_k < H_e``).
+    the beginning in the [`MovingHorizonEstimator`](@ref) (``N_k < H_e``). The predicted
+    outputs are computed from the algebraic variables in ``\mathbf{A_0}``, while the values
+    in ``\mathbf{Ā}`` are strictly for the `fq!` function.
     
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
