@@ -1660,12 +1660,12 @@ By introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the de
 state defects are computed with:
 ```math
 \mathbf{ŝ_k}(ℓ+j) = \mathbf{x̂_d}(ℓ+j) + 0.5 T_s [\mathbf{k̇}_1(ℓ+j) + \mathbf{k̇}_2(ℓ+j)] 
-                       + \mathbf{ŵ_d}(ℓ+j) - \mathbf{x̂_d}(ℓ+j+1)                                              
+                      - \mathbf{x̂_d}(ℓ+j+1) + \mathbf{ŵ_d}(ℓ+j)                                              
 ```
 for ``j = 0, 1, ... , N_k-1``, and in which ``\mathbf{x̂_d}`` and ``\mathbf{ŵ_d}`` are the
 deterministic state and process noise estimates, respectively, extracted from the decision
-variable `Z̃`. The ``\mathbf{k̇}`` coefficients are  evaluated from the continuous-time
-function `model.f!` and:
+variable `Z̃`. The ``\mathbf{k̇}`` coefficients are evaluated from the continuous-time
+function [`fq!`](@ref) and:
 ```math
 \begin{aligned}
 \mathbf{k̇}_1(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a_0}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d̂_0}(ℓ+j),   \mathbf{p}\Big) \\
@@ -1673,7 +1673,14 @@ function `model.f!` and:
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
-is defined in [`f̂!`](@ref) documentation.
+is defined in [`f̂!`](@ref) documentation. The algebraic variable residuals for 
+[`NonLinModelDAE`](@ref) are also computed from ``j = 0, 1, ... , N_k-1`` and:
+```math
+\begin{aligned}
+\mathbf{q}_1(ℓ+j) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a_0}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d̂_0}(ℓ+j),   \mathbf{p}\Big) \\
+\mathbf{q}_2(ℓ+j) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{a_0}(ℓ+j+1), \mathbf{û_0}(ℓ+j+h), \mathbf{d̂_0}(ℓ+j+1), \mathbf{p}\Big) 
+\end{aligned}
+```
 """
 function con_nonlinprogeq_mhe!(
     geq, _ , _ , Û0, K̄, Q̄,
@@ -1685,17 +1692,16 @@ function con_nonlinprogeq_mhe!(
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     Ts = model.Ts
+    na = get_na(model)
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     nw = nŵ - nxs
     nx̃ = estim.nε + nx̂
     nx̃_nX̂ = nx̃ + nx̂*estim.He
-    p = estim.direct ? 0 : 1
+    nŜk̄, nQ̄ = nx*He, 2*na*He 
+    i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃, A0_Z̃ = @views Z̃[(nx̃+1):(nx̃_nX̂)], Z̃[(1 + nx̃_nX̂):(nx̃_nX̂ + na*Nk)]
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
-
-    # TODO: continue here, chose how to store ŝk, q1 and q2 in geq and choose if 
-    # TODO: precall fq! before the loop for the first one.
-    #@views fq!(K̄[1:nx], q0, model, x̂0arr[1:nx], a0arr, Û0[1:nu], estim.D0[])
+    Ŝk̄, Q̄ = @views geq[1:nŜk̄], geq[(nŜk̄+1):nQ̄] 
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
@@ -1704,23 +1710,24 @@ function con_nonlinprogeq_mhe!(
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             a0   = @views A0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
         end
-        d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
+        d0       = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         k̄        = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         q̄        = @views          Q̄[(1 + nā*(j-1)):(nā*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
         x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         a0next_Z̃ = @views       A0_Z̃[(1 + na*(j-1)):(na*(j-1) + na)]
-        ŝk       = @views        geq[(1 + nx*(j-1)):(nx*j)]
+        ŝk       = @views         Ŝk̄[(1 + nx*(j-1)):(nx*j)]
         k̇1, k̇2   = @views          k̄[1:nx], k̄[nx+1:2nx]  
         q1, q2   = @views          q̄[1:na], q̄[na+1:2na]
-        d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
+        d0next   = @views   estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
             fq!(k̇1, q1, model, x̂d_Z̃, a0, û0, d0)
         else
-            k̇1 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k2 of of the last iter. j-1
+            k̇1 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇2 of the last iter. j-1
+            q1 .= @views Q̄[(1 + nā*(j-1)-na):(nā*(j-1))] # q2 of the last iter. j-1
         end
         if h < 1
             fq!(k̇2, q2, model, x̂dnext_Z̃, a0next_Z̃, û0, d0next)
@@ -1729,10 +1736,12 @@ function con_nonlinprogeq_mhe!(
             û0next = @views j ≥ Nk ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
             fq!(k̇2, q2, model, x̂dnext_Z̃, a0next_Z̃, û0next, d0next)
         end
-        ŝk  .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
-        ŝk .+= ŵd
+        ŝk .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2) + ŵd
     end
-    Nk < He && (geq[nx*Nk+1:end] .= 0)
+    if Nk < He
+        Ŝk[(nx*Nk + 1):end] .= 0
+        Q̄[(nā*Nk + 1):end]  .= 0
+    end
     return geq
 end
 
