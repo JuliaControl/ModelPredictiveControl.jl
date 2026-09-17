@@ -1706,7 +1706,7 @@ function con_nonlinprogeq_mhe!(
     Ts = model.Ts
     na = get_na(model)
     nk̄ = get_nk̄(model, transcription)
-    nw = nŵ - nxs
+    nw          = nŵ - nxs
     nx̃          = estim.nε + nx̂
     nx̃_nX̂       = nx̃ + nx̂*estim.He
     nx̃_nX̂_na_nA = nx̃_nX̂ + na + na*estim.He
@@ -1761,7 +1761,7 @@ function con_nonlinprogeq_mhe!(
         end
         ŝk .= @. x̂d_Z̃ - x̂dnext + 0.5*Ts*(k̇1 + k̇2) + ŵd
     end
-    if Nk < He
+    if Nk < He 
         Ŝk[(nx*Nk + 1):end] .= 0
         Q0[(na*Nk + 1):end] .= 0
         Q̄[(na*Nk + 1):end]  .= 0
