@@ -205,13 +205,13 @@ transcription method.
     \quad \text{and} \quad
     \mathbf{A_0} = \begin{bmatrix}
         \mathbf{a_0}(k-N_k+p+1)                                         \\
-        \mathbf{a_0}(k-N_k+p+1)                                         \\
+        \mathbf{a_0}(k-N_k+p+2)                                         \\
         \vdots                                                          \\
         \mathbf{a_0}(k+p)                                               \end{bmatrix}
     ```
     See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
-    variables at the beginning (``N_k < He``).
+    variables at the beginning (``N_k < H_e``).
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
