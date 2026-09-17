@@ -1739,27 +1739,27 @@ function con_nonlinprogeq_mhe!(
         q1       = @views          Q̄[(1 + na*(j-1)):(na*j)]
         q2       = @views         Q0[(1 + na*(j-1)):(na*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
-        x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
-        a_Z̃      = @views        Ā_Z̃[(1 + na*(j-1)):(na*(j-1) + na)]
+        x̂dnext   = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        ā        = @views        Ā_Z̃[(1 + na*(j-1)):(na*(j-1) + na)]
         ŝk       = @views         Ŝk̄[(1 + nx*(j-1)):(nx*j)]
         k̇1, k̇2   = @views          k̄[1:nx], k̄[nx+1:2nx]  
         d0next   = @views   estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
-            fq!(k̇1, q1, model, x̂d_Z̃, a0, û0, d0)
+            fq!(k̇1, q1, model, x̂d_Z̃, ā, û0, d0)
         else
-            k̇1 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇2 of the last iter. j-1
-            q1 .= @views Q̄[(1 + nā*(j-1)-na):(nā*(j-1))] # q2 of the last iter. j-1
+            k̇1 .= @views  K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇2 of the last iter. j-1
+            q1 .= @views Q0[(1 + na*(j-1)-na):(na*(j-1))] # q2 of the last iter. j-1
         end
         if h < 1
-            fq!(k̇2, q2, model, x̂dnext_Z̃, a0next_Z̃, û0, d0next)
+            fq!(k̇2, q2, model, x̂dnext, a0, û0, d0next)
         else
             # special case: û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k
             û0next = @views j ≥ Nk ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
-            fq!(k̇2, q2, model, x̂dnext_Z̃, a0next_Z̃, û0next, d0next)
+            fq!(k̇2, q2, model, x̂dnext, a0, û0next, d0next)
         end
-        ŝk .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2) + ŵd
+        ŝk .= @. x̂d_Z̃ - x̂dnext + 0.5*Ts*(k̇1 + k̇2) + ŵd
     end
     if Nk < He
         Ŝk[(nx*Nk + 1):end] .= 0
