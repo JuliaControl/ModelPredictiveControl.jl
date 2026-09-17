@@ -203,9 +203,10 @@ transcription method.
         \mathbf{x̂_0}(k-N_k+p)                                           \\  
         \mathbf{X̂_0}                                                    \\         
         \mathbf{0_x̂}                                                    \\
-        \mathbf{a_0}(k-N_k+p)                                           \\
         \mathbf{A_0}                                                    \\
         \mathbf{0_a}                                                    \\
+        \mathbf{Ā}                                                      \\
+        \mathbf{0_ā}                                                    \\
         \mathbf{Ŵ}                                                      \\
         \mathbf{0_ŵ}                                                    \end{bmatrix}
     \: , \quad
