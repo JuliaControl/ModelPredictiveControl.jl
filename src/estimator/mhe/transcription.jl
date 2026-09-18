@@ -776,7 +776,6 @@ function init_matconstraint_mhe(
         nx̂ = length(x̂0min)
         nAeq = size(Aeq, 1)                  # number of linear equality constraints
         neq  = nZ̃ - nŴ - nε - nx̂ - nAeq      # number of nonlinear equality constraints
-        @show neq
     end
     i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
     i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
@@ -903,9 +902,9 @@ function linconstraint!(
     return nothing
 end
 
-"Set `b` excluding sensor noise bounds if for `NonLinModel` and non-`SingleShooting`."
+"Set `b` excluding sensor noise bounds if not a `LinModel` and non-`SingleShooting`."
 function linconstraint!(
-    estim::MovingHorizonEstimator, ::NonLinModel, ::TranscriptionMethod
+    estim::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod
 )
     nx̂, nŵ = estim.nx̂, estim.nx̂
     # --- truncate vector and matrices if necessary ---
@@ -1007,7 +1006,7 @@ end
 
 """
     linconstrainteq!(
-        estim::MovingHorizonEstimator, ::SimModelODE, transcription::TranscriptionMethod
+        estim::MovingHorizonEstimator, ::SimModel, transcription::TranscriptionMethod
     )
 
 By default, only update `Aeq` when `Nk < He` for other [`TranscriptionMethod`](@ref).
@@ -1017,7 +1016,7 @@ vector is only zeros for this specific case. See [`init_defectmat_mhe`](@ref) fo
 equations.
 """
 function linconstrainteq!(
-    estim::MovingHorizonEstimator, ::SimModelODE, transcription::TranscriptionMethod
+    estim::MovingHorizonEstimator, ::SimModel, transcription::TranscriptionMethod
 )
     optim, con, Nk = estim.optim, estim.con, estim.Nk[]
     nŝ = size(con.Aeq, 1) ÷ estim.He # number of state defects per time step
@@ -1051,7 +1050,7 @@ function linconstrainteq!(
     return nothing
 end
 "No linear equality constraints for all cases of [`SingleShooting`](@ref)."
-linconstrainteq!(::MovingHorizonEstimator, ::SimModelODE, ::SingleShooting) = nothing
+linconstrainteq!(::MovingHorizonEstimator, ::SimModel, ::SingleShooting) = nothing
 
 @doc raw"""
     set_warmstart_mhe!(
@@ -1305,13 +1304,16 @@ function set_warmstart_mhe!(
     Z̃s[(nx̃+nX̂+1):(nx̃+nX̂+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nX̂+nŵ+1):(nx̃+nX̂+nŴ)]
     Z̃s[(nx̃+nX̂+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
-    x̄ = buffer.x̂
-    V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
-    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
+    x̄, a0arr = buffer.x̂, buffer.a
+    V̂, Ŵ, X̂0, A0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.Ŷ
+    Û0, K̄ = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     x̂0arr = estim.x̂0arr_old
+    a0arr = geta0arr!(a0arr, estim, transcription, Z̃s)
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
-    predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃s)
+    predict_mhe!(
+        V̂, X̂0, A0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃s
+    )
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+nX̂+1:end] .= 0 # Ŵ = 0
@@ -1354,7 +1356,7 @@ end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, A0, _ , _ , 
+        V̂, X̂0, A0, _ , _ , _ , 
         estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod, 
         _ , _ , _ , Z̃
     ) -> V̂, X̂0, A0
@@ -1762,7 +1764,7 @@ function con_nonlinprogeq_mhe!(
         ŝk .= @. x̂d_Z̃ - x̂dnext + 0.5*Ts*(k̇1 + k̇2) + ŵd
     end
     if Nk < He 
-        Ŝk[(nx*Nk + 1):end] .= 0
+        Ŝk̄[(nx*Nk + 1):end] .= 0
         Q0[(na*Nk + 1):end] .= 0
         Q̄[(na*Nk + 1):end]  .= 0
     end

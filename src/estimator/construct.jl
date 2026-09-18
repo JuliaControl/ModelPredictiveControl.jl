@@ -8,6 +8,7 @@ struct StateEstimatorBuffer{NT<:Real}
     V̂ ::Vector{NT}
     Ŵ ::Vector{NT}
     X̂ ::Vector{NT}
+    A ::Vector{NT}
     Ŷ ::Vector{NT}
     D ::Vector{NT}
     P̂ ::Matrix{NT}
@@ -37,7 +38,7 @@ function StateEstimatorBuffer{NT}(
     transcription::TranscriptionMethod = SingleShooting()
 ) where NT <: Real
     nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
-    nV̂, nŴ, nX̂, nŶ, nD = nym*He, nŵ*He, nx̂*He, ny*He, nd*(He+1)
+    nV̂, nŴ, nX̂, nA, nŶ, nD = nym*He, nŵ*He, nx̂*He, na*He, ny*He, nd*(He+1)
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)
     k̄  = Vector{NT}(undef, nk̄)
@@ -47,6 +48,7 @@ function StateEstimatorBuffer{NT}(
     V̂  = Vector{NT}(undef, nV̂)
     Ŵ  = Vector{NT}(undef, nŴ)
     X̂  = Vector{NT}(undef, nX̂)
+    A  = Vector{NT}(undef, nA)
     Ŷ  = Vector{NT}(undef, nŶ)
     D  = Vector{NT}(undef, nD)
     P̂  = Matrix{NT}(undef, nx̂, nx̂)
@@ -58,7 +60,7 @@ function StateEstimatorBuffer{NT}(
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
     return StateEstimatorBuffer{NT}(
-        u, û, k̄, x̂, a, Z̃, V̂, Ŵ, X̂, Ŷ, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
+        u, û, k̄, x̂, a, Z̃, V̂, Ŵ, X̂, A, Ŷ, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
     )
 end
 
