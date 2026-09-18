@@ -1226,8 +1226,8 @@ function set_warmstart_mhe!(
     V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
     Û0, K̄ = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     A0, Ā = Vector{NT}(undef, na*Nk), Vector{NT}(undef, nā*Nk) # TODO: remove the 2 allocations
-    x̂0arr  = estim.x̂0arr_old
-    a0arr .=  
+    x̂0arr = estim.x̂0arr_old
+    a0arr = geta0arr!(a0arr, estim, estim.transcription, Z̃s)  
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
     predict_mhe!(V̂, X̂0, A0, Û0, K̄, Ā, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃s)
