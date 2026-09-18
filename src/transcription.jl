@@ -175,7 +175,7 @@ transcription method.
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                               \\
         \mathbf{a_0}(k+0)                                               \\
-        \mathbf{a_1}(k+0)                                               \end{bmatrix}
+        \mathbf{a_0}(k+1)                                               \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
     ```math

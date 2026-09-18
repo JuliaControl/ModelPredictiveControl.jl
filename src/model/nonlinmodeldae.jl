@@ -677,11 +677,11 @@ function con_nonlinprogeq!(
 )
     nx, na = model.nx, model.na
     Ts = model.Ts
-    x0next_Z, a0_Z, a1_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
+    x0next_Z, a0_Z, a0next_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
     sknext, q0, q1  = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
     k̇0, k̇1 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
-    model.fq!(k̇0, q0, x0,       a0_Z, u0, d0, model.p)
-    model.fq!(k̇1, q1, x0next_Z, a1_Z, u0, d0, model.p)
+    model.fq!(k̇0, q0, x0,       a0_Z,     u0, d0, model.p)
+    model.fq!(k̇1, q1, x0next_Z, a0next_Z, u0, d0, model.p)
     sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇0 + k̇1)
     return geq
 end
@@ -785,7 +785,11 @@ function h!(y0, model::NonLinModelDAE, x0, d0, p)
     return nothing
 end
 
-"Call `model.fq!` for [`NonLinModelDAE`](@ref) or `model.f!` for [`NonLinModel`](@ref)."
+"""
+    fq!(ẋ0, q0, model, x0, a0, u0, d0)
+
+Call `model.fq!` for [`NonLinModelDAE`](@ref) or `model.f!` for [`NonLinModel`](@ref).
+"""
 function fq!(ẋ0, q0, model::NonLinModelDAE, x0, a0, u0, d0)
     return model.fq!(ẋ0, q0, x0, a0, u0, d0, model.p)
 end
