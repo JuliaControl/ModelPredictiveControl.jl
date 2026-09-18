@@ -1,6 +1,6 @@
 "Get the number of elements in the optimization decision vector `Z`"
-get_nZ_mhe(::SingleShooting, He, nx̂ , _ , nŵ, ::Any=0) = nx̂ + nŵ*He
-get_nZ_mhe(::MultipleShooting, He, nx̂ , _ , nŵ, ::Any=0) = nx̂ + nx̂*He + nŵ*He
+get_nZ_mhe(::SingleShooting, He, nx̂ , _ , nŵ, na=0) = nx̂ + nŵ*He
+get_nZ_mhe(::MultipleShooting, He, nx̂ , _ , nŵ, na=0) = nx̂ + nx̂*He + nŵ*He
 function get_nZ_mhe(::TrapezoidalCollocation, He, nx̂, _ , nŵ, na=0)
     return nx̂ + nx̂*He + na + na*He + na*He + nŵ*He
 end
