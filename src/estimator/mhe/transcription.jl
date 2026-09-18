@@ -1230,7 +1230,7 @@ function set_warmstart_mhe!(
     a0arr = geta0arr!(a0arr, estim, estim.transcription, Z̃s)  
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
-    predict_mhe!(V̂, X̂0, A0, Û0, K̄, Ā, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃s)
+    predict_mhe!(V̂, X̂0, A0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃s)
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+nX̂+nK̄+1:end] .= 0 # Ŵ = 0
