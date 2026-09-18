@@ -1222,7 +1222,7 @@ function set_warmstart_mhe!(
     Z̃s[(i_base+1):(i_base+nŴ-nŵ)]   .= @views estim.Z̃[(i_base+nŵ+1):(i_base+nŴ)]
     Z̃s[(i_base+nŴ-nŵ+1):end]        .= 0
     # --- verify definiteness of objective function --- 
-    x̄, a0rr = buffer.x̂, buffer.a
+    x̄, a0arr = buffer.x̂, buffer.a
     V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
     Û0, K̄ = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     A0, Ā = Vector{NT}(undef, na*Nk), Vector{NT}(undef, nā*Nk) # TODO: remove the 2 allocations
