@@ -1103,13 +1103,15 @@ function set_warmstart_mhe!(
     Z̃s[(nx̃+1):(nx̃+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nŵ+1):(nx̃+nŴ)]
     Z̃s[(nx̃+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
-    x̄ = buffer.x̂
-    V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
+    x̄, a0arr = buffer.x̂, buffer.a
+    V̂, Ŵ, X̂0, A0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.Ŷ
     Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     x̂0arr = estim.x̂0arr_old
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s) 
-    predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃s)
+    predict_mhe!(
+        V̂, X̂0, A0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃s
+    )
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+1:end] .= 0 # Ŵ = 0
