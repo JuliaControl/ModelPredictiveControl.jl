@@ -184,13 +184,13 @@ transcription method.
         \mathbf{X̂_0}                                                    \\
         \mathbf{A_0}                                                    \\
         \mathbf{Ā}                                                      \end{bmatrix}
-    \: , \quad
+    , \: 
     \mathbf{A_0} = \begin{bmatrix}
         \mathbf{a_0}(k+1)                                               \\
         \mathbf{a_0}(k+2)                                               \\
         \vdots                                                          \\
         \mathbf{a_0}(k+H_p)                                             \end{bmatrix}
-    \quad \text{and} \quad
+    \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{a}(k+0)                                                 \\
         \mathbf{a}(k+1)                                                 \\
@@ -210,13 +210,13 @@ transcription method.
         \mathbf{0_ā}                                                    \\
         \mathbf{Ŵ}                                                      \\
         \mathbf{0_ŵ}                                                    \end{bmatrix}
-    \: , \quad
+    , \: 
     \mathbf{A_0} = \begin{bmatrix}
         \mathbf{a_0}(k-N_k+p+1)                                         \\
         \mathbf{a_0}(k-N_k+p+2)                                         \\
         \vdots                                                          \\
         \mathbf{a_0}(k+p)                                               \end{bmatrix}
-    \quad \text{and} \quad
+    \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{a}(k-N_k+p+0)                                           \\
         \mathbf{a}(k-N_k+p+1)                                           \\
@@ -227,7 +227,7 @@ transcription method.
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
     variables at the beginning (``N_k < H_e``). The predicted outputs are computed from
     the algebraic variables in ``\mathbf{A_0}``, while the values in ``\mathbf{Ā}`` are
-    strictly used in the the `fq!` function.
+    strictly reserved for the the `fq!` function.
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
@@ -348,13 +348,13 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{A_0}                                                \\
         \mathbf{K̄}                                                  \\
         \mathbf{Ā}                                                  \end{bmatrix}
-    \: , \quad
+    , \:
     \mathbf{A_0} = \begin{bmatrix}
         \mathbf{a_0}(k+1)                                           \\
         \mathbf{a_0}(k+2)                                           \\
         \vdots                                                      \\
         \mathbf{a_0}(k+H_p)                                         \end{bmatrix}
-    \quad \text{and} \quad
+    \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{ā}(k+0)                                             \\
         \mathbf{ā}(k+1)                                             \\
@@ -376,13 +376,13 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{0_ā}                                                \\ 
         \mathbf{Ŵ}                                                  \\
         \mathbf{0_ŵ}                                                \end{bmatrix}
-    \: , \quad
+    , \;
     \mathbf{A_0} = \begin{bmatrix}
         \mathbf{a_0}(k-N_k+p+1)                                     \\
-        \mathbf{a_0}(k-N_k+p+1)                                     \\
+        \mathbf{a_0}(k-N_k+p+2)                                     \\
         \vdots                                                      \\
         \mathbf{a_0}(k+p)                                           \end{bmatrix}
-    \quad \text{and} \quad
+    \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{ā}(k-N_k+p+0)                                       \\
         \mathbf{ā}(k-N_k+p+1)                                       \\
@@ -392,7 +392,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision variables at
     the beginning in the [`MovingHorizonEstimator`](@ref) (``N_k < H_e``). The predicted
     outputs are computed from the algebraic variables in ``\mathbf{A_0}``, while the values
-    in ``\mathbf{Ā}`` are strictly used in the the `fq!` function.
+    in ``\mathbf{Ā}`` are strictly reserved for the `fq!` function.
     
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
