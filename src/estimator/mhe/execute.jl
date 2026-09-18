@@ -652,13 +652,16 @@ otherwise the state is for the next time step.
 """
 function getstate!(estim::MovingHorizonEstimator{NT}, Z̃) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nu, nk̄, nx̂, Nk = model.nu, model.nk̄, estim.nx̂, estim.Nk[]
-    x̂0arr = buffer.x̂
-    V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
+    nu, nx̂, Nk = model.nu, estim.nx̂, estim.Nk[]
+    nk̄ = get_nk̄(model, estim.transcription)
+    x̂0arr, a0arr = buffer.x̂, buffer.a
+    V̂, Ŵ, X̂0, A0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.Ŷ
     Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
     getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
     getx̂0arr!(x̂0arr, estim, Z̃)
-    predict_mhe!(V̂, X̂0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, Ŵ, Z̃)
+    predict_mhe!(
+        V̂, X̂0, A0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃
+    )
     estim.x̂0 .= @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     return nothing
 end
