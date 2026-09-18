@@ -1356,9 +1356,9 @@ end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, A0, _ , _ , _ , 
+        V̂, X̂0, A0, Û0, K̄, Ŷ0, 
         estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod, 
-        _ , _ , _ , Z̃
+        x̂0arr, a0arr, Ŵ, Z̃ 
     ) -> V̂, X̂0, A0
 
 Compute the `V̂` vector and `X̂0` vectors for the `MovingHorizonEstimator` and `LinModel`.
@@ -1402,7 +1402,7 @@ end
     predict_mhe!(
         V̂, X̂0, A0, Û0, K̄, Ŷ0, 
         estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
-        x̂0arr, _ , Ŵ, _ 
+        x̂0arr, a0arr, Ŵ, Z̃ 
     ) -> V̂, X̂0, A0
 
 Compute the vectors when `model` is a [`NonLinModel`](@ref) with [`SingleShooting`](@ref).
@@ -1730,7 +1730,7 @@ function con_nonlinprogeq_mhe!(
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
-            a0   = @views a0arr[1:nx]
+            a0   = @views a0arr[1:na]
         else
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             a0   = @views A0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]

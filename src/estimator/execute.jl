@@ -144,7 +144,7 @@ end
 """
     ĥ!(ŷ0, estim::StateEstimator, model::NonLinModelDAE, x0, a0, d0)
 
-Same than [`ĥ!`](@ref) for [`NonLinModelDAE`](@ref) but with the algebraic variable `a0`.
+Same than [`ĥ!`](@ref) for [`NonLinModelDAE`](@ref) but with algebraic variable `a0`.
 """
 function ĥ!(ŷ0, estim::StateEstimator, model::NonLinModelDAE, x̂0, a0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
@@ -159,7 +159,7 @@ end
 
 Ignore the algebraic variable argument for other [`SimModelODE`](@ref) types.
 """
-ĥ!(ŷ0, estim::StateEstimator, model::SimModelODE, x̂0, _ , d0) = ĥ!(ŷ0, model, estim, x̂0, d0)
+ĥ!(ŷ0, estim::StateEstimator, model::SimModelODE, x̂0, _ , d0) = ĥ!(ŷ0, estim, model, x̂0, d0)
 
 """
     disturbedinput!(Û0, estim::StateEstimator, x̂0, X̂0, U0) -> Û0
