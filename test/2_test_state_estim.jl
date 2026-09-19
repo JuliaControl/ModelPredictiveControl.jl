@@ -1383,6 +1383,37 @@ end
     @test mhe11() ≈ [13] atol=5e-3
 end
 
+@testitem "MHE estim. & getinfo (NonLinModelDAE)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
+    import ForwardDiff
+
+    function fq!(ẋ, res, x, a, u, _ , p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[])
+        res[] = x[] - a[]
+        return nothing
+    end
+    function h!(y, x, a, _ , _ )
+        y[] = 2 * x[] + a[]
+    end
+    p=[0.5]
+    dae = NonLinModelDAE(fq!, h!, 1.0, 1, 1, 1, 1; p)
+
+    transcription = TrapezoidalCollocation(f_threads=true, h_threads=true)
+    mhe = MovingHorizonEstimator(dae; He=3, transcription, hessian=true)
+    preparestate!(mhe, [0.0])
+    x̂ = updatestate!(mhe, [0.0], [0.0])
+    @test x̂ ≈ zeros(mhe.nx̂) atol=1e-8
+    @test mhe.x̂0 ≈ zeros(mhe.nx̂) atol=1e-8
+
+    transcription = TrapezoidalCollocation(1)
+    mhe2 = MovingHorizonEstimator(dae; He=3, transcription, hessian=true)
+    preparestate!(mhe2, [0.0])
+    x̂ = updatestate!(mhe2, [0.0], [0.0])
+    @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-8
+    @test mhe2.x̂0 ≈ zeros(mhe2.nx̂) atol=1e-8
+end
+
 @testitem "MHE estim. with unfilled window" setup=[SetupMPCtests] begin
     f(x,u,_,_) = 0.5x + u
     h(x,_,_) = x
