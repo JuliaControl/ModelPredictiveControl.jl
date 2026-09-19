@@ -1383,7 +1383,7 @@ end
     @test mhe11() ≈ [13] atol=5e-3
 end
 
-@testitem "MHE estim. & getinfo (NonLinModelDAE)" setup=[SetupMPCtests] begin
+@testitem "MHE estim. & getinfo (NonLinModelDAE, TC)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
     import ForwardDiff
