@@ -247,6 +247,7 @@ struct MovingHorizonEstimator{
             direct, prepared,
             buffer
         )
+        reset_warmstart!(estim, transcription)
         init_optimization!(estim, model, optim)
         return estim
     end

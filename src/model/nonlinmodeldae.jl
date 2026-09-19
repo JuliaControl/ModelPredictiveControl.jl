@@ -409,6 +409,10 @@ get_nā(model::NonLinModelDAE, transcription::OrthogonalCollocation) = model.na
 get_nā(model::NonLinModelDAE, ::TrapezoidalCollocation) = model.na
 get_nā(::SimModel, ::TranscriptionMethod) = 0
 
+"Get the warm-starting value for the algebraic variable `as_0`."
+get_as_0(model::NonLinModelDAE) = model.as_0
+get_as_0(model::SimModel) = model.buffer.a
+
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."
 function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
     return nx + transcription.no*nx + na + transcription.no*na

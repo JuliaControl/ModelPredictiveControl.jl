@@ -44,6 +44,7 @@ struct NonLinModel{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    xs_0::Vector{NT}
     jacobian::JB
     linfunc!::LF
     buffer::SimModelBuffer{NT}
@@ -65,6 +66,7 @@ struct NonLinModel{
         dop = zeros(NT, nd)
         xop = zeros(NT, nx)
         fop = zeros(NT, nx)
+        xs_0 = zeros(NT, nx)
         uname = ["\$u_{$i}\$" for i in 1:nu]
         yname = ["\$y_{$i}\$" for i in 1:ny]
         dname = ["\$d_{$i}\$" for i in 1:nd]
@@ -83,6 +85,7 @@ struct NonLinModel{
             nu, nx, ny, nd, nk̄, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
+            xs_0,
             jacobian, linfunc!,
             buffer
         )
