@@ -67,6 +67,8 @@ ModelPredictiveControl.get_nonlincon_oracle(::MovingHorizonEstimator, ::ModelPre
 ```@docs
 ModelPredictiveControl.f̂!
 ModelPredictiveControl.ĥ!
+ModelPredictiveControl.fq_dae!
+ModelPredictiveControl.ĥ_dae!
 ```
 
 ## Remove Operating Points
