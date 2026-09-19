@@ -923,7 +923,7 @@ Objective function of the MHE when `model` is not a [`LinModel`](@ref).
 The function `dot(x, A, x)` is a performant way of calculating `x'*A*x`.
 """
 function obj_nonlinprog(estim::MovingHorizonEstimator, ::SimModel, x̄, V̂, Ŵ, Z̃) 
-    Nk = estim.Nk[] 
+    Nk = estim.Nk[]
     invP̄ = estim.cov.invP̄
     invQ̂_Nk = trunc_cov(estim.cov.invQ̂_He, estim.nx̂, Nk, estim.He)
     invR̂_Nk = trunc_cov(estim.cov.invR̂_He, estim.nym, Nk, estim.He)

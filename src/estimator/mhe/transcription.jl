@@ -1746,8 +1746,12 @@ function con_nonlinprogeq_mhe!(
         x̂dnext   = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ā        = @views        Ā_Z̃[(1 + na*(j-1)):(na*(j-1) + na)]
         ŝk       = @views         Ŝk̄[(1 + nx*(j-1)):(nx*j)]
-        k̇1, k̇2   = @views          k̄[1:nx], k̄[nx+1:2nx]  
-        d0next   = @views   estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
+        k̇1, k̇2   = @views          k̄[1:nx], k̄[nx+1:2nx]
+        if estim.direct || j ≥ Nk
+            d0next = d0 # special case: d0(k+1)≈d0(k), since d0(k+1) is not available
+        else
+            d0next = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
+        end
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
@@ -1832,7 +1836,11 @@ function con_nonlinprogeq_mhe!(
         k̄     = @views             K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         k̄_Z̃      = @views        K_Z̃[(1 + nk̄*(j-1)):(nk̄*j)]
         ŝk̄       = @views        geq[(1 + nk̄*(j-1)):(nk̄*j)]
-        d0next   = @views   estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
+        if estim.direct || j ≥ Nk
+            d0next = d0 # special case: d0(k+1)≈d0(k), since d0(k+1) is not available
+        else
+            d0next = @views estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
+        end
         # ----------------- collocation constraint defects -----------------------------
         Δk = k̄
         for i=1:no
