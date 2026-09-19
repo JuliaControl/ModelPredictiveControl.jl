@@ -256,9 +256,10 @@ end
 @doc raw"""
     MovingHorizonEstimator(model::SimModel; <keyword arguments>)
 
-Construct a moving horizon estimator (MHE) based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
+Construct a moving horizon estimator (MHE) based on `model`.
 
-It can handle constraints on the estimates. Additionally, `model` is not linearized like the
+It supports ([`LinModel`](@ref), [`NonLinModel`](@ref)), [`NonLinModelDAE`](@ref)) and
+constraints on the estimates. Additionally, `model` is not linearized like the
 [`ExtendedKalmanFilter`](@ref), and the probability  distribution is not approximated like
 the [`UnscentedKalmanFilter`](@ref). The computational costs are drastically higher, 
 however, since it minimizes the following objective function at each discrete time ``k``:
@@ -501,7 +502,8 @@ MovingHorizonEstimator estimator with a sample time Ts = 5.0 s:
       the `f` and `h` functions must be compatible with this feature. See the 
       [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
       for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
-      estimates the arrival covariance by default.
+      estimates the arrival covariance by default for [`NonLinModel`](@ref). The default is
+      a [`SteadyKalmanFilter`](@ref) for [`NonLinModelDAE`](@ref).
 
     Two exceptions about AD: if `transcription` is not a [`SingleShooting`](@ref), the 
     `jacobian` argument and the `hessian=true` option default to this sparse backend:
