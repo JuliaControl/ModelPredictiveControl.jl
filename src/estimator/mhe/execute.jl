@@ -145,7 +145,7 @@ julia> round.(getinfo(estim)[:Ŷ], digits=3)
 """
 function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, buffer, Nk = estim.model, estim.buffer, estim.Nk[]
-    nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
+    nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, get_nk̄(model, estim.transcription)
     nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
     Z̃ = estim.Z̃
     info = Dict{Symbol, Any}()

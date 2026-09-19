@@ -156,7 +156,7 @@ fq_dae!(ẋ0, _ , model::NonLinModel, x0, _ , u0, d0)= model.f!(ẋ0, x0, u0, d0
 
 Similar than [`ĥ!`](@ref) but with a algebraic variable `a0` for [`NonLinModelDAE`](@ref) .
 """
-function ĥ!(ŷ0, estim::StateEstimator, model::NonLinModelDAE, x̂0, a0, d0)
+function ĥ_dae!(ŷ0, estim::StateEstimator, model::NonLinModelDAE, x̂0, a0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
     model.h!(ŷ0, xd, a0, d0, model.p)
@@ -165,11 +165,11 @@ function ĥ!(ŷ0, estim::StateEstimator, model::NonLinModelDAE, x̂0, a0, d0)
 end
 
 """
-    ĥ!(ŷ0, estim::StateEstimator, model::SimModelODE, x0, _ , d0)
+    ĥ_dae!(ŷ0, estim::StateEstimator, model::SimModelODE, x0, _ , d0)
 
 Ignore the algebraic variable argument for other [`SimModelODE`](@ref) types.
 """
-ĥ!(ŷ0, estim::StateEstimator, model::SimModelODE, x̂0, _, d0) = ĥ!(ŷ0, estim, model, x̂0, d0)
+ĥ_dae!(ŷ0, estim::StateEstimator, model::SimModelODE, x̂0, _, d0) = ĥ!(ŷ0, estim, model, x̂0, d0)
 
 """
     disturbedinput!(Û0, estim::StateEstimator, x̂0, X̂0, U0) -> Û0

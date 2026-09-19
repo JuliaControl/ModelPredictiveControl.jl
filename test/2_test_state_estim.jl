@@ -1388,28 +1388,49 @@ end
     using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
     import ForwardDiff
 
-    function fq!(ẋ, res, x, a, u, _ , p)
-        ẋ[] = -p[] * (x[] - 0.2 * u[])
+    function fq!(ẋ, res, x, a, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
         res[] = x[] - a[]
         return nothing
     end
-    function h!(y, x, a, _ , _ )
-        y[] = 2 * x[] + a[]
+    function h!(y, x, a, d, _ )
+        y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    p=[0.5]
-    dae = NonLinModelDAE(fq!, h!, 1.0, 1, 1, 1, 1; p)
+    Ts, p = 100.0, [0.01]
+    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p)
 
     transcription = TrapezoidalCollocation(f_threads=true, h_threads=true)
     mhe = MovingHorizonEstimator(dae; He=3, transcription, hessian=true)
-    preparestate!(mhe, [0.0])
-    x̂ = updatestate!(mhe, [0.0], [0.0])
+    preparestate!(mhe, [0.0], [0.0])
+    x̂ = updatestate!(mhe, [0.0], [0.0], [0.0])
     @test x̂ ≈ zeros(mhe.nx̂) atol=1e-8
     @test mhe.x̂0 ≈ zeros(mhe.nx̂) atol=1e-8
 
+    
+    preparestate!(mhe, [0], [0])
+    info = getinfo(mhe)
+    @test info[:x̂] ≈ x̂ atol=1e-8
+    @test info[:Ŷ][end-1:end] ≈ [0] atol=1e-8
+    for i in 1:40
+        preparestate!(mhe, [0], [0])
+        updatestate!(mhe, [3.0], [0], [0])
+    end
+    preparestate!(mhe, [0], [0])
+    @test mhe([0]) ≈ [0] atol=1e-3
+    for i in 1:40
+        preparestate!(mhe, [7.0], [0])
+        updatestate!(mhe, [0], [7.0], [0])
+    end
+    preparestate!(mhe, [7.0], [0])
+    @test mhe([0]) ≈ [7.0] atol=1e-3
+    
+
+
+
     transcription = TrapezoidalCollocation(1)
     mhe2 = MovingHorizonEstimator(dae; He=3, transcription, hessian=true)
-    preparestate!(mhe2, [0.0])
-    x̂ = updatestate!(mhe2, [0.0], [0.0])
+    preparestate!(mhe2, [0.0], [0.0])
+    x̂ = updatestate!(mhe2, [0.0], [0.0], [0.0])
     @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-8
     @test mhe2.x̂0 ≈ zeros(mhe2.nx̂) atol=1e-8
 end
