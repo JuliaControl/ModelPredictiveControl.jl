@@ -1499,7 +1499,7 @@ function predict_mhe!(
         ŷ0  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
         v̂   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
         y0m = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
-        ĥ!(ŷ0, estim, model, x̂0, a0, d0)
+        ĥ_dae!(ŷ0, estim, model, x̂0, a0, d0)
         ŷ0m = @views ŷ0[estim.i_ym]
         if any(isnan, y0m) # nan in Y0m: y0m=ŷ0m => associated v̂ value = 0
             y0m = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0m, ŷ0m)]
@@ -1727,7 +1727,7 @@ function con_nonlinprogeq_mhe!(
     if na > 0
         k̇0, x̂darr    = @views K̄[1:nx], x̂0arr[1:nx] 
         û0arr, d0arr = @views Û0[1:nu], estim.D0[(1 + i_d0arr):(nd + i_d0arr)]
-        fq!(k̇0, q0arr, model, x̂darr, a0arr, û0arr, d0arr)
+        fq_dae!(k̇0, q0arr, model, x̂darr, a0arr, û0arr, d0arr)
     end
     @threadsif f_threads for j=1:Nk
         if j < 2
@@ -1751,17 +1751,17 @@ function con_nonlinprogeq_mhe!(
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
             # last iteration (j-1) may not be executed (iterations are re-orderable)
-            fq!(k̇1, q1, model, x̂d_Z̃, ā, û0, d0)
+            fq_dae!(k̇1, q1, model, x̂d_Z̃, ā, û0, d0)
         else
             k̇1 .= @views  K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇2 of the last iter. j-1
             q1 .= @views Q0[(1 + na*(j-1)-na):(na*(j-1))] # q2 of the last iter. j-1
         end
         if h < 1
-            fq!(k̇2, q2, model, x̂dnext, a0, û0, d0next)
+            fq_dae!(k̇2, q2, model, x̂dnext, a0, û0, d0next)
         else
             # special case: û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k
             û0next = @views j ≥ Nk ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
-            fq!(k̇2, q2, model, x̂dnext, a0, û0next, d0next)
+            fq_dae!(k̇2, q2, model, x̂dnext, a0, û0next, d0next)
         end
         ŝk .= @. x̂d_Z̃ - x̂dnext + 0.5*Ts*(k̇1 + k̇2) + ŵd
     end
