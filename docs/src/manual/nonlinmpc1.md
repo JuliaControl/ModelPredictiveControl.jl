@@ -1,10 +1,10 @@
-# [Manual: Nonlinear Design](@id man_nonlin)
+# [Manual: Nonlinear Design (ODE)](@id man_nonlin)
 
 ```@contents
-Pages = ["nonlinmpc.md"]
+Pages = ["nonlinmpc1.md"]
 ```
 
-## Nonlinear Model
+## Nonlinear Model (ODE)
 
 In this example, the goal is to control the angular position ``θ`` of a pendulum
 attached to a motor. Knowing that the manipulated input is the motor torque ``τ`` in Nm, the
@@ -24,7 +24,7 @@ The following figure presents the system:
     border:20px solid white; display: block; margin-left: auto; margin-right: auto;"/></p>
 ```
 
-The plant model is nonlinear:
+The plant model is nonlinear ordinary differential equation (ODE) system:
 
 ```math
 \begin{aligned}
@@ -38,7 +38,7 @@ in which ``g`` is the gravitational acceleration in m/s², ``L``, the pendulum l
 the end of the pendulum in kg, all bundled in the parameter vector ``\mathbf{p} =
 [\begin{smallmatrix} g & L & K & m \end{smallmatrix}]'``. The [`NonLinModel`](@ref)
 constructor assumes by default that the state function `f` is continuous in time, that is,
-an ordinary differential equation system (like here):
+an ODE system (like here):
 
 ```@codeblocks
 line_counter = :continue
