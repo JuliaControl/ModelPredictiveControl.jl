@@ -1399,18 +1399,16 @@ end
     Ts, p = 100.0, [0.01]
     dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p)
 
-    transcription = TrapezoidalCollocation(f_threads=true, h_threads=true)
+    transcription = TrapezoidalCollocation()
     mhe = MovingHorizonEstimator(dae; He=3, transcription, hessian=true)
     preparestate!(mhe, [0.0], [0.0])
     x̂ = updatestate!(mhe, [0.0], [0.0], [0.0])
     @test x̂ ≈ zeros(mhe.nx̂) atol=1e-8
     @test mhe.x̂0 ≈ zeros(mhe.nx̂) atol=1e-8
-
-    
     preparestate!(mhe, [0], [0])
     info = getinfo(mhe)
     @test info[:x̂] ≈ x̂ atol=1e-8
-    @test info[:Ŷ][end-1:end] ≈ [0] atol=1e-8
+    @test info[:Ŷ][end] ≈ 0 atol=1e-8
     for i in 1:40
         preparestate!(mhe, [0], [0])
         updatestate!(mhe, [3.0], [0], [0])
@@ -1424,11 +1422,8 @@ end
     preparestate!(mhe, [7.0], [0])
     @test mhe([0]) ≈ [7.0] atol=1e-3
     
-
-
-
-    transcription = TrapezoidalCollocation(1)
-    mhe2 = MovingHorizonEstimator(dae; He=3, transcription, hessian=true)
+    transcription = TrapezoidalCollocation(1, f_threads=true, h_threads=true)
+    mhe2 = MovingHorizonEstimator(dae; He=3, transcription)
     preparestate!(mhe2, [0.0], [0.0])
     x̂ = updatestate!(mhe2, [0.0], [0.0], [0.0])
     @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-8
