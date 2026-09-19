@@ -1,30 +1,3 @@
-"""
-    reset_warmstart!(estim::MovingHorizonEstimator, transcription::CollocationMethod)
-
-Reset warm-starting values `estim.Z̃` at values stored in `estim.model`
-"""
-function reset_warmstart!(
-    estim::MovingHorizonEstimator, transcription::TrapezoidalCollocation
-)
-    model = estim.model
-    as_0 = get_as_0(model)
-    nx, no, na = model.nx, transcription.no, get_na(model)
-    x0s  = model.buffer.x
-    x0s .= model.xs_0 .- model.xop
-    a0s  = as_0
-    #nk̄ = nx*no
-    #model.a0                      .= a0s
-    #model.Z[1:nx]                 .= x0s
-    #model.Z[(nx+1):(nx+na)]       .= a0s
-    #k̄_Z = @views model.Z[(nx+na+1):(nx+na+nk̄)]
-    #repeat!(k̄_Z, x0s, no)
-    #ā_Z = @views model.Z[(nx+na+nk̄+1):end]
-    #repeat!(ā_Z, a0s, no)
-    return nothing
-end
-
-
-
 "Reset the data windows and time-varying variables for the moving horizon estimator."
 function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0) 
     model = estim.model
@@ -60,6 +33,57 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     invert_cov!(estim, estim.covestim)
     estim.x̂0arr_old .= 0
     reset_warmstart!(estim, estim.transcription)
+    return nothing
+end
+
+"""
+    reset_warmstart!(estim::MovingHorizonEstimator, ::TranscriptionMethod)
+
+Reset warm-starting values `estim.Z̃` at values stored in `estim.model`
+"""
+function reset_warmstart!(estim::MovingHorizonEstimator, ::MultipleShooting)
+    model = estim.model
+    nx, nx̂, nε = model.nx, estim.nx̂, estim.nε
+    nx̃ = nε + nx̂
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
+    for i in 1:estim.He
+        estim.Z̃[(nx̃+(j-1)*nx̂+1):(nx̃+(j-1)*nx̂+nx)] .= x0s
+    end
+    return nothing
+end
+function reset_warmstart!(
+    estim::MovingHorizonEstimator, ::TrapezoidalCollocation
+)
+    model = estim.model
+    nx, nx̂, nε, na = model.nx, estim.nx̂, estim.nε, get_na(model)
+    nx̃ = nε + nx̂
+    as_0 = get_as_0(model)
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = as_0
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
+    estim.Z̃[(nx̃ + nx̂*He + 1):(nx̃ + nx̂*He + na)] = a0s
+    for i in 1:estim.He
+        estim.Z̃[(nx̃+(j-1)*nx̂+1):(nx̃+(j-1)*nx̂+nx)] .= x0s
+        estim.Z̃[(nx̃+nx̂*He+na+(j-1)*na+1):(nx̃+nx̂*He+na+j*na)] .= a0s
+        estim.Z̃[(nx̃+nx̂*He+na+na*He+(j-1)*na+1):(nx̃+nx̂*He+na+na*He+j*na)] .= a0s
+    end
+    return nothing
+end
+function reset_warmstart!(estim::MovingHorizonEstimator, ::OrthogonalCollocation)
+    return nothing
+end
+function reset_warmstart!(estim::MovingHorizonEstimator, ::SingleShooting)
+    model = estim.model
+    nx, nε = model.nx, estim.nε
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
     return nothing
 end
 
