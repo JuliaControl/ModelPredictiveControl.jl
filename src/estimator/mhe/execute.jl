@@ -43,13 +43,13 @@ Reset warm-starting values `estim.Z̃` at values stored in `estim.model`
 """
 function reset_warmstart!(estim::MovingHorizonEstimator, ::MultipleShooting)
     model = estim.model
-    nx, nx̂, nε = model.nx, estim.nx̂, estim.nε
+    nx, nx̂, nε, He = model.nx, estim.nx̂, estim.nε, estim.He
     nx̃ = nε + nx̂
     x0s  = model.buffer.x
     x0s .= model.xs_0 .- model.xop
     estim.Z̃ .= 0
     estim.Z̃[nε+1:nε+nx] = x0s
-    for i in 1:estim.He
+    for j in 1:He
         estim.Z̃[(nx̃+(j-1)*nx̂+1):(nx̃+(j-1)*nx̂+nx)] .= x0s
     end
     return nothing
@@ -58,7 +58,7 @@ function reset_warmstart!(
     estim::MovingHorizonEstimator, ::TrapezoidalCollocation
 )
     model = estim.model
-    nx, nx̂, nε, na = model.nx, estim.nx̂, estim.nε, get_na(model)
+    nx, nx̂, nε, He, na = model.nx, estim.nx̂, estim.nε, estim.He, get_na(model)
     nx̃ = nε + nx̂
     as_0 = get_as_0(model)
     x0s  = model.buffer.x
@@ -67,14 +67,32 @@ function reset_warmstart!(
     estim.Z̃ .= 0
     estim.Z̃[nε+1:nε+nx] = x0s
     estim.Z̃[(nx̃ + nx̂*He + 1):(nx̃ + nx̂*He + na)] = a0s
-    for i in 1:estim.He
+    for j in 1:He
         estim.Z̃[(nx̃+(j-1)*nx̂+1):(nx̃+(j-1)*nx̂+nx)] .= x0s
         estim.Z̃[(nx̃+nx̂*He+na+(j-1)*na+1):(nx̃+nx̂*He+na+j*na)] .= a0s
         estim.Z̃[(nx̃+nx̂*He+na+na*He+(j-1)*na+1):(nx̃+nx̂*He+na+na*He+j*na)] .= a0s
     end
     return nothing
 end
-function reset_warmstart!(estim::MovingHorizonEstimator, ::OrthogonalCollocation)
+function reset_warmstart!(
+    estim::MovingHorizonEstimator, transcription::OrthogonalCollocation
+)
+    model = estim.model
+    nx, nx̂, nε, He, na = model.nx, estim.nx̂, estim.nε, estim.He, get_na(model)
+    nx̃ = nε + nx̂
+    as_0 = get_as_0(model)
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = as_0
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
+    estim.Z̃[(nx̃ + nx̂*He + 1):(nx̃ + nx̂*He + na)] = a0s
+    for j in 1:He
+        estim.Z̃[(nx̃+(j-1)*nx̂+1):(nx̃+(j-1)*nx̂+nx)] .= x0s
+        estim.Z̃[(nx̃+nx̂*He+na+(j-1)*na+1):(nx̃+nx̂*He+na+j*na)] .= a0s
+        estim.Z̃[(nx̃+nx̂*He+na+na*He+(j-1)*nx̂+1):(nx̃+nx̂*He+na+na*He+(j-1)*nx̂+nx)] .= x0s
+        estim.Z̃[(nx̃+nx̂*He+na+na*He+nx*He+(j-1)*na+1):(nx̃+nx̂*He+na+na*He+nx*He+j*na)] .= a0s
+    end
     return nothing
 end
 function reset_warmstart!(estim::MovingHorizonEstimator, ::SingleShooting)
