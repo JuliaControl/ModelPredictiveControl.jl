@@ -1677,7 +1677,7 @@ state defects are computed with:
 for ``j = 0, 1, ... , N_k-1``, and in which ``\mathbf{x̂_d}`` and ``\mathbf{ŵ_d}`` are the
 deterministic state and process noise estimates, respectively, extracted from the decision
 variable `Z̃`. The ``\mathbf{k̇}`` coefficients are evaluated from the continuous-time
-function [`fq!`](@ref) and:
+function [`fq_dae!`](@ref) and:
 ```math
 \begin{aligned}
 \mathbf{k̇_1}(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a}(ℓ+j),     \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
