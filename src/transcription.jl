@@ -161,8 +161,7 @@ moderately stiff systems and is A-stable. See Extended Help for more details.
     Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
     `TrapezoidalCollocation` transcription, the built-in [`StateEstimator`](@ref) will
     still use the `solver` provided at the construction of the [`NonLinModel`](@ref) to
-    estimate the plant states, not the trapezoidal rule (see `supersample` option of
-    [`RungeKutta`](@ref) for stiff systems).
+    estimate the plant states, not the trapezoidal rule.
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
 transcription method.
@@ -227,11 +226,8 @@ transcription method.
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
     variables at the beginning (``N_k < H_e``). The predicted outputs are computed from
     the algebraic variables in ``\mathbf{A_0}``, while the values in ``\mathbf{Ā}`` are
-    strictly reserved for the the `fq!` function.
-
-    It's important to understand that the ``\mathbf{A_0}`` vector must be explicitly
-    included in the decision variables because of the output function ``\mathbf{h}``. As a
-    corollary, the optimal values #TODO: continue here or delete this par if no longer required
+    strictly reserved for the the `fq!` function. The ``\mathbf{a_0}`` vector is at the left
+    endpoint of the trapezoid, while the ``\mathbf{a_1}`` is at the right endpoint.
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
@@ -287,7 +283,7 @@ where ``\mathbf{K̄}`` encompasses all the intermediate stages of the determinis
 ```
 The `roots` keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or
 Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstring for info
-on `f_threads` and `h_threads` keywords. This transcription computes thecpredictions by
+on `f_threads` and `h_threads` keywords. This transcription computes the predictions by
 enforcing the collocation and continuity constraints at the collocationc points. It is
 efficient for highly stiff systems, but generally more expensive than the other methods for
 non-stiff systems. See Extended Help for details and the transcription of
@@ -297,8 +293,7 @@ non-stiff systems. See Extended Help for details and the transcription of
     Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
     `OrthogonalCollocation` transcription, the built-in [`StateEstimator`](@ref) will still
     use the `solver` provided at the construction of the [`NonLinModel`](@ref) to estimate
-    the plant states, not orthogonal collocation (see `supersample` option of 
-    [`RungeKutta`](@ref) for stiff systems).
+    the plant states, not orthogonal collocation.
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are highly recommended for
 this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
@@ -396,14 +391,16 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision variables at
     the beginning in the [`MovingHorizonEstimator`](@ref) (``N_k < H_e``). The predicted
     outputs are computed from the algebraic variables in ``\mathbf{A_0}``, while the values
-    in ``\mathbf{Ā}`` are strictly reserved for the `fq!` function.
+    in ``\mathbf{Ā}`` are strictly reserved for the `fq!` function. The ``\mathbf{A_0}`` 
+    vector must be explicitly included in the decision variables since the output function
+    `h!` is evaluated at different locations than the collocation points, in general.
     
-    The collocation points are located at the roots of orthogonal polynomials, which is 
-    "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
-    The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
-    is more accurate than Gauss-Radau but only A-stable, while the latter being L-stable. 
-    See [`init_orthocolloc`](@ref), [`con_nonlinprogeq!`](@ref) and [`con_nonlinprogeq_mhe!`](@ref)
-    for more details.
+    More precisely, the outputs are at the sampling times, while the collocation points are
+    at the roots of orthogonal polynomials, which is "optimal" for approximating the state
+    trajectories with polynomials of degree ``n_o``. The method then enforces the system
+    dynamics at these points. The Gauss-Legendre scheme is more accurate than Gauss-Radau
+    but only A-stable, while the latter being L-stable. See [`init_orthocolloc`](@ref),
+    [`con_nonlinprogeq!`](@ref) and [`con_nonlinprogeq_mhe!`](@ref) for more details.
 
     As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
     states are left out of the ``\mathbf{K̄}`` vector to reduce the dimensions, and also

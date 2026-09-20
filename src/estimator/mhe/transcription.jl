@@ -1719,10 +1719,10 @@ function con_nonlinprogeq_mhe!(
     X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃_nX̂)]
     A0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂_na_nA)] # skipping a0arr components
     Ā_Z̃  = @views Z̃[(1 + nx̃_nX̂_na_nA):(nx̃_nX̂_na_nA + nĀ)]
-    Û0    = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
-    Ŝk̄    = @views geq[1:nŜk̄]
-    Q0    = @views geq[(nŜk̄ + 1):(nŜk̄ + nA + na)]
-    Q̄     = @views geq[(nŜk̄ + nA + na + 1):end]
+    Û0   = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
+    Ŝk̄   = @views geq[1:nŜk̄]
+    Q0   = @views geq[(nŜk̄ + 1):(nŜk̄ + nA + na)]
+    Q̄    = @views geq[(nŜk̄ + nA + na + 1):end]
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
@@ -1763,11 +1763,11 @@ function con_nonlinprogeq_mhe!(
         fq_dae!(k̇1, q1, model, x̂dnext, a1, û1, d1)
         ŝk .= @. x̂d_Z̃ - x̂dnext + 0.5*Ts*(k̇0 + k̇1) + ŵd
     end
-    Q0[(na*Nk + 1):(na*Nk + na)] .= @views Q̄[(1 + na*(Nk-1)):(na*Nk)] # final q1 value
+    Q0[(1 + na*Nk):(na*(Nk+1))] .= @views Q̄[(1 + na*(Nk-1)):(na*Nk)] # final q1 value
     if Nk < He 
-        Ŝk̄[(nx*Nk + 1):end] .= 0
-        Q0[(na*Nk + na + 1):end] .= 0
-        Q̄[(na*Nk + 1):end]  .= 0
+        Ŝk̄[(1 + nx*Nk):end] .= 0
+        Q0[(1 + na*Nk + na):end] .= 0
+        Q̄[(1  + na*Nk):end]  .= 0
     end
     return geq
 end
