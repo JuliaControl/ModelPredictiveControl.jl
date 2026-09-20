@@ -173,11 +173,11 @@ struct MovingHorizonEstimator{
             CE<:KalmanEstimator{NT}
         }
         nu, ny, nd = model.nu, model.ny, model.nd
+        validate_transcription(model, transcription)
         nk̄, na = get_nk̄(model, transcription), get_na(model)
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
-        validate_transcription(model, transcription)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂ = model.nx + nxs

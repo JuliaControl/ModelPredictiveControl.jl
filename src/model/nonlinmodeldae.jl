@@ -355,6 +355,11 @@ function validate_h_dae(NT, h)
     return ismutating
 end
 
+function validate_transcription(::NonLinModelDAE, ::ShootingMethod)
+    throw(ArgumentError("Transcription with shooting methods is not supported with NonLinModelDAE"))
+    return nothing
+end
+
 """
     validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p) -> iszero_Ha
 

@@ -1035,6 +1035,34 @@ end
     )
 end
 
+@testitem "MHE construction (NonLinModelDAE)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using JuMP, Ipopt, DifferentiationInterface
+    import FiniteDiff
+    
+    function fq!(ẋ, res, x, a, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        res[] = x[] - a[]
+        return nothing
+    end
+    function h!(y, x, a, d, _ )
+        y[] = 2 * x[] + a[] + 0.1 * d[]
+    end
+    Ts, p = 100.0, [0.01]
+    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p)
+
+    transcription = TrapezoidalCollocation()
+    mhe = MovingHorizonEstimator(dae; He=3, transcription)
+    @test mhe.transcription isa TrapezoidalCollocation
+
+    transcription = TrapezoidalCollocation(1, f_threads=true, h_threads=true)
+    mhe2 = MovingHorizonEstimator(dae; He=3, transcription, direct=false)
+    @test mhe2.direct == false
+
+    @test_throws ArgumentError MovingHorizonEstimator(dae, He=3, transcription=SingleShooting())
+    @test_throws ArgumentError MovingHorizonEstimator(dae, He=3, transcription=MultipleShooting())
+end
+
 @testitem "MHE estim. & getinfo (LinModel, SS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
     using JuMP, DAQP
