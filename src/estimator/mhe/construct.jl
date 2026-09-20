@@ -380,6 +380,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 5.0 s:
   │ ├ 5 estimation steps He
   │ ├ 1 manipulated inputs u (0 integrating states)
   │ ├ 2 estimated states x̂
+  │ ├ 0 algebraic variables a
   │ ├ 1 measured outputs ym (1 integrating states)
   │ ├ 0 unmeasured outputs yu
   │ └ 0 measured disturbances d
