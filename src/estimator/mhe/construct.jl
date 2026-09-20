@@ -173,7 +173,7 @@ struct MovingHorizonEstimator{
             CE<:KalmanEstimator{NT}
         }
         nu, ny, nd = model.nu, model.ny, model.nd
-        nk̄ = get_nk̄(model, transcription)
+        nk̄, na = get_nk̄(model, transcription), get_na(model)
         He < 1  && throw(ArgumentError("Estimation horizon He should be ≥ 1"))
         Cwt < 0 && throw(ArgumentError("Cwt weight should be ≥ 0"))
         nym, nyu = validate_ym(model, i_ym)
@@ -204,7 +204,7 @@ struct MovingHorizonEstimator{
             ES, GS, JS, BS, 
             gc!, nc
         )
-        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
+        nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
         # dummy values, updated before optimization:
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
         Z̃ = zeros(NT, nZ̃)
@@ -221,7 +221,9 @@ struct MovingHorizonEstimator{
         test_custom_function_mhe(NT, model, i_ym, He, gc!, nc, x̂op, p, direct)
         # force computation of derivatives for the first NLP iteration:
         force∇J, force∇g, force∇geq = [true], [true], [true]
-        buffer = StateEstimatorBuffer{NT}(nu, nx̂, nym, ny, nd, nk̄, He, nŵ, nε, transcription)
+        buffer = StateEstimatorBuffer{NT}(
+            nu, nx̂, nym, ny, nd, nk̄, na, He, nŵ, nε, transcription
+        )
         estim = new{NT, SM, KC, TM, JM, GB, JB, HB, PT, GCfunc, CE}(
             model, transcription, optim, con, 
             gradient, jacobian, hessian,
@@ -245,6 +247,7 @@ struct MovingHorizonEstimator{
             direct, prepared,
             buffer
         )
+        reset_warmstart!(estim, transcription)
         init_optimization!(estim, model, optim)
         return estim
     end
@@ -253,9 +256,10 @@ end
 @doc raw"""
     MovingHorizonEstimator(model::SimModel; <keyword arguments>)
 
-Construct a moving horizon estimator (MHE) based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
+Construct a moving horizon estimator (MHE) based on `model`.
 
-It can handle constraints on the estimates. Additionally, `model` is not linearized like the
+It supports ([`LinModel`](@ref), [`NonLinModel`](@ref)), [`NonLinModelDAE`](@ref)) and
+constraints on the estimates. Additionally, `model` is not linearized like the
 [`ExtendedKalmanFilter`](@ref), and the probability  distribution is not approximated like
 the [`UnscentedKalmanFilter`](@ref). The computational costs are drastically higher, 
 however, since it minimizes the following objective function at each discrete time ``k``:
@@ -498,7 +502,8 @@ MovingHorizonEstimator estimator with a sample time Ts = 5.0 s:
       the `f` and `h` functions must be compatible with this feature. See the 
       [`JuMP` documentation](@extref JuMP Common-mistakes-when-writing-a-user-defined-operator)
       for common mistakes when writing these functions. Also, an [`UnscentedKalmanFilter`](@ref)
-      estimates the arrival covariance by default.
+      estimates the arrival covariance by default for [`NonLinModel`](@ref). The default is
+      a [`SteadyKalmanFilter`](@ref) for [`NonLinModelDAE`](@ref).
 
     Two exceptions about AD: if `transcription` is not a [`SingleShooting`](@ref), the 
     `jacobian` argument and the `hessian=true` option default to this sparse backend:
@@ -648,11 +653,16 @@ function default_optim_mhe(model::SimModel, nc)
 end
 
 "Default arrival covariance estimator for MHE, depending on the model type only."
-function default_covestim_mhe(model::SimModelODE, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     if model isa LinModel
         return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
-    else
+    elseif model isa NonLinModel
         return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    else
+        nx, nu, ny = model.nx, model.nu, model.ny
+        A, Bu, C = 0.1*I(nx), ones(nx, nu), ones(ny, nx)
+        dummy_model = LinModel(A, Bu, C, 0, 0, model.Ts)
+        return SteadyKalmanFilter(dummy_model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
     end
 end
 
@@ -1084,8 +1094,8 @@ and ``\mathbf{0}`` is properly sized for the `transcription` instance.
 function init_ZtoŴ(
     model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ
 ) where {NT<:Real}
-    nk̄ = get_nk̄(model, transcription)
-    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
+    nk̄, na = get_nk̄(model, transcription), get_na(model)
+    nŴ, nZ = nŵ*He, get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
     Tŵ = [spzeros(NT, nŴ, nZ-nŴ) I]
     return Tŵ
 end
@@ -1311,8 +1321,8 @@ function init_boxconstraint_mhe(
     x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
     A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
-    nk̄ = get_nk̄(model, transcription)
-    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
+    nk̄, na = get_nk̄(model, transcription), get_na(model)
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
     Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
     nε > 0 && (Z̃min[begin] = 0)
     nŴ = nŵ*He
@@ -1431,16 +1441,17 @@ function get_nonlinobj_op(
 ) where JNT<:Real
     model, con = estim.model, estim.con
     grad, hess = estim.gradient, estim.hessian
-    nx̂, nym, nŷ, nu = estim.nx̂, estim.nym, model.ny, model.nu
+    nx̂, nym, nŷ, nu, na = estim.nx̂, estim.nym, model.ny, model.nu, get_na(model)
     nk̄ = get_nk̄(model, estim.transcription)
     He = estim.He
     nc, neq, ng = con.nc, con.neq, length(con.i_g)
-    nŴ, nV̂, nX̂, ng, nZ̃ = He*nx̂, He*nym, He*nx̂, length(con.i_g), length(estim.Z̃)
+    nŴ, nV̂, nX̂, nA, ng, nZ̃ = He*nx̂, He*nym, He*nx̂, He*na, length(con.i_g), length(estim.Z̃)
     nK̄, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
     J::Vector{JNT}                      = zeros(JNT, 1)
     x̂0arr::Vector{JNT}, x̄::Vector{JNT}  = zeros(JNT, nx̂),  zeros(JNT, nx̂)
+    a0arr::Vector{JNT}, A0::Vector{JNT} = zeros(JNT, na),  zeros(JNT, nA)
     Ŵ::Vector{JNT}                      = zeros(JNT, nŴ)
     V̂::Vector{JNT},     X̂0::Vector{JNT} = zeros(JNT, nV̂),  zeros(JNT, nX̂)
     Ŵe::Vector{JNT}                     = zeros(JNT, nŴe)
@@ -1449,16 +1460,16 @@ function get_nonlinobj_op(
     Û0::Vector{JNT},    Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
     gc::Vector{JNT},    g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                    = zeros(JNT, neq)
-    function J!(Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
+    function J!(Z̃, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
     Z̃_J = zeros(JNT, nZ̃)
     J_cache = (
-        Cache(x̂0arr), Cache(x̄), 
-        Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
         Cache(Û0), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g), Cache(geq)
@@ -1548,18 +1559,19 @@ function get_nonlincon_oracle(
     # ----------- common cache for all functions  ----------------------------------------
     model, con = estim.model, estim.con
     jac, hess = estim.jacobian, estim.hessian
-    nx̂, nym, nŷ, nu = estim.nx̂, estim.nym, model.ny, model.nu
+    nx̂, nym, nŷ, nu, na = estim.nx̂, estim.nym, model.ny, model.nu, get_na(model)
     nk̄ = get_nk̄(model, estim.transcription)
     He = estim.He
     nc, neq, ng = con.nc, con.neq, length(con.i_g)
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ngi = sum(con.i_g)
-    nŴ, nV̂, nX̂, nZ̃ = He*nx̂, He*nym, He*nx̂, length(estim.Z̃)
+    nŴ, nV̂, nX̂, nA, nZ̃ = He*nx̂, He*nym, He*nx̂, He*na, length(estim.Z̃)
     nK̄, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     strict = Val(true)
     myInf                                 = convert(JNT, Inf)
     x̂0arr::Vector{JNT}, x̄::Vector{JNT}    = zeros(JNT, nx̂),  zeros(JNT, nx̂)
+    a0arr::Vector{JNT}, A0::Vector{JNT}   = zeros(JNT, na),  zeros(JNT, nA)
     Ŵ::Vector{JNT}                        = zeros(JNT, nŴ)
     V̂::Vector{JNT},     X̂0::Vector{JNT}   = zeros(JNT, nV̂),  zeros(JNT, nX̂)
     Ŵe::Vector{JNT}                       = zeros(JNT, nŴe)
@@ -1571,24 +1583,26 @@ function get_nonlincon_oracle(
     gi::Vector{JNT}                       = zeros(JNT, ngi)
     λi::Vector{JNT},    λeq::Vector{JNT}  = rand(JNT, ngi),  rand(JNT, neq)
     # -------------- inequality constraint: nonlinear oracle -------------------------
-    function gi!(gi, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
+    function gi!(gi, Z̃, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return nothing
     end
-    function ℓ_gi(Z̃, λi, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, gi)
+    function ℓ_gi(
+        Z̃, λi, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, gi
+    )
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return dot(λi, gi)
     end
     Z̃_∇gi = zeros(JNT, nZ̃)
     ∇gi_cache = (
-        Cache(x̂0arr), Cache(x̄), 
-        Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
         Cache(Û0), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g), Cache(geq)
@@ -1601,9 +1615,9 @@ function get_nonlincon_oracle(
     ∇gi_structure = init_diffstructure(∇gi)
     if !isnothing(hess)
         ∇²gi_cache = (
-            Cache(x̂0arr), Cache(x̄), 
-            Cache(Ŵ), Cache(V̂), Cache(X̂0), 
-            Cache(Ŵe), Cache(V̂e), Cache(X̂e),    
+            Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
+            Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
+            Cache(Ŵe), Cache(V̂e), Cache(X̂e),
             Cache(Û0), Cache(K̄), Cache(Ŷ0), 
             Cache(gc), Cache(g), Cache(geq),
             Cache(gi)
@@ -1651,22 +1665,24 @@ function get_nonlincon_oracle(
         eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²gi_func!
     )
     # ------------- equality constraints : nonlinear oracle ------------------------------
-    function geq!(geq, Z̃, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g)
+    function geq!(geq, Z̃, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g)
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return nothing
     end
-    function ℓ_geq(Z̃, λeq, x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
+    function ℓ_geq(
+        Z̃, λeq, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq
+    )
         update_predictions!(
-            x̂0arr, x̄, Ŵ, V̂, X̂0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return dot(λeq, geq)
     end
     Z̃_∇geq = zeros(JNT, nZ̃)
     ∇geq_cache = (
-        Cache(x̂0arr), Cache(x̄), 
-        Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+        Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
         Cache(Û0), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g)
@@ -1678,8 +1694,8 @@ function get_nonlincon_oracle(
     ∇geq_structure  = init_diffstructure(∇geq)
     if !isnothing(hess)
         ∇²geq_cache = (
-            Cache(x̂0arr), Cache(x̄), 
-            Cache(Ŵ), Cache(V̂), Cache(X̂0), 
+            Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
+            Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
             Cache(Ŵe), Cache(V̂e), Cache(X̂e),
             Cache(Û0), Cache(K̄), Cache(Ŷ0), 
             Cache(gc), Cache(g), Cache(geq)

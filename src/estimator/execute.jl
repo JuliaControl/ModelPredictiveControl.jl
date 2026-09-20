@@ -14,7 +14,7 @@ function remove_op!(estim::StateEstimator, ym, d, u=nothing)
 end
 
 @doc raw"""
-    f̂!(x̂0next, û0, k, estim::StateEstimator, model::SimModelODE, x̂0, u0, d0) -> nothing
+    f̂!(x̂0next, û0, k̄, estim::StateEstimator, model::SimModel, x̂0, u0, d0) -> nothing
 
 Mutating state update function ``\mathbf{f̂}`` of the augmented model.
 
@@ -28,7 +28,7 @@ the function returns the next state of the augmented model, as deviation vectors
 ```
 where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂0next` argument. The method mutates `x̂0next`, 
 `û0` and `k` in place. The argument `û0` stores the disturbed input of the augmented model
-``\mathbf{û_0}``, and `k`, the intermediate stage values of `model.solver`, when applicable.
+``\mathbf{û_0}``, and `k̄`, the intermediate stage values of `model.solver`, when applicable.
 The model parameter `model.p` is not included in the function signature for conciseness. 
 The operating points are handled inside ``\mathbf{f̂}``. See Extended Help for details on 
 ``\mathbf{û_0, f̂}`` and ``\mathbf{ĥ}`` implementations.
@@ -61,8 +61,8 @@ The operating points are handled inside ``\mathbf{f̂}``. See Extended Help for 
     are computed by [`augment_model`](@ref) (almost always zeros in practice for 
     [`NonLinModel`](@ref)).
 """
-function f̂!(x̂0next, û0, k, estim::StateEstimator, model::SimModelODE, x̂0, u0, d0)
-    return f̂!(x̂0next, û0, k, model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0)
+function f̂!(x̂0next, û0, k̄, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
+    return f̂!(x̂0next, û0, k̄, model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0)
 end
 
 @doc raw"""
@@ -92,28 +92,28 @@ function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
 end
 
 """
-    f̂!(x̂0next, û0, k, model::SimModelODE, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+    f̂!(x̂0next, û0, k, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
 
-Same than [`f̂!`](@ref) for [`SimModelODE`](@ref) but without the `estim` argument.
+Same than [`f̂!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
 """
-function f̂!(x̂0next, û0, k, model::SimModelODE, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+function f̂!(x̂0next, û0, k̄, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
     @views xdnext, xsnext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
     mul!(û0, Cs_u, xs)      # ys_u = Cs_u*xs
     û0 .+= u0               # û0 = u0 + ys_u  
-    f!(xdnext, k, model, xd, û0, d0, model.p)
+    f!(xdnext, k̄, model, xd, û0, d0, model.p)
     mul!(xsnext, As, xs)
     x̂0next .+= f̂op .- x̂op
     return nothing
 end
 
 @doc raw"""
-    ĥ!(ŷ0, estim::StateEstimator, model::SimModelODE, x̂0, d0) -> nothing
+    ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, d0) -> nothing
 
 Mutating output function ``\mathbf{ĥ}`` of the augmented model, see [`f̂!`](@ref).
 """
-function ĥ!(ŷ0, estim::StateEstimator, model::SimModelODE, x̂0, d0)
+function ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, d0)
     return ĥ!(ŷ0, model, estim.Cs_y, x̂0, d0)
 end
 
@@ -129,17 +129,47 @@ function ĥ!(ŷ0, estim::StateEstimator, ::LinModel, x̂0, d0)
 end
 
 """
-    ĥ!(ŷ0, model::SimModelODE, Cs_y, x̂0, d0)
+    ĥ!(ŷ0, model::SimModel, Cs_y::AbstractMatrix, x̂0, d0)
 
-Same than [`ĥ!`](@ref) for [`SimModelODE`](@ref) but without the `estim` argument.
+Same than [`ĥ!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
 """
-function ĥ!(ŷ0, model::SimModelODE, Cs_y, x̂0, d0)
+function ĥ!(ŷ0, model::SimModel, Cs_y::AbstractMatrix, x̂0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
     h!(ŷ0, model, xd, d0, model.p)  # y0 = h(xd, d0)
     mul!(ŷ0, Cs_y, xs, 1, 1)        # ŷ0 = y0 + Cs_y*xs
     return nothing
 end
+
+"""
+    fq_dae!(ẋ0, q0, model, x0, a0, u0, d0)
+
+Call `model.fq!` for [`NonLinModelDAE`](@ref) or `model.f!` for [`NonLinModel`](@ref).
+"""
+function fq_dae!(ẋ0, q0, model::NonLinModelDAE, x0, a0, u0, d0)
+    return model.fq!(ẋ0, q0, x0, a0, u0, d0, model.p)
+end
+fq_dae!(ẋ0, _ , model::NonLinModel, x0, _ , u0, d0)= model.f!(ẋ0, x0, u0, d0, model.p)
+
+"""
+    ĥ_dae!(ŷ0, estim::StateEstimator, model::NonLinModelDAE, x0, a0, d0)
+
+Similar than [`ĥ!`](@ref) but with a algebraic variable `a0` for [`NonLinModelDAE`](@ref) .
+"""
+function ĥ_dae!(ŷ0, estim::StateEstimator, model::NonLinModelDAE, x̂0, a0, d0)
+    # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
+    @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    model.h!(ŷ0, xd, a0, d0, model.p)
+    mul!(ŷ0, estim.Cs_y, xs, 1, 1)        # ŷ0 = y0 + Cs_y*xs
+    return nothing
+end
+
+"""
+    ĥ_dae!(ŷ0, estim::StateEstimator, model::SimModelODE, x0, _ , d0)
+
+Ignore the algebraic variable argument for other [`SimModelODE`](@ref) types.
+"""
+ĥ_dae!(ŷ0, estim::StateEstimator, model::SimModelODE, x̂0, _, d0) = ĥ!(ŷ0, estim, model, x̂0, d0)
 
 """
     disturbedinput!(Û0, estim::StateEstimator, x̂0, X̂0, U0) -> Û0

@@ -182,14 +182,20 @@ transcription method.
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                     \\
         \mathbf{X̂_0}                                                    \\
-        \mathbf{a_0}(k+0)                                               \\
-        \mathbf{A_0}                                                    \end{bmatrix}
-    \quad \text{and} \quad
+        \mathbf{A_0}                                                    \\
+        \mathbf{Ā}                                                      \end{bmatrix}
+    , \: 
     \mathbf{A_0} = \begin{bmatrix}
         \mathbf{a_0}(k+1)                                               \\
         \mathbf{a_0}(k+2)                                               \\
         \vdots                                                          \\
         \mathbf{a_0}(k+H_p)                                             \end{bmatrix}
+    \: \text{and} \:
+    \mathbf{Ā} = \begin{bmatrix}
+        \mathbf{a}(k+0)                                                 \\
+        \mathbf{a}(k+1)                                                 \\
+        \vdots                                                          \\
+        \mathbf{a}(k+H_p-1)                                             \end{bmatrix}
     ```
     and, for [`MovingHorizonEstimator`](@ref) with DAEs:
     ```math
@@ -197,21 +203,31 @@ transcription method.
         \mathbf{x̂_0}(k-N_k+p)                                           \\  
         \mathbf{X̂_0}                                                    \\         
         \mathbf{0_x̂}                                                    \\
-        \mathbf{a_0}(k-N_k+p)                                           \\
+        \mathbf{a_0}(k-N_k+p)                                           \\  
         \mathbf{A_0}                                                    \\
         \mathbf{0_a}                                                    \\
+        \mathbf{Ā}                                                      \\
+        \mathbf{0_ā}                                                    \\
         \mathbf{Ŵ}                                                      \\
         \mathbf{0_ŵ}                                                    \end{bmatrix}
-    \quad \text{and} \quad
+    , \: 
     \mathbf{A_0} = \begin{bmatrix}
         \mathbf{a_0}(k-N_k+p+1)                                         \\
-        \mathbf{a_0}(k-N_k+p+1)                                         \\
+        \mathbf{a_0}(k-N_k+p+2)                                         \\
         \vdots                                                          \\
         \mathbf{a_0}(k+p)                                               \end{bmatrix}
+    \: \text{and} \:
+    \mathbf{Ā} = \begin{bmatrix}
+        \mathbf{a}(k-N_k+p+0)                                           \\
+        \mathbf{a}(k-N_k+p+1)                                           \\
+        \vdots                                                          \\
+        \mathbf{a}(k+p-1)                                               \end{bmatrix}
     ```
     See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
-    variables at the beginning (``N_k < He``).
+    variables at the beginning (``N_k < H_e``). The predicted outputs are computed from
+    the algebraic variables in ``\mathbf{A_0}``, while the values in ``\mathbf{Ā}`` are
+    strictly reserved for the the `fq!` function.
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
@@ -310,10 +326,10 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     algebraic variables at the collocation points:
     ```math
     \mathbf{ā}(k+j) = \begin{bmatrix}
-        \mathbf{ā}_1(k+j)                                           \\
-        \mathbf{ā}_2(k+j)                                           \\
+        \mathbf{a}_1(k+j)                                           \\
+        \mathbf{a}_2(k+j)                                           \\
         \vdots                                                      \\
-        \mathbf{ā}_{n_o}(k+j)                                       \end{bmatrix}
+        \mathbf{a}_{n_o}(k+j)                                       \end{bmatrix}
     ```
     Although not strictly needed, the current algebraic variable ``\mathbf{a_0}(k+0)`` is
     still included in the decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
@@ -332,7 +348,13 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{A_0}                                                \\
         \mathbf{K̄}                                                  \\
         \mathbf{Ā}                                                  \end{bmatrix}
-    \quad \text{and} \quad
+    , \:
+    \mathbf{A_0} = \begin{bmatrix}
+        \mathbf{a_0}(k+1)                                           \\
+        \mathbf{a_0}(k+2)                                           \\
+        \vdots                                                      \\
+        \mathbf{a_0}(k+H_p)                                         \end{bmatrix}
+    \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{ā}(k+0)                                             \\
         \mathbf{ā}(k+1)                                             \\
@@ -345,6 +367,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{x̂_0}(k-N_k+p)                                       \\  
         \mathbf{X̂_0}                                                \\         
         \mathbf{0_x̂}                                                \\
+        \mathbf{a_0}(k-N_k+p)                                       \\
         \mathbf{A_0}                                                \\
         \mathbf{0_a}                                                \\
         \mathbf{K̄}                                                  \\
@@ -353,16 +376,23 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{0_ā}                                                \\ 
         \mathbf{Ŵ}                                                  \\
         \mathbf{0_ŵ}                                                \end{bmatrix}
-    \quad \text{and} \quad
+    , \;
+    \mathbf{A_0} = \begin{bmatrix}
+        \mathbf{a_0}(k-N_k+p+1)                                     \\
+        \mathbf{a_0}(k-N_k+p+2)                                     \\
+        \vdots                                                      \\
+        \mathbf{a_0}(k+p)                                           \end{bmatrix}
+    \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{ā}(k-N_k+p+0)                                       \\
         \mathbf{ā}(k-N_k+p+1)                                       \\
         \vdots                                                      \\
         \mathbf{ā}(k+p-1)                                           \end{bmatrix}
     ```
-    See the Extended Help of [`TrapezoidalCollocation`](@ref) for the exact definition of 
-    ``\mathbf{A_0}`` on the last two cases. All the ``\mathbf{0_{(•)}}`` are vectors with
-    zeros for the unused decision variables at the beginning (``N_k < H_e``).
+    All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision variables at
+    the beginning in the [`MovingHorizonEstimator`](@ref) (``N_k < H_e``). The predicted
+    outputs are computed from the algebraic variables in ``\mathbf{A_0}``, while the values
+    in ``\mathbf{Ā}`` are strictly reserved for the `fq!` function.
     
     The collocation points are located at the roots of orthogonal polynomials, which is 
     "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.

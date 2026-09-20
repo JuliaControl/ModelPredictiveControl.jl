@@ -3,10 +3,12 @@ struct StateEstimatorBuffer{NT<:Real}
     û ::Vector{NT}
     k̄ ::Vector{NT}
     x̂ ::Vector{NT}
+    a ::Vector{NT}
     Z̃ ::Vector{NT}
     V̂ ::Vector{NT}
     Ŵ ::Vector{NT}
     X̂ ::Vector{NT}
+    A ::Vector{NT}
     Ŷ ::Vector{NT}
     D ::Vector{NT}
     P̂ ::Matrix{NT}
@@ -21,7 +23,7 @@ end
 
 @doc raw"""
     StateEstimatorBuffer{NT}(
-        nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk̄::Int=0
+        nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk̄::Int=0, na::Int=0,
         He::Int=0, nŵ::Int=nx̂, nε::Int=0, 
         transcription::TranscriptionMethod = SingleShooting()
     )
@@ -31,20 +33,22 @@ Create a buffer for `StateEstimator` objects for estimated states and measured o
 The buffer is used to store intermediate results during estimation without allocating.
 """
 function StateEstimatorBuffer{NT}(
-    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk̄::Int=0, 
+    nu::Int, nx̂::Int, nym::Int, ny::Int, nd::Int, nk̄::Int=0, na::Int=0,
     He::Int=0, nŵ::Int=nx̂, nε::Int=0,
     transcription::TranscriptionMethod = SingleShooting()
 ) where NT <: Real
-    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ)
-    nV̂, nŴ, nX̂, nŶ, nD = nym*He, nŵ*He, nx̂*He, ny*He, nd*(He+1)
+    nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
+    nV̂, nŴ, nX̂, nA, nŶ, nD = nym*He, nŵ*He, nx̂*He, na*He, ny*He, nd*(He+1)
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)
     k̄  = Vector{NT}(undef, nk̄)
     x̂  = Vector{NT}(undef, nx̂)
+    a  = Vector{NT}(undef, na)
     Z̃  = Vector{NT}(undef, nZ̃)
     V̂  = Vector{NT}(undef, nV̂)
     Ŵ  = Vector{NT}(undef, nŴ)
     X̂  = Vector{NT}(undef, nX̂)
+    A  = Vector{NT}(undef, nA)
     Ŷ  = Vector{NT}(undef, nŶ)
     D  = Vector{NT}(undef, nD)
     P̂  = Matrix{NT}(undef, nx̂, nx̂)
@@ -56,7 +60,7 @@ function StateEstimatorBuffer{NT}(
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
     return StateEstimatorBuffer{NT}(
-        u, û, k̄, x̂, Z̃, V̂, Ŵ, X̂, Ŷ, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
+        u, û, k̄, x̂, a, Z̃, V̂, Ŵ, X̂, A, Ŷ, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
     )
 end
 
@@ -174,7 +178,7 @@ where ``\mathbf{e}(k)`` is an unknown zero mean white noise and ``\mathbf{A_s} =
 it is thus ignored. The function [`init_integrators`](@ref) builds the state-space matrices.
 """
 function init_estimstoch(
-    model::SimModelODE{NT}, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVectorOrInt
+    model::SimModel{NT}, i_ym, nint_u::IntVectorOrInt, nint_ym::IntVectorOrInt
 ) where {NT<:Real}
     nu, ny, nym = model.nu, model.ny, length(i_ym)
     As_u , Cs_u , nint_u  = init_integrators(nint_u , nu , "u")
@@ -198,7 +202,7 @@ function validate_ym(model::SimModel, i_ym)
 end
 
 "Convert the measured outputs stochastic model `stoch_ym` to all outputs `stoch_y`."
-function stoch_ym2y(model::SimModelODE{NT}, i_ym, Asm, Bsm, Csm, Dsm) where {NT<:Real}
+function stoch_ym2y(model::SimModel{NT}, i_ym, Asm, Bsm, Csm, Dsm) where {NT<:Real}
     As = Asm
     Bs = Bsm
     Cs = zeros(NT, model.ny, size(Csm,2))

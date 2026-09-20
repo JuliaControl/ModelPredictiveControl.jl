@@ -400,6 +400,19 @@ function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
     return iszero_Ha
 end
 
+"Get the number of algebraic variable `na` in `model`."
+get_na(model::NonLinModelDAE) = model.na
+get_na(::SimModel) = 0
+
+"Get length of the `ā` vector with all the algebraic variable collocation pts (excl. τ=1)."
+get_nā(model::NonLinModelDAE, transcription::OrthogonalCollocation) = model.na*transcription.no
+get_nā(model::NonLinModelDAE, ::TrapezoidalCollocation) = model.na
+get_nā(::SimModel, ::TranscriptionMethod) = 0
+
+"Get the warm-starting value for the algebraic variable `as_0`."
+get_as_0(model::NonLinModelDAE) = model.as_0
+get_as_0(model::SimModel) = model.buffer.a
+
 "Get the number of elements in the optimization decision vector `Z` for DAE solving."
 function get_nZ_dae(transcription::OrthogonalCollocation, nx, na)
     return nx + transcription.no*nx + na + transcription.no*na
@@ -656,26 +669,40 @@ function update_predictions!(k̄, geq, model, Z)
     return nothing
 end
 
+"""
+    con_nonlinprogeq!(
+        geq, k̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
+    ) -> geq
+
+TBW
+"""
 function con_nonlinprogeq!(
     geq, k̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
 )
     nx, na = model.nx, model.na
     Ts = model.Ts
     x0next_Z, a0_Z, a0next_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
-    sknext, q1, q2  = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
-    k̇1, k̇2 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
-    model.fq!(k̇1, q1, x0,       a0_Z,     u0, d0, model.p)
-    model.fq!(k̇2, q2, x0next_Z, a0next_Z, u0, d0, model.p)
-    sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇1 + k̇2)
+    sknext, q0, q1  = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
+    k̇0, k̇1 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
+    model.fq!(k̇0, q0, x0,       a0_Z,     u0, d0, model.p)
+    model.fq!(k̇1, q1, x0next_Z, a0next_Z, u0, d0, model.p)
+    sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇0 + k̇1)
     return geq
 end
 
+"""
+    con_nonlinprogeq!(
+        geq, k̄, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
+    ) -> geq
+
+TBW
+"""
 function con_nonlinprogeq!(
     geq, k̄, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
 )
     nx, na = model.nx, model.na
     Mo, no =  model.Mo, transcription.no
-    nk̄, nā = get_nk̄(model, transcription), no*na
+    nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     a0_Z, k̄_Z, ā_Z = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
     q0, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)] 
     @views model.fq!(k̄[1:nx], q0, x0, a0_Z, u0, d0, model.p)
