@@ -1747,10 +1747,10 @@ function con_nonlinprogeq_mhe!(
         ā        = @views        Ā_Z̃[(1 + na*(j-1)):(na*(j-1) + na)]
         ŝk       = @views         Ŝk̄[(1 + nx*(j-1)):(nx*j)]
         k̇1, k̇2   = @views          k̄[1:nx], k̄[nx+1:2nx]
-        if estim.direct || j ≥ Nk
-            d0next = d0 # special case: d0(k+1)≈d0(k), since d0(k+1) is not available
-        else
+        if estim.direct || j < Nk
             d0next = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
+        else
+            d0next = d0 # special case: d0(k+1)≈d0(k), since d0(k+1) is not available
         end
         if f_threads || h < 1 || j < 2
             # we need to recompute k1 with multi-threading, even with h==1, since the 
@@ -1822,6 +1822,7 @@ function con_nonlinprogeq_mhe!(
     nk̄ = get_nk̄(model, transcription)
     nx̃ = estim.nε + nx̂
     p = estim.direct ? 0 : 1
+    i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃, K_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)], Z̃[(nx̃+nx̂*He+1):(nx̃+nx̂*He+nk̄*He)]
     Dtemp = estim.buffer.D
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
@@ -1836,10 +1837,10 @@ function con_nonlinprogeq_mhe!(
         k̄     = @views             K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         k̄_Z̃      = @views        K_Z̃[(1 + nk̄*(j-1)):(nk̄*j)]
         ŝk̄       = @views        geq[(1 + nk̄*(j-1)):(nk̄*j)]
-        if estim.direct || j ≥ Nk
-            d0next = d0 # special case: d0(k+1)≈d0(k), since d0(k+1) is not available
+        if estim.direct || j < Nk
+            d0next = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
         else
-            d0next = @views estim.D0[(1 + nd*(j+p)):(nd*(j+p+1))]
+            d0next = d0 # special case: d0(k+1)≈d0(k), since d0(k+1) is not available
         end
         # ----------------- collocation constraint defects -----------------------------
         Δk = k̄
