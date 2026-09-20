@@ -1763,7 +1763,14 @@ function con_nonlinprogeq_mhe!(
         fq_dae!(k̇1, q1, model, x̂dnext, a1, û1, d1)
         ŝk .= @. x̂d_Z̃ - x̂dnext + 0.5*Ts*(k̇0 + k̇1) + ŵd
     end
-    Q0[(1 + na*Nk):(na*(Nk+1))] .= @views Q̄[(1 + na*(Nk-1)):(na*Nk)] # final q1 value
+    if na > 0 # final residual at k+p:
+        x̂d     = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
+        a0     = @views     A0_Z̃[(1 + na*(Nk-1)):((na*(Nk-1) + na))]
+        û0     = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))]
+        d0     = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]
+        q0     = @views       Q0[(1 + na*Nk):(na*Nk + na)]
+        @views fq_dae!(K̄[1:nx], q0, model, x̂d, a0, û0, d0)
+    end
     if Nk < He 
         Ŝk̄[(1 + nx*Nk):end] .= 0
         Q0[(1 + na*Nk + na):end] .= 0
