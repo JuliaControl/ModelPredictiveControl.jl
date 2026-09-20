@@ -405,6 +405,10 @@ function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
     return iszero_Ha
 end
 
+"Default to `SingleShooting()`, or `model.transcription` if `model` is a `NonLinModelDAE`."
+default_transcription(::SimModel) = SingleShooting()
+default_transcription(model::NonLinModelDAE) = model.transcription
+
 "Get the number of algebraic variable `na` in `model`."
 get_na(model::NonLinModelDAE) = model.na
 get_na(::SimModel) = 0

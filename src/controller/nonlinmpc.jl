@@ -1,4 +1,3 @@
-const DEFAULT_NONLINMPC_TRANSCRIPTION = SingleShooting()
 const DEFAULT_NONLINMPC_HESSIAN = AutoSparse(
     AutoForwardDiff();
     sparsity_detector=TracerSparsityDetector(),
@@ -365,7 +364,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc::Int = 0,
     p = model.p,
-    transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
+    transcription::TranscriptionMethod = SingleShooting(),
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
@@ -380,9 +379,6 @@ function NonLinMPC(
         transcription, optim, gradient, jacobian, hessian
     )
 end
-
-default_estimator(model::SimModelODE; kwargs...) = UnscentedKalmanFilter(model; kwargs...)
-default_estimator(model::LinModel; kwargs...) = SteadyKalmanFilter(model; kwargs...)
 
 """
     NonLinMPC(estim::StateEstimator; <keyword arguments>)
@@ -441,7 +437,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc = 0,
     p = estim.model.p,
-    transcription::TranscriptionMethod = DEFAULT_NONLINMPC_TRANSCRIPTION,
+    transcription::TranscriptionMethod = SingleShooting(),
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
@@ -466,6 +462,9 @@ function NonLinMPC(
         transcription, optim, gradient, jacobian, hessian
     )
 end
+
+default_estimator(model::SimModelODE; kwargs...) = UnscentedKalmanFilter(model; kwargs...)
+default_estimator(model::LinModel; kwargs...) = SteadyKalmanFilter(model; kwargs...)
 
 """
     validate_JE(NT, JE) -> nothing
