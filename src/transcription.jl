@@ -218,16 +218,20 @@ transcription method.
         \mathbf{a_0}(k+p)                                               \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
-        \mathbf{a}(k-N_k+p+0)                                           \\
-        \mathbf{a}(k-N_k+p+1)                                           \\
+        \mathbf{a_1}(k-N_k+p+0)                                         \\
+        \mathbf{a_1}(k-N_k+p+1)                                         \\
         \vdots                                                          \\
-        \mathbf{a}(k+p-1)                                               \end{bmatrix}
+        \mathbf{a_1}(k+p-1)                                             \end{bmatrix}
     ```
     See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
     variables at the beginning (``N_k < H_e``). The predicted outputs are computed from
     the algebraic variables in ``\mathbf{A_0}``, while the values in ``\mathbf{Ā}`` are
     strictly reserved for the the `fq!` function.
+
+    It's important to understand that the ``\mathbf{A_0}`` vector must be explicitly
+    included in the decision variables because of the output function ``\mathbf{h}``. As a
+    corollary, the optimal values #TODO: continue here or delete this par if no longer required
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
