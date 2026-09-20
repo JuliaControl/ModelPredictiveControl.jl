@@ -3,7 +3,7 @@ include("mhe/execute.jl")
 include("mhe/transcription.jl")
 
 "Return estimation horizon He and slack variables length nε for `MovingHorizonEstimator`."
-get_other_dims(estim::MovingHorizonEstimator) = (estim.He, estim.nε)
+get_other_dims(estim::MovingHorizonEstimator) = (estim.He, estim.nε, get_na(estim.model))
 
 "Print optimizer and other information for `MovingHorizonEstimator`."
 function print_details(io::IO, estim::MovingHorizonEstimator)
@@ -27,11 +27,13 @@ print_backends(::IO, ::MovingHorizonEstimator, ::LinModel) = nothing
 function print_estim_dim(io::IO, estim::MovingHorizonEstimator, n; firstchars=nothing)
     nu, nd = estim.model.nu, estim.model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
+    na = get_na(estim.model)
     He, nε = estim.He, estim.nε
     niu, niym = sum(estim.nint_u), sum(estim.nint_ym)
     println(io, "  │ ├$(lpad(He, n)) estimation steps He")
     println(io, "  │ ├$(lpad(nu, n)) manipulated inputs u ($niu integrating states)")
     println(io, "  │ ├$(lpad(nx̂, n)) estimated states x̂")
+    println(io, "  │ ├$(lpad(na, n)) algebraic variables a")
     println(io, "  │ ├$(lpad(nym, n)) measured outputs ym ($niym integrating states)")
     println(io, "  │ ├$(lpad(nyu, n)) unmeasured outputs yu")
     print(io,   "  │ └$(lpad(nd, n)) measured disturbances d")
