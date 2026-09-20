@@ -1766,8 +1766,8 @@ function con_nonlinprogeq_mhe!(
     if na > 0 # final residual at k+p:
         x̂d     = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
         a0     = @views     A0_Z̃[(1 + na*(Nk-1)):((na*(Nk-1) + na))]
-        û0     = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))]
-        d0     = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]
+        û0     = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p)≈û0(k+p-1)
+        d0     = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]           # d0(k+1)≈d0(k)
         q0     = @views       Q0[(1 + na*Nk):(na*Nk + na)]
         @views fq_dae!(K̄[1:nx], q0, model, x̂d, a0, û0, d0)
     end
