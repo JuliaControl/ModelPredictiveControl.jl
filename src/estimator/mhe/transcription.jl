@@ -1763,13 +1763,13 @@ function con_nonlinprogeq_mhe!(
         ŝk .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇0 + k̇1) + ŵd
     end
     if na > 0 # final residual at k+p: 
-        x̂d_Z̃   = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
-        a0_Z̃   = @views     A0_Z̃[(1 + na*(Nk-1)):((na*(Nk-1) + na))]
-        û0     = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p)≈û0(k+p-1)
-        d0     = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]           # d0(k+1)≈d0(k)
-        q0     = @views       Q0[(1 + na*Nk):(na*Nk + na)]
-        k̇0     = @views        K̄[(end-nx+1):end]
-        fq_dae!(k̇0, q0, model, x̂d_Z̃, a0_Z̃, û0, d0)
+        x̂dend   = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
+        a0end   = @views     A0_Z̃[(1 + na*(Nk-1)):((na*(Nk-1) + na))]
+        û0end   = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p)≈û0(k+p-1)
+        d0end   = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]           # d0(k+1)≈d0(k)
+        q0end   = @views       Q0[(1 + na*Nk):(na*Nk + na)]
+        k̇0end   = @views        K̄[(end-nx+1):end]
+        fq_dae!(k̇0end, q0end, model, x̂dend, a0end, û0end, d0end)
     end
     return geq
 end
@@ -1816,27 +1816,47 @@ function con_nonlinprogeq_mhe!(
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     Mo, no, τ =  estim.Mo, transcription.no, transcription.τ
-    nk̄ = get_nk̄(model, transcription)
+    na = get_na(model)
+    nā, nk̄ = na*no, get_nk̄(model, transcription)
     nx̃ = estim.nε + nx̂
+    nx̃_nX̂  = nx̃ + nx̂*estim.He
+    nŜk̄, nA, nK̄, nĀ = nk̄*He, na*He, nk̄*He, nā*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
-    X̂0_Z̃, K_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)], Z̃[(nx̃+nx̂*He+1):(nx̃+nx̂*He+nk̄*He)]
+    X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]
+    A0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nA)] # skipping a0arr components
+    K̄_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nA):(nx̃_nX̂ + na + nA + nK̄)]
+    Ā_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nA + nK̄):(nx̃_nX̂ + na + nA + nK̄ + nĀ)]
     Dtemp = estim.buffer.D
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
+    Ŝk̄   = @views geq[1:nŜk̄]
+    Q0   = @views geq[(1 + nŜk̄):(nŜk̄ + nA + na)]
+    Q̄    = @views geq[(1 + nŜk̄ + nA + na):()]
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
+            a0   = @views a0arr[1:na]
         else
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
+            a0   = @views A0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
         end
-        d0     = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
-        û0     = @views         Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄     = @views             K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        k̄_Z̃    = @views        K_Z̃[(1 + nk̄*(j-1)):(nk̄*j)]
-        ŝk̄     = @views        geq[(1 + nk̄*(j-1)):(nk̄*j)]
+        d0   = @views estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
+        û0   = @views       Û0[(1 + nu*(j-1)):(nu*j)]
+        k̄    = @views        K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄_Z̃  = @views      K̄_Z̃[(1 + nk̄*(j-1)):(nk̄*j)]
+        ā_Z̃  = @views      Ā_Z̃[(1 + nā*(j-1)):(nā*j)]
+        q0   = @views       Q0[(1 + na*(j-1)):(na*j)]
+        q̄    = @views        Q̄[(1 + nā*(j-1)):(nā*j)]
+        ŝk̄   = @views       Ŝk̄[(1 + nk̄*(j-1)):(nk̄*j)]
         if estim.direct || j < Nk
             d0next = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
         else
             d0next = d0 # special case: d0(k+1)≈d0(k), since d0(k+1) is not available
+        end
+        # ----------------- residual at sampling times (τ=0) ---------------------------
+        if na > 0 && (f_threads || h < 1 || j < 2)
+            @views fq_dae!(k̄[1:nx], q0, model, x̂d_Z̃, a0, û0, d0)
+        else
+            q0 .= @views Q0[(1 + na*(j-2)):(na*(j-1))] # q0 of the prev. iter (j-1)
         end
         # ----------------- collocation constraint defects -----------------------------
         Δk = k̄
@@ -1849,17 +1869,16 @@ function con_nonlinprogeq_mhe!(
             ûi = similar(û0) # TODO: remove this allocation
         end
         for i=1:no
-            k̇i   = @views    k̄[(1 + (i-1)*nx):(i*nx)]
-            ki_Z̃ = @views  k̄_Z̃[(1 + (i-1)*nx):(i*nx)]
+            k̇i, ki_Z̃  = @views k̄[(1 + (i-1)*nx):(i*nx)], k̄_Z̃[(1 + (i-1)*nx):(i*nx)]
+            qi, ai_Z̃  = @views q̄[(1 + (i-1)*na):(i*na)], ā_Z̃[(1 + (i-1)*na):(i*na)]
             di  .= (1-τ[i]).*d0 .+ τ[i].*d0next
-            if h < 1
-                model.f!(k̇i, ki_Z̃, û0, di, model.p)
-            else
-                # special case: û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k
-                û0next = @views j ≥ Nk ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
-                ûi .= (1-τ[i]).*û0 .+ τ[i].*û0next
-                model.f!(k̇i, ki_Z̃, ûi, di, model.p)
+            if h > 0 && j < Nk
+                û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
+                ûi    .= (1-τ[i]).*û0 .+ τ[i].*û0next
+            else # special case, û0(k+p)≈û0(k+p-1), since û0(k+p) not available at time k:
+                ûi = û0
             end
+            fq_dae!(k̇i, qi, model, ki_Z̃, ai_Z̃, ûi, di)
         end
         ŝk̄ .-= k̄
     end
