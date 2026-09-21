@@ -1715,13 +1715,14 @@ function con_nonlinprogeq_mhe!(
     nx̃_nX̂  = nx̃ + nx̂*estim.He
     nŜk, nA, nĀ = nx*He, na*He, na*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
-    X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]
+    X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x0arr components
     A0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nA)] # skipping a0arr components
     A1_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na + nA):(nx̃_nX̂ + na + nA + nĀ)]
     Û0   = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
+    (Nk < He) && (geq .= 0) 
     Ŝk   = @views geq[1:nŜk]
     Q0   = @views geq[(1 + nŜk):(nŜk + nA + na)]
-    Q̄    = @views geq[(1 + nŜk + nA + na):end]
+    Q̄    = @views geq[(1 + nŜk + nA + na):end]    
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
@@ -1750,8 +1751,8 @@ function con_nonlinprogeq_mhe!(
             # previous iteration (j-1) may not be executed (iterations are re-orderable)
             fq_dae!(k̇0, q0, model, x̂d_Z̃, a0_Z̃, û0, d0)
         else
-            k̇0 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇1 of the prev. iter. (j-1)
-            q0 .= @views a0_Z̃ .- A1_Z̃[(1 + na*(j-2)):(na*(j-1))] # a0 = a1 of prev. iter.
+            k̇0 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇1[j-1] (prev. iter)
+            q0 .= @views a0_Z̃ .- A1_Z̃[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a1[j-1]
         end
         if h > 0 && j < Nk
             û1 = @views Û0[(1 + nu*j):(nu*(j+1))]
@@ -1761,18 +1762,14 @@ function con_nonlinprogeq_mhe!(
         fq_dae!(k̇1, q1, model, x̂dnext_Z̃, a1_Z̃, û1, d1)
         ŝk .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇0 + k̇1) + ŵd
     end
-    if na > 0 # final residual at k+p:
+    if na > 0 # final residual at k+p: 
         x̂d_Z̃   = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
         a0_Z̃   = @views     A0_Z̃[(1 + na*(Nk-1)):((na*(Nk-1) + na))]
         û0     = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p)≈û0(k+p-1)
         d0     = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]           # d0(k+1)≈d0(k)
         q0     = @views       Q0[(1 + na*Nk):(na*Nk + na)]
-        @views fq_dae!(K̄[1:nx], q0, model, x̂d_Z̃, a0_Z̃, û0, d0)
-    end
-    if Nk < He 
-        Ŝk[(1 + nx*Nk):end] .= 0
-        Q0[(1 + na*Nk + na):end] .= 0
-        Q̄[(1  + na*Nk):end]  .= 0
+        k̇0     = @views        K̄[(end-nx+1):end]
+        fq_dae!(k̇0, q0, model, x̂d_Z̃, a0_Z̃, û0, d0)
     end
     return geq
 end
