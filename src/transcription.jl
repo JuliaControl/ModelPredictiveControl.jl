@@ -495,7 +495,14 @@ beginning of the interval ``τ_0=0``, and is also extracted from `Z̃`. The ``\m
 derivatives for the ``i``th collocation point are computed from the continuous-time function
 [`fq_dae!`](@ref) and:
 ```math
-\mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
+\mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{a}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
+```
+The residuals of [`NonLinModelDAE`](@ref) at the collocation points are nonlinear equality
+constraints:
+```math
+\begin{aligned}
+\mathbf{q}_i(k) &= \mathbf{q}\Big(\mathbf{k}_i(k), \mathbf{a}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big) \\
+                &= \mathbf{0}
 ```
 Based on the normalized time ``τ_i`` and the hold order `transcription.h`, the inputs and
 disturbances are either piecewise constant or linear:
