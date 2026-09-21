@@ -1350,7 +1350,7 @@ end
     h! = (y,x,_,_)   -> y .= x 
     nonlinmodel_c = NonLinModel(f!, h!, 500, 1, 1, 1)
 
-    transcription = TrapezoidalCollocation(f_threads=true, h_threads=true)
+    transcription = TrapezoidalCollocation(f_threads=true, h_threads=false)
     mhe6 = MovingHorizonEstimator(
         nonlinmodel_c; He=3, direct=false, transcription
     )
@@ -1361,7 +1361,8 @@ end
     preparestate!(mhe6, [13])
     @test mhe6() ≈ [13] atol=5e-3
 
-    transcription = TrapezoidalCollocation(1)
+    ##### # h=1 & f_threads=false options test the branch with the reuse of k̇1 from prev. iter:
+    transcription = TrapezoidalCollocation(1, f_threads=true, h_threads=true)
     mhe7 = MovingHorizonEstimator(
         nonlinmodel_c; He=3, direct=true, transcription
     )
@@ -1428,7 +1429,7 @@ end
     as_0, xs_0 = [-1.0], [1.0]
     dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
-    transcription = TrapezoidalCollocation()
+    transcription = TrapezoidalCollocation(f_threads=true, h_threads=false)
     mhe = MovingHorizonEstimator(dae; He=2, transcription, hessian=true)
     preparestate!(mhe, [0.0], [0.0])
     x̂ = updatestate!(mhe, [0.0], [0.0], [0.0])
@@ -1451,7 +1452,8 @@ end
     preparestate!(mhe, [7.0], [0])
     @test mhe([0]) ≈ [7.0] atol=1e-3
 
-    transcription = TrapezoidalCollocation(1, f_threads=true, h_threads=true)
+    # h=1 & f_threads=false options test the branch with reuse of k̇1 & q1 from prev. iter:
+    transcription = TrapezoidalCollocation(1, f_threads=false, h_threads=true)
     mhe2 = MovingHorizonEstimator(dae; He=2, Cwt=1e4, direct=false, transcription)
     preparestate!(mhe2, [0.0], [0.0])
     x̂ = updatestate!(mhe2, [0.0], [0.0], [0.0])
