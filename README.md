@@ -82,7 +82,7 @@ for more detailed examples.
 
 ### 🎯 Model Predictive Control Features
 
-- 🏭️ **Plant Model**: Linear or nonlinear models exploiting multiple dispatch.
+- 🏭️ **Plant Model**: Linear, nonlinear ODE and nonlinear DAE models exploiting multiple dispatch.
 - ⛳️ **Objectives**: Tracking for inputs/outputs, move suppression, terminal costs, and economic costs.
 - ⏳️ **Horizons**: Distinct prediction/control horizons with custom move blocking.
 - 📸 **Linearization**: Auto-differentiation for exact Jacobians.
