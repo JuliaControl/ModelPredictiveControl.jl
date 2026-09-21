@@ -4,6 +4,10 @@
 Pages = ["nonlinmpc2.md"]
 ```
 
+!!! todo "Under Construction"
+    This tutorial is currently under construction. Only the modeling part is written for
+    now.
+
 ## Nonlinear Model (DAE)
 
 In this example, the goal is to control the pH of a solution in a continuously stirred
