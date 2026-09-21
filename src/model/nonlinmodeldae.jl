@@ -798,6 +798,31 @@ function h!(y0, model::NonLinModelDAE, x0, d0, p)
     return nothing
 end
 
+"""
+    fq_dae!(ẋ0, q0, model, x0, a0, u0, d0)
+
+Call `model.fq!` for [`NonLinModelDAE`](@ref) or `model.f!` for [`NonLinModel`](@ref).
+
+Both the algebraic variable `a0` and the residual `q0` arguments are ignored if `model` is a 
+[`NonLinModel`](@ref).
+"""
+function fq_dae!(ẋ0, q0, model::NonLinModelDAE, x0, a0, u0, d0)
+    return model.fq!(ẋ0, q0, x0, a0, u0, d0, model.p)
+end
+fq_dae!(ẋ0, _ , model::NonLinModel, x0, _ , u0, d0) = model.f!(ẋ0, x0, u0, d0, model.p)
+
+"""
+    h_dae!(y0, model, x0, a0, d0)
+
+Call `model.h!` with the `a0` argument if [`NonLinModelDAE`](@ref), else without.
+
+See also [`fq_dae!`](@ref).
+"""
+function h_dae!(y0, model::NonLinModelDAE, x0, a0, d0)
+    return model.h!(y0, x0, a0, d0, model.p)
+end
+h_dae!(y0, model::NonLinModel, x0, _ , d0) = model.h!(y0, x0, d0, model.p)
+
 function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
     mul!(model.Fs, model.Ks, model.x0_optim)
     model.beq .= @. -model.Fs

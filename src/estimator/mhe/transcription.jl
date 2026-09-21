@@ -1499,7 +1499,7 @@ function predict_mhe!(
         ŷ0  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
         v̂   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
         y0m = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
-        ĥ_dae!(ŷ0, estim, model, x̂0, a0, d0)
+        ĥ!(ŷ0, estim, model, x̂0, a0, d0)
         ŷ0m = @views ŷ0[estim.i_ym]
         if any(isnan, y0m) # nan in Y0m: y0m=ŷ0m => associated v̂ value = 0
             y0m = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0m, ŷ0m)]
@@ -1714,15 +1714,15 @@ function con_nonlinprogeq_mhe!(
     nx̃          = estim.nε + nx̂
     nx̃_nX̂       = nx̃ + nx̂*estim.He
     nx̃_nX̂_na_nA = nx̃_nX̂ + na + na*estim.He
-    nŜk̄, nA, nĀ = nx*He, na*He, na*He
+    nŜk, nA, nĀ = nx*He, na*He, na*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃_nX̂)]
     A0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂_na_nA)] # skipping a0arr components
-    Ā_Z̃  = @views Z̃[(1 + nx̃_nX̂_na_nA):(nx̃_nX̂_na_nA + nĀ)]
+    A1_Z̃ = @views Z̃[(1 + nx̃_nX̂_na_nA):(nx̃_nX̂_na_nA + nĀ)]
     Û0   = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
-    Ŝk̄   = @views geq[1:nŜk̄]
-    Q0   = @views geq[(nŜk̄ + 1):(nŜk̄ + nA + na)]
-    Q̄    = @views geq[(nŜk̄ + nA + na + 1):end]
+    Ŝk̄   = @views geq[1:nŜk]
+    Q0   = @views geq[(nŜk + 1):(nŜk + nA + na)]
+    Q̄    = @views geq[(nŜk + nA + na + 1):end]
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
@@ -1734,7 +1734,7 @@ function con_nonlinprogeq_mhe!(
         d0       = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         k̄        = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        a1       = @views        Ā_Z̃[(1 + na*(j-1)):(na*j)]
+        a1       = @views       A1_Z̃[(1 + na*(j-1)):(na*j)]
         q0       = @views         Q0[(1 + na*(j-1)):(na*j)]
         q1       = @views          Q̄[(1 + na*(j-1)):(na*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
@@ -1806,8 +1806,8 @@ are computed by:
 ```
 for ``j = 0, 1, ... , N_k-1``, and knowing that the ``\mathbf{k}_i(ℓ+j)`` and 
 ``\mathbf{x̂_d}(ℓ+j)`` vectors are extracted from the decision variables in `Z̃`. The
-``\mathbf{k̇}_i`` vectors are evaluated from the continuous-time function `model.f`, as
-described in [`init_orthocolloc`](@ref). The defects for the continuity constraints and the
+``\mathbf{k̇}_i`` vectors are evaluated from the continuous-time function [`fq_dae!`](@ref),
+as described in [`init_orthocolloc`](@ref). The defects for the continuity constraints and the
 stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@ref)). The
 estimated process noise ``\mathbf{ŵ}(ℓ+j)`` are incorporated in the continuity constraint.
 """
@@ -1823,7 +1823,6 @@ function con_nonlinprogeq_mhe!(
     Mo, no, τ =  estim.Mo, transcription.no, transcription.τ
     nk̄ = get_nk̄(model, transcription)
     nx̃ = estim.nε + nx̂
-    p = estim.direct ? 0 : 1
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃, K_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)], Z̃[(nx̃+nx̂*He+1):(nx̃+nx̂*He+nk̄*He)]
     Dtemp = estim.buffer.D
@@ -1834,11 +1833,11 @@ function con_nonlinprogeq_mhe!(
         else
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
         end
-        d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
-        û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
+        d0     = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
+        û0     = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         k̄     = @views             K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        k̄_Z̃      = @views        K_Z̃[(1 + nk̄*(j-1)):(nk̄*j)]
-        ŝk̄       = @views        geq[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄_Z̃    = @views        K_Z̃[(1 + nk̄*(j-1)):(nk̄*j)]
+        ŝk̄     = @views        geq[(1 + nk̄*(j-1)):(nk̄*j)]
         if estim.direct || j < Nk
             d0next = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
         else

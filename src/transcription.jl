@@ -493,7 +493,7 @@ knowing that the ``\mathbf{k}_i(k)`` vectors are directly extracted from the dec
 variables in `Z̃`. The ``\mathbf{x̂_d}(k)`` vector is the estimated deterministic state at the
 beginning of the interval ``τ_0=0``, and is also extracted from `Z̃`. The ``\mathbf{k̇}_i``
 derivatives for the ``i``th collocation point are computed from the continuous-time function
-`model.f!` and:
+[`fq_dae!`](@ref) and:
 ```math
 \mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
 ```
