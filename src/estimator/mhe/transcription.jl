@@ -1485,8 +1485,8 @@ function predict_mhe!(
     nx̃ = nε + nx̂
     nx̃_nX̂ = nx̃ + nx̂*estim.He
     h_threads = transcription.h_threads
-    X̂0[1:nx̂*Nk] .= @views Z̃[(1 + nx̃):(nx̃ + nx̂*Nk)]
-    A0[1:na*Nk] .= @views Z̃[(1 + nx̃_nX̂):(nx̃_nX̂ + na*Nk)]
+    X̂0[1:nx̂*Nk] .= @views Z̃[(1 + nx̃):(nx̃ + nx̂*Nk)]                   # skip x0arr
+    A0[1:na*Nk] .= @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + na*Nk)]   # skip a0arr
     @threadsif h_threads for j=1:Nk
         if estim.direct
             x̂0 = @views X̂0[(1+nx̂*(j-1)):(nx̂*j)]
@@ -1509,6 +1509,7 @@ function predict_mhe!(
     if Nk < estim.He  # fill unused values with 0s for tracer sparsity detection:
         V̂[nym*Nk+1:end] .= 0
         X̂0[nx̂*Nk+1:end] .= 0
+        A0[na*Nk+1:end] .= 0
     end
     return V̂, X̂0, A0
 end
