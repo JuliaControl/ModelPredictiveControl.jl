@@ -1362,7 +1362,7 @@ end
     @test mhe6() ≈ [13] atol=5e-3
 
     ##### # h=1 & f_threads=false options test the branch with the reuse of k̇1 from prev. iter:
-    transcription = TrapezoidalCollocation(1, f_threads=true, h_threads=true)
+    transcription = TrapezoidalCollocation(1, f_threads=false, h_threads=true)
     mhe7 = MovingHorizonEstimator(
         nonlinmodel_c; He=3, direct=true, transcription
     )
