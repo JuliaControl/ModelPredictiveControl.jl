@@ -1459,7 +1459,6 @@ end
     x̂ = updatestate!(mhe2, [0.0], [0.0], [0.0])
     @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-6
     @test mhe2.x̂0 ≈ zeros(mhe2.nx̂) atol=1e-6
-    @show x̂
     initstate!(mhe2, [0], [0], [0])
     @test mhe2.Z̃[2:2] ≈ mhe2.Z̃[4:4] ≈ mhe2.Z̃[6:6] ≈ xs_0
     @test mhe2.Z̃[3:3] ≈ mhe2.Z̃[5:5] ≈ mhe2.Z̃[7:7] ≈ [0.0]
