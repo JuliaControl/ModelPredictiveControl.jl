@@ -174,7 +174,7 @@ transcription method.
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                               \\
         \mathbf{a_0}(k+0)                                               \\
-        \mathbf{a_0}(k+1)                                               \end{bmatrix}
+        \mathbf{a_1}(k+0)                                               \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
     ```math
@@ -191,10 +191,10 @@ transcription method.
         \mathbf{a_0}(k+H_p)                                             \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
-        \mathbf{a}(k+0)                                                 \\
-        \mathbf{a}(k+1)                                                 \\
+        \mathbf{a_1}(k+0)                                               \\
+        \mathbf{a_1}(k+1)                                               \\
         \vdots                                                          \\
-        \mathbf{a}(k+H_p-1)                                             \end{bmatrix}
+        \mathbf{a_1}(k+H_p-1)                                           \end{bmatrix}
     ```
     and, for [`MovingHorizonEstimator`](@ref) with DAEs:
     ```math
