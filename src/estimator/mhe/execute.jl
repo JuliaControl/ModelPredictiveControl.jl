@@ -99,12 +99,14 @@ following fields:
 - `:ε` or *`:epsilon`* : optimal slack variable, ``ε``
 - `:X̂` or *`:Xhat`* : optimal estimated states over ``N_k``, ``\mathbf{X̂}``
 - `:x̂` or *`:xhat`* : optimal estimated state, ``\mathbf{x̂}_k(k+p)``
+- `:Â` or *`:Ahat`* : optimal estimated algebraic variables over ``N_k``, ``\mathbf{Â}``
 - `:V̂` or *`:Vhat`* : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``
 - `:P̄` or *`:Pbar`* : estimation error covariance at arrival, ``\mathbf{P̄}``
 - `:x̄` or *`:xbar`* : optimal estimation error at arrival, ``\mathbf{x̄}``
 - `:Ŷ` or *`:Yhat`* : optimal estimated outputs over ``N_k``, ``\mathbf{Ŷ}``
 - `:Ŷm` or *`:Yhatm`* : optimal estimated measured outputs over ``N_k``, ``\mathbf{Ŷ^m}``
 - `:x̂arr` or *`:xhatarr`* : optimal estimated state at arrival, ``\mathbf{x̂}_k(k-N_k+p)``
+- `:âarr` or *`:ahatarr`* : optimal estimated algebraic variable at arrival, ``\mathbf{â}(k-N_k+p)``
 - `:J`   : objective value optimum, ``J``
 - `:Ym`  : measured outputs over ``N_k``, ``\mathbf{Y^m}``
 - `:U`   : manipulated inputs over ``N_k``, ``\mathbf{U}``
@@ -176,6 +178,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:Ŵ]  = Ŵ[1:nŵ*Nk]
     info[:ε]  = getslack(estim, Z̃)
     info[:X̂]  = X̂[1:nx̂*Nk]
+    info[:Â]  = Â0[1:na*Nk]
     info[:x̂]  = estim.x̂0 .+ estim.x̂op
     info[:V̂]  = V̂[1:nym*Nk]
     info[:P̄]  = estim.P̂arr_old
@@ -183,6 +186,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:Ŷ]  = Ŷ[1:ny*Nk]
     info[:Ŷm] = Ŷ[vec(estim.i_ym .+ ny.*(0:Nk-1)')]
     info[:x̂arr] = x̂arr
+    info[:âarr] = â0arr
     info[:J]  = J
     info[:Ym] = Ym
     info[:U]  = U 
@@ -191,9 +195,11 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     # --- non-Unicode fields ---
     info[:What] = info[:Ŵ]
     info[:xhatarr] = info[:x̂arr]
+    info[:ahararr] = info[:âarr]
     info[:epsilon] = info[:ε]
     info[:Xhat] = info[:X̂]
-    info[:xhat] = info[:x̂]
+    info[:Ahat] = info[:Â]
+    info[:ahat] = info[:â]
     info[:Vhat] = info[:V̂]
     info[:Pbar] = info[:P̄]
     info[:xbar] = info[:x̄]
