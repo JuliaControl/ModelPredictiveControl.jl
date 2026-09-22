@@ -140,7 +140,7 @@ end
 
 Construct a nonlinear DAE model from state-space functions `fq`/`fq!` and `h`/`h!`.
 
-It supports continuous differential and algebraic equations (DAE). The functions are
+It supports continuous-time differential and algebraic equations (DAE). The functions are
 provided in the semi-explicit form:
 ```math
 \begin{aligned}
