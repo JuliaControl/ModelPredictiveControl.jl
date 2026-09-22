@@ -1819,8 +1819,8 @@ function con_nonlinprogeq_mhe!(
     nx̂, He = estim.nx̂, estim.He
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
-    Mo, no, τ =  estim.Mo, transcription.no, transcription.τ
-    τendIsNotOne = (τ[end] < 1)
+    no, τ, τendIsNotOne =  transcription.no, transcription.τ, transcription.τendIsNotOne
+    Mo = estim.Mo
     na = get_na(model)
     nā, nk̄ = na*no, get_nk̄(model, transcription)
     nx̃ = estim.nε + nx̂

@@ -413,6 +413,7 @@ struct OrthogonalCollocation <: CollocationMethod
     f_threads::Bool
     h_threads::Bool
     τ::Vector{COLLOCATION_NODE_TYPE}
+    τendIsNotOne::Bool
     function OrthogonalCollocation(
         h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
@@ -431,7 +432,8 @@ struct OrthogonalCollocation <: CollocationMethod
         else
             throw(ArgumentError("roots argument must be :gaussradau or :gausslegendre."))
         end
-        return new(h, no, f_threads, h_threads, τ)
+        τendIsNotOne = (τ[end] < 1)
+        return new(h, no, f_threads, h_threads, τ, τendIsNotOne)
     end
 end
 
