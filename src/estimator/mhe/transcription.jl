@@ -1049,6 +1049,68 @@ end
 "No linear equality constraints for all cases of [`SingleShooting`](@ref)."
 linconstrainteq!(::MovingHorizonEstimator, ::SimModel, ::SingleShooting) = nothing
 
+"""
+    reset_warmstart!(estim::MovingHorizonEstimator, ::TranscriptionMethod)
+
+Reset warm-starting values `estim.Z̃` at values stored in `estim.model`
+"""
+function reset_warmstart!(estim::MovingHorizonEstimator, ::MultipleShooting)
+    model = estim.model
+    nx, nx̂, nx̃, nε, He = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
+    for j in 1:He
+        estim.Z̃[(nx̃+(j-1)*nx̂+1):(nx̃+(j-1)*nx̂+nx)] .= x0s
+    end
+    return nothing
+end
+function reset_warmstart!(estim::MovingHorizonEstimator, ::TrapezoidalCollocation)
+    model = estim.model
+    nx, nx̂, nx̃, nε, He, na = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He, get_na(model)
+    as_0 = get_as_0(model)
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = as_0
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
+    estim.Z̃[(nx̃ + nx̂*He + 1):(nx̃ + nx̂*He + na)] = a0s
+    for j in 1:He
+        estim.Z̃[(nx̃+(j-1)*nx̂+1):(nx̃+(j-1)*nx̂+nx)] .= x0s
+        estim.Z̃[(nx̃+nx̂*He+na+(j-1)*na+1):(nx̃+nx̂*He+na+j*na)] .= a0s
+        estim.Z̃[(nx̃+nx̂*He+na+na*He+(j-1)*na+1):(nx̃+nx̂*He+na+na*He+j*na)] .= a0s
+    end
+    return nothing
+end
+function reset_warmstart!(estim::MovingHorizonEstimator, ::OrthogonalCollocation)
+    model = estim.model
+    nx, nx̂, nx̃, nε, He, na = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He, get_na(model)
+    as_0 = get_as_0(model)
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = as_0
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
+    estim.Z̃[(nx̃ + nx̂*He + 1):(nx̃ + nx̂*He + na)] = a0s
+    for j in 1:He
+        estim.Z̃[(nx̃+(j-1)*nx̂+1):(nx̃+(j-1)*nx̂+nx)] .= x0s
+        estim.Z̃[(nx̃+nx̂*He+na+(j-1)*na+1):(nx̃+nx̂*He+na+j*na)] .= a0s
+        estim.Z̃[(nx̃+nx̂*He+na+na*He+(j-1)*nx+1):(nx̃+nx̂*He+na+na*He+j*nx)] .= x0s
+        estim.Z̃[(nx̃+nx̂*He+na+na*He+nx*He+(j-1)*na+1):(nx̃+nx̂*He+na+na*He+nx*He+j*na)] .= a0s
+    end
+    return nothing
+end
+function reset_warmstart!(estim::MovingHorizonEstimator, ::SingleShooting)
+    model = estim.model
+    nx, nε = model.nx, estim.nε
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
+    return nothing
+end
+
 @doc raw"""
     set_warmstart_mhe!(
         estim::MovingHorizonEstimator, transcription::SingleShooting, Z̃var
@@ -1857,7 +1919,7 @@ function con_nonlinprogeq_mhe!(
         else
             d1 = d0 # special case: d0(k+1)≈d0(k), since d0(k+1) is not available at time k:
         end
-        # ----------------- residual at sampling times (τ=0) ---------------------------
+        # ----------------- residual at sampling instants (τ=0) -----------------------
         # we need to recompute q0 with multi-threading, even with h>0 and τ[end]≈1, since 
         # the previous iteration (j-1) may not be executed (iterations are re-orderable)
         computeDynamicsAtBegin = τendIsNotOne || f_threads || h < 1 || j < 2 

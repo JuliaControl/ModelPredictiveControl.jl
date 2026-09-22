@@ -395,11 +395,11 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     vector must be explicitly included in the decision variables since the output function
     `h!` is evaluated at different locations than the collocation points, in general.
     
-    More precisely, the outputs are at the sampling times, while the collocation points are
-    at the roots of orthogonal polynomials, which is "optimal" for approximating the state
-    trajectories with polynomials of degree ``n_o``. The method then enforces the system
-    dynamics at these points. The Gauss-Legendre scheme is more accurate than Gauss-Radau
-    but only A-stable, while the latter being L-stable. See [`init_orthocolloc`](@ref),
+    More precisely, the outputs are at the sampling instants, while the collocation points
+    are at the roots of orthogonal polynomials, which is "optimal" for approximating the
+    state trajectories with polynomials of degree ``n_o``. The method then enforces the
+    system dynamics at these points. The Gauss-Legendre scheme is more accurate than
+    Gauss-Radau but only A-stable, while the latter being L-stable. See [`init_orthocolloc`](@ref),
     [`con_nonlinprogeq!`](@ref) and [`con_nonlinprogeq_mhe!`](@ref) for more details.
 
     As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
