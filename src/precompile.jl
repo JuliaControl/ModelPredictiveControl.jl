@@ -108,8 +108,8 @@ R̂y = repeat([55; 30], 3)
     sim!(daemodel, 2, [10])
 
     mhe_dae = MovingHorizonEstimator(daemodel, He=2, direct=false)
-    preparestate!(mhe, [5])
-    updatestate(mhe, [2], [5])
+    preparestate!(mhe_dae, [5])
+    updatestate!(mhe_dae, [2], [5])
 
 end
 
