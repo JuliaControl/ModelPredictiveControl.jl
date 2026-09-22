@@ -259,7 +259,7 @@ end
 
 Construct a moving horizon estimator (MHE) based on `model`.
 
-It supports ([`LinModel`](@ref), [`NonLinModel`](@ref)), [`NonLinModelDAE`](@ref)) and
+It supports ([`LinModel`](@ref), [`NonLinModel`](@ref), [`NonLinModelDAE`](@ref)) and
 constraints on the estimates. Additionally, `model` is not linearized like the
 [`ExtendedKalmanFilter`](@ref), and the probability  distribution is not approximated like
 the [`UnscentedKalmanFilter`](@ref). The computational costs are drastically higher, 
