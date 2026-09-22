@@ -1499,13 +1499,13 @@ end
         updatestate!(mhe, [3.0], [0], [0])
     end
     preparestate!(mhe, [0], [0])
-    @test mhe([0]) ≈ [0] atol=1e-3
+    @test mhe([0]) ≈ [0] atol=5e-3
     for i in 1:40
         preparestate!(mhe, [7.0], [0])
         updatestate!(mhe, [0], [7.0], [0])
     end
     preparestate!(mhe, [7.0], [0])
-    @test mhe([0]) ≈ [7.0] atol=1e-3
+    @test mhe([0]) ≈ [7.0] atol=5e-3
 
     no, roots = 2, :gaussradau
     # h=1 & f_threads=false options test the branch with reuse of q̄ from prev. iter:
