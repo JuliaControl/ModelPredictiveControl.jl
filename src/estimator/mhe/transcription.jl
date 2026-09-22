@@ -1351,7 +1351,7 @@ function set_warmstart_mhe!(
     na = get_na(model)
     nk̄ = get_nk̄(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
-    nx̃, nŴ, nX̂, nA = nε + nx̂, nŵ*He, nx̂*He, na*He
+    nx̃, nŴ, nX̂, nA, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, na*He
     Z̃s = estim.buffer.Z̃
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
