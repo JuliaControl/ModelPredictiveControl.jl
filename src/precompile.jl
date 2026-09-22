@@ -104,8 +104,13 @@ R̂y = repeat([55; 30], 3)
     linearizemodel = linearize(nlmodel)
     setmodel!(mpc_kf, linearizemodel)
 
-    daemodel = NonLinModelDAE(fq_dae!, h_dae!, 1.0, 1, 1, 1, 1)
+    daemodel = NonLinModelDAE(fq_dae!, h_dae!, 1.0, 1, 1, 1, 1; transcription)
     sim!(daemodel, 2, [10])
+
+    mhe_dae = MovingHorizonEstimator(daemodel, He=2, direct=false)
+    preparestate!(mhe, [5])
+    updatestate(mhe, [2], [5])
+
 end
 
 end # @setup_workload
