@@ -1460,10 +1460,67 @@ end
     @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-6
     @test mhe2.x̂0 ≈ zeros(mhe2.nx̂) atol=1e-6
     initstate!(mhe2, [0], [0], [0])
-    @test mhe2.Z̃[2:2] ≈ mhe2.Z̃[4:4] ≈ mhe2.Z̃[6:6] ≈ xs_0
-    @test mhe2.Z̃[3:3] ≈ mhe2.Z̃[5:5] ≈ mhe2.Z̃[7:7] ≈ [0.0]
-    @test mhe2.Z̃[8:8] ≈ mhe2.Z̃[9:9] ≈ mhe2.Z̃[10:10] ≈ as_0
-    @test mhe2.Z̃[11:11] ≈ mhe2.Z̃[12:12] ≈ as_0 
+    @test mhe2.Z̃[2:2] ≈ mhe2.Z̃[4:4] ≈ mhe2.Z̃[6:6] ≈ xs_0           # xd in X̂0
+    @test mhe2.Z̃[3:3] ≈ mhe2.Z̃[5:5] ≈ mhe2.Z̃[7:7] ≈ [0.0]          # xs in X̂0
+    @test mhe2.Z̃[8:8] ≈ mhe2.Z̃[9:9] ≈ mhe2.Z̃[10:10] ≈ as_0         # â0 in Â0
+    @test mhe2.Z̃[11:11] ≈ mhe2.Z̃[12:12] ≈ as_0                     # a1 in Ā
+end
+
+@testitem "MHE estim. & getinfo (NonLinModelDAE, OC)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
+    import ForwardDiff
+
+    function fq!(ẋ, res, x, a, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        res[] = x[] - a[]
+        return nothing
+    end
+    function h!(y, x, a, d, _ )
+        y[] = 2 * x[] + a[] + 0.1 * d[]
+    end
+    Ts, p = 100.0, [0.01]
+    as_0, xs_0 = [-0.01], [0.01]
+    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p, xs_0, as_0)
+
+    no, roots = 3, :gausslegendre
+    transcription = OrthogonalCollocation(0, no; roots, f_threads=true, h_threads=false)
+    mhe = MovingHorizonEstimator(dae; He=2, transcription, hessian=true)
+    preparestate!(mhe, [0.0], [0.0])
+    x̂ = updatestate!(mhe, [0.0], [0.0], [0.0])
+    @test x̂ ≈ zeros(mhe.nx̂) atol=1e-6
+    @test mhe.x̂0 ≈ zeros(mhe.nx̂) atol=1e-6
+    preparestate!(mhe, [0], [0])
+    info = getinfo(mhe)
+    @test info[:x̂] ≈ x̂ atol=1e-6
+    @test info[:Ŷ][end] ≈ 0 atol=1e-6
+    for i in 1:40
+        preparestate!(mhe, [0], [0])
+        updatestate!(mhe, [3.0], [0], [0])
+    end
+    preparestate!(mhe, [0], [0])
+    @test mhe([0]) ≈ [0] atol=1e-3
+    for i in 1:40
+        preparestate!(mhe, [7.0], [0])
+        updatestate!(mhe, [0], [7.0], [0])
+    end
+    preparestate!(mhe, [7.0], [0])
+    @test mhe([0]) ≈ [7.0] atol=1e-3
+
+    no, roots = 2, :gaussradau
+    # h=1 & f_threads=false options test the branch with reuse of q̄ from prev. iter:
+    transcription = OrthogonalCollocation(1, no; roots, f_threads=false, h_threads=true)
+    mhe2 = MovingHorizonEstimator(dae; He=2, Cwt=1e4, direct=false, transcription)
+    preparestate!(mhe2, [0.0], [0.0])
+    x̂ = updatestate!(mhe2, [0.0], [0.0], [0.0])
+    @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-6
+    @test mhe2.x̂0 ≈ zeros(mhe2.nx̂) atol=1e-6
+    initstate!(mhe2, [0], [0], [0])
+    @test mhe2.Z̃[2:2] ≈ mhe2.Z̃[4:4] ≈ mhe2.Z̃[6:6] ≈ xs_0    # xd in X̂0
+    @test mhe2.Z̃[3:3] ≈ mhe2.Z̃[5:5] ≈ mhe2.Z̃[7:7] ≈ [0.0]   # xs in X̂0
+    @test mhe2.Z̃[8:8] ≈ mhe2.Z̃[9:9] ≈ mhe2.Z̃[10:10] ≈ as_0  # â0 in Â0
+    @test mhe2.Z̃[11:11] ≈ mhe2.Z̃[13:13] ≈ xs_0              # xd in K̄
+    @test mhe2.Z̃[14:14] ≈ mhe2.Z̃[15:15] ≈ as_0              # a  in Ā
 end
 
 @testitem "MHE estim. with unfilled window" setup=[SetupMPCtests] begin
