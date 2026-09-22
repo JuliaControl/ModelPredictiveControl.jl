@@ -227,11 +227,11 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     nc, neq, ng = con.nc, con.neq, length(con.i_g)
     i_g = findall(con.i_g) # convert to non-logical indices for non-allocating @views
     ngi = sum(con.i_g)
-    nV̂, nX̂, nA, nŴ = He*nym, He*nx̂, He*na, He*nx̂
+    nV̂, nX̂, nÂ, nŴ = He*nym, He*nx̂, He*na, He*nx̂
     nK̄, nU, nŶ = He*nk̄, He*nu, He*nŷ
     nŴe, nX̂e, nV̂e = (He+1)*nx̂, (He+1)*nx̂, (He+1)*nym
     x̂0arr, x̄  = zeros(NT, nx̂), zeros(NT, nx̂)
-    â0arr, Â0 = zeros(NT, na), zeros(NT, nA)
+    â0arr, Â0 = zeros(NT, na), zeros(NT, nÂ)
     Ŵ         = zeros(NT, nŴ)
     V̂, X̂0     = zeros(NT, nV̂),  zeros(NT, nX̂)
     Ŵe        = zeros(NT, nŴe)

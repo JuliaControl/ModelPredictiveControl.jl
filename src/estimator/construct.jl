@@ -39,7 +39,7 @@ function StateEstimatorBuffer{NT}(
     transcription::TranscriptionMethod = SingleShooting()
 ) where NT <: Real
     nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
-    nV̂, nŴ, nX̂, nA, nŶ, nU, nD = nym*He, nŵ*He, nx̂*He, na*He, ny*He, nu*He, nd*(He+1)
+    nV̂, nŴ, nX̂, nÂ, nŶ, nU, nD = nym*He, nŵ*He, nx̂*He, na*He, ny*He, nu*He, nd*(He+1)
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)
     k̄  = Vector{NT}(undef, nk̄)
@@ -49,7 +49,7 @@ function StateEstimatorBuffer{NT}(
     V̂  = Vector{NT}(undef, nV̂)
     Ŵ  = Vector{NT}(undef, nŴ)
     X̂  = Vector{NT}(undef, nX̂)
-    Â  = Vector{NT}(undef, nA)
+    Â  = Vector{NT}(undef, nÂ)
     Ŷ  = Vector{NT}(undef, nŶ)
     U  = Vector{NT}(undef, nU)
     D  = Vector{NT}(undef, nD)

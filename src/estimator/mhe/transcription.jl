@@ -13,15 +13,15 @@ end
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::TranscriptionMethod)
     nx̂, nx̃, nŵ, Nk = estim.nx̂, estim.nx̃, estim.nx̂, estim.Nk[]
     na = get_na(estim.model)
-    nŴ, nX̂, nA   = nŵ*Nk, nx̂*Nk, na*Nk
+    nŴ, nX̂, nÂ   = nŵ*Nk, nx̂*Nk, na*Nk
     nx̃_nX̂_He          = nx̃ + nx̂*estim.He
     na_nA_He          = na + na*estim.He
     nx̃_nX̂_na_nA_He    = nx̃_nX̂_He + na_nA_He
     nx̃_nX̂_na_nA_nĀ_He = nx̃_nX̂_na_nA_He + na*estim.He
     i_Z̃_NK = [
         (1):(nx̃ + nX̂);
-        (1 + nx̃_nX̂_He):(nx̃_nX̂_He + na + nA)
-        (1 + nx̃_nX̂_na_nA_He):(nx̃_nX̂_na_nA_He + nA)
+        (1 + nx̃_nX̂_He):(nx̃_nX̂_He + na + nÂ)
+        (1 + nx̃_nX̂_na_nA_He):(nx̃_nX̂_na_nA_He + nÂ)
         (1 + nx̃_nX̂_na_nA_nĀ_He):(nx̃_nX̂_na_nA_nĀ_He + nŴ)
     ]
     return i_Z̃_NK
@@ -30,7 +30,7 @@ function get_i_Z̃_Nk(estim::MovingHorizonEstimator, transcription::OrthogonalCo
     nx̂, nx̃, nŵ, Nk = estim.nx̂, estim.nx̃, estim.nx̂, estim.Nk[]
     na = get_na(estim.model)
     nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
-    nŴ, nX̂, nA, nK̄, nĀ  = nŵ*Nk, nx̂*Nk, na*Nk, nk̄*Nk, nā*Nk
+    nŴ, nX̂, nÂ, nK̄, nĀ  = nŵ*Nk, nx̂*Nk, na*Nk, nk̄*Nk, nā*Nk
     nx̃_nX̂_He             = nx̃ + nx̂*estim.He
     na_nA_He             = na + na*estim.He
     nx̃_nX̂_na_nA_He       = nx̃_nX̂_He          + na_nA_He
@@ -38,7 +38,7 @@ function get_i_Z̃_Nk(estim::MovingHorizonEstimator, transcription::OrthogonalCo
     nx̃_nX̂_na_nA_nK̄_nĀ_He = nx̃_nX̂_na_nA_nK̄_He + na*estim.He
     i_Z̃_NK = [
         (1):(nx̃ + nX̂);
-        (1 + nx̃_nX̂_He):(nx̃_nX̂_He + na + nA);
+        (1 + nx̃_nX̂_He):(nx̃_nX̂_He + na + nÂ);
         (1 + nx̃_nX̂_na_nA_He):(nx̃_nX̂_na_nA_He + nK̄);
         (1 + nx̃_nX̂_na_nA_nK̄_He):(nx̃_nX̂_na_nA_nK̄_He + nĀ);
         (1 + nx̃_nX̂_na_nA_nK̄_nĀ_He):(nx̃_nX̂_na_nA_nK̄_nĀ_He + nŴ);
@@ -1253,7 +1253,7 @@ function set_warmstart_mhe!(
     na = get_na(model)
     nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
-    nx̃, nŴ, nX̂, nA, nK̄, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, nk̄*He, nā*He
+    nx̃, nŴ, nX̂, nÂ, nK̄, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, nk̄*He, nā*He
     Z̃s = estim.buffer.Z̃
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
@@ -1266,18 +1266,18 @@ function set_warmstart_mhe!(
     Z̃s[(i_base+nX̂-nx̂+1):(i_base+nX̂)] .= @views estim.Z̃[(i_base+nX̂-nx̂+1):(i_base+nX̂)]
     # --- algebraic variables â0arr and Â0 ---
     i_base = nx̃ + nX̂ 
-    Z̃s[(i_base+1):(i_base+nA)]       .= @views estim.Z̃[(i_base+na+1):(i_base+na+nA)]
-    Z̃s[(i_base+nA+1):(i_base+na+nA)] .= @views estim.Z̃[(i_base+nA+1):(i_base+na+nA)]
+    Z̃s[(i_base+1):(i_base+nÂ)]       .= @views estim.Z̃[(i_base+na+1):(i_base+na+nÂ)]
+    Z̃s[(i_base+nÂ+1):(i_base+na+nÂ)] .= @views estim.Z̃[(i_base+nÂ+1):(i_base+na+nÂ)]
     # --- deterministic states at collocation points K̄ --- 
-    i_base = nx̃ + nX̂ + na + nA
+    i_base = nx̃ + nX̂ + na + nÂ
     Z̃s[(i_base+1):(i_base+nK̄-nk̄)]    .= @views estim.Z̃[(i_base+nk̄+1):(i_base+nK̄)]
     Z̃s[(i_base+nK̄-nk̄+1):(i_base+nK̄)] .= @views estim.Z̃[(i_base+nK̄-nk̄+1):(i_base+nK̄)]
     # --- algebraic variables at collocation points Ā --- 
-    i_base = nx̃ + nX̂ + na + nA + nK̄
+    i_base = nx̃ + nX̂ + na + nÂ + nK̄
     Z̃s[(i_base+1):(i_base+nĀ-nā)]    .= @views estim.Z̃[(i_base+nā+1):(i_base+nĀ)]
     Z̃s[(i_base+nĀ-nā+1):(i_base+nĀ)] .= @views estim.Z̃[(i_base+nĀ-nā+1):(i_base+nĀ)]
     # --- process noise estimates Ŵ ---
-    i_base = nx̃ + nX̂ + na + nA + nK̄ + nĀ
+    i_base = nx̃ + nX̂ + na + nÂ + nK̄ + nĀ
     Z̃s[(i_base+1):(i_base+nŴ-nŵ)]   .= @views estim.Z̃[(i_base+nŵ+1):(i_base+nŴ)]
     Z̃s[(i_base+nŴ-nŵ+1):end]        .= 0
     # --- verify definiteness of objective function --- 
@@ -1351,7 +1351,7 @@ function set_warmstart_mhe!(
     na = get_na(model)
     nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
-    nx̃, nŴ, nX̂, nA, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, nā*He
+    nx̃, nŴ, nX̂, nÂ, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, nā*He
     Z̃s = estim.buffer.Z̃
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
@@ -1364,14 +1364,14 @@ function set_warmstart_mhe!(
     Z̃s[(i_base+nX̂-nx̂+1):(i_base+nX̂)] .= @views estim.Z̃[(i_base+nX̂-nx̂+1):(i_base+nX̂)]
     # --- algebraic variables â0arr and Â0 ---
     i_base = nx̃ + nX̂ 
-    Z̃s[(i_base+1):(i_base+nA)]       .= @views estim.Z̃[(i_base+na+1):(i_base+na+nA)]
-    Z̃s[(i_base+nA+1):(i_base+na+nA)] .= @views estim.Z̃[(i_base+nA+1):(i_base+na+nA)]
+    Z̃s[(i_base+1):(i_base+nÂ)]       .= @views estim.Z̃[(i_base+na+1):(i_base+na+nÂ)]
+    Z̃s[(i_base+nÂ+1):(i_base+na+nÂ)] .= @views estim.Z̃[(i_base+nÂ+1):(i_base+na+nÂ)]
     # --- algebraic variables Ā --- 
-    i_base = nx̃ + nX̂ + na + nA
+    i_base = nx̃ + nX̂ + na + nÂ
     Z̃s[(i_base+1):(i_base+nĀ-nā)]    .= @views estim.Z̃[(i_base+nā+1):(i_base+nĀ)]
     Z̃s[(i_base+nĀ-nā+1):(i_base+nĀ)] .= @views estim.Z̃[(i_base+nĀ-nā+1):(i_base+nĀ)]
     # --- process noise estimates Ŵ ---
-    i_base = nx̃ + nX̂ + na + nA + nĀ
+    i_base = nx̃ + nX̂ + na + nÂ + nĀ
     Z̃s[(i_base+1):(i_base+nŴ-nŵ)]   .= @views estim.Z̃[(i_base+nŵ+1):(i_base+nŴ)]
     Z̃s[(i_base+nŴ-nŵ+1):end]        .= 0
     # --- verify definiteness of objective function ---
@@ -1788,16 +1788,16 @@ function con_nonlinprogeq_mhe!(
     nk̄ = get_nk̄(model, transcription)
     nw = nŵ - nxs
     nx̃_nX̂  = nx̃ + nx̂*estim.He
-    nŜk, nA, nĀ = nx*He, na*He, na*He
+    nŜk, nÂ, nĀ = nx*He, na*He, na*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
-    Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nA)] # skipping â0arr components
-    A1_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na + nA):(nx̃_nX̂ + na + nA + nĀ)]
+    Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
+    A1_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nĀ)]
     Û0   = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
     (Nk < He) && (geq .= 0) 
     Ŝk   = @views geq[1:nŜk]
-    Q0   = @views geq[(1 + nŜk):(nŜk + nA + na)]
-    Q̄    = @views geq[(1 + nŜk + nA + na):end]    
+    Q0   = @views geq[(1 + nŜk):(nŜk + nÂ + na)]
+    Q̄    = @views geq[(1 + nŜk + nÂ + na):end]    
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
@@ -1905,18 +1905,18 @@ function con_nonlinprogeq_mhe!(
     na = get_na(model)
     nā, nk̄ = na*no, get_nk̄(model, transcription)
     nx̃_nX̂  = nx̃ + nx̂*estim.He
-    nŜk̄, nA, nK̄, nĀ = nk̄*He, na*He, nk̄*He, nā*He
+    nŜk̄, nÂ, nK̄, nĀ = nk̄*He, na*He, nk̄*He, nā*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
-    Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nA)] # skipping â0arr components
-    K̄_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nA):(nx̃_nX̂ + na + nA + nK̄)]
-    Ā_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nA + nK̄):(nx̃_nX̂ + na + nA + nK̄ + nĀ)]
+    Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
+    K̄_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nK̄)]
+    Ā_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nÂ + nK̄):(nx̃_nX̂ + na + nÂ + nK̄ + nĀ)]
     Dtemp = estim.buffer.D
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
     (Nk < He) && (geq .= 0) 
     Ŝk̄   = @views geq[1:nŜk̄]
-    Q0   = @views geq[(1 + nŜk̄):(nŜk̄ + nA + na)]
-    Q̄    = @views geq[(1 + nŜk̄ + nA + na):end]
+    Q0   = @views geq[(1 + nŜk̄):(nŜk̄ + nÂ + na)]
+    Q̄    = @views geq[(1 + nŜk̄ + nÂ + na):end]
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
