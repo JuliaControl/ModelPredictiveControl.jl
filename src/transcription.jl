@@ -505,6 +505,7 @@ constraints:
 \begin{aligned}
 \mathbf{q}_i(k) &= \mathbf{q}\Big(\mathbf{k}_i(k), \mathbf{a}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big) \\
                 &= \mathbf{0}
+\end{aligned}
 ```
 Based on the normalized time ``τ_i`` and the hold order `transcription.h`, the inputs and
 disturbances are either piecewise constant or linear:

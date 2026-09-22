@@ -1756,7 +1756,7 @@ variable `Z̃`. The ``\mathbf{k̇}`` coefficients are evaluated from the continu
 function [`fq_dae!`](@ref) and:
 ```math
 \begin{aligned}
-\mathbf{k̇_0}(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a_0}(ℓ+j), \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
+\mathbf{k̇_0}(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
 \mathbf{k̇_1}(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{a_1}(ℓ+j), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
@@ -1765,13 +1765,13 @@ is defined in [`f̂!`](@ref) documentation. The residuals for [`NonLinModelDAE`]
 also computed from ``j = 0, 1, ... , N_k-1`` and:
 ```math
 \begin{aligned}
-\mathbf{q_0}(ℓ+j) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a_0}(ℓ+j), \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
+\mathbf{q_0}(ℓ+j) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
 \mathbf{q_1}(ℓ+j) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{a_1}(ℓ+j), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
 and also one final residual at `k+p`:
 ```math
-\mathbf{q_0}(k+p) = \mathbf{q}\Big(\mathbf{x̂_d}(k+p), \mathbf{a_0}(k+p), \mathbf{û_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big)
+\mathbf{q_0}(k+p) = \mathbf{q}\Big(\mathbf{x̂_d}(k+p), \mathbf{â_0}(k+p), \mathbf{û_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big)
 ```
 """
 function con_nonlinprogeq_mhe!(
@@ -1881,7 +1881,13 @@ are computed by:
 for ``j = 0, 1, ... , N_k-1``, and knowing that the ``\mathbf{k}_i(ℓ+j)`` and 
 ``\mathbf{x̂_d}(ℓ+j)`` vectors are extracted from the decision variables in `Z̃`. The
 ``\mathbf{k̇}_i`` vectors are evaluated from the continuous-time function [`fq_dae!`](@ref),
-as described in [`init_orthocolloc`](@ref). The defects for the continuity constraints and the
+as described in [`init_orthocolloc`](@ref). The nonlinear equality constraints also include
+the residuals at the collocation points ``\mathf{q}_i(ℓ+j)``, see [`init_orthocolloc`](@ref).
+Additionnaly, the residuals at the sampling instants ```\mathbf{q_0}(ℓ+j)`` are given by: 
+```math
+\mathbf{q_0}_i(ℓ+j) = \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j), \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j), \mathbf{d_0}(ℓ+j), \mathbf{p}\Big)
+```
+for ``j = 0, 1, ... , N_k``. The defects for the continuity constraints and the
 stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@ref)). The
 estimated process noise ``\mathbf{ŵ}(ℓ+j)`` are incorporated in the continuity constraint.
 """
