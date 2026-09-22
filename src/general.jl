@@ -28,7 +28,8 @@ const DEFAULT_JACSPARSE = AutoSparse(
 )
 
 const HIDDEN_GETINFO_KEYS_MHE = (
-    :What, :xhatarr, :epsilon, :Xhat, :xhat, :Vhat, :Pbar, :xbar, :Yhat, :Yhatm, :ϵ,
+    :What, :xhatarr, :ahatarr, :epsilon, :Xhat, :Ahat, :xhat, :Vhat, 
+    :Pbar, :xbar, :Yhat, :Yhatm, :ϵ,
     :nablaJ, :nabla2J, :nabla2J_ncolors, 
     :nablag, :nablag_ncolors, :nabla2lg, :nabla2lg_ncolors, 
     :nablageq, :nablag_ncolors, :nabla2lgeq, :nabla2lgeq_ncolors

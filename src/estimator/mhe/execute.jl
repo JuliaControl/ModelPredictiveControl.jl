@@ -148,7 +148,7 @@ julia> round.(getinfo(estim)[:Ŷ], digits=3)
 function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     model, buffer, Nk = estim.model, estim.buffer, estim.Nk[]
     nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, get_nk̄(model, estim.transcription)
-    nx̂, nym, nŵ = estim.nx̂, estim.nym, estim.nx̂
+    nx̂, nym, nŵ, na = estim.nx̂, estim.nym, estim.nx̂, get_na(model)
     Z̃ = estim.Z̃
     info = Dict{Symbol, Any}()
     V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
@@ -199,7 +199,6 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:epsilon] = info[:ε]
     info[:Xhat] = info[:X̂]
     info[:Ahat] = info[:Â]
-    info[:ahat] = info[:â]
     info[:Vhat] = info[:V̂]
     info[:Pbar] = info[:P̄]
     info[:xbar] = info[:x̄]
