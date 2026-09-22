@@ -1750,7 +1750,7 @@ function con_nonlinprogeq_mhe!(
             # we need to recompute k̇0 with multi-threading, even with h==1, since the 
             # previous iteration (j-1) may not be executed (iterations are re-orderable)
             fq_dae!(k̇0, q0, model, x̂d_Z̃, a0_Z̃, û0, d0)
-        else
+        else # piecewise linear inputs u and disturbances d:
             k̇0 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇1[j-1] (prev. iter)
             q0 .= @views a0_Z̃ .- A1_Z̃[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a1[j-1]
         end
@@ -1762,14 +1762,17 @@ function con_nonlinprogeq_mhe!(
         fq_dae!(k̇1, q1, model, x̂dnext_Z̃, a1_Z̃, û1, d1)
         ŝk .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇0 + k̇1) + ŵd
     end
-    if na > 0 # final residual at k+p (keep "end" in vars, solve a weird race cond.): 
+    # keep "end" in names, it solves a weird race cond. with f_threads on Julia v1.13.0
+    q0end = @views   Q0[(1 + na*Nk):(na*Nk + na)]
+    a0end = @views A0_Z̃[(1 + na*(Nk-1)):(na*Nk)]
+    if na > 0 && h < 1 # compute the final residual at k+p:
         x̂dend   = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
-        a0end   = @views     A0_Z̃[(1 + na*(Nk-1)):((na*(Nk-1) + na))]
-        û0end   = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p)≈û0(k+p-1)
-        d0end   = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]           # d0(k+1)≈d0(k)
-        q0end   = @views       Q0[(1 + na*Nk):(na*Nk + na)]
+        û0end   = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p) ≈ û0(k+p-1)
+        d0end   = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]           # d0(k+1) ≈ d0(k)
         k̇0end   = @views        K̄[(end-nx+1):end]
         fq_dae!(k̇0end, q0end, model, x̂dend, a0end, û0end, d0end)
+    else # piecewise linear inputs u and disturvances d:
+        q0end .= a0end .- @views A1_Z̃[(1 + na*(Nk-1)):(na*Nk)]
     end
     return geq
 end
