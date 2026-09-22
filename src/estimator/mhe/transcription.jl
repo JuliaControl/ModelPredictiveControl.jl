@@ -1349,9 +1349,9 @@ function set_warmstart_mhe!(
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
     na = get_na(model)
-    nk̄ = get_nk̄(estim.model, transcription)
+    nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
-    nx̃, nŴ, nX̂, nA, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, na*He
+    nx̃, nŴ, nX̂, nA, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, nā*He
     Z̃s = estim.buffer.Z̃
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
