@@ -1207,14 +1207,14 @@ The warm-starting value is provided in Extended Help.
         \mathbf{x̂_0}(k+p-1|k-1)         \\
         \mathbf{x̂_0}(k+p-1|k-1)         \\
         \mathbf{0_x̂}                    \\
-        \mathbf{a_0}(k-N_k+p|k-1)       \\
-        \mathbf{a_0}(k-N_k+p+1|k-1)     \\
-        \mathbf{a_0}(k-N_k+p+2|k-1)     \\
+        \mathbf{â_0}(k-N_k+p|k-1)       \\
+        \mathbf{â_0}(k-N_k+p+1|k-1)     \\
+        \mathbf{â_0}(k-N_k+p+2|k-1)     \\
         \vdots
-        \mathbf{a_0}(k-p-2|k-1)         \\
+        \mathbf{â_0}(k-p-2|k-1)         \\
+        \mathbf{â_0}(k-p-1|k-1)         \\
         \mathbf{a_0}(k-p-1|k-1)         \\
-        \mathbf{a_0}(k-p-1|k-1)         \\
-        \mathbf{0_a}                    \\
+        \mathbf{0_â}                    \\
         \mathbf{k̄}(k-N_k+p+0|k-1)       \\
         \mathbf{k̄}(k-N_k+p+1|k-1)       \\
         \vdots                          \\
@@ -1240,10 +1240,11 @@ The warm-starting value is provided in Extended Help.
     ```
     where ``\mathbf{x̂_0}(k-j|k-1)`` is the predicted state for time ``k-j`` computed at the
     last control period ``k-1``, expressed as a deviation from the operating point 
-    ``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k-j|k-1)`` include the ``n_o`` intermediate
-    stage predictions for the interval ``k-j``, and is also computed at the last control period.
-    See the Extended Help of [`MultipleShooting`](@ref) and [`OrthogonalCollocation`](@ref) for
-    the defintion of vectors ``\mathbf{0_x̂}``, ``\mathbf{0_k}`` and ``\mathbf{0_ŵ}``.
+    ``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k-j|k-1)`` and ``\mathbf{ā}(k-j|k-1)
+    include the ``n_o`` intermediate stage predictions for the interval ``k-j``, and is also
+    computed at the last control period. See the Extended Help of [`MultipleShooting`](@ref)
+    and [`OrthogonalCollocation`](@ref) for the defintion of vectors ``\mathbf{0_x̂}``,
+    ``\mathbf{0_â}``, ``\mathbf{0_k}`` and ``\mathbf{0_ŵ}``.
 """
 function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::OrthogonalCollocation, Z̃var
@@ -1325,14 +1326,14 @@ The warm-starting value is provided in Extended Help.
         \mathbf{x̂_0}(k+p-1|k-1)         \\
         \mathbf{x̂_0}(k+p-1|k-1)         \\
         \mathbf{0_x̂}                    \\
-        \mathbf{a_0}(k-N_k+p|k-1)       \\
-        \mathbf{a_0}(k-N_k+p+1|k-1)     \\
-        \mathbf{a_0}(k-N_k+p+2|k-1)     \\
+        \mathbf{â_0}(k-N_k+p|k-1)       \\
+        \mathbf{â_0}(k-N_k+p+1|k-1)     \\
+        \mathbf{â_0}(k-N_k+p+2|k-1)     \\
         \vdots
-        \mathbf{a_0}(k-p-2|k-1)         \\
-        \mathbf{a_0}(k-p-1|k-1)         \\
-        \mathbf{a_0}(k-p-1|k-1)         \\
-        \mathbf{0_a}                    \\
+        \mathbf{â_0}(k-p-2|k-1)         \\
+        \mathbf{â_0}(k-p-1|k-1)         \\
+        \mathbf{â_0}(k-p-1|k-1)         \\
+        \mathbf{0_â}                    \\
         \mathbf{ŵ}(k-N_k+p+0|k-1)       \\
         \mathbf{ŵ}(k-N_k+p+1|k-1)       \\
         \vdots                          \\
@@ -1347,6 +1348,7 @@ function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::TranscriptionMethod, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
+    na = get_na(model)
     nk̄ = get_nk̄(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂ = nε + nx̂, nŵ*He, nx̂*He
@@ -1354,13 +1356,24 @@ function set_warmstart_mhe!(
     # --- slack variable ε ---
     estim.nε == 1 && (Z̃s[begin] = estim.Z̃[begin])
     # --- arrival state estimate x̂0arr ---
-    Z̃s[nε+1:nx̃] = estim.x̂0arr_old
-    # --- state estimates X̂0 --- 
-    Z̃s[(nx̃+1):(nx̃+nX̂-nx̂)]    .= @views estim.Z̃[(nx̃+nx̂+1):(nx̃+nX̂)]
-    Z̃s[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)] .= @views estim.Z̃[(nx̃+nX̂-nx̂+1):(nx̃+nX̂)]
+    i_base = nε
+    Z̃s[i_base+1:nx̃] = estim.x̂0arr_old
+    # --- state estimates X̂0 ---
+    i_base = nx̃
+    Z̃s[(i_base+1):(i_base+nX̂-nx̂)]    .= @views estim.Z̃[(i_base+nx̂+1):(i_base+nX̂)]
+    Z̃s[(i_base+nX̂-nx̂+1):(i_base+nX̂)] .= @views estim.Z̃[(i_base+nX̂-nx̂+1):(i_base+nX̂)]
+    # --- algebraic variables â0arr and Â0 ---
+    i_base = nx̃ + nX̂ 
+    Z̃s[(i_base+1):(i_base+nA)]       .= @views estim.Z̃[(i_base+na+1):(i_base+na+nA)]
+    Z̃s[(i_base+nA+1):(i_base+na+nA)] .= @views estim.Z̃[(i_base+nA+1):(i_base+na+nA)]
+    # --- algebraic variables Ā --- 
+    i_base = nx̃ + nX̂ + na + nA
+    Z̃s[(i_base+1):(i_base+nĀ-nā)]    .= @views estim.Z̃[(i_base+nā+1):(i_base+nĀ)]
+    Z̃s[(i_base+nĀ-nā+1):(i_base+nĀ)] .= @views estim.Z̃[(i_base+nĀ-nā+1):(i_base+nĀ)]
     # --- process noise estimates Ŵ ---
-    Z̃s[(nx̃+nX̂+1):(nx̃+nX̂+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nX̂+nŵ+1):(nx̃+nX̂+nŴ)]
-    Z̃s[(nx̃+nX̂+nŴ-nŵ+1):end]  .= 0
+    i_base = nx̃ + nX̂ + na + nA + nĀ
+    Z̃s[(i_base+1):(i_base+nŴ-nŵ)]   .= @views estim.Z̃[(i_base+nŵ+1):(i_base+nŴ)]
+    Z̃s[(i_base+nŴ-nŵ+1):end]        .= 0
     # --- verify definiteness of objective function ---
     x̄, â0arr = buffer.x̂, buffer.â
     V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
