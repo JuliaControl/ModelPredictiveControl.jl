@@ -46,8 +46,7 @@ function get_i_Z̃_Nk(estim::MovingHorizonEstimator, transcription::OrthogonalCo
     return i_Z̃_NK
 end
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::SingleShooting) 
-    nŵ, Nk = estim.nx̂, estim.Nk[]
-    nx̃ = estim.nε + estim.nx̂
+    nx̃, nŵ, Nk = estim.nx̃, estim.nx̂, estim.Nk[]
     return (1):(nx̃ + nŵ*Nk)
 end
 
@@ -1328,28 +1327,36 @@ end
 
 "Fill the unused decision variables in `Z̃` with `0`s (only when `Nk < He`)."
 function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::SingleShooting)
-    nŵ, nx̂, Nk =  estim.nx̂, estim.nx̂, estim.Nk[]
-    nx̃ = estim.nε + nx̂
-    Z̃[(nx̃ + nŵ*Nk + 1):end] .= 0 # unused decision variables after Ŵ vector
+    nŵ, nx̃, Nk =  estim.nx̂, estim.nx̃, estim.Nk[]
+    Z̃[(1 + nx̃ + nŵ*Nk):end] .= 0 # unused vars after Ŵ vector
     return nothing
 end
 function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::TranscriptionMethod)
-    nŵ, nx̂, He, Nk =  estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
-    nx̃ = estim.nε + nx̂
-    nx̃_nX̂_He = nx̃ + nx̂*He
-    Z̃[(nx̃ + nx̂*Nk + 1):(nx̃_nX̂_He)] .= 0 # unused decision variables after X̂0 vector
-    Z̃[(nx̃_nX̂_He + nŵ*Nk + 1):end]  .= 0 # unused decision variables after Ŵ vector
+    nŵ, nx̂, nx̃, He, Nk =  estim.nx̂, estim.nx̂, estim.nx̃, estim.He, estim.Nk[]
+    na = get_na(estim.model)
+    nx̃_nX̂_He          = nx̃ + nx̂*He
+    nx̃_nX̂_na_nA_He    = nx̃ + nx̂*He + na + na*He
+    nx̃_nX̂_na_nA_nĀ_He = nx̃ + nx̂*He + na + na*He + na*He
+    Z̃[(1 + nx̃ + nx̂*Nk):(nx̃_nX̂_He)]                      .= 0 # unused vars after X̂0 vector
+    Z̃[(1 + nx̃_nX̂_He + na + na*Nk):(nx̃_nX̂_na_nA_He)]     .= 0 # unused vars after A0 vector
+    Z̃[(1 + nx̃_nX̂_na_nA_He + na*Nk):(nx̃_nX̂_na_nA_nĀ_He)] .= 0 # unused vars after Ā vector
+    Z̃[(1 + nx̃_nX̂_na_nA_nĀ_He + nŵ*Nk):end]              .= 0 # unused vars after Ŵ vector
     return nothing
 end
 function fill0unused!(Z̃, estim::MovingHorizonEstimator, transcription::OrthogonalCollocation)
-    nŵ, nx̂, He, Nk =  estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
-    nx̃ = estim.nε + nx̂
+    nŵ, nx̂, nx̃, He, Nk =  estim.nx̂, estim.nx̂, estim.nx̃, estim.He, estim.Nk[]
+    na = get_na(estim.model)
     nk̄ = get_nk̄(estim.model, transcription)
-    nx̃_nX̂_He    = nx̃ + nx̂*He
-    nx̃_nX̂_nK_He = nx̃_nX̂_He + nk̄*He
-    Z̃[(nx̃ + nx̂*Nk + 1):(nx̃_nX̂_He)]          .= 0 # unused decision variables after X̂0 vector
-    Z̃[(nx̃_nX̂_He + nk̄*Nk + 1):(nx̃_nX̂_nK_He)] .= 0 # unused decision variables after K vector
-    Z̃[(nx̃_nX̂_nK_He + nŵ*Nk + 1):end]        .= 0 # unused decision variables after Ŵ vector
+    nā = transcription.no*na
+    nx̃_nX̂_He             = nx̃ + nx̂*He
+    nx̃_nX̂_na_nA_He       = nx̃ + nx̂*He + na + na*He
+    nx̃_nX̂_na_nA_nK̄_He    = nx̃ + nx̂*He + na + na*He + nk̄*He
+    nx̃_nX̂_na_nA_nK̄_nĀ_He = nx̃ + nx̂*He + na + na*He + nk̄*He + nā*He
+    Z̃[(1 + nx̃ + nx̂*Nk):(nx̃_nX̂_He)]                            .= 0 # unused vars after X̂0 vector
+    Z̃[(1 + nx̃_nX̂_He + na + na*Nk):(nx̃_nX̂_na_nA_He)]           .= 0 # unused vars after A0 vector
+    Z̃[(1 + nx̃_nX̂_na_nA_He + nk̄*Nk):(nx̃_nX̂_na_nA_nK̄_He)]       .= 0 # unused vars after K̄ vector
+    Z̃[(1 + nx̃_nX̂_na_nA_nK̄_He + nā*Nk):(nx̃_nX̂_na_nA_nK̄_nĀ_He)] .= 0 # unused vars after Ā vector
+    Z̃[(1 + nx̃_nX̂_na_nA_nK̄_nĀ_He + nŵ*Nk):end]                 .= 0 # unused vars after Ŵ vector
     return nothing
 end
 
