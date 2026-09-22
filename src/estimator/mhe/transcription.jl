@@ -1883,9 +1883,9 @@ for ``j = 0, 1, ... , N_k-1``, and knowing that the ``\mathbf{k}_i(ℓ+j)`` and
 ``\mathbf{k̇}_i`` vectors are evaluated from the continuous-time function [`fq_dae!`](@ref),
 as described in [`init_orthocolloc`](@ref). The nonlinear equality constraints also include
 the residuals at the collocation points ``\mathf{q}_i(ℓ+j)``, see [`init_orthocolloc`](@ref).
-The residuals at the sampling instants ```\mathbf{q_0}(ℓ+j)`` are other constraints: 
+The residuals at the sampling instants ``\mathbf{q_0}(ℓ+j)`` are other constraints: 
 ```math
-\mathbf{q_0}_i(ℓ+j) = \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j), \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j), \mathbf{d_0}(ℓ+j), \mathbf{p}\Big)
+\mathbf{q_0}(ℓ+j) = \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j), \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j), \mathbf{d_0}(ℓ+j), \mathbf{p}\Big)
 ```
 for ``j = 0, 1, ... , N_k``. The defects for the continuity constraints and the
 stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@ref)). The
