@@ -98,12 +98,12 @@ Same than [`f̂!`](@ref) for [`SimModel`](@ref) but without the `estim` argument
 """
 function f̂!(x̂0next, û0, k̄, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    @views xdnext, xsnext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
-    mul!(û0, Cs_u, xs)      # ys_u = Cs_u*xs
+    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    @views x̂dnext, x̂snext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
+    mul!(û0, Cs_u, x̂s)      # ys_u = Cs_u*xs
     û0 .+= u0               # û0 = u0 + ys_u  
-    f!(xdnext, k̄, model, xd, û0, d0, model.p)
-    mul!(xsnext, As, xs)
+    f!(x̂dnext, k̄, model, x̂d, û0, d0, model.p)
+    mul!(x̂snext, As, x̂s)
     x̂0next .+= f̂op .- x̂op
     return nothing
 end
@@ -135,9 +135,9 @@ Same than [`ĥ!`](@ref) for [`SimModel`](@ref) but without the `estim` argument
 """
 function ĥ!(ŷ0, model::SimModel, Cs_y::AbstractMatrix, x̂0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    h!(ŷ0, model, xd, d0, model.p)  # y0 = h(xd, d0)
-    mul!(ŷ0, Cs_y, xs, 1, 1)        # ŷ0 = y0 + Cs_y*xs
+    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    h!(ŷ0, model, x̂d, d0, model.p)  # y0 = h(xd, d0)
+    mul!(ŷ0, Cs_y, x̂s, 1, 1)        # ŷ0 = y0 + Cs_y*xs
     return nothing
 end
 
@@ -148,9 +148,9 @@ Same than [`ĥ!`](@ref) for [`SimModel`](@ref), but call [`h_dae!`](@ref) inter
 """
 function ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, â0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
-    @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    h_dae!(ŷ0, model, xd, â0, d0)
-    mul!(ŷ0, estim.Cs_y, xs, 1, 1)        # ŷ0 = y0 + Cs_y*xs
+    @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
+    h_dae!(ŷ0, model, x̂d, â0, d0)
+    mul!(ŷ0, estim.Cs_y, x̂s, 1, 1)        # ŷ0 = y0 + Cs_y*xs
     return nothing
 end
 

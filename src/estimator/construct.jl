@@ -3,12 +3,12 @@ struct StateEstimatorBuffer{NT<:Real}
     û ::Vector{NT}
     k̄ ::Vector{NT}
     x̂ ::Vector{NT}
-    a ::Vector{NT}
+    â ::Vector{NT}
     Z̃ ::Vector{NT}
     V̂ ::Vector{NT}
     Ŵ ::Vector{NT}
     X̂ ::Vector{NT}
-    A ::Vector{NT}
+    Â ::Vector{NT}
     Ŷ ::Vector{NT}
     U ::Vector{NT}
     D ::Vector{NT}

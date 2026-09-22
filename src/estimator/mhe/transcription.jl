@@ -1500,7 +1500,7 @@ function predict_mhe!(
         ŷ0  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
         v̂   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
         y0m = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
-        ĥ!(ŷ0, estim, model, x̂0, a0, d0)
+        ĥ!(ŷ0, estim, model, x̂0, â0, d0)
         ŷ0m = @views ŷ0[estim.i_ym]
         if any(isnan, y0m) # nan in Y0m: y0m=ŷ0m => associated v̂ value = 0
             y0m = [isnan(y) ? ŷ : y for (y, ŷ) in zip(y0m, ŷ0m)]
