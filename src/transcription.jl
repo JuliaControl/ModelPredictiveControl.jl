@@ -181,14 +181,14 @@ transcription method.
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                     \\
         \mathbf{X̂_0}                                                    \\
-        \mathbf{A_0}                                                    \\
+        \mathbf{Â_0}                                                    \\
         \mathbf{Ā}                                                      \end{bmatrix}
     , \: 
-    \mathbf{A_0} = \begin{bmatrix}
-        \mathbf{a_0}(k+1)                                               \\
-        \mathbf{a_0}(k+2)                                               \\
+    \mathbf{Â_0} = \begin{bmatrix}
+        \mathbf{â_0}(k+1)                                               \\
+        \mathbf{â_0}(k+2)                                               \\
         \vdots                                                          \\
-        \mathbf{a_0}(k+H_p)                                             \end{bmatrix}
+        \mathbf{â_0}(k+H_p)                                             \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{a_1}(k+0)                                               \\
@@ -202,19 +202,19 @@ transcription method.
         \mathbf{x̂_0}(k-N_k+p)                                           \\  
         \mathbf{X̂_0}                                                    \\         
         \mathbf{0_x̂}                                                    \\
-        \mathbf{a_0}(k-N_k+p)                                           \\  
-        \mathbf{A_0}                                                    \\
-        \mathbf{0_a}                                                    \\
+        \mathbf{â_0}(k-N_k+p)                                           \\  
+        \mathbf{Â_0}                                                    \\
+        \mathbf{0_â}                                                    \\
         \mathbf{Ā}                                                      \\
         \mathbf{0_ā}                                                    \\
         \mathbf{Ŵ}                                                      \\
         \mathbf{0_ŵ}                                                    \end{bmatrix}
     , \: 
-    \mathbf{A_0} = \begin{bmatrix}
-        \mathbf{a_0}(k-N_k+p+1)                                         \\
-        \mathbf{a_0}(k-N_k+p+2)                                         \\
+    \mathbf{Â_0} = \begin{bmatrix}
+        \mathbf{â_0}(k-N_k+p+1)                                         \\
+        \mathbf{â_0}(k-N_k+p+2)                                         \\
         \vdots                                                          \\
-        \mathbf{a_0}(k+p)                                               \end{bmatrix}
+        \mathbf{â_0}(k+p)                                               \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{a_1}(k-N_k+p+0)                                         \\
@@ -225,8 +225,8 @@ transcription method.
     See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
     variables at the beginning (``N_k < H_e``). The predicted outputs are computed from
-    the algebraic variables in ``\mathbf{A_0}``, while the values in ``\mathbf{Ā}`` are
-    strictly reserved for the the `fq!` function. The ``\mathbf{a_0}`` vector is at the left
+    the algebraic variables in ``\mathbf{Â_0}``, while the values in ``\mathbf{Ā}`` are
+    strictly reserved for the the `fq!` function. The ``\mathbf{â_0}`` vector is at the left
     endpoint of the trapezoid, while the ``\mathbf{a_1}`` is at the right endpoint.
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
@@ -344,15 +344,15 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                 \\
         \mathbf{X̂_0}                                                \\
-        \mathbf{A_0}                                                \\
+        \mathbf{Â_0}                                                \\
         \mathbf{K̄}                                                  \\
         \mathbf{Ā}                                                  \end{bmatrix}
     , \:
-    \mathbf{A_0} = \begin{bmatrix}
-        \mathbf{a_0}(k+1)                                           \\
-        \mathbf{a_0}(k+2)                                           \\
+    \mathbf{Â_0} = \begin{bmatrix}
+        \mathbf{â_0}(k+1)                                           \\
+        \mathbf{â_0}(k+2)                                           \\
         \vdots                                                      \\
-        \mathbf{a_0}(k+H_p)                                         \end{bmatrix}
+        \mathbf{â_0}(k+H_p)                                         \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{ā}(k+0)                                             \\
@@ -366,9 +366,9 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{x̂_0}(k-N_k+p)                                       \\  
         \mathbf{X̂_0}                                                \\         
         \mathbf{0_x̂}                                                \\
-        \mathbf{a_0}(k-N_k+p)                                       \\
-        \mathbf{A_0}                                                \\
-        \mathbf{0_a}                                                \\
+        \mathbf{â_0}(k-N_k+p)                                       \\
+        \mathbf{Â_0}                                                \\
+        \mathbf{0_â}                                                \\
         \mathbf{K̄}                                                  \\
         \mathbf{0_k̄}                                                \\
         \mathbf{Ā}                                                  \\
@@ -376,11 +376,11 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{Ŵ}                                                  \\
         \mathbf{0_ŵ}                                                \end{bmatrix}
     , \;
-    \mathbf{A_0} = \begin{bmatrix}
-        \mathbf{a_0}(k-N_k+p+1)                                     \\
-        \mathbf{a_0}(k-N_k+p+2)                                     \\
+    \mathbf{Â_0} = \begin{bmatrix}
+        \mathbf{â_0}(k-N_k+p+1)                                     \\
+        \mathbf{â_0}(k-N_k+p+2)                                     \\
         \vdots                                                      \\
-        \mathbf{a_0}(k+p)                                           \end{bmatrix}
+        \mathbf{â_0}(k+p)                                           \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{ā}(k-N_k+p+0)                                       \\
@@ -390,8 +390,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     ```
     All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision variables at
     the beginning in the [`MovingHorizonEstimator`](@ref) (``N_k < H_e``). The predicted
-    outputs are computed from the algebraic variables in ``\mathbf{A_0}``, while the values
-    in ``\mathbf{Ā}`` are strictly reserved for the `fq!` function. The ``\mathbf{A_0}`` 
+    outputs are computed from the algebraic variables in ``\mathbf{Â_0}``, while the values
+    in ``\mathbf{Ā}`` are strictly reserved for the `fq!` function. The ``\mathbf{Â_0}`` 
     vector must be explicitly included in the decision variables since the output function
     `h!` is evaluated at different locations than the collocation points, in general.
     

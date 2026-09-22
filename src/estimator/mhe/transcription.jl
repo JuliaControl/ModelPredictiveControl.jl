@@ -1099,14 +1099,14 @@ function set_warmstart_mhe!(
     Z̃s[(nx̃+1):(nx̃+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nŵ+1):(nx̃+nŴ)]
     Z̃s[(nx̃+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
-    x̄, a0arr = buffer.x̂, buffer.a
-    V̂, Ŵ, X̂0, A0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.U, buffer.Ŷ
+    x̄, â0arr = buffer.x̂, buffer.â
+    V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
     K = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
     x̂0arr = estim.x̂0arr_old
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s) 
     predict_mhe!(
-        V̂, X̂0, A0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃s
+        V̂, X̂0, Â0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃s
     )
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
@@ -1201,7 +1201,7 @@ function set_warmstart_mhe!(
     i_base = nx̃
     Z̃s[(i_base+1):(i_base+nX̂-nx̂)]    .= @views estim.Z̃[(i_base+nx̂+1):(i_base+nX̂)]
     Z̃s[(i_base+nX̂-nx̂+1):(i_base+nX̂)] .= @views estim.Z̃[(i_base+nX̂-nx̂+1):(i_base+nX̂)]
-    # --- algebraic variables a0arr and A0 ---
+    # --- algebraic variables â0arr and Â0 ---
     i_base = nx̃ + nX̂ 
     Z̃s[(i_base+1):(i_base+nA)]       .= @views estim.Z̃[(i_base+na+1):(i_base+na+nA)]
     Z̃s[(i_base+nA+1):(i_base+na+nA)] .= @views estim.Z̃[(i_base+nA+1):(i_base+na+nA)]
@@ -1218,14 +1218,14 @@ function set_warmstart_mhe!(
     Z̃s[(i_base+1):(i_base+nŴ-nŵ)]   .= @views estim.Z̃[(i_base+nŵ+1):(i_base+nŴ)]
     Z̃s[(i_base+nŴ-nŵ+1):end]        .= 0
     # --- verify definiteness of objective function --- 
-    x̄, a0arr = buffer.x̂, buffer.a
-    V̂, Ŵ, X̂0, A0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.U, buffer.Ŷ
+    x̄, â0arr = buffer.x̂, buffer.â
+    V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
     K̄ = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
     x̂0arr = estim.x̂0arr_old
-    a0arr = geta0arr!(a0arr, estim, estim.transcription, Z̃s)  
+    â0arr = getâ0arr!(â0arr, estim, estim.transcription, Z̃s)  
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
-    predict_mhe!(V̂, X̂0, A0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃s)
+    predict_mhe!(V̂, X̂0, Â0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃s)
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+nX̂+nK̄+1:end] .= 0 # Ŵ = 0
@@ -1300,15 +1300,15 @@ function set_warmstart_mhe!(
     Z̃s[(nx̃+nX̂+1):(nx̃+nX̂+nŴ-nŵ)] .= @views estim.Z̃[(nx̃+nX̂+nŵ+1):(nx̃+nX̂+nŴ)]
     Z̃s[(nx̃+nX̂+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
-    x̄, a0arr = buffer.x̂, buffer.a
-    V̂, Ŵ, X̂0, A0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.U, buffer.Ŷ
+    x̄, â0arr = buffer.x̂, buffer.â
+    V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
     K̄ = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
     x̂0arr = estim.x̂0arr_old
-    a0arr = geta0arr!(a0arr, estim, transcription, Z̃s)
+    â0arr = getâ0arr!(â0arr, estim, transcription, Z̃s)
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
     predict_mhe!(
-        V̂, X̂0, A0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃s
+        V̂, X̂0, Â0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃s
     )
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
@@ -1336,7 +1336,7 @@ function fill0unused!(Z̃, estim::MovingHorizonEstimator, ::TranscriptionMethod)
     nx̃_nX̂_na_nA_He    = nx̃ + nx̂*He + na + na*He
     nx̃_nX̂_na_nA_nĀ_He = nx̃ + nx̂*He + na + na*He + na*He
     Z̃[(1 + nx̃ + nx̂*Nk):(nx̃_nX̂_He)]                      .= 0 # unused vars after X̂0 vector
-    Z̃[(1 + nx̃_nX̂_He + na + na*Nk):(nx̃_nX̂_na_nA_He)]     .= 0 # unused vars after A0 vector
+    Z̃[(1 + nx̃_nX̂_He + na + na*Nk):(nx̃_nX̂_na_nA_He)]     .= 0 # unused vars after Â0 vector
     Z̃[(1 + nx̃_nX̂_na_nA_He + na*Nk):(nx̃_nX̂_na_nA_nĀ_He)] .= 0 # unused vars after Ā vector
     Z̃[(1 + nx̃_nX̂_na_nA_nĀ_He + nŵ*Nk):end]              .= 0 # unused vars after Ŵ vector
     return nothing
@@ -1351,7 +1351,7 @@ function fill0unused!(Z̃, estim::MovingHorizonEstimator, transcription::Orthogo
     nx̃_nX̂_na_nA_nK̄_He    = nx̃ + nx̂*He + na + na*He + nk̄*He
     nx̃_nX̂_na_nA_nK̄_nĀ_He = nx̃ + nx̂*He + na + na*He + nk̄*He + nā*He
     Z̃[(1 + nx̃ + nx̂*Nk):(nx̃_nX̂_He)]                            .= 0 # unused vars after X̂0 vector
-    Z̃[(1 + nx̃_nX̂_He + na + na*Nk):(nx̃_nX̂_na_nA_He)]           .= 0 # unused vars after A0 vector
+    Z̃[(1 + nx̃_nX̂_He + na + na*Nk):(nx̃_nX̂_na_nA_He)]           .= 0 # unused vars after Â0 vector
     Z̃[(1 + nx̃_nX̂_na_nA_He + nk̄*Nk):(nx̃_nX̂_na_nA_nK̄_He)]       .= 0 # unused vars after K̄ vector
     Z̃[(1 + nx̃_nX̂_na_nA_nK̄_He + nā*Nk):(nx̃_nX̂_na_nA_nK̄_nĀ_He)] .= 0 # unused vars after Ā vector
     Z̃[(1 + nx̃_nX̂_na_nA_nK̄_nĀ_He + nŵ*Nk):end]                 .= 0 # unused vars after Ŵ vector
@@ -1360,10 +1360,10 @@ end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, A0, Û0, K̄, Ŷ0, 
+        V̂, X̂0, Â0, Û0, K̄, Ŷ0, 
         estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod, 
-        x̂0arr, a0arr, Ŵ, Z̃ 
-    ) -> V̂, X̂0, A0
+        x̂0arr, â0arr, Ŵ, Z̃ 
+    ) -> V̂, X̂0, Â0
 
 Compute the `V̂` vector and `X̂0` vectors for the `MovingHorizonEstimator` and `LinModel`.
 
@@ -1376,10 +1376,10 @@ noises from ``k-N_k+1`` to ``k``. The `X̂0` vector is estimated states from ``k
 \mathbf{X̂_0} &= \mathbf{Ẽ_X̂ Z̃} + \mathbf{F_X̂}
 \end{aligned}
 ```
-The vector `A0` is ignored and returned unchanged.
+The vector `Â0` is ignored and returned unchanged.
 """
 function predict_mhe!(
-    V̂, X̂0, A0, _ , _ , _ ,
+    V̂, X̂0, Â0, _ , _ , _ ,
     estim::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod, 
     _ , _ , _ , Z̃
 )
@@ -1399,25 +1399,25 @@ function predict_mhe!(
     end
     V̂_res  .= mul!(V̂_res, Ẽ, Z̃) .+ F
     X̂0_res .= mul!(X̂0_res, ẼX̂, Z̃) .+ FX̂
-    return V̂, X̂0, A0
+    return V̂, X̂0, Â0
 end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, A0, Û0, K̄, Ŷ0, 
+        V̂, X̂0, Â0, Û0, K̄, Ŷ0, 
         estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
-        x̂0arr, a0arr, Ŵ, Z̃ 
-    ) -> V̂, X̂0, A0
+        x̂0arr, â0arr, Ŵ, Z̃ 
+    ) -> V̂, X̂0, Â0
 
 Compute the vectors when `model` is a [`NonLinModel`](@ref) with [`SingleShooting`](@ref).
 
-The function mutates `V̂`, `X̂0`, `Û0`, `K` and `Ŷ0` vector arguments. The vector `A0` is
+The function mutates `V̂`, `X̂0`, `Û0`, `K` and `Ŷ0` vector arguments. The vector `Â0` is
 ignored and returned unchanged. The augmented model of [`f̂!`](@ref) and [`ĥ!`](@ref) is
 called recursively in a `for` loop from ``j=1`` to ``N_k``, and by adding the estimated
 process noise ``\mathbf{ŵ}``.
 """
 function predict_mhe!(
-    V̂, X̂0, A0, Û0, K̄, Ŷ0, 
+    V̂, X̂0, Â0, Û0, K̄, Ŷ0, 
     estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
     x̂0arr, _ , Ŵ, _ 
 )
@@ -1462,15 +1462,15 @@ function predict_mhe!(
         V̂[nym*Nk+1:end] .= 0
         X̂0[nx̂*Nk+1:end] .= 0
     end
-    return V̂, X̂0, A0
+    return V̂, X̂0, Â0
 end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, A0, _ , _ , Ŷ0, 
+        V̂, X̂0, Â0, _ , _ , Ŷ0, 
         estim::MovingHorizonEstimator, model::SimModel, ::TranscriptionMethod, 
-        x̂0arr, a0arr, _ , Z̃ 
-    ) -> V̂, X̂0, A0
+        x̂0arr, â0arr, _ , Z̃ 
+    ) -> V̂, X̂0, Â0
 
 Compute the vectors for all other cases.
 
@@ -1478,23 +1478,23 @@ The function mutates `V̂`, `X̂0`, and `Ŷ0` vector arguments. The augmented o
 [`ĥ!`](@ref) is called multiple times in a `for` loop from ``j=1`` to ``N_k``.
 """
 function predict_mhe!(
-    V̂, X̂0, A0, _ , _ , Ŷ0, 
+    V̂, X̂0, Â0, _ , _ , Ŷ0, 
     estim::MovingHorizonEstimator, model::SimModel, transcription::TranscriptionMethod, 
-    x̂0arr, a0arr, _ , Z̃ 
+    x̂0arr, â0arr, _ , Z̃ 
 )
     nd, ny, na = model.nd, model.ny, get_na(model)
     nx̂, nx̃, nym, Nk = estim.nx̂, estim.nx̃, estim.nym, estim.Nk[]
     nx̃_nX̂ = nx̃ + nx̂*estim.He
     h_threads = transcription.h_threads
     X̂0[1:nx̂*Nk] .= @views Z̃[(1 + nx̃):(nx̃ + nx̂*Nk)]                   # skip x0arr
-    A0[1:na*Nk] .= @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + na*Nk)]   # skip a0arr
+    Â0[1:na*Nk] .= @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + na*Nk)]   # skip â0arr
     @threadsif h_threads for j=1:Nk
         if estim.direct
             x̂0 = @views X̂0[(1+nx̂*(j-1)):(nx̂*j)]
-            a0 = @views A0[(1+na*(j-1)):(na*j)]
+            â0 = @views Â0[(1+na*(j-1)):(na*j)]
         else
             x̂0 = @views j < 2 ? x̂0arr[1:nx̂] : X̂0[(1+nx̂*(j-2)):(nx̂*(j-1))]
-            a0 = @views j < 2 ? a0arr[1:na] : A0[(1+na*(j-2)):(na*(j-1))]
+            â0 = @views j < 2 ? â0arr[1:na] : Â0[(1+na*(j-2)):(na*(j-1))]
         end
         d0  = @views  estim.D0[(1+nd*j):(nd*(j+1))] # the 1st nd elements are not needed here
         ŷ0  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
@@ -1510,9 +1510,9 @@ function predict_mhe!(
     if Nk < estim.He  # fill unused values with 0s for tracer sparsity detection:
         V̂[nym*Nk+1:end] .= 0
         X̂0[nx̂*Nk+1:end] .= 0
-        A0[na*Nk+1:end] .= 0
+        Â0[na*Nk+1:end] .= 0
     end
-    return V̂, X̂0, A0
+    return V̂, X̂0, Â0
 end
 
 """
@@ -1664,7 +1664,7 @@ end
     con_nonlinprogeq_mhe!(
         geq, _ , _ , Û0, K̄,
         estim::MovingHorizonEstimator, model::SimModel, ::TrapezoidalCollocation, 
-        x̂0arr, a0arr, Ŵ, Z̃
+        x̂0arr, â0arr, Ŵ, Z̃
     ) -> geq
 
 Nonlinear MHE equality constrains for [`SimModel`](@ref) and [`TrapezoidalCollocation`](@ref).
@@ -1702,7 +1702,7 @@ and also one final residual at `k+p`:
 function con_nonlinprogeq_mhe!(
     geq, _ , _ , Û0, K̄,
     estim::MovingHorizonEstimator, model::SimModel, transcription::TrapezoidalCollocation, 
-    x̂0arr, a0arr, Ŵ, Z̃
+    x̂0arr, â0arr, Ŵ, Z̃
 )
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
     nx̂, nx̃, nxs, nŵ, He = estim.nx̂, estim.nx̃, estim.nxs, estim.nx̂, estim.He
@@ -1715,8 +1715,8 @@ function con_nonlinprogeq_mhe!(
     nx̃_nX̂  = nx̃ + nx̂*estim.He
     nŜk, nA, nĀ = nx*He, na*He, na*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
-    X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x0arr components
-    A0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nA)] # skipping a0arr components
+    X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
+    Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nA)] # skipping â0arr components
     A1_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na + nA):(nx̃_nX̂ + na + nA + nĀ)]
     Û0   = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
     (Nk < He) && (geq .= 0) 
@@ -1726,10 +1726,10 @@ function con_nonlinprogeq_mhe!(
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
-            a0_Z̃ = @views a0arr[1:na]
+            â0_Z̃ = @views â0arr[1:na]
         else
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
-            a0_Z̃ = @views A0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
+            â0_Z̃ = @views Â0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
         end
         d0       = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
@@ -1750,10 +1750,10 @@ function con_nonlinprogeq_mhe!(
         # the previous iteration (j-1) may not be executed (iterations are re-orderable)
         computeDynamicsAtBegin = f_threads || h < 1 || j < 2
         if computeDynamicsAtBegin
-            fq_dae!(k̇0, q0, model, x̂d_Z̃, a0_Z̃, û0, d0)
+            fq_dae!(k̇0, q0, model, x̂d_Z̃, â0_Z̃, û0, d0)
         else # piecewise linear inputs u and disturbances d:
             k̇0 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇1[j-1] (prev. iter)
-            q0 .= @views a0_Z̃ .- A1_Z̃[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a1[j-1]
+            q0 .= @views â0_Z̃ .- A1_Z̃[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a1[j-1]
         end
         if h > 0 && j < Nk
             û1 = @views Û0[(1 + nu*j):(nu*(j+1))]
@@ -1765,7 +1765,7 @@ function con_nonlinprogeq_mhe!(
     end
     # keep "end" in names, it solves a weird race cond. with f_threads on Julia v1.13.0
     q0end = @views   Q0[(1 + na*Nk):(na*Nk + na)]
-    a0end = @views A0_Z̃[(1 + na*(Nk-1)):(na*Nk)]
+    a0end = @views Â0_Z̃[(1 + na*(Nk-1)):(na*Nk)]
     if na > 0 && h < 1 # compute the final residual at k+p:
         x̂dend   = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
         û0end   = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p) ≈ û0(k+p-1)
@@ -1782,7 +1782,7 @@ end
     con_nonlinprogeq_mhe!(
         geq, _ , _ , Û0, K̄,
         estim::MovingHorizonEstimator, model::SimModel, ::OrthogonalCollocation, 
-        x̂0arr, a0arr, _ , Z̃
+        x̂0arr, â0arr, _ , Z̃
     ) -> geq
 
 Nonlinear MHE equality constrains for [`SimModel`](@ref) and [`OrthogonalCollocation`](@ref).
@@ -1813,7 +1813,7 @@ estimated process noise ``\mathbf{ŵ}(ℓ+j)`` are incorporated in the continui
 function con_nonlinprogeq_mhe!(
     geq, _ , _ , Û0, K̄,
     estim::MovingHorizonEstimator, model::SimModel, transcription::OrthogonalCollocation, 
-    x̂0arr, a0arr, _ , Z̃
+    x̂0arr, â0arr, _ , Z̃
 )
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
     nx̂, nx̃, He = estim.nx̂, estim.nx̃, estim.He
@@ -1826,8 +1826,8 @@ function con_nonlinprogeq_mhe!(
     nx̃_nX̂  = nx̃ + nx̂*estim.He
     nŜk̄, nA, nK̄, nĀ = nk̄*He, na*He, nk̄*He, nā*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
-    X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x0arr components
-    A0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nA)] # skipping a0arr components
+    X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
+    Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nA)] # skipping â0arr components
     K̄_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nA):(nx̃_nX̂ + na + nA + nK̄)]
     Ā_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nA + nK̄):(nx̃_nX̂ + na + nA + nK̄ + nĀ)]
     Dtemp = estim.buffer.D
@@ -1839,10 +1839,10 @@ function con_nonlinprogeq_mhe!(
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
-            a0_Z̃ = @views a0arr[1:na]
+            â0_Z̃ = @views â0arr[1:na]
         else
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
-            a0_Z̃ = @views A0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
+            â0_Z̃ = @views Â0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
         end
         d0   = @views estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
         û0   = @views       Û0[(1 + nu*(j-1)):(nu*j)]
@@ -1862,9 +1862,9 @@ function con_nonlinprogeq_mhe!(
         # the previous iteration (j-1) may not be executed (iterations are re-orderable)
         computeDynamicsAtBegin = τendIsNotOne || f_threads || h < 1 || j < 2 
         if na > 0 && computeDynamicsAtBegin
-            @views fq_dae!(k̄dot[1:nx] ,q0 , model, x̂d_Z̃, a0_Z̃, û0, d0)
+            @views fq_dae!(k̄dot[1:nx] ,q0 , model, x̂d_Z̃, â0_Z̃, û0, d0)
         else
-            q0 .= @views a0_Z̃ .- Ā_Z̃[(1 + nā*(j-1) - na):(nā*(j-1))] # a0[j] = a_no[j-1]
+            q0 .= @views â0_Z̃ .- Ā_Z̃[(1 + nā*(j-1) - na):(nā*(j-1))] # a0[j] = a_no[j-1]
         end
         # ----------------- collocation constraint defects -----------------------------
         Δk = k̄dot
@@ -1892,7 +1892,7 @@ function con_nonlinprogeq_mhe!(
     end
     # keep "end" in names, it solves a weird race cond. with f_threads on Julia v1.13.0
     q0end = @views   Q0[(1 + na*Nk):(na*Nk + na)]
-    a0end = @views A0_Z̃[(1 + na*(Nk-1)):(na*Nk)]
+    a0end = @views Â0_Z̃[(1 + na*(Nk-1)):(na*Nk)]
     if na > 0 && h < 1 # compute the final residual at k+p:
         x̂dend   = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
         û0end   = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p) ≈ û0(k+p-1)

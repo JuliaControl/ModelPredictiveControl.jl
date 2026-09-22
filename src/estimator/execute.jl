@@ -142,14 +142,14 @@ function ĥ!(ŷ0, model::SimModel, Cs_y::AbstractMatrix, x̂0, d0)
 end
 
 """
-    ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x0, a0, d0)
+    ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, â0, d0)
 
 Same than [`ĥ!`](@ref) for [`SimModel`](@ref), but call [`h_dae!`](@ref) internally.
 """
-function ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, a0, d0)
+function ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, â0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views xd, xs = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    h_dae!(ŷ0, model, xd, a0, d0)
+    h_dae!(ŷ0, model, xd, â0, d0)
     mul!(ŷ0, estim.Cs_y, xs, 1, 1)        # ŷ0 = y0 + Cs_y*xs
     return nothing
 end

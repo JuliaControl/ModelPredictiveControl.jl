@@ -1455,7 +1455,7 @@ function get_nonlinobj_op(
     strict = Val(true)
     J::Vector{JNT}                      = zeros(JNT, 1)
     x̂0arr::Vector{JNT}, x̄::Vector{JNT}  = zeros(JNT, nx̂),  zeros(JNT, nx̂)
-    a0arr::Vector{JNT}, A0::Vector{JNT} = zeros(JNT, na),  zeros(JNT, nA)
+    â0arr::Vector{JNT}, Â0::Vector{JNT} = zeros(JNT, na),  zeros(JNT, nA)
     Ŵ::Vector{JNT}                      = zeros(JNT, nŴ)
     V̂::Vector{JNT},     X̂0::Vector{JNT} = zeros(JNT, nV̂),  zeros(JNT, nX̂)
     Ŵe::Vector{JNT}                     = zeros(JNT, nŴe)
@@ -1464,16 +1464,16 @@ function get_nonlinobj_op(
     Û0::Vector{JNT},    Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
     gc::Vector{JNT},    g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                    = zeros(JNT, neq)
-    function J!(Z̃, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
+    function J!(Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
     Z̃_J = zeros(JNT, nZ̃)
     J_cache = (
-        Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
-        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
+        Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
         Cache(Û0), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g), Cache(geq)
@@ -1575,7 +1575,7 @@ function get_nonlincon_oracle(
     strict = Val(true)
     myInf                                 = convert(JNT, Inf)
     x̂0arr::Vector{JNT}, x̄::Vector{JNT}    = zeros(JNT, nx̂),  zeros(JNT, nx̂)
-    a0arr::Vector{JNT}, A0::Vector{JNT}   = zeros(JNT, na),  zeros(JNT, nA)
+    â0arr::Vector{JNT}, Â0::Vector{JNT}   = zeros(JNT, na),  zeros(JNT, nA)
     Ŵ::Vector{JNT}                        = zeros(JNT, nŴ)
     V̂::Vector{JNT},     X̂0::Vector{JNT}   = zeros(JNT, nV̂),  zeros(JNT, nX̂)
     Ŵe::Vector{JNT}                       = zeros(JNT, nŴe)
@@ -1587,26 +1587,26 @@ function get_nonlincon_oracle(
     gi::Vector{JNT}                       = zeros(JNT, ngi)
     λi::Vector{JNT},    λeq::Vector{JNT}  = rand(JNT, ngi),  rand(JNT, neq)
     # -------------- inequality constraint: nonlinear oracle -------------------------
-    function gi!(gi, Z̃, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
+    function gi!(gi, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return nothing
     end
     function ℓ_gi(
-        Z̃, λi, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, gi
+        Z̃, λi, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, gi
     )
         update_predictions!(
-            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return dot(λi, gi)
     end
     Z̃_∇gi = zeros(JNT, nZ̃)
     ∇gi_cache = (
-        Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
-        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
+        Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
         Cache(Û0), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g), Cache(geq)
@@ -1619,8 +1619,8 @@ function get_nonlincon_oracle(
     ∇gi_structure = init_diffstructure(∇gi)
     if !isnothing(hess)
         ∇²gi_cache = (
-            Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
-            Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
+            Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
+            Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
             Cache(Ŵe), Cache(V̂e), Cache(X̂e),
             Cache(Û0), Cache(K̄), Cache(Ŷ0), 
             Cache(gc), Cache(g), Cache(geq),
@@ -1669,24 +1669,24 @@ function get_nonlincon_oracle(
         eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²gi_func!
     )
     # ------------- equality constraints : nonlinear oracle ------------------------------
-    function geq!(geq, Z̃, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g)
+    function geq!(geq, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g)
         update_predictions!(
-            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return nothing
     end
     function ℓ_geq(
-        Z̃, λeq, x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq
+        Z̃, λeq, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq
     )
         update_predictions!(
-            x̂0arr, a0arr, x̄, Ŵ, V̂, X̂0, A0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return dot(λeq, geq)
     end
     Z̃_∇geq = zeros(JNT, nZ̃)
     ∇geq_cache = (
-        Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
-        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
+        Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
+        Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
         Cache(Û0), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g)
@@ -1698,8 +1698,8 @@ function get_nonlincon_oracle(
     ∇geq_structure  = init_diffstructure(∇geq)
     if !isnothing(hess)
         ∇²geq_cache = (
-            Cache(x̂0arr), Cache(a0arr), Cache(x̄), 
-            Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(A0), 
+            Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
+            Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
             Cache(Ŵe), Cache(V̂e), Cache(X̂e),
             Cache(Û0), Cache(K̄), Cache(Ŷ0), 
             Cache(gc), Cache(g), Cache(geq)

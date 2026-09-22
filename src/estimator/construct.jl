@@ -44,12 +44,12 @@ function StateEstimatorBuffer{NT}(
     û  = Vector{NT}(undef, nu)
     k̄  = Vector{NT}(undef, nk̄)
     x̂  = Vector{NT}(undef, nx̂)
-    a  = Vector{NT}(undef, na)
+    â  = Vector{NT}(undef, na)
     Z̃  = Vector{NT}(undef, nZ̃)
     V̂  = Vector{NT}(undef, nV̂)
     Ŵ  = Vector{NT}(undef, nŴ)
     X̂  = Vector{NT}(undef, nX̂)
-    A  = Vector{NT}(undef, nA)
+    Â  = Vector{NT}(undef, nA)
     Ŷ  = Vector{NT}(undef, nŶ)
     U  = Vector{NT}(undef, nU)
     D  = Vector{NT}(undef, nD)
@@ -62,7 +62,7 @@ function StateEstimatorBuffer{NT}(
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
     return StateEstimatorBuffer{NT}(
-        u, û, k̄, x̂, a, Z̃, V̂, Ŵ, X̂, A, Ŷ, U, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
+        u, û, k̄, x̂, â, Z̃, V̂, Ŵ, X̂, Â, Ŷ, U, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
     )
 end
 
