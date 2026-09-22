@@ -43,8 +43,7 @@ Reset warm-starting values `estim.Z̃` at values stored in `estim.model`
 """
 function reset_warmstart!(estim::MovingHorizonEstimator, ::MultipleShooting)
     model = estim.model
-    nx, nx̂, nε, He = model.nx, estim.nx̂, estim.nε, estim.He
-    nx̃ = nε + nx̂
+    nx, nx̂, nx̃, nε, He = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He
     x0s  = model.buffer.x
     x0s .= model.xs_0 .- model.xop
     estim.Z̃ .= 0
@@ -56,8 +55,7 @@ function reset_warmstart!(estim::MovingHorizonEstimator, ::MultipleShooting)
 end
 function reset_warmstart!(estim::MovingHorizonEstimator, ::TrapezoidalCollocation)
     model = estim.model
-    nx, nx̂, nε, He, na = model.nx, estim.nx̂, estim.nε, estim.He, get_na(model)
-    nx̃ = nε + nx̂
+    nx, nx̂, nx̃, nε, He, na = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He, get_na(model)
     as_0 = get_as_0(model)
     x0s  = model.buffer.x
     x0s .= model.xs_0 .- model.xop
@@ -74,8 +72,7 @@ function reset_warmstart!(estim::MovingHorizonEstimator, ::TrapezoidalCollocatio
 end
 function reset_warmstart!(estim::MovingHorizonEstimator, ::OrthogonalCollocation)
     model = estim.model
-    nx, nx̂, nε, He, na = model.nx, estim.nx̂, estim.nε, estim.He, get_na(model)
-    nx̃ = nε + nx̂
+    nx, nx̂, nx̃, nε, He, na = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He, get_na(model)
     as_0 = get_as_0(model)
     x0s  = model.buffer.x
     x0s .= model.xs_0 .- model.xop

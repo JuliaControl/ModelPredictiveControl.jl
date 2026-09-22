@@ -109,6 +109,7 @@ struct MovingHorizonEstimator{
     nym::Int
     nyu::Int
     nxs::Int
+    nx̃::Int
     p::PT
     Mo::SparseMatrixCSC{NT, Int}
     Co::SparseMatrixCSC{NT, Int}
@@ -180,7 +181,7 @@ struct MovingHorizonEstimator{
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂ = model.nx + nxs
-        nŵ = nx̂ 
+        nŵ = nx̂
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         lastu0 = zeros(NT, nu)
@@ -203,6 +204,7 @@ struct MovingHorizonEstimator{
             ES, GS, JS, BS, 
             gc!, nc
         )
+        nx̃ = nx̂ + nε
         nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
         # dummy values, updated before optimization:
         H̃, q̃, r = Hermitian(zeros(NT, nZ̃, nZ̃), :L), zeros(NT, nZ̃), zeros(NT, 1)
@@ -231,7 +233,7 @@ struct MovingHorizonEstimator{
             covestim,  
             Z̃, lastu0, x̂op, f̂op, x̂0, 
             He, nε,
-            i_ym, nx̂, nym, nyu, nxs, 
+            i_ym, nx̂, nym, nyu, nxs, nx̃,
             p,
             Mo, Co, λo,
             As, Cs_u, Cs_y, nint_u, nint_ym,

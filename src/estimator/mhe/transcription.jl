@@ -11,10 +11,9 @@ end
 
 "Get the element indices in the decision vector `Z̃` that applies to a `Nk` window length."
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::TranscriptionMethod)
-    nx̂, nŵ, Nk = estim.nx̂, estim.nx̂, estim.Nk[]
+    nx̂, nx̃, nŵ, Nk = estim.nx̂, estim.nx̃, estim.nx̂, estim.Nk[]
     na = get_na(estim.model)
     nŴ, nX̂, nA   = nŵ*Nk, nx̂*Nk, na*Nk
-    nx̃ = estim.nε + nx̂
     nx̃_nX̂_He          = nx̃ + nx̂*estim.He
     na_nA_He          = na + na*estim.He
     nx̃_nX̂_na_nA_He    = nx̃_nX̂_He + na_nA_He
@@ -28,11 +27,10 @@ function get_i_Z̃_Nk(estim::MovingHorizonEstimator, ::TranscriptionMethod)
     return i_Z̃_NK
 end
 function get_i_Z̃_Nk(estim::MovingHorizonEstimator, transcription::OrthogonalCollocation)
-    nx̂, nŵ, Nk = estim.nx̂, estim.nx̂, estim.Nk[]
+    nx̂, nx̃, nŵ, Nk = estim.nx̂, estim.nx̃, estim.nx̂, estim.Nk[]
     na = get_na(estim.model)
     nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
     nŴ, nX̂, nA, nK̄, nĀ  = nŵ*Nk, nx̂*Nk, na*Nk, nk̄*Nk, nā*Nk
-    nx̃ = estim.nε + nx̂
     nx̃_nX̂_He             = nx̃ + nx̂*estim.He
     na_nA_He             = na + na*estim.He
     nx̃_nX̂_na_nA_He       = nx̃_nX̂_He          + na_nA_He
@@ -1480,8 +1478,7 @@ function predict_mhe!(
     x̂0arr, a0arr, _ , Z̃ 
 )
     nd, ny, na = model.nd, model.ny, get_na(model)
-    nx̂, nε, nym, Nk = estim.nx̂, estim.nε, estim.nym, estim.Nk[]
-    nx̃ = nε + nx̂
+    nx̂, nx̃, nym, Nk = estim.nx̂, estim.nx̃, estim.nym, estim.Nk[]
     nx̃_nX̂ = nx̃ + nx̂*estim.He
     h_threads = transcription.h_threads
     X̂0[1:nx̂*Nk] .= @views Z̃[(1 + nx̃):(nx̃ + nx̂*Nk)]                   # skip x0arr
@@ -1630,11 +1627,10 @@ function con_nonlinprogeq_mhe!(
     x̂0arr, _ , Ŵ, Z̃
 )
     nu, nx, nd, nk̄ = model.nu, model.nx, model.nd, model.nk̄
-    nx̂, nxs, nŵ, He = estim.nx̂, estim.nxs, estim.nx̂, estim.He
+    nx̂, nx̃, nxs, nŵ, He = estim.nx̂, estim.nx̃, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     nw = nŵ - nxs
-    nx̃ = estim.nε + nx̂
     p = estim.direct ? 0 : 1
     X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)]
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
@@ -1704,13 +1700,13 @@ function con_nonlinprogeq_mhe!(
     x̂0arr, a0arr, Ŵ, Z̃
 )
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
-    nx̂, nxs, nŵ, He = estim.nx̂, estim.nxs, estim.nx̂, estim.He
+    nx̂, nx̃, nxs, nŵ, He = estim.nx̂, estim.nx̃, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     Ts = model.Ts
     na = get_na(model)
     nk̄ = get_nk̄(model, transcription)
-    nw, nx̃ = nŵ - nxs, estim.nε + nx̂
+    nw = nŵ - nxs
     nx̃_nX̂  = nx̃ + nx̂*estim.He
     nŜk, nA, nĀ = nx*He, na*He, na*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
@@ -1815,14 +1811,13 @@ function con_nonlinprogeq_mhe!(
     x̂0arr, a0arr, _ , Z̃
 )
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
-    nx̂, He = estim.nx̂, estim.He
+    nx̂, nx̃, He = estim.nx̂, estim.nx̃, estim.He
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     no, τ, τendIsNotOne =  transcription.no, transcription.τ, transcription.τendIsNotOne
     Mo = estim.Mo
     na = get_na(model)
     nā, nk̄ = na*no, get_nk̄(model, transcription)
-    nx̃ = estim.nε + nx̂
     nx̃_nX̂  = nx̃ + nx̂*estim.He
     nŜk̄, nA, nK̄, nĀ = nk̄*He, na*He, nk̄*He, nā*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
