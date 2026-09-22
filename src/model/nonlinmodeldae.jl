@@ -816,7 +816,7 @@ fq_dae!(ẋ0, _ , model::NonLinModel, x0, _ , u0, d0) = model.f!(ẋ0, x0, u0, d
 
 Call `model.h!` with the `a0` argument if [`NonLinModelDAE`](@ref), else without.
 
-See also [`fq_dae!`](@ref).
+The `a0` argument is ignored for [`SimModelODE`](@ref)s. See also [`fq_dae!`](@ref).
 """
 function h_dae!(y0, model::NonLinModelDAE, x0, a0, d0)
     return model.h!(y0, x0, a0, d0, model.p)
