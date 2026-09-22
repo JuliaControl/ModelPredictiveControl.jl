@@ -195,7 +195,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     # --- non-Unicode fields ---
     info[:What] = info[:Ŵ]
     info[:xhatarr] = info[:x̂arr]
-    info[:ahararr] = info[:âarr]
+    info[:ahatarr] = info[:âarr]
     info[:epsilon] = info[:ε]
     info[:Xhat] = info[:X̂]
     info[:Ahat] = info[:Â]
