@@ -1087,7 +1087,6 @@ function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::SingleShooting, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nu = model.nu
     nk̄ = get_nk̄(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ = nε + nx̂, nŵ*He
@@ -1188,7 +1187,7 @@ function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::OrthogonalCollocation, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nu, na = model.nu, get_na(model)
+    na = get_na(model)
     nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂, nA, nK̄, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, nk̄*He, nā*He
@@ -1286,7 +1285,6 @@ function set_warmstart_mhe!(
     estim::MovingHorizonEstimator{NT}, transcription::TranscriptionMethod, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nu = model.nu
     nk̄ = get_nk̄(estim.model, transcription)
     nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂ = nε + nx̂, nŵ*He, nx̂*He
