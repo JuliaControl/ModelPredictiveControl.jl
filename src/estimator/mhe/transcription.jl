@@ -1104,8 +1104,8 @@ function set_warmstart_mhe!(
     Z̃s[(nx̃+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
     x̄, a0arr = buffer.x̂, buffer.a
-    V̂, Ŵ, X̂0, A0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.Ŷ
-    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
+    V̂, Ŵ, X̂0, A0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.U, buffer.Ŷ
+    K = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
     x̂0arr = estim.x̂0arr_old
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s) 
@@ -1223,9 +1223,8 @@ function set_warmstart_mhe!(
     Z̃s[(i_base+nŴ-nŵ+1):end]        .= 0
     # --- verify definiteness of objective function --- 
     x̄, a0arr = buffer.x̂, buffer.a
-    V̂, Ŵ, X̂0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Ŷ
-    Û0, K̄ = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
-    A0, Ā = Vector{NT}(undef, na*Nk), Vector{NT}(undef, nā*Nk) # TODO: remove the 2 allocations
+    V̂, Ŵ, X̂0, A0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.U, buffer.Ŷ
+    K̄ = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
     x̂0arr = estim.x̂0arr_old
     a0arr = geta0arr!(a0arr, estim, estim.transcription, Z̃s)  
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
@@ -1307,8 +1306,8 @@ function set_warmstart_mhe!(
     Z̃s[(nx̃+nX̂+nŴ-nŵ+1):end]  .= 0
     # --- verify definiteness of objective function ---
     x̄, a0arr = buffer.x̂, buffer.a
-    V̂, Ŵ, X̂0, A0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.Ŷ
-    Û0, K̄ = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
+    V̂, Ŵ, X̂0, A0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.U, buffer.Ŷ
+    K̄ = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
     x̂0arr = estim.x̂0arr_old
     a0arr = geta0arr!(a0arr, estim, transcription, Z̃s)
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero

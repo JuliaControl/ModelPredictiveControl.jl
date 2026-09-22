@@ -54,9 +54,7 @@ function reset_warmstart!(estim::MovingHorizonEstimator, ::MultipleShooting)
     end
     return nothing
 end
-function reset_warmstart!(
-    estim::MovingHorizonEstimator, ::TrapezoidalCollocation
-)
+function reset_warmstart!(estim::MovingHorizonEstimator, ::TrapezoidalCollocation)
     model = estim.model
     nx, nx̂, nε, He, na = model.nx, estim.nx̂, estim.nε, estim.He, get_na(model)
     nx̃ = nε + nx̂
@@ -74,9 +72,7 @@ function reset_warmstart!(
     end
     return nothing
 end
-function reset_warmstart!(
-    estim::MovingHorizonEstimator, transcription::OrthogonalCollocation
-)
+function reset_warmstart!(estim::MovingHorizonEstimator, ::OrthogonalCollocation)
     model = estim.model
     nx, nx̂, nε, He, na = model.nx, estim.nx̂, estim.nε, estim.He, get_na(model)
     nx̃ = nε + nx̂
@@ -729,15 +725,15 @@ otherwise the state is for the next time step.
 """
 function getstate!(estim::MovingHorizonEstimator{NT}, Z̃) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nu, nx̂, Nk = model.nu, estim.nx̂, estim.Nk[]
+    nx̂, Nk = estim.nx̂, estim.Nk[]
     nk̄ = get_nk̄(model, estim.transcription)
     x̂0arr, a0arr = buffer.x̂, buffer.a
-    V̂, Ŵ, X̂0, A0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.Ŷ
-    Û0, K = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove the 2 allocations
+    V̂, Ŵ, X̂0, A0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.A, buffer.U, buffer.Ŷ
+    K̄ = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
     getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
     getx̂0arr!(x̂0arr, estim, Z̃)
     predict_mhe!(
-        V̂, X̂0, A0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃
+        V̂, X̂0, A0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, a0arr, Ŵ, Z̃
     )
     estim.x̂0 .= @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     return nothing
