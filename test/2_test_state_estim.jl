@@ -1059,6 +1059,9 @@ end
     mhe2 = MovingHorizonEstimator(dae; He=3, transcription, direct=false)
     @test mhe2.direct == false
 
+    mhe3 = MovingHorizonEstimator(dae, He=3, hessian=true)
+    @test mhe.transcription isa OrthogonalCollocation
+
     @test_throws ArgumentError MovingHorizonEstimator(dae, He=3, transcription=SingleShooting())
     @test_throws ArgumentError MovingHorizonEstimator(dae, He=3, transcription=MultipleShooting())
 end
