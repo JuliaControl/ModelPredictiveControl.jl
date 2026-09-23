@@ -662,8 +662,10 @@ function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂
     elseif model isa NonLinModel
         return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     else
+        # SteadyKalmanFilter with arbitrary LinModel (will be ignored):
         nx, nu, ny = model.nx, model.nu, model.ny
-        A, Bu, C = 0.1*I(nx), ones(nx, nu), ones(ny, nx)
+        A = range(0.1, 0.9, length=nx) # distinct and stable eigenvalues for observability
+        Bu, C = ones(nx, nu), ones(ny, nx)
         dummy_model = LinModel(A, Bu, C, 0, 0, model.Ts)
         return SteadyKalmanFilter(dummy_model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
     end
