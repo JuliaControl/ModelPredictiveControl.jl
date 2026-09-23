@@ -327,5 +327,5 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
 end
 x̂_0=[x_0; c_Ain]
 res = simMHE(mhe, plant, 100; x_0, x̂_0)
-plot(res, plotd=false, plotxwithx̂=true)
+p = plot(res, plotd=false, plotxwithx̂=true, xlabel="Time (h)")
 ```
