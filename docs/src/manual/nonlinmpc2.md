@@ -58,7 +58,7 @@ K_a &= \frac{[\mathrm{H}^+][\mathrm{Ac}^-]}{[\mathrm{H}\mathrm{Ac}]}
 \end{aligned}
 ```
 
-We respectively denote the algebraic variable and the two states with:
+The following notation highlights three key concentrations in the model:
 
 ```math
 \begin{aligned}
@@ -77,12 +77,6 @@ balance leads the algebraic equation:
 0 = a_H + c_B - \frac{K_w}{a_H} - \frac{K_a c_A}{K_a + a_H}
 ```
 
-The pH is computed with:
-
-```math
-\mathrm{pH} = -10 \log_{10}(a_H)
-```
-
 !!! details "Reduction to an ODE"
     The algebraic equation can be further manipulated to produce this cubic expression:
     ```math
@@ -92,6 +86,12 @@ The pH is computed with:
     `h!` to transform the system to an ODE, effectively avoiding the complexity of DAEs.
     When possible, plant model should be constructed with the specialized [`NonLinModel`](@ref)
     for ODEs. This tutorial will still treat the system as a DAE to illustrate its API.
+
+The pH is:
+
+```math
+\mathrm{pH} = -10 \log_{10}(a_H) ⟹ a_H = 10^{-\mathrm{pH}}
+```
 
 ### Mass Balance
 
@@ -118,14 +118,31 @@ because of the weir, the following relations compute the outflow terms:
 \end{aligned}
 ```
 
+### Model Construction
+
+The state and the algebraic vectors are respectively defined as:
+
+```math
+\begin{aligned}
+    \mathbf{x} &= \begin{bmatrix} c_A \\ c_B \end{bmatrix}                     \\
+    \mathbf{a} &= \mathrm{pH}
+\end{aligned}
+```
+
+Alternatively, defining the algebraic vector as ``\mathbf{a} = a_H`` is a valid realization,
+but a vastly inferior choice numerically since ``a_H`` spans around 14 orders of magnitude
+(``10^{-1}`` to ``10^{-14}``) while the pH is bounded between roughly 1 to 14. Moreover,
+it avoids a `log10` call that is undefined for negative values.
+
 The [`NonLinModelDAE`](@ref) constructor expects that the state dynamics and the algebraic
-equation is combined into a single `fq!(ẋ, res, x, a, u, d, p) -> nothing` function that
+equation are combined into a single `fq!(ẋ, res, x, a, u, d, p) -> nothing` function that
 modifies both `ẋ` and `res` arguments in-place (an out-of-place option is also available),
 with the state dynamics and the residual of the algebraic equation, respectively:
 
 ```@example 1
 using ModelPredictiveControl
 
+calc_a_H(pH) = 10.0^(-pH)
 calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out) = (60/V)*(q_Ain * c_Ain - q_out * c_Aout)
 calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out) = (60/V)*(q_Bin * c_Bin - q_out * c_Bout)
 calc_res(a_H, c_A, c_B, Kw, Ka) = a_H + c_B - (Kw / a_H) - (Ka * c_A / (Ka + a_H))
@@ -133,10 +150,11 @@ function fq!(ẋ, res, x, a, u, d, p)
     c_Ain, c_Bin, Kw, Ka, V = p
     q_Ain, q_Bin = d[1], u[1] # [L/min], [L/min]
     c_A, c_B     = x[1], x[2] # [mol/L], [mol/L]
-    a_H = a[1]                # [mol/L]
-    q_out = q_Ain + q_Bin     # [L/min]
+    pH           = a[1]       # [-]
+    q_out  = q_Ain + q_Bin    # [L/min]
     c_Aout = c_A              # [mol/L]
     c_Bout = c_B              # [mol/L]
+    a_H    = calc_a_H(pH)
     ẋ[1]   = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out)
     ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out)
     res[1] = calc_res(a_H, c_A, c_B, Kw, Ka)
@@ -147,31 +165,18 @@ end
 A similar in-place function is expected for the model output:
 
 ```@example 1
-calc_pH(a_H) = -log10(a_H)
-function h!(y, _ , a, _ , _ ) 
-    a_H = a[1]
-    pH = try
-        calc_pH(a_H)
-    catch myerror
-        myerror isa DomainError ? NaN : rethrow()
-    end
-    y[1] = pH
-    return nothing
-end
+h!(y, _ , a , _ , _ ) = (y .= a; nothing)  
 ```
 
-By default, Julia throws a `DomainError` if `log10` is called with a negative number. The
-`try` blocks is necessary to let the optimizer explores undefined domains by a returning a
-`NaN` value in such cases. For similar reasons, providing an initial guess for the algebraic
-variable `as_0` is crucial here to prioritize positive ``a_H`` concentration and ensure a
-defined ``\mathrm{pH}`` value:
+Providing an initial guess for the algebraic variable `as_0` is important to prioritize
+positive pH solution:
 
 ```@example 1
-V = 1000.0      # reactor volume [L]
 c_Ain = 0.1     # feed concentration of weak acid [mol/L]
 c_Bin = 0.1     # feed concentration of strong base [mol/L]
 Kw = 1.0e-14    # water dissociation constant [mol^2/L^2]
 Ka = 1.75e-5    # acid dissociation constant [mol/L]
+V = 1000.0      # reactor volume [L]
 
 Ts = 0.5        # Sample time [h]
 nu, nx, na, ny, nd = 1, 2, 1, 1, 1
@@ -180,45 +185,45 @@ p = [c_Ain, c_Bin, Kw, Ka, V]
 vu, vd = [raw"$q_{Bin}$ (L/min)"], [raw"$q_{Ain}$ (L/min)"]
 vx, vy = [raw"$c_A$ (mol/L)", raw"$c_B$ (mol/L)"], [raw"$\mathrm{pH}$"]
 
-model = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny, nd; p, as_0=[1e-5])
-model = setname!(model, u=vu, x=vx, y=vy, d=vd)
+plant = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny, nd; p=p, as_0=[7])
+plant = setname!(plant, u=vu, x=vx, y=vy, d=vd)
 ```
 
 By default, an [`OrthogonalCollocation`](@ref) with 3 collocation points transcribes the
 state dynamics and the algebraic equations into an optimization problem. A simple open-loop
-simulation of `model` with:
+simulation of `plant` with:
 
 1. a bump on the base flow rate ``\mathbf{u} = q_{Bin}``
 2. a bump on the acid flow rare ``\mathbf{d} = q_{Ain}``
-3. a bump on the acid feed concentration ``c_{Ain}`` (as an unmeasured disturbance)
+3. a bump on the acid feed concentration ``c_{Ain}`` (an unmeasured disturbance)
 
 validates that our DAE is well-posed:
 
 ```@example 1
-function simDAE(model, N; x_0)
-    ny, ny, nd, nx = model.ny, model.ny, model.nd, model.nx
+function simDAE(plant, N; x_0)
+    ny, ny, nd, nx = plant.ny, plant.ny, plant.nd, plant.nx
     Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
-    C_Ain_0 = model.p[1]
-    setstate!(model, x_0)
+    c_Ain_0 = plant.p[1]
+    setstate!(plant, x_0)
     x = x_0
     for i=1:N
-        u     = i ≤ (1N÷4) ? [10.0]  : [9.7]
-        d     = i ≤ (2N÷4) ? [10.0]  : [9.8]
-        c_Ain = i ≤ (3N÷4) ? C_Ain_0 : (C_Ain_0 + 0.05)
-        model.p[1] = c_Ain
-        y = model(d)
+        u     = i ≤ (1N÷4) ? [10.0]  : [11.0]
+        d     = i ≤ (2N÷4) ? [10.0]  : [12.0]
+        c_Ain = i ≤ (3N÷4) ? c_Ain_0 : (c_Ain_0 - 0.01)
+        plant.p[1] = c_Ain
+        y = plant(d)
         Y_data[:, i] = y
         U_data[:, i] = u
         D_data[:, i] = d
         X_data[:, i] = x
-        x = updatestate!(model, u, d)
+        x = updatestate!(plant, u, d)
     end
-    model.p[1] = C_Ain_0
-    return SimResult(model, U_data, Y_data, D_data; X_data)
+    plant.p[1] = c_Ain_0
+    return SimResult(plant, U_data, Y_data, D_data; X_data)
 end
 x_0 = [0.0505, 0.0495]
 N = 101
-res = simDAE(model, N; x_0)
+res = simDAE(plant, N; x_0)
 ```
 
 We plot the results by modifying the x-axis label to substitute the default time units
@@ -236,41 +241,91 @@ savefig("plot1_DAEpH.svg"); nothing # hide
 
 The default settings of the [`MovingHorizonEstimator`](@ref) assume that the measured
 output is disturbed by a random-walk stochastic process (the pH). This is generally enough
-to estimate the unmeasured disturbances in steady-state (the acid feed concentration).
-To improve the interpretability of the results and the estimation performances, we can
-instead disable the default stochastic model and construct an adaptive estimator. We first
-need to augment the dynamics with our estimated parameter, the acid feed concentration
-``c_{Ain}``:
+to estimate the unmeasured disturbances in steady-state (the acid feed concentration, in
+this case study). To improve the interpretability of the results and the estimation
+performances, we can instead disable the default stochastic model and construct an adaptive
+estimator. We first need to augment the dynamics with our estimated parameter, the acid feed
+concentration ``c_{Ain}``:
 
 ```@example 1
 calc_ċ_Ain( _ ) = 0
-function f̂q!(ẋ, res, x, a, u, d, p̂)
+function f̂q!(dx̂, res, x̂, a, u, d, p̂)
     c_Bin, Kw, Ka, V = p̂
     q_Ain, q_Bin = d[1], u[1]
-    c_A, c_B     = x[1], x[2]
-    c_Ain        = x[3]
-    a_H = a[1]               
-    q_out = q_Ain + q_Bin     
+    c_A, c_B     = x̂[1], x̂[2]
+    c_Ain        = x̂[3]
+    pH           = a[1]       
+    q_out  = q_Ain + q_Bin     
     c_Aout = c_A             
-    c_Bout = c_B             
-    ẋ[1]   = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out)
-    ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out)
-    ẋ[3]   = calc_ċ_Ain(c_Ain)
+    c_Bout = c_B     
+    a_H    = calc_a_H(pH)        
+    dx̂[1]  = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out)
+    dx̂[2]  = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out)
+    dx̂[3]  = calc_ċ_Ain(c_Ain)
     res[1] = calc_res(a_H, c_A, c_B, Kw, Ka)
     return nothing
 end
-ĥ!(y, x, a, d, p̂) = h!(y, x, a, d, p)
+ĥ!(y, x̂, a, d, p̂) = h!(y, x̂, a, d, p̂)
 p̂ = [c_Bin, Kw, Ka, V]
-nx̂ = 3
+nx̂ = nx + 1
 vx̂ = [vx; raw"$c_{Ain}$ (mol/L)"]
-model_aug = NonLinModelDAE(f̂q!, ĥ!, Ts, nu, nx̂, na, ny, nd; p, as_0=[1e-5])
-model_aug = setname!(model_aug, u=vu, x=vx̂, y=vy, d=vd)
+model = NonLinModelDAE(f̂q!, ĥ!, Ts, nu, nx̂, na, ny, nd; p=p̂, as_0=[7])
+model = setname!(model, u=vu, x=vx̂, y=vy, d=vd)
 ```
 
-Since `calc_ċ_Ain` returns `0`, the ``c_{Ain}`` parameter is assumed to be time-invariant.
-More precisely, this feed property is assumed to be disturbed by a random-walk, instead of
-the measured output directly.
+Since `calc_ċ_Ain` always returns `0`, the ``c_{Ain}`` parameter is assumed to be
+time-invariant. More precisely, this concentration of the acid feed is assumed to be
+disturbed by a random-walk, instead of the measured output. Among all the settings of the
+[`MovingHorizonEstimator`](@ref), a proper tuning of the covariance matrices through `σQ`
+`σR` and `σP_0`, a past horizon `He` long enough to see the whole dynamics, and an exact
+Hessian matrix can improve the stability on a highly nonlinear and stiff plant model like
+here. We can also bound the three estimated states to positive values since they are
+concentration in mol/L:
 
 ```@example 1
-mhe = MovingHorizonEstimator(model_aug, He=5, nint_ym=0)
+nint_ym=0; nint_u=0;                            # disable the default stochastic model
+He = 10; hessian=true
+σQ = [0.01, 0.01, 0.1]; σR=[0.5]; σP_0 = 0.1*σQ
+mhe = MovingHorizonEstimator(model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0)
+using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit at optimization
+mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
+```
+
+The state constraints are shown in round bracket next to the decision variables. There are
+33 of them (3 states × 10 datapoints in the pasts + 3 others for the arrival estimate). The
+arrival covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref). A
+proper tuning of `σP_0` and `He` reduces the impact of this approximation. We can now
+reproduce the last simulated scenario and see how `mhe` performs:
+
+```@example 1
+function simMHE(mhe, plant, N; x_0, x̂_0)
+    ny, ny, nd, nx, nx̂ = plant.ny, plant.ny, plant.nd, plant.nx, mhe.nx̂
+    Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
+    Ŷ_data, X̂_data = zeros(ny, N), zeros(nx̂, N)
+    c_Ain_0 = plant.p[1]
+    initstate!(mhe, [7], [10], [10])
+    setstate!(plant, x_0); setstate!(mhe, x̂_0)
+    x = x_0
+    for i=1:N
+        u     = i ≤ (1N÷4) ? [10.0]  : [11.0]
+        d     = i ≤ (2N÷4) ? [10.0]  : [12.0]
+        c_Ain = i ≤ (3N÷4) ? c_Ain_0 : (c_Ain_0 - 0.01)
+        plant.p[1] = c_Ain
+        y = plant(d)
+        x̂ = preparestate!(mhe, y, d)
+        ŷ = mhe(d)
+        Y_data[:, i] = y
+        U_data[:, i] = u
+        D_data[:, i] = d
+        X_data[:, i] = x
+        Ŷ_data[:, i] = ŷ
+        X̂_data[:, i] = x̂
+        x = updatestate!(plant, u, d)
+    end
+    plant.p[1] = c_Ain_0
+    return SimResult(mhe, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data)
+end
+x̂_0=[x_0; c_Ain]
+res = simMHE(mhe, plant, 100; x_0, x̂_0)
+plot(res, plotd=false, plotxwithx̂=true)
 ```
