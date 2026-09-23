@@ -284,8 +284,8 @@ concentration in mol/L:
 
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
-He = 10; hessian=true
-σQ = [0.01, 0.01, 0.1]; σR=[0.5]; σP_0 = 0.1*σQ
+He = 10; hessian = true
+σQ = [0.01, 0.01, 0.005]; σR=[0.1]; σP_0 = 100*[0.001, 0.001, 1e-6]
 mhe = MovingHorizonEstimator(model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0)
 using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit at optimization
 mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
@@ -295,9 +295,10 @@ The state constraints are shown in round bracket next to the decision variables.
 33 of them (3 states × 10 datapoints in the pasts + 3 others for the arrival estimate). The
 arrival covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref). A
 proper tuning of `σP_0` and `He` reduces the impact of this approximation. We can now
-reproduce the last simulated scenario and see how `mhe` performs:
+reproduce the last simulated scenario and see how `mhe` performs under pH measurement noise:
 
 ```@example 1
+using Random
 function simMHE(mhe, plant, N; x_0, x̂_0)
     ny, ny, nd, nx, nx̂ = plant.ny, plant.ny, plant.nd, plant.nx, mhe.nx̂
     Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
@@ -311,7 +312,7 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
         d     = i ≤ (2N÷4) ? [10.0]  : [12.0]
         c_Ain = i ≤ (3N÷4) ? c_Ain_0 : (c_Ain_0 - 0.01)
         plant.p[1] = c_Ain
-        y = plant(d)
+        y = plant(d) + 0.1*randn(1)
         x̂ = preparestate!(mhe, y, d)
         ŷ = mhe(d)
         Y_data[:, i] = y
@@ -321,6 +322,7 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
         Ŷ_data[:, i] = ŷ
         X̂_data[:, i] = x̂
         x = updatestate!(plant, u, d)
+        x̂ = updatestate!(mhe, y, u, d)
     end
     plant.p[1] = c_Ain_0
     return SimResult(mhe, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data)
