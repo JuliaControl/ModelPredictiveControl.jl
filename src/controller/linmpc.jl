@@ -1,5 +1,3 @@
-const DEFAULT_LINMPC_TRANSCRIPTION = SingleShooting()
-
 struct LinMPC{
     NT<:Real, 
     SE<:StateEstimator, 
@@ -241,7 +239,7 @@ function LinMPC(
     Wd = nothing,
     Wr = nothing,
     Cwt = DEFAULT_CWT,
-    transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
+    transcription::ShootingMethod = SingleShooting(),
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_QP_OPTIMIZER, add_bridges=true),
     kwargs...
 )
@@ -300,7 +298,7 @@ function LinMPC(
     Wd = nothing,
     Wr = nothing,
     Cwt  = DEFAULT_CWT,
-    transcription::ShootingMethod = DEFAULT_LINMPC_TRANSCRIPTION,
+    transcription::ShootingMethod = SingleShooting(),
     optim::JM = JuMP.Model(DEFAULT_QP_OPTIMIZER, add_bridges=true)
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
     isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 

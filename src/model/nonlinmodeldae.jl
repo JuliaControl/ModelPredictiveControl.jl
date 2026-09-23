@@ -140,7 +140,7 @@ end
 
 Construct a nonlinear DAE model from state-space functions `fq`/`fq!` and `h`/`h!`.
 
-It supports continuous differential and algebraic equations (DAE). The functions are
+It supports continuous-time differential and algebraic equations (DAE). The functions are
 provided in the semi-explicit form:
 ```math
 \begin{aligned}
@@ -355,6 +355,11 @@ function validate_h_dae(NT, h)
     return ismutating
 end
 
+function validate_transcription(::NonLinModelDAE, ::ShootingMethod)
+    throw(ArgumentError("Transcription with shooting methods is not supported with NonLinModelDAE"))
+    return nothing
+end
+
 """
     validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p) -> iszero_Ha
 
@@ -399,6 +404,10 @@ function validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
     end
     return iszero_Ha
 end
+
+"Default to `SingleShooting()`, or `model.transcription` if `model` is a `NonLinModelDAE`."
+default_transcription(::SimModel) = SingleShooting()
+default_transcription(model::NonLinModelDAE) = model.transcription
 
 "Get the number of algebraic variable `na` in `model`."
 get_na(model::NonLinModelDAE) = model.na
@@ -681,11 +690,11 @@ function con_nonlinprogeq!(
 )
     nx, na = model.nx, model.na
     Ts = model.Ts
-    x0next_Z, a0_Z, a0next_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
-    sknext, q0, q1  = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
+    x0next_Z, a0_Z, a1_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
+    sknext, q0, q1 = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
     k̇0, k̇1 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
     model.fq!(k̇0, q0, x0,       a0_Z,     u0, d0, model.p)
-    model.fq!(k̇1, q1, x0next_Z, a0next_Z, u0, d0, model.p)
+    model.fq!(k̇1, q1, x0next_Z, a1_Z, u0, d0, model.p)
     sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇0 + k̇1)
     return geq
 end
@@ -788,6 +797,27 @@ function h!(y0, model::NonLinModelDAE, x0, d0, p)
     model.h!(y0, x0, a0, d0, p)
     return nothing
 end
+
+"""
+    fq_dae!(ẋ0, q0, model, x0, a0, u0, d0)
+
+Call `model.fq!` for [`NonLinModelDAE`](@ref) or `model.f!` for [`NonLinModel`](@ref).
+
+Both the algebraic variable `a0` and the residual `q0` arguments are ignored if `model` is a 
+[`NonLinModel`](@ref).
+"""
+fq_dae!(ẋ0, q0, model::NonLinModelDAE, x0, a0, u0, d0) = model.fq!(ẋ0, q0, x0, a0, u0, d0, model.p)
+fq_dae!(ẋ0, _ , model::NonLinModel,    x0, _ , u0, d0) = model.f!(ẋ0, x0, u0, d0, model.p)
+
+"""
+    h_dae!(y0, model, x0, a0, d0)
+
+Call `model.h!` with the `a0` argument if [`NonLinModelDAE`](@ref), else without.
+
+The `a0` argument is ignored for [`SimModelODE`](@ref)s. See also [`fq_dae!`](@ref).
+"""
+h_dae!(y0, model::NonLinModelDAE, x0, a0, d0) =  model.h!(y0, x0, a0, d0, model.p)
+h_dae!(y0, model::SimModelODE,    x0, _ , d0) =  h!(y0, model, x0, d0, model.p)
 
 function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
     mul!(model.Fs, model.Ks, model.x0_optim)

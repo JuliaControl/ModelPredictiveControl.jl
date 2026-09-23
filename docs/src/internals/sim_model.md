@@ -22,6 +22,8 @@ ModelPredictiveControl.init_defectmat_dae
 ```@docs
 ModelPredictiveControl.f!
 ModelPredictiveControl.h!
+ModelPredictiveControl.fq_dae!
+ModelPredictiveControl.h_dae!
 ```
 
 ## Init State

@@ -161,8 +161,7 @@ moderately stiff systems and is A-stable. See Extended Help for more details.
     Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
     `TrapezoidalCollocation` transcription, the built-in [`StateEstimator`](@ref) will
     still use the `solver` provided at the construction of the [`NonLinModel`](@ref) to
-    estimate the plant states, not the trapezoidal rule (see `supersample` option of
-    [`RungeKutta`](@ref) for stiff systems).
+    estimate the plant states, not the trapezoidal rule.
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are recommended for this
 transcription method.
@@ -175,27 +174,27 @@ transcription method.
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                               \\
         \mathbf{a_0}(k+0)                                               \\
-        \mathbf{a_0}(k+1)                                               \end{bmatrix}
+        \mathbf{a_1}(k+0)                                               \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                     \\
         \mathbf{X̂_0}                                                    \\
-        \mathbf{A_0}                                                    \\
+        \mathbf{Â_0}                                                    \\
         \mathbf{Ā}                                                      \end{bmatrix}
     , \: 
-    \mathbf{A_0} = \begin{bmatrix}
-        \mathbf{a_0}(k+1)                                               \\
-        \mathbf{a_0}(k+2)                                               \\
+    \mathbf{Â_0} = \begin{bmatrix}
+        \mathbf{â_0}(k+1)                                               \\
+        \mathbf{â_0}(k+2)                                               \\
         \vdots                                                          \\
-        \mathbf{a_0}(k+H_p)                                             \end{bmatrix}
+        \mathbf{â_0}(k+H_p)                                             \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
-        \mathbf{a}(k+0)                                                 \\
-        \mathbf{a}(k+1)                                                 \\
+        \mathbf{a_1}(k+0)                                               \\
+        \mathbf{a_1}(k+1)                                               \\
         \vdots                                                          \\
-        \mathbf{a}(k+H_p-1)                                             \end{bmatrix}
+        \mathbf{a_1}(k+H_p-1)                                           \end{bmatrix}
     ```
     and, for [`MovingHorizonEstimator`](@ref) with DAEs:
     ```math
@@ -203,31 +202,32 @@ transcription method.
         \mathbf{x̂_0}(k-N_k+p)                                           \\  
         \mathbf{X̂_0}                                                    \\         
         \mathbf{0_x̂}                                                    \\
-        \mathbf{a_0}(k-N_k+p)                                           \\  
-        \mathbf{A_0}                                                    \\
-        \mathbf{0_a}                                                    \\
+        \mathbf{â_0}(k-N_k+p)                                           \\  
+        \mathbf{Â_0}                                                    \\
+        \mathbf{0_â}                                                    \\
         \mathbf{Ā}                                                      \\
         \mathbf{0_ā}                                                    \\
         \mathbf{Ŵ}                                                      \\
         \mathbf{0_ŵ}                                                    \end{bmatrix}
     , \: 
-    \mathbf{A_0} = \begin{bmatrix}
-        \mathbf{a_0}(k-N_k+p+1)                                         \\
-        \mathbf{a_0}(k-N_k+p+2)                                         \\
+    \mathbf{Â_0} = \begin{bmatrix}
+        \mathbf{â_0}(k-N_k+p+1)                                         \\
+        \mathbf{â_0}(k-N_k+p+2)                                         \\
         \vdots                                                          \\
-        \mathbf{a_0}(k+p)                                               \end{bmatrix}
+        \mathbf{â_0}(k+p)                                               \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
-        \mathbf{a}(k-N_k+p+0)                                           \\
-        \mathbf{a}(k-N_k+p+1)                                           \\
+        \mathbf{a_1}(k-N_k+p+0)                                         \\
+        \mathbf{a_1}(k-N_k+p+1)                                         \\
         \vdots                                                          \\
-        \mathbf{a}(k+p-1)                                               \end{bmatrix}
+        \mathbf{a_1}(k+p-1)                                             \end{bmatrix}
     ```
     See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
     variables at the beginning (``N_k < H_e``). The predicted outputs are computed from
-    the algebraic variables in ``\mathbf{A_0}``, while the values in ``\mathbf{Ā}`` are
-    strictly reserved for the the `fq!` function.
+    the algebraic variables in ``\mathbf{Â_0}``, while the values in ``\mathbf{Ā}`` are
+    strictly reserved for the the `fq!` function. The ``\mathbf{â_0}`` vector is at the left
+    endpoint of the trapezoid, while the ``\mathbf{a_1}`` is at the right endpoint.
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
@@ -283,7 +283,7 @@ where ``\mathbf{K̄}`` encompasses all the intermediate stages of the determinis
 ```
 The `roots` keyword argument is either `:gaussradau` or `:gausslegendre`, for Gauss-Radau or
 Gauss-Legendre quadrature, respectively. See [`MultipleShooting`](@ref) docstring for info
-on `f_threads` and `h_threads` keywords. This transcription computes thecpredictions by
+on `f_threads` and `h_threads` keywords. This transcription computes the predictions by
 enforcing the collocation and continuity constraints at the collocationc points. It is
 efficient for highly stiff systems, but generally more expensive than the other methods for
 non-stiff systems. See Extended Help for details and the transcription of
@@ -293,8 +293,7 @@ non-stiff systems. See Extended Help for details and the transcription of
     Except if you construct your MPC with a [`MovingHorizonEstimator`](@ref) based on a
     `OrthogonalCollocation` transcription, the built-in [`StateEstimator`](@ref) will still
     use the `solver` provided at the construction of the [`NonLinModel`](@ref) to estimate
-    the plant states, not orthogonal collocation (see `supersample` option of 
-    [`RungeKutta`](@ref) for stiff systems).
+    the plant states, not orthogonal collocation.
 
 Sparse optimizers like `Ipopt` and sparse Jacobian computations are highly recommended for
 this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
@@ -345,15 +344,15 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                 \\
         \mathbf{X̂_0}                                                \\
-        \mathbf{A_0}                                                \\
+        \mathbf{Â_0}                                                \\
         \mathbf{K̄}                                                  \\
         \mathbf{Ā}                                                  \end{bmatrix}
     , \:
-    \mathbf{A_0} = \begin{bmatrix}
-        \mathbf{a_0}(k+1)                                           \\
-        \mathbf{a_0}(k+2)                                           \\
+    \mathbf{Â_0} = \begin{bmatrix}
+        \mathbf{â_0}(k+1)                                           \\
+        \mathbf{â_0}(k+2)                                           \\
         \vdots                                                      \\
-        \mathbf{a_0}(k+H_p)                                         \end{bmatrix}
+        \mathbf{â_0}(k+H_p)                                         \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{ā}(k+0)                                             \\
@@ -367,9 +366,9 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{x̂_0}(k-N_k+p)                                       \\  
         \mathbf{X̂_0}                                                \\         
         \mathbf{0_x̂}                                                \\
-        \mathbf{a_0}(k-N_k+p)                                       \\
-        \mathbf{A_0}                                                \\
-        \mathbf{0_a}                                                \\
+        \mathbf{â_0}(k-N_k+p)                                       \\
+        \mathbf{Â_0}                                                \\
+        \mathbf{0_â}                                                \\
         \mathbf{K̄}                                                  \\
         \mathbf{0_k̄}                                                \\
         \mathbf{Ā}                                                  \\
@@ -377,11 +376,11 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{Ŵ}                                                  \\
         \mathbf{0_ŵ}                                                \end{bmatrix}
     , \;
-    \mathbf{A_0} = \begin{bmatrix}
-        \mathbf{a_0}(k-N_k+p+1)                                     \\
-        \mathbf{a_0}(k-N_k+p+2)                                     \\
+    \mathbf{Â_0} = \begin{bmatrix}
+        \mathbf{â_0}(k-N_k+p+1)                                     \\
+        \mathbf{â_0}(k-N_k+p+2)                                     \\
         \vdots                                                      \\
-        \mathbf{a_0}(k+p)                                           \end{bmatrix}
+        \mathbf{â_0}(k+p)                                           \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
         \mathbf{ā}(k-N_k+p+0)                                       \\
@@ -391,15 +390,17 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     ```
     All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision variables at
     the beginning in the [`MovingHorizonEstimator`](@ref) (``N_k < H_e``). The predicted
-    outputs are computed from the algebraic variables in ``\mathbf{A_0}``, while the values
-    in ``\mathbf{Ā}`` are strictly reserved for the `fq!` function.
+    outputs are computed from the algebraic variables in ``\mathbf{Â_0}``, while the values
+    in ``\mathbf{Ā}`` are strictly reserved for the `fq!` function. The ``\mathbf{Â_0}`` 
+    vector must be explicitly included in the decision variables since the output function
+    `h!` is evaluated at different locations than the collocation points, in general.
     
-    The collocation points are located at the roots of orthogonal polynomials, which is 
-    "optimal" for approximating the state trajectories with polynomials of degree ``n_o``.
-    The method then enforces the system dynamics at these points. The Gauss-Legendre scheme
-    is more accurate than Gauss-Radau but only A-stable, while the latter being L-stable. 
-    See [`init_orthocolloc`](@ref), [`con_nonlinprogeq!`](@ref) and [`con_nonlinprogeq_mhe!`](@ref)
-    for more details.
+    More precisely, the outputs are at the sampling instants, while the collocation points
+    are at the roots of orthogonal polynomials, which is "optimal" for approximating the
+    state trajectories with polynomials of degree ``n_o``. The method then enforces the
+    system dynamics at these points. The Gauss-Legendre scheme is more accurate than
+    Gauss-Radau but only A-stable, while the latter being L-stable. See [`init_orthocolloc`](@ref),
+    [`con_nonlinprogeq!`](@ref) and [`con_nonlinprogeq_mhe!`](@ref) for more details.
 
     As explained in the Extended Help of [`TrapezoidalCollocation`](@ref), the stochastic
     states are left out of the ``\mathbf{K̄}`` vector to reduce the dimensions, and also
@@ -412,6 +413,7 @@ struct OrthogonalCollocation <: CollocationMethod
     f_threads::Bool
     h_threads::Bool
     τ::Vector{COLLOCATION_NODE_TYPE}
+    τendIsNotOne::Bool
     function OrthogonalCollocation(
         h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
@@ -430,7 +432,8 @@ struct OrthogonalCollocation <: CollocationMethod
         else
             throw(ArgumentError("roots argument must be :gaussradau or :gausslegendre."))
         end
-        return new(h, no, f_threads, h_threads, τ)
+        τendIsNotOne = (τ[end] < 1)
+        return new(h, no, f_threads, h_threads, τ, τendIsNotOne)
     end
 end
 
@@ -492,9 +495,17 @@ knowing that the ``\mathbf{k}_i(k)`` vectors are directly extracted from the dec
 variables in `Z̃`. The ``\mathbf{x̂_d}(k)`` vector is the estimated deterministic state at the
 beginning of the interval ``τ_0=0``, and is also extracted from `Z̃`. The ``\mathbf{k̇}_i``
 derivatives for the ``i``th collocation point are computed from the continuous-time function
-`model.f!` and:
+[`fq_dae!`](@ref) and:
 ```math
-\mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
+\mathbf{k̇}_i(k) =  \mathbf{f}\Big(\mathbf{k}_i(k), \mathbf{a}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big)
+```
+The residuals of [`NonLinModelDAE`](@ref) at the collocation points are nonlinear equality
+constraints:
+```math
+\begin{aligned}
+\mathbf{q}_i(k) &= \mathbf{q}\Big(\mathbf{k}_i(k), \mathbf{a}_i(k), \mathbf{û}_i(k), \mathbf{d}_i(k), \mathbf{p}\Big) \\
+                &= \mathbf{0}
+\end{aligned}
 ```
 Based on the normalized time ``τ_i`` and the hold order `transcription.h`, the inputs and
 disturbances are either piecewise constant or linear:
