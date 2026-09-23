@@ -5,8 +5,8 @@ Pages = ["nonlinmpc2.md"]
 ```
 
 !!! todo "Under Construction"
-    This tutorial is currently under construction. Only the modeling part is written for
-    now.
+    This tutorial is currently under construction. Only the modeling and the estimation
+    parts are written for now.
 
 ## Nonlinear Model (DAE)
 
@@ -89,8 +89,9 @@ The pH is computed with:
     0 = a_H^3 + (c_B + K_a) a_H^2 + \big(K_a(c_A + c_B) + K_w \big) a_H - K_w K_a
     ```
     We could extract the positive real root of this expression inside the output function
-    `h!` to transform the system to an ODE, effectively avoiding the increased complexity
-    of DAEs. The tutorial will still treat the system as a DAE to illustrate its API.
+    `h!` to transform the system to an ODE, effectively avoiding the complexity of DAEs.
+    When possible, plant model should be constructed with the specialized [`NonLinModel`](@ref)
+    for ODEs. This tutorial will still treat the system as a DAE to illustrate its API.
 
 ### Mass Balance
 
@@ -117,17 +118,17 @@ because of the weir, the following relations compute the outflow terms:
 \end{aligned}
 ```
 
-The code is:
+The [`NonLinModelDAE`](@ref) constructor expects that the state dynamics and the algebraic
+equation is combined into a single `fq!(ẋ, res, x, a, u, d, p) -> nothing` function that
+modifies both `ẋ` and `res` arguments in-place (an out-of-place option is also available),
+with the state dynamics and the residual of the algebraic equation, respectively:
 
 ```@example 1
 using ModelPredictiveControl
 
-V = 1000.0      # reactor volume [L]
-c_Ain = 0.1     # feed concentration of weak acid [mol/L]
-c_Bin = 0.1     # feed concentration of strong base [mol/L]
-Kw = 1.0e-14    # water dissociation constant [mol^2/L^2]
-Ka = 1.75e-5    # acid dissociation constant [mol/L]
-
+calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out) = (60/V)*(q_Ain * c_Ain - q_out * c_Aout)
+calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out) = (60/V)*(q_Bin * c_Bin - q_out * c_Bout)
+calc_res(a_H, c_A, c_B, Kw, Ka) = a_H + c_B - (Kw / a_H) - (Ka * c_A / (Ka + a_H))
 function fq!(ẋ, res, x, a, u, d, p)
     c_Ain, c_Bin, Kw, Ka, V = p
     q_Ain, q_Bin = d[1], u[1] # [L/min], [L/min]
@@ -136,58 +137,140 @@ function fq!(ẋ, res, x, a, u, d, p)
     q_out = q_Ain + q_Bin     # [L/min]
     c_Aout = c_A              # [mol/L]
     c_Bout = c_B              # [mol/L]
-    ẋ[1]   = (60/V)*(q_Ain * c_Ain - q_out * c_Aout)
-    ẋ[2]   = (60/V)*(q_Bin * c_Bin - q_out * c_Bout)
-    res[1] = a_H + c_B - (Kw / a_H) - (Ka * c_A / (Ka + a_H))
+    ẋ[1]   = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out)
+    ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out)
+    res[1] = calc_res(a_H, c_A, c_B, Kw, Ka)
     return nothing
 end
+```
 
-function h!(y, _, a, _ , _ ) 
+A similar in-place function is expected for the model output:
+
+```@example 1
+calc_pH(a_H) = -log10(a_H)
+function h!(y, _ , a, _ , _ ) 
     a_H = a[1]
     pH = try
-        -log10(a_H)
+        calc_pH(a_H)
     catch myerror
         myerror isa DomainError ? NaN : rethrow()
     end
     y[1] = pH
     return nothing
 end
+```
 
-Ts = 0.5 # Sample time [h]
+By default, Julia throws a `DomainError` if `log10` is called with a negative number. The
+`try` blocks is necessary to let the optimizer explores undefined domains by a returning a
+`NaN` value in such cases. For similar reasons, providing an initial guess for the algebraic
+variable `as_0` is crucial here to prioritize positive ``a_H`` concentration and ensure a
+defined ``\mathrm{pH}`` value:
+
+```@example 1
+V = 1000.0      # reactor volume [L]
+c_Ain = 0.1     # feed concentration of weak acid [mol/L]
+c_Bin = 0.1     # feed concentration of strong base [mol/L]
+Kw = 1.0e-14    # water dissociation constant [mol^2/L^2]
+Ka = 1.75e-5    # acid dissociation constant [mol/L]
+
+Ts = 0.5        # Sample time [h]
 nu, nx, na, ny, nd = 1, 2, 1, 1, 1
 p = [c_Ain, c_Bin, Kw, Ka, V]
 
-model = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny, nd; p, as_0=[1e-5])
-vu, vd = ["\$q_B\$ (L/min)"], ["\$q_A\$ (L/min)"]
-vx, vy = ["\$c_A\$ (mol/L)", "\$c_B\$ (mol/L)"], ["\$\\mathrm{pH}\$"]
-model = setname!(model, u=vu, x=vx, y=vy, d=vd)
+vu, vd = [raw"$q_{Bin}$ (L/min)"], [raw"$q_{Ain}$ (L/min)"]
+vx, vy = [raw"$c_A$ (mol/L)", raw"$c_B$ (mol/L)"], [raw"$\mathrm{pH}$"]
 
-u = [10.0]
-d = [10.0]
-x_0 = [0.051, 0.049]
-N = 61
-Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
-x = x_0
-let x=x, u=u, d=d
-    setstate!(model, x)
+model = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny, nd; p, as_0=[1e-5])
+model = setname!(model, u=vu, x=vx, y=vy, d=vd)
+```
+
+By default, an [`OrthogonalCollocation`](@ref) with 3 collocation points transcribes the
+state dynamics and the algebraic equations into an optimization problem. A simple open-loop
+simulation of `model` with:
+
+1. a bump on the base flow rate ``\mathbf{u} = q_{Bin}``
+2. a bump on the acid flow rare ``\mathbf{d} = q_{Ain}``
+3. a bump on the acid feed concentration ``c_{Ain}`` (as an unmeasured disturbance)
+
+validates that our DAE is well-posed:
+
+```@example 1
+function simDAE(model, N; x_0)
+    ny, ny, nd, nx = model.ny, model.ny, model.nd, model.nx
+    Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
+    C_Ain_0 = model.p[1]
+    setstate!(model, x_0)
+    x = x_0
     for i=1:N
-        d = i ≤ 2N÷3 ? [10.0] : [9.8]
+        u     = i ≤ (1N÷4) ? [10.0]  : [9.7]
+        d     = i ≤ (2N÷4) ? [10.0]  : [9.8]
+        c_Ain = i ≤ (3N÷4) ? C_Ain_0 : (C_Ain_0 + 0.05)
+        model.p[1] = c_Ain
         y = model(d)
-        u = i ≤ N÷3  ? [10.0] : [9.7]
         Y_data[:, i] = y
         U_data[:, i] = u
         D_data[:, i] = d
         X_data[:, i] = x
         x = updatestate!(model, u, d)
     end
+    model.p[1] = C_Ain_0
+    return SimResult(model, U_data, Y_data, D_data; X_data)
 end
-res = SimResult(model, U_data, Y_data, D_data; X_data)
+x_0 = [0.0505, 0.0495]
+N = 101
+res = simDAE(model, N; x_0)
+```
 
+We plot the results by modifying the x-axis label to substitute the default time units
+to hours:
+
+```@example 1
 using Plots
-#theme(:default)
-theme(:dark)
-default(fontfamily="Computer Modern"); scalefontsizes(1.1)
-#p = plot(res, plotx=true, plotd=false, xlabel="Time (h)")
-#xlabel!(p[3], "")
-p = plot(res, plotd=true, xlabel="Time (h)")
+plot(res, plotu=true, plotd=true, xlabel="Time (h)")
+savefig("plot1_DAEpH.svg"); nothing # hide
+```
+
+![plot1_DAEpH](plot1_DAEpH.svg)
+
+## Adaptive Moving Horizon Estimation
+
+The default settings of the [`MovingHorizonEstimator`](@ref) assume that the measured
+output is disturbed by a random-walk stochastic process (the pH). This is generally enough
+to estimate the unmeasured disturbances in steady-state (the acid feed concentration).
+To improve the interpretability of the results and the estimation performances, we can
+instead disable the default stochastic model and construct an adaptive estimator. We first
+need to augment the dynamics with our estimated parameter, the acid feed concentration
+``c_{Ain}``:
+
+```@example 1
+calc_ċ_Ain( _ ) = 0
+function f̂q!(ẋ, res, x, a, u, d, p̂)
+    c_Bin, Kw, Ka, V = p̂
+    q_Ain, q_Bin = d[1], u[1]
+    c_A, c_B     = x[1], x[2]
+    c_Ain        = x[3]
+    a_H = a[1]               
+    q_out = q_Ain + q_Bin     
+    c_Aout = c_A             
+    c_Bout = c_B             
+    ẋ[1]   = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out)
+    ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out)
+    ẋ[3]   = calc_ċ_Ain(c_Ain)
+    res[1] = calc_res(a_H, c_A, c_B, Kw, Ka)
+    return nothing
+end
+ĥ!(y, x, a, d, p̂) = h!(y, x, a, d, p)
+p̂ = [c_Bin, Kw, Ka, V]
+nx̂ = 3
+vx̂ = [vx; raw"$c_{Ain}$ (mol/L)"]
+model_aug = NonLinModelDAE(f̂q!, ĥ!, Ts, nu, nx̂, na, ny, nd; p, as_0=[1e-5])
+model_aug = setname!(model_aug, u=vu, x=vx̂, y=vy, d=vd)
+```
+
+Since `calc_ċ_Ain` returns `0`, the ``c_{Ain}`` parameter is assumed to be time-invariant.
+More precisely, this feed property is assumed to be disturbed by a random-walk, instead of
+the measured output directly.
+
+```@example 1
+mhe = MovingHorizonEstimator(model_aug, He=5, nint_ym=0)
 ```
