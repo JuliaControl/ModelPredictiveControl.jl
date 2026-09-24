@@ -159,13 +159,13 @@ function fq!(ẋ, res, x, a, u, d, p)
     ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out)
     res[1] = calc_res(a_H, c_A, c_B, Kw, Ka)
     return nothing
-end
+end;
 ```
 
 A similar in-place function is expected for the model output:
 
 ```@example 1
-h!(y, _ , a , _ , _ ) = (y .= a; nothing)  
+h!(y, _ , a , _ , _ ) = (y .= a; nothing);
 ```
 
 Providing an initial guess for the state `xs_0` and algebraic variable `as_0` is important
@@ -313,6 +313,7 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
     Ŷ_data, X̂_data = zeros(ny, N), zeros(nx̂, N)
     c_Ain_0 = plant.p[1]
     setstate!(plant, x_0); setstate!(mhe, x̂_0)
+    initstate!(mhe, [10], [7], [10])
     x = x_0
     for i=1:N
         u     = i ≤ (1N÷4) ? [10.0]  : [11.0]
