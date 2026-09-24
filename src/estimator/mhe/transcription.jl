@@ -1083,9 +1083,12 @@ function reset_warmstart!(estim::MovingHorizonEstimator, ::TrapezoidalCollocatio
     end
     return nothing
 end
-function reset_warmstart!(estim::MovingHorizonEstimator, ::OrthogonalCollocation)
+function reset_warmstart!(estim::MovingHorizonEstimator, transcription::OrthogonalCollocation)
     model = estim.model
-    nx, nx̂, nx̃, nε, He, na = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He, get_na(model)
+    no = transcription.no
+    nx, nx̂, nx̃, nε, He  = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He
+    na = get_na(model)
+    nā, nk̄ = get_nā(model, transcription), get_nk̄(model, transcription)
     as_0 = get_as_0(model)
     x0s  = model.buffer.x
     x0s .= model.xs_0 .- model.xop
@@ -1096,9 +1099,11 @@ function reset_warmstart!(estim::MovingHorizonEstimator, ::OrthogonalCollocation
     for j in 1:He
         estim.Z̃[(nx̃+(j-1)*nx̂+1):(nx̃+(j-1)*nx̂+nx)] .= x0s
         estim.Z̃[(nx̃+nx̂*He+na+(j-1)*na+1):(nx̃+nx̂*He+na+j*na)] .= a0s
-        estim.Z̃[(nx̃+nx̂*He+na+na*He+(j-1)*nx+1):(nx̃+nx̂*He+na+na*He+j*nx)] .= x0s
-        estim.Z̃[(nx̃+nx̂*He+na+na*He+nx*He+(j-1)*na+1):(nx̃+nx̂*He+na+na*He+nx*He+j*na)] .= a0s
     end
+    K̄ = @views estim.Z̃[(nx̃+nx̂*He+na+na*He+1):(nx̃+nx̂*He+na+na*He+nk̄*He)] 
+    repeat!(K̄, x0s, no*He)
+    Ā = @views estim.Z̃[(nx̃+nx̂*He+na+na*He+nk̄*He+1):(nx̃+nx̂*He+na+na*He+nk̄*He+nā*He)]
+    repeat!(Ā, a0s, no*He)
     return nothing
 end
 function reset_warmstart!(estim::MovingHorizonEstimator, ::SingleShooting)
