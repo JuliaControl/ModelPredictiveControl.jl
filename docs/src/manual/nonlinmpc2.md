@@ -298,9 +298,10 @@ mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
 
 The state constraints are shown in round brackets next to the decision variables. There are
 27 of them (3 states × 8 datapoints in the pasts + 3 arrival estimates). The arrival
-covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref). A proper
-tuning of `σP_0` and `He` reduces the impact of this approximation. We can now reproduce the
-last simulated scenario and see how `mhe` performs under pH measurement noise:
+covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref), specified by
+`σP_0` argument. A proper tuning of `σP_0` and `He` reduces the impact of the constant
+arrival approximation. We can now reproduce the last simulated scenario and see how `mhe`
+performs under pH and flow rate measurement noise:
 
 ```@example 1
 using Random
@@ -350,7 +351,7 @@ but it is a well-known issue of adaptive estimation and control. A persistent ex
 performances. With a sampling time of 30 min, the solving of the optimization problem is
 obviously fast enough for realtime execution and application to closed-loop control:
 
-```@example
+```@example 1
 T = @elapsed simMHE(mhe, plant, N; x_0, x̂_0)
 println("Total optimization and simulation time for $N time steps: $T s")
 ```
