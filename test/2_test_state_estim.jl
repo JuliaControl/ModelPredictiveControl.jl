@@ -1059,6 +1059,9 @@ end
     mhe2 = MovingHorizonEstimator(dae; He=3, transcription, direct=false)
     @test mhe2.direct == false
 
+    mhe3 = MovingHorizonEstimator(dae, He=3, hessian=true)
+    @test mhe3.transcription isa OrthogonalCollocation
+
     mhe_skf = MovingHorizonEstimator(dae; He=3, nint_ym=0, nint_u=0, σP_0 = [0.5]) 
     @test mhe_skf.cov.P̂_0 ≈ [0.5^2]
     @test mhe_skf.cov.invP̄ ≈ [1/(0.5^2)]
