@@ -281,11 +281,12 @@ model = setname!(model, u=vu, x=vx̂, y=vy, d=vd)
 Since `calc_ċ_Ain` always returns `0`, the ``c_{Ain}`` parameter is assumed to be
 time-invariant. More precisely, this concentration of the acid feed is assumed to be
 disturbed by a random-walk, instead of the measured output. Among all the settings of the
-[`MovingHorizonEstimator`](@ref), a proper tuning of the covariance matrices through `σQ`
-`σR` and `σP_0`, a past horizon `He` long enough to see the whole dynamics, and an exact
-Hessian matrix can improve the stability on a highly nonlinear and stiff plant model like
-here. We can also bound the three estimated states to positive values since they are
-concentration in mol/L:
+[`MovingHorizonEstimator`](@ref), a proper tuning of the covariance matrices through `σQ`,
+`σR` and `σP_0`, and a past horizon `He` long enough to see the main dynamics can improve
+the stability on a highly nonlinear and stiff plant model like here. An exact Hessian matrix
+with `hessian=true` also helps for DAEs, since the dynamics are encoded in the nonlinear
+equality constraints. We can also bound the three estimated states to positive values since
+they are concentration in mol/L:
 
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
@@ -345,11 +346,12 @@ savefig(p, "plot2_DAEpH.svg"); nothing # hide
 
 ![plot2_DAEpH](plot2_DAEpH.svg)
 
-The estimated acid concentration does not perfectly converge towards the actual value,
-but it is a well-known issue of adaptive estimation and control. A persistent excitation on
-``\mathbf{u}`` like an additive dither signal would presumably improve the estimation
-performances. With a sampling time of 30 min, the solving of the optimization problem is
-obviously fast enough for realtime execution and application to closed-loop control:
+The estimated acid feed concentration ``c_{Ain}`` does not perfectly converge towards the
+actual value, but it is a well-known issue of adaptive estimation and control. A persistent
+excitation on ``\mathbf{u}`` like an additive dither signal would presumably improve the
+estimation performances. With a sampling time of 30 min, the solving of the optimization
+problem is obviously fast enough for realtime execution and application to closed-loop
+control:
 
 ```@example 1
 T = @elapsed simMHE(mhe, plant, N; x_0, x̂_0)
