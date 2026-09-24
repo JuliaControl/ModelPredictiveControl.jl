@@ -159,13 +159,15 @@ function fq!(ẋ, res, x, a, u, d, p)
     ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out)
     res[1] = calc_res(a_H, c_A, c_B, Kw, Ka)
     return nothing
-end;
+end
+nothing # hide
 ```
 
 A similar in-place function is expected for the model output:
 
 ```@example 1
-h!(y, _ , a , _ , _ ) = (y .= a; nothing);
+h!(y, _ , a , _ , _ ) = (y .= a; nothing)
+nothing # hide
 ```
 
 Providing an initial guess for the state `xs_0` and algebraic variable `as_0` is important
