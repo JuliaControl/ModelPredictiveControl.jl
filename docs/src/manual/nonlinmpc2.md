@@ -290,10 +290,10 @@ concentration in mol/L:
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
 He = 8; hessian = true
-σQ = [0.0015, 0.0015, 2e-4]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]   #5e-4]
+σQ = [0.0015, 0.0015, 2e-4]; σR=[0.05]; σP_0 = [0.05, 0.05, 5e-4]
 mhe = MovingHorizonEstimator(model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0)
-mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
 using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit during optimization
+mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
 ```
 
 The state constraints are shown in round brackets next to the decision variables. There are
@@ -307,11 +307,10 @@ using Random
 function simMHE(mhe, plant, N; x_0, x̂_0)
     ny, ny, nd, nx, nx̂ = plant.ny, plant.ny, plant.nd, plant.nx, mhe.nx̂
     Y_data, U_data, D_data = zeros(ny, N), zeros(nu, N), zeros(nd, N)
-    X_data = zeros(nx+1, N) # to store also the actual c_Ain value
+    X_data = zeros(nx+1, N) # nx+1 to store the actual c_Ain value in the last row
     Ŷ_data, X̂_data = zeros(ny, N), zeros(nx̂, N)
     c_Ain_0 = plant.p[1]
     setstate!(plant, x_0); setstate!(mhe, x̂_0)
-    initstate!(mhe, [7], [10], [10])
     x = x_0
     for i=1:N
         u     = i ≤ (1N÷4) ? [10.0]  : [11.0]
@@ -337,7 +336,24 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
     return SimResult(mhe, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data)
 end
 x̂_0 = [0.025, 0.025, c_Ain]
-res = simMHE(mhe, plant, N; x_0, x̂_0)# N; x_0, x̂_0)
-# T = @elapsed 
+res = simMHE(mhe, plant, N; x_0, x̂_0)
 p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false, xlabel="Time (h)")
+xlabel!(p[2], ""); xlabel!(p[3], "") # remove xlabel on c_A and c_B plots
+savefig(p, "plot2_DAEpH.svg"); nothing # hide
 ```
+
+![plot2_DAEpH](plot2_DAEpH.svg)
+
+The estimated acid concentration does not perfectly converge towards the actual value,
+but it is a well-known issue of adaptive estimation and control. A persistent excitation on
+``\mathbf{u}`` like an additive dither signal would presumably improve the estimation
+performances. With a sampling time of 30 min, the solving of the optimization problem is
+obviously fast enough for realtime execution and application to closed-loop control:
+
+```@example
+T = @elapsed simMHE(mhe, plant, N; x_0, x̂_0)
+println("Total optimization and simulation time for $N time steps: $T s")
+```
+
+Perhaps more importantly, the fast simulations ease the tuning of the estimation horizon and
+covariance matrices, for iterative and trial-and-error approaches.
