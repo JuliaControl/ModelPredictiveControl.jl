@@ -168,8 +168,8 @@ A similar in-place function is expected for the model output:
 h!(y, _ , a , _ , _ ) = (y .= a; nothing)  
 ```
 
-Providing an initial guess for the algebraic variable `as_0` is important to prioritize
-positive pH solution:
+Providing an initial guess for the state `xs_0` and algebraic variable `as_0` is important
+for DAEs, to prioritize positive pH and concentration solution, *inter alia*:
 
 ```@example 1
 c_Ain = 0.1     # feed concentration of weak acid [mol/L]
@@ -185,13 +185,17 @@ p = [c_Ain, c_Bin, Kw, Ka, V]
 vu, vd = [raw"$q_{Bin}$ (L/min)"], [raw"$q_{Ain}$ (L/min)"]
 vx, vy = [raw"$c_A$ (mol/L)", raw"$c_B$ (mol/L)"], [raw"$\mathrm{pH}$"]
 
-plant = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny, nd; p=p, as_0=[7])
+transcription = TrapezoidalCollocation()
+xs_0, as_0 = [0.025, 0.025], [7]
+
+plant = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny, nd; p=p, xs_0, as_0, transcription)
 plant = setname!(plant, u=vu, x=vx, y=vy, d=vd)
 ```
 
-By default, an [`OrthogonalCollocation`](@ref) with 3 collocation points transcribes the
-state dynamics and the algebraic equations into an optimization problem. A simple open-loop
-simulation of `plant` with:
+We use a [`TrapezoidalCollocation`](@ref) transcription instead of the default
+[`OrthogonalCollocation`](@ref), since it is less computationnaly expensive and its accuracy
+and stability is good enough for this case study. A simple open-loop simulation of `plant`
+with:
 
 1. a bump on the base flow rate ``\mathbf{u} = q_{Bin}``
 2. a bump on the acid flow rare ``\mathbf{d} = q_{Ain}``
@@ -222,7 +226,7 @@ function simDAE(plant, N; x_0)
     return SimResult(plant, U_data, Y_data, D_data; X_data)
 end
 x_0 = [0.0505, 0.0495]
-N = 101
+N = 81
 res = simDAE(plant, N; x_0)
 ```
 
@@ -269,7 +273,8 @@ ĥ!(y, x̂, a, d, p̂) = h!(y, x̂, a, d, p̂)
 p̂ = [c_Bin, Kw, Ka, V]
 nx̂ = nx + 1
 vx̂ = [vx; raw"$c_{Ain}$ (mol/L)"]
-model = NonLinModelDAE(f̂q!, ĥ!, Ts, nu, nx̂, na, ny, nd; p=p̂, as_0=[7])
+x̂s_0 = [xs_0; 0.1]
+model = NonLinModelDAE(f̂q!, ĥ!, Ts, nu, nx̂, na, ny, nd; p=p̂, xs_0=x̂s_0, as_0, transcription)
 model = setname!(model, u=vu, x=vx̂, y=vy, d=vd)
 ```
 
@@ -284,50 +289,55 @@ concentration in mol/L:
 
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
-He = 10; hessian = true
-σQ = [0.01, 0.01, 0.005]; σR=[0.1]; σP_0 = 100*[0.001, 0.001, 1e-6]
+He = 8; hessian = true
+σQ = [0.0015, 0.0015, 2e-4]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]   #5e-4]
 mhe = MovingHorizonEstimator(model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0)
-using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit at optimization
 mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
+using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit during optimization
 ```
 
-The state constraints are shown in round bracket next to the decision variables. There are
-33 of them (3 states × 10 datapoints in the pasts + 3 others for the arrival estimate). The
-arrival covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref). A
-proper tuning of `σP_0` and `He` reduces the impact of this approximation. We can now
-reproduce the last simulated scenario and see how `mhe` performs under pH measurement noise:
+The state constraints are shown in round brackets next to the decision variables. There are
+27 of them (3 states × 8 datapoints in the pasts + 3 arrival estimates). The arrival
+covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref). A proper
+tuning of `σP_0` and `He` reduces the impact of this approximation. We can now reproduce the
+last simulated scenario and see how `mhe` performs under pH measurement noise:
 
 ```@example 1
 using Random
 function simMHE(mhe, plant, N; x_0, x̂_0)
     ny, ny, nd, nx, nx̂ = plant.ny, plant.ny, plant.nd, plant.nx, mhe.nx̂
-    Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
+    Y_data, U_data, D_data = zeros(ny, N), zeros(nu, N), zeros(nd, N)
+    X_data = zeros(nx+1, N) # to store also the actual c_Ain value
     Ŷ_data, X̂_data = zeros(ny, N), zeros(nx̂, N)
     c_Ain_0 = plant.p[1]
-    initstate!(mhe, [7], [10], [10])
     setstate!(plant, x_0); setstate!(mhe, x̂_0)
+    initstate!(mhe, [7], [10], [10])
     x = x_0
     for i=1:N
         u     = i ≤ (1N÷4) ? [10.0]  : [11.0]
         d     = i ≤ (2N÷4) ? [10.0]  : [12.0]
         c_Ain = i ≤ (3N÷4) ? c_Ain_0 : (c_Ain_0 - 0.01)
         plant.p[1] = c_Ain
-        y = plant(d) + 0.1*randn(1)
-        x̂ = preparestate!(mhe, y, d)
-        ŷ = mhe(d)
-        Y_data[:, i] = y
-        U_data[:, i] = u
-        D_data[:, i] = d
-        X_data[:, i] = x
-        Ŷ_data[:, i] = ŷ
-        X̂_data[:, i] = x̂
+        y  = evaloutput(plant, d)
+        ym = y + 0.05*randn(1)
+        dm = d + 0.10*randn(1)
+        x̂  = preparestate!(mhe, ym, dm) 
+        ŷ  = evaloutput(mhe, dm)
+        Y_data[:, i]   = ym
+        U_data[:, i]   = u
+        D_data[:, i]   = dm
+        X_data[1:2, i] = x
+        X_data[3, i]   = c_Ain
+        Ŷ_data[:, i]   = ŷ
+        X̂_data[:, i]   = x̂
         x = updatestate!(plant, u, d)
-        x̂ = updatestate!(mhe, y, u, d)
+        x̂ = updatestate!(mhe, ym, u, dm)
     end
     plant.p[1] = c_Ain_0
     return SimResult(mhe, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data)
 end
-x̂_0=[x_0; c_Ain]
-res = simMHE(mhe, plant, 100; x_0, x̂_0)
-p = plot(res, plotd=false, plotxwithx̂=true, xlabel="Time (h)")
+x̂_0 = [0.025, 0.025, c_Ain]
+res = simMHE(mhe, plant, N; x_0, x̂_0)# N; x_0, x̂_0)
+# T = @elapsed 
+p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false, xlabel="Time (h)")
 ```
