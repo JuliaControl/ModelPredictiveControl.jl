@@ -200,7 +200,7 @@ and stability is good enough for this case study. A simple open-loop simulation 
 with:
 
 1. a bump on the base flow rate ``\mathbf{u} = q_{Bin}``
-2. a bump on the acid flow rare ``\mathbf{d} = q_{Ain}``
+2. a bump on the acid flow rate ``\mathbf{d} = q_{Ain}``
 3. a bump on the acid feed concentration ``c_{Ain}`` (an unmeasured disturbance)
 
 validates that our DAE is well-posed:
