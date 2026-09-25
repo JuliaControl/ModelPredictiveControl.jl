@@ -11,9 +11,9 @@ Pages = ["nonlinmpc2.md"]
 ## Nonlinear Model (DAE)
 
 In this example, the goal is to control the pH of a solution in a continuously stirred
-tank reactor (CSTR) for neutralization. The manipulated input is the inlet flow rate of
-a strong base in L/min, while the inlet flow rate of a weak acid, also in L/min, is a
-measured disturbance:
+tank reactor (CSTR) for neutralization. The manipulated input ``\mathbf{u}`` is the inlet
+flow rate of a strong base in L/min, while the inlet flow rate of a weak acid, also in
+L/min, is a measured disturbance ``\mathbf{d}``:
 
 ```math
 \begin{aligned}
@@ -87,7 +87,7 @@ balance leads the algebraic equation:
     When possible, plant model should be constructed with the specialized [`NonLinModel`](@ref)
     for ODEs. This tutorial will still treat the system as a DAE to illustrate its API.
 
-The pH is:
+The pH is defined as:
 
 ```math
 \mathrm{pH} = -10 \log_{10}(a_H) ⟹ a_H = 10^{-\mathrm{pH}}
@@ -195,19 +195,19 @@ plant = setname!(plant, u=vu, x=vx, y=vy, d=vd)
 ```
 
 We use a [`TrapezoidalCollocation`](@ref) transcription instead of the default
-[`OrthogonalCollocation`](@ref), since it is less computationnaly expensive and its accuracy
+[`OrthogonalCollocation`](@ref), since it is less computationally expensive and its accuracy
 and stability is good enough for this case study. A simple open-loop simulation of `plant`
 with:
 
 1. a bump on the base flow rate ``\mathbf{u} = q_{Bin}``
-2. a bump on the acid flow rare ``\mathbf{d} = q_{Ain}``
+2. a bump on the acid flow rate ``\mathbf{d} = q_{Ain}``
 3. a bump on the acid feed concentration ``c_{Ain}`` (an unmeasured disturbance)
 
 validates that our DAE is well-posed:
 
 ```@example 1
 function simDAE(plant, N; x_0)
-    ny, ny, nd, nx = plant.ny, plant.ny, plant.nd, plant.nx
+    ny, nd, nx = plant.ny, plant.nd, plant.nx
     Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
     c_Ain_0 = plant.p[1]
     setstate!(plant, x_0)
@@ -281,14 +281,14 @@ model = setname!(model, u=vu, x=vx̂, y=vy, d=vd)
 ```
 
 Since `calc_ċ_Ain` always returns `0`, the ``c_{Ain}`` parameter is assumed to be
-time-invariant. More precisely, this concentration of the acid feed is assumed to be
+time-invariant. More precisely, the concentration of the acid feed is assumed to be
 disturbed by a random-walk, instead of the measured output. Among all the settings of the
 [`MovingHorizonEstimator`](@ref), a proper tuning of the covariance matrices through `σQ`,
 `σR` and `σP_0`, and a past horizon `He` long enough to see the main dynamics can improve
 the stability on a highly nonlinear and stiff plant model like here. An exact Hessian matrix
 with `hessian=true` also helps for DAEs, since the dynamics are encoded in the nonlinear
 equality constraints. We can also bound the three estimated states to positive values since
-they are concentration in mol/L:
+they are concentrations in mol/L:
 
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
@@ -300,7 +300,7 @@ mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
 ```
 
 The state constraints are shown in round brackets next to the decision variables. There are
-27 of them (3 states × 8 datapoints in the pasts + 3 arrival estimates). The arrival
+27 of them (3 states × 8 datapoints in the past + 3 arrival estimates). The arrival
 covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref), specified by
 `σP_0` argument. A proper tuning of `σP_0` and `He` reduces the impact of the constant
 arrival approximation. We can now reproduce the last simulated scenario and see how `mhe`
@@ -362,4 +362,4 @@ println("Total optimization and simulation time for $N time steps: $T s")
 ```
 
 Perhaps more importantly, the fast simulations ease the tuning of the estimation horizon and
-covariance matrices, for iterative and trial-and-error approaches.
+covariance matrices, for iterative trial-and-error approaches.
