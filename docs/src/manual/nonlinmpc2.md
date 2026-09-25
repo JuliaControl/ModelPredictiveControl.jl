@@ -207,7 +207,7 @@ validates that our DAE is well-posed:
 
 ```@example 1
 function simDAE(plant, N; x_0)
-    ny, ny, nd, nx = plant.ny, plant.ny, plant.nd, plant.nx
+    ny, nd, nx = plant.ny, plant.nd, plant.nx
     Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
     c_Ain_0 = plant.p[1]
     setstate!(plant, x_0)
