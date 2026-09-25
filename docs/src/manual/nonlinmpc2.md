@@ -300,7 +300,7 @@ mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
 ```
 
 The state constraints are shown in round brackets next to the decision variables. There are
-27 of them (3 states × 8 datapoints in the pasts + 3 arrival estimates). The arrival
+27 of them (3 states × 8 datapoints in the past + 3 arrival estimates). The arrival
 covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref), specified by
 `σP_0` argument. A proper tuning of `σP_0` and `He` reduces the impact of the constant
 arrival approximation. We can now reproduce the last simulated scenario and see how `mhe`
