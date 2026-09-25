@@ -281,7 +281,7 @@ model = setname!(model, u=vu, x=vx̂, y=vy, d=vd)
 ```
 
 Since `calc_ċ_Ain` always returns `0`, the ``c_{Ain}`` parameter is assumed to be
-time-invariant. More precisely, this concentration of the acid feed is assumed to be
+time-invariant. More precisely, the concentration of the acid feed is assumed to be
 disturbed by a random-walk, instead of the measured output. Among all the settings of the
 [`MovingHorizonEstimator`](@ref), a proper tuning of the covariance matrices through `σQ`,
 `σR` and `σP_0`, and a past horizon `He` long enough to see the main dynamics can improve
