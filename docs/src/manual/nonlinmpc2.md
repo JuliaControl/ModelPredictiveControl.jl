@@ -293,7 +293,7 @@ they are concentrations in mol/L:
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
 He = 8; hessian = true
-σQ = [0.0015, 0.0015, 2e-4]; σR=[0.05]; σP_0 = [0.05, 0.05, 5e-4]
+σQ = [0.5e-3, 0.5e-3, 0.75e-3]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]
 mhe = MovingHorizonEstimator(model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0)
 using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit during optimization
 mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
@@ -335,7 +335,7 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
         Ŷ_data[:, i]   = ŷ
         X̂_data[:, i]   = x̂
         x = updatestate!(plant, u, d)
-        x̂ = updatestate!(mhe, ym, u, dm)
+        x̂ = updatestate!(mhe, u, ym, dm)
     end
     plant.p[1] = c_Ain_0
     return SimResult(mhe, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data)
