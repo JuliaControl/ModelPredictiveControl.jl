@@ -139,6 +139,10 @@ equation are combined into a single `fq!(ẋ, res, x, a, u, d, p) -> nothing` fu
 modifies both `ẋ` and `res` arguments in-place (an out-of-place option is also available),
 with the state dynamics and the residual of the algebraic equation, respectively:
 
+```@codeblocks
+line_counter = :continue
+```
+
 ```@example 1
 using ModelPredictiveControl
 
@@ -349,12 +353,10 @@ savefig(p, "plot2_DAEpH.svg"); nothing # hide
 
 ![plot2_DAEpH](plot2_DAEpH.svg)
 
-The estimated acid feed concentration ``c_{Ain}`` does not perfectly converge towards the
-actual value, but it is a well-known issue of adaptive estimation and control. A persistent
-excitation on ``\mathbf{u}`` like an additive dither signal would presumably improve the
-estimation performances. With a sampling time of 30 min, the solving of the optimization
-problem is obviously fast enough for realtime execution and application to closed-loop
-control:
+The estimation performances seem good enough for closed-loop control applications as the
+various species in the neutralization tank are tracked correctly. With a sampling time of 30
+minutes, the solving of the optimization problem is obviously fast enough for realtime
+execution:
 
 ```@example 1
 T = @elapsed simMHE(mhe, plant, N; x_0, x̂_0)
