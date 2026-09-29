@@ -184,7 +184,8 @@ Kw = 1.0e-14    # water dissociation constant [mol^2/L^2]
 Ka = 1.75e-5    # acid dissociation constant [mol/L]
 V = 1000.0      # reactor volume [L]
 
-Ts = 0.5        # Sample time [h]
+Ts = 0.5        # sample time
+unit = "h"      # time unit shown on plot x-label suffixes
 nu, nx, na, ny, nd = 1, 2, 1, 1, 1
 p = [c_Ain, c_Bin, Kw, Ka, V]
 
@@ -194,7 +195,10 @@ vx, vy = [raw"$c_A$ (mol/L)", raw"$c_B$ (mol/L)"], [raw"$\mathrm{pH}$"]
 transcription = TrapezoidalCollocation()
 xs_0, as_0 = [0.025, 0.025], [7]
 
-plant = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny, nd; p=p, xs_0, as_0, transcription)
+plant = NonLinModelDAE(
+    fq!, h!, Ts, nu, nx, na, ny, nd; 
+    p=p, xs_0, as_0, transcription, unit
+)
 plant = setname!(plant, u=vu, x=vx, y=vy, d=vd)
 ```
 
@@ -236,12 +240,11 @@ N = 81
 res = simDAE(plant, N; x_0)
 ```
 
-We plot the results by modifying the x-axis label to substitute the default time units
-to hours:
+We can now plot the result:
 
 ```@example 1
 using Plots
-plot(res, plotu=true, plotd=true, xlabel="Time (h)")
+plot(res, plotu=true, plotd=true)
 savefig("plot1_DAEpH.svg"); nothing # hide
 ```
 
@@ -280,7 +283,10 @@ p̂ = [c_Bin, Kw, Ka, V]
 nx̂ = nx + 1
 vx̂ = [vx; raw"$c_{Ain}$ (mol/L)"]
 x̂s_0 = [xs_0; 0.1]
-model = NonLinModelDAE(f̂q!, ĥ!, Ts, nu, nx̂, na, ny, nd; p=p̂, xs_0=x̂s_0, as_0, transcription)
+model = NonLinModelDAE(
+    f̂q!, ĥ!, Ts, nu, nx̂, na, ny, nd; 
+    p=p̂, xs_0=x̂s_0, as_0, transcription, unit
+)
 model = setname!(model, u=vu, x=vx̂, y=vy, d=vd)
 ```
 
@@ -346,8 +352,7 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
 end
 x̂_0 = [0.025, 0.025, c_Ain]
 res = simMHE(mhe, plant, N; x_0, x̂_0)
-p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false, xlabel="Time (h)")
-xlabel!(p[2], ""); xlabel!(p[3], "") # remove xlabel on c_A and c_B plots
+p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false)
 savefig(p, "plot2_DAEpH.svg"); nothing # hide
 ```
 
