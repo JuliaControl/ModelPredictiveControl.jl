@@ -44,13 +44,15 @@ struct NonLinModel{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    unit::String
     xs_0::Vector{NT}
     jacobian::JB
     linfunc!::LF
     buffer::SimModelBuffer{NT}
     function NonLinModel{NT}(
-        solver::DS, f!::F, h!::H, Ts, nu, nx, ny, nd, 
-        p::PT, jacobian::JB, linfunc!::LF
+        solver::DS, f!::F, h!::H, Ts, nu, nx, ny, nd,  
+        p::PT, jacobian::JB, linfunc!::LF,
+        unit="s"
     ) where {
             NT<:Real, 
             DS<:DiffSolver,
@@ -85,6 +87,7 @@ struct NonLinModel{
             nu, nx, ny, nd, nk̄, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
+            unit,
             xs_0,
             jacobian, linfunc!,
             buffer
@@ -138,7 +141,7 @@ See also [`LinModel`](@ref), and [`NonLinModelDAE`](@ref) to include algebraic e
 # Arguments
 - `f::Function` or `f!`: state function of the model.
 - `h::Function` or `h!`: output function of the model.
-- `Ts`: sampling time of the model in seconds.
+- `Ts`: sampling time of the model (see `unit` below).
 - `nu`: number of manipulated inputs.
 - `nx`: number of states.
 - `ny`: number of outputs.
@@ -148,6 +151,7 @@ See also [`LinModel`](@ref), and [`NonLinModelDAE`](@ref) to include algebraic e
   dynamics, use `nothing` for discrete-time models (default to 4th order [`RungeKutta`](@ref)).
 - `jacobian=AutoForwardDiff()`: an `AbstractADType` backend when [`linearize`](@ref) is
    called, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List).
+- `unit="s"`: time unit shown in plots x-label suffix (no underlying time data conversion).
 
 # Examples
 ```jldoctest
@@ -202,7 +206,7 @@ NonLinModel with a sample time Ts = 2.0 s:
 """
 function NonLinModel{NT}(
     f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
-    p=NT[], solver=RungeKutta(4), jacobian=AutoForwardDiff()
+    p=NT[], solver=RungeKutta(4), jacobian=AutoForwardDiff(), unit="s"
 ) where {NT<:Real}
     isnothing(solver) && (solver=EmptySolver())
     f!, h! = get_mutating_functions(NT, f, h)
@@ -210,15 +214,15 @@ function NonLinModel{NT}(
         NT, f!, h!, Ts, nu, nx, ny, nd, p, solver, jacobian
     )
     return NonLinModel{NT}(
-        solver, f!, h!, Ts, nu, nx, ny, nd, p, jacobian, linfunc!
+        solver, f!, h!, Ts, nu, nx, ny, nd, p, jacobian, linfunc!, unit
     )
 end
 
 function NonLinModel(
     f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
-    p=Float64[], solver=RungeKutta(4), jacobian=AutoForwardDiff()
+    p=Float64[], solver=RungeKutta(4), jacobian=AutoForwardDiff(), unit="s"
 )
-    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; p, solver, jacobian)
+    return NonLinModel{Float64}(f, h, Ts, nu, nx, ny, nd; p, solver, jacobian, unit)
 end
 
 "Get the mutating functions `f!` and `h!` from the provided functions in argument."

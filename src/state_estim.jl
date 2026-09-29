@@ -32,11 +32,12 @@ include("estimator/manual.jl")
 
 function Base.show(io::IO, estim::StateEstimator)
     model = estim.model
+    Ts, unit = model.Ts, model.unit
     nu, nd = model.nu, model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     other_dims = get_other_dims(estim)
     n = maximum(ndigits.((nu, nx̂, nym, nyu, nd, other_dims...))) + 1
-    println(io, "$(nameof(typeof(estim))) estimator with a sample time Ts = $(model.Ts) s:")
+    println(io, "$(nameof(typeof(estim))) estimator with a sample time Ts = $Ts $unit:")
     println(io, "├ model: $(nameof(typeof(estim.model)))")
     print_details(io, estim)
     println(io, "└ dimensions:")

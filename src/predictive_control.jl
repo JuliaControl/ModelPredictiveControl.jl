@@ -30,12 +30,13 @@ include("controller/transcription.jl")
 
 function Base.show(io::IO, mpc::PredictiveController)
     estim, model = mpc.estim, mpc.estim.model
+    Ts, unit = model.Ts, model.unit
     Hp, Hc = mpc.Hp, mpc.Hc
     nu, nd = model.nu, model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     other_dims = get_other_dims(estim)
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd, other_dims...))) + 1
-    println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = $(model.Ts) s:")
+    println(io, "$(nameof(typeof(mpc))) controller with a sample time Ts = $Ts $unit:")
     println(io, "├ estimator: $(nameof(typeof(mpc.estim)))")
     println(io, "├ model: $(nameof(typeof(model)))")
     println(io, "├ optimizer: $(JuMP.solver_name(mpc.optim))")
