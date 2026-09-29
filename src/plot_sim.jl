@@ -389,6 +389,8 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
     nd = length(indices_d)
     nx = length(indices_x)
 
+    unit = model.unit
+
     layout_mat = Matrix{Tuple{Int64, Int64}}(undef, 1, 0)
     ny > 0 && (layout_mat = [layout_mat (ny, 1)])
     nu > 0 && (layout_mat = [layout_mat (nu, 1)])
@@ -401,7 +403,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
     for i in 1:ny
         i_y = indices_y[i]
         @series begin
-            i == ny && (xguide --> "Time (s)")
+            i == ny && (xguide --> "Time ($unit)")
             yguide  --> yname[i_y]
             color   --> 1
             subplot --> subplot_base + i
@@ -415,7 +417,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
     for i in 1:nu
         i_u = indices_u[i]
         @series begin
-            i == nu && (xguide --> "Time (s)")
+            i == nu && (xguide --> "Time ($unit)")
             yguide     --> uname[i_u]
             color      --> 1
             subplot    --> subplot_base + i
@@ -430,7 +432,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
     for i in 1:nd
         i_d = indices_d[i]
         @series begin
-            i == nd && (xguide --> "Time (s)")
+            i == nd && (xguide --> "Time ($unit)")
             yguide  --> dname[i_d]
             color   --> 1
             subplot --> subplot_base + i
@@ -444,7 +446,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:SimModel}) = nothing
     for i in 1:nx
         i_x = indices_x[i]
         @series begin
-            i == nx && (xguide --> "Time (s)")
+            i == nx && (xguide --> "Time ($unit)")
             yguide     --> xname[i_x]
             color      --> 1
             subplot    --> subplot_base + i
@@ -532,6 +534,8 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
     nx  = length(indices_x)
     nx̂  = length(indices_x̂)
     nxx̂ = length(indices_xx̂)
+
+    unit = model.unit
     
     layout_mat = Matrix{Tuple{Int64, Int64}}(undef, 1, 0)
     ny  ≠ 0 && (layout_mat = [layout_mat (ny, 1)])
@@ -547,7 +551,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
     for i in 1:ny
         i_y = indices_y[i]
         @series begin
-            i == ny && (xguide --> "Time (s)")
+            i == ny && (xguide --> "Time ($unit)")
             yguide  --> yname[i_y]
             color   --> 1
             subplot --> subplot_base + i
@@ -557,7 +561,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
         end
         if i_y in indices_ŷ
             @series begin
-                i == ny && (xguide --> "Time (s)")
+                i == ny && (xguide --> "Time ($unit)")
                 yguide  --> yname[i_y]
                 color     --> 2
                 subplot   --> subplot_base + i
@@ -574,7 +578,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
     for i in 1:nu
         i_u = indices_u[i]
         @series begin
-            i == nu && (xguide --> "Time (s)")
+            i == nu && (xguide --> "Time ($unit)")
             yguide     --> uname[i_u]
             color      --> 1
             subplot    --> subplot_base + i
@@ -589,7 +593,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
     for i in 1:nd
         i_d = indices_d[i]
         @series begin
-            i == nd && (xguide --> "Time (s)")
+            i == nd && (xguide --> "Time ($unit)")
             yguide  --> dname[i_d]
             color   --> 1
             subplot --> subplot_base + i
@@ -603,7 +607,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
     for i in 1:nx
         i_x = indices_x[i]
         @series begin
-            i == nx && (xguide --> "Time (s)")
+            i == nx && (xguide --> "Time ($unit)")
             yguide     --> xname[i_x]
             color      --> 1
             subplot    --> subplot_base + i
@@ -617,7 +621,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
     for i in 1:nx̂
         i_x̂ = indices_x̂[i]
         @series begin
-            i == nx̂ && (xguide --> "Time (s)")
+            i == nx̂ && (xguide --> "Time ($unit)")
             yguide     --> x̂name[i_x̂]
             color      --> 2
             subplot    --> subplot_base + i
@@ -630,7 +634,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
         x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_x̂], X̂max[end-2*estim.nx̂+i_x̂]
         if i_x̂ in indices_x̂min && !isinf(x̂min_i)
             @series begin
-                i == nx̂ && (xguide --> "Time (s)")
+                i == nx̂ && (xguide --> "Time ($unit)")
                 yguide     --> x̂name[i_x̂]
                 color      --> 4
                 subplot    --> subplot_base + i
@@ -643,7 +647,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
         end
         if i_x̂ in indices_x̂max && !isinf(x̂max_i)
             @series begin
-                i == nx̂ && (xguide --> "Time (s)")
+                i == nx̂ && (xguide --> "Time ($unit)")
                 yguide     --> x̂name[i_x̂]
                 color      --> 5
                 subplot    --> subplot_base + i
@@ -663,7 +667,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
         isplotted_x̂ = i_xx̂ ≤ size(res.X̂_data, 1)
         if isplotted_x
             @series begin
-                i == nxx̂ && (xguide --> "Time (s)")
+                i == nxx̂ && (xguide --> "Time ($unit)")
                 yguide     --> xx̂name[i_xx̂]
                 color      --> 1
                 subplot    --> subplot_base + i
@@ -674,7 +678,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
         end
         if isplotted_x̂
             @series begin
-                i == nxx̂ && (xguide --> "Time (s)")
+                i == nxx̂ && (xguide --> "Time ($unit)")
                 yguide     --> xx̂name[i_xx̂]
                 color      --> 2
                 subplot    --> subplot_base + i
@@ -687,7 +691,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
             x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_xx̂], X̂max[end-2*estim.nx̂+i_xx̂]
             if i_xx̂ in indices_x̂min && !isinf(x̂min_i)
                 @series begin
-                    i == nxx̂ && (xguide --> "Time (s)")
+                    i == nxx̂ && (xguide --> "Time ($unit)")
                     yguide     --> xx̂name[i_xx̂]
                     color      --> 4
                     subplot    --> subplot_base + i
@@ -700,7 +704,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:StateEstimator}) = nothing
             end
             if i_xx̂ in indices_x̂max && !isinf(x̂max_i)
                 @series begin
-                    i == nxx̂ && (xguide --> "Time (s)")
+                    i == nxx̂ && (xguide --> "Time ($unit)")
                     yguide     --> xx̂name[i_xx̂]
                     color      --> 5
                     subplot    --> subplot_base + i
@@ -815,6 +819,8 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
     nx̂  = length(indices_x̂)
     nxx̂ = length(indices_xx̂)
 
+    unit = model.unit
+
     layout_mat = Matrix{Tuple{Int64, Int64}}(undef, 1, 0)
     ny  ≠ 0 && (layout_mat = [layout_mat (ny, 1)])
     nu  ≠ 0 && (layout_mat = [layout_mat (nu, 1)])
@@ -829,7 +835,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
     for i in 1:ny
         i_y = indices_y[i]
         @series begin
-            i == ny && (xguide --> "Time (s)")
+            i == ny && (xguide --> "Time ($unit)")
             yguide  --> yname[i_y]
             color   --> 1
             subplot --> subplot_base + i
@@ -839,7 +845,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         end
         if i_y in indices_ŷ
             @series begin
-                i == ny && (xguide --> "Time (s)")
+                i == ny && (xguide --> "Time ($unit)")
                 yguide  --> yname[i_y]
                 color     --> 2
                 subplot   --> subplot_base + i
@@ -853,7 +859,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         M_Hp_i = mpc.weights.M_Hp[i_y, i_y]
         if i_y in indices_ry && !iszero(M_Hp_i)
             @series begin
-                i == ny && (xguide --> "Time (s)")
+                i == ny && (xguide --> "Time ($unit)")
                 yguide    --> yname[i_y]
                 color     --> 3
                 subplot   --> subplot_base + i
@@ -867,7 +873,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         ymin_i, ymax_i = Ymin[i_y], Ymax[i_y]
         if i_y in indices_ymin && !isinf(ymin_i)
             @series begin
-                i == ny && (xguide --> "Time (s)")
+                i == ny && (xguide --> "Time ($unit)")
                 yguide    --> yname[i_y]
                 color     --> 4
                 subplot   --> subplot_base + i
@@ -880,7 +886,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         end
         if i_y in indices_ymax && !isinf(ymax_i)
             @series begin
-                i == ny && (xguide --> "Time (s)")
+                i == ny && (xguide --> "Time ($unit)")
                 yguide    --> yname[i_y]
                 color     --> 5
                 subplot   --> subplot_base + i
@@ -897,7 +903,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
     for i in 1:nu
         i_u = indices_u[i]
         @series begin
-            i == nu && (xguide --> "Time (s)")
+            i == nu && (xguide --> "Time ($unit)")
             yguide     --> uname[i_u]
             color      --> 1
             subplot    --> subplot_base + i
@@ -909,7 +915,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         L_Hp_i = mpc.weights.L_Hp[i_u, i_u]
         if i_u in indices_ru && !iszero(L_Hp_i)
             @series begin
-                i == nu && (xguide --> "Time (s)")
+                i == nu && (xguide --> "Time ($unit)")
                 yguide    --> uname[i_u]
                 color     --> 3
                 subplot   --> subplot_base + i
@@ -923,7 +929,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         umin_i, umax_i = Umin[i_u], Umax[i_u]
         if i_u in indices_umin && !isinf(umin_i)
             @series begin
-                i == nu && (xguide --> "Time (s)")
+                i == nu && (xguide --> "Time ($unit)")
                 yguide    --> uname[i_u]
                 color     --> 4
                 subplot   --> subplot_base + i
@@ -936,7 +942,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         end
         if i_u in indices_umax && !isinf(umax_i)
             @series begin
-                i == nu && (xguide --> "Time (s)")
+                i == nu && (xguide --> "Time ($unit)")
                 yguide    --> uname[i_u]
                 color     --> 5
                 subplot   --> subplot_base + i
@@ -953,7 +959,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
     for i in 1:nd
         i_d = indices_d[i]
         @series begin
-            i == nd && (xguide --> "Time (s)")
+            i == nd && (xguide --> "Time ($unit)")
             yguide  --> dname[i_d]
             color   --> 1
             subplot --> subplot_base + i
@@ -967,7 +973,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
     for i in 1:nx
         i_x = indices_x[i]
         @series begin
-            i == nx && (xguide --> "Time (s)")
+            i == nx && (xguide --> "Time ($unit)")
             yguide     --> xname[i_x]
             color      --> 1
             subplot    --> subplot_base + i
@@ -981,7 +987,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
     for i in 1:nx̂
         i_x̂ = indices_x̂[i]
         @series begin
-            i == nx̂ && (xguide --> "Time (s)")
+            i == nx̂ && (xguide --> "Time ($unit)")
             yguide     --> x̂name[i_x̂]
             color      --> 2
             subplot    --> subplot_base + i
@@ -994,7 +1000,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_x̂], X̂max[end-2*estim.nx̂+i_x̂]
         if i_x̂ in indices_x̂min && !isinf(x̂min_i)
             @series begin
-                i == nx̂ && (xguide --> "Time (s)")
+                i == nx̂ && (xguide --> "Time ($unit)")
                 yguide     --> x̂name[i_x̂]
                 color      --> 4
                 subplot    --> subplot_base + i
@@ -1007,7 +1013,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         end
         if i_x̂ in indices_x̂max && !isinf(x̂max_i)
             @series begin
-                i == nx̂ && (xguide --> "Time (s)")
+                i == nx̂ && (xguide --> "Time ($unit)")
                 yguide     --> x̂name[i_x̂]
                 color      --> 5
                 subplot    --> subplot_base + i
@@ -1027,7 +1033,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         isplotted_x̂ = i_xx̂ ≤ size(res.X̂_data, 1)
         if isplotted_x
             @series begin
-                i == nxx̂ && (xguide --> "Time (s)")
+                i == nxx̂ && (xguide --> "Time ($unit)")
                 yguide     --> xx̂name[i_xx̂]
                 color      --> 1
                 subplot    --> subplot_base + i
@@ -1038,7 +1044,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
         end
         if isplotted_x̂
             @series begin
-                i == nxx̂ && (xguide --> "Time (s)")
+                i == nxx̂ && (xguide --> "Time ($unit)")
                 yguide     --> xx̂name[i_xx̂]
                 color      --> 2
                 subplot    --> subplot_base + i
@@ -1051,7 +1057,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
             x̂min_i, x̂max_i = X̂min[end-2*estim.nx̂+i_xx̂], X̂max[end-2*estim.nx̂+i_xx̂]
             if i_xx̂ in indices_x̂min && !isinf(x̂min_i)
                 @series begin
-                    i == nxx̂ && (xguide --> "Time (s)")
+                    i == nxx̂ && (xguide --> "Time ($unit)")
                     yguide     --> xx̂name[i_xx̂]
                     color      --> 4
                     subplot    --> subplot_base + i
@@ -1064,7 +1070,7 @@ plot_recipe(::Nothing, ::SimResult{<:Real, <:PredictiveController}) = nothing
             end
             if i_xx̂ in indices_x̂max && !isinf(x̂max_i)
                 @series begin
-                    i == nxx̂ && (xguide --> "Time (s)")
+                    i == nxx̂ && (xguide --> "Time ($unit)")
                     yguide     --> xx̂name[i_xx̂]
                     color      --> 5
                     subplot    --> subplot_base + i
