@@ -90,7 +90,7 @@ balance leads the algebraic equation:
 The pH is defined as:
 
 ```math
-\mathrm{pH} = -10 \log_{10}(a_H) ⟹ a_H = 10^{-\mathrm{pH}}
+\mathrm{pH} = -\log_{10}(a_H) ⟹ a_H = 10^{-\mathrm{pH}}
 ```
 
 ### Mass Balance
