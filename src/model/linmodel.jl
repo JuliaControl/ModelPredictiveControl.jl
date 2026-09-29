@@ -208,7 +208,7 @@ end
 
 
 @doc raw"""
-    LinModel(sys::TransferFunction[, Ts]; unit="s", i_u=1:size(sys,2), i_d=Int[])
+    LinModel(sys::TransferFunction[, Ts]; i_u=1:size(sys,2), i_d=Int[], unit="s")
 
 Convert to minimal realization state-space when `sys` is a transfer function.
 
@@ -235,7 +235,7 @@ end
 
 
 """
-    LinModel(sys::DelayLtiSystem, Ts; unit="s", i_u=1:size(sys,2), i_d=Int[])
+    LinModel(sys::DelayLtiSystem, Ts; i_u=1:size(sys,2), i_d=Int[], unit="s")
 
 Discretize with zero-order hold when `sys` is a continuous system with delays.
 
