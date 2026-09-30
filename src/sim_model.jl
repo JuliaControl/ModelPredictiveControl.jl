@@ -387,10 +387,11 @@ include("model/nonlinmodel.jl")
 include("model/nonlinmodeldae.jl")
 
 function Base.show(io::IO, model::SimModel)
+    Ts, unit = model.Ts, model.unit
     nu, nd = model.nu, model.nd
     nx, ny = model.nx, model.ny
     n = maximum(ndigits.((nu, nx, ny, nd))) + 1
-    println(io, "$(nameof(typeof(model))) with a sample time Ts = $(model.Ts) s:")
+    println(io, "$(nameof(typeof(model))) with a sample time Ts = $Ts $unit:")
     print_details(io, model)
     println(io, "└ dimensions:")
     println(io, "  ├$(lpad(nu, n)) manipulated inputs u")

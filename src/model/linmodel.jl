@@ -22,9 +22,10 @@ struct LinModel{NT<:Real} <: SimModelODE{NT}
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    unit::String
     xs_0::Vector{NT}
     buffer::SimModelBuffer{NT}
-    function LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where {NT<:Real}
+    function LinModel{NT}(A, Bu, C, Bd, Dd, Ts, unit="s") where {NT<:Real}
         A, Bu = to_mat(A, 1, 1), to_mat(Bu, 1, 1)
         nu, nx = size(Bu, 2), size(A, 2)
         (C == I) && (C = Matrix{NT}(I, nx, nx))
@@ -62,6 +63,7 @@ struct LinModel{NT<:Real} <: SimModelODE{NT}
             nu, nx, ny, nd, nk̄,
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
+            unit,
             xs_0,
             buffer
         )
@@ -69,9 +71,9 @@ struct LinModel{NT<:Real} <: SimModelODE{NT}
 end
 
 @doc raw"""
-    LinModel(sys::StateSpace[, Ts]; i_u=1:size(sys,2), i_d=Int[])
+    LinModel(sys::StateSpace[, Ts]; i_u=1:size(sys,2), i_d=Int[], unit="s")
 
-Construct a linear model from state-space model `sys` with sampling time `Ts` in seconds.
+Construct a linear model from state-space model `sys` with sampling time `Ts`.
 
 The system `sys` can be continuous or discrete-time (`Ts` can be omitted for the latter).
 For continuous dynamics, its state-space equations are (discrete case in Extended Help):
@@ -83,11 +85,13 @@ For continuous dynamics, its state-space equations are (discrete case in Extende
 ```
 with the state ``\mathbf{x}`` and output ``\mathbf{y}`` vectors. The ``\mathbf{s}`` vector 
 comprises the manipulated inputs ``\mathbf{u}`` and measured disturbances ``\mathbf{d}``, 
-in any order. `i_u` provides the indices of ``\mathbf{s}`` that are manipulated, and `i_d`, 
-the measured disturbances. The constructor automatically discretizes continuous systems,
-resamples discrete ones if `Ts ≠ sys.Ts`, computes a new balancing and minimal state-space
-realization, and separates the ``\mathbf{s}`` terms in two parts (details in Extended Help). 
-The rest of the documentation assumes discrete models since all systems end up in this form.
+in any order. The keyword argument `i_u` provides the indices of ``\mathbf{s}`` that are
+manipulated, and `i_d`, the measured disturbances. The string `unit` sets the x-label suffix
+in the plots (no underlying time data conversion). The constructor automatically discretizes
+continuous systems, resamples discrete ones if `Ts ≠ sys.Ts`, computes a new balancing and
+minimal state-space realization and separates the ``\mathbf{s}`` terms in two parts (details
+in Extended Help). The rest of the documentation assumes discrete models since all systems
+end up in this form.
 
 See also [`ss`](@extref ControlSystemsBase.ss)
 
@@ -134,7 +138,7 @@ LinModel with a sample time Ts = 0.1 s:
         \mathbf{y}(k)   &=  \mathbf{C x}(k) + \mathbf{D_d d}(k)
     \end{aligned}
     ```
-    Use the syntax [`LinModel{NT}(A, Bu, C, Bd, Dd, Ts)`](@ref) to force a specific
+    Use the syntax [`LinModel{NT}(A, Bu, C, Bd, Dd, Ts, unit)`](@ref) to force a specific
     state-space representation. 
     
     It is assumed that ``\mathbf{D_u=0}`` (or `sys` is strictly proper) since otherwise the
@@ -152,7 +156,8 @@ function LinModel(
     sys::StateSpace{E, NT},
     Ts::Union{Real,Nothing} = nothing;
     i_u::AbstractVector{Int} = 1:size(sys,2),
-    i_d::AbstractVector{Int} = Int[]
+    i_d::AbstractVector{Int} = Int[],
+    unit="s"
 ) where {E, NT<:Real}
     if !isempty(i_d)
         # common indexes in i_u and i_d are interpreted as measured disturbances d :
@@ -198,12 +203,12 @@ function LinModel(
     Bd  = sys_dis.B[:,nu+1:end]
     C   = sys_dis.C
     Dd  = sys_dis.D[:,nu+1:end]
-    return LinModel{NT}(A, Bu, C, Bd, Dd, Ts)
+    return LinModel{NT}(A, Bu, C, Bd, Dd, Ts, unit)
 end
 
 
 @doc raw"""
-    LinModel(sys::TransferFunction[, Ts]; i_u=1:size(sys,2), i_d=Int[])
+    LinModel(sys::TransferFunction[, Ts]; i_u=1:size(sys,2), i_d=Int[], unit="s")
 
 Convert to minimal realization state-space when `sys` is a transfer function.
 
@@ -230,7 +235,7 @@ end
 
 
 """
-    LinModel(sys::DelayLtiSystem, Ts; i_u=1:size(sys,2), i_d=Int[])
+    LinModel(sys::DelayLtiSystem, Ts; i_u=1:size(sys,2), i_d=Int[], unit="s")
 
 Discretize with zero-order hold when `sys` is a continuous system with delays.
 
@@ -242,7 +247,7 @@ function LinModel(sys::DelayLtiSystem, Ts::Real; kwargs...)
 end
 
 @doc raw"""
-    LinModel{NT}(A, Bu, C, Bd, Dd, Ts)
+    LinModel{NT}(A, Bu, C, Bd, Dd, Ts, unit="s")
 
 Construct the model from the discrete state-space matrices `A, Bu, C, Bd, Dd` directly.
 
@@ -252,8 +257,8 @@ syntax do not modify the state-space representation provided in argument (`minre
 called). Care must be taken to ensure that the model is controllable and observable. The 
 optional parameter `NT` explicitly set the number type of vectors (default to `Float64`).
 """
-LinModel{NT}(A, Bu, C, Bd, Dd, Ts) where NT<:Real
-LinModel(A, Bu, C, Bd, Dd, Ts) = LinModel{Float64}(A, Bu, C, Bd, Dd, Ts)
+LinModel{NT}(A, Bu, C, Bd, Dd, Ts, unit) where NT<:Real
+LinModel(A, Bu, C, Bd, Dd, Ts, unit="s") = LinModel{Float64}(A, Bu, C, Bd, Dd, Ts, unit)
 
 function validate_transcription(::LinModel, ::CollocationMethod)
     throw(ArgumentError("Collocation methods are not supported for LinModel."))

@@ -1,6 +1,6 @@
 @testitem "LinModel construction" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    linmodel1 = LinModel(sys, Ts, i_u=1:2)
+    linmodel1 = LinModel(sys, Ts, i_u=1:2, unit="h")
     @test linmodel1.nx == 2
     @test linmodel1.nu == 2
     @test linmodel1.nd == 0
@@ -10,6 +10,7 @@
     @test linmodel1.Bd  ≈ zeros(2,0)
     @test linmodel1.C   ≈ Gss.C
     @test linmodel1.Dd  ≈ zeros(2,0)
+    @test linmodel1.unit == "h"
 
     linmodel2 = LinModel(Gss)
     setop!(linmodel2, uop=[10,50], yop=[50,30])
@@ -77,8 +78,9 @@
     linmodel11 = LinModel(Gss.A, Gss.B, I, 0, 0, Ts)
     @test linmodel11.ny == linmodel11.nx
 
-    linmodel12 = LinModel{Float32}(Gss.A, Gss.B, Gss.C, zeros(2, 0), zeros(2, 0), Ts)
+    linmodel12 = LinModel{Float32}(Gss.A, Gss.B, Gss.C, zeros(2, 0), zeros(2, 0), Ts, "h")
     @test isa(linmodel12, LinModel{Float32})
+    @test linmodel12.unit == "h"
 
     linmodel13 = LinModel(sys,Ts,i_d=[3])
     linmodel13 = setname!(linmodel13, 
@@ -164,15 +166,16 @@ end
     linmodel1 = LinModel(sys,Ts,i_u=[1,2])
     f1!(x,u,_,model) = model.A*x + model.Bu*u
     h1!(x,_,model)   = model.C*x
-    daemodel = NonLinModel(f1!,h1!,Ts,2,2,2,solver=nothing,p=linmodel1)
-    @test daemodel.nx == 2
-    @test daemodel.nu == 2
-    @test daemodel.nd == 0
-    @test daemodel.ny == 2
-    ẋ, y = daemodel.buffer.x, daemodel.buffer.y
-    daemodel.f!(ẋ, [0,0],[0,0],[1],daemodel.p)
+    nonlinmodel1 = NonLinModel(f1!,h1!,Ts,2,2,2, solver=nothing, p=linmodel1, unit="h")
+    @test nonlinmodel1.nx == 2
+    @test nonlinmodel1.nu == 2
+    @test nonlinmodel1.nd == 0
+    @test nonlinmodel1.ny == 2
+    @test nonlinmodel1.unit == "h"
+    ẋ, y = nonlinmodel1.buffer.x, nonlinmodel1.buffer.y
+    nonlinmodel1.f!(ẋ, [0,0],[0,0],[1],nonlinmodel1.p)
     @test ẋ ≈ zeros(2,)
-    daemodel.h!(y,[0,0],[1],daemodel.p)
+    nonlinmodel1.h!(y,[0,0],[1],nonlinmodel1.p)
     @test y ≈ zeros(2,)
 
     linmodel2 = LinModel(sys,Ts,i_d=[3])
@@ -451,12 +454,13 @@ end
     Ts = 1
     p = [0.5]
 
-    dae = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p)
+    dae = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, unit="h")
     @test dae.nx == nx
     @test dae.na == na
     @test dae.nu == nu
     @test dae.nd == 0
     @test dae.ny == ny
+    @test dae.unit == "h"
     @test dae.iszero_Ha == false 
     ẋ, q, y = dae.buffer.x, dae.buffer.a, dae.buffer.y
     dae.fq!(ẋ, q, [0], [0], [0], [0], dae.p)

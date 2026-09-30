@@ -51,6 +51,7 @@ struct NonLinModelDAE{
     yname::Vector{String}
     dname::Vector{String}
     xname::Vector{String}
+    unit::String
     xs_0::Vector{NT}
     as_0::Vector{NT}
     x0_optim::Vector{NT}
@@ -64,9 +65,9 @@ struct NonLinModelDAE{
         xs_0,
         as_0,
         transcription::TM, 
-        optim_state::JMS,
-        optim_output::JMO,
-        jacobian::JB, hessian::HB
+        optim_state::JMS, optim_output::JMO,
+        jacobian::JB, hessian::HB,
+        unit="s"
     ) where {
             NT<:Real, 
             TM<:CollocationMethod,
@@ -123,6 +124,7 @@ struct NonLinModelDAE{
             nu, nx, na, ny, nd, 
             uop, yop, dop, xop, fop,
             uname, yname, dname, xname,
+            unit,
             xs_0, as_0,
             x0_optim, u0_optim, d0_optim,
             iszero_Ha,
@@ -182,7 +184,7 @@ See also [`NonLinModel`](@ref) for ODEs.
 # Arguments
 - `fq::Function` or `fq!`: combined state and algebraic function of the model.
 - `h::Function` or `h!`: output function of the model.
-- `Ts`: sampling time of the model in seconds.
+- `Ts`: sampling time of the model (see `unit` below).
 - `nu`: number of manipulated inputs.
 - `nx`: number of states.
 - `na`: number of algebraic variables.
@@ -191,17 +193,18 @@ See also [`NonLinModel`](@ref) for ODEs.
 - `p=[]`: parameters of the model (any type).
 - `xs_0=zeros(nx)`: initial guess (optimization warm-start) for the states.
 - `as_0=zeros(na)`: initial guess (optimization warm-start) for the algebraic variables.
-- `transcription=OrthogonalCollocation()` : a [`TrapezoidalCollocation`](@ref) or 
+- `transcription=OrthogonalCollocation()`: a [`TrapezoidalCollocation`](@ref) or 
    [`OrthogonalCollocation`](@ref) instance for open-loop simulations.
-- `optim_state=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for [`updatestate!`](@ref),
+- `optim_state=JuMP.Model(Ipopt.Optimizer)`: nonlinear optimizer for [`updatestate!`](@ref),
    provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
-- `optim_output=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer for [`evaloutput`](@ref),
+- `optim_output=JuMP.Model(Ipopt.Optimizer)`: nonlinear optimizer for [`evaloutput`](@ref),
    provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
-- `jacobian=AutoForwardDiff()` : an `AbstractADType` backend for the Jacobian of the
+- `jacobian=AutoForwardDiff()`: an `AbstractADType` backend for the Jacobian of the
    nonlinear constraints, see [`DifferentiationInterface` doc](@extref DifferentiationInterface List)
-- `hessian=false` : an `AbstractADType` backend or `Bool` for the Hessian of the Lagrangian, 
+- `hessian=false`: an `AbstractADType` backend or `Bool` for the Hessian of the Lagrangian, 
    see `jacobian` above for the options. The default `false` skip it and use the
     quasi-Newton method of `optim` (see Extended Help).
+- `unit="s"`: time unit shown in plots x-label suffix (no underlying time data conversion).
 
 # Examples
 ```jldoctest
@@ -251,12 +254,13 @@ function NonLinModelDAE{NT}(
     optim_output  = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     jacobian = DEFAULT_JACDENSE,
     hessian = false,
+    unit = "s"
 ) where {NT<:Real}
     fq!, h! = get_mutating_functions_dae(NT, fq, h)
     hessian = validate_hessian(hessian, DEFAULT_NONLINDAE_HESSIAN)
     return NonLinModelDAE{NT}(
         fq!, h!, Ts, nu, nx, na, ny, nd, p, xs_0, as_0,
-        transcription, optim_state, optim_output, jacobian, hessian
+        transcription, optim_state, optim_output, jacobian, hessian, unit
     )
 end
 
@@ -271,10 +275,11 @@ function NonLinModelDAE(
     optim_output  = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     jacobian = DEFAULT_JACDENSE,
     hessian = false,
+    unit = "s"
 )
     return NonLinModelDAE{Float64}(
         fq, h, Ts, nu, nx, na, ny, nd; 
-        p, xs_0, as_0, transcription, optim_state, optim_output, jacobian, hessian
+        p, xs_0, as_0, transcription, optim_state, optim_output, jacobian, hessian, unit
     )
 end
 
@@ -933,11 +938,12 @@ function getinfo(model::NonLinModelDAE{NT}) where NT<:Real
 end
 
 function Base.show(io::IO, model::NonLinModelDAE)
+    Ts, unit = model.Ts, model.unit
     nu, nd = model.nu, model.nd
     nx, ny = model.nx, model.ny
     na = model.na
     n = maximum(ndigits.((nu, nx, ny, nd))) + 1
-    println(io, "$(nameof(typeof(model))) with a sample time Ts = $(model.Ts) s:")
+    println(io, "$(nameof(typeof(model))) with a sample time Ts = $Ts $unit:")
     println(io, "├ state optimizer: $(JuMP.solver_name(model.optim_state))")
     println(io, "├ output optimizer: $(JuMP.solver_name(model.optim_output))")
     println(io, "├ transcription: $(transcription_str(model.transcription))")
