@@ -87,6 +87,33 @@ c_float daqp_max_soft_slack(DAQPWorkspace *work){
     return smax;
 }
 
+/*
+ * Cycling that persists after the working set has been refactorized: constraints
+ * are then only added if their violation also exceeds the rounding level of
+ * u = -M'lam, and daqp_solve checks the solution with primal_tol afterwards
+ * (daqp_violates_hard).
+ * Returns 0 (the cycling is reported) for the proximal method and hierarchical
+ * problems, which handle cycling themselves, for a nonsymmetric AVI, or if the
+ * floor is already used.
+ */
+int daqp_set_noise_floor(DAQPWorkspace *work){
+    if(work->n_prox > 0 || DAQP_IS_HIERARCHICAL(work) ||
+            (work->avi != NULL && !work->avi->is_symmetric) ||
+            (work->state & DAQP_STATE_NOISE_FLOOR)) return 0;
+    work->state |= DAQP_STATE_NOISE_FLOOR;
+    return 1;
+}
+
+// The (negative) rounding level of u = -M'lam, below which violations are not
+// added (0 if the floor is not used; the rows of M are normalized)
+c_float daqp_noise_floor(DAQPWorkspace *work){
+    int i;
+    c_float s = 0;
+    if(!(work->state & DAQP_STATE_NOISE_FLOOR)) return 0;
+    for(i = 0; i < work->n_active; i++) s += work->lam_star[i] < 0 ? -work->lam_star[i] : work->lam_star[i];
+    return -DAQP_ADD_NOISE_GAIN*(sizeof(c_float) == sizeof(float) ? FLT_EPSILON : DBL_EPSILON)*s;
+}
+
 // Slack of the soft constraint that is active at working set index i
 c_float daqp_soft_slack(DAQPWorkspace *work, const int i){
     const int id = work->WS[i];
@@ -187,6 +214,7 @@ int daqp_add_infeasible(DAQPWorkspace *work){
     c_float bound;
     c_float Mu,min_cand;
     int isupper=0, add_ind=DAQP_EMPTY_IND;
+    const c_float noise = daqp_noise_floor(work); // 0 unless cycling persisted
     // Simple bounds
     for(j=0, disp=0;j<work->ms;j++){
         // Never activate immutable or already active constraints
@@ -202,6 +230,7 @@ int daqp_add_infeasible(DAQPWorkspace *work){
         }
         disp+=work->n-j;
         bound = (work->scaling == NULL) ? ep : ep*work->scaling[j];
+        if(bound > noise) bound = noise;
         min_cand = work->dupper[j]-Mu;
         if(min_cand < min_val && min_cand < bound){
             add_ind = j; isupper = 1;
@@ -228,6 +257,7 @@ int daqp_add_infeasible(DAQPWorkspace *work){
             : work->Mu[j-work->ms];
         disp+=work->n;
         bound = (work->scaling == NULL) ? ep : ep*work->scaling[j];
+        if(bound > noise) bound = noise;
 
         min_cand = work->dupper[j]-Mu;
         if(min_cand < min_val &&  min_cand < bound){
@@ -457,6 +487,21 @@ void daqp_compute_singular_direction(DAQPWorkspace *work){
 }
 
 
+// Whether -d_W'lam exceeds fval = ||u||^2 (its value at a solution) by more
+// than fval and the active residuals allowed by primal_tol
+int daqp_inconsistent_dual(DAQPWorkspace *work){
+    int i, id;
+    c_float dl = 0, tol = 0, l;
+    for(i = 0; i < work->n_active; i++){
+        id = work->WS[i];
+        if(DAQP_IS_SOFT(id)) return 0;
+        l = work->lam_star[i];
+        dl += l*(DAQP_IS_LOWER(id) ? work->dlower[id] : work->dupper[id]);
+        tol += (l < 0 ? -l : l)*(work->scaling != NULL ? work->scaling[id] : 1);
+    }
+    return -dl > 2*work->fval + work->settings->primal_tol*tol;
+}
+
 void daqp_pivot_last(DAQPWorkspace *work){
     const int rm_ind = work->n_active-2;
     if(work->n_active > 1 && work->sing_ind == DAQP_EMPTY_IND &&
@@ -562,7 +607,7 @@ void daqp_deactivate_constraints(DAQPWorkspace *work){
 }
 
 // Solve L*D*L'*dlam = r (r and dlam in xldl, zldl used as scratch)
-static void daqp_solve_working_set(DAQPWorkspace *work){
+void daqp_solve_working_set(DAQPWorkspace *work){
     int i, j, disp;
     const int na = work->n_active;
     c_float sum;
@@ -593,7 +638,7 @@ static void daqp_solve_working_set(DAQPWorkspace *work){
 }
 
 // y <-- y - M_W'*dlam for the working set W
-static void daqp_sub_working_set_rows(DAQPWorkspace *work, const c_float* dlam, c_float* y){
+void daqp_sub_working_set_rows(DAQPWorkspace *work, const c_float* dlam, c_float* y){
     int i, j, disp, id;
     for(i = 0; i < work->n_active; i++){
         const c_float dl = dlam[i];
@@ -684,11 +729,27 @@ static c_float daqp_active_residual(const DAQPWorkspace *work, const int id){
     return val - (DAQP_IS_LOWER(id) ? qp->blower[id] : qp->bupper[id]);
 }
 
+// y <-- Rinv*y (as ldp2qp_solution, without v)
+void daqp_apply_Rinv(DAQPWorkspace *work, c_float* y){
+    int i, j, disp;
+    const int n = work->n;
+    if(work->Rinv != NULL){
+        for(i = 0, disp = 0; i < n; i++){
+            y[i] *= work->Rinv[disp++];
+            for(j = i+1; j < n; j++) y[i] += work->Rinv[disp++]*y[j];
+        }
+        if(work->scaling != NULL)
+            for(i = 0; i < work->ms; i++) y[i] /= work->scaling[i];
+    }
+    else if(work->RinvD != NULL)
+        for(i = 0; i < n; i++) y[i] *= work->RinvD[i];
+}
+
 // One step of iterative refinement of x on the active constraints, done
 // directly in x to avoid the cancellation in x = Rinv*(u-v)
 void daqp_refine_primal(DAQPWorkspace *work){
-    int i, j, disp, id;
-    const int n = work->n, na = work->n_active, ms = work->ms;
+    int i, j, id;
+    const int n = work->n, na = work->n_active;
     const DAQPProblem* qp = work->qp;
     c_float *r = work->xldl, *du = work->zldl, dfval = 0;
     if(na == 0 || qp == NULL || work->sing_ind != DAQP_EMPTY_IND) return;
@@ -724,17 +785,7 @@ void daqp_refine_primal(DAQPWorkspace *work){
     daqp_sub_working_set_rows(work,r,du);
     for(j = 0; j < n; j++) dfval += 0.5*du[j]*du[j];
 
-    // dx = Rinv*du (as ldp2qp_solution, without v)
-    if(work->Rinv != NULL){
-        for(i = 0, disp = 0; i < n; i++){
-            du[i] *= work->Rinv[disp++];
-            for(j = i+1; j < n; j++) du[i] += work->Rinv[disp++]*du[j];
-        }
-        if(work->scaling != NULL)
-            for(i = 0; i < ms; i++) du[i] /= work->scaling[i];
-    }
-    else if(work->RinvD != NULL)
-        for(i = 0; i < n; i++) du[i] *= work->RinvD[i];
+    daqp_apply_Rinv(work,du); // dx
     for(i = 0; i < n; i++) work->x[i] += du[i];
 
     for(i = 0; i < na; i++)

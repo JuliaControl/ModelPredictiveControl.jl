@@ -10,6 +10,7 @@ int daqp_ldp(DAQPWorkspace *work){
     int refine_adds=0; // Refinements without progress that added a constraint
     c_float best_fval = -1;
     c_float fval_bound = 2*work->settings->fval_bound; // Internal objective is twice the nomninal
+    work->state &= ~DAQP_STATE_NOISE_FLOOR;
 
     // Correctly cleanup a singular working-set on entry
     if(work->sing_ind != DAQP_EMPTY_IND && work->sing_ind == work->n_active-1 &&
@@ -66,7 +67,7 @@ int daqp_ldp(DAQPWorkspace *work){
                     // then removed again without progress), further refinements
                     // repeat that deterministically, so they are stopped after
                     // two such attempts and the current solution is accepted.
-                    if(work->n_active > 0 && min_D < work->settings->pivot_tol &&
+                    if(work->n_active > 0 && min_D < DAQP_REFINE_PIVOT &&
                             refine_adds < 2){
                         daqp_refine_active(work);
                         // A constraint added after the refinement goes through
@@ -77,6 +78,12 @@ int daqp_ldp(DAQPWorkspace *work){
                         }
                     }
 
+
+                    // Check for incosistent dual
+                    if(daqp_inconsistent_dual(work)){
+                        exitflag = DAQP_EXIT_INFEASIBLE;
+                        break;
+                    }
 
                     // Softening was needed if a soft constraint ended up violated
                     work->soft_slack = daqp_max_soft_slack(work);
@@ -92,8 +99,12 @@ cycle_guard:
                 if(work->fval-best_fval < work->settings->progress_tol){
                     if(cycle_counter++ > work->settings->cycle_tol){
                         if(tried_repair == 1 || work->bnb != NULL){
-                            exitflag = DAQP_EXIT_CYCLE;
-                            break;
+                            if(!daqp_set_noise_floor(work)){
+                                exitflag = DAQP_EXIT_CYCLE;
+                                break;
+                            }
+                            cycle_counter = 0;
+                            best_fval = -1;
                         }
                         else{// Cycling -> Try to reorder and refactorize LDL
                             tried_repair =1;

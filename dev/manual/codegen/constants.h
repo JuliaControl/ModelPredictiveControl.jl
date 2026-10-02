@@ -21,7 +21,7 @@ extern "C" {
 #define DAQP_DEFAULT_DUAL_TOL 1e-12
 #define DAQP_DEFAULT_ZERO_TOL 1e-11
 #define DAQP_DEFAULT_PROG_TOL 1e-14
-#define DAQP_DEFAULT_PIVOT_TOL 1e-6
+#define DAQP_DEFAULT_PIVOT_TOL 1e-8
 #define DAQP_DEFAULT_CYCLE_TOL 10
 #define DAQP_DEFAULT_ETA -1.0
 #define DAQP_AUTO_ETA_CAP 1e-6
@@ -50,6 +50,15 @@ extern "C" {
 // Refine if the rounding errors (about DAQP_REFINE_GAIN*eps*max(|u|,|v|)/min(D))
 // might exceed primal_tol
 #define DAQP_REFINE_GAIN 1e3
+// The active constraints are refined at a solution if a pivot of the LDL' is
+// below this (independent of pivot_tol, since BnB does not refine x afterwards)
+#define DAQP_REFINE_PIVOT 1e-6
+// When cycling persists after the working set has been refactorized, a
+// constraint is only added if its violation also exceeds the rounding level of
+// u = -M'lam, about DAQP_ADD_NOISE_GAIN*eps*sum|lam| (the rows of M are
+// normalized). Below it, the computed violation is rounding noise, on which a
+// degenerate working set can swap constraints indefinitely
+#define DAQP_ADD_NOISE_GAIN 10
 
 // eps (relative to max(H_ii)) used when a semi-proximal inner problem fails
 #define DAQP_PROX_EPS_MAX 1e-3
@@ -57,6 +66,9 @@ extern "C" {
 // and any Hessian if n*eps*cond > DAQP_HESSIAN_COND_EPS
 #define DAQP_HESSIAN_COND_MAX 1e8
 #define DAQP_HESSIAN_COND_EPS 0.1
+// The inverse of the Cholesky factor is deferred if the bound of cond(H) from
+// its diagonal, times DAQP_COND_DEFER_MARGIN, is below the limits above
+#define DAQP_COND_DEFER_MARGIN 100
 
 // How the reduced problem of an equality elimination is posed
 #define DAQP_EQ_PATH_LDP 0 // Identity Hessian, no linear term (H PD on the null space)
@@ -67,7 +79,7 @@ extern "C" {
 // (neq > EQ_MIN_COUNT and EQ_MIN_RATIO*neq > n)
 #define DAQP_EQ_MIN_COUNT 5
 #define DAQP_EQ_MIN_RATIO 10
-#define DAQP_EQ_MIN_DIM 20
+#define DAQP_EQ_MIN_DIM 12
 // Diagonal Hessians require at least n/DAQP_EQ_DIAG_MIN_RATIO equalities
 #define DAQP_EQ_DIAG_MIN_RATIO 4
 
@@ -77,6 +89,10 @@ extern "C" {
 #define DAQP_R_OFFSET(X,Y) (((2*Y-X-1)*X)/2)
 
 // EXIT FLAGS
+// Optimal, but found after cycling with the rounding level as the tolerance for
+// adding constraints, and the solution violates a constraint by more than
+// primal_tol (see DAQP_ADD_NOISE_GAIN)
+#define DAQP_EXIT_OPTIMAL_INEXACT 4
 #define DAQP_EXIT_SOFT_OPTIMAL 2
 #define DAQP_EXIT_OPTIMAL 1
 #define DAQP_EXIT_INFEASIBLE -1
@@ -108,6 +124,13 @@ extern "C" {
 #define DAQP_STATE_RINV_NORMALIZED 512 // The first ms rows of Rinv are normalized
 #define DAQP_STATE_INCUMBENT 1024 // work->x holds a candidate solution for BnB
 #define DAQP_STATE_ILL_CONDITIONED 2048 // cond(H) (estimate) above DAQP_REFINE_COND
+
+// Rinv holds the Cholesky factor R (with reciprocal diagonal), not its inverse.
+// Kept while the unconstrained optimum is optimal; inverted before a constrained solve.
+#define DAQP_STATE_CHOLESKY_PENDING 4096
+// Constraints are only added above the rounding level of u (set by daqp_ldp when
+// cycling persists, see DAQP_ADD_NOISE_GAIN)
+#define DAQP_STATE_NOISE_FLOOR 8192
 
 // CONSTRAINT MASKS
 #define DAQP_ACTIVE 1
