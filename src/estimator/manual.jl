@@ -52,7 +52,7 @@ end
 @doc raw"""
     ManualEstimator(model::SimModel; <keyword arguments>)
 
-Construct a manual state estimator for `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
+Construct a manual state estimator for `model`.
 
 This [`StateEstimator`](@ref) type allows the construction of [`PredictiveController`](@ref)
 objects but turns off the built-in state estimation. The user must manually provides the 

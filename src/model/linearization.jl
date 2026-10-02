@@ -127,7 +127,7 @@ function linearize(model::SimModelODE{NT}; kwargs...) where NT<:Real
     C  = Matrix{NT}(undef, ny, nx)
     Bd = Matrix{NT}(undef, nx, nd)
     Dd = Matrix{NT}(undef, ny, nd)
-    linmodel = LinModel{NT}(A, Bu, C, Bd, Dd, model.Ts)
+    linmodel = LinModel{NT}(A, Bu, C, Bd, Dd, model.Ts, model.unit)
     linmodel.uname .= model.uname
     linmodel.xname .= model.xname
     linmodel.yname .= model.yname

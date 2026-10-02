@@ -71,7 +71,7 @@ The following notation highlights three key concentrations in the model:
 in which ``c_A`` represents the total concentration of the acid species in the reactor
 (mol/L), composed of an undissociated acid ``\mathrm{H}\mathrm{Ac}`` and the acetate ion
 ``\mathrm{Ac}^-``. Substituting the constants, algebraic and state variables into the charge
-balance leads the algebraic equation:
+balance leads to the algebraic equation:
 
 ```math
 0 = a_H + c_B - \frac{K_w}{a_H} - \frac{K_a c_A}{K_a + a_H}
