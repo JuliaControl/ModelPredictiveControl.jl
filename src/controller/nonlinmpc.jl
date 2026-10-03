@@ -229,7 +229,8 @@ This controller allocates memory at each time step for the optimization.
    Extended Help).
 - `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
-- `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
+- `transcription=default_transcription(model)` : a [`TranscriptionMethod`](@ref) object,
+   default to [`SingleShooting`](@ref) or `model.transcription` for [`NonLinModelDAE`](@ref).
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
 - `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
@@ -364,7 +365,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc::Int = 0,
     p = model.p,
-    transcription::TranscriptionMethod = SingleShooting(),
+    transcription::TranscriptionMethod = default_transcription(model),
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
@@ -437,7 +438,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc = 0,
     p = estim.model.p,
-    transcription::TranscriptionMethod = SingleShooting(),
+    transcription::TranscriptionMethod = default_transcription(estim.model),
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
@@ -464,6 +465,7 @@ function NonLinMPC(
 end
 
 default_estimator(model::SimModelODE; kwargs...) = UnscentedKalmanFilter(model; kwargs...)
+default_estimator(model::SimModelDAE; kwargs...) = MovingHorizonEstimator(model; kwargs...)
 default_estimator(model::LinModel; kwargs...) = SteadyKalmanFilter(model; kwargs...)
 
 """
