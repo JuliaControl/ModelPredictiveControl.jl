@@ -3,10 +3,12 @@ function get_nZ_mpc(estim::StateEstimator, ::SingleShooting, _ , Hc)
     return estim.model.nu*Hc
 end
 function get_nZ_mpc(estim::StateEstimator, ::TranscriptionMethod, Hp, Hc)
-    return estim.model.nu*Hc + estim.nx̂*Hp
+    na = get_na(estim.model)
+    return estim.model.nu*Hc + estim.nx̂*Hp + 2*na*Hp 
 end
 function get_nZ_mpc(estim::StateEstimator, transcription::OrthogonalCollocation, Hp, Hc)
-    return estim.model.nu*Hc + estim.nx̂*Hp + estim.model.nx*transcription.no*Hp
+    no, na = transcription.no, get_na(estim.model)
+    return estim.model.nu*Hc + estim.nx̂*Hp + na*Hp + estim.model.nx*no*Hp + na*no*Hp
 end
 
 @doc raw"""
@@ -241,13 +243,13 @@ end
 
 """
     init_predmat(
-        model::NonLinModel, estim, transcription::SingleShooting, Hp, Hc, nb
+        model::SimModel, estim, transcription::SingleShooting, Hp, Hc, nb
     ) -> E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 
-Return empty matrices for [`SingleShooting`](@ref) of [`NonLinModel`](@ref)
+Return empty matrices for non-[`LinModel`](@ref) and [`SingleShooting`](@ref).
 """
 function init_predmat(
-    model::NonLinModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, _
+    model::SimModel, estim::StateEstimator{NT}, transcription::SingleShooting, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     nZ = get_nZ_mpc(estim, transcription, Hp, Hc)
@@ -263,10 +265,10 @@ end
 
 @doc raw"""
     init_predmat(
-        model::NonLinModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb
+        model::SimModel, estim, transcription::TranscriptionMethod, Hp, Hc, nb
     ) -> E, G, J, K, V, B, ex̂, gx̂, jx̂, kx̂, vx̂, bx̂
 
-Return the terminal state matrices for [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
+Return the terminal state matrices for non-`LinModel` and other [`TranscriptionMethod`](@ref).
 
 The output prediction matrices are all empty matrices. The terminal state matrices are
 given in the Extended Help section.
@@ -279,7 +281,7 @@ given in the Extended Help section.
     [\begin{smallmatrix}\mathbf{0} & \mathbf{I} & \mathbf{0}\end{smallmatrix}]`` otherwise.
 """
 function init_predmat(
-    model::NonLinModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
+    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, Hp, Hc, _
 ) where {NT<:Real}
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     nΔU = nu*Hc
