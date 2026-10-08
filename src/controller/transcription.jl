@@ -417,7 +417,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModelODE, estim::StateEstimator, transcription::TranscriptionMethod, 
+        model::SimModel, estim::StateEstimator, transcription::TranscriptionMethod, 
         Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
@@ -440,26 +440,30 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     the defect matrices are computed with:
     ```math
     \begin{aligned}
-    \mathbf{E_{S}^{Δu}} &= \mathbf{0}                                                                            \\
+    \mathbf{E_{S}^{Δu}} &= \mathbf{0}                                                                               \\
     \mathbf{E_{S}^{x̂}}  &= \begin{bmatrix}
-        \mathbf{0} & \mathbf{-I}  & \mathbf{0} & \mathbf{0}  & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
-        \mathbf{0} & \mathbf{A_s} & \mathbf{0} & \mathbf{-I} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}   \\
-        \vdots     & \vdots       & \vdots     & \vdots      & \ddots & \vdots       & \vdots     & \vdots       \\
-        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}  & \cdots & \mathbf{A_s} & \mathbf{0} & \mathbf{-I}  \end{bmatrix} \\
-    \mathbf{E_S}       &= \begin{bmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}}                               \end{bmatrix} \\
+        \mathbf{0} & \mathbf{-I}  & \mathbf{0} & \mathbf{0}  & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}      \\
+        \mathbf{0} & \mathbf{A_s} & \mathbf{0} & \mathbf{-I} & \cdots & \mathbf{0}   & \mathbf{0} & \mathbf{0}      \\
+        \vdots     & \vdots       & \vdots     & \vdots      & \ddots & \vdots       & \vdots     & \vdots          \\
+        \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}  & \cdots & \mathbf{A_s} & \mathbf{0} & \mathbf{-I}     \end{bmatrix} \\
+    \mathbf{E_{S}^{â}} &= \mathbf{0}                                                                                \\
+    \mathbf{E_{S}^{ā}} &= \mathbf{0}                                                                                \\
+    \mathbf{E_S}       &= \begin{bmatrix} 
+        \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} & \mathbf{E_{S}^{â}} & \mathbf{E_{S}^{ā}}                          \end{bmatrix} \\
     \mathbf{K_S}       &= \begin{bmatrix}
-        \mathbf{0} & \mathbf{A_s}                                                                                \\                                          
-        \mathbf{0} & \mathbf{0}                                                                                  \\   
-        \vdots     & \vdots                                                                                      \\
-        \mathbf{0} & \mathbf{0}                                                                                  \end{bmatrix}
+        \mathbf{0} & \mathbf{A_s}                                                                                   \\                                          
+        \mathbf{0} & \mathbf{0}                                                                                     \\   
+        \vdots     & \vdots                                                                                         \\
+        \mathbf{0} & \mathbf{0}                                                                                     \end{bmatrix}
     \end{aligned}
     ```
 """
 function init_defectmat(
-    model::SimModelODE, estim::StateEstimator{NT}, ::TranscriptionMethod, 
+    model::SimModel, estim::StateEstimator{NT}, ::TranscriptionMethod, 
     Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
+    na, nā = get_na(model), get_nā(model, transcription)
     As = estim.As
     # --- current state estimates x̂0 ---
     KS = zeros(NT, nxs*Hp, nx̂)
@@ -474,7 +478,9 @@ function init_defectmat(
         iCol = (nx+1:nx̂) .+ nx̂*(j-1)
         ESx̂[iRow, iCol] = As
     end
-    ES = [ESΔu ESx̂]
+    ESâ = zeros(NT, nxs*Hp, na*Hp)
+    ESā = zeros(NT, nxs*Hp, nā*Hp)
+    ES = [ESΔu ESx̂ ESâ ESā]
     # --- current measured disturbances d0 and predictions D̂0 ---
     GS = zeros(NT, nxs*Hp, nd)
     JS = zeros(NT, nxs*Hp, nd*Hp)
@@ -485,7 +491,7 @@ end
 
 @doc raw"""
     init_defectmat(
-        model::SimModelODE, estim::StateEstimator, transcription::OrthogonalCollocation, 
+        model::SimModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
         Hp, Hc, _ , Co, λo
     ) -> ES, GS, JS, KS, VS, BS
 
@@ -509,30 +515,33 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     constants of [`init_orthocolloc`](@ref), the defect matrices are:
     ```math
     \begin{aligned}
-    \mathbf{E_{S}^{Δu}} &= \mathbf{0}                                                                                               \\
+    \mathbf{E_{S}^{Δu}} &= \mathbf{0}                                                                                                   \\
     \mathbf{E_{S}^{x̂}}  &= \begin{bmatrix}
-       \mathbf{-I}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}    \\
-        \mathbf{0}    & \mathbf{-I}  & \mathbf{0} &\mathbf{0}  & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}    \\
-        λ_o\mathbf{I} & \mathbf{0}   &\mathbf{-I} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}    \\
-        \mathbf{0}    & \mathbf{A_s} & \mathbf{0} &\mathbf{-I} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0}    \\
-        \vdots        & \vdots       & \vdots     & \vdots     & \ddots & \vdots        & \vdots       & \vdots     & \vdots        \\
-        \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & λ_o\mathbf{I} & \mathbf{0}   & \mathbf{-I} & \mathbf{0}   \\   
-        \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{A_s} & \mathbf{0}  & \mathbf{-I}  \end{bmatrix} \\
+        \mathbf{-I}   & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0}  & \mathbf{0}       \\
+        \mathbf{0}    & \mathbf{-I}  & \mathbf{0} &\mathbf{0}  & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0}  & \mathbf{0}       \\
+        λ_o\mathbf{I} & \mathbf{0}   &\mathbf{-I} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0}  & \mathbf{0}       \\
+        \mathbf{0}    & \mathbf{A_s} & \mathbf{0} &\mathbf{-I} & \cdots & \mathbf{0}    & \mathbf{0}   & \mathbf{0}  & \mathbf{0}       \\
+        \vdots        & \vdots       & \vdots     & \vdots     & \ddots & \vdots        & \vdots       & \vdots      & \vdots           \\
+        \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & λ_o\mathbf{I} & \mathbf{0}   & \mathbf{-I} & \mathbf{0}       \\   
+        \mathbf{0}    & \mathbf{0}   & \mathbf{0} & \mathbf{0} & \cdots & \mathbf{0}    & \mathbf{A_s} & \mathbf{0}  & \mathbf{-I}      \end{bmatrix} \\
     \mathbf{E_{S}^{k̄}} &= \begin{bmatrix}
-       \mathbf{C_o}   & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \\
-        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \\
-        \mathbf{0}    & \mathbf{C_o} & \cdots & \mathbf{0}                                                                          \\
-        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \\
-        \vdots        & \vdots       & \ddots & \vdots                                                                              \\
-        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{C_o}                                                                        \\   
-        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                          \end{bmatrix} \\
-    \mathbf{E_S}       &= \begin{bmatrix} \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} & \mathbf{E_{S}^{k̄}}                             \end{bmatrix} \\
+        \mathbf{C_o}  & \mathbf{0}   & \cdots & \mathbf{0}                                                                              \\
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                              \\
+        \mathbf{0}    & \mathbf{C_o} & \cdots & \mathbf{0}                                                                              \\
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                              \\
+        \vdots        & \vdots       & \ddots & \vdots                                                                                  \\
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{C_o}                                                                            \\   
+        \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                              \end{bmatrix} \\
+    \mathbf{E_{S}^{â}} &= \mathbf{0}                                                                                                    \\
+    \mathbf{E_{S}^{ā}} &= \mathbf{0}                                                                                                    \\
+    \mathbf{E_S}       &= \begin{bmatrix} 
+        \mathbf{E_{S}^{Δu}} & \mathbf{E_{S}^{x̂}} & \mathbf{E_{S}^{â}} & \mathbf{E_{S}^{k̄}} & \mathbf{E_{S}^{ā}}                         \end{bmatrix} \\
     \mathbf{K_S}       &= \begin{bmatrix}
-        λ_o\mathbf{I} & \mathbf{0}                                                                                                  \\                                          
-        \mathbf{0}    & \mathbf{A_s}                                                                                                \\
-        \mathbf{0}    & \mathbf{0}                                                                                                  \\    
-        \vdots        & \vdots                                                                                                      \\
-        \mathbf{0}    & \mathbf{0}                                                                                                  \end{bmatrix}
+        λ_o\mathbf{I} & \mathbf{0}                                                                                                      \\                                          
+        \mathbf{0}    & \mathbf{A_s}                                                                                                    \\
+        \mathbf{0}    & \mathbf{0}                                                                                                      \\    
+        \vdots        & \vdots                                                                                                          \\
+        \mathbf{0}    & \mathbf{0}                                                                                                      \end{bmatrix}
     \end{aligned}
     ```
     Note that if `estim` is an [`InternalModel`](@ref), the state vector is not augmented 
@@ -540,7 +549,7 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     are removed (2nd row of blocks, 4th row of blocks, and so on). 
 """
 function init_defectmat(
-    model::NonLinModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
+    model::SimModel, estim::StateEstimator, transcription::OrthogonalCollocation, 
     Hp, Hc, _ , Co, λo
 )
     As, nxs = estim.As, estim.nxs
@@ -548,7 +557,7 @@ function init_defectmat(
 end
 
 function init_defectmat(
-    model::NonLinModel, estim::InternalModel{NT}, transcription::OrthogonalCollocation, 
+    model::SimModel, estim::InternalModel{NT}, transcription::OrthogonalCollocation, 
     Hp, Hc, _ , Co, λo
 ) where {NT<:Real}
     As, nxs = zeros(NT, 0, 0), 0 # the state vector is not augmented, no stochastic defects
@@ -556,10 +565,11 @@ function init_defectmat(
 end
 
 function init_defectmat_orthocolloc(
-    model::NonLinModel, estim::StateEstimator{NT}, transcription::OrthogonalCollocation, 
+    model::SimModel, estim::StateEstimator{NT}, transcription::OrthogonalCollocation, 
     Hp, Hc, Co, λo, As, nxs
 ) where {NT<:Real}
     nu, nx, nd, nx̂ = model.nu, model.nx, model.nd, estim.nx̂
+    na, nā = get_na(model), get_nā(model, transcription)
     nk̄ = get_nk̄(model, transcription)
     λo_I = λo*I(nx)
     # --- current state estimates x̂0 ---
@@ -580,7 +590,9 @@ function init_defectmat_orthocolloc(
         ESx̂[iRow_As, iCol_As] = As
     end
     ESk̄ = repeatdiag([Co; zeros(NT, nxs, nk̄)], Hp)
-    ES  = [ESΔu ESx̂ ESk̄]
+    ESâ = zeros(NT, nx̂*Hp, na*Hp)
+    ESā = zeros(NT, nx̂*Hp, nā*Hp)
+    ES  = [ESΔu ESx̂ ESâ ESk̄ ESā]
     # --- current measured disturbances d0 and predictions D̂0 ---
     GS = zeros(NT, nx̂*Hp, nd)
     JS = zeros(NT, nx̂*Hp, nd*Hp)
@@ -591,14 +603,14 @@ end
 
 """
     init_defectmat(
-        model::NonLinModel, estim::InternalModel, ::TranscriptionMethod,
+        model::SimModel, estim::InternalModel, ::TranscriptionMethod,
         Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
 Return empty matrices for [`InternalModel`](@ref) (the state vector is not augmented).
 """
 function init_defectmat(
-    ::NonLinModel, estim::InternalModel, transcription::TranscriptionMethod, 
+    ::SimModel, estim::InternalModel, transcription::TranscriptionMethod, 
     Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
@@ -614,13 +626,6 @@ Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
 """
 function init_defectmat(
     ::SimModelODE, estim::StateEstimator, transcription::SingleShooting,
-    Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
-)
-    return init_defectmat_empty(estim, transcription, Hp, Hc)
-end
-
-function init_defectmat(
-    ::NonLinModel, estim::InternalModel, transcription::SingleShooting,
     Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
@@ -643,7 +648,7 @@ end
 
 @doc raw"""
     init_matconstraint_mpc(
-        model::LinModel, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ 
+        model::LinModel, transcription::ShootingMethod, Z̃min, Z̃max, nc, nϵ 
         U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
         args...
     ) -> i_b, i_g, A, Aeq, neq
@@ -668,7 +673,7 @@ case, `args`  needs to contain all the inequality and equality constraint matric
 The integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mpc(
-    model::LinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, _ ,
+    model::LinModel{NT}, transcription::ShootingMethod, Z̃min, Z̃max, nc, _ ,
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
@@ -731,9 +736,9 @@ function init_matconstraint_mpc(
     return i_b, i_g, A, Aeq, neq
 end
 
-"Init `i_b, A` without output constraints if `NonLinModel` and other `TranscriptionMethod`."
+"Init `i_b, A` without output constraints if not `LinModel` and other `TranscriptionMethod`."
 function init_matconstraint_mpc(
-    model::NonLinModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
+    model::SimModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nϵ,
     U0min, U0max, ΔUmin, ΔUmax, Y0min, Y0max, Wmin, Wmax, x̂0min, x̂0max,
     args...
 ) where {NT<:Real}
@@ -783,7 +788,7 @@ end
 boxconstraint_terminal!(Z̃min, Z̃max, ::SingleShooting, _, _ , _, _, _, _, _) = Z̃min, Z̃max
 
 "Unset `i_ΔUmin` and `i_ΔUmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max)
+function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max)
     nΔU = length(i_ΔUmin)
     ΔUmin, ΔUmax = @views Z̃min[1:nΔU], @views Z̃max[1:nΔU]
     foreach(i -> !isinf(ΔUmin[i]) && (i_ΔUmin[i] = false), eachindex(ΔUmin))
@@ -792,14 +797,14 @@ function deleteΔU_lincon!(i_ΔUmin, i_ΔUmax, ::SimModelODE, ::TranscriptionMet
 end 
 
 "Unset `i_x̂min` and `i_x̂max` elements if finite box constraints in `Z̃min` and `Z̃max`."
-function deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModelODE, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
+function deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nΔU, nX̂)
     nx̂ = length(i_x̂min)
     x̂0min, x̂0max = @views Z̃min[nΔU+nX̂-nx̂+1:nΔU+nX̂], @views Z̃max[nΔU+nX̂-nx̂+1:nΔU+nX̂]
     foreach(i -> !isinf(x̂0min[i]) && (i_x̂min[i] = false), eachindex(x̂0min))
     foreach(i -> !isinf(x̂0max[i]) && (i_x̂max[i] = false), eachindex(x̂0max))
     return i_x̂min, i_x̂max
 end
-deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModelODE, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
+deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
 
 @doc raw"""
     linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
@@ -1131,8 +1136,8 @@ the terminal constraints applied on ``\mathbf{x̂_0}(k+H_p)``. The computations 
 identical for any [`TranscriptionMethod`](@ref) if the model is linear:
 ```math
 \begin{aligned}
-\mathbf{Ŷ_0}        &= \mathbf{Ẽ Z̃}   + \mathbf{F} \\
-\mathbf{x̂_0}(k+H_p) &= \mathbf{ẽ_x̂ Z̃} + \mathbf{f_x̂}
+    \mathbf{Ŷ_0}        &= \mathbf{Ẽ Z̃}   + \mathbf{F} \\
+    \mathbf{x̂_0}(k+H_p) &= \mathbf{ẽ_x̂ Z̃} + \mathbf{f_x̂}
 \end{aligned}
 ```
 """

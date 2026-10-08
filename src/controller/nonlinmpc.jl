@@ -741,11 +741,11 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
 end
 
 """
-    init_optimization!(mpc::NonLinMPC, model::SimModelODE, optim::JuMP.GenericModel) -> nothing
+    init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel) -> nothing
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC, model::SimModelODE, optim::JuMP.GenericModel)  
+function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel)  
     # --- variables and linear constraints ---
     con = mpc.con
     nZ̃ = length(mpc.Z̃)
@@ -846,8 +846,8 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
     Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
     gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                 = zeros(JNT, neq)
-    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
+    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     end
     Z̃_J = zeros(JNT, nZ̃)
@@ -1117,7 +1117,7 @@ end
 
 """
     update_predictions!(
-        ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq, 
+        ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, Â0, gc, g, geq, 
         mpc::PredictiveController, Z̃
     ) -> nothing
 
@@ -1126,7 +1126,8 @@ Update in-place all vectors for the predictions of `mpc` controller at decision 
 The method mutates all the arguments before the `mpc` argument.
 """
 function update_predictions!(
-    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq, mpc::PredictiveController, Z̃
+    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, Â0, gc, g, geq, 
+    mpc::PredictiveController, Z̃
 )
     model, transcription = mpc.estim.model, mpc.transcription
     U0 = getU0!(U0, mpc, Z̃)

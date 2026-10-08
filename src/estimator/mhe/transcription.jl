@@ -556,9 +556,9 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
         \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{I}   & \cdots      & \mathbf{0}  & \mathbf{0}                                        \\
         \vdots     & \vdots       & \vdots     & \vdots       & \ddots      & \vdots      & \vdots                                            \\
         \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}   & \cdots      & \mathbf{0}  & \mathbf{I}                                        \end{bmatrix} \\
-    \mathbf{E_S^a} &= \mathbf{0}                                                                                                              \\
+    \mathbf{E_S^â} &= \mathbf{0}                                                                                                              \\
     \mathbf{E_S^ā} &= \mathbf{0}                                                                                                              \\
-    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^a} & \mathbf{E_S^ā} & \mathbf{E_S^ŵ}                                       \end{bmatrix}
+    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^â} & \mathbf{E_S^ā} & \mathbf{E_S^ŵ}                                       \end{bmatrix}
     \end{aligned}
     ```
 """
@@ -578,9 +578,9 @@ function init_defectmat_mhe(
         ESx̂[iRow, iCol] = As
     end
     ESŵ = repeatdiag([zeros(NT, nxs, nŵd) I], He)
-    ESa = zeros(nxs*He, na + na*He)
-    ESā = zeros(nxs*He, nā*He)
-    ES = [ESx̂ ESa ESā ESŵ]
+    ESâ = zeros(NT, nxs*He, na + na*He)
+    ESā = zeros(NT, nxs*He, nā*He)
+    ES = [ESx̂ ESâ ESā ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
     JS = zeros(NT, nxs*He, model.nd*(He+1))
     BS = zeros(NT, nxs*He)
@@ -627,9 +627,9 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{C_o}                                                                                    \\ 
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                                      \end{bmatrix} \\
     \mathbf{E_S^ŵ} &= \mathbf{I}                                                                                                                \\
-    \mathbf{E_S^a} &= \mathbf{0}                                                                                                                \\
+    \mathbf{E_S^â} &= \mathbf{0}                                                                                                                \\
     \mathbf{E_S^ā} &= \mathbf{0}                                                                                                                \\
-    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^a} & \mathbf{E_S^k̄} & \mathbf{E_S^ā} & \mathbf{E_S^ŵ}                        \end{bmatrix} \\
+    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^â} & \mathbf{E_S^k̄} & \mathbf{E_S^ā} & \mathbf{E_S^ŵ}                        \end{bmatrix} \\
     \end{aligned}
     ```
 """
@@ -653,9 +653,9 @@ function init_defectmat_mhe(
     end
     ESk̄ = repeatdiag([Co; zeros(NT, nxs, nk̄)], He)
     ESŵ = I # will be different if nŵ ≠ nx̂ is implemented
-    ESa = zeros(nx̂*He, na + na*He)
-    ESā = zeros(nx̂*He, nā*He)
-    ES = [ESx̂ ESa ESk̄ ESā ESŵ]
+    ESâ = zeros(NT, nx̂*He, na + na*He)
+    ESā = zeros(NT, nx̂*He, nā*He)
+    ES = [ESx̂ ESâ ESk̄ ESā ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
     JS = zeros(NT, nxs*He, model.nd*(He+1))
     BS = zeros(NT, nxs*He)
@@ -1566,7 +1566,7 @@ function predict_mhe!(
     nx̂, nx̃, nym, Nk = estim.nx̂, estim.nx̃, estim.nym, estim.Nk[]
     nx̃_nX̂ = nx̃ + nx̂*estim.He
     h_threads = transcription.h_threads
-    X̂0[1:nx̂*Nk] .= @views Z̃[(1 + nx̃):(nx̃ + nx̂*Nk)]                   # skip x0arr
+    X̂0[1:nx̂*Nk] .= @views Z̃[(1 + nx̃):(nx̃ + nx̂*Nk)]                   # skip x̂0arr
     Â0[1:na*Nk] .= @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + na*Nk)]   # skip â0arr
     @threadsif h_threads for j=1:Nk
         if estim.direct
