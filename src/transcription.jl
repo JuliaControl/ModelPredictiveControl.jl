@@ -168,13 +168,14 @@ transcription method.
 
 # Extended Help
 !!! details "Extended Help"
-    The algebraic vectors at the future time step ``\mathbf{a_0}`` is included in the 
-    decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
+    Introducing the **left limit** ``\mathbf{a_0}`` and the **right limit** ``\mathbf{a^+}``
+    of the algebraic variables (to support zero-order hold inputs), the decision vector for
+    open-loop simulations of [`NonLinModelDAE`](@ref) include both vectors:
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                               \\
-        \mathbf{a_0}(k+0)                                               \\
-        \mathbf{a_1}(k+0)                                               \end{bmatrix}
+        \mathbf{a^+}(k+0)                                               \\
+        \mathbf{a_0}(k+1)                                               \end{bmatrix}
     ```
     For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
     ```math
@@ -191,10 +192,10 @@ transcription method.
         \mathbf{â_0}(k+H_p)                                             \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
-        \mathbf{a_1}(k+0)                                               \\
-        \mathbf{a_1}(k+1)                                               \\
+        \mathbf{a^+}(k+0)                                               \\
+        \mathbf{a^+}(k+1)                                               \\
         \vdots                                                          \\
-        \mathbf{a_1}(k+H_p-1)                                           \end{bmatrix}
+        \mathbf{a^+}(k+H_p-1)                                           \end{bmatrix}
     ```
     and, for [`MovingHorizonEstimator`](@ref) with DAEs:
     ```math
@@ -217,17 +218,18 @@ transcription method.
         \mathbf{â_0}(k+p)                                               \end{bmatrix}
     \: \text{and} \:
     \mathbf{Ā} = \begin{bmatrix}
-        \mathbf{a_1}(k-N_k+p+0)                                         \\
-        \mathbf{a_1}(k-N_k+p+1)                                         \\
+        \mathbf{a^+}(k-N_k+p+0)                                         \\
+        \mathbf{a^+}(k-N_k+p+1)                                         \\
         \vdots                                                          \\
-        \mathbf{a_1}(k+p-1)                                             \end{bmatrix}
+        \mathbf{a^+}(k+p-1)                                             \end{bmatrix}
     ```
     See [`MultipleShooting`](@ref) for the exact definition of ``\mathbf{X̂_0}`` on the last
     two cases. All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision
     variables at the beginning (``N_k < H_e``). The predicted outputs are computed from
-    the algebraic variables in ``\mathbf{Â_0}``, while the values in ``\mathbf{Ā}`` are
-    strictly reserved for the the `fq!` function. The ``\mathbf{â_0}`` vector is at the left
-    endpoint of the trapezoid, while the ``\mathbf{a_1}`` is at the right endpoint.
+    the left limit values ``\mathbf{â_0}``, while the variables in the ``\mathbf{Ā}`` vector
+    are for the the `fq!` function. From a collocation perspective, the ``\mathbf{a^+}``
+    vectors correspond to the left endpoints of the trapezoids, and ``\mathbf{â_0}``, the
+    right endpoints.
 
     Note that the stochastic model of the unmeasured disturbances is strictly linear and
     discrete-time, as described in [`ModelPredictiveControl.init_estimstoch`](@ref). 
@@ -330,16 +332,19 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \vdots                                                      \\
         \mathbf{a}_{n_o}(k+j)                                       \end{bmatrix}
     ```
-    Although not strictly needed, the current algebraic variable ``\mathbf{a_0}(k+0)`` is
-    still included in the decision vector for open-loop simulations of [`NonLinModelDAE`](@ref):
+    Although not strictly needed, the current algebraic variable at the right limit 
+    ``\mathbf{a^+}(k+0)`` is included in the decision vector for open-loop simulations of
+    [`NonLinModelDAE`](@ref):
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{x_0}(k+1)                                           \\ 
-        \mathbf{a_0}(k+0)                                           \\
+        \mathbf{a^+}(k+0)                                           \\
         \mathbf{k̄}(k+0)                                             \\
         \mathbf{ā}(k+0)                                             \end{bmatrix}
     ```
-    For [`NonLinMPC`](@ref) based on [`NonLinModelDAE`](@ref), the decision vector is:
+    Introducing the **left limit** of the algebraic variables ``\mathbf{â_0}`` (to support
+    zero-order hold inputs), the decision vector for [`NonLinMPC`](@ref) based on 
+    [`NonLinModelDAE`](@ref) is:
     ```math
     \mathbf{Z} = \begin{bmatrix} 
         \mathbf{ΔU}                                                 \\
@@ -390,10 +395,10 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     ```
     All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision variables at
     the beginning in the [`MovingHorizonEstimator`](@ref) (``N_k < H_e``). The predicted
-    outputs are computed from the algebraic variables in ``\mathbf{Â_0}``, while the values
-    in ``\mathbf{Ā}`` are strictly reserved for the `fq!` function. The ``\mathbf{Â_0}`` 
-    vector must be explicitly included in the decision variables since the output function
-    `h!` is evaluated at different locations than the collocation points, in general.
+    outputs are computed from the left limit values ``\mathbf{â_0}``, while the variables in
+    the ``\mathbf{Ā}`` vector are for the the `fq!` function. The ``\mathbf{Â_0}`` vector
+    must be explicitly included in the decision variables since the output function `h!` is
+    evaluated at different locations than the collocation points, in general.
     
     More precisely, the outputs are at the sampling instants, while the collocation points
     are at the roots of orthogonal polynomials, which is "optimal" for approximating the

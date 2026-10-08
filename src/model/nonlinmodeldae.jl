@@ -694,12 +694,12 @@ function con_nonlinprogeq!(
     geq, k̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
 )
     nx, na = model.nx, model.na
-    Ts = model.Ts
-    x0next_Z, a0_Z, a1_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
+    Ts = model.Ts 
+    x0next_Z, aP_Z, a0_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
     sknext, q0, q1 = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
     k̇0, k̇1 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
-    model.fq!(k̇0, q0, x0,       a0_Z,     u0, d0, model.p)
-    model.fq!(k̇1, q1, x0next_Z, a1_Z, u0, d0, model.p)
+    model.fq!(k̇0, q0, x0,       aP_Z,     u0, d0, model.p)
+    model.fq!(k̇1, q1, x0next_Z, a0_Z, u0, d0, model.p)
     sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇0 + k̇1)
     return geq
 end
@@ -717,9 +717,9 @@ function con_nonlinprogeq!(
     nx, na = model.nx, model.na
     Mo, no =  model.Mo, transcription.no
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
-    a0_Z, k̄_Z, ā_Z = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
+    aP_Z, k̄_Z, ā_Z = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
     q0, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)] 
-    @views model.fq!(k̄[1:nx], q0, x0, a0_Z, u0, d0, model.p)
+    @views model.fq!(k̄[1:nx], q0, x0, aP_Z, u0, d0, model.p)
     Δk = k̄
     for i=1:no
         Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z[(1 + (i-1)*nx):(i*nx)] .- x0
@@ -761,8 +761,8 @@ end
 Solve the optimization `model.optim` problem for [`NonLinModelDAE`](@ref).
 
 After solving, the next state ``\mathbf{x_0}(k+1)`` will be stored in-place in the `x0next`
-argument. The next algebraic variable ``\mathbf{a_0}(k+1)`` will be also stored at
-`model.a0`.
+argument. The right limit of the current algebraic variable ``\mathbf{a^+}(k+0)`` will be
+also stored at `model.a0`.
 """
 function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
     nx, na = model.nx, model.na
