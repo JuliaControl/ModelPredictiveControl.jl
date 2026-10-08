@@ -1774,7 +1774,7 @@ also computed from ``j = 0, 1, ... , N_k-1`` and:
 \mathbf{q^-}(ℓ+j+1) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{â_0}(ℓ+j+1), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
-plus one last residual at the arrival:
+plus one last residual for the arrival:
 ```math
 \mathbf{q}(ℓ) = \mathbf{q}\Big(\mathbf{x̂_d}(ℓ), \mathbf{â_0}(ℓ), \mathbf{û_0}(ℓ), \mathbf{d_0}(ℓ), \mathbf{p}\Big)
 ```
