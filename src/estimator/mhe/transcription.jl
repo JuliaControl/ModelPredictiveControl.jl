@@ -1752,7 +1752,7 @@ Nonlinear MHE equality constrains for [`SimModel`](@ref) and [`TrapezoidalColloc
 By introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the deterministic
 state defects are computed with:
 ```math
-\mathbf{ŝ_k}(ℓ+j) = \mathbf{x̂_d}(ℓ+j) + 0.5 T_s [\mathbf{k̇_0}(ℓ+j) + \mathbf{k̇_1}(ℓ+j)] 
+\mathbf{ŝ_k}(ℓ+j) = \mathbf{x̂_d}(ℓ+j) + 0.5 T_s [\mathbf{k̇^+}(ℓ+j) + \mathbf{k̇^-}(ℓ+j+1)] 
                       - \mathbf{x̂_d}(ℓ+j+1) + \mathbf{ŵ_d}(ℓ+j)                                              
 ```
 for ``j = 0, 1, ... , N_k-1``, and in which ``\mathbf{x̂_d}`` and ``\mathbf{ŵ_d}`` are the
@@ -1761,8 +1761,8 @@ variable `Z̃`. The ``\mathbf{k̇}`` coefficients are evaluated from the continu
 function [`fq_dae!`](@ref) and:
 ```math
 \begin{aligned}
-\mathbf{k̇_0}(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
-\mathbf{k̇_1}(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{a_1}(ℓ+j), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
+\mathbf{k̇^+}(ℓ+j)   &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a^+}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
+\mathbf{k̇^-}(ℓ+j+1) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{â_0}(ℓ+j+1), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
@@ -1770,13 +1770,13 @@ is defined in [`f̂!`](@ref) documentation. The residuals for [`NonLinModelDAE`]
 also computed from ``j = 0, 1, ... , N_k-1`` and:
 ```math
 \begin{aligned}
-\mathbf{q_0}(ℓ+j) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
-\mathbf{q_1}(ℓ+j) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{a_1}(ℓ+j), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
+\mathbf{q^+}(ℓ+j)   &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a^+}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
+\mathbf{q^-}(ℓ+j+1) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{â_0}(ℓ+j+1), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
-and also one final residual at `k+p`:
+plus one last residual at the arrival:
 ```math
-\mathbf{q_0}(k+p) = \mathbf{q}\Big(\mathbf{x̂_d}(k+p), \mathbf{â_0}(k+p), \mathbf{û_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big)
+\mathbf{q}(ℓ) = \mathbf{q}\Big(\mathbf{x̂_d}(ℓ), \mathbf{â_0}(ℓ), \mathbf{û_0}(ℓ), \mathbf{d_0}(ℓ), \mathbf{p}\Big)
 ```
 """
 function con_nonlinprogeq_mhe!(
@@ -1784,6 +1784,9 @@ function con_nonlinprogeq_mhe!(
     estim::MovingHorizonEstimator, model::SimModel, transcription::TrapezoidalCollocation, 
     x̂0arr, â0arr, Ŵ, Z̃
 )
+    # TODO: MODIFIER LE CODE EN FONCTION DE LA NOUVELLE NOTATION CI-DESSUS
+    # TODO: MODIFIER LA DOCSTRING THE OC CI-DESSUS AVEC LA NOUVELLE NOTATION (ET INIT_ORTHOCOLLOC, SI NÉCESSAIRE)
+    # TODO: MODIFIE LE CODE THE OC CI-DESSUS SI LA NOTATION DANS LA DOCSTRING A CHANGÉ
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
     nx̂, nx̃, nxs, nŵ, He = estim.nx̂, estim.nx̃, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]
