@@ -1799,62 +1799,59 @@ function con_nonlinprogeq_mhe!(
     nŜk, nÂ, nĀ = nx*He, na*He, na*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
-    Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
-    AP_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nĀ)]
+    Â0   = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
+    A⁺   = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nĀ)]
     Û0   = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
     (Nk < He) && (geq .= 0) 
     Ŝk   = @views geq[1:nŜk]
     qarr = @views geq[(1 + nŜk):(nŜk + na)]
     Q⁻   = @views geq[(1 + nŜk + na):(nŜk + na + nÂ)]
-    Q⁺   = @views geq[(1 + nŜk + na + nÂ):end]    
-
-
+    Q⁺   = @views geq[(1 + nŜk + na + nÂ):end]  
     
     if na > 0
         k̇arr, x̂darr  = @views  K̄[1:nx], x̂0arr[1:nx]
-        û0arr, d0arr = @views Û0[1:nu], estim.D0[1:nd]      
+        û0arr, d0arr = @views Û0[1:nu], estim.D0[(1 + id_0arr):(nd + 1 + id_0arr)]      
         fq_dae!(k̇arr, qarr, model, x̂darr, â0arr, û0arr, d0arr)
     end
 
     @threadsif f_threads for j=1:Nk
         if j < 2
-            x̂d_Z̃ = @views x̂0arr[1:nx]
-            â0_Z̃ = @views â0arr[1:na]
+            x̂d = @views x̂0arr[1:nx]
         else
-            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
-            â0_Z̃ = @views Â0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
+            x̂d = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
         end
         d0       = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         k̄dot     = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        a1_Z̃     = @views       AP_Z̃[(1 + na*(j-1)):(na*j)]
-        q0       = @views         Q0[(1 + na*(j-1)):(na*j)]
-        q1       = @views          QP[(1 + na*(j-1)):(na*j)]
+        a⁺       = @views         A⁺[(1 + na*(j-1)):(na*j)]
+        q⁻       = @views         Q⁻[(1 + na*(j-1)):(na*j)]
+        q⁺       = @views         Q⁺[(1 + na*(j-1)):(na*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
-        x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        x̂dnext   = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        â0next   = @views         Â0[(1 + na*(j-1)):(na*(j-1) + na)]
         ŝk       = @views         Ŝk[(1 + nx*(j-1)):(nx*j)]
-        k̇0, k̇1   = @views       k̄dot[1:nx], k̄dot[nx+1:2nx]
+        k̇⁺, k̇⁻   = @views       k̄dot[1:nx], k̄dot[nx+1:2nx]
         if estim.direct || j < Nk
-            d1 = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
+            d0next = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
         else # special case, d0(k+1)≈d0(k), since d0(k+1) is not available at time k:
-            d1 = d0 
+            d0next = d0 
         end
-        # we need to recompute k̇0 & q0 with multi-threading, even with h>0, since 
+        # we need to recompute k̇⁺ & q0 with multi-threading, even with h>0, since 
         # the previous iteration (j-1) may not be executed (iterations are re-orderable)
         computeDynamicsAtBegin = f_threads || h < 1 || j < 2
         if computeDynamicsAtBegin
-            fq_dae!(k̇0, q0, model, x̂d_Z̃, â0_Z̃, û0, d0)
+            fq_dae!(k̇⁺, q⁺, model, x̂d, â⁺, û0, d0)
         else # piecewise linear inputs u and disturbances d:
-            k̇0 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇1[j-1] (prev. iter)
-            q0 .= @views â0_Z̃ .- AP_Z̃[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a1[j-1]
+            k̇⁺ .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇1[j-1] (prev. iter)
+            q⁺ .= @views â0_Z̃ .- A⁺[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a⁺[j-1]
         end
         if h > 0 && j < Nk
-            û1 = @views Û0[(1 + nu*j):(nu*(j+1))]
+            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
         else # special case, û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k:
-            û1 = û0 
+            û0next = û0 
         end
-        fq_dae!(k̇1, q1, model, x̂dnext_Z̃, a1_Z̃, û1, d1)
-        ŝk .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇0 + k̇1) + ŵd
+        fq_dae!(k̇⁻, q⁻, model, x̂dnext, â0next, û0next, d0next)
+        ŝk .= @. x̂d - x̂dnext + 0.5*Ts*(k̇⁺ + k̇⁻) + ŵd
     end
     return geq
 end
