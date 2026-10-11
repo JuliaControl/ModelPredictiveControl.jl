@@ -1784,9 +1784,7 @@ function con_nonlinprogeq_mhe!(
     estim::MovingHorizonEstimator, model::SimModel, transcription::TrapezoidalCollocation, 
     x̂0arr, â0arr, Ŵ, Z̃
 )
-    # TODO: MODIFIER LE CODE EN FONCTION DE LA NOUVELLE NOTATION CI-DESSUS
-    # TODO: MODIFIER LA DOCSTRING THE OC CI-DESSUS AVEC LA NOUVELLE NOTATION (ET INIT_ORTHOCOLLOC, SI NÉCESSAIRE)
-    # TODO: MODIFIE LE CODE THE OC CI-DESSUS SI LA NOTATION DANS LA DOCSTRING A CHANGÉ
+    # TODO: u0next et d0next sont des bons noms
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
     nx̂, nx̃, nxs, nŵ, He = estim.nx̂, estim.nx̃, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]
@@ -1807,13 +1805,11 @@ function con_nonlinprogeq_mhe!(
     qarr = @views geq[(1 + nŜk):(nŜk + na)]
     Q⁻   = @views geq[(1 + nŜk + na):(nŜk + na + nÂ)]
     Q⁺   = @views geq[(1 + nŜk + na + nÂ):end]  
-    
     if na > 0
         k̇arr, x̂darr  = @views  K̄[1:nx], x̂0arr[1:nx]
-        û0arr, d0arr = @views Û0[1:nu], estim.D0[(1 + id_0arr):(nd + 1 + id_0arr)]      
+        û0arr, d0arr = @views Û0[1:nu], estim.D0[(1 + i_d0arr):(nd + i_d0arr)]      
         fq_dae!(k̇arr, qarr, model, x̂darr, â0arr, û0arr, d0arr)
     end
-
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d = @views x̂0arr[1:nx]
@@ -1840,9 +1836,9 @@ function con_nonlinprogeq_mhe!(
         # the previous iteration (j-1) may not be executed (iterations are re-orderable)
         computeDynamicsAtBegin = f_threads || h < 1 || j < 2
         if computeDynamicsAtBegin
-            fq_dae!(k̇⁺, q⁺, model, x̂d, â⁺, û0, d0)
+            fq_dae!(k̇⁺, q⁺, model, x̂d, a⁺, û0, d0)
         else # piecewise linear inputs u and disturbances d:
-            k̇⁺ .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇1[j-1] (prev. iter)
+            k̇⁺ .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))]       # k̇⁻[j-1] (prev. iter)
             q⁺ .= @views â0_Z̃ .- A⁺[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a⁺[j-1]
         end
         if h > 0 && j < Nk
