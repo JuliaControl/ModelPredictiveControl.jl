@@ -1800,12 +1800,22 @@ function con_nonlinprogeq_mhe!(
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
     Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
-    A1_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nĀ)]
+    AP_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nĀ)]
     Û0   = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
     (Nk < He) && (geq .= 0) 
     Ŝk   = @views geq[1:nŜk]
-    Q0   = @views geq[(1 + nŜk):(nŜk + nÂ + na)]
-    Q̄    = @views geq[(1 + nŜk + nÂ + na):end]    
+    qarr = @views geq[(1 + nŜk):(nŜk + na)]
+    Q⁻   = @views geq[(1 + nŜk + na):(nŜk + na + nÂ)]
+    Q⁺   = @views geq[(1 + nŜk + na + nÂ):end]    
+
+
+    
+    if na > 0
+        k̇arr, x̂darr  = @views  K̄[1:nx], x̂0arr[1:nx]
+        û0arr, d0arr = @views Û0[1:nu], estim.D0[1:nd]      
+        fq_dae!(k̇arr, qarr, model, x̂darr, â0arr, û0arr, d0arr)
+    end
+
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
@@ -1817,9 +1827,9 @@ function con_nonlinprogeq_mhe!(
         d0       = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         k̄dot     = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        a1_Z̃     = @views       A1_Z̃[(1 + na*(j-1)):(na*j)]
+        a1_Z̃     = @views       AP_Z̃[(1 + na*(j-1)):(na*j)]
         q0       = @views         Q0[(1 + na*(j-1)):(na*j)]
-        q1       = @views          Q̄[(1 + na*(j-1)):(na*j)]
+        q1       = @views          QP[(1 + na*(j-1)):(na*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
         x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ŝk       = @views         Ŝk[(1 + nx*(j-1)):(nx*j)]
@@ -1836,7 +1846,7 @@ function con_nonlinprogeq_mhe!(
             fq_dae!(k̇0, q0, model, x̂d_Z̃, â0_Z̃, û0, d0)
         else # piecewise linear inputs u and disturbances d:
             k̇0 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇1[j-1] (prev. iter)
-            q0 .= @views â0_Z̃ .- A1_Z̃[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a1[j-1]
+            q0 .= @views â0_Z̃ .- AP_Z̃[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a1[j-1]
         end
         if h > 0 && j < Nk
             û1 = @views Û0[(1 + nu*j):(nu*(j+1))]
@@ -1845,18 +1855,6 @@ function con_nonlinprogeq_mhe!(
         end
         fq_dae!(k̇1, q1, model, x̂dnext_Z̃, a1_Z̃, û1, d1)
         ŝk .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇0 + k̇1) + ŵd
-    end
-    # keep "end" in names, it solves a weird race cond. with f_threads on Julia v1.13.0
-    q0end = @views   Q0[(1 + na*Nk):(na*Nk + na)]
-    a0end = @views Â0_Z̃[(1 + na*(Nk-1)):(na*Nk)]
-    if na > 0 && h < 1 # compute the final residual at k+p:
-        x̂dend   = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
-        û0end   = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p) ≈ û0(k+p-1)
-        d0end   = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]           # d0(k+1) ≈ d0(k)
-        k̇0end   = @views        K̄[(end-nx+1):end]
-        fq_dae!(k̇0end, q0end, model, x̂dend, a0end, û0end, d0end)
-    else # piecewise linear inputs u and disturvances d:
-        q0end .= a0end .- @views A1_Z̃[(1 + na*(Nk-1)):(na*Nk)]
     end
     return geq
 end
