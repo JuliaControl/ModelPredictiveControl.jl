@@ -214,7 +214,13 @@ struct MovingHorizonEstimator{
         U0,  Ue  = fill(NT(NaN), nu*He),     fill(NT(NaN),  nu*(He+1))
         D0,  De  = fill(NT(NaN), nd*(He+1)), fill(NT(NaN),  nd*(He+1))
         X̂0_old   = fill(NT(NaN), nx̂*He)
-        D0[1:nd] .= 0 # D0 start with d0(-1) and it should not be NaN
+        D0[1:nd] .= 0 # D0 starts with d0(-1) and it should not be NaN
+        if direct # the following windows all start at k=-1, thus replace the NaN values:
+            Yem[1:ny] .= @views model.yop[i_ym]
+            U0[1:nu]  .= 0
+            Ue[1:nu]  .= model.uop
+            De[1:nd]  .= model.dop
+        end
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(cov.P̂_0)
         Nk = [0]
