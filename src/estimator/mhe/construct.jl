@@ -214,7 +214,8 @@ struct MovingHorizonEstimator{
         U0,  Ue  = fill(NT(NaN), nu*He),     fill(NT(NaN),  nu*(He+1))
         D0,  De  = fill(NT(NaN), nd*(He+1)), fill(NT(NaN),  nd*(He+1))
         X̂0_old   = fill(NT(NaN), nx̂*He)
-        D0[1:nd] .= 0 # D0 start with d0(-1) and it should not be NaN
+        D0[1:nd] .= 0 # D0 starts with d0(-1) and it should not be NaN
+        direct && (De[1:nd] .= model.dop) # De starts with d(-1) if p=0, thus similar
         x̂0arr_old = zeros(NT, nx̂)
         P̂arr_old = copy(cov.P̂_0)
         Nk = [0]
