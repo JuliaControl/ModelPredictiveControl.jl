@@ -168,7 +168,7 @@ transcription method.
 
 # Extended Help
 !!! details "Extended Help"
-    Introducing the **left limit** ``\mathbf{a_0}`` and the **right limit** ``\mathbf{a^+}``
+    Introducing the *left limit* ``\mathbf{a_0}`` and the *right limit* ``\mathbf{a^+}``
     of the algebraic variables (to support zero-order hold inputs), the decision vector for
     open-loop simulations of [`NonLinModelDAE`](@ref) include both vectors:
     ```math
@@ -342,7 +342,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \mathbf{k̄}(k+0)                                             \\
         \mathbf{ā}(k+0)                                             \end{bmatrix}
     ```
-    Introducing the **left limit** of the algebraic variables ``\mathbf{â_0}`` (to support
+    Introducing the *left limit* of the algebraic variables ``\mathbf{â_0}`` (to support
     zero-order hold inputs), the decision vector for [`NonLinMPC`](@ref) based on 
     [`NonLinModelDAE`](@ref) is:
     ```math
