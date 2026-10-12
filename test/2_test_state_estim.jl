@@ -898,6 +898,11 @@ end
     @test mhe1.nxs == 2
     @test mhe1.nx̂ == 6
     @test size(mhe1.Ẽ, 2) == 6*mhe1.nx̂
+    @test all(isfinite, mhe1.U0[1:2])
+    @test all(isnan,    mhe1.Y0m[1:2])
+    @test all(isfinite, mhe1.Yem[1:2])
+    @test all(isfinite, mhe1.D0[1:1])
+    @test all(isfinite, mhe1.De[1:1])
 
     mhe3 = MovingHorizonEstimator(linmodel, He=5, i_ym=[2])
     @test mhe3.nym == 1
@@ -960,7 +965,7 @@ end
     mhe15 = MovingHorizonEstimator(linmodel; He=1, σP_0, covestim)
     @test mhe15.cov.invP̄ ≈ inv(covestim.cov.P̂)
 
-    function gcl(X̂e, _ , _ , _ , _ , _ , _ , _ , nx, ε)
+    function gcl(X̂e, _ , _ , _ , _ , _ , _ , _ , nc, ε)
         gc = X̂e .- 100 .- ε   
         return [gc; zeros(nc .- length(X̂e))]
     end
