@@ -1965,7 +1965,7 @@ function con_nonlinprogeq_mhe!(
             fq_dae!(k̇i, qi, model, ki, ai, ûi, di)
         end
         ŝk̄ .-= k̄dot
-        # ----------------- residual at sampling instants (τ=0) -----------------------
+        # ----------------- residual at sampling instants (τ=1) -----------------------
         # we need to recompute q0 with multi-threading, even with h>0 and τ[end]≈1, since 
         # the previous iteration (j-1) may not be executed (iterations are re-orderable)
         computeDynamicsAtBegin = τendIsNotOne || f_threads || h < 1 || j < 2 
