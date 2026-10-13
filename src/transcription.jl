@@ -332,7 +332,7 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
         \vdots                                                      \\
         \mathbf{a}_{n_o}(k+j)                                       \end{bmatrix}
     ```
-    Although not strictly needed, the current algebraic variable at the right limit 
+    Although not strictly needed, the current algebraic variable at the *right limit* 
     ``\mathbf{a^+}(k+0)`` is included in the decision vector for open-loop simulations of
     [`NonLinModelDAE`](@ref):
     ```math
@@ -395,8 +395,8 @@ this transcription method (sparser formulation than [`MultipleShooting`](@ref)).
     ```
     All the ``\mathbf{0_{(•)}}`` are vectors with zeros for the unused decision variables at
     the beginning in the [`MovingHorizonEstimator`](@ref) (``N_k < H_e``). The predicted
-    outputs are computed from the left limit values ``\mathbf{â_0}``, while the variables in
-    the ``\mathbf{Ā}`` vector are for the the `fq!` function. The ``\mathbf{Â_0}`` vector
+    outputs are computed from the *left limit* values ``\mathbf{â_0}``, while the variables
+    in the ``\mathbf{Ā}`` vector are for the the `fq!` function. The ``\mathbf{Â_0}`` vector
     must be explicitly included in the decision variables since the output function `h!` is
     evaluated at different locations than the collocation points, in general.
     
