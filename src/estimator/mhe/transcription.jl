@@ -1566,7 +1566,7 @@ function predict_mhe!(
     nx̂, nx̃, nym, Nk = estim.nx̂, estim.nx̃, estim.nym, estim.Nk[]
     nx̃_nX̂ = nx̃ + nx̂*estim.He
     h_threads = transcription.h_threads
-    X̂0[1:nx̂*Nk] .= @views Z̃[(1 + nx̃):(nx̃ + nx̂*Nk)]                   # skip x0arr
+    X̂0[1:nx̂*Nk] .= @views Z̃[(1 + nx̃):(nx̃ + nx̂*Nk)]                   # skip x̂0arr
     Â0[1:na*Nk] .= @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + na*Nk)]   # skip â0arr
     @threadsif h_threads for j=1:Nk
         if estim.direct
@@ -1696,7 +1696,7 @@ end
 
 Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K` vectors in argument. By introducing 
+The method mutates the `geq`, `X̂0`, `Û0` and `K̄` vectors in argument. By introducing 
 the integer ``ℓ = k - N_k + p`` to shorten the notation, the defects of the estimated states
 are computed with:
 ```math
@@ -1742,7 +1742,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , _ , Û0, K̄,
+        geq, _ , _ , Û0, K̄dot,
         estim::MovingHorizonEstimator, model::SimModel, ::TrapezoidalCollocation, 
         x̂0arr, â0arr, Ŵ, Z̃
     ) -> geq
@@ -1752,7 +1752,7 @@ Nonlinear MHE equality constrains for [`SimModel`](@ref) and [`TrapezoidalColloc
 By introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the deterministic
 state defects are computed with:
 ```math
-\mathbf{ŝ_k}(ℓ+j) = \mathbf{x̂_d}(ℓ+j) + 0.5 T_s [\mathbf{k̇_0}(ℓ+j) + \mathbf{k̇_1}(ℓ+j)] 
+\mathbf{ŝ_k}(ℓ+j) = \mathbf{x̂_d}(ℓ+j) + 0.5 T_s [\mathbf{k̇^+}(ℓ+j) + \mathbf{k̇^-}(ℓ+j+1)] 
                       - \mathbf{x̂_d}(ℓ+j+1) + \mathbf{ŵ_d}(ℓ+j)                                              
 ```
 for ``j = 0, 1, ... , N_k-1``, and in which ``\mathbf{x̂_d}`` and ``\mathbf{ŵ_d}`` are the
@@ -1761,8 +1761,8 @@ variable `Z̃`. The ``\mathbf{k̇}`` coefficients are evaluated from the continu
 function [`fq_dae!`](@ref) and:
 ```math
 \begin{aligned}
-\mathbf{k̇_0}(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
-\mathbf{k̇_1}(ℓ+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{a_1}(ℓ+j), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
+\mathbf{k̇^+}(ℓ+j)   &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a^+}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
+\mathbf{k̇^-}(ℓ+j+1) &= \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{â_0}(ℓ+j+1), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
@@ -1770,20 +1770,21 @@ is defined in [`f̂!`](@ref) documentation. The residuals for [`NonLinModelDAE`]
 also computed from ``j = 0, 1, ... , N_k-1`` and:
 ```math
 \begin{aligned}
-\mathbf{q_0}(ℓ+j) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
-\mathbf{q_1}(ℓ+j) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{a_1}(ℓ+j), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
+\mathbf{q^+}(ℓ+j)   &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j),   \mathbf{a^+}(ℓ+j),   \mathbf{û_0}(ℓ+j),   \mathbf{d_0}(ℓ+j),   \mathbf{p}\Big) \\
+\mathbf{q^-}(ℓ+j+1) &= \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j+1), \mathbf{â_0}(ℓ+j+1), \mathbf{û_0}(ℓ+j+h), \mathbf{d_0}(ℓ+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
-and also one final residual at `k+p`:
+plus one last residual for the arrival:
 ```math
-\mathbf{q_0}(k+p) = \mathbf{q}\Big(\mathbf{x̂_d}(k+p), \mathbf{â_0}(k+p), \mathbf{û_0}(k), \mathbf{d_0}(k), \mathbf{p}\Big)
+\mathbf{q}(ℓ) = \mathbf{q}\Big(\mathbf{x̂_d}(ℓ), \mathbf{â_0}(ℓ), \mathbf{û_0}(ℓ), \mathbf{d_0}(ℓ), \mathbf{p}\Big)
 ```
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , _ , Û0, K̄,
+    geq, _ , _ , Û0, K̄dot,
     estim::MovingHorizonEstimator, model::SimModel, transcription::TrapezoidalCollocation, 
     x̂0arr, â0arr, Ŵ, Z̃
 )
+    # TODO: u0next et d0next sont des bons noms
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
     nx̂, nx̃, nxs, nŵ, He = estim.nx̂, estim.nx̃, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]
@@ -1792,75 +1793,64 @@ function con_nonlinprogeq_mhe!(
     na = get_na(model)
     nk̄ = get_nk̄(model, transcription)
     nw = nŵ - nxs
-    nx̃_nX̂  = nx̃ + nx̂*estim.He
+    nx̃_nX̂  = nx̃ + nx̂*estim.He 
     nŜk, nÂ, nĀ = nx*He, na*He, na*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
-    X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
-    Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
-    A1_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nĀ)]
-    Û0   = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
+    X̂0 = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
+    Â0 = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
+    A⁺ = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nĀ)]
+    Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0, estim.U0)
     (Nk < He) && (geq .= 0) 
     Ŝk   = @views geq[1:nŜk]
-    Q0   = @views geq[(1 + nŜk):(nŜk + nÂ + na)]
-    Q̄    = @views geq[(1 + nŜk + nÂ + na):end]    
+    qarr = @views geq[(1 + nŜk):(nŜk + na)]
+    Q⁻   = @views geq[(1 + nŜk + na):(nŜk + na + nÂ)]
+    Q⁺   = @views geq[(1 + nŜk + na + nÂ):end]  
+    if na > 0
+        k̇arr, x̂darr  = @views K̄dot[1:nx], x̂0arr[1:nx]
+        û0arr, d0arr = @views Û0[1:nu], estim.D0[(1 + i_d0arr):(nd + i_d0arr)]      
+        fq_dae!(k̇arr, qarr, model, x̂darr, â0arr, û0arr, d0arr)
+    end
     @threadsif f_threads for j=1:Nk
-        if j < 2
-            x̂d_Z̃ = @views x̂0arr[1:nx]
-            â0_Z̃ = @views â0arr[1:na]
-        else
-            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
-            â0_Z̃ = @views Â0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
+        x̂d     = @views j < 2 ? x̂0arr[1:nx] : X̂0[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
+        d0     = @views estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
+        û0     = @views       Û0[(1 + nu*(j-1)):(nu*j)]
+        k̄dot   = @views     K̄dot[(1 + nk̄*(j-1)):(nk̄*j)]
+        a⁺     = @views       A⁺[(1 + na*(j-1)):(na*j)]
+        q⁺     = @views       Q⁺[(1 + na*(j-1)):(na*j)]
+        ŵd     = @views        Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
+        ŝk     = @views       Ŝk[(1 + nx*(j-1)):(nx*j)]
+        q⁻next = @views       Q⁻[(1 + na*(j-1)):(na*j)]
+        x̂dnext = @views       X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        â0next = @views       Â0[(1 + na*(j-1)):(na*(j-1) + na)]
+        k̇⁺, k̇⁻next = @views k̄dot[1:nx], k̄dot[nx+1:2nx]
+        if h > 0 && j < Nk
+            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
+        else # special case, û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k:
+            û0next = û0 
         end
-        d0       = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
-        û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄dot     = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        a1_Z̃     = @views       A1_Z̃[(1 + na*(j-1)):(na*j)]
-        q0       = @views         Q0[(1 + na*(j-1)):(na*j)]
-        q1       = @views          Q̄[(1 + na*(j-1)):(na*j)]
-        ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
-        x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
-        ŝk       = @views         Ŝk[(1 + nx*(j-1)):(nx*j)]
-        k̇0, k̇1   = @views       k̄dot[1:nx], k̄dot[nx+1:2nx]
-        if estim.direct || j < Nk
-            d1 = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
+        if estim.direct || j < Nk # d0(k+1) is never needed if estim.direct
+            d0next = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
         else # special case, d0(k+1)≈d0(k), since d0(k+1) is not available at time k:
-            d1 = d0 
+            d0next = d0 
         end
-        # we need to recompute k̇0 & q0 with multi-threading, even with h>0, since 
+        # we need to recompute k̇⁺ & q⁺ with multi-threading, even with h>0, since 
         # the previous iteration (j-1) may not be executed (iterations are re-orderable)
         computeDynamicsAtBegin = f_threads || h < 1 || j < 2
         if computeDynamicsAtBegin
-            fq_dae!(k̇0, q0, model, x̂d_Z̃, â0_Z̃, û0, d0)
+            fq_dae!(k̇⁺, q⁺, model, x̂d, a⁺, û0, d0)
         else # piecewise linear inputs u and disturbances d:
-            k̇0 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k̇1[j-1] (prev. iter)
-            q0 .= @views â0_Z̃ .- A1_Z̃[(1 + na*(j-2)):(na*(j-1))] # a0[j] = a1[j-1]
+            k̇⁺ .= @views K̄dot[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))]  # k̇⁺[j] = k̇⁻[j-1] (prev. iter)
+            q⁺ .= @views a⁺ .- Â0[(1 + na*(j-2)):(na*(j-1))] # a⁺[j] = â0[j-1] (prev. iter)
         end
-        if h > 0 && j < Nk
-            û1 = @views Û0[(1 + nu*j):(nu*(j+1))]
-        else # special case, û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k:
-            û1 = û0 
-        end
-        fq_dae!(k̇1, q1, model, x̂dnext_Z̃, a1_Z̃, û1, d1)
-        ŝk .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇0 + k̇1) + ŵd
-    end
-    # keep "end" in names, it solves a weird race cond. with f_threads on Julia v1.13.0
-    q0end = @views   Q0[(1 + na*Nk):(na*Nk + na)]
-    a0end = @views Â0_Z̃[(1 + na*(Nk-1)):(na*Nk)]
-    if na > 0 && h < 1 # compute the final residual at k+p:
-        x̂dend   = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
-        û0end   = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p) ≈ û0(k+p-1)
-        d0end   = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]           # d0(k+1) ≈ d0(k)
-        k̇0end   = @views        K̄[(end-nx+1):end]
-        fq_dae!(k̇0end, q0end, model, x̂dend, a0end, û0end, d0end)
-    else # piecewise linear inputs u and disturvances d:
-        q0end .= a0end .- @views A1_Z̃[(1 + na*(Nk-1)):(na*Nk)]
+        fq_dae!(k̇⁻next, q⁻next, model, x̂dnext, â0next, û0next, d0next)
+        ŝk .= @. x̂d + 0.5*Ts*(k̇⁺ + k̇⁻next) - x̂dnext + ŵd
     end
     return geq
 end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , _ , Û0, K̄,
+        geq, _ , _ , Û0, K̄dot,
         estim::MovingHorizonEstimator, model::SimModel, ::OrthogonalCollocation, 
         x̂0arr, â0arr, _ , Z̃
     ) -> geq
@@ -1888,16 +1878,17 @@ for ``j = 0, 1, ... , N_k-1``, and knowing that the ``\mathbf{k}_i(ℓ+j)`` and
 ``\mathbf{k̇}_i`` vectors are evaluated from the continuous-time function [`fq_dae!`](@ref),
 as described in [`init_orthocolloc`](@ref). The nonlinear equality constraints also include
 the residuals at the collocation points ``\mathf{q}_i(ℓ+j)``, see [`init_orthocolloc`](@ref).
-The residuals at the sampling instants ``\mathbf{q_0}(ℓ+j)`` are other constraints: 
+The residuals at the left limit of the sampling instants ``\mathbf{q^-}(ℓ+j)`` are other
+constraints: 
 ```math
-\mathbf{q_0}(ℓ+j) = \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j), \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j), \mathbf{d_0}(ℓ+j), \mathbf{p}\Big)
+\mathbf{q^-}(ℓ+j) = \mathbf{q}\Big(\mathbf{x̂_d}(ℓ+j), \mathbf{â_0}(ℓ+j), \mathbf{û_0}(ℓ+j), \mathbf{d_0}(ℓ+j), \mathbf{p}\Big)
 ```
 for ``j = 0, 1, ... , N_k``. The defects for the continuity constraints and the
 stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@ref)). The
 estimated process noise ``\mathbf{ŵ}(ℓ+j)`` are incorporated in the continuity constraint.
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , _ , Û0, K̄,
+    geq, _ , _ , Û0, K̄dot,
     estim::MovingHorizonEstimator, model::SimModel, transcription::OrthogonalCollocation, 
     x̂0arr, â0arr, _ , Z̃
 )
@@ -1912,81 +1903,67 @@ function con_nonlinprogeq_mhe!(
     nx̃_nX̂  = nx̃ + nx̂*estim.He
     nŜk̄, nÂ, nK̄, nĀ = nk̄*He, na*He, nk̄*He, nā*He
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
-    X̂0_Z̃ = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
-    Â0_Z̃ = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
-    K̄_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nK̄)]
-    Ā_Z̃  = @views Z̃[(1 + nx̃_nX̂ + na + nÂ + nK̄):(nx̃_nX̂ + na + nÂ + nK̄ + nĀ)]
+    X̂0 = @views Z̃[(1 + nx̃):(nx̃_nX̂)]                   # skipping x̂0arr components
+    Â0 = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
+    K̄  = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nK̄)]
+    Ā  = @views Z̃[(1 + nx̃_nX̂ + na + nÂ + nK̄):(nx̃_nX̂ + na + nÂ + nK̄ + nĀ)]
     Dtemp = estim.buffer.D
-    Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
+    Utemp = similar(Û0) # TODO: remove this allocation
+    Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0, estim.U0)
     (Nk < He) && (geq .= 0) 
     Ŝk̄   = @views geq[1:nŜk̄]
-    Q0   = @views geq[(1 + nŜk̄):(nŜk̄ + nÂ + na)]
-    Q̄    = @views geq[(1 + nŜk̄ + nÂ + na):end]
+    qarr = @views geq[(1 + nŜk̄):(nŜk̄ + na)]
+    Q⁻   = @views geq[(1 + nŜk̄ + na):(nŜk̄ + na + nÂ)]
+    Q̄    = @views geq[(1 + nŜk̄ + na + nÂ):end]
+    if na > 0
+        k̇arr, x̂darr  = @views K̄dot[1:nx], x̂0arr[1:nx]
+        û0arr, d0arr = @views Û0[1:nu], estim.D0[(1 + i_d0arr):(nd + i_d0arr)]      
+        fq_dae!(k̇arr, qarr, model, x̂darr, â0arr, û0arr, d0arr)
+    end
     @threadsif f_threads for j=1:Nk
-        if j < 2
-            x̂d_Z̃ = @views x̂0arr[1:nx]
-            â0_Z̃ = @views â0arr[1:na]
-        else
-            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
-            â0_Z̃ = @views Â0_Z̃[(1 + na*(j-2)):(na*(j-2) + na)]
+        x̂d     = @views j < 2 ? x̂0arr[1:nx] : X̂0[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
+        d0     = @views estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
+        û0     = @views       Û0[(1 + nu*(j-1)):(nu*j)]
+        k̄dot   = @views     K̄dot[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄      = @views        K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        ā      = @views        Ā[(1 + nā*(j-1)):(nā*j)]
+        q̄      = @views        Q̄[(1 + nā*(j-1)):(nā*j)]
+        ŝk̄     = @views       Ŝk̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        q⁻next = @views       Q⁻[(1 + na*(j-1)):(na*j)]
+        x̂dnext = @views       X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        â0next = @views       Â0[(1 + na*(j-1)):(na*(j-1) + na)]
+        if h > 0 && j < Nk
+            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
+        else # special case, û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k:
+            û0next = û0 
         end
-        d0   = @views estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
-        û0   = @views       Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄dot = @views        K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        k̄_Z̃  = @views      K̄_Z̃[(1 + nk̄*(j-1)):(nk̄*j)]
-        ā_Z̃  = @views      Ā_Z̃[(1 + nā*(j-1)):(nā*j)]
-        q0   = @views       Q0[(1 + na*(j-1)):(na*j)]
-        q̄    = @views        Q̄[(1 + nā*(j-1)):(nā*j)]
-        ŝk̄   = @views       Ŝk̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        if estim.direct || j < Nk
-            d1 = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
-        else
-            d1 = d0 # special case: d0(k+1)≈d0(k), since d0(k+1) is not available at time k:
-        end
-        # ----------------- residual at sampling instants (τ=0) -----------------------
-        # we need to recompute q0 with multi-threading, even with h>0 and τ[end]≈1, since 
-        # the previous iteration (j-1) may not be executed (iterations are re-orderable)
-        computeDynamicsAtBegin = τendIsNotOne || f_threads || h < 1 || j < 2 
-        if na > 0 && computeDynamicsAtBegin
-            @views fq_dae!(k̄dot[1:nx] ,q0 , model, x̂d_Z̃, â0_Z̃, û0, d0)
-        else
-            q0 .= @views â0_Z̃ .- Ā_Z̃[(1 + nā*(j-1) - na):(nā*(j-1))] # a0[j] = a_no[j-1]
+        if estim.direct || j < Nk # d0(k+1) is never needed if estim.direct
+            d0next = @views estim.D0[(1 + nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
+        else  # special case: d0(k+1)≈d0(k), since d0(k+1) not available at time k:
+            d0next = d0
         end
         # ----------------- collocation constraint defects -----------------------------
         Δk = k̄dot
         for i=1:no
-            Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
+            Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄[(1 + (i-1)*nx):(i*nx)] .- x̂d
         end
         mul!(ŝk̄, Mo, Δk)
-        di = @views Dtemp[(1 + nd*(j-1)):(nd*j)]
-        if h > 0
-            ûi = similar(û0) # TODO: remove this allocation
-        end
+        di, ûi = @views Dtemp[(1 + nd*(j-1)):(nd*j)], Utemp[(1 + nu*(j-1)):(nu*j)]
         for i=1:no
-            k̇i, ki_Z̃  = @views k̄dot[(1 + (i-1)*nx):(i*nx)], k̄_Z̃[(1 + (i-1)*nx):(i*nx)]
-            qi, ai_Z̃  = @views    q̄[(1 + (i-1)*na):(i*na)], ā_Z̃[(1 + (i-1)*na):(i*na)]
-            di  .= (1-τ[i]).*d0 .+ τ[i].*d1
-            if h > 0 && j < Nk
-                û1  = @views Û0[(1 + nu*j):(nu*(j+1))]
-                ûi .= (1-τ[i]).*û0 .+ τ[i].*û1
-            else # special case, û0(k+p)≈û0(k+p-1), since û0(k+p) is not available:
-                ûi  = û0 
-            end
-            fq_dae!(k̇i, qi, model, ki_Z̃, ai_Z̃, ûi, di)
+            k̇i, ki  = @views k̄dot[(1 + (i-1)*nx):(i*nx)], k̄[(1 + (i-1)*nx):(i*nx)]
+            qi, ai  = @views    q̄[(1 + (i-1)*na):(i*na)], ā[(1 + (i-1)*na):(i*na)]
+            ûi .= (1-τ[i]).*û0 .+ τ[i].*û0next
+            di .= (1-τ[i]).*d0 .+ τ[i].*d0next
+            fq_dae!(k̇i, qi, model, ki, ai, ûi, di)
         end
         ŝk̄ .-= k̄dot
-    end
-    # keep "end" in names, it solves a weird race cond. with f_threads on Julia v1.13.0
-    q0end = @views   Q0[(1 + na*Nk):(na*Nk + na)]
-    a0end = @views Â0_Z̃[(1 + na*(Nk-1)):(na*Nk)]
-    if na > 0 && h < 1 # compute the final residual at k+p:
-        x̂dend   = @views     X̂0_Z̃[(1 + nx̂*(Nk-1)):((nx̂*(Nk-1) + nx))]
-        û0end   = @views       Û0[(1 + nu*(Nk-1)):((nu*(Nk-1) + nu))] # û0(k+p) ≈ û0(k+p-1)
-        d0end   = @views estim.D0[(1 + nd*Nk):(nd*Nk + nd)]           # d0(k+1) ≈ d0(k)
-        k̇0end   = @views        K̄[(end-nx+1):end]
-        fq_dae!(k̇0end, q0end, model, x̂dend, a0end, û0end, d0end)
-    else # piecewise linear inputs u and disturvances d:
-        q0end .= @views a0end .- Ā_Z̃[(1 + nā*Nk - na):(nā*Nk)] # a0[j] = a_no[j-1]
+        # ----------------- residual at sampling instants (τ=1) ------------------------
+        if na > 0 && τendIsNotOne
+            k̇⁻next = @views k̄dot[1:nx] 
+            fq_dae!(k̇⁻next, q⁻next, model, x̂dnext, â0next, û0next, d0next)
+        else
+            q⁻next .= @views â0next .- ā[end-na+1:end]
+        end
     end
     return geq
 end
