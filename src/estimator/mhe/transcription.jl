@@ -1839,7 +1839,7 @@ function con_nonlinprogeq_mhe!(
         if computeDynamicsAtBegin
             fq_dae!(k̇⁺, q⁺, model, x̂d, a⁺, û0, d0)
         else # piecewise linear inputs u and disturbances d:
-            k̇⁺ .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))]     # k̇⁺[j] = k̇⁻[j-1] (prev. iter)
+            k̇⁺ .= @views K̄dot[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))]  # k̇⁺[j] = k̇⁻[j-1] (prev. iter)
             q⁺ .= @views a⁺ .- Â0[(1 + na*(j-2)):(na*(j-1))] # a⁺[j] = â0[j-1] (prev. iter)
         end
         fq_dae!(k̇⁻next, q⁻next, model, x̂dnext, â0next, û0next, d0next)
