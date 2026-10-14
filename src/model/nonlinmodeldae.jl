@@ -240,6 +240,13 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
     are no global direct transmissions from ``\mathbf{u}`` to ``\mathbf{y}`` with the
     functions ``\mathbf{q}`` and ``\mathbf{h}`` using [`SparseConnectivityTracer.jl`](@extref SparseConnectivityTracer.jl).
 
+    Note that open loop simulations discretize the manipulated inputs ``\mathbf{u}`` and
+    measured disturbances ``\mathbf{d}`` with a zero-order hold (piecewise constants), since
+    the values for the next time step cannot be fed to the simple [`updatestate!`](@ref)
+    method. It induces a small plant-model mismatch for the inputs if `h=1` in the
+    transcription method of the estimator/controller, and also for the disturbances, always
+    discretized as piecewise linear functions in the estimator/controller.
+    
     By default, a dense [`ForwardDiff`](@extref ForwardDiff) backend is used for the 
     Jacobians of the nonlinear equality constraints. This is also the default backend for
     the Hessians if `hessian=true`.
