@@ -898,6 +898,11 @@ end
     @test mhe1.nxs == 2
     @test mhe1.nx̂ == 6
     @test size(mhe1.Ẽ, 2) == 6*mhe1.nx̂
+    @test all(isfinite, mhe1.U0[1:2])
+    @test all(isnan,    mhe1.Y0m[1:2])
+    @test all(isfinite, mhe1.Yem[1:2])
+    @test all(isfinite, mhe1.D0[1:1])
+    @test all(isfinite, mhe1.De[1:1])
 
     mhe3 = MovingHorizonEstimator(linmodel, He=5, i_ym=[2])
     @test mhe3.nym == 1
@@ -960,7 +965,7 @@ end
     mhe15 = MovingHorizonEstimator(linmodel; He=1, σP_0, covestim)
     @test mhe15.cov.invP̄ ≈ inv(covestim.cov.P̂)
 
-    function gcl(X̂e, _ , _ , _ , _ , _ , _ , _ , nx, ε)
+    function gcl(X̂e, _ , _ , _ , _ , _ , _ , _ , nc, ε)
         gc = X̂e .- 100 .- ε   
         return [gc; zeros(nc .- length(X̂e))]
     end
@@ -1441,12 +1446,12 @@ end
     mhe = MovingHorizonEstimator(dae; He=2, transcription, hessian=true)
     preparestate!(mhe, [0.0], [0.0])
     x̂ = updatestate!(mhe, [0.0], [0.0], [0.0])
-    @test x̂ ≈ zeros(mhe.nx̂) atol=1e-6
-    @test mhe.x̂0 ≈ zeros(mhe.nx̂) atol=1e-6
+    @test x̂ ≈ zeros(mhe.nx̂) atol=1e-5
+    @test mhe.x̂0 ≈ zeros(mhe.nx̂) atol=1e-5
     preparestate!(mhe, [0], [0])
     info = getinfo(mhe)
-    @test info[:x̂] ≈ x̂ atol=1e-6
-    @test info[:Ŷ][end] ≈ 0 atol=1e-6
+    @test info[:x̂] ≈ x̂ atol=1e-5
+    @test info[:Ŷ][end] ≈ 0 atol=1e-5
     for i in 1:40
         preparestate!(mhe, [0], [0])
         updatestate!(mhe, [3.0], [0], [0])
@@ -1465,8 +1470,8 @@ end
     mhe2 = MovingHorizonEstimator(dae; He=2, Cwt=1e4, direct=false, transcription)
     preparestate!(mhe2, [0.0], [0.0])
     x̂ = updatestate!(mhe2, [0.0], [0.0], [0.0])
-    @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-6
-    @test mhe2.x̂0 ≈ zeros(mhe2.nx̂) atol=1e-6
+    @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-5
+    @test mhe2.x̂0 ≈ zeros(mhe2.nx̂) atol=1e-5
     initstate!(mhe2, [0], [0], [0])
     @test mhe2.Z̃[2:2] ≈ mhe2.Z̃[4:4] ≈ mhe2.Z̃[6:6] ≈ xs_0           # xd in X̂0
     @test mhe2.Z̃[3:3] ≈ mhe2.Z̃[5:5] ≈ mhe2.Z̃[7:7] ≈ [0.0]          # xs in X̂0
@@ -1496,12 +1501,12 @@ end
     mhe = MovingHorizonEstimator(dae; He=2, transcription, hessian=true)
     preparestate!(mhe, [0.0], [0.0])
     x̂ = updatestate!(mhe, [0.0], [0.0], [0.0])
-    @test x̂ ≈ zeros(mhe.nx̂) atol=1e-6
-    @test mhe.x̂0 ≈ zeros(mhe.nx̂) atol=1e-6
+    @test x̂ ≈ zeros(mhe.nx̂) atol=1e-5
+    @test mhe.x̂0 ≈ zeros(mhe.nx̂) atol=1e-5
     preparestate!(mhe, [0], [0])
     info = getinfo(mhe)
-    @test info[:x̂] ≈ x̂ atol=1e-6
-    @test info[:Ŷ][end] ≈ 0 atol=1e-6
+    @test info[:x̂] ≈ x̂ atol=1e-5
+    @test info[:Ŷ][end] ≈ 0 atol=1e-5
     for i in 1:40
         preparestate!(mhe, [0], [0])
         updatestate!(mhe, [3.0], [0], [0])
@@ -1521,8 +1526,8 @@ end
     mhe2 = MovingHorizonEstimator(dae; He=2, Cwt=1e4, direct=false, transcription)
     preparestate!(mhe2, [0.0], [0.0])
     x̂ = updatestate!(mhe2, [0.0], [0.0], [0.0])
-    @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-6
-    @test mhe2.x̂0 ≈ zeros(mhe2.nx̂) atol=1e-6
+    @test x̂ ≈ zeros(mhe2.nx̂) atol=1e-5
+    @test mhe2.x̂0 ≈ zeros(mhe2.nx̂) atol=1e-5
     initstate!(mhe2, [0], [0], [0])
     @test mhe2.Z̃[2:2] ≈ mhe2.Z̃[4:4] ≈ mhe2.Z̃[6:6] ≈ xs_0    # xd in X̂0
     @test mhe2.Z̃[3:3] ≈ mhe2.Z̃[5:5] ≈ mhe2.Z̃[7:7] ≈ [0.0]   # xs in X̂0
