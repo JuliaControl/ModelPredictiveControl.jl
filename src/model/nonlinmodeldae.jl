@@ -877,10 +877,10 @@ The function should be called after calling [`updatestate!`](@ref) on `model` ob
 returns the dictionary `info` with the following fields:
 
 - `:xnext` : next state, ``\mathbf{x}(k+1)``
-- `:q` : current algebraic equation residuals `res`, ``\mathbf{q(x, a, u, d, p)}`` 
+- `:a` : right limit of current algebraic variable, ``\mathbf{a^+}(k)``
+- `:q` : current algebraic equation residuals `res`, ``\mathbf{q(x, a^+, u, d, p)}`` 
 - `:y` : current output, ``\mathbf{y}(k)``
 - `:x` : current state, ``\mathbf{x}(k)``
-- `:a` : current algebraic variable, ``\mathbf{a}(k)``
 - `:u` : current manipulated input, ``\mathbf{u}(k)``
 - `:d` : current measured disturbances, ``\mathbf{u}(k)``
 
