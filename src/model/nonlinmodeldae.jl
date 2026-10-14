@@ -240,6 +240,13 @@ NonLinModelDAE with a sample time Ts = 5.0 s:
     are no global direct transmissions from ``\mathbf{u}`` to ``\mathbf{y}`` with the
     functions ``\mathbf{q}`` and ``\mathbf{h}`` using [`SparseConnectivityTracer.jl`](@extref SparseConnectivityTracer.jl).
 
+    Note that open loop simulations discretize the manipulated inputs ``\mathbf{u}`` and
+    measured disturbances ``\mathbf{d}`` with a zero-order hold (piecewise constants), since
+    the values for the next time step cannot be fed to the simple [`updatestate!`](@ref)
+    method. It induces a small plant-model mismatch for the inputs if `h=1` in the
+    transcription method of the estimator/controller, and also for the disturbances, always
+    discretized as piecewise linear functions in the estimator/controller.
+    
     By default, a dense [`ForwardDiff`](@extref ForwardDiff) backend is used for the 
     Jacobians of the nonlinear equality constraints. This is also the default backend for
     the Hessians if `hessian=true`.
@@ -675,7 +682,7 @@ end
 """
     update_predictions!(k̄, geq, model, Z)
 
-TBW
+Update `k̄` and `geq` in place for the open loop root solving of [`NonLinModelDAE`](@ref).
 """
 function update_predictions!(k̄, geq, model, Z)
     x0, u0, d0 = model.x0_optim, model.u0_optim, model.d0_optim
@@ -685,54 +692,52 @@ end
 
 """
     con_nonlinprogeq!(
-        geq, k̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
+        geq, k̄dot, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
     ) -> geq
 
-TBW
+Nonlinear equality constraint for open loop root solving of [`NonLinModelDAE`](@ref).
 """
 function con_nonlinprogeq!(
-    geq, k̄, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
+    geq, k̄dot, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
 )
     nx, na = model.nx, model.na
     Ts = model.Ts 
-    x0next_Z, aP_Z, a0_Z = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
-    sknext, q0, q1 = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
-    k̇0, k̇1 = @views k̄[1:nx], k̄[(nx+1):(2nx)]
-    model.fq!(k̇0, q0, x0,       aP_Z,     u0, d0, model.p)
-    model.fq!(k̇1, q1, x0next_Z, a0_Z, u0, d0, model.p)
-    sknext .= @. x0 - x0next_Z + 0.5*Ts*(k̇0 + k̇1)
+    x0next, a⁺, a0next = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
+    sknext, q⁺, q⁻next = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
+    k̇⁺, k̇⁻next         = @views k̄dot[1:nx], k̄dot[(nx+1):(2nx)]
+    model.fq!(k̇⁺    , q⁺    , x0    , a⁺    , u0, d0, model.p)
+    model.fq!(k̇⁻next, q⁻next, x0next, a0next, u0, d0, model.p)
+    sknext .= @. x0 + 0.5*Ts*(k̇⁺ + k̇⁻next) - x0next
     return geq
 end
 
 """
     con_nonlinprogeq!(
-        geq, k̄, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
+        geq, k̄dot, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
     ) -> geq
 
-TBW
+Same but using an [`OrthogonalCollocation`](@ref) transcription.
 """
 function con_nonlinprogeq!(
-    geq, k̄, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
+    geq, k̄dot, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
 )
     nx, na = model.nx, model.na
     Mo, no =  model.Mo, transcription.no
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
-    aP_Z, k̄_Z, ā_Z = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
-    q0, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)] 
-    @views model.fq!(k̄[1:nx], q0, x0, aP_Z, u0, d0, model.p)
-    Δk = k̄
+    a⁺, k̄, ā   = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
+    q⁺, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)] 
+    @views model.fq!(k̄dot[1:nx], q⁺, x0, a⁺, u0, d0, model.p)
+    Δk = k̄dot
     for i=1:no
-        Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z[(1 + (i-1)*nx):(i*nx)] .- x0
+        Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄[(1 + (i-1)*nx):(i*nx)] .- x0
     end
     mul!(sk̄, Mo, Δk)
     for i=1:no
-        k̇i   = @views   k̄[(1 + (i-1)*nx):(i*nx)]
-        qi   = @views   q̄[(1 + (i-1)*na):(i*na)]
-        ki_Z = @views k̄_Z[(1 + (i-1)*nx):(i*nx)]
-        ai_Z = @views ā_Z[(1 + (i-1)*na):(i*na)]
-        model.fq!(k̇i, qi, ki_Z, ai_Z, u0, d0, model.p)
+        k̇i, ki = @views k̄dot[(1 + (i-1)*nx):(i*nx)], k̄[(1 + (i-1)*nx):(i*nx)]
+        qi, ai = @views    q̄[(1 + (i-1)*na):(i*na)], ā[(1 + (i-1)*na):(i*na)]
+        model.fq!(k̇i, qi, ki, ai, u0, d0, model.p)
     end
-    sk̄ .-= k̄
+    sk̄ .-= k̄dot
     return geq
 end
 
@@ -879,10 +884,10 @@ The function should be called after calling [`updatestate!`](@ref) on `model` ob
 returns the dictionary `info` with the following fields:
 
 - `:xnext` : next state, ``\mathbf{x}(k+1)``
-- `:q` : current algebraic equation residuals `res`, ``\mathbf{q(x, a, u, d, p)}`` 
+- `:a` : right limit of current algebraic variable, ``\mathbf{a^+}(k)``
+- `:q` : current algebraic equation residuals `res`, ``\mathbf{q(x, a^+, u, d, p)}`` 
 - `:y` : current output, ``\mathbf{y}(k)``
 - `:x` : current state, ``\mathbf{x}(k)``
-- `:a` : current algebraic variable, ``\mathbf{a}(k)``
 - `:u` : current manipulated input, ``\mathbf{u}(k)``
 - `:d` : current measured disturbances, ``\mathbf{u}(k)``
 

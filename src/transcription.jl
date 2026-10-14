@@ -150,8 +150,8 @@ for descriptions of `f_threads` and `h_threads` keywords. The Extended Help deta
 the decision variables for [`NonLinModelDAE`](@ref). The `h` argument is `0` or `1`, for 
 piecewise constant or linear manipulated inputs ``\mathbf{u}`` (`h=1` is slightly less
 expensive). Note that the various [`DiffSolver`](@ref) here assume zero-order hold, so `h=1`
-will induce a plant-model mismatch if the plant is simulated with these solvers. Measured
-disturbances ``\mathbf{d}`` are piecewise linear.
+will induce a small plant-model mismatch if the plant is simulated with these solvers. 
+Measured disturbances ``\mathbf{d}`` are piecewise linear.
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
