@@ -1465,7 +1465,7 @@ end
     preparestate!(mhe, [7.0], [0])
     @test mhe([0]) ≈ [7.0] atol=1e-3
 
-    # h=1 & f_threads=false options test the branch with reuse of k̇1 & q1 from prev. iter:
+    # h=1 & f_threads=false options test the branch with reuse of k̇ & q from prev. iter:
     transcription = TrapezoidalCollocation(1, f_threads=false, h_threads=true)
     mhe2 = MovingHorizonEstimator(dae; He=2, Cwt=1e4, direct=false, transcription)
     preparestate!(mhe2, [0.0], [0.0])

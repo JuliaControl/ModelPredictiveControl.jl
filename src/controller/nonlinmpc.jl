@@ -154,9 +154,9 @@ struct NonLinMPC{
 end
 
 @doc raw"""
-    NonLinMPC(model::SimModelODE; <keyword arguments>)
+    NonLinMPC(model::SimModel; <keyword arguments>)
 
-Construct a nonlinear predictive controller based on [`SimModelODE`](@ref) `model`.
+Construct a nonlinear predictive controller based on [`SimModel`](@ref) `model`.
 
 Both [`NonLinModel`](@ref) and [`LinModel`](@ref) are supported (see Extended Help). The 
 controller minimizes the following objective function at each discrete time ``k``:
@@ -197,7 +197,8 @@ definition of the other variables.
 This method uses the default state estimator:
 
 - if `model` is a [`LinModel`](@ref), a [`SteadyKalmanFilter`](@ref) with default arguments;
-- else, an [`UnscentedKalmanFilter`](@ref) with default arguments. 
+- if `model` is a [`NonLinModel`](@ref), an [`UnscentedKalmanFilter`](@ref) with default arguments;
+- else, a [`MovingHorizonEstimator`](@ref) with default arguments.
 
 This controller allocates memory at each time step for the optimization.
 
@@ -206,7 +207,7 @@ This controller allocates memory at each time step for the optimization.
     `MethodError: no method matching Float64(::ForwardDiff.Dual)`.
 
 # Arguments
-- `model::SimModelODE` : model used for controller predictions and state estimations.
+- `model::SimModel` : model used for controller predictions and state estimations.
 - `Hp::Int=10+nk` : prediction horizon ``H_p``, `nk` is the number of delays if `model` is a
    [`LinModel`](@ref) (must be specified otherwise).
 - `Hc::Union{Int, Vector{Int}}=2` : control horizon ``H_c``, custom move blocking pattern is 
@@ -346,7 +347,7 @@ NonLinMPC controller with a sample time Ts = 5.0 s:
     `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
 """
 function NonLinMPC(
-    model::SimModelODE;
+    model::SimModel;
     Hp::Int = default_Hp(model),
     Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, model.ny),
