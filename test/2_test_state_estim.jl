@@ -1521,7 +1521,6 @@ end
     @test mhe([0]) ≈ [7.0] atol=5e-3
 
     no, roots = 2, :gaussradau
-    # h=1 & f_threads=false options test the branch with reuse of q̄ from prev. iter:
     transcription = OrthogonalCollocation(1, no; roots, f_threads=false, h_threads=true)
     mhe2 = MovingHorizonEstimator(dae; He=2, Cwt=1e4, direct=false, transcription)
     preparestate!(mhe2, [0.0], [0.0])

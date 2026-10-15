@@ -1162,6 +1162,51 @@ end
 
 end
 
+@testitem "NonLinMPC moves & getinfo (NonLinModelDAE, OC)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using DifferentiationInterface
+    import FiniteDiff
+
+    function fq!(ẋ, res, x, a, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        res[] = x[] - a[]
+        return nothing
+    end
+    function h!(y, x, a, d, _ )
+        y[] = x[] + a[] + 0.1 * d[]
+    end
+    Kp = 2*0.2 # static gain for input, factor 2 since the output is 2*x (a==x)
+    Ts, p = 100.0, [0.01]
+    as_0, xs_0 = [-1.0], [1.0]
+    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p, xs_0, as_0)
+
+    no, roots = 3, :gausslegendre
+    transcription = OrthogonalCollocation(0, no; roots, f_threads=true, h_threads=false)
+    nmpc = NonLinMPC(dae; Hp=100, Hc=1, He=2, Nwt=[0.0], transcription)
+    preparestate!(nmpc, [0.0], [0.0])
+    u = moveinput!(nmpc, [Kp], [0.0])
+    @test u ≈ [1.0] atol=5e-2
+    info = getinfo(nmpc)
+    @test info[:u] ≈ u
+    @test info[:Ŷ][end] ≈ Kp atol=5e-3
+
+    no, roots = 2, :gaussradau
+    transcription = OrthogonalCollocation(1, no; roots, f_threads=false, h_threads=true)
+    nmpc2 = NonLinMPC(dae; Hp=100, Hc=1, He=2, Nwt=[0.0], transcription)
+    preparestate!(nmpc2, [0.0], [0.0])
+    u = moveinput!(nmpc2, [Kp], [0.0])
+    @test u ≈ [1.0] atol=5e-2
+
+    initstate!(nmpc2, [0], [0], [0])
+    nX̂, nÂ, nK̄, nĀ = nmpc2.estim.nx̂*100, dae.na*100, dae.nx*no*100, dae.na*no*100
+    @test nmpc2.Z̃[1:1] ≈ [0.0] # Δu in ΔU
+    @test nmpc2.Z̃[(1 + 1):(1 + nX̂)] ≈ repeat([xs_0; 0.0], 100)           # x̂d and x̂s in X̂0
+    @test nmpc2.Z̃[(1 + nX̂ + 1):(1 + nX̂ + nÂ)] ≈ repeat(as_0, 100)               # â0 in Â0
+    @test nmpc2.Z̃[(1 + nX̂ + nÂ + 1):(1 + nX̂ + nÂ + nK̄)] ≈ repeat(xs_0, no*100)  # k̄ in K̄
+    @test nmpc2.Z̃[(1 + nX̂ + nÂ + nK̄ + 1):end-1] ≈ repeat(as_0, no*100)          # ā in Ā
+    
+end
+
 @testitem "NonLinMPC step disturbance rejection" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = setop!(LinModel(tf(5, [2000, 1]), 3000.0), yop=[10])
