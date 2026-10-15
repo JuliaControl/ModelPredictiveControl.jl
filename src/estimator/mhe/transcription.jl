@@ -1215,7 +1215,7 @@ The warm-starting vector is provided in Extended Help.
         \mathbf{â_0}(k-N_k+p|k-1)       \\
         \mathbf{â_0}(k-N_k+p+1|k-1)     \\
         \mathbf{â_0}(k-N_k+p+2|k-1)     \\
-        \vdots
+        \vdots                          \\
         \mathbf{â_0}(k-p-2|k-1)         \\
         \mathbf{â_0}(k-p-1|k-1)         \\
         \mathbf{a_0}(k-p-1|k-1)         \\
@@ -1334,7 +1334,7 @@ The warm-starting vector is provided in Extended Help.
         \mathbf{â_0}(k-N_k+p|k-1)       \\
         \mathbf{â_0}(k-N_k+p+1|k-1)     \\
         \mathbf{â_0}(k-N_k+p+2|k-1)     \\
-        \vdots
+        \vdots                          \\
         \mathbf{â_0}(k-p-2|k-1)         \\
         \mathbf{â_0}(k-p-1|k-1)         \\
         \mathbf{â_0}(k-p-1|k-1)         \\
