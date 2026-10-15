@@ -618,14 +618,20 @@ end
 
 """
     init_defectmat(
-        model::SimModelODE, estim::StateEstimator, transcription::SingleShooting, 
+        model::SimModel, estim::StateEstimator, transcription::SingleShooting, 
         Hp, Hc, nb, Co=nothing, λo=nothing
     ) -> ES, GS, JS, KS, VS, BS
 
-Return empty matrices for [`SingleShooting`](@ref) transcription (N/A).
+Return empty matrices for all [`SingleShooting`](@ref) cases (N/A).
 """
 function init_defectmat(
-    ::SimModelODE, estim::StateEstimator, transcription::SingleShooting,
+    ::SimModel, estim::StateEstimator, transcription::SingleShooting,
+    Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
+)
+    return init_defectmat_empty(estim, transcription, Hp, Hc)
+end
+function init_defectmat(
+    ::SimModel, estim::InternalModel, transcription::SingleShooting,
     Hp, Hc, ::Any, ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
