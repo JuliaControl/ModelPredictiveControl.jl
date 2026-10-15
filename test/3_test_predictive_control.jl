@@ -905,6 +905,34 @@ end
     @test_throws ArgumentError OrthogonalCollocation(2)
 end
 
+@testitem "NonLinMPC construction (NonLinModelDAE)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using JuMP, Ipopt, DifferentiationInterface
+    import FiniteDiff
+
+    function fq!(ẋ, res, x, a, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        res[] = x[] - a[]
+        return nothing
+    end
+    function h!(y, x, a, d, _ )
+        y[] = 2 * x[] + a[] + 0.1 * d[]
+    end
+    Ts, p = 100.0, [0.01]
+    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p)
+
+    transcription = TrapezoidalCollocation()
+    nmpc = NonLinMPC(dae; He=3, Hp=3, transcription)
+    @test mhe.transcription isa TrapezoidalCollocation
+
+    nmpc2 = NonLinMPC(dae; He=3, Hp=3, hessian=true)
+    @test nmpc2.transcription isa OrthogonalCollocation
+    
+    @test_throws ArgumentError NonLinMPC(dae; Hp=3, He=3, transcription=SingleShooting())
+    @test_throws ArgumentError NonLinMPC(dae; Hp=3, He=3, transcription=MultipleShooting())
+
+end
+
 @testitem "NonLinMPC moves & getinfo (LinModel, SS)" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using DifferentiationInterface
