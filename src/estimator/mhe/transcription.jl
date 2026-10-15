@@ -1245,7 +1245,7 @@ The warm-starting vector is provided in Extended Help.
     ```
     where ``\mathbf{x̂_0}(k-j|k-1)`` is the predicted state for time ``k-j`` computed at the
     last control period ``k-1``, expressed as a deviation from the operating point 
-    ``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k-j|k-1)`` and ``\mathbf{ā}(k-j|k-1)
+    ``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k-j|k-1)`` and ``\mathbf{ā}(k-j|k-1)``
     include the ``n_o`` intermediate stage predictions for the interval ``k-j``, and is also
     computed at the last control period. See the Extended Help of [`MultipleShooting`](@ref)
     and [`OrthogonalCollocation`](@ref) for the defintion of vectors ``\mathbf{0_x̂}``,
