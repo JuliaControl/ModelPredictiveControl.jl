@@ -1575,11 +1575,11 @@ end
 @doc raw"""
     con_nonlinprogeq!(
         geq, _ , Û0, K̄dot, 
-        mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
+        mpc::PredictiveController, model::SimModel, transcription::OrthogonalCollocation, 
         U0, Z̃
     ) -> geq
 
-Nonlinear equality constrains for [`NonLinModel`](@ref) and [`OrthogonalCollocation`](@ref).
+Nonlinear equality constrains for [`SimModel`](@ref) and [`OrthogonalCollocation`](@ref).
 
 The defects between the deterministic state derivative at the ``n_o`` collocation points and
 the model dynamics are computed by:
@@ -1598,62 +1598,87 @@ the model dynamics are computed by:
 ```
 for ``j = 0, 1, ... , H_p-1``, and knowing that the ``\mathbf{k}_i(k+j)`` and 
 ``\mathbf{x̂_d}(k+j)`` vectors are extracted from the decision variables in `Z̃`. The
-``\mathbf{k̇}_i`` vectors are evaluated from the continuous-time function `model.f`, as
-described in [`init_orthocolloc`](@ref). The defects for the continuity constraints and the
-stochastic states are linear equality constraints (see [`init_defectmat`](@ref)).
+``\mathbf{k̇}_i`` vectors are evaluated from the continuous-time function [`fq_dae!`](@ref),
+as described in [`init_orthocolloc`](@ref). The nonlinear equality constraints also include
+the residuals at the collocation points ``\mathf{q}_i(ℓ+j)``, see [`init_orthocolloc`](@ref).
+The residuals at the left limit of the sampling instants ``\mathbf{q^-}(ℓ+j)`` are other
+constraints: 
+```math
+\mathbf{q^-}(k+j) = \mathbf{q}\Big(\mathbf{x̂_d}(k+j), \mathbf{â_0}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big)
+```
+for ``j = 0, 1, ... , H_p-1``. The defects for the continuity constraints and the stochastic
+states are linear equality constraints (see [`init_defectmat`](@ref)).
 """
 function con_nonlinprogeq!(
     geq, _ , Û0, K̄dot,  
-    mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
+    mpc::PredictiveController, model::SimModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
     nu, nx̂, nd, nx, h = model.nu, mpc.estim.nx̂, model.nd, model.nx, transcription.h
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
-    Mo, no, τ =  mpc.Mo, transcription.no, transcription.τ
-    nk̄ = get_nk̄(model, transcription)
+    no, τ, τendIsNotOne =  transcription.no, transcription.τ, transcription.τendIsNotOne
+    Mo = mpc.Mo
+    na = get_na(model)
+    nā, nk̄ = na*no, get_nk̄(model, transcription)
+    nŜk̄, nÂ, nK̄, nĀ = nk̄*Hp, na*Hp, nk̄*Hp, nā*Hp
     D̂0 = mpc.D̂0
-    X̂0_Z̃, K̄_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)], Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nk̄*Hp)]
-    D̂temp = mpc.buffer.D̂
-    Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
+    X̂0 = @views Z̃[(1 + nΔU):(nΔU + nX̂)]
+    Â0 = @views Z̃[(1 + nΔU + nX̂):(nΔU + nX̂ + nÂ)]
+    K̄  = @views Z̃[(1 + nΔU + nX̂ + nÂ):(nΔU + nX̂ + nÂ + nK̄)]
+    Ā  = @views Z̃[(1 + nΔU + nX̂ + nÂ + nK̄):(nΔU + nX̂ + nÂ + nK̄ + nĀ)]
+    Dtemp = mpc.buffer.D̂
+    Utemp = similar(Û0) # TODO: remove this allocation
+    Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0, U0)
+    Ŝk̄ = @views geq[1:nŜk̄]
+    Q⁻ = @views geq[(nŜk̄+1):(nŜk̄+nÂ)]
+    Q̄  = @views geq[(nŜk̄+nÂ+1):end]
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
+            x̂d = @views mpc.estim.x̂0[1:nx]
             d̂0   = @views mpc.d0[1:nd]
         else
-            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
+            x̂d = @views X̂0[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         û0       = @views    Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄        = @views  K̄dot[(1 + nk̄*(j-1)):(nk̄*j)]
-        k̄_Z̃      = @views   K̄_Z̃[(1 + nk̄*(j-1)):(nk̄*j)] 
+        k̄dot     = @views  K̄dot[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄        = @views     K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        ā        = @views     Ā[(1 + nā*(j-1)):(nā*j)]
+        q̄        = @views     Q̄[(1 + nā*(j-1)):(nā*j)]
+        ŝk̄       = @views    Ŝk̄[(1 + nk̄*(j-1)):(nk̄*j)]
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
-        ŝk̄       = @views   geq[(1 + nk̄*(j-1)):(nk̄*j)]
+        q⁻next   = @views    Q⁻[(1 + na*(j-1)):(na*j)]
+        x̂dnext   = @views    X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        â0next   = @views    Â0[(1 + na*(j-1)):(na*(j-1) + na)]
+        if h > 0 && j < Hp
+            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
+        else # j = Hp special case, û0(k+Hp-1) = û0(k+Hp), since Hc≤Hp implies Δu(k+Hp) = 0:
+            û0next = û0 
+        end
         # ----------------- collocation constraint defects -----------------------------
-        Δk = k̄
+        Δk = k̄dot
         for i=1:no
-            Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄_Z̃[(1 + (i-1)*nx):(i*nx)] .- x̂d_Z̃
+            Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄[(1 + (i-1)*nx):(i*nx)] .- x̂d
         end
         mul!(ŝk̄, Mo, Δk)
-        d̂i = @views D̂temp[(1 + nd*(j-1)):(nd*j)]
-        if h > 0
-            ûi = similar(û0) # TODO: remove this allocation
-        end
+        d̂i, ûi = @views Dtemp[(1 + nd*(j-1)):(nd*j)], Utemp[(1 + nu*(j-1)):(nu*j)]
         for i=1:no
-            k̇i   = @views   k̄[(1 + (i-1)*nx):(i*nx)]
-            ki_Z̃ = @views k̄_Z̃[(1 + (i-1)*nx):(i*nx)]
-            d̂i  .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
-            if h < 1
-                model.f!(k̇i, ki_Z̃, û0, d̂i, model.p)
-            else
-                # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
-                û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
-                ûi .= (1-τ[i]).*û0 .+ τ[i].*û0next
-                model.f!(k̇i, ki_Z̃, ûi, d̂i, model.p)
-            end
+            k̇i, ki  = @views k̄dot[(1 + (i-1)*nx):(i*nx)], k̄[(1 + (i-1)*nx):(i*nx)]
+            qi, ai  = @views    q̄[(1 + (i-1)*na):(i*na)], ā[(1 + (i-1)*na):(i*na)]
+            ûi .= (1-τ[i]).*û0 .+ τ[i].*û0next
+            d̂i .= (1-τ[i]).*d̂0 .+ τ[i].*d̂0next
+            fq_dae!(k̇i, qi, model, ki, ai, ûi, d̂i)
         end
-        ŝk̄ .-= k̄
+        ŝk̄ .-= k̄dot
+        # ---------------- residual at sampling instants (τ=1) ------------------------
+        if na > 0 && τendIsNotOne
+            k̇⁻next = @views k̄dot[1:nx] 
+            fq_dae!(k̇⁻next, q⁻next, model, x̂dnext, â0next, û0next, d̂0next)
+        else
+            q⁻next .= @views â0next .- ā[end-na+1:end]
+        end
     end
     return geq
 end
