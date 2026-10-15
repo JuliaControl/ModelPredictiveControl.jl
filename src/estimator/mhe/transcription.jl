@@ -1689,7 +1689,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, X̂0, _ , Û0, K̄,
+        geq, X̂0, Û0, K̄,
         estim::MovingHorizonEstimator, model::NonLinModel, ::MultipleShooting, 
         x̂0arr, _ , Ŵ, Z̃
     ) -> geq
@@ -1707,7 +1707,7 @@ for ``j = 0, 1, ... , N_k-1`` and in which the augmented state vectors ``\mathbf
 extracted from the decision variable `Z̃`. The function ``\mathbf{f̂}`` is defined at [`f̂!`](@ref).
 """
 function con_nonlinprogeq_mhe!(
-    geq, X̂0, _ , Û0, K̄,
+    geq, X̂0, Û0, K̄,
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::MultipleShooting, 
     x̂0arr, _ , Ŵ, Z̃
 )
@@ -1742,7 +1742,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , _ , Û0, K̄dot,
+        geq, _ , Û0, K̄dot,
         estim::MovingHorizonEstimator, model::SimModel, ::TrapezoidalCollocation, 
         x̂0arr, â0arr, Ŵ, Z̃
     ) -> geq
@@ -1780,7 +1780,7 @@ plus one last residual for the arrival:
 ```
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , _ , Û0, K̄dot,
+    geq, _ , Û0, K̄dot,
     estim::MovingHorizonEstimator, model::SimModel, transcription::TrapezoidalCollocation, 
     x̂0arr, â0arr, Ŵ, Z̃
 )
@@ -1850,7 +1850,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , _ , Û0, K̄dot,
+        geq, _ , Û0, K̄dot,
         estim::MovingHorizonEstimator, model::SimModel, ::OrthogonalCollocation, 
         x̂0arr, â0arr, _ , Z̃
     ) -> geq
@@ -1888,7 +1888,7 @@ stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@r
 estimated process noise ``\mathbf{ŵ}(ℓ+j)`` are incorporated in the continuity constraint.
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , _ , Û0, K̄dot,
+    geq, _ , Û0, K̄dot,
     estim::MovingHorizonEstimator, model::SimModel, transcription::OrthogonalCollocation, 
     x̂0arr, â0arr, _ , Z̃
 )
@@ -1969,4 +1969,4 @@ function con_nonlinprogeq_mhe!(
 end
 
 "No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
-con_nonlinprogeq_mhe!(geq,_,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod,_,_,_,_) = geq
+con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod,_,_,_,_) = geq

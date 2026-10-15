@@ -930,7 +930,7 @@ function update_predictions!(
     gc  = con_custom_mhe!(gc, estim, X̂e, V̂e, Ŵe, x̄, ε) 
     g   = con_nonlinprog_mhe!(g, estim, model, transcription, X̂0, V̂, gc, ε)
     geq = con_nonlinprogeq_mhe!(
-        geq, X̂0, Â0, Û0, K̄, estim, model, transcription, x̂0arr, â0arr, Ŵ, Z̃
+        geq, X̂0, Û0, K̄, estim, model, transcription, x̂0arr, â0arr, Ŵ, Z̃
     )
     return nothing
 end
