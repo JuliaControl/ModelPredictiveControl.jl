@@ -153,7 +153,6 @@ function ĥ!(ŷ0, estim::StateEstimator, model::SimModel, x̂0, â0, d0)
     mul!(ŷ0, estim.Cs_y, x̂s, 1, 1)        # ŷ0 = y0 + Cs_y*xs
     return nothing
 end
-ĥ!(ŷ0, ::InternalModel, model::SimModel, x̂0, â0, d0) = h_dae!(ŷ0, model, x̂0, â0, d0)
 
 """
     disturbedinput!(Û0, estim::StateEstimator, x̂0, X̂0, U0) -> Û0
