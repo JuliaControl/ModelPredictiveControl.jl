@@ -923,7 +923,7 @@ end
 
     transcription = TrapezoidalCollocation()
     nmpc = NonLinMPC(dae; He=3, Hp=3, transcription)
-    @test mhe.transcription isa TrapezoidalCollocation
+    @test nmpc.transcription isa TrapezoidalCollocation
 
     nmpc2 = NonLinMPC(dae; He=3, Hp=3, hessian=true)
     @test nmpc2.transcription isa OrthogonalCollocation
