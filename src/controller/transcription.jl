@@ -1016,7 +1016,7 @@ function reset_warmstart!(mpc::PredictiveController, ::TrapezoidalCollocation)
     a0s  = as_0 
     mpc.Z̃ .= 0
     for j in 1:Hp
-        mpc.Z̃[(nΔU + nx*(j-1) + 1):(nΔU + nx*j)] .= x0s
+        mpc.Z̃[(nΔU + nx̂*(j-1) + 1):(nΔU + nx̂*(j-1) + nx)]  .= x0s
         mpc.Z̃[(nΔU + nX̂ + na*(j-1) + 1):(nΔU + nX̂ + na*j)] .= a0s
         mpc.Z̃[(nΔU + nX̂ + nÂ + na*(j-1) + 1):(nΔU + nX̂ + nÂ + na*j)] .= a0s
     end
@@ -1034,7 +1034,7 @@ function reset_warmstart!(mpc::PredictiveController, transcription::OrthogonalCo
     a0s  = as_0 
     mpc.Z̃ .= 0
     for j in 1:Hp
-        mpc.Z̃[(nΔU + nx*(j-1) + 1):(nΔU + nx*j)] .= x0s
+        mpc.Z̃[(nΔU + nx̂*(j-1) + 1):(nΔU + nx̂*(j-1) + nx)]  .= x0s
         mpc.Z̃[(nΔU + nX̂ + na*(j-1) + 1):(nΔU + nX̂ + na*j)] .= a0s
     end
     K̄ = @views mpc.Z̃[(nΔU + nX̂ + nÂ + 1):(nΔU + nX̂ + nÂ + nK̄)]
