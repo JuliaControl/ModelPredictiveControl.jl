@@ -1049,20 +1049,25 @@ end
 
 Set and return the warm-start value of `Z̃var` for [`SingleShooting`](@ref) transcription.
 
-If supported by `mpc.optim`, it warm-starts the solver at:
-```math
-\mathbf{Z̃_s} =                  \begin{bmatrix}
-    \mathbf{Δu}(k+0|k-1)        \\ 
-    \mathbf{Δu}(k+1|k-1)        \\ 
-    \vdots                      \\
-    \mathbf{Δu}(k+H_c-3|k-1)    \\
-    \mathbf{Δu}(k+H_c-2|k-1)    \\
-    \mathbf{0}                  \\
-    ϵ_{k-1}
-\end{bmatrix}
-```
-where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
-last control period ``k-1``, and ``ϵ_{k-1}``, the slack variable of the last control period.
+The warm-starting vector is provided in the Extended Help.
+
+# Extended Help
+!!! details "Extended Help"
+    If supported by `mpc.optim`, it warm-starts the solver at:
+    ```math
+    \mathbf{Z̃_s} =                  \begin{bmatrix}
+        \mathbf{Δu}(k+0|k-1)        \\ 
+        \mathbf{Δu}(k+1|k-1)        \\ 
+        \vdots                      \\
+        \mathbf{Δu}(k+H_c-3|k-1)    \\
+        \mathbf{Δu}(k+H_c-2|k-1)    \\
+        \mathbf{0}                  \\
+        ϵ_{k-1}
+    \end{bmatrix}
+    ```
+    where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
+    last control period ``k-1``, and ``ϵ_{k-1}``, the slack variable of the last control
+    period.
 """
 function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
     nu, Hc, Z̃s = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
@@ -1081,47 +1086,51 @@ end
 
 Do the same but for [`OrthogonalCollocation`](@ref).
 
-It warm-starts the solver at:
-```math
-\mathbf{Z̃_s} =                      \begin{bmatrix}
-    \mathbf{Δu}(k+0|k-1)            \\ 
-    \mathbf{Δu}(k+1|k-1)            \\ 
-    \vdots                          \\
-    \mathbf{Δu}(k+H_c-3|k-1)        \\
-    \mathbf{Δu}(k+H_c-2|k-1)        \\
-    \mathbf{0}                      \\
-    \mathbf{x̂_0}(k+1|k-1)           \\
-    \mathbf{x̂_0}(k+2|k-1)           \\
-    \vdots                          \\
-    \mathbf{x̂_0}(k+H_p-2|k-1)       \\
-    \mathbf{x̂_0}(k+H_p-1|k-1)       \\
-    \mathbf{x̂_0}(k+H_p-1|k-1)       \\
-    \mathbf{â_0}(k+1|k-1)           \\
-    \mathbf{â_0}(k+2|k-1)           \\
-    \vdots                          \\
-    \mathbf{â_0}(k+H_p-2|k-1)       \\
-    \mathbf{â_0}(k+H_p-1|k-1)       \\
-    \mathbf{â_0}(k+H_p-1|k-1)       \\
-    \mathbf{k̄}(k+0|k-1)             \\
-    \mathbf{k̄}(k+1|k-1)             \\
-    \vdots                          \\
-    \mathbf{k̄}(k+H_p-3|k-1)         \\
-    \mathbf{k̄}(k+H_p-2|k-1)         \\
-    \mathbf{k̄}(k+H_p-2|k-1)         \\
-    \mathbf{ā}(k+0|k-1)             \\
-    \mathbf{ā}(k+1|k-1)             \\
-    \vdots                          \\
-    \mathbf{ā}(k+H_p-3|k-1)         \\
-    \mathbf{ā}(k+H_p-2|k-1)         \\
-    \mathbf{ā}(k+H_p-2|k-1)         \\
-    ϵ_{k-1}
-\end{bmatrix}
-```
-where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
-last control period ``k-1``, expressed as a deviation from the operating point 
-``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k+j|k-1)``  and ``\mathbf{ā}(k-j|k-1) include
-the ``n_o`` intermediate stage predictions for the interval ``k+j``, and is also computed at
-the last control period.
+The warm-starting vector is provided in the Extended Help.
+
+# Extended Help
+!!! details "Extended Help"
+    It warm-starts the solver at:
+    ```math
+    \mathbf{Z̃_s} =                      \begin{bmatrix}
+        \mathbf{Δu}(k+0|k-1)            \\ 
+        \mathbf{Δu}(k+1|k-1)            \\ 
+        \vdots                          \\
+        \mathbf{Δu}(k+H_c-3|k-1)        \\
+        \mathbf{Δu}(k+H_c-2|k-1)        \\
+        \mathbf{0}                      \\
+        \mathbf{x̂_0}(k+1|k-1)           \\
+        \mathbf{x̂_0}(k+2|k-1)           \\
+        \vdots                          \\
+        \mathbf{x̂_0}(k+H_p-2|k-1)       \\
+        \mathbf{x̂_0}(k+H_p-1|k-1)       \\
+        \mathbf{x̂_0}(k+H_p-1|k-1)       \\
+        \mathbf{â_0}(k+1|k-1)           \\
+        \mathbf{â_0}(k+2|k-1)           \\
+        \vdots                          \\
+        \mathbf{â_0}(k+H_p-2|k-1)       \\
+        \mathbf{â_0}(k+H_p-1|k-1)       \\
+        \mathbf{â_0}(k+H_p-1|k-1)       \\
+        \mathbf{k̄}(k+0|k-1)             \\
+        \mathbf{k̄}(k+1|k-1)             \\
+        \vdots                          \\
+        \mathbf{k̄}(k+H_p-3|k-1)         \\
+        \mathbf{k̄}(k+H_p-2|k-1)         \\
+        \mathbf{k̄}(k+H_p-2|k-1)         \\
+        \mathbf{ā}(k+0|k-1)             \\
+        \mathbf{ā}(k+1|k-1)             \\
+        \vdots                          \\
+        \mathbf{ā}(k+H_p-3|k-1)         \\
+        \mathbf{ā}(k+H_p-2|k-1)         \\
+        \mathbf{ā}(k+H_p-2|k-1)         \\
+        ϵ_{k-1}
+    \end{bmatrix}
+    ```
+    where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
+    last control period ``k-1``, expressed as a deviation from the operating point 
+    ``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k+j|k-1)``  and ``\mathbf{ā}(k-j|k-1)
+    include the ``n_o`` intermediate stage predictions for the interval ``k+j``, and is also
+    computed at the last control period.
 """
 function set_warmstart!(
     mpc::PredictiveController, transcription::OrthogonalCollocation, Z̃var
@@ -1161,36 +1170,40 @@ end
 
 Do the same but for other [`TranscriptionMethod`](@ref).
 
-It warm-starts the solver at:
-```math
-\mathbf{Z̃_s} =                  \begin{bmatrix}
-    \mathbf{Δu}(k+0|k-1)        \\ 
-    \mathbf{Δu}(k+1|k-1)        \\ 
-    \vdots                      \\
-    \mathbf{Δu}(k+H_c-3|k-1)    \\
-    \mathbf{Δu}(k+H_c-2|k-1)    \\
-    \mathbf{0}                  \\
-    \mathbf{x̂_0}(k+1|k-1)       \\
-    \mathbf{x̂_0}(k+2|k-1)       \\
-    \vdots                      \\
-    \mathbf{x̂_0}(k+H_p-2|k-1)   \\
-    \mathbf{x̂_0}(k+H_p-1|k-1)   \\
-    \mathbf{x̂_0}(k+H_p-1|k-1)   \\
-    \mathbf{â_0}(k+1|k-1)       \\
-    \mathbf{â_0}(k+2|k-1)       \\
-    \vdots                      \\
-    \mathbf{â_0}(k+H_p-2|k-1)   \\
-    \mathbf{â_0}(k+H_p-1|k-1)   \\
-    \mathbf{â_0}(k+H_p-1|k-1)   \\
-    \mathbf{ā}(k+0|k-1)         \\
-    \mathbf{ā}(k+1|k-1)         \\
-    \vdots                      \\
-    \mathbf{ā}(k+H_p-3|k-1)     \\
-    \mathbf{ā}(k+H_p-2|k-1)     \\
-    \mathbf{ā}(k+H_p-2|k-1)     \\
-    ϵ_{k-1}
-\end{bmatrix}
-```
+The warm-starting vector is provided in the Extended Help.
+
+# Extended Help
+!!! details "Extended Help"
+    It warm-starts the solver at:
+    ```math
+    \mathbf{Z̃_s} =                  \begin{bmatrix}
+        \mathbf{Δu}(k+0|k-1)        \\ 
+        \mathbf{Δu}(k+1|k-1)        \\ 
+        \vdots                      \\
+        \mathbf{Δu}(k+H_c-3|k-1)    \\
+        \mathbf{Δu}(k+H_c-2|k-1)    \\
+        \mathbf{0}                  \\
+        \mathbf{x̂_0}(k+1|k-1)       \\
+        \mathbf{x̂_0}(k+2|k-1)       \\
+        \vdots                      \\
+        \mathbf{x̂_0}(k+H_p-2|k-1)   \\
+        \mathbf{x̂_0}(k+H_p-1|k-1)   \\
+        \mathbf{x̂_0}(k+H_p-1|k-1)   \\
+        \mathbf{â_0}(k+1|k-1)       \\
+        \mathbf{â_0}(k+2|k-1)       \\
+        \vdots                      \\
+        \mathbf{â_0}(k+H_p-2|k-1)   \\
+        \mathbf{â_0}(k+H_p-1|k-1)   \\
+        \mathbf{â_0}(k+H_p-1|k-1)   \\
+        \mathbf{ā}(k+0|k-1)         \\
+        \mathbf{ā}(k+1|k-1)         \\
+        \vdots                      \\
+        \mathbf{ā}(k+H_p-3|k-1)     \\
+        \mathbf{ā}(k+H_p-2|k-1)     \\
+        \mathbf{ā}(k+H_p-2|k-1)     \\
+        ϵ_{k-1}
+    \end{bmatrix}
+    ```
 """
 function set_warmstart!(
     mpc::PredictiveController, transcription::TranscriptionMethod, Z̃var

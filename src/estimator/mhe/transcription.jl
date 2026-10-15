@@ -1123,11 +1123,11 @@ end
 
 Set and return the warm-start value of `Z̃var` for [`MovingHorizonEstimator`](@ref).
 
-If supported by `estim.optim` and based a [`SingleShooting`](@ref) transcription, it
-warm-starts the solver at the value provided in Extended Help.
+The warm-starting vector is provided in the Extended Help.
 
 # Extended Help
 !!! details "Extended Help"
+    If supported by `estim.optim` it warm-starts the solver at:
     ```math
     \mathbf{Z̃_s} = 
     \begin{bmatrix}
@@ -1142,13 +1142,13 @@ warm-starts the solver at the value provided in Extended Help.
         \mathbf{0_ŵ}
     \end{bmatrix}
     ```
-    where ``ε_{k-1}`` and ``\mathbf{ŵ}(k-j|k-1)`` are respectively the slack variable and the
-    process noise estimates computed at the last time step ``k-1``. The vector 
-    ``\mathbf{x̂_0^†}(k-N_k+p)`` is the deviation vector of the state at the arrival estimated
-    at time ``k-N_k``. If the objective function is not finite at this point, all the process
-    noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. See the Extended Help of 
-    [`SingleShooting`](@ref) for the defintion of vector ``\mathbf{0_ŵ}``. The method mutates
-    all the arguments.
+    where ``ε_{k-1}`` and ``\mathbf{ŵ}(k-j|k-1)`` are respectively the slack variable and
+    the process noise estimates computed at the last time step ``k-1``. The vector 
+    ``\mathbf{x̂_0^†}(k-N_k+p)`` is the deviation vector of the state at the arrival
+    estimated at time ``k-N_k``. If the objective function is not finite at this point, all
+    the process noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. See the Extended
+    Help of [`SingleShooting`](@ref) for the defintion of vector ``\mathbf{0_ŵ}``. The
+    method mutates all the arguments.
 """
 function set_warmstart!(
     estim::MovingHorizonEstimator{NT}, transcription::SingleShooting, Z̃var
@@ -1195,7 +1195,7 @@ end
 
 Do the same but for [`OrthogonalCollocation`](@ref).
 
-The warm-starting value is provided in Extended Help.
+The warm-starting vector is provided in Extended Help.
 
 # Extended Help
 !!! details "Extended Help"
@@ -1314,7 +1314,7 @@ end
 
 Do the same but for other transcription [`TranscriptionMethod`](@ref).
 
-The warm-starting value is provided in Extended Help.
+The warm-starting vector is provided in Extended Help.
 
 # Extended Help
 !!! details "Extended Help"
