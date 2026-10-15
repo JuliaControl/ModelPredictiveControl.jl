@@ -1476,7 +1476,7 @@ end
     @test mhe2.Z̃[2:2] ≈ mhe2.Z̃[4:4] ≈ mhe2.Z̃[6:6] ≈ xs_0           # xd in X̂0
     @test mhe2.Z̃[3:3] ≈ mhe2.Z̃[5:5] ≈ mhe2.Z̃[7:7] ≈ [0.0]          # xs in X̂0
     @test mhe2.Z̃[8:8] ≈ mhe2.Z̃[9:9] ≈ mhe2.Z̃[10:10] ≈ as_0         # â0 in Â0
-    @test mhe2.Z̃[11:11] ≈ mhe2.Z̃[12:12] ≈ as_0                     # a1 in Ā
+    @test mhe2.Z̃[11:11] ≈ mhe2.Z̃[12:12] ≈ as_0                     # a⁺ in Ā
 end
 
 @testitem "MHE estim. & getinfo (NonLinModelDAE, OC)" setup=[SetupMPCtests] begin
