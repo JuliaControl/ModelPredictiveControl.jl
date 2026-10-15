@@ -34,7 +34,6 @@ ModelPredictiveControl.get_nonlincon_oracle(::NonLinMPC, ::ModelPredictiveContro
 
 ```@docs
 ModelPredictiveControl.optim_objective!(::PredictiveController)
-ModelPredictiveControl.set_warmstart_mpc!
 ModelPredictiveControl.predict!
 ModelPredictiveControl.con_nonlinprog!
 ModelPredictiveControl.con_nonlinprogeq!

@@ -1039,7 +1039,7 @@ function reset_warmstart!(mpc::PredictiveController, transcription::OrthogonalCo
 end
 
 @doc raw"""
-    set_warmstart_mpc!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
+    set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
 
 Set and return the warm-start value of `Z̃var` for [`SingleShooting`](@ref) transcription.
 
@@ -1058,7 +1058,7 @@ If supported by `mpc.optim`, it warm-starts the solver at:
 where ``\mathbf{Δu}(k+j|k-1)`` is the input increment for time ``k+j`` computed at the 
 last control period ``k-1``, and ``ϵ_{k-1}``, the slack variable of the last control period.
 """
-function set_warmstart_mpc!(mpc::PredictiveController, ::SingleShooting, Z̃var)
+function set_warmstart!(mpc::PredictiveController, ::SingleShooting, Z̃var)
     nu, Hc, Z̃s = mpc.estim.model.nu, mpc.Hc, mpc.buffer.Z̃
     nΔU = nu*Hc
     # --- input increments ΔU ---
@@ -1071,7 +1071,7 @@ function set_warmstart_mpc!(mpc::PredictiveController, ::SingleShooting, Z̃var)
 end
 
 @doc raw"""
-    set_warmstart_mpc!(mpc::PredictiveController, ::OrthogonalCollocation, Z̃var) -> Z̃s
+    set_warmstart!(mpc::PredictiveController, ::OrthogonalCollocation, Z̃var) -> Z̃s
 
 Do the same but for [`OrthogonalCollocation`](@ref).
 
@@ -1117,7 +1117,7 @@ last control period ``k-1``, expressed as a deviation from the operating point
 the ``n_o`` intermediate stage predictions for the interval ``k+j``, and is also computed at
 the last control period.
 """
-function set_warmstart_mpc!(
+function set_warmstart!(
     mpc::PredictiveController, transcription::OrthogonalCollocation, Z̃var
 )
     nu, nx̂ = mpc.estim.model.nu, mpc.estim.nx̂
@@ -1151,7 +1151,7 @@ function set_warmstart_mpc!(
 end
 
 @doc raw"""
-    set_warmstart_mpc!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var) -> Z̃s
+    set_warmstart!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var) -> Z̃s
 
 Do the same but for other [`TranscriptionMethod`](@ref).
 
@@ -1186,7 +1186,7 @@ It warm-starts the solver at:
 \end{bmatrix}
 ```
 """
-function set_warmstart_mpc!(
+function set_warmstart!(
     mpc::PredictiveController, transcription::TranscriptionMethod, Z̃var
 )
     nu, nx̂ = mpc.estim.model.nu, mpc.estim.nx̂

@@ -598,7 +598,7 @@ end
 
 Optimize objective of `estim` [`MovingHorizonEstimator`](@ref) and return the solution `Z̃`.
 
-If first warm-starts the solver with [`set_warmstart_mhe!`](@ref). It then calls 
+If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls 
 `JuMP.optimize!(estim.optim)` and extract the solution. A failed optimization prints an 
 `@error` log in the REPL and returns the warm-start value. A failed optimization also prints
 [`getinfo`](@ref) results in the debug log [if activated](@extref Julia Example:-Enable-debug-level-messages).
@@ -606,7 +606,7 @@ If first warm-starts the solver with [`set_warmstart_mhe!`](@ref). It then calls
 function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
     optim = estim.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
-    Z̃s = set_warmstart_mhe!(estim, estim.transcription, Z̃var)
+    Z̃s = set_warmstart!(estim, estim.transcription, Z̃var)
     set_force∇!(estim)
     # ------- solve optimization problem --------------
     try

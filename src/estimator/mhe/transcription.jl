@@ -1117,7 +1117,7 @@ function reset_warmstart!(estim::MovingHorizonEstimator, transcription::Orthogon
 end
 
 @doc raw"""
-    set_warmstart_mhe!(
+    set_warmstart!(
         estim::MovingHorizonEstimator, transcription::SingleShooting, Z̃var
     ) -> Z̃s
 
@@ -1150,7 +1150,7 @@ warm-starts the solver at the value provided in Extended Help.
     [`SingleShooting`](@ref) for the defintion of vector ``\mathbf{0_ŵ}``. The method mutates
     all the arguments.
 """
-function set_warmstart_mhe!(
+function set_warmstart!(
     estim::MovingHorizonEstimator{NT}, transcription::SingleShooting, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
@@ -1189,7 +1189,7 @@ function set_warmstart_mhe!(
 end
 
 @doc raw"""
-    set_warmstart_mhe!(
+    set_warmstart!(
         estim::MovingHorizonEstimator, transcription::OrthogonalCollocation, Z̃var
     ) -> Z̃s
 
@@ -1251,7 +1251,7 @@ The warm-starting value is provided in Extended Help.
     and [`OrthogonalCollocation`](@ref) for the defintion of vectors ``\mathbf{0_x̂}``,
     ``\mathbf{0_â}``, ``\mathbf{0_k}`` and ``\mathbf{0_ŵ}``.
 """
-function set_warmstart_mhe!(
+function set_warmstart!(
     estim::MovingHorizonEstimator{NT}, transcription::OrthogonalCollocation, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
@@ -1308,7 +1308,7 @@ function set_warmstart_mhe!(
 end
 
 @doc raw"""
-    set_warmstart_mhe!(
+    set_warmstart!(
         estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃var
     ) -> Z̃s
 
@@ -1356,7 +1356,7 @@ The warm-starting value is provided in Extended Help.
     \end{bmatrix}
     ```
 """
-function set_warmstart_mhe!(
+function set_warmstart!(
     estim::MovingHorizonEstimator{NT}, transcription::TranscriptionMethod, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
