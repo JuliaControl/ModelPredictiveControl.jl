@@ -1249,7 +1249,7 @@ The warm-starting vector is provided in Extended Help.
     include the ``n_o`` intermediate stage predictions for the interval ``k-j``, and is also
     computed at the last control period. See the Extended Help of [`MultipleShooting`](@ref)
     and [`OrthogonalCollocation`](@ref) for the defintion of vectors ``\mathbf{0_x̂}``,
-    ``\mathbf{0_â}``, ``\mathbf{0_k}`` and ``\mathbf{0_ŵ}``.
+    ``\mathbf{0_â}``, ``\mathbf{0_k̄}``, ``\mathbf{0_ā}``,  and ``\mathbf{0_ŵ}``.
 """
 function set_warmstart!(
     estim::MovingHorizonEstimator{NT}, transcription::OrthogonalCollocation, Z̃var
