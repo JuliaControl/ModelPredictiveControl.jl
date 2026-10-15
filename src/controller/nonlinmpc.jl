@@ -147,6 +147,7 @@ struct NonLinMPC{
             Uop, Yop, Dop,
             buffer
         )
+        reset_warmstart!(mpc, transcription)
         init_optimization!(mpc, model, optim)
         return mpc
     end
@@ -1117,7 +1118,7 @@ end
 
 """
     update_predictions!(
-        ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, Â0, gc, g, geq, 
+        ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq, 
         mpc::PredictiveController, Z̃
     ) -> nothing
 
@@ -1126,7 +1127,7 @@ Update in-place all vectors for the predictions of `mpc` controller at decision 
 The method mutates all the arguments before the `mpc` argument.
 """
 function update_predictions!(
-    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, Â0, gc, g, geq, 
+    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq, 
     mpc::PredictiveController, Z̃
 )
     model, transcription = mpc.estim.model, mpc.transcription

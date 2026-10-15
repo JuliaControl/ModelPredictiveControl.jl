@@ -7,8 +7,8 @@ It also stores `u - mpc.estim.model.uop` at `mpc.lastu0` for converting the inpu
 ``\mathbf{ΔU}`` to inputs ``\mathbf{U}``.
 """
 function initstate!(mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty)
-    mpc.Z̃ .= 0
     mpc.lastu0 .= u .- mpc.estim.model.uop
+    reset_warmstart!(mpc, mpc.transcription)
     return initstate!(mpc.estim, u, ym, d)
 end
 
@@ -144,14 +144,15 @@ julia> round.(getinfo(mpc)[:Ŷ], digits=3)
 """
 function getinfo(mpc::PredictiveController{NT}) where NT<:Real
     model, buffer, transcription = mpc.estim.model, mpc.buffer, mpc.transcription
-    nΔŨ, nK = mpc.Hc*model.nu + mpc.nϵ, mpc.Hp*model.nk̄
+    nk̄ = get_nk̄(model, transcription)
+    nΔŨ, nK̄ = mpc.Hc*model.nu + mpc.nϵ, mpc.Hp*nk̄
     nŶe, nUe = (mpc.Hp+1)*model.ny, (mpc.Hp+1)*model.nu
     nX̂0, nÛ0 = mpc.estim.nx̂*mpc.Hp, model.nu*mpc.Hp 
     Z̃ = mpc.Z̃
     info = Dict{Symbol, Any}()
     ΔŨ     = Vector{NT}(undef, nΔŨ)
     x̂0end  = similar(mpc.estim.x̂0)
-    K      = Vector{NT}(undef, nK) 
+    K      = Vector{NT}(undef, nK̄) 
     Ue, Ŷe = Vector{NT}(undef, nUe), Vector{NT}(undef, nŶe)
     U0, Ŷ0 = similar(mpc.Uop), similar(mpc.Yop)
     Û0, X̂0 = Vector{NT}(undef, nÛ0), Vector{NT}(undef, nX̂0)
@@ -277,25 +278,25 @@ function initpred!(mpc::PredictiveController, model::LinModel, ry, d, lastu, D̂
 end
 
 @doc raw"""
-    initpred!(mpc::PredictiveController, model::SimModelODE, ry, d, lastu, D̂, R̂y, R̂u) -> nothing
+    initpred!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u) -> nothing
 
 Init `lastu0, ŷ, F, d0, D̂0, D̂e, R̂y, R̂u` vectors when model is not a [`LinModel`](@ref).
 """
-function initpred!(mpc::PredictiveController, model::SimModelODE, ry, d, lastu, D̂, R̂y, R̂u)
+function initpred!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u)
     initpred_common!(mpc, model, ry, d, lastu, D̂, R̂y, R̂u)
     return nothing
 end
 
 """
-    initpred_common!(mpc::PredictiveController, model::SimModelODE, ry, d, lastu, D̂, R̂y, R̂u) -> F
+    initpred_common!(mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u) -> F
 
-Common computations of `initpred!` for all types of [`SimModelODE`](@ref).
+Common computations of `initpred!` for all types of [`SimModel`](@ref).
 
 Will also init `mpc.F` with 0 values, or with the stochastic predictions `Ŷs` if `mpc.estim`
 is an [`InternalModel`](@ref). The function returns `mpc.F`.
 """
 function initpred_common!(
-    mpc::PredictiveController, model::SimModelODE, ry, d, lastu, D̂, R̂y, R̂u
+    mpc::PredictiveController, model::SimModel, ry, d, lastu, D̂, R̂y, R̂u
 )
     mpc.lastu0 .= lastu .- model.uop
     mul!(mpc.Tu_lastu0, mpc.Tu, mpc.lastu0)
@@ -327,14 +328,14 @@ end
 predictstoch!(Ŷs, ::PredictiveController, ::StateEstimator) = (Ŷs .= 0; nothing)
 
 @doc raw"""
-    linconstraint_custom!(mpc::PredictiveController, model::SimModelODE)
+    linconstraint_custom!(mpc::PredictiveController, model::SimModel)
 
 Init the ``\mathbf{F_w}`` vector for the custom linear inequality constraints.
 
 See [`relaxW`](@ref) for the definition of the vector. The function does nothing if
 `mpc.con.nw < 1`.
 """
-function linconstraint_custom!(mpc::PredictiveController, model::SimModelODE)
+function linconstraint_custom!(mpc::PredictiveController, model::SimModel)
     mpc.con.nw < 1 && return nothing
     ny, nu, nd, buffer = model.ny, model.nu, model.nd, mpc.buffer
     Fw = mpc.con.Fw
@@ -509,7 +510,7 @@ end
 set_force∇!(::PredictiveController) = nothing
 
 "By default, no need to update the objective function."
-set_objective_linear_coef!(::PredictiveController, ::SimModelODE, _) = nothing
+set_objective_linear_coef!(::PredictiveController, ::SimModel, _) = nothing
 
 "Update the linear coefficients of the quadratic objective with `mpc.q̃` for `LinModel`."
 function set_objective_linear_coef!(mpc::PredictiveController, ::LinModel, Z̃var)

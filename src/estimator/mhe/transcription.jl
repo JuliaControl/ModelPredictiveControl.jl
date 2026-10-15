@@ -1054,6 +1054,15 @@ linconstrainteq!(::MovingHorizonEstimator, ::SimModel, ::SingleShooting) = nothi
 
 Reset warm-starting values `estim.Z̃` at values stored in `estim.model`
 """
+function reset_warmstart!(estim::MovingHorizonEstimator, ::SingleShooting)
+    model = estim.model
+    nx, nε = model.nx, estim.nε
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
+    return nothing
+end
 function reset_warmstart!(estim::MovingHorizonEstimator, ::MultipleShooting)
     model = estim.model
     nx, nx̂, nx̃, nε, He = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He
@@ -1104,15 +1113,6 @@ function reset_warmstart!(estim::MovingHorizonEstimator, transcription::Orthogon
     repeat!(K̄, x0s, no*He)
     Ā = @views estim.Z̃[(nx̃+nx̂*He+na+na*He+nk̄*He+1):(nx̃+nx̂*He+na+na*He+nk̄*He+nā*He)]
     repeat!(Ā, a0s, no*He)
-    return nothing
-end
-function reset_warmstart!(estim::MovingHorizonEstimator, ::SingleShooting)
-    model = estim.model
-    nx, nε = model.nx, estim.nε
-    x0s  = model.buffer.x
-    x0s .= model.xs_0 .- model.xop
-    estim.Z̃ .= 0
-    estim.Z̃[nε+1:nε+nx] = x0s
     return nothing
 end
 
@@ -1339,6 +1339,13 @@ The warm-starting value is provided in Extended Help.
         \mathbf{â_0}(k-p-1|k-1)         \\
         \mathbf{â_0}(k-p-1|k-1)         \\
         \mathbf{0_â}                    \\
+        \mathbf{ā}(k-N_k+p+0|k-1)       \\
+        \mathbf{ā}(k-N_k+p+1|k-1)       \\
+        \vdots                          \\
+        \mathbf{ā}(k+p-3|k-1)           \\
+        \mathbf{ā}(k+p-2|k-1)           \\
+        \mathbf{ā}(k+p-2|k-1)           \\
+        \mathbf{0_ā}                    \\
         \mathbf{ŵ}(k-N_k+p+0|k-1)       \\
         \mathbf{ŵ}(k-N_k+p+1|k-1)       \\
         \vdots                          \\
@@ -1371,7 +1378,7 @@ function set_warmstart_mhe!(
     i_base = nx̃ + nX̂ 
     Z̃s[(i_base+1):(i_base+nÂ)]       .= @views estim.Z̃[(i_base+na+1):(i_base+na+nÂ)]
     Z̃s[(i_base+nÂ+1):(i_base+na+nÂ)] .= @views estim.Z̃[(i_base+nÂ+1):(i_base+na+nÂ)]
-    # --- algebraic variables Ā --- 
+    # --- algebraic variables at collocation points Ā --- 
     i_base = nx̃ + nX̂ + na + nÂ
     Z̃s[(i_base+1):(i_base+nĀ-nā)]    .= @views estim.Z̃[(i_base+nā+1):(i_base+nĀ)]
     Z̃s[(i_base+nĀ-nā+1):(i_base+nĀ)] .= @views estim.Z̃[(i_base+nĀ-nā+1):(i_base+nĀ)]
@@ -1554,8 +1561,8 @@ end
 
 Compute the vectors for all other cases.
 
-The function mutates `V̂`, `X̂0`, and `Ŷ0` vector arguments. The augmented output function 
-[`ĥ!`](@ref) is called multiple times in a `for` loop from ``j=1`` to ``N_k``.
+The function mutates `V̂`, `X̂0`, `Â0`, and `Ŷ0` vector arguments. The augmented output
+function [`ĥ!`](@ref) is called multiple times in a `for` loop from ``j=1`` to ``N_k``.
 """
 function predict_mhe!(
     V̂, X̂0, Â0, _ , _ , Ŷ0, 
@@ -1696,15 +1703,19 @@ end
 
 Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K̄` vectors in argument. By introducing 
-the integer ``ℓ = k - N_k + p`` to shorten the notation, the defects of the estimated states
-are computed with:
+The method mutates the `geq`, `X̂0`, `Û0` and `K̄` vectors in argument. The defects of the 
+stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@ref)). By
+introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the defects of the
+estimated states are computed with:
 ```math
-\mathbf{ŝ}(ℓ+j+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(ℓ+j), \mathbf{u_0}(ℓ+j), \mathbf{d_0}(ℓ+j)\Big) 
-                           + \mathbf{ŵ}(ℓ+j) - \mathbf{x̂_0}(ℓ+j+1)
+\mathbf{ŝ_d}(ℓ+j+1) = \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j), \mathbf{u_0}(ℓ+j), \mathbf{d_0}(ℓ+j), \mathbf{p}\Big) 
+                           + \mathbf{ŵ_d}(ℓ+j) - \mathbf{x̂_d}(ℓ+j+1)
 ```
-for ``j = 0, 1, ... , N_k-1`` and in which the augmented state vectors ``\mathbf{x̂_0}`` are 
-extracted from the decision variable `Z̃`. The function ``\mathbf{f̂}`` is defined at [`f̂!`](@ref).
+for ``j = 0, 1, ... , N_k-1`` and in which the deterministic state vectors ``\mathbf{x̂_d}``
+are first `model.nx` elements of the augmented states ``\mathbf{x̂_0}``, and they are
+extracted from the decision variable `Z̃`. The function ``\mathbf{f}`` is the deterministic
+state update function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is defined in
+[`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq_mhe!(
     geq, X̂0, Û0, K̄,
@@ -1716,7 +1727,7 @@ function con_nonlinprogeq_mhe!(
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     nw = nŵ - nxs
-    p = estim.direct ? 0 : 1
+    i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)]
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
     @threadsif f_threads for j=1:Nk
@@ -1725,7 +1736,7 @@ function con_nonlinprogeq_mhe!(
         else
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
         end
-        d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
+        d0       = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
         k̄        = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
@@ -1784,7 +1795,6 @@ function con_nonlinprogeq_mhe!(
     estim::MovingHorizonEstimator, model::SimModel, transcription::TrapezoidalCollocation, 
     x̂0arr, â0arr, Ŵ, Z̃
 )
-    # TODO: u0next et d0next sont des bons noms
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
     nx̂, nx̃, nxs, nŵ, He = estim.nx̂, estim.nx̃, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]

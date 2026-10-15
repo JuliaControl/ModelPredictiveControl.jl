@@ -459,7 +459,7 @@ The matrices ``\mathbf{E_S}`` and ``\mathbf{K_S}`` are defined in the Extended H
     ```
 """
 function init_defectmat(
-    model::SimModel, estim::StateEstimator{NT}, ::TranscriptionMethod, 
+    model::SimModel, estim::StateEstimator{NT}, transcription::TranscriptionMethod, 
     Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 ) where {NT<:Real}
     nu, nx, nd, nx̂, nxs = model.nu, model.nx, model.nd, estim.nx̂, estim.nxs
@@ -807,7 +807,7 @@ end
 deletex̂end_lincon!(i_x̂min, i_x̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_x̂min, i_x̂max
 
 @doc raw"""
-    linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
+    linconstraint!(mpc::PredictiveController, model::LinModel, ::ShootingMethod)
 
 Set `b` vector for the linear model inequality constraints (``\mathbf{A Z̃ ≤ b}``) of MPC.
 
@@ -816,7 +816,7 @@ Also init ``\mathbf{f_x̂} = \mathbf{g_x̂ d_0}(k) + \mathbf{j_x̂ D̂_0} + \mat
 [`init_predmat`](@ref). The ``\mathbf{F_w}`` vector for the custom linear constraints is
 also updated, see [`relaxW`](@ref).
 """
-function linconstraint!(mpc::PredictiveController, model::LinModel, ::TranscriptionMethod)
+function linconstraint!(mpc::PredictiveController, model::LinModel, ::ShootingMethod)
     nU, nΔU, nY = length(mpc.con.U0min), length(mpc.con.ΔUmin), length(mpc.con.Y0min)
     nW = length(mpc.con.Wmin)
     nx̂, fx̂ = mpc.estim.nx̂, mpc.con.fx̂
@@ -856,7 +856,7 @@ function linconstraint!(mpc::PredictiveController, model::LinModel, ::Transcript
 end
 
 "Set `b` excluding predicted output constraints for `NonLinModel` and not `SingleShooting`."
-function linconstraint!(mpc::PredictiveController, model::NonLinModel, ::TranscriptionMethod)
+function linconstraint!(mpc::PredictiveController, model::SimModel, ::TranscriptionMethod)
     nU, nΔU = length(mpc.con.U0min), length(mpc.con.ΔUmin)
     nW = length(mpc.con.Wmin)
     nx̂ = mpc.estim.nx̂
@@ -937,7 +937,7 @@ end
 
 """
     linconstrainteq!(
-        mpc::PredictiveController, ::SimModelODE, ::StateEstimator, ::TranscriptionMethod
+        mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
     )
 
 By default, fallback to doing same the but using the shorter equations.
@@ -947,7 +947,7 @@ constraints of [`OrthogonalCollocation`](@ref), if applicable. See [`init_defect
 for the equation.
 """
 function linconstrainteq!(
-    mpc::PredictiveController, ::SimModelODE, ::StateEstimator, ::TranscriptionMethod
+    mpc::PredictiveController, ::SimModel, ::StateEstimator, ::TranscriptionMethod
 )
     FS  = mpc.con.FS
     mul!(FS, mpc.con.KS, mpc.estim.x̂0) # the only non-zero matrix is KS
@@ -959,7 +959,7 @@ end
 
 """
     linconstrainteq!(
-        mpc::PredictiveController, ::NonLinModel, ::InternalModel, ::OrthogonalCollocation
+        mpc::PredictiveController, ::SimModel, ::InternalModel, ::OrthogonalCollocation
     )
 
 Same as above but only for the continuity constraints of [`OrthogonalCollocation`](@ref).
@@ -967,7 +967,7 @@ Same as above but only for the continuity constraints of [`OrthogonalCollocation
 There are no stochastic defects, the [`InternalModel`](@ref) does not augment the states.
 """
 function linconstrainteq!(
-    mpc::PredictiveController, ::NonLinModel, ::InternalModel, ::OrthogonalCollocation
+    mpc::PredictiveController, ::SimModel, ::InternalModel, ::OrthogonalCollocation
 )
     FS  = mpc.con.FS
     mul!(FS, mpc.con.KS, mpc.estim.x̂0) # the only non-zero matrix is KS
@@ -977,10 +977,66 @@ function linconstrainteq!(
     return nothing
 end
 "No linear equality constraints for other cases of [`InternalModel`](@ref)."
-linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel, ::TranscriptionMethod) = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel, ::TranscriptionMethod) = nothing
 "No linear equality constraints for all cases of [`SingleShooting`](@ref) (N/A)."
-linconstrainteq!(::PredictiveController, ::SimModelODE,    ::StateEstimator, ::SingleShooting) = nothing 
-linconstrainteq!(::PredictiveController, ::NonLinModel, ::InternalModel,  ::SingleShooting) = nothing 
+linconstrainteq!(::PredictiveController, ::SimModel, ::StateEstimator, ::SingleShooting) = nothing
+linconstrainteq!(::PredictiveController, ::SimModel, ::InternalModel,  ::SingleShooting) = nothing 
+
+"""
+    reset_warmstart!(mpc::PredictiveController, ::TranscriptionMethod)
+
+Reset warm-starting values `mpc.Z̃` at values stored in `mpc.estim.model`
+"""
+reset_warmstart!(mpc::PredictiveController, ::SingleShooting) = (mpc.Z̃ .= 0; nothing)
+function reset_warmstart!(mpc::PredictiveController, ::MultipleShooting)
+    model = mpc.estim.model
+    Hp, Hc, nx, nu = mpc.Hp, mpc.Hc, model.nx, model.nu
+    nΔU = nu*Hc
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    mpc.Z̃ .= 0
+    for j in 1:Hp
+        mpc.Z̃[(nΔU + nx*(j-1) + 1):(nΔU + nx*j)] .= x0s
+    end
+    return nothing
+end
+function reset_warmstart!(mpc::PredictiveController, ::TrapezoidalCollocation)
+    model = mpc.estim.model
+    Hp, Hc, nx̂, nx, nu, na = mpc.Hp, mpc.Hc, mpc.estim.nx̂, model.nx, model.nu, get_na(model)
+    nΔU, nX̂, nÂ = nu*Hc, nx̂*Hp, na*Hp
+    as_0 = get_as_0(model)
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = as_0 
+    mpc.Z̃ .= 0
+    for j in 1:Hp
+        mpc.Z̃[(nΔU + nx*(j-1) + 1):(nΔU + nx*j)] .= x0s
+        mpc.Z̃[(nΔU + nX̂ + na*(j-1) + 1):(nΔU + nX̂ + na*j)] .= a0s
+        mpc.Z̃[(nΔU + nX̂ + nÂ + na*(j-1) + 1):(nΔU + nX̂ + nÂ + na*j)] .= a0s
+    end
+    return nothing
+end
+function reset_warmstart!(mpc::PredictiveController, transcription::OrthogonalCollocation)
+    model = mpc.estim.model
+    Hp, Hc, nx̂, nx, nu, na = mpc.Hp, mpc.Hc, mpc.estim.nx̂, model.nx, model.nu, get_na(model)
+    nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
+    no = transcription.no
+    nΔU, nX̂, nÂ, nK̄, nĀ = nu*Hc, nx̂*Hp, na*Hp, nk̄*Hp, nā*Hp
+    as_0 = get_as_0(model)
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    a0s  = as_0 
+    mpc.Z̃ .= 0
+    for j in 1:Hp
+        mpc.Z̃[(nΔU + nx*(j-1) + 1):(nΔU + nx*j)] .= x0s
+        mpc.Z̃[(nΔU + nX̂ + na*(j-1) + 1):(nΔU + nX̂ + na*j)] .= a0s
+    end
+    K̄ = @views mpc.Z̃[(nΔU + nX̂ + nÂ + 1):(nΔU + nX̂ + nÂ + nK̄)]
+    repeat!(K̄, x0s, no*Hp)
+    Ā = @views mpc.Z̃[(nΔU + nX̂ + nÂ + nK̄ + 1):(nΔU + nX̂ + nÂ + nK̄ + nĀ)]
+    repeat!(Ā, a0s, no*Hp)
+    return nothing
+end
 
 @doc raw"""
     set_warmstart_mpc!(mpc::PredictiveController, ::SingleShooting, Z̃var) -> Z̃s
@@ -1034,36 +1090,60 @@ It warm-starts the solver at:
     \mathbf{x̂_0}(k+H_p-2|k-1)       \\
     \mathbf{x̂_0}(k+H_p-1|k-1)       \\
     \mathbf{x̂_0}(k+H_p-1|k-1)       \\
+    \mathbf{â_0}(k+1|k-1)           \\
+    \mathbf{â_0}(k+2|k-1)           \\
+    \vdots                          \\
+    \mathbf{â_0}(k+H_p-2|k-1)       \\
+    \mathbf{â_0}(k+H_p-1|k-1)       \\
+    \mathbf{â_0}(k+H_p-1|k-1)       \\
     \mathbf{k̄}(k+0|k-1)             \\
     \mathbf{k̄}(k+1|k-1)             \\
     \vdots                          \\
     \mathbf{k̄}(k+H_p-3|k-1)         \\
     \mathbf{k̄}(k+H_p-2|k-1)         \\
     \mathbf{k̄}(k+H_p-2|k-1)         \\
+    \mathbf{ā}(k+0|k-1)             \\
+    \mathbf{ā}(k+1|k-1)             \\
+    \vdots                          \\
+    \mathbf{ā}(k+H_p-3|k-1)         \\
+    \mathbf{ā}(k+H_p-2|k-1)         \\
+    \mathbf{ā}(k+H_p-2|k-1)         \\
     ϵ_{k-1}
 \end{bmatrix}
 ```
 where ``\mathbf{x̂_0}(k+j|k-1)`` is the predicted state for time ``k+j`` computed at the
 last control period ``k-1``, expressed as a deviation from the operating point 
-``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k+j|k-1)`` include the ``n_o`` intermediate
-stage predictions for the interval ``k+j``, and is also computed at the last control period.
+``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k+j|k-1)``  and ``\mathbf{ā}(k-j|k-1) include
+the ``n_o`` intermediate stage predictions for the interval ``k+j``, and is also computed at
+the last control period.
 """
 function set_warmstart_mpc!(
     mpc::PredictiveController, transcription::OrthogonalCollocation, Z̃var
 )
     nu, nx̂ = mpc.estim.model.nu, mpc.estim.nx̂
     Hp, Hc, Z̃s  = mpc.Hp, mpc.Hc, mpc.buffer.Z̃
-    nk̄ = get_nk̄(mpc.estim.model, transcription)
-    nΔU, nX̂, nK = nu*Hc, nx̂*Hp, nk̄*Hp
+    na = get_na(mpc.estim.model)
+    nk̄, nā = get_nk̄(mpc.estim.model, transcription), get_nā(mpc.estim.model, transcription)
+    nΔU, nX̂, nÂ, nK̄, nĀ = nu*Hc, nx̂*Hp, na*Hp, nk̄*Hp, nā*Hp 
     # --- input increments ΔU ---
     Z̃s[1:(nΔU-nu)]       .= @views mpc.Z̃[(nu+1):(nΔU)]
     Z̃s[(nΔU-nu+1):(nΔU)] .= 0
     # --- predicted states X̂0 ---
-    Z̃s[(nΔU+1):(nΔU+nX̂-nx̂)]    .= @views mpc.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
-    Z̃s[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)] .= @views mpc.Z̃[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)]
-    # --- collocation points K ---
-    Z̃s[(nΔU+nX̂+1):(nΔU+nX̂+nK-nk̄)]    .= @views mpc.Z̃[(nΔU+nX̂+nk̄+1):(nΔU+nX̂+nK)]
-    Z̃s[(nΔU+nX̂+nK-nk̄+1):(nΔU+nX̂+nK)] .= @views mpc.Z̃[(nΔU+nX̂+nK-nk̄+1):(nΔU+nX̂+nK)]
+    i_base = nΔU
+    Z̃s[(i_base+1):(i_base+nX̂-nx̂)]    .= @views mpc.Z̃[(i_base+nx̂+1):(i_base+nX̂)]
+    Z̃s[(i_base+nX̂-nx̂+1):(i_base+nX̂)] .= @views mpc.Z̃[(i_base+nX̂-nx̂+1):(i_base+nX̂)]
+    # --- algebraic variables Â0 ---
+    i_base = nΔU + nX̂
+    Z̃s[(i_base+1):(i_base+nÂ-na)]    .= @views mpc.Z̃[(i_base+na+1):(i_base+nÂ)]
+    Z̃s[(i_base+nÂ-na+1):(i_base+nÂ)] .= @views mpc.Z̃[(i_base+nÂ-na+1):(i_base+nÂ)]
+    # --- deterministic states at collocation points K̄ ---
+    i_base = nΔU + nX̂ + nÂ
+    Z̃s[(i_base+1):(i_base+nK̄-nk̄)]    .= @views mpc.Z̃[(i_base+nk̄+1):(i_base+nK̄)]
+    Z̃s[(i_base+nK̄-nk̄+1):(i_base+nK̄)] .= @views mpc.Z̃[(i_base+nK̄-nk̄+1):(i_base+nK̄)]
+    # --- algebraic variables at collocation points Ā ---
+    i_base = nΔU + nX̂ + nÂ + nK̄
+    Z̃s[(i_base+1):(i_base+nĀ-nā)]    .= @views mpc.Z̃[(i_base+nā+1):(i_base+nĀ)]
+    Z̃s[(i_base+nĀ-nā+1):(i_base+nĀ)] .= @views mpc.Z̃[(i_base+nĀ-nā+1):(i_base+nĀ)]
     # --- slack variable ϵ ---
     mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
     JuMP.set_start_value.(Z̃var, Z̃s)
@@ -1090,19 +1170,44 @@ It warm-starts the solver at:
     \mathbf{x̂_0}(k+H_p-2|k-1)   \\
     \mathbf{x̂_0}(k+H_p-1|k-1)   \\
     \mathbf{x̂_0}(k+H_p-1|k-1)   \\
+    \mathbf{â_0}(k+1|k-1)       \\
+    \mathbf{â_0}(k+2|k-1)       \\
+    \vdots                      \\
+    \mathbf{â_0}(k+H_p-2|k-1)   \\
+    \mathbf{â_0}(k+H_p-1|k-1)   \\
+    \mathbf{â_0}(k+H_p-1|k-1)   \\
+    \mathbf{ā}(k+0|k-1)         \\
+    \mathbf{ā}(k+1|k-1)         \\
+    \vdots                      \\
+    \mathbf{ā}(k+H_p-3|k-1)     \\
+    \mathbf{ā}(k+H_p-2|k-1)     \\
+    \mathbf{ā}(k+H_p-2|k-1)     \\
     ϵ_{k-1}
 \end{bmatrix}
 ```
 """
-function set_warmstart_mpc!(mpc::PredictiveController, ::TranscriptionMethod, Z̃var)
-    nu, nx̂, Hp, Hc, Z̃s = mpc.estim.model.nu, mpc.estim.nx̂, mpc.Hp, mpc.Hc, mpc.buffer.Z̃
-    nΔU, nX̂ = nu*Hc, nx̂*Hp
+function set_warmstart_mpc!(
+    mpc::PredictiveController, transcription::TranscriptionMethod, Z̃var
+)
+    nu, nx̂ = mpc.estim.model.nu, mpc.estim.nx̂
+    Hp, Hc, Z̃s  = mpc.Hp, mpc.Hc, mpc.buffer.Z̃
+    na, nā = get_na(mpc.estim.model), get_nā(mpc.estim.model, transcription)
+    nΔU, nX̂, nÂ, nĀ = nu*Hc, nx̂*Hp, na*Hp, nā*Hp 
     # --- input increments ΔU ---
     Z̃s[1:(nΔU-nu)] .= @views mpc.Z̃[nu+1:nΔU]
     Z̃s[(nΔU-nu+1):(nΔU)] .= 0
     # --- predicted states X̂0 ---
-    Z̃s[(nΔU+1):(nΔU+nX̂-nx̂)]    .= @views mpc.Z̃[(nΔU+nx̂+1):(nΔU+nX̂)]
-    Z̃s[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)] .= @views mpc.Z̃[(nΔU+nX̂-nx̂+1):(nΔU+nX̂)]
+    i_base = nΔU
+    Z̃s[(i_base+1):(i_base+nX̂-nx̂)]    .= @views mpc.Z̃[(i_base+nx̂+1):(i_base+nX̂)]
+    Z̃s[(i_base+nX̂-nx̂+1):(i_base+nX̂)] .= @views mpc.Z̃[(i_base+nX̂-nx̂+1):(i_base+nX̂)]
+    # --- algebraic variables Â0 ---
+    i_base = nΔU + nX̂
+    Z̃s[(i_base+1):(i_base+nÂ-na)]    .= @views mpc.Z̃[(i_base+na+1):(i_base+nÂ)]
+    Z̃s[(i_base+nÂ-na+1):(i_base+nÂ)] .= @views mpc.Z̃[(i_base+nÂ-na+1):(i_base+nÂ)]
+    # --- algebraic variables at collocation points Ā ---
+    i_base = nΔU + nX̂ + nÂ
+    Z̃s[(i_base+1):(i_base+nĀ-nā)]    .= @views mpc.Z̃[(i_base+nā+1):(i_base+nĀ)]
+    Z̃s[(i_base+nĀ-nā+1):(i_base+nĀ)] .= @views mpc.Z̃[(i_base+nĀ-nā+1):(i_base+nĀ)]
     # --- slack variable ϵ ---
     mpc.nϵ == 1 && (Z̃s[end] = mpc.Z̃[end])
     JuMP.set_start_value.(Z̃var, Z̃s)
@@ -1199,11 +1304,11 @@ end
 @doc raw"""
     predict!(
         Ŷ0, x̂0end, _ , _ , _ , 
-        mpc::PredictiveController, model::NonLinModel, transcription::TranscriptionMethod,
+        mpc::PredictiveController, model::SimModel, transcription::TranscriptionMethod,
         _ , Z̃
     ) -> Ŷ0, x̂0end
 
-Compute vectors if `model` is a [`NonLinModel`](@ref) and other [`TranscriptionMethod`](@ref).
+Compute the vectors for all other cases.
     
 The method mutates `Ŷ0` and `x̂0end` arguments. The augmented output function [`ĥ!`](@ref) 
 is called multiple times in a `for` loop:
@@ -1215,18 +1320,21 @@ from the decision variable `Z̃`.
 """
 function predict!(
     Ŷ0, x̂0end, _, _, _,
-    mpc::PredictiveController, model::NonLinModel, transcription::TranscriptionMethod,
+    mpc::PredictiveController, model::SimModel, transcription::TranscriptionMethod,
     _ , Z̃
 )
-    nu, ny, nd, nx̂, Hp, Hc = model.nu, model.ny, model.nd, mpc.estim.nx̂, mpc.Hp, mpc.Hc
+    nu, ny, nd, nx̂, na = model.nu, model.ny, model.nd, mpc.estim.nx̂, get_na(model)
+    Hp, Hc = mpc.Hp, mpc.Hc
+    nΔU, nX̂, nÂ = nu*Hc, nx̂*Hp, na*Hp
     h_threads = transcription.h_threads
-    X̂0 = @views Z̃[(nu*Hc+1):(nu*Hc+nx̂*Hp)] # Z̃ = [ΔU; X̂0; ϵ]
+    X̂0, Â0 = @views Z̃[(1 + nΔU):(nΔU + nX̂)], Z̃[(1 + nΔU + nX̂):(nΔU + nX̂ + nÂ)]
     D̂0 = mpc.D̂0
     @threadsif h_threads for j=1:Hp
         x̂0 = @views X̂0[(1+nx̂*(j-1)):(nx̂*j)]
+        â0 = @views Â0[(1+na*(j-1)):(na*j)]
         d̂0 = @views D̂0[(1+nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1+ny*(j-1)):(ny*j)]
-        ĥ!(ŷ0, mpc.estim, model, x̂0, d̂0)
+        ĥ!(ŷ0, mpc.estim, model, x̂0, â0, d̂0)
     end
     Ŷ0    .+= mpc.F # F = Ŷs if mpc.estim is an InternalModel, else F = 0.
     x̂0end  .= @views X̂0[(1+nx̂*(Hp-1)):(nx̂*Hp)]
@@ -1235,16 +1343,16 @@ end
 
 """
     con_nonlinprog!(
-        g, mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, _ , Ŷ0, gc, ϵ
+        g, mpc::PredictiveController, ::SimModel, ::TranscriptionMethod, _ , Ŷ0, gc, ϵ
     ) -> g
 
-Nonlinear constrains when `model` is a [`NonLinModel`](@ref) with non-[`SingleShooting`](@ref).
+Nonlinear constrains when `model` is any [`SimModel`](@ref) with non-[`SingleShooting`](@ref).
 
 The method mutates the `g` vectors in argument and returns it. The output prediction and the
 custom constraints are included in the `g` vector.
 """
 function con_nonlinprog!(
-    g, mpc::PredictiveController, ::NonLinModel, ::TranscriptionMethod, _ , Ŷ0, gc, ϵ
+    g, mpc::PredictiveController, ::SimModel, ::TranscriptionMethod, _ , Ŷ0, gc, ϵ
 )
     nŶ = length(Ŷ0)
     for i in eachindex(g)
@@ -1301,7 +1409,7 @@ end
 
 """
     con_nonlinprog!(
-        g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, _
+        g, ::PredictiveController, ::LinModel, ::ShootingMethod, _ , _ , gc, _
     ) -> g
 
 Compute the same but for [`LinModel`](@ref). 
@@ -1310,7 +1418,7 @@ The nonlinear custom inequality constraints in `gc` are the only nonlinear const
 for this case. 
 """
 function con_nonlinprog!(
-    g, ::PredictiveController, ::LinModel, ::TranscriptionMethod, _ , _ , gc, _
+    g, ::PredictiveController, ::LinModel, ::ShootingMethod, _ , _ , gc, _
 )
     for i in eachindex(g)
         g[i] = gc[i]
@@ -1331,7 +1439,7 @@ The method mutates the `geq`, `X̂0`, `Û0` and `K̄` vectors in argument. The 
 stochastic states are linear equality constraints (see [`init_defectmat`](@ref)). The
 defects of the deterministic states are computed with:
 ```math
-\mathbf{ŝ_d}(k+j+1) = \mathbf{f}\Big(\mathbf{x̂_d}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j)\Big) 
+\mathbf{ŝ_d}(k+j+1) = \mathbf{f}\Big(\mathbf{x̂_d}(k+j), \mathbf{û_0}(k+j), \mathbf{d̂_0}(k+j), \mathbf{p}\Big) 
                       - \mathbf{x̂_d}(k+j+1)
 ```
 for ``j = 0, 1, ... , H_p-1`` and in which the deterministic state ``\mathbf{x̂_d}`` are the
@@ -1373,33 +1481,40 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, _ , Û0, K̄
-        mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
+        geq, _ , Û0, K̄dot,
+        mpc::PredictiveController, model::SimModel, transcription::TrapezoidalCollocation, 
         U0, Z̃
     ) -> geq
 
-Nonlinear equality constrains for [`NonLinModel`](@ref) and [`TrapezoidalCollocation`](@ref).
+Nonlinear equality constrains for [`SimModel`](@ref) and [`TrapezoidalCollocation`](@ref).
 
 The deterministic state defects are computed with:
 ```math
-\mathbf{ŝ_d}(k+j+1) = \mathbf{x̂_d}(k+j) + 0.5 T_s [\mathbf{k̇}_1(k+j) + \mathbf{k̇}_2(k+j)] 
+\mathbf{ŝ_k}(k+j) = \mathbf{x̂_d}(k+j) + 0.5 T_s [\mathbf{k̇^+}(k+j) + \mathbf{k̇^-}(k+j+1)] 
                        - \mathbf{x̂_d}(k+j+1)                                              
 ```
 for ``j = 0, 1, ... , H_p-1``, and in which ``\mathbf{x̂_d}`` are the deterministic states
 extracted from the decision variable `Z̃`. The ``\mathbf{k̇}`` coefficients are evaluated from
-the continuous-time function `model.f!` and:
+the continuous-time function [`fq_dae!`](@ref) and:
 ```math
 \begin{aligned}
-\mathbf{k̇}_1(k+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
-\mathbf{k̇}_2(k+j) &= \mathbf{f}\Big(\mathbf{x̂_d}(k+j+1), \mathbf{û_0}(k+j+h), \mathbf{d̂_0}(k+j+1), \mathbf{p}\Big) 
+\mathbf{k̇^+}(k+j)   &= \mathbf{f}\Big(\mathbf{x̂_d}(k+j),   \mathbf{a^+}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d̂_0}(k+j),   \mathbf{p}\Big) \\
+\mathbf{k̇^-}(k+j+1) &= \mathbf{f}\Big(\mathbf{x̂_d}(k+j+1), \mathbf{â_0}(k+j+1), \mathbf{û_0}(k+j+h), \mathbf{d̂_0}(k+j+1), \mathbf{p}\Big) 
 \end{aligned}
 ```
 in which ``h`` is the hold order `transcription.h` and the disturbed input ``\mathbf{û_0}``
-is defined in [`f̂!`](@ref) documentation.
+is defined in [`f̂!`](@ref) documentation. The residuals for [`NonLinModelDAE`](@ref) are
+also computed from ``j = 0, 1, ... , H_p-1`` and:
+```math
+\begin{aligned}
+\mathbf{q^+}(k+j)   &= \mathbf{q}\Big(\mathbf{x̂_d}(k+j),   \mathbf{a^+}(k+j),   \mathbf{û_0}(k+j),   \mathbf{d_0}(k+j),   \mathbf{p}\Big) \\
+\mathbf{q^-}(k+j+1) &= \mathbf{q}\Big(\mathbf{x̂_d}(k+j+1), \mathbf{â_0}(k+j+1), \mathbf{û_0}(k+j+h), \mathbf{d_0}(k+j+1), \mathbf{p}\Big) 
+\end{aligned}
+```
 """
 function con_nonlinprogeq!(
-    geq, _ , Û0, K̄, 
-    mpc::PredictiveController, model::NonLinModel, transcription::TrapezoidalCollocation, 
+    geq, _ , Û0, K̄dot, 
+    mpc::PredictiveController, model::SimModel, transcription::TrapezoidalCollocation, 
     U0, Z̃
 )
     nu, nx̂, nd, nx, h = model.nu, mpc.estim.nx̂, model.nd, model.nx, transcription.h
@@ -1407,39 +1522,51 @@ function con_nonlinprogeq!(
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
     Ts = model.Ts
+    na = get_na(model)
     nk̄ = get_nk̄(model, transcription)
+    nŜk, nÂ, nĀ = nx*Hp, na*Hp, na*Hp
     D̂0 = mpc.D̂0
-    X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
-    Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
+    X̂0 = @views Z̃[(nΔU+1):(nΔU+nX̂)]
+    Â0 = @views Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nÂ)]
+    A⁺ = @views Z̃[(nΔU+nX̂+nÂ+1):(nΔU+nX̂+nÂ+nĀ)]
+    Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0, U0)
+    Ŝk = @views geq[1:nŜk]
+    Q⁻ = @views geq[(nŜk+1):(nŜk+nÂ)]
+    Q⁺ = @views geq[(nŜk+nÂ+1):(nŜk+nÂ+nĀ)]
     @threadsif f_threads for j=1:Hp
         if j < 2
-            x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
+            x̂d = @views mpc.estim.x̂0[1:nx]
             d̂0   = @views mpc.d0[1:nd]
         else
-            x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
+            x̂d = @views X̂0[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        û0      =  @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄        = @views    K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
-        x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
-        ŝdnext   = @views  geq[(1 + nx*(j-1)):(nx*(j-1) + nx)]
-        k̇1, k̇2   = @views k̄[1:nx], k̄[nx+1:2*nx]
-        if f_threads || h < 1 || j < 2
-            # we need to recompute k1 with multi-threading, even with h==1, since the 
-            # last iteration (j-1) may not be executed (iterations are re-orderable)
-            model.f!(k̇1, x̂d_Z̃, û0, d̂0, model.p)
-        else
-            k̇1 .= @views K̄[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))] # k2 of of the last iter. j-1
+        û0     =  @views  Û0[(1 + nu*(j-1)):(nu*j)]
+        k̄dot   = @views K̄dot[(1 + nk̄*(j-1)):(nk̄*j)]
+        a⁺     = @views   A⁺[(1 + na*(j-1)):(na*j)]
+        q⁺     = @views   Q⁺[(1 + na*(j-1)):(na*j)]
+        ŝk     = @views   Ŝk[(1 + nx*(j-1)):(nx*j)]
+        d̂0next = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
+        q⁻next = @views   Q⁻[(1 + na*(j-1)):(na*j)]
+        x̂dnext = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]  
+        â0next = @views   Â0[(1 + na*(j-1)):(na*(j-1) + na)]
+        k̇⁺, k̇⁻next = @views k̄dot[1:nx], k̄dot[nx+1:2*nx]
+        if h > 0 && j < Hp
+            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
+        else # j = Hp special case, û0(k+Hp-1) = û0(k+Hp), since Hc≤Hp implies Δu(k+Hp) = 0:
+            û0next = û0 
         end
-        if h < 1
-            model.f!(k̇2, x̂dnext_Z̃, û0, d̂0next, model.p)
+        # we need to recompute k̇⁺ & q⁺ with multi-threading, even with h>0, since the 
+        # previous iteration (j-1) may not be executed (iterations are re-orderable)
+        computeDynamicsAtBegin = f_threads || h < 1 || j < 2
+        if computeDynamicsAtBegin
+            fq_dae!(k̇⁺, q⁺, model, x̂d, a⁺, û0, d̂0)
         else
-            # j = Hp special case: u(k+Hp-1) = u(k+Hp) since Hc≤Hp implies Δu(k+Hp) = 0:
-            û0next = @views j ≥ Hp ? û0 : Û0[(1 + nu*j):(nu*(j+1))]
-            model.f!(k̇2, x̂dnext_Z̃, û0next, d̂0next, model.p)
+            k̇⁺ .= @views K̄dot[(1 + nk̄*(j-1)-nx):(nk̄*(j-1))]  # k̇⁺[j] = k̇⁻[j-1] (prev. iter)
+            q⁺ .= @views a⁺ .- Â0[(1 + na*(j-2)):(na*(j-1))] # a⁺[j] = â0[j-1] (prev. iter)
         end
-        ŝdnext .= @. x̂d_Z̃ - x̂dnext_Z̃ + 0.5*Ts*(k̇1 + k̇2)
+        fq_dae!(k̇⁻next, q⁻next, model, x̂dnext, â0next, û0next, d̂0next)
+        ŝk .= @. x̂d - x̂dnext + 0.5*Ts*(k̇⁺ + k̇⁻next)
     end
     return geq
 end
@@ -1447,7 +1574,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, _ , Û0, K̄, 
+        geq, _ , Û0, K̄dot, 
         mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
         U0, Z̃
     ) -> geq
@@ -1476,7 +1603,7 @@ described in [`init_orthocolloc`](@ref). The defects for the continuity constrai
 stochastic states are linear equality constraints (see [`init_defectmat`](@ref)).
 """
 function con_nonlinprogeq!(
-    geq, _ , Û0, K̄,  
+    geq, _ , Û0, K̄dot,  
     mpc::PredictiveController, model::NonLinModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
@@ -1499,7 +1626,7 @@ function con_nonlinprogeq!(
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
         û0       = @views    Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄        = @views     K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄        = @views  K̄dot[(1 + nk̄*(j-1)):(nk̄*j)]
         k̄_Z̃      = @views   K̄_Z̃[(1 + nk̄*(j-1)):(nk̄*j)] 
         d̂0next   = @views    D̂0[(1 + nd*(j-1)):(nd*j)]
         ŝk̄       = @views   geq[(1 + nk̄*(j-1)):(nk̄*j)]

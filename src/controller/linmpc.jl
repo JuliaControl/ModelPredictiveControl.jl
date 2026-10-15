@@ -104,6 +104,7 @@ struct LinMPC{
             Uop, Yop, Dop,
             buffer
         )
+        reset_warmstart!(mpc, transcription)
         init_optimization!(mpc, model, optim)
         return mpc
     end
