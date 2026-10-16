@@ -427,6 +427,7 @@ function simNMPC(nmpc, plant, N, ry; x_0, x̂_0, noise=false)
     return SimResult(nmpc, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data, Ry_data)
 end
 N2, ry = 61, [7.0]
+using Logging # hide
 res2 = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res2 = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0)
 end # hide
