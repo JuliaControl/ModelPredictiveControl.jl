@@ -373,16 +373,16 @@ matrices ``\mathbf{E_S, G_S, J_S, K_S, V_S, B_S}`` are defined in the Extended H
     (see [`move_blocking`](@ref)).
 """
 function init_defectmat(
-    ::LinModel, estim::StateEstimator, ::MultipleShooting, 
+    ::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, 
     Hp, Hc, nb, ::Any=nothing, ::Any=nothing
-)
+) where NT <: Real
     return init_defectmat_lin(estim, Hp, Hc, nb) 
 end
 
 function init_defectmat(
-    ::LinModel, estim::InternalModel, ::MultipleShooting,
+    ::LinModel, estim::InternalModel{NT}, ::MultipleShooting,
     Hp, Hc, nb, ::Any=nothing, ::Any=nothing
-) 
+) where NT <: Real
     return init_defectmat_lin(estim, Hp, Hc, nb) 
 end
 
@@ -943,7 +943,7 @@ function linconstrainteq!(
 end
 
 function linconstrainteq!(
-    mpc, model::LinModel, ::InternalModel, ::MultipleShooting
+    mpc::PredictiveController, model::LinModel, ::InternalModel, ::MultipleShooting
 )
     return linconstrainteq_lin!(mpc, model)
 end
