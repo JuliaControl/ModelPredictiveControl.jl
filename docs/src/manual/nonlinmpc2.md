@@ -427,7 +427,9 @@ function simNMPC(nmpc, plant, N, ry; x_0, x̂_0, noise=false)
     return SimResult(nmpc, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data, Ry_data)
 end
 N2, ry = 61, [7.0]
+res2 = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res2 = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0)
+end # hide
 p = plot(res2, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
 savefig(p, "plot3_DAEpH.svg"); nothing # hide
 display(p) # hide
@@ -441,7 +443,9 @@ easurement noise, the pH constraints are occasionally violated briefly, but the 
 responds quickly and returns the effluent pH to the specified range.
 
 ```@example 1
+res3 = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res3 = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0, noise=true)
+end # hide
 p = plot(res3, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
 savefig(p, "plot4_DAEpH.svg"); nothing # hide
 display(p) # hide
@@ -453,6 +457,8 @@ Finally, we benchmark the total runtime for this scenario, including estimation,
 and plant simulation:
 
 ```@example 1
+T = with_logger(ConsoleLogger(stderr, Error)) do # hide
 T = @elapsed simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0)
+end # hide
 println("Total optimization and simulation time for $N2 time steps: $T s")
 ```
