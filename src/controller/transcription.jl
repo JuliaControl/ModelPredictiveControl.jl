@@ -373,9 +373,21 @@ matrices ``\mathbf{E_S, G_S, J_S, K_S, V_S, B_S}`` are defined in the Extended H
     (see [`move_blocking`](@ref)).
 """
 function init_defectmat(
-    model::LinModel, estim::StateEstimator{NT}, ::MultipleShooting, 
+    ::LinModel, estim::StateEstimator, ::MultipleShooting, 
     Hp, Hc, nb, ::Any=nothing, ::Any=nothing
-) where {NT<:Real}
+)
+    return init_defectmat_lin(estim, Hp, Hc, nb) 
+end
+
+function init_defectmat(
+    ::LinModel, estim::InternalModel, ::MultipleShooting,
+    Hp, Hc, nb, ::Any=nothing, ::Any=nothing
+) 
+    return init_defectmat_lin(estim, Hp, Hc, nb) 
+end
+
+function init_defectmat_lin(estim::StateEstimator{NT}, Hp, Hc, nb) where {NT<:Real}
+    model = estim.model
     nu, nx̂, nd = model.nu, estim.nx̂, model.nd
     Â, B̂u, B̂d = estim.Â, estim.B̂u, estim.B̂d
     # helper function to be similar to eqs. in docstring:
@@ -413,17 +425,6 @@ function init_defectmat(
     # --- state x̂op and state update f̂op operating points ---
     BS = repeat(estim.f̂op - estim.x̂op, Hp)
     return ES, GS, JS, KS, VS, BS
-end
-
-function init_defectmat(
-    model::LinModel, estim::InternalModel{NT}, transcription::MultipleShooting,
-    Hp, Hc, nb, Co=nothing, λo=nothing
-) where {NT<:Real}
-    return invoke(
-        init_defectmat,
-        Tuple{LinModel, StateEstimator{NT}, MultipleShooting, Any, Any, Any, Any, Any},
-        model, estim, transcription, Hp, Hc, nb, Co, λo
-    )
 end
 
 @doc raw"""
@@ -938,6 +939,16 @@ Also init ``\mathbf{F_S} = \mathbf{G_S d_0}(k) + \mathbf{J_S D̂_0} + \mathbf{K_
 function linconstrainteq!(
     mpc::PredictiveController, model::LinModel, ::StateEstimator, ::MultipleShooting
 )
+    return linconstrainteq_lin!(mpc, model)
+end
+
+function linconstrainteq!(
+    mpc, model::LinModel, ::InternalModel, ::MultipleShooting
+)
+    return linconstrainteq_lin!(mpc, model)
+end
+
+function linconstrainteq_lin!(mpc::PredictiveController, model::LinModel)
     FS  = mpc.con.FS
     FS .= mpc.con.BS
     mul!(FS, mpc.con.KS, mpc.estim.x̂0, 1, 1)
@@ -950,17 +961,6 @@ function linconstrainteq!(
     linconeq = mpc.optim[:linconstrainteq]
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
-end
-
-function linconstrainteq!(
-    mpc::PredictiveController, model::LinModel, estim::InternalModel,
-    transcription::MultipleShooting
-)
-    return invoke(
-        linconstrainteq!,
-        Tuple{PredictiveController, LinModel, StateEstimator, MultipleShooting},
-        mpc, model, estim, transcription
-    )
 end
 
 """
