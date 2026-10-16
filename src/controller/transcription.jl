@@ -958,8 +958,10 @@ function linconstrainteq_lin!(mpc::PredictiveController, model::LinModel)
         mul!(FS, mpc.con.JS, mpc.D̂0, 1, 1)
     end
     mpc.con.beq .= @. -FS
-    linconeq = mpc.optim[:linconstrainteq]
-    JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    if length(mpc.con.beq) > 0
+        linconeq = mpc.optim[:linconstrainteq]
+        JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    end
     return nothing
 end
 
@@ -980,8 +982,10 @@ function linconstrainteq!(
     FS  = mpc.con.FS
     mul!(FS, mpc.con.KS, mpc.estim.x̂0) # the only non-zero matrix is KS
     mpc.con.beq .= @. -FS
-    linconeq = mpc.optim[:linconstrainteq]
-    JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    if length(mpc.con.beq) > 0
+        linconeq = mpc.optim[:linconstrainteq]
+        JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    end
     return nothing
 end
 
@@ -1000,8 +1004,10 @@ function linconstrainteq!(
     FS  = mpc.con.FS
     mul!(FS, mpc.con.KS, mpc.estim.x̂0) # the only non-zero matrix is KS
     mpc.con.beq .= @. -FS
-    linconeq = mpc.optim[:linconstrainteq]
-    JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    if length(mpc.con.beq) > 0
+        linconeq = mpc.optim[:linconstrainteq]
+        JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
+    end
     return nothing
 end
 "No linear equality constraints for other cases of [`InternalModel`](@ref)."
