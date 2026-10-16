@@ -187,9 +187,14 @@ end
 
 Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h!`](@ref).
 """
-function ĥ!(ŷ0, ::InternalModel, model::NonLinModel, x̂0, d0)
-    return h!(ŷ0, model, x̂0, d0, model.p)
-end
+ĥ!(ŷ0, ::InternalModel, model::NonLinModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0, model.p)
+
+@doc raw"""
+    ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, â0, d0)
+
+Same, but calls [`h_dae!`](@ref) instead.
+"""
+ĥ!(ŷ0, ::InternalModel, model::SimModel, x̂0, â0, d0) = h_dae!(ŷ0, model, x̂0, â0, d0)
 
 "No input disturbances for [`InternalModel`](@ref), return `Û0 .= U0`."
 disturbedinput!(Û0, ::InternalModel, _ , _ , U0) = (Û0 .= U0)

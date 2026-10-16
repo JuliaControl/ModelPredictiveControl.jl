@@ -24,3 +24,10 @@ ModelPredictiveControl.initpred!
 ModelPredictiveControl.linconstraint!
 ModelPredictiveControl.linconstrainteq!
 ```
+
+## Warm-starting
+
+```@docs
+ModelPredictiveControl.reset_warmstart!
+ModelPredictiveControl.set_warmstart!
+```

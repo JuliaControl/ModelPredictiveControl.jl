@@ -556,9 +556,9 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
         \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{I}   & \cdots      & \mathbf{0}  & \mathbf{0}                                        \\
         \vdots     & \vdots       & \vdots     & \vdots       & \ddots      & \vdots      & \vdots                                            \\
         \mathbf{0} & \mathbf{0}   & \mathbf{0} & \mathbf{0}   & \cdots      & \mathbf{0}  & \mathbf{I}                                        \end{bmatrix} \\
-    \mathbf{E_S^a} &= \mathbf{0}                                                                                                              \\
+    \mathbf{E_S^â} &= \mathbf{0}                                                                                                              \\
     \mathbf{E_S^ā} &= \mathbf{0}                                                                                                              \\
-    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^a} & \mathbf{E_S^ā} & \mathbf{E_S^ŵ}                                       \end{bmatrix}
+    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^â} & \mathbf{E_S^ā} & \mathbf{E_S^ŵ}                                       \end{bmatrix}
     \end{aligned}
     ```
 """
@@ -578,9 +578,9 @@ function init_defectmat_mhe(
         ESx̂[iRow, iCol] = As
     end
     ESŵ = repeatdiag([zeros(NT, nxs, nŵd) I], He)
-    ESa = zeros(nxs*He, na + na*He)
-    ESā = zeros(nxs*He, nā*He)
-    ES = [ESx̂ ESa ESā ESŵ]
+    ESâ = zeros(NT, nxs*He, na + na*He)
+    ESā = zeros(NT, nxs*He, nā*He)
+    ES = [ESx̂ ESâ ESā ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
     JS = zeros(NT, nxs*He, model.nd*(He+1))
     BS = zeros(NT, nxs*He)
@@ -627,9 +627,9 @@ The matrix ``\mathbf{E_S}`` is defined in the Extended Help section.
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{C_o}                                                                                    \\ 
         \mathbf{0}    & \mathbf{0}   & \cdots & \mathbf{0}                                                                                      \end{bmatrix} \\
     \mathbf{E_S^ŵ} &= \mathbf{I}                                                                                                                \\
-    \mathbf{E_S^a} &= \mathbf{0}                                                                                                                \\
+    \mathbf{E_S^â} &= \mathbf{0}                                                                                                                \\
     \mathbf{E_S^ā} &= \mathbf{0}                                                                                                                \\
-    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^a} & \mathbf{E_S^k̄} & \mathbf{E_S^ā} & \mathbf{E_S^ŵ}                        \end{bmatrix} \\
+    \mathbf{E_S}   &= \begin{bmatrix} \mathbf{E_S^x̂} & \mathbf{E_S^â} & \mathbf{E_S^k̄} & \mathbf{E_S^ā} & \mathbf{E_S^ŵ}                        \end{bmatrix} \\
     \end{aligned}
     ```
 """
@@ -653,9 +653,9 @@ function init_defectmat_mhe(
     end
     ESk̄ = repeatdiag([Co; zeros(NT, nxs, nk̄)], He)
     ESŵ = I # will be different if nŵ ≠ nx̂ is implemented
-    ESa = zeros(nx̂*He, na + na*He)
-    ESā = zeros(nx̂*He, nā*He)
-    ES = [ESx̂ ESa ESk̄ ESā ESŵ]
+    ESâ = zeros(NT, nx̂*He, na + na*He)
+    ESā = zeros(NT, nx̂*He, nā*He)
+    ES = [ESx̂ ESâ ESk̄ ESā ESŵ]
     GS = zeros(NT, nxs*He, model.nu*He)
     JS = zeros(NT, nxs*He, model.nd*(He+1))
     BS = zeros(NT, nxs*He)
@@ -1054,6 +1054,15 @@ linconstrainteq!(::MovingHorizonEstimator, ::SimModel, ::SingleShooting) = nothi
 
 Reset warm-starting values `estim.Z̃` at values stored in `estim.model`
 """
+function reset_warmstart!(estim::MovingHorizonEstimator, ::SingleShooting)
+    model = estim.model
+    nx, nε = model.nx, estim.nε
+    x0s  = model.buffer.x
+    x0s .= model.xs_0 .- model.xop
+    estim.Z̃ .= 0
+    estim.Z̃[nε+1:nε+nx] = x0s
+    return nothing
+end
 function reset_warmstart!(estim::MovingHorizonEstimator, ::MultipleShooting)
     model = estim.model
     nx, nx̂, nx̃, nε, He = model.nx, estim.nx̂, estim.nx̃, estim.nε, estim.He
@@ -1106,28 +1115,19 @@ function reset_warmstart!(estim::MovingHorizonEstimator, transcription::Orthogon
     repeat!(Ā, a0s, no*He)
     return nothing
 end
-function reset_warmstart!(estim::MovingHorizonEstimator, ::SingleShooting)
-    model = estim.model
-    nx, nε = model.nx, estim.nε
-    x0s  = model.buffer.x
-    x0s .= model.xs_0 .- model.xop
-    estim.Z̃ .= 0
-    estim.Z̃[nε+1:nε+nx] = x0s
-    return nothing
-end
 
 @doc raw"""
-    set_warmstart_mhe!(
+    set_warmstart!(
         estim::MovingHorizonEstimator, transcription::SingleShooting, Z̃var
     ) -> Z̃s
 
 Set and return the warm-start value of `Z̃var` for [`MovingHorizonEstimator`](@ref).
 
-If supported by `estim.optim` and based a [`SingleShooting`](@ref) transcription, it
-warm-starts the solver at the value provided in Extended Help.
+The warm-starting vector is provided in the Extended Help.
 
 # Extended Help
 !!! details "Extended Help"
+    If supported by `estim.optim` it warm-starts the solver at:
     ```math
     \mathbf{Z̃_s} = 
     \begin{bmatrix}
@@ -1142,15 +1142,15 @@ warm-starts the solver at the value provided in Extended Help.
         \mathbf{0_ŵ}
     \end{bmatrix}
     ```
-    where ``ε_{k-1}`` and ``\mathbf{ŵ}(k-j|k-1)`` are respectively the slack variable and the
-    process noise estimates computed at the last time step ``k-1``. The vector 
-    ``\mathbf{x̂_0^†}(k-N_k+p)`` is the deviation vector of the state at the arrival estimated
-    at time ``k-N_k``. If the objective function is not finite at this point, all the process
-    noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. See the Extended Help of 
-    [`SingleShooting`](@ref) for the defintion of vector ``\mathbf{0_ŵ}``. The method mutates
-    all the arguments.
+    where ``ε_{k-1}`` and ``\mathbf{ŵ}(k-j|k-1)`` are respectively the slack variable and
+    the process noise estimates computed at the last time step ``k-1``. The vector 
+    ``\mathbf{x̂_0^†}(k-N_k+p)`` is the deviation vector of the state at the arrival
+    estimated at time ``k-N_k``. If the objective function is not finite at this point, all
+    the process noises ``\mathbf{ŵ}_{k-1}(k-j)`` are warm-started at zeros. See the Extended
+    Help of [`SingleShooting`](@ref) for the defintion of vector ``\mathbf{0_ŵ}``. The
+    method mutates all the arguments.
 """
-function set_warmstart_mhe!(
+function set_warmstart!(
     estim::MovingHorizonEstimator{NT}, transcription::SingleShooting, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
@@ -1189,13 +1189,13 @@ function set_warmstart_mhe!(
 end
 
 @doc raw"""
-    set_warmstart_mhe!(
+    set_warmstart!(
         estim::MovingHorizonEstimator, transcription::OrthogonalCollocation, Z̃var
     ) -> Z̃s
 
 Do the same but for [`OrthogonalCollocation`](@ref).
 
-The warm-starting value is provided in Extended Help.
+The warm-starting vector is provided in Extended Help.
 
 # Extended Help
 !!! details "Extended Help"
@@ -1215,7 +1215,7 @@ The warm-starting value is provided in Extended Help.
         \mathbf{â_0}(k-N_k+p|k-1)       \\
         \mathbf{â_0}(k-N_k+p+1|k-1)     \\
         \mathbf{â_0}(k-N_k+p+2|k-1)     \\
-        \vdots
+        \vdots                          \\
         \mathbf{â_0}(k-p-2|k-1)         \\
         \mathbf{â_0}(k-p-1|k-1)         \\
         \mathbf{a_0}(k-p-1|k-1)         \\
@@ -1245,13 +1245,13 @@ The warm-starting value is provided in Extended Help.
     ```
     where ``\mathbf{x̂_0}(k-j|k-1)`` is the predicted state for time ``k-j`` computed at the
     last control period ``k-1``, expressed as a deviation from the operating point 
-    ``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k-j|k-1)`` and ``\mathbf{ā}(k-j|k-1)
+    ``\mathbf{x̂_{op}}``. The vector ``\mathbf{k̄}(k-j|k-1)`` and ``\mathbf{ā}(k-j|k-1)``
     include the ``n_o`` intermediate stage predictions for the interval ``k-j``, and is also
     computed at the last control period. See the Extended Help of [`MultipleShooting`](@ref)
     and [`OrthogonalCollocation`](@ref) for the defintion of vectors ``\mathbf{0_x̂}``,
-    ``\mathbf{0_â}``, ``\mathbf{0_k}`` and ``\mathbf{0_ŵ}``.
+    ``\mathbf{0_â}``, ``\mathbf{0_k̄}``, ``\mathbf{0_ā}``,  and ``\mathbf{0_ŵ}``.
 """
-function set_warmstart_mhe!(
+function set_warmstart!(
     estim::MovingHorizonEstimator{NT}, transcription::OrthogonalCollocation, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
@@ -1308,13 +1308,13 @@ function set_warmstart_mhe!(
 end
 
 @doc raw"""
-    set_warmstart_mhe!(
+    set_warmstart!(
         estim::MovingHorizonEstimator, transcription::TranscriptionMethod, Z̃var
     ) -> Z̃s
 
 Do the same but for other transcription [`TranscriptionMethod`](@ref).
 
-The warm-starting value is provided in Extended Help.
+The warm-starting vector is provided in Extended Help.
 
 # Extended Help
 !!! details "Extended Help"
@@ -1334,11 +1334,18 @@ The warm-starting value is provided in Extended Help.
         \mathbf{â_0}(k-N_k+p|k-1)       \\
         \mathbf{â_0}(k-N_k+p+1|k-1)     \\
         \mathbf{â_0}(k-N_k+p+2|k-1)     \\
-        \vdots
+        \vdots                          \\
         \mathbf{â_0}(k-p-2|k-1)         \\
         \mathbf{â_0}(k-p-1|k-1)         \\
         \mathbf{â_0}(k-p-1|k-1)         \\
         \mathbf{0_â}                    \\
+        \mathbf{ā}(k-N_k+p+0|k-1)       \\
+        \mathbf{ā}(k-N_k+p+1|k-1)       \\
+        \vdots                          \\
+        \mathbf{ā}(k+p-3|k-1)           \\
+        \mathbf{ā}(k+p-2|k-1)           \\
+        \mathbf{ā}(k+p-2|k-1)           \\
+        \mathbf{0_ā}                    \\
         \mathbf{ŵ}(k-N_k+p+0|k-1)       \\
         \mathbf{ŵ}(k-N_k+p+1|k-1)       \\
         \vdots                          \\
@@ -1349,7 +1356,7 @@ The warm-starting value is provided in Extended Help.
     \end{bmatrix}
     ```
 """
-function set_warmstart_mhe!(
+function set_warmstart!(
     estim::MovingHorizonEstimator{NT}, transcription::TranscriptionMethod, Z̃var
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
@@ -1371,7 +1378,7 @@ function set_warmstart_mhe!(
     i_base = nx̃ + nX̂ 
     Z̃s[(i_base+1):(i_base+nÂ)]       .= @views estim.Z̃[(i_base+na+1):(i_base+na+nÂ)]
     Z̃s[(i_base+nÂ+1):(i_base+na+nÂ)] .= @views estim.Z̃[(i_base+nÂ+1):(i_base+na+nÂ)]
-    # --- algebraic variables Ā --- 
+    # --- algebraic variables at collocation points Ā --- 
     i_base = nx̃ + nX̂ + na + nÂ
     Z̃s[(i_base+1):(i_base+nĀ-nā)]    .= @views estim.Z̃[(i_base+nā+1):(i_base+nĀ)]
     Z̃s[(i_base+nĀ-nā+1):(i_base+nĀ)] .= @views estim.Z̃[(i_base+nĀ-nā+1):(i_base+nĀ)]
@@ -1554,8 +1561,8 @@ end
 
 Compute the vectors for all other cases.
 
-The function mutates `V̂`, `X̂0`, and `Ŷ0` vector arguments. The augmented output function 
-[`ĥ!`](@ref) is called multiple times in a `for` loop from ``j=1`` to ``N_k``.
+The function mutates `V̂`, `X̂0`, `Â0`, and `Ŷ0` vector arguments. The augmented output
+function [`ĥ!`](@ref) is called multiple times in a `for` loop from ``j=1`` to ``N_k``.
 """
 function predict_mhe!(
     V̂, X̂0, Â0, _ , _ , Ŷ0, 
@@ -1689,25 +1696,29 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, X̂0, _ , Û0, K̄,
+        geq, X̂0, Û0, K̄,
         estim::MovingHorizonEstimator, model::NonLinModel, ::MultipleShooting, 
         x̂0arr, _ , Ŵ, Z̃
     ) -> geq
 
 Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K̄` vectors in argument. By introducing 
-the integer ``ℓ = k - N_k + p`` to shorten the notation, the defects of the estimated states
-are computed with:
+The method mutates the `geq`, `X̂0`, `Û0` and `K̄` vectors in argument. The defects of the 
+stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@ref)). By
+introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the defects of the
+estimated states are computed with:
 ```math
-\mathbf{ŝ}(ℓ+j+1) = \mathbf{f̂}\Big(\mathbf{x̂_0}(ℓ+j), \mathbf{u_0}(ℓ+j), \mathbf{d_0}(ℓ+j)\Big) 
-                           + \mathbf{ŵ}(ℓ+j) - \mathbf{x̂_0}(ℓ+j+1)
+\mathbf{ŝ_d}(ℓ+j+1) = \mathbf{f}\Big(\mathbf{x̂_d}(ℓ+j), \mathbf{u_0}(ℓ+j), \mathbf{d_0}(ℓ+j), \mathbf{p}\Big) 
+                           + \mathbf{ŵ_d}(ℓ+j) - \mathbf{x̂_d}(ℓ+j+1)
 ```
-for ``j = 0, 1, ... , N_k-1`` and in which the augmented state vectors ``\mathbf{x̂_0}`` are 
-extracted from the decision variable `Z̃`. The function ``\mathbf{f̂}`` is defined at [`f̂!`](@ref).
+for ``j = 0, 1, ... , N_k-1`` and in which the deterministic state vectors ``\mathbf{x̂_d}``
+are first `model.nx` elements of the augmented states ``\mathbf{x̂_0}``, and they are
+extracted from the decision variable `Z̃`. The function ``\mathbf{f}`` is the deterministic
+state update function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is defined in
+[`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq_mhe!(
-    geq, X̂0, _ , Û0, K̄,
+    geq, X̂0, Û0, K̄,
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::MultipleShooting, 
     x̂0arr, _ , Ŵ, Z̃
 )
@@ -1716,7 +1727,7 @@ function con_nonlinprogeq_mhe!(
     Nk = estim.Nk[]
     f_threads = transcription.f_threads
     nw = nŵ - nxs
-    p = estim.direct ? 0 : 1
+    i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)]
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
     @threadsif f_threads for j=1:Nk
@@ -1725,7 +1736,7 @@ function con_nonlinprogeq_mhe!(
         else
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
         end
-        d0       = @views   estim.D0[(1 + nd*(j+p-1)):(nd*(j+p))]
+        d0       = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
         k̄        = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
         û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
         ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
@@ -1742,7 +1753,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , _ , Û0, K̄dot,
+        geq, _ , Û0, K̄dot,
         estim::MovingHorizonEstimator, model::SimModel, ::TrapezoidalCollocation, 
         x̂0arr, â0arr, Ŵ, Z̃
     ) -> geq
@@ -1780,11 +1791,10 @@ plus one last residual for the arrival:
 ```
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , _ , Û0, K̄dot,
+    geq, _ , Û0, K̄dot,
     estim::MovingHorizonEstimator, model::SimModel, transcription::TrapezoidalCollocation, 
     x̂0arr, â0arr, Ŵ, Z̃
 )
-    # TODO: u0next et d0next sont des bons noms
     nu, nx, nd, h = model.nu, model.nx, model.nd, transcription.h
     nx̂, nx̃, nxs, nŵ, He = estim.nx̂, estim.nx̃, estim.nxs, estim.nx̂, estim.He
     Nk = estim.Nk[]
@@ -1850,7 +1860,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , _ , Û0, K̄dot,
+        geq, _ , Û0, K̄dot,
         estim::MovingHorizonEstimator, model::SimModel, ::OrthogonalCollocation, 
         x̂0arr, â0arr, _ , Z̃
     ) -> geq
@@ -1888,7 +1898,7 @@ stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@r
 estimated process noise ``\mathbf{ŵ}(ℓ+j)`` are incorporated in the continuity constraint.
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , _ , Û0, K̄dot,
+    geq, _ , Û0, K̄dot,
     estim::MovingHorizonEstimator, model::SimModel, transcription::OrthogonalCollocation, 
     x̂0arr, â0arr, _ , Z̃
 )
@@ -1969,4 +1979,4 @@ function con_nonlinprogeq_mhe!(
 end
 
 "No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
-con_nonlinprogeq_mhe!(geq,_,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod,_,_,_,_) = geq
+con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod,_,_,_,_) = geq

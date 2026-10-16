@@ -1,7 +1,7 @@
 @doc raw"""
     abstract type SimModel end
 
-Supertype of [`LinModel`](@ref) and [`NonLinModel`](@ref) types.
+Supertype of all the plant model types.
 
 ---
 

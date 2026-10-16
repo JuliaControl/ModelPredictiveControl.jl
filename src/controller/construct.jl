@@ -94,7 +94,7 @@ end
 
 "Outer constructor to validate and convert weight matrices if necessary."
 function ControllerWeights(
-    model::SimModelODE{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
+    model::SimModel{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
 ) where {NT<:Real}
     validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
     M_Hp, N_Hc, L_Hp = NT.(M_Hp), NT.(N_Hc), NT.(L_Hp)
@@ -102,7 +102,7 @@ function ControllerWeights(
 end
 
 "Validate predictive controller weight and horizon specified values."
-function validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, C=Inf, E=nothing)
+function validate_weights(model::SimModel, Hp, Hc, M_Hp, N_Hc, L_Hp, C=Inf, E=nothing)
     nu, ny = model.nu, model.ny
     nM, nN, nL = ny*Hp, nu*Hc, nu*Hp
     Hp < 1 && throw(ArgumentError("Prediction horizon Hp should be ≥ 1"))

@@ -147,15 +147,16 @@ struct NonLinMPC{
             Uop, Yop, Dop,
             buffer
         )
+        reset_warmstart!(mpc, transcription)
         init_optimization!(mpc, model, optim)
         return mpc
     end
 end
 
 @doc raw"""
-    NonLinMPC(model::SimModelODE; <keyword arguments>)
+    NonLinMPC(model::SimModel; <keyword arguments>)
 
-Construct a nonlinear predictive controller based on [`SimModelODE`](@ref) `model`.
+Construct a nonlinear predictive controller based on [`SimModel`](@ref) `model`.
 
 Both [`NonLinModel`](@ref) and [`LinModel`](@ref) are supported (see Extended Help). The 
 controller minimizes the following objective function at each discrete time ``k``:
@@ -196,7 +197,8 @@ definition of the other variables.
 This method uses the default state estimator:
 
 - if `model` is a [`LinModel`](@ref), a [`SteadyKalmanFilter`](@ref) with default arguments;
-- else, an [`UnscentedKalmanFilter`](@ref) with default arguments. 
+- if `model` is a [`NonLinModel`](@ref), an [`UnscentedKalmanFilter`](@ref) with default arguments;
+- else, a [`MovingHorizonEstimator`](@ref) with default arguments.
 
 This controller allocates memory at each time step for the optimization.
 
@@ -205,7 +207,7 @@ This controller allocates memory at each time step for the optimization.
     `MethodError: no method matching Float64(::ForwardDiff.Dual)`.
 
 # Arguments
-- `model::SimModelODE` : model used for controller predictions and state estimations.
+- `model::SimModel` : model used for controller predictions and state estimations.
 - `Hp::Int=10+nk` : prediction horizon ``H_p``, `nk` is the number of delays if `model` is a
    [`LinModel`](@ref) (must be specified otherwise).
 - `Hc::Union{Int, Vector{Int}}=2` : control horizon ``H_c``, custom move blocking pattern is 
@@ -229,7 +231,8 @@ This controller allocates memory at each time step for the optimization.
    Extended Help).
 - `nc=0` : number of custom nonlinear inequality constraints.
 - `p=model.p` : ``J_E`` and ``\mathbf{g_c}`` functions parameter ``\mathbf{p}`` (any type).
-- `transcription=SingleShooting()` : a [`TranscriptionMethod`](@ref) for the optimization.
+- `transcription=default_transcription(model)` : a [`TranscriptionMethod`](@ref) object,
+   default to [`SingleShooting`](@ref) or `model.transcription` for [`NonLinModelDAE`](@ref).
 - `optim=JuMP.Model(Ipopt.Optimizer)` : nonlinear optimizer used in the predictive
    controller, provided as a [`JuMP.Model`](@extref) object (default to [`Ipopt`](https://github.com/jump-dev/Ipopt.jl) optimizer).
 - `gradient=AutoForwardDiff()` : an `AbstractADType` backend for the gradient of the objective
@@ -344,7 +347,7 @@ NonLinMPC controller with a sample time Ts = 5.0 s:
     `10/Cwt` (if not already set), to scale the small values of ``ϵ``.
 """
 function NonLinMPC(
-    model::SimModelODE;
+    model::SimModel;
     Hp::Int = default_Hp(model),
     Hc::IntVectorOrInt = DEFAULT_HC,
     Mwt  = fill(DEFAULT_MWT, model.ny),
@@ -364,7 +367,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc::Int = 0,
     p = model.p,
-    transcription::TranscriptionMethod = SingleShooting(),
+    transcription::TranscriptionMethod = default_transcription(model),
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
@@ -437,7 +440,7 @@ function NonLinMPC(
     gc ::Function = gc!,
     nc = 0,
     p = estim.model.p,
-    transcription::TranscriptionMethod = SingleShooting(),
+    transcription::TranscriptionMethod = default_transcription(estim.model),
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_NLP_OPTIMIZER, add_bridges=false),
     gradient::AbstractADType = DEFAULT_GRADIENT,
     jacobian::AbstractADType = default_jacobian(transcription),
@@ -464,6 +467,7 @@ function NonLinMPC(
 end
 
 default_estimator(model::SimModelODE; kwargs...) = UnscentedKalmanFilter(model; kwargs...)
+default_estimator(model::SimModelDAE; kwargs...) = MovingHorizonEstimator(model; kwargs...)
 default_estimator(model::LinModel; kwargs...) = SteadyKalmanFilter(model; kwargs...)
 
 """
@@ -739,11 +743,11 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
 end
 
 """
-    init_optimization!(mpc::NonLinMPC, model::SimModelODE, optim::JuMP.GenericModel) -> nothing
+    init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel) -> nothing
 
 Init the nonlinear optimization for [`NonLinMPC`](@ref) controllers.
 """
-function init_optimization!(mpc::NonLinMPC, model::SimModelODE, optim::JuMP.GenericModel)  
+function init_optimization!(mpc::NonLinMPC, model::SimModel, optim::JuMP.GenericModel)  
     # --- variables and linear constraints ---
     con = mpc.con
     nZ̃ = length(mpc.Z̃)
@@ -844,8 +848,8 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
     Û0::Vector{JNT}, X̂0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nX̂)
     gc::Vector{JNT}, g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                 = zeros(JNT, neq)
-    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
+    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     end
     Z̃_J = zeros(JNT, nZ̃)
@@ -1124,7 +1128,8 @@ Update in-place all vectors for the predictions of `mpc` controller at decision 
 The method mutates all the arguments before the `mpc` argument.
 """
 function update_predictions!(
-    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq, mpc::PredictiveController, Z̃
+    ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K̄, X̂0, gc, g, geq, 
+    mpc::PredictiveController, Z̃
 )
     model, transcription = mpc.estim.model, mpc.transcription
     U0 = getU0!(U0, mpc, Z̃)

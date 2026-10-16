@@ -91,25 +91,20 @@ R̂y = repeat([55; 30], 3)
     )
     sim!(nmpc_ukf, 2, [55, 30])
 
-    transcription = OrthogonalCollocation(0, 2)
-    nmpc_mhe = setconstraint!(NonLinMPC(
-        MovingHorizonEstimator(nlmodel; He=2, transcription); transcription, Hp=3, Cwt=Inf), 
-        ymin=[45, -Inf]
-    )
-    setconstraint!(nmpc_mhe.estim, x̂min=[-50,-50,-50,-50], x̂max=[50,50,50,50])
-    initstate!(nmpc_mhe, nlmodel.uop, y)
-    preparestate!(nmpc_mhe, [55, 30])
-    nmpc_mhe([55, 30])
-
     linearizemodel = linearize(nlmodel)
     setmodel!(mpc_kf, linearizemodel)
 
+    transcription = OrthogonalCollocation(0, 2)
     daemodel = NonLinModelDAE(fq_dae!, h_dae!, 100.0, 1, 1, 1, 1; transcription)
     sim!(daemodel, 2, [10])
 
     mhe_dae = MovingHorizonEstimator(daemodel, He=2, direct=false)
-    preparestate!(mhe_dae, [5])
-    updatestate!(mhe_dae, [2], [5])
+    setconstraint!(mhe_dae, x̂min=[-50, 50], x̂max=[50, 50])
+    nmpc_dae = NonLinMPC(mhe_dae, Hp=3)
+    setconstraint!(nmpc_dae, ymin=[-50], ymax=[50])
+    preparestate!(nmpc_dae, [5])
+    moveinput!(nmpc_dae, [0.1])
+    updatestate!(nmpc_dae, [2], [5])
 
 end
 
