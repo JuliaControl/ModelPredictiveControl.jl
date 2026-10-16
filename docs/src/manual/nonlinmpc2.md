@@ -4,10 +4,6 @@
 Pages = ["nonlinmpc2.md"]
 ```
 
-!!! todo "Under Construction"
-    This tutorial is currently under construction. Only the modeling and the estimation
-    parts are written for now.
-
 ## Nonlinear Model (DAE)
 
 In this example, the goal is to control the pH of a solution in a continuously stirred
@@ -303,7 +299,7 @@ they are concentrations in mol/L:
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
 He = 8; hessian = true
-σQ = [0.5e-3, 0.5e-3, 0.75e-3]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]
+σQ = [0.5e-3, 0.5e-3, 1e-3]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]
 mhe = MovingHorizonEstimator(model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0)
 using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit during optimization
 mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
@@ -354,6 +350,7 @@ x̂_0 = [0.025, 0.025, c_Ain]
 res = simMHE(mhe, plant, N; x_0, x̂_0)
 p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false)
 savefig(p, "plot2_DAEpH.svg"); nothing # hide
+display(p) # hide
 ```
 
 ![plot2_DAEpH](plot2_DAEpH.svg)
@@ -370,3 +367,95 @@ println("Total optimization and simulation time for $N time steps: $T s")
 
 Perhaps more importantly, the fast simulations ease the tuning of the estimation horizon and
 covariance matrices, for iterative trial-and-error approaches.
+
+## Adaptive Nonlinear Model Predictive Control
+
+We construct a [`NonLinMPC`](@ref) based on `mhe`, thus producing an adaptive model
+predictive control law. The controller regulates the effluent pH to 7.0, with an allowable
+deviation of ±1.0. The base flow rate is also constrained between 0 and 20 L/min:
+
+```@example 1
+nmpc = NonLinMPC(mhe, Hp=8, Hc=2, Nwt=[5.0])
+nmpc = setconstraint!(nmpc, ymin=[6], ymax=[8], umin=[0], umax=[20])
+using JuMP; unset_time_limit_sec(nmpc.optim)  # no wall time limit during optimization
+```
+
+Next, we define a function similar to `simMHE` that simulates the plant in closed loop with
+the `nmpc` controller, subject to two disturbances:
+
+1. a bump on the acid flow rate ``\mathbf{d} = q_{Ain}`` (measured)
+2. a bump on the acid feed concentration ``c_{Ain}`` (unmeasured)
+
+The resulting response is:
+
+```@example 1
+function simNMPC(nmpc, plant, N, ry; x_0, x̂_0, noise=false)
+    ny, ny, nd, nx, nx̂ = plant.ny, plant.ny, plant.nd, plant.nx, nmpc.estim.nx̂
+    Ry_data, Y_data, U_data, D_data = zeros(ny, N), zeros(ny, N), zeros(nu, N), zeros(nd, N)
+    X_data = zeros(nx+1, N)
+    Ŷ_data, X̂_data = zeros(ny, N), zeros(nx̂, N)
+    c_Ain_0 = plant.p[1]
+    setstate!(plant, x_0); setstate!(nmpc, x̂_0)
+    initstate!(nmpc, [10], [7], [10])
+    x = x_0
+    for i=1:N
+        d     = i ≤ (1N÷3) ? [10.0]  : [12.0]
+        c_Ain = i ≤ (2N÷3) ? c_Ain_0 : (c_Ain_0 + 0.01)
+        plant.p[1] = c_Ain
+        y  = evaloutput(plant, d)
+        ym = y + noise*0.05*randn(1)
+        dm = d + noise*0.10*randn(1)
+        x̂ = preparestate!(nmpc, ym, dm) 
+        ŷ = evaloutput(nmpc.estim, dm)
+        u = moveinput!(nmpc, ry, dm)
+        Y_data[:, i]   = ym
+        Ry_data[:, i]  = ry
+        U_data[:, i]   = u
+        D_data[:, i]   = dm
+        X_data[1:2, i] = x
+        X_data[3, i]   = c_Ain
+        Ŷ_data[:, i]   = ŷ
+        X̂_data[:, i]   = x̂
+        x = updatestate!(plant, u, d)
+        x̂ = updatestate!(nmpc, u, ym, dm)
+    end
+    plant.p[1] = c_Ain_0
+    return SimResult(nmpc, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data, Ry_data)
+end
+N2, ry = 61, [7.0]
+using Logging # hide
+res2 = with_logger(ConsoleLogger(stderr, Error)) do # hide
+res2 = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0)
+end # hide
+p = plot(res2, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
+savefig(p, "plot3_DAEpH.svg"); nothing # hide
+display(p) # hide
+```
+
+![plot3_DAEpH](plot3_DAEpH.svg)
+
+The figure above shows that the `nmpc` controller tightly regulates the pH around 7.0 and
+that the `mhe` estimator accurately tracks all three species at steady state. With m
+easurement noise, the pH constraints are occasionally violated briefly, but the feedback law
+responds quickly and returns the effluent pH to the specified range.
+
+```@example 1
+res3 = with_logger(ConsoleLogger(stderr, Error)) do # hide
+res3 = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0, noise=true)
+end # hide
+p = plot(res3, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
+savefig(p, "plot4_DAEpH.svg"); nothing # hide
+display(p) # hide
+```
+
+![plot4_DAEpH](plot4_DAEpH.svg)
+
+Finally, we benchmark the total runtime for this scenario, including estimation, control, 
+and plant simulation:
+
+```@example 1
+T = with_logger(ConsoleLogger(stderr, Error)) do # hide
+T = @elapsed simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0)
+end # hide
+println("Total optimization and simulation time for $N2 time steps: $T s")
+```
