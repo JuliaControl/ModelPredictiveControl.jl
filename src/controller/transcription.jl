@@ -415,6 +415,17 @@ function init_defectmat(
     return ES, GS, JS, KS, VS, BS
 end
 
+function init_defectmat(
+    model::LinModel, estim::InternalModel{NT}, transcription::MultipleShooting,
+    Hp, Hc, nb, Co=nothing, λo=nothing
+) where {NT<:Real}
+    return invoke(
+        init_defectmat,
+        Tuple{LinModel, StateEstimator{NT}, MultipleShooting, Any, Any, Any, Any, Any},
+        model, estim, transcription, Hp, Hc, nb, Co, λo
+    )
+end
+
 @doc raw"""
     init_defectmat(
         model::SimModel, estim::StateEstimator, transcription::TranscriptionMethod, 
@@ -610,7 +621,7 @@ end
 Return empty matrices for [`InternalModel`](@ref) (the state vector is not augmented).
 """
 function init_defectmat(
-    ::SimModel, estim::InternalModel, transcription::TranscriptionMethod, 
+    ::SimModel, estim::InternalModel, transcription::TranscriptionMethod,
     Hp, Hc, ::Any , ::Any=nothing, ::Any=nothing
 )
     return init_defectmat_empty(estim, transcription, Hp, Hc)
@@ -939,6 +950,17 @@ function linconstrainteq!(
     linconeq = mpc.optim[:linconstrainteq]
     JuMP.set_normalized_rhs(linconeq, mpc.con.beq)
     return nothing
+end
+
+function linconstrainteq!(
+    mpc::PredictiveController, model::LinModel, estim::InternalModel,
+    transcription::MultipleShooting
+)
+    return invoke(
+        linconstrainteq!,
+        Tuple{PredictiveController, LinModel, StateEstimator, MultipleShooting},
+        mpc, model, estim, transcription
+    )
 end
 
 """
