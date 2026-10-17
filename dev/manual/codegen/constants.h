@@ -189,6 +189,16 @@ extern "C" {
 #define DAQP_HQ_FROZEN 512
 #define DAQP_HQ_ELIMINATED 1024
 
+// Internal marker: a general constraint with a zero row, which daqp_normalize_M
+// ignores (as IMMUTABLE) until the row becomes nonzero. Its ACTIVE, IMMUTABLE and
+// SOFT bits are kept in bits 12-14 (LOWER in place), which also fits a 16-bit int.
+// Read the sense of such a constraint only through DAQP_ZERO_ROW_SENSE
+#define DAQP_ZERO_ROW 2048
+#define DAQP_ZERO_ROW_MARK(s) (DAQP_IMMUTABLE | DAQP_ZERO_ROW | ((s) & DAQP_LOWER) | \
+        (((s) & DAQP_ACTIVE) << 12) | (((s) & (DAQP_IMMUTABLE | DAQP_SOFT)) << 11))
+#define DAQP_ZERO_ROW_SENSE(s) (((s) & DAQP_ZERO_ROW) ? ((s) & DAQP_LOWER) | \
+        (((s) >> 12) & DAQP_ACTIVE) | (((s) >> 11) & (DAQP_IMMUTABLE | DAQP_SOFT)) : (s))
+
 #define DAQP_IS_HIERARCHICAL(work) \
     ((work)->hierarchy != NULL && (work)->hierarchy->nh > 1)
 
