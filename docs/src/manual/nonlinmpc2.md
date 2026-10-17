@@ -299,7 +299,7 @@ they are concentrations in mol/L:
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
 He = 8; hessian = true
-σQ = [0.5e-3, 0.5e-3, 1e-3]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]
+σQ = [0.5e-3, 0.5e-3, 0.9e-3]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]
 mhe = MovingHorizonEstimator(model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0)
 using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit during optimization
 mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
@@ -376,8 +376,8 @@ deviation of ±1.0. The base flow rate is also constrained between 0 and 20 L/mi
 
 ```@example 1
 nmpc = NonLinMPC(mhe, Hp=8, Hc=2, Nwt=[5.0])
-nmpc = setconstraint!(nmpc, ymin=[6], ymax=[8], umin=[0], umax=[20])
 using JuMP; unset_time_limit_sec(nmpc.optim)  # no wall time limit during optimization
+nmpc = setconstraint!(nmpc, ymin=[6], ymax=[8], umin=[0], umax=[20])
 ```
 
 Next, we define a function similar to `simMHE` that simulates the plant in closed loop with
@@ -435,9 +435,9 @@ display(p) # hide
 ![plot3_DAEpH](plot3_DAEpH.svg)
 
 The figure above shows that the `nmpc` controller tightly regulates the pH around 7.0 and
-that the `mhe` estimator accurately tracks all three species at steady state. With m
-easurement noise, the pH constraints are occasionally violated briefly, but the feedback law
-responds quickly and returns the effluent pH to the specified range.
+that the `mhe` estimator accurately tracks all three species at steady state. With
+measurement noise, the pH constraints are occasionally violated briefly, but the feedback
+law responds quickly and returns the effluent pH to the specified range:
 
 ```@example 1
 res3 = with_logger(ConsoleLogger(stderr, Error)) do # hide
