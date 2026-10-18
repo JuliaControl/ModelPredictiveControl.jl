@@ -375,7 +375,7 @@ predictive control law. The controller regulates the effluent pH to 7.0, with an
 deviation of ±1.0. The base flow rate is also constrained between 0 and 20 L/min:
 
 ```@example 1
-nmpc = NonLinMPC(mhe, Hp=8, Hc=2, Nwt=[5.0])
+nmpc = NonLinMPC(mhe, Hp=8, Hc=2, Nwt=[5.0], hessian=true)
 using JuMP; unset_time_limit_sec(nmpc.optim)  # no wall time limit during optimization
 nmpc = setconstraint!(nmpc, ymin=[6], ymax=[8], umin=[0], umax=[20])
 ```
