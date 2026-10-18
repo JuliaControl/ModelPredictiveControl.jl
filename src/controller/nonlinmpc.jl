@@ -158,7 +158,7 @@ end
 
 Construct a nonlinear predictive controller based on [`SimModel`](@ref) `model`.
 
-Both [`NonLinModel`](@ref) and [`LinModel`](@ref) are supported (see Extended Help). The 
+It supports [`LinModel`](@ref), [`NonLinModel`](@ref) and [`NonLinModelDAE`](@ref). The
 controller minimizes the following objective function at each discrete time ``k``:
 ```math
 \begin{aligned}
