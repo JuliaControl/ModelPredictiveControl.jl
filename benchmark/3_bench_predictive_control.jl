@@ -113,7 +113,7 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["SingleShooting"] =
     )
 UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["SingleShootingHessian"] =
     @benchmarkable(
-        moveinput!($nmpc_nonlin_ss, $y, $d),
+        moveinput!($nmpc_nonlin_ss_hess, $y, $d),
         setup=preparestate!($nmpc_nonlin_ss_hess, $y, $d),
         samples=samples, evals=evals, seconds=seconds
     )
@@ -125,7 +125,7 @@ UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["MultipleShooting"] =
     )
 UNIT_MPC["NonLinMPC"]["moveinput!"]["NonLinModel"]["MultipleShootingHessian"] =
     @benchmarkable(
-        moveinput!($nmpc_nonlin_ms, $y, $d),
+        moveinput!($nmpc_nonlin_ms_hess, $y, $d),
         setup=preparestate!($nmpc_nonlin_ms_hess, $y, $d),
         samples=samples, evals=evals, seconds=seconds
     )
