@@ -13,7 +13,7 @@ on:
 
 jobs:
   julia-ci:
-    uses: julia-testitems/testitem-workflow/.github/workflows/juliaci.yml@v2
+    uses: franckgaga/testitem-workflow/.github/workflows/juliaci.yml@patch-1
     with:
       memory-threshold: 0.9
       include-windows-x86: false
