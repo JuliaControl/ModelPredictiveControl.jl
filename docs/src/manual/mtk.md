@@ -149,9 +149,9 @@ using Logging # hide
 res_ry = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
 end #
-p1 = plot(res_ry)
-savefig("plot1_MTK.svg") # hide
-display(p1) # hide
+p = plot(res_ry)
+savefig(p, "plot1_MTK.svg") # hide
+display(p) # hide
 ```
 
 ![plot1_MTK](plot1_MTK.svg)
@@ -162,9 +162,9 @@ and also the output disturbance rejection:
 res_yd = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, π], x̂_0=[0, π, 0], y_step=[10])
 end # hide
-p2 = plot(res_yd)
-savefig("plot2_MTK.svg") # hide
-display(p2) # hide
+p = plot(res_yd)
+savefig(p, "plot2_MTK.svg") # hide
+display(p) # hide
 ```
 
 ![plot2_MTK](plot2_MTK.svg)

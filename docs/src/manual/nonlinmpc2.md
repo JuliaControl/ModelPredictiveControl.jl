@@ -240,9 +240,9 @@ We can now plot the result:
 
 ```@example 1
 using Plots
-p1 = plot(res, plotu=true, plotd=true)
-savefig(p1, "plot1_DAEpH.svg") # hide
-display(p1) # hide
+p = plot(res, plotu=true, plotd=true)
+savefig(p, "plot1_DAEpH.svg") # hide
+display(p) # hide
 ```
 
 ![plot1_DAEpH](plot1_DAEpH.svg)
@@ -349,9 +349,9 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
 end
 x̂_0 = [0.025, 0.025, c_Ain]
 res = simMHE(mhe, plant, N; x_0, x̂_0)
-p2 = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false)
-savefig(p2, "plot2_DAEpH.svg") # hide
-display(p2) # hide
+p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false)
+savefig(p, "plot2_DAEpH.svg") # hide
+display(p) # hide
 ```
 
 ![plot2_DAEpH](plot2_DAEpH.svg)
@@ -428,9 +428,9 @@ using Logging # hide
 res = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0)
 end # hide
-p3 = plot(res, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
-savefig(p3, "plot3_DAEpH.svg") # hide
-display(p3) # hide
+p = plot(res, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
+savefig(p, "plot3_DAEpH.svg") # hide
+display(p) # hide
 ```
 
 ![plot3_DAEpH](plot3_DAEpH.svg)
@@ -444,9 +444,9 @@ law responds quickly and returns the effluent pH to the specified range:
 res = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0, noise=true)
 end # hide
-p4 = plot(res, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
-savefig(p4, "plot4_DAEpH.svg") # hide
-display(p4) # hide
+p = plot(res, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
+savefig(p, "plot4_DAEpH.svg") # hide
+display(p) # hide
 ```
 
 ![plot4_DAEpH](plot4_DAEpH.svg)
