@@ -17,3 +17,4 @@ UnoSolver = "1baa60ac-02f7-4b39-a7a8-2f4f58486b05"
 
 [compat]
 Random = "<0.0.1, 1"
+LinearAlgebra = "<0.0.1, 1"
