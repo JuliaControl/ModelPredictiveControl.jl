@@ -443,7 +443,7 @@ law responds quickly and returns the effluent pH to the specified range:
 
 ```@example 1
 res = with_logger(ConsoleLogger(stderr, Error)) do # hide
-Random.seed!(5367) # hide
+Random.seed!(5379) # hide
 res = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0, noise=true)
 end # hide
 p = plot(res, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
