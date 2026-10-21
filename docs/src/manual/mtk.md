@@ -4,11 +4,6 @@
 Pages = ["mtk.md"]
 ```
 
-```@setup 1
-using Logging; errlogger = ConsoleLogger(stderr, Error);
-old_logger = global_logger(); global_logger(errlogger);
-```
-
 ## Pendulum Model
 
 This example integrates the simple pendulum model of the [penultimate section](@ref man_nonlin)
@@ -150,9 +145,13 @@ The 180° setpoint response is identical:
 using Plots
 N = 35
 using JuMP; unset_time_limit_sec(nmpc.optim) # hide
+using Logging # hide
+res_ry = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
-plot(res_ry)
-savefig("plot1_MTK.svg"); nothing # hide
+end #
+p1 = plot(res_ry)
+savefig("plot1_MTK.svg") # hide
+display(p1) # hide
 ```
 
 ![plot1_MTK](plot1_MTK.svg)
@@ -160,9 +159,12 @@ savefig("plot1_MTK.svg"); nothing # hide
 and also the output disturbance rejection:
 
 ```@example 1
+res_yd = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res_yd = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, π], x̂_0=[0, π, 0], y_step=[10])
-plot(res_yd)
-savefig("plot2_MTK.svg"); nothing # hide
+end # hide
+p2 = plot(res_yd)
+savefig("plot2_MTK.svg") # hide
+display(p2) # hide
 ```
 
 ![plot2_MTK](plot2_MTK.svg)
@@ -170,7 +172,3 @@ savefig("plot2_MTK.svg"); nothing # hide
 ## Acknowledgement
 
 Authored by `1-Bart-1` and `baggepinnen`, thanks for the contribution.
-
-```@setup 1
-global_logger(old_logger);
-```
