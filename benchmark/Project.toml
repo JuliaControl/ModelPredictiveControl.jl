@@ -16,5 +16,6 @@ SparseMatrixColorings = "0a514795-09f3-496d-8182-132a7b665d35"
 UnoSolver = "1baa60ac-02f7-4b39-a7a8-2f4f58486b05"
 
 [compat]
+UnoSolver = "0.3.8"
 Random = "<0.0.1, 1"
 LinearAlgebra = "<0.0.1, 1"
