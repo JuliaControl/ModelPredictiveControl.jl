@@ -240,8 +240,9 @@ We can now plot the result:
 
 ```@example 1
 using Plots
-plot(res, plotu=true, plotd=true)
-savefig("plot1_DAEpH.svg"); nothing # hide
+p = plot(res, plotu=true, plotd=true)
+savefig(p, "plot1_DAEpH.svg") # hide
+display(p) # hide
 ```
 
 ![plot1_DAEpH](plot1_DAEpH.svg)
@@ -314,6 +315,7 @@ performs under pH and flow rate measurement noise:
 
 ```@example 1
 using Random
+Random.seed!(1123) # hide
 function simMHE(mhe, plant, N; x_0, x̂_0)
     ny, ny, nd, nx, nx̂ = plant.ny, plant.ny, plant.nd, plant.nx, mhe.nx̂
     Y_data, U_data, D_data = zeros(ny, N), zeros(nu, N), zeros(nd, N)
@@ -349,7 +351,7 @@ end
 x̂_0 = [0.025, 0.025, c_Ain]
 res = simMHE(mhe, plant, N; x_0, x̂_0)
 p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false)
-savefig(p, "plot2_DAEpH.svg"); nothing # hide
+savefig(p, "plot2_DAEpH.svg") # hide
 display(p) # hide
 ```
 
@@ -424,11 +426,11 @@ function simNMPC(nmpc, plant, N, ry; x_0, x̂_0, noise=false)
 end
 N2, ry = 61, [7.0]
 using Logging # hide
-res2 = with_logger(ConsoleLogger(stderr, Error)) do # hide
-res2 = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0)
+res = with_logger(ConsoleLogger(stderr, Error)) do # hide
+res = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0)
 end # hide
-p = plot(res2, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
-savefig(p, "plot3_DAEpH.svg"); nothing # hide
+p = plot(res, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
+savefig(p, "plot3_DAEpH.svg") # hide
 display(p) # hide
 ```
 
@@ -440,11 +442,12 @@ measurement noise, the pH constraints are occasionally violated briefly, but the
 law responds quickly and returns the effluent pH to the specified range:
 
 ```@example 1
-res3 = with_logger(ConsoleLogger(stderr, Error)) do # hide
-res3 = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0, noise=true)
+res = with_logger(ConsoleLogger(stderr, Error)) do # hide
+Random.seed!(5379) # hide
+res = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0, noise=true)
 end # hide
-p = plot(res3, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
-savefig(p, "plot4_DAEpH.svg"); nothing # hide
+p = plot(res, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
+savefig(p, "plot4_DAEpH.svg") # hide
 display(p) # hide
 ```
 

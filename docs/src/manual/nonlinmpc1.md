@@ -73,8 +73,9 @@ using Plots
 u = [0.5]
 N = 35
 res = sim!(model, N, u)
-plot(res, plotu=false)
-savefig("plot1_NonLinMPC.svg"); nothing # hide
+p = plot(res, plotu=false)
+savefig(p, "plot1_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot1_NonLinMPC](plot1_NonLinMPC.svg)
@@ -103,9 +104,11 @@ estimator tuning is tested on a plant with a 25 % larger friction coefficient ``
 p_plant = copy(p_model)
 p_plant[3] = 1.25*p_model[3]
 plant = setname!(NonLinModel(f, h, Ts, nu, nx, ny; p=p_plant); u=vu, x=vx, y=vy)
+using Random; Random.seed!(2944) # hide
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
-plot(res, plotu=false, plotxwithx̂=true)
-savefig("plot2_NonLinMPC.svg"); nothing # hide
+p = plot(res, plotu=false, plotxwithx̂=true)
+savefig(p, "plot2_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot2_NonLinMPC](plot2_NonLinMPC.svg)
@@ -132,8 +135,9 @@ The option `Cwt=Inf` disables the slack variable `ϵ` for constraint softening. 
 using JuMP; unset_time_limit_sec(nmpc.optim) # hide
 ry = [180.0]
 res_ry = sim!(nmpc, N, ry, plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
-plot(res_ry)
-savefig("plot3_NonLinMPC.svg"); nothing # hide
+p = plot(res_ry)
+savefig(p, "plot3_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot3_NonLinMPC](plot3_NonLinMPC.svg)
@@ -144,8 +148,9 @@ satisfactory:
 
 ```@example man_nonlin
 res_yd = sim!(nmpc, N, ry, plant=plant, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10])
-plot(res_yd)
-savefig("plot4_NonLinMPC.svg"); nothing # hide
+p = plot(res_yd)
+savefig(p, "plot4_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot4_NonLinMPC](plot4_NonLinMPC.svg)
@@ -217,8 +222,9 @@ setpoint is similar:
 unset_time_limit_sec(empc.optim)    # hide
 ry = [180.0, 0]
 res2_ry = sim!(empc, N, ry, plant=plant2, x_0=[0, 0], x̂_0=[0, 0, 0])
-plot(res2_ry, ploty=[1])
-savefig("plot5_NonLinMPC.svg"); nothing # hide
+p = plot(res2_ry, ploty=[1])
+savefig(p, "plot5_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot5_NonLinMPC](plot5_NonLinMPC.svg)
@@ -237,8 +243,9 @@ Also, for a 10° step disturbance:
 
 ```@example man_nonlin
 res2_yd = sim!(empc, N, ry; plant=plant2, x_0=[π, 0], x̂_0=[π, 0, 0], y_step=[10, 0])
-plot(res2_yd, ploty=[1])
-savefig("plot6_NonLinMPC.svg"); nothing # hide
+p = plot(res2_yd, ploty=[1])
+savefig(p, "plot6_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot6_NonLinMPC](plot6_NonLinMPC.svg)
@@ -324,8 +331,9 @@ function plotWithPower(res, Pmax)
     plot!(plt2, t, Pmax, label=raw"$P_\mathrm{max}$", linestyle=:dot, linewidth=1.5)
     return plot(plt1, plt2, layout=(2,1))
 end
-plotWithPower(res3_ry, Pmax)
-savefig("plot7_NonLinMPC.svg"); nothing # hide
+p = plotWithPower(res3_ry, Pmax)
+savefig(p, "plot7_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot7_NonLinMPC](plot7_NonLinMPC.svg)
@@ -359,8 +367,9 @@ The linear controller satisfactorily rejects the 10° step disturbance:
 ```@example man_nonlin
 ry = [180.0]
 res_lin = sim!(mpc, N, ry; plant, x_0=[π, 0], y_step=[10])
-plot(res_lin)
-savefig("plot9_NonLinMPC.svg"); nothing # hide
+p = plot(res_lin)
+savefig(p, "plot9_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot9_NonLinMPC](plot9_NonLinMPC.svg)
@@ -398,8 +407,9 @@ does slightly improve the rejection of the step disturbance:
 
 ```@example man_nonlin
 res_lin2 = sim!(mpc2, N, ry; plant, x_0=[π, 0], y_step=[10])
-plot(res_lin2)
-savefig("plot10_NonLinMPC.svg"); nothing # hide
+p = plot(res_lin2)
+savefig(p, "plot10_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot10_NonLinMPC](plot10_NonLinMPC.svg)
@@ -418,8 +428,9 @@ results:
 
 ```@example man_nonlin
 res_ms = sim!(mpc_ms, N, ry; plant, x_0=[π, 0], y_step=[10])
-plot!(res_ms)
-savefig("plot10b_NonLinMPC.svg"); nothing # hide
+plot!(p, res_ms)
+savefig(p, "plot10b_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot10b_NonLinMPC](plot10b_NonLinMPC.svg)
@@ -490,8 +501,9 @@ operating point. The [`SimResult`](@ref) object is for plotting purposes only. T
 ```@example man_nonlin
 x_0 = [0, 0]; x̂_0 = [0, 0, 0];
 res_slin = sim_adapt!(mpc3, model, N, ry, plant, x_0, x̂_0)
-plot(res_slin)
-savefig("plot12_NonLinMPC.svg"); nothing # hide
+p = plot(res_slin)
+savefig(p, "plot12_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot12_NonLinMPC](plot12_NonLinMPC.svg)
@@ -501,8 +513,9 @@ and the 10° step disturbance:
 ```@example man_nonlin
 x_0 = [π, 0]; x̂_0 = [π, 0, 0]; y_step = [10]
 res_slin = sim_adapt!(mpc3, model, N, ry, plant, x_0, x̂_0, y_step)
-plot(res_slin)
-savefig("plot13_NonLinMPC.svg"); nothing # hide
+p = plot(res_slin)
+savefig(p, "plot13_NonLinMPC.svg") # hide
+display(p) # hide
 ```
 
 ![plot13_NonLinMPC](plot13_NonLinMPC.svg)
