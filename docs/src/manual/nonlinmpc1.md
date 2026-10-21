@@ -104,6 +104,7 @@ estimator tuning is tested on a plant with a 25 % larger friction coefficient ``
 p_plant = copy(p_model)
 p_plant[3] = 1.25*p_model[3]
 plant = setname!(NonLinModel(f, h, Ts, nu, nx, ny; p=p_plant); u=vu, x=vx, y=vy)
+using Random; Random.seed!(2944) # hide
 res = sim!(estim, N, [0.5], plant=plant, y_noise=[0.5])
 p = plot(res, plotu=false, plotxwithx̂=true)
 savefig(p, "plot2_NonLinMPC.svg") # hide

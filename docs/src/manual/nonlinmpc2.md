@@ -315,6 +315,7 @@ performs under pH and flow rate measurement noise:
 
 ```@example 1
 using Random
+Random.seed!(1123) # hide
 function simMHE(mhe, plant, N; x_0, x̂_0)
     ny, ny, nd, nx, nx̂ = plant.ny, plant.ny, plant.nd, plant.nx, mhe.nx̂
     Y_data, U_data, D_data = zeros(ny, N), zeros(nu, N), zeros(nd, N)
@@ -442,6 +443,7 @@ law responds quickly and returns the effluent pH to the specified range:
 
 ```@example 1
 res = with_logger(ConsoleLogger(stderr, Error)) do # hide
+Random.seed!(5367) # hide
 res = simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0, noise=true)
 end # hide
 p = plot(res, plotd=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
