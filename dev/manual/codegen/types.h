@@ -85,6 +85,7 @@ typedef struct{
     int depth;
     int WS_start;
     int WS_end;
+    c_float lb; // Lower bound on internal objective
 }DAQPNode;
 
 typedef struct{
