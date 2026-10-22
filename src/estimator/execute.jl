@@ -384,7 +384,7 @@ julia> x̂ = updatestate!(kf, u, ym) # x̂[2] is the integrator state (nint_ym a
  0.0
 ```
 """
-function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
+function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty;)
     isnothing(ym) && (ym = estim.buffer.ym; ym .= NaN) # nothing: skip correction step
     if estim.direct && !estim.prepared[]
         error("preparestate! must be called before updatestate! with direct=true option")

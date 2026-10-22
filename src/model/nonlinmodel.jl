@@ -8,7 +8,9 @@ struct EmptySolver <: DiffSolver
 end
 
 "Call `f!` function directly for discrete-time models (no solver)."
-function solver_f!(xnext, _ , f!::F, _ , ::EmptySolver, x, u, d, p) where F
+function solver_f!(
+    xnext, _ , _ , _ , f!::F, _ , ::EmptySolver, x, u, d, _ , _ , p
+) where F<:Function
     return f!(xnext, x, u, d, p)
 end
 
@@ -315,23 +317,26 @@ LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 
 """
-    f!(x0next, k̄, model::NonLinModel, x0, u0, d0, p)
+    f!(x0next, k̄, model::NonLinModel, x0, u0, d0, u0next, d0next)
 
 Compute `x0next` using the [`DiffSolver`](@ref) in `model.solver` and `model.f!`.
 
 The method mutates `x0next` and `k̄` arguments in-place. The latter is used to store the
-intermediate stage values of the solver.
+intermediate stage values of the solver. The model parameter `model.p` is not included in
+the function signature for conciseness.
 """
-function f!(x0next, k̄, model::NonLinModel, x0, u0, d0, p)
-    return solver_f!(x0next, k̄, model.f!, model.Ts, model.solver, x0, u0, d0, p)
+function f!(x0next, k̄, model::NonLinModel, x0, u0, d0, u0next, d0next)
+    return solver_f!(
+        x0next, k̄, model.f!, model.Ts, model.solver, x0, u0, d0, u0next, d0next, model.p
+    )
 end
 
 """
-    h!(y0, model::NonLinModel, x0, d0, p)
+    h!(y0, model::NonLinModel, x0, d0)
 
 Compute `y0` by calling `model.h!` directly for [`NonLinModel`](@ref).
 """
-h!(y0, model::NonLinModel, x0, d0, p) = model.h!(y0, x0, d0, p)
+h!(y0, model::NonLinModel, x0, d0) = model.h!(y0, x0, d0, model.p)
 
 include("solver.jl")
 

@@ -44,6 +44,10 @@ struct SimModelBuffer{NT<:Real}
     y::Vector{NT}
     d::Vector{NT}
     k̄::Vector{NT}
+    ui::Vector{NT}
+    di::Vector{NT}
+    unext::Vector{NT}
+    dnext::Vector{NT}
     empty::Vector{NT}
 end
 
@@ -65,8 +69,12 @@ function SimModelBuffer{NT}(
     y = Vector{NT}(undef, ny)
     d = Vector{NT}(undef, nd)
     k̄ = Vector{NT}(undef, nx*(ni+1)) # the "+1" is necessary because of super-sampling
+    ui = Vector{NT}(undef, nu)
+    di = Vector{NT}(undef, nd)
+    unext = Vector{NT}(undef, nu)
+    dnext = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
-    return SimModelBuffer{NT}(u, x, a, y, d, k̄, empty)
+    return SimModelBuffer{NT}(u, x, a, y, d, k̄, ui, di, unext, dnext, empty)
 end
 
 @doc raw"""
@@ -245,11 +253,13 @@ function preparestate!(model::SimModel)
 end
 
 @doc raw"""
-    updatestate!(model::SimModel, u, d=[]) -> xnext
+    updatestate!(model::SimModel, u, d=[]; unext=u, dnext=d) -> xnext
 
 Update `model.x0` states with current inputs `u` and meas. dist. `d` for the next time step.
 
 The method computes and returns the model state for the next time step ``\mathbf{x}(k+1)``.
+The keyword arguments `unext` and `dnext` allow simulating with first-order hold (FOH)
+assumption on manipulated inputs and measure disturbances, respectively.
 
 # Examples
 ```jldoctest
@@ -260,12 +270,18 @@ julia> x = updatestate!(model, [1])
  1.0
 ```
 """
-function updatestate!(model::SimModel{NT}, u, d=model.buffer.empty) where NT <: Real
+function updatestate!(
+    model::SimModel{NT}, u, d=model.buffer.empty; unext=u, dnext=d
+) where NT <: Real
     validate_args(model::SimModel, d, u)
-    u0, d0, x0next, k̄ = model.buffer.u, model.buffer.d, model.buffer.x, model.buffer.k̄
+    u0, d0, k̄ = model.buffer.u, model.buffer.d, model.buffer.k̄
+    x0next, u0next, d0next = model.buffer.x, model.buffer.unext, model.buffer.dnext
+    ui, di = model.buffer.ui, model.buffer.di
     u0 .= u .- model.uop
     d0 .= d .- model.dop
-    f!(x0next, k̄, model, model.x0, u0, d0, model.p)
+    u0next .= unext .- model.uop
+    d0next .= dnext .- model.dop
+    f!(x0next, k̄, ui, di, model, model.x0, u0, d0, u0next, d0next)
     x0next  .+= model.fop .- model.xop
     model.x0 .= x0next
     xnext   = x0next
@@ -294,7 +310,7 @@ function evaloutput(model::SimModel{NT}, d=model.buffer.empty) where NT <: Real
     validate_args(model, d)
     d0, y0  = model.buffer.d, model.buffer.y
     d0 .= d .- model.dop
-    h!(y0, model, model.x0, d0, model.p)
+    h!(y0, model, model.x0, d0)
     y   = y0
     y .+= model.yop
     return y

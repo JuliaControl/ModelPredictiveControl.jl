@@ -290,11 +290,11 @@ function initstate_core!(model::LinModel, u0, d0)
 end
 
 """
-    f!(x0next, _ , model::LinModel, x0, u0, d0, _ ) -> nothing
+    f!(x0next, _ , model::LinModel, x0, u0, d0 , _ , _ ) -> nothing
 
 Evaluate `x0next = A*x0 + Bu*u0 + Bd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function f!(x0next, _ , model::LinModel, x0, u0, d0, _ )
+function f!(x0next, _ , model::LinModel, x0, u0, d0 , _ , _ )
     mul!(x0next, model.A,  x0)
     mul!(x0next, model.Bu, u0, 1, 1)
     mul!(x0next, model.Bd, d0, 1, 1)
@@ -303,11 +303,11 @@ end
 
 
 """
-    h!(y0, model::LinModel, x0, d0, _ ) -> nothing
+    h!(y0, model::LinModel, x0, d0) -> nothing
 
 Evaluate `y0 = C*x0 + Dd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function h!(y0, model::LinModel, x0, d0, _ )
+function h!(y0, model::LinModel, x0, d0)
     mul!(y0, model.C,  x0)
     mul!(y0, model.Dd, d0, 1, 1)
     return nothing
