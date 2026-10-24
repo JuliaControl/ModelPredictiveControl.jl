@@ -827,7 +827,7 @@ Call `model.h!` with the `a0` argument if [`NonLinModelDAE`](@ref), else without
 The `a0` argument is ignored for [`SimModelODE`](@ref)s. See also [`fq_dae!`](@ref).
 """
 h_dae!(y0, model::NonLinModelDAE, x0, a0, d0) =  model.h!(y0, x0, a0, d0, model.p)
-h_dae!(y0, model::SimModelODE,    x0, _ , d0) =  h!(y0, model, x0, d0, model.p)
+h_dae!(y0, model::SimModelODE,    x0, _ , d0) =  h!(y0, model, x0, d0)
 
 function linconstrainteq!(model::NonLinModelDAE, ::OrthogonalCollocation)
     mul!(model.Fs, model.Ks, model.x0_optim)

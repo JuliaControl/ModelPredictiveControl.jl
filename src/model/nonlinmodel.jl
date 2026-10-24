@@ -317,7 +317,7 @@ LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 
 """
-    f!(x0next, k̄, model::NonLinModel, x0, u0, d0, u0next, d0next)
+    f!(x0next, k̄, ui, di, model::NonLinModel, x0, u0, d0, u0next, d0next)
 
 Compute `x0next` using the [`DiffSolver`](@ref) in `model.solver` and `model.f!`.
 
@@ -325,10 +325,9 @@ The method mutates `x0next` and `k̄` arguments in-place. The latter is used to 
 intermediate stage values of the solver. The model parameter `model.p` is not included in
 the function signature for conciseness.
 """
-function f!(x0next, k̄, model::NonLinModel, x0, u0, d0, u0next, d0next)
-    return solver_f!(
-        x0next, k̄, model.f!, model.Ts, model.solver, x0, u0, d0, u0next, d0next, model.p
-    )
+function f!(x0next, k̄, ui, di, model::NonLinModel, x0, u0, d0, u0next, d0next)
+    Ts, solver, p = model.Ts, model.solver, model.p
+    return solver_f!(x0next, k̄, ui, di, model.f!, Ts, solver, x0, u0, d0, u0next, d0next, p)
 end
 
 """

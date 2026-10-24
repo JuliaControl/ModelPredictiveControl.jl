@@ -294,7 +294,7 @@ end
 
 Evaluate `x0next = A*x0 + Bu*u0 + Bd*d0` in-place when `model` is a [`LinModel`](@ref).
 """
-function f!(x0next, _ , model::LinModel, x0, u0, d0 , _ , _ )
+function f!(x0next, _ , _ , _ , model::LinModel, x0, u0, d0 , _ , _ )
     mul!(x0next, model.A,  x0)
     mul!(x0next, model.Bu, u0, 1, 1)
     mul!(x0next, model.Bd, d0, 1, 1)

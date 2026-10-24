@@ -1520,7 +1520,7 @@ function con_nonlinprogeq!(
         x̂dnext   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ŝdnext    = @views geq[(1 + nx*(j-1)):(nx*j)]
-        f!(x̂dnext, k̄, model, x̂d_Z̃, û0, d̂0, model.p)
+        f!(x̂dnext, k̄, model, x̂d_Z̃, û0, d̂0)
         ŝdnext .= @. x̂dnext - x̂dnext_Z̃
     end
     return geq
