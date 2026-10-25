@@ -1504,9 +1504,11 @@ function con_nonlinprogeq!(
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
     f_threads = transcription.f_threads
+    h = transcription.h
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
+    Ûi, D̂i = similar(Û0), similar(D̂0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
@@ -1515,8 +1517,12 @@ function con_nonlinprogeq!(
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄        = @views    K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        ûi = @views Ûi[(1 + nu*(j-1)):(nu*j)]
+        d̂i = @views D̂i[(1 + nd*(j-1)):(nd*j)]
+        k̄  = @views  K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        û0next   = @views (h < 0 && j < Hp) ? Û0[(1 + nu*j):(nu*(j+1))] : û0 # Δu(k+Hp) = 0
+        d̂0next   = @views D̂0[(1 + nd*(j-1)):(nd*j)] # always FOH for measured disturbances d        
         x̂dnext   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ŝdnext   = @views geq[(1 + nx*(j-1)):(nx*j)]

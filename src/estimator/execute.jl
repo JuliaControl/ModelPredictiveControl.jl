@@ -14,7 +14,9 @@ function remove_op!(estim::StateEstimator, ym, d, u=nothing)
 end
 
 @doc raw"""
-    f̂!(x̂0next, û0, k̄, estim::StateEstimator, model::SimModel, x̂0, u0, d0) -> nothing
+    f̂!(
+        x̂0next, û0, k̄, estim::StateEstimator, model::SimModel, x̂0, u0, d0, u0next, d0next
+    ) -> nothing
 
 Mutating state update function ``\mathbf{f̂}`` of the augmented model.
 
@@ -61,12 +63,17 @@ The operating points are handled inside ``\mathbf{f̂}``. See Extended Help for 
     are computed by [`augment_model`](@ref) (almost always zeros in practice for 
     [`NonLinModel`](@ref)).
 """
-function f̂!(x̂0next, û0, k̄, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
-    return f̂!(x̂0next, û0, k̄, model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0)
+function f̂!(
+    x̂0next, û0, k̄, estim::StateEstimator, model::SimModel, x̂0, u0, d0, u0next, d0next
+)
+    return f̂!(
+        x̂0next, û0, k̄, 
+        model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0, u0next, d0next
+    )
 end
 
 @doc raw"""
-    f̂!(x̂0next, _ , _ , estim::StateEstimator, model::LinModel, x̂0, u0, d0) -> nothing
+    f̂!(x̂0next, _ , _ , estim::StateEstimator, model::LinModel, x̂0, u0, d0, _ , _ ) -> nothing
 
 Use the augmented model matrices and operating points if `model` is a [`LinModel`](@ref).
 
@@ -83,7 +90,7 @@ Use the augmented model matrices and operating points if `model` is a [`LinModel
     ```
     with the augmented matrices constructed by [`augment_model`](@ref).
 """
-function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
+function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0, _ , _ )
     mul!(x̂0next, estim.Â,  x̂0)
     mul!(x̂0next, estim.B̂u, u0, 1, 1)
     mul!(x̂0next, estim.B̂d, d0, 1, 1)
@@ -92,18 +99,27 @@ function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
 end
 
 """
-    f̂!(x̂0next, û0, k, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+    f̂!(
+        x̂0next, û0, û0next, k̄, 
+        model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0, u0next, d0next
+    )
 
 Same than [`f̂!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
 """
-function f̂!(x̂0next, û0, k̄, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+function f̂!(
+    x̂0next, û0, û0next, k̄, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0, u0next, d0next
+)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
     @views x̂dnext, x̂snext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
-    mul!(û0, Cs_u, x̂s)      # ys_u = Cs_u*xs
-    û0 .+= u0               # û0 = u0 + ys_u  
-    f!(x̂dnext, k̄, model, x̂d, û0, d0, model.p)
     mul!(x̂snext, As, x̂s)
+    mul!(û0, Cs_u, x̂s)          # ys_u(k)    = Cs_u*xs(k)
+    û0 .+= u0                   # û0(k)      = u0(k) + ys_u(k)  
+    mul!(û0next, Cs_u, x̂snext)  # ys_u(k+1)  = Cs_u*xs(k+1)
+    û0next .+= u0next           # û0(k+1)    = u0(k+1) + ys_u(k+1)
+    # TODO: CONTINUE HERE (create ûi variable, an new argument of this function)
+    f!(x̂dnext, k̄, ûi, di, model, x̂d, û0, d0, û0next, d0next)
+    
     x̂0next .+= f̂op .- x̂op
     return nothing
 end
@@ -136,8 +152,8 @@ Same than [`ĥ!`](@ref) for [`SimModel`](@ref) but without the `estim` argument
 function ĥ!(ŷ0, model::SimModel, Cs_y::AbstractMatrix, x̂0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    h!(ŷ0, model, x̂d, d0, model.p)  # y0 = h(xd, d0)
-    mul!(ŷ0, Cs_y, x̂s, 1, 1)        # ŷ0 = y0 + Cs_y*xs
+    h!(ŷ0, model, x̂d, d0)      # y0 = h(xd, d0)
+    mul!(ŷ0, Cs_y, x̂s, 1, 1)   # ŷ0 = y0 + Cs_y*xs
     return nothing
 end
 
@@ -358,7 +374,7 @@ function preparestate!(estim::StateEstimator, ym, d=estim.buffer.empty)
 end
 
 @doc raw"""
-    updatestate!(estim::StateEstimator, u, ym, d=[]) -> x̂next
+    updatestate!(estim::StateEstimator, u, ym, d=[]; unext=u, dnext=d) -> x̂next
 
 Update `estim.x̂0` estimate with current inputs `u`, measured outputs `ym` and dist. `d`. 
 
@@ -384,13 +400,15 @@ julia> x̂ = updatestate!(kf, u, ym) # x̂[2] is the integrator state (nint_ym a
  0.0
 ```
 """
-function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty;)
+function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty; unext=u, dnext=d)
     isnothing(ym) && (ym = estim.buffer.ym; ym .= NaN) # nothing: skip correction step
     if estim.direct && !estim.prepared[]
         error("preparestate! must be called before updatestate! with direct=true option")
     end
     validate_args(estim, ym, d, u)
+    validate_args(estim.model, dnext, unext)
     y0m, d0, u0 = remove_op!(estim, ym, d, u)
+    u0next, d0next = estim.model.buffer.unext, estim.model.buffer.dnext
     update_estimate!(estim, u0, y0m, d0)
     estim.prepared[] = false
     x̂next  = estim.buffer.x̂

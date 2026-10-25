@@ -80,6 +80,7 @@ plant model/constraints. The Extended Help details transcription of
 struct SingleShooting <: ShootingMethod
     h::Int
     function SingleShooting(h::Int=0)
+        !(h == 0 || h == 1) && throw(ArgumentError("h argument must be 0 or 1."))
         return new(h)
     end
 end
@@ -146,6 +147,7 @@ struct MultipleShooting <: ShootingMethod
     f_threads::Bool
     h_threads::Bool
     function MultipleShooting(h::Int=0; f_threads=false, h_threads=false)
+        !(h == 0 || h == 1) && throw(ArgumentError("h argument must be 0 or 1."))
         return new(h, f_threads, h_threads)
     end
 end
@@ -252,9 +254,7 @@ struct TrapezoidalCollocation <: CollocationMethod
     f_threads::Bool
     h_threads::Bool
     function TrapezoidalCollocation(h::Int=0; f_threads=false, h_threads=false)
-        if !(h == 0 || h == 1)
-            throw(ArgumentError("h argument must be 0 or 1 for TrapezoidalCollocation."))
-        end
+        !(h == 0 || h == 1) && throw(ArgumentError("h argument must be 0 or 1."))
         no = 2 # 2 collocation points per intervals for trapezoidal rule
         return new(h, no, f_threads, h_threads)
     end
@@ -430,9 +430,7 @@ struct OrthogonalCollocation <: CollocationMethod
     function OrthogonalCollocation(
         h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
-        if !(h == 0 || h == 1)
-            throw(ArgumentError("h argument must be 0 or 1 for OrthogonalCollocation."))
-        end
+        !(h == 0 || h == 1) && throw(ArgumentError("h argument must be 0 or 1."))
         if roots==:gaussradau            
             x, _ = FastGaussQuadrature.gaussradau(COLLOCATION_NODE_TYPE, no)
             # we reverse the nodes to include the τ=1.0 node:

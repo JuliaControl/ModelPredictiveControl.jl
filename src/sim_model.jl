@@ -275,12 +275,13 @@ julia> x = updatestate!(model, [1])
 function updatestate!(
     model::SimModel{NT}, u, d=model.buffer.empty; unext=u, dnext=d
 ) where NT <: Real
-    validate_args(model::SimModel, d, u)
+    validate_args(model, d, u)
+    validate_args(model, dnext, unext)
     u0, d0, k̄ = model.buffer.u, model.buffer.d, model.buffer.k̄
     x0next, u0next, d0next = model.buffer.x, model.buffer.unext, model.buffer.dnext
     ui, di = model.buffer.ui, model.buffer.di
-    u0 .= u .- model.uop
-    d0 .= d .- model.dop
+    u0     .= u .- model.uop
+    d0     .= d .- model.dop
     u0next .= unext .- model.uop
     d0next .= dnext .- model.dop
     f!(x0next, k̄, ui, di, model, model.x0, u0, d0, u0next, d0next)

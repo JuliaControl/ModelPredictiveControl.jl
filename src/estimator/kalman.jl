@@ -251,7 +251,7 @@ function correct_estimate!(estim::SteadyKalmanFilter, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
+    update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0, _ , _ )
 
 Update `estim.x̂0` estimate with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -273,7 +273,7 @@ provided below.
 \mathbf{x̂}_{k}(k+1) = \mathbf{Â x̂}_{k}(k) + \mathbf{B̂_u u}(k) + \mathbf{B̂_d d}(k) 
 ```
 """
-function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0)
+function update_estimate!(estim::SteadyKalmanFilter, u0, y0m, d0, _ , _ )
     if !estim.direct
         correct_estimate!(estim, y0m, d0)
     end
@@ -485,7 +485,7 @@ end
 
 
 @doc raw"""
-    update_estimate!(estim::KalmanFilter, u0, y0m, d0)
+    update_estimate!(estim::KalmanFilter, u0, y0m, d0, _ , _ )
 
 Update [`KalmanFilter`](@ref) state `estim.x̂0` and estimation error covariance `estim.cov.P̂`.
 
@@ -517,7 +517,7 @@ provided below, see [^2] for details.
 [^2]: "Kalman Filter", *Wikipedia: The Free Encyclopedia*, 
      <https://en.wikipedia.org/wiki/Kalman_filter>, Accessed 2024-08-08.
 """
-function update_estimate!(estim::KalmanFilter, u0, y0m, d0)
+function update_estimate!(estim::KalmanFilter, u0, y0m, d0, _ , _ )
     if !estim.direct
         correct_estimate!(estim, y0m, d0)
     end
@@ -827,7 +827,7 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
+    update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0, u0next, d0next)
     
 Update [`UnscentedKalmanFilter`](@ref) state `estim.x̂0` and covariance estimate `estim.cov.P̂`.
 
@@ -870,7 +870,7 @@ step is skipped if `estim.direct == true` since it's already done by the user.
      Kalman, H∞, and Nonlinear Approaches", John Wiley & Sons, p. 433–459, <https://doi.org/10.1002/0470045345.ch14>, 
      ISBN9780470045343.
 """
-function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
+function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0, u0next, d0next)
     if !estim.direct
         correct_estimate!(estim, y0m, d0)
     end
@@ -890,7 +890,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     X̂0next = X̂0corr
     for j in axes(X̂0next, 2)
         @views x̂0corr .= X̂0corr[:, j]
-        @views f̂!(X̂0next[:, j], û0, k̄, estim, estim.model, x̂0corr, u0, d0)
+        @views f̂!(X̂0next[:, j], û0, k̄, estim, estim.model, x̂0corr, u0, d0, u0next, d0next)
     end
     x̂0next .= mul!(x̂0corr, X̂0next, m̂)
     X̄0next  = estim.X̄0
