@@ -290,7 +290,7 @@ function initstate_core!(model::LinModel, u0, d0)
 end
 
 """
-    f!(x0next, _ , model::LinModel, x0, u0, d0 , _ , _ ) -> nothing
+    f!(x0next, _ , _ , _ , model::LinModel, x0, u0, d0 , _ , _ ) -> nothing
 
 Evaluate `x0next = A*x0 + Bu*u0 + Bd*d0` in-place when `model` is a [`LinModel`](@ref).
 """

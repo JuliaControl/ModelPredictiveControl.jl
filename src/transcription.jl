@@ -33,9 +33,9 @@ Abstract subtype of [`TranscriptionMethod`](@ref) for direct collocation methods
 abstract type CollocationMethod <: TranscriptionMethod end
 
 @doc raw"""
-    SingleShooting()
+    SingleShooting(h::Int=0)
 
-Construct a direct single shooting [`TranscriptionMethod`](@ref).
+Construct a direct single shooting [`TranscriptionMethod`](@ref) with `h`th order hold.
 
 In the case of [`PredictiveController`](@ref) types, the decision variable in the
 optimization problem is (excluding the slack ``ϵ``, and without any custom move blocking):
@@ -46,6 +46,12 @@ optimization problem is (excluding the slack ``ϵ``, and without any custom move
     \vdots                                              \\ 
     \mathbf{Δu}(k+H_c-1)                                \end{bmatrix}
 ```
+The `h` argument is `0` or `1`, for piecewise constant or linear manipulated inputs 
+``\mathbf{u}``. Measured disturbances ``\mathbf{d}`` are always piecewise linear. This
+setting is ignored for [`LinModel`](@ref) since already discretized. Note that `unext` and
+`dnext` keyword arguments must be explicitly provided to the [`updatestate!`](@ref) method
+to simulate a plant with first-order hold (FOH) inputs.
+
 This method computes the predictions by calling the augmented discrete-time model
 recursively over the prediction horizon ``H_p`` in the objective function, or by updating
 the linear coefficients of the quadratic optimization for [`LinModel`](@ref). It is 
@@ -71,12 +77,17 @@ plant model/constraints. The Extended Help details transcription of
     elements in ``\mathbf{Z}`` is therefore constant. The ``\mathbf{Ŵ}`` vector is defined
     in the Extended Help of [`MovingHorizonEstimator`](@ref).
 """
-struct SingleShooting <: ShootingMethod end
+struct SingleShooting <: ShootingMethod
+    h::Int
+    function SingleShooting(h::Int=0)
+        return new(h)
+    end
+end
 
 @doc raw"""
-    MultipleShooting(; f_threads=false, h_threads=false)
+    MultipleShooting(h::Int; f_threads=false, h_threads=false)
 
-Construct a direct multiple shooting [`TranscriptionMethod`](@ref).
+Construct a direct multiple shooting [`TranscriptionMethod`](@ref) with `h`th order hold.
 
 The decision variable of [`PredictiveController`](@ref) is (excluding ``ϵ``):
 ```math
@@ -94,7 +105,7 @@ operating point ``\mathbf{x̂_{op}}`` (see [`augment_model`](@ref)):
 where ``\mathbf{x̂}_i(k+j)`` is the state prediction for time ``k+j``, estimated by the
 observer at time ``i=k`` or ``i=k-1`` depending on its `direct` flag. Note that 
 ``\mathbf{X̂_0 = X̂}`` if the operating point is zero, which is typically the case in practice
-for [`NonLinModel`](@ref). 
+for [`NonLinModel`](@ref). See [`SingleShooting`](@ref) for details on `h` arguments.
     
 This transcription computes the predictions by calling the augmented discrete-time model
 in the equality constraint function recursively over ``H_p``, or by updating the linear
@@ -131,10 +142,11 @@ provided in the Extended Help.
     with zeros is for the unused decision variables at the beginning.
 """
 struct MultipleShooting <: ShootingMethod 
+    h::Int
     f_threads::Bool
     h_threads::Bool
-    function MultipleShooting(; f_threads=false, h_threads=false)
-        return new(f_threads, h_threads)
+    function MultipleShooting(h::Int=0; f_threads=false, h_threads=false)
+        return new(h, f_threads, h_threads)
     end
 end
 
@@ -144,14 +156,10 @@ end
 Construct an implicit trapezoidal [`TranscriptionMethod`](@ref) with `h`th order hold.
 
 This is the simplest collocation method. It supports continuous-time [`NonLinModel`](@ref)
-and [`NonLinModelDAE`](@ref). For [`NonLinModel`](@ref), the decision variables are the same
-as for [`MultipleShooting`](@ref), hence similar computational costs. See the same docstring
-for descriptions of `f_threads` and `h_threads` keywords. The Extended Help details
-the decision variables for [`NonLinModelDAE`](@ref). The `h` argument is `0` or `1`, for 
-piecewise constant or linear manipulated inputs ``\mathbf{u}`` (`h=1` is slightly less
-expensive). Note that the various [`DiffSolver`](@ref) here assume zero-order hold, so `h=1`
-will induce a small plant-model mismatch if the plant is simulated with these solvers. 
-Measured disturbances ``\mathbf{d}`` are piecewise linear.
+and [`NonLinModelDAE`](@ref). See [`SingleShooting`](@ref) for details on `h` arguments. For
+[`NonLinModel`](@ref), the decision variables are the same as for [`MultipleShooting`](@ref),
+hence similar computational costs. See the same docstring for descriptions of `f_threads`
+and `h_threads` keywords. The Extended Help details the decision variables for [`NonLinModelDAE`](@ref). 
 
 This transcription computes the predictions by calling the continuous-time model in the
 equality constraint function and by using the implicit trapezoidal rule. It can handle
@@ -258,13 +266,13 @@ end
         h::Int=0, no::Int=3; f_threads=false, h_threads=false, roots=:gaussradau
     )
 
-Construct an orthogonal collocation [`TranscriptionMethod`](@ref).
+Construct an orthogonal collocation [`TranscriptionMethod`](@ref) with `h`th order hold.
 
 Also known as pseudo-spectral method. It supports continuous-time [`NonLinModel`](@ref)
-and [`NonLinModelDAE`](@ref). The `h` argument is the hold order for ``\mathbf{u}`` (`0` or 
-`1`), and the `no` argument, the number of collocation points ``n_o``. The decision variable
-of [`PredictiveController`](@ref) with [`NonLinModel`](@ref) is similar to 
-[`MultipleShooting`](@ref), but it also includes the collocation points:
+and [`NonLinModelDAE`](@ref). See [`SingleShooting`](@ref) for details on `h` arguments. The
+`no` argument is the number of collocation points ``n_o``. The decision variable of
+[`PredictiveController`](@ref) with [`NonLinModel`](@ref) is similar to [`MultipleShooting`](@ref),
+but it also includes the collocation points:
 ```math
 \mathbf{Z} = \begin{bmatrix} \mathbf{ΔU} \\ \mathbf{X̂_0} \\ \mathbf{K̄} \end{bmatrix}
 ```
