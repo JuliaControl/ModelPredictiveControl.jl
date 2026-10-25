@@ -321,9 +321,11 @@ LinModel(model::NonLinModel; kwargs...) = linearize(model; kwargs...)
 
 Compute `x0next` using the [`DiffSolver`](@ref) in `model.solver` and `model.f!`.
 
-The method mutates `x0next` and `k̄` arguments in-place. The latter is used to store the
-intermediate stage values of the solver. The model parameter `model.p` is not included in
-the function signature for conciseness.
+The method mutates `x0next`, `k̄`, `ui` and `di` arguments in-place. The `k̄` argument is used
+to store the intermediate stage values of the solver. The `ui` and `di` arguments are used
+to stored the interpolated inputs and measured disturbances, respectively (needed for FOH
+discretization). The model parameter `model.p` is not included in the function signature for
+conciseness.
 """
 function f!(x0next, k̄, ui, di, model::NonLinModel, x0, u0, d0, u0next, d0next)
     Ts, solver, p = model.Ts, model.solver, model.p

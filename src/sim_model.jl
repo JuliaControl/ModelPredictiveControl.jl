@@ -258,8 +258,9 @@ end
 Update `model.x0` states with current inputs `u` and meas. dist. `d` for the next time step.
 
 The method computes and returns the model state for the next time step ``\mathbf{x}(k+1)``.
-The keyword arguments `unext` and `dnext` allow simulating with first-order hold (FOH)
-assumption on manipulated inputs and measure disturbances, respectively.
+The keyword arguments `unext` and `dnext` allow simulating with a first-order hold (FOH) on
+manipulated inputs and measured disturbances, respectively (interpreted as the right limit
+value of the next time step ``k+1``).
 
 # Examples
 ```jldoctest

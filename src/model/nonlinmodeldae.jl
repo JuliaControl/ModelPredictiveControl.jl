@@ -57,6 +57,8 @@ struct NonLinModelDAE{
     x0_optim::Vector{NT}
     u0_optim::Vector{NT}
     d0_optim::Vector{NT}
+    u0next_optim::Vector{NT}
+    d0next_optim::Vector{NT}
     iszero_Ha::Bool
     buffer::SimModelBuffer{NT}
     function NonLinModelDAE{NT}(
@@ -93,9 +95,6 @@ struct NonLinModelDAE{
         size(as_0) ≠ (na,) && throw(DimensionMismatch("as_0 size $(size(as_0)) ≠ alg. var. size ($na,)"))
         x0, a0 = zeros(NT, nx), zeros(NT, na)
         t  = zeros(NT, 1)
-        # the updatestate!(model, u, d) API does not know the input `u` of the next time 
-        # step k+1, so only piecewise constant input `u` is supported here (h=0):
-        transcription.h > 0 && error("Only zero-order hold (h=0) is supported for simulations of DAEs")
         iszero_Ha = validate_strictly_proper(NT, fq!, h!, nu, nx, na, ny, nd, p)
         Mo, Co, λo = init_orthocolloc(NT, transcription, nx, Ts)
         nZ = get_nZ_dae(transcription, nx, na)
@@ -105,6 +104,7 @@ struct NonLinModelDAE{
         beq = zeros(NT, size(Aeq, 1))
         neq = nZ - size(Aeq, 1) # number of nonlinear equality constraints
         x0_optim, u0_optim, d0_optim = zeros(NT, nx), zeros(NT, nu), zeros(NT, nd)
+        u0next_optim, d0next_optim = zeros(NT, nu), zeros(NT, nd)
         # force computation of derivatives for the first NLP iteration:
         force∇q, force∇geq = [true], [true]
         buffer = SimModelBuffer{NT}(nu, nx, ny, nd, 0, na)
@@ -126,7 +126,7 @@ struct NonLinModelDAE{
             uname, yname, dname, xname,
             unit,
             xs_0, as_0,
-            x0_optim, u0_optim, d0_optim,
+            x0_optim, u0_optim, d0_optim, u0next_optim, d0next_optim,
             iszero_Ha,
             buffer
         )
@@ -686,47 +686,66 @@ Update `k̄` and `geq` in place for the open loop root solving of [`NonLinModelD
 """
 function update_predictions!(k̄, geq, model, Z)
     x0, u0, d0 = model.x0_optim, model.u0_optim, model.d0_optim
-    con_nonlinprogeq!(geq, k̄, model, model.transcription, x0, u0, d0, Z)
+    u0next, d0next = model.u0next_optim, model.d0next_optim
+    con_nonlinprogeq!(
+        geq, k̄, model, model.transcription, x0, u0, d0, u0next, d0next, Z
+    )
     return nothing
 end
 
 """
     con_nonlinprogeq!(
-        geq, k̄dot, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
+        geq, k̄dot,
+        model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, u0next, d0next, Z
     ) -> geq
 
 Nonlinear equality constraint for open loop root solving of [`NonLinModelDAE`](@ref).
 """
 function con_nonlinprogeq!(
-    geq, k̄dot, model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, Z
+    geq, k̄dot,
+    model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, u0next, d0next, Z
 )
+    transcription = model.transcription
     nx, na = model.nx, model.na
-    Ts = model.Ts 
+    h = transcription.h
+    Ts = model.Ts
+    u⁺, d⁺ = u0, d0
+    u⁻next = h > 0 ? u0next : u0
+    d⁻next = d0next # always first-order hold for measured disturbances d
     x0next, a⁺, a0next = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
     sknext, q⁺, q⁻next = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
     k̇⁺, k̇⁻next         = @views k̄dot[1:nx], k̄dot[(nx+1):(2nx)]
-    model.fq!(k̇⁺    , q⁺    , x0    , a⁺    , u0, d0, model.p)
-    model.fq!(k̇⁻next, q⁻next, x0next, a0next, u0, d0, model.p)
+    model.fq!(k̇⁺    , q⁺    , x0    , a⁺    , u⁺    , d⁺    , model.p)
+    model.fq!(k̇⁻next, q⁻next, x0next, a0next, u⁻next, d⁻next, model.p)
     sknext .= @. x0 + 0.5*Ts*(k̇⁺ + k̇⁻next) - x0next
     return geq
 end
 
 """
     con_nonlinprogeq!(
-        geq, k̄dot, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
+        geq, k̄dot
+        model::NonLinModelDAE, ::OrthogonalCollocation, x0, u0, d0, u0next, d0next, Z
     ) -> geq
 
 Same but using an [`OrthogonalCollocation`](@ref) transcription.
 """
 function con_nonlinprogeq!(
-    geq, k̄dot, model::NonLinModelDAE, transcription::OrthogonalCollocation, x0, u0, d0, Z
+    geq, k̄dot,
+    model::NonLinModelDAE, ::OrthogonalCollocation, x0, u0, d0, u0next, d0next, Z
 )
+    transcription = model.transcription
     nx, na = model.nx, model.na
-    Mo, no =  model.Mo, transcription.no
+    h = transcription.h
+    Mo =  model.Mo
+    no, τ = transcription.no, transcription.τ
+    ui, di = model.buffer.ui, model.buffer.di
+    u⁺, d⁺ = u0, d0
+    u⁻next = h > 0 ? u0next : u0
+    d⁻next = d0next # always first-order hold for measured disturbances d
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     a⁺, k̄, ā   = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
-    q⁺, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)] 
-    @views model.fq!(k̄dot[1:nx], q⁺, x0, a⁺, u0, d0, model.p)
+    q⁺, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)]
+    @views model.fq!(k̄dot[1:nx], q⁺, x0, a⁺, u⁺, d⁺, model.p)
     Δk = k̄dot
     for i=1:no
         Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄[(1 + (i-1)*nx):(i*nx)] .- x0
@@ -735,7 +754,9 @@ function con_nonlinprogeq!(
     for i=1:no
         k̇i, ki = @views k̄dot[(1 + (i-1)*nx):(i*nx)], k̄[(1 + (i-1)*nx):(i*nx)]
         qi, ai = @views    q̄[(1 + (i-1)*na):(i*na)], ā[(1 + (i-1)*na):(i*na)]
-        model.fq!(k̇i, qi, ki, ai, u0, d0, model.p)
+        ui .= (1-τ[i]).*u⁺ .+ τ[i].*u⁻next
+        di .= (1-τ[i]).*d⁺ .+ τ[i].*d⁻next
+        model.fq!(k̇i, qi, ki, ai, ui, di, model.p)
     end
     sk̄ .-= k̄dot
     return geq
@@ -757,11 +778,13 @@ function initstate_core!(model::NonLinModelDAE, u0, d0)
     model.x0_optim .= model.x0
     model.u0_optim .= u0
     model.d0_optim .= d0
+    model.u0next_optim .= u0
+    model.d0next_optim .= d0
     return nothing
 end
 
 @doc raw"""
-    f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ ) -> nothing
+    f!(x0next, _ , _ , _ , model::NonLinModelDAE, x0, u0, d0, u0next, d0next) -> nothing
 
 Solve the optimization `model.optim` problem for [`NonLinModelDAE`](@ref).
 
@@ -769,11 +792,13 @@ After solving, the next state ``\mathbf{x_0}(k+1)`` will be stored in-place in t
 argument. The right limit of the current algebraic variable ``\mathbf{a^+}(k+0)`` will be
 also stored at `model.a0`.
 """
-function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
+function f!(x0next, _ , _ , _ , model::NonLinModelDAE, x0, u0, d0, u0next, d0next)
     nx, na = model.nx, model.na
     model.x0_optim .= x0
     model.u0_optim .= u0
     model.d0_optim .= d0
+    model.u0next_optim .= u0next
+    model.d0next_optim .= d0next
     linconstrainteq!(model, model.transcription)
     Zvar = model.optim_state[:Zvar]
     Z = solve!(model, model.optim_state, Zvar, model.Z)
@@ -784,7 +809,7 @@ function f!(x0next, _ , model::NonLinModelDAE, x0, u0, d0, _ )
 end
 
 """
-    h!(y0, model::NonLinModelDAE, x0, d0, p) -> nothing
+    h!(y0, model::NonLinModelDAE, x0, d0) -> nothing
 
 Solve the algebraic equation to get `a0` and call `model.h!` for [`NonLinModelDAE`](@ref).
 
@@ -792,7 +817,7 @@ If `model.iszero_Ha` is `true`, the algebraic variable is not used in `model.h!`
 to [`SparseConnectivityTracer.jl`](@extref SparseConnectivityTracer.jl), the algebraic
 equation solving is thus skipped and `model.h!` is called directly.
 """
-function h!(y0, model::NonLinModelDAE, x0, d0, p)
+function h!(y0, model::NonLinModelDAE, x0, d0)
     if !model.iszero_Ha
         model.x0_optim .= x0
         model.d0_optim .= d0
@@ -804,7 +829,7 @@ function h!(y0, model::NonLinModelDAE, x0, d0, p)
     else # model.h! is not a function of a0, this vector is not needed here:
         a0 = model.buffer.a
     end
-    model.h!(y0, x0, a0, d0, p)
+    model.h!(y0, x0, a0, d0, model.p)
     return nothing
 end
 
@@ -884,12 +909,14 @@ The function should be called after calling [`updatestate!`](@ref) on `model` ob
 returns the dictionary `info` with the following fields:
 
 - `:xnext` : next state, ``\mathbf{x}(k+1)``
-- `:a` : right limit of current algebraic variable, ``\mathbf{a^+}(k)``
-- `:q` : current algebraic equation residuals `res`, ``\mathbf{q(x, a^+, u, d, p)}`` 
-- `:y` : current output, ``\mathbf{y}(k)``
+- `:unext` : right limit of the next manipulated input, ``\mathbf{u^+}(k+1)``
+- `:dnext` : right limit of the next measured disturbance, ``\mathbf{d^+}(k+1)``
 - `:x` : current state, ``\mathbf{x}(k)``
-- `:u` : current manipulated input, ``\mathbf{u}(k)``
-- `:d` : current measured disturbances, ``\mathbf{u}(k)``
+- `:a` : right limit of current algebraic variable, ``\mathbf{a^+}(k)``
+- `:u` : right limit of current manipulated input, ``\mathbf{u^+}(k)``
+- `:d` : right limit of current measured disturbances, ``\mathbf{d^+}(k)``
+- `:q` : current algebraic equation residuals `res`, ``\mathbf{q(x, a^+, u^+, d^+, p)}`` 
+- `:y` : current output, ``\mathbf{y}(k)``
 
 The following two fields are also available if the related method is called at least once:
 
@@ -913,26 +940,33 @@ julia> a = round.(getinfo(model)[:a], digits=6)
 """
 function getinfo(model::NonLinModelDAE{NT}) where NT<:Real
     x0, u0, d0 = model.x0_optim, model.u0_optim, model.d0_optim
+    u0next, d0next = model.u0next_optim, model.d0next_optim
     a0, p =  model.a0, model.p
     buffer = model.buffer
-    ẋ, q, y0 = buffer.x, buffer.a, buffer.y
+    k̄, q, y0 = buffer.k̄, buffer.a, buffer.y
+    ẋ = @views k̄[1:model.nx]
     model.fq!(ẋ, q, x0, a0, u0, d0, p)
     model.h!(y0, x0, a0, d0, p)
     y = y0
     y .+ model.yop
     x, u, d = buffer.x, buffer.u, buffer.d
+    unext, dnext = buffer.unext, buffer.dnext
     x .= x0 .+ model.xop
     u .= u0 .+ model.uop
     d .= d0 .+ model.dop
     a  = a0
+    unext .= u0next .+ model.uop
+    dnext .= d0next .+ model.dop
     info = Dict{Symbol, Any}()
     info[:xnext] = model.x0 + model.xop
-    info[:q] = q
-    info[:y] = y
+    info[:unext] = unext
+    info[:dnext] = dnext
     info[:x] = x
     info[:a] = a
     info[:u] = u
     info[:d] = d
+    info[:q] = q
+    info[:y] = y
     if JuMP.termination_status(model.optim_state) ≠ JuMP.OPTIMIZE_NOT_CALLED
         info[:sol_state]  = JuMP.solution_summary(model.optim_state,  verbose=true)
     end
