@@ -18,6 +18,7 @@ UnoSolver = "1baa60ac-02f7-4b39-a7a8-2f4f58486b05"
 [compat]
 BenchmarkTools = "1.8.0"
 Ipopt = "1.16.0"
+SparseConnectivityTracer = "1.2.4"
 UnoSolver = "0.3.8"
 Random = "<0.0.1, 1"
 LinearAlgebra = "<0.0.1, 1"
