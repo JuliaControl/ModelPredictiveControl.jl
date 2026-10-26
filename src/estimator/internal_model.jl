@@ -170,14 +170,19 @@ function matrices_internalmodel(model::SimModelODE{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂0next, _ , k, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    f̂!(x̂0next, _ , _ , k̄, ûi, di,
+        estim::InternalModel, model::NonLinModel, x̂0, u0, d0, u0next, d0next
+    ) -> nothing
 
 State update function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
 
 It calls [`f!`](@ref) directly since this estimator does not augment the states.
 """
-function f̂!(x̂0next, _ , k, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
-    f!(x̂0next, k, model, x̂0, u0, d0, model.p)
+function f̂!(
+    x̂0next, _ , _ , k̄, ûi, di,
+    estim::InternalModel, model::NonLinModel, x̂0, u0, d0, u0next, d0next
+)
+    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0next, d0next)
     x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
@@ -185,9 +190,9 @@ end
 @doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
 
-Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h!`](@ref).
+Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h!`](@ref) directly.
 """
-ĥ!(ŷ0, ::InternalModel, model::NonLinModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0, model.p)
+ĥ!(ŷ0, ::InternalModel, model::NonLinModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0)
 
 @doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, â0, d0)
@@ -308,7 +313,7 @@ function update_estimate!(estim::InternalModel, u0, _ , d0)
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
     x̂dnext, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
-    f̂!(x̂dnext, û0, k̄, estim, estim.model, x̂d, u0, d0) 
+    f̂!(x̂dnext, û0, û0next, k̄, ûi, di, estim, model, x̂d, u0, d0, u0next, d0next) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = estim.x̂snext

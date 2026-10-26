@@ -2,6 +2,8 @@ struct StateEstimatorBuffer{NT<:Real}
     u ::Vector{NT}
     û ::Vector{NT}
     k̄ ::Vector{NT}
+    ûi::Vector{NT}
+    di::Vector{NT}
     x̂ ::Vector{NT}
     â ::Vector{NT}
     Z̃ ::Vector{NT}
@@ -43,6 +45,8 @@ function StateEstimatorBuffer{NT}(
     u  = Vector{NT}(undef, nu)
     û  = Vector{NT}(undef, nu)
     k̄  = Vector{NT}(undef, nk̄)
+    ûi = Vector{NT}(undef, nu)
+    di = Vector{NT}(undef, nd)
     x̂  = Vector{NT}(undef, nx̂)
     â  = Vector{NT}(undef, na)
     Z̃  = Vector{NT}(undef, nZ̃)
@@ -62,7 +66,7 @@ function StateEstimatorBuffer{NT}(
     d  = Vector{NT}(undef, nd)
     empty = Vector{NT}(undef, 0)
     return StateEstimatorBuffer{NT}(
-        u, û, k̄, x̂, â, Z̃, V̂, Ŵ, X̂, Â, Ŷ, U, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
+        u, û, k̄, ûi, di, x̂, â, Z̃, V̂, Ŵ, X̂, Â, Ŷ, U, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
     )
 end
 
