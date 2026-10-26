@@ -419,7 +419,9 @@ function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty; unext=
     validate_args(estim.model, dnext, unext)
     y0m, d0, u0 = remove_op!(estim, ym, d, u)
     u0next, d0next = estim.model.buffer.unext, estim.model.buffer.dnext
-    update_estimate!(estim, u0, y0m, d0)
+    u0next .= unext .- estim.model.uop
+    d0next .= dnext .- estim.model.dop
+    update_estimate!(estim, u0, y0m, d0, u0next, d0next)
     estim.prepared[] = false
     x̂next  = estim.buffer.x̂
     x̂next .= estim.x̂0 .+ estim.x̂op

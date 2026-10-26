@@ -21,6 +21,7 @@ struct StateEstimatorBuffer{NT<:Real}
     ym::Vector{NT}
     ŷ ::Vector{NT}
     d ::Vector{NT}
+    ûnext::Vector{NT}
     empty::Vector{NT}
 end
 
@@ -64,9 +65,10 @@ function StateEstimatorBuffer{NT}(
     ym = Vector{NT}(undef, nym)
     ŷ  = Vector{NT}(undef, ny)
     d  = Vector{NT}(undef, nd)
+    ûnext = Vector{NT}(undef, nu)
     empty = Vector{NT}(undef, 0)
     return StateEstimatorBuffer{NT}(
-        u, û, k̄, ûi, di, x̂, â, Z̃, V̂, Ŵ, X̂, Â, Ŷ, U, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, empty
+        u, û, k̄, ûi, di, x̂, â, Z̃, V̂, Ŵ, X̂, Â, Ŷ, U, D, P̂, Q̂, R̂, K̂, ym, ŷ, d, ûnext, empty
     )
 end
 
