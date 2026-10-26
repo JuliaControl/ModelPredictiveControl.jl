@@ -82,7 +82,7 @@ is allocation-free.
 ```jldoctest
 julia> model = LinModel([tf(3, [30, 1]); tf(-2, [5, 1])], 0.5);
 
-julia> estim = Luenberger(model, nint_ym=[1, 1], poles=[0.61, 0.62, 0.63, 0.64])
+julia> estim = Luenberger(model, nint_ym=[1, 1], poles=[0.30, 0.35, 0.40, 0.45])
 Luenberger estimator with a sample time Ts = 0.5 s:
 ├ model: LinModel
 ├ direct: true
