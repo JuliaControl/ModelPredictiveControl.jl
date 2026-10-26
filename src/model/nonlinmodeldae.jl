@@ -710,8 +710,8 @@ function con_nonlinprogeq!(
     h = transcription.h
     Ts = model.Ts
     u⁺, d⁺ = u0, d0
-    u⁻next = h > 0 ? u0next : u0
-    d⁻next = d0next # always first-order hold for measured disturbances d
+    # h is ignored here, u0next & d0next values determine the hold order (like NonLinModel):
+    u⁻next, d⁻next = u0next, d0next
     x0next, a⁺, a0next = @views Z[1:nx], Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+2na)]
     sknext, q⁺, q⁻next = @views geq[1:nx], geq[(nx+1):(nx+na)], geq[(nx+na+1):(nx+2na)]
     k̇⁺, k̇⁻next         = @views k̄dot[1:nx], k̄dot[(nx+1):(2nx)]
@@ -735,13 +735,12 @@ function con_nonlinprogeq!(
 )
     transcription = model.transcription
     nx, na = model.nx, model.na
-    h = transcription.h
     Mo =  model.Mo
     no, τ = transcription.no, transcription.τ
     ui, di = model.buffer.ui, model.buffer.di
     u⁺, d⁺ = u0, d0
-    u⁻next = h > 0 ? u0next : u0
-    d⁻next = d0next # always first-order hold for measured disturbances d
+    # h is ignored here, u0next & d0next values determine the hold order (like NonLinModel):
+    u⁻next, d⁻next = u0next, d0next
     nk̄, nā = get_nk̄(model, transcription), get_nā(model, transcription)
     a⁺, k̄, ā   = @views Z[(nx+1):(nx+na)], Z[(nx+na+1):(nx+na+nk̄)], Z[(nx+na+nk̄+1):end]
     q⁺, sk̄, q̄  = @views geq[1:na], geq[(na+1):(na+nk̄)], geq[(na+nk̄+1):(na+nk̄+nā)]
@@ -909,8 +908,8 @@ The function should be called after calling [`updatestate!`](@ref) on `model` ob
 returns the dictionary `info` with the following fields:
 
 - `:xnext` : next state, ``\mathbf{x}(k+1)``
-- `:unext` : right limit of the next manipulated input, ``\mathbf{u^+}(k+1)``
-- `:dnext` : right limit of the next measured disturbance, ``\mathbf{d^+}(k+1)``
+- `:unext` : left limit of the next manipulated input, ``\mathbf{u^-}(k+1)``
+- `:dnext` : left limit of the next measured disturbance, ``\mathbf{d^-}(k+1)``
 - `:x` : current state, ``\mathbf{x}(k)``
 - `:a` : right limit of current algebraic variable, ``\mathbf{a^+}(k)``
 - `:u` : right limit of current manipulated input, ``\mathbf{u^+}(k)``
