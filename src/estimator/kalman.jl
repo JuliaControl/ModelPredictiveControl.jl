@@ -893,7 +893,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0, u0next, d0n
     X̂0next = X̂0corr # X̂0next is an alias of X̂0corr 
     for j in axes(X̂0next, 2)
         x̂0corr_j, x̂0next_j = @views X̂0corr[:, j], X̂0next[:, j]
-        @views f̂!(
+        f̂!(
             x̂0next, û0, û0next, ûi, di, k̄, 
             estim, estim.model, x̂0corr_j, u0, d0, u0next, d0next
         )
@@ -1112,7 +1112,7 @@ Return the functions that computes the `F̂` and `Ĥ` Jacobians of the augmente
 
 The functions has the following signatures:
 ```
-linfuncF̂!(F̂, x̂0next , backend, x̂0, cst_u0, cst_d0) -> nothing
+linfuncF̂!(F̂, x̂0next , backend, x̂0, cst_u0, cst_d0, cst_u0next, cst_d0next) -> nothing
 linfuncĤ!(Ĥ, ŷ0     , backend, x̂0, cst_d0) -> nothing
 ```
 They mutates all the arguments before `backend`, which is an `AbstractADType` object from 
@@ -1124,24 +1124,31 @@ function get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)
     nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
     nx̂ = model.nx + size(As, 1)
     x̂op = f̂op = zeros(nx̂) # not important for Jacobian computations
-    function f̂_ekf!(x̂0next, x̂0, û0, k, u0, d0)
-        return f̂!(x̂0next, û0, k, model, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+    function f̂_ekf!(x̂0next, x̂0, û0, û0next, k̄, ûi, di, u0, d0, u0next, d0next)
+        return f̂!(
+            x̂0next, û0, û0next, k̄, ûi, di, 
+            model, As, Cs_u, f̂op, x̂op, x̂0, u0, d0, u0next, d0next
+        )
     end
     ĥ_ekf!(ŷ0, x̂0, d0) = ĥ!(ŷ0, model, Cs_y, x̂0, d0)
     strict  = Val(true)
     x̂0next = zeros(NT, nx̂)
     ŷ0 = zeros(NT, ny)
     x̂0 = zeros(NT, nx̂)
-    û0 = Cache(zeros(NT, nu))
-    k̄  = Cache(zeros(NT, nk̄))
-    cst_u0 = Constant(rand(NT, nu))
-    cst_d0 = Constant(rand(NT, nd))
-    F̂prep = prepare_jacobian(
-        f̂_ekf!, x̂0next, jacobian, x̂0, û0, k̄, cst_u0, cst_d0; strict
-    )
-    Ĥprep = prepare_jacobian(ĥ_ekf!, ŷ0, jacobian, x̂0, cst_d0; strict)
-    function linfuncF̂!(F̂, x̂0next, backend, x̂0, cst_u0, cst_d0)
-        return jacobian!(f̂_ekf!, x̂0next, F̂, F̂prep, backend, x̂0, û0, k̄, cst_u0, cst_d0)
+    û0, û0next = Cache(zeros(NT, nu)), Cache(zeros(NT, nu))
+    ûi, di     = Cache(zeros(NT, nu)), Cache(zeros(NT, nd))
+    k̄          = Cache(zeros(NT, nk̄))
+    cst_u0, cst_d0         = Constant(rand(NT, nu)), Constant(rand(NT, nd))
+    cst_u0next, cst_d0next = Constant(rand(NT, nu)), Constant(rand(NT, nd))
+    F̂context = (û0, û0next, k̄, ûi, di, cst_u0, cst_d0, cst_u0next, cst_d0next)
+    F̂prep = prepare_jacobian(f̂_ekf!, x̂0next, jacobian, x̂0, F̂context...; strict)
+    Ĥprep = prepare_jacobian(ĥ_ekf!, ŷ0,     jacobian, x̂0, cst_d0; strict)
+    function linfuncF̂!(F̂, x̂0next, backend, x̂0, cst_u0, cst_d0, cst_u0next, cst_d0next)
+        return jacobian!(
+            f̂_ekf!, x̂0next, F̂, F̂prep, backend, 
+            x̂0, û0, û0next, k̄, ûi, di, 
+            cst_u0, cst_d0, cst_u0next, cst_d0next
+        )
     end
     function linfuncĤ!(Ĥ, ŷ0, backend, x̂0, cst_d0)
         return jacobian!(ĥ_ekf!, ŷ0, Ĥ, Ĥprep, backend, x̂0, cst_d0)
@@ -1160,9 +1167,10 @@ function correct_estimate!(estim::ExtendedKalmanFilter, y0m, d0)
         return nothing
     end
     x̂0 = estim.x̂0
+    backend = estim.jacobian
     cst_d0 = Constant(d0)
     ŷ0, Ĥ, Ĥm = estim.buffer.ŷ, estim.Ĥ, estim.Ĥm
-    estim.linfuncĤ!(Ĥ, ŷ0, estim.jacobian, x̂0, cst_d0)
+    estim.linfuncĤ!(Ĥ, ŷ0, backend, x̂0, cst_d0)
     Ĥm .= @views Ĥ[estim.i_ym, :]
     return correct_estimate_kf!(estim, y0m, d0, Ĥm)
 end
@@ -1206,14 +1214,16 @@ and prediction step equations are provided below. The correction step is skipped
 \end{aligned}
 ```
 """
-function update_estimate!(estim::ExtendedKalmanFilter{NT}, u0, y0m, d0) where NT<:Real
+function update_estimate!(estim::ExtendedKalmanFilter, u0, y0m, d0, u0next, d0next)
     if !estim.direct
         correct_estimate!(estim, y0m, d0)
     end
-    cst_u0, cst_d0 = Constant(u0), Constant(d0)
+    backend = estim.jacobian
+    cst_u0, cst_d0         = Constant(u0), Constant(d0)
+    cst_u0next, cst_d0next = Constant(u0next), Constant(d0next)
     x̂0corr = estim.x̂0
     x̂0next, F̂ = estim.buffer.x̂, estim.F̂
-    estim.linfuncF̂!(F̂, x̂0next, estim.jacobian, x̂0corr, cst_u0, cst_d0)
+    estim.linfuncF̂!(F̂, x̂0next, backend, x̂0corr, cst_u0, cst_d0, cst_u0next, cst_d0next)
     return predict_estimate_kf!(estim, u0, d0, F̂)
 end
 
@@ -1271,7 +1281,9 @@ function correct_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, 
 end
 
 """
-    predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, u0, d0, Â)
+    predict_estimate_kf!(
+        estim::Union{KalmanFilter, ExtendedKalmanFilter}, u0, d0, Â, u0next=u0, d0next=d0
+    ) -> nothing
 
 Predict time-varying/extended Kalman Filter estimates with augmented `Ĉm` and `Â` matrices.
 
@@ -1279,12 +1291,16 @@ Allows code reuse for [`KalmanFilter`](@ref), [`ExtendedKalmanFilterKalmanFilter
 They predict the state `x̂` and covariance `P̂` with the same equations. See 
 [`update_estimate`](@ref) methods for the equations.
 """
-function predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, u0, d0, Â)
+function predict_estimate_kf!(
+    estim::Union{KalmanFilter, ExtendedKalmanFilter}, u0, d0, Â, u0next=u0, d0next=d0
+)
     x̂0corr, P̂corr = estim.x̂0, estim.cov.P̂
     Q̂ = estim.cov.Q̂
-    x̂0next, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
+    x̂0next, k̄  = estim.buffer.x̂, estim.buffer.k̄
+    û0, û0next = estim.buffer.û, estim.buffer.ûnext
+    ûi, di     = estim.buffer.ûi, estim.buffer.di 
     # in-place operations to reduce allocations:
-    f̂!(x̂0next, û0, k̄, estim, estim.model, x̂0corr, u0, d0)
+    f̂!(x̂0next, û0, û0next, k̄, ûi, di, estim, estim.model, x̂0corr, u0, d0, u0next, d0next)
     P̂corr_Âᵀ = estim.buffer.P̂
     mul!(P̂corr_Âᵀ, P̂corr, Â')
     Â_P̂corr_Âᵀ = estim.buffer.Q̂

@@ -294,7 +294,7 @@ function correct_estimate!(estim::InternalModel, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::InternalModel,  u0, _ , d0)
+    update_estimate!(estim::InternalModel,  u0, _ , d0, u0next, d0next)
 
 Update `estim.x̂0`/`x̂d`/`x̂s` with current inputs `u0`, measured outputs `y0m` and dist. `d0`.
 
@@ -308,11 +308,13 @@ The [`InternalModel`](@ref) updates the deterministic `x̂d` and stochastic `x̂
 This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``. See 
 [`init_internalmodel`](@ref) for details. 
 """
-function update_estimate!(estim::InternalModel, u0, _ , d0)
+function update_estimate!(estim::InternalModel, u0, _ , d0, u0next, d0next)
     model = estim.model
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
-    x̂dnext, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
+    x̂dnext, k̄  = estim.buffer.x̂, estim.buffer.k̄
+    û0, û0next = estim.buffer.û, estim.buffer.ûnext
+    ûi, di     = estim.buffer.ûi, estim.buffer.di
     f̂!(x̂dnext, û0, û0next, k̄, ûi, di, estim, model, x̂d, u0, d0, u0next, d0next) 
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
@@ -354,7 +356,7 @@ function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) 
     M = I - model.A
     x̂d .= M\x̂_tmp # also updates estim.x̂0 (they are the same object)
     ŷ0d = estim.buffer.ŷ
-    h!(ŷ0d, model, x̂d, d0, model.p)
+    h!(ŷ0d, model, x̂d, d0)
     ŷs = ŷ0d
     ŷs[estim.i_ym] .= @views y0m .- ŷ0d[estim.i_ym]
     # ŷs=0 for unmeasured outputs :
