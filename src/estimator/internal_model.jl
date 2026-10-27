@@ -88,6 +88,7 @@ InternalModel estimator with a sample time Ts = 0.5 s:
 └ dimensions:
   ├ 1 manipulated inputs u
   ├ 2 estimated states x̂
+  ├ 0 algebraic variables a
   ├ 1 measured outputs ym
   ├ 1 unmeasured outputs yu
   └ 0 measured disturbances d
