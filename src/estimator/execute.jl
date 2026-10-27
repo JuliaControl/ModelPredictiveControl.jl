@@ -397,9 +397,9 @@ should be called prior to this one to correct the estimate when applicable (if
 
 As mentioned at the previous method, the `unext` and `dnext` keyword arguments allow FOH
 discretization during estimation, but note that these two values are typically unknown on
-real physical plant. Also note that the [`MovingHorizonEstimator`](@ref) with the default
-`direct=true` option is not able to estimate ``\mathbf{x̂}_k(k+1)``, the returned value is
-therefore the current corrected state ``\mathbf{x̂}_k(k)``.
+real physical plant since non-causal. Also note that the [`MovingHorizonEstimator`](@ref)
+with the default `direct=true` option is not able to estimate ``\mathbf{x̂}_k(k+1)``, the
+returned value is therefore the current corrected state ``\mathbf{x̂}_k(k)``.
 
 # Examples
 ```jldoctest
