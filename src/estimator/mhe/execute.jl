@@ -603,7 +603,7 @@ If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls
 `@error` log in the REPL and returns the warm-start value. A failed optimization also prints
 [`getinfo`](@ref) results in the debug log [if activated](@extref Julia Example:-Enable-debug-level-messages).
 """
-function optim_objective!(estim::MovingHorizonEstimator{NT}) where NT<:Real
+function optim_objective!(estim::MovingHorizonEstimator)
     optim = estim.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     Z̃s = set_warmstart!(estim, estim.transcription, Z̃var)

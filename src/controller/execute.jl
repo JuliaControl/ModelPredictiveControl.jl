@@ -464,7 +464,7 @@ If first warm-starts the solver with [`set_warmstart!`](@ref). It then calls
 `@error` log in the REPL and returns the warm-start value. A failed optimization also prints
 [`getinfo`](@ref) results in the debug log [if activated](https://docs.julialang.org/en/v1/stdlib/Logging/#Example:-Enable-debug-level-messages).
 """
-function optim_objective!(mpc::PredictiveController{NT}) where {NT<:Real}
+function optim_objective!(mpc::PredictiveController)
     model, optim = mpc.estim.model, mpc.optim
     Z̃var::Vector{JuMP.VariableRef} = optim[:Z̃var]
     Z̃s = set_warmstart!(mpc, mpc.transcription, Z̃var)
