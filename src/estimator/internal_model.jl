@@ -1,4 +1,4 @@
-struct InternalModel{NT<:Real, SM<:SimModelODE} <: StateEstimator{NT}
+struct InternalModel{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     model::SM
     x̂op::Vector{NT}
     f̂op::Vector{NT}
@@ -30,8 +30,9 @@ struct InternalModel{NT<:Real, SM<:SimModelODE} <: StateEstimator{NT}
     buffer::StateEstimatorBuffer{NT}
     function InternalModel{NT}(
         model::SM, i_ym, Asm, Bsm, Csm, Dsm
-    ) where {NT<:Real, SM<:SimModelODE}
-        nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
+    ) where {NT<:Real, SM<:SimModel}
+        nu, ny, nd = model.nu, model.ny, model.nd
+        nk̄ = get_nk̄(model, default_transcription(model))
         nym, nyu = validate_ym(model, i_ym)
         validate_internalmodel(model, nym, Csm, Dsm)
         As, Bs, Cs, Ds = stoch_ym2y(model, i_ym, Asm, Bsm, Csm, Dsm)
@@ -61,11 +62,12 @@ struct InternalModel{NT<:Real, SM<:SimModelODE} <: StateEstimator{NT}
 end
 
 @doc raw"""
-    InternalModel(model::SimModelODE; i_ym=1:model.ny, stoch_ym=ss(I,I,I,I,model.Ts))
+    InternalModel(model::SimModel; i_ym=1:model.ny, stoch_ym=ss(I,I,I,I,model.Ts))
 
-Construct an internal model estimator based on `model` ([`LinModel`](@ref) or [`NonLinModel`](@ref)).
+Construct an internal model estimator based on `model`.
 
-`i_ym` provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are 
+It supports [`LinModel`](@ref), [`NonLinModel`](@ref) and [`NonLinModelDAE`](@ref). `i_ym`
+provides the `model` output indices that are measured ``\mathbf{y^m}``, the rest are
 unmeasured ``\mathbf{y^u}``. `model` evaluates the deterministic predictions 
 ``\mathbf{ŷ_d}``, and `stoch_ym`, the stochastic predictions of the measured outputs 
 ``\mathbf{ŷ_s^m}`` (the unmeasured ones being ``\mathbf{ŷ_s^u=0}``). The predicted outputs
@@ -74,8 +76,8 @@ estimator is allocation-free if `model` simulations do not allocate.
 
 !!! warning
     `InternalModel` estimator does not work if `model` is integrating or unstable. The 
-    constructor verifies these aspects for `LinModel` but not for `NonLinModel`. Uses any 
-    other state estimator in such cases.
+    constructor verifies these aspects only for `LinModel` types. Uses any other state
+    estimator in such cases.
 
 # Examples
 ```jldoctest
@@ -108,7 +110,7 @@ function InternalModel(
     model::SM;
     i_ym::AbstractVector{Int} = 1:model.ny,
     stoch_ym::LTISystem = (In = I(length(i_ym)); ss(In, In, In, In, model.Ts))
-) where {NT<:Real, SM<:SimModelODE{NT}}
+) where {NT<:Real, SM<:SimModel{NT}}
     stoch_ym = minreal(ss(stoch_ym))
     if iscontinuous(stoch_ym)
         stoch_ym = c2d(stoch_ym, model.Ts, :tustin)
@@ -124,7 +126,7 @@ function InternalModel(
 end
 
 "Validate if deterministic `model` and stochastic model `Csm, Dsm` for `InternalModel`s."
-function validate_internalmodel(model::SimModelODE, nym, Csm, Dsm)
+function validate_internalmodel(model::SimModel, nym, Csm, Dsm)
     validate_poles(model)
     if size(Csm,1) ≠ nym || size(Dsm,1) ≠ nym
         error("Stochastic model output quantity ($(size(Csm,1))) is different from "*
@@ -144,7 +146,7 @@ function validate_poles(model::LinModel)
     end
     return nothing
 end
-validate_poles(::SimModelODE) = nothing
+validate_poles(::SimModel) = nothing
 
 @doc raw"""
     matrices_internalmodel(model::LinModel) -> Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
@@ -162,7 +164,7 @@ function matrices_internalmodel(model::LinModel)
     return Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op
 end
 "Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref)."
-function matrices_internalmodel(model::SimModelODE{NT}) where NT<:Real
+function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
     nu, nx, nd, ny = model.nu, model.nx, model.nd, model.ny
     Â, B̂u, Ĉ, B̂d, D̂d = zeros(NT,0,nx), zeros(NT,0,nu), zeros(NT,ny,0), zeros(NT,0,nd), zeros(NT,ny,0)
     x̂op, f̂op = copy(model.xop), copy(model.fop)
@@ -170,27 +172,33 @@ function matrices_internalmodel(model::SimModelODE{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂0next, _ , k, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
+    f̂!(x̂0next, _ , k̄, estim::InternalModel, model::SimModel, x̂0, u0, d0)
 
-State update function ``\mathbf{f̂}`` of [`InternalModel`](@ref) for [`NonLinModel`](@ref).
+State update function ``\mathbf{f̂}`` of [`InternalModel`](@ref).
 
 It calls [`f!`](@ref) directly since this estimator does not augment the states.
 """
-function f̂!(x̂0next, _ , k, estim::InternalModel, model::NonLinModel, x̂0, u0, d0)
-    f!(x̂0next, k, model, x̂0, u0, d0, model.p)
+function f̂!(x̂0next, _ , k̄, estim::InternalModel, model::SimModel, x̂0, u0, d0)
+    f!(x̂0next, k̄, model, x̂0, u0, d0, model.p)
+    x̂0next .+= estim.f̂op .- estim.x̂op
+    return nothing
+end
+function f̂!(x̂0next, _ , k̄, estim::InternalModel, model::LinModel, x̂0, u0, d0)
+    f!(x̂0next, k̄, model, x̂0, u0, d0, model.p)
     x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
 
 @doc raw"""
-    ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, d0)
+    ĥ!(ŷ0, estim::InternalModel, model::SimModel, x̂0, d0)
 
 Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h!`](@ref).
 """
-ĥ!(ŷ0, ::InternalModel, model::NonLinModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0, model.p)
+ĥ!(ŷ0, ::InternalModel, model::SimModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0, model.p)
+ĥ!(ŷ0, ::InternalModel, model::LinModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0, model.p)
 
 @doc raw"""
-    ĥ!(ŷ0, estim::InternalModel, model::NonLinModel, x̂0, â0, d0)
+    ĥ!(ŷ0, estim::InternalModel, model::SimModel, x̂0, â0, d0)
 
 Same, but calls [`h_dae!`](@ref) instead.
 """
@@ -375,10 +383,12 @@ end
 "Print InternalModel information without i/o integrators."
 function print_estim_dim(io::IO, estim::InternalModel, n; firstchars=" ")
     nu, nd = estim.model.nu, estim.model.nd
+    na = get_na(estim.model)
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     f = firstchars
     println(io, "$f ├$(lpad(nu, n)) manipulated inputs u")
     println(io, "$f ├$(lpad(nx̂, n)) estimated states x̂")
+    println(io, "$f ├$(lpad(na, n)) algebraic variables a")
     println(io, "$f ├$(lpad(nym, n)) measured outputs ym")
     println(io, "$f ├$(lpad(nyu, n)) unmeasured outputs yu")
     print(io,   "$f └$(lpad(nd, n)) measured disturbances d")
