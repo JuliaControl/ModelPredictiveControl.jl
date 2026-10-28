@@ -1507,6 +1507,7 @@ function con_nonlinprogeq!(
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
+    Ûi, D̂i = similar(Û0), similar(D̂0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
