@@ -213,7 +213,7 @@ end
 """
     addinfo!(info, mpc::PredictiveController) -> info
 
-By default, add the custom linear inrquality vector `W` and the solution summary `:sol` that
+By default, add the custom linear inequality vector `W` and the solution summary `:sol` that
 can be printed to `info`.
 """
 function addinfo!(info, mpc::PredictiveController{NT}) where NT<:Real
@@ -221,7 +221,7 @@ function addinfo!(info, mpc::PredictiveController{NT}) where NT<:Real
     W = Vector{NT}(undef, nW)
     W .= mul!(W, mpc.con.Ẽw, mpc.Z̃) .+ mpc.con.Fw
     info[:W] = W
-    info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
+    info[:sol] = JuMP.solution_summary(mpc.optim) # verbose: redundant information
     return info
 end
 
