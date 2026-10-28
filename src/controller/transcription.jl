@@ -1348,7 +1348,7 @@ function predict!(
             û0next = Û0[(1 + nu*j):(nu*(j+1))]
         else
             u0next = u0
-            û0next = û0
+            û0next = û0 # û0next and û0 are aliased in f̂!, but it's okay since u0next=u0
         end
         u0next = @views (h > 0 && j < Hp) ? U0[(1 + nu*j):(nu*(j+1))] : u0
         û0next = @views (h > 0 && j < Hp) ? Û0[(1 + nu*j):(nu*(j+1))] : û0
