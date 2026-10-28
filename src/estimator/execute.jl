@@ -120,10 +120,12 @@ function f̂!(
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
     @views x̂dnext, x̂snext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
-    mul!(û0, Cs_u, x̂s)      # ys_u = Cs_u*xs
-    û0 .+= u0               # û0 = u0 + ys_u  
-    f!(x̂dnext, k̄, ûi, di, model, x̂d, û0, d0, û0next, d0next)
     mul!(x̂snext, As, x̂s)
+    mul!(û0, Cs_u, x̂s)          # ys_u(k)    = Cs_u*xs(k)
+    û0 .+= u0                   # û0(k)      = u0(k) + ys_u(k)  
+    mul!(û0next, Cs_u, x̂snext)  # ys_u(k+1)  = Cs_u*xs(k+1)
+    û0next .+= u0next           # û0(k+1)    = u0(k+1) + ys_u(k+1)
+    f!(x̂dnext, k̄, ûi, di, model, x̂d, û0, d0, û0next, d0next)
     x̂0next .+= f̂op .- x̂op
     return nothing
 end
