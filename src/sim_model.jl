@@ -261,7 +261,7 @@ The method computes and returns the model state for the next time step ``\mathbf
 The keyword arguments `unext` and `dnext` allow simulating with a first-order hold (FOH) on
 manipulated inputs and measured disturbances, respectively (interpreted as the left limit
 value at the next time step ``k+1``). The default is zero-order hold (ZOH) on both. The two
-values are ignored for [`LinModel`](@ref) since discretization is  already performed at
+values are ignored for [`LinModel`](@ref) since discretization is already performed at
 construction.
 
 # Examples

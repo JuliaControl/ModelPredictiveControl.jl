@@ -367,13 +367,9 @@ operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and
 state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
 should be called prior to this one to correct the estimate when applicable (if
 `estim.direct == true`). If `isnothing(ym)`, only the prediction step is performed in 
-[`update_estimate!`](@ref), for when the measured outputs are temporarily unavailable. 
-
-As mentioned at the previous method, the `unext` and `dnext` keyword arguments allow FOH
-discretization during estimation, but note that these two values are typically unknown on
-real physical plant. Also note that the [`MovingHorizonEstimator`](@ref) with the default
-`direct=true` option is not able to estimate ``\mathbf{x̂}_k(k+1)``, the returned value is
-therefore the current corrected state ``\mathbf{x̂}_k(k)``.
+[`update_estimate!`](@ref), for when the measured outputs are temporarily unavailable. The
+`unext` and `dnext` arguments are not supported for [`StateEstimator`](@ref) since
+they complexify the implementation produce non-causal filters, so less useful in practice.
 
 # Examples
 ```jldoctest
@@ -387,7 +383,7 @@ julia> x̂ = updatestate!(kf, u, ym) # x̂[2] is the integrator state (nint_ym a
  0.0
 ```
 """
-function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty;)
+function updatestate!(estim::StateEstimator, u, ym, d=estim.buffer.empty)
     isnothing(ym) && (ym = estim.buffer.ym; ym .= NaN) # nothing: skip correction step
     if estim.direct && !estim.prepared[]
         error("preparestate! must be called before updatestate! with direct=true option")
