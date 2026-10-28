@@ -1,7 +1,7 @@
 ## ----------------------------------------------------------------------------------------
 ## ----------------- UNIT TESTS  ----------------------------------------------------------
 ## ----------------------------------------------------------------------------------------
-const UNIT_MODEL = SUITE["UNIT TESTS"]["SimModel"]
+const UNIT_MODEL = SUITE["SimModel"]["UNIT TESTS"]
 
 UNIT_MODEL["LinModel"]["updatestate!"] = 
     @benchmarkable(
@@ -27,5 +27,5 @@ UNIT_MODEL["NonLinModel"]["linearize!"] =
 ## ----------------------------------------------------------------------------------------
 ## ----------------- CASE STUDIES ---------------------------------------------------------
 ## ----------------------------------------------------------------------------------------
-const CASE_MODEL = SUITE["CASE STUDIES"]["SimModel"]
+const CASE_MODEL = SUITE["SimModel"]["CASE STUDIES"]
 # TODO: Add case study benchmarks for SimModel

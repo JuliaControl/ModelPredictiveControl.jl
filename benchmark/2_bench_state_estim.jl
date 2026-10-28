@@ -1,7 +1,7 @@
 ## ----------------------------------------------------------------------------------------
 ## ----------------- UNIT TESTS -----------------------------------------------------------
 ## ----------------------------------------------------------------------------------------
-const UNIT_ESTIM = SUITE["UNIT TESTS"]["StateEstimator"]
+const UNIT_ESTIM = SUITE["StateEstimator"]["UNIT TESTS"]
 
 skf = SteadyKalmanFilter(linmodel)
 UNIT_ESTIM["SteadyKalmanFilter"]["preparestate!"] = 
@@ -206,7 +206,7 @@ UNIT_ESTIM["MovingHorizonEstimator"]["getinfo!"]["NonLinModel"] =
 ## ----------------------------------------------------------------------------------------
 ## ----------------- CASE STUDIES ---------------------------------------------------------
 ## ----------------------------------------------------------------------------------------
-const CASE_ESTIM = SUITE["CASE STUDIES"]["StateEstimator"]
+const CASE_ESTIM = SUITE["StateEstimator"]["CASE STUDIES"]
 
 ## ----------------- Case study: CSTR -----------------------------------------------------
 model = CSTR_model

@@ -8,8 +8,18 @@ permissions:
 jobs:
   bench:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: 
+          - SimModel
+          - StateEstimator
+          - PredictiveController
     if: ${{ contains(github.event.pull_request.labels.*.name, 'benchmark') }}
     steps:
       - uses: MilesCranmer/AirspeedVelocity.jl@action-v1
         with:
           julia-version: '1'
+          job-summary: 'true'
+          filter: ${{ matrix.group }}
+          bench-on: HEAD    # Forces AirspeedVelocity to use the benchmark script from the PR branch, TO DELETE

@@ -1,7 +1,7 @@
 # -----------------------------------------------------------------------------------------
 # ---------------------- UNIT TESTS -------------------------------------------------------
 # -----------------------------------------------------------------------------------------
-const UNIT_MPC = SUITE["UNIT TESTS"]["PredictiveController"]
+const UNIT_MPC = SUITE["PredictiveController"]["UNIT TESTS"]
 
 linmpc_ss = LinMPC(
     linmodel, transcription=SingleShooting(), 
@@ -157,7 +157,7 @@ UNIT_MPC["NonLinMPC"]["getinfo!"]["NonLinModel"] =
 ## ----------------------------------------------------------------------------------------
 ## ---------------------- CASE STUDIES ----------------------------------------------------
 ## ----------------------------------------------------------------------------------------
-const CASE_MPC = SUITE["CASE STUDIES"]["PredictiveController"]
+const CASE_MPC = SUITE["PredictiveController"]["CASE STUDIES"]
 
 ## ----------------- Case study: CSTR without feedforward ---------------------------------
 model = CSTR_model
