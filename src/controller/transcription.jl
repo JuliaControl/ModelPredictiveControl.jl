@@ -1321,7 +1321,14 @@ The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K` arguments. The augm
 \mathbf{ŷ_0}(k+j)   &= \mathbf{ĥ}\Big(\mathbf{x̂_0}(k+j), \mathbf{d̂_0}(k+j) \Big)
 \end{aligned}
 ```
-for ``j = 0, 1, ... , H_p``.
+for ``j = 0, 1, ... , H_p``. 
+    
+    
+    
+    
+    The [`f̂!`](@ref) is not actually called here since it does not
+support FOH discretization, and it is needed here. The internals of [`f̂`](@ref) are
+reproduced here for this reason.
 """
 function predict!(
     Ŷ0, x̂0end, X̂0, Û0, K̄,
@@ -1363,7 +1370,6 @@ function predict!(
             û0next = û0
         end
         # ---------------- update state of deterministic model ----------------------------
-        # f̂! avoided to support FOH
         f!(x̂dnext, k̄, ûi, d̂i, model, x̂d, û0, d̂0, û0next, d̂0next)
         # --------0000---- compute predicted output for k+j -------------------------------
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
