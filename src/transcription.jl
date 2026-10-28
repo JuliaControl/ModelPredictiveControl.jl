@@ -48,7 +48,7 @@ optimization problem is (excluding the slack ``ϵ``, and without any custom move
 ```
 The `h` argument is `0` or `1`, for piecewise constant or linear manipulated inputs 
 ``\mathbf{u}``. Measured disturbances ``\mathbf{d}`` are always piecewise linear. This
-setting is ignored for [`LinModel`](@ref) since already discretized. Note this setting
+setting is ignored for [`LinModel`](@ref) since already discretized at construction, and it
 only applies for the internal predictions of MPC and MHE.
 
 This method computes the predictions by calling the augmented discrete-time model
