@@ -59,7 +59,8 @@ The operating points are handled inside ``\mathbf{f̂}``. See Extended Help for 
     The ``\mathbf{f}`` and ``\mathbf{h}`` functions above are in fact the [`f!`](@ref) and 
     [`h!`](@ref) methods, respectively. The operating points ``\mathbf{x̂_{op}, f̂_{op}}``
     are computed by [`augment_model`](@ref) (almost always zeros in practice for 
-    [`NonLinModel`](@ref)).
+    [`NonLinModel`](@ref)). Note that this function only supports ZOH discretization, call
+    [`f!`](@ref) directly for FOH inputs.
 """
 function f̂!(x̂0next, û0, k̄, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
     return f̂!(x̂0next, û0, k̄, model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0)
@@ -102,7 +103,7 @@ function f̂!(x̂0next, û0, k̄, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0
     @views x̂dnext, x̂snext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
     mul!(û0, Cs_u, x̂s)      # ys_u = Cs_u*xs
     û0 .+= u0               # û0 = u0 + ys_u  
-    f!(x̂dnext, k̄, model, x̂d, û0, d0, model.p)
+    f!(x̂dnext, k̄, ûi, di, model, x̂d, û0, d0, û0, d0)
     mul!(x̂snext, As, x̂s)
     x̂0next .+= f̂op .- x̂op
     return nothing
@@ -136,7 +137,7 @@ Same than [`ĥ!`](@ref) for [`SimModel`](@ref) but without the `estim` argument
 function ĥ!(ŷ0, model::SimModel, Cs_y::AbstractMatrix, x̂0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    h!(ŷ0, model, x̂d, d0, model.p)  # y0 = h(xd, d0)
+    h!(ŷ0, model, x̂d, d0)           # y0 = h(xd, d0)
     mul!(ŷ0, Cs_y, x̂s, 1, 1)        # ŷ0 = y0 + Cs_y*xs
     return nothing
 end

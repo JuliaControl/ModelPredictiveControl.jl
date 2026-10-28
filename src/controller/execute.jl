@@ -553,9 +553,7 @@ end
 
 Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
-function updatestate!(
-    mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty
-)
+function updatestate!(mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty)
     return updatestate!(mpc.estim, u, ym, d)
 end
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))

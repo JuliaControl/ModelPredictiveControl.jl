@@ -1503,7 +1503,7 @@ function con_nonlinprogeq!(
     nx̂, nx, nu, nd, nk̄ = mpc.estim.nx̂, model.nx, model.nu, model.nd, model.nk̄
     Hp, Hc = mpc.Hp, mpc.Hc
     nΔU, nX̂ = nu*Hc, nx̂*Hp
-    f_threads = transcription.f_threads
+    h, f_threads = transcription.h, transcription.f_threads
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
@@ -1516,8 +1516,13 @@ function con_nonlinprogeq!(
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
             d̂0   = @views   D̂0[(1 + nd*(j-2)):(nd*(j-1))]
         end
-        û0       = @views   Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄        = @views    K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        û0 = @views Û0[(1 + nu*(j-1)):(nu*j)]
+        ûi = @views Ûi[(1 + nu*(j-1)):(nu*j)]
+        d̂i = @views D̂i[(1 + nd*(j-1)):(nd*j)]
+        k̄  = @views  K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        # j = Hp special case, û0(k+Hp-1) = û0(k+Hp), since Hc≤Hp implies Δu(k+Hp) = 0:
+        û0next   = @views (h > 0 && j < Hp) ? Û0[(1 + nu*j):(nu*(j+1))] : û0
+        d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂dnext   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         x̂dnext_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         ŝdnext   = @views geq[(1 + nx*(j-1)):(nx*j)]
@@ -1577,6 +1582,7 @@ function con_nonlinprogeq!(
     X̂0 = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     Â0 = @views Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nÂ)]
     A⁺ = @views Z̃[(nΔU+nX̂+nÂ+1):(nΔU+nX̂+nÂ+nĀ)]
+    Ûi, D̂i = similar(Û0), similar(D̂0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0, U0)
     Ŝk = @views geq[1:nŜk]
     Q⁻ = @views geq[(nŜk+1):(nŜk+nÂ)]
@@ -1676,8 +1682,7 @@ function con_nonlinprogeq!(
     Â0 = @views Z̃[(1 + nΔU + nX̂):(nΔU + nX̂ + nÂ)]
     K̄  = @views Z̃[(1 + nΔU + nX̂ + nÂ):(nΔU + nX̂ + nÂ + nK̄)]
     Ā  = @views Z̃[(1 + nΔU + nX̂ + nÂ + nK̄):(nΔU + nX̂ + nÂ + nK̄ + nĀ)]
-    Dtemp = mpc.buffer.D̂
-    Utemp = similar(Û0) # TODO: remove this allocation
+    Ûi, D̂i = similar(Û0), similar(D̂0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0, U0)
     Ŝk̄ = @views geq[1:nŜk̄]
     Q⁻ = @views geq[(nŜk̄+1):(nŜk̄+nÂ)]
@@ -1711,7 +1716,7 @@ function con_nonlinprogeq!(
             Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄[(1 + (i-1)*nx):(i*nx)] .- x̂d
         end
         mul!(ŝk̄, Mo, Δk)
-        d̂i, ûi = @views Dtemp[(1 + nd*(j-1)):(nd*j)], Utemp[(1 + nu*(j-1)):(nu*j)]
+        ûi, d̂i = @views Ûi[(1 + nu*(j-1)):(nu*j)],  D̂i[(1 + nd*(j-1)):(nd*j)]
         for i=1:no
             k̇i, ki  = @views k̄dot[(1 + (i-1)*nx):(i*nx)], k̄[(1 + (i-1)*nx):(i*nx)]
             qi, ai  = @views    q̄[(1 + (i-1)*na):(i*na)], ā[(1 + (i-1)*na):(i*na)]
