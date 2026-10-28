@@ -1343,15 +1343,12 @@ function predict!(
         d̂i     = @views D̂i[(1 + nd*(j-1)):(nd*j)]
         d̂0next = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
+        û0next = @views j < Hp ? Û0[(1 + nu*j):(nu*(j+1))] : Û0[1:nu]
         if h > 0 && j < Hp
-            u0next = U0[(1 + nu*j):(nu*(j+1))]
-            û0next = Û0[(1 + nu*j):(nu*(j+1))]
-        else
+            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
+        else # j=Hp special case, û0(k+Hp-1) = û0(k+Hp), since Hc ≤ Hp implies Δu(k+Hp)=0:
             u0next = u0
-            û0next = û0 # û0next and û0 are aliased in f̂!, but it's okay since u0next=u0
         end
-        u0next = @views (h > 0 && j < Hp) ? U0[(1 + nu*j):(nu*(j+1))] : u0
-        û0next = @views (h > 0 && j < Hp) ? Û0[(1 + nu*j):(nu*(j+1))] : û0
         f̂!(x̂0next, û0, û0next, k̄, ûi, d̂i, mpc.estim, model, x̂0, u0, d̂0, u0next, d̂0next)
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         d̂0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
