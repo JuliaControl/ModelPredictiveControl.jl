@@ -22,4 +22,3 @@ jobs:
           julia-version: '1'
           job-summary: 'true'
           filter: ${{ matrix.group }}
-          bench-on: HEAD    # Forces AirspeedVelocity to use the benchmark script from the PR branch, TO DELETE
