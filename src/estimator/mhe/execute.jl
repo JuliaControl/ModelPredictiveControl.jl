@@ -583,7 +583,7 @@ function add_data_windows!(
     end
     # --- update the arrival state estimated at k-Nk ---
     estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
-    # --- update the next time step k+1 values (FOH) ---
+    # --- update the next time step k+1 values (FOH discretization) ---
     estim.u0next .= u0next
     estim.d0next .= d0next
     return ismoving
