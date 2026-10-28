@@ -1121,24 +1121,29 @@ function get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)
     nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
     nx̂ = model.nx + size(As, 1)
     x̂op = f̂op = zeros(nx̂) # not important for Jacobian computations
-    function f̂_ekf!(x̂0next, x̂0, û0, k, u0, d0)
-        return f̂!(x̂0next, û0, k, model, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+    function f̂_ekf!(x̂0next, x̂0, û0, û0next, k̄, ûi, di, u0, d0)
+        return f̂!(
+            x̂0next, û0, û0next, k̄, ûi, di, 
+            model, As, Cs_u, f̂op, x̂op, x̂0, u0, d0, u0, d0
+        )
     end
     ĥ_ekf!(ŷ0, x̂0, d0) = ĥ!(ŷ0, model, Cs_y, x̂0, d0)
     strict  = Val(true)
     x̂0next = zeros(NT, nx̂)
     ŷ0 = zeros(NT, ny)
     x̂0 = zeros(NT, nx̂)
-    û0 = Cache(zeros(NT, nu))
-    k̄  = Cache(zeros(NT, nk̄))
-    cst_u0 = Constant(rand(NT, nu))
-    cst_d0 = Constant(rand(NT, nd))
+    û0, û0next = Cache(zeros(NT, nu)), Cache(zeros(NT, nu))
+    k̄          = Cache(zeros(NT, nk̄))
+    ûi, di     = Cache(zeros(NT, nu)), Cache(zeros(NT, nd))
+    cst_u0     = Constant(rand(NT, nu))
+    cst_d0     = Constant(rand(NT, nd))
+    F̂cache = (û0, û0next, k̄, ûi, di)
     F̂prep = prepare_jacobian(
-        f̂_ekf!, x̂0next, jacobian, x̂0, û0, k̄, cst_u0, cst_d0; strict
+        f̂_ekf!, x̂0next, jacobian, x̂0, cst_u0, cst_d0, F̂cache...; strict
     )
     Ĥprep = prepare_jacobian(ĥ_ekf!, ŷ0, jacobian, x̂0, cst_d0; strict)
     function linfuncF̂!(F̂, x̂0next, backend, x̂0, cst_u0, cst_d0)
-        return jacobian!(f̂_ekf!, x̂0next, F̂, F̂prep, backend, x̂0, û0, k̄, cst_u0, cst_d0)
+        return jacobian!(f̂_ekf!, x̂0next, F̂, F̂prep, backend, x̂0, cst_u0, cst_d0, F̂cache...)
     end
     function linfuncĤ!(Ĥ, ŷ0, backend, x̂0, cst_d0)
         return jacobian!(ĥ_ekf!, ŷ0, Ĥ, Ĥprep, backend, x̂0, cst_d0)
