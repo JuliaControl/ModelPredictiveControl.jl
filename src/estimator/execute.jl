@@ -67,7 +67,7 @@ function f̂!(x̂0next, û0, k̄, ûi, di, estim::StateEstimator, model::SimMo
 end
 
 @doc raw"""
-    f̂!(x̂0next, _ , _ , _ , _ , estim::StateEstimator, model::LinModel, x̂0, u0, d0) -> nothing
+    f̂!(x̂0next, _, _, _, _, estim::StateEstimator, model::LinModel, x̂0, u0, d0) -> nothing
 
 Use the augmented model matrices and operating points if `model` is a [`LinModel`](@ref).
 
@@ -93,7 +93,7 @@ function f̂!(x̂0next, _ , _ , _ , _ , estim::StateEstimator, ::LinModel, x̂0,
 end
 
 """
-    f̂!(x̂0next, û0, k, ûi, di, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+    f̂!(x̂0next, û0, k, ûi, di, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0) -> nothing
 
 Same than [`f̂!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
 """

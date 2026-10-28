@@ -1325,19 +1325,47 @@ for ``j = 0, 1, ... , H_p``.
 """
 function predict!(
     Ŷ0, x̂0end, X̂0, Û0, K̄,
-    mpc::PredictiveController, model::NonLinModel, ::SingleShooting,
+    mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
     U0, _
 )
-    nu, nx̂, ny, nd, nk̄, Hp = model.nu, mpc.estim.nx̂, model.ny, model.nd, model.nk̄, mpc.Hp
+    nx, nu, ny, nd, nk̄ = model.nx, model.nu, model.ny, model.nd, model.nk̄
+    nx̂, Hp = mpc.estim.nx̂, mpc.Hp 
+    h = transcription.h
+    As, Cs_u = mpc.estim.As, mpc.estim.Cs_u
     D̂0 = mpc.D̂0
+    Ûi, D̂i = similar(Û0), similar(D̂0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
     d̂0 = @views mpc.d0[1:nd]
     for j=1:Hp
+        # ------ extract the samples for k+j ------------------------
+        x̂d, x̂s = @views x̂0[1:nx], x̂0[(1 + nx):end]
         u0     = @views U0[(1 + nu*(j-1)):(nu*j)]
         û0     = @views Û0[(1 + nu*(j-1)):(nu*j)]
-        k̄      = @views K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        k̄      = @views  K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        ûi     = @views Ûi[(1 + nu*(j-1)):(nu*j)]
+        d̂i     = @views D̂i[(1 + nd*(j-1)):(nd*j)]
+        d̂0next = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂0next = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k̄, mpc.estim, model, x̂0, u0, d̂0)
+        x̂dnext, x̂snext = @views x̂0next[1:nx], x̂0next[(1 + nx):end]
+        # ----------------- update state of stochastic model (linear) ---------------------
+        mul!(x̂snext, As, x̂s)
+        # ----------------- compute current and next disturbed inputs ---------------------
+        if h < 1 || j < 2 # else, û0 was already computed and stored in Û0 at j-1
+            mul!(û0, Cs_u, x̂s)      # ys_u = Cs_u*xs
+            û0 .+= u0               # û0 = u0 + ys_u  
+        end
+        if h > 0 && j < Hp
+            u0next = @views U0[(1 + nu*j):(nu*(j+1))]
+            û0next = @views Û0[(1 + nu*j):(nu*(j+1))]
+            mul!(û0next, Cs_u, x̂snext)
+            û0next .+= u0next
+        else  # j=Hp special case, û0(k+Hp-1) = û0(k+Hp), since Hc ≤ Hp implies Δu(k+Hp)=0:
+            û0next = û0
+        end
+        # ---------------- update state of deterministic model ----------------------------
+        # f̂! avoided to support FOH
+        f!(x̂dnext, k̄, ûi, d̂i, model, x̂d, û0, d̂0, û0next, d̂0next)
+        # --------0000---- compute predicted output for k+j -------------------------------
         x̂0 = @views X̂0[(1 + nx̂*(j-1)):(nx̂*j)]
         d̂0 = @views D̂0[(1 + nd*(j-1)):(nd*j)]
         ŷ0 = @views Ŷ0[(1 + ny*(j-1)):(ny*j)]
@@ -1520,7 +1548,7 @@ function con_nonlinprogeq!(
         ûi = @views Ûi[(1 + nu*(j-1)):(nu*j)]
         d̂i = @views D̂i[(1 + nd*(j-1)):(nd*j)]
         k̄  = @views  K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        # j = Hp special case, û0(k+Hp-1) = û0(k+Hp), since Hc≤Hp implies Δu(k+Hp) = 0:
+        # j=Hp special case, û0(k+Hp-1) = û0(k+Hp), since Hc ≤ Hp implies Δu(k+Hp)=0:
         û0next   = @views (h > 0 && j < Hp) ? Û0[(1 + nu*j):(nu*(j+1))] : û0
         d̂0next   = @views   D̂0[(1 + nd*(j-1)):(nd*j)]
         x̂dnext   = @views   X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
@@ -1582,7 +1610,6 @@ function con_nonlinprogeq!(
     X̂0 = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     Â0 = @views Z̃[(nΔU+nX̂+1):(nΔU+nX̂+nÂ)]
     A⁺ = @views Z̃[(nΔU+nX̂+nÂ+1):(nΔU+nX̂+nÂ+nĀ)]
-    Ûi, D̂i = similar(Û0), similar(D̂0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0, U0)
     Ŝk = @views geq[1:nŜk]
     Q⁻ = @views geq[(nŜk+1):(nŜk+nÂ)]
