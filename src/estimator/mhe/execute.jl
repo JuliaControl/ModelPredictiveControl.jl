@@ -43,7 +43,7 @@ Do the same but for [`MovingHorizonEstimator`](@ref) objects.
 """
 function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
     if estim.direct
-        ismoving = add_data_windows!(estim, y0m, d0)
+        ismoving = add_data_windows!(estim, y0m, d0, estim.lastu0)
         ismoving && correct_cov!(estim)
         initpred!(estim, estim.model)
         linconstraint!(estim, estim.model, estim.transcription)
@@ -55,7 +55,7 @@ function correct_estimate!(estim::MovingHorizonEstimator, y0m, d0)
 end
 
 @doc raw"""
-    update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0)
+    update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0, u0next, d0next)
     
 Update [`MovingHorizonEstimator`](@ref) state `estim.x̂0`.
 
@@ -69,7 +69,7 @@ step ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated using `estim.covestim` objec
 also stores `u0` at `estim.lastu0`, so it can be added to the data window at the next time
 step in [`correct_estimate!`](@ref).
 """
-function update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0)
+function update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0, u0next, d0next)
     if !estim.direct
         add_data_windows!(estim, y0m, d0, u0)
         initpred!(estim, estim.model)
@@ -515,16 +515,14 @@ function getslack(estim::MovingHorizonEstimator, Z̃::AbstractVector{NT}) where 
 end
 
 """
-    add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.lastu0) -> ismoving
+    add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0, u0next, d0next) -> ismoving
 
 Add data to the observation windows of the moving horizon estimator and clamp `estim.Nk`.
 
 If ``k ≥ H_e``, the observation windows are moving in time and `estim.Nk` is clamped to
 `estim.He`. It returns `true` if the observation windows are moving, `false` otherwise.
-If no `u0` argument is provided, the manipulated input of the last time step is added to its
-window (the correct value if `estim.direct`). 
 """
-function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.lastu0)
+function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0, u0next, d0next)
     model = estim.model
     nx̂, nym, nd, nu, nŵ = estim.nx̂, estim.nym, model.nd, model.nu, estim.nx̂
     # --- check for NaN values in the arguments ---
