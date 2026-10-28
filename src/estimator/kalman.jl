@@ -879,6 +879,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     Q̂, nx̂ = estim.cov.Q̂, estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
     x̂0next, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
+    ûi, di = estim.buffer.ûi, estim.buffer.di
     # in-place operations to reduce allocations:
     P̂corr_temp  = Hermitian(estim.buffer.P̂, :L)
     P̂corr_temp .= P̂corr
@@ -891,7 +892,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     X̂0next = X̂0corr # X̂0next is an alias of X̂0corr 
     for j in axes(X̂0next, 2)
         x̂0corr_j, x̂0next_j = @views X̂0corr[:, j], X̂0next[:, j]
-        @views f̂!(x̂0next, û0, k̄, estim, estim.model, x̂0corr_j, u0, d0)
+        @views f̂!(x̂0next, û0, k̄, ûi, di, estim, estim.model, x̂0corr_j, u0, d0)
         x̂0next_j .= x̂0next
     end
     mul!(x̂0next, X̂0next, m̂)
