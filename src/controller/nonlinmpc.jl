@@ -587,7 +587,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     mpc.con.gc!(gc_opt, Ue, Ŷe, D̂e, mpc.p, ϵ)
     info[:JE]  = JE_opt
     info[:gc] = gc_opt
-    info[:sol] = JuMP.solution_summary(mpc.optim, verbose=true)
+    info[:sol] = JuMP.solution_summary(mpc.optim) # verbose: redundant information
     # --- objective derivatives ---
     model, optim, con = mpc.estim.model, mpc.optim, mpc.con
     hess = mpc.hessian
