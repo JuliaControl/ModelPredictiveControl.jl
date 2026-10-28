@@ -48,9 +48,8 @@ optimization problem is (excluding the slack ``ϵ``, and without any custom move
 ```
 The `h` argument is `0` or `1`, for piecewise constant or linear manipulated inputs 
 ``\mathbf{u}``. Measured disturbances ``\mathbf{d}`` are always piecewise linear. This
-setting is ignored for [`LinModel`](@ref) since already discretized. Note that `unext` and
-`dnext` keyword arguments must be explicitly provided to the [`updatestate!`](@ref) method
-to simulate a plant with first-order hold (FOH) inputs.
+setting is ignored for [`LinModel`](@ref) since already discretized. Note this setting
+only applies for the internal predictions of MPC and MHE.
 
 This method computes the predictions by calling the augmented discrete-time model
 recursively over the prediction horizon ``H_p`` in the objective function, or by updating
