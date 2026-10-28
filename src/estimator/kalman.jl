@@ -794,8 +794,9 @@ function correct_estimate!(estim::UnscentedKalmanFilter, y0m, d0)
     X̂0[:, nx̂+2:end] .= @views X̂0[:, nx̂+2:end] .- γ_sqrtP̂
     ŷ0 = estim.buffer.ŷ
     for j in axes(Ŷ0m, 2)
-        @views ĥ!(ŷ0, estim, estim.model, X̂0[:, j], d0)
-        @views Ŷ0m[:, j] .= ŷ0[estim.i_ym]
+        x̂0_j, ŷ0m_j = @views X̂0[:, j], Ŷ0m[:, j]
+        ĥ!(ŷ0, estim, estim.model, x̂0_j, d0)
+        ŷ0m_j .= @views ŷ0[estim.i_ym]
     end
     ŷ0m = @views ŷ0[estim.i_ym]
     mul!(ŷ0m, Ŷ0m, m̂)
@@ -887,12 +888,13 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     X̂0corr .= x̂0corr
     X̂0corr[:, 2:nx̂+1]   .= @views X̂0corr[:, 2:nx̂+1]   .+ γ_sqrtP̂corr
     X̂0corr[:, nx̂+2:end] .= @views X̂0corr[:, nx̂+2:end] .- γ_sqrtP̂corr
-    X̂0next = X̂0corr
+    X̂0next = X̂0corr # X̂0next is an alias of X̂0corr 
     for j in axes(X̂0next, 2)
-        @views x̂0corr .= X̂0corr[:, j]
-        @views f̂!(X̂0next[:, j], û0, k̄, estim, estim.model, x̂0corr, u0, d0)
+        x̂0corr_j, x̂0next_j = @views X̂0corr[:, j], X̂0next[:, j]
+        @views f̂!(x̂0next, û0, k̄, estim, estim.model, x̂0corr_j, u0, d0)
+        x̂0next_j .= x̂0next
     end
-    x̂0next .= mul!(x̂0corr, X̂0next, m̂)
+    mul!(x̂0next, X̂0next, m̂)
     X̄0next  = estim.X̄0
     X̄0next .= X̂0next .- x̂0next
     Ŝ_X̄0nextᵀ = estim.X̂0'

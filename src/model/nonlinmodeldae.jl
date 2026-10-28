@@ -968,7 +968,7 @@ function getinfo(model::NonLinModelDAE{NT}) where NT<:Real
     info[:q] = q
     info[:y] = y
     if JuMP.termination_status(model.optim_state) ≠ JuMP.OPTIMIZE_NOT_CALLED
-        info[:sol_state]  = JuMP.solution_summary(model.optim_state,  verbose=true)
+        info[:sol_state]  = JuMP.solution_summary(model.optim_state, verbose=true)
     end
     if JuMP.termination_status(model.optim_output) ≠ JuMP.OPTIMIZE_NOT_CALLED
         info[:sol_output] = JuMP.solution_summary(model.optim_output, verbose=true)

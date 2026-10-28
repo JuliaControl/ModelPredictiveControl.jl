@@ -191,7 +191,7 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:Ym] = Ym
     info[:U]  = U 
     info[:D]  = D
-    info[:sol] = JuMP.solution_summary(estim.optim, verbose=true)
+    info[:sol] = JuMP.solution_summary(estim.optim) # verbose: redundant information
     # --- non-Unicode fields ---
     info[:What] = info[:Ŵ]
     info[:xhatarr] = info[:x̂arr]

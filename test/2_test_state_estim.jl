@@ -467,6 +467,17 @@ end
     internalmodel8 = InternalModel(linmodel3)
     @test isa(internalmodel8, InternalModel{Float32})
 
+    function fq_dae!(ẋ, res, x, a, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        res[] = x[] - a[]
+        return nothing
+    end
+    function h_dae!(y, x, a, d, _ )
+        y[] = 2 * x[] + a[] + 0.1 * d[]
+    end
+    dae = NonLinModelDAE(fq_dae!, h_dae!, 100.0, 1, 1, 1, 1, 1; p=[0.01])
+    internalmodel9 = InternalModel(dae)  
+
     unstablemodel = LinModel(ss(diagm([0.5, -0.5, 1.5]), ones(3,1), I, 0, 1))
     @test_throws ErrorException InternalModel(unstablemodel)
     @test_throws ErrorException InternalModel(linmodel, i_ym=[1,4])
@@ -522,6 +533,21 @@ end
         preparestate!(internalmodel4, [50+7, NaN])
     )
     @test internalmodel4.ŷs ≈ [7, 0]
+    function fq_dae!(ẋ, res, x, a, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        res[] = x[] - a[]
+        return nothing
+    end
+    function h_dae!(y, x, a, d, _ )
+        y[] = 2 * x[] + a[] + 0.1 * d[]
+    end
+    dae = NonLinModelDAE(fq_dae!, h_dae!, 100.0, 1, 1, 1, 1, 1; p=[0.01])
+    internalmodel5 = InternalModel(dae)
+    initstate!(internalmodel5, [0], [0], [0])
+    preparestate!(internalmodel5, [6], [0])
+    updatestate!(internalmodel5, [0], [6], [0])
+    @test internalmodel5.x̂d ≈ [0]
+    @test internalmodel5.x̂s ≈ [6]
 end
 
 @testitem "IM set model" setup=[SetupMPCtests] begin
