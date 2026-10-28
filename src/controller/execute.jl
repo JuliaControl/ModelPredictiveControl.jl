@@ -549,14 +549,14 @@ function getinput!(mpc, Z̃)
 end
 
 """
-    updatestate!(mpc::PredictiveController, u, ym, d=[]; unext=u, dnext=d) -> x̂next
+    updatestate!(mpc::PredictiveController, u, ym, d=[]) -> x̂next
 
 Call [`updatestate!`](@ref) on `mpc.estim` [`StateEstimator`](@ref).
 """
 function updatestate!(
-    mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty; unext=u, dnext=d
+    mpc::PredictiveController, u, ym, d=mpc.estim.buffer.empty
 )
-    return updatestate!(mpc.estim, u, ym, d; unext, dnext)
+    return updatestate!(mpc.estim, u, ym, d)
 end
 updatestate!(::PredictiveController, _ ) = throw(ArgumentError("missing measured outputs ym"))
 
