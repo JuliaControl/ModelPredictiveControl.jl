@@ -29,8 +29,6 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     nd > 0 && (estim.D0[1:nd] .= d0) # add d0(-1) to the data window
     estim.lastu0 .= u0
     estim.u0curr .= u0
-    estim.u0next .= u0
-    estim.d0next .= d0
     # estim.cov.P̂_0 is P̂(-1|-1) if estim.direct==false, else P̂(-1|0)
     estim.P̂arr_old  .= estim.cov.P̂_0
     invert_cov!(estim, estim.covestim)
@@ -1105,14 +1103,10 @@ function setmodel_estimator!(
     end
     estim.lastu0        .+= uop_old
     estim.u0curr        .+= uop_old
-    estim.u0next        .+= uop_old
-    estim.d0next        .+= dop_old
     estim.Z̃[nε+1:nε+nx̂] .+= x̂op_old
     estim.x̂0arr_old     .+= x̂op_old
     estim.lastu0        .-= model.uop
     estim.u0curr        .-= model.uop
-    estim.u0next        .-= model.uop
-    estim.d0next        .-= model.dop
     estim.Z̃[nε+1:nε+nx̂] .-= x̂op
     estim.x̂0arr_old     .-= x̂op
     # --- box constraints ---
