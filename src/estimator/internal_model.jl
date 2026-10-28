@@ -204,8 +204,8 @@ end
 
 Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h!`](@ref).
 """
-ĥ!(ŷ0, ::InternalModel, model::SimModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0, model.p)
-ĥ!(ŷ0, ::InternalModel, model::LinModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0, model.p)
+ĥ!(ŷ0, ::InternalModel, model::SimModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0)
+ĥ!(ŷ0, ::InternalModel, model::LinModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0)
 
 @doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::SimModel, x̂0, â0, d0)
@@ -367,7 +367,7 @@ function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) 
     M = I - model.A
     x̂d .= M\x̂_tmp # also updates estim.x̂0 (they are the same object)
     ŷ0d = estim.buffer.ŷ
-    h!(ŷ0d, model, x̂d, d0, model.p)
+    h!(ŷ0d, model, x̂d, d0)
     ŷs = ŷ0d
     ŷs[estim.i_ym] .= @views y0m .- ŷ0d[estim.i_ym]
     # ŷs=0 for unmeasured outputs :

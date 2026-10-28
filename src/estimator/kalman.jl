@@ -1282,16 +1282,18 @@ They predict the state `x̂` and covariance `P̂` with the same equations. See
 [`update_estimate`](@ref) methods for the equations.
 """
 function predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, u0, d0, Â)
+    buffer = estim.buffer
     x̂0corr, P̂corr = estim.x̂0, estim.cov.P̂
     Q̂ = estim.cov.Q̂
-    x̂0next, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
+    x̂0next, û0, û0next, k̄ = buffer.x̂, buffer.û, buffer.ûnext, buffer.k̄
+    ûi, di = buffer.ûi, buffer.di
     # in-place operations to reduce allocations:
-    f̂!(x̂0next, û0, k̄, estim, estim.model, x̂0corr, u0, d0)
-    P̂corr_Âᵀ = estim.buffer.P̂
+    f̂!(x̂0next, û0, û0next, k̄, ûi, di, estim, estim.model, x̂0corr, u0, d0, u0, d0)
+    P̂corr_Âᵀ = buffer.P̂
     mul!(P̂corr_Âᵀ, P̂corr, Â')
-    Â_P̂corr_Âᵀ = estim.buffer.Q̂
+    Â_P̂corr_Âᵀ = buffer.Q̂
     mul!(Â_P̂corr_Âᵀ, Â, P̂corr_Âᵀ)
-    P̂next  = estim.buffer.P̂
+    P̂next  = buffer.P̂
     P̂next .= Â_P̂corr_Âᵀ .+ Q̂
     estim.x̂0 .= x̂0next
     estim.cov.P̂  .= Hermitian(P̂next, :L)
