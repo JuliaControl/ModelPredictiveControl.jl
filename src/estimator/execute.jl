@@ -67,7 +67,7 @@ details on ``\mathbf{û_0, f̂}`` and ``\mathbf{ĥ}`` implementations.
     [`NonLinModel`](@ref)).
 """
 function f̂!(
-    x̂0next, û0, k̄, ûi, di, 
+    x̂0next, û0, û0next, k̄, ûi, di, 
     estim::StateEstimator, model::SimModel, x̂0, u0, d0, u0next, d0next
 )
     return f̂!(

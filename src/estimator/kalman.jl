@@ -875,13 +875,14 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     if !estim.direct
         correct_estimate!(estim, y0m, d0)
     end
+    buffer = estim.buffer
     x̂0corr, X̂0corr, P̂corr = estim.x̂0, estim.X̂0, estim.cov.P̂
     Q̂, nx̂ = estim.cov.Q̂, estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
-    x̂0next, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
-    ûi, di = estim.buffer.ûi, estim.buffer.di
+    x̂0next, û0, û0next, k̄ = buffer.x̂, buffer.û, buffer.ûnext, buffer.k̄
+    ûi, di = buffer.ûi, buffer.di
     # in-place operations to reduce allocations:
-    P̂corr_temp  = Hermitian(estim.buffer.P̂, :L)
+    P̂corr_temp  = Hermitian(buffer.P̂, :L)
     P̂corr_temp .= P̂corr
     P̂corr_chol  = cholesky!(P̂corr_temp) # also modifies P̂corr_temp
     sqrtP̂corr   = P̂corr_chol.L
@@ -892,7 +893,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     X̂0next = X̂0corr # X̂0next is an alias of X̂0corr 
     for j in axes(X̂0next, 2)
         x̂0corr_j, x̂0next_j = @views X̂0corr[:, j], X̂0next[:, j]
-        @views f̂!(x̂0next, û0, k̄, ûi, di, estim, estim.model, x̂0corr_j, u0, d0)
+        f̂!(x̂0next, û0, û0next, k̄, ûi, di, estim, estim.model, x̂0corr_j, u0, d0, u0, d0)
         x̂0next_j .= x̂0next
     end
     mul!(x̂0next, X̂0next, m̂)
@@ -900,7 +901,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     X̄0next .= X̂0next .- x̂0next
     Ŝ_X̄0nextᵀ = estim.X̂0'
     mul!(Ŝ_X̄0nextᵀ, Ŝ, X̄0next')
-    P̂next = estim.buffer.P̂
+    P̂next = buffer.P̂
     mul!(P̂next, X̄0next, Ŝ_X̄0nextᵀ) 
     P̂next   .+= Q̂
     estim.x̂0 .= x̂0next

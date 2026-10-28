@@ -173,19 +173,28 @@ function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂0next, _ , k̄, ûi, di, estim::InternalModel, model::SimModel, x̂0, u0, d0)
+    f̂!(
+        x̂0next, _ , _ , k̄, ûi, di, 
+        estim::InternalModel, model::SimModel, x̂0, u0, d0, u0next, d0next
+    ) -> nothing
 
 State update function ``\mathbf{f̂}`` of [`InternalModel`](@ref).
 
 It calls [`f!`](@ref) directly since this estimator does not augment the states.
 """
-function f̂!(x̂0next, _ , k̄, ûi, di, estim::InternalModel, model::SimModel, x̂0, u0, d0)
-    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0, d0)
+function f̂!(
+    x̂0next, _ , _ , k̄, ûi, di, 
+    estim::InternalModel, model::SimModel, x̂0, u0, d0, u0next, d0next
+)
+    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0, d0, u0next, d0next)
     x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
-function f̂!(x̂0next, _ , k̄, ûi, di, estim::InternalModel, model::LinModel, x̂0, u0, d0)
-    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0, d0)
+function f̂!(
+    x̂0next, _ , _ , k̄, ûi, di, 
+    estim::InternalModel, model::LinModel, x̂0, u0, d0, u0next, d0next
+)
+    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0, d0, u0next, d0next)
     x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
