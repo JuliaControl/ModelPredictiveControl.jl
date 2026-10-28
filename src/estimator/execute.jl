@@ -368,8 +368,8 @@ state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`prep
 should be called prior to this one to correct the estimate when applicable (if
 `estim.direct == true`). If `isnothing(ym)`, only the prediction step is performed in 
 [`update_estimate!`](@ref), for when the measured outputs are temporarily unavailable. The
-`unext` and `dnext` arguments are not supported for [`StateEstimator`](@ref) since
-they complexify the implementation produce non-causal filters, so less useful in practice.
+`unext` and `dnext` arguments are not supported for [`StateEstimator`](@ref) since they
+complexify the implementation and produce non-causal filters, so less useful in practice.
 
 # Examples
 ```jldoctest
