@@ -322,11 +322,11 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 [`init_internalmodel`](@ref) for details. 
 """
 function update_estimate!(estim::InternalModel, u0, _ , d0)
-    model = estim.model
+    model, buffer = estim.model, estim.buffer
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
-    x̂dnext, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
-    f̂!(x̂dnext, û0, k̄, estim, estim.model, x̂d, u0, d0) 
+    x̂dnext, k̄, ûi, di = buffer.x̂, buffer.k̄, buffer.ûi, buffer.di
+    f!(x̂dnext, k̄, ûi, di, model, x̂d, u0, d0, u0, d0)
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = estim.x̂snext
