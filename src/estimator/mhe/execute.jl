@@ -28,6 +28,9 @@ function init_estimate_cov!(estim::MovingHorizonEstimator, y0m, d0, u0)
     end 
     nd > 0 && (estim.D0[1:nd] .= d0) # add d0(-1) to the data window
     estim.lastu0 .= u0
+    estim.u0curr .= u0
+    estim.u0next .= u0
+    estim.d0next .= d0
     # estim.cov.P̂_0 is P̂(-1|-1) if estim.direct==false, else P̂(-1|0)
     estim.P̂arr_old  .= estim.cov.P̂_0
     invert_cov!(estim, estim.covestim)
@@ -66,12 +69,14 @@ estimate ``\mathbf{x̂}_k(k+p)`` is computed by inserting the optimal values of
 ``\mathbf{x̂}_k(k-N_k+p)`` and ``\mathbf{Ŵ}`` in the augmented model from ``j = N_k-1`` to
 ``0`` inclusively. Afterward, if ``N_k = H_e``, the arrival covariance for the next time
 step ``\mathbf{P̂}_{k-N_k}(k-N_k+1)`` is estimated using `estim.covestim` object. It
-also stores `u0` at `estim.lastu0`, so it can be added to the data window at the next time
-step in [`correct_estimate!`](@ref).
+also respectively stores `u0` and `u0next` at `estim.lastu0` and `estim.u0curr`, so it can
+be added to the data window at the next time step in [`correct_estimate!`](@ref). The
+`estim.u0curr` is only used for FOH discretization with non-`LinModel` and `direct=true`
+(non-causal in practice).
 """
 function update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0, u0next, d0next)
     if !estim.direct
-        add_data_windows!(estim, y0m, d0, u0)
+        add_data_windows!(estim, y0m, d0, u0, u0next, d0next)
         initpred!(estim, estim.model)
         linconstraint!(estim, estim.model, estim.transcription)
         linconstrainteq!(estim, estim.model, estim.transcription)
@@ -80,6 +85,7 @@ function update_estimate!(estim::MovingHorizonEstimator, u0, y0m, d0, u0next, d0
     end
     (estim.Nk[] == estim.He) && update_cov!(estim)
     estim.lastu0 .= u0
+    estim.u0curr .= u0next
     return nothing
 end
 
@@ -515,18 +521,24 @@ function getslack(estim::MovingHorizonEstimator, Z̃::AbstractVector{NT}) where 
 end
 
 """
-    add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0, u0next, d0next) -> ismoving
+    add_data_windows!(
+        estim::MovingHorizonEstimator, y0m, d0, u0_lastu0, u0next=u0_lastu0, d0next=d0
+    ) -> ismoving
 
 Add data to the observation windows of the moving horizon estimator and clamp `estim.Nk`.
 
-If ``k ≥ H_e``, the observation windows are moving in time and `estim.Nk` is clamped to
-`estim.He`. It returns `true` if the observation windows are moving, `false` otherwise.
+The argument `u0_lastu0` is the input of the last time step if `estim.direct`, or the
+current time step otherwise. If ``k ≥ H_e``, the observation windows are moving in time and
+`estim.Nk` is clamped to `estim.He`. It returns `true` if the observation windows are
+moving, `false` otherwise.
 """
-function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0, u0next, d0next)
+function add_data_windows!(
+    estim::MovingHorizonEstimator, y0m, d0, u0_lastu0, u0next=u0_lastu0, d0next=d0
+)
     model = estim.model
     nx̂, nym, nd, nu, nŵ = estim.nx̂, estim.nym, model.nd, model.nu, estim.nx̂
     # --- check for NaN values in the arguments ---
-    any(isnan, u0) && throw(ArgumentError("NaN values in the MHE manipulated input u"))
+    any(isnan, u0_lastu0) && throw(ArgumentError("NaN values in the MHE manipulated input u"))
     if any(isnan, y0m)
         @warn "NaN values in the MHE measurements ym: ignoring them in the objective"
     end
@@ -534,7 +546,7 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0, u0next, d
     # --- data windows for the predictions ---
     yopm = @views model.yop[estim.i_ym]
     Nk = estim.Nk[]
-    p = estim.direct ? 0 : 1 # u0 argument is u0(k-1) if estim.direct, else u0(k)
+    p = estim.direct ? 0 : 1
     x̂0_old = estim.x̂0        # x̂0_old is x̂0(k-1|k-1) if estim.direct, else x̂0(k|k-1)
     estim.Nk .+= 1
     Nk = estim.Nk[]
@@ -553,8 +565,8 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0, u0next, d
         end
         estim.U0[1:end-nu]          .= @views estim.U0[nu+1:end]
         estim.Ue[1:end-nu]          .= @views estim.Ue[nu+1:end]
-        estim.U0[end-nu+1:end]                          .= u0
-        estim.Ue[(end-nu+1 - nu):(end - nu)]            .= u0 .+ model.uop
+        estim.U0[end-nu+1:end]                          .= u0_lastu0
+        estim.Ue[(end-nu+1 - nu):(end - nu)]            .= u0_lastu0 .+ model.uop
         estim.X̂0_old[1:end-nx̂]      .= @views estim.X̂0_old[nx̂+1:end]
         estim.X̂0_old[end-nx̂+1:end]  .= x̂0_old
         estim.Nk .= estim.He
@@ -565,12 +577,15 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0, u0next, d
             estim.D0[(1 + nd*Nk):(nd*(Nk+1))]           .= d0
             estim.De[(1 + nd*(Nk-p)):(nd*(Nk-p+1))]     .= d0 .+ model.dop
         end
-        estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0
-        estim.Ue[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0 .+ model.uop
+        estim.U0[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0_lastu0
+        estim.Ue[(1 + nu*(Nk-1)):(nu*Nk)]               .= u0_lastu0 .+ model.uop
         estim.X̂0_old[(1 + nx̂*(Nk-1)):(nx̂*Nk)]           .= x̂0_old
     end
     # --- update the arrival state estimated at k-Nk ---
     estim.x̂0arr_old .= @views estim.X̂0_old[1:nx̂]
+    # --- update the next time step k+1 values (FOH) ---
+    estim.u0next .= u0next
+    estim.d0next .= d0next
     return ismoving
 end
 
@@ -1089,9 +1104,15 @@ function setmodel_estimator!(
         estim.X̂0_old[(1+nx̂*(i-1)):(nx̂*i)] .-= x̂op
     end
     estim.lastu0        .+= uop_old
+    estim.u0curr        .+= uop_old
+    estim.u0next        .+= uop_old
+    estim.d0next        .+= dop_old
     estim.Z̃[nε+1:nε+nx̂] .+= x̂op_old
     estim.x̂0arr_old     .+= x̂op_old
     estim.lastu0        .-= model.uop
+    estim.u0curr        .-= model.uop
+    estim.u0next        .-= model.uop
+    estim.d0next        .-= model.dop
     estim.Z̃[nε+1:nε+nx̂] .-= x̂op
     estim.x̂0arr_old     .-= x̂op
     # --- box constraints ---

@@ -99,6 +99,9 @@ struct MovingHorizonEstimator{
     covestim::CE
     Z̃::Vector{NT}
     lastu0::Vector{NT}
+    u0curr::Vector{NT}
+    u0next::Vector{NT}
+    d0next::Vector{NT}
     x̂op::Vector{NT}
     f̂op::Vector{NT}
     x̂0 ::Vector{NT}
@@ -184,7 +187,8 @@ struct MovingHorizonEstimator{
         nŵ = nx̂
         Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
-        lastu0 = zeros(NT, nu)
+        lastu0, u0curr = zeros(NT, nu), zeros(NT, nu)
+        u0next, d0next = zeros(NT, nu), zeros(NT, nd)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         Tŵ = init_ZtoŴ(model, transcription, He, nx̂, nŵ)
         E, G, J, B, ex̄, EX̂, GX̂, JX̂, BX̂ = init_predmat_mhe(
@@ -237,7 +241,8 @@ struct MovingHorizonEstimator{
             force∇J, force∇g, force∇geq,
             cov,
             covestim,  
-            Z̃, lastu0, x̂op, f̂op, x̂0, 
+            Z̃, lastu0, u0curr, x̂op, f̂op, x̂0, 
+            u0next, d0next,
             He, nε,
             i_ym, nx̂, nym, nyu, nxs, nx̃,
             p,
