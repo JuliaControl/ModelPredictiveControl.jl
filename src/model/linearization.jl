@@ -16,13 +16,13 @@ is an `AbstractADType` object from `DifferentiationInterface`. The `cst_x`, `cst
 function get_linearization_func(
     NT, f!::F, h!::H, Ts, nu, nx, ny, nd, p, solver, backend
 ) where {F<:Function, H<:Function}
-    function f_x!(xnext, x, k̄, ui, di, u, d)
+    function f_x!(xnext, x, u, d, k̄, ui, di)
         return solver_f!(xnext, k̄, ui, di, f!, Ts, solver, x, u, d, u, d, p) # ZOH only
     end
-    function f_u!(xnext, u, k̄, ui, di, x, d)
+    function f_u!(xnext, u, x, d, k̄, ui, di)
         return solver_f!(xnext, k̄, ui, di, f!, Ts, solver, x, u, d, u, d, p) # ZOH only
     end
-    function f_d!(xnext, d, k̄, ui, di, x, u)
+    function f_d!(xnext, d, x, u, k̄, ui, di)
         return solver_f!(xnext, k̄, ui, di, f!, Ts, solver, x, u, d, u, d, p) # ZOH only
     end
     h_x!(y, x, d) = h!(y, x, d, p)
@@ -170,7 +170,7 @@ function linearize!(
     nonlinmodel = model
     buffer = nonlinmodel.buffer
     # --- remove the operating points of the nonlinear model (typically zeros) ---
-    x0, u0, d0, k̄ = buffer.x, buffer.u, buffer.d, buffer.k̄
+    x0, u0, d0, k̄, ui, di = buffer.x, buffer.u, buffer.d, buffer.k̄, buffer.ui, buffer.di
     x0 .= x .- nonlinmodel.xop
     u0 .= u .- nonlinmodel.uop
     d0 .= d .- nonlinmodel.dop
@@ -178,11 +178,11 @@ function linearize!(
     linearize_core!(linmodel, nonlinmodel, x0, u0, d0)
     # --- compute the nonlinear model output at operating points ---
     x0next, y0 = linmodel.buffer.x, linmodel.buffer.y
-    h!(y0, nonlinmodel, x0, d0, model.p)
+    h!(y0, nonlinmodel, x0, d0)
     y0 .+= nonlinmodel.yop
     y = y0
     # --- compute the nonlinear model next state at operating points ---
-    f!(x0next, k̄, nonlinmodel, x0, u0, d0, model.p)
+    f!(x0next, k̄, ui, di, nonlinmodel, x0, u0, d0, u0, d0) # ZOH only
     x0next .+= nonlinmodel.fop 
     xnext = x0next  # xnext = f(x0,u0,d0) + fop - xop + xop = f(x0,u0,d0) + fop
     # --- recompute x since it was modified in buffer.x ---
