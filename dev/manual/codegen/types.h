@@ -111,6 +111,8 @@ typedef struct{
     int n_root_WS;
 
     c_float* RinvD; // Diagonal R of an LP with a singular Hessian (see daqp_bnb_prox)
+    c_float* reg; // eps_j of the regularization eps_j/2*x_j^2 in daqp_bnb_prox
+    c_float* xtmp; // Workspace for x
     DAQPProblem* ps_qp; // Presolved copy of the problem (see daqp_presolve)
 }DAQPBnB;
 

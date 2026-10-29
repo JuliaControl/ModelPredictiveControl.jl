@@ -36,6 +36,8 @@ extern "C" {
 #define DAQP_SOFT_CURV_TOL 1.5e-8
 #define DAQP_DEFAULT_REFACTOR_TOL 1e-9
 #define DAQP_DEFAULT_EPS_PROX (-1e-6)
+// Smallest singularity tolerance in BnB (see daqp_bnb_sing_tol)
+#define DAQP_BNB_MIN_SING_TOL 1e-14
 
 // Equality-reduction policy (DAQPSettings.eq_reduction). AUTO only reduces
 // solves that start from scratch, which the setup/update marks with
