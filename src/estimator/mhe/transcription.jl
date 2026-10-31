@@ -1520,8 +1520,8 @@ function predict_mhe!(
         ŵ       = @views         Ŵ[(1+nŵ*(j-1)):(nŵ*j)]
         k̄       = @views         K̄[(1+nk̄*(j-1)):(nk̄*j)]
         û0      = @views         Û0[(1+nu*(j-1)):(nu*j)]
-        ûi     = @views Ui[(1 + nu*(j-1)):(nu*j)]
-        di     = @views Di[(1 + nd*(j-1)):(nd*j)]
+        ûi      = @views Ui[(1 + nu*(j-1)):(nu*j)]
+        di      = @views Di[(1 + nd*(j-1)):(nd*j)]
         x̂0next  = @views         X̂0[(1+nx̂*(j-1)):(nx̂*j)]
         d0next = @views (j < Nk) ? estim.D0[(1+nd*j + i_d0arr):(nd*(j+1) + i_d0arr)] : d0
         if h > 0 && j < Nk
@@ -1530,7 +1530,6 @@ function predict_mhe!(
             u0next = u0
         end
         û0next = @views j < Nk ? Û0[(1+nu*j):(nu*(j+1))] : Û0[1:nu]
-        #d0next  = @views   estim.D0[(1 + nd*j):(nd*(j+1))]
         f̂!(x̂0next, û0, û0next, k̄, ûi, di, estim, model, x̂0, u0, d0, u0next, d0next)
         x̂0next .+= ŵ
         if estim.direct
