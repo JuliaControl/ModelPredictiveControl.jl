@@ -1756,7 +1756,7 @@ function con_nonlinprogeq_mhe!(
         x̂dnext   = @views          X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         x̂dnext_Z̃ = @views        X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
         û0next   = @views j < Nk ? Û0[(1 + nu*j):(nu*(j+1))] : û0
-        d0next   = @views    estim.D0[(1+nd*j + i_d0arr):(nd*(j+1) + i_d0arr)] # (j < Nk) ? : d0
+        d0next   = @views (j < Nk) ? estim.D0[(1+nd*j + i_d0arr):(nd*(j+1) + i_d0arr)] : d0
         ŝdnext   = @views         geq[(1 + nx*(j-1)):(nx*j)]
         f!(x̂dnext, k̄, ûi, di, model, x̂d_Z̃, û0, d0, û0next, d0next)
         x̂dnext .+= ŵd
