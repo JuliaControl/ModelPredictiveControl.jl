@@ -215,7 +215,7 @@ function simDAE(plant, N; x_0)
     Y_data, U_data, D_data, X_data = zeros(ny, N), zeros(nu, N), zeros(nd, N), zeros(nx, N)
     c_Ain_0 = plant.p[1]
     setstate!(plant, x_0)
-    x = x_0
+    x, d = x_0, [10.0]
     for i=1:N
         u     = i ≤ (1N÷4) ? [10.0]  : [11.0]
         d     = i ≤ (2N÷4) ? [10.0]  : [12.0]
@@ -226,7 +226,9 @@ function simDAE(plant, N; x_0)
         U_data[:, i] = u
         D_data[:, i] = d
         X_data[:, i] = x
-        x = updatestate!(plant, u, d)
+        dnext = i+1 ≤ (2N÷4) ? [10.0]  : [12.0]
+        x = updatestate!(plant, u, d; dnext)
+        d = dnext
     end
     plant.p[1] = c_Ain_0
     return SimResult(plant, U_data, Y_data, D_data; X_data)
@@ -236,7 +238,10 @@ N = 81
 res = simDAE(plant, N; x_0)
 ```
 
-We can now plot the result:
+Providing a `dnext` keyword argument to [`updatestate!`](@ref) allows discretizing the
+measured disturbances with first-order hold (FOH), instead of zero-order hold, which is
+consistent with the method applied by the [`MovingHorizonEstimator`](@ref). We can now plot
+the result:
 
 ```@example 1
 using Plots
@@ -324,10 +329,9 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
     c_Ain_0 = plant.p[1]
     setstate!(plant, x_0); setstate!(mhe, x̂_0)
     initstate!(mhe, [10], [7], [10])
-    x = x_0
+    x, d = x_0, [10.0]
     for i=1:N
         u     = i ≤ (1N÷4) ? [10.0]  : [11.0]
-        d     = i ≤ (2N÷4) ? [10.0]  : [12.0]
         c_Ain = i ≤ (3N÷4) ? c_Ain_0 : (c_Ain_0 - 0.01)
         plant.p[1] = c_Ain
         y  = evaloutput(plant, d)
@@ -342,8 +346,10 @@ function simMHE(mhe, plant, N; x_0, x̂_0)
         X_data[3, i]   = c_Ain
         Ŷ_data[:, i]   = ŷ
         X̂_data[:, i]   = x̂
-        x = updatestate!(plant, u, d)
+        dnext = i+1 ≤ (2N÷4) ? [10.0]  : [12.0]
+        x = updatestate!(plant, u, d; dnext)
         x̂ = updatestate!(mhe, u, ym, dm)
+        d = dnext
     end
     plant.p[1] = c_Ain_0
     return SimResult(mhe, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data)
@@ -399,9 +405,8 @@ function simNMPC(nmpc, plant, N, ry; x_0, x̂_0, noise=false)
     c_Ain_0 = plant.p[1]
     setstate!(plant, x_0); setstate!(nmpc, x̂_0)
     initstate!(nmpc, [10], [7], [10])
-    x = x_0
+    x, d = x_0, [10.0]
     for i=1:N
-        d     = i ≤ (1N÷3) ? [10.0]  : [12.0]
         c_Ain = i ≤ (2N÷3) ? c_Ain_0 : (c_Ain_0 + 0.01)
         plant.p[1] = c_Ain
         y  = evaloutput(plant, d)
@@ -418,8 +423,10 @@ function simNMPC(nmpc, plant, N, ry; x_0, x̂_0, noise=false)
         X_data[3, i]   = c_Ain
         Ŷ_data[:, i]   = ŷ
         X̂_data[:, i]   = x̂
-        x = updatestate!(plant, u, d)
+        dnext = i+1 ≤ (1N÷3) ? [10.0]  : [12.0]
+        x = updatestate!(plant, u, d; dnext)
         x̂ = updatestate!(nmpc, u, ym, dm)
+        d = dnext
     end
     plant.p[1] = c_Ain_0
     return SimResult(nmpc, U_data, Y_data, D_data; plant, X_data, X̂_data, Ŷ_data, Ry_data)
