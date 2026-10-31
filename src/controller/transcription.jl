@@ -1332,7 +1332,7 @@ function predict!(
     nx̂, Hp = mpc.estim.nx̂, mpc.Hp 
     h = transcription.h
     D̂0 = mpc.D̂0
-    Ûi, D̂i = similar(Û0), similar(D̂0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    Ûi, D̂i = similar(Û0), mpc.buffer.D̂     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
     d̂0 = @views mpc.d0[1:nd]
     for j=1:Hp
@@ -1519,7 +1519,7 @@ function con_nonlinprogeq!(
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
-    Ûi, D̂i = similar(Û0), similar(D̂0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    Ûi, D̂i = similar(Û0), mpc.buffer.D̂     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
@@ -1693,7 +1693,7 @@ function con_nonlinprogeq!(
     Â0 = @views Z̃[(1 + nΔU + nX̂):(nΔU + nX̂ + nÂ)]
     K̄  = @views Z̃[(1 + nΔU + nX̂ + nÂ):(nΔU + nX̂ + nÂ + nK̄)]
     Ā  = @views Z̃[(1 + nΔU + nX̂ + nÂ + nK̄):(nΔU + nX̂ + nÂ + nK̄ + nĀ)]
-    Ûi, D̂i = similar(Û0), similar(D̂0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    Ûi, D̂i = similar(Û0), mpc.buffer.D̂     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0, U0)
     Ŝk̄ = @views geq[1:nŜk̄]
     Q⁻ = @views geq[(nŜk̄+1):(nŜk̄+nÂ)]

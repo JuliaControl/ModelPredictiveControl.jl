@@ -1511,7 +1511,7 @@ function predict_mhe!(
     nu, nd, ny, nk̄ = model.nu, model.nd, model.ny, model.nk̄
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
     h = transcription.h
-    Ui, Di = similar(Û0), similar(estim.D0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    Ui, Di = similar(Û0), estim.buffer.D     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     x̂0 = @views x̂0arr[1:nx̂]
     for j=1:Nk
@@ -1740,20 +1740,25 @@ function con_nonlinprogeq_mhe!(
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)]
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
+    Ûi, Di = similar(Û0), estim.buffer.D     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
         else
             x̂d_Z̃ = @views X̂0_Z̃[(1 + nx̂*(j-2)):(nx̂*(j-2) + nx)]
         end
-        d0       = @views   estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
-        k̄        = @views          K̄[(1 + nk̄*(j-1)):(nk̄*j)]
-        û0       = @views         Û0[(1 + nu*(j-1)):(nu*j)]
-        ŵd       = @views          Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
-        x̂dnext   = @views         X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
-        x̂dnext_Z̃ = @views       X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
-        ŝdnext   = @views        geq[(1 + nx*(j-1)):(nx*j)]
-        f!(x̂dnext, k̄, model, x̂d_Z̃, û0, d0, model.p)
+        d0       = @views    estim.D0[(1 + nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
+        k̄        = @views           K̄[(1 + nk̄*(j-1)):(nk̄*j)]
+        û0       = @views          Û0[(1 + nu*(j-1)):(nu*j)]
+        ûi       = @views          Ûi[(1 + nu*(j-1)):(nu*j)]
+        di       = @views          Di[(1 + nd*(j-1)):(nd*j)]
+        ŵd       = @views           Ŵ[(1 + nŵ*(j-1)):(nŵ*(j-1) + nw)]
+        x̂dnext   = @views          X̂0[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        x̂dnext_Z̃ = @views        X̂0_Z̃[(1 + nx̂*(j-1)):(nx̂*(j-1) + nx)]
+        û0next   = @views j < Nk ? Û0[(1 + nu*j):(nu*(j+1))] : û0
+        d0next   = @views    estim.D0[(1+nd*j + i_d0arr):(nd*(j+1) + i_d0arr)] # (j < Nk) ? : d0
+        ŝdnext   = @views         geq[(1 + nx*(j-1)):(nx*j)]
+        f!(x̂dnext, k̄, ûi, di, model, x̂d_Z̃, û0, d0, û0next, d0next)
         x̂dnext .+= ŵd
         ŝdnext  .= @. x̂dnext - x̂dnext_Z̃
     end
