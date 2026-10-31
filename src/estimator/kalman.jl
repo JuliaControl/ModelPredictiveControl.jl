@@ -1121,7 +1121,7 @@ function get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)
     nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
     nx̂ = model.nx + size(As, 1)
     x̂op = f̂op = zeros(nx̂) # not important for Jacobian computations
-    function f̂_ekf!(x̂0next, x̂0, û0, û0next, k̄, ûi, di, u0, d0)
+    function f̂_ekf!(x̂0next, x̂0, u0, d0, û0, û0next, k̄, ûi, di)
         return f̂!(
             x̂0next, û0, û0next, k̄, ûi, di, 
             model, As, Cs_u, f̂op, x̂op, x̂0, u0, d0, u0, d0
