@@ -1505,27 +1505,38 @@ process noise ``\mathbf{ŵ}``.
 """
 function predict_mhe!(
     V̂, X̂0, Â0, Û0, K̄, Ŷ0, 
-    estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
+    estim::MovingHorizonEstimator, model::NonLinModel, transcription::SingleShooting, 
     x̂0arr, _ , Ŵ, _ 
 )
     nu, nd, ny, nk̄ = model.nu, model.nd, model.ny, model.nk̄
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
-    p = estim.direct ? 0 : 1
+    h = transcription.h
+    Ui, Di = similar(Û0), similar(estim.D0)     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     x̂0 = @views x̂0arr[1:nx̂]
     for j=1:Nk
         u0      = @views  estim.U0[(1+nu*(j-1)):(nu*j)]
-        d0      = @views  estim.D0[(1+nd*(j+p-1)):(nd*(j+p))]
+        d0      = @views  estim.D0[(1+nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
         ŵ       = @views         Ŵ[(1+nŵ*(j-1)):(nŵ*j)]
         k̄       = @views         K̄[(1+nk̄*(j-1)):(nk̄*j)]
-        û0      = @views        Û0[(1+nu*(j-1)):(nu*j)]
-        x̂0next  = @views        X̂0[(1+nx̂*(j-1)):(nx̂*j)]
-        f̂!(x̂0next, û0, k̄, estim, model, x̂0, u0, d0)
+        û0      = @views         Û0[(1+nu*(j-1)):(nu*j)]
+        ûi     = @views Ui[(1 + nu*(j-1)):(nu*j)]
+        di     = @views Di[(1 + nd*(j-1)):(nd*j)]
+        x̂0next  = @views         X̂0[(1+nx̂*(j-1)):(nx̂*j)]
+        d0next = @views (j < Nk) ? estim.D0[(1+nd*j + i_d0arr):(nd*(j+1) + i_d0arr)] : d0
+        if h > 0 && j < Nk
+            u0next = estim.U0[(1+nu*j):(nu*(j+1))]
+        else
+            u0next = u0
+        end
+        û0next = @views j < Nk ? Û0[(1+nu*j):(nu*(j+1))] : Û0[1:nu]
+        #d0next  = @views   estim.D0[(1 + nd*j):(nd*(j+1))]
+        f̂!(x̂0next, û0, û0next, k̄, ûi, di, estim, model, x̂0, u0, d0, u0next, d0next)
         x̂0next .+= ŵ
         if estim.direct
             ŷ0next  = @views        Ŷ0[(1 +  ny*(j-1)):(ny*j)]
             y0nextm = @views estim.Y0m[(1 + nym*(j-1)):(nym*j)]
             v̂next   = @views         V̂[(1 + nym*(j-1)):(nym*j)]
-            d0next  = @views  estim.D0[(1 + nd*j):(nd*(j+1))]
             ĥ!(ŷ0next, estim, model, x̂0next, d0next)
             ŷ0nextm = @views ŷ0next[estim.i_ym]
             if any(isnan, y0nextm) # nan in Y0m: y0m=ŷ0m => associated v̂ value = 0
