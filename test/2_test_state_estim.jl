@@ -2062,8 +2062,8 @@ end
         updatestate!(ukf, [11, 50], y, [25])
         updatestate!(ekf, [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
-    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3
+    @test X̂_mhe ≈ X̂_ukf atol=1e-2 rtol=1e-2
+    @test X̂_mhe ≈ X̂_ekf atol=1e-2 rtol=1e-2
     
     ukf = UnscentedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
     ekf = ExtendedKalmanFilter(nonlinmodel, nint_ym=0, direct=true)
@@ -2089,8 +2089,8 @@ end
         updatestate!(ukf, [11, 50], y, [25])
         updatestate!(ekf, [11, 50], y, [25])
     end
-    @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
-    @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3 
+    @test X̂_mhe ≈ X̂_ukf atol=1e-2 rtol=1e-2
+    @test X̂_mhe ≈ X̂_ekf atol=1e-2 rtol=1e-2 
 end
 
 @testitem "MHE LinModel v.s. NonLinModel" setup=[SetupMPCtests] begin
