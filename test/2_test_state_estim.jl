@@ -1348,6 +1348,22 @@ end
     )
     @test mhe8.x̂0 ≈ zeros(6) atol=1e-9
 
+    function f!(ẋ, x, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        return nothing
+    end
+    function h!(y, x, d, _ )
+        y[] = x[] + 0.1 * d[]
+    end
+    Ts, p = 100.0, [0.01]
+    model = NonLinModel(f!, h!, Ts, 1, 1, 1, 1; p)
+    transcription = SingleShooting(1)
+    mhe_foh = MovingHorizonEstimator(model; He=3, transcription)
+    preparestate!(mhe_foh, [0.0], [0.0])
+    x̂ = updatestate!(mhe_foh, [1.0], [0.0], [0.0])
+    info = getinfo(mhe_foh)
+    @test mhe_foh.transcription.h == 1
+    @test info[:x̂] ≈ x̂
 end
 
 @testitem "MHE estim. & getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
@@ -1378,6 +1394,23 @@ end
     info = getinfo(mhe3) # test getinfo when Nk<He 
     @test info[:Ŵ] ≈ [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     @test info[:V̂] ≈ [0.0, 0.0]
+
+    function f!(ẋ, x, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        return nothing
+    end
+    function h!(y, x, d, _ )
+        y[] = x[] + 0.1 * d[]
+    end
+    Ts, p = 100.0, [0.01]
+    model = NonLinModel(f!, h!, Ts, 1, 1, 1, 1; p)
+    transcription = MultipleShooting(1)
+    mhe_foh = MovingHorizonEstimator(model; He=3, direct=false, transcription)
+    preparestate!(mhe_foh, [0.0], [0.0])
+    x̂ = updatestate!(mhe_foh, [1.0], [0.0], [0.0])
+    info = getinfo(mhe_foh)
+    @test mhe_foh.transcription.h == 1
+    @test info[:x̂] ≈ x̂
 end
 
 @testitem "MHE estim. & getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin

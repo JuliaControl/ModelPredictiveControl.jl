@@ -1061,6 +1061,23 @@ end
     moveinput!(nmpc11, [10], [0])
     ΔU_diff = diff(getinfo(nmpc11)[:U])
     @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
+
+    function f!(ẋ, x, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        return nothing
+    end
+    function h!(y, x, d, _ )
+        y[] = x[] + 0.1 * d[]
+    end
+    Ts, p = 100.0, [0.01]
+    model = NonLinModel(f!, h!, Ts, 1, 1, 1, 1; p)
+    transcription = SingleShooting(1)
+    nmpc_foh = NonLinMPC(model; Hp=5, Hc=1, Nwt=[0], transcription)
+    preparestate!(nmpc_foh, [0.0], [0.0])
+    u = moveinput!(nmpc_foh, [1.0], [0.0])
+    info = getinfo(nmpc_foh)
+    @test nmpc_foh.transcription.h == 1
+    @test info[:u] ≈ u
 end
 
 @testitem "NonLinMPC moves & getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
@@ -1090,6 +1107,23 @@ end
     info = getinfo(nmpc4t)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
+
+    function f!(ẋ, x, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        return nothing
+    end
+    function h!(y, x, d, _ )
+        y[] = x[] + 0.1 * d[]
+    end
+    Ts, p = 100.0, [0.01]
+    model = NonLinModel(f!, h!, Ts, 1, 1, 1, 1; p)
+    transcription = MultipleShooting(1)
+    nmpc_foh = NonLinMPC(model; Hp=5, Hc=1, Nwt=[0], transcription)
+    preparestate!(nmpc_foh, [0.0], [0.0])
+    u = moveinput!(nmpc_foh, [1.0], [0.0])
+    info = getinfo(nmpc_foh)
+    @test nmpc_foh.transcription.h == 1
+    @test info[:u] ≈ u
 end
 
 @testitem "NonLinMPC moves & getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin
