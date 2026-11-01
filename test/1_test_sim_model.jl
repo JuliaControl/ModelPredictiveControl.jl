@@ -573,10 +573,11 @@ end
     @test dae.x0 ≈ zeros(1) atol=1e-6
     @test evaloutput(dae) ≈ zeros(1) atol=1e-6
 
-    transcription = TrapezoidalCollocation()
+    transcription = TrapezoidalCollocation(1)
     dae2 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription, xs_0, as_0)
     @test updatestate!(dae2, u) ≈ zeros(1) atol=1e-6
     @test updatestate!(dae2, u, d) ≈ zeros(1) atol=1e-6
+    @test updatestate!(dae2, u; unext=u) ≈ zeros(1) atol=1e-6
     @test dae2.x0 ≈ zeros(1) atol=1e-6
     @test dae2() ≈ zeros(1) atol=1e-6
 
