@@ -33,6 +33,8 @@ function solver_f!(
 ) where F<:Function
     supersample = solver.supersample
     Ts_inner = Ts/supersample
+    isFOH_u = isdifferent(u, unext)
+    isFOH_d = isdifferent(d, dnext)
     nx = length(x)
     xcurr = @views k̄[1:nx]
     k1 = @views k̄[(1nx + 1):(2nx)]
@@ -42,21 +44,21 @@ function solver_f!(
     @. xcurr = x
     for i=1:supersample
         τ = (i-1.0)/supersample 
-        @. ui = (1-τ)*u + (τ)*unext
-        @. di = (1-τ)*d + (τ)*dnext
-        f!(k1, xcurr, ui, di, p)
+        u1 = isFOH_u ? @.(ui = (1-τ)*u + (τ)*unext) : u
+        d1 = isFOH_d ? @.(di = (1-τ)*d + (τ)*dnext) : d
+        f!(k1, xcurr, u1, d1, p)
         @. xnext = xcurr + k1 * Ts_inner/2
         τ = (i-0.5)/supersample 
-        @. ui = (1-τ)*u + (τ)*unext
-        @. di = (1-τ)*d + (τ)*dnext
-        f!(k2, xnext, ui, di, p)
+        u2and3 = isFOH_u ? @.(ui = (1-τ)*u + (τ)*unext) : u
+        d2and3 = isFOH_d ? @.(di = (1-τ)*d + (τ)*dnext) : d
+        f!(k2, xnext, u2and3, d2and3, p)
         @. xnext = xcurr + k2 * Ts_inner/2
-        f!(k3, xnext, ui, di, p)
+        f!(k3, xnext, u2and3, d2and3, p)
         @. xnext = xcurr + k3 * Ts_inner
         τ = i/supersample
-        @. ui = (1-τ)*u + (τ)*unext
-        @. di = (1-τ)*d + (τ)*dnext
-        f!(k4, xnext, ui, di, p)
+        u4 = isFOH_u ? @.(ui = (1-τ)*u + (τ)*unext) : u
+        d4 = isFOH_d ? @.(di = (1-τ)*d + (τ)*dnext) : d
+        f!(k4, xnext, u4, d4, p)
         @. xcurr = xcurr + (k1 + 2k2 + 2k3 + k4)*Ts_inner/6
     end
     @. xnext = xcurr
@@ -79,15 +81,17 @@ function solver_f!(
 ) where F<:Function
     supersample = solver.supersample
     Ts_inner = Ts/supersample
+    isFOH_u = isdifferent(u, unext)
+    isFOH_d = isdifferent(d, dnext)
     nx = length(x)
     xcurr = @views k̄[1:nx]
     k1 = @views k̄[(1nx + 1):(2nx)]
     @. xcurr = x
     for i=1:supersample
         τ = (i-1)/supersample 
-        @. ui = (1-τ)*u + (τ)*unext
-        @. di = (1-τ)*d + (τ)*dnext
-        f!(k1, xcurr, ui, di, p)
+        u1 = isFOH_u ? @.(ui = (1-τ)*u + (τ)*unext) : u
+        d1 = isFOH_d ? @.(di = (1-τ)*d + (τ)*dnext) : d
+        f!(k1, xcurr, u1, d1, p)
         @. xcurr = xcurr + k1 * Ts_inner
     end
     @. xnext = xcurr
