@@ -1355,8 +1355,8 @@ end
     function h!(y, x, d, _ )
         y[] = x[] + 0.1 * d[]
     end
-    Ts, p = 100.0, [0.01]
-    model = NonLinModel(f!, h!, Ts, 1, 1, 1, 1; p)
+    p = [0.01]
+    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
     transcription = SingleShooting(1)
     mhe_foh = MovingHorizonEstimator(model; He=3, transcription)
     preparestate!(mhe_foh, [0.0], [0.0])
