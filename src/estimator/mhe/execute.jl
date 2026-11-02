@@ -152,8 +152,8 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     Z̃ = estim.Z̃
     info = Dict{Symbol, Any}()
     V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
-    x̂0arr, â0arr = buffer.x̂, buffer.â
-    x̄, K = Vector{NT}(undef, nx̂), Vector{NT}(undef, nk̄*Nk)
+    â0arr = buffer.â
+    x̂0arr, x̄, K = Vector{NT}(undef, nx̂), Vector{NT}(undef, nx̂), Vector{NT}(undef, nk̄*Nk)
     x̂0arr     = getx̂0arr!(x̂0arr, estim, Z̃)
     â0arr     = getâ0arr!(â0arr, estim, estim.transcription, Z̃)
     Ŵ         = getŴ!(Ŵ, estim, estim.transcription, Z̃)
