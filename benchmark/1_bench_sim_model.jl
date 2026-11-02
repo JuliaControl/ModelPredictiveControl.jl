@@ -29,3 +29,12 @@ UNIT_MODEL["NonLinModel"]["linearize!"] =
 ## ----------------------------------------------------------------------------------------
 const CASE_MODEL = SUITE["SimModel"]["CASE STUDIES"]
 # TODO: Add case study benchmarks for SimModel
+
+u_pendulum = [0.5]
+CASE_STUDY["NonLinModel"]["pendulum"]["updatestate!"] =
+    @benchmarkable(
+        updatestate!($pendulum_model, $u_pendulum); 
+    )
+
+
+pendulum_model
