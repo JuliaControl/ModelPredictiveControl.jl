@@ -918,8 +918,8 @@ end
     function h!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    Ts, p = 100.0, [0.01]
-    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p)
+    p = [0.01]
+    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p)
 
     transcription = TrapezoidalCollocation()
     nmpc = NonLinMPC(dae; He=3, Hp=3, transcription)
@@ -1115,8 +1115,8 @@ end
     function h!(y, x, d, _ )
         y[] = x[] + 0.1 * d[]
     end
-    Ts, p = 100.0, [0.01]
-    model = NonLinModel(f!, h!, Ts, 1, 1, 1, 1; p)
+    p = [0.01]
+    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
     transcription = MultipleShooting(1)
     nmpc_foh = NonLinMPC(model; Hp=5, Hc=1, Nwt=[0], transcription)
     preparestate!(nmpc_foh, [0.0], [0.0])
@@ -1195,9 +1195,9 @@ end
         y[] = x[] + a[] + 0.1 * d[]
     end
     Kp = 2*0.2 # static gain for input, factor 2 since the output is 2*x (a==x)
-    Ts, p = 100.0, [0.01]
+    p = [0.01]
     as_0, xs_0 = [-1.0], [1.0]
-    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     transcription = TrapezoidalCollocation(f_threads=true, h_threads=false)
     nmpc = NonLinMPC(dae; Hp=100, Hc=1, He=2, Nwt=[0.0], transcription)
@@ -1238,9 +1238,9 @@ end
         y[] = x[] + a[] + 0.1 * d[]
     end
     Kp = 2*0.2 # static gain for input, factor 2 since the output is 2*x (a==x)
-    Ts, p = 100.0, [0.01]
+    p = [0.01]
     as_0, xs_0 = [-1.0], [1.0]
-    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     no, roots = 3, :gausslegendre
     transcription = OrthogonalCollocation(0, no; roots, f_threads=true, h_threads=false)
