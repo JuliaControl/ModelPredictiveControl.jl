@@ -948,7 +948,8 @@ function getinfo(model::NonLinModelDAE{NT}) where NT<:Real
     model.h!(y0, x0, a0, d0, p)
     y = y0
     y .+ model.yop
-    x, u, d = buffer.x, buffer.u, buffer.d
+    x = Vector{NT}(undef, model.nx)
+    u, d = buffer.u, buffer.d
     unext, dnext = buffer.unext, buffer.dnext
     x .= x0 .+ model.xop
     u .= u0 .+ model.uop
