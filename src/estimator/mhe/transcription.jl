@@ -1155,7 +1155,7 @@ function set_warmstart!(
 ) where NT<:Real
     model, buffer = estim.model, estim.buffer
     nk̄ = get_nk̄(estim.model, transcription)
-    nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
+    nu, nε, nx̂, nŵ, He, Nk = model.nu, estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ = nε + nx̂, nŵ*He
     Z̃s = estim.buffer.Z̃
     # --- slack variable ε ---
@@ -1168,12 +1168,12 @@ function set_warmstart!(
     # --- verify definiteness of objective function ---
     x̄, â0arr = buffer.x̂, buffer.â
     V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
-    K = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
+    Ûi, K̄ = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove allocations
     x̂0arr = estim.x̂0arr_old
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s) 
     predict_mhe!(
-        V̂, X̂0, Â0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃s
+        V̂, X̂0, Â0, Û0, Ûi, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃s
     )
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
@@ -1257,7 +1257,7 @@ function set_warmstart!(
     model, buffer = estim.model, estim.buffer
     na = get_na(model)
     nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
-    nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
+    nu, nε, nx̂, nŵ, He, Nk = model.nu, estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂, nÂ, nK̄, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, nk̄*He, nā*He
     Z̃s = estim.buffer.Z̃
     # --- slack variable ε ---
@@ -1288,12 +1288,14 @@ function set_warmstart!(
     # --- verify definiteness of objective function --- 
     x̄, â0arr = buffer.x̂, buffer.â
     V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
-    K̄ = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
+    Ûi, K̄ = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove allocations
     x̂0arr = estim.x̂0arr_old
     â0arr = getâ0arr!(â0arr, estim, estim.transcription, Z̃s)  
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
-    predict_mhe!(V̂, X̂0, Â0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃s)
+    predict_mhe!(
+        V̂, X̂0, Â0, Û0, Ûi, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃s
+    )
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
         Z̃s[nx̃+nX̂+nK̄+1:end] .= 0 # Ŵ = 0
@@ -1362,7 +1364,7 @@ function set_warmstart!(
     model, buffer = estim.model, estim.buffer
     na = get_na(model)
     nk̄, nā = get_nk̄(estim.model, transcription), get_nā(estim.model, transcription)
-    nε, nx̂, nŵ, He, Nk = estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
+    nu, nε, nx̂, nŵ, He, Nk = model.nu, estim.nε, estim.nx̂, estim.nx̂, estim.He, estim.Nk[]
     nx̃, nŴ, nX̂, nÂ, nĀ = nε + nx̂, nŵ*He, nx̂*He, na*He, nā*He
     Z̃s = estim.buffer.Z̃
     # --- slack variable ε ---
@@ -1389,13 +1391,13 @@ function set_warmstart!(
     # --- verify definiteness of objective function ---
     x̄, â0arr = buffer.x̂, buffer.â
     V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
-    K̄ = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
+    Ûi, K̄ = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove allocations
     x̂0arr = estim.x̂0arr_old
     â0arr = getâ0arr!(â0arr, estim, transcription, Z̃s)
     x̄ .= 0 # x̂0arr == x̂arr_old implies the error at arrival x̄ is zero
     getŴ!(Ŵ, estim, transcription, Z̃s)
     predict_mhe!(
-        V̂, X̂0, Â0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃s
+        V̂, X̂0, Â0, Û0, Ûi, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃s
     )
     Js = obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃s)
     if !isfinite(Js)
@@ -1447,7 +1449,7 @@ end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, Â0, Û0, K̄, Ŷ0, 
+        V̂, X̂0, Â0, Û0, Ûi, K̄, Ŷ0, 
         estim::MovingHorizonEstimator, model::LinModel, transcription::TranscriptionMethod, 
         x̂0arr, â0arr, Ŵ, Z̃ 
     ) -> V̂, X̂0, Â0
@@ -1466,7 +1468,7 @@ noises from ``k-N_k+1`` to ``k``. The `X̂0` vector is estimated states from ``k
 The vector `Â0` is ignored and returned unchanged.
 """
 function predict_mhe!(
-    V̂, X̂0, Â0, _ , _ , _ ,
+    V̂, X̂0, Â0, _ , _ , _ , _ ,
     estim::MovingHorizonEstimator, ::LinModel, ::TranscriptionMethod, 
     _ , _ , _ , Z̃
 )
@@ -1491,7 +1493,7 @@ end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, Â0, Û0, K̄, Ŷ0, 
+        V̂, X̂0, Â0, Û0, Ûi, K̄, Ŷ0, 
         estim::MovingHorizonEstimator, model::NonLinModel, ::SingleShooting, 
         x̂0arr, â0arr, Ŵ, Z̃ 
     ) -> V̂, X̂0, Â0
@@ -1504,14 +1506,14 @@ called recursively in a `for` loop from ``j=1`` to ``N_k``, and by adding the es
 process noise ``\mathbf{ŵ}``.
 """
 function predict_mhe!(
-    V̂, X̂0, Â0, Û0, K̄, Ŷ0, 
+    V̂, X̂0, Â0, Û0, Ûi, K̄, Ŷ0, 
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::SingleShooting, 
     x̂0arr, _ , Ŵ, _ 
 )
     nu, nd, ny, nk̄ = model.nu, model.nd, model.ny, model.nk̄
     nx̂, nŵ, nym, Nk = estim.nx̂, estim.nx̂, estim.nym, estim.Nk[]
     h = transcription.h
-    Ui, Di = similar(Û0), estim.buffer.D     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    Di = estim.buffer.D
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     x̂0 = @views x̂0arr[1:nx̂]
     for j=1:Nk
@@ -1520,7 +1522,7 @@ function predict_mhe!(
         ŵ       = @views         Ŵ[(1+nŵ*(j-1)):(nŵ*j)]
         k̄       = @views         K̄[(1+nk̄*(j-1)):(nk̄*j)]
         û0      = @views         Û0[(1+nu*(j-1)):(nu*j)]
-        ûi      = @views Ui[(1 + nu*(j-1)):(nu*j)]
+        ûi      = @views Ûi[(1 + nu*(j-1)):(nu*j)]
         di      = @views Di[(1 + nd*(j-1)):(nd*j)]
         x̂0next  = @views         X̂0[(1+nx̂*(j-1)):(nx̂*j)]
         d0next = @views (j < Nk) ? estim.D0[(1+nd*j + i_d0arr):(nd*(j+1) + i_d0arr)] : d0
@@ -1564,7 +1566,7 @@ end
 
 @doc raw"""
     predict_mhe!(
-        V̂, X̂0, Â0, _ , _ , Ŷ0, 
+        V̂, X̂0, Â0, _ , _ , _ , Ŷ0, 
         estim::MovingHorizonEstimator, model::SimModel, ::TranscriptionMethod, 
         x̂0arr, â0arr, _ , Z̃ 
     ) -> V̂, X̂0, Â0
@@ -1575,7 +1577,7 @@ The function mutates `V̂`, `X̂0`, `Â0`, and `Ŷ0` vector arguments. The aug
 function [`ĥ!`](@ref) is called multiple times in a `for` loop from ``j=1`` to ``N_k``.
 """
 function predict_mhe!(
-    V̂, X̂0, Â0, _ , _ , Ŷ0, 
+    V̂, X̂0, Â0, _ , _ , _ , Ŷ0, 
     estim::MovingHorizonEstimator, model::SimModel, transcription::TranscriptionMethod, 
     x̂0arr, â0arr, _ , Z̃ 
 )
@@ -1706,15 +1708,15 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, X̂0, Û0, K̄,
+        geq, X̂0, Û0, Ûi, K̄,
         estim::MovingHorizonEstimator, model::NonLinModel, ::MultipleShooting, 
         x̂0arr, _ , Ŵ, Z̃
     ) -> geq
 
 Nonlinear MHE equality constrains for [`NonLinModel`](@ref) and [`MultipleShooting`](@ref).
 
-The method mutates the `geq`, `X̂0`, `Û0` and `K̄` vectors in argument. The defects of the 
-stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@ref)). By
+The method mutates the `geq`, `X̂0`, `Û0`, `Ûi` and `K̄` vectors in argument. The defects of
+the stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@ref)). By
 introducing the integer ``ℓ = k - N_k + p`` to shorten the notation, the defects of the
 estimated states are computed with:
 ```math
@@ -1728,7 +1730,7 @@ state update function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is def
 [`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq_mhe!(
-    geq, X̂0, Û0, K̄,
+    geq, X̂0, Û0, Ûi, K̄,
     estim::MovingHorizonEstimator, model::NonLinModel, transcription::MultipleShooting, 
     x̂0arr, _ , Ŵ, Z̃
 )
@@ -1740,7 +1742,7 @@ function con_nonlinprogeq_mhe!(
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     X̂0_Z̃ = @views Z̃[(nx̃+1):(nx̃+nx̂*He)]
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0_Z̃, estim.U0)
-    Ûi, Di = similar(Û0), estim.buffer.D     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    Di = estim.buffer.D
     @threadsif f_threads for j=1:Nk
         if j < 2
             x̂d_Z̃ = @views x̂0arr[1:nx]
@@ -1768,7 +1770,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , Û0, K̄dot,
+        geq, _ , Û0, _ , K̄dot,
         estim::MovingHorizonEstimator, model::SimModel, ::TrapezoidalCollocation, 
         x̂0arr, â0arr, Ŵ, Z̃
     ) -> geq
@@ -1806,7 +1808,7 @@ plus one last residual for the arrival:
 ```
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , Û0, K̄dot,
+    geq, _ , Û0, _ , K̄dot,
     estim::MovingHorizonEstimator, model::SimModel, transcription::TrapezoidalCollocation, 
     x̂0arr, â0arr, Ŵ, Z̃
 )
@@ -1875,7 +1877,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq_mhe!(
-        geq, _ , Û0, K̄dot,
+        geq, _ , Û0, Ûi, K̄dot,
         estim::MovingHorizonEstimator, model::SimModel, ::OrthogonalCollocation, 
         x̂0arr, â0arr, _ , Z̃
     ) -> geq
@@ -1913,7 +1915,7 @@ stochastic states are linear equality constraints (see [`init_defectmat_mhe`](@r
 estimated process noise ``\mathbf{ŵ}(ℓ+j)`` are incorporated in the continuity constraint.
 """
 function con_nonlinprogeq_mhe!(
-    geq, _ , Û0, K̄dot,
+    geq, _ , Û0, Ûi, K̄dot,
     estim::MovingHorizonEstimator, model::SimModel, transcription::OrthogonalCollocation, 
     x̂0arr, â0arr, _ , Z̃
 )
@@ -1932,8 +1934,7 @@ function con_nonlinprogeq_mhe!(
     Â0 = @views Z̃[(1 + nx̃_nX̂ + na):(nx̃_nX̂ + na + nÂ)] # skipping â0arr components
     K̄  = @views Z̃[(1 + nx̃_nX̂ + na + nÂ):(nx̃_nX̂ + na + nÂ + nK̄)]
     Ā  = @views Z̃[(1 + nx̃_nX̂ + na + nÂ + nK̄):(nx̃_nX̂ + na + nÂ + nK̄ + nĀ)]
-    Dtemp = estim.buffer.D
-    Utemp = similar(Û0) # TODO: remove this allocation
+    Di = estim.buffer.D
     Û0 = disturbedinput!(Û0, estim, x̂0arr, X̂0, estim.U0)
     (Nk < He) && (geq .= 0) 
     Ŝk̄   = @views geq[1:nŜk̄]
@@ -1973,7 +1974,7 @@ function con_nonlinprogeq_mhe!(
             Δk[(1 + (i-1)*nx):(i*nx)] = @views k̄[(1 + (i-1)*nx):(i*nx)] .- x̂d
         end
         mul!(ŝk̄, Mo, Δk)
-        di, ûi = @views Dtemp[(1 + nd*(j-1)):(nd*j)], Utemp[(1 + nu*(j-1)):(nu*j)]
+        di, ûi = @views Di[(1 + nd*(j-1)):(nd*j)], Ûi[(1 + nu*(j-1)):(nu*j)]
         for i=1:no
             k̇i, ki  = @views k̄dot[(1 + (i-1)*nx):(i*nx)], k̄[(1 + (i-1)*nx):(i*nx)]
             qi, ai  = @views    q̄[(1 + (i-1)*na):(i*na)], ā[(1 + (i-1)*na):(i*na)]
@@ -1994,4 +1995,4 @@ function con_nonlinprogeq_mhe!(
 end
 
 "No nonlinear eq. const. for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
-con_nonlinprogeq_mhe!(geq,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod,_,_,_,_) = geq
+con_nonlinprogeq_mhe!(geq,_,_,_,_,::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod,_,_,_,_) = geq

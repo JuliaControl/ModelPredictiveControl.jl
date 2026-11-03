@@ -152,14 +152,15 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     Z̃ = estim.Z̃
     info = Dict{Symbol, Any}()
     V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
-    â0arr = buffer.â
-    x̂0arr, x̄, K = Vector{NT}(undef, nx̂), Vector{NT}(undef, nx̂), Vector{NT}(undef, nk̄*Nk)
+    â0arr = buffer.â 
+    x̂0arr, x̄  = Vector{NT}(undef, nx̂), Vector{NT}(undef, nx̂)
+    Ûi, K̄     = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk)
     x̂0arr     = getx̂0arr!(x̂0arr, estim, Z̃)
     â0arr     = getâ0arr!(â0arr, estim, estim.transcription, Z̃)
     Ŵ         = getŴ!(Ŵ, estim, estim.transcription, Z̃)
     x̄         = getx̄!(x̄, estim, x̂0arr)
     V̂, X̂0, Â0 = predict_mhe!(
-        V̂, X̂0, Â0, Û0, K, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃
+        V̂, X̂0, Â0, Û0, Ûi, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃
     )
     Ŷ0   = predict_outputs_mhe!(Ŷ0, estim, X̂0, Â0, x̂0arr, â0arr)
     J    = obj_nonlinprog(estim, estim.model, x̄, V̂, Ŵ, Z̃)
@@ -665,15 +666,15 @@ otherwise the state is for the next time step.
 """
 function getstate!(estim::MovingHorizonEstimator{NT}, Z̃) where NT<:Real
     model, buffer = estim.model, estim.buffer
-    nx̂, Nk = estim.nx̂, estim.Nk[]
+    nu, nx̂, Nk = model.nu, estim.nx̂, estim.Nk[]
     nk̄ = get_nk̄(model, estim.transcription)
     x̂0arr, â0arr = buffer.x̂, buffer.â
     V̂, Ŵ, X̂0, Â0, Û0, Ŷ0 = buffer.V̂, buffer.Ŵ, buffer.X̂, buffer.Â, buffer.U, buffer.Ŷ
-    K̄ = Vector{NT}(undef, nk̄*Nk) # TODO: remove the allocation
+    Ûi, K̄ = Vector{NT}(undef, nu*Nk), Vector{NT}(undef, nk̄*Nk) # TODO: remove allocations
     getŴ!(Ŵ, estim, estim.transcription, estim.Z̃) 
     getx̂0arr!(x̂0arr, estim, Z̃)
     predict_mhe!(
-        V̂, X̂0, Â0, Û0, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃
+        V̂, X̂0, Â0, Û0, Ûi, K̄, Ŷ0, estim, model, estim.transcription, x̂0arr, â0arr, Ŵ, Z̃
     )
     estim.x̂0 .= @views X̂0[((Nk-1)*nx̂+1):(Nk*nx̂)]
     return nothing
@@ -905,7 +906,7 @@ end
 
 """
     update_predictions!(
-        x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, 
+        x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, 
         estim::MovingHorizonEstimator, Z̃
     ) -> nothing
 
@@ -914,7 +915,7 @@ Update in-place the vectors for the predictions of `estim` estimator at decision
 The method mutates all the arguments before `estim` argument.
 """
 function update_predictions!(
-    x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, 
+    x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, 
     estim::MovingHorizonEstimator, Z̃
 )
     model, transcription = estim.model, estim.transcription
@@ -923,14 +924,14 @@ function update_predictions!(
     x̄         = getx̄!(x̄, estim, x̂0arr)
     Ŵ         = getŴ!(Ŵ, estim, transcription, Z̃)
     V̂, X̂0, Â0 = predict_mhe!(
-        V̂, X̂0, Â0, Û0, K̄, Ŷ0, estim, model, transcription, x̂0arr, â0arr, Ŵ, Z̃
+        V̂, X̂0, Â0, Û0, Ûi, K̄, Ŷ0, estim, model, transcription, x̂0arr, â0arr, Ŵ, Z̃
     )
     Ŵe, V̂e, X̂e = extended_vectors!(Ŵe, V̂e, X̂e, estim, Ŵ, V̂, X̂0, x̂0arr)
     ε   = getslack(estim, Z̃)
     gc  = con_custom_mhe!(gc, estim, X̂e, V̂e, Ŵe, x̄, ε) 
     g   = con_nonlinprog_mhe!(g, estim, model, transcription, X̂0, V̂, gc, ε)
     geq = con_nonlinprogeq_mhe!(
-        geq, X̂0, Û0, K̄, estim, model, transcription, x̂0arr, â0arr, Ŵ, Z̃
+        geq, X̂0, Û0, Ûi, K̄, estim, model, transcription, x̂0arr, â0arr, Ŵ, Z̃
     )
     return nothing
 end

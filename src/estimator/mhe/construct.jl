@@ -1471,11 +1471,12 @@ function get_nonlinobj_op(
     V̂e::Vector{JNT},    X̂e::Vector{JNT} = zeros(JNT, nV̂e), zeros(JNT, nX̂e)
     K̄::Vector{JNT}                      = zeros(JNT, nK̄)
     Û0::Vector{JNT},    Ŷ0::Vector{JNT} = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Ûi::Vector{JNT}                     = zeros(JNT, nU)
     gc::Vector{JNT},    g::Vector{JNT}  = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                    = zeros(JNT, neq)
-    function J!(Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
+    function J!(Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
@@ -1484,7 +1485,7 @@ function get_nonlinobj_op(
         Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-        Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+        Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g), Cache(geq)
     )
     # temporarily "fill" the estimation window for the preparation of the gradient: 
@@ -1591,23 +1592,24 @@ function get_nonlincon_oracle(
     V̂e::Vector{JNT},    X̂e::Vector{JNT}   = zeros(JNT, nV̂e), zeros(JNT, nX̂e)
     K̄::Vector{JNT}                        = zeros(JNT, nK̄)
     Û0::Vector{JNT},    Ŷ0::Vector{JNT}   = zeros(JNT, nU),  zeros(JNT, nŶ)
+    Ûi::Vector{JNT}                       = zeros(JNT, nU)
     gc::Vector{JNT},    g::Vector{JNT}    = zeros(JNT, nc),  zeros(JNT, ng)
     geq::Vector{JNT}                      = zeros(JNT, neq)
     gi::Vector{JNT}                       = zeros(JNT, ngi)
     λi::Vector{JNT},    λeq::Vector{JNT}  = rand(JNT, ngi),  rand(JNT, neq)
     # -------------- inequality constraint: nonlinear oracle -------------------------
-    function gi!(gi, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq)
+    function gi!(gi, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return nothing
     end
     function ℓ_gi(
-        Z̃, λi, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, gi
+        Z̃, λi, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, gi
     )
         update_predictions!(
-            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return dot(λi, gi)
@@ -1617,7 +1619,7 @@ function get_nonlincon_oracle(
         Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-        Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+        Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g), Cache(geq)
     )
     # temporarily "fill" the estimation windows for the preparation of the gradient: 
@@ -1631,7 +1633,7 @@ function get_nonlincon_oracle(
             Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
             Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
             Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-            Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+            Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
             Cache(gc), Cache(g), Cache(geq),
             Cache(gi)
         )
@@ -1678,17 +1680,17 @@ function get_nonlincon_oracle(
         eval_hessian_lagrangian      = isnothing(hess) ? nothing          : ∇²gi_func!
     )
     # ------------- equality constraints : nonlinear oracle ------------------------------
-    function geq!(geq, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g)
+    function geq!(geq, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g)
         update_predictions!(
-            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return nothing
     end
     function ℓ_geq(
-        Z̃, λeq, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq
+        Z̃, λeq, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq
     )
         update_predictions!(
-            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K̄, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return dot(λeq, geq)
     end
@@ -1697,7 +1699,7 @@ function get_nonlincon_oracle(
         Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-        Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+        Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g)
     )
     estim.Nk[] = He # see comment above
@@ -1710,7 +1712,7 @@ function get_nonlincon_oracle(
             Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
             Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
             Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-            Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+            Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
             Cache(gc), Cache(g), Cache(geq)
         )
         estim.Nk[] = He # see comment above

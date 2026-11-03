@@ -1748,4 +1748,4 @@ function con_nonlinprogeq!(
 end
 
 "No eq. constraints for other cases e.g. [`SingleShooting`](@ref), returns `geq` unchanged."
-con_nonlinprogeq!(geq,_,_,_,::PredictiveController,::SimModel,::TranscriptionMethod,_,_)=geq
+con_nonlinprogeq!(geq,_,_,_,_,::PredictiveController,::SimModel,::TranscriptionMethod,_,_)=geq

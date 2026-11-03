@@ -606,15 +606,16 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     Ue, Ŷe  = zeros(NT, nUe), zeros(NT, nŶe)
     U0, Ŷ0  = zeros(NT, nU),  zeros(NT, nŶ)
     Û0, X̂0  = zeros(NT, nU),  zeros(NT, nX̂)
+    Ûi      = zeros(NT, nU)
     gc, g   = zeros(NT, nc),  zeros(NT, ng)
     gi, geq = zeros(NT, ngi), zeros(NT, neq)
     J_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-        Cache(Û0), Cache(K), Cache(X̂0), 
+        Cache(Û0), Cache(Ûi), Cache(K), Cache(X̂0), 
         Cache(gc), Cache(g), Cache(geq),
     )
-    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
+    function J!(Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, g, geq)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, g, geq, mpc, Z̃)
         return obj_nonlinprog!(Ŷ0, U0, mpc, Ue, Ŷe, ΔŨ)
     end
     if !isnothing(hess)
@@ -629,11 +630,11 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     # --- inequality constraint derivatives ---
     ∇g_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-        Cache(Û0), Cache(K), Cache(X̂0), 
+        Cache(Û0), Cache(Ûi), Cache(K), Cache(X̂0), 
         Cache(gc), Cache(geq), Cache(g)
     )
-    function gi!(gi, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, geq, g)
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
+    function gi!(gi, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, geq, g)
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, g, geq, mpc, Z̃)
         gi .= @views g[i_g]
         return nothing
     end
@@ -657,10 +658,10 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         end
         ∇²g_cache = (
             Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0), 
-            Cache(Û0), Cache(K), Cache(X̂0), 
+            Cache(Û0), Cache(Ûi), Cache(K), Cache(X̂0), 
             Cache(gc), Cache(geq), Cache(g), Cache(gi)
         )
-        function ℓ_gi(Z̃, λi, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, geq, g, gi)
+        function ℓ_gi(Z̃, λi, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, geq, g, gi)
             update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
             gi .= @views g[i_g]
             return dot(λi, gi)
@@ -677,8 +678,8 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         Cache(Û0), Cache(K),   Cache(X̂0),
         Cache(gc), Cache(g)
     )
-    function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g) 
-        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
+    function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, g) 
+        update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, g, geq, mpc, Z̃)
         return nothing
     end
     ∇geq_prep = prepare_jacobian(geq!, geq, mpc.jacobian, mpc.Z̃, geq_cache...)
@@ -704,8 +705,8 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
             Cache(Û0), Cache(K),   Cache(X̂0),
             Cache(gc), Cache(geq), Cache(g)
         )
-        function ℓ_geq(Z̃, λeq, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, geq, g)
-            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, K, X̂0, gc, g, geq, mpc, Z̃)
+        function ℓ_geq(Z̃, λeq, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, geq, g)
+            update_predictions!(ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, g, geq, mpc, Z̃)
             return dot(λeq, geq)
         end
         ∇²ℓgeq_prep = prepare_hessian(ℓ_geq, hess, mpc.Z̃, Constant(λeq), ∇²geq_cache...)
