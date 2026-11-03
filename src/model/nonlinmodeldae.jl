@@ -687,27 +687,23 @@ Update `k̄` and `geq` in place for the open loop root solving of [`NonLinModelD
 function update_predictions!(k̄, geq, model, Z)
     x0, u0, d0 = model.x0_optim, model.u0_optim, model.d0_optim
     u0next, d0next = model.u0next_optim, model.d0next_optim
-    con_nonlinprogeq!(
-        geq, k̄, model, model.transcription, x0, u0, d0, u0next, d0next, Z
-    )
+    con_nonlinroots!(geq, k̄, model, model.transcription, x0, u0, d0, u0next, d0next, Z)
     return nothing
 end
 
 """
-    con_nonlinprogeq!(
+    con_nonlinroots!(
         geq, k̄dot,
         model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, u0next, d0next, Z
     ) -> geq
 
 Nonlinear equality constraint for open loop root solving of [`NonLinModelDAE`](@ref).
 """
-function con_nonlinprogeq!(
+function con_nonlinroots!(
     geq, k̄dot,
     model::NonLinModelDAE, ::TrapezoidalCollocation, x0, u0, d0, u0next, d0next, Z
 )
-    transcription = model.transcription
     nx, na = model.nx, model.na
-    h = transcription.h
     Ts = model.Ts
     u⁺, d⁺ = u0, d0
     # h is ignored here, u0next & d0next values determine the hold order (like NonLinModel):
@@ -722,14 +718,14 @@ function con_nonlinprogeq!(
 end
 
 """
-    con_nonlinprogeq!(
+    con_nonlinroots!(
         geq, k̄dot
         model::NonLinModelDAE, ::OrthogonalCollocation, x0, u0, d0, u0next, d0next, Z
     ) -> geq
 
 Same but using an [`OrthogonalCollocation`](@ref) transcription.
 """
-function con_nonlinprogeq!(
+function con_nonlinroots!(
     geq, k̄dot,
     model::NonLinModelDAE, ::OrthogonalCollocation, x0, u0, d0, u0next, d0next, Z
 )
