@@ -548,6 +548,26 @@ end
     updatestate!(internalmodel5, [0], [6], [0])
     @test internalmodel5.x̂d ≈ [0]
     @test internalmodel5.x̂s ≈ [6]
+    buffer = internalmodel5.buffer
+    x̂0next, k̄, ûi, di = buffer.x̂, buffer.k̄, buffer.ûi, buffer.di
+    û0, û0next = buffer.û, buffer.ûnext
+    @test_nowarn ModelPredictiveControl.f̂!( 
+        x̂0next, û0, û0next, k̄, ûi, di, internalmodel5, dae, [0], [0], [0], [0], [0]
+    ) # for coverage
+
+    internalmodel6 = InternalModel(linmodel, i_ym=[1])
+    preparestate!(internalmodel6, [57])
+    updatestate!(internalmodel6, [10, 50], [57])
+    @test internalmodel6.x̂d ≈ [0, 0]
+    @test internalmodel6.x̂s ≈ [7]
+    buffer = internalmodel6.buffer
+    x̂0next, k̄, ûi, di = buffer.x̂, buffer.k̄, buffer.ûi, buffer.di
+    û0, û0next = buffer.û, buffer.ûnext
+    @test_nowarn ModelPredictiveControl.f̂!( 
+        x̂0next, û0, û0next, k̄, ûi, di, 
+        internalmodel6, linmodel, [0, 0], [10, 50], Float64[], [10, 50], Float64[]
+    ) # for coverage
+    
 end
 
 @testitem "IM set model" setup=[SetupMPCtests] begin

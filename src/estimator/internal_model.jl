@@ -186,7 +186,7 @@ function f̂!(
     x̂0next, _ , _ , k̄, ûi, di, 
     estim::InternalModel, model::SimModel, x̂0, u0, d0, u0next, d0next
 )
-    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0, d0, u0next, d0next)
+    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0next, d0next)
     x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
@@ -194,7 +194,7 @@ function f̂!(
     x̂0next, _ , _ , k̄, ûi, di, 
     estim::InternalModel, model::LinModel, x̂0, u0, d0, u0next, d0next
 )
-    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0, d0, u0next, d0next)
+    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0next, d0next)
     x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
