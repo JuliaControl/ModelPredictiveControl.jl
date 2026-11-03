@@ -1276,7 +1276,7 @@ getU0!(U0, mpc::PredictiveController, Z̃) = (mul!(U0, mpc.P̃u, Z̃) .+ mpc.Tu_
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, _ , _ , _ ,
+        Ŷ0, x̂0end, _ , _ , _ , _ ,
         mpc::PredictiveController, model::LinModel, transcription::TranscriptionMethod, 
         _ , Z̃
     ) -> Ŷ0, x̂0end
@@ -1294,7 +1294,7 @@ identical for any [`TranscriptionMethod`](@ref) if the model is linear:
 ```
 """
 function predict!(
-    Ŷ0, x̂0end, _, _, _,
+    Ŷ0, x̂0end, _, _, _, _,
     mpc::PredictiveController, ::LinModel, ::TranscriptionMethod, 
     _ , Z̃
 )
@@ -1306,14 +1306,14 @@ end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, X̂0, Û0, K̄,
+        Ŷ0, x̂0end, X̂0, Û0, Ûi, K̄,
         mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
         U0, _
     ) -> Ŷ0, x̂0end
 
 Compute vectors if `model` is a [`NonLinModel`](@ref) and for [`SingleShooting`](@ref).
     
-The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K` arguments. The augmented model of
+The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0`, `Ûi` and `K` arguments. The augmented model of
 [`f̂!`](@ref) and [`ĥ!`](@ref) functions is called recursively in a `for` loop:
 ```math
 \begin{aligned}
@@ -1324,7 +1324,7 @@ The method mutates `Ŷ0`, `x̂0end`, `X̂0`, `Û0` and `K` arguments. The augm
 for ``j = 0, 1, ... , H_p``.
 """
 function predict!(
-    Ŷ0, x̂0end, X̂0, Û0, K̄,
+    Ŷ0, x̂0end, X̂0, Û0, Ûi, K̄,
     mpc::PredictiveController, model::NonLinModel, transcription::SingleShooting,
     U0, _
 )
@@ -1332,7 +1332,7 @@ function predict!(
     nx̂, Hp = mpc.estim.nx̂, mpc.Hp 
     h = transcription.h
     D̂0 = mpc.D̂0
-    Ûi, D̂i = similar(Û0), mpc.buffer.D̂     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    D̂i = mpc.buffer.D̂
     x̂0 = @views mpc.estim.x̂0[1:nx̂]
     d̂0 = @views mpc.d0[1:nd]
     for j=1:Hp
@@ -1362,7 +1362,7 @@ end
 
 @doc raw"""
     predict!(
-        Ŷ0, x̂0end, _ , _ , _ , 
+        Ŷ0, x̂0end, _ ,_ , _ , _ , 
         mpc::PredictiveController, model::SimModel, transcription::TranscriptionMethod,
         _ , Z̃
     ) -> Ŷ0, x̂0end
@@ -1378,7 +1378,7 @@ for ``j = 1, 2, ... , H_p``, and in which ``\mathbf{x̂_0}`` is the augmented st
 from the decision variable `Z̃`.
 """
 function predict!(
-    Ŷ0, x̂0end, _, _, _,
+    Ŷ0, x̂0end, _, _, _, _,
     mpc::PredictiveController, model::SimModel, transcription::TranscriptionMethod,
     _ , Z̃
 )
@@ -1487,7 +1487,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, X̂0, Û0, K̄
+        geq, X̂0, Û0, Ûi, K̄
         mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
         U0, Z̃
     ) -> geq
@@ -1508,7 +1508,7 @@ state update function [`f!`](@ref). The disturbed input ``\mathbf{û_0}`` is def
 [`f̂!`](@ref) documentation.
 """
 function con_nonlinprogeq!(
-    geq, X̂0, Û0, K̄, 
+    geq, X̂0, Û0, Ûi, K̄, 
     mpc::PredictiveController, model::NonLinModel, transcription::MultipleShooting, 
     U0, Z̃
 )
@@ -1519,7 +1519,7 @@ function con_nonlinprogeq!(
     D̂0 = mpc.D̂0
     X̂0_Z̃ = @views Z̃[(nΔU+1):(nΔU+nX̂)]
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0_Z̃, U0)
-    Ûi, D̂i = similar(Û0), mpc.buffer.D̂     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    D̂i = mpc.buffer.D̂
     @threadsif f_threads for j=1:Hp
         if j < 2
             x̂d_Z̃ = @views mpc.estim.x̂0[1:nx]
@@ -1546,7 +1546,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, _ , Û0, K̄dot,
+        geq, _ , Û0, _ , K̄dot,
         mpc::PredictiveController, model::SimModel, transcription::TrapezoidalCollocation, 
         U0, Z̃
     ) -> geq
@@ -1578,7 +1578,7 @@ also computed from ``j = 0, 1, ... , H_p-1`` and:
 ```
 """
 function con_nonlinprogeq!(
-    geq, _ , Û0, K̄dot, 
+    geq, _ , Û0, _ , K̄dot, 
     mpc::PredictiveController, model::SimModel, transcription::TrapezoidalCollocation, 
     U0, Z̃
 )
@@ -1639,7 +1639,7 @@ end
 
 @doc raw"""
     con_nonlinprogeq!(
-        geq, _ , Û0, K̄dot, 
+        geq, _ , Û0, Ûi, K̄dot, 
         mpc::PredictiveController, model::SimModel, transcription::OrthogonalCollocation, 
         U0, Z̃
     ) -> geq
@@ -1675,7 +1675,7 @@ for ``j = 0, 1, ... , H_p-1``. The defects for the continuity constraints and th
 states are linear equality constraints (see [`init_defectmat`](@ref)).
 """
 function con_nonlinprogeq!(
-    geq, _ , Û0, K̄dot,  
+    geq, _ , Û0, Ûi, K̄dot,  
     mpc::PredictiveController, model::SimModel, transcription::OrthogonalCollocation, 
     U0, Z̃
 )
@@ -1693,7 +1693,7 @@ function con_nonlinprogeq!(
     Â0 = @views Z̃[(1 + nΔU + nX̂):(nΔU + nX̂ + nÂ)]
     K̄  = @views Z̃[(1 + nΔU + nX̂ + nÂ):(nΔU + nX̂ + nÂ + nK̄)]
     Ā  = @views Z̃[(1 + nΔU + nX̂ + nÂ + nK̄):(nΔU + nX̂ + nÂ + nK̄ + nĀ)]
-    Ûi, D̂i = similar(Û0), mpc.buffer.D̂     # TODO: DELETE THIS AND ADD NEW ARGUMENTS
+    D̂i = mpc.buffer.D̂
     Û0 = disturbedinput!(Û0, mpc.estim, mpc.estim.x̂0, X̂0, U0)
     Ŝk̄ = @views geq[1:nŜk̄]
     Q⁻ = @views geq[(nŜk̄+1):(nŜk̄+nÂ)]
