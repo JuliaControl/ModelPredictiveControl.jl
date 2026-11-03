@@ -239,6 +239,7 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
     V̂e, X̂e    = zeros(NT, nV̂e), zeros(NT, nX̂e)
     K̄         = zeros(NT, nK̄)
     Û0, Ŷ0    = zeros(NT, nU),  zeros(NT, nŶ)
+    Ûi        = zeros(NT, nU)
     gc, g     = zeros(NT, nc), zeros(NT, ng) 
     geq       = zeros(NT, neq)
     gi        = zeros(NT, ngi)
@@ -246,12 +247,12 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
         Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-        Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+        Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g), Cache(geq)
     )
-    function J!(Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
+    function J!(Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return obj_nonlinprog(estim, model, x̄, V̂, Ŵ, Z̃)
     end
@@ -269,12 +270,12 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
         Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-        Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+        Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g), Cache(geq)
     )
-    function gi!(gi, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq)
+    function gi!(gi, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq)
         update_predictions!(
-            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         gi .= @views g[i_g]
         return nothing
@@ -301,15 +302,15 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
             Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
             Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
             Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-            Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+            Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
             Cache(gc), Cache(g), Cache(geq),
             Cache(gi)
         )
         function ℓ_gi(
-            Z̃, λi, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, gi
+            Z̃, λi, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, gi
         )
             update_predictions!(
-                x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
+                x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
             )
             gi .= @views g[i_g]
             return dot(λi, gi)
@@ -325,12 +326,12 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
         Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
         Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
         Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-        Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+        Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
         Cache(gc), Cache(g)
     )
-    function geq!(geq, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g)
+    function geq!(geq, Z̃, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g)
         update_predictions!(
-            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
+            x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
         )
         return nothing
     end
@@ -356,14 +357,14 @@ function addinfo!(info, estim::MovingHorizonEstimator{NT}, model::SimModel) wher
             Cache(x̂0arr), Cache(â0arr), Cache(x̄), 
             Cache(Ŵ), Cache(V̂), Cache(X̂0), Cache(Â0), 
             Cache(Ŵe), Cache(V̂e), Cache(X̂e),
-            Cache(Û0), Cache(K̄), Cache(Ŷ0), 
+            Cache(Û0), Cache(Ûi), Cache(K̄), Cache(Ŷ0), 
             Cache(gc), Cache(g), Cache(geq)
         )
         function ℓ_geq(
-            Z̃, λeq, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq
+            Z̃, λeq, x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq
         )
             update_predictions!(
-                x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, K, Ŷ0, gc, g, geq, estim, Z̃
+                x̂0arr, â0arr, x̄, Ŵ, V̂, X̂0, Â0, Ŵe, V̂e, X̂e, Û0, Ûi, K̄, Ŷ0, gc, g, geq, estim, Z̃
             )
             return dot(λeq, geq)
         end
