@@ -675,7 +675,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
     # --- equality constraint derivatives ---
     geq_cache = (
         Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
-        Cache(Û0), Cache(K),   Cache(X̂0),
+        Cache(Û0), Cache(Ûi), Cache(K), Cache(X̂0),
         Cache(gc), Cache(g)
     )
     function geq!(geq, Z̃, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, g) 
@@ -702,7 +702,7 @@ function addinfo!(info, mpc::NonLinMPC{NT}) where NT<:Real
         end
         ∇²geq_cache = (
             Cache(ΔŨ), Cache(x̂0end), Cache(Ue), Cache(Ŷe), Cache(U0), Cache(Ŷ0),
-            Cache(Û0), Cache(K),   Cache(X̂0),
+            Cache(Û0), Cache(Ûi), Cache(K), Cache(X̂0),
             Cache(gc), Cache(geq), Cache(g)
         )
         function ℓ_geq(Z̃, λeq, ΔŨ, x̂0end, Ue, Ŷe, U0, Ŷ0, Û0, Ûi, K, X̂0, gc, geq, g)
