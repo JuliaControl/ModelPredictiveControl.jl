@@ -227,9 +227,10 @@ end
         "4th order Runge-Kutta differential equation solver with 1 supersamples."
     nonlinmodel5 = NonLinModel(f3, h3, 1.0, 1, 2, 1, 1, solver=solver, p=p)
     ẋ, k̄, y = nonlinmodel5.buffer.x, nonlinmodel5.buffer.k̄, nonlinmodel5.buffer.y
-    ModelPredictiveControl.f!(ẋ, k̄, nonlinmodel5, [0; 0], [0], [0], nonlinmodel5.p)
+    ui, di = nonlinmodel5.buffer.ui, nonlinmodel5.buffer.di
+    ModelPredictiveControl.f!(ẋ, k̄, ui, di, nonlinmodel5, [0; 0], [0], [0], [0], [0])
     @test ẋ ≈ zeros(2)
-    ModelPredictiveControl.h!(y, nonlinmodel5, [0; 0], [0], nonlinmodel5.p)
+    ModelPredictiveControl.h!(y, nonlinmodel5, [0; 0], [0])
     @test y ≈ zeros(1)
 
     function f2!(ẋ, x, u , d, p)
@@ -245,15 +246,17 @@ end
     end
     nonlinmodel6 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=RungeKutta(), p=p)
     ẋ, k̄, y = nonlinmodel6.buffer.x, nonlinmodel6.buffer.k̄, nonlinmodel6.buffer.y
-    ModelPredictiveControl.f!(ẋ, k̄, nonlinmodel6, [0; 0], [0], [0], nonlinmodel6.p)
+    ui, di = nonlinmodel6.buffer.ui, nonlinmodel6.buffer.di
+    ModelPredictiveControl.f!(ẋ, k̄, ui, di, nonlinmodel6, [0; 0], [0], [0], [0], [0])
     @test ẋ ≈ zeros(2)
-    ModelPredictiveControl.h!(y, nonlinmodel6, [0; 0], [0], nonlinmodel6.p)
+    ModelPredictiveControl.h!(y, nonlinmodel6, [0; 0], [0])
     @test y ≈ zeros(1)
     nonlinmodel7 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, solver=ForwardEuler(), p=p)
     ẋ, k̄, y = nonlinmodel7.buffer.x, nonlinmodel7.buffer.k̄, nonlinmodel7.buffer.y
-    ModelPredictiveControl.f!(ẋ, k̄, nonlinmodel7, [0; 0], [0], [0], nonlinmodel7.p)
+    ui, di = nonlinmodel7.buffer.ui, nonlinmodel7.buffer.di
+    ModelPredictiveControl.f!(ẋ, k̄, ui, di, nonlinmodel7, [0; 0], [0], [0], [0], [0])
     @test ẋ ≈ zeros(2)
-    ModelPredictiveControl.h!(y, nonlinmodel7, [0; 0], [0], nonlinmodel7.p)
+    ModelPredictiveControl.h!(y, nonlinmodel7, [0; 0], [0])
     @test y ≈ zeros(1)
     nonlinmodel8 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, p=p, jacobian=AutoFiniteDiff())
     @test nonlinmodel8.jacobian == AutoFiniteDiff()
@@ -336,15 +339,16 @@ end
     linmodel3 = linearize(nonlinmodel3; x, u, d)
     x0, u0, d0 = x - nonlinmodel3.xop, u - nonlinmodel3.uop, d - nonlinmodel3.dop
     x0next, k, y0 = nonlinmodel3.buffer.x, nonlinmodel3.buffer.k̄, nonlinmodel3.buffer.y
+    ui, di = nonlinmodel3.buffer.ui, nonlinmodel3.buffer.di
     backend = AutoForwardDiff()
-    f_A(x0next, x0, k)  = ModelPredictiveControl.f!(x0next, k, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
-    f_Bu(x0next, u0, k) = ModelPredictiveControl.f!(x0next, k, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
-    f_Bd(x0next, d0, k) = ModelPredictiveControl.f!(x0next, k, nonlinmodel3, x0, u0, d0, nonlinmodel3.p)
-    h_C(y0, x0)  = ModelPredictiveControl.h!(y0, nonlinmodel3, x0, d0, nonlinmodel3.p)
-    h_Dd(y0, d0) = ModelPredictiveControl.h!(y0, nonlinmodel3, x0, d0, nonlinmodel3.p)
-    A  = jacobian(f_A,  x0next, backend, x0, Cache(k))
-    Bu = jacobian(f_Bu, x0next, backend, u0, Cache(k))
-    Bd = jacobian(f_Bd, x0next, backend, d0, Cache(k))
+    f_A(x0next, x0, k, ui, di)  = ModelPredictiveControl.f!(x0next, k, ui, di, nonlinmodel3, x0, u0, d0, u0, d0)
+    f_Bu(x0next, u0, k, ui, di) = ModelPredictiveControl.f!(x0next, k, ui, di, nonlinmodel3, x0, u0, d0, u0, d0)
+    f_Bd(x0next, d0, k, ui, di) = ModelPredictiveControl.f!(x0next, k, ui, di, nonlinmodel3, x0, u0, d0, u0, d0)
+    h_C(y0, x0)  = ModelPredictiveControl.h!(y0, nonlinmodel3, x0, d0)
+    h_Dd(y0, d0) = ModelPredictiveControl.h!(y0, nonlinmodel3, x0, d0)
+    A  = jacobian(f_A,  x0next, backend, x0, Cache(k), Cache(ui), Cache(di))
+    Bu = jacobian(f_Bu, x0next, backend, u0, Cache(k), Cache(ui), Cache(di))
+    Bd = jacobian(f_Bd, x0next, backend, d0, Cache(k), Cache(ui), Cache(di))
     C  = jacobian(h_C,  y0, backend, x0)
     Dd = jacobian(h_Dd, y0, backend, d0)
     @test linmodel3.A  ≈ A
@@ -569,10 +573,11 @@ end
     @test dae.x0 ≈ zeros(1) atol=1e-6
     @test evaloutput(dae) ≈ zeros(1) atol=1e-6
 
-    transcription = TrapezoidalCollocation()
+    transcription = TrapezoidalCollocation(1)
     dae2 = NonLinModelDAE(fq!, h!, Ts, nu, nx, na, ny; p, transcription, xs_0, as_0)
     @test updatestate!(dae2, u) ≈ zeros(1) atol=1e-6
     @test updatestate!(dae2, u, d) ≈ zeros(1) atol=1e-6
+    @test updatestate!(dae2, u; unext=u) ≈ zeros(1) atol=1e-6
     @test dae2.x0 ≈ zeros(1) atol=1e-6
     @test dae2() ≈ zeros(1) atol=1e-6
 

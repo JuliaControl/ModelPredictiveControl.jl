@@ -548,6 +548,26 @@ end
     updatestate!(internalmodel5, [0], [6], [0])
     @test internalmodel5.x̂d ≈ [0]
     @test internalmodel5.x̂s ≈ [6]
+    buffer = internalmodel5.buffer
+    x̂0next, k̄, ûi, di = buffer.x̂, buffer.k̄, buffer.ûi, buffer.di
+    û0, û0next = buffer.û, buffer.ûnext
+    @test_nowarn ModelPredictiveControl.f̂!( 
+        x̂0next, û0, û0next, k̄, ûi, di, internalmodel5, dae, [0], [0], [0], [0], [0]
+    ) # for coverage
+
+    internalmodel6 = InternalModel(linmodel, i_ym=[1])
+    preparestate!(internalmodel6, [57])
+    updatestate!(internalmodel6, [10, 50], [57])
+    @test internalmodel6.x̂d ≈ [0, 0]
+    @test internalmodel6.x̂s ≈ [7]
+    buffer = internalmodel6.buffer
+    x̂0next, k̄, ûi, di = buffer.x̂, buffer.k̄, buffer.ûi, buffer.di
+    û0, û0next = buffer.û, buffer.ûnext
+    @test_nowarn ModelPredictiveControl.f̂!( 
+        x̂0next, û0, û0next, k̄, ûi, di, 
+        internalmodel6, linmodel, [0, 0], [10, 50], Float64[], [10, 50], Float64[]
+    ) # for coverage
+    
 end
 
 @testitem "IM set model" setup=[SetupMPCtests] begin
@@ -1079,8 +1099,8 @@ end
     function h!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    Ts, p = 100.0, [0.01]
-    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p)
+    p = [0.01]
+    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p)
 
     transcription = TrapezoidalCollocation()
     mhe = MovingHorizonEstimator(dae; He=3, transcription)
@@ -1348,6 +1368,22 @@ end
     )
     @test mhe8.x̂0 ≈ zeros(6) atol=1e-9
 
+    function f!(ẋ, x, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        return nothing
+    end
+    function h!(y, x, d, _ )
+        y[] = x[] + 0.1 * d[]
+    end
+    p = [0.01]
+    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
+    transcription = SingleShooting(1)
+    mhe_foh = MovingHorizonEstimator(model; He=3, transcription)
+    preparestate!(mhe_foh, [0.0], [0.0])
+    x̂ = updatestate!(mhe_foh, [1.0], [0.0], [0.0])
+    info = getinfo(mhe_foh)
+    @test mhe_foh.transcription.h == 1
+    @test info[:x̂] ≈ x̂
 end
 
 @testitem "MHE estim. & getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
@@ -1378,6 +1414,23 @@ end
     info = getinfo(mhe3) # test getinfo when Nk<He 
     @test info[:Ŵ] ≈ [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     @test info[:V̂] ≈ [0.0, 0.0]
+
+    function f!(ẋ, x, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        return nothing
+    end
+    function h!(y, x, d, _ )
+        y[] = x[] + 0.1 * d[]
+    end
+    p = [0.01]
+    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
+    transcription = MultipleShooting(1)
+    mhe_foh = MovingHorizonEstimator(model; He=3, direct=false, transcription)
+    preparestate!(mhe_foh, [0.0], [0.0])
+    x̂ = updatestate!(mhe_foh, [1.0], [0.0], [0.0])
+    info = getinfo(mhe_foh)
+    @test mhe_foh.transcription.h == 1
+    @test info[:x̂] ≈ x̂
 end
 
 @testitem "MHE estim. & getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin
@@ -1464,9 +1517,9 @@ end
     function h!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    Ts, p = 100.0, [0.01]
+    p = [0.01]
     as_0, xs_0 = [-1.0], [1.0]
-    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     transcription = TrapezoidalCollocation(f_threads=true, h_threads=false)
     mhe = MovingHorizonEstimator(dae; He=2, transcription, hessian=true)
@@ -1518,9 +1571,9 @@ end
     function h!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    Ts, p = 100.0, [0.01]
+    p = [0.01]
     as_0, xs_0 = [-0.01], [0.01]
-    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     no, roots = 3, :gausslegendre
     transcription = OrthogonalCollocation(0, no; roots, f_threads=true, h_threads=false)
@@ -2079,15 +2132,15 @@ end
     X̂_ekf = zeros(4, 6)
     for i in 1:6
         y = [50,31] + randn(2)
-        x̂_mhe = preparestate!(mhe, y, [25])
-        x̂_ukf = preparestate!(ukf,  y, [25])
-        x̂_ekf = preparestate!(ekf,  y, [25])
+        x̂_mhe = preparestate!(mhe, y, [20])
+        x̂_ukf = preparestate!(ukf,  y, [20])
+        x̂_ekf = preparestate!(ekf,  y, [20])
         X̂_mhe[:,i] = x̂_mhe
         X̂_ukf[:,i]  = x̂_ukf
         X̂_ekf[:,i]  = x̂_ekf
-        updatestate!(mhe, [11, 50], y, [25])
-        updatestate!(ukf, [11, 50], y, [25])
-        updatestate!(ekf, [11, 50], y, [25])
+        updatestate!(mhe, [11, 50], y, [20])
+        updatestate!(ukf, [11, 50], y, [20])
+        updatestate!(ekf, [11, 50], y, [20])
     end
     @test X̂_mhe ≈ X̂_ukf atol=1e-3 rtol=1e-3
     @test X̂_mhe ≈ X̂_ekf atol=1e-3 rtol=1e-3 

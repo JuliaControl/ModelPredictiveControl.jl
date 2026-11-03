@@ -875,12 +875,14 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     if !estim.direct
         correct_estimate!(estim, y0m, d0)
     end
+    buffer = estim.buffer
     x̂0corr, X̂0corr, P̂corr = estim.x̂0, estim.X̂0, estim.cov.P̂
     Q̂, nx̂ = estim.cov.Q̂, estim.nx̂
     γ, m̂, Ŝ = estim.γ, estim.m̂, estim.Ŝ
-    x̂0next, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
+    x̂0next, û0, û0next, k̄ = buffer.x̂, buffer.û, buffer.ûnext, buffer.k̄
+    ûi, di = buffer.ûi, buffer.di
     # in-place operations to reduce allocations:
-    P̂corr_temp  = Hermitian(estim.buffer.P̂, :L)
+    P̂corr_temp  = Hermitian(buffer.P̂, :L)
     P̂corr_temp .= P̂corr
     P̂corr_chol  = cholesky!(P̂corr_temp) # also modifies P̂corr_temp
     sqrtP̂corr   = P̂corr_chol.L
@@ -891,7 +893,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     X̂0next = X̂0corr # X̂0next is an alias of X̂0corr 
     for j in axes(X̂0next, 2)
         x̂0corr_j, x̂0next_j = @views X̂0corr[:, j], X̂0next[:, j]
-        @views f̂!(x̂0next, û0, k̄, estim, estim.model, x̂0corr_j, u0, d0)
+        f̂!(x̂0next, û0, û0next, k̄, ûi, di, estim, estim.model, x̂0corr_j, u0, d0, u0, d0)
         x̂0next_j .= x̂0next
     end
     mul!(x̂0next, X̂0next, m̂)
@@ -899,7 +901,7 @@ function update_estimate!(estim::UnscentedKalmanFilter, u0, y0m, d0)
     X̄0next .= X̂0next .- x̂0next
     Ŝ_X̄0nextᵀ = estim.X̂0'
     mul!(Ŝ_X̄0nextᵀ, Ŝ, X̄0next')
-    P̂next = estim.buffer.P̂
+    P̂next = buffer.P̂
     mul!(P̂next, X̄0next, Ŝ_X̄0nextᵀ) 
     P̂next   .+= Q̂
     estim.x̂0 .= x̂0next
@@ -1119,24 +1121,29 @@ function get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)
     nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
     nx̂ = model.nx + size(As, 1)
     x̂op = f̂op = zeros(nx̂) # not important for Jacobian computations
-    function f̂_ekf!(x̂0next, x̂0, û0, k, u0, d0)
-        return f̂!(x̂0next, û0, k, model, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+    function f̂_ekf!(x̂0next, x̂0, u0, d0, û0, û0next, k̄, ûi, di)
+        return f̂!(
+            x̂0next, û0, û0next, k̄, ûi, di, 
+            model, As, Cs_u, f̂op, x̂op, x̂0, u0, d0, u0, d0
+        )
     end
     ĥ_ekf!(ŷ0, x̂0, d0) = ĥ!(ŷ0, model, Cs_y, x̂0, d0)
     strict  = Val(true)
     x̂0next = zeros(NT, nx̂)
     ŷ0 = zeros(NT, ny)
     x̂0 = zeros(NT, nx̂)
-    û0 = Cache(zeros(NT, nu))
-    k̄  = Cache(zeros(NT, nk̄))
-    cst_u0 = Constant(rand(NT, nu))
-    cst_d0 = Constant(rand(NT, nd))
+    û0, û0next = Cache(zeros(NT, nu)), Cache(zeros(NT, nu))
+    k̄          = Cache(zeros(NT, nk̄))
+    ûi, di     = Cache(zeros(NT, nu)), Cache(zeros(NT, nd))
+    cst_u0     = Constant(rand(NT, nu))
+    cst_d0     = Constant(rand(NT, nd))
+    F̂cache = (û0, û0next, k̄, ûi, di)
     F̂prep = prepare_jacobian(
-        f̂_ekf!, x̂0next, jacobian, x̂0, û0, k̄, cst_u0, cst_d0; strict
+        f̂_ekf!, x̂0next, jacobian, x̂0, cst_u0, cst_d0, F̂cache...; strict
     )
     Ĥprep = prepare_jacobian(ĥ_ekf!, ŷ0, jacobian, x̂0, cst_d0; strict)
     function linfuncF̂!(F̂, x̂0next, backend, x̂0, cst_u0, cst_d0)
-        return jacobian!(f̂_ekf!, x̂0next, F̂, F̂prep, backend, x̂0, û0, k̄, cst_u0, cst_d0)
+        return jacobian!(f̂_ekf!, x̂0next, F̂, F̂prep, backend, x̂0, cst_u0, cst_d0, F̂cache...)
     end
     function linfuncĤ!(Ĥ, ŷ0, backend, x̂0, cst_d0)
         return jacobian!(ĥ_ekf!, ŷ0, Ĥ, Ĥprep, backend, x̂0, cst_d0)
@@ -1275,16 +1282,18 @@ They predict the state `x̂` and covariance `P̂` with the same equations. See
 [`update_estimate`](@ref) methods for the equations.
 """
 function predict_estimate_kf!(estim::Union{KalmanFilter, ExtendedKalmanFilter}, u0, d0, Â)
+    buffer = estim.buffer
     x̂0corr, P̂corr = estim.x̂0, estim.cov.P̂
     Q̂ = estim.cov.Q̂
-    x̂0next, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
+    x̂0next, û0, û0next, k̄ = buffer.x̂, buffer.û, buffer.ûnext, buffer.k̄
+    ûi, di = buffer.ûi, buffer.di
     # in-place operations to reduce allocations:
-    f̂!(x̂0next, û0, k̄, estim, estim.model, x̂0corr, u0, d0)
-    P̂corr_Âᵀ = estim.buffer.P̂
+    f̂!(x̂0next, û0, û0next, k̄, ûi, di, estim, estim.model, x̂0corr, u0, d0, u0, d0)
+    P̂corr_Âᵀ = buffer.P̂
     mul!(P̂corr_Âᵀ, P̂corr, Â')
-    Â_P̂corr_Âᵀ = estim.buffer.Q̂
+    Â_P̂corr_Âᵀ = buffer.Q̂
     mul!(Â_P̂corr_Âᵀ, Â, P̂corr_Âᵀ)
-    P̂next  = estim.buffer.P̂
+    P̂next  = buffer.P̂
     P̂next .= Â_P̂corr_Âᵀ .+ Q̂
     estim.x̂0 .= x̂0next
     estim.cov.P̂  .= Hermitian(P̂next, :L)

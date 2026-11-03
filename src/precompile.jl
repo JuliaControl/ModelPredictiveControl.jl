@@ -8,13 +8,13 @@ sys = [
 ]
 Ts = 400.0
 sys2 = minreal(ss(sys))
-function f!(xnext, x, u, _ , p)
+function f1!(xnext, x, u, _ , p)
     A, B, _ = p
     mul!(xnext, A , x)
     mul!(xnext, B, u, 1, 1)
     return nothing
 end
-function h!(y, x, _ , p)
+function h1!(y, x, _ , p)
     _, _, C = p
     mul!(y, C, x)
     return nothing
@@ -80,7 +80,7 @@ R̂y = repeat([55; 30], 3)
     exmpc.estim()
     exmpc([55, 30])
 
-    nlmodel = NonLinModel(f!, h!, Ts, 2, 2, 2; solver=RungeKutta(4), p)
+    nlmodel = NonLinModel(f1!, h1!, Ts, 2, 2, 2; solver=RungeKutta(4), p)
     nlmodel = setop!(nlmodel, uop=[10, 10], yop=[50, 30])
     y = nlmodel()
 

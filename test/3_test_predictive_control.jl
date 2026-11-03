@@ -918,8 +918,8 @@ end
     function h!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    Ts, p = 100.0, [0.01]
-    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p)
+    p = [0.01]
+    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p)
 
     transcription = TrapezoidalCollocation()
     nmpc = NonLinMPC(dae; He=3, Hp=3, transcription)
@@ -1038,7 +1038,7 @@ end
     nonlinmodel2 = NonLinModel{Float32}(f, h, 3000.0, 1, 2, 1, 1, solver=nothing, p=linmodel2)
     nmpc7  = NonLinMPC(nonlinmodel2, Hp=10)
     y = similar(nonlinmodel2.yop)
-    ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0], nonlinmodel2.p)
+    ModelPredictiveControl.h!(y, nonlinmodel2, Float32[0,0], Float32[0])
     preparestate!(nmpc7, [0], [0])
     @test moveinput!(nmpc7, [0], [0]) ≈ [0.0] atol=5e-2
 
@@ -1061,6 +1061,23 @@ end
     moveinput!(nmpc11, [10], [0])
     ΔU_diff = diff(getinfo(nmpc11)[:U])
     @test ΔU_diff[[2, 4, 5, 7, 8, 9]] ≈ zeros(6) atol=1e-9
+
+    function f!(ẋ, x, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        return nothing
+    end
+    function h!(y, x, d, _ )
+        y[] = x[] + 0.1 * d[]
+    end
+    p = [0.01]
+    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
+    transcription = SingleShooting(1)
+    nmpc_foh = NonLinMPC(model; Hp=5, Hc=1, Nwt=[0], transcription)
+    preparestate!(nmpc_foh, [0.0], [0.0])
+    u = moveinput!(nmpc_foh, [1.0], [0.0])
+    info = getinfo(nmpc_foh)
+    @test nmpc_foh.transcription.h == 1
+    @test info[:u] ≈ u
 end
 
 @testitem "NonLinMPC moves & getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
@@ -1090,6 +1107,23 @@ end
     info = getinfo(nmpc4t)
     @test info[:u] ≈ u
     @test info[:Ŷ][end] ≈ 10 atol=5e-2
+
+    function f!(ẋ, x, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        return nothing
+    end
+    function h!(y, x, d, _ )
+        y[] = x[] + 0.1 * d[]
+    end
+    p = [0.01]
+    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
+    transcription = MultipleShooting(1)
+    nmpc_foh = NonLinMPC(model; Hp=5, Hc=1, Nwt=[0], transcription)
+    preparestate!(nmpc_foh, [0.0], [0.0])
+    u = moveinput!(nmpc_foh, [1.0], [0.0])
+    info = getinfo(nmpc_foh)
+    @test nmpc_foh.transcription.h == 1
+    @test info[:u] ≈ u
 end
 
 @testitem "NonLinMPC moves & getinfo (NonLinModel, TC)" setup=[SetupMPCtests] begin
@@ -1161,9 +1195,9 @@ end
         y[] = x[] + a[] + 0.1 * d[]
     end
     Kp = 2*0.2 # static gain for input, factor 2 since the output is 2*x (a==x)
-    Ts, p = 100.0, [0.01]
+    p = [0.01]
     as_0, xs_0 = [-1.0], [1.0]
-    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     transcription = TrapezoidalCollocation(f_threads=true, h_threads=false)
     nmpc = NonLinMPC(dae; Hp=100, Hc=1, He=2, Nwt=[0.0], transcription)
@@ -1204,9 +1238,9 @@ end
         y[] = x[] + a[] + 0.1 * d[]
     end
     Kp = 2*0.2 # static gain for input, factor 2 since the output is 2*x (a==x)
-    Ts, p = 100.0, [0.01]
+    p = [0.01]
     as_0, xs_0 = [-1.0], [1.0]
-    dae = NonLinModelDAE(fq!, h!, Ts, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     no, roots = 3, :gausslegendre
     transcription = OrthogonalCollocation(0, no; roots, f_threads=true, h_threads=false)

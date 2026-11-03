@@ -173,19 +173,28 @@ function matrices_internalmodel(model::SimModel{NT}) where NT<:Real
 end
 
 @doc raw"""
-    f̂!(x̂0next, _ , k̄, estim::InternalModel, model::SimModel, x̂0, u0, d0)
+    f̂!(
+        x̂0next, _ , _ , k̄, ûi, di, 
+        estim::InternalModel, model::SimModel, x̂0, u0, d0, u0next, d0next
+    ) -> nothing
 
 State update function ``\mathbf{f̂}`` of [`InternalModel`](@ref).
 
 It calls [`f!`](@ref) directly since this estimator does not augment the states.
 """
-function f̂!(x̂0next, _ , k̄, estim::InternalModel, model::SimModel, x̂0, u0, d0)
-    f!(x̂0next, k̄, model, x̂0, u0, d0, model.p)
+function f̂!(
+    x̂0next, _ , _ , k̄, ûi, di, 
+    estim::InternalModel, model::SimModel, x̂0, u0, d0, u0next, d0next
+)
+    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0next, d0next)
     x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
-function f̂!(x̂0next, _ , k̄, estim::InternalModel, model::LinModel, x̂0, u0, d0)
-    f!(x̂0next, k̄, model, x̂0, u0, d0, model.p)
+function f̂!(
+    x̂0next, _ , _ , k̄, ûi, di, 
+    estim::InternalModel, model::LinModel, x̂0, u0, d0, u0next, d0next
+)
+    f!(x̂0next, k̄, ûi, di, model, x̂0, u0, d0, u0next, d0next)
     x̂0next .+= estim.f̂op .- estim.x̂op
     return nothing
 end
@@ -195,8 +204,8 @@ end
 
 Output function ``\mathbf{ĥ}`` of [`InternalModel`](@ref), it calls [`h!`](@ref).
 """
-ĥ!(ŷ0, ::InternalModel, model::SimModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0, model.p)
-ĥ!(ŷ0, ::InternalModel, model::LinModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0, model.p)
+ĥ!(ŷ0, ::InternalModel, model::SimModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0)
+ĥ!(ŷ0, ::InternalModel, model::LinModel, x̂0, d0) = h!(ŷ0, model, x̂0, d0)
 
 @doc raw"""
     ĥ!(ŷ0, estim::InternalModel, model::SimModel, x̂0, â0, d0)
@@ -313,11 +322,11 @@ This estimator does not augment the state vector, thus ``\mathbf{x̂ = x̂_d}``.
 [`init_internalmodel`](@ref) for details. 
 """
 function update_estimate!(estim::InternalModel, u0, _ , d0)
-    model = estim.model
+    model, buffer = estim.model, estim.buffer
     x̂d, x̂s, ŷs = estim.x̂d, estim.x̂s, estim.ŷs
     # -------------- deterministic model ---------------------
-    x̂dnext, û0, k̄ = estim.buffer.x̂, estim.buffer.û, estim.buffer.k̄
-    f̂!(x̂dnext, û0, k̄, estim, estim.model, x̂d, u0, d0) 
+    x̂dnext, k̄, ûi, di = buffer.x̂, buffer.k̄, buffer.ûi, buffer.di
+    f!(x̂dnext, k̄, ûi, di, model, x̂d, u0, d0, u0, d0)
     x̂d .= x̂dnext # this also updates estim.x̂0 (they are the same object)
     # --------------- stochastic model -----------------------
     x̂snext = estim.x̂snext
@@ -358,7 +367,7 @@ function init_estimate!(estim::InternalModel, model::LinModel{NT}, y0m, d0, u0) 
     M = I - model.A
     x̂d .= M\x̂_tmp # also updates estim.x̂0 (they are the same object)
     ŷ0d = estim.buffer.ŷ
-    h!(ŷ0d, model, x̂d, d0, model.p)
+    h!(ŷ0d, model, x̂d, d0)
     ŷs = ŷ0d
     ŷs[estim.i_ym] .= @views y0m .- ŷ0d[estim.i_ym]
     # ŷs=0 for unmeasured outputs :

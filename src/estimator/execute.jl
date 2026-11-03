@@ -14,7 +14,10 @@ function remove_op!(estim::StateEstimator, ym, d, u=nothing)
 end
 
 @doc raw"""
-    f̂!(x̂0next, û0, k̄, estim::StateEstimator, model::SimModel, x̂0, u0, d0) -> nothing
+    f̂!(
+        x̂0next, û0, û0next, k̄, ûi, di, 
+        estim::StateEstimator, model::SimModel, x̂0, u0, d0, u0next, d0next
+    ) -> nothing
 
 Mutating state update function ``\mathbf{f̂}`` of the augmented model.
 
@@ -27,11 +30,13 @@ the function returns the next state of the augmented model, as deviation vectors
 \end{aligned}
 ```
 where ``\mathbf{x̂_0}(k+1)`` is stored in `x̂0next` argument. The method mutates `x̂0next`, 
-`û0` and `k` in place. The argument `û0` stores the disturbed input of the augmented model
-``\mathbf{û_0}``, and `k̄`, the intermediate stage values of `model.solver`, when applicable.
-The model parameter `model.p` is not included in the function signature for conciseness. 
-The operating points are handled inside ``\mathbf{f̂}``. See Extended Help for details on 
-``\mathbf{û_0, f̂}`` and ``\mathbf{ĥ}`` implementations.
+`û0`, `û0next`, `k`, `ûi` and `di` in-place. The argument `û0` and `û0next` respectively
+store the disturbed input of the augmented model ``\mathbf{û_0}`` the current and next time
+step, and `k̄`, the intermediate stage values of `model.solver`, when applicable. The
+arguments store the interpolated values of the disturbed input and disturbance, 
+respectively. The model parameter `model.p` is not included in the function signature for
+conciseness. The operating points are handled inside ``\mathbf{f̂}``. See Extended Help for
+details on ``\mathbf{û_0, f̂}`` and ``\mathbf{ĥ}`` implementations.
 
 # Extended Help
 !!! details "Extended Help"
@@ -61,12 +66,21 @@ The operating points are handled inside ``\mathbf{f̂}``. See Extended Help for 
     are computed by [`augment_model`](@ref) (almost always zeros in practice for 
     [`NonLinModel`](@ref)).
 """
-function f̂!(x̂0next, û0, k̄, estim::StateEstimator, model::SimModel, x̂0, u0, d0)
-    return f̂!(x̂0next, û0, k̄, model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0)
+function f̂!(
+    x̂0next, û0, û0next, k̄, ûi, di, 
+    estim::StateEstimator, model::SimModel, x̂0, u0, d0, u0next, d0next
+)
+    return f̂!(
+        x̂0next, û0, û0next, k̄, ûi, di, 
+        model, estim.As, estim.Cs_u, estim.f̂op, estim.x̂op, x̂0, u0, d0, u0next, d0next
+    )
 end
 
 @doc raw"""
-    f̂!(x̂0next, _ , _ , estim::StateEstimator, model::LinModel, x̂0, u0, d0) -> nothing
+    f̂!(
+        x̂0next, _ , _ , _ , _ , _ , 
+        estim::StateEstimator, model::LinModel, x̂0, u0, d0, _ , _
+    ) -> nothing
 
 Use the augmented model matrices and operating points if `model` is a [`LinModel`](@ref).
 
@@ -83,7 +97,7 @@ Use the augmented model matrices and operating points if `model` is a [`LinModel
     ```
     with the augmented matrices constructed by [`augment_model`](@ref).
 """
-function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
+function f̂!(x̂0next, _, _, _, _, _, estim::StateEstimator, ::LinModel, x̂0, u0, d0, _, _)
     mul!(x̂0next, estim.Â,  x̂0)
     mul!(x̂0next, estim.B̂u, u0, 1, 1)
     mul!(x̂0next, estim.B̂d, d0, 1, 1)
@@ -92,18 +106,26 @@ function f̂!(x̂0next, _ , _ , estim::StateEstimator, ::LinModel, x̂0, u0, d0)
 end
 
 """
-    f̂!(x̂0next, û0, k, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+    f̂!(
+        x̂0next, û0, û0next, k̄, ûi, di, 
+        model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0, u0next, d0next
+    ) -> nothing
 
 Same than [`f̂!`](@ref) for [`SimModel`](@ref) but without the `estim` argument.
 """
-function f̂!(x̂0next, û0, k̄, model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0)
+function f̂!(
+    x̂0next, û0, û0next, k̄, ûi, di, 
+    model::SimModel, As, Cs_u, f̂op, x̂op, x̂0, u0, d0, u0next, d0next
+)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
     @views x̂dnext, x̂snext = x̂0next[1:model.nx], x̂0next[model.nx+1:end]
-    mul!(û0, Cs_u, x̂s)      # ys_u = Cs_u*xs
-    û0 .+= u0               # û0 = u0 + ys_u  
-    f!(x̂dnext, k̄, model, x̂d, û0, d0, model.p)
     mul!(x̂snext, As, x̂s)
+    mul!(û0, Cs_u, x̂s)          # ys_u(k)    = Cs_u*xs(k)
+    û0 .+= u0                   # û0(k)      = u0(k) + ys_u(k)  
+    mul!(û0next, Cs_u, x̂snext)  # ys_u(k+1)  = Cs_u*xs(k+1)
+    û0next .+= u0next           # û0(k+1)    = u0(k+1) + ys_u(k+1)
+    f!(x̂dnext, k̄, ûi, di, model, x̂d, û0, d0, û0next, d0next)
     x̂0next .+= f̂op .- x̂op
     return nothing
 end
@@ -136,7 +158,7 @@ Same than [`ĥ!`](@ref) for [`SimModel`](@ref) but without the `estim` argument
 function ĥ!(ŷ0, model::SimModel, Cs_y::AbstractMatrix, x̂0, d0)
     # `@views` macro avoid copies with matrix slice operator e.g. [a:b]
     @views x̂d, x̂s = x̂0[1:model.nx], x̂0[model.nx+1:end]
-    h!(ŷ0, model, x̂d, d0, model.p)  # y0 = h(xd, d0)
+    h!(ŷ0, model, x̂d, d0)           # y0 = h(xd, d0)
     mul!(ŷ0, Cs_y, x̂s, 1, 1)        # ŷ0 = y0 + Cs_y*xs
     return nothing
 end
@@ -367,10 +389,9 @@ operating points with [`remove_op!`](@ref), calls [`update_estimate!`](@ref) and
 state estimate for the next time step ``\mathbf{x̂}_k(k+1)``. The method [`preparestate!`](@ref)
 should be called prior to this one to correct the estimate when applicable (if
 `estim.direct == true`). If `isnothing(ym)`, only the prediction step is performed in 
-[`update_estimate!`](@ref), for when the measured outputs are temporarily unavailable. Note
-that the [`MovingHorizonEstimator`](@ref) with the default `direct=true` option is not able
-to estimate ``\mathbf{x̂}_k(k+1)``, the returned value is therefore the current corrected
-state ``\mathbf{x̂}_k(k)``.
+[`update_estimate!`](@ref), for when the measured outputs are temporarily unavailable. The
+`unext` and `dnext` arguments are not supported for [`StateEstimator`](@ref) since they
+complexify the implementation and produce non-causal filters, so less useful in practice.
 
 # Examples
 ```jldoctest

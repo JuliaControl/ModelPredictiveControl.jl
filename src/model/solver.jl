@@ -28,24 +28,37 @@ This solver is allocation-free if the `f!` and `h!` functions do not allocate.
 RungeKutta(order::Int=4; supersample::Int=1) = RungeKutta(order, supersample)
 
 "Solve the differential equation with the 4th order Runge-Kutta method."
-function solver_f!(xnext, k̄, f!::F, Ts, solver::RungeKutta{4}, x, u, d, p) where F
+function solver_f!(
+    xnext, k̄, ui, di, f!::F, Ts, solver::RungeKutta{4}, x, u, d, unext, dnext, p
+) where F<:Function
     supersample = solver.supersample
     Ts_inner = Ts/supersample
+    isFOH_u = isdifferent(u, unext)
+    isFOH_d = isdifferent(d, dnext)
     nx = length(x)
     xcurr = @views k̄[1:nx]
     k1 = @views k̄[(1nx + 1):(2nx)]
     k2 = @views k̄[(2nx + 1):(3nx)]
     k3 = @views k̄[(3nx + 1):(4nx)]
-    k4 = @views k̄[(4nx + 1):(5nx)]   
+    k4 = @views k̄[(4nx + 1):(5nx)]
     @. xcurr = x
     for i=1:supersample
-        f!(k1, xcurr, u, d, p)
+        τ = (i-1.0)/supersample 
+        u1 = isFOH_u ? @.(ui = (1-τ)*u + (τ)*unext) : u
+        d1 = isFOH_d ? @.(di = (1-τ)*d + (τ)*dnext) : d
+        f!(k1, xcurr, u1, d1, p)
         @. xnext = xcurr + k1 * Ts_inner/2
-        f!(k2, xnext, u, d, p)
+        τ = (i-0.5)/supersample 
+        u2and3 = isFOH_u ? @.(ui = (1-τ)*u + (τ)*unext) : u
+        d2and3 = isFOH_d ? @.(di = (1-τ)*d + (τ)*dnext) : d
+        f!(k2, xnext, u2and3, d2and3, p)
         @. xnext = xcurr + k2 * Ts_inner/2
-        f!(k3, xnext, u, d, p)
+        f!(k3, xnext, u2and3, d2and3, p)
         @. xnext = xcurr + k3 * Ts_inner
-        f!(k4, xnext, u, d, p)
+        τ = i/supersample
+        u4 = isFOH_u ? @.(ui = (1-τ)*u + (τ)*unext) : u
+        d4 = isFOH_d ? @.(di = (1-τ)*d + (τ)*dnext) : d
+        f!(k4, xnext, u4, d4, p)
         @. xcurr = xcurr + (k1 + 2k2 + 2k3 + k4)*Ts_inner/6
     end
     @. xnext = xcurr
@@ -63,15 +76,22 @@ const ForwardEuler(;supersample=1) = RungeKutta(1; supersample)
 
 
 "Solve the differential equation with the forward Euler method."
-function solver_f!(xnext, k̄, f!::F, Ts, solver::RungeKutta{1}, x, u, d, p) where F
+function solver_f!(
+    xnext, k̄, ui, di, f!::F, Ts, solver::RungeKutta{1}, x, u, d, unext, dnext, p
+) where F<:Function
     supersample = solver.supersample
     Ts_inner = Ts/supersample
+    isFOH_u = isdifferent(u, unext)
+    isFOH_d = isdifferent(d, dnext)
     nx = length(x)
     xcurr = @views k̄[1:nx]
     k1 = @views k̄[(1nx + 1):(2nx)]
     @. xcurr = x
     for i=1:supersample
-        f!(k1, xcurr, u, d, p)
+        τ = (i-1)/supersample 
+        u1 = isFOH_u ? @.(ui = (1-τ)*u + (τ)*unext) : u
+        d1 = isFOH_d ? @.(di = (1-τ)*d + (τ)*dnext) : d
+        f!(k1, xcurr, u1, d1, p)
         @. xcurr = xcurr + k1 * Ts_inner
     end
     @. xnext = xcurr

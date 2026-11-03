@@ -16,9 +16,15 @@ is an `AbstractADType` object from `DifferentiationInterface`. The `cst_x`, `cst
 function get_linearization_func(
     NT, f!::F, h!::H, Ts, nu, nx, ny, nd, p, solver, backend
 ) where {F<:Function, H<:Function}
-    f_x!(xnext, x, k, u, d) = solver_f!(xnext, k, f!, Ts, solver, x, u, d, p)
-    f_u!(xnext, u, k, x, d) = solver_f!(xnext, k, f!, Ts, solver, x, u, d, p)
-    f_d!(xnext, d, k, x, u) = solver_f!(xnext, k, f!, Ts, solver, x, u, d, p)
+    function f_x!(xnext, x, u, d, k̄, ui, di)
+        return solver_f!(xnext, k̄, ui, di, f!, Ts, solver, x, u, d, u, d, p) # ZOH only
+    end
+    function f_u!(xnext, u, x, d, k̄, ui, di)
+        return solver_f!(xnext, k̄, ui, di, f!, Ts, solver, x, u, d, u, d, p) # ZOH only
+    end
+    function f_d!(xnext, d, x, u, k̄, ui, di)
+        return solver_f!(xnext, k̄, ui, di, f!, Ts, solver, x, u, d, u, d, p) # ZOH only
+    end
     h_x!(y, x, d) = h!(y, x, d, p)
     h_d!(y, d, x) = h!(y, x, d, p)
     strict  = Val(true)
@@ -27,23 +33,24 @@ function get_linearization_func(
     x = zeros(NT, nx)
     u = zeros(NT, nu)
     d = zeros(NT, nd)
-    k = zeros(NT, nx*(solver.ni+1))
-    cache_k = Cache(k)
+    k̄ = zeros(NT, nx*(solver.ni+1))
+    ui, di = zeros(NT, nu), zeros(NT, nd)
+    f_cache = (Cache(k̄), Cache(ui), Cache(di))
     cst_x = Constant(rand(NT, nx))
     cst_u = Constant(rand(NT, nu))
     cst_d = Constant(rand(NT, nd))
-    A_prep  = prepare_jacobian(f_x!, xnext, backend, x, cache_k, cst_u, cst_d; strict)
-    Bu_prep = prepare_jacobian(f_u!, xnext, backend, u, cache_k, cst_x, cst_d; strict)
-    Bd_prep = prepare_jacobian(f_d!, xnext, backend, d, cache_k, cst_x, cst_u; strict)
+    A_prep  = prepare_jacobian(f_x!, xnext, backend, x, cst_u, cst_d, f_cache...; strict)
+    Bu_prep = prepare_jacobian(f_u!, xnext, backend, u, cst_x, cst_d, f_cache...; strict)
+    Bd_prep = prepare_jacobian(f_d!, xnext, backend, d, cst_x, cst_u, f_cache...; strict)
     C_prep  = prepare_jacobian(h_x!, y,     backend, x, cst_d                ; strict)
     Dd_prep = prepare_jacobian(h_d!, y,     backend, d, cst_x                ; strict)
     function linfunc!(xnext, y, A, Bu, C, Bd, Dd, backend, x, u, d, cst_x, cst_u, cst_d)
         # all the arguments before `backend` are mutated in this function
-        jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cache_k, cst_u, cst_d)
-        jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cache_k, cst_x, cst_d)
+        jacobian!(f_x!, xnext, A,  A_prep,  backend, x, cst_u, cst_d, f_cache...)
+        jacobian!(f_u!, xnext, Bu, Bu_prep, backend, u, cst_x, cst_d, f_cache...)
         jacobian!(h_x!, y,     C,  C_prep,  backend, x, cst_d)
         if nd > 0
-            jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cache_k, cst_x, cst_u)
+            jacobian!(f_d!, xnext, Bd, Bd_prep, backend, d, cst_x, cst_u, f_cache...)
             jacobian!(h_d!, y,     Dd, Dd_prep, backend, d, cst_x)
         end
         return nothing
@@ -163,7 +170,7 @@ function linearize!(
     nonlinmodel = model
     buffer = nonlinmodel.buffer
     # --- remove the operating points of the nonlinear model (typically zeros) ---
-    x0, u0, d0, k̄ = buffer.x, buffer.u, buffer.d, buffer.k̄
+    x0, u0, d0, k̄, ui, di = buffer.x, buffer.u, buffer.d, buffer.k̄, buffer.ui, buffer.di
     x0 .= x .- nonlinmodel.xop
     u0 .= u .- nonlinmodel.uop
     d0 .= d .- nonlinmodel.dop
@@ -171,11 +178,11 @@ function linearize!(
     linearize_core!(linmodel, nonlinmodel, x0, u0, d0)
     # --- compute the nonlinear model output at operating points ---
     x0next, y0 = linmodel.buffer.x, linmodel.buffer.y
-    h!(y0, nonlinmodel, x0, d0, model.p)
+    h!(y0, nonlinmodel, x0, d0)
     y0 .+= nonlinmodel.yop
     y = y0
     # --- compute the nonlinear model next state at operating points ---
-    f!(x0next, k̄, nonlinmodel, x0, u0, d0, model.p)
+    f!(x0next, k̄, ui, di, nonlinmodel, x0, u0, d0, u0, d0) # ZOH only
     x0next .+= nonlinmodel.fop 
     xnext = x0next  # xnext = f(x0,u0,d0) + fop - xop + xop = f(x0,u0,d0) + fop
     # --- recompute x since it was modified in buffer.x ---
