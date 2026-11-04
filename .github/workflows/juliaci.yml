@@ -15,9 +15,9 @@ jobs:
   julia-ci:
     uses: franckgaga/testitem-workflow/.github/workflows/juliaci.yml@patch-1
     with:
-      memory-threshold: 0.9
       include-windows-x86: false
       include-macos-x64: false
+      include-macos-aarch64: false
     permissions: write-all
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
