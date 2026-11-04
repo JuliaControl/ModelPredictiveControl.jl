@@ -1531,7 +1531,7 @@ function predict_mhe!(
             d0next = d0
         end
         if h > 0 && j < Nk
-            u0next = estim.U0[(1+nu*j):(nu*(j+1))]
+            u0next = @views estim.U0[(1+nu*j):(nu*(j+1))]
         else # special case, û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k:
             u0next = u0
         end
