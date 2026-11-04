@@ -1517,18 +1517,22 @@ function predict_mhe!(
     i_d0arr = estim.direct ? 0 : nd # the first nd elements in D0 are useless if p=1
     x̂0 = @views x̂0arr[1:nx̂]
     for j=1:Nk
-        u0      = @views  estim.U0[(1+nu*(j-1)):(nu*j)]
-        d0      = @views  estim.D0[(1+nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
-        ŵ       = @views         Ŵ[(1+nŵ*(j-1)):(nŵ*j)]
-        k̄       = @views         K̄[(1+nk̄*(j-1)):(nk̄*j)]
-        û0      = @views         Û0[(1+nu*(j-1)):(nu*j)]
-        ûi      = @views Ûi[(1 + nu*(j-1)):(nu*j)]
-        di      = @views Di[(1 + nd*(j-1)):(nd*j)]
-        x̂0next  = @views         X̂0[(1+nx̂*(j-1)):(nx̂*j)]
-        d0next = @views (j < Nk) ? estim.D0[(1+nd*j + i_d0arr):(nd*(j+1) + i_d0arr)] : d0
+        u0     = @views  estim.U0[(1+nu*(j-1)):(nu*j)]
+        d0     = @views  estim.D0[(1+nd*(j-1) + i_d0arr):(nd*j + i_d0arr)]
+        ŵ      = @views         Ŵ[(1+nŵ*(j-1)):(nŵ*j)]
+        k̄      = @views         K̄[(1+nk̄*(j-1)):(nk̄*j)]
+        û0     = @views         Û0[(1+nu*(j-1)):(nu*j)]
+        ûi     = @views Ûi[(1 + nu*(j-1)):(nu*j)]
+        di     = @views Di[(1 + nd*(j-1)):(nd*j)]
+        x̂0next = @views         X̂0[(1+nx̂*(j-1)):(nx̂*j)]
+        if estim.direct || j < Nk # d0(k+1) is never needed if estim.direct
+            d0next = @views estim.D0[(1+nd*j + i_d0arr):(nd*(j+1) + i_d0arr)]
+        else # special case, d0(k+1)≈d0(k), since d0(k+1) is not available at time k:
+            d0next = d0
+        end
         if h > 0 && j < Nk
-            u0next = estim.U0[(1+nu*j):(nu*(j+1))]
-        else
+            u0next = @views estim.U0[(1+nu*j):(nu*(j+1))]
+        else # special case, û0(k+p)≈û0(k+p-1), since û0(k+p) is not available at time k:
             u0next = u0
         end
         û0next = @views j < Nk ? Û0[(1+nu*j):(nu*(j+1))] : Û0[1:nu]
