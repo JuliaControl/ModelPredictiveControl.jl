@@ -218,7 +218,6 @@ function simDAE(plant, N; x_0)
     x, d = x_0, [10.0]
     for i=1:N
         u     = i ≤ (1N÷4) ? [10.0]  : [11.0]
-        d     = i ≤ (2N÷4) ? [10.0]  : [12.0]
         c_Ain = i ≤ (3N÷4) ? c_Ain_0 : (c_Ain_0 - 0.01)
         plant.p[1] = c_Ain
         y = plant(d)
