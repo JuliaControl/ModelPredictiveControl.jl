@@ -1379,10 +1379,14 @@ end
     model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
     transcription = SingleShooting(1)
     mhe_foh = MovingHorizonEstimator(model; He=3, transcription)
-    preparestate!(mhe_foh, [0.0], [0.0])
-    x̂ = updatestate!(mhe_foh, [1.0], [0.0], [0.0])
-    info = getinfo(mhe_foh)
     @test mhe_foh.transcription.h == 1
+    for i in 1:50
+        preparestate!(mhe_foh, [1.5], [0.0])
+        updatestate!(mhe_foh, [0.0], [1.5], [0.0])
+    end
+    x̂ = preparestate!(mhe_foh, [1.5], [0.0])
+    @test mhe_foh([0.0]) ≈ [1.5]
+    info = getinfo(mhe_foh)
     @test info[:x̂] ≈ x̂
 end
 
