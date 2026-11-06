@@ -1251,7 +1251,7 @@ end
     h(x,d,model)   = model.C*x + model.Dd*d
     nonlinmodel = NonLinModel(f, h, Ts, 2, 4, 2, 1, solver=nothing, p=linmodel)
     nonlinmodel = setop!(nonlinmodel, uop=[10,50], yop=[50,30], dop=[5])
-#=
+
     mhe1 = MovingHorizonEstimator(nonlinmodel, He=3)
     JuMP.set_attribute(mhe1.optim, "tol", 1e-7)
     preparestate!(mhe1, [50, 30], [5])
@@ -1327,7 +1327,7 @@ end
     end
     preparestate!(mhe2, [50, 30], [5])
     @test mhe2([5]) ≈ [50, 30] atol=5e-3
-=#
+
     Q̂ = diagm([1/4, 1/4, 1/4, 1/4].^2) 
     R̂ = diagm([1, 1].^2)
     optim = Model(Ipopt.Optimizer)
@@ -1341,29 +1341,35 @@ end
     @test evaloutput(mhe5, [5]) ≈ mhe5([5]) ≈ [50, 30]
     info = getinfo(mhe5)
     @test info[:x̂] ≈ x̂ atol=1e-9
-    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9  
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9 
+    
+    @test_nowarn ModelPredictiveControl.info2debugstr(info)
+    @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
 
     # coverage of the branch with error termination status (with an infeasible problem):
-    mhe_infeas = setconstraint!(mhe5, v̂min=[1, 1], v̂max=[-1, -1]) 
+    mhe_infeas = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
+    mhe_infeas = setconstraint!(mhe_infeas, v̂min=[1, 1], v̂max=[-1, -1]) 
     @test_logs(
         (:error, "MHE terminated without solution: estimation in open-loop "*
                  "(more info in debug log)"), 
         preparestate!(mhe_infeas, [0, 0], [0])
     )
 
-    @test_nowarn ModelPredictiveControl.info2debugstr(info)
-    @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
+    gradient, jacobian, hessian = AutoFiniteDiff(), AutoFiniteDiff(), AutoFiniteDiff()
 
-    hessian = AutoFiniteDiff()
-
-    mhe8 = MovingHorizonEstimator(nonlinmodel; He=2, hessian)
-    @test mhe8.hessian isa AutoFiniteDiff
+    mhe8 = MovingHorizonEstimator(nonlinmodel; He=2, gradient, jacobian, hessian)
+    @test mhe8.gradient isa AutoFiniteDiff
+    @test mhe8.jacobian isa AutoFiniteDiff
+    @test mhe8.hessian isa AutoFiniteDiff 
+    x̂ = preparestate!(mhe8, [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-6
+    updatestate!(mhe8, [10, 50], [50, 30], [5])
     @test_logs(
         (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
         preparestate!(mhe8, [50, NaN], [5])
     )
-    @test mhe8.x̂0 ≈ zeros(6) atol=1e-9
-#=
+    @test mhe8.x̂0 ≈ zeros(6) atol=1e-6
+
     function f!(ẋ, x, u, d, p)
         ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
         return nothing
@@ -1384,7 +1390,7 @@ end
     @test mhe_foh([0.0]) ≈ [1.5]
     info = getinfo(mhe_foh)
     @test info[:x̂] ≈ x̂
-=#
+
 end
 
 @testitem "MHE estim. & getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
