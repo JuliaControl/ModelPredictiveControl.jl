@@ -1241,9 +1241,9 @@ end
 end
 
 @testitem "MHE estim. & getinfo (NonLinModel, SS)" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, ForwardDiff
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     using JuMP, Ipopt, DifferentiationInterface, SparseMatrixColorings, SparseConnectivityTracer
-    import ForwardDiff
+    import FiniteDiff
 
     linmodel = LinModel(sys,Ts,i_u=[1,2], i_d=[3])
     linmodel = setop!(linmodel, uop=[10,50], yop=[50,30], dop=[5])
@@ -1341,7 +1341,10 @@ end
     @test evaloutput(mhe5, [5]) ≈ mhe5([5]) ≈ [50, 30]
     info = getinfo(mhe5)
     @test info[:x̂] ≈ x̂ atol=1e-9
-    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9  
+    @test info[:Ŷ][end-1:end] ≈ [50, 30] atol=1e-9 
+    
+    @test_nowarn ModelPredictiveControl.info2debugstr(info)
+    @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
 
     # coverage of the branch with error termination status (with an infeasible problem):
     mhe_infeas = MovingHorizonEstimator(nonlinmodel, He=1, Cwt=Inf)
@@ -1352,21 +1355,20 @@ end
         preparestate!(mhe_infeas, [0, 0], [0])
     )
 
-    @test_nowarn ModelPredictiveControl.info2debugstr(info)
-    @test_throws ErrorException setstate!(mhe1, [1,2,3,4,5,6], diagm(.1:.1:.6))
+    gradient, jacobian, hessian = AutoFiniteDiff(), AutoFiniteDiff(), AutoFiniteDiff()
 
-    hessian = AutoSparse(
-        AutoForwardDiff();
-        sparsity_detector=TracerSparsityDetector(),
-        coloring_algorithm=GreedyColoringAlgorithm(),
-    )
-
-    mhe8 = MovingHorizonEstimator(nonlinmodel; He=2, hessian)
+    mhe8 = MovingHorizonEstimator(nonlinmodel; He=2, gradient, jacobian, hessian)
+    @test mhe8.gradient isa AutoFiniteDiff
+    @test mhe8.jacobian isa AutoFiniteDiff
+    @test mhe8.hessian isa AutoFiniteDiff 
+    x̂ = preparestate!(mhe8, [50, 30], [5])
+    @test x̂ ≈ zeros(6) atol=1e-6
+    updatestate!(mhe8, [10, 50], [50, 30], [5])
     @test_logs(
         (:warn, "NaN values in the MHE measurements ym: ignoring them in the objective"),
         preparestate!(mhe8, [50, NaN], [5])
     )
-    @test mhe8.x̂0 ≈ zeros(6) atol=1e-9
+    @test mhe8.x̂0 ≈ zeros(6) atol=1e-6
 
     function f!(ẋ, x, u, d, p)
         ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
@@ -1388,6 +1390,7 @@ end
     @test mhe_foh([0.0]) ≈ [1.5]
     info = getinfo(mhe_foh)
     @test info[:x̂] ≈ x̂
+
 end
 
 @testitem "MHE estim. & getinfo (NonLinModel, MS)" setup=[SetupMPCtests] begin
