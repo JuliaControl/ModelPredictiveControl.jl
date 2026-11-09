@@ -882,6 +882,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
                     J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_cache...
                 )
             end
+            return nothing
         end
     else
         function (J, ∇J, Z̃_J, Z̃_arg)
@@ -892,6 +893,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
                     J!, ∇J, ∇J_prep, grad, Z̃_J, J_cache...
                 )
             end
+            return nothing
         end
     end
     J_func = if !isnothing(hess)
