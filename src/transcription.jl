@@ -84,7 +84,7 @@ struct SingleShooting <: ShootingMethod
 end
 
 @doc raw"""
-    MultipleShooting(h::Int; f_threads=false, h_threads=false)
+    MultipleShooting(h::Int=0; f_threads=false, h_threads=false)
 
 Construct a direct multiple shooting [`TranscriptionMethod`](@ref) with `h`th order hold.
 
