@@ -17,8 +17,6 @@ jobs:
     with:
       include-windows-x86: false    # not worth it, windows 32bit is too uncommon
       include-macos-x64: false      # most mac are aarch64 nowadays
-      include-macos-aarch64: false  # would like to include it, but too unreliable for now
-      include-linux-x86: false      # would like to include it, but too unreliable for now
     permissions: write-all
     secrets:
       codecov_token: ${{ secrets.CODECOV_TOKEN }}
