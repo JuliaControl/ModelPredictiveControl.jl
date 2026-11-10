@@ -943,10 +943,20 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
             return fill_diffstructure!(∇²J_arg, ∇²J, ∇²J_structure)
         end
     end
-    if !isnothing(hess)
-        @operator(optim, J_op, nZ̃, J_func, ∇J_func!, ∇²J_func!)
+    J_op = if !isnothing(hess)
+        JuMP.add_nonlinear_operator(
+            optim, nZ̃,
+            NoTypeFunction(J_func), 
+            NoTypeFunction(∇J_func!), 
+            NoTypeFunction(∇²J_func!);
+            name = :J_op)
     else
-        @operator(optim, J_op, nZ̃, J_func, ∇J_func!)
+        JuMP.add_nonlinear_operator(
+            optim, 
+            nZ̃,
+            NoTypeFunction(J_func), 
+            NoTypeFunction(∇J_func!);
+            name = :J_op)
     end
     return J_op
 end

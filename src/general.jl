@@ -49,6 +49,21 @@ const ERROR_STATUSES = (
     JuMP.INVALID_OPTION, JuMP.INTERRUPTED, JuMP.OTHER_ERROR
 )
 
+"""
+A callable wrapper that erases the concrete type of its function.
+
+The `f` field is deliberately an abstract type (`Function`) to hide its concrete type. It
+means that calling this wrapper produces a dynamic dispatch, which is acceptable since MOI
+already does a dynamic dispatch when calling registered nonlinear operators. The goal is
+to hide the concrete type of `J_func`, `∇J_func` and `∇²J_func` closures at construction,
+since they are huge because of all the captured variables. Methods are slow to compile when
+their signature contains giant types. The constructor TTFX is thus reduced with this trick.
+"""
+struct NoTypeFunction <: Function
+    f::Function
+end
+(obj::NoTypeFunction)(args...) = obj.f(args...)
+
 "Verify that `optim` termination status is `OPTIMAL` or `LOCALLY_SOLVED`."
 function issolved(optim::JuMP.GenericModel)
     status = JuMP.termination_status(optim)
