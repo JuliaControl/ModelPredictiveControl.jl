@@ -1509,14 +1509,18 @@ function get_nonlinobj_op(
                     J!, ∇J, ∇²J, ∇²J_prep, hess, Z̃_J, J_cache...
                 )
             end
+            return nothing
         end    
     else
         function (J, ∇J, Z̃_J, Z̃_arg)
             if isdifferent(Z̃_arg, Z̃_J) || estim.force∇J[]
                 estim.force∇J[] = false
                 Z̃_J .= Z̃_arg
-                J[], _ = value_and_gradient!(J!, ∇J, ∇J_prep, grad, Z̃_J, J_cache...)
+                J[], _ = value_and_gradient!(
+                    J!, ∇J, ∇J_prep, grad, Z̃_J, J_cache...
+                )
             end
+            return nothing
         end
     end
     J_func = if !isnothing(hess)
