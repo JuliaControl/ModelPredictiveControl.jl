@@ -1445,9 +1445,11 @@ It is based on the splatting syntax. This method is really intricate and that's 
 - These functions are used inside the nonlinear optimization, so they must be type-stable
   and as efficient as possible. All the function outputs and derivatives are cached and
   updated in-place if required to use the efficient [`value_and_gradient!`](@extref DifferentiationInterface DifferentiationInterface.value_and_jacobian!).
-- The splatting syntax for objective functions implies the use of `Vararg{T,N}` (see the [performance tip](@extref Julia Be-aware-of-when-Julia-avoids-specializing))
-  and memoization to avoid redundant computations. This is already complex, but it's even
-  worse knowing that the automatic differentiation tools do not support splatting.
+- The splatting syntax is required for [`add_nonlinear_operator`](@extref JuMP JuMP.add_nonlinear_operator)
+  but automatic differentiation tools do not support splatting.
+- The internal of `MOI.jl` calls the 3 functions of `add_nonlinear_operator` with a runtime
+  dispatch. It is thus a waste of time and resources to compile (a.k.a specialize) these 3
+  closures. The `NoTypeFunction` wrapper hide their concrete type to disable compilation.
 """
 function get_nonlinobj_op(
     estim::MovingHorizonEstimator, optim::JuMP.GenericModel{JNT}
@@ -1524,33 +1526,21 @@ function get_nonlinobj_op(
         end
     end
     J_func = if !isnothing(hess)
-        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-            return J[]::T
-        end
+        (Z̃_arg...) -> (update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg); J[])
     else
-        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-            update_objective!(J, ∇J, Z̃_J, Z̃_arg)
-            return J[]::T
-        end
+        (Z̃_arg...) -> (update_objective!(J, ∇J, Z̃_J, Z̃_arg); J[])
     end
-    # only the multivariate syntax of JuMP.@operator, univariate is impossible for MHE
-    # since Z̃ comprises the arrival state estimate AND the estimated process noise:
+    # only the multivariate syntax of JuMP.add_nonlinear_operator, univariate is impossible
+    # for MHE since Z̃ comprises the arrival state estimate AND the estimated process noise:
     ∇J_func! = if !isnothing(hess)
-        function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-            update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-            return ∇J_arg .= ∇J
-        end
+        (∇J_arg, Z̃_arg...) -> (update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg); ∇J_arg .= ∇J)
     else
-        function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-            update_objective!(J, ∇J, Z̃_J, Z̃_arg)
-            return ∇J_arg .= ∇J
-        end
+        (∇J_arg, Z̃_arg...) -> (update_objective!(J, ∇J, Z̃_J, Z̃_arg); ∇J_arg .= ∇J)
     end
-    function ∇²J_func!(∇²J_arg::AbstractMatrix{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
-        update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-        return fill_diffstructure!(∇²J_arg, ∇²J, ∇²J_structure)
-    end
+    ∇²J_func! = (∇²J_arg, Z̃_arg...) -> (
+        update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg);
+        fill_diffstructure!(∇²J_arg, ∇²J, ∇²J_structure)
+    )
     J_op = if !isnothing(hess)
         JuMP.add_nonlinear_operator(
             optim, nZ̃,

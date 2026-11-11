@@ -831,8 +831,8 @@ It is based on the splatting syntax. This method is really intricate and that's 
 - The splatting syntax is required for [`add_nonlinear_operator`](@extref JuMP JuMP.add_nonlinear_operator)
   but automatic differentiation tools do not support splatting.
 - The internal of `MOI.jl` calls the 3 functions of `add_nonlinear_operator` with a runtime
-  dispatch. It is thus a waste of time and resources to compile (a.k.a specialize) these
-  functions. The `NoTypeFunction` wrapper hide their concrete type to disable compilation.
+  dispatch. It is thus a waste of time and resources to compile (a.k.a specialize) these 3
+  closures. The `NoTypeFunction` wrapper hide their concrete type to disable compilation.
 - The signature of gradient and hessian functions is not the same for univariate (`nZ̃ == 1`)
   and multivariate (`nZ̃ > 1`) operators in `JuMP`. Both must be defined.
 """
