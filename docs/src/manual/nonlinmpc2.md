@@ -143,8 +143,8 @@ line_counter = :continue
 using ModelPredictiveControl
 
 calc_a_H(pH) = 10.0^(-pH)
-calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out) = (60/V)*(q_Ain * c_Ain - q_out * c_Aout)
-calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out) = (60/V)*(q_Bin * c_Bin - q_out * c_Bout)
+calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out, V) = (60/V)*(q_Ain * c_Ain - q_out * c_Aout)
+calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out, V) = (60/V)*(q_Bin * c_Bin - q_out * c_Bout)
 calc_res(a_H, c_A, c_B, Kw, Ka) = a_H + c_B - (Kw / a_H) - (Ka * c_A / (Ka + a_H))
 function fq!(ẋ, res, x, a, u, d, p)
     c_Ain, c_Bin, Kw, Ka, V = p
@@ -155,8 +155,8 @@ function fq!(ẋ, res, x, a, u, d, p)
     c_Aout = c_A              # [mol/L]
     c_Bout = c_B              # [mol/L]
     a_H    = calc_a_H(pH)
-    ẋ[1]   = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out)
-    ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out)
+    ẋ[1]   = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out, V)
+    ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out, V)
     res[1] = calc_res(a_H, c_A, c_B, Kw, Ka)
     return nothing
 end
@@ -273,8 +273,8 @@ function f̂q!(dx̂, res, x̂, a, u, d, p̂)
     c_Aout = c_A             
     c_Bout = c_B     
     a_H    = calc_a_H(pH)        
-    dx̂[1]  = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out)
-    dx̂[2]  = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out)
+    dx̂[1]  = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out, V)
+    dx̂[2]  = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out, V)
     dx̂[3]  = calc_ċ_Ain(c_Ain)
     res[1] = calc_res(a_H, c_A, c_B, Kw, Ka)
     return nothing
