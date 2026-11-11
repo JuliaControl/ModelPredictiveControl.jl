@@ -897,14 +897,14 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
         end
     end
     J_func = if !isnothing(hess)
-        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+        function (Z̃_arg...)
             update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
-            return J[]::T
+            return J[]
         end
     else
-        function (Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+        function (Z̃_arg...)
             update_objective!(J, ∇J, Z̃_J, Z̃_arg)
-            return J[]::T
+            return J[]
         end
     end
     ∇J_func! = if nZ̃ == 1        # univariate syntax (see JuMP.@operator doc):
@@ -921,12 +921,12 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
         end
     else                        # multivariate syntax (see JuMP.@operator doc):
         if !isnothing(hess)
-            function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            function (∇J_arg::AbstractVector, Z̃_arg...)
                 update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
                 return ∇J_arg .= ∇J
             end
         else
-            function (∇J_arg::AbstractVector{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+            function (∇J_arg::AbstractVector, Z̃_arg...)
                 update_objective!(J, ∇J, Z̃_J, Z̃_arg)
                 return ∇J_arg .= ∇J
             end
@@ -938,7 +938,7 @@ function get_nonlinobj_op(mpc::NonLinMPC, optim::JuMP.GenericModel{JNT}) where J
             return ∇²J[]
         end
     else                        # multivariate syntax (see JuMP.@operator doc):
-        function (∇²J_arg::AbstractMatrix{T}, Z̃_arg::Vararg{T, N}) where {N, T<:Real}
+        function (∇²J_arg::AbstractMatrix, Z̃_arg...)
             update_objective!(J, ∇J, ∇²J, Z̃_J, Z̃_arg)
             return fill_diffstructure!(∇²J_arg, ∇²J, ∇²J_structure)
         end
