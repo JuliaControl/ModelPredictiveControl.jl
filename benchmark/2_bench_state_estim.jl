@@ -438,3 +438,72 @@ CASE_ESTIM["Pendulum"]["MovingHorizonEstimator"]["Uno"]["Current form (Hessian, 
         sim!($mhe_pendulum_uno_currhms, $N, $u; plant=$plant, x_0=$x_0, x̂_0=$x̂_0, progress=false),
         samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
     )
+
+## ----------------- Case study: pH neutralization reactor --------------------------------
+model, p = ph_model, ph_p
+nint_ym=0; nint_u=0;
+He = 8;
+σQ = [0.5e-3, 0.5e-3, 0.9e-3]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]
+
+x_0, x̂_0 = ph_x_0, [ph_x_0[1:2]; ph_x_0[3]+0.1]
+u, d = [10.0], [10.0]
+N = 10;
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = TrapezoidalCollocation(0)
+hessian = true
+mhe_ph_ipopt_tch = MovingHorizonEstimator(
+    model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0, optim, transcription
+)
+mhe_ph_ipopt_tch = setconstraint!(mhe_ph_ipopt_tch, x̂min=[0, 0, 0])
+JuMP.unset_time_limit_sec(mhe_ph_ipopt_tch.optim)
+
+optim = JuMP.Model(optimizer_with_attributes(Ipopt.Optimizer,"sb"=>"yes"), add_bridges=false)
+transcription = OrthogonalCollocation(0, 2, roots=:gaussradau)
+hessian = true
+mhe_ph_ipopt_och = MovingHorizonEstimator(
+    model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0, optim, transcription
+)
+mhe_ph_ipopt_och = setconstraint!(mhe_ph_ipopt_och, x̂min=[0, 0, 0])
+JuMP.unset_time_limit_sec(mhe_ph_ipopt_och.optim)
+
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="funnelsqp"), add_bridges=false)
+transcription = TrapezoidalCollocation(0)
+hessian = true
+mhe_ph_uno_tch = MovingHorizonEstimator(
+    model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0, optim, transcription
+)
+mhe_ph_uno_tch = setconstraint!(mhe_ph_uno_tch, x̂min=[0, 0, 0])
+JuMP.unset_time_limit_sec(mhe_ph_uno_tch.optim)
+
+optim = JuMP.Model(()->UnoSolver.Optimizer(preset="funnelsqp"), add_bridges=false)
+transcription = OrthogonalCollocation(0, 2, roots=:gaussradau)
+hessian = true
+mhe_ph_uno_och = MovingHorizonEstimator(
+    model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0, optim, transcription
+)
+mhe_ph_uno_och = setconstraint!(mhe_ph_uno_och, x̂min=[0, 0, 0])
+JuMP.unset_time_limit_sec(mhe_ph_uno_och.optim)
+
+samples, evals, seconds = 25, 1, 15*60
+CASE_ESTIM["pH neutral."]["MovingHorizonEstimator"]["Ipopt"]["TrapezoidalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($mhe_ph_ipopt_tch, $N, $u; x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_ESTIM["pH neutral."]["MovingHorizonEstimator"]["Ipopt"]["OrthogonalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($mhe_ph_ipopt_och, $N, $u; x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_ESTIM["pH neutral."]["MovingHorizonEstimator"]["Uno"]["TrapezoidalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($mhe_ph_uno_tch, $N, $u; x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+CASE_ESTIM["pH neutral."]["MovingHorizonEstimator"]["Uno"]["OrthogonalCollocation (Hessian)"] =
+    @benchmarkable(
+        sim!($mhe_ph_uno_och, $N, $u; x_0=$x_0, x̂_0=$x̂_0, progress=false),
+        samples=samples, evals=evals, seconds=seconds, setup=GC.gc()
+    )
+

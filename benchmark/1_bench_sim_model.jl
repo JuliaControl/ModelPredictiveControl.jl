@@ -34,3 +34,8 @@ CASE_MODEL["NonLinModel"]["pendulum"]["updatestate!"] =
     @benchmarkable(
         updatestate!($pendulum_model, $u_pendulum); 
     )
+u_ph, d_ph = [10.0], [10.0]
+CASE_MODEL["NonLinModelDAE"]["pH neutral."]["updatestate!"] =
+    @benchmarkable(
+        updatestate!($ph_model, $u_ph, $d_ph); 
+    )
