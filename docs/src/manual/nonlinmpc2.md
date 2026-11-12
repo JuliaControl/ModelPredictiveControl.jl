@@ -459,7 +459,7 @@ display(p) # hide
 
 ![plot4_DAEpH](plot4_DAEpH.svg)
 
-Finally, we benchmark the total runtime for this scenario, including estimation, control, 
+Finally, we benchmark the total runtime for this scenario, including estimation, control,
 and plant simulation:
 
 ```@example 1
