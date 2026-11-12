@@ -90,6 +90,7 @@ function generate_f_h_mtk(model, inputs, outputs)
     x = ModelingToolkit.varmap_to_vars(x_map, x_sym)
     return f_mtk!, h_mtk!, p_sym, p, x_sym, x, i_alg
 end
+nothing # hide
 ```
 
 The `generate_model` method then constructs an adequate [`SimModel`](@ref) object that
@@ -136,6 +137,7 @@ function generate_model(
     end
     return model # deliberately type unstable function
 end
+nothing # hide
 ```
 
 ## Pendulum Model
