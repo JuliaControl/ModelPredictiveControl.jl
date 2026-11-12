@@ -262,7 +262,7 @@ eqs = [
 @named mtk_model = System(eqs, t)
 ```
 
-The substitution ``a_H = 10^(-pH)`` is explicitly applied in the algebraic equation to
+The substitution ``a_H = 10^{-pH}`` is explicitly applied in the algebraic equation to
 improve the numerical conditioning of the system. The converted model is:
 
 ```@example 1
