@@ -56,7 +56,7 @@ function generate_f_h_mtk(model, inputs, outputs)
     (_, h_ip) = ModelingToolkit.build_explicit_observed_function(
         io_sys, outputs; inputs, return_inplace = true
     )
-    u_nothing = fill(nothing, length(inputs))
+    const u_nothing = fill(nothing, length(inputs))
     function h_mtk!(y, x, _ , p)
         try
             # MTK.jl supports a `u` argument in `h_ip` function but not this package. We
