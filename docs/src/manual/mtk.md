@@ -93,7 +93,7 @@ end
 ```
 
 The `generate_model` method then constructs an adequate [`SimModel`](@ref) object that
-internally separate the differential states and algebraic variables, if any, to comply with
+internally separates the differential states and algebraic variables, if any, to comply with
 this package's interface:
 
 ```@example 1
@@ -161,11 +161,11 @@ f_mtk!, h_mtk!, p_sym, p, x_sym, x, i_alg = generate_f_h_mtk(mtk_model, inputs, 
 [x_sym x]
 ```
 
-Since MTK is an acausal modeling framework, we do not have the control on the state
+Since MTK is an acausal modeling framework, we do not have control over the state
 realization chosen by the package. The content of `x_sym` above shows it settled for the
 state vector ``\mathbf{x}(t) = [\begin{smallmatrix}ω(t) && θ(t)\end{smallmatrix}]'``,
 that is, the states of the [pendulum section](@ref man_nonlin) in the reverse order. As the
-same also applies for the parameters, the `p_sym` object informs on how the `p` vector is
+same also applies to the parameters, the `p_sym` object informs on how the `p` vector is
 sorted:
 
 ```@example 1
@@ -195,7 +195,7 @@ plant = setname!(plant; u=vu, x=vx, y=vy)
 
 ## Pendulum Controller Design
 
-We can than reproduce the Kalman filter and the controller design of the [penultimate section](@ref man_nonlin)
+We can then reproduce the Kalman filter and the controller design of the [penultimate section](@ref man_nonlin)
 by reversing the order of `σQ` vector, because of the different state realization:
 
 ```@example 1
@@ -269,7 +269,7 @@ f_mtk!, h_mtk!, p_sym, p, x_sym, x, i_alg = generate_f_h_mtk(mtk_model, inputs, 
 [x_sym x]
 ```
 
-The content of `x_sym` shows it settled for the combined state and algebraic vector
+The content of `x_sym` shows that it chose for the combined state and algebraic vector
 ``[\begin{smallmatrix}c_B(t) && c_A(t) && \mathrm{pH}(t)\end{smallmatrix}]'``. The states
 are thus in the reverse order of the [last section](@ref man_dae). The order of the
 parameters is:
