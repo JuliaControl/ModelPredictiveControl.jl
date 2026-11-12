@@ -212,7 +212,7 @@ The 180° setpoint response is identical:
 ```@example 1
 using Plots
 N = 35
-using JuMP; unset_time_limit_sec(nmpc.optim) # hide
+import JuMP; JuMP.unset_time_limit_sec(nmpc.optim) # hide
 using Logging # hide
 res_ry = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res_ry = sim!(nmpc, N, [180.0], plant=plant, x_0=[0, 0], x̂_0=[0, 0, 0])
