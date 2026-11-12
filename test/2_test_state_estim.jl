@@ -475,7 +475,7 @@ end
     function h_dae!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    dae = NonLinModelDAE(fq_dae!, h_dae!, 100.0, 1, 1, 1, 1, 1; p=[0.01])
+    dae = NonLinModelDAE(fq_dae!, h_dae!, 1000.0, 1, 1, 1, 1, 1; p=[0.001])
     internalmodel9 = InternalModel(dae)  
 
     unstablemodel = LinModel(ss(diagm([0.5, -0.5, 1.5]), ones(3,1), I, 0, 1))
@@ -541,7 +541,7 @@ end
     function h_dae!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    dae = NonLinModelDAE(fq_dae!, h_dae!, 100.0, 1, 1, 1, 1, 1; p=[0.01])
+    dae = NonLinModelDAE(fq_dae!, h_dae!, 1000.0, 1, 1, 1, 1, 1; p=[0.001])
     internalmodel5 = InternalModel(dae)
     initstate!(internalmodel5, [0], [0], [0])
     preparestate!(internalmodel5, [6], [0])
@@ -1099,8 +1099,8 @@ end
     function h!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    p = [0.01]
-    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p)
+    p = [0.001]
+    dae = NonLinModelDAE(fq!, h!, 1000.0, 1, 1, 1, 1, 1; p)
 
     transcription = TrapezoidalCollocation()
     mhe = MovingHorizonEstimator(dae; He=3, transcription)
@@ -1377,8 +1377,8 @@ end
     function h!(y, x, d, _ )
         y[] = x[] + 0.1 * d[]
     end
-    p = [0.01]
-    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
+    p = [0.001]
+    model = NonLinModel(f!, h!, 1000.0, 1, 1, 1, 1; p)
     transcription = SingleShooting(1)
     mhe_foh = MovingHorizonEstimator(model; He=3, transcription)
     @test mhe_foh.transcription.h == 1
@@ -1429,8 +1429,8 @@ end
     function h!(y, x, d, _ )
         y[] = x[] + 0.1 * d[]
     end
-    p = [0.01]
-    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
+    p = [0.001]
+    model = NonLinModel(f!, h!, 1000.0, 1, 1, 1, 1; p)
     transcription = MultipleShooting(1)
     mhe_foh = MovingHorizonEstimator(model; He=3, direct=false, transcription)
     preparestate!(mhe_foh, [0.0], [0.0])
@@ -1524,9 +1524,9 @@ end
     function h!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    p = [0.01]
+    p = [0.001]
     as_0, xs_0 = [-1.0], [1.0]
-    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 1000.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     transcription = TrapezoidalCollocation(f_threads=true, h_threads=false)
     mhe = MovingHorizonEstimator(dae; He=2, transcription, hessian=true)
@@ -1578,9 +1578,9 @@ end
     function h!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    p = [0.01]
+    p = [0.001]
     as_0, xs_0 = [-0.01], [0.01]
-    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 1000.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     no, roots = 3, :gausslegendre
     transcription = OrthogonalCollocation(0, no; roots, f_threads=true, h_threads=false)

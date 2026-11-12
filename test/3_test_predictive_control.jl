@@ -918,8 +918,8 @@ end
     function h!(y, x, a, d, _ )
         y[] = 2 * x[] + a[] + 0.1 * d[]
     end
-    p = [0.01]
-    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p)
+    p = [0.001]
+    dae = NonLinModelDAE(fq!, h!, 1000.0, 1, 1, 1, 1, 1; p)
 
     transcription = TrapezoidalCollocation()
     nmpc = NonLinMPC(dae; He=3, Hp=3, transcription)
@@ -1069,8 +1069,8 @@ end
     function h!(y, x, d, _ )
         y[] = x[] + 0.1 * d[]
     end
-    p = [0.01]
-    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
+    p = [0.001]
+    model = NonLinModel(f!, h!, 1000.0, 1, 1, 1, 1; p)
     transcription = SingleShooting(1)
     nmpc_foh = NonLinMPC(model; Hp=5, Hc=1, Nwt=[0], transcription)
     preparestate!(nmpc_foh, [0.0], [0.0])
@@ -1115,8 +1115,8 @@ end
     function h!(y, x, d, _ )
         y[] = x[] + 0.1 * d[]
     end
-    p = [0.01]
-    model = NonLinModel(f!, h!, 100.0, 1, 1, 1, 1; p)
+    p = [0.001]
+    model = NonLinModel(f!, h!, 1000.0, 1, 1, 1, 1; p)
     transcription = MultipleShooting(1)
     nmpc_foh = NonLinMPC(model; Hp=5, Hc=1, Nwt=[0], transcription)
     preparestate!(nmpc_foh, [0.0], [0.0])
@@ -1195,9 +1195,9 @@ end
         y[] = x[] + a[] + 0.1 * d[]
     end
     Kp = 2*0.2 # static gain for input, factor 2 since the output is 2*x (a==x)
-    p = [0.01]
+    p = [0.001]
     as_0, xs_0 = [-1.0], [1.0]
-    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 1000.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     transcription = TrapezoidalCollocation(f_threads=true, h_threads=false)
     nmpc = NonLinMPC(dae; Hp=100, Hc=1, He=2, Nwt=[0.0], transcription)
@@ -1238,9 +1238,9 @@ end
         y[] = x[] + a[] + 0.1 * d[]
     end
     Kp = 2*0.2 # static gain for input, factor 2 since the output is 2*x (a==x)
-    p = [0.01]
+    p = [0.001]
     as_0, xs_0 = [-1.0], [1.0]
-    dae = NonLinModelDAE(fq!, h!, 100.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
+    dae = NonLinModelDAE(fq!, h!, 1000.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
 
     no, roots = 3, :gausslegendre
     transcription = OrthogonalCollocation(0, no; roots, f_threads=true, h_threads=false)
@@ -1783,11 +1783,11 @@ end
 
 @testitem "All MPCs with move blocking" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    G = tf( 10, [400,  1])
-    linmodel = LinModel(G, 100.0)
+    G = tf( 10, [4000,  1])
+    linmodel = LinModel(G, 1000.0)
     f = (x, u, _, p) -> p.A * x + p.Bu * u
     h = (x, _, p)    -> p.C * x
-    nonlinmodel = NonLinModel(f, h, 100.0, 1, 1, 1, p=linmodel, solver=nothing)
+    nonlinmodel = NonLinModel(f, h, 1000.0, 1, 1, 1, p=linmodel, solver=nothing)
     Mwt, Nwt, Hp, Hc = [1], [0], 30, [2, 3, 4, 21]
     N = 25
     mpc0 = ExplicitMPC(linmodel; Mwt, Nwt, Hp, Hc)
