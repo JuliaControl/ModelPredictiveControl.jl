@@ -468,3 +468,66 @@ T = @elapsed simNMPC(nmpc, plant, N2, ry; x_0=[0.07, 0.04], x̂_0)
 end # hide
 println("Total optimization and simulation time for $N2 time steps: $T s")
 ```
+
+## ODE Version
+
+```@example 1
+function positive_cubic_root(a, b, c, d)
+    if !(a > 0 && b >= 0 && c >= 0 && d < 0)
+        throw(ArgumentError("Expected a > 0, b ≥ 0, c ≥ 0, and d < 0"))
+    end
+    p = (3a * c - b^2) / (3a^2)
+    q = (2b^3 - 9a * b * c + 27a^2 * d) / (27a^3)
+    Δ = (q / 2)^2 + (p / 3)^3
+    shift = b / (3a)
+    x = if Δ >= 0
+        cbrt(-q / 2 + sqrt(Δ)) + cbrt(-q / 2 - sqrt(Δ)) - shift
+    else
+        θ = acos(clamp((3q / (2p)) * sqrt(-3 / p), -1, 1)) / 3
+        2sqrt(-p / 3) * cos(θ) - shift
+    end
+    # Refine in the original polynomial to limit cancellation near zero.
+    for _ in 1:3
+        f = ((a * x + b) * x + c) * x + d
+        fp = (3a * x + 2b) * x + c
+        x -= f / fp
+    end
+    return x
+end
+
+function h_ode!(y, x, d, p)
+    _, _, Kw, Ka = p
+    c_A, c_B = x
+    a = 1
+    b = c_B + Ka
+    c = Ka * (c_A + c_B) + Kw
+    d = -Kw * Ka
+    a_H = positive_cubic_root(a, b, c, d)
+    println(a_H)
+    pH  = -log10(a_H)
+    y[] = pH
+    return nothing
+end
+
+function f_ode!(ẋ, x, u, d, p)
+    c_Ain, c_Bin, Kw, Ka, V = p
+    q_Ain, q_Bin = d[1], u[1] # [L/min], [L/min]
+    c_A, c_B     = x[1], x[2] # [mol/L], [mol/L]
+    q_out  = q_Ain + q_Bin    # [L/min]
+    c_Aout = c_A              # [mol/L]
+    c_Bout = c_B              # [mol/L]
+    ẋ[1]   = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out, V)
+    ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out, V)
+    return nothing
+end
+
+plant = NonLinModel(
+    f_ode!, h_ode!, Ts, nu, nx, ny, nd; 
+    p=p , unit
+)
+
+res = sim!(plant, 30, [10], [10]; x_0)
+using Plots
+theme(:dark)
+plot(res)
+```
