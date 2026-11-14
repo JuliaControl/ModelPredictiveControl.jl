@@ -76,7 +76,7 @@ balance leads to the algebraic equation:
 !!! details "Reduction to an ODE"
     The algebraic equation can be further manipulated to produce this cubic expression:
     ```math
-    0 = a_H^3 + (c_B + K_a) a_H^2 + \big(K_a(c_A + c_B) + K_w \big) a_H - K_w K_a
+    0 = a_H^3 + (c_B + K_a) a_H^2 + \big(K_a(c_B - c_A) - K_w \big) a_H - K_w K_a
     ```
     We could extract the positive real root of this expression inside the output function
     `h!` to transform the system to an ODE, effectively avoiding the complexity of DAEs.
@@ -469,43 +469,47 @@ end # hide
 println("Total optimization and simulation time for $N2 time steps: $T s")
 ```
 
-## ODE Version
+## Comparison to ODE
 
 ```@example 1
-function positive_cubic_root(a, b, c, d)
-    if !(a > 0 && b >= 0 && c >= 0 && d < 0)
-        throw(ArgumentError("Expected a > 0, b ≥ 0, c ≥ 0, and d < 0"))
-    end
-    p = (3a * c - b^2) / (3a^2)
-    q = (2b^3 - 9a * b * c + 27a^2 * d) / (27a^3)
+"Compute the positive real root of ``f(x) = Ax³ + Bx² + Cx + D``"
+function positive_cubic_root(A, B, C, D)
+    p = (3A * C - B^2) / (3A^2)
+    q = (2B^3 - 9A * B * C + 27A^2 * D) / (27A^3)
     Δ = (q / 2)^2 + (p / 3)^3
-    shift = b / (3a)
-    x = if Δ >= 0
-        cbrt(-q / 2 + sqrt(Δ)) + cbrt(-q / 2 - sqrt(Δ)) - shift
-    else
-        θ = acos(clamp((3q / (2p)) * sqrt(-3 / p), -1, 1)) / 3
-        2sqrt(-p / 3) * cos(θ) - shift
-    end
-    # Refine in the original polynomial to limit cancellation near zero.
-    for _ in 1:3
-        f = ((a * x + b) * x + c) * x + d
-        fp = (3a * x + 2b) * x + c
+    shift = B / (3A)
+    sqrtΔ = sqrt(abs(Δ))
+    x_cardano = cbrt(-q / 2 + sqrtΔ) + cbrt(-q / 2 - sqrtΔ) - shift
+    θ = acos(clamp((3q / (2p)) * sqrt(-3 / p), -1, 1)) / 3
+    x_trig = 2sqrt(-p / 3) * cos(θ) - shift
+    x = ifelse(Δ ≥ 0, x_cardano, x_trig)
+    for _ in 1:3 # refine in the original polynomial to limit cancellation near zero:
+        f = ((A * x + B) * x + C) * x + D
+        fp = (3A * x + 2B) * x + C
         x -= f / fp
     end
     return x
 end
 
+function log10nan(x)
+    log10_x = try
+        log10(x)
+    catch myerror
+        if myerror isa DomainError
+            NaN
+        else
+            rethrow()
+        end
+    end
+    return log10_x
+end
+
 function h_ode!(y, x, d, p)
     _, _, Kw, Ka = p
-    c_A, c_B = x
-    a = 1
-    b = c_B + Ka
-    c = Ka * (c_A + c_B) + Kw
-    d = -Kw * Ka
-    a_H = positive_cubic_root(a, b, c, d)
-    println(a_H)
-    pH  = -log10(a_H)
-    y[] = pH
+    c_A, c_B     = x[1], x[2]
+    A, B, C, D = (1.0), (c_B + Ka), (Ka*(c_B - c_A) - Kw), (-Kw*Ka)
+    a_H = positive_cubic_root(A, B, C, D)
+    y[] = -log10nan(a_H)
     return nothing
 end
 
@@ -520,14 +524,60 @@ function f_ode!(ẋ, x, u, d, p)
     ẋ[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out, V)
     return nothing
 end
+p = [c_Ain, c_Bin, Kw, Ka, V]
 
 plant = NonLinModel(
     f_ode!, h_ode!, Ts, nu, nx, ny, nd; 
     p=p , unit
 )
 
+x_0 = [0.0505, 0.0495]
 res = sim!(plant, 30, [10], [10]; x_0)
 using Plots
 theme(:dark)
 plot(res)
+
+
+function f̂_ode!(dx̂, x̂, u, d, p̂)
+    c_Bin, Kw, Ka, V = p̂
+    q_Ain, q_Bin = d[1], u[1] # [L/min], [L/min]
+    c_A, c_B     = x̂[1], x̂[2]
+    c_Ain        = x̂[3]
+    q_out  = q_Ain + q_Bin    # [L/min]
+    c_Aout = c_A              # [mol/L]
+    c_Bout = c_B              # [mol/L]
+    dx̂[1]   = calc_ċ_A(c_Ain, q_Ain, c_Aout, q_out, V)
+    dx̂[2]   = calc_ċ_B(c_Bin, q_Bin, c_Bout, q_out, V)
+    dx̂[3]   = calc_ċ_Ain(c_Ain)
+    return nothing
+end
+
+function ĥ_ode!(y, x̂, d, p̂)
+    _, Kw, Ka, _ = p̂
+    c_A, c_B     = x̂[1], x̂[2]
+    A, B, C, D = (1.0), (c_B + Ka), (Ka*(c_B - c_A) - Kw), (-Kw*Ka)
+    a_H = positive_cubic_root(A, B, C, D)
+    y[] = -log10nan(a_H)
+    return nothing
+end
+
+p̂ = [c_Bin, Kw, Ka, V]
+nx̂ = nx + 1
+vx̂ = [vx; raw"$c_{Ain}$ (mol/L)"]
+x̂s_0 = [xs_0; 0.1]
+model = NonLinModel(f̂_ode!, ĥ_ode!, Ts, nu, nx̂, ny, nd; p=p̂, unit)
+model = setname!(model, u=vu, x=vx̂, y=vy, d=vd)
+
+mhe2 = MovingHorizonEstimator(
+    model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0, transcription
+)
+using JuMP; unset_time_limit_sec(mhe2.optim)     # no wall time limit during optimization
+mhe2 = setconstraint!(mhe2, x̂min=[0, 0, 0])
+res = simMHE(mhe2, plant, N; x_0, x̂_0)
+p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false)
+display(p) # hide
+
+T = @elapsed simMHE(mhe2, plant, N; x_0, x̂_0)
+println("Total optimization and simulation time for $N time steps: $T s")
+
 ```
