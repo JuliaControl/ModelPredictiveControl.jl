@@ -35,9 +35,10 @@ model, with combined differential states and algebraic variables in a single vec
 using ModelPredictiveControl, ModelingToolkit
 using ModelingToolkit: D_nounits as D, t_nounits as t
 
-function generate_f_h_mtk(model, inputs, outputs)
+function generate_f_h_mtk(model, inputs, outputs, disturbances=nothing)
+    known_disturbance_inputs = disturbances
     (_, f_ip), x_sym, p_sym, io_sys = ModelingToolkit.generate_control_function(
-        model, inputs, split=false, simplify=true
+        model, inputs; known_disturbance_inputs, split=false, simplify=true
     )
     i_alg = ModelingToolkit.is_alg_equation.(equations(io_sys))
     function f_mtk!(ẋ, x, u, _ , p)
@@ -248,7 +249,8 @@ The MTK model of the neutralization reactor from the [last section](@ref man_dae
 constructed as follows:
 
 ```@example 1
-@parameters c_Ain=0.1 c_Bin=0.1 Kw=1e-14 Ka=1.75e-5 V=1000 q_Ain=10
+@parameters c_Ain=0.1 c_Bin=0.1 Kw=1e-14 Ka=1.75e-5 V=1000
+@variables q_Ain(t)=10
 @variables c_A(t)=0.025 c_B(t)=0.025 q_Bin(t)=10 pH(t)=7.0
 @variables q_out(t) c_Aout(t) c_Bout(t)
 eqs = [
@@ -266,8 +268,10 @@ The substitution ``a_H = 10^{-\mathrm{pH}}`` is explicitly applied in the algebr
 to improve the numerical conditioning of the system. The converted model is:
 
 ```@example 1
-inputs, outputs = [q_Bin], [pH]
-f_mtk!, h_mtk!, p_sym, p, x_sym, x, i_alg = generate_f_h_mtk(mtk_model, inputs, outputs)
+inputs, outputs, disturbances = [q_Bin], [pH], [q_Ain]
+f_mtk!, h_mtk!, p_sym, p, x_sym, x, i_alg = generate_f_h_mtk(
+    mtk_model, inputs, outputs, disturbances
+)
 [x_sym x]
 ```
 
