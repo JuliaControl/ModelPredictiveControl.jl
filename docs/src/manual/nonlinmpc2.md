@@ -76,7 +76,7 @@ balance leads to the algebraic equation:
 !!! details "Reduction to an ODE"
     The algebraic equation can be further manipulated to produce this cubic expression:
     ```math
-    0 = a_H^3 + (c_B + K_a) a_H^2 + \big(K_a(c_A + c_B) + K_w \big) a_H - K_w K_a
+    0 = a_H^3 + (c_B + K_a) a_H^2 + \big(K_a(c_B - c_A) - K_w \big) a_H - K_w K_a
     ```
     We could extract the positive real root of this expression inside the output function
     `h!` to transform the system to an ODE, effectively avoiding the complexity of DAEs.
