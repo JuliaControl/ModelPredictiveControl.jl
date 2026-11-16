@@ -351,11 +351,11 @@ res = with_logger(ConsoleLogger(stderr, Error)) do # hide
 res = sim!(nmpc, N, ry, d; x_0, x̂_0)
 end # hide
 p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
-savefig(p, "plot5_DAEpH.svg") # hide
+savefig(p, "plot4_DAEpH.svg") # hide
 display(p) # hide
 ```
 
-![plot5_MTK](plot5_MTK.svg)
+![plot4_MTK](plot4_MTK.svg)
 
 As expected, the close-loop response is similar to the one of the [last section](@ref man_dae),
 but not identical since the stochastic model of the unmeasured disturbances is different.
