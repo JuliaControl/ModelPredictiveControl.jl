@@ -260,6 +260,8 @@ end
     @test y ≈ zeros(1)
     nonlinmodel8 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1, p=p, jacobian=AutoFiniteDiff())
     @test nonlinmodel8.jacobian == AutoFiniteDiff()
+    nonlinmodel9 = NonLinModel(f2!, h2!, 1.0, 1, 2, 1, 1; p, xs_0=[3.5, 9.5])
+    @test nonlinmodel9.xs_0   ≈ [3.5, 9.5]
 
     @test_throws ErrorException NonLinModel(
         (x,u)->linmodel1.A*x + linmodel1.Bu*u,

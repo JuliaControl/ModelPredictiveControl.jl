@@ -137,7 +137,8 @@ function generate_model(
         )
     else
         f!, h! = f_mtk!, h_mtk!
-        model = NonLinModel(f!, h!, Ts, nu, nx, ny, nd; p, unit)
+        xs_0 = xs_mtk
+        model = NonLinModel(f!, h!, Ts, nu, nx, ny, nd; p, xs_0, unit)
     end
     return model # deliberately type unstable function
 end
