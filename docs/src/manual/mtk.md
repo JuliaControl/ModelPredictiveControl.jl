@@ -245,8 +245,10 @@ display(p) # hide
 
 ## Neutralization Reactor Model
 
-!!! todo "Under Construction"
-    This section is not finished, only the model conversion is written for now.
+This example repeats the neutralization reactor setup from the previous section but with
+MTK. The observer and controller are non-adaptive to simplify the design. Instead of
+estimating the acid feed concentration, an integrating state is added at the manipulated
+input ``q_{Bin}``.
 
 The MTK model of the neutralization reactor from the [last section](@ref man_dae) is
 constructed as follows:
@@ -278,7 +280,7 @@ f_mtk!, h_mtk!, p_sym, p, x_sym, x, i_alg = generate_f_h_mtk(
 [x_sym x]
 ```
 
-The content of `x_sym` shows that it chose for the combined state and algebraic vector
+The content of `x_sym` shows that it chose for the combined state and algebraic vector this:
 ``[\begin{smallmatrix}c_B(t) && c_A(t) && \mathrm{pH}(t)\end{smallmatrix}]'``. The states
 are thus in the reverse order of the [last section](@ref man_dae). The order of the
 parameters is:
@@ -302,9 +304,8 @@ vx, vy = [raw"$c_B$ (mol/L)", raw"$c_A$ (mol/L)"], [raw"$\mathrm{pH}$"]
 model = setname!(model, u=vu, d=vd, y=vy, x=vx)
 ```
 
-The returned value is a [`NonLinModelDAE`](@ref) object, as expected. The transient
-response is identical to the first 10 hours of the open-loop simulations of the
-[last section](@ref man_dae):
+The returned value is a [`NonLinModelDAE`](@ref) object, as expected. The transient response
+is identical to the first 10 hours of the open-loop simulations in the [last section](@ref man_dae):
 
 ```@example 1
 using Plots
@@ -321,6 +322,8 @@ display(p) # hide
 
 ![plot3_MTK](plot3_MTK.svg)
 
+We next configure the MHE, including an integrating state at the manipulated input:
+
 ```@example 1
 nint_u=[1] # integrating state at the q_Bin input 
 He = 8; hessian = true
@@ -330,24 +333,15 @@ using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit during opti
 mhe = setconstraint!(mhe, x̂min=[0, 0, -Inf])
 ```
 
-```@example 1
-x_0, x̂_0 = [0.0495, 0.0505], [0.025, 0.025, 0]
-using Logging # hide
-res = with_logger(ConsoleLogger(stderr, Error)) do # hide
-res = sim!(mhe, N, u, d; x_0, x̂_0)
-end # hide
-p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false)
-savefig(p, "plot4_DAEpH.svg") # hide
-display(p) # hide
-```
-
-![plot4_MTK](plot4_MTK.svg)
+Using the MHE, we configure an NMPC to keep the pH within the desired range:
 
 ```@example 1
 nmpc = NonLinMPC(mhe, Hp=8, Hc=2, Nwt=[5.0], hessian=true)
 using JuMP; unset_time_limit_sec(nmpc.optim)  # no wall time limit during optimization
 nmpc = setconstraint!(nmpc, ymin=[6], ymax=[8], umin=[0], umax=[20])
 ```
+
+Finally, we simulate the closed-loop response with a pH setpoint of 7:
 
 ```@example 1
 ry = [7.0]
@@ -362,6 +356,9 @@ display(p) # hide
 ```
 
 ![plot5_MTK](plot5_MTK.svg)
+
+As expected, the close-loop response is similar to the one of the [last section](@ref man_dae),
+but not identical since the stochastic model of the unmeasured disturbances is different.
 
 ## Acknowledgement
 
