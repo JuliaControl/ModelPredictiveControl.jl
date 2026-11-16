@@ -199,7 +199,7 @@ plant = generate_model(f_mtk!, h_mtk!, Ts, i_alg, inputs, outputs; p=p2)
 plant = setname!(plant; u=vu, x=vx, y=vy)
 ```
 
-## Pendulum Controller Design
+## Pendulum Controller
 
 We can then reproduce the Kalman filter and the controller design of the [penultimate section](@ref man_nonlin)
 by reversing the order of `σQ` vector, because of the different state realization:
@@ -321,6 +321,8 @@ display(p) # hide
 ```
 
 ![plot3_MTK](plot3_MTK.svg)
+
+## Neutralization Reactor Controller
 
 We next configure the MHE, including an integrating state at the manipulated input:
 
