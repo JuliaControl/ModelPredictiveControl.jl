@@ -15,8 +15,7 @@ objects. This object is then used to design controllers similar to the previous 
 !!! danger "Disclaimer"
     This simple example is not an official interface to `ModelingToolkit.jl`. It is provided
     as a basic starting template to combine both packages. There is no guarantee that it
-    will work for all corner cases. For instance, measured disturbances are not supported in
-    the current implementation (to be added).
+    will work for all corner cases.
 
 ```@codeblocks
 line_counter = :continue
@@ -41,9 +40,11 @@ function generate_f_h_mtk(model, inputs, outputs, disturbances=nothing)
         model, inputs; known_disturbance_inputs, split=false, simplify=true
     )
     i_alg = ModelingToolkit.is_alg_equation.(equations(io_sys))
-    function f_mtk!(ẋ, x, u, _ , p)
+    nd = isnothing(disturbances) ? 0 : length(disturbances) 
+    f_ip_with_d = (nd < 1) ? (ẋ, x, u, p, t, _ ) -> f_ip(ẋ, x, u, p, t) : f_ip
+    function f_mtk!(ẋ, x, u, d, p)
         try
-            f_ip(ẋ, x, u, p, nothing)
+            f_ip_with_d(ẋ, x, u, p, nothing, d)
         catch err
             if err isa MethodError
                 error("NonLinModel does not support a time argument t in the f "*
@@ -55,15 +56,16 @@ function generate_f_h_mtk(model, inputs, outputs, disturbances=nothing)
         return nothing
     end
     (_, h_ip) = ModelingToolkit.build_explicit_observed_function(
-        io_sys, outputs; inputs, return_inplace = true
+        io_sys, outputs; inputs, known_disturbance_inputs, return_inplace = true
     )
+    h_ip_with_d = (nd < 1) ? (y, x, u, p, t, _ ) -> h_ip(y, x, u, p, t) : h_ip
     u_nothing = fill(nothing, length(inputs))
-    function h_mtk!(y, x, _ , p)
+    function h_mtk!(y, x, d, p)
         try
             # MTK.jl supports a `u` argument in `h_ip` function but not this package. We
             # set `u` as a vector of nothing and `h_ip` function will presumably throw
             # an MethodError if this argument is used inside the function
-            h_ip(y, x, u_nothing, p, nothing)
+            h_ip_with_d(y, x, u_nothing, p, nothing, d)
         catch err
             if err isa MethodError
                 error("NonLinModel only support strictly proper systems (no "*
@@ -100,10 +102,11 @@ this package's interface:
 
 ```@example 1
 function generate_model(
-    f_mtk!::F, h_mtk!::H, Ts, i_alg, inputs, outputs, p; 
-    xs_mtk=zeros(length(i_alg)), unit="s", transcription=OrthogonalCollocation()
+    f_mtk!::F, h_mtk!::H, Ts, i_alg, inputs, outputs, disturbances=nothing;
+    p=nothing, xs_mtk=zeros(length(i_alg)), unit="s", transcription=OrthogonalCollocation()
 ) where {F<:Function, H<:Function}
     nu, ny = length(inputs), length(outputs)
+    nd = isnothing(disturbances) ? 0 : length(disturbances)
     nx_mtk::Int = length(i_alg)
     na::Int     = sum(i_alg)
     nx::Int     = nx_mtk - na
@@ -130,11 +133,11 @@ function generate_model(
         end
         xs_0, as_0 = xs_mtk[i_x], xs_mtk[i_a]
         model = NonLinModelDAE(
-            fq!, h!, Ts, nu, nx, na, ny; p, unit, xs_0, as_0, transcription
+            fq!, h!, Ts, nu, nx, na, ny, nd; p, unit, xs_0, as_0, transcription
         )
     else
         f!, h! = f_mtk!, h_mtk!
-        model = NonLinModel(f!, h!, Ts, nu, nx, ny; p, unit)
+        model = NonLinModel(f!, h!, Ts, nu, nx, ny, nd; p, unit)
     end
     return model # deliberately type unstable function
 end
@@ -179,7 +182,7 @@ We can now construct a [`SimModel`](@ref) with this specific state realization:
 
 ```@example 1
 Ts = 0.1
-model = generate_model(f_mtk!, h_mtk!, Ts, i_alg, inputs, outputs, p)
+model = generate_model(f_mtk!, h_mtk!, Ts, i_alg, inputs, outputs; p)
 vu, vx, vy = ["\$τ\$ (Nm)"], ["\$ω\$ (rad/s)", "\$θ\$ (rad)"], ["\$θ\$ (°)"]
 model = setname!(model; u=vu, x=vx, y=vy)
 ```
@@ -192,7 +195,7 @@ coefficient ``K``:
 i_K = findfirst(==("K"), string.(p_sym))
 p2 = copy(p)
 p2[i_K] = 1.25*p[i_K]
-plant = generate_model(f_mtk!, h_mtk!, Ts, i_alg, inputs, outputs, p2)
+plant = generate_model(f_mtk!, h_mtk!, Ts, i_alg, inputs, outputs; p=p2)
 plant = setname!(plant; u=vu, x=vx, y=vy)
 ```
 
@@ -291,11 +294,12 @@ Ts, unit = 0.5, "h"
 xs_mtk = x
 transcription = TrapezoidalCollocation()
 model = generate_model(
-    f_mtk!, h_mtk!, Ts, i_alg, inputs, outputs, p; xs_mtk, unit, transcription
+    f_mtk!, h_mtk!, Ts, i_alg, inputs, outputs, disturbances; 
+    p, xs_mtk, unit, transcription
 )
-vu = [raw"$q_{Bin}$ (L/min)"]
+vu, vd = [raw"$q_{Bin}$ (L/min)"], [raw"$q_{Ain}$ (L/min)"]
 vx, vy = [raw"$c_B$ (mol/L)", raw"$c_A$ (mol/L)"], [raw"$\mathrm{pH}$"]
-model = setname!(model, u=vu, y=vy, x=vx)
+model = setname!(model, u=vu, d=vd, y=vy, x=vx)
 ```
 
 The returned value is a [`NonLinModelDAE`](@ref) object, as expected. The transient
@@ -304,11 +308,11 @@ response is identical to the first 10 hours of the open-loop simulations of the
 
 ```@example 1
 using Plots
-u, x_0 = [10.0], [0.0495, 0.0505]
+u, d, x_0 = [10.0], [10.0], [0.0495, 0.0505]
 N = 21
 using Logging # hide
 res = with_logger(ConsoleLogger(stderr, Error)) do # hide
-res = sim!(model, N, u; x_0)
+res = sim!(model, N, u, d; x_0)
 end # hide
 p = plot(res)
 savefig(p, "plot3_MTK.svg") # hide
