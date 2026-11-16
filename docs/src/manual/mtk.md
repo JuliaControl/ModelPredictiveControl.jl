@@ -77,6 +77,7 @@ function generate_f_h_mtk(model, inputs, outputs, disturbances=nothing)
         return nothing
     end
     ic = initial_conditions(io_sys)
+    io_sys |> equations |> display
     p_map, x_map = try
         (
             Dict(sym => ic[sym] for sym in p_sym), 
@@ -320,6 +321,49 @@ display(p) # hide
 ```
 
 ![plot3_MTK](plot3_MTK.svg)
+
+```@example 1
+using Plots
+u, d, x_0 = [10.0], [10.0], [0.0495, 0.0505]
+N = 21
+using Logging # hide
+res = with_logger(ConsoleLogger(stderr, Error)) do # hide
+res = sim!(model, N, u, d; x_0)
+end # hide
+p = plot(res)
+savefig(p, "plot3_MTK.svg") # hide
+display(p) # hide
+```
+
+```@example 1
+@variables c_Ain_s(t)=0.1
+eqs_2 = [
+    D(c_A) ~ 60/V*(q_Ain * c_Ain_s - q_out * c_Aout)
+    D(c_B) ~ 60/V*(q_Bin * c_Bin   - q_out * c_Bout)
+    D(c_Ain_s) ~ 0
+    0      ~ 10^(-pH) + c_B - (Kw / 10^(-pH)) - (Ka * c_A / (Ka + 10^(-pH)))
+    q_out  ~ q_Ain + q_Bin
+    c_Aout ~ c_A
+    c_Bout ~ c_B
+]
+@named mtk_model_2 = System(eqs_2, t)
+f_mtk!, h_mtk!, p_sym, p, x_sym, x, i_alg = generate_f_h_mtk(
+    mtk_model_2, inputs, outputs, disturbances
+)
+[x_sym x]
+```
+
+```@example 1
+```
+
+```@example 1
+model = generate_model(
+    f_mtk!, h_mtk!, Ts, i_alg, inputs, outputs, disturbances; 
+    p, xs_mtk, unit, transcription
+)
+vx̂ = [vx; raw"$c_{Ain}$ (mol/L)"]
+model = setname!(model, u=vu, d=vd, y=vy, x=vx̂)
+```
 
 ## Acknowledgement
 
