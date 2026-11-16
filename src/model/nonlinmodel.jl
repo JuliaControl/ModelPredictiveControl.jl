@@ -231,7 +231,7 @@ end
 function NonLinModel(
     f::Function, h::Function, Ts::Real, nu::Int, nx::Int, ny::Int, nd::Int=0;
     p=Float64[], 
-    xs_0 = zeros(NT, nx),
+    xs_0 = zeros(nx),
     solver=RungeKutta(4), 
     jacobian=AutoForwardDiff(), 
     unit="s"
