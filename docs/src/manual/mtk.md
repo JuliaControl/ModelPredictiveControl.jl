@@ -77,7 +77,6 @@ function generate_f_h_mtk(model, inputs, outputs, disturbances=nothing)
         return nothing
     end
     ic = initial_conditions(io_sys)
-    io_sys |> equations |> display
     p_map, x_map = try
         (
             Dict(sym => ic[sym] for sym in p_sym), 
@@ -323,47 +322,46 @@ display(p) # hide
 ![plot3_MTK](plot3_MTK.svg)
 
 ```@example 1
-using Plots
-u, d, x_0 = [10.0], [10.0], [0.0495, 0.0505]
-N = 21
+nint_u=[1] # integrating state at the q_Bin input 
+He = 8; hessian = true
+σQ = [0.5e-3, 0.5e-3]; σR=[0.05]; σP_0 = [0.05, 0.05]; σQint_u=[0.15]; σPint_u_0=[0.075]
+mhe = MovingHorizonEstimator(model; nint_u, He, hessian, σQ, σR, σP_0, σQint_u, σPint_u_0)
+using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit during optimization
+mhe = setconstraint!(mhe, x̂min=[0, 0, -Inf])
+```
+
+```@example 1
+x_0, x̂_0 = [0.0495, 0.0505], [0.025, 0.025, 0]
 using Logging # hide
 res = with_logger(ConsoleLogger(stderr, Error)) do # hide
-res = sim!(model, N, u, d; x_0)
+res = sim!(mhe, N, u, d; x_0, x̂_0)
 end # hide
-p = plot(res)
-savefig(p, "plot3_MTK.svg") # hide
+p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false)
+savefig(p, "plot4_DAEpH.svg") # hide
 display(p) # hide
 ```
 
+![plot4_MTK](plot4_MTK.svg)
+
 ```@example 1
-@variables c_Ain_s(t)=0.1
-eqs_2 = [
-    D(c_A) ~ 60/V*(q_Ain * c_Ain_s - q_out * c_Aout)
-    D(c_B) ~ 60/V*(q_Bin * c_Bin   - q_out * c_Bout)
-    D(c_Ain_s) ~ 0
-    0      ~ 10^(-pH) + c_B - (Kw / 10^(-pH)) - (Ka * c_A / (Ka + 10^(-pH)))
-    q_out  ~ q_Ain + q_Bin
-    c_Aout ~ c_A
-    c_Bout ~ c_B
-]
-@named mtk_model_2 = System(eqs_2, t)
-f_mtk!, h_mtk!, p_sym, p, x_sym, x, i_alg = generate_f_h_mtk(
-    mtk_model_2, inputs, outputs, disturbances
-)
-[x_sym x]
+nmpc = NonLinMPC(mhe, Hp=8, Hc=2, Nwt=[5.0], hessian=true)
+using JuMP; unset_time_limit_sec(nmpc.optim)  # no wall time limit during optimization
+nmpc = setconstraint!(nmpc, ymin=[6], ymax=[8], umin=[0], umax=[20])
 ```
 
 ```@example 1
+ry = [7.0]
+x_0, x̂_0 = [0.04, 0.07], [0.025, 0.025, 0]
+using Logging # hide
+res = with_logger(ConsoleLogger(stderr, Error)) do # hide
+res = sim!(nmpc, N, ry, d; x_0, x̂_0)
+end # hide
+p = plot(res, plotd=false, plotu=false, plotxwithx̂=true, plotx̂min=false, plotŷ=true)
+savefig(p, "plot5_DAEpH.svg") # hide
+display(p) # hide
 ```
 
-```@example 1
-model = generate_model(
-    f_mtk!, h_mtk!, Ts, i_alg, inputs, outputs, disturbances; 
-    p, xs_mtk, unit, transcription
-)
-vx̂ = [vx; raw"$c_{Ain}$ (mol/L)"]
-model = setname!(model, u=vu, d=vd, y=vy, x=vx̂)
-```
+![plot5_MTK](plot5_MTK.svg)
 
 ## Acknowledgement
 
