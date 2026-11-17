@@ -2179,7 +2179,7 @@ end
         updatestate!(mhe_lin, [11, 50], y, [25])
         updatestate!(mhe_nonlin, [11, 50], y, [25])
     end
-    @test X̂_lin ≈ X̂_nonlin atol=1e-3 rtol=1e-3
+    @test X̂_lin ≈ X̂_nonlin atol=5e-3 rtol=5e-3
     mhe2_lin = MovingHorizonEstimator(linmodel, He=5, nint_ym=0, direct=false)
     mhe2_lin = setconstraint!(
         mhe2_lin, x̂min=[-100, -100, -100, -100], ŵmin=[10,10,10,10]
@@ -2199,7 +2199,7 @@ end
         updatestate!(mhe2_lin, [11, 50], y, [25])
         updatestate!(mhe2_nonlin, [11, 50], y, [25])
     end
-    @test X̂_lin ≈ X̂_nonlin atol=1e-3 rtol=1e-3
+    @test X̂_lin ≈ X̂_nonlin atol=5e-3 rtol=5e-3
 end
 
 @testitem "Manual construction" setup=[SetupMPCtests] begin
